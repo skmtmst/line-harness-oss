@@ -9,13 +9,43 @@ import Button from './button'
 import Breadcrumb from '@/components/layout/breadcrumb'
 import { flushListUrlState, useListUrlState } from './list-url-state'
 import { useDetailPanelUrl } from './detail-panel'
+import KpiCard from './kpi-card'
+import { Tabs } from './tabs'
+import { FeatureLinkCard } from './side-cards'
+import { SideCard } from '@/components/dashboard/side-cards'
 
-vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
+vi.mock('next/link', () => ({ default: ({ children, prefetch, ...props }: React.ComponentProps<'a'> & { prefetch?: boolean | null }) => <a {...props} data-prefetch-mode={String(prefetch)}>{children}</a> }))
 afterEach(() => { cleanup(); vi.restoreAllMocks(); flushListUrlState() })
 beforeEach(() => window.history.replaceState(null, '', '/tags'))
 const origin = 'http://localhost:3000'
 const source = '/templates?q=予約&folder=f1&sort=name&page=2&row=t1'
 const edit = listNavigationHref('/templates/edit?id=t1', source, 'account-a', origin)
+
+it('共通リンクは表示だけで先読みせず、明示した先読みと通常のリンク操作を保つ', () => {
+  const click = vi.fn(event => event.preventDefault())
+  render(<><PageLink href="/broadcasts" target="_blank" onClick={click}>配信へ</PageLink><PageLink href="/friends" prefetch>明示先読み</PageLink><PageLink href="/settings" prefetch={null}>自動先読み</PageLink><Button href="/templates">テンプレートへ</Button></>)
+  const link = screen.getByRole('link', { name: '配信へ' })
+  expect(link.getAttribute('data-prefetch-mode')).toBe('false')
+  expect(link.getAttribute('href')).toBe('/broadcasts')
+  expect(link.getAttribute('target')).toBe('_blank')
+  fireEvent.click(link, { ctrlKey: true })
+  expect(click).toHaveBeenCalledOnce()
+  expect(screen.getByRole('link', { name: '明示先読み' }).getAttribute('data-prefetch-mode')).toBe('true')
+  expect(screen.getByRole('link', { name: '自動先読み' }).getAttribute('data-prefetch-mode')).toBe('null')
+  expect(screen.getByRole('link', { name: 'テンプレートへ' }).getAttribute('data-prefetch-mode')).toBe('false')
+})
+
+it('数の帯・タブ・関連機能のリンクは行き先を変えず、表示だけの先読みを止める', () => {
+  render(<><KpiCard title="友だち" value={3} unit="人" detail="今日" action={{ label: '友だちへ', href: '/friends?tag=one' }}/><Tabs items={[{ label: '配信', href: '/broadcasts?status=draft' }]} /><FeatureLinkCard items={[{ label: '予約へ', note: '予定を確認', href: '/booking/bookings' }]} /><SideCard title="最近の動き" action={{ label: '履歴へ', href: '/staff?tab=audit' }}>動き</SideCard></>)
+  for (const [name, href] of [['友だちへ', '/friends?tag=one'], ['予約へ', '/booking/bookings'], ['履歴へ', '/staff?tab=audit']]) {
+    const link = screen.getByRole('link', { name })
+    expect(link.getAttribute('href')).toBe(href)
+    expect(link.getAttribute('data-prefetch-mode')).toBe('false')
+  }
+  const tab = screen.getByRole('tab', { name: '配信' })
+  expect(tab.getAttribute('href')).toBe('/broadcasts?status=draft')
+  expect(tab.getAttribute('data-prefetch-mode')).toBe('false')
+})
 
 describe('一覧→詳細→編集→戻る', () => {
   it('一覧条件と選んだ対象を詳細→編集まで持ち帰る', () => {

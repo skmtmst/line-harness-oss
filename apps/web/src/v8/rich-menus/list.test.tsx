@@ -42,7 +42,7 @@ const group = (id: string, name: string, extra: Record<string, unknown> = {}) =>
 
 const items = [
   group('g-default', '通常メニュー', { isDefaultForAll: true, targetingPriority: 0, folderId: 'rmf-normal' }),
-  group('g-autumn', '秋のキャンペーン', { status: 'draft', isDefaultForAll: true, publishingAt: '2026-10-05T00:00:00.000+09:00', targetingPriority: 1 }),
+  group('g-autumn', '秋のキャンペーン', { status: 'draft', isDefaultForAll: true, publishingAt: '2027-10-05T00:00:00.000+09:00', targetingPriority: 1 }),
 ]
 
 vi.mock('@/contexts/account-context', () => ({
@@ -157,13 +157,15 @@ describe('V8 リッチメニュー一覧', () => {
   test('行に順番・状態の札・今月の回数が出る（集計の無い行は「—」）', async () => {
     const view = render(<RichMenusListV8 />)
     const first = (await view.findByText('通常メニュー')).closest('tr') as HTMLElement
-    expect(first.textContent).toContain('公開中')
+    expect(within(first).getByText('公開中').closest('[aria-hidden="true"]')).toBeNull()
     expect(first.textContent).toContain('12回')
     expect(first.textContent).toContain('（既定）')
     const second = view.getByText('秋のキャンペーン').closest('tr') as HTMLElement
     expect(second.textContent).toContain('10/05 公開')
     expect(second.textContent).toContain('10/05 から既定')
     expect(second.textContent).toContain('—')
+    expect(within(second).getByText('2027/10/05 公開').closest('[aria-hidden="true"]')).toBeNull()
+    expect(second.closest('[data-column-sizing]')?.getAttribute('data-column-sizing')).toBe('controls')
   })
 
   test('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {

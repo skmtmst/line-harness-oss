@@ -6,21 +6,35 @@ import { Tabs } from './tabs'
 import ReorderHandle from './reorder-handle'
 import TemplateFolderSelect from '../chats/template-folder-select'
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); document.documentElement.removeAttribute('data-theme') })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); document.documentElement.removeAttribute('data-theme') })
 
-it('WEB-046: 後から変わったタブの幅に下線を合わせる', () => {
+it('WEB-046: 後から変わったタブの幅に下線を合わせる', async () => {
   document.documentElement.dataset.theme = 'v8'
-  let resize = () => {}
+  let resize: ResizeObserverCallback
+  const targets = new Set<Element>()
+  const unobserve = vi.fn((target: Element) => { targets.delete(target) })
   vi.stubGlobal('ResizeObserver', class {
-    constructor(callback: () => void) { resize = callback }
-    observe() {}
+    constructor(callback: ResizeObserverCallback) { resize = callback }
+    observe(target: Element) { targets.add(target) }
+    unobserve = unobserve
     disconnect() {}
   })
+  let tabWidth = 80
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return { left: 0, width: this.getAttribute('role') === 'tab' ? tabWidth : 300, height: 20 } as DOMRect
+  })
   const view = render(<Tabs items={[{ label: '会員', count: 1, current: true }]} />)
+  await act(async () => { await Promise.resolve() })
+  expect(view.container.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain('width: 80px')
   const tab = screen.getByRole('tab')
-  vi.spyOn(tab, 'getBoundingClientRect').mockReturnValue({ left: 0, width: 108 } as DOMRect)
-  act(() => resize())
+  tabWidth = 108
+  const entries = [...targets].map(target => ({ target, contentRect: target.getBoundingClientRect(),
+    borderBoxSize: [{ inlineSize: target.getBoundingClientRect().width, blockSize: 20 }], contentBoxSize: [], devicePixelContentBoxSize: [],
+  }))
+  await act(async () => { resize(entries, {} as ResizeObserver); await Promise.resolve() })
   expect(view.container.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain('width: 108px')
+  view.unmount()
+  expect(unobserve).toHaveBeenCalledWith(tab)
 })
 
 it('WEB-019: マウスの移動口が無いつまみは出さない', () => {

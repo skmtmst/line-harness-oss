@@ -8,7 +8,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
-- [最初に読む：開発・運用の引き継ぎ](START-HERE.md)
+- [最初に読む：製品とコードの入口](START-HERE.md)
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
@@ -458,6 +458,9 @@
 - [0.24.0.md](release-log/0.24.0.md)
 - [リマインダ](release-log/0.25.0.md)
 - [反映履歴の書き方](release-log/README.md)
+- [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
+- [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
+- [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
 - [fielderr2.md](release-log/drafts/fielderr2.md)
 - [kenta-form-fixed-1010.md](release-log/drafts/kenta-form-fixed-1010.md)
@@ -477,6 +480,8 @@
 - [独立点検からの安全性・予約・表示の修正](release-log/unreleased/1793-masato-independent-audit-fixes.md)
 - [独立点検後の計画と質問の保存・破棄の記録](release-log/unreleased/1790-kenta-after-review-plan.md)
 - [検証環境の最終確認と独立点検の開始準備](release-log/unreleased/1791-kenta-independent-review-ready.md)
+- [画面の先読みと友だち一覧の再計測の改善](release-log/unreleased/1792-kenta-v8-rendering-performance.md)
+- [共通描画と注目の星の不要な動きの修正](release-log/unreleased/1795-kenta-common-draw-speed.md)
 - [1781-kenta-cleanup-a01.md](release-log/unreleased/1781-kenta-cleanup-a01.md)
 - [1781-kenta-cleanup-a02.md](release-log/unreleased/1781-kenta-cleanup-a02.md)
 - [1781-kenta-cleanup-a03.md](release-log/unreleased/1781-kenta-cleanup-a03.md)

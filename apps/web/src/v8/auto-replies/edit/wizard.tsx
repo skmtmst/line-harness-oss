@@ -1,10 +1,12 @@
 'use client'
 
+import { readLineImageContent } from '@/lib/line-image-content'
+
 import { WizardBasicStep } from './wizard-basic-step'
 import { WizardConfirmStep } from './wizard-confirm-step'
 import { buildWizardInput } from './wizard-input'
 import { loadWizardDraft } from './wizard-load'
-import { DONE_DESIGN_NODE,EMPTY_FORM,InputIssue,LoadState,MAIN_KINDS,RuleRow,STEP_DESIGN_NODES,STEP_LABELS_V8,STEP_ORDER,WizardForm,WizardStep,formFromSettings,readLineImageContent } from './wizard-model'
+import { DONE_DESIGN_NODE,EMPTY_FORM,InputIssue,LoadState,MAIN_KINDS,RuleRow,STEP_DESIGN_NODES,STEP_LABELS_V8,STEP_ORDER,WizardForm,WizardStep,formFromSettings } from './wizard-model'
 import { renderWizardPreview } from './wizard-preview'
 import { WizardPriorityStep } from './wizard-priority-step'
 import { WizardResponseStep } from './wizard-response-step'

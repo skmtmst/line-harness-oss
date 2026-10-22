@@ -117,7 +117,7 @@
 :root .info .icon { color: var(--color-status-info); }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .notice { -webkit-font-smoothing: auto; }
+:root .notice { -webkit-font-smoothing: antialiased; }
 
 :root .notice[data-density="compact"] { gap: var(--tpl-rt-chip-row-gap); padding: var(--tpl-rt-notice-pad); border-radius: var(--tpl-rt-inner-radius); color: var(--color-ink); font-size: var(--text-label); line-height: normal; }
 /* ：題と説明を2行にし、右側に競合の操作を並べる。 */

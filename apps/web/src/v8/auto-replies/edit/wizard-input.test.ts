@@ -1,8 +1,9 @@
+import { readLineImageContent } from '@/lib/line-image-content'
 import { describe, expect, it } from 'vitest'
 import type { AutoReplyDraftInput } from '@line-crm/shared'
 import { applyMatchType } from '@/components/auto-replies/draft-fields'
 import { buildWizardInput } from './wizard-input'
-import { EMPTY_FORM, formFromSettings, readLineImageContent, type WizardForm } from './wizard-model'
+import { EMPTY_FORM, formFromSettings, type WizardForm } from './wizard-model'
 
 const rule = (keyword: string, matchType: 'exact' | 'contains' = 'contains') => ({ keyword, matchType, minLength: '', caseSensitive: true })
 const form = (patch: Partial<WizardForm> = {}): WizardForm => ({ ...EMPTY_FORM, ruleName: '予約返信', keywordRules: [rule('予約')], responseContent: '承りました', ...patch })

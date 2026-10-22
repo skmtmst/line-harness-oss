@@ -10,7 +10,7 @@
 .root[data-fill]::before { pointer-events: none; }
 :root .root { position: relative; padding: 0; margin: 0; }
 :root .root::before { content: ''; position: absolute; inset: -3px; }
-:root .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 :root .input { gap: 0; border-radius: var(--polish-radius-pill); }
 /*
  * 小さい字（★BG-B `z14gEG` 人物2択）。文 12/17。

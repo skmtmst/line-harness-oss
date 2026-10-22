@@ -284,27 +284,33 @@ test('new style selection opens once, explicit later and legacy later stay defer
 })
 
 async function useIndustryFixture(page, style = 'salon', legacyMeet = false) {
+  // Use the same mock responder without a second network request. Navigation can
+  // cancel a prefetch while route.fetch() is waiting, before its later fulfill.
+  const { mockFetch } = await import('../../../scripts/v8-guard/mock-local.mjs')
   await page.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'visual-qa-account')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
   })
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())
-    const response = await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` })
+    const response = await mockFetch(route.request().method(), `${url.pathname}${url.search}`)
     if (url.pathname === '/api/dashboard/style') {
       expect(route.request().method()).toBe('GET')
-      const fixture = await response.json()
+      const fixture = JSON.parse(response.body)
       return route.fulfill({ json: { ...fixture, data: { ...fixture.data, style, styleSelected: true, styleMode: 'configured', shouldPromptStyleSelection: false } } })
     }
     if (legacyMeet && url.pathname === '/api/dashboard/style/schedule') {
-      const fixture = await response.json()
+      const fixture = JSON.parse(response.body)
       const entry = fixture.data.entries[0]
       entry.id = 'meet:legacy-meet'
       entry.kind = 'meet'
       entry.booking = { ...entry.booking, id: 'legacy-meet', kind: 'meet', friendId: 'friend-1' }
       return route.fulfill({ json: fixture })
     }
-    return route.fulfill({ response })
+    return route.fulfill({ status: response.status, headers: {
+      ...response.headers,
+      'access-control-allow-origin': route.request().headers().origin ?? 'null',
+    }, body: response.body })
   })
 }
 
@@ -347,14 +353,14 @@ test('salon keeps existing KPI slots and forwards real staff, time and booking i
 
   await page.goto('/?view=calendar&range=week')
   const week = page.getByRole('region', { name: '1週間のカレンダー' })
-  await week.getByRole('button', { name: '予約を入れる', exact: true }).first().click()
+  await week.getByRole('button', { name: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}に予約を入れる$/ }).first().click()
   await expect(page).toHaveURL(/\/booking\/bookings\/new\?/)
   url = new URL(page.url())
   expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   expect(url.searchParams.get('time')).toMatch(/^\d{2}:\d{2}$/)
   expect(url.searchParams.has('staffId')).toBe(false)
   await page.goto('/?view=calendar&range=week')
-  await week.getByRole('button', { name: 'カット 山田 花子', exact: true }).click()
+  await week.getByRole('button', { name: '10:00〜11:30 カット 山田 花子', exact: true }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'w1')
 })
 
@@ -375,14 +381,14 @@ test('consult forwards board and weekly booking identity, date, time and staff',
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'm1')
   await page.goto('/?view=calendar&range=week')
   const week = page.getByRole('region', { name: '1週間のカレンダー' })
-  await week.getByRole('button', { name: '予約を入れる', exact: true }).first().click()
+  await week.getByRole('button', { name: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}に予約を入れる$/ }).first().click()
   await expect(page).toHaveURL(/\/booking\/bookings\/new\?/)
   url = new URL(page.url())
   expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   expect(url.searchParams.get('time')).toMatch(/^\d{2}:\d{2}$/)
   expect(url.searchParams.has('staffId')).toBe(false)
   await page.goto('/?view=calendar&range=week')
-  await week.getByRole('button', { name: '転職の初回面談 原田 修', exact: true }).click()
+  await week.getByRole('button', { name: '10:00〜11:00 転職の初回面談 原田 修', exact: true }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'm1')
 })
 

@@ -10,7 +10,7 @@ vi.mock('../lib/api.js', () => ({ api: { getForm: vi.fn(), getMyLatestFormAnswer
 const { api } = await import('../lib/api.js')
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
-async function open() {
+async function open(filePatch: Partial<FormInputBlock> = {}) {
   const layout = emptyLayout()
   layout.options.confirmDialog = { enabled: false }
   const fields: Partial<FormInputBlock>[] = [
@@ -21,7 +21,7 @@ async function open() {
     { type: 'date', name: 'date', label: '日付', placeholder: '例：2026/10/09' },
     { type: 'text', name: 'time', label: '時刻', limit: { format: 'time' }, placeholder: '例：13:00' },
     { type: 'address', name: 'address', label: '住所', placeholder: '例：1-2-3' },
-    { type: 'file', name: 'file', label: '添付画像' },
+    { type: 'file', name: 'file', label: '添付画像', ...filePatch },
     { type: 'rating', name: 'rating', label: '評価' },
   ]
   layout.sections[0].blocks = fields.map((f, i) => ({ kind: 'input', id: `b${i}`, ...f } as FormInputBlock))
@@ -68,5 +68,35 @@ describe('編集した参考の文字と実際の入力', () => {
     fireEvent.change(input, { target: { files: [file] } })
     await waitFor(() => expect(api.uploadFormFile).toHaveBeenCalledWith('f1', file, undefined, 'b7', 'single'))
     expect((await screen.findByAltText('送った画像') as HTMLImageElement).src).toBe('https://example.test/photo.png')
+  })
+})
+
+
+describe('本人確認の新規受付停止', () => {
+  it('古い画像値が残る任意欄も再添付せず、画像や削除操作を出さない', async () => {
+    await open({ fileKinds: ['image', 'identity'], required: false, defaultValue: 'https://example.test/images/form-uploads/legacy.png' })
+    expect(screen.getByRole('alert').textContent).toContain('本人確認書類は受け付けていません')
+    expect(screen.queryByAltText('送った画像')).toBeNull()
+    expect(screen.queryByRole('button', { name: '選び直す' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }))
+    expect(api.submitForm).not.toHaveBeenCalled()
+    expect(api.uploadFormFile).not.toHaveBeenCalled()
+    expect(screen.queryByText(/^ご回答ありがとうございました/)).toBeNull()
+  })
+  it.each([true, false])('旧設定の必須=%sを黙って変えず、撮影やアップロードに誘導しない', async required => {
+    await open({ fileKind: 'identity', fileBothSides: true, required })
+    expect(screen.getByRole('alert').textContent).toContain('本人確認書類は受け付けていません')
+    expect(screen.queryByLabelText('添付画像', { selector: 'input' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '写真を撮る' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }))
+    if (required) {
+      expect(api.submitForm).not.toHaveBeenCalled()
+      expect(screen.getAllByRole('alert').some(alert => alert.textContent?.includes('店舗にお問い合わせください'))).toBe(true)
+      expect(screen.queryByText(/^ご回答ありがとうございました/)).toBeNull()
+    } else {
+      await screen.findByText(/^ご回答ありがとうございました/)
+      expect(vi.mocked(api.submitForm).mock.calls[0][1].data).not.toHaveProperty('file')
+    }
+    expect(api.uploadFormFile).not.toHaveBeenCalled()
   })
 })

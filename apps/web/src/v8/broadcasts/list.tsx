@@ -26,7 +26,7 @@ import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { ListPage, ListPagePagination } from '@/components/templates';
-import BroadcastForm from '@/components/broadcasts/broadcast-form'
+import BroadcastForm from '@/components/broadcasts/broadcast-form-lazy'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -1154,6 +1154,7 @@ export default function BroadcastListV8() {
           open={createMenuOpen}
           onClose={() => setCreateMenuOpen(false)}
           anchorRef={createAnchorRef}
+          align="start"
           ariaLabel="配信の作り方"
           items={[
             /* 絵  の分け方：かんたんに送る（1画面・板 ）と詳しく作る（5つの手順 `/broadcasts/new`）。

@@ -25,7 +25,7 @@ export function FeatureLinkCard({ items, className }: { items: FeatureLink[]; cl
       {items.map((item) => (
         <div key={item.label} className={styles.linkRow}>
           {item.href ? (
-            <Link href={item.href} className={styles.linkName}>
+            <Link href={item.href} prefetch={false} className={styles.linkName}>
               <ArrowRight />
               {item.label}
             </Link>

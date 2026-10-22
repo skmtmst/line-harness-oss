@@ -54,7 +54,7 @@ function rewardFixture(id: string, name: string, status: 'published' | 'draft') 
     currentVersion: versionFixture(),
     exchangedThisMonth: 21,
     availableCodeCount: null,
-    benefitName: null,
+    benefitName: '発送先の確認メッセージ',
     createdAt: '2026-09-10T00:00:00.000Z',
     updatedAt: '2026-09-10T00:00:00.000Z',
   }
@@ -196,6 +196,7 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
     const body = container.textContent ?? ''
     /* くっつけると読みにくい（残り制限なし・10/31まで は昔の書き方）。 */
     expect(body).toContain('残り 制限なし')
+    expect(container.querySelector('[data-truncated-text][title="クーポン「発送先の確認メッセージ」"]')?.textContent).toBe('クーポン「発送先の確認メッセージ」')
     expect(body).toContain('10/31 まで')
     expect(body).not.toContain('残り制限なし')
     expect(container.querySelector('[title="1回も使っていない人の数は未取得"]')).not.toBeNull()

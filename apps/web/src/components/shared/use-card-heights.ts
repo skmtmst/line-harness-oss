@@ -9,10 +9,11 @@ export function useCardHeights() {
     const card = ref.current
     if (!card) return
     const css = getComputedStyle(card)
-    const border = ['Top', 'Right', 'Bottom', 'Left'].some(side => parseFloat(css.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0)
     const outline = css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0
+    // outline・影で枠が確定したら、使用寸法を解決するborder幅は読まない。
+    const framed = outline || css.boxShadow !== 'none' || ['Top', 'Right', 'Bottom', 'Left'].some(side => parseFloat(css.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0)
     // Cardを枠のない入力段として使う画面へ、箱用の余白を足さない。
-    card.toggleAttribute('data-card-unframed', !border && !outline && css.boxShadow === 'none')
+    card.toggleAttribute('data-card-unframed', !framed)
   })
   useLayoutEffect(() => {
     const parent = ref.current?.parentElement

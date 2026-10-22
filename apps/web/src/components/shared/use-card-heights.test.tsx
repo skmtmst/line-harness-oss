@@ -41,3 +41,63 @@ it.each([undefined, 'natural'] as const)('横のカードは指定された高�
   const cards = container.querySelectorAll<HTMLElement>('[data-design-part="card"]')
   expect([...cards].map(card => card.style.minHeight)).toEqual(cardHeight === 'natural' ? ['', ''] : ['100px', '100px'])
 })
+
+it.each([
+  ['outline', 'solid', '1px', 'none'],
+  ['shadow', 'none', '0px', 'rgb(0, 0, 0) 0px 1px 2px'],
+])('枠が%sで確定したカードはborder幅を読まない', (_frame, outlineStyle, outlineWidth, boxShadow) => {
+  const nativeStyle = window.getComputedStyle.bind(window)
+  const borders = vi.fn(() => '0px')
+  vi.spyOn(window, 'getComputedStyle').mockImplementation(element => {
+    if (!element.matches('[data-design-part="card"]')) return nativeStyle(element)
+    return { outlineStyle, outlineWidth, boxShadow, getPropertyValue: borders } as unknown as CSSStyleDeclaration
+  })
+  const { container } = render(<Card>吹き出し</Card>)
+  expect(container.querySelector('[data-design-part="card"]')?.hasAttribute('data-card-unframed')).toBe(false)
+  expect(borders).not.toHaveBeenCalled()
+})
+
+it.each(['top', 'right', 'bottom', 'left'])('outlineと影がない%s辺だけの枠も認識する', side => {
+  const nativeStyle = window.getComputedStyle.bind(window)
+  vi.spyOn(window, 'getComputedStyle').mockImplementation(element => {
+    if (!element.matches('[data-design-part="card"]')) return nativeStyle(element)
+    return { outlineStyle: 'none', outlineWidth: '0px', boxShadow: 'none',
+      getPropertyValue: (property: string) => property === `border-${side}-width` ? '1px' : '0px',
+    } as CSSStyleDeclaration
+  })
+  const { container } = render(<Card>辺の枠</Card>)
+  expect(container.querySelector('[data-design-part="card"]')?.hasAttribute('data-card-unframed')).toBe(false)
+})
+
+it('同じカードでも再描画後のclass・枠の変更をその都度確認する', () => {
+  const nativeStyle = window.getComputedStyle.bind(window)
+  const reads = vi.fn()
+  vi.spyOn(window, 'getComputedStyle').mockImplementation(element => {
+    if (!element.matches('[data-design-part="card"]')) return nativeStyle(element)
+    reads(element.className)
+    const framed = element.classList.contains('framed')
+    return { outlineStyle: framed ? 'solid' : 'none', outlineWidth: framed ? '1px' : '0px', boxShadow: 'none',
+      getPropertyValue: () => '0px',
+    } as unknown as CSSStyleDeclaration
+  })
+  const { container, rerender } = render(<Card className="unframed">入力段</Card>)
+  const card = container.querySelector('[data-design-part="card"]')
+  expect(card?.hasAttribute('data-card-unframed')).toBe(true)
+  rerender(<Card className="framed">枠の箱</Card>)
+  expect(container.querySelector('[data-design-part="card"]')).toBe(card)
+  expect(card?.hasAttribute('data-card-unframed')).toBe(false)
+  rerender(<Card className="unframed">入力段</Card>)
+  expect(card?.hasAttribute('data-card-unframed')).toBe(true)
+  expect(reads).toHaveBeenCalledTimes(3)
+})
+
+
+it('同じclassでもinlineの枠変更と枠の解除を再描画で反映する', () => {
+  const { container, rerender } = render(<Card style={{ border: 0, outline: 'none', boxShadow: 'none' }}>入力段</Card>)
+  const card = container.querySelector('[data-design-part="card"]')
+  expect(card?.hasAttribute('data-card-unframed')).toBe(true)
+  rerender(<Card style={{ border: 0, outline: '1px solid black', boxShadow: 'none' }}>枠の箱</Card>)
+  expect(card?.hasAttribute('data-card-unframed')).toBe(false)
+  rerender(<Card style={{ border: 0, outline: 'none', boxShadow: 'none' }}>入力段</Card>)
+  expect(card?.hasAttribute('data-card-unframed')).toBe(true)
+})

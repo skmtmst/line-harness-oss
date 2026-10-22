@@ -3,24 +3,9 @@
 import { Children, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import Dialog from './dialog'
 import { TruncatedTextFocus } from './truncated-text'
+import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
+import { observeElementResize } from './element-resize-observer'
 import styles from './tag-overflow.module.css'
-
-// Read all rows before committing fit counts. Updating one row before measuring
-// the next repeatedly forces the browser to lay out the same native table.
-const pendingMeasurements = new Map<object, () => () => void>()
-let measurementQueued = false
-function scheduleMeasurement(key: object, read: () => () => void) {
-  pendingMeasurements.set(key, read)
-  if (measurementQueued) return
-  measurementQueued = true
-  queueMicrotask(() => {
-    measurementQueued = false
-    const reads = [...pendingMeasurements.values()]
-    pendingMeasurements.clear()
-    const commits = reads.map(read => read())
-    for (const commit of commits) commit()
-  })
-}
 
 /** : 横1行に入る数。+N の幅も先に確保する。 */
 export function fittingTagCount(widths: number[], available: number, gap: number, moreWidth: (rest: number) => number): number {
@@ -45,30 +30,57 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
   const root = useRef<HTMLSpanElement>(null)
   const measure = useRef<HTMLSpanElement>(null)
   const more = useRef<HTMLButtonElement>(null)
-  const [fit, setFit] = useState(0)
+  const measuredContent = useRef('')
+  const refreshWidths = useRef<() => void>(() => {})
+  const [fit, setFit] = useState(() => Math.min(items.length, maxVisible ?? items.length, 1))
   const [open, setOpen] = useState(false)
   useLayoutEffect(() => {
     const host = root.current
     const samples = measure.current
     if (!host || !samples) return
     let active = true
+    let widths: number[] | null = null
+    let sampleWidth: number | null = null
+    measuredContent.current = samples.innerHTML
     const key = {}
     const read = () => {
       if (!active) return () => {}
-      const widths = Array.from(samples.children).map((child) => child.getBoundingClientRect().width)
-      const gap = parseFloat(getComputedStyle(host).columnGap) || 0
+      // Only the host's available width changes when a column is resized.
+      // Keep natural tag widths until their contents, sizing or fonts change.
+      if (!widths) {
+        widths = Array.from(samples.children).map((child) => child.getBoundingClientRect().width)
+        sampleWidth = samples.getBoundingClientRect().width
+      }
+      const style = getComputedStyle(host)
+      // The one-tag layout uses a smaller display gap; fit against the shared natural gap.
+      const naturalGap = parseFloat(style.getPropertyValue('--tpl-tag-overflow-gap'))
+      const gap = Number.isFinite(naturalGap) ? naturalGap : parseFloat(style.columnGap) || 0
       const count = fittingTagCount(widths, host.clientWidth, gap, () => more.current?.getBoundingClientRect().width ?? 0)
+      const fitted = Math.min(Math.max(count, widths.length ? 1 : 0), maxVisible ?? items.length)
       // 1つも入らない狭い列でも、最初の札は省略して出す（+N だけにしない。絵 ）。
-      return () => { if (active) setFit(Math.min(Math.max(count, widths.length ? 1 : 0), maxVisible ?? items.length)) }
+      return () => { if (active) setFit(fitted) }
     }
     const update = () => { if (active) scheduleMeasurement(key, read) }
+    const invalidate = () => { widths = null; update() }
+    refreshWidths.current = invalidate
     update()
-    const observer = new ResizeObserver(update)
-    observer.observe(host)
-    observer.observe(samples)
-    document.fonts?.ready.then(update)
-    return () => { active = false; pendingMeasurements.delete(key); observer.disconnect() }
-  }, [children, maxVisible, items.length])
+    const stopObserving = observeElementResize([host, samples], (entries) => {
+      if (!entries.length || entries.some((entry) => {
+        if (entry.target !== samples) return false
+        const width = entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect?.width
+        return width === undefined || width !== sampleWidth
+      })) widths = null
+      update()
+    })
+    const fonts = document.fonts
+    if (fonts?.status === 'loading') void fonts.ready.then(invalidate)
+    fonts?.addEventListener('loadingdone', invalidate)
+    return () => { active = false; refreshWidths.current = () => {}; cancelMeasurement(key); stopObserving(); fonts?.removeEventListener('loadingdone', invalidate) }
+  }, [maxVisible, items.length])
+  useLayoutEffect(() => {
+    const content = measure.current?.innerHTML ?? ''
+    if (content !== measuredContent.current) { measuredContent.current = content; refreshWidths.current() }
+  }, [children])
   const shown = Math.min(fit, maxVisible ?? items.length, items.length)
   const rest = items.length - shown
   return <>

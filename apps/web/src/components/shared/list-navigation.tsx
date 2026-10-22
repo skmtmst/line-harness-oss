@@ -106,9 +106,10 @@ export function useListItemHref() {
 }
 
 /** Next Link の動き（新しいタブ・離脱確認）をそのまま使う。 */
-export default function PageLink({ href, ...props }: ComponentProps<typeof NextLink>) {
+export default function PageLink({ href, prefetch = false, ...props }: ComponentProps<typeof NextLink>) {
   const destination = useListNavigationHref()
-  return <NextLink {...props} href={typeof href === 'string' ? destination(href) : href} />
+  // 初期表示では今の画面を優先する。行き先は外枠のHoverPrefetchが意図を見て先読みする。
+  return <NextLink {...props} prefetch={prefetch} href={typeof href === 'string' ? destination(href) : href} />
 }
 
 /** ボタン経由の移動も、Link と同じ口で戻り先を持ち運ぶ。 */

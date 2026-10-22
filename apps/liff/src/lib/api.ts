@@ -148,6 +148,7 @@ export const api = {
       /** B5：追加メニュー（1 人分・0〜3 個）。2 人以上の組は口がまだ受けない。 */
       addonIds?: string[];
       entitlement_id?: string;
+      payment_method?: 'onsite' | 'online';
       /** B6：答えで決まった行き先の署名（resolve の返事）。 */
       routingToken?: string;
       meeting_mode?: 'online' | 'in_person';
@@ -171,12 +172,20 @@ export const api = {
       || !Array.isArray(c.tiers) || c.tiers.length < 2
       || !c.tiers.every((t) => isRecord(t) && typeof t.beforeHours === 'number' && typeof t.percent === 'number')
       || typeof d.amount !== 'number') throw responseShapeError(data, path);
+    const p = data.payment;
+    if (p !== undefined && (!isRecord(p) || !['none', 'onsite', 'online', 'customer_choice'].includes(String(p.mode))
+      || !Array.isArray(p.allowedMethods) || new Set(p.allowedMethods).size !== p.allowedMethods.length
+      || !p.allowedMethods.every(method => method === 'onsite' || method === 'online')
+      || (p.mode === 'none' ? p.allowedMethods.length !== 0
+        : p.mode === 'customer_choice' ? !p.allowedMethods.includes('online')
+          : p.allowedMethods.length !== 1 || p.allowedMethods[0] !== p.mode))) throw responseShapeError(data, path);
     return {
       enabled: c.enabled, version: c.version as number, freeUntil: c.freeUntil,
       tiers: c.tiers.map((t) => ({ beforeHours: t.beforeHours, percent: t.percent })),
       afterPercent: c.tiers[c.tiers.length - 1].percent, noShowPercent: c.noShowPercent,
       price: c.price, cardRequired: c.cardRequired,
       deposit: d.amount > 0 ? { amount: d.amount } : null,
+      ...(p === undefined ? {} : { payment: p as BookingCancellationPreview['payment'] }),
     };
   },
   /** カードの登録（gap1・試験モード）。登録済みなら status=ready、まだなら url の登録画面へ。 */

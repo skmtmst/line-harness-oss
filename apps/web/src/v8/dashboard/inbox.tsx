@@ -1,9 +1,9 @@
 'use client'
 
-import { loadStaffIdentity } from '@/lib/staff-role'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useStaffIdentity } from '@/lib/staff-role'
+import { useListUrlParam, useListUrlValue } from '@/components/shared/list-url-state'
 import Link from '@/components/shared/list-navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, fetchApi } from '@/lib/api'
 import { inboxItemHref, type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import Pagination from '@/components/shared/pagination'
@@ -52,28 +52,23 @@ export function InboxSection({ onSummaryChange }: {
   const [loading, setLoading] = useState(true)
   const [lastSuccessAt, setLastSuccessAt] = useState<Date | null>(null)
   const [page, setPage] = useListUrlValue('page', 1)
-  const [pageSize, setPageSize] = useListUrlValue('pageSize', DEFAULT_PAGE_SIZE)
+  const [urlPageSize] = useListUrlValue('pageSize', DEFAULT_PAGE_SIZE)
+  const [pageSizeParam] = useListUrlParam('pageSize')
+  const staffId = useStaffIdentity()?.id
+  // 本人確認済みIDの表示設定だけ復元し、失効時は標準件数へ戻す。
+  const personalPageSize = useMemo(() => {
+    if (!staffId) return DEFAULT_PAGE_SIZE
+    try {
+      const raw = window.localStorage.getItem(PAGE_SIZE_STORAGE_PREFIX + staffId)
+      const restored = raw === null ? NaN : Number(raw)
+      return PAGE_SIZE_OPTIONS.includes(restored) ? restored : DEFAULT_PAGE_SIZE
+    } catch { return DEFAULT_PAGE_SIZE }
+  }, [staffId])
+  // 明示URLを優先。本人の暗黙設定はURLへ書き込んで次の本人へ持ち越さない。
+  const pageSize = pageSizeParam === '' ? personalPageSize : urlPageSize
   const loadSeq = useRef(0)
   const total = summary?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
-
-  useEffect(() => {
-    let cancelled = false
-    void loadStaffIdentity()
-      .then((response) => {
-        if (cancelled || !response.success) return
-        try {
-          const raw = window.localStorage.getItem(PAGE_SIZE_STORAGE_PREFIX + response.data.id)
-          const restored = raw === null ? NaN : Number(raw)
-          if (PAGE_SIZE_OPTIONS.includes(restored)) {
-            setPageSize(restored)
-            setPage(1)
-          }
-        } catch { /* storage unavailable */ }
-      })
-      .catch(() => undefined)
-    return () => { cancelled = true }
-  }, [])
 
   const load = useCallback(async () => {
     const seq = ++loadSeq.current

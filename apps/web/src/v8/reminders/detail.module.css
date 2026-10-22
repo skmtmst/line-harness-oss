@@ -38,25 +38,7 @@
 }
 
 /* ---- 左の本文と右の列 ---- */
-.split { display: flex; flex: 1; min-width: 0; }
-.main {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--tpl-create-content-gap);
-  min-width: 0;
-}
-.side {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--tpl-section-gap);
-  width: var(--tpl-rm-side-w);
-  padding: var(--tpl-preview-pad);
-  box-shadow: var(--tpl-rm-line-left);
-}
-.side > * { align-self: stretch; }
+.main { display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; }
 .phoneWrap { display: flex; justify-content: center; padding-top: var(--tpl-rm-phone-pull); }
 .sideActions { display: flex; align-items: center; gap: var(--tpl-rm-side-row-gap); }
 .sideAction { flex: 1 1 0; min-width: 0; }
@@ -88,7 +70,7 @@
   padding: var(--tpl-section-pad);
   border-radius: var(--radius-card);
   outline: 1px solid var(--card-edge);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
   box-shadow: var(--card-shadow);
 }
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
@@ -123,13 +105,10 @@
 .colWide { flex: none; width: var(--tpl-rm-col-step); }
 .colResult { display: flex; flex: none; width: var(--tpl-rm-col-result); }
 .colReason { flex: none; width: var(--tpl-rm-col-when); overflow: hidden; color: var(--color-ink-secondary); text-overflow: ellipsis; white-space: nowrap; }
-.colDate { flex: none; width: calc(var(--tpl-rm-col-date) + var(--tpl-rm-col-time) + var(--tpl-rm-row-gap-lg)); }
-.colState { display: flex; flex: none; width: var(--tpl-rm-col-step); }
 .colOps { display: flex; flex: none; justify-content: flex-end; gap: var(--tpl-rm-insert-gap); width: var(--tpl-rm-col-ops); }
 .cellSub { display: block; color: var(--color-ink-faint); font-size: var(--tpl-rm-small-size); line-height: var(--tpl-rm-small-lh); }
 .friendName { color: var(--color-ink); font-weight: 600; text-decoration: none; }
 .friendName:hover { text-decoration: underline; }
-.colDate > * { width: 100%; }
 /* 絵の基準日の欄は高さ32（表の行 55.5）。部品の中身は変えず、この表の中でだけ高さを合わせる。 */
 .pill {
   display: inline-flex;

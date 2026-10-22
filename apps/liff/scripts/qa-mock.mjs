@@ -18,6 +18,7 @@
  *   GET  /__qa/state                   今の設定を見る
  */
 import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 
 const PORT = Number(process.env.QA_MOCK_PORT ?? 8790);
 
@@ -374,6 +375,17 @@ function qaDocumentForm() {
       options: { confirmDialog: { enabled: false } },
     },
   };
+}
+
+function qaAttachmentForm() {
+  const form = qaDocumentForm();
+  form.id = 'qa-attachments';
+  form.name = '写真・PDFの添付';
+  form.layout.sections[0].blocks = [{
+    id: 'qa-attachment-file', kind: 'input', type: 'file', name: 'attachment', label: '写真・PDF',
+    required: true, fileKinds: ['image', 'pdf'], fileMaxCount: 2,
+  }];
+  return form;
 }
 
 const server = createServer(async (req, res) => {
@@ -930,18 +942,26 @@ const server = createServer(async (req, res) => {
     const m = pathname.match(/^\/api\/forms\/([^/]+)\/files$/);
     if (method === 'POST' && m) {
       if (m[1] === 'qa-document') {
-        const chunks = [];
-        for await (const chunk of req) chunks.push(chunk);
-        const bytes = Buffer.concat(chunks);
-        const side = url.searchParams.get('side');
-        if (!['front', 'back'].includes(side) || !bytes.length || url.searchParams.get('block_id') !== 'qa-document-file') {
-          json(res, 400, { success: false, error: 'invalid_document_upload' });
+        json(res, 400, { success: false, code: 'IDENTITY_DOCUMENT_DISABLED', error: '本人確認書類は受け取れません。画像・PDFの質問を使ってください' });
+        return;
+      }
+      if (m[1] === 'qa-attachments') {
+        const mimeType = (req.headers['content-type'] || '').split(';')[0];
+        const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
+        if (url.searchParams.get('block_id') !== 'qa-attachment-file' || url.searchParams.get('side') !== 'single' || !allowed.includes(mimeType)) {
+          json(res, 400, { success: false, error: '添付の質問と受け取れる形式を確認してください' });
           return;
         }
-        json(res, 200, { success: true, data: { file: {
-          fileId: `qa-document-${side}`, side, filename: url.searchParams.get('filename') || 'qa.png',
-          mimeType: req.headers['content-type'] || 'image/png', size: bytes.length, state: 'ready',
-        } } });
+        let size = 0;
+        for await (const chunk of req) size += chunk.length;
+        if (!size || size > 10485760) {
+          json(res, 400, { success: false, error: '1ファイル10MBまでです' });
+          return;
+        }
+        json(res, 201, { success: true, data: { file: {
+          fileId: randomUUID(), kind: mimeType === 'application/pdf' ? 'pdf' : 'image', side: 'single',
+          filename: url.searchParams.get('filename') || 'qa.png', mimeType, state: 'ready',
+        }, scanStatus: 'clean' } });
         return;
       }
       json(res, 200, {
@@ -963,7 +983,7 @@ const server = createServer(async (req, res) => {
     if (method === 'GET' && m) {
       // 本物と同じ包み。試し合言葉付きは本物と同じく isTest:true を足す。
       const testToken = url.searchParams.get('test_token');
-      const form = m[1] === 'qa-document' ? qaDocumentForm() : qaForm();
+      const form = m[1] === 'qa-document' ? qaDocumentForm() : m[1] === 'qa-attachments' ? qaAttachmentForm() : qaForm();
       json(res, 200, { success: true, data: testToken ? { ...form, isTest: true } : form });
       return;
     }

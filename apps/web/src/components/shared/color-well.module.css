@@ -413,14 +413,14 @@
    大きさは承認済み ★BG-2 `P8ZUj` が正しい形なので上書きしない:
    ピッカー本体 288px・見本は 8 列の可変幅・スポイト `TvFgh` は 28×28・
    HEX 欄 `Ayckb` は残り幅いっぱい。ここで 226px や 16px に戻すと承認と食い違う。 */
-:root .well { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; box-shadow: var(--shadow-board); }
-:root .swatch { border-radius: 7px; box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -0.5px; }
-:root .pop { border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; border-radius: var(--polish-radius-dialog); box-shadow: var(--shadow-controls-pop); }
-:root .cell { box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -0.5px; }
+:root .well { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -1px; box-shadow: var(--shadow-board); }
+:root .swatch { border-radius: 7px; box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -1px; }
+:root .pop { border: 0; outline: 1px solid var(--color-board-line); outline-offset: -1px; border-radius: var(--polish-radius-dialog); box-shadow: var(--shadow-controls-pop); }
+:root .cell { box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -1px; }
 :root .cell[aria-selected='true'] { outline: 2px solid var(--color-accent-deep); outline-offset: -1px; box-shadow: var(--shadow-controls-selected); }
 :root .dropper svg { width: 16px; height: 16px; }
-:root .hexField { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; border-radius: var(--polish-radius-control); }
-:root .hexMark, :root .hexInput { color: var(--color-ink-secondary); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 12px; font-weight: 400; line-height: normal; }
+:root .hexField { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -1px; border-radius: var(--polish-radius-control); }
+:root .hexMark, :root .hexInput { color: var(--color-ink-secondary); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 12px; font-weight: 400; line-height: normal; }
 :root .well:focus-visible, :root .cell:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 :root .swatch, :root .cell { gap: 0; }
 :root .cell, :root .dropper { min-height: 0; }

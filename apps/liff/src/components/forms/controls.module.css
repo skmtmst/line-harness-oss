@@ -29,7 +29,7 @@ input.nightInput:not([type='radio']):not([type='checkbox']) { height: var(--liff
 .icon { width: 18px; height: 18px; flex-shrink: 0; }
 .select { appearance: none; padding-right: 40px; }
 .note { margin: 0; font-size: 12px; line-height: 18px; color: var(--color-liff-sub, var(--v8-liff-sub, var(--color-ink-faint))); }
-.choice { display: flex; min-height: var(--liff-touch-size, 44px); align-items: center; gap: 10px; border: 0; outline: 1px solid var(--color-liff-line-strong, var(--v8-liff-slot-line, var(--color-border))); outline-offset: -0.5px; border-radius: 10px; padding: var(--liff-space-3, 12px) var(--liff-space-label, 14px); background: var(--color-canvas); color: var(--color-ink); font-size: 14px; line-height: 21px; }
+.choice { display: flex; min-height: var(--liff-touch-size, 44px); align-items: center; gap: 10px; border: 0; outline: 1px solid var(--color-liff-line-strong, var(--v8-liff-slot-line, var(--color-border))); outline-offset: -1px; border-radius: 10px; padding: var(--liff-space-3, 12px) var(--liff-space-label, 14px); background: var(--color-canvas); color: var(--color-ink); font-size: 14px; line-height: 21px; }
 .choice[data-selected] { border-color: var(--color-liff-primary, var(--fe-phone-main, var(--v8-liff-primary, var(--color-accent)))); background: var(--color-liff-soft, var(--v8-liff-primary-soft, var(--color-accent-soft))); }
 .choice input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--color-liff-primary, var(--fe-phone-main, var(--v8-liff-primary, var(--color-accent)))); }
 .stars { display: flex; gap: 4px; }
@@ -102,7 +102,7 @@ input.choiceInput[type='radio']:checked, .choice input[type='radio']:checked { b
 .choice input.choiceInput[type='radio']:checked:focus-visible { outline: 2px solid var(--color-status-info); outline-offset: 2px; }
 
 .formLabel { font-size: 15px; line-height: 22px; }
-.days .day { border: 0; outline: 1px solid var(--color-liff-line, var(--color-border)); outline-offset: -0.5px; font-family: Inter, system-ui, sans-serif; line-height: normal; }
+.days .day { border: 0; outline: 1px solid var(--color-liff-line, var(--color-border)); outline-offset: -1px; font-family: Inter, system-ui, sans-serif; line-height: normal; }
 .days .weekday { font-family: "Noto Sans JP", system-ui, sans-serif; line-height: normal; }
 .times .time { min-height: 42px; font-family: Inter, system-ui, sans-serif; font-size: 12px; line-height: normal; font-weight: 500; }
 .times .time[aria-pressed='true'] { font-size: 15px; font-weight: 700; }

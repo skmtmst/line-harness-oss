@@ -199,7 +199,8 @@ export default function Booking() {
             autoConfirm={autoConfirm}
             cancelDeadlineMinutesBefore={cancelDeadline}
             onPolicyChange={setCardStep}
-            onBack={() => setStep('datetime')}
+            onPaymentChange={setPaymentDue}
+            onBack={() => { setPaymentDue(false); setStep('datetime'); }}
             onRegisterBack={(fn) => { confirmBack.current = fn; }}
             party={partyActive ? party : undefined}
             onSubmitted={(result) => {

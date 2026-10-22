@@ -1,10 +1,12 @@
+import type { StoreComparisonDetail } from '@line-crm/shared';
+import { readAccountAttention } from '../services/hq-account-attention.js';
 import {comparisonData,checkExportAccess} from '../services/store-comparison-export.js';
 import {gapBody,gapKey} from '../services/gap-common.js';
 import {Hono,type Context,type Handler} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError} from '../services/gap-common.js';
 import {getVisibleLineAccountScope} from '../services/account-access.js';
-import {comparisonKeys,comparisonUnits,comparisonPeriod,storeNumbers,type ComparisonKey} from '../services/store-comparison.js';
+import {comparisonKeys,comparisonUnits,comparisonPeriod,comparisonTrend,storeNumbers,type ComparisonKey} from '../services/store-comparison.js';
 export const storeComparison=new Hono<Env>();
 storeComparison.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'comparison_unavailable'},e instanceof GapError?e.status:503));
 async function stores(c:Context<Env>){const s=c.get('staff');if(!s?.tenantId||!['owner','admin'].includes(s.role))throw new GapError('forbidden',403);const member=await c.env.DB.prepare("SELECT id FROM staff_members WHERE id=? AND tenant_id=? AND role IN('owner','admin') AND is_active=1").bind(s.id,s.tenantId).first();if(!member&&c.get('impersonation')?.tenantId!==s.tenantId)throw new GapError('forbidden',403);return (await getVisibleLineAccountScope(c.env.DB,s)).accounts;}
@@ -33,7 +35,12 @@ storeComparison.get('/api/hq/store-comparison/exports/:id',exportView(false));
 storeComparison.get('/api/hq/store-comparison/exports/:id/download',exportView(true));
 storeComparison.get('/api/hq/store-comparison/:accountId',async c=>{
  const id=c.req.param('accountId');if(!(await stores(c)).some(a=>a.id===id))throw new GapError('not_found',404);
- const numbers=await storeNumbers(c.env.DB,id,comparisonPeriod(c.req.query('from'),c.req.query('to')));
- const recent=(await c.env.DB.prepare('SELECT id,title,status,sent_at FROM broadcasts WHERE line_account_id=? ORDER BY created_at DESC LIMIT 3').bind(id).all()).results;
- return c.json({success:true,data:{accountId:id,...numbers,recentBroadcasts:recent,attention:null}});
+ const period=comparisonPeriod(c.req.query('from'),c.req.query('to'));
+ const numbers=await storeNumbers(c.env.DB,id,period);
+ const recent=(await c.env.DB.prepare('SELECT id,title,status,sent_at FROM broadcasts WHERE line_account_id=? ORDER BY created_at DESC LIMIT 3').bind(id).all<StoreComparisonDetail['recentBroadcasts'][number]>()).results;
+ let attention:StoreComparisonDetail['attention'];
+ try { const result=await readAccountAttention(c.env.DB,id,false);attention={status:'ready',counts:result.counts,targets:result.targets}; }
+ catch { attention={status:'unavailable',counts:null}; }
+ const data:StoreComparisonDetail={accountId:id,...numbers,trend:comparisonTrend(numbers.trend,period),recentBroadcasts:recent,attention};
+ return c.json({success:true,data});
 });

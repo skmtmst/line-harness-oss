@@ -1,11 +1,9 @@
 /*
  * ★V8 バナー生成・プロジェクトの中（・・）。頭は型（ListPage）。
- * 左に札と画像のます（3列・間12）、右に生成パネル（390）と「画像を生成」。値は globals.css の `--tpl-hb-*`。
+ * 画像と生成設定の配置は共通 DetailColumns、画像のますは3列。値は globals.css の `--tpl-hb-*`。
  */
 .body { display: flex; flex-direction: column; gap: var(--tpl-hb-body-gap); padding: var(--tpl-hb-project-pad); min-width: 0; }
-.split { display: flex; align-items: flex-start; gap: var(--tpl-hb-project-gap); min-width: 0; }
 .gallery { display: flex; flex-direction: column; flex: 1; gap: var(--tpl-hb-gallery-gap); min-width: 0; align-self: stretch; }
-/* 下の帯は左の列の下端に置き、画面の下に付いてくる（右のパネルには重ねない）。 */
 /*
  * 見出しの行（`KWlQY` 154x20 ＝ 文字14・行の高さ20の太字／`LWv01`・`h4yzAO` は小さい字）。
  * 板では3つが左から間8で続くので、右へ押し出す詰め物（`.spacer`）は置かない。
@@ -59,7 +57,7 @@
   justify-content: center;
   gap: var(--tpl-hb-pending-gap);
   outline: 1px dashed var(--color-control-border);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
   background: var(--color-canvas);
   cursor: default;
 }
@@ -91,19 +89,6 @@
 .star svg { width: var(--tpl-hb-star-glyph); height: var(--tpl-hb-star-glyph); }
 .starOn { fill: var(--color-status-warn); color: var(--color-status-warn); }
 .starOff { color: var(--color-ink-faint); }
-
-/*
- * 生成パネルは中身だけを持つ（2026-10-07）。承認済み ★BG-B `qIp42` では
- * 生成するボタン・条件をクリア・大きさの札は下部追従バー `X2oLn` にあるので、
- * パネルの中の全幅ボタン（`.full`）と下の行（`.panelFoot` / `.linkButton`）は
- * 置き場所ごと消した。見た目は共通の帯と札の部品が持つ。
- */
-.panel { display: flex; flex-direction: column; gap: var(--tpl-hb-dialog-gap); width: var(--tpl-hb-panel-w); flex-shrink: 0; }
-
-@media (max-width: 1151px) {
-  .split { flex-direction: column; }
-  .panel { width: 100%; }
-}
 
 .selectionTools { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tpl-hb-tool-gap); margin-left: var(--tpl-hb-selection-margin); }
 .tileSelect { position: absolute; z-index: 1; top: var(--tpl-hb-tool-gap); left: var(--tpl-hb-tool-gap); }

@@ -26,7 +26,9 @@ export interface DuplicatesStatsData {
   uniquePeople: number
   friendDups: number
   duplicateGroups: number
-  // 送信実績ではなく friendDups × 単価の見積り。実績が繋がるまで画面には出さない。
+  // 旧Workerの省略・実績取得不能を0通にしない。
+  overlappingDeliveryCount?: number | null
+  // friendDups × 単価の見積り。実送信数の代わりには使わない。
   wastedPerBroadcastYen: number
   msgUnitYen: number
   perAccount: PerAccountStat[]

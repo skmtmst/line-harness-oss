@@ -38,7 +38,7 @@
   gap: 0;
   border: 0;
   outline: 1px solid var(--color-hairline);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
 }
 :root .sm { border-radius: var(--radius-tile-sm); }
 :root .md, :root .lg { border-radius: var(--radius-tile); }

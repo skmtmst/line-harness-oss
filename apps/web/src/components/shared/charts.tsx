@@ -6,7 +6,7 @@ export const CHART_COLORS = { primary: 'var(--color-accent-deep)', secondary: 'v
 export function chartNumber(value: number | null, unit = '') { return value === null || !Number.isFinite(value) ? '—' : `${value.toLocaleString('ja-JP')}${unit}` }
 export function chartDate(value: string) { return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${Number(value.slice(5,7))}/${Number(value.slice(8,10))}` : value }
 export type ChartPoint = { key: string; label: string; value: number | null; note?: string; emphasis?: boolean }
-export function ValueBarChart({ items, label, unit = '', presentation = 'standard' }: { items: ChartPoint[]; label: string; unit?: string; presentation?: 'standard' | 'summary' }) {
+export function ValueBarChart({ items, label, unit = '', presentation = 'standard', signed = false }: { items: ChartPoint[]; label: string; unit?: string; presentation?: 'standard' | 'summary'; signed?: boolean }) {
  const columnsRef = useRef<HTMLDivElement>(null)
  const [labelStep, setLabelStep] = useState(1)
  useEffect(() => {
@@ -27,10 +27,14 @@ export function ValueBarChart({ items, label, unit = '', presentation = 'standar
   void document.fonts?.ready.then(measure)
   return () => observer?.disconnect()
  }, [items])
- const max = Math.max(1,...items.map(p=>p.value ?? 0)); const ticks = barChartTicks(max); const top=ticks.at(-1) || 1
+ const max = Math.max(1,...items.map(p=>p.value ?? 0)); const positiveTicks = barChartTicks(max); const top=positiveTicks.at(-1) || 1
+ const below=signed ? barChartTicks(Math.max(0,...items.map(p=>-(p.value??0)))).at(-1)! : 0
+ const minimum=signed && items.some(p=>(p.value??0)<0) ? -below : 0, span=top-minimum
+ const ticks=minimum<0 ? [...barChartTicks(-minimum).filter(t=>t>0).map(t=>-t),...positiveTicks] : positiveTicks
+ const bottom=(value:number)=>(value-minimum)/span*100
  return <div className={styles.root} role="group" aria-label={label}>
-  <div className={styles.plot} data-presentation={presentation}>{presentation === 'standard' && ticks.map(tick=><span className={styles.grid} key={tick} style={{bottom:`${tick/top*100}%`}} aria-hidden="true"><span>{chartNumber(tick,unit)}</span></span>)}
-   <div ref={columnsRef} className={styles.columns} data-dense={items.length > 14 || undefined}>{items.map((item,index)=><div className={styles.column} key={item.key}><button type="button" className={styles.hit} aria-label={`${item.label} ${chartNumber(item.value,unit)}${item.note ? `・${item.note}`:''}`}><span className={styles.bar} style={{height:`${Math.max(0,item.value??0)/top*100}%`,background:presentation === 'summary' && !item.emphasis ? 'var(--color-accent)' : CHART_COLORS.primary}}/><span className={styles.tooltip}>{item.label} {chartNumber(item.value,unit)}{item.note}</span></button><span className={styles.axis} data-chart-axis data-axis-edge={items.length > 1 ? index === 0 ? 'first' : index === items.length - 1 ? 'last' : undefined : undefined} hidden={index !== 0 && index !== items.length - 1 && (index % labelStep !== 0 || items.length - 1 - index < labelStep)}>{chartDate(item.label)}</span></div>)}</div>
+  <div className={styles.plot} data-presentation={presentation}>{presentation === 'standard' && ticks.map(tick=><span className={styles.grid} key={tick} style={{bottom:`${bottom(tick)}%`}} aria-hidden="true"><span>{chartNumber(tick,unit)}</span></span>)}
+   <div ref={columnsRef} className={styles.columns} data-dense={items.length > 14 || undefined}>{items.map((item,index)=><div className={styles.column} key={item.key}><button type="button" className={styles.hit} aria-label={`${item.label} ${chartNumber(item.value,unit)}${item.note ? `・${item.note}`:''}`}><span className={styles.bar} style={{...(signed?{position:'absolute' as const,bottom:`${bottom(Math.min(0,item.value??0))}%`,height:`${Math.abs(item.value??0)/span*100}%`}:{height:`${Math.max(0,item.value??0)/top*100}%`}),background:presentation === 'summary' && !item.emphasis ? 'var(--color-accent)' : CHART_COLORS.primary}}/><span className={styles.tooltip}>{item.label} {chartNumber(item.value,unit)}{item.note}</span></button><span className={styles.axis} data-chart-axis data-axis-edge={items.length > 1 ? index === 0 ? 'first' : index === items.length - 1 ? 'last' : undefined : undefined} hidden={index !== 0 && index !== items.length - 1 && (index % labelStep !== 0 || items.length - 1 - index < labelStep)}>{chartDate(item.label)}</span></div>)}</div>
   </div>
  </div>
 }

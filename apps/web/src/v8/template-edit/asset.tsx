@@ -690,7 +690,6 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>答え終わったときに行うこと</h2>
               </div>
-              <Notice tone="warn">回答後の処理はまだ動きません。設定は保存できますが、回答を受け取る仕組みができるまで実行されません。</Notice>
               <InlineActionRowsV8 actions={answerActions} onChange={setAnswerActions} {...actionOptions} />
             </Card>
 

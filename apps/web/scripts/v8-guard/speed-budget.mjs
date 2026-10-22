@@ -12,7 +12,7 @@ import {execFileSync} from 'node:child_process'
 import { chromium } from '@playwright/test'
 import { screenReady } from './screen-ready.mjs'
 import { finishSpeedCheck } from './speed-outcome.mjs'
-import { SAMPLE_COUNT, REGRESSION_FACTOR, LONG_TASK_FLOOR_MS, speedPolicy } from './speed-policy.mjs'
+import { SAMPLE_COUNT, REGRESSION_FACTOR, LONG_TASK_FLOOR_MS, ONE_FRAME_MS, speedPolicy } from './speed-policy.mjs'
 export { screenReady } from './screen-ready.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -33,8 +33,8 @@ export const SPEED_ROUTES = {
   settings: '/settings',
 }
 
-/* 悪くなったら落とす幅（2026-10-04 司令塔決定①）。時間は20%、JS は1KB。 */
-export { REGRESSION_FACTOR }
+/* 悪くなったら落とす幅（2026-10-04 司令塔決定①）。時間は20%か1回分、JS は1KB。 */
+export { REGRESSION_FACTOR, ONE_FRAME_MS }
 export const JS_SLACK_BYTES = 1024
 
 /* 5回の中央値。外れ値と欠測は生の測定値と一緒に結果へ残す。 */
@@ -302,7 +302,16 @@ export async function measureStress(browser, target) {
   }
 }
 
-/* 落とすのは悪化だけ。時間は20%、JS は1KB（2026-10-04 司令塔決定①）。 */
+/* 時間は「20%」か「画面の書き換え1回分（17ms）」の大きい方まで許す。
+   1回分は測り方の粒の揺れで、悪化とは呼ばない。JS は従来の1KBだけ。 */
+export function budgetLimit(metric, baseline, policy = speedPolicy('local')) {
+  if (metric === 'jsBytes') return baseline + JS_SLACK_BYTES
+  const floor = metric === 'longTaskMs' ? Math.max(baseline, LONG_TASK_FLOOR_MS) : baseline
+  const allowed = Math.max(floor * REGRESSION_FACTOR, floor + ONE_FRAME_MS)
+  return allowed * policy.timeFactor
+}
+
+/* 落とすのは悪化だけ。時間は20%か1回分、JS は1KB（2026-10-04 司令塔決定①）。 */
 export function budgetExceedances(measured, baselines, policy = speedPolicy('local')) {
   const exceedances = []
   for (const m of measured) {
@@ -311,8 +320,7 @@ export function budgetExceedances(measured, baselines, policy = speedPolicy('loc
     for (const metric of ['showMs', 'lcpMs', 'pressMs', 'longTaskMs', 'jsBytes']) {
       const value = m[metric], b = base[metric]
       if (!Number.isFinite(value) || !Number.isFinite(b)) continue
-      const limit = metric === 'jsBytes' ? b + JS_SLACK_BYTES
-        : (metric === 'longTaskMs' ? Math.max(b, LONG_TASK_FLOOR_MS) : b) * REGRESSION_FACTOR * policy.timeFactor
+      const limit = budgetLimit(metric, b, policy)
       if (value > limit) exceedances.push({ screen: m.name, metric, value, limit, unit: metric === 'jsBytes' ? 'B' : 'ms', check: 'budget' })
     }
   }

@@ -63,7 +63,7 @@ export function SideCard({
             同じ見た目にする。ダッシュボードの行き先リンクはこの1つに
             そろえ、独自の色・大きさを増やさない。
           */}
-          {action ? <Link href={action.href} className="text-status-info shrink-0 text-label font-semibold hover:underline">{action.label}</Link> : null}
+          {action ? <Link href={action.href} prefetch={false} className="text-status-info shrink-0 text-label font-semibold hover:underline">{action.label}</Link> : null}
         </div>
         <div>{children}</div>
         {freshness ? <div className="flex justify-end">{freshness}</div> : null}
@@ -161,6 +161,7 @@ export function SupportMarkStatusCard({
           { label: '対応済み', value: inbox?.resolved ?? null, href: '/chats?status=resolved' },
         ].map((row) => (
           <Link
+            prefetch={false}
             key={row.label}
             href={row.href}
             title={`${row.label}で絞った受信箱を開く`}
@@ -310,7 +311,7 @@ export function UpcomingCard({
               <div key={`${item.kind}-${item.id}`} className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-ink truncate text-xs font-medium" title={item.title}>
-                    <Link href={item.href} className="hover:underline">{item.title}</Link>
+                    <Link href={item.href} prefetch={false} className="hover:underline">{item.title}</Link>
                   </p>
                   <p className="text-ink-faint text-micro mt-0.5">
                     {upcomingKindLabel[item.kind] ?? '予定'}

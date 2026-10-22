@@ -112,23 +112,6 @@
 .audienceAlone { margin-bottom: var(--tpl-rml-alone-shift); }
 .audienceCell .sub { margin-top: var(--tpl-compact-gap); }
 
-/* 状態の札（公開中＝緑・予約＝青・下書き＝灰）。 */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-rml-pill-gap);
-  padding: var(--tpl-rml-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-rml-pill-lh);
-  white-space: nowrap;
-}
-.pillDot { width: var(--tpl-rml-pill-dot); height: var(--tpl-rml-pill-dot); border-radius: var(--radius-pill); background: currentColor; }
-.pillLive { background: var(--color-success-bg); color: var(--color-success); }
-.pillScheduled { background: var(--color-status-info-soft); color: var(--color-action); }
-.pillDraft { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
-
 .countMain {
   color: var(--color-ink);
   font-size: var(--text-caption);

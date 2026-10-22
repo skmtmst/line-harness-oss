@@ -7,6 +7,8 @@ import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, List
 import PageSizeSelect from './page-size-select'
 import Select from './select'
 import HelpTip from './help-tip'
+import SearchField from './search-field'
+import { ListPage } from '@/components/templates/list-page'
 
 afterEach(cleanup)
 
@@ -44,6 +46,38 @@ it('nested Frame and Toolbar render the leading actions once and keep their hand
   render(<ListToolbarLeading leading={<button onClick={create}>作る</button>}><ListToolbarFrame><ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} /></ListToolbarFrame></ListToolbarLeading>)
   expect(screen.getAllByRole('button', { name: '作る' })).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: '作る' }))
+  expect(create).toHaveBeenCalledOnce()
+})
+
+it('a framed toolbar inside a responsive wrapper keeps one set of actions and the entered search', () => {
+  const create = vi.fn(), folder = vi.fn(), search = vi.fn()
+  const view = (className: string) => <ListToolbarLeading leading={<>
+    <button onClick={create}>成果地点を作る</button><button onClick={folder}>フォルダを選ぶ</button>
+  </>}><div className={className}><ListToolbarFrame layout="stacked"><ListToolbarRow>
+    <input aria-label="成果地点を検索" defaultValue="" onChange={search} />
+  </ListToolbarRow></ListToolbarFrame></div></ListToolbarLeading>
+  const { rerender } = render(view('wide-tools'))
+  expect(screen.getAllByRole('button', { name: '成果地点を作る' })).toHaveLength(1)
+  expect(screen.getAllByRole('button', { name: 'フォルダを選ぶ' })).toHaveLength(1)
+  fireEvent.change(screen.getByRole('textbox', { name: '成果地点を検索' }), { target: { value: '購入' } })
+  rerender(view('narrow-tools'))
+  expect(screen.getByRole<HTMLInputElement>('textbox', { name: '成果地点を検索' }).value).toBe('購入')
+  fireEvent.click(screen.getByRole('button', { name: '成果地点を作る' }))
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを選ぶ' }))
+  expect(create).toHaveBeenCalledOnce()
+  expect(folder).toHaveBeenCalledOnce()
+  expect(search).toHaveBeenCalledOnce()
+})
+
+it('an outer frame leaves the leading actions to a nested existing frame', () => {
+  const create = vi.fn()
+  render(<ListToolbarLeading leading={<button onClick={create}>項目を作る</button>}>
+    <ListToolbarFrame><section><ListToolbarFrame><ListToolbarRow>
+      <input aria-label="項目を検索" />
+    </ListToolbarRow></ListToolbarFrame></section></ListToolbarFrame>
+  </ListToolbarLeading>)
+  expect(screen.getAllByRole('button', { name: '項目を作る' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '項目を作る' }))
   expect(create).toHaveBeenCalledOnce()
 })
 
@@ -189,4 +223,27 @@ it('U4：並びの候補が無ければ空の欄を置かない', () => {
   const { container } = render(<ListToolbarSort value="" options={[]} onChange={change} />)
   expect(container.querySelector('button')).toBeNull()
   expect(change).not.toHaveBeenCalled()
+})
+
+
+it.each([false, true])('単独の検索を渡した一覧も、畳む先へフォルダと許可された作成を渡す（閲覧のみ=%s）', readOnly => {
+  const create = vi.fn(), folder = vi.fn(), search = vi.fn()
+  const { container } = render(<ListPage title="自動応答" readOnly={readOnly} folders={<nav>広い画面のフォルダ</nav>}
+    folderNav={{ rows: [{ id: 'all', label: 'すべて' }, { id: 'other', label: '予約' }], activeId: 'all', onSelect: folder,
+      createAction: readOnly ? undefined : <button onClick={create}>ひな形を作る</button> }}
+    toolbar={<SearchField aria-label="ひな形を検索" placeholder="ひな形を探す" value="" updateMode="immediate" onChange={search} />}>一覧の内容</ListPage>)
+  const leading = container.querySelector<HTMLElement>('[data-toolbar-leading]')
+  expect(leading).toBeTruthy()
+  const tools = leading!.closest('[data-list-toolbar]')!
+  expect(tools.contains(screen.getByRole('searchbox', { name: 'ひな形を検索' }))).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  fireEvent.click(screen.getByRole('option', { name: '予約' }).querySelector('button')!)
+  expect(folder).toHaveBeenCalledWith('other')
+  fireEvent.change(screen.getByRole('searchbox', { name: 'ひな形を検索' }), { target: { value: '来店' } })
+  expect(search).toHaveBeenCalledWith('来店')
+  if (readOnly) expect(screen.queryByRole('button', { name: 'ひな形を作る' })).toBeNull()
+  else {
+    fireEvent.click(screen.getByRole('button', { name: 'ひな形を作る' }))
+    expect(create).toHaveBeenCalledOnce()
+  }
 })

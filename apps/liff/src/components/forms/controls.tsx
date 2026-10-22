@@ -104,7 +104,7 @@ export function FormFileControl({ label, uploading = false, onUpload, kind = 'im
   const [reselectOpen, setReselectOpen] = useState(false)
   const accept = [allowedKinds.some(k => k === 'image' || k === 'identity') ? FORM_FILE_ACCEPT : '', allowedKinds.includes('pdf') ? 'application/pdf' : ''].filter(Boolean).join(',')
   const choose = (file?: File) => {
-    if (!file) return;
+    if (!file || allowedKinds.includes('identity')) return;
     if (file.size > 10 * 1024 * 1024 || !file.size) { setError('1ファイル10MBまでです'); return }
     if (!accept.split(',').includes(file.type)) { setError('受け取れる形式のファイルを選んでください'); return }
     setError(''); onUpload?.(file, sideRef.current)
@@ -117,6 +117,7 @@ export function FormFileControl({ label, uploading = false, onUpload, kind = 'im
     sideRef.current = sides.length === 2 ? files.some(f => f.side === selectedSide) ? (selectedSide === 'front' ? 'back' : 'front') : selectedSide : 'single';
     (take ? camera : ref).current?.click();
   }
+  if (allowedKinds.includes('identity')) return <FieldError>本人確認書類は受け付けていません。店舗にお問い合わせください。</FieldError>
   return <div className={styles.fileControl}>
     <input ref={ref} type="file" aria-label={label} accept={accept} disabled={uploading} hidden onChange={e => { choose(e.target.files?.[0]); e.target.value = '' }} />
     <input ref={camera} type="file" aria-label={`${label}を撮る`} accept={FORM_FILE_ACCEPT} capture="environment" disabled={uploading} hidden onChange={e => { choose(e.target.files?.[0]); e.target.value = '' }} />

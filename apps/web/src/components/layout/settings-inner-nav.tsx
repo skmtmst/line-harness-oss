@@ -221,6 +221,7 @@ export function SettingsMenu({ heading, label, entries, placement = 'inline', fi
         {entries.map(({ href, label: itemLabel, Icon, active, children = [] }) => (
           <li key={href}>
             <Link
+              prefetch={false}
               href={href}
               className={`${styles.item} ${active ? styles.itemActive : ''}`}
               aria-current={active ? 'page' : undefined}
@@ -232,7 +233,7 @@ export function SettingsMenu({ heading, label, entries, placement = 'inline', fi
               <ul className={styles.children}>
                 {children.map((child) => (
                   <li key={child.href}>
-                    <Link href={child.href} className={`${styles.child} ${child.active ? styles.itemActive : ''}`}>
+                    <Link prefetch={false} href={child.href} className={`${styles.child} ${child.active ? styles.itemActive : ''}`}>
                       {child.label}
                     </Link>
                   </li>

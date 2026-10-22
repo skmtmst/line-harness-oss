@@ -45,3 +45,11 @@ it('狭い軸は間引き、全日付の棒と読み上げを残し、幅が戻�
  expect(axes().length).toBeGreaterThan(narrow)
  expect(screen.getAllByRole('button')).toHaveLength(30)
 })
+
+it('符号付きは0基準の上下に描き、欠測と観測0を区別する',()=>{
+ render(<ValueBarChart signed label="増減" unit="人" items={[{key:'a',label:'10/1',value:-4},{key:'b',label:'10/2',value:8},{key:'c',label:'10/3',value:null},{key:'d',label:'10/4',value:0}]}/>);
+ const negative=screen.getByRole('button',{name:'10/1 -4人'}).querySelector('[style]') as HTMLElement;
+ const positive=screen.getByRole('button',{name:'10/2 8人'}).querySelector('[style]') as HTMLElement;
+ expect(parseFloat(negative.style.height)).toBeGreaterThan(0);expect(parseFloat(negative.style.bottom)).toBeLessThan(parseFloat(positive.style.bottom));
+ expect(screen.getByRole('button',{name:'10/3 —'})).toBeTruthy();expect(screen.getByRole('button',{name:'10/4 0人'})).toBeTruthy();
+})

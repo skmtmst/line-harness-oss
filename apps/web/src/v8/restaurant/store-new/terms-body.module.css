@@ -47,6 +47,8 @@
 
 .meta {
   margin: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: normal;

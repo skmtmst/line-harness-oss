@@ -29,9 +29,12 @@ import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import SegmentedControl from '@/components/shared/segmented'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
+import { fetchHqBillingMetrics } from '@/lib/api/helpers/hq-billing'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import {
   INVOICE_STATUS_LABELS,
@@ -51,6 +54,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
+type BillingMetrics = Awaited<ReturnType<typeof fetchHqBillingMetrics>>['data']
 
 /** プランを変える確認の窓の渡し先。portal＝支払いの管理（Stripe の画面）、contact＝運営へのお問い合わせ。 */
 type ChangeRoute = 'portal' | 'contact'
@@ -98,6 +102,10 @@ function BillingInner() {
 
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [summary, setSummary] = useState<BillingSummary | null>(null)
+  const [metrics, setMetrics] = useState<BillingMetrics | null>(null)
+  const [metricsLoading, setMetricsLoading] = useState(false)
+  const [metricsFailed, setMetricsFailed] = useState(false)
+  const [metricsAttempt, setMetricsAttempt] = useState(0)
   const [invoices, setInvoices] = useState<BillingInvoice[] | null>(null)
   /* R118: 履歴だけの取得失敗は概要と分けて持つ（失敗を `[]` に畳まない）。 */
   const [invoiceFailed, setInvoiceFailed] = useState(false)
@@ -140,6 +148,27 @@ function BillingInner() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    let cancelled = false
+    setMetrics(null)
+    setMetricsFailed(false)
+    if (!canManageRole(role)) {
+      setMetricsLoading(false)
+      return () => { cancelled = true }
+    }
+    setMetricsLoading(true)
+    void fetchHqBillingMetrics().then((res) => {
+      if (cancelled) return
+      if (res.success) setMetrics(res.data)
+      else setMetricsFailed(true)
+    }).catch(() => {
+      if (!cancelled) setMetricsFailed(true)
+    }).finally(() => {
+      if (!cancelled) setMetricsLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [role, metricsAttempt])
+
   // Checkout から戻った直後は Webhook がまだ届いていないことがある。少し待って読み直す。
   useEffect(() => {
     if (checkoutResult !== 'success') return
@@ -178,7 +207,15 @@ function BillingInner() {
   const invoiceUnreachable = invoiceError instanceof ApiError && invoiceError.status === 502
 
   const frame = (body: React.ReactNode) => (
-    <ListPage boardId="JB8V1" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
+    <ListPage boardId="JB8V1" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}
+      stats={status === 'ready' && canManageRole(role) ? (
+        <KpiBand>
+          <KpiCard title="今月の請求" value={metrics?.thisMonthBilledYen} valueText={metrics?.thisMonthBilledYen != null ? yen(metrics.thisMonthBilledYen) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.thisMonthBilledYen == null ? '今月の請求は未取得' : '保存済みの請求から集計'} loading={metricsLoading} onRetry={metricsFailed ? () => setMetricsAttempt((attempt) => attempt + 1) : undefined} />
+          <KpiCard title="契約中" value={metrics?.contractCount} unit="契約" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.activeAccountCount != null && metrics.trialCount != null ? `稼働中 ${metrics.activeAccountCount}アカウント・トライアル ${metrics.trialCount}` : '未取得'} help="統括単位の契約数です。LINEアカウントごとの契約数ではありません。" loading={metricsLoading} />
+          <KpiCard title="未払い" value={metrics?.unpaidInvoiceCount} unit="件" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.unpaidInvoiceCount == null ? '請求の記録は未取得' : '保存済みの請求から集計'} loading={metricsLoading} />
+          <KpiCard title="次の請求日" value={null} valueText={metrics?.nextBillingAt ? polishFormatDate(metrics.nextBillingAt, { style: 'list-day' }) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.nextBillingAt ? '現在の契約の更新日' : '予定は未取得'} loading={metricsLoading} />
+        </KpiBand>
+      ) : undefined}>
       <PageContent>{body}</PageContent>
     </ListPage>
   )

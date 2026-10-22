@@ -5,8 +5,7 @@
  *    同じ母集団にする（行の合計と見出しが食い違わない）。
  * 2. 各一覧の表は 1440px の初期表示で操作列まで収まる幅にする
  *    （ページ側のフォルダ帯を引いた実効幅 ≈780〜820px に収める）。
- * 3. リッチメニューの状態表示は共有 StatusBadge に一本化し、
- *    「公開予定」も札として出す（平文との混在をやめる）。
+ * 3. 状態と公開日時の実表示は v8/rich-menus/list.test.tsx の操作試験で守る。
  * 4. フォームの「フォルダを追加」は押せない理由を hover 限定の title
  *    ではなく常時表示の注記で伝える。
  * 5. 予約メニューにドラッグできない「⠿」の飾りを戻さない。
@@ -91,16 +90,6 @@ describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収め�
 
 })
 
-describe('Issue #709: リッチメニューの状態表示は共有StatusBadgeに一本化', () => {
-  it('共有StatusBadgeをimportし、ローカル札実装を持たない', () => {
-    const src = read('rich-menus/page.tsx')
-    expect(src).toContain('styles.pillScheduled')
-    // 平文の公開予定表示は札へ集約したので、行内の直接表示は残さない。
-    expect(src).toContain("g.status === 'published' ? styles.pillLive : styles.pillDraft")
-    expect(src).toContain('`${shortDay(g.publishingAt)} 公開`')
-    expect(src).not.toMatch(/function StatusBadge\(/)
-  })
-})
 
 /*
  * R25 で箱を接続したため、「止まっている理由」の表明は外す。

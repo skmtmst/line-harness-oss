@@ -32,6 +32,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
 import { DataTable,NameCell,RowNameLink,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
 import { Tabs,type TabItem } from '@/components/shared/tabs'
 import TagPill from '@/components/shared/tag-pill'
@@ -416,7 +417,7 @@ export default function HqStoreList(props: HqStoreListProps) {
     { key: 'method', head: '付け方', col: <col key="method" className={storeStyles.colKind} />, cell: (row) => plainTd('method', row.assignment_method ?? emptyValue('unknown')) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
   ] : type === 'rich_menu' ? [
-    { key: 'audience', head: '誰に出すか', col: <col key="audience" className={storeStyles.colPublish} />, cell: (row) => plainTd('audience', row.display_audience ?? emptyValue('unknown'), row.display_audience ?? undefined) },
+    { key: 'audience', head: '誰に出すか', col: <col key="audience" className={storeStyles.colPublish} />, cell: (row) => plainTd('audience', <TruncatedText value={row.display_audience ?? emptyValue('unknown')} />, row.display_audience ?? undefined) },
     { key: 'state', head: '状態', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
     { key: 'taps', head: '今月押された', col: <col key="taps" className={storeStyles.colMonthly} />, cell: (row) => plainTd('taps', row.tap_count == null ? emptyValue('unknown') : `${formatNumber(row.tap_count)}回`, '配った先のアカウントで押された回数の合計') },

@@ -74,7 +74,7 @@
   border: 0;
   border-radius: var(--polish-radius-small);
   outline: 1px solid var(--color-hairline);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
   font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
   line-height: 18px;
 }

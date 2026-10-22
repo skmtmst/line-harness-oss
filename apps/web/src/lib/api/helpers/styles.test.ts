@@ -178,3 +178,9 @@ it('saves KPI choices and reminder draft revision without losing account/version
     ],
   });
 });
+it('omits metricIds from a cards-only save and keeps an explicit empty metric selection', async () => {
+  await styleApi.saveCards('a', 3, [{ id: 'analytics', visible: false }]);
+  expect(JSON.parse(mocks.fetchApi.mock.calls[0][1]!.body as string)).toEqual({ expectedVersion: 3, cards: [{ id: 'analytics', visible: false }] });
+  await styleApi.saveCards('a', 4, [], []);
+  expect(JSON.parse(mocks.fetchApi.mock.calls[1][1]!.body as string)).toEqual({ expectedVersion: 4, cards: [], metricIds: [] });
+});

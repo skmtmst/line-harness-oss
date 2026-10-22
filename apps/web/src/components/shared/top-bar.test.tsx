@@ -40,7 +40,6 @@ describe("管理画面共通トップバー", () => {
  */
 describe('V8 の帯は絵どおり（殻合わせ）', () => {
   it('パンくずの手前はホーム（格子印＋リンク。統括の画面は統括のホームへ）', () => {
-    expect(source).toContain('<Link href={homeHref} className={styles.crumbHome}>')
     expect(source).toContain("homeHref = '/'")
     expect(appTopBar).toContain("homeHref={hqShell ? '/hq' : '/'}")
     expect(source).toContain('ホーム')

@@ -7,6 +7,15 @@ export interface CustomerSegments {cells:Array<{r:number;f:number;name:string;co
 export type StoreComparisonKey='friendChange'|'blockRate'|'clickRate'|'bookings'|'visits'|'noShowRate'|'responseMinutes';
 export interface StoreComparisonRow {accountId:string;name:string;style:string|null;computedAt:string|null;metrics:Record<StoreComparisonKey,{value:number|null;diff:number|null;unit:string;available:boolean}>}
 export interface StoreComparisonResult {rows:StoreComparisonRow[];average:Record<StoreComparisonKey,number|null>;total:number;computedAt:string|null}
+export type HqAttentionKind = 'unhandledChats'|'pendingBookings'|'unpaid'|'connections'|'stoppedDeliveries';
+export type HqAttentionCounts = Record<HqAttentionKind, number>;
+export interface StoreComparisonDay { date:string; values:Record<StoreComparisonKey,number|null>; state:'ready'|'partial'|'failed'|'missing' }
+export interface StoreComparisonDetail {
+ accountId:string; style:string|null; computedAt:string|null; values:Record<StoreComparisonKey,number|null>;
+ trend:StoreComparisonDay[];
+ recentBroadcasts:Array<{id:string;title:string;status:string;sent_at:string|null}>;
+ attention:{status:'ready';counts:HqAttentionCounts;targets:Partial<Record<HqAttentionKind,Array<{href:string;count:number}>>>}|{status:'unavailable';counts:null};
+}
 export type AutoLineKind='cart'|'browse'|'restock';
 export interface AutoLineRule {kind:AutoLineKind;enabled:boolean;waitMinutes:number;messages:unknown[];version:number;testMode:true}
 export interface BookingPassPlan {id:string;kind:'ticket'|'monthly';name:string;price:number;count:number|null;monthlyLimit:number|null;eventIds?:string[]|null;validDays:number;menuIds:string[];allowWithoutPass:boolean;status:'draft'|'on_sale'|'stopped';version:number}

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Dialog from './dialog'
 import TruncatedText, { compactUrl, TruncatedTextFocus } from './truncated-text'
@@ -32,10 +32,11 @@ describe('省略した文字の全文確認', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
-  it('切れた名前をTabで全文確認でき、短い名前にはTab停止を増やさない', () => {
+  it('切れた名前をTabで全文確認でき、短い名前にはTab停止を増やさない', async () => {
     vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(180)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80)
     const { rerender } = render(<TruncatedText value="長い項目の名前" />)
+    await act(async () => { await Promise.resolve() })
     const text = screen.getByText('長い項目の名前')
     expect(text.tabIndex).toBe(0)
     expect(text.getAttribute('aria-label')).toBe('長い項目の名前')
@@ -46,6 +47,7 @@ describe('省略した文字の全文確認', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
     vi.restoreAllMocks()
     rerender(<TruncatedText value="短い名前" />)
+    await act(async () => { await Promise.resolve() })
     expect(screen.getByText('短い名前').hasAttribute('tabindex')).toBe(false)
     expect(screen.getByText('短い名前').hasAttribute('aria-label')).toBe(false)
     expect(screen.getByText('短い名前').title).toBe('短い名前')
@@ -79,13 +81,14 @@ describe('省略した文字の全文確認', () => {
   })
 })
 
-it('タグ幅専用の不可視コピーは測らず、表示する文字の全文確認を残す', () => {
+it('タグ幅専用の不可視コピーは測らず、表示する文字の全文確認を残す', async () => {
   const observe = vi.fn()
-  vi.stubGlobal('ResizeObserver', class { observe = observe; disconnect() {} })
+  vi.stubGlobal('ResizeObserver', class { observe = observe; unobserve() {} disconnect() {} })
   vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(180)
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80)
   try {
     render(<><span data-tag-overflow-measure="" aria-hidden="true" inert><TruncatedText value="不可視の名前" /></span><TruncatedText value="表示する長い名前" /></>)
+    await act(async () => { await Promise.resolve() })
     expect(new Set(observe.mock.calls.map(([node]) => node))).toEqual(new Set([screen.getByText('表示する長い名前')]))
     expect(screen.getByText('不可視の名前').hasAttribute('tabindex')).toBe(false)
     const visible = screen.getByText('表示する長い名前')
@@ -95,11 +98,12 @@ it('タグ幅専用の不可視コピーは測らず、表示する文字の全�
   } finally { vi.unstubAllGlobals() }
 })
 
-it('全文を開く操作が別にある群は重複するTab停止を作らず、単独では戻す', () => {
+it('全文を開く操作が別にある群は重複するTab停止を作らず、単独では戻す', async () => {
   vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(180)
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80)
   const value = '長いタグの名前'
   const { rerender } = render(<TruncatedTextFocus.Provider value={false}><TruncatedText value={value} /></TruncatedTextFocus.Provider>)
+  await act(async () => { await Promise.resolve() })
   expect(screen.getByText(value).hasAttribute('tabindex')).toBe(false)
   expect(screen.getByText(value).title).toBe(value)
   fireEvent.mouseEnter(screen.getByText(value))

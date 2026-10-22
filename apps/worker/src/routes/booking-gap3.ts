@@ -9,6 +9,7 @@ import {depositRule,validDeposit,depositEstimate,cancellationCardRequired} from 
 import {resolveAccountIdFromLiff,verifyCallerLineUserId,resolveFriendId} from './booking.js';
 import {bookingCancellationQuote,cancellationPolicy,cancellationQuote} from '../features/booking/booking-cancellation/index.js';
 import {getAccountTimeZone} from '../services/availability.js';
+import {bookingPaymentSelection} from '../features/booking/booking-payment-selection/index.js';
 import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 export const bookingGap3=new Hono<Env>();
 bookingGap3.use('/api/booking/admin/*',requirePermission('/booking/bookings'));
@@ -70,7 +71,8 @@ bookingGap3.get('/api/liff/booking/cost-estimate',async c=>{
    .bind(staffId??null,id,a).first<{base_price:number;price:number;is_offered:number|null}>();if(!m)throw new GapError('not_found',404);
  if(staffId&&m.is_offered!==1)return c.json({success:false,error:'menu_not_offered'},422);
  const price=staffId?m.price:m.base_price,policy=await cancellationPolicy(c.env.DB,a);
- return c.json({success:true,data:{cancellation:{...policy,price,...cancellationQuote(policy,start,price),cardRequired:await cancellationCardRequired(c.env.DB,a,friend)},deposit:await depositEstimate(c.env.DB,a,String(id),price,start,people,await getAccountTimeZone(c.env.DB,a))}});
+ const payment=await bookingPaymentSelection(c.env.DB,a,String(id),friend);
+ return c.json({success:true,data:{cancellation:{...policy,price,...cancellationQuote(policy,start,price),cardRequired:await cancellationCardRequired(c.env.DB,a,friend)},deposit:await depositEstimate(c.env.DB,a,String(id),price,start,people,await getAccountTimeZone(c.env.DB,a)),payment:{mode:payment.config.mode,allowedMethods:payment.allowedMethods}}});
 });
 
 async function self(c:Context<Env>){const a=await resolveAccountIdFromLiff(c),u=await verifyCallerLineUserId(c,a??undefined);if(!a||!u)throw new GapError('unauthorized',401);const f=await resolveFriendId(c,u,a);if(!f)throw new GapError('not_found',404);return {a,f};}

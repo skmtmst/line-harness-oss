@@ -19,6 +19,18 @@
   cursor: pointer;
 }
 .block[data-placement='cell'] { position: static; width: 100%; min-height: var(--tpl-people-block-height); }
+.block[data-placement='calendar'] {
+  inset: auto;
+  inset-block: 0;
+  inset-inline-start: calc(100% * var(--calendar-lane) / var(--calendar-lanes) + var(--polish-space-row) / 2);
+  inline-size: calc(100% * var(--calendar-span) / var(--calendar-lanes) - var(--polish-space-row));
+  pointer-events: auto;
+  padding: var(--polish-space-row);
+  gap: 0;
+  color: var(--color-ink);
+  font-size: var(--text-micro);
+}
+.block[data-placement='calendar'] > span { max-inline-size: 100%; min-inline-size: 0; }
 
 .blockLine {
   background: var(--color-accent-soft);

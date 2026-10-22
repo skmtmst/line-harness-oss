@@ -54,6 +54,17 @@ describe('V8 の型へ渡す操作', () => {
     fireEvent.click(toggle)
     expect((screen.getByRole('textbox', { name: '回答を探す' }) as HTMLInputElement).value).toBe('ココ')
   })
+  it('補助欄の無い詳細は開く操作と空き列を持たず、本文を残す', () => {
+    const { container, rerender } = render(<DetailColumns asideLabel="生成設定" aside={null} expanded={false} onExpandedChange={vi.fn()}><button>画像を開く</button></DetailColumns>)
+    const columns = () => container.firstElementChild!
+    expect(columns().hasAttribute('data-has-aside')).toBe(false)
+    expect(screen.queryByRole('complementary')).toBeNull()
+    expect(screen.queryByRole('button', { name: '生成設定' })).toBeNull()
+    expect(screen.getByRole('button', { name: '画像を開く' })).toBeTruthy()
+    rerender(<DetailColumns asideLabel="生成設定" aside={<input aria-label="生成文" />} expanded={false} onExpandedChange={vi.fn()}>画像一覧</DetailColumns>)
+    expect(columns().hasAttribute('data-has-aside')).toBe(true)
+    expect(screen.getByRole('button', { name: '生成設定' })).toBeTruthy()
+  })
   it('本文幅の保存口を選んだ画面だけ本文内に置き、既存の配置は保つ', () => {
     const { container, rerender } = render(<SettingsPage title="設定" navigation="目次" saveActions={<button>保存</button>}>内容</SettingsPage>)
     const content = () => container.querySelector('[data-template-region="content"]')!

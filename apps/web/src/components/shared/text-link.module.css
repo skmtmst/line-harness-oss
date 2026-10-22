@@ -44,7 +44,7 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .root { font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .root { font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 :root .label { line-height: 18px; }
 }
 

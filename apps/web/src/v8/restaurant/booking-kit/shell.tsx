@@ -114,7 +114,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, children }: {
+export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, children, renderPage }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -148,7 +148,9 @@ export default function RestaurantShell({ boardId, title, description, explanati
   headSize?: 'compact'
   /** 題の下の説明の行を出さず「？」へ入れる（絵に説明の行が無い板。休業日・貸切 ）。 */
   hideSubtitle?: boolean
-  children: (ctx: RestaurantV8Context) => ReactNode
+  children?: (ctx: RestaurantV8Context) => ReactNode
+  /** 保存状態を持つ子が、既存PageFrameの本文と下部操作を分けて置く場合。 */
+  renderPage?: (ctx: RestaurantV8Context, heading: ReactNode, notice: ReactNode) => ReactNode
 }) {
   usePageTitle(title)
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -223,7 +225,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
   ) : !ctx ? (
     <EmptySetup />
   ) : (
-    children(ctx)
+    children?.(ctx)
   )
   const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect compact size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField></span> : <StoreFilterTabs value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/> : null
   const noticeBand = loadError !== null && snapshot?.organization ? <ListState kind="error" title={savedButUnread ? "保存しましたが、最新の表示を読み込めませんでした" : "最新の表示を読み込めませんでした"} error={loadError} onRetry={()=>void load()}/> : notice ? (
@@ -239,8 +241,8 @@ export default function RestaurantShell({ boardId, title, description, explanati
     )
   }
 
-  const page = (
-    <div data-design-node={boardId} data-restaurant-fusion={templateHeading||undefined} data-list-skeleton={layout === 'ledger' && !templateHeading ? 'templates' : undefined} className={styles.page}>
+  const heading = (
+    <>
       {templateHeading ? <PageHeading
         inset="none"
         title={title}
@@ -260,6 +262,12 @@ export default function RestaurantShell({ boardId, title, description, explanati
       </div>
       )}
       {storeTab ? <div className={styles.storeTabs}><StoreTabs current={storeTab} flush /></div> : null}
+    </>
+  )
+  if (ctx && renderPage) return renderPage(ctx, <div className={styles.page} data-restaurant-fusion={templateHeading || undefined}>{heading}</div>, noticeBand)
+  const page = (
+    <div data-design-node={boardId} data-restaurant-fusion={templateHeading||undefined} data-list-skeleton={layout === 'ledger' && !templateHeading ? 'templates' : undefined} className={styles.page}>
+      {heading}
       <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''} ${storeTab ? styles.bodyAfterTabs : ''} ${boundary ? '' : styles.bodyFlush}`}>
         {boundary ? <BoundaryBanner /> : null}
         {noticeBand}

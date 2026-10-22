@@ -1,3 +1,4 @@
+import type { StoreComparisonDay, StoreComparisonKey } from '@line-crm/shared';
 import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import {GapError} from './gap-common.js';
 export const comparisonKeys=['friendChange','blockRate','clickRate','bookings','visits','noShowRate','responseMinutes']as const;
@@ -18,9 +19,23 @@ export function comparisonPeriod(from?:string,to?:string){
  const end=to??japanDateOffset(-1),start=from??new Date(Date.parse(end)-29*86400000).toISOString().slice(0,10);
  if(![start,end].every(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s)||start>end||Date.parse(end)-Date.parse(start)>366*86400000)throw new GapError('invalid_period');return {from:start,to:end,days:1+(Date.parse(end)-Date.parse(start))/86400000};
 }
+/** Daily values use only the saved observation, never fill a missing day with zero. */
+export function comparisonTrend(rows:Record<string,unknown>[], period:ReturnType<typeof comparisonPeriod>):StoreComparisonDay[] {
+ const byDay=new Map(rows.map(row=>[String(row.date),row]));
+ return Array.from({length:period.days},(_,index)=>{
+  const date=japanDateOffset(index,new Date(`${period.from}T00:00:00+09:00`)),row=byDay.get(date);
+  const value=(key:string)=>typeof row?.[key]==='number'&&Number.isFinite(row[key])?row[key] as number:null;
+  const added=value('friends_added'),blocked=value('friends_blocked'),start=value('friends_at_start'),recipients=value('broadcast_recipients'),clicks=value('broadcast_clicks'),visits=value('visits'),noShows=value('no_shows');
+  const known=!!row&&row.state!=='failed';
+  const values:Record<StoreComparisonKey,number|null>={friendChange:added!==null&&blocked!==null?added-blocked:null,blockRate:start!==null&&start>0&&blocked!==null?100*blocked/start:null,clickRate:recipients!==null&&recipients>0&&clicks!==null?100*clicks/recipients:null,bookings:value('bookings'),visits,noShowRate:visits!==null&&noShows!==null&&visits+noShows>0?100*noShows/(visits+noShows):null,responseMinutes:value('first_response_median_minutes')};
+  if(!known)for(const key of comparisonKeys)values[key]=null;
+  return {date,values,state:row?.state==='failed'?'failed':!row?'missing':row.state==='ready'?'ready':'partial'};
+ });
+}
 export async function storeNumbers(db:D1Database,a:string,period:ReturnType<typeof comparisonPeriod>){
  const style=(await db.prepare("SELECT style FROM account_styles WHERE line_account_id=? AND selection_mode='configured'").bind(a).first<{style:string}>())?.style??null;
- const rows=(await db.prepare("SELECT * FROM hq_store_daily_metrics WHERE account_id=? AND date BETWEEN ? AND ? AND state!='failed' ORDER BY date").bind(a,period.from,period.to).all<Record<string,unknown>>()).results;
+ const observations=(await db.prepare("SELECT * FROM hq_store_daily_metrics WHERE account_id=? AND date BETWEEN ? AND ? ORDER BY date").bind(a,period.from,period.to).all<Record<string,unknown>>()).results;
+ const rows=observations.filter(row=>row.state!=='failed');
  const full=rows.length===period.days,sum=(key:string)=>full&&rows.every(r=>r[key]!==null)?rows.reduce((n,r)=>n+Number(r[key]),0):null;
  const added=sum('friends_added'),blocked=sum('friends_blocked'),start=full?rows[0]?.friends_at_start:null,recipients=sum('broadcast_recipients'),clicks=sum('broadcast_clicks'),visits=sum('visits'),noShows=sum('no_shows');
  // Read human response timestamps to compute the actual period median, never a median of medians.
@@ -28,7 +43,7 @@ export async function storeNumbers(db:D1Database,a:string,period:ReturnType<type
  const minutes=full?(await db.prepare(`SELECT minutes FROM hq_store_response_samples WHERE account_id=? AND julianday(responded_at)>=julianday(?) AND julianday(responded_at)<julianday(?) ORDER BY minutes`).bind(a,from,to).all<{minutes:number}>()).results.filter(x=>x.minutes>=0).map(x=>x.minutes):[];
  const response=minutes.length?(minutes[Math.floor((minutes.length-1)/2)]+minutes[Math.floor(minutes.length/2)])/2:null;
  const values:Record<ComparisonKey,number|null>={friendChange:added!==null&&blocked!==null?added-blocked:null,blockRate:start&&blocked!==null?100*blocked/Number(start):null,clickRate:recipients&&clicks!==null?100*clicks/recipients:null,bookings:sum('bookings'),visits,noShowRate:visits!==null&&noShows!==null&&visits+noShows>0?100*noShows/(visits+noShows):null,responseMinutes:response};
- return {values,style,computedAt:full?rows.map(r=>String(r.computed_at)).sort()[0]??null:null,trend:rows};
+ return {values,style,computedAt:full?rows.map(r=>String(r.computed_at)).sort()[0]??null:null,trend:observations};
 }
 
 /** Reserve one historical slot and one yesterday slot per tick, so new work cannot starve repair. */

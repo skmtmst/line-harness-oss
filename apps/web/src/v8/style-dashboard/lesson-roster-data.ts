@@ -1,5 +1,6 @@
 import { eventsApi, type EventBookingItem } from '@/lib/api'
 import type { StyleRoster } from './model'
+import { toLessonRosterMember } from './lesson-roster-state'
 
 /** 展開表示と全員操作のため、表示用の7人に切らずページを読み切る。 */
 export async function loadLessonBookings(accountId: string, eventId: string, slotId: string, signal: AbortSignal): Promise<EventBookingItem[]> {
@@ -23,14 +24,7 @@ export async function loadLessonBookings(accountId: string, eventId: string, slo
 }
 
 export function lessonRosterMembers(items: EventBookingItem[]): StyleRoster['members'] {
-  return items.map(b => ({
-    name: b.friend_display_name ?? b.friend_name ?? '名前なし',
-    sub: b.is_first_time ? '初めて' : b.status === 'cancelled' ? '取消' : '会員',
-    pay: { label: '—', tone: 'neutral' },
-    attend: b.cancelled_at ? 'cancel' : b.status === 'attended' ? 'done' : b.status === 'no_show' ? 'absent' : 'button',
-    bookingId: b.id,
-    eventId: b.event_id,
-  }))
+  return items.map(toLessonRosterMember)
 }
 
 /** 個別更新の識別子は予約ID。名前なし・同名の人も混ざらない。 */

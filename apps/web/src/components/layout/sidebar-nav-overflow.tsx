@@ -1,10 +1,15 @@
 'use client'
+import { cancelMeasurement, scheduleMeasurement } from '../shared/dom-measurement-batch'
+import { observeElementResize } from '../shared/element-resize-observer'
 
 
 
 export function watchNavOverflow(nav: HTMLElement | null) {
-  if (!nav || typeof ResizeObserver === 'undefined') return
-  const update = () => {
+  if (!nav) return
+  let active = true
+  const key = {}
+  const read = () => {
+    if (!active) return () => {}
     const more = nav.scrollHeight - nav.clientHeight - nav.scrollTop > 1
     const above = nav.scrollTop > 1
     let cutTop = 0
@@ -18,22 +23,41 @@ export function watchNavOverflow(nav: HTMLElement | null) {
         if (above && rect.top < box.top && rect.bottom > box.top) cutTop = Math.max(cutTop, rect.bottom - box.top)
       }
     }
-    nav.style.setProperty('--nav-cut-top', `${Math.ceil(cutTop)}px`)
-    nav.style.setProperty('--nav-cut-bottom', `${Math.ceil(cutBottom)}px`)
-    if (more || above) nav.setAttribute('data-clipped', '')
-    else nav.removeAttribute('data-clipped')
+    const top = `${Math.ceil(cutTop)}px`, bottom = `${Math.ceil(cutBottom)}px`, clipped = more || above
+    const topChanged = nav.style.getPropertyValue('--nav-cut-top') !== top
+    const bottomChanged = nav.style.getPropertyValue('--nav-cut-bottom') !== bottom
+    const clippedChanged = nav.hasAttribute('data-clipped') !== clipped
+    return () => {
+      if (!active) return
+      if (topChanged) nav.style.setProperty('--nav-cut-top', top)
+      if (bottomChanged) nav.style.setProperty('--nav-cut-bottom', bottom)
+      if (clippedChanged) {
+        if (clipped) nav.setAttribute('data-clipped', '')
+        else nav.removeAttribute('data-clipped')
+      }
+    }
   }
+  const update = () => { if (active) scheduleMeasurement(key, read) }
+  let children: Element[] = [], stopObserving = () => {}
+  const observeChildren = () => {
+    const next = Array.from(nav.children)
+    if (next.length === children.length && next.every((child, index) => child === children[index])) return
+    stopObserving()
+    children = next
+    stopObserving = observeElementResize([nav, ...children], update)
+  }
+  // Also observe an empty navigation; groups may arrive after account/permission data.
+  stopObserving = observeElementResize([nav], update)
+  observeChildren()
   update()
   nav.addEventListener('scroll', update, { passive: true })
-  const observer = new ResizeObserver(update)
-  observer.observe(nav)
-  for (const child of Array.from(nav.children)) observer.observe(child)
-  // 区分が後から足される・開閉されるときも測り直す。
-  const mutations = new MutationObserver(update)
-  mutations.observe(nav, { childList: true, subtree: true })
+  const mutations = new MutationObserver(() => { if (active) { observeChildren(); update() } })
+  mutations.observe(nav, { childList: true, subtree: true, characterData: true })
   return () => {
+    active = false
+    cancelMeasurement(key)
     nav.removeEventListener('scroll', update)
-    observer.disconnect()
+    stopObserving()
     mutations.disconnect()
   }
 }

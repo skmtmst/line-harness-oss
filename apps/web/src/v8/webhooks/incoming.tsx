@@ -5,7 +5,7 @@ const FIELD_REQUIREMENTS = {
   createName: requiredText("名前を入力してください"),
 }
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSearchParams } from 'next/navigation'
 import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox, Copy } from 'lucide-react'
@@ -19,7 +19,7 @@ import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import EmptyList from '@/components/shared/empty-list'
@@ -759,25 +759,26 @@ export default function WebhooksIncomingV8() {
               <p className={styles.cardNote}>いま確認が必要な届物はありません。</p>
             ) : (
               <>
-                <DataTable aria-label="人が見つからなかった届物">
+                <DataTable aria-label="人が見つからなかった届物" columnSizing="content">
                   <thead>
                     <TableHeadRow>
-                  <Th className={styles.miniWhen}>届いた日時</Th>
-                  <Th className={styles.miniValue}>届いた値</Th>
-                  <Th className={styles.miniCandidate}>候補</Th>
-                  <Th grow className={styles.miniOps}><span className={styles.srOnly}>操作</span></Th>
+                  <Th>届いた日時</Th>
+                  <Th grow>届いた値</Th>
+                  <Th>候補</Th>
+                  <Th showActionLabel>操作</Th>
                 </TableHeadRow>
                 </thead>
                 <tbody>
                 {unmatched.map((item) => (
-                  <Tr key={item.id} data-row-id={item.id}>
-                    <Td className={styles.miniWhen}>{shortDateTime(item.receivedAt)}</Td>
-                    <Td className={styles.miniValue} title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
-                      {item.identityAttempts.length > 0
+                  <Fragment key={item.id}>
+                  <Tr data-row-id={item.id} aria-describedby={unmatchedActionError?.id === item.id ? `wh-unmatched-error-${item.id}` : undefined}>
+                    <Td><TruncatedText value={shortDateTime(item.receivedAt)} /></Td>
+                    <Td grow title={item.identityAttempts.map((attempt: { kind: string; value: string }) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')}>
+                      <TruncatedText value={item.identityAttempts.length > 0
                         ? item.identityAttempts.map((attempt: { kind: string; value: string }) => attempt.value).join('、')
-                        : '照合に使える値が届いていません'}
+                        : '照合に使える値が届いていません'} />
                     </Td>
-                    <Td className={styles.miniCandidate}>
+                    <Td>
                       <TruncatedText value={item.kind === 'candidate'
                         ? '1人の友だちに一致'
                         : item.kind === 'ambiguous'
@@ -785,12 +786,12 @@ export default function WebhooksIncomingV8() {
                           : '一致する友だちがいません'} />
                       {item.kind === 'ambiguous' && canResolveUnmatched ? item.candidates.map((candidate) => (
                         <div key={candidate.friendId}>
-                          <span>{candidate.displayName ?? candidate.friendId}</span>
+                          <TruncatedText value={candidate.displayName ?? candidate.friendId} />
                           <Button disabled={dismissingId !== null} busy={dismissingId === item.id} onClick={() => void resolveUnmatched(item, { action: 'link', friendId: candidate.friendId })}>この人に結び付ける</Button>
                         </div>
                       )) : null}
                     </Td>
-                    <Td grow className={styles.miniOps}>
+                    <ActionCell>
                       {canResolveUnmatched ? (
                         item.kind === 'candidate' && item.candidates[0] ? (
                           <Button disabled={dismissingId !== null} busy={dismissingId === item.id} onClick={() => void resolveUnmatched(item, { action: 'link', friendId: item.candidates[0].friendId })}>結び付ける</Button>
@@ -800,11 +801,12 @@ export default function WebhooksIncomingV8() {
                           </Button>
                         )
                       ) : <span className={styles.cardNote}>結び付け・確認は統括または管理者に頼んでください。</span>}
-                    {unmatchedActionError && unmatchedActionError.id === item.id ? (
-                      <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{unmatchedActionError.message}</Notice>
-                    ) : null}
-                    </Td>
+                    </ActionCell>
                   </Tr>
+                  {unmatchedActionError?.id === item.id ? <Tr><Td colSpan={4}>
+                    <Notice id={`wh-unmatched-error-${item.id}`} tone="danger" role="alert">{unmatchedActionError.message}</Notice>
+                  </Td></Tr> : null}
+                  </Fragment>
                 ))}
                 </tbody>
                 </DataTable>

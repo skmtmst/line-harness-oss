@@ -100,13 +100,17 @@
  * 一言を渡さない画面（40画面以上）は3列・中央寄せのままで変わらない。
  */
 .withInfo {
-  /* 左の文が残りの幅を使い、一言と操作は中身の幅で右端に並ぶ（操作を2段に折らない・）。 */
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
+.withInfo .lead { flex: 1 1 auto; flex-wrap: wrap; }
+.withInfo .info { flex: 0 1 auto; }
 .withInfo .actions {
+  flex: 0 1 auto;
   justify-content: flex-end;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 /*

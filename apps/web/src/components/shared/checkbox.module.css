@@ -175,7 +175,7 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .label { line-height: 20px; font-weight: 400; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .label { line-height: 20px; font-weight: 400; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 :root .box { border: 0; border-radius: var(--polish-radius-small); outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
 :root .input:checked + .box, :root .input:indeterminate + .box { outline-color: var(--color-accent-deep); }
 :root .input[aria-invalid='true']:not(:checked) + .box { outline-color: var(--color-status-danger); }

@@ -20,7 +20,8 @@
 - 数の帯・新着予約：`styleApi.summary`（metrics・previous・newBookings）。率は 0〜1 を %、null は「—」と理由（数が少ない・未設定）、0 は実測の 0。前との比べは previous から（無断率・取消率は下がると緑）。
 - サロンの数の帯は `styles.md`・SM21 に従い、予約（見込み額を補足）・対応待ち・次回予約率・呼び戻し待ち・無断キャンセル率を既存の5枠へ接続する。呼び戻しは人数、無断率はAPIの分子・分母・対象期間を使う。未取得・分母不足を0にしない。保存済みPencilの同じ5枠は旧項目の入金・新着を含むため、配置は変えず、この項目差は設計図の未同期として残す。
 - 盤・一覧・週／月：`styleApi.schedule`（columns・entries・days・closures・availability）。担当の候補は columns、空きは availability.slots、担当の休みは closures。飲食の盤は `axis=table`。
-- 分析：`styleApi.analytics`（日数→ from/to。periodMetrics・daily・menus・staff・funnel）。前の期間の日ごとの値は返らないので、グラフはこの期間だけ。
+- 分析：`styleApi.analytics`（日数→ from/to、timeZone、担当の絞り込み）。日別グラフは正規の `dailyComparison.current/previous` を同じ日順で比べ、0は実測値、未取得・権限なし等は欠測として描く。前の期間の日付は元の日付を保持する。
+- 支払いの小タブは予約の集計と分け、同じ選択期間を示す `payments.period` と一致した入金額・件数、返金額・件数、未入金・期限切れを表示する。APIは日時の半開区間と店舗・担当の条件を照合する。実測値がないものを0にせず、日別の支払いグラフや詳細のAPIがない部分は取得可能なデータとして表示しない。
 - ［表示を変える］：`styleApi.get` の cards と版 → `saveCards`・`resetCards`（配列の順が上から下。接続の異常・媒体の知らせは隠せない）。
 - ［休みを入れる］：飲食は既存の `restaurantTestApi.createClosure`（卓は tableIds）、ほかは `styleApi.closeHours` を担当 1 人ずつ（途中の失敗をまとめて成功にしない）。既存の予約は取り消さない。
 - 教室の名簿：既存の `eventsApi.listBookings`（回＝slot_id）、出席は `eventsApi.updateBooking(status=attended)`。
@@ -35,6 +36,11 @@
 - サロン・面談の通常予約の空きは既存の `/booking/bookings/new` へ日付・時刻・担当IDを渡す（週の空きは日付・時刻と担当の絞り込み）。受け側は店舗・メニューの担当候補と実際の空きに存在するときだけ選ぶ。詳細・コピーは台帳表示用IDではなく実予約IDを `?booking=` へ渡す。閲覧のみでは作成操作を出さない。通常予約に属さない旧Meet相談は、受信箱の「次の予定」と同じく相談者の友だち詳細へ渡す。相談者IDが欠けた場合は架空の予約を開かず失敗を知らせる。旧Meetの専用日程・担当変更画面は未接続であり、通常予約の変更完了には数えない。
 - 教室：回を押すと右に名簿（出席・この回の人に LINE・支払いのリンク・休講にする）。
 - 異常の帯の［閉じた］は `completeChannelCloseTask`（飲食）。
+
+- 週カレンダーの重なる予約は共通部品で並べ、3件以上が同時に重なる区間は残り件数から全予約を開く。予約と空きは別の列で、担当や収容数が不明なときに予約数から空きを推測しない。複数の空きは一覧から選べる。閲覧のみは追加と空きの操作を出さず、予約の詳細を開ける。
+
+- 週と日の空き操作は、取得状態がavailableで残りが正数、または明示的なnull（定員なし）の枠だけに出す。満席0・未取得の枠を空きに数えない。満席の回本体、×の表示、回IDと詳細は残す。
+- 週の時間軸は表示する予約と空きの早朝・夜間まで広げ、15分などの短い箱も文字と操作が収まる共通の時間尺度を使う。日をまたぐ区間は店舗の時差で分け、続きの空き操作でも元の予約開始日時を保持する。
 
 ## 印・確かめの窓（B-338）
 - ［無断にする］（面談は［欠席にする］）は開始の時刻を過ぎた予約にだけ出す（行の主ボタン［来店｜無断］と「…」の両方）。あとで戻せる。飲食は `postSeatVisitMark(no_show)`、人の予約は `bookingApi.postVisitMark(no_show)`、Meet は `styleApi.saveMeetResult(attendance=no_show)`。

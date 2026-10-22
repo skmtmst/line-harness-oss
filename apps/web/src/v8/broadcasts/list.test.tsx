@@ -12,6 +12,11 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const formImport = vi.hoisted(() => ({ evaluations: 0, props: null as unknown }))
+vi.mock('@/components/broadcasts/broadcast-form', () => {
+  formImport.evaluations += 1
+  return { default: (props: unknown) => { formImport.props = props; return <div data-loaded-broadcast-form /> } }
+})
 const listBroadcasts = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view' } })))
@@ -74,6 +79,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
 import BroadcastListV8 from './list'
+const initialFormEvaluations = formImport.evaluations
 import { flushListUrlState } from '@/components/shared/list-url-state'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -152,6 +158,13 @@ function buttonByText(text: string): HTMLButtonElement | undefined {
 }
 
 describe('V8 一斉配信一覧（src/v8）の動き', () => {
+  it('does not evaluate the creation module while only the list is open', async () => {
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    expect(initialFormEvaluations).toBe(0)
+    expect(host.querySelector('[data-loaded-broadcast-form]')).toBeNull()
+  })
+
   it('未分類の件数を選択中の店舗に絞り、ほかの店舗の配信を足さない', async () => {
     listFolders.mockImplementation(async (_kind, accountId) => ({ success: true, data: [], unfiledCount: accountId === 'account-a' ? 0 : 2 }))
     act(() => { root.render(<BroadcastListV8 />) })
@@ -270,6 +283,33 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     routerPush.mockClear()
     act(() => { (items[1] as HTMLElement).click() })
     expect(routerPush).toHaveBeenCalledWith('/broadcasts/new')
+  })
+
+  it('配信を作るメニューは左のフォルダの列から左へはみ出さないよう、左端をそろえて開く（align=start）', async () => {
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    const create = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('配信を作る')) as HTMLButtonElement
+    act(() => { create.click() })
+    await flush()
+    const portal = document.querySelector('[data-menu-portal]')
+    expect(portal?.querySelector('[role="menu"][aria-label="配信の作り方"]'), '配信の作り方のメニューが開いていません').toBeTruthy()
+    expect(portal?.getAttribute('data-align')).toBe('start')
+  })
+
+  it('loads the same inline form for template entry and keeps its cancel callback', async () => {
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    const create = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('配信を作る'))!
+    act(() => create.click())
+    await flush()
+    const template = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent?.includes('テンプレートから作る'))!
+    await act(async () => template.click())
+    await waitFor(() => expect(host.querySelector('[data-loaded-broadcast-form]')).toBeTruthy())
+    const form = formImport.props as { openTemplatePickerInitially: boolean; onCancel: () => void; tags: unknown[] }
+    expect(form.openTemplatePickerInitially).toBe(true)
+    expect(form.tags).toEqual([])
+    act(() => form.onCancel())
+    expect(host.querySelector('[data-loaded-broadcast-form]')).toBeNull()
   })
 
   it('決まり2：下書きも予約済みも確認してから削除する', async () => {

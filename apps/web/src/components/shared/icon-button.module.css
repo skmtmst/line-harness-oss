@@ -82,7 +82,7 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .button { border: 0; padding: 0; gap: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }
+:root .button { border: 0; padding: 0; gap: 0; outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); }
 :root .button > :is(svg, img) { width: 16px; height: 16px; }
 
 /* 行の中の小さい形（size="small"・ の上下 24×24・印 12）。既定の 36 は変えない。 */
