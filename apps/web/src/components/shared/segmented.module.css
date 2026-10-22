@@ -169,3 +169,9 @@ html:root .root .item, html:root .root .thumb, html:root .root[data-size] .thumb
 :root .thumb { background: var(--color-selection-bg); box-shadow: var(--choice-selected-shadow); }
 :root .selected, :root .root[data-appearance] .selected { background: var(--color-selection-bg); color: var(--color-selection-border); outline: 1px solid var(--color-selection-border); outline-offset: -1px; font-weight: 600; }
 html:root .item { white-space: nowrap; flex-shrink: 0; }
+
+/* 表示を切り替える帯は白いつまみ。離れた選択札の意味色は別に保つ。 */
+:root .root[data-appearance='track'] .thumb { background: var(--color-canvas); box-shadow: var(--shadow-segment-thumb); }
+:root .root[data-appearance='track'] .selected { background: transparent; color: var(--color-ink); box-shadow: none; }
+:root .root[data-appearance='track'] .selected:not(:focus-visible) { outline: none; }
+:root .root[data-appearance='track'] .item:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
