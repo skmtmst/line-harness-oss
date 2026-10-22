@@ -150,6 +150,10 @@ export function periodFrom(period: PeriodKey, now: Date): string | null {
 
 
 
+/** サーバー（auto-reply-runs）が決まった言葉で返す失敗の理由だけを出す。それ以外（生のエラー・顧客の本文）は出さない。 */
+const SAFE_FAILURE_REASONS = new Set(['LINEへの返信を受け付けてもらえませんでした', '返信または一部の処理だけ完了しました', '自動応答を完了できませんでした'])
+const safeFailureReason = (detail: string | null | undefined) => (detail && SAFE_FAILURE_REASONS.has(detail) ? detail : null)
+
 export default function AutoReplyRunsV8() {
   const [logEntry, setLogEntry] = useState<LogEntryFacts | null>(null)
   const router = useRouter()
@@ -382,7 +386,7 @@ export default function AutoReplyRunsV8() {
   ]
 
   const rowMenuItems = (item: AutoReplyRun): ActionMenuItem[] => {
-    const list: ActionMenuItem[] = [{ id: 'detail', label: '実行の詳細を見る', onSelect: () => setLogEntry({ occurredAt: item.occurredAt, target: item.friendName ?? '削除済みの友だち', status: isDeliveryUnconfirmed(item) ? '要確認' : statusView(item.status).label, reason: isDeliveryUnconfirmed(item) ? DELIVERY_UNCONFIRMED_REASON : matchesFilter(item, 'failed') ? (item.detail || '処理を完了できませんでした。設定と相手先の状態を確認してください。') : statusView(item.status).label }) }]
+    const list: ActionMenuItem[] = [{ id: 'detail', label: '実行の詳細を見る', onSelect: () => setLogEntry({ occurredAt: item.occurredAt, target: item.friendName ?? '削除済みの友だち', status: isDeliveryUnconfirmed(item) ? '要確認' : statusView(item.status).label, reason: isDeliveryUnconfirmed(item) ? DELIVERY_UNCONFIRMED_REASON : matchesFilter(item, 'failed') ? (safeFailureReason(item.detail) ?? '処理を完了できませんでした。設定と相手先の状態を確認してください。') : statusView(item.status).label }) }]
     if (item.friendId) {
       list.push({
         id: 'chat',
@@ -522,7 +526,7 @@ export default function AutoReplyRunsV8() {
               {visibleItems.map((item) => {
                 const view = statusView(item.status)
                 const failed = matchesFilter(item, 'failed')
-                const done = isDeliveryUnconfirmed(item) ? DELIVERY_UNCONFIRMED_REASON : failed ? item.detail || '処理を完了できませんでした' : actionLabel(item)
+                const done = isDeliveryUnconfirmed(item) ? DELIVERY_UNCONFIRMED_REASON : failed ? safeFailureReason(item.detail) ?? '処理を完了できませんでした' : actionLabel(item)
                 const name = item.friendName ?? '削除済みの友だち'
                 const menuItems = rowMenuItems(item)
                 return (
