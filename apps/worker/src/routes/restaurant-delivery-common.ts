@@ -108,12 +108,29 @@ export async function serviceStates(
     .bind(store.id)
     .all<DeliveryServiceStateRow>();
   const byService = new Map((rows.results ?? []).map((row) => [row.service, row]));
+  const uber = await dbFor(c.env, store.id).prepare(
+    `SELECT status, uber_store_id, provisioned_at, last_error,
+       (SELECT COUNT(*) FROM rt_delivery_uber_connections other
+         WHERE other.uber_store_id = connection.uber_store_id AND other.status = 'connected'
+           AND other.provisioned_at IS NOT NULL) AS connected_count
+       FROM rt_delivery_uber_connections connection WHERE store_id = ? AND account_id = ?`,
+  ).bind(store.id, store.lineAccountId).first<{
+    status: string; uber_store_id: string | null; provisioned_at: number | null; last_error: string | null; connected_count: number;
+  }>();
+  const uberUnresolved = uber?.last_error === 'pos_activation_started' || uber?.last_error === 'pos_activation_unknown';
+  const uberAmbiguous = (uber?.connected_count ?? 0) > 1;
+  const uberStatus = uber?.status === 'connected' && uber.uber_store_id && uber.provisioned_at !== null && !uberUnresolved && !uberAmbiguous
+    ? 'connected' as const
+    : uber?.status === 'expired' || uber?.status === 'no_permission' || uberUnresolved || uberAmbiguous
+      ? 'error' as const : 'disconnected' as const;
+  const uberState = byService.get('ubereats');
+  if (uberState) byService.set('ubereats', { ...uberState, connection_status: uberStatus });
   return DELIVERY_SERVICES.map(
     (service) =>
       byService.get(service) ?? {
         store_id: store.id,
         service,
-        connection_status: 'disconnected' as const,
+        connection_status: service === 'ubereats' ? uberStatus : 'disconnected' as const,
         intake_status: 'open' as const,
         stop_until: null,
         stop_requested_at: null,
@@ -294,7 +311,9 @@ export async function sendWithLedger(
 
 /** 送信に失敗した時の返し方。画面には分類済みの短い文だけを出す。 */
 export function dispatchFailure(c: Context<Env>, result: Extract<DeliveryDispatchResult, { ok: false }>) {
-  const status = result.error.retryable ? 503 : 502;
+  const status = result.error.code === 'delivery_action_unsupported' ? 422
+    : ['delivery_result_unknown', 'delivery_order_conflict', 'delivery_operation_failed'].includes(result.error.code) ? 409
+      : result.error.retryable ? 503 : 502;
   return fail(c, status, result.error.message, {
     code: result.error.code,
     retryable: result.error.retryable,

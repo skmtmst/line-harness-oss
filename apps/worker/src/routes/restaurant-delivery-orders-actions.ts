@@ -6,6 +6,7 @@ import { requireIrreversibleConfirmation, requireRole } from '../middleware/role
 import { auditLog } from '../lib/audit-log.js';
 import type { AuditAction } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
+import { runUberOrderMutation } from '../features/uber-delivery/index.js';
 import { fail } from './restaurant-google.js';
 
 import { canTransitionOrder, nowSec } from '../services/restaurant-delivery.js';
@@ -62,7 +63,17 @@ export function registerDeliveryOrderActions(restaurantDelivery: Hono<Env>): voi
     }
 
     const now = nowSec();
-    const result = await sendWithLedger(c, store, {
+    const result = order.service === 'ubereats' ? await runUberOrderMutation({
+      db: dbFor(c.env, store.id),
+      env: c.env,
+      store,
+      order,
+      action: input.action,
+      to: input.to,
+      timeColumn: input.timeColumn,
+      reasonCode: input.cancel?.reasonCode,
+      now,
+    }) : await sendWithLedger(c, store, {
       service: order.service,
       action: input.action,
       targetKind: 'order',
@@ -76,28 +87,31 @@ export function registerDeliveryOrderActions(restaurantDelivery: Hono<Env>): voi
       return dispatchFailure(c, result);
     }
 
-    const sets = ['status = ?', 'updated_at = ?', 'version = version + 1'];
-    const binds: unknown[] = [input.to, now];
-    if (input.timeColumn) {
-      sets.push(`${input.timeColumn} = ?`);
-      binds.push(now);
-    }
-    if (input.cancel) {
-      sets.push('cancel_reason_code = ?', 'canceled_by = ?');
-      binds.push(input.cancel.reasonCode, input.cancel.canceledBy);
-    }
-    // 版と元の状態で絞る。同じ注文を2つの端末から進めた時は先の操作だけを通す。
-    const updated = await dbFor(c.env, store.id)
-      .prepare(
-        `UPDATE rt_delivery_orders SET ${sets.join(', ')}
-        WHERE id = ? AND store_id = ? AND status = ? AND version = ?`,
-      )
-      .bind(...binds, order.id, store.id, order.status, order.version)
-      .run();
-    if ((updated.meta?.changes ?? 0) === 0) {
-      return fail(c, 409, 'ほかの端末がこの注文を進めました。画面を開き直してください', {
-        code: 'STALE_ORDER',
-      });
+    // Uber は専用経路で注文の更新と送信台帳の確定を同じトランザクションに含める。
+    if (order.service !== 'ubereats') {
+      const sets = ['status = ?', 'updated_at = ?', 'version = version + 1'];
+      const binds: unknown[] = [input.to, now];
+      if (input.timeColumn) {
+        sets.push(`${input.timeColumn} = ?`);
+        binds.push(now);
+      }
+      if (input.cancel) {
+        sets.push('cancel_reason_code = ?', 'canceled_by = ?');
+        binds.push(input.cancel.reasonCode, input.cancel.canceledBy);
+      }
+      // 版と元の状態で絞る。同じ注文を2つの端末から進めた時は先の操作だけを通す。
+      const updated = await dbFor(c.env, store.id)
+        .prepare(
+          `UPDATE rt_delivery_orders SET ${sets.join(', ')}
+          WHERE id = ? AND store_id = ? AND status = ? AND version = ?`,
+        )
+        .bind(...binds, order.id, store.id, order.status, order.version)
+        .run();
+      if ((updated.meta?.changes ?? 0) === 0) {
+        return fail(c, 409, 'ほかの端末がこの注文を進めました。画面を開き直してください', {
+          code: 'STALE_ORDER',
+        });
+      }
     }
 
     auditLog(c, input.audit, target, { lineAccountId: order.account_id });
