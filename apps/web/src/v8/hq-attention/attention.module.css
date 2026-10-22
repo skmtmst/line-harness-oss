@@ -1,13 +1,4 @@
 /* 対応が要るもの（Kyf8U）。件数の列は 5 つ同じ幅、行の高さ 60。 */
-.parent {
-  --hqa-parent-gap: 4px;
-  margin-right: var(--hqa-parent-gap);
-  font-weight: 400;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-body);
-  white-space: nowrap;
-}
-
 .buttonIcon,
 .helpIcon {
   width: var(--polish-icon-control);
@@ -16,6 +7,8 @@
 }
 
 .sort {
+  align-self: center;
+  margin-left: auto;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   white-space: nowrap;
