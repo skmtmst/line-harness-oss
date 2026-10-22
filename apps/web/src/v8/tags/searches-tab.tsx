@@ -190,6 +190,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
       if (!accountId) return
       await api.savedSearches.delete(search.id, accountId)
       setPendingDelete(null)
+      notifyToast(`保存した検索「${search.name}」を削除しました`)
       void load()
     } catch (reason) {
       const fieldFailure = saveErrors.capture(reason)
