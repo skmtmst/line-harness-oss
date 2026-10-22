@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from './test-utils/d1-sqlite.js';
 import type { Env } from './worker-env.js';
@@ -18,7 +19,7 @@ afterEach(() => { fixture.jobs = []; });
 describe('Googleの定期読み取りも飲食店の試験旗から独立', () => {
   it.each(['production', 'staging'] as const)('%s の実設定で必要な処理だけを登録する', async environment => {
     const { unstable_readConfig } = await import('wrangler');
-    const config = unstable_readConfig({ config: new URL(environment === 'production' ? '../wrangler.toml' : '../wrangler.staging.toml', import.meta.url).pathname });
+    const config = unstable_readConfig({ config: fileURLToPath(new URL(environment === 'production' ? '../wrangler.toml' : '../wrangler.staging.toml', import.meta.url)) });
     const db = createTestD1();
     const env = { ...config.vars, DB: db.db } as Env['Bindings'];
     try {

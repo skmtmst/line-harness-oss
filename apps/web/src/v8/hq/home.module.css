@@ -107,6 +107,10 @@
   gap: var(--tpl-hq-plan-head-gap);
   flex-shrink: 0;
 }
+@container v8-page (max-width: 639px) {
+  .cardButtons { flex-wrap: wrap; }
+}
+
 .grow { flex: 1; min-width: 0; }
 
 .linkButton {

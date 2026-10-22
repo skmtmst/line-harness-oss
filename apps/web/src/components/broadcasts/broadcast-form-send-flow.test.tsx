@@ -4,12 +4,12 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 
-const mocks = vi.hoisted(() => ({ preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), preview: vi.fn(), confirm: vi.fn(), create: vi.fn(), update: vi.fn(), send: vi.fn(), config: vi.fn(), request: vi.fn(), preflight: vi.fn(), success: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   const empty = async () => ({ success: true, data: [] })
   return { ...actual, api: { ...actual.api,
-    broadcasts: { ...actual.api.broadcasts, create: mocks.create, update: mocks.update, send: mocks.send, list: empty, preflight: mocks.preflight,
+    broadcasts: { ...actual.api.broadcasts, get: mocks.get, create: mocks.create, update: mocks.update, send: mocks.send, list: empty, preflight: mocks.preflight,
       approval: { config: mocks.config, request: mocks.request, candidates: async () => ({ success: true, data: [{ id: 'reviewer', name: '確認担当' }] }) } },
     folders: { list: empty }, scenarios: { list: empty }, commonVars: { list: empty }, friendFields: { list: empty },
     broadcastMessageAssets: { list: empty }, templates: { list: empty },
@@ -42,6 +42,7 @@ async function confirm() { await click('今すぐ送る', container); await act(
 
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks()
+  mocks.get.mockResolvedValue({ success: true, data: { id: 'draft', version: 2, status: 'sending' } })
   mocks.create.mockResolvedValue({ success: true, data: { id: 'draft', version: 1 } })
   mocks.update.mockResolvedValue({ success: true, data: { id: 'draft', version: 2 } })
   mocks.send.mockResolvedValue({ success: true, data: { id: 'draft', status: 'sending' } })
@@ -59,7 +60,8 @@ describe('V8の5手順で送信を確定する', () => {
     expect(mocks.create).toHaveBeenCalledTimes(1); expect(mocks.preview).toHaveBeenCalledWith('draft'); expect(mocks.confirm).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(button('10 人に送る', dialog)); fireEvent.click(button('10 人に送る', dialog)) }); await flush()
     expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith('draft', { expectedVersion: 2, confirmedRecipientCount: 10 })
-    expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.success).toHaveBeenCalledTimes(1)
+    expect(mocks.get).toHaveBeenCalledExactlyOnceWith('draft')
+    expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.success).toHaveBeenCalledExactlyOnceWith({ id: 'draft', version: 2, status: 'sending' })
   })
   it('送信が断られたときは入力と確認窓を残し、成功として移動しない', async () => {
     mocks.confirm.mockRejectedValue(new Error('送信枠が足りません'))

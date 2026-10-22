@@ -19,7 +19,8 @@ import BottomBar from '../components/ui/bottom-bar.js';
 import Button from '../components/ui/button/index.js';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import PartyMenuStep, { PartyStaffStep, PartySummary } from '../components/party-step.js';
-import { initialParty, partyCapable, type PartyState } from '../lib/party.js';
+import { staffBookingPrice } from '../lib/booking-price.js';
+import { initialParty, partyCapable, totals, type PartyState } from '../lib/party.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
@@ -115,6 +116,12 @@ export default function Booking() {
   function pickStaff(s: StaffItem) {
     if (s.id !== staff?.id) setSlot(null);
     setStaff(s);
+    setParty(current => ({ ...current, members: current.members.map((member, index) => index === 0 ? { ...member, staff: s, designated: s.is_designation_optional !== 1 } : member) }));
+  }
+
+  function changeParty(next: PartyState) {
+    setParty(next);
+    setSlot(null);
   }
 
   /* 2 人以上・追加メニューあり。確認と送信を組の形にする。 */
@@ -139,7 +146,7 @@ export default function Booking() {
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
         <div key={step} className="liff-step">
         {step === 'menu' && partyMode && (
-          <PartyMenuStep menu={menu!} party={party} onParty={setParty} onChangeMenu={() => setChangingMenu(true)} />
+          <PartyMenuStep menu={menu!} party={party} onParty={changeParty} onChangeMenu={() => setChangingMenu(true)} />
         )}
         {step === 'menu' && !partyMode && (
           <div data-design-node="IruGD" className="space-y-3.5">
@@ -155,7 +162,7 @@ export default function Booking() {
           </div>
         )}
         {step === 'staff' && menu && party.size > 1 && (
-          <PartyStaffStep menu={menu} party={party} onParty={setParty} onLoadState={setStepReady} />
+          <PartyStaffStep menu={menu} party={party} onParty={changeParty} onLoadState={setStepReady} />
         )}
         {step === 'staff' && menu && party.size === 1 && (
           <div data-design-node="biNP5">
@@ -170,7 +177,9 @@ export default function Booking() {
         )}
         {step === 'datetime' && menu && staff && (
           <DateTimePicker
-            key={`${menu.id}-${staff.id}`}
+            key={`${menu.id}-${staff.id}-${party.members[0].addonIds.join(',')}`}
+            addonIds={party.members[0].addonIds}
+            additionalDurationMinutes={(menu.addons ?? []).filter(a => party.members[0].addonIds.includes(a.id)).reduce((sum, a) => sum + a.duration_minutes, 0)}
             menu={menu}
             staff={staff}
             hint={isPeek ? '空き状況の確認モードです' : undefined}
@@ -209,16 +218,16 @@ export default function Booking() {
           <BookingPayment
             bookingId={bookingId}
             menuName={menu.name}
-            initialAmount={staff.price}
+            initialAmount={partyActive ? totals(party, menu).price : staffBookingPrice(staff)}
             slot={slot}
-            durationMinutes={staff.duration_minutes}
+            durationMinutes={partyActive ? totals(party, menu).minutes : staff.duration_minutes}
           />
         )}
         {step === 'done' && menu && staff && slot && (
           <Done
             menuName={menu.name}
             slot={slot}
-            durationMinutes={staff.duration_minutes}
+            durationMinutes={partyActive ? totals(party, menu).minutes : staff.duration_minutes}
             status={doneStatus}
             bookingId={bookingId}
             prepayNotice={prepayNotice}
@@ -243,16 +252,16 @@ export default function Booking() {
       )}
       {step === 'staff' && stepReady && (
         <BottomBar>
-          {party.size === 1 && menu && staff && menu.price_mode !== 'inquiry' && menu.base_price > 0 ? (
+          {!partyActive && menu && staff && menu.price_mode !== 'inquiry' && menu.base_price > 0 ? (
             <p className="mb-2.5 flex items-baseline gap-2 text-[13px] text-liff-sub" data-booking-total="">
               <span>合計</span>
-              <span className="text-[17px] font-bold text-ink">{formatYen(menu.base_price + nominationFee(menu, staff))}</span>
+              <span className="text-[17px] font-bold text-ink">{formatYen(staffBookingPrice(staff))}</span>
               <span className="text-xs">{nominationFee(menu, staff) > 0
-                ? `（料金 ${formatYen(menu.base_price)}・指名料 ${formatYen(nominationFee(menu, staff))}）`
-                : `（料金 ${formatYen(menu.base_price)}・指名料なし）`}</span>
+                ? `（料金 ${formatYen(staff.price)}・指名料 ${formatYen(nominationFee(menu, staff))}）`
+                : `（料金 ${formatYen(staff.price)}・指名料なし）`}</span>
             </p>
           ) : null}
-          {party.size > 1 && menu ? <PartySummary party={party} first={menu} withFee /> : null}
+          {partyActive && menu ? <PartySummary party={party} first={menu} withFee /> : null}
           <Button variant="primary" disabled={party.size > 1 ? !party.members[0].staff : !staff} onClick={() => { if (party.size > 1) { const lead = party.members[0].staff; if (lead && lead.id !== staff?.id) { setSlot(null); setStaff(lead); } } setStep('datetime'); }}>
             日時を選ぶ
           </Button>

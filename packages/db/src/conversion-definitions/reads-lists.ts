@@ -3,8 +3,8 @@ import { metricsCte, definitionWhere, selectDefinitionsSql, orderBy, cancellatio
 
 
 export async function listConversionDefinitions(db: D1Database, input: ConversionDefinitionListInput) {
-  const cte = metricsCte(input.range);
   const where = definitionWhere(input);
+  const cte = metricsCte(input.range, where);
   const stateWhere = definitionWhere(input, false);
   const limit = Math.min(100, Math.max(1, input.limit));
   const cursor = Math.max(0, input.cursor);
@@ -39,8 +39,8 @@ export async function listConversionDefinitions(db: D1Database, input: Conversio
   ]);
   const total = Number(totalRow?.total ?? 0);
   const [cancellations, reversals] = await Promise.all([
-    cancellationMetrics(db, input.range.from, input.range.to),
-    reversalMetrics(db, input.range.from, input.range.to),
+    cancellationMetrics(db, input.range.from, input.range.to, rows.results.map(row => row.id)),
+    reversalMetrics(db, input.range.from, input.range.to, rows.results.map(row => row.id)),
   ]);
   const stateCounts = { active: 0, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0, unused: 0 };
   for (const row of stateRows.results) {
@@ -77,19 +77,19 @@ export async function getConversionDefinitionDetail(
     WITH period_metrics AS (
       SELECT conversion_point_id, COUNT(*) AS recorded_count,
              COALESCE(SUM(COALESCE(value_snapshot, 0)), 0) AS net_value
-        FROM conversion_events GROUP BY conversion_point_id
+        FROM conversion_events WHERE conversion_point_id = ? GROUP BY conversion_point_id
     ), usage_counts AS (
       SELECT conversion_point_id, COUNT(*) AS usage_count
-        FROM conversion_definition_usages GROUP BY conversion_point_id
+        FROM conversion_definition_usages WHERE conversion_point_id = ? GROUP BY conversion_point_id
     )
     ${selectDefinitionsSql()}
      WHERE cp.id = ? AND ${account.sql}`)
-    .bind(id, ...account.values)
+    .bind(id, id, id, ...account.values)
     .first<DefinitionRow>();
   if (!row) return null;
   const [cancellations, reversals] = await Promise.all([
-    cancellationMetrics(db, '0000-01-01', '9999-12-31'),
-    reversalMetrics(db, '0000-01-01', '9999-12-31'),
+    cancellationMetrics(db, '0000-01-01', '9999-12-31', [id]),
+    reversalMetrics(db, '0000-01-01', '9999-12-31', [id]),
   ]);
   const cancellation = cancellations.get(row.id);
   const reversal = reversals.get(row.id);

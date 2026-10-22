@@ -1,4 +1,3 @@
-import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import type { RecurrenceFrequency as SeriesFreq, SeriesOccurrence } from '@line-crm/shared'
 
 /** 繰り返しの予約の言葉と並べ方（言葉の表：繰り返す・毎週・隔週・毎月第 N 曜・飛ばす。「シリーズ」「定期」は使わない）。 */
@@ -8,19 +7,32 @@ export const FREQ_OPTIONS: { value: SeriesFreq; label: string }[] = [
   { value: 'monthly_nth', label: '毎月' },
 ]
 const WEEK = ['日', '月', '火', '水', '木', '金', '土']
-const jst = (iso: string) => japanCalendar(new Date(iso))
-export const weekdayOf = (iso: string) => jst(iso).getUTCDay()
-export const timeOf = (iso: string) => { const d = jst(iso); return `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}` }
-export const dayOf = (iso: string) => { const d = jst(iso); return `${d.getUTCMonth() + 1}/${String(d.getUTCDate()).padStart(2, '0')}` }
-export const dayWithWeekday = (iso: string) => `${dayOf(iso)}（${WEEK[weekdayOf(iso)]}）`
-export const hm = (iso: string) => { const d = jst(iso); return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}` }
-export const firstDay = (iso: string) => { const d = jst(iso); return `${d.getUTCMonth() + 1}/${String(d.getUTCDate()).padStart(2, '0')}` }
+/** Booking slots supply the account's IANA zone; older callers retain the Japan default. */
+export function seriesTimeZone(value = 'Asia/Tokyo'): string {
+  try { return new Intl.DateTimeFormat('en', { timeZone: value }).resolvedOptions().timeZone }
+  catch { return 'Asia/Tokyo' }
+}
+function calendar(iso: string, timeZone = 'Asia/Tokyo') {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: seriesTimeZone(timeZone), year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(iso))
+  const n = (type: string) => Number(parts.find((p) => p.type === type)?.value)
+  return { day: n('day'), month: n('month'), hour: n('hour'), minute: n('minute'),
+    weekday: new Date(Date.UTC(n('year'), n('month') - 1, n('day'))).getUTCDay() }
+}
+export const weekdayOf = (iso: string, timeZone?: string) => calendar(iso, timeZone).weekday
+export const timeOf = (iso: string, timeZone?: string) => { const d = calendar(iso, timeZone); return `${d.hour}:${String(d.minute).padStart(2, '0')}` }
+export const dayOf = (iso: string, timeZone?: string) => { const d = calendar(iso, timeZone); return `${d.month}/${String(d.day).padStart(2, '0')}` }
+export const dayWithWeekday = (iso: string, timeZone?: string) => `${dayOf(iso, timeZone)}（${WEEK[weekdayOf(iso, timeZone)]}）`
+export const hm = (iso: string, timeZone?: string) => { const d = calendar(iso, timeZone); return `${String(d.hour).padStart(2, '0')}:${String(d.minute).padStart(2, '0')}` }
+export const firstDay = dayOf
 
-/** 「毎週金曜 14:00」「隔週金曜 14:00」「毎月第 3 金曜 14:00」。 */
-export function ruleLabel(freq: SeriesFreq, startsAt: string): string {
-  const wd = `${WEEK[weekdayOf(startsAt)]}曜`
-  if (freq === 'monthly_nth') return `毎月第 ${Math.floor((jst(startsAt).getUTCDate() - 1) / 7) + 1} ${wd} ${hm(startsAt)}`
-  return `${freq === 'weekly' ? '毎週' : '隔週'}${wd} ${hm(startsAt)}`
+/** 「毎週金曜 14:00」「隔週金曜 14:00」「毎月第 N 曜」。 */
+export function ruleLabel(freq: SeriesFreq, startsAt: string, timeZone?: string): string {
+  const wd = `${WEEK[weekdayOf(startsAt, timeZone)]}曜`
+  if (freq === 'monthly_nth') return `毎月第 ${Math.floor((calendar(startsAt, timeZone).day - 1) / 7) + 1} ${wd} ${hm(startsAt, timeZone)}`
+  return `${freq === 'weekly' ? '毎週' : '隔週'}${wd} ${hm(startsAt, timeZone)}`
 }
 
 export type Pick = 'keep' | 'alternative' | 'skip'

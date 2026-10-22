@@ -151,25 +151,30 @@ export function definitionWhere(
   return { sql: clauses.join(' AND '), values };
 }
 
-export function metricsCte(range: ConversionDefinitionRange): { sql: string; values: unknown[] } {
+/** 保存形式が空白区切りでもISOでも、JST暦日を索引で絞る。 */
+function calendarRangeBinds(from: string, to: string): string[] {
+  return [from.slice(0, 10), `${to.slice(0, 10)}\uffff`];
+}
+
+export function metricsCte(range: ConversionDefinitionRange, where: { sql: string; values: unknown[] }): { sql: string; values: unknown[] } {
   return {
-    sql: `WITH period_metrics AS (
+    sql: `WITH scoped_points AS (
+      SELECT cp.id FROM conversion_points cp WHERE ${where.sql}
+    ), period_metrics AS (
       SELECT conversion_point_id,
              COUNT(*) AS recorded_count,
              COALESCE(SUM(COALESCE(value_snapshot, 0)), 0) AS net_value
         FROM conversion_events
-       -- N-269: created_at は JST ISO(T付き)と datetime() 書式が混在する。
-       -- 文字列の大小比較だと 'T' > ' ' で期間末のISO行が抜けるため、
-       -- 保存されたJST暦日の先頭10文字で日単位に比較する。
-       WHERE substr(created_at, 1, 10) >= ? AND substr(created_at, 1, 10) <= ?
+       WHERE conversion_point_id IN (SELECT id FROM scoped_points)
+         AND created_at >= ? AND created_at < ?
        GROUP BY conversion_point_id
     ), usage_counts AS (
       SELECT conversion_point_id, COUNT(*) AS usage_count
         FROM conversion_definition_usages
+       WHERE conversion_point_id IN (SELECT id FROM scoped_points)
        GROUP BY conversion_point_id
     )`,
-    // 暦日の先頭10文字(YYYY-MM-DD)で比較する。時刻・書式差を含めない。
-    values: [range.from.slice(0, 10), range.to.slice(0, 10)],
+    values: [...where.values, ...calendarRangeBinds(range.from, range.to)],
   };
 }
 
@@ -195,7 +200,8 @@ export function orderBy(sort: ConversionDefinitionSort): string {
   return 'recorded_count DESC, cp.updated_at DESC, cp.id ASC';
 }
 
-export async function cancellationMetrics(db: D1Database, from: string, to: string): Promise<Map<string, CancellationMetric>> {
+export async function cancellationMetrics(db: D1Database, from: string, to: string, pointIds: string[]): Promise<Map<string, CancellationMetric>> {
+  if (pointIds.length === 0) return new Map();
   const tables = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('affiliate_adjustments','affiliate_reward_entries')").all<{ name: string }>();
   if (tables.results.length < 2) return new Map();
   const rows = await db.prepare(`SELECT ce.conversion_point_id,
@@ -205,8 +211,9 @@ export async function cancellationMetrics(db: D1Database, from: string, to: stri
     JOIN affiliate_reward_entries re ON re.id = aa.source_entry_id
     JOIN conversion_events ce ON ce.id = re.conversion_event_id
     WHERE aa.reason_type = 'cancel'
-      AND substr(aa.created_at, 1, 10) >= ? AND substr(aa.created_at, 1, 10) <= ?
-    GROUP BY ce.conversion_point_id`).bind(from.slice(0, 10), to.slice(0, 10)).all<{ conversion_point_id: string; cancellation_count: number; cancellation_value: number }>();
+      AND ce.conversion_point_id IN (${sqlIdSet(pointIds).sql})
+      AND aa.created_at >= ? AND aa.created_at < ?
+    GROUP BY ce.conversion_point_id`).bind(...sqlIdSet(pointIds).binds, ...calendarRangeBinds(from, to)).all<{ conversion_point_id: string; cancellation_count: number; cancellation_value: number }>();
   return new Map(rows.results.map((row) => [row.conversion_point_id, { count: Number(row.cancellation_count), value: Number(row.cancellation_value) }]));
 }
 
@@ -216,7 +223,8 @@ export async function cancellationMetrics(db: D1Database, from: string, to: stri
  * 'restore' が最後に来たものは数え直しの対象に戻る。
  * 台帳がまだ無い環境(移行前)では空を返して既存表示を壊さない。
  */
-export async function reversalMetrics(db: D1Database, from: string, to: string): Promise<Map<string, CancellationMetric>> {
+export async function reversalMetrics(db: D1Database, from: string, to: string, pointIds: string[]): Promise<Map<string, CancellationMetric>> {
+  if (pointIds.length === 0) return new Map();
   const table = await db
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'conversion_event_reversals'")
     .first<{ name: string }>();
@@ -227,6 +235,7 @@ export async function reversalMetrics(db: D1Database, from: string, to: string):
     FROM conversion_event_reversals r
     JOIN conversion_events ce ON ce.id = r.conversion_event_id
    WHERE r.kind = 'reverse'
+     AND ce.conversion_point_id IN (${sqlIdSet(pointIds).sql})
      AND r.rowid = (
        SELECT r2.rowid
          FROM conversion_event_reversals r2
@@ -234,8 +243,8 @@ export async function reversalMetrics(db: D1Database, from: string, to: string):
         ORDER BY r2.created_at DESC, r2.rowid DESC
         LIMIT 1
      )
-     AND substr(r.created_at, 1, 10) >= ? AND substr(r.created_at, 1, 10) <= ?
-   GROUP BY ce.conversion_point_id`).bind(from.slice(0, 10), to.slice(0, 10)).all<{ conversion_point_id: string; reversal_count: number; reversal_value: number }>();
+     AND r.created_at >= ? AND r.created_at < ?
+   GROUP BY ce.conversion_point_id`).bind(...sqlIdSet(pointIds).binds, ...calendarRangeBinds(from, to)).all<{ conversion_point_id: string; reversal_count: number; reversal_value: number }>();
   return new Map(rows.results.map((row) => [row.conversion_point_id, { count: Number(row.reversal_count), value: Number(row.reversal_value) }]));
 }
 

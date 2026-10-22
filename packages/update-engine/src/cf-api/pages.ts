@@ -270,31 +270,27 @@ export async function deployPagesProject(opts: {
 }
 
 /**
- * Return just the most recent deployment for a Pages project. Used by
- * the update engine to grab a known-good rollback target before
- * attempting a new deploy.
+ * Snapshot the active production deployment, not a newer preview or failed build.
+ * The exported name is retained for existing update-engine callers.
  */
 export async function getLatestDeployment(opts: {
   creds: CfApiCreds;
   projectName: string;
 }): Promise<{ id: string }> {
   const { creds, projectName } = opts;
-  const res = await fetch(
-    `${pagesProjectApiBase(creds.accountId, projectName)}/deployments?per_page=1`,
-    {
-      method: 'GET',
-      headers: authHeader(creds.apiToken),
-    },
-  );
-  if (!res.ok) {
-    await throwHttpError('GET pages deployments failed', res);
+  const res = await fetch(pagesProjectApiBase(creds.accountId, projectName), {
+    method: 'GET', headers: authHeader(creds.apiToken),
+  });
+  if (!res.ok) await throwHttpError('GET pages project failed', res);
+  const body = await res.json() as { success: boolean; result?: { canonical_deployment?: {
+    id: string; environment: string; is_skipped?: boolean; latest_stage?: { name: string; status: string };
+  } } };
+  const deployment = body.result?.canonical_deployment;
+  if (!body.success || !deployment?.id || deployment.environment !== 'production'
+    || deployment.is_skipped || deployment.latest_stage?.name !== 'deploy' || deployment.latest_stage.status !== 'success') {
+    throw new Error('pages_production_snapshot_unavailable');
   }
-  const body = (await res.json()) as { result: Array<{ id: string }> };
-  const first = body.result?.[0];
-  if (!first) {
-    throw new Error('GET pages deployments: empty result list');
-  }
-  return { id: first.id };
+  return { id: deployment.id };
 }
 
 /**
@@ -317,4 +313,5 @@ export async function rollbackPagesDeployment(opts: {
   if (!res.ok) {
     await throwHttpError('POST pages rollback failed', res);
   }
+  if (!(await res.json() as { success: boolean }).success) throw new Error('pages_rollback_unsuccessful');
 }

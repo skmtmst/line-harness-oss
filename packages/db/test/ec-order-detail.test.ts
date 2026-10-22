@@ -405,3 +405,18 @@ describe('getEcOrderDetail', () => {
     expect(detail!.outcomes.conversions.map((row) => row.id)).toEqual([]);
   });
 });
+
+
+describe('注文の出来事が増えた場合', () => {
+  it('150件の出来事と処理履歴をD1の変数上限以内で全件返す', async () => {
+    for (let i = 0; i < 150; i++) insertEvent({ id: `bulk-${i}`, externalId: `external-${i}` });
+    const order = await seedOrder({ eventId: 'bulk-0', externalId: 'external-0' });
+    for (let i = 0; i < 150; i++) {
+      sqlite.prepare(`INSERT INTO ec_action_executions
+        (id, line_account_id, event_id, action_type, rule_version, idempotency_key, status, created_at, updated_at)
+        VALUES (?, 'account-1', ?, 'notification', 'ec-action-v1', ?, 'succeeded', '2026-09-16', '2026-09-16')`).run(`action-${i}`, `bulk-${i}`, `key-${i}`);
+    }
+    const detail = await getEcOrderDetail(db, { lineAccountId: 'account-1', orderId: order.id });
+    expect(detail?.events).toHaveLength(150);
+  });
+});

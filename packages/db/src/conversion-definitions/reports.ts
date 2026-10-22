@@ -273,8 +273,8 @@ export async function listConversionDefinitionsForExport(
   db: D1Database,
   input: Omit<ConversionDefinitionListInput, 'cursor' | 'limit'>,
 ): Promise<{ items: ConversionDefinitionListItem[]; truncated: boolean }> {
-  const cte = metricsCte(input.range);
   const where = definitionWhere(input);
+  const cte = metricsCte(input.range, where);
   // N-267: 上限そのもの(10000)ではなく +1 件まで読み、切れたことを確実に
   // 検出して呼び出し側へ返す。黙って切るとCSVが未完の一覧に見える。
   const rows = await db.prepare(`${cte.sql}

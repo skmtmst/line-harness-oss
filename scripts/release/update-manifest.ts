@@ -27,6 +27,9 @@ export interface ReleaseEntry {
   version: string;
   released_at: string;
   worker_hash: string;
+  worker_bundle_hash?: string;
+  worker_assets_hash?: string;
+  migrations_hash?: string;
   admin_hash: string;
   liff_hash: string;
   bundle_url: string;

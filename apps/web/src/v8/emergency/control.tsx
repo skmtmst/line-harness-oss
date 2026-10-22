@@ -1,4 +1,5 @@
 'use client'
+import { useRunningVersion } from '@/lib/use-running-version'
 
 import { formatMonthDay, stopMinutes } from './control-time'
 
@@ -25,8 +26,6 @@ import { EmergencyControlFeedback } from './control-feedback'
 import { emergencySafetyTransition, isEmergencyMutationLocked, runCurrentRequest } from './control-state'
 import { CAPABILITY_LABEL, describeRestoreBlockers, describeRestoreDrift, describeRestoreResult } from '@/lib/operation-restore'
 import { SendPathCoveragePanel } from './send-path-coverage-panel'
-import releaseLog from '@/generated/release-log-summary.json'
-import type { UpdateRelease } from '@/lib/operation-updates'
 import styles from '../../app/emergency/control-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
@@ -118,6 +117,7 @@ const EmergencyControlV8 = (
   { accounts }: { accounts: LineAccount[] },
   ref: React.Ref<EmergencyControlV8Handle>,
 ) => {
+  const runningVersion = useRunningVersion()
   const [targetAccountId, setTargetAccountId] = useState('all')
   const [targets, setTargets] = useState<Record<StopTarget, boolean>>({ broadcasts: true, scenarios: true, reminders: true, automations: false })
   const [reason, setReason] = useState('')
@@ -297,11 +297,6 @@ const EmergencyControlV8 = (
     },
     { minutes: 0, entry: null },
   )
-  const deployments = entries.filter((item) => item.historyKind === 'deployment' && item.deployment)
-  const releases = (releaseLog as { releases?: UpdateRelease[] }).releases ?? []
-  const deployedVersion = deployments.find((item) => item.deployment?.phase === 'succeeded' && item.deployment.version)?.deployment?.version
-  const currentVersion = deployedVersion ?? releases.find((item) => item.released)?.version ?? null
-  const latestReleaseAt = releases.find((item) => item.released)?.released ?? null
 
   const selectedTargets = (Object.keys(targets) as StopTarget[]).filter((key) => targets[key])
   const selectedCapabilities = selectedTargets.flatMap((key) => TARGET_CAPABILITIES[key])
@@ -540,8 +535,8 @@ const EmergencyControlV8 = (
         <KpiCard title="止めた回数" icon={<OctagonPause size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
         <KpiCard title="最長の停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
           detail={longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'} />
-        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} unit="" valueText={historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}
-          detail={latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'} />
+        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} unit="" valueText={runningVersion.detail?.version ?? emptyValue('unknown')}
+          detail={runningVersion.statusText} />
       </KpiBand>
 
       <section className={styles.card} aria-labelledby="emergency-targets-heading">

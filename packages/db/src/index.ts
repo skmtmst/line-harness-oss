@@ -125,7 +125,7 @@ export type {
 export {
   LINE_ACCOUNT_INACTIVE_REASONS, LineAccountLifecycleError, LineAccountRevisionConflictError, activateLineAccount, activeTenantLineAccountSql, archiveLineAccount,
   createLineAccount, deactivateLineAccount, decryptLineAccountCredentials, getLineAccountArchiveBlockers, getLineAccountByChannelId, getLineAccountById,
-  getLineAccountConnectionChecksByIdempotencyKey, getLineAccountCredentialHealth, getLineAccountListStats, getLineAccountScopeEntries, getLineAccountTenantStatus, getLineAccounts,
+  getLineAccountConnectionChecksByIdempotencyKey, getLineAccountCredentialHealth, getLineAccountListStats, getLineAccountScopeEntries, getLineAccountLoginChannels, getLineAccountTenantStatus, getLineAccounts,
   getLineAccountsByIds, isLineAccountTenantActive, listAutoSwitchedOutPoolAccounts, listLineAccountsWithTenantStatus, listSkippedDeliveries, recordPoolSwitchEvent,
   recordSkippedDelivery, resolveLineCredential, restoreLineAccount, saveLineAccountConnectionChecks, setDefaultLineAccount, updateLineAccount,
   updateLineAccountFields, updateLineAccountOrder,

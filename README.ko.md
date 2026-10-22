@@ -15,7 +15,7 @@ Cloudflare 무료 플랜에서 동작. **서버 비용 0원**. Claude Code 에�
 
 [![클릭하여 YouTube 재생 — LINE Harness 도입 가이드](https://img.youtube.com/vi/DiRuGaeq1sM/maxresdefault.jpg)](https://youtu.be/DiRuGaeq1sM)
 
-**현재 버전**: v0.13.2 ・ MIT License ・ TypeScript / Cloudflare Workers + D1
+**문서 기준 버전**: v0.13.2 (현재 버전: [package.json](package.json)) ・ MIT License ・ TypeScript / Cloudflare Workers + D1
 
 ---
 

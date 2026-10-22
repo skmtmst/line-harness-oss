@@ -23,3 +23,12 @@ test('日本時間で言葉にする（毎週金曜 14:00・隔週・毎月第 3
   expect(ruleLabel('biweekly', '2026-11-20T05:00:00.000Z')).toBe('隔週金曜 14:00')
   expect(ruleLabel('monthly_nth', '2026-11-20T05:00:00.000Z')).toBe('毎月第 3 金曜 14:00')
 })
+
+
+test('店舗の日付・第N曜日で繰り返し、日本と日付が違う店でも翌日に移さない', () => {
+  const at = '2026-11-04T23:00:00.000Z', zone = 'America/New_York'
+  expect(dayWithWeekday(at, zone)).toBe('11/04（水）')
+  expect(ruleLabel('monthly_nth', at, zone)).toBe('毎月第 1 水曜 18:00')
+  expect(hm('2026-07-01T22:00:00Z', zone)).toBe('18:00')
+  expect(hm('2026-11-05T05:00:00Z', zone)).toBe('00:00')
+})

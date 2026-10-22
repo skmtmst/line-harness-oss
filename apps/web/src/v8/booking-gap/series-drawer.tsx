@@ -38,6 +38,7 @@ export type SeriesDrawerSummary = {
   staffName: string
   startsAt: string
   endsAt: string
+  timeZone?: string
 }
 
 const MIN = 2
@@ -88,7 +89,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
         friendId: summary.friendId,
         staffId: summary.staffId,
         startsAt: summary.startsAt,
-        rule: { freq, weekday: weekdayOf(summary.startsAt), count },
+        rule: { freq, weekday: weekdayOf(summary.startsAt, summary.timeZone), count },
       }).then((res) => {
         if (!current) return
         setList(res.data.occurrences)
@@ -98,7 +99,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
       }).catch(() => { if (current) setState('error') })
     }, 250)
     return () => { current = false; clearTimeout(timer) }
-  }, [open, on, countOk, count, freq, accountId, summary.menuId, summary.staffId, summary.startsAt, retry])
+  }, [open, on, countOk, count, freq, accountId, summary.menuId, summary.staffId, summary.friendId, summary.startsAt, summary.timeZone, retry])
 
   const blocked = useMemo(() => list.filter((o) => !o.available), [list])
   const made = createdCount(list, picks)
@@ -111,7 +112,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
     try {
       const res = await bookingSeriesApi.create(accountId, {
         menuId: summary.menuId, staffId: summary.staffId, friendId: summary.friendId, startsAt: summary.startsAt,
-        rule: { freq, weekday: weekdayOf(summary.startsAt), count },
+        rule: { freq, weekday: weekdayOf(summary.startsAt, summary.timeZone), count },
         /* 口の選択は「そのまま」と「飛ばす」。別の時間は、その回の keep に新しい開始を添える。 */
         choices: list.map((o) => {
           const pick = picks[o.index] ?? 'skip'
@@ -153,7 +154,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
     >
       <div className={styles.body}>
         <dl className={styles.summary}>
-          <div><dt>日時</dt><dd>{dayWithWeekday(summary.startsAt)} {hm(summary.startsAt)}〜{hm(summary.endsAt)}</dd></div>
+          <div><dt>日時</dt><dd>{dayWithWeekday(summary.startsAt, summary.timeZone)} {hm(summary.startsAt, summary.timeZone)}〜{hm(summary.endsAt, summary.timeZone)}</dd></div>
           <div><dt>担当</dt><dd>{summary.staffName}</dd></div>
         </dl>
         <section className={styles.card} aria-label="繰り返す">
@@ -169,7 +170,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
               </Field>
             </div>
             {!countOk ? <Notice tone="danger">回数は {MIN} 回から {MAX} 回までです。</Notice> : null}
-            {countOk && state !== 'idle' ? <p className={styles.range}>{dayOf(summary.startsAt)} から {state === 'ready' ? dayOf(last) : '…'} まで、{ruleLabel(freq, summary.startsAt)}（{count} 回）</p> : null}
+            {countOk && state !== 'idle' ? <p className={styles.range}>{dayOf(summary.startsAt, summary.timeZone)} から {state === 'ready' ? dayOf(last, summary.timeZone) : '…'} まで、{ruleLabel(freq, summary.startsAt, summary.timeZone)}（{count} 回）</p> : null}
             {state === 'loading' ? <Skeleton height={48} /> : null}
             {state === 'error' ? <Notice tone="danger">空きを確かめられませんでした。<Button variant="text" onClick={() => setRetry((n) => n + 1)}>もう一度</Button></Notice> : null}
             {state === 'ready' && unreadable ? <p className={styles.range}>空きを確かめられない回があります。その回は作りません。</p> : null}
@@ -185,10 +186,10 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
                     const pick = picks[o.index] ?? 'skip'
                     return (
                       <Tr key={o.index}>
-                        <Td>{dayWithWeekday(o.startsAt)}</Td>
-                        <Td><div className={styles.reason}><span>{reasonText(o.reason)}</span><span className={alt ? styles.alt : styles.sub}>{alt ? `→ ${hm(alt)} にする` : 'この回は作りません'}</span></div></Td>
+                        <Td>{dayWithWeekday(o.startsAt, summary.timeZone)}</Td>
+                        <Td><div className={styles.reason}><span>{reasonText(o.reason)}</span><span className={alt ? styles.alt : styles.sub}>{alt ? `→ ${hm(alt, summary.timeZone)} にする` : 'この回は作りません'}</span></div></Td>
                         <Td>
-                          <SegmentedControl aria-label={`${dayOf(o.startsAt)} の回`} size="compact" value={pick === 'skip' || !alt ? 'skip' : 'alternative'}
+                          <SegmentedControl aria-label={`${dayOf(o.startsAt, summary.timeZone)} の回`} size="compact" value={pick === 'skip' || !alt ? 'skip' : 'alternative'}
                             options={[{ value: 'alternative', label: '別の時間' }, { value: 'skip', label: '飛ばす' }]}
                             onChange={(next) => { if (next === 'alternative' && !alt) return; setPicks((p) => ({ ...p, [o.index]: next })) }} />
                         </Td>
@@ -200,7 +201,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
             </> : null}
           </> : null}
         </section>
-        {on && state === 'ready' ? <p className={styles.note}>{list.length} 回のうち {made} 件を入れます{skipped.length ? `（${skipped.map((o) => dayOf(o.startsAt)).join('・')} は飛ばす）` : ''}。保存の直前に空きを確かめ直します。</p> : null}
+        {on && state === 'ready' ? <p className={styles.note}>{list.length} 回のうち {made} 件を入れます{skipped.length ? `（${skipped.map((o) => dayOf(o.startsAt, summary.timeZone)).join('・')} は飛ばす）` : ''}。保存の直前に空きを確かめ直します。</p> : null}
       </div>
     </Drawer>
     </>

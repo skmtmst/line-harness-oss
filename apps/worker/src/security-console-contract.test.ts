@@ -1,9 +1,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import ts from 'typescript';
 import { expect, it } from 'vitest';
 
-function unsafeConsoleCalls(source: string): number[] {
+function unsafeConsoleCalls(source: string, readDependency: (specifier: string) => string | undefined = () => undefined): number[] {
   const file=ts.createSourceFile('security-source.ts',source,ts.ScriptTarget.Latest,true);
   const failures:number[]=[];
   function binding(name:string,at:ts.Node):ts.Expression|undefined {
@@ -32,6 +32,93 @@ function unsafeConsoleCalls(source: string): number[] {
     }
     return false;
   }
+  // A category is safe only when membership is checked against a closed,
+  // unmodified set. Imported registries must be frozen literal records.
+  function shadows(tree:ts.Node,name:string,allowed?:ts.Node):boolean {
+    let found=false;
+    function visit(node:ts.Node){
+      if((ts.isVariableDeclaration(node)||ts.isParameter(node)||ts.isBindingElement(node)||ts.isImportSpecifier(node)
+        ||ts.isImportClause(node)||ts.isNamespaceImport(node)||ts.isFunctionDeclaration(node)||ts.isFunctionExpression(node)
+        ||ts.isClassDeclaration(node)||ts.isClassExpression(node)||ts.isEnumDeclaration(node)||ts.isModuleDeclaration(node)||ts.isImportEqualsDeclaration(node))
+        &&node.name&&node.name!==allowed&&ts.isIdentifier(node.name)&&node.name.text===name)found=true;
+      ts.forEachChild(node,visit);
+    }
+    visit(tree);return found;
+  }
+  function unwrap(node:ts.Expression):ts.Expression {
+    return ts.isParenthesizedExpression(node)||ts.isAsExpression(node)?unwrap(node.expression):node;
+  }
+  function frozenImportedRecord(name:string):boolean {
+    if(shadows(file,'Object'))return false;
+    for(const statement of file.statements){
+      if(!ts.isImportDeclaration(statement)||!ts.isStringLiteral(statement.moduleSpecifier))continue;
+      const names=statement.importClause?.namedBindings;
+      if(!names||!ts.isNamedImports(names))continue;
+      const entry=names.elements.find(item=>item.name.text===name);if(!entry)continue;
+      if(shadows(file,name,entry.name))return false;
+      const content=readDependency(statement.moduleSpecifier.text);if(content===undefined)return false;
+      const module=ts.createSourceFile('category-registry.ts',content,ts.ScriptTarget.Latest,true);
+      if(shadows(module,'Object'))return false;
+      const exported=entry.propertyName?.text??entry.name.text;
+      for(const declaration of module.statements){
+        if(!ts.isVariableStatement(declaration)||!(declaration.declarationList.flags&ts.NodeFlags.Const)
+          ||!declaration.modifiers?.some(modifier=>modifier.kind===ts.SyntaxKind.ExportKeyword))continue;
+        const variable=declaration.declarationList.declarations.find(item=>ts.isIdentifier(item.name)&&item.name.text===exported);
+        if(!variable?.initializer)continue;
+        const expression=unwrap(variable.initializer);
+        if(!ts.isCallExpression(expression)||expression.expression.getText(module)!=='Object.freeze'||expression.arguments.length!==1)return false;
+        const record=unwrap(expression.arguments[0]);
+        return ts.isObjectLiteralExpression(record)&&record.properties.length>0&&record.properties.every(property=>
+          ts.isPropertyAssignment(property)&&(ts.isIdentifier(property.name)||ts.isStringLiteral(property.name))
+          &&ts.isStringLiteral(property.initializer)&&/^[a-z][a-z0-9_]{0,95}$/.test(property.initializer.text));
+      }
+    }
+    return false;
+  }
+  function closedSet(name:string):boolean {
+    if(shadows(file,'Set'))return false;
+    const declarations:ts.VariableDeclaration[]=[];
+    function collect(node:ts.Node){if(ts.isVariableDeclaration(node)&&ts.isIdentifier(node.name)&&node.name.text===name)declarations.push(node);ts.forEachChild(node,collect);}
+    collect(file);
+    const declaration=declarations[0];
+    if(declarations.length!==1||!ts.isVariableDeclarationList(declaration.parent)||!(declaration.parent.flags&ts.NodeFlags.Const)||!declaration.initializer)return false;
+    const initializer=unwrap(declaration.initializer);
+    if(!ts.isNewExpression(initializer)||!ts.isIdentifier(initializer.expression)||initializer.expression.text!=='Set'||initializer.arguments?.length!==1)return false;
+    const entries=unwrap(initializer.arguments[0]);
+    if(!ts.isArrayLiteralExpression(entries)||!entries.elements.length)return false;
+    const fixed=entries.elements.every(entry=>{
+      if(ts.isStringLiteral(entry))return /^[a-z][a-z0-9_]{0,95}$/.test(entry.text);
+      if(!ts.isSpreadElement(entry)||!ts.isCallExpression(entry.expression))return false;
+      const values=entry.expression;
+      return values.expression.getText(file)==='Object.values'&&values.arguments.length===1
+        &&ts.isIdentifier(values.arguments[0])&&frozenImportedRecord(values.arguments[0].text);
+    });
+    if(!fixed)return false;
+    let immutable=true;
+    function check(node:ts.Node){
+      if(ts.isIdentifier(node)&&node.text===name&&node!==declaration.name){
+        const member=node.parent;
+        if(!ts.isPropertyAccessExpression(member)||member.expression!==node||member.name.text!=='has'
+          ||!ts.isCallExpression(member.parent)||member.parent.expression!==member)immutable=false;
+      }
+      ts.forEachChild(node,check);
+    }
+    check(file);return immutable;
+  }
+  function safeCategorySpread(node:ts.Expression):boolean {
+    const expression=unwrap(node);
+    if(!ts.isConditionalExpression(expression)||!ts.isObjectLiteralExpression(expression.whenTrue)||expression.whenTrue.properties.length!==1
+      ||!ts.isObjectLiteralExpression(expression.whenFalse)||expression.whenFalse.properties.length)return false;
+    const property=expression.whenTrue.properties[0];
+    if(!ts.isPropertyAssignment(property)||!ts.isIdentifier(property.name)||!['scheduledJob','failureKind'].includes(property.name.text))return false;
+    const input=`metrics.${property.name.text}`;
+    const condition=unwrap(expression.condition);
+    if(property.initializer.getText(file)!==input||!ts.isBinaryExpression(condition)||condition.operatorToken.kind!==ts.SyntaxKind.AmpersandAmpersandToken
+      ||condition.left.getText(file)!==input||!ts.isCallExpression(condition.right))return false;
+    const guard=condition.right;
+    return ts.isPropertyAccessExpression(guard.expression)&&guard.expression.name.text==='has'&&ts.isIdentifier(guard.expression.expression)
+      &&guard.arguments.length===1&&guard.arguments[0].getText(file)===input&&closedSet(guard.expression.expression.text);
+  }
   // 共通serializerだけは、自由な文を含まない厳密な構造と採番元を検査する。
   function safeEnvelope(node:ts.Expression,at:ts.Node):boolean {
     if(ts.isIdentifier(node)){const value=binding(node.text,at);return !!value&&safeEnvelope(value,at);}
@@ -41,7 +128,7 @@ function unsafeConsoleCalls(source: string): number[] {
       if(ts.isSpreadAssignment(property)){
         const expression=ts.isParenthesizedExpression(property.expression)?property.expression.expression:property.expression;
         const text=expression.getText(file).replace(/\s+/g,'');
-        if(!/^Number\.isInteger\(metrics\.status\).*\?\{status:metrics\.status\}:\{\}$/.test(text)
+        if(!safeCategorySpread(expression)&&!/^Number\.isInteger\(metrics\.status\).*\?\{status:metrics\.status\}:\{\}$/.test(text)
           &&!/^Number\.isFinite\(metrics\.durationMs\).*\?\{durationMs:Math\.round\(metrics\.durationMs!\)\}:\{\}$/.test(text))return false;
         continue;
       }
@@ -147,6 +234,22 @@ it('accepts locally minted incident UUIDs and rejects caller IDs and shadowed or
   ])expect(unsafeConsoleCalls(source)).toHaveLength(1);
 });
 
+it('category fields require exact membership checks and immutable literal sets',()=>{
+  const envelope=(prefix:string,spread:string)=>`${prefix};function write(level,code,metrics){const context=currentInvocation();const event={timestamp:new Date().toISOString(),level:level==='log'?'info':level,code:/^[a-zA-Z][a-zA-Z0-9_.-]{0,95}$/.test(code)?code:'invalid_log_event',requestId:context?.requestId??null,invocationId:context?.invocationId??null,source:context?.source??'background',...(${spread})};console.error(JSON.stringify(event));}`;
+  const checked="metrics.scheduledJob && categories.has(metrics.scheduledJob) ? {scheduledJob:metrics.scheduledJob} : {}";
+  expect(unsafeConsoleCalls(envelope("const categories=new Set(['booking_expirer'])",checked))).toEqual([]);
+  for(const prefix of ["let categories=new Set(['booking_expirer'])","const categories=new Set([body.category])","const categories=new Set(['booking_expirer']);categories.add(body.category)","const categories=new Set(['booking_expirer']);const alias=categories","const Set=body.Set;const categories=new Set(['booking_expirer'])"])
+    expect(unsafeConsoleCalls(envelope(prefix,checked))).toHaveLength(1);
+  for(const spread of ["metrics.scheduledJob ? {scheduledJob:metrics.scheduledJob} : {}","metrics.scheduledJob && categories.has(metrics.failureKind) ? {scheduledJob:metrics.scheduledJob} : {}","metrics.scheduledJob && categories.has(metrics.scheduledJob) ? {scheduledJob:body.category} : {}"])
+    expect(unsafeConsoleCalls(envelope("const categories=new Set(['booking_expirer'])",spread))).toHaveLength(1);
+  const imported=envelope("import {codes} from './registry.js';const categories=new Set([...Object.values(codes),'unknown'])",checked);
+  expect(unsafeConsoleCalls(imported,()=>"export const codes=Object.freeze({job:'booking_expirer'} as const)")).toEqual([]);
+  const shadowed=imported.replace("const categories=new Set([...Object.values(codes),'unknown'])",'').replace('function write(level,code,metrics){',"function write(level,code,metrics,codes){const categories=new Set([...Object.values(codes),'unknown']);");
+  expect(unsafeConsoleCalls(shadowed,()=>"export const codes=Object.freeze({job:'booking_expirer'})")).toHaveLength(1);
+  for(const registry of ["export const codes={job:'booking_expirer'} as const","export const codes=Object.freeze({job:body.category})","const Object=body.Object;export const codes=Object.freeze({job:'booking_expirer'})"])
+    expect(unsafeConsoleCalls(imported,()=>registry)).toHaveLength(1);
+});
+
 it('S14 production console calls carry fixed codes, route templates and proven server UUIDs only',()=>{
   const root=resolve(import.meta.dirname,'../../..');
   const findings:string[]=[];
@@ -156,7 +259,10 @@ it('S14 production console calls carry fixed codes, route templates and proven s
       if(entry.isDirectory()){if(entry.name!=='test-utils')walk(path);continue;}
       if(!/\.(ts|tsx)$/.test(path)||/\.(test|spec)\./.test(path))continue;
       const source=readFileSync(path,'utf8');if(!source.includes('console'))continue;
-      findings.push(...unsafeConsoleCalls(source).map(line=>`${path.slice(root.length+1)}:${line}`));
+      findings.push(...unsafeConsoleCalls(source,specifier=>{
+        if(!specifier.startsWith('.'))return undefined;
+        try{return readFileSync(resolve(dirname(path),specifier.replace(/\.js$/,'.ts')),'utf8');}catch{return undefined;}
+      }).map(line=>`${path.slice(root.length+1)}:${line}`));
     }
   }
   for(const directory of ['apps/worker/src','apps/web/src','apps/liff/src','packages/db/src','packages/line-sdk/src','packages/shared/src','packages/sdk/src','packages/mcp-server/src'])walk(join(root,directory));

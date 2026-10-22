@@ -1,3 +1,4 @@
+import { isWorkerDeploymentSnapshot, restoreWorkerDeployment } from '../cf-api/worker-deployments.js';
 import type { UpdateContext } from '../types.js';
 import type { EventEmitter } from '../events.js';
 import { listWorkerBindings, putWorkerScript } from '../cf-api/workers.js';
@@ -11,7 +12,7 @@ import { WORKER_COMPATIBILITY_FLAGS } from '../compat-flags.js';
  * are the "known-good" coordinates we revert to if Apply or Verify fails.
  */
 export interface RollbackSnapshot {
-  /** Fully-qualified URL where the previous Worker bundle bytes can be fetched (e.g. R2 signed URL). */
+  /** Worker deployment reference, or a legacy URL for the previous script bytes. */
   snapshotWorkerBundleUrl: string;
   /** CF Pages deployment id to revert the admin project to. */
   snapshotAdminDeployment: string;
@@ -43,11 +44,9 @@ async function readBodyExcerpt(res: Response): Promise<string> {
  *   4. Roll back the admin Pages project to its previous deployment id.
  *   5. Roll back the liff Pages project to its previous deployment id.
  *
- * **D1 migrations are NOT rolled back.** The harness contract is
- * additive-only migrations (new tables/columns), so the old Worker
- * continues to function against the new-but-superset schema. Reverting
- * schema would risk losing rows that were written after the migration
- * succeeded but before Apply failed downstream.
+ * **D1 migrations are NOT rolled back.** Code rollback does not undo data
+ * or schema changes. Release review must establish old-code compatibility;
+ * otherwise database recovery requires a separately reviewed operation.
  *
  * Steps run sequentially with no retry — if any step throws, the error
  * propagates and the orchestrator records both the original failure and
@@ -62,33 +61,39 @@ export async function runRollback(
 ): Promise<void> {
   await ev.emit({ step: 'rollback', status: 'running' });
 
-  // Step 1: fetch the previous Worker bundle. A non-200 means the snapshot
-  // URL is gone (R2 lifecycle? signed URL expired?) and we cannot proceed
-  // — rolling back to nothing would brick the Worker.
-  const res = await fetch(snap.snapshotWorkerBundleUrl);
-  if (!res.ok) {
-    const excerpt = await readBodyExcerpt(res);
-    throw new Error(
-      `rollback: failed to fetch snapshot worker bundle from ${snap.snapshotWorkerBundleUrl}: HTTP ${res.status} ${excerpt}`,
-    );
-  }
-  const bytes = Buffer.from(await res.arrayBuffer());
+  if (!ctx.liffPagesProject && !isWorkerDeploymentSnapshot(snap.snapshotWorkerBundleUrl)) throw new Error('worker_assets_rollback_snapshot_missing');
+  if (isWorkerDeploymentSnapshot(snap.snapshotWorkerBundleUrl)) {
+    await restoreWorkerDeployment(ctx.creds, ctx.workerName, snap.snapshotWorkerBundleUrl);
+  } else {
+    // Step 1: fetch the previous Worker bundle. A non-200 means the snapshot
+    // URL is gone (R2 lifecycle? signed URL expired?) and we cannot proceed
+    // — rolling back to nothing would brick the Worker.
+    const res = await fetch(snap.snapshotWorkerBundleUrl);
+    if (!res.ok) {
+      const excerpt = await readBodyExcerpt(res);
+      throw new Error(
+        `rollback: failed to fetch snapshot worker bundle from ${snap.snapshotWorkerBundleUrl}: HTTP ${res.status} ${excerpt}`,
+      );
+    }
+    const bytes = Buffer.from(await res.arrayBuffer());
 
-  // Step 2 + 3: re-PUT the old worker with current bindings preserved.
-  // listWorkerBindings reads the live state — even mid-rollback this is
-  // what the customer expects to keep (D1/R2/KV ids, secrets, env vars).
-  const bindings = await listWorkerBindings({
-    creds: ctx.creds,
-    scriptName: ctx.workerName,
-  });
-  await putWorkerScript({
-    creds: ctx.creds,
-    scriptName: ctx.workerName,
-    scriptContent: bytes,
-    bindings,
-    compatibilityFlags: WORKER_COMPATIBILITY_FLAGS,
-    keepAssets: true,
-  });
+    // Step 2 + 3: re-PUT the old worker with current bindings preserved.
+    // listWorkerBindings reads the live state — even mid-rollback this is
+    // what the customer expects to keep (D1/R2/KV ids, secrets, env vars).
+    const bindings = await listWorkerBindings({
+      creds: ctx.creds,
+      scriptName: ctx.workerName,
+    });
+    await putWorkerScript({
+      creds: ctx.creds,
+      scriptName: ctx.workerName,
+      scriptContent: bytes,
+      bindings,
+      compatibilityFlags: WORKER_COMPATIBILITY_FLAGS,
+      keepAssets: true,
+    });
+
+  }
 
   // Step 4: admin Pages rollback. Done before liff so a failure here
   // surfaces before we touch the customer-facing UI, leaving liff still
@@ -104,7 +109,7 @@ export async function runRollback(
   // Step 5: liff Pages rollback. Customer-facing, done last so the swap
   // back happens only after the admin console is already on the old
   // version. Skipped for worker-assets installs (no LIFF Pages project —
-  // the Worker script rollback in step 3 already restored their LIFF).
+  // the deployment-version rollback already restored their client assets).
   if (ctx.liffPagesProject && snap.snapshotLiffDeployment) {
     await rollbackPagesDeployment({
       creds: ctx.creds,

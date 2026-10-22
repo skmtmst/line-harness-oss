@@ -1,3 +1,4 @@
+import { verifyWorkerAssets } from '../cf-api/worker-assets.js';
 import type { UpdateContext } from '../types.js';
 import type { EventEmitter } from '../events.js';
 import { executeD1Query } from '../cf-api/d1.js';
@@ -15,8 +16,8 @@ export interface VerifyUrls {
   adminUrl: string;
   /**
    * LIFF Pages root URL (e.g. `https://liff.example.pages.dev/`), or ''
-   * for worker-assets installs — the LIFF probe is skipped when empty
-   * (the Worker /health probe already covers the serving script).
+   * for Worker-assets installs, where the shipped asset bytes are verified
+   * against the Worker's public origin instead.
    */
   liffUrl: string;
 }
@@ -53,6 +54,7 @@ export async function runVerify(
   ctx: UpdateContext,
   urls: VerifyUrls,
   ev: EventEmitter,
+  workerAssetsFiles?: ReadonlyMap<string, Buffer>,
 ): Promise<void> {
   await ev.emit({ step: 'verify', status: 'running' });
 
@@ -99,6 +101,10 @@ export async function runVerify(
     }
   }
 
+  if (!ctx.liffPagesProject) {
+    if (!workerAssetsFiles) throw new Error('worker_assets_verify_files_missing');
+    await verifyWorkerAssets(ctx.workerPublicUrl ?? new URL(urls.workerHealthUrl).origin, workerAssetsFiles);
+  }
   await ev.emit({ step: 'verify', status: 'done' });
 }
 

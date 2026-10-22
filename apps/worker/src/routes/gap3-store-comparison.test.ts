@@ -61,6 +61,36 @@ test('CMP-05/09/10: プールと現在の可視店の交差だけで比較し、
  d.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='o'; INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('o','a','now')");data=await read(url+'&poolId=pool',{...gapOwner});expect(data.rows.map((r:any)=>r.accountId)).toEqual(['a']);
 });
 
+test('日付が変わっても過去の失敗・欠測を少しずつ回収し、集計期間を回復する', async()=>{
+ d.raw.exec("UPDATE line_accounts SET is_active=0 WHERE id!='a'; UPDATE line_accounts SET created_at='2026-10-13T15:00:00Z' WHERE id='a'");
+ snapshot('a',1,'2026-10-14');
+ snapshot('b',999,'2026-10-15');
+ d.raw.exec("INSERT INTO hq_store_daily_metrics(account_id,date,state,computed_at) VALUES('a','2026-10-15','failed','2026-10-16T00:00:00Z')");
+ const now=new Date('2026-10-18T00:00:00Z');
+ for(let i=0;i<4;i++)await processStoreComparison(d.db,now);
+ expect(d.raw.prepare("SELECT date,state FROM hq_store_daily_metrics WHERE account_id='a' ORDER BY date").all()).toEqual([
+  {date:'2026-10-14',state:'partial'},{date:'2026-10-15',state:'partial'},
+  {date:'2026-10-16',state:'partial'},{date:'2026-10-17',state:'partial'},
+ ]);
+ const period=comparisonPeriod('2026-10-14','2026-10-17'),recovered=await storeNumbers(d.db,'a',period);
+ expect(recovered.values.bookings).toBe(1);
+ expect(comparisonTrend(recovered.trend,period).map(day=>({date:day.date,state:day.state,bookings:day.values.bookings}))).toEqual([
+  {date:'2026-10-14',state:'partial',bookings:1},{date:'2026-10-15',state:'partial',bookings:0},
+  {date:'2026-10-16',state:'partial',bookings:0},{date:'2026-10-17',state:'partial',bookings:0},
+ ]);
+ expect(recovered.trend.every(row=>row.account_id==='a')).toBe(true);
+ expect(fetch).not.toHaveBeenCalled();
+});
+
+
+test('昨日の未処理店舗が残っていても過去枠を確保し、JST表記の作成日を落とさない',async()=>{
+ d.raw.exec("UPDATE line_accounts SET created_at='2026-10-15T20:00:00' WHERE id='a'; INSERT INTO hq_store_daily_metrics(account_id,date,state,computed_at) VALUES('a','2026-10-15','failed','2026-10-16T00:00:00Z')");
+ await processStoreComparison(d.db,new Date('2026-10-18T00:00:00Z'));
+ expect(d.raw.prepare("SELECT state FROM hq_store_daily_metrics WHERE account_id='a' AND date='2026-10-15'").get()).toEqual({state:'partial'});
+ expect(d.raw.prepare("SELECT count(*) n FROM hq_store_daily_metrics WHERE date='2026-10-17'").get()).toEqual({n:1});
+ expect(d.raw.prepare("SELECT count(*) n FROM line_accounts WHERE is_active=1").get()).toEqual({n:4});
+});
+
 test('CMP-06: 日別実値、欠測、失敗、日付と中央値を守る',()=>{
  const days=comparisonTrend([{date:'2026-10-14',state:'ready',friends_added:1,friends_blocked:4,friends_at_start:20,broadcast_recipients:100,broadcast_clicks:8,bookings:0,visits:4,no_shows:1,first_response_median_minutes:3.5},{date:'2026-10-15',state:'failed',bookings:99}],comparisonPeriod('2026-10-14','2026-10-16'));
  expect(days.map(d=>d.date)).toEqual(['2026-10-14','2026-10-15','2026-10-16']);expect(days[0].values).toEqual({friendChange:-3,blockRate:20,clickRate:8,bookings:0,visits:4,noShowRate:20,responseMinutes:3.5});

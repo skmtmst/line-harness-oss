@@ -557,6 +557,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
   const EXTERNAL = '__external__'
   const [media, setMedia] = useState<MediaItem[] | null>(null)
   const [mediaError, setMediaError] = useState(false)
+  const [mediaAttempt, setMediaAttempt] = useState(0)
   const [choice, setChoice] = useState(webinar.videoMediaId ?? (webinar.videoPrefix ? EXTERNAL : ''))
   const [minutes, setMinutes] = useState(String(Math.round(webinar.durationSeconds / 60)))
   const [busy, setBusy] = useState(false)
@@ -565,13 +566,15 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
   useEffect(() => {
     if (!webinar.accountId) return
     let active = true
+    setMedia(null)
+    setMediaError(false)
     void api.media.list(webinar.accountId, { kind: 'video', limit: 100 }).then((res) => {
       if (!active) return
       if (res.success) setMedia(res.data.items)
       else setMediaError(true)
     }).catch(() => { if (active) setMediaError(true) })
     return () => { active = false }
-  }, [webinar.accountId])
+  }, [webinar.accountId, mediaAttempt])
   const save = async () => {
     const duration = Number(minutes)
     if (!Number.isFinite(duration) || duration <= 0) { setMinutesError('動画の長さ（分）を入れてください。'); setError(''); focusFieldById('wd-minutes'); return }
@@ -617,7 +620,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
   return (
     <SaveErrorScope errors={saveErrors}><Dialog open title="動画を差し替える" description="登録メディアの動画から選びます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。" confirmLabel="保存する" busy={busy} error={error || undefined} onConfirm={() => save()} onCancel={() => { if (!busy) onClose() }}>
       <div className={styles.dialogBody}>
-        {mediaError ? <Notice tone="info">登録メディアの動画を読み込めませんでした。</Notice> : null}
+        {mediaError ? <Notice tone="info" action={<Button onClick={() => setMediaAttempt(value => value + 1)}>もう一度読み込む</Button>}>登録メディアの動画を読み込めませんでした。</Notice> : null}
         <SaveErrorField names={["choice","videoMediaId"]}><EntitySelect label="動画" aria-label="動画" size="full" value={choice} disabled={media === null && !mediaError} onChange={setChoice} options={[
           { value: '', label: '選ばない' },
           ...(webinar.videoPrefix && !webinar.videoMediaId ? [{ value: EXTERNAL, label: `今の動画のまま（${webinar.videoPrefix}）` }] : []),
