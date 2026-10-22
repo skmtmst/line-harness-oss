@@ -124,18 +124,26 @@ pnpm --filter docs dev    # マニュアルサイト（3003）
 
 ルートで `pnpm run`、各パッケージで `pnpm --filter <名前> run` を実行すると、使える命令の一覧が出ます。
 
-## 4. どこを直せば何が変わるか
+## 4. 確かめたいこと｜次に開く場所
 
-変更する場所を探すときは、次の 4 つを順に開きます。中身をこの文書へ写していません。リンク先が正本です。
+変更する場所や決まりを探すときは、次の表から開きます。中身をこの文書へ写していません。リンク先が正本です。
 
-| 知りたいこと | 開く文書 |
+| 確かめたいこと | 次に開く場所 |
 |---|---|
-| 画面の色・余白・ボタン・表・窓など、今の持ち主のファイルと変数 | [見た目を変える場所の地図](v8-change-map.md) |
-| ファイルの置き場、名前、公開入口、依存の向き、検査の入口 | [コードの構成と名前](code-structure.md) |
+| 置き場・名前・公開入口・依存 | [コードの構成と名前](code-structure.md) |
 | 旧 code-rules 案の内容が、今どの節へ採用されたか | [コードの決まりを探す](code-rules.md) |
-| V8 の見た目の決まり、作り方、合格の判断 | [V8 の見た目の決まり](v8-design-rules.md) |
+| URL から本体・API・試験へ | [機能案内の一覧](feature-guides.md) → 各機能 README → BEHAVIOR |
+| 型・共通部品と見た目の直し先 | [V8 の見た目の決まり](v8-design-rules.md)、[型の対応表](v8-pattern-catalog.md)、[変更箇所の地図](v8-change-map.md) |
+| 動き・受け入れ条件 | [V6 全34機能の索引](v6-requirements/v6-requirements-master-index.md)、[V8 で足した要件の索引](v8-requirements/README.md)、[段2の共通契約](v8-requirements/cleanup-stage2-contract.md) |
+| HTTP の登録・処理・共有型 | [API の追い方](handoff-api.md)、[エラーの契約](error-codes.md) |
+| 設定名・DB 構造 | [設定と秘密値の保管先](config-and-secrets.md)、[DB 構造](db-schema.md)。実値を文書へ書かない |
+| 検査と公開前の工程 | [検査の入口](code-structure.md#5-検査の入口)、[配備ゲート](DEPLOY-GATE.md)、[V8 切替](v8-requirements/v8-switch.md) |
+| 何を外し、何を保持したか | [整理の引き継ぎ](handoff-cleanup.md)、[文書の保管先](document-archives.md)、[変更履歴](release-log/README.md) |
+| 配布物・フォント・規約 | [表示と契約の確認事項](legal/distribution-and-terms.md) |
 
 探し方の順番は、動きなら要件、置き場所なら `code-structure.md`、見た目なら `v8-design-rules.md`、実際のファイルなら `v8-change-map.md` です。型と共通部品の持ち主は [型の対応表](v8-pattern-catalog.md) で確かめます。
+
+専門家の確認が要るものは SELL-06（LIFF SDK の LINE 独自契約）と SELL-10（正式規約と飲食草案の整合）です。著作権者の表記・配布物へ残す表示と本文の確定は司令塔が行います。未確認を完了にせず、確認する担当と根拠を引き継いでください。
 
 ## 5. 要件の正本
 
