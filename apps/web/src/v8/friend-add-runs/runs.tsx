@@ -10,6 +10,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { RowNameLink } from '@/components/shared/table';
 
 import SegmentedControl from '@/components/shared/segmented'
+import { runCounts } from './run-counts'
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
@@ -404,11 +405,12 @@ function FriendAddRunsInner() {
   const successRate = delivered === null || summary === null || summary.cumulativeDeliveries === 0
     ? '成功率 —'
     : `成功率 ${((delivered / summary.cumulativeDeliveries) * 100).toFixed(1)}%`
+  const counts = runCounts(kind, routing, data?.total, summary)
   const chips: Array<{ key: Chip; label: string; count?: number }> = [
-    { key: 'all', label: 'すべて', count: data && activeChip === 'all' ? data.total : undefined },
-    { key: 'failed', label: '失敗', count: summary?.failed },
-    { key: 'pending', label: 'テスト待ち', count: summary?.testPending ?? undefined },
-    { key: 'returning', label: '再追加', count: summary?.returning },
+    { key: 'all', label: 'すべて', count: counts.all },
+    { key: 'failed', label: '失敗', count: counts.failed },
+    { key: 'pending', label: 'テスト待ち', count: counts.pending },
+    { key: 'returning', label: '再追加', count: counts.returning },
   ]
   const pageCount = cursorPage + (data?.nextCursor ? 1 : 0)
   const changePage = (next: number) => {
