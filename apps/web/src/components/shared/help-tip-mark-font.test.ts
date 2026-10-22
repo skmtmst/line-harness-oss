@@ -4,23 +4,20 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * V8 の「?」の印：字の箱を絵の行の高さ（10）に近づけるため、半角の「?」は上下の幅の小さい Inter で描く。
- * Noto Sans JP の 10px では字の箱が 15 になり、測ると上に 3・高さ +5 ずれる（2026-10-07 測定）。
- * 円の大きさ 16 と字の大きさ 10 は変えない。
+ * V8 の「?」の印：文字の「?」は上下の余白のくせで丸の真ん中に来なかった（2026-10-23 オーナー指摘）。
+ * 図形のアイコン（lucide の CircleHelp）で描き、大きさは 16px のまま。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'help-tip.module.css'), 'utf8')
-const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8')
+const tsx = readFileSync(join(HERE, 'help-tip.tsx'), 'utf8')
 
-describe('「?」の印の字', () => {
-  it('V8 の印の字は Inter の変数で描き、最後に効く', () => {
-    const last = css.lastIndexOf(":root .mark {")
-    expect(css.slice(last)).toMatch(/font-family: var\(--tpl-ux5-help-mark-font\);/)
-    expect(globals).toMatch(/:root \{[^}]*--tpl-ux5-help-mark-font: var\(--font-inter\), Inter, sans-serif;/)
+describe('「?」の印', () => {
+  it('文字ではなく図形のアイコンで描く', () => {
+    expect(tsx).toMatch(/<CircleHelp className=\{styles\.markIcon\}/)
+    expect(tsx).not.toMatch(/>\?<\/span>/)
   })
 
-  it('円は 16px・字は 11px のまま', () => {
-    expect(css).toMatch(/:root \.mark \{[^}]*width: 16px;[^}]*height: 16px;/)
-    expect(css).toMatch(/font-size: var\(--text-micro\);\s*line-height: 11px;/)
+  it('印は 16px の正方形', () => {
+    expect(css).toMatch(/:root \.markIcon \{[^}]*width: 16px;[^}]*height: 16px;/)
   })
 })
