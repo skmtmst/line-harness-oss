@@ -457,6 +457,7 @@
 - [リマインダ](release-log/0.25.0.md)
 - [反映履歴の書き方](release-log/README.md)
 - [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
+- [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
 - [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
 - [fielderr2.md](release-log/drafts/fielderr2.md)
 - [kenta-form-fixed-1010.md](release-log/drafts/kenta-form-fixed-1010.md)
