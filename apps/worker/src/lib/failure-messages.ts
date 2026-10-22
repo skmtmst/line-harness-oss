@@ -3,6 +3,7 @@
 export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, message: string]>> = {
   "AI loop Slack report not configured": ["AI_LOOP_SLACK_REPORT_NOT_CONFIGURED", "AIのSlack報告が未設定です。連携の設定を確認してください。"],
   "Account already in this pool": ["ACCOUNT_ALREADY_IN_THIS_POOL", "このアカウントは、すでにこの流入プールに登録されています。"],
+  "Account unavailable": ["ACCOUNT_UNAVAILABLE", "このLINE公式アカウントは現在利用できません。管理者にお問い合わせください。"],
   "Affiliate not found": ["AFFILIATE_NOT_FOUND", "紹介者が見つかりません。一覧から開き直してください。"],
   "All account insight fetches failed; please retry later": ["ALL_ACCOUNT_INSIGHT_FETCHES_FAILED_PLEASE_RETRY_LATER", "すべてのアカウントの集計を取得できませんでした。時間をおいて読み直してください。"],
   "Already enrolled in this scenario": ["ALREADY_ENROLLED_IN_THIS_SCENARIO", "この友だちは、すでにこのシナリオに登録されています。"],
@@ -60,6 +61,8 @@ export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, m
   "Integration is not configured": ["INTEGRATION_IS_NOT_CONFIGURED", "外部連携が未設定です。連携の設定を確認してください。"],
   "Internal Server Error": ["INTERNAL_SERVER_ERROR", "処理を完了できませんでした。状態を確認し、管理者にお問い合わせください。"],
   "Internal server error": ["INTERNAL_SERVER_ERROR", "処理を完了できませんでした。状態を確認し、管理者にお問い合わせください。"],
+  "Identity required": ["IDENTITY_REQUIRED", "本人確認の情報がありません。LINEでログインし直してください。"],
+  "Identity unavailable": ["IDENTITY_UNAVAILABLE", "本人確認を利用できません。LINEログインの設定を管理者に確認してください。"],
   "Invalid ID token": ["INVALID_ID_TOKEN", "本人確認の情報が正しくありません。ログインし直してください。"],
   "Invalid Idempotency-Key": ["INVALID_IDEMPOTENCY_KEY", "操作を確認するキーが正しくありません。画面を開き直してください。"],
   "Invalid JSON": ["INVALID_JSON", "送信内容を読み取れません。入力内容を確認してください。"],
