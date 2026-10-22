@@ -210,8 +210,10 @@ export default function FriendsListV8() {
   useEffect(() => { setBulkOpen(false); setSelectionFriends([]); setRowAction(null) }, [selectionScope])
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [setSelectedIds])
   const identity = useMemo(() => ({}), [selectionScope])
-  const loadContextRef = useRef({ accountId: selectedAccountId, scope: listScope, identity })
-  loadContextRef.current = { accountId: selectedAccountId, scope: listScope, identity }
+  // 権限の確定では一覧を取り直さず、選択と保存操作だけを無効にする。
+  const readIdentity = useMemo(() => ({}), [listScope])
+  const loadContextRef = useRef({ accountId: selectedAccountId, scope: listScope, identity, readIdentity, setSelectedIds })
+  loadContextRef.current = { accountId: selectedAccountId, scope: listScope, identity, readIdentity, setSelectedIds }
   const displayedFriendsRef = useRef(friends)
   displayedFriendsRef.current = friends
   const hasRowsRef = useRef(false)
@@ -401,13 +403,13 @@ export default function FriendsListV8() {
       if (!response.success) throw new Error('読み込めませんでした')
       return response.data
     })
-    if (request !== loadRequestRef.current || loadContextRef.current.scope !== listScope) return
+    if (request !== loadRequestRef.current || loadContextRef.current.scope !== listScope || loadContextRef.current.identity !== identity) return
     setSelectionFriends(all)
     setSelectedIds(new Set(all.map(friend => friend.id)))
   }
 
   const loadFriends = useCallback(async () => {
-    if (loadContextRef.current.identity !== identity) return
+    if (loadContextRef.current.readIdentity !== readIdentity) return
     const requestId = ++loadRequestRef.current
     const requestedScope = listScope
     if (hasRowsRef.current) {
@@ -419,7 +421,7 @@ export default function FriendsListV8() {
     }
     if (!hasRowsRef.current) { setRefreshing(false); setBulkOpen(false) }
     const stale = () => {
-      return requestId !== loadRequestRef.current || loadContextRef.current.scope !== requestedScope || loadContextRef.current.identity !== identity
+      return requestId !== loadRequestRef.current || loadContextRef.current.scope !== requestedScope || loadContextRef.current.readIdentity !== readIdentity
     }
     try {
       const response = await api.friends.list({
@@ -446,7 +448,7 @@ export default function FriendsListV8() {
         // 一部のページだけでは、見えない行が対象から除かれたかは分からない。
         if (response.data.items.length >= response.data.total) {
           const returnedIds = new Set(response.data.items.map(friend => friend.id))
-          setSelectedIds(ids => new Set([...ids].filter(id => returnedIds.has(id))))
+          loadContextRef.current.setSelectedIds(ids => new Set([...ids].filter(id => returnedIds.has(id))))
         }
         setFriends(response.data.items)
         setTotal(response.data.total)
@@ -466,7 +468,7 @@ export default function FriendsListV8() {
       setRefreshing(false)
     }
     return false
-  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode, requestedFieldColumns, listScope, identity, setFriends, setTotal, setLoadStatus, setSelectedIds])
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode, requestedFieldColumns, listScope, readIdentity, setFriends, setTotal, setLoadStatus])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => void loadMarks(), [loadMarks])

@@ -2,7 +2,7 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const fx = vi.hoisted(() => ({ account: 'A', role: 'owner', granted: false, list: vi.fn(), save: vi.fn(), notify: vi.fn() }))
+const fx = vi.hoisted(() => ({ account: 'A', role: 'owner' as string | null, granted: false, list: vi.fn(), save: vi.fn(), notify: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(window.location.search), usePathname: () => '/friends' }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fx.account, loading: false }) }))
@@ -37,6 +37,70 @@ async function open() {
   await screen.findByRole('checkbox', { name: '山田さんを選ぶ' })
   return view
 }
+it('本人の権限が確定しても進行中の初回読取を増やさず、権限変更では選択を捨てる', async () => {
+  let finish!: (value: ReturnType<typeof answer>) => void
+  fx.role = null
+  fx.list.mockReturnValue(new Promise(resolve => { finish = resolve }))
+  const view = render(<List />)
+  await waitFor(() => expect(fx.list).toHaveBeenCalledTimes(1))
+  fx.role = 'owner'; view.rerender(<List />)
+  expect(fx.list).toHaveBeenCalledTimes(1)
+  await act(async () => finish(answer()))
+  fireEvent.click(screen.getByRole('checkbox', { name: '山田さんを選ぶ' }))
+  fx.role = 'viewer'; view.rerender(<List />)
+  expect(screen.queryByRole('checkbox', { name: '山田さんを選ぶ' })).toBeNull()
+  expect(screen.getByText('山田さん')).toBeTruthy()
+  fx.role = 'owner'; view.rerender(<List />)
+  expect(screen.getByRole<HTMLInputElement>('checkbox', { name: '山田さんを選ぶ' }).checked).toBe(false)
+  expect(fx.list).toHaveBeenCalledTimes(1)
+})
+
+it('アカウントを往復した後に届く前の読取応答を表示しない', async () => {
+  const pending: Array<(value: ReturnType<typeof answer>) => void> = []
+  fx.list.mockImplementation(() => new Promise(resolve => { pending.push(resolve) }))
+  const view = render(<List />)
+  await waitFor(() => expect(pending).toHaveLength(1))
+  fx.account = 'B'; view.rerender(<List />)
+  await waitFor(() => expect(pending).toHaveLength(2))
+  await act(async () => pending[1](answer([{ ...friend, displayName: 'Bの友だち' }])))
+  expect(screen.getByText('Bの友だち')).toBeTruthy()
+  fx.account = 'A'; view.rerender(<List />)
+  expect(screen.queryByText('Bの友だち')).toBeNull()
+  await waitFor(() => expect(pending).toHaveLength(3))
+  await act(async () => pending[2](answer([{ ...friend, displayName: '新しいAの友だち' }])))
+  await act(async () => pending[0](answer([{ ...friend, displayName: '古いAの友だち' }])))
+  expect(screen.getByText('新しいAの友だち')).toBeTruthy()
+  expect(screen.queryByText('古いAの友だち')).toBeNull()
+})
+
+it('権限を往復した後に届く注目の保存結果を持ち込まない', async () => {
+  let finish!: (value: unknown) => void
+  fx.save.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  const view = await open()
+  fireEvent.click(screen.getByRole('button', { name: '山田さんの注目を付ける' }))
+  fx.role = 'viewer'; view.rerender(<List />)
+  fx.role = 'owner'; view.rerender(<List />)
+  await act(async () => finish({ success: true, data: { metadata: { __attention: null }, updatedAt: 'obsolete-version' } }))
+  fireEvent.click(screen.getByRole('button', { name: '山田さんの注目を外す' }))
+  await waitFor(() => expect(fx.save).toHaveBeenCalledTimes(2))
+  expect(fx.save.mock.calls[1][0]).toContain('expectedUpdatedAt=version-1')
+  expect(fx.notify).not.toHaveBeenCalled()
+})
+
+it('全件の選択を待つ間に権限を往復しても前の選択を復活させない', async () => {
+  let finish!: (value: ReturnType<typeof answer>) => void
+  fx.list.mockResolvedValueOnce(answer([friend], 2)).mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  const view = await open()
+  fireEvent.click(screen.getByRole('checkbox', { name: '山田さんを選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '2人すべてを選ぶ' }))
+  await waitFor(() => expect(fx.list).toHaveBeenCalledTimes(2))
+  fx.role = 'viewer'; view.rerender(<List />)
+  fx.role = 'owner'; view.rerender(<List />)
+  await act(async () => finish(answer([friend, { ...friend, id: 'two', displayName: '佐藤さん' }])))
+  expect(screen.getByRole<HTMLInputElement>('checkbox', { name: '山田さんを選ぶ' }).checked).toBe(false)
+  expect(screen.queryByText('2人を選択中')).toBeNull()
+})
+
 it('注目の保存後は全表を取り直さず、選択と新しい版を次の保存に使う', async () => {
   await open()
   fireEvent.click(screen.getByRole('checkbox', { name: '山田さんを選ぶ' }))
