@@ -1,3 +1,4 @@
+import { timingMiddleware, timingSpan } from '../lib/server-timing.js';
 import { rememberAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { logger } from '@line-crm/shared/server';
 /** Public auth facade. Internal auth.ts modules retain the existing manual-review gate. */
@@ -25,23 +26,25 @@ export async function authenticateAdminSession(
   c: Context<Env>,
   token: string | null,
 ): Promise<AuthenticatedStaff | null> {
-  if (!token) return null;
-  const tokenHash = await sha256Hex(token);
-  const staff = await getStaffByAdminSession(c.env.DB, tokenHash, new Date().toISOString());
-  if (!staff) return null;
-  const configured = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY);
-  const registered = Boolean(staff.totp_enabled_at && staff.totp_secret_enc);
-  // 方針と確認済みの印は独立。未登録者の印は読んでも許可できないので取らない。
-  const [policy, verified] = await Promise.all([
-    configured ? getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) : null,
-    registered ? getPlatformSetting(c.env.DB, `auth.mfa.session:${tokenHash}`) : null,
-  ]);
-  const required = configured && policy !== 'false';
-  if ((required && !registered) || (registered && verified !== staff.id)) {
-    await deleteAdminSession(c.env.DB, tokenHash);
-    return null;
-  }
-  return rememberAuthenticatedStaffRecord(c.env.DB, { ...toAuthenticatedStaff(staff), credential: 'session' }, staff);
+  return timingSpan(c, 'session', async () => {
+    if (!token) return null;
+    const tokenHash = await sha256Hex(token);
+    const staff = await timingSpan(c, 'staff', () => getStaffByAdminSession(c.env.DB, tokenHash, new Date().toISOString()));
+    if (!staff) return null;
+    const configured = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY);
+    const registered = Boolean(staff.totp_enabled_at && staff.totp_secret_enc);
+    // 方針と確認済みの印は独立。未登録者の印は読んでも許可できないので取らない。
+    const [policy, verified] = await Promise.all([
+      configured ? getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) : null,
+      registered ? getPlatformSetting(c.env.DB, `auth.mfa.session:${tokenHash}`) : null,
+    ]);
+    const required = configured && policy !== 'false';
+    if ((required && !registered) || (registered && verified !== staff.id)) {
+      await deleteAdminSession(c.env.DB, tokenHash);
+      return null;
+    }
+    return rememberAuthenticatedStaffRecord(c.env.DB, { ...toAuthenticatedStaff(staff), credential: 'session' }, staff);
+  });
 }
 
 async function authenticateCookieToken(
@@ -73,7 +76,7 @@ export async function authenticateApiToken(
     return authenticateAdminSession(c, token.slice(ADMIN_SESSION_BEARER_PREFIX.length));
   }
 
-  const staff = await getStaffByApiKey(c.env.DB, token);
+  const staff = await timingSpan(c, 'staff', () => getStaffByApiKey(c.env.DB, token));
   if (staff) {
     const required = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
     // This endpoint exchanges the primary credential for a challenge, never
@@ -106,7 +109,7 @@ export async function authenticateApiToken(
   return null;
 }
 
-export async function authMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
+async function authenticateRequest(c: Context<Env>, next: Next): Promise<Response | void> {
   // Skip auth for the LINE webhook endpoint — it uses signature verification instead
   // Skip auth for OpenAPI docs — public documentation
   const path = c.req.path;
@@ -163,7 +166,8 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
 
   // 代理ログイン（★37-5）。運営マスターが契約先の画面に入っている間だけ、
   // 見ている統括を差し替える。既定は閲覧のみなので、この直後の readOnly 判定に乗る。
-  const impersonated = await resolveImpersonation(c, staff, path);
+  const authenticated = staff;
+  const impersonated = await timingSpan(c, 'impersonation', () => resolveImpersonation(c, authenticated, path));
   if (impersonated) {
     staff = impersonated.staff;
     c.set('impersonation', impersonated.context);
@@ -224,4 +228,10 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
 
   c.set('staff', staff);
   return next();
+}
+
+const timedAuthentication = timingMiddleware('auth', authenticateRequest);
+
+export async function authMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
+  return timedAuthentication(c, next);
 }

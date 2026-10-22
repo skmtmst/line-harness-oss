@@ -1,3 +1,4 @@
+import { d1BindingIdentity } from '../lib/d1-timing.js';
 import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -129,6 +130,12 @@ async function callback(state: Record<string, string>) {
   );
 }
 
+function requestDb(): D1Database {
+  const db = dbMocks.enrollFriendInScenario.mock.calls[0]?.[0] as D1Database;
+  expect(d1BindingIdentity(db)).toBe(DB);
+  return db;
+}
+
 const FRIEND_ADD_SCENARIO = {
   id: 'scn-1',
   trigger_type: 'friend_add',
@@ -160,10 +167,10 @@ describe('GET /auth/callback — friend_add auto-enroll delegates to pushImmedia
   it("enrolls and hands the fresh enrollment to the service ('once' mode contract)", async () => {
     await callback({ ref: '' });
 
-    expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(DB, 'F-new', 'scn-1');
+    expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(requestDb(), 'F-new', 'scn-1');
     expect(pushImmediateFirstStep).toHaveBeenCalledTimes(1);
     expect(pushImmediateFirstStep).toHaveBeenCalledWith(
-      DB,
+      requestDb(),
       'F-new',
       'scn-1',
       {
@@ -226,10 +233,10 @@ describe('GET /auth/callback — friend_add auto-enroll delegates to pushImmedia
     await callback({ ref: '', account: 'CH-9' });
 
     expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledTimes(1);
-    expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(DB, 'F-new', 'scn-mine');
+    expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(requestDb(), 'F-new', 'scn-mine');
     expect(pushImmediateFirstStep).toHaveBeenCalledTimes(1);
     expect(pushImmediateFirstStep).toHaveBeenCalledWith(
-      DB,
+      requestDb(),
       'F-new',
       'scn-mine',
       expect.objectContaining({ accountChannelId: 'CH-9' }),
@@ -252,7 +259,7 @@ describe('GET /auth/callback — friend_add auto-enroll delegates to pushImmedia
     expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledTimes(2);
     expect(pushImmediateFirstStep).toHaveBeenCalledTimes(2);
     expect(pushImmediateFirstStep).toHaveBeenLastCalledWith(
-      DB,
+      requestDb(),
       'F-new',
       'scn-b',
       expect.anything(),

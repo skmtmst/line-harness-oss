@@ -1,3 +1,4 @@
+import { d1BindingIdentity } from '../lib/d1-timing.js';
 import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -172,13 +173,15 @@ describe('GET /auth/callback — friend_add scenario auto-enroll gating', () => 
 
     await callback();
 
+    const db = dbMocks.getFriendByLineUserIdForAccount.mock.calls[0]?.[0] as D1Database;
+    expect(d1BindingIdentity(db)).toBe(DB);
     expect(dbMocks.getFriendByLineUserIdForAccount).toHaveBeenCalledWith(
-      DB,
+      db,
       'U-login',
       'account-main',
     );
     expect(dbMocks.upsertFriend).toHaveBeenCalledWith(
-      DB,
+      db,
       expect.objectContaining({
         lineUserId: 'U-login',
         lineAccountId: 'account-main',

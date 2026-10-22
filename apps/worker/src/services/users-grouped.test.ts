@@ -1,3 +1,4 @@
+import { createD1Timing, timedD1 } from '../lib/d1-timing.js';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { _resetCacheForTest, computeUsersGrouped } from './users-grouped.js';
 
@@ -601,12 +602,17 @@ describe('computeUsersGrouped', () => {
       },
     } as unknown as D1Database;
 
-    await computeUsersGrouped(db);
-    await computeUsersGrouped(db);
+    const initial = createD1Timing();
+    const repeated = createD1Timing();
+    await computeUsersGrouped(timedD1(db, initial));
+    await computeUsersGrouped(timedD1(db, repeated));
     expect(identCalls).toBe(1);
+    expect(initial.count).toBe(2);
+    expect(repeated.count).toBe(0);
 
-    await computeUsersGrouped(db, { forceRefresh: true });
+    await computeUsersGrouped(timedD1(db, repeated), { forceRefresh: true });
     expect(identCalls).toBe(2);
+    expect(repeated.count).toBe(2);
   });
 
   test('空結果はキャッシュされない（誤検知マスクを避ける）', async () => {

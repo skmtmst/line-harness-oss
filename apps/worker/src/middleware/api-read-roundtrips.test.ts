@@ -72,6 +72,7 @@ it.each([
   const response = await request(path);
   expect(response.status, await response.clone().text()).toBe(200);
   expect(trips.length, trips.join('\n')).toBe(expected);
+  expect(response.headers.get('Server-Timing')).toContain(`d1_count;desc="${expected}"`);
 });
 
 it('別要求のスタッフ停止・範囲変更を読み直し、秘密列を応答へ出さない', async () => {
@@ -113,6 +114,7 @@ it.each([
   const response = await request(path, { TOTP_ENCRYPTION_KEY: mfaKey });
   expect(response.status, await response.clone().text()).toBe(200);
   expect(trips.length, trips.join('\n')).toBe(expected);
+  expect(response.headers.get('Server-Timing')).toContain(`d1_count;desc="${expected}"`);
 });
 
 it.each(['missing', 'wrong-staff', 'policy-off'] as const)('MFA確認の印が%sならセッションを拒否する', async mode => {

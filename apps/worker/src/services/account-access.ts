@@ -5,6 +5,7 @@ import {
   type LineAccountScopeEntry,
 } from '@line-crm/db';
 
+import { timingDbSpan } from '../lib/server-timing.js';
 import { readAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
@@ -113,7 +114,7 @@ export function getVisibleLineAccountScope(
   const cached = byDb.get(db);
   if (cached && cached.signature === signature) return cached.pending;
   // 失敗した読取は残さず、同じ要求内の再試行を許す。
-  const pending = resolveVisibleLineAccountScope(db, staff).catch((error: unknown) => {
+  const pending = timingDbSpan(db, 'scope', () => resolveVisibleLineAccountScope(db, staff)).catch((error: unknown) => {
     if (byDb.get(db)?.pending === pending) byDb.delete(db);
     throw error;
   });
