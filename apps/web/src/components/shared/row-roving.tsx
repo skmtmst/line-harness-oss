@@ -184,15 +184,18 @@ export function useRowRoving(ref: RefObject<HTMLTableSectionElement | null>, ena
 export function RovingTbody({
   children,
   reorderKey,
+  reorderScope,
   ...bodyProps
 }: Omit<HTMLAttributes<HTMLTableSectionElement>, 'children'> & {
   children?: ReactNode
   /** 並びの印（行の id を並べた文字）。変わると、`data-reorder-id` の行を前の位置から滑らせる。 */
   reorderKey?: string
+  /** アカウント・条件・ページの印。変わったときは並べ替えの動きを付けない。 */
+  reorderScope?: string
 }) {
   const ref = useRef<HTMLTableSectionElement>(null)
   useRowRoving(ref)
-  useFlipRows(ref, reorderKey ?? '')
+  useFlipRows(ref, reorderKey ?? '', reorderScope)
   return (
     <tbody ref={ref} {...bodyProps}>
       {children}
