@@ -1101,6 +1101,7 @@ export default function AutoRepliesListV8() {
             open={createMenuOpen}
             onClose={() => setCreateMenuOpen(false)}
             anchorRef={createMenuAnchorRef}
+            align="start"
             ariaLabel="ルールの作り方"
             items={[
               { id: 'full', label: 'くわしく作る', onSelect: () => { setCreateMenuOpen(false); router.push('/auto-replies/edit') } },

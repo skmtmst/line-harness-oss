@@ -8,7 +8,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
-- [最初に読む：開発・運用の引き継ぎ](START-HERE.md)
+- [最初に読む：製品とコードの入口](START-HERE.md)
 
 ## 使う人の手引き
 
@@ -457,6 +457,7 @@
 - [リマインダ](release-log/0.25.0.md)
 - [反映履歴の書き方](release-log/README.md)
 - [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
+- [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
 - [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
 - [fielderr2.md](release-log/drafts/fielderr2.md)
 - [kenta-form-fixed-1010.md](release-log/drafts/kenta-form-fixed-1010.md)
