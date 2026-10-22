@@ -4,9 +4,9 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ read:vi.fn(), save:vi.fn(), postal:vi.fn(), name:vi.fn(), role:'owner' as string|null }))
+const mocks = vi.hoisted(() => ({ read:vi.fn(), save:vi.fn(), postal:vi.fn(), name:vi.fn(), role:'owner' as string|null, nameSave:vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => ({
-  ...(await importOriginal()), api:{tenants:{companyContact:mocks.read,saveCompanyContact:mocks.save,me:mocks.name},postalCode:{search:mocks.postal}},
+  ...(await importOriginal()), api:{tenants:{companyContact:mocks.read,saveCompanyContact:mocks.save,me:mocks.name,updateName:mocks.nameSave},postalCode:{search:mocks.postal}},
 }))
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole:()=>mocks.role}))
 vi.mock('@/components/shell/page-chrome', () => ({usePageCrumbs:()=>{},usePageTitle:()=>{}}))
@@ -28,6 +28,7 @@ beforeEach(()=>{clearToastsForTest();
   mocks.read.mockResolvedValue({success:true,data:{...values,revision:4}})
   mocks.save.mockResolvedValue({success:true,data:{...values,revision:5}})
   mocks.name.mockResolvedValue({success:true,data:{name:'統括の名前'}})
+  mocks.nameSave.mockResolvedValue({success:true,data:{name:'新しい統括名'}})
 })
 afterEach(cleanup)
 
@@ -79,11 +80,12 @@ describe('会社と連絡先の画面の動き',()=>{
     mocks.read.mockRejectedValueOnce(new Error('読み込めませんでした'))
     render(<CompanyContactCard canEdit/> )
     await waitFor(()=>expect(screen.getByRole('alert')).toBeTruthy())
-    expect((screen.getByRole('button',{name:'会社と連絡先を保存する'}) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button',{name:'会社と連絡先を保存する'})).toBeNull()
     submit();expect(mocks.save).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button',{name:'もう一度読み込む'}))
     await loaded()
-    expect((screen.getByRole('button',{name:'会社と連絡先を保存する'}) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.queryByRole('button',{name:'会社と連絡先を保存する'})).toBeNull()
+    submit();expect(mocks.save).not.toHaveBeenCalled()
   })
   it.each(['会社名（正式）','郵便番号','住所','電話番号','担当者名','担当者のメール'])('必須の%sが空なら送信しない',async label=>{
     await renderCard();fireEvent.change(field(label),{target:{value:' '}});submit()
@@ -96,7 +98,7 @@ describe('会社と連絡先の画面の動き',()=>{
   it('二重保存を防ぎ、通信中に入力を変更させない',async()=>{
     let finish!: (value:unknown)=>void
     mocks.save.mockImplementation(()=>new Promise(resolve=>{finish=resolve}))
-    await renderCard();submit()
+    await renderCard();fireEvent.change(field('担当者名'),{target:{value:'保存中の担当'}});submit()
     await waitFor(()=>expect(field('担当者名').disabled).toBe(true))
     submit();expect(mocks.save).toHaveBeenCalledTimes(1)
     finish({success:true,data:{...values,revision:5}})
@@ -148,6 +150,60 @@ describe('会社と連絡先の画面の動き',()=>{
     fireEvent.click(screen.getByRole('button',{name:'住所を探す'}))
     await waitFor(()=>expect(screen.queryByText(/全データが未登録/)).toBeNull())
     expect(field('住所').value).toBe(values.address)
+    fireEvent.change(field('担当者名'),{target:{value:'新しい担当'}})
     submit();await waitFor(()=>expect(mocks.save).toHaveBeenCalledTimes(1))
   })
+})
+
+
+it('統括の2つの設定は変更時だけ1本の帯を出し、取消で両方を元へ戻す', async () => {
+  render(<HqSettingsV8 />)
+  await loaded()
+  await waitFor(() => expect(field('統括名').value).toBe('統括の名前'))
+  expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+  fireEvent.change(field('統括名'), { target: { value: '新しい統括名' } })
+  fireEvent.change(field('担当者名'), { target: { value: '別の担当' } })
+  expect(screen.getAllByRole('button', { name: '保存する' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
+  await waitFor(() => expect(screen.queryByRole('button', { name: '保存する' })).toBeNull())
+  expect(field('統括名').value).toBe('統括の名前')
+  expect(field('担当者名').value).toBe(values.contactName)
+  expect(mocks.save).not.toHaveBeenCalled()
+  expect(mocks.nameSave).not.toHaveBeenCalled()
+})
+it('統括名の保存後に会社の保存が失敗しても、未保存の入力を残して会社だけやり直す', async () => {
+  render(<><HqSettingsV8 /><ToastHost /></>)
+  await loaded()
+  await waitFor(() => expect(field('統括名').value).toBe('統括の名前'))
+  fireEvent.change(field('統括名'), { target: { value: '新しい統括名' } })
+  fireEvent.change(field('担当者名'), { target: { value: '未保存の担当' } })
+  mocks.save.mockRejectedValueOnce(new Error('通信できませんでした'))
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
+  expect(mocks.nameSave).toHaveBeenCalledOnce()
+  expect(field('統括名').value).toBe('新しい統括名')
+  expect(field('担当者名').value).toBe('未保存の担当')
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(2))
+  expect(mocks.nameSave).toHaveBeenCalledOnce()
+  await waitFor(() => expect(screen.queryByRole('button', { name: '保存する' })).toBeNull())
+})
+
+
+it('統括名の保存を待つ間は、会社の入力と住所検索も動かさない', async () => {
+  let finish!: (value: unknown) => void
+  mocks.nameSave.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+  render(<HqSettingsV8 />)
+  await loaded()
+  await waitFor(() => expect(field('統括名').value).toBe('統括の名前'))
+  fireEvent.change(field('統括名'), { target: { value: '新しい統括名' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect((screen.getByRole('button', { name: '住所を探す' }) as HTMLButtonElement).disabled).toBe(true))
+  expect(field('担当者名').disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: '住所を探す' }))
+  expect(mocks.postal).not.toHaveBeenCalled()
+  finish({ success: true, data: { name: '新しい統括名' } })
+  await waitFor(() => expect((screen.getByRole('button', { name: '住所を探す' }) as HTMLButtonElement).disabled).toBe(false))
+  expect(mocks.save).not.toHaveBeenCalled()
 })

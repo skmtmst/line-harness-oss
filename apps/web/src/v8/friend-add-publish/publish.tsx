@@ -357,6 +357,7 @@ function FriendAddPublish() {
       steps={(
         <Steps
           label="初回案内の作る手順"
+          readOnly={!canEdit} summaries={{ 基本設定: rule.name, 流入リンク: routeNames.join('・') || '未選択', 初回案内: firstSendText(rule), あわせて行うこと: actionSummaryText(rule) }}
           steps={PUBLISH_STEPS.map((label, index) => ({
             label,
             state: index < PUBLISH_STEPS.length - 1 ? 'done' as const : 'current' as const,

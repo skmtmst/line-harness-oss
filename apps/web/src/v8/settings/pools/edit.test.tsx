@@ -46,6 +46,9 @@ it('編集中に閉じると破棄を確認し、キャンセルでは入力を�
   const confirm = screen.getByRole('dialog', { name: '入力を破棄しますか？' })
   fireEvent.click(within(confirm).getByRole('button', { name: '編集を続ける', exact: true }))
   expect((screen.getByRole('textbox', { name: /プール名/ }) as HTMLInputElement).value).toBe('入力途中')
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'プールを編集' })).getByRole('button', { name: 'キャンセル', exact: true }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: '入力を破棄しますか？' })).getByRole('button', { name: '破棄する', exact: true }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(net.update).not.toHaveBeenCalled()
 })
 
@@ -54,4 +57,20 @@ it('閲覧のみと管理者には編集の口を出さない（APIはオーナ�
   render(<PoolsV8 />)
   await screen.findByText('店への入り口')
   expect(screen.queryByRole('button', { name: '店への入り口の操作' })).toBeNull()
+})
+
+
+it('未変更・元の名前・周囲の空白だけの変更では保存せず、閉じられる', async () => {
+  render(<PoolsV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '店への入り口の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
+  const input = screen.getByRole('textbox', { name: /プール名/ })
+  expect(screen.queryByRole('button', { name: '保存する', exact: true })).toBeNull()
+  fireEvent.change(input, { target: { value: '変更した名前' } })
+  expect(screen.getByRole('button', { name: '保存する', exact: true })).toBeTruthy()
+  fireEvent.change(input, { target: { value: '  店への入り口  ' } })
+  expect(screen.queryByRole('button', { name: '保存する', exact: true })).toBeNull()
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '閉じる', exact: true }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(net.update).not.toHaveBeenCalled()
 })

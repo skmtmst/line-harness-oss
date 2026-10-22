@@ -64,8 +64,12 @@ export function WizardSteps({
   current,
   stateOf,
   onSelect,
+  summaries,
+  readOnly,
 }: {
   current: StepKey
+  summaries?: Readonly<Record<string, string>>
+  readOnly?: boolean
   stateOf: (key: StepKey) => 'done' | 'current' | 'todo'
   /** 渡さないときは段を押せない（作る前など）。 */
   onSelect?: (key: StepKey) => void
@@ -74,6 +78,8 @@ export function WizardSteps({
     <Steps
       label="ウェビナーを作る進み方"
       currentKey={current}
+      summaries={summaries}
+      readOnly={readOnly}
       steps={STEPS.map((step) => {
         const state = stateOf(step.key)
         return {

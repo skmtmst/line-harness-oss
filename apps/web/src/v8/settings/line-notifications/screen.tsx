@@ -25,6 +25,8 @@ import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell, RowNameButton } from '
 import StatusBadge from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
+import { DialogActions } from '@/components/shared/dialog'
+import { PageFooter } from '@/components/templates/page-footer'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -581,15 +583,15 @@ function CustomerNotificationEditor({
     setTitleError('')
     action()
   }
-  return <div data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
+  return <div data-design-node="Q55bb" className="min-w-0 space-y-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="text-xs font-semibold text-ink-faint">LINE通知　›　お知らせの種類</p>
+        <p className="text-xs font-semibold text-ink-faint"><Button variant="text" size="inline" onClick={onClose} disabled={busy}>LINE通知</Button>　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
         <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : emptyValue('none')} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
         {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
       </div>
-      <Button onClick={onTestSend} disabled={busy}>テスト受信者に送る</Button>
+      <DialogActions padding="none"><Button onClick={onTestSend} disabled={busy}>テスト受信者に送る</Button>{definition ? <Button variant={hasUnsaved ? "secondary" : "primary"} onClick={() => validateEditor(onPublish)} disabled={busy}>顧客へのお知らせを公開</Button> : null}</DialogActions>
     </div>
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
@@ -672,17 +674,10 @@ function CustomerNotificationEditor({
       </aside>
     </div>
 
-    {/*
-      * N-337: 固定フッターの主要操作。ボタンの文字は部品側で `nowrap` なので、
-      * 375px級では並びを折り返さないと横にはみ出す。入れ物を `min-w-0` にし、
-      * 操作列を `flex-wrap` で複数行に落とす。左右の余白も狭幅では詰める。
-      */}
-    <div data-design="editor-footer" className="fixed bottom-0 left-0 right-0 z-20 min-w-0 border-t border-hairline bg-canvas px-4 py-3 shadow-float sm:px-6">
-      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1584 }}>
-        <p className="min-w-0 text-xs text-ink-faint">{definition ? '下書きの保存だけでは公開中の内容は変わりません。確認後に公開してください。' : '出しています。保存すると、次のお知らせから新しい文面が使われます。'}</p>
-        <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>テスト受信者に送る</Button><Button onClick={() => validateEditor(onSave)} disabled={busy}>{definition ? '下書きを保存する' : 'お知らせを保存する'}</Button>{definition ? <Button variant="primary" onClick={() => validateEditor(onPublish)} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
-      </div>
-    </div>
+    {hasUnsaved ? <PageFooter
+      status={definition ? '下書きの保存だけでは公開中の内容は変わりません。確認後に公開してください。' : '保存すると、次のお知らせから新しい文面が使われます。'}
+      actions={<><Button onClick={onClose} disabled={busy}>キャンセル</Button><Button variant="primary" onClick={() => validateEditor(onSave)} disabled={busy}>{definition ? '下書きを保存する' : 'お知らせを保存する'}</Button></>}
+    /> : null}
   </div>
 }
 
@@ -1111,6 +1106,7 @@ function LineNotificationsPage() {
   }
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
+    if (enabled === setting.isEnabled && !dirtyEvents.includes(setting.eventType)) return
     if (notificationTitleRequirement.check(setting.title ?? '')) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     if (definitionsFailed && !definitionByEvent.get(setting.eventType)) {

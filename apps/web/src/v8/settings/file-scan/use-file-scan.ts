@@ -186,7 +186,7 @@ export function useFileScan() {
 
   async function saveConfig() {
     if (!canEdit) return
-    if (!selectedAccountId) return
+    if (!selectedAccountId || configBusy || !configDirty) return
     setActionError('')
     if (configFields.submit().length > 0) return
     setConfigBusy(true)
@@ -303,6 +303,7 @@ export function useFileScan() {
     secretRef,
     setSecretRef,
     configBusy,
+    configDirty,
     configFields,
     stopExternal,
     setStopExternal,

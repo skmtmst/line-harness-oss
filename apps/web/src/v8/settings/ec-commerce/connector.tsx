@@ -4,6 +4,7 @@ import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import { PageFooter } from '@/components/templates/page-footer'
 import Checkbox from '@/components/shared/checkbox'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -158,7 +159,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   }
 
   const save = async () => {
-    if (!accountId) return
+    if (!canEdit || saving || !dirty || !accountId) return
     const accountAtSave = accountId
     setSaving(true)
     setNotice(null)
@@ -181,6 +182,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
   }
 
   const requestSave = () => {
+    if (!canEdit || saving || !dirty) return
     if (!accountId || saving || !canEdit) return
     const domain = form.shopDomain.trim().toLowerCase()
     const next = {
@@ -326,12 +328,10 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
           <Link href="/conversions" title={`アカウント全体 ${impactWords(impact?.conversions)}`}>→ コンバージョン</Link>
           <Link href="/ec-commerce/identity-candidates" title="会員のつき合わせ">→ 会員</Link>
         </p>
-        {canEdit ? (
-          <div className={styles.saveBox}>
-            <Button type="button" variant="primary" disabled={saving} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button>
-          </div>
-        ) : null}
+
       </div>
+
+      {canEdit && (dirty || saving) ? <PageFooter actions={<><Button disabled={saving} onClick={() => { setForm(toForm(connector ?? null)); setReplacingSecret(false); setErrors({}); setNotice(null); saveErrors.reset() }}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={requestSave} busy={saving} busyLabel="保存しています…">設定を保存する</Button></>} /> : null}
 
       <ConfirmDialog
         open={emptyConfirm !== null}

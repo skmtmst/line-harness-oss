@@ -39,3 +39,14 @@ it('担当範囲は窓で仮選択し、取消では反映せず確定してか�
   fireEvent.click(screen.getByRole('button', { name: '招待メールを送る' }))
   expect(submit).toHaveBeenCalledWith(expect.objectContaining({ scopedLineAccountIds: ['b'], assignedLineAccountId: 'a', accountScope: 'accounts' }))
 })
+
+
+it('不正なメールの貼り付けはその場で知らせ、招待を送らない', () => {
+  const submit = vi.fn()
+  render(<MemberDialog open session={1} member={null} accounts={accounts} onSubmit={submit} onCancel={() => {}} />)
+  fireEvent.change(screen.getByLabelText('名前'), { target: { value: '担当者' } })
+  fireEvent.paste(screen.getByLabelText('メールアドレス'), { clipboardData: { getData: () => 'bad@' } })
+  expect(screen.getByRole('alert').textContent).toContain('正しいメール')
+  fireEvent.click(screen.getByRole('button', { name: '招待メールを送る' }))
+  expect(submit).not.toHaveBeenCalled()
+})

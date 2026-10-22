@@ -213,3 +213,5 @@ button.step:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.summaries { display: flex; flex-direction: column; gap: var(--polish-space-field); margin-top: var(--polish-space-card); }

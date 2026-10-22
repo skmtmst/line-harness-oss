@@ -122,3 +122,26 @@ describe('新規スタッフの成果承認権限', () => {
     expect(labels.toggleStaffPermissionKey(['/conversions', 'conversion.approval.edit'], '/conversions')).toEqual([])
   })
 })
+
+test('貼り付けたメールをチップにしても、選んだ権限と1人分の宛先で招待する', async () => {
+  await fillBasics()
+  const email = screen.getByLabelText(/メールアドレス/)
+  fireEvent.change(email, { target: { value: '' } })
+  fireEvent.paste(email, { clipboardData: { getData: () => 'invite@example.test' } })
+  expect(screen.getByRole('button', { name: 'invite@example.testを外す' })).toBeTruthy()
+  fireEvent.click(opCheckbox())
+  await save()
+  expect(fixture.created[0]).toMatchObject({ email: 'invite@example.test', role: 'staff', permissionKeys: expect.arrayContaining(['/conversions', 'conversion.approval.edit']) })
+})
+
+test('メールを複数貼った場合は1件も招待せず、入力を残して直せる', async () => {
+  await fillBasics()
+  const email = screen.getByLabelText(/メールアドレス/)
+  fireEvent.change(email, { target: { value: '' } })
+  fireEvent.paste(email, { clipboardData: { getData: () => 'one@example.test,two@example.test' } })
+  fireEvent.click(opCheckbox())
+  fireEvent.click(screen.getByRole('button', { name: '招待メールを送る' }))
+  expect(fixture.created).toHaveLength(0)
+  expect((email as HTMLInputElement).value).toBe('one@example.test,two@example.test')
+  expect(email.getAttribute('aria-invalid')).toBe('true')
+})

@@ -1065,27 +1065,29 @@ describe('#678 実Reactで描いた編集画面', () => {
     hasUnsaved: false,
   }
 
-  /*
-   * 実寸は line-notifications-browser-behavior.mjs が実物のChromeで測る。
-   *   pnpm --filter web build
-   *   node apps/web/src/app/line-notifications/line-notifications-browser-behavior.mjs
-   * そこで測った値（折り返しなしだと 375px で右端 550px = 175px が画面の外、
-   * 折り返しありで 359px）を踏まえ、ここでは折り返しを外す変更を止める。
-   */
-  it('375px級でも固定フッターの主要操作を折り返し、横へはみ出す一列にしない', () => {
-    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} />)
-    const actions = /<div data-design="editor-footer-actions" class="([^"]+)"/.exec(html)
-    expect(actions).not.toBeNull()
-    // ボタンの文字は共通部品側で nowrap。列が折り返さないと 375px で横に出る。
-    expect(actions![1]).toContain('flex-wrap')
-    expect(actions![1]).toContain('min-w-0')
-    const footer = /<div data-design="editor-footer" class="([^"]+)"/.exec(html)
-    expect(footer![1]).toContain('px-4')
-    expect(footer![1]).toContain('sm:px-6')
-    // 折り返した分だけ本文の下余白を広げ、最後の入力欄が隠れないようにする。
-    expect(html).toContain('pb-48 sm:pb-24')
-    expect(html).toContain('顧客へのお知らせを公開')
-    expect(html).toContain('下書きを保存する')
+  it('変更がある時だけ共通の保存帯を出し、公開とテスト送信は変更前でも使える', () => {
+    const clean = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} />)
+    expect(clean).not.toContain('data-template-region="footer"')
+    expect(clean).not.toContain('下書きを保存する')
+    expect(clean).toContain('顧客へのお知らせを公開')
+    expect(clean).toContain('テスト受信者に送る')
+    const dirty = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} hasUnsaved />)
+    expect(dirty).toContain('data-template-region="footer"')
+    expect(dirty).toContain('data-sticky-layout="center"')
+    expect(dirty).toContain('下書きを保存する')
+  })
+
+  it('下書きの変更を戻すと保存口が消え、閉じる操作と公開は残る', () => {
+    const onClose = vi.fn()
+    const onPublish = vi.fn()
+    const view = render(<CustomerNotificationEditor {...editorProps} onClose={onClose} onPublish={onPublish} hasUnsaved />)
+    expect(screen.getByRole('button', { name: '下書きを保存する' })).toBeTruthy()
+    view.rerender(<CustomerNotificationEditor {...editorProps} onClose={onClose} onPublish={onPublish} />)
+    expect(screen.queryByRole('button', { name: '下書きを保存する' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '顧客へのお知らせを公開' }))
+    expect(onPublish).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'LINE通知', exact: true }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('未保存の編集があることを画面に出す', () => {
@@ -1108,13 +1110,13 @@ describe('#678 実Reactで描いた編集画面', () => {
   })
 
   it('定義がないお知らせには公開ボタンを出さない', () => {
-    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} definition={null} />)
+    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} definition={null} hasUnsaved />)
     expect(html).not.toContain('顧客へのお知らせを公開')
     expect(html).toContain('お知らせを保存する')
   })
 
   it('保存中は主要操作を押せなくする', () => {
-    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} busy />)
+    const html = renderToStaticMarkup(<CustomerNotificationEditor {...editorProps} busy hasUnsaved />)
     expect(html.match(/disabled=""/g)?.length ?? 0).toBeGreaterThanOrEqual(3)
   })
 })

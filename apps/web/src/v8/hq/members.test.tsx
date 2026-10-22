@@ -120,7 +120,7 @@ describe('V8 統括のメンバーの窓', () => {
     await act(async () => { buttonByText('権限者を招待')!.click() })
     await flush()
     const dialog = document.querySelector('[role="dialog"]')!
-    const email = dialog.querySelector('input[type="email"]') as HTMLInputElement
+    const email = screen.getByRole('textbox', { name: 'メールアドレス' }) as HTMLInputElement
     await act(async () => { fireEvent.change(email, { target: { value: 'staff@example.com' } }) })
     await act(async () => { screen.getByRole('button', { name: '担当アカウント：変える' }).click() })
     const picker = screen.getByRole('dialog', { name: '担当アカウントを選ぶ' })

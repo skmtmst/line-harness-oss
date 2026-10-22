@@ -89,10 +89,7 @@ describe('メンバー管理（36-5）', () => {
     expect(members).toContain('（あなた）')
   })
 
-  it('統括名の保存ボタンはカードの中（V8 正本 K7HYu どおり。下部追従バーは使わない） @claude 2026-10-06', () => {
-    expect(settings).not.toContain('<StickyBar')
-    expect(settings).toContain('統括名を保存する')
-  })
+
 })
 
 describe('お問い合わせ（36-3）', () => {

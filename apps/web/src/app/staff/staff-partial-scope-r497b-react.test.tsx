@@ -162,11 +162,10 @@ describe('R497b 一部だけ許可の表示と保存', () => {
     expect(screen.getByText(/一部だけ許可が1\s*行あります/)).toBeTruthy()
   })
 
-  test('何も変えない保存は更新要求を送らず、窓だけ閉じる', async () => {
+  test('未変更では保存口を出さず、パンくずで書き込まずに一覧へ戻れる', async () => {
     await openScopeView()
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
-    })
+    expect(screen.queryByRole('button', { name: /見せる範囲を保存/ })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'ログインユーザー', exact: true })) })
     expect(screen.queryByText(/見せる範囲を保存しますか/)).toBeNull()
     expect(fixture.updated).toHaveLength(0)
     await waitFor(() => {
