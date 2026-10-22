@@ -16,6 +16,9 @@ describe('使う人への失敗の理由', () => {
     ['name must be 60 characters or fewer', 400, 'NAME_MUST_BE_60_CHARACTERS_OR_FEWER', '名前は60文字以下にしてください。'],
     ['expectedVersion is required', 400, 'EXPECTED_VERSION_IS_REQUIRED', '操作に必要な最新の状態を確認できません。画面を読み直してください。'],
     ['idToken is required', 400, 'ID_TOKEN_IS_REQUIRED', 'LINEでログインし直してから、もう一度操作してください。'],
+    ['Identity required', 401, 'IDENTITY_REQUIRED', '本人確認の情報がありません。LINEでログインし直してください。'],
+    ['Account unavailable', 503, 'ACCOUNT_UNAVAILABLE', 'このLINE公式アカウントは現在利用できません。管理者にお問い合わせください。'],
+    ['Identity unavailable', 401, 'IDENTITY_UNAVAILABLE', '本人確認を利用できません。LINEログインの設定を管理者に確認してください。'],
     ['Internal server error', 500, 'INTERNAL_SERVER_ERROR', '処理を完了できませんでした。状態を確認し、管理者にお問い合わせください。'],
   ] as const)('%s の理由がHTTPの応答に届く', async (reason, status, code, message) => {
     const api = new Hono().use('*', apiContractMiddleware);
