@@ -1,8 +1,8 @@
-> 文書：文字を見る試験の判断案｜区分：司令塔への説明・未承認｜最終確認：2026-10-22（日本時間）
+> 文書：文字を見る試験の判断案｜区分：司令塔が承認 2026-10-23｜最終確認：2026-10-23（日本時間）
 
 # Q02-D 18ファイルの判断案
 
-土台：95ed89396efa98b6ace3f81887d49026261031ec。18ファイルをすべて読み、削除0・試験変更0。元の68は文字を見る試験の数で、現在の実行件数ではない。残す7／書き換える11。削除は司令塔だけが判断する。
+土台：95ed89396efa98b6ace3f81887d49026261031ec。18ファイルをすべて読み、削除0・試験変更0。元の68は文字を見る試験の数で、現在の実行件数ではない。2026-10-23に司令塔が承認：残す7／書き換える11／消す0。書き換えは1ファイルずつ実施し、禁止の見張り・計算・故障対照と動きの試験を保つ。完了した範囲は個別コミットと引き継ぎ記録で示す。
 
 | 現在のファイル | 案 | 理由・守り方 |
 |---|---|---|
@@ -16,7 +16,7 @@
 | `apps/web/src/components/shared/button-busy-contract.test.ts` | 残す | 現在はTypeScript構文解析による全画面の禁止検査＋悪い/良いfixtureの実行。古い特定ファイルの文字固定から既に更新されており、共通busy表示の再発を守る。 |
 | `apps/web/src/components/shared/card-shape-contract.test.ts` | 残す | カードの影/角丸の構文検査を実行し、変数の連鎖・上書き・条件合成の故障対照を持つ。見張りを消す対象ではない。#1795の枠計測にも触らない。 |
 | `apps/web/src/components/shared/green-semantics-contract.test.tsx` | 書き換える | 生色の禁止検査と4.5:1の計算は残す。CardHeader/StatusBadge/Noticeの役割の色は実ブラウザ描画へ接続し、CSS文字列固定だけの部分を置き換える。 |
-| `apps/web/src/components/shared/motion-audit-regression.test.tsx` | 書き換える | 保存中の幅・更新中の操作・焦点・IME中Escapeの動作はすべて残す。menuの退場タイミングと手順窓の高さ変化だけをDOM/計測で試す。#1795完了後に扱う。 |
+| `apps/web/src/components/shared/motion-audit-regression.test.tsx` | 書き換える | 保存中の幅・更新中の操作・焦点・IME中Escapeの動作はすべて残す。menuの退場タイミングと手順窓の高さ変化だけをDOM/計測で試す。#1795は統合済みのため着手できる。 |
 | `apps/web/src/components/shared/table-header-migration-contract.test.ts` | 書き換える | 共通Thを使った画面の表の役割と列の整合を描画で確認する。直書き見出し/二重上書きの禁止検査は残し、移行時の出現文字列と過去数の固定を分ける。 |
 | `apps/web/src/components/shared/v8-rule-values.test.ts` | 残す | verifyRuleValues/Bindingsという解析器を実行し、旧高さ・条件限定上書き・影の参照・未定義・循環の故障対照を持つ。禁止の見張りに当たる。 |
 | `apps/web/src/lib/card-radius-contract.test.ts` | 残す | V8の役割別角丸の変数解決と、窓にカード角丸を使わない禁止を守る。画面を機械的に消す対象ではなく、実ブラウザの角丸確認を補完する検査。 |
