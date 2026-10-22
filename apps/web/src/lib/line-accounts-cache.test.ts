@@ -5,6 +5,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('./api/transport/prefetch', () => ({ prefetchApiRead: vi.fn() }))
+
 const list = vi.hoisted(() => vi.fn())
 vi.mock('./api', () => ({ api: { lineAccounts: { list } } }))
 

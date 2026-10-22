@@ -6,7 +6,7 @@ import { fetchWithNetworkMessage, extractApiErrorCode } from './errors'
 
 const sharedReads = new Map<string, Promise<unknown>>()
 
-/** 同時に出る請求表示だけ共有する。完了後は捨て、保存後の読み直しは必ず通信する。 */
+/** 同じ認証情報で同時に出る読取を共有する。完了後は捨て、保存後の読み直しは必ず通信する。 */
 export function fetchSharedRead<T>(path: string): Promise<T> {
   const csrf = getCsrfToken()
   // Cookie だけでセッションの世代が分からない場合は共有しない。

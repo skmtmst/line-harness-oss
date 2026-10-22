@@ -157,8 +157,9 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
     await settle()
 
-    // 期限切れは確認と一覧の両方を取り直す。
-    expect(fetchSpy).toHaveBeenCalledTimes(4)
+    // 期限切れは確認と一覧を取り直し、認証世代のある本人情報も先読みする。
+    expect(fetchSpy).toHaveBeenCalledTimes(5)
+    expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/staff/me'))).toHaveLength(1)
   })
 
   it('CSRFトークンが変わった（別ログイン/権限更新）なら期限前でも確認し直す', async () => {
@@ -171,8 +172,9 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
     await settle()
 
-    // 指紋が変わったので使い回しの答えを捨て、確認と一覧の両方を取り直す。
-    expect(fetchSpy).toHaveBeenCalledTimes(4)
+    // 指紋が変わったので古い答えを捨て、本人情報も新しい世代で先読みする。
+    expect(fetchSpy).toHaveBeenCalledTimes(5)
+    expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/staff/me'))).toHaveLength(1)
   })
 
   it('401の合図（SESSION_LOST_EVENT）のあとは期限前でも確認し直す', async () => {
@@ -186,8 +188,9 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
     await settle()
 
-    // 合図で使い回しの答えを捨てたので、確認と一覧の両方を取り直す。
-    expect(fetchSpy).toHaveBeenCalledTimes(4)
+    // 合図で古い答えを捨て、確認・一覧・本人情報を取り直す。
+    expect(fetchSpy).toHaveBeenCalledTimes(5)
+    expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('/api/staff/me'))).toHaveLength(1)
   })
 
   it('確認に失敗したら再利用せずログイン画面へ送る', async () => {
