@@ -460,6 +460,7 @@
 - [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
 - [対応が要るものの速さとお知らせの下の空き](release-log/unreleased/1798-kenta-hq-attention-speed.md)
 - [統括のアカウントの空きと受信箱の見た目](release-log/unreleased/1799-kenta-beui-round1.md)
+- [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
 - [fielderr2.md](release-log/drafts/fielderr2.md)
