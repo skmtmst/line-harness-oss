@@ -4,8 +4,9 @@
  * @param {number} [expandedWidth]
  * @param {boolean} [includeExpanded]
  * @param {boolean} [secondary]
+ * @param {{ optional?: { element: Element, width: number }, filter?: { element: Element, width: number } }} [snapshot]
  */
-export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 0, includeExpanded = true, secondary = false) {
+export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 0, includeExpanded = true, secondary = false, snapshot = {}) {
   const flatten = element => getComputedStyle(element).display === 'contents'
     ? [...element.children].flatMap(flatten) : [element]
   const tools = [...toolbar.children].flatMap(flatten).filter(tool => {
@@ -28,12 +29,19 @@ export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 
     // A growing overflow group fills spare space, not just its controls' demand.
     // Its existing natural-width measurement also avoids rounded scrollWidth feedback.
     const optional = tool.matches('[data-toolbar-overflow-group]') ? tool : tool.querySelector('[data-toolbar-overflow-group]')
-    const natural = optional && !optional.hasAttribute('data-collapsed') ? parseFloat(optional.style.getPropertyValue('--toolbar-optional-width')) : 0
+    const natural = optional && !optional.hasAttribute('data-collapsed')
+      ? snapshot.optional?.element === optional ? snapshot.optional.width : parseFloat(optional.style.getPropertyValue('--toolbar-optional-width')) : 0
     const growing = natural > 0 && parseFloat(getComputedStyle(optional).flexGrow) > 0
     if (growing) width = Math.max(0, width - Math.max(optional.getBoundingClientRect().width, optional.scrollWidth)) + natural
     if (expandedItem && (tool === expandedItem || tool.contains(expandedItem))) width += Math.max(0, expandedWidth - (growing && optional === expandedItem ? natural : expandedItem.getBoundingClientRect().width))
-    for (const group of includeExpanded ? tool.matches('[data-filter-width]') ? [tool] : [...tool.querySelectorAll('[data-filter-width]')] : []) {
-      width += Math.max(0, Number(group.dataset.filterWidth) - group.getBoundingClientRect().width)
+    const filter = snapshot.filter
+    const directGroup = tool.matches('[data-filter-width]') || tool === filter?.element
+    const groups = includeExpanded ? directGroup ? [tool] : [...tool.querySelectorAll('[data-filter-width]')] : []
+    // The first measurement has not committed the filter's width attribute yet.
+    if (includeExpanded && !directGroup && filter && tool.contains(filter.element) && !groups.includes(filter.element)) groups.push(filter.element)
+    for (const group of groups) {
+      const naturalWidth = filter?.element === group ? filter.width : Number(group.dataset.filterWidth)
+      width += Math.max(0, naturalWidth - group.getBoundingClientRect().width)
     }
     return sum + width
   }, 0) + gap * Math.max(0, tools.length - 1)
@@ -50,13 +58,21 @@ export function fitToolbarWrap(toolbar) {
 /** Reserve a readable control even when an old wrapper is narrower than it.
  * @param {HTMLElement} item
  */
-export function fitToolbarOptionalWidth(item) {
+export function measureToolbarOptionalWidth(item) {
   const content = item.querySelector('[data-toolbar-optional-content]')
-  if (!content || item.hasAttribute('data-collapsed')) return 0
+  if (!content || item.hasAttribute('data-collapsed')) return null
   const children = [...content.children].filter(el => getComputedStyle(el).display !== 'none')
   const intrinsic = children.reduce((sum, el) => sum + Math.max(el.getBoundingClientRect().width, el.scrollWidth), 0)
     + (parseFloat(getComputedStyle(content).columnGap) || 0) * Math.max(0, children.length - 1)
-  const width = Math.ceil(item.hasAttribute('data-toolbar-overflow-group') ? intrinsic : Math.max(content.getBoundingClientRect().width, content.scrollWidth))
+  return Math.ceil(item.hasAttribute('data-toolbar-overflow-group') ? intrinsic : Math.max(content.getBoundingClientRect().width, content.scrollWidth))
+}
+
+/** Commit a measured width; callers without a snapshot keep the immediate fit contract.
+ * @param {HTMLElement} item
+ * @param {number | null} [width]
+ */
+export function fitToolbarOptionalWidth(item, width = measureToolbarOptionalWidth(item)) {
+  if (width === null) return 0
   item.style.setProperty('--toolbar-optional-width', `${width}px`)
   return width
 }

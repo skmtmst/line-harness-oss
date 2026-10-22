@@ -144,3 +144,90 @@ it('伸びた道具の余白と整数scrollWidthの丸めを需要に数えず�
     expect(toolbarContentFit(toolbar).required).toBe(276.171875)
   } finally { toolbar.remove() }
 })
+
+it.each(['overflow', 'filters'])('%sの自然幅を確定してから寸法を読み直さず、同じ読取結果で収まりを判断する', kind => {
+  const { observers, reads } = environment()
+  const { container } = render(<ListToolbarFrame><ListToolbarRow>{kind === 'overflow'
+    ? <ListToolbarOptional collapse="overflow"><button>保存した検索</button></ListToolbarOptional>
+    : <ResponsiveFilterChips><FilterChip selected={false} onChange={() => {}}>予約のみ</FilterChip></ResponsiveFilterChips>
+  }</ListToolbarRow></ListToolbarFrame>)
+  const subject = kind === 'overflow' ? container.querySelector<HTMLElement>('details')! : container.querySelector<HTMLElement>('[data-filter-chips]')!.parentElement!
+  const committedWidth = () => kind === 'overflow' ? subject.style.getPropertyValue('--toolbar-optional-width') : subject.dataset.filterWidth
+  if (kind === 'overflow') { subject.style.setProperty('--toolbar-optional-width', '1px'); subject.style.flexGrow = '1' }
+  else subject.dataset.filterWidth = '1'
+  const before = committedWidth(), phases: string[] = []
+  const record = () => phases.push(committedWidth() === before ? 'read' : 'read-after-width-write')
+  reads.mockImplementation(function (this: HTMLElement) { record(); return new DOMRect(0, 0, 100, 32) })
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => { record(); return 1000 })
+  const watched = kind === 'overflow' ? subject.querySelector('button') : subject
+  const observer = observers.find(instance => instance.observe.mock.calls.some(([node]) => node === watched))!
+  expect(observer).toBeTruthy()
+  act(() => { observer.callback([], {} as ResizeObserver) })
+  expect(committedWidth()).toBe(kind === 'overflow' ? '100px' : '100')
+  expect(subject.hasAttribute(kind === 'overflow' ? 'data-collapsed' : 'data-filter-collapsed')).toBe(false)
+  expect(phases.length).toBeGreaterThan(0)
+  expect(phases).not.toContain('read-after-width-write')
+})
+
+it.each(['direct', 'nested', 'inside-measured-group'])('自然幅のsnapshotは%sの既存の札の数え方と一致し、属性を書かない', async placement => {
+  const { toolbarContentFit } = await import('./list-toolbar-fit.mjs')
+  const toolbar = document.createElement('div'), tool = document.createElement('span')
+  const group = placement === 'direct' ? tool : document.createElement('span')
+  group.textContent = '予約のみ'; if (group !== tool) tool.append(group)
+  if (placement === 'inside-measured-group') tool.dataset.filterWidth = '90'
+  toolbar.append(tool); document.body.append(toolbar)
+  vi.spyOn(toolbar, 'clientWidth', 'get').mockReturnValue(150)
+  vi.spyOn(tool, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 32))
+  if (group !== tool) vi.spyOn(group, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 40, 32))
+  try {
+    const snapshot = toolbarContentFit(toolbar, null, 0, true, false, { filter: { element: group, width: 160 } })
+    expect(group.hasAttribute('data-filter-width')).toBe(false)
+    group.dataset.filterWidth = '160'
+    expect(snapshot).toEqual(toolbarContentFit(toolbar))
+    expect(snapshot.fits).toBe(placement === 'inside-measured-group')
+    expect(toolbarContentFit(toolbar, null, 0, false).required).toBe(100)
+  } finally { toolbar.remove() }
+})
+
+it('札の自然幅が増えた通知では、書込前の小さい幅に惑わされず選択を保って畳む', () => {
+  const { observers, reads } = environment()
+  const change = vi.fn()
+  const { container } = render(<ListToolbarFrame><ListToolbarRow><ResponsiveFilterChips>
+    <FilterChip selected onChange={change}>予約済み</FilterChip>
+  </ResponsiveFilterChips></ListToolbarRow></ListToolbarFrame>)
+  const wide = container.querySelector<HTMLElement>('[data-filter-chips]')!, choices = wide.parentElement!
+  choices.dataset.filterWidth = '100'
+  reads.mockImplementation(function (this: HTMLElement) { return new DOMRect(0, 0, this === wide ? 240 : 100, 32) })
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200)
+  const observer = observers.find(instance => instance.observe.mock.calls.some(([node]) => node === choices))!
+  act(() => { observer.callback([], {} as ResizeObserver) })
+  expect(choices.dataset.filterWidth).toBe('240')
+  expect(choices.hasAttribute('data-filter-collapsed')).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: '状態' }))
+  expect(screen.getByRole('option', { name: /予約済み/ }).getAttribute('aria-selected')).toBe('true')
+  expect(change).not.toHaveBeenCalled()
+})
+
+it.each([0, 216])('操作の自然幅%dをsnapshotで渡しても即時fitと同じ需要になり、測定中はDOM幅を書かない', async width => {
+  const { toolbarContentFit, measureToolbarOptionalWidth, fitToolbarOptionalWidth } = await import('./list-toolbar-fit.mjs')
+  const toolbar = document.createElement('div'), item = document.createElement('details'), content = document.createElement('div'), button = document.createElement('button')
+  content.dataset.toolbarOptionalContent = ''; content.append(button); item.append(content)
+  item.dataset.toolbarOverflowGroup = ''; item.style.flexGrow = '1'; item.style.setProperty('--toolbar-optional-width', '900px')
+  toolbar.append(item); document.body.append(toolbar)
+  vi.spyOn(toolbar, 'clientWidth', 'get').mockReturnValue(200)
+  vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, width, 32))
+  vi.spyOn(item, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 32))
+  try {
+    const measured = measureToolbarOptionalWidth(item)
+    expect(measured).toBe(width)
+    const snapshot = toolbarContentFit(toolbar, item, width, false, false, { optional: { element: item, width } })
+    expect(item.style.getPropertyValue('--toolbar-optional-width')).toBe('900px')
+    expect(fitToolbarOptionalWidth(item)).toBe(width)
+    expect(item.style.getPropertyValue('--toolbar-optional-width')).toBe(`${width}px`)
+    expect(snapshot).toEqual(toolbarContentFit(toolbar, item, width, false))
+    item.setAttribute('data-collapsed', '')
+    expect(measureToolbarOptionalWidth(item)).toBeNull()
+    expect(fitToolbarOptionalWidth(item)).toBe(0)
+    expect(item.style.getPropertyValue('--toolbar-optional-width')).toBe(`${width}px`)
+  } finally { toolbar.remove() }
+})
