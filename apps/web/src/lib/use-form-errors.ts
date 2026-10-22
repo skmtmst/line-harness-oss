@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { focusRevealedField } from './revealed-field-focus'
 
 export type FormFieldProblem = {
   key: string
@@ -27,20 +28,7 @@ export type FormFieldOptions = {
 /** 欄に結び付いたサーバーの誤り（欄の名前 → 理由の文）。 */
 export type ServerFieldErrors = Record<string, string | null | undefined>
 
-/** 入れる欄（差し込みの道具・選ぶボタンより先に選ぶ）。 */
-const ENTRY = 'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"]'
-const FOCUSABLE = `${ENTRY}, button:not([disabled]), [tabindex]:not([tabindex="-1"])`
-
-/**
- * 欄の要素から、フォーカスを受けられる要素を選ぶ。束の枠なら、中の入れる欄の1つ目
- * （上に差し込みの道具が並んでいても本文へ）、無ければ押せる所の1つ目。
- */
-function focusTarget(el: HTMLElement): HTMLElement {
-  if (el.matches(FOCUSABLE)) return el
-  return el.querySelector<HTMLElement>(ENTRY) ?? el.querySelector<HTMLElement>(FOCUSABLE) ?? el
-}
-
-/** 開く（reveal）の後、描き直しを待つ。2コマ待てば React の描き直しと配置が済む。 */
+/** reveal後のReact描画を待つ。段の開閉完了はfocus時に別途確認する。 */
 function afterPaint(run: () => void) {
   requestAnimationFrame(() => requestAnimationFrame(run))
 }
@@ -50,15 +38,15 @@ function afterPaint(run: () => void) {
  * フォーカスする。自前の誤りの表（`Record<欄, 文>`）を持つ画面が、1つ目の欄へ移るときに使う。
  * 描き直しの後に呼べるよう、次のコマで動く。
  */
+let cancelIdFocus = () => {}
 export function focusFieldById(id: string) {
+  cancelIdFocus()
+  let cancelled = false
+  let pending: ReturnType<typeof focusRevealedField> | undefined
+  cancelIdFocus = () => { cancelled = true; pending?.cancel() }
   requestAnimationFrame(() => {
-    const el = typeof document === 'undefined' ? null : document.getElementById(id)
-    if (!el) return
-    const disclosure = el.closest('details')
-    if (disclosure && !disclosure.open) disclosure.open = true
-    const target = focusTarget(el)
-    target.scrollIntoView?.({ block: 'center' })
-    target.focus({ preventScroll: true })
+    if (cancelled || typeof document === 'undefined') return
+    pending = focusRevealedField(() => document.getElementById(id))
   })
 }
 
@@ -92,6 +80,14 @@ export function focusFieldById(id: string) {
 export function useFormErrors() {
   const [, bump] = useState(0)
   const focusAfterCommit = useRef(false)
+  const focusGeneration = useRef(0)
+  const pendingFocus = useRef<ReturnType<typeof focusRevealedField> | null>(null)
+  const cancelFocus = useCallback(() => {
+    focusGeneration.current += 1
+    pendingFocus.current?.cancel()
+    pendingFocus.current = null
+  }, [])
+  useLayoutEffect(() => cancelFocus, [cancelFocus])
   /** blur か送信で「見せてよい」になった欄 */
   const touchedRef = useRef(new Set<string>())
   /** 欄の定義（描画順＝まとめの並び順） */
@@ -232,36 +228,37 @@ export function useFormErrors() {
     return count
   }
 
-  /** 要素へスクロールしてフォーカスする。 */
-  const moveTo = (el: HTMLElement) => {
-    const disclosure = el.closest('details')
-    if (disclosure) disclosure.open = true
-    const target = focusTarget(el)
-    target.scrollIntoView?.({ block: "center" })
-    target.focus({ preventScroll: true })
-  }
-
   /**
    * いま直してほしい欄のうち最初のものへ移る。隠れた所の欄は先に開き（reveal）、
    * 描き直しを待ってからスクロールしてフォーカスする。
    */
   const focusFirst = () => {
+    const origin = document.activeElement
+    cancelFocus()
+    const generation = focusGeneration.current
     for (const [key, def] of definitions()) {
       if (!problemOf(key)) continue
       const registered = registeredRef.current.get(key)
       const target = [...(serverTargets.current.get(key) ?? [])].find((node) => node.isConnected)
       const el = target ?? elsRef.current.get(key) ?? (registered ? [...registered.keys()].find((node) => node.isConnected) : undefined)
+      const resolve = () => {
+        if (generation !== focusGeneration.current || !problemOf(key)) return null
+        const server = [...(serverTargets.current.get(key) ?? [])].find(node => node.isConnected)
+        return server ?? elsRef.current.get(key) ?? [...(registeredRef.current.get(key)?.keys() ?? [])].find(node => node.isConnected)
+      }
+      const move = () => {
+        if (generation !== focusGeneration.current) return
+        if (document.activeElement !== origin && document.activeElement !== document.body) return
+        pendingFocus.current = focusRevealedField(resolve)
+      }
       if (def.reveal && !target?.closest('[role="dialog"], [role="alertdialog"]')) {
         def.reveal()
-        afterPaint(() => {
-          const shown = elsRef.current.get(key) ?? [...(registeredRef.current.get(key)?.keys() ?? [])].find((node) => node.isConnected)
-          if (shown) moveTo(shown)
-        })
+        afterPaint(move)
         return
       }
       // 要素を覚えていない欄（印だけの束）は次の欄へ進む。
       if (el) {
-        moveTo(el)
+        move()
         return
       }
     }
@@ -273,6 +270,7 @@ export function useFormErrors() {
    * 前回のサーバーの誤りは送り直すので消す。
    */
   const submit = (): FormFieldProblem[] => {
+    cancelFocus()
     serverRef.current.clear()
     serverTargets.current.clear()
     const problems: FormFieldProblem[] = []
@@ -291,6 +289,7 @@ export function useFormErrors() {
    * 登録していない欄の名前は捨てて、出せた欄の数を返す。0 なら画面は今の帯で知らせる。
    */
   const setServerErrors = (errors: ServerFieldErrors): number => {
+    cancelFocus()
     serverRef.current.clear()
     serverTargets.current.clear()
     let shown = 0
@@ -322,6 +321,7 @@ export function useFormErrors() {
 
   /** 開き直した窓・空に戻した入力で、触れた印・まとめ・サーバーの誤りを消す。 */
   const reset = () => {
+    cancelFocus()
     focusAfterCommit.current = false
     touchedRef.current.clear()
     serverRef.current.clear()
@@ -332,9 +332,16 @@ export function useFormErrors() {
 
   // Queue field focus only after React has committed errors and cleared saving.
   useLayoutEffect(() => {
+    pendingFocus.current?.refresh()
     if (!focusAfterCommit.current) return
     focusAfterCommit.current = false
-    requestAnimationFrame(focusFirst)
+    const generation = focusGeneration.current
+    const origin = document.activeElement
+    requestAnimationFrame(() => {
+      if (generation !== focusGeneration.current) return
+      if (document.activeElement !== origin && document.activeElement !== document.body) return
+      focusFirst()
+    })
   })
 
   const requirement = (key: string) => ({ required: Boolean(defsRef.current.get(key)?.required) })
