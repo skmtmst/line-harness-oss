@@ -1,6 +1,6 @@
 'use client'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { CircleDot, Download, Star } from 'lucide-react'
+import { CircleDot, Download } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
@@ -136,7 +136,7 @@ export default function OpsAuditV8() {
         <div className={styles.tools}>
           <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => { setFilter(''); setPage(1) }}>すべて</FilterChip>
           {FILTERS.map((f) => (
-            <FilterChip key={f.key} icon={<Star size={13} aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => { setFilter(selected ? f.key : ''); setPage(1) }}>
+            <FilterChip key={f.key} selected={filter === f.key} onChange={(selected) => { setFilter(selected ? f.key : ''); setPage(1) }}>
               {f.label}
             </FilterChip>
           ))}

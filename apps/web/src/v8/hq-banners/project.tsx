@@ -616,7 +616,7 @@ function ProjectInner() {
               <div role="group" aria-label="画像の絞り込み" className={styles.chips}>
                 <FilterChip selected={filter === 'all'} icon={<Sparkles size={14} aria-hidden="true" />} onChange={() => setFilter('all')}>{`すべて ${images.length}`}</FilterChip>
                 <FilterChip selected={filter === 'favorite'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>{`お気に入り ${favoriteCount}`}</FilterChip>
-                <FilterChip selected={filter === 'delivered'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>{`配布済み ${deliveredCount}`}</FilterChip>
+                <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>{`配布済み ${deliveredCount}`}</FilterChip>
               </div>
               {canManage ? <div className={styles.selectionTools}>
                 <SaveErrorField names={["length","visible.length","selectedImages","selected_images"]}><Checkbox checked={visible.length > 0 && visible.every((image) => selectedImages.includes(image.id))}
