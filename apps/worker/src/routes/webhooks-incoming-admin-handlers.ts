@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { outgoingEventTypes } from './webhook-event-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -360,8 +361,8 @@ export const get__api_webhooks_incoming_id_unmatched_8 = async (c: Context<Env, 
     const status = c.req.query('status');
     const listStatus = status === 'resolved' || status === 'dismissed' ? status : 'pending';
     // R401: 50件超えは limit/offset で辿る。空表示の判定に使う総数も返す。
-    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') ?? '') || 50));
-    const offset = Math.max(0, Number(c.req.query('offset') ?? '') || 0);
+    const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit'), '') || 50));
+    const offset = Math.max(0, listQueryNumber(c.req.query('offset'), '') || 0);
     const [items, total] = await Promise.all([
       listIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus, limit, offset),
       countIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus),

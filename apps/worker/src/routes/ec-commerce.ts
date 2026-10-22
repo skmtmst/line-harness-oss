@@ -1,3 +1,4 @@
+import { listQueryNumber, clampedListInteger } from '../lib/list-paging.js';
 import { jstDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -293,10 +294,8 @@ ecCommerce.get(
     : scope?.allowedAccountIds.length
       ? `(e.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR e.line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'e.line_account_id IS NULL' : '1 = 0';
-  const requestedLimit = Number(c.req.query('limit') || '30');
-  const requestedOffset = Number(c.req.query('offset') || '0');
-  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 30;
-  const offset = Number.isInteger(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
+  const limit = clampedListInteger(c.req.query('limit') || undefined, 30, 1, 100);
+  const offset = clampedListInteger(c.req.query('offset') || undefined, 0, 0);
   const eventType = c.req.query('eventType') || '';
   const status = c.req.query('status') || '';
   const view = c.req.query('view') || '';
@@ -573,8 +572,8 @@ ecCommerce.get(
     return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
   }
   const hasPagination = c.req.query('limit') !== undefined || c.req.query('offset') !== undefined;
-  const requestedLimit = Number(c.req.query('limit') || String(SUBSCRIPTIONS_NON_PAGINATED_MAX));
-  const requestedOffset = Number(c.req.query('offset') || '0');
+  const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, String(SUBSCRIPTIONS_NON_PAGINATED_MAX));
+  const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, '0');
   const limit = Number.isInteger(requestedLimit)
     ? Math.min(Math.max(requestedLimit, 1), 100)
     : SUBSCRIPTIONS_NON_PAGINATED_MAX;
@@ -1204,8 +1203,7 @@ function summarizeItems(raw: string | null): { text: string; count: number; quan
 }
 
 ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staff'), async (c) => {
-  const requestedLimit = Number(c.req.query('limit') || '20');
-  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20;
+  const limit = clampedListInteger(c.req.query('limit') || undefined, 20, 1, 100);
 
   // 出荷予定日は計算値なのでSQLでは並べ替えられない。直近のイベントを多めに
   // 取り出してから、算出した日付で並べ替えて limit で切る。

@@ -3,7 +3,7 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getOperators, getOperatorById, createOperator, updateOperator, deleteOperator } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit } from '../lib/list-paging.js';
 
 import { listOutboundSendFailures } from '../services/outbound-idempotency.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';

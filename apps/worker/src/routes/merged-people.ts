@@ -1,3 +1,4 @@
+import { listIntegerInRange } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputJsonBoundary } from '../lib/input-errors.js';
@@ -182,16 +183,10 @@ async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
     && hasMergedPersonHistory(c.env.DB, tenantId(c), id);
 }
 
-function positiveInt(value: string | undefined, fallback: number, max: number): number | null {
-  if (value === undefined || value === '') return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 && parsed <= max ? parsed : null;
-}
-
 mergedPeople.get('/api/friends/people', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const limit = positiveInt(c.req.query('limit'), 20, 100);
-    const offset = positiveInt(c.req.query('offset'), 0, 100_000);
+    const limit = listIntegerInRange(c.req.query('limit'), 20, 0, 100);
+    const offset = listIntegerInRange(c.req.query('offset'), 0, 0, 100_000);
     if (limit === null || limit < 1 || offset === null) {
       return c.json({ success: false, error: 'ページ位置が正しくありません', code: 'INVALID_PAGINATION' }, 400);
     }

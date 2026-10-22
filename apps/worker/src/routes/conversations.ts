@@ -2,7 +2,7 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit } from '../lib/list-paging.js';
 
 const conversations = new Hono<Env>();
 

@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { getCookie, setCookie } from 'hono/cookie';
 import { logger } from '@line-crm/shared/server';
 import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affiliate-self-auth.js';
@@ -118,7 +119,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
 
-    const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+    const requestedLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(100, Math.max(1, requestedLimit))
       : 20;

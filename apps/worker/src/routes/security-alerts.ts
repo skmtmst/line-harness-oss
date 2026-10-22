@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { recordAuditEvent } from '@line-crm/db';
@@ -24,7 +25,7 @@ async function list(c: Context<Env>, platform: boolean) {
   try {
     const scope = await scopeFor(c, platform);
     if (!scope) return c.json({ success: false, error: '表示できるアカウントを指定してください' }, 403);
-    const offset = Number(c.req.query('offset') ?? '0');
+    const offset = listQueryNumber(c.req.query('offset'), 0);
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1000000) return c.json({ success: false, error: '表示位置が正しくありません' }, 400);
     const total = await c.env.DB.prepare(`SELECT COUNT(*) AS count FROM security_alerts WHERE ${scope.where} AND status != 'resolved'`)
       .bind(...scope.binds).first<{ count: number }>();

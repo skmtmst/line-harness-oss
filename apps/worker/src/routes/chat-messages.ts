@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -61,8 +62,8 @@ chatMessages.get('/api/chats/:friendId/messages/search', async (c) => {
   if (friend instanceof Response) return friend;
   const q = c.req.query('q')?.trim() ?? '',
     needle = normalizeConversationSearch(q);
-  const limit = Number(c.req.query('limit') ?? 30),
-    offset = Number(c.req.query('offset') ?? 0);
+  const limit = listQueryNumber(c.req.query('limit'), 30),
+    offset = listQueryNumber(c.req.query('offset'), 0);
   if (
     !q ||
     Array.from(q).length > 200 ||
@@ -132,7 +133,7 @@ chatMessages.get('/api/chats/:friendId/messages/search', async (c) => {
 chatMessages.get('/api/chats/:friendId/messages', async (c) => {
   const friend = await authorize(c);
   if (friend instanceof Response) return friend;
-  const limit = Number(c.req.query('limit') ?? 50),
+  const limit = listQueryNumber(c.req.query('limit'), 50),
     at = c.req.query('cursorAt'),
     id = c.req.query('cursorId'),
     direction = c.req.query('direction') ?? 'before';

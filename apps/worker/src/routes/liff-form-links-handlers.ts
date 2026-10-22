@@ -1,3 +1,4 @@
+import { clampedListInteger } from '../lib/list-paging.js';
 import { trackedLinkReferralMatchesAccount } from '../services/tracked-link-identity.js';
 import { navigationProof } from '../lib/navigation-proof.js';
 import { storedRedirectTarget } from '../lib/safe-redirect.js';
@@ -24,10 +25,8 @@ export const get__api_analytics_ref_refCode_orders_1 = async (c: Context<Env, "/
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
 
-    const limitRaw = Number(c.req.query('limit') ?? '20');
-    const offsetRaw = Number(c.req.query('offset') ?? '0');
-    const limit = Number.isInteger(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 20;
-    const offset = Number.isInteger(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
+    const limit = clampedListInteger(c.req.query('limit'), 20, 1, 50);
+    const offset = clampedListInteger(c.req.query('offset'), 0, 0);
 
     const where = `f.ref_code = ? ${accountScope.where}`;
     const binds = [refCode, ...accountScope.binds];

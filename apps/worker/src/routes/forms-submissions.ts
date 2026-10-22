@@ -12,7 +12,7 @@ import { getFormById, type FormSubmitClaimScope, getFormAccountIds, getFormDelet
 
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
-import { listLimit, listPage } from './list-pagination.js';
+import { parseOffsetPaging } from '../lib/list-paging.js';
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -284,8 +284,9 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
       data: await Promise.all(submissions.map(async row => ({ ...serializeSubmission(row, postActions.get(row.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(row.data), c.get('staff')?.role, row.id) }))),
     });
   }
-  const page = listPage(c.req.query('page'));
-  const limit = listLimit(c.req.query('limit'), 20);
+  const { page, limit } = parseOffsetPaging(
+    { page: c.req.query('page'), limit: c.req.query('limit') }, { defaultLimit: 20 },
+  );
   // N-171/N-179: 一覧・件数・CSV が同じ検索条件になるよう、検索語をページング前に渡す。
   const search = (c.req.query('q') ?? '').trim().slice(0, 200) || undefined;
   const [submissions, summary] = await Promise.all([

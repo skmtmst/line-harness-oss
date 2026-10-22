@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -169,8 +170,8 @@ opsSupport.get('/api/ops/support/tickets', async (c) => {
   const priority = priorityRaw && (SUPPORT_PRIORITIES as readonly string[]).includes(priorityRaw) ? (priorityRaw as SupportPriority) : undefined;
   const sortRaw = c.req.query('sort');
   const sort = sortRaw === 'oldest' || sortRaw === 'priority' ? sortRaw : 'newest';
-  const limit = Number(c.req.query('limit') ?? 50);
-  const offset = Number(c.req.query('offset') ?? 0);
+  const limit = listQueryNumber(c.req.query('limit'), 50);
+  const offset = listQueryNumber(c.req.query('offset'), 0);
   const { rows, total } = await listSupportTickets(db, {
     stage, priority, q: c.req.query('q') ?? '', sort,
     limit: Number.isFinite(limit) ? limit : 50, offset: Number.isFinite(offset) ? offset : 0,

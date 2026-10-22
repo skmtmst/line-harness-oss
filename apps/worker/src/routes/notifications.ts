@@ -1,3 +1,4 @@
+import { clampedListInteger } from '../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -688,10 +689,7 @@ notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin
 notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const status = c.req.query('status') ?? undefined;
-    const requestedLimit = Number(c.req.query('limit') ?? '100');
-    const limit = Number.isInteger(requestedLimit)
-      ? Math.min(Math.max(requestedLimit, 1), 100)
-      : 100;
+    const limit = clampedListInteger(c.req.query('limit'), 100, 1, 100);
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {

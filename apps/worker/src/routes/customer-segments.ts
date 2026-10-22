@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import {createSavedSearch} from '@line-crm/db';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
@@ -19,7 +20,7 @@ customerSegments.get('/api/analytics/customer-segments',async c=>{
  return c.json({success:true,data:{cells,outside:stamp?.at?outside:{count:null},total:stamp?.at?rows.reduce((n,r)=>n+r.count,0)+(outside?.count??0):null,computedAt:stamp?.at??null,status:stamp?.status??'not_computed'}});
 });
 customerSegments.get('/api/analytics/customer-segments/cells/:r/:f/friends',async c=>{
- const a=await gapAccount(c),r=Number(c.req.param('r')),f=Number(c.req.param('f')),{basis,column}=filters(c.req.query('basis'),c.req.query('measure')),offset=Number(c.req.query('cursor')??c.req.query('offset')??0);
+ const a=await gapAccount(c),r=Number(c.req.param('r')),f=Number(c.req.param('f')),{basis,column}=filters(c.req.query('basis'),c.req.query('measure')),offset=listQueryNumber(c.req.query('cursor')??c.req.query('offset'), 0);
  const all=r===0&&f===0;if(!all&&![r,f].every(x=>Number.isInteger(x)&&x>=1&&x<=5)||!Number.isSafeInteger(offset)||offset<0)throw new GapError('invalid_filter');
  const where=`c.account_id=? AND c.basis=?${all?'':` AND c.r_bucket=? AND c.${column}=?`}`,binds=all?[a,basis]:[a,basis,r,f];
  const total=await c.env.DB.prepare(`SELECT count(*) n,SUM(CASE WHEN ${optedOut} THEN 1 ELSE 0 END) optedOutCount FROM customer_activity_daily c WHERE ${where}`).bind(...binds).first<{n:number;optedOutCount:number}>();

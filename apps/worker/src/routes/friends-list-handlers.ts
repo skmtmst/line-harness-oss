@@ -13,7 +13,7 @@ import { hasStaffPermission } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listResponse } from '../lib/list-etag.js';
 import { compileSavedSearch, friendFieldValueSql } from '../services/saved-search-filter.js';
-import { listLimit, listOffset } from './list-pagination.js';
+import { listLimit, listOffset } from '../lib/list-paging.js';
 import { adminAccountScope, escapeLikePattern, serializeFriendListRow, serializeTag } from './friends-definition.js';
 import type { Context } from 'hono';
 

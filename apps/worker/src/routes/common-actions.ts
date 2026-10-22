@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -53,7 +54,7 @@ function validationResponse(c: Context<Env>, error: CommonActionValidationError)
 
 function nonNegativeInteger(value: string | undefined, field: string): number | undefined {
   if (value === undefined) return undefined;
-  const parsed = Number(value);
+  const parsed = listQueryNumber(value, Number.NaN);
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new CommonActionValidationError('pagination_invalid', 'ページ指定を確認してください', field);
   }

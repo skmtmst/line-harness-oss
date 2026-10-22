@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { jstDate as japanDate, jstDateOffset as japanDateOffset, jstMonthStart as japanMonthStart } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -127,8 +128,8 @@ function escapeLike(value: string): string {
 
 /** 健康日記（37-4）はメモリ上で絞り込んだ結果を分けるために使う。 */
 function paginate<T>(items: T[], pageParam: string | undefined, sizeParam?: string) {
-  const page = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1);
-  const pageSize = sizeParam === 'all' ? MAX_PETS : Math.min(MAX_PETS, Math.max(1, Number.parseInt(sizeParam ?? '', 10) || PAGE_SIZE));
+  const page = Math.max(1, listQueryNumber(pageParam, 1, { format: 'integer-prefix' }) || 1);
+  const pageSize = sizeParam === 'all' ? MAX_PETS : Math.min(MAX_PETS, Math.max(1, listQueryNumber(sizeParam, '', { format: 'integer-prefix' }) || PAGE_SIZE));
   const start = (page - 1) * pageSize;
   return { page, pageSize, total: items.length, items: items.slice(start, start + pageSize) };
 }
@@ -186,8 +187,8 @@ nenPets.get('/api/nen/pets', async (c) => {
     : 'p.updated_at DESC';
 
   const wantsAll = c.req.query('pageSize') === 'all';
-  const page = Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1);
-  const pageSize = Math.min(MAX_PETS, Math.max(1, Number.parseInt(c.req.query('pageSize') ?? '', 10) || PAGE_SIZE));
+  const page = Math.max(1, listQueryNumber(c.req.query('page'), 1, { format: 'integer-prefix' }) || 1);
+  const pageSize = Math.min(MAX_PETS, Math.max(1, listQueryNumber(c.req.query('pageSize'), '', { format: 'integer-prefix' }) || PAGE_SIZE));
 
   const kpiCutoff = new Date(today.getTime() - STALE_WEIGHT_DAYS * 86_400_000).toISOString();
   const monthStart = japanMonthStart(today);

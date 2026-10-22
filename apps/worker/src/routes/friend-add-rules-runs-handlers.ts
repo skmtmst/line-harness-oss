@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { deleteFriendAddRuleFolder, ensureFriendAddFallbackRules, listFriendAddRuleOrderIds, listFriendAddRulesPage, reorderFriendAddRulePriorities, reorderFriendAddRulePrioritiesCAS, type FriendAddRuleKind, type FriendAddRuleRow } from '@line-crm/db';
@@ -19,7 +20,7 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
   const ruleId = c.req.query('rule_id');
   const kind = c.req.query('kind');
   const attribution = c.req.query('attribution');
-  const limit = Number(c.req.query('limit') ?? 20);
+  const limit = listQueryNumber(c.req.query('limit'), 20);
   const cursorValue = c.req.query('cursor');
   const cursor = parseRunCursor(cursorValue);
   if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
@@ -388,7 +389,7 @@ export const get__api_friend_add_rules_7 = async (c: Context<Env, "/api/friend-a
   // 21件目以降が検索に出ず、フォルダ件数もページ内の数になる。
   const search = c.req.query('q')?.trim() || undefined;
   const folder = c.req.query('folder')?.trim() || undefined;
-  const limit = Number(c.req.query('limit') ?? 20);
+  const limit = listQueryNumber(c.req.query('limit'), 20);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) return c.json({ success: false, error: 'limit は1〜100で指定してください' }, 400);
   try {
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);

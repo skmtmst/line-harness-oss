@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
 import { fetchQuota } from '../services/dashboard-quota.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -43,7 +44,7 @@ dashboard.get('/api/dashboard/activity', requireRole('owner', 'admin', 'staff'),
   try {
     const access = await requireVisibleAccount(c);
     if ('response' in access) return access.response;
-    const limit = Number(c.req.query('limit') ?? 10);
+    const limit = listQueryNumber(c.req.query('limit'), 10);
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
       return c.json({ success: false, error: 'limit は1〜100の整数を指定してください' }, 400);
     }

@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -380,8 +381,8 @@ nenRanks.get('/api/nen/members', async (c) => {
     petFilter: petParam === 'with' || petParam === 'without' ? petParam : 'any',
     query: c.req.query('q') ?? '',
     sort: sortParam === 'lifetime_desc' || sortParam === 'balance_desc' || sortParam === 'recent' ? sortParam : 'annual_desc',
-    page: Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1),
-    pageSize: Math.max(1, Math.min(Number.parseInt(c.req.query('pageSize') ?? '20', 10) || 20, 100)),
+    page: Math.max(1, listQueryNumber(c.req.query('page'), 1, { format: 'integer-prefix' }) || 1),
+    pageSize: Math.max(1, Math.min(listQueryNumber(c.req.query('pageSize'), 20, { format: 'integer-prefix' }) || 20, 100)),
   };
   const [{ items, total }, kpis] = await Promise.all([
     listNenMembers(c.env.DB, options),

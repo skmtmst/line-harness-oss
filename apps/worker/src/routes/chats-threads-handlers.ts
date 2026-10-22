@@ -4,7 +4,7 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 
 import { getChatById, getFriendById, markInboxConversationRead, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit, listQueryNumber } from '../lib/list-paging.js';
 
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveOrCreateChat } from './chats-definition.js';
@@ -34,7 +34,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       if (unreadOnly || quickFilter || operatorId === 'unassigned') {
         return c.json({ success: false, error: 'incompatible_filters' }, 400);
       }
-      const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+      const requestedLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
       const limit = Number.isFinite(requestedLimit)
         ? Math.min(200, Math.max(1, requestedLimit))
         : 200;
@@ -440,7 +440,7 @@ export const get__api_chats_id_2 = async (c: Context<Env, "/api/chats/:id">) => 
     // 直近から limit 件ずつ返すカーソルページング。全文一括(LIMIT 1000)だと長期の
     // 会話で応答が重くなり、画像/Flex再描画時のスクロール追従も高コストになる。
     // 1件多めに取って「続きがあるか」だけ見て捨てる(limit+1方式)。
-    const rawMessageLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+    const rawMessageLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
     const messageLimit = Number.isSafeInteger(rawMessageLimit)
       ? Math.min(1000, Math.max(1, rawMessageLimit))
       : 100;

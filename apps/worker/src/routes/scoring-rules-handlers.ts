@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
 import { createMileageRuleIdempotent, serializeMileageRule } from './mileage-rule-create.js';
 import { inputError } from '../lib/input-errors.js';
@@ -365,8 +366,8 @@ export const get__api_action_scores_friends_9 = async (c: Context<Env, "/api/act
     if (!ACTION_SCORE_SORTS.has(sortValue as ActionScoreSort)) {
       return c.json({ success: false, error: 'sort is invalid' }, 400);
     }
-    const requestedLimit = Number(c.req.query('limit') || 20);
-    const requestedOffset = Number(c.req.query('offset') || 0);
+    const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 20);
+    const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
     const bands = await getActionScoreBands(c.env.DB, accountId);
     const data = await getActionScoreOverview(c.env.DB, {
       accountId,

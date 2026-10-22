@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID, RESTAURANT_EXTERNAL_PROVIDERS, reservationInstant, type RestaurantExternalLink, type RestaurantExternalProvider } from '@line-crm/shared';
@@ -134,8 +135,8 @@ async function inputBody(c: Context<Env>): Promise<Record<string, unknown> | Res
 
 restaurantExternalLinks.get(path, async (c) => {
   const store = await selectedStore(c); if (store instanceof Response) return store;
-  const limit = c.req.query('limit') === undefined ? 100 : Number(c.req.query('limit'));
-  const offset = c.req.query('offset') === undefined ? 0 : Number(c.req.query('offset'));
+  const limit = c.req.query('limit') === undefined ? 100 : listQueryNumber(c.req.query('limit'), Number.NaN);
+  const offset = c.req.query('offset') === undefined ? 0 : listQueryNumber(c.req.query('offset'), Number.NaN);
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100 || !Number.isSafeInteger(offset) || offset < 0) {
     return inputError(c, { success: false, error: '表示件数または開始位置が正しくありません' }, 400, ['limit', 'offset']);
   }

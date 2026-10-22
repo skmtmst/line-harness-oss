@@ -1,3 +1,4 @@
+import { truncatedListLimit, truncatedListOffset } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { petCard } from './nen-pet-card.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -552,16 +553,12 @@ async function adminAccountScope(c: Context<Env>) {
 
 export /** 1ページの枚数。指定なし・壊れた指定は 200。上限も 200 で頭打ちにする。 */
 function photoPageSize(raw: string | undefined): number {
-  const value = Number(raw);
-  if (!Number.isFinite(value)) return 200;
-  return Math.min(200, Math.max(1, Math.trunc(value)));
+  return truncatedListLimit(raw, 200, 200);
 }
 
 export /** 何枚目から取るか。指定なし・負・壊れた指定は 0。 */
 function photoPageOffset(raw: string | undefined): number {
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  return Math.trunc(value);
+  return truncatedListOffset(raw);
 }
 
 export type SavedReviewEvent = {

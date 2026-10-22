@@ -8,7 +8,7 @@ import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { listLimit, listOffset } from './list-pagination.js';
+import { parseOffsetPaging } from '../lib/list-paging.js';
 import type { ConversionDefinitionUsageKind } from '@line-crm/db';
 import { conversionContractError, conversionRange, definitionFilters, conversionDefinitionScope, csvCell, jstDate, adminAccountScope, ConversionPointBody, readMeasureOptions, positiveVersion, CONVERSION_MEASURE_PATCH_KEYS, parseDate, APPROVAL_STATUSES } from './conversions-definition.js';
 import type { Context } from 'hono';
@@ -370,6 +370,9 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
       return c.json({ success: false, error: 'startDate と endDate は YYYY-MM-DD で正しく指定してください' }, 400);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const paging = parseOffsetPaging(
+      { limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 100 },
+    );
     const events = await getConversionEvents(c.env.DB, {
       scope: { allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned },
       conversionPointId: c.req.query('conversionPointId'),
@@ -377,8 +380,8 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
       affiliateCode: c.req.query('affiliateCode'),
       startDate: c.req.query('startDate'),
       endDate: c.req.query('endDate'),
-      limit: listLimit(c.req.query('limit'), 100),
-      offset: listOffset(c.req.query('offset')),
+      limit: paging.limit,
+      offset: paging.offset,
     });
 
     // #819: 取消は追記の台帳。最新の追記が 'reverse' のものだけを
@@ -583,8 +586,9 @@ export const get__api_conversions_approvals_13 = async (c: Context<Env, "/api/co
       );
     }
 
-    const limit = listLimit(c.req.query('limit'), 200);
-    const offset = listOffset(c.req.query('offset'));
+    const { limit, offset } = parseOffsetPaging(
+      { limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 200 },
+    );
 
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const rows = await getConversionApprovalQueue(c.env.DB, {

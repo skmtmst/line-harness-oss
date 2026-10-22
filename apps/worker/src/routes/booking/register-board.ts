@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../../lib/list-paging.js';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { peopleBoardEntry } from '@line-crm/shared';
@@ -9,7 +10,7 @@ import { updateAdminBooking } from './update.js';
 export function registerBoard(booking: Hono<Env>): void {
 booking.get('/api/booking/admin/board',async c=>{
  const accountId=await resolveAccountIdAdmin(c);if(!accountId)return inputError(c,{error:'missing_account_id'},400,['account_id']);
- const from=c.req.query('from'),to=c.req.query('to'),offset=Number(c.req.query('offset')??0),limit=Number(c.req.query('limit')??100);
+ const from=c.req.query('from'),to=c.req.query('to'),offset=listQueryNumber(c.req.query('offset'), 0),limit=listQueryNumber(c.req.query('limit'), 100);
  if(!from||!to||!Number.isFinite(Date.parse(from))||!Number.isFinite(Date.parse(to))||Date.parse(to)<=Date.parse(from)||!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>500)return inputError(c,{error:'invalid_range'},400,['from','to','limit','offset']);
  const rows=await c.env.DB.prepare(`SELECT b.*,COALESCE(f.real_name,f.display_name,bc.display_name,'—') customer_name,s.display_name staff_name,m.name menu_name
  FROM bookings b LEFT JOIN friends f ON f.id=b.friend_id LEFT JOIN booking_customers bc ON bc.id=b.booking_customer_id LEFT JOIN staff s ON s.id=b.staff_id LEFT JOIN menus m ON m.id=b.menu_id

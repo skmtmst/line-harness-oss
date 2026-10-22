@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { outgoingEventTypes } from './webhook-event-types.js';
@@ -426,8 +427,8 @@ export const get__api_webhooks_interactions_8 = async (c: Context<Env, "/api/web
       direction: direction === 'incoming' || direction === 'outgoing' ? direction : undefined,
       status: status === 'succeeded' || status === 'failed' ? status : undefined,
       search: c.req.query('search'),
-      page: Number(c.req.query('page') ?? 1),
-      limit: Number(c.req.query('limit') ?? 20),
+      page: listQueryNumber(c.req.query('page'), 1),
+      limit: listQueryNumber(c.req.query('limit'), 20),
     });
     return c.json({
       success: true,

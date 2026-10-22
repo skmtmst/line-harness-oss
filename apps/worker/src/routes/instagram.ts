@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -531,7 +532,7 @@ instagram.get('/api/instagram/messages', async (c) => {
       success: true,
       data: { state: 'unconfigured', messages: [], total: null },
     });
-  const limit = Number(c.req.query('limit') ?? 50),
+  const limit = listQueryNumber(c.req.query('limit'), 50),
     before = c.req.query('beforeId');
   if (!Number.isInteger(limit) || limit < 1 || limit > 100)
     throw new InstagramError('invalid_limit', 400);

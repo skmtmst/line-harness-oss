@@ -59,7 +59,7 @@ import {
 } from '../services/nen-campaign-metrics.js';
 import { auditLog } from '../lib/audit-log.js';
 import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
-import { listLimit, listOffset } from './list-pagination.js';
+import { listLimit, parseOffsetPaging, listQueryNumber } from '../lib/list-paging.js';
 
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
@@ -109,10 +109,11 @@ function columnOperationError(c: Context<Env>, error: unknown): Response {
 
 function cursorOffset(value: string | undefined): number {
   if (!value) return 0;
-  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) {
+  const parsed = listQueryNumber(value, 0);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(parsed)) {
     throw new NenCampaignMetricsError('cursor_invalid', '続きの位置が正しくありません', 400, 'cursor');
   }
-  return Number(value);
+  return parsed;
 }
 
 function isUrl(value: string): boolean {
@@ -618,8 +619,9 @@ nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   // 件数制限なしの全件取得は件数が増えると重い(点検 #512 の中6)。上限200・page送り付き。
-  const limit = listLimit(c.req.query('limit'), 200);
-  const offset = listOffset(c.req.query('offset'));
+  const { limit, offset } = parseOffsetPaging(
+    { limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 200 },
+  );
   const totalRow = await c.env.DB.prepare(
     `SELECT COUNT(*) AS total FROM nen_columns WHERE line_account_id = ?`,
   ).bind(accountId).first<{ total: number }>();

@@ -1,3 +1,4 @@
+import { boundedListInteger } from '../lib/list-paging.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
@@ -202,12 +203,6 @@ function serializeRun(
   };
 }
 
-function boundedInteger(raw: string | undefined, fallback: number, max: number): number {
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0) return fallback;
-  return Math.min(value, max);
-}
-
 async function normalizedSearchHash(value: string): Promise<string> {
   const normalized = value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
@@ -251,8 +246,8 @@ autoReplyRuns.get(
       const status = statusRaw && DOMAIN_STATUSES.has(statusRaw as AutoReplyEvaluationStatus)
         ? statusRaw as AutoReplyEvaluationStatus
         : undefined;
-      const limit = Math.max(1, boundedInteger(c.req.query('limit'), 20, 100));
-      const offset = boundedInteger(c.req.query('offset'), 0, 1_000_000);
+      const limit = Math.max(1, boundedListInteger(c.req.query('limit'), 20, 100));
+      const offset = boundedListInteger(c.req.query('offset'), 0, 1_000_000);
       const search = c.req.query('search')?.trim() || undefined;
       const staff = c.get('staff');
       const canViewInput = staff.role !== 'staff' || staff.permissionKeys?.includes('/chats') === true;

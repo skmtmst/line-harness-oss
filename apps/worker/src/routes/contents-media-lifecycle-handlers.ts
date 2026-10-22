@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import { getMediaVersionKeys } from '@line-crm/db';
@@ -536,7 +537,7 @@ export const get__api_common_vars_9 = async (c: Context<Env, "/api/common-vars">
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
-  const rawLimit = Number(c.req.query('limit'));
+  const rawLimit = listQueryNumber(c.req.query('limit'), Number.NaN);
   const limit = Number.isFinite(rawLimit)
     ? Math.max(1, Math.min(Math.floor(rawLimit), COMMON_VARS_LIST_LIMIT))
     : COMMON_VARS_LIST_LIMIT;

@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
@@ -463,8 +464,8 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const filter = (c.req.query('filter') ?? 'all') as PostFilter;
   const kind = c.req.query('kind') ?? 'all';
-  const page = Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1);
-  const perPage = Math.min(LIST_LIMIT_MAX, Math.max(1, Number.parseInt(c.req.query('per_page') ?? '20', 10) || 20));
+  const page = Math.max(1, listQueryNumber(c.req.query('page'), 1, { format: 'integer-prefix' }) || 1);
+  const perPage = Math.min(LIST_LIMIT_MAX, Math.max(1, listQueryNumber(c.req.query('per_page'), 20, { format: 'integer-prefix' }) || 20));
 
   const rows = (await dbFor(c.env, store.id).prepare('SELECT * FROM rt_google_posts WHERE store_id = ? ORDER BY created_at DESC LIMIT 1000').bind(store.id).all<PostRow>()).results;
 

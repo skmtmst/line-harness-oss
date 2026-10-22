@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite} from '../services/gap-common.js';
@@ -8,7 +9,7 @@ aiAnswerLogs.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.
 aiAnswerLogs.use('/api/ai-answer-logs*',requirePermission('/auto-replies'));
 function view(r:Record<string,unknown>,masked:boolean){return {testMode:String(r.id).startsWith(simulatedQaPrefix),id:r.id,createdAt:r.created_at,chatId:r.chat_id,friendId:r.friend_id,friendName:masked?null:r.friend_name,questionText:masked?'（非表示）':r.question_text,action:r.action,handoffReason:r.handoff_reason,qaEntryId:r.qa_entry_id,qaTitle:r.qa_title,qaVersion:r.qa_version};}
 aiAnswerLogs.get('/api/ai-answer-logs',async c=>{
- const a=await gapAccount(c),offset=Number(c.req.query('offset')??0),action=c.req.query('action')??'';
+ const a=await gapAccount(c),offset=listQueryNumber(c.req.query('offset'), 0),action=c.req.query('action')??'';
  if(!Number.isSafeInteger(offset)||offset<0||action&&!['answered','handed_off','customer_asked_human'].includes(action))throw new GapError('invalid_filter');
  const where='l.account_id=? AND (?=\'\' OR l.action=?)',bind=[a,action,action];
  const total=await c.env.DB.prepare(`SELECT count(*) n FROM ai_answer_logs l WHERE ${where}`).bind(...bind).first<{n:number}>();

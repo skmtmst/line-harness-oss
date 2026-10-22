@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import type {Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {getVisibleLineAccountScope} from './account-access.js';
@@ -18,7 +19,7 @@ export async function slaChatList(c:Context<Env>) {
  const total=await c.env.DB.prepare(`SELECT COUNT(*) n ${join} WHERE ${clauses.join(' AND ')}`).bind(...binds).first<{n:number}>();
  const due=c.req.query('beforeDueAt'),id=c.req.query('beforeId');
  if(due&&id){clauses.push('(julianday(c.sla_due_at)>julianday(?) OR (c.sla_due_at=? AND f.id>?))');binds.push(due,due,id);}
- const limit=Math.min(200,Math.max(1,Number(c.req.query('limit'))||50));
+ const limit=Math.min(200,Math.max(1,listQueryNumber(c.req.query('limit'), Number.NaN)||50));
  const rows=(await c.env.DB.prepare(`SELECT c.*,(SELECT content FROM messages_log WHERE friend_id=c.friend_id ORDER BY created_at DESC LIMIT 1) last_message,f.display_name,f.picture_url,f.line_account_id ${join} WHERE ${clauses.join(' AND ')} ORDER BY julianday(c.sla_due_at),f.id LIMIT ?`).bind(...binds,limit).all<Record<string,unknown>>()).results;
  const data=await enrichSlaChats(c.env.DB,rows.map(r=>({id:String(r.friend_id),friendId:r.friend_id,friendName:r.display_name,friendPictureUrl:r.picture_url,operatorId:r.operator_id,status:r.status,revision:r.revision,lastMessageAt:r.last_message_at,lastMessage:r.last_message,unread:r.status==='unread',conversationId:r.id})));
  return c.json({success:true,data,total:total?.n??0});

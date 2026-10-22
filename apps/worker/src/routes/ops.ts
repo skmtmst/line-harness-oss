@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { jstMonthStart as japanMonthStart } from '@line-crm/shared';
 import type { TenantStatus, TenantListRow } from './ops-tenant-types.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
@@ -387,8 +388,8 @@ ops.get('/api/ops/audit', async (c) => {
   const actionsRaw = (c.req.query('action') ?? '').split(',').map((a) => a.trim()).filter(Boolean);
   const actions = actionsRaw.filter((a): a is PlatformAuditAction =>
     (PLATFORM_AUDIT_ACTIONS as readonly string[]).includes(a));
-  const limit = Number.parseInt(c.req.query('limit') ?? '50', 10) || 50;
-  const offset = Number.parseInt(c.req.query('offset') ?? '0', 10) || 0;
+  const limit = listQueryNumber(c.req.query('limit'), 50, { format: 'integer-prefix' }) || 50;
+  const offset = listQueryNumber(c.req.query('offset'), 0, { format: 'integer-prefix' }) || 0;
   const result = await listPlatformAudit(dbFor(c.env), {
     tenantId: c.req.query('tenant_id') || null,
     actions,

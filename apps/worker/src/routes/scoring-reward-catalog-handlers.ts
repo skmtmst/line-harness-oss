@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { recordAuditEvent } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 
@@ -370,8 +371,8 @@ export const get__api_mileage_redemptions_18 = async (c: Context<Env, "/api/mile
       if (!MILEAGE_REDEMPTION_LIST_STATUSES.has(statusValue)) {
         return c.json({ success: false, error: 'status is invalid' }, 400);
       }
-      const requestedLimit = Number(c.req.query('limit') || 20);
-      const requestedOffset = Number(c.req.query('offset') || 0);
+      const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 20);
+      const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
       const listed = await listMileageRedemptions(c.env.DB, {
         lineAccountId: accountId,
         status: statusValue as MileageRedemptionListStatus,
@@ -489,8 +490,8 @@ export const get__api_mileage_friends_21 = async (c: Context<Env, "/api/mileage/
     if (!accountScope.allowedAccountIds.includes(accountId)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
-    const requestedLimit = Number(c.req.query('limit') || 20);
-    const requestedOffset = Number(c.req.query('offset') || 0);
+    const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 20);
+    const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
     const data = await getMileageFriendsV6(c.env.DB, {
       lineAccountId: accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
@@ -512,8 +513,8 @@ export const get__api_mileage_earning_rules_22 = async (c: Context<Env, "/api/mi
     if (!await canUseMileageAccount(c, accountId)) {
       return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
     }
-    const requestedLimit = Number(c.req.query('limit') || 20);
-    const requestedOffset = Number(c.req.query('offset') || 0);
+    const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 20);
+    const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
     const data = await getMileageEarningRulesV6(c.env.DB, {
       lineAccountId: accountId,
       limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,

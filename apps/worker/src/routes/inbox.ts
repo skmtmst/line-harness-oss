@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import {
@@ -51,8 +52,8 @@ inbox.get('/api/inbox/unanswered', async (c) => {
       q: q || undefined,
       account,
       minWaitMinutes: minWaitMinutesStr ? Number.parseInt(minWaitMinutesStr, 10) : undefined,
-      page: pageStr ? Number.parseInt(pageStr, 10) : undefined,
-      pageSize: pageSizeStr ? Number.parseInt(pageSizeStr, 10) : undefined,
+      page: pageStr ? listQueryNumber(pageStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
+      pageSize: pageSizeStr ? listQueryNumber(pageSizeStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
       allowedAccountIds: scope.allowedAccountIds,
       canSeeUnassigned: scope.canSeeUnassigned,
     };

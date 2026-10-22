@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import type { Hono, MiddlewareHandler } from 'hono';
 import { listFriendDeliveryConsents } from '@line-crm/db/src/friend-delivery-consents.js';
 import type { Env } from '../worker-env.js';
@@ -7,7 +8,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 export function registerFriendDeliveryConsents(app: Hono<Env>, visible: MiddlewareHandler<Env>) {
   app.get('/api/friends/:id/delivery-consents/history', requireRole('owner','admin','staff'), visible, async c => {
     c.header('Cache-Control','no-store');
-    const limit=Number(c.req.query('limit')??20),cursor=c.req.query('cursor'),purpose=c.req.query('purpose');
+    const limit=listQueryNumber(c.req.query('limit'), 20),cursor=c.req.query('cursor'),purpose=c.req.query('purpose');
     if(![10,20,50].includes(limit)||cursor!==undefined&&(!/^[1-9]\d*$/.test(cursor)||!Number.isSafeInteger(Number(cursor)))||purpose!==undefined&&!/^[a-z][a-z0-9_-]{0,79}$/.test(purpose))return c.json({success:false,error:'目的・ページを確認してください'},400);
     const binds=[c.req.param('id'),purpose??null,purpose??null];
     const where='e.friend_id=? AND (? IS NULL OR e.purpose=?) AND e.line_account_id=(SELECT f.line_account_id FROM friends f WHERE f.id=e.friend_id)';

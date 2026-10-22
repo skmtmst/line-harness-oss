@@ -14,7 +14,7 @@ import { resolveCustomerFormTheme } from '@line-crm/shared';
 import { getFormsWithStats, getFormById, getFormLatestEdit, getFormAccountIds, getFolderById, formBelongsToLineAccount, createForm, updateForm, setFormFolder, publishFormVersion, type UpdateFormInput, countActiveFormTestTokens, insertFormTestToken, deleteExpiredFormTestTokens, getFriendByLineUserIdForAccount, jstNow, toJstString } from '@line-crm/db';
 
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
-import { listLimit, listPage } from './list-pagination.js';
+import { parseOffsetPaging } from '../lib/list-paging.js';
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -86,9 +86,11 @@ export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
     const total = list.length;
     const limitParam = c.req.query('limit');
     if (limitParam !== undefined && limitParam.trim() !== '') {
-      const limit = listLimit(limitParam, FORM_LIST_PAGE_FALLBACK_LIMIT);
-      const page = listPage(c.req.query('page'));
-      const items = list.slice((page - 1) * limit, (page - 1) * limit + limit);
+      const { page, limit, offset } = parseOffsetPaging(
+        { page: c.req.query('page'), limit: limitParam },
+        { defaultLimit: FORM_LIST_PAGE_FALLBACK_LIMIT },
+      );
+      const items = list.slice(offset, offset + limit);
       return c.json({
         success: true,
         data: { items, total, all_total: allTotal, page, limit },

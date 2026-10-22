@@ -15,7 +15,7 @@ import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
-import { listLimit, listPage } from './list-pagination.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { resumeQuestionAnswer, registerLegacyQuestionAnswers } from '../features/scenarios/scenario-question-answer/index.js';
 import { LineClient } from '@line-crm/line-sdk';
 
@@ -91,9 +91,8 @@ export const patch__api_scenarios_reorder_3 = async (c: Context<Env, "/api/scena
 export const get__api_scenarios_4 = async (c: Context<Env, "/api/scenarios">) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
-    const limit = listLimit(c.req.query('limit'), 50, 200);
-    const page = listPage(c.req.query('page'));
-    const offset = (page - 1) * limit;
+    const paging = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') });
+    const { limit, offset } = paging;
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: 'シナリオが見つかりません' }, 404);
@@ -196,7 +195,7 @@ export const get__api_scenarios_4 = async (c: Context<Env, "/api/scenarios">) =>
 
     return c.json({
       success: true,
-      data: {
+      data: buildOffsetListResponse({
         items: items.map((row) => ({
           ...serializeScenario(row),
           stepCount: row.step_count,
@@ -204,12 +203,12 @@ export const get__api_scenarios_4 = async (c: Context<Env, "/api/scenarios">) =>
           completedCount: counts.get(row.id)?.completed ?? 0,
         })),
         total,
-        limit,
+        paging,
         sort: [
           { field: 'createdAt', direction: 'desc' },
           { field: 'id', direction: 'desc' },
         ],
-      },
+      }),
     });
   } catch (err) {
     throw err;

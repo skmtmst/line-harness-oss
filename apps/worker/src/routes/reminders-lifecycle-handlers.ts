@@ -1,3 +1,4 @@
+import { clampedListInteger } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getFriendById, getReminderById, createReminder, updateReminder, deleteReminder, restoreReminder, createReminderStep, deleteReminderStep, enrollFriendInReminder, getFriendReminders, listReminderRegistrants, moveReminderRegistrantTargetDate, cancelReminderRegistrant, resumeReminderRegistrant, getReminderRegistrantById, getReminderDeliveryRunById, getReminderDeliveryRunSummary, getReminderDeliveryStepSummaries, listReminderDeliveryRuns, retryReminderDeliveryRun, getReminderPublishedVersion, parseReminderVersionSettings, type ReminderDeliveryRunStatus } from '@line-crm/db';
@@ -40,10 +41,8 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
         (executedOnly !== undefined && !['true', 'false'].includes(executedOnly))) {
       return c.json({ success: false, error: '取得条件が正しくありません' }, 400);
     }
-    const rawLimit = Number(c.req.query('limit') ?? 20);
-    const rawOffset = Number(c.req.query('offset') ?? 0);
-    const limit = Number.isInteger(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 20;
-    const offset = Number.isInteger(rawOffset) ? Math.max(0, rawOffset) : 0;
+    const limit = clampedListInteger(c.req.query('limit'), 20, 1, 100);
+    const offset = clampedListInteger(c.req.query('offset'), 0, 0);
     const search = c.req.query('search')?.trim().slice(0, 100) || undefined;
 
     const [runs, summary, stepRows, publishedVersion] = await Promise.all([

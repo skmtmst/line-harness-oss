@@ -45,7 +45,7 @@ import {
   retryAutomationRun,
 } from '../features/automations/automation-engine/index.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit, boundedListInteger } from '../lib/list-paging.js';
 import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
 
 const automations = new Hono<Env>();
@@ -432,12 +432,6 @@ function executionRunsCsv(items: AutomationExecutionRun[]): string {
   return `﻿${lines.join('\r\n')}`;
 }
 
-function boundedInteger(raw: string | undefined, fallback: number, max: number): number {
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0) return fallback;
-  return Math.min(value, max);
-}
-
 async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<void>) {
   const id = c.req.param('id')!;
   // #942: 一覧が返すidは の automation_definitions。旧 automations 表の
@@ -609,8 +603,8 @@ automations.get(
     }
     const rawLimit = c.req.query('limit');
     const rawOffset = c.req.query('offset');
-    const limit = rawLimit === undefined ? undefined : boundedInteger(rawLimit, -1, 200);
-    const offset = rawOffset === undefined ? undefined : boundedInteger(rawOffset, -1, 1_000_000);
+    const limit = rawLimit === undefined ? undefined : boundedListInteger(rawLimit, -1, 200);
+    const offset = rawOffset === undefined ? undefined : boundedListInteger(rawOffset, -1, 1_000_000);
     if ((rawLimit !== undefined && limit === -1) || (rawOffset !== undefined && offset === -1)) {
       return c.json({ success: false, error: 'ページ指定を確認してください' }, 400);
     }
@@ -716,8 +710,8 @@ automations.get(
     // CSVは画面の1頁ではなく絞り込み全体を出す。暴走だけ上限で留める。
     const limit = wantsCsv
       ? 5_000
-      : Math.max(1, boundedInteger(c.req.query('limit'), 20, 100));
-    const offset = wantsCsv ? 0 : boundedInteger(c.req.query('offset'), 0, 1_000_000);
+      : Math.max(1, boundedListInteger(c.req.query('limit'), 20, 100));
+    const offset = wantsCsv ? 0 : boundedListInteger(c.req.query('offset'), 0, 1_000_000);
     const defaults = defaultWindow();
     const from = c.req.query('from') || defaults.from;
     const to = c.req.query('to') || defaults.to;

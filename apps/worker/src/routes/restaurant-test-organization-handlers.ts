@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { parseReservationFilter } from './restaurant-reservation-filter.js';
 import { deriveStoreLineStatuses, isValidTimezone, uniqueStoreConflict } from './restaurant-store-status.js';
@@ -631,8 +632,8 @@ export const get__api_restaurant_test_inbound_emails_20 = async (c: Context<Env,
   const storeId = c.req.query('storeId') || organization.scopedStoreId;
   if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   if ((c.req.query('status') || 'quarantined') !== 'quarantined') return c.json({ success: false, error: 'status は quarantined を指定してください' }, 400);
-  const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
-  const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+  const limit = Math.min(200, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 100, { format: 'integer-prefix' }) || 100));
+  const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0, { format: 'integer-prefix' }) || 0);
   const rows = await dbFor(c.env, storeId).prepare(`SELECT e.id, e.store_id AS storeId, e.received_at AS receivedAt,
     e.status, e.quarantine_reason AS reason, m.code AS mediaCode, m.name AS mediaName
     FROM rt_inbound_emails e LEFT JOIN rt_media m ON m.id = e.media_id

@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getSupportMarkById, setFriendSupportMarkBulk, getSavedSearches, getSavedSearchById, createSavedSearch, reorderSavedSearches, updateSavedSearchWithRevision, deleteSavedSearch, countSavedSearches, getSavedSearchReferences, getSavedSearchUsageCounts, getSavedSearchReferenceUsageCounts, validateSearchConditions, SAVED_SEARCH_LIMIT, getLoginAudit, getStaffMembers, LOGIN_AUDIT_ACTIONS, type LoginAuditRow, type LoginAuditAction, getFolders, getFolderItemCounts, isFolderKind, getWebinarFolderCounts } from '@line-crm/db';
@@ -443,7 +444,7 @@ export const get__api_login_audit_9 = async (c: Context<Env, "/api/login-audit">
     const items = await getLoginAudit(c.env.DB, {
       adminUserId: c.req.query('userId') || undefined,
       action,
-      limit: Number(c.req.query('limit') ?? 100),
+      limit: listQueryNumber(c.req.query('limit'), 100),
     });
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
     const staffById = new Map((await getStaffMembers(c.env.DB, tenantId)).map((member) => [member.id, member]));

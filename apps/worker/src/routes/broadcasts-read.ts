@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
 import { broadcastSendPreview } from '../services/gap-send-preview.js';
@@ -34,8 +35,8 @@ export const get__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">) 
   const status = c.req.query('status');
   const folderId = c.req.query('folderId');
   const displayStatusParam = c.req.query('displayStatus');
-  const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
-  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') ?? '20', 10) || 20));
+  const cursor = Math.max(0, listQueryNumber(c.req.query('cursor'), '0', { format: 'integer-prefix' }) || 0);
+  const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit'), 20, { format: 'integer-prefix' }) || 20));
   const page = await getBroadcastListPage(c.env.DB, lineAccountId || undefined, scope, {
     order: sort, ...range, folderId, status,
     displayStatuses: displayStatusParam ? displayStatusParam.split(',').map(value => value.trim()).filter(Boolean) : undefined,
@@ -234,8 +235,8 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
   if (!['all', 'delivered', 'temporary', 'permanent', 'unknown', 'inflight'].includes(result)) {
     return c.json({ success: false, error: 'result が正しくありません' }, 400);
   }
-  const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
-  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') ?? '50', 10) || 50));
+  const cursor = Math.max(0, listQueryNumber(c.req.query('cursor'), '0', { format: 'integer-prefix' }) || 0);
+  const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit'), 50, { format: 'integer-prefix' }) || 50));
   const filter = recipientResultFilter(result);
 
   const totalRow = await c.env.DB.prepare(
@@ -324,8 +325,8 @@ export const get__api_broadcasts_id_activity_10 = async (c: Context<Env, "/api/b
   if (!broadcast || !await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
     return c.json({ success: false, error: 'Broadcast not found' }, 404);
   }
-  const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
-  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') ?? '50', 10) || 50));
+  const cursor = Math.max(0, listQueryNumber(c.req.query('cursor'), '0', { format: 'integer-prefix' }) || 0);
+  const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit'), 50, { format: 'integer-prefix' }) || 50));
   const { entries, nextCursor } = await listBroadcastActivity(c.env.DB, id, { limit, cursor });
   return c.json({
     success: true,

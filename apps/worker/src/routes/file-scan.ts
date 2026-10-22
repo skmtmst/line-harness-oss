@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { purgeUnsafeFormDocuments } from '../features/forms/form-documents/index.js';
@@ -180,8 +181,8 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
    * 件数と同じ条件で絞るので、一覧と総件数がずれない。
    */
   const query = (c.req.query('q') ?? '').trim();
-  const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20) || 20, 1), 100);
-  const offset = Math.max(Number(c.req.query('offset') ?? 0) || 0, 0);
+  const limit = Math.min(Math.max(listQueryNumber(c.req.query('limit'), 20) || 20, 1), 100);
+  const offset = Math.max(listQueryNumber(c.req.query('offset'), 0) || 0, 0);
   if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);

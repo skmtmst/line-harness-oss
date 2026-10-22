@@ -9,7 +9,7 @@ import {
 import type { Env } from '../worker-env.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit } from '../lib/list-paging.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 

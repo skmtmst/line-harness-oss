@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite} from '../services/gap-common.js';
@@ -13,7 +14,7 @@ async function visible(c:Context<Env>,a:string,id?:string){
 function newKey(){const bytes=crypto.getRandomValues(new Uint8Array(32));return 'mcp_'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
 mcpConnections.get('/api/mcp-connections',async c=>{const a=await account(c);return c.json({success:true,data:await visible(c,a)});});
 mcpConnections.get('/api/mcp-connections/logs',async c=>{
- const a=await account(c),id=c.req.query('connectionId')??null,kind=c.req.query('kind')??'',result=c.req.query('result')??'',offset=Number(c.req.query('offset')??0);if(!Number.isSafeInteger(offset)||offset<0)throw new GapError('invalid_pagination');
+ const a=await account(c),id=c.req.query('connectionId')??null,kind=c.req.query('kind')??'',result=c.req.query('result')??'',offset=listQueryNumber(c.req.query('offset'), 0);if(!Number.isSafeInteger(offset)||offset<0)throw new GapError('invalid_pagination');
  const connection=id?(await visible(c,a,id))[0]:null;if(id&&!connection)throw new GapError('not_found',404);
  const where="FROM mcp_call_logs l JOIN mcp_connections c ON c.id=l.connection_id WHERE c.organization_id=(SELECT tenant_id FROM line_accounts WHERE id=?) AND EXISTS(SELECT 1 FROM json_each(c.account_ids_json) WHERE value=?) AND (? IS NULL OR c.id=?) AND (?='' OR l.kind=?) AND (?='' OR l.result=?)";
  const bindings=[a,a,id,id,kind,kind,result,result];

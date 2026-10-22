@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -850,8 +851,8 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/changes', async (c) => 
   const result = c.req.query('result') ?? 'all';
   const days = Math.min(365, Math.max(1, Number.parseInt(c.req.query('days') ?? '30', 10) || 30));
   const q = (c.req.query('q') ?? '').trim().toLowerCase();
-  const page = Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1);
-  const perPage = Math.min(HISTORY_LIMIT_MAX, Math.max(1, Number.parseInt(c.req.query('per_page') ?? '20', 10) || 20));
+  const page = Math.max(1, listQueryNumber(c.req.query('page'), 1, { format: 'integer-prefix' }) || 1);
+  const perPage = Math.min(HISTORY_LIMIT_MAX, Math.max(1, listQueryNumber(c.req.query('per_page'), 20, { format: 'integer-prefix' }) || 20));
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const db = dbFor(c.env, store.id);
 

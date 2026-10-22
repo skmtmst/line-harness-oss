@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
@@ -12,8 +13,8 @@ import type { Context } from 'hono';
 
 export const get__api_friends_id_timeline_1 = async (c: Context<Env, "/api/friends/:id/timeline">) => {
     try {
-      const limitRaw = Number(c.req.query('limit') ?? 50);
-      const offsetRaw = Number(c.req.query('cursor') ?? 0);
+      const limitRaw = listQueryNumber(c.req.query('limit'), 50);
+      const offsetRaw = listQueryNumber(c.req.query('cursor'), 0);
       if (!Number.isInteger(limitRaw) || limitRaw < 1 || limitRaw > 100
           || !Number.isInteger(offsetRaw) || offsetRaw < 0) {
         return c.json({ success: false, error: 'ページ位置が正しくありません' }, 400);

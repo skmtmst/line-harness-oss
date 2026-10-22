@@ -9,7 +9,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { getBroadcastById, resolveLineCredential } from '@line-crm/db';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit, listQueryNumber } from '../lib/list-paging.js';
 
 const profileRefresh = new Hono<Env>();
 
@@ -26,7 +26,7 @@ const profileRefresh = new Hono<Env>();
  * Caller (cron / curl) は hasMore=false まで offset を進めて再 POST する想定。
  */
 profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), inputJsonBoundary(), async (c) => {
-  const offset = Number.parseInt(c.req.query('offset') ?? '0', 10);
+  const offset = listQueryNumber(c.req.query('offset'), 0, { format: 'integer-prefix' });
   const limit = listLimit(c.req.query('limit'), 100, 500);
   const accountIdFilter = c.req.query('accountId') ?? null;
 

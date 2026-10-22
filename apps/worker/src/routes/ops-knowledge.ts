@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -34,7 +35,7 @@ const conflict = { success: false, error: '内容が更新されました。読�
 
 opsKnowledge.get('/api/ops/knowledge', async c => {
   const { q, kind, articleKind, state } = c.req.query();
-  const offset = Number(c.req.query('offset') || 0);
+  const offset = listQueryNumber(c.req.query('offset') || undefined, 0);
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1_000_000 || (q?.length ?? 0) > 200 ||
     (kind && !HQ_SUPPORT_KINDS.some(value => value === kind)) ||
     (articleKind && articleKind !== 'verified' && articleKind !== 'answer_example') ||

@@ -31,7 +31,7 @@ import { sendAdConversions, retryAdConversion, AdConversionRetryError } from '..
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { listLimit, listPage } from './list-pagination.js';
+import { listLimit, parseOffsetPaging } from '../lib/list-paging.js';
 
 /**
  * 画面へ返す形。秘密の値は出さず、設定済みの鍵名だけ出す。
@@ -427,8 +427,7 @@ adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
 // GET /api/ad-platforms/logs — conversion send logs across visible platforms
 adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const page = listPage(c.req.query('page'));
-    const limit = listLimit(c.req.query('limit'), 50);
+    const { page, limit } = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') });
     const status = c.req.query('status')?.trim();
     const query = c.req.query('query')?.trim();
     const lineAccountId = c.req.query('lineAccountId')?.trim();

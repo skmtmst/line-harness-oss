@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { issueStampQr, storefrontQr, stampQrStatus, revokeStampQr, redeemStampQr } from '../services/visit-stamp-qr.js';
@@ -164,7 +165,7 @@ visitStamps.post('/api/liff/visit-stamps/cards/:id/paper-requests',inputJsonBoun
 
 visitStamps.get('/api/visit-stamps/entries',async c=>{
  const a=await account(c,c.req.query('accountId')),db=dbFor(c.env),from=c.req.query('from'),to=c.req.query('to'),friend=c.req.query('friendId'),kind=c.req.query('kind');
- const page=Number(c.req.query('page')??1),pageSize=Number(c.req.query('pageSize')??50);
+ const page=listQueryNumber(c.req.query('page'), 1),pageSize=listQueryNumber(c.req.query('pageSize'), 50);
  if(!Number.isSafeInteger(page)||page<1||!Number.isSafeInteger(pageSize)||pageSize<1||pageSize>200||!Number.isSafeInteger((page-1)*pageSize)||(from&&!Number.isFinite(Date.parse(from)))||(to&&!Number.isFinite(Date.parse(to)))||(from&&to&&Date.parse(from)>=Date.parse(to))
  ||(kind&&!['visit','manual','paper','redeem','reverse','expire','restore'].includes(kind)))throw new StampError('期間・種類・ページを確認してください');
  if(friend)stampId(friend);

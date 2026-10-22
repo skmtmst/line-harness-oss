@@ -1,3 +1,4 @@
+import { clampedListInteger } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { mfaConfiguration } from '../lib/mfa-config.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -86,8 +87,7 @@ function parseCapabilities(raw: unknown): OperationCapability[] | null {
 }
 
 function historyLimit(raw: string | undefined): number {
-  const value = Number(raw ?? 100);
-  return Number.isInteger(value) ? Math.min(Math.max(value, 1), 200) : 100;
+  return clampedListInteger(raw, 100, 1, 200);
 }
 
 const STEP_UP_PURPOSE = 'operations.control' as const;

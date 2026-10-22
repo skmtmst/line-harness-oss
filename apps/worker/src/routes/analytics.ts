@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { jstDate as japanDate, jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { serializeFunnel, funnelErrorStatus } from './analytics-funnel-display.js';
@@ -341,7 +342,7 @@ analytics.get('/api/analytics/url-clicks', async (c) => {
     const context = await overviewContext(c, account.accountId);
     if (!context.ok) return context.response;
     const limitRaw = c.req.query('limit');
-    const limit = limitRaw === undefined ? 200 : Number(limitRaw);
+    const limit = listQueryNumber(limitRaw, 200);
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
       return c.json({ success: false, error: '表示件数は1〜200で指定してください' }, 400);
     }
@@ -975,8 +976,8 @@ analytics.get('/api/analytics/funnels', async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
-    const page = Number(c.req.query('page') ?? 1);
-    const pageSize = Number(c.req.query('pageSize') ?? 200);
+    const page = listQueryNumber(c.req.query('page'), 1);
+    const pageSize = listQueryNumber(c.req.query('pageSize'), 200);
     if (!Number.isInteger(page) || page < 1) {
       return c.json({ success: false, error: 'ページは1以上の整数で指定してください' }, 400);
     }

@@ -1,3 +1,4 @@
+import { boundedListInteger } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -43,11 +44,6 @@ function canUseKind(c: Parameters<typeof getStaff>[0], kind: IdentityCandidateKi
   if (!staff || staff.role === 'owner' || staff.role === 'admin') return Boolean(staff);
   const permission = kind === 'friend_duplicate' ? '/friends' : '/ec-commerce';
   return staff.permissionKeys?.includes(permission) ?? false;
-}
-
-function positiveInt(value: string | undefined, fallback: number, max: number): number {
-  const parsed = Number(value ?? fallback);
-  return Number.isInteger(parsed) && parsed >= 0 ? Math.min(parsed, max) : fallback;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -169,8 +165,8 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
     const data = await listIdentityCandidates(c.env.DB, {
       tenantId: tenantId(c), kind, status,
       allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
-      limit: Math.max(1, positiveInt(c.req.query('limit'), 20, 100)),
-      offset: positiveInt(c.req.query('offset'), 0, 100_000),
+      limit: Math.max(1, boundedListInteger(c.req.query('limit'), 20, 100)),
+      offset: boundedListInteger(c.req.query('offset'), 0, 100_000),
       // FRIEND-11: 名前・根拠の検索は全件へかける。
       q: c.req.query('q') ?? undefined,
     });
@@ -197,7 +193,7 @@ identityCandidates.post('/api/identity-candidates/detect', requireRole('owner', 
     const data = await detectFriendDuplicateCandidates(c.env.DB, {
       tenantId: tenantId(c),
       allowedAccountIds: scope.allowedAccountIds,
-      limit: positiveInt(c.req.query('limit'), 50, 100),
+      limit: boundedListInteger(c.req.query('limit'), 50, 100),
       after: c.req.query('after') ?? null,
     });
     return c.json({ success: true, data });

@@ -15,7 +15,7 @@ import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { getScenarioRuns, saveScenarioDraft, simulateFriendPlan, simulateScenario } from '../features/scenarios/scenario-contract/index.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit } from '../lib/list-paging.js';
 import { validateStepCondition, validateStepSchedule, validateQuestionForStorage, serializeStep, WEEKDAY_JA, requireScenarioAccountScope, scenarioContractError, serializeFriendScenario } from './scenarios-definition.js';
 import type { Context } from 'hono';
 

@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 
@@ -56,8 +57,8 @@ export const get__api_mileage_overview_2 = async (c: Context<Env, "/api/mileage/
     if (!accountScope.allowedAccountIds.includes(accountId)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
-    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') || 50)));
-    const offset = Math.max(0, Number(c.req.query('offset') || 0));
+    const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 50)));
+    const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0));
     const overview = await getMileageAdminOverview(c.env.DB, {
       accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
@@ -110,8 +111,8 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
     if (fromValue && toValue && fromValue > toValue) {
       return c.json({ success: false, error: 'from must not be after to' }, 400);
     }
-    const requestedLimit = Number(c.req.query('limit') || 50);
-    const requestedOffset = Number(c.req.query('offset') || 0);
+    const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 50);
+    const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
     const historyInput = {
       ...(kind ? { kind: kind as 'earned' | 'spent' | 'voided' } : {}),
       accountId,

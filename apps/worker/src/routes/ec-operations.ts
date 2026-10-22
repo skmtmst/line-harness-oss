@@ -1,3 +1,4 @@
+import { clampedListInteger } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
@@ -41,11 +42,9 @@ function lineAccountId(c: Context<Env>): string | null {
 }
 
 function pagination(c: Context<Env>): { limit: number; offset: number } {
-  const rawLimit = Number(c.req.query('limit') ?? 20);
-  const rawOffset = Number(c.req.query('offset') ?? 0);
   return {
-    limit: Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 20,
-    offset: Number.isInteger(rawOffset) ? Math.max(rawOffset, 0) : 0,
+    limit: clampedListInteger(c.req.query('limit'), 20, 1, 100),
+    offset: clampedListInteger(c.req.query('offset'), 0, 0),
   };
 }
 

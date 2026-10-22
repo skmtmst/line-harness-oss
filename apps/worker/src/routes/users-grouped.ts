@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -24,8 +25,8 @@ usersGrouped.get('/api/users-grouped', requireRole('owner', 'admin', 'staff'), a
       account,
       // FRIEND-09: 表示中ページへの後絞りをやめ、全件へかける条件として受ける。
       uid: uidRaw === 'linked' || uidRaw === 'unlinked' ? uidRaw : undefined,
-      page: pageStr ? Number.parseInt(pageStr, 10) : undefined,
-      pageSize: pageSizeStr ? Number.parseInt(pageSizeStr, 10) : undefined,
+      page: pageStr ? listQueryNumber(pageStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
+      pageSize: pageSizeStr ? listQueryNumber(pageSizeStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
       forceRefresh,
     };
 

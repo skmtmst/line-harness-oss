@@ -6,7 +6,7 @@ import { trackConversion, listConversionDefinitions, getConversionDefinitionDeta
 import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit, listQueryNumber } from '../lib/list-paging.js';
 import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { maskedPayloadShape } from '../services/incoming-webhook-actions.js';
 import { sha256Hex } from '../middleware/auth.js';
@@ -23,7 +23,7 @@ export const get__api_conversions_definitions_1 = async (c: Context<Env, "/api/c
     const scope = await conversionDefinitionScope(c, filters.value.lineAccountId);
     if (!scope.ok) return scope.response;
     const cursorRaw = c.req.query('cursor') ?? '0';
-    const cursor = Number(cursorRaw);
+    const cursor = listQueryNumber(cursorRaw, Number.NaN);
     if (!/^\d+$/.test(cursorRaw) || !Number.isSafeInteger(cursor)) {
       return c.json({ success: false, error: 'cursor は0以上の整数で指定してください' }, 400);
     }

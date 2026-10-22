@@ -12,7 +12,7 @@ import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit, listQueryNumber } from '../lib/list-paging.js';
 import { serializeTag, serializeFriendFormSubmission } from './friends-definition.js';
 import type { Context } from 'hono';
 
@@ -30,7 +30,7 @@ export const get__api_friends_id_mileage_1 = async (c: Context<Env, "/api/friend
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
-    const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+    const requestedLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(100, Math.max(1, requestedLimit))
       : 10;

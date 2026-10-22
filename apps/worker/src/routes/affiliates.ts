@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { serializeAffiliate } from './affiliate-serialization.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
@@ -626,7 +627,7 @@ affiliates.get('/api/affiliates/:id/journeys', affiliateReportPermission(), asyn
     if (!affiliate) {
       return c.json({ success: false, error: 'Affiliate not found' }, 404);
     }
-    const limitParam = Number.parseInt(c.req.query('limit') ?? '', 10);
+    const limitParam = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
     const page = await getAffiliateJourneys(c.env.DB, c.req.param('id'), {
       limit: Number.isFinite(limitParam) ? limitParam : undefined,
       beforeAt: c.req.query('beforeAt') || undefined,

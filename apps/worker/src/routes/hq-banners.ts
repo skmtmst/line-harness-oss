@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { checkMediaGate } from '../services/file-scan.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import {serializeProject,parseTextLines,parseEmphasisLines,serializeGeneration,serializeMedia,serializeImage} from './hq-banner-serializers.js';
@@ -538,7 +539,7 @@ hqBanners.get('/api/hq/banners/images', async (c) => {
       try { const cursor = JSON.parse(before); if (typeof cursor.at !== 'string' || typeof cursor.id !== 'string' || !cursor.id || !Number.isFinite(Date.parse(cursor.at))) throw new Error(); }
       catch { return c.json({ success: false, error: '読み込み位置を確認してください' }, 400); }
     }
-    const limitRaw = Number(c.req.query('limit') ?? '30');
+    const limitRaw = listQueryNumber(c.req.query('limit'), '30');
     const filter = {
       tenantId,
       delivered: delivered === undefined ? undefined : delivered === '1',
