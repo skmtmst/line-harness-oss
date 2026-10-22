@@ -1,6 +1,7 @@
 'use client'
 
 import { cloneElement, memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
 import styles from './table-body.module.css'
 
 // Window/height updates do not change an existing row's data or event handlers.
@@ -27,6 +28,8 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
 }) {
   const body = useRef<HTMLTableSectionElement>(null)
   const heights = useRef(new Map<string, number>())
+  const rowObserver = useRef<ResizeObserver | null>(null)
+  const observedRows = useRef(new Set<Element>())
   const estimate = useRef(estimatedRowHeight)
   const [window, setWindow] = useState({ start: 0, end: 20, retained: [] as number[] })
   const [revision, setRevision] = useState(0)
@@ -34,7 +37,7 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
   const virtual = items.length > threshold
   const keys = useMemo(() => items.map(itemKey), [items, itemKey])
   const offsets = useMemo(() => {
-    // ResizeObserver advances the revision when the measured-height cache changes.
+    // ResizeObserver advances the revision only when effective row offsets change.
     void revision
     const values = [0]
     for (const key of keys) values.push(values[values.length - 1] + (heights.current.get(key) ?? estimate.current))
@@ -53,30 +56,46 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
     }
   }, [virtual, items.length])
 
+  const model = useRef({ keys, offsets, length: items.length, colSpan })
+  const queueCompute = useRef<(structure?: boolean) => void>(() => {})
+
   useLayoutEffect(() => {
     if (!virtual || !body.current) return
     const element = body.current
     let frame = 0
+    let active = true
+    let structureDirty = true
+    let tableWidth: number | undefined
+    let scrollParents: HTMLElement[] = []
+    const measurementKey = {}
+    const widths = new WeakMap<Element, number>()
     const compute = () => {
-      const firstRow = element.querySelector<HTMLTableRowElement>('[data-table-index]')
-      if (firstRow) {
-        const columns = [...firstRow.cells].reduce((sum, cell) => sum + (getComputedStyle(cell).display === 'none' ? 0 : cell.colSpan), 0)
-        // A spacer spanning hidden columns creates anonymous columns and squeezes the name cell.
-        if (columns > 0) setVisibleColumns((previous) => previous === columns ? previous : columns)
+      if (!active) return () => {}
+      const { offsets, length } = model.current
+      let columns: number | undefined
+      if (structureDirty) {
+        structureDirty = false
+        const firstRow = element.querySelector<HTMLTableRowElement>('[data-table-index]')
+        if (firstRow) {
+          columns = [...firstRow.cells].reduce((sum, cell) => sum + (getComputedStyle(cell).display === 'none' ? 0 : cell.colSpan), 0)
+        }
+        scrollParents = []
+        for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+          if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY)) scrollParents.push(parent)
+        }
       }
       const rect = element.getBoundingClientRect()
+      tableWidth = rect.width
       // Capture nested main/dialog scrollers too; their viewport can be shorter than the browser.
       let top = 0
       let bottom = globalThis.window.innerHeight
-      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
-        if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY)) {
-          const box = parent.getBoundingClientRect()
-          top = Math.max(top, box.top)
-          bottom = Math.min(bottom, box.bottom)
-        }
+      for (const parent of scrollParents) {
+        const box = parent.getBoundingClientRect()
+        top = Math.max(top, box.top)
+        bottom = Math.min(bottom, box.bottom)
       }
       const find = (position: number) => {
-        let low = 0, high = items.length
+        let low = 0, high = length
         while (low < high) {
           const middle = (low + high) >>> 1
           if (offsets[middle + 1] <= position) low = middle + 1
@@ -85,56 +104,105 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
         return low
       }
       const start = Math.max(0, find(Math.max(0, top - rect.top)) - 5)
-      const end = Math.min(items.length, find(Math.max(0, bottom - rect.top)) + 6)
+      const end = Math.min(length, find(Math.max(0, bottom - rect.top)) + 6)
       const retained = new Set<number>()
       // Focus and open row menus/dialogs remain mounted, even after a jump to the far end.
       for (const row of element.querySelectorAll<HTMLElement>('[data-table-index]')) {
         if (row.contains(document.activeElement) || row.querySelector('[aria-expanded="true"], [aria-modal="true"]')) {
           const index = Number(row.dataset.tableIndex)
-          for (let i = Math.max(0, index - 1); i <= Math.min(items.length - 1, index + 1); i++) retained.add(i)
+          for (let i = Math.max(0, index - 1); i <= Math.min(length - 1, index + 1); i++) retained.add(i)
         }
       }
       const pinned = [...retained].filter((i) => i < start || i >= end).sort((a, b) => a - b)
-      setWindow((previous) => previous.start === start && previous.end === end && previous.retained.join() === pinned.join()
+      return () => {
+        if (!active) return
+        if (columns !== undefined && columns > 0) setVisibleColumns(previous => previous === columns ? previous : columns)
+        setWindow((previous) => previous.start === start && previous.end === end && previous.retained.join() === pinned.join()
         ? previous : { start, end, retained: pinned })
+      }
     }
+    const queue = (structure = false) => {
+      if (!active) return
+      structureDirty ||= structure
+      scheduleMeasurement(measurementKey, compute)
+    }
+    queueCompute.current = queue
     const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(() => { frame = 0; compute() })
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; queue() })
     }
-    compute()
+    const resize = () => { structureDirty = true; schedule() }
+    queue(true)
     globalThis.window.addEventListener('scroll', schedule, { capture: true, passive: true })
-    globalThis.window.addEventListener('resize', schedule)
+    globalThis.window.addEventListener('resize', resize)
     document.addEventListener('focusin', schedule)
     document.addEventListener('focusout', schedule)
     const observer = new ResizeObserver((entries) => {
       let changed = false
+      let geometryChanged = false
+      let widthChanged = false
+      let unusableSize = entries.length === 0
       for (const entry of entries) {
         const row = entry.target as HTMLTableRowElement
         const index = Number(row.dataset.tableIndex)
-        const height = row.getBoundingClientRect().height
-        const key = keys[index]
+        // Native RO already measured these border-box dimensions.
+        const box = entry.borderBoxSize?.[0]
+        const fallback = box ? null : row.getBoundingClientRect()
+        const height = box?.blockSize ?? fallback!.height
+        const width = box?.inlineSize ?? fallback!.width
+        const previousWidth = widths.get(row) ?? tableWidth
+        widths.set(row, width)
+        if (previousWidth !== width) { structureDirty = true; widthChanged = true }
+        unusableSize ||= height <= 0 || width <= 0
+        const key = model.current.keys[index]
         if (key !== undefined && height > 0 && heights.current.get(key) !== height) {
+          geometryChanged ||= (heights.current.get(key) ?? estimate.current) !== height
           heights.current.set(key, height)
           changed = true
         }
       }
       if (changed) {
         // Use the measured first row for unseen rows, while keeping measured variable heights.
-        estimate.current = heights.current.get(keys[0]) ?? estimate.current
-        setRevision((value) => value + 1)
+        const nextEstimate = heights.current.get(model.current.keys[0]) ?? estimate.current
+        geometryChanged ||= nextEstimate !== estimate.current
+        estimate.current = nextEstimate
+        if (geometryChanged) setRevision((value) => value + 1)
       }
-      schedule()
+      // Newly mounted, estimate-equal rows preserve the computed viewport and offsets.
+      // Keep zero/unknown sizes conservative and remeasure actual geometry or column changes.
+      if (geometryChanged || widthChanged || structureDirty || unusableSize) schedule()
     })
-    for (const row of element.querySelectorAll('[data-table-index]')) observer.observe(row)
+    rowObserver.current = observer
     return () => {
+      active = false
+      queueCompute.current = () => {}
+      cancelMeasurement(measurementKey)
       if (frame) cancelAnimationFrame(frame)
       observer.disconnect()
+      rowObserver.current = null
+      observedRows.current.clear()
       globalThis.window.removeEventListener('scroll', schedule, { capture: true })
-      globalThis.window.removeEventListener('resize', schedule)
+      globalThis.window.removeEventListener('resize', resize)
       document.removeEventListener('focusin', schedule)
       document.removeEventListener('focusout', schedule)
     }
-  }, [virtual, items.length, keys, offsets, window.start, window.end, window.retained, colSpan])
+  }, [virtual])
+
+  useLayoutEffect(() => {
+    const structure = model.current.keys !== keys || model.current.colSpan !== colSpan
+    model.current = { keys, offsets, length: items.length, colSpan }
+    queueCompute.current(structure)
+  }, [keys, offsets, items.length, colSpan])
+
+  // A scroll only changes which rows are mounted. Keep listeners and the observer
+  // alive, and subscribe just the entering rows before the browser measures them.
+  useLayoutEffect(() => {
+    const observer = rowObserver.current
+    if (!observer || !body.current) return
+    const mounted = new Set(body.current.querySelectorAll('[data-table-index]'))
+    for (const row of observedRows.current) if (!mounted.has(row)) observer.unobserve(row)
+    for (const row of mounted) if (!observedRows.current.has(row)) observer.observe(row)
+    observedRows.current = mounted
+  })
 
   // Drop measurements for records that have gone away; page/account changes cannot grow this cache.
   useLayoutEffect(() => {

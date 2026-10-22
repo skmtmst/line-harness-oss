@@ -122,3 +122,6 @@ html:root .table[data-table-presentation='metrics'] .row > * + * { padding-inlin
 html:root .table[data-table-presentation='metrics'] .row > :last-child { padding-inline-end: var(--grid-table-row-padding); }
 html:root .table[data-table-presentation='metrics'] .row[data-head] > :first-child { border-start-start-radius: var(--radius-control); border-end-start-radius: var(--radius-control); }
 html:root .table[data-table-presentation='metrics'] .row[data-head] > :last-child { border-start-end-radius: var(--radius-control); border-end-end-radius: var(--radius-control); }
+
+html:root .cell[data-list-action-cell] { display: flex; align-items: center; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }
+html:root .cell[data-tone='danger'] { color: var(--color-danger); }

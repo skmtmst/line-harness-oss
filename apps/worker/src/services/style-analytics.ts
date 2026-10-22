@@ -2,7 +2,7 @@ import { withDisplayReadCache } from '@line-crm/db/src/display-read-cache.js';
 import { restaurantCivilTime } from './restaurant-booking.js';
 import { styleDashboardSidebar } from './style-dashboard-sidebar.js';
 import { StyleError } from './style-setup.js';
-import type { IndustryStyle, StyleSnapshot } from '@line-crm/shared';
+import type { IndustryStyle, StyleSnapshot, StyleAnalyticsData } from '@line-crm/shared';
 
 export * from './style-analytics-core.js';
 export { styleRows } from './style-booking-rows.js';
@@ -59,7 +59,7 @@ export async function styleSnapshot(
 ): Promise<
   StyleSnapshot & {
     people: ReturnType<typeof personMetrics>['people'];
-    analytics: Record<string, unknown>;
+    analytics: StyleAnalyticsData;
   }
 > {
   // Audience snapshots retain live inputs. Only the display-only calculations
@@ -151,7 +151,7 @@ export async function styleSnapshot(
     ).length,
     '予約が入った日が期間内の予約',
   );
-  const analytics: Record<string, unknown> = {
+  const analytics: StyleAnalyticsData = {
     dailyComparison: {
       current: daily(from, to),
       previous: daily(previousFrom, previousTo),

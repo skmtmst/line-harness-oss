@@ -100,7 +100,87 @@ async function render(node: React.ReactNode) {
 
 const buttons = () => [...document.querySelectorAll('button, a')] as HTMLElement[]
 
+function unmatchedFixture(resolveStatus = 200) {
+  const base = globalThis.fetch
+  const resolutions: unknown[] = [], limits: string[] = []
+  const rows = ['candidate', 'ambiguous', 'unmatched'].map((kind, index) => ({
+    id: `unmatched-${index}`, kind, status: 'pending', receivedAt: '2026-10-21T01:02:00Z',
+    identityAttempts: [{ kind: 'verified_email', path: '$.email', value: `very-long-incoming-address-${index}@example.invalid` }],
+    candidates: kind === 'unmatched' ? [] : [
+      { friendId: 'friend-1', displayName: '候補の長い名前その一' },
+      ...(kind === 'ambiguous' ? [{ friendId: 'friend-2', displayName: '候補の長い名前その二' }] : []),
+    ],
+    maskedShape: null, resolvedFriendId: null, resolvedAt: null,
+  }))
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/api/webhooks/unmatched/') && init?.method === 'POST') {
+      resolutions.push({ url, body: JSON.parse(String(init.body)) })
+      return resolveStatus === 403 ? json({ success: false, error: 'forbidden' }, 403) : json({ success: true, data: { id: 'unmatched-1', status: 'resolved' } })
+    }
+    if (url.includes('/incoming/in-1/unmatched')) {
+      limits.push(new URL(url).searchParams.get('limit') || '')
+      return json({ success: true, data: rows, total: 51 })
+    }
+    const response = await base(input, init)
+    if (/\/incoming\/in-1\?/.test(url)) {
+      const body = await response.json()
+      body.data.pendingUnmatched = 51
+      body.data.identityMatching.onNotFound = 'unmatched_box'
+      return json(body)
+    }
+    return response
+  })
+  return { resolutions, limits }
+}
+
 describe('外部連携 V8', () => {
+  it('届物は値に余り幅を渡し、複数候補の各結び付けと追加読み込みを保つ', async () => {
+    const fixture = unmatchedFixture()
+    await render(<WebhooksIncomingV8 />)
+    const table = within(host).getByRole('table', { name: '人が見つからなかった届物' })
+    const row = table.querySelector('[data-row-id="unmatched-1"]') as HTMLElement
+    expect(row.children[1].hasAttribute('data-cell-grow')).toBe(true)
+    expect(row.lastElementChild?.hasAttribute('data-list-action-cell')).toBe(true)
+    expect(row.lastElementChild?.hasAttribute('data-cell-grow')).toBe(false)
+    expect(row.querySelector('[title="very-long-incoming-address-1@example.invalid"]')).not.toBeNull()
+    const candidates = within(row).getAllByRole('button', { name: 'この人に結び付ける' })
+    expect(candidates).toHaveLength(2)
+    await act(async () => candidates[1].click())
+    expect(fixture.resolutions).toContainEqual(expect.objectContaining({ body: { action: 'link', friendId: 'friend-2' } }))
+    await act(async () => within(host).getByRole('button', { name: 'さらに表示' }).click())
+    expect(fixture.limits).toContain('50')
+    expect(fixture.limits).toContain('100')
+  })
+
+  it('届物の403は該当行に紐づく全幅のエラーで表示し、操作列を押し広げない', async () => {
+    const fixture = unmatchedFixture(403)
+    await render(<WebhooksIncomingV8 />)
+    const row = host.querySelector('[data-row-id="unmatched-0"]') as HTMLElement
+    await act(async () => within(row).getByRole('button', { name: '結び付ける' }).click())
+    expect(fixture.resolutions).toHaveLength(1)
+    const notice = host.querySelector('#wh-unmatched-error-unmatched-0')!
+    expect(notice.getAttribute('role')).toBe('alert')
+    expect(notice.closest('td')?.getAttribute('colspan')).toBe('4')
+    expect(row.getAttribute('aria-describedby')).toBe(notice.id)
+    expect(row.querySelector('[role="alert"]')).toBeNull()
+    expect(within(row).getByRole('button', { name: '結び付ける' }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('届物があっても閲覧のみでは結び付けを出さず、見本の省略文字は全文を残す', async () => {
+    role = 'staff'
+    const fixture = unmatchedFixture()
+    await render(<WebhooksIncomingV8 />)
+    expect(within(host).queryByRole('button', { name: '結び付ける' })).toBeNull()
+    expect(within(host).queryByRole('button', { name: 'この人に結び付ける' })).toBeNull()
+    expect(fixture.resolutions).toHaveLength(0)
+    act(() => root.unmount()); root = createRoot(host)
+    await render(<WebhooksSamplesV8 />)
+    for (const text of ['LINE公式アカウント', '予約ID・メニュー・担当', '注文番号・金額・お客様名']) {
+      expect([...host.querySelectorAll('[data-truncated-text]')].some(node => node.getAttribute('title') === text && node.textContent === text)).toBe(true)
+    }
+  })
+
   it('やり取りの記録は1ページでも件数とページ送りを同じ帯に出す', async () => {
     await render(<WebhooksInteractionsV8 />)
     const pager = within(host).getByRole('navigation', { name: 'やり取りの記録のページ送り' })

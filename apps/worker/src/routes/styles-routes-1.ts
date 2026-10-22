@@ -5,6 +5,7 @@ import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import {
   paymentBadges,
   paymentSummary,
+  paymentSummaryInWindow,
 } from '../features/booking/booking-payment-admin/index.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
@@ -57,6 +58,7 @@ styles.get(base, async (c) => {
     data: {
       style,
       styleSelected: !!p?.selected_at && p.selection_mode === 'configured',
+      metricsCustomized: p?.metrics_json != null,
       shouldPromptStyleSelection: hasPendingStyleSelection(p),
       styleMode: p?.selection_mode ?? 'later',
       version: p?.version ?? 0,
@@ -196,6 +198,7 @@ styles.put(base + '/cards', async (c) => {
     success: true,
     data: {
       ...dashboardPresentation(p.style, cards, metrics),
+      metricsCustomized: metrics !== null,
       version: p.version + 1,
     },
   });
@@ -218,6 +221,7 @@ styles.delete(base + '/cards', async (c) => {
     success: true,
     data: {
       ...dashboardPresentation(p.style, defaultCards(p.style), null),
+      metricsCustomized: false,
       version: p.version + 1,
     },
   });
@@ -351,7 +355,9 @@ for (const path of [
     const payments = hasStaffPermission(c, '/booking/bookings')
       ? {
           status: 'available',
-          ...(await paymentSummary(c.env.DB, id, new Date(), 'today', staffId)),
+          ...(path === '/analytics'
+            ? { ...(await paymentSummaryInWindow(c.env.DB, id, data, staffId)), period: { from: data.from, to: data.to, timeZone: data.timeZone, dateBasis: 'payment' } }
+            : await paymentSummary(c.env.DB, id, new Date(), 'today', staffId)),
           source: '/api/booking/admin/payments',
         }
       : { status: 'forbidden' };

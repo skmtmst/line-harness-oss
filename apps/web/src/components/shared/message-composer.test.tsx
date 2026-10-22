@@ -32,6 +32,17 @@ describe('共通メッセージ composer', () => {
     expect(screen.queryByText('商品A')).toBeNull(); expect(screen.getByText('カードを作ると表示されます')).toBeTruthy()
   })
 
+  it('作成済みカルーセルの縮小見本は省略しても元のタイトルを確認でき、編集するカードを保つ', () => {
+    const title = 'お試しセットを初めて購入する方へのご案内'
+    const onCompose = vi.fn()
+    render(<Composer bubbles={[{ id: 'carousel-1', type: 'carousel', content: { templateName: '秋の商品', columnsJson: JSON.stringify([{ title, thumbnailImageUrl: 'https://example.test/image.png' }]), inline: true } }]} accountId={null} onChange={() => {}} onMove={() => {}} onDelete={() => {}} onAdd={() => {}} onPickTemplate={() => {}} onSaveTemplate={() => {}} onCompose={onCompose} />)
+    const text = screen.getByTitle(title)
+    expect(text.hasAttribute('data-truncated-text')).toBe(true)
+    expect(text.textContent).toBe(title)
+    fireEvent.click(screen.getByRole('button', { name: '開いて直す' }))
+    expect(onCompose).toHaveBeenCalledWith(0, 'carousel')
+  })
+
   it('上下移動・削除で本文と吹き出しの組を保ち、最後の1通は残す', () => {
     render(<Harness />)
     fireEvent.click(screen.getByRole('button', { name: '1通目を下へ移動' }))

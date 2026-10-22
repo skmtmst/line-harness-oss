@@ -429,16 +429,6 @@ it('畳んだ右欄は共通の窓で見え方を読め、保存せずに閉じ�
   expect(templatesApi.update).not.toHaveBeenCalled()
 })
 
-it('リサーチの回答後の処理は未動作と知らせ、設定は保存する', async () => {
-  assetsCreate.mockResolvedValue({success:true,data:{id:'research'}})
-  await mount('kind=research&visual=1')
-  expect(host.textContent).toContain('まだ動きません')
-  expect(host.textContent).toContain('設定は保存できます')
-  fireEvent.click(screen.getByRole('button',{name:'保存して公開'}))
-  await flush()
-  expect(assetsCreate).toHaveBeenCalledWith(expect.objectContaining({kind:'research',payload:expect.objectContaining({answerActions:[]})}))
-})
-
 it('リサーチ（EsYo4）：選択肢は札の並び。札を押すとその選択肢の「行うこと」が出て、届き方はお客さまが答える画面', async () => {
   await mount('kind=research&visual=1')
   // 問1 は「止めたい」に点数が入っているので、その行うことが出ている。

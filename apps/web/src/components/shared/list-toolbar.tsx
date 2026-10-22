@@ -8,7 +8,7 @@ import SearchField from './search-field'
 import FilterChip from './filter-chip'
 import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
-import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth } from './list-toolbar-fit.mjs'
+import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth, fitToolbarOverflowPanel, observeToolbarContent } from './list-toolbar-fit.mjs'
 
 function useToolbarFit() {
   const ref = useRef<HTMLDivElement>(null)
@@ -45,6 +45,11 @@ function useToolbarFit() {
 /** 一覧型が狭い板の「作る・フォルダ」を検索と同じ段へ渡す。 */
 const LeadingContext = createContext<{ leading: ReactNode; persistent?: boolean; trailingAccessory?: ReactNode }>({ leading: null })
 const FrameContext = createContext(false)
+/** 画面幅で切り替える包みの中にも道具があれば、枠と操作を重ねて作らない。 */
+function containsToolbarLayout(nodes: ReactNode): boolean {
+  return Children.toArray(nodes).some(node => isValidElement<{ children?: ReactNode }>(node)
+    && (node.type === ListToolbar || node.type === ListToolbarFrame || containsToolbarLayout(node.props.children)))
+}
 export function ListToolbarLeading({ children, leading, persistent, accessory, trailingAccessory }: { children: ReactNode; leading: ReactNode; persistent?: boolean; accessory?: ReactNode; trailingAccessory?: ReactNode }) {
   // 旧い断片の道具も、型の口で役目をそろえる。フォームのRowはそのまま保つ。
   const flatten = (items: ReactNode, prefix = ''): ReactNode[] => Children.toArray(items).flatMap((node, index) => {
@@ -52,13 +57,11 @@ export function ListToolbarLeading({ children, leading, persistent, accessory, t
     const key = `${prefix}${node.key ?? index}`
     return node.type === Fragment ? flatten(node.props.children, `${key}/`) : [cloneElement(node, { key })]
   })
-  const nodes = isValidElement<{ children?: ReactNode }>(children) && children.type === Fragment ? flatten(children.props.children) : null
-  const containsLayout = (items: ReactNode[]): boolean => items.some(node => isValidElement<{ children?: ReactNode }>(node)
-    && (node.type === ListToolbar || node.type === ListToolbarFrame || node.type === Fragment && containsLayout(Children.toArray(node.props.children))))
+  const nodes = flatten(children)
   const containsTool = (node: ReactNode): boolean => isValidElement<{ children?: ReactNode }>(node)
     && ([ListToolbarRow, ListToolbarSearchSlot, SearchField, Select, PageSizeSelect].includes(node.type as typeof ListToolbarRow)
       || Children.toArray(node.props.children).some(containsTool))
-  const needsFrame = nodes && nodes.some(containsTool) && !containsLayout(nodes)
+  const needsFrame = nodes.some(containsTool) && !containsToolbarLayout(nodes)
   // 案内文は道具より前の段。作る・フォルダ・検索の間に挟まない。
   const notices = needsFrame ? nodes.filter(node => isValidElement(node) && node.type === 'p') : []
   const tools = needsFrame ? <>{notices}<ListToolbarFrame>{[...nodes.filter(node => !notices.includes(node)), accessory].map((node, index) => {
@@ -168,9 +171,7 @@ export default function ListToolbar({
 export function ListToolbarFrame({ children, layout = 'band', singleRow = false, ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked'; /** 狭い板でも道具を 1 行に並べる（検索は縮み、折り返さない）。既定は狭い板で 2 段。 */ singleRow?: boolean }) {
   const ref = useToolbarFit()
   const { leading, persistent } = useContext(LeadingContext)
-  const containsToolbar = (nodes: ReactNode): boolean => Children.toArray(nodes).some(node => isValidElement<{ children?: ReactNode }>(node)
-    && (node.type === ListToolbar || node.props.children && containsToolbar(node.props.children)))
-  const ownsLeading = !containsToolbar(children)
+  const ownsLeading = !containsToolbarLayout(children)
   return <FrameContext.Provider value><div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'} data-toolbar-single-row={singleRow || undefined}>
     {ownsLeading && leading ? <span className={styles.leading} data-toolbar-leading data-toolbar-persistent={persistent || undefined}>{leading}</span> : null}
     {ownsLeading ? <span className={styles.rowBreak} aria-hidden="true" /> : null}{children}
@@ -241,6 +242,8 @@ function InlineOptional({ children }: { children: ReactNode }) {
 
 function OverflowTools({ children, label }: { children: ReactNode; label: string }) {
   const ref = useRef<HTMLDetailsElement>(null), expandedWidth = useRef(0)
+  const contentObserver = useRef<ReturnType<typeof observeToolbarContent> | null>(null)
+  const measuredChildren = useRef(children)
   const [collapsed, setCollapsed] = useState(false)
   useLayoutEffect(() => {
     const item = ref.current
@@ -250,16 +253,17 @@ function OverflowTools({ children, label }: { children: ReactNode; label: string
     const toolbar = flat ? owner : row ?? owner
     if (!item || !toolbar || !window.ResizeObserver) return
     const measure = () => {
+      if (!item.isConnected) return
+      if (item.hasAttribute('data-collapsed') && item.open) fitToolbarOverflowPanel(item, toolbar)
       if (!item.hasAttribute('data-collapsed')) expandedWidth.current = fitToolbarOptionalWidth(item)
       setCollapsed(!toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100)).fits)
     }
-    let frame = 0
-    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
-    const observer = new ResizeObserver(queue)
-    observer.observe(toolbar)
-    for (const tool of toolbar.querySelectorAll('button,input')) observer.observe(tool)
-    measure(); void document.fonts?.ready.then(measure)
-    return () => { cancelAnimationFrame(frame); observer.disconnect() }
+    const observer = observeToolbarContent(item, () => [toolbar, ...toolbar.querySelectorAll('button,input')], measure, true)
+    contentObserver.current = observer
+    return () => { contentObserver.current = null; observer.stop() }
+  }, [])
+  useLayoutEffect(() => {
+    if (measuredChildren.current !== children) { measuredChildren.current = children; contentObserver.current?.refresh() }
   }, [children])
   return <details ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional data-toolbar-overflow-group data-collapsed={collapsed || undefined} open={collapsed ? undefined : true}
     onKeyDown={event => { if (event.key === 'Escape' && collapsed) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}>
@@ -313,6 +317,8 @@ function compactFilterGroups(node: ReactNode, preserveChips = false): ReactNode 
 export function ResponsiveFilterChips({ children, label = '状態', preserveChips = false }: { children: ReactNode; label?: string; preserveChips?: boolean }) {
   const ref = useRef<HTMLSpanElement>(null)
   const unfoldedWidth = useRef(0)
+  const contentObserver = useRef<ReturnType<typeof observeToolbarContent> | null>(null)
+  const measuredChildren = useRef(children)
   const [collapsed, setCollapsed] = useState(false)
   useLayoutEffect(() => {
     const choices = ref.current
@@ -324,17 +330,17 @@ export function ResponsiveFilterChips({ children, label = '状態', preserveChip
     const measure = () => {
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
-      choices.dataset.filterWidth = String(unfoldedWidth.current)
+      const width = String(unfoldedWidth.current)
+      if (choices.dataset.filterWidth !== width) choices.dataset.filterWidth = width
       setCollapsed(!toolbarContentFit(toolbar, null, 0, true, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100)).fits)
     }
-    let frame = 0
-    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
-    const observer = new ResizeObserver(queue)
-    observer.observe(toolbar); observer.observe(choices)
-    measure()
-    void document.fonts?.ready.then(measure)
-    return () => { cancelAnimationFrame(frame); observer.disconnect() }
-  }, [children, preserveChips])
+    const observer = observeToolbarContent(choices, () => [toolbar, choices], measure)
+    contentObserver.current = observer
+    return () => { contentObserver.current = null; observer.stop() }
+  }, [preserveChips])
+  useLayoutEffect(() => {
+    if (measuredChildren.current !== children) { measuredChildren.current = children; contentObserver.current?.refresh() }
+  }, [children])
   const chips = Children.toArray(children).filter(isValidElement<React.ComponentProps<typeof FilterChip>>)
   const text = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<{ children?: ReactNode }>(child) ? text(child.props.children) : String(child)).join('')
   const selected = chips.map((child,index) => child.props.selected ? index : -1).filter(index => index >= 0)

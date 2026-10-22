@@ -2,11 +2,11 @@
 
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
-import StickyBar from '@/components/shared/sticky-bar'
+import { PageFrame, PageFooter } from '@/components/templates/page-frame'
 import TruncatedText from '@/components/shared/truncated-text'
 import { RowMenu } from '@/components/shared/row-actions'
 import { ActionCell, DataTable, RowNameButton, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -29,7 +29,7 @@ import styles from './tables.module.css'
 const SEAT_TYPE_LABEL: Record<string, string> = { table: 'テーブル', counter: 'カウンター', private_room: '個室', terrace: 'テラス' }
 const TABLE_LAYOUT = { headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--polish-space-section)', bodyTextSize: 'var(--polish-text-body)', collapseScope: 'page' as const }
 
-export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8Context; canEdit: boolean }) {
+export default function TablesAssignBoard({ ctx, canEdit, heading, notice }: { ctx: RestaurantV8Context; canEdit: boolean; heading?: ReactNode; notice?: ReactNode }) {
   const { data, store } = ctx
   const { selectedAccountId } = useAccount()
   const assignment = useAssignment(selectedAccountId && store ? { kind: 'tables', accountId: selectedAccountId, storeId: store.id } : null)
@@ -42,7 +42,11 @@ export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8C
   const todayCount = (id: string) => data.reservations.filter((item) => item.table_id === id && jstDate(new Date(item.starts_at)) === today && !['cancelled', 'no_show', 'rejected'].includes(item.status)).length
 
   return (
-    <div className={styles.assignStack}>
+    <PageFrame kind="restaurant" standalone boardId="jmVYJ" hasFooter={canEdit}>
+      {heading}
+      <div data-template-region="body">
+      <div className={styles.assignStack}>
+      {notice}
       <FormLeaveGuard dirty={assignment.dirty} busy={assignment.saving} />
       <AssignmentSection state={assignment} kind="tables" canEdit={canEdit} />
       <Card overflow="hidden">
@@ -66,8 +70,10 @@ export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8C
           })}</tbody>
         </DataTable>
       </Card>
+      </div>
+      </div>
       {canEdit ? (
-        <StickyBar actions={<>
+        <PageFooter actions={<>
           <Button onClick={assignment.reset} disabled={assignment.saving}>キャンセル</Button>
           <Button variant="primary" busy={assignment.saving} onClick={() => { if (!assignment.dirty) { notifyToast('変更はありません。'); return } if (assignment.status === 'not-ready') { preparing.open('卓の割り当て方の保存'); return } void assignment.save(order) }}><Check size={15} aria-hidden="true" />保存する</Button>
         </>} />
@@ -76,6 +82,6 @@ export default function TablesAssignBoard({ ctx, canEdit }: { ctx: RestaurantV8C
       <AssignmentRowDialog open={target !== null} name={target ? `卓 ${target.code}` : ''} unit="組" value={target ? assignment.resources[target.id] : undefined}
         onClose={() => setTarget(null)} onApply={(patch) => { if (target) assignment.setResource(target.id, patch) }} />
       <AssignmentConflict state={assignment} unit="組" order={order} subject="卓の割り当て方" names={Object.fromEntries(rows.map((table) => [table.id, `卓 ${table.code}`]))} />
-    </div>
+    </PageFrame>
   )
 }

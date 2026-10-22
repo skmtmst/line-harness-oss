@@ -120,7 +120,7 @@ export default function ShipmentPanel({
         title="出荷予定"
         /* 今日・明日以降の予定を、最後に取れた時刻と一緒に示す（IDEA-01）。 */
         meta={dashboardLocalUpdatedAt(fetchedAt) ?? undefined}
-        action={<Link href="/ec-commerce" className="hover:underline">すべて見る →</Link>}
+        action={<Link href="/ec-commerce" prefetch={false} className="hover:underline">すべて見る →</Link>}
         actionTone="info"
       />
       <div className="px-[18px] pb-[18px]">
@@ -198,7 +198,7 @@ export default function ShipmentPanel({
                         </Td>
                         <Td className="text-ink whitespace-nowrap">
                           {row.friendId ? (
-                            <Link href={`/chats?friend=${row.friendId}`} className="hover:underline">
+                            <Link href={`/chats?friend=${row.friendId}`} prefetch={false} className="hover:underline">
                               {row.friendName ?? '名前未設定'}
                             </Link>
                           ) : (

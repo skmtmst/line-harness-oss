@@ -137,6 +137,8 @@ export const identityMethods = {
         uniquePeople: number;
         friendDups: number;
         duplicateGroups: number;
+        // Older Worker responses may omit this; null means unavailable, not zero.
+        overlappingDeliveryCount?: number | null;
         wastedPerBroadcastYen: number;
         msgUnitYen: number;
         perAccount: Array<{

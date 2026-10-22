@@ -9,7 +9,7 @@ import { TextInput, ChoiceInput, FieldLabel, FieldCount } from '../components/fo
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import liff from '../lib/liff-runtime.js';
-import { PREFECTURES, collectInputs, isOtherFreeText, formChoiceIsSelected, nextSectionIndex, normalizeBookingValue, normalizeFormTheme, normalizeRatingValue, validateAnswer, type FormAvailability, type FormBlock, type FormBookingValue, type FormInputBlock, type FormLayout } from '@line-crm/shared';
+import { PREFECTURES, collectInputs, formFileKinds, isOtherFreeText, formChoiceIsSelected, nextSectionIndex, normalizeBookingValue, normalizeFormTheme, normalizeRatingValue, validateAnswer, type FormAvailability, type FormBlock, type FormBookingValue, type FormInputBlock, type FormLayout } from '@line-crm/shared';
 import { submitButtonText } from '../lib/form-button-text.js';
 import { api, type MenuItem, type PublicForm, type RoutedTarget, type StaffItem } from '../lib/api.js';
 import Stepper from '../components/ui/Stepper.js';
@@ -291,6 +291,7 @@ export default function Form() {
       if (!layout) return;
       const block = collectInputs(layout).find(b => b.name === name);
       if (!block) return;
+      if (formFileKinds(block).includes('identity')) { setError('本人確認書類は受け付けていません。店舗にお問い合わせください。'); return; }
       const res = await api.uploadFormFile(id, file, testToken ?? undefined, block.id, side);
       if (res.data.file) {
         const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
@@ -316,7 +317,12 @@ export default function Form() {
     const errors: Record<string, string> = {};
     for (const block of visibleInputs) {
       if (block.name in errors) continue;
-      const message = validateAnswer(block, answers[block.name]);
+      const value = answers[block.name];
+      const unavailable = block.type === 'file' && formFileKinds(block).includes('identity');
+      const hasFile = Array.isArray(value) ? value.length > 0 : !!value;
+      const message = unavailable && (block.required || hasFile)
+        ? '本人確認書類は受け付けていません。店舗にお問い合わせください。'
+        : validateAnswer(block, value);
       if (message) errors[block.name] = message;
       const picked = block.type === 'booking' ? normalizeBookingValue(answers[block.name]) : null;
       if (style === 'consult' && picked && picked.kind !== 'seats' && !formMeetingMode(answers[block.name])) {
@@ -1285,7 +1291,7 @@ function BlockView({
               files={Array.isArray(value) ? value as import('@line-crm/shared').FormFileAnswer[] : []}
               uploading={uploading} onUpload={(file, side) => onUpload(block.name, file, side)}
               onRemove={fileId => { const next = (Array.isArray(value) ? value : []).filter(v => v.fileId !== fileId); const removed = (Array.isArray(value) ? value : []).find(v => v.fileId === fileId); if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl); onChange(block.name, next); }} />
-            {!Array.isArray(value) && text && (
+            {!formFileKinds(block).includes('identity') && !Array.isArray(value) && text && (
               <div className="mt-2">
                 <img src={text} alt="送った画像" className="max-h-40 rounded-lg" />
                 <Button variant="text" className="mt-1"

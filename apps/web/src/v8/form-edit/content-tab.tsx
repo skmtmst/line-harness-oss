@@ -472,7 +472,7 @@ function BookingFields({ block, refs, set, portable = false }: { block: FormInpu
   const days = booking?.daysAhead ?? 14
   const menuOptions = useMemo(() => menus.map((menu) => ({ ...menu, name: `${menu.name}・${menu.durationMinutes}分` })), [menus])
   const setBooking = (next: Partial<NonNullable<FormInputBlock['booking']>>) =>
-    set({ booking: { menuId: booking?.menuId ?? '', staffId: booking?.staffId ?? null, daysAhead: days, ...next } })
+    set({ booking: { ...booking, menuId: booking?.menuId ?? '', staffId: booking?.staffId ?? null, daysAhead: days, ...next } })
   return (
     <>
       <div className={styles.bookingRow}>
@@ -512,14 +512,14 @@ function BookingFields({ block, refs, set, portable = false }: { block: FormInpu
           /></SaveErrorField>
         </Labeled>
       </div>
-      {/* 絵の2つのつまみ（メニューを選んでもらう・未承認で入れる）は保存する口がまだ無い。今の決まりを文で出す。 */}
+      {/* 保存済みの決まりを案内する。切替を足す場合は回答側の選択画面も合わせる。 */}
       <p className={styles.bookingRule}>
         <span>メニューを選んでもらう</span>
         <span className={styles.bookingRuleValue}>上のメニューで決まり</span>
       </p>
       <p className={styles.bookingRule}>
         <span>予約は「未承認」で入れて、店が承認する</span>
-        <span className={styles.bookingRuleValue}>予約の設定どおり</span>
+        <span className={styles.bookingRuleValue}>{booking?.requireApproval === true ? '店が承認します' : '予約の設定どおり'}</span>
       </p>
       <div className={styles.bookingInfo}>
         <CalendarCheck size={16} aria-hidden="true" className={styles.bookingInfoIcon} />

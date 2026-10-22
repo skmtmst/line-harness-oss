@@ -8,6 +8,7 @@ export type DashboardRange = 'today' | 'week' | 'month'
 export type Tone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
 
 export interface StyleKpi {
+  metricId?: string
   id: string
   title: string
   value: number | null
@@ -102,7 +103,7 @@ export interface StyleWeek {
   to: string
   days: StyleWeekDay[]
   entries: { id: string; day: string; start: string; end: string; title: string; name: string }[]
-  free: { day: string; start: string; end: string }[]
+  free: { day: string; start: string; end: string; bookingDay?: string; bookingStart?: string }[]
 }
 export interface StyleMonthDay { date: string; day: string; inMonth: boolean; closed?: boolean; groups?: number; people?: number; empty?: boolean; mark?: StyleBadge | null; today?: boolean }
 export interface StyleMonth {
@@ -117,7 +118,7 @@ export interface StyleRoster {
   title: string
   pay: StyleBadge
   meta: string
-  members: { name: string; sub: string; pay: StyleBadge; attend: 'done' | 'absent' | 'button' | 'cancel'; bookingId?: string; eventId?: string }[]
+  members: { name: string; sub: string; pay: StyleBadge; attend: 'done' | 'absent' | 'button' | 'cancel' | 'unavailable'; bookingId?: string; eventId?: string }[]
   /** 回が始まったか（［欠席］はこの後だけ）。 */
   started?: boolean
   more: string
@@ -145,14 +146,15 @@ export interface StyleAnalytics {
   tabs: { id: string; label: string }[]
   tab: string
   cards: { id: string; title: string; valueText: string; unit?: string; delta?: { text: string; tone: 'up' | 'down' } | null; help: string }[]
-  chart: { title: string; help: string; ticks: string[]; axis: string[]; points: { label: string; now: number; prev: number }[]; max: number }
-  table: { title: string; help: string; link?: { label: string; href: string } | null; columns: { label: string; align?: 'right' }[]; rows: { id: string; name: string; sub: string; cells: StyleAnalyticsCell[] }[]; note?: string }
+  chart: { title: string; help: string; ticks: string[]; axis: string[]; points: { label: string; now: number | null; prev: number | null; previousLabel?: string }[]; max: number; emptyMessage?: string } | null
+  table: { title: string; help: string; link?: { label: string; href: string } | null; columns: { label: string; align?: 'right' }[]; rows: { id: string; name: string; sub: string; cells: StyleAnalyticsCell[] }[]; note?: string } | null
+  availability?: { kind: 'forbidden' | 'unavailable' | 'unmeasured'; description: string }
   side: (StyleSideCard & { bars?: { label: string; value: string; ratio: number }[]; split?: { ratio: number }; note?: string })[]
 }
 
 export interface StyleLayoutItem { id: string; label: string; on: boolean; locked?: boolean }
 /** ［表示を変える］の中身。口の cards（id・visible、配列の順が上から下）と版を画面の言葉で持つ。 */
-export interface StyleLayout { base: string; changed: number; version: number; cards: StyleLayoutItem[] }
+export interface StyleLayout { base: string; changed: number; version: number; cards: StyleLayoutItem[]; metricIds?: string[]; metricsCustomized?: boolean }
 
 export interface StyleClosureInput {
   date: string

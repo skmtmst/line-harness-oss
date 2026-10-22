@@ -38,6 +38,7 @@ import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel';
@@ -1008,7 +1009,7 @@ export default function RichMenusListV8() {
     <>
       <span className="sr-only" role="status" aria-live="polite">{moveNotice}</span>
       <div className={styles.tableWrap} aria-busy={loading || undefined}>
-        <DataTable>
+        <DataTable columnSizing="controls">
           {tableCols}
           {tableHead}
           <tbody ref={bodyRef}>
@@ -1089,15 +1090,9 @@ export default function RichMenusListV8() {
                   </Td>
                   <Td>
                     {g.publishingAt ? (
-                      <span className={`${styles.pill} ${styles.pillScheduled}`}>
-                        <span className={styles.pillDot} aria-hidden="true" />
-                        {`${shortDay(g.publishingAt)} 公開`}
-                      </span>
+                      <StatusBadge tone="info" size="compact">{`${shortDay(g.publishingAt)} 公開`}</StatusBadge>
                     ) : (
-                      <span className={`${styles.pill} ${g.status === 'published' ? styles.pillLive : styles.pillDraft}`}>
-                        <span className={styles.pillDot} aria-hidden="true" />
-                        {g.status === 'published' ? '公開中' : '下書き'}
-                      </span>
+                      <StatusBadge tone={g.status === 'published' ? 'success' : 'neutral'} size="compact">{g.status === 'published' ? '公開中' : '下書き'}</StatusBadge>
                     )}
                   </Td>
                   <Td

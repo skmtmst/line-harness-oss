@@ -1,22 +1,43 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { FormFileControl } from './controls'
 afterEach(cleanup)
 describe('書類の入力', () => {
-  it('写真は表・裏で選び、PDFはファイルだけを選ぶ', () => {
+  it.each([
+    { kind: 'identity' as const, bothSides: true },
+    { kind: 'identity' as const, bothSides: false },
+    { kinds: ['image', 'pdf', 'identity'] as ('image' | 'pdf' | 'identity')[], bothSides: true },
+  ])('過去の本人確認設定は新規受付・撮影・選び直しを出さない（%j）', props => {
+    const upload = vi.fn(), remove = vi.fn()
+    const { container, rerender } = render(<FormFileControl label="本人確認" {...props} onUpload={upload} onRemove={remove} />)
+    expect(screen.getByRole('alert').textContent).toContain('本人確認書類は受け付けていません')
+    expect(container.querySelector('input[type=file]')).toBeNull()
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    rerender(<FormFileControl label="本人確認" {...props} files={[
+      { fileId: 'front', kind: 'identity', side: 'front', filename: 'private-front.png', state: 'ready' },
+      { fileId: 'back', kind: 'identity', side: 'back', filename: 'private-back.png', state: 'pending' },
+    ]} onUpload={upload} onRemove={remove} />)
+    expect(screen.getByRole('alert').textContent).toContain('店舗にお問い合わせください')
+    expect(container.querySelector('input[type=file]')).toBeNull()
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    expect(container.textContent).not.toContain('private-')
+    expect(upload).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+  })
+  it('写真とPDFの受付は保ち、既存設定を変更した時だけ選べる', () => {
     const upload = vi.fn()
-    const { container, rerender } = render(<FormFileControl label="本人確認" kind="identity" bothSides onUpload={upload} />)
+    const { container, rerender } = render(<FormFileControl label="添付" kind="identity" onUpload={upload} />)
+    rerender(<FormFileControl label="添付" kinds={['image', 'pdf']} onUpload={upload} />)
     const input = container.querySelector('input[type=file]') as HTMLInputElement
-    expect(screen.getByRole('group', { name: '表' })).toBeTruthy()
-    expect(screen.getByRole('group', { name: '裏' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '裏（写真を入れる）' })); fireEvent.click(screen.getByRole('button', { name: '写真を選ぶ' }))
-    const image = new File(['png'], 'back.png', { type: 'image/png' })
+    expect(input.accept).toContain('image/png')
+    expect(input.accept).toContain('application/pdf')
+    const image = new File(['png'], 'photo.png', { type: 'image/png' })
+    fireEvent.click(screen.getByRole('button', { name: '写真を選ぶ' }))
     fireEvent.change(input, { target: { files: [image] } })
-    expect(upload).toHaveBeenCalledWith(image, 'back')
+    expect(upload).toHaveBeenCalledWith(image, 'single')
     rerender(<FormFileControl label="PDF" kind="pdf" onUpload={upload} />)
     expect(input.accept).toBe('application/pdf')
-    expect(screen.queryByText(/内蔵の検査/)).toBeNull()
     expect(screen.queryByRole('button', { name: '写真を撮る' })).toBeNull()
   })
   it('送信前に形式と10MBを断り、アップロード中は選べない', () => {
@@ -38,54 +59,33 @@ describe('書類の入力', () => {
     fireEvent.click(screen.getByRole('button', { name: '申込.pdfを外す' }))
     expect(remove).toHaveBeenCalledWith('file')
   })
-  it('表裏の写真と×は同じ枠に置き、検査中の写真にも状態を出す', () => {
-    const remove = vi.fn()
-    render(<FormFileControl label="本人確認" kind="identity" bothSides onRemove={remove} files={[
-      { fileId: 'front', side: 'front', filename: 'front.png', mimeType: 'image/png', previewUrl: 'blob:front', state: 'pending' },
-      { fileId: 'back', side: 'back', filename: 'back.png', mimeType: 'image/png', previewUrl: 'blob:back', state: 'ready' },
-    ]} />)
-    for (const [side, filename] of [['表', 'front.png'], ['裏', 'back.png']]) {
-      const group = within(screen.getByRole('group', { name: side }))
-      const image = group.getByAltText('送った写真')
-      const button = group.getByRole('button', { name: `${filename}を外す` })
-      expect(image.parentElement?.parentElement).toBe(button.parentElement)
-      expect(group.getAllByRole('button')).toHaveLength(2)
-    }
-    expect(screen.getByText('front.png（検査中）')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'back.pngを外す' }))
-    expect(remove).toHaveBeenCalledWith('back')
-  })
-  it('選び直しを開くときは添付を保ち、選んだ片面だけ外して再選択する', () => {
+  it('写真は検査中を示し、選び直しを開いただけでは添付を外さない', () => {
     const remove = vi.fn(), upload = vi.fn()
-    const front = { fileId: 'front', side: 'front' as const, filename: 'front.png', mimeType: 'image/png', state: 'ready' as const }
-    const back = { ...front, fileId: 'back', side: 'back' as const, filename: 'back.png' }
-    const { container, rerender } = render(<FormFileControl label="本人確認" kind="identity" bothSides files={[front, back]} onRemove={remove} onUpload={upload} />)
+    const photo = { fileId: 'photo', side: 'single' as const, filename: 'photo.png', mimeType: 'image/png', previewUrl: 'blob:photo', state: 'pending' as const }
+    const { container, rerender } = render(<FormFileControl label="写真" files={[photo]} onRemove={remove} onUpload={upload} />)
+    expect(screen.getByAltText('送った写真')).toBeTruthy()
+    expect(screen.getByText('photo.png（検査中）')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '撮り直す・選び直す' }))
     expect(remove).not.toHaveBeenCalled()
     expect(upload).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '裏を外して選び直す', hidden: true }))
-    expect(remove).toHaveBeenCalledWith('back')
-    rerender(<FormFileControl label="本人確認" kind="identity" bothSides files={[front]} onRemove={remove} onUpload={upload} />)
-    fireEvent.click(screen.getByRole('button', { name: '写真を選ぶ' }))
-    const image = new File(['png'], 'new-back.png', { type: 'image/png' })
+    fireEvent.click(screen.getByRole('button', { name: 'photo.pngを外して選び直す', hidden: true }))
+    expect(remove).toHaveBeenCalledWith('photo')
+    rerender(<FormFileControl label="写真" files={[]} onRemove={remove} onUpload={upload} />)
+    const image = new File(['png'], 'new.png', { type: 'image/png' })
     fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [image] } })
-    expect(upload).toHaveBeenCalledWith(image, 'back')
-    expect(screen.getByRole('button', { name: 'front.pngを外す' })).toBeTruthy()
+    expect(upload).toHaveBeenCalledWith(image, 'single')
   })
-  it('アップロード中は外す・片面選択・選び直しを止める', () => {
+  it('アップロード中は写真を外す・選び直す操作を止める', () => {
     const remove = vi.fn()
-    render(<FormFileControl label="本人確認" kind="identity" bothSides uploading onRemove={remove} files={[
-      { fileId: 'front', side: 'front', filename: 'front.png', state: 'ready' },
-      { fileId: 'back', side: 'back', filename: 'back.png', state: 'ready' },
+    render(<FormFileControl label="写真" uploading onRemove={remove} files={[
+      { fileId: 'photo', side: 'single', filename: 'photo.png', state: 'ready' },
     ]} />)
-    for (const name of ['front.pngを外す', 'back.pngを外す', '表を選ぶ', '裏を選ぶ']) {
-      expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true)
-    }
+    expect((screen.getByRole('button', { name: 'photo.pngを外す' }) as HTMLButtonElement).disabled).toBe(true)
     const summary = screen.getByRole('button', { name: '撮り直す・選び直す' })
     expect((summary as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(summary)
     expect(summary.getAttribute('aria-expanded')).toBe('false')
-    expect(screen.queryByRole('button', { name: '表を外して選び直す' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'photo.pngを外して選び直す' })).toBeNull()
     expect(remove).not.toHaveBeenCalled()
   })
 })

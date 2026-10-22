@@ -514,8 +514,8 @@ function InflowDetailContent() {
                 <KpiCard presentation="band" icon={<MousePointerClick size={14} aria-hidden="true" />} title="クリック" value={funnel.click_count} unit="回" detail={null} />
                 <KpiCard presentation="band" icon={<UserPlus size={14} aria-hidden="true" />} title="友だち追加" value={funnel.friend_add_count} unit="人" detail={addRate == null ? '追加率は集計できません' : `追加率 ${addRate}%`} />
                 <KpiCard presentation="band" icon={<FileText size={14} aria-hidden="true" />} title="フォーム" value={funnel.form_submission_count} unit="件" detail={null} />
-                <KpiCard presentation="band" icon={<ShoppingBag size={14} aria-hidden="true" />} title="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'} />
-                <KpiCard presentation="band" icon={<RotateCcw size={14} aria-hidden="true" />} title="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`) : '集計を取得できていません'} />
+                <KpiCard presentation="band" icon={<ShoppingBag size={14} aria-hidden="true" />} title="購入" value={ordersSummary?.total ?? null} unit="件" detailLayout="single" detail={ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'} />
+                <KpiCard presentation="band" icon={<RotateCcw size={14} aria-hidden="true" />} title="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detailLayout="single" detail={ordersSummary ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`) : '集計を取得できていません'} />
               </KpiBand>
             ) : funnelError ? (
               <div className={styles.funnelError}>

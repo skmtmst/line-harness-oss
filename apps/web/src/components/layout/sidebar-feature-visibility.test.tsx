@@ -54,12 +54,14 @@ vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { 
 import Sidebar from './sidebar'
 import SettingsInnerNav from './settings-inner-nav'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
+import { clearFeatureSettingsCache } from '@/lib/feature-settings-cache'
 
 describe('Sidebarのstaff向け機能表示read-model', () => {
   beforeEach(() => {
     forgetStaffIdentity()
     // 表示可否は画面間で共有される（V6R-S0-b）。試験ごとに応答を替えるので毎回捨てる。
     clearFeatureVisibilityCache()
+    clearFeatureSettingsCache()
     fixture.accountId = 'account-1'
     window.localStorage.clear()
     fixture.visibility.mockReset()
@@ -153,6 +155,51 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     })
   })
 
+  it.each(['owner', 'admin'])('%sは表示可否を待たず並びも読み、並び失敗で表示可否を失わない', async (role) => {
+    rememberStaffIdentity({ role } as StaffMember)
+    let resolveVisibility: ((value: unknown) => void) | undefined
+    fixture.visibility.mockImplementationOnce(() => new Promise(resolve => { resolveVisibility = resolve }))
+    fixture.get.mockRejectedValue(new Error('403 Forbidden'))
+    const view = render(<Sidebar />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalledWith('account-1'))
+    await waitFor(() => expect(fixture.get).toHaveBeenCalledWith('account-1'))
+    expect(view.queryAllByText('一斉配信')).toHaveLength(0)
+    await act(async () => { resolveVisibility?.({ success: true, data: { features: { broadcasts: true } } }) })
+    await waitFor(() => expect(view.getAllByText('一斉配信')).not.toHaveLength(0))
+    expect(view.queryAllByText('もう一度')).toHaveLength(0)
+  })
+
+  it.each([null, 'staff', 'viewer', 'read-only-owner'])('権限%sでは管理GETを先読みしない', async (role) => {
+    window.localStorage.setItem('lh_staff_role', 'owner')
+    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/broadcasts']))
+    if (role) rememberStaffIdentity({ role: role === 'read-only-owner' ? 'owner' : role, readOnly: role === 'read-only-owner' } as StaffMember)
+    const view = render(<Sidebar />)
+    await waitFor(() => expect(view.getAllByText('一斉配信')).not.toHaveLength(0))
+    expect(fixture.get).not.toHaveBeenCalled()
+  })
+
+  it.each(['account', 'role'])('%s切替後に届いた古い並びを適用しない', async (change) => {
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
+    let resolveOld: ((value: unknown) => void) | undefined
+    fixture.get.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    const view = render(<Sidebar />)
+    await waitFor(() => expect(fixture.get).toHaveBeenCalledWith('account-1'))
+    if (change === 'account') {
+      fixture.accountId = 'account-current'
+      view.rerender(<Sidebar />)
+      await waitFor(() => expect(fixture.get).toHaveBeenCalledWith('account-current'))
+    } else {
+      window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/broadcasts']))
+      act(() => rememberStaffIdentity({ role: 'viewer' } as StaffMember))
+    }
+    await waitFor(() => expect(view.getAllByText('一斉配信')).not.toHaveLength(0))
+    const menus = () => [...view.container.querySelectorAll('nav')].map(nav => nav.textContent)
+    const currentMenus = menus()
+    await act(async () => { resolveOld?.({ success: true, data: { version: 1, sidebarOrder: ['自動化', 'メイン'], sidebarItemOrder: null } }) })
+    expect(menus()).toEqual(currentMenus)
+    expect(fixture.get).toHaveBeenCalledTimes(change === 'account' ? 2 : 1)
+  })
+
   it('保存roleがadminでも管理GETが403なら、staff向け表示可否を捨てない', async () => {
     window.localStorage.setItem('lh_staff_role', 'admin')
     rememberStaffIdentity({ role: 'admin' } as StaffMember)
@@ -168,6 +215,15 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
       expect(view.queryAllByText('シナリオ配信')).toHaveLength(0)
       expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
     })
+  })
+
+  it('管理GETの成功応答が不正でも、取得済みの表示可否を捨てない', async () => {
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
+    fixture.get.mockResolvedValue({ success: true })
+    const view = render(<Sidebar />)
+    await waitFor(() => expect(fixture.get).toHaveBeenCalled())
+    await waitFor(() => expect(view.getAllByText('一斉配信')).not.toHaveLength(0))
+    expect(view.queryAllByText('もう一度')).toHaveLength(0)
   })
 
   it.each([

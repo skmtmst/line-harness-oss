@@ -46,6 +46,7 @@ export default function DuplicatesListV8() {
   const pageCount = Math.max(1, Math.ceil(d.candidateTotal / CANDIDATE_PAGE_SIZE))
   const filtering = !d.unfilteredCandidates
   const counts = d.statusCounts
+  const deliveryCount = !isForbidden(d.statsFailure) && typeof d.data?.overlappingDeliveryCount === 'number' ? d.data.overlappingDeliveryCount : null
 
   const exportVisible = () => {
     const header = ['候補A', '候補B', '確からしさ', '一致した根拠', 'アカウント', '状態', '最終更新']
@@ -84,12 +85,10 @@ export default function DuplicatesListV8() {
     },
     {
       key: 'deliveries', title: '重なって届いた配信',
-      valueText: '—',
-      unit: '件',
-      detail: '配信実績の接続を待っています',
-      help: d.data
-        ? `配信の実績を接続したあと、同じ人に2通届いた分をここに出します。いまの見積りは1配信あたり ¥${formatNumber(d.data.wastedPerBroadcastYen)}（¥${formatNumber(d.data.msgUnitYen)}/通）です。`
-        : '配信の実績を接続したあと、同じ人に2通届いた分をここに出します。',
+      valueText: deliveryCount !== null ? formatNumber(deliveryCount) : emptyValue('unknown'),
+      unit: '通',
+      detail: isForbidden(d.statsFailure) ? '集計を見る権限がありません' : deliveryCount !== null ? d.statsFailure ? '前回取得した配信実績' : '配信実績から集計' : d.loading ? '読み込んでいます' : '配信実績は未取得です',
+      help: '同じ配信が統合ユーザーの複数の友だちに届いたとき、1人分を除いた余分な通数です。配信の回数や人数ではありません。',
     },
     {
       key: 'weak', title: '根拠が足りない',

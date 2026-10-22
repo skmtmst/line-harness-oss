@@ -85,6 +85,10 @@ export type StyleBooking = {
     amount: number;
   } | null;
 };
+export type StyleDailyMetrics = { date: string; metrics: Record<string, StyleMetric> };
+export type StyleAnalyticsData = Record<string, unknown> & {
+  dailyComparison?: { current: StyleDailyMetrics[]; previous?: StyleDailyMetrics[] };
+};
 export type StyleSnapshot = {
   style: IndustryStyle;
   asOf: string;
@@ -239,6 +243,8 @@ export type StyleDashboardPayments =
       expiredCount: number;
       holdMinutes: number;
       source: string;
+      /** Present when the values use the selected analytics window rather than today. */
+      period?: { from: string; to: string; timeZone: string; dateBasis: 'payment' };
     }
   | { status: 'forbidden' | 'unavailable'; reason?: string };
 

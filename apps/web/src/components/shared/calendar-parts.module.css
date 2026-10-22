@@ -11,4 +11,23 @@
 .legendItem[data-state='star'] svg { color: var(--color-star-on); }
 .dayName { display: flex; flex-direction: column; min-inline-size: 0; }
 .dayName a { color: var(--color-accent-deep); font-size: var(--text-body); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.timeGrid { position: relative; min-inline-size: 0; block-size: calc(var(--tpl-sd-week-hour) * var(--calendar-hour-count) + var(--tpl-sd-board-top)); }
+.calendarPosition { position: absolute; min-inline-size: 0; pointer-events: none; }
+.calendarFree {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc(100% * var(--calendar-lane) / var(--calendar-lanes) + var(--polish-space-row) / 2);
+  inline-size: calc(100% * var(--calendar-span) / var(--calendar-lanes) - var(--polish-space-row));
+  block-size: 100%;
+  min-inline-size: 0;
+  justify-content: flex-start;
+  gap: 0;
+  padding: var(--polish-space-row);
+  overflow: hidden;
+  pointer-events: auto;
+  font-size: var(--text-micro);
+}
+.calendarFree > svg { flex-shrink: 0; }
+.calendarList { display: flex; flex-direction: column; align-items: stretch; gap: var(--polish-space-row); min-inline-size: 0; }
+.calendarList > button { min-inline-size: 0; text-align: start; }
 }

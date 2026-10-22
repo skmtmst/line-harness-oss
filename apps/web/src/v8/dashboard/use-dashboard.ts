@@ -1,5 +1,5 @@
 'use client'
-import { loadStaffIdentity } from '@/lib/staff-role'
+import { useStaffIdentity } from '@/lib/staff-role'
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { dashboardCardForStyle } from './style-cards'
 
@@ -116,7 +116,7 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
   const [supportMarkAutoOnInbound, setSupportMarkAutoOnInbound] = useState<boolean | null>(null)
   const [notificationData, setNotificationData] = useState<{ accountId: string; value: NotificationCenterData } | null>(null)
   const [notificationFailed, setNotificationFailed] = useState(false)
-  const [staffName, setStaffName] = useState<string | null>(null)
+  const staffName = useStaffIdentity()?.name ?? null
 
   const openEditor = useCallback(() => {
     setPreferenceSaveError(null)
@@ -168,15 +168,6 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
   const supplementGate = true
   const needsTwoFactor = visibleRight.some((item) => item.id === 'operational-alerts')
   const needsSupportMarks = visibleRight.some((item) => item.id === 'support-mark-status')
-
-  /* 本人の名前（あいさつ）。取れなくても画面は止めない。 */
-  useEffect(() => {
-    let cancelled = false
-    void loadStaffIdentity()
-      .then((response) => { if (!cancelled && response.success) setStaffName(response.data.name) })
-      .catch(() => undefined)
-    return () => { cancelled = true }
-  }, [])
 
   useEffect(() => {
     if (!selectedAccountId) {

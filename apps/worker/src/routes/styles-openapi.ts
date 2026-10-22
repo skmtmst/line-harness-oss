@@ -51,6 +51,11 @@ for(const [method,path,summary] of definitions) {
   if(path.startsWith('/api/dashboard/'))parameters.push({name:'account_id',in:'query',required:true,schema:{type:'string'}});
   if(liff)parameters.push({name:'liffId',in:'query',required:true,schema:{type:'string'}},{name:'Authorization',in:'header',required:true,schema:{type:'string'},description:'本人のLINE IDトークン'});
   const operation:Operation={tags:[liff?'Booking':'Styles'],summary,description:liff?'LINE IDトークンで本人とお店を確定する。別の人やお店の記録は操作できない。':'管理画面の認証と店舗の範囲を確認する。更新は閲覧専用の担当者に許可しない。版が古い更新は409。',parameters,responses:{'200':{description:'操作または取得の結果'},'201':{description:'新しい記録を保存'},'400':{description:'入力を確認してください'},'401':{description:'認証が必要'},'403':{description:'操作する権限がない'},'404':{description:'対象が見つからない'},'409':{description:'版または予約枠の競合'},'422':{description:'入力した値を使えない'}}};
+  if(path === '/api/dashboard/style/analytics') {
+    operation.description += ' 支払い集計は店舗時間帯の選択期間[from,to)と担当者の範囲を使う。入金日・返金日など記録ごとの日付で数え、予約日や来店日と混ぜない。支払い閲覧権限がなければpayments.status=forbidden。';
+    operation.parameters.push(...['from','to','staff_id'].map(name => ({ name, in: 'query', required: false, schema: { type: 'string' } })));
+    operation.responses['200'].description = '予約の集計と支払い集計。利用できる支払い集計はpayments.periodにfrom/to/timeZone/dateBasis=paymentを返す。0件と取得失敗は別で、取得失敗はエラー応答。';
+  }
   if(liff)operation.security=[];
   if(!['get','delete'].includes(method))operation.requestBody={required:true,content:{'application/json':{schema:{type:'object'}}}};
   (paths[path]??={})[method]=operation;

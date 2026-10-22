@@ -39,7 +39,7 @@ import { styleDashboardMock } from './style-dashboard-mock.mjs'
 import { styleSetupRead, styleSetupWrite } from './style-setup-fixtures.mjs'
 import { encodePng } from './v8-png.mjs'
 import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
-import { BILLING_INVOICES, BILLING_SUMMARY } from './billing-fixture.mjs'
+import { BILLING_INVOICES, BILLING_SUMMARY, BILLING_METRICS } from './billing-fixture.mjs'
 import {
   mileageWriteResponse,
   MILEAGE_REWARDS,
@@ -3071,12 +3071,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       row('mf-5', 'reversal', 'available', -10, '付けすぎを取り消し', 'リンクをクリック（重複）', 'manual', '河野', '2026-09-20T09:00:00+09:00', 1582),
     ], pagination: { total: 5, limit: 100, offset: 0 } } }
   }
-  if (method === 'GET' && pathname === '/api/hq/billing/summary') {
-    return { success: true, data: BILLING_SUMMARY }
-  }
-  if (method === 'GET' && pathname === '/api/hq/billing/invoices') {
-    return { success: true, data: BILLING_INVOICES }
-  }
+  if (method === 'GET' && pathname === '/api/hq/billing/summary') return { success: true, data: BILLING_SUMMARY }
+  if (method === 'GET' && pathname === '/api/hq/billing/metrics') return { success: true, data: BILLING_METRICS }
+  if (method === 'GET' && pathname === '/api/hq/billing/invoices') return { success: true, data: BILLING_INVOICES }
   if (method === 'GET' && pathname === '/api/hq/notices/line-registration') {
     /* 絵 `D6fh3`：運営（契約者専用）の LINE は設定済み・まだ紐づいていない・確認コード 482913。 */
     return { success: true, data: { available: true, accountName: 'musubo 運営（契約者専用）', basicId: '@musubo', addFriendUrl: 'https://line.me/R/ti/p/@musubo', linked: false, code: '482913', codeExpiresAt: '2026-10-07T18:00:00+09:00' } }

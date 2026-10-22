@@ -4,9 +4,11 @@ import PeriodPicker from '@/components/shared/period-picker'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
+import type { StoreComparisonDetail, HqAttentionKind, StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import { ValueBarChart } from '@/components/shared/charts'
 import DeltaChip from '@/components/shared/delta-chip'
 import Drawer from '@/components/shared/drawer'
 import ListState from '@/components/shared/list-state'
@@ -157,9 +159,7 @@ export default function StoreComparisonList() {
       </DataTable>
       <div className={styles.averageBand}>
         <span className={styles.averageTitle}>{`${total} 店の平均`}</span>
-        <span className={styles.averageText}>
-          {METRICS.map((def) => `${def.label} ${formatMetric(def.key, data.average[def.key] ?? null)}`).join('・')}
-        </span>
+        <TruncatedText className={styles.averageText} value={METRICS.map((def) => `${def.label} ${formatMetric(def.key, data.average[def.key] ?? null)}`).join('・')} />
         <span className={styles.averageNote}>{`札は${compare === 'average' ? '全店の平均' : '前の期間'}との差（赤＝悪い・緑＝良い）`}</span>
       </div>
     </>
@@ -203,15 +203,27 @@ function MetricCell({ def, metric, compare }: { def: MetricDef; metric: StoreCom
   )
 }
 
-type Detail = {
-  recentBroadcasts: Array<{ id: string; title: string; status: string; sent_at: string | null }>
-  attention: unknown
+const ATTENTION: Array<{key:HqAttentionKind;label:string}> = [
+ {key:'unhandledChats',label:'未対応・対応中・保留のトーク'},
+ {key:'pendingBookings',label:'承認待ちの予約'},
+ {key:'unpaid',label:'未払い'},
+ {key:'connections',label:'接続の異常'},
+]
+
+function attentionTargetLabel(href:string) {
+ const path=new URL(href,'https://qa.invalid');
+ if(path.pathname==='/chats')return {unread:'未対応のトークを開く',in_progress:'対応中のトークを開く',on_hold:'保留のトークを開く'}[path.searchParams.get('status') ?? ''] ?? 'トークを開く';
+ if(path.pathname==='/events/bookings')return 'イベントの申込を開く';
+ if(path.pathname==='/restaurant-test/reservations')return '飲食店の予約台帳を開く';
+ if(path.pathname==='/booking/bookings')return '承認待ちの予約を開く';
+ if(path.pathname==='/booking/menus')return 'お支払いの記録を開く';
+ return '接続の状態を開く';
 }
 
 function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRow | null; period: { from: string; to: string }; compare: 'previous' | 'average'; onClose: () => void }) {
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
-  const [detail, setDetail] = useState<{ id: string; status: Status; data: Detail | null }>({ id: '', status: 'loading', data: null })
+  const [detail, setDetail] = useState<{ id: string; status: Status; data: StoreComparisonDetail | null }>({ id: '', status: 'loading', data: null })
   const accountId = row?.accountId ?? null
 
   useEffect(() => {
@@ -222,7 +234,7 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
       .then((response) => {
         if (cancelled) return
         if (!response.success) throw new Error('detail_failed')
-        setDetail({ id: accountId, status: 'ready', data: response.data as Detail })
+        setDetail({ id: accountId, status: 'ready', data: response.data })
       })
       .catch(() => { if (!cancelled) setDetail({ id: accountId, status: 'error', data: null }) })
     return () => { cancelled = true }
@@ -234,6 +246,8 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
     ? [...METRICS].sort((a, b) => Number(diffTone(b, row.metrics[b.key]?.diff ?? null) === 'down') - Number(diffTone(a, row.metrics[a.key]?.diff ?? null) === 'down'))
     : []
   const current = detail.id === accountId ? detail : { id: '', status: 'loading' as Status, data: null }
+
+  const attention = current.data?.attention
 
   return (
     <Drawer
@@ -251,7 +265,7 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
     >
       {row ? (
         <div className={styles.drawerBody}>
-          <section className={styles.card} aria-label="7つの数">
+          <Card padding="default" layout="vertical" gap="normal" aria-label="7つの数">
             <h3 className={styles.cardTitle}>7 つの数</h3>
             <div>
               {ordered.map((def) => {
@@ -259,18 +273,24 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
                 const tone = diffTone(def, metric?.diff ?? null)
                 const diff = formatDiff(def.key, metric?.diff ?? null)
                 return (
-                  <div key={def.key} className={styles.metricRow}>
+                  <div key={def.key}>
+                  <div className={styles.metricRow}>
                     <span className={styles.metricName}>{def.label}</span>
                     <span className={styles.metricValue}>
                       {metric?.available && metric.value !== null ? formatMetric(def.key, metric.value) : <span className={styles.cellEmpty}>—</span>}
                       {diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : null}
                     </span>
                   </div>
+                  {current.status === 'ready' && current.data?.trend?.length ? <ValueBarChart label={`${def.label}の日ごとの推移`} unit={metric?.unit ?? ''} signed={def.key === 'friendChange'} items={current.data.trend.map(day => ({key:day.date,label:day.date,value:day.values[def.key],note:day.state==='failed'?'集計に失敗':day.state==='missing'?'取得待ち':undefined}))} /> : null}
+                  {current.status === 'loading' ? <p className={styles.mute}>推移を読み込んでいます</p> : null}
+                  {current.status === 'error' ? <p className={styles.mute}>推移を読み込めませんでした。</p> : null}
+                  {current.status === 'ready' && !current.data?.trend?.length ? <p className={styles.mute}>推移はまだ取れていません。</p> : null}
+                  </div>
                 )
               })}
             </div>
-          </section>
-          <section className={styles.card} aria-label="最近の配信">
+          </Card>
+          <Card padding="default" layout="vertical" gap="normal" aria-label="最近の配信">
             <h3 className={styles.cardTitle}>最近の配信</h3>
             {current.status === 'loading' ? <p className={styles.mute}>読み込んでいます</p> : null}
             {current.status === 'error' ? <p className={styles.mute}>最近の配信を読み込めませんでした。</p> : null}
@@ -285,7 +305,16 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
                 ))}
               </div>
             ) : null}
-          </section>
+          </Card>
+          <Card padding="default" layout="vertical" gap="normal" aria-label="対応が要るもの">
+            <h3 className={styles.cardTitle}>対応が要るもの</h3>
+            {current.status === 'loading' ? <p className={styles.mute}>読み込んでいます</p> : null}
+            {current.status === 'error' || (current.status === 'ready' && attention?.status !== 'ready') ? <p className={styles.mute}>対応が要るものを読み込めませんでした。</p> : null}
+            {current.status === 'ready' && attention?.status === 'ready' ? ATTENTION.map(item => <div key={item.key}>
+              <p>{item.label} {attention.counts[item.key]}件</p>
+              {(attention.targets?.[item.key] ?? []).map(target => <Button key={target.href} variant="text" onClick={() => { setSelectedAccountId(row.accountId); router.push(target.href) }}>{attentionTargetLabel(target.href)} {target.count}件</Button>)}
+            </div>) : null}
+          </Card>
         </div>
       ) : null}
     </Drawer>

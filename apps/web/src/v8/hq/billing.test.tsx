@@ -8,7 +8,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BillingPlanView, BillingSummary } from '@/lib/hq-billing'
 
 vi.hoisted(() => {
@@ -21,6 +21,9 @@ const checkout = vi.hoisted(() => vi.fn())
 const portal = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const metrics = vi.hoisted(() => vi.fn())
+
+vi.mock('@/lib/api/helpers/hq-billing', () => ({ fetchHqBillingMetrics: metrics }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -78,6 +81,13 @@ const card = (name: string) => cards().find((s) => s.querySelector('h2')?.textCo
 const buttonsIn = (el: Element) => Array.from(el.querySelectorAll('button')).map((b) => ({ text: b.textContent?.trim(), disabled: b.disabled }))
 const buttonByText = (text: string) => Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === text) as HTMLButtonElement | undefined
 
+beforeEach(() => {
+  metrics.mockResolvedValue({ success: true, data: {
+    thisMonthBilledYen: null, contractCount: 1, activeAccountCount: 5,
+    trialCount: 0, unpaidInvoiceCount: null, nextBillingAt: null,
+  } })
+})
+
 afterEach(async () => {
   await act(async () => { root?.unmount() })
   root = null
@@ -86,6 +96,54 @@ afterEach(async () => {
 })
 
 describe('V8 統括の請求：いまのプランと変えるボタン', () => {
+  it('集計の項目が届かなければ未取得を出し、欠けた数を文字列や0で表示しない', async () => {
+    metrics.mockResolvedValue({ success: true, data: {} })
+    await render(baseSummary({}))
+    const band = document.querySelector('[data-template-region="stats"]')!
+    expect(band.textContent).toContain('未取得')
+    expect(band.textContent).not.toContain('undefined')
+    expect(band.textContent).not.toContain('NaN')
+    expect(band.textContent).not.toContain('0アカウント')
+  })
+
+  it('保存済み集計を表示し、実測0・未取得・統括単位の契約を区別する', async () => {
+    metrics.mockResolvedValue({ success: true, data: {
+      thisMonthBilledYen: 0, contractCount: 1, activeAccountCount: 5,
+      trialCount: 0, unpaidInvoiceCount: 0, nextBillingAt: '2026-11-01T00:00:00+09:00',
+    } })
+    await render(baseSummary({}))
+    const band = document.querySelector('[data-template-region="stats"]')!
+    expect(band.textContent).toContain('¥0')
+    expect(band.textContent).toContain('1契約')
+    expect(band.textContent).toContain('稼働中 5アカウント')
+    expect(band.textContent).toContain('0件')
+    expect(band.textContent).toContain('11/01')
+    expect(band.textContent).not.toContain('未取得')
+  })
+
+  it('集計だけ失敗してもプランを残し、再読込後は未取得を0にしない', async () => {
+    metrics.mockRejectedValueOnce(new Error('offline'))
+    await render(baseSummary({}))
+    expect(card('スタンダード').textContent).toContain('利用中')
+    expect(document.body.textContent).toContain('読み込めませんでした')
+    const retry = document.querySelector('[data-template-region="stats"] button') as HTMLButtonElement
+    expect(retry).not.toBeNull()
+    await act(async () => retry.click())
+    await flush()
+    expect(metrics).toHaveBeenCalledTimes(2)
+    const band = document.querySelector('[data-template-region="stats"]')!
+    expect(band.textContent).toContain('今月の請求は未取得')
+    expect(band.textContent).toContain('請求の記録は未取得')
+    expect(band.textContent).not.toContain('¥0')
+  })
+
+  it('閲覧のみには集計の管理者専用APIを呼ばず、プラン閲覧は維持する', async () => {
+    await render(baseSummary({}), 'viewer')
+    expect(metrics).not.toHaveBeenCalled()
+    expect(card('スタンダード').textContent).toContain('利用中')
+    expect(document.querySelector('[data-template-region="stats"]')).toBeNull()
+  })
+
   it('契約中：いまのプランに「利用中」と押せない［いまのプラン］、ほかは［このプランに変える］', async () => {
     await render(baseSummary({}))
     const current = card('スタンダード')

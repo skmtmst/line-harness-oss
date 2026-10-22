@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import PeriodPicker, { pastPeriod, validPeriod } from './period-picker'
-vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
 afterEach(cleanup)
 it('決まり5：3期間と指定期間を同じ部品で選び、日付は日本時間の暦日を含める', () => {
  const onChange = vi.fn(), onRangeChange = vi.fn()
@@ -18,4 +18,15 @@ it('口が28日までのときは30日と偽らず、できない期間を出さ
  expect(screen.getByRole('button',{name:'過去28日'})).toBeTruthy()
  expect(screen.queryByRole('button',{name:'過去30日'})).toBeNull()
  expect(screen.queryByRole('button',{name:'期間を指定'})).toBeNull()
+})
+
+it('長い期間名でも選択値を保ち、指定期間の2日付へ切り替えられる', () => {
+ const onChange = vi.fn(), onRangeChange = vi.fn()
+ render(<PeriodPicker days={30} choices={[{ days: 7, label: '過去7日間の分析対象' }, { days: 30, label: '過去30日間の分析対象（キャンペーンを含む）' }]} customRange={{ from: '2026-10-14', to: '2026-10-15' }} onChange={onChange} onRangeChange={onRangeChange} />)
+ expect(screen.getByRole('button', { name: '期間を指定' }).getAttribute('aria-pressed')).toBe('true')
+ expect(screen.getByRole('button', { name: '期間の始まり' }).textContent).toContain('2026年10月14日')
+ expect(screen.getByRole('button', { name: '期間の終わり' }).textContent).toContain('2026年10月15日')
+ fireEvent.click(screen.getByRole('button', { name: '過去7日間の分析対象' }))
+ expect(onChange).toHaveBeenCalledWith(7)
+ expect(onRangeChange).not.toHaveBeenCalled()
 })

@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import { Children, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import kpiStyles from './kpi-card.module.css'
 
 /** 4つ並びのときの並べ方（管理画面 の見た目）。 */
@@ -21,6 +21,7 @@ export default function KpiBand({
   edgeInset,
   density,
   layout,
+  maxColumns,
   ...rest
 }: {
   children: ReactNode
@@ -34,8 +35,20 @@ export default function KpiBand({
   edgeInset?: 'parent'
   /** 段や引き出しの中で使う小さい帯。 */
   layout?: 'booking' | 'link-row'
+  /** Keep every selected metric, wrapping into existing bands after this many columns. */
+  maxColumns?: number
   density?: 'compact'
 } & Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'className'>) {
+  if (maxColumns !== undefined && Number.isInteger(maxColumns) && maxColumns > 0) {
+    const items = Children.toArray(children)
+    if (items.length > maxColumns) {
+      const rows: ReactNode[][] = []
+      for (let start = 0; start < items.length; start += maxColumns) rows.push(items.slice(start, start + maxColumns))
+      return <div data-shared-part="kpi-band-rows" {...rest} style={{ ...rest.style, '--kpi-band-row-columns': maxColumns } as CSSProperties}>
+        {rows.map((row, index) => <KpiBand key={index} gridClassName={gridClassName} className={className} presentation={presentation} border={border} edgeInset={edgeInset} density={density} layout={layout}>{row}</KpiBand>)}
+      </div>
+    }
+  }
   return (
     <div
       className={`${kpiStyles.strip} ${gridClassName}${className ? ` ${className}` : ''}`}

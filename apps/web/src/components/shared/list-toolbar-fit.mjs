@@ -25,7 +25,13 @@ export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 
       const minimum = parseFloat(getComputedStyle(tool).getPropertyValue('--list-search-content-min'))
       if (minimum > 0) width = Math.min(width, minimum)
     }
-    if (expandedItem && (tool === expandedItem || tool.contains(expandedItem))) width += Math.max(0, expandedWidth - expandedItem.getBoundingClientRect().width)
+    // A growing overflow group fills spare space, not just its controls' demand.
+    // Its existing natural-width measurement also avoids rounded scrollWidth feedback.
+    const optional = tool.matches('[data-toolbar-overflow-group]') ? tool : tool.querySelector('[data-toolbar-overflow-group]')
+    const natural = optional && !optional.hasAttribute('data-collapsed') ? parseFloat(optional.style.getPropertyValue('--toolbar-optional-width')) : 0
+    const growing = natural > 0 && parseFloat(getComputedStyle(optional).flexGrow) > 0
+    if (growing) width = Math.max(0, width - Math.max(optional.getBoundingClientRect().width, optional.scrollWidth)) + natural
+    if (expandedItem && (tool === expandedItem || tool.contains(expandedItem))) width += Math.max(0, expandedWidth - (growing && optional === expandedItem ? natural : expandedItem.getBoundingClientRect().width))
     for (const group of includeExpanded ? tool.matches('[data-filter-width]') ? [tool] : [...tool.querySelectorAll('[data-filter-width]')] : []) {
       width += Math.max(0, Number(group.dataset.filterWidth) - group.getBoundingClientRect().width)
     }
@@ -53,4 +59,57 @@ export function fitToolbarOptionalWidth(item) {
   const width = Math.ceil(item.hasAttribute('data-toolbar-overflow-group') ? intrinsic : Math.max(content.getBoundingClientRect().width, content.scrollWidth))
   item.style.setProperty('--toolbar-optional-width', `${width}px`)
   return width
+}
+
+/** Keep an expanded overflow panel inside its toolbar, including near the right edge.
+ * @param {HTMLElement} item
+ * @param {HTMLElement} toolbar
+ */
+export function fitToolbarOverflowPanel(item, toolbar) {
+  const content = item.querySelector('[data-toolbar-optional-content]')
+  if (!content) return
+  const bounds = toolbar.getBoundingClientRect(), anchor = item.getBoundingClientRect()
+  const css = getComputedStyle(toolbar)
+  const left = bounds.left + (parseFloat(css.paddingLeft) || 0)
+  const right = Math.min(bounds.right - (parseFloat(css.paddingRight) || 0), window.innerWidth)
+  const available = Math.max(0, Math.floor(right - left))
+  const width = Math.min(content.getBoundingClientRect().width, available)
+  const offset = Math.max(left - anchor.left, Math.min(0, right - anchor.left - width))
+  item.style.setProperty('--toolbar-optional-panel-width', `${available}px`)
+  item.style.setProperty('--toolbar-optional-panel-left', `${Math.floor(offset)}px`)
+}
+
+/** Keep the observer on rerender; remeasure changed props without duplicate initial delivery.
+ * @param {HTMLElement} item
+ * @param {() => Element[]} targets
+ * @param {() => void} measure
+ * @param {boolean} [toggle]
+ */
+export function observeToolbarContent(item, targets, measure, toggle = false) {
+  let active = true, frame = 0, content = ''
+  let watched = new Set()
+  const read = () => { if (active && item.isConnected) measure() }
+  const queue = () => { if (active) { cancelAnimationFrame(frame); frame = requestAnimationFrame(read) } }
+  const observer = new ResizeObserver(queue)
+  const refresh = () => {
+    if (!active) return
+    const nextContent = item.innerHTML
+    if (content !== nextContent || !watched.size) {
+      content = nextContent
+      const next = new Set(targets())
+      for (const target of watched) if (!next.has(target)) observer.unobserve(target)
+      for (const target of next) if (!watched.has(target)) observer.observe(target)
+      watched = next
+    }
+    read()
+  }
+  refresh()
+  if (toggle) item.addEventListener('toggle', queue)
+  // Already-loaded fonts do not change the initial measurement.
+  if (document.fonts?.status === 'loading') void document.fonts.ready.then(read)
+  return { refresh, stop: () => {
+    active = false
+    if (toggle) item.removeEventListener('toggle', queue)
+    cancelAnimationFrame(frame); observer.disconnect()
+  } }
 }

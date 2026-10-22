@@ -7,10 +7,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { diffTone, formatDiff, formatMetric, METRICS } from './metrics'
 
+const navigation = vi.hoisted(() => ({push:vi.fn(),select:vi.fn()}))
 const api = vi.hoisted(() => ({ get: vi.fn(), detail: vi.fn(), export: vi.fn(), exportStatus: vi.fn(), download: vi.fn() }))
 vi.mock('@/lib/api/helpers/gap3', () => ({ storeComparisonApi: api }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/hq/store-comparison', useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: vi.fn(), loading: false }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: navigation.push, replace: vi.fn() }), usePathname: () => '/hq/store-comparison', useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: navigation.select, loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 
 const { default: StoreComparisonList } = await import('./list')
@@ -62,7 +63,10 @@ describe('店の比較の表', () => {
     for (const def of METRICS) expect(screen.getByRole('button', { name: `${def.label}で並べ替える` })).toBeTruthy()
     expect(screen.getByText('−25')).toBeTruthy()
     expect(screen.getAllByTitle('この数はまだ取れていません').length).toBe(2)
-    expect(screen.getByText('2 店の平均')).toBeTruthy()
+    const average = screen.getByText('2 店の平均')
+    const fullSummary = average.parentElement?.querySelector('[data-truncated-text]')
+    expect(fullSummary?.getAttribute('title')).toBe(fullSummary?.textContent)
+    for (const def of METRICS) expect(fullSummary?.getAttribute('title')).toContain(def.label)
     expect(screen.getByText(/札は前の期間との差（赤＝悪い・緑＝良い）/)).toBeTruthy()
   })
 
@@ -115,3 +119,17 @@ describe('店の比較の表', () => {
     expect(await screen.findByRole('button', { name: /もう一度/ })).toBeTruthy()
   })
 })
+
+it('推移7種と対応0件を保ち押した店を切り替えて開く',async()=>{
+ const values={friendChange:-3,blockRate:1,clickRate:null,bookings:0,visits:0,noShowRate:null,responseMinutes:2};
+ api.detail.mockResolvedValue({success:true,data:{trend:[{date:'2026-10-15',values,state:'partial'}],recentBroadcasts:[],attention:{status:'ready',counts:{unhandledChats:5,pendingBookings:3,unpaid:0,connections:1,stoppedDeliveries:0},targets:{unhandledChats:[{href:'/chats?status=unread',count:5}],pendingBookings:[{href:'/booking/bookings?view=list&status=requested',count:1},{href:'/events/bookings?id=definition-a',count:1},{href:'/restaurant-test/reservations?view=list',count:1}]}}}});
+ render(<StoreComparisonList/>);fireEvent.click(await screen.findByText('大宮店'));await screen.findByRole('group',{name:'友だちの増減の日ごとの推移'});
+ for(const def of METRICS)expect(screen.getByRole('group',{name:`${def.label}の日ごとの推移`})).toBeTruthy();expect(screen.getByText('未払い 0件')).toBeTruthy();expect(screen.queryByRole('button',{name:'お支払いの記録を開く 0件'})).toBeNull();expect(screen.getByText('承認待ちの予約 3件')).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'未対応のトークを開く 5件'}));expect(navigation.select).toHaveBeenCalledWith('s1');expect(navigation.push).toHaveBeenCalledWith('/chats?status=unread');
+ fireEvent.click(screen.getByRole('button',{name:'イベントの申込を開く 1件'}));expect(navigation.push).toHaveBeenLastCalledWith('/events/bookings?id=definition-a');
+ fireEvent.click(screen.getByRole('button',{name:'飲食店の予約台帳を開く 1件'}));expect(navigation.push).toHaveBeenLastCalledWith('/restaurant-test/reservations?view=list');
+});
+it('対応取得失敗時は0件ボタンを作らず配信は残す',async()=>{
+ api.detail.mockResolvedValue({success:true,data:{trend:[],recentBroadcasts:[{id:'b',title:'実際の配信',status:'sent',sent_at:null}],attention:{status:'unavailable',counts:null}}});
+ render(<StoreComparisonList/>);fireEvent.click(await screen.findByText('大宮店'));expect(await screen.findByText('対応が要るものを読み込めませんでした。')).toBeTruthy();expect(screen.queryByRole('button',{name:'未払い 0件'})).toBeNull();expect(screen.getByText('実際の配信')).toBeTruthy();
+});

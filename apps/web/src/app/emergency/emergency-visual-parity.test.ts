@@ -24,7 +24,7 @@ describe('Y4LkX1 運用状態の表示確認', () => {
   })
 
   it('タブは板の並び（健全性チェック・更新履歴・緊急コントロール）', () => {
-    const start = visible.indexOf('const TABS')
+    const start = visible.indexOf('const BASE_TABS')
     const block = visible.slice(start, visible.indexOf(']', start) + 1)
     const keys = [...block.matchAll(/key: '(\w+)'/g)].map((match) => match[1])
     expect(keys).toEqual(['health', 'history', 'control'])

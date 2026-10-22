@@ -34,6 +34,7 @@ import { api, fetchApi, type EcNotificationRun } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import styles from './screen.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
@@ -230,12 +231,12 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
                   <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`} >{item.notificationName}</button>
                 </Td>
                 <Td className={styles.runWhoCell}>
-                  <span className={`${styles.cell} ${styles.runWho}`}>{item.friendName || '名前は未取得'}</span>
-                  <span className={`${styles.cell} ${styles.opSub}`}>{who}</span>
+                  <TruncatedText className={`${styles.cell} ${styles.runWho}`} value={item.friendName || '名前は未取得'} />
+                  <TruncatedText className={`${styles.cell} ${styles.opSub}`} value={who} />
                 </Td>
                 <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'muted' ? 'neutral' : status.tone}>{status.label}</StatusBadge></Td>
                 <Td className={styles.cell} title={reason}>{item.resolved ? `対応済み・${reason}` : reason}</Td>
-                <Td className={styles.cell}>{`${item.attemptCount == null ? emptyValue('unknown') : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : emptyValue('unknown')}`}</Td>
+                <Td className={styles.cell}><TruncatedText value={`${item.attemptCount == null ? emptyValue('unknown') : `${item.attemptCount}回`}・${item.clickedAt ? 'クリックあり' : emptyValue('unknown')}`} /></Td>
               </Tr>
             })}
           </tbody>

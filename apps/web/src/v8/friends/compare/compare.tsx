@@ -8,7 +8,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { DashboardColumns } from '@/components/templates'
 import Button from '@/components/shared/button'
-import StickyBar from '@/components/shared/sticky-bar'
+import { PageFooter } from '@/components/templates/page-footer'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
@@ -123,11 +123,11 @@ function CompareInner() {
     : '採用する値：表で選んだ値'
 
   return (
-    <PageFrame kind="detail" heightMode="content" boardId="fcg2D">
+    <PageFrame kind="detail" heightMode="content" hasFooter={review.state === 'ready' && Boolean(detail)} boardId="fcg2D">
       <PageHeading title={detail ? `${detail.left.label} ↔ ${detail.right.label}` : '重複候補を比べて決める'}
         help={<>{detail ? `確からしさ：${CONFIDENCE_WORD[detail.confidence.label]}${decisive ? `・根拠：${decisive.label}` : ''}` : '同じ人かどうかを、根拠を見て決めます'}</>} />
 
-      <div className={styles.body}>
+      <div className={styles.body} data-template-region="body">
         <IdentityStateBlock
           state={review.state}
           failure={review.failure}
@@ -323,30 +323,31 @@ function CompareInner() {
                 </tbody>
               </DataTable>
             </section>
-
-            <StickyBar
-              destructive={(
-                <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('different')}>
-                  <UserX size={14} aria-hidden="true" />
-                  別の人だった
-                </Button>
-              )}
-              actions={(
-                <>
-                  <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('deferred')}>
-                    <Clock size={14} aria-hidden="true" />
-                    あとで決める（保留）
-                  </Button>
-                  <Button type="button" variant="primary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('linked')}>
-                    <LinkIcon size={14} aria-hidden="true" />
-                    同じ人として結び付ける
-                  </Button>
-                </>
-              )}
-            />
           </>
         ) : null}
       </div>
+      {review.state === 'ready' && detail ? (
+        <PageFooter
+          destructive={(
+            <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('different')}>
+              <UserX size={14} aria-hidden="true" />
+              別の人だった
+            </Button>
+          )}
+          actions={(
+            <>
+              <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('deferred')}>
+                <Clock size={14} aria-hidden="true" />
+                あとで決める（保留）
+              </Button>
+              <Button type="button" variant="primary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('linked')}>
+                <LinkIcon size={14} aria-hidden="true" />
+                同じ人として結び付ける
+              </Button>
+            </>
+          )}
+        />
+      ) : null}
     </PageFrame>
   )
 }

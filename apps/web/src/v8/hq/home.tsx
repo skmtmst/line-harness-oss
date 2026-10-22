@@ -1,6 +1,6 @@
 'use client'
 
-import { DataTable, Tr, Th, Td, TableHeadRow } from '@/components/shared/table';
+import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -554,7 +554,7 @@ export default function HqHomeV8() {
           })}
         </div>
       ) : (
-        <DataTable aria-label="アカウントの一覧">
+        <DataTable aria-label="アカウントの一覧" columnWeights={[3, 1.5, 1, 1, 1.25, 0.5]}>
           <thead><TableHeadRow>
             <Th>アカウント</Th>
             <Th>接続</Th>
@@ -568,14 +568,14 @@ export default function HqHomeV8() {
             const name = account.displayName || account.name
             return (
               <Tr key={account.id}>
-                <Td>
-                  <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
+                <PersonCell avatarName={brandInitial(tenantName || name)} avatarSize={32} nameTitle={[name, state.label, accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))].filter(Boolean).join(' / ')} name={
                   <span className={styles.cardName}>
-                    <span className={styles.name} ><TruncatedText value={String(name ?? '')} /></span>
-                    <span className={styles.meta}><TruncatedText value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} /></span>
+                    <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>}>
+                      <TruncatedText className={styles.name} value={String(name ?? '')} />
+                    </FolderDotName>
+                    <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
                   </span>
-                  <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>
-                </Td>
+                } />
                 <Td>{(() => {
                   const pay = payState[account.id]
                   if (!pay || pay === 'unknown') return emptyValue('unknown')

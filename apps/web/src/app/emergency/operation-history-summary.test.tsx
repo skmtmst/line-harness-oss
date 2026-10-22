@@ -11,7 +11,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'viewer', canManageRole: () => false }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'viewer', useStaffIdentity: () => ({ role: 'viewer', readOnly: false }) }))
 
 /*
  * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。

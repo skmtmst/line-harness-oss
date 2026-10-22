@@ -1,12 +1,14 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BillingPlanView, BillingSummary } from '@/lib/hq-billing'
 import HqBillingPage from './page'
 
 const calls = vi.hoisted(() => ({ summary: vi.fn(), invoices: vi.fn(), checkout: vi.fn(), portal: vi.fn() }))
+const metrics = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/helpers/hq-billing', () => ({ fetchHqBillingMetrics: metrics }))
 vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   const mocked = await (() => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))()
@@ -48,6 +50,12 @@ beforeEach(() => {
   localStorage.setItem('lh_staff_role', 'owner')
   calls.summary.mockResolvedValue({ success: true, data: summary })
   calls.invoices.mockResolvedValue({ success: true, data: [] })
+  metrics.mockResolvedValue({ success: true, data: {
+    period: { from: '2026-10-01', until: '2026-11-01' }, unavailable: {},
+    thisMonthBilledYen: null, contractCount: 0, contractUnit: 'organization', activeAccountCount: 0,
+    contractAccountCount: null, trialCount: 1, unpaidInvoiceCount: null, paymentFailureCount: null,
+    nextBillingAt: null, source: 'stored_invoices', observedInvoiceCount: 0, lastSyncedAt: null,
+  } })
   // 外部へ移動せず、送信した周期と申込みエラーからの復帰を確認する。
   calls.checkout.mockResolvedValue({ success: false, error: 'テスト用の申込み停止' })
 })
@@ -242,7 +250,8 @@ describe('請求履歴の取得失敗（R118）', () => {
     await openPage()
     expect(screen.getByText('支払い履歴を読み込めませんでした')).toBeTruthy()
     calls.invoices.mockResolvedValue({ success: true, data: [] })
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    const history = screen.getByRole('heading', { name: '支払い履歴' }).closest('section')!
+    fireEvent.click(within(history).getByRole('button', { name: 'もう一度読み込む' }))
     await screen.findByText(/まだ支払いはありません/)
     expect(screen.queryByText('支払い履歴を読み込めませんでした')).toBeNull()
   })

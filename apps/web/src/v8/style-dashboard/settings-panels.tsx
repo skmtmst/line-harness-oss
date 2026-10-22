@@ -7,6 +7,7 @@ import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
 import { Field } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
+import Notice from '@/components/shared/notice'
 import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -16,20 +17,23 @@ import Toggle from '@/components/shared/toggle'
 import { Steps } from '@/components/templates/steps'
 import { ArrowDown,ArrowUp,CalendarX2,Info,Lock,RotateCcw,Scissors,Send,Shapes } from 'lucide-react'
 import { useEffect,useState } from 'react'
-import type { StyleClosureInput,StyleLayout,StyleLayoutItem } from './model'
+import type { StyleClosureInput,StyleLayout,StyleLayoutItem,StyleKpi,IndustryStyle } from './model'
 import styles from './style-dashboard.module.css'
+import { metricOptions } from './metric-selection'
 
 /*
  * ［表示を変える］の引き出し（wFmQa・ 追記 7・8・ の 7）：
  * 数の帯（5 つまで）と横のカードの出し入れ・上下の入れ替え・型に戻す・カードを足す。
  * 接続の異常の帯は隠せない（必ず出る）。
  */
-export function ViewDrawer({ open, layout, busy, onClose, onSave, onReset, onChangeStyle }: {
+export function ViewDrawer({ open, layout, industry, defaultMetrics = [], busy, onClose, onSave, onReset, onChangeStyle }: {
   open: boolean
   layout: StyleLayout | null
+  industry: IndustryStyle
+  defaultMetrics?: StyleKpi[]
   busy: boolean
   onClose: () => void
-  onSave: (next: StyleLayoutItem[]) => void
+  onSave: (next: StyleLayoutItem[], metricIds?: string[]) => void
   onReset: () => void
   /** ［型を変える］（ 追記 6）：業種の型を選び直す。データはそのまま。 */
   onChangeStyle: (style: 'restaurant' | 'salon' | 'consult' | 'lesson' | 'standard') => void
@@ -37,18 +41,28 @@ export function ViewDrawer({ open, layout, busy, onClose, onSave, onReset, onCha
   const [picking, setPicking] = useState(false)
   const [nextStyle, setNextStyle] = useState<'restaurant' | 'salon' | 'consult' | 'lesson' | 'standard'>('salon')
   const [cards, setCards] = useState<StyleLayoutItem[]>([])
-  useEffect(() => { if (open && layout) setCards(layout.cards) }, [open, layout])
-  const dirty = Boolean(layout) && JSON.stringify(cards) !== JSON.stringify(layout?.cards)
+  const [metricIds, setMetricIds] = useState<string[]>([])
+  const defaultIdsKey = JSON.stringify(defaultMetrics.map(item => item.metricId ?? item.id))
+  const initialIdsKey = layout?.metricsCustomized === true ? JSON.stringify(layout.metricIds ?? []) : defaultIdsKey
+  const metricsReady = typeof layout?.metricsCustomized === 'boolean' && Array.isArray(layout.metricIds) && (layout.metricsCustomized || defaultMetrics.length > 0)
+  useEffect(() => { if (open && layout) { setCards(layout.cards); setMetricIds(JSON.parse(initialIdsKey) as string[]) } }, [open, layout, initialIdsKey])
+  const metricsDirty = metricsReady && JSON.stringify(metricIds) !== initialIdsKey
+  const defaultIds = JSON.parse(defaultIdsKey) as string[]
+  const metricChanges = layout?.metricsCustomized === true ? Array.from({ length: Math.max(layout.metricIds?.length ?? 0, defaultIds.length) }, (_, index) => layout.metricIds?.[index] !== defaultIds[index]).filter(Boolean).length : 0
+  const dirty = Boolean(layout) && (JSON.stringify(cards) !== JSON.stringify(layout?.cards) || metricsDirty)
+  const availableMetrics = metricOptions(defaultMetrics, industry)
+  const orderedMetrics = [...metricIds.map(id => availableMetrics.find(option => option.id === id) ?? { id, label: '表示できない項目' }), ...availableMetrics.filter(option => !metricIds.includes(option.id))]
+  const moveMetric = (index: number, step: -1 | 1) => setMetricIds(list => { const next = [...list]; const [item] = next.splice(index, 1); next.splice(index + step, 0, item); return next })
   const move = (index: number, step: -1 | 1) => setCards((list) => { const next = [...list]; const [item] = next.splice(index, 1); next.splice(index + step, 0, item); return next })
   const shown = cards.filter((c) => !c.locked)
   return (
     <Drawer open={open} title="表示を変える" titleAccessory={<HelpTip label="表示を変えるの説明">ダッシュボードに出すカードを選び、上下を入れ替えます。業種の型は初期の組みです。いつでも型に戻せます。</HelpTip>} closeAppearance="box" dirty={dirty} busy={busy} onClose={onClose}
-      footer={<div className={styles.drawerFoot}><Button onClick={onClose}>キャンセル</Button><Button variant="primary" busy={busy} busyLabel="保存しています" disabled={!dirty} onClick={() => onSave(cards)}>保存する</Button></div>}>
+      footer={<div className={styles.drawerFoot}><Button onClick={onClose}>キャンセル</Button><Button variant="primary" busy={busy} busyLabel="保存しています" disabled={!dirty} onClick={() => onSave(cards, metricsDirty ? metricIds : undefined)}>保存する</Button></div>}>
       {layout ? (
         <div className={styles.drawerBody}>
           <div className={styles.drawerBase}>
             <Scissors size={16} aria-hidden="true" />
-            <span className={styles.drawerBaseText}><strong>いまの型：{layout.base}</strong><span className={styles.cellMuted}>{layout.changed}か所を変えています</span></span>
+            <span className={styles.drawerBaseText}><strong>いまの型：{layout.base}</strong><span className={styles.cellMuted}>{layout.changed + metricChanges}か所を変えています</span></span>
             <span className={styles.grow} />
             <Button size="compact" onClick={() => setPicking(!picking)} aria-expanded={picking}><Shapes size={16} aria-hidden="true" />型を変える</Button>
             <Button size="compact" onClick={onReset} disabled={busy}><RotateCcw size={16} aria-hidden="true" />型に戻す</Button>
@@ -60,6 +74,18 @@ export function ViewDrawer({ open, layout, busy, onClose, onSave, onReset, onCha
               <span className={styles.cellMuted}>予約や友だちのデータはそのまま使えます</span>
             </div>
           ) : null}
+          <section className={styles.drawerSection} aria-label="数の帯">
+            <div className={styles.drawerSectionHead}><h3>数の帯</h3><HelpTip label="数の帯の説明">表示する数と順番を選びます。取得できない値は「—」で表示します。</HelpTip><span className={styles.grow} /><span className={styles.cellMuted}>5つまで</span></div>
+            {!metricsReady ? <Notice tone="info">数の表示設定を確認できないため、変更できません。読み直してください。</Notice> : null}
+            {metricsReady ? orderedMetrics.map(item => {
+              const index = metricIds.indexOf(item.id), checked = index >= 0
+              return <div key={item.id} className={styles.drawerRow}>
+                <SaveErrorField names={['metricIds']}><Toggle checked={checked} label={`数の帯：${item.label}`} disabled={busy || !metricsReady || (!checked && metricIds.length >= 5)} onChange={on => setMetricIds(list => on ? [...list, item.id] : list.filter(id => id !== item.id))} /></SaveErrorField>
+                <span className={styles.drawerLabel}>{item.label}</span><span className={styles.grow} />
+                {checked ? <><IconButton size="row" aria-label={`数の帯：${item.label}を上へ`} disabled={busy || !metricsReady || index <= 0} onClick={() => moveMetric(index, -1)}><ArrowUp size={16} /></IconButton><IconButton size="row" aria-label={`数の帯：${item.label}を下へ`} disabled={busy || !metricsReady || index === metricIds.length - 1} onClick={() => moveMetric(index, 1)}><ArrowDown size={16} /></IconButton></> : null}
+              </div>
+            }) : null}
+          </section>
           <section className={styles.drawerSection} aria-label="カード">
             <div className={styles.drawerSectionHead}><h3>カード</h3><HelpTip label="カードの説明">ダッシュボードのタブとカードです。上下だけ入れ替えられます。</HelpTip><span className={styles.grow} /><span className={styles.cellMuted}>上下だけ入れ替え</span></div>
             {shown.map((item) => {

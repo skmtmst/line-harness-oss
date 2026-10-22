@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ErrorCountBadge } from './error-count-badge'
+import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
+import { observeElementResize } from './element-resize-observer'
 import styles from './tabs.module.css'
 
 export interface TabItem {
@@ -93,34 +95,54 @@ export function Tabs({
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
   const currentKey = items.findIndex((item) => item.current)
   const itemWidthsKey = JSON.stringify(items.map(({ label, count, countTone, errorCount }) => [label, count, countTone, errorCount]))
+  const indicatorRef = useRef(indicator)
+  const queueMeasure = useRef<() => void>(() => {})
+  const observerKey = JSON.stringify(items.map(({ label, id, href }) => [label, id, Boolean(href)]))
   useLayoutEffect(() => {
-    const measure = () => {
-      if (wrap || typeof document === 'undefined') {
-        setIndicator(null)
-        return
-      }
+    let active = true
+    const key = {}
+    const commit = (next: { left: number; width: number } | null) => {
+      const previous = indicatorRef.current
+      if (!active || (previous === null && next === null)
+        || (previous !== null && next !== null && previous.left === next.left && previous.width === next.width)) return
+      indicatorRef.current = next
+      setIndicator(next)
+    }
+    if (wrap) {
+      commit(null)
+      return () => { active = false }
+    }
+    const read = () => {
+      if (!active) return () => {}
       const list = itemsRef.current
       const current = list?.querySelector<HTMLElement>('[aria-selected="true"]')
-      if (!list || !current) {
-        setIndicator(null)
-        return
-      }
+      if (!list || !current) return () => commit(null)
       const listBox = list.getBoundingClientRect()
       const tabBox = current.getBoundingClientRect()
+      // A hidden copy has no usable geometry; retain the last visible underline until it reopens.
+      if (listBox.width === 0 || tabBox.width === 0) return () => {}
       const next = { left: tabBox.left - listBox.left, width: tabBox.width }
-      setIndicator((prev) => (
-        prev && prev.left === next.left && prev.width === next.width ? prev : next
-      ))
+      return () => commit(next)
     }
-    measure()
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
-    if (itemsRef.current) {
-      observer?.observe(itemsRef.current)
-      itemsRef.current.querySelectorAll<HTMLElement>('[role="tab"]').forEach(tab => observer?.observe(tab))
+    const update = () => { if (active) scheduleMeasurement(key, read) }
+    queueMeasure.current = update
+    update()
+    const list = itemsRef.current
+    const stopObserving = observeElementResize(list ? [list, ...list.querySelectorAll<HTMLElement>('[role="tab"]')] : [], update)
+    const fonts = document.fonts
+    if (fonts?.status === 'loading') void fonts.ready.then(update)
+    fonts?.addEventListener?.('loadingdone', update)
+    window.addEventListener('resize', update)
+    return () => {
+      active = false
+      if (queueMeasure.current === update) queueMeasure.current = () => {}
+      cancelMeasurement(key)
+      stopObserving()
+      fonts?.removeEventListener?.('loadingdone', update)
+      window.removeEventListener('resize', update)
     }
-    window.addEventListener('resize', measure)
-    return () => { observer?.disconnect(); window.removeEventListener('resize', measure) }
-  }, [currentKey, itemWidthsKey, wrap])
+  }, [observerKey, wrap])
+  useLayoutEffect(() => { queueMeasure.current() }, [currentKey, itemWidthsKey, wrap, size, spacing, className])
   const sliding = indicator !== null
 
   return (
@@ -183,7 +205,7 @@ function Tab({ id, controls, label, href, count, countTone, errorCount, current,
 
   if (href && !current && !disabled) {
     return (
-      <Link href={href} replace {...shared}>
+      <Link href={href} prefetch={false} replace {...shared}>
         {body}
       </Link>
     )

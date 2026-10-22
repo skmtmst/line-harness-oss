@@ -54,7 +54,7 @@ describe('一覧の行の決まり（/193/194/195/198）', () => {
     expect(fittingTagCount([80, 80, 80], 100, 8, () => 40)).toBe(0)
   })
   it('+Nを押すと全件が見え、タグを外す操作も残る', () => {
-    vi.stubGlobal('ResizeObserver', class { observe() {}; disconnect() {} })
+    vi.stubGlobal('ResizeObserver', class { observe() {}; unobserve() {}; disconnect() {} })
     const remove = vi.fn()
     render(<TagOverflow maxVisible={0}><TagPill name="VIP" onRemove={remove} /><TagPill name="会員" /><TagPill name="常連" /></TagOverflow>)
     fireEvent.click(screen.getByRole('button', { name: 'すべてのタグ（ほか3件）' }))

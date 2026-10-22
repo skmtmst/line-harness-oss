@@ -13,7 +13,7 @@ export interface MenuItem {
   buffer_after_minutes: number;
   base_price: number;
   price_mode?: 'fixed' | 'free' | 'inquiry';
-  payment_mode?: 'none' | 'onsite' | 'online';
+  payment_mode?: 'none' | 'onsite' | 'online' | 'customer_choice';
   /** 同じメニューの公開設定。未取得を対面と推測しない。 */
   meeting_mode?: 'online' | 'in_person' | 'customer_choice';
   sort_order: number;
@@ -347,6 +347,8 @@ export interface BookingCancellationPreview {
   price: number;
   /** デポジット（今払う額）。無ければ null。 */
   deposit: { amount: number } | null;
+  /** 本人の選択条件。古いWorkerでは欠けるため、選択式では取得し直す。 */
+  payment?: { mode: 'none' | 'onsite' | 'online' | 'customer_choice'; allowedMethods: Array<'onsite' | 'online'> };
 }
 
 

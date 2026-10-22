@@ -204,7 +204,7 @@ export default function TopBar({
               「ホーム」で最初の画面へ（統括もふだんの画面も同じ殻）。
               の帯にだけ出すので v7 は変わらない。
             */}
-            <Link href={homeHref} className={styles.crumbHome}>
+            <Link prefetch={false} href={homeHref} className={styles.crumbHome}>
               <HomeGridIcon /><span>ホーム</span>
             </Link>
             <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
@@ -230,15 +230,15 @@ export default function TopBar({
                    */
                   <button type="button" className={`${styles.crumbFromLink} ${styles.crumbFromButton}`} onClick={() => requestUnsavedAction(crumb.onSelect!)}>{crumb.label}</button>
                 ) : crumb.href ? (
-                  <Link href={crumb.href} className={styles.crumbFromLink}>{crumb.label}</Link>
+                  <Link prefetch={false} href={crumb.href} className={styles.crumbFromLink}>{crumb.label}</Link>
                 ) : (
                   <span className={styles.crumbFrom}>{crumb.label}</span>
                 )}
                 <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
               </span>
             ))}
-            {title ? <h1 className={styles.crumbCurrent} title={title}>{titleHref ? <Link href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</h1>
-              : (() => { const last = (crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').at(-1); return last ? <h1 className={styles.crumbCurrent} title={last.label}>{last.href ? <Link href={last.href} className={styles.crumbCurrentLink}>{last.label}</Link> : last.label}</h1> : null })()}
+            {title ? <h1 className={styles.crumbCurrent} title={title}>{titleHref ? <Link prefetch={false} href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</h1>
+              : (() => { const last = (crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').at(-1); return last ? <h1 className={styles.crumbCurrent} title={last.label}>{last.href ? <Link prefetch={false} href={last.href} className={styles.crumbCurrentLink}>{last.label}</Link> : last.label}</h1> : null })()}
           </nav>
         </div>
       ) : null}
@@ -246,7 +246,7 @@ export default function TopBar({
       {!v8Chrome ? <div className={styles.titleGroup}>
         <h1 className={styles.title} title={title}>{title}</h1>
         {manualHref
-          ? <Link href={manualHref} className={styles.manual}><BookIcon /><span>マニュアル</span></Link>
+          ? <Link prefetch={false} href={manualHref} className={styles.manual}><BookIcon /><span>マニュアル</span></Link>
           : null}
       </div> : null}
 
@@ -347,6 +347,7 @@ export default function TopBar({
             </>
           ) : (
             <Link
+              prefetch={false}
               href="/notifications"
               className={`${styles.iconButton}`}
               aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}

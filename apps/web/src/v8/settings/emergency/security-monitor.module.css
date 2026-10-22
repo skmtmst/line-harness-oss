@@ -1,0 +1,17 @@
+/*
+ * ★V8 運用状態 › セキュリティの見張り。寸法は globals.css の [data-theme="v8"] の --tpl-sb-*（健全性チェックと同じ値）だけを使う。
+ */
+.panel { display: flex; flex-direction: column; gap: var(--tpl-sb-ec-gap); }
+.monitorIcon { flex: none; width: var(--tpl-sb-hc-banner-icon); height: var(--tpl-sb-hc-banner-icon); color: var(--color-ink-faint); }
+
+.listSection { display: flex; flex-direction: column; gap: var(--tpl-sb-ec-gap); }
+.heading { display: flex; align-items: baseline; gap: var(--space-8); margin: 0; color: var(--color-ink); font-size: var(--tpl-sb-hc-banner-title); font-weight: 700; line-height: var(--tpl-sb-hc-banner-title-lh); }
+.count { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 500; }
+
+.stack { display: flex; flex-direction: column; min-width: 0; }
+.main { min-width: 0; color: var(--color-ink); font-weight: 600; }
+.sub { color: var(--color-ink-secondary); font-size: var(--tpl-sb-row-sub); line-height: var(--tpl-sb-row-sub-lh); }
+.num { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-8); white-space: nowrap; }
+
+.pager { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-sb-ec-gap); color: var(--color-ink-secondary); font-size: var(--text-caption); }

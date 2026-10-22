@@ -49,8 +49,8 @@ if(process.argv[1]===fileURLToPath(import.meta.url)) {
  }
  if(measured.status!==0 || !complete) process.exitCode=1
  // 合否の55測定を終えてから別に診断。トレース負荷を正式の中央値へ混ぜない。
- if(complete && process.exitCode && process.env.CI==='true') {
-  const trace=spawnSync(process.execPath,[fileURLToPath(new URL('./perf3-profile.mjs',import.meta.url)),url,`${out}.diagnosis`,'1'],{stdio:'inherit',env:{...process.env,PERF3_DIAGNOSE:'only',PERF3_SCREENS:'broadcast-new,templates,tags,friends-2000'}})
+ if(complete && (process.exitCode || result.exceedances.length>0) && process.env.CI==='true') {
+  const trace=spawnSync(process.execPath,[fileURLToPath(new URL('./perf3-profile.mjs',import.meta.url)),url,`${out}.diagnosis`,'1'],{stdio:'inherit',env:{...process.env,PERF3_DIAGNOSE:'only',PERF3_SCREENS:'dashboard,broadcast-new,templates,tags,friends-2000'}})
   if(trace.status!==0) console.error('別の診断は未完了です。正式の測定結果と失敗判定は維持します。')
  }
 }

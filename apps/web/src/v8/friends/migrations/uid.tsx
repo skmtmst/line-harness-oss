@@ -10,6 +10,7 @@ import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
+import { PageFooter } from '@/components/templates/page-footer'
 import { Steps } from '@/components/templates/steps'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -346,38 +347,13 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
         </section>
 
         {active && registerOpen && canDecideItems ? register : null}
-
-        {active && reviewing ? (
-          <div className={styles.footer}>
-            <div className={styles.footerBar}>
-              <span />
-              <div className={styles.footerCenter}>
-                <Button href="/friends">キャンセル</Button>
-                {executeBlockedReason ? (
-                  <span className={styles.small}>{executeBlockedReason}</span>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="primary"
-                    disabled={active.status !== 'ready' || m.busy || m.detailBusy}
-                    title={active.status !== 'ready' ? '要確認をすべて決めると進めます' : undefined}
-                    onClick={() => { m.setExecuteError(null); m.setConfirmExecute(true) }}
-                  >
-                    本移行へ進む
-                  </Button>
-                )}
-              </div>
-              <span />
-            </div>
-          </div>
-        ) : null}
       </>
     )
   }
 
   return (
     /* 要確認の判断は板を画面の高さまで伸ばし、キャンセルの帯を画面の下に追従させる。 */
-    <PageFrame kind="list" boardId={active && !reviewing ? 'L48eY' : 'Z0jHp'} heightMode={active && reviewing ? 'viewport' : undefined}>
+    <PageFrame kind="list" boardId={active && !reviewing ? 'L48eY' : 'Z0jHp'} hasFooter={Boolean(active && reviewing)} heightMode={active && reviewing ? 'viewport' : undefined}>
       <FriendsSectionHead
         current="uid-migration"
         description="友だち情報と配信停止の状態を、新しいLINEアカウントへ引き継ぎます"
@@ -388,7 +364,23 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
           </Button>
         )}
       />
-      <div className={styles.body} data-fill={active && reviewing ? '' : undefined}>{body}</div>
+      <div className={styles.body} data-template-region="body">{body}</div>
+      {active && reviewing ? <PageFooter actions={<>
+        <Button href="/friends">キャンセル</Button>
+        {executeBlockedReason ? (
+          <span className={styles.small}>{executeBlockedReason}</span>
+        ) : (
+          <Button
+            type="button"
+            variant="primary"
+            disabled={active.status !== 'ready' || m.busy || m.detailBusy}
+            title={active.status !== 'ready' ? '要確認をすべて決めると進めます' : undefined}
+            onClick={() => { m.setExecuteError(null); m.setConfirmExecute(true) }}
+          >
+            本移行へ進む
+          </Button>
+        )}
+      </>} /> : null}
 
       <MigrationItemDialog detailItem={m.detailItem} active={active} me={m.me} busy={m.busy} detailError={m.detailError} onClose={() => { m.setDetailItem(null); m.setDetailError(null) }} decide={(item, decision) => void m.decide(item, decision)} />
       <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy} open={m.confirmExecute && isOwnerRole(m.me?.role)} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />

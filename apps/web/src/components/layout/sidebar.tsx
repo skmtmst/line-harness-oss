@@ -289,7 +289,10 @@ export default function Sidebar({
       void Promise.all([import('@/lib/feature-visibility-cache'), import('@/lib/feature-settings-cache')])
         .then(async ([{ loadFeatureVisibility }, { loadFeatureSettings }]) => {
           // 画面側の useFeatureVisibility と同じ答えを共有する（V6R-S0-b）。
-          const visibility = await loadFeatureVisibility(accountId)
+          const visibilityRequest = loadFeatureVisibility(accountId)
+          // 並びは表示可否の結果を使わない。確認済み管理者だけ並行して読み、失敗は先に受け止める。
+          const settingsRequest = canManageFeatureSettings ? loadFeatureSettings(accountId).catch(() => null) : null
+          const visibility = await visibilityRequest
           const features = visibility.success ? visibility.data?.features : undefined
           if (!cancelled && isBooleanRecord(features)) {
             setSectionOrder(null)
@@ -305,8 +308,8 @@ export default function Sidebar({
           if (!canManageFeatureSettings) return
           try {
             // 機能設定画面と同じ答えを共有する。保存の合図で捨てられる。
-            const settings = await loadFeatureSettings(accountId)
-            if (!cancelled && settings.success) {
+            const settings = await settingsRequest
+            if (!cancelled && settings?.success) {
               setExplicitSettings({ accountId, value: settings.data.version > 0 })
               setSectionOrder(settings.data.sidebarOrder)
               setItemOrder(settings.data.sidebarItemOrder)

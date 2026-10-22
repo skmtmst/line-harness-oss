@@ -16,6 +16,8 @@ import { RowMenu } from '@/components/shared/row-actions'
 import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import StickyBar, { StickyBarRegion } from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
+import TruncatedText from '@/components/shared/truncated-text'
+import { DetailColumns } from '@/components/templates/detail-columns'
 import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import type { AccountWithStats } from '@/contexts/account-context'
@@ -56,19 +58,6 @@ import ReferenceFrame from './reference-frame'
 import { bannerFailureMessage,tileLabel } from './words'
 
 
-
-/*
- * ★V8 バナー生成・プロジェクトの中（Pencil ・生成中 ・上限 ）。
- * 窓：画像の詳細 ・一覧から外す ・アーカイブ ・名前と説明を変える。
- *
- * 管理画面 の画面（app/hq/banners/project/page.tsx）と、読み書きの口・1枚ずつ作る繰り返し・
- * 戻ったら続きから動く・失敗時の扱い・`?id=` `?from=` は同じ。見た目だけを絵どおりに一から組んだ：
- * 頭（型 ListPage：題・説明／来た道の案内・操作5つ）→ 左に札と画像のます、右に生成パネル。
- *
- * 右の生成パネルは共通の GenerationPanel をそのまま使う。絵は「用途の選ぶ欄・切り抜きの位置・
- * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
- * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
- */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound' | 'missing'
 type Filter = 'all' | 'favorite' | 'delivered'
@@ -139,6 +128,10 @@ function ProjectInner() {
   const cancelRef = useRef(false)
   const loopRef = useRef<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const [panelExpanded, setPanelExpanded] = useState(false)
+  const [panelRequest, setPanelRequest] = useState(0)
+  useEffect(() => { if (panelRequest) panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, [panelRequest])
+  const revealPanel = () => { setPanelExpanded(true); setPanelRequest(n => n + 1) }
   const fileRef = useRef<HTMLInputElement>(null)
 
   usePageTitle(project?.name ?? null)
@@ -556,7 +549,7 @@ function ProjectInner() {
   const archived = Boolean(project.archivedAt)
   const limited = bannerLimitKind(usage) !== null
   const boardId = running ? 'p03ImY' : limited ? 'zOpMG' : 'iMnph'
-  const description = `${project.description ? `${project.description.replace(/。$/, '')}。` : ''}右で用途とテキストを決めて生成し、気に入った画像をアカウントへ配ります。`
+  const description = `${project.description ? `${project.description.replace(/。$/, '')}。` : ''}生成パネルで用途とテキストを決めて生成し、気に入った画像をアカウントへ配ります。`
   const favoriteCount = images.filter((i) => i.isFavorite).length
   const deliveredCount = images.filter((i) => i.deliveredAccountIds.length > 0).length
   const doneSoFar = running ? running.doneCount + running.failedCount : 0
@@ -602,7 +595,13 @@ function ProjectInner() {
       {/* ページ内の戻るリンク（プロジェクト一覧 › …）は置かない。戻るは上のパンくずだけ（決まり 2026-10-08）。 */}
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
-        <div className={styles.split}>
+        <DetailColumns presentation="card" asideLabel="用途とテキストの設定" toggleLabel="用途とテキストを設定" expanded={panelExpanded} onExpandedChange={setPanelExpanded}
+          aside={canManage ? <div ref={panelRef}>
+            <GenerationPanel v8Layout presets={presets} maxCount={maxCount} value={input}
+              onChange={(next) => { setInputTouched(true); setInput(next) }} disabled={Boolean(running) || archived || !engineReady}
+              referenceImages={referenceImages} onPickReference={openPicker} onUploadReference={(file) => void uploadReference(file)}
+              referenceBusy={referenceBusy} usage={usage} onReloadUsage={loadUsage} usageHeading monthRemaining />
+          </div> : null}>
           <section className={styles.gallery} aria-labelledby={galleryHeadId}>
             {/* G-6（sr0Po）：画像を押すと詳細、選ぶ操作はその下の右端。 */}
             <div className={styles.galleryHead}>
@@ -643,7 +642,7 @@ function ProjectInner() {
               <ListState permissionScope="hq"
                 kind="empty"
                 title="まだ画像がありません"
-                description="右の生成パネルで用途とテキストを決めて「生成する」を押すと、ここに並びます。手持ちの画像は「画像を取り込む」から入れられます。"
+                description="生成パネルで用途とテキストを決めて「生成する」を押すと、ここに並びます。手持ちの画像は「画像を取り込む」から入れられます。"
               />
             ) : visible.length === 0 && pendingCount === 0 ? (
               <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => setFilter('all')}>条件を外す</Button>} />
@@ -660,7 +659,7 @@ function ProjectInner() {
                       <Thumb image={image} />
                     </button>
                     <div className={styles.tileMeta}>
-                      <span className={styles.metaText}>{tileLabel(presets.find((p) => p.key === image.generation?.presetKey), image)}</span>
+                      <TruncatedText className={styles.metaText} value={tileLabel(presets.find((p) => p.key === image.generation?.presetKey), image)} />
                       <span className={styles.spacer} />
                       {image.deliveredAccountIds.length > 0 ? <span className={styles.pillOk}><span className={styles.dot} aria-hidden="true" />配布済み</span> : null}
                       {canManage ? (
@@ -673,7 +672,10 @@ function ProjectInner() {
                 ) })())}
               </div>
             )}
-            {/* 下の帯は左の本文の幅だけに置き、右の生成パネルに重ねない（司令塔 2026-10-15・iMnph）。 */}
+
+          </section>
+
+        </DetailColumns>
             <StickyBarRegion gap="var(--tpl-hb-gallery-gap)" feedback={blockedReason && input.presetKey && !running && (inputTouched || !validation) ? <p className={styles.warnText}>{blockedReason}</p> : null}>
             {/* 入力が足りないだけの理由は、開いたばかりでは出さない（触ってから）。接続・アーカイブ・上限はすぐ出す。 */}
 
@@ -716,30 +718,6 @@ function ProjectInner() {
               />
             ) : null}
             </StickyBarRegion>
-          </section>
-
-          {canManage ? (
-            <div ref={panelRef} className={styles.panel}>
-              <GenerationPanel
-                v8Layout
-                presets={presets}
-                maxCount={maxCount}
-                value={input}
-                onChange={(next) => { setInputTouched(true); setInput(next) }}
-                disabled={Boolean(running) || archived || !engineReady}
-                referenceImages={referenceImages}
-                onPickReference={openPicker}
-                onUploadReference={(file) => void uploadReference(file)}
-                referenceBusy={referenceBusy}
-                usage={usage}
-                onReloadUsage={loadUsage}
-                /* 承認済み ★BG-B `qIp42` の `ta8eS`「利用量」。この板だけが見出しを持つ。 */
-                usageHeading
-                monthRemaining
-              />
-            </div>
-          ) : null}
-        </div>
 
       </div>
 
@@ -812,12 +790,12 @@ function ProjectInner() {
             const generation = openImage.generation
             if (generation) setInput(inputFromGeneration(generation))
             setOpenImage(null)
-            panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            revealPanel()
           } : undefined}
           onUseAsReference={() => {
             addReference(openImage)
             setOpenImage(null)
-            panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            revealPanel()
           }}
         />
       ) : null}
