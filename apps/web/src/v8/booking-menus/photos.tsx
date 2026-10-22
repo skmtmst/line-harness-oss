@@ -30,7 +30,7 @@ function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, 
   onPick: () => void; onRemove: () => void; onSave?: () => void; orderActions?: React.ReactNode
   disabledReason?: string; visibilityControl?: React.ReactNode; visibilityLabel?: string
 }) {
-  return <Card layout="vertical" overflow="hidden" aria-label={`${name}の写真`}>
+  return <Card frame="flat" layout="vertical" overflow="hidden" aria-label={`${name}の写真`}>
     <div className={styles.photo}>
       {photo ? <MediaThumbnail kind="image" src={api.media.contentUrl(photo.mediaId, accountId)} alt={`${name}の写真`} />
         : <ListEmptyMessage>写真はありません</ListEmptyMessage>}
