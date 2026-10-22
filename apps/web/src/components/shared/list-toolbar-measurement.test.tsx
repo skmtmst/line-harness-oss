@@ -208,6 +208,37 @@ it('札の自然幅が増えた通知では、書込前の小さい幅に惑わ�
   expect(change).not.toHaveBeenCalled()
 })
 
+it.each([['0', 100], ['', 100], ['1', 0]] as const)('伸び率「%s」の操作が200から%dへ縮む通知で、反映後の幅で収まりを判断する', (grow, nextWidth) => {
+  const { observers, reads } = environment()
+  let natural = 200, available = 400
+  const nativeStyle = getComputedStyle
+  vi.spyOn(globalThis, 'getComputedStyle').mockImplementation(element => {
+    const css = nativeStyle(element)
+    return element.tagName !== 'DETAILS' ? css : new Proxy(css, { get(target, property) {
+      if (property === 'flexGrow') return grow
+      const value = Reflect.get(target, property, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+  })
+  reads.mockImplementation(function (this: HTMLElement) {
+    const optional = this.tagName === 'DETAILS' ? this : this.querySelector<HTMLElement>('details')
+    const width = optional ? Math.max(natural, Number.parseFloat(optional.style.getPropertyValue('--toolbar-optional-width')) || 0) : natural
+    return new DOMRect(0, 0, width, 32)
+  })
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => available)
+  const { container } = render(<ListToolbarFrame><ListToolbarRow><ListToolbarOptional collapse="overflow"><button>保存した検索</button></ListToolbarOptional></ListToolbarRow></ListToolbarFrame>)
+  const item = container.querySelector('details')!, button = item.querySelector('button')!
+  expect(item.style.getPropertyValue('--toolbar-optional-width')).toBe('200px')
+  expect(item.hasAttribute('data-collapsed')).toBe(false)
+  const attributes = vi.spyOn(item, 'setAttribute')
+  natural = nextWidth; available = 150
+  const observer = observers.find(instance => instance.observe.mock.calls.some(([node]) => node === button))!
+  act(() => { observer.callback([], {} as ResizeObserver) })
+  expect(item.style.getPropertyValue('--toolbar-optional-width')).toBe(`${nextWidth}px`)
+  expect(item.hasAttribute('data-collapsed')).toBe(false)
+  expect(attributes.mock.calls.some(([name]) => name === 'data-collapsed')).toBe(false)
+})
+
 it.each([0, 216])('操作の自然幅%dをsnapshotで渡しても即時fitと同じ需要になり、測定中はDOM幅を書かない', async width => {
   const { toolbarContentFit, measureToolbarOptionalWidth, fitToolbarOptionalWidth } = await import('./list-toolbar-fit.mjs')
   const toolbar = document.createElement('div'), item = document.createElement('details'), content = document.createElement('div'), button = document.createElement('button')

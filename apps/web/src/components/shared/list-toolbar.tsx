@@ -256,9 +256,13 @@ function OverflowTools({ children, label }: { children: ReactNode; label: string
       if (!item.isConnected) return
       if (item.hasAttribute('data-collapsed') && item.open) fitToolbarOverflowPanel(item, toolbar)
       const width = measureToolbarOptionalWidth(item)
+      const growing = width !== null && width > 0 && parseFloat(getComputedStyle(item).flexGrow) > 0
       if (width !== null) expandedWidth.current = width
-      const collapsed = !toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100), { optional: { element: item, width: expandedWidth.current } }).fits
-      if (width !== null) fitToolbarOptionalWidth(item, width)
+      // A non-growing box's min-width affects geometry; fit after committing that width.
+      if (width !== null && !growing) fitToolbarOptionalWidth(item, width)
+      const snapshot = growing ? { optional: { element: item, width: expandedWidth.current } } : undefined
+      const collapsed = !toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100), snapshot).fits
+      if (growing) fitToolbarOptionalWidth(item, width)
       setCollapsed(collapsed)
     }
     const observer = observeToolbarContent(item, () => [toolbar, ...toolbar.querySelectorAll('button,input')], measure, true)
