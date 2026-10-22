@@ -48,6 +48,14 @@ describe('invocation context', () => {
     });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+  it('定期処理の固定分類だけを構造フィールドへ残す',()=>{
+    const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+    logger.error('scheduled.job_failed',{scheduledJob:'booking_expirer',failureKind:'type_error'});
+    logger.error('scheduled.job_failed',{scheduledJob:'unregistered-job',failureKind:'unregistered-kind'} as never);
+    expect(JSON.parse(String(log.mock.calls[0][0]))).toMatchObject({scheduledJob:'booking_expirer',failureKind:'type_error'});
+    expect(JSON.parse(String(log.mock.calls[1][0]))).not.toHaveProperty('scheduledJob');
+    expect(JSON.parse(String(log.mock.calls[1][0]))).not.toHaveProperty('failureKind');
+  });
   it('構造化ログに秘密・個人情報・例外や任意の値を混ぜない', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     withInvocation('http', () => logger.error('fixed.failure', {

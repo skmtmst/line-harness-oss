@@ -1,4 +1,5 @@
 import { formatYen as yen } from '@line-crm/shared';
+import { staffNominationFee } from './booking-price.js';
 import type { MenuAddon, MenuItem, StaffItem } from './api.js';
 
 /*
@@ -33,14 +34,14 @@ export const menuOf = (party: PartyState, first: MenuItem, index: number): MenuI
 export const addonsOf = (menu: MenuItem, member: PartyMember): MenuAddon[] => (menu.addons ?? []).filter((a) => member.addonIds.includes(a.id));
 
 export function memberMinutes(menu: MenuItem, member: PartyMember): number {
-  return menu.duration_minutes + addonsOf(menu, member).reduce((n, a) => n + a.duration_minutes, 0);
+  return (member.staff?.duration_minutes ?? menu.duration_minutes) + addonsOf(menu, member).reduce((n, a) => n + a.duration_minutes, 0);
 }
 export function memberPrice(menu: MenuItem, member: PartyMember): number {
-  return menu.base_price + addonsOf(menu, member).reduce((n, a) => n + a.price, 0);
+  return (member.staff?.price ?? menu.base_price) + addonsOf(menu, member).reduce((n, a) => n + a.price, 0);
 }
-/** 指名料＝担当の料金とメニューの料金の差。指名なし・差が無いときは 0。 */
-export function designationFee(menu: MenuItem, member: PartyMember): number {
-  return member.staff && !member.staff.is_designation_optional ? Math.max(0, member.staff.price - menu.base_price) : 0;
+/** APIが返した指名料。指名なしの人には加算しない。 */
+export function designationFee(_menu: MenuItem, member: PartyMember): number {
+  return member.staff ? staffNominationFee(member.staff) : 0;
 }
 
 export function totals(party: PartyState, first: MenuItem) {

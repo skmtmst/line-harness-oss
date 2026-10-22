@@ -31,9 +31,13 @@ describe('デリバリー受注：共通の仮サーバーの応答契約', () =
       env: { ...process.env, PORT: String(port) },
       stdio: 'ignore',
     })
-    for (let attempt = 0; attempt < 50; attempt++) {
+    const startupDeadline = Date.now() + 5000
+    while (Date.now() < startupDeadline) {
+      if (child.exitCode !== null || child.signalCode !== null) {
+        throw new Error(`偽 API が起動前に終了しました: ${child.exitCode ?? child.signalCode}`)
+      }
       try {
-        if ((await fetch(`${baseUrl}/__mock-fingerprint`)).ok) return
+        if ((await fetch(`${baseUrl}/__mock-fingerprint`, { signal: AbortSignal.timeout(500) })).ok) return
       } catch { /* 起動待ち */ }
       await new Promise((resolve) => setTimeout(resolve, 20))
     }

@@ -1,4 +1,4 @@
-import { signedLiffState } from '../test-utils/liff-oauth.js';
+import { signedLiffState, mockLineIdToken } from '../test-utils/liff-oauth.js';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import Database from 'better-sqlite3';
@@ -168,7 +168,7 @@ function postIntent(app: Hono<Env>, env: Env['Bindings'], ref: string) {
     '/api/liff/friend-add-intent',
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mockLineIdToken('login1')}` },
       body: JSON.stringify({ ref, source: 'liff' }),
     },
     env,

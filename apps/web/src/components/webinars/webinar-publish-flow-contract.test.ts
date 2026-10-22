@@ -3,45 +3,12 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const FORM = fs.readFileSync(path.join(__dirname, 'webinar-form.tsx'), 'utf8')
 const DONE = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'webinars', 'published', 'page.tsx'), 'utf8')
 /** 撮影モックの公開応答は、本物と同じ器で返す。 */
 const MOCK = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 
 describe("管理画面 ウェビナー公開前確認と公開完了の契約", () => {
-  it('下書きから公開へ変えるときだけ確認を挟む', () => {
-    /*
-      未保存判定の正本は「最後に保存できた内容」（baseline）。
-      段を往復しても入力が残るので、公開の確認は baseline との差で決める。
-    */
-    expect(FORM).toContain("const isPublishing = status === 'active' && baseline.status !== 'active'")
-    expect(FORM).toContain('<ConfirmDialog')
-    /*
-      題は**ウェビナーの名前**を出す。「このウェビナーを」だと、2枚開いて
-      いるときにどちらを公開するのか読めない（削除の窓 `EGMb1` と同じ形）。
-    */
-    expect(FORM).toContain("title={`「${title || '無題のウェビナー'}」を公開しますか？`}")
-    expect(FORM).toContain('この内容で公開する')
-    expect(FORM).toContain('requestSave()')
-  })
-
-  it('動画・配信枠・動画時間が無い状態では公開させない', () => {
-    expect(FORM).toContain('if (!videoReady)')
-    expect(FORM).toContain('if (rules.length === 0)')
-    expect(FORM).toContain('durationMinutes < 1')
-    expect(FORM.indexOf('const problem = publicationProblem()')).toBeLessThan(FORM.indexOf('setPublishConfirmOpen(true)'))
-  })
-
-  it('公開APIの実際の返事に含まれるIDだけを完了画面へ渡す', () => {
-    /*
-      R95: 公開は公開専用口を通す。完了画面の行き先は保存の返事のIDから
-      作り、作り話の status=success は付けない。
-    */
-    expect(FORM).toContain('return publishNow(updated.data.id)')
-    expect(FORM).toContain('return publishNow(created.data.id)')
-    expect(FORM).toContain('`/webinars/published?id=${webinarId}`')
-    expect(FORM).not.toContain('/webinars/published?status=success')
-  })
+  // 保存・公開前検査・専用APIは v8/webinar-edit/video-publish.test.tsx の実DOM試験で守る。
 
   it('公開完了は実Nodeと実データだけを表示する', () => {
     expect(DONE).toContain('data-design-node="TimXl"')

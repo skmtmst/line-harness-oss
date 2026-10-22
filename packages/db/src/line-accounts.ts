@@ -38,6 +38,7 @@ export {
 } from './line-accounts-create.js';
 export {
   getLineAccountById,
+  getLineAccountLoginChannels,
   getLineAccounts,
   listLineAccountsWithTenantStatus,
   getLineAccountTenantStatus,

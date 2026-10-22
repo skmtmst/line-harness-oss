@@ -192,7 +192,6 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   'v8/template-edit/frame.tsx': 'v8/template-edit/message.tsx',
   // リンクの見え方も含め、入力は親のスナップショットへ即時反映する。窓を閉じても残り、離脱は親の番兵が守る。
   'v8/form-edit/appearance-tab.tsx': 'v8/form-edit/edit.tsx',
-  'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
   'app/affiliate-offers/new/page.tsx': 'v8/affiliate-offer-new/create.tsx',
@@ -416,8 +415,6 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/accounts/account-edit-modal.tsx':
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'components/auto-replies/edit-dialog.tsx':
-    's2: 自動応答の編集。共通ダイアログは背景クリックとEscで閉じる。V6R-S2-a（board#1066）で付ける',
   'components/broadcasts/broadcast-asset-manager.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/friend-fields/support-mark-rules-panel.tsx':

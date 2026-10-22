@@ -8,6 +8,13 @@ type Availability = {
   closed_dates: string[]
 }
 
+type EventBookingsPage = {
+  items: Array<{ id: string; event_id: string; slot_id: string; status: string }>
+  total: number
+  limit: number
+  sort: Array<{ field: string; direction: string }>
+}
+
 describe('予約の空き枠：偽 API と Worker の応答契約', () => {
   let child: ChildProcess
   let baseUrl: string
@@ -43,6 +50,36 @@ describe('予約の空き枠：偽 API と Worker の応答契約', () => {
     expect(response.status).toBe(200)
     return response.json()
   }
+
+  it('イベント予約の全件を重複なく有限ページで返し、最終頁の次は空になる', async () => {
+    const read = async (page: number) => {
+      const response = await fetch(`${baseUrl}/api/events/admin/events/ev-1/bookings?page=${page}&limit=2`)
+      expect(response.status).toBe(200)
+      return response.json() as Promise<EventBookingsPage>
+    }
+    const first = await read(1)
+    expect(first).toMatchObject({ total: 6, limit: 2, sort: [{ field: 'requested_at', direction: 'desc' }, { field: 'id', direction: 'desc' }] })
+    const ids = first.items.map(item => item.id)
+    for (let page = 2; page <= Math.ceil(first.total / first.limit); page += 1) {
+      const result = await read(page)
+      expect(result.total).toBe(first.total)
+      ids.push(...result.items.map(item => item.id))
+    }
+    expect(ids).toHaveLength(first.total)
+    expect(new Set(ids).size).toBe(first.total)
+    expect((await read(4)).items).toEqual([])
+  })
+
+  it('イベント・開催回・状態で絞った後の総件数を返す', async () => {
+    const read = async (event: string, query: string) => fetch(`${baseUrl}/api/events/admin/events/${event}/bookings?${query}`)
+      .then(response => response.json() as Promise<EventBookingsPage>)
+    const confirmed = await read('ev-1', 'slot_id=event-slot-1&status=confirmed&limit=2')
+    expect(confirmed.total).toBe(3)
+    expect(confirmed.items).toHaveLength(2)
+    expect(confirmed.items.every(item => item.event_id === 'ev-1' && item.slot_id === 'event-slot-1' && item.status === 'confirmed')).toBe(true)
+    expect(await read('ev-1', 'slot_id=missing')).toMatchObject({ items: [], total: 0 })
+    expect(await read('missing', '')).toMatchObject({ items: [], total: 0 })
+  })
 
   it.each([
     ['2026-09-03', false],

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -852,7 +853,7 @@ describe('Googleビジネス：口コミ', () => {
 describe('実際の本番・検証設定を組み合わせたルート', () => {
   it.each(['production', 'staging'] as const)('%s のGoogle接続は開き、飲食店だけ独立して閉じる', async environment => {
     const { unstable_readConfig } = await import('wrangler');
-    const config = unstable_readConfig({ config: new URL(environment === 'production' ? '../../wrangler.toml' : '../../wrangler.staging.toml', import.meta.url).pathname });
+    const config = unstable_readConfig({ config: fileURLToPath(new URL(environment === 'production' ? '../../wrangler.toml' : '../../wrangler.staging.toml', import.meta.url)) });
     Object.assign(env, config.vars);
     seedStore();
     const google = await call('/api/restaurant-test/google/connection?account_id=account-2');

@@ -40,7 +40,6 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: fixture.accountId, liffId: 'liff' }], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
-vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
 vi.mock('@/components/shared/select', () => ({
   default: ({ value, onChange, options, size: _size, ...props }: {
     value: string

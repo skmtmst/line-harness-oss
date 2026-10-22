@@ -2,7 +2,7 @@ import { useCustomerWords, useCustomerStyle } from './customer-style-scope.js';
 import PaymentPreparingNote from './payment-preparing-note.js';
 import { useEffect,useState } from 'react';
 import { api,type BookingEntitlement,type CreateBookingResponse,type MenuItem,type StaffItem } from '../lib/api.js';
-import { bookingPriceText } from '../lib/booking-price.js';
+import { bookingPriceText, staffBookingPrice } from '../lib/booking-price.js';
 import { useRef } from 'react';
 import { type BookingCancellationPreview } from '../lib/api.js';
 import CancellationPolicy from './cancellation-policy.js';
@@ -137,7 +137,7 @@ export default function Confirm({
     : paymentMode === 'online' || paymentMode === 'onsite' ? paymentMode : null;
   const missingPaymentOptions = paymentMode === 'customer_choice' && !paymentOptions;
   const missingPaymentChoice = !chosenEntitlement && paymentMode === 'customer_choice' && (!paymentMethod || missingPaymentOptions);
-  const onlinePayment = paymentMethod === 'online' && (party ? totals(party, menu).price : staff.price) > 0;
+  const onlinePayment = paymentMethod === 'online' && (party ? totals(party, menu).price : staffBookingPrice(staff)) > 0;
   const immediateConfirmation = autoConfirm && !onlinePayment && !missingPaymentChoice;
   useEffect(() => { onPaymentChange?.(onlinePayment); }, [onlinePayment, onPaymentChange]);
 
@@ -244,7 +244,7 @@ export default function Confirm({
         <Row
           alignEnd={policy !== null}
           label="料金"
-          value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : party ? `${yen(totals(party, menu).price)}（目安）` : policy || paymentMode === 'online' || paymentMode === 'customer_choice' ? bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・当日払う）`}
+          value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : party ? `${yen(totals(party, menu).price)}（目安）` : policy || paymentMode === 'online' || paymentMode === 'customer_choice' ? bookingPriceText(staffBookingPrice(staff), staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staffBookingPrice(staff), staff.price_mode ?? menu.price_mode)}（目安・当日払う）`}
         />
         {policy?.deposit ? (
           <>

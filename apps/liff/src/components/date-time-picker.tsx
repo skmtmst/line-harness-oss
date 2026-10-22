@@ -271,6 +271,8 @@ export default function DateTimePicker({
   menu,
   staff,
   hint,
+  addonIds = [],
+  additionalDurationMinutes = 0,
   selected,
   onSelect,
   onConfirm,
@@ -282,6 +284,8 @@ export default function DateTimePicker({
   menu: MenuItem;
   staff: StaffItem;
   hint?: string;
+  addonIds?: readonly string[];
+  additionalDurationMinutes?: number;
   selected: SlotPick | null;
   onSelect: (s: SlotPick | null) => void;
   /** 下の帯の主ボタン (週: 内容を確かめる / peek: この時間で予約に進む)。 */
@@ -294,6 +298,7 @@ export default function DateTimePicker({
   onEmptyState?: (empty: boolean) => void;
 }) {
   const today = jstToday();
+  const addonKey = JSON.stringify(addonIds);
   // 414 幅の板（）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
   // 予約の設定（最初の形・受付期間・カレンダーの出し方・空きの点）。
@@ -408,7 +413,7 @@ export default function DateTimePicker({
     setWeekLoading(true);
     setWeekFailed(false);
     api
-      .availability(menu.id, staff.id, from, to)
+      .availability(menu.id, staff.id, from, to, JSON.parse(addonKey) as string[])
       .then((r) => {
         if (cancelled) return;
         const { byDate, fullDates, limitedDates, openDates } = groupSlots(
@@ -433,7 +438,7 @@ export default function DateTimePicker({
     return () => {
       cancelled = true;
     };
-  }, [view, settings, winStart, menu.id, staff.id, today, windowEnd, loadedWins, weekReloadKey]);
+  }, [view, settings, winStart, menu.id, staff.id, addonKey, today, windowEnd, loadedWins, weekReloadKey]);
 
   // 見ている週が読めたら、空きのある一番早い日を選ぶ。
   // 利用者がまだ日を選んでいない間だけ選び直す。
@@ -469,7 +474,7 @@ export default function DateTimePicker({
     let cancelled = false;
     let settled = false;
     void Promise.all(
-      splitRange(from, to).map(([head, tail]) => api.availability(menu.id, staff.id, head, tail)),
+      splitRange(from, to).map(([head, tail]) => api.availability(menu.id, staff.id, head, tail, JSON.parse(addonKey) as string[])),
     )
       .then((results) => {
         settled = true;
@@ -499,7 +504,7 @@ export default function DateTimePicker({
       // 外さないと、その月へ戻っても読み始めず読み込み中のまま残る。
       if (!settled) loadingMonthsRef.current.delete(loadingKey);
     };
-  }, [view, settings, month, menu.id, staff.id, today, windowEnd, loadedMonths, calReloadKey]);
+  }, [view, settings, month, menu.id, staff.id, addonKey, today, windowEnd, loadedMonths, calReloadKey]);
 
   // 見ている月が読めたら、その月で空きのある一番早い日を選ぶ。
   // 利用者がまだ日を選んでいない間だけ選び直す。選んだ後の月送り・
@@ -631,7 +636,7 @@ export default function DateTimePicker({
   const listTimes = listDay ? (weekByDate?.[listDay] ?? []) : [];
 
   const slotEnd =
-    selected && addMinutesHm(selected.start, staff.duration_minutes);
+    selected && addMinutesHm(selected.start, staff.duration_minutes + additionalDurationMinutes);
 
   const toggleButton = (target: DateView, label: string) => {
     const active = view === target;

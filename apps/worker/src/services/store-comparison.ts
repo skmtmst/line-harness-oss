@@ -46,13 +46,26 @@ export async function storeNumbers(db:D1Database,a:string,period:ReturnType<type
  return {values,style,computedAt:full?rows.map(r=>String(r.computed_at)).sort()[0]??null:null,trend:observations};
 }
 
-/** Work through stores independently, retrying a failed store after one hour. */
+/** Reserve one historical slot and one yesterday slot per tick, so new work cannot starve repair. */
 export async function processStoreComparison(db:D1Database,now=new Date()){
- const day=japanDateOffset(-1, now);
- const account=await db.prepare(`SELECT a.id FROM line_accounts a WHERE a.is_active=1 AND a.archived_at IS NULL AND NOT EXISTS(SELECT 1 FROM hq_store_daily_metrics m WHERE m.account_id=a.id AND m.date=? AND (m.state!='failed' OR julianday(m.computed_at)>julianday(?,'-1 hour'))) ORDER BY a.id LIMIT 1`).bind(day,now.toISOString()).first<{id:string}>();
- if(!account)return;
- try{await snapshotStoreMetrics(db,account.id,day,now);}catch(error){
-  await db.prepare("INSERT INTO hq_store_daily_metrics(account_id,date,state,computed_at) VALUES(?,?,'failed',?) ON CONFLICT(account_id,date) DO UPDATE SET state='failed',computed_at=excluded.computed_at").bind(account.id,day,now.toISOString()).run();
-  throw error;
+ const yesterday=japanDateOffset(-1, now);
+ let failed:unknown;
+ for(const historical of [true,false]){
+  const account=await db.prepare(`WITH RECURSIVE days(day) AS (
+    SELECT ? UNION ALL SELECT date(day,'-1 day') FROM days WHERE day>date(?,'-366 days')
+  ) SELECT a.id,days.day FROM days CROSS JOIN line_accounts a
+  WHERE a.is_active=1 AND a.archived_at IS NULL AND ${historical ? 'days.day<?' : 'days.day=?'}
+    AND (days.day=? OR days.day>=CASE WHEN upper(substr(a.created_at,-1))='Z' OR substr(a.created_at,-6,1) IN('+','-')
+      THEN date(a.created_at,'+9 hours') ELSE MIN(date(a.created_at),date(a.created_at,'+9 hours')) END
+      OR days.day>=(SELECT MIN(m.date) FROM hq_store_daily_metrics m WHERE m.account_id=a.id))
+    AND NOT EXISTS(SELECT 1 FROM hq_store_daily_metrics m WHERE m.account_id=a.id AND m.date=days.day
+      AND (m.state!='failed' OR julianday(m.computed_at)>julianday(?,'-1 hour')))
+  ORDER BY days.day ASC,a.id LIMIT 1`).bind(yesterday,yesterday,yesterday,yesterday,now.toISOString()).first<{id:string;day:string}>();
+  if(!account)continue;
+  try{await snapshotStoreMetrics(db,account.id,account.day,now);}catch(error){
+   await db.prepare("INSERT INTO hq_store_daily_metrics(account_id,date,state,computed_at) VALUES(?,?,'failed',?) ON CONFLICT(account_id,date) DO UPDATE SET state='failed',computed_at=excluded.computed_at").bind(account.id,account.day,now.toISOString()).run();
+   failed=error;
+  }
  }
+ if(failed)throw failed;
 }

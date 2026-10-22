@@ -1,3 +1,4 @@
+import { applyTrackedMigrations, uploadWorkerAssets, verifyWorkerAssets, materializeWorkerAssets, workerAssetsConfig, snapshotWorkerDeployment, restoreWorkerDeployment } from '@line-harness/update-engine';
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -17,7 +18,6 @@ import {
   deployPagesProject,
   materializeAdminFiles,
   findResidualPlaceholders,
-  isBenignSchemaErrorText,
   type CfApiCreds,
   type CurrentVersion,
   type ParsedBundle,
@@ -44,6 +44,7 @@ import {
  * surfaces a clear error in that case rather than guessing.
  */
 interface SetupState {
+  liffId?: string;
   projectName?: string;
   workerName?: string;
   adminProject?: string;
@@ -114,6 +115,7 @@ function persistWorkerPublicUrl(
  * create a LIFF Pages project. All LIFF Pages steps are skipped for them.
  */
 interface ResolvedUpdateConfig {
+  liffId?: string;
   workerName: string;
   adminProject: string;
   liffProject: string;
@@ -203,6 +205,7 @@ export function resolveState(
   return {
     ok: true,
     value: {
+      liffId: state.liffId,
       workerName: workerName!,
       adminProject: adminProject!,
       liffProject: liffProject!,
@@ -675,6 +678,7 @@ export async function runUpdate(
 
   // 7) Download + verify bundle
   const bundle = await downloadAndVerifyBundle(upgrade, s);
+  if (!cfg.liffProject) materializeWorkerAssets(bundle.workerAssetsFiles, cfg.liffId);
 
   // 8) Apply migrations (in manifest order). Duplicate-object errors are
   // benign — CLI installs applied every migration available at install
@@ -688,7 +692,7 @@ export async function runUpdate(
     s,
   });
 
-  // 9) Worker — preserve existing bindings + assets
+  // 9) Worker — preserve bindings and deploy the matching Worker client assets
   await deployWorkerFromBundle(creds, cfg, bundle, s);
 
   // 10) Admin Pages — materialize the placeholder API origin first
@@ -827,50 +831,17 @@ function applyMigrationsGuard(bundle: ParsedBundle, names: string[]): void {
   }
 }
 
-/**
- * Apply migrations one file at a time, in the given order.
- *
- * Duplicate-object errors ("already exists" / "duplicate column") are benign
- * and logged as skips: migrations are additive-only + INSERT OR IGNORE by
- * repo policy (scripts/check-migrations.ts), and CLI installs apply every
- * migration shipped at install time, so re-encountering one is expected.
- * Any other error aborts BEFORE the Worker/Pages deploys run.
- */
+/** Apply only checksum-verified pending migrations; unknown history requires a reviewed baseline. */
 async function applyMigrations(opts: {
-  creds: CfApiCreds;
-  d1DatabaseId: string;
-  names: string[];
-  bundle: ParsedBundle;
-  s: Spinner;
+  creds: CfApiCreds; d1DatabaseId: string; names: string[]; bundle: ParsedBundle; s: Spinner;
 }): Promise<void> {
-  const { creds, d1DatabaseId, names, bundle, s } = opts;
-  for (const name of names) {
-    const sql = bundle.migrations.get(name);
-    if (!sql) {
-      p.cancel(`migration ${name} が bundle にありません`);
-      process.exit(1);
-    }
-    s.start(`Migration ${name} 実行中`);
-    try {
-      await executeD1Query({
-        creds,
-        databaseId: d1DatabaseId,
-        sql: sql.toString("utf-8"),
-      });
-      s.stop(`Migration ${name} 完了`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (isBenignSchemaErrorText(msg)) {
-        s.stop(pc.dim(`Migration ${name}: 適用済みのためスキップ`));
-        continue;
-      }
-      s.stop(pc.red(`Migration ${name} 失敗: ${msg}`));
-      p.cancel(
-        "先に手動で migration を確認してください。Worker/Pages はまだ更新されていません。",
-      );
-      process.exit(1);
-    }
-  }
+  await applyTrackedMigrations({
+    creds: opts.creds, databaseId: opts.d1DatabaseId, names: opts.names, files: opts.bundle.migrations,
+    onMigration: async (name, status) => {
+      if (status === 'running') opts.s.start(`Migration ${name} 実行中`);
+      else opts.s.stop(`Migration ${name}: ${status === 'skipped' ? '適用記録・チェックサム一致' : '完了'}`);
+    },
+  });
 }
 
 /**
@@ -905,11 +876,17 @@ async function deployWorkerFromBundle(
   s: Spinner,
 ): Promise<void> {
   s.start("Worker デプロイ中");
+  let snapshot: string | undefined;
+  let started = false;
   try {
+    const workerAssets = !cfg.liffProject ? materializeWorkerAssets(bundle.workerAssetsFiles, cfg.liffId) : undefined;
+    if (!cfg.liffProject) snapshot = await snapshotWorkerDeployment(creds, cfg.workerName);
     const bindings = await listWorkerBindings({
       creds,
       scriptName: cfg.workerName,
     });
+    const assetsJwt = !cfg.liffProject ? await uploadWorkerAssets({ creds, scriptName: cfg.workerName, files: workerAssets! }) : undefined;
+    started = true;
     await putWorkerScript({
       creds,
       scriptName: cfg.workerName,
@@ -919,12 +896,14 @@ async function deployWorkerFromBundle(
         workerPublicUrl: cfg.workerPublicUrl,
       }),
       compatibilityFlags: WORKER_COMPATIBILITY_FLAGS,
-      // Bundle carries no Worker assets — keep the ones deployed at setup
-      // (they serve the LIFF SPA on worker-assets installs).
-      keepAssets: true,
+      keepAssets: !assetsJwt,
+      assetsJwt,
+      assetsConfig: workerAssets ? workerAssetsConfig(workerAssets) : undefined,
     });
+    if (!cfg.liffProject) await verifyWorkerAssets(cfg.workerPublicUrl, workerAssets!);
     s.stop("Worker デプロイ完了");
   } catch (e) {
+    if (started && snapshot) await restoreWorkerDeployment(creds, cfg.workerName, snapshot);
     const msg = e instanceof Error ? e.message : String(e);
     s.stop(pc.red(`Worker デプロイ失敗: ${msg}`));
     p.cancel(
@@ -1169,9 +1148,9 @@ async function runAdoption(opts: {
   const s = p.spinner();
 
   const bundle = await downloadAndVerifyBundle(target, s);
+  if (!cfg.liffProject) materializeWorkerAssets(bundle.workerAssetsFiles, cfg.liffId);
 
-  // Replay every migration in the bundle, oldest first. Duplicates are
-  // skipped via the benign-error policy inside applyMigrations.
+  // Verify every migration against durable history; never infer prior application from duplicate SQL errors.
   const allMigrations = Array.from(bundle.migrations.keys()).sort();
   p.log.info(
     `全 ${allMigrations.length} migration を確認します（適用済みはスキップされます）`,

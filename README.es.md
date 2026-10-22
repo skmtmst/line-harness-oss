@@ -15,7 +15,7 @@ Funciona sobre el plan gratuito de Cloudflare. **Costo de servidor: $0/mes**. Op
 
 [![Haz clic para reproducir en YouTube — Guía de configuración de LINE Harness](https://img.youtube.com/vi/DiRuGaeq1sM/maxresdefault.jpg)](https://youtu.be/DiRuGaeq1sM)
 
-**Versión actual**: v0.13.2 ・ Licencia MIT ・ TypeScript / Cloudflare Workers + D1
+**Versión de este documento**: v0.13.2 (versión actual: [package.json](package.json)) ・ Licencia MIT ・ TypeScript / Cloudflare Workers + D1
 
 ---
 

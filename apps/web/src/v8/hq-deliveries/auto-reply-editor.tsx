@@ -8,7 +8,7 @@
  */
 import { useState, type ReactNode } from 'react'
 import type { HqDeliveryTemplateDefinition } from '@line-crm/shared'
-import { readLineImageContent } from '@/components/auto-replies/edit-dialog-model'
+import { readLineImageContent } from '@/lib/line-image-content'
 import ImageFrame from '@/components/shared/image-frame'
 import Notice from '@/components/shared/notice'
 import { responseTypeWord } from '@/v8/auto-replies/public/auto-reply-words/index'

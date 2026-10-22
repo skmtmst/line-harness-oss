@@ -1,5 +1,7 @@
 'use client'
 
+import { readLineImageContent } from '@/lib/line-image-content'
+
 import type { AccountWithStats } from '@/contexts/account-context';
 
 
@@ -16,7 +18,7 @@ import type {
 AutoReplyDraftInput
 } from '@line-crm/shared';
 import { validateFlexContent } from '@line-crm/shared';
-import { InputIssue,WizardForm,readLineImageContent } from './wizard-model';
+import { InputIssue,WizardForm } from './wizard-model';
 
 type BuildWizardInputContext = {
   accounts: AccountWithStats[]

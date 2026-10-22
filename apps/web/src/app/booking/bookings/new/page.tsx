@@ -1135,7 +1135,7 @@ export default function NewProxyBookingPage() {
           actions={(
             <>
               {(step === 'confirm' || step === 'conflict') && <Button onClick={() => { setStep('input'); setError('') }}>入力に戻る</Button>}
-              {step === 'confirm' && friend && confirmedSlot ? <Button href={`/booking/bookings?${new URLSearchParams({ series: 'new', seriesAt: slotInstant(confirmedSlot) ?? '', seriesMenu: menuId, seriesStaff: staffId, seriesFriend: friend.id, seriesName: friend.displayName ?? '' })}`}>繰り返して入れる</Button> : null}
+              {step === 'confirm' && friend && confirmedSlot ? <Button href={`/booking/bookings?${new URLSearchParams({ series: 'new', seriesAt: slotInstant(confirmedSlot) ?? '', seriesMenu: menuId, seriesStaff: staffId, seriesFriend: friend.id, seriesName: friend.displayName ?? '', seriesTimeZone: slotTimeZone })}`}>繰り返して入れる</Button> : null}
               {step === 'input' ? (
                 <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()} busy={loading} busyLabel="空きを再確認しています">予約内容を確認する
                 </Button>

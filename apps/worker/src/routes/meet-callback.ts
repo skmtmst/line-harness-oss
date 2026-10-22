@@ -10,6 +10,7 @@ import { getFriendByLineUserIdForAccount, getScenarioById } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { verifySupportRelay } from '../services/support-relay.js';
 import { sha256Hex } from '../middleware/auth.js';
+import { readBoundedText } from '../lib/input-errors.js';
 
 const app = new Hono<Env>();
 
@@ -17,8 +18,8 @@ const app = new Hono<Env>();
 app.post('/api/meet-callback', async (c) => {
   const secret = c.env.MEET_CALLBACK_SECRET;
   if (!secret) return c.json({ success: false, error: 'Meet callback not configured' }, 503);
-  const rawBody = await c.req.text();
-  if (new TextEncoder().encode(rawBody).byteLength > 256 * 1024) {
+  const rawBody = await readBoundedText(c.req.raw, 256 * 1024);
+  if (rawBody === null) {
     return c.json({ success: false, error: 'Payload too large' }, 413);
   }
   const verified = await verifySupportRelay(

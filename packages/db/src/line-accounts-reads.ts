@@ -127,3 +127,20 @@ export async function getLineAccountsByIds(
     result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),
   );
 }
+
+
+/** LIFF検証候補だけを検索し、送信用の秘密情報は読まない。 */
+export async function getLineAccountLoginChannels(
+  db: D1Database,
+  lookup: { accountId?: string; loginChannelId?: string },
+): Promise<Array<{ id: string; tenant_id: string | null; login_channel_id: string | null }>> {
+  const value = lookup.accountId || lookup.loginChannelId;
+  if (!value) return [];
+  const column = lookup.accountId ? 'id' : 'login_channel_id';
+  const result = await db.prepare(`
+    SELECT id, tenant_id, login_channel_id FROM line_accounts
+     WHERE ${column} = ?
+     ORDER BY display_order ASC, created_at ASC
+  `).bind(value).all<{ id: string; tenant_id: string | null; login_channel_id: string | null }>();
+  return result.results;
+}
