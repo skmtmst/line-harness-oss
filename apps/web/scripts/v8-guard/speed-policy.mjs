@@ -6,6 +6,8 @@ export const SAMPLE_COUNT = 5
 export const CI_TIME_FACTOR = 1.30
 export const REGRESSION_FACTOR = 1.2
 export const LONG_TASK_FLOOR_MS = 50
+/* 画面の書き換え1回分。時間の測定値は、20%より小さい差ならこの1回分まで許す。 */
+export const ONE_FRAME_MS = 17
 
 export function speedPolicy(profile = process.env.V8_SPEED_PROFILE ?? (process.env.CI === 'true' ? 'ci' : 'local')) {
   if (!['local', 'ci'].includes(profile)) throw new Error(`未知の速度測定環境: ${profile}`)
