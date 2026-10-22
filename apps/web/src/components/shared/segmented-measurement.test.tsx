@@ -35,7 +35,10 @@ describe('切替器の寸法追従', () => {
       </Profiler>
     )
     const view = render(control())
+    expect(view.container.firstElementChild?.hasAttribute('data-sliding')).toBe(false)
+    expect(view.container.querySelector<HTMLElement>('[aria-hidden="true"]')?.hidden).toBe(true)
     await flush()
+    expect(view.container.firstElementChild?.getAttribute('data-sliding')).toBe('true')
     const thumb = () => view.container.querySelector<HTMLElement>('[aria-hidden="true"]')!
     expect(thumb().style.transform).toBe('translateX(90px)')
     expect(thumb().style.width).toBe('60px')
@@ -96,12 +99,12 @@ describe('切替器の寸法追従', () => {
     }
   })
 
-  it.each(['choices', 'reservation', 'intake-stop'] as const)('%s はつまみの寸法を測らない', async appearance => {
+  it.each(['choices', 'reservation', 'intake-stop'] as const)('%s も選択面を同じつまみで測る', async appearance => {
     const view = render(<SegmentedControl appearance={appearance} options={options} value="graph" onChange={() => {}} aria-label="表示" />)
     await flush()
-    expect(reads).toBe(0)
-    expect(observed.callbacks).toHaveLength(0)
-    expect(view.container.querySelector('[aria-hidden="true"]')).toBeNull()
+    expect(reads).toBeGreaterThan(0)
+    expect(observed.callbacks).toHaveLength(1)
+    expect(view.container.querySelector('[aria-hidden="true"]')).not.toBeNull()
   })
 
   it('取り外すと予約済みの測定とresize購読を止める', async () => {
