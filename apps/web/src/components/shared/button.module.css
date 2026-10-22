@@ -199,7 +199,7 @@
 
 :root .button[data-presentation]:not([data-presentation='restaurant']) {
   flex-shrink: 0; min-height: 0; height: auto; border: 0; padding: 0;
-  background: transparent; box-shadow: none; font-family: inherit; font-weight: 600; line-height: inherit;
+  background: transparent; box-shadow: none; font-family: inherit; font-weight: var(--tpl-button-weight); line-height: inherit;
 }
 :root .button[data-presentation='account-inline'] { color: var(--color-accent-deep); font-size: var(--tpl-acd-label-size); }
 :root .button[data-presentation='registration-inline'] { color: var(--color-action); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); }
@@ -232,7 +232,7 @@
 /* 文字だけの行内操作。通常のボタンの見た目は変えない。 */
 :root .button.inline.text {
   height: auto; min-height: 0; padding: 0; border: 0; background: none;
-  color: var(--color-action); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-rs-lh-12);
+  color: var(--color-action); font-size: var(--text-caption); font-weight: var(--tpl-button-weight); line-height: var(--tpl-rs-lh-12);
 }
 
 :root .button.inline.text.textInk { color: var(--color-ink); }
@@ -266,7 +266,7 @@
 :root .button.booking { height: var(--tpl-chip-h); padding-inline: var(--tpl-booking-button-pad); gap: var(--tpl-body-gap); }
 
 @layer components {
-:root .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}
+:root .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:var(--tpl-button-weight);padding-inline:16px;}
 }
 /* ：共通ボタンを選ぶ札として使う画面も同じ形。 */
 html:root .button:not([data-part='row-name']):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='funnel-row'])[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }

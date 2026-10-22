@@ -140,7 +140,7 @@ describe('設計の実測値に合わせる', () => {
     expect(token('radius-control')).toBe('10px')
     expect(BUTTON).toMatch(/font-size:\s*var\(--text-body\)/)
     expect(BUTTON).toMatch(/:root \.button\s*{[^}]*font-weight:\s*var\(--tpl-button-weight\)/s)
-    expect(token('tpl-button-weight')).toBe('600')
+    expect(token('tpl-button-weight')).toBe('500')
     // ：文字だけの操作もボタンの太さ600。本文400へ戻さない。
     expect(BUTTON).toMatch(/:root \.button\.inline\.text\s*{[^}]*font-weight:\s*var\(--font-weight-bold\)/s)
     expect(token('font-weight-bold')).toBe('600')

@@ -614,7 +614,7 @@
   /*
    * カード（線で囲んだ箱）の線と影（2026-10-09 案A：ブラーを抑え、境目をくっきりさせる）。
    * 影は 0 1px 1px / 黒16% ＋ 0 2px 4px / 黒8%、線は黒8%。
-   * 数のカード・アカウント/プロジェクト/プランのカード・設定の段・表の枠など、線で囲んだ箱は全部この2つを読む。
+   * 既定のカードはこの2つを読む。一覧の平らなカードは Card.frame="flat" で影を外す。
    * 選ぶカード（ラジオ・チェック）・入力欄・ボタン・浮く面（メニュー・窓）は別の値のまま。
    */
   --card-edge: rgba(29, 29, 31, 0.08);
@@ -3001,7 +3001,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --color-badge-info-bg: var(--polish-status-info-bg); --color-badge-info: var(--polish-status-info-ink);
   --tpl-folder-create-h: 36px;
   --tpl-folder-create-pad: 0 16px;
-  --tpl-button-weight: 600;
+  --tpl-button-weight: 500;
   --tpl-button-h: 36px;
   --tpl-button-pad-side: 16px;
   --tpl-dialog-width: 560px;

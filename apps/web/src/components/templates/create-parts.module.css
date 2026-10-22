@@ -82,13 +82,13 @@
 .summary[data-variant='link'] .rows { gap: normal; }
 .summary[data-variant='link'] .row { padding: var(--tpl-af-cr-kv-pad); border: 0; }
 .summary[data-variant='link'] .rowLabel { flex-shrink: 0; line-height: var(--tpl-wa-af-note-lh); }
-.summary[data-variant='link'] .rowValue { font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-wa-af-preview-lh); }
+.summary[data-variant='link'] .rowValue { font-size: var(--text-label); font-weight: var(--polish-weight-body); line-height: var(--tpl-wa-af-preview-lh); }
 /* 実行の記録の小箱：行の線は寸法を増やさず、段の間は4。 */
 .summary[data-variant='record'] { gap: var(--tpl-fm2-rd-box-gap); }
 .summary[data-variant='record'] .rows { gap: var(--tpl-fm2-rd-box-gap); }
 .summary[data-variant='record'] .row { border: 0; box-shadow: var(--shadow-row-line); }
 .summary[data-variant='record'] .row:last-child { box-shadow: none; }
-.summary[data-variant='record'] .rowValue { font-weight: 700; }
+.summary[data-variant='record'] .rowValue { font-weight: var(--polish-weight-body); }
 
 /* 箱の外の淡い案内。 */
 .note {
