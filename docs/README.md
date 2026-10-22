@@ -476,6 +476,7 @@
 - [独立点検後の計画と質問の保存・破棄の記録](release-log/unreleased/1790-kenta-after-review-plan.md)
 - [検証環境の最終確認と独立点検の開始準備](release-log/unreleased/1791-kenta-independent-review-ready.md)
 - [画面の先読みと友だち一覧の再計測の改善](release-log/unreleased/1792-kenta-v8-rendering-performance.md)
+- [共通描画と注目の星の不要な動きの修正](release-log/unreleased/1795-kenta-common-draw-speed.md)
 - [1781-kenta-cleanup-a01.md](release-log/unreleased/1781-kenta-cleanup-a01.md)
 - [1781-kenta-cleanup-a02.md](release-log/unreleased/1781-kenta-cleanup-a02.md)
 - [1781-kenta-cleanup-a03.md](release-log/unreleased/1781-kenta-cleanup-a03.md)
