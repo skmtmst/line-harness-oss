@@ -51,14 +51,18 @@
 :global(:root) .folders + .main { border-left: 0; }
 :global(:root) .explanation { width: 100%; }
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
-:global(:root) .toolbar[data-toolbar-spacing='section'] { padding-block: var(--polish-space-card); }
+:global(:root) .toolbar:is([data-toolbar-spacing='section'], [data-toolbar-spacing='stats']) { padding-block: var(--polish-space-card); }
+/* 題から最初の道具・数の帯までは道具側の16だけ。間にタブ・帯・閲覧案内がある板は対象外。 */
+:global(:root) .frame > .heading:has(+ .listBody > .split:first-child > .main > .toolbar[data-toolbar-spacing]) { padding-bottom: 0; }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .listCards { display: grid; grid-template-columns: repeat(var(--tpl-list-card-columns), minmax(0, 1fr)); gap: var(--polish-space-card); padding-inline: var(--tpl-list-inset); align-items: start; }
+:global(:root) .listCards[data-card-inset='parent'] { padding-inline: 0; }
 @container v8-page (max-width: 1099px) {
   :global(:root) .listCards[data-card-columns='4'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  :global(:root) .listCards[data-card-narrow-columns] { grid-template-columns: repeat(var(--tpl-list-card-narrow-columns), minmax(0, 1fr)); }
 }
 :global(:root) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
 :global(:root) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }

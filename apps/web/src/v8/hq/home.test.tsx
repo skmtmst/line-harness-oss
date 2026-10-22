@@ -117,6 +117,17 @@ describe('統括のアカウント', () => {
     expect(container.querySelector('article [data-design-part="notice"]')).toBeNull()
   })
 
+  it('分類のないカードではLINE IDの情報の次に数を読み、正常ならそのまま操作へ進める', async () => {
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, connection: { status: 'ok', issues: [] } }] })
+    await render()
+    const card = container.querySelector('article')!
+    const stats = card.querySelector('dl')!
+    expect(card.querySelector('[data-tag-overflow]')).toBeNull()
+    expect(stats.previousElementSibling?.textContent).toContain('@273ytrca')
+    expect(stats.nextElementSibling).toBeNull()
+    expect(card.querySelector('button[aria-label$="へ入る"]')).not.toBeNull()
+  })
+
   it('「入る」を押すと、友だちの引き継ぎを続きから進める口を叩く', async () => {
     await render()
     const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!

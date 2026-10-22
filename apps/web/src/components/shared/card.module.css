@@ -255,3 +255,8 @@ html:root .card[data-card-selected] { --card-edge: var(--color-accent-deep); bac
 html:root .card[data-card-frame='ring'] {
   border: 0; box-shadow: var(--tpl-sa-ring);
 }
+
+/* 情報内と操作前の間は親のgapを1回だけ使う。高さ合わせで増えた分だけ操作の上へ回す。 */
+html:root .withActions { display: flex; flex-direction: column; }
+.information { display: flex; flex-direction: column; min-width: 0; gap: inherit; }
+.bottomActions { margin-top: auto; min-width: 0; }

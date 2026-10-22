@@ -5,9 +5,15 @@
 .media[data-kind='image'] { max-width: var(--tpl-inbox-image-width); border-radius: var(--radius-mini); }
 .media[data-kind='preview'] { display: block; margin-inline: auto; max-height: var(--tpl-inbox-image-preview-height); width: auto; border-radius: var(--radius-mini); }
 .flexMedia { max-width: var(--tpl-inbox-flex-width); }
-.floating { position: absolute; overflow-y: auto; background: var(--color-canvas); border: 1px solid var(--card-edge); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); }
+.floating { animation: inbox-panel-enter var(--motion-fast) var(--motion-ease-out) both; position: absolute; overflow-y: auto; background: var(--color-canvas); border: 1px solid var(--card-edge); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); }
 .floating[data-placement='below'] { top: 100%; right: 0; z-index: 40; margin-top: var(--space-8); width: var(--tpl-inbox-summary-width); max-width: var(--tpl-inbox-popup-viewport-width); max-height: var(--tpl-inbox-saved-views-height); padding: var(--space-16); }
 .floating[data-placement='above'] { bottom: 100%; left: var(--space-16); z-index: 30; margin-bottom: var(--space-8); width: var(--tpl-inbox-memo-width); max-width: var(--tpl-inbox-memo-max-width); max-height: var(--tpl-inbox-memo-height); padding: var(--polish-space-section); }
+.floating[data-placement='below'] { transform-origin: top right; }
+.floating[data-placement='above'] { transform-origin: bottom left; }
+.floating[data-leaving] { pointer-events: none; animation: inbox-panel-exit var(--motion-instant) var(--motion-ease-out) both; }
+@keyframes inbox-panel-enter { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+@keyframes inbox-panel-exit { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .floating, .floating[data-leaving] { animation: none; } }
 .backdrop { position: fixed; inset: 0; z-index: 60; background: var(--color-scrim); }
 .emailHeading { min-height: var(--tpl-inbox-email-heading-height); padding: var(--polish-space-field) var(--space-16); padding-right: var(--tpl-inbox-email-heading-end); border-bottom: 1px solid var(--color-hairline); }
 }
