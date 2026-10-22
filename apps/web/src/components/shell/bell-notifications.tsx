@@ -8,7 +8,7 @@ import type { TopBarNotificationsPopover } from '@/components/shared/top-bar'
 import { isDashboardNotificationData } from '@/components/dashboard/notification-summary'
 import { notificationDestination, notificationLinkLabel } from '@/v8/notifications/public/destination/index'
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
-import { formatRelative } from '@/lib/format'
+import { formatRelative, formatYmd } from '@/lib/format'
 import { runOptimistic } from '@/lib/undoable'
 
 /** 小窓に出す最大の件数（絵 mV28V）。 */
@@ -119,15 +119,20 @@ export default function BellNotifications({
   }, [accountId, apply, data])
 
   const shown = useMemo(() => (data ? bellOrder(data.items).slice(0, BELL_POPOVER_LIMIT) : []), [data])
-  const items: BellItem[] = shown.map((item) => ({
-    id: item.id,
-    title: item.title,
-    body: item.body,
-    category: item.category === 'error' ? 'error' : 'update',
-    unread: !item.isRead,
-    time: formatRelative(item.createdAt, undefined, '日時不明'),
-    linkLabel: notificationLinkLabel(item),
-  }))
+  const today = formatYmd(new Date())
+  const items: BellItem[] = shown.map((item) => {
+    const day = formatYmd(item.createdAt)
+    return {
+      id: item.id,
+      title: item.title,
+      body: item.body,
+      category: item.category === 'error' ? 'error' : 'update',
+      unread: !item.isRead,
+      time: formatRelative(item.createdAt, undefined, '日時不明'),
+      period: day === '' ? 'unknown' : day === today ? 'today' : 'earlier',
+      linkLabel: notificationLinkLabel(item),
+    }
+  })
 
   const select = (id: string) => {
     const item = shown.find((row) => row.id === id)
@@ -142,7 +147,6 @@ export default function BellNotifications({
       open={open}
       onClose={onClose}
       getAnchor={popover.getAnchor}
-      getPositionRect={popover.getPositionRect}
       id={popover.id}
       state={state}
       items={items}
