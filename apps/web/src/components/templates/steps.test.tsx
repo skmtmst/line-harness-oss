@@ -17,9 +17,18 @@ const STEPS: StepperStep[] = [
 
 /**
  * ★V8 の手順（共通部品 Fa8ED・決まりの板 q1xNMz。2026-10-08 オーナー）。
- * 丸24（済み＝緑に白い✓・今＝墨に白い数字・まだ＝薄い枠に灰の数字）・名13（今だけ太字）・線24×1.5。
+ * 状態の印・移動できる段と、丸の次に名前を置く構造を守る。
  */
 describe('手順（型の共通部品 Steps）', () => {
+  it('各段は丸の次に名前を置き、省略しても全文を確認できる', () => {
+    render(<Steps label="アカウント登録" steps={STEPS} currentKey="audience" />)
+    for (const item of screen.getByRole('navigation').querySelectorAll('li')) {
+      const dot = item.querySelector('[data-step-dot]')!
+      const name = item.querySelector('[data-step-name]')!
+      expect(dot.nextElementSibling).toBe(name)
+      expect(name.closest('[title]')?.getAttribute('title')).toBe(name.textContent)
+    }
+  })
   it('質問の縦の列では未回答にも移れ、現在の場所と回答済みを分ける', () => {
     const select = vi.fn()
     render(<Steps label="はじめの質問の一覧" layout="sidebar" currentKey="now" steps={[
