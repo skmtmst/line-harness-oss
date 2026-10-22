@@ -16,7 +16,7 @@ function useToolbarFit() {
     const toolbar = ref.current
     if (!toolbar || !window.ResizeObserver) return
     const measure = () => {
-      // Only slot searches inside a frame consume this inherited width, even when nested.
+      // この継承値を使うのは、入れ子を含む枠内の検索欄だけ。
       const slotSearches = toolbar.querySelectorAll(`.${styles.slotTool}[data-toolbar-role="search"]`)
       if (Array.from(slotSearches).some(slot => slot.closest(`.${styles.slots}`))) {
         const leading = toolbar.querySelector<HTMLElement>('[data-toolbar-leading]')

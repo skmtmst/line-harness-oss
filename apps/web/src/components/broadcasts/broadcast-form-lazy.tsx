@@ -7,7 +7,7 @@ import ListState from '@/components/shared/list-state'
 import type { BroadcastFormProps } from './broadcast-form-props'
 
 type Form = ComponentType<BroadcastFormProps>
-// Code only: never cache a form instance, account data, or draft values.
+// 読み込んだコードだけを再利用し、フォームの実体・店舗情報・下書きは保存しない。
 let recoveredForm: Form | null = null
 const CancelLoading = createContext<() => void>(() => {})
 
@@ -16,7 +16,7 @@ function LoadingForm() {
   return <><ListState kind="loading" title="配信作成画面を読み込んでいます" /><Button variant="secondary" onClick={cancel}>作成をやめる</Button></>
 }
 
-/** Only an import rejection enters this state; save/permission errors stay in BroadcastForm. */
+/** コードの読込み失敗だけを扱い、保存・権限の失敗は元のフォームで扱う。 */
 function FormLoadFailed(props: BroadcastFormProps) {
   const [Recovered, setRecovered] = useState<Form | null>(() => recoveredForm)
   const [loadError, setLoadError] = useState(true)
@@ -28,7 +28,7 @@ function FormLoadFailed(props: BroadcastFormProps) {
     inFlight.current = true
     setLoadError(false)
     try {
-      // A fresh import retries the chunk request, rather than reusing React.lazy's rejected promise.
+      // 失敗済みの読込み結果を使わず、コードの取得をやり直す。
       const loaded = await import('./broadcast-form')
       recoveredForm = loaded.default
       if (live.current) setRecovered(() => loaded.default)
@@ -43,7 +43,7 @@ function FormLoadFailed(props: BroadcastFormProps) {
   return <ListState kind="error" title="配信作成画面を読み込めませんでした" onRetry={() => void retry()} action={<Button variant="secondary" onClick={props.onCancel}>作成をやめる</Button>} />
 }
 
-// Stable component identity: changing parent props must not recreate an entered form.
+// 親の値が変わっても、入力中のフォームを作り直さない。
 const LazyForm = dynamic<BroadcastFormProps>(
   () => import('./broadcast-form').catch(() => ({ default: FormLoadFailed })),
   { loading: LoadingForm },
