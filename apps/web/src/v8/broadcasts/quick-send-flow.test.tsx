@@ -2,7 +2,8 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ create: vi.fn(), send: vi.fn(), get: vi.fn(), request: vi.fn(), preflight: vi.fn(), config: vi.fn() }))
+const mocks = vi.hoisted(() => ({ create: vi.fn(), send: vi.fn(), get: vi.fn(), request: vi.fn(), preflight: vi.fn(), config: vi.fn(), notify: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ notifyToast: mocks.notify }))
 vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   const mocked = await (() => ({ api: {
@@ -42,6 +43,7 @@ it('日本時間10月5日10時を同じ時刻のISOで予約する', async () =>
   fireEvent.click(screen.getByRole('radio', { name: '日時を決める' }))
   fireEvent.change(screen.getByLabelText('送る日時'), { target: { value: '2026-10-05T10:00' } })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '予約する' })) })
+  expect(mocks.notify).toHaveBeenCalledWith('配信を予約しました')
   expect(mocks.create.mock.calls[0][0].scheduledAt).toBe('2026-10-05T01:00:00.000Z')
   expect(new Date(mocks.create.mock.calls[0][0].scheduledAt).getTime()).toBe(new Date('2026-10-05T10:00:00+09:00').getTime())
 })
@@ -62,6 +64,8 @@ it('承認依頼の失敗後も同じ配信へ依頼する', async () => {
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '承認を頼む' })) })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '承認を頼む' })) })
   expect(mocks.create).toHaveBeenCalledTimes(1)
+  expect(mocks.notify).toHaveBeenCalledTimes(1)
+  expect(mocks.notify).toHaveBeenCalledWith('配信の承認を頼みました')
   expect(mocks.request.mock.calls).toEqual([['created-1', { approverStaffId: 'owner' }], ['created-1', { approverStaffId: 'owner' }]])
 })
 it('送信応答を失っても送信済みを確認して二重に送らない', async () => {
@@ -72,6 +76,7 @@ it('送信応答を失っても送信済みを確認して二重に送らない'
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '送る', exact: true })) })
   expect(mocks.create).toHaveBeenCalledTimes(1)
   expect(mocks.send).toHaveBeenCalledTimes(1)
+  expect(mocks.notify).toHaveBeenCalledWith('配信を送りました')
   expect(onSent).toHaveBeenCalledTimes(1)
 })
 it('同じ描画中の連打で二つ作らない', async () => {
@@ -137,3 +142,11 @@ it('WEB112: 確定前に人数が変わったら作成せず新しい人数を�
 
 // 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
 vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))
+
+it('送信の受付は完了や見込み人数で知らせない', async () => {
+  mocks.send.mockResolvedValue({ success: true, data: { status: 'sending', sentCount: 0 } })
+  await fill()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '送る', exact: true })) })
+  expect(mocks.notify).toHaveBeenCalledWith('配信の送信を受け付けました')
+  expect(mocks.notify).toHaveBeenCalledTimes(1)
+})
