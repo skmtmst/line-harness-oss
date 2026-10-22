@@ -47,7 +47,7 @@ export function useFlipRows(containerRef: RefObject<HTMLElement | null>, orderKe
   const previousScope = useRef(scopeKey)
   const animations = useRef<Animation[]>([])
   useLayoutEffect(() => {
-    animations.current.forEach(animation => animation.cancel())
+    animations.current.forEach(animation => animation?.cancel())
     animations.current = []
     const container = containerRef.current
     if (!container) { positions.current.clear(); return }
@@ -66,10 +66,11 @@ export function useFlipRows(containerRef: RefObject<HTMLElement | null>, orderKe
       if (!animate || before === undefined || duration <= 0) continue
       const delta = before - top
       if (Math.abs(delta) < 1) continue
-      animations.current.push(row.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }], { duration, easing: 'cubic-bezier(0.2, 0, 0, 1)' }))
+      const animation = row.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }], { duration, easing: 'cubic-bezier(0.2, 0, 0, 1)' })
+      if (animation) animations.current.push(animation)
     }
     positions.current = next
     previousScope.current = scopeKey
   }, [containerRef, orderKey, scopeKey])
-  useLayoutEffect(() => () => { animations.current.forEach(animation => animation.cancel()) }, [])
+  useLayoutEffect(() => () => { animations.current.forEach(animation => animation?.cancel()) }, [])
 }
