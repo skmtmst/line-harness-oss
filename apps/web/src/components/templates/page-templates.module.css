@@ -553,3 +553,7 @@
 }
 
 .detailColumns:not([data-has-aside]) { grid-template-columns: minmax(0, 1fr); margin-right: 0; }
+
+/* 数の帯を白い板の余白の内側へ置く。道具に含む帯は道具の余白を使う。 */
+:global(:root) .stats:has([data-kpi-strip]) { padding-inline: var(--tpl-list-inset); }
+:global(:root) .section { border-bottom: 0; }

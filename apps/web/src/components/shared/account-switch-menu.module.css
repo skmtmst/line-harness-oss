@@ -118,7 +118,7 @@
   height: var(--tpl-hq2-switch-mark);
   border-radius: var(--radius-control);
   background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  color: var(--color-ink);
   font-size: var(--text-nano);
   font-weight: 700;
 }
@@ -134,6 +134,6 @@
   flex-shrink: 0;
   width: var(--tpl-hq2-switch-icon);
   height: var(--tpl-hq2-switch-icon);
-  color: var(--color-accent-deep);
+  color: var(--color-ink);
 }
 }

@@ -47,7 +47,7 @@
 }
 
 .rowInteractive.rowSelected:hover {
-  background: var(--color-accent-soft);
+  background: var(--polish-selection-bg);
 }
 
 .row + .row .bodyCell { /* strokeWidth: {top: 1} */
@@ -175,7 +175,7 @@
 }
 
 :root .row { background: var(--color-canvas); }
-:root .rowSelected { background: var(--color-accent-soft); }
+:root .rowSelected { background: var(--polish-selection-bg); }
 :root .rowInteractive:hover:not(.rowSelected) { background: var(--color-table-head); }
 }
 /* ★V8 一覧の行の「名前＋下の説明」（ 行：名前 13/600 高さ19 → 間3 → 説明 11 高さ16、行 62）。説明の中の印で行を押し上げない（司令塔 2026-10-05） */
@@ -504,7 +504,7 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
 :root :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--table-head-height, var(--tpl-list-head-h)); min-height: var(--table-head-height, var(--tpl-list-head-h)); }
 :root :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h)); }
 .row[data-highlighted] {
-  background: var(--color-accent-soft);
+  background: var(--polish-selection-bg);
 }
 
 /* ：列の余白・行の高さは表の部品が持つ。 */
@@ -577,3 +577,11 @@ html:root .frame:is([data-column-sizing='content'], [data-column-sizing='control
 
 /* 中身で測る設定表でも、全行が同じ列幅を使う。外部リンクの印も幅に含める。 */
 :root .frame[data-grid-table]:is([data-column-sizing='content'], [data-column-sizing='controls']) .table tr { grid-template-columns: var(--table-content-columns, var(--table-columns)); }
+
+/* すべての共通表で文字階層と数字の桁をそろえる。 */
+:root .table tbody { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); font-variant-numeric: tabular-nums; }
+html:root .frame .table tbody td { font-size: var(--polish-text-body); }
+:root .table thead tr { background: var(--color-canvas); border-top: 0; }
+html:root .name { font-weight: var(--polish-value-weight); }
+
+:root .frame .row:hover { background: var(--polish-table-hover); box-shadow: var(--shadow-row-line), var(--polish-band-shadow); }

@@ -285,3 +285,13 @@
 /* 小さい帯の「9.8 → 9.2 kg」のような幅の要る数は1段小さく（18）し、横の余白も詰めて切れないようにする（健康日記 ）。帯の指定より後に置く。 */
 :root .strip .card[data-kpi-density='compact'][data-kpi-range] { padding-inline: 12px; }
 :root .strip .card[data-kpi-density='compact'][data-kpi-range] .number { font-size: 18px; }
+
+/* ラベルと値の強弱。アイコンに小箱を重ねない。 */
+:root .label { color: var(--color-ink-secondary); font-weight: var(--polish-control-weight); }
+:root .icon { width: var(--polish-icon-large); height: var(--polish-icon-large); border: 0; outline: none; border-radius: 0; background: none; }
+:root .icon svg { width: var(--polish-icon-large); height: var(--polish-icon-large); stroke-width: var(--polish-icon-stroke); }
+:root .number, :root .card[data-kpi-presentation='inline'] .number { font-weight: var(--polish-value-weight); font-variant-numeric: tabular-nums; }
+:root .link { color: var(--color-ink); }
+:root .link:hover, :root .valueAction:hover { text-decoration: underline; }
+
+:root .card[data-kpi-presentation='inline'] .unit { font-weight: var(--polish-control-weight); }

@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { ArrowRight, Inbox, MoreHorizontal } from 'lucide-react'
+import { ArrowRight, MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 import StatusBadge from './status-badge'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
@@ -48,7 +48,7 @@ function staticMenuDescription(menu: ReactNode): string | undefined {
 
 export type KpiCardProps = {
   title: string
-  /** 図柄。省略時は数のマスの標準Inbox。`null` は印のない絵だけで使う。 */
+  /** 図柄。省略時は印を出さない。渡すときは指標の意味に合う図柄を使う。 */
   icon?: ReactNode
   /** V8: 数の右に出す増減の札。 */
   delta?: ReactNode
@@ -225,9 +225,9 @@ export default function KpiCard({
           className={styles.label}
           title={title || undefined}
         >
-          {icon === null ? null : (
+          {icon == null ? null : (
             <span data-kpi-icon className={styles.icon} aria-hidden="true">
-              {icon ?? <Inbox size={14} />}
+              {icon}
             </span>
           )}
           {hasTip && helpDisplay === 'label' ? (

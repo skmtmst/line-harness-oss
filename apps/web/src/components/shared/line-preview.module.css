@@ -244,13 +244,13 @@
 
 :root .island, :root .dateChip > span { border-radius: 999px; }
 :root .bubbleText { flex: 1; word-break: normal; }
-:root .clock { font-variant-numeric: normal; }
+:root .clock { font-variant-numeric: tabular-nums; }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 :root .phoneRoot { -webkit-font-smoothing: auto; }
 
 /* LINEの時刻は正本のInterと同じ比例幅。管理画面の等幅数字を継承しない。 */
-:root .messageTime { font-variant-numeric: normal; }
+:root .messageTime { font-variant-numeric: tabular-nums; }
 
 /* ★V8 絵（「段の題 LINEでの見え方」）：題は右の列の幅いっぱいで左寄せ・15px/600/23・? との間6。スマホは下の真ん中。 */
 :root .phoneRoot { width: 100%; }

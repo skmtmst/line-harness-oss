@@ -269,8 +269,25 @@
 :root .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}
 }
 /* ：共通ボタンを選ぶ札として使う画面も同じ形。 */
-html:root .button:not([data-part='row-name']):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='funnel-row'])[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
+html:root .button:not([data-part='row-name']):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='funnel-row'])[aria-pressed='true'] { background: var(--polish-selection-bg); color: var(--polish-selection-ink); border-color: var(--polish-selection-ink); box-shadow: var(--polish-selection-shadow); }
 
 :root .button[data-full-width] { width: 100%; justify-content: center; text-align: center; }
 
 html:root .button.filterActive { outline: 1px solid var(--color-focus-ring); color: var(--color-action); }
+
+/* 副操作は灰色の面。文字・アイコンだけの口と主操作はそれぞれ保つ。 */
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']) {
+  border: 0; outline: none; box-shadow: none;
+  background: var(--polish-control-bg);
+  font-size: var(--polish-control-text); font-weight: var(--polish-control-weight);
+}
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):hover:not(:disabled) { background: var(--polish-control-hover); }
+:root .button:is(.text, .inline.text)[data-presentation], :root .button.inline.text { color: var(--color-ink); font-weight: var(--polish-control-weight); }
+:root .button.text:hover:not(:disabled) { text-decoration: underline; }
+html:root .button.filterActive { outline-color: var(--color-control-border); color: var(--color-ink); }
+
+:root .button.secondary[aria-pressed='true']:not([data-presentation]) { background: var(--polish-selection-bg); color: var(--polish-selection-ink); }
+
+/* 明示された危険・成功の文字色は、文字だけの操作でも保持する。 */
+:root .button.inline.text.textDanger { color: var(--color-danger); }
+:root .button.inline.text.textAccent { color: var(--color-accent-deep); }
