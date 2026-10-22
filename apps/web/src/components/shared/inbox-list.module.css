@@ -5,6 +5,10 @@
 .headline > h2 { flex: 1; min-width: 0; padding-left: var(--tpl-inbox-title-inset); }
 .search { padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) 0; }
 .filters { display: flex; flex-wrap: wrap; gap: var(--space-8); margin-top: var(--tpl-inbox-head-gap); }
+.row { padding: var(--tpl-inbox-row-pad); width: 100%; text-align: left; background: transparent; }
+.row:hover { background: var(--color-shell); }
+.row[aria-current='true'], .row[aria-current='true']:hover { background: var(--color-accent-soft); }
+.row:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
 }
 
 /* 従来の続きの操作の寸法。画面は見た目を上書きしない。 */

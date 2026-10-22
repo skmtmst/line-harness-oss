@@ -550,6 +550,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   })
 
   const {
+    sendError,
+    pendingMessages,
     handleSendMessage,
     handleSendPack,
     handleKeyDown,
@@ -558,7 +560,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     sending,
     sendLockRef,
     pendingAttachment,
-    setError,
     messageContent,
     pendingImage,
     selectedAccountId,
@@ -689,6 +690,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     unseenIncoming,
     setUnseenIncoming,
   } = useInboxScroll({
+    pendingMessages,
     selectedChatId,
     chatDetail,
     textareaRef,
@@ -777,7 +779,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput,
           handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule,
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
-          imagePreviewOpen,
+          imagePreviewOpen, sendError, pendingMessages,
         }} />
 
         {/*

@@ -11,6 +11,22 @@ vi.mock('./dialog', () => ({ default: () => null }))
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
+it('分類0件では空の段も計測対象も作らず、追加・全削除・再追加を反映する', async () => {
+  vi.stubGlobal('ResizeObserver', undefined)
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(500)
+  const { container, rerender } = render(<TagOverflow>{[null, false, []]}</TagOverflow>)
+  expect(container.childElementCount).toBe(0)
+  const tags = <TagOverflow><span>VIP</span><span>会員</span></TagOverflow>
+  rerender(tags)
+  await act(async () => { await Promise.resolve() })
+  expect(container.querySelector('[data-tag-overflow]')?.textContent).toContain('VIP会員')
+  rerender(<TagOverflow>{[]}</TagOverflow>)
+  expect(container.childElementCount).toBe(0)
+  rerender(tags)
+  await act(async () => { await Promise.resolve() })
+  expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(2)
+})
+
 it('最初の札が縮む境界幅でも、通常の8px間隔で収まる1件と+2を保つ', async () => {
   vi.stubGlobal('ResizeObserver', undefined)
   let available = 215

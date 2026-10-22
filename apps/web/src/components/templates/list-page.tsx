@@ -55,8 +55,8 @@ export interface ListPageBodyProps {
   /** 小窓の一覧は、ページの幅と独立してフォルダを横に並べる。 */
   dialogLayout?: boolean
   toolbar?: ReactNode
-  /** 固定した絵で道具の上下余白が16の一覧。通常の14は変えない。 */
-  toolbarSpacing?: 'section'
+  /** 上下16の道具領域。statsは先頭が数の帯。見出しの直後では上の余白を一度だけ持つ。 */
+  toolbarSpacing?: 'section' | 'stats'
   /** 案内の帯と道具の段の間を16にする固定絵。既定の段間は変えない。 */
   noticeSpacing?: 'section'
   /** 案内と道具を別の行に置く一覧。行同士はカードの間隔（16）。 */
@@ -148,8 +148,8 @@ export function ListPager({ children }: { children: ReactNode }) {
 }
 
 /** Lists of cards use the same spacing as other groups of content. */
-export function ListPageCards({ children, columns = 3 }: { children: ReactNode; columns?: 1 | 3 | 4 }) {
-  return <div className={styles.listCards} data-card-columns={columns} style={{ '--tpl-list-card-columns': columns } as CSSProperties}>{children}</div>
+export function ListPageCards({ children, columns = 3, narrowColumns, inset }: { children: ReactNode; columns?: 1 | 3 | 4; narrowColumns?: 1 | 2 | 3; inset?: 'parent' }) {
+  return <div className={styles.listCards} data-card-columns={columns} data-card-narrow-columns={narrowColumns} data-card-inset={inset} style={{ '--tpl-list-card-columns': columns, '--tpl-list-card-narrow-columns': narrowColumns } as CSSProperties}>{children}</div>
 }
 
 /** カードなどの本文の余白と段の間を一覧型が持つ。 */

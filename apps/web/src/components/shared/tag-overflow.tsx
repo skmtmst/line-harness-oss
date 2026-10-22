@@ -83,6 +83,7 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
   }, [children])
   const shown = Math.min(fit, maxVisible ?? items.length, items.length)
   const rest = items.length - shown
+  if (items.length === 0) return null
   return <>
     <span ref={root} className={styles.line} data-tag-overflow="" onClick={(event) => event.stopPropagation()}>
       <TruncatedTextFocus.Provider value={rest === 0}>{items.slice(0, shown).map((item, index) => <span key={index} className={styles.item} data-shrink={shown === 1 && rest > 0 ? '' : undefined}>{item}</span>)}</TruncatedTextFocus.Provider>

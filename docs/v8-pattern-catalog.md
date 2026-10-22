@@ -123,6 +123,8 @@
 ## card カード（中身のまとまりの箱）
 
 - 選んだカードの枠と面は `Card.selected` へ渡す。既定のカードは変更しない。
+- 下部に操作を置くカードは `Card.actions` を使い、情報の段間と操作までの間隔は `gap` で1回だけ指定する。自然な高さの差が48px以下なら既存の高さ合わせで操作も下端へ寄せる。記事として並べる場合は `as="article"`。
+- 親が左右の余白を持つカード一覧は `ListPageCards inset="parent"`、狭い板の列数は `narrowColumns` で指定する。先頭の数の帯を道具領域に置く一覧は `ListPage toolbarSpacing="stats"` とし、見出し下と道具上の余白を重ねない。タブ・独立した数の帯が間にある一覧の間隔は保つ。
 
 - 一覧のカード配置は一覧型の `ListPageCards`（`list-page.tsx` と `page-templates.module.css`）が列数と共通16の間隔を持つ。カードの面と内側は `Card`・`CardContent`・`CardHeader`（card.tsx）、操作は `RowNameButton`・`IconButton` が持つ（L7メディア・バナー）。CardContentは端の16を1回だけ持つ。
 - 分析のカード本文は `ListPageSection` が共通16/24の余白、`DetailColumns(presentation="analysis")` が左右の列と狭幅の折り畳みを持つ。カードの面/題はCard/CardHeader。ほかの提示と既定は保つ（L11 ws9wt）。
@@ -1036,7 +1038,7 @@
 ## 受信箱の列・入力・補助面（inbox-frame）
 
 - **役目**：受信箱の3列、会話の媒体、返信入力、保存した検索と内部メモの補助面。
-- **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-conversation-head.tsx`・同CSSと`inbox-head-menus.tsx`（会話の頭・担当・対応・検索・顧客欄の開閉）、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
+- **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-conversation-head.tsx`・同CSSと`inbox-head-menus.tsx`（会話の頭・担当・対応・検索・顧客欄の開閉）、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用、送信状態と `InboxThreadLoading` の骨組み）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路、`InboxListRow` の選択表示）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
 - **持ち主（Pen）**：受信箱 eovoG。媒体と補助面の従来寸法は共通トークンへ移し、画面から上書きしない。
 - **確認**：送信・引用・添付・予約・遅延応答・入力時の確認を既存試験で守る。見た目の候補は測定と左右画像の確認後だけ記録する。
 
