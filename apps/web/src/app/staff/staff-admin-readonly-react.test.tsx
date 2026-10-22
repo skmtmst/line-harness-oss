@@ -134,7 +134,7 @@ describe('ログインユーザーの権限確認 (IDEA-30)', () => {
 
     // 保存口も下書き変更の入口も出さない・効かせない
     expect(screen.queryByRole('button', { name: /見せる範囲を保存/ })).toBeNull()
-    expect((screen.getByRole('button', { name: 'ほかの人と同じにする' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: 'ほかの人と同じにする' })).toBeNull()
     for (const button of screen.getAllByRole('button').filter((item) => item.getAttribute('aria-pressed') !== null)) {
       expect((button as HTMLButtonElement).disabled).toBe(true)
     }
@@ -144,10 +144,10 @@ describe('ログインユーザーの権限確認 (IDEA-30)', () => {
     // 管理者であることと、この画面では確認だけできることを示す
     expect(screen.getByText(/管理者はすべての機能を使えます。/)).toBeTruthy()
     // 管理者向けは一覧へ戻る導線だけが出る（権限編集モーダルではない画面内表示）。
-    expect(screen.getByRole('button', { name: '一覧へ戻る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'ログインユーザー', exact: true })).toBeTruthy()
 
     // 戻ると一覧へ戻る
-    fireEvent.click(screen.getByRole('button', { name: '一覧へ戻る' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ログインユーザー', exact: true }))
     await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
     expect(fixture.updateStaff).not.toHaveBeenCalled()
   })
@@ -157,7 +157,8 @@ describe('ログインユーザーの権限確認 (IDEA-30)', () => {
     await openScope('対象者')
 
     expect(screen.getByText('対象のLINEアカウント：すべてのLINEアカウント')).toBeTruthy()
-    // 管理者以外は従来どおり保存口へ進める
+    expect(screen.queryByRole('button', { name: /見せる範囲を保存/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
     expect(screen.getByRole('button', { name: /見せる範囲を保存/ })).toBeTruthy()
   })
 

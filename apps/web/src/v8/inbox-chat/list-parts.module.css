@@ -64,10 +64,6 @@
  * 名前・内容・札の段の間2、内容は13pxの1行で省略、経路は枠だけの小さな札、
  * 担当の前の丸い頭文字は置かない。互換経路は今までどおり。
  */
-:global(:root) .row {
-  padding: var(--tpl-inbox-row-pad);
-}
-
 :global(:root) .rowInner {
   gap: var(--tpl-inbox-row-gap);
 }
@@ -104,7 +100,7 @@
   padding: var(--tpl-inbox-badge-pad);
   border: 0;
   outline: 1px solid var(--color-hairline);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
   border-radius: var(--radius-mini);
   background: transparent;
   color: var(--color-ink-secondary);

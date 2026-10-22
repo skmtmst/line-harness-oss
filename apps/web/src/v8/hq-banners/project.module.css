@@ -57,7 +57,7 @@
   justify-content: center;
   gap: var(--tpl-hb-pending-gap);
   outline: 1px dashed var(--color-control-border);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
   background: var(--color-canvas);
   cursor: default;
 }

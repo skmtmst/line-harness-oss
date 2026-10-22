@@ -1077,7 +1077,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                   <Tr
                     key={point.id}
                     interactive
-                    selected={panelId === point.id || highlighted}
+                    selected={folderMove.isSelected(point.id) || panelId === point.id || highlighted}
                     data-table-layout="columns"
                     data-row-id={point.id}
                     detailKey="point" onOpen={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}

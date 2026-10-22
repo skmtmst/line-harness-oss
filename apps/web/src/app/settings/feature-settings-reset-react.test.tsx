@@ -186,6 +186,6 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
       await settle()
     })
     expect(String((mutableSwitch() as HTMLInputElement).checked)).toBe('true')
-    expect(button('キャンセル').disabled).toBe(true)
+    expect([...document.body.querySelectorAll('button')].some(button => button.textContent?.trim() === 'キャンセル')).toBe(false)
   })
 })

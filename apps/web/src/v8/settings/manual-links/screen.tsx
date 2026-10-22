@@ -57,12 +57,13 @@ export default function ManualLinksScreen() {
     cancelEdit,
     saveEdit,
     guard,
+    dirty,
   } = useManualLinks()
 
   const frame = (children: React.ReactNode) => (
     <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION} explanation="この表を直せるのは運営だけです。お客さまの組織からは見えません。"
       saveStatus={canEdit && editingKey ? `${rows.find(row => (row.taskId ?? row.screenId) === editingKey)?.name ?? ''}の行き先を編集中` : undefined}
-      saveActions={canEdit && editingKey ? <>
+      saveActions={canEdit && editingKey && (dirty || saving) ? <>
         <Button variant="secondary" disabled={saving} onClick={cancelEdit}>キャンセル</Button>
         <Button variant="primary" actionWording disabled={saving} onClick={() => void saveEdit()} busy={saving} busyLabel="保存しています…">決める</Button>
       </> : undefined}>

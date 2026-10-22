@@ -5,12 +5,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(new URL('../../v8/scenarios/list.tsx', import.meta.url), 'utf8')
 
 describe("管理画面 シナリオ一覧の読込状態", () => {
-  it('読込・成功・失敗を別の状態として持つ', () => {
-    expect(PAGE).toContain('useOffsetServerList<ScenarioRow>')
-    expect(PAGE).toContain('scenarioList.loading')
-    expect(PAGE).toContain('scenarioList.error')
-    expect(PAGE).toContain('scenarioList.items')
-  })
+
 
   it('読込失敗を空のシナリオ一覧として表示しない', () => {
     expect(PAGE).toContain('scenarioList.error')

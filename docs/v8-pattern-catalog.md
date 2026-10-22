@@ -123,6 +123,8 @@
 ## card カード（中身のまとまりの箱）
 
 - 選んだカードの枠と面は `Card.selected` へ渡す。既定のカードは変更しない。
+- 下部に操作を置くカードは `Card.actions` を使い、情報の段間と操作までの間隔は `gap` で1回だけ指定する。自然な高さの差が48px以下なら既存の高さ合わせで操作も下端へ寄せる。記事として並べる場合は `as="article"`。
+- 親が左右の余白を持つカード一覧は `ListPageCards inset="parent"`、狭い板の列数は `narrowColumns` で指定する。先頭の数の帯を道具領域に置く一覧は `ListPage toolbarSpacing="stats"` とし、見出し下と道具上の余白を重ねない。タブ・独立した数の帯が間にある一覧の間隔は保つ。
 
 - 一覧のカード配置は一覧型の `ListPageCards`（`list-page.tsx` と `page-templates.module.css`）が列数と共通16の間隔を持つ。カードの面と内側は `Card`・`CardContent`・`CardHeader`（card.tsx）、操作は `RowNameButton`・`IconButton` が持つ（L7メディア・バナー）。CardContentは端の16を1回だけ持つ。
 - 分析のカード本文は `ListPageSection` が共通16/24の余白、`DetailColumns(presentation="analysis")` が左右の列と狭幅の折り畳みを持つ。カードの面/題はCard/CardHeader。ほかの提示と既定は保つ（L11 ws9wt）。
@@ -547,6 +549,7 @@
 - **10-12の追加（F組・B-260）**：`CreatePage`の`contentDisabled`／`contentLabel`で本文をネイティブfieldsetにする。余白と段間は型が持ち、保存中・比較中・閲覧のみの入力をまとめて止める。通知と下の帯はfieldsetの外へ渡す。レポート作成の動作試験で保存・失敗・競合・権限を保つ。
 
 - **10-12の変わり形（F組・B-260）**：同じ入力欄の前後に固定文字を置く`AffixedTextField`は`text-field.tsx`／`text-field.module.css`が持つ。値は入力部分だけ、前後の文字は保存しない。Fieldの必須・誤り・説明・フォーカスと同じ契約を保つ。画面で別の枠や焦点の輪を作らない。
+- 招待のメール欄は `shared/email-chip-field.tsx`。既存の TextField・Chip を使い、Enter・貼り付け・欄から離れる操作で1件を札にする。複数件は切り捨てず入力に残して理由を示す。送信値・名前・権限は画面が持つ。
 - 言葉を足す欄は `shared/keyword-input.tsx`。枠と検索印は `AffixedTextField`、幅は既存の言葉入力用の値を使う。Enter・カンマ・離れる操作で確定し、日本語の変換中は確定しない。条件や重複の判断は画面が渡す。
 
 - **10-12の色選択の変わり形（F組）**：固定色をその場で選ぶ欄は`FolderColorButton`の`appearance="palette"`。丸は24px、選んだ色に輪。保存色が候補外でも現在色の選択を出す。色の名前・選択・矢印キーは同じ正本が持つ。既定のフォルダ色メニューは保つ。
@@ -905,6 +908,8 @@
 <a id="steps"></a>
 ## steps 手順
 
+- 完了した入力の要約は `Steps.summaries`。変える口は既存の `onSelect` へ渡す。現在・未完の段には要約を出さない。方向の動きは同じ持ち主の `StepContent` と `CreatePage.step` / `CreateStepColumns.step`。入力を作り直さず transform だけを150ms動かし、動きを減らす設定では即時に替える。
+
 - **役目**：題のすぐ下・左寄せ・1行。済みの段だけ押して戻れる
 - **持ち主（コード）**：`apps/web/src/components/templates/steps.tsx`・`apps/web/src/components/templates/steps.module.css`（部品 `Steps`）
 - **持ち主（Pen）**：`NUOgw`「手順」
@@ -1036,7 +1041,7 @@
 ## 受信箱の列・入力・補助面（inbox-frame）
 
 - **役目**：受信箱の3列、会話の媒体、返信入力、保存した検索と内部メモの補助面。
-- **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-conversation-head.tsx`・同CSSと`inbox-head-menus.tsx`（会話の頭・担当・対応・検索・顧客欄の開閉）、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
+- **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-conversation-head.tsx`・同CSSと`inbox-head-menus.tsx`（会話の頭・担当・対応・検索・顧客欄の開閉）、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用、送信状態と `InboxThreadLoading` の骨組み）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路、`InboxListRow` の選択表示）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
 - **持ち主（Pen）**：受信箱 eovoG。媒体と補助面の従来寸法は共通トークンへ移し、画面から上書きしない。
 - **確認**：送信・引用・添付・予約・遅延応答・入力時の確認を既存試験で守る。見た目の候補は測定と左右画像の確認後だけ記録する。
 
@@ -1133,3 +1138,10 @@
 - 固定分類は `shared/category-panel.tsx` の `CategoryPanel`。フォルダ管理の追加・変更・削除を持たず、既存の分類を選ぶ。操作と直前の知らせを本文列の下端に置く場合は `StickyBarRegion`。
 - 友だち一覧の表は `DataTable cellPresentation="friends"`。チェック・注目・操作の端の余白は共通セルの `columnKind`、ひな形の通常セルは `Td presentation="template-plain"`。
 - LIFFの見出し・欄の失敗・切替は `apps/liff/src/components/ui/` の `PageHeading`・`FieldError`・`Button variant="switch"`。監査は実際の読み込み先を照合し、生の手書きと部品の上書きは引き続き止める。
+
+## ログの記録とカレンダーの期間移動
+
+- ログの中身とコピーは `shared/log-entry-details.tsx` の `LogEntryDetails` / `LogEntryCopy`。時刻・相手・結果・表示用の理由だけを渡し、本文・URL・秘密値・生のエラーを渡さない。コピーは既存 `CopyTextButton` の固定幅と失敗時の手動選択を使い、成功の印は1600ms。
+- カレンダーの期間移動は `shared/calendar-period.tsx` の `CalendarPeriod`。日付順のキーで方向を決め、transformだけを共通200msで動かす。初回・同期間の再取得・表示方式の切替では動かさず、次の移動で前の動きを中断し、動きを減らす設定では即時表示する。
+- 月の日付は `shared/month-calendar` が今日（文字・aria-current）と選択（枠・aria-selected）を分ける。空き枠は既存 `BookingSlot` の表示を保ち、閲覧のみには変更操作を出さない。
+- 見張り：`log-entry-details.test.tsx`、`calendar-period.test.tsx`、既存の月表示・予約枠・ログの権限と再実行の試験。

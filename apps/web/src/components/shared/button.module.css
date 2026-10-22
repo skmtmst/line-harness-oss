@@ -191,9 +191,9 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 :root .primary { border: 0; outline: 1px solid var(--color-primary-border); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
-:root .secondary { outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
+:root .secondary { outline: 1px solid var(--color-control-border); outline-offset: -1px; }
 .text { border-color: transparent; }
 :root .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
 
@@ -207,7 +207,7 @@
 :root .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
 .danger-outline { border-color: var(--color-hairline); }
-:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }
+:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); }
 
 /* 本文中の小さな操作。通常のボタンの高さは変えない。 */
 :root .inline { height: auto; min-height: 0; padding: 0; font-size: var(--text-caption); line-height: 19px; }

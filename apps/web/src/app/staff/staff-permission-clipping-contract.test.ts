@@ -36,10 +36,10 @@ describe('LAY-07: 権限詳細の設定欄が狭い幅で潰れない', () => {
 })
 
 describe('LAY-08: 保存バーが画面外へ逃げない', () => {
-  it('バーの左端は var(--sidebar-width) 固定ではなくビュー幅に追従する', () => {
+  it('画面ごとの固定座標を置かず、共通の追従帯へ配置を委ねる', () => {
     expect(staffSource).not.toContain('var(--sidebar-width')
-    expect(staffSource).toContain('inset-x-0')
-    expect(staffSource).toContain('xl:left-64')
+    expect(staffSource).toContain('<PageFooter')
+    expect(staffSource).not.toContain('fixed inset-x-0 bottom-0')
   })
 
   it('バーの高さを固定せず、下部はキャンセルと保存に絞る', () => {

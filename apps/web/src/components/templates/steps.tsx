@@ -5,6 +5,8 @@ import Button from '@/components/shared/button'
 
 import { Check, Circle, CircleCheck, CircleDot } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
+import { useLayoutEffect, useRef, type HTMLAttributes } from 'react'
+import { motionMs, shouldAnimateLeave } from '@/components/shared/overlay-utils'
 import styles from './steps.module.css'
 
 export type { StepperStep as StepsStep } from '@/components/shared/stepper'
@@ -27,6 +29,8 @@ export function Steps({
   currentKey,
   connectorSize,
   layout = 'horizontal',
+  summaries,
+  readOnly = false,
 }: {
   /** 何の進みか（例：「リッチメニューを作る手順」）。nav の読み上げ名。 */
   label: string
@@ -36,6 +40,9 @@ export function Steps({
   connectorSize?: 'short'
   /** 窓の左で、回答済み・現在・未回答の質問へ移る列。 */
   layout?: 'horizontal' | 'sidebar'
+  /** 済んだ入力の要約。値を持つ画面だけが渡す。 */
+  summaries?: Readonly<Record<string, string>>
+  readOnly?: boolean
 }) {
   const items = steps.map((raw, index) => ({ ...raw, key: raw.key ?? raw.label, order: raw.order ?? index + 1 }))
   const currentIndex = currentKey !== undefined
@@ -46,6 +53,8 @@ export function Steps({
     const state = items[index].state
     return state === 'current' ? 'todo' : state
   }
+
+  const summaryItems = summaries ? items.filter((step, index) => stateOf(index) === 'done' && summaries[step.key]) : []
 
   if (layout === 'sidebar') return (
     <nav aria-label={label} data-part="steps" data-layout="sidebar" className={styles.root}>
@@ -60,6 +69,7 @@ export function Steps({
           </li>
         })}
       </ol>
+
     </nav>
   )
 
@@ -112,20 +122,47 @@ export function Steps({
           )
         })}
       </ol>
+      {summaries && summaryItems.length > 0 ? <div role="list" aria-label="設定済みの内容" className={styles.summaries}>
+        {summaryItems.map((step) => <div role="listitem" key={step.key} className={styles.sectionHead}>
+          <span className={styles.sectionTitle}>{step.label}</span>
+          <span className={styles.sectionSummary} title={summaries[step.key]}>{summaries[step.key]}</span>
+          {step.onSelect && !readOnly ? <Button variant="secondary" size="compact" aria-label={`${step.label}を変える`} onClick={step.onSelect}>変える</Button> : null}
+        </div>)}
+      </div> : null}
     </nav>
   )
 }
 
+/** 入力を作り直さず、進む・戻る方向だけを示す。次の操作で前の動きを取り消す。 */
+export function StepContent({ step, children, as: Element = 'div', disabled, ...props }: HTMLAttributes<HTMLElement> & { step: number | null; as?: 'div' | 'fieldset'; disabled?: boolean }) {
+  const ref = useRef<HTMLDivElement & HTMLFieldSetElement>(null)
+  const previous = useRef(step)
+  useLayoutEffect(() => {
+    const from = previous.current
+    previous.current = step
+    const panel = ref.current
+    if (step === null || from === null || from === step || !panel?.animate || !shouldAnimateLeave()) return
+    const animation = panel.animate([
+      { transform: step > from ? 'translateX(var(--polish-space-card))' : 'translateX(calc(-1 * var(--polish-space-card)))' },
+      { transform: 'translateX(0)' },
+    ], { duration: motionMs('--motion-exit', 150), easing: 'ease-out' })
+    // 次の操作や閉じる操作による取消は、保存や画面の失敗ではない。
+    void animation.finished?.catch(() => {})
+    return () => animation.cancel()
+  }, [step])
+  return <Element {...props} disabled={Element === 'fieldset' ? disabled : undefined} ref={ref}>{children}</Element>
+}
+
 /** 段を開いて入力し、閉じた段には要約と変更口を残す作成画面。 */
-export function StepSection({ order, title, summary, open, onChange, children }: {
-  order: number; title: string; summary: string; open: boolean; onChange: () => void; children: import('react').ReactNode
+export function StepSection({ order, title, summary, open, onChange, children, readOnly = false }: {
+  order: number; title: string; summary: string; open: boolean; onChange: () => void; children: import('react').ReactNode; readOnly?: boolean
 }) {
   return <Card padding="default" layout="vertical" gap="var(--polish-space-field)" selected={open} aria-label={`${order} ${title}`}>
     <div className={styles.sectionHead}>
       <span className={styles.sectionNumber}>{order}</span>
       <span className={styles.sectionTitle}>{title}</span>
       <span className={styles.sectionSummary} title={open ? undefined : summary}>{open ? null : summary}</span>
-      {open ? null : <Button variant="secondary" onClick={onChange}>変える</Button>}
+      {open || readOnly ? null : <Button variant="secondary" onClick={onChange}>変える</Button>}
     </div>
     {open ? <div className={styles.sectionBody}>{children}</div> : null}
   </Card>

@@ -240,7 +240,8 @@ describe('V8 ウェビナーの編集', () => {
     await render(<WebinarEditV8 />)
     expect(host.textContent).toContain('通知と視聴後のこと')
     expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('通知')
-    const video = buttons().find((button) => button.textContent?.includes('動画') && button.closest('[data-part="steps"]'))
+    expect(host.querySelector('[aria-label="設定済みの内容"]')?.textContent).toContain('動画あり・配信枠 1件')
+    const video = host.querySelector('[aria-label="動画を変える"]') as HTMLButtonElement | null
     expect(video).toBeTruthy()
     await act(async () => { video!.click() })
     for (let i = 0; i < 4; i += 1) await act(async () => {})

@@ -5,6 +5,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
@@ -137,6 +138,11 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
     expect(host.textContent).not.toContain('登録した内容は消えていません')
     // 集計の数値は「—」にし、0とは言わない。
     expect(host.textContent).toContain('1配信あたりの無駄')
+    const missing = within(host).getByText('重複配信の削減').closest<HTMLElement>('[data-kpi-presentation]')!
+    expect(within(missing).getByText('—')).toBeTruthy()
+    expect(within(missing).getByText('配信実績の接続を待っています')).toBeTruthy()
+    await act(async () => { fireEvent.click(within(missing).getByRole('button', { name: '重複配信の削減の説明' })) })
+    expect(within(document.body).getByText('配信前プレビューの実績を接続したあと、重複分を除いた削減の見込みをここに表示します。')).toBeTruthy()
   })
 
   it('集計503×statusCounts省略（旧Worker）：0組と誤案内せず総数と内訳不明を分けて出す', async () => {

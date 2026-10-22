@@ -28,7 +28,7 @@ const DOC = join(ROOT, 'docs', 'v8-board-to-code.md')
 const outAt = process.argv.indexOf('--out')
 const OUT = outAt >= 0 && process.argv[outAt + 1] ? resolve(ROOT, process.argv[outAt + 1]) : DOC
 
-const NO_SPLIT = '（別ファイルなし：page.tsx の中で分けている・または V8 なし）'
+const NO_SPLIT = '（入口から画面本体を自動特定できないため要確認）'
 const NO_PAGE = '（page.tsx なし）'
 const NO_URL = '（撮らない板・URL なし）'
 
@@ -65,7 +65,7 @@ export function v8FilesOf(entryFile) {
 }
 
 function resolveTsx(base) {
-  for (const candidate of [`${base}.tsx`, `${base}.ts`, join(base, 'index.tsx')]) {
+  for (const candidate of [`${base}.tsx`, `${base}.ts`, join(base, 'index.tsx'), join(base, 'index.ts')]) {
     if (existsSync(candidate)) return candidate
   }
   return null
@@ -125,13 +125,17 @@ function main() {
     }
     return `| ${board.doc} | ${id} | ${cell(board.name)} | ${url ?? '—'} | ${entryCell} | ${fileCell} |`
   })
+  const verifiedOn = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date())
   const head = [
+    `> 文書：V8の板とコードの対応｜区分：今の説明（自動生成）｜最終確認：${verifiedOn}（日本時間）`,
+    '',
     '# V8 の絵（Pencil の板）と画面のコードの対応表',
     '',
     '- 作り直し：`node scripts/visual-qa/build-v8-board-to-code.mjs`（手で直さない）。URL は `scripts/visual-qa/v8-design-map.json` と同じもの（実URL・タブ指定）。入口・画面のファイルは、その URL の入口（`page.tsx`、`?` の後ろは外して探す）が読む `@/v8/…` または `*-v8` のファイル。共通の見出し（`readonly-header-v8`）は画面のファイルに数えない。',
-    '- 「V8 の画面ファイル」が `v8/…` なら `apps/web/src/v8/` の新しい画面、`app/…-v8.tsx` なら今の V8 ファイル（60% 以上合うものはここを直す。`apps/web/src/v8/README.md`）。1つの入口が複数の画面を読むとき（タブごと）は全部並べる。',
+    '- 画面本体は `apps/web/src/v8/<機能>/` に置き、`app/**/page.tsx` は入口だけにする。現在のimportから本体を探し、見た目の一致率で置き場を選ばない（`apps/web/src/v8/README.md`）。1つの入口が複数の画面を読むとき（タブごと）は全部並べる。',
+    '- この表はURLとコードの対応を調べる案内。板の合否・対象数の正本は `docs/v8-requirements/v8-switch.md` と正式台帳を参照し、この表の行数を合格の分母にしない。',
     '- 画面の中の見た目は型・部品で決まるので、まず `docs/v8-where-to-change.md` を読む。',
-    `- 数：src/v8 を読む板 ${readsV8}・app の V8 ファイルだけを読む板 ${readsApp}・入口が V8 の別ファイルを読まない板（page.tsx の中で分けている・または V8 なし） ${noSplit}・URL なし ${noUrl}。`,
+    `- 数：src/v8 を読む板 ${readsV8}・app の V8 ファイルだけを読む板 ${readsApp}・入口から画面本体を自動特定できない板（要確認） ${noSplit}・URL なし ${noUrl}。`,
     '',
     '| 文書 | 板ID | 板の名前 | 画面のURL | 入口 | V8 の画面ファイル |',
     '|---|---|---|---|---|---|',

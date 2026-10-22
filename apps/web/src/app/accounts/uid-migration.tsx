@@ -3,6 +3,8 @@
 import { canManageRole, isOwnerRole } from '@/lib/staff-role'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import { Steps } from '@/components/templates/steps'
 import Checkbox from '@/components/shared/checkbox'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
@@ -401,28 +403,12 @@ function MigrationReviewBoard({
   return (
     <>
       {/* Z0jHp: 自動で一致／要確認／一致しない／競合 の4枚。 */}
-      <div className={styles.kpis} role="group" aria-label="照合の内訳">
-        <div className={styles.kpi}>
-          <p className={styles.kpiLabel}>自動で一致</p>
-          <p className={styles.kpiValue}>{formatNumber(active.counts.auto)}<span className={styles.kpiUnit}>人</span></p>
-          <p className={styles.kpiDetail}>そのまま引き継ぐ</p>
-        </div>
-        <div className={styles.kpi}>
-          <p className={styles.kpiLabel}>要確認</p>
-          <p className={styles.kpiValue}>{formatNumber(active.counts.review)}<span className={styles.kpiUnit}>人</span></p>
-          <p className={styles.kpiDetail}>いまここで決める</p>
-        </div>
-        <div className={styles.kpi}>
-          <p className={styles.kpiLabel}>一致しない</p>
-          <p className={styles.kpiValue}>{formatNumber(active.counts.unmatched)}<span className={styles.kpiUnit}>人</span></p>
-          <p className={styles.kpiDetail}>新しく作るか除く</p>
-        </div>
-        <div className={styles.kpi}>
-          <p className={styles.kpiLabel}>競合</p>
-          <p className={styles.kpiValue}>{formatNumber(active.counts.conflict)}<span className={styles.kpiUnit}>人</span></p>
-          <p className={styles.kpiDetail}>同じ先に2人いる</p>
-        </div>
-      </div>
+      <KpiBand role="group" aria-label="照合の内訳">
+        <KpiCard presentation="band" icon={null} title="自動で一致" value={active.counts.auto} unit="人" detail="そのまま引き継ぐ" />
+        <KpiCard presentation="band" icon={null} title="要確認" value={active.counts.review} unit="人" detail="いまここで決める" />
+        <KpiCard presentation="band" icon={null} title="一致しない" value={active.counts.unmatched} unit="人" detail="新しく作るか除く" />
+        <KpiCard presentation="band" icon={null} title="競合" value={active.counts.conflict} unit="人" detail="同じ先に2人いる" />
+      </KpiBand>
 
       <section className={styles.section} aria-labelledby="uid-review">
         <div className={styles.sectionHead}>
@@ -560,24 +546,12 @@ function MigrationResultBoard({
             : statusView.description}
         </p>
       </div>
-      <div className={styles.kpis} role="group" aria-label="照合の結果">
-        <div className={styles.kpi}>
-          <p className={styles.kpiLabel}>引き継いだ</p>
-          <p className={styles.kpiValue}>{formatNumber(active.counts.applied)}<span className={styles.kpiUnit}>人</span></p>
-        </div>
-        <div className={styles.kpi}>
-          <p className={styles.kpiLabel}>一致先なし</p>
-          <p className={styles.kpiValue}>{formatNumber(active.counts.unmatched)}<span className={styles.kpiUnit}>人</span></p>
-        </div>
-        <div className={styles.kpi}>
-          <p className={styles.kpiLabel}>除いた</p>
-          <p className={styles.kpiValue}>{formatNumber(active.decisionCounts?.exclude ?? 0)}<span className={styles.kpiUnit}>人</span></p>
-        </div>
-        <div className={styles.kpi}>
-          <p className={styles.kpiLabel}>失敗</p>
-          <p className={styles.kpiValue}>{formatNumber(active.counts.failed)}<span className={styles.kpiUnit}>人</span></p>
-        </div>
-      </div>
+      <KpiBand role="group" aria-label="照合の結果">
+        <KpiCard presentation="band" icon={null} title="引き継いだ" value={active.counts.applied} unit="人" detail="" />
+        <KpiCard presentation="band" icon={null} title="一致先なし" value={active.counts.unmatched} unit="人" detail="" />
+        <KpiCard presentation="band" icon={null} title="除いた" value={active.decisionCounts?.exclude ?? 0} unit="人" detail="" />
+        <KpiCard presentation="band" icon={null} title="失敗" value={active.counts.failed} unit="人" detail="" />
+      </KpiBand>
       {active.rollbackable && (
         <div className={styles.cardCenter}>
           {rollbackBlockedReason

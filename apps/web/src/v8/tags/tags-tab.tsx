@@ -1,4 +1,6 @@
 'use client'
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 
 import { useActionError } from '@/lib/use-action-error'
 
@@ -190,8 +192,8 @@ export default function TagsTab({
 }) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
-  const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
-  const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
+  const { value: items, setValue: setItems, hasValue: loaded } = useListSnapshot<Tag[]>(accountId ?? '', fixture?.items ?? [])
+  const { value: groups, setValue: setGroups } = useListSnapshot<TagGroup[]>(accountId ?? '', fixture?.groups ?? [])
   const [status, setStatus] = useState<LoadStatus>(fixture ? 'ready' : 'loading')
   // 操作の失敗（並び替え・フォルダ移動）。読み込みの失敗とは別物。
   const { error: actionError, setError: setActionError } = useActionError(accountId ?? '')
@@ -265,7 +267,7 @@ export default function TagsTab({
 
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [fixture, accountId, saveErrors])
+  }, [fixture, accountId, saveErrors, setItems, setGroups])
   useEffect(() => { void load() }, [load])
 
   /* 数の帯のサーバー側の数。一覧とは別の要求なので、失敗しても一覧は止めない（「—」）。 */
@@ -287,7 +289,6 @@ export default function TagsTab({
   /* アカウントを切り替えたら、前のアカウントのフォルダ選択と件数を残さない。 */
   useEffect(() => {
     if (fixture) return
-    setItems([])
     setGroups([])
     setOpenMenuId(null)
     setMenuMoveFor(null)
@@ -327,7 +328,7 @@ export default function TagsTab({
 
   /** アカウント切替直後の1フレームは「未取得」として扱う（管理画面 と同じ）。 */
   const staleAccount = !fixture && loadRequestRef.current.accountId !== accountId
-  const ready = status === 'ready' && !staleAccount
+  const ready = (status === 'ready' || (status === 'loading' && loaded)) && !staleAccount
 
   /* 整理候補の数。未取得は null（「—」）、取得できて0件は 0。 */
   const cleanupCount = cleanupKnown(items, ready)
@@ -703,7 +704,7 @@ export default function TagsTab({
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <RovingTbody reorderKey={liveOrder.shown.map((tag) => tag.id).join(',')}>
+        <RovingTbody reorderScope={JSON.stringify([accountId, view])} reorderKey={liveOrder.shown.map((tag) => tag.id).join(',')}>
           {liveOrder.shown.map((tag) => {
             const group = groups.find((item) => item.id === tag.groupId)
             const editHref = `/tags/edit?id=${tag.id}`
@@ -850,7 +851,7 @@ export default function TagsTab({
         {actionError ? (
           <Notice tone="danger" >{actionError}<button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button></Notice>
         ) : null}
-        {table}
+        <RefreshCover refreshing={status === 'loading' && loaded}>{table}</RefreshCover>
       </ListPageBody>
 
       {/* 行の詳細パネル。フォルダの入力中はそちらを出す。 */}

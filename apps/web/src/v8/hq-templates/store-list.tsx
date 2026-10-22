@@ -468,7 +468,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             const folder = folderOf(row.folder_id)
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
-              <Tr key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
+              <Tr selected={selectedIds.includes(row.id)} key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
                 {type === 'rich_menu' ? <Td presentation="template-plain">{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
                 {type === 'template' ? <Td presentation="template-plain"><Checkbox aria-label={`「${row.name}」を選ぶ`} checked={selectedIds.includes(row.id)} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...current, row.id] : current.filter((id) => id !== row.id))} /></Td> : null}
                 {type === 'tag' ? (

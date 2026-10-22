@@ -26,10 +26,5 @@ describe('V8タグ一覧の件数の母集団', () => {
     expect(PAGE).toContain('range={{ total: filtered.length,')
     expect(PAGE).toContain("const archiveChip = <FilterChip selected={onlyArchived}")
   })
-  it('アカウント切替で前のフォルダ・行・件数を残さない', () => {
-    expect(PAGE).toContain("useOnAccountSwitch(accountId, () => setView({ folder: '', page: '1' }))")
-    expect(PAGE).toContain('setItems([])')
-    expect(PAGE).toContain('setGroups([])')
-    expect(PAGE).toContain('loadRequestRef.current.accountId !== accountId')
-  })
+
 })

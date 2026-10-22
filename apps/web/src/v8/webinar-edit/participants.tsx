@@ -187,7 +187,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   } else if (state === 'error') {
     body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" onRetry={() => setAttempt((count) => count + 1)} />
   } else if (pageItems.length === 0) {
-    body = <ListState kind="empty" title={filter || query.trim() !== '' ? 'この条件に当てはまる人はいません' : 'まだ参加者はいません'} />
+    body = <ListState kind="empty" emptyPreset={filter || query.trim() ? 'filtered' : 'readonly'} title={filter || query.trim() !== '' ? 'この条件に当てはまる人はいません' : 'まだ参加者はいません'} action={filter || query.trim() ? <Button onClick={() => { setFilter(''); setQuery(''); setPage(1) }}>条件を外す</Button> : undefined} />
   } else {
     body = (
       <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--tpl-wb-col-gap)', padding: '0 var(--tpl-list-inset)' }} aria-label="参加者一覧">

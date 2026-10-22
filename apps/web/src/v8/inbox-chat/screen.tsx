@@ -249,8 +249,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   const inboxListLoading = nameQueryPending
     || currentFilterNotLoaded
-    || (channel !== 'email' && loading)
-    || (channel !== 'line' && emailLoading)
+
+  const inboxListRefreshing = !inboxListLoading && ((channel !== 'email' && loading) || (channel !== 'line' && emailLoading))
 
   const inboxListFailed = (channel !== 'email' && chatListFailed)
     || (channel !== 'line' && Boolean(emailError))
@@ -550,6 +550,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   })
 
   const {
+    sendError,
+    pendingMessages,
     handleSendMessage,
     handleSendPack,
     handleKeyDown,
@@ -558,7 +560,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     sending,
     sendLockRef,
     pendingAttachment,
-    setError,
     messageContent,
     pendingImage,
     selectedAccountId,
@@ -689,6 +690,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     unseenIncoming,
     setUnseenIncoming,
   } = useInboxScroll({
+    pendingMessages,
     selectedChatId,
     chatDetail,
     textareaRef,
@@ -749,7 +751,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef,
           emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef,
           setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats,
-          handleSelectChat, inboxListLoading, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
+          handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
           clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails,
         }} />
 
@@ -777,7 +779,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput,
           handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule,
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
-          imagePreviewOpen,
+          imagePreviewOpen, sendError, pendingMessages,
         }} />
 
         {/*

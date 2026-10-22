@@ -1,4 +1,5 @@
 'use client'
+import { RefreshCover } from '@/components/shared/refresh-cover'
 import { unreadLookup } from '@/components/chats/assignee-unread';
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
 import { buildOperatorRows } from '@/components/chats/inbox-dropdown';
@@ -9,7 +10,7 @@ import Button from '@/components/shared/button';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import FilterChip from '@/components/shared/filter-chip';
 import { InboxFloatingPanel } from '@/components/shared/inbox-content';
-import { InboxFilterControls, InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListSearch } from '@/components/shared/inbox-list';
+import { InboxFilterControls, InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { RowMenu } from '@/components/shared/row-actions';
 import SearchField from '@/components/shared/search-field';
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
@@ -90,6 +91,7 @@ type Props = {
   chats: ChatListItem[]
   handleSelectChat: (chatId: string) => void
   inboxListLoading: boolean
+  inboxListRefreshing: boolean
   hasMoreChats: boolean
   hasMoreEmails: boolean
   inboxListFailed: boolean
@@ -100,7 +102,7 @@ type Props = {
   loadingMoreEmails: boolean
 }
 
-export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef, setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats, handleSelectChat, inboxListLoading, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails }: Props) {
+export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef, setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats, handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails }: Props) {
   return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
     {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
@@ -141,8 +143,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           >
             <Bookmark aria-hidden size={16} />
           </Button>
-          {savedViewsOpen && (
-            <InboxFloatingPanel placement="below">
+          <InboxFloatingPanel open={savedViewsOpen} placement="below">
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
                 {savedViews.length === 0 ? (
@@ -218,7 +219,6 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
             </InboxFloatingPanel>
-          )}
         </div>
         {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
         {(
@@ -486,7 +486,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                 // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
                 // 直書きボタンの借金に数えられる (design-debt)。
                 <div key={item.id} className="border-b border-hairline">
-                  <button
+                  <InboxListRow selected={selectedThreadId === item.threadId}
                     onClick={() => {
                       // LINEの選択を外す。両方開いていると中央に何を
                       // 出すのか決まらない。URL指定の案内とURL状態も外す。
@@ -504,8 +504,6 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                         method: 'POST',
                       }).catch(() => undefined)
                     }}
-                    className={`w-full px-3 py-3 text-left transition-colors ${selectedThreadId === item.threadId ? 'bg-accent-soft' : 'hover:bg-shell'
-                      } ${styles.row}`}
                   >
                     <div className={`flex items-start gap-3 ${styles.rowInner}`}>
                       <div className="relative shrink-0">
@@ -539,7 +537,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </InboxListRow>
                 </div>
               ),
             }))
@@ -585,16 +583,11 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                 // 直書きボタンの借金に数えられる (design-debt)。
                 const node = (
                   <div key={chat.id} className="border-b border-hairline">
-                    <button
+                    <InboxListRow selected={isSelected}
                       onClick={() => handleSelectChat(chat.id)}
                       /* 名前は相手の名前だけ、未読と本文は説明に回す（読み上げで名前から入れる）。 */
                       aria-labelledby={(`chat-row-name-${chat.id}`)}
                       aria-describedby={(`${chat.isUnread ? `chat-row-unread-${chat.id} ` : ''}chat-row-preview-${chat.id}`)}
-                      className={`w-full px-3 py-3 text-left transition-colors ${isSelected
-                          ? 'bg-shell'
-                          /* 板 ：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
-                          : 'hover:bg-shell'
-                        } ${styles.row}`}
                     >
                       <div className={`flex items-start gap-3 ${styles.rowInner}`}>
                         <div className="relative shrink-0">
@@ -641,7 +634,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                           </div>
                         </div>
                       </div>
-                    </button>
+                    </InboxListRow>
                   </div>
                 )
                 return node
@@ -693,7 +686,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             )
           }
           if (rows.length > 0) {
-            return <ChatListWindow items={rows} scrollerRef={listScrollRef} hasMore={hasMoreChats || hasMoreEmails} />
+            return <RefreshCover refreshing={inboxListRefreshing}><ChatListWindow items={rows} scrollerRef={listScrollRef} hasMore={hasMoreChats || hasMoreEmails} /></RefreshCover>
           }
           // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
           if (inboxListFailed) return null

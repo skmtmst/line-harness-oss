@@ -29,7 +29,7 @@
   border: 0;
   border-radius: var(--radius-control);
   outline: 1px solid var(--color-control-border);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
   background: var(--color-canvas);
   color: var(--color-ink);
   font: inherit;
@@ -45,7 +45,7 @@
 .editor[aria-invalid='true'],
 .editor[aria-invalid='true']:focus-visible {
   outline: 1px solid var(--color-danger);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
 }
 
 /* 空のときの例文（textarea の placeholder と同じ色）。高さ0の段で、カーソルは行の頭に残す。 */
@@ -94,7 +94,7 @@
   border: 0;
   border-radius: var(--radius-pill);
   outline: 1px solid var(--color-control-border);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: 12px;

@@ -2,13 +2,13 @@ import { readAccountAttention } from '../services/hq-account-attention.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { Hono } from 'hono';
 
+import type { AccountStyle } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 import {
   StyleError,
   checkStyle,
-  profile,
   readDefinition,
 } from '../services/style-setup.js';
 import { instant } from '../services/style-analytics.js';
@@ -264,23 +264,24 @@ styles.put(
 styles.get('/api/hq/style-attention', async (c) => {
   await hq(c, true);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  const items = [];
-  for (const account of scope.accounts) {
-    const a = account.id;
-    const { counts, details } = await readAccountAttention(c.env.DB, a);
-    items.push({
-      accountId: a,
-      style: (await profile(c.env.DB, a))?.style ?? 'standard',
-      name:
-        (
-          await c.env.DB.prepare('SELECT name FROM line_accounts WHERE id=?')
-            .bind(a)
-            .first<{ name: string }>()
-        )?.name ?? '',
-      counts,
-      details,
-    });
-  }
+  const [metadata, attention] = await Promise.all([
+    scope.accounts.length
+      ? c.env.DB.prepare(
+          `SELECT a.id,a.name,p.style FROM line_accounts a
+           LEFT JOIN account_styles p ON p.line_account_id=a.id
+           WHERE a.id IN (SELECT value FROM json_each(?))`,
+        ).bind(JSON.stringify(scope.allowedAccountIds)).all<{ id: string; name: string; style: AccountStyle | null }>()
+      : Promise.resolve({ results: [] }),
+    Promise.all(scope.accounts.map(account => readAccountAttention(c.env.DB, account.id, true, 1))),
+  ]);
+  const byId = new Map(metadata.results.map(row => [row.id, row]));
+  const items = scope.accounts.map((account, index) => ({
+    accountId: account.id,
+    style: byId.get(account.id)?.style ?? 'standard',
+    name: byId.get(account.id)?.name ?? '',
+    counts: attention[index].counts,
+    details: attention[index].details,
+  }));
   return c.json({
     success: true,
     data: { asOf: new Date().toISOString(), items },

@@ -1,5 +1,6 @@
 'use client'
 import Card from '@/components/shared/card'
+import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-entry-details'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { DashboardColumns } from '@/components/templates/dashboard-page'
 import PageSizeSelect from '@/components/shared/page-size-select'
@@ -88,7 +89,7 @@ export function actionLabel(run: AutoReplyRun): string {
   if (run.replyStatus === 'accepted') parts.push('返信')
   if ((summary.executed ?? 0) > 0) parts.push(`後続処理${summary.executed}件`)
   if ((summary.failed ?? 0) > 0) parts.push(`失敗${summary.failed}件`)
-  return parts.length > 0 ? parts.join('＋') : run.detail ?? emptyValue('unknown')
+  return parts.length > 0 ? parts.join('＋') : statusView(run.status).label
 }
 
 function csvCell(value: unknown): string {
@@ -102,7 +103,7 @@ function csvFor(items: AutoReplyRun[]): string {
       formatDateTime(item.occurredAt),
       item.friendName ?? '削除済みの友だち',
       item.accountLabel ?? emptyValue('unknown'),
-      item.inputPreview ?? emptyValue('unknown'),
+      '本文は非表示',
       item.triggerLabel,
       isDeliveryUnconfirmed(item) ? '要確認' : statusView(item.status).label,
       actionLabel(item),
@@ -146,14 +147,15 @@ export function periodFrom(period: PeriodKey, now: Date): string | null {
 }
 
 
-/** 届いた言葉は「」で囲んで1行。 */
-function quoted(text: string | null): string {
-  return text ? `「${text}」` : emptyValue('unknown')
-}
 
 
+
+/** サーバー（auto-reply-runs）が決まった言葉で返す失敗の理由だけを出す。それ以外（生のエラー・顧客の本文）は出さない。 */
+const SAFE_FAILURE_REASONS = new Set(['LINEへの返信を受け付けてもらえませんでした', '返信または一部の処理だけ完了しました', '自動応答を完了できませんでした'])
+const safeFailureReason = (detail: string | null | undefined) => (detail && SAFE_FAILURE_REASONS.has(detail) ? detail : null)
 
 export default function AutoReplyRunsV8() {
+  const [logEntry, setLogEntry] = useState<LogEntryFacts | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
@@ -184,6 +186,7 @@ export default function AutoReplyRunsV8() {
 
   useEffect(() => {
     setPage(1)
+    setLogEntry(null)
     setData(null)
     setActionMessage('')
     setFilter('all')
@@ -366,18 +369,15 @@ export default function AutoReplyRunsV8() {
   const visibleItems = items.filter((item) => {
     if (!matchesFilter(item, filter)) return false
     if (!query) return true
-    return [item.friendName, item.inputPreview, item.triggerLabel]
+    return [item.friendName, item.triggerLabel]
       .some((text) => (text ?? '').toLowerCase().includes(query))
   })
   const isActiveRule = data?.rule.isActive === true && data.rule.id
 
-  /* 札の数：すべて＝全件・失敗＝帯の数・確認待ち＝引き継ぎの確認待ち。見送りは口に数が無いので出さない。 */
-  const chipCounts: Record<RunFilter, number | null> = {
-    all: data ? data.pagination.total : null,
-    failed: data ? failedCount : null,
-    pending: data ? data.handovers.waiting : null,
-    skipped: null,
-  }
+  /* この切り替えは今のページを絞る。引き継ぎ待ちの人数を実行待ちの件数に流用しない。 */
+  const chipCounts: Record<RunFilter, number | null> = Object.fromEntries(
+    (['all', 'failed', 'pending', 'skipped'] as const).map(key => [key, data ? items.filter(item => matchesFilter(item, key)).length : null]),
+  ) as Record<RunFilter, number | null>
   const chips: Array<{ key: RunFilter; label: string }> = [
     { key: 'all', label: 'すべて' },
     { key: 'failed', label: '失敗' },
@@ -386,7 +386,7 @@ export default function AutoReplyRunsV8() {
   ]
 
   const rowMenuItems = (item: AutoReplyRun): ActionMenuItem[] => {
-    const list: ActionMenuItem[] = []
+    const list: ActionMenuItem[] = [{ id: 'detail', label: '実行の詳細を見る', onSelect: () => setLogEntry({ occurredAt: item.occurredAt, target: item.friendName ?? '削除済みの友だち', status: isDeliveryUnconfirmed(item) ? '要確認' : statusView(item.status).label, reason: isDeliveryUnconfirmed(item) ? DELIVERY_UNCONFIRMED_REASON : matchesFilter(item, 'failed') ? (safeFailureReason(item.detail) ?? '処理を完了できませんでした。設定と相手先の状態を確認してください。') : statusView(item.status).label }) }]
     if (item.friendId) {
       list.push({
         id: 'chat',
@@ -407,6 +407,9 @@ export default function AutoReplyRunsV8() {
     }
     return list
   }
+
+  const filteredEmpty = filter !== 'all' || Boolean(search.trim() || dateFrom || dateTo) || period !== 'month'
+  const clearEmptyFilters = () => { setFilter('all'); setSearch(''); setPeriod('month'); setDateFrom(''); setDateTo(''); setPage(1) }
 
   return (
     <DetailPage
@@ -470,14 +473,14 @@ export default function AutoReplyRunsV8() {
         <ListToolbarFrame><ListToolbarRow>
 
             <SearchField
-              placeholder="友だち・言葉で探す"
-              aria-label="友だち・言葉で探す"
+              placeholder="友だち・きっかけで探す"
+              aria-label="友だち・きっかけで探す"
               value={search}
               onChange={(value) => setSearch(value)}
               onClear={() => setSearch('')}
             />
 
-          <SegmentedControl aria-label="結果で絞り込む" value={filter} onChange={setFilter} options={chips.map(chip=>({value:chip.key,label:chipCounts[chip.key]==null?chip.label:`${chip.label} ${formatNumber(chipCounts[chip.key]!)}`}))} />
+          <SegmentedControl aria-label="結果で絞り込む" value={filter} onChange={setFilter} options={chips.map(chip=>({value:chip.key,label:chip.label,count:chipCounts[chip.key] ?? undefined,ariaLabel:`${chip.label}${chipCounts[chip.key] === null ? '' : ` ${chipCounts[chip.key]}件`}（このページ）`}))} />
 
           {period === 'custom' ? (
             <>
@@ -503,16 +506,16 @@ export default function AutoReplyRunsV8() {
         ) : error ? (
           <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : items.length === 0 ? (
-          <ListState kind="empty" title="実行結果はまだありません" description="自動応答が動くと、ここに結果が残ります。" />
+          <ListState kind="empty" emptyPreset={filteredEmpty ? 'filtered' : 'readonly'} title={filteredEmpty ? '条件に合う記録はありません' : '実行結果はまだありません'} description={filteredEmpty ? undefined : '自動応答が動くと、ここに結果が残ります。'} action={filteredEmpty ? <Button onClick={clearEmptyFilters}>条件を外す</Button> : undefined} />
         ) : visibleItems.length === 0 ? (
-          <ListState kind="empty" title="条件に合う記録はありません" description="絞り込みや検索の条件を変えてみてください。" />
+          <ListState kind="empty" emptyPreset="filtered" title="条件に合う記録はありません" action={<Button onClick={clearEmptyFilters}>条件を外す</Button>} />
         ) : (
           <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <thead>
               <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colWhen}>日時</Th>
                 <Th className={styles.colFriend}>友だち</Th>
-                <Th className={styles.colInput}>届いた言葉</Th>
+                <Th className={styles.colInput}>きっかけ</Th>
                 <Th className={styles.colResult}>結果</Th>
                 <Th grow className={styles.colDone}>行ったこと</Th>
                 <Th collapseAt="narrow" className={styles.colTime}>時間</Th>
@@ -523,7 +526,7 @@ export default function AutoReplyRunsV8() {
               {visibleItems.map((item) => {
                 const view = statusView(item.status)
                 const failed = matchesFilter(item, 'failed')
-                const done = isDeliveryUnconfirmed(item) ? DELIVERY_UNCONFIRMED_REASON : failed && item.detail ? item.detail : actionLabel(item)
+                const done = isDeliveryUnconfirmed(item) ? DELIVERY_UNCONFIRMED_REASON : failed ? safeFailureReason(item.detail) ?? '処理を完了できませんでした' : actionLabel(item)
                 const name = item.friendName ?? '削除済みの友だち'
                 const menuItems = rowMenuItems(item)
                 return (
@@ -535,7 +538,7 @@ export default function AutoReplyRunsV8() {
                       <RowNameLink href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}><TruncatedText value={name} /></RowNameLink>
                     ) : <TruncatedText value={name} />} />
                     <Td className={styles.colInput}>
-                      <span className={styles.input} title={`${quoted(item.inputPreview)}（きっかけ：${item.triggerLabel}）`}>{quoted(item.inputPreview)}</span>
+                      <TruncatedText value={item.triggerLabel} />
                     </Td>
                     <Td className={styles.colResult}>{isDeliveryUnconfirmed(item) ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>}</Td>
                     <Td grow className={styles.colDone}><TruncatedText value={done} /></Td>
@@ -586,6 +589,7 @@ export default function AutoReplyRunsV8() {
 
       {actionMessage ? <p className={styles.hint} role="status">{actionMessage}</p> : null}
 
+      <LogEntryDetails entry={logEntry} onClose={() => setLogEntry(null)} />
       <ConfirmDialog
         open={stopOpen}
         title="この自動応答を止めますか？"

@@ -1,4 +1,5 @@
 import { escapeHtml as escapeHtmlAttribute } from './lib/html-escape.js';
+import { failureMessage } from './lib/failure-messages.js';
 import { logger, resumeInvocation, withInvocation } from '@line-crm/shared/server';
 import { setHolidayCoverageWarningHandler } from '@line-crm/shared';
 import { stagingQa } from './routes/staging-qa.js';
@@ -988,7 +989,7 @@ app.get('/o', async (c) => {
 
   const liffId = c.req.query('liffId') || '';
   if (!/^[0-9]+-[A-Za-z0-9]+$/.test(liffId)) {
-    return c.text('Invalid liffId', 400);
+    return c.text(failureMessage('Invalid liffId'), 400);
   }
 
   const liffParams = new URLSearchParams();

@@ -648,7 +648,7 @@ export default function WebhooksOutgoingV8() {
                   )
                 }
                 return (
-                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id} href={`/webhooks/edit?id=${item.id}`}>
+                  <Tr selected={folderMove.isSelected(item.id)} key={item.id} data-table-layout="columns" data-row-id={item.id} href={`/webhooks/edit?id=${item.id}`}>
                     <Td grow className={styles.colName}>
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。 */}
                       <FolderDotName folder={folderDotFor(folders, item.folderId)}>{folderMove.checkbox(item)}

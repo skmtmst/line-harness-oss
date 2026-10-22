@@ -193,7 +193,7 @@
 }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .tip { -webkit-font-smoothing: auto; }
+:root .tip { -webkit-font-smoothing: antialiased; }
 
 @layer components {
 :root .mark {

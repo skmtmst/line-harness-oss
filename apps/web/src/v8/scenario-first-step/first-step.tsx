@@ -568,7 +568,7 @@ export default function ScenarioFirstStepV8() {
 
       steps={(
         <Steps
-          label="シナリオ作成の進み方"
+          label="シナリオ作成の進み方" readOnly={!canEdit} summaries={{ シナリオ情報: scenario?.name ?? '', 配信方式: modeLabel[mode] }}
           steps={[
             /* 済みの段を押すと、同じ下書きのシナリオ情報・配信方式（/scenarios/new?id=…）へ戻る。 */
             { label: 'シナリオ情報', state: 'done', onSelect: id ? () => router.push(`/scenarios/new?id=${encodeURIComponent(id)}`) : undefined },

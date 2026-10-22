@@ -128,8 +128,8 @@ describe('V8 投稿（審査）', () => {
     await render()
     const checkbox = host.querySelector('input[type="checkbox"]')!
     await click(checkbox)
-    expect(buttons('201件すべてを選ぶ')).toHaveLength(1)
-    await click(buttons('201件すべてを選ぶ')[0])
+    expect(buttons('201枚すべてを選ぶ')).toHaveLength(1)
+    await click(buttons('201枚すべてを選ぶ')[0])
     expect(host.textContent).toContain('201枚を選択中')
     expect(offsets).toContain('200')
     await click(buttons('まとめて採用')[0])

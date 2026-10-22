@@ -107,3 +107,20 @@ test('一覧口の429は1枚の案内になり読み直しの口が残る', asyn
     .find((item) => item.textContent?.trim() === 'もう一度読み込む')
   expect(retry).toBeTruthy()
 })
+
+test('初回読込・成功0件・失敗を言い分け、再試行で一覧を回復する', async () => {
+  let finish!: (value: Response) => void
+  handler = url => url.pathname === '/api/scenarios' ? new Promise(resolve => { finish = resolve }) : base(url)
+  await act(async () => root.render(<ScenariosPage />))
+  await settle()
+  expect(host.querySelector('[data-empty-list]')).toBeNull()
+  expect(host.textContent).not.toContain('シナリオを読み込めませんでした')
+  await act(async () => finish(response({ success: false, error: 'down' }, 500)))
+  await eventually(() => expect(host.textContent).toContain('シナリオを読み込めませんでした'))
+  expect(host.querySelector('[data-empty-list]')).toBeNull()
+  handler = url => url.pathname === '/api/scenarios' ? response({ success: true, data: { items: [], total: 0, limit: 50 } }) : base(url)
+  const retry = [...host.querySelectorAll('button')].find(button => button.textContent === 'もう一度読み込む')!
+  await act(async () => retry.click())
+  await eventually(() => expect(host.querySelector('[data-empty-list]')).not.toBeNull())
+  expect(host.textContent).not.toContain('シナリオを読み込めませんでした')
+})

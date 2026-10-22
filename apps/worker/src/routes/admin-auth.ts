@@ -1,3 +1,4 @@
+import { readAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { bearerToken, readCookie } from '../middleware/auth-http.js';
 import { mfaConfiguration, mfaEncryptionConfigured, MFA_KEY_NOTICE } from '../lib/mfa-config.js';
@@ -866,35 +867,18 @@ adminAuth.get('/api/auth/session', async (c) => {
   const staff = c.get('staff');
   // 運営マスターかどうか。platform_admins が空の間は既定の統括のオーナーも真になる
   // （初期登録のため。API 側の requirePlatformAdmin と同じ判定）。
-  const platformAdmin = await isPlatformAdmin(c);
-  // 招待の進み具合（★37-10）。awaiting_totp なら画面は 2要素認証の設定へ案内する。
-  const platformAdminRecord = staff.id === 'env-owner' ? null : await getPlatformAdminRecord(c.env.DB, staff.id);
+  const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
+  // 役割・招待状態・現在のセッション・本人行は互いの結果を使わない。
+  const [platformAdmin, platformAdminRecord, currentSession, staffRecord] = await Promise.all([
+    isPlatformAdmin(c),
+    staff.id === 'env-owner' ? null : getPlatformAdminRecord(c.env.DB, staff.id),
+    sessionTokenHash ? getAdminSessionByTokenHash(c.env.DB, sessionTokenHash).catch(() => null) : null,
+    staff.id === 'env-owner' ? null : readAuthenticatedStaffRecord(c.env.DB, staff) ?? getStaffById(c.env.DB, staff.id).catch(() => null),
+  ]);
   const platformAdminState = platformAdminRecord?.is_active === 1 ? platformAdminRecord.activation_state : null;
   // /api/auth/* は代理ログインの差し替え対象外なので、ここで直接引く。
-  const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id, await adminSessionTokenHashFromRequest(c)) : null;
+  const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id, sessionTokenHash) : null;
   const impersonation = active ? toImpersonationContext(active) : null;
-  /*
-   * いつもと違う端末・場所からのログインか（V-2 の帯）。セッション行が
-   * 無いAPIキー経路では null のまま。取れないときもログイン画面と同じく
-   * 表示を止めないため失敗は null に畳む。
-   */
-  const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
-  let currentSession = null;
-  if (sessionTokenHash) {
-    try {
-      currentSession = await getAdminSessionByTokenHash(c.env.DB, sessionTokenHash);
-    } catch {
-      // セッション行が読めなくても本人確認情報の表示を止めない。
-      currentSession = null;
-    }
-  }
-  /*
-   * 再確認の聞き方（V-1 ダイアログの表示切替）。2段階認証の設定があれば
-   * 認証アプリの6桁、無ければパスワード。どちらも無い人は大事な操作の前に
-   * 設定へ誘導するため 'none'。staff文脈にはTOTP・パスワード列が無いので
-   * 本体を引き直す。
-   */
-  const staffRecord = staff.id === 'env-owner' ? null : await getStaffById(c.env.DB, staff.id).catch(() => null);
   const stepUpMethod = staffRecord?.totp_enabled_at && staffRecord.totp_secret_enc
     ? 'totp'
     : staffRecord?.password_hash ? 'password' : 'none';

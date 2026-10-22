@@ -1,3 +1,4 @@
+import { prefetchApiRead } from './api/transport/prefetch'
 import { api } from './api'
 
 /*
@@ -44,6 +45,8 @@ export function loadLineAccounts(options?: { reload?: boolean }): Promise<Accoun
 /** AuthGuard のセッション確認と並べて、先に取り始めるだけ。結果は載せる側が読む。 */
 export function prefetchLineAccounts(): void {
   try {
+    // 本人情報も一覧の結果を使わない。権限判定は従来の本人APIを通す。
+    prefetchApiRead('/api/staff/me')
     void loadLineAccounts().catch(() => undefined)
   } catch {
     // 取れなくても AuthGuard の確認は続ける。載せる側が失敗表示を出す。

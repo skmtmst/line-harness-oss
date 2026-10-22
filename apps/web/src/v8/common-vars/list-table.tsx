@@ -141,6 +141,7 @@ export function renderCommonVarList({ accountLoading, activeId, allOnPageSelecte
                   <Tr
                     interactive
                     key={item.id}
+                    selected={selected.has(item.id)}
                     data-row-id={item.id}
                     className={styles.rowClick}
                     tabIndex={0}

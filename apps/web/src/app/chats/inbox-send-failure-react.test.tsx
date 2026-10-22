@@ -28,6 +28,8 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
   headers: { 'Content-Type': 'application/json' },
 })
 
+let sendKeys: Array<string | null> = []
+
 let sendResponse: () => Response = () => json({
   success: true,
   data: { sent: true, messageId: 'm-1', sentByStaffName: '自分', revision: 2 },
@@ -35,6 +37,7 @@ let sendResponse: () => Response = () => json({
 
 function responseFor(url: URL, init?: RequestInit): Response {
   if (url.pathname === '/api/chats/friend-a/send' && init?.method === 'POST') {
+    sendKeys.push(new Headers(init.headers).get('Idempotency-Key'))
     return sendResponse()
   }
   if (url.pathname === '/api/chats') return json({ success: true, data: [] })
@@ -97,6 +100,7 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
   let root: Root
 
   beforeEach(() => {
+    sendKeys = []
     fixture.params = new URLSearchParams('friend=friend-a')
     sendResponse = () => json({
       success: true,
@@ -136,7 +140,7 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
     await act(async () => { button.click() })
   }
 
-  it('429は送信制限と待機時間をバナーで出し、入力を残す', async () => {
+  it('429は送信制限と待機時間を入力欄の近くへ出し、入力を残す', async () => {
     sendResponse = () => json({
       success: false,
       code: 'LINE_RATE_LIMITED',
@@ -154,6 +158,23 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
     })
     const textarea = host.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
     expect(textarea.value).toBe('制限に当たる文')
+    expect(textarea.closest('[data-inbox-v4="composer"]')?.textContent).toContain('送信制限')
+  })
+
+  it('失敗した同じ本文の再送には同じ鍵を使い、成功した後の送信は新しい鍵にする', async () => {
+    sendResponse = () => json({ success: false, code: 'LINE_RATE_LIMITED' }, 429)
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+    await typeAndSend('再送する文')
+    expect(sendKeys).toHaveLength(1)
+    expect(sendKeys[0]).toBeTruthy()
+    sendResponse = () => json({ success: true, data: { sent: true, sentByStaffName: '自分', revision: 2 } })
+    await typeAndSend('再送する文')
+    expect(sendKeys).toEqual([sendKeys[0], sendKeys[0]])
+    expect(host.querySelector('[data-inbox-v4="composer"]')?.textContent).not.toContain('送信制限')
+    await typeAndSend('再送する文')
+    expect(sendKeys).toHaveLength(3)
+    expect(sendKeys[2]).not.toBe(sendKeys[0])
   })
 
   it('送達不明は二重送信を止める案内を出す', async () => {

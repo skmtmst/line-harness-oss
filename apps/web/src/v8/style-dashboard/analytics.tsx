@@ -3,6 +3,8 @@ import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Card from '@/components/shared/card'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import DeltaChip from '@/components/shared/delta-chip'
 import HelpTip from '@/components/shared/help-tip'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -43,15 +45,14 @@ export function StyleAnalyticsView({ data, error, onTab, onRetry, onRowOpen }: {
         ))}
       </>}>
         <SegmentedControl aria-label="分析の切り口" appearance="track" size="small" fit="content" value={data.tab} onChange={onTab} options={data.tabs.map((t) => ({ value: t.id, label: t.label }))} />
-        {data.availability ? <ListState kind={data.availability.kind === 'forbidden' ? 'forbidden' : 'empty'} title={data.availability.description} description="ほかの分析の切り口は、上の切り替えから確認できます。" /> : <div className={styles.metricGrid}>
+        {data.availability ? <ListState kind={data.availability.kind === 'forbidden' ? 'forbidden' : 'empty'} title={data.availability.description} description="ほかの分析の切り口は、上の切り替えから確認できます。" /> : <KpiBand maxColumns={3}>
           {data.cards.map((c) => (
-            <Card key={c.id} className={styles.metricCard} contentPadding="var(--polish-space-field) var(--polish-space-card)" gap="var(--tpl-sd-metric-gap)" aria-label={c.title}>
-              <span className={styles.metricHead}>{c.title}<HelpTip label={`${c.title}の説明`}>{c.help}</HelpTip></span>
-              <span className={styles.metricValue}><strong>{c.valueText}</strong>{c.unit ? <span>{c.unit}</span> : null}</span>
-              {c.delta ? <span><DeltaChip tone={c.delta.tone}>{c.delta.text}</DeltaChip></span> : null}
-            </Card>
+            <KpiCard key={c.id} presentation="band" aria-label={c.title} title={c.title} icon={null}
+              value={null} valueText={c.valueText} valueTextWithUnit unit={c.unit ?? ''}
+              help={c.help} helpDisplay="question" detail=""
+              delta={c.delta && c.valueText !== '—' ? <DeltaChip tone={c.delta.tone}>{c.delta.text}</DeltaChip> : undefined} />
           ))}
-        </div>}
+        </KpiBand>}
         {!data.availability && (chart ? <Card className={styles.chartCard} contentPadding="var(--polish-space-card)" gap="var(--polish-space-field)" aria-label={chart.title}>
           <h3 className={styles.sectionTitle}>{chart.title}<HelpTip label={`${chart.title}の説明`}>{chart.help}</HelpTip></h3>
           <span className={styles.calLegend}><i data-k="now" />この期間{chart.points.some((p) => p.prev !== null) ? <><i data-k="prev" />前の期間</> : null}</span>

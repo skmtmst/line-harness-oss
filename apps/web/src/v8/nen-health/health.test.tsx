@@ -127,7 +127,7 @@ describe('V8 健康日記（src/v8/nen-health）', () => {
     expect(document.body.textContent).toContain('健康日記 30日のまとめ')
     const weightNumber = Array.from(document.querySelectorAll('[data-kpi-number]')).find(el => el.textContent === '9.8 → 9.2')
     expect(weightNumber).toBeTruthy()
-    expect(weightNumber?.nextElementSibling?.textContent).toBe('kg')
+    expect(weightNumber?.closest('[data-design-version="v8"]')?.querySelector('[data-kpi-unit]')?.textContent).toBe('kg')
     expect(document.body.textContent).toContain('30日で −0.6kg（−6%）')
     expect(document.body.textContent).toContain('散歩を短めにした')
     expect(byText('獣医師向け PDF を書き出す')?.disabled).toBe(false)

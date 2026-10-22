@@ -8,7 +8,7 @@
 .monthCell { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--polish-space-row); min-block-size: var(--tpl-sd-month-cell); padding: var(--polish-space-row) var(--polish-space-field); border-block-start: 1px solid var(--color-hairline); border-inline-start: 1px solid var(--color-hairline); cursor: pointer; min-inline-size: 0; }
 .monthCell:nth-child(7n + 1) { border-inline-start: 0; }
 .monthCell[data-closed] { background: var(--color-canvas-sunken); }
-.monthCell[data-today] { outline: var(--tpl-sd-ring) solid var(--color-accent-deep); outline-offset: -2px; background: var(--color-accent-soft); }
+.monthCell[data-selected] { outline: var(--tpl-sd-ring) solid var(--color-accent-deep); outline-offset: -2px; background: var(--color-accent-soft); }
 .monthCell[data-today] strong { color: var(--color-accent-deep); }
 .monthCell[data-out] { color: var(--color-ink-faint); }
 .monthCell:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); }

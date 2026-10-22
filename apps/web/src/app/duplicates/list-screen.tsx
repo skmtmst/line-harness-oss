@@ -2,7 +2,8 @@
 import Link from '@/components/shared/list-navigation'
 import { CircleAlert, Info, RotateCw, SearchX } from 'lucide-react'
 import Button from '@/components/shared/button'
-import HelpTip from '@/components/shared/help-tip'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
@@ -78,45 +79,20 @@ export default function DuplicatesV8() {
       </p>
 
       {/* 数の帯：4つのマス。取れない数は「—」と短い理由（SXCb3）。1152 は `G9C4Uw`。 */}
-      <div className={styles.kpis} data-design-node="G9C4Uw">
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>重複候補</span>
-          <p className={styles.kpiValue}>{d.duplicateTotalText}</p>
-          <p className={styles.kpiDetail}>{kpiCandidateDetail}</p>
-        </div>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>
-            確認済み
-            <HelpTip label="確認済みの説明">統合ユーザーに紐付け済みの組数です</HelpTip>
-          </span>
-          <p className={styles.kpiValue}>
-            {d.statusCounts !== null ? `${formatNumber(d.statusCounts.linked ?? 0)}組` : emptyValue('unknown')}
-          </p>
-          <p className={styles.kpiDetail}>
-            {d.statusCounts !== null ? '統合ユーザーに紐付け済みの組数です' : '読み込めませんでした'}
-          </p>
-        </div>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>
-            重複配信の削減
-            <HelpTip label="重複配信の削減の説明">配信前プレビューの実績を接続したあと、重複分を除いた削減の見込みをここに表示します。</HelpTip>
-          </span>
-          <p className={styles.kpiValue}>{emptyValue('unknown')}</p>
-          <p className={styles.kpiDetail}>配信実績の接続を待っています</p>
-        </div>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>
-            1配信あたりの無駄
-            <HelpTip label="1配信あたりの無駄の説明">重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。</HelpTip>
-          </span>
-          <p className={styles.kpiValue}>
-            {d.data ? `¥${formatNumber(d.data.wastedPerBroadcastYen)}` : emptyValue('unknown')}
-          </p>
-          <p className={styles.kpiDetail}>
-            {d.data ? `¥${formatNumber(d.data.msgUnitYen)}/通の見積り` : '読み込めませんでした'}
-          </p>
-        </div>
-      </div>
+      <KpiBand data-design-node="G9C4Uw">
+        <KpiCard presentation="band" icon={null} title="重複候補" value={null}
+          valueText={d.duplicateTotalText.replace(/組$/u, '')} valueTextWithUnit unit="組" detail={kpiCandidateDetail} />
+        <KpiCard presentation="band" icon={null} title="確認済み" value={d.statusCounts !== null ? d.statusCounts.linked ?? 0 : null} unit="組"
+          help="統合ユーザーに紐付け済みの組数です" helpDisplay="question"
+          detail={d.statusCounts !== null ? '統合ユーザーに紐付け済みの組数です' : '読み込めませんでした'} />
+        <KpiCard presentation="band" icon={null} title="重複配信の削減" value={null} unit=""
+          help="配信前プレビューの実績を接続したあと、重複分を除いた削減の見込みをここに表示します。" helpDisplay="question"
+          detail="配信実績の接続を待っています" />
+        <KpiCard presentation="band" icon={null} title="1配信あたりの無駄" value={null}
+          valueText={d.data ? `¥${formatNumber(d.data.wastedPerBroadcastYen)}` : '—'} unit=""
+          help="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。" helpDisplay="question"
+          detail={d.data ? `¥${formatNumber(d.data.msgUnitYen)}/通の見積り` : '読み込めませんでした'} />
+      </KpiBand>
 
       {/* 集計だけ落ちたときは候補一覧を残し、失敗はこの1行で伝える（R598）。 */}
       {!d.data || isForbidden(d.statsFailure) ? (

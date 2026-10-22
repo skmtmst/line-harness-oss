@@ -5,7 +5,7 @@ import { connectGuardBrowser } from './browser-session.mjs'
 import { fitListSearchPlaceholder } from '../../src/components/shared/search-field-size.mjs'
 import { scanListSkeleton } from './list-skeleton-scan.mjs'
 import { fitListColumns } from '../../src/components/shared/list-column-sizing.mjs'
-import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth } from '../../src/components/shared/list-toolbar-fit.mjs'
+import { toolbarContentFit, fitToolbarWrap, measureToolbarOptionalWidth, fitToolbarOptionalWidth } from '../../src/components/shared/list-toolbar-fit.mjs'
 import { fitSelectContent } from '../../src/components/shared/select-content-size.mjs'
 
 test('numeric support columns reserve the full note instead of the old truncation budget', async () => {
@@ -184,6 +184,7 @@ test('U5: optional controls reserve the overflowing readable width and keep the 
     for (const width of [1440, 1152]) {
       await page.setViewportSize({ width, height: 900 })
       await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{height:36px;flex:none}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><span class="optional" data-toolbar-optional><span data-toolbar-optional-content><div style="width:150px"><button style="width:177px">報酬の決め方：すべて</button></div></span></span><button style="width:90px">計測中</button></div></section></html>`)
+      await page.addScriptTag({ content: measureToolbarOptionalWidth.toString() })
       assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('U5 道具の重なり'))
       await page.locator('[data-toolbar-optional]').evaluate(fitToolbarOptionalWidth)
       const gap = await page.locator('.toolbar').evaluate(el => { const [a,b] = [...el.querySelectorAll('button')].map(e=>e.getBoundingClientRect());return b.x-a.right })
@@ -251,6 +252,7 @@ test('named overflow measures its tools, not free space reserved for the rightmo
   try {
     const page = await browser.newPage()
     await page.setContent(`<style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{height:36px;flex:none}</style><div class="toolbar" style="width:800px"><button style="width:200px">検索</button><details class="optional" data-toolbar-optional data-toolbar-overflow-group open><summary>条件</summary><div data-toolbar-optional-content><button style="width:160px">配信日</button><button style="width:140px">保存する</button><span class="slotsEnd"><button style="width:120px">保存した検索</button></span></div></details></div>`)
+    await page.addScriptTag({ content: measureToolbarOptionalWidth.toString() })
     const measuredWidth = await page.locator('details').evaluate(fitToolbarOptionalWidth)
     assert.ok(measuredWidth > 0)
     assert.equal((await page.locator('.toolbar').evaluate(toolbarContentFit)).fits,true)

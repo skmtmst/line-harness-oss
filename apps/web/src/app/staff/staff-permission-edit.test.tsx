@@ -109,7 +109,7 @@ async function openEdit(expectOp = true) {
   })
   await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '役割を変える' })) })
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: '✓ 保存する' })).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'メールアドレス' })).toBeTruthy()
   })
   if (expectOp) {
     await waitFor(() => {
@@ -124,7 +124,7 @@ async function saveEdit() {
 
 async function saveEditFull() {
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: '✓ 保存する' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
   })
   await waitFor(() => {
     expect(fixture.updated).toHaveLength(1)
@@ -177,6 +177,7 @@ describe('既存スタッフの成果承認権限', () => {
     await openEdit(false)
     // 管理者に操作権限の欄は出ない。
     expect(screen.queryByRole('checkbox', { name: '成果を承認・却下する' })).toBeNull()
+    fireEvent.change(screen.getByRole('textbox', { name: '名前' }), { target: { value: '変更後の管理者名' } })
     const payload = (await saveEditFull()) as Record<string, unknown>
     expect(payload.permissionKeys).toBeUndefined()
   })

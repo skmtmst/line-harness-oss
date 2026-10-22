@@ -19,7 +19,7 @@ import { useTaskManualHref } from '@/lib/use-manual-href'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { Steps } from '@/components/templates/steps'
+import { Steps, StepContent } from '@/components/templates/steps'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Button from '@/components/shared/button'
@@ -253,6 +253,8 @@ export default function StoreNewV8() {
         steps={(
           <Steps
             label="店舗を追加する手順"
+            readOnly={Boolean(created)}
+            summaries={{ '1': '利用規約に同意済み', '2': [name, alias].filter(Boolean).join('・'), '3': '公式アカウントを準備済み', '4': '接続するチャネルを設定済み' }}
             currentKey={created ? undefined : String(step)}
             steps={STEPS.map(([title], index) => {
               const number = index + 1
@@ -271,7 +273,7 @@ export default function StoreNewV8() {
           />
         )}
       />
-      <div className={styles.body}>
+      <StepContent step={step} className={styles.body}>
         <div className={styles.split}>
           <section className={styles.card} aria-labelledby="store-new-step-title">
             <h2 id="store-new-step-title" className={styles.cardTitle}>{STEPS[step - 1][0]}</h2>
@@ -354,7 +356,7 @@ export default function StoreNewV8() {
           <HelpPanel step={step} />
         </div>
         <div className={styles.footer}>{footer}</div>
-      </div>
+      </StepContent>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した店舗の内容" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </PageFrame></SaveErrorScope>
   )

@@ -637,7 +637,7 @@
    */
   --motion-instant: 80ms;
   --motion-fast: 120ms;
-  --motion-base: 200ms;
+  --motion-base: 200ms; --motion-kpi-roll: 500ms; /* 数の帯の数字が回る演出だけ、500msまでの例外。 */
   --motion-slow: 300ms;
   /*
    * ★V8 仕上げ（M10）：閉じる 150ms・引き出し 240ms。
@@ -704,7 +704,7 @@
  *     部品側は `line-height: var(--text-lh, 1.4)` と書き、互換経路は
  *     既定値 1.4 が効いて1画素も変わらない）
  *   control-border   案1：入力・選ぶ・検索・副ボタン・絞り込みの札の黒12%の枠。
- *     control-shadow は黒6%の薄い影。チェック・ラジオ・トグルは別変数で保つ。
+ *     control-shadow は影なし（薄い線1本だけにして縁のにじみを無くす）。チェック・ラジオ・トグルは別変数で保つ。
  *   status-warn-soft  注意の薄い地は #fff7e6 → #fdf3e1（夕13・TOKENS）
  *   track  #1d1d1f0a  進みの棒・切り替えの溝の地（夕13・TOKENS）
  *   border-soft  #1d1d1f14  ダイアログ・ふきだしなど重なる物の縁（同上）
@@ -802,7 +802,7 @@
   --shadow-controls-selected: 0 0 0 #087a3e33;
   --text-lh: 1.5;
   --color-control-border: #1d1d1f1f;
-  --control-shadow: 0 1px 2px rgba(29, 29, 31, 0.06);
+  --control-shadow: 0 0 #0000;
   --color-toggle-locked: #dadde2;
   --color-status-warn-soft: #f973161a;
   --color-track: #1d1d1f0a;
@@ -1010,7 +1010,6 @@
   --tpl-hql-actions-w: 136px;
   --tpl-hql-home-card-h: 234px;
   /* 統括のカードの帯の段の最低の高さ。警告の無いカードにも帯の分の空きを残し、どの段のカードも同じ高さ（ 234）にする。 */
-  --tpl-hq-home-reason-min: 32px;
   --tpl-hql-form-storage-w: 136px; --tpl-hql-form-state-w: 96px; --tpl-hql-form-dest-w: 290px; --tpl-hql-form-actions-w: 148px;
   /* 統括のメンバー・アカウントの残り（作業役 hq） */ --tpl-hq-mem-radio-gap: 20px; --tpl-hq-mem-check-pad: 12px; --tpl-hq-mem-check-gap: 6px; --tpl-hq-mem-confirm-row-h: 35.5px; --tpl-hq-mem-confirm-label-w: 200px; --tpl-hq-home-account-h: 240px; --tpl-hq-home-warn-pad-end: 0px; --tpl-hq-home-warn-pull: -10px;
   --tpl-an-tabs-gap: 24px; --tpl-an-tab-pad-bottom: 8px; --tpl-an-tab-line: 2px; --tpl-an-tab-lh: 19px; --tpl-an-ro-margin: 12px 0 13px; --tpl-an-kpi-menu: 24px; --tpl-an-actions-extra: 4px;
@@ -2003,7 +2002,7 @@
   --tpl-inbox-thread-pad: 20px 24px;      /* やりとりの内側 */
   --tpl-inbox-out-column-gap: 4px;   /* 送った文と送り手の間 */
   --tpl-inbox-thread-gap: 12px;           /* 吹き出しの行と行・日付と吹き出しの間 */
-  --tpl-inbox-bubble-w: 340px;            /* 吹き出しの幅の上限 */
+  --tpl-inbox-bubble-w: 340px; --tpl-inbox-skeleton-width: 160px; /* 吹き出しの幅の上限・骨組みの幅 */
   --tpl-inbox-bubble-pad: 12px 16px;      /* 吹き出しの内側 */
   --tpl-inbox-bubble-radius: var(--polish-radius-card);
   --tpl-inbox-bubble-text: var(--polish-text-body);
@@ -2230,7 +2229,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  :root [data-part="attention-star"][aria-pressed="true"] svg {
+  :root [data-part="attention-star"][aria-pressed="true"][data-star-pop] svg {
     animation: v8-star-pop var(--motion-base) var(--motion-ease-out);
   }
 }
@@ -2817,7 +2816,7 @@ select:not([multiple]):not(.appearance-none) {
 
 /* zUg8S の白い板は左メニューに接する。余白は右と下だけ。 */
 @media (min-width: 1024px) {
-  :root #main-content { margin-left: 0; border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; }
+  :root #main-content { margin-left: 0; border: 0; outline: 1px solid var(--color-board-line); outline-offset: -1px; }
 }
 
 :root { --color-status-warn-deep: #c2410c; }

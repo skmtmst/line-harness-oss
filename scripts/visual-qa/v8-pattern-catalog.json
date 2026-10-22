@@ -3213,11 +3213,13 @@
             "InboxFloatingPanel",
             "InboxInfoBackdrop",
             "InboxEmailHeading",
+            "InboxListRow",
             "InboxListHeader",
             "InboxListHeadline",
             "InboxListSearch",
             "InboxFilterControls",
             "InboxMessage",
+            "InboxThreadLoading",
             "InboxMessageDay",
             "InboxQuotedMessage",
             "InboxHistoryButton"

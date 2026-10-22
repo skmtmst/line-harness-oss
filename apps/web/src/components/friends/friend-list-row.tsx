@@ -1,5 +1,7 @@
 'use client'
 
+import { useAttentionStarMotion } from '@/components/shared/use-attention-star-motion'
+
 /* 契約試験が renderToStaticMarkup で描くので、明示的に React を読む。 */
 import TagOverflow from '@/components/shared/tag-overflow'
 import React from 'react'
@@ -62,6 +64,7 @@ export default function FriendListRow({
   onAction,
 }: Props) {
   const router = useRouter()
+  const attentionMotion = useAttentionStarMotion()
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage
   const lastContact = selectLastContactAt(friend)
@@ -105,10 +108,10 @@ export default function FriendListRow({
         disabled={!canEdit}
         aria-pressed={attention}
         aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
-        onClick={(event) => {
+        onClick={(event) => attentionMotion(event, () => {
           event.stopPropagation()
-          onToggleAttention?.()
-        }}
+          return onToggleAttention?.()
+        })}
         className={`rounded-mini p-1 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
       >
         <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
@@ -235,6 +238,7 @@ export function FriendListCard({
   onAction,
 }: Props) {
   const router = useRouter()
+  const attentionMotion = useAttentionStarMotion()
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage
   const lastContact = selectLastContactAt(friend)
@@ -297,10 +301,10 @@ export function FriendListCard({
           disabled={!canEdit}
         aria-pressed={attention}
           aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
-          onClick={(event) => {
+          onClick={(event) => attentionMotion(event, () => {
             event.stopPropagation()
-            onToggleAttention?.()
-          }}
+            return onToggleAttention?.()
+          })}
           className={`rounded-mini p-1 pt-1.5 ${attention ? 'text-status-warn-deep' : 'text-ink-faint'} hover:bg-status-warn-soft hover:text-status-warn-deep`}
         >
           <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />

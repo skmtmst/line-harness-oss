@@ -8,7 +8,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
-- [最初に読む：開発・運用の引き継ぎ](START-HERE.md)
+- [最初に読む：製品とコードの入口](START-HERE.md)
 
 ## 使う人の手引き
 
@@ -458,6 +458,11 @@
 - [リマインダ](release-log/0.25.0.md)
 - [反映履歴の書き方](release-log/README.md)
 - [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
+- [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
+- [対応が要るものの速さとお知らせの下の空き](release-log/unreleased/1798-kenta-hq-attention-speed.md)
+- [統括のアカウントの空きと受信箱の見た目](release-log/unreleased/1799-kenta-beui-round1.md)
+- [一覧・数の帯・手順・ログの見た目と速さ](release-log/unreleased/1802-kenta-beui-round2.md)
+- [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
 - [fielderr2.md](release-log/drafts/fielderr2.md)
 - [kenta-form-fixed-1010.md](release-log/drafts/kenta-form-fixed-1010.md)
@@ -477,6 +482,7 @@
 - [独立点検後の計画と質問の保存・破棄の記録](release-log/unreleased/1790-kenta-after-review-plan.md)
 - [検証環境の最終確認と独立点検の開始準備](release-log/unreleased/1791-kenta-independent-review-ready.md)
 - [画面の先読みと友だち一覧の再計測の改善](release-log/unreleased/1792-kenta-v8-rendering-performance.md)
+- [共通描画と注目の星の不要な動きの修正](release-log/unreleased/1795-kenta-common-draw-speed.md)
 - [1781-kenta-cleanup-a01.md](release-log/unreleased/1781-kenta-cleanup-a01.md)
 - [1781-kenta-cleanup-a02.md](release-log/unreleased/1781-kenta-cleanup-a02.md)
 - [1781-kenta-cleanup-a03.md](release-log/unreleased/1781-kenta-cleanup-a03.md)
@@ -736,3 +742,5 @@
 - [LINE連携の権限確認の更新](release-log/unreleased/1781-kenta-proxy-permissions.md)
 - [リンクの本人確認と案内の更新](release-log/unreleased/1781-kenta-link-identity.md)
 - [登録ファイルの確認と公開の更新](release-log/unreleased/1781-kenta-media-delivery.md)
+
+- [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

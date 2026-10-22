@@ -9,8 +9,6 @@ import { ScheduleStageV8 } from './edit-schedule'
 export { ConfirmStageV8,DoneStageV8 } from './edit-confirm'
 export { reminderAudienceCounts,stageFor } from './edit-model'
 export { ScheduleStageV8 } from './edit-schedule'
-
-
 import { testSendConfirmDescription } from '@/components/reminders/test-recipient-guidance'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
@@ -50,6 +48,7 @@ import { SettingCheckbox } from '@/components/shared/checkbox';
 import Dialog from '@/components/shared/dialog';
 import { emptyValue } from '@/components/shared/empty-value';
 import { CreatePage } from '@/components/templates';
+import { StepContent } from '@/components/templates/steps'
 import { useAccount } from '@/contexts/account-context';
 import { formatNumber } from '@/lib/format';
 import { ArrowRight, Filter, RefreshCw, Users } from 'lucide-react';
@@ -397,7 +396,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     boardId: designNode,
     title: 'リマインダを作る',
     identity: <BackToReminders />,
-    steps: <ReminderV8Stepper current={currentKey} reminderId={reminderId} />,
+    steps: <ReminderV8Stepper current={currentKey} reminderId={reminderId} settings={subjectSettings} readOnly={!canManageRole(role)} />,
     help: (
       <>
         {v8stage === 'basics'
@@ -417,7 +416,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
     : null
 
   return (
-    <SaveErrorScope errors={saveErrors}><fieldset disabled={busy} className="contents">
+    <SaveErrorScope errors={saveErrors}><fieldset disabled={busy} className="contents"><StepContent step={["basics", "target", "messages", "schedule", "confirm", "done"].indexOf(v8stage)}>
       {v8stage === 'basics' ? (
         <BasicsStageV8
           frame={frame}
@@ -520,7 +519,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
         <DoneStageV8 frame={frame} reminderId={reminderId} settings={subjectSettings} published={published} preview={preview} />
       ) : null}
 
-      <ConfirmDialog
+      </StepContent><ConfirmDialog
         open={testConfirm && v8stage === 'confirm'}
         title="テスト送信しますか？"
         description={testSend.phase.kind === 'unknown' ? '前回の送信結果を確認できていません。再試行しても二重には送られません。' : testSendConfirmDescription(testRecipient.view, sentName, sentKind)}

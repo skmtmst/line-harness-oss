@@ -13,6 +13,7 @@ import styles from './kpi-card.module.css'
 import { formatNumber } from '@/lib/format'
 import { RetryLabel } from './retry-label'
 import { normalizeActionLabel } from './action-words'
+import { KpiRollingValue } from './kpi-value-motion'
 
 function detailText(node: ReactNode): string {
   return React.Children.toArray(node).map(child => {
@@ -199,9 +200,10 @@ export default function KpiCard({
   const explanation = <>{tip}{helpHref ? <a href={helpHref}>{helpHrefLabel ?? 'くわしく'}</a> : null}</>
   const explanationLabel = descriptionLabel ?? `${helpLabel ?? title}の説明`
 
+  const displayedNumber = `${numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : ''}${numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}`
   const numberAndUnit = <>
-    <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
-    {(numberText !== undefined && valueRange === undefined && !valueTextWithUnit) || statusText ? null : <span className={styles.unit}>{unit}</span>}
+    <KpiRollingValue text={displayedNumber} identity={cardProps.id ?? title} loading={loading || Boolean(cardProps.hidden)} />
+    {(numberText !== undefined && valueRange === undefined && !valueTextWithUnit) || statusText ? null : <span data-kpi-unit className={styles.unit}>{unit}</span>}
   </>
 
   return (

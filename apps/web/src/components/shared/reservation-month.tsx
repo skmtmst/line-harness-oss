@@ -22,7 +22,7 @@ export default function ReservationMonth({ month, entries, onOpen, readableNames
     {Array.from({ length: first.getUTCDay() }, (_, index) => <div key={'blank' + index} />)}
     {Array.from({ length: count }, (_, index) => {
       const date = `${month}-${String(index + 1).padStart(2, '0')}`
-      return <div key={date}><strong>{index + 1}日</strong>{entries.filter(entry =>
+      return <div key={date} data-today={date === japanDate() || undefined} aria-current={date === japanDate() ? 'date' : undefined}><strong>{index + 1}日{date === japanDate() ? '・今日' : ''}</strong>{entries.filter(entry =>
         japanDate(new Date(entry.startsAt)) === date,
       ).map(entry => {
         const label = `${formatDate(entry.startsAt, { style: 'time' })} ${entry.customerName}`

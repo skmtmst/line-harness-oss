@@ -17,6 +17,8 @@ export type BellItem = {
   unread: boolean
   /** 「5分前」「昨日 18:20」など。 */
   time: string
+  /** 作成日時を日本時間で分けた日付の組。日時が不正なら不明として残す。 */
+  period: 'today' | 'earlier' | 'unknown'
   /** 行き先の言葉（「配信を開く」など。→ は部品が付ける）。 */
   linkLabel: string
 }
@@ -48,6 +50,12 @@ const FILTERS: { value: BellFilter; label: string }[] = [
   { value: 'all', label: 'すべて' },
   { value: 'error', label: 'エラー' },
   { value: 'update', label: 'アップデート' },
+]
+
+const PERIODS: { value: BellItem['period']; label: string }[] = [
+  { value: 'today', label: '今日' },
+  { value: 'earlier', label: 'それより前' },
+  { value: 'unknown', label: '日時不明' },
 ]
 
 /**
@@ -142,28 +150,37 @@ export default function BellPopover({
         ) : items.length === 0 ? (
           <p className={styles.state}>お知らせはまだありません。</p>
         ) : (
-          <ul className={styles.list}>
-            {items.map((item) => (
-              <li key={item.id} className={styles.item} data-unread={item.unread}>
-                <button type="button" className={styles.row} onClick={() => onSelect(item.id)} title={item.body || undefined} >
-                  <span className={styles.icon} data-category={item.category} aria-hidden="true">
-                    {item.category === 'error' ? <TriangleAlert /> : <Sparkles />}
-                  </span>
-                  <span className={styles.text}>
-                    <span className={styles.itemTitle}>
-                      {item.title}
-                      {item.unread ? <span className="sr-only">（未読）</span> : null}
-                    </span>
-                    <span className={styles.meta}>
-                      <span className={styles.time}>{item.time}</span>
-                      <span className={styles.go}>{`${item.linkLabel} →`}</span>
-                    </span>
-                  </span>
-                  {item.unread ? <span className={styles.dot} aria-hidden="true" /> : null}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div>
+            {PERIODS.map((period) => {
+              const rows = items.filter(item => item.period === period.value)
+              if (rows.length === 0) return null
+              return <section key={period.value} aria-label={period.label}>
+                <h3 className={styles.period}>{period.label}</h3>
+                <ul className={styles.list}>
+                  {rows.map((item) => (
+                    <li key={item.id} className={styles.item} data-unread={item.unread}>
+                      <button type="button" className={styles.row} onClick={() => onSelect(item.id)} title={item.body || undefined} >
+                        <span className={styles.icon} data-category={item.category} aria-hidden="true">
+                          {item.category === 'error' ? <TriangleAlert /> : <Sparkles />}
+                        </span>
+                        <span className={styles.text}>
+                          <span className={styles.itemTitle}>
+                            {item.title}
+                            {item.unread ? <span className="sr-only">（未読）</span> : null}
+                          </span>
+                          <span className={styles.meta}>
+                            <span className={styles.time}>{item.time}</span>
+                            <span className={styles.go}>{`${item.linkLabel} →`}</span>
+                          </span>
+                        </span>
+                        {item.unread ? <span className={styles.dot} aria-hidden="true" /> : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            })}
+          </div>
         )}
 
         {/* 下は「すべて見る」だけ。通知設定はその先のお知らせの画面にある（オーナー 2026-10-08：押すものが2つ並ぶのはおかしい）。 */}

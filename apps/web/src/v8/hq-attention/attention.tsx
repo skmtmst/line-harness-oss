@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Info, RefreshCw } from 'lucide-react'
-import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -54,7 +54,7 @@ const count = (item: HqAttentionItem, kind: HqAttentionKind) => item.counts[kind
 const total = (item: HqAttentionItem) => KINDS.reduce((sum, kind) => sum + count(item, kind.key), 0)
 
 export default function HqAttentionV8() {
-  usePageTitle('ホーム')
+  usePageTitle('対応が要るもの')
   const router = useRouter()
   const { accounts, setSelectedAccountId } = useAccount()
   const [items, setItems] = useState<HqAttentionItem[] | null>(null)
@@ -131,7 +131,7 @@ export default function HqAttentionV8() {
   return (
     <ListPage
       boardId="Kyf8U"
-      title={<><Link href="/hq" className={styles.parent}>ホーム ›</Link>対応が要るもの</>}
+      title="対応が要るもの"
       help="アカウントごとに、すぐ対応が要るものの件数を出します。件数を押すと、そのアカウントに切り替えて開きます。"
       actions={<Button onClick={() => void load()} busy={loading} busyLabel="読み直しています…"><RefreshCw aria-hidden="true" className={styles.buttonIcon} />すべて読み直す</Button>}
       stats={stats}

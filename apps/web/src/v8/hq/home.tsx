@@ -1,11 +1,14 @@
 'use client'
 
+import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
+import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ListPage } from '@/components/templates';
+import { ListPage, ListPageCards } from '@/components/templates';
+import Card from '@/components/shared/card';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/shared/list-toolbar';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
@@ -507,13 +510,13 @@ export default function HqHomeV8() {
           filteredDescription="検索の言葉や絞り込みを外すと、すべて出ます"
         />
       ) : view === 'cards' ? (
-        <div className={styles.grid}>
+        <ListPageCards inset="parent" narrowColumns={2}>
           {shown.map((account) => {
             const state = statusOf(account)
             const warned = state.tone === 'warn'
             const name = account.displayName || account.name
             return (
-              <article key={account.id} className={styles.card} aria-label={name}>
+              <Card key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
                 <div className={styles.cardHead}>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <div className={styles.cardName}>
@@ -540,19 +543,16 @@ export default function HqHomeV8() {
                     <dd>{`${formatNumber(account.stats?.messagesThisMonth ?? 0)} 通`}</dd>
                   </div>
                 </dl>
-                <div className={styles.reasonSlot}>
-                  {warned ? (() => {
-                    const reason = connectionReasonLine(account)
-                    return <Notice tone="warn" compact title={reason.title} message={reason.text}
-                      action={canManage ? <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button> : undefined}
-                    />
-                  })() : null}
-                </div>
-                {cardActions(account)}
-              </article>
+                {warned ? (() => {
+                  const reason = connectionReasonLine(account)
+                  return <Notice tone="warn" compact title={reason.title} message={reason.text}
+                    action={canManage ? <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button> : undefined}
+                  />
+                })() : null}
+              </Card>
             )
           })}
-        </div>
+        </ListPageCards>
       ) : (
         <DataTable aria-label="アカウントの一覧" columnWeights={[3, 1.5, 1, 1, 1.25, 0.5]}>
           <thead><TableHeadRow>
@@ -602,13 +602,14 @@ export default function HqHomeV8() {
   )
 
   return (
+    <KpiValueMotionProvider scope={`hq-accounts:${jstDate().slice(0, 7)}`}>
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
       help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{"カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"}</>}
 
       folders={folderColumn}
-      folderInset toolbar={toolbar} toolbarSpacing="section" toolbarRowGap="card"
+      folderInset toolbar={toolbar} toolbarSpacing="stats" toolbarRowGap="card"
       folderWidth={200}
       folderNav={{ rows: folderRows, activeId: folder, onSelect: selectFolder, createAction: createAccount, label: 'フォルダ' }}
     >
@@ -685,5 +686,6 @@ export default function HqHomeV8() {
         />
       ) : null}
     </ListPage></SaveErrorScope>
+    </KpiValueMotionProvider>
   )
 }
