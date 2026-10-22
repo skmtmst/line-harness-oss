@@ -108,3 +108,14 @@ it('選んだオンラインが無料なら余分な支払いの手順を増や�
   fireEvent.click(primary());
   await waitFor(() => expect(onSubmitted).toHaveBeenCalledWith(expect.objectContaining({ prepayNotice: null })));
 });
+
+
+it('基本料金が0でも指名料があればオンラインの支払い手順と合計額を示す', async () => {
+  const onPaymentChange = vi.fn();
+  render(<Confirm menu={{ ...menu, base_price: 0 }} staff={{ ...staff, price: 0, nomination_fee: 1500 }} slot={slot} autoConfirm onSubmitted={() => {}} onPaymentChange={onPaymentChange} />);
+  fireEvent.click(await screen.findByRole('radio', { name: 'オンラインで先に払う' }));
+  expect(screen.getByText('¥1,500')).toBeTruthy();
+  expect(onPaymentChange).toHaveBeenLastCalledWith(true);
+  expect(primary().textContent).toContain('リクエスト');
+  expect(primary().disabled).toBe(false);
+});

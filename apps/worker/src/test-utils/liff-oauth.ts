@@ -6,3 +6,8 @@ export async function signedLiffState(secret: string, data: Record<string, strin
   const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ data: JSON.stringify(data), nonce, expires: Date.now() + 600_000 }))));
   return { state: `${payload}.${await navigationProof(secret, 'liff-oauth', payload)}`, cookie: `lh_liff_oauth=${nonce}` };
 }
+
+/** JWT-shaped fixture; tests must mock LINE verification separately. */
+export function mockLineIdToken(channelId: string): string {
+  return `fixture.${btoa(JSON.stringify({ aud: channelId }))}.signature`;
+}

@@ -14,6 +14,7 @@ import {
   replaceConversionDefinitionUsages,
   stopConversionDefinition,
 } from '../src/conversion-definitions/index.js';
+import { metricsCte, definitionWhere } from '../src/conversion-definitions/reads-query-parts.js';
 import { asD1 } from './d1-test-helper.js';
 
 const migration = readFileSync(
@@ -282,5 +283,19 @@ describe('migration 319 conversion definition read contract', () => {
     });
     expect(deleted).toEqual({ id: 'point-empty', deleted: true });
     expect(sqlite.prepare("SELECT id FROM conversion_points WHERE id = 'point-empty'").get()).toBeUndefined();
+  });
+});
+
+
+describe('成果の集計対象', () => {
+  it('集計の内部でも閲覧対象と日付を絞り、別店舗を集計しない', () => {
+    const sqlite = setup();
+    sqlite.prepare(`INSERT INTO conversion_events
+      (id, conversion_point_id, friend_id, value_snapshot, created_at) VALUES (?, 'point-a', 'friend-1', 1, ?)`)
+      .run('last-iso', '2026-09-07T23:59:59.999+09:00');
+    const cte = metricsCte(range, definitionWhere({ scope }));
+    const metrics = sqlite.prepare(`${cte.sql} SELECT * FROM period_metrics`).all(...cte.values);
+    expect(metrics).toEqual([{ conversion_point_id: 'point-a', recorded_count: 3, net_value: 11001 }]);
+    sqlite.close();
   });
 });

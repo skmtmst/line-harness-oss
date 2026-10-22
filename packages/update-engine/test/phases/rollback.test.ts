@@ -124,6 +124,27 @@ describe('runRollback', () => {
     vi.restoreAllMocks();
   });
 
+  it('Worker-assets snapshotは旧versionへ戻し、古いJSだけを上書きしない',async()=>{
+    const versions=[{version_id:'00000000-0000-4000-8000-000000000001',percentage:100}];
+    const calls:string[]=[];
+    globalThis.fetch=vi.fn(async(url,init)=>{
+      calls.push(String(url));expect(init?.method).toBe('POST');
+      if(String(url).includes('/workers/scripts/')) expect(JSON.parse(String(init?.body))).toEqual({strategy:'percentage',versions});
+      else expect(String(url)).toContain(`/pages/projects/${ADMIN_PROJECT}/deployments/${ADMIN_DEPLOY_ID}/rollback`);
+      return Response.json({success:true,result:{}});
+    });
+    const {events,emitter}=collectEvents();
+    await runRollback(sampleCtx({liffPagesProject:''}),sampleSnap({snapshotWorkerBundleUrl:'worker-deployment:'+JSON.stringify(versions),snapshotLiffDeployment:''}),emitter);
+    expect(calls).toHaveLength(2);
+    expect(events.at(-1)).toMatchObject({step:'rollback',status:'done'});
+  });
+
+  it('Worker assetsの旧scriptだけの履歴は混在を作らず配備前に止める',async()=>{
+    const {emitter}=collectEvents();
+    await expect(runRollback(sampleCtx({liffPagesProject:''}),sampleSnap(),emitter)).rejects.toThrow('worker_assets_rollback_snapshot_missing');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('happy path — fetches old bundle, restores worker (with preserved bindings), rolls back both pages', async () => {
     const existingBindings = [
       { type: 'd1', name: 'DB', database_id: D1_ID },

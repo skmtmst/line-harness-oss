@@ -13,7 +13,7 @@ Cloudflare 無料枠で動く。サーバー代 **0 円**。Claude Code から�
 
 [![クリックで YouTube を再生 — LINE Harness 導入の全手順](https://img.youtube.com/vi/DiRuGaeq1sM/maxresdefault.jpg)](https://youtu.be/DiRuGaeq1sM)
 
-**現バージョン**: v0.14.1 ・ MIT License ・ TypeScript / Cloudflare Workers + D1
+**現バージョン**: [package.json](package.json) を参照（この文書の確認時点: v0.24.0） ・ MIT License ・ TypeScript / Cloudflare Workers + D1
 
 ---
 

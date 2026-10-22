@@ -7,7 +7,7 @@ const menu: MenuItem = {
   max_party_size: 3, addons: [{ id: 'a1', name: '歯みがき', duration_minutes: 15, price: 800 }, { id: 'a2', name: '爪切り', duration_minutes: 10, price: 500 }],
 };
 const any: StaffItem = { id: 's0', display_name: '指名なし', role: null, profile_image_url: null, bio: null, is_designation_optional: 1, price: 8400, duration_minutes: 105 };
-const sasaki: StaffItem = { id: 's1', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: null, is_designation_optional: 0, price: 8900, duration_minutes: 105 };
+const sasaki: StaffItem = { id: 's1', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: null, is_designation_optional: 0, price: 8400, nomination_fee: 500, duration_minutes: 105 };
 
 describe('同伴・複数メニュー（B5）の合計', () => {
   it('人数の段を出すのは、メニューが人数か追加メニューを許したときだけ（上限 1・追加なしは今までどおり）', () => {
@@ -26,7 +26,7 @@ describe('同伴・複数メニュー（B5）の合計', () => {
     expect(menuLine(sum.rows[0].menu, sum.rows[0].member)).toBe('トリミング（小型犬）＋歯みがき');
   });
 
-  it('指名なしは指名料なし、指名は担当の料金との差（佐々木 +¥500）で合計は ¥18,100（絵 zYErQ）', () => {
+  it('指名なしは指名料なし、指名は設定された指名料（佐々木 +¥500）で合計は ¥18,100（絵 zYErQ）', () => {
     const party = resize(initialParty(), 2);
     party.members[0] = { ...party.members[0], addonIds: ['a1'], staff: sasaki, designated: true };
     party.members[1] = { ...party.members[1], staff: any };
@@ -45,4 +45,10 @@ describe('同伴・複数メニュー（B5）の合計', () => {
     expect(sameStaffSequence(party)).toBe(false);
     expect(totals(party, menu).minutes).toBe(105);
   });
+});
+
+it('追加メニューと担当別料金・指名料・所要時間をそれぞれ加算する', () => {
+  const party = initialParty();
+  party.members[0] = { ...party.members[0], addonIds: ['a1'], staff: { ...sasaki, price: 9000, nomination_fee: 600, duration_minutes: 90 }, designated: true };
+  expect(totals(party, menu)).toMatchObject({ price: 10400, minutes: 105 });
 });

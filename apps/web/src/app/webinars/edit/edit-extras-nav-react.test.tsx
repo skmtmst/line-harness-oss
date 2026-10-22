@@ -51,9 +51,6 @@ vi.mock('@/lib/use-unsaved-guard', () => ({
   useUnsavedGuard: () => ({ leaveTarget: null, confirmLeave: () => {}, cancelLeave: () => {}, disarm: () => {} }),
 }))
 
-vi.mock('@/components/webinars/webinar-form', () => ({
-  default: () => null,
-}))
 
 import EditWebinarPage from './page'
 

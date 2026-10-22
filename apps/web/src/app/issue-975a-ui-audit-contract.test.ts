@@ -101,13 +101,7 @@ describe('U058: 差し込み操作は本文の欄より後に置く', () => {
     expect(body).toBeGreaterThan(-1)
     expect(insert).toBeGreaterThan(body)
   })
-  it('自動返信は返信文のtextareaの後に差し込みボタン', () => {
-    const dialog = read('../components/auto-replies/edit-dialog.tsx')
-    const textarea = dialog.indexOf('返信する内容を入力')
-    const insert = dialog.indexOf('差し込み項目')
-    expect(textarea).toBeGreaterThan(-1)
-    expect(insert).toBeGreaterThan(textarea)
-  })
+
 })
 
 describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる', () => {

@@ -41,6 +41,7 @@ export function useInboxConversation({ CHAT_MESSAGE_PAGE_SIZE, selectedChatIdRef
     if (selectedChatIdRef.current !== chatId) return
     const requestedAccountId = detailAccountRef.current
     const requestId = ++detailRequestIdRef.current
+    setChatDetail((current) => current?.id === chatId ? current : null)
     setDetailLoading(true)
     setError('')
     try {
@@ -211,5 +212,7 @@ export function useInboxConversation({ CHAT_MESSAGE_PAGE_SIZE, selectedChatIdRef
       return [entry, ...prev]
     })
   }, [chatDetail, chats, setChats])
-  return { chatDetail, setChatDetail, detailLoading, setDetailLoading, messagesHasMore, setMessagesHasMore, loadingOlderMessages, loadChatDetail, loadOlderMessages, refreshChatDetailQuietly }
+  // 切替直後の描画も旧宛先を出さない。効果の完了を待って隠すと1描画だけ混ざる。
+  const currentDetail = chatDetail?.id === selectedChatId && detailAccountRef.current === selectedAccountId ? chatDetail : null
+  return { chatDetail: currentDetail, setChatDetail, detailLoading, setDetailLoading, messagesHasMore, setMessagesHasMore, loadingOlderMessages, loadChatDetail, loadOlderMessages, refreshChatDetailQuietly }
 }

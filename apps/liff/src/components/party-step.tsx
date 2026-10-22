@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
-import { bookingPriceText } from '../lib/booking-price.js';
+import { bookingPriceText, staffNominationFee } from '../lib/booking-price.js';
 import { logFailure } from '../lib/user-message.js';
 import {
   MAX_ADDONS, addonsOf, menuLine, menuOf, memberMinutes, personLabel, personShort, resize, totals, yen, type PartyMember, type PartyState,
@@ -199,7 +199,7 @@ export function PartyStaffStep({ menu, party, onParty, onLoadState }: {
               {(lists[mine.id] ?? []).map((s) => {
                 const any = s.is_designation_optional === 1;
                 const selected = any ? !member.designated : member.designated && member.staff?.id === s.id;
-                const diff = Math.max(0, s.price - mine.base_price);
+                const diff = staffNominationFee(s);
                 return (
                   <Button key={s.id} variant="option" selected={selected} aria-pressed={selected} onClick={() => setStaff(index, any ? s : s)}>
                     <span className="flex w-full flex-col items-center gap-0.5">

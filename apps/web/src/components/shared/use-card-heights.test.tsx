@@ -42,6 +42,24 @@ it.each([undefined, 'natural'] as const)('横のカードは指定された高�
   expect([...cards].map(card => card.style.minHeight)).toEqual(cardHeight === 'natural' ? ['', ''] : ['100px', '100px'])
 })
 
+it.each([48, 49])('情報と操作を持つカードも自然高の差%sで高さ合わせを判定する', difference => {
+  const frames: FrameRequestCallback[] = []
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => { frames.push(cb); return frames.length })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const natural = this.getAttribute('aria-label') === '短い' ? 100 : 100 + difference
+    return { top: 0, height: Math.max(natural, parseFloat(this.style.minHeight) || 0) } as DOMRect
+  })
+  const { container } = render(<div style={{ display: 'grid' }}>
+    <Card as="article" layout="vertical" aria-label="短い" actions={<button>開く</button>}>情報</Card>
+    <Card as="article" layout="vertical" aria-label="長い" actions={<button>開く</button>}>情報と補足</Card>
+  </div>)
+  frames.splice(0).forEach(cb => cb(0))
+  const cards = [...container.querySelectorAll<HTMLElement>('article')]
+  expect(cards.map(card => parseFloat(card.style.minHeight))).toEqual(difference <= 48 ? [148, 148] : [0, 0])
+  expect(cards.map(card => card.style.alignSelf)).toEqual(['flex-start', 'flex-start'])
+})
+
 it.each([
   ['outline', 'solid', '1px', 'none'],
   ['shadow', 'none', '0px', 'rgb(0, 0, 0) 0px 1px 2px'],

@@ -45,7 +45,7 @@ import { annotate, decodePng, diffImages, encodePng, scaleDown, sideBySide } fro
 export const HERE = dirname(fileURLToPath(import.meta.url))
 export const ROOT = join(HERE, '..', '..')
 
-export const DESIGN_DIR = process.env.V8_DESIGN_DIR ?? '/Users/kentakenta/lh-work/design/v8'
+export const DESIGN_DIR = process.env.V8_DESIGN_DIR ?? join(HERE, 'design-archive')
 export const VISUAL_QA_BASE = process.env.VISUAL_QA_BASE ?? 'http://localhost:3101'
 
 /** 対応表を読む。一括実行（v8-parity-all.mjs）も同じものを見る。 */

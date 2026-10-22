@@ -322,6 +322,24 @@ describe('友だち数の推移', () => {
     expect(today.sections.trend.freshness).toBe('stale');
   });
 
+  test('多数の店舗も一定の問い合わせ数で空店舗を含めて記録する', async () => {
+    for (let i = 0; i < 350; i++) insertAccount(`store-${i}`);
+    insertFriend('unassigned');
+    let queries = 0;
+    const budgetDb = {
+      prepare(sql: string) {
+        queries++;
+        if (queries > 3) throw new Error('snapshot query budget exceeded');
+        return db.prepare(sql);
+      },
+    } as D1Database;
+    await recordFriendSnapshot(budgetDb, null, jstDate(0));
+    expect(queries).toBeLessThanOrEqual(3);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM friend_daily_snapshots').get()).toEqual({ n: 351 });
+    expect(sqlite.prepare("SELECT total, active FROM friend_daily_snapshots WHERE line_account_id = 'store-349'").get()).toEqual({ total: 0, active: 0 });
+    expect(sqlite.prepare("SELECT total FROM friend_daily_snapshots WHERE line_account_id = '__unassigned__'").get()).toEqual({ total: 1 });
+  });
+
   test('日次記録は1回の上限まで進め、未記録の残りを次回に続ける', async () => {
     for (const id of ['account-a', 'account-b', 'account-c']) insertAccount(id);
 

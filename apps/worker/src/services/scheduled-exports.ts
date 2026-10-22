@@ -34,11 +34,11 @@ export async function processDueScheduledExports(
   for (const account of accounts) {
     if (!account.is_active) continue;
     try {
-      // 同じ日の定期分は1件だけ。created_at はISO文字列で日付が先頭。
+      // 保存はUTC、日次の区切りはJST。旧UUIDの履歴も同じ暦日で見つける。
       const existing = await env.DB.prepare(
         `SELECT id FROM friend_export_jobs
           WHERE line_account_id = ? AND created_by = 'system'
-            AND substr(created_at, 1, 10) = ?`,
+            AND date(created_at, '+9 hours') = ?`,
       ).bind(account.id, today).first<{ id: string }>();
       if (existing) {
         skipped += 1;
@@ -48,16 +48,20 @@ export async function processDueScheduledExports(
         'SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ?',
       ).bind(account.id).first<{ count: number }>();
       const expiresAt = new Date(Date.parse(input.now) + EXPORT_TTL_MS).toISOString();
-      await env.DB.prepare(
+      const inserted = await env.DB.prepare(
         `INSERT INTO friend_export_jobs
           (id, line_account_id, filter_json, columns_json, encoding, status, row_count,
            created_by, created_by_name, created_at, expires_at)
-         VALUES (?, ?, ?, '["basic"]', 'utf-8', 'completed', ?, 'system', '定期実行', ?, ?)`,
+         SELECT ?, ?, ?, '["basic"]', 'utf-8', 'completed', ?, 'system', '定期実行', ?, ?
+          WHERE NOT EXISTS (SELECT 1 FROM friend_export_jobs
+            WHERE line_account_id = ? AND created_by = 'system' AND date(created_at, '+9 hours') = ?)
+          ON CONFLICT(id) DO NOTHING`,
       ).bind(
-        crypto.randomUUID(), account.id, JSON.stringify({ accountId: account.id, trigger: 'daily' }),
-        count?.count ?? 0, input.now, expiresAt,
+        `scheduled-friend-export:${account.id}:${today}`, account.id, JSON.stringify({ accountId: account.id, trigger: 'daily' }),
+        count?.count ?? 0, input.now, expiresAt, account.id, today,
       ).run();
-      generated += 1;
+      if (inserted.meta.changes === 1) generated += 1;
+      else skipped += 1;
     } catch (error) {
       failed += 1;
       logger.error("scheduled_export_failed");

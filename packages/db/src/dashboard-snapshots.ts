@@ -45,47 +45,38 @@ export async function recordFriendSnapshot(
       )
       .bind(UNASSIGNED_SNAPSHOT_ACCOUNT_ID, day, batchLimit)
       .all<{ id: string }>();
-    await Promise.all(
-      targets.results.map((target) => recordFriendSnapshot(db, target.id, day)),
-    );
+    await writeFriendSnapshots(db, targets.results.map(target => target.id), day);
     return;
   }
+  await writeFriendSnapshots(db, [accountId], day);
+}
 
-  const unassigned = accountId === UNASSIGNED_SNAPSHOT_ACCOUNT_ID;
-  const accountWhere = unassigned ? 'line_account_id IS NULL' : 'line_account_id = ?';
-  const accountBinds = unassigned ? [] : [accountId];
-  const counts = await friendBreakdown(db, null, { sql: accountWhere, binds: accountBinds });
-  const added = await count(
-    db,
-    `SELECT COUNT(*) AS n FROM friends WHERE created_at >= ? AND created_at < ? AND ${accountWhere}`,
-    day,
-    nextDate(day),
-    ...accountBinds,
-  );
-
-  await db
-    .prepare(
-      `INSERT INTO friend_daily_snapshots
-         (date, line_account_id, active, total, blocked_by_them, hidden_by_us, added, blocked, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-       ON CONFLICT (date, line_account_id) DO UPDATE SET
-         active = excluded.active,
-         total = excluded.total,
-         blocked_by_them = excluded.blocked_by_them,
-         hidden_by_us = excluded.hidden_by_us,
-         added = excluded.added,
-         updated_at = excluded.updated_at`,
-    )
-    .bind(
-      day,
-      accountId,
-      counts.active,
-      counts.total,
-      counts.blockedByThem,
-      counts.hiddenByUs,
-      added,
-    )
-    .run();
+/** 選ばれた店舗を一文で記録し、店舗数による問い合わせ上限超過を防ぐ。 */
+async function writeFriendSnapshots(db: D1Database, accountIds: string[], day: string): Promise<void> {
+  if (accountIds.length === 0) return;
+  await db.prepare(`
+    INSERT INTO friend_daily_snapshots
+      (date, line_account_id, active, total, blocked_by_them, hidden_by_us, added, blocked, updated_at)
+    SELECT ?, targets.value,
+           SUM(CASE WHEN f.is_following = 1 AND f.is_hidden = 0 THEN 1 ELSE 0 END),
+           COUNT(f.id),
+           SUM(CASE WHEN f.is_following = 0 AND f.is_hidden = 0 THEN 1 ELSE 0 END),
+           SUM(CASE WHEN f.is_following = 1 AND f.is_hidden = 1 THEN 1 ELSE 0 END),
+           SUM(CASE WHEN f.created_at >= ? AND f.created_at < ? THEN 1 ELSE 0 END),
+           0, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+      FROM json_each(?) targets
+      LEFT JOIN friends f ON f.line_account_id = targets.value
+        OR (targets.value = ? AND f.line_account_id IS NULL)
+     WHERE 1
+     GROUP BY targets.value
+    ON CONFLICT (date, line_account_id) DO UPDATE SET
+      active = excluded.active,
+      total = excluded.total,
+      blocked_by_them = excluded.blocked_by_them,
+      hidden_by_us = excluded.hidden_by_us,
+      added = excluded.added,
+      updated_at = excluded.updated_at
+  `).bind(day, day, nextDate(day), JSON.stringify(accountIds), UNASSIGNED_SNAPSHOT_ACCOUNT_ID).run();
 }
 
 /**
