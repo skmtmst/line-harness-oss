@@ -43,6 +43,7 @@ vi.mock('@/lib/api', () => {
         visibility: () => Promise.resolve({ success: true, data: { features: { media: true } } }),
       },
       media: {
+        counts: () => Promise.resolve({ success: true, data: { total: 1, byKind: { image: 0, video: 1, audio: 0, file: 0 }, unused: 1, archived: 0 } }),
         list: (accountId: string, params?: unknown) => {
           fixture.listCalls.push({ accountId, params })
           return Promise.resolve({

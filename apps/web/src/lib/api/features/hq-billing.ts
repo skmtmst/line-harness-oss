@@ -1,7 +1,7 @@
 import type { PlanKey, BillingInterval, BillingSummary, BillingInvoice } from '../../hq-billing'
 import { fetchApi } from '../transport/request'
 import type { ApiResponse } from '@line-crm/shared'
-import { fetchSharedRead } from '../transport/cache'
+import type { FetchApiOptions } from '../types/transport'
 
 export const hqBillingMethods = {
   hqBilling: {
@@ -10,7 +10,7 @@ export const hqBillingMethods = {
         amountDueYen: number; prorationDifferenceYen: number; nextBillingAt: string | null;
         estimatedAt: string; isEstimate: true; notice: string }>>(
         `/api/hq/billing/preview?${new URLSearchParams({ planKey, interval })}`),
-    summary: () => fetchSharedRead<ApiResponse<BillingSummary>>('/api/hq/billing/summary'),
+    summary: (options?: FetchApiOptions) => fetchApi<ApiResponse<BillingSummary>>('/api/hq/billing/summary', options),
     /** Stripe の申込画面の URL。オーナーだけ。 */
     checkout: (planKey: PlanKey, interval: BillingInterval = 'month') =>
       fetchApi<ApiResponse<{ url: string }>>('/api/hq/billing/checkout', { method: 'POST', body: JSON.stringify({ planKey, interval }) }),

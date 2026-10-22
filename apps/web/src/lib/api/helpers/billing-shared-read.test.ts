@@ -20,7 +20,7 @@ describe('同時に出る請求表示の読み込み', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('同時の取得は1回、完了後の再読み込みは最新を取得し、表示用の加工も共有しない', async () => {
+  it('同時の取得は1回、短時間は再利用し、手動の読み直しは最新を取得し、表示用の加工も共有しない', async () => {
     let answer!: (res: Response) => void
     const fetch = vi.fn().mockImplementationOnce(() => new Promise<Response>((resolve) => { answer = resolve }))
       .mockImplementation(() => Promise.resolve(response()))
@@ -33,6 +33,8 @@ describe('同時に出る請求表示の読み込み', () => {
     expect(a).toEqual(b)
     expect(a.data).not.toBe(b.data)
     await api.hqBilling.summary()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    await api.hqBilling.summary({ cache: 'reload' })
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 

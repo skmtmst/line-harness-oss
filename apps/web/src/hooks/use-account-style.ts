@@ -2,28 +2,21 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ACCOUNT_STYLES } from '@line-crm/shared'
+import { invalidateApiReads } from '@/lib/api/transport/read-cache'
 import type { styleApi } from '@/lib/api/helpers/styles'
 
 export const ACCOUNT_STYLE_UPDATED = 'musubo:account-style-updated'
 export function accountStyleUpdated(accountId: string) {
-  pending.delete(accountId)
+  invalidateApiReads('/api/dashboard/style', accountId)
   window.dispatchEvent(new CustomEvent(ACCOUNT_STYLE_UPDATED, { detail: { accountId } }))
 }
 
 type Data = Awaited<ReturnType<typeof styleApi.get>>['data']
-// 同時の読み取りだけ共有する。端末の前の業種・失敗・古い権限は覚えない。
-const pending = new Map<string, Promise<Data>>()
 function load(accountId: string): Promise<Data> {
-  const hit = pending.get(accountId)
-  if (hit) return hit
-  const promise = import('@/lib/api/helpers/styles').then(module => module.styleApi.get(accountId)).then(res => {
+  return import('@/lib/api/helpers/styles').then(module => module.styleApi.get(accountId)).then(res => {
     if (!res.success || !ACCOUNT_STYLES.includes(res.data?.style)) throw new Error('使い方のスタイルを読み込めませんでした')
     return res.data
   })
-  pending.set(accountId, promise)
-  const forget = () => { if (pending.get(accountId) === promise) pending.delete(accountId) }
-  void promise.then(forget, forget)
-  return promise
 }
 
 /** サーバーで所属を確かめた業種。切替の最初の描画から前の店を返さない。 */

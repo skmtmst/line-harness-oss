@@ -94,15 +94,13 @@ export async function loadMediaSummary({ latestAccountRef, selectedAccountId, se
     setQuotaFailed(false)
     const [quotaResponse, overallResponse] = await Promise.all([
       api.media.quota(accountAtRequest).catch(() => null),
-      // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
-      api.media.list(accountAtRequest, {
-        archived: showArchivedOnly ? 'only' : undefined,
-        limit: 1,
-        offset: 0,
-      }).catch(() => null),
+      // フォルダ欄の総数も数の帯と同じ一括集計を使い、一覧の部分件数にしない。
+      api.media.counts(accountAtRequest).catch(() => null),
     ])
     if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
-    if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
+    setOverallTotal(overallResponse?.success
+      ? showArchivedOnly ? overallResponse.data.archived : overallResponse.data.total
+      : null)
     if (quotaResponse?.success) setQuota(quotaResponse.data)
     else {
       setQuota(null)

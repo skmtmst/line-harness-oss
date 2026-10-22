@@ -1,3 +1,4 @@
+import { clearApiReadCache } from './api/transport/read-cache'
 export const ADMIN_SESSION_STORAGE_KEY = 'lh_admin_session_fallback'
 export const TWO_FACTOR_CHALLENGE_STORAGE_KEY = 'lh_two_factor_challenge'
 const TWO_FACTOR_NEXT_STORAGE_KEY = 'lh_2fa_next'
@@ -72,6 +73,7 @@ export function isOpsTwoFactorReturn(
 
 export function storeAdminSession(sessionToken: string, csrfToken?: string): void {
   if (typeof window === 'undefined' || !sessionToken) return
+  clearApiReadCache()
   runtimeAdminSessionToken = sessionToken
   writeSessionStorage(ADMIN_SESSION_STORAGE_KEY, sessionToken)
   if (csrfToken) {
@@ -171,6 +173,7 @@ export function adminSessionHeaders(tokenOverride?: string): Record<string, stri
 
 export function clearAdminSession(): void {
   if (typeof window === 'undefined') return
+  clearApiReadCache()
   runtimeAdminSessionToken = ''
   removeSessionStorage(ADMIN_SESSION_STORAGE_KEY)
 }

@@ -26,7 +26,7 @@ it('一覧が未完了でも本人情報を先に読み、利用側が同じ1本
   expect(fetch.mock.calls.filter(([url]) => url.endsWith('/api/staff/me'))).toHaveLength(1)
   resolveList(new Response('{"success":true,"data":[]}'))
   await api.staff.me()
-  expect(fetch.mock.calls.filter(([url]) => url.endsWith('/api/staff/me'))).toHaveLength(2)
+  expect(fetch.mock.calls.filter(([url]) => url.endsWith('/api/staff/me'))).toHaveLength(1)
 })
 
 it.each(['csrf', 'bearer', 'invalidate', 'expiry'] as const)('%s が変われば先読みを使わない', async kind => {
@@ -37,6 +37,7 @@ it.each(['csrf', 'bearer', 'invalidate', 'expiry'] as const)('%s が変われば
   let now = 1000
   vi.spyOn(Date, 'now').mockImplementation(() => now)
   prefetchApiRead('/api/staff/me')
+  await api.staff.me()
   if (kind === 'csrf') csrf = 'fixture-new-session'
   if (kind === 'bearer') token = 'fixture-b'
   if (kind === 'invalidate') clearCommonCaches()

@@ -27,17 +27,6 @@ vi.hoisted(() => {
 
 const api = vi.hoisted(() => ({ listAccounts: vi.fn() }))
 
-vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
-  const actual = await importOriginal()
-  return {
-    ...actual,
-    api: {
-      ...actual.api,
-      lineAccounts: { ...actual.api.lineAccounts, list: api.listAccounts },
-    },
-  }
-})
-
 const fixture = vi.hoisted(() => ({ pathname: '/friends' }))
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }))
 
@@ -120,7 +109,14 @@ beforeEach(() => {
   vi.clearAllMocks()
   clearLineAccountsCache()
   storage = new MemoryStorage()
+  storage.setItem('lh_csrf', 'fixture-session')
   vi.stubGlobal('localStorage', storage)
+  vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+    const response = new URL(input).pathname === '/api/staff/me'
+      ? { success: true, data: { id: 'staff-a', role: 'owner' } }
+      : await api.listAccounts()
+    return new Response(JSON.stringify(response))
+  }))
   fixture.pathname = '/friends'
   host = document.createElement('div')
   document.body.appendChild(host)

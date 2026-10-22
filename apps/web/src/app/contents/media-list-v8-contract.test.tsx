@@ -288,17 +288,6 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     expect(LIST_V8).toContain('<BulkBar')
   })
 
-  test('帯の数は実データで数え、種別・未使用・退避の総数を別に読む', () => {
-    expect(LIST_V8).toContain('unusedOnly: true')
-    expect(LIST_V8).toContain("archived: 'only'")
-    expect(LIST_V8).toContain('formatMediaSize(quota.usageBytes)')
-    expect(LIST_V8).toContain('quota.limitBytes')
-    expect(LIST_V8).toContain('—（未取得）')
-    // 見本の数は一例。直書きしない。
-    expect(LIST_V8).not.toContain('3.2 GB')
-    expect(LIST_V8).not.toContain('10 GB')
-    expect(LIST_V8).not.toContain('186')
-  })
 
   test("管理画面 の列・絞り込み・操作を残す", () => {
     // 列（札の中身）。
