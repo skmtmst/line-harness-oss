@@ -358,6 +358,7 @@
 
 - **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
+  - 窓の頭の任意の印は `Dialog.headerIcon`・`ConfirmDialog.headerIcon`・`Drawer.headerIcon`。灰色の小さな四角へ置き、説明は既存の `description` で題の下に出す。危険な操作の `titleIcon` は独立して保つ。明るい面・角16・柔らかい影・薄い背景と軽いぼかしは共通値、開閉はtransformとopacityのみ。
   - 入力行：`shared/dialog-form-row.tsx` の `DialogFormRow` に既存の `Field` を渡す。独立した入力を本文幅へそろえ、保存・エラーは呼び出し側のまま保つ。
   - チェック・未設定情報の行：同じファイルの `DialogContentRow` に共通 `Checkbox` または名前・操作を渡す。チェック後も行の薄い線を保ち、未設定情報は `tone="muted"` の灰色の面で1行にまとめる。
   - 公開前の宛先：`shared/dialog-recipient-list.tsx` の `DialogRecipientList` へ実際の名前・役割・共通の通知方法の札を渡す。通常一覧の固定行高を持たず、役割を読めない時は「—」。
@@ -366,7 +367,7 @@
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
   - 確認の実行を左、取消を中央に分ける場合は `confirmPlacement="start"`。通常の文字幅は `actionWidthReserve="idle"` で指定し、既定の結果文の幅予約は保つ。
   - 独自の処理を持つ窓でも操作は `DialogActions` に渡す。`footerAlign` だけを指定して本文にボタンを直置きしない。
-  - 読む変数：`--radius-panel`・`--shadow-float`・`--card-edge`
+  - 読む変数：`--polish-radius-dialog`・`--polish-window-*`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
 - **見つけ方（コード）**：
   - raw-dialog：`role=["']dialog["']|aria-modal=|<dialog\b` — 窓を手書き

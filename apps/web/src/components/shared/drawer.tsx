@@ -18,6 +18,8 @@ export type DrawerProps = {
   open: boolean
   title: string
   titleAccessory?: ReactNode
+  /** 題と説明の左に置く、アプリの印の小さな四角。 */
+  headerIcon?: ReactNode
   closeAppearance?: 'box'
   description?: ReactNode
   contentSpacing?: 'sections'
@@ -64,6 +66,7 @@ export default function Drawer({
   open,
   title,
   titleAccessory,
+  headerIcon,
   closeAppearance,
   description,
   contentSpacing,
@@ -102,9 +105,12 @@ export default function Drawer({
   if (!open && !leaving) return null
 
   const titleBlock = (
-    <div>
-      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</h2>{titleAccessory}</div>
-      {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
+    <div className={styles.heading}>
+      {headerIcon ? <span className={styles.headerIcon} aria-hidden="true">{headerIcon}</span> : null}
+      <div className={styles.headingText}>
+        <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</h2>{titleAccessory}</div>
+        {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
+      </div>
     </div>
   )
   const closeButton = closeAppearance === 'box' ? <IconButton onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></IconButton> : <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>

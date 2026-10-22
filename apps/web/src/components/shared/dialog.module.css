@@ -8,7 +8,9 @@
   align-items: center;
   justify-content: center;
   overflow-y: auto;
-  background: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  background: var(--polish-window-backdrop);
+  -webkit-backdrop-filter: blur(var(--polish-window-blur));
+  backdrop-filter: blur(var(--polish-window-blur));
   padding: 16px;
 }
 
@@ -324,7 +326,7 @@
 :root .panel {
   width: min(var(--tpl-dialog-width), 100%); padding: 0; gap: 0; overflow: hidden;
   border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--card-edge); outline-offset: -1px;
-  box-shadow: var(--shadow-controls-pop);
+  box-shadow: var(--polish-window-shadow);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
 :root .panel[data-size='large'] { width: min(var(--tpl-dialog-large-width), 100%); }
@@ -497,3 +499,24 @@ html:root .panel[data-confirm-placement='start'] .actions > button:last-of-type 
 }
 
 :root .footer :is(button, a) { border-radius: var(--radius-primary-action); }
+
+/* 余白は各段だけが持ち、本文との境目で重ねない。個別指定の窓はその口を保つ。 */
+html:root .panel:not([data-design-header-padding]):not([data-design-header-height]):not([data-layout]):not([data-design-layout]) > .headerRow {
+  padding: var(--polish-space-section) var(--polish-space-section) 0;
+}
+html:root .panel:not([data-layout]):not([data-design-layout]):not([style*='--dialog-design-footer-padding']) > .footer > .actions:not([data-padding='none']) {
+  padding: var(--space-16) var(--polish-space-section) var(--polish-space-section);
+}
+.headerIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--polish-window-icon-size);
+  height: var(--polish-window-icon-size);
+  border-radius: var(--polish-radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  box-shadow: inset 0 0 0 1px var(--color-hairline);
+}
+.headerIcon > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }

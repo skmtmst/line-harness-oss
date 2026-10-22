@@ -46,6 +46,8 @@ export type DialogProps = {
   designHeaderHeight?: number
   /** 頭の×の左に置く操作（選ぶ窓の「＋タグを作る」など）。 */
   headerAction?: ReactNode
+  /** 題と説明の左に置く、アプリの印の小さな四角。 */
+  headerIcon?: ReactNode
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
   designContentPadding?: string
   /** 指定した窓だけ下の操作段の余白を変える。 */
@@ -142,6 +144,7 @@ export default function Dialog({
   designHeaderPadding,
   designHeaderHeight,
   headerAction,
+  headerIcon,
   designContentPadding,
   designFooterPadding,
   footerDivider = true,
@@ -305,6 +308,7 @@ export default function Dialog({
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
       <div className={styles.headerRow}>
+        {headerIcon ? <span className={styles.headerIcon} aria-hidden="true">{headerIcon}</span> : null}
         <div className={styles.headerContent}>
           {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
         </div>

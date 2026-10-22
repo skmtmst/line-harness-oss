@@ -40,6 +40,8 @@ interface ConfirmDialogProps {
   children?: ReactNode
   /** 見出しの左に置く絵。危険な操作は警告、と一目で分かるようにする。 */
   titleIcon?: ReactNode | false
+  /** 題と説明の左に置く、アプリの印の小さな四角。 */
+  headerIcon?: ReactNode
   /** 実行ボタンの中、文字の左に置く絵。 */
   confirmIcon?: ReactNode
   /** この確認画面に対応するPencilの実Node。 */
@@ -98,6 +100,7 @@ export default function ConfirmDialog({
   error,
   children,
   titleIcon,
+  headerIcon,
   confirmIcon,
   designNode,
   designHeaderPadding,
@@ -173,6 +176,7 @@ export default function ConfirmDialog({
       error={error || executionError}
       primaryAction={primaryAction}
       titleIcon={shownTitleIcon}
+      headerIcon={headerIcon}
       confirmIcon={shownConfirmIcon}
       designNode={designNode}
       designHeaderPadding={designHeaderPadding}

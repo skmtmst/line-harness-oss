@@ -2988,7 +2988,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --radius-segment: var(--polish-radius-control);
   --color-table-head: #f7f8fa;
   --color-focus-ring: var(--polish-focus);
-  --shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12);
+  --shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12); --polish-window-shadow: 0 24px 80px rgb(29 29 31 / 0.16), 0 8px 24px rgb(29 29 31 / 0.08); --polish-window-backdrop: color-mix(in srgb, var(--color-ink) 18%, transparent); --polish-window-blur: 4px; --polish-window-icon-size: 32px;
   --shadow-float: var(--shadow-controls-pop);
   --shadow-overlay: var(--shadow-controls-pop);
   --select-menu-shadow: var(--shadow-controls-pop);
