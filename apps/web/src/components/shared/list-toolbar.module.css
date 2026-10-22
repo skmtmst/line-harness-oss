@@ -317,3 +317,26 @@ html:root .leading > :is(button, a) { width: max-content; flex: none; }
  * 2026-10-15 判定役：約16px 右へずれていた）。本文の段が左右の余白を持つので、部品は二重に持たない。
  */
 :root :global([data-page-template='settings'] [data-template-region='content']) .toolbar { padding-inline: 0; }
+
+/*
+ * 幅640px未満：右端の並び・件数の束（trailing・slotsEnd）は中身の幅のまま
+ * 縮まないため、幅360・390pxの一覧で最後のボタンが画面の右端を越えていた。
+ * 束は1行を使い切ってから、中の道具（ボタン・選ぶ欄）の間で次の行へ送る。
+ * ボタンの中の短い文字は折り返さない（折り返すのは行のほう）。
+ */
+@container v8-page (max-width: 639px) {
+  html:root .toolbar { flex-wrap: wrap; }
+  html:root .toolbar .row2 .trailing,
+  html:root .slots:not([data-toolbar-single-row]) .slotsEnd {
+    flex: 0 0 100%; width: 100%; max-width: 100%; min-width: 0;
+    margin-left: 0; flex-wrap: wrap; justify-content: flex-end;
+  }
+  html:root .toolbar .row2 .trailing > *,
+  html:root .slots:not([data-toolbar-single-row]) .slotsEnd > * {
+    flex: 0 0 auto; max-width: 100%;
+  }
+  html:root .toolbar .row2 .trailing :is([data-sort-select], [data-per-page-select]),
+  html:root .slots:not([data-toolbar-single-row]) .slotsEnd :has(> [data-list-page-size]) {
+    width: auto; min-width: 0; max-width: 100%; flex: 0 0 auto;
+  }
+}
