@@ -44,6 +44,9 @@ import EmptyList from '@/components/shared/empty-list'
 import DateField from '@/components/shared/date-field'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
+import { FilterPopover } from '@/components/shared/filter-popover'
+import { useRowLeaving } from '@/lib/use-row-leaving'
+import { rowPrimary } from '@/components/shared/row-roving'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
@@ -217,7 +220,7 @@ export default function BroadcastListV8() {
   const [dateFrom, setDateFrom] = useListUrlValue('dateFrom', '')
   const [dateTo, setDateTo] = useListUrlValue('dateTo', '')
   const [datePopoverOpen, setDatePopoverOpen] = useState(false)
-  const datePopoverRef = useRef<HTMLDivElement>(null)
+  const { leave, isLeaving } = useRowLeaving()
   const { folders, unfiledCount, error: folderLoadError, reload: loadFolders } = useManagedFolders('broadcast', selectedAccountId)
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
@@ -457,23 +460,6 @@ export default function BroadcastListV8() {
     return () => { cancelled = true }
   }, [selectedAccountId, savedViewsSeq])
 
-  /* 「配信日」のポップオーバーは外を押したら・Esc で閉じる。 */
-  useEffect(() => {
-    if (!datePopoverOpen) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!datePopoverRef.current?.contains(event.target as Node)) setDatePopoverOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDatePopoverOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [datePopoverOpen])
-
   const applySavedView = (id: string) => {
     const view = savedViews.find((item) => item.id === id)
     if (!view) return
@@ -523,13 +509,27 @@ export default function BroadcastListV8() {
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return
     const targetId = deleteTarget.id
+    const requestKey = listRequestKey
     setDeleting(true)
     setDeleteError('')
     try {
       const res = await api.broadcasts.delete(targetId)
       if (!res.success) throw new Error(res.error)
+      const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>('tr[data-row-id]'))
+      const index = rows.findIndex(row => row.dataset.rowId === targetId)
+      const neighbor = rows[index + 1] ?? rows[index - 1]
+      const focus = neighbor ? rowPrimary(neighbor) : null
       setDeleteTarget(null)
-      await loadList((page - 1) * pageSize)
+      // 確認窓の焦点復帰より後に、次の行へ移す。削除済みの行は戻さない。
+      requestAnimationFrame(() => {
+        const activeRow = document.activeElement?.closest('tr')?.getAttribute('data-row-id')
+        if (currentListRequest.current === requestKey && (activeRow === targetId || document.activeElement === document.body)) focus?.isConnected && focus.focus()
+      })
+      leave(targetId, () => {
+        setBroadcasts(current => current.filter(item => item.id !== targetId))
+        // loadList は読み直し専用の失敗表示を持つ。削除のcatchへは戻さない。
+        if (currentListRequest.current === requestKey) void loadList((page - 1) * pageSize)
+      })
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
 
@@ -774,30 +774,19 @@ export default function BroadcastListV8() {
   )
 
   const dateBox = (
-    <div className={styles.datePopoverWrap} ref={datePopoverRef}>
-      <FilterChip
-        selected={Boolean(dateFrom || dateTo)}
-        aria-haspopup="dialog"
-        aria-expanded={datePopoverOpen}
-        onChange={() => setDatePopoverOpen((open) => !open)}
-        selectedIcon={false}
-      >
+    <FilterPopover open={datePopoverOpen} onClose={() => setDatePopoverOpen(false)} label="配信日で絞る（開始〜終了）"
+      trigger={<FilterChip selected={Boolean(dateFrom || dateTo)} aria-haspopup="dialog" aria-expanded={datePopoverOpen}
+        onChange={() => setDatePopoverOpen((open) => !open)} selectedIcon={false}>
         {dateRangeLabel(dateFrom, dateTo)}<CalendarDays size={14} aria-hidden="true" />
-      </FilterChip>
-      {datePopoverOpen ? (
-        <div className={styles.datePopover} role="dialog" aria-label="配信日で絞る">
-          <p className={styles.datePopoverLabel}>配信日で絞る（開始〜終了）</p>
-          <SaveErrorField names={["dateFrom","from","date_from"]}><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" placeholder="開始日" /></SaveErrorField>
-          <SaveErrorField names={["dateTo","to","date_to"]}><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" placeholder="終了日" /></SaveErrorField>
-          <div className={styles.datePopoverActions}>
-            {(dateFrom || dateTo) ? (
-              <Button type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>外す</Button>
-            ) : null}
-            <Button type="button" variant="primary" onClick={() => setDatePopoverOpen(false)}>閉じる</Button>
-          </div>
-        </div>
-      ) : null}
-    </div>
+      </FilterChip>}
+      actions={<>
+        {(dateFrom || dateTo) ? <Button type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>外す</Button> : null}
+        <Button type="button" variant="primary" onClick={() => setDatePopoverOpen(false)}>閉じる</Button>
+      </>}
+    >
+      <SaveErrorField names={["dateFrom","from","date_from"]}><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" placeholder="開始日" /></SaveErrorField>
+      <SaveErrorField names={["dateTo","to","date_to"]}><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" placeholder="終了日" /></SaveErrorField>
+    </FilterPopover>
   )
 
   /* 閲覧のみは保存できないので置かない。場所だけ空けて「保存した検索」までの並びを保つ。 */
@@ -1030,6 +1019,7 @@ export default function BroadcastListV8() {
             <Tr
               key={broadcast.id}
               selected={selection.isSelected(broadcast.id)}
+              leaving={isLeaving(broadcast.id)}
               data-reorder-id={broadcast.id}
               className={styles.row}
               interactive
