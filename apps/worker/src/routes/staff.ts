@@ -1,3 +1,4 @@
+import { readAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { logger } from '@line-crm/shared/server';
 import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import { effectiveStaffEditKeys, SCOPE_OPERATION_KEYS } from '@line-crm/shared';
@@ -359,7 +360,7 @@ staff.get('/api/staff/me', async (c) => {
     if (current.id === 'env-owner') {
       return c.json({ success: true, data: { id: current.id, tenantId: current.tenantId ?? DEFAULT_TENANT_ID, name: '管理者', role: 'admin', email: null, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all', scopedLineAccountIds: [] } });
     }
-    const member = await getStaffById(c.env.DB, current.id);
+    const member = readAuthenticatedStaffRecord(c.env.DB, current) ?? await getStaffById(c.env.DB, current.id);
     if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
     return c.json({ success: true, data: { ...await serializeStaff(c.env.DB, member), readOnly: current.readOnly } });
   } catch (error) {
