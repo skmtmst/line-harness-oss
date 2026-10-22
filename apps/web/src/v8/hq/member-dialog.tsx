@@ -16,6 +16,7 @@ import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
+import { EmailChipField } from '@/components/shared/email-chip-field'
 import head from './dialog-head.module.css'
 import styles from './member-dialog.module.css'
 import { inviteRequirements } from './member-requirements'
@@ -211,7 +212,7 @@ export default function MemberDialogV8({
             </FormField>
             <FormField label="メールアドレス" requirement={inviteRequirements.email} htmlFor={`${uid}-email`} error={fieldErrors.email}>
 
-              <SaveErrorField names={["email","value.email"]}><TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例：staff@example.com" /></SaveErrorField>
+              <SaveErrorField names={["email","value.email"]}><EmailChipField id={`${uid}-email`} value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onValueChange={(email) => set('email', email)} className={styles.full} placeholder="例：staff@example.com" /></SaveErrorField>
 
             </FormField>
           </div>

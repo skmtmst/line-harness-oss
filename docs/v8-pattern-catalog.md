@@ -547,6 +547,7 @@
 - **10-12の追加（F組・B-260）**：`CreatePage`の`contentDisabled`／`contentLabel`で本文をネイティブfieldsetにする。余白と段間は型が持ち、保存中・比較中・閲覧のみの入力をまとめて止める。通知と下の帯はfieldsetの外へ渡す。レポート作成の動作試験で保存・失敗・競合・権限を保つ。
 
 - **10-12の変わり形（F組・B-260）**：同じ入力欄の前後に固定文字を置く`AffixedTextField`は`text-field.tsx`／`text-field.module.css`が持つ。値は入力部分だけ、前後の文字は保存しない。Fieldの必須・誤り・説明・フォーカスと同じ契約を保つ。画面で別の枠や焦点の輪を作らない。
+- 招待のメール欄は `shared/email-chip-field.tsx`。既存の TextField・Chip を使い、Enter・貼り付け・欄から離れる操作で1件を札にする。複数件は切り捨てず入力に残して理由を示す。送信値・名前・権限は画面が持つ。
 - 言葉を足す欄は `shared/keyword-input.tsx`。枠と検索印は `AffixedTextField`、幅は既存の言葉入力用の値を使う。Enter・カンマ・離れる操作で確定し、日本語の変換中は確定しない。条件や重複の判断は画面が渡す。
 
 - **10-12の色選択の変わり形（F組）**：固定色をその場で選ぶ欄は`FolderColorButton`の`appearance="palette"`。丸は24px、選んだ色に輪。保存色が候補外でも現在色の選択を出す。色の名前・選択・矢印キーは同じ正本が持つ。既定のフォルダ色メニューは保つ。
@@ -904,6 +905,8 @@
 
 <a id="steps"></a>
 ## steps 手順
+
+- 完了した入力の要約は `Steps.summaries`。変える口は既存の `onSelect` へ渡す。現在・未完の段には要約を出さない。方向の動きは同じ持ち主の `StepContent` と `CreatePage.step` / `CreateStepColumns.step`。入力を作り直さず transform だけを150ms動かし、動きを減らす設定では即時に替える。
 
 - **役目**：題のすぐ下・左寄せ・1行。済みの段だけ押して戻れる
 - **持ち主（コード）**：`apps/web/src/components/templates/steps.tsx`・`apps/web/src/components/templates/steps.module.css`（部品 `Steps`）
