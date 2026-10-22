@@ -1,6 +1,7 @@
 'use client'
 import { api, fetchApi, type InboxStats } from '@/lib/api';
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events';
+import { invalidateApiReads } from '@/lib/api/transport/read-cache';
 import { withRequestTimeout } from '@/lib/request-timeout';
 import { useEffect, useRef, useState } from 'react';
 import { StatusFilter } from './inbox-model';
@@ -43,6 +44,8 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
       if (timer !== undefined) return
       timer = setTimeout(() => {
         timer = undefined
+        // 新着・再確認の知らせでは、変更前から待っている集計にも相乗りしない。
+        invalidateApiReads('/api/chats')
         setRefreshVersion((current) => current + 1)
       }, 120)
     }

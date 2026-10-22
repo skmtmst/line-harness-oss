@@ -37,17 +37,17 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '会社', iconUrl: null }) }))
 vi.mock('@/components/layout/sidebar-identity', () => ({ default: () => <div>identity</div> }))
 vi.mock('@/components/hq/account-menu', () => ({ default: () => <div>hq</div>, SidebarAccountMenu: ({ hq }: { hq: boolean }) => <div data-testid="sidebar-account">{hq ? 'me-hq' : 'me-store'}</div> }))
-vi.mock('@/lib/api', () => ({
-  api: {
-    featureSettings: {
-      visibility: fixture.visibility,
-      get: fixture.get,
+vi.mock('@/lib/api', async original => {
+  const actual = await original<typeof import('@/lib/api')>()
+  return {
+    api: {
+      featureSettings: actual.api.featureSettings,
+      inbox: { unanswered: { count: vi.fn(async () => ({ success: true, data: { total: 0 } })) } },
+      nenMembers: { overview: vi.fn(async () => ({ success: true, data: { pendingPhotos: 0 } })) },
+      health: { summary: vi.fn(async () => ({ success: true, data: { warningCount: 0, dangerCount: 0 } })) },
     },
-    inbox: { unanswered: { count: vi.fn(async () => ({ success: true, data: { total: 0 } })) } },
-    nenMembers: { overview: vi.fn(async () => ({ success: true, data: { pendingPhotos: 0 } })) },
-    health: { summary: vi.fn(async () => ({ success: true, data: { warningCount: 0, dangerCount: 0 } })) },
-  },
-}))
+  }
+})
 
 // この試験は既存の権限・旗・並びを検査する。業種の対照はstyle-menu.testで行う。
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' }, status: 'ready', error: null, reload: vi.fn() }) }))
@@ -64,6 +64,16 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     clearFeatureSettingsCache()
     fixture.accountId = 'account-1'
     window.localStorage.clear()
+    window.localStorage.setItem('lh_csrf', 'fixture-session')
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const url = new URL(input)
+      const response = url.pathname === '/api/settings/features/visibility'
+        ? await fixture.visibility(url.searchParams.get('account_id'))
+        : url.pathname === '/api/settings/features'
+          ? await fixture.get(url.searchParams.get('account_id'))
+          : { success: true, data: {} }
+      return new Response(JSON.stringify(response))
+    }))
     fixture.visibility.mockReset()
     fixture.get.mockReset()
     fixture.visibility.mockResolvedValue({
@@ -81,7 +91,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     })
   })
 
-  afterEach(() => cleanup())
+  afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
   it('一般staffは最小read-modelだけを使い、offの項目を隠す', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')

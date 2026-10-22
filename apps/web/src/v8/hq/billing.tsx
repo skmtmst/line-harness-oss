@@ -118,13 +118,13 @@ function BillingInner() {
   const intervalSynced = useRef(false)
   const [change, setChange] = useState<{ plan: BillingPlanView; route: ChangeRoute } | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (reload = false) => {
     setStatus('loading')
     setInvoiceFailed(false)
     setInvoiceError(null)
     try {
       const [summaryRes, invoiceRes] = await Promise.all([
-        api.hqBilling.summary(),
+        api.hqBilling.summary(reload ? { cache: 'reload' } : undefined),
         api.hqBilling.invoices().catch((caught: unknown) => {
           setInvoiceError(caught)
           return null
@@ -172,7 +172,7 @@ function BillingInner() {
   // Checkout から戻った直後は Webhook がまだ届いていないことがある。少し待って読み直す。
   useEffect(() => {
     if (checkoutResult !== 'success') return
-    const timer = setTimeout(() => void load(), 4000)
+    const timer = setTimeout(() => void load(true), 4000)
     return () => clearTimeout(timer)
   }, [checkoutResult, load])
 
@@ -224,7 +224,7 @@ function BillingInner() {
   // 担当者は見られない（権限表: 課金プランは担当者 不可。閲覧のみは閲覧できる）。
   if (status === 'forbidden' || role === 'staff') return frame(<ListState permissionScope="hq" kind="forbidden" />)
   if (status === 'error' || !summary) {
-    return frame(<ListState permissionScope="hq" kind="error" title="契約状況を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />)
+    return frame(<ListState permissionScope="hq" kind="error" title="契約状況を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load(true)} />)
   }
 
   const banner = billingBanner(summary)
@@ -373,7 +373,7 @@ function BillingInner() {
             title={invoiceUnreachable ? '決済サービスにつながりませんでした' : '支払い履歴を読み込めませんでした'}
             description={invoiceUnreachable ? '少し待って、もう一度読み込んでください。' : undefined}
             error={invoiceError ?? undefined}
-            onRetry={() => void load()}
+            onRetry={() => void load(true)}
           />
         ) : invoices === null || invoices.length === 0 ? (
           <p className={styles.empty}>まだ支払いはありません。プランを選ぶと、ここに請求と支払いの記録が並びます。</p>

@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import type { ReactNode } from 'react'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { loadLineAccounts } from '@/lib/line-accounts-cache'
+import { clearApiReadCache } from '@/lib/api/transport/read-cache'
 
 const STORAGE_KEY = 'lh_selected_account'
 
@@ -100,6 +101,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   const setSelectedAccountId = useCallback((id: string) => {
     requestUnsavedAction(() => {
+      clearApiReadCache()
       setSelectedAccountIdState(id)
       try {
         localStorage.setItem(STORAGE_KEY, id)
@@ -111,6 +113,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   const clearSelectedAccountId = useCallback(() => {
     requestUnsavedAction(() => {
+      clearApiReadCache()
       setSelectedAccountIdState(null)
       try {
         localStorage.removeItem(STORAGE_KEY)

@@ -1,10 +1,13 @@
 // @vitest-environment happy-dom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { useAccountStyle, accountStyleUpdated } from './use-account-style'
 const net = vi.hoisted(() => ({ get: vi.fn() }))
-vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: net }))
-afterEach(cleanup)
+beforeEach(() => {
+  localStorage.setItem('lh_csrf', 'fixture-session')
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(await net.get(new URL(url).searchParams.get('account_id'))))))
+})
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 const ok = (style: string) => ({ success: true, data: { style } })
 it('切替の最初の描画から別店の業種を返さず、遅い前の返事も使わない', async () => {
   let resolveOld!: (value: unknown) => void

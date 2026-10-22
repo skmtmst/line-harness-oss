@@ -1,4 +1,5 @@
 import type { StaffMember } from '@line-crm/shared'
+import { invalidateApiReads } from './api/transport/read-cache'
 
 // 保存値ではなく、本人APIで確かめた役割と鍵だけを使う。
 let identity: StaffMember | null = null
@@ -9,6 +10,7 @@ export function rememberStaffIdentity(value: StaffMember): void {
   for (const listener of listeners) listener()
 }
 export function forgetStaffIdentity(): void {
+  invalidateApiReads('/api/staff/me')
   generation++
   identity = null
   for (const listener of listeners) listener()

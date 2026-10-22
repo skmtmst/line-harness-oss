@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BillingPlanView, BillingSummary } from '@/lib/hq-billing'
 import HqBillingPage from './page'
 
 const calls = vi.hoisted(() => ({ summary: vi.fn(), invoices: vi.fn(), checkout: vi.fn(), portal: vi.fn() }))
+const navigation = vi.hoisted(() => ({ checkout: '' }))
 const metrics = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api/helpers/hq-billing', () => ({ fetchHqBillingMetrics: metrics }))
 vi.mock('@/lib/api', async importOriginal => {
@@ -14,7 +15,7 @@ vi.mock('@/lib/api', async importOriginal => {
   const mocked = await (() => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))()
   return { ...actual, ...mocked }
 })
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/billing', useRouter: () => ({push: vi.fn()}) }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams({ checkout: navigation.checkout }), usePathname: () => '/hq/billing', useRouter: () => ({push: vi.fn()}) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
 
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole: () => 'owner'}))
@@ -33,6 +34,7 @@ const summary: BillingSummary = {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  navigation.checkout = ''
   /*
    * この環境の happy-dom は localStorage を用意しない（document と window は
    * 入る）。ほかの画面試験と同じく、Map 仕掛けの最小の器を当てる。
@@ -108,9 +110,19 @@ describe('課金プラン（36-2）', () => {
     expect(page).toContain('利用中')
   })
 
-  it('Checkout から戻ったら Webhook を待って読み直す', () => {
-    expect(page).toContain("params.get('checkout')")
-    expect(page).toContain('setTimeout(() => void load(), 4000)')
+  it('Checkout から戻ったら4秒待ち、保存済みの表示を使わずに読み直す', async () => {
+    vi.useFakeTimers()
+    navigation.checkout = 'success'
+    try {
+      render(createElement(HqBillingPage))
+      await act(async () => {})
+      expect(calls.summary).toHaveBeenCalledTimes(1)
+      await act(async () => { await vi.advanceTimersByTimeAsync(3999) })
+      expect(calls.summary).toHaveBeenCalledTimes(1)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(calls.summary).toHaveBeenCalledTimes(2)
+      expect(calls.summary).toHaveBeenLastCalledWith({ cache: 'reload' })
+    } finally { vi.useRealTimers() }
   })
 
   it('左下のアカウントメニューにプランの札と「課金プラン」が出る', () => {
