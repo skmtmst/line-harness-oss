@@ -67,7 +67,7 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { BASIC_FRIEND_FIELDS,type Folder,type FriendField,type Scenario,type Tag } from '@line-crm/shared';
 import { FriendsTabs } from '../shared/head';
-import { hasEditKey } from '../shared/nav';
+import { canEditFeature } from '@/lib/staff-capability'
 import { csvExportLine } from './csv-export';
 import { emptyMessageOf, hasAnyFilter } from './empty';
 import { prefixed } from './list-filter-options';
@@ -120,15 +120,9 @@ export default function FriendsListV8() {
   const marksEnabled = featureVisibility.enabled('support_marks')
   const savedSearchEnabled = featureVisibility.enabled('saved_searches')
   const staffRole = useStaffRole()
-  /*
-   * 変えられるか。役割はサーバの答え。担当者でも項目キーで任されていれば変えられる。
-   * 役割が読めるまでは今までどおり出す（最後の守りはサーバの 403）。
-   */
-  const [keys, setKeys] = useState({ friends: false, chats: false })
-  useEffect(() => { setKeys({ friends: hasEditKey('/friends'), chats: hasEditKey('/chats') }) }, [])
   const manager = canManageRole(staffRole)
-  const canEditFriends = manager || keys.friends
-  const canEditChats = manager || keys.chats
+  const canEditFriends = canEditFeature('/friends', staffRole)
+  const canEditChats = canEditFeature('/chats', staffRole)
   const readOnly = !canEditFriends && !canEditChats
   const canImport = manager
 
@@ -170,6 +164,7 @@ export default function FriendsListV8() {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [rowAction, setRowAction] = useState<{ friend: FriendListItem; action: FriendAction } | null>(null)
   const [notice, setNotice] = useState<Notice>(null)
+  const attentionSavingRef = useRef(new Map<string, object>())
   const loadRequestRef = useRef(0)
 
   useEffect(() => { setRowAction(null) }, [selectedAccountId])
@@ -208,10 +203,15 @@ export default function FriendsListV8() {
   const { value: friends, setValue: setFriends } = useListSnapshot<FriendListItem[]>(listScope, [])
   const { value: total, setValue: setTotal } = useListSnapshot(listScope, 0)
   const { value: loadStatus, setValue: setLoadStatus } = useListSnapshot<LoadStatus>(listScope, 'loading')
-  const { value: selectedIds, setValue: setSelectedIds } = useListSnapshot<Set<string>>(listScope, new Set())
+  const selectionScope = JSON.stringify([listScope, staffRole, canEditFriends, canEditChats])
+  const { value: selectedIds, setValue: setSelectedIds } = useListSnapshot<Set<string>>(selectionScope, new Set())
+  useEffect(() => { setBulkOpen(false); setSelectionFriends([]); setRowAction(null) }, [selectionScope])
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [setSelectedIds])
-  const loadContextRef = useRef({ accountId: selectedAccountId, scope: listScope })
-  loadContextRef.current = { accountId: selectedAccountId, scope: listScope }
+  const identity = useMemo(() => ({}), [selectionScope])
+  const loadContextRef = useRef({ accountId: selectedAccountId, scope: listScope, identity })
+  loadContextRef.current = { accountId: selectedAccountId, scope: listScope, identity }
+  const displayedFriendsRef = useRef(friends)
+  displayedFriendsRef.current = friends
   const hasRowsRef = useRef(false)
   hasRowsRef.current = loadStatus === 'ready'
 
@@ -405,6 +405,7 @@ export default function FriendsListV8() {
   }
 
   const loadFriends = useCallback(async () => {
+    if (loadContextRef.current.identity !== identity) return
     const requestId = ++loadRequestRef.current
     const requestedScope = listScope
     if (hasRowsRef.current) {
@@ -414,9 +415,9 @@ export default function FriendsListV8() {
       setFriends([])
       setTotal(0)
     }
-    if (!hasRowsRef.current) { setRefreshing(false); setBulkOpen(false); setSelectedIds(new Set()) }
+    if (!hasRowsRef.current) { setRefreshing(false); setBulkOpen(false) }
     const stale = () => {
-      return requestId !== loadRequestRef.current || loadContextRef.current.scope !== requestedScope
+      return requestId !== loadRequestRef.current || loadContextRef.current.scope !== requestedScope || loadContextRef.current.identity !== identity
     }
     try {
       const response = await api.friends.list({
@@ -440,6 +441,11 @@ export default function FriendsListV8() {
       })
       if (stale()) return
       if (response.success) {
+        // 一部のページだけでは、見えない行が対象から除かれたかは分からない。
+        if (response.data.items.length >= response.data.total) {
+          const returnedIds = new Set(response.data.items.map(friend => friend.id))
+          setSelectedIds(ids => new Set([...ids].filter(id => returnedIds.has(id))))
+        }
         setFriends(response.data.items)
         setTotal(response.data.total)
         setLoadStatus('ready')
@@ -449,6 +455,7 @@ export default function FriendsListV8() {
         setLoadStatus('error')
       }
       setRefreshing(false)
+      return response.success
     } catch {
       if (stale()) return
       setFriends([])
@@ -456,7 +463,8 @@ export default function FriendsListV8() {
       setLoadStatus('error')
       setRefreshing(false)
     }
-  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode, requestedFieldColumns, listScope, setFriends, setTotal, setLoadStatus, setSelectedIds])
+    return false
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode, requestedFieldColumns, listScope, identity, setFriends, setTotal, setLoadStatus, setSelectedIds])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => void loadMarks(), [loadMarks])
@@ -529,27 +537,51 @@ export default function FriendsListV8() {
    * ほかの変更と重なった（409）ときは、最新を読み直して知らせる。
    */
   const toggleAttention = useCallback(async (friend: FriendListItem) => {
+    const savingScope = listScope
+    const savingIdentity = identity
+    const savingKey = `${savingScope}:${friend.id}`
+    if (attentionSavingRef.current.get(savingKey) === savingIdentity) return
+    attentionSavingRef.current.set(savingKey, savingIdentity)
     const current = String(friend.metadata?.__attention ?? '') === '1'
     const apply = (on: boolean) => setFriends((rows) => rows.map((row) => (
       row.id === friend.id ? { ...row, metadata: { ...(row.metadata ?? {}), __attention: on ? '1' : null } } : row
     )))
     apply(!current)
     try {
-      await fetchApi<{ success: boolean; data: unknown }>(
+      const saved = await fetchApi<{ success: boolean; data: Pick<FriendListItem, 'metadata' | 'updatedAt'> }>(
         `/api/friends/${friend.id}/metadata?expectedUpdatedAt=${encodeURIComponent(friend.updatedAt)}`,
         { method: 'PUT', body: JSON.stringify({ __attention: current ? null : '1' }) },
       )
-      void loadFriends()
+      if (loadContextRef.current.identity !== savingIdentity) return
+      if (!saved.success || !saved.data?.updatedAt) throw new Error('保存後の状態を確認できませんでした')
+      // 保存前に始まった一覧の応答で、新しい版を上書きしない。
+      loadRequestRef.current += 1
+      setRefreshing(false)
+      setFriends(rows => rows.map(row => row.id === friend.id ? { ...row, ...saved.data } : row))
+      if (attentionOnly || advanced || audienceId) {
+        if (attentionOnly && current) {
+          setFriends(rows => rows.filter(row => row.id !== friend.id))
+          setTotal(count => Math.max(0, count - 1))
+          setSelectedIds(ids => new Set([...ids].filter(id => id !== friend.id)))
+        }
+        void loadFriends()
+      }
     } catch (error) {
+      if (loadContextRef.current.identity !== savingIdentity) return
       apply(current)
       if (error instanceof ApiError && error.status === 409) {
-        await loadFriends()
-        notifyToast('注目がほかの変更と重なりました。最新の状態を読み直したので、確かめてもう一度押してください。', { tone: 'error' })
+        const refreshed = await loadFriends()
+        if (loadContextRef.current.identity !== savingIdentity) return
+        notifyToast(refreshed
+          ? '注目がほかの変更と重なりました。最新の状態を読み直したので、確かめてもう一度押してください。'
+          : '注目がほかの変更と重なりました。最新の状態を読み込めませんでした。一覧をもう一度読み直してください。', { tone: 'error' })
       } else {
-        notifyToast('注目を変えられませんでした。', { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleAttentionRef.current(friend) } })
+        notifyToast('注目を変えられませんでした。', { tone: 'error', actionLabel: 'もう一度', onAction: () => { if (loadContextRef.current.identity === savingIdentity) { const latest = displayedFriendsRef.current.find(row => row.id === friend.id); if (latest) void toggleAttentionRef.current(latest) } } })
       }
+    } finally {
+      if (attentionSavingRef.current.get(savingKey) === savingIdentity) attentionSavingRef.current.delete(savingKey)
     }
-  }, [loadFriends, setFriends])
+  }, [loadFriends, setFriends, setTotal, setSelectedIds, listScope, identity, attentionOnly, advanced, audienceId])
   const toggleAttentionRef = useRef(toggleAttention)
   toggleAttentionRef.current = toggleAttention
 
@@ -984,7 +1016,7 @@ export default function FriendsListV8() {
             accountId={selectedAccountId}
             supportMarksEnabled={marksEnabled}
             onClose={() => setBulkOpen(false)}
-            onDone={() => void loadFriends()}
+            onDone={() => { clearSelection(); void loadFriends() }}
           />
           {rowAction ? (
             <Dialog open title={`${rowAction.friend.displayName}への操作`} onCancel={() => setRowAction(null)} footer={<Button onClick={() => setRowAction(null)}>閉じる</Button>}>
@@ -997,7 +1029,7 @@ export default function FriendsListV8() {
                 hideActions
                 friendTags={rowAction.friend.tags}
                 onFriendTagsChange={(next) => applyFriendTags(rowAction.friend.id, next)}
-                onDone={() => { setRowAction(null); void loadFriends() }}
+                onDone={() => { setSelectedIds(ids => new Set([...ids].filter(id => id !== rowAction.friend.id))); setRowAction(null); void loadFriends() }}
               />
             </Dialog>
           ) : null}
