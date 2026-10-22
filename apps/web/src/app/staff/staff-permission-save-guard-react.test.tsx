@@ -106,6 +106,33 @@ afterEach(() => {
 })
 
 describe('R497/R498 権限保存の画面', () => {
+  test.each(['ctrlKey', 'metaKey'])('%s で関連画面を別タブに開いても、元の下書きは閉じない', async (modifier) => {
+    await act(async () => { render(<StaffPage />) })
+    await act(async () => { fireEvent.click(await screen.findByRole('button', { name: /の中身を見る$/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^友だち：変えられる/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('link', { name: '→ 入った記録' }), { [modifier]: true }) })
+    expect(screen.getByRole('button', { name: /^友だち：変えられる/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+    expect(fixture.updated).toHaveLength(0)
+  })
+
+  test.each(['一覧へ戻る', 'つながる先'] as const)('見せる範囲の下書きは、%s前に確認し、編集を続ければ残る', async (destination) => {
+    const leave = () => fireEvent.click(destination === '一覧へ戻る'
+      ? screen.getByRole('button', { name: 'ログインユーザー', exact: true })
+      : screen.getByRole('link', { name: '→ 入った記録' }))
+    await act(async () => { render(<StaffPage />) })
+    await act(async () => { fireEvent.click(await screen.findByRole('button', { name: /の中身を見る$/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^友だち：変えられる/ })) })
+    await act(async () => { leave() })
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '編集を続ける' })) })
+    expect(screen.getByRole('button', { name: /^友だち：変えられる/ }).getAttribute('aria-pressed')).toBe('true')
+    await act(async () => { leave() })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' })) })
+    expect(await screen.findByRole('button', { name: /の中身を見る$/ })).toBeTruthy()
+    expect(fixture.updated).toHaveLength(0)
+  })
+
   test('表にない保存済み権限は残すと出る', async () => {
     await act(async () => { render(<StaffPage />) })
     await waitFor(() => {
