@@ -254,10 +254,11 @@
 :root .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }
 /* hQQlt：箱の中の小さな件数。通常のカード・数の帯は変えない。 */
 :root .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
-/* 白いカードの中の小さな数（絵 「今日の取り込み」）：題 11 の下に数 18/700。 */
+/* 箱の中の小さな数も、数字と単位の文字の役割を分ける。 */
 :root .card[data-kpi-presentation='inline'] .head { min-height: 0; }
 :root .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 11px; font-weight: 400; line-height: 16px; }
-:root .card[data-kpi-presentation='inline'] .number, :root .card[data-kpi-presentation='inline'] .unit { font-size: 18px; font-weight: 700; line-height: 26px; }
+:root .card[data-kpi-presentation='inline'] .number { font-size: 18px; font-weight: 600; line-height: 26px; }
+:root .card[data-kpi-presentation='inline'] .unit { font-size: var(--text-caption); font-weight: 400; }
 :root .card[data-kpi-presentation='inline'] .value { gap: 4px; }
 :root .card[data-kpi-presentation='inline'] .detail { display: none; }
 :root .valueDanger { color: var(--color-danger); }
@@ -280,6 +281,8 @@
 
 /* 数を押して内訳を開く口。数字と単位の配置は通常の数と同じ。 */
 .valueAction { min-height: 0; display: inline-flex; align-items: inherit; gap: inherit; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.valueAction:hover { background: var(--color-canvas-sunken); border-radius: var(--radius-control); }
+.valueAction:hover .number { text-decoration: underline; text-underline-offset: var(--space-2); }
 .valueAction:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; border-radius: var(--radius-control); }
 
 /* 小さい帯の「9.8 → 9.2 kg」のような幅の要る数は1段小さく（18）し、横の余白も詰めて切れないようにする（健康日記 ）。帯の指定より後に置く。 */

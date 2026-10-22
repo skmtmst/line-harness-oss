@@ -101,66 +101,6 @@
   color: var(--color-ink-faint);
 }
 
-/* 数の帯：4つのマス。見出しの右に「？」の補足。 */
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--card-edge);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-
-.kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding: 14px 16px;
-}
-
-.kpi + .kpi {
-  border-left: 1px solid var(--color-hairline);
-}
-
-.kpiLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.kpiLabel svg {
-  color: var(--color-ink-faint);
-}
-
-.kpiValue {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.25;
-  font-variant-numeric: tabular-nums;
-}
-
-.kpiUnit {
-  margin-left: 2px;
-  color: var(--color-ink-faint);
-  font-size: 12px;
-  font-weight: 400;
-}
-
-.kpiDetail {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
 /* 道具の段：検索・絞り込み・右に件数。 */
 .toolbar {
   display: flex;
@@ -703,18 +643,6 @@
 
 /* ===== 板が狭いとき（1100px 未満 ≒ 画面 1352px 未満） ===== */
 @container (max-width: 1099px) {
-  .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .kpi:nth-child(odd) {
-    border-left: 0;
-  }
-
-  .kpi:nth-child(n + 3) {
-    border-top: 1px solid var(--color-hairline);
-  }
-
   .comparePair,
   .duoCards {
     grid-template-columns: minmax(0, 1fr);
@@ -722,15 +650,6 @@
 }
 
 @container (max-width: 560px) {
-  .kpis {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .kpi + .kpi {
-    border-left: 0;
-    border-top: 1px solid var(--color-hairline);
-  }
-
   .searchWrap {
     width: 100%;
   }

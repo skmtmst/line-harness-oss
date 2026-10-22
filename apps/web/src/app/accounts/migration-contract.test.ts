@@ -220,7 +220,6 @@ describe("UID移行のカード間隔", () => {
   })
 
   it('対応表ありの中身も gap-4 でそろえ、mb-6（24px）を作らない', () => {
-    expect(PAGE).toContain('className={styles.kpis}')
     expect(CSS).toMatch(/\.section\s*\{[^}]*gap: 12px/s)
     expect(PAGE).not.toMatch(/className="[^"]*\bmb-6\b/)
   })
