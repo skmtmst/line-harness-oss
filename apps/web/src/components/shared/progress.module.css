@@ -153,4 +153,15 @@
 :root .fill,
 :root .indeterminate { border-radius: 3px; }
 
+.track[data-appearance='onboarding'] { flex-shrink: 0; width: var(--tpl-d23-ob-bar-w); height: var(--tpl-d23-ob-bar-h); border-radius: var(--tpl-d23-ob-bar-radius); background: var(--color-surface-pearl); }
+.track[data-appearance='onboarding'] .fill { background: var(--color-action); border-radius: var(--tpl-d23-ob-bar-radius); }
+.track[data-appearance='quota'] { display: block; width: 100%; height: var(--tpl-db-bar-h); border-radius: var(--tpl-db-bar-radius); }
+.track[data-appearance='quota'] .fill { border-radius: var(--tpl-db-bar-radius); }
+.track[data-tone='danger'] .fill { background: var(--color-danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fill, .fail { transition: none; }
+  .indeterminate, .spin { animation: none; }
+}
+
 }
