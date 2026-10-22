@@ -641,6 +641,7 @@
 
 ## 引き継ぎで加わった文書
 
+- [文字を見る試験18ファイルの判断案](qa/quality-source-test-decisions.md)
 - [account-new のコード案内](../apps/web/src/v8/account-new/README.md)
 - [accounts-detail のコード案内](../apps/web/src/v8/accounts-detail/README.md)
 - [affiliate-offer-new のコード案内](../apps/web/src/v8/affiliate-offer-new/README.md)
