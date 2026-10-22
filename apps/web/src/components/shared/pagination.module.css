@@ -137,7 +137,7 @@ button.item:disabled {
 html:root .current {
   border-color: var(--color-selection-border);
   background: var(--color-selection-bg);
-  color: var(--color-selection-border);  font-weight: 600; /* 薄い緑の地で細い字がかすれて見えた（2026-10-23）。状態の札なので太字 */
+  color: var(--color-selection-border);  font-weight: 600; /* 薄い緑の地で細い字がかすれて見えた。状態の札なので太字 */
 }
 :root span.item:not(.current) { outline-color: transparent; }
 :root .summary { font-family: var(--font-inter), Inter, system-ui, sans-serif; line-height: 20px; }

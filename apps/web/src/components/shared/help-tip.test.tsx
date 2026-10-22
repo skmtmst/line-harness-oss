@@ -73,7 +73,7 @@ describe('補足の「？」', () => {
     expect(more.getAttribute('href')).toBe('/manual#word')
   })
 
-  it('印は丸の中の「?」の図形で、読み上げは説明の名前のまま（文字の「?」は真ん中に来ないため 2026-10-23 に図形へ）', () => {
+  it('印は丸の中の「?」の図形で、読み上げは説明の名前のまま', () => {
     const { container } = render(<HelpTip label="人数の説明">送る相手の数。</HelpTip>)
     const button = container.querySelector('button')!
     expect(button.querySelector('svg[data-help-mark]')).not.toBeNull()
