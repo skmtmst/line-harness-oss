@@ -219,3 +219,31 @@ it.each(['infinite', 'paused'] as const)('無関係な%s演出を待たず、段
   await act(async () => finish.get(panel)!())
   expect(document.activeElement).toBe(name())
 })
+
+
+function InitialDialog() {
+  fields = useFormErrors()
+  fields.define('name', '名前', () => '入力してください')
+  return <div role="dialog"><button>閉じる</button><details><summary>入力</summary><input aria-label="名前" {...fields.bind('name')} /></details></div>
+}
+
+it.each(['pointerdown', 'keydown'] as const)('新しく開いた窓の最初の操作でも、実%s後は焦点を奪わない', async kind => {
+  render(<InitialDialog />)
+  act(() => { fields.submit() })
+  const control = screen.getByRole('button', { name: '閉じる' })
+  if (kind === 'pointerdown') fireEvent.pointerDown(control)
+  else fireEvent.keyDown(control, { key: 'Tab' })
+  act(() => control.focus())
+  await frame()
+  expect(document.activeElement).toBe(control)
+})
+
+it('開閉待ち中の新しい窓の自動初期focusでは取消さず、実終了で誤り欄へ移る', async () => {
+  render(<InitialDialog />)
+  const panel = details(); animate(panel)
+  act(() => fields.submit()); await frame()
+  act(() => screen.getByRole('button', { name: '閉じる' }).focus())
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: '閉じる' }))
+  await complete(panel)
+  expect(document.activeElement).toBe(name())
+})

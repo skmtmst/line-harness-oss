@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import { focusRevealedField } from './revealed-field-focus'
+import { focusRemainsExpected, focusRevealedField } from './revealed-field-focus'
 
 export type FormFieldProblem = {
   key: string
@@ -82,12 +82,23 @@ export function useFormErrors() {
   const focusAfterCommit = useRef(false)
   const focusGeneration = useRef(0)
   const pendingFocus = useRef<ReturnType<typeof focusRevealedField> | null>(null)
+  const queuedInteraction = useRef<(() => void) | null>(null)
   const cancelFocus = useCallback(() => {
     focusGeneration.current += 1
+    queuedInteraction.current?.()
+    queuedInteraction.current = null
     pendingFocus.current?.cancel()
     pendingFocus.current = null
   }, [])
   useLayoutEffect(() => cancelFocus, [cancelFocus])
+  const watchInteraction = () => {
+    document.addEventListener('pointerdown', cancelFocus, true)
+    document.addEventListener('keydown', cancelFocus, true)
+    queuedInteraction.current = () => {
+      document.removeEventListener('pointerdown', cancelFocus, true)
+      document.removeEventListener('keydown', cancelFocus, true)
+    }
+  }
   /** blur か送信で「見せてよい」になった欄 */
   const touchedRef = useRef(new Set<string>())
   /** 欄の定義（描画順＝まとめの並び順） */
@@ -228,6 +239,11 @@ export function useFormErrors() {
     return count
   }
 
+  const focusElement = (key: string) => {
+    const server = [...(serverTargets.current.get(key) ?? [])].find(node => node.isConnected)
+    return server ?? elsRef.current.get(key) ?? [...(registeredRef.current.get(key)?.keys() ?? [])].find(node => node.isConnected)
+  }
+
   /**
    * いま直してほしい欄のうち最初のものへ移る。隠れた所の欄は先に開き（reveal）、
    * 描き直しを待ってからスクロールしてフォーカスする。
@@ -238,20 +254,21 @@ export function useFormErrors() {
     const generation = focusGeneration.current
     for (const [key, def] of definitions()) {
       if (!problemOf(key)) continue
-      const registered = registeredRef.current.get(key)
       const target = [...(serverTargets.current.get(key) ?? [])].find((node) => node.isConnected)
-      const el = target ?? elsRef.current.get(key) ?? (registered ? [...registered.keys()].find((node) => node.isConnected) : undefined)
+      const el = focusElement(key)
       const resolve = () => {
         if (generation !== focusGeneration.current || !problemOf(key)) return null
-        const server = [...(serverTargets.current.get(key) ?? [])].find(node => node.isConnected)
-        return server ?? elsRef.current.get(key) ?? [...(registeredRef.current.get(key)?.keys() ?? [])].find(node => node.isConnected)
+        return focusElement(key)
       }
       const move = () => {
         if (generation !== focusGeneration.current) return
-        if (document.activeElement !== origin && document.activeElement !== document.body) return
+        if (!focusRemainsExpected(origin, resolve())) { cancelFocus(); return }
+        queuedInteraction.current?.()
+        queuedInteraction.current = null
         pendingFocus.current = focusRevealedField(resolve)
       }
       if (def.reveal && !target?.closest('[role="dialog"], [role="alertdialog"]')) {
+        watchInteraction()
         def.reveal()
         afterPaint(move)
         return
@@ -337,9 +354,11 @@ export function useFormErrors() {
     focusAfterCommit.current = false
     const generation = focusGeneration.current
     const origin = document.activeElement
+    watchInteraction()
     requestAnimationFrame(() => {
       if (generation !== focusGeneration.current) return
-      if (document.activeElement !== origin && document.activeElement !== document.body) return
+      const key = [...definitions().keys()].find(key => problemOf(key))
+      if (!focusRemainsExpected(origin, key ? focusElement(key) : null)) { cancelFocus(); return }
       focusFirst()
     })
   })

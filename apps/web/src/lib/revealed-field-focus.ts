@@ -7,11 +7,20 @@ function focusTarget(el: HTMLElement): HTMLElement {
   return el.querySelector<HTMLElement>(ENTRY) ?? el.querySelector<HTMLElement>(FOCUSABLE) ?? el
 }
 
+/** 新しく開いた対象窓の初期focusは、利用者が別欄を選んだ移動と分ける。 */
+export function focusRemainsExpected(origin: Element | null, el?: HTMLElement | null) {
+  const active = document.activeElement
+  if (active === origin || active === document.body) return true
+  const dialog = el?.closest('[role="dialog"], [role="alertdialog"]')
+  return !!dialog && !dialog.contains(origin) && dialog.querySelector(FOCUSABLE) === active
+}
+
 /**
  * 即時のfocusを優先する。開いた段がまだnative非表示で失敗した時だけ、
  * その段の実際の開閉完了を購読する。再試行時は現在の欄を取り直す。
  */
 export function focusRevealedField(resolve: () => HTMLElement | null | undefined) {
+  const origin = document.activeElement
   let active = true
   let ownFocus = false
   let current: HTMLElement | null = null
@@ -36,7 +45,7 @@ export function focusRevealedField(resolve: () => HTMLElement | null | undefined
     scope = undefined
     watched = []
   }
-  const onFocus = () => { if (!ownFocus) cancel() }
+  const onFocus = () => { if (!ownFocus && !focusRemainsExpected(origin, resolve())) cancel() }
   const listen = (document: Document) => {
     if (owner) return
     owner = document
