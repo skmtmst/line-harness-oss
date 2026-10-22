@@ -16,8 +16,13 @@ function useToolbarFit() {
     const toolbar = ref.current
     if (!toolbar || !window.ResizeObserver) return
     const measure = () => {
-      const leading = toolbar.querySelector<HTMLElement>('[data-toolbar-leading]')
-      toolbar.style.setProperty('--toolbar-leading-width', `${Math.ceil(leading?.getBoundingClientRect().width ?? 0)}px`)
+      // Only slot searches inside a frame consume this inherited width, even when nested.
+      const slotSearches = toolbar.querySelectorAll(`.${styles.slotTool}[data-toolbar-role="search"]`)
+      if (Array.from(slotSearches).some(slot => slot.closest(`.${styles.slots}`))) {
+        const leading = toolbar.querySelector<HTMLElement>('[data-toolbar-leading]')
+        const width = `${Math.ceil(leading?.getBoundingClientRect().width ?? 0)}px`
+        if (toolbar.style.getPropertyValue('--toolbar-leading-width') !== width) toolbar.style.setProperty('--toolbar-leading-width', width)
+      }
       if (toolbar.dataset.toolbarLayout?.includes('stacked')) {
         for (const row of toolbar.querySelectorAll<HTMLElement>('[data-toolbar-row]')) fitToolbarWrap(row)
       } else fitToolbarWrap(toolbar)
