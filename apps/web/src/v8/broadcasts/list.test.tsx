@@ -285,6 +285,17 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     expect(routerPush).toHaveBeenCalledWith('/broadcasts/new')
   })
 
+  it('配信を作るメニューは左のフォルダの列から左へはみ出さないよう、左端をそろえて開く（align=start）', async () => {
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    const create = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('配信を作る')) as HTMLButtonElement
+    act(() => { create.click() })
+    await flush()
+    const portal = document.querySelector('[data-menu-portal]')
+    expect(portal?.querySelector('[role="menu"][aria-label="配信の作り方"]'), '配信の作り方のメニューが開いていません').toBeTruthy()
+    expect(portal?.getAttribute('data-align')).toBe('start')
+  })
+
   it('loads the same inline form for template entry and keeps its cancel callback', async () => {
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()

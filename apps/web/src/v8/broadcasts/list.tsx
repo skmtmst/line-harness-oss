@@ -1154,6 +1154,7 @@ export default function BroadcastListV8() {
           open={createMenuOpen}
           onClose={() => setCreateMenuOpen(false)}
           anchorRef={createAnchorRef}
+          align="start"
           ariaLabel="配信の作り方"
           items={[
             /* 絵  の分け方：かんたんに送る（1画面・板 ）と詳しく作る（5つの手順 `/broadcasts/new`）。
