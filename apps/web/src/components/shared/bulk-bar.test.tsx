@@ -35,6 +35,11 @@ describe('一括バー（★管理画面 z97zZN §2）', () => {
     expect(container.textContent).toContain('3人を選択中')
   })
 
+  it.each(['人', '枚', '件'])('全件を選ぶ操作にも単位「%s」を使う', (unit) => {
+    const view = render(<BulkBar count={3} total={12} unit={unit} onSelectAll={() => {}} />)
+    expect(view.getByRole('button', { name: `12${unit}すべてを選ぶ` })).toBeTruthy()
+  })
+
   it('0件へ戻ると少し待ってから消える（下がって消える）', () => {
     vi.useFakeTimers()
     const { container, rerender } = render(<BulkBar count={2} />)

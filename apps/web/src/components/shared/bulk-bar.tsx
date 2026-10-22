@@ -103,7 +103,7 @@ export default function BulkBar({ count, unit = '件', hint, children, overflow,
         {count}
         {unit}を選択中
       </strong>
-      {total !== undefined && count < total && onSelectAll ? <Button size="compact" busy={selectingAll} busyLabel="対象を読み込んでいます…" onClick={() => void selectAll()}>{total}件すべてを選ぶ</Button> : null}
+      {total !== undefined && count < total && onSelectAll ? <Button size="compact" busy={selectingAll} busyLabel="対象を読み込んでいます…" onClick={() => void selectAll()}>{total}{unit}すべてを選ぶ</Button> : null}
       {selectError ? <span role="alert">{selectError}</span> : null}
       {hint ? <span className={styles.hint}>{hint}</span> : null}
       {children || overflow ? (

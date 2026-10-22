@@ -408,6 +408,9 @@ export default function AutoReplyRunsV8() {
     return list
   }
 
+  const filteredEmpty = filter !== 'all' || Boolean(search.trim() || dateFrom || dateTo) || period !== 'month'
+  const clearEmptyFilters = () => { setFilter('all'); setSearch(''); setPeriod('month'); setDateFrom(''); setDateTo(''); setPage(1) }
+
   return (
     <DetailPage
       boardId="nWmLg"
@@ -503,9 +506,9 @@ export default function AutoReplyRunsV8() {
         ) : error ? (
           <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : items.length === 0 ? (
-          <ListState kind="empty" title="実行結果はまだありません" description="自動応答が動くと、ここに結果が残ります。" />
+          <ListState kind="empty" emptyPreset={filteredEmpty ? 'filtered' : 'readonly'} title={filteredEmpty ? '条件に合う記録はありません' : '実行結果はまだありません'} description={filteredEmpty ? undefined : '自動応答が動くと、ここに結果が残ります。'} action={filteredEmpty ? <Button onClick={clearEmptyFilters}>条件を外す</Button> : undefined} />
         ) : visibleItems.length === 0 ? (
-          <ListState kind="empty" title="条件に合う記録はありません" description="絞り込みや検索の条件を変えてみてください。" />
+          <ListState kind="empty" emptyPreset="filtered" title="条件に合う記録はありません" action={<Button onClick={clearEmptyFilters}>条件を外す</Button>} />
         ) : (
           <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <thead>

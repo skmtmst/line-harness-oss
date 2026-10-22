@@ -387,7 +387,7 @@ export default function WebhooksInteractionsV8() {
       />
     )
   } else if (data.items.length === 0) {
-    listBody = <ListState kind="empty" title="条件に合うやり取りはありません" description="期間や絞り込みを変えて確認してください。" />
+    listBody = <ListState kind="empty" emptyPreset={search || direction !== 'all' || status !== 'all' || periodDays !== 30 ? 'filtered' : 'readonly'} title="条件に合うやり取りはありません" description="期間や絞り込みを変えて確認してください。" action={search || direction !== 'all' || status !== 'all' || periodDays !== 30 ? <Button onClick={() => { setSearch(''); setDirection('all'); setStatus('all'); setPeriodDays(30); setPage(1) }}>条件を外す</Button> : undefined} />
   } else {
     listBody = (
       <div className={styles.tableWrap}>

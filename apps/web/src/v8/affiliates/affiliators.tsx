@@ -549,7 +549,7 @@ export default function AffiliatorsTab() {
         </thead>
         <tbody>
           {pagedRows.map((row, saveFieldIndex) => (
-            <Tr key={row.id} data-table-layout="columns" data-row-id={row.id} detailKey="affiliate" onOpen={() => { setDrawerId(current => current === row.id ? null : row.id); setDrawerEdit(false) }}>
+            <Tr selected={selected.has(row.id)} key={row.id} data-table-layout="columns" data-row-id={row.id} detailKey="affiliate" onOpen={() => { setDrawerId(current => current === row.id ? null : row.id); setDrawerEdit(false) }}>
               <Td className={styles.colCheck}>
                 {readonly ? <UnavailableSelection label={`${row.name}を選ぶ`} /> : (
                   <SaveErrorField names={[`pagedRows.${saveFieldIndex}.id`,"id","row.id","checked"]}><Checkbox

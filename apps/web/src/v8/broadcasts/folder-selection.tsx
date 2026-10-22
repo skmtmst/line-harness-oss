@@ -20,6 +20,7 @@ export function useBroadcastFolderSelection({ accountId, canEdit, broadcasts, fo
     },
   })
   return {
+    isSelected: selection.isSelected,
     pageCheckbox: items.length ? selection.pageCheckbox : null,
     checkbox: (broadcast: ApiBroadcast) => items.some(item => item.id === broadcast.id)
       ? selection.checkbox({ ...broadcast, name: broadcast.title }) : null,

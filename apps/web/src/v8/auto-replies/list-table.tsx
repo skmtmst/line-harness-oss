@@ -157,6 +157,7 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
               return (
                 <Tr interactive
                   key={r.id}
+                    selected={selectedIds.has(r.id)}
                   data-reorder-id={r.id}
                   onDragEnter={() => liveOrder.enter(r.id)}
                   onDragOver={dragId ? (event) => event.preventDefault() : undefined}

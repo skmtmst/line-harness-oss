@@ -532,7 +532,7 @@ export default function EventsListV8() {
               const low = state === 'open' && isLowApplication(e)
               const when = whenText(e.next_slot_starts_at)
               return (
-                <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id} detailKey="event" onOpen={() => openDetail(e.id)}>
+                <Tr key={e.id} data-row-id={e.id} selected={folderMove.isSelected(e.id) || highlightedId === e.id} detailKey="event" onOpen={() => openDetail(e.id)}>
                   <NameCell selection={folderMove.checkbox(e)} name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
                           <RowNameLink

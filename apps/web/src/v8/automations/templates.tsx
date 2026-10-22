@@ -218,7 +218,7 @@ export default function AutomationTemplatesV8() {
         </div>
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}</ListPageSection>
         {visible.length === 0 ? (
-          <ListState kind="empty" title="条件に合う見本はありません" description="きっかけの札を外すと、すべて出ます。" />
+          <ListState kind="empty" emptyPreset={trigger ? 'filtered' : 'readonly'} title={trigger ? '条件に合う見本はありません' : '使える見本はまだありません'} description={trigger ? 'きっかけの札を外すと、すべて出ます。' : 'このアカウントで使える見本が登録されると、ここに表示されます。'} action={trigger ? <Button onClick={() => setTrigger('')}>条件を外す</Button> : undefined} />
         ) : (
           <section role="list" aria-label="見本"><ListPageCards columns={4}>
             {visible.map((item) => {

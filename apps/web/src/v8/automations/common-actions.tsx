@@ -341,7 +341,7 @@ export default function CommonActionsV8() {
                   ? `古い版 ${item.oldVersionBindingCount}`
                   : item.status === 'published' && item.draftVersion != null ? '下書きあり' : null
                 return (
-                  <Tr key={item.id} data-table-layout="columns" data-row-id={item.id} href={versionsHref(item.id)}>
+                  <Tr selected={folderMove.isSelected(item.id)} key={item.id} data-table-layout="columns" data-row-id={item.id} href={versionsHref(item.id)}>
                     <Td grow>
                       {/* 名前の前に分類先の色の丸。説明は名前の頭にそろえる。 */}
                       <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}

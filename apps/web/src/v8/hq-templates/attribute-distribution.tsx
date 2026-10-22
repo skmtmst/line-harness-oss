@@ -110,7 +110,7 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
       collapsedFolders={<SaveErrorField names={["filter"]}><Select aria-label="アカウントのフォルダ" value={filter} onChange={setFilter} options={folderRows.map((row) => ({ value: row.id, label: row.label }))} /></SaveErrorField>}
       toolbar={<><SaveErrorField names={["search"]}><input aria-label="アカウント名で探す" className={styles.input} value={search} onChange={(event) => setSearch(event.target.value)} /></SaveErrorField><span>{`選んだ ${selected.length} アカウント`}</span></>}>
       <DataTable><thead><TableHeadRow><Th>選択</Th><Th>アカウント</Th><Th>配布方法・結果</Th></TableHeadRow></thead><tbody>
-        {visible.map((account, saveFieldIndex) => <Tr key={account.id} data-row-id={account.id}>
+        {visible.map((account, saveFieldIndex) => <Tr selected={selected.includes(account.id)} key={account.id} data-row-id={account.id}>
           <Td><SaveErrorField names={[`visible.${saveFieldIndex}.id`,"id","account.id","selected"]}><Checkbox aria-label={account.name} disabled={busy || stage !== 'accounts'} checked={selected.includes(account.id)} onCheckedChange={(on) => setSelected((current) => on ? [...new Set([...current, account.id])] : current.filter((id) => id !== account.id))} /></SaveErrorField></Td>
           <Td><FolderDotName folder={folders.membership?.get(account.id)?.folder}>{account.name}</FolderDotName></Td>
           <Td>{stage === 'confirm' ? preflight?.stores.find((store) => store.accountId === account.id)?.items.map((item) => <div key={item.sourceId}>
