@@ -7,6 +7,9 @@ import { OptionalBadge } from './form-controls'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
+  as?: 'section' | 'article'
+  /** 情報とは別に下端へ寄せる操作。間隔はカードのgapだけが持つ。 */
+  actions?: ReactNode
   /** ring は寸法を取らない内側の1px線。手順の案内など、影を重ねない面。 */
   frame?: 'raised' | 'inset' | 'ring'
   layout?: 'block' | 'vertical' | 'horizontal' | 'media'
@@ -47,6 +50,8 @@ function hasSides(value: string): boolean {
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
 export default function Card({
   children,
+  as: CardTag = 'section',
+  actions,
   className,
   frame = 'raised',
   layout = 'block',
@@ -68,6 +73,7 @@ export default function Card({
   const gapValue = gapToken ? undefined : gap
   const classes = [
     styles.card,
+    actions ? styles.withActions : null,
     corner === 'segment' ? styles.segment : null,
     frame === 'inset' ? styles.inset : null,
     variant !== 'default' ? styles[variant] : null,
@@ -92,14 +98,14 @@ export default function Card({
     .join(' ')
 
   return (
-    <section ref={cardRef} className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
+    <CardTag ref={cardRef} className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
       data-card-frame={frame === 'ring' ? frame : undefined} data-card-selected={selected || undefined} data-card-padding={padding} data-card-variant={variant}
       data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
       data-card-spacing-sides={contentPadding && hasSides(contentPadding) ? '' : undefined}
       style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding ?? '0px', '--card-content-gap': gapValue ?? '0px' } as CSSProperties : style} {...props}>
-      {children}
-    </section>
+      {actions ? <><div className={styles.information}>{children}</div><div className={styles.bottomActions}>{actions}</div></> : children}
+    </CardTag>
   )
 }
 
