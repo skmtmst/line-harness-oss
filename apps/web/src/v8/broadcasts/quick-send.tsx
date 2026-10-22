@@ -1,5 +1,6 @@
 'use client'
 
+import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
@@ -199,6 +200,7 @@ export default function QuickSendV8({
         if (!current.success) throw new Error(current.error ?? '配信の状態を確認できませんでした')
         if (current.data.status === 'sent' || current.data.status === 'sending'
           || (attempt.needsApproval && current.data.approvalStatus === 'pending')) {
+          notifyToast(current.data.approvalStatus === 'pending' ? '配信の承認を頼みました' : current.data.status === 'sent' ? '配信を送りました' : '配信の送信を受け付けました')
           guard.disarm()
           onSent()
           onClose()
@@ -242,9 +244,13 @@ export default function QuickSendV8({
       if (attempt.needsApproval) {
         const requested = await api.broadcasts.approval.request(id, { approverStaffId: approverId })
         if (!requested.success) throw new Error(requested.error)
+        notifyToast('配信の承認を頼みました')
       } else if (!attempt.scheduledAt) {
         const sent = await api.broadcasts.send(id, needsCountConfirmation ? { confirmedRecipientCount: Number(countInput) } : undefined)
         if (!sent.success) throw new Error(sent.error)
+        notifyToast(sent.data?.status === 'sent' ? '配信を送りました' : '配信の送信を受け付けました')
+      } else {
+        notifyToast('配信を予約しました')
       }
       guard.disarm()
       onSent()

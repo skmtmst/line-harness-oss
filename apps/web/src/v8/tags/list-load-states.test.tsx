@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushListUrlState } from '@/components/shared/list-url-state'
 
+const mutations = vi.hoisted(() => ({ remove: vi.fn(), restore: vi.fn(), notify: vi.fn() }))
+vi.mock('@/components/shared/toast', () => ({ notifyToast: mutations.notify, notifySaved: mutations.notify }))
 const net = vi.hoisted(() => ({ tags: vi.fn(), groups: vi.fn(), marks: vi.fn(), searches: vi.fn() }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
@@ -11,8 +13,8 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
-    tags: { ...actual.api.tags, list: net.tags }, tagGroups: { ...actual.api.tagGroups, list: net.groups },
-    supportMarks: { ...actual.api.supportMarks, list: net.marks }, savedSearches: { ...actual.api.savedSearches, list: net.searches },
+    tags: { ...actual.api.tags, list: net.tags, restore: mutations.restore }, tagGroups: { ...actual.api.tagGroups, list: net.groups },
+    supportMarks: { ...actual.api.supportMarks, list: net.marks }, savedSearches: { ...actual.api.savedSearches, list: net.searches, delete: mutations.remove },
     listStats: { get: async () => ({ success: false }) },
     scenarios: { list: async () => ({ success: true, data: [] }) }, friendFields: { list: async () => ({ success: true, data: [] }) },
   } }
@@ -37,6 +39,7 @@ beforeEach(() => {
   flushListUrlState()
   window.history.replaceState(null, '', '/tags')
   for (const load of Object.values(net)) load.mockReset().mockResolvedValue(answer([]))
+  for (const operation of Object.values(mutations)) operation.mockReset().mockResolvedValue({ success: true, data: { version: 2 } })
   document.documentElement.dataset.theme = 'v8'
 })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
@@ -91,4 +94,29 @@ describe.each(variants)('$name の読込状態', variant => {
     expect(screen.queryByText('Bの遅い行')).toBeNull()
     expect(document.querySelector('tbody')?.textContent).toContain('Cの行')
   })
+})
+
+it('保存した検索の削除は確認後に実行し、対象名付きで知らせる', async () => {
+  const search = { ...variants[2].row, lineAccountId: 'A', canDelete: true }
+  net.searches.mockResolvedValueOnce(answer([search])).mockResolvedValue(answer([]))
+  render(<SearchesTab accountId="A" canEdit />)
+  const menu = await screen.findByRole('button', { name: '保存した検索「Aの保存した検索」の操作' })
+  fireEvent.click(menu)
+  fireEvent.click(await screen.findByRole('menuitem', { name: '削除する' }))
+  expect(mutations.remove).not.toHaveBeenCalled()
+  fireEvent.click(await screen.findByRole('button', { name: '削除する', exact: true }))
+  await waitFor(() => expect(mutations.notify).toHaveBeenCalledWith('保存した検索「Aの保存した検索」を削除しました'))
+  expect(mutations.remove).toHaveBeenCalledWith('search-a', 'A')
+})
+it('タグの復元も確認後に対象名付きで知らせる', async () => {
+  window.history.replaceState(null, '', '/tags?archived=1')
+  net.tags.mockResolvedValueOnce(answer([{ ...variants[0].row, status: 'archived', version: 1 }])).mockResolvedValue(answer([]))
+  render(<TagsTab accountId="A" canEdit narrow={false} csvOpen={false} onCsvClose={() => {}} />)
+  const menu = (await screen.findAllByRole('button', { name: 'タグ「Aのタグ」の操作' }))[0]
+  fireEvent.click(menu)
+  fireEvent.click(await screen.findByRole('menuitem', { name: '保管から戻す' }))
+  expect(mutations.restore).not.toHaveBeenCalled()
+  fireEvent.click(await screen.findByRole('button', { name: '保管から戻す', exact: true }))
+  await waitFor(() => expect(mutations.notify).toHaveBeenCalledWith('「Aのタグ」を保管から戻しました'))
+  expect(mutations.restore).toHaveBeenCalledWith('tag-a', 'A', 1)
 })
