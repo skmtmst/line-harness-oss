@@ -59,9 +59,11 @@ const state = {
   lineAccounts: [] as Array<{ id: string; name: string }>,
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {}
   return {
+    ...actual,
     ApiError,
     fetchApi: vi.fn(),
     api: {
@@ -119,4 +121,17 @@ describe('V8 ログインユーザーの入力確認', () => {
       expect(fixture.updateStaff).not.toHaveBeenCalled()
     } finally { HTMLElement.prototype.scrollIntoView = originalScroll }
   })
+})
+
+it('保存口が失敗を返したら成功扱いで閉じず、変更した入力を残す', async () => {
+  fixture.updateStaff.mockReset().mockResolvedValue({ success: false, error: '保存できませんでした' })
+  render(<StaffEditV8 />)
+  const name = await screen.findByRole('textbox', { name: /^名前/ }) as HTMLInputElement
+  expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+  fireEvent.change(name, { target: { value: '未保存の名前' } })
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await screen.findByText(/保存できませんでした/)
+  expect(fixture.updateStaff).toHaveBeenCalledOnce()
+  expect(name.value).toBe('未保存の名前')
+  expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
 })

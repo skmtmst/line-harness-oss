@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
+import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -128,7 +129,7 @@ function saveButton(el: HTMLDivElement): HTMLButtonElement {
 }
 
 function dialogButton(label: string): HTMLButtonElement {
-  const button = Array.from(document.body.querySelectorAll('button')).find((node) => node.textContent?.includes(label))
+  const button = Array.from(document.body.querySelectorAll('[role="dialog"] button, [role="alertdialog"] button')).find((node) => node.textContent?.includes(label))
   if (!button) throw new Error(`ダイアログの「${label}」が見つかりません`)
   return button as HTMLButtonElement
 }
@@ -136,6 +137,8 @@ function dialogButton(label: string): HTMLButtonElement {
 describe('つなぎ先の全外し確認(#517 軽7)', () => {
   it('G1: 全部入りで保存すると、確認を挟まずそのまま保存する', async () => {
     const el = await mountReady()
+    expect(el.querySelector('[data-shared-part="sticky-bar"]')).toBeNull()
+    await act(async () => { fireEvent.change(el.querySelector('input[placeholder="nen-store.myshopify.com"]')!, { target: { value: 'updated.example.com' } }) })
     await act(async () => { saveButton(el).click() })
     await act(async () => { await drainMicrotasks() })
     expect(mockUpdate).toHaveBeenCalledTimes(1)

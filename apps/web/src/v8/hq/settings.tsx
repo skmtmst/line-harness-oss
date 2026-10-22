@@ -1,7 +1,7 @@
 'use client'
 import { notifySaved } from '@/components/shared/toast'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useState, useRef, useImperativeHandle, type FormEvent } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -17,6 +17,8 @@ import styles from './settings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { PageFooter } from '@/components/templates/page-footer'
+import type { SettingsDraft, SettingsDraftProps } from './settings-draft'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
@@ -39,20 +41,39 @@ export default function HqSettingsV8() {
   /* 役割はサーバ（/api/staff/me）から読む。変えられるのはオーナーと管理者だけ。 */
   const role = useStaffRole()
   const canEdit = canManageRole(role)
+  const nameDraft = useRef<SettingsDraft>(null)
+  const contactDraft = useRef<SettingsDraft>(null)
+  const [nameDirty, setNameDirty] = useState(false)
+  const [contactDirty, setContactDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const saveAll = async () => {
+    if (!canEdit || savingRef.current) return
+    savingRef.current = true
+    setSaving(true)
+    try {
+      for (const draft of [nameDraft, contactDraft]) {
+        if (draft.current?.dirty && !await draft.current.save()) break
+      }
+    } finally { savingRef.current = false; setSaving(false) }
+  }
+
 
   return (
     <ListPage boardId="K7HYu" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderWidth={200} folderNav={settingsNav}>
+      <FormLeaveGuard dirty={canEdit && (nameDirty || contactDirty)} busy={saving} />
       <div className={styles.body}>
         {role && !canEdit ? <ReadOnlyNotice >閲覧のみで見ています。統括名の変更と会社・連絡先の登録は管理者だけができます。</ReadOnlyNotice> : null}
-        <TenantNameCard canEdit={canEdit} />
-        {canEdit ? <CompanyContactCard canEdit /> : null}
+        <TenantNameCard canEdit={canEdit} draftRef={nameDraft} onDirtyChange={setNameDirty} locked={saving} />
+        {canEdit ? <CompanyContactCard canEdit draftRef={contactDraft} onDirtyChange={setContactDirty} locked={saving} /> : null}
       </div>
+      {canEdit && (nameDirty || contactDirty || saving) ? <PageFooter status="変更した項目を保存します" actions={<><Button disabled={saving} onClick={() => { nameDraft.current?.reset(); contactDraft.current?.reset() }}>キャンセル</Button><Button variant="primary" disabled={saving} busy={saving} onClick={() => void saveAll()}>保存する</Button></>} /> : null}
     </ListPage>
   )
 }
 
 /** 統括名のカード（共通の入力段・間12）。 */
-function TenantNameCard({ canEdit }: { canEdit: boolean }) {
+function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit: boolean } & SettingsDraftProps) {
   const saveErrors = useSaveFormErrors()
   const uid = useId()
   const [name, setName] = useState('')
@@ -61,13 +82,14 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [nameError, setNameError] = useState('')
-  const [saved, setSaved] = useState(false)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     void api.tenants.me()
       .then((response) => {
-        if (!cancelled && response.success) { setName(response.data.name ?? ''); setBaseline(response.data.name ?? '') }
+        if (!response.success) throw new Error(response.error)
+        if (!cancelled) { setName(response.data.name ?? ''); setBaseline(response.data.name ?? ''); setReady(true) }
       })
       .catch(() => {
         if (!cancelled) setError('統括名を読み込めませんでした。時間をおいてもう一度お試しください。')
@@ -80,15 +102,16 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
 
   const save = async (event?: FormEvent) => {
     event?.preventDefault()
+    if (!canEdit || loading || saving || !ready) return false
+    if (!dirty) return true
     const trimmed = name.trim()
-    setSaved(false)
     if (!trimmed || trimmed.length > 100) {
       setNameError(!trimmed ? '統括名を入力してください。' : '統括名は100文字以内で入力してください。')
       setError('')
       const input = document.getElementById(`${uid}-name`)
       input?.focus()
       input?.scrollIntoView?.({ block: 'center' })
-      return
+      return false
     }
     setNameError('')
     setSaving(true)
@@ -98,7 +121,8 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       if (!response.success) throw new Error(response.error)
       setName(response.data.name ?? trimmed)
       setBaseline(response.data.name ?? trimmed)
-      setSaved(true); notifySaved()
+      notifySaved('統括名を保存しました。')
+      return true
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
@@ -107,10 +131,16 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
         scope: 'hq',
       })) }
+      return false
     } finally {
       setSaving(false)
     }
   }
+
+  const dirty = ready && name.trim() !== baseline
+  const reset = () => { setName(baseline); setNameError(''); setError(''); saveErrors.reset() }
+  useImperativeHandle(draftRef, () => ({ dirty, save, reset }))
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
   if (!canEdit) {
     return (
@@ -127,13 +157,12 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
 
   return (
     <SaveErrorScope errors={saveErrors}><form onSubmit={save} className={styles.form}><Card variant="form" gap="normal">
-      <FormLeaveGuard dirty={name !== baseline} busy={saving} />
       <div className={styles.field}><Field label="統括名" htmlFor={`${uid}-name`}><SaveErrorField names={["name"]}><TextField
           id={`${uid}-name`}
           value={name}
           maxLength={100}
-          disabled={loading || saving}
-          onChange={(event) => { setName(event.target.value); setSaved(false); setNameError('') }}
+          disabled={loading || saving || locked || !ready}
+          onChange={(event) => { setName(event.target.value); setNameError('') }}
           invalid={Boolean(nameError)}
           aria-describedby={nameError ? `${uid}-name-error` : undefined}
           className={styles.full}
@@ -142,9 +171,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       <p className={styles.hint}>会社名やブランド名など、メンバーが見てわかる名前にします</p>
       {error ? <Notice tone="danger" >{error}</Notice> : null}
       {null}
-      <div className={styles.actions}>
-        <Button variant="primary" type="submit" disabled={loading || saving} busy={saving}>統括名を保存する</Button>
-      </div>
+
     </Card></form></SaveErrorScope>
   )
 }

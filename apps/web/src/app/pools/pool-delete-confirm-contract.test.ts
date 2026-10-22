@@ -60,7 +60,7 @@ describe('プールの削除確認', () => {
   })
 
   it('プール削除の窓が、止まる口と残る記録を読ませる', () => {
-    const jsx = dialog(PAGE, 1)
+    const jsx = dialog(PAGE, 0)
     expect(jsx, 'プール名を読ませていない').toContain('pool.name')
     expect(jsx, 'どのURLが止まるのか読ませていない').toContain('公開URL ${publicUrl} は使えなくなり')
     expect(jsx, '残るものを言っていない').toContain(
@@ -96,7 +96,7 @@ describe('プールからアカウントを外す確認', () => {
   })
 
   it('入れ直せる操作なので、取り消せない操作の赤は付けない', () => {
-    const jsx = dialog(PAGE, 2)
+    const jsx = dialog(PAGE, 1)
     expect(jsx, '入れ直せる操作まで赤くすると、本当に消える操作の赤が効かない')
       .not.toContain('destructive')
     expect(jsx).toContain('confirmLabel="外す"')

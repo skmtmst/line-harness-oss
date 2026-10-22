@@ -93,14 +93,19 @@ describe('★V8 機能設定の閲覧のみ', () => {
       fetchSpy.mockRestore()
     }
   })
-  it('オーナーにはスイッチ・まとめて・並びを変える・保存の帯がある', async () => {
+  it('オーナーは変更した時だけ保存の帯が現れ、元へ戻すと消える', async () => {
     fixture.role = 'owner'
     await act(async () => { root.render(<FeatureSettingsScreen />) })
     await flush()
     expect(host.querySelectorAll('input[type="checkbox"]').length).toBeGreaterThan(0)
     expect(buttonNames()).toContain('並びを変える')
     expect(buttonNames()).toContain('まとめて')
+    expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(false)
+    const checkbox = host.querySelector('input[type="checkbox"]')!
+    await act(async () => { fireEvent.click(checkbox) })
     expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(true)
+    await act(async () => { fireEvent.click(checkbox) })
+    expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(false)
     expect(host.textContent).not.toContain('閲覧のみで見ています')
   })
 

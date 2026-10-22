@@ -64,6 +64,7 @@ export default function FileScanScreen() {
     page,
     setPage,
     actionError,
+    setActionError,
     actionDone,
     releaseTarget,
     setReleaseTarget,
@@ -86,6 +87,7 @@ export default function FileScanScreen() {
     secretRef,
     setSecretRef,
     configBusy,
+    configDirty,
     configFields,
     stopExternal,
     setStopExternal,
@@ -226,7 +228,8 @@ export default function FileScanScreen() {
   const legacySecret = Boolean(config?.externalSecretRef && !/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(config.externalSecretRef))
 
   return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}
+        saveActions={canEdit && configOpen && (configDirty || configBusy) ? <><Button disabled={configBusy} onClick={() => { setProvider(config?.externalProvider ?? ''); setEndpoint(config?.externalEndpointUrl ?? ''); setSecretRef(config?.externalSecretRef ?? ''); setActionError(''); configFields.reset() }}>キャンセル</Button><Button variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">外の検査の設定を保存する</Button></> : undefined}>
         {SAFETY_NOTICE}
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
@@ -329,11 +332,7 @@ export default function FileScanScreen() {
             <Field label="鍵の名前" htmlFor="file-scan-secret-ref" requirement={configFields.requirement('externalSecretRef')} error={configFields.error('externalSecretRef')} note="FILE_SCAN_SECRET_ で始まる大文字・数字・下線、120文字以内。送り先と同じ組の名前を指定します。鍵の値は入力しません。">
               <SaveErrorField names={["externalSecretRef","secretRef","secret_ref"]}><TextField {...configFields.bind('externalSecretRef')} id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_SECRET_PRIMARY" /></SaveErrorField>
             </Field>
-            <div>
-              <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">
-                外の検査の設定を保存する
-              </Button>
-            </div>
+
           </div>
         ) : null}
       </Card>

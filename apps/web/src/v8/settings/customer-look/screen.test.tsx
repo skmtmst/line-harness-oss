@@ -28,10 +28,10 @@ test('REQ-F01 競合時は入力を残し、最新の版を読んでから保存
 })
 test('閲覧だけなら変更と保存を出さない',async()=>{mock.role='viewer';mock.get.mockResolvedValue({success:true,data:{look:DEFAULT_CUSTOMER_LOOK,version:3}});render(<CustomerLookScreen/>);await screen.findByText('見本：line');expect(screen.queryByRole('radio')).toBeNull();expect(screen.queryByRole('button',{name:'保存する'})).toBeNull()})
 
-test('未変更の理由を出し、変更後は理由を外して保存できる', async () => {
+test('未変更では帯を出さず、変更後は保存できる', async () => {
  mock.get.mockResolvedValue({success:true,data:{look:DEFAULT_CUSTOMER_LOOK,version:3}})
  render(<CustomerLookScreen/>); await screen.findByRole('radio',{name:/モダン/})
- for (const name of ['キャンセル','保存する']) expect(screen.getByRole('button',{name}).getAttribute('aria-description')).toBe('変更していません')
+ for (const name of ['キャンセル','保存する']) expect(screen.queryByRole('button',{name})).toBeNull()
  fireEvent.click(screen.getByRole('radio',{name:/モダン/}))
  const save = screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement
  expect(save.disabled).toBe(false); expect(save.hasAttribute('aria-description')).toBe(false)

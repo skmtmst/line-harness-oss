@@ -1,4 +1,5 @@
 'use client'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 
 import { orderPools } from './pool-order'
 export { orderPools } from './pool-order'
@@ -155,11 +156,11 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const publicUrl = `${apiBase}/pool/${pool.slug}`
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(pool.name)
+  const [savedName, setSavedName] = useState(pool.name)
   const [editVersion, setEditVersion] = useState(pool.updatedAt)
   const [editBusy, setEditBusy] = useState(false)
   const [editError, setEditError] = useState('')
   const [nameError, setNameError] = useState('')
-  const [discardOpen, setDiscardOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -175,17 +176,16 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const conflict = useSaveConflict<TrafficPool>({ contextKey: pool.id, fetchLatest, reload: async () => {
     try {
       const latest = await fetchLatest()
-      setEditName(latest.name); setEditVersion(latest.updatedAt); setEditError(''); conflict.clear()
+      setEditName(latest.name); setSavedName(latest.name); setEditVersion(latest.updatedAt); setEditError(''); conflict.clear()
     } catch { setEditError('最新のプールを読み込めませんでした。入力は残っています。もう一度お試しください。') }
   } })
 
   const closeEdit = () => {
     if (editBusy) return
-    if (editName !== pool.name) setDiscardOpen(true)
-    else setEditing(false)
+    setEditing(false)
   }
   const saveEdit = async () => {
-    if (!canManage || editBusy || conflict.conflict) return
+    if (!canManage || editBusy || conflict.conflict || editName.trim() === savedName.trim()) return
     if (!editName.trim()) { setNameError('名前を入力してください'); return }
     setEditBusy(true); setEditError('')
     try {
@@ -228,7 +228,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
               menuLabel="操作"
               open={menuOpen}
               onOpenChange={setMenuOpen}
-              items={[{ id: 'edit', label: '編集する', onSelect: () => { setMenuOpen(false); setEditName(pool.name); setEditVersion(pool.updatedAt); conflict.clear(); setEditError(''); setNameError(''); setEditing(true) } }, ...(!isMain ? [{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } } as const] : [])]}
+              items={[{ id: 'edit', label: '編集する', onSelect: () => { setMenuOpen(false); setEditName(pool.name); setSavedName(pool.name); setEditVersion(pool.updatedAt); conflict.clear(); setEditError(''); setNameError(''); setEditing(true) } }, ...(!isMain ? [{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } } as const] : [])]}
             />
           </div>
         ) : null} />
@@ -239,14 +239,13 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
       {copyError ? <Notice tone="danger" >{copyError}</Notice> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
 
-      <SaveErrorScope errors={saveErrors}><Dialog open={editing} title="プールを編集" designWidth={560} busy={editBusy} error={editError} onCancel={closeEdit} onConfirm={conflict.conflict ? undefined : () => void saveEdit()} confirmLabel="保存する">
+      <SaveErrorScope errors={saveErrors}><FormLeaveGuard dirty={editing && editName.trim() !== savedName.trim()} busy={editBusy} /><Dialog open={editing} title="プールを編集" designWidth={560} dirty={editName.trim() !== savedName.trim()} busy={editBusy} error={editError} onCancel={closeEdit} onConfirm={conflict.conflict || editName.trim() === savedName.trim() ? undefined : () => void saveEdit()} confirmLabel="保存する">
         {conflict.conflict && <SaveConflictBand title={saveConflictTitle(conflict.conflict.updatedAt, 'プール', pool.name)} description="ほかの人が先に保存しました。入力は残っています。" compareBusy={conflict.compareBusy} onCompare={() => void conflict.compare()} onReload={() => void conflict.reloadLatest()} />}
         <Field label="プール名" htmlFor={`pool-name-${pool.id}`} required error={nameError}>
           <SaveErrorField names={["name"]}><TextField id={`pool-name-${pool.id}`} value={editName} maxLength={100} onChange={(event) => { setEditName(event.target.value); setNameError('') }} /></SaveErrorField>
         </Field>
       </Dialog></SaveErrorScope>
       <SaveConflictCompareDialog open={conflict.compareOpen} busy={conflict.compareBusy} error={conflict.compareError} lines={conflict.latest ? (conflict.latest.name === editName ? [] : [{ text: `プール名：あなたの下書き「${editName}」／最新「${conflict.latest.name}」`, kind: 'change' }]) : null} onReload={() => void conflict.reloadLatest()} onCancel={conflict.closeCompare} />
-      <ConfirmDialog open={discardOpen} title="入力を破棄しますか？" description="変更したプール名は保存されません。" confirmLabel="破棄する" onConfirm={() => { setDiscardOpen(false); setEditing(false) }} onCancel={() => setDiscardOpen(false)} />
       <ConfirmDialog
         open={confirmOpen}
         title={`プール「${pool.name}」を削除しますか？`}

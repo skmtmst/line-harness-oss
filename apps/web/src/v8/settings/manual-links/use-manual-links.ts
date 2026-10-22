@@ -6,6 +6,7 @@ import { loadStaffIdentity, useStaffIdentity } from '@/lib/staff-role'
 import { canViewManualLinks } from '@/lib/manual-link-access'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { notifySaved } from '@/components/shared/toast'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { ApiError, api, type ManualLink } from '@/lib/api'
 import {
@@ -93,7 +94,8 @@ export function useManualLinks() {
     }
   }
 
-  const guard = useUnsavedGuard({ dirty: editingKey !== null && editingUrl !== (links.find((item) => item.key === editingKey)?.url ?? ''), busy: saving })
+  const dirty = editingKey !== null && editingUrl.trim() !== (links.find((item) => item.key === editingKey)?.url ?? '')
+  const guard = useUnsavedGuard({ dirty, busy: saving })
   const startEdit = (key: string) => guard.guarded(() => {
     if (!canEditTable(staff)) return
     const link = links.find((item) => item.key === key)
@@ -103,7 +105,7 @@ export function useManualLinks() {
   })
 
   const saveEdit = async () => {
-    if (!canEditTable(staff) || !editingKey || saving) return
+    if (!canEditTable(staff) || !editingKey || saving || !dirty) return
     const current = links.find((item) => item.key === editingKey)
     if (!current) return
     setSaving(true)
@@ -119,6 +121,7 @@ export function useManualLinks() {
       }
       setLinks((items) => items.map((item) => item.key === editingKey ? result.data : item))
       setEditingKey(null)
+      notifySaved('マニュアルの行き先を保存しました。')
     } catch (error) {
       // ほかの人が先に変えたときは編集中身を残し、最新を読み直す。
       if (error instanceof ApiError && error.status === 409) {
@@ -146,6 +149,7 @@ export function useManualLinks() {
 
   return {
     guard,
+    dirty,
     staff,
     rows,
     shown,

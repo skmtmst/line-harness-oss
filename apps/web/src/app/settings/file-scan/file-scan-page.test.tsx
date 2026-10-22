@@ -108,12 +108,14 @@ describe('ファイルの検査の設定画面', () => {
     externalSecretRef: 'FILE_SCAN_SECRET_PRIMARY', externalEnabled: true,
     externalTimeoutMs: 10000, maxBytesOverride: null, maxPixelsOverride: null, updatedAt: '2026-10-12T00:00:00Z',
   }
-  async function openConfig(config = externalConfig) {
+  async function openConfig(config = externalConfig, changed = true) {
     ready()
     mocks.getConfig.mockResolvedValue({ success: true, data: { config } })
     mocks.list.mockResolvedValue({ success: true, data: { items: [], total: 0 } })
     render(<FileScanSettingsPage />)
     fireEvent.click(await screen.findByRole('button', { name: '設定を編集' }))
+    expect(screen.queryByRole('button', { name: '外の検査の設定を保存する' })).toBeNull()
+    if (changed) fireEvent.change(screen.getByLabelText('提供元'), { target: { value: 'edited-scanner' } })
   }
   test.each(['externalProvider', 'externalEndpointUrl', 'externalSecretRef'])('400の%sの理由を該当欄へ出し、入力と編集を保つ', async key => {
     await openConfig()
