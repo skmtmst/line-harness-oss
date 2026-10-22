@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { measureMedian, judge, median, stubApi } from './speed-budget.mjs'
+import { measureMedian, judge, median, stubApi, targetExceedances, ONE_FRAME_MS } from './speed-budget.mjs'
 import { speedPolicy } from './speed-policy.mjs'
 import { assertStressTargets } from './stress-targets.mjs'
 import { speedReport } from './speed-report.mjs'
@@ -53,7 +53,7 @@ test('CI実測84ms・63msは補正後に通るが、2倍は全時間指標で落
   assert.equal(ci.timeFactor, 1.3)
   assert.equal(ci.sampleCount, 5)
   assert.deepEqual(judge([{ ...sample, pressMs: 84 }], { inbox: base }, ci), [])
-  assert.ok(judge([{ ...sample, pressMs: 84 }], { inbox: base }, speedPolicy('local')).length)
+  assert.ok(judge([{ ...sample, pressMs: 85 }], { inbox: base }, speedPolicy('local')).length)
   assert.equal(assertStressTargets({ complete: true, measured: [stress] }, ci), stress)
   assert.throws(() => assertStressTargets({ complete: true, measured: [stress] }), /上限\s*50ms/)
   for (const metric of ['showMs', 'lcpMs', 'pressMs', 'longTaskMs']) {
@@ -66,12 +66,27 @@ test('CI実測84ms・63msは補正後に通るが、2倍は全時間指標で落
 
 test('補正の境界を守り、JS量とlongtaskの検出境界を時間倍率と混同しない', () => {
   const ci = speedPolicy('ci')
-  assert.deepEqual(judge([{ ...sample, pressMs: 104 }], { inbox: base }, ci), [])
-  assert.equal(judge([{ ...sample, pressMs: 105 }], { inbox: base }, ci).length, 1)
+  assert.deepEqual(judge([{ ...sample, pressMs: 109 }], { inbox: base }, ci), [])
+  assert.equal(judge([{ ...sample, pressMs: 110 }], { inbox: base }, ci).length, 1)
   assert.equal(judge([{ ...sample, jsBytes: base.jsBytes + 1025 }], { inbox: base }, ci).length, 1)
   assert.deepEqual(judge([{ ...sample, longTaskMs: 63 }], { inbox: { ...base, longTaskMs: 0 } }, ci), [])
   assert.equal(judge([{ ...sample, longTaskMs: 100 }], { inbox: { ...base, longTaskMs: 0 } }, ci).length, 1)
   assert.throws(() => speedPolicy('unlimited'), /未知/)
+})
+
+test('時間は20%か書き換え1回分（17ms）の大きい方まで許し、本当の悪化とほかの予算は落とす', () => {
+  const local = speedPolicy('local')
+  assert.equal(ONE_FRAME_MS, 17)
+  /* ① 基準67msに書き換え1回分の揺れが乗った83msは通る。 */
+  assert.deepEqual(judge([{ ...sample, pressMs: 83 }], { inbox: base }, local), [])
+  /* ② 基準の1.6倍を超える本当の悪化110msは落ちる。 */
+  assert.equal(judge([{ ...sample, pressMs: 110 }], { inbox: base }, local).length, 1)
+  /* ③ 時間でない予算は今までどおり。JSは1KBを超えたら落ちる。 */
+  assert.equal(judge([{ ...sample, jsBytes: base.jsBytes + 1025 }], { inbox: base }, local).length, 1)
+  assert.deepEqual(judge([{ ...sample, jsBytes: base.jsBytes + 1024 }], { inbox: base }, local), [])
+  /* 元の固定目標（反応100ms）の判定は変えない。 */
+  assert.equal(targetExceedances([{ ...sample, pressMs: 83 }], { pressMs: 100 }).length, 0)
+  assert.equal(targetExceedances([{ ...sample, pressMs: 110 }], { pressMs: 100 }).length, 1)
 })
 
 test('途中結果に速い2,000人があっても、未完了・エラー・欠測は合格にならない', () => {
