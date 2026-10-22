@@ -1,4 +1,5 @@
 'use client'
+import { notifySaved } from '@/components/shared/toast'
 
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 
@@ -15,7 +16,7 @@ import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conf
  * 均等・優先順・ランダム＋優先度・対象の人・今の未割り当てに当てる、は口の次の段。選べない形で並べ、準備中と書く。
  * 設定はオーナー・管理者だけ（開く入口を出さない）。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { InboxFirstResponseSettings } from '@line-crm/shared'
 import Drawer from '@/components/shared/drawer'
 import Button from '@/components/shared/button'
@@ -52,6 +53,8 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
   /** 保存したあと、一覧の札を取り直す。 */
   onSaved: (settings: InboxFirstResponseSettings) => void
 }) {
+  const contextRef = useRef({ accountId, open })
+  contextRef.current = { accountId, open }
   const saveErrors = useSaveFormErrors()
   const [settings, setSettings] = useState<InboxFirstResponseSettings | null>(null)
   const [draft, setDraft] = useState<InboxFirstResponseSettings | null>(null)
@@ -91,9 +94,12 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
         strategy: 'none', enabled: draft.enabled, firstResponseMinutes: minutes, businessHoursOnly: draft.businessHoursOnly,
         escalateTeamId: draft.escalateTeamId, expectedVersion: settings.version,
       })
+      if (contextRef.current.accountId !== accountId || !contextRef.current.open) return
+      notifySaved('「割り当てと返事の期限」を保存しました')
       onSaved(res.data)
       onClose()
     } catch (caught) {
+      if (contextRef.current.accountId !== accountId || !contextRef.current.open) return
       saveErrors.capture(caught)
       setError(isConflictResponse(caught)
         ? CONFLICT_TEXT.routing
