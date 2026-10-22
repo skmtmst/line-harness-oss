@@ -338,7 +338,7 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
     expect(routerPush).not.toHaveBeenCalled()
     expect(screen.getByRole('radio', { name: /条件に当てはまる友だちだけ/ })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /形と画像/ }))
+    fireEvent.click(screen.getByRole('button', { name: '形と画像に戻る' }))
     await flush()
     expect(screen.getByDisplayValue('メインメニュー改')).toBeTruthy()
   })

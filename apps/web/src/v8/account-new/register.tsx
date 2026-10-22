@@ -11,6 +11,7 @@ import {
 import { api, type FollowerImportState, type LineAccountConnectData, type LineRegistrationReceipt } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { StepContent } from '@/components/templates/steps'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
 import { Steps } from '@/components/templates/steps'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
@@ -540,6 +541,7 @@ function AccountRegistrationForm() {
         steps={(
           <Steps
             label="登録の進捗"
+            summaries={{ '1': '事前確認済み', '2': 'LINEの接続設定を確認済み', '3': form.name.trim(), '4': templateKey ? ({ standard: '基本の使い方', ec: 'EC・通販', salon: 'サロン', restaurant: '飲食店', school: '教室' } as Record<string, string>)[templateKey] ?? '使い方を設定済み' : '' }}
             /* v07はアカウントを③で作るので、作ったあとも⑤へ飛ばさない。 */
             currentKey={String(currentStep)}
             steps={V8_STEPS.map((step) => ({
@@ -554,7 +556,7 @@ function AccountRegistrationForm() {
         )}
       />
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
-        <div ref={stepPanelRef} tabIndex={-1} className={styles.stepBody}>
+        <div ref={stepPanelRef} tabIndex={-1}><StepContent step={currentStep * 10 + sub} className={styles.stepBody}>
           {currentStep === 1 && (
             <Step1Precheck
               badge={badge}
@@ -692,7 +694,7 @@ function AccountRegistrationForm() {
           ) : error ? (
             <Notice tone="danger" message={error} onClose={() => setError('')} />
           ) : null}
-        </div>
+        </StepContent></div>
         <StickyBar presentation="account-registration" actions={currentStep === 5 ? (
             <Button href="/hq" variant="primary"><ArrowLeft size={15} aria-hidden="true" />統括コンソールへ戻る</Button>
           ) : currentStep === 3 && sub === 1 && !rowsOk ? <>

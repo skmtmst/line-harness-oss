@@ -4,9 +4,11 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import PreviewLauncher from './preview-launcher'
 import styles from './page-templates.module.css'
+import { StepContent } from './steps'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export interface CreatePageProps extends PageHeadingProps {
+  step?: number | null
   readOnly?: boolean
   /** 本文の入力をネイティブfieldsetでまとめて無効にする。 */
   contentDisabled?: boolean
@@ -54,8 +56,8 @@ export interface CreatePageProps extends PageHeadingProps {
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, busy, boardId, elementRef, standalone, heightMode, children, preview, previewLabel, previewTitle, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
-  const Content = contentDisabled === undefined ? 'div' : 'fieldset'
+export function CreatePage({ step = null, readOnly, contentDisabled, contentLabel, dirty, busy, boardId, elementRef, standalone, heightMode, children, preview, previewLabel, previewTitle, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+  const Content = StepContent
   const aside = typeof preview === 'function' ? preview(false) : preview
   const dialogPreview = typeof preview === 'function' ? preview(true) : preview
   return <PageFrame kind="create" boardId={boardId} elementRef={elementRef} standalone={standalone} heightMode={heightMode ?? (footerActions ? 'viewport' : 'content')} hasFooter={!!footerActions}>
@@ -66,7 +68,7 @@ export function CreatePage({ readOnly, contentDisabled, contentLabel, dirty, bus
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
     {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher label={previewLabel} title={previewTitle}>{dialogPreview}</PreviewLauncher>}</div> : null}
     <div className={styles.split} data-template-region="body">
-      <Content className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing} disabled={contentDisabled} aria-label={contentDisabled === undefined ? undefined : contentLabel ?? '入力内容'}>{children}</Content>
+      <Content step={step} as={contentDisabled === undefined ? 'div' : 'fieldset'} className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing} disabled={contentDisabled} aria-label={contentDisabled === undefined ? undefined : contentLabel ?? '入力内容'}>{children}</Content>
       {preview ? <aside aria-label={previewLabel} className={styles.preview} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{aside}</div></aside> : null}
     </div>
     {footerActions ? <div className={styles.footer} data-template-region="footer" data-footer-placement={footerPlacement}><StickyBar actions={footerActions} outlined={footerOutlined} destructive={destructive} status={status} /></div> : null}

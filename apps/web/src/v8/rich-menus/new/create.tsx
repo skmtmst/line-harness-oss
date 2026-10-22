@@ -1176,7 +1176,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   return (
     <SaveErrorScope errors={saveErrors}><fieldset disabled={busy} className="contents">
-    <CreatePage dirty={false} readOnly={!host && !canOperate} boardId={
+    <CreatePage step={stepIndex} dirty={false} readOnly={!host && !canOperate} boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
       } headingSize="large" title={<>リッチメニューを作る</>} help={<>{headNote}{conditionHelp ? <p>{conditionHelp}</p> : null}</>} notice={conflict ? (
@@ -1191,7 +1191,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onReload={acceptLatestAndContinue}
             />
           </div>
-        ) : null} noticeSpacing="band" identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={(inDialog) => renderRail(inDialog)} previewCompactWhenNarrow footerActions={
+        ) : null} noticeSpacing="band" identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} readOnly={!host && !canOperate} summaries={{ shape: `${name}・${tabCount}タブ`, buttons: `${pages.reduce((total, page) => total + page.areas.length, 0)}個のボタン`, audience: audience === 'all' ? '全員' : '条件に合う友だち' }} />}  preview={(inDialog) => renderRail(inDialog)} previewCompactWhenNarrow footerActions={
           !host && !canOperate ? <Button href="/rich-menus">一覧へ戻る</Button> : host ? (
             <>
               <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>
