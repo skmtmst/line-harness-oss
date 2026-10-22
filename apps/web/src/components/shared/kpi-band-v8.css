@@ -59,6 +59,7 @@ html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][da
 }
 
 /* 帯の数は絵どおり 22px（--tpl- の変数で1か所管理）。 */
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-value],
 :root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
   font-size: var(--tpl-band-number-size);
   line-height: var(--tpl-band-number-lh);
@@ -72,11 +73,12 @@ html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][da
   padding: 10px 16px;
   gap: 4px;
 }
+:root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-value],
 :root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] {
   font-size: var(--tpl-band-compact-number-size);
   line-height: var(--tpl-band-compact-number-lh);
 }
-:root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] + span {
+:root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-unit] {
   font-size: var(--text-micro);
 }
 

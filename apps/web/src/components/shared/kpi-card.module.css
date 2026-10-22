@@ -10,6 +10,40 @@
   display: none;
 }
 
+:root .number.rollingValue {
+  position: relative;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  vertical-align: bottom;
+}
+
+.rollingValue[data-kpi-rolling] > .actualValue { opacity: 0; }
+.rollingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  white-space: pre;
+  pointer-events: none;
+}
+.digitWindow { height: 1lh; overflow: hidden; }
+.digitColumn {
+  display: flex;
+  flex-direction: column;
+  /* 撮影などでanimationだけを無効にしても最終の数字を出す。 */
+  transform: translateY(calc(-200% / 3));
+  animation: kpi-digit-roll var(--motion-kpi-roll) var(--motion-ease-out) both;
+}
+.digitColumn > span { height: 1lh; }
+@keyframes kpi-digit-roll {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(-200% / 3)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rollingValue[data-kpi-rolling] > .actualValue { opacity: 1; }
+  .rollingOverlay { display: none; }
+  .digitColumn { animation: none; }
+}
+
 .head {
   position: relative;
   display: flex;

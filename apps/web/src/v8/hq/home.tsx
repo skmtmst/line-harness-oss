@@ -1,5 +1,7 @@
 'use client'
 
+import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
+import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
@@ -602,6 +604,7 @@ export default function HqHomeV8() {
   )
 
   return (
+    <KpiValueMotionProvider scope={`hq-accounts:${jstDate().slice(0, 7)}`}>
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
@@ -685,5 +688,6 @@ export default function HqHomeV8() {
         />
       ) : null}
     </ListPage></SaveErrorScope>
+    </KpiValueMotionProvider>
   )
 }
