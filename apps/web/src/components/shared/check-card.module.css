@@ -180,3 +180,6 @@ html:root .invalid { outline-color: var(--color-danger); }
 html:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; }
 /* 箱は行の高さ（24）の中で下へ落ちないよう、包みの中で塊として置く（印と箱の位置をそろえる）。 */
 html:root .box { display: block; }
+
+/* 箱と説明のかたまりを、カードの高さの中央にそろえる。 */
+html:root .card { align-items: center; }

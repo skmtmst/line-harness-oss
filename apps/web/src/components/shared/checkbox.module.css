@@ -19,6 +19,8 @@
 .root {
   display: inline-flex;
   flex-direction: column; /* gap: 4 */
+  vertical-align: top;
+  line-height: 0;
 }
 
 .root[data-disabled='true'] {
@@ -132,11 +134,13 @@
 }
 
 .description {
+  line-height: var(--text-caption--line-height, 1.5);
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: 12px; /* fontSize: 12 */
 }
 
 .error {
+  line-height: var(--text-caption--line-height, 1.5);
   color: var(--color-status-danger); /* fill: $status-danger */
   font-size: 12px; /* fontSize: 12 */
 }
@@ -190,3 +194,9 @@
 html:root .control, html:root .input { width: var(--choice-size); height: var(--choice-size); }
 /*  の差し戻し：16px のチェックは絵の四角（角4）へ。 */
 html:root .box { border-radius: var(--choice-checkbox-radius); }
+
+/* 設定の包みも文字の基準線から切り離す。 */
+.setting { display: inline-flex; vertical-align: top; line-height: 0; }
+
+/* チェックを直接置くセルでは、文字だけの行の高さに箱を引き上げさせない。 */
+:global(html:root) :is(:global(th), :global(td)):has(> .root.root) { line-height: var(--choice-size); }
