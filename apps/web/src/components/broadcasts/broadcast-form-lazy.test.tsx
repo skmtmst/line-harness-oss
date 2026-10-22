@@ -105,10 +105,21 @@ it('does not mount a late retry after unmount and reopens using recovered code o
   await render(Lazy)
   await waitFor(() => expect(host.querySelector('[data-list-state="error"]')).toBeTruthy())
   let resolve!: (value: { default: typeof Form }) => void
-  vi.doMock('./broadcast-form', () => new Promise(done => { resolve = done }))
+  let releaseImport!: () => void
+  const importScheduled = new Promise<void>(done => { releaseImport = done })
+  const retryImportStarted = vi.fn()
+  vi.doMock('./broadcast-form', async () => {
+    await importScheduled
+    retryImportStarted()
+    return new Promise(done => { resolve = done })
+  })
   await act(async () => { button('もう一度読み込む').click() })
+  releaseImport()
+  // Reactのact完了だけでは、非同期のmock import factory開始は保証されない。
+  await waitFor(() => expect(retryImportStarted).toHaveBeenCalledTimes(1))
   act(() => { root.render(<p>一覧へ戻った</p>) })
   await act(async () => { resolve({ default: Form }) })
+  expect(host.textContent).toBe('一覧へ戻った')
   expect(mounted).not.toHaveBeenCalled()
   await render(Lazy, props({ openTemplatePickerInitially: true }))
   await waitFor(() => expect(host.textContent).toContain('picker-open'))
