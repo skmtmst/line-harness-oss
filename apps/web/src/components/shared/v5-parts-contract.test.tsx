@@ -157,11 +157,11 @@ describe('部品のCSS境界', () => {
   })
 
   it('生の色・ローカル変数・Pencilに無い大文字化や字間を持たない', () => {
+    // 焦点の輪は control-feedback.test.mjs でボタン・ページ送り・数の操作・行の名前を実描画して確かめる。
     for (const name of ['button.module.css', 'pagination.module.css', 'kpi-card.module.css', 'table.module.css']) {
       const css = withoutComments(read(name))
       expect(css, `${name} に生の色がある`).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(css, `${name} がローカル変数を定義している`).not.toMatch(/^\s*--(?!tw-)[a-z-]+:/m)
-      expect(css, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)/)
     }
     expect(withoutComments(read('table.module.css'))).not.toMatch(/text-transform|letter-spacing/)
   })
