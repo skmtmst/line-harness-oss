@@ -147,12 +147,6 @@
 .attendDone { color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 600; white-space: nowrap; }
 
 /* 分析 */
-.metricGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--polish-space-field); }
-.metricCard { min-inline-size: 0; }
-.metricHead { display: flex; align-items: center; gap: var(--polish-space-row); color: var(--color-ink); font-size: var(--text-label); font-weight: 500; white-space: nowrap; }
-.metricValue { display: flex; align-items: baseline; gap: var(--polish-space-row); white-space: nowrap; }
-.metricValue strong { color: var(--color-ink); font-size: var(--text-title); font-weight: 700; }
-.metricValue span { color: var(--color-ink-secondary); font-size: var(--text-label); }
 .chartCard { min-inline-size: 0; }
 .sectionTitle { display: flex; align-items: center; gap: var(--polish-space-row); margin: var(--tpl-sd-text-margin); color: var(--color-ink); font-size: var(--text-callout); font-weight: 700; white-space: nowrap; }
 .pairChart { display: grid; grid-template-columns: var(--tpl-sd-time-col) minmax(0, 1fr); grid-template-rows: var(--tpl-sd-chart-h) auto; }
@@ -187,5 +181,4 @@
 /* 白い板が 1100 未満のときは右の列を畳む（決まり：右の欄は 1100 未満で畳む）。日付の段は折り返す。 */
 @container v8-page (max-width: 1099px) {
   .filters { flex-wrap: wrap; row-gap: var(--polish-space-row); }
-  .metricGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

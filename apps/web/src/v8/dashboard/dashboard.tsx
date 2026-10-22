@@ -1,4 +1,5 @@
 'use client'
+import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { dashboardPeriodLabel } from '@/components/dashboard/freshness'
 import { partialFailureLabels,partialFailuresWithoutCard } from '@/components/dashboard/partial-failure-labels'
 import ShipmentPanel from '@/components/dashboard/shipment-panel'
@@ -368,6 +369,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   ) : undefined
 
   return (
+    <KpiValueMotionProvider scope={d.selectedAccountId ? JSON.stringify([d.selectedAccountId, d.period, d.today]) : null}>
     <DashboardPage
       boardId="WQmep"
       headingSize="compact"
@@ -412,5 +414,6 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       {/* はじめの質問の窓（B-313）。`?setup=0〜|summary` かスタイル未選択の最初の訪問で開く。 */}
       {wizardStep !== null && setup.data && d.selectedAccountId && canManage ? <StyleSetupWizard accountId={d.selectedAccountId} state={setup.data.state} initialStep={wizardStep} onClose={closeWizard} /> : null}
     </DashboardPage>
+    </KpiValueMotionProvider>
   )
 }
