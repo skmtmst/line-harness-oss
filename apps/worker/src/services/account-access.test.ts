@@ -7,6 +7,7 @@ import {
   canAccessLineAccount,
   filterVisibleLineAccounts,
   getVisibleLineAccountScope,
+  restrictVisibleLineAccountScope,
   validateAccountHierarchy,
 } from './account-access.js';
 
@@ -233,6 +234,37 @@ describe('getVisibleLineAccountScope の同一要求メモ化(#633)', () => {
     expect(second).toEqual(first);
     expect(viaAccess).toBe(true);
     expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(1);
+  });
+
+  it('機能の範囲を狭めた後も、同じ要求の可視範囲を再読取せず広げない', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    staffRows.set('s', { account_scope: 'accounts' });
+    scopeIds.set('s', ['parent', 'child']);
+    await getVisibleLineAccountScope(db, member);
+    const narrowed = restrictVisibleLineAccountScope(db, member, ['child', 'grandchild', 'tenant-b-account']);
+    expect(narrowed).not.toBe(member);
+    await expect(getVisibleLineAccountScope(db, narrowed)).resolves.toMatchObject({
+      ids: ['child'], allowedAccountIds: ['child'], canSeeUnassigned: false, isAccountScoped: true,
+    });
+    expect(await canAccessAllLineAccounts(db, narrowed, ['parent'])).toBe(false);
+    expect(await canAccessAllLineAccounts(db, narrowed, [null])).toBe(false);
+    const again = restrictVisibleLineAccountScope(db, narrowed, ['parent', 'child']);
+    expect((await getVisibleLineAccountScope(db, again)).ids).toEqual(['child']);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(1);
+    expect((await getVisibleLineAccountScope(db, member)).ids).toEqual(['parent', 'child']);
+  });
+
+  it('絞り込み後も別DB・別要求・範囲の変更では読み直す', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    await getVisibleLineAccountScope(db, member);
+    const narrowed = restrictVisibleLineAccountScope(db, member, ['child']);
+    await getVisibleLineAccountScope({} as D1Database, narrowed);
+    await getVisibleLineAccountScope(db, { ...narrowed });
+    narrowed.featureEnabledLineAccountIds = ['parent'];
+    expect((await getVisibleLineAccountScope(db, narrowed)).ids).toEqual(['parent']);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(4);
   });
 
   it('同時に投げた解決は1回の読取に束ねる', async () => {
