@@ -159,6 +159,8 @@ describe('Uber Eats のアプリトークン', () => {
   });
 
   it('429のあと冷却中は再送せず、冷却後に1回だけ回復する', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW_MS);
     const d1 = database();
     const { fetcher, calls } = fetchSequence([
       Response.json({ error: 'rate_limited', detail: 'provider-body-must-not-escape' }, { status: 429 }),

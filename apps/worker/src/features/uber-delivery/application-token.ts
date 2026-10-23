@@ -9,7 +9,13 @@ import {
   type UberTokenSet,
 } from '../../services/uber-eats.js';
 
-const REQUIRED_SCOPES = ['eats.order', 'eats.store.orders.read'] as const;
+const ORDER_SCOPES = ['eats.order', 'eats.store.orders.read'] as const;
+const STORE_SCOPES = ['eats.store'] as const;
+type ApplicationTokenPurpose = 'orders' | 'store';
+
+function requiredScopes(purpose: ApplicationTokenPurpose | undefined): readonly string[] {
+  return purpose === 'store' ? STORE_SCOPES : ORDER_SCOPES;
+}
 const CACHE_PREFIX = 'uber-application-token:v1:';
 const REFRESH_LOCK_PREFIX = 'uber-application-token-refresh:v1:';
 const FAILURE_LOCK_PREFIX = 'uber-application-token-failure:v1:';
@@ -72,6 +78,7 @@ async function sha256Hex(value: string): Promise<string> {
 async function cacheIdentity(input: {
   client: Pick<UberOAuthClient, 'clientId' | 'clientSecret' | 'hosts'>;
   encryptionKey: string;
+  scopes: readonly string[];
 }): Promise<string> {
   const material = JSON.stringify({
     version: 1,
@@ -79,7 +86,7 @@ async function cacheIdentity(input: {
     clientId: input.client.clientId,
     clientSecret: input.client.clientSecret,
     encryptionKey: input.encryptionKey,
-    scopes: [...REQUIRED_SCOPES].sort(),
+    scopes: [...input.scopes].sort(),
   });
   return sha256Hex(material);
 }
@@ -89,6 +96,7 @@ async function readCachedToken(input: {
   cacheId: string;
   encryptionKey: string;
   nowMs: number;
+  scopes: readonly string[];
 }): Promise<UberTokenSet | null> {
   const row = await input.db
     .prepare(
@@ -102,7 +110,7 @@ async function readCachedToken(input: {
   if (!row || !isUsable(row, input.nowMs)) return null;
   const scope = scopeList(row.granted_scope);
   try {
-    assertGrantedScopes(scope, REQUIRED_SCOPES);
+    assertGrantedScopes(scope, input.scopes);
   } catch {
     return null;
   }
@@ -209,7 +217,7 @@ async function retainFailureCooldownAndRelease(input: {
   ]);
 }
 
-function validateTokenPayload(payload: unknown): ValidTokenResponse {
+function validateTokenPayload(payload: unknown, scopes: readonly string[]): ValidTokenResponse {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw invalidResponseError();
   }
@@ -226,7 +234,7 @@ function validateTokenPayload(payload: unknown): ValidTokenResponse {
     throw invalidResponseError();
   }
   const scope = scopeList(record.scope);
-  assertGrantedScopes(scope, REQUIRED_SCOPES);
+  assertGrantedScopes(scope, scopes);
   return { accessToken, expiresInSeconds, scope };
 }
 
@@ -234,6 +242,7 @@ async function requestApplicationToken(input: {
   client: Pick<UberOAuthClient, 'clientId' | 'clientSecret' | 'hosts'>;
   fetcher: FetchLike;
   nowMs: number;
+  scopes: readonly string[];
 }): Promise<UberTokenSet> {
   const observed: { token?: ValidTokenResponse } = {};
   const boundedFetch: FetchLike = async (url, init) => {
@@ -249,7 +258,7 @@ async function requestApplicationToken(input: {
       } catch {
         throw invalidResponseError();
       }
-      observed.token = validateTokenPayload(payload);
+      observed.token = validateTokenPayload(payload, input.scopes);
     }
     return response;
   };
@@ -259,7 +268,7 @@ async function requestApplicationToken(input: {
     token = await fetchApplicationToken({
       client: input.client,
       fetch: boundedFetch,
-      scopes: REQUIRED_SCOPES,
+      scopes: input.scopes,
       nowMs: input.nowMs,
     });
   } catch (error) {
@@ -275,7 +284,7 @@ async function requestApplicationToken(input: {
   }
   const validated = observed.token;
   if (!validated) throw invalidResponseError();
-  assertGrantedScopes(token.scope, REQUIRED_SCOPES);
+  assertGrantedScopes(token.scope, input.scopes);
   if (
     token.accessToken !== validated.accessToken ||
     token.expiresAtMs !== input.nowMs + validated.expiresInSeconds * 1000 ||
@@ -339,7 +348,7 @@ async function persistTokenIfOwner(input: {
 }
 
 /**
- * 注文の受け取りに使うアプリ単位のトークンを、安全に使い回す。
+ * 連携済み店舗の操作に使うアプリ単位のトークンを、用途別に安全に使い回す。
  * 呼び出しごとの状態はD1へ置き、Workerのモジュール全体には保持しない。
  */
 export async function getUberApplicationToken(input: {
@@ -348,20 +357,23 @@ export async function getUberApplicationToken(input: {
   encryptionKey: string | undefined;
   fetcher: FetchLike;
   nowMs?: number;
+  /** Store reconciliation needs eats.store; order ingestion remains the default cache/scope. */
+  purpose?: ApplicationTokenPurpose;
 }): Promise<UberTokenSet> {
   const nowMs = input.nowMs ?? Date.now();
   const wallClockStartedAtMs = Date.now();
   const elapsedNowMs = () => nowMs + Math.max(0, Date.now() - wallClockStartedAtMs);
+  const scopes = requiredScopes(input.purpose);
 
   // 鍵が無い・形式が違う場合は、外部へ秘密値を送る前に既存の暗号処理で止める。
   await encryptCredential('uber_application_token_key_check', input.encryptionKey);
   const encryptionKey = input.encryptionKey!.trim();
-  const identity = await cacheIdentity({ client: input.client, encryptionKey });
+  const identity = await cacheIdentity({ client: input.client, encryptionKey, scopes });
   const cacheId = `${CACHE_PREFIX}${identity}`;
   const refreshKey = `${REFRESH_LOCK_PREFIX}${identity}`;
   const failureKey = `${FAILURE_LOCK_PREFIX}${identity}`;
 
-  const cached = await readCachedToken({ db: input.db, cacheId, encryptionKey, nowMs });
+  const cached = await readCachedToken({ db: input.db, cacheId, encryptionKey, nowMs, scopes });
   if (cached) return cached;
   if (await activeFailureCooldown(input.db, failureKey, nowMs)) {
     throw fixedError('uber_application_token_cooldown');
@@ -374,7 +386,7 @@ export async function getUberApplicationToken(input: {
   let tokenRequestStarted = false;
   try {
     // 排他を取る前に別の実行主体が保存している場合は、その値を使う。
-    const afterLock = await readCachedToken({ db: input.db, cacheId, encryptionKey, nowMs: elapsedNowMs() });
+    const afterLock = await readCachedToken({ db: input.db, cacheId, encryptionKey, nowMs: elapsedNowMs(), scopes });
     if (afterLock) {
       await releaseRefreshLock(input.db, refreshKey, ownerToken);
       return afterLock;
@@ -389,6 +401,7 @@ export async function getUberApplicationToken(input: {
       client: input.client,
       fetcher: input.fetcher,
       nowMs,
+      scopes,
     });
     const encryptedToken = await encryptCredential(token.accessToken, encryptionKey);
     const persistenceNowMs = elapsedNowMs();

@@ -7,6 +7,7 @@ import { UberEatsError } from '../../services/uber-eats.js';
 import { getUberApplicationToken } from './application-token.js';
 import { getUberOrder } from './order-api.js';
 import { parseUberNotification, parseUberOrder, type UberNotification } from './order-payload.js';
+import { parseUberStoreLifecycleNotification, processUberStoreLifecycleNotification } from './store-lifecycle.js';
 import {
   UBER_STORE_ELIGIBILITY, UBER_STORE_JOINS, acquireWebhookLock, claimWebhookAttempt,
   existingUberOrder, finishWebhookEvent, hasUberCancellation, ingestUberCancellation, ingestUberOrder,
@@ -62,6 +63,27 @@ async function retainRetryDelay(db: D1Database, key: string, lease: UberWebhookL
 
 /** 呼び出し元が本文サイズとHMACを検査した後だけ使う、Uber標準通知の受け口。 */
 export async function handleUberWebhook(c: Context<Env>, raw: unknown, rawBody: string, nowSeconds: number): Promise<Response> {
+  const lifecycle = parseUberStoreLifecycleNotification(raw);
+  if (lifecycle.matched) {
+    if (!lifecycle.ok) return c.json({ success: false, error: lifecycle.error }, 400);
+    const client = uberOAuthClient(c.env);
+    if (!client) return c.json({ success: false, error: 'Integration is not configured' }, 503);
+    const result = await processUberStoreLifecycleNotification({
+      db: dbFor(c.env), notification: lifecycle.notification, rawBody,
+      expectedClientId: client.clientId,
+      hosts: client.hosts, fetcher: (url, init) => tracedFetch(url, init), nowMs: nowSeconds * 1000,
+      getAccessToken: async () => {
+        if (!deliverySendEnabled(c.env)) throw new UberEatsError('unavailable', 503);
+        return (await getUberApplicationToken({
+          db: dbFor(c.env), client, encryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+          fetcher: (url, init) => tracedFetch(url, init), purpose: 'store', nowMs: nowSeconds * 1000,
+        })).accessToken;
+      },
+    });
+    return result.status === 200
+      ? c.body(null, 200)
+      : c.json({ success: false, error: result.error ?? 'Processing failed' }, result.status);
+  }
   const parsed = parseUberNotification(raw);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
   const notice = parsed.notification;
