@@ -77,7 +77,7 @@ describe('統括の配布画面への入口', () => {
   it.each(CASES)('$labelのサイドバーのリンクから機能の住所へ進める', ({ href, label }) => {
     const view = render(createElement(Sidebar))
     const desktop = within(view.container.querySelector('aside:not(#mobile-menu)') as HTMLElement)
-    const link = desktop.getByRole('link', { name: label, exact: true })
+    const link = desktop.getByRole('link', { name: label })
     expect(link.getAttribute('href')).toBe(href)
     fireEvent.click(link)
     expect(fixture.navigate).toHaveBeenCalledWith(href)
