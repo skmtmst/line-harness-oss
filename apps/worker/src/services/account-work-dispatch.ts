@@ -1,4 +1,5 @@
 import type { WorkerBindings } from '../worker-bindings.js';
+import { activeTenantLineAccountSql } from '@line-crm/db';
 import { withScheduledWorkLease, SCHEDULED_WORK_BUDGET_MS } from './scheduled-work-lease.js';
 import { ACCOUNT_WORK_TASKS, ACCOUNT_WORK_WINDOW_MS, type AccountWorkMessage } from './account-work-types.js';
 
@@ -40,14 +41,25 @@ export async function dispatchAccountWork(
     let accounts = 0;
     for (let page = 0; page < MAX_PAGES && clock() - started < SCHEDULED_WORK_BUDGET_MS; page++) {
       if (!await lease.renew()) throw new Error('account_work_dispatch_lease_lost');
-      const rows = await env.DB.prepare(
-        'SELECT id FROM line_accounts WHERE is_active = 1 AND id > ? ORDER BY id LIMIT ?',
-      ).bind(state.cursor, PAGE_SIZE).all<{ id: string }>();
+      const rows = await env.DB.prepare(`SELECT a.id,
+        a.id IN (SELECT b.line_account_id FROM broadcasts b WHERE b.status='sending'
+          AND b.line_account_id IS NOT NULL AND b.sent_at IS NULL AND b.stopped_at IS NULL) AS has_broadcast,
+        EXISTS(SELECT 1 FROM google_calendar_connections g
+          WHERE g.line_account_id=a.id AND g.is_active=1) AS has_calendar
+        FROM line_accounts a WHERE a.is_active=1 AND a.archived_at IS NULL AND a.id>?
+          AND ${activeTenantLineAccountSql('a.id')}
+        ORDER BY a.id LIMIT ?`)
+        .bind(state.cursor, PAGE_SIZE).all<{ id: string; has_broadcast: number; has_calendar: number }>();
       const ids = rows.results ?? [];
       // Each sendBatch is at most 100 messages and about 25 KB at the ID limit.
       for (const task of ACCOUNT_WORK_TASKS) {
         if (ids.length === 0) break;
-        await queue.sendBatch(ids.map(account => ({ body: {
+        // Check eligibility again next window. The consumer still revalidates
+        // state, so cancellation or suspension after selection remains safe.
+        const targets = ids.filter(account => task === 'broadcast' ? account.has_broadcast === 1
+          : task === 'calendar' ? account.has_calendar === 1 : true);
+        if (targets.length === 0) continue;
+        await queue.sendBatch(targets.map(account => ({ body: {
           kind: 'account_work', task, accountId: account.id,
           windowStartedAt: state.windowStartedAt, sequence: 0,
         } satisfies AccountWorkMessage })));
