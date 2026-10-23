@@ -150,6 +150,8 @@
 <a id="kpi-band"></a>
 ## kpi-band 数の帯
 
+- 数字は共通値の34px・500・行40、上下16。数値の範囲・使用数／上限・9桁以上の金額等がある帯は、共通KpiBandが2列へ分け、数字・単位を省略しない（2026-10-23の指定寸法を保つための共通側の対応）。
+
 - **役目**：数（KPI）を線で区切った1本の帯で並べる
 - **補足**：Gの最新版に従い、既定は文節で折り返す。`detailLayout="single"` は1行＋省略で全文を `title` に残し、`qualifier` は括弧の前で改行する。行き先は次の行。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
 - **持ち主（コード）**：`apps/web/src/components/shared/kpi-band.tsx`・`apps/web/src/components/shared/kpi-card.tsx`・`apps/web/src/components/shared/kpi-card.module.css`・`apps/web/src/components/shared/kpi-band-v8.css`・`apps/web/src/components/shared/list-kpis.tsx`（部品 `KpiBand`・`KpiCard`・`ListKpis`）
@@ -725,7 +727,7 @@
 ## customer-info 顧客情報の欄
 
 - **役目**：受信箱の右の欄と友だちの詳細の概要の左を同じ部品で（段ごとの見出し＋編集・決まった8つの欄・タグ・マイル…）
-- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`）。マイルの数・記録・再試行は`customer-info-mileage.tsx`・同CSS。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
+- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`・左右のスクロール余白をそろえる `CustomerInfoViewport`）。マイルの数・記録・再試行は`customer-info-mileage.tsx`・同CSS。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
 - **持ち主（Pen）**：`GBTyR`「顧客情報の欄（B-167）」
   - 2026-10-11確認：両画面の入口は別でも欄の持ち主は CustomerInfoPanel。取得・保存・権限は呼び出す側が渡す。
   - 部品の板の html に書き出されていない ID：`GBTyR`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
@@ -1154,8 +1156,8 @@
 
 ## 予約の状態・種類・現在時刻（2026-10-23）
 
-- 持ち主：`shared/booking-controls.tsx` の BookingBlock、`shared/booking-state.ts` と同CSS、`shared/booking-presentation.tsx`。札・一覧の状態・凡例は同じ面を使う。来店中は濃い緑と白字、確定は白と細線、終了は灰、承認待ち／仮押さえは白と点線、要対応は薄赤と赤い点線、注意は薄琥珀。状態は文字でも伝える。
-- 種類の色：BookingCategoryとReservationSourceは既存TagPillのTagColorDotを名前の前へ置く。丸は装飾、名前は文字。経路を札の地色へ混ぜない。BookingNowLineは濃い灰の線と時刻の札。
+- 持ち主：`shared/booking-controls.tsx` の BookingBlock、`shared/booking-state.ts` と同CSS、`shared/booking-presentation.tsx`。札・一覧の状態・凡例は同じ面を使う。来店中は濃い緑と白字、確定は白と細線、終了は灰。要対応（承認待ち）は赤の2px点線、期限付きの仮押さえは灰の点線、無断キャンセルは薄赤と赤の2px実線。予約の重なりの要対応は薄赤と赤い点線、注意は薄琥珀。状態は文字でも伝える。
+- 種類の色：BookingCategoryとReservationSourceは既存TagPillのTagColorDotを名前の前へ置く。丸は装飾、名前は文字。経路を札の地色へ混ぜない。BookingNowLineは中間の灰の線と、同じ灰に白字の時刻の札。
 - 使用先：ReservationBoard（時間×卓・一覧・月）、ReservationPeopleGrid、CalendarTimeEntries、スタイル別StaffBoard。月の日付の今日／選択と空き枠の操作は既存の口を保つ。
 - 短い札の高さは `shared/use-calendar-time-scale.ts` が時間軸全体の倍率で確保する。CalendarTimeEntriesは既定のカレンダー軸、StaffBoardは `board` の軸を使い、隣の予約へ札を伸ばさない。
 - 見張り：`booking-presentation.test.tsx` と既存の予約の移動・失敗・権限・印刷・日付選択の操作試験。絵との合否は司令塔が判定する。
