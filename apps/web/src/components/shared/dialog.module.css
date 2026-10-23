@@ -437,7 +437,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel { -webkit-font-smoothing: antialiased; }
 
 /* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
-:root .panel[data-design-layout='stacked'] { padding: 24px; gap: 14px; }
+:root .panel[data-design-layout='stacked'] { --dialog-stack-gap: 14px; padding: 24px; gap: var(--dialog-stack-gap); }
 :root .panel[data-design-layout='stacked'] > .headerRow { padding: 0; align-items: center; }
 :root .panel[data-design-layout='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
 :root .panel[data-design-layout='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
@@ -573,7 +573,7 @@ html:root .footer :is(button, a)[data-dialog-action='secondary']:focus-visible {
 
 /* 区切り線のある次の段までの余白は頭が持ち、説明の行数で変えない。 */
 html:root .panel:not([data-layout]):not([data-design-layout]) > .headerRow:has(.description):has(+ .steps),
-html:root .panel:not([data-layout]):not([data-design-layout]) > .headerRow:has(.description):has(+ .footer .actions:not([data-padding='none'])) {
+html:root .panel:not([data-confirmation='compact']):not([data-layout]):not([data-design-layout]) > .headerRow:has(.description):has(+ .footer .actions:not([data-padding='none'])) {
   padding-block-end: var(--polish-window-divider-space);
   height: auto;
   min-height: var(--dialog-design-header-height, 0px);
@@ -582,4 +582,12 @@ html:root .panel:not([data-layout]):not([data-design-layout]) > .headerRow:has(.
 /* 個別の左右・下の余白を保ち、線から操作までの上だけ共通化する。 */
 html:root .panel:not([data-layout]):not([data-design-layout]) > .footer > .actions:not([data-padding='none']) {
   padding-block-start: var(--polish-window-divider-space);
+}
+
+/* 短い確認は説明から操作までを一続きにし、間は操作側だけが持つ。 */
+html:root .panel[data-confirmation='compact']:not([data-layout]):not([data-design-layout]) > .headerRow {
+  padding-block-end: 0;
+}
+html:root .panel[data-confirmation='compact'][data-design-layout='stacked'] > .footer {
+  margin-block-start: calc(var(--polish-window-divider-space) - var(--dialog-stack-gap));
 }

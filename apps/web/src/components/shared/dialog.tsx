@@ -236,6 +236,7 @@ export default function Dialog({
       : primaryAction === 'cancel' ? () => cancelRef.current : undefined,
   )
   const layer = useOverlayLayer(open && modal)
+  const shortConfirmation = confirmation && !children && !steps
   const confirmationSizeClass = confirmation && compact
     ? tone === 'destructive'
       ? styles.destructiveConfirmation
@@ -287,7 +288,8 @@ export default function Dialog({
       data-description-band={descriptionBand}
       data-footer-align={footerAlign}
       data-design-footer-gap={designFooterGap !== undefined || undefined}
-      data-footer-divider={footerDivider ? undefined : 'none'}
+      data-confirmation={shortConfirmation ? 'compact' : undefined}
+      data-footer-divider={shortConfirmation || !footerDivider ? 'none' : undefined}
       data-footer-lead={footerLeadFlexible ? undefined : 'fixed'}
       data-design-width=""
       data-design-header-padding={designHeaderPadding ? '' : undefined}

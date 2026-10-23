@@ -15,15 +15,16 @@ const compiled = await build({
 import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
 import ReservationBoard from './src/components/shared/reservation-board';
 import Dialog from './src/components/shared/dialog';
+import ConfirmDialog from './src/components/shared/confirm-dialog';
 import Drawer from './src/components/shared/drawer';
 import Button from './src/components/shared/button';
 const statuses=['requested','confirmed','confirmed','no_show'];
 const entries=statuses.map((status,i)=>({id:String(i),kind:'seats',version:1,scopeId:'s',startsAt:'2026-09-03T09:00:00Z',endsAt:'2026-09-03T10:30:00Z',status,customerName:['承認を待つ予約','期限付きの仮押さえ','確定した予約','無断キャンセル'][i],guestCount:2,resourceIds:['t'+i],resourceLabel:'卓'+i,source:'phone',courseName:null,note:null,dining:null,holdExpiresAt:i===1?'2026-09-03T10:00:00Z':null}));
 function Fixture(){const [kind,setKind]=useState(''),[lines,setLines]=useState(1),[opened,setOpened]=useState('');const description=lines===1?'説明の文です。':<>説明の一行目です。<br/>説明の二行目です。</>;return <main>
 <ReservationBoard entries={entries} resources={entries.map(e=>({id:e.resourceIds[0],label:e.resourceLabel,active:true,capacity:2}))} dates={['2026-09-03']} onOpen={setOpened}/><output>{opened}</output>
-{['confirm','create','drawer','inset'].map(k=><button key={k} onClick={()=>setKind(k)}>{k}</button>)}
+{['confirm','send','cancel','stacked','long-confirm','create','drawer','inset'].map(k=><button key={k} onClick={()=>setKind(k)}>{k}</button>)}
 <button onClick={()=>setLines(lines===1?2:1)}>説明を切り替える</button>
-{kind==='drawer'?<Drawer open title="引き出しの題" description={description} onClose={()=>setKind('')} footer={<Button onClick={()=>setKind('')}>保存する</Button>}><p>本文</p></Drawer>:<Dialog open={!!kind} layout={kind==='inset'?'inset':undefined} title={kind==='create'?'作る窓の題':'確認の題'} description={description} steps={kind==='create'?<span>手順</span>:undefined} confirmation={kind==='confirm'} onCancel={()=>setKind('')} onConfirm={()=>setKind('')} confirmLabel="保存する">{kind==='create'?<input aria-label="名前"/>:null}</Dialog>}
+{['confirm','send','cancel','stacked'].includes(kind)?<ConfirmDialog open designLayout={kind==='stacked'?'stacked':undefined} title={kind==='confirm'?'削除しますか？':kind==='send'?'送信しますか？':'取り消しますか？'} description={description} destructive={kind==='confirm'} confirmLabel={kind==='confirm'?'削除する':kind==='send'?'送る':'取り消す'} onCancel={()=>setKind('')} onConfirm={()=>setKind('')}/>:kind==='drawer'?<Drawer open title="引き出しの題" description={description} onClose={()=>setKind('')} footer={<Button onClick={()=>setKind('')}>保存する</Button>}>{Array.from({length:40},(_,i)=><p key={i}>本文{i}</p>)}</Drawer>:<Dialog open={!!kind} layout={kind==='inset'?'inset':undefined} title={kind==='create'?'作る窓の題':'確認の題'} description={description} steps={kind==='create'?<span>手順</span>:undefined} confirmation={kind==='long-confirm'} onCancel={()=>setKind('')} onConfirm={()=>setKind('')} confirmLabel="保存する">{kind==='long-confirm'?<div>{Array.from({length:40},(_,i)=><div key={i}><input aria-label={'入力'+i}/></div>)}</div>:kind==='create'?<input aria-label="名前"/>:null}</Dialog>}
 </main>}createRoot(document.getElementById('root')).render(<Fixture/>);
 ` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
@@ -90,16 +91,16 @@ for (const width of [1152,1440]) test(`予約と窓の文字が切れず、状�
     assert.equal(metrics.legend.filter(x=>x.startsWith('要対応')).length,1)
     await page.getByRole('button',{name:/承認を待つ予約/}).click()
     assert.equal(await page.locator('output').textContent(),'0')
-    for (const kind of ['confirm','create','drawer','inset']) for (const lines of [1,2]) {
+    for (const kind of ['confirm','send','cancel','stacked','long-confirm','create','drawer','inset']) for (const lines of [1,2]) {
       await page.getByRole('button',{name:kind,exact:true}).click()
-      const panel=page.getByRole('dialog')
+      const panel=page.locator('[data-design-part="dialog"],[data-design-part="drawer"]')
       await panel.waitFor()
       const gap=await panel.evaluate(e=>{
         const desc=document.getElementById(e.getAttribute('aria-describedby')),header=desc.closest('header,[class*="headerRow"]')
-        const h=header.getBoundingClientRect(),d=desc.getBoundingClientRect()
-        return {gap:h.bottom-parseFloat(getComputedStyle(header).borderBottomWidth)-d.bottom,lineCount:d.height/parseFloat(getComputedStyle(desc).lineHeight)}
+        const h=(header??desc).getBoundingClientRect(),d=desc.getBoundingClientRect()
+        return {gap:h.bottom-(header?parseFloat(getComputedStyle(header).borderBottomWidth):0)-d.bottom,lineCount:d.height/parseFloat(getComputedStyle(desc).lineHeight)}
       })
-      assert.equal(gap.gap,kind==='inset'?0:24,`${kind} ${lines}行`)
+      assert.equal(gap.gap,['inset','confirm','send','cancel','stacked','long-confirm'].includes(kind)?0:24,`${kind} ${lines}行`)
       assert.equal(gap.lineCount,lines)
       const actionGap=await panel.evaluate(e=>{
         const actions=e.querySelector('[data-dialog-actions]')??e.querySelector('[data-window-actions]'),button=actions?.querySelector('button,a')
@@ -107,7 +108,30 @@ for (const width of [1152,1440]) test(`予約と窓の文字が切れず、状�
         const b=actions.getBoundingClientRect(),r=button.getBoundingClientRect()
         return r.top-b.top-parseFloat(getComputedStyle(actions).borderTopWidth)
       })
-      if(actionGap!==null)assert.equal(actionGap,24,`${kind} 線とボタンの間`)
+      if(actionGap!==null)assert.equal(actionGap,kind==='stacked'?0:24,`${kind} 操作の上余白`)
+      const footerMetrics=await panel.evaluate(e=>{
+        const a=e.querySelector('[data-dialog-actions]')??e.querySelector('[data-window-actions]'),b=a.querySelector('button,a').getBoundingClientRect(),d=document.getElementById(e.getAttribute('aria-describedby')).getBoundingClientRect(),p=e.getBoundingClientRect();
+        return {border:parseFloat(getComputedStyle(a).borderTopWidth),gap:b.top-d.bottom,bottom:p.bottom-b.bottom}
+      })
+      assert.equal(footerMetrics.border,['confirm','send','cancel','stacked'].includes(kind)?0:1,`${kind} 区切り線`)
+      if(['confirm','send','cancel','stacked'].includes(kind)){
+        assert.equal(footerMetrics.gap,24,'説明から操作まで24px')
+        assert.equal(footerMetrics.bottom,24,'操作の下余白は24pxのまま')
+        await panel.locator('[data-dialog-actions]').evaluate(e=>e.style.borderTop='1px solid black')
+        await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-dialog-actions]')).borderTopWidth==='1px')
+        const broken=await panel.locator('[data-dialog-actions]').evaluate(e=>parseFloat(getComputedStyle(e).borderTopWidth))
+        assert.throws(()=>assert.equal(broken,0),'線の復活を検出する')
+        await panel.locator('[data-dialog-actions]').evaluate(e=>e.style.removeProperty('border-top'))
+        await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-dialog-actions]')).borderTopWidth==='0px')
+        assert.equal(await panel.locator('[data-dialog-actions]').evaluate(e=>parseFloat(getComputedStyle(e).borderTopWidth)),0)
+      }
+      if(kind==='long-confirm'||kind==='drawer'){
+        const before=await panel.locator('[data-window-actions]').boundingBox()
+        const scrolled=await panel.locator(kind==='drawer'?'[class*="body"]':'[class*="content"]').first().evaluate(e=>{e.scrollTop=e.scrollHeight;return e.scrollTop})
+        assert.ok(scrolled>0,'長い中身は本文で送る')
+        const after=await panel.locator('[data-window-actions]').boundingBox()
+        assert.equal(after.y,before.y,'本文を送っても下の操作は動かない')
+      }
       if(process.env.LAYOUT_SHOTS){const fs=await import('node:fs');fs.mkdirSync(process.env.LAYOUT_SHOTS,{recursive:true});await panel.screenshot({path:`${process.env.LAYOUT_SHOTS}/${kind}-${lines}line-${width}-2x.png`})}
       await panel.getByRole('button',{name:'閉じる',exact:true}).click()
       await panel.waitFor({state:'hidden'})
