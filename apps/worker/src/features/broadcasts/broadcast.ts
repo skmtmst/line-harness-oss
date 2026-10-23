@@ -988,6 +988,10 @@ async function processQueuedBroadcastBatches(
   // 送信前に次の1分枠を予約。古い候補の並走・再配達・次Cronもこの時刻を守る。
   if (Number(raw.stealth_spread_minutes ?? 0)>0) await reserveBroadcastDispatchMinute(db, broadcast.id, budget.nowMs());
 
+  // ロック取得後に旧実行の未確定送信を閉じる。dedupも通常配信も再送しない。
+  await db.prepare(`UPDATE broadcast_send_claims SET state='unknown',error_code='interrupted_dispatch'
+    WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NOT NULL`).bind(broadcast.id).run();
+
   // 旧1通では初回の追跡結果を message_content へ保存する。複数通は画面が編集に使う
   // message_bubbles_json を上書きせず、各tickで変換する。autoTrackContent はURLと
   // アカウントが同じなら同じ追跡リンクを再利用するため、再開してもリンクは増えない。
@@ -1111,9 +1115,6 @@ async function processQueuedBroadcastBatches(
     await updateBroadcastStatus(db, broadcast.id, 'sent', { totalCount: 0, successCount: 0 });
     return;
   }
-  // 前の実行が外部呼出しの途中で失われた行は、送達不明として残す。
-  await db.prepare(`UPDATE broadcast_send_claims SET state='unknown',error_code='interrupted_dispatch'
-    WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NOT NULL`).bind(broadcast.id).run();
   // ブロック・非表示・アカウント変更は宛先の変更と別。送らずに結果を残す。
   await db.prepare(`UPDATE broadcast_send_claims SET state='failed',error_code='recipient_unavailable'
     WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NULL
