@@ -51,6 +51,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('Uber connection management route guards', () => {
   it('uses normal connect for an unmapped pending OAuth retry and reconnect only for mapped stores', () => {
     expect(uberOAuthModeForConnection({ status: 'pending_store', uber_store_id: null })).toBe('connect');
+    expect(uberOAuthModeForConnection({ status: 'disconnected', uber_store_id: 'uber-store-1' })).toBe('connect');
     expect(uberOAuthModeForConnection({ status: 'expired', uber_store_id: 'uber-store-1' })).toBe('reconnect');
   });
 

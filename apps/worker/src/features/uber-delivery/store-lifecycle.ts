@@ -1,6 +1,7 @@
 import { fetchPosData, UberEatsError, type FetchLike, type UberPosData } from '../../services/uber-eats.js';
 import type { UberHosts } from '../../services/uber-eats-hosts.js';
 import { acquireWebhookLock, releaseWebhookLock } from './webhook-ingestion.js';
+import { POS_DEACTIVATION_CONFIRMED } from './connection-management.js';
 import { appliedUberStoreLifecycleState } from './store-lifecycle-ordering.js';
 const STORE_EVENT_TYPES = new Set(['store.provisioned', 'store.deprovisioned']);
 const LIFECYCLE_LOCK_PREFIX = 'uber-store-lifecycle:';
@@ -349,14 +350,10 @@ export async function processUberStoreLifecycleNotification(input: {
       });
       if (!event || !sameEvent(event, connection, notice)) return { status: 503, error: 'Connection changed' };
     }
-    if (notice.eventType === 'store.provisioned' && connection.status === 'disconnected') {
-      if (!await finishWithoutConnection({ db: input.db, event, status: 'ignored',
-        code: 'store_lifecycle_stale', nowSeconds, lease: currentLease() })) return INTERRUPTED;
-      return { status: 200 };
-    }
     if (notice.eventType === 'store.provisioned'
       && (connection.last_error === 'pos_deactivation_started'
         || connection.last_error === 'pos_deactivation_unknown'
+        || connection.last_error === POS_DEACTIVATION_CONFIRMED
         || connection.last_error === 'pos_disconnect_reauthorization_pending')) {
       if (!await finishWithoutConnection({ db: input.db, event, status: 'ignored',
         code: 'pos_deactivation_unresolved', nowSeconds, lease: currentLease() })) return INTERRUPTED;
@@ -448,7 +445,10 @@ export async function processUberStoreLifecycleNotification(input: {
         nowMs,
         connectionSql: `UPDATE rt_delivery_uber_connections SET status = 'disconnected',
           access_token_enc = NULL, access_token_expires_at = NULL, granted_scope = NULL,
-          provisioned_at = NULL, disconnected_at = ?, last_error = NULL,
+          provisioned_at = NULL, disconnected_at = ?,
+          last_error = CASE WHEN last_error IN
+            ('pos_deactivation_started', 'pos_deactivation_unknown', '${POS_DEACTIVATION_CONFIRMED}')
+            THEN last_error ELSE NULL END,
           version = version + 1, updated_at = ?`,
         connectionBinds: [eventMs, nowMs],
         expectedStatus: 'disconnected',

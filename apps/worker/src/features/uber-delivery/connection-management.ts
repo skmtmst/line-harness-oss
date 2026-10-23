@@ -12,6 +12,7 @@ import { acquireWebhookLock, releaseWebhookLock } from './webhook-ingestion.js';
 
 export const POS_DEACTIVATION_STARTED = 'pos_deactivation_started';
 export const POS_DEACTIVATION_UNKNOWN = 'pos_deactivation_unknown';
+export const POS_DEACTIVATION_CONFIRMED = 'pos_deactivation_confirmed';
 export const POS_DISCONNECT_REAUTH_PENDING = 'pos_disconnect_reauthorization_pending';
 const PROVISION_REVIEW = 'store_provision_review_required';
 const MENU_REVIEW = 'store_menu_refresh_review_required';
@@ -216,7 +217,8 @@ async function disconnected(input: {
     ...input,
     checkedAtMs: input.nowMs,
     setSql: `status = 'disconnected', access_token_enc = NULL, access_token_expires_at = NULL,
-      granted_scope = NULL, provisioned_at = NULL, disconnected_at = ?, last_error = NULL,
+      granted_scope = NULL, provisioned_at = NULL, disconnected_at = ?,
+      last_error = '${POS_DEACTIVATION_CONFIRMED}',
       version = version + 1, updated_at = ?`,
     binds: [input.nowMs, input.nowMs],
   });

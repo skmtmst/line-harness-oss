@@ -5,6 +5,7 @@ import type { FetchLike, UberOAuthClient } from '../../services/uber-eats.js';
 import {
   checkUberConnection,
   disconnectUberConnection,
+  POS_DEACTIVATION_CONFIRMED,
   POS_DEACTIVATION_UNKNOWN,
   saveUberOAuthConnection,
 } from './connection-management.js';
@@ -192,15 +193,18 @@ describe('Uber connection management', () => {
 
   it('does not let a pre-disconnect OAuth callback revive the connection', async () => {
     database.raw.prepare(`UPDATE rt_delivery_uber_connections
-      SET status = 'disconnected', provisioned_at = NULL, disconnected_at = ?, version = 2
-      WHERE store_id = 'store-1'`).run(NOW + 1);
+      SET status = 'disconnected', provisioned_at = NULL, disconnected_at = ?,
+        last_error = ?, version = 2
+      WHERE store_id = 'store-1'`).run(NOW + 1, POS_DEACTIVATION_CONFIRMED);
     const stale = await saveUberOAuthConnection({
       db: database.db, storeId: 'store-1', accountId: 'account-1', tenantId: TENANT, mode: 'connect', staffId: 'owner-1',
       accessTokenEnc: 'encrypted', accessTokenExpiresAt: NOW + 10_000,
       grantedScope: 'eats.pos_provisioning', stateCreatedAt: NOW, expectedVersion: 1, nowMs: NOW + 2,
     });
     expect(stale).toBe(false);
-    expect(row()).toMatchObject({ status: 'disconnected', version: 2 });
+    expect(row()).toMatchObject({
+      status: 'disconnected', last_error: POS_DEACTIVATION_CONFIRMED, version: 2,
+    });
 
     const fresh = await saveUberOAuthConnection({
       db: database.db, storeId: 'store-1', accountId: 'account-1', tenantId: TENANT, mode: 'connect', staffId: 'owner-1',
@@ -208,7 +212,9 @@ describe('Uber connection management', () => {
       grantedScope: 'eats.pos_provisioning', stateCreatedAt: NOW + 2, expectedVersion: 2, nowMs: NOW + 3,
     });
     expect(fresh).toBe(true);
-    expect(row()).toMatchObject({ status: 'pending_store', disconnected_at: null, version: 3 });
+    expect(row()).toMatchObject({
+      status: 'pending_store', disconnected_at: null, last_error: null, version: 3,
+    });
   });
 
   it('does not save an OAuth token after store ownership changes', async () => {
@@ -299,7 +305,7 @@ describe('Uber connection management', () => {
     expect(result.ok).toBe(true);
     expect(claimedBeforeDelete).toBe(true);
     expect(row()).toMatchObject({ status: 'disconnected', access_token_enc: null, granted_scope: null,
-      provisioned_at: null, last_error: null, version: 3 });
+      provisioned_at: null, last_error: POS_DEACTIVATION_CONFIRMED, version: 3 });
     expect(api.calls.at(-1)).toMatchObject({ method: 'DELETE', authorization: 'Bearer merchant-token' });
   });
 

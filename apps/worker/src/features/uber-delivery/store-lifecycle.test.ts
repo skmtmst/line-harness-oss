@@ -254,6 +254,24 @@ describe('Uber store lifecycle processing', () => {
     expect(event()).toMatchObject({ status: 'processed', event_type: 'store.deprovisioned' });
   });
 
+  it.each([
+    ['pending_store', 'pos_deactivation_started', null],
+    ['pending_store', 'pos_deactivation_unknown', null],
+    ['disconnected', 'pos_deactivation_confirmed', NOW_MS - 60_000],
+  ])('preserves the %s / %s manual DELETE marker on deprovision',
+    async (status, lastError, disconnectedAt) => {
+      await seedConnection({ status, connectedAt: NOW_MS - 120_000, provisionedAt: null });
+      database.raw.prepare(`UPDATE rt_delivery_uber_connections
+        SET last_error = ?, disconnected_at = ? WHERE store_id = 'store-one'`)
+        .run(lastError, disconnectedAt);
+      await expect(process(payload('store.deprovisioned'))).resolves.toEqual({ status: 200 });
+
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(connection()).toMatchObject({
+        status: 'disconnected', last_error: lastError, version: 2,
+      });
+    });
+
   it('does not let an old deprovision event deactivate a newer reconnection', async () => {
     await seedConnection({
       status: 'connected',
@@ -303,6 +321,40 @@ describe('Uber store lifecycle processing', () => {
     expect(connection()).toMatchObject({ status: 'disconnected', disconnected_at: NOW_MS, version: 2 });
     expect(event('provision-old')).toMatchObject({ status: 'ignored', error_code: 'store_lifecycle_stale' });
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('restores a temporarily deprovisioned mapping after a newer verified provision', async () => {
+    await seedConnection({ status: 'connected', provisionedAt: NOW_MS - 120_000 });
+    await process(payload('store.deprovisioned', { eventId: 'temporary-deprovision' }));
+    await expect(process(payload('store.provisioned', {
+      eventId: 'new-provision', timestamp: NOW_SECONDS + 60,
+    }))).resolves.toEqual({ status: 200 });
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(connection()).toMatchObject({
+      status: 'connected', provisioned_at: NOW_MS + 60_000, disconnected_at: null,
+      last_error: null, version: 3,
+    });
+    expect(event('new-provision')).toMatchObject({ status: 'processed' });
+  });
+
+  it('does not revive a confirmed manual disconnect from a newer stale positive provision', async () => {
+    await seedConnection({ status: 'disconnected', provisionedAt: null, version: 3 });
+    database.raw.prepare(`UPDATE rt_delivery_uber_connections
+      SET disconnected_at = ?, last_error = 'pos_deactivation_confirmed'
+      WHERE store_id = 'store-one'`).run(NOW_MS);
+    await expect(process(payload('store.provisioned', {
+      eventId: 'stale-positive-provision', timestamp: NOW_SECONDS + 60,
+    }))).resolves.toEqual({ status: 200 });
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(connection()).toMatchObject({
+      status: 'disconnected', provisioned_at: null, disconnected_at: NOW_MS,
+      last_error: 'pos_deactivation_confirmed', version: 3,
+    });
+    expect(event('stale-positive-provision')).toMatchObject({
+      status: 'ignored', error_code: 'pos_deactivation_unresolved',
+    });
   });
 
   it('keeps a same-second old provision disconnected when current provider access is gone', async () => {
