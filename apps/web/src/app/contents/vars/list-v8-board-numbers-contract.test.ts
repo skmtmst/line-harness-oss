@@ -8,17 +8,8 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const css = readUiSource(join(SRC, 'v8/common-vars/list.module.css'), 'utf8')
 const tsx = readUiSource(join(SRC, 'v8/common-vars/list.tsx'), 'utf8')
 const tokens = readFileSync(join(SRC, 'app/globals.css'), 'utf8')
-const kpi = readFileSync(join(SRC, 'components/shared/kpi-card.module.css'), 'utf8')
 
 describe('V8共通情報の現役の型と数値', () => {
-  it('数の帯は共通の16/24・間8を使う', () => {
-    expect(tsx).toContain('presentation="band"')
-    expect(kpi).toContain('var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side)')
-    expect(tokens).toContain('--tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 24px; --tpl-band-cell-gap: 8px')
-  })
-  it('数字は共通の22と行高26を使う', () => {
-    expect(kpi).toContain('font-size: var(--tpl-band-number-size)')
-  })
   it('見出しと行は共通の高さ・行余白に従う', () => {
     expect(css).toContain('height: var(--tpl-cv-head-h)')
     expect(css).toContain('height: var(--tpl-cv-row-h)')

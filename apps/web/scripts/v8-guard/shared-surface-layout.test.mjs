@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { expect } from '@playwright/test'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { compileUiStyles } from './compile-ui-styles.mjs'
 import { measureControlCentering } from '../../../../scripts/visual-qa/control-centering.mjs'
@@ -159,7 +160,10 @@ for (const width of [1152,1440,1920]) {
         await page.getByRole('button',{name,exact:true}).click()
         const panel=page.locator('[aria-modal="true"]')
         await panel.waitFor()
-        const geometry=await panel.evaluate(el=>{
+        // 開いた直後の描画と遷移を終えてから、表示中の窓を測る。
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+        await panel.evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished)))
+        const measure=()=>panel.evaluate(el=>{
           const rect=el.getBoundingClientRect(),style=getComputedStyle(el)
           const heading=el.querySelector('h2').getBoundingClientRect()
           const controls=[...el.querySelectorAll('button')].map(button=>button.getBoundingClientRect())
@@ -170,15 +174,18 @@ for (const width of [1152,1440,1920]) {
             closeRound:parseFloat(closeStyle.borderRadius)>=Math.min(closeRect.width,closeRect.height)/2,
             controls:controls.every(b=>b.left>=rect.left&&b.right<=rect.right&&b.top>=rect.top&&b.bottom<=rect.bottom)}
         })
+        let geometry
+        await expect.poll(async()=>{geometry=await measure();return geometry.radius},{message:`${name}: 窓の角丸`}).toBe('16px')
         assert.equal(geometry.bounds,true,`${name}: ${JSON.stringify(geometry)}`)
         assert.equal(geometry.heading,true,name);assert.equal(geometry.controls,true,name)
-        assert.equal(geometry.radius,'16px');assert.equal(geometry.icon,32)
+        assert.equal(geometry.radius,'16px',`${name}: ${JSON.stringify(geometry)}`);assert.equal(geometry.icon,32)
         assert.ok(parseFloat(geometry.iconRadius)>=16);assert.equal(geometry.closeRound,true)
         assert.equal(geometry.background,'rgb(255, 255, 255)');assert.notEqual(geometry.shadow,'none')
         if(name!=='引き出し'){
           const cancel=panel.getByRole('button',{name:'キャンセル',exact:true});
           await page.keyboard.press('Tab');await cancel.focus();
           await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+          await cancel.evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished)))
           const focus=await cancel.evaluate(el=>({width:getComputedStyle(el).outlineWidth,color:getComputedStyle(el).outlineColor}));
           assert.equal(focus.width,'2px');assert.equal(focus.color,'rgb(37, 99, 235)',name);
         }
@@ -188,6 +195,23 @@ for (const width of [1152,1440,1920]) {
     }finally{await browser.close()}
   })
 }
+
+test('窓の角丸が欠けたままなら描画待ちでも失敗し、復元後に通る',async()=>{
+  const browser=await connectGuardBrowser()
+  try{
+    const page=await browser.newPage({reducedMotion:'reduce'})
+    await mount(page,1152)
+    await page.getByRole('button',{name:'通常',exact:true}).click()
+    const panel=page.getByRole('dialog',{name:'新しく作る'})
+    const radius=()=>panel.evaluate(el=>getComputedStyle(el).borderTopLeftRadius)
+    await expect.poll(radius).toBe('16px')
+    const fault=await page.addStyleTag({content:'[aria-modal="true"]{border-top-left-radius:0px!important}'})
+    await expect.poll(radius).toBe('0px')
+    await assert.rejects(expect.poll(radius,{timeout:300}).toBe('16px'))
+    await fault.evaluate(el=>el.remove())
+    await expect.poll(radius).toBe('16px')
+  }finally{await browser.close()}
+})
 
 for(const reducedMotion of ['reduce','no-preference']) {
   test(`窓と探す窓は動きを減らす設定を守り、閉じかけでも開き直せる ${reducedMotion}`,async()=>{

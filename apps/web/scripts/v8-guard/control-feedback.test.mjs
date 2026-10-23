@@ -260,8 +260,29 @@ for(const width of [1152,1440])test(`設定行の札と操作を区別でき、�
     assert.equal(await page.getByLabel('行の操作回数').textContent(),'2')
     assert.equal(await focusedRing(page),true)
     assert.notEqual(await page.getByRole('button',{name:'副操作',exact:true}).evaluate(e=>getComputedStyle(e).backgroundColor),rows[0].bg)
+  }finally{await page.close();await browser.close()}
+})
+
+for(const width of [1152,1440])test(`数の帯の余白と数字を実寸で守り、古い間隔の故障を検出する ${width}`,async()=>{
+  const browser=await connectGuardBrowser(),page=await browser.newPage({viewport:{width,height:1000},reducedMotion:'reduce'})
+  try{
+    await mount(page)
     const band=page.locator('[data-measure-band] [data-kpi-strip]')
-    const dimensions=await band.evaluate(e=>{const cell=e.firstElementChild,n=cell.querySelector('[data-kpi-number]'),s=getComputedStyle(cell),v=getComputedStyle(n);return{gap:s.gap,pad:s.paddingTop,size:v.fontSize,line:v.lineHeight,weight:v.fontWeight}})
-    assert.deepEqual(dimensions,{gap:'4px',pad:'16px',size:'34px',line:'36px',weight:'500'})
+    const measure=()=>band.evaluate(e=>[...e.children].map(cell=>{
+      const n=cell.querySelector('[data-kpi-number]'),s=getComputedStyle(cell),v=getComputedStyle(n)
+      return{gap:s.gap,top:s.paddingTop,bottom:s.paddingBottom,left:s.paddingLeft,right:s.paddingRight,size:v.fontSize,line:v.lineHeight,weight:v.fontWeight}
+    }))
+    const expected={gap:'4px',top:'16px',bottom:'16px',left:'24px',right:'24px',size:'34px',line:'36px',weight:'500'}
+    const normal=await measure()
+    assert.ok(normal.length>0)
+    for(const dimensions of normal)assert.deepEqual(dimensions,expected)
+    const fault=await page.addStyleTag({content:'[data-measure-band] [data-design-version]{gap:8px!important}'})
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-measure-band] [data-design-version]')).gap==='8px')
+    const broken=await measure()
+    assert.equal(broken[0].gap,'8px')
+    assert.throws(()=>assert.deepEqual(broken[0],expected))
+    await fault.evaluate(el=>el.remove())
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-measure-band] [data-design-version]')).gap==='4px')
+    assert.deepEqual(await measure(),normal)
   }finally{await page.close();await browser.close()}
 })

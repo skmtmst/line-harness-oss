@@ -108,10 +108,10 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
     await openSurfaces(page, width)
     const distances = await page.evaluate(surfaceDistances)
     console.log(JSON.stringify({ width, distances }))
-    assert.deepEqual(distances, { hq: 16, contents: 14, banners: 14, 'common-vars': width === 1440 ? 8 : null, 'reminder-detail': 6, 'auto-reply': 8, reminder: 8, 'hq-broadcast': 2, scenario: 8, 'rich-menu': 8 })
+    assert.deepEqual(distances, { hq: 8, contents: 14, banners: 14, 'common-vars': width === 1440 ? 8 : null, 'reminder-detail': 6, 'auto-reply': 8, reminder: 8, 'hq-broadcast': 2, scenario: 8, 'rich-menu': 8 })
     for (const id of ['contents', 'banners']) {
       const gap = await page.locator('#' + id).evaluate(el => el.querySelector('[data-template-region="toolbar"]').firstElementChild.getBoundingClientRect().top - el.querySelector('h2').getBoundingClientRect().bottom)
-      assert.equal(gap, 14)
+      assert.equal(gap, 8)
     }
     const sectionGaps = await page.evaluate(() => {
       const tools = document.querySelector('#section-with-tools [data-template-region="toolbar"]')
@@ -121,7 +121,7 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
         noTools.querySelector('p').getBoundingClientRect().top - noTools.querySelector('h2').getBoundingClientRect().bottom,
         document.querySelector('#section-with-tools [data-page-template]').getBoundingClientRect().bottom - text.getBoundingClientRect().bottom]
     })
-    assert.deepEqual(sectionGaps, [14, 16, 24])
+    assert.deepEqual(sectionGaps, [14, 8, 24])
     const flat = await page.locator('#flat').evaluate(el => {
       const css = getComputedStyle(el)
       return { shadow: css.boxShadow, line: css.outlineWidth, padding: css.padding }
@@ -137,7 +137,11 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
     const fonts = await page.locator('#surfaces [data-part="create-summary"] dd').evaluateAll(nodes => nodes.map(el => getComputedStyle(el).fontWeight))
     assert.deepEqual(fonts, ['400', '400'])
     for (const th of await page.locator('thead th').all()) assert.equal(await th.evaluate(el => getComputedStyle(el).fontWeight), '500')
-    assert.equal(await page.locator('#hq h2').evaluate(el => getComputedStyle(el).fontWeight), '700')
+    const heading = await page.locator('#hq h2').evaluate(el => {
+      const style = getComputedStyle(el)
+      return { size: style.fontSize, weight: style.fontWeight }
+    })
+    assert.deepEqual(heading, { size: '32px', weight: '600' })
     const iconColor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-ink-secondary').trim())
     // 色の表記（hex/rgb）を同じ実CSSの計算結果へそろえて比較する。
     const neutral = await page.evaluate(color => { const el = document.createElement('span'); el.style.color = color; document.body.append(el); const result = getComputedStyle(el).color; el.remove(); return result }, iconColor)
@@ -166,5 +170,21 @@ test('詳細タブに子の余白を戻す故障を実寸で見つけ、復元�
     assert.equal(broken['reminder-detail'], 14)
     await tabs.evaluate(el => el.style.removeProperty('margin-top'))
     assert.equal((await page.evaluate(surfaceDistances))['reminder-detail'], 6)
+  } finally { await browser.close() }
+})
+
+test('題の下へ古い余白を戻す故障を実寸で見つけ、復元後に通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await openSurfaces(page, 1440)
+    const toolbar = page.locator('#hq [data-template-region="toolbar"]')
+    assert.equal((await page.evaluate(surfaceDistances)).hq, 8)
+    await toolbar.evaluate(el => { el.style.marginTop = '8px' })
+    const broken = await page.evaluate(surfaceDistances)
+    assert.equal(broken.hq, 16)
+    assert.throws(() => assert.equal(broken.hq, 8))
+    await toolbar.evaluate(el => el.style.removeProperty('margin-top'))
+    assert.equal((await page.evaluate(surfaceDistances)).hq, 8)
   } finally { await browser.close() }
 })
