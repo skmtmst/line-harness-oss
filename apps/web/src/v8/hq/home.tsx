@@ -445,7 +445,7 @@ export default function HqHomeV8() {
         <ListToolbarRow>
           <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
             {STATUS_FILTERS.map((item) => (
-              <FilterChip key={item.value} selected={status === item.value} icon={item.icon} onChange={() => { setStatus(item.value); resetPage() }}>
+              <FilterChip key={item.value} selected={status === item.value} selectedIcon={false} onChange={() => { setStatus(item.value); resetPage() }}>
                 {`${item.label} ${statusCount(item.value)}`}
               </FilterChip>
             ))}

@@ -1,7 +1,7 @@
 'use client'
 
 import { jstDate } from '@/lib/jst-datetime'
-import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './date-field.module.css'
@@ -167,6 +167,7 @@ export default function DateField({
         type="button"
         className={styles.field}
         data-size={size}
+        data-clearable={selected && !disabled && clearable || undefined}
         disabled={disabled}
         data-invalid={invalid || undefined}
         // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
@@ -189,6 +190,7 @@ export default function DateField({
       >
         <Calendar aria-hidden="true" className={styles.icon} />
         <span className={selected ? styles.value : styles.placeholder}>{selected ? displayFormat === 'short' ? `${selected.getMonth() + 1}/${selected.getDate()}（${WEEKDAYS[selected.getDay()]}）` : displayFormat === 'day' ? `${selected.getMonth() + 1}月${selected.getDate()}日（${WEEKDAYS[selected.getDay()]}）` : formatLabel(selected) : placeholder}</span>
+        <ChevronDown aria-hidden="true" className={styles.chevron} />
       </button>
       {selected && !disabled && clearable ? (
         <button type="button" className={styles.clear} aria-label="日付を消す" onClick={() => onChange('')}>

@@ -393,14 +393,14 @@ describe('ファイルの検査の設定画面', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '外の検査を止める' }))
     await waitFor(() => {
-      expect(screen.getByText('外の検査を止める', { selector: 'h2' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: '外の検査を止める', exact: true })).toBeTruthy()
     })
     confirmInDialog('外の検査を止める')
     const message = '設定を消せませんでした。通信状態を確認して、もう一度お試しください。'
     await waitFor(() => {
       expect(screen.getByText(message)).toBeTruthy()
     })
-    expect(screen.getByText('外の検査を止める', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '外の検査を止める', exact: true })).toBeTruthy()
     expect(container.querySelector('p[role="alert"]')).toBeNull()
   })
 

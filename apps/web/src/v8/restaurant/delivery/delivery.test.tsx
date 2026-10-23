@@ -490,7 +490,7 @@ describe('一覧と確認の操作を保つ', () => {
     expect(dialog.querySelector('[data-qa-dialog-callout]')).toBeNull()
     // 題の左に丸い注意三角を置く。
     const heading = dialog.querySelector('h2')
-    const mark = heading?.previousElementSibling
+    const mark = heading?.querySelector('[aria-hidden="true"]')
     expect(mark?.tagName).toBe('SPAN')
     expect(mark?.querySelector('svg')).toBeTruthy()
   })

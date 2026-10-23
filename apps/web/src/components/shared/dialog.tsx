@@ -248,17 +248,14 @@ export default function Dialog({
 
   const shownHeaderIcon = headerIcon ?? (!titleIcon && !designHeaderHeight ? <PanelsTopLeft /> : null)
   const titleNode = (
-    <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}</h2>
+    <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`} data-has-heading-icon={Boolean(titleIcon || shownHeaderIcon) || undefined}>
+      {titleIcon || shownHeaderIcon ? <span className={styles.headerIcon} aria-hidden="true">{titleIcon || shownHeaderIcon}</span> : null}
+      <span>{typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}</span>
+    </h2>
   )
   /*  解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。
      かけらは描画に出ない（囲み要素なし）。渡さないときは h2 そのまま。 */
-  const titlePart = (<>{titleIcon ? (
-    <div className={styles.titleRow}>
-      <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
-      {titleNode}
-      {titleHelp}
-    </div>
-  ) : titleHelp ? <div className={styles.titleRow}>{titleNode}{titleHelp}</div> : titleNode}</>)
+  const titlePart = titleHelp ? <div className={styles.titleRow}>{titleNode}{titleHelp}</div> : titleNode
   const descriptionNode = description ? <p id={descriptionId} className={styles.description}>{description}</p> : null
   const heading = (
     <>
@@ -309,7 +306,6 @@ export default function Dialog({
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
       <div className={styles.headerRow}>
-        {shownHeaderIcon ? <span className={styles.headerIcon} aria-hidden="true">{shownHeaderIcon}</span> : null}
         <div className={styles.headerContent}>
           {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
         </div>

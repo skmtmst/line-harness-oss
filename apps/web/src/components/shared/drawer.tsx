@@ -106,9 +106,8 @@ export default function Drawer({
 
   const titleBlock = (
     <div className={styles.heading}>
-      {headerIcon ? <span className={styles.headerIcon} aria-hidden="true">{headerIcon}</span> : null}
       <div className={styles.headingText}>
-        <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</h2>{titleAccessory}</div>
+        <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{headerIcon ? <span className={styles.headerIcon} aria-hidden="true">{headerIcon}</span> : null}<span>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</span></h2>{titleAccessory}</div>
         {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
       </div>
     </div>

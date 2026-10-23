@@ -144,7 +144,7 @@
 }
 
 :root .textTrigger .chevron {
-  display: none;
+  display: block;
 }
 
 :root .directionIcon {
@@ -209,15 +209,17 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
 
 :root .root[data-select-icon-only] { width: var(--tpl-button-h); min-width: var(--tpl-button-h); flex: none; }
 
-/* 選択欄は線なしの灰色。文字だけ・状態の札の口は保つ。 */
+/* 選択欄は白い地と薄い枠。副ボタンとは面で区別する。 */
 :root .trigger:not(.textTrigger):not([data-tone]) {
-  outline-color: transparent; border: 0; box-shadow: none; background: var(--polish-control-bg);
+  outline-color: var(--color-control-border); border: 0; box-shadow: none; background: var(--color-canvas);
   font-size: var(--polish-control-text); font-weight: var(--polish-control-weight);
 }
-:root .trigger:not(.textTrigger):not([data-tone]):hover:not(:disabled) { background: var(--polish-control-hover); }
+:root .trigger:not(.textTrigger):not([data-tone]):hover:not(:disabled) { background: var(--color-canvas-sunken); }
 :root .invalid .trigger:not(.textTrigger) { outline: 1px solid var(--color-danger); outline-offset: -1px; }
 :root .leadingIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 
 :root .trigger { padding-block-start: var(--polish-text-center-inset); }
 
 :root .trigger:not(.textTrigger):not([data-tone]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
+:root .textTrigger { height: var(--tpl-button-h); padding-inline: var(--tpl-select-inset); gap: var(--tpl-select-gap); outline: 1px solid var(--color-control-border); outline-offset: -1px; background: var(--color-canvas); }

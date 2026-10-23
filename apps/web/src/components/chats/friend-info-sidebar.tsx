@@ -10,7 +10,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import CustomerInfoMileage from '@/components/shared/customer-info-mileage'
-import CustomerInfoPanel from '@/components/shared/customer-info-panel'
+import CustomerInfoPanel, { CustomerInfoViewport } from '@/components/shared/customer-info-panel'
 import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
 import { DragHandle } from '@/components/shared/row-actions'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
@@ -407,7 +407,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
           setTagToRemove(null)
         }}
       />
-      <div className="flex-1 overflow-y-auto">
+      <CustomerInfoViewport>
         {loading ? (
           <DelayedSkeleton
             loading
@@ -506,7 +506,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         ) : (
           <div className="p-4 text-xs text-ink-faint">友だち情報がありません</div>
         )}
-      </div>
+      </CustomerInfoViewport>
     </div>
   )
 }

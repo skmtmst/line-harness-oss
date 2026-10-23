@@ -209,8 +209,10 @@ html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset:
 :root .tpList > :first-child:not(.tpCards) { margin-bottom: var(--space-8); }
 
 /* 画面の選択入口だけをそろえ、窓内の候補・確定処理には触れない。 */
-:root .field { border-color: transparent; box-shadow: none; background: var(--polish-control-bg); }
-:root .field:has(.fieldTrigger:hover:not(:disabled)) { background: var(--polish-control-hover); }
+:root .field { border-color: var(--color-control-border); box-shadow: none; background: var(--color-canvas); }
+:root .field:has(.fieldTrigger:hover:not(:disabled)) { background: var(--color-canvas-sunken); }
 :root .field[data-invalid] { border-color: var(--color-danger); }
 :root .field :is(.fieldName, .fieldPlaceholder, .fieldAction) { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
 :root .fieldAction { color: var(--color-ink); }
+
+:root .fieldAction { color: var(--color-ink-faint); }

@@ -268,7 +268,6 @@ function BillingInner() {
         <SegmentedControl<BillingInterval>
           aria-label="支払いの周期"
           size="small"
-          className={styles.interval}
           value={interval}
           onChange={setInterval}
           options={[

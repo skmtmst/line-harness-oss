@@ -29,16 +29,6 @@
   min-height: var(--tpl-hq-control-h);
 }
 
-/* 周期の切り替え（器の余白3・項目 5/14・12/17） */
-.interval {
-  padding: var(--tpl-hq-seg-pad);
-}
-
-.interval > button {
-  padding: var(--tpl-hq-seg-item-pad);
-  line-height: var(--tpl-hq-seg-item-lh);
-}
-
 /* プラン3枚（間16・角丸16・余白20・高さはそろえる） */
 .plans {
   display: grid;

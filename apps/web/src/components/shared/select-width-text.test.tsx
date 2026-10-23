@@ -1,14 +1,9 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Select from './select'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 const OPTIONS = [
   { value: 'new', label: '新しい順' },
   { value: 'old', label: '古い順' },
@@ -78,15 +73,16 @@ describe('選ぶ欄の幅と枠なし', () => {
     expect(container.querySelector('[class*="leadingIcon"]')).toBeNull()
   })
 
-  it('treatment="text" で上下矢印が出る（箱は v8 の CSS で消える）', () => {
-    const { container } = render(
-      <Select aria-label="並び順" value="new" onChange={() => {}} options={OPTIONS} treatment="text" />,
-    )
+  it('文字型の並び替えもキーで候補を選び、選ぶと閉じる', () => {
+    const change = vi.fn()
+    render(<Select aria-label="並び順" value="new" onChange={change} options={OPTIONS} treatment="text" />)
+    const trigger = screen.getByRole('button', { name: '並び順' })
     expect(screen.getByText('新しい順')).toBeTruthy()
-    const css = read('select.module.css')
-    expect(css).toMatch(/:root \.textTrigger\s*\{[^}]*border:\s*0/s)
-    expect(css).toMatch(/:root \.textTrigger \.chevron\s*\{\s*display:\s*none;/s)
-    expect(container.querySelector('[class*="directionIcon"]')).not.toBeNull()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    expect(change).toHaveBeenCalledWith('old')
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
   })
 })
 

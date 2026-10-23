@@ -266,5 +266,6 @@ html:root .card[data-card-frame='flat'] {
 
 /* 情報内と操作前の間は親のgapを1回だけ使う。高さ合わせで増えた分だけ操作の上へ回す。 */
 html:root .withActions { display: flex; flex-direction: column; }
-.information { display: flex; flex-direction: column; min-width: 0; gap: inherit; }
-.bottomActions { margin-top: auto; min-width: 0; }
+.information { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: inherit; }
+.information > :last-child { margin-top: auto; }
+.bottomActions { min-width: 0; }

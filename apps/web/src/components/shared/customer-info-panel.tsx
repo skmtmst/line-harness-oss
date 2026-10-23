@@ -18,6 +18,10 @@ import { api } from '@/lib/api'
 import { notifyToast } from './toast'
 
 export type CustomerInfoSection = { key: string; label: string; action?: ReactNode; content: ReactNode }
+/** スクロールの送り幅を左右に等しく確保する顧客欄の置き場。 */
+export function CustomerInfoViewport({ children }: { children: ReactNode }) {
+  return <div className={styles.viewport}>{children}</div>
+}
 /** 友だち概要と受信箱の共通の欄。取得・保存は呼び出し側、表示項目の好みは共通。 */
 export default function CustomerInfoPanel({
   friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false, labelWidth = 'standard',
@@ -33,7 +37,7 @@ export default function CustomerInfoPanel({
   extraSections?: CustomerInfoSection[]
   actionWording?: boolean
   hiddenPersonalCount?: number
-  /** 見出しの幅。'wide'（84）は受信箱の右の列。「次の自動配信」まで1行で値と離して置く。 */
+  /** 受信箱の右の列では項目名の内容に合わせて幅を決める。 */
   labelWidth?: 'standard' | 'wide'
 }) {
   const [expanded, setExpanded] = useState(false)

@@ -32,9 +32,4 @@
 
 }
 
-/* 図柄を外しても、固定した案内の文章の開始位置は動かさない。 */
-@layer components {
-.body[data-explanation-inset='notice'] { padding-inline-start: calc(16px + 16px + 10px); }
-}
-
 :root .toggle { box-sizing: border-box; height: 18px; padding-block-start: var(--polish-text-center-inset); }

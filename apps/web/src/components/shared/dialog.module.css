@@ -530,7 +530,12 @@ html:root .panel .close {
   box-shadow: none;
 }
 html:root .headerContent { gap: var(--space-4); }
-html:root .headerIcon { align-self: center; }
+/* 題の実際の行高を継ぎ、説明の行数に関係なく最初の行へそろえる。 */
+html:root .title[data-has-heading-icon] { display: flex; align-items: flex-start; gap: var(--space-12); }
+html:root .title[data-has-heading-icon] > span:last-child { min-width: 0; }
+html:root .title .headerIcon { align-self: flex-start; margin-top: calc((1lh - var(--polish-window-icon-size)) / 2); }
+html:root .headerContent:has(.headerIcon) .description,
+html:root .headerContent:has(.headerIcon) .titleNote { margin-inline-start: calc(var(--polish-window-icon-size) + var(--space-12)); }
 html:root .panel[data-description-band='warning'] .headerIcon {
   background: var(--color-warning-bg);
   color: var(--color-warning);

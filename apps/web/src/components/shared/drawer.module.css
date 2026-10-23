@@ -315,7 +315,7 @@
 /* 紹介者の620幅の板。外側の余白を型が持つ。 */
 :root .panel[data-layout='inset'] { padding: var(--tpl-af-dr-pad); gap: var(--tpl-af-dr-gap); box-shadow: var(--tpl-af-dr-shadow); }
 :root .panel[data-layout='inset'] .header { padding: 0; gap: var(--tpl-af-dr-gap); }
-:root .panel[data-layout='inset'] .title { font-size: var(--text-heading); font-weight: 700; line-height: normal; }
+:root .panel[data-layout='inset'] .title { font-size: var(--text-heading); font-weight: 700; line-height: var(--tpl-af-dr-title-lh); }
 :root .panel[data-layout='inset'] .description { margin-top: var(--tpl-af-dr-head-gap); font-size: var(--text-caption); line-height: normal; white-space: normal; overflow-wrap: anywhere; }
 :root .panel[data-layout='inset'] .body { padding: 0; }
 :root .panel[data-layout='inset'] .footer { padding: 0; border: 0; gap: var(--tpl-toolbar-gap); }
@@ -396,3 +396,7 @@ html:root .panel .close:focus-visible {
   outline-offset: var(--polish-focus-offset);
 }
 html:root .heading { align-items: center; }
+
+html:root .panel .title:has(.headerIcon) { display: flex; align-items: flex-start; gap: var(--space-12); }
+html:root .title .headerIcon { margin-top: calc((1lh - var(--polish-window-icon-size)) / 2); }
+html:root .headingText:has(.headerIcon) .description { margin-inline-start: calc(var(--polish-window-icon-size) + var(--space-12)); }

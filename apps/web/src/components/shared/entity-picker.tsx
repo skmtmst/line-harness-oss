@@ -3,7 +3,7 @@
 import { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type SingleProps, type EntityPickerWindowProps, type MultiBodyProps, type MultiProps, type FieldBase, type SingleField, type MultiField } from './entity-picker-types'
 export { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type EntityPickerWindowProps } from './entity-picker-types'
 
-import { ChevronRight, ArrowUpRight, Plus, type LucideIcon } from 'lucide-react'
+import { ChevronDown, ArrowUpRight, Plus, type LucideIcon } from 'lucide-react'
 import { folderDisplayColor, FolderDot } from './folder-dot'
 import { useFieldContext, joinDescribedBy } from './field-context'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
@@ -303,7 +303,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
       </>}
     </span>}
     {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
-    {(readOnly && empty) || (actionHidden === true && !empty) ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix && !actionHidden ? actionLabel : null}<ChevronRight size={16} /></span>}
+    {(readOnly && empty) || (actionHidden === true && !empty) ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix && !actionHidden ? actionLabel : null}<ChevronDown size={16} /></span>}
   </div>
 }
 

@@ -323,11 +323,14 @@
 
 :root .field[data-size="compact"] { height: var(--tpl-rt-control-h); }
 
-/* 日付を選ぶ入口も灰色の面。入力の誤りとキーボードの輪は残す。 */
-:root .field { border-color: transparent; background: var(--polish-control-bg); font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
-:root .field:not([data-open]):not([data-invalid]) { border-color: transparent; box-shadow: none; }
-:root .field[data-open] { border-color: transparent; box-shadow: none; }
-:root .field:hover:not(:disabled):not([data-readonly]) { background: var(--polish-control-hover); }
+/* 日付を選ぶ入口は白い地と薄い線。入力の誤りとキーボードの輪は残す。 */
+:root .field { border-color: var(--color-control-border); background: var(--color-canvas); font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
+:root .field:not([data-open]):not([data-invalid]) { border-color: var(--color-control-border); box-shadow: none; }
+:root .field[data-open] { border-color: var(--color-control-border); box-shadow: none; }
+:root .field:hover:not(:disabled):not([data-readonly]) { background: var(--color-canvas-sunken); }
 :root .field[data-invalid] { border-color: var(--color-danger); }
 
 :root .day[data-selected] { font-weight: 600; }
+
+:root .chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); flex: none; color: var(--color-ink-faint); margin-inline-start: auto; }
+:root .field:not([data-clearable]) { padding-inline-end: var(--tpl-select-inset); }

@@ -3,17 +3,22 @@
 /* 項目と値を直接並べ、顧客パネルの基本欄の固定幅とは独立させる。 */
 .rows {
   display: grid;
-  grid-template-columns: minmax(var(--tpl-customer-label), max-content) minmax(0, 1fr);
-  gap: var(--tpl-fdt-group-gap);
+  grid-template-columns: max-content minmax(0, 1fr);
+  row-gap: var(--space-4);
+  column-gap: var(--space-8);
   margin: 0;
   font-size: var(--polish-text-body);
   line-height: var(--tpl-inbox-row-preview-lh);
 }
 .rows > dt {
+  min-height: var(--space-24);
+  display: flex;
+  align-items: center;
   color: var(--color-ink-secondary);
   white-space: nowrap;
 }
 .rows > dd {
+  min-height: var(--space-24);
   display: flex;
   align-items: center;
   gap: var(--space-8);

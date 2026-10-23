@@ -11,8 +11,8 @@
 }
 :global(:root) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
 :global(:root) .frame:is([data-template-layout='event-list'], [data-template-layout='event-roster'], [data-template-layout='distribution']) {
-  --tpl-head-pad-top: var(--tpl-head-pad-side);
-  --tpl-head-pad-bottom: var(--tpl-folder-pad-block);
+  --tpl-head-pad-top: var(--space-16);
+  --tpl-head-pad-bottom: var(--space-8);
   --tpl-toolbar-pad-block: var(--tpl-folder-pad-block);
 }
 :global(:root) .frame[data-template-layout='event-list'] { --folder-row-pad-block: var(--tpl-toolbar-gap); }
@@ -26,16 +26,16 @@
 :global(:root) .headingText:has(> [data-screen-explanation]:not([hidden])) { flex-basis: 0; }
 :global(:root) .heading:has(> .headingText > [data-screen-explanation]:not([hidden])) > .actions { align-self: flex-start; }
 :global(:root) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
-:global(:root) .title { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
-:global(:root) .pageTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
+:global(:root) .title { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); letter-spacing: var(--tpl-title-tracking); }
+:global(:root) .pageTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); letter-spacing: var(--tpl-title-tracking); }
 :global(:root) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 /* 題とタブの間は headingText の gap が持つ。二重に余白を足さない。 */
 :global(:root) .headingTabs { margin-top: 0; }
 /* 詳細のタブも headingText の段間だけを使う。 */
 :global(:root) [data-page-template='detail'] .headingTabs { margin-top: 0; }
-/* タブ付きの頭は固定絵の下余白16。通常の頭の12とは分ける。 */
-:global(:root) .heading:has(.headingTabs) { padding-bottom: var(--tpl-folder-pad-block); }
-/* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
+/* タブの有無によらず、題の下は共通の余白を使う。 */
+:global(:root) .heading:has(.headingTabs) { padding-bottom: var(--tpl-head-pad-bottom); }
+/* compact は間2・説明13/20を維持し、題は標準と同じ文字の値。 */
 :global(:root) .heading[data-heading-size='compact'] .headingText { gap: var(--tpl-compact-gap); }
 :global(:root) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }
 :global(:root) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
@@ -53,10 +53,15 @@
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar:is([data-toolbar-spacing='section'], [data-toolbar-spacing='stats']) { padding-block: var(--polish-space-card); }
 /* 題から最初の道具・数の帯までは道具側の余白だけ。間にタブ・帯・閲覧案内がある板は対象外。 */
-:global(:root) .frame > .heading:has(+ .listBody > .split:first-child > .main > .toolbar:not([data-collapsed-only])) { padding-bottom: 0; }
+:global(:root) .frame > .heading + .listBody > .split:first-child > .main > .toolbar:first-child:not([data-collapsed-only]) { padding-top: 0; }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
+/* 数の帯の直後は型が12を持ち、帯側のmarginと重ねない。 */
+:global(:root) .toolbar:has(> [data-kpi-strip]) { row-gap: var(--space-12); }
+:global(:root) .stats [data-kpi-strip]:last-child { margin-bottom: 0; }
+:global(:root) .stats:has([data-kpi-strip]) + .split > .main > .toolbar:first-child { padding-top: var(--space-12); }
+:global(:root) .frame > [data-kpi-strip] + * { margin-top: var(--space-12); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .listCards { display: grid; grid-template-columns: repeat(var(--tpl-list-card-columns), minmax(0, 1fr)); gap: var(--polish-space-card); padding-inline: var(--tpl-list-inset); align-items: start; }
 :global(:root) .listCards[data-card-inset='parent'] { padding-inline: 0; }
@@ -89,7 +94,7 @@
 /* 道具を渡さない画面で、広い板に空の段を出さない。 */
 :global(:root) .toolbar[data-collapsed-only] { display: none; }
 :global(:root) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-:global(:root) [data-page-template='dashboard'] .heading { padding-bottom: var(--polish-space-card); }
+:global(:root) [data-page-template='dashboard'] .heading { padding-bottom: var(--tpl-head-pad-bottom); }
 :global(:root) .dashboardRow { display: flex; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
 :global(:root) .dashboardCell { min-width: 0; flex: 1; padding: var(--polish-space-card) var(--polish-space-section); }
 :global(:root) .dashboardCell + .dashboardCell { border-left: 1px solid var(--color-hairline); }
@@ -124,7 +129,7 @@
 :global(:root) .detailSummary { width: 320px; padding: var(--polish-space-card) var(--polish-space-section); border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
 :global(:root) .detailContent { padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
 /* 実行の記録：本文と補助欄は型が組み、短い板は中身で終わる。 */
-:global(:root) [data-template-layout='record-detail'] > .heading { padding-top: var(--polish-space-section); }
+:global(:root) [data-template-layout='record-detail'] > .heading { padding-top: var(--tpl-head-pad-top); }
 :global(:root) [data-template-layout='record-detail'] > .split { border-top: 1px solid var(--color-hairline); }
 :global(:root) [data-template-layout='record-detail'] .detailContent { padding: var(--polish-space-section); padding-bottom: 0; gap: var(--polish-space-card); }
 :global(:root) [data-template-layout='record-detail'] .detailSummary { order: 2; width: var(--tpl-fm2-rd-side-w); padding: var(--polish-space-section); padding-bottom: 0; border-right: 0; border-left: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-card); align-self: flex-start; }
@@ -416,11 +421,11 @@
 :global(:root) .bookingStats { min-width: 0; width: calc(100% - var(--tpl-booking-aside-width)); }
 :global(:root) .bookingHeading .actions { gap: var(--tpl-booking-heading-gap); }
 :global(:root) .bookingHeading .heading { padding-top: var(--tpl-booking-head-pad-top); }
-:global(:root) .bookingContent { min-width: 0; padding: var(--tpl-section-gap) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
+:global(:root) .bookingContent { min-width: 0; padding: var(--space-12) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
 @container v8-page (width < 1100px) {
   :global(:root) .bookingHeading,
   :global(:root) .bookingStats { width: 100%; }
-  :global(:root) .bookingHeading .heading { padding-block: var(--tpl-booking-narrow-head-pad); }
+  :global(:root) .bookingHeading .heading { padding-block: var(--tpl-booking-narrow-head-pad) var(--tpl-head-pad-bottom); }
 }
 
 /* ：フォルダの列は余白込み200、ページ送りは右寄せ。 */
@@ -559,7 +564,7 @@
 .detailColumns:not([data-has-aside]) { grid-template-columns: minmax(0, 1fr); margin-right: 0; }
 
 /* 本文の最初が段なら、その段が上の間を持つ。道具の直後と末尾は親側だけ。 */
-:global(:root) .frame > .heading:has(+ .listBody > .split:first-child > .main > .content:first-child > .listSection) { padding-bottom: 0; }
+:global(:root) .frame > .heading + .listBody > .split:first-child > .main > .content:first-child > .listSection:first-child { padding-top: 0; }
 :global(:root) .toolbar + .content > .listSection:first-child { padding-top: 0; }
 :global(:root) .content > .listSection:last-child { padding-bottom: 0; }
 

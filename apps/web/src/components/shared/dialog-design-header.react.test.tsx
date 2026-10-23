@@ -21,7 +21,7 @@ describe('窓の頭の余白・高さを絵から渡す', () => {
     const panel = screen.getByRole('dialog', { name: '新しく作る' })
     const icon = screen.getByTestId('app-icon').parentElement!
     expect(icon.getAttribute('aria-hidden')).toBe('true')
-    expect(icon.nextElementSibling?.contains(screen.getByRole('heading'))).toBe(true)
+    expect(screen.getByRole('heading').contains(icon)).toBe(true)
     expect(document.getElementById(panel.getAttribute('aria-describedby')!)?.textContent).toBe('名前を入力してください。')
   })
 

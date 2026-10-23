@@ -281,7 +281,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     </Button>
   ) : null
   const folders = (
-    <div className={styles.folderInset}>
+    <>
       <ManagedFolderPanel
         kind={null}
         folders={[]}
@@ -293,7 +293,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
         onSelect={() => setView('all')}
         allCount={ready ? projects.length : null}
       />
-    </div>
+    </>
   )
   const viewFilter = (
     <ViewChips chips={viewChips} active={view} onChange={(next) => setView((next ?? 'all') as ProjectView)} />
@@ -600,7 +600,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   ) : null
   const selectView = (id: string) => { setView(id as LibraryView); resetPage() }
   const folders = (
-    <div className={styles.folderInset}>
+    <>
       <ManagedFolderPanel
         kind={null}
         folders={[]}
@@ -612,7 +612,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
         onSelect={() => selectView('all')}
         allCount={ready ? counts?.all ?? images.length : null}
       />
-    </div>
+    </>
   )
 
   const total = counts ? (view === 'all' ? counts.all : counts[view]) : null

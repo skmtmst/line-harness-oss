@@ -102,12 +102,18 @@
 :root .v6-filter-chip[data-size='inbox'] { padding: 0 var(--tpl-inbox-composer-input-pad); }
 
 /* 道具の文字は13/500。選択は色を増やさず面の違いで伝える。 */
-:root .v6-filter-chip { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); outline-color: transparent; box-shadow: none; background: var(--polish-control-bg); }
+:root .v6-filter-chip { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); outline-color: var(--color-control-border); box-shadow: none; background: var(--color-canvas); }
 :root .v6-filter-chip:not([aria-pressed='true']):hover:not(:disabled) { background: var(--polish-control-hover); }
-:root .v6-filter-chip[aria-pressed='true'] { background: var(--polish-selection-bg); color: var(--polish-selection-ink); outline-color: transparent; box-shadow: var(--polish-selection-shadow); }
+:root .v6-filter-chip[aria-pressed='true'] { background: var(--color-ink); color: var(--color-canvas); outline-color: var(--color-ink); box-shadow: none; }
 :root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-ink-secondary); }
 :root .v6-filter-chip__icon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 
 :root .v6-filter-chip { padding-block-start: var(--polish-text-center-inset); }
 
 :root .v6-filter-chip[aria-pressed]:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
+:root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: inherit; }
+
+:root .v6-filter-chip[aria-haspopup] { background: var(--color-canvas); color: var(--color-ink); outline-color: var(--color-control-border); }
+:root .v6-filter-chip__chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); flex: none; color: var(--color-ink-faint); order: 1; }
+:root .v6-filter-chip[aria-haspopup]:hover:not(:disabled) { background: var(--color-canvas-sunken); }

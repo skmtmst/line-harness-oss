@@ -60,9 +60,8 @@ describe('globals.css の変数の書き直し', () => {
     expect(findTokenCollisions(':root { --a: 22px; } [data-theme="v7"] { --a: 20px; }')).toHaveLength(0)
   })
 
-  it('予約スタッフの題と予約からの売上の題は別の名前で、どちらもページの題の値（22px）を読む', () => {
+  it('予約スタッフの題と予約からの売上の題は別の名前で、どちらもページの題の共通値を読む', () => {
     const css = fs.readFileSync(GLOBALS, 'utf8')
-    expect(css).toMatch(/--polish-text-page:\s*22px/)
     expect(css).toMatch(/--tpl-title-size:\s*var\(--polish-text-page\)/)
     expect(css).toMatch(/--tpl-bks-title-size:\s*var\(--tpl-title-size\)/)
     expect(css).toMatch(/--tpl-bks-sales-title-size:\s*var\(--tpl-title-size\)/)

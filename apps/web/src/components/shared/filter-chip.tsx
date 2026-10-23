@@ -1,12 +1,12 @@
-import { Check } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import './filter-chip.css'
 
 /**
  * 一覧の絞り込み札（★管理画面・全画面で1つだけ使う形）。
  *
- * 丸い札・高さ32・選んだら濃い緑の地に白文字＋✓（#669: 選んだ状態は
- * 「有効状態」なのでアクセントを使う）。件数は文字の後ろに小さく出す。
+ * 丸い札・高さ32・選んだら濃い地に白文字＋✓。
+ * 件数は文字の後ろに小さく出す。
  * 選んでいないときは印を出さない（○や星などの飾りを付けない）。
  *
  * 状態を表示するだけの Chip と違い、これは押して条件を切り替える操作に使う。
@@ -50,10 +50,11 @@ export default function FilterChip({
       disabled={disabled}
       title={title}
       onClick={() => onChange(!selected)}
-      className="v6-filter-chip" data-size={size}
+      className="v6-filter-chip" data-part="filter-chip" data-size={size}
     >
       {icon ? <span className="v6-filter-chip__icon">{icon}</span> : selected && selectedIcon && showCheck ? <Check aria-hidden="true" className="v6-filter-chip__icon" /> : null}
       {children}
+      {popup ? <ChevronDown aria-hidden="true" className="v6-filter-chip__chevron" /> : null}
       {count === undefined || count === '' ? null : (
         <>{' '}
           <span className="v6-filter-chip__count">{count}</span>

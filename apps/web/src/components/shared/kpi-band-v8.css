@@ -165,3 +165,14 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]
  html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
  html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
+
+/* 数字の段だけを大きく軽くし、単位と補足の寸法は保つ。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
+  font-size: var(--tpl-band-number-size); font-weight: var(--tpl-band-number-weight);
+  line-height: var(--tpl-band-number-lh); letter-spacing: var(--tpl-band-number-tracking);
+}
+
+html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { padding-block: var(--space-16); }
+/* 大きな金額は文字を縮めず2列にし、単位まで読み取れる幅を確保する。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-wide-values] { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-wide-values] > :last-child:nth-child(odd) { grid-column: 1 / -1; }

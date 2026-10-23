@@ -65,5 +65,5 @@ it('保存成功で閉じたあとも編集を開いた起点へフォーカス�
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '保存する' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(save).toHaveBeenCalledOnce()
-  expect(document.activeElement).toBe(opener)
+  await waitFor(() => expect(document.activeElement).toBe(opener))
 })

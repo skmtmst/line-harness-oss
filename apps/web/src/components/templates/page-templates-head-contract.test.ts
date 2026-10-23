@@ -20,17 +20,17 @@ describe('型の見出し（379板の絵）', () => {
     const vars = globals.match(/:root \{[^}]*--tpl-head-pad-top[^}]*\}/s)
     expect(vars, '変数の一覧がありません').toBeTruthy()
     for (const [name, value] of [
-      ['--tpl-head-pad-top', 'var(--polish-space-section)'], ['--tpl-head-pad-side', 'var(--polish-space-section)'], ['--tpl-head-pad-bottom', 'var(--polish-space-field)'],
-      ['--tpl-title-size', 'var(--polish-text-page)'], ['--tpl-title-weight', '700'], ['--tpl-title-lh', '32px'],
+      ['--tpl-head-pad-top', '16px'], ['--tpl-head-pad-side', 'var(--polish-space-section)'], ['--tpl-head-pad-bottom', '8px'],
+      ['--tpl-title-size', 'var(--polish-text-page)'], ['--tpl-title-weight', '600'], ['--tpl-title-lh', '40px'],
       ['--tpl-head-gap', 'var(--polish-space-row)'], ['--tpl-desc-size', 'var(--polish-text-body)'], ['--tpl-desc-lh', '19px'],
       ['--tpl-toolbar-pad-block', '14px'], ['--tpl-toolbar-pad-side', '24px'], ['--tpl-toolbar-gap', '8px'],
       ['--tpl-folder-width', '200px'],
       ['--tpl-page-pad-block', '10px'], ['--tpl-page-pad-side', '24px'],
-      ['--tpl-band-number-size', '32px'], ['--tpl-band-number-lh', '38px'],
+      ['--tpl-band-number-size', '34px'], ['--tpl-band-number-lh', '40px'],
       ['--tpl-band-cell-pad-block', '16px'], ['--tpl-band-cell-pad-side', '24px'], ['--tpl-band-cell-gap', '8px'],
-      ['--tpl-create-head-pad-top', '24px'], ['--tpl-create-head-pad-side', '24px'], ['--tpl-create-head-pad-bottom', '16px'],
+      ['--tpl-create-head-pad-top', 'var(--tpl-head-pad-top)'], ['--tpl-create-head-pad-side', '24px'], ['--tpl-create-head-pad-bottom', 'var(--tpl-head-pad-bottom)'],
       ['--tpl-create-head-gap', '8px'],
-      ['--tpl-detail-head-pad-top', '20px'], ['--tpl-detail-head-pad-side', '24px'], ['--tpl-detail-head-pad-bottom', '16px'],
+      ['--tpl-detail-head-pad-top', 'var(--tpl-head-pad-top)'], ['--tpl-detail-head-pad-side', '24px'], ['--tpl-detail-head-pad-bottom', 'var(--tpl-head-pad-bottom)'],
       ['--tpl-detail-head-gap', '12px'], ['--tpl-detail-actions-gap', '6px'], ['--tpl-detail-tabs-pad-bottom', '12px'],
       ['--tpl-create-content-pad-block', 'var(--polish-space-section)'], ['--tpl-create-content-pad-side', 'var(--polish-space-section)'], ['--tpl-create-content-gap', 'var(--polish-space-card)'],
       ['--tpl-section-pad', 'var(--polish-space-section)'], ['--tpl-section-gap', 'var(--polish-space-field)'],
