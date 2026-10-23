@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   deliveryWebhookIpAllowlist,
   isDeliveryWebhookIpAllowed,
@@ -8,6 +8,7 @@ import {
   UBER_OAUTH_CALLBACK_PATH,
   uberOAuthClient,
   uberWebhookSecret,
+  dispatchToDeliveryService,
   type DeliveryEnv,
 } from './restaurant-delivery.js';
 
@@ -73,6 +74,36 @@ describe('Uber Eats のログイン連携の設定', () => {
         RT_DELIVERY_UBEREATS_WEBHOOK_SECRET: 'static-secret-value-that-is-long-enough',
       }),
     ).toBeNull();
+  });
+});
+
+describe('Uber Eats 注文操作の送信経路', () => {
+  it('旧来の静的URLとトークンが残っていても汎用経路からは送信しない', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const result = await dispatchToDeliveryService(
+      {
+        RT_DELIVERY_SEND_ENABLED: 'true',
+        RT_DELIVERY_UBEREATS_API_BASE_URL: 'https://legacy-ubereats.example.test',
+        RT_DELIVERY_UBEREATS_API_TOKEN: 'synthetic-static-token',
+      },
+      {
+        service: 'ubereats',
+        action: 'accept',
+        externalId: 'synthetic-order-id',
+      },
+      {
+        completedAttempts: 0,
+        now: new Date('2026-10-22T00:00:00.000Z'),
+        fetcher,
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'delivery_action_unsupported', retryable: false },
+      nextAttemptAt: null,
+    });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });
 

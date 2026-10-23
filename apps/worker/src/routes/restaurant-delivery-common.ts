@@ -38,14 +38,13 @@ export function csvCell(value: string | number | null | undefined): string {
 /**
  * 画面に出す状態の名前。英語の符号は出さない。
  *
- * 承認済みデザインの状態は「新着・調理中・受け渡し済み・キャンセル」の4つだけ。
- * 店の操作は「準備完了」で終わり、そのあと受け渡されたかどうかは各サービスからの
- * 通知で内部的に分かれるだけなので、`ready` と `handed_over` は同じ名前で見せる。
+ * `ready` は商品の準備が終わり、まだ受け渡しを待っている状態。
+ * `handed_over` と同じ名前にすると、未完了の注文を見落とすため別の名前で見せる。
  */
 export const ORDER_STATUS_LABELS: Record<DeliveryOrderStatus, string> = {
   new: '新着',
   cooking: '調理中',
-  ready: '受け渡し済み',
+  ready: '準備完了',
   handed_over: '受け渡し済み',
   canceled: 'キャンセル',
   rejected: '拒否',
@@ -108,12 +107,32 @@ export async function serviceStates(
     .bind(store.id)
     .all<DeliveryServiceStateRow>();
   const byService = new Map((rows.results ?? []).map((row) => [row.service, row]));
+  const uber = await dbFor(c.env, store.id).prepare(
+    `SELECT status, uber_store_id, provisioned_at, last_error,
+       (SELECT COUNT(*) FROM rt_delivery_uber_connections other
+         WHERE other.uber_store_id = connection.uber_store_id AND other.status = 'connected'
+           AND other.provisioned_at IS NOT NULL) AS connected_count
+       FROM rt_delivery_uber_connections connection WHERE store_id = ? AND account_id = ?`,
+  ).bind(store.id, store.lineAccountId).first<{
+    status: string; uber_store_id: string | null; provisioned_at: number | null; last_error: string | null; connected_count: number;
+  }>();
+  const uberUnresolved = ['pos_activation_started', 'pos_activation_unknown',
+    'pos_deactivation_started', 'pos_deactivation_unknown',
+    'pos_disconnect_reauthorization_pending',
+    'store_provision_review_required', 'store_menu_refresh_review_required'].includes(uber?.last_error ?? '');
+  const uberAmbiguous = (uber?.connected_count ?? 0) > 1;
+  const uberStatus = uber?.status === 'connected' && uber.uber_store_id && uber.provisioned_at !== null && !uberUnresolved && !uberAmbiguous
+    ? 'connected' as const
+    : uber?.status === 'expired' || uber?.status === 'no_permission' || uberUnresolved || uberAmbiguous
+      ? 'error' as const : 'disconnected' as const;
+  const uberState = byService.get('ubereats');
+  if (uberState) byService.set('ubereats', { ...uberState, connection_status: uberStatus });
   return DELIVERY_SERVICES.map(
     (service) =>
       byService.get(service) ?? {
         store_id: store.id,
         service,
-        connection_status: 'disconnected' as const,
+        connection_status: service === 'ubereats' ? uberStatus : 'disconnected' as const,
         intake_status: 'open' as const,
         stop_until: null,
         stop_requested_at: null,
@@ -294,7 +313,9 @@ export async function sendWithLedger(
 
 /** 送信に失敗した時の返し方。画面には分類済みの短い文だけを出す。 */
 export function dispatchFailure(c: Context<Env>, result: Extract<DeliveryDispatchResult, { ok: false }>) {
-  const status = result.error.retryable ? 503 : 502;
+  const status = result.error.code === 'delivery_action_unsupported' ? 422
+    : ['delivery_result_unknown', 'delivery_order_conflict', 'delivery_operation_failed'].includes(result.error.code) ? 409
+      : result.error.retryable ? 503 : 502;
   return fail(c, status, result.error.message, {
     code: result.error.code,
     retryable: result.error.retryable,

@@ -8,7 +8,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { dbFor } from '../services/db-router.js';
 import { fail } from './restaurant-google.js';
 
-import { DELIVERY_SERVICE_LABELS, isDeliveryService, judgeUrgency, nowSec, summarizeOrderItems, tokyoDateText, tokyoDayRange } from '../services/restaurant-delivery.js';
+import { DELIVERY_SERVICE_LABELS, deliverySendEnabled, isDeliveryService, judgeUrgency, nowSec, summarizeOrderItems, tokyoDateText, tokyoDayRange, uberOAuthClient } from '../services/restaurant-delivery.js';
 import type { DeliveryOrderStatus } from '../services/restaurant-delivery.js';
 import type { DeliveryService } from '../services/delivery-service-types.js';
 import { ORDER_STATUS_LABELS, isoOrNull, deliveryStore, serviceStates, resumeExpiredIntake, cookingCountFor, itemsForOrders } from './restaurant-delivery-common.js';
@@ -83,7 +83,7 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
       }
       summary.count += row.count;
       summary.amount += row.amount;
-      if (row.status === 'ready' || row.status === 'handed_over') {
+      if (row.status === 'handed_over') {
         summary.handedOverCount += row.count;
       }
       const current = summary.byService.get(row.service) ?? { count: 0, amount: 0 };
@@ -140,7 +140,7 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
         db
           .prepare(
             `SELECT status, COUNT(*) AS count FROM rt_delivery_orders
-            WHERE store_id = ? AND status IN ('new','cooking')
+            WHERE store_id = ? AND status IN ('new','cooking','ready')
             GROUP BY status`,
           )
           .bind(store.id)
@@ -179,7 +179,9 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
       const tabCounts = { all: 0, new: 0, cooking: 0, handed_over: 0 };
       for (const row of openCountRows.results ?? []) {
         if (row.status === 'new') tabCounts.new = row.count;
-        if (row.status === 'cooking') tabCounts.cooking = row.count;
+        if (row.status === 'cooking' || row.status === 'ready') {
+          tabCounts.cooking += row.count;
+        }
       }
       tabCounts.handed_over = todaySummary.handedOverCount;
       // 「すべて」は本日の注文と、まだ手が離れていない注文の合計。
@@ -206,12 +208,12 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
       if (tab === 'new') {
         tabClause = "status = 'new'";
       } else if (tab === 'cooking') {
-        tabClause = "status = 'cooking'";
+        tabClause = "status IN ('cooking','ready')";
       } else if (tab === 'handed_over') {
-        tabClause = "status IN ('ready','handed_over') AND received_at >= ? AND received_at < ?";
+        tabClause = "status = 'handed_over' AND received_at >= ? AND received_at < ?";
         bindings.push(today.from, today.to);
       } else {
-        tabClause = "(status IN ('new','cooking') OR (received_at >= ? AND received_at < ?))";
+        tabClause = "(status IN ('new','cooking','ready') OR (received_at >= ? AND received_at < ?))";
         bindings.push(today.from, today.to);
       }
       let serviceClause = '';
@@ -244,6 +246,11 @@ export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void 
           service: state.service,
           label: DELIVERY_SERVICE_LABELS[state.service],
           connectionStatus: state.connection_status,
+          ...(state.service === 'ubereats' ? {
+            orderActionsEnabled: state.connection_status === 'connected'
+              && deliverySendEnabled(c.env) && uberOAuthClient(c.env) !== null
+              && Boolean(c.env.LINE_CREDENTIAL_ENCRYPTION_KEY?.trim()),
+          } : {}),
           intakeStatus: state.intake_status,
           stopUntil: isoOrNull(state.stop_until),
           todayCount: todaySummary.byService.get(state.service)?.count ?? 0,

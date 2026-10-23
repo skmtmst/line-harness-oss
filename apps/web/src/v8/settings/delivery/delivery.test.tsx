@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 import DeliverySettingsPage, { SERVICES, type DeliveryService } from './delivery'
 
 /**
@@ -21,6 +22,8 @@ const fixture = vi.hoisted(() => ({
   search: { value: '' },
   accountId: { value: null as string | null },
   connection: vi.fn(),
+  checkConnection: vi.fn(),
+  disconnect: vi.fn(),
   connectStart: vi.fn(),
   stores: vi.fn(),
   selectStore: vi.fn(),
@@ -41,14 +44,21 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId.value, accounts: [] }),
 }))
-vi.mock('@/lib/restaurant-delivery-api', () => ({
-  restaurantDeliveryApi: {
-    ubereatsConnection: fixture.connection,
-    ubereatsConnectStart: fixture.connectStart,
-    ubereatsStores: fixture.stores,
-    ubereatsSelectStore: fixture.selectStore,
-  },
-}))
+vi.mock('@/lib/restaurant-delivery-api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/restaurant-delivery-api')>('@/lib/restaurant-delivery-api')
+  return {
+    ...actual,
+    restaurantDeliveryApi: {
+      ...actual.restaurantDeliveryApi,
+      ubereatsConnection: fixture.connection,
+      ubereatsCheckConnection: fixture.checkConnection,
+      ubereatsDisconnect: fixture.disconnect,
+      ubereatsConnectStart: fixture.connectStart,
+      ubereatsStores: fixture.stores,
+      ubereatsSelectStore: fixture.selectStore,
+    },
+  }
+})
 
 /** サーバが返す接続の状態のひな型。 */
 function connection(next: Partial<{ status: string; storeName: string | null; connectedAt: string | null; checkedAt: string | null }> = {}, oauthConfigured = true) {
@@ -66,6 +76,17 @@ function connection(next: Partial<{ status: string; storeName: string | null; co
       ...next,
     },
   }
+}
+
+function connectionMutation(next: Partial<ReturnType<typeof connection>['connection']> = {}) {
+  return { success: true, connection: { ...connection().connection, ...next } }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+  return { promise, resolve, reject }
 }
 
 const REAL_LOCATION = window.location
@@ -116,6 +137,7 @@ describe('設定 › デリバリー連携', () => {
       .map((region) => region.querySelector('h2')?.textContent)
     expect(titles).toEqual(['Uber Eats', '出前館', 'ロケットナウ'])
     expect(screen.getAllByText('未接続')).toHaveLength(3)
+    expect(card('Uber Eats').getByText('Uber Eats への接続を設定します。注文の連携は受注画面で確認します')).toBeTruthy()
 
     const login = button('Uber Eats にログインしてつなぐ')
     expect(login.disabled).toBe(false)
@@ -189,7 +211,7 @@ describe('設定 › デリバリー連携', () => {
     expect(await screen.findByText('渋谷店')).toBeTruthy()
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('接続中')).toBeTruthy()
-    expect(uberCard.getByText('準備中', { exact: true })).toBeTruthy()
+    expect(uberCard.getByText('受注画面で確認', { exact: true })).toBeTruthy()
     expect(uberCard.queryByRole('button', { name: /注文の連携/ })).toBeNull()
     expect(uberCard.getByText('つないだお店')).toBeTruthy()
   })
@@ -265,20 +287,127 @@ describe('設定 › デリバリー連携', () => {
     expect(card('出前館').queryByText('申し込んだ日')).toBeNull()
   })
 
-  it('DL-3：承認済みの窓を保ち、受け口のない解除で接続を変えない', () => {
-    render(<DeliverySettingsPage services={[uber({ status: 'connected', storeName: '渋谷店' })]} />)
+  it('DL-3：確認窓で確定した1回だけ解除し、サーバの解除済み応答を反映する', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'connected', storeName: '渋谷店' }))
+    const pending = deferred<ReturnType<typeof connectionMutation>>()
+    fixture.disconnect.mockReturnValue(pending.promise)
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
 
     fireEvent.click(button('連携を解除する'))
     // 承認案 `kJLks` のとおり、英字で終わる社名のあとは半角の空きを入れる。
     expect(screen.getByText('Uber Eats の連携を解除しますか')).toBeTruthy()
     expect(screen.getByText(/^Uber Eats とのつなぎを外します。/)).toBeTruthy()
+    expect(fixture.disconnect).not.toHaveBeenCalled()
 
     fireEvent.click(button('解除する'))
-    expect(screen.queryByText('Uber Eats の連携を解除しますか')).toBeNull()
-    const uberCard = card('Uber Eats')
-    expect(screen.getByText('現在準備中です')).toBeTruthy()
-    expect(uberCard.getByText('接続中')).toBeTruthy()
-    expect(uberCard.getByText('渋谷店')).toBeTruthy()
+    expect(fixture.disconnect).toHaveBeenCalledWith('acc-1')
+    expect(fixture.disconnect).toHaveBeenCalledTimes(1)
+    expect(button('解除しています…').disabled).toBe(true)
+    fireEvent.click(button('解除しています…'))
+    expect(fixture.disconnect).toHaveBeenCalledTimes(1)
+
+    await act(async () => pending.resolve(connectionMutation({ status: 'disconnected' })))
+    await waitFor(() => expect(screen.queryByText('Uber Eats の連携を解除しますか')).toBeNull())
+    expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
+    expect(card('Uber Eats').queryByText('渋谷店')).toBeNull()
+    expect(screen.queryByText('現在準備中です')).toBeNull()
+  })
+
+  it('DL-3：解除結果が確定しなければ窓と接続表示を保ち、自動で送り直さない', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'connected', storeName: '渋谷店' }))
+    fixture.disconnect.mockResolvedValue(connectionMutation({ status: 'connected', storeName: '渋谷店' }))
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
+    fireEvent.click(button('連携を解除する'))
+    fireEvent.click(button('解除する'))
+
+    expect(await screen.findByText(/解除結果を確認できませんでした/)).toBeTruthy()
+    expect(screen.getByText('Uber Eats の連携を解除しますか')).toBeTruthy()
+    expect(button('解除する').disabled).toBe(true)
+    expect(card('Uber Eats').getByText('接続エラー')).toBeTruthy()
+    expect(card('Uber Eats').getByText('渋谷店')).toBeTruthy()
+    expect((card('Uber Eats').getByRole('button', { name: '接続を確かめる' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((card('Uber Eats').getByRole('button', { name: '連携を解除する' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(fixture.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('DL-3：解除結果不明の符号を受けたら接続操作を止める', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'connected', storeName: '渋谷店' }))
+    fixture.disconnect.mockRejectedValue(new ApiError(503, 'API error: 503', 'pos_deactivation_unknown'))
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
+    fireEvent.click(button('連携を解除する'))
+    fireEvent.click(button('解除する'))
+
+    expect(await screen.findByText(/解除結果を確認できませんでした/)).toBeTruthy()
+    expect(button('解除する').disabled).toBe(true)
+    expect(card('Uber Eats').getByText('接続エラー')).toBeTruthy()
+    expect((card('Uber Eats').getByRole('button', { name: '連携を解除する' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(fixture.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('DL-3：再認証が必要なら接続表示を保ち、ログインし直す必要を伝える', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'connected', storeName: '渋谷店' }))
+    fixture.disconnect.mockRejectedValue(new ApiError(409, 'API error: 409', 'reauthorization_required'))
+    fixture.connectStart.mockResolvedValue({ success: true, mode: 'reconnect', authorizeUrl: 'https://auth.uber.com/oauth/v2/authorize?reauth=1' })
+    const location = stubLocation()
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
+    fireEvent.click(button('連携を解除する'))
+    fireEvent.click(button('解除する'))
+
+    expect(await screen.findAllByText(/Uber Eats へログインし直す必要があります/)).toHaveLength(2)
+    expect(screen.getByText('Uber Eats の連携を解除しますか')).toBeTruthy()
+    expect(button('解除する').disabled).toBe(true)
+    expect(card('Uber Eats').getByText('接続中')).toBeTruthy()
+    expect(card('Uber Eats').getByText('渋谷店')).toBeTruthy()
+    expect(fixture.disconnect).toHaveBeenCalledTimes(1)
+    expect(fixture.connectStart).not.toHaveBeenCalled()
+
+    fireEvent.click(button('キャンセル'))
+    expect(card('Uber Eats').getByText('Uber Eats へログインし直す必要があります。「Uber Eats にログインし直す」から、もう一度許可してください。')).toBeTruthy()
+    fireEvent.click(button('Uber Eats にログインし直す'))
+    await waitFor(() => expect(fixture.connectStart).toHaveBeenCalledWith('acc-1'))
+    expect(location.href).toBe('https://auth.uber.com/oauth/v2/authorize?reauth=1')
+  })
+
+  it('期限切れの接続は再ログインの入口を出し、reconnect応答だけで認可画面へ移る', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'expired', storeName: '渋谷店' }))
+    fixture.connectStart.mockResolvedValue({ success: true, mode: 'reconnect', authorizeUrl: 'https://auth.uber.com/oauth/v2/authorize?reauth=1' })
+    const location = stubLocation()
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText(/Uber Eats へのログインの期限が切れました/)).toBeTruthy()
+    expect((card('Uber Eats').getByRole('button', { name: '連携を解除する' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(button('Uber Eats にログインし直す'))
+
+    await waitFor(() => expect(fixture.connectStart).toHaveBeenCalledWith('acc-1'))
+    expect(location.href).toBe('https://auth.uber.com/oauth/v2/authorize?reauth=1')
+  })
+
+  it('再ログイン開始がreconnectでなければ認可画面へ移らない', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'expired', storeName: '渋谷店' }))
+    fixture.connectStart.mockResolvedValue({ success: true, mode: 'connect', authorizeUrl: 'https://auth.uber.com/oauth/v2/authorize?wrong=1' })
+    const location = stubLocation()
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText(/Uber Eats へのログインの期限が切れました/)).toBeTruthy()
+    fireEvent.click(button('Uber Eats にログインし直す'))
+
+    expect(await screen.findByText(/ログイン画面を開けませんでした/)).toBeTruthy()
+    expect(location.href).toBe('')
+    expect(fixture.connectStart).toHaveBeenCalledTimes(1)
   })
 
   it('DL-4：Uber から戻ると候補を取って窓が開き、選ぶと接続中になる', async () => {
@@ -310,6 +439,7 @@ describe('設定 › デリバリー連携', () => {
     ).toBeTruthy()
     expect(fixture.stores).toHaveBeenCalledWith('acc-1')
     expect(button('このお店につなぐ').disabled).toBe(true)
+    expect(screen.getByText(/接続後、受注画面で利用できる注文の操作を確認してください/)).toBeTruthy()
 
     // 共通の RadioCardGroup は fieldset ＋ legend で描くので、役割は group。
     const stores = within(screen.getByRole('group', { name: 'つなぐお店' }))
@@ -324,7 +454,7 @@ describe('設定 › デリバリー連携', () => {
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('接続中')).toBeTruthy()
     expect(uberCard.getByText('渋谷店')).toBeTruthy()
-    expect(uberCard.getByText('準備中', { exact: true })).toBeTruthy()
+    expect(uberCard.getByText('受注画面で確認', { exact: true })).toBeTruthy()
     expect(uberCard.queryByRole('button', { name: /注文の連携/ })).toBeNull()
     expect(screen.queryByText(/Uber Eats へのログインは受け取りました/)).toBeNull()
   })
@@ -376,12 +506,62 @@ describe('設定 › デリバリー連携', () => {
     expect(fixture.selectStore).toHaveBeenCalledTimes(1)
     expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
   })
-  it('接続の確認は未接続の口なので、現在時刻を成功日時にしない', () => {
-    render(<DeliverySettingsPage services={[uber({ status: 'connected', checkedAt: '2026-10-12T01:00:00.000Z' })]} />)
+  it('接続の確認はサーバが確定した状態と確認時刻だけを反映する', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({
+      status: 'connected',
+      storeName: '渋谷店',
+      checkedAt: '2026-10-12T01:00:00.000Z',
+    }))
+    fixture.checkConnection.mockResolvedValue(connectionMutation({
+      status: 'connected',
+      storeName: '渋谷店',
+      checkedAt: '2026-10-23T02:30:00.000Z',
+    }))
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
     const before = card('Uber Eats').getByText('最後に確かめた時刻').nextElementSibling?.textContent
     fireEvent.click(button('接続を確かめる'))
-    expect(screen.getByText('現在準備中です')).toBeTruthy()
+    expect(fixture.checkConnection).toHaveBeenCalledWith('acc-1')
+    await waitFor(() => expect(card('Uber Eats').getByText('最後に確かめた時刻').nextElementSibling?.textContent).not.toBe(before))
+    expect(screen.queryByText('現在準備中です')).toBeNull()
+  })
+
+  it('接続の確認に失敗したら表示中の状態と時刻を保つ', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({
+      status: 'connected',
+      storeName: '渋谷店',
+      checkedAt: '2026-10-12T01:00:00.000Z',
+    }))
+    fixture.checkConnection.mockRejectedValue(new Error('失敗'))
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
+    const before = card('Uber Eats').getByText('最後に確かめた時刻').nextElementSibling?.textContent
+    fireEvent.click(button('接続を確かめる'))
+
+    expect(await screen.findByText(/表示中の接続状態は変更していません/)).toBeTruthy()
+    expect(card('Uber Eats').getByText('接続中')).toBeTruthy()
+    expect(card('Uber Eats').getByText('渋谷店')).toBeTruthy()
     expect(card('Uber Eats').getByText('最後に確かめた時刻').nextElementSibling?.textContent).toBe(before)
+    expect(fixture.checkConnection).toHaveBeenCalledTimes(1)
+  })
+
+  it('接続確認で解除結果不明が分かったら接続操作を止める', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'connected', storeName: '渋谷店' }))
+    fixture.checkConnection.mockRejectedValue(new ApiError(409, 'API error: 409', 'pos_deactivation_unknown'))
+
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
+    fireEvent.click(button('接続を確かめる'))
+
+    expect(await screen.findByText(/連携を解除した結果を確認する必要があります/)).toBeTruthy()
+    expect(card('Uber Eats').getByText('接続エラー')).toBeTruthy()
+    expect((card('Uber Eats').getByRole('button', { name: '接続を確かめる' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((card('Uber Eats').getByRole('button', { name: '連携を解除する' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('閲覧のみでOAuthから戻っても、候補の取得や変更窓を自動で開かない', async () => {
@@ -391,11 +571,87 @@ describe('設定 › デリバリー連携', () => {
     fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
     fixture.stores.mockResolvedValue({ success: true, stores: STORES })
     render(<DeliverySettingsPage />)
-    await waitFor(() => expect(fixture.connection).toHaveBeenCalledWith('acc-1'))
     expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
     expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
+    expect(fixture.connection).not.toHaveBeenCalled()
     expect(fixture.stores).not.toHaveBeenCalled()
     expect(fixture.selectStore).not.toHaveBeenCalled()
+  })
+
+  it('LINE公式アカウントを替えた後は、前のアカウントの遅い確認結果を反映しない', async () => {
+    fixture.accountId.value = 'account-a'
+    fixture.connection.mockImplementation((accountId: string) => Promise.resolve(connection({
+      status: 'connected',
+      storeName: accountId === 'account-a' ? '店舗A' : '店舗B',
+    })))
+    const oldCheck = deferred<ReturnType<typeof connectionMutation>>()
+    fixture.checkConnection.mockReturnValue(oldCheck.promise)
+    const { rerender } = render(<DeliverySettingsPage />)
+    expect(await screen.findByText('店舗A')).toBeTruthy()
+
+    fireEvent.click(button('接続を確かめる'))
+    expect(fixture.checkConnection).toHaveBeenCalledWith('account-a')
+    fixture.accountId.value = 'account-b'
+    rerender(<DeliverySettingsPage />)
+    expect(await screen.findByText('店舗B')).toBeTruthy()
+
+    await act(async () => oldCheck.resolve(connectionMutation({ status: 'connected', storeName: '古い店舗' })))
+    expect(card('Uber Eats').getByText('店舗B')).toBeTruthy()
+    expect(card('Uber Eats').queryByText('古い店舗')).toBeNull()
+  })
+
+  it('操作開始前の遅い読み取りは、同じアカウントの確定結果を上書きしない', async () => {
+    fixture.accountId.value = 'acc-1'
+    const oldLoad = deferred<ReturnType<typeof connection>>()
+    fixture.connection.mockReturnValue(oldLoad.promise)
+    fixture.checkConnection.mockResolvedValue(connectionMutation({ status: 'disconnected' }))
+    render(<DeliverySettingsPage services={[uber({ status: 'connected', storeName: '渋谷店' })]} />)
+    await waitFor(() => expect(fixture.connection).toHaveBeenCalledWith('acc-1'))
+
+    fireEvent.click(button('接続を確かめる'))
+    await waitFor(() => expect(card('Uber Eats').getByText('未接続')).toBeTruthy())
+    await act(async () => oldLoad.resolve(connection({ status: 'connected', storeName: '古い店舗' })))
+
+    expect(card('Uber Eats').getByText('未接続')).toBeTruthy()
+    expect(card('Uber Eats').queryByText('古い店舗')).toBeNull()
+  })
+
+  it('閲覧のみへ変わった後は、開始済みの確認結果を反映しない', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'connected', storeName: '渋谷店' }))
+    const oldCheck = deferred<ReturnType<typeof connectionMutation>>()
+    fixture.checkConnection.mockReturnValue(oldCheck.promise)
+    const { rerender } = render(<DeliverySettingsPage />)
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
+
+    fireEvent.click(button('接続を確かめる'))
+    fixture.role.value = 'staff'
+    rerender(<DeliverySettingsPage />)
+    expect(await screen.findByText(/閲覧のみ/)).toBeTruthy()
+    await act(async () => oldCheck.resolve(connectionMutation({ status: 'connected', storeName: '古い店舗' })))
+
+    expect(card('Uber Eats').getByText('渋谷店')).toBeTruthy()
+    expect(card('Uber Eats').queryByText('古い店舗')).toBeNull()
+    expect(card('Uber Eats').queryByRole('button', { name: '接続を確かめる' })).toBeNull()
+    expect(card('Uber Eats').queryByRole('button', { name: '連携を解除する' })).toBeNull()
+  })
+
+  it('LINE公式アカウントを替えた後は、前のアカウントの遅い読み取りを反映しない', async () => {
+    fixture.accountId.value = 'account-a'
+    const oldLoad = deferred<ReturnType<typeof connection>>()
+    fixture.connection.mockImplementation((accountId: string) => accountId === 'account-a'
+      ? oldLoad.promise
+      : Promise.resolve(connection({ status: 'connected', storeName: '店舗B' })))
+    const { rerender } = render(<DeliverySettingsPage />)
+    await waitFor(() => expect(fixture.connection).toHaveBeenCalledWith('account-a'))
+
+    fixture.accountId.value = 'account-b'
+    rerender(<DeliverySettingsPage />)
+    expect(await screen.findByText('店舗B')).toBeTruthy()
+    await act(async () => oldLoad.resolve(connection({ status: 'connected', storeName: '店舗A' })))
+
+    expect(card('Uber Eats').getByText('店舗B')).toBeTruthy()
+    expect(card('Uber Eats').queryByText('店舗A')).toBeNull()
   })
 
   it.each(['pos_activation_started', 'pos_activation_unknown'])('結果の照合が必要な%sは再表示しても再送の窓を開かない', async (lastError) => {
@@ -412,6 +668,66 @@ describe('設定 › デリバリー連携', () => {
     expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
     expect(fixture.stores).not.toHaveBeenCalled()
     expect(fixture.selectStore).not.toHaveBeenCalled()
+    expect((card('Uber Eats').getByRole('button', { name: '接続を確かめる' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((card('Uber Eats').getByRole('button', { name: '連携を解除する' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it.each(['pos_deactivation_started', 'pos_deactivation_unknown'])('解除結果の照合が必要な%sは接続先を残し、接続操作を止める', async (lastError) => {
+    fixture.accountId.value = 'acc-1'
+    const data = connection({ status: 'pending_store', storeName: '渋谷店', connectedAt: '2026-10-13T02:30:00.000Z' })
+    fixture.connection.mockResolvedValue({ ...data, connection: { ...data.connection, lastError } })
+    render(<DeliverySettingsPage />)
+
+    expect(await screen.findByText(/連携を解除した結果を確認する必要があります/)).toBeTruthy()
+    expect(card('Uber Eats').getByText('接続エラー')).toBeTruthy()
+    expect(card('Uber Eats').getByText('渋谷店')).toBeTruthy()
+    expect((card('Uber Eats').getByRole('button', { name: '接続を確かめる' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((card('Uber Eats').getByRole('button', { name: '連携を解除する' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(fixture.checkConnection).not.toHaveBeenCalled()
+    expect(fixture.disconnect).not.toHaveBeenCalled()
+  })
+
+  it.each(['store_provision_review_required', 'store_menu_refresh_review_required'])('%sは店舗選択へ戻さず、安全な接続確認だけを残す', async (lastError) => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=pending_store'
+    const data = connection({ status: 'pending_store', storeName: '渋谷店', connectedAt: '2026-10-13T02:30:00.000Z' })
+    fixture.connection.mockResolvedValue({ ...data, connection: { ...data.connection, lastError } })
+    render(<DeliverySettingsPage />)
+
+    expect(await screen.findByText(/Uber Eats 側の接続状態を確認する必要があります/)).toBeTruthy()
+    expect(card('Uber Eats').getByText('接続エラー')).toBeTruthy()
+    expect(card('Uber Eats').getByText('渋谷店')).toBeTruthy()
+    expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
+    expect(fixture.stores).not.toHaveBeenCalled()
+    expect(fixture.selectStore).not.toHaveBeenCalled()
+    expect((card('Uber Eats').getByRole('button', { name: '接続を確かめる' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((card('Uber Eats').getByRole('button', { name: '連携を解除する' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('再ログインから戻ったら店舗選択や解除を自動実行せず、接続確認の完了を待つ', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.search.value = 'ubereats=reauthorized'
+    const pending = connection({ status: 'pending_store', storeName: '渋谷店', connectedAt: '2026-10-13T02:30:00.000Z' })
+    fixture.connection.mockResolvedValue({
+      ...pending,
+      connection: { ...pending.connection, lastError: 'pos_disconnect_reauthorization_pending' },
+    })
+    fixture.checkConnection.mockResolvedValue(connectionMutation({ status: 'connected', storeName: '渋谷店' }))
+    render(<DeliverySettingsPage />)
+
+    expect(await screen.findByText(/Uber Eats へのログインを更新しました/)).toBeTruthy()
+    expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Uber Eats にログインし直す' })).toBeNull()
+    expect(fixture.stores).not.toHaveBeenCalled()
+    expect(fixture.disconnect).not.toHaveBeenCalled()
+    expect((card('Uber Eats').getByRole('button', { name: '接続を確かめる' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((card('Uber Eats').getByRole('button', { name: '連携を解除する' }) as HTMLButtonElement).disabled).toBe(true)
+
+    fireEvent.click(card('Uber Eats').getByRole('button', { name: '接続を確かめる' }))
+    await waitFor(() => expect(card('Uber Eats').getByText('接続中')).toBeTruthy())
+    expect((card('Uber Eats').getByRole('button', { name: '連携を解除する' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(fixture.checkConnection).toHaveBeenCalledTimes(1)
+    expect(fixture.disconnect).not.toHaveBeenCalled()
   })
 
 })

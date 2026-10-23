@@ -250,6 +250,7 @@ function OrderRow({
   nowMs,
   busy,
   canManage,
+  uberOrderActionsEnabled,
   checked,
   selectable,
   onToggleSelect,
@@ -257,11 +258,13 @@ function OrderRow({
   onAccept,
   onReject,
   onReady,
+  onHandOver,
 }: {
   order: DeliveryOrderSummary
   nowMs: number
   busy: boolean
   canManage: boolean
+  uberOrderActionsEnabled: boolean
   /** まとめて受け付ける相手として選んでいるか。 */
   checked: boolean
   /** 新着だけ選べる（受け付けたあとの注文はまとめて受け付けられない）。 */
@@ -271,8 +274,9 @@ function OrderRow({
   onAccept: (order: DeliveryOrderSummary) => void
   onReject: (order: DeliveryOrderSummary) => void
   onReady: (order: DeliveryOrderSummary) => void
+  onHandOver: (order: DeliveryOrderSummary) => void
 }) {
-  const preparing = order.service === 'ubereats'
+  const preparing = order.service === 'ubereats' && !uberOrderActionsEnabled
   const [menuOpen, setMenuOpen] = useState(false)
   /* 行の右端：主な操作は1つだけボタン、残りは「…」（共通の ActionCell。オーナー決定 ）。 */
   const openItem = { id: 'open', label: '詳細を見る', onSelect: () => onOpen(order.id) }
@@ -352,7 +356,7 @@ function OrderRow({
                 items={[openItem, { id: 'reject', label: '断る', disabled: busy || preparing, onSelect: () => onReject(order) }]}
               />
             </>
-          ) : order.status === 'cooking' && canManage ? (
+          ) : (order.status === 'cooking' || order.status === 'ready') && canManage ? (
             <>
               <Button
                 size="compact"
@@ -361,11 +365,13 @@ function OrderRow({
                 disabled={preparing}
                 title={preparing ? PREPARING_WORD : undefined}
                 busyLabel="変更中"
-                doneLabel="準備済"
-                aria-label={`注文${order.orderNumber}を準備完了にする`}
-                onClick={() => onReady(order)}
+                doneLabel={order.status === 'cooking' ? '準備済' : '受渡済'}
+                aria-label={order.status === 'cooking'
+                  ? `注文${order.orderNumber}を準備完了にする`
+                  : `注文${order.orderNumber}を受け渡し済みにする`}
+                onClick={() => order.status === 'cooking' ? onReady(order) : onHandOver(order)}
               >
-                準備完了にする
+                {order.status === 'cooking' ? '準備完了にする' : '受け渡し済みにする'}
               </Button>
               <RowMenu
                 size="row"
@@ -401,6 +407,7 @@ export interface OrdersBoardProps {
   /** 受付の再開を送っているサービス。 */
   busyService: DeliveryService | null
   canManage: boolean
+  uberOrderActionsEnabled: boolean
   nowMs: number
   /** まとめて受け付ける相手として選んでいる注文の id。 */
   selected: string[]
@@ -417,6 +424,7 @@ export interface OrdersBoardProps {
   onAccept: (order: DeliveryOrderSummary) => void
   onReject: (order: DeliveryOrderSummary) => void
   onReady: (order: DeliveryOrderSummary) => void
+  onHandOver: (order: DeliveryOrderSummary) => void
   onStopService: (service: DeliveryService) => void
   onResumeService: (service: DeliveryService) => void
   onPage: (page: number) => void
@@ -431,6 +439,7 @@ export default function OrdersBoard({
   busyOrderId,
   busyService,
   canManage,
+  uberOrderActionsEnabled,
   nowMs,
   selected,
   bulkBusy,
@@ -443,6 +452,7 @@ export default function OrdersBoard({
   onAccept,
   onReject,
   onReady,
+  onHandOver,
   onStopService,
   onResumeService,
   onPage,
@@ -577,6 +587,7 @@ export default function OrdersBoard({
               nowMs={nowMs}
               busy={busyOrderId === order.id || bulkBusy}
               canManage={canManage}
+              uberOrderActionsEnabled={uberOrderActionsEnabled}
               checked={selectedSet.has(order.id)}
               selectable={canManage && order.status === 'new' && order.service !== 'ubereats'}
               onToggleSelect={onToggleSelect}
@@ -584,6 +595,7 @@ export default function OrdersBoard({
               onAccept={onAccept}
               onReject={onReject}
               onReady={onReady}
+              onHandOver={onHandOver}
             />
           ))
         )}

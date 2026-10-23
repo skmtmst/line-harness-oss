@@ -18,6 +18,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { currentInvocation, withInvocation } from '@line-crm/shared/server';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import {
+  orderCreatedPayload as deliveryOrderCreatedPayload,
+  uberIgnoredNotification,
+  type DeliveryOrderCreatedOverrides,
+} from '../test-utils/delivery-webhook-fixtures.js';
 import { stubUberStoresApi, type UberStoresApiOptions } from '../test-utils/uber-stores-api.js';
 
 type MockStaff = {
@@ -144,13 +149,13 @@ function seedOrder(
           total_amount, currency, item_count, pickup_method, wanted_at, urgency,
           received_at, version, created_at, updated_at)
        VALUES (?, 'account-2', 'store-shibuya', ?, ?, ?, ?, 3200, 'JPY', 2,
-               '配達（Uber Eats 配達員）', ?, 'normal', ?, ?, ?, ?)`,
+               '配達（出前館 配達員）', ?, 'normal', ?, ?, ?, ?)`,
     )
     .run(
       id,
-      overrides.service ?? 'ubereats',
-      overrides.externalOrderId ?? `UE-${id}`,
-      `#UE-${id}`,
+      overrides.service ?? 'demaecan',
+      overrides.externalOrderId ?? `DM-${id}`,
+      `#DM-${id}`,
       overrides.status ?? 'new',
       NOW_SEC + 1800,
       NOW_SEC - 60,
@@ -238,25 +243,9 @@ async function signUberWebhook(rawBody: string, secret = UBEREATS_CLIENT_SECRET)
 }
 
 function orderCreatedPayload(
-  overrides: { eventId?: string; externalOrderId?: string; orderNumber?: string } = {},
+  overrides: DeliveryOrderCreatedOverrides = {},
 ) {
-  return {
-    event_id: overrides.eventId ?? 'evt-1',
-    event_type: 'order.created',
-    store_id: 'store-shibuya',
-    order: {
-      external_order_id: overrides.externalOrderId ?? 'UE-9001',
-      order_number: overrides.orderNumber ?? '#UE-9001',
-      total_amount: 2480,
-      pickup_method: '配達（Uber Eats 配達員）',
-      wanted_at: NOW_SEC + 1500,
-      received_at: NOW_SEC - 30,
-      items: [
-        { name: '鶏の唐揚げ弁当', quantity: 2, amount: 1800 },
-        { name: '味噌汁', note: '特製タレ増量（無料）', quantity: 1, amount: 680 },
-      ],
-    },
-  };
+  return deliveryOrderCreatedPayload(NOW_SEC, overrides);
 }
 
 /** 署名付きで受信口を叩く。既定は正しい署名・正しい時刻。 */
@@ -272,7 +261,7 @@ async function postWebhook(
     headers?: Record<string, string>;
   } = {},
 ) {
-  const service = init.service ?? 'ubereats';
+  const service = init.service ?? 'demaecan';
   const rawBody = init.rawBody ?? JSON.stringify(payload);
   const timestamp = init.timestamp ?? NOW_SEC;
   // 署名の作り方はサービスごとに違う。Uber は本文だけ・時刻の見出しなし。
@@ -374,8 +363,8 @@ beforeEach(() => {
     RT_DELIVERY_UBEREATS_CLIENT_ID: 'test-client-id',
     RT_DELIVERY_UBEREATS_CLIENT_SECRET: 'test-client-secret',
     RT_DELIVERY_SEND_ENABLED: 'true',
-    RT_DELIVERY_UBEREATS_API_BASE_URL: 'https://ubereats.example.test',
-    RT_DELIVERY_UBEREATS_API_TOKEN: 'ubereats-token',
+    RT_DELIVERY_DEMAECAN_API_BASE_URL: 'https://demaecan.example.test',
+    RT_DELIVERY_DEMAECAN_API_TOKEN: 'demaecan-token',
     RT_DELIVERY_UBEREATS_WEBHOOK_SECRET: UBEREATS_WEBHOOK_SECRET,
     RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET: DEMAECAN_WEBHOOK_SECRET,
   } as unknown as Env['Bindings'];
@@ -404,12 +393,12 @@ describe('送信台帳（受入条件2）', () => {
 
     // 外へ出たのは1回だけ。宛先は各サービスの店舗向け窓口（受注一元化サービスは経由しない）。
     expect(deliveryCalls).toHaveLength(1);
-    expect(deliveryCalls[0]?.url).toBe('https://ubereats.example.test/orders/accept');
+    expect(deliveryCalls[0]?.url).toBe('https://demaecan.example.test/orders/accept');
 
     const rows = dispatchRows();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      service: 'ubereats',
+      service: 'demaecan',
       action: 'accept',
       target_kind: 'order',
       target_id: 'order-1',
@@ -511,17 +500,17 @@ describe('受信口（受入条件3）', () => {
     const events = eventRows();
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
-      service: 'ubereats',
+      service: 'demaecan',
       external_event_id: 'evt-1',
       event_type: 'order.created',
-      external_order_id: 'UE-9001',
+      external_order_id: 'DM-9001',
       status: 'processed',
       error_code: null,
     });
 
     const orders = testDb.raw
       .prepare('SELECT * FROM rt_delivery_orders WHERE external_order_id = ?')
-      .all('UE-9001') as Array<Record<string, unknown>>;
+      .all('DM-9001') as Array<Record<string, unknown>>;
     expect(orders).toHaveLength(1);
     expect(orders[0]).toMatchObject({ store_id: 'store-shibuya', status: 'new', item_count: 3 });
     const items = testDb.raw
@@ -538,12 +527,12 @@ describe('受信口（受入条件3）', () => {
   });
 
   it('本文を書き換えた通知は署名が合わず401になる', async () => {
-    const payload = orderCreatedPayload();
+    const payload = uberIgnoredNotification();
     const signed = JSON.stringify(payload);
-    const tampered = JSON.stringify({ ...payload, order: { ...payload.order, total_amount: 1 } });
+    const tampered = JSON.stringify({ ...payload, event_type: 'orders.other_future_notification' });
     const signature = await signUberWebhook(signed);
 
-    const response = await postWebhook(null, { rawBody: tampered, signature });
+    const response = await postWebhook(null, { service: 'ubereats', rawBody: tampered, signature });
     expect(response.status).toBe(401);
     expect(eventRows()).toHaveLength(0);
   });
@@ -551,7 +540,7 @@ describe('受信口（受入条件3）', () => {
   // Uber は公式仕様で時刻の見出しを送らないため、Uber の受信口では時刻を見ない。
   // 見ると本物の通知を落としてしまうので、ここでそのことを固定する。
   it('Uber からの通知は時刻の見出しが無くても受け付ける', async () => {
-    const rawBody = JSON.stringify(orderCreatedPayload());
+    const rawBody = JSON.stringify(uberIgnoredNotification());
     const response = await app().request(
       '/api/restaurant-test/delivery/webhooks/ubereats',
       {
@@ -565,11 +554,13 @@ describe('受信口（受入条件3）', () => {
       env,
     );
     expect(response.status).toBe(200);
-    expect(eventRows()).toHaveLength(1);
+    expect(await response.text()).toBe('');
+    expect(eventRows()).toHaveLength(0);
+    expect(deliveryCalls).toHaveLength(0);
   });
 
   it('Uber の受信口に自社方式の見出しだけで送っても401になる', async () => {
-    const rawBody = JSON.stringify(orderCreatedPayload());
+    const rawBody = JSON.stringify(uberIgnoredNotification());
     const response = await app().request(
       '/api/restaurant-test/delivery/webhooks/ubereats',
       {
@@ -589,7 +580,10 @@ describe('受信口（受入条件3）', () => {
   });
 
   it('Uber の受信口は静的なトークン用の合言葉では通らない', async () => {
-    const response = await postWebhook(orderCreatedPayload(), { secret: UBEREATS_WEBHOOK_SECRET });
+    const response = await postWebhook(uberIgnoredNotification(), {
+      service: 'ubereats',
+      secret: UBEREATS_WEBHOOK_SECRET,
+    });
     expect(response.status).toBe(401);
     expect(eventRows()).toHaveLength(0);
   });
@@ -641,7 +635,7 @@ describe('受信口（受入条件3）', () => {
   it('通知IDが違えば別の注文として取り込む', async () => {
     await postWebhook(orderCreatedPayload());
     const response = await postWebhook(
-      orderCreatedPayload({ eventId: 'evt-2', externalOrderId: 'UE-9002', orderNumber: '#UE-9002' }),
+      orderCreatedPayload({ eventId: 'evt-2', externalOrderId: 'DM-9002', orderNumber: '#DM-9002' }),
     );
     expect(response.status).toBe(200);
     expect(eventRows()).toHaveLength(2);
@@ -663,20 +657,20 @@ describe('受信口（受入条件3）', () => {
   });
 
   // Uber の受信口の鍵は同じアプリの Secret なので、欠けを見るのもそちら。
-  it('鍵が設定されていないサービスは503で断り、署名の判定へ進まない', async () => {
+  it('Uber の鍵が設定されていなければ503で断り、署名の判定へ進まない', async () => {
     env = { ...env, RT_DELIVERY_UBEREATS_CLIENT_SECRET: undefined } as Env['Bindings'];
-    const response = await postWebhook(orderCreatedPayload());
+    const response = await postWebhook(uberIgnoredNotification(), { service: 'ubereats' });
     expect(response.status).toBe(503);
     expect(eventRows()).toHaveLength(0);
   });
 
   it('お客様からのキャンセル通知で注文を終わらせる', async () => {
-    seedOrder({ status: 'cooking', externalOrderId: 'UE-7001' });
+    seedOrder({ status: 'cooking', externalOrderId: 'DM-7001' });
     const response = await postWebhook({
       event_id: 'evt-cancel-1',
       event_type: 'order.canceled',
       store_id: 'store-shibuya',
-      cancel: { external_order_id: 'UE-7001', canceled_by: 'customer' },
+      cancel: { external_order_id: 'DM-7001', canceled_by: 'customer' },
     });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true, result: 'canceled' });
@@ -746,7 +740,7 @@ describe('受信口の送信元IPの制限（出前館QA#7）', () => {
     env = {
       ...env,
       RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '192.0.2.1',
-      RT_DELIVERY_UBEREATS_WEBHOOK_IP_ALLOWLIST: '198.51.100.7',
+      RT_DELIVERY_DEMAECAN_WEBHOOK_IP_ALLOWLIST: '198.51.100.7',
     } as Env['Bindings'];
 
     // 共通側のIPはこのサービスでは通らない。
@@ -766,7 +760,7 @@ describe('受信口の送信元IPの制限（出前館QA#7）', () => {
     env = {
       ...env,
       RT_DELIVERY_WEBHOOK_IP_ALLOWLIST: '203.0.113.5',
-      RT_DELIVERY_UBEREATS_CLIENT_SECRET: undefined,
+      RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET: undefined,
     } as Env['Bindings'];
     // 鍵が無ければ本来は503だが、IPで断る方が先なので403になる。
     const response = await postWebhook(orderCreatedPayload(), {
@@ -823,7 +817,7 @@ describe('受信口の本文の大きさの上限（413）', () => {
   });
 
   it('鍵が無いときは大きさより先に503。設定不足の方を先に伝える', async () => {
-    env = { ...env, RT_DELIVERY_UBEREATS_CLIENT_SECRET: undefined } as Env['Bindings'];
+    env = { ...env, RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET: undefined } as Env['Bindings'];
     const response = await postWebhook(orderCreatedPayload(), {
       headers: { 'content-length': String(MAX_WEBHOOK_BODY_BYTES + 1) },
     });
@@ -920,33 +914,33 @@ describe('取り消せない操作（受入条件4）', () => {
 
   it('確認手順を経た受付一括停止は送れたサービスだけ停止にする', async () => {
     const response = await call('/api/restaurant-test/delivery/intake/stop', {
-      body: { preset: '30m', services: ['ubereats'] },
+      body: { preset: '30m', services: ['demaecan'] },
       confirm: INTAKE_STOP_CONFIRM_TOKEN,
     });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       success: true,
       preset: '30m',
-      stopped: ['ubereats'],
+      stopped: ['demaecan'],
       failed: [],
     });
 
     expect(dispatchRows()[0]).toMatchObject({
       action: 'intake_stop',
       target_kind: 'service',
-      target_id: 'ubereats',
+      target_id: 'demaecan',
       status: 'succeeded',
     });
     const state = testDb.raw
       .prepare('SELECT * FROM rt_delivery_service_states WHERE store_id = ? AND service = ?')
-      .get('store-shibuya', 'ubereats') as Record<string, unknown> | undefined;
+      .get('store-shibuya', 'demaecan') as Record<string, unknown> | undefined;
     expect(state).toMatchObject({ intake_status: 'stopped' });
     expect(state?.stop_until).toBe(NOW_SEC + 30 * 60);
   });
 
   it('停止する長さを選んでいないときは400で返す', async () => {
     const response = await call('/api/restaurant-test/delivery/intake/stop', {
-      body: { services: ['ubereats'] },
+      body: { services: ['demaecan'] },
       confirm: INTAKE_STOP_CONFIRM_TOKEN,
     });
     expect(response.status).toBe(400);
@@ -956,7 +950,7 @@ describe('取り消せない操作（受入条件4）', () => {
   it('送信が全部失敗したら受付状態は変えない', async () => {
     sendFailStatus = 429;
     const response = await call('/api/restaurant-test/delivery/intake/stop', {
-      body: { preset: '60m', services: ['ubereats'] },
+      body: { preset: '60m', services: ['demaecan'] },
       confirm: INTAKE_STOP_CONFIRM_TOKEN,
     });
     expect(response.status).toBe(503);
@@ -970,26 +964,26 @@ describe('取り消せない操作（受入条件4）', () => {
 
   it('受付の再開は確認手順を求めない（元に戻す操作なので）', async () => {
     const stopped = await call('/api/restaurant-test/delivery/intake/stop', {
-      body: { preset: '30m', services: ['ubereats'] },
+      body: { preset: '30m', services: ['demaecan'] },
       confirm: INTAKE_STOP_CONFIRM_TOKEN,
     });
     expect(stopped.status).toBe(200);
 
     const response = await call('/api/restaurant-test/delivery/intake/resume', {
-      body: { services: ['ubereats'] },
+      body: { services: ['demaecan'] },
     });
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ success: true, resumed: ['ubereats'] });
+    await expect(response.json()).resolves.toMatchObject({ success: true, resumed: ['demaecan'] });
     const state = testDb.raw
       .prepare('SELECT * FROM rt_delivery_service_states WHERE store_id = ? AND service = ?')
-      .get('store-shibuya', 'ubereats') as Record<string, unknown> | undefined;
+      .get('store-shibuya', 'demaecan') as Record<string, unknown> | undefined;
     expect(state).toMatchObject({ intake_status: 'open', stop_until: null });
   });
 
   it('担当者（staff）は受付の再開もできない', async () => {
     useStaffRole('staff');
     const response = await call('/api/restaurant-test/delivery/intake/resume', {
-      body: { services: ['ubereats'] },
+      body: { services: ['demaecan'] },
       token: 'staff-session',
     });
     expect(response.status).toBe(403);
@@ -1076,7 +1070,7 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
   /** 30分の停止をかける。D-6の窓から送られる形と同じ。 */
   async function stopFor30m() {
     const response = await call('/api/restaurant-test/delivery/intake/stop', {
-      body: { preset: '30m', services: ['ubereats'] },
+      body: { preset: '30m', services: ['demaecan'] },
       confirm: INTAKE_STOP_CONFIRM_TOKEN,
     });
     expect(response.status).toBe(200);
@@ -1084,7 +1078,7 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
     return response;
   }
 
-  function stateRow(service = 'ubereats'): Record<string, unknown> | undefined {
+  function stateRow(service = 'demaecan'): Record<string, unknown> | undefined {
     return testDb.raw
       .prepare('SELECT * FROM rt_delivery_service_states WHERE store_id = ? AND service = ?')
       .get('store-shibuya', service) as Record<string, unknown> | undefined;
@@ -1106,7 +1100,7 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
     vi.setSystemTime(new Date(NOW.getTime() + 31 * 60 * 1000));
 
     const services = await servicesFromOrders();
-    expect(services.find((state) => state.service === 'ubereats')).toMatchObject({
+    expect(services.find((state) => state.service === 'demaecan')).toMatchObject({
       intakeStatus: 'open',
       stopUntil: null,
     });
@@ -1115,7 +1109,7 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
     expect(dispatchRows().at(-1)).toMatchObject({
       action: 'intake_resume',
       target_kind: 'service',
-      target_id: 'ubereats',
+      target_id: 'demaecan',
       status: 'succeeded',
     });
   });
@@ -1125,7 +1119,7 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
     vi.setSystemTime(new Date(NOW.getTime() + 29 * 60 * 1000));
 
     const services = await servicesFromOrders();
-    expect(services.find((state) => state.service === 'ubereats')?.intakeStatus).toBe('stopped');
+    expect(services.find((state) => state.service === 'demaecan')?.intakeStatus).toBe('stopped');
     expect(deliveryCalls).toHaveLength(0);
     expect(stateRow()).toMatchObject({ intake_status: 'stopped' });
   });
@@ -1136,27 +1130,27 @@ describe('期限が過ぎた受付停止の自動再開（受入条件2）', () 
 
     sendFailStatus = 429;
     const failed = await servicesFromOrders();
-    expect(failed.find((state) => state.service === 'ubereats')?.intakeStatus).toBe('stopped');
+    expect(failed.find((state) => state.service === 'demaecan')?.intakeStatus).toBe('stopped');
     expect(stateRow()).toMatchObject({ intake_status: 'stopped' });
     expect(dispatchRows().at(-1)).toMatchObject({ action: 'intake_resume', status: 'retryable_failed' });
 
     sendFailStatus = null;
     const retried = await servicesFromOrders();
-    expect(retried.find((state) => state.service === 'ubereats')?.intakeStatus).toBe('open');
+    expect(retried.find((state) => state.service === 'demaecan')?.intakeStatus).toBe('open');
     expect(stateRow()).toMatchObject({ intake_status: 'open', stop_until: null });
   });
 
   it('手で再開した後は自動再開を重ねて送らない', async () => {
     await stopFor30m();
     const resumed = await call('/api/restaurant-test/delivery/intake/resume', {
-      body: { services: ['ubereats'] },
+      body: { services: ['demaecan'] },
     });
     expect(resumed.status).toBe(200);
     deliveryCalls = [];
 
     vi.setSystemTime(new Date(NOW.getTime() + 31 * 60 * 1000));
     const services = await servicesFromOrders();
-    expect(services.find((state) => state.service === 'ubereats')?.intakeStatus).toBe('open');
+    expect(services.find((state) => state.service === 'demaecan')?.intakeStatus).toBe('open');
     expect(deliveryCalls).toHaveLength(0);
   });
 });
@@ -1215,7 +1209,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       store_id: 'store-shibuya',
       account_id: 'account-2',
       status: 'connected',
-      uber_store_name: null,
+      uber_store_id: 'uber-store-1', uber_store_name: null,
       connected_at: null,
       provisioned_at: null,
       last_error: null,
@@ -1225,14 +1219,13 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     testDb.raw
       .prepare(
         `INSERT INTO rt_delivery_uber_connections
-           (store_id, account_id, status, uber_store_name, connected_at, provisioned_at,
-            last_error, version, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+           (store_id, account_id, status, uber_store_id, uber_store_name, connected_at, provisioned_at,
+            last_error, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       )
       .run(
-        row.store_id,
-        row.account_id,
+        row.store_id, row.account_id,
         row.status,
+        row.uber_store_id,
         row.uber_store_name,
         row.connected_at,
         row.provisioned_at,
@@ -1514,11 +1507,12 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     stubTokenEndpoint();
 
     const res = await callback({ state, code: 'auth-code' }, { cookie: state });
-    expect(resultCodeOf(res)).toBe('pending_store');
+    expect(resultCodeOf(res)).toBe('reauthorized');
 
     const rows = connectionRows();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ status: 'pending_store', version: 2 });
+    expect(rows[0]).toMatchObject({ status: 'pending_store', uber_store_id: 'uber-store-1',
+      last_error: 'pos_disconnect_reauthorization_pending', version: 2 });
   });
 
   it('権限が足りないときは接続情報を作らず、符号だけを残す（受入条件4）', async () => {
@@ -2066,16 +2060,17 @@ describe('受信口の応答時間（出前館QA#10）', () => {
     const calls: Array<() => Promise<Response>> = [];
     for (let index = 0; index < count; index += 1) {
       const rawBody = JSON.stringify(make(index));
-      // Uber の受信口なので Uber の方式（本文だけの署名・時刻の見出しなし）で作る。
-      const signature = await signUberWebhook(rawBody);
+      const timestamp = String(NOW_SEC);
+      const signature = await signWebhook(NOW_SEC, rawBody);
       calls.push(async () =>
         instance.request(
-          '/api/restaurant-test/delivery/webhooks/ubereats',
+          '/api/restaurant-test/delivery/webhooks/demaecan',
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-uber-signature': signature,
+              'x-nen-timestamp': timestamp,
+              'x-nen-signature': signature,
             },
             body: rawBody,
           },
@@ -2116,13 +2111,13 @@ describe('受信口の応答時間（出前館QA#10）', () => {
   it('注文の取り込みは1件ずつ1秒以内に応答する', async () => {
     // 最初の1回は読み込みと組み立ての重さが乗る。測る前に捨てる。
     await postWebhook(
-      orderCreatedPayload({ eventId: 'evt-warmup', externalOrderId: 'UE-WARM', orderNumber: '#UE-WARM' }),
+      orderCreatedPayload({ eventId: 'evt-warmup', externalOrderId: 'DM-WARM', orderNumber: '#DM-WARM' }),
     );
     const calls = await prepared(SAMPLES, (index) =>
       orderCreatedPayload({
         eventId: `evt-perf-${index}`,
-        externalOrderId: `UE-${8000 + index}`,
-        orderNumber: `#UE-${8000 + index}`,
+        externalOrderId: `DM-${8000 + index}`,
+        orderNumber: `#DM-${8000 + index}`,
       }),
     );
 
@@ -2146,10 +2141,10 @@ describe('受信口の応答時間（出前館QA#10）', () => {
       event_type: 'order.created',
       store_id: 'store-shibuya',
       order: {
-        external_order_id: `UE-${8500 + index}`,
-        order_number: `#UE-${8500 + index}`,
+        external_order_id: `DM-${8500 + index}`,
+        order_number: `#DM-${8500 + index}`,
         total_amount: 50_000,
-        pickup_method: '配達（Uber Eats 配達員）',
+        pickup_method: '配達（出前館 配達員）',
         wanted_at: NOW_SEC + 1500,
         received_at: NOW_SEC - 30,
         items,
@@ -2165,13 +2160,13 @@ describe('受信口の応答時間（出前館QA#10）', () => {
 
   it('キャンセルの取り込みも1件ずつ1秒以内に応答する', async () => {
     for (let index = 0; index < SAMPLES; index += 1) {
-      seedOrder({ id: `order-perf-${index}`, status: 'cooking', externalOrderId: `UE-${7000 + index}` });
+      seedOrder({ id: `order-perf-${index}`, status: 'cooking', externalOrderId: `DM-${7000 + index}` });
     }
     const calls = await prepared(SAMPLES, (index) => ({
       event_id: `evt-cancel-perf-${index}`,
       event_type: 'order.canceled',
       store_id: 'store-shibuya',
-      cancel: { external_order_id: `UE-${7000 + index}`, canceled_by: 'customer' },
+      cancel: { external_order_id: `DM-${7000 + index}`, canceled_by: 'customer' },
     }));
 
     const stats = await measure('order.canceled', calls);
@@ -2184,8 +2179,8 @@ describe('受信口の応答時間（出前館QA#10）', () => {
   it('再送された通知は取り込みへ進まず、取り込みより速く返す', async () => {
     const payload = orderCreatedPayload({
       eventId: 'evt-dup-perf',
-      externalOrderId: 'UE-7900',
-      orderNumber: '#UE-7900',
+      externalOrderId: 'DM-7900',
+      orderNumber: '#DM-7900',
     });
     expect((await postWebhook(payload)).status).toBe(200);
     const calls = await prepared(SAMPLES, () => payload);
@@ -2199,7 +2194,7 @@ describe('受信口の応答時間（出前館QA#10）', () => {
   it('応答を返す前に相手のサービスへ送信しない。外向きの通信は応答に乗らない', async () => {
     // 1秒の約束を守れる根拠は「受け取って即返す」こと。
     // 受信の処理の中で外へ繋ぎに行くと、相手の遅さがそのまま応答時間になる。
-    await postWebhook(orderCreatedPayload({ eventId: 'evt-no-egress', externalOrderId: 'UE-7800' }));
+    await postWebhook(orderCreatedPayload({ eventId: 'evt-no-egress', externalOrderId: 'DM-7800' }));
     expect(deliveryCalls).toHaveLength(0);
   });
 });

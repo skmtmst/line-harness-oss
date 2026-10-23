@@ -192,6 +192,8 @@ export type AuditAction =
   | 'restaurant.delivery.ubereats.connect'
   // つなぐお店の確定。Uber 側で連携が有効になる取り消しにくい操作なので必ず残す。
   | 'restaurant.delivery.ubereats.store.select'
+  | 'restaurant.delivery.ubereats.connection.check'
+  | 'restaurant.delivery.ubereats.connection.disconnect'
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'
   | 'ad_cost.import'

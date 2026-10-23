@@ -1,5 +1,5 @@
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
-import type { UberConnectionData, UberConnectionStatus } from '@/lib/restaurant-delivery-api'
+import type { UberConnection, UberConnectionData, UberConnectionStatus } from '@/lib/restaurant-delivery-api'
 
 /**
  * ★V8-B 設定 › デリバリー連携（★承認済み `デリバリー連携_v04.pen` 2026-10-18）の
@@ -44,6 +44,12 @@ export type DeliveryService = {
   stateNoteTone?: 'warn' | 'danger'
   /** 各社のログインで許可されたお店の一覧（`X5d8UF` の選び口に出す） */
   stores?: DeliveryStore[]
+  /** 外部側の結果が未確定で、安全な照合も重ねてはいけない状態。 */
+  connectionCheckBlocked?: boolean
+  /** 外部側の結果が未確定で、解除を重ねてはいけない状態。 */
+  connectionDisconnectBlocked?: boolean
+  /** 加盟店の認可を更新する必要があり、再ログインの入口を出す状態。 */
+  needsReauthorization?: boolean
 }
 
 /**
@@ -69,7 +75,7 @@ export const SERVICES: DeliveryService[] = [
   {
     id: 'uber',
     name: 'Uber Eats',
-    sub: 'Uber Eats への接続を設定します。注文の取り込みはまだ利用できません',
+    sub: 'Uber Eats への接続を設定します。注文の連携は受注画面で確認します',
     connect: 'login',
     guide:
       'ボタンを押すと Uber Eats のログイン画面が開きます。ふだんお使いの Uber Eats のIDでログインし、「許可」を押してください。そのあと、つなぐお店を選ぶ画面に戻ります。',
@@ -126,7 +132,7 @@ export const UBER_STATE_NOTE: Partial<Record<UberConnectionStatus, StateNote>> =
     tone: 'warn',
   },
   expired: {
-    text: 'Uber Eats とのつなぎの期限が切れました。「Uber Eats にログインしてつなぐ」からもう一度ログインしてください。',
+    text: 'Uber Eats へのログインの期限が切れました。「Uber Eats にログインし直す」から、もう一度許可してください。完了後に接続を確かめてください。',
     tone: 'danger',
   },
   no_permission: {
@@ -141,6 +147,7 @@ export const UBER_STATE_NOTE: Partial<Record<UberConnectionStatus, StateNote>> =
  */
 const UBER_RETURN_NOTE: Record<string, StateNote> = {
   pending_store: UBER_STATE_NOTE.pending_store as StateNote,
+  reauthorized: { text: 'Uber Eats へのログインを更新しました。接続を確かめたあと、必要な操作をもう一度行ってください。', tone: 'warn' },
   'error:denied': { text: 'Uber Eats の画面で「許可」が押されなかったため、つなげませんでした。もう一度お試しください。', tone: 'danger' },
   'error:invalid_state': { text: 'ログインの受け付けから時間が経ちすぎたため、やり直しが必要です。もう一度ボタンを押してください。', tone: 'danger' },
   'error:store_missing': { text: 'このLINEアカウントにお店が紐付いていないため、つなげませんでした。musubo へお知らせください。', tone: 'danger' },
@@ -160,30 +167,54 @@ function uberReturnNote(flash: string): StateNote | undefined {
   return undefined
 }
 
-/** サーバから読んだ接続の状態を、画面の1段ぶんの書き換えへ直す。 */
-export function uberPatch(data: UberConnectionData, flash: string): Partial<DeliveryService> {
-  const { connection } = data
-  if (connection.lastError === 'pos_activation_started' || connection.lastError === 'pos_activation_unknown') {
+/** 確定した接続状態を、画面の1段ぶんの書き換えへ直す。 */
+export function uberConnectionPatch(connection: UberConnection, flash = ''): Partial<DeliveryService> {
+  const activationUnresolved = connection.lastError === 'pos_activation_started' || connection.lastError === 'pos_activation_unknown'
+  const deactivationUnresolved = connection.lastError === 'pos_deactivation_started' || connection.lastError === 'pos_deactivation_unknown'
+  const storeReviewRequired = connection.lastError === 'store_provision_review_required'
+    || connection.lastError === 'store_menu_refresh_review_required'
+  const disconnectReauthorizationPending = connection.lastError === 'pos_disconnect_reauthorization_pending'
+  if (activationUnresolved || deactivationUnresolved || storeReviewRequired || disconnectReauthorizationPending) {
     return {
       ready: false,
       status: 'error',
-      // The saved target is a request snapshot, not a confirmed connection.
-      storeName: undefined,
-      connectedAt: undefined,
+      connectionCheckBlocked: deactivationUnresolved,
+      connectionDisconnectBlocked: true,
+      needsReauthorization: false,
+      // 接続開始前の保存値は依頼時の写し。保存済み接続の要確認状態は確認用に残す。
+      storeName: deactivationUnresolved || storeReviewRequired || disconnectReauthorizationPending ? connection.storeName ?? undefined : undefined,
+      connectedAt: deactivationUnresolved || storeReviewRequired || disconnectReauthorizationPending ? connection.connectedAt ?? undefined : undefined,
       checkedAt: connection.checkedAt ?? undefined,
-      stateNote: 'お店をつないだ結果を確認する必要があります。送り直さず musubo へお知らせください。',
+      stateNote: deactivationUnresolved
+        ? '連携を解除した結果を確認する必要があります。操作を繰り返さず musubo へお知らせください。'
+        : disconnectReauthorizationPending
+          ? 'Uber Eats へのログインを更新しました。「接続を確かめる」で状態を確認してください。確認後、必要ならもう一度解除してください。'
+        : storeReviewRequired
+          ? 'Uber Eats 側の接続状態を確認する必要があります。「接続を確かめる」で確認し、解消しない場合は musubo へお知らせください。'
+        : 'お店をつないだ結果を確認する必要があります。送り直さず musubo へお知らせください。',
       stateNoteTone: 'danger',
     }
   }
   const note = uberReturnNote(flash) ?? UBER_STATE_NOTE[connection.status]
   return {
-    // この環境に接続の設定が無ければ押させない。
-    ready: data.oauthConfigured,
+    connectionCheckBlocked: false,
+    connectionDisconnectBlocked: connection.status === 'expired',
+    needsReauthorization: connection.status === 'expired',
     status: UBER_DESIGN_STATUS[connection.status],
     storeName: connection.storeName ?? undefined,
     connectedAt: connection.connectedAt ?? undefined,
     checkedAt: connection.checkedAt ?? undefined,
     stateNote: note?.text,
     stateNoteTone: note?.tone,
+  }
+}
+
+/** サーバから読んだ接続状態と環境のOAuth設定を、画面の1段へ反映する。 */
+export function uberPatch(data: UberConnectionData, flash: string): Partial<DeliveryService> {
+  return {
+    // この環境に接続の設定が無ければ押させない。
+    ready: data.oauthConfigured,
+    // 外部側の結果が未確定なら、OAuth設定があっても再送操作は止める。
+    ...uberConnectionPatch(data.connection, flash),
   }
 }

@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RestaurantStore } from '@/lib/restaurant-test-api'
 import type {
   DeliveryMenuItem,
+  DeliveryOrderDetailData,
   DeliveryOrderSummary,
   DeliveryOrdersData,
   DeliveryService,
@@ -25,6 +26,7 @@ const fixture = vi.hoisted(() => ({
   order: vi.fn(),
   accept: vi.fn(),
   ready: vi.fn(),
+  handOver: vi.fn(),
   reject: vi.fn(),
   cancel: vi.fn(),
   history: vi.fn(),
@@ -36,6 +38,7 @@ const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(),
   ubereatsConnection: vi.fn(),
   role: { value: 'owner' as string | null },
+  accountId: { value: 'account-1' as string | null },
 }))
 
 vi.mock('@/lib/restaurant-delivery-api', async (importOriginal) => {
@@ -48,6 +51,7 @@ vi.mock('@/lib/restaurant-delivery-api', async (importOriginal) => {
       order: fixture.order,
       accept: fixture.accept,
       ready: fixture.ready,
+      handOver: fixture.handOver,
       reject: fixture.reject,
       cancel: fixture.cancel,
       history: fixture.history,
@@ -67,7 +71,7 @@ vi.mock('@/lib/restaurant-test-api', async (importOriginal) => {
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
-    selectedAccountId: 'account-1',
+    selectedAccountId: fixture.accountId.value,
     setSelectedAccountId: vi.fn(),
     accounts: [],
     loading: false,
@@ -151,12 +155,17 @@ function order(
   }
 }
 
-function ordersData(orders: DeliveryOrderSummary[]): DeliveryOrdersData {
+function ordersData(
+  orders: DeliveryOrderSummary[],
+  uberOrderActionsEnabled?: boolean,
+): DeliveryOrdersData {
   return {
     success: true,
     store: { id: 'store-1', name: '然-NEN- 本店' },
     services: [
-      serviceState('ubereats', 'Uber Eats'),
+      serviceState('ubereats', 'Uber Eats', uberOrderActionsEnabled === undefined
+        ? {}
+        : { orderActionsEnabled: uberOrderActionsEnabled }),
       serviceState('demaecan', '出前館'),
       serviceState('rocketnow', 'ロケットナウ', {
         intakeStatus: 'stopped',
@@ -215,6 +224,7 @@ function at(url: string) {
 
 beforeEach(() => {
   fixture.role.value = 'owner'
+  fixture.accountId.value = 'account-1'
   fixture.ubereatsConnection.mockResolvedValue({ connection: { status: 'connected', lastError: null } })
   fixture.snapshot.mockResolvedValue({ success: true, data: { stores: [store()] } })
   fixture.orders.mockResolvedValue(ordersData([
@@ -231,6 +241,10 @@ beforeEach(() => {
   fixture.accept.mockResolvedValue({
     success: true,
     order: { id: 'o1', status: 'cooking', statusLabel: '調理中', updatedAt: null },
+  })
+  fixture.handOver.mockResolvedValue({
+    success: true,
+    order: { id: 'o1', status: 'handed_over', statusLabel: '受け渡し済み', updatedAt: null },
   })
   fixture.order.mockResolvedValue({
     success: true,
@@ -399,6 +413,7 @@ describe('閲覧のみ（staff）', () => {
 
   it('受け付ける・拒否・準備完了・停止・再開を置かない', async () => {
     fixture.role.value = 'staff'
+    fixture.orders.mockResolvedValue(ordersData([order('o1', 'UE-1001')], true))
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
 
@@ -560,7 +575,7 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     expect((uber.getByRole('button', { name: 'Uber Eatsの受付を止める' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(uber.getByRole('button', { name: 'Uber Eatsの受付を止める' }))
     expect(fixture.stopIntake).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Uber Eats の注文の連携は準備中' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Uber Eats の営業状態変更・メニュー同期は準備中' }))
     expect(await screen.findByRole('dialog', { name: '現在準備中です' })).toBeTruthy()
     expect(fixture.accept).not.toHaveBeenCalled()
   })
@@ -579,14 +594,14 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     await waitFor(() => expect(fixture.resumeIntake).toHaveBeenCalledWith('account-1', ['rocketnow']))
   })
 
-  it.each(['new', 'cooking'] as const)('Uberの%s詳細は読めるが変更を送れない', async (status) => {
+  it.each(['new', 'cooking'] as const)('旧形式の応答ではUberの%s詳細は読めるが変更を送れない', async (status) => {
     const original = await fixture.order()
     fixture.order.mockResolvedValue({ ...original, order: { ...original.order, status } })
     at('/restaurant-test/delivery?id=o1')
     render(<DeliveryPage />)
     const dialog = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
     await dialog.findByText('唐揚げ弁当')
-    expect(dialog.getByText(/受け付け・拒否・キャンセル・準備完了の操作はまだ利用できません/)).toBeTruthy()
+    expect(dialog.getByText(/この店舗では Uber Eats の個別注文操作をまだ利用できません/)).toBeTruthy()
     for (const name of status === 'new' ? ['注文をキャンセルする', '断る', '受け付ける'] : ['注文をキャンセルする', '準備完了にする']) {
       const button = dialog.getByRole('button', { name }) as HTMLButtonElement
       expect(button.disabled).toBe(true)
@@ -597,6 +612,87 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     expect(fixture.reject).not.toHaveBeenCalled()
     expect(fixture.ready).not.toHaveBeenCalled()
     expect(fixture.cancel).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['new', '受け付ける', 'accept'],
+    ['new', '断る', 'reject'],
+    ['cooking', '準備完了にする', 'ready'],
+    ['ready', '受け渡し済みにする', 'handOver'],
+  ] as const)('サーバが利用可能と返したUberの%s注文で%sを実行できる', async (status, label, action) => {
+    const original = await fixture.order()
+    fixture.order.mockResolvedValue({ ...original, order: { ...original.order, status } })
+    fixture.orders.mockResolvedValue(ordersData([order('o1', 'UE-1001', { status })], true))
+    at('/restaurant-test/delivery?id=o1')
+    render(<DeliveryPage />)
+
+    const dialog = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
+    expect(await dialog.findByText(/Uber Eats の準備完了・受け渡し済みは、店舗内の進行記録/)).toBeTruthy()
+    const button = dialog.getByRole('button', { name: label }) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    fireEvent.click(button)
+    await waitFor(() => expect(fixture[action]).toHaveBeenCalledWith('account-1', 'o1'))
+  })
+
+  it('サーバが利用可能と返したUber注文を確認後にキャンセルできる', async () => {
+    fixture.orders.mockResolvedValue(ordersData([order('o1', 'UE-1001')], true))
+    at('/restaurant-test/delivery?id=o1')
+    render(<DeliveryPage />)
+    const detail = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
+    fireEvent.click(await detail.findByRole('button', { name: '注文をキャンセルする' }))
+    const confirmation = within(await screen.findByRole('alertdialog', { name: 'この注文をキャンセルしますか？' }))
+    fireEvent.click(confirmation.getByRole('button', { name: 'キャンセルする' }))
+    await waitFor(() => expect(fixture.cancel).toHaveBeenCalledWith('account-1', 'o1', 'out_of_stock'))
+  })
+
+  it('アカウント切替後に遅れて戻った利用可能フラグを混ぜない', async () => {
+    let resolveOld!: (data: DeliveryOrdersData) => void
+    const oldResponse = new Promise<DeliveryOrdersData>((resolve) => { resolveOld = resolve })
+    fixture.orders.mockImplementation((accountId: string) => accountId === 'account-1'
+      ? oldResponse
+      : Promise.resolve(ordersData([order('o1', 'UE-1001')])))
+    const rendered = render(<DeliveryPage />)
+    await waitFor(() => expect(fixture.orders).toHaveBeenCalledWith('account-1', { tab: 'new' }))
+
+    fixture.accountId.value = 'account-2'
+    rendered.rerender(<DeliveryPage />)
+    await waitFor(() => expect(fixture.orders).toHaveBeenCalledWith('account-2', { tab: 'new' }))
+    const button = await screen.findByLabelText('注文UE-1001を受け付ける') as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+
+    resolveOld(ordersData([order('o1', 'UE-1001')], true))
+    await Promise.resolve()
+    expect((screen.getByLabelText('注文UE-1001を受け付ける') as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(button)
+    expect(fixture.accept).not.toHaveBeenCalled()
+  })
+
+  it('アカウント切替後に遅れて戻った注文詳細を操作対象にしない', async () => {
+    const current = await fixture.order()
+    let resolveOld!: (data: DeliveryOrderDetailData) => void
+    const oldResponse = new Promise<DeliveryOrderDetailData>((resolve) => { resolveOld = resolve })
+    fixture.orders.mockResolvedValue(ordersData([order('o1', 'UE-1001')], true))
+    fixture.order.mockImplementation((accountId: string) => accountId === 'account-1'
+      ? oldResponse
+      : Promise.resolve({
+          ...current,
+          order: { ...current.order, orderNumber: 'UE-ACCOUNT-2' },
+        }))
+    at('/restaurant-test/delivery?id=o1')
+    const rendered = render(<DeliveryPage />)
+    await waitFor(() => expect(fixture.order).toHaveBeenCalledWith('account-1', 'o1'))
+
+    fixture.accountId.value = 'account-2'
+    rendered.rerender(<DeliveryPage />)
+    expect(await screen.findByText('#UE-ACCOUNT-2')).toBeTruthy()
+    resolveOld({ ...current, order: { ...current.order, orderNumber: 'UE-OLD' } })
+    await Promise.resolve()
+    expect(screen.queryByText('#UE-OLD')).toBeNull()
+
+    const dialog = within(screen.getByRole('dialog', { name: '注文の詳細' }))
+    fireEvent.click(dialog.getByRole('button', { name: '受け付ける' }))
+    await waitFor(() => expect(fixture.accept).toHaveBeenCalledWith('account-2', 'o1'))
+    expect(fixture.accept).not.toHaveBeenCalledWith('account-1', 'o1')
   })
 
   it.each([
