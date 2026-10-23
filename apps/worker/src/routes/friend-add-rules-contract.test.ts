@@ -1,3 +1,4 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { readFileSync } from 'node:fs';
@@ -25,6 +26,7 @@ function app(db: D1Database, actor: AuthenticatedStaff = owner) {
     await next();
   });
   instance.route('/', friendAddRules);
+  instance.onError(unhandledWorkerError);
   return instance;
 }
 
@@ -283,7 +285,7 @@ describe('friend-add rule data contracts', () => {
     } as unknown as D1Database;
     const response = await app(failingDb).request('/api/friend-add-runs?account_id=account-1');
     expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toMatchObject({ success: false, error: '実行結果を取得できませんでした' });
+    await expect(response.json()).resolves.toMatchObject({ success: false, error: 'Internal Server Error', incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
   });
 
   it('フォルダ作成を冪等にし、下書き保存と停止の古い版を409にする', async () => {

@@ -248,7 +248,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
         approvalConfirmedCount = confirmed;
       }
     } catch (gateError) {
-      logger.error("routes_broadcasts_failed");
+      logger.error("broadcasts.broadcasts_id_put_failed");
       return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
     }
   }
@@ -312,7 +312,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
         await approval.recordBroadcastApprovalEvent(c.env.DB, id, c.get('staff')?.id ?? '', 'cancelled', '内容の変更');
       }
     } catch (approvalError) {
-      logger.error("routes_broadcasts_failed");
+      logger.error("broadcasts.broadcasts_id_put_failed");
     }
   }
 

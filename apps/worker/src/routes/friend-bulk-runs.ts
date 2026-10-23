@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputJsonBoundary } from '../lib/input-errors.js';
@@ -32,8 +33,7 @@ function errorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof FriendBulkRunError) {
     return fail(c, error.status as ContentfulStatusCode, error.code, { error: error.message }, bulkErrorFields(error.code));
   }
-  logger.error("routes_friend_bulk_runs_failed");
-  return fail(c, 500, 'INTERNAL_SERVER_ERROR', { error: '一括操作を処理できませんでした' });
+  throw error;
 }
 
 function idempotencyKey(c: { req: { header(name: string): string | undefined } }): string {
@@ -48,7 +48,7 @@ function keepRunning(c: { executionCtx: ExecutionContext }, promise: Promise<unk
   try {
     c.executionCtx.waitUntil(promise);
   } catch {
-    void promise.catch((error) => logger.error("routes_friend_bulk_runs_failed"));
+    void promise.catch((error) => logger.error("friend_bulk_runs.keep_running_failed"));
   }
 }
 
@@ -104,12 +104,12 @@ friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin'), 
       c.req.param('id'),
       staff.tenantId ?? DEFAULT_TENANT_ID,
       {
-        page: Number(c.req.query('page') ?? 1),
-        limit: Number(c.req.query('limit') ?? 50),
+        page: listQueryNumber(c.req.query('page'), 1),
+        limit: listQueryNumber(c.req.query('limit'), 50),
       },
     );
     if (!detail) return c.json({ success: false, error: '一括操作が見つかりません' }, 404);
-    return c.json({ success: true, data: { ...detail, approval: await getBulkMessageApproval(c.env.DB, detail.id) } });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...detail, approval: await getBulkMessageApproval(c.env.DB, detail.id), paging: { limit: detail.limit }, sort: [{ field: 'ordinal', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }

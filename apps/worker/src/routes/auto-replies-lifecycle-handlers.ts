@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { readPriority } from '../features/auto-replies/auto-reply-priority/index.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -222,8 +221,7 @@ export const post__api_auto_replies_1 = async (c: Context<Env, "/api/auto-replie
       },
     }, 201);
   } catch (err) {
-    logger.error("routes_auto_replies_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -425,8 +423,7 @@ export const put__api_auto_replies_id_2 = async (c: Context<Env, "/api/auto-repl
     const memos = await internalMemosOf(c.env.DB, [updated.id]);
     return c.json({ success: true, data: serializeAutoReply(updated, memos.get(updated.id) ?? null) });
   } catch (err) {
-    logger.error("routes_auto_replies_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -467,8 +464,7 @@ export const post__api_auto_replies_id_stop_3 = async (c: Context<Env, "/api/aut
     await resolveStoppedByNames(c.env.DB, [data]);
     return c.json({ success: true, data });
   } catch (err) {
-    logger.error("routes_auto_replies_failed");
-    return c.json({ success: false, error: '自動応答を停止できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -482,8 +478,7 @@ export const delete__api_auto_replies_id_4 = async (c: Context<Env, "/api/auto-r
     await deleteAutoReply(c.env.DB, id, c.get('staff')?.id ?? null);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_auto_replies_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -498,7 +493,6 @@ export const post__api_auto_replies_id_restore_5 = async (c: Context<Env, "/api/
     await resolveStoppedByNames(c.env.DB, [data]);
     return c.json({ success: true, data });
   } catch (err) {
-    logger.error("routes_auto_replies_failed");
-    return c.json({ success: false, error: '自動応答を元に戻せませんでした' }, 500);
+    throw err;
   }
 };

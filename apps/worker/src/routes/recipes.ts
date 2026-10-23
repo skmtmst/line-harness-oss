@@ -296,8 +296,7 @@ recipes.get('/api/recipes', requireRole('owner', 'admin', 'staff'), async (c) =>
     const features = accountId ? await readFeatures(c.env.DB, accountId) : {};
     return c.json({ success: true, data: rows.map((r) => serialize(r, counts, features)) });
   } catch (err) {
-    logger.error("routes_recipes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -344,8 +343,7 @@ recipes.post('/api/recipes', requireRole('owner', 'admin'), inputJsonBoundary({"
     });
     return c.json({ success: true, data: serialize(recipe, {}, {}) }, 201);
   } catch (err) {
-    logger.error("routes_recipes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -363,8 +361,7 @@ recipes.get('/api/recipes/:id', requireRole('owner', 'admin', 'staff'), async (c
     ]);
     return c.json({ success: true, data: serialize(recipe, counts, features) });
   } catch (err) {
-    logger.error("routes_recipes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -532,7 +529,7 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), i
         202,
       );
     } catch (err) {
-      logger.error("routes_recipes_failed");
+      logger.error("recipes.by_id_clone_create_failed");
       await finishCloneRun(c.env.DB, run.id, {
         status: 'rolled_back',
         createdCount: 0,
@@ -546,8 +543,7 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), i
       }, 500);
     }
   } catch (err) {
-    logger.error("routes_recipes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -575,8 +571,7 @@ recipes.get('/api/recipes/clone-runs/:runId', requireRole('owner', 'admin', 'sta
       },
     });
   } catch (err) {
-    logger.error("routes_recipes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

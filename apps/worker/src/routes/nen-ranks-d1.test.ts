@@ -1,3 +1,4 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 /*
  * 会員ランク（★37-1-A / 37-1-B）の設定API。実D1（bootstrap.sql を流した SQLite）で、
  *  1. 初期値（4ランク・4節目）が最初の GET で入る
@@ -56,6 +57,7 @@ function harness(role: 'owner' | 'admin' | 'staff', env: Record<string, unknown>
     await next();
   });
   app.route('/', nenRanks);
+  app.onError(unhandledWorkerError);
   return app;
 }
 

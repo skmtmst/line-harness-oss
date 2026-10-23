@@ -9,7 +9,7 @@ import {
 import type { Env } from '../worker-env.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { listLimit } from './list-pagination.js';
+import { listLimit } from '../lib/list-paging.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
@@ -54,8 +54,7 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
       })),
     });
   } catch (err) {
-    logger.error("routes_stripe_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -152,7 +151,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
           occurredAt: event.processed_at,
         }).catch((error) => {
           // Stripeイベントは記録済み。派生スコアの失敗で再送を誘発しない。
-          logger.error("routes_stripe_failed");
+          logger.error("stripe.integrations_stripe_webhook_create_failed");
         });
       }
 
@@ -182,8 +181,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
       data: { id: event.id, stripeEventId: event.stripe_event_id, eventType: event.event_type, processedAt: event.processed_at },
     });
   } catch (err) {
-    logger.error("routes_stripe_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

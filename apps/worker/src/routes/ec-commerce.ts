@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber, clampedListInteger } from '../lib/list-paging.js';
 import { jstDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -293,10 +294,8 @@ ecCommerce.get(
     : scope?.allowedAccountIds.length
       ? `(e.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR e.line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'e.line_account_id IS NULL' : '1 = 0';
-  const requestedLimit = Number(c.req.query('limit') || '30');
-  const requestedOffset = Number(c.req.query('offset') || '0');
-  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 30;
-  const offset = Number.isInteger(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
+  const limit = clampedListInteger(c.req.query('limit') || undefined, 30, 1, 100);
+  const offset = clampedListInteger(c.req.query('offset') || undefined, 0, 0);
   const eventType = c.req.query('eventType') || '';
   const status = c.req.query('status') || '';
   const view = c.req.query('view') || '';
@@ -418,8 +417,7 @@ ecCommerce.get(
     }
     return c.json({
       success: true,
-      data: {
-        items: actionRows.results.map((row) => {
+      data: buildOffsetListResponse({ items: actionRows.results.map((row) => {
           const orderId = row.order_id == null ? null : String(row.order_id);
           return {
             id: String(row.id),
@@ -464,8 +462,7 @@ ecCommerce.get(
           };
         }),
         total: Number(actionCount?.count ?? 0),
-        summary: actionSummary,
-      },
+        summary: actionSummary, paging: { limit }, sort: [{field:'receivedAt',direction:sort === 'oldest' ? 'asc' : 'desc'},{field:'createdAt',direction:sort === 'oldest' ? 'asc' : 'desc'}] }),
       pagination: { total: Number(actionCount?.count ?? 0), limit, offset },
     });
   }
@@ -500,9 +497,7 @@ ecCommerce.get(
     c.env.DB.prepare(`SELECT COUNT(*) AS count FROM ec_events e ${where}`).bind(...bindings).first<{ count: number }>(),
   ]);
 
-  return c.json({
-    success: true,
-    data: rows.results.map((row) => ({
+  const responseItems = rows.results.map((row) => ({
       id: row.id,
       externalEventId: row.external_event_id,
       eventType: row.event_type,
@@ -515,9 +510,10 @@ ecCommerce.get(
       errorMessage: row.error_message,
       receivedAt: row.received_at,
       processedAt: row.processed_at,
-    })),
-    pagination: { total: countRow?.count ?? 0, limit, offset },
-  });
+    }));
+  return c.json(buildOffsetListResponse({ success: true,
+    data: responseItems,
+    pagination: { total: countRow?.count ?? 0, limit, offset }, items: responseItems, total: countRow?.count ?? 0, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }] }));
 });
 
 /**
@@ -573,8 +569,8 @@ ecCommerce.get(
     return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
   }
   const hasPagination = c.req.query('limit') !== undefined || c.req.query('offset') !== undefined;
-  const requestedLimit = Number(c.req.query('limit') || String(SUBSCRIPTIONS_NON_PAGINATED_MAX));
-  const requestedOffset = Number(c.req.query('offset') || '0');
+  const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, String(SUBSCRIPTIONS_NON_PAGINATED_MAX));
+  const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, '0');
   const limit = Number.isInteger(requestedLimit)
     ? Math.min(Math.max(requestedLimit, 1), 100)
     : SUBSCRIPTIONS_NON_PAGINATED_MAX;
@@ -727,8 +723,7 @@ ecCommerce.get(
 
   return c.json({
     success: true,
-    data: {
-      items,
+    data: buildOffsetListResponse({ items,
       summary: {
         total,
         active: stateCount('active'),
@@ -755,8 +750,7 @@ ecCommerce.get(
         ruleVersion: 'subscription-payment-status-v1',
         calculatedAt: syncedRow?.synced_at ?? null,
         predictiveScoreAvailable: false,
-      },
-    },
+      }, total: Number(countRow?.count ?? 0), paging: { limit }, sort: [] }),
     pagination: { total: Number(countRow?.count ?? 0), limit, offset },
   });
 });
@@ -1204,8 +1198,7 @@ function summarizeItems(raw: string | null): { text: string; count: number; quan
 }
 
 ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staff'), async (c) => {
-  const requestedLimit = Number(c.req.query('limit') || '20');
-  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20;
+  const limit = clampedListInteger(c.req.query('limit') || undefined, 20, 1, 100);
 
   // 出荷予定日は計算値なのでSQLでは並べ替えられない。直近のイベントを多めに
   // 取り出してから、算出した日付で並べ替えて limit で切る。

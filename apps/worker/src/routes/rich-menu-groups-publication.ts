@@ -69,16 +69,9 @@ export const post__api_rich_menu_groups_groupId_pages_pageId_image_1 = async (c:
       await c.env.IMAGES.delete(key);
     } catch {
       // 片付けの失敗は元の失敗に付けない。ログだけ残す。
-      logger.error("routes_rich_menu_groups_failed");
+      logger.error("rich_menu_groups.rich_menu_groups_group_id_pages_page_id_image_post_failed");
     }
-    logger.error("routes_rich_menu_groups_failed");
-    return c.json(
-      {
-        success: false,
-        error: '画像の保存に失敗しました。もう一度お試しください。',
-      },
-      500,
-    );
+    throw error;
   }
 
   return c.json({
@@ -457,7 +450,7 @@ export const post__api_rich_menu_groups_groupId_reconcile_10 = async (c: Context
         deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
       });
     } catch (auditError) {
-      logger.error("routes_rich_menu_groups_failed");
+      logger.error("rich_menu_groups.rich_menu_groups_group_id_reconcile_post_failed");
     }
 
     return c.json({
@@ -545,6 +538,6 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
       );
     }
     const message = e instanceof Error ? e.message : String(e);
-    return c.json({ success: false, error: message }, 500);
+    throw e;
   }
 };

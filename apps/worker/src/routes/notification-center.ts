@@ -1,4 +1,4 @@
-import { logger } from '@line-crm/shared/server';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -48,12 +48,12 @@ notificationCenter.get('/api/notifications/center', async (c) => {
     }
     const category = categoryFrom(c.req.query('category'));
     if (category === null) return c.json({ success: false, error: '通知の種類が正しくありません' }, 400);
-    const rawLimit = Number(c.req.query('limit') ?? '20');
+    const rawLimit = listQueryNumber(c.req.query('limit'), 20);
     if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > 100) {
       return c.json({ success: false, error: '表示件数は1〜100で指定してください' }, 400);
     }
     // 通知一覧画面の「さらに読み込む」が使う。パネルは省略して先頭から読む。
-    const rawOffset = Number(c.req.query('offset') ?? '0');
+    const rawOffset = listQueryNumber(c.req.query('offset'), 0);
     if (!Number.isInteger(rawOffset) || rawOffset < 0 || rawOffset > 100000) {
       return c.json({ success: false, error: '開始位置が正しくありません' }, 400);
     }
@@ -64,7 +64,7 @@ notificationCenter.get('/api/notifications/center', async (c) => {
     ]);
     return c.json({
       success: true,
-      data: {
+      data: buildOffsetListResponse({
         items: items.map((item) => ({
           id: item.id,
           eventType: item.event_type,
@@ -77,11 +77,13 @@ notificationCenter.get('/api/notifications/center', async (c) => {
         })),
         counts,
         unreadCount: counts.unread,
-      },
+        total: category ? counts[category] : counts.all,
+        paging: { limit: rawLimit },
+        sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }],
+      }),
     });
   } catch (err) {
-    logger.error("routes_notification_center_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -104,8 +106,7 @@ notificationCenter.post(
     });
     return c.json({ success: true, data: { updated } });
   } catch (err) {
-    logger.error("routes_notification_center_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
   },
 );
@@ -128,8 +129,7 @@ notificationCenter.post(
     if (!updated) return c.json({ success: false, error: '通知が見つかりません' }, 404);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_notification_center_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
   },
 );

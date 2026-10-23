@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 
 const dbMocks = {
   getAffiliates: vi.fn(),
@@ -39,6 +43,7 @@ function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
     return next();
   });
   app.route('/', affiliates);
+  app.onError(unhandledWorkerError);
   return app;
 }
 
@@ -132,7 +137,13 @@ describe('GET /api/affiliate-payments', () => {
     dbMocks.getAffiliatePaymentSummaries.mockRejectedValue(new Error('db unavailable'));
     const res = await get('/api/affiliate-payments?lineAccountId=account-1');
     expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ success: false });
+    const body = await res.json<{ incidentId: string }>();
+    expect(body).toMatchObject({ success: false, error: 'Internal Server Error' });
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(JSON.stringify(body)).not.toContain('db unavailable');
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+      source: 'worker', message: 'unhandled_worker_error', path: 'GET /api/affiliate-payments', incidentId: body.incidentId,
+    });
   });
 });
 

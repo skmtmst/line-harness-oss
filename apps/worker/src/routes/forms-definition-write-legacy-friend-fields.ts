@@ -61,7 +61,7 @@ export async function writeLegacyFriendFields(
       const checked = validateFriendFieldValue(target, rawForCheck);
       if (!checked.ok) {
         result.failed += 1;
-        logger.error("routes_forms_failed");
+        logger.error("forms.write_legacy_friend_fields_failed");
         continue;
       }
       await setFriendFieldValue(db, {
@@ -74,7 +74,7 @@ export async function writeLegacyFriendFields(
       result.succeeded += 1;
     } catch (error) {
       result.failed += 1;
-      logger.error("routes_forms_failed");
+      logger.error("forms.write_legacy_friend_fields_failed");
     }
   }
   return result;
@@ -96,7 +96,7 @@ const requireArchiveManage: MiddlewareHandler<Env> = async (c, next) => {
     }
     await next();
   } catch (error) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.require_archive_manage_failed");
     return c.json({ success: false, error: '回答フォームの権限を確認できませんでした' }, 503);
   }
 };
@@ -181,7 +181,7 @@ async function runFormPostEffects(input: {
       });
       awarded = true;
     } catch (error) {
-      logger.error("routes_forms_failed");
+      logger.error("forms.run_form_post_effects_failed");
     }
     if (awarded && claim) await claim.checkpoint('mileage');
   }
@@ -556,7 +556,7 @@ async function runFormPostEffects(input: {
     } catch (error) {
       if (error instanceof ClaimOwnershipLost) throw error;
       if (['metadata','layout_effects','legacy_fields'].includes(effect.step)) registrationsReady = false;
-      logger.error("routes_forms_failed");
+      logger.error("forms.run_form_post_effects_failed");
       continue;
     }
     if (claim) await claim.checkpoint(effect.step);
@@ -576,7 +576,7 @@ async function runFormPostEffects(input: {
       submission.destination_write_failed = destinationWriteResult.failed;
     } catch (error) {
       // 回答自体は保存済み。記録失敗を回答失敗へ見せず、再開・再実行時に残す。
-      logger.error("routes_forms_failed");
+      logger.error("forms.record_destination_write_failed");
       return;
     }
     if (claim) await claim.checkpoint('destination_status');

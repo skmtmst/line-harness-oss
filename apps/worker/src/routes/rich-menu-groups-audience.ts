@@ -75,7 +75,7 @@ export const post__api_rich_menu_groups_groupId_apply_to_tag_1 = async (c: Conte
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      return c.json({ success: false, error: message }, 500);
+      throw e;
     }
   }
 
@@ -184,7 +184,7 @@ export const post__api_rich_menu_groups_groupId_duplicate_2 = async (c: Context<
         deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
       });
     } catch (auditError) {
-      logger.error("routes_rich_menu_groups_failed");
+      logger.error("rich_menu_groups.rich_menu_groups_group_id_duplicate_post_failed");
     }
 
     return c.json(
@@ -286,7 +286,7 @@ export const get__api_rich_menu_groups_groupId_audience_summary_3 = async (c: Co
       },
     });
   } catch (error) {
-    logger.error("routes_rich_menu_groups_failed");
+    logger.error("rich_menu_groups.rich_menu_groups_group_id_audience_summary_get_failed");
     return c.json({ success: false, error: '対象人数を確認できませんでした' }, 503);
   }
 };
@@ -510,7 +510,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
           deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
         });
       } catch (auditError) {
-        logger.error("routes_rich_menu_groups_failed");
+        logger.error("rich_menu_groups.rich_menu_groups_group_id_test_apply_post_failed");
       }
 
       const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);

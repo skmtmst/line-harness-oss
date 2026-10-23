@@ -13,7 +13,7 @@ import { hasStaffPermission } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listResponse } from '../lib/list-etag.js';
 import { compileSavedSearch, friendFieldValueSql } from '../services/saved-search-filter.js';
-import { listLimit, listOffset } from './list-pagination.js';
+import { buildOffsetListResponse, listLimit, listOffset } from '../lib/list-paging.js';
 import { adminAccountScope, escapeLikePattern, serializeFriendListRow, serializeTag } from './friends-definition.js';
 import type { Context } from 'hono';
 
@@ -557,25 +557,22 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
         });
       } catch (error) {
         // 集計台帳の一時失敗で、友だち一覧そのものを表示不能にしない。
-        logger.error("routes_friends_failed");
+        logger.error("friends.friends_get_failed");
       }
     }
 
     // 同じ中身なら304（list-etag）。本文のハッシュだけ見て個人情報は混ぜない。
     return listResponse(c, {
       success: true,
-      data: {
-        items: itemsWithTags,
+      data: buildOffsetListResponse({ items: itemsWithTags,
         ...(cursorMode?{nextCursor:items.length===limit?friendListCursor({createdAt:items.at(-1)!.created_at,id:items.at(-1)!.id,sort}):null}:{}),
         total,
         page: Math.floor(offset / limit) + 1,
         limit,
-        hasNextPage: offset + limit < total,
-      },
+        hasNextPage: offset + limit < total, paging: { limit }, sort: [...(search ? [{ field: 'match_score', direction: 'asc' as const }] : []),{field:'createdAt',direction:createdOrder === 'ASC' ? 'asc' : 'desc'},{field:'id',direction:createdOrder === 'ASC' ? 'asc' : 'desc'}] }),
     });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -596,8 +593,7 @@ export const get__api_friends_add_breakdown_2 = async (c: Context<Env, "/api/fri
     const data = await getFriendAddBreakdown(c.env.DB, safeDays, statsScope);
     return c.json({ success: true, data });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -620,8 +616,7 @@ export const get__api_friends_count_3 = async (c: Context<Env, "/api/friends/cou
     }
     return c.json({ success: true, data: { count } });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -649,7 +644,6 @@ export const get__api_friends_ref_stats_4 = async (c: Context<Env, "/api/friends
       },
     });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

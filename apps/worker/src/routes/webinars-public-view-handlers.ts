@@ -49,7 +49,7 @@ export const get__api_liff_webinars_slug_1 = async (c: Context<Env, "/api/liff/w
       c.executionCtx.waitUntil(
         Promise.resolve(
           attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
-        ).catch((err) => logger.error("routes_webinars_failed")),
+        ).catch((err) => logger.error("webinars.liff_webinars_slug_get_failed")),
       );
     }
     const exp = now + webinar.duration_seconds + TOKEN_GRACE_SECONDS;
@@ -123,7 +123,7 @@ export const get__api_liff_webinars_slug_1 = async (c: Context<Env, "/api/liff/w
       c.executionCtx.waitUntil(
         Promise.resolve(
           attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
-        ).catch((err) => logger.error("routes_webinars_failed")),
+        ).catch((err) => logger.error("webinars.liff_webinars_slug_get_failed")),
       );
     }
 
@@ -236,7 +236,7 @@ export const get__api_liff_webinars_slug_1 = async (c: Context<Env, "/api/liff/w
     c.executionCtx.waitUntil(
       Promise.resolve(
         attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
-      ).catch((err) => logger.error("routes_webinars_failed")),
+      ).catch((err) => logger.error("webinars.liff_webinars_slug_get_failed")),
     );
   }
 
@@ -377,7 +377,7 @@ export const post__api_liff_webinars_slug_heartbeat_3 = async (c: Context<Env, "
       friendId: auth.friendId,
       sourceEventId: `${loaded.webinar.id}:${auth.friendId}:complete`,
       metadata: { webinarId: loaded.webinar.id, sessionStartAt },
-    }).catch((err) => logger.error("routes_webinars_failed")));
+    }).catch((err) => logger.error("webinars.liff_webinars_slug_heartbeat_post_failed")));
     // R97: 保存した視聴後アクション（完了のきっかけ）を実行口へ接続する。
     // 同じ視聴の再送は実行記録の冪等キーで1件にまとまる。
     c.executionCtx.waitUntil(runWebinarTriggerActions(c.env.DB, {
@@ -386,7 +386,7 @@ export const post__api_liff_webinars_slug_heartbeat_3 = async (c: Context<Env, "
       sessionStartAt,
       trigger: 'completed',
       executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY, operatorMailEnv: c.env },
-    }).catch((err) => logger.error("routes_webinars_failed")));
+    }).catch((err) => logger.error("webinars.liff_webinars_slug_heartbeat_post_failed")));
   }
   return c.json({ ok: true });
 };
@@ -583,7 +583,7 @@ export const post__api_liff_webinars_slug_cta_click_6 = async (c: Context<Env, "
         attachTagAndFireSideEffects(
           c.env.DB, auth.friendId, loaded.webinar.tag_on_cta_click,
         ),
-      ).catch((err) => logger.error("routes_webinars_failed")),
+      ).catch((err) => logger.error("webinars.liff_webinars_slug_cta_click_post_failed")),
     );
   }
   // R97: 保存した視聴後アクション（CTAクリックのきっかけ）を実行口へ接続する。
@@ -593,6 +593,6 @@ export const post__api_liff_webinars_slug_cta_click_6 = async (c: Context<Env, "
     sessionStartAt,
     trigger: 'cta_clicked',
     executorDependencies: { credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY, operatorMailEnv: c.env },
-  }).catch((err) => logger.error("routes_webinars_failed")));
+  }).catch((err) => logger.error("webinars.liff_webinars_slug_cta_click_post_failed")));
   return c.json({ ok: true });
 };

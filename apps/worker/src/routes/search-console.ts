@@ -35,7 +35,7 @@ searchConsole.get('/api/search-console/performance', async (c) => {
     const performance = await getSearchConsolePerformance({ accessToken, siteUrl, rangeDays });
     return c.json({ success: true, data: { status: 'connected' as const, ...performance } });
   } catch (error) {
-    logger.error("routes_search_console_failed");
+    logger.error("search_console.performance_list_failed");
     const accessDenied = error instanceof SearchConsoleApiError && [401, 403].includes(error.status);
     return c.json({
       success: false,

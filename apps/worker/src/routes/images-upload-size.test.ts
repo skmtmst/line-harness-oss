@@ -1,3 +1,4 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -10,6 +11,7 @@ function app(put: ReturnType<typeof vi.fn>) {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => { c.set('staff', { id: 'synthetic-staff', name: 'Synthetic', role: 'admin', readOnly: false }); await next(); });
   instance.route('/', images);
+  instance.onError(unhandledWorkerError);
   return { instance, env: { IMAGES: { put }, DB: {} } as unknown as Env['Bindings'] };
 }
 describe('S13 image size before allocation', () => {

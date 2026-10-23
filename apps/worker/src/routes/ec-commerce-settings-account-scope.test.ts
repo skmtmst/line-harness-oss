@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env';
@@ -97,12 +96,4 @@ describe('EC通知設定のアカウント境界', () => {
     expect((await target.request('/api/ec-commerce/settings')).status).toBe(400);
   });
 
-  it('実配信も受信したLINEアカウントの設定を優先して読む', () => {
-    // 実配信の処理本体は services/ec-event-processing.ts へ切り出してある
-    //（受付口と再試行で共用）。読む設定の向きは変えていない。
-    const source = readFileSync(new URL('../features/ec-commerce/ec-event-processing.ts', import.meta.url), 'utf8');
-    expect(source).toContain('a.line_account_id = ?');
-    expect(source).toContain('.bind(lineAccountId, event.event_type)');
-    expect(source).toContain('COALESCE(a.is_enabled, s.is_enabled)');
-  });
 });

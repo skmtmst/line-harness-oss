@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { hasMediaSignature } from './media-signature.js';
 import { inputError } from '../lib/input-errors.js';
@@ -27,7 +28,7 @@ export const get__api_media_quota_1 = async (c: Context<Env, "/api/media/quota">
     }
     return c.json({ success: true, data: await getMediaStorageQuota(c.env.DB, accountId) });
   } catch (err) {
-    logger.error("routes_contents_failed");
+    logger.error("contents.media_quota_get_failed");
     return c.json({ success: false, error: '容量を確認できませんでした' }, 503);
   }
 };
@@ -259,13 +260,13 @@ export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<E
         mimeType: session.expected_mime,
         sizeBytes: session.expected_size,
       }).catch((err) => {
-        logger.error("routes_contents_failed");
+        logger.error("contents.media_upload_sessions_id_complete_post_failed");
         return null;
       });
       if (versionScan) {
         await runScanForStoredObject(c.env.DB, c.env.IMAGES, versionScan, session.r2_key, {
           width: session.width, height: session.height,
-        }).catch((err) => logger.error("routes_contents_failed"));
+        }).catch((err) => logger.error("contents.media_upload_sessions_id_complete_post_failed"));
       }
       return c.json({
         success: true,
@@ -285,13 +286,13 @@ export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<E
       mimeType: media.mime_type,
       sizeBytes: media.size_bytes,
     }).catch((err) => {
-      logger.error("routes_contents_failed");
+      logger.error("contents.media_upload_sessions_id_complete_post_failed");
       return null;
     });
     if (newScan) {
       await runScanForStoredObject(c.env.DB, c.env.IMAGES, newScan, session.r2_key, {
         width: media.width, height: media.height,
-      }).catch((err) => logger.error("routes_contents_failed"));
+      }).catch((err) => logger.error("contents.media_upload_sessions_id_complete_post_failed"));
     }
     return c.json({
       success: true,
@@ -445,7 +446,7 @@ export const post__api_media_id_replacement_preview_5 = async (c: Context<Env, "
         },
       });
     } catch (err) {
-      logger.error("routes_contents_failed");
+      logger.error("contents.media_id_replacement_preview_post_failed");
       return c.json({ success: false, error: '差し替え内容を確認できませんでした' }, 503);
     }
   };
@@ -469,8 +470,8 @@ export const get__api_media_7 = async (c: Context<Env, "/api/media">) => {
   const kind = kindRaw && ['image', 'video', 'audio', 'file'].includes(kindRaw)
     ? (kindRaw as MediaKind)
     : undefined;
-  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '20', 10) || 20));
-  const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+  const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 20, { format: 'integer-prefix' }) || 20));
+  const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0, { format: 'integer-prefix' }) || 0);
   const sortRaw = c.req.query('sort');
   const sort = sortRaw && ['newest', 'oldest', 'name', 'size', 'usage'].includes(sortRaw)
     ? sortRaw as 'newest' | 'oldest' | 'name' | 'size' | 'usage'
@@ -495,7 +496,7 @@ export const get__api_media_7 = async (c: Context<Env, "/api/media">) => {
   const names = await uploaderNameMap(c.env.DB, items);
   return c.json({
     success: true,
-    data: { items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset },
+    data: buildOffsetListResponse({ items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset, paging: { limit }, sort: sort === 'oldest' ? [{field:'createdAt',direction:'asc'}] : sort === 'name' ? [{field:'filename',direction:'asc'}] : sort === 'size' ? [{field:'sizeBytes',direction:'desc'}] : sort === 'usage' ? [{field:'usageCount',direction:'desc'},{field:'createdAt',direction:'desc'}] : [{field:'createdAt',direction:'desc'}] }),
   });
 };
 

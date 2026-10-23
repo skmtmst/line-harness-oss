@@ -364,8 +364,7 @@ staff.get('/api/staff/me', async (c) => {
     if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
     return c.json({ success: true, data: { ...await serializeStaff(c.env.DB, member), readOnly: current.readOnly } });
   } catch (error) {
-    logger.error("routes_staff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -392,8 +391,7 @@ staff.get('/api/staff', async (c) => {
       ))),
     });
   } catch (error) {
-    logger.error("routes_staff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -405,8 +403,7 @@ staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (
     const loginCount = await countLoginAudit(c.env.DB, { adminUserId: id, action: 'login' });
     return c.json({ success: true, data: { loginCount } });
   } catch (error) {
-    logger.error("routes_staff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -420,8 +417,7 @@ staff.get('/api/staff/last-logins', requireRole('owner', 'admin'), async (c) => 
     const data = await getLastLoginByStaff(c.env.DB, members.map((member) => member.id));
     return c.json({ success: true, data });
   } catch (error) {
-    logger.error("routes_staff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -453,8 +449,7 @@ staff.post('/api/staff/:id/resend-invite', requireRole('owner', 'admin'), inputJ
     const refreshed = await getStaffById(c.env.DB, member.id);
     return c.json({ success: true, data: await serializeStaff(c.env.DB, refreshed ?? member) });
   } catch (error) {
-    logger.error("routes_staff_failed");
-    return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -522,7 +517,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
         try {
           await deleteStaffMemberWithScopes(c.env.DB, duplicateInvite.id);
         } catch (cleanupError) {
-          logger.error("routes_staff_failed");
+          logger.error("staff.create_failed");
         }
       } else {
         return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
@@ -570,14 +565,13 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
       try {
         await deleteStaffMemberWithScopes(c.env.DB, member.id);
       } catch (cleanupError) {
-        logger.error("routes_staff_failed");
+        logger.error("staff.create_failed");
       }
       throw error;
     }
     return c.json({ success: true, data: await serializeStaff(c.env.DB, member) }, 201);
   } catch (error) {
-    logger.error("routes_staff_failed");
-    return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -649,13 +643,12 @@ staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), in
         });
       }
     } catch (error) {
-      logger.error("routes_staff_failed");
+      logger.error("staff.by_id_resend_invitation_create_failed");
       return c.json({ success: false, error: '招待メールを送信できませんでした。時間をおいて、もう一度送り直してください。' }, 500);
     }
     return c.json({ success: true, data: await serializeStaff(c.env.DB, updated) });
   } catch (error) {
-    logger.error("routes_staff_failed");
-    return c.json({ success: false, error: '招待を再送できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -978,8 +971,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
         });
       }
     } catch (error) {
-      logger.error("routes_staff_failed");
-      return c.json({ success: false, error: '確認メールを送信できませんでした。時間をおいて、もう一度変更してください。' }, 500);
+      throw error;
     }
     const data = await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id));
     const payload = { success: true as const, data: { ...data, emailChangePending: true, pendingEmail: selfEmailChange.next } };
@@ -1035,13 +1027,12 @@ staff.post('/api/staff/email-change/confirm', inputJsonBoundary({"token":["strin
         });
       } catch (error) {
         // 確定そのものは済んでいる。知らせの失敗で確定を取り消すと二重の不整合になるので、記録だけ残す。
-        logger.error("routes_staff_failed");
+        logger.error("staff.email_change_confirm_create_failed");
       }
     }
     return c.json({ success: true, data: { email: nextEmail } });
   } catch (error) {
-    logger.error("routes_staff_failed");
-    return c.json({ success: false, error: 'メールアドレスの変更を確定できませんでした' }, 500);
+    throw error;
   }
 });
 

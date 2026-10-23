@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { serializeConversionPoint } from './conversion-point-serialization.js';
 import { inputError } from '../lib/input-errors.js';
 import { conversionApprovalCounts } from '../services/tab-counts.js';
@@ -9,7 +8,7 @@ import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { listLimit, listOffset } from './list-pagination.js';
+import { parseOffsetPaging } from '../lib/list-paging.js';
 import type { ConversionDefinitionUsageKind } from '@line-crm/db';
 import { conversionContractError, conversionRange, definitionFilters, conversionDefinitionScope, csvCell, jstDate, adminAccountScope, ConversionPointBody, readMeasureOptions, positiveVersion, CONVERSION_MEASURE_PATCH_KEYS, parseDate, APPROVAL_STATUSES } from './conversions-definition.js';
 import type { Context } from 'hono';
@@ -133,8 +132,7 @@ export const get__api_conversions_points_3 = async (c: Context<Env, "/api/conver
       data: items.map(serializeConversionPoint),
     });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -164,8 +162,7 @@ export const post__api_conversions_points_4 = async (c: Context<Env, "/api/conve
     });
     return c.json({ success: true, data: serializeConversionPoint(point) }, 201);
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -239,8 +236,7 @@ export const put__api_conversions_points_id_5 = async (c: Context<Env, "/api/con
     if (!point) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeConversionPoint(point) });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -274,8 +270,7 @@ export const delete__api_conversions_points_id_6 = async (c: Context<Env, "/api/
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -362,8 +357,7 @@ export const post__api_conversions_track_7 = async (c: Context<Env, "/api/conver
     if (err instanceof Error && err.message === 'conversion_excluded') {
       return inputError(c, { success: false, error: '「数えない条件」に当てはまるため記録できません' }, 422, []);
     }
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -376,6 +370,9 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
       return c.json({ success: false, error: 'startDate と endDate は YYYY-MM-DD で正しく指定してください' }, 400);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const paging = parseOffsetPaging(
+      { limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 100 },
+    );
     const events = await getConversionEvents(c.env.DB, {
       scope: { allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned },
       conversionPointId: c.req.query('conversionPointId'),
@@ -383,8 +380,8 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
       affiliateCode: c.req.query('affiliateCode'),
       startDate: c.req.query('startDate'),
       endDate: c.req.query('endDate'),
-      limit: listLimit(c.req.query('limit'), 100),
-      offset: listOffset(c.req.query('offset')),
+      limit: paging.limit,
+      offset: paging.offset,
     });
 
     // #819: 取消は追記の台帳。最新の追記が 'reverse' のものだけを
@@ -405,8 +402,7 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
       })),
     });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -442,8 +438,7 @@ export const get__api_conversions_events_id_reversals_9 = async (c: Context<Env,
         })),
       });
     } catch (err) {
-      logger.error("routes_conversions_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -507,8 +502,7 @@ export const post__api_conversions_events_id_reversals_10 = async (c: Context<En
         throw err;
       }
     } catch (err) {
-      logger.error("routes_conversions_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -578,8 +572,7 @@ export const get__api_conversions_approvals_counts_12 = async (c: Context<Env, "
       allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned,
     }) });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -593,8 +586,9 @@ export const get__api_conversions_approvals_13 = async (c: Context<Env, "/api/co
       );
     }
 
-    const limit = listLimit(c.req.query('limit'), 200);
-    const offset = listOffset(c.req.query('offset'));
+    const { limit, offset } = parseOffsetPaging(
+      { limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 200 },
+    );
 
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const rows = await getConversionApprovalQueue(c.env.DB, {
@@ -607,7 +601,6 @@ export const get__api_conversions_approvals_13 = async (c: Context<Env, "/api/co
 
     return c.json({ success: true, data: rows });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

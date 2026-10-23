@@ -237,7 +237,7 @@ function adminLoginUrl(c: Context<Env>, error?: string, next?: string | null): s
 }
 
 function logAuthFailure(): void {
-  logger.error("routes_admin_auth_failed");
+  logger.error("admin_auth.authenticate_failed");
 }
 
 function recordLoginAuditBestEffort(c: Context<Env>, staffId: string): Promise<void> {
@@ -479,7 +479,7 @@ adminAuth.post('/api/auth/two-factor/verify', inputJsonBoundary({"challengeToken
     session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1, true);
   } catch (error) {
     logAuthFailure();
-    return c.json({ success: false, error: 'ログイン状態を作成できませんでした。ログインからやり直してください' }, 500);
+    throw error;
   }
   await recordLoginAuditBestEffort(c, staff.id);
   return c.json({
@@ -632,7 +632,7 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', inputJsonBoundary({"challen
     session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1, true);
   } catch (error) {
     logAuthFailure();
-    return c.json({ success: false, error: 'ログイン状態を作成できませんでした。ログインからやり直してください' }, 500);
+    throw error;
   }
   await recordLoginAuditBestEffort(c, staff.id);
   return c.json({
@@ -757,7 +757,7 @@ adminAuth.post('/api/auth/step-up', inputJsonBoundary({"code":["string"],"passwo
 adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) {
-    logger.error("routes_admin_auth_failed");
+    logger.error("admin_auth.auth_login_create_failed");
     return c.json({ success: false, error: config.misconfigured }, 500);
   }
 
@@ -976,7 +976,7 @@ adminAuth.post('/api/auth/sessions/revoke-others', inputJsonBoundary(), async (c
       after: { revoked },
     });
   } catch (error) {
-    logger.error("routes_admin_auth_failed");
+    logger.error("admin_auth.auth_sessions_revoke_others_create_failed");
   }
   return c.json({ success: true, data: { revoked } });
 });

@@ -36,8 +36,7 @@ export const post__api_liff_entry_route_coupon_use_1 = async (c: Context<Env, "/
     if (!result.ok) return c.json({ success: false, error: result.message }, 409);
     return c.json({ success: true, data: { message: result.message, replayed: result.replayed ?? false } });
   } catch (error) {
-    logger.error("routes_liff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 };
 
@@ -108,8 +107,7 @@ export const post__api_liff_friend_add_intent_2 = async (c: Context<Env, "/api/l
       },
     });
   } catch (err) {
-    logger.error("routes_liff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -283,7 +281,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
             await applyXHarnessActions(db, friend.id, xhResult);
           }
         } catch (err) {
-          logger.error("routes_liff_failed");
+          logger.error("liff.liff_link_post_failed");
         }
       }
       return c.json({
@@ -367,7 +365,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
           await applyXHarnessActions(db, friend.id, xhResult);
         }
       } catch (err) {
-        logger.error("routes_liff_failed");
+        logger.error("liff.liff_link_post_failed");
       }
     }
 
@@ -376,8 +374,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
       data: { userId, alreadyLinked: false },
     });
   } catch (err) {
-    logger.error("routes_liff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -513,8 +510,7 @@ export const get__api_analytics_ref_summary_4 = async (c: Context<Env, "/api/ana
       },
     });
   } catch (err) {
-    logger.error("routes_liff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -579,8 +575,7 @@ export const get__api_analytics_ref_refCode_5 = async (c: Context<Env, "/api/ana
       },
     });
   } catch (err) {
-    logger.error("routes_liff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 

@@ -1,4 +1,4 @@
-import { logger } from '@line-crm/shared/server';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { deleteFriendAddRuleFolder, ensureFriendAddFallbackRules, listFriendAddRuleOrderIds, listFriendAddRulesPage, reorderFriendAddRulePriorities, reorderFriendAddRulePrioritiesCAS, type FriendAddRuleKind, type FriendAddRuleRow } from '@line-crm/db';
@@ -20,7 +20,7 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
   const ruleId = c.req.query('rule_id');
   const kind = c.req.query('kind');
   const attribution = c.req.query('attribution');
-  const limit = Number(c.req.query('limit') ?? 20);
+  const limit = listQueryNumber(c.req.query('limit'), 20);
   const cursorValue = c.req.query('cursor');
   const cursor = parseRunCursor(cursorValue);
   if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
@@ -129,8 +129,7 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
     const items = allRows.slice(0, limit);
     return c.json({
       success: true,
-      data: {
-        items: items.map((row) => ({
+      data: buildOffsetListResponse({ items: items.map((row) => ({
           id: row.id,
           receivedAt: row.occurred_at,
           processedAt: row.processed_at,
@@ -177,12 +176,10 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
           failed: summary?.failed_runs ?? 0,
           lastDeliveryAt: summary?.last_delivery_at ?? null,
           staffHandoffs: { value: null, state: 'unavailable', reason: '担当者引き継ぎと実行イベントを結ぶ記録がありません' },
-        },
-      },
+        }, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
     });
   } catch (error) {
-    logger.error("routes_friend_add_rules_failed");
-    return c.json({ success: false, error: '実行結果を取得できませんでした' }, 500);
+    throw error;
   }
 };
 
@@ -262,8 +259,7 @@ export const get__api_friend_add_runs_id_2 = async (c: Context<Env, "/api/friend
       },
     });
   } catch (error) {
-    logger.error("routes_friend_add_rules_failed");
-    return c.json({ success: false, error: '実行結果の詳細を取得できませんでした' }, 500);
+    throw error;
   }
 };
 
@@ -287,8 +283,7 @@ export const post__api_friend_add_runs_id_retry_3 = async (c: Context<Env, "/api
       data: { status: result.status, retried: result.retried ?? 0 },
     });
   } catch (error) {
-    logger.error("routes_friend_add_rules_failed");
-    return c.json({ success: false, error: '失敗した処理を再試行できませんでした' }, 500);
+    throw error;
   }
 };
 
@@ -331,8 +326,7 @@ export const post__api_friend_add_rules_folders_4 = async (c: Context<Env, "/api
     if (error instanceof Error && /unique/i.test(error.message)) {
       return c.json({ success: false, code: 'DUPLICATE_FOLDER_NAME', error: '同じ名前のフォルダがあります' }, 409);
     }
-    logger.error("routes_friend_add_rules_failed");
-    return c.json({ success: false, error: 'フォルダを作成できませんでした' }, 500);
+    throw error;
   }
 };
 
@@ -356,7 +350,7 @@ export const patch__api_friend_add_rules_folders_id_5 = async (c: Context<Env, "
     return c.json({ success: true, data: updated });
   } catch (error) {
     if (error instanceof Error && /unique/i.test(error.message)) return c.json({ success: false, error: '同じ名前のフォルダがあります' }, 409);
-    return c.json({ success: false, error: 'フォルダを変更できませんでした' }, 500);
+    throw error;
   }
 };
 
@@ -378,8 +372,7 @@ export const delete__api_friend_add_rules_folders_id_6 = async (c: Context<Env, 
     if (result === 'conflict') return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'フォルダが更新されました。読み直してください' }, 409);
     return c.json({ success: true, data: { id, deleted: true } satisfies import('@line-crm/shared').FriendAddRuleFolderDeleteResult });
   } catch (error) {
-    logger.error("routes_friend_add_rules_failed");
-    return c.json({ success: false, error: 'フォルダを削除できませんでした' }, 500);
+    throw error;
   }
 };
 
@@ -394,7 +387,7 @@ export const get__api_friend_add_rules_7 = async (c: Context<Env, "/api/friend-a
   // 21件目以降が検索に出ず、フォルダ件数もページ内の数になる。
   const search = c.req.query('q')?.trim() || undefined;
   const folder = c.req.query('folder')?.trim() || undefined;
-  const limit = Number(c.req.query('limit') ?? 20);
+  const limit = listQueryNumber(c.req.query('limit'), 20);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) return c.json({ success: false, error: 'limit は1〜100で指定してください' }, 400);
   try {
     if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
@@ -452,8 +445,7 @@ export const get__api_friend_add_rules_7 = async (c: Context<Env, "/api/friend-a
     const scenarioNames = new Map(options.scenarios.map((scenario) => [scenario.id, scenario.name]));
     return c.json({
       success: true,
-      data: {
-        items: rows.map((row) => toRule(row, routeNames, scenarioNames)),
+      data: buildOffsetListResponse({ items: rows.map((row) => toRule(row, routeNames, scenarioNames)),
         total: page.total,
         nextCursor: page.nextCursor,
         orderVersion,
@@ -470,15 +462,13 @@ export const get__api_friend_add_rules_7 = async (c: Context<Env, "/api/friend-a
           delivered: summary?.delivered ?? null,
           failed: summary?.failed ?? null,
         },
-        options,
-      },
+        options, paging: { limit }, sort: [] }),
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_CURSOR_INVALID') {
       return c.json({ success: false, error: 'cursor が正しくありません' }, 400);
     }
-    logger.error("routes_friend_add_rules_failed");
-    return c.json({ success: false, error: '友だち追加時の配信を取得できませんでした' }, 500);
+    throw error;
   }
 };
 
@@ -504,8 +494,7 @@ export const patch__api_friend_add_rules_reorder_8 = async (c: Context<Env, "/ap
     await reorderFriendAddRulePriorities(c.env.DB, { lineAccountId: accountId, friendKind: kind, ids });
     return c.json({ success: true, data: { updated: ids.length } });
   } catch (error) {
-    logger.error("routes_friend_add_rules_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 };
 
@@ -570,7 +559,6 @@ export const put__api_friend_add_rules_order_9 = async (c: Context<Env, "/api/fr
     const orderVersion = await getFriendAddOrderVersion(c.env.DB, accountId, kind);
     return c.json({ success: true, data: { updated: ids.length, orderVersion } });
   } catch (error) {
-    logger.error("routes_friend_add_rules_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 };

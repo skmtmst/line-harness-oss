@@ -34,7 +34,7 @@ hqBannerFolders.use('/api/hq/banners/*', requireRole('owner', 'admin'));
 hqBannerFolders.onError((e, c) => {
   if (e instanceof FolderRevisionError) return inputError(c, { success: false, error: e.code }, e.status, [e.field]);
   if (e instanceof HqFolderError) return folderInputError(c, e);
-  return c.json({ success: false, error: 'フォルダを保存できません' }, 500);
+  throw e;
 });
 hqBannerFolders.use('*', async (c, next) => {
   if (c.get('staff')?.readOnly && !['GET', 'HEAD'].includes(c.req.method)) return c.json({ success: false, error: '閲覧のみです' }, 403);

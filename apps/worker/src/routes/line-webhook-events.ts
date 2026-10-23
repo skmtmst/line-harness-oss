@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -54,9 +53,8 @@ lineWebhookEvents.get(
           recoveryReasonCode: recovery?.reasonCode ?? null, recoveryReason: recovery?.reason ?? null });
       }
       return c.json({ success: true, data: visible });
-    } catch {
-      logger.error("line_webhook_events_list_failed");
-      return c.json({ success: false, error: 'Webhook台帳を取得できませんでした' }, 500);
+    } catch (error) {
+      throw error;
     }
   },
 );
@@ -84,9 +82,8 @@ lineWebhookEvents.post(
         code: result.status === 'needs_review' ? 'WEBHOOK_REQUIRES_REVIEW' : result.status === 'busy' ? 'WEBHOOK_RETRY_BUSY' : 'WEBHOOK_RETRY_FAILED',
         error: result.status === 'needs_review' ? `要確認：${result.reason}` : result.status === 'busy' ? '処理中です。時間をおいて確認してください' : '再処理に失敗しました。保存済みの工程からもう一度再開できます',
       }, result.status === 'failed' ? 503 : 409);
-    } catch {
-      logger.error("line_webhook_event_retry_check_failed");
-      return c.json({ success: false, error: 'Webhookイベントを確認できませんでした' }, 500);
+    } catch (error) {
+      throw error;
     }
   },
 );

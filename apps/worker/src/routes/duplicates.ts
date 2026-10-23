@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -89,7 +88,6 @@ duplicates.get('/api/duplicates/stats', requireRole('owner', 'admin', 'staff'), 
     });
     return c.json({ success: true, data: serializeDuplicatesStats(stats) });
   } catch (err) {
-    logger.error("routes_duplicates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });

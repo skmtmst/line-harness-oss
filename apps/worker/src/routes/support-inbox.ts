@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -167,8 +168,7 @@ supportInbox.get('/api/support/summary', async (c) => {
       },
     });
   } catch (error) {
-    logger.error("support_summary_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -188,8 +188,8 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     }
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
-    const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
-    const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+    const limit = Math.min(200, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 100, { format: 'integer-prefix' }) || 100));
+    const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0, { format: 'integer-prefix' }) || 0);
     // LINEとメールを待ち時間順で統合してからページを切るため、要求ページの末尾まで
     // 両方の候補を取得する。1回に読む件数は従来どおり最大200件に抑える。
     const fetchLimit = Math.min(200, limit + offset);
@@ -340,8 +340,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     }, null);
     return c.json({
       success: true,
-      data: {
-        items: channel === 'email' ? items : paginateSupportInboxItems(items, offset, limit),
+      data: buildCursorListResponse({ items: channel === 'email' ? items : paginateSupportInboxItems(items, offset, limit),
         summary: {
           total: lineTotal + emailTotal,
           line: lineTotal,
@@ -350,12 +349,10 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           oldestWaitMinutes: oldest
             ? Math.max(0, Math.floor((Date.now() - new Date(oldest).getTime()) / 60_000))
             : null,
-        },
-      },
+        }, paging: { limit }, sort: [] }),
     });
   } catch (error) {
-    logger.error("support_inbox_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -394,7 +391,7 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
     before= で古い履歴、after= で新着の差分を取る。
     返す messages は常に created_at 昇順。
   */
-  const parsedLimit = Number(c.req.query('limit'));
+  const parsedLimit = listQueryNumber(c.req.query('limit'), Number.NaN);
   const limit = Number.isSafeInteger(parsedLimit) && parsedLimit > 0
     ? Math.min(parsedLimit, 200)
     : 100;
@@ -448,16 +445,15 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
   const total = await c.env.DB.prepare(
     'SELECT COUNT(*) AS c FROM support_email_messages WHERE thread_id = ?',
   ).bind(id).first<{ c: number }>();
+  const responseItems = messages;
   return c.json({
     success: true,
-    data: {
-      thread,
-      messages,
+    data: buildOffsetListResponse({ thread,
+      messages: responseItems,
       total: total?.c ?? messages.length,
       hasMoreOlder,
       oldestCursor: messages.length ? encodeMessageCursor(messages[0].created_at, messages[0].id) : null,
-      newestCursor: messages.length ? encodeMessageCursor(messages[messages.length - 1].created_at, messages[messages.length - 1].id) : null,
-    },
+      newestCursor: messages.length ? encodeMessageCursor(messages[messages.length - 1].created_at, messages[messages.length - 1].id) : null, items: responseItems, paging: { limit }, sort: [{ field: 'created_at', direction: 'asc' }, { field: 'id', direction: 'asc' }] }),
   });
 });
 

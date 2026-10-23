@@ -252,7 +252,8 @@ describe('merged person HTTP contract', () => {
     const response = await harness({ role: 'staff' }).request('/api/friends/people');
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      success: true, data: { items: [], total: 0, limit: 20, offset: 0 },
+      success: true, data: { items: [], total: 0, limit: 20, offset: 0,
+        sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] },
     });
     expect(personMocks.listMergedPeople).toHaveBeenCalledWith(
       expect.anything(), 'tenant-a', ['account-a'], 20, 0,

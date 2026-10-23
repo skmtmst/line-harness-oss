@@ -1,3 +1,4 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
@@ -69,6 +70,7 @@ function harness(options: {
     await next();
   });
   app.route('/', nenPhotoOperations);
+  app.onError(unhandledWorkerError);
   return app;
 }
 
@@ -127,6 +129,7 @@ function bulkHarness(options: {
     await next();
   });
   app.route('/', nenPhotoOperations);
+  app.onError(unhandledWorkerError);
   return { app, batches, runs };
 }
 

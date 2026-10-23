@@ -1,6 +1,6 @@
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { checkMediaGate } from '../services/file-scan.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
-import { logger } from '@line-crm/shared/server';
 import {serializeProject,parseTextLines,parseEmphasisLines,serializeGeneration,serializeMedia,serializeImage} from './hq-banner-serializers.js';
 import {GapError,gapAccount,gapWrite} from '../services/gap-common.js';
 import {requireAccountAi} from '../services/account-ai-features.js';
@@ -252,8 +252,7 @@ hqBanners.get('/api/hq/banners/stats', async (c) => {
     const stats = await getBannerStats(c.env.DB, tenantOf(c));
     return c.json({ success: true, data: stats });
   } catch (err) {
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -266,8 +265,7 @@ hqBanners.get('/api/hq/banners/projects', async (c) => {
     const items = await listBannerProjects(c.env.DB, { tenantId: tenantOf(c), archived, query, folderId: c.req.query('folderId') === '__none__' ? null : c.req.query('folderId') });
     return c.json({ success: true, data: items.map(serializeProject) });
   } catch (err) {
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -289,8 +287,7 @@ hqBanners.post('/api/hq/banners/projects', inputJsonBoundary(), async (c) => {
     return c.json({ success: true, data: serializeProject(project) }, 201);
   } catch (err) {
     if(err instanceof HqFolderError)return folderInputError(c, err);
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -313,8 +310,7 @@ hqBanners.get('/api/hq/banners/projects/:id', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -339,8 +335,7 @@ hqBanners.patch('/api/hq/banners/projects/:id', inputJsonBoundary(), async (c) =
     return c.json({ success: true, data: serializeProject(project) });
   } catch (err) {
     if(err instanceof HqFolderError)return folderInputError(c, err);
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -372,8 +367,7 @@ hqBanners.post('/api/hq/banners/projects/:id/duplicate', inputJsonBoundary(), as
     const refreshed = await getBannerProject(c.env.DB, copy.id, tenantId);
     return c.json({ success: true, data: serializeProject(refreshed ?? copy) }, 201);
   } catch (err) {
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -480,8 +474,7 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', inputJsonBoundary(), 
     await touchBannerProject(c.env.DB, project.id);
     return c.json({ success: true, data: serializeGeneration(generation) }, 201);
   } catch (err) {
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -546,7 +539,7 @@ hqBanners.get('/api/hq/banners/images', async (c) => {
       try { const cursor = JSON.parse(before); if (typeof cursor.at !== 'string' || typeof cursor.id !== 'string' || !cursor.id || !Number.isFinite(Date.parse(cursor.at))) throw new Error(); }
       catch { return c.json({ success: false, error: '読み込み位置を確認してください' }, 400); }
     }
-    const limitRaw = Number(c.req.query('limit') ?? '30');
+    const limitRaw = listQueryNumber(c.req.query('limit'), '30');
     const filter = {
       tenantId,
       delivered: delivered === undefined ? undefined : delivered === '1',
@@ -563,15 +556,13 @@ hqBanners.get('/api/hq/banners/images', async (c) => {
     const counts = c.req.query('withCounts') === '1' ? await countBannerImages(c.env.DB, filter) : undefined;
     const base = workerUrl(c);
     const last = items[items.length - 1];
-    return c.json({
-      success: true,
-      data: items.map((i) => serializeImage(i, base)),
+    const responseItems = items.map((i) => serializeImage(i, base));
+    return c.json(buildCursorListResponse({ success: true,
+      data: responseItems,
       counts,
-      nextBefore: items.length >= filter.limit && last ? JSON.stringify({ at: last.created_at, id: last.id }) : null,
-    });
+      nextBefore: items.length >= filter.limit && last ? JSON.stringify({ at: last.created_at, id: last.id }) : null, items: responseItems, paging: { limit: filter.limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (err) {
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -600,8 +591,7 @@ hqBanners.patch('/api/hq/banners/images/:id', inputJsonBoundary(), async (c) => 
     return c.json({ success: true, data: serializeImage(detail!, workerUrl(c)) });
   } catch (err) {
     if(err instanceof HqFolderError)return folderInputError(c, err);
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -685,8 +675,7 @@ hqBanners.post('/api/hq/banners/projects/:id/uploads', inputJsonBoundary({}, { m
     const detail = await getBannerImageWithDetail(c.env.DB, image.id, tenantId);
     return c.json({ success: true, data: serializeImage(detail!, workerUrl(c)) }, 201);
   } catch (err) {
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -773,7 +762,6 @@ hqBanners.post('/api/hq/banners/images/:id/deliver', inputJsonBoundary(), async 
       data: { image: serializeImage(detail!, workerUrl(c)), deliveries: results },
     });
   } catch (err) {
-    logger.error("routes_hq_banners_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });

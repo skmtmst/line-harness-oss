@@ -122,7 +122,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
           staffId: row.staff_id,
           startsAt: row.starts_at,
         },
-      }, accountId).catch((err) => logger.error("routes_booking_failed")),
+      }, accountId).catch((err) => logger.error("booking.admin_requests_by_id_update_failed")),
     );
   } else if (next === 'rejected') {
     // N-065: 却下でも の未送信予定は止める (通知だけでは送り続ける)。
@@ -160,7 +160,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     await cancelObsoleteConfirmationRuns(c.env.DB, id, accountId);
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, id, 'rejected').catch((err) =>
-        logger.error("routes_booking_failed"),
+        logger.error("booking.admin_requests_by_id_update_failed"),
       ),
     );
   } else if (next === 'cancelled' || next === 'expired') {
@@ -210,7 +210,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         bookingId: id,
         lineAccountId: accountId,
         remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), id),
-      }).catch((error) => logger.error("routes_booking_failed")),
+      }).catch((error) => logger.error("booking.admin_requests_by_id_update_failed")),
     );
     // キャンセル待ち：空いた枠を登録の早い順で1人に知らせる。
     // 知らせの失敗で取り消し自体を失敗させない。

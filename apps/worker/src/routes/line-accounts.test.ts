@@ -1,7 +1,7 @@
 import { apiContractMiddleware } from '../middleware/api-contract.js';
 vi.mock('../services/line-messaging-identity.js', () => ({ verifyLineMessagingIdentity: vi.fn().mockResolvedValue(true) }));
 import { describe, expect, test, beforeEach, vi } from 'vitest';
-import { Hono } from 'hono';
+import { Hono, type ErrorHandler } from 'hono';
 import type { Env } from '../worker-env.js';
 
 // Mock @line-crm/db so we can assert on the values the route forwards to the
@@ -98,6 +98,8 @@ function setupApp(
     await next();
   });
   app.route('/', lineAccounts);
+  // 通知先が未設定でも応答を返せるため、最小の試験環境へ共通の失敗処理を接続する。
+  app.onError(unhandledWorkerError as ErrorHandler);
   return app;
 }
 
@@ -1411,7 +1413,7 @@ describe('GET /api/line-accounts', () => {
     const res = await setupApp('owner').request('/api/line-accounts');
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+    expect(await res.json()).toEqual({ success: false, error: 'Internal Server Error', incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
     expect(fetch).not.toHaveBeenCalled();
   });
 

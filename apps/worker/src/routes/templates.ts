@@ -260,14 +260,14 @@ templates.get('/api/templates', async (c) => {
       taps = await getCarouselTapTotals(c.env.DB);
     } catch (err) {
       // 数が出ないだけ。一覧そのものは出す。
-      logger.error("routes_templates_failed");
+      logger.error("templates.list_failed");
     }
     let sends = new Map<string, { thisMonth: number; total: number }>();
     try {
       sends = await getTemplateSendCounts(c.env.DB, items.map((item) => item.id));
     } catch (err) {
       // 集計だけ取れないときも、テンプレートそのものは操作できるようにする。
-      logger.error("routes_templates_failed");
+      logger.error("templates.list_failed");
     }
     /*
      * 差し戻し対応(要件1): 一覧の主 messageType/messageContent は公開版だけを返す。
@@ -327,8 +327,7 @@ templates.get('/api/templates', async (c) => {
     }
     return c.json({ success: true, data: withSamples });
   } catch (err) {
-    logger.error("routes_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -409,8 +408,7 @@ templates.get('/api/templates/:id', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -465,8 +463,7 @@ templates.get('/api/templates/:id/usages', async (c) => {
     );
     return c.json({ success: true, data: { ...usage, broadcasts, reminderEnrollments } });
   } catch (err) {
-    logger.error("routes_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -556,8 +553,7 @@ templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBo
     if (err instanceof MediaReferenceAccountError) {
       return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
-    logger.error("routes_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -723,8 +719,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
     if (err instanceof Error && err.message === 'TEMPLATE_DRAFT_CONFLICT') {
       return c.json({ success: false, code: 'TEMPLATE_DRAFT_CONFLICT', error: 'ほかの編集が保存されています。変更内容を確認してから読み直してください' }, 409);
     }
-    logger.error("routes_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -833,8 +828,7 @@ templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'),
     if (err instanceof MediaReferenceAccountError) {
       return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
-    logger.error("routes_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -868,8 +862,7 @@ templates.get('/api/templates/:id/versions', async (c) => {
       })),
     });
   } catch (err) {
-    logger.error("routes_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -935,8 +928,7 @@ templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), 
     if (code === 'TEMPLATE_PUBLISH_KEY_CONFLICT') {
       return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
     }
-    logger.error("routes_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -990,8 +982,7 @@ templates.delete('/api/templates/:id', requireDeliveryAccess('templates'), async
     await deleteTemplate(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

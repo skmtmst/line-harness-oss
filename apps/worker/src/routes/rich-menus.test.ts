@@ -1,5 +1,6 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { Hono } from 'hono';
+import { Hono, type ErrorHandler } from 'hono';
 import { richMenus } from './rich-menus.js';
 
 const uploadRichMenuImage = vi.fn();
@@ -50,6 +51,8 @@ describe('POST /api/rich-menus/:id/image', () => {
       return next();
     });
     app.route('/', richMenus);
+    // 通知先が未設定でも応答を返せるため、最小の試験環境へ共通の失敗処理を接続する。
+    app.onError(unhandledWorkerError as ErrorHandler);
     return app;
   }
 
@@ -150,6 +153,7 @@ describe('GET /api/friends/:friendId/rich-menu (#496-13)', () => {
       return next();
     });
     app.route('/', richMenus);
+    app.onError(unhandledWorkerError as ErrorHandler);
     return app;
   }
 
@@ -220,8 +224,9 @@ describe('GET /api/friends/:friendId/rich-menu (#496-13)', () => {
     });
 
     expect(res.status).toBe(500);
-    const body = await res.json() as { success: boolean; error: string };
-    expect(body.error).toBe('リッチメニューを取得できませんでした');
+    const body = await res.json() as { success: boolean; error: string; incidentId: string };
+    expect(body.error).toBe('Internal Server Error');
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
     expect(body.error).not.toContain('socket hang up');
   });
 });

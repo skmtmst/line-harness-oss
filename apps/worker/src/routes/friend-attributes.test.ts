@@ -1,3 +1,4 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -109,6 +110,7 @@ function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
     return next();
   });
   app.route('/', friendAttributes);
+  app.onError(unhandledWorkerError);
   return app;
 }
 const env = { DB: {} as D1Database };
@@ -296,6 +298,7 @@ describe('対応マーク', () => {
       return next();
     });
     app.route('/', friendAttributes);
+  app.onError(unhandledWorkerError);
     const res = await app.fetch(
       new Request('https://example.com/api/support-marks?lineAccountId=account-1'),
       env,

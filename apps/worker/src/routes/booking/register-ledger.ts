@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
@@ -10,8 +11,8 @@ export function registerLedger(booking: Hono<Env>): void {
 booking.get('/api/booking/admin/requests', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
-  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '50', 10) || 50));
-  const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+  const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 50, { format: 'integer-prefix' }) || 50));
+  const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0, { format: 'integer-prefix' }) || 0);
   const { where, values } = bookingLedgerFilter(c, accountId);
   const [rows, count] = await Promise.all([
     c.env.DB.prepare(
@@ -27,7 +28,8 @@ booking.get('/api/booking/admin/requests', async (c) => {
       .bind(...values).first<{ total: number }>(),
   ]);
   // 同じ中身なら304（list-etag）。
-  return listResponse(c, { requests: rows.results, total: Number(count?.total ?? 0), limit, offset });
+  const responseItems = rows.results;
+  return listResponse(c, buildOffsetListResponse({ requests: responseItems, total: Number(count?.total ?? 0), limit, offset, items: responseItems, paging: { limit }, sort: [{ field: 'starts_at', direction: 'asc' }] }));
 });
 
 /**

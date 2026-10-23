@@ -39,8 +39,8 @@ lineAccountTags.onError((error, c) => {
   if (error.message.includes('UNIQUE constraint failed: line_account_tags.tenant_id, line_account_tags.name')) {
     return c.json({ success: false, error: '同じ名前のアカウントタグがあります' }, 409);
   }
-  // DB例外には入力値が含まれる場合があるため、本文を記録・返却しない。
-  return c.json({ success: false, error: 'アカウントタグを保存・取得できませんでした' }, 500);
+  // 共通の失敗処理が自由文を伏せ、問い合わせ番号を付ける。
+  throw error;
 });
 lineAccountTags.get('/api/line-account-tags', requireRole('owner', 'admin'), denyReadOnly(), async c => {
   return c.json({ success: true, data: (await listLineAccountTags(c.env.DB, tenantOf(c))).map(serializeLineAccountTag) });

@@ -216,7 +216,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
         return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました', code: 'VERSION_CONFLICT' }, 409);
       }
     }
-    logger.error("routes_nen_members_failed");
+    logger.error("nen_members.nen_members_photos_id_review_put_failed");
     return c.json({ success: false, code: 'REVIEW_SAVE_FAILED', error: '保存できませんでした。もう一度お試しください' }, 500);
   }
   await syncNenPhotoTags(c.env.DB, String(photo.friend_id));
@@ -241,7 +241,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
         finalPointSync = 'synced';
       }
     } catch (error) {
-      logger.error("routes_nen_members_failed");
+      logger.error("nen_members.nen_members_photos_id_review_put_failed");
     }
   }
   const delivery = await deliverPhotoReviewNotification(c.env.DB, c, photo, {

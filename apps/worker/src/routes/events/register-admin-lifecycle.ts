@@ -275,12 +275,12 @@ events.post(
               });
               notified += 1;
             } catch (error) {
-              logger.error("routes_events_failed");
+              logger.error("events.admin_events_by_id_change_review_apply_create_failed");
             }
           }
         }
       } catch (error) {
-        logger.error("routes_events_failed");
+        logger.error("events.admin_events_by_id_change_review_apply_create_failed");
       }
       await markChangeLogNotified(c.env.DB, result.logId, notified);
     }

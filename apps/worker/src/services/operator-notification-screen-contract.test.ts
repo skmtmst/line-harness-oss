@@ -1,40 +1,11 @@
-/*
- * N-327 (#663): 画面の「きっかけ」一覧と Worker の登録簿がずれたら落ちる。
- *
- * この試験が無かったせいで、実際にこうなっていた(審査 2026-09-12 の実測):
- *
- *   登録簿  : ["booking_created","broadcast_completed","ec_order_received","form_submitted"]
- *   画面の4択: ["cv_fire","friend_add","incoming_webhook.custom","message_received"]
- *   交わり  : []
- *
- * **交わりが空。**画面から作れるルールは1つも発火できないのに、公開は 200 で
- * 通り `isActive: true` になっていた。つまり「公開したのに届かない」。
- * この票が直そうとしたものが、入口だけ別の言葉を話していたせいで残っていた。
- *
- * 原因は「両者を突き合わせるものが何も無かった」こと。画面が先にでき、
- * 登録簿が後からでき、誰も照らし合わせなかった。**ここがその照らし合わせ。**
- *
- * ここで止めたい崩れ方:
- *   1. 画面に、登録簿に無い値を足す(選べるのに発火しない)
- *   2. 登録簿に producer を足したのに、画面へ出し忘れる(作れない)
- *   3. 画面のラベルが空・値の重複
- *
- * 画面は別アプリ(apps/web)なので import できない。**ソースを読んで値を
- * 取り出す。**取り出せなくなったら(書き方が変わったら)それ自体を落とす。
- */
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it } from 'vitest';
-
 import { listOperatorEventTypes } from './operator-notification-registry.js';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const SCREEN_OPTIONS_FILE = join(
-  HERE, '..', '..', '..', '..',
-  'apps', 'web', 'src', 'v8', 'line-notifications', 'operator-event-options.ts',
-);
+// 実際の選択肢を実行して比べる。別アプリ全体をWorkerの型検査へ含めない。
+const optionsPath = new URL('../../../web/src/v8/line-notifications/operator-event-options.ts', import.meta.url).pathname;
+const { OPERATOR_EVENT_OPTIONS } = await import(optionsPath) as {
+  OPERATOR_EVENT_OPTIONS: ReadonlyArray<{ value: string; label: string }>;
+};
 
 /**
  * 画面に出さない登録簿のきっかけ。
@@ -49,34 +20,9 @@ const SCREEN_HIDDEN_EVENT_TYPES: ReadonlyArray<{ eventType: string; reason: stri
   {eventType:'inbox_assigned_reply',reason:'担当者通知はAPIのみの担当。画面の選択肢・PWAはClaudeの接続待ち。APIから通知ルールを作れる。画面の接続時にこの例外を消す。'},
 ];
 
-const screenSource = readFileSync(SCREEN_OPTIONS_FILE, 'utf8');
-
-/** OPERATOR_EVENT_OPTIONS の配列リテラルから value と label を取り出す。 */
-function screenOptions(): Array<{ value: string; label: string }> {
-  const start = screenSource.indexOf('export const OPERATOR_EVENT_OPTIONS');
-  expect(
-    start, `画面の一覧(${SCREEN_OPTIONS_FILE})に OPERATOR_EVENT_OPTIONS が見つかりません`,
-  ).toBeGreaterThanOrEqual(0);
-  // 型注釈の `OperatorEventOption[]` にも `]` があるので、`= [` の開き括弧を
-  // 見つけてからその先の `]` を探す。ここを間違えると本体が空になり、
-  // 突き合わせが空振りしたまま緑になる。
-  const open = screenSource.indexOf('= [', start);
-  expect(open, 'OPERATOR_EVENT_OPTIONS の配列リテラルが見つかりません').toBeGreaterThan(start);
-  const end = screenSource.indexOf(']', open);
-  expect(end).toBeGreaterThan(open);
-  const body = screenSource.slice(open, end);
-  const found: Array<{ value: string; label: string }> = [];
-  const pattern = /\{\s*value:\s*'([^']+)'\s*,\s*label:\s*'([^']*)'\s*\}/g;
-  for (let match = pattern.exec(body); match; match = pattern.exec(body)) {
-    found.push({ value: match[1]!, label: match[2]! });
-  }
-  return found;
-}
-
-describe('N-327 #663 画面のきっかけと登録簿の突き合わせ', () => {
-  it('画面の一覧を読み出せる（書き方が変わったら気づく）', () => {
-    const options = screenOptions();
-    // 取り出せない = 突き合わせが空振りする。空振りを緑で通さない。
+describe('画面のきっかけと登録簿の突き合わせ', () => {
+  it('画面の選択肢には空の値・ラベルと重複がない', () => {
+    const options = OPERATOR_EVENT_OPTIONS;
     expect(options.length).toBeGreaterThan(0);
     expect(options.every((option) => option.value.length > 0)).toBe(true);
     expect(options.every((option) => option.label.length > 0)).toBe(true);
@@ -86,7 +32,7 @@ describe('N-327 #663 画面のきっかけと登録簿の突き合わせ', () =>
 
   it('画面にあって登録簿に無いきっかけは1つも無い（選べるのに発火しない）', () => {
     const registry = new Set(listOperatorEventTypes().map((entry) => entry.eventType));
-    const orphans = screenOptions().map((option) => option.value)
+    const orphans = OPERATOR_EVENT_OPTIONS.map((option) => option.value)
       .filter((value) => !registry.has(value));
     expect(
       orphans,
@@ -96,7 +42,7 @@ describe('N-327 #663 画面のきっかけと登録簿の突き合わせ', () =>
   });
 
   it('登録簿にあって画面に無いきっかけは、理由を書いたものだけ（出し忘れを防ぐ）', () => {
-    const shown = new Set(screenOptions().map((option) => option.value));
+    const shown = new Set(OPERATOR_EVENT_OPTIONS.map((option) => option.value));
     const hidden = new Set(SCREEN_HIDDEN_EVENT_TYPES.map((entry) => entry.eventType));
     const missing = listOperatorEventTypes().map((entry) => entry.eventType)
       .filter((eventType) => !shown.has(eventType) && !hidden.has(eventType));
@@ -110,7 +56,7 @@ describe('N-327 #663 画面のきっかけと登録簿の突き合わせ', () =>
   });
 
   it('接続済みのきっかけは、明示したAPI先行分を除き画面から選べる', () => {
-    const shown = new Set(screenOptions().map((option) => option.value));
+    const shown = new Set(OPERATOR_EVENT_OPTIONS.map((option) => option.value));
     const connectedButHidden = listOperatorEventTypes()
       .filter((entry) => entry.connected && !shown.has(entry.eventType)
         && !SCREEN_HIDDEN_EVENT_TYPES.some(hidden=>hidden.eventType===entry.eventType))

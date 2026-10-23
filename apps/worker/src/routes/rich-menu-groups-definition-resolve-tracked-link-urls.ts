@@ -567,7 +567,7 @@ async function handleManualPublish(
       return c.json({ success: false, error: '公開の担当が別の処理へ移りました。最新の状態を確認して、もう一度お試しください。' }, 409);
     }
     if (e instanceof RichMenuValidationError) return inputError(c, { success: false, error: message }, 400, ["pages"]);
-    return c.json({ success: false, error: message }, 500);
+    throw e;
   }
 }
 

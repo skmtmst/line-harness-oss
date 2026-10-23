@@ -1,4 +1,4 @@
-import { logger } from '@line-crm/shared/server';
+import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
@@ -42,11 +42,9 @@ function lineAccountId(c: Context<Env>): string | null {
 }
 
 function pagination(c: Context<Env>): { limit: number; offset: number } {
-  const rawLimit = Number(c.req.query('limit') ?? 20);
-  const rawOffset = Number(c.req.query('offset') ?? 0);
   return {
-    limit: Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 20,
-    offset: Number.isInteger(rawOffset) ? Math.max(rawOffset, 0) : 0,
+    limit: clampedListInteger(c.req.query('limit'), 20, 1, 100),
+    offset: clampedListInteger(c.req.query('offset'), 0, 0),
   };
 }
 
@@ -83,10 +81,9 @@ ecOperations.get(
         lineAccountId: accountId, status: status as EcOrderState | null,
         query: c.req.query('query')?.trim().slice(0, 100) || '', ...page,
       });
-      return c.json({ success: true, data, pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: page.limit }, sort: [{ field: 'orderedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
-      logger.error("routes_ec_operations_failed");
-      return c.json({ success: false, error: '注文を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -112,8 +109,7 @@ ecOperations.get(
       if (!data) return c.json({ success: false, error: '注文が見つかりません' }, 404);
       return c.json({ success: true, data });
     } catch (error) {
-      logger.error("routes_ec_operations_failed");
-      return c.json({ success: false, error: '注文の処理状況を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -149,10 +145,9 @@ ecOperations.get(
         status: status as EcActionExecutionStatus | null,
         statuses: statusGroup ? groupStatuses[statusGroup] : null, ...page,
       });
-      return c.json({ success: true, data, pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: page.limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
-      logger.error("routes_ec_operations_failed");
-      return c.json({ success: false, error: 'ECの処理履歴を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -197,8 +192,7 @@ ecOperations.post(
       auditLog(c, 'ec.action.retry', { kind: 'ec-action-execution', id: result.execution.id });
       return c.json({ success: true, data: result.execution }, result.kind === 'queued' ? 202 : 200);
     } catch (error) {
-      logger.error("routes_ec_operations_failed");
-      return c.json({ success: false, error: 'ECの処理を再試行できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -224,10 +218,9 @@ ecOperations.get(
         status: rawStatus as IdentityState,
         ...page,
       });
-      return c.json({ success: true, data, pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: page.limit }, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
-      logger.error("routes_ec_operations_failed");
-      return c.json({ success: false, error: '会員のつき合わせを確認できませんでした' }, 500);
+      throw error;
     }
   },
 );

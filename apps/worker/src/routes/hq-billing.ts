@@ -178,8 +178,7 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_hq_billing_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -285,8 +284,7 @@ hqBilling.post('/api/hq/billing/checkout', requireRole('owner'), inputJsonBounda
       logger.warn("routes_hq_billing_warn");
       return c.json({ success: false, error: '決済サービスに接続できませんでした。時間をおいてもう一度お試しください' }, 502);
     }
-    logger.error("routes_hq_billing_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -306,8 +304,7 @@ hqBilling.post('/api/hq/billing/portal', requireRole('owner', 'admin'), inputJso
     if (err instanceof StripeApiError) {
       return c.json({ success: false, error: '決済サービスに接続できませんでした。時間をおいてもう一度お試しください' }, 502);
     }
-    logger.error("routes_hq_billing_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -336,8 +333,7 @@ hqBilling.get('/api/hq/billing/invoices', requireRole('owner', 'admin'), async (
     if (err instanceof StripeApiError) {
       return c.json({ success: false, error: '支払い履歴を取得できませんでした。時間をおいてもう一度お試しください' }, 502);
     }
-    logger.error("routes_hq_billing_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -559,7 +555,6 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     await finish();
     return c.json({ success: true, data: { received: true } });
   } catch (err) {
-    logger.error("routes_hq_billing_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });

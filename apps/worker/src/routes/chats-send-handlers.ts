@@ -332,7 +332,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
         .bind(jstNow(), chat.id)
         .run();
     } catch (e) {
-      logger.error("routes_chats_failed");
+      logger.error("chats.chats_id_send_post_failed");
     }
 
     await fireEvent(c.env.DB, 'manual_reply_sent', {
@@ -342,7 +342,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
       friendId: friend.id,
       eventData: { staffId: c.get('staff').id },
     }, undefined, friend.line_account_id).catch((error) => {
-      logger.error("routes_chats_failed");
+      logger.error("chats.chats_id_send_post_failed");
     });
 
     await releaseInboxReplyLease(c.env.DB, {
@@ -365,8 +365,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
         channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
       }).catch(() => undefined);
     }
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -404,7 +403,6 @@ export const post__api_chats_id_render_preview_2 = async (c: Context<Env, "/api/
       data: { content: rendered.content, unresolved: rendered.unresolved },
     });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

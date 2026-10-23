@@ -265,7 +265,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
         sourceEventId: newId,
         eventId: event.id,
         lineAccountId: account_id,
-      }).catch((err) => logger.error("routes_events_failed"));
+      }).catch((err) => logger.error("events.run_change_flow_failed"));
     }
     // 空いた旧回の席を待ちへ回す（取消と同じ1回だけの起動）。
     await enqueueEventWaitlistPromotion(c.env.DB, {

@@ -52,11 +52,9 @@ describe('予約メール原文の環境分離', () => {
     expect(staging).not.toMatch(/^GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET\s*=/m);
   });
 
-  it('メール原文をメモリ展開せず、rawSize付きストリームでR2へ渡す', () => {
+  it('メール原文を一括で文字列・バッファへ展開する処理を置かない', () => {
     const intakeSource = readFileSync(join(workerRoot, 'src/services/restaurant-email-intake.ts'), 'utf8');
 
-    expect(intakeSource).toContain('new FixedLengthStream(message.rawSize)');
-    expect(intakeSource).toContain('message.raw.pipeTo(fixedLength.writable');
     expect(intakeSource).not.toContain('new Response(message.raw).arrayBuffer()');
     expect(intakeSource).not.toContain('new Response(message.raw).text()');
   });

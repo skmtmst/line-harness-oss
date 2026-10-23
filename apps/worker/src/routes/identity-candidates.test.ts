@@ -113,7 +113,8 @@ describe('identity candidate HTTP contract', () => {
     const empty = await app.request('/api/identity-candidates?kind=friend_duplicate');
     expect(empty.status).toBe(200);
     expect(await empty.json()).toEqual({
-      success: true, data: { items: [], total: 0, limit: 20, offset: 0 },
+      success: true, data: { items: [], total: 0, limit: 20, offset: 0,
+        sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] },
     });
   });
 

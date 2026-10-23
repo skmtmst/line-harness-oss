@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError, readFolderAssignment } from '@line-crm/db';
 import {
@@ -130,8 +129,7 @@ affiliateOffers.get('/api/affiliate-offers', async (c) => {
     });
     return c.json({ success: true, data: items.map(serializeOffer) });
   } catch (err) {
-    logger.error("routes_affiliate_offers_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -146,8 +144,7 @@ affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
     }
     return c.json({ success: true, data: serializeOffer(item) });
   } catch (err) {
-    logger.error("routes_affiliate_offers_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -251,8 +248,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inp
     return c.json({ success: true, data: serializeOffer(offer) }, 201);
   } catch (err) {
     if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
-    logger.error("routes_affiliate_offers_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -363,8 +359,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     return c.json({ success: true, data: serializeOffer(updated) });
   } catch (err) {
     if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
-    logger.error("routes_affiliate_offers_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -401,8 +396,7 @@ affiliateOffers.get('/api/affiliate-offers/:id/versions', async (c) => {
     const versions = await listOfferVersions(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: versions.map(serializeOfferVersion) });
   } catch (err) {
-    logger.error("routes_affiliate_offers_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -428,8 +422,7 @@ affiliateOffers.get('/api/affiliate-offers/:id/cap-status', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_affiliate_offers_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -489,8 +482,7 @@ affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 
     if (err instanceof Error && /windowDays|cap/.test(err.message)) {
       return inputError(c, { success: false, error: err.message }, 400, ["windowDays","cap"]);
     }
-    logger.error("routes_affiliate_offers_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

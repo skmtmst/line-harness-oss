@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { recordAuditEvent } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 
@@ -60,7 +61,7 @@ export const post__api_mileage_exports_2 = async (c: Context<Env, "/api/mileage/
       targetKind: kind!, targetId: accountId, result: 'success', reason: body.reason.trim() });
     return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${kind}.csv"`, 'Cache-Control': 'no-store' } });
-  } catch { return c.json({ success: false, error: '書き出しに失敗しました' }, 500); }
+  } catch (error) { throw error; }
 };
 
 export const get__api_mileage_reward_folders_3 = async (c: Context<Env, "/api/mileage/reward-folders">) => {
@@ -370,8 +371,8 @@ export const get__api_mileage_redemptions_18 = async (c: Context<Env, "/api/mile
       if (!MILEAGE_REDEMPTION_LIST_STATUSES.has(statusValue)) {
         return c.json({ success: false, error: 'status is invalid' }, 400);
       }
-      const requestedLimit = Number(c.req.query('limit') || 20);
-      const requestedOffset = Number(c.req.query('offset') || 0);
+      const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 20);
+      const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
       const listed = await listMileageRedemptions(c.env.DB, {
         lineAccountId: accountId,
         status: statusValue as MileageRedemptionListStatus,
@@ -380,10 +381,8 @@ export const get__api_mileage_redemptions_18 = async (c: Context<Env, "/api/mile
       });
       return c.json({
         success: true,
-        data: {
-          items: listed.items.map((item) => publicMileageRedemption(item)),
-          pagination: listed.pagination,
-        },
+        data: buildOffsetListResponse({ items: listed.items.map((item) => publicMileageRedemption(item)),
+          pagination: listed.pagination, total: listed.pagination.total, paging: { limit: listed.pagination.limit }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }),
       });
     } catch (error) {
       return mileageRewardError(c, error);
@@ -489,8 +488,8 @@ export const get__api_mileage_friends_21 = async (c: Context<Env, "/api/mileage/
     if (!accountScope.allowedAccountIds.includes(accountId)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
-    const requestedLimit = Number(c.req.query('limit') || 20);
-    const requestedOffset = Number(c.req.query('offset') || 0);
+    const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 20);
+    const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
     const data = await getMileageFriendsV6(c.env.DB, {
       lineAccountId: accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
@@ -500,7 +499,7 @@ export const get__api_mileage_friends_21 = async (c: Context<Env, "/api/mileage/
       limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
       offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [{ field: 'available', direction: 'desc' }, { field: 'displayName', direction: 'asc' }, { field: 'friendId', direction: 'asc' }] }) });
   } catch (error) {
     return mileageV6Error(c, error);
   }
@@ -512,14 +511,14 @@ export const get__api_mileage_earning_rules_22 = async (c: Context<Env, "/api/mi
     if (!await canUseMileageAccount(c, accountId)) {
       return inputError(c, { success: false, error: 'LINE account not found' }, accountId ? 404 : 400, []);
     }
-    const requestedLimit = Number(c.req.query('limit') || 20);
-    const requestedOffset = Number(c.req.query('offset') || 0);
+    const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 20);
+    const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
     const data = await getMileageEarningRulesV6(c.env.DB, {
       lineAccountId: accountId,
       limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
       offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [{ field: 'sortOrder', direction: 'asc' }, { field: 'createdAt', direction: 'asc' }, { field: 'id', direction: 'asc' }] }) });
   } catch (error) {
     return mileageV6Error(c, error);
   }

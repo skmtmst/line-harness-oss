@@ -67,8 +67,7 @@ export function conversionContractError(c: Context<Env>, error: unknown): Respon
   if (error instanceof ConversionDefinitionError) {
     return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
   }
-  logger.error("conversion_definition_contract_failed");
-  return c.json({ success: false, error: '成果地点の情報を処理できませんでした' }, 500);
+  throw error;
 }
 
 export function jstDate(date: Date): string {
@@ -447,7 +446,7 @@ async function notifyOfferActionFailure(
       }),
     });
   } catch (error) {
-    logger.error("routes_conversions_failed");
+    logger.error("conversions.notify_offer_action_failure_failed");
   }
 }
 
@@ -495,7 +494,7 @@ async function runApprovedConversionOfferActions(
       try {
         await attachTagAndFireSideEffects(db, plan.friendId, plan.tagId);
       } catch (error) {
-        logger.error("routes_conversions_failed");
+        logger.error("conversions.run_approved_conversion_offer_actions_failed");
         attachError = error;
       }
       // 例外を投げない失敗（マイル工程・走り直し経路の失敗）も未完として拾う。
@@ -564,7 +563,7 @@ async function runApprovedConversionOfferActions(
             }
           }
         } catch (error) {
-          logger.error("routes_conversions_failed");
+          logger.error("conversions.run_approved_conversion_offer_actions_failed");
           failures.push({
             action: 'scenario',
             refId: plan.scenarioId,
@@ -665,6 +664,6 @@ async function notifyApprovalOnce(
       throw err;
     }
   } catch (err) {
-    logger.error("routes_conversions_failed");
+    logger.error("conversions.notify_approval_once_failed");
   }
 }

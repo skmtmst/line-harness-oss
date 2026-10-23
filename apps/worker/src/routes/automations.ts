@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import {defaultWindow} from './automation-execution-window.js';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -46,7 +45,7 @@ import {
   retryAutomationRun,
 } from '../features/automations/automation-engine/index.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
-import { listLimit } from './list-pagination.js';
+import { buildOffsetListResponse, listLimit, boundedListInteger } from '../lib/list-paging.js';
 import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
 
 const automations = new Hono<Env>();
@@ -130,8 +129,7 @@ async function definitionEndpoint<T>(c: Context<Env>, run: () => Promise<T>): Pr
     return c.json({ success: true, data: await run() });
   } catch (error) {
     if (error instanceof AutomationDefinitionError) return definitionErrorResponse(c, error);
-    logger.error("automation_definition_api_failed");
-    return c.json({ success: false, error: 'オートメーションを処理できませんでした' }, 500);
+    throw error;
   }
 }
 
@@ -144,8 +142,7 @@ async function draftEndpoint<T>(
     return c.json({ success: true, data: await run() }, successStatus as 200);
   } catch (error) {
     if (error instanceof AutomationDraftError) return draftErrorResponse(c, error);
-    logger.error("automation_draft_api_failed");
-    return c.json({ success: false, error: 'オートメーションの下書きを処理できませんでした' }, 500);
+    throw error;
   }
 }
 
@@ -435,12 +432,6 @@ function executionRunsCsv(items: AutomationExecutionRun[]): string {
   return `﻿${lines.join('\r\n')}`;
 }
 
-function boundedInteger(raw: string | undefined, fallback: number, max: number): number {
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0) return fallback;
-  return Math.min(value, max);
-}
-
 async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<void>) {
   const id = c.req.param('id')!;
   // #942: 一覧が返すidは の automation_definitions。旧 automations 表の
@@ -593,8 +584,7 @@ automations.get('/api/automations/counts', requireAutomationViewPermission, asyn
   try {
     return c.json({ success: true, data: await automationTabCounts(c.env.DB, accountId) });
   } catch (err) {
-    logger.error("routes_automations_failed");
-    return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -613,8 +603,8 @@ automations.get(
     }
     const rawLimit = c.req.query('limit');
     const rawOffset = c.req.query('offset');
-    const limit = rawLimit === undefined ? undefined : boundedInteger(rawLimit, -1, 200);
-    const offset = rawOffset === undefined ? undefined : boundedInteger(rawOffset, -1, 1_000_000);
+    const limit = rawLimit === undefined ? undefined : boundedListInteger(rawLimit, -1, 200);
+    const offset = rawOffset === undefined ? undefined : boundedListInteger(rawOffset, -1, 1_000_000);
     if ((rawLimit !== undefined && limit === -1) || (rawOffset !== undefined && offset === -1)) {
       return c.json({ success: false, error: 'ページ指定を確認してください' }, 400);
     }
@@ -623,20 +613,18 @@ automations.get(
       requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       { limit, offset, includeArchived: c.req.query('includeArchived') === '1' },
     );
-    return c.json({
-      success: true,
-      data: await withStyleSampleMetadata(c.env.DB,result.items,'automation'),
+    const responseItems = await withStyleSampleMetadata(c.env.DB,result.items,'automation');
+    return c.json(buildOffsetListResponse({ success: true,
+      data: responseItems,
       summary: result.summary,
       freshness: result.freshness,
       pagination: {
         total: result.total,
         limit: limit ?? null,
         offset: offset ?? 0,
-      },
-    });
+      }, items: responseItems, total: result.total, paging: { limit: limit ?? result.total }, sort: [{ field: 'priority', direction: 'desc' }, { field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (err) {
-    logger.error("routes_automations_failed");
-    return c.json({ success: false, error: 'オートメーションを表示できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -721,8 +709,8 @@ automations.get(
     // CSVは画面の1頁ではなく絞り込み全体を出す。暴走だけ上限で留める。
     const limit = wantsCsv
       ? 5_000
-      : Math.max(1, boundedInteger(c.req.query('limit'), 20, 100));
-    const offset = wantsCsv ? 0 : boundedInteger(c.req.query('offset'), 0, 1_000_000);
+      : Math.max(1, boundedListInteger(c.req.query('limit'), 20, 100));
+    const offset = wantsCsv ? 0 : boundedListInteger(c.req.query('offset'), 0, 1_000_000);
     const defaults = defaultWindow();
     const from = c.req.query('from') || defaults.from;
     const to = c.req.query('to') || defaults.to;
@@ -773,10 +761,9 @@ automations.get(
       items,
       pagination: { total: result.total, limit, offset },
     };
-    return c.json({ success: true, data: body });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...body, total: result.total, paging: { limit }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
   } catch (err) {
-    logger.error("routes_automations_failed");
-    return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -807,8 +794,7 @@ automations.post(
         const status = error.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
-      logger.error("automation_run_retry_failed");
-      return c.json({ success: false, error: '失敗した処理を再実行できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -855,8 +841,7 @@ automations.get(
         },
       });
     } catch (err) {
-      logger.error("routes_automations_failed");
-      return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
+      throw err;
     }
   },
 );
@@ -886,8 +871,7 @@ automations.post(
         const status = error.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
-      logger.error("automation_run_cancel_failed");
-      return c.json({ success: false, error: '実行を取りやめられませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -1015,8 +999,7 @@ automations.get(
       },
     });
   } catch (err) {
-    logger.error("routes_automations_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -1070,8 +1053,7 @@ automations.put('/api/automations/:id', requireRole('owner', 'admin'), inputJson
       },
     });
   } catch (err) {
-    logger.error("routes_automations_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -1080,8 +1062,7 @@ automations.delete('/api/automations/:id', requireRole('owner', 'admin'), async 
     await deleteAutomation(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_automations_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -1109,8 +1090,7 @@ automations.get(
       })),
     });
   } catch (err) {
-    logger.error("routes_automations_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

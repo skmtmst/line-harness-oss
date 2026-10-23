@@ -1,4 +1,4 @@
-import { logger } from '@line-crm/shared/server';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import {
@@ -35,8 +35,7 @@ inbox.get('/api/inbox/activity-digest', async (c) => {
     });
     return c.json({ success: true, data });
   } catch (err) {
-    logger.error("routes_inbox_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -53,17 +52,16 @@ inbox.get('/api/inbox/unanswered', async (c) => {
       q: q || undefined,
       account,
       minWaitMinutes: minWaitMinutesStr ? Number.parseInt(minWaitMinutesStr, 10) : undefined,
-      page: pageStr ? Number.parseInt(pageStr, 10) : undefined,
-      pageSize: pageSizeStr ? Number.parseInt(pageSizeStr, 10) : undefined,
+      page: pageStr ? listQueryNumber(pageStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
+      pageSize: pageSizeStr ? listQueryNumber(pageSizeStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
       allowedAccountIds: scope.allowedAccountIds,
       canSeeUnassigned: scope.canSeeUnassigned,
     };
 
     const result = await computeUnansweredInbox(c.env.DB, opts);
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...result, items: result.rows, paging: { limit: result.pageSize }, sort: [{ field: 'lastIncomingAt', direction: 'desc' }, { field: 'friendId', direction: 'desc' }] }) });
   } catch (err) {
-    logger.error("routes_inbox_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -76,7 +74,6 @@ inbox.get('/api/inbox/unanswered/count', async (c) => {
     });
     return c.json({ success: true, data: result });
   } catch (err) {
-    logger.error("routes_inbox_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });

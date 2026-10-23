@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { logger, traceQueueMessage } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -316,7 +317,7 @@ codexSlackEvents.get('/api/integrations/codex-monitor/status', async (c) => {
   if (!c.env.API_KEY || authorization !== `Bearer ${c.env.API_KEY}`) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
-  const parsedLimit = Number.parseInt(c.req.query('limit') ?? '20', 10);
+  const parsedLimit = listQueryNumber(c.req.query('limit'), 20, { format: 'integer-prefix' });
   const limit = Number.isFinite(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 20;
   const result = await c.env.DB.prepare(`
     SELECT slack_event_id, team_id, channel_id, message_ts, thread_ts, status,

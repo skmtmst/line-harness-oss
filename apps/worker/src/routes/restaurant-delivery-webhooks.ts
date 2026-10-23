@@ -165,7 +165,7 @@ export function registerDeliveryWebhooks(restaurantDelivery: Hono<Env>): void {
     const secret = deliveryWebhookSigningSecret(c.env, service);
     if (!secret) {
       // 合言葉が未設定・短すぎる場合は検証できない。受け取らずに設定不足として返す。
-      logger.error("routes_restaurant_delivery_failed");
+      logger.error("restaurant_delivery.restaurant_test_delivery_webhooks_by_service_create_failed");
       return c.json({ success: false, error: 'Integration is not configured' }, 503);
     }
 
@@ -267,7 +267,7 @@ export function registerDeliveryWebhooks(restaurantDelivery: Hono<Env>): void {
       return c.json({ success: true, result: 'ignored' });
     } catch (error) {
       // 例外の本文は残さない。種類だけを符号にして台帳へ入れ、相手には再試行を促す。
-      logger.error("routes_restaurant_delivery_failed");
+      logger.error("restaurant_delivery.restaurant_test_delivery_webhooks_by_service_create_failed");
       await closeEvent('retryable_failed', 'processing_failed');
       return c.json({ success: false, error: 'Processing failed' }, 503);
     }

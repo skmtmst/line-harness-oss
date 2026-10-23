@@ -6,7 +6,7 @@ import { trackConversion, listConversionDefinitions, getConversionDefinitionDeta
 import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { listLimit } from './list-pagination.js';
+import { buildOffsetListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
 import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { maskedPayloadShape } from '../services/incoming-webhook-actions.js';
 import { sha256Hex } from '../middleware/auth.js';
@@ -23,7 +23,7 @@ export const get__api_conversions_definitions_1 = async (c: Context<Env, "/api/c
     const scope = await conversionDefinitionScope(c, filters.value.lineAccountId);
     if (!scope.ok) return scope.response;
     const cursorRaw = c.req.query('cursor') ?? '0';
-    const cursor = Number(cursorRaw);
+    const cursor = listQueryNumber(cursorRaw, Number.NaN);
     if (!/^\d+$/.test(cursorRaw) || !Number.isSafeInteger(cursor)) {
       return c.json({ success: false, error: 'cursor は0以上の整数で指定してください' }, 400);
     }
@@ -34,7 +34,7 @@ export const get__api_conversions_definitions_1 = async (c: Context<Env, "/api/c
       cursor,
       limit: listLimit(c.req.query('limit'), 50),
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [] }) });
   } catch (error) {
     return conversionContractError(c, error);
   }
@@ -391,7 +391,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
     try {
       await recordConversionIngestionEvent(c.env.DB, { conversionPointId: pointId, ...entry });
     } catch (logError) {
-      logger.error("routes_conversions_failed");
+      logger.error("conversions.record_ingestion_event_failed");
     }
   };
   try {
@@ -585,7 +585,6 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
       throw trackError;
     }
   } catch (error) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 };

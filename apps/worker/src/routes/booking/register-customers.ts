@@ -28,7 +28,7 @@ booking.get('/api/booking/admin/customers', async (c) => {
     });
     return c.json({ customers });
   } catch (error) {
-    logger.error("routes_booking_failed");
+    logger.error("booking.admin_customers_list_failed");
     return c.json({ error: 'customer_data_unavailable' }, 503);
   }
 });
@@ -47,7 +47,7 @@ booking.get('/api/booking/admin/customers/:id', async (c) => {
       ? c.json({ customer })
       : c.json({ error: 'booking_customer_not_found' }, 404);
   } catch (error) {
-    logger.error("routes_booking_failed");
+    logger.error("booking.admin_customers_by_id_get_failed");
     return c.json({ error: 'customer_data_unavailable' }, 503);
   }
 });
@@ -215,7 +215,7 @@ booking.post(
       if (code.startsWith('booking_customer_') && code.endsWith('_invalid')) {
         return inputError(c, { error: code }, 422, [code.slice('booking_customer_'.length, -'_invalid'.length)]);
       }
-      logger.error("routes_booking_failed");
+      logger.error("booking.admin_customers_create_failed");
       return c.json({ error: 'customer_data_unavailable' }, 503);
     }
   },

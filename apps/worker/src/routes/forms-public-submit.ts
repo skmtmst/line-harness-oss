@@ -439,7 +439,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
           await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner, claimCtx.version);
         }
       } catch (error) {
-        logger.error("routes_forms_failed");
+        logger.error("forms.settle_claim_failed");
       }
       return missing;
     };
@@ -587,7 +587,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
         submission.destination_write_failed = result.failed;
       } catch (error) {
         // 回答自体は保存済み。記録失敗を回答失敗へ見せず、再開時に残す。
-        logger.error("routes_forms_failed");
+        logger.error("forms.update_destination_write_result_failed");
         return;
       }
       if (claimCtx) {
@@ -730,7 +730,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
             } catch (error) {
               if (error instanceof ClaimOwnershipLost) throw error;
               // 届かなくても回答の保存へ進む。再開時に送り直す。
-              logger.error("routes_forms_failed");
+              logger.error("forms.forms_id_submit_post_failed");
             }
           }
           // Still save the submission for records
@@ -777,7 +777,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
       sourceEventId: submission.id,
       metadata: { formId, submissionId: submission.id },
     }).catch((error) => {
-      logger.error("routes_forms_failed");
+      logger.error("forms.record_form_conversion_failed");
       return null;
     });
     if (executionCtx) executionCtx.waitUntil(recordFormConversion());
@@ -816,7 +816,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
         }),
       ]).then((results) => {
         for (const result of results) {
-          if (result.status === 'rejected') logger.error("routes_forms_failed");
+          if (result.status === 'rejected') logger.error("forms.forms_id_submit_post_failed");
         }
       }),
     );

@@ -464,7 +464,7 @@ async function internalMemosOf(
   try {
     return await getAutoReplyInternalMemos(db, autoReplyIds);
   } catch (err) {
-    logger.error("routes_auto_replies_failed");
+    logger.error("auto_replies.internal_memos_of_failed");
     return new Map();
   }
 }
@@ -490,7 +490,7 @@ async function resolveStoppedByNames(
     }
   } catch (err) {
     // 名前が引けなくても一覧は出す。ID そのものは画面に出さず null のままにする。
-    logger.error("routes_auto_replies_failed");
+    logger.error("auto_replies.resolve_stopped_by_names_failed");
   }
 }
 

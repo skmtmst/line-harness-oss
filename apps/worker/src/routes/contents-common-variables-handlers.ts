@@ -323,7 +323,7 @@ export const get__api_common_vars_id_delete_impact_4 = async (c: Context<Env, "/
     const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
     return c.json({ success: true, data: serializeCommonVarDeleteImpact(existing, impact) });
   } catch (err) {
-    logger.error("routes_contents_failed");
+    logger.error("contents.common_vars_id_delete_impact_get_failed");
     return c.json(
       { success: false, error: '使用先を確認できないため削除できません' },
       503,
@@ -383,7 +383,7 @@ export const post__api_common_vars_id_impact_preview_5 = async (c: Context<Env, 
     if (err instanceof RequestBodyError) {
       return inputError(c, { success: false, error: err.message }, err.status, []);
     }
-    logger.error("routes_contents_failed");
+    logger.error("contents.common_vars_id_impact_preview_post_failed");
     return c.json(
       { success: false, error: '影響する場所を確認できませんでした' },
       503,
@@ -495,7 +495,7 @@ export const post__api_common_vars_id_replace_6 = async (c: Context<Env, "/api/c
         currentVersion: err.currentVersion,
       }, 409);
     }
-    logger.error("routes_contents_failed");
+    logger.error("contents.common_vars_id_replace_post_failed");
     return c.json({ success: false, error: '差し替えの影響を確認できませんでした' }, 503);
   }
 };
@@ -533,7 +533,7 @@ export const delete__api_common_vars_id_7 = async (c: Context<Env, "/api/common-
     await deleteCommonVar(c.env.DB, existing.id, accountId, c.get('staff').id, deleteReason);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_contents_failed");
+    logger.error("contents.common_vars_id_delete_failed");
     return c.json(
       { success: false, error: '使用先を確認できないため削除できません' },
       503,

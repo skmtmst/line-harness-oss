@@ -489,7 +489,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     occurredAt: nowIso,
   }).catch((error) => {
     // 予約成立後の派生処理なので、スコア側の障害で予約を失敗扱いにしない。
-    logger.error("routes_events_failed");
+    logger.error("events.run_booking_flow_failed");
   });
   const actionScoreExecutionCtx = optionalExecutionCtx(c);
   if (actionScoreExecutionCtx) actionScoreExecutionCtx.waitUntil(actionScorePromise);
@@ -515,7 +515,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       sourceEventId: id,
       eventId: event.id,
       lineAccountId: account_id,
-    }).catch((err) => logger.error("routes_events_failed"));
+    }).catch((err) => logger.error("events.run_booking_flow_failed"));
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
         lineAccountId: account_id,
@@ -526,7 +526,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
           bookingType: 'event', bookingId: id, eventId: event.id, slotId: slot.id,
         },
       })
-        .catch((error) => logger.error("routes_events_failed")),
+        .catch((error) => logger.error("events.run_booking_flow_failed")),
     );
   }
 
@@ -568,7 +568,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       });
     }
   } catch (e) {
-    logger.error("routes_events_failed");
+    logger.error("events.run_booking_flow_failed");
   }
 
   return finalize(201, { id, status });

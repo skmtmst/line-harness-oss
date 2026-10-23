@@ -160,12 +160,12 @@ webMeasurement.post('/api/public/web-conversions', inputJsonBoundary(), async (c
         });
       } catch (err) {
         // アカウント境界・停止中などは1地点の失敗で他を止めない。
-        logger.error("routes_web_measurement_failed");
+        logger.error("web_measurement.public_web_conversions_create_failed");
       }
     }
     return c.body(null, 204, corsHeaders());
   } catch (err) {
-    logger.error("routes_web_measurement_failed");
+    logger.error("web_measurement.public_web_conversions_create_failed");
     return c.body(null, 204, corsHeaders());
   }
 });
@@ -206,8 +206,7 @@ webMeasurement.get(
         })),
       });
     } catch (err) {
-      logger.error("routes_web_measurement_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   },
 );
@@ -242,8 +241,7 @@ webMeasurement.post('/api/measurement-sites', requireRole('owner', 'admin'), inp
     auditLog(c, 'measurement_site.create', { kind: 'measurement_site', id: site.id }, { lineAccountId: accountId });
     return c.json({ success: true, data: { id: site.id, label: site.label, domains: site.domains } });
   } catch (err) {
-    logger.error("routes_web_measurement_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -277,8 +275,7 @@ webMeasurement.patch('/api/measurement-sites/:id', requireRole('owner', 'admin')
     auditLog(c, 'measurement_site.update', { kind: 'measurement_site', id: site.id }, { lineAccountId: site.line_account_id });
     return c.json({ success: true, data: { id: site.id } });
   } catch (err) {
-    logger.error("routes_web_measurement_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -326,8 +323,7 @@ webMeasurement.post(
     try {
       return await changeSiteStopState(c, c.req.param('id'), true);
     } catch (err) {
-      logger.error("routes_web_measurement_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   },
 );
@@ -339,8 +335,7 @@ webMeasurement.post(
     try {
       return await changeSiteStopState(c, c.req.param('id'), false);
     } catch (err) {
-      logger.error("routes_web_measurement_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   },
 );

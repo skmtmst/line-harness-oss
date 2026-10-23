@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { applyMileageRulesForEvent } from '@line-crm/db';
@@ -58,8 +57,7 @@ instagramEngagement.post('/api/integrations/ig-harness/engagement', inputJsonBou
     if (error instanceof Error && error.message.startsWith('Mileage friend not found:')) {
       return c.json({ success: false, error: 'friend_not_found' }, 404);
     }
-    logger.error("routes_instagram_engagement_failed");
-    return c.json({ success: false, error: 'internal_error' }, 500);
+    throw error;
   }
 });
 

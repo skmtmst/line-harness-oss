@@ -100,6 +100,7 @@ type ListBody = {
     all_total?: number;
     page: number;
     limit: number;
+    sort: Array<{ field: string; direction: 'asc' | 'desc' }>;
   };
 };
 
@@ -125,6 +126,7 @@ describe('#1060 GET /api/forms のサーバーページング', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as ListBody;
     expect(body.data.total).toBe(5);
+    expect(body.data.sort).toEqual([{ field: 'lastSubmittedAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }]);
     expect(body.data.items).toHaveLength(5);
     // latest-answer: 回答あり（新しい順）→ 未回答（作成が新しい順）。
     expect(ids(body)).toEqual([
@@ -184,12 +186,14 @@ describe('#1060 GET /api/forms のサーバーページング', () => {
     const answers = await (await list(db, '&sort=answers')).json() as ListBody;
     expect(ids(answers)[0]).toBe('form-stored');
     expect(ids(answers)[1]).toBe('form-alpha');
+    expect(answers.data.sort).toEqual([{ field: 'submitCount', direction: 'desc' }, { field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }]);
     // 名前順はフォームの表示名（displayFormName 済み）で並ぶ。
     // アンケート → ガンマ → デルタ → ベータ版 → 習慣調査。
     const names = await (await list(db, '&sort=name')).json() as ListBody;
     expect(ids(names)).toEqual([
       'form-stored', 'form-gamma', 'form-delta', 'form-beta', 'form-alpha',
     ]);
+    expect(names.data.sort).toEqual([{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]);
   });
 
   it('絞り込み＋ページングを組み合わせても total がずれない', async () => {

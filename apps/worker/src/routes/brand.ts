@@ -48,7 +48,7 @@ brand.get('/api/public/brand', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_brand_failed");
+    logger.error("brand.public_brand_list_failed");
     return c.json({ success: true, data: empty });
   }
 });
