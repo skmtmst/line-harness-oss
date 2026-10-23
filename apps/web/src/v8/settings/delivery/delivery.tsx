@@ -7,7 +7,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
-import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
@@ -261,7 +261,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         <PageHeading
           headingSize="compact"
           title="デリバリー連携"
-          help={`デリバリーサービスへの接続を設定します。Uber Eats の接続が完了しても、注文の取り込み・受注操作・営業状態の変更・メニューの同期はまだ利用できません。${
+          help={`デリバリーサービスへの接続を設定します。Uber Eats の注文の取り込みと注文ごとの操作は、連携の利用準備が整った店舗では受注画面に表示されます。営業状態の変更・メニューの同期はまだ利用できません。${
             anyConnected
               ? 'つながっているサービスの状態をここに出します。お店での入力はありません。うまくいっていない時は musubo が原因を確認し、必要な手続きを行います。'
               : 'お店での入力はありません。Uber Eats は「ログインしてつなぐ」を押して Uber Eats の画面で許可するだけ、出前館とロケットナウは「連携を申し込む」を押すだけです。鍵・接続先アドレス・通知の設定は、すべて musubo 側で行います。'
@@ -283,7 +283,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                 <CustomerInfoRows rows={[
                   { label: '接続の状態', value: <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge> },
                   ...(service.id === 'uber' ? [{ label: '注文の連携', value: (
-                    <StatusBadge tone="neutral" size="compact">{PREPARING_WORD}</StatusBadge>
+                    <StatusBadge tone="neutral" size="compact">受注画面で確認</StatusBadge>
                   ) }] : []),
                 ]} />
 
@@ -406,7 +406,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           ))}
         </RadioCardGroup>
         <p className={styles.note}>
-          選んだお店への接続を設定します。注文の連携はまだ利用できません。あとから変えるときは、この画面で一度解除してからもう一度ログインしてください。
+          選んだお店への接続を設定します。接続後、受注画面で利用できる注文の操作を確認してください。あとからつなぐお店を変えるときは、musubo へお知らせください。
         </p>
       </Dialog>
       {preparing.dialog}

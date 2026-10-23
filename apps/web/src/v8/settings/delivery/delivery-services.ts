@@ -69,7 +69,7 @@ export const SERVICES: DeliveryService[] = [
   {
     id: 'uber',
     name: 'Uber Eats',
-    sub: 'Uber Eats への接続を設定します。注文の取り込みはまだ利用できません',
+    sub: 'Uber Eats への接続を設定します。注文の連携は受注画面で確認します',
     connect: 'login',
     guide:
       'ボタンを押すと Uber Eats のログイン画面が開きます。ふだんお使いの Uber Eats のIDでログインし、「許可」を押してください。そのあと、つなぐお店を選ぶ画面に戻ります。',

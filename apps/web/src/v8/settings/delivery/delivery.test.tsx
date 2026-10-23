@@ -116,6 +116,7 @@ describe('設定 › デリバリー連携', () => {
       .map((region) => region.querySelector('h2')?.textContent)
     expect(titles).toEqual(['Uber Eats', '出前館', 'ロケットナウ'])
     expect(screen.getAllByText('未接続')).toHaveLength(3)
+    expect(card('Uber Eats').getByText('Uber Eats への接続を設定します。注文の連携は受注画面で確認します')).toBeTruthy()
 
     const login = button('Uber Eats にログインしてつなぐ')
     expect(login.disabled).toBe(false)
@@ -189,7 +190,7 @@ describe('設定 › デリバリー連携', () => {
     expect(await screen.findByText('渋谷店')).toBeTruthy()
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('接続中')).toBeTruthy()
-    expect(uberCard.getByText('準備中', { exact: true })).toBeTruthy()
+    expect(uberCard.getByText('受注画面で確認', { exact: true })).toBeTruthy()
     expect(uberCard.queryByRole('button', { name: /注文の連携/ })).toBeNull()
     expect(uberCard.getByText('つないだお店')).toBeTruthy()
   })
@@ -310,6 +311,7 @@ describe('設定 › デリバリー連携', () => {
     ).toBeTruthy()
     expect(fixture.stores).toHaveBeenCalledWith('acc-1')
     expect(button('このお店につなぐ').disabled).toBe(true)
+    expect(screen.getByText(/接続後、受注画面で利用できる注文の操作を確認してください/)).toBeTruthy()
 
     // 共通の RadioCardGroup は fieldset ＋ legend で描くので、役割は group。
     const stores = within(screen.getByRole('group', { name: 'つなぐお店' }))
@@ -324,7 +326,7 @@ describe('設定 › デリバリー連携', () => {
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('接続中')).toBeTruthy()
     expect(uberCard.getByText('渋谷店')).toBeTruthy()
-    expect(uberCard.getByText('準備中', { exact: true })).toBeTruthy()
+    expect(uberCard.getByText('受注画面で確認', { exact: true })).toBeTruthy()
     expect(uberCard.queryByRole('button', { name: /注文の連携/ })).toBeNull()
     expect(screen.queryByText(/Uber Eats へのログインは受け取りました/)).toBeNull()
   })
