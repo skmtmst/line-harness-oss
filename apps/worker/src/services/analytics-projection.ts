@@ -11,6 +11,8 @@ import {
 
 import { featureJobCanRun } from './feature-enforcement.js';
 
+export type AnalyticsProjectionAccount = Pick<LineAccount, 'id' | 'is_active' | 'timezone'>;
+
 export interface AnalyticsProjectionRefreshResult {
   processed: number;
   matched: number;
@@ -20,9 +22,9 @@ export interface AnalyticsProjectionRefreshResult {
 }
 
 export function selectNextAnalyticsProjectionAccount(
-  accounts: LineAccount[],
+  accounts: AnalyticsProjectionAccount[],
   lastAccountId: string,
-): LineAccount | null {
+): AnalyticsProjectionAccount | null {
   const active = accounts
     .filter((account) => account.is_active === 1)
     .sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
@@ -31,7 +33,23 @@ export function selectNextAnalyticsProjectionAccount(
 
 export async function refreshRecentAnalyticsProjections(
   db: D1Database,
-  accounts: LineAccount[],
+  accounts: AnalyticsProjectionAccount[],
+  now: Date,
+): Promise<AnalyticsProjectionRefreshResult> {
+  const schedulerCursor = await getAnalyticsProjectionSchedulerCursor(db, now.toISOString());
+  const account = selectNextAnalyticsProjectionAccount(accounts, schedulerCursor);
+  if (!account) return { processed: 0, matched: 0, mismatched: 0, inProgress: 0, failed: 0 };
+  try {
+    return await refreshAccountAnalyticsProjection(db, account, now);
+  } finally {
+    await saveAnalyticsProjectionSchedulerCursor(db, account.id, now.toISOString());
+  }
+}
+
+/** One bounded account chunk; queue consumers serialize calls with an account lease. */
+export async function refreshAccountAnalyticsProjection(
+  db: D1Database,
+  account: AnalyticsProjectionAccount,
   now: Date,
 ): Promise<AnalyticsProjectionRefreshResult> {
   const result: AnalyticsProjectionRefreshResult = {
@@ -42,11 +60,8 @@ export async function refreshRecentAnalyticsProjections(
     failed: 0,
   };
   const cutoffAt = now.toISOString();
-  const schedulerCursor = await getAnalyticsProjectionSchedulerCursor(db, cutoffAt);
-  const account = selectNextAnalyticsProjectionAccount(accounts, schedulerCursor);
-  if (!account) return result;
   try {
-    // OFFでもfinallyで巡回は進める。集計・カバレッジの書き込みは行わない。
+    // OFFでは集計・カバレッジを書き込まず、呼び出し元が次のアカウントへ進む。
     if (!await featureJobCanRun(db, { accountId: account.id, featureId: 'analytics', job: 'analytics projection' })) {
       return result;
     }
@@ -77,9 +92,6 @@ export async function refreshRecentAnalyticsProjections(
   } catch (error) {
     result.failed = 1;
     logger.error("analytics_projection_failed");
-  } finally {
-    // 成否に関係なく次のアカウントへ進め、大きい・壊れた1社が他社を塞がないようにする。
-    await saveAnalyticsProjectionSchedulerCursor(db, account.id, cutoffAt);
   }
   return result;
 }

@@ -29,6 +29,7 @@ import {
   type RequestOptions,
 } from './google-business.js';
 import { createFeatureJobGate } from './feature-enforcement.js';
+import { SCHEDULED_WORK_BUDGET_MS, withScheduledWorkLease } from './scheduled-work-lease.js';
 
 export const GOOGLE_SHEETS_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
@@ -50,7 +51,11 @@ const PACE_MS = 200;
 const RUN_STALE_MS = 30 * 60 * 1000;
 /** 手動実行が応答を待てる時間の目安。超えたら途中点を保存して partial で切る。 */
 export const MANUAL_SYNC_BUDGET_MS = 25 * 1000;
-export const SCHEDULED_SYNC_BUDGET_MS = 10 * 60 * 1000;
+export const SCHEDULED_SYNC_BUDGET_MS = SCHEDULED_WORK_BUDGET_MS;
+export const SCHEDULED_SYNC_BATCH_SIZE = 25;
+const SYNC_ATTEMPT_PREFIX = 'google-sheets-sync:attempt:';
+const FAILED_SYNC_COOLDOWN_MS = 30 * 60_000;
+const PARTIAL_SYNC_COOLDOWN_MS = 5 * 60_000;
 
 export type GoogleSheetsDataType = 'friends' | 'form_answers';
 export const GOOGLE_SHEETS_DATA_TYPES: readonly GoogleSheetsDataType[] = [
@@ -454,6 +459,36 @@ function jstDate(iso: string): string {
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** Apply the invocation deadline to OAuth, retries and response bodies as well as page loops. */
+function deadlineRequests(input: {
+  fetch?: FetchLike;
+  sleep?: (ms: number) => Promise<void>;
+  deadlineMs?: number;
+}): { fetch: FetchLike; sleep: (ms: number) => Promise<void> } {
+  const fetchFn = input.fetch ?? fetch;
+  const sleep = input.sleep ?? defaultSleep;
+  const deadline = input.deadlineMs;
+  if (deadline === undefined) return { fetch: fetchFn, sleep };
+  const assertTime = (neededMs = 0) => {
+    if (Date.now() + neededMs >= deadline) throw new Error('google_sheets_time_budget');
+  };
+  return {
+    fetch: async (url, init) => {
+      assertTime();
+      const timeout = AbortSignal.timeout(Math.max(1, deadline - Date.now()));
+      return fetchFn(url, {
+        ...init,
+        signal: init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout,
+      });
+    },
+    sleep: async (ms) => {
+      assertTime(ms);
+      await sleep(ms);
+      assertTime();
+    },
+  };
+}
+
 /**
  * 死んでいる running 行を畳み、それでも生きている running が残れば null。
  * 手動・定期・他プロセスの重複をここで1回だけ断る。
@@ -533,11 +568,14 @@ export async function syncOneDataType(
     fetch?: FetchLike;
     sleep?: (ms: number) => Promise<void>;
     deadlineMs?: number;
+    maxPages?: number;
   },
 ): Promise<SyncOneResult> {
   const db = env.DB;
-  const fetchFn = input.fetch ?? fetch;
-  const sleep = input.sleep ?? defaultSleep;
+  if (input.deadlineMs !== undefined && Date.now() >= input.deadlineMs) {
+    return { dataType: type, status: 'partial', rowsWritten: 0, error: 'time_budget' };
+  }
+  const { fetch: fetchFn, sleep } = deadlineRequests(input);
   const source = DATA_SOURCES[type];
   const run = await acquireSyncRun(db, integration.id, type, {
     kind: input.kind,
@@ -559,7 +597,12 @@ export async function syncOneDataType(
     const keys = await readKeyColumn(options, spreadsheetId, source.sheetTitle);
 
     let deadlineHit = false;
+    let pages = 0;
     for (;;) {
+      if (input.deadlineMs !== undefined && Date.now() >= input.deadlineMs) {
+        deadlineHit = true;
+        break;
+      }
       const page = await source.fetchPage(db, integration.line_account_id, cursor);
       if (page.length === 0) break;
       const updates: Array<{ rowIndex: number; values: (string | null)[] }> = [];
@@ -577,23 +620,29 @@ export async function syncOneDataType(
       }
       await updateRows(options, spreadsheetId, source.sheetTitle, updates);
       await appendRows(options, spreadsheetId, source.sheetTitle, appends);
-      await sleep(PACE_MS);
       rowsWritten += page.length;
       cursor = page[page.length - 1]!.cursor;
       await writeSyncCursor(db, integration, type, cursor, input.now);
-      if (input.deadlineMs !== undefined && Date.now() + PAGE_SIZE * 2 > input.deadlineMs) {
+      pages += 1;
+      if (page.length < PAGE_SIZE) break;
+      if ((input.maxPages !== undefined && pages >= input.maxPages)
+        || (input.deadlineMs !== undefined && Date.now() + PAGE_SIZE * 2 > input.deadlineMs)) {
         deadlineHit = true;
         break;
       }
+      await sleep(PACE_MS);
     }
 
     const status = deadlineHit ? 'partial' : 'ok';
     await finishRun(db, run.id, { status, rowsWritten, cursor, now: new Date().toISOString() });
     return { dataType: type, status, rowsWritten };
   } catch (error) {
-    const kind = error instanceof GoogleBusinessError ? error.kind : 'unknown';
+    const outOfTime = input.deadlineMs !== undefined
+      && (Date.now() >= input.deadlineMs || (error instanceof Error && error.message === 'google_sheets_time_budget'));
+    const kind = outOfTime ? 'time_budget' : error instanceof GoogleBusinessError ? error.kind : 'unknown';
+    const status = rowsWritten > 0 || outOfTime ? 'partial' : 'error';
     await finishRun(db, run.id, {
-      status: rowsWritten > 0 ? 'partial' : 'error',
+      status,
       rowsWritten,
       error: kind,
       cursor,
@@ -607,7 +656,7 @@ export async function syncOneDataType(
       ).bind(new Date().toISOString(), integration.id).run();
       integration.status = 'expired';
     }
-    return { dataType: type, status: rowsWritten > 0 ? 'partial' : 'error', rowsWritten, error: kind };
+    return { dataType: type, status, rowsWritten, error: kind };
   }
 }
 
@@ -624,11 +673,24 @@ export async function syncGoogleSheetsIntegration(
     fetch?: FetchLike;
     sleep?: (ms: number) => Promise<void>;
     deadlineMs?: number;
+    maxPages?: number;
   },
 ): Promise<SyncOneResult[]> {
   const db = env.DB;
   const results: SyncOneResult[] = [];
+  const completed = input.kind === 'scheduled'
+    ? (await db.prepare(`SELECT DISTINCT data_type FROM google_sheets_sync_runs
+        WHERE integration_id = ? AND kind = 'scheduled' AND run_date = ?
+          AND spreadsheet_id = ? AND status = 'ok'`)
+      .bind(integration.id, jstDate(input.now), integration.spreadsheet_id)
+      .all<{ data_type: GoogleSheetsDataType }>()).results
+    : [];
+  const completedTypes = new Set(completed.map((row) => row.data_type));
   for (const type of GOOGLE_SHEETS_DATA_TYPES) {
+    if (completedTypes.has(type)) {
+      results.push({ dataType: type, status: 'skipped', rowsWritten: 0 });
+      continue;
+    }
     results.push(await syncOneDataType(env, integration, type, input));
     // 要再接続へ落ちたら残りの種別は試さない。
     if (integration.status === 'expired') break;
@@ -661,7 +723,7 @@ export async function syncGoogleSheetsIntegration(
 }
 
 /**
- * 定期実行（cron）。その日(JST)の scheduled 実行がまだ無い連携を全部回す。
+ * 定期実行（cron）。未完了の連携を、前回試行が古いものから有界に進める。
  * 機能「external_integrations」がオフのアカウントは gate で止める。
  */
 export async function processDueGoogleSheetsSyncs(
@@ -670,57 +732,75 @@ export async function processDueGoogleSheetsSyncs(
 ): Promise<{ synced: number; skipped: number; failed: number }> {
   const db = env.DB;
   const today = jstDate(input.now);
+  const nowMs = Date.parse(input.now);
+  const deadlineMs = Date.now() + SCHEDULED_SYNC_BUDGET_MS;
   const gate = createFeatureJobGate();
-  const integrations = await db.prepare(
-    `SELECT * FROM google_sheets_integrations
-      WHERE status = 'connected' AND spreadsheet_id IS NOT NULL
-      ORDER BY line_account_id`,
-  ).all<GoogleSheetsIntegrationRow>();
+  const empty = { synced: 0, skipped: 0, failed: 0 };
+  const claimed = await withScheduledWorkLease(db, 'google-sheets-sync', async (lease) => {
+    // Completion belongs to both data types, the JST date and the current target.
+    // A partial/failed run must remain eligible to resume its saved cursor today.
+    const integrations = await db.prepare(
+      `SELECT i.* FROM google_sheets_integrations i
+        LEFT JOIN platform_settings attempt ON attempt.key = ? || i.id
+        WHERE i.status = 'connected' AND i.spreadsheet_id IS NOT NULL
+          AND (CASE WHEN json_valid(attempt.value)
+               THEN COALESCE(json_extract(attempt.value, '$.nextEligibleAt'), 0) ELSE 0 END) <= ?
+          AND NOT EXISTS (
+            SELECT 1 FROM google_sheets_sync_runs r
+            WHERE r.integration_id = i.id AND r.kind = 'scheduled'
+              AND r.run_date = ? AND r.spreadsheet_id = i.spreadsheet_id
+              AND r.status = 'ok' AND r.data_type IN ('friends', 'form_answers')
+            GROUP BY r.integration_id HAVING COUNT(DISTINCT r.data_type) = 2
+          )
+        ORDER BY CASE WHEN json_valid(attempt.value)
+          THEN COALESCE(json_extract(attempt.value, '$.attemptedAt'), 0) ELSE 0 END, i.id
+        LIMIT ?`,
+    ).bind(SYNC_ATTEMPT_PREFIX, nowMs, today, SCHEDULED_SYNC_BATCH_SIZE).all<GoogleSheetsIntegrationRow>();
 
-  let synced = 0;
-  let skipped = 0;
-  let failed = 0;
-  for (const integration of integrations.results) {
-    try {
-      if (!await gate.canRun(db, integration.line_account_id, 'external_integrations', 'google sheets sync')) {
-        skipped += 1;
-        continue;
-      }
-      /*
-       * 実行日は日本時間で持つ（R442）。started_at のUTC日付と比べると、
-       * JSTの0時〜9時に走った分と同日の9時以降の分が別日扱いになり、
-       * 同じJST日に定期同期が二度走っていた。
-       * 出力先も条件に入れる。出力先を変えた日に、変える前のシートへの
-       * 定期実行が残っていても、新しい出力先への初回実行を止めない。
-       * run_date が NULL の古い行は判定に使わない（導入前の行は一度だけ
-       * 同日の再実行を許すが、同じ行を二度書き込むわけではない）。
-       */
-      const already = await db.prepare(
-        `SELECT id FROM google_sheets_sync_runs
-          WHERE integration_id = ? AND kind = 'scheduled'
-            AND run_date = ? AND spreadsheet_id = ? LIMIT 1`,
-      ).bind(integration.id, today, integration.spreadsheet_id).first<{ id: string }>();
-      if (already) {
-        skipped += 1;
-        continue;
-      }
-      const results = await syncGoogleSheetsIntegration(env, integration, {
-        kind: 'scheduled',
-        now: input.now,
-        fetch: input.fetch,
-        sleep: input.sleep,
-        deadlineMs: Date.now() + SCHEDULED_SYNC_BUDGET_MS,
-      });
-      if (results.some((r) => r.status === 'error' || r.status === 'partial')) {
+    let synced = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const integration of integrations.results) {
+      if (Date.now() >= deadlineMs || !await lease.renew()) break;
+      const attemptKey = SYNC_ATTEMPT_PREFIX + integration.id;
+      try {
+        // Persist before feature checks / external calls: disabled, failed and crashed
+        // connections rotate behind the untouched tail instead of occupying LIMIT forever.
+        await db.prepare(`INSERT INTO platform_settings (key, value, updated_by, updated_at)
+          VALUES (?, ?, 'google-sheets-sync', ?)
+          ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`)
+          .bind(attemptKey, JSON.stringify({ attemptedAt: nowMs, nextEligibleAt: nowMs + FAILED_SYNC_COOLDOWN_MS }), input.now).run();
+        if (!await gate.canRun(db, integration.line_account_id, 'external_integrations', 'google sheets sync')) {
+          skipped += 1;
+          continue;
+        }
+        const results = await syncGoogleSheetsIntegration(env, integration, {
+          kind: 'scheduled',
+          now: input.now,
+          fetch: input.fetch,
+          sleep: input.sleep,
+          deadlineMs,
+          maxPages: 1,
+        });
+        if (results.some((r) => r.status === 'error' || r.status === 'partial')) {
+          failed += 1;
+          if (!results.some((r) => r.status === 'error')) {
+            await db.prepare('UPDATE platform_settings SET value = ? WHERE key = ?')
+              .bind(JSON.stringify({ attemptedAt: nowMs, nextEligibleAt: nowMs + PARTIAL_SYNC_COOLDOWN_MS }), attemptKey).run();
+          }
+        } else if (results.some((r) => r.status === 'already_running')) {
+          skipped += 1;
+        } else {
+          synced += 1;
+          await db.prepare('DELETE FROM platform_settings WHERE key = ?').bind(attemptKey).run();
+        }
+      } catch (error) {
         failed += 1;
-      } else {
-        synced += 1;
+        // 詳細メッセージは応答内容を含み得るので、種別名だけを記録する。
+        logger.error("google_sheets_sync_failed");
       }
-    } catch (error) {
-      failed += 1;
-      // 詳細メッセージは応答内容を含み得るので、種別名だけを記録する。
-      logger.error("google_sheets_sync_failed");
     }
-  }
-  return { synced, skipped, failed };
+    return { synced, skipped, failed };
+  });
+  return claimed.acquired ? claimed.value : empty;
 }

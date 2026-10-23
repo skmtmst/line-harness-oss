@@ -32,7 +32,7 @@ test('CMP-04/16: 日別の控えは日本時間・来店/取消、単一店舗�
  expect(d.raw.prepare("SELECT bookings,friends_added FROM hq_store_daily_metrics WHERE account_id='a'").get()).toEqual({bookings:1,friends_added:null});
  d.raw.exec("DELETE FROM hq_store_daily_metrics; CREATE TRIGGER fail_one BEFORE INSERT ON hq_store_daily_metrics WHEN NEW.account_id='a' AND NEW.state!='failed' BEGIN SELECT RAISE(ABORT,'snapshot failure'); END");
  await expect(processStoreComparison(d.db,new Date('2026-10-16T00:00:00Z'))).rejects.toThrow('snapshot failure');
- await processStoreComparison(d.db,new Date('2026-10-16T00:01:00Z'));expect(d.raw.prepare('SELECT account_id,state FROM hq_store_daily_metrics ORDER BY account_id').all()).toEqual([{account_id:'a',state:'failed'},{account_id:'a2',state:'partial'}]);
+ await processStoreComparison(d.db,new Date('2026-10-16T00:01:00Z'));expect(d.raw.prepare('SELECT account_id,state FROM hq_store_daily_metrics ORDER BY account_id').all()).toEqual([{account_id:'a',state:'failed'},{account_id:'a2',state:'partial'},{account_id:'a3',state:'partial'},{account_id:'b',state:'partial'}]);
 });
 
 test('CMP-01: 最初の人の返事は会話が再開しても消えず、期間の中央値を出す',async()=>{
@@ -87,7 +87,7 @@ test('昨日の未処理店舗が残っていても過去枠を確保し、JST�
  d.raw.exec("UPDATE line_accounts SET created_at='2026-10-15T20:00:00' WHERE id='a'; INSERT INTO hq_store_daily_metrics(account_id,date,state,computed_at) VALUES('a','2026-10-15','failed','2026-10-16T00:00:00Z')");
  await processStoreComparison(d.db,new Date('2026-10-18T00:00:00Z'));
  expect(d.raw.prepare("SELECT state FROM hq_store_daily_metrics WHERE account_id='a' AND date='2026-10-15'").get()).toEqual({state:'partial'});
- expect(d.raw.prepare("SELECT count(*) n FROM hq_store_daily_metrics WHERE date='2026-10-17'").get()).toEqual({n:1});
+ expect(d.raw.prepare("SELECT count(*) n FROM hq_store_daily_metrics WHERE date='2026-10-17'").get()).toEqual({n:4});
  expect(d.raw.prepare("SELECT count(*) n FROM line_accounts WHERE is_active=1").get()).toEqual({n:4});
 });
 

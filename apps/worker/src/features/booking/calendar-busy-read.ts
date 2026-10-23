@@ -3,7 +3,8 @@ import type { BusyInterval } from '../../services/google-calendar.js';
 import { GoogleCalendarReadError } from '../../services/google-calendar.js';
 import { calendarDirectionEnabled } from './calendar-switch-state.js';
 import { getStaffCalendarConnection, clientForConnection } from './calendar-connection.js';
-export async function readCalendarBusy(db:D1Database,credentials:GoogleServiceAccountCredentials,input:{lineAccountId:string;staffId:string;timeMin:string;timeMax:string;fresh?:boolean}):Promise<BusyInterval[]|null> {
+export async function readCalendarBusy(db:D1Database,credentials:GoogleServiceAccountCredentials,input:{lineAccountId:string;staffId:string;timeMin:string;timeMax:string;fresh?:boolean;signal?:AbortSignal}):Promise<BusyInterval[]|null> {
+ input.signal?.throwIfAborted();
  if(!await calendarDirectionEnabled(db,input.lineAccountId,input.staffId,'read'))return null;
  const conn=await getStaffCalendarConnection(db,input.lineAccountId,input.staffId);
  if(!conn)return null; // 明示的な接続解除後は勤務の枠へ戻る。
@@ -14,7 +15,8 @@ export async function readCalendarBusy(db:D1Database,credentials:GoogleServiceAc
  const usable=cache&&Date.parse(cache.last_read_at)>Date.now()-15*60000&&Date.parse(cache.time_min)<=Date.parse(input.timeMin)&&Date.parse(cache.time_max)>=Date.parse(input.timeMax);
  if(!input.fresh&&usable)return JSON.parse(cache.busy_json);
  try {
-  const client=await clientForConnection(conn,credentials,{db,accountId:input.lineAccountId}),busy=await client.getTimedBusy(input.timeMin,input.timeMax);
+  input.signal?.throwIfAborted();
+  const client=await clientForConnection(conn,credentials,{db,accountId:input.lineAccountId}),busy=await client.getTimedBusy(input.timeMin,input.timeMax,input.signal);
   const own=new Set((await db.prepare('SELECT external_event_id FROM bookings WHERE line_account_id=? AND external_calendar_id=? AND external_event_id IS NOT NULL').bind(input.lineAccountId,conn.calendar_id).all<{external_event_id:string}>()).results.map(r=>r.external_event_id));
   const intervals=busy.filter(r=>!own.has(r.id)).map(({start,end})=>({start,end}));
   await db.prepare(`INSERT INTO booking_calendar_busy_cache(line_account_id,staff_id,connection_id,calendar_id,time_min,time_max,busy_json,last_read_at)

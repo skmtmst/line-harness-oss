@@ -1,38 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getLineAccounts, updateLineAccount, updateLineAccountFields, fetchBotProfile } = vi.hoisted(() => ({
-  getLineAccounts: vi.fn(),
+const { updateLineAccount, updateLineAccountFields, fetchBotProfile } = vi.hoisted(() => ({
   updateLineAccount: vi.fn(),
   updateLineAccountFields: vi.fn(),
   fetchBotProfile: vi.fn(),
 }));
 
-vi.mock('@line-crm/db', () => ({
-  getLineAccounts,
+vi.mock('@line-crm/db', async original => ({
+  ...await original<typeof import('@line-crm/db')>(),
   updateLineAccount,
   updateLineAccountFields,
 }));
 
 vi.mock('../lib/bot-profile.js', () => ({ fetchBotProfile }));
 
-import type { LineAccount } from '@line-crm/db';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { refreshLineAccessTokens } from './token-refresh.js';
 
-function account(id: string, syncedAt: string | null): LineAccount {
-  return {
-    id,
-    name: `Account ${id}`,
-    channel_id: `channel-${id}`,
-    channel_secret: `secret-${id}`,
-    channel_access_token: `token-${id}`,
-    token_expires_at: '2026-10-31T00:00:00+09:00',
-    line_profile_synced_at: syncedAt,
-    is_active: 1,
-  } as LineAccount;
-}
-
 describe('refreshLineAccessTokens profile sync', () => {
+  let fixture: ReturnType<typeof createTestD1>;
   beforeEach(() => {
+    fixture = createTestD1();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-15T03:00:00Z'));
     vi.clearAllMocks();
@@ -41,31 +29,31 @@ describe('refreshLineAccessTokens profile sync', () => {
   });
 
   afterEach(() => {
+    fixture.raw.close();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
   it('syncs profiles daily even when tokens are fresh and continues after one DB failure', async () => {
-    getLineAccounts.mockResolvedValue([
-      account('old-1', '2026-09-13T12:00:00+09:00'),
-      account('old-2', null),
-      account('fresh', '2026-09-15T11:00:00+09:00'),
-    ]);
+    fixture.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_secret,channel_access_token,token_expires_at,line_profile_synced_at)
+      VALUES('old-1','channel-old-1','First','secret','token-old-1','2026-10-31T00:00:00+09:00','2026-09-13T12:00:00+09:00'),
+        ('old-2','channel-old-2','Second','secret','token-old-2','2026-10-31T00:00:00+09:00','2026-09-12T12:00:00+09:00'),
+        ('fresh','channel-fresh','Fresh','secret','token-fresh','2026-10-31T00:00:00+09:00','2026-09-15T11:00:00+09:00')`);
     fetchBotProfile
       .mockResolvedValueOnce({ displayName: 'First', pictureUrl: 'https://example.com/1.jpg', basicId: '@first' })
       .mockResolvedValueOnce({ displayName: 'Second', basicId: '@second' });
     updateLineAccountFields.mockRejectedValueOnce(new Error('temporary D1 error'));
 
-    await refreshLineAccessTokens({} as D1Database);
+    await refreshLineAccessTokens(fixture.db);
 
     expect(updateLineAccount).not.toHaveBeenCalled();
     expect(fetchBotProfile).toHaveBeenCalledTimes(2);
-    expect(fetchBotProfile).toHaveBeenNthCalledWith(1, 'token-old-1');
-    expect(fetchBotProfile).toHaveBeenNthCalledWith(2, 'token-old-2');
+    expect(fetchBotProfile).toHaveBeenNthCalledWith(1, 'token-old-2');
+    expect(fetchBotProfile).toHaveBeenNthCalledWith(2, 'token-old-1');
     expect(updateLineAccountFields).toHaveBeenCalledTimes(2);
     expect(updateLineAccountFields).toHaveBeenLastCalledWith(
       expect.anything(),
-      'old-2',
+      'old-1',
       expect.objectContaining({
         lineDisplayName: 'Second',
         lineBasicId: '@second',

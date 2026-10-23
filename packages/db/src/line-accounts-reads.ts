@@ -92,15 +92,18 @@ export async function getLineAccountScopeEntries(
   db: D1Database,
   tenantId: string,
 ): Promise<LineAccountScopeEntry[]> {
+  const tenantFilter = tenantId === DEFAULT_TENANT_ID
+    ? '(tenant_id = ? OR tenant_id IS NULL)'
+    : 'tenant_id = ?';
   const result = await db
     .prepare(
       `SELECT id, tenant_id, parent_line_account_id, is_active, archived_at,
               login_channel_id, liff_id
          FROM line_accounts
-        WHERE COALESCE(tenant_id, ?) = ?
+        WHERE ${tenantFilter}
         ORDER BY display_order ASC, created_at ASC`,
     )
-    .bind(DEFAULT_TENANT_ID, tenantId)
+    .bind(tenantId)
     .all<LineAccountScopeEntry>();
   return result.results;
 }

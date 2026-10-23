@@ -1,6 +1,7 @@
 import type { StoreComparisonDay, StoreComparisonKey } from '@line-crm/shared';
 import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import {GapError} from './gap-common.js';
+import { SCHEDULED_WORK_BUDGET_MS, withScheduledWorkLease } from './scheduled-work-lease.js';
 export const comparisonKeys=['friendChange','blockRate','clickRate','bookings','visits','noShowRate','responseMinutes']as const;
 export type ComparisonKey=typeof comparisonKeys[number];
 export const comparisonUnits:Record<ComparisonKey,string>={friendChange:'人',blockRate:'%',clickRate:'%',bookings:'件',visits:'件',noShowRate:'%',responseMinutes:'分'};
@@ -46,26 +47,67 @@ export async function storeNumbers(db:D1Database,a:string,period:ReturnType<type
  return {values,style,computedAt:full?rows.map(r=>String(r.computed_at)).sort()[0]??null:null,trend:observations};
 }
 
-/** Reserve one historical slot and one yesterday slot per tick, so new work cannot starve repair. */
-export async function processStoreComparison(db:D1Database,now=new Date()){
- const yesterday=japanDateOffset(-1, now);
- let failed:unknown;
- for(const historical of [true,false]){
-  const account=await db.prepare(`WITH RECURSIVE days(day) AS (
-    SELECT ? UNION ALL SELECT date(day,'-1 day') FROM days WHERE day>date(?,'-366 days')
-  ) SELECT a.id,days.day FROM days CROSS JOIN line_accounts a
-  WHERE a.is_active=1 AND a.archived_at IS NULL AND ${historical ? 'days.day<?' : 'days.day=?'}
-    AND (days.day=? OR days.day>=CASE WHEN upper(substr(a.created_at,-1))='Z' OR substr(a.created_at,-6,1) IN('+','-')
-      THEN date(a.created_at,'+9 hours') ELSE MIN(date(a.created_at),date(a.created_at,'+9 hours')) END
-      OR days.day>=(SELECT MIN(m.date) FROM hq_store_daily_metrics m WHERE m.account_id=a.id))
-    AND NOT EXISTS(SELECT 1 FROM hq_store_daily_metrics m WHERE m.account_id=a.id AND m.date=days.day
-      AND (m.state!='failed' OR julianday(m.computed_at)>julianday(?,'-1 hour')))
-  ORDER BY days.day ASC,a.id LIMIT 1`).bind(yesterday,yesterday,yesterday,yesterday,now.toISOString()).first<{id:string;day:string}>();
-  if(!account)continue;
-  try{await snapshotStoreMetrics(db,account.id,account.day,now);}catch(error){
-   await db.prepare("INSERT INTO hq_store_daily_metrics(account_id,date,state,computed_at) VALUES(?,?,'failed',?) ON CONFLICT(account_id,date) DO UPDATE SET state='failed',computed_at=excluded.computed_at").bind(account.id,account.day,now.toISOString()).run();
-   failed=error;
-  }
- }
- if(failed)throw failed;
+export const STORE_COMPARISON_DAILY_BATCH_SIZE = 5;
+const STORE_COMPARISON_ATTEMPT_PREFIX = 'store-comparison:attempt:';
+
+/** Keep a repair slot as well as enough daily slots for 5,000 accounts. */
+export async function processStoreComparison(db: D1Database, now = new Date()) {
+  return withScheduledWorkLease(db, 'store-comparison', async (lease) => {
+    const yesterday = japanDateOffset(-1, now);
+    const started = Date.now();
+    let failure: unknown;
+    for (const historical of [true, false]) {
+      const attemptPrefix = STORE_COMPARISON_ATTEMPT_PREFIX + (historical ? 'history:' : 'daily:');
+      const accounts = historical
+        ? await db.prepare(`WITH RECURSIVE
+            eligible_accounts AS MATERIALIZED (
+              SELECT a.id, CASE WHEN upper(substr(a.created_at,-1))='Z' OR substr(a.created_at,-6,1) IN('+','-')
+                THEN date(a.created_at,'+9 hours') ELSE MIN(date(a.created_at),date(a.created_at,'+9 hours')) END first_day,
+                (SELECT MIN(m.date) FROM hq_store_daily_metrics m WHERE m.account_id=a.id) first_metric_day,
+                attempt.value last_attempt_at
+              FROM line_accounts a
+              LEFT JOIN platform_settings attempt ON attempt.key=?||a.id
+              WHERE a.is_active=1 AND a.archived_at IS NULL
+                AND (CASE WHEN upper(substr(a.created_at,-1))='Z' OR substr(a.created_at,-6,1) IN('+','-')
+                  THEN date(a.created_at,'+9 hours') ELSE MIN(date(a.created_at),date(a.created_at,'+9 hours')) END < ?
+                  OR EXISTS(SELECT 1 FROM hq_store_daily_metrics m WHERE m.account_id=a.id AND m.date<?))
+            ), days(day) AS (
+              SELECT date(?,'-1 day') UNION ALL SELECT date(day,'-1 day') FROM days WHERE day>date(?,'-366 days')
+            ) SELECT a.id,days.day FROM days CROSS JOIN eligible_accounts a
+            WHERE (days.day>=a.first_day OR days.day>=a.first_metric_day)
+              AND NOT EXISTS(SELECT 1 FROM hq_store_daily_metrics m WHERE m.account_id=a.id AND m.date=days.day
+                AND (m.state!='failed' OR julianday(m.computed_at)>julianday(?,'-1 hour')))
+            ORDER BY COALESCE(a.last_attempt_at, ''), days.day ASC,a.id LIMIT 1`)
+            .bind(attemptPrefix, yesterday, yesterday, yesterday, yesterday, now.toISOString())
+            .all<{ id: string; day: string }>()
+        : await db.prepare(`SELECT a.id, ? AS day FROM line_accounts a
+            LEFT JOIN platform_settings attempt ON attempt.key=?||a.id
+            WHERE a.is_active=1 AND a.archived_at IS NULL
+              AND NOT EXISTS(SELECT 1 FROM hq_store_daily_metrics m WHERE m.account_id=a.id AND m.date=?
+                AND (m.state!='failed' OR julianday(m.computed_at)>julianday(?,'-1 hour')))
+            ORDER BY COALESCE(attempt.value, ''), COALESCE((SELECT MAX(m.date) FROM hq_store_daily_metrics m
+              WHERE m.account_id=a.id AND m.state!='failed'), ''), a.id LIMIT ?`)
+            .bind(yesterday, attemptPrefix, yesterday, now.toISOString(), STORE_COMPARISON_DAILY_BATCH_SIZE)
+            .all<{ id: string; day: string }>();
+      for (const account of accounts.results) {
+        if (Date.now() - started >= SCHEDULED_WORK_BUDGET_MS || !await lease.renew()) break;
+        try {
+          // Separate daily/history cursors avoid a successful daily refresh moving
+          // untouched history behind a repeatedly failing repair prefix.
+          await db.prepare(`INSERT INTO platform_settings(key,value,updated_by,updated_at)
+            VALUES(?,?,'store-comparison',?) ON CONFLICT(key) DO UPDATE
+            SET value=excluded.value,updated_at=excluded.updated_at`)
+            .bind(attemptPrefix + account.id, now.toISOString(), now.toISOString()).run();
+          await snapshotStoreMetrics(db, account.id, account.day, now);
+        } catch (error) {
+          await db.prepare(`INSERT INTO hq_store_daily_metrics(account_id,date,state,computed_at)
+            VALUES(?,?,'failed',?) ON CONFLICT(account_id,date) DO UPDATE
+            SET state='failed',computed_at=excluded.computed_at`)
+            .bind(account.id, account.day, now.toISOString()).run();
+          failure = error;
+        }
+      }
+    }
+    if (failure) throw failure;
+  });
 }

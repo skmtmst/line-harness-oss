@@ -33,6 +33,8 @@ import { lineProxy } from '../routes/line-proxy.js';
 
 import { dbFor } from '../services/db-router.js';
 
+import { ACCOUNT_WORK_CRON } from '../services/account-work-types.js';
+import { dispatchAccountWork } from '../services/account-work-dispatch.js';
 import { runScheduledOperationHealthChecks } from '../services/operations-health.js';
 import { observeOperationDispatcher } from '../services/operation-dispatch-health.js';
 import { processOperationNotificationOutbox } from '../services/operation-notifications.js';
@@ -50,6 +52,10 @@ export async function scheduled(
   env: Env['Bindings'],
   ctx: ExecutionContext,
 ): Promise<void> {
+  if (event.cron === ACCOUNT_WORK_CRON) {
+    await dispatchAccountWork(env, event.scheduledTime);
+    return;
+  }
   // 通知・配信と、再実行できる重い集計・走査を別のCron invocationへ分ける。
   // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
   const lane = scheduledLane(event.cron);
@@ -96,10 +102,15 @@ export async function scheduled(
   // 管理画面を開いていなくても、各LINEアカウントの確認項目を5分窓ごとに保存する。
   // 各checkと各accountは独立しており、失敗しても配信ジョブを止めない。
   try {
-    await runScheduledOperationHealthChecks(env.DB, {
-      r2: env.IMAGES,
-      queue: env.CODEX_MENTION_QUEUE, security: env,
-    });
+    if (env.ACCOUNT_WORK_QUEUE) {
+      const { runSecurityMonitor } = await import('../services/security-monitor.js');
+      await runSecurityMonitor(env);
+    } else {
+      await runScheduledOperationHealthChecks(env.DB, {
+        r2: env.IMAGES,
+        queue: env.CODEX_MENTION_QUEUE, security: env,
+      });
+    }
   } catch (error) {
     logger.error("src_index_failed");
   }
@@ -192,7 +203,7 @@ export async function scheduled(
   // token refresh はリマインドより先に済ませる (失効直後トークンでの 401 送信を防ぐ。
   // 旧順序では refresh が先だった invariant の維持)。
   try {
-    await refreshLineAccessTokens(env.DB);
+    await refreshLineAccessTokens(env.DB, env.LINE_CREDENTIAL_ENCRYPTION_KEY);
   } catch (e) {
     logger.error("src_index_failed");
   }
@@ -786,7 +797,12 @@ export async function scheduled(
     observeDispatch('broadcast deliveries', async () => {
       await Promise.all([
         processScheduledBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
-        processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
+        // NULL-owned legacy/cross-account broadcasts do not belong to an account
+        // consumer. Keep their bounded sweep even after the dedicated queue starts.
+        processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL, {
+          ...(env.ACCOUNT_WORK_QUEUE ? { accountId: null } : {}),
+          credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        }),
       ]);
       // 送信後動作の取り残し回収（受理済みだが実行が終わっていない宛先）。
       // 失敗・送達不明の宛先は対象外。送達自体は変えない。

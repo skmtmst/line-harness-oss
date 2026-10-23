@@ -198,7 +198,7 @@ const processorCases = [
   ["google business resync", "processGoogleBusinessHourlyResync", "frequentHeavy"],
   ["NEN tag refresh", "refreshAllNenTags", "sixHourlyHeavy"],
   ["analytics retention purge", "purgeExpiredAnalyticsReadData", "sixHourlyHeavy"],
-  ["friend snapshot", "recordFriendSnapshot", "sixHourlyHeavy"],
+  ["friend snapshot", "recordFriendSnapshot", "frequentHeavy"],
   ["media usage scan", "scanMediaUsage", "sixHourlyHeavy"],
   ["following mileage", "enqueueFollowingMileageMilestones", "sixHourlyHeavy"],
   ["booking expirer", "runExpirer", "sixHourlyHeavy"],
@@ -253,8 +253,8 @@ test('設定済みのCron式は実際のレーンを呼び、通知は重いレ�
   const crons=JSON.parse(config.match(/^crons\s*=\s*(\[[^\n]+\])/m)![1]!) as string[];
   expect(new Set(crons)).toEqual(new Set(Object.values(SCHEDULED_CRONS)));
   const expected = {
-    frequentHeavy: ['friend bulk runs','analytics cross','mileage projection','ad conversion outbox retry','analytics url exposure projection','analytics projection','account health','broadcast insights','NEN rich menu jobs','support email sync','friend field reminders','google business resync'],
-    sixHourlyHeavy: ['NEN tag refresh','analytics retention purge','friend snapshot','media usage scan','following mileage','booking expirer','event booking expirer','billing invoice sync','restaurant raw mail retention','google business metrics','tenant data retention purge'],
+    frequentHeavy: ['friend snapshot','friend bulk runs','analytics cross','mileage projection','ad conversion outbox retry','analytics url exposure projection','analytics projection','account health','broadcast insights','NEN rich menu jobs','support email sync','friend field reminders','google business resync'],
+    sixHourlyHeavy: ['NEN tag refresh','analytics retention purge','media usage scan','following mileage','booking expirer','event booking expirer','billing invoice sync','restaurant raw mail retention','google business metrics','tenant data retention purge'],
   };
   const classified=new Set(FEATURE_JOB_MANIFEST.map(job=>job.name));
   for (const lane of ['frequentHeavy','sixHourlyHeavy'] as const) {

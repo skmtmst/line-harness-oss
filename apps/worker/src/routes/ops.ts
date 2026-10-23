@@ -108,6 +108,22 @@ ops.get('/api/ops/me', async (c) => {
 ops.get('/api/ops/tenants', async (c) => {
   const q = (c.req.query('q') ?? '').trim();
   const status = c.req.query('status');
+  const limit = Number(c.req.query('limit') ?? 100);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) {
+    return c.json({ success: false, error: '表示件数は1〜200件で指定してください' }, 400);
+  }
+  let cursor: [string, string] | null = null;
+  const rawCursor = c.req.query('cursor');
+  if (rawCursor !== undefined) {
+    try {
+      const value: unknown = JSON.parse(rawCursor);
+      if (!Array.isArray(value) || value.length !== 2
+        || value.some(part => typeof part !== 'string' || !part || part.length > 200)) throw new Error('invalid cursor');
+      cursor = value as [string, string];
+    } catch {
+      return c.json({ success: false, error: '続きを読み込む位置が正しくありません' }, 400);
+    }
+  }
   const where: string[] = [];
   const binds: unknown[] = [];
   if (status && TENANT_STATUSES.has(status as TenantStatus)) { where.push('t.status = ?'); binds.push(status); }
@@ -117,8 +133,15 @@ ops.get('/api/ops/tenants', async (c) => {
     const like = `%${q}%`;
     binds.push(like, like, like, like);
   }
+  const summaryClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+  const summaryBinds = [...binds];
+  if (cursor) {
+    where.push('(t.created_at < ? OR (t.created_at = ? AND t.id > ?))');
+    binds.push(cursor[0], cursor[0], cursor[1]);
+  }
   const clause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-  const { results } = await dbFor(c.env)
+  const db = dbFor(c.env);
+  const [{ results }, summaryRow] = await Promise.all([db
     .prepare(
       `SELECT t.id, t.name, t.status, t.feature_packs, t.plan_key, t.plan_status, t.trial_ends_at,
               t.current_period_ends_at, t.created_at, t.updated_at,
@@ -128,24 +151,35 @@ ops.get('/api/ops/tenants', async (c) => {
                  WHERE s2.tenant_id = t.id AND l.action = 'login') AS last_login_at
        FROM tenants t ${clause}
        ORDER BY t.created_at DESC, t.id ASC
-       LIMIT 500`,
+       LIMIT ?`,
     )
-    .bind(...binds)
-    .all<TenantListRow>();
-  const rows = results ?? [];
+    .bind(...binds, limit + 1)
+    .all<TenantListRow>(),
+  db.prepare(`SELECT COUNT(*) total,
+    SUM(CASE WHEN t.plan_status IN ('active','past_due') THEN 1 ELSE 0 END) active,
+    SUM(CASE WHEN t.plan_status='trialing' THEN 1 ELSE 0 END) trialing,
+    SUM(CASE WHEN t.status='suspended' THEN 1 ELSE 0 END) suspended,
+    SUM(CASE WHEN t.plan_status='past_due' THEN 1 ELSE 0 END) past_due
+    FROM tenants t ${summaryClause}`).bind(...summaryBinds)
+    .first<{ total: number; active: number | null; trialing: number | null; suspended: number | null; past_due: number | null }>(),
+  ]);
+  const rows = (results ?? []).slice(0, limit);
   const summary = {
     // 「契約中」は請求状態だけで数える（active ＋決済失敗の past_due は請求が
     // まだ生きている）。請求が解約・課金対象外のものを契約中に混ぜない
     // （監査 R153：一覧・詳細・ダッシュボードで定義をそろえる）。
-    active: rows.filter((r) => r.plan_status === 'active' || r.plan_status === 'past_due').length,
-    trialing: rows.filter((r) => r.plan_status === 'trialing').length,
-    suspended: rows.filter((r) => r.status === 'suspended').length,
-    pastDue: rows.filter((r) => r.plan_status === 'past_due').length,
+    active: summaryRow?.active ?? 0,
+    trialing: summaryRow?.trialing ?? 0,
+    suspended: summaryRow?.suspended ?? 0,
+    pastDue: summaryRow?.past_due ?? 0,
   };
+  const last = rows.at(-1);
   return c.json({
     success: true,
     data: rows.map(({ feature_packs, ...row }) => ({ ...row, featurePacks: safeParse(feature_packs) })),
     summary,
+    total: summaryRow?.total ?? 0,
+    nextCursor: results.length > limit && last ? JSON.stringify([last.created_at, last.id]) : null,
   });
 });
 

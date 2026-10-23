@@ -1,6 +1,7 @@
 import { withDisplayReadCache } from '@line-crm/db/src/display-read-cache.js';
 import {GapError} from './gap-common.js';
-import {comparisonKeys,comparisonUnits,comparisonPeriod,storeNumbers,type ComparisonKey} from './store-comparison.js';
+import {comparisonKeys,comparisonUnits,comparisonPeriod,type ComparisonKey} from './store-comparison.js';
+import {readStoreComparisonNumbers} from './store-comparison-reads.js';
 import {getVisibleLineAccountScope} from './account-access.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 export async function comparisonData(db:D1Database,visible:Array<{id:string}>,tenant:string,filters:Record<string,string>,allRows=false){
@@ -13,13 +14,19 @@ export async function comparisonData(db:D1Database,visible:Array<{id:string}>,te
   const pool=await db.prepare('SELECT p.id FROM traffic_pools p JOIN line_accounts a ON a.id=p.active_account_id WHERE p.id=? AND p.is_active=1 AND a.tenant_id=?').bind(poolId,tenant).first();
   if(!pool)throw new GapError('not_found',404);
   const members=(await db.prepare('SELECT line_account_id FROM pool_accounts WHERE pool_id=? AND is_active=1').bind(poolId).all<{line_account_id:string}>()).results;
-  accounts=accounts.filter(a=>members.some(m=>m.line_account_id===a.id));
+  const memberIds=new Set(members.map(member=>member.line_account_id));
+  accounts=accounts.filter(a=>memberIds.has(a.id));
  }
  if(q('order')&&!['asc','desc'].includes(q('order')!))throw new GapError('invalid_filter');
- const values=await Promise.all(accounts.map(async a=>({a,...await storeNumbers(db,a.id,period)})));
- const average=Object.fromEntries(comparisonKeys.map(k=>{const nums=values.length<3?[]:values.map(v=>v.values[k]).filter((n):n is number=>n!==null);return [k,nums.length>=3?nums.reduce((n,v)=>n+v,0)/nums.length:null];})) as Record<ComparisonKey,number|null>;
  const previous=comparisonPeriod(new Date(Date.parse(period.from)-period.days*86400000).toISOString().slice(0,10),new Date(Date.parse(period.from)-86400000).toISOString().slice(0,10));
- const rows=await Promise.all(values.map(async v=>{const baseline=compare==='average'?average:(await storeNumbers(db,v.a.id,previous)).values;return {accountId:v.a.id,name:(await db.prepare('SELECT name FROM line_accounts WHERE id=?').bind(v.a.id).first<{name:string}>())?.name??'',style:v.style,computedAt:v.computedAt,metrics:Object.fromEntries(comparisonKeys.map(k=>[k,{value:v.values[k],diff:v.values[k]!==null&&baseline[k]!==null?v.values[k]!-baseline[k]!:null,unit:comparisonUnits[k],available:v.values[k]!==null}]))};}));
+ const ids=accounts.map(account=>account.id);
+ const [currentNumbers,previousNumbers]=await Promise.all([
+  readStoreComparisonNumbers(db,ids,period),
+  compare==='previous'?readStoreComparisonNumbers(db,ids,previous):Promise.resolve(null),
+ ]);
+ const values=accounts.map(a=>({a,...currentNumbers.get(a.id)!}));
+ const average=Object.fromEntries(comparisonKeys.map(k=>{const nums=values.length<3?[]:values.map(v=>v.values[k]).filter((n):n is number=>n!==null);return [k,nums.length>=3?nums.reduce((n,v)=>n+v,0)/nums.length:null];})) as Record<ComparisonKey,number|null>;
+ const rows=values.map(v=>{const baseline=compare==='average'?average:previousNumbers!.get(v.a.id)!.values;return {accountId:v.a.id,name:v.name,style:v.style,computedAt:v.computedAt,metrics:Object.fromEntries(comparisonKeys.map(k=>[k,{value:v.values[k],diff:v.values[k]!==null&&baseline[k]!==null?v.values[k]!-baseline[k]!:null,unit:comparisonUnits[k],available:v.values[k]!==null}]))};});
  const direction=q('order')==='desc'?-1:1;rows.sort((a,b)=>{const x=a.metrics[sort].value,y=b.metrics[sort].value;return x===null?(y===null?a.accountId.localeCompare(b.accountId):1):y===null?-1:direction*(x-y)||a.accountId.localeCompare(b.accountId);});
  return {rows:allRows?rows:rows.slice((page-1)*size,page*size),average,total:rows.length,computedAt:values.every(v=>v.computedAt)?values.map(v=>v.computedAt!).sort()[0]??null:null};
  });
@@ -30,9 +37,11 @@ export async function checkExportAccess(db:D1Database,job:Record<string,unknown>
  if(!staff)throw new GapError('export_access_changed',403);
  const scope=await getVisibleLineAccountScope(db,{id:staff.id,name:staff.name,role:staff.role,tenantId:staff.tenant_id,readOnly:staff.access_level==='read_only'} as AuthenticatedStaff);
  const ids=JSON.parse(String(job.account_ids_json)) as string[];
- if(ids.some(id=>!scope.accounts.some(a=>a.id===id)))throw new GapError('export_access_changed',403);
+ const allowedIds=new Set(scope.accounts.map(account=>account.id));
+ if(ids.some(id=>!allowedIds.has(id)))throw new GapError('export_access_changed',403);
  const data=await comparisonData(db,scope.accounts,staff.tenant_id,JSON.parse(String(job.filters_json)),true);
- if(data.rows.length!==ids.length||data.rows.some(r=>!ids.includes(r.accountId)))throw new GapError('export_scope_changed',403);
+ const requestedIds=new Set(ids);
+ if(data.rows.length!==ids.length||data.rows.some(r=>!requestedIds.has(r.accountId)))throw new GapError('export_scope_changed',403);
  return data;
 }
 function csvCell(v:unknown){const t=v==null?'':String(v);return '"'+(typeof v==='string'&&/^\s*[=+@\-]/.test(t)?"'"+t:t).replaceAll('"','""')+'"';}

@@ -1,12 +1,41 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { getLineAccountScopeEntries, getLineAccountLoginChannels } from '../src/line-accounts.js';
 import { asD1 } from './d1-test-helper.js';
 
 describe('LINE account authorization scope query', () => {
+  it('uses the tenant index for a small tenant inside five thousand accounts and retains legacy default rows', async () => {
+    const sqlite = new Database(':memory:');
+    sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'bootstrap.sql'), 'utf8'));
+    try {
+      const tenant = sqlite.prepare('INSERT INTO tenants(id,name) VALUES(?,?)');
+      const account = sqlite.prepare(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id,display_order)
+        VALUES(?,?,?,'synthetic','synthetic',?,?)`);
+      sqlite.transaction(() => {
+        for (let i = 0; i < 500; i++) {
+          tenant.run('tenant-' + i, 'Synthetic tenant ' + i);
+          for (let j = 0; j < 10; j++) {
+            const id = 'account-' + (i * 10 + j);
+            account.run(id, id, id, 'tenant-' + i, j);
+          }
+        }
+        account.run('legacy', 'legacy', 'legacy', null, 0);
+        account.run('default', 'default', 'default', DEFAULT_TENANT_ID, 1);
+      })();
+      const db = asD1(sqlite), prepare = vi.spyOn(db, 'prepare');
+      expect((await getLineAccountScopeEntries(db, 'tenant-250')).map(row => row.id))
+        .toEqual(Array.from({ length: 10 }, (_, i) => 'account-' + (2500 + i)));
+      const query = prepare.mock.calls[0][0];
+      const plans = sqlite.prepare('EXPLAIN QUERY PLAN ' + query).all('tenant-250') as Array<{ detail: string }>;
+      expect(plans.some(plan => plan.detail.includes('SEARCH line_accounts USING INDEX idx_line_accounts_tenant'))).toBe(true);
+      expect((await getLineAccountScopeEntries(db, DEFAULT_TENANT_ID)).map(row => row.id)).toEqual(['legacy', 'default']);
+      expect(await getLineAccountScopeEntries(db, 'missing-tenant')).toEqual([]);
+    } finally { sqlite.close(); }
+  });
+
   it('filters inside D1 and never loads or decrypts credential columns', async () => {
     const sqlite = new Database(':memory:');
     sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'bootstrap.sql'), 'utf8'));

@@ -70,11 +70,11 @@ export class GoogleCalendarClient {
     throw new GoogleCalendarReadError(outcome.state.status??503);
   }
 
-  private json<T>(url: string, init: RequestInit): Promise<T> {
+  private json<T>(url: string, init: RequestInit, signal?: AbortSignal): Promise<T> {
     return this.request(url,init,async response=>{
       if(!response.ok){void response.body?.cancel().catch(()=>{});throw new GoogleCalendarReadError(response.status);}
       return await response.json().catch(()=>{throw new GoogleCalendarReadError(502);}) as T;
-    });
+    },signal);
   }
 
   /** 不明な書込みを同じIDの読取りで照合する。予定は増やさない。 */
@@ -105,14 +105,15 @@ export class GoogleCalendarClient {
   }
 
   /** 題名・参加者・本文を要求しない。終日とfreeは予約枠を塞がない。 */
-  async getTimedBusy(timeMin:string,timeMax:string):Promise<Array<BusyInterval & {id:string}>> {
+  async getTimedBusy(timeMin:string,timeMax:string,signal?:AbortSignal):Promise<Array<BusyInterval & {id:string}>> {
     const result:Array<BusyInterval & {id:string}>=[];let token:string|undefined;
     for(let page=0;page<100;page++) {
+      signal?.throwIfAborted();
       const query=new URLSearchParams({timeMin,timeMax,singleEvents:'true',maxResults:'2500',fields:'items(id,status,transparency,start(dateTime),end(dateTime)),nextPageToken'});
       if(token)query.set('pageToken',token);
       const data=await this.json<{items?:Array<{id:string;status?:string;transparency?:string;start?:{dateTime?:string};end?:{dateTime?:string}}>;nextPageToken?:string}>(
         `${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events?${query}`,
-        {headers:{Authorization:`Bearer ${this.config.accessToken}`}});
+        {headers:{Authorization:`Bearer ${this.config.accessToken}`}},signal);
       if(!Array.isArray(data.items))throw new GoogleCalendarReadError(502);
       for(const e of data.items){if(e.status==='cancelled'||e.transparency==='transparent'||!e.start?.dateTime||!e.end?.dateTime)continue;
         if(!e.id||!Number.isFinite(Date.parse(e.start.dateTime))||!Number.isFinite(Date.parse(e.end.dateTime))||Date.parse(e.end.dateTime)<=Date.parse(e.start.dateTime))throw new GoogleCalendarReadError(502);

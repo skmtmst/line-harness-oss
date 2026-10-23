@@ -152,6 +152,14 @@ function rejectedByLine(status: number): Error {
   return err;
 }
 
+async function finishQueued(db: D1Database, client: import('@line-crm/line-sdk').LineClient) {
+  for (let tick=0;tick<20;tick++) {
+    const result=await processQueuedBroadcasts(db,client);
+    if (!result.hasMore) return;
+  }
+  throw new Error('配信が有限回で完了しませんでした');
+}
+
 describe('一斉配信の停止（#662）', () => {
   describe('絞り込み配信', () => {
     it('停止すると、送っている束を送り終えたところで止まり、次の束は始めない', async () => {
@@ -178,19 +186,19 @@ describe('一斉配信の停止（#662）', () => {
 
         // 2束目は始まっていない。
         expect(calls).toHaveLength(1);
-        expect(sentUserIds()).toHaveLength(500);
+        expect(sentUserIds()).toHaveLength(100);
 
         const row = broadcastRow(worker.raw);
         expect(row.status).toBe('sending');
         expect(row.stopped_at).not.toBeNull();
-        expect(row.batch_offset).toBe(500);
-        expect(row.success_count).toBe(500);
+        expect(row.batch_offset).toBe(100);
+        expect(row.success_count).toBe(100);
 
-        // 台帳には開始時の600人が在り、外へ出たのは1束目の500人だけ。
+        // 台帳には開始時の600人が在り、外へ出たのは1束目の100人だけ。
         const rows = ledgerRows(worker.raw);
         expect(rows).toHaveLength(600);
-        expect(rows.filter(r => r.state === 'sent')).toHaveLength(500);
-        expect(rows.filter(r => r.state === 'claimed')).toHaveLength(100);
+        expect(rows.filter(r => r.state === 'sent')).toHaveLength(100);
+        expect(rows.filter(r => r.state === 'claimed')).toHaveLength(500);
 
         // もう一度cronが回っても、停止中の配信は拾わない。
         const second = makeLineClient();
@@ -218,7 +226,7 @@ describe('一斉配信の停止（#662）', () => {
 
       await resumeBroadcastSending(db, { id: 'b1', expectedVersion: 2 });
       const second = makeLineClient();
-      await processQueuedBroadcasts(db, second.client);
+      await finishQueued(db, second.client);
 
       const all = [...first.sentUserIds(), ...second.sentUserIds()];
       expect(all).toHaveLength(600);
@@ -254,7 +262,7 @@ describe('一斉配信の停止（#662）', () => {
       // 再開して送り直しても、その相手には送らない。
       await resumeBroadcastSending(db, { id: 'b1', expectedVersion: 2 });
       const { client, sentUserIds } = makeLineClient();
-      await processQueuedBroadcasts(db, client);
+      await finishQueued(db, client);
       expect(sentUserIds()).toHaveLength(599);
       expect(sentUserIds()).not.toContain('Uf0000');
     });
@@ -265,7 +273,7 @@ describe('一斉配信の停止（#662）', () => {
       seedFriends(raw, 600);
       seedSendingSegmentBroadcast(raw);
 
-      // 2束目（100人）が LINE に断られる。要求は届いていて、誰にも配られていない。
+      // 2束目（50人）が LINE に断られる。要求は届いていて、誰にも配られていない。
       // #816: 送り直すのは一時的な失敗だけなので、429（速度制限）で断る。
       // 400 だと恒常的な失敗になり、送り直しの対象に入らない。
       const first = makeLineClient({
@@ -275,7 +283,7 @@ describe('一斉配信の停止（#662）', () => {
       });
       await processQueuedBroadcasts(db, first.client);
       expect(await countBroadcastLedger(db, 'b1')).toEqual({
-        sent: 500, failed: 100, unknown: 0, claimed: 0,
+        sent: 100, failed: 50, unknown: 0, claimed: 450,
       });
 
       // 運用者は止めてから送り直す。止めないと、次のcronが同じ束を
@@ -285,14 +293,14 @@ describe('一斉配信の停止（#662）', () => {
       version += 1;
       const attempt = await beginBroadcastRetryAttempt(db, { id: 'b1', expectedVersion: version });
       expect(attempt).toEqual({ changes: 1, attemptNo: 2 });
-      await expect(reopenFailedClaims(db, 'b1', 2)).resolves.toBe(100);
+      await expect(reopenFailedClaims(db, 'b1', 2)).resolves.toBe(50);
 
       const retry = makeLineClient();
-      await processQueuedBroadcasts(db, retry.client);
+      await finishQueued(db, retry.client);
 
-      // 送り直したのは失敗した100人だけ。
-      expect(retry.sentUserIds()).toHaveLength(100);
-      const firstSent = new Set(first.sentUserIds().slice(0, 500));
+      // 失敗した50人と、停止時点で未送信だった450人を送る。
+      expect(retry.sentUserIds()).toHaveLength(500);
+      const firstSent = new Set(first.sentUserIds().slice(0, 100));
       expect(retry.sentUserIds().some((id) => firstSent.has(id))).toBe(false);
       expect(await countBroadcastLedger(db, 'b1')).toEqual({
         sent: 600, failed: 0, unknown: 0, claimed: 0,
@@ -314,14 +322,16 @@ describe('一斉配信の停止（#662）', () => {
       });
       await processQueuedBroadcasts(db, first.client);
       expect(await countBroadcastLedger(db, 'b1')).toEqual({
-        sent: 500, failed: 0, unknown: 100, claimed: 0,
+        sent: 100, failed: 0, unknown: 50, claimed: 450,
       });
 
-      // 送り直す相手がいない。
+      // 結果不明の50人は送り直さず、未送信の450人だけ進める。
       await expect(reopenFailedClaims(db, 'b1', 2)).resolves.toBe(0);
       const retry = makeLineClient();
-      await processQueuedBroadcasts(db, retry.client);
-      expect(retry.sentUserIds()).toHaveLength(0);
+      await finishQueued(db, retry.client);
+      expect(retry.sentUserIds()).toHaveLength(450);
+      const attempted = new Set(first.sentUserIds());
+      expect(retry.sentUserIds().some(id=>attempted.has(id))).toBe(false);
     });
 
 
@@ -342,10 +352,10 @@ describe('一斉配信の停止（#662）', () => {
       }
 
       const { client, calls, sentUserIds } = makeLineClient();
-      await processQueuedBroadcasts(db, client);
+      await finishQueued(db, client);
 
-      // 1束目は 500 人ではなく 497 人。
-      expect(calls[0]).toHaveLength(500);
+      // 既送・不明を除いた未送信者だけを、小さい束で進める。
+      expect(calls[0]).toHaveLength(100);
       expect(sentUserIds()).not.toContain('Uf0000');
       expect(sentUserIds()).not.toContain('Uf0001');
       // 数えるのも送った分だけ。束の大きさで数えると、送っていない3人が
@@ -406,19 +416,20 @@ describe('一斉配信の停止（#662）', () => {
         let injected = false;
         (recorder.db as unknown as { prepare: (sql: string) => unknown }).prepare = (sql: string) => {
           const statement = original(sql) as D1PreparedStatement & { all: <T>() => Promise<T> };
-          if (!sql.includes("SELECT * FROM broadcasts WHERE status = 'sending'")) return statement;
-          const all = statement.all.bind(statement);
-          return {
-            ...statement,
+          if (!sql.includes("SELECT * FROM candidates WHERE dispatch_rank=1")) return statement;
+          const intercept = (target: D1PreparedStatement): D1PreparedStatement => ({
+            ...target,
+            bind: (...args: unknown[]) => intercept(target.bind(...args)),
             all: async <T>() => {
-              const result = await all<T>();
+              const result = await target.all<T>();
               if (!injected) {
                 injected = true;
                 await requestBroadcastStop(operator.db, { id: 'b1', expectedVersion: 1 });
               }
               return result;
             },
-          } as unknown as D1PreparedStatement;
+          } as D1PreparedStatement);
+          return intercept(statement);
         };
 
         const { client, calls } = makeLineClient();
@@ -482,6 +493,7 @@ describe('一斉配信の停止（#662）', () => {
           processQueuedBroadcasts(b.db, second.client),
         ]);
 
+        await finishQueued(a.db, first.client);
         const all = [...first.sentUserIds(), ...second.sentUserIds()];
         expect(all).toHaveLength(600);
         expect(new Set(all).size).toBe(600);
@@ -705,7 +717,7 @@ describe('停止と再送の件数（全経路）', () => {
     const t2 = makeLineClient({ onMulticast: () => { throw rejectedByLine(429); } });
     await processQueuedBroadcasts(db, t2.client);
     expect(await countBroadcastLedger(db, 'b1')).toEqual({
-      sent: 500, failed: 100, unknown: 0, claimed: 0,
+      sent: 100, failed: 100, unknown: 0, claimed: 400,
     });
 
     // 失敗した相手だけ送り直す
@@ -716,7 +728,7 @@ describe('停止と再送の件数（全経路）', () => {
     expect(attempt.attemptNo).toBe(2);
     await reopenFailedClaims(db, 'b1', attempt.attemptNo!);
     const t3 = makeLineClient();
-    await processQueuedBroadcasts(db, t3.client);
+    await finishQueued(db, t3.client);
 
     const delivered = [...t1.sentUserIds(), ...t3.sentUserIds()];
     expect(delivered).toHaveLength(600);

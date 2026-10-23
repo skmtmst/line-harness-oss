@@ -66,7 +66,10 @@ test('same-data SQL/latency comparison retains dashboard and daily-comparison re
       spy.mockRestore();
     }
     process.stdout.write(JSON.stringify({ benchmark: name, simulatedD1Ms: 2, measurements }) + '\n');
-    expect(measurements[1].sql).toBeLessThan(measurements[0].sql);
+    if (name === 'comparison') {
+      // Bulk aggregates no longer repeat reads, with or without display caching.
+      expect(measurements.map(item => item.sql)).toEqual([2, 2]);
+    } else expect(measurements[1].sql).toBeLessThan(measurements[0].sql);
   }
 });
 
