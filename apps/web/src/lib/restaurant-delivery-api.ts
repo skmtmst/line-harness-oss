@@ -55,6 +55,8 @@ export interface DeliveryServiceState {
   service: DeliveryService
   label: string
   connectionStatus: DeliveryConnectionStatus
+  /** サーバーが明示的に許可した場合だけUberの個別注文操作を表示する。 */
+  orderActionsEnabled?: boolean
   intakeStatus: DeliveryIntakeStatus
   stopUntil: string | null
   todayCount: number

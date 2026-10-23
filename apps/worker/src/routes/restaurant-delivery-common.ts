@@ -38,14 +38,13 @@ export function csvCell(value: string | number | null | undefined): string {
 /**
  * 画面に出す状態の名前。英語の符号は出さない。
  *
- * 承認済みデザインの状態は「新着・調理中・受け渡し済み・キャンセル」の4つだけ。
- * 店の操作は「準備完了」で終わり、そのあと受け渡されたかどうかは各サービスからの
- * 通知で内部的に分かれるだけなので、`ready` と `handed_over` は同じ名前で見せる。
+ * `ready` は商品の準備が終わり、まだ受け渡しを待っている状態。
+ * `handed_over` と同じ名前にすると、未完了の注文を見落とすため別の名前で見せる。
  */
 export const ORDER_STATUS_LABELS: Record<DeliveryOrderStatus, string> = {
   new: '新着',
   cooking: '調理中',
-  ready: '受け渡し済み',
+  ready: '準備完了',
   handed_over: '受け渡し済み',
   canceled: 'キャンセル',
   rejected: '拒否',
