@@ -14,8 +14,9 @@
 }
 
 .row[data-tone='muted'] {
-  background: var(--color-surface-pearl);
-  outline-color: var(--color-control-border);
+  background: var(--polish-window-group-bg);
+  border-radius: var(--polish-radius-card);
+  outline-color: transparent;
 }
 
 .row > :first-child { min-width: 0; }

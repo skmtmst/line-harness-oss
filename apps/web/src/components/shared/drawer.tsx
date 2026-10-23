@@ -3,7 +3,7 @@
 
 import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { PanelsTopLeft, X } from 'lucide-react'
 import { OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
 import Dialog from './dialog'
@@ -18,7 +18,7 @@ export type DrawerProps = {
   open: boolean
   title: string
   titleAccessory?: ReactNode
-  /** 題と説明の左に置く、アプリの印の小さな四角。 */
+  /** 題と説明の左に置く、線のアイコン。false なら印を省く。 */
   headerIcon?: ReactNode
   closeAppearance?: 'box'
   description?: ReactNode
@@ -66,7 +66,7 @@ export default function Drawer({
   open,
   title,
   titleAccessory,
-  headerIcon,
+  headerIcon = <PanelsTopLeft />,
   closeAppearance,
   description,
   contentSpacing,
@@ -113,7 +113,7 @@ export default function Drawer({
       </div>
     </div>
   )
-  const closeButton = closeAppearance === 'box' ? <IconButton onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></IconButton> : <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
+  const closeButton = closeAppearance === 'box' ? <IconButton className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></IconButton> : <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
 
   const panel = (
     <aside
@@ -159,7 +159,7 @@ export default function Drawer({
       </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {band ? <div className={styles.band}>{band}</div> : null}
-      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
+      {footer ? <footer className={styles.footer} data-window-actions>{footer}</footer> : null}
     </aside>
   )
   const discardDialog = discard.confirming ? <Dialog open title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null

@@ -34,7 +34,7 @@ describe('窓の頭の余白・高さを絵から渡す', () => {
     screen.getByRole('button', { name: '実行する' }).click()
     expect(confirm).toHaveBeenCalledTimes(1)
   })
-  it('渡さなければ印も変数も付けない（今までどおり）', () => {
+  it('標準の頭では幅と個別の寸法指定を変えない', () => {
     render(<Dialog open modal={false} title="確認" onCancel={vi.fn()} />)
     const panel = screen.getByRole('dialog')
     expect(panel.hasAttribute('data-design-header-padding')).toBe(false)
@@ -49,6 +49,25 @@ describe('窓の頭の余白・高さを絵から渡す', () => {
     expect(panel.style.getPropertyValue('--dialog-design-header-padding')).toBe('20px 20px 0')
     expect(panel.style.getPropertyValue('--dialog-design-header-height')).toBe('44px')
     expect(panel.style.getPropertyValue('--dialog-design-width')).toBe('560px')
+  })
+
+  it('印を省く指定では装飾を足さず、題と説明を読み上げる', () => {
+    render(<Dialog open modal={false} title="入力" description="名前を入力" headerIcon={false} onCancel={vi.fn()} />)
+    const panel = screen.getByRole('dialog', { name: '入力' })
+    expect(panel.querySelectorAll('svg')).toHaveLength(1)
+    expect(document.getElementById(panel.getAttribute('aria-describedby')!)?.textContent).toBe('名前を入力')
+  })
+
+  it('取消を主にした未保存の確認へ成功の印を足さない', () => {
+    render(<ConfirmDialog open title="入力を破棄しますか？" description="入力が消えます" primaryAction="cancel" onCancel={vi.fn()} onConfirm={vi.fn()} />)
+    const panel = screen.getByRole('dialog')
+    expect(panel.querySelectorAll('svg')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'キャンセル' })).toBeTruthy()
+  })
+
+  it('明示した印なしの確認でも装飾を補わない', () => {
+    render(<ConfirmDialog open title="実行しますか？" description="内容を確認" titleIcon={false} onCancel={vi.fn()} onConfirm={vi.fn()} />)
+    expect(screen.getByRole('dialog').querySelectorAll('svg')).toHaveLength(1)
   })
 
   it('ConfirmDialog も同じ口を素通しする', () => {

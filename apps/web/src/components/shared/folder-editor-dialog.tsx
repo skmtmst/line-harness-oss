@@ -4,6 +4,7 @@ import { normalizeActionLabel } from './action-words'
 import type { ComponentProps, ReactNode, Ref } from 'react'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { useId } from 'react'
+import { Folder } from 'lucide-react'
 import Dialog from './dialog'
 import Button from './button'
 import { TextField } from './text-field'
@@ -63,9 +64,9 @@ export default function FolderEditorDialog({ name, nameError, nameRef, onNameCha
    * 失敗の知らせは窓の本文の中（名前と色の下）に置く。窓の下の帯（やめる・保存する）とは本文の余白で離れ、
    * 知らせが増えたぶん窓が下へ伸びる（2026-10-09 オーナー：知らせがボタンに重なっていた）。
    */
-  return <Dialog {...dialog} title={normalizeActionLabel(dialog.title)} busy={busy} designWidth={560} designHeaderPadding="24px 24px 0"
-    footer={<div className={styles.footer}>{footer ?? <>
-      <Button type="button" onClick={dialog.onCancel} disabled={busy}>{cancelLabel}</Button>
+  return <Dialog {...dialog} title={normalizeActionLabel(dialog.title)} headerIcon={<Folder />} busy={busy} designWidth={560} designHeaderPadding="24px 24px 0"
+    footer={<div className={styles.footer} data-dialog-actions>{footer ?? <>
+      <Button type="button" data-dialog-action="secondary" onClick={dialog.onCancel} disabled={busy}>{cancelLabel}</Button>
       <Button type="button" variant="primary" onClick={onConfirm} title={confirmTitle}
         disabled={busy || confirmDisabled || !name.trim()} busy={busy}>{confirmIcon}{confirmLabel}</Button>
     </>}</div>}>

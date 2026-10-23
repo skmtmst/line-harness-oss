@@ -344,7 +344,7 @@
 :root .panel:not(.inline) .body { flex: 0 1 auto; }
 
 /* ：浮く面の影と薄い縁を共通化。 */
-:root .panel { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--polish-window-shadow); border-radius: var(--polish-radius-dialog); }
+:root .panel { border: 0; outline: 1px solid var(--polish-window-edge); outline-offset: -1px; box-shadow: var(--polish-window-shadow); border-radius: var(--polish-radius-dialog); }
 
 /* ：幅の指定がある引き出しでも窓の題の段をそろえる。 */
 :root .panel.panel .title {
@@ -377,9 +377,22 @@ html:root .panel[data-initial-focus='panel']:focus-visible { outline-color: tran
   flex: none;
   width: var(--polish-window-icon-size);
   height: var(--polish-window-icon-size);
-  border-radius: var(--polish-radius-control);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  box-shadow: inset 0 0 0 1px var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--polish-window-icon-bg);
+  color: var(--polish-window-icon-ink);
 }
 .headerIcon > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+
+html:root .panel .close {
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: none;
+}
+html:root .panel .close:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}
+html:root .heading { align-items: center; }

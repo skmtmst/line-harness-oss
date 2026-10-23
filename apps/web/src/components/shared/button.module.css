@@ -274,3 +274,18 @@ html:root .button:not([data-part='row-name']):not([data-part='attention-star']):
 :root .button[data-full-width] { width: 100%; justify-content: center; text-align: center; }
 
 html:root .button.filterActive { outline: 1px solid var(--color-focus-ring); color: var(--color-action); }
+
+/* 窓の取消・副操作は線のない淡い面。ページの副ボタンは既定のまま。 */
+html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) :global([data-window-actions]) .secondary {
+  outline-color: transparent;
+  border-color: transparent;
+  background: var(--polish-window-cancel-bg);
+  box-shadow: none;
+}
+html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) :global([data-window-actions]) .secondary:hover:not(:disabled) {
+  background: var(--polish-hover);
+}
+html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) :global([data-window-actions]) .secondary:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}

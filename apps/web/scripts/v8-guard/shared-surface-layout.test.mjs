@@ -28,6 +28,8 @@ import ConfirmDialog from './src/components/shared/confirm-dialog';
 import Drawer from './src/components/shared/drawer';
 import Button from './src/components/shared/button';
 import CommandPalette from './src/components/shared/command-palette';
+import Notice from './src/components/shared/notice';
+import {DialogContentRow} from './src/components/shared/dialog-form-row';
 function Fixture(){
  const [window,setWindow]=useState(''),[value,setValue]=useState(false),[current,setCurrent]=useState('now');
  const steps=[{key:'done',label:'事前確認',state:'done',onSelect:()=>setCurrent('done')},{key:'now',label:'アカウント接続',state:'current'}, {key:'next',label:'接続確認',state:'todo'}, {key:'choice',label:'使い方を選ぶ',state:'todo'}, {key:'finish',label:'完了',state:'todo'}];
@@ -45,7 +47,7 @@ function Fixture(){
   {window==='引き出し'?<Drawer open title="設定を編集する" headerIcon={props.headerIcon} description={props.description} onClose={()=>setWindow('')} footer={<Button onClick={()=>setWindow('')}>保存する</Button>}><input aria-label="名前" defaultValue="保持する名前"/></Drawer>:
    ['確認','危険','警告'].includes(window)?<ConfirmDialog {...props} title="内容を確認しますか？" destructive={window==='危険'} warning={window==='警告'}/>:
    <Dialog {...props} open={!!window} widthPreset={window==='選択'?'picker':undefined} steps={window==='手順'?<Steps label="窓の手順" steps={steps} currentKey="now"/>:null}>
-    <label>名前<input aria-label="名前" defaultValue="保持する名前"/></label>{window==='長文'?<div style={{height:1600}}>長い内容</div>:null}
+    <DialogContentRow tone="muted"><label>名前<input aria-label="名前" defaultValue="保持する名前"/></label></DialogContentRow><Notice tone="warn">入力した内容を確認してください。</Notice>{window==='長文'?<div style={{height:1600}}>長い内容</div>:null}
    </Dialog>}
  </main>
 }createRoot(document.getElementById('root')).render(<Fixture/>);
@@ -132,6 +134,12 @@ for (const width of [1152,1440,1920]) {
       assert.equal((await page.evaluate(measureControlCentering,'#selection')).findings.length,0)
       await page.getByRole('checkbox',{name:'全選択',exact:true}).check()
       assert.equal(await page.getByRole('checkbox',{name:'行を選ぶ',exact:true}).isChecked(),true)
+      const boxes=await page.locator('#selection input[type="checkbox"]').evaluateAll(inputs=>inputs.map(input=>{
+        const frame=input.nextElementSibling?.tagName==='SPAN'?input.nextElementSibling:input;
+        const style=getComputedStyle(frame),rect=frame.getBoundingClientRect();
+        return {width:rect.width,height:rect.height,radius:style.borderRadius,ring:style.outlineWidth,image:style.backgroundImage};
+      }))
+      assert.ok(boxes.every(box=>box.width===16&&box.height===16&&box.radius==='4px'&&box.ring==='1px'&&box.image==='none'),JSON.stringify(boxes))
       await page.getByRole('checkbox',{name:'ラベル付き',exact:true}).focus(); await page.keyboard.press('Space')
       assert.equal(await page.getByRole('checkbox',{name:'全選択',exact:true}).isChecked(),false)
       // 実寸をずらした場合に、この計測がずれを見逃さないことを確かめる。
@@ -155,16 +163,25 @@ for (const width of [1152,1440,1920]) {
           const rect=el.getBoundingClientRect(),style=getComputedStyle(el)
           const heading=el.querySelector('h2').getBoundingClientRect()
           const controls=[...el.querySelectorAll('button')].map(button=>button.getBoundingClientRect())
-          const icon=el.querySelector('[class*="headerIcon"]').getBoundingClientRect()
+          const iconEl=el.querySelector('[class*="headerIcon"]'),icon=iconEl.getBoundingClientRect(),close=el.querySelector('button[aria-label="閉じる"]'),closeRect=close.getBoundingClientRect(),closeStyle=getComputedStyle(close)
           return {background:style.backgroundColor,radius:style.borderTopLeftRadius,shadow:style.boxShadow,
             bounds:rect.left>=0&&rect.top>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight,
-            heading:heading.top>=rect.top&&heading.bottom<=rect.bottom,icon:icon.width,
+            heading:heading.top>=rect.top&&heading.bottom<=rect.bottom,icon:icon.width,iconRadius:getComputedStyle(iconEl).borderRadius,
+            closeRound:parseFloat(closeStyle.borderRadius)>=Math.min(closeRect.width,closeRect.height)/2,
             controls:controls.every(b=>b.left>=rect.left&&b.right<=rect.right&&b.top>=rect.top&&b.bottom<=rect.bottom)}
         })
         assert.equal(geometry.bounds,true,`${name}: ${JSON.stringify(geometry)}`)
         assert.equal(geometry.heading,true,name);assert.equal(geometry.controls,true,name)
         assert.equal(geometry.radius,'16px');assert.equal(geometry.icon,32)
+        assert.ok(parseFloat(geometry.iconRadius)>=16);assert.equal(geometry.closeRound,true)
         assert.equal(geometry.background,'rgb(255, 255, 255)');assert.notEqual(geometry.shadow,'none')
+        if(name!=='引き出し'){
+          const cancel=panel.getByRole('button',{name:'キャンセル',exact:true});
+          await page.keyboard.press('Tab');await cancel.focus();
+          await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+          const focus=await cancel.evaluate(el=>({width:getComputedStyle(el).outlineWidth,color:getComputedStyle(el).outlineColor}));
+          assert.equal(focus.width,'2px');assert.equal(focus.color,'rgb(37, 99, 235)',name);
+        }
         await panel.getByRole('button',{name:'閉じる',exact:true}).click()
         await panel.waitFor({state:'detached'})
       }

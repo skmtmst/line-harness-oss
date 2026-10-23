@@ -325,7 +325,7 @@
 /* 正本 q3DPdz：枠560、頭・手順・中身・下を独立した段にする。 */
 :root .panel {
   width: min(var(--tpl-dialog-width), 100%); padding: 0; gap: 0; overflow: hidden;
-  border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--card-edge); outline-offset: -1px;
+  border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--polish-window-edge); outline-offset: -1px;
   box-shadow: var(--polish-window-shadow);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
@@ -514,9 +514,54 @@ html:root .panel:not([data-layout]):not([data-design-layout]):not([style*='--dia
   flex: none;
   width: var(--polish-window-icon-size);
   height: var(--polish-window-icon-size);
-  border-radius: var(--polish-radius-control);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
-  box-shadow: inset 0 0 0 1px var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--polish-window-icon-bg);
+  color: var(--polish-window-icon-ink);
 }
 .headerIcon > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+
+/* 窓内の装飾は共通部品が持つ。段の順・幅と操作の位置は変えない。 */
+html:root .panel .close {
+  width: var(--polish-window-close-size);
+  height: var(--polish-window-close-size);
+  min-height: 0;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  box-shadow: none;
+}
+html:root .headerContent { gap: var(--space-4); }
+html:root .headerIcon { align-self: center; }
+html:root .panel[data-description-band='warning'] .headerIcon {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+html:root .panel[role='alertdialog'] .headerIcon {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+html:root .panel .titleRow { align-items: center; }
+html:root .titleIcon {
+  justify-content: center;
+  width: var(--polish-window-icon-size);
+  height: var(--polish-window-icon-size);
+  padding: 0;
+  border-radius: var(--radius-pill);
+  background: var(--polish-window-icon-bg);
+  color: var(--polish-window-icon-ink);
+}
+html:root .panel[role='alertdialog'] .titleIcon {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+html:root .footer :is(button, a)[data-dialog-action='secondary'] {
+  outline-color: transparent;
+  background: var(--polish-window-cancel-bg);
+  box-shadow: none;
+}
+html:root .footer :is(button, a)[data-dialog-action='secondary']:hover:not(:disabled) {
+  background: var(--polish-hover);
+}
+html:root .footer :is(button, a)[data-dialog-action='secondary']:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}
