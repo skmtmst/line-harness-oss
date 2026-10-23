@@ -197,13 +197,13 @@
 .text { border-color: transparent; }
 :root .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
 
-:root .button[data-presentation]:not([data-presentation='restaurant']) {
+:root .button:is([data-presentation='account-inline'], [data-presentation='registration-inline']) {
   flex-shrink: 0; min-height: 0; height: auto; border: 0; padding: 0;
   background: transparent; box-shadow: none; font-family: inherit; font-weight: var(--tpl-button-weight); line-height: inherit;
 }
 :root .button[data-presentation='account-inline'] { color: var(--color-accent-deep); font-size: var(--tpl-acd-label-size); }
 :root .button[data-presentation='registration-inline'] { color: var(--color-action); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); }
-:root .button[data-presentation]:hover:not(:disabled) { text-decoration: underline; }
+:root .button:is([data-presentation='account-inline'], [data-presentation='registration-inline']):hover:not(:disabled) { text-decoration: underline; }
 :root .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
 .danger-outline { border-color: var(--color-hairline); }
@@ -312,4 +312,24 @@ html:root :is(:global([data-design-part='dialog']), :global([data-design-part='d
   outline-offset: var(--polish-focus-offset);
 }
 
-html:root .button:is(.standard, .field, .compact)[data-text-content]:not([data-presentation]) { padding-block-start: var(--polish-text-center-inset); }
+html:root .button:is(.standard, .field, .compact)[data-text-content]:is(:not([data-presentation]), [data-presentation='row-action']) { padding-block-start: var(--polish-text-center-inset); }
+
+/* 設定行の操作は札から区別できる白地の枠。通常の副操作は灰色のまま。 */
+html:root .button.secondary[data-presentation='row-action'] {
+  border: 1px solid var(--color-control-border);
+  outline-color: transparent;
+  background: var(--color-canvas);
+  box-shadow: var(--control-shadow);
+  color: var(--color-ink);
+  font-size: var(--polish-control-text);
+  font-weight: var(--polish-control-weight);
+}
+html:root .button.secondary[data-presentation='row-action'].textAccent {
+  border-color: var(--color-primary-border);
+  color: var(--color-accent-deep);
+}
+html:root .button.secondary[data-presentation='row-action']:is(:hover, :active):not(:disabled) { background: var(--polish-hover); }
+html:root .button.secondary[data-presentation='row-action']:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}

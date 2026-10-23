@@ -14,6 +14,7 @@ const compiled = await build({
   stdin: { resolveDir: webRoot, loader: 'tsx', contents: `
 import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
 import Button from './src/components/shared/button';
+import {RowStatusActions} from './src/components/shared/row-actions';
 import SegmentedControl from './src/components/shared/segmented';
 import Pagination from './src/components/shared/pagination';
 import KpiCard from './src/components/shared/kpi-card';
@@ -27,7 +28,8 @@ import Drawer from './src/components/shared/drawer';
 import InlineEdit from './src/components/shared/inline-edit';
 import {SettingsPage} from './src/components/templates/settings-page';
 import {RowNameButton} from './src/components/shared/table';
-function Fixture(){const[value,setValue]=useState('graph');const[window,setWindow]=useState('');return <main>
+function Fixture(){const[value,setValue]=useState('graph');const[window,setWindow]=useState('');const[count,setCount]=useState(0);return <main>
+<section data-measure-status-actions>{[false,true].map(alert=><div key={String(alert)}><RowStatusActions status={<StatusBadge tone={alert?'warning':'neutral'}>{alert?'未設定':'あとで'}</StatusBadge>}><Button presentation="row-action" textTone={alert?'accent':'ink'} onClick={()=>setCount(count+1)}>{alert?'決まりを入れる':'選ぶ'}</Button></RowStatusActions></div>)}<RowStatusActions status={<StatusBadge>設定済み</StatusBadge>}><Button presentation="row-action" href="/settings">中身を見る</Button></RowStatusActions><output aria-label="行の操作回数">{count}</output></section>
 <Button variant="secondary">副操作</Button><Button variant="secondary" filterActive>絞り込み中</Button>
 <Button variant="secondary" presentation="restaurant">店の副操作</Button><Button>主操作</Button>
 <Pagination page={1} pageCount={3} onPageChange={()=>{}}/>
@@ -89,6 +91,8 @@ test('塗りと絞り込み状態があってもキーボードの焦点を見�
   try {
     const page=await browser.newPage({reducedMotion:'reduce'})
     await mount(page)
+    await page.getByRole('button',{name:'副操作',exact:true}).focus()
+    await page.keyboard.press('Shift+Tab')
     for(const name of ['副操作','絞り込み中','店の副操作','主操作']){
       await page.keyboard.press('Tab')
       assert.equal(await page.evaluate(()=>document.activeElement.textContent),name)
@@ -229,4 +233,35 @@ test('白い選択欄と予約の線を実描画で見分け、選択操作を�
     assert.equal(lines.no_show.style,'solid');assert.equal(lines.no_show.width,'2px');assert.equal(lines.no_show.color,lines.pending.color)
     await page.close()
   } finally { await browser.close() }
+})
+
+for(const width of [1152,1440])test(`設定行の札と操作を区別でき、両幅で操作できる ${width}`,async()=>{
+  const browser=await connectGuardBrowser(),page=await browser.newPage({viewport:{width,height:1000},reducedMotion:'reduce'})
+  try{
+    await mount(page)
+    const section=page.locator('[data-measure-status-actions]')
+    const rows=await section.locator('[data-shared-part="row-status-actions"]').evaluateAll(elements=>elements.map(e=>{
+      const badge=e.firstElementChild,button=e.lastElementChild.firstElementChild,s=getComputedStyle(button),b=badge.getBoundingClientRect(),a=button.getBoundingClientRect()
+      return {bg:s.backgroundColor,border:s.borderTopWidth,color:s.color,borderColor:s.borderTopColor,center:b.y+b.height/2-a.y-a.height/2,width:a.width,height:a.height}
+    }))
+    assert.equal(new Set(rows.map(r=>r.width)).size,1)
+    for(const row of rows){assert.equal(row.bg,'rgb(255, 255, 255)');assert.equal(row.border,'1px');assert.equal(row.height,36);assert.ok(Math.abs(row.center)<1)}
+    // 枠を消す故障が同じ描画検査で検出され、復旧後に通ることを確かめる。
+    const fault=await page.addStyleTag({content:'[data-presentation="row-action"]{border:0!important}'})
+    const broken=await section.getByRole('button',{name:'選ぶ',exact:true}).evaluate(e=>getComputedStyle(e).borderTopWidth)
+    assert.throws(()=>assert.equal(broken,'1px'))
+    await fault.evaluate(e=>e.remove())
+    assert.equal(await section.getByRole('button',{name:'選ぶ',exact:true}).evaluate(e=>getComputedStyle(e).borderTopWidth),'1px')
+    assert.notEqual(rows[0].borderColor,rows[1].borderColor)
+    assert.notEqual(rows[0].color,rows[1].color)
+    assert.equal(await section.getByRole('link',{name:'中身を見る'}).getAttribute('href'),'/settings')
+    await section.getByRole('button',{name:'選ぶ',exact:true}).click()
+    await section.getByRole('button',{name:'決まりを入れる',exact:true}).press('Enter')
+    assert.equal(await page.getByLabel('行の操作回数').textContent(),'2')
+    assert.equal(await focusedRing(page),true)
+    assert.notEqual(await page.getByRole('button',{name:'副操作',exact:true}).evaluate(e=>getComputedStyle(e).backgroundColor),rows[0].bg)
+    const band=page.locator('[data-measure-band] [data-kpi-strip]')
+    const dimensions=await band.evaluate(e=>{const cell=e.firstElementChild,n=cell.querySelector('[data-kpi-number]'),s=getComputedStyle(cell),v=getComputedStyle(n);return{gap:s.gap,pad:s.paddingTop,size:v.fontSize,line:v.lineHeight,weight:v.fontWeight}})
+    assert.deepEqual(dimensions,{gap:'4px',pad:'16px',size:'34px',line:'36px',weight:'500'})
+  }finally{await page.close();await browser.close()}
 })

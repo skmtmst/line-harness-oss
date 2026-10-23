@@ -33,7 +33,7 @@ type CommonProps = {
   /** よく使う絞り込みが適用中の印。開閉状態は aria-expanded で別に伝える。 */
   filterActive?: boolean
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
-  presentation?: 'account-inline' | 'registration-inline' | 'restaurant'
+  presentation?: 'account-inline' | 'registration-inline' | 'restaurant' | 'row-action'
   className?: string
   /** Authored action words only; entity names and arbitrary values remain unchanged. */
   actionWording?: boolean

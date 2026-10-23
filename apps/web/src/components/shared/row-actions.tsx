@@ -329,3 +329,11 @@ export function RowActions({
     </span>
   )
 }
+
+/** 設定行の札と操作。操作の幅と右端、札との縦の中心をそろえる。 */
+export function RowStatusActions({ status, children }: { status?: ReactNode; children: ReactNode }) {
+  return <span className={styles.statusActions} data-shared-part="row-status-actions">
+    {status}
+    <span className={styles.statusAction}>{children}</span>
+  </span>
+}

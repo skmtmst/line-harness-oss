@@ -118,7 +118,7 @@ function StepRow({ step, readOnly }: { step: StepResult; readOnly: boolean }) {
       </div></GridCell>
       <GridCell align="right">
         {done ? <StatusBadge tone="success" size="compact">済み</StatusBadge> : step.action && !readOnly ? (
-          <Button href={step.action.href} variant="secondary">{step.action.label}</Button>
+          <Button href={step.action.href} presentation="row-action" textTone={step.state === 'stalled' ? 'accent' : 'ink'}>{step.action.label}</Button>
         ) : <span className={styles.stepBlocked}>{step.blockedReason}</span>}
       </GridCell>
     </GridRow>

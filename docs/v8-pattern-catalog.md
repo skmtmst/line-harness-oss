@@ -290,7 +290,7 @@
 ## row-menu 行の右端「…」
 
 - **役目**：行の操作を右端の「…」1つにまとめる
-- **持ち主（コード）**：`apps/web/src/components/shared/row-actions.tsx`・`apps/web/src/components/shared/row-actions.module.css`・`apps/web/src/components/shared/action-menu.tsx`・`apps/web/src/components/shared/action-menu.module.css`（部品 `RowMenu`・`MoreAction`・`RowActions`・`RowAction`・`RowQuickAction`）
+- **持ち主（コード）**：`apps/web/src/components/shared/row-actions.tsx`・`apps/web/src/components/shared/row-actions.module.css`・`apps/web/src/components/shared/action-menu.tsx`・`apps/web/src/components/shared/action-menu.module.css`（部品 `RowMenu`・`MoreAction`・`RowActions`・`RowAction`・`RowQuickAction`・`RowStatusActions`）
 - **持ち主（Pen）**：`hnuY9`「その他操作メニュー」
   - 部品の板の html に書き出されていない ID：`hnuY9`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
 - **見つけ方（コード）**：
@@ -836,6 +836,8 @@
 
 <a id="primary-button"></a>
 ## primary-button 主ボタン・ボタン
+
+- 設定行の操作は `Button` の `presentation="row-action"`（白地・欄と同じ細枠）。注意行は `textTone="accent"` で緑の枠と文字。札と操作の並びは `RowStatusActions` が中央と操作幅をそろえる。通常の副操作は灰色を保つ（2026-10-23オーナー）。
 
 - **役目**：主＝文字の幅・高さ36・濃い緑の縁＋カードの影・角丸8。言葉は「〇〇を作る」「〜する」
 - **持ち主（コード）**：`apps/web/src/components/shared/button.tsx`・`apps/web/src/components/shared/button.module.css`・`apps/web/src/components/shared/icon-button.tsx`・`apps/web/src/components/shared/icon-button.module.css`（部品 `Button`・`IconButton`）
