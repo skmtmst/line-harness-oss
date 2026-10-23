@@ -10,8 +10,6 @@
 
 - [最初に読む：製品とコードの入口](START-HERE.md)
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
-- [手順・チェック・窓の細部と修正前後の比較](../review/DESIGN-AUDIT-1023/polish-nizam/README.md) — 作業記録、確認 2026-10-23
-- [確認窓の区切り線と修正前後の比較](../review/TRAIN-ALL-1023/fix3/FINAL.md) — 作業記録、確認 2026-10-23
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
 ## 使う人の手引き

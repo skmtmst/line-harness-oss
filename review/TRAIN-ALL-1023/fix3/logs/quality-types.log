@@ -1,3 +1,0 @@
-
-> line-oss-crm@0.24.0 quality:typecheck /Users/kentakenta/lh-work/lh-train-all-1023
-> tsc --noEmit --allowJs --checkJs --skipLibCheck --module nodenext --target es2022 --allowImportingTsExtensions scripts/structure/quality-inventory.mjs scripts/structure/repository-files.mjs scripts/structure/quality-check.mjs

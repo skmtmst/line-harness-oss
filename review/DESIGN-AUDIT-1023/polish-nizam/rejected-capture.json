@@ -1,6 +1,0 @@
-{
-  "reason": "ブラウザが旧build 53ZwFqVUWRX1nrg3w_W96を再利用。崩れ0でも今回の修正後の証拠にしない。",
-  "rawEvidence": "/Users/kentakenta/lh-work/design/v8/codex-handoff/polish-nizam-stale-export",
-  "shots": 21,
-  "next": "ページ単位でHTTPキャッシュを無効にしてreloadし、現行build識別子と共通値を照合して再取得する。"
-}
