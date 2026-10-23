@@ -196,7 +196,7 @@ export default function SoldOutBoard({
               />
             ) : (
               visible.map((item) => (
-                <Tr key={item.id} data-table-layout="columns">
+                <Tr selected={canSync(item) && selectedSet.has(item.id)} key={item.id} data-table-layout="columns">
                   {canManage ? (
                     <Td>
                       <Checkbox

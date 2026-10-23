@@ -139,6 +139,33 @@ function seedDefinition(status: string) {
 }
 
 describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
+  it.each([
+    [0, 1, '店舗Aの通知', false],
+    [1, 0, '店舗Aの通知', true],
+    [null, 0, 'ご注文ありがとうございます', true],
+  ] as const)('店舗の設定%s・他店舗%sのとき、受信先の設定または共通設定だけで送信する', async (ownEnabled, otherEnabled, title, sent) => {
+    sqlite.exec(`INSERT INTO line_accounts
+      (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('account-b', 'channel-b', 'B店', 'token-b', 'secret-b')`);
+    const setting = sqlite.prepare(`INSERT INTO ec_notification_account_settings
+      (line_account_id, event_type, is_enabled, title_override, created_at, updated_at)
+      VALUES (?, 'ec.order.confirmed', ?, ?, '2026-10-22', '2026-10-22')`);
+    setting.run('account-b', otherEnabled, '店舗Bの通知');
+    if (ownEnabled !== null) setting.run('account-a', ownEnabled, '店舗Aの通知');
+
+    expect((await post(baseEvent())).status).toBe(sent ? 200 : 202);
+
+    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(sent ? 1 : 0);
+    if (sent) {
+      const message = JSON.stringify(pushMessageWithRequestId.mock.calls[0][1]);
+      expect(message).toContain(title);
+      expect(message).not.toContain('店舗Bの通知');
+      expect(deliveries()[0]).toMatchObject({ status: 'provider_accepted' });
+    } else {
+      expect(deliveries()[0]).toMatchObject({ status: 'excluded', attempts: 0, error_code: 'notification_disabled' });
+    }
+  });
+
   it('受理: 通知・送達・試行を1件ずつ残し、従来台帳も sent になる', async () => {
     const response = await post(baseEvent());
     expect(response.status).toBe(200);

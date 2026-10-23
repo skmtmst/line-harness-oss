@@ -1,0 +1,31 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/* 浮く面の位置はMenuPortal、動きはこの一か所が持つ。 */
+:root .motion.motion { transform-origin: top right; transition-property: none; }
+:root .motion[data-origin='left'] { transform-origin: top left; }
+:root .motion[data-placement='up'] { transform-origin: bottom right; }
+:root .motion[data-placement='up'][data-origin='left'] { transform-origin: bottom left; }
+/* 面の内側で同じ登場を重ねない。内部のカレンダー移動やスピナーは保つ。 */
+:root .motion.motion > * { animation: none; }
+@media (prefers-reduced-motion: no-preference) {
+  :root .motion.motion[data-ready='true'] { animation: surface-enter var(--motion-fast) var(--motion-ease-out); }
+  :root .motion.motion[data-closing] { animation: surface-leave var(--motion-instant) var(--motion-ease-out) forwards; }
+}
+@keyframes surface-enter {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes surface-leave {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root .motion.motion { animation: none; }
+}
+
+.filterSurface { width: var(--tpl-bc-popover-w); }
+.panel { display: flex; flex-direction: column; gap: var(--tpl-cell-gap-half); padding: var(--tpl-rule-row-gap); }
+.heading { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 600; }
+.actions { display: flex; justify-content: flex-end; gap: var(--tpl-cell-gap-half); }
+
+}

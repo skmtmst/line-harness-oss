@@ -274,7 +274,7 @@ async function openEditor(page) {
   const editRow = page.getByRole('button', { name: '内容を編集' })
   await editRow.first().waitFor({ timeout: 15_000 })
   await editRow.first().click()
-  await page.getByRole('button', { name: '下書きを保存する', exact: true }).waitFor({ timeout: 15_000 })
+  await page.getByRole('textbox', { name: 'ご案内文', exact: true }).waitFor({ timeout: 15_000 })
 }
 
 const introBox = (page) => page.getByRole('textbox', { name: 'ご案内文', exact: true })
@@ -297,15 +297,16 @@ try {
      */
     const { context, page } = await openHarness(browser)
     await openEditor(page)
+    await introBox(page).fill('寸法検査用の下書き')
     const widths = [375, 390, 768, 1440, 1920]
     for (const width of widths) {
       await page.setViewportSize({ width, height: 812 })
       await page.waitForTimeout(150)
       const measured = await page.evaluate(() => {
-        const actions = document.querySelector('[data-design="editor-footer-actions"]')
-        const footer = document.querySelector('[data-design="editor-footer"]')
-        const main = document.querySelector('[data-design-node="Q55bb"]')
-        const buttons = [...actions.querySelectorAll('button')].map((button) => {
+        const actions = document.querySelector('[data-template-region="footer"] [data-sticky-actions]')
+        const footer = document.querySelector('[data-template-region="footer"]')
+        const footerStyle = getComputedStyle(footer)
+        const buttons = [...document.querySelector('[data-design-node="Q55bb"]').querySelectorAll('[data-dialog-actions] button, [data-sticky-actions] button')].map((button) => {
           const rect = button.getBoundingClientRect()
           const style = getComputedStyle(button)
           const probe = document.createElement('span')
@@ -333,20 +334,19 @@ try {
           documentScrollWidth: document.documentElement.scrollWidth,
           actionsWidth: actions.getBoundingClientRect().width,
           footerHeight: footer.getBoundingClientRect().height,
-          mainPaddingBottom: parseFloat(getComputedStyle(main).paddingBottom),
+          footerPosition: footerStyle.position,
+          footerBottom: footerStyle.bottom,
           rows: new Set(buttons.map((button) => Math.round(button.right - button.width))).size,
           rightmost: Math.max(...buttons.map((button) => button.right)),
           squeezed: buttons.filter((button) => button.overflows || button.needs > button.width + 1).map((button) => button.text),
         }
       })
-      console.log(`  ${width}px 操作列 ${Math.round(measured.actionsWidth)}px / 右端 ${Math.round(measured.rightmost)}px / フッタ ${Math.round(measured.footerHeight)}px / 下余白 ${measured.mainPaddingBottom}px`)
+      console.log(`  ${width}px 操作列 ${Math.round(measured.actionsWidth)}px / 右端 ${Math.round(measured.rightmost)}px / フッタ ${Math.round(measured.footerHeight)}px / 追従 ${measured.footerPosition}`)
       assert.ok(measured.rightmost <= width + 1, `${width}px で主要操作が画面の外へ出ている（右端 ${Math.round(measured.rightmost)}px）`)
       assert.deepEqual(measured.squeezed, [], `${width}px でボタンの文字が枠に収まっていない`)
       assert.ok(measured.documentScrollWidth <= width + 1, `${width}px でページが横スクロールする`)
-      assert.ok(
-        measured.mainPaddingBottom >= measured.footerHeight,
-        `${width}px で固定フッター（${Math.round(measured.footerHeight)}px）が本文の下余白（${measured.mainPaddingBottom}px）を越えている`,
-      )
+      assert.equal(measured.footerPosition, 'sticky', `${width}px で保存帯が本文の共通の追従位置を失っている`)
+      assert.notEqual(measured.footerBottom, 'auto', `${width}px で保存帯の追従位置がない`)
     }
     await context.close()
     console.log('375px 寸法検査: PASS')

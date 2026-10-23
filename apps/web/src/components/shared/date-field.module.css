@@ -262,15 +262,15 @@
 
 .day[data-today] {
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 0 0 1.5px var(--color-accent-deep);
+  box-shadow: inset 0 0 0 1.5px var(--color-control-border);
   font-weight: 500;
 }
 
 .day[data-selected] {
   border-radius: var(--radius-pill);
-  background: var(--color-accent-deep);
-  box-shadow: none;
-  color: var(--color-on-accent);
+  background: var(--polish-selection-bg);
+  box-shadow: var(--polish-selection-shadow);
+  color: var(--color-ink);
   font-weight: 500;
 }
 
@@ -322,3 +322,15 @@
 }
 
 :root .field[data-size="compact"] { height: var(--tpl-rt-control-h); }
+
+/* 日付を選ぶ入口は白い地と薄い線。入力の誤りとキーボードの輪は残す。 */
+:root .field { border-color: var(--color-control-border); background: var(--color-canvas); font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
+:root .field:not([data-open]):not([data-invalid]) { border-color: var(--color-control-border); box-shadow: none; }
+:root .field[data-open] { border-color: var(--color-control-border); box-shadow: none; }
+:root .field:hover:not(:disabled):not([data-readonly]) { background: var(--color-canvas-sunken); }
+:root .field[data-invalid] { border-color: var(--color-danger); }
+
+:root .day[data-selected] { font-weight: 600; }
+
+:root .chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); flex: none; color: var(--color-ink-faint); margin-inline-start: auto; }
+:root .field:not([data-clearable]) { padding-inline-end: var(--tpl-select-inset); }

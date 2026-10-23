@@ -787,7 +787,7 @@ function AutoReplyWizardV8Inner() {
   const renderPreview = (withPhone: boolean) => renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged, step, testMessage, triggerSamples }, withPhone)
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={pageTitle} help={<>
+    <SaveErrorScope errors={saveErrors}><CreatePage step={STEP_ORDER.indexOf(step)} footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={pageTitle} help={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (
@@ -796,7 +796,7 @@ function AutoReplyWizardV8Inner() {
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
           自動応答へ
-        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} previewLabel={step === 'basic' || step === 'trigger' ? '設定内容を見る' : undefined} previewTitle={step === 'basic' || step === 'trigger' ? '設定内容' : undefined} preview={renderPreview(true)} footerActions={
+        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} summaries={{ basic: form.ruleName, trigger: form.respondToAll ? 'すべてのメッセージ' : `${form.keywordRules.length}件のキーワード`, response: form.mode === 'inline-text' ? form.responseContent : ({ silent: '返信しない', template: 'テンプレートから返信', 'inline-flex': 'カードで返信', 'inline-image': '画像で返信' })[form.mode], priority: `優先順位 ${form.priority}` }} />} previewLabel={step === 'basic' || step === 'trigger' ? '設定内容を見る' : undefined} previewTitle={step === 'basic' || step === 'trigger' ? '設定内容' : undefined} preview={renderPreview(true)} footerActions={
           <>
             <Button
               type="button"

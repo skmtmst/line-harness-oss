@@ -27,11 +27,11 @@ export function dayBookingSummary(rows: BookingRequest[], date: string, availabi
   const line = active.filter(row => row.source ? row.source === 'liff' : Boolean(row.friend_id)).length
   const slots = availability.slots.filter(slot => slot.date === date && slot.remaining > 0 && ['available', 'limited'].includes(slot.state))
   const phone = active.filter(row => row.source === 'phone').length
-  return { active: active.length, line, phone, other: active.length - line - phone, requested: active.filter(row => row.status === 'requested').length,
+  return { active: active.length, line, phone, other: active.length - line - phone, requested: active.filter(row => ['requested', 'pending'].includes(row.status)).length,
     cancelled: rows.filter(row => ['cancelled', 'rejected', 'no_show'].includes(row.status)).length,
     sales: rows.filter(row => row.status === 'confirmed').reduce((sum, row) => sum + row.price_at_booking, 0),
     available: availability.status === 'ready' ? new Set(slots.map(slot => `${slot.staffId}/${slot.start}`)).size : null,
-    next: active.filter(row => ['requested', 'confirmed'].includes(row.status) && Date.parse(row.ends_at) > Date.now()).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))[0] }
+    next: active.filter(row => ['requested', 'pending', 'confirmed'].includes(row.status) && Date.parse(row.ends_at) > Date.now()).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))[0] }
 }
 
 export default function PeopleDayFrame({ view, date, rows, ready, availability, actions, canWrite, onOpen, children, usageStyle }: {
@@ -66,7 +66,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
             </div>
           </div>
           <div className={styles.state}>
-            <StatusBadge tone={next.status === 'requested' ? 'warning' : 'info'}>{next.status === 'requested' ? '承認待ち' : Date.parse(next.starts_at) > Date.now() ? 'このあと' : words.active}</StatusBadge>
+            <StatusBadge tone={['requested', 'pending'].includes(next.status) ? 'warning' : 'info'}>{['requested', 'pending'].includes(next.status) ? '承認待ち' : Date.parse(next.starts_at) > Date.now() ? 'このあと' : words.active}</StatusBadge>
             <ReservationSource value={next.source === 'liff' || (!next.source && next.friend_id) ? 'line' : next.source === 'phone' ? 'phone' : next.source ?? 'line'} />
           </div>
           <ul className={styles.rows}>

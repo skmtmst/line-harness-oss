@@ -28,8 +28,7 @@ export function scenarioContractError(c: Context<Env>, error: unknown): Response
       ...(error.field ? { field: error.field } : {}),
     }, error.status, []);
   }
-  logger.error("scenario_v6_contract_failed");
-  return c.json({ success: false, error: 'シナリオの情報を処理できませんでした' }, 500);
+  throw error;
 }
 
 export async function requireScenarioAccountScope(c: Context<Env>, lineAccountId: string): Promise<Response | null> {
@@ -491,7 +490,7 @@ async function runTestSend(
     }
     return c.json({ success: true, data: { sent: result.sent } });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
+    logger.error("scenarios.run_test_send_failed");
     return c.json(
       { success: false, error: `テスト送信に失敗しました: ${(err as Error).message}` },
       502,

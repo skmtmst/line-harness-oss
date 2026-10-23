@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { getBroadcastApprovalThreshold } from '../features/broadcasts/broadcast-approval/index.js';
 import { sendAudienceCounts } from '../services/gap-send-preview.js';
 import { resolveHqBroadcastAudience } from '../features/hq-broadcasts/hq-broadcast-audience/index.js';
@@ -25,7 +26,7 @@ hqBroadcasts.use('/api/hq/broadcasts/*',requireRole('owner','admin'),async(c,nex
 hqBroadcasts.get('/api/hq/broadcasts',async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method));
   const result=await listHqBroadcasts(db,a.tenantId,{from:c.req.query('from'),to:c.req.query('to'),q:c.req.query('q'),status:c.req.query('status'),folderId:c.req.query('folderId'),limit:c.req.query('limit'),cursor:c.req.query('cursor'),sort:c.req.query('sort')});
-  return c.json({success:true,...result});
+  return c.json(buildOffsetListResponse({ success:true,...result, items: result.data, total: result.pagination.total, paging: { limit: result.pagination.limit }, sort: [{field:'at',direction:c.req.query('sort') === 'oldest' ? 'asc' : 'desc'},{field:'id',direction:c.req.query('sort') === 'oldest' ? 'asc' : 'desc'}] }));
 });
 hqBroadcasts.get('/api/hq/broadcasts/quota',async c=>{const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);return c.json({success:true,data:await hqBroadcastQuota(db,a.tenantId)})});
 hqBroadcasts.get('/api/hq/broadcasts/saved-views',async c=>{
@@ -138,7 +139,7 @@ hqBroadcasts.patch('/api/hq/broadcasts/:id',inputJsonBoundary({"title":["string"
 });
 
 function pagination(c:{req:{query(k:string):string|undefined}}) {
- const offset=Number(c.req.query('cursor')??0),limit=Number(c.req.query('limit')??50);
+ const offset=listQueryNumber(c.req.query('cursor'), 0),limit=listQueryNumber(c.req.query('limit'), 50);
  if(!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(limit)||limit<1||limit>100)throw new StampError('件数を確認してください');
  return {offset,limit};
 }

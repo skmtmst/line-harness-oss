@@ -8,7 +8,9 @@
   align-items: center;
   justify-content: center;
   overflow-y: auto;
-  background: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  background: var(--polish-window-backdrop);
+  -webkit-backdrop-filter: blur(var(--polish-window-blur));
+  backdrop-filter: blur(var(--polish-window-blur));
   padding: 16px;
 }
 
@@ -57,7 +59,7 @@
 }
 
 .confirmationPanel .titleIcon {
-  color: var(--color-accent-deep);
+  color: var(--color-ink-secondary);
 }
 
 .confirmationPanel[role='alertdialog'] .titleIcon {
@@ -323,8 +325,8 @@
 /* 正本 q3DPdz：枠560、頭・手順・中身・下を独立した段にする。 */
 :root .panel {
   width: min(var(--tpl-dialog-width), 100%); padding: 0; gap: 0; overflow: hidden;
-  border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--card-edge); outline-offset: -1px;
-  box-shadow: var(--shadow-controls-pop);
+  border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--polish-window-edge); outline-offset: -1px;
+  box-shadow: var(--polish-window-shadow);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
 :root .panel[data-size='large'] { width: min(var(--tpl-dialog-large-width), 100%); }
@@ -435,7 +437,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel { -webkit-font-smoothing: antialiased; }
 
 /* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
-:root .panel[data-design-layout='stacked'] { padding: 24px; gap: 14px; }
+:root .panel[data-design-layout='stacked'] { --dialog-stack-gap: 14px; padding: 24px; gap: var(--dialog-stack-gap); }
 :root .panel[data-design-layout='stacked'] > .headerRow { padding: 0; align-items: center; }
 :root .panel[data-design-layout='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
 :root .panel[data-design-layout='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
@@ -481,7 +483,7 @@ html:root .panel[data-layout='inset'] > .headerRow,
 html:root .panel[data-layout='inset'] > .content { padding: 0; }
 html:root .panel[data-layout='inset'] .headerContent { gap: var(--tpl-hb-dialog-head-gap); }
 html:root .panel[data-layout='inset'] .content { align-items: stretch; }
-html:root .panel[data-layout='inset'] .actions { padding: var(--space-16) 0 0; }
+html:root .panel[data-layout='inset'] .actions { padding: var(--polish-window-divider-space) 0 0; }
 .actionLead { display: flex; flex-wrap: wrap; gap: var(--space-8); min-width: 0; margin-right: auto; }
 
 html:root .panel[data-confirm-placement='start'] .actions {
@@ -497,3 +499,95 @@ html:root .panel[data-confirm-placement='start'] .actions > button:last-of-type 
 }
 
 :root .footer :is(button, a) { border-radius: var(--radius-primary-action); }
+
+/* 余白は各段だけが持ち、本文との境目で重ねない。個別指定の窓はその口を保つ。 */
+html:root .panel:not([data-design-header-padding]):not([data-design-header-height]):not([data-layout]):not([data-design-layout]) > .headerRow {
+  padding: var(--polish-space-section) var(--polish-space-section) 0;
+}
+html:root .panel:not([data-layout]):not([data-design-layout]):not([style*='--dialog-design-footer-padding']) > .footer > .actions:not([data-padding='none']) {
+  padding: var(--polish-window-divider-space) var(--polish-space-section) var(--polish-space-section);
+}
+.headerIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--polish-window-icon-size);
+  height: var(--polish-window-icon-size);
+  border-radius: var(--radius-pill);
+  background: var(--polish-window-icon-bg);
+  color: var(--polish-window-icon-ink);
+}
+.headerIcon > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+
+/* 窓内の装飾は共通部品が持つ。段の順・幅と操作の位置は変えない。 */
+html:root .panel .close {
+  width: var(--polish-window-close-size);
+  height: var(--polish-window-close-size);
+  min-height: 0;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  box-shadow: none;
+}
+html:root .headerContent { gap: var(--space-4); }
+/* 題の実際の行高を継ぎ、説明の行数に関係なく最初の行へそろえる。 */
+html:root .title[data-has-heading-icon] { display: flex; align-items: flex-start; gap: var(--space-12); }
+html:root .title[data-has-heading-icon] > span:last-child { min-width: 0; }
+html:root .title .headerIcon { align-self: flex-start; margin-top: calc((1lh - var(--polish-window-icon-size)) / 2); }
+html:root .headerContent:has(.headerIcon) .description,
+html:root .headerContent:has(.headerIcon) .titleNote { margin-inline-start: calc(var(--polish-window-icon-size) + var(--space-12)); }
+html:root .panel[data-description-band='warning'] .headerIcon {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+html:root .panel[role='alertdialog'] .headerIcon {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+html:root .panel .titleRow { align-items: center; }
+html:root .titleIcon {
+  justify-content: center;
+  width: var(--polish-window-icon-size);
+  height: var(--polish-window-icon-size);
+  padding: 0;
+  border-radius: var(--radius-pill);
+  background: var(--polish-window-icon-bg);
+  color: var(--polish-window-icon-ink);
+}
+html:root .panel[role='alertdialog'] .titleIcon {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+html:root .footer :is(button, a)[data-dialog-action='secondary'] {
+  outline-color: transparent;
+  background: var(--polish-window-cancel-bg);
+  box-shadow: none;
+}
+html:root .footer :is(button, a)[data-dialog-action='secondary']:hover:not(:disabled) {
+  background: var(--polish-hover);
+}
+html:root .footer :is(button, a)[data-dialog-action='secondary']:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}
+
+/* 区切り線のある次の段までの余白は頭が持ち、説明の行数で変えない。 */
+html:root .panel:not([data-layout]):not([data-design-layout]) > .headerRow:has(.description):has(+ .steps),
+html:root .panel:not([data-confirmation='compact']):not([data-layout]):not([data-design-layout]) > .headerRow:has(.description):has(+ .footer .actions:not([data-padding='none'])) {
+  padding-block-end: var(--polish-window-divider-space);
+  height: auto;
+  min-height: var(--dialog-design-header-height, 0px);
+}
+
+/* 個別の左右・下の余白を保ち、線から操作までの上だけ共通化する。 */
+html:root .panel:not([data-layout]):not([data-design-layout]) > .footer > .actions:not([data-padding='none']) {
+  padding-block-start: var(--polish-window-divider-space);
+}
+
+/* 短い確認は説明から操作までを一続きにし、間は操作側だけが持つ。 */
+html:root .panel[data-confirmation='compact']:not([data-layout]):not([data-design-layout]) > .headerRow {
+  padding-block-end: 0;
+}
+html:root .panel[data-confirmation='compact'][data-design-layout='stacked'] > .footer {
+  margin-block-start: calc(var(--polish-window-divider-space) - var(--dialog-stack-gap));
+}

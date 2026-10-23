@@ -1,3 +1,4 @@
+import type { BookingState } from '@/components/shared/booking-state'
 /*
  * 業種ダッシュボード（XBkC2）の画面の形。口（API 組4 `lib/api-styles.ts` の styleApi）の生の値を
  * `adapter.ts` がこの形へ組み立てる。数・率・通貨・状態の書き方はここから先で決める（口は生の数だけ返す）。
@@ -69,7 +70,7 @@ export interface StyleBoardEntry {
   end: string
   name: string
   menu: string
-  state: 'done' | 'active' | 'booked' | 'pending' | 'off'
+  state: 'done' | 'active' | 'booked' | 'pending' | 'off' | 'attention' | 'no_show' | 'warning'
   stateLabel: string
   nominated?: boolean
   unpaid?: boolean
@@ -102,10 +103,10 @@ export interface StyleWeek {
   from: string
   to: string
   days: StyleWeekDay[]
-  entries: { id: string; day: string; start: string; end: string; title: string; name: string }[]
+  entries: { id: string; day: string; start: string; end: string; title: string; name: string; state?: BookingState }[]
   free: { day: string; start: string; end: string; bookingDay?: string; bookingStart?: string }[]
 }
-export interface StyleMonthDay { date: string; day: string; inMonth: boolean; closed?: boolean; groups?: number; people?: number; empty?: boolean; mark?: StyleBadge | null; today?: boolean }
+export interface StyleMonthDay { date: string; day: string; inMonth: boolean; closed?: boolean; groups?: number; people?: number; empty?: boolean; mark?: StyleBadge | null; today?: boolean; selected?: boolean }
 export interface StyleMonth {
   title: string
   days: StyleMonthDay[]

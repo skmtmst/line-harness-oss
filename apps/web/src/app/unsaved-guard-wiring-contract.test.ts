@@ -22,6 +22,9 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  // 会社・連絡先とプール名の下書きは、共通の FormLeaveGuard が画面離脱を守る。
+  'v8/hq/company-contact.tsx',
+  'v8/settings/pools/pools.tsx',
   // 友だち詳細の情報欄。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
   'v8/friend-detail/info-tab.tsx',
   'v8/restaurant/organization/store-groups.tsx',
@@ -217,7 +220,6 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   // 配信の自動応答の編集は、一覧と同じ console.tsx の中で開く。書きかけの有無は親が持ち、番兵は親が持つ。
   'v8/hq-deliveries/auto-reply-editor.tsx': 'v8/hq-deliveries/console.tsx',
   // 作る・直す型（CreatePage）に dirty を渡す画面。離脱の番兵は型が持つ。
-  'v8/restaurant/menu/edit.tsx': 'components/templates/create-page.tsx',
 }
 
 /*

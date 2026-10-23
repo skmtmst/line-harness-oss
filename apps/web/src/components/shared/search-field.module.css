@@ -161,3 +161,8 @@ html:root .disabled .input:disabled { opacity: 1; }
 
 /* ・仕上げ8：検索の読み込みは aria-busy で伝え、回る印は保存ボタンだけにする。 */
 :root .loadingIcon { display: none; animation: none; }
+
+/* 入れる欄は白地と薄い線で選択ボタンと見分ける。 */
+:root .search { background: var(--color-canvas); box-shadow: none; }
+:root .input { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
+:root .searchIcon { flex-basis: var(--polish-icon-control); }

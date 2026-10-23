@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listIntegerInRange } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputJsonBoundary } from '../lib/input-errors.js';
@@ -164,8 +165,7 @@ function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof MergedPersonError) {
     return fail(c, error.status, error.code, { error: error.message }, mergedPersonErrorFields(c, error.code));
   }
-  logger.error("routes_merged_people_failed");
-  return fail(c, 500, 'INTERNAL_ERROR', { error: '統合ユーザーを処理できませんでした' });
+  throw error;
 }
 
 async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
@@ -183,22 +183,16 @@ async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
     && hasMergedPersonHistory(c.env.DB, tenantId(c), id);
 }
 
-function positiveInt(value: string | undefined, fallback: number, max: number): number | null {
-  if (value === undefined || value === '') return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 && parsed <= max ? parsed : null;
-}
-
 mergedPeople.get('/api/friends/people', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const limit = positiveInt(c.req.query('limit'), 20, 100);
-    const offset = positiveInt(c.req.query('offset'), 0, 100_000);
+    const limit = listIntegerInRange(c.req.query('limit'), 20, 0, 100);
+    const offset = listIntegerInRange(c.req.query('offset'), 0, 0, 100_000);
     if (limit === null || limit < 1 || offset === null) {
       return c.json({ success: false, error: 'ページ位置が正しくありません', code: 'INVALID_PAGINATION' }, 400);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
     const data = await listMergedPeople(c.env.DB, tenantId(c), scope.allowedAccountIds, limit, offset);
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }

@@ -5,13 +5,14 @@ import { observeElementResize } from './element-resize-observer'
 import type { ReactNode } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import styles from './segmented.module.css'
+import { SlidingIndicator } from './sliding-indicator'
 import { useFieldContext } from './field-context'
 
 /**
  * 切り替え（3つ）（Pencil ★V8 `dtJVi`）。
  *
  * 灰色（shell）の器の中に項目を並べ、選んだものへ白いつまみが
- * 前の位置から滑って着く（120ms）。左右の矢印キーでも移せる。
+ * 前の位置から滑って着く（200ms）。左右の矢印キーでも移せる。
  * 「期間：7日/30日/90日」や「表示：表/カード」など、2〜4つの
  * 排他的な切り替えに使う。
  */
@@ -63,7 +64,7 @@ export default function SegmentedControl<T extends string>({
   const bad = invalid || field?.invalid
   const rootRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const [thumb, setThumb] = useState({ left: 0, width: 0 })
+  const [thumb, setThumb] = useState({ left: 0, width: 0, selection: value })
 
   const selectedIndex = Math.max(0, options.findIndex((o) => o.value === value))
 
@@ -73,15 +74,14 @@ export default function SegmentedControl<T extends string>({
 
   // Observe option geometry as well as the root: labels/counts can change at fixed root width.
   useLayoutEffect(() => {
-    if (appearance !== 'track') return
     let active = true
     const key = {}
     const read = () => {
       const item = itemRefs.current[selectedIndex]
       if (!active || !item) return () => {}
-      const next = { left: item.offsetLeft, width: item.offsetWidth }
+      const next = { left: item.offsetLeft, width: item.offsetWidth, selection: options[selectedIndex]?.value ?? value }
       return () => {
-        if (!active || (thumbRef.current.left === next.left && thumbRef.current.width === next.width)) return
+        if (!active || (thumbRef.current.left === next.left && thumbRef.current.width === next.width && thumbRef.current.selection === next.selection)) return
         thumbRef.current = next
         setThumb(next)
       }
@@ -106,6 +106,7 @@ export default function SegmentedControl<T extends string>({
   useLayoutEffect(() => { queueMeasure.current() }, [options, selectedIndex, appearance, size, className, disabled, equalWidth, fit, bad])
 
   const onKeyDown = (event: React.KeyboardEvent) => {
+    if (disabled || options.length === 0) return
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     event.preventDefault()
     const delta = event.key === 'ArrowRight' ? 1 : -1
@@ -117,6 +118,7 @@ export default function SegmentedControl<T extends string>({
   return (
     <div
       data-segmented-control
+      data-sliding={thumb.width > 0 || undefined}
       ref={rootRef}
       id={id ?? field?.controlId}
       data-invalid={bad || undefined}
@@ -131,11 +133,7 @@ export default function SegmentedControl<T extends string>({
       data-segmented-fit={fit}
       onKeyDown={onKeyDown}
     >
-      {appearance === 'track' ? <span
-        className={styles.thumb}
-        style={{ transform: `translateX(${thumb.left}px)`, width: thumb.width }}
-        aria-hidden="true"
-      /> : null}
+      <SlidingIndicator className={styles.thumb} left={thumb.left} width={thumb.width} selection={thumb.selection} />
       {options.map((option, index) => (
         <button
           key={option.value}
@@ -147,6 +145,7 @@ export default function SegmentedControl<T extends string>({
           className={[styles.item, option.value === value ? styles.selected : null]
             .filter(Boolean)
             .join(' ')}
+          data-part={appearance === 'track' ? 'joined-segment' : undefined}
           aria-label={option.ariaLabel}
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}

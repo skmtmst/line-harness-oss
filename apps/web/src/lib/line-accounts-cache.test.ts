@@ -5,8 +5,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+
+
 const list = vi.hoisted(() => vi.fn())
-vi.mock('./api', () => ({ api: { lineAccounts: { list } } }))
+
 
 import { clearLineAccountsCache, loadLineAccounts, prefetchLineAccounts } from './line-accounts-cache'
 
@@ -14,16 +16,23 @@ const ok = { success: true as const, data: [{ id: 'acc-1' }] }
 
 describe('アカウント一覧の共有', () => {
   beforeEach(() => {
+    localStorage.setItem('lh_csrf', 'fixture-session')
     clearLineAccountsCache()
     list.mockReset()
     list.mockResolvedValue(ok)
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const url = new URL(input)
+      if (url.pathname === '/api/staff/me') return new Response(JSON.stringify({ success: true, data: { id: 'me' } }))
+      return new Response(JSON.stringify(await list()))
+    }))
   })
-  afterEach(() => vi.restoreAllMocks())
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
   it('同時に来た要求は1本にまとめ、同じ答えを返す', async () => {
     const [a, b] = await Promise.all([loadLineAccounts(), loadLineAccounts()])
     expect(list).toHaveBeenCalledTimes(1)
-    expect(a).toBe(b)
+    expect(a).toEqual(b)
+    expect(a).not.toBe(b)
   })
 
   it('プリフェッチに載せる側が相乗りする（確認と並列）', async () => {

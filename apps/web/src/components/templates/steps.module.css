@@ -1,22 +1,20 @@
 /*
  * ★V8 の手順（共通部品 Fa8ED・決まりの板 q1xNMz。2026-10-08 オーナー）。
- * 寸法は app/globals.css の :root の --tpl-steps-*（丸22・名13・線24×1.5・間8・丸と名8）。
+ * 横の手順は丸を等間隔に並べ、名前を丸の下で中央にそろえる。
  * 1行を守る：折り返さず、入らない幅では各名を省略し全文はtitleに残す。
  */
 .root {
   display: block;
   width: 100%;
   min-width: 0;
-  overflow: hidden;
 }
 
 .list {
   display: flex;
-  width: max-content;
+  width: 100%;
   max-width: 100%;
   flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--tpl-steps-gap);
+  align-items: flex-start;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -24,16 +22,18 @@
 }
 
 .item {
+  position: relative;
   display: flex;
-  flex: 0 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   align-items: center;
-  gap: var(--tpl-steps-gap);
 }
 
 .line {
-  flex: 0 0 auto;
-  width: var(--tpl-steps-line-w);
+  position: absolute;
+  top: calc((var(--tpl-steps-dot) - var(--tpl-steps-line-h)) / 2);
+  left: calc(-50% + var(--tpl-steps-dot) / 2 + var(--tpl-steps-gap));
+  width: calc(100% - var(--tpl-steps-dot) - var(--tpl-steps-gap) * 2);
   height: var(--tpl-steps-line-h);
   background: var(--color-divider);
 }
@@ -44,7 +44,8 @@
 
 .step {
   display: inline-flex;
-  flex: 0 1 auto;
+  width: 100%;
+  flex-direction: column;
   align-items: center;
   gap: var(--tpl-steps-dot-gap);
   min-height: 0;
@@ -55,12 +56,12 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  text-align: left;
+  text-align: center;
 }
 
 button.step {
   cursor: pointer;
-  border-radius: var(--radius-pill);
+  border-radius: var(--polish-radius-small);
 }
 
 button.step:hover .name {
@@ -87,13 +88,14 @@ button.step:focus-visible {
 }
 
 .dot[data-step-dot='done'] {
-  background: var(--color-accent-deep);
-  color: var(--color-on-accent);
+  background: var(--color-selection-bg);
+  color: var(--color-accent-deep);
 }
 
 .dot[data-step-dot='current'] {
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  background: var(--color-canvas);
+  color: var(--color-accent-deep);
+  box-shadow: inset 0 0 0 2px var(--color-accent-deep);
 }
 
 .dot[data-step-dot='todo'] {
@@ -114,10 +116,11 @@ button.step:focus-visible {
 }
 
 .name {
+  max-width: calc(100% - var(--tpl-steps-gap));
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--color-ink);
+  color: var(--color-ink-secondary);
   font-size: var(--tpl-steps-text-size);
   font-weight: 400;
   line-height: var(--tpl-steps-text-lh);
@@ -125,6 +128,7 @@ button.step:focus-visible {
 }
 
 .name[data-step-name='current'] {
+  color: var(--color-ink);
   font-weight: 600;
 }
 
@@ -144,10 +148,8 @@ button.step:focus-visible {
   border: 0;
 }
 
-.root[data-connector-size='short'] { --tpl-steps-line-w: var(--tpl-msg-composer-step-line-w); --tpl-steps-dot-gap: var(--tpl-msg-composer-step-gap); }
+.root[data-connector-size='short'] { --tpl-steps-dot-gap: var(--tpl-msg-composer-step-gap); }
 
-/* ：今の番号は緑の面＋白い数字。 */
-.dot[data-step-dot='current'] { background: var(--color-selection-border); color: var(--color-on-accent); }
 
 .sectionHead { display: flex; align-items: center; gap: var(--polish-space-field); min-width: 0; }
 .sectionNumber { display: inline-flex; align-items: center; justify-content: center; width: var(--space-24); height: var(--space-24); border-radius: var(--radius-large); background: var(--color-shell); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; flex-shrink: 0; }
@@ -213,3 +215,5 @@ button.step:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.summaries { display: flex; flex-direction: column; gap: var(--polish-space-field); margin-top: var(--polish-space-card); }

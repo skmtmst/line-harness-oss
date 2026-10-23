@@ -798,7 +798,7 @@ export default function HqBroadcastCreate() {
 
   return (
     <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><>
-      <CreatePage boardId="BBRDb" dirty={false}
+      <CreatePage step={stepIndex} boardId="BBRDb" dirty={false}
         footerActions={(
           <>
             {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
@@ -820,7 +820,7 @@ export default function HqBroadcastCreate() {
         status={draftLabel}
          title={<>一括配信を作る</>} headingSize="compact"
         help="送るアカウントを選び、配信対象・メッセージ・送信設定を確かめてから配信します。下書きの保存では、友だちへ送信しません。"
-        steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></>}
+        steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} summaries={{ basic: title.trim(), audience: `${chosen.length}アカウント`, message: `${bubbles.length}通`, schedule: sendWhenLabel ?? '未設定' }} /></>}
         >
         {error ? (
           <Notice
@@ -839,7 +839,7 @@ export default function HqBroadcastCreate() {
             この一括配信はもう送った（予約した）ので直せません。新しく作るときは、送るアカウントと中身を入れてください。
           </Notice>
         ) : null}
-        {draftState === 'error' ? <Notice tone="danger" role="alert">下書きを読み込めませんでした。一括配信の一覧から開き直してください。</Notice> : null}
+        {draftState === 'error' ? <Notice tone="danger" role="alert" action={<Link href="/hq/broadcasts">一括配信へ →</Link>}>下書きを読み込めませんでした。一括配信の一覧から開き直してください。</Notice> : null}
 
 
             {/* ① 基本設定（lmWCZ） */}

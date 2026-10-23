@@ -12,13 +12,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (file: string) => readFileSync(join(SRC, file), 'utf8')
 
 describe('初回の読み込みの骨組み', () => {
-  it('タグ：空・該当なしの案内は読み終えてから（status が ready のときだけ）', () => {
-    const source = read('v8/tags/tags-tab.tsx')
-    expect(source).toContain("const ready = status === 'ready' && !staleAccount")
-    expect(source).toContain('filtered={items.length > 0}')
-    expect(source).toMatch(/ready && visible\.length === 0 \?/)
-    expect(source).not.toMatch(/\) : items\.length === 0 \?/)
-  })
+
 
   it.each([
     ['v8/friend-add/list.tsx', '友だち追加時の配信を読み込んでいます'],

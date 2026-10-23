@@ -95,7 +95,7 @@ afterEach(async () => {
 async function mountReady(overrides: Record<string, unknown> = {}) {
   mockConnector.mockResolvedValue({ success: true, data: overview(overrides) })
   render(<><ToastHost /><ConnectorPanel accountId="account-a" /></>)
-  await screen.findByRole('button', { name: '設定を保存する' })
+  await screen.findByLabelText('ショップのアドレス')
 }
 
 describe('#948 N-320: 影響件数の明示とやり直し規定の常時表示', () => {
@@ -167,6 +167,7 @@ describe('#948 N-326: 保存を送れない理由を表示する', () => {
 
   it('鍵が未設定のつなぎ先では、32文字未満の理由を出す', async () => {
     await mountReady({ connector: { secretConfigured: false, secretLastFour: null, secretUpdatedAt: null } })
+    fireEvent.change(screen.getByLabelText('つなぐための鍵'), { target: { value: 'short' } })
     const save = screen.getByRole('button', { name: '設定を保存する' }) as HTMLButtonElement
     fireEvent.click(save)
     expect(mockUpdate).not.toHaveBeenCalled()

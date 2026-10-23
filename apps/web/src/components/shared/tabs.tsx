@@ -4,6 +4,7 @@ import { ErrorCountBadge } from './error-count-badge'
 import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
 import { observeElementResize } from './element-resize-observer'
 import styles from './tabs.module.css'
+import { SlidingIndicator } from './sliding-indicator'
 
 export interface TabItem {
   /** 対応するパネルから参照するタブの ID。 */
@@ -87,12 +88,11 @@ export function Tabs({
   }
 
   /*
-   * ★V8 仕上げ（M10）：選ばれている下線が滑って移る（120ms）。
-   * 今のタブの下に動く印を置く。折り返すタブやサーバ描画・タブ無しでは
-   * 枠線の下線が出る。
+   * 選択したタブの段へ共通FLIPで下線を移す（200ms）。
+   * 測定前やサーバ描画では、選択したタブの枠線を下線として出す。
    */
   const itemsRef = useRef<HTMLSpanElement>(null)
-  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
+  const [indicator, setIndicator] = useState<{ left: number; top: number; width: number; selection: number } | null>(null)
   const currentKey = items.findIndex((item) => item.current)
   const itemWidthsKey = JSON.stringify(items.map(({ label, count, countTone, errorCount }) => [label, count, countTone, errorCount]))
   const indicatorRef = useRef(indicator)
@@ -101,16 +101,12 @@ export function Tabs({
   useLayoutEffect(() => {
     let active = true
     const key = {}
-    const commit = (next: { left: number; width: number } | null) => {
+    const commit = (next: { left: number; top: number; width: number; selection: number } | null) => {
       const previous = indicatorRef.current
       if (!active || (previous === null && next === null)
-        || (previous !== null && next !== null && previous.left === next.left && previous.width === next.width)) return
+        || (previous !== null && next !== null && previous.left === next.left && previous.width === next.width && previous.selection === next.selection && previous.top === next.top)) return
       indicatorRef.current = next
       setIndicator(next)
-    }
-    if (wrap) {
-      commit(null)
-      return () => { active = false }
     }
     const read = () => {
       if (!active) return () => {}
@@ -121,7 +117,7 @@ export function Tabs({
       const tabBox = current.getBoundingClientRect()
       // A hidden copy has no usable geometry; retain the last visible underline until it reopens.
       if (listBox.width === 0 || tabBox.width === 0) return () => {}
-      const next = { left: tabBox.left - listBox.left, width: tabBox.width }
+      const next = { left: tabBox.left - listBox.left, top: Number.isFinite(tabBox.bottom - listBox.bottom) ? tabBox.bottom - listBox.bottom : 0, width: tabBox.width, selection: Array.from(list.querySelectorAll('[role="tab"]')).indexOf(current) }
       return () => commit(next)
     }
     const update = () => { if (active) scheduleMeasurement(key, read) }
@@ -157,11 +153,7 @@ export function Tabs({
         onKeyDown={moveFocus}
       >
         {sliding ? (
-          <span
-            aria-hidden="true"
-            className={styles.indicator}
-            style={{ width: indicator.width, transform: `translateX(${indicator.left}px)` }}
-          />
+          <SlidingIndicator className={styles.indicator} left={indicator.left} top={indicator.top} width={indicator.width} selection={indicator.selection} />
         ) : null}
         {items.map((item, index) => (
           // 選択中のタブに Tab キーで入れるようにする（roving tabindex）。

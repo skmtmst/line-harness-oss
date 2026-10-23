@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import { extractContactFormReceipt, paginateSupportInboxItems } from './support-inbox.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import type { Env } from '../worker-env.js';
+import { extractContactFormReceipt, paginateSupportInboxItems, supportInbox } from './support-inbox.js';
 
 describe('paginateSupportInboxItems', () => {
   it('5件表示で6件目を2ページ目に出す', () => {
@@ -44,9 +46,45 @@ ECサイトのお問い合わせフォームから送信しています。`);
 });
 
 describe('support inbox assignee contract', () => {
-  it('担当者は顧客usersではなく有効なstaff_membersで確認する', () => {
-    const source = readFileSync(new URL('./support-inbox.ts', import.meta.url), 'utf8');
-    expect(source).toContain('SELECT 1 FROM staff_members WHERE id = ? AND is_active = 1');
-    expect(source).not.toContain('SELECT 1 FROM users WHERE id = ?');
+  it.each([
+    ['active-staff', 200, 'active-staff', 2],
+    ['inactive-staff', 400, null, 1],
+    ['customer-only', 400, null, 1],
+    ['unknown', 400, null, 1],
+  ] as const)('担当を%sへ変更したとき、有効な担当者だけを保存する', async (staffId, status, assigned, revision) => {
+    const db = createTestD1();
+    try {
+      db.raw.exec(`
+        INSERT INTO staff_members (id, name, api_key, role, is_active) VALUES
+          ('owner', '管理者', 'fixture-owner', 'owner', 1),
+          ('active-staff', '有効な担当者', 'fixture-active', 'staff', 1),
+          ('inactive-staff', '無効な担当者', 'fixture-inactive', 'staff', 0);
+        INSERT INTO users (id, display_name) VALUES ('customer-only', '顧客');
+        INSERT INTO support_email_threads
+          (id, customer_email, subject, normalized_subject, status, revision, last_message_at, last_incoming_at, created_at, updated_at)
+        VALUES ('thread', 'customer@example.test', '相談', '相談', 'unread', 1,
+          '2026-10-22', '2026-10-22', '2026-10-22', '2026-10-22');
+      `);
+      const app = new Hono<Env>();
+      app.use('*', async (c, next) => {
+        c.set('staff', { id: 'owner', name: '管理者', role: 'owner', readOnly: false });
+        await next();
+      });
+      app.route('/', supportInbox);
+      const response = await app.request('/api/support/email/threads/thread/assignee', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ staffId, revision: 1 }),
+      }, { DB: db.db } as Env['Bindings']);
+
+      expect(response.status).toBe(status);
+      expect(db.raw.prepare('SELECT assigned_staff_id, revision FROM support_email_threads WHERE id = ?')
+        .get('thread')).toEqual({ assigned_staff_id: assigned, revision });
+      if (status === 400) {
+        expect(await response.json()).toMatchObject({ success: false, error: '担当者が見つかりません' });
+      }
+    } finally {
+      db.raw.close();
+    }
   });
 });

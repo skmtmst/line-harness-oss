@@ -102,3 +102,17 @@ it('単独の進みの棒は範囲外や非数の値を収め、読み上げ名�
   rerender(<ProgressBar value={62.5} label="配信の進み" />)
   expect(bar.getAttribute('aria-valuenow')).toBe('62.5')
 })
+
+it.each([false, true])('reduce=%sでも連続更新は値を先に描き、棒の幅を変えない', reduced => {
+  vi.stubGlobal('matchMedia', () => ({ matches: reduced }))
+  try {
+    const view = render(<ProgressBar value={10} label="進み" />)
+    const bar = screen.getByRole('progressbar', { name: '進み' })
+    for (const value of [60, 15, 100]) {
+      view.rerender(<ProgressBar value={value} label="進み" />)
+      expect(bar.getAttribute('aria-valuenow')).toBe(String(value))
+      expect((bar.firstElementChild as HTMLElement).style.transform).toBe(`scaleX(${value / 100})`)
+      expect((bar.firstElementChild as HTMLElement).style.width).toBe('')
+    }
+  } finally { vi.unstubAllGlobals() }
+})

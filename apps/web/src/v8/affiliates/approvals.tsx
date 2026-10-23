@@ -452,7 +452,7 @@ export default function ApprovalsTab() {
             const needsReview = reasons.length > 0
             const pending = item.approvalStatus === 'pending'
             return (
-              <Tr key={item.eventId} data-table-layout="columns" onOpen={() => setDetailItem(item)}>
+              <Tr selected={selected.has(item.eventId)} key={item.eventId} data-table-layout="columns" onOpen={() => setDetailItem(item)}>
                 <Td className={styles.colCheck}>
                   {canSelect ? (
                     <SaveErrorField names={[`pagedItems.${saveFieldIndex}.eventId`,`pagedItems.${saveFieldIndex}.event_id`,"eventId","item.eventId","selected","event_id","id","item.event_id"]}><Checkbox

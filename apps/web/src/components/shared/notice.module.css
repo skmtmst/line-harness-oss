@@ -208,3 +208,21 @@
     grid-row: 1;
   }
 }
+
+/* 窓内の注意・結果は丸い淡色の印と文字。意味と読み上げの役割を保つ。 */
+html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) .notice {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  gap: var(--polish-space-row);
+}
+html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) .notice .icon {
+  box-sizing: content-box;
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+  padding: var(--space-6);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, currentColor 9%, transparent);
+}
+
+:root .action > a { white-space: nowrap; color: var(--color-action); font-weight: 600; }

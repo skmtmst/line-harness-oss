@@ -236,8 +236,7 @@ analyticsExports.post(
       c.set('outputAudit', { count: (fresh ?? job).row_count, accountId: account.accountId, targetId: job.id, phase: 'requested' });
     return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 202);
     } catch (error) {
-      logger.error("analytics_export_create_failed");
-      return c.json({ success: false, error: '書き出しを始められませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -258,8 +257,7 @@ analyticsExports.get(
       }
       return c.json({ success: true, data: exportJobJson(job) });
     } catch (error) {
-      logger.error("analytics_export_status_failed");
-      return c.json({ success: false, error: '書き出しの状態を確認できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -298,8 +296,7 @@ analyticsExports.get(
         },
       });
     } catch (error) {
-      logger.error("analytics_export_download_failed");
-      return c.json({ success: false, error: 'ダウンロードできませんでした' }, 500);
+      throw error;
     }
   },
 );

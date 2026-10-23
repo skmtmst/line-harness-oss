@@ -230,7 +230,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
                   <tr><td colSpan={5} className={styles.stateCell}><ListState kind="loading" title="読み込んでいます" /></td></tr>
                 ) : u.rows.length === 0 ? (
                   <tr><td colSpan={5} className={styles.stateCell}>
-                    <ListState kind="empty" title="条件に合う人はいません" description="検索や絞り込みを外すと、すべて出ます。" />
+                    <ListState kind="empty" emptyPreset={u.q || u.onlyDups || u.account || u.uid ? 'filtered' : 'readonly'} title={u.q || u.onlyDups || u.account || u.uid ? '条件に合う人はいません' : 'まだ友だちがいません'} description={u.q || u.onlyDups || u.account || u.uid ? '検索や絞り込みを外すと、すべて出ます。' : 'LINEで友だちになった人がここに並びます。'} action={u.q || u.onlyDups || u.account || u.uid ? <Button onClick={() => { u.setQ(''); u.setOnlyDups(false); u.setAccount(''); u.setUid(''); u.setPage(1) }}>条件を外す</Button> : undefined} />
                   </td></tr>
                 ) : u.rows.flatMap((row) => {
                   const personId = mergedPersonIdOf(row)

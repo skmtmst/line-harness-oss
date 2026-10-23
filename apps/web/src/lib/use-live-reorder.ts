@@ -42,14 +42,19 @@ const reducedMotion = () =>
  * 並びが変わったとき、各行を前の位置から今の位置へ滑らせる（FLIP）。
  * 行には `data-reorder-id` を付ける。動きを減らす設定では動かさない。長さは --motion-base。
  */
-export function useFlipRows(containerRef: RefObject<HTMLElement | null>, orderKey: string): void {
+export function useFlipRows(containerRef: RefObject<HTMLElement | null>, orderKey: string, scopeKey = ''): void {
   const positions = useRef(new Map<string, number>())
+  const previousScope = useRef(scopeKey)
+  const animations = useRef<Animation[]>([])
   useLayoutEffect(() => {
+    animations.current.forEach(animation => animation?.cancel())
+    animations.current = []
     const container = containerRef.current
-    if (!container) return
+    if (!container) { positions.current.clear(); return }
     const rows = [...container.querySelectorAll<HTMLElement>('[data-reorder-id]')]
     const next = new Map<string, number>()
-    const animate = !reducedMotion() && typeof HTMLElement.prototype.animate === 'function'
+    const sameRows = rows.length === positions.current.size && rows.every(row => positions.current.has(row.dataset.reorderId ?? ''))
+    const animate = previousScope.current === scopeKey && sameRows && !reducedMotion() && typeof HTMLElement.prototype.animate === 'function'
     const duration = animate
       ? Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--motion-base')) || 0
       : 0
@@ -61,8 +66,11 @@ export function useFlipRows(containerRef: RefObject<HTMLElement | null>, orderKe
       if (!animate || before === undefined || duration <= 0) continue
       const delta = before - top
       if (Math.abs(delta) < 1) continue
-      row.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }], { duration, easing: 'cubic-bezier(0.2, 0, 0, 1)' })
+      const animation = row.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }], { duration, easing: 'cubic-bezier(0.2, 0, 0, 1)' })
+      if (animation) animations.current.push(animation)
     }
     positions.current = next
-  }, [containerRef, orderKey])
+    previousScope.current = scopeKey
+  }, [containerRef, orderKey, scopeKey])
+  useLayoutEffect(() => () => { animations.current.forEach(animation => animation?.cancel()) }, [])
 }

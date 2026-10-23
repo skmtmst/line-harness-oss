@@ -2,6 +2,7 @@
 
 import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
+import { useListSnapshot } from './use-list-snapshot'
 import ListState from '@/components/shared/list-state'
 import { LIST_REQUEST_TIMEOUT_MS } from '@/lib/request-timeout'
 import { classifyApiFailure } from '@/components/shared/api-error-message'
@@ -65,7 +66,7 @@ export function serverListStateView({
   error,
   retry,
 }: StateViewInput): ReactElement | null {
-  if (loading && itemCount === 0) return createElement(ListState, { kind: 'loading' })
+  if (loading && !loaded && itemCount === 0) return createElement(ListState, { kind: 'loading' })
   // m23m: 捕まえた失敗をそのまま渡す。403 は権限の案内・再試行なし、
   // 429 は待ち案内になる（ListState の `error` が言い分ける）。
   if (error) return createElement(ListState, { kind: 'error', error, onRetry: retry })
@@ -102,9 +103,9 @@ export function useOffsetServerList<T>({
   requestTimeoutMs?: number
 }) {
   const [navigation, setNavigation] = useState({ requestKey, page: 1 })
-  const [state, setState] = useState<LoadState<T>>(() => initialState(initialLimit))
   const [retryVersion, setRetryVersion] = useState(0)
   const page = navigation.requestKey === requestKey ? navigation.page : 1
+  const { value: state, setValue: setState } = useListSnapshot<LoadState<T>>(JSON.stringify([requestKey, page, initialLimit]), initialState(initialLimit))
   /*
    * URL のページは最初に描けた一覧にだけ使う。読み込んだ直後は絞り込みの値も
    * URL から入ってきて requestKey が一度変わるので、その切り替えでは
@@ -125,9 +126,8 @@ export function useOffsetServerList<T>({
       setNavigation({ requestKey, page: keep ?? 1 })
       if (pageUrlKey && keep === null) writeListUrlParam(pageUrlKey, '')
       /*
-       * ★管理画面 sTJsh §2: 条件の切り替えでも前の一覧を消さない。
-       * 新しい答えが来るまで、いま出ている行・件数・ページ番号を
-       * 残したまま読み直す（画面側は薄め＋上の線で伝える）。
+       * 条件の切り替えでは、スナップショットの鍵で旧行と旧件数を隠す。
+       * 同じ条件の再取得だけ、いまの行と件数を残して読み直す。
        */
       setState((current) => ({ ...current, loading: true, error: null }))
       return
@@ -135,9 +135,8 @@ export function useOffsetServerList<T>({
 
     const controller = new AbortController()
     /*
-     * 前の一覧を残したまま読み直す（★管理画面 sTJsh §2）。行が出ているときは
-     * 消さず、画面側が `refreshing` で薄め＋線の帯を出す。行が無いときは
-     * ListState の読み込み表示が従来どおり出る。
+     * 同じ条件で行が出ているときは残し、画面側へ `refreshing` を渡す。
+     * 未取得の条件では ListState の読み込み表示を出す。
      */
     setState((current) => ({ ...current, loading: true, error: null }))
     /*
@@ -178,7 +177,7 @@ export function useOffsetServerList<T>({
       clearTimeout(timeout)
       controller.abort()
     }
-  }, [initialLimit, load, navigation.requestKey, page, requestKey, requestTimeoutMs, retryVersion])
+  }, [initialLimit, load, navigation.requestKey, page, requestKey, requestTimeoutMs, retryVersion, setState])
 
   const setPage = useCallback((nextPage: number) => {
     const safePage = Number.isSafeInteger(nextPage) && nextPage > 0 ? nextPage : 1
@@ -196,10 +195,9 @@ export function useOffsetServerList<T>({
     setPage,
     retry,
     /*
-     * 前の表示を残した読み直し中（★管理画面 sTJsh §2）。一覧を薄めて
-     * 上に線の帯を出す合図。初回・0件からの読み込みでは立たない。
+     * 同じ条件の行を残した読み直し中。画面側の RefreshCover へ渡す。
      */
-    refreshing: state.loading && state.items.length > 0,
+    refreshing: state.loading && state.loaded,
     stateView: serverListStateView({
       loaded: state.loaded,
       loading: state.loading,
@@ -221,7 +219,7 @@ export function useCursorServerList<T>({
   initialLimit?: number
 }) {
   const [activeKey, setActiveKey] = useState(requestKey)
-  const [state, setState] = useState<LoadState<T>>(() => initialState(initialLimit))
+  const { value: state, setValue: setState } = useListSnapshot<LoadState<T>>(requestKey, initialState(initialLimit))
   const [retryVersion, setRetryVersion] = useState(0)
   const requestId = useRef(0)
   const activeController = useRef<AbortController | null>(null)
@@ -259,7 +257,7 @@ export function useCursorServerList<T>({
     } finally {
       if (activeController.current === controller) activeController.current = null
     }
-  }, [initialLimit, load])
+  }, [initialLimit, load, setState])
 
   useEffect(() => () => activeController.current?.abort(), [])
 
@@ -289,7 +287,7 @@ export function useCursorServerList<T>({
 
   return {
     ...state,
-    refreshing: state.loading && state.items.length > 0,
+    refreshing: state.loading && state.loaded,
     hasNext: Boolean(state.nextCursor),
     loadNext,
     retry,

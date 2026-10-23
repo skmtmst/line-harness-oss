@@ -1,26 +1,13 @@
 import { responseApiError } from './errors'
-import { getCsrfToken, API_URL } from './session'
+import { API_URL, apiReadScope } from './session'
 import { fetchApi } from './request'
 import { adminSessionHeaders } from '../../admin-session'
 import { fetchWithNetworkMessage, extractApiErrorCode } from './errors'
+import { apiReadCacheGeneration, canonicalApiPath, synchronizeApiReadScope } from './read-cache'
 
-const sharedReads = new Map<string, Promise<unknown>>()
-
-/** 同時に出る請求表示だけ共有する。完了後は捨て、保存後の読み直しは必ず通信する。 */
+/** 互換口。取得中の共有と短い再利用は共通の GET 処理が所有する。 */
 export function fetchSharedRead<T>(path: string): Promise<T> {
-  const csrf = getCsrfToken()
-  // Cookie だけでセッションの世代が分からない場合は共有しない。
-  if (!csrf) return fetchApi<T>(path)
-  const key = JSON.stringify([path, adminSessionHeaders(), csrf])
-  let pending = sharedReads.get(key)
-  if (!pending) {
-    pending = fetchApi<T>(path)
-    sharedReads.set(key, pending)
-    const forget = () => { if (sharedReads.get(key) === pending) sharedReads.delete(key) }
-    pending.then(forget, forget)
-  }
-  // 呼び出し側で表示用に並べ替え・加工しても、もう一方の表示へ伝えない。
-  return (pending as Promise<T>).then((response) => structuredClone(response))
+  return fetchApi<T>(path)
 }
 
 /**
@@ -28,28 +15,45 @@ export function fetchSharedRead<T>(path: string): Promise<T> {
  *
  * - readCachedList：覚えている分だけすぐ返す（無いときは null）。画面はこちらを先に出す。
  * - refreshCachedList：ETag を付けて取り直す。変わっていなければ 304 で覚えていた分を返す。
- * 覚えるのは本文と ETag だけ。秘密値・個人情報を鍵や値に混ぜない（path をそのまま鍵にする）。
+ * 本文と ETag はタブ内だけ。通常の GET と同じ認証・店舗・失効の世代で区別する。
  */
 const listCache = new Map<string, { etag: string | null; body: unknown }>()
+let listGeneration = -1
+
+function listCacheKey(path: string): string {
+  const scope = apiReadScope()
+  synchronizeApiReadScope(scope.key)
+  const generation = apiReadCacheGeneration()
+  if (listGeneration !== generation || !scope.identified) listCache.clear()
+  listGeneration = generation
+  return JSON.stringify([scope.key, generation, canonicalApiPath(path)])
+}
 
 export function readCachedList<T>(path: string): T | null {
-  return (listCache.get(path)?.body ?? null) as T | null
+  return structuredClone(listCache.get(listCacheKey(path))?.body ?? null) as T | null
 }
 
 export async function refreshCachedList<T>(path: string): Promise<T> {
-  const cached = listCache.get(path)
+  const key = listCacheKey(path)
+  const cached = listCache.get(key)
+  // 明示の再検証が失敗したら、前の成功を新しい答えとして残さない。
+  listCache.delete(key)
   const headers: Record<string, string> = { ...adminSessionHeaders() }
   if (cached?.etag) headers['If-None-Match'] = cached.etag
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     credentials: 'include',
     headers,
   })
-  if (res.status === 304 && cached) return cached.body as T
+  if (res.status === 304 && cached) {
+    if (key === listCacheKey(path)) listCache.set(key, cached)
+    return structuredClone(cached.body) as T
+  }
   if (!res.ok) {
     const raw = await res.text()
     throw responseApiError(res, raw, extractApiErrorCode(raw), undefined)
   }
   const body = (await res.json()) as T
-  listCache.set(path, { etag: res.headers.get('ETag'), body })
-  return body
+  const failed = body && typeof body === 'object' && 'success' in body && body.success === false
+  if (!failed && key === listCacheKey(path)) listCache.set(key, { etag: res.headers.get('ETag'), body })
+  return structuredClone(body)
 }

@@ -4,11 +4,11 @@ import { pathToFileURL } from 'node:url'
 import postcss from 'postcss'
 
 export const RULE_VALUES = {
-  '--color-badge-neutral-bg': '#94a3b81a', '--color-badge-neutral': '#475569',
-  '--color-badge-success-bg': '#16a34a1a', '--color-badge-success': '#087a3e',
-  '--color-badge-warning-bg': '#f973161a', '--color-badge-warning': '#c2410c',
-  '--color-badge-danger-bg': '#ef44441a', '--color-badge-danger': '#b91c1c',
-  '--color-badge-info-bg': '#2563eb1a', '--color-badge-info': '#1d4ed8',
+  '--color-badge-neutral-bg': '#ffffff', '--color-badge-neutral': '#1d1d1f',
+  '--color-badge-success-bg': '#ffffff', '--color-badge-success': '#1d1d1f',
+  '--color-badge-warning-bg': '#ffffff', '--color-badge-warning': '#c2410c',
+  '--color-badge-danger-bg': '#ffffff', '--color-badge-danger': '#b91c1c',
+  '--color-badge-info-bg': '#ffffff', '--color-badge-info': '#1d1d1f',
   '--text-body': '13px', '--text-label': '12px', '--text-caption': '12px',
   '--radius-segment': '10px', '--color-table-head': '#f7f8fa',
   '--color-focus-ring': '#2563eb',
@@ -70,7 +70,7 @@ export const RULE_BINDINGS = [
   ['tag-pill', ".pill[data-size]", 'height', '--tpl-tag-pill-h'],
   ['dialog', ".title", 'font-size', '--tpl-dialog-title-size'],
   ['dialog', ".title", 'font-weight', '--tpl-dialog-title-weight'],
-  ['dialog', ".panel", 'box-shadow', '--shadow-controls-pop'],
+  ['dialog', ".panel", 'box-shadow', '--polish-window-shadow'],
   ['drawer', ".panel.panel .title", 'font-size', '--tpl-dialog-title-size'],
   ['drawer', ".panel.panel .title", 'font-weight', '--tpl-dialog-title-weight'],
   ['folder-editor-dialog', ".label", 'font-size', '--tpl-field-label-size'],

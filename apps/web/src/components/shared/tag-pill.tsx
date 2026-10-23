@@ -19,6 +19,10 @@ export interface TagPillProps {
   onRemove?: () => void
 }
 
+export function TagColorDot({ color }: Pick<TagPillProps, 'color'>) {
+  return <span className={styles.dot} style={color ? { backgroundColor: color } : undefined} aria-hidden="true" />
+}
+
 function TagName({ name, color, folderName }: Pick<TagPillProps, 'name' | 'color' | 'folderName'>) {
   const folderLabel = folderName === undefined ? undefined : `フォルダ：${folderName}`
   return <>

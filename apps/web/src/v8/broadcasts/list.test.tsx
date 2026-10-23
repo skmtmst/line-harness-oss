@@ -434,23 +434,23 @@ it('配信日の共通入口から期間を指定し、選択表示と解除を�
   expect(trigger.getAttribute('aria-pressed')).toBe('false')
   act(() => { trigger.click() })
   expect(trigger.getAttribute('aria-expanded')).toBe('true')
-  act(() => { (host.querySelector('button[aria-label="配信日（開始）"]') as HTMLButtonElement).click() })
+  act(() => { (document.querySelector('button[aria-label="配信日（開始）"]') as HTMLButtonElement).click() })
   await flush()
   const month = document.querySelector('[role="grid"]')!.getAttribute('aria-label')!.match(/(\d+)年(\d+)月/)!
   const prefix = `${month[1]}-${month[2].padStart(2,'0')}`
   const chooseDay = (day:string) => ([...document.querySelectorAll<HTMLButtonElement>('[role="grid"] button:not([data-outside])')].find(button=>button.textContent===day)!).click()
   act(() => { chooseDay('1') })
-  act(() => { (host.querySelector('button[aria-label="配信日（終了）"]') as HTMLButtonElement).click() })
+  act(() => { (document.querySelector('button[aria-label="配信日（終了）"]') as HTMLButtonElement).click() })
   await flush()
   act(() => { chooseDay('2') })
   await flush()
   expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({from:`${prefix}-01`,to:`${prefix}-02`}))
   expect(trigger.getAttribute('aria-pressed')).toBe('true')
-  act(() => { buttonByText('外す')!.click() })
+  act(() => { ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === '外す')!).click() })
   await flush()
   expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({from:undefined,to:undefined}))
   expect(trigger.getAttribute('aria-pressed')).toBe('false')
-  act(() => { buttonByText('閉じる')!.click() })
+  act(() => { ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === '閉じる')!).click() })
   expect(trigger.getAttribute('aria-expanded')).toBe('false')
 })
 it('保存した検索の送信済み・表示件数・古い順も復元する', async () => {
@@ -516,6 +516,8 @@ it('選んだ配信だけを、確認後にその版のままフォルダへ移�
   act(() => root.render(<BroadcastListV8 />))
   await flush()
   act(() => fireEvent.click(host.querySelector('input[aria-label="8月キャンペーンのお知らせを選ぶ"]')!))
+  expect(host.querySelector('[data-row-id="bc-1"]')?.getAttribute('aria-selected')).toBe('true')
+  expect(host.querySelector('[data-row-id="bc-2"]')?.getAttribute('aria-selected')).toBe('false')
   const move = [...document.querySelectorAll('button')].find(button => button.textContent?.trim() === 'フォルダへ移す')!
   act(() => fireEvent.click(move))
   expect(updateBroadcast).not.toHaveBeenCalled()
@@ -526,4 +528,97 @@ it('選んだ配信だけを、確認後にその版のままフォルダへ移�
   await flush()
   expect(updateBroadcast.mock.calls).toEqual([['bc-1', { folderId: 'campaign', expectedVersion: 7 }]])
   expect(document.querySelector('[role="dialog"]')).toBeNull()
+})
+
+it('並び順の読み直しでは行と件数を残し、状態条件の切替では旧行を隠す', async () => {
+  resetUrl()
+  act(() => root.render(<BroadcastListV8 />))
+  await flush()
+  let resolve!: (value: unknown) => void
+  listBroadcasts.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+  act(() => fireEvent.click(host.querySelector('[aria-label="並び"]')!))
+  act(() => fireEvent.click([...document.querySelectorAll('[role="option"]')].find(el => el.textContent?.includes('古い順'))!.querySelector('button')!))
+  await flush()
+  expect(host.querySelector('[data-row-id="bc-1"]')).not.toBeNull()
+  expect(host.querySelector('[aria-busy="true"]')).not.toBeNull()
+  await act(async () => resolve({ success: true, data: [rowB, base], pagination: { total: 2 } }))
+  await flush()
+  listBroadcasts.mockImplementationOnce(() => new Promise(() => {}))
+  act(() => buttonByText('下書き')?.click())
+  await flush()
+  expect(host.querySelector('[data-row-id="bc-1"]')).toBeNull()
+})
+
+async function confirmDraftDeletion() {
+  const trigger = host.querySelector<HTMLButtonElement>('tr[data-row-id="bc-2"] button[aria-haspopup="menu"]')!
+  act(() => { trigger.focus(); trigger.click() })
+  const remove = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent?.includes('削除する'))!
+  act(() => remove.click())
+  await flush()
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(button => button.textContent === '削除する')!
+  act(() => confirm.click())
+  await flush()
+}
+
+it('削除成功後にだけ150ms薄め、次の行へ焦点を移し、再取得失敗を削除失敗にしない', async () => {
+  resetUrl()
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame'] })
+  try {
+    let resolveDelete!: (value: { success: boolean; data: null }) => void
+    deleteBroadcast.mockImplementationOnce(() => new Promise(resolve => { resolveDelete = resolve }))
+    act(() => root.render(<BroadcastListV8 />))
+    await flush()
+    await confirmDraftDeletion()
+    expect(host.querySelector('tr[data-row-id="bc-2"]')?.hasAttribute('data-leaving')).toBe(false)
+    listBroadcasts.mockRejectedValueOnce(new Error('reload failed'))
+    await act(async () => resolveDelete({ success: true, data: null }))
+    await flush()
+    expect(host.querySelector('tr[data-row-id="bc-2"]')?.getAttribute('data-leaving')).toBe('true')
+    await act(async () => vi.advanceTimersByTime(20))
+    expect(document.activeElement?.closest('tr')?.getAttribute('data-row-id')).toBe('bc-1')
+    await act(async () => vi.advanceTimersByTime(129))
+    expect(host.querySelector('tr[data-row-id="bc-2"]')).not.toBeNull()
+    await act(async () => vi.advanceTimersByTime(1))
+    await flush()
+    expect(document.body.textContent).toContain('一斉配信を読み込めませんでした')
+    expect(document.body.textContent).not.toContain('この配信を削除できませんでした')
+    expect(document.querySelector('[role="alertdialog"]:not([aria-hidden="true"])')).toBeNull()
+  } finally { vi.useRealTimers() }
+})
+
+it('削除失敗は行と確認窓を残し、動きを減らす設定の成功は待たずに行を外す', async () => {
+  resetUrl()
+  deleteBroadcast.mockRejectedValueOnce(new Error('delete failed'))
+  act(() => root.render(<BroadcastListV8 />))
+  await flush()
+  await confirmDraftDeletion()
+  expect(host.querySelector('tr[data-row-id="bc-2"]')?.hasAttribute('data-leaving')).toBe(false)
+  expect(document.body.textContent).toContain('この配信を削除できませんでした')
+  vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: query.includes('prefers-reduced-motion'), addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList)
+  listBroadcasts.mockImplementationOnce(() => new Promise(() => {}))
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(button => button.textContent === '削除する')!
+  act(() => confirm.click())
+  await flush()
+  expect(host.querySelector('tr[data-row-id="bc-2"]')).toBeNull()
+  expect(host.querySelector('tr[data-row-id="bc-1"]')).not.toBeNull()
+  vi.restoreAllMocks()
+})
+
+it('行が消える途中で別の絞り込みを選んでも、古い条件を読み直さない', async () => {
+  resetUrl()
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    act(() => root.render(<BroadcastListV8 />))
+    await flush()
+    await confirmDraftDeletion()
+    expect(host.querySelector('tr[data-row-id="bc-2"]')?.hasAttribute('data-leaving')).toBe(true)
+    const draft = buttonByText('下書き 3')!
+    act(() => draft.click())
+    await flush()
+    const reads = listBroadcasts.mock.calls.length
+    expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ displayStatus: 'draft' }))
+    await act(async () => vi.advanceTimersByTime(150))
+    await flush()
+    expect(listBroadcasts).toHaveBeenCalledTimes(reads)
+  } finally { vi.useRealTimers() }
 })

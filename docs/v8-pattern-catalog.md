@@ -150,6 +150,8 @@
 <a id="kpi-band"></a>
 ## kpi-band 数の帯
 
+- 数字は共通値の34px・500・行40、上下16。数値の範囲・使用数／上限・9桁以上の金額等がある帯は、共通KpiBandが2列へ分け、数字・単位を省略しない（2026-10-23の指定寸法を保つための共通側の対応）。
+
 - **役目**：数（KPI）を線で区切った1本の帯で並べる
 - **補足**：Gの最新版に従い、既定は文節で折り返す。`detailLayout="single"` は1行＋省略で全文を `title` に残し、`qualifier` は括弧の前で改行する。行き先は次の行。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
 - **持ち主（コード）**：`apps/web/src/components/shared/kpi-band.tsx`・`apps/web/src/components/shared/kpi-card.tsx`・`apps/web/src/components/shared/kpi-card.module.css`・`apps/web/src/components/shared/kpi-band-v8.css`・`apps/web/src/components/shared/list-kpis.tsx`（部品 `KpiBand`・`KpiCard`・`ListKpis`）
@@ -288,7 +290,7 @@
 ## row-menu 行の右端「…」
 
 - **役目**：行の操作を右端の「…」1つにまとめる
-- **持ち主（コード）**：`apps/web/src/components/shared/row-actions.tsx`・`apps/web/src/components/shared/row-actions.module.css`・`apps/web/src/components/shared/action-menu.tsx`・`apps/web/src/components/shared/action-menu.module.css`（部品 `RowMenu`・`MoreAction`・`RowActions`・`RowAction`・`RowQuickAction`）
+- **持ち主（コード）**：`apps/web/src/components/shared/row-actions.tsx`・`apps/web/src/components/shared/row-actions.module.css`・`apps/web/src/components/shared/action-menu.tsx`・`apps/web/src/components/shared/action-menu.module.css`（部品 `RowMenu`・`MoreAction`・`RowActions`・`RowAction`・`RowQuickAction`・`RowStatusActions`）
 - **持ち主（Pen）**：`hnuY9`「その他操作メニュー」
   - 部品の板の html に書き出されていない ID：`hnuY9`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
 - **見つけ方（コード）**：
@@ -356,8 +358,10 @@
 <a id="dialog"></a>
 ## dialog 窓（確かめ・編集）
 
-- **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
+- **役目**：確かめ・編集・選ぶを共通の窓で出す。短い確認は説明から操作まで24px・区切り線なし、作成・長い入力の窓は線を保つ。共通Dialogが確認用途と本文・手順の有無で判別する（2026-10-23オーナー決定B）。
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
+  - 窓の頭の任意の印は `Dialog.headerIcon`・`ConfirmDialog.headerIcon`・`Drawer.headerIcon`。淡い色の丸へ置き、説明は既存の `description` で題の下に出す。標準の頭には既定の線の印を補い、`false` なら省く。固定高さの頭には既定の印を足さない。危険な操作の `titleIcon` は独立して保つ。明るい面・角16・柔らかい影・薄い背景と軽いぼかしは共通値、開閉はtransformとopacityのみ。
+  - 窓の閉じる印は薄い線の丸、取消の副操作は窓内だけ薄灰の塗り。フォームのまとまりは `DialogContentRow` の `tone="muted"` とフォルダ編集の共通部品が持ち、画面側で装飾を足さない。
   - 入力行：`shared/dialog-form-row.tsx` の `DialogFormRow` に既存の `Field` を渡す。独立した入力を本文幅へそろえ、保存・エラーは呼び出し側のまま保つ。
   - チェック・未設定情報の行：同じファイルの `DialogContentRow` に共通 `Checkbox` または名前・操作を渡す。チェック後も行の薄い線を保ち、未設定情報は `tone="muted"` の灰色の面で1行にまとめる。
   - 公開前の宛先：`shared/dialog-recipient-list.tsx` の `DialogRecipientList` へ実際の名前・役割・共通の通知方法の札を渡す。通常一覧の固定行高を持たず、役割を読めない時は「—」。
@@ -366,7 +370,7 @@
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
   - 確認の実行を左、取消を中央に分ける場合は `confirmPlacement="start"`。通常の文字幅は `actionWidthReserve="idle"` で指定し、既定の結果文の幅予約は保つ。
   - 独自の処理を持つ窓でも操作は `DialogActions` に渡す。`footerAlign` だけを指定して本文にボタンを直置きしない。
-  - 読む変数：`--radius-panel`・`--shadow-float`・`--card-edge`
+  - 読む変数：`--polish-radius-dialog`・`--polish-window-*`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
 - **見つけ方（コード）**：
   - raw-dialog：`role=["']dialog["']|aria-modal=|<dialog\b` — 窓を手書き
@@ -425,6 +429,8 @@
 
 <a id="select"></a>
 ## select プルダウン（許される範囲）
+
+- 浮く面の位置・はみ出し・押した角からの開きは共通 `shared/menu-portal` と同CSSが持つ。絞り込みの入力と操作を置く面は `shared/filter-popover`。画面は入力・解除・閉じる操作だけを渡す。内側の日付候補はEscで先に閉じ、外側の面は残す。
 
 - **役目**：数が決まっていて少ない選択（種類・並び・期間・件数・役割など7個まで）だけ
 - **持ち主（コード）**：`apps/web/src/components/shared/select.tsx`・`apps/web/src/components/shared/select.module.css`・`apps/web/src/components/shared/select-menu.tsx`・`apps/web/src/components/shared/select-menu.module.css`・`apps/web/src/components/shared/menu-portal.tsx`（部品 `Select`・`SelectMenu`）
@@ -549,6 +555,7 @@
 - **10-12の追加（F組・B-260）**：`CreatePage`の`contentDisabled`／`contentLabel`で本文をネイティブfieldsetにする。余白と段間は型が持ち、保存中・比較中・閲覧のみの入力をまとめて止める。通知と下の帯はfieldsetの外へ渡す。レポート作成の動作試験で保存・失敗・競合・権限を保つ。
 
 - **10-12の変わり形（F組・B-260）**：同じ入力欄の前後に固定文字を置く`AffixedTextField`は`text-field.tsx`／`text-field.module.css`が持つ。値は入力部分だけ、前後の文字は保存しない。Fieldの必須・誤り・説明・フォーカスと同じ契約を保つ。画面で別の枠や焦点の輪を作らない。
+- 招待のメール欄は `shared/email-chip-field.tsx`。既存の TextField・Chip を使い、Enter・貼り付け・欄から離れる操作で1件を札にする。複数件は切り捨てず入力に残して理由を示す。送信値・名前・権限は画面が持つ。
 - 言葉を足す欄は `shared/keyword-input.tsx`。枠と検索印は `AffixedTextField`、幅は既存の言葉入力用の値を使う。Enter・カンマ・離れる操作で確定し、日本語の変換中は確定しない。条件や重複の判断は画面が渡す。
 
 - **10-12の色選択の変わり形（F組）**：固定色をその場で選ぶ欄は`FolderColorButton`の`appearance="palette"`。丸は24px、選んだ色に輪。保存色が候補外でも現在色の選択を出す。色の名前・選択・矢印キーは同じ正本が持つ。既定のフォルダ色メニューは保つ。
@@ -597,6 +604,8 @@
 
 <a id="tabs"></a>
 ## tabs タブ
+
+- 選択の下線と切り替えの背景は共通 `shared/sliding-indicator` が動かす。寸法を一度だけ更新し、選び直しは現在位置からtransformで200ms。初回・同じ選択の幅調整・動きを減らす設定では即時。
 
 - **役目**：中身を切り替える。?tab= と router.replace
 - **持ち主（コード）**：`apps/web/src/components/shared/tabs.tsx`・`apps/web/src/components/shared/tabs.module.css`・`apps/web/src/components/layout/scrollable-tabs.tsx`・`apps/web/src/components/layout/merged-tabs.tsx`（部品 `Tabs`・`ScrollableTabs`・`MergedTabs`）
@@ -718,7 +727,7 @@
 ## customer-info 顧客情報の欄
 
 - **役目**：受信箱の右の欄と友だちの詳細の概要の左を同じ部品で（段ごとの見出し＋編集・決まった8つの欄・タグ・マイル…）
-- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`）。マイルの数・記録・再試行は`customer-info-mileage.tsx`・同CSS。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
+- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`・左右のスクロール余白をそろえる `CustomerInfoViewport`）。マイルの数・記録・再試行は`customer-info-mileage.tsx`・同CSS。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
 - **持ち主（Pen）**：`GBTyR`「顧客情報の欄（B-167）」
   - 2026-10-11確認：両画面の入口は別でも欄の持ち主は CustomerInfoPanel。取得・保存・権限は呼び出す側が渡す。
   - 部品の板の html に書き出されていない ID：`GBTyR`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
@@ -828,6 +837,8 @@
 <a id="primary-button"></a>
 ## primary-button 主ボタン・ボタン
 
+- 設定行の操作は `Button` の `presentation="row-action"`（白地・欄と同じ細枠）。注意行は `textTone="accent"` で緑の枠と文字。札と操作の並びは `RowStatusActions` が中央と操作幅をそろえる。通常の副操作は灰色を保つ（2026-10-23オーナー）。
+
 - **役目**：主＝文字の幅・高さ36・濃い緑の縁＋カードの影・角丸8。言葉は「〇〇を作る」「〜する」
 - **持ち主（コード）**：`apps/web/src/components/shared/button.tsx`・`apps/web/src/components/shared/button.module.css`・`apps/web/src/components/shared/icon-button.tsx`・`apps/web/src/components/shared/icon-button.module.css`（部品 `Button`・`IconButton`）
   - 読む変数：`--card-shadow`・`--radius-control`
@@ -906,6 +917,8 @@
 
 <a id="steps"></a>
 ## steps 手順
+
+- 完了した入力の要約は `Steps.summaries`。変える口は既存の `onSelect` へ渡す。現在・未完の段には要約を出さない。方向の動きは同じ持ち主の `StepContent` と `CreatePage.step` / `CreateStepColumns.step`。入力を作り直さず transform だけを150ms動かし、動きを減らす設定では即時に替える。
 
 - **役目**：題のすぐ下・左寄せ・1行。済みの段だけ押して戻れる
 - **持ち主（コード）**：`apps/web/src/components/templates/steps.tsx`・`apps/web/src/components/templates/steps.module.css`（部品 `Steps`）
@@ -1135,3 +1148,18 @@
 - 固定分類は `shared/category-panel.tsx` の `CategoryPanel`。フォルダ管理の追加・変更・削除を持たず、既存の分類を選ぶ。操作と直前の知らせを本文列の下端に置く場合は `StickyBarRegion`。
 - 友だち一覧の表は `DataTable cellPresentation="friends"`。チェック・注目・操作の端の余白は共通セルの `columnKind`、ひな形の通常セルは `Td presentation="template-plain"`。
 - LIFFの見出し・欄の失敗・切替は `apps/liff/src/components/ui/` の `PageHeading`・`FieldError`・`Button variant="switch"`。監査は実際の読み込み先を照合し、生の手書きと部品の上書きは引き続き止める。
+
+## ログの記録とカレンダーの期間移動
+
+- ログの中身とコピーは `shared/log-entry-details.tsx` の `LogEntryDetails` / `LogEntryCopy`。時刻・相手・結果・表示用の理由だけを渡し、本文・URL・秘密値・生のエラーを渡さない。コピーは既存 `CopyTextButton` の固定幅と失敗時の手動選択を使い、成功の印は1600ms。
+- カレンダーの期間移動は `shared/calendar-period.tsx` の `CalendarPeriod`。日付順のキーで方向を決め、transformだけを共通200msで動かす。初回・同期間の再取得・表示方式の切替では動かさず、次の移動で前の動きを中断し、動きを減らす設定では即時表示する。
+- 月の日付は `shared/month-calendar` が今日（文字・aria-current）と選択（枠・aria-selected）を分ける。空き枠は既存 `BookingSlot` の表示を保ち、閲覧のみには変更操作を出さない。
+- 見張り：`log-entry-details.test.tsx`、`calendar-period.test.tsx`、既存の月表示・予約枠・ログの権限と再実行の試験。
+
+## 予約の状態・種類・現在時刻（2026-10-23）
+
+- 持ち主：`shared/booking-controls.tsx` の BookingBlock、`shared/booking-state.ts` と同CSS、`shared/booking-presentation.tsx`。札・一覧の状態・凡例は同じ面を使う。来店中は濃い緑と白字、確定は白と細線、終了は灰。要対応（承認待ち）は赤の2px点線、期限付きの仮押さえは灰の点線、無断キャンセルは薄赤と赤の2px実線。予約の重なりの要対応は薄赤と赤い点線、注意は薄琥珀。状態は文字でも伝える。
+- 種類の色：BookingCategoryとReservationSourceは既存TagPillのTagColorDotを名前の前へ置く。丸は装飾、名前は文字。経路を札の地色へ混ぜない。BookingNowLineは中間の灰の線と、同じ灰に白字の時刻の札。
+- 使用先：ReservationBoard（時間×卓・一覧・月）、ReservationPeopleGrid、CalendarTimeEntries、スタイル別StaffBoard。月の日付の今日／選択と空き枠の操作は既存の口を保つ。
+- 短い札の高さは `shared/use-calendar-time-scale.ts` が時間軸全体の倍率で確保する。CalendarTimeEntriesは既定のカレンダー軸、StaffBoardは `board` の軸を使い、隣の予約へ札を伸ばさない。
+- 見張り：`booking-presentation.test.tsx` と既存の予約の移動・失敗・権限・印刷・日付選択の操作試験。絵との合否は司令塔が判定する。

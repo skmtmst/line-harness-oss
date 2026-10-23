@@ -12,7 +12,7 @@ import { getFormById, type FormSubmitClaimScope, getFormAccountIds, getFormDelet
 
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
-import { listLimit, listPage } from './list-pagination.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -79,7 +79,7 @@ export const post__api_forms_id_archive_1 = async (c: Context<Env, "/api/forms/:
       },
     });
   } catch (error) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.forms_id_archive_post_failed");
     return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
   }
 };
@@ -139,7 +139,7 @@ export const post__api_forms_id_unarchive_2 = async (c: Context<Env, "/api/forms
       },
     });
   } catch (error) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.forms_id_unarchive_post_failed");
     return c.json({ success: false, error: '回答フォームを元に戻せませんでした' }, 503);
   }
 };
@@ -189,7 +189,7 @@ export const delete__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) 
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.forms_id_delete_failed");
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 };
@@ -284,8 +284,9 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
       data: await Promise.all(submissions.map(async row => ({ ...serializeSubmission(row, postActions.get(row.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(row.data), c.get('staff')?.role, row.id) }))),
     });
   }
-  const page = listPage(c.req.query('page'));
-  const limit = listLimit(c.req.query('limit'), 20);
+  const { page, limit } = parseOffsetPaging(
+    { page: c.req.query('page'), limit: c.req.query('limit') }, { defaultLimit: 20 },
+  );
   // N-171/N-179: 一覧・件数・CSV が同じ検索条件になるよう、検索語をページング前に渡す。
   const search = (c.req.query('q') ?? '').trim().slice(0, 200) || undefined;
   const [submissions, summary] = await Promise.all([
@@ -304,14 +305,12 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
   const postActions = await describePostActionsForSubmissions(c.env.DB, submissions.items, form);
   return c.json({
     success: true,
-    data: {
-      items: await Promise.all(submissions.items.map(async row => ({ ...serializeSubmission(row, postActions.get(row.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(row.data), c.get('staff')?.role, row.id) }))),
+    data: buildOffsetListResponse({ items: await Promise.all(submissions.items.map(async row => ({ ...serializeSubmission(row, postActions.get(row.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(row.data), c.get('staff')?.role, row.id) }))),
       total: submissions.total,
       page: submissions.page,
       limit: submissions.limit,
       summary,
-      period,
-    },
+      period, paging: { limit: submissions.limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
   });
 };
 
@@ -430,7 +429,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
           await failFormSubmitClaim(c.env.DB, scope, owner, taken.version);
         }
       } catch (error) {
-        logger.error("routes_forms_failed");
+        logger.error("forms.forms_id_submissions_submission_id_retry_effects_post_failed");
       }
       return missing;
     },
@@ -519,7 +518,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
         } catch (error) {
           if (error instanceof ClaimOwnershipLost) throw error;
           // 届かなくても残りの記録へ進む。未完のまま残して次の再実行に託す。
-          logger.error("routes_forms_failed");
+          logger.error("forms.forms_id_submissions_submission_id_retry_effects_post_failed");
         }
       }
       // 回答行はある(この口は回答idから入る)。記録だけ揃える。
@@ -547,7 +546,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
           submission.destination_write_failed = 0;
           recorded = true;
         } catch (error) {
-          logger.error("routes_forms_failed");
+          logger.error("forms.forms_id_submissions_submission_id_retry_effects_post_failed");
         }
         if (recorded) await claimHandle.checkpoint('destination_status');
       }

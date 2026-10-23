@@ -111,7 +111,7 @@ export function renderValueFields({ canWrite, expiryBehavior, fallbackFieldError
         <div className={styles.sideFields}>
           {canWrite ? (
             <SaveErrorField names={["expiryBehavior","saved","expiry_behavior"]}><Select
-              size="full"
+              size="content"
               aria-label="期間外の動き"
               id="cv-expiry-behavior"
               value={expiryBehavior}

@@ -38,8 +38,7 @@ export const get__api_conversions_events_id_attribution_1 = async (c: Context<En
       },
     });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -146,8 +145,7 @@ export const patch__api_conversions_events_id_approval_2 = async (c: Context<Env
 
     return c.json({ success: true, data: { id: c.req.param('id'), approvalStatus: parsed.status } });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -219,7 +217,7 @@ export const post__api_conversions_approvals_bulk_3 = async (c: Context<Env, "/a
               continue;
             }
           } catch (err) {
-            logger.error("routes_conversions_failed");
+            logger.error("conversions.conversions_approvals_bulk_post_failed");
             result.failed.push({ id: itemId, error: '案件の動作を実行できませんでした' });
             continue;
           }
@@ -228,13 +226,12 @@ export const post__api_conversions_approvals_bulk_3 = async (c: Context<Env, "/a
       } catch (err) {
         // m22u R353: 途中の失敗で全体を500にしない。処理済み・失敗の一覧を
         // 必ず返し、一部だけ承認済みのまま黙って止まらないようにする。
-        logger.error("routes_conversions_failed");
+        logger.error("conversions.conversions_approvals_bulk_post_failed");
         result.failed.push({ id: itemId, error: '処理できませんでした。もう一度お試しください' });
       }
     }
     return c.json({ success: true, data: result });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

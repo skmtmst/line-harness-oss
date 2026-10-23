@@ -5,14 +5,14 @@
  * helper 本体が 503 を日本語へ変えることは
  * staff-save-503-wording-contract.test.ts が本物で守る。
  * ここでは「保存catch が messageOf ではなく describeSaveFailure を通り、
- * その結果が確認窓と下の帯の両方に出て、生の API error:503 が出ない」
+ * その結果が確認窓に1回出て、閉じたあとは本文へ残り、生の API error:503 が出ない」
  * ことだけを守る。409/step-up/部分権限/idempotency/再試行は触らない。
  */
 import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { StaffMember } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
@@ -125,7 +125,7 @@ afterEach(() => {
 })
 
 describe('R497-SAVE-WORDING 保存503の配線', () => {
-  test('503の保存失敗は確認窓と下の帯にヘルパーの案内を出し、生文を出さない', async () => {
+  test('503の保存失敗は確認窓に1回知らせ、閉じたあとも案内を残す', async () => {
     await act(async () => { render(<StaffPage />) })
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /の中身を見る$/ })).toBeTruthy()
@@ -150,9 +150,12 @@ describe('R497-SAVE-WORDING 保存503の配線', () => {
       fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
     await waitFor(() => {
-      // 確認窓と下の帯の両方にヘルパーの案内が出る。
-      expect(screen.getAllByText('保存案内（ヘルパー経由）')).toHaveLength(2)
+      // 確認窓の前面で一度だけ知らせる。
+      expect(screen.getAllByText('保存案内（ヘルパー経由）')).toHaveLength(1)
     })
+    fireEvent.click(within(screen.getByRole('dialog', { name: /見せる範囲を保存しますか/ })).getByRole('button', { name: 'キャンセル' }))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('保存案内（ヘルパー経由）'))
+    expect(screen.getAllByText('保存案内（ヘルパー経由）')).toHaveLength(1)
     // 生の API error:503 はどこにも出ない。
     expect(screen.queryByText(/API error:/)).toBeNull()
     // helper に 503 が渡っている（messageOf 直出しではない）。

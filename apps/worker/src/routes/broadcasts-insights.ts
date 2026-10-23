@@ -178,7 +178,7 @@ export const post__api_broadcasts_id_fetch_insight_2 = async (c: Context<Env, "/
         aggMedia += (overview.uniqueMediaPlayed as number) ?? 0;
         if (messages && messages.length > 0) hasAnyData = true;
       } catch (err) {
-        logger.error("routes_broadcasts_failed");
+        logger.error("broadcasts.broadcasts_id_fetch_insight_post_failed");
         responses.push({ accountId: aid, data: { error: String(err) } });
       }
     }
@@ -401,7 +401,7 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
            VALUES (?, ?, 'outgoing', ?, ?, NULL, 'test', 'broadcast', ?)`
       ).bind(crypto.randomUUID(), friend.id, part.messageType, part.messageContent, now)));
     } catch (err) {
-      logger.error("routes_broadcasts_failed");
+      logger.error("broadcasts.broadcasts_id_test_send_post_failed");
       failed++;
     }
   }
@@ -537,7 +537,7 @@ export const post__api_segments_count_5 = async (c: Context<Env, "/api/segments/
 
     return c.json({ success: true, count: result?.count ?? 0 });
   } catch (err) {
-    logger.error("routes_broadcasts_failed");
+    logger.error("broadcasts.segments_count_post_failed");
     return inputError(c, { success: false, error: 'Invalid segment conditions' }, 400, ["conditions"]);
   }
 };

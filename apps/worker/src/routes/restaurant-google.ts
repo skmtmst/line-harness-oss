@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
@@ -461,8 +462,7 @@ export function googleErrorResponse(c: Context<Env>, error: unknown) {
         return fail(c, 502, 'Googleとの通信に失敗しました', { code: error.kind });
     }
   }
-  logger.error("routes_restaurant_google_failed");
-  return fail(c, 500, '予期しないエラーが発生しました');
+  throw error;
 }
 
 export async function requireConnectedStore(c: Context<Env>): Promise<{ store: StoreContext; connection: ConnectionRow } | Response> {
@@ -791,7 +791,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     return c.redirect(adminReturnUrl(c, lineAccountId, 'connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
-    logger.error("routes_restaurant_google_failed");
+    logger.error("restaurant_google.restaurant_test_google_oauth_callback_list_failed");
     await writeLog(c, store.id, { kind: stateRow.mode, result: 'failed', error: code });
     return c.redirect(adminReturnUrl(c, lineAccountId, `error:${code}`));
   }
@@ -955,8 +955,8 @@ restaurantGoogle.get('/api/restaurant-test/google/reviews', async (c) => {
   const rating = Number.parseInt(c.req.query('rating') ?? '', 10);
   const order = c.req.query('order') ?? 'newest';
   const q = (c.req.query('q') ?? '').trim();
-  const page = Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1);
-  const perPage = Math.min(REVIEWS_PAGE_SIZE_MAX, Math.max(1, Number.parseInt(c.req.query('per_page') ?? '20', 10) || 20));
+  const page = Math.max(1, listQueryNumber(c.req.query('page'), 1, { format: 'integer-prefix' }) || 1);
+  const perPage = Math.min(REVIEWS_PAGE_SIZE_MAX, Math.max(1, listQueryNumber(c.req.query('per_page'), 20, { format: 'integer-prefix' }) || 20));
 
   const where: string[] = ['store_id = ?'];
   const binds: unknown[] = [store.id];
@@ -983,14 +983,13 @@ restaurantGoogle.get('/api/restaurant-test/google/reviews', async (c) => {
     .bind(...binds, perPage, (page - 1) * perPage)
     .all<ReviewRow>();
   const connection = await connectionFor(c, store.id);
-  return c.json({
-    success: true,
-    reviews: rows.results.map(publicReview),
+  const responseItems = rows.results.map(publicReview);
+  return c.json(buildOffsetListResponse({ success: true,
+    reviews: responseItems,
     page,
     perPage,
     total: total?.n ?? 0,
-    connection: publicConnection(connection),
-  });
+    connection: publicConnection(connection), items: responseItems, paging: { limit: perPage }, sort: [] }));
 });
 
 restaurantGoogle.get('/api/restaurant-test/google/reviews/:id', async (c) => {
@@ -1050,7 +1049,7 @@ export async function runReplyDraftAi(c: Context<Env>, prompt: { system: string;
       });
     } catch (error) {
       // 鍵やモデルの設定ちがい・混雑・時間切れで画面が止まらないよう、Workers AI で作り直す。
-      logger.error("routes_restaurant_google_failed");
+      logger.error("restaurant_google.run_reply_draft_ai_failed");
       if (!c.env.AI) throw error instanceof OpenAITextError && error.kind === 'timeout' ? new GoogleAiTimeout() : error;
     }
   }
@@ -1091,7 +1090,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
     text = await runReplyDraftAi(c, prompt);
   } catch (error) {
     const timedOut = error instanceof GoogleAiTimeout || (error instanceof OpenAITextError && error.kind === 'timeout');
-    logger.error("routes_restaurant_google_failed");
+    logger.error("restaurant_google.restaurant_test_google_reviews_by_id_draft_generate_create_failed");
     return fail(c, timedOut ? 504 : 502, 'AIの下書き作成に失敗しました。もう一度お試しください', { code: timedOut ? 'ai_timeout' : 'ai_failed' });
   }
   const validated = validateReplyText(text);

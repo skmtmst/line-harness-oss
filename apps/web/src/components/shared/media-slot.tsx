@@ -275,6 +275,7 @@ export default function MediaSlot({
   const error = errorProp || ownError
   const interactive = !readOnly && !disabled && !busy && canFile
   const compact = size === 'compact'
+  const dropHint = compact ? 'またはクリック' : 'またはクリックしてファイルをアップロード'
   const noun = NOUN[kind]
   const formats = formatNamesOf(accept)
   const legacyMax = limitText?.match(/([\d.]+)\s*(?:MB|MiB|メガバイト)/)?.[1]
@@ -491,10 +492,10 @@ export default function MediaSlot({
           limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{compact ? limit : `（${limit}）`}</span> : null
         ) : (
           <>
-            <span className={styles.desc}>
+            <span className={`${styles.desc} ${styles.dropHint}`} title={`ドラッグ＆ドロップ ${dropHint}`}>
               ドラッグ＆ドロップ
               <br />
-              {compact ? 'またはクリック' : 'またはクリックしてファイルをアップロード'}
+              {dropHint}
             </span>
             {limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{compact ? limit : `（${limit}）`}</span> : null}
           </>

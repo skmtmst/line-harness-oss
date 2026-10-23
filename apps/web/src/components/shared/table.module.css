@@ -10,7 +10,7 @@
   padding: 0 12px;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 500;
+  font-weight: var(--polish-weight-label);
   white-space: nowrap;
   text-align: left;
   vertical-align: middle;
@@ -81,7 +81,7 @@
   margin-top: 4px;
   padding: 8px 16px;
   border-radius: var(--radius-control);
-  color: var(--color-accent-deep);
+  color: var(--color-ink);
   font-size: var(--text-label);
   font-weight: 600;
   text-decoration: underline;
@@ -141,7 +141,7 @@
 :root .headRow[data-presentation='embedded'] .cell {
   height: var(--tpl-ev-fr-head-h);
   padding: 0 var(--tpl-cell-gap-half);
-  font-weight: 600;
+  font-weight: var(--polish-weight-label);
 }
 /* 端の列は行の端の余白（--tpl-row-pad-side）にそろえる。見出しだけ内側にずれていた。 */
 :root .headRow[data-presentation='embedded'] .cell:first-child { padding-left: var(--tpl-row-pad-side); }
@@ -168,3 +168,8 @@ html:root button.rowNameLink.rowNameLink[aria-pressed='true'] { background: none
 
 html:root .person { display: flex; align-items: center; gap: var(--space-8); min-width: 0; width: 100%; flex-wrap: nowrap; }
 html:root .personName { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* 見出しは白い地と下線だけ。名前は本文より一段強くする。 */
+:root .headRow { border-top: 0; border-bottom: 1px solid var(--color-divider); background: var(--color-canvas); }
+:root .headRow .cell { font-size: var(--polish-text-support); font-weight: var(--polish-control-weight); }
+:root .name, html:root button.rowNameLink { font-weight: var(--polish-value-weight); }

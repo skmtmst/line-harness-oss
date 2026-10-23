@@ -2,7 +2,9 @@
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { CalendarPerson, CalendarTimeEntries, calendarTimeRange, useCalendarTimeScale } from '@/components/shared/calendar-parts'
+import { BookingLegend } from '@/components/shared/booking-presentation'
 import MonthCalendarGrid from '@/components/shared/month-calendar'
+import CalendarPeriod from '@/components/shared/calendar-period'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import StatusBadge from '@/components/shared/status-badge'
@@ -46,12 +48,13 @@ export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 
         <span className={styles.grow} />
         <span className={styles.calLegend}><i data-k="booked" />予約<i data-k="free" />空き<i data-k="off" />休み</span>
       </div>
-      <div className={styles.weekFrame}>
+      <BookingLegend/>
+      <CalendarPeriod period={week.days[0]?.date ?? ''} scope={period}><div className={styles.weekFrame}>
         <div className={styles.weekHead}>
           <span className={styles.boardTimeHead} />
           {week.days.map((d) => (
-            <div key={d.date} className={styles.weekDay} data-today={d.today || undefined}>
-              <strong>{d.label}</strong><span>{d.sub}</span>
+            <div key={d.date} className={styles.weekDay} data-today={d.today || undefined} aria-current={d.today ? 'date' : undefined}>
+              <strong>{d.label}</strong><span>{d.today ? `今日・${d.sub}` : d.sub}</span>
             </div>
           ))}
         </div>
@@ -59,7 +62,7 @@ export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 
           {hours.map((h) => <div key={h} className={styles.boardLine} style={{ insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${toMin(h) / 60 - axis.from} + var(--tpl-sd-board-top))` }}><span className={styles.boardHour}>{h.padStart(5, '0')}</span></div>)}
           {week.days.map((d, i) => <span key={d.date} className={styles.boardDivider} data-closed={d.closed || undefined} style={{ insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${week.days.length} * ${i})`, inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${week.days.length})` }}>{d.closed ? <span className={styles.closedLabel}>定休日</span> : null}</span>)}
         </CalendarTimeEntries>
-      </div>
+      </div></CalendarPeriod>
     </section>
   )
 }

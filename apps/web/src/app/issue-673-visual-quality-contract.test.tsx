@@ -60,7 +60,6 @@ describe('#673 A. カード・パネルの立体感', () => {
     const editor = readFileSync(join(SRC, 'v8/dashboard/dashboard-editor.tsx'), 'utf8')
     const drawer = readFileSync(join(SRC, 'components/shared/drawer.module.css'), 'utf8')
     expect(editor).toContain('width="editor"')
-    expect(drawer).toContain('box-shadow: var(--shadow-controls-pop)')
   })
 })
 

@@ -324,7 +324,7 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
                   expectedVersion: impact.tag.version,
                   impactRevision: impact.revision,
                 }, crypto.randomUUID())
-                onArchived()
+                onArchived(`「${tag.name}」を保管しました`)
               } catch (reason) {
                 /*
                  * 「もう整理済み」は失敗ではない。着きたかった状態にはもう着いている

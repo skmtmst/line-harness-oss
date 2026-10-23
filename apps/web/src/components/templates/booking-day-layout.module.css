@@ -1,6 +1,6 @@
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-booking-aside-width); min-width: 0; }
 .main { min-width: 0; }
-.content { min-width: 0; padding: var(--polish-space-card) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
+.content { min-width: 0; padding: var(--space-12) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
 .aside { min-width: 0; border-left: 1px solid var(--color-hairline); }
 .launcher { display: none; }
 .sidebarSection { min-width: 0; padding: var(--polish-space-card); border-bottom: 1px solid var(--color-hairline); font-size: var(--text-caption); }

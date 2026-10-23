@@ -246,7 +246,6 @@ export default function Select({
     >
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
       <Trigger
-        size={iconOnly ? 'compact' : undefined}
         ref={triggerRef}
         id={buttonId}
         type="button"

@@ -1,3 +1,4 @@
+import { listIntegerInRange } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
 import { createSavedSearch, jstNow, validateSearchConditions, validateSavedSegmentConditions, type SupportMarkWithUsage, type SupportMarkScope, type SavedSearch, type SavedSearchAccess, type SavedSearchConditionFormat, type SavedSearchReference, type Folder } from '@line-crm/db';
@@ -167,15 +168,11 @@ export function savedSearchDetail(
 }
 
 export function positiveInteger(raw: string | undefined, fallback: number, max: number): number | null {
-  if (raw === undefined || raw === '') return fallback;
-  const value = Number(raw);
-  return Number.isInteger(value) && value > 0 && value <= max ? value : null;
+  return listIntegerInRange(raw, fallback, 1, max);
 }
 
 export function nonNegativeInteger(raw: string | undefined, fallback = 0): number | null {
-  if (raw === undefined || raw === '') return fallback;
-  const value = Number(raw);
-  return Number.isInteger(value) && value >= 0 ? value : null;
+  return listIntegerInRange(raw, fallback, 0, Number.POSITIVE_INFINITY);
 }
 
 export async function savedSearchMatchForRow(

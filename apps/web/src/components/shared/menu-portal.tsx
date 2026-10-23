@@ -4,11 +4,16 @@ import { createPortal } from 'react-dom'
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { isImeComposing } from './ime'
 import { useV8Leave } from './overlay-utils'
+import styles from './menu-portal.module.css'
+
+const openPanels: HTMLDivElement[] = []
 
 export type MenuPortalAlign = 'start' | 'end'
 export type MenuPortalPlacement = 'down' | 'up'
 
 export type MenuPortalProps = {
+  /** 絞り込みの窓など、開いた面の最初の操作へ焦点を移して戻す。 */
+  focusPanel?: boolean
   /** 操作メニューの閉じる時間（提案Fは80ms）。候補欄の既定は変えない。 */
   exitDuration?: number
   /** 開いている間だけ body へ出す。閉じたら何も描かない。 */
@@ -51,6 +56,7 @@ export type MenuPortalProps = {
 export type MenuPortalRect = Pick<DOMRect, 'top' | 'bottom' | 'left' | 'right' | 'width'>
 
 type Geometry = {
+  origin: 'left' | 'right'
   top: number
   left: number
   width: number | undefined
@@ -106,6 +112,7 @@ export default function MenuPortal({
   onReady,
   children,
   exitDuration,
+  focusPanel = false,
 }: MenuPortalProps) {
   const leaving = useV8Leave(open, exitDuration)
   const [mounted, setMounted] = useState(false)
@@ -124,6 +131,22 @@ export default function MenuPortal({
   const positionRef = useRef(getPositionRect)
   positionRef.current = getPositionRect
 
+  const dismissOnEscape = (event: globalThis.KeyboardEvent) => {
+    if (event.key !== 'Escape' || event.defaultPrevented || isImeComposing(event)
+      || openPanels.at(-1) !== panelRef.current) return
+    event.preventDefault()
+    if (escapeRef.current) escapeRef.current()
+    else {
+      const panel = panelRef.current
+      const restoreFocus = focusPanel || panel?.contains(event.target as Node) || panel?.contains(document.activeElement)
+      closeRef.current()
+      const anchor = anchorRef.current()
+      const target = anchor?.matches('button, input, a[href], [tabindex]')
+        ? anchor : anchor?.querySelector<HTMLElement>('input, button, [tabindex="0"]')
+      if (restoreFocus) target?.focus()
+    }
+  }
+
   useLayoutEffect(() => {
     setMounted(true)
   }, [])
@@ -134,7 +157,8 @@ export default function MenuPortal({
       const anchor = anchorRef.current()
       const panel = panelRef.current
       if (!anchor || !panel) return
-      const anchorRect = positionRef.current?.() ?? anchor.getBoundingClientRect()
+      const triggerRect = anchor.getBoundingClientRect()
+      const anchorRect = positionRef.current?.() ?? triggerRect
       const minWidth = matchWidth === 'min' ? anchorRect.width : undefined
       // 'min' は欄の幅を下限にする。位置は下限を当てた後の幅で決める。
       const panelWidth = matchWidth === true
@@ -166,6 +190,7 @@ export default function MenuPortal({
       if (align === 'end' && rawLeft < margin) rawLeft = anchorRect.left
       const left = Math.max(margin, Math.min(rawLeft, viewportWidth - panelWidth - margin))
       setGeometry({
+        origin: triggerRect.left + triggerRect.width / 2 - left > panelWidth / 2 ? 'right' : 'left',
         top,
         left,
         width: matchWidth === true ? Math.max(0, panelWidth) : undefined,
@@ -190,7 +215,8 @@ export default function MenuPortal({
     if (!mounted || !geometry || readyRef.current) return
     readyRef.current = true
     onReadyRef.current?.()
-  }, [open, mounted, geometry])
+    if (focusPanel) panelRef.current?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]')?.focus()
+  }, [open, mounted, geometry, focusPanel])
 
   // 下に続きがある間だけ下端の影を出す。入りきる時は影なし。
   useLayoutEffect(() => {
@@ -221,6 +247,10 @@ export default function MenuPortal({
 
   useLayoutEffect(() => {
     if (!open || !mounted) return
+    const panel = panelRef.current
+    if (!panel) return
+    const anchor = anchorRef.current()
+    openPanels.push(panel)
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node
       if (panelRef.current?.contains(target)) return
@@ -235,23 +265,16 @@ export default function MenuPortal({
       if (typeof element.closest === 'function' && element.closest('[data-menu-portal]')) return
       closeRef.current()
     }
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        // 日本語の変換をやめる Esc は入力欄のもの。メニューは閉じない。
-        if (isImeComposing(event)) return
-        // メニューで処理した印。下の詳細パネルなどが同じ Esc で閉じないように。
-        event.preventDefault()
-        if (escapeRef.current) escapeRef.current()
-        else closeRef.current()
-      }
-    }
+    const onKeyDown = dismissOnEscape
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
     return () => {
+      openPanels.splice(openPanels.indexOf(panel), 1)
+      if (focusPanel && (panel.contains(document.activeElement) || document.activeElement === document.body)) anchor?.focus()
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open, mounted])
+  }, [open, mounted, focusPanel])
 
   if ((!open && (!exitDuration || !leaving)) || !mounted || typeof document === 'undefined') return null
   return createPortal(
@@ -260,8 +283,16 @@ export default function MenuPortal({
       // 静的に読める形にする（直書き借金の見張り）。重なりの数字と
       // 画面端の上限は style へ。見た目（白地・角丸・浮きの影）は子が持つ。
       // 高さの上限と続きの影だけは器が持つ（子は自分の上限を外す）。
-      className={className ? `fixed min-w-0 ${className}` : 'fixed min-w-0'}
+      className={`fixed min-w-0 ${styles.motion}${className ? ` ${className}` : ''}`}
       data-menu-portal=""
+      data-ready={Boolean(geometry)}
+      data-origin={geometry?.origin}
+      onKeyDown={event => {
+        if (event.key !== 'Escape') return
+        // PortalのReactイベントは元の道具の段へも届く。外のdetails等を一緒に閉じない。
+        event.stopPropagation()
+        dismissOnEscape(event.nativeEvent)
+      }}
       data-closing={leaving || undefined}
       aria-hidden={leaving || undefined}
       inert={leaving || undefined}

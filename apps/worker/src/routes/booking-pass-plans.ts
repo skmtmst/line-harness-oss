@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
@@ -7,7 +8,7 @@ export const bookingPassPlans=new Hono<Env>();
 bookingPassPlans.use('/api/booking/admin/pass-plans*',requirePermission('/booking/bookings'));
 bookingPassPlans.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'pass_plans_unavailable'},e instanceof GapError?e.status:503));
 bookingPassPlans.get('/api/booking/admin/pass-plans',async c=>{
- const a=await gapAccount(c),q=c.req.query('q')??'',status=c.req.query('status')??'',offset=Number(c.req.query('offset')??0),limit=Number(c.req.query('limit')??20);if(!Number.isSafeInteger(offset)||offset<0||![10,20,50].includes(limit)||q.length>100)throw new GapError('invalid_pagination');
+ const a=await gapAccount(c),q=c.req.query('q')??'',status=c.req.query('status')??'',offset=listQueryNumber(c.req.query('offset'), 0),limit=listQueryNumber(c.req.query('limit'), 20);if(!Number.isSafeInteger(offset)||offset<0||![10,20,50].includes(limit)||q.length>100)throw new GapError('invalid_pagination');
  const where="line_account_id=? AND (?='' OR status=?) AND instr(lower(name),lower(?))>0",binds=[a,status,status,q];
  const total=await c.env.DB.prepare(`SELECT count(*) n FROM booking_pass_plans WHERE ${where}`).bind(...binds).first<{n:number}>(),rows=(await c.env.DB.prepare(`SELECT * FROM booking_pass_plans WHERE ${where} ORDER BY created_at DESC,id LIMIT ? OFFSET ?`).bind(...binds,limit,offset).all<Record<string,unknown>>()).results;
  const summary=await c.env.DB.prepare(`SELECT (SELECT count(*) FROM booking_pass_plans WHERE line_account_id=? AND status='on_sale') onSale,count(DISTINCT CASE WHEN status='active' THEN friend_id END) holders,count(CASE WHEN status='active' AND julianday(expires_at)>=julianday('now') AND julianday(expires_at)<=julianday('now','+30 days') THEN 1 END) expiringIn30d FROM booking_entitlements WHERE line_account_id=?`).bind(a,a).first();
@@ -21,7 +22,7 @@ bookingPassPlans.get('/api/booking/admin/pass-plans',async c=>{
  ORDER BY julianday(last.period_start) DESC,julianday(last.occurred_at) DESC,
  CASE last.kind WHEN 'customer.subscription.deleted' THEN 3 WHEN 'invoice.paid' THEN 2 ELSE 1 END DESC,last.event_id DESC LIMIT 1)
  WHERE e.line_account_id=? AND e.billing_status!='ok'`).bind(a).first();
- return c.json({success:true,data:{items:rows.map(passPlanView),total:total?.n??0,summary:{...summary,...simulation,billingFailed:null,billingStatus:'unconfigured'}}});
+ return c.json({success:true,data:buildOffsetListResponse({ items:rows.map(passPlanView),total:total?.n??0,summary:{...summary,...simulation,billingFailed:null,billingStatus:'unconfigured'}, paging: { limit }, sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});
 });
 for(const method of ['POST','PUT']as const)bookingPassPlans.on(method,method==='POST'?'/api/booking/admin/pass-plans':'/api/booking/admin/pass-plans/:id',async c=>{
  gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c),p=passPlanInput(b),actor=c.get('staff').id;
@@ -42,8 +43,8 @@ for(const action of ['start','stop']as const)bookingPassPlans.post(`/api/booking
  const r=await c.env.DB.prepare('UPDATE booking_pass_plans SET status=?,event_target_scope_json=CASE WHEN ? THEN ? ELSE event_target_scope_json END,version=version+1 WHERE id=? AND line_account_id=? AND version=?').bind(action==='start'?'on_sale':'stopped',eventIds!==undefined,eventIds==null?null:JSON.stringify(eventIds),c.req.param('id'),a,v).run();if(!r.meta.changes)throw new GapError('version_conflict',409);return c.json({success:true,data:{status:action==='start'?'on_sale':'stopped',version:v+1}});
 });
 bookingPassPlans.get('/api/booking/admin/pass-plans/:id/holders',async c=>{
- const a=await gapAccount(c),id=c.req.param('id'),offset=Number(c.req.query('offset')??0),limit=Number(c.req.query('limit')??20);if(!Number.isSafeInteger(offset)||offset<0||![10,20,50].includes(limit))throw new GapError('invalid_pagination');
+ const a=await gapAccount(c),id=c.req.param('id'),offset=listQueryNumber(c.req.query('offset'), 0),limit=listQueryNumber(c.req.query('limit'), 20);if(!Number.isSafeInteger(offset)||offset<0||![10,20,50].includes(limit))throw new GapError('invalid_pagination');
  if(!await c.env.DB.prepare('SELECT id FROM booking_pass_plans WHERE id=? AND line_account_id=?').bind(id,a).first())throw new GapError('not_found',404);
  const items=(await c.env.DB.prepare('SELECT e.id,e.friend_id,f.display_name,e.remaining,e.expires_at,e.status FROM booking_entitlements e JOIN friends f ON f.id=e.friend_id AND f.line_account_id=e.line_account_id WHERE e.plan_id=? AND e.line_account_id=? ORDER BY e.expires_at,e.id LIMIT ? OFFSET ?').bind(id,a,limit,offset).all<Record<string,unknown>>()).results;
- const total=await c.env.DB.prepare('SELECT count(*) n FROM booking_entitlements WHERE plan_id=? AND line_account_id=?').bind(id,a).first<{n:number}>();return c.json({success:true,data:{items:items.map(x=>({...x,display_name:c.get('impersonation')?'（非表示）':x.display_name})),total:total?.n??0}});
+ const total=await c.env.DB.prepare('SELECT count(*) n FROM booking_entitlements WHERE plan_id=? AND line_account_id=?').bind(id,a).first<{n:number}>();return c.json({success:true,data:buildOffsetListResponse({ items:items.map(x=>({...x,display_name:c.get('impersonation')?'（非表示）':x.display_name})),total:total?.n??0, paging: { limit }, sort: [{ field: 'expires_at', direction: 'asc' }, { field: 'id', direction: 'asc' }] })});
 });

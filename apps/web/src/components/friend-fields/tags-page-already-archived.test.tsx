@@ -77,6 +77,7 @@ vi.mock('@/lib/api', () => {
 vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 
 import TagsList from '@/v8/tags/list'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 
 const TAGS = [
   {
@@ -121,6 +122,7 @@ function dependencies() {
 }
 
 beforeEach(() => {
+  flushListUrlState(); window.history.replaceState(null, '', '/tags')
   fixture.tagsList = vi.fn(async () => ({ success: true, data: TAGS }))
   fixture.tagGroupsList = vi.fn(async () => ({ success: true, data: [] }))
   fixture.dependencies = vi.fn(async () => dependencies())
@@ -206,4 +208,12 @@ describe('R190 保管済みの行に同じ確認を繰り返さない', () => {
     // 編集への道は残す。保管済みでも名前・説明の訂正はできる（#710）。
     expect(screen.getByRole('menuitem', { name: '編集する' })).toBeTruthy()
   })
+})
+
+test('保管が完了したら対象の名前を知らせて一覧を読み直す', async () => {
+  fixture.archive = vi.fn(async () => ({ success: true }))
+  await openDeleteDialog()
+  fireEvent.click(screen.getByRole('button', { name: 'このタグを保管する' }))
+  await screen.findByText('「旧キャンペーン」を保管しました')
+  await waitFor(() => expect(fixture.tagsList).toHaveBeenCalledTimes(2))
 })

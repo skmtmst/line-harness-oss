@@ -3,7 +3,6 @@
 import { accountHandle } from './account-dialogs'
 import { formatNumber } from '@/lib/format'
 
-import { CircleDot, Star } from 'lucide-react';
 import { type AccountWithStats } from '@/contexts/account-context';
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 
@@ -17,11 +16,11 @@ const UNFILED = '__none__'
 
 const ALL = '__all__'
 
-const STATUS_FILTERS: { value: StatusFilter; label: string; icon: React.ReactNode }[] = [
-  { value: 'all', label: 'すべて', icon: <CircleDot size={14} aria-hidden="true" /> },
-  { value: 'ok', label: '正常', icon: <Star size={14} aria-hidden="true" /> },
-  { value: 'warn', label: '要確認', icon: <Star size={14} aria-hidden="true" /> },
-  { value: 'archived', label: 'アーカイブ', icon: <Star size={14} aria-hidden="true" /> },
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'すべて' },
+  { value: 'ok', label: '正常' },
+  { value: 'warn', label: '要確認' },
+  { value: 'archived', label: 'アーカイブ' },
 ]
 
 

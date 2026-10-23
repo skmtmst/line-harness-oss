@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../../lib/list-paging.js';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { buildConfirmationReminderSchedule, getReminderTiming } from '../../features/booking/booking-confirm/index.js';
@@ -44,7 +45,7 @@ booking.get('/api/booking/admin/bookings/:id/audit-logs', async (c) => {
     .bind(bookingId, accountId)
     .first<{ ok: number }>();
   if (!exists) return c.json({ error: 'booking_not_found' }, 404);
-  const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
+  const limit = Math.min(200, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 100, { format: 'integer-prefix' }) || 100));
   const logs = await listBookingAuditLogs(c.env.DB, { bookingId, lineAccountId: accountId, limit });
   return c.json({ audit_logs: logs });
 });

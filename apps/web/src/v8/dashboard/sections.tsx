@@ -1,5 +1,6 @@
 'use client'
 
+import { ProgressBar } from '@/components/shared/progress'
 import StatusPill from '@/components/shared/status-pill'
 import Link from '@/components/shared/list-navigation'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -132,9 +133,7 @@ export function SendQuota({ delivery, metric, section, onRetry, overviewFailed }
         </p>
       )}
       {unlimited ? null : (
-        <span className={styles.track} aria-hidden="true">
-          <span className={low ? styles.fillDanger : styles.fill} style={{ width: `${rate ?? 0}%` }} />
-        </span>
+        <ProgressBar appearance="quota" tone={low ? 'danger' : undefined} value={rate ?? 0} label="送信枠の使用率" />
       )}
       {notConnected ? (
         <Updated>LINEアカウントが未接続です</Updated>

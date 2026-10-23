@@ -93,8 +93,7 @@
 
 /*
  * ★V8「タブ」（clV5c）：選んだタブは緑ではなく墨の下線＋墨の600。
- * 選んでないタブは ink-secondary の 500。下線と文字色は速い動きで
- * 移る（★V8 動き「切り替え・タブは滑る 120ms」）。
+ * 選んでないタブは ink-secondary の 500。下線は共通FLIPの200ms、文字色は120msで切り替える。
  */
 :root .list {
   gap: 24px;
@@ -123,7 +122,7 @@
 }
 
 /*
- * ★V8 仕上げ（M10）：選ばれている下線が滑って移る（120ms）。
+ * ★V8 仕上げ（M10）：選ばれている下線が共通FLIPで移る（200ms）。
  * 測れたときだけ動く印を出し、枠線の下線は消す。
  * 測れないときは枠線の下線が残る（tabs.tsx の data-sliding）。
  */
@@ -138,9 +137,8 @@
   height: 2px;
   border-radius: var(--radius-mini);
   background: var(--color-ink);
-  transition:
-    transform var(--motion-fast) var(--motion-ease-out),
-    width var(--motion-fast) var(--motion-ease-out);
+  transform-origin: left center;
+  transition-property: none;
 }
 
 :root .items[data-sliding='true'] .current {
@@ -225,3 +223,5 @@
 :root .list .items[data-sliding='true'] .current { border-bottom-color: transparent; }
 /* 通知の固定絵は文字を段の上へ置く。高さ36と切り替えの動きは共通。 */
 :root .list[data-size='notification'] .tab.tab { align-items: flex-start; }
+
+:root .list .tab.tab { padding-block-start: var(--tpl-tabs-center-inset); }

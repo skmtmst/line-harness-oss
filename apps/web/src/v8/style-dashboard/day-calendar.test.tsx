@@ -6,6 +6,7 @@ import type { IndustryStyle, StyleBooking, StyleSchedule, StyleSnapshot } from '
 import type { eventsApi } from '@/lib/api'
 import { toToday } from './adapter'
 import StyleDashboard from './style-dashboard'
+import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 
 const state = vi.hoisted(() => ({ search: 'view=calendar', role: 'admin', push: vi.fn(), replace: vi.fn(), summary: vi.fn(), schedule: vi.fn(), bookings: vi.fn<typeof eventsApi.listBookings>() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: state.push, replace: state.replace }), usePathname: () => '/', useSearchParams: () => new URLSearchParams(state.search) }))
@@ -41,6 +42,33 @@ beforeEach(() => {
   state.bookings.mockResolvedValue({ items: [], total: 0, limit: 50, sort: [] })
 })
 afterEach(cleanup)
+
+it('実画面の月移動は読み込み後に1回だけ滑り、同月の日選択では滑らない', async () => {
+  state.search = 'view=calendar&range=month'
+  setTestReducedMotion(false)
+  document.documentElement.style.setProperty('--motion-base', '200ms')
+  document.documentElement.style.setProperty('--polish-space-card', '20px')
+  const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate')
+  const animate = vi.fn((_frames: Keyframe[], _options: KeyframeAnimationOptions) => ({ cancel: vi.fn() }))
+  Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate })
+  try {
+    render(<StyleDashboard style="salon" />)
+    const month = await screen.findByRole('region', { name: '1か月のカレンダー' })
+    expect(animate).not.toHaveBeenCalled()
+    fireEvent.click(within(month).getByRole('button', { name: '次へ', exact: true }))
+    await screen.findByRole('region', { name: '1か月のカレンダー' })
+    await waitFor(() => expect(animate).toHaveBeenCalledOnce())
+    const calendar = screen.getByRole('grid')
+    const day = calendar.querySelector<HTMLButtonElement>('[role="gridcell"]:not([data-out]):not([data-selected])')!
+    fireEvent.click(day)
+    await screen.findByRole('region', { name: '1か月のカレンダー' })
+    expect(animate).toHaveBeenCalledOnce()
+  } finally {
+    if (original) Object.defineProperty(HTMLElement.prototype, 'animate', original)
+    else Reflect.deleteProperty(HTMLElement.prototype, 'animate')
+    document.documentElement.style.cssText = ''
+  }
+})
 
 it.each<IndustryStyle>(['restaurant', 'salon', 'consult', 'lesson'])('%sの今日カレンダーに正規day予約を表示し、実予約・教室の名簿へ接続する', async style => {
   render(<StyleDashboard style={style} />)
@@ -90,4 +118,18 @@ it('日表示も実APIの取消記録ID・空き候補を落とさず、週/月�
   const monthly = fixture('salon', '2026-10-01', 'month')
   expect(toToday('salon', monthly.snapshot, monthly.schedule, '2026-10-01', 'month').week).toBeNull()
   expect(toToday('salon', monthly.snapshot, monthly.schedule, '2026-10-01', 'month').month).toBeTruthy()
+})
+
+it.each([
+  ['confirmed', false, null, 'confirmed'],
+  ['seated', false, null, 'active'],
+  ['confirmed', true, null, 'completed'],
+  ['requested', false, null, 'pending'],
+  ['no_show', false, null, 'no_show'],
+] as const)('日週表示も%sの実状態を札へ渡し、予定時刻だけで来店扱いしない', (status, visited, attendance, expected) => {
+  const { snapshot, schedule } = fixture('salon')
+  const entry = schedule.entries[0]
+  const next = { ...schedule, entries: [{ ...entry, booking: { ...entry.booking!, status, visited, attendance } }] }
+  expect(toToday('salon', snapshot, next, '2026-10-21', 'today').week?.entries[0].state).toBe(expected)
+  expect(toToday('salon', snapshot, next, '2026-10-21', 'today').board?.entries[0].state).toBe(({ confirmed: 'booked', completed: 'done' } as Record<string, string>)[expected] ?? expected)
 })

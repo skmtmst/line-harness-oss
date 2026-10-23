@@ -1,4 +1,4 @@
-import { logger } from '@line-crm/shared/server';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -54,7 +54,7 @@ function validationResponse(c: Context<Env>, error: CommonActionValidationError)
 
 function nonNegativeInteger(value: string | undefined, field: string): number | undefined {
   if (value === undefined) return undefined;
-  const parsed = Number(value);
+  const parsed = listQueryNumber(value, Number.NaN);
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new CommonActionValidationError('pagination_invalid', 'ページ指定を確認してください', field);
   }
@@ -92,8 +92,7 @@ async function endpoint<T>(
     return c.json({ success: true, data }, successStatus as 200);
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
-    logger.error("common_action_api_failed");
-    return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
+    throw error;
   }
 }
 
@@ -133,17 +132,15 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
         'Content-Disposition': 'attachment; filename="common-actions.csv"',
       });
     }
-    return c.json({
-      success: true,
-      data: result.items,
+    const responseItems = result.items;
+    return c.json(buildOffsetListResponse({ success: true,
+      data: responseItems,
       pagination: { total: result.total, limit: limit ?? null, offset },
       summary,
-      freshness: 'available',
-    });
+      freshness: 'available', items: responseItems, total: result.total, paging: { limit: limit ?? result.total }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
-    logger.error("common_action_api_failed");
-    return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
+    throw error;
   }
 });
 

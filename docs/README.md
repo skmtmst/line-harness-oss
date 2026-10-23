@@ -452,6 +452,7 @@
 
 ## 反映履歴
 
+- [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
 - [反映履歴（アップデート履歴）の設計](change-log-design.md)
@@ -462,6 +463,8 @@
 - [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
 - [対応が要るものの速さとお知らせの下の空き](release-log/unreleased/1798-kenta-hq-attention-speed.md)
 - [統括のアカウントの空きと受信箱の見た目](release-log/unreleased/1799-kenta-beui-round1.md)
+- [一覧・数の帯・手順・ログの見た目と速さ](release-log/unreleased/1802-kenta-beui-round2.md)
+- [細部の直し（左メニューの吹き出し・「？」・2段階認証の欄・主ボタン）](release-log/unreleased/1803-kenta-detail-polish.md)
 - [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
 - [スマートフォンの幅で店名を切れにくく](release-log/unreleased/1804-kenta-hq-card-narrow.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
@@ -650,6 +653,7 @@
 
 ## 引き継ぎで加わった文書
 
+- [文字を見る試験18ファイルの判断案](qa/quality-source-test-decisions.md)
 - [account-new のコード案内](../apps/web/src/v8/account-new/README.md)
 - [accounts-detail のコード案内](../apps/web/src/v8/accounts-detail/README.md)
 - [affiliate-offer-new のコード案内](../apps/web/src/v8/affiliate-offer-new/README.md)
@@ -746,3 +750,6 @@
 - [LINE連携の権限確認の更新](release-log/unreleased/1781-kenta-proxy-permissions.md)
 - [リンクの本人確認と案内の更新](release-log/unreleased/1781-kenta-link-identity.md)
 - [登録ファイルの確認と公開の更新](release-log/unreleased/1781-kenta-media-delivery.md)
+- [手動テスト版の見た目と予約の状態の更新](release-log/unreleased/1807-kenta-manual-test-polish.md)
+
+- [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

@@ -1,6 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @import "tailwindcss";
 @import "../components/shared/kpi-band-v8.css";
+@import "../components/shared/focus-ring.css";
 
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
 [data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
@@ -65,10 +66,10 @@
   --color-accent-deep: #087a3e;
   --color-on-accent: #ffffff;
 
-  /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
-  --color-action: var(--color-accent-deep);
-  --color-action-hover: var(--color-accent);
-  --color-action-soft: var(--color-accent-soft);
+  /* 文字の操作は濃い字。主ボタンと成功は専用の緑を使う。 */
+  --color-action: var(--color-ink);
+  --color-action-hover: var(--color-ink);
+  --color-action-soft: var(--polish-selection-bg);
   --color-focus-ring: var(--polish-focus);
   --color-on-action: #ffffff;
 
@@ -450,7 +451,7 @@
    * 2枚の影）。照りは緑の上に薄い白の内側線で、ボタンが平らに
    * なりすぎないようにする。
    */
-  --shadow-primary-action: var(--card-shadow);
+  --shadow-primary-action: 0 1px 2px rgba(29, 29, 31, 0.1); /* 主ボタンは薄い1枚の影（カードの二重の影は重く見える） */
   /* トグル・オフの地（Pencil V8 トグル/オフ LxHpj の #c9ced6）。 */
   --color-toggle-off: #c9ced6;
   /* 注目の星・オン（Pencil V8 w0R1PQ）：塗りは黄、縁は濃い黄。 */
@@ -478,7 +479,7 @@
   --color-notice-warning-bg: #fff7e6;
   --color-notice-danger-bg: #fef0f0;
   --color-menu-danger: #e5484d;
-  --color-link: var(--color-accent-deep);
+  --color-link: var(--color-ink);
   --color-checkbox-line: #dadde2;
   --radius-checkbox-mark: 3px;
   --text-callout: 14px;
@@ -529,7 +530,7 @@
   --tpl-select-inset: 12px;
   --tpl-select-gap: 8px;
   --tpl-select-page-size: 112px;
-  --polish-icon-heading: 20px;
+  --polish-icon-heading: 18px;
   --polish-icon-empty: 40px;
   --polish-icon-stroke: 1.75;
 }
@@ -545,30 +546,30 @@
   --polish-status-gap: 8px;
   --polish-status-pad: 2px 8px;
   --polish-status-success-dot: #16a34a;
-  --polish-status-success-bg: #16a34a1a;
-  --polish-status-success-ink: #087a3e;
+  --polish-status-success-bg: var(--color-canvas);
+  --polish-status-success-ink: var(--color-ink);
   --polish-status-warning-dot: #f97316;
-  --polish-status-warning-bg: #f973161a;
+  --polish-status-warning-bg: var(--color-canvas);
   --polish-status-warning-ink: #c2410c;
   --polish-status-danger-dot: #ef4444;
-  --polish-status-danger-bg: #ef44441a;
+  --polish-status-danger-bg: var(--color-canvas);
   --polish-status-danger-ink: #b91c1c;
   --polish-status-info-dot: #2563eb;
-  --polish-status-info-bg: #2563eb1a;
-  --polish-status-info-ink: #1d4ed8;
+  --polish-status-info-bg: var(--color-canvas);
+  --polish-status-info-ink: var(--color-ink);
   --polish-status-neutral-dot: #94a3b8;
-  --polish-status-neutral-bg: #94a3b81a;
-  --polish-status-neutral-ink: #475569;
+  --polish-status-neutral-bg: var(--color-canvas);
+  --polish-status-neutral-ink: var(--color-ink);
 }
 :root {
   --polish-table-row: 56px;
   --polish-table-head: 40px;
   --polish-table-number-gap: 24px;
-  --polish-table-head-bg: #f7f8fa;
-  --polish-table-hover: #1d1d1f05;
+  --polish-table-head-bg: var(--color-canvas);
+  --polish-table-hover: var(--color-canvas);
 }
 :root {
-  --polish-text-page: 22px;
+  --polish-text-page: 32px;
   --polish-text-section: 15px;
   --polish-text-body: 13px;
   --polish-text-support: 12px;
@@ -579,6 +580,9 @@
 }
 :root {
   --polish-space-row: 8px;
+  --polish-control-bg: #f0f0f2; --polish-control-hover: #e8e8eb; --polish-control-text: 13px; --polish-control-weight: 500; --polish-value-weight: 600;
+  --polish-selection-bg: #f0f0f2; --polish-selection-ink: var(--color-ink); --polish-selection-shadow: var(--shadow-nav-active); --polish-selection-outline: 1px solid var(--color-control-border); --polish-band-radius: 16px;
+  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06); --polish-nav-tracking: 0.06em; --polish-icon-small: 14px; --polish-icon-large: 18px; --polish-text-center-inset: 1px; --tpl-tabs-center-inset: 3px; --tpl-funnel-window-min-width: 208px; --tpl-cv-period-preview-width: 320px; --tpl-cv-period-content-width: 288px;
   --polish-space-field: 12px;
   --polish-space-card: 16px;
   --polish-space-section: 24px;
@@ -614,7 +618,7 @@
   /*
    * カード（線で囲んだ箱）の線と影（2026-10-09 案A：ブラーを抑え、境目をくっきりさせる）。
    * 影は 0 1px 1px / 黒16% ＋ 0 2px 4px / 黒8%、線は黒8%。
-   * 数のカード・アカウント/プロジェクト/プランのカード・設定の段・表の枠など、線で囲んだ箱は全部この2つを読む。
+   * 既定のカードはこの2つを読む。一覧の平らなカードは Card.frame="flat" で影を外す。
    * 選ぶカード（ラジオ・チェック）・入力欄・ボタン・浮く面（メニュー・窓）は別の値のまま。
    */
   --card-edge: rgba(29, 29, 31, 0.08);
@@ -637,7 +641,7 @@
    */
   --motion-instant: 80ms;
   --motion-fast: 120ms;
-  --motion-base: 200ms;
+  --motion-base: 200ms; --motion-kpi-roll: 500ms; /* 数の帯の数字が回る演出だけ、500msまでの例外。 */
   --motion-slow: 300ms;
   /*
    * ★V8 仕上げ（M10）：閉じる 150ms・引き出し 240ms。
@@ -793,8 +797,8 @@
   /* controls レーン：書き出しHTMLの線・成功・浮く色選びの値。 */
   --color-controls-swatch-line: #1d1d1f1f;
   --shadow-controls-primary: var(--shadow-primary-action);
-  --shadow-primary-action: var(--card-shadow);
-  --color-primary-border: #06612f;
+  --shadow-primary-action: 0 1px 2px rgba(29, 29, 31, 0.1); /* 主ボタンは薄い1枚の影（カードの二重の影は重く見える） */
+  --color-primary-border: var(--color-accent-deep); /* 地と同じ色。濃い縁が下の影と重なって太い枠に見えた */
   --radius-primary-action: 8px;
   --tpl-folder-create-space-col-h: 45px;
   /* 表の行の下の線を行の内側に描く（線を含めて1行の高さ。data-table）。@theme に置くと CSS Modules だけが読む値は消えるので、ここ。 */
@@ -896,9 +900,9 @@
   --tpl-booking-button-pad: 16px;
   --tpl-booking-seg-item-width: 65px;
   --tpl-booking-seg-last-width: 56px;
-  --tpl-booking-head-pad-top: 24px;
+  --tpl-booking-head-pad-top: var(--tpl-head-pad-top);
   --tpl-booking-narrow-head-pad: 16px;
-  --tpl-head-pad-top: var(--polish-space-section); --tpl-head-pad-side: var(--polish-space-section); --tpl-head-pad-bottom: var(--polish-space-field);
+  --tpl-head-pad-top: 16px; --tpl-head-pad-side: var(--polish-space-section); --tpl-head-pad-bottom: 8px;
   /* 成果とアフィリエイトの V8（・・・・・・・）。表は絵の列の並び（見出し 13/20・欄の間16）。 */
   --tpl-af-col-gap: 16px; --tpl-af-head-h: var(--polish-table-head); --tpl-af-head-pad: 13px 20px; --tpl-af-row-h: var(--polish-table-row); --tpl-af-row-pad: 9px 20px;
   --tpl-af-col-state: 96px; --tpl-af-col-check: 24px; --tpl-af-col-links: 76px; --tpl-af-col-friends: 84px; --tpl-af-col-conv: 60px; --tpl-af-col-reward: 84px; --tpl-af-col-ops: 140px;
@@ -913,7 +917,7 @@
   --tpl-af-stack-gap: 3px; --tpl-af-pill-pad: 2px 8px; --tpl-af-pill-gap: 5px; --tpl-af-pill-lh: 18px; --tpl-af-ops-gap: 6px;
   --tpl-af-notice-after: 0px; --tpl-af-num-pad-end: 8px; --tpl-af-tab-pad-bottom: 6px; --tpl-af-ro-before: 8px; --tpl-af-ro-after: 16px; /* 振込先の注意の帯と今回の締めの箱の間（・帯の上下は12）。 */ --tpl-af-notice-stack-gap: 12px;
   --tpl-af-saved-w: 154px; --tpl-af-search-w: 240px; --tpl-af-foot-pad: 12px 24px; --tpl-af-viewer-create-h: 52px;
-  --tpl-af-dr-w: 620px; --tpl-af-dr-pad: 24px; --tpl-af-dr-gap: 16px; --tpl-af-dr-shadow: -8px 0 24px rgb(29 29 31 / 0.16); --tpl-af-dr-head-gap: 4px; --tpl-af-dr-close: 36px;
+  --tpl-af-dr-w: 620px; --tpl-af-dr-pad: 24px; --tpl-af-dr-gap: 16px; --tpl-af-dr-shadow: -8px 0 24px rgb(29 29 31 / 0.16); --tpl-af-dr-head-gap: 4px; --tpl-af-dr-title-lh: 32px; --tpl-af-dr-close: 36px;
   --tpl-af-dr-tab-gap: 24px; --tpl-af-dr-tab-pad-bottom: 8px; --tpl-af-dr-tab-line: 2px; --tpl-af-dr-kpi-value-lh: 23px; --tpl-af-dr-kpi-sub-lh: 14px; --tpl-af-dr-kpi-gap: 2px; --tpl-af-dr-kpi-pad: 10px 12px; --tpl-af-dr-row-gap: 10px; --tpl-af-dr-row-h: var(--polish-table-row); --tpl-af-dr-row-pad: 8px 12px;
   --tpl-af-dr-card-pad: var(--polish-space-card); --tpl-af-dr-text-lh: 18px; --tpl-af-dr-foot-pad: 12px;
   /* 統括のバナー生成（・・ と窓）。 */
@@ -939,7 +943,7 @@
   --tpl-bc-cell-pad-block: 9px; --tpl-bc-head-pad-block: 13px; --tpl-bc-col-gap: 16px; --tpl-bc-edge-pad: 20px; --tpl-bc-cell-lh: 18px; --tpl-bc-result-lh: 19px;
   --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-menu: 56px; --tpl-bc-col-select: 48px;
   --tpl-bc-badge-gap: 5px; --tpl-bc-badge-pad: 2px 8px; --tpl-bc-menu-size: 28px; --tpl-bc-pager-lh: 21px; --tpl-bc-state-pad: 28px 24px; --tpl-bc-state-icon: 32px;
-  --tpl-title-size: var(--polish-text-page); --tpl-title-weight: 700; --tpl-title-lh: 32px;
+  --tpl-title-size: var(--polish-text-page); --tpl-title-weight: 600; --tpl-title-lh: 40px; --tpl-title-tracking: -0.01em;
   /* ウェビナーの編集・参加者・分析・コメント演出（・・・・・・・・・）。 */
   --tpl-wc-back-gap: 4px; --tpl-wc-head-gap: 12px; --tpl-wc-tab-gap: 24px; --tpl-wc-tab-line: 2px; --tpl-wc-tab-lh: 19px; --tpl-wc-tab-pad-bottom: 8px;
   --tpl-wc-step-line-w: 24px; --tpl-wc-step-line-h: 2px; --tpl-wc-step-no-size: 11px; --tpl-wc-stats-notice-pad: 12px 24px; --tpl-wc-state-pad: 32px 24px;
@@ -1407,13 +1411,13 @@
   --tpl-rml-blocker-pad: 9px 0; --tpl-rml-blocker-gap: 8px; --tpl-rml-blocker-lh: 17px; --tpl-rml-dlg-w: 600px; --tpl-rml-dlg-pad: 24px; --tpl-rml-dlg-gap: 14px; --tpl-rml-dlg-top: 240px; --tpl-rml-dlg-title-size: var(--polish-text-section); --tpl-rml-dlg-title-lh: 25px; --tpl-rml-dlg-desc-lh: 22px; --tpl-rml-icon-btn: 28px; --tpl-rml-notice-after: var(--polish-space-row); --tpl-rml-grip-w: 14px; --tpl-rml-row-line: inset 0 -1px 0 var(--color-divider);
   --tpl-rml-ext-max-w: 1584px; --tpl-rml-ext-side-w: 430px; --tpl-rml-ext-thumb-w: 48px; --tpl-rml-ext-col-a: 100px; --tpl-rml-ext-col-b: 110px; --tpl-rml-ext-col-c: 120px; --tpl-rml-ext-area-w: 24px; --tpl-rml-ext-ratio-large: 2500 / 1686; --tpl-rml-ext-ratio-compact: 2500 / 843;
   --tpl-band-gap: 0;
-  --tpl-band-line: rgb(0 0 0 / 0.07);
-  --tpl-band-compact-number-size: 20px; --tpl-band-compact-number-lh: 24px;
+  --tpl-band-line: rgb(29 29 31 / 0.04);
+  --tpl-band-compact-number-size: var(--tpl-band-number-size); --tpl-band-compact-number-lh: var(--tpl-band-number-lh);
   --tpl-viewer-create-space-h: 36px; --tpl-viewer-create-space-col-h: 49px; --tpl-viewer-folder-add-space: 17px; /* 閲覧のみで隠した作るボタンの高さ（場所だけ空ける）。列の上に直接置く画面はボタンの下の間 13 も含める */
   /* 自動応答の一覧（・・）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: var(--polish-table-row); --tpl-ar-narrow-head-h: 34px; --tpl-badge-dot: 6px;
   --tpl-ro-band-pad: 12px 16px; --tpl-ro-band-gap: 12px; --tpl-ro-band-bg: #e9f1ff; --tpl-ro-band-radius: var(--polish-radius-control); --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
-  --tpl-band-number-size: 22px; --tpl-band-number-lh: 26px; --tpl-band-unit-lh: 18px;
+  --tpl-band-number-size: 34px; --tpl-band-number-lh: 36px; --tpl-band-number-weight: 500; --tpl-band-number-tracking: -0.02em; --tpl-band-unit-lh: 18px;
   /* 外部連携（・・・・・・・）。 */
   --tpl-wh-ro-row-pad: 12px 24px; --tpl-wh-notice-after: 6px; --tpl-wh-saved-w: 153px; --tpl-wh-create-w: 135px; --tpl-wh-create-after: 16px; --tpl-wh-add-space: 31px; --tpl-wh-note-lh: 17px;
   --tpl-wh-col-gap: 16px; --tpl-wh-head-h: var(--polish-table-head); --tpl-wh-head-pad: 13px 20px; --tpl-wh-row-h: var(--polish-table-row); --tpl-wh-row-pad: 9px 20px; --tpl-wh-num-pad-end: 8px;
@@ -1424,11 +1428,11 @@
   --tpl-wh-value-lh: 21px; --tpl-wh-pick-pad: 0 10px 0 12px; --tpl-wh-mini-head-pad: 10px 16px; --tpl-wh-mini-row-pad: 12px 16px; --tpl-wh-mini-row-h: var(--polish-table-row);
   --tpl-wh-mini-when: 120px; --tpl-wh-mini-value: 200px; --tpl-wh-mini-candidate: 160px; --tpl-wh-mini-ops: 120px; --tpl-wh-sample-lh: 16px; --tpl-wh-textarea-h: 144px; --tpl-wh-textarea-pad: 8px 12px;
   --tpl-wh-dialog-pull-top: 14px; --tpl-wh-dialog-pull-bottom: 10px; --tpl-wh-sheets-gap: 16px; --tpl-wh-small-select-w: 104px; --tpl-wh-log-row-h: var(--polish-table-row); --tpl-wh-log-body-w: 180px; --tpl-wh-log-reply-w: 100px; --tpl-wh-log-time-w: 84px; --tpl-wh-log-ops-w: 130px; --tpl-wh-detail-row-pad: 8px 0; --tpl-wh-pager-margin: 12px 24px; --tpl-wh-pager-lead-pad: 20px; --tpl-wh-new-card-gap: var(--polish-space-row); --tpl-wh-check-gap: 16px; --tpl-wh-event-pad: 12px 14px; --tpl-wh-sample-line-gap: 1px; --tpl-wh-sheets-side-w: 320px; --tpl-wh-care-lh: 19px; --tpl-wh-run-row-h: var(--polish-table-row); --tpl-wh-run-when: 140px; --tpl-wh-run-kind: 80px; --tpl-wh-run-what: 220px; --tpl-wh-skel-dot: 32px; --tpl-wh-skel-bar: 10px;
-  --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 24px; --tpl-band-cell-gap: 8px;
+  --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 24px; --tpl-band-cell-gap: 4px;
   /* シナリオ配信の編集（src/v8/scenario-detail・絵の） */
   --tpl-sd-head-pad: 20px 24px 16px; --tpl-sd-head-gap: 12px; --tpl-sd-head-text-gap: 6px; --tpl-sd-title-gap: 10px; --tpl-sd-back-size: 13px; --tpl-sd-back-lh: 19px; --tpl-sd-title-size: var(--polish-text-section); --tpl-sd-title-lh: 32px; --tpl-sd-meta-size: 12px; --tpl-sd-meta-lh: 17px; --tpl-sd-icon-btn: 28px; --tpl-sd-icon-btn-radius: var(--polish-radius-small); --tpl-sd-icon: 16px;
   --tpl-sd-conflict-wrap-pad: 0 24px 8px; --tpl-sd-conflict-pad: 12px 16px; --tpl-sd-conflict-gap: 12px; --tpl-sd-conflict-icon: 18px; --tpl-sd-conflict-bg: #fdf3e1; --tpl-sd-conflict-text-gap: 2px; --tpl-sd-conflict-title-size: var(--polish-text-section); --tpl-sd-conflict-title-lh: 20px; --tpl-sd-conflict-body-size: var(--polish-text-body); --tpl-sd-conflict-body-lh: 19px;
-  --tpl-sd-left-pad: 20px 28px; --tpl-sd-left-gap: 18px; --tpl-sd-right-w: 379.5px; --tpl-sd-right-pad: 20px 24px; --tpl-sd-right-gap: 14px; --tpl-sd-right-title-size: var(--polish-text-section); --tpl-sd-right-title-lh: 23px;
+  --tpl-sd-left-pad: 20px 28px; --tpl-sd-left-gap: 18px; --tpl-sd-right-w: 379.5px; --tpl-sd-right-pad: 20px 24px; --tpl-sd-right-gap: var(--polish-space-card); --tpl-sd-right-title-size: var(--polish-text-section); --tpl-sd-right-title-lh: 23px;
   --tpl-sd-band-pad: 12px 14px; --tpl-sd-band-gap: 10px; --tpl-sd-band-radius: var(--polish-radius-card); --tpl-sd-band-icon: 16px; --tpl-sd-band-size: 13px; --tpl-sd-band-lh: 20px; --tpl-sd-started-shadow: 0 1px 2px #1d1d1f0f, 0 8px 24px #1d1d1f14;
   --tpl-sd-cards-gap: 12px; --tpl-sd-card-h: 172px; --tpl-sd-card-pad: var(--polish-space-card); --tpl-sd-card-gap: var(--polish-space-row); --tpl-sd-card-radius: var(--polish-radius-card); --tpl-sd-card-head-gap: 8px; --tpl-sd-num: 20px; --tpl-sd-num-size: 11px; --tpl-sd-card-title-size: var(--polish-text-section); --tpl-sd-card-title-lh: 19px; --tpl-sd-card-main-size: 14px; --tpl-sd-card-main-lh: 20px; --tpl-sd-note-size: var(--polish-text-note); --tpl-sd-note-lh: 16px; --tpl-sd-state-gap: 6px; --tpl-sd-state-size: 13px; --tpl-sd-state-lh: 19px;
   --tpl-sd-kpi-pad: 12px 14px; --tpl-sd-kpi-gap: 2px; --tpl-sd-kpi-label-size: 12px; --tpl-sd-kpi-label-lh: 17px; --tpl-sd-kpi-num-size: 20px; --tpl-sd-kpi-num-lh: 24px; --tpl-sd-kpi-wide-lh: 29px; --tpl-sd-kpi-unit-gap: 3px;
@@ -1478,7 +1482,7 @@
   --tpl-acct-register-body-pad: 12px 24px 24px;
   --tpl-acct-basic-pad: 20px 20px 44px;
   --tpl-acct-handover-content-pad: 24px;
-  --tpl-acd-pad: 16px 24px 24px; --tpl-acd-gap: 14px; --tpl-acd-stack-gap: 12px; --tpl-acd-side-w: 320px;
+  --tpl-acd-pad: 16px 24px 24px; --tpl-acd-gap: var(--polish-space-card); --tpl-acd-stack-gap: 12px; --tpl-acd-side-w: 320px;
   --tpl-acd-card-pad: var(--polish-space-card); --tpl-acd-card-gap: var(--polish-space-row); --tpl-acd-card-radius: var(--polish-radius-card); --tpl-acd-inner-pad: 16px;
   --tpl-acd-title-size: var(--polish-text-section); --tpl-acd-title-lh: 20px; --tpl-acd-head-gap: 2px; --tpl-acd-sub-lh: 16px;
   --tpl-acd-row-pad: 7px 0; --tpl-acd-row-gap: 12px; --tpl-acd-label-w: 150px; --tpl-acd-label-size: var(--polish-text-support); --tpl-acd-label-lh: 16px; --tpl-acd-value-size: 12px; --tpl-acd-value-lh: 16.5px;
@@ -1511,9 +1515,9 @@
   --tpl-starter-gap: 12px; --tpl-starter-card-h: 196px; --tpl-card-title-size: var(--polish-text-section);
   --tpl-side-card-pad: var(--polish-space-card); --tpl-side-card-gap: var(--polish-space-row); --tpl-side-row-gap: var(--polish-space-row); --tpl-side-row-pad: var(--polish-space-row);
   --tpl-side-title-lh: 19px; --tpl-text-sm-lh: 17px; --tpl-side-note-pad: 12px 14px; --tpl-label-tag-gap: 6px;
-  --tpl-create-head-pad-top: 24px; --tpl-create-head-pad-side: 24px; --tpl-create-head-pad-bottom: 16px;
+  --tpl-create-head-pad-top: var(--tpl-head-pad-top); --tpl-create-head-pad-side: 24px; --tpl-create-head-pad-bottom: var(--tpl-head-pad-bottom);
   --tpl-create-head-gap: 8px;
-  --tpl-detail-head-pad-top: 20px; --tpl-detail-head-pad-side: 24px; --tpl-detail-head-pad-bottom: 16px;
+  --tpl-detail-head-pad-top: var(--tpl-head-pad-top); --tpl-detail-head-pad-side: 24px; --tpl-detail-head-pad-bottom: var(--tpl-head-pad-bottom);
   --tpl-detail-head-gap: 12px; --tpl-detail-actions-gap: 6px; --tpl-detail-tabs-pad-bottom: 12px;
   --tpl-create-content-pad-block: var(--polish-space-section); --tpl-create-content-pad-side: var(--polish-space-section); --tpl-create-content-gap: var(--polish-space-card);
   /* 作成の型の口 contentSpacing='flush-top'（板の頭のすぐ下から。E-9 p17Qku：上 4・左右 24・下 24、段の間 28）。 */
@@ -1564,9 +1568,9 @@
   --tpl-ms-fn-field-gap: var(--polish-space-field); --tpl-ms-fn-input-shadow: 0 1px 2px rgb(29 29 31 / 4%); --tpl-ms-fn-input-lh: 21px; --tpl-ms-fn-remove-gap: 2px;
   --tpl-ms-qc-head-pad: 24px 24px 0; --tpl-ms-qc-close-inset: 18px; --tpl-ms-qc-title-size: var(--polish-text-section); --tpl-ms-qc-title-lh: 26px; --tpl-ms-qc-chipbox-pad: 8px 10px; --tpl-ms-qc-chip-gap: 4px; --tpl-ms-qc-chip-pad: 6px 12px; --tpl-ms-qc-input-min: 120px; --tpl-ms-qc-textarea-h: 96px; --tpl-ms-qc-foot-margin: 14px 24px 24px; --tpl-ms-qc-text-btn-pad: 0 14px; --tpl-ms-qc-balance-w: 96px; --tpl-ms-qc-chip-x: 14px; --tpl-ms-qc-chip-x-inset: 2px;
   --tpl-ms-qs-textarea-h: 110px; --tpl-ms-qs-approval-w: 266px; --tpl-ms-qs-approval-lh: 19px; --tpl-ms-qs-when-h: 31px; --tpl-ms-focus-w: 2px; --tpl-ms-focus-offset: -2px;
-  /* 手順（共通部品 Fa8ED・決まり q1xNMz 2026-10-08）：丸22・数11/600・名13・線24×1.5・間8・丸と名6・説明の下に（行の間8＋12）。 */
-  --tpl-steps-gap: 8px; --tpl-steps-dot: 22px; --tpl-steps-dot-gap: var(--polish-space-row); --tpl-steps-text-size: var(--polish-text-body); --tpl-steps-text-lh: 19px;
-  --tpl-steps-num-size: 11px; --tpl-steps-check: 12px; --tpl-steps-line-w: 24px; --tpl-steps-line-h: 1.5px; --tpl-steps-top-gap: 12px; --tpl-steps-head-gap: 8px;
+  /* 横の手順：丸26・数11/600・名12。名前を丸の下の1行に置き、中心の高さを線でつなぐ。 */
+  --tpl-steps-gap: 8px; --tpl-steps-dot: 26px; --tpl-steps-dot-gap: var(--polish-space-row); --tpl-steps-text-size: var(--text-caption); --tpl-steps-text-lh: 19px;
+  --tpl-steps-num-size: 11px; --tpl-steps-check: 12px; --tpl-steps-line-w: 24px; --tpl-steps-line-h: 1px; --tpl-steps-top-gap: 12px; --tpl-steps-head-gap: 8px;
   /* ダッシュボード：数の帯・右の列・グラフ・表・友だち追加リンク・最近の動き。 */
   --tpl-db-num-size: 28px; --tpl-db-num-lh: 32px; --tpl-db-unit-size: 13px; --tpl-db-unit-lh: 20px; --tpl-db-cell-pad: 16px 20px; --tpl-db-cell-gap: 8px;
   --tpl-db-tag-pad: 2px 7px; --tpl-db-tag-radius: var(--polish-radius-small); --tpl-db-tag-gap: 3px; --tpl-db-aside-pad: var(--polish-space-card); --tpl-db-aside-pad-narrow: 18px 16px; --tpl-db-aside-gap: 10px; --tpl-db-aside-tail-pad: 0px; --tpl-db-aside-tail-pull: -7px; --tpl-db-aside-inbox-tail-pad: 6px; --tpl-db-kv-gap: 8px; --tpl-db-dot: 7px;
@@ -1613,7 +1617,7 @@
   /* 設定の中のメニュー（設定の板  ほか 8 枚）。 */
   --tpl-setnav-w: 200px; --tpl-setnav-divider: inset -1px 0 0 var(--color-hairline); --tpl-setnav-pad: 16px 12px; --tpl-setnav-gap: 2px; --tpl-setnav-item-pad: 8px 10px; --tpl-setnav-item-gap: 8px; --tpl-setnav-radius: var(--polish-radius-control); --tpl-setnav-child-indent: 22px; --tpl-setnav-band-pad: 8px 16px;
   /* 設定 A（はじめの設定 ・LINEアカウント ・プール管理 ・ログインユーザー  ほか）。 */
-  --tpl-sa-content-pad: 16px 24px 24px; --tpl-sa-gap: 14px; --tpl-sa-card-pad: var(--polish-space-card); --tpl-sa-card-gap: var(--polish-space-row); --tpl-sa-pair-gap: var(--polish-space-card);
+  --tpl-sa-content-pad: 16px 24px 24px; --tpl-sa-gap: var(--polish-space-card); --tpl-sa-card-pad: var(--polish-space-card); --tpl-sa-card-gap: var(--polish-space-row); --tpl-sa-pair-gap: var(--polish-space-card);
   --tpl-sa-progress-pad: 16px; --tpl-sa-progress-gap: 12px; --tpl-sa-progress-size: 18px; --tpl-sa-bar-h: 8px; --tpl-sa-bar-radius: var(--polish-radius-small);
   --tpl-sa-step-pad: 16px; --tpl-sa-step-gap: 16px; --tpl-sa-mark: 28px; --tpl-sa-mark-line: 1.5px; --tpl-sa-step-text-gap: 2px; --tpl-sa-title-lh: 19px; --tpl-sa-sub-lh: 16px; --tpl-sa-card-title-lh: 20px; --tpl-sa-card-line-lh: 17px;
   --tpl-sa-pool-pad: 18px; --tpl-sa-pool-gap: 10px; --tpl-sa-pool-name-size: var(--polish-text-body); --tpl-sa-pool-name-lh: 22px; --tpl-sa-pool-slug-lh: 16px; --tpl-sa-row-pad: 8px 12px; --tpl-sa-row-gap: 8px; --tpl-sa-row-radius: var(--polish-radius-control); --tpl-sa-url-lh: 15px; --tpl-sa-label-lh: 16px; --tpl-sa-link-lh: 17px; --tpl-sa-member-name-lh: 17px;
@@ -1632,7 +1636,7 @@
   --tpl-settings-content-pad-block: 24px; --tpl-settings-content-pad-side: 24px; --tpl-settings-content-gap: 16px;
   --tpl-settings-gap: 16px;
   /* ★V8 設定の板（機能設定・マニュアルの正本表・ファイルの検査・運用状態・EC連携・LINE通知）。sb の作業役が足した値。 */
-  --tpl-sb-nav-w: 208px; --tpl-sb-head-gap: 8px; --tpl-sb-head-pad-bottom: 16px; --tpl-sb-desc-size: var(--polish-text-body); --tpl-sb-desc-lh: 17px; --tpl-sb-footer-side: 12px;
+  --tpl-sb-nav-w: 208px; --tpl-sb-head-gap: 8px; --tpl-sb-head-pad-bottom: var(--tpl-head-pad-bottom); --tpl-sb-desc-size: var(--polish-text-body); --tpl-sb-desc-lh: 17px; --tpl-sb-footer-side: 12px;
   --tpl-sb-band-pad: 10px 14px; --tpl-sb-band-gap: 10px; --tpl-sb-band-radius: var(--polish-radius-control); --tpl-sb-band-icon: 16px; --tpl-sb-band-text: var(--polish-text-body); --tpl-sb-band-lh: 20px;
   --tpl-sb-ctl-h: 36px; --tpl-sb-ctl-radius: var(--polish-radius-control); --tpl-sb-ctl-pad: 0 12px; --tpl-sb-ctl-gap: 8px; --tpl-sb-search-w: 220px; --tpl-sb-search-w-wide: 240px; --tpl-sb-icon-s: 14px; --tpl-sb-icon-m: 15px;
   --tpl-sb-card-radius: var(--polish-radius-card); --tpl-sb-group-gap: 12px; --tpl-sb-group-head-pad: 12px 14px; --tpl-sb-group-head-gap: 8px; --tpl-sb-group-title: var(--polish-text-section); --tpl-sb-group-title-lh: 20px;
@@ -1649,7 +1653,7 @@
   --tpl-sb-note-pad: 12px 16px; --tpl-sb-note-text: var(--polish-text-note); --tpl-sb-tbl-pad: 4px 12px; --tpl-sb-tbl-row-pad: 11px 8px; --tpl-sb-tbl-gap: 12px; --tpl-sb-tbl-head: 12px;
   --tpl-sb-ml-col-id: 70px; --tpl-sb-ml-col-name: 150px; --tpl-sb-ml-col-checked: 130px; --tpl-sb-ml-col-status: 90px; --tpl-sb-ml-col-action: 76px; --tpl-sb-ml-edit-w: 240px;
   --tpl-sb-fs-col-uploader: 120px; --tpl-sb-fs-col-action: 200px; --tpl-sb-more: 28px; --tpl-sb-ext-pad: 16px; --tpl-sb-form-w: 420px;
-  --tpl-sb-nav-w-narrow: 200px; --tpl-sb-narrow-pad-top: 16px; --tpl-sb-narrow-pad-bottom: 24px; --tpl-sb-narrow-pad-side: 24px; --tpl-sb-narrow-gap: 14px;
+  --tpl-sb-nav-w-narrow: 200px; --tpl-sb-narrow-pad-top: 16px; --tpl-sb-narrow-pad-bottom: 24px; --tpl-sb-narrow-pad-side: 24px; --tpl-sb-narrow-gap: var(--polish-space-card);
   --tpl-sb-tab-gap: 20px; --tpl-sb-tab-pad-bottom: 8px; --tpl-sb-tab-line: 2px; --tpl-sb-ec-head-pad: 9px 16px; --tpl-sb-ec-row-pad: 10px 16px; --tpl-sb-ec-gap: 14px; --tpl-sb-ec-lh: 17px; --tpl-sb-dot: 6px; --tpl-sb-sort-w: 120px;
   --tpl-sb-ec-col-when: 170px; --tpl-sb-ec-col-who: 150px; --tpl-sb-ec-col-what: 222px; --tpl-sb-ec-col-done: 170px; --tpl-sb-ec-col-status: 90px; --tpl-sb-ec-col-menu: 36px;
   --tpl-sb-kpi-pad: 14px; --tpl-sb-kpi-gap: 4px; --tpl-sb-kpi-num: 20px; --tpl-sb-kpi-num-lh: 24px;
@@ -2932,11 +2936,6 @@ select:not([multiple]):not(.appearance-none) {
   width: var(--polish-icon-heading); height: var(--polish-icon-heading); stroke-width: var(--polish-icon-stroke); color: inherit;
 }
 
-/* キーボードの輪は、画面から渡されたクラスにも共通で効く。 */
-html:root :is(button, a, input, textarea, select, [tabindex], [role='button'], [role='tab'], [role='menuitem'], [role='option']):focus-visible:not(:where([data-dialog-choice-cards] a)) {
-  outline: var(--polish-focus-width) solid var(--polish-focus);
-  outline-offset: var(--polish-focus-offset);
-}
 /* 数値として登録し、地の濃さを120msで連続して変える（文字には重ねない）。 */
 @property --polish-overlay-strength { syntax: '<number>'; inherits: false; initial-value: 0; }
 html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):not(:where([data-dialog-choice-cards] a)) {
@@ -2988,7 +2987,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --radius-segment: var(--polish-radius-control);
   --color-table-head: #f7f8fa;
   --color-focus-ring: var(--polish-focus);
-  --shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12);
+  --shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12); --polish-window-shadow: 0 24px 80px rgb(29 29 31 / 0.16), 0 8px 24px rgb(29 29 31 / 0.08); --polish-window-backdrop: color-mix(in srgb, var(--color-ink) 18%, transparent); --polish-window-blur: 4px; --polish-window-icon-size: 32px; --polish-window-icon-bg: var(--color-selection-bg); --polish-window-icon-ink: var(--color-accent-deep); --polish-window-edge: color-mix(in srgb, var(--color-ink) 4%, transparent); --polish-window-group-bg: #f8f8f9; --polish-window-close-size: 32px; --polish-window-cancel-bg: #f1f1f2; --polish-window-divider-space: 24px; --polish-row-action-width: 128px;
   --shadow-float: var(--shadow-controls-pop);
   --shadow-overlay: var(--shadow-controls-pop);
   --select-menu-shadow: var(--shadow-controls-pop);
@@ -3001,7 +3000,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --color-badge-info-bg: var(--polish-status-info-bg); --color-badge-info: var(--polish-status-info-ink);
   --tpl-folder-create-h: 36px;
   --tpl-folder-create-pad: 0 16px;
-  --tpl-button-weight: 600;
+  --tpl-button-weight: 500;
   --tpl-button-h: 36px;
   --tpl-button-pad-side: 16px;
   --tpl-dialog-width: 560px;
@@ -3038,7 +3037,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-list-head-h: 40px;
   --tpl-list-search-w: 240px;
   --tpl-list-search-min: 120px;
-  --tpl-list-band-h: 116px;
+  --tpl-list-band-h: 112px;
   --tpl-list-band-pad: 16px 24px;
   --tpl-list-gap: 8px;
   --tpl-list-cell-side: 16px;
@@ -3103,7 +3102,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --color-code-bg: #f5f6f8;
   --color-code-border: #e5e7eb;
   --color-choice-border: #c9ced6;
-  --choice-size: 16px; --choice-checkbox-radius: 4px;
+  --choice-size: 16px; --choice-checkbox-radius: 4px; --polish-choice-ring: 1px; --polish-choice-border: #8b929e; --polish-choice-mark-stroke: 2;
   --choice-ring: 1.5px;
   --choice-dot: 8px;
   --choice-card-ring: 2px;
@@ -3148,11 +3147,11 @@ html:root input[type='checkbox']:checked { border-color: var(--color-selection-b
 html:root input:is([type='radio'], [type='checkbox']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 /* ：素の切り替えも同じ選択の色。ページ内タブはの黒い下線を保つ。フォルダの列の行は列の選んだ形（灰の地）を保つ（選ぶ窓で aria-pressed が付く）。注目の星は黄色い塗りだけ（緑の箱にしない）。曜日のつなげた並びは地の色だけ。ファネルの段の行は薄い緑の地と濃い棒だけ（枠を足さない・絵 ）。表の行の名前は行の地の色で選んだことを示す（名前に枠を足さない・絵 ）。 */
-html:root button:not([role='tab']):not([data-folder-select]):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='funnel-row']):not([data-part='row-name']):is([aria-pressed='true'], [data-current]:not([data-current='false']), [aria-current='page'], [aria-current='step']) { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
+html:root button:not([role='tab']):not([data-folder-select]):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='filter-chip']):not([data-part='funnel-row']):not([data-part='row-name']):is([aria-pressed='true'], [data-current]:not([data-current='false']), [aria-current='page'], [aria-current='step']) { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
 
 :root { --tpl-list-state-w: 104px; }
 
-:root { --tpl-band-detail-h: 18px; --tpl-list-band-no-detail-h: 90px; --tpl-insert-icon: 16px; --tpl-insert-footer-pad: 8px 12px; }
+:root { --tpl-band-detail-h: 18px; --tpl-list-band-no-detail-h: 88px; --tpl-insert-icon: 16px; --tpl-insert-footer-pad: 8px 12px; }
 
 /* 固定V8 登録メディアの縮小見本。 */
 :root { --tpl-media-file-surface: #e9ecef; --tpl-media-video-surface: #5a6577; --tpl-media-thumbnail-icon: 40px; }
@@ -3191,3 +3190,9 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 :root { --tpl-layout-zero: 0; --tpl-layout-auto: auto; --tpl-layout-full: 100%; --tpl-layout-relaxed: 1.6; }
 
 :root { --tpl-sender-icon: 32px; --tpl-sender-row: 48px; --tpl-sender-tile: 88px; --tpl-sender-icon-text: 13px; --tpl-sender-note-lh: 18px; --tpl-sender-outline: 2px; }
+
+
+/* 複合部品や画面が渡す線幅も、同じlucideの値へそろえる。 */
+:root svg.lucide { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
+
+html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][data-align='right']) { font-variant-numeric: tabular-nums; }

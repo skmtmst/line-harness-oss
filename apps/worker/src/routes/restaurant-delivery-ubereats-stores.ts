@@ -203,7 +203,7 @@ export function registerUberStoreRoutes(app: Hono<Env>, deps: UberStoreRoutesDep
         // 残すのは分類済みの符号だけ。Uber から返った自由文・本文・例外は保存も表示もしない。
         const code = error instanceof UberEatsError ? error.kind : 'store_list_failed';
         await uberMarkConnectionError(c, store.id, code, uberStatusForError(error));
-        logger.error('routes_restaurant_delivery_failed');
+        logger.error("restaurant_delivery.restaurant_test_delivery_ubereats_stores_list_failed");
         return fail(c, 502, 'Uber Eats からお店の一覧を取れませんでした', { code });
       }
 
@@ -305,7 +305,7 @@ export function registerUberStoreRoutes(app: Hono<Env>, deps: UberStoreRoutesDep
         const code = error instanceof UberEatsError ? error.kind : 'provisioning_failed';
         const unknown = !(error instanceof UberEatsError) || error.status === null || error.status === 408 || (error.status ?? 0) >= 500 || error.kind === 'unknown';
         await failPosActivation(db, store.id, unknown ? POS_ACTIVATION_UNKNOWN : code, unknown ? undefined : uberStatusForError(error));
-        logger.error('routes_restaurant_delivery_failed');
+        logger.error("restaurant_delivery.restaurant_test_delivery_ubereats_stores_select_create_failed");
         return fail(c, 502, unknown ? UBER_TOKEN_FAILURE_MESSAGES.pos_activation_unknown : 'Uber Eats でお店をつなげませんでした', { code: unknown ? POS_ACTIVATION_UNKNOWN : code });
       }
 

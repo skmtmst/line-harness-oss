@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import {createSavedSearch} from '@line-crm/db';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
@@ -19,12 +20,12 @@ customerSegments.get('/api/analytics/customer-segments',async c=>{
  return c.json({success:true,data:{cells,outside:stamp?.at?outside:{count:null},total:stamp?.at?rows.reduce((n,r)=>n+r.count,0)+(outside?.count??0):null,computedAt:stamp?.at??null,status:stamp?.status??'not_computed'}});
 });
 customerSegments.get('/api/analytics/customer-segments/cells/:r/:f/friends',async c=>{
- const a=await gapAccount(c),r=Number(c.req.param('r')),f=Number(c.req.param('f')),{basis,column}=filters(c.req.query('basis'),c.req.query('measure')),offset=Number(c.req.query('cursor')??c.req.query('offset')??0);
+ const a=await gapAccount(c),r=Number(c.req.param('r')),f=Number(c.req.param('f')),{basis,column}=filters(c.req.query('basis'),c.req.query('measure')),offset=listQueryNumber(c.req.query('cursor')??c.req.query('offset'), 0);
  const all=r===0&&f===0;if(!all&&![r,f].every(x=>Number.isInteger(x)&&x>=1&&x<=5)||!Number.isSafeInteger(offset)||offset<0)throw new GapError('invalid_filter');
  const where=`c.account_id=? AND c.basis=?${all?'':` AND c.r_bucket=? AND c.${column}=?`}`,binds=all?[a,basis]:[a,basis,r,f];
  const total=await c.env.DB.prepare(`SELECT count(*) n,SUM(CASE WHEN ${optedOut} THEN 1 ELSE 0 END) optedOutCount FROM customer_activity_daily c WHERE ${where}`).bind(...binds).first<{n:number;optedOutCount:number}>();
  const rows=(await c.env.DB.prepare(`SELECT f.id,f.display_name,c.activity_count,c.amount,c.last_activity_at FROM customer_activity_daily c JOIN friends f ON f.id=c.friend_id AND f.line_account_id=c.account_id WHERE ${where} ORDER BY f.id LIMIT 20 OFFSET ?`).bind(...binds,offset).all<Record<string,unknown>>()).results;
- return c.json({success:true,data:{items:rows.map(x=>({...x,display_name:c.get('impersonation')?'（非表示）':x.display_name})),total:total?.n??0,optedOutCount:total?.optedOutCount??0,nextCursor:offset+rows.length<(total?.n??0)?String(offset+rows.length):null}});
+ return c.json({success:true,data:buildOffsetListResponse({ items:rows.map(x=>({...x,display_name:c.get('impersonation')?'（非表示）':x.display_name})),total:total?.n??0,optedOutCount:total?.optedOutCount??0,nextCursor:offset+rows.length<(total?.n??0)?String(offset+rows.length):null, paging: { limit: 20 }, sort: [{ field: 'id', direction: 'asc' }] })});
 });
 customerSegments.put('/api/analytics/customer-segments/cells/:r/:f/name',async c=>{
  gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c),r=Number(c.req.param('r')),f=Number(c.req.param('f'));if(![r,f].every(x=>Number.isInteger(x)&&x>=1&&x<=5)||typeof b.name!=='string'||!b.name.trim()||b.name.length>50)throw new GapError('invalid_name');

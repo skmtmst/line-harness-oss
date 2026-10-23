@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -205,7 +206,7 @@ nenRanks.delete('/api/nen/rank-settings/:id', requireRole('owner', 'admin'), asy
         : ecSyncResult.status === 'failed' ? 'ECへの反映に失敗した会員がいます。結果を確認してやり直してください' : data.message } });
   } catch (error) {
     if (error instanceof NenRankDeleteError) return inputError(c, { success: false, error: error.message }, error.status, []);
-    return c.json({ success: false, error: 'ランクを削除できませんでした。読み直してからもう一度お試しください' }, 500);
+    throw error;
   }
 });
 
@@ -380,8 +381,8 @@ nenRanks.get('/api/nen/members', async (c) => {
     petFilter: petParam === 'with' || petParam === 'without' ? petParam : 'any',
     query: c.req.query('q') ?? '',
     sort: sortParam === 'lifetime_desc' || sortParam === 'balance_desc' || sortParam === 'recent' ? sortParam : 'annual_desc',
-    page: Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1),
-    pageSize: Math.max(1, Math.min(Number.parseInt(c.req.query('pageSize') ?? '20', 10) || 20, 100)),
+    page: Math.max(1, listQueryNumber(c.req.query('page'), 1, { format: 'integer-prefix' }) || 1),
+    pageSize: Math.max(1, Math.min(listQueryNumber(c.req.query('pageSize'), 20, { format: 'integer-prefix' }) || 20, 100)),
   };
   const [{ items, total }, kpis] = await Promise.all([
     listNenMembers(c.env.DB, options),
@@ -411,14 +412,12 @@ nenRanks.get('/api/nen/members', async (c) => {
   });
   return c.json({
     success: true,
-    data: {
-      items: data,
+    data: buildOffsetListResponse({ items: data,
       total,
       page: options.page,
       pageSize: options.pageSize,
       kpis,
-      ranks: ranks.map((rank) => ({ key: rank.rank_key, name: rank.name, annualThresholdYen: rank.annual_threshold_yen, mileRatePercent: rank.mile_rate_percent })),
-    },
+      ranks: ranks.map((rank) => ({ key: rank.rank_key, name: rank.name, annualThresholdYen: rank.annual_threshold_yen, mileRatePercent: rank.mile_rate_percent })), paging: { limit: options.pageSize ?? 20 }, sort: [] }),
   });
 });
 

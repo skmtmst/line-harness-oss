@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -57,8 +56,7 @@ users.get('/api/users', requireRole('owner', 'admin', 'staff'), async (c) => {
     const items = await getUsersForAccess(c.env.DB, await userAccessScope(c));
     return c.json({ success: true, data: items.map(serializeUser) });
   } catch (err) {
-    logger.error("routes_users_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -72,8 +70,7 @@ users.get('/api/users/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
     }
     return c.json({ success: true, data: serializeUser(user) });
   } catch (err) {
-    logger.error("routes_users_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -99,8 +96,7 @@ users.post('/api/users', requireRole('owner', 'admin'), inputJsonBoundary({"emai
     });
     return c.json({ success: true, data: serializeUser(user) }, 201);
   } catch (err) {
-    logger.error("routes_users_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -130,8 +126,7 @@ users.put('/api/users/:id', requireRole('owner', 'admin'), inputJsonBoundary({"e
     }
     return c.json({ success: true, data: serializeUser(updated) });
   } catch (err) {
-    logger.error("routes_users_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -168,8 +163,7 @@ users.delete('/api/users/:id', requireRole('owner'), async (c) => {
     await archiveUser(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_users_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -210,8 +204,7 @@ users.post('/api/users/:id/link', requireRole('owner', 'admin'), inputJsonBounda
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_users_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -233,8 +226,7 @@ users.get('/api/users/:id/accounts', requireRole('owner', 'admin', 'staff'), asy
       })),
     });
   } catch (err) {
-    logger.error("routes_users_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -257,8 +249,7 @@ users.post('/api/users/match', requireRole('owner', 'admin'), inputJsonBoundary(
     }
     return c.json({ success: true, data: serializeUser(user) });
   } catch (err) {
-    logger.error("routes_users_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

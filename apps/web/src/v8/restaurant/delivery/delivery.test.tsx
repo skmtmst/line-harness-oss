@@ -490,7 +490,7 @@ describe('一覧と確認の操作を保つ', () => {
     expect(dialog.querySelector('[data-qa-dialog-callout]')).toBeNull()
     // 題の左に丸い注意三角を置く。
     const heading = dialog.querySelector('h2')
-    const mark = heading?.previousElementSibling
+    const mark = heading?.querySelector('[aria-hidden="true"]')
     expect(mark?.tagName).toBe('SPAN')
     expect(mark?.querySelector('svg')).toBeTruthy()
   })
@@ -518,8 +518,8 @@ describe('一覧と確認の操作を保つ', () => {
     // 時間は共通の切り替え部品に任せ、つながった帯ではなく離れた札4つにする。
     const times = within(dialog).getByRole('group', { name: '停止する時間' })
     expect(times.getAttribute('data-appearance')).toBe('intake-stop')
-    // つまみ（滑る白い帯）は出さない。
-    expect(times.querySelector('[aria-hidden="true"]')).toBeNull()
+    // 選択の面だけが滑り、4つの時間の操作と選択状態を保つ。
+    expect(times.querySelector('[aria-hidden="true"]')).not.toBeNull()
     const cards = times.querySelectorAll('button')
     expect(cards.length).toBe(4)
     expect(Array.from(cards).map((card) => card.getAttribute('aria-pressed'))).toEqual([

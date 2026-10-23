@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite} from '../services/gap-common.js';
@@ -8,13 +9,13 @@ aiAnswerLogs.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.
 aiAnswerLogs.use('/api/ai-answer-logs*',requirePermission('/auto-replies'));
 function view(r:Record<string,unknown>,masked:boolean){return {testMode:String(r.id).startsWith(simulatedQaPrefix),id:r.id,createdAt:r.created_at,chatId:r.chat_id,friendId:r.friend_id,friendName:masked?null:r.friend_name,questionText:masked?'（非表示）':r.question_text,action:r.action,handoffReason:r.handoff_reason,qaEntryId:r.qa_entry_id,qaTitle:r.qa_title,qaVersion:r.qa_version};}
 aiAnswerLogs.get('/api/ai-answer-logs',async c=>{
- const a=await gapAccount(c),offset=Number(c.req.query('offset')??0),action=c.req.query('action')??'';
+ const a=await gapAccount(c),offset=listQueryNumber(c.req.query('offset'), 0),action=c.req.query('action')??'';
  if(!Number.isSafeInteger(offset)||offset<0||action&&!['answered','handed_off','customer_asked_human'].includes(action))throw new GapError('invalid_filter');
  const where='l.account_id=? AND (?=\'\' OR l.action=?)',bind=[a,action,action];
  const total=await c.env.DB.prepare(`SELECT count(*) n FROM ai_answer_logs l WHERE ${where}`).bind(...bind).first<{n:number}>();
  const rows=(await c.env.DB.prepare(`SELECT l.*,f.display_name friend_name,json_extract(q.questions_json,'$[0]') qa_title FROM ai_answer_logs l LEFT JOIN friends f ON f.id=l.friend_id AND f.line_account_id=l.account_id LEFT JOIN qa_entries q ON q.id=l.qa_entry_id AND q.account_id=l.account_id WHERE ${where} ORDER BY l.created_at DESC,l.id LIMIT 20 OFFSET ?`).bind(...bind,offset).all<Record<string,unknown>>()).results;
  const summary=await c.env.DB.prepare(`SELECT count(CASE WHEN action='answered' AND id NOT LIKE 'ai-sim:%' THEN 1 END) answered,count(CASE WHEN action='handed_off' AND id NOT LIKE 'ai-sim:%' THEN 1 END) handedOff,count(CASE WHEN action='answered' AND id LIKE 'ai-sim:%' THEN 1 END) simulatedAnswered,count(CASE WHEN action!='answered' AND id LIKE 'ai-sim:%' THEN 1 END) simulatedHandedOff FROM ai_answer_logs WHERE account_id=?`).bind(a).first();
- return c.json({success:true,data:{items:rows.map(r=>view(r,!!c.get('impersonation'))),total:total?.n??0,summary:{...summary,askedAgainRate:null}}});
+ return c.json({success:true,data:buildOffsetListResponse({ items:rows.map(r=>view(r,!!c.get('impersonation'))),total:total?.n??0,summary:{...summary,askedAgainRate:null}, paging: { limit: 20 }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});
 });
 aiAnswerLogs.get('/api/ai-answer-logs/:id',async c=>{
  const a=await gapAccount(c),r=await c.env.DB.prepare('SELECT l.*,f.display_name friend_name FROM ai_answer_logs l LEFT JOIN friends f ON f.id=l.friend_id AND f.line_account_id=l.account_id WHERE l.id=? AND l.account_id=?').bind(c.req.param('id'),a).first<Record<string,unknown>>();if(!r)throw new GapError('not_found',404);

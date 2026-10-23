@@ -134,7 +134,7 @@
 
 /* 一覧の下の「＋ 新しいフォルダを作る」（dLffh）。緑・600。 */
 .action {
-  color: var(--color-accent-deep);
+  color: var(--color-ink);
   font-weight: 600;
 }
 
@@ -170,7 +170,7 @@
   width: var(--select-menu-check);
   height: var(--select-menu-check);
   flex: none;
-  color: var(--color-accent-deep);
+  color: var(--color-ink);
 }
 
 /* 名前の下に1行の説明がある行（YPzmo「押したら」）。印は名前の行の高さにそろえて上に寄せる。 */
@@ -203,3 +203,5 @@
 
 /* ：開いた選ぶ欄も浮く面の薄い縁を使う。 */
 :root .surface { border-color: var(--card-edge); }
+
+:root .item { padding-block: 7.5px 6.5px; }

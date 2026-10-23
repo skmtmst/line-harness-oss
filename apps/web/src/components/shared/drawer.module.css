@@ -6,7 +6,9 @@
   z-index: 80;
   display: flex;
   justify-content: flex-end;
-  background: color-mix(in srgb, var(--color-ink) 35%, transparent);
+  background: var(--polish-window-backdrop);
+  -webkit-backdrop-filter: blur(var(--polish-window-blur));
+  backdrop-filter: blur(var(--polish-window-blur));
 }
 
 .panel {
@@ -44,7 +46,7 @@
   justify-content: space-between;
   gap: 16px;
   border-bottom: 1px solid var(--color-hairline);
-  padding: 20px 24px;
+  padding: var(--polish-space-section);
 }
 
 .inline .header {
@@ -103,7 +105,7 @@
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: var(--polish-space-section);
 }
 
 .inline .body {
@@ -156,7 +158,7 @@
 .footer {
   flex: 0 0 auto;
   border-top: 1px solid var(--color-hairline);
-  padding: 16px 24px;
+  padding: var(--polish-space-section);
 }
 
 @media (max-width: 560px) {
@@ -169,7 +171,7 @@
 }
 
 /*
- * ★V8 仕上げ（M10）「横から出る面」：右から入る（240ms ease-out）。
+ * ★V8 仕上げ（M10）「引き出し」：少し下から浮き上がる（200ms ease-out）。
  * 閉じるときは逆（150ms）。閉じの印 `data-closing` は drawer.tsx が
  * V8 のときだけ付ける（管理画面・試験は今までどおり即時に消える）。
  */
@@ -186,8 +188,8 @@
 
   :root .panel {
     transition:
-      opacity var(--motion-panel) var(--motion-ease-out),
-      transform var(--motion-panel) var(--motion-ease-out);
+      opacity var(--motion-base) var(--motion-ease-out),
+      transform var(--motion-base) var(--motion-ease-out);
   }
 
   @starting-style {
@@ -197,7 +199,7 @@
 
     :root .panel {
       opacity: 0;
-      transform: translateX(24px);
+      transform: translateY(4px) scale(0.98);
     }
   }
 
@@ -306,14 +308,14 @@
 
 :root .panel[data-closing] {
   opacity: 0;
-  transform: translateX(24px);
+  transform: translateY(4px) scale(0.98);
 }
 }
 
 /* 紹介者の620幅の板。外側の余白を型が持つ。 */
 :root .panel[data-layout='inset'] { padding: var(--tpl-af-dr-pad); gap: var(--tpl-af-dr-gap); box-shadow: var(--tpl-af-dr-shadow); }
 :root .panel[data-layout='inset'] .header { padding: 0; gap: var(--tpl-af-dr-gap); }
-:root .panel[data-layout='inset'] .title { font-size: var(--text-heading); font-weight: 700; line-height: normal; }
+:root .panel[data-layout='inset'] .title { font-size: var(--text-heading); font-weight: 700; line-height: var(--tpl-af-dr-title-lh); }
 :root .panel[data-layout='inset'] .description { margin-top: var(--tpl-af-dr-head-gap); font-size: var(--text-caption); line-height: normal; white-space: normal; overflow-wrap: anywhere; }
 :root .panel[data-layout='inset'] .body { padding: 0; }
 :root .panel[data-layout='inset'] .footer { padding: 0; border: 0; gap: var(--tpl-toolbar-gap); }
@@ -327,7 +329,7 @@
 :root .panel[data-width='order'] .body { display: flex; flex-direction: column; gap: var(--tpl-st2-od-gap); padding: 0 var(--tpl-st2-od-pad); }
 :root .panel[data-width='order'] .footer { display: flex; justify-content: space-between; gap: var(--tpl-st2-od-gap); border: 0; padding: 0 var(--tpl-st2-od-pad) var(--tpl-st2-od-pad); }
 /* G-9: メッセージ作成の広い引き出し。ほかの引き出しは変えない。 */
-:root .panel[data-width='composer'] { width: min(var(--tpl-msg-composer-drawer-w), 100%); border-radius: var(--radius-panel) 0 0 var(--radius-panel); }
+:root .panel[data-width='composer'] { width: min(var(--tpl-msg-composer-drawer-w), 100%); border-radius: var(--polish-radius-dialog); }
 :root .panel[data-width='composer'] .header { padding: var(--tpl-msg-composer-drawer-head-pad); align-items: center; }
 :root .panel[data-width='composer'] .title { font-size: var(--tpl-msg-composer-drawer-title); line-height: var(--tpl-msg-composer-drawer-title-lh); font-weight: 700; }
 :root .panel[data-width='composer'] .body { padding: 0; }
@@ -342,7 +344,7 @@
 :root .panel:not(.inline) .body { flex: 0 1 auto; }
 
 /* ：浮く面の影と薄い縁を共通化。 */
-:root .panel { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
+:root .panel { border: 0; outline: 1px solid var(--polish-window-edge); outline-offset: -1px; box-shadow: var(--polish-window-shadow); border-radius: var(--polish-radius-dialog); }
 
 /* ：幅の指定がある引き出しでも窓の題の段をそろえる。 */
 :root .panel.panel .title {
@@ -365,3 +367,46 @@ html:root .panel[data-height-mode='viewport']:not(.inline) .body {
 
 /* 面そのものへ寄せた板（initialFocus='panel'）。面は Tab では止まらず、開いたときにだけ寄るので輪は出さない。 */
 html:root .panel[data-initial-focus='panel']:focus-visible { outline-color: transparent; }
+
+.heading { display: flex; align-items: flex-start; gap: var(--space-12); min-width: 0; }
+.headingText { min-width: 0; }
+.headerIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--polish-window-icon-size);
+  height: var(--polish-window-icon-size);
+  border-radius: var(--radius-pill);
+  background: var(--polish-window-icon-bg);
+  color: var(--polish-window-icon-ink);
+}
+.headerIcon > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+
+html:root .panel .close {
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: none;
+}
+html:root .panel .close:focus-visible {
+  outline: var(--polish-focus-width) solid var(--polish-focus);
+  outline-offset: var(--polish-focus-offset);
+}
+html:root .heading { align-items: center; }
+
+html:root .panel .title:has(.headerIcon) { display: flex; align-items: flex-start; gap: var(--space-12); }
+html:root .title .headerIcon { margin-top: calc((1lh - var(--polish-window-icon-size)) / 2); }
+html:root .headingText:has(.headerIcon) .description { margin-inline-start: calc(var(--polish-window-icon-size) + var(--space-12)); }
+
+/* 説明と頭の区切り線の間を、窓と同じ段の余白にそろえる。 */
+html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order']) .header:has(.description) {
+  padding-block-end: var(--polish-window-divider-space);
+}
+
+/* 区切り線から本文・下の操作までの間隔は窓と同じ値を使う。 */
+html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order']) :is(.body, .footer) {
+  padding-block-start: var(--polish-window-divider-space);
+}

@@ -1,3 +1,4 @@
+import { listQueryNumber } from '../lib/list-paging.js';
 import { getCookie, setCookie } from 'hono/cookie';
 import { logger } from '@line-crm/shared/server';
 import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affiliate-self-auth.js';
@@ -118,7 +119,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
 
-    const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+    const requestedLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(100, Math.max(1, requestedLimit))
       : 20;
@@ -147,8 +148,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
     }));
     return c.json({ success: true, mileage, history, insights, opportunities });
   } catch (err) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -209,8 +209,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
       }),
     });
   } catch (error) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: '使い道を読み込めませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -253,8 +252,7 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', inputJsonBounda
     if (error instanceof MileageRewardError) {
       return inputError(c, { success: false, error: error.message, code: error.code }, error.status as 400, []);
     }
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: '交換を受け付けられませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -336,8 +334,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', inputJsonBoundary(), as
       links: [serializeLink(firstLink, baseUrl)],
     });
   } catch (err) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -378,8 +375,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
       links: links.map((l) => serializeLink(l, baseUrl, stats, offerNames)),
     });
   } catch (err) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -400,8 +396,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/bank', async (c) => {
     });
     return c.json({ success: true, data });
   } catch (error) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: '振込先を確認できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -457,8 +452,7 @@ affiliateSelfRoutes.put('/api/liff/affiliate/bank', inputJsonBoundary(), async (
     logger.log("routes_affiliate_self_log");
     return c.json({ success: true, data: result.profile }, result.kind === 'created' ? 201 : 200);
   } catch (error) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: '振込先を保存できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -483,8 +477,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
       renewalUrl: customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', statement.id),
     })) });
   } catch (error) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: '支払明細を確認できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -534,8 +527,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
       },
     });
   } catch (error) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: '支払明細を取得できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -620,8 +612,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async
       : undefined;
     return c.json({ link: serializeLink(link, baseUrl, undefined, offerNames) });
   } catch (err) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -700,8 +691,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
 
     return c.json({ offers: data });
   } catch (err) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -766,8 +756,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', inputJsonBound
       link: serializeLink(link, baseUrl, undefined, offerNames),
     });
   } catch (err) {
-    logger.error("routes_affiliate_self_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

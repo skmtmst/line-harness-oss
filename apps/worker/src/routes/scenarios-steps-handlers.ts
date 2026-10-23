@@ -1,5 +1,4 @@
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
-import { logger } from '@line-crm/shared/server';
 import { validateConditionForStorage } from './scenario-condition-validation.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -16,7 +15,7 @@ import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { getScenarioRuns, saveScenarioDraft, simulateFriendPlan, simulateScenario } from '../features/scenarios/scenario-contract/index.js';
-import { listLimit } from './list-pagination.js';
+import { buildOffsetListResponse, listLimit } from '../lib/list-paging.js';
 import { validateStepCondition, validateStepSchedule, validateQuestionForStorage, serializeStep, WEEKDAY_JA, requireScenarioAccountScope, scenarioContractError, serializeFriendScenario } from './scenarios-definition.js';
 import type { Context } from 'hono';
 
@@ -238,8 +237,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
 
     return c.json({ success: true, data: serializeStep(updated) });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -249,8 +247,7 @@ export const delete__api_scenarios_id_steps_stepId_2 = async (c: Context<Env, "/
     await deleteScenarioStep(c.env.DB, stepId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -323,8 +320,7 @@ export const post__api_scenarios_id_steps_reorder_3 = async (c: Context<Env, "/a
 
     return c.json({ success: true });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -440,8 +436,7 @@ export const get__api_scenarios_id_preview_4 = async (c: Context<Env, "/api/scen
       },
     });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -458,8 +453,7 @@ export const get__api_scenarios_id_stats_5 = async (c: Context<Env, "/api/scenar
     const stats = await computeScenarioStats(c.env.DB, scenarioId);
     return c.json({ success: true, data: stats });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -501,7 +495,7 @@ export const get__api_scenarios_id_runs_7 = async (c: Context<Env, "/api/scenari
       cursor: c.req.query('cursor'),
       limit: listLimit(c.req.query('limit'), 50, 100),
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, items: data.subscriptions, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [] }) });
   } catch (error) {
     return scenarioContractError(c, error);
   }
@@ -616,7 +610,6 @@ export const post__api_scenarios_id_enroll_friendId_10 = async (c: Context<Env, 
     }
     return c.json({ success: true, data: serializeFriendScenario(enrollment) }, 201);
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

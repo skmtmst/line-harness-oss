@@ -1,4 +1,5 @@
 'use client'
+import { invalidateApiReads } from '@/lib/api/transport/read-cache'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { type CancelReservationInput } from '@/components/shared/booking-confirm-dialogs'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
@@ -133,7 +134,7 @@ export function useStyleDashboard(style: IndustryStyle) {
   const currentLayoutScope = useRef(layoutScope)
   currentLayoutScope.current = layoutScope
   const [presentationRead, setPresentationRead] = useState(0)
-  const reloadPresentation = () => { loadedLayoutScope.current = null; setPresentationRead(value => value + 1) }
+  const reloadPresentation = () => { invalidateApiReads('/api/dashboard/style', accountId); loadedLayoutScope.current = null; setPresentationRead(value => value + 1) }
   const [selectionState, setSelectionState] = useState<{ scope: string; metricIds?: string[]; metricsCustomized?: boolean } | null>(null)
   const applyPresentation = (next: { cards: StyleCard[]; version: number; metricIds?: string[]; metricsCustomized?: boolean }, reset = false) => {
     if (currentLayoutScope.current !== layoutScope) return false

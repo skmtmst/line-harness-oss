@@ -69,7 +69,7 @@ function Variant({ variant, winner, metric }: { variant: AbVariantResult; winner
         <span className={styles.variantTitle} title={variant.label ?? undefined}>{`${variant.key} 案${variant.label ? `：${variant.label}` : ''}`}</span>
         {winner ? <StatusBadge tone="success" dot>勝ち</StatusBadge> : null}
       </div>
-      <KpiBand>
+      <KpiBand maxColumns={2}>
         <KpiCard detail="" presentation="band" title="送った" value={variant.sent} unit="人" />
         <KpiCard detail="" presentation="band" title="クリック率" valueText={pct(variant.clickRate)} value={null} unit="" />
         <KpiCard detail="" presentation="band" title={metric === 'purchase' ? '購入' : '予約'} valueText={metric === 'purchase' ? count(variant.purchases, '件') : count(variant.bookings, '件')} value={null} unit="" />

@@ -1793,7 +1793,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
         res: await call(STORES_PATH), trace: currentInvocation()!,
       }));
       expect(errorSpy.mock.calls.map((args: unknown[]) => JSON.parse(String(args[0])))).toContainEqual(expect.objectContaining({
-        code: 'routes_restaurant_delivery_failed', level: 'error', source: 'http',
+        code: 'restaurant_delivery.restaurant_test_delivery_ubereats_stores_list_failed', level: 'error', source: 'http',
         requestId: trace.requestId, invocationId: trace.invocationId,
       }));
       expect(res.status).toBe(502);
@@ -1903,7 +1903,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
         res: await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } }), trace: currentInvocation()!,
       }));
       expect(errorSpy.mock.calls.map((args: unknown[]) => JSON.parse(String(args[0])))).toContainEqual(expect.objectContaining({
-        code: 'routes_restaurant_delivery_failed', level: 'error', source: 'http',
+        code: 'restaurant_delivery.restaurant_test_delivery_ubereats_stores_select_create_failed', level: 'error', source: 'http',
         requestId: trace.requestId, invocationId: trace.invocationId,
       }));
       expect(res.status).toBe(502);

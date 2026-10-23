@@ -171,11 +171,15 @@ export default function Progress({
 }
 
 /** V8 tydx2: bare progress track. Full Progress keeps its actions and announcements. */
-export function ProgressBar({ value, label, className }: { value: number; label: string; className?: string }) {
-  const clamped = Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0
+export function ProgressBar({ value, label, className, max = 100, appearance, tone }: {
+  value: number; label: string; className?: string; max?: number
+  appearance?: 'onboarding' | 'quota'; tone?: 'danger'
+}) {
+  const limit = Number.isFinite(max) && max > 0 ? max : 0
+  const clamped = Number.isFinite(value) ? Math.min(limit, Math.max(0, value)) : 0
   return (
-    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={clamped} className={[styles.track, className].filter(Boolean).join(' ')}>
-      <div className={styles.fill} style={{ width: `${clamped}%`, transform: 'none' }} />
+    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={clamped} data-appearance={appearance} data-tone={tone} className={[styles.track, className].filter(Boolean).join(' ')}>
+      <div className={styles.fill} style={{ transform: `scaleX(${limit > 0 ? clamped / limit : 0})` }} />
     </div>
   )
 }

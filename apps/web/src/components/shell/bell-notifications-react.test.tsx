@@ -15,12 +15,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NotificationCenterItem } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
+  role: 'owner' as string | null,
   push: vi.fn(),
   list: vi.fn(),
   markRead: vi.fn(),
   markAllRead: vi.fn(),
   toast: vi.fn(),
 }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: fixture.push }), usePathname: () => '/' }))
 vi.mock('next/link', async () => {
@@ -93,6 +95,7 @@ async function openPopover() {
 
 describe('★V8 ベルの小窓', () => {
   beforeEach(() => {
+    fixture.role = 'owner'
     document.documentElement.dataset.theme = 'v8'
     fixture.push.mockReset()
     fixture.toast.mockReset()
@@ -112,8 +115,21 @@ describe('★V8 ベルの小窓', () => {
     ]))
   })
 
+  it.each(['viewer', null])('権限が %s の間は既読操作を出さず、通知の移動はできる', async (role) => {
+    fixture.role = role
+    render(<Harness />)
+    const panel = await openPopover()
+    await within(panel).findByText('未読のエラー')
+    expect(within(panel).queryByRole('button', { name: 'すべて既読にする' })).toBeNull()
+    await act(async () => { fireEvent.click(within(panel).getByText('未読のエラー')) })
+    expect(fixture.markRead).not.toHaveBeenCalled()
+    expect(fixture.markAllRead).not.toHaveBeenCalled()
+    expect(fixture.push).toHaveBeenCalled()
+  })
+
   afterEach(() => {
     cleanup()
+    vi.useRealTimers()
     delete document.documentElement.dataset.theme
   })
 
@@ -137,6 +153,13 @@ describe('★V8 ベルの小窓', () => {
     await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(screen.queryByRole('dialog', { name: 'お知らせ' })).toBeNull()
     expect(document.activeElement).toBe(bell())
+  })
+
+  it('上の帯の端ではなく、押したベルの下から開く', async () => {
+    render(<Harness />)
+    vi.spyOn(bell(), 'getBoundingClientRect').mockReturnValue(new DOMRect(800, 60, 36, 36))
+    const dialog = await openPopover()
+    expect(dialog.parentElement?.style.top).toBe('100px')
   })
 
   it('小窓の外を押すと閉じ、中を押しても閉じない', async () => {
@@ -166,6 +189,35 @@ describe('★V8 ベルの小窓', () => {
     await within(dialog).findByText('未読 3')
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'エラー' })) })
     await waitFor(() => expect(fixture.list).toHaveBeenLastCalledWith('account-1', { category: 'error', limit: 50 }))
+  })
+
+  it('日本時間の今日とそれより前に分け、各組の中では未読を先にする', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-22T15:30:00.000Z'))
+    fixture.list.mockResolvedValue(centerData([
+      item('today-read', { title: '今日の既読', isRead: true, createdAt: '2026-10-22T15:20:00Z' }),
+      item('earlier', { title: '前の日の未読', createdAt: '2026-10-22T14:59:59Z' }),
+      item('today-unread', { title: '今日の未読', createdAt: '2026-10-22 15:00:00' }),
+    ]))
+    render(<Harness />)
+    const dialog = await openPopover()
+    const today = await within(dialog).findByRole('region', { name: '今日' })
+    expect(within(today).getAllByRole('listitem').map(row => row.textContent)).toEqual([
+      expect.stringContaining('今日の未読'), expect.stringContaining('今日の既読'),
+    ])
+    const earlier = within(dialog).getByRole('region', { name: 'それより前' })
+    expect(within(earlier).getByText('前の日の未読')).toBeTruthy()
+    expect(within(dialog).getAllByRole('region').map(region => region.getAttribute('aria-label'))).toEqual(['今日', 'それより前'])
+  })
+
+  it('日時が壊れた通知を消さず、不明として読める。空の日付の組は出さない', async () => {
+    fixture.list.mockResolvedValue(centerData([item('unknown', { createdAt: 'invalid', title: '日時のない通知' })]))
+    render(<Harness />)
+    const dialog = await openPopover()
+    const unknown = await within(dialog).findByRole('region', { name: '日時不明' })
+    expect(within(unknown).getByText('日時のない通知')).toBeTruthy()
+    expect(within(dialog).queryByRole('region', { name: '今日' })).toBeNull()
+    expect(within(dialog).queryByRole('region', { name: 'それより前' })).toBeNull()
   })
 
   it('行を押すと既読にして行き先へ移り、小窓を閉じる。ベルの数も減る', async () => {

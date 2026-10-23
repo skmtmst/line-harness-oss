@@ -36,11 +36,11 @@ export const accountsMethods = {
     update: (id: string, input: Partial<import("@line-crm/shared").LineAccountTagInput>) => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
   },
   lineAccounts: {
-    list: (live = false, folderId?:string|null) => {
+    list: (live = false, folderId?:string|null, options?: FetchApiOptions) => {
       const query=new URLSearchParams()
       if(live) query.set('live','1')
       if(folderId!==undefined) query.set('folderId',folderId ?? '__none__')
-      return fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${query.size?`?${query}`:''}`)
+      return fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${query.size?`?${query}`:''}`, live ? { ...options, cache: 'reload' } : options)
     },
     summary: () =>
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),

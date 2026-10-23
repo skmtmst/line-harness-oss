@@ -1,4 +1,4 @@
-import { logger } from '@line-crm/shared/server';
+import { buildOffsetListResponse, listIntegerInRange } from '../lib/list-paging.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
   ACCESS_ROLE_BUNDLES,
@@ -43,12 +43,6 @@ function requirePermission(permission: string) {
   };
 }
 
-function integerQuery(raw: string | undefined, fallback: number, min: number, max: number): number | null {
-  if (raw === undefined || raw === '') return fallback;
-  const value = Number(raw);
-  return Number.isInteger(value) && value >= min && value <= max ? value : null;
-}
-
 function enumQuery<T extends string>(raw: string | undefined, allowed: readonly T[]): T | undefined | null {
   if (raw === undefined || raw === '') return undefined;
   return allowed.includes(raw as T) ? raw as T : null;
@@ -89,8 +83,8 @@ access.get(
   async (c) => {
     const status = enumQuery(c.req.query('status'), USER_STATUSES);
     const roleBundle = enumQuery(c.req.query('roleBundle'), ROLE_BUNDLES);
-    const limit = integerQuery(c.req.query('limit'), 50, 1, 200);
-    const offset = integerQuery(c.req.query('offset'), 0, 0, 100_000);
+    const limit = listIntegerInRange(c.req.query('limit'), 50, 1, 200);
+    const offset = listIntegerInRange(c.req.query('offset'), 0, 0, 100_000);
     if (status === null || roleBundle === null || limit === null || offset === null) {
       return c.json({ success: false, error: '絞り込み条件を確認してください' }, 400);
     }
@@ -117,18 +111,15 @@ access.get(
       });
       return c.json({
         success: true,
-        data: {
-          items: result.items.map((item) => ({
+        data: buildOffsetListResponse({ items: result.items.map((item) => ({
             ...item,
             email: emailLevel === 'full' ? item.email : emailLevel === 'masked' ? maskEmail(item.email) : null,
           })),
           summary: result.summary,
-          pagination: { total: result.total, limit: result.limit, offset: result.offset },
-        },
+          pagination: { total: result.total, limit: result.limit, offset: result.offset }, total: result.total, paging: { limit: result.limit }, sort: [{ field: 'last_login_at', direction: 'desc' }, { field: 'created_at', direction: 'asc' }] }),
       });
     } catch (error) {
-      logger.error("routes_access_failed");
-      return c.json({ success: false, error: 'ログインユーザーを取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -159,8 +150,7 @@ access.get(
         },
       });
     } catch (error) {
-      logger.error("routes_access_failed");
-      return c.json({ success: false, error: '権限のかたまりを取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -177,8 +167,8 @@ access.get(
     const sort = enumQuery(c.req.query('sort'), AUDIT_SORTS);
     const from = dateQuery(c.req.query('from'));
     const to = dateQuery(c.req.query('to'));
-    const limit = integerQuery(c.req.query('limit'), 20, 1, 200);
-    const offset = integerQuery(c.req.query('offset'), 0, 0, 100_000);
+    const limit = listIntegerInRange(c.req.query('limit'), 20, 1, 200);
+    const offset = listIntegerInRange(c.req.query('offset'), 0, 0, 100_000);
     if (category === null || result === null || attention === null || group === null || sort === null || from === null || to === null || limit === null || offset === null) {
       return c.json({ success: false, error: '絞り込み条件を確認してください' }, 400);
     }
@@ -208,15 +198,12 @@ access.get(
       });
       return c.json({
         success: true,
-        data: {
-          items: audit.items,
+        data: buildOffsetListResponse({ items: audit.items,
           summary: audit.summary,
-          pagination: { total: audit.total, limit: audit.limit, offset: audit.offset },
-        },
+          pagination: { total: audit.total, limit: audit.limit, offset: audit.offset }, total: audit.total, paging: { limit: audit.limit }, sort: [{field:'created_at',direction:sort ?? 'desc'},{field:'id',direction:sort ?? 'desc'}] }),
       });
     } catch (error) {
-      logger.error("routes_access_failed");
-      return c.json({ success: false, error: '操作記録を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );

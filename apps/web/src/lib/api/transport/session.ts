@@ -1,3 +1,5 @@
+import { clearApiReadCache } from './read-cache'
+import { adminSessionHeaders } from '../../admin-session'
 export const API_URL = process.env.NEXT_PUBLIC_API_URL
 
 if (!API_URL) {
@@ -28,9 +30,19 @@ export function getCsrfToken(): string {
 
 export function setCsrfToken(token: string | undefined | null): void {
   if (typeof window === 'undefined' || !token) return
+  if (getCsrfToken() !== token) clearApiReadCache()
   try {
     localStorage.setItem(CSRF_STORAGE_KEY, token)
   } catch { /* 保存できなくてもセッション認証自体は動く */ }
+}
+
+/** 認証情報はメモリ上のキーにだけ使い、保存・ログ出力はしない。 */
+export function apiReadScope(): { key: string; identified: boolean } {
+  let account: string | null = null
+  try { account = localStorage.getItem('lh_selected_account') } catch { /* 保存できない環境は明示された対象で区別する。 */ }
+  const csrf = getCsrfToken()
+  const headers = adminSessionHeaders()
+  return { key: JSON.stringify([csrf, headers, account]), identified: Boolean(csrf || headers.Authorization) }
 }
 
 export const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])

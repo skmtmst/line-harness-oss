@@ -5,7 +5,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({ list: vi.fn(), stats: vi.fn() }))
 vi.mock('next/navigation', () => ({
@@ -68,7 +68,9 @@ describe('統合ユーザーの失敗と0件（WEB322）', () => {
     await waitFor(() => expect(screen.getByText('読み込めませんでした')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
     await waitFor(() => expect(screen.getByTitle('紐付く友だち：7件（各アカウントの友だち登録）')).toBeTruthy())
-    expect(screen.getByTitle('紐付く友だち：7件（各アカウントの友だち登録）').previousElementSibling?.textContent).toBe('0人')
+    const count = within(screen.getByLabelText('統合ユーザーの集計'))
+    expect(count.getByText('0')).toBeTruthy()
+    expect(count.getByText('人')).toBeTruthy()
     expect(fixture.stats).toHaveBeenCalledTimes(2)
   })
 

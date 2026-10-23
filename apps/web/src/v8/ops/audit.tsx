@@ -1,6 +1,7 @@
 'use client'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { CircleDot, Download, Star } from 'lucide-react'
+import { Download } from 'lucide-react'
+
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
@@ -8,8 +9,10 @@ import { AUDIT_ACTION_LABEL, formatDateTime, opsCall } from '@/components/ops/op
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
-import FilterChip from '@/components/shared/filter-chip'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { Tabs } from '@/components/shared/tabs'
+import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-entry-details'
+import { useAuditCounts } from './use-audit-counts'
+import { DataTable, TableHeadRow, Th, Tr, Td, RowNameButton } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import { OpsHead } from './shell'
@@ -22,6 +25,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import Card from '@/components/shared/card'
+import { useOpsReadOnly } from './use-ops-read-only'
 
 /**
  * 運営の監査ログ V8。
@@ -62,6 +66,8 @@ function shortDateTime(value: string | null | undefined): string {
 }
 
 export default function OpsAuditV8() {
+  const readOnly = useOpsReadOnly()
+  const [entry, setEntry] = useState<LogEntryFacts | null>(null)
   const [rows, setRows] = useState<OpsAuditRow[]>([])
   const [total, setTotal] = useState(0)
   const [filter, setFilter] = useListUrlValue('filter', '')
@@ -73,6 +79,7 @@ export default function OpsAuditV8() {
   const [exporting, setExporting] = useState(false)
   const [exportNote, setExportNote] = useState('')
 
+  const counts = useAuditCounts(from, to, FILTERS)
   const actionsFor = (key: string) => FILTERS.find((f) => f.key === key)?.actions || undefined
 
   const load = useCallback(async () => {
@@ -85,7 +92,7 @@ export default function OpsAuditV8() {
     setTotal(res.total)
   }, [filter, from, to, page])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { setEntry(null); void load() }, [load])
 
   const exportCsv = async () => {
     setExporting(true)
@@ -134,12 +141,8 @@ export default function OpsAuditV8() {
       />
       <div className={parts.stack}>
         <div className={styles.tools}>
-          <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => { setFilter(''); setPage(1) }}>すべて</FilterChip>
-          {FILTERS.map((f) => (
-            <FilterChip key={f.key} icon={<Star size={13} aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => { setFilter(selected ? f.key : ''); setPage(1) }}>
-              {f.label}
-            </FilterChip>
-          ))}
+          <Tabs size="compact" wrap label="監査ログの種類" items={[{ key: '', label: 'すべて' }, ...FILTERS].map(item => ({ label: item.label, count: counts[item.key], current: filter === item.key, onClick: () => { setFilter(item.key); setPage(1); setEntry(null) } }))} />
+
           <span className={styles.spacer} />
           <div className={styles.dateGroup} role="group" aria-label="開始日"><span className={styles.dateLabel}>開始日</span><span className={styles.date}>
             <SaveErrorField names={["from"]}><DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" placeholder="指定なし" displayFormat="short" /></SaveErrorField>
@@ -170,7 +173,7 @@ export default function OpsAuditV8() {
               <Tr key={row.id}>
                 <Td title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</Td>
                 <Td><TruncatedText value={row.staff_name ?? ''} /></Td>
-                <Td><TruncatedText value={actionWord(row.action)} /></Td>
+                <Td><RowNameButton title={actionWord(row.action)} onClick={() => setEntry({ occurredAt: row.created_at, target: row.tenant_name ?? '運営全体', status: actionWord(row.action), reason: row.reason ?? '理由の記録なし' })}>{actionWord(row.action)}</RowNameButton></Td>
                 <Td title={row.tenant_name ?? ''}><TruncatedText value={row.tenant_name ?? emptyValue('unknown')} /></Td>
                 <Td grow title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}><TruncatedText value={row.reason ?? emptyValue('unknown')} /></Td>
               </Tr>
@@ -182,6 +185,7 @@ export default function OpsAuditV8() {
         ) : null}
         <p className={parts.note} title={`${total}件中 ${total === 0 ? 0 : (page - 1) * PAGE + 1}〜${Math.min(page * PAGE, total)}件を表示`}>記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>
       </div>
+      <LogEntryDetails canCopy={!readOnly} entry={entry} onClose={() => setEntry(null)} />
     </PageFrame>
   )
 }

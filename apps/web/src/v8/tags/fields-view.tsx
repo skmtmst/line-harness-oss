@@ -1,4 +1,5 @@
 'use client'
+import { RefreshCover } from '@/components/shared/refresh-cover'
 
 import type { FriendFieldType } from '@line-crm/shared';
 import { api } from '@/lib/api';
@@ -95,7 +96,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
               <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
             )}</Notice>
         ) : null}
-        {table}
+        <RefreshCover refreshing={model.status === 'loading' && model.loaded}>{table}</RefreshCover>
       </ListPageBody>
 
       {/* 行の詳細パネル。名前はその場で直せる。 */}

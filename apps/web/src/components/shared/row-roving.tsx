@@ -56,7 +56,7 @@ export function rowPrimary(row: HTMLTableRowElement, items = rowItems(row)): HTM
 function bodyRows(body: HTMLTableSectionElement): HTMLTableRowElement[] {
   // body.rows を持たない環境（試験の DOM）でも動くよう、子の tr を数える。
   return Array.from(body.children).filter(
-    (el): el is HTMLTableRowElement => el.tagName === 'TR' && !(el as HTMLElement).hidden,
+    (el): el is HTMLTableRowElement => el.tagName === 'TR' && !(el as HTMLElement).hidden && !el.hasAttribute('inert'),
   )
 }
 
@@ -167,7 +167,7 @@ export function useRowRoving(ref: RefObject<HTMLTableSectionElement | null>, ena
         syncRowStops(body)
       })
     })
-    observer.observe(body, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex', 'disabled', 'href', 'hidden'] })
+    observer.observe(body, { childList: true, subtree: true, attributes: true, attributeFilter: ['tabindex', 'disabled', 'href', 'hidden', 'inert'] })
     const onKeyDown = (event: KeyboardEvent) => handleRowKey(body, event)
     body.addEventListener('keydown', onKeyDown)
     return () => {
@@ -184,15 +184,18 @@ export function useRowRoving(ref: RefObject<HTMLTableSectionElement | null>, ena
 export function RovingTbody({
   children,
   reorderKey,
+  reorderScope,
   ...bodyProps
 }: Omit<HTMLAttributes<HTMLTableSectionElement>, 'children'> & {
   children?: ReactNode
   /** 並びの印（行の id を並べた文字）。変わると、`data-reorder-id` の行を前の位置から滑らせる。 */
   reorderKey?: string
+  /** アカウント・条件・ページの印。変わったときは並べ替えの動きを付けない。 */
+  reorderScope?: string
 }) {
   const ref = useRef<HTMLTableSectionElement>(null)
   useRowRoving(ref)
-  useFlipRows(ref, reorderKey ?? '')
+  useFlipRows(ref, reorderKey ?? '', reorderScope)
   return (
     <tbody ref={ref} {...bodyProps}>
       {children}

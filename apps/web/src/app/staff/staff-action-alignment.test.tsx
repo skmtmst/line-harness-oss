@@ -285,7 +285,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     expect(screen.getByText('保存すると、対象者はもう一度ログインする必要があります。')).toBeTruthy()
     expect(screen.queryByText('権限を変えると、その場で効きます。')).toBeNull()
     expect(fixture.updateStaff).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: /見せる範囲を保存しますか/ })).getByRole('button', { name: 'キャンセル' }))
     expect(fixture.updateStaff).not.toHaveBeenCalled()
 
     fixture.updateStaff.mockRejectedValueOnce(new Error('保存できません'))

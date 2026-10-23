@@ -156,7 +156,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_revert_1 = async (c: 
           deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
         });
       } catch (auditError) {
-        logger.error("routes_rich_menu_groups_failed");
+        logger.error("rich_menu_groups.rich_menu_groups_group_id_test_apply_revert_post_failed");
       }
 
       const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);

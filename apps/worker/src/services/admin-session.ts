@@ -243,6 +243,6 @@ export async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: strin
     });
   } catch (error) {
     if (onFailure) onFailure();
-    else logger.error("routes_auth_email_failed");
+    else logger.error("auth_email.record_successful_login_audit_failed");
   }
 }

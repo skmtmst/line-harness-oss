@@ -37,7 +37,7 @@ html:root [data-dialog-choice-cards] a.link { background: transparent; }
 }
 
 .link:hover::after {
-  outline: 1px solid var(--color-action);
+  outline: 1px solid var(--color-control-border);
   outline-offset: -1px;
 }
 
@@ -57,8 +57,8 @@ html:root [data-dialog-choice-cards] a.link { background: transparent; }
   width: var(--tpl-feat-kind-icon);
   height: var(--tpl-feat-kind-icon);
   border-radius: var(--tpl-feat-kind-icon-radius);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
 }
 
 .title {

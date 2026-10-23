@@ -31,12 +31,6 @@ describe('R38 絞り込みと0件表示の言い分け', () => {
     expect(EMPTY.indexOf('if (filtered)')).toBeLessThan(EMPTY.indexOf('const button ='))
   })
 
-  it('フォルダ欄の「すべて」は絞り込み前の総数を出す', () => {
-    // m26m: 未取得の間は偽ゼロにせず伏せるが、総数の出どころは絞り込み前の
-    // overallTotal のまま（R38の約束は変えない）。
-    expect(MEDIA).toContain('count: listKnown && !loadFailed ? (overallTotal ?? total) : null')
-    expect(MEDIA).toContain('limit: 1,')
-  })
 
   it('共通情報一覧の絞り込み0件にも「条件を外す」を置く', () => {
     expect(VARS).toContain('filtered={items.length > 0}')

@@ -57,6 +57,7 @@ vi.mock('@/lib/api', () => {
         list: () => Promise.resolve({ success: true, data: [], unfiledCount: 0 }),
       },
       media: {
+        counts: () => Promise.resolve({ success: true, data: { total: 1, byKind: { image: 1, video: 0, audio: 0, file: 0 }, unused: 1, archived: 0 } }),
         list: (accountId: string) => Promise.resolve({
           success: true,
           data: {

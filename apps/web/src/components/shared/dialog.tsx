@@ -4,7 +4,7 @@
 import { isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
 import React, { useContext, useEffect, useLayoutEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, X } from 'lucide-react'
+import { Check, PanelsTopLeft, X } from 'lucide-react'
 import Button from './button'
 import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
@@ -46,6 +46,8 @@ export type DialogProps = {
   designHeaderHeight?: number
   /** 頭の×の左に置く操作（選ぶ窓の「＋タグを作る」など）。 */
   headerAction?: ReactNode
+  /** 題と説明の左に置く、線のアイコン。false なら印を省く。 */
+  headerIcon?: ReactNode
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
   designContentPadding?: string
   /** 指定した窓だけ下の操作段の余白を変える。 */
@@ -142,6 +144,7 @@ export default function Dialog({
   designHeaderPadding,
   designHeaderHeight,
   headerAction,
+  headerIcon,
   designContentPadding,
   designFooterPadding,
   footerDivider = true,
@@ -233,6 +236,7 @@ export default function Dialog({
       : primaryAction === 'cancel' ? () => cancelRef.current : undefined,
   )
   const layer = useOverlayLayer(open && modal)
+  const shortConfirmation = confirmation && !children && !steps
   const confirmationSizeClass = confirmation && compact
     ? tone === 'destructive'
       ? styles.destructiveConfirmation
@@ -243,18 +247,16 @@ export default function Dialog({
   useLayoutEffect(() => setMounted(true), [])
   if (!open && !leaving) return null
 
+  const shownHeaderIcon = headerIcon ?? (!titleIcon && !designHeaderHeight ? <PanelsTopLeft /> : null)
   const titleNode = (
-    <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}</h2>
+    <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`} data-has-heading-icon={Boolean(titleIcon || shownHeaderIcon) || undefined}>
+      {titleIcon || shownHeaderIcon ? <span className={styles.headerIcon} aria-hidden="true">{titleIcon || shownHeaderIcon}</span> : null}
+      <span>{typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}</span>
+    </h2>
   )
   /*  解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。
      かけらは描画に出ない（囲み要素なし）。渡さないときは h2 そのまま。 */
-  const titlePart = (<>{titleIcon ? (
-    <div className={styles.titleRow}>
-      <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
-      {titleNode}
-      {titleHelp}
-    </div>
-  ) : titleHelp ? <div className={styles.titleRow}>{titleNode}{titleHelp}</div> : titleNode}</>)
+  const titlePart = titleHelp ? <div className={styles.titleRow}>{titleNode}{titleHelp}</div> : titleNode
   const descriptionNode = description ? <p id={descriptionId} className={styles.description}>{description}</p> : null
   const heading = (
     <>
@@ -286,7 +288,8 @@ export default function Dialog({
       data-description-band={descriptionBand}
       data-footer-align={footerAlign}
       data-design-footer-gap={designFooterGap !== undefined || undefined}
-      data-footer-divider={footerDivider ? undefined : 'none'}
+      data-confirmation={shortConfirmation ? 'compact' : undefined}
+      data-footer-divider={shortConfirmation || !footerDivider ? 'none' : undefined}
       data-footer-lead={footerLeadFlexible ? undefined : 'fixed'}
       data-design-width=""
       data-design-header-padding={designHeaderPadding ? '' : undefined}
@@ -316,9 +319,9 @@ export default function Dialog({
       </div>
       {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><div className={`${styles.callout} ${styles.calloutDanger}`} data-qa-dialog-callout>{descriptionNode}</div></div> : designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
-      {children ? <div className={styles.content} data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
+      {children ? <div className={styles.content} data-window-body data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
-      <div className={styles.footer}>
+      <div className={styles.footer} data-window-actions>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま

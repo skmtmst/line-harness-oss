@@ -575,7 +575,7 @@ export default function BookingMediaPage() {
             </div>
           </section>
         </div>
-        {canManage ? (
+        {canManage && (changes > 0 || saving) ? (
           <PageFooter
               actions={(
                 <>

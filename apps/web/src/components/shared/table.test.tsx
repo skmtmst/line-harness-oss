@@ -92,14 +92,15 @@ describe('一覧の行と選択', () => {
     expect(tableCss).toMatch(/:root \.headRow \.cell\s*\{[^}]*height:\s*var\(--tpl-thead-h\)/s)
   })
 
-  it('選んだ行は aria-selected と薄い緑の地（色だけにしない）', () => {
-    expect(dataTableCss).toMatch(/\.rowSelected\s*\{[^}]*var\(--color-accent-soft\)/s)
-    renderTable(
+  it('行の選択と解除を読み上げへ伝える', () => {
+    const { rerender } = renderTable(
       <Tr selected>
         <Td>Masato.S</Td>
       </Tr>,
     )
     expect(screen.getByText('Masato.S').closest('tr')?.getAttribute('aria-selected')).toBe('true')
+    rerender(<DataTable><table><tbody><Tr><Td>Masato.S</Td></Tr></tbody></table></DataTable>)
+    expect(screen.getByText('Masato.S').closest('tr')?.getAttribute('aria-selected')).toBeNull()
   })
 
   it('指を乗せた行の地は押せる行だけ（CSSの指定）', () => {

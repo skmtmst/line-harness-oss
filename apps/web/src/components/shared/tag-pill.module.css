@@ -38,8 +38,8 @@
   .pill[data-compact-narrow] { --tag-pill-pad: var(--tpl-tag-table-compact-pad); }
 }
 .dot {
-  width: var(--tag-pill-dot);
-  height: var(--tag-pill-dot);
+  width: var(--tag-pill-dot, 6px);
+  height: var(--tag-pill-dot, 6px);
   flex-shrink: 0;
   border-radius: var(--radius-pill);
   background: var(--color-shell-gray);

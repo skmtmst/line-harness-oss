@@ -42,8 +42,10 @@ describe('④ 表の行の登場と退場', () => {
       expect(selectors.some((rule) => row.matches(rule.selector))).toBe(true)
       view.rerender(screen(true))
       expect(row.dataset.leaving).toBe('true')
+      expect(row.hasAttribute('inert')).toBe(true)
       expect(selectors.some((rule) => row.matches(rule.selector))).toBe(false)
       view.rerender(screen(false))
+      expect(row.hasAttribute('inert')).toBe(false)
       expect(selectors.some((rule) => row.matches(rule.selector))).toBe(true)
     } finally {
       delete document.documentElement.dataset.theme

@@ -1,3 +1,4 @@
+import { readLineAccountListMetadata } from '../services/line-account-list-metadata.js';
 import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { verifyLineMessagingIdentity } from '../services/line-messaging-identity.js';
@@ -8,11 +9,10 @@ import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
 import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { getLineAccountFoldersByAccountIds, getLineAccountTag } from '@line-crm/db';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import { getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountListStats, getLineAccountTagsByAccountIds, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
+import { getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
 import type { LineAccount as DbLineAccount, LineAccountConnectionCheck, LineAccountScopeEntry } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
@@ -80,9 +80,9 @@ lineAccounts.get('/api/line-accounts', async (c) => {
       if(folderId && !await getLineAccountTag(db,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,folderId)) return c.json({success:false,error:'フォルダが見つかりません'},404);
       items=items.filter(item=>(item.folder_id ?? null)===folderId);
     }
-    const tagsByAccount = await getLineAccountTagsByAccountIds(db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map(item => item.id));
-    const foldersByAccount = await getLineAccountFoldersByAccountIds(db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map(item => item.id));
-    const statsByAccount = await getLineAccountListStats(db, items.map((item) => item.id));
+    const { tagsByAccount, foldersByAccount, statsByAccount } = await readLineAccountListMetadata(
+      db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map((item) => item.id),
+    );
     const serializeWithStats = (item: DbLineAccount) => {
       const overview = statsByAccount[item.id];
       return {
@@ -132,8 +132,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
     );
     return c.json({ success: true, data: results });
   } catch (err) {
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -156,8 +155,7 @@ lineAccounts.get('/api/line-accounts/summary', async (c) => {
     ).bind(...sqlIdSet(visibleActiveIds).binds).first<{ count: number }>();
     return c.json({ success: true, data: { uniqueFriendCount: row?.count ?? 0 } });
   } catch (err) {
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -506,8 +504,7 @@ lineAccounts.post(
       if (error instanceof LineAccountRevisionConflictError) {
         return c.json({ success: false, error: 'REVISION_CONFLICT' }, 409);
       }
-      logger.error("routes_line_accounts_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw error;
     }
   },
 );
@@ -541,8 +538,7 @@ lineAccounts.put('/api/line-accounts/default', requireRole('owner'), inputJsonBo
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -593,8 +589,7 @@ lineAccounts.post('/api/line-accounts/:id/archive', requireRole('owner'), inputJ
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -614,8 +609,7 @@ lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), inputJ
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -659,8 +653,7 @@ lineAccounts.post('/api/line-accounts/:id/deactivate', requireRole('owner', 'adm
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -709,7 +702,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
       });
     } catch (checkError) {
       // 台帳への記録が失敗しても再開判定は止めない（検査自体は済んでいる）。
-      logger.error("routes_line_accounts_failed");
+      logger.error("line_accounts.by_id_activate_create_failed");
     }
     if (!connectionOk) {
       return inputError(c, {
@@ -732,8 +725,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -762,8 +754,7 @@ lineAccounts.get(
         })),
       });
     } catch (err) {
-      logger.error("routes_line_accounts_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   },
 );
@@ -785,8 +776,7 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
     }
     return c.json({ success: true, data: serializeLineAccount(account) });
   } catch (err) {
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -808,11 +798,10 @@ lineAccounts.get(
         return c.json({ success: false, error: 'LINE account not found' }, 404);
       }
       return c.json({ success: true, data: health });
-    } catch {
+    } catch (error) {
       // Do not serialize the underlying error: crypto/runtime errors can contain
       // implementation details that are unnecessary for this diagnostic.
-      logger.error("line_credential_health_check_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw error;
     }
   },
 );
@@ -844,7 +833,7 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
     });
   } catch (err) {
     const lineStatus = typeof (err as { status?: unknown } | null)?.status === 'number' ? (err as { status: number }).status : null; // LINEの状態番号(401失効/403権限不足/429上限)だけ残す。本文・トークンは出さない
-    logger.error("routes_line_accounts_failed");
+    logger.error("line_accounts.by_id_follower_insight_get_failed");
     return c.json({ success: false, error: 'Failed to fetch LINE follower insight', lineStatus }, 502);
   }
 });
@@ -881,7 +870,7 @@ lineAccounts.post(
       return c.json({ success: true, data: state });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      logger.error("routes_line_accounts_failed");
+      logger.error("line_accounts.by_id_follower_import_detect_create_failed");
       return c.json({ success: false, error: '利用可否の確認に失敗しました' }, 502);
     }
   },
@@ -1449,7 +1438,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
         await copyLineAccountSettings(c.env.DB, copyFromAccountId, account.id, copyItems);
       } catch (copyError) {
         await deleteUncommittedLineAccount(c.env.DB, account.id);
-        logger.error("routes_line_accounts_failed");
+        logger.error("line_accounts.create_failed");
         return c.json({ success: false, error: '設定のコピーに失敗したため、アカウントは追加していません' }, 500);
       }
     }
@@ -1464,7 +1453,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
         account.id,
       );
     } catch (err) {
-      logger.error("routes_line_accounts_failed");
+      logger.error("line_accounts.create_failed");
     }
 
     try {
@@ -1490,8 +1479,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     if (duplicate) {
       return inputError(c, { success: false, error: duplicate.error }, duplicate.status, []);
     }
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -1567,8 +1555,7 @@ lineAccounts.patch(
       );
       return c.json({ success: true, data: relationships });
     } catch (err) {
-      logger.error("routes_line_accounts_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   },
 );
@@ -1610,8 +1597,7 @@ lineAccounts.patch(
     } catch (err) {
       const conflict = lifecycleConflict(err);
       if (conflict) return c.json(conflict, 409);
-      logger.error("routes_line_accounts_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   },
 );
@@ -1788,8 +1774,7 @@ lineAccounts.patch(
     } catch (err) {
       const conflict = lifecycleConflict(err);
       if (conflict) return c.json(conflict, 409);
-      logger.error("routes_line_accounts_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   },
 );
@@ -1951,8 +1936,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
     if (err instanceof CredentialEncryptionKeyError) {
       return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
     }
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -1963,8 +1947,7 @@ lineAccounts.delete('/api/line-accounts/:id', requireRole('owner'), async (c) =>
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    logger.error("routes_line_accounts_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

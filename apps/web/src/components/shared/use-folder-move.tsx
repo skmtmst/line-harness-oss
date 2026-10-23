@@ -60,6 +60,7 @@ export function useFolderMove<T extends Item>({ accountId, canEdit, items, folde
     } finally { lock.current = false; setBusy(false) }
   }
   return {
+    isSelected: (id: string) => canEdit && selected.has(id),
     open: (item: T) => open([item]),
     checkbox: (item: T) => canEdit ? <Checkbox aria-label={`${item.name}を選ぶ`} checked={selected.has(item.id)} disabled={busy} onClick={(event) => event.stopPropagation()} onCheckedChange={(next) => { if (!busy) setSelected((old) => { const value = new Set(old); if (next) value.add(item.id); else value.delete(item.id); return value }) }} /> : null,
     pageCheckbox: canEdit ? <Checkbox aria-label="このページを全部選ぶ" disabled={busy || items.length === 0} checked={items.length > 0 && items.every((item) => selected.has(item.id))} indeterminate={selected.size > 0 && selected.size < items.length} onCheckedChange={(next) => { if (!busy) setSelected(next ? new Set(items.map((item) => item.id)) : new Set()) }} /> : null,

@@ -112,7 +112,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   } catch (gateError) {
     if(gateError instanceof GapError)return c.json({success:false,error:gateError.code},gateError.status);
     // 数えられない（DB到達不能など）ときは送らない。誤送信より停止を選ぶ。
-    logger.error("routes_broadcasts_failed");
+    logger.error("broadcasts.broadcasts_id_send_post_failed");
     return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
   }
 
@@ -216,7 +216,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
       ctx.waitUntil(
         processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-          logger.error("routes_broadcasts_failed");
+          logger.error("broadcasts.broadcasts_id_send_post_failed");
         }),
       );
     } catch (kickErr) {
@@ -288,7 +288,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
       ctx.waitUntil(
         processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-          logger.error("routes_broadcasts_failed");
+          logger.error("broadcasts.broadcasts_id_send_post_failed");
         }),
       );
     } catch (kickErr) {
@@ -359,7 +359,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
       ctx.waitUntil(
         processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-          logger.error("routes_broadcasts_failed");
+          logger.error("broadcasts.broadcasts_id_send_post_failed");
         }),
       );
     } catch (kickErr) {
@@ -495,7 +495,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       });
     } catch (notificationError) {
       // 配信本体は完了済み。通知の失敗で再配信させず、台帳の回収口に残す。
-      logger.error("routes_broadcasts_failed");
+      logger.error("broadcasts.broadcasts_id_send_post_failed");
     }
   }
   return c.json({ success: true, data: result ? serializeBroadcast(result) : null });
@@ -548,7 +548,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
         }, segmentGate.status as 409, []);
     }
   } catch (gateError) {
-    logger.error("routes_broadcasts_failed");
+    logger.error("broadcasts.broadcasts_id_send_segment_post_failed");
     return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
   }
 

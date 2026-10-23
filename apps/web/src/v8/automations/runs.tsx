@@ -14,7 +14,8 @@ import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import FilterChip from '@/components/shared/filter-chip'
+import { Tabs } from '@/components/shared/tabs'
+import { LogEntryCopy } from '@/components/shared/log-entry-details'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell, RowNameButton } from '@/components/shared/table'
@@ -448,14 +449,10 @@ export default function AutomationRunsV8() {
   ]
 
   /* ===== 道具の段 ===== */
-  const chipCount = (value: number | undefined) => (value === undefined ? emptyValue('unknown') : formatNumber(value))
-  const filterChips = (
-    <div role="group" aria-label="結果で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={resultFilter === 'executed'} onChange={(next) => toggleResult('executed', next)} icon={<Activity size={13} aria-hidden="true" />}>{`動いた ${chipCount(summary?.executed)}`}</FilterChip>
-      <FilterChip selected={resultFilter === 'skipped'} onChange={(next) => toggleResult('skipped', next)} icon={<Filter size={13} aria-hidden="true" />}>{`条件に外れた ${chipCount(summary?.skipped)}`}</FilterChip>
-      <FilterChip selected={resultFilter === 'problems'} onChange={(next) => toggleResult('problems', next)} icon={<TriangleAlert size={13} aria-hidden="true" />}>{`失敗 ${chipCount(summary?.failed)}`}</FilterChip>
-    </div>
-  )
+  const filterChips = <Tabs size="compact" wrap label="結果で絞り込む" items={[
+    { label: 'すべて', count: summary?.total, current: resultFilter === 'all', onClick: () => { setResultFilter('all'); setPage(1) } },
+    ...([{ value: 'executed', label: '動いた', count: summary?.executed }, { value: 'skipped', label: '条件に外れた', count: summary?.skipped }, { value: 'problems', label: '失敗', count: summary?.failed }] as const).map(item => ({ label: item.label, count: item.count, current: resultFilter === item.value, onClick: () => toggleResult(item.value, true) })),
+  ]} />
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
@@ -616,6 +613,7 @@ export default function AutomationRunsV8() {
         >
           {run ? (
             <div className={styles.panel}>
+              <LogEntryCopy canCopy={permissions?.canExport === true} entry={{ occurredAt: run.occurredAt, target: run.subject ?? '友だち名なし', status: STATUS_LABEL[run.status], reason: resultReason(run) ?? STATUS_LABEL[run.status] }} />
               <p className={styles.panelText}>
                 {`版 v${(runDetail ?? run).versionNumber}`}
                 {(runDetail ?? run).isTest ? '・テスト実行' : ''}

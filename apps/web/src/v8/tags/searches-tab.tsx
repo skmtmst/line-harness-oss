@@ -45,6 +45,9 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { RovingTbody } from '@/components/shared/row-roving'
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
@@ -101,16 +104,16 @@ function updatedText(search: SavedSearch): string {
 export default function SearchesTab({ accountId, canEdit, explanation = false }: { accountId: string | null; canEdit: boolean; explanation?: boolean }) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
-  const [items, setItems] = useState<SavedSearch[]>([])
-  const [summary, setSummary] = useState<SavedSearchSummary | null>(null)
+  const { value: items, setValue: setItems, hasValue: loaded } = useListSnapshot<SavedSearch[]>(accountId ?? '', [])
+  const { value: summary, setValue: setSummary } = useListSnapshot<SavedSearchSummary | null>(accountId ?? '', null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [forbidden, setForbidden] = useState(false)
   // 並び替え・削除・複製の失敗。読み込みの失敗は loadError。
   const [error, setError] = useState('')
   const [retryOrder, setRetryOrder] = useState<SavedSearch[] | null>(null)
-  const [tags, setTags] = useState<Tag[]>([])
-  const [conditionLabels, setConditionLabels] = useState<SavedSearchConditionLabels>({})
+  const { value: tags, setValue: setTags } = useListSnapshot<Tag[]>(accountId ?? '', [])
+  const { value: conditionLabels, setValue: setConditionLabels } = useListSnapshot<SavedSearchConditionLabels>(accountId ?? '', {})
   const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
   const [query, setQuery] = useListUrlValue('q', '')
   const [usageFilter, setUsageFilter] = useListUrlValue<SavedSearchUsageFilter>('usageFilter', 'all')
@@ -128,10 +131,6 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
     setLoading(true)
     setLoadError('')
     setForbidden(false)
-    setItems([])
-    setSummary(null)
-    setTags([])
-    setConditionLabels({})
     if (!accountId) {
       setLoading(false)
       return
@@ -173,7 +172,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
     } finally {
       if (sequence === loadSequence.current) setLoading(false)
     }
-  }, [accountId, saveErrors])
+  }, [accountId, saveErrors, setItems, setSummary, setTags, setConditionLabels])
   useEffect(() => { void load() }, [load])
 
   /* アカウントが変わったら、前のアカウントの削除確認を閉じる。 */
@@ -191,6 +190,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
       if (!accountId) return
       await api.savedSearches.delete(search.id, accountId)
       setPendingDelete(null)
+      notifyToast(`保存した検索「${search.name}」を削除しました`)
       void load()
     } catch (reason) {
       const fieldFailure = saveErrors.capture(reason)
@@ -248,7 +248,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
     }
   }
 
-  const ready = Boolean(accountId) && !loading && !loadError && !forbidden
+  const ready = Boolean(accountId) && loaded && !loadError && !forbidden
   const kpis = summary ?? savedSearchKpiValues(items, ready)
 
   const filteredList = filterSavedSearches(items, query, usageFilter).filter((item) => {
@@ -348,7 +348,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
   ) : ready && visible.length === 0 ? (
     <ListState kind="empty" title="条件に合うものはありません" description="検索や絞り込みを外すと、すべて出ます"  action={<>{filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsageFilter('all'); setMatchFilter('all') }}>条件を外す</Button> : null}</>} />
   ) : (
-    <DelayedSkeleton loading={loading} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
+    <DelayedSkeleton loading={!loaded} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
       <DataTable className={styles.table}>
         <thead>
           <TableHeadRow>
@@ -361,7 +361,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
-        <tbody>
+        <RovingTbody reorderKey={visible.map(row => row.id).join(',')} reorderScope={JSON.stringify([accountId, query, usageFilter, matchFilter, currentPage, pageSize])}>
           {visible.map((search) => {
             const summaryText = conditionSummary(splitConditions(search.conditions, tags, conditionLabels))
             const editHref = search.lineAccountId && canEdit ? `/tags/searches/edit?id=${encodeURIComponent(search.id)}` : null
@@ -370,6 +370,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
               <Tr
                 interactive
                 key={search.id}
+                data-reorder-id={search.id}
                 className={`${styles.row} ${styles.searchRow}`}
                 tabIndex={0}
                 detailKey="search" onOpen={() => openSearchDetail(search.id)}
@@ -421,7 +422,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
               </Tr>
             )
           })}
-        </tbody>
+        </RovingTbody>
       </DataTable>
 
 
@@ -492,7 +493,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
               <button type="button" onClick={() => { setError(''); void load() }}>もう一度読み込む</button>
             )}</Notice>
         ) : null}
-        {table}
+        <RefreshCover refreshing={loading && loaded}>{table}</RefreshCover>
       </ListPageBody>
 
       {/* 行の詳細パネル。名前はその場で直せる。 */}

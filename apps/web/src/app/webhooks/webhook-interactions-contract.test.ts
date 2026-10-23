@@ -83,15 +83,7 @@ describe('V8 外部連携・やり取りの記録 Uv9AA', () => {
     expect(PAGE).not.toContain('requestBodyJson')
   })
 
-  it('一覧にURL・秘密値を出さず、詳細は伏せ字の本文だけ読み内部エラーを出さない', () => {
-    expect(PAGE).toContain('接続先 URL、シークレット、本文のうち個人が分かる部分は、安全のため伏せています。')
-    expect(PAGE).toContain('title={item.triggerSummary}>{lines.main}')
-    expect(PAGE).toContain('api.webhooks.interactions.payload(item.id, accountId)')
-    expect(PAGE).not.toContain('API error:')
-    expect(PAGE).not.toContain('Failed to fetch')
-    expect(PAGE).not.toContain('requestBodyJson')
-    expect(PAGE).not.toContain('idempotencyKey')
-  })
+  // 本文・秘密値・内部エラーの表示は interactions-v8-react.test.tsx の実DOMと通信回数で確かめる。
 
   it('送り直しは管理者だけに見せ、単体と一括の両方を持つ', () => {
     // 役割の出し分けは interactions-v8-react.test.tsx の実DOMと故障対照で確かめる。

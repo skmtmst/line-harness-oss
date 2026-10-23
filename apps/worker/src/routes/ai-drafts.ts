@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import {g2OpenAiAvailable} from '../services/account-ai-features.js';
 import {Hono,type Context} from 'hono';
@@ -56,9 +57,9 @@ aiDrafts.post('/api/chats/:id/ai/typing',async c=>{
  return c.json({success:true,data:{typing:true,expiresAt}});
 });
 aiDrafts.get('/api/qa-entries',requirePermission('/auto-replies'),async(c)=>{
- const a=await gapAccount(c),query=c.req.query('q')??'',offset=Number(c.req.query('offset')??0);if(!Number.isSafeInteger(offset)||offset<0||query.length>200)throw new GapError('invalid_pagination');
+ const a=await gapAccount(c),query=c.req.query('q')??'',offset=listQueryNumber(c.req.query('offset'), 0);if(!Number.isSafeInteger(offset)||offset<0||query.length>200)throw new GapError('invalid_pagination');
  const rows=(await c.env.DB.prepare("SELECT * FROM qa_entries WHERE account_id=? AND (questions_json LIKE ? OR answer_messages_json LIKE ?) ORDER BY updated_at DESC,id LIMIT 20 OFFSET ?").bind(a,`%${query}%`,`%${query}%`,offset).all()).results;
- const count=await c.env.DB.prepare('SELECT count(*) total FROM qa_entries WHERE account_id=? AND (questions_json LIKE ? OR answer_messages_json LIKE ?)').bind(a,`%${query}%`,`%${query}%`).first<{total:number}>();return c.json({success:true,data:{items:rows,total:count?.total??0,nextOffset:rows.length===20?offset+20:null}});
+ const count=await c.env.DB.prepare('SELECT count(*) total FROM qa_entries WHERE account_id=? AND (questions_json LIKE ? OR answer_messages_json LIKE ?)').bind(a,`%${query}%`,`%${query}%`).first<{total:number}>();return c.json({success:true,data:buildOffsetListResponse({ items:rows,total:count?.total??0,nextOffset:rows.length===20?offset+20:null, paging: { limit: 20 }, sort: [{ field: 'updated_at', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});
 });
 function qaBody(b:Record<string,unknown>){if(!Array.isArray(b.questions)||!b.questions.length||b.questions.length>20||b.questions.some(x=>typeof x!=='string'||!x.trim()||x.length>500)||typeof b.answer!=='string'||!b.answer.trim()||b.answer.length>5000)throw new GapError('invalid_qa');return {questions:b.questions as string[],answer:b.answer as string};}
 aiDrafts.post('/api/qa-entries',requirePermission('/auto-replies'),async(c)=>{

@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
@@ -402,10 +403,8 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
   }
   const denied = await requireAccount(c, lineAccountId);
   if (denied) return denied;
-  const rawLimit = Number(c.req.query('limit') ?? '20');
-  const rawOffset = Number(c.req.query('offset') ?? '0');
-  const limit = Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 20;
-  const offset = Number.isInteger(rawOffset) ? Math.max(rawOffset, 0) : 0;
+  const limit = clampedListInteger(c.req.query('limit'), 20, 1, 100);
+  const offset = clampedListInteger(c.req.query('offset'), 0, 0);
   const view = c.req.query('view') ?? 'all';
   if (view !== 'all' && view !== 'failures') {
     return inputError(c, { success: false, error: '表示条件が正しくありません' }, 400, ["view"]);
@@ -427,8 +426,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
     : null;
   return c.json({
     success: true,
-    data: {
-      items: result.items.map((row) => serializeDeliveryItem(row, attemptsByDelivery.get(row.id) ?? [])),
+    data: buildOffsetListResponse({ items: result.items.map((row) => serializeDeliveryItem(row, attemptsByDelivery.get(row.id) ?? [])),
       summary: result.summary,
       coverage: {
         source: 'notification_delivery_ledger',
@@ -436,8 +434,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
         attemptHistoryAvailable: true,
         retryAvailable: true,
       },
-      ...(quota ? { quota } : {}),
-    },
+      ...(quota ? { quota } : {}), total: result.total, paging: { limit }, sort: [] }),
     pagination: { total: result.total, limit, offset },
   });
 }

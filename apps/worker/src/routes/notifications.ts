@@ -1,5 +1,5 @@
+import { clampedListInteger } from '../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -76,8 +76,7 @@ notifications.get('/api/notifications/rules', requireRole('owner', 'admin'), asy
       data: items.map((item) => serializeRule(item)),
     });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -143,8 +142,7 @@ const listOperatorRules = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -182,8 +180,7 @@ const previewOperatorRecipients = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -231,8 +228,7 @@ const previewOperatorRuleRecipients = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -279,8 +275,7 @@ const publishOperatorRule = async (c: Context<Env>) => {
     auditLog(c, 'operator_notification.rule.publish', { kind: 'notification_rule', id: rule.id });
     return c.json({ success: true, data: updated ? serializeRule(updated) : null });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -306,8 +301,7 @@ const stopOperatorRule = async (c: Context<Env>) => {
     auditLog(c, 'operator_notification.rule.stop', { kind: 'notification_rule', id: rule.id });
     return c.json({ success: true, data: updated ? serializeRule(updated) : null });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -335,8 +329,7 @@ const testOperatorRule = async (c: Context<Env>) => {
     auditLog(c, 'operator_notification.rule.test', { kind: 'notification_rule', id: rule.id });
     return c.json({ success: true, data: result });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -369,8 +362,7 @@ const dispatchOperatorEventRoute = async (c: Context<Env>) => {
       throw err;
     }
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -405,8 +397,7 @@ const listOperatorEventTypesRoute = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -427,8 +418,7 @@ const sweepOperatorOutbox = async (c: Context<Env>) => {
     });
     return c.json({ success: true, data: result });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -492,8 +482,7 @@ const exportOperatorDeliveriesCsv = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -514,8 +503,7 @@ const getOperatorRule = async (c: Context<Env>) => {
       data: serializeRule(item),
     });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -551,8 +539,7 @@ const createOperatorRule = async (c: Context<Env>) => {
       data: serializeRule(item),
     }, 201);
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -602,8 +589,7 @@ const updateOperatorRule = async (c: Context<Env>) => {
       data: serializeRule(updated),
     });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -676,8 +662,7 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
     if (!updated) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
     return c.json({ success: true, data: serializeRule(updated) });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -695,8 +680,7 @@ notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin
     await deleteNotificationRule(c.env.DB, c.req.param('id') ?? '', lineAccountId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -705,10 +689,7 @@ notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin
 notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const status = c.req.query('status') ?? undefined;
-    const requestedLimit = Number(c.req.query('limit') ?? '100');
-    const limit = Number.isInteger(requestedLimit)
-      ? Math.min(Math.max(requestedLimit, 1), 100)
-      : 100;
+    const limit = clampedListInteger(c.req.query('limit'), 100, 1, 100);
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
@@ -730,8 +711,7 @@ notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), 
       })),
     });
   } catch (err) {
-    logger.error("routes_notifications_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

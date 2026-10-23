@@ -17,9 +17,18 @@ const STEPS: StepperStep[] = [
 
 /**
  * ★V8 の手順（共通部品 Fa8ED・決まりの板 q1xNMz。2026-10-08 オーナー）。
- * 丸24（済み＝緑に白い✓・今＝墨に白い数字・まだ＝薄い枠に灰の数字）・名13（今だけ太字）・線24×1.5。
+ * 状態の印・移動できる段と、丸の次に名前を置く構造を守る。
  */
 describe('手順（型の共通部品 Steps）', () => {
+  it('各段は丸の次に名前を置き、省略しても全文を確認できる', () => {
+    render(<Steps label="アカウント登録" steps={STEPS} currentKey="audience" />)
+    for (const item of screen.getByRole('navigation').querySelectorAll('li')) {
+      const dot = item.querySelector('[data-step-dot]')!
+      const name = item.querySelector('[data-step-name]')!
+      expect(dot.nextElementSibling).toBe(name)
+      expect(name.closest('[title]')?.getAttribute('title')).toBe(name.textContent)
+    }
+  })
   it('質問の縦の列では未回答にも移れ、現在の場所と回答済みを分ける', () => {
     const select = vi.fn()
     render(<Steps label="はじめの質問の一覧" layout="sidebar" currentKey="now" steps={[
@@ -87,4 +96,34 @@ describe('手順（型の共通部品 Steps）', () => {
     expect(repair).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('button', { name: '送信に戻る' })).toBeNull()
   })
+})
+
+it('完了した内容だけを1行で要約し、変える操作を元の段へつなぐ', () => {
+  const change = vi.fn()
+  render(<Steps label="作成" currentKey="message" summaries={{ basic: '夏のお知らせ', audience: 'タグ：会員', message: '未完成の本文' }} steps={[
+    { key: 'basic', label: '基本', state: 'done', onSelect: change },
+    { key: 'audience', label: '対象', state: 'done' },
+    { key: 'message', label: '本文', state: 'todo' },
+  ]} />)
+  expect(screen.getByText('夏のお知らせ').getAttribute('title')).toBe('夏のお知らせ')
+  expect(screen.getByText('タグ：会員')).toBeTruthy()
+  expect(screen.queryByText('未完成の本文')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '基本を変える' }))
+  expect(change).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('button', { name: '対象を変える' })).toBeNull()
+})
+
+it('閲覧のみでは要約を読めるが、変えるボタンを出さない', () => {
+  render(<Steps readOnly label="確認" currentKey="next" summaries={{ saved: '保存済みの名前' }} steps={[
+    { key: 'saved', label: '基本', state: 'done', onSelect: vi.fn() },
+    { key: 'next', label: '確認', state: 'todo' },
+  ]} />)
+  expect(screen.getByText('保存済みの名前')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '基本を変える' })).toBeNull()
+})
+
+
+it('完了した入力が無いときは、空の要約の段を置かない', () => {
+  render(<Steps label="作る" currentKey="first" summaries={{ first: '入力中' }} steps={[{ key: 'first', label: '基本', state: 'todo' }]} />)
+  expect(screen.queryByRole('list', { name: '設定済みの内容' })).toBeNull()
 })

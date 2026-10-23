@@ -231,10 +231,19 @@ html:root .tip a { color: var(--color-action); }
 
 /* 題から開く説明は、印の寸法・戻し余白を持たない。 */
 html:root .button[data-help-trigger='text'] {
-  width: auto; height: auto; min-width: 0; max-width: 100%; max-height: none;
+  width: auto; height: 1lh; min-height: 1lh; min-width: 0; max-width: 100%; max-height: none;
   margin: 0; aspect-ratio: auto; border-radius: var(--radius-control);
   color: inherit; font: inherit; text-align: inherit; justify-content: flex-start;
 }
 html:root .button[data-help-trigger='text']:hover { text-decoration: underline; }
 html:root .button[data-help-trigger='text']:focus-visible { outline-offset: 2px; }
 html:root .button[data-help-trigger='text']:active { scale: 1; }
+
+/* 「?」は文字ではなく図形のアイコンで描く。文字は上下の余白のくせで丸の真ん中に来ない。 */
+:root .markIcon { display: block; flex: none; width: 16px; height: 16px; color: var(--color-ink-faint); transition: color var(--motion-fast) var(--motion-ease-out); }
+:root .button:hover .markIcon { color: var(--color-ink-secondary); }
+
+:root .button[data-help-trigger='text'] { padding-block-start: var(--polish-text-center-inset); }
+:root .tip { max-width: min(300px, calc(100vw - 24px)); overflow-wrap: anywhere; }
+
+:root .tip { position: fixed; }

@@ -323,7 +323,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           {targetAccounts.map((account) => {
             const acct = account as unknown as { liffId?: string | null; name: string; country: string | null }
             const name = `${acct.country ? acct.country + ' ' : ''}${acct.name}`
-            if (!acct.liffId) return <Notice key={account.id} tone="warn" message={`${name}: LIFF ID 未設定`} />
+            if (!acct.liffId) return <Notice key={account.id} tone="warn" action={canManageRole(role) ? <Button variant="text" size="inline" href={`/accounts/detail?id=${encodeURIComponent(account.id)}`}>アカウント設定へ →</Button> : undefined} message={`${name}: LIFF ID 未設定`} />
             const url = `https://liff.line.me/${acct.liffId}/?page=event&id=${eventId}&liffId=${acct.liffId}`
             return <Field key={account.id} label={`${name}の固定 URL (QR・LP 直貼り用)`}>
               <TextInput readOnly value={url} onFocus={(event) => event.currentTarget.select()} />
@@ -338,7 +338,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           <Button onClick={() => copyValue(liffUrl)}>{copiedValue === liffUrl ? 'コピー済' : 'コピー'}</Button>
         </Field>
       </FormSection>
-      return <Notice tone="warn" message="LIFF ID が未設定のため予約 URL を生成できません。LINE アカウント設定で LIFF ID を登録してください。" />
+      return <Notice tone="warn" action={canManageRole(role) ? <Button variant="text" size="inline" href={`/accounts/detail?id=${encodeURIComponent(accountId)}`}>アカウント設定へ →</Button> : undefined} message="LIFF ID が未設定のため予約 URL を生成できません。LINE アカウント設定で LIFF ID を登録してください。" />
     })()}
     {eventId && draft.is_published === 0 ? <Notice tone="warn" message="現在「下書き」状態です。公開設定タブで「公開する」を ON にすると友だち向けの予約 URL が表示されます。" /> : null}
     <Tabs label="イベントの編集" items={TABS.map((item) => ({

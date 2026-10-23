@@ -218,10 +218,12 @@
   margin: var(--tpl-ar-ed-band-mt) 0 var(--tpl-ar-ed-band-mb);
 }
 
-/* 1152 の板：右の列は 幅280・余白16。上に「LINEでの見え方を見る」。 */
+/* 期間外の選択肢と矢印が収まる幅を、プレビューと内側のカードで共有する。 */
 :global([data-page-template='create']):has(.narrowPhoneOpen) {
   --tpl-preview-pad: var(--tpl-ar-ed-narrow-pad);
-  --tpl-preview-narrow-content-width: var(--tpl-ar-ed-narrow-side-w);
+  --tpl-preview-narrow-width: var(--tpl-cv-period-preview-width);
+  --tpl-preview-narrow-content-width: var(--tpl-cv-period-content-width);
+  --tpl-r2-rail-compact-content-width: var(--tpl-cv-period-content-width);
 }
 .narrowPhoneOpen { display: flex; flex-direction: column; align-self: stretch; }
 .narrowPhoneOpen > :global(*) { width: 100%; }

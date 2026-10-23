@@ -1,3 +1,4 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 
@@ -74,6 +75,7 @@ function createApp(
     await next();
   });
   app.route('/', friends);
+  app.onError(unhandledWorkerError);
   return app;
 }
 
@@ -297,7 +299,7 @@ describe('A-8 friends tenant scope', () => {
     const response = await createApp([], rows).request('/api/friends');
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ success: false, error: 'Internal server error' });
+    expect(await response.json()).toEqual({ success: false, error: 'Internal Server Error', incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
     expect(mocks.getFriendTagsByFriendIds).toHaveBeenCalledTimes(1);
   });
 

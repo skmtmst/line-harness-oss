@@ -120,8 +120,8 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
 }
 
 /* `cBSCb/q6d8jk`。$size-label 13 / 700。 */

@@ -199,7 +199,7 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     await render()
     expect(beforeUnload().defaultPrevented).toBe(false)
     expect(document.body.textContent).not.toContain('保存していない変更があります')
-    expect(button('機能設定を保存').disabled).toBe(true)
+    expect([...document.body.querySelectorAll('button')].some(button => button.textContent?.includes('機能設定を保存'))).toBe(false)
     expect(add.mock.calls.filter(([name]) => name === 'beforeunload')).toHaveLength(1)
     expect(addDocument.mock.calls.filter(([name]) => name === 'click')).toHaveLength(1)
   })

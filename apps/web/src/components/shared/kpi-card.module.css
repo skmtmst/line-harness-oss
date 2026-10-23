@@ -10,6 +10,40 @@
   display: none;
 }
 
+:root .number.rollingValue {
+  position: relative;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  vertical-align: bottom;
+}
+
+.rollingValue[data-kpi-rolling] > .actualValue { opacity: 0; }
+.rollingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  white-space: pre;
+  pointer-events: none;
+}
+.digitWindow { height: 1lh; overflow: hidden; }
+.digitColumn {
+  display: flex;
+  flex-direction: column;
+  /* 撮影などでanimationだけを無効にしても最終の数字を出す。 */
+  transform: translateY(calc(-200% / 3));
+  animation: kpi-digit-roll var(--motion-kpi-roll) var(--motion-ease-out) both;
+}
+.digitColumn > span { height: 1lh; }
+@keyframes kpi-digit-roll {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(-200% / 3)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rollingValue[data-kpi-rolling] > .actualValue { opacity: 1; }
+  .rollingOverlay { display: none; }
+  .digitColumn { animation: none; }
+}
+
 .head {
   position: relative;
   display: flex;
@@ -254,10 +288,11 @@
 :root .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }
 /* hQQlt：箱の中の小さな件数。通常のカード・数の帯は変えない。 */
 :root .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
-/* 白いカードの中の小さな数（絵 「今日の取り込み」）：題 11 の下に数 18/700。 */
+/* 箱の中の小さな数も、数字と単位の文字の役割を分ける。 */
 :root .card[data-kpi-presentation='inline'] .head { min-height: 0; }
 :root .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 11px; font-weight: 400; line-height: 16px; }
-:root .card[data-kpi-presentation='inline'] .number, :root .card[data-kpi-presentation='inline'] .unit { font-size: 18px; font-weight: 700; line-height: 26px; }
+:root .card[data-kpi-presentation='inline'] .number { font-size: 18px; font-weight: 600; line-height: 26px; }
+:root .card[data-kpi-presentation='inline'] .unit { font-size: var(--text-caption); font-weight: 400; }
 :root .card[data-kpi-presentation='inline'] .value { gap: 4px; }
 :root .card[data-kpi-presentation='inline'] .detail { display: none; }
 :root .valueDanger { color: var(--color-danger); }
@@ -280,8 +315,19 @@
 
 /* 数を押して内訳を開く口。数字と単位の配置は通常の数と同じ。 */
 .valueAction { min-height: 0; display: inline-flex; align-items: inherit; gap: inherit; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.valueAction:hover { background: var(--color-canvas-sunken); border-radius: var(--radius-control); }
+.valueAction:hover .number { text-decoration: underline; text-underline-offset: var(--space-2); }
 .valueAction:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; border-radius: var(--radius-control); }
 
 /* 小さい帯の「9.8 → 9.2 kg」のような幅の要る数は1段小さく（18）し、横の余白も詰めて切れないようにする（健康日記 ）。帯の指定より後に置く。 */
 :root .strip .card[data-kpi-density='compact'][data-kpi-range] { padding-inline: 12px; }
-:root .strip .card[data-kpi-density='compact'][data-kpi-range] .number { font-size: 18px; }
+
+/* ラベルと値の強弱。アイコンに小箱を重ねない。 */
+:root .label { color: var(--color-ink-secondary); font-weight: var(--polish-control-weight); }
+:root .icon { width: var(--polish-icon-large); height: var(--polish-icon-large); border: 0; outline-color: transparent; border-radius: 0; background: none; }
+:root .icon svg { width: var(--polish-icon-large); height: var(--polish-icon-large); stroke-width: var(--polish-icon-stroke); }
+:root .number, :root .card[data-kpi-presentation='inline'] .number { font-weight: var(--polish-value-weight); font-variant-numeric: tabular-nums; }
+:root .link { color: var(--color-ink); }
+:root .link:hover, :root .valueAction:hover { text-decoration: underline; }
+
+:root .card[data-kpi-presentation='inline'] .unit { font-weight: var(--polish-control-weight); }

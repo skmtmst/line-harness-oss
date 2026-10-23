@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Activity, CircleDot, FileWarning, Filter, LayoutTemplate, ListChecks, RefreshCw, Star } from 'lucide-react'
+import { Activity, CircleDot, FileWarning, Filter, LayoutTemplate, ListChecks, RefreshCw } from 'lucide-react'
 import { api, fetchApi, type AutomationListItem, type AutomationTemplateSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -201,13 +201,12 @@ export default function AutomationTemplatesV8() {
                 key={chip}
                 selected={trigger === chip}
                 onChange={(selected) => setTrigger(selected ? chip : '')}
-                icon={<Star size={13} aria-hidden="true" />}
               >
                 {chip}
               </FilterChip>
             ))}
             {hiddenChipCount > 0 ? (
-              <FilterChip selected={false} aria-expanded={false} onChange={() => setChipsOpen(true)} icon={<Star size={13} aria-hidden="true" />}>
+              <FilterChip selected={false} aria-expanded={false} onChange={() => setChipsOpen(true)}>
                 {`+${hiddenChipCount}`}
               </FilterChip>
             ) : null}
@@ -218,13 +217,13 @@ export default function AutomationTemplatesV8() {
         </div>
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}</ListPageSection>
         {visible.length === 0 ? (
-          <ListState kind="empty" title="条件に合う見本はありません" description="きっかけの札を外すと、すべて出ます。" />
+          <ListState kind="empty" emptyPreset={trigger ? 'filtered' : 'readonly'} title={trigger ? '条件に合う見本はありません' : '使える見本はまだありません'} description={trigger ? 'きっかけの札を外すと、すべて出ます。' : 'このアカウントで使える見本が登録されると、ここに表示されます。'} action={trigger ? <Button onClick={() => setTrigger('')}>条件を外す</Button> : undefined} />
         ) : (
           <section role="list" aria-label="見本"><ListPageCards columns={4}>
             {visible.map((item) => {
               const triggerText = templateTriggerText(item.triggerLabel)
               return (
-                <Card key={item.key} role="listitem" layout="vertical" padding="compact" gap="tight">
+                <Card frame="flat" key={item.key} role="listitem" layout="vertical" padding="compact" gap="tight">
                   <h2 className={styles.cardTitle} title={item.name}>{item.name}</h2>
                   <dl className={styles.facts}>
                     <div className={styles.fact}>

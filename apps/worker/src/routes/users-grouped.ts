@@ -1,4 +1,4 @@
-import { logger } from '@line-crm/shared/server';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -25,15 +25,14 @@ usersGrouped.get('/api/users-grouped', requireRole('owner', 'admin', 'staff'), a
       account,
       // FRIEND-09: 表示中ページへの後絞りをやめ、全件へかける条件として受ける。
       uid: uidRaw === 'linked' || uidRaw === 'unlinked' ? uidRaw : undefined,
-      page: pageStr ? Number.parseInt(pageStr, 10) : undefined,
-      pageSize: pageSizeStr ? Number.parseInt(pageSizeStr, 10) : undefined,
+      page: pageStr ? listQueryNumber(pageStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
+      pageSize: pageSizeStr ? listQueryNumber(pageSizeStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
       forceRefresh,
     };
 
     const result = await computeUsersGrouped(c.env.DB, opts);
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...result, items: result.rows, paging: { limit: result.pageSize }, sort: [{ field: 'accountCount', direction: 'desc' }, { field: 'lastActivityAt', direction: 'desc' }] }) });
   } catch (err) {
-    logger.error("routes_users_grouped_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });

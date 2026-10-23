@@ -1,8 +1,13 @@
+// @vitest-environment happy-dom
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+afterEach(cleanup)
 import ts from 'typescript'
 import {
   EFFECTIVE_LEGEND,
@@ -30,8 +35,6 @@ const PAGE_WITHOUT_COMMENTS = ts.createPrinter({ removeComments: true }).printFi
   ts.createSourceFile('list.tsx', PAGE, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX),
 )
 const WORDS = read("../../v8/auto-replies/auto-reply-words.ts")
-const DIALOG = read('..', '..', 'components', 'shared', 'dialog.tsx')
-const CONFIRM = read('..', '..', 'components', 'shared', 'confirm-dialog.tsx')
 
 /**
  * 画面に出してはいけない、作った側の言葉と保存してある値。
@@ -296,13 +299,22 @@ describe('一覧の画面が置き換え表を通す', () => {
 
 describe('削除確認 Gy9OK の絵と、押せる形', () => {
 
-  it('共通ダイアログが絵の口を持つ（渡さなければ今までどおり）', () => {
-    expect(CONFIRM).toContain('titleIcon?: ReactNode')
-    expect(CONFIRM).toContain('confirmIcon?: ReactNode')
-    expect(DIALOG).toContain('titleIcon?: ReactNode')
-    expect(DIALOG).toContain('confirmIcon?: ReactNode')
-    expect(DIALOG).toContain('{titleIcon ? (')
-    expect(DIALOG).toContain('{!busy && confirmIcon ?')
+  it('確認の印を飾りとして出し、実行と取消を使える', () => {
+    const confirm = vi.fn(), cancel = vi.fn()
+    render(createElement(ConfirmDialog, {
+      open: true, title: '削除しますか？', description: '内容を確かめてください。',
+      titleIcon: createElement('svg', { 'data-testid': 'title-icon' }),
+      confirmIcon: createElement('svg', { 'data-testid': 'confirm-icon' }),
+      onConfirm: confirm, onCancel: cancel,
+    }))
+    expect(screen.getByRole('heading', { name: '削除しますか？' }).contains(screen.getByTestId('title-icon'))).toBe(true)
+    expect(screen.getByTestId('title-icon').parentElement?.getAttribute('aria-hidden')).toBe('true')
+    const action = screen.getByRole('button', { name: '実行する' })
+    expect(action.contains(screen.getByTestId('confirm-icon'))).toBe(true)
+    fireEvent.click(action)
+    expect(confirm).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect(cancel).toHaveBeenCalledOnce()
   })
 
   it('消せない状態では確認のボタンを出さず、理由を本文に出す', () => {

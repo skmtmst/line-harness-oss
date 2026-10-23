@@ -1,3 +1,4 @@
+import { d1BindingIdentity } from '../lib/d1-timing.js';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -276,15 +277,16 @@ export async function computeUsersGrouped(
   let allRows: UnifiedUserRow[];
   const scopeKey = opts.allowedAccountIds === undefined ? 'internal-unscoped'
     : JSON.stringify([...new Set(opts.allowedAccountIds)].sort());
-  const cached = cachedByDb.get(db);
+  const cacheDb = d1BindingIdentity(db);
+  const cached = cachedByDb.get(cacheDb);
   if (!opts.forceRefresh && cached?.scopeKey === scopeKey && Date.now() - cached.at < CACHE_TTL_MS) {
     allRows = cached.rows;
   } else {
     allRows = await computeAllRows(db, opts.allowedAccountIds);
     if (allRows.length > 0) {
-      cachedByDb.set(db, { rows: allRows, at: Date.now(), scopeKey });
+      cachedByDb.set(cacheDb, { rows: allRows, at: Date.now(), scopeKey });
     } else {
-      cachedByDb.delete(db);
+      cachedByDb.delete(cacheDb);
     }
   }
 

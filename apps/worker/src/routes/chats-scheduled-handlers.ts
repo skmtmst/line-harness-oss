@@ -343,7 +343,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
         .bind(jstNow(), chat.id)
         .run();
     } catch (e) {
-      logger.error("routes_chats_failed");
+      logger.error("chats.chats_id_send_combined_post_failed");
     }
 
     await fireEvent(c.env.DB, 'manual_reply_sent', {
@@ -353,7 +353,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
       friendId: friend.id,
       eventData: { staffId: c.get('staff').id },
     }, undefined, friend.line_account_id).catch((error) => {
-      logger.error("routes_chats_failed");
+      logger.error("chats.chats_id_send_combined_post_failed");
     });
 
     await releaseInboxReplyLease(c.env.DB, {
@@ -377,8 +377,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
         channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
       }).catch(() => undefined);
     }
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -486,8 +485,7 @@ export const post__api_chats_id_schedule_2 = async (c: Context<Env, "/api/chats/
       data: { ...scheduledSendResponse(row), replayed: !created },
     });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -503,8 +501,7 @@ export const get__api_chats_id_scheduled_3 = async (c: Context<Env, "/api/chats/
       data: { scheduled: rows.map(scheduledSendResponse) },
     });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -588,8 +585,7 @@ export const patch__api_chats_id_scheduled_scheduleId_4 = async (c: Context<Env,
     }
     return c.json({ success: true, data: { updated: true } });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -626,7 +622,6 @@ export const delete__api_chats_id_scheduled_scheduleId_5 = async (c: Context<Env
     }
     return c.json({ success: true, data: { cancelled: true } });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

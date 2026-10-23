@@ -23,7 +23,7 @@
 .multiRows { display: flex; flex-direction: column; gap: var(--tpl-picker-row-gap); min-height: 0; overflow-y: auto; }
 /* S2Vgi（正の形）：行は薄い枠の箱、選んだ行は緑の地と緑の枠。 */
 .multiRow { display: flex; flex: none; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-bd-ring); }
-.multiRow[data-selected] { background: var(--color-accent-soft); box-shadow: var(--tpl-bd-ring-accent); }
+.multiRow[data-selected] { background: var(--polish-selection-bg); box-shadow: var(--tpl-bd-ring); }
 /* 窓の中身の高さは「テンプレートを選ぶ」と同じ。候補が多くても下の帯を画面の外へ押し出さない。 */
 /* 1つ選ぶ窓も高さを決め、候補が多いときは一覧の中を送る（：候補29件で下の段が画面の外へ出ていた）。 */
 .singleBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
@@ -107,7 +107,7 @@
   cursor: pointer;
 }
 .tpCard:hover { background: var(--color-surface-pearl); }
-.tpCard[data-selected], .tpCard[aria-pressed='true'] { background: var(--color-accent-soft); outline: var(--tpl-inbox-tp-card-on); outline-offset: var(--tpl-inbox-tp-card-on-offset); }
+.tpCard[data-selected], .tpCard[aria-pressed='true'] { background: var(--polish-selection-bg); outline: var(--polish-selection-outline); outline-offset: var(--tpl-inbox-tp-card-on-offset); }
 .tpCardText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--tpl-inbox-row-line-gap); }
 .tpCardName { overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .tpCardBody { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
@@ -138,12 +138,12 @@
   gap: var(--tpl-inbox-chead-gap);
   width: 100%;
   padding: var(--tpl-inbox-tp-band-pad);
-  background: var(--color-accent-soft);
+  background: var(--polish-selection-bg);
   font-size: var(--text-caption);
 }
-.tpBandLabel { flex: none; color: var(--color-accent-deep); font-weight: 700; }
+.tpBandLabel { flex: none; color: var(--color-ink); font-weight: 700; }
 .tpBandOrder { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink); text-overflow: ellipsis; white-space: nowrap; }
-.tpBandCount { flex: none; color: var(--color-accent-deep); font-weight: 700; }
+.tpBandCount { flex: none; color: var(--color-ink); font-weight: 700; }
 .tpFoot {
   display: flex;
   align-items: center;
@@ -159,10 +159,10 @@
 .createRow > :first-child { flex: 1; min-width: 0; }
 .tpFootNote { color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
 /* S2Vgi：一覧の下の「選んだもの」の帯（薄い緑の地・左に名前・右に件数）。 */
-.pickedBand { display: flex; align-items: center; gap: var(--tpl-picker-gap); width: 100%; min-width: 0; padding: var(--tpl-inbox-tp-band-pad); background: var(--color-accent-soft); font-size: var(--text-caption); }
-.pickedLabel { flex: none; color: var(--color-accent-deep); font-weight: 600; }
+.pickedBand { display: flex; align-items: center; gap: var(--tpl-picker-gap); width: 100%; min-width: 0; padding: var(--tpl-inbox-tp-band-pad); background: var(--polish-selection-bg); font-size: var(--text-caption); }
+.pickedLabel { flex: none; color: var(--color-ink); font-weight: 600; }
 .pickedNames { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); text-overflow: ellipsis; white-space: nowrap; }
-.pickedCount { flex: none; color: var(--color-accent-deep); font-weight: 600; }
+.pickedCount { flex: none; color: var(--color-ink); font-weight: 600; }
 .tpFootSub { color: var(--color-ink-faint); font-size: var(--text-nano); white-space: nowrap; }
 .tpFootActions { display: flex; flex: none; align-items: center; gap: var(--tpl-inbox-composer-gap); }
 
@@ -186,7 +186,7 @@
 .fieldName { max-width: 100%; flex-shrink: 1; }
 /* の絞り込み：項目名と値を1行の本文として見せる。 */
 .field[data-value-prefix] .fieldName { font-size: var(--polish-text-body); font-weight: 400; line-height: var(--tpl-inbox-row-preview-lh); }
-.fieldAction { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); flex-shrink: 0; font-size: var(--text-body); font-weight: 600; color: var(--color-accent-deep); }
+.fieldAction { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); flex-shrink: 0; font-size: var(--text-body); font-weight: 600; color: var(--color-ink); }
 .fieldClear { position: relative; border: 0; background: none; color: var(--color-ink-secondary); font-size: var(--text-caption); cursor: pointer; }
 .fieldClear:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); }
 .fieldChips { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; gap: var(--tpl-picker-tiny-gap); padding-block: var(--tpl-picker-tiny-gap); pointer-events: none; }
@@ -201,9 +201,18 @@
 
 /* ：候補のカードも同じ選択の枠・輪・点。 */
 html:root .tpCard { position: relative; padding-right: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
-html:root .tpCard[data-selected] { background: var(--color-choice-selected); outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; }
+html:root .tpCard[data-selected] { background: var(--polish-selection-bg); outline: var(--choice-card-ring) solid var(--polish-selection-ink); outline-offset: -2px; }
 html:root .cardRadio { appearance: none; opacity: 1; width: var(--choice-size); height: var(--choice-size); right: var(--space-16); top: var(--space-16); margin: 0; border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
-html:root .cardRadio:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
+html:root .cardRadio:checked { border-color: var(--polish-selection-ink); background: radial-gradient(circle, var(--polish-selection-ink) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
 html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 
 :root .tpList > :first-child:not(.tpCards) { margin-bottom: var(--space-8); }
+
+/* 画面の選択入口だけをそろえ、窓内の候補・確定処理には触れない。 */
+:root .field { border-color: var(--color-control-border); box-shadow: none; background: var(--color-canvas); }
+:root .field:has(.fieldTrigger:hover:not(:disabled)) { background: var(--color-canvas-sunken); }
+:root .field[data-invalid] { border-color: var(--color-danger); }
+:root .field :is(.fieldName, .fieldPlaceholder, .fieldAction) { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
+:root .fieldAction { color: var(--color-ink); }
+
+:root .fieldAction { color: var(--color-ink-faint); }

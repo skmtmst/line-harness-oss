@@ -14,8 +14,9 @@
   justify-content: center;
   align-items: flex-start;
   padding: 12vh 16px 16px;
-  background: color-mix(in srgb, var(--color-ink) 40%, transparent);
-  animation: palette-in var(--motion-base) var(--motion-ease-out);
+  background: var(--polish-window-backdrop);
+  -webkit-backdrop-filter: blur(var(--polish-window-blur));
+  backdrop-filter: blur(var(--polish-window-blur));
 }
 
 .panel {
@@ -25,9 +26,9 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
+  border-radius: var(--polish-radius-dialog);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--polish-window-shadow);
 }
 
 .input {
@@ -97,40 +98,16 @@
   text-align: center;
 }
 
-@keyframes palette-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
+/* 閉じかけで開き直しても、現在の位置から操作を受ける。 */
+.backdrop[data-closing] { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .backdrop { transition: opacity var(--motion-base) var(--motion-ease-out); }
+  .panel { transition: opacity var(--motion-base) var(--motion-ease-out), transform var(--motion-base) var(--motion-ease-out); }
+  @starting-style {
+    .backdrop { opacity: 0; }
+    .panel { opacity: 0; transform: translateY(4px) scale(0.98); }
   }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 閉じるときは開くの逆（--motion-exit）。印 data-closing は command-palette.tsx が付ける。 */
-.backdrop[data-closing] {
-  animation: palette-out var(--motion-exit) var(--motion-ease-out) forwards;
-  pointer-events: none;
-}
-
-@keyframes palette-out {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .backdrop,
-  .backdrop[data-closing] {
-    animation: none;
-  }
+  .backdrop[data-closing], .backdrop[data-closing] .panel { transition-duration: var(--motion-exit); }
+  .backdrop[data-closing] .panel { opacity: 0; transform: translateY(4px) scale(0.98); }
 }
 }

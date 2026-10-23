@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -169,15 +170,16 @@ opsSupport.get('/api/ops/support/tickets', async (c) => {
   const priority = priorityRaw && (SUPPORT_PRIORITIES as readonly string[]).includes(priorityRaw) ? (priorityRaw as SupportPriority) : undefined;
   const sortRaw = c.req.query('sort');
   const sort = sortRaw === 'oldest' || sortRaw === 'priority' ? sortRaw : 'newest';
-  const limit = Number(c.req.query('limit') ?? 50);
-  const offset = Number(c.req.query('offset') ?? 0);
+  const limit = listQueryNumber(c.req.query('limit'), 50);
+  const offset = listQueryNumber(c.req.query('offset'), 0);
   const { rows, total } = await listSupportTickets(db, {
     stage, priority, q: c.req.query('q') ?? '', sort,
     limit: Number.isFinite(limit) ? limit : 50, offset: Number.isFinite(offset) ? offset : 0,
   });
   const replies = await countRepliesForRequests(db, rows.map((r) => r.id));
   const base = workerUrl(c);
-  return c.json({ success: true, data: rows.map((r) => serializeTicket(r, base, replies.get(r.id) ?? 0)), total });
+  const responseItems = rows.map((r) => serializeTicket(r, base, replies.get(r.id) ?? 0));
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total, items: responseItems, paging: { limit: Number.isFinite(limit) ? Math.min(200, Math.max(1, limit)) : 50 }, sort: [] }));
 });
 
 // ---------------------------------------------------------------------------
@@ -197,7 +199,7 @@ opsSupport.get('/api/ops/support/tickets/:id', async (c) => {
   const base = workerUrl(c);
   // 閲覧の記録（統括には見せない）。失敗しても画面は出す。
   await audit(c, { action: 'ticket.view', ticket, visibleToTenant: false }).catch((error) => {
-    logger.error("routes_ops_support_failed");
+    logger.error("ops_support.ops_support_tickets_by_id_get_failed");
   });
   return c.json({
     success: true,
@@ -297,7 +299,7 @@ opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(
       deliveredVia.push('email');
     } catch (error) {
       // メールが落ちても返信は記録する。画面には「メールは送れなかった」と返す。
-      logger.error("routes_ops_support_failed");
+      logger.error("ops_support.ops_support_tickets_by_id_reply_create_failed");
     }
   }
   const message = await addSupportReply(db, {
@@ -478,7 +480,7 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
       if (timer) clearTimeout(timer);
     }
   } catch (error) {
-    logger.error("routes_ops_support_failed");
+    logger.error("ops_support.ops_support_tickets_by_id_draft_ai_create_failed");
     if (error instanceof KnowledgeAiTimeout) {
       return c.json({ success: false, error: 'AI の応答が 45 秒以内に返りませんでした。手で書くか、少し待ってからもう一度お試しください' }, 504);
     }

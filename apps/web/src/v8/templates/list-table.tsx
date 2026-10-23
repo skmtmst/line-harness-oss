@@ -156,6 +156,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                   <Tr
                     interactive
                     key={t.id}
+                    selected={selectedIds.has(t.id)}
                     data-row-id={t.id}
                     className={styles.rowClick}
                     tabIndex={0}

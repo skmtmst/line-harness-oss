@@ -25,7 +25,7 @@ export const get__api_rich_menu_groups_groupId_delete_impact_1 = async (c: Conte
       }
       return c.json({ success: true, data: impact });
     } catch (error) {
-      logger.error("routes_rich_menu_groups_failed");
+      logger.error("rich_menu_groups.rich_menu_groups_group_id_delete_impact_get_failed");
       return c.json(
         { success: false, error: '削除したときの影響を確認できませんでした' },
         503,
@@ -142,7 +142,7 @@ export const post__api_rich_menu_groups_groupId_preview_targets_2 = async (c: Co
       },
     });
   } catch (error) {
-    logger.error("routes_rich_menu_groups_failed");
+    logger.error("rich_menu_groups.rich_menu_groups_group_id_preview_targets_post_failed");
     return c.json({ success: false, error: '対象人数を確認できませんでした' }, 503);
   }
 };
@@ -163,7 +163,7 @@ export const get__api_rich_menu_groups_groupId_usages_3 = async (c: Context<Env,
       },
     });
   } catch (error) {
-    logger.error("routes_rich_menu_groups_failed");
+    logger.error("rich_menu_groups.rich_menu_groups_group_id_usages_get_failed");
     return c.json({ success: false, error: '使用先を確認できませんでした' }, 503);
   }
 };
@@ -358,14 +358,14 @@ export const post__api_rich_menu_groups_8 = async (c: Context<Env, "/api/rich-me
         try {
           await c.env.IMAGES.delete(key);
         } catch {
-          logger.error("routes_rich_menu_groups_failed");
+          logger.error("rich_menu_groups.rich_menu_groups_post_failed");
         }
         throw dbError;
       }
       const refreshed = await getRichMenuGroupWithPages(c.env.DB, created.id);
       return c.json({ success: true, data: serializeGroupWithPages(refreshed ?? created) });
     } catch (error) {
-      logger.error("routes_rich_menu_groups_failed");
+      logger.error("rich_menu_groups.rich_menu_groups_post_failed");
       return c.json(
         {
           success: false,
@@ -528,7 +528,7 @@ export const delete__api_rich_menu_groups_groupId_11 = async (c: Context<Env, "/
   try {
     impact = await getRichMenuDeleteImpact(c.env.DB, groupId);
   } catch (error) {
-    logger.error("routes_rich_menu_groups_failed");
+    logger.error("rich_menu_groups.rich_menu_groups_group_id_delete_failed");
     return c.json(
       { success: false, error: '削除したときの影響を確認できませんでした' },
       503,

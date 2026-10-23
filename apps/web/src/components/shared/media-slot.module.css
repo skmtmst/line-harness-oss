@@ -155,8 +155,15 @@
 .frame[data-size='compact'] .reason {
   font-size: var(--tpl-slot-desc-compact);
 }
-.frame[data-size='compact'] .limit {
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+
+/* 空の案内・上限は短い文字。狭い枠でも語の途中で折り返さず、入りきらない分は
+   1行のまま省略して全文を title で見せる（題と同じ扱い）。 */
+.dropHint,
+.limit {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reason {
@@ -303,3 +310,5 @@
   display: none;
 }
 }
+
+:root .frame { gap: var(--polish-space-field); }

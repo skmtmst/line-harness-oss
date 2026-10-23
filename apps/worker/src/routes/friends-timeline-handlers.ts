@@ -1,3 +1,4 @@
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
@@ -12,8 +13,8 @@ import type { Context } from 'hono';
 
 export const get__api_friends_id_timeline_1 = async (c: Context<Env, "/api/friends/:id/timeline">) => {
     try {
-      const limitRaw = Number(c.req.query('limit') ?? 50);
-      const offsetRaw = Number(c.req.query('cursor') ?? 0);
+      const limitRaw = listQueryNumber(c.req.query('limit'), 50);
+      const offsetRaw = listQueryNumber(c.req.query('cursor'), 0);
       if (!Number.isInteger(limitRaw) || limitRaw < 1 || limitRaw > 100
           || !Number.isInteger(offsetRaw) || offsetRaw < 0) {
         return c.json({ success: false, error: 'ページ位置が正しくありません' }, 400);
@@ -157,15 +158,12 @@ export const get__api_friends_id_timeline_1 = async (c: Context<Env, "/api/frien
       }));
       return c.json({
         success: true,
-        data: {
-          items,
+        data: buildCursorListResponse({ items,
           limit: limitRaw,
-          nextCursor: hasNextPage ? String(offsetRaw + limitRaw) : null,
-        },
+          nextCursor: hasNextPage ? String(offsetRaw + limitRaw) : null, paging: { limit: limitRaw }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
       });
     } catch (error) {
-      logger.error("routes_friends_failed");
-      return c.json({ success: false, error: '友だちの履歴を読み込めませんでした' }, 500);
+      throw error;
     }
   };
 
@@ -323,7 +321,7 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
         nextRetryAt: null,
         now: failedAt,
       });
-      logger.error("routes_friends_failed");
+      logger.error("friends.friends_id_messages_post_failed");
       return c.json({
         success: false,
         error: '送信の準備に失敗しました',
@@ -398,7 +396,6 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
 
     return c.json({ success: true, data: { messageId: logId } });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

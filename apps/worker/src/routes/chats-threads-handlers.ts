@@ -1,11 +1,10 @@
-import { logger } from '@line-crm/shared/server';
 import { slaChatList, enrichSlaChats } from '../services/inbox-sla-list.js';
 import { refreshInboxSla } from '../services/inbox-sla.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 
 import { getChatById, getFriendById, markInboxConversationRead, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
-import { listLimit } from './list-pagination.js';
+import { buildCursorListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
 
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveOrCreateChat } from './chats-definition.js';
@@ -35,7 +34,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       if (unreadOnly || quickFilter || operatorId === 'unassigned') {
         return c.json({ success: false, error: 'incompatible_filters' }, 400);
       }
-      const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+      const requestedLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
       const limit = Number.isFinite(requestedLimit)
         ? Math.min(200, Math.max(1, requestedLimit))
         : 200;
@@ -50,7 +49,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         allowedAccountIds: visibleScope.allowedAccountIds,
         canSeeUnassigned: visibleScope.canSeeUnassigned,
       });
-      if (unanswered.rows.length === 0) return c.json({ success: true, data: [] });
+      if (unanswered.rows.length === 0) return c.json(buildCursorListResponse({ success: true, data: [], items: [], paging: { limit }, sort: [] }));
 
       // 未対応サービスで確定した最大200人だけの会話メタ情報を取る。
       // json_each へID配列を1 bindで渡すため、D1の100 bind上限にも当たらない。
@@ -93,7 +92,8 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
           updatedAt: chat.updated_at,
         }];
       });
-      return c.json({ success: true, data });
+      const responseItems = data;
+      return c.json(buildCursorListResponse({ success: true, data, items: responseItems, paging: { limit }, sort: [] }));
     }
 
     // List everyone who has any message history (incoming or outgoing — push/broadcast/scenario included)
@@ -379,10 +379,10 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       updatedAt: ch.updated_at,
     }));
 
-    return c.json({ success: true, data: await enrichSlaChats(c.env.DB,data) });
+    const responseItems = await enrichSlaChats(c.env.DB,data);
+    return c.json(buildCursorListResponse({ success: true, data: responseItems, items: responseItems, paging: { limit }, sort: [] }));
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -442,7 +442,7 @@ export const get__api_chats_id_2 = async (c: Context<Env, "/api/chats/:id">) => 
     // 直近から limit 件ずつ返すカーソルページング。全文一括(LIMIT 1000)だと長期の
     // 会話で応答が重くなり、画像/Flex再描画時のスクロール追従も高コストになる。
     // 1件多めに取って「続きがあるか」だけ見て捨てる(limit+1方式)。
-    const rawMessageLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
+    const rawMessageLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
     const messageLimit = Number.isSafeInteger(rawMessageLimit)
       ? Math.min(1000, Math.max(1, rawMessageLimit))
       : 100;
@@ -538,8 +538,7 @@ export const get__api_chats_id_2 = async (c: Context<Env, "/api/chats/:id">) => 
       },
     });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -566,8 +565,7 @@ export const post__api_chats_id_read_3 = async (c: Context<Env, "/api/chats/:id/
     }
     return c.json({ success: true, data: { isUnread: false } });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -602,8 +600,7 @@ export const post__api_chats_read_all_4 = async (c: Context<Env, "/api/chats/rea
       .run();
     return c.json({ success: true, data: { marked: true } });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
+    throw err;
   }
 };
 

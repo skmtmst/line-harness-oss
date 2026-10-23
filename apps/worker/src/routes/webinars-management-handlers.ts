@@ -1,3 +1,4 @@
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { applyVideoMediaSelection } from './webinar-video-selection.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -388,8 +389,8 @@ export const get__api_webinars_id_participants_10 = async (c: Context<Env, "/api
     return c.json({ success: false, error: 'invalid_filter' }, 400);
   }
   const classification = (filterRaw ?? null) as WebinarParticipantClassification | null;
-  const limit = Math.min(200, Math.max(1, Number(c.req.query('limit') ?? 50) || 50));
-  const offset = Math.max(0, Number(c.req.query('cursor') ?? 0) || 0);
+  const limit = Math.min(200, Math.max(1, listQueryNumber(c.req.query('limit'), 50) || 50));
+  const offset = Math.max(0, listQueryNumber(c.req.query('cursor'), 0) || 0);
   const [webinar, measurement] = await Promise.all([
     getWebinarById(c.env.DB, id),
     webinarParticipantMeasurement(c.env.DB, id),
@@ -405,8 +406,7 @@ export const get__api_webinars_id_participants_10 = async (c: Context<Env, "/api
   const hasNext = rows.length > limit;
   return c.json({
     success: true,
-    data: {
-      items: rows.slice(0, limit).map((row) => ({
+    data: buildCursorListResponse({ items: rows.slice(0, limit).map((row) => ({
         friendId: row.friend_id,
         friendName: row.friend_name,
         pictureUrl: row.picture_url,
@@ -436,8 +436,7 @@ export const get__api_webinars_id_participants_10 = async (c: Context<Env, "/api
       rule: {
         completionThresholdSeconds,
         durationSeconds: webinar.duration_seconds,
-      },
-    },
+      }, paging: { limit }, sort: [] }),
   });
   };
 

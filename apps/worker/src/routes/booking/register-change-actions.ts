@@ -201,7 +201,7 @@ booking.post(
       await notifyForBooking(c.env.DB, bookingId, notificationKind, op.id);
     } catch (error) {
       outcome = 'failed';
-      logger.error("routes_booking_failed");
+      logger.error("booking.admin_bookings_by_id_notifications_by_run_id_retry_create_failed");
     }
     const refreshed = await c.env.DB
       .prepare(`SELECT status, error_code FROM booking_operation_runs WHERE id = ?`)

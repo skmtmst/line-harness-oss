@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 
 const dbMocks = vi.hoisted(() => ({
   getConversionPoints: vi.fn(),
@@ -82,6 +86,7 @@ function app(role: Role = 'owner', permissionKeys: string[] = ['/conversions']) 
     await next();
   });
   hono.route('/', conversions);
+  hono.onError(unhandledWorkerError);
   return hono;
 }
 
@@ -131,7 +136,9 @@ describe('conversion definition routes', () => {
       '/api/conversions/definitions?from=2026-09-01&to=2026-09-07&lineAccountId=account-a&q=%E8%B3%BC%E5%85%A5&status=active&sourceType=purchase&sort=value_desc',
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, data: LIST_RESULT });
+    expect(await response.json()).toEqual({ success: true, data: {
+      ...LIST_RESULT, total: LIST_RESULT.pagination.total, limit: LIST_RESULT.pagination.limit, sort: [],
+    } });
     expect(dbMocks.listConversionDefinitions).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       lineAccountId: 'account-a', query: '購入', status: 'active', sourceType: 'purchase',
       sort: 'value_desc', cursor: 0, limit: 50,
@@ -143,7 +150,13 @@ describe('conversion definition routes', () => {
     dbMocks.listConversionDefinitions.mockRejectedValueOnce(new Error('database unavailable'));
     const response = await app().request('/api/conversions/definitions?from=2026-09-01&to=2026-09-07');
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ success: false, error: '成果地点の情報を処理できませんでした' });
+    const body = await response.json<{ incidentId: string }>();
+    expect(body).toEqual({ success: false, error: 'Internal Server Error', incidentId: expect.any(String) });
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(JSON.stringify(body)).not.toContain('database unavailable');
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+      source: 'worker', message: 'unhandled_worker_error', path: 'GET /api/conversions/definitions', incidentId: body.incidentId,
+    });
   });
 
   it('日付・状態・cursorの入力不良を400で拒否する', async () => {

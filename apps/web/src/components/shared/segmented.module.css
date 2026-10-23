@@ -7,7 +7,7 @@
  *     角丸 control（高さ 36。Pencil は余白 3→2 に更新済み）
  *   つまみ（選択中）：canvas の白・角丸 8・薄い影・中の文字 13/600 ink
  *   未選択：文字 13/500 ink-secondary（地は器の track が透ける）
- *   つまみは前の位置から 120ms で滑って着く。
+ *   つまみは前の位置から 200ms で滑って着く。
  *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない。
  */
 
@@ -54,6 +54,9 @@
   color: var(--color-ink);
 }
 
+/* 通常の切り替えでは数の左だけが間を持つ。予約用のflex gapとは重ねない。 */
+:root .root:not([data-size='booking']) .count { margin-inline-start: var(--tpl-chip-gap); }
+
 .selected,
 .selected:hover {
   font-weight: 600;
@@ -74,11 +77,10 @@
   outline-offset: 2px;
 }
 
-/* ★V8 仕上げ3回目（M10）②：つまみの滑り・文字の色を --motion-* にそろえる（120ms）。V8 にだけ生えた部品のため 管理画面 の規定は持たない。 */
+/* ★V8 仕上げ3回目（M10）②：つまみは共通FLIP、文字の色は --motion-fast（120ms）。V8 にだけ生えた部品のため 管理画面 の規定は持たない。 */
 :root .thumb {
-  transition:
-    transform var(--motion-fast) var(--motion-ease-out),
-    width var(--motion-fast) var(--motion-ease-out);
+  transform-origin: left center;
+  transition-property: none;
 }
 
 :root .item {
@@ -167,5 +169,26 @@ html:root .root .item, html:root .root .thumb, html:root .root[data-size] .thumb
 
 /* ・・：10-10 に採用した共通の形。 */
 :root .thumb { background: var(--color-selection-bg); box-shadow: var(--choice-selected-shadow); }
-:root .selected, :root .root[data-appearance] .selected { background: var(--color-selection-bg); color: var(--color-selection-border); outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
+:root .selected, :root .root[data-appearance] .selected { background: var(--color-selection-bg); color: var(--color-selection-border); outline: 1px solid var(--color-selection-border); outline-offset: -1px; font-weight: 600; }
 html:root .item { white-space: nowrap; flex-shrink: 0; }
+
+/* 選択面を一枚にし、文字の背景で滑るつまみを覆わない。 */
+html:root .root[data-sliding] .selected { background: transparent; outline-color: transparent; }
+html:root .root .thumb { outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
+html:root .root:is([data-appearance='choices'], [data-appearance='reservation'], [data-appearance='intake-stop']) .thumb { top: 0; bottom: 0; }
+html:root .root:is([data-appearance='choices'], [data-appearance='reservation']) .thumb { border-radius: var(--radius-pill); }
+
+html:root .root .item:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
+/* 表示を切り替える帯は白いつまみ。離れた選択札の意味色は別に保つ。 */
+:root .root[data-appearance='track'] .thumb { background: var(--color-canvas); box-shadow: var(--shadow-segment-thumb); }
+:root .root[data-appearance='track'] .selected { background: transparent; color: var(--color-ink); box-shadow: none; }
+:root .root[data-appearance='track'] .selected:not(:focus-visible) { outline-color: transparent; }
+:root .root[data-appearance='track'] .item:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+
+/* 切り替え帯は白いつまみ一枚で現在地を示す。 */
+html:root .root[data-appearance="track"] .thumb { background: var(--color-canvas); outline-color: transparent; box-shadow: var(--shadow-segment-thumb); }
+html:root .root[data-appearance="track"] .selected { color: var(--color-ink); background: transparent; outline-color: transparent; box-shadow: none; }
+html:root .root[data-appearance="track"] .item:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+
+:root .root[data-size='booking'] .item { padding-block-start: var(--polish-text-center-inset); }

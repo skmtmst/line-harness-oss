@@ -410,10 +410,12 @@
   font-family: var(--font-inter), Inter, sans-serif; font-size: 11px;
   font-weight: 700; line-height: 11px; border-radius: 999px; background: var(--color-status-danger);
 }
-:root [data-collapsed] .badge {
-  position: absolute; top: -2px; right: 0; min-width: 0; width: 18px; height: 16px;
-  padding: 0; border: 0; outline: 2px solid var(--color-shell); outline-offset: -1px;
-  font-size: 10px; line-height: 10px;
+:root [data-collapsed] .badge,
+:root .desktop[data-collapsed] .badge {
+  position: absolute; top: 6px; right: 8px; min-width: 0; width: 8px; height: 8px;
+  padding: 0; border: 0; outline: 2px solid var(--color-shell); outline-offset: 0;
+  /* 畳んだ幅では数字がアイコンを潰すので、赤い点だけにする。件数は吹き出しと読み上げに残る。 */
+  font-size: 0; line-height: 0; color: transparent;
 }
 :root .section + .sectionHeading,
 :root .sectionHeading + .sectionHeading { margin-top: 1px; }
@@ -452,3 +454,46 @@
       visibility var(--motion-base) allow-discrete;
   }
 }
+
+/* 畳んだ時の名前の吹き出し（アイコンの右・画面に固定）。乗せた瞬間に出す。動きを減らす設定では動かさない。 */
+:root .railTip {
+  position: fixed;
+  left: 72px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--polish-radius-control);
+  background: var(--color-ink-secondary); /* 黒より少し灰色 */
+  color: var(--color-canvas);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+  animation: rail-tip-in var(--motion-fast) cubic-bezier(0.2, 0, 0, 1);
+}
+:root .railTipCount {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: var(--color-canvas);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+@keyframes rail-tip-in {
+  from { opacity: 0; transform: translate(-4px, -50%); }
+  to { opacity: 1; transform: translate(0, -50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root .railTip { animation: none; }
+}
+
+/* 組の見出しは小さな灰色。畳んだ帯の吹き出しは既存のまま。 */
+:root .sectionHeading, :root .sectionToggle { color: var(--color-ink-secondary); font-size: var(--polish-text-note); font-weight: var(--polish-control-weight); letter-spacing: var(--polish-nav-tracking); }
+:root .sectionChevron { width: var(--polish-icon-small); height: var(--polish-icon-small); color: var(--color-ink-faint); stroke-width: var(--polish-icon-stroke); }
+
+:root .desktop:not([data-collapsed]) .badge { padding-block-start: var(--polish-text-center-inset); }

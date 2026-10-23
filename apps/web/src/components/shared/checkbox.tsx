@@ -99,5 +99,5 @@ export function UnavailableSelection({ label, reason = '閲覧のみのため選
 export function SettingCheckbox({ checked, label, onChange, disabled, locked }: {
  checked: boolean; label: string; onChange?: (checked:boolean)=>void; disabled?:boolean; locked?:boolean
 }) {
- return <span data-setting-checkbox><Checkbox checked={Boolean(locked || checked)} aria-label={label} disabled={locked || disabled} title={locked ? 'この設定は常にオンです' : undefined} aria-description={locked ? 'この設定は常にオンです' : undefined} onCheckedChange={onChange ?? (()=>{})} /></span>
+ return <span data-setting-checkbox className={styles.setting}><Checkbox checked={Boolean(locked || checked)} aria-label={label} disabled={locked || disabled} title={locked ? 'この設定は常にオンです' : undefined} aria-description={locked ? 'この設定は常にオンです' : undefined} onCheckedChange={onChange ?? (()=>{})} /></span>
 }

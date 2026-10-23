@@ -1,4 +1,5 @@
 import type { HqMediaUploadSession, MessageTemplateMediaDefinition } from '@line-crm/shared';
+import { buildCursorListResponse } from '../lib/list-paging.js';
 import type { Env } from '../worker-env.js';
 import { createR2PresignedPutUrl } from './r2-presigned-upload.js';
 import { copyHqMediaStream, hashHqMedia, HQ_MEDIA_MAX_BYTES } from './hq-media-stream.js';
@@ -157,5 +158,6 @@ export async function listHqRegisteredMedia(db:D1Database,bucket:R2Bucket,author
     }
     items.push({...media,selectable,sizeKb:media.sizeBytes/1024});
   }
-  return {items,nextCursor:page.truncated?page.cursor:null};
+  return buildCursorListResponse({ items, nextCursor: page.truncated ? page.cursor : null,
+    paging: { limit: Number(input.limit ?? 30) }, sort: [] });
 }

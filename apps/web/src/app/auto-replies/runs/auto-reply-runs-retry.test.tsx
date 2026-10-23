@@ -240,3 +240,29 @@ describe('自動応答・実行結果の再実行（N-081）', () => {
     expect(runsMock).toHaveBeenCalledTimes(1)
   })
 })
+
+it('件数はこのページの実行結果で数え、詳細とコピーへ顧客本文や生のエラーを渡さない', async () => {
+  const response = listResponse([
+    runItem({ inputPreview: '顧客だけの本文', errorCode: 'token=private-secret', detail: 'token=private-secret' }),
+    runItem({ id: 'waiting-2', status: 'pending', canRetry: false }),
+  ])
+  response.data.summary.errors = 999
+  response.data.handovers.waiting = 99
+  response.data.pagination.total = 500
+  runsMock.mockResolvedValue(response)
+  const writeText = vi.fn(async (_text: string) => {})
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  await renderPage()
+  expect(container.textContent).not.toMatch(/顧客だけの本文|private-secret/)
+  expect(container.querySelector('button[aria-label="すべて 2件（このページ）"]')?.textContent).toBe('すべて2')
+  expect(container.querySelector('button[aria-label="確認待ち 1件（このページ）"]')?.textContent).toBe('確認待ち1')
+  const detail = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent === '実行の詳細を見る')!
+  await act(async () => detail.click())
+  const dialog = document.querySelector('[role="dialog"]')!
+  expect(dialog.textContent).toContain('田中さん')
+  expect(dialog.textContent).toContain('処理を完了できませんでした')
+  expect(dialog.textContent).not.toMatch(/顧客だけの本文|private-secret/)
+  await act(async () => (dialog.querySelector('[aria-label="この記録をコピー"]') as HTMLElement).click())
+  expect(writeText.mock.calls[0][0]).toContain('相手：田中さん')
+  expect(writeText.mock.calls[0][0]).not.toMatch(/顧客だけの本文|private-secret/)
+})

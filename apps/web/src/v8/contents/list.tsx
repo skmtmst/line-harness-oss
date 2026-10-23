@@ -8,7 +8,7 @@ import { loadMediaFolders,loadMediaList,loadMediaSummary } from './list-load'
 
 import { deleteMediaItem } from './list-delete-action'
 import { MediaCardV8 } from './list-media-card'
-import { isKnownUnused,KINDS,MediaDetailFailure,mediaDetailIdFromLocation,MediaDetailPhase,MediaKpis,MediaManagementPermission,MediaSort,MediaView,PAGE_SIZE_OPTIONS,SORT_OPTIONS,UNGROUPED } from './list-model'
+import { isKnownUnused,KINDS,MediaDetailFailure,mediaDetailIdFromLocation,MediaDetailPhase,MediaKpis,MediaManagementPermission,MediaSort,MediaView,PAGE_SIZE_OPTIONS,SORT_OPTIONS,UNGROUPED,usableMediaCounts } from './list-model'
 
 import { describeApiFailure, classifyApiFailure,permissionDeniedMessage } from '@/components/shared/api-error-message'
 import BulkBar from '@/components/shared/bulk-bar'
@@ -369,13 +369,35 @@ export default function MediaLibraryListV8() {
   }, [loadList, loadSummary])
 
   /*
-    数の帯の4マス。絞り込み・ページ送りが変わっても数は変わらないので、
-    一覧の読み直しとは別に読む。1件だけ取って総数を読む（実データのみ）。
+    数の帯は絞り込み・ページ送りでは変わらない。種別・未使用・保管済みの
+    件数を既存の一括集計で読む。一覧の部分件数を総数へ流用しない。
     失敗したマスは null のまま「—」で出す（偽ゼロを置かない）。
   */
   const loadKpis = useCallback(async () => {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
+      setKpis(EMPTY_KPIS)
+      return
+    }
+    const response = await api.media.counts(accountAtRequest).catch(() => null)
+    if (accountAtRequest !== latestAccountRef.current) return
+    const counts = response?.success ? usableMediaCounts(response.data) : null
+    if (counts) {
+      setKpis({
+        known: true,
+        total: null,
+        kindTotals: counts.byKind,
+        unusedTotal: counts.unused,
+        archivedTotal: counts.archived,
+      })
+      return
+    }
+    /*
+      集計の口が成功を返しても形が違う（古いAPIや画面確認の見本）ときは、
+      一覧の口から種別ごとの総数を読む。画面を落とさず、偽ゼロも置かない。
+      失敗（拒否・成功でない）のときは「—（未取得）」のままにする。
+    */
+    if (!response?.success) {
       setKpis(EMPTY_KPIS)
       return
     }
@@ -387,22 +409,13 @@ export default function MediaLibraryListV8() {
       api.media.list(accountAtRequest, { archived: 'only', limit: 1, offset: 0 }).catch(() => null),
     ])
     if (accountAtRequest !== latestAccountRef.current) return
-    const kindTotals: Record<MediaItem['kind'], number | null> = {
-      image: null,
-      audio: null,
-      video: null,
-      file: null,
-    }
-    let anyKindKnown = false
+    const kindTotals: Record<MediaItem['kind'], number | null> = { image: null, audio: null, video: null, file: null }
     KINDS.forEach((kind, index) => {
-      const response = kindResponses[index]
-      if (response?.success) {
-        kindTotals[kind.key] = response.data.total
-        anyKindKnown = true
-      }
+      const kindResponse = kindResponses[index]
+      if (kindResponse?.success) kindTotals[kind.key] = kindResponse.data.total
     })
     setKpis({
-      known: anyKindKnown || unusedResponse?.success === true || archivedResponse?.success === true,
+      known: true,
       total: null,
       kindTotals,
       unusedTotal: unusedResponse?.success ? unusedResponse.data.total : null,
@@ -733,7 +746,7 @@ export default function MediaLibraryListV8() {
   const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
 
   /* 数の帯の文言。失敗・未取得は「—」で出し、偽ゼロを置かない。 */
-  const kpiTotalText = !listKnown || loadFailed ? emptyValue('unknown') : formatNumber(overallTotal ?? total)
+  const kpiTotalText = !listKnown || loadFailed || overallTotal === null ? emptyValue('unknown') : formatNumber(overallTotal)
   const kindBreakdown = KINDS
     .map((kind) => (kpis.kindTotals[kind.key] == null ? null : `${kind.label}${formatNumber(kpis.kindTotals[kind.key] as number)}`))
     .filter((text): text is string => text !== null)
@@ -823,7 +836,7 @@ export default function MediaLibraryListV8() {
     }
   }
   const kpiCards = [
-    { key: 'total', title: '登録メディア', icon: Images, value: kpiTotalText === '—' ? null : (overallTotal ?? total), unit: '件', detail: kindBreakdown || '—（未取得）' },
+    { key: 'total', title: '登録メディア', icon: Images, value: kpiTotalText === '—' ? null : overallTotal, unit: '件', detail: kindBreakdown || '—（未取得）' },
     { key: 'unused', title: 'どこでも使っていない', icon: EyeOff, value: kpis.unusedTotal ?? null, unit: '件', detail: '消してよいか確かめられます' },
     { key: 'usage', title: '使っている容量', icon: HardDrive, value: null, valueText: quota ? formatMediaSize(quota.usageBytes).split(' ')[0] : undefined, valueTextWithUnit: true, unit: quota ? formatMediaSize(quota.usageBytes).split(' ')[1] : '', detail: quota && quotaPercent != null ? `上限 ${formatMediaSize(quota.limitBytes)} の ${quotaPercent}%` : '—（未取得）' },
     { key: 'archived', title: 'アーカイブ', icon: Archive, value: kpis.archivedTotal ?? null, unit: '件', detail: '一覧と新規選択から外したもの' },
@@ -844,7 +857,7 @@ export default function MediaLibraryListV8() {
     // 入れると「すべて0・未分類2」のように母集団が混ざる。
     // m26m: 一覧が読めていない（初回・失敗・別アカウント切替直後）の
     // total=0 は偽ゼロなので数えない（null は数を出さない約束）。
-    { kind: 'all' as const, id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null },
+    { kind: 'all' as const, id: '', label: 'すべて', count: listKnown && !loadFailed ? overallTotal : null },
     ...folders.map((folder) => ({
       kind: 'folder' as const,
       id: folder.id,

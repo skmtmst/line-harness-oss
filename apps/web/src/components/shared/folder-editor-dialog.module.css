@@ -15,3 +15,10 @@
   font-size: var(--tpl-field-label-size);
   font-weight: var(--tpl-field-label-weight);
 }
+
+/* 名前と色のまとまりは線を重ねず淡い面に置く。外側24・内側16は別の段が持つ。 */
+:root .row {
+  padding: var(--polish-space-card);
+  border-radius: var(--polish-radius-card);
+  background: var(--polish-window-group-bg);
+}

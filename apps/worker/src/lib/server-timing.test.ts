@@ -1,62 +1,96 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
-import { timingMark, timingStart } from './server-timing.js';
+import { timingHandler, timingMiddleware, timingSpan, timingStart } from './server-timing.js';
 
-/*
- * V6R-CX-a: 段ごとの経過時間を Server-Timing で返す。
- * ログイン済みの職員への応答だけに付け、未ログインには付けない。
- */
+const env = { ADMIN_ORIGIN: 'https://admin.example' } as Env['Bindings'];
+afterEach(() => vi.restoreAllMocks());
+
 function build(handler: (c: import('hono').Context<Env>) => Response | Promise<Response>) {
   const app = new Hono<Env>();
   app.use('*', timingStart());
-  app.use('*', async (c, next) => {
-    // 認証の代わり。ヘッダがあればログイン済みとみなす。
-    if (c.req.header('X-Test-Staff')) c.set('staff', { id: 's1', name: 'S', role: 'admin', readOnly: false, tenantId: 't' } as never);
+  app.use('*', timingMiddleware('auth', async (c, next) => {
+    if (c.req.header('X-Deny')) return c.json({ ok: false }, 401);
     await next();
-  });
-  app.use('*', timingMark('auth'));
+  }));
+  app.use('*', timingHandler());
   app.get('/api/x', handler);
+  app.onError((_error, c) => c.json({ ok: false }, 500));
   return app;
 }
 
-const env = { ADMIN_ORIGIN: 'https://admin.example' } as never;
-
-describe('Server-Timing（V6R-CX-a）', () => {
-  it('ログイン済みの応答に、段・本体・全体の時間を付ける', async () => {
-    const res = await build((c) => c.json({ ok: true })).request('http://worker.example/api/x', { headers: { 'X-Test-Staff': '1' } }, env);
-    const header = res.headers.get('Server-Timing') ?? '';
-    expect(header).toMatch(/auth;dur=\d+/);
-    expect(header).toMatch(/handler;dur=\d+/);
-    expect(header).toMatch(/total;dur=\d+/);
+describe('Server-Timing', () => {
+  it.each([200, 401, 403, 404, 429, 500] as const)('認証の有無にかかわらず%sにも固定名と数値だけを付ける', async status => {
+    const res = await build(c => c.json({ ok: true }, status)).request('/api/x', {}, env);
+    expect(res.status).toBe(status);
+    const header = res.headers.get('Server-Timing')!;
+    expect(header).toMatch(/auth;dur=\d+\.\d+/);
+    expect(header).toMatch(/handler;dur=\d+\.\d+/);
+    expect(header).toMatch(/total;dur=\d+\.\d+/);
+    expect(header).toContain('d1_count;desc="0"');
+    expect(header).toContain('d1_sql_count;desc="0"');
+    expect(header).not.toContain('d1_sql;dur=');
+    for (const metric of header.split(', ')) expect(metric).toMatch(/^[a-z1-9_]+;(?:dur=\d+\.\d+|desc="\d+")$/);
   });
 
-  it('未ログインの応答には付けない（認証の時間差を見せない）', async () => {
-    const res = await build((c) => c.json({ ok: true })).request('http://worker.example/api/x', {}, env);
-    expect(res.headers.get('Server-Timing')).toBeNull();
-    expect(res.headers.get('Timing-Allow-Origin')).toBeNull();
+  it('早期拒否と例外を本体の時間へ混ぜず、実行した段へ付ける', async () => {
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const app = new Hono<Env>();
+    app.use('*', timingStart());
+    app.use('*', timingMiddleware('auth', async c => {
+      now += 120;
+      return c.json({ ok: false }, 401);
+    }));
+    app.get('/api/x', () => { throw new Error('must not run'); });
+    const res = await app.request('/api/x', {}, env);
+    expect(res.status).toBe(401);
+    expect(res.headers.get('Server-Timing')).toContain('auth;dur=120.00');
+    expect(res.headers.get('Server-Timing')).toContain('handler;dur=0.00');
+    const error = await build(() => { throw new Error('private detail'); }).request('/api/x', {}, env);
+    expect(error.status).toBe(500);
+    expect(error.headers.get('Server-Timing')).not.toContain('private detail');
   });
 
-  it('許可した管理画面の origin にだけ Timing-Allow-Origin を付ける', async () => {
-    const app = build((c) => c.json({ ok: true }));
-    const allowed = await app.request('http://worker.example/api/x', { headers: { 'X-Test-Staff': '1', Origin: 'https://admin.example' } }, env);
-    expect(allowed.headers.get('Timing-Allow-Origin')).toBe('https://admin.example');
-    const other = await app.request('http://worker.example/api/x', { headers: { 'X-Test-Staff': '1', Origin: 'https://evil.example' } }, env);
-    expect(other.headers.get('Timing-Allow-Origin')).toBeNull();
+  it('段は下流を除き、session/staffの内訳と応答加工を測る', async () => {
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const app = new Hono<Env>();
+    app.use('*', timingStart());
+    app.use('*', timingMiddleware('auth', async (c, next) => {
+      await timingSpan(c, 'session', async () => {
+        now += 10;
+        await timingSpan(c, 'staff', async () => { now += 30; });
+      });
+      await next();
+      now += 5;
+    }));
+    app.use('*', timingHandler());
+    app.get('/api/x', c => { now += 80; return c.text('ok'); });
+    const response = await app.request('/api/x', {}, env);
+    const header = response.headers.get('Server-Timing');
+    for (const metric of ['auth;dur=45.00', 'session;dur=40.00', 'staff;dur=30.00', 'handler;dur=80.00', 'total;dur=125.00']) {
+      expect(header).toContain(metric);
+    }
   });
 
-  it('ヘッダを書き換えられない応答でも、500にせずそのまま返す', async () => {
-    let tried = 0;
+  it('許可した管理画面のoriginにだけブラウザ計測を公開する', async () => {
+    const app = build(c => c.text('ok'));
+    for (const origin of ['https://admin.example', 'https://evil.example', 'null']) {
+      const response = await app.request('/api/x', { headers: { Origin: origin } }, env);
+      expect(response.headers.get('Timing-Allow-Origin')).toBe(origin === 'https://admin.example' ? origin : null);
+    }
+  });
+
+  it('書換え不可の応答を本文や状態を変えずに包み直す', async () => {
     const res = await build(() => {
-      const response = new Response('proxied', { status: 200 });
-      const locked = new Headers();
-      locked.append = () => { tried += 1; throw new TypeError('immutable'); };
-      locked.set = () => { tried += 1; throw new TypeError('immutable'); };
-      Object.defineProperty(response, 'headers', { value: locked });
+      const response = new Response('proxied', { status: 202, headers: { 'X-Upstream': 'kept' } });
+      response.headers.set = () => { throw new TypeError('immutable'); };
       return response;
-    }).request('http://worker.example/api/x', { headers: { 'X-Test-Staff': '1' } }, env);
-    expect(tried).toBeGreaterThan(0);
-    expect(res.status).toBe(200);
+    }).request('/api/x', {}, env);
+    expect(res.status).toBe(202);
     expect(await res.text()).toBe('proxied');
+    expect(res.headers.get('X-Upstream')).toBe('kept');
+    expect(res.headers.get('Server-Timing')).toContain('total;dur=');
   });
 });

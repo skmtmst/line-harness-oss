@@ -1,4 +1,5 @@
-import { Children, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
+import { Children, isValidElement, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
+import type { KpiCardProps } from './kpi-card'
 import kpiStyles from './kpi-card.module.css'
 
 /** 4つ並びのときの並べ方（管理画面 の見た目）。 */
@@ -49,8 +50,15 @@ export default function KpiBand({
       </div>
     }
   }
+  const wideValues = Children.toArray(children).some(child => {
+    if (!isValidElement<Pick<KpiCardProps, 'value' | 'valueText' | 'valueRange'>>(child)) return false
+    if (child.props.valueRange !== undefined) return true
+    if (typeof child.props.valueText === 'string' && /\d\s*[/〜～]\s*\d/.test(child.props.valueText)) return true
+    return String(child.props.valueText ?? child.props.value ?? '').replace(/[^0-9]/g, '').length >= 9
+  })
   return (
     <div
+      data-kpi-wide-values={wideValues || undefined}
       className={`${kpiStyles.strip} ${gridClassName}${className ? ` ${className}` : ''}`}
       data-kpi-layout={layout}
       data-kpi-border={border}

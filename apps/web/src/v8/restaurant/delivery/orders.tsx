@@ -281,7 +281,7 @@ function OrderRow({
   /* 行の右端：主な操作は1つだけボタン、残りは「…」（共通の ActionCell。オーナー決定 ）。 */
   const openItem = { id: 'open', label: '詳細を見る', onSelect: () => onOpen(order.id) }
   return (
-    <Tr data-table-layout="columns">
+    <Tr selected={canManage && checked} data-table-layout="columns">
       {/* 閲覧のみの人には「選ぶ」を押せない形で置かずに列ごと出さない（★V8 2026-10-06）。 */}
       {canManage ? (
         <Td>

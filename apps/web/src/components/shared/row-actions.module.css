@@ -219,3 +219,7 @@ html:root .action[data-row-menu]:focus-visible {
 html:root .inlineGrip:not(:has(svg)) {
   font-size: var(--polish-icon-control);
 }
+
+.statusActions { display: inline-flex; flex: none; align-items: center; gap: var(--polish-space-field); }
+.statusAction { display: inline-flex; flex: none; }
+.statusAction > :is(button, a) { min-width: var(--polish-row-action-width); }

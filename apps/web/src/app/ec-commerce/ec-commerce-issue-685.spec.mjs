@@ -224,10 +224,9 @@ test('21件目の商品、未知種別、サーバ検索を実際の画面操作
 })
 
 test('集計だけ失敗しても一覧を残し、画面の再読み込み操作で集計を戻す', async ({ page }) => {
-  let overviewRequests = 0
+  let overviewFails = true
   await page.route('**/api/ec-commerce/overview*', (route) => {
-    overviewRequests += 1
-    if (overviewRequests <= 2) {
+    if (overviewFails) {
       return route.fulfill({ status: 500, json: { success: false, error: '集計に失敗' } })
     }
     return route.fulfill({ json: overview })
@@ -239,9 +238,14 @@ test('集計だけ失敗しても一覧を残し、画面の再読み込み操�
   await openEc(page)
   await expect(page.getByText('商品1 × 1')).toBeVisible()
   await expect(page.getByText('集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。')).toBeVisible()
+  await expectNoOverviewNumbers(page)
+  // 同時要求の共有数によらず、再読み込みを押す前にAPIを回復させる。
+  overviewFails = false
   await page.getByRole('button', { name: '集計をもう一度読む' }).click()
   await expect(overviewNumbers(page, 21)).toBeVisible()
   await expect(page.getByText(/今日 21件/)).toBeVisible()
+  await expect(page.getByText('商品1 × 1')).toBeVisible()
+  await expect(page.getByText('集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。')).toHaveCount(0)
 })
 
 /*

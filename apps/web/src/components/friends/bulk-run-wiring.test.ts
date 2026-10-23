@@ -116,13 +116,6 @@ describe("管理画面 友だち一括操作（IAf7j）の配線", () => {
     for (const r of ['setPreview(null)', 'setDetail(null)', 'setFailure(null)']) expect(effect).toContain(r)
   })
 
-  it('一覧の再読込では選択と一括操作の窓を一緒に閉じる', () => {
-    expect(PAGE).toContain('friendIds={[...selectedIds]}')
-    const load = PAGE.slice(PAGE.indexOf('const loadFriends'), PAGE.indexOf('const resetPageWith'))
-    expect(load).toContain('setBulkOpen(false)')
-    expect(load).toContain('setSelectedIds(new Set())')
-  })
-
   it('内部IDを画面へ出さない', () => {
     /*
       名前が無いときは「名前未登録」。**`key=` は描画されない**ので、

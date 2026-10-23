@@ -41,7 +41,7 @@ const MARKUP = renderToStaticMarkup(
 
 /** 「画像をダウンロード」のリンク先。実際に押したときに飛ぶURLそのもの。 */
 function downloadHref(): string {
-  const match = /<a class="[^"]*" href="([^"]*\/api\/qr[^"]*)"/.exec(MARKUP)
+  const match = /<a\b[^>]*\bhref="([^"]*\/api\/qr[^"]*)"/.exec(MARKUP)
   expect(match, 'ダウンロードのリンクが見つからない').not.toBeNull()
   return match![1].replace(/&amp;/g, '&')
 }

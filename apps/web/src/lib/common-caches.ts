@@ -1,3 +1,4 @@
+import { clearPrefetchedReads } from './api/transport/prefetch'
 import { clearFeatureSettingsCache } from './feature-settings-cache'
 import { clearFeatureVisibilityCache } from './feature-visibility-cache'
 import { clearLineAccountsCache } from './line-accounts-cache'
@@ -14,6 +15,7 @@ import { clearOperatorsCache } from './operators-cache'
  * 捨てない（誰が見ても同じで、捨てると余計に取り直す）。
  */
 export function clearCommonCaches(): void {
+  clearPrefetchedReads()
   clearFeatureSettingsCache()
   clearFeatureVisibilityCache()
   clearLineAccountsCache()

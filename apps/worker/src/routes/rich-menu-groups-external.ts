@@ -434,7 +434,7 @@ export const get__api_rich_menu_groups_tap_stats_5 = async (c: Context<Env, "/ap
     const stats = await getRichMenuTapStats(c.env.DB, accountId, from, to);
     return c.json({ success: true, data: stats });
   } catch (e) {
-    return c.json({ success: false, error: e instanceof Error ? e.message : String(e) }, 500);
+    throw e;
   }
 };
 
@@ -624,7 +624,7 @@ export const get__api_rich_menu_groups_6 = async (c: Context<Env, "/api/rich-men
     }
     return c.json({ success: true, data: items });
   } catch (error) {
-    logger.error("routes_rich_menu_groups_failed");
+    logger.error("rich_menu_groups.rich_menu_groups_get_failed");
     return c.json({ success: false, error: 'リッチメニュー一覧を取得できませんでした' }, 503);
   }
 };

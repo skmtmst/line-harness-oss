@@ -4,7 +4,8 @@ import { useCallback, useState } from 'react'
 import { CircleAlert, RotateCw, SearchX, UserPlus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import HelpTip from '@/components/shared/help-tip'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -105,40 +106,15 @@ export default function UsersV8() {
       <FriendsManageNavV8 current="統合ユーザー" />
 
       {/* 数の帯：3つのマス（ADjK8）。ページ内の数はその旨を添える。 */}
-      <div className={styles.kpis} style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>統合ユーザー</span>
-          <p className={styles.kpiValue}>
-            {uniquePeople !== null ? formatNumber(uniquePeople) : emptyValue('unknown')}
-            <span className={styles.kpiUnit}>人</span>
-          </p>
-          <p className={styles.kpiDetail} title={summary.stats ? `紐付く友だち：${formatNumber(summary.stats.totalFollowing)}件（各アカウントの友だち登録）` : undefined}>
-            {summary.status === 'loading' ? '読み込んでいます' : summary.status === 'error' ? <>読み込めませんでした <button type="button" className={styles.linkAction} onClick={() => void summary.load()}>再読み込み</button></> : '重複を1人にまとめた数'}
-          </p>
-        </div>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>
-            UID連携済み
-            <HelpTip label="UID連携済みの説明">このページに出ている人のうち、LINE UIDを根拠にまとめている数です。</HelpTip>
-          </span>
-          <p className={styles.kpiValue}>
-            {u.loading || u.error ? emptyValue('unknown') : formatNumber(linkedUidCount)}
-            <span className={styles.kpiUnit}>人</span>
-          </p>
-          <p className={styles.kpiDetail}>このページでUID確認済み</p>
-        </div>
-        <div className={styles.kpi}>
-          <span className={styles.kpiLabel}>
-            複数アカウントにいる
-            <HelpTip label="複数アカウントの説明">このページに出ている人のうち、2つ以上のLINEアカウントに登録がある数です。</HelpTip>
-          </span>
-          <p className={styles.kpiValue}>
-            {u.loading || u.error ? emptyValue('unknown') : formatNumber(multiAccountCount)}
-            <span className={styles.kpiUnit}>人</span>
-          </p>
-          <p className={styles.kpiDetail}>送信前に配信先の確認が必要です</p>
-        </div>
-      </div>
+      <KpiBand>
+        <KpiCard presentation="band" icon={null} title="統合ユーザー" aria-label="統合ユーザーの集計" value={uniquePeople} unit="人"
+          detail={<span title={summary.stats ? `紐付く友だち：${formatNumber(summary.stats.totalFollowing)}件（各アカウントの友だち登録）` : undefined}>{summary.status === 'loading' ? '読み込んでいます' : summary.status === 'error' ? '読み込めませんでした' : '重複を1人にまとめた数'}</span>}
+          onRetry={summary.status === 'error' ? () => void summary.load() : undefined} retryLabel="再読み込み" />
+        <KpiCard presentation="band" icon={null} title="UID連携済み" value={u.loading || u.error ? null : linkedUidCount} unit="人"
+          help="このページに出ている人のうち、LINE UIDを根拠にまとめている数です。" helpDisplay="question" detail="このページでUID確認済み" />
+        <KpiCard presentation="band" icon={null} title="複数アカウントにいる" value={u.loading || u.error ? null : multiAccountCount} unit="人"
+          help="このページに出ている人のうち、2つ以上のLINEアカウントに登録がある数です。" helpLabel="複数アカウント" helpDisplay="question" detail="送信前に配信先の確認が必要です" />
+      </KpiBand>
 
       {/* 道具の段：検索・UID・所属・複数アカウントのみ、右に件数とCSV。 */}
       <div className={styles.toolbar}>
@@ -152,11 +128,10 @@ export default function UsersV8() {
             placeholder="名前・メール・電話で探す"
           />
         </div>
-        <div className={styles.selectWrap}>
           <SaveErrorField names={["uid","u.uid"]}><Select
             aria-label="UID連携で絞り込む"
             label="UID連携"
-            size="full"
+            size="content"
             value={u.uid}
             onChange={u.setUid}
             options={[
@@ -165,7 +140,6 @@ export default function UsersV8() {
               { value: 'unlinked', label: 'UID：未連携・要確認' },
             ]}
           /></SaveErrorField>
-        </div>
         <div className={styles.selectWrap}>
           <SaveErrorField names={["account","u.account"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"

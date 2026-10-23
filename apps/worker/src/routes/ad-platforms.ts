@@ -31,7 +31,7 @@ import { sendAdConversions, retryAdConversion, AdConversionRetryError } from '..
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { listLimit, listPage } from './list-pagination.js';
+import { listLimit, parseOffsetPaging } from '../lib/list-paging.js';
 
 /**
  * 画面へ返す形。秘密の値は出さず、設定済みの鍵名だけ出す。
@@ -78,7 +78,7 @@ async function readDisplayConfig(
     const secrets = JSON.parse(await decryptCredential(p.config_encrypted, encryptionKey));
     return { values: parsed, secretKeys: Object.keys(secrets) };
   } catch (err) {
-    logger.error("routes_ad_platforms_failed");
+    logger.error("ad_platforms.read_display_config_failed");
     return { values: parsed, secretKeys: [] };
   }
 }
@@ -121,8 +121,7 @@ adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), asy
       data: await Promise.all(visible.map((item) => serializePlatform(item, key))),
     });
   } catch (err) {
-    logger.error("routes_ad_platforms_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -184,8 +183,7 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), inputJsonBoundary({"
       throw err;
     }
   } catch (err) {
-    logger.error("routes_ad_platforms_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -301,8 +299,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), inputJsonBoundary
       throw err;
     }
   } catch (err) {
-    logger.error("routes_ad_platforms_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -397,8 +394,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), inputJsonBounda
       },
     });
   } catch (err) {
-    logger.error("routes_ad_platforms_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -424,16 +420,14 @@ adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_ad_platforms_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
 // GET /api/ad-platforms/logs — conversion send logs across visible platforms
 adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const page = listPage(c.req.query('page'));
-    const limit = listLimit(c.req.query('limit'), 50);
+    const { page, limit } = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') });
     const status = c.req.query('status')?.trim();
     const query = c.req.query('query')?.trim();
     const lineAccountId = c.req.query('lineAccountId')?.trim();
@@ -522,8 +516,7 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
       },
     });
   } catch (err) {
-    logger.error("routes_ad_platforms_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -546,8 +539,7 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
       data: logs.map(serializeLog),
     });
   } catch (err) {
-    logger.error("routes_ad_platforms_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -567,7 +559,7 @@ adPlatforms.post('/api/ad-platforms/logs/:id/retry', requireRole('owner'), input
     return c.json({ success: true, data });
   } catch (error) {
     if (error instanceof AdConversionRetryError) return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
-    return c.json({ success: false, error: '広告への送信をやり直せませんでした' }, 500);
+    throw error;
   }
 });
 

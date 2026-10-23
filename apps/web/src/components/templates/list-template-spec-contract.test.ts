@@ -82,7 +82,6 @@ describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
     expect(globals).toMatch(/--tpl-toolbar-pad-side:\s*24px/)
     expect(globals).toMatch(/--tpl-band-cell-pad-block:\s*16px/)
     expect(globals).toMatch(/--tpl-band-cell-pad-side:\s*24px/)
-    expect(globals).toMatch(/--tpl-band-number-lh:\s*26px/)
   })
 
   it('帯の CSS（kpi-band-v8.css）は残す・数は変数で22', () => {

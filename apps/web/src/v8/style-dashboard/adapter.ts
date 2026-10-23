@@ -1,3 +1,4 @@
+import { reservationBookingState } from '@/components/shared/booking-state'
 import { formatYen as yen } from '@line-crm/shared';
 import { styleTerm, term } from '@/lib/terms'
 import { paymentAnalytics, paymentAnalyticsSide } from './analytics-payments'
@@ -176,7 +177,7 @@ function boardOf(style: IndustryStyle, sch: StyleSchedule, now: Date): StyleBoar
   const entries: StyleBoard['entries'] = sch.entries.filter((e) => e.columnIds[0]).map((e) => {
     const b = e.booking
     const st = b ? bookingStatus(b, style) : { label: '', tone: 'info' as const }
-    const state: StyleBoard['entries'][number]['state'] = !b ? 'booked' : b.visited ? 'done' : b.status === 'seated' || b.attendance === 'visited' ? 'active' : ['requested', 'pending'].includes(b.status) ? 'pending' : 'booked'
+    const state: StyleBoard['entries'][number]['state'] = !b ? 'booked' : b.status === 'no_show' ? 'no_show' : b.visited || ['completed', 'cancelled', 'rejected', 'expired'].includes(b.status) ? 'done' : b.status === 'seated' || b.attendance === 'visited' ? 'active' : ['requested', 'pending'].includes(b.status) ? 'pending' : 'booked'
     return { id: e.id, columnId: e.columnIds[0], start: hm(e.startsAt, tz), end: hm(e.endsAt, tz), name: b?.name ?? e.title, menu: b ? e.title : '', state, stateLabel: st.label, nominated: b?.designation === 'designated' }
   })
   // 担当・卓の休み（closures）も盤に出す。人の custom_hours は残した営業時間なので休みの箱にしない。
@@ -208,7 +209,7 @@ function weekOf(sch: StyleSchedule, now: Date): StyleWeek {
       return start < end ? [{ day: day.date, start, end }] : []
     })
   }
-  const entries = sch.entries.flatMap(e => segments(e.startsAt, e.endsAt).map(slot => ({ id: e.id, ...slot, title: e.title, name: e.booking?.name ?? '' })))
+  const entries = sch.entries.flatMap(e => segments(e.startsAt, e.endsAt).map(slot => ({ id: e.id, ...slot, title: e.title, name: e.booking?.name ?? '', ...(e.booking ? { state: e.booking.status === 'no_show' ? 'no_show' as const : e.booking.visited ? 'completed' as const : reservationBookingState({ status: e.booking.attendance === 'visited' ? 'visited' : e.booking.status, holdExpiresAt: null }) } : {}) })))
   const free = bookableScheduleSlots(sch).flatMap(s => {
     const original = parts(s.startsAt, tz)
     // A clipped continuation is not a new bookable start. Keep the API candidate's original action.
@@ -233,7 +234,7 @@ function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow
       const inMonth = cursor.getUTCMonth() === month
       const d = sch.days.find((x) => x.date === date)
       const closed = sch.availability.closedDates.includes(date)
-      cells.push({ date, day: cursor.getUTCDate() === 1 ? `${cursor.getUTCMonth() + 1}/1` : String(cursor.getUTCDate()), inMonth, ...(inMonth ? closed ? { closed } : d && d.bookings > 0 ? { groups: d.bookings, people: d.people } : d ? { empty: true } : {} : {}), today: date === today })
+      cells.push({ date, day: cursor.getUTCDate() === 1 ? `${cursor.getUTCMonth() + 1}/1` : String(cursor.getUTCDate()), inMonth, ...(inMonth ? closed ? { closed } : d && d.bookings > 0 ? { groups: d.bookings, people: d.people } : d ? { empty: true } : {} : {}), today: date === today, selected: date === selected })
       cursor.setUTCDate(cursor.getUTCDate() + 1)
     }
   } while (cursor.getUTCMonth() === month)

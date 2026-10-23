@@ -94,8 +94,8 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
     </LinePreview>
   </>
 
-  return <CreatePage dirty={false} busy={busy} boardId="T5ljMA" title={title} help={help} notice={notice}
-    steps={<Steps label="自動応答のひな形を作る手順" steps={steps} currentKey={step} />}
+  return <CreatePage step={index} dirty={false} busy={busy} boardId="T5ljMA" title={title} help={help} notice={notice}
+    steps={<Steps label="自動応答のひな形を作る手順" steps={steps} currentKey={step} readOnly={!canEdit} summaries={{ basic: name, trigger: keyword, reply: replyLabel }} />}
     preview={preview}
     footerActions={<>
       {/* ページ内に戻るは置かない（決まり）。前の段へは上の手順の段から戻る。 */}

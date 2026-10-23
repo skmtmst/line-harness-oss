@@ -58,8 +58,7 @@ calendar.get('/api/integrations/google-calendar', requireRole('owner', 'admin'),
       })),
     });
   } catch (err) {
-    logger.error("routes_calendar_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -87,8 +86,7 @@ calendar.post('/api/integrations/google-calendar/connect', requireRole('owner', 
       data: { id: conn.id, calendarId: conn.calendar_id, authType: conn.auth_type, isActive: Boolean(conn.is_active), createdAt: conn.created_at },
     }, 201);
   } catch (err) {
-    logger.error("routes_calendar_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -99,8 +97,7 @@ calendar.delete('/api/integrations/google-calendar/:id', requireRole('owner', 'a
     if (!deleted) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_calendar_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -181,8 +178,7 @@ calendar.get('/api/integrations/google-calendar/slots', requireRole('owner', 'ad
 
     return c.json({ success: true, data: slots });
   } catch (err) {
-    logger.error("routes_calendar_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -223,8 +219,7 @@ calendar.get('/api/integrations/google-calendar/bookings', requireRole('owner', 
       })),
     });
   } catch (err) {
-    logger.error("routes_calendar_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -301,8 +296,7 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
       },
     }, 201);
   } catch (err) {
-    logger.error("routes_calendar_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -341,8 +335,7 @@ calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRol
 
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_calendar_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

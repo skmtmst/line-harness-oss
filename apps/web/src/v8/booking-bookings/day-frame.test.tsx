@@ -53,3 +53,9 @@ test('日付やアカウントを読み直している間は、前の空き枠�
   const { container } = render(<PeopleDayFrame view="day" date="2026-10-15" rows={[row]} ready={false} availability={{ status: 'ready', slots: [slot] }} actions={null} canWrite={false} onOpen={() => {}}>盤</PeopleDayFrame>)
   expect([...container.querySelectorAll('[data-kpi-number]')].map(node => node.textContent)).toEqual(['—', '—', '—', '—'])
 })
+
+test('pending表記も承認が必要な件数へ含め、売上の確定分へ混ぜない', () => {
+  const result = dayBookingSummary([{ ...row, status: 'pending' }], '2026-10-15', { status: 'ready', slots: [] })
+  expect(result.requested).toBe(1)
+  expect(result.sales).toBe(0)
+})

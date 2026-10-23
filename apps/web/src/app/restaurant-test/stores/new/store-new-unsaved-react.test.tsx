@@ -77,7 +77,7 @@ describe('faGn4: 店舗の基本情報の案内', () => {
     await agree()
     await screen.findByRole('heading', { name: '店舗の基本情報' })
     await screen.findByText(/^店舗ごとに、新しいプロバイダーを作ってください。/)
-    await screen.findByText(/利用規約に同意済み/)
+    await screen.findByText(/利用規約に同意済み/, { selector: 'p' })
     expect(screen.getByRole('link', { name: 'キャンセル' })).toBeTruthy()
   })
 })

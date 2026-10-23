@@ -164,8 +164,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
     if (execution) {
       try { await execution.fail(); } catch { /* The lease lets a later retry recover even during a DB outage. */ }
     }
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -184,8 +183,7 @@ export const get__api_webhooks_api_tokens_2 = async (c: Context<Env, "/api/webho
     const items = await listIntegrationApiTokens(c.env.DB, lineAccountId, { includeRevoked });
     return c.json({ success: true, data: items.map(serializeApiToken) });
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -229,8 +227,7 @@ export const post__api_webhooks_api_tokens_3 = async (c: Context<Env, "/api/webh
       },
     }, 201);
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -251,8 +248,7 @@ export const post__api_webhooks_api_tokens_id_revoke_4 = async (c: Context<Env, 
     auditLog(c, 'webhook.api_token.revoke', { kind: 'integration_api_token', id }, { lineAccountId });
     return c.json({ success: true, data: { id } });
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -279,8 +275,7 @@ export const post__api_webhooks_api_tokens_id_reactivate_5 = async (c: Context<E
     const row = await getIntegrationApiTokenById(c.env.DB, id, lineAccountId);
     return c.json({ success: true, data: serializeApiToken(row!) });
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -321,7 +316,6 @@ export const post__api_webhooks_api_tokens_id_rotate_6 = async (c: Context<Env, 
       },
     });
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

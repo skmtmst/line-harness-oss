@@ -27,10 +27,12 @@ export default function CopyTextButton({
   disabled = false,
   variant = 'text',
   size,
+  feedbackDurationMs = 1500,
 }: {
   /** クリップボードへ書き込む全文。表示用文字列ではなく取り出したい値。 */
   value?: string
   getValue?: () => Promise<string>
+  feedbackDurationMs?: 1500 | 1600
   label?: string
   icon?: ReactNode
   role?: 'button' | 'menuitem'
@@ -75,7 +77,7 @@ export default function CopyTextButton({
       if (generation !== generationRef.current) return
       setState('copied')
       if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-      timerRef.current = window.setTimeout(() => setState('idle'), 1500)
+      timerRef.current = window.setTimeout(() => setState('idle'), feedbackDurationMs)
     } catch {
       if (generation === generationRef.current) setState('failed')
     } finally {

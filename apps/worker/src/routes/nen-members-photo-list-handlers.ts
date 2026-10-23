@@ -1,3 +1,4 @@
+import { buildCursorListResponse } from '../lib/list-paging.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 import { getPublicationThirtyDayViews } from '@line-crm/db';
@@ -94,13 +95,12 @@ export const get__api_nen_members_photos_2 = async (c: Context<Env, "/api/nen-me
         ${q ? `AND (ps.caption LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\')` : ''}
       ORDER BY ps.created_at DESC, ps.id DESC LIMIT ? OFFSET ?`,
   ).bind(staleCutoff, ...(q ? [accountId, accountId, like, like, like] : [accountId, accountId]), limit, offset).all<Record<string, unknown>>();
-  return c.json({
-    success: true,
-    data: rows.results.map((row) => ({
+  const responseItems = rows.results.map((row) => ({
       ...row,
       pet_call_name: petCallName(String(row.pet_name ?? ''), row.pet_gender),
-    })),
-  });
+    }));
+  return c.json(buildCursorListResponse({ success: true,
+    data: responseItems, items: responseItems, paging: { limit }, sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
 };
 
 export const get__api_nen_members_photos_publications_3 = async (c: Context<Env, "/api/nen-members/photos/publications">) => {

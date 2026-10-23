@@ -39,6 +39,8 @@ import {
 } from '@/lib/api'
 import { webinarLoadFailure, type WebinarLoadFailure } from '@/v8/webinars/public/helpers/index'
 import { BackLink, WizardSteps } from './chrome'
+import { StepContent } from '@/components/templates/steps'
+import { webinarStepSummaries } from './wizard-summaries'
 import {
   PANE_KEYS,
   STEPS,
@@ -397,7 +399,7 @@ function EditInner() {
       title: STEP_TITLE[key],
       actions: menuActions,
       identity: <BackLink />,
-      steps: <WizardSteps current={key} stateOf={stateOf} onSelect={goStep} />,
+      steps: <WizardSteps current={key} stateOf={stateOf} onSelect={goStep} summaries={webinarStepSummaries(webinar, editor, ctaCount)} readOnly={readOnly} />,
       status: unsaved.size > 0 ? '保存していない変更があります' : undefined,
       footerActions: footerWithDraft(
         <Button
@@ -424,7 +426,7 @@ function EditInner() {
   const keep = (key: PaneKey, node: ReactNode) => (visited.has(key) ? <div key={key} hidden={pane !== key}>{node}</div> : null)
 
   return (
-    <SaveErrorScope errors={saveErrors}><div className="min-w-0" data-wc-editor="v8">
+    <SaveErrorScope errors={saveErrors}><StepContent step={STEP_KEYS.includes(pane) ? STEP_KEYS.indexOf(pane) : null} className="min-w-0" data-wc-editor="v8">
       {keep('basic', <BasicPane ctx={ctx} chrome={wizardChrome('basic')} onDirtyChange={dirtyReporterFor('basic')} registerSave={saveRegistrarFor('basic')} />)}
       {keep('video', <VideoPane ctx={ctx} chrome={wizardChrome('video')} onDirtyChange={dirtyReporterFor('video')} registerSave={saveRegistrarFor('video')} />)}
       {keep('cta', <CtaPane ctx={ctx} chrome={wizardChrome('cta')} onDirtyChange={dirtyReporterFor('cta')} registerSave={saveRegistrarFor('cta')} />)}
@@ -435,7 +437,7 @@ function EditInner() {
       {keep('comments', <CommentsPane ctx={ctx} chrome={detailChrome} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} />)}
       {leaveDialog}
       <Dialog open={pauseVersion !== null} title={`「${webinar.title}」を停止しますか？`} description={`公開中の版 ${pauseVersion ?? editor.version} を止めます。公開ページでの申し込みと視聴ができなくなります。あとで公開し直せます。`} tone="destructive" confirmation confirmLabel="停止する" busy={pausing} error={pauseError || undefined} onConfirm={() => void pause()} onCancel={() => { if (!pausing) setPauseVersion(null) }} />
-    </div></SaveErrorScope>
+    </StepContent></SaveErrorScope>
   )
 }
 

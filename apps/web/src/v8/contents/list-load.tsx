@@ -4,7 +4,7 @@ import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { api,ApiError,type MediaQuota } from '@/lib/api'
 import type { Folder,MediaItem } from '@line-crm/shared'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
-import { MediaSort } from './list-model'
+import { MediaSort, usableMediaCounts } from './list-model'
 
 
 type LoadMediaListContext = {
@@ -94,15 +94,28 @@ export async function loadMediaSummary({ latestAccountRef, selectedAccountId, se
     setQuotaFailed(false)
     const [quotaResponse, overallResponse] = await Promise.all([
       api.media.quota(accountAtRequest).catch(() => null),
-      // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
-      api.media.list(accountAtRequest, {
+      // フォルダ欄の総数も数の帯と同じ一括集計を使い、一覧の部分件数にしない。
+      api.media.counts(accountAtRequest).catch(() => null),
+    ])
+    if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
+    const counts = overallResponse?.success ? usableMediaCounts(overallResponse.data) : null
+    if (counts) {
+      setOverallTotal(showArchivedOnly ? counts.archived : counts.total)
+    } else if (overallResponse?.success) {
+      /*
+        集計の口が成功を返しても形が違う（古いAPIや画面確認の見本）ときは、
+        一覧の口の総数へ切り替える。失敗のときは「—」のままにする。
+      */
+      const listResponse = await api.media.list(accountAtRequest, {
         archived: showArchivedOnly ? 'only' : undefined,
         limit: 1,
         offset: 0,
-      }).catch(() => null),
-    ])
-    if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
-    if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
+      }).catch(() => null)
+      if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
+      setOverallTotal(listResponse?.success ? listResponse.data.total : null)
+    } else {
+      setOverallTotal(null)
+    }
     if (quotaResponse?.success) setQuota(quotaResponse.data)
     else {
       setQuota(null)

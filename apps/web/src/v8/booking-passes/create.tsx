@@ -2,7 +2,7 @@
 
 import { PASS_LIST_HREF } from './words'
 
-import { StepSection } from '@/components/templates/steps'
+import { StepSection, StepContent } from '@/components/templates/steps'
 
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -181,7 +181,7 @@ function PassCreateInner() {
   const summary4 = 'まだ（あとで Stripe とつなぐ）'
 
   const stepCard = (n: StepKey, title: string, summary: string, content: ReactNode, change?: () => void) => (
-    <StepSection key={n} order={n} title={title} summary={summary} open={open === n} onChange={change ?? (() => setOpen(n))}>{content}</StepSection>
+    <StepSection readOnly={!canEdit} key={n} order={n} title={title} summary={summary} open={open === n} onChange={change ?? (() => setOpen(n))}>{content}</StepSection>
   )
 
   const footer = canEdit ? (
@@ -201,7 +201,7 @@ function PassCreateInner() {
   ) : loadState === 'missing' ? (
     <ListState kind="empty" emptyPreset="readonly" title="この回数券・月謝は直せません" description="見つからないか、販売を始めたあとです。販売を始めた券は、やめることだけできます。" />
   ) : (
-    <div className={styles.formSections}>
+    <StepContent step={open} className={styles.formSections}>
       {notice ? <Notice tone="danger" message={notice} /> : null}
       {stepCard(1, '種類と値段', summary1, (
         <>
@@ -271,7 +271,7 @@ function PassCreateInner() {
           <div><Button variant="secondary" onClick={() => preparing.open('LINEでの回数券・月謝の販売')}>つなぎ方を見る</Button></div>
         </>
       ), () => preparing.open('LINEでの回数券・月謝の販売'))}
-    </div>
+    </StepContent>
   )
 
   return (

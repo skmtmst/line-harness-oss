@@ -47,7 +47,7 @@
 }
 
 .rowInteractive.rowSelected:hover {
-  background: var(--color-accent-soft);
+  background: var(--polish-selection-bg);
 }
 
 .row + .row .bodyCell { /* strokeWidth: {top: 1} */
@@ -175,7 +175,7 @@
 }
 
 :root .row { background: var(--color-canvas); }
-:root .rowSelected { background: var(--color-accent-soft); }
+:root .rowSelected { background: var(--polish-selection-bg); }
 :root .rowInteractive:hover:not(.rowSelected) { background: var(--color-table-head); }
 }
 /* ★V8 一覧の行の「名前＋下の説明」（ 行：名前 13/600 高さ19 → 間3 → 説明 11 高さ16、行 62）。説明の中の印で行を押し上げない（司令塔 2026-10-05） */
@@ -203,9 +203,9 @@
   display: flex; flex-direction: column; gap: var(--tpl-rt-cell-gap); min-width: 0; height: auto; padding: 0; border: 0; box-shadow: none;
   color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: normal; white-space: nowrap;
 }
-:root .frame[data-density='reviews'] th { font-size: var(--text-micro); font-weight: 600; }
+:root .frame[data-density='reviews'] th { font-size: var(--text-micro); font-weight: var(--polish-weight-label); }
 :root .frame[data-density='media'] th {
-  height: auto; padding: var(--tpl-e49-head-pad); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-e49-lh-18);
+  height: auto; padding: var(--tpl-e49-head-pad); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: var(--polish-weight-label); line-height: var(--tpl-e49-lh-18);
 }
 :root .frame[data-density='media'] td { height: var(--tpl-e49-row-h); padding: var(--tpl-e49-row-pad); }
 :root .frame[data-density='media'] :is(th, td):first-child { padding-left: var(--tpl-e49-edge); }
@@ -235,7 +235,7 @@
 :root .frame[data-table-presentation='inventory'] th {
   height: auto; padding: var(--tpl-rs-th-pad-block) var(--tpl-rs-inv-col-gap) var(--tpl-rs-th-pad-block) 0;
   border: 0; color: var(--color-ink-secondary); font-size: var(--text-micro);
-  font-weight: 600; line-height: var(--tpl-rs-lh-11);
+  font-weight: var(--polish-weight-label); line-height: var(--tpl-rs-lh-11);
 }
 :root .frame[data-table-presentation='inventory'] .row { height: var(--tpl-rs-inv-row-h); }
 :root .frame[data-table-presentation='inventory'] .bodyCell {
@@ -251,7 +251,7 @@
 :root .frame[data-table-presentation='channels'] thead tr { height: var(--tpl-rs-inv-ch-head-h); }
 :root .frame[data-table-presentation='channels'] th {
   height: auto; padding: 0 var(--tpl-rs-cell-gap) 0 0; border: 0; color: var(--color-ink-secondary);
-  font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-rs-lh-12);
+  font-size: var(--text-caption); font-weight: var(--polish-weight-label); line-height: var(--tpl-rs-lh-12);
 }
 :root .frame[data-table-presentation='channels'] .row { height: var(--tpl-rs-inv-ch-row-h); }
 :root .frame[data-table-presentation='channels'] .bodyCell {
@@ -313,7 +313,7 @@
 :root .frame[data-table-density] .table th {
   color: var(--color-ink-secondary);
   font-size: var(--tpl-sb-row-sub);
-  font-weight: 600;
+  font-weight: var(--polish-weight-label);
   line-height: var(--tpl-sb-row-sub-lh);
 }
 
@@ -393,7 +393,7 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: var(--polish-weight-label);
 }
 
 /* 狭い板では同じ列を保ちながら、指定された比率で収める。 */
@@ -417,7 +417,7 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
 :root .table[data-table-presentation='account-handover'] thead tr { padding: var(--tpl-acd-ho-head-pad); }
 :root .table[data-table-presentation='account-handover'] tbody tr { padding: var(--tpl-acd-ho-row-pad); }
 :root .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) th {
-  display: block; height: auto; padding: 0; font-size: var(--text-micro); font-weight: 600; line-height: var(--tpl-sa-label-lh);
+  display: block; height: auto; padding: 0; font-size: var(--text-micro); font-weight: var(--polish-weight-label); line-height: var(--tpl-sa-label-lh);
 }
 :root .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) td {
   display: block; padding: 0; box-shadow: none; font-size: var(--text-caption); line-height: var(--tpl-sa-member-name-lh); min-width: 0;
@@ -429,7 +429,7 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
 :root .table[data-table-presentation='connection-check'] td {
   padding: 0; box-shadow: none; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-:root .table[data-table-presentation='connection-check'] td:first-child { width: var(--tpl-htn-result-label-w); color: var(--color-ink); font-weight: 700; }
+:root .table[data-table-presentation='connection-check'] td:first-child { width: var(--tpl-htn-result-label-w); color: var(--color-ink); font-weight: var(--polish-weight-label); }
 :root .table[data-table-presentation='connection-check'] td:last-child { width: var(--tpl-htn-result-badge-w); text-align: right; }
 
 :root .table.table[data-table-presentation='account-list'] :is(th, td):nth-child(4) { padding-right: var(--tpl-sa-acc-friends-pad); }
@@ -504,7 +504,7 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
 :root :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--table-head-height, var(--tpl-list-head-h)); min-height: var(--table-head-height, var(--tpl-list-head-h)); }
 :root :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h)); }
 .row[data-highlighted] {
-  background: var(--color-accent-soft);
+  background: var(--polish-selection-bg);
 }
 
 /* ：列の余白・行の高さは表の部品が持つ。 */
@@ -577,3 +577,11 @@ html:root .frame:is([data-column-sizing='content'], [data-column-sizing='control
 
 /* 中身で測る設定表でも、全行が同じ列幅を使う。外部リンクの印も幅に含める。 */
 :root .frame[data-grid-table]:is([data-column-sizing='content'], [data-column-sizing='controls']) .table tr { grid-template-columns: var(--table-content-columns, var(--table-columns)); }
+
+/* すべての共通表で文字階層と数字の桁をそろえる。 */
+:root .table tbody { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); font-variant-numeric: tabular-nums; }
+html:root .frame .table tbody td { font-size: var(--polish-text-body); }
+:root .table thead tr { background: var(--color-canvas); border-top: 0; }
+html:root .name { font-weight: var(--polish-value-weight); }
+
+:root .frame .row:hover { background: var(--polish-table-hover); box-shadow: var(--shadow-row-line), var(--polish-band-shadow); }

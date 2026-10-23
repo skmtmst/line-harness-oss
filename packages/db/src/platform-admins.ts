@@ -343,13 +343,13 @@ export async function getActiveImpersonation(
   staffId: string,
   sessionTokenHash?: string | null,
 ): Promise<ImpersonationSession | null> {
-  await db.prepare(`UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL
+  const results = await db.batch<ImpersonationSession>([
+    db.prepare(`UPDATE impersonation_sessions SET ended_at=? WHERE staff_id=? AND ended_at IS NULL
     AND (julianday(started_at)<=julianday('now','-1 hour') OR NOT EXISTS
       (SELECT 1 FROM platform_settings p JOIN admin_sessions s ON s.token_hash=p.value
         WHERE p.key='auth.impersonation.session:'||impersonation_sessions.id AND s.staff_id=impersonation_sessions.staff_id
-          AND julianday(s.expires_at)>julianday('now')))`).bind(jstNow(), staffId).run();
-  return db
-    .prepare(
+          AND julianday(s.expires_at)>julianday('now')))`).bind(jstNow(), staffId),
+    db.prepare(
       `SELECT i.*, CASE WHEN i.pii_revealed=1 AND EXISTS
          (SELECT 1 FROM pii_reveal_logs r WHERE r.impersonation_session_id=i.id AND r.staff_id=i.staff_id
            AND r.tenant_id=i.tenant_id AND length(trim(r.reason))>=4) THEN 1 ELSE 0 END AS pii_revealed
@@ -361,7 +361,8 @@ export async function getActiveImpersonation(
        ORDER BY started_at DESC LIMIT 1`,
     )
     .bind(staffId, sessionTokenHash === undefined ? 1 : 0, sessionTokenHash ?? null)
-    .first<ImpersonationSession>();
+  ]);
+  return results[1]!.results[0] ?? null;
 }
 
 /** 既に有効なものがあれば先に終える。運営マスター 1 人につき同時に 1 件だけ。 */

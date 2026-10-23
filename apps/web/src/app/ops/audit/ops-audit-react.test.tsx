@@ -15,7 +15,7 @@ const row = (index: number): OpsAuditRow => ({
   created_at: '2026-09-27T03:00:00.000Z',
   staff_name: '運営 太郎',
   tenant_name: '株式会社サンプル',
-  action: 'tenant.status.change',
+  action: auditAction,
   reason: 'テスト',
   ip: '203.0.113.1',
   visible_to_tenant: false,
@@ -25,14 +25,19 @@ let host: HTMLDivElement
 let root: Root
 let calls: Array<{ url: string }>
 let totalRows = 0
+let auditAction = 'tenant.status.change'
+let readOnly = false
 
 beforeEach(() => {
   calls = []
   totalRows = 120
+  auditAction = 'tenant.status.change'
+  readOnly = false
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
     calls.push({ url })
+    if (new URL(url).pathname === '/api/ops/me') return new Response(JSON.stringify({ success: true, data: { id: 'operator', readOnly } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     const params = new URL(url).searchParams
     const limit = Number(params.get('limit') ?? '50')
     const offset = Number(params.get('offset') ?? '0')
@@ -59,6 +64,21 @@ async function flush() {
 }
 
 describe('日付範囲の折返し（R158）', () => {
+  it('省略される長い操作名も、タイトルで全文を確認できる', async () => {
+    auditAction = 'impersonation.write'
+    await act(async () => { root.render(<OpsAuditPage />) })
+    await flush()
+    const button = [...host.querySelectorAll<HTMLButtonElement>('[data-part="row-name"]')][0]
+    expect(button.textContent).toBe('代理ログイン（書き込み）')
+    expect(button.title).toBe('代理ログイン（書き込み）')
+  })
+  it.each([true, false])('運営メンバーの閲覧のみ=%s に応じて記録のコピーを出し分ける', async (value) => {
+    readOnly = value
+    await act(async () => { root.render(<OpsAuditPage />) })
+    await flush()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[data-part="row-name"]')!.click() })
+    expect(document.querySelector('[aria-label="この記録をコピー"]') !== null).toBe(!value)
+  })
   it('理由の全文にIPと公開範囲を添え、脚注で全件数と表示範囲を確認できる', async () => {
     await act(async () => { root.render(<OpsAuditPage />) })
     await flush()

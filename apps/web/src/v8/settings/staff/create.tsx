@@ -11,6 +11,7 @@ import Card from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import { TextInput } from '@/components/shared/form-controls'
+import { EmailChipField } from '@/components/shared/email-chip-field'
 
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { useAccount } from '@/contexts/account-context'
@@ -120,7 +121,7 @@ export default function NewStaffPage() {
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="名前" htmlFor="staff-name" required error={fields.error('name')}><TextInput {...fields.bind('name')} id="staff-name" value={name} onChange={(e) => setName(e.target.value)} invalid={fields.invalid('name')} /></Field>
-        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。" error={fields.error('email')}><TextInput {...fields.bind('email')} id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} invalid={fields.invalid('email')} /></Field>
+        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。" error={fields.error('email')}><EmailChipField {...fields.bind('email')} id="staff-email" value={email} onValueChange={setEmail} maxLength={254} invalid={fields.invalid('email')} /></Field>
       </div>
     </FormSection>
 

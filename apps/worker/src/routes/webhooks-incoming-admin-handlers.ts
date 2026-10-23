@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { outgoingEventTypes } from './webhook-event-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -45,8 +46,7 @@ export const get__api_webhooks_incoming_1 = async (c: Context<Env, "/api/webhook
       })),
     });
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -113,9 +113,8 @@ export const get__api_webhooks_incoming_id_2 = async (c: Context<Env, "/api/webh
         updatedAt: item.updated_at,
       },
     });
-  } catch {
-    logger.error("incoming_webhook_detail_failed");
-    return c.json({ success: false, error: '受け取り口の詳細を表示できませんでした' }, 500);
+  } catch (error) {
+    throw error;
   }
 };
 
@@ -146,9 +145,8 @@ export const patch__api_webhooks_incoming_id_config_3 = async (c: Context<Env, "
     }
     auditLog(c, 'webhook.incoming.config.update', { kind: 'incoming_webhook', id: result.item.id });
     return c.json({ success: true, data: { id: result.item.id, version: result.item.version } });
-  } catch {
-    logger.error("incoming_webhook_config_update_failed");
-    return c.json({ success: false, error: '受け取り口の設定を保存できませんでした' }, 500);
+  } catch (error) {
+    throw error;
   }
 };
 
@@ -207,8 +205,7 @@ export const post__api_webhooks_incoming_4 = async (c: Context<Env, "/api/webhoo
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -296,8 +293,7 @@ export const put__api_webhooks_incoming_id_5 = async (c: Context<Env, "/api/webh
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -315,8 +311,7 @@ export const delete__api_webhooks_incoming_id_6 = async (c: Context<Env, "/api/w
     auditLog(c, 'webhook.incoming.delete', { kind: 'incoming_webhook', id }, { lineAccountId });
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -346,8 +341,7 @@ export const post__api_webhooks_incoming_id_restore_7 = async (c: Context<Env, "
       },
     });
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -367,8 +361,8 @@ export const get__api_webhooks_incoming_id_unmatched_8 = async (c: Context<Env, 
     const status = c.req.query('status');
     const listStatus = status === 'resolved' || status === 'dismissed' ? status : 'pending';
     // R401: 50件超えは limit/offset で辿る。空表示の判定に使う総数も返す。
-    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') ?? '') || 50));
-    const offset = Math.max(0, Number(c.req.query('offset') ?? '') || 0);
+    const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit'), '') || 50));
+    const offset = Math.max(0, listQueryNumber(c.req.query('offset'), '') || 0);
     const [items, total] = await Promise.all([
       listIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus, limit, offset),
       countIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus),
@@ -388,10 +382,7 @@ export const get__api_webhooks_incoming_id_unmatched_8 = async (c: Context<Env, 
       ).bind(lineAccountId, ...(candidateIds.length ? sqlIdSet(candidateIds).binds : [])).all<{ id: string; display_name: string | null }>();
       for (const row of rows.results ?? []) candidateNames.set(row.id, row.display_name);
     }
-    return c.json({
-      success: true,
-      total,
-      data: items.map((item) => {
+    const responseItems = items.map((item) => {
         const friendIds = item.kind === 'ambiguous'
           ? safeJson<string[]>(item.candidate_friend_ids_json, [])
           : [];
@@ -411,11 +402,12 @@ export const get__api_webhooks_incoming_id_unmatched_8 = async (c: Context<Env, 
           resolvedAt: item.resolved_at,
           receivedAt: item.received_at,
         };
-      }),
-    });
+      });
+    return c.json(buildOffsetListResponse({ success: true,
+      total,
+      data: responseItems, items: responseItems, paging: { limit }, sort: [] }));
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -486,7 +478,7 @@ export const post__api_webhooks_incoming_id_test_9 = async (c: Context<Env, "/ap
       });
     } catch (logError) {
       // 台帳の一時障害で試し自体を止めない。
-      logger.error("routes_webhooks_failed");
+      logger.error("webhooks.webhooks_incoming_id_test_post_failed");
     }
     auditLog(c, 'webhook.incoming.test', { kind: 'incoming_webhook', id: webhook.id }, { lineAccountId });
     return c.json({
@@ -510,8 +502,7 @@ export const post__api_webhooks_incoming_id_test_9 = async (c: Context<Env, "/ap
       },
     });
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -550,8 +541,7 @@ export const post__api_webhooks_unmatched_id_resolve_10 = async (c: Context<Env,
       { kind: 'incoming_webhook_unmatched', id: item.id }, { lineAccountId });
     return c.json({ success: true, data: { id: item.id, status: action === 'link' ? 'resolved' : 'dismissed' } });
   } catch (err) {
-    logger.error("routes_webhooks_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -611,8 +601,7 @@ export const get__api_webhooks_outgoing_11 = async (c: Context<Env, "/api/webhoo
         };
       }),
     });
-  } catch {
-    logger.error("outgoing_webhook_list_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+  } catch (error) {
+    throw error;
   }
 };

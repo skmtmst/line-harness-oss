@@ -162,7 +162,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         sourceEventId: booking.id,
         eventId: booking.event_id,
         lineAccountId: booking.line_account_id,
-      }).catch((err) => logger.error("routes_events_failed"));
+      }).catch((err) => logger.error("events.admin_events_by_id_bookings_by_booking_id_decide_create_failed"));
     }
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
@@ -175,7 +175,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
           eventId: booking.event_id, slotId: booking.slot_id,
         },
       })
-        .catch((error) => logger.error("routes_events_failed")),
+        .catch((error) => logger.error("events.admin_events_by_id_bookings_by_booking_id_decide_create_failed")),
     );
   }
   if (action === 'reject') {

@@ -11,6 +11,7 @@ import { PAGE_SIZES, pageSizeOptions } from '@/components/shared/page-size-optio
 import { useCallback, useEffect, useState } from 'react'
 import { History } from 'lucide-react'
 import Button from '@/components/shared/button'
+import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-entry-details'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import EmptyList from '@/components/shared/empty-list'
 import ListState from '@/components/shared/list-state'
@@ -21,7 +22,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RowMenu } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
-import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr, RowNameButton } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
 import { describeApiFailure, loadFailureCopy } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
@@ -55,8 +56,10 @@ export default function McpLogV8() {
   const [stopOpen, setStopOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [entry, setEntry] = useState<LogEntryFacts | null>(null)
 
   const fetchLogs = useCallback(async () => {
+    setEntry(null)
     setLoad({ kind: 'loading' })
     const resultFilter = url.what === 'refused' || url.what === 'error' ? url.what : ''
     const kindFilter = resultFilter ? '' : url.what
@@ -117,7 +120,7 @@ export default function McpLogV8() {
         </ListToolbarEnd>
       </ListToolbarRow></ListToolbarFrame>}
       pagination={load.kind === 'ready' && total > size ? <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / size))} onPageChange={(next) => setUrl({ page: String(next) })} range={{ total, first: (page - 1) * size + 1, last: Math.min(total, page * size) }} /> : undefined}
-      overlays={<ConfirmDialog
+      overlays={<><LogEntryDetails canCopy={permissions.see && !permissions.viewer} entry={entry} onClose={() => setEntry(null)} /><ConfirmDialog
         open={stopOpen}
         title={`「${connection?.name ?? ''}」を止めますか？`}
         description="すぐ使えなくなり、次の呼び出しから断ります。止めた人は記録に残ります。もう一度使うときは、接続を作り直します。"
@@ -127,7 +130,7 @@ export default function McpLogV8() {
         error={error || undefined}
         onConfirm={() => void stop()}
         onCancel={() => { if (!busy) setStopOpen(false) }}
-      />}
+      /></>}
     >
       {load.kind === 'loading' ? <ListState kind="loading" /> : null}
       {failure ? <ListState kind="error" title={failure.title} description={failure.description} onRetry={failure.retryable ? () => void fetchLogs() : undefined} /> : null}
@@ -159,7 +162,7 @@ export default function McpLogV8() {
                 <Tr key={log.id} data-row-id={log.id}>
                   <Td>{at(log.at)}</Td>
                   <Td title={log.connectionName}><TruncatedText value={log.connectionName} /></Td>
-                  <Td><StatusBadge tone={state.tone}>{state.label}</StatusBadge></Td>
+                  <Td><RowNameButton onClick={() => setEntry({ occurredAt: log.at, target: log.connectionName, status: state.label, reason: log.summary })}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></RowNameButton></Td>
                   <Td grow title={log.summary}><TruncatedText value={log.summary} /></Td>
                   <ActionCell>
                     {items.length ? <RowMenu appearance="plain" label={`${at(log.at)} の記録の操作`} open={menuId === log.id} onOpenChange={(next) => setMenuId(next ? log.id : null)} items={items} /> : null}

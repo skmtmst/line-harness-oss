@@ -11,14 +11,6 @@ const mocks = vi.hoisted(() => ({
   accountsList: vi.fn(),
   operatorsList: vi.fn(),
 }))
-vi.mock('./api', () => ({
-  api: {
-    featureSettings: { get: mocks.settingsGet, visibility: mocks.visibility },
-    lineAccounts: { list: mocks.accountsList },
-    operators: { list: mocks.operatorsList },
-  },
-}))
-
 import { clearCommonCaches } from './common-caches'
 import { loadFeatureSettings } from './feature-settings-cache'
 import { loadFeatureVisibility } from './feature-visibility-cache'
@@ -28,6 +20,14 @@ import { loadOperators } from './operators-cache'
 describe('共通の使い回しの破棄', () => {
   beforeEach(() => {
     clearCommonCaches()
+    localStorage.setItem('lh_csrf', 'fixture-session')
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const path = new URL(input).pathname
+      const read = path === '/api/settings/features' ? mocks.settingsGet
+        : path === '/api/settings/features/visibility' ? mocks.visibility
+          : path === '/api/line-accounts' ? mocks.accountsList : mocks.operatorsList
+      return new Response(JSON.stringify(await read()))
+    }))
     for (const mock of Object.values(mocks)) {
       mock.mockReset()
       mock.mockResolvedValue({ success: true, data: { features: {} } })
@@ -35,7 +35,7 @@ describe('共通の使い回しの破棄', () => {
     mocks.accountsList.mockResolvedValue({ success: true, data: [] })
     mocks.operatorsList.mockResolvedValue({ success: true, data: [] })
   })
-  afterEach(() => vi.restoreAllMocks())
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
   it('捨てる前はどれも取り直さない', async () => {
     await loadFeatureSettings('acc-1')

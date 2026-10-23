@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import ChatsPage from './page'
+import * as toast from '@/components/shared/toast'
 import { api, ApiError } from '@/lib/api'
 
 /*
@@ -212,6 +213,23 @@ describe('N-031 内部メモの紙のフォーカス制御', () => {
     })
     expect(input.value).toBe('保存できないメモ')
     expect(popover(host)).not.toBeNull()
+  })
+
+  it('内部メモの保存は対象名を知らせ、返された新しい版を採用する', async () => {
+    const saved = vi.spyOn(toast, 'notifySaved').mockImplementation(() => () => {})
+    const update = vi.spyOn(api.chats, 'update').mockResolvedValue({ success: true, data: { revision: 2, notes: '更新したメモ' } } as Awaited<ReturnType<typeof api.chats.update>>)
+    const panel = await openMemo()
+    const input = panel.querySelector('textarea')!
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    await act(async () => { setter.call(input, '更新したメモ'); input.dispatchEvent(new Event('input', { bubbles: true })) })
+    await act(async () => { [...panel.querySelectorAll('button')].find(button => button.textContent === 'メモを保存する')!.click() })
+    expect(saved).toHaveBeenCalledExactlyOnceWith('「メモ確認」の内部メモを保存しました')
+    expect(popover(host)).toBeNull()
+    const nextPanel = await openMemo()
+    const nextInput = nextPanel.querySelector('textarea')!
+    await act(async () => { setter.call(nextInput, '次のメモ'); nextInput.dispatchEvent(new Event('input', { bubbles: true })) })
+    await act(async () => { [...nextPanel.querySelectorAll('button')].find(button => button.textContent === 'メモを保存する')!.click() })
+    expect(update).toHaveBeenLastCalledWith('friend-a', { notes: '次のメモ', revision: 2 })
   })
 
 })

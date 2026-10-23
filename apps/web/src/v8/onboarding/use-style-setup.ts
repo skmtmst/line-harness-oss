@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { styleApi } from '@/lib/api/helpers/styles'
 import type { StarterItemState, StyleState, StyleWarning } from './model'
 import { canManageRole } from '@/lib/staff-role'
+import { invalidateApiReads } from '@/lib/api/transport/read-cache'
 
 export type StyleSetupData = {
   state: StyleState
@@ -28,7 +29,10 @@ export function useStyleSetup(accountId: string | null, role: string | null) {
       .catch((error: unknown) => { if (!cancelled) setSnapshot({ accountId, data: null, error, status: 'error' }) })
     return () => { cancelled = true }
   }, [accountId, enabled, tick])
-  const reload = useCallback(() => setTick((value) => value + 1), [])
+  const reload = useCallback(() => {
+    invalidateApiReads('/api/dashboard/style', accountId ?? undefined)
+    setTick((value) => value + 1)
+  }, [accountId])
   const current = enabled && snapshot?.accountId === accountId ? snapshot : null
   return { data: current?.data ?? null, error: current?.error ?? null, status: !enabled || !accountId ? 'idle' as const : current?.status ?? 'loading' as const, reload }
 }

@@ -9,9 +9,24 @@ import { broadcasts } from './broadcasts.js';
 import { forms } from './forms.js';
 import { webinarRoutes } from './webinars.js';
 import { contents } from './contents.js';
+import { tags } from './tags.js';
+import { friends } from './friends.js';
+import { analytics } from './analytics.js';
+import { lineAccounts } from './line-accounts.js';
+import { access } from './access.js';
+import { commonActions } from './common-actions.js';
+import { templates } from './templates.js';
 
 const report = vi.hoisted(() => vi.fn(async () => false));
 vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
+// 所属確認の後の業務SQLを壊し、門番だけの失敗を合格に数えない。
+vi.mock('../services/account-access.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../services/account-access.js')>(),
+  getVisibleLineAccountScope: vi.fn(async () => ({
+    accounts: [], allowedAccountIds: ['private-account'], ids: ['private-account'],
+    canSeeUnassigned: true, isAccountScoped: false,
+  })),
+}));
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -24,6 +39,13 @@ const cases = [
   ['フォームの一覧', forms, '/api/forms?account_id=private-account', 'GET /api/forms'],
   ['ウェビナー', webinarRoutes, '/api/webinars/private-recipient?token=private-token', 'GET /api/webinars/:id'],
   ['コンテンツ', contents, '/api/media/private-recipient?accountId=private-account&token=private-token', 'GET /api/media/:id'],
+  ['タグ', tags, '/api/tag-groups?accountId=private-account', 'GET /api/tag-groups'],
+  ['友だち', friends, '/api/friends?accountId=private-account', 'GET /api/friends'],
+  ['分析', analytics, '/api/analytics/messages?account_id=private-account', 'GET /api/analytics/messages'],
+  ['LINEアカウント', lineAccounts, '/api/line-accounts?token=private-token', 'GET /api/line-accounts'],
+  ['権限', access, '/api/access/users?token=private-token', 'GET /api/access/users'],
+  ['共通の動作', commonActions, '/api/common-actions?account_id=private-account', 'GET /api/common-actions'],
+  ['テンプレート', templates, '/api/templates?accountId=private-account', 'GET /api/templates'],
 ] as const;
 
 function appWithRoutes(routes: Hono<Env>) {

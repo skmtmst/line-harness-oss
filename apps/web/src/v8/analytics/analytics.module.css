@@ -81,7 +81,6 @@
 }
 /* 絵の数字は詰めた字幅（11 が 18px）。表の桁そろえの等幅をここだけ外す。 */
 .band [data-kpi-number] {
-  font-variant-numeric: normal;
 }
 
 /* 本文：左に棒、右に 320 の列。1152 では1列にして右の2枚を横に並べる。 */
@@ -1169,3 +1168,6 @@
 .table[data-kind='page'] .num[data-w^='sc'] { padding-right: var(--tpl-an-num-pad-end); }
 
 .caption, .captionNoticePlacement { margin: 0; }
+
+.controls { flex-wrap: wrap; }
+.field[data-w='window'] { min-width: var(--tpl-funnel-window-min-width); }

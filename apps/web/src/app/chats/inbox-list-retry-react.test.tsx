@@ -136,3 +136,19 @@ test('メールだけ見ている画面ではLINE一覧の失敗行を出さな�
   expect(retryButton()).toBeUndefined()
   expect(list().textContent).not.toContain('チャットの読み込みに失敗しました。')
 })
+
+test('同条件の読み直しでは会話を残し、遅い更新だけ「更新中」を出す', async () => {
+  handler = url => url.pathname === '/api/chats' ? response(linePayload(['残して読む会話'])) : base(url)
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(list().textContent).toContain('残して読む会話'))
+  let complete!: (value: Response) => void
+  handler = url => url.pathname === '/api/chats' ? new Promise(resolve => { complete = resolve }) : base(url)
+  const { UNANSWERED_REFRESH_EVENT } = await import('@/lib/events')
+  act(() => window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT)))
+  await settle()
+  expect(list().textContent).toContain('残して読む会話')
+  expect(list().querySelector('[data-inbox-list-state="loading"]')).toBeNull()
+  await eventually(() => expect(list().textContent).toContain('更新中'))
+  await act(async () => complete(response(linePayload(['更新した会話']))))
+  await eventually(() => expect(list().textContent).toContain('更新した会話'))
+})

@@ -1,3 +1,4 @@
+import { fetchPrefetchedRead } from '../transport/prefetch'
 import { fetchApi } from '../transport/request'
 import type { ApiResponse, StaffMember } from '@line-crm/shared'
 
@@ -7,7 +8,7 @@ export const staffMethods = {
       fetchApi<ApiResponse<StaffMember[]>>('/api/staff'),
     get: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`),
-    me: () => fetchApi<ApiResponse<StaffMember>>('/api/staff/me'),
+    me: () => fetchPrefetchedRead<ApiResponse<StaffMember>>('/api/staff/me'),
     create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId: string; canAccessDescendantAccounts?: boolean; accountScope: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq' }) =>
       fetchApi<ApiResponse<StaffMember>>('/api/staff', {
         method: 'POST',

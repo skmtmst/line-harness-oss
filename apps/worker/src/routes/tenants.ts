@@ -121,8 +121,8 @@ tenants.post('/api/tenants', inputJsonBoundary(), async (c) => {
       db.prepare(`INSERT INTO tenants (id, name, status, feature_packs)
         VALUES (?, ?, 'active', ?)`).bind(tenantId, name, JSON.stringify(featurePacks)),
     ]);
-  } catch {
-    return c.json({ success: false, error: '統括を作成できませんでした' }, 500);
+  } catch (error) {
+    throw error;
   }
 
   return c.json({

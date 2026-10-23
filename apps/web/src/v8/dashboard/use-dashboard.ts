@@ -150,9 +150,14 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
   const loadRequestId = useRef(0)
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
-  const data = overview && overview.accountId === selectedAccountId && overview.period === period
+  const data = overview && overview.accountId === selectedAccountId
     ? overview.value
     : null
+  const displayedPeriod = data ? overview!.period : period
+  const previousPeriod = data !== null && displayedPeriod !== period
+  const periodNotice = previousPeriod
+    ? error ? `前の期間を表示しています。選んだ期間のデータを${STATE_TEXT.error}` : '前の期間を表示・更新中'
+    : ''
   const supportMarksEnabled = useFeatureVisibility(selectedAccountId).enabled('support_marks')
   const visibleRight = preferences.right
     .filter(item => dashboardCardForStyle(item.id, usageStyle, preferenceVersion > 0))
@@ -546,7 +551,9 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
     openEditor,
     closeEditor,
     data,
-    loading,
+    displayedPeriod,
+    periodNotice,
+    loading: loading && data === null,
     error,
     load,
     preferences,

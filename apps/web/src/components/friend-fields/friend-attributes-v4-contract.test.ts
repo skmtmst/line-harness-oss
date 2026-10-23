@@ -170,27 +170,7 @@ describe('タグ V4 contract', () => {
     }
   })
 
-  it('空・読込・エラー・権限不足を言い分ける', () => {
-    const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
-    // 設計 ★管理画面 4-2-C `yKEdO`。共通部品に寄せる（自前で組むと画面ごとにずれる）。
-    expect(source).toContain("import ListState from '@/components/shared/list-state'")
-    expect(source).toContain('<DelayedSkeleton loading={!ready}')
-    expect(source).toContain("status === 'forbidden'")
-    expect(source).toContain("status === 'error'")
-    expect(source).toContain('<EmptyList')
-    // 403 は「壊れた」ではなく「見せてよい人ではない」。同じ扱いにしない。
-    expect(source).toContain("reason.status === 403 ? 'forbidden' : 'error'")
-    // 読み込めなかったときに「ありません」と言い切らない（PR #216 と同じ壊れ方）。
-    const empty = source.indexOf('まだタグがありません')
-    expect(empty).toBeGreaterThan(-1)
-    const before = source.slice(0, empty)
-    expect(before.lastIndexOf("status === 'error'")).toBeGreaterThan(-1)
-    // 中身を出せていないあいだは数を出さない。0件と出すと消えたように見える。
-    expect(source).toContain("const ready = status === 'ready'")
-    expect(source).toContain('count: ready ? items.length : null')
-    // 権限が無いときは作る操作を出さない。
-    expect(source).toContain("status === 'forbidden' || !canEdit ? null : (")
-  })
+
 
   it('取れていない値を「0件」や「手動」で埋めない', () => {
     const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')

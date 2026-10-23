@@ -281,7 +281,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     </Button>
   ) : null
   const folders = (
-    <div className={styles.folderInset}>
+    <>
       <ManagedFolderPanel
         kind={null}
         folders={[]}
@@ -293,7 +293,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
         onSelect={() => setView('all')}
         allCount={ready ? projects.length : null}
       />
-    </div>
+    </>
   )
   const viewFilter = (
     <ViewChips chips={viewChips} active={view} onChange={(next) => setView((next ?? 'all') as ProjectView)} />
@@ -413,7 +413,7 @@ function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFav
     ? '— ・ いま作成中'
     : `${project.imageCount} 枚 ・ ${monthDay(project.updatedAt)} 更新`
   return (
-    <Card padding="rows" layout="media" overflow="hidden" aria-label={project.name}>
+    <Card frame="flat" padding="rows" layout="media" overflow="hidden" aria-label={project.name}>
       <button type="button" className={styles.mosaic} onClick={onOpen} aria-label={`${project.name} を開く`}>
         {[0, 1, 2].map((i) => <Thumb key={i} image={thumbnails[i] ?? null} />)}
       </button>
@@ -600,7 +600,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   ) : null
   const selectView = (id: string) => { setView(id as LibraryView); resetPage() }
   const folders = (
-    <div className={styles.folderInset}>
+    <>
       <ManagedFolderPanel
         kind={null}
         folders={[]}
@@ -612,7 +612,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
         onSelect={() => selectView('all')}
         allCount={ready ? counts?.all ?? images.length : null}
       />
-    </div>
+    </>
   )
 
   const total = counts ? (view === 'all' ? counts.all : counts[view]) : null
@@ -694,7 +694,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
         <ListToolbar search={{placeholder:'テキスト・指示で探す',label:'テキスト・指示で探す',value:query,onChange:(value)=>{setQuery(value);resetPage()}}}
           filters={<><ViewChips chips={viewChips} active={view} onChange={(next) => selectView((next ?? 'all') as LibraryView)} /><ResponsiveFilterChips label="用途">
             <FilterChip selected={shape === null} icon={<CircleDot size={14} aria-hidden="true" />} onChange={()=>{setShape(null);resetPage()}}>すべて</FilterChip>
-            {SHAPE_FILTERS.map((item) => <FilterChip key={item.key} selected={shape === item.key} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => {setShape(on ? item.key : null);resetPage()}}>{item.label}</FilterChip>)}
+            {SHAPE_FILTERS.map((item) => <FilterChip key={item.key} selected={shape === item.key} onChange={(on) => {setShape(on ? item.key : null);resetPage()}}>{item.label}</FilterChip>)}
           </ResponsiveFilterChips></>}
           trailing={<span>並び：作成が新しい順</span>} />
         {actionError ? <Notice tone="danger" message={actionError} /> : null}

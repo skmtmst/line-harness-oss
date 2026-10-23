@@ -2,6 +2,8 @@
 
 import { Steps } from '@/components/templates/steps'
 import type { ReactNode } from 'react'
+import type { ReminderDraftSettings } from '@line-crm/shared'
+import { reminderStepTimings, reminderStopSummary, reminderTriggerLabel } from '@/components/reminders/reminder-labels'
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ChevronLeft } from 'lucide-react'
@@ -47,7 +49,7 @@ export function stepHref(step: ReminderV8StepKey, reminderId: string): string {
 }
 
 /** 手順表示。済んだ段は押すとその手順へ戻れる。完了は全段 done にする。 */
-export function ReminderV8Stepper({ current, reminderId }: { current: ReminderV8StepKey | 'done'; reminderId: string }) {
+export function ReminderV8Stepper({ current, reminderId, settings, readOnly }: { current: ReminderV8StepKey | 'done'; reminderId: string; settings?: ReminderDraftSettings; readOnly?: boolean }) {
   const router = useRouter()
   const currentIndex = REMINDER_V8_STEPS.findIndex((step) => step.key === current)
   const steps: StepperStep[] = REMINDER_V8_STEPS.map((step, index) => {
@@ -59,7 +61,8 @@ export function ReminderV8Stepper({ current, reminderId }: { current: ReminderV8
       onSelect: done ? () => router.push(stepHref(step.key, reminderId)) : undefined,
     }
   })
-  return <Steps label="リマインダを作る手順" steps={steps} currentKey={current === 'done' ? undefined : current} />
+  return <Steps label="リマインダを作る手順" steps={steps} currentKey={current === 'done' ? undefined : current} readOnly={readOnly}
+    summaries={settings ? { basics: `${settings.name}・${reminderTriggerLabel(settings.triggerType)}`, target: `${settings.targetCondition ? '条件で絞る' : settings.targetTagId ? 'タグで絞る' : '対象者全員'}・${reminderStopSummary(settings.stopConditions)}`, messages: `${settings.steps.length}通`, schedule: reminderStepTimings(settings) } : undefined} />
 }
 
 /** 頭の「← リマインダへ」。 */

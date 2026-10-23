@@ -67,10 +67,12 @@ const summary = {
 
 let staffIdentity: { role: string; readOnly?: boolean; roleBundle?: string }
 let mutationRequests = 0
+let payloadRequests = 0
 
 beforeEach(() => {
   staffIdentity = { role: 'owner' }
   mutationRequests = 0
+  payloadRequests = 0
   items = [interaction()]
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -85,6 +87,7 @@ beforeEach(() => {
     if (url.includes('/incoming')) return json({ success: true, data: [] })
     if (url.includes('/interactions')) {
       if (url.includes('/payload')) {
+        payloadRequests++
         return json({ success: true, data: { id: 'whk_20260930_0558_02', body: { event: 'booking_created', friend: 'Masato S.（伏せ字）' }, available: true } })
       }
       return json({ success: true, data: { items, total: items.length, page: 1, limit: 20, summary } })
@@ -153,9 +156,9 @@ test('旧テーマ属性でも現役の記録タブが出て Uv9AA が出る', a
  * 中身は絵  どおり真ん中の窓（2026-10-07 右の詳細パネルから変えた）。
  * 絵の窓に前後の行へ移る操作は無いので、前後送りの確かめは外した（BEHAVIOR.md）。
  */
-test('v8 で中身を見ると中身の窓（DA0Ag）が出て、伏せ字の本文と送り直しが出る', async () => {
+test('v8 で中身を見ると中身の窓（DA0Ag）に理由と送り直しが出て、本文は出さない', async () => {
   items = [
-    interaction(),
+    Object.assign(interaction(), { requestBodyJson: 'private-body', idempotencyKey: 'private-key', internalError: 'API error: Failed to fetch' }),
     interaction({ id: 'whk_20260930_0601_01', webhookName: '顧客台帳', triggerSummary: '友だちが追加された' }),
   ]
   document.documentElement.dataset.theme = 'v8'
@@ -171,8 +174,12 @@ test('v8 で中身を見ると中身の窓（DA0Ag）が出て、伏せ字の本
   expect(dialog.textContent).toContain('やり取りの中身')
   expect(dialog.textContent).toContain('予約台帳')
   expect(dialog.textContent).toContain('相手先のサーバが応えませんでした')
-  // 本文は F-18 の口から読む（伏せ字のまま出す）。
-  expect(dialog.textContent).toContain('"friend": "Masato S.（伏せ字）"')
+  // 本文の取得を足さず、送受信の本文と秘密値は窓へ出さない。
+  expect(dialog.textContent).not.toContain('"friend": "Masato S.（伏せ字）"')
+  expect(dialog.textContent).toContain('送受信の本文は、この記録には表示しません')
+  expect(payloadRequests).toBe(0)
+  expect(dialog.textContent).not.toMatch(/private-body|private-key|API error:|Failed to fetch/)
+  expect(board.textContent).not.toMatch(/private-body|private-key|API error:|Failed to fetch/)
   expect(dialog.textContent).toContain('届いたか確かめてから送り直す')
   // 一覧は後ろに残る。
   expect(board.querySelector('tbody tr')).not.toBeNull()
@@ -223,5 +230,6 @@ test.each([
   expect([...board.querySelectorAll('button')].some(button => button.textContent?.includes('失敗したものをまとめてやり直す'))).toBe(false)
   await openContents(board)
   expect([...document.querySelectorAll('button')].filter(button => button.textContent?.includes('送り直す'))).toHaveLength(0)
+  expect(document.querySelector('[aria-label="この記録をコピー"]')).toBeNull()
   expect(mutationRequests).toBe(0)
 })

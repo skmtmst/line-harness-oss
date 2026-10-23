@@ -138,7 +138,7 @@ export default function EmergencyScreen({
       ) : null}
       {tab === 'control' ? renderControl?.(accounts, controlRef) : null}
       {tab === 'security' && canReadSecurity ? <SecurityMonitorPanel accountId={selectedAccountId} canOperate={canReviewSecurity} /> : null}
-      {tab === 'history' ? (renderHistory ? renderHistory() : <UpdateHistoryV8 />) : null}
+      {tab === 'history' ? (renderHistory ? renderHistory() : <UpdateHistoryV8 canCopy={canManage} />) : null}
       <HistoryDetails panel={historyDetail} onClose={() => setHistoryDetail(null)} />
     </SbSettingsScreen>
   )

@@ -63,7 +63,7 @@ booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
       access_token: null,
     }, googleCredentials(c.env), {db:c.env.DB,accountId});
   } catch (error) {
-    logger.error("routes_booking_failed");
+    logger.error("booking.admin_staff_by_id_google_calendar_update_failed");
     const message = error instanceof Error ? error.message : String(error);
     const status = message === 'google_service_account_not_configured' ? 503 : 422;
     return inputError(c, { error: status === 503 ? 'service_account_not_configured' : 'calendar_not_accessible' }, status, []);

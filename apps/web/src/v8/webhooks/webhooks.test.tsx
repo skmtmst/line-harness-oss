@@ -334,8 +334,8 @@ describe('外部連携 V8', () => {
 
   it('やり取りの記録：札に件数、中身は「・」の前を1行目・後ろと経緯を2行目に出す', async () => {
     await render(<WebhooksInteractionsV8 />)
-    expect(host.textContent).toContain('すべて 2,146')
-    expect(host.textContent).toContain('失敗 2')
+    expect(within(host).getByRole('tab', { name: /^すべて\s*2,?146$/ })).toBeTruthy()
+    expect(within(host).getByRole('tab', { name: /^失敗\s*2$/ })).toBeTruthy()
     const row = host.querySelector('tr[data-row-id="wi-1"]')
     expect(row?.textContent).toContain('予約が入った')
     expect(row?.textContent).toContain('Masato S.・3回やり直して失敗')

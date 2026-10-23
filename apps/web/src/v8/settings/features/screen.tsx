@@ -346,7 +346,7 @@ export default function FeatureSettingsScreen() {
       title={TITLE}
       help={DESCRIPTION}
       explanation="公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。"
-      saveActions={ready && canManage ? (
+      saveActions={ready && canManage && (dirty || saving) ? (
         <>
           <Button
             variant="secondary"
@@ -370,16 +370,9 @@ export default function FeatureSettingsScreen() {
           </Button>
         </>
       ) : undefined}
-      saveStatus={ready && canManage ? (
-        <span className={styles.barLead}>
-          <Button variant="secondary" onClick={() => setResetToDefaultsOpen(true)} disabled={saving}>
-            <RotateCcw className={styles.btnIcon} aria-hidden="true" />
-            初期値に戻す
-          </Button>
-          {dirty ? <span className={styles.barStatus}>未保存の変更があります</span> : null}
-        </span>
-      ) : undefined}
+
     >
+      {ready && canManage ? <Button variant="secondary" onClick={() => setResetToDefaultsOpen(true)} disabled={saving}><RotateCcw className={styles.btnIcon} aria-hidden="true" />初期値に戻す</Button> : null}
       {!canManage && (
         <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       )}

@@ -4,7 +4,9 @@ import { jstDate as japanDate } from '@/lib/jst-datetime'
 
 import type { ReservationBoardEntry } from '@line-crm/shared'
 import { formatDate } from '@/lib/format'
-import Button from './button'
+import { BookingBlock } from './booking-controls'
+import { BookingName, BookingTime } from './booking-presentation'
+import { reservationBookingState } from './booking-state'
 import { FolderDotName } from './folder-dot'
 import { ListFolderContext } from './list-folder-context'
 import styles from './reservation-board.module.css'
@@ -22,14 +24,14 @@ export default function ReservationMonth({ month, entries, onOpen, readableNames
     {Array.from({ length: first.getUTCDay() }, (_, index) => <div key={'blank' + index} />)}
     {Array.from({ length: count }, (_, index) => {
       const date = `${month}-${String(index + 1).padStart(2, '0')}`
-      return <div key={date}><strong>{index + 1}日</strong>{entries.filter(entry =>
+      return <div key={date} data-today={date === japanDate() || undefined} aria-current={date === japanDate() ? 'date' : undefined}><strong>{index + 1}日{date === japanDate() ? '・今日' : ''}</strong>{entries.filter(entry =>
         japanDate(new Date(entry.startsAt)) === date,
       ).map(entry => {
         const label = `${formatDate(entry.startsAt, { style: 'time' })} ${entry.customerName}`
-        if (!readableNames) return <Button presentation="restaurant" key={entry.id} onClick={() => onOpen(entry.id)}>{label}</Button>
-        return <Button presentation="restaurant" fullWidth key={entry.id} aria-label={label} title={label} onClick={() => onOpen(entry.id)}>
-          <FolderDotName>{label}</FolderDotName>
-        </Button>
+        if (!readableNames) return <BookingBlock placement="month" state={reservationBookingState(entry)} key={entry.id} aria-label={label} onClick={() => onOpen(entry.id)}><BookingName>{entry.customerName}</BookingName><BookingTime>{formatDate(entry.startsAt, { style: 'time' })}</BookingTime></BookingBlock>
+        return <BookingBlock placement="month" state={reservationBookingState(entry)} key={entry.id} aria-label={label} title={label} onClick={() => onOpen(entry.id)}>
+          <BookingName><FolderDotName>{label}</FolderDotName></BookingName>
+        </BookingBlock>
       })}</div>
     })}
   </div></ListFolderContext.Provider>

@@ -11,8 +11,8 @@
 }
 :global(:root) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
 :global(:root) .frame:is([data-template-layout='event-list'], [data-template-layout='event-roster'], [data-template-layout='distribution']) {
-  --tpl-head-pad-top: var(--tpl-head-pad-side);
-  --tpl-head-pad-bottom: var(--tpl-folder-pad-block);
+  --tpl-head-pad-top: var(--space-16);
+  --tpl-head-pad-bottom: var(--space-8);
   --tpl-toolbar-pad-block: var(--tpl-folder-pad-block);
 }
 :global(:root) .frame[data-template-layout='event-list'] { --folder-row-pad-block: var(--tpl-toolbar-gap); }
@@ -26,16 +26,16 @@
 :global(:root) .headingText:has(> [data-screen-explanation]:not([hidden])) { flex-basis: 0; }
 :global(:root) .heading:has(> .headingText > [data-screen-explanation]:not([hidden])) > .actions { align-self: flex-start; }
 :global(:root) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
-:global(:root) .title { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
-:global(:root) .pageTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
+:global(:root) .title { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); letter-spacing: var(--tpl-title-tracking); }
+:global(:root) .pageTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); letter-spacing: var(--tpl-title-tracking); }
 :global(:root) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 /* 題とタブの間は headingText の gap が持つ。二重に余白を足さない。 */
 :global(:root) .headingTabs { margin-top: 0; }
-/* メタ情報を持つ詳細のタブは、頭の段間8を保つ。 */
-:global(:root) [data-page-template='detail'] .headingTabs { margin-top: var(--tpl-head-gap); }
-/* タブ付きの頭は固定絵の下余白16。通常の頭の12とは分ける。 */
-:global(:root) .heading:has(.headingTabs) { padding-bottom: var(--tpl-folder-pad-block); }
-/* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
+/* 詳細のタブも headingText の段間だけを使う。 */
+:global(:root) [data-page-template='detail'] .headingTabs { margin-top: 0; }
+/* タブの有無によらず、題の下は共通の余白を使う。 */
+:global(:root) .heading:has(.headingTabs) { padding-bottom: var(--tpl-head-pad-bottom); }
+/* compact は間2・説明13/20を維持し、題は標準と同じ文字の値。 */
 :global(:root) .heading[data-heading-size='compact'] .headingText { gap: var(--tpl-compact-gap); }
 :global(:root) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }
 :global(:root) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
@@ -52,11 +52,16 @@
 :global(:root) .explanation { width: 100%; }
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar:is([data-toolbar-spacing='section'], [data-toolbar-spacing='stats']) { padding-block: var(--polish-space-card); }
-/* 題から最初の道具・数の帯までは道具側の16だけ。間にタブ・帯・閲覧案内がある板は対象外。 */
-:global(:root) .frame > .heading:has(+ .listBody > .split:first-child > .main > .toolbar[data-toolbar-spacing]) { padding-bottom: 0; }
+/* 題から最初の道具・数の帯までは道具側の余白だけ。間にタブ・帯・閲覧案内がある板は対象外。 */
+:global(:root) .frame > .heading + .listBody > .split:first-child > .main > .toolbar:first-child:not([data-collapsed-only]) { padding-top: 0; }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
+/* 数の帯の直後は型が12を持ち、帯側のmarginと重ねない。 */
+:global(:root) .toolbar:has(> [data-kpi-strip]) { row-gap: var(--space-12); }
+:global(:root) .stats [data-kpi-strip]:last-child { margin-bottom: 0; }
+:global(:root) .stats:has([data-kpi-strip]) + .split > .main > .toolbar:first-child { padding-top: var(--space-12); }
+:global(:root) .frame > [data-kpi-strip] + * { margin-top: var(--space-12); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .listCards { display: grid; grid-template-columns: repeat(var(--tpl-list-card-columns), minmax(0, 1fr)); gap: var(--polish-space-card); padding-inline: var(--tpl-list-inset); align-items: start; }
 :global(:root) .listCards[data-card-inset='parent'] { padding-inline: 0; }
@@ -68,7 +73,7 @@
 @container v8-page (max-width: 639px) {
   :global(:root) .listCards, :global(:root) .listCards:is([data-card-columns], [data-card-narrow-columns]) { grid-template-columns: minmax(0, 1fr); }
 }
-:global(:root) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
+:global(:root) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side); }
 :global(:root) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global(:root) .folders { box-sizing: content-box; width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-row); }
 /*
@@ -89,7 +94,7 @@
 /* 道具を渡さない画面で、広い板に空の段を出さない。 */
 :global(:root) .toolbar[data-collapsed-only] { display: none; }
 :global(:root) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-:global(:root) [data-page-template='dashboard'] .heading { padding-bottom: var(--polish-space-card); }
+:global(:root) [data-page-template='dashboard'] .heading { padding-bottom: var(--tpl-head-pad-bottom); }
 :global(:root) .dashboardRow { display: flex; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
 :global(:root) .dashboardCell { min-width: 0; flex: 1; padding: var(--polish-space-card) var(--polish-space-section); }
 :global(:root) .dashboardCell + .dashboardCell { border-left: 1px solid var(--color-hairline); }
@@ -124,7 +129,7 @@
 :global(:root) .detailSummary { width: 320px; padding: var(--polish-space-card) var(--polish-space-section); border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
 :global(:root) .detailContent { padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
 /* 実行の記録：本文と補助欄は型が組み、短い板は中身で終わる。 */
-:global(:root) [data-template-layout='record-detail'] > .heading { padding-top: var(--polish-space-section); }
+:global(:root) [data-template-layout='record-detail'] > .heading { padding-top: var(--tpl-head-pad-top); }
 :global(:root) [data-template-layout='record-detail'] > .split { border-top: 1px solid var(--color-hairline); }
 :global(:root) [data-template-layout='record-detail'] .detailContent { padding: var(--polish-space-section); padding-bottom: 0; gap: var(--polish-space-card); }
 :global(:root) [data-template-layout='record-detail'] .detailSummary { order: 2; width: var(--tpl-fm2-rd-side-w); padding: var(--polish-space-section); padding-bottom: 0; border-right: 0; border-left: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-card); align-self: flex-start; }
@@ -314,8 +319,8 @@
  * 横いっぱいに広げない（部品 Steps が中身の幅）。題の行の右は操作（actions）だけ。
  */
 :global(:root) .steps { min-width: 0; }
-/* どの型でも手順は頭の最後の行（題と説明の下）。作る型は下で並びを決め直す。 */
-:global(:root) .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-head-gap); }
+/* 手順は頭の最後の行。前の段との間は heading の row-gap だけが持つ。 */
+:global(:root) .heading > .steps { flex-basis: 100%; order: 5; margin-top: 0; }
 /* ：列の先頭へ直接渡された作る操作も、FolderPanel と同じ形。 */
 :global(:root) .folders > :global(a):first-child,
 :global(:root) .folders > :global(button):first-child {
@@ -325,8 +330,8 @@
 :global(:root) .folders > :global([aria-hidden='true']):first-child {
   height: var(--tpl-folder-create-space-col-h);
 }
-/* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（ フォルダの列：間2＋14＋2） */
-:global(:root) .folders > :global(a) + * , :global(:root) .folders > :global(button) + * { margin-top: var(--polish-space-row); }
+/* 操作の次も folders の gap だけを使う。 */
+:global(:root) .folders > :global(a) + * , :global(:root) .folders > :global(button) + * { margin-top: 0; }
 /* ★V8 作る型の頭の並び（q1xNMz）：題（右に操作）→ 説明 → 手順。 */
 :global(:root) [data-page-template='create'] .heading > .headingText { display: contents; }
 :global(:root) [data-page-template='create'] .heading > .headingText > .titleRow { flex: 1 1 0; order: 1; }
@@ -336,7 +341,7 @@
 :global(:root) [data-page-template='create'] .heading > .headingText > .subtitle { flex-basis: 100%; order: 3; }
 :global(:root) [data-page-template='create'] .heading[data-heading-size='compact'] { row-gap: var(--tpl-compact-gap); }
 :global(:root) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
-:global(:root) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-top-gap); }
+:global(:root) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: 0; }
 
 /* 案内と本文の間を詰める板。指定した一覧・詳細だけに効く。 */
 :global(:root) [data-page-template='list'] .heading[data-bottom-spacing='compact'] { padding-bottom: var(--tpl-head-gap); }
@@ -372,7 +377,7 @@
   .detailColumns[data-presentation='notification'] .detailColumnAside[data-expanded] { display: flex; }
 }
 
-:global(:root) [data-page-template='create'] .heading[data-steps-spacing='compact'] > .steps { margin-top: var(--tpl-steps-compact-top-gap); }
+:global(:root) [data-page-template='create'] .heading[data-steps-spacing='compact'] > .steps { margin-top: 0; }
 /* 広い設定本文の口。画面の CSS から型の余白・幅を上書きしない。 */
 :global(:root) .settings[data-content-layout] { gap: 0; }
 :global(:root) .settingsContent[data-content-layout] { max-width: none; }
@@ -416,11 +421,11 @@
 :global(:root) .bookingStats { min-width: 0; width: calc(100% - var(--tpl-booking-aside-width)); }
 :global(:root) .bookingHeading .actions { gap: var(--tpl-booking-heading-gap); }
 :global(:root) .bookingHeading .heading { padding-top: var(--tpl-booking-head-pad-top); }
-:global(:root) .bookingContent { min-width: 0; padding: var(--tpl-section-gap) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
+:global(:root) .bookingContent { min-width: 0; padding: var(--space-12) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
 @container v8-page (width < 1100px) {
   :global(:root) .bookingHeading,
   :global(:root) .bookingStats { width: 100%; }
-  :global(:root) .bookingHeading .heading { padding-block: var(--tpl-booking-narrow-head-pad); }
+  :global(:root) .bookingHeading .heading { padding-block: var(--tpl-booking-narrow-head-pad) var(--tpl-head-pad-bottom); }
 }
 
 /* ：フォルダの列は余白込み200、ページ送りは右寄せ。 */
@@ -557,3 +562,23 @@
 }
 
 .detailColumns:not([data-has-aside]) { grid-template-columns: minmax(0, 1fr); margin-right: 0; }
+
+/* 本文の最初が段なら、その段が上の間を持つ。道具の直後と末尾は親側だけ。 */
+:global(:root) .frame > .heading + .listBody > .split:first-child > .main > .content:first-child > .listSection:first-child { padding-top: 0; }
+:global(:root) .toolbar + .content > .listSection:first-child { padding-top: 0; }
+:global(:root) .content > .listSection:last-child { padding-bottom: 0; }
+
+/* 数の帯を白い板の余白の内側へ置く。道具に含む帯は道具の余白を使う。 */
+:global(:root) .stats:has([data-kpi-strip]) { padding-inline: var(--tpl-list-inset); }
+:global(:root) .section { border-bottom: 0; }
+
+@container v8-page (width < 1100px) {
+ :global(:root) .dashboardRow:not([data-row='restaurant']) { flex-direction: column; }
+ :global(:root) .dashboardRow:not([data-row='restaurant']) > .dashboardAside { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
+ :global(:root) .dashboardColumns:not([data-layout='cards']) { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+:global(:root) .toolbar :global(.v6-filter-chip) { height: var(--tpl-button-h); }
+
+@container v8-page (width < 1100px) {
+ :global(:root) .dashboardRow[data-aside-size='column'] { display: flex; }
+}

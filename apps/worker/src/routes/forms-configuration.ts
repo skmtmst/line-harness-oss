@@ -14,7 +14,7 @@ import { resolveCustomerFormTheme } from '@line-crm/shared';
 import { getFormsWithStats, getFormById, getFormLatestEdit, getFormAccountIds, getFolderById, formBelongsToLineAccount, createForm, updateForm, setFormFolder, publishFormVersion, type UpdateFormInput, countActiveFormTestTokens, insertFormTestToken, deleteExpiredFormTestTokens, getFriendByLineUserIdForAccount, jstNow, toJstString } from '@line-crm/db';
 
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
-import { listLimit, listPage } from './list-pagination.js';
+import { buildOffsetListResponse, parseOffsetPaging, type ListSort } from '../lib/list-paging.js';
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -73,6 +73,13 @@ export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
      */
     const filter = validFormListFilter(c.req.query('filter'));
     const sort = validFormListSort(c.req.query('sort'));
+    const listSort: ListSort = sort === 'name'
+      ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
+      : sort === 'answers'
+        ? [{ field: 'submitCount', direction: 'desc' }, { field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+        : sort === 'updated'
+          ? [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+          : [{ field: 'lastSubmittedAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }];
     const search = c.req.query('q') ?? '';
     const allTotal = data.length;
     let list = data;
@@ -86,17 +93,19 @@ export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
     const total = list.length;
     const limitParam = c.req.query('limit');
     if (limitParam !== undefined && limitParam.trim() !== '') {
-      const limit = listLimit(limitParam, FORM_LIST_PAGE_FALLBACK_LIMIT);
-      const page = listPage(c.req.query('page'));
-      const items = list.slice((page - 1) * limit, (page - 1) * limit + limit);
+      const { page, limit, offset } = parseOffsetPaging(
+        { page: c.req.query('page'), limit: limitParam },
+        { defaultLimit: FORM_LIST_PAGE_FALLBACK_LIMIT },
+      );
+      const items = list.slice(offset, offset + limit);
       return c.json({
         success: true,
-        data: { items, total, all_total: allTotal, page, limit },
+        data: buildOffsetListResponse({ items, total, all_total: allTotal, page, limit, paging: { limit }, sort: listSort }),
       });
     }
     return c.json({
       success: true,
-      data: { items: list, total, all_total: allTotal, page: 1, limit: list.length },
+      data: buildOffsetListResponse({ items: list, total, all_total: allTotal, page: 1, limit: list.length, paging: { limit: list.length }, sort: listSort }),
     });
   }
   return c.json({ success: true, data });
@@ -597,7 +606,7 @@ export const get__api_forms_id_delete_impact_10 = async (c: Context<Env, "/api/f
     }
     return c.json({ success: true, data: authorized.impact });
   } catch (error) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.forms_id_delete_impact_get_failed");
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 };

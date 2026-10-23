@@ -34,7 +34,7 @@ export default function PeriodPicker({ days, onChange, customRange, onRangeChang
   const options = choices ? choices.map((item) => ({ value: String(item.days), label: item.label })) : supportedDays.map((value) => ({ value: String(value), label: `過去${value}日` }))
   if (onRangeChange) options.push({ value: 'custom', label: '期間を指定' })
   const update = (next: PeriodRange) => { setDraft(next); if (validPeriod(next)) onRangeChange?.(next) }
-  return <div className={styles.root}>
+  return <div className={styles.root} data-period-range={custom || undefined}>
     <SegmentedControl aria-label="集計期間" size={size} options={options} value={custom ? 'custom' : String(days)} onChange={(value) => {
       if (value === 'custom') { setDraft(customRange ?? pastPeriod(days)); setCustomOpen(true) }
       else { setCustomOpen(false); onChange(Number(value)) }

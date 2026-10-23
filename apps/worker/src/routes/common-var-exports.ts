@@ -174,8 +174,7 @@ commonVarExports.get('/api/common-vars/exports', requireRole('owner', 'admin', '
     const jobs = await listCommonVarExportJobs(c.env.DB, accountId, EXPORT_JOBS_LIST_LIMIT);
     return c.json({ success: true, data: jobs.map((job) => exportJobJson(job)) });
   } catch (error) {
-    logger.error("common_var_exports_list_failed");
-    return c.json({ success: false, error: '書き出しの履歴を読み込めませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -223,8 +222,7 @@ commonVarExports.post('/api/common-vars/exports', requireDeliveryAccess('commonV
     c.set('outputAudit', { count: (fresh ?? job).row_count, accountId: accountId, targetId: job.id, phase: 'requested' });
     return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 201);
   } catch (error) {
-    logger.error("common_var_export_create_failed");
-    return c.json({ success: false, error: '書き出しを作れませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -239,8 +237,7 @@ commonVarExports.get('/api/common-vars/exports/:id', requireRole('owner', 'admin
     }
     return c.json({ success: true, data: exportJobJson(job) });
   } catch (error) {
-    logger.error("common_var_export_status_failed");
-    return c.json({ success: false, error: '書き出しの状態を確認できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -302,7 +299,6 @@ commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireDelivery
     const fresh = await getCommonVarExportJob(c.env.DB, next.id);
     return c.json({ success: true, data: exportJobJson(fresh ?? next) }, 201);
   } catch (error) {
-    logger.error("common_var_export_regenerate_failed");
-    return c.json({ success: false, error: 'もう一度書き出せませんでした' }, 500);
+    throw error;
   }
 });

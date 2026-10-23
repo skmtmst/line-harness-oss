@@ -1,5 +1,7 @@
 'use client'
 
+import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
+import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
@@ -443,7 +445,7 @@ export default function HqHomeV8() {
         <ListToolbarRow>
           <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
             {STATUS_FILTERS.map((item) => (
-              <FilterChip key={item.value} selected={status === item.value} icon={item.icon} onChange={() => { setStatus(item.value); resetPage() }}>
+              <FilterChip key={item.value} selected={status === item.value} selectedIcon={false} onChange={() => { setStatus(item.value); resetPage() }}>
                 {`${item.label} ${statusCount(item.value)}`}
               </FilterChip>
             ))}
@@ -514,7 +516,7 @@ export default function HqHomeV8() {
             const warned = state.tone === 'warn'
             const name = account.displayName || account.name
             return (
-              <Card key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
+              <Card frame="flat" key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
                 <div className={styles.cardHead}>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <div className={styles.cardName}>
@@ -600,6 +602,7 @@ export default function HqHomeV8() {
   )
 
   return (
+    <KpiValueMotionProvider scope={`hq-accounts:${jstDate().slice(0, 7)}`}>
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
@@ -683,5 +686,6 @@ export default function HqHomeV8() {
         />
       ) : null}
     </ListPage></SaveErrorScope>
+    </KpiValueMotionProvider>
   )
 }

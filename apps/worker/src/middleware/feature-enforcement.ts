@@ -5,7 +5,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 import type { FeatureId } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from './auth/principal/auth.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { getVisibleLineAccountScope, restrictVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import { accountFeatureAvailability, createFeatureAvailabilityRequestContext, type FeatureAvailability } from '../services/feature-enforcement.js';
 
@@ -806,7 +806,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
     if (bulk) {
       if (!bulk.ok) return bulk.response;
       const bulkStaff = c.get('staff');
-      if (bulkStaff) c.set('staff', { ...bulkStaff, featureEnabledLineAccountIds: bulk.enabled });
+      if (bulkStaff) c.set('staff', restrictVisibleLineAccountScope(dbFor(c.env), bulkStaff, bulk.enabled));
       return next();
     }
     // 対象が引けない要求は下の従来の解決へ（handler が入力検査で400にする）。
@@ -879,7 +879,7 @@ async function enforceAccounts(
     if (enabledIds.length === 0) {
       return unavailableResponse(c, states[0]!.availability);
     }
-    c.set('staff', { ...staff, featureEnabledLineAccountIds: enabledIds });
+    c.set('staff', restrictVisibleLineAccountScope(db, staff, enabledIds));
     await next();
     await appendFeatureScopeMeta(c, excluded);
     return;

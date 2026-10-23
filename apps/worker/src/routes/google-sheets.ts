@@ -188,8 +188,7 @@ function sheetsErrorResponse(c: Context<Env>, error: unknown) {
         return fail(c, 502, 'Googleとの通信に失敗しました', { code: error.kind });
     }
   }
-  logger.error("routes_google_sheets_failed");
-  return fail(c, 500, '予期しないエラーが発生しました');
+  throw error;
 }
 
 // ---------- 状態 ----------
@@ -416,7 +415,7 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
     return c.redirect(adminReturnUrl(c, lineAccountId, stateRow.mode === 'reconnect' ? 'reconnected' : 'connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
-    logger.error("routes_google_sheets_failed");
+    logger.error("google_sheets.integrations_google_sheets_oauth_callback_list_failed");
     return c.redirect(adminReturnUrl(c, lineAccountId, `error:${code}`));
   }
 });

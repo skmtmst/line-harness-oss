@@ -341,7 +341,7 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
           )
           .bind(code_, Date.now(), store.id)
           .run();
-        logger.error("routes_restaurant_delivery_failed");
+        logger.error("restaurant_delivery.register_delivery_uber_failed");
         return c.redirect(uberReturnUrl(c, lineAccountId, `error:${code_}`));
       }
     },
@@ -403,13 +403,13 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
         return c.json({ success: false, code: 'probe_cooldown', retryAfterSec: outcome.retryAfterSec }, 429);
       case 'uber_error':
         // 残すのは分類済みの符号だけ。Uber から返った自由文・本文は保存も表示もしない。
-        logger.error("routes_restaurant_delivery_failed");
+        logger.error("restaurant_delivery.internal_ubereats_sandbox_token_probe_create_failed");
         return c.json(
           { success: false, code: outcome.code, uberCode: outcome.uberCode, status: outcome.status },
           502,
         );
       case 'network_failed':
-        logger.error("routes_restaurant_delivery_failed");
+        logger.error("restaurant_delivery.internal_ubereats_sandbox_token_probe_create_failed");
         return c.json({ success: false, code: 'probe_network_failed' }, 502);
       default:
         return c.json({ success: false, code: 'oauth_not_configured' }, 503);

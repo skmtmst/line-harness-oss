@@ -176,8 +176,13 @@ describe('狭い幅でも題を「…」で切らない（1280・1152）', () =>
 
 
 
-  it('送信枠の数字は比例幅、グラフの日付は棒の真ん中', () => {
-    expect(dashCss).toMatch(/\.quotaNum \{[^}]*font-variant-numeric: normal;/)
+  it('送信枠の残数は0を保ち、グラフの日付は棒の真ん中', async () => {
+    const { SendQuota } = await import('./sections')
+    const metric = { value: { used: 3, limit: 200, remaining: 197 }, state: 'available' as const, reason: null, asOf: null, period: 'this-month' as const }
+    const view = render(<SendQuota delivery={null} metric={metric} onRetry={() => {}} />)
+    expect(screen.getByText('197')).toBeTruthy()
+    view.rerender(<SendQuota delivery={null} metric={{ ...metric, value: { used: 200, limit: 200, remaining: 0 } }} onRetry={() => {}} />)
+    expect(screen.getByText('0')).toBeTruthy()
     const chartCss = readFileSync(join(__dirname, '../../components/shared/bar-chart.module.css'), 'utf8')
     expect(chartCss).toMatch(/\.axisLabel \{[^}]*text-align: center;/)
   })

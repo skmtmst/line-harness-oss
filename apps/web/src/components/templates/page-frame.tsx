@@ -13,9 +13,9 @@ export interface PageHeadingProps {
   titleTabIndex?: number
   /** 既存の枠が外側の余白を持つときだけ指定。 */
   inset?: 'none'
-  /** 題はすべて22/700/32。compact は題の周りの余白・間隔だけを詰める。 */
+  /** 題は32/600/40。compact は題の周りの余白・間隔だけを詰める。 */
   headingSize?: 'regular' | 'compact' | 'large'
-  /** 頭の上の余白を絵の値にする。渡さないときは共通の 24（`--tpl-head-pad-top`）のまま。 */
+  /** 頭の上の余白を絵の値にする。渡さないときは共通の 16（`--tpl-head-pad-top`）のまま。 */
   padTop?: number
   /** 題と説明の間を絵の値にする。渡さないときは共通の 8（`--tpl-head-gap`）のまま。 */
   textGap?: number

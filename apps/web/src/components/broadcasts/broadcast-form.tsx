@@ -45,7 +45,7 @@ import { SaveConflictBand,SaveConflictCompareDialog,useSaveConflict } from '@/co
 import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { Steps } from '@/components/templates'
+import { Steps, StepContent } from '@/components/templates/steps'
 import { CreateColumns } from '@/components/templates/create-page'
 import { useAccount } from '@/contexts/account-context'
 import type { BroadcastApprovalCandidate } from '@/lib/api'
@@ -1249,7 +1249,7 @@ export default function BroadcastForm({
         <p aria-live="polite">{draftStatusLabel || '下書き・未保存'}</p>
       </div>
       {/* ★V8：手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。v7 はこれまでの帯のまま。 */}
-      {<div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} /></div>}
+      {<div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} summaries={currentStep ? { basic: title.trim(), audience: confirmAudienceLabel, message: `${bubbles.length}通・${bubbles.map(bubble => String(bubble.content.text ?? typeLabel(bubble.type))).join(' / ')}`, schedule: sendWhenLabel ?? '未設定' } : undefined} /></div>}
       <Button ref={previewToggleRef} aria-expanded={previewOpen} aria-controls="broadcast-line-preview" className={styles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
     </header>
     {/*
@@ -1282,7 +1282,7 @@ export default function BroadcastForm({
       </p>
     ) : null}
     <CreateColumns>
-      <div className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
+      <StepContent step={currentStep ? currentStepIndex : null} className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
             <section className="rounded-card border content-card bg-canvas p-5">
@@ -1391,7 +1391,7 @@ export default function BroadcastForm({
         <p className="text-danger mt-1 text-xs">{lengthNotice.description}</p>
       </Notice>
     )}
-      </div>
+      </StepContent>
       <BroadcastPreviewRail {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
 

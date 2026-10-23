@@ -3,12 +3,14 @@
 export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, message: string]>> = {
   "AI loop Slack report not configured": ["AI_LOOP_SLACK_REPORT_NOT_CONFIGURED", "AIのSlack報告が未設定です。連携の設定を確認してください。"],
   "Account already in this pool": ["ACCOUNT_ALREADY_IN_THIS_POOL", "このアカウントは、すでにこの流入プールに登録されています。"],
+  "Account unavailable": ["ACCOUNT_UNAVAILABLE", "このLINE公式アカウントは現在利用できません。管理者にお問い合わせください。"],
   "Affiliate not found": ["AFFILIATE_NOT_FOUND", "紹介者が見つかりません。一覧から開き直してください。"],
   "All account insight fetches failed; please retry later": ["ALL_ACCOUNT_INSIGHT_FETCHES_FAILED_PLEASE_RETRY_LATER", "すべてのアカウントの集計を取得できませんでした。時間をおいて読み直してください。"],
   "Already enrolled in this scenario": ["ALREADY_ENROLLED_IN_THIS_SCENARIO", "この友だちは、すでにこのシナリオに登録されています。"],
   "Already reviewed": ["ALREADY_REVIEWED", "すでに確認済みです。最新の状態を確認してください。"],
   "An account-scoped user cannot create an unlinked user": ["AN_ACCOUNT_SCOPED_USER_CANNOT_CREATE_AN_UNLINKED_USER", "担当アカウントが限定されている場合、アカウントに結び付かないユーザーは作成できません。"],
   "Attributed conversion event not found": ["ATTRIBUTED_CONVERSION_EVENT_NOT_FOUND", "対応する成果の記録が見つかりません。一覧から開き直してください。"],
+  "Authorization failed": ["AUTHORIZATION_FAILED", "本人確認に失敗しました。お手数ですが、リンクを開き直してください。"],
   "Auto-reply not found": ["AUTO_REPLY_NOT_FOUND", "自動応答が見つかりません。一覧から開き直してください。"],
   "Automation not found": ["AUTOMATION_NOT_FOUND", "自動化が見つかりません。一覧から開き直してください。"],
   "Bearer token is required": ["BEARER_TOKEN_IS_REQUIRED", "認証情報がありません。ログインし直してください。"],
@@ -47,6 +49,7 @@ export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, m
   "Friend not found": ["FRIEND_NOT_FOUND", "友だちが見つかりません。一覧から開き直してください。"],
   "Friend not found or out of scope": ["FRIEND_NOT_FOUND_OR_OUT_OF_SCOPE", "利用できる友だちが見つかりません。アカウントと権限を確認してください。"],
   "Friend reminder not found": ["FRIEND_REMINDER_NOT_FOUND", "友だちのリマインダが見つかりません。一覧から開き直してください。"],
+  "ID token verification failed": ["ID_TOKEN_VERIFICATION_FAILED", "本人確認の情報を確認できませんでした。お手数ですが、リンクを開き直してください。"],
   "Idempotency-Key header required": ["IDEMPOTENCY_KEY_HEADER_REQUIRED", "操作を確認するキーがありません。画面を開き直してください。"],
   "Idempotency-Key is already used with different content": ["IDEMPOTENCY_KEY_IS_ALREADY_USED_WITH_DIFFERENT_CONTENT", "同じ操作のキーが別の内容で使われています。処理の状態を確認してください。"],
   "Idempotency-Key is invalid": ["IDEMPOTENCY_KEY_IS_INVALID", "操作を確認するキーが正しくありません。画面を開き直してください。"],
@@ -59,7 +62,10 @@ export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, m
   "Integration account is not configured": ["INTEGRATION_ACCOUNT_IS_NOT_CONFIGURED", "連携アカウントが未設定です。連携の設定を確認してください。"],
   "Integration is not configured": ["INTEGRATION_IS_NOT_CONFIGURED", "外部連携が未設定です。連携の設定を確認してください。"],
   "Internal Server Error": ["INTERNAL_SERVER_ERROR", "処理を完了できませんでした。状態を確認し、管理者にお問い合わせください。"],
+  "Internal error": ["INTERNAL_ERROR", "処理を完了できませんでした。時間をおいて、もう一度お試しください。"],
   "Internal server error": ["INTERNAL_SERVER_ERROR", "処理を完了できませんでした。状態を確認し、管理者にお問い合わせください。"],
+  "Identity required": ["IDENTITY_REQUIRED", "本人確認の情報がありません。LINEでログインし直してください。"],
+  "Identity unavailable": ["IDENTITY_UNAVAILABLE", "本人確認を利用できません。LINEログインの設定を管理者に確認してください。"],
   "Invalid ID token": ["INVALID_ID_TOKEN", "本人確認の情報が正しくありません。ログインし直してください。"],
   "Invalid Idempotency-Key": ["INVALID_IDEMPOTENCY_KEY", "操作を確認するキーが正しくありません。画面を開き直してください。"],
   "Invalid JSON": ["INVALID_JSON", "送信内容を読み取れません。入力内容を確認してください。"],
@@ -89,6 +95,7 @@ export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, m
   "Invalid image key": ["INVALID_IMAGE_KEY", "指定した画像を利用できません。画像を選び直してください。"],
   "Invalid kind": ["INVALID_KIND", "種類の指定を確認してください。"],
   "Invalid leapYearPolicy": ["INVALID_LEAP_YEAR_POLICY", "うるう年の扱いの指定を確認してください。"],
+  "Invalid liffId": ["INVALID_LIFF_ID", "お客さま用画面の指定を確認できません。リンクを開き直してください。"],
   "Invalid notification copy": ["INVALID_NOTIFICATION_COPY", "通知の案内文の指定を確認してください。"],
   "Invalid or revoked token": ["INVALID_OR_REVOKED_TOKEN", "本人確認の情報が無効になっています。ログインし直してください。"],
   "Invalid order": ["INVALID_ORDER", "並び順の指定を確認してください。"],
@@ -150,6 +157,7 @@ export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, m
   "This form is no longer accepting responses": ["THIS_FORM_IS_NO_LONGER_ACCEPTING_RESPONSES", "このフォームの受付は終了しています。"],
   "Thread not found": ["THREAD_NOT_FOUND", "会話が見つかりません。一覧から開き直してください。"],
   "Title must be 1-80 characters": ["TITLE_MUST_BE_1_80_CHARACTERS", "タイトルは1〜80文字で入力してください。"],
+  "Token exchange failed": ["TOKEN_EXCHANGE_FAILED", "LINEとの連携を完了できませんでした。時間をおいて、リンクを開き直してください。"],
   "Token mismatch": ["TOKEN_MISMATCH", "本人確認の情報が一致しません。ログインし直してください。"],
   "Too many requests": ["TOO_MANY_REQUESTS", "操作が集中しています。少し待ってからお試しください。"],
   "Too many requests. Please try again later.": ["TOO_MANY_REQUESTS_PLEASE_TRY_AGAIN_LATER", "操作が集中しています。少し待ってからお試しください。"],
@@ -465,6 +473,11 @@ export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, m
   "url is required": ["URL_IS_REQUIRED", "URLを入力してください。"],
   "windowDays must be an integer between 1 and 365": ["WINDOW_DAYS_MUST_BE_AN_INTEGER_BETWEEN_1_AND_365", "集計日数は1〜365の整数で指定してください。"],
 };
+
+/** Reviewed Japanese text for a legacy reason. Unknown reasons use a safe generic guide. */
+export function failureMessage(reason: string, fallback = '処理を完了できませんでした。時間をおいて、もう一度お試しください。'): string {
+  return Object.hasOwn(FAILURE_MESSAGES, reason) ? FAILURE_MESSAGES[reason]![1] : fallback;
+}
 
 /** Canonical codes can be used by new handlers without an English legacy reason. */
 export const FAILURE_CODE_MESSAGES: Readonly<Record<string, string>> = Object.fromEntries(

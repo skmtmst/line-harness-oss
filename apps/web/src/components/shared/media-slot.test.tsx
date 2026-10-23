@@ -131,9 +131,11 @@ it('読み取りのみ：押せる口を出さない', () => {
 })
 
 it('小さい所は文字を減らす', () => {
-  render(<MediaSlot title="画像を追加" size="compact" accept="image/png,image/jpeg" maxBytes={10 * 1024 * 1024} />)
+  render(<MediaSlot title="画像を追加" size="compact" accept="image/png,image/jpeg" maxBytes={10 * 1024 * 1024} onFile={() => {}} />)
   expect(screen.getByText('PNG・JPEG・10MB まで')).toBeTruthy()
   expect(screen.queryByText(/ファイルをアップロード/)).toBeNull()
+  // 案内は狭い枠でも1行のまま省略し、全文は title で見せる。
+  expect(screen.getByTitle('ドラッグ＆ドロップ またはクリック').textContent).toBe('ドラッグ＆ドロップまたはクリック')
 })
 
 it('形式の名前', () => {

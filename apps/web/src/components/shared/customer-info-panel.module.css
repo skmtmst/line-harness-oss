@@ -51,5 +51,14 @@
 
 /* 絵 ：節の中身が文字だけ（メモ・リッチメニュー名）のときも、行の値と同じ本文の大きさ。 */
 .content { color: var(--color-ink); font-size: var(--polish-text-body); line-height: var(--tpl-inbox-row-preview-lh); }
-/* 受信箱の右の列：見出し84。「次の自動配信」が値にくっつかない。 */
-.panel[data-label-width='wide'] { --tpl-customer-label: 84px; }
+.viewport { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable both-edges; }
+
+/* 列幅は実際の項目名で決め、値と出どころの操作を右端まで使う。 */
+:root .rows { display: grid; grid-template-columns: max-content minmax(0, 1fr); row-gap: var(--space-4); column-gap: var(--space-8); }
+:root .rows > .row { grid-column: 1 / -1; grid-template-columns: subgrid; min-height: var(--space-24); align-items: center; }
+:root .rows > .row[data-layout='stack'] { grid-template-columns: minmax(0, 1fr); }
+:root .row dd > :first-child { flex: 1; min-width: 0; }
+:root .row dd > :nth-child(2) { flex: none; margin-inline-start: auto; opacity: 0.45; }
+:root .row:is(:hover, :focus-within) dd > :nth-child(2) { opacity: 1; }
+/* 受信箱の外側が左右24を持つので、内側で同じ余白を重ねない。 */
+:root .panel[data-label-width='wide'] { --tpl-customer-label: max-content; padding: 0; }

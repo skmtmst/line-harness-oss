@@ -19,17 +19,18 @@ import { emptyValue } from '@/components/shared/empty-value';
 import type { useFieldsTab } from './use-fields-tab'
 import { fieldTypeWord } from './fields-list-model'
 
-export default function FieldsTable({ canEdit, host, items, status, error, setQuery, type, setType, setFolderFilter, pageSize, page, setPage, dragId, setDragId, leavingId, openMenuId, setOpenMenuId, openFieldDetail, load, visible, pages, currentPage, liveOrder, bodyRef, move, keyboardMove, rowMenuItems, fieldContextItems, folderDotOf, filterActive, createButton }: ReturnType<typeof useFieldsTab>) {
+export default function FieldsTable({ canEdit, host, items, loaded, status, error, setQuery, type, setType, setFolderFilter, pageSize, page, setPage, dragId, setDragId, leavingId, openMenuId, setOpenMenuId, openFieldDetail, load, visible, pages, currentPage, liveOrder, bodyRef, move, keyboardMove, rowMenuItems, fieldContextItems, folderDotOf, filterActive, createButton }: ReturnType<typeof useFieldsTab>) {
+  const ready = loaded && (status === 'ready' || status === 'loading')
   return status === 'forbidden' ? (
     <ListState kind="forbidden" title="友だち情報欄を見る権限がありません" />
   ) : status === 'error' ? (
     <ListState kind="error" title="友だち情報欄を読み込めませんでした" description={error || undefined} onRetry={() => void load()} />
-  ) : status === 'ready' && items.length === 0 ? (
+  ) : ready && items.length === 0 ? (
     <ListState kind="empty" title="まだ項目はありません" description="友だちに入力してもらう項目（誕生日・住まいなど）を作れます。" action={createButton(false)} />
-  ) : status === 'ready' && visible.length === 0 ? (
+  ) : ready && visible.length === 0 ? (
     <ListState kind="empty" emptyPreset="filtered" title="条件に合うものはありません" action={filterActive ? <Button type="button" onClick={() => { setQuery(''); setType('all'); setFolderFilter('') }}>条件を外す</Button> : undefined} />
   ) : (
-    <DelayedSkeleton loading={status !== 'ready'} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
+    <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
       <DataTable className={styles.table}>
         <thead>
           <TableHeadRow>

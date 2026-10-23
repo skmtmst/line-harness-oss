@@ -1,3 +1,4 @@
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { issueStampQr, storefrontQr, stampQrStatus, revokeStampQr, redeemStampQr } from '../services/visit-stamp-qr.js';
@@ -164,7 +165,7 @@ visitStamps.post('/api/liff/visit-stamps/cards/:id/paper-requests',inputJsonBoun
 
 visitStamps.get('/api/visit-stamps/entries',async c=>{
  const a=await account(c,c.req.query('accountId')),db=dbFor(c.env),from=c.req.query('from'),to=c.req.query('to'),friend=c.req.query('friendId'),kind=c.req.query('kind');
- const page=Number(c.req.query('page')??1),pageSize=Number(c.req.query('pageSize')??50);
+ const page=listQueryNumber(c.req.query('page'), 1),pageSize=listQueryNumber(c.req.query('pageSize'), 50);
  if(!Number.isSafeInteger(page)||page<1||!Number.isSafeInteger(pageSize)||pageSize<1||pageSize>200||!Number.isSafeInteger((page-1)*pageSize)||(from&&!Number.isFinite(Date.parse(from)))||(to&&!Number.isFinite(Date.parse(to)))||(from&&to&&Date.parse(from)>=Date.parse(to))
  ||(kind&&!['visit','manual','paper','redeem','reverse','expire','restore'].includes(kind)))throw new StampError('期間・種類・ページを確認してください');
  if(friend)stampId(friend);
@@ -174,7 +175,7 @@ visitStamps.get('/api/visit-stamps/entries',async c=>{
  const args=[a,from??null,from??null,to??null,to??null,friend??null,friend??null,friend??null,a,kind??null,kind??null];
  const total=await db.prepare(`SELECT COUNT(*) AS n FROM visit_stamp_entries e WHERE ${where}`).bind(...args).first<{n:number}>();
  const items=(await db.prepare(`SELECT e.id,e.card_id AS cardId,e.friend_id AS friendId,e.line_account_id AS accountId,e.kind,e.delta,e.actor_id AS actorId,e.reason,e.created_at AS createdAt,e.original_id AS originalId FROM visit_stamp_entries e WHERE ${where} ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?`).bind(...args,pageSize,(page-1)*pageSize).all()).results;
- return c.json({success:true,data:{items,total:total!.n,page,pageSize}});
+ return c.json({success:true,data:buildOffsetListResponse({ items,total:total!.n,page,pageSize, paging: { limit: pageSize }, sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'desc' }] })});
 });
 visitStamps.get('/api/liff/visit-stamps/cards/:id/paper-requests',async c=>{
  const x=await customer(c),card=c.req.param('id');await stampCard(x.db,card,x.tenantId);await stampWallet(x.db,card,x.friendId,x.a);

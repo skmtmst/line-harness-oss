@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { CircleCheck, Circle, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
+import { RowStatusActions } from '@/components/shared/row-actions'
 import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -91,12 +92,13 @@ function SetupRow({ row, onOpenStep, onPreparing }: { row: TodoRow; onOpenStep: 
         <span className={styles.rowTitle}>{row.title}</span>
         <span className={styles.rowNote}>{row.note}</span>
       </span>
-      <StatusBadge tone={row.badge.tone} dot>{row.badge.label}</StatusBadge>
+      <RowStatusActions status={<StatusBadge tone={row.badge.tone} dot>{row.badge.label}</StatusBadge>}>
       {row.action.preparing
-        ? <Button onClick={() => onPreparing(row.action.preparing!)}>{row.action.label}</Button>
+        ? <Button presentation="row-action" textTone={row.alert ? 'accent' : 'ink'} onClick={() => onPreparing(row.action.preparing!)}>{row.action.label}</Button>
         : row.action.href
-          ? <Button href={row.action.href}>{row.action.label}</Button>
-          : <Button onClick={() => onOpenStep(row.action.step ?? 0)}>{row.action.label}</Button>}
+          ? <Button presentation="row-action" textTone={row.alert ? 'accent' : 'ink'} href={row.action.href}>{row.action.label}</Button>
+          : <Button presentation="row-action" textTone={row.alert ? 'accent' : 'ink'} onClick={() => onOpenStep(row.action.step ?? 0)}>{row.action.label}</Button>}
+      </RowStatusActions>
     </li>
   )
 }

@@ -373,7 +373,7 @@ export default function StaffNewV8() {
             : menusError !== null ? <ListState kind="error" title="メニューを読み込めませんでした"
               description={isForbiddenOrRateLimited(menusError) ? undefined : '通信の不具合などでメニュー一覧を読み込めませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
               error={menusError} onRetry={() => setMenusReloadKey(value => value + 1)} />
-            : menus.length === 0 ? <Notice tone="info">まだメニューがありません。先に予約設定の「メニュー」から登録してください。</Notice>
+            : menus.length === 0 ? <Notice tone="info" action={<Button variant="text" size="inline" href="/booking/menus">メニューへ →</Button>}>まだメニューがありません。先に予約設定の「メニュー」から登録してください。</Notice>
             : <Field label="予約を受けられるメニュー" required error={fieldErrors.menus && offered.size === 0 ? fieldErrors.menus : undefined}>
                 <EntitySelect aria-label="予約を受けられるメニュー" noun="予約メニュー" size="full" values={[...offered]}
                   onChange={(ids) => setOffered(new Set(ids))} invalid={!!fieldErrors.menus && offered.size === 0}

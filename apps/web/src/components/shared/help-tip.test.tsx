@@ -73,10 +73,12 @@ describe('補足の「？」', () => {
     expect(more.getAttribute('href')).toBe('/manual#word')
   })
 
-  it('印は「?」の文字で、丸いアイコンは出さない', () => {
+  it('印は丸の中の「?」の図形で、読み上げは説明の名前のまま', () => {
     const { container } = render(<HelpTip label="人数の説明">送る相手の数。</HelpTip>)
-    expect(container.querySelector('button')!.textContent).toBe('?')
-    expect(container.querySelector('svg')).toBeNull()
+    const button = container.querySelector('button')!
+    expect(button.querySelector('svg[data-help-mark]')).not.toBeNull()
+    expect(button.textContent).toBe('')
+    expect(button.getAttribute('aria-label')).toContain('人数の説明')
   })
 })
 

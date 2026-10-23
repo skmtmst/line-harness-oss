@@ -249,14 +249,23 @@ html:root .headerStacked { padding: 0; }
 /* 内側の薄い面は平らにする。form/asideの外枠を重ねない。 */
 html:root .card[data-card-surface='muted'] { border: 0; outline: revert; box-shadow: none; background: var(--color-surface-pearl); }
 
-html:root .card[data-card-selected] { --card-edge: var(--color-accent-deep); background: var(--color-accent-soft); }
+html:root .card[data-card-selected] { --card-edge: var(--color-control-border); background: var(--polish-selection-bg); }
 
 /* 内側の線だけの面。外枠・影で本文の寸法を増やさず、既存のカードは変えない。 */
 html:root .card[data-card-frame='ring'] {
   border: 0; box-shadow: var(--tpl-sa-ring);
 }
 
+/* 一覧の平らな面。内側の線なので、既存の本文幅・高さは変えない。 */
+html:root .card[data-card-frame='flat'] {
+  border: 0;
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
 /* 情報内と操作前の間は親のgapを1回だけ使う。高さ合わせで増えた分だけ操作の上へ回す。 */
 html:root .withActions { display: flex; flex-direction: column; }
-.information { display: flex; flex-direction: column; min-width: 0; gap: inherit; }
-.bottomActions { margin-top: auto; min-width: 0; }
+.information { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: inherit; }
+.information > :last-child { margin-top: auto; }
+.bottomActions { min-width: 0; }

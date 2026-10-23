@@ -13,7 +13,9 @@ import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, type AuditEventItem, type AuditEventSummary } from '@/lib/api'
 import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { formatDateTime } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const EMPTY_SUMMARY: AuditEventSummary = {
@@ -217,12 +219,12 @@ export default function LoginAudit({ userId }: { userId?: string }) {
   const summaryValue = (value: number): number | null => (loadedPeriod === null ? null : value)
 
   return <div id="staff-audit">
-    <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-busy={loading}>
+    <KpiBand data-design="KPIs" className="mb-4" aria-busy={loading}>
       <AuditKpi label={summaryTitle} value={summaryValue(summary.total)} note={summaryNote} />
       <AuditKpi label="消した操作" value={summaryValue(summary.deleted)} note="削除として記録された操作" />
       <AuditKpi label="配信した操作" value={summaryValue(summary.sent)} note="送信・公開として記録された操作" />
       <AuditKpi label="いつもと違う場所から" value={summaryValue(summary.suspiciousLogins)} note="見なれない場所からのログイン" attention={summary.suspiciousLogins > 0} />
-    </div>
+    </KpiBand>
     <Notice tone="info" className="mb-4">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</Notice>
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <SearchField aria-label="人の名前・操作の内容で検索" value={query} onChange={setQuery} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1" />
@@ -260,5 +262,5 @@ export default function LoginAudit({ userId }: { userId?: string }) {
 }
 
 function AuditKpi({ label, value, note, attention = false }: { label: string; value: number | null; note: string; attention?: boolean }) {
-  return <div className="flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4"><p className="text-xs font-semibold leading-normal text-ink-faint">{label}</p><p className={`text-xl font-medium leading-normal tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value === null ? '—' : <>{formatNumber(value)}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></>}</p><p className="text-xs leading-normal text-ink-faint">{note}</p></div>
+  return <KpiCard presentation="band" title={label} value={value} unit="件" detail={note} valueTone={attention ? 'danger' : 'default'} />
 }

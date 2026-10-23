@@ -1,4 +1,5 @@
 import { escapeHtml as escapeHtmlAttribute } from './lib/html-escape.js';
+import { failureMessage } from './lib/failure-messages.js';
 import { logger, resumeInvocation, withInvocation } from '@line-crm/shared/server';
 import { setHolidayCoverageWarningHandler } from '@line-crm/shared';
 import { stagingQa } from './routes/staging-qa.js';
@@ -136,7 +137,7 @@ import { autoReplies } from './routes/auto-replies.js';
 import { autoReplyRuns } from './routes/auto-reply-runs.js';
 import { adminAuth } from './routes/admin-auth.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
-import { timingMark, timingStart } from './lib/server-timing.js';
+import { timingHandler, timingMiddleware, timingStart } from './lib/server-timing.js';
 import booking from './routes/booking.js';
 import { bookingEntitlements } from './routes/booking-entitlements.js';
 import { bookingPayments } from './routes/booking-payments.js';
@@ -253,6 +254,7 @@ export const ADMIN_REQUEST_HEADERS = [
 // SDK/MCP callers send no Origin header and are unaffected.
 // 検索に出さない：本物の robots.txt と、全部の応答に X-Robots-Tag（リリース前点検 2026-10-07）。
 setHolidayCoverageWarningHandler(() => logger.warn('src_japanese_holidays_warn'));
+app.use('*', timingStart());
 app.use('*', apiContractMiddleware);
 app.use('*', noindexHeaderMiddleware);
 // Establish an invocation-local outbound boundary before any auth or error reporting.
@@ -266,52 +268,46 @@ app.use('*', async (c, next) => {
 });
 app.get('/robots.txt', robotsTxtHandler);
 
-// 段ごとの経過時間を Server-Timing で返す（V6R-CX-a）。ログイン済みの職員への応答だけ。
-app.use('*', timingStart());
-app.use('*', cors({
+// 段とD1の待ちを、認証前の拒否・公開応答も含めて数値だけで返す。
+app.use('*', timingMiddleware('cors', cors({
   origin: (origin, c) => resolveCorsOrigin(c.env, origin, c.req.url),
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: [...ADMIN_REQUEST_HEADERS],
-  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated', 'X-Request-ID'],
+  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated', 'X-Request-ID', 'Server-Timing'],
   maxAge: 600,
-}));
+})));
 
-app.use('*', timingMark('cors'));
 // Rate limiting — runs before auth to block abuse early
 app.use('*', htmlSecurityMiddleware);
-app.use('*', rateLimitMiddleware);
-app.use('*', timingMark('rate'));
+app.use('*', timingMiddleware('rate', rateLimitMiddleware));
 
 // LIFF/public routes skip staff auth. Apply their tenant wall before auth and
 // before any route handler can persist a form/booking/member write.
-app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
-app.use('/api/events/liff/*', tenantPublicBoundaryMiddleware);
+app.use('/api/liff/*', timingMiddleware('tenant', tenantPublicBoundaryMiddleware));
+app.use('/api/events/liff/*', timingMiddleware('tenant', tenantPublicBoundaryMiddleware));
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
-app.use('*', authenticatedRateLimitMiddleware);
-app.use('/api/*', outputAuditMiddleware);
-app.use('*', timingMark('auth'));
+app.use('*', timingMiddleware('rate', authenticatedRateLimitMiddleware));
+app.use('/api/*', timingMiddleware('audit', outputAuditMiddleware));
 
 // Tenant boundary — authenticated admin APIs may only select LINE accounts
 // that belong to the signed-in staff member's tenant.
-app.use('*', tenantScopeMiddleware);
-app.use('*', timingMark('tenant'));
+app.use('*', timingMiddleware('tenant', tenantScopeMiddleware));
 // 代理ログイン中の個人情報の伏せ字。認証の後ろ、各ルートの前。
-app.use('/api/*', piiMaskMiddleware);
-app.use('/api/*', privateImageResponseMiddleware);
-app.use('/api/*', timingMark('pii'));
+app.use('/api/*', timingMiddleware('pii', piiMaskMiddleware));
+app.use('/api/*', timingMiddleware('pii', privateImageResponseMiddleware));
 
 // 認証済み管理APIの変更を共通監査へ残す。route固有の監査がある場合は重複させない。
-app.use('/api/*', businessAuditMiddleware);
-app.use('/api/*', timingMark('audit'));
+app.use('/api/*', timingMiddleware('audit', businessAuditMiddleware));
 
 // 機能設定は認証・tenant scope の後、各 route handler の前で強制する。
 // manifest と実 route の全件照合を必須テストにした上で、未分類も fail closed にする。
-app.use('/api/*', featureEnforcementMiddleware);
-app.use('/api/*', timingMark('feature'));
-app.use('/api/*', sensitiveOperationMiddleware);
+app.use('/api/*', timingMiddleware('feature', featureEnforcementMiddleware));
+app.use('/api/*', timingMiddleware('sensitive', sensitiveOperationMiddleware));
+
+app.use('*', timingHandler());
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
@@ -360,6 +356,8 @@ app.route('/', liffRoutes);
 app.route('/', liffNotificationPreferences);
 app.route('/', affiliateSelfRoutes);
 app.route('/', affiliatePayouts);
+
+app.use('*', timingHandler());
 
 // Mount route groups — Round 3
 app.route('/', webhooks);
@@ -988,7 +986,7 @@ app.get('/o', async (c) => {
 
   const liffId = c.req.query('liffId') || '';
   if (!/^[0-9]+-[A-Za-z0-9]+$/.test(liffId)) {
-    return c.text('Invalid liffId', 400);
+    return c.text(failureMessage('Invalid liffId'), 400);
   }
 
   const liffParams = new URLSearchParams();

@@ -257,7 +257,7 @@ async function createFriendForRecipient(
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
-      logger.error("routes_line_proxy_failed");
+      logger.error("line_proxy.create_friend_for_recipient_failed");
     }
 
     const friend = await upsertFriend(db, {
@@ -278,7 +278,7 @@ async function createFriendForRecipient(
     }
     return friend;
   } catch (err) {
-    logger.error("routes_line_proxy_failed");
+    logger.error("line_proxy.create_friend_for_recipient_failed");
     return null;
   }
 }
@@ -463,7 +463,7 @@ async function logProxySend(
       logger.warn("routes_line_proxy_warn");
     }
   } catch (err) {
-    logger.error("routes_line_proxy_failed");
+    logger.error("line_proxy.log_proxy_send_failed");
   }
 }
 
@@ -639,7 +639,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
         signal: AbortSignal.timeout(15_000),
       });
     } catch (err) {
-      logger.error("routes_line_proxy_failed");
+      logger.error("line_proxy.proxy_handler_failed");
       return c.json({ message: 'Upstream request failed' }, 502);
     }
 

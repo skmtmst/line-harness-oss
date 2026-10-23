@@ -3,7 +3,7 @@
 import { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type SingleProps, type EntityPickerWindowProps, type MultiBodyProps, type MultiProps, type FieldBase, type SingleField, type MultiField } from './entity-picker-types'
 export { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type EntityPickerWindowProps } from './entity-picker-types'
 
-import { ChevronRight, ArrowUpRight, Plus, type LucideIcon } from 'lucide-react'
+import { ChevronDown, ArrowUpRight, Plus, type LucideIcon } from 'lucide-react'
 import { folderDisplayColor, FolderDot } from './folder-dot'
 import { useFieldContext, joinDescribedBy } from './field-context'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
@@ -297,13 +297,13 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
     {Icon ? <Icon className={styles.fieldIcon} size={16} aria-hidden="true" /> : null}
     {selection ? <span className={styles.fieldChips}>{selection}</span> :
     <span className={styles.fieldValue}>
-      {empty ? <span className={styles.fieldPlaceholder}>{placeholder ?? `${noun}を選ぶ`}</span> : <>
+      {empty ? <span className={styles.fieldPlaceholder} title={placeholder ?? `${noun}を選ぶ`}>{placeholder ?? `${noun}を選ぶ`}</span> : <>
         <>{valuePrefix ? <span className={styles.fieldName} title={name}>{name}</span> : <TagPill size={compact ? 'sm' : 'md'} name={name} color={color} aria-label={`選択中の${noun}：${name}`} />}</>
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}
     </span>}
     {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
-    {(readOnly && empty) || (actionHidden === true && !empty) ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix && !actionHidden ? actionLabel : null}<ChevronRight size={16} /></span>}
+    {(readOnly && empty) || (actionHidden === true && !empty) ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix && !actionHidden ? actionLabel : null}<ChevronDown size={16} /></span>}
   </div>
 }
 
