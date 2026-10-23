@@ -22,7 +22,7 @@
 .accounts li:first-child { border-top: 0; }
 .accountsNum { text-align: right; font-variant-numeric: tabular-nums; }
 .sender { display: inline-flex; align-items: center; gap: 8px; }
-.senderIcon { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--radius-pill); background: var(--color-accent-soft); color: var(--color-accent-deep); font-size: 12px; font-weight: 700; object-fit: cover; }
+.senderIcon { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--radius-pill); background: var(--color-surface-pearl); color: var(--color-ink-secondary); font-size: 12px; font-weight: 700; object-fit: cover; }
 .caution { width: 100%; align-self: stretch; box-sizing: border-box; display: flex; gap: 8px; margin-top: 16px; padding: 12px; border-radius: var(--radius-segment); background: var(--color-status-warn-soft); color: var(--color-ink); font-size: var(--text-caption); line-height: 18px; }
 .caution svg { flex: none; margin-top: 1px; color: var(--color-warning); }
 .caution p { margin: 2px 0 0; }

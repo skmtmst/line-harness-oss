@@ -31,8 +31,8 @@
 :global(:root) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 /* 題とタブの間は headingText の gap が持つ。二重に余白を足さない。 */
 :global(:root) .headingTabs { margin-top: 0; }
-/* メタ情報を持つ詳細のタブは、頭の段間8を保つ。 */
-:global(:root) [data-page-template='detail'] .headingTabs { margin-top: var(--tpl-head-gap); }
+/* 詳細のタブも headingText の段間だけを使う。 */
+:global(:root) [data-page-template='detail'] .headingTabs { margin-top: 0; }
 /* タブ付きの頭は固定絵の下余白16。通常の頭の12とは分ける。 */
 :global(:root) .heading:has(.headingTabs) { padding-bottom: var(--tpl-folder-pad-block); }
 /* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
@@ -52,8 +52,8 @@
 :global(:root) .explanation { width: 100%; }
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar:is([data-toolbar-spacing='section'], [data-toolbar-spacing='stats']) { padding-block: var(--polish-space-card); }
-/* 題から最初の道具・数の帯までは道具側の16だけ。間にタブ・帯・閲覧案内がある板は対象外。 */
-:global(:root) .frame > .heading:has(+ .listBody > .split:first-child > .main > .toolbar[data-toolbar-spacing]) { padding-bottom: 0; }
+/* 題から最初の道具・数の帯までは道具側の余白だけ。間にタブ・帯・閲覧案内がある板は対象外。 */
+:global(:root) .frame > .heading:has(+ .listBody > .split:first-child > .main > .toolbar:not([data-collapsed-only])) { padding-bottom: 0; }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
@@ -68,7 +68,7 @@
 @container v8-page (max-width: 639px) {
   :global(:root) .listCards, :global(:root) .listCards:is([data-card-columns], [data-card-narrow-columns]) { grid-template-columns: minmax(0, 1fr); }
 }
-:global(:root) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
+:global(:root) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side); }
 :global(:root) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global(:root) .folders { box-sizing: content-box; width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-row); }
 /*
@@ -314,8 +314,8 @@
  * 横いっぱいに広げない（部品 Steps が中身の幅）。題の行の右は操作（actions）だけ。
  */
 :global(:root) .steps { min-width: 0; }
-/* どの型でも手順は頭の最後の行（題と説明の下）。作る型は下で並びを決め直す。 */
-:global(:root) .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-head-gap); }
+/* 手順は頭の最後の行。前の段との間は heading の row-gap だけが持つ。 */
+:global(:root) .heading > .steps { flex-basis: 100%; order: 5; margin-top: 0; }
 /* ：列の先頭へ直接渡された作る操作も、FolderPanel と同じ形。 */
 :global(:root) .folders > :global(a):first-child,
 :global(:root) .folders > :global(button):first-child {
@@ -325,8 +325,8 @@
 :global(:root) .folders > :global([aria-hidden='true']):first-child {
   height: var(--tpl-folder-create-space-col-h);
 }
-/* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（ フォルダの列：間2＋14＋2） */
-:global(:root) .folders > :global(a) + * , :global(:root) .folders > :global(button) + * { margin-top: var(--polish-space-row); }
+/* 操作の次も folders の gap だけを使う。 */
+:global(:root) .folders > :global(a) + * , :global(:root) .folders > :global(button) + * { margin-top: 0; }
 /* ★V8 作る型の頭の並び（q1xNMz）：題（右に操作）→ 説明 → 手順。 */
 :global(:root) [data-page-template='create'] .heading > .headingText { display: contents; }
 :global(:root) [data-page-template='create'] .heading > .headingText > .titleRow { flex: 1 1 0; order: 1; }
@@ -336,7 +336,7 @@
 :global(:root) [data-page-template='create'] .heading > .headingText > .subtitle { flex-basis: 100%; order: 3; }
 :global(:root) [data-page-template='create'] .heading[data-heading-size='compact'] { row-gap: var(--tpl-compact-gap); }
 :global(:root) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
-:global(:root) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-top-gap); }
+:global(:root) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: 0; }
 
 /* 案内と本文の間を詰める板。指定した一覧・詳細だけに効く。 */
 :global(:root) [data-page-template='list'] .heading[data-bottom-spacing='compact'] { padding-bottom: var(--tpl-head-gap); }
@@ -372,7 +372,7 @@
   .detailColumns[data-presentation='notification'] .detailColumnAside[data-expanded] { display: flex; }
 }
 
-:global(:root) [data-page-template='create'] .heading[data-steps-spacing='compact'] > .steps { margin-top: var(--tpl-steps-compact-top-gap); }
+:global(:root) [data-page-template='create'] .heading[data-steps-spacing='compact'] > .steps { margin-top: 0; }
 /* 広い設定本文の口。画面の CSS から型の余白・幅を上書きしない。 */
 :global(:root) .settings[data-content-layout] { gap: 0; }
 :global(:root) .settingsContent[data-content-layout] { max-width: none; }
@@ -557,3 +557,8 @@
 }
 
 .detailColumns:not([data-has-aside]) { grid-template-columns: minmax(0, 1fr); margin-right: 0; }
+
+/* 本文の最初が段なら、その段が上の間を持つ。道具の直後と末尾は親側だけ。 */
+:global(:root) .frame > .heading:has(+ .listBody > .split:first-child > .main > .content:first-child > .listSection) { padding-bottom: 0; }
+:global(:root) .toolbar + .content > .listSection:first-child { padding-top: 0; }
+:global(:root) .content > .listSection:last-child { padding-bottom: 0; }

@@ -516,7 +516,7 @@ export default function HqHomeV8() {
             const warned = state.tone === 'warn'
             const name = account.displayName || account.name
             return (
-              <Card key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
+              <Card frame="flat" key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
                 <div className={styles.cardHead}>
                   <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
                   <div className={styles.cardName}>

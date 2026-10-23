@@ -256,6 +256,14 @@ html:root .card[data-card-frame='ring'] {
   border: 0; box-shadow: var(--tpl-sa-ring);
 }
 
+/* 一覧の平らな面。内側の線なので、既存の本文幅・高さは変えない。 */
+html:root .card[data-card-frame='flat'] {
+  border: 0;
+  outline: 1px solid var(--card-edge);
+  outline-offset: -1px;
+  box-shadow: none;
+}
+
 /* 情報内と操作前の間は親のgapを1回だけ使う。高さ合わせで増えた分だけ操作の上へ回す。 */
 html:root .withActions { display: flex; flex-direction: column; }
 .information { display: flex; flex-direction: column; min-width: 0; gap: inherit; }

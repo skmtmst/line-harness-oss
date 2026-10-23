@@ -10,8 +10,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   as?: 'section' | 'article'
   /** 情報とは別に下端へ寄せる操作。間隔はカードのgapだけが持つ。 */
   actions?: ReactNode
-  /** ring は寸法を取らない内側の1px線。手順の案内など、影を重ねない面。 */
-  frame?: 'raised' | 'inset' | 'ring'
+  /** flat は影なしの1px線。raised は従来の影、ring は内側の線だけ。 */
+  frame?: 'raised' | 'flat' | 'inset' | 'ring'
   layout?: 'block' | 'vertical' | 'horizontal' | 'media'
   /**
    * 設定の箱。'settings' は16の余白・10の間（EC設定）。
@@ -47,7 +47,7 @@ function hasSides(value: string): boolean {
   return /\s/.test(flat.trim())
 }
 
-/** Pencil V5のダッシュボードカードを正本にした共通の面。 */
+/** 情報の面。平らな一覧と、影を持つ面を明示して使い分ける。 */
 export default function Card({
   children,
   as: CardTag = 'section',
@@ -99,7 +99,7 @@ export default function Card({
 
   return (
     <CardTag ref={cardRef} className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
-      data-card-frame={frame === 'ring' ? frame : undefined} data-card-selected={selected || undefined} data-card-padding={padding} data-card-variant={variant}
+      data-card-frame={frame === 'ring' || frame === 'flat' ? frame : undefined} data-card-selected={selected || undefined} data-card-padding={padding} data-card-variant={variant}
       data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
       data-card-spacing-sides={contentPadding && hasSides(contentPadding) ? '' : undefined}

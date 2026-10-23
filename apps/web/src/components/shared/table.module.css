@@ -10,7 +10,7 @@
   padding: 0 12px;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 500;
+  font-weight: var(--polish-weight-label);
   white-space: nowrap;
   text-align: left;
   vertical-align: middle;
@@ -141,7 +141,7 @@
 :root .headRow[data-presentation='embedded'] .cell {
   height: var(--tpl-ev-fr-head-h);
   padding: 0 var(--tpl-cell-gap-half);
-  font-weight: 600;
+  font-weight: var(--polish-weight-label);
 }
 /* 端の列は行の端の余白（--tpl-row-pad-side）にそろえる。見出しだけ内側にずれていた。 */
 :root .headRow[data-presentation='embedded'] .cell:first-child { padding-left: var(--tpl-row-pad-side); }
