@@ -11,6 +11,7 @@
 - [最初に読む：製品とコードの入口](START-HERE.md)
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
+- [500社・5,000 LINEアカウントの容量点検と移行条件](multi-tenant-scale.md)
 
 ## 使う人の手引き
 
