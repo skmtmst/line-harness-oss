@@ -16,13 +16,14 @@ import React,{useState} from 'react';import {createRoot} from 'react-dom/client'
 import ReservationBoard from './src/components/shared/reservation-board';
 import Dialog from './src/components/shared/dialog';
 import Drawer from './src/components/shared/drawer';
+import Button from './src/components/shared/button';
 const statuses=['requested','confirmed','confirmed','no_show'];
 const entries=statuses.map((status,i)=>({id:String(i),kind:'seats',version:1,scopeId:'s',startsAt:'2026-09-03T09:00:00Z',endsAt:'2026-09-03T10:30:00Z',status,customerName:['承認を待つ予約','期限付きの仮押さえ','確定した予約','無断キャンセル'][i],guestCount:2,resourceIds:['t'+i],resourceLabel:'卓'+i,source:'phone',courseName:null,note:null,dining:null,holdExpiresAt:i===1?'2026-09-03T10:00:00Z':null}));
 function Fixture(){const [kind,setKind]=useState(''),[lines,setLines]=useState(1),[opened,setOpened]=useState('');const description=lines===1?'説明の文です。':<>説明の一行目です。<br/>説明の二行目です。</>;return <main>
 <ReservationBoard entries={entries} resources={entries.map(e=>({id:e.resourceIds[0],label:e.resourceLabel,active:true,capacity:2}))} dates={['2026-09-03']} onOpen={setOpened}/><output>{opened}</output>
-{['confirm','create','drawer'].map(k=><button key={k} onClick={()=>setKind(k)}>{k}</button>)}
+{['confirm','create','drawer','inset'].map(k=><button key={k} onClick={()=>setKind(k)}>{k}</button>)}
 <button onClick={()=>setLines(lines===1?2:1)}>説明を切り替える</button>
-{kind==='drawer'?<Drawer open title="引き出しの題" description={description} onClose={()=>setKind('')}><p>本文</p></Drawer>:<Dialog open={!!kind} title={kind==='create'?'作る窓の題':'確認の題'} description={description} steps={kind==='create'?<span>手順</span>:undefined} confirmation={kind==='confirm'} onCancel={()=>setKind('')} onConfirm={()=>setKind('')} confirmLabel="保存する">{kind==='create'?<input aria-label="名前"/>:null}</Dialog>}
+{kind==='drawer'?<Drawer open title="引き出しの題" description={description} onClose={()=>setKind('')} footer={<Button onClick={()=>setKind('')}>保存する</Button>}><p>本文</p></Drawer>:<Dialog open={!!kind} layout={kind==='inset'?'inset':undefined} title={kind==='create'?'作る窓の題':'確認の題'} description={description} steps={kind==='create'?<span>手順</span>:undefined} confirmation={kind==='confirm'} onCancel={()=>setKind('')} onConfirm={()=>setKind('')} confirmLabel="保存する">{kind==='create'?<input aria-label="名前"/>:null}</Dialog>}
 </main>}createRoot(document.getElementById('root')).render(<Fixture/>);
 ` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
@@ -89,7 +90,7 @@ for (const width of [1152,1440]) test(`予約と窓の文字が切れず、状�
     assert.equal(metrics.legend.filter(x=>x.startsWith('要対応')).length,1)
     await page.getByRole('button',{name:/承認を待つ予約/}).click()
     assert.equal(await page.locator('output').textContent(),'0')
-    for (const kind of ['confirm','create','drawer']) for (const lines of [1,2]) {
+    for (const kind of ['confirm','create','drawer','inset']) for (const lines of [1,2]) {
       await page.getByRole('button',{name:kind,exact:true}).click()
       const panel=page.getByRole('dialog')
       await panel.waitFor()
@@ -98,8 +99,15 @@ for (const width of [1152,1440]) test(`予約と窓の文字が切れず、状�
         const h=header.getBoundingClientRect(),d=desc.getBoundingClientRect()
         return {gap:h.bottom-parseFloat(getComputedStyle(header).borderBottomWidth)-d.bottom,lineCount:d.height/parseFloat(getComputedStyle(desc).lineHeight)}
       })
-      assert.equal(gap.gap,16,`${kind} ${lines}行`)
+      assert.equal(gap.gap,kind==='inset'?0:24,`${kind} ${lines}行`)
       assert.equal(gap.lineCount,lines)
+      const actionGap=await panel.evaluate(e=>{
+        const actions=e.querySelector('[data-dialog-actions]')??e.querySelector('[data-window-actions]'),button=actions?.querySelector('button,a')
+        if(!button)return null
+        const b=actions.getBoundingClientRect(),r=button.getBoundingClientRect()
+        return r.top-b.top-parseFloat(getComputedStyle(actions).borderTopWidth)
+      })
+      if(actionGap!==null)assert.equal(actionGap,24,`${kind} 線とボタンの間`)
       if(process.env.LAYOUT_SHOTS){const fs=await import('node:fs');fs.mkdirSync(process.env.LAYOUT_SHOTS,{recursive:true});await panel.screenshot({path:`${process.env.LAYOUT_SHOTS}/${kind}-${lines}line-${width}-2x.png`})}
       await panel.getByRole('button',{name:'閉じる',exact:true}).click()
       await panel.waitFor({state:'hidden'})

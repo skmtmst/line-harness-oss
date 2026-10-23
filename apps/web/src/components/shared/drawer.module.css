@@ -403,5 +403,10 @@ html:root .headingText:has(.headerIcon) .description { margin-inline-start: calc
 
 /* 説明と頭の区切り線の間を、窓と同じ段の余白にそろえる。 */
 html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order']) .header:has(.description) {
-  padding-block-end: var(--space-16);
+  padding-block-end: var(--polish-window-divider-space);
+}
+
+/* 区切り線から本文・下の操作までの間隔は窓と同じ値を使う。 */
+html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order']) :is(.body, .footer) {
+  padding-block-start: var(--polish-window-divider-space);
 }
