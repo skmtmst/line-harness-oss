@@ -312,4 +312,4 @@ html:root :is(:global([data-design-part='dialog']), :global([data-design-part='d
   outline-offset: var(--polish-focus-offset);
 }
 
-html:root .button:is(.standard, .field, .compact, .slot):not([data-presentation]) { padding-block-start: var(--polish-text-center-inset); }
+html:root .button:is(.standard, .field, .compact)[data-text-content]:not([data-presentation]) { padding-block-start: var(--polish-text-center-inset); }

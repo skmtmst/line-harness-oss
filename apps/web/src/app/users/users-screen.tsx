@@ -128,11 +128,10 @@ export default function UsersV8() {
             placeholder="名前・メール・電話で探す"
           />
         </div>
-        <div className={styles.selectWrap}>
           <SaveErrorField names={["uid","u.uid"]}><Select
             aria-label="UID連携で絞り込む"
             label="UID連携"
-            size="full"
+            size="content"
             value={u.uid}
             onChange={u.setUid}
             options={[
@@ -141,7 +140,6 @@ export default function UsersV8() {
               { value: 'unlinked', label: 'UID：未連携・要確認' },
             ]}
           /></SaveErrorField>
-        </div>
         <div className={styles.selectWrap}>
           <SaveErrorField names={["account","u.account"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"

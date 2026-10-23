@@ -207,7 +207,7 @@
 html:root .content { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); flex: none; }
 html:root .content .trigger { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); max-width: none; }
 
-:root .root[data-select-icon-only] { width: var(--select-menu-field-h); min-width: var(--select-menu-field-h); flex: none; }
+:root .root[data-select-icon-only] { width: var(--tpl-button-h); min-width: var(--tpl-button-h); flex: none; }
 
 /* 選択欄は線なしの灰色。文字だけ・状態の札の口は保つ。 */
 :root .trigger:not(.textTrigger):not([data-tone]) {
@@ -219,8 +219,5 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
 :root .leadingIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 
 :root .trigger { padding-block-start: var(--polish-text-center-inset); }
-:root .value { flex-shrink: 0; }
-:root .standard { min-width: max-content; }
-:root .standard .trigger { min-width: max-content; }
 
 :root .trigger:not(.textTrigger):not([data-tone]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

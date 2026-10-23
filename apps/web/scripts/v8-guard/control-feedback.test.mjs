@@ -22,20 +22,26 @@ import StatusBadge from './src/components/shared/status-badge';
 import StatusPill from './src/components/shared/status-pill';
 import Dialog from './src/components/shared/dialog';
 import Drawer from './src/components/shared/drawer';
+import {SettingsPage} from './src/components/templates/settings-page';
 import {RowNameButton} from './src/components/shared/table';
 function Fixture(){const[value,setValue]=useState('graph');const[window,setWindow]=useState('');return <main>
 <Button variant="secondary">副操作</Button><Button variant="secondary" filterActive>絞り込み中</Button>
 <Button variant="secondary" presentation="restaurant">店の副操作</Button><Button>主操作</Button>
 <Pagination page={1} pageCount={3} onPageChange={()=>{}}/>
-<KpiCard title="要対応" value={3} valueAction={{label:'数の内訳',expanded:false,onClick:()=>{}}}/>
+<KpiCard title="要対応" value={3} help="対応が必要な件数です" helpDisplay="question" valueAction={{label:'数の内訳',expanded:false,onClick:()=>{}}}/>
 <RowNameButton>行の名前</RowNameButton>
+<Button aria-label="その他操作"><svg width="16" height="16" aria-hidden="true"><rect width="16" height="16"/></svg></Button>
 <SegmentedControl aria-label="表示" value={value} onChange={setValue} options={[{value:'graph',label:'グラフ'},{value:'table',label:'表'}]}/>
 <SegmentedControl aria-label="選択札" appearance="choices" value="one" onChange={()=>{}} options={[{value:'one',label:'候補'}]}/>
+<SegmentedControl aria-label="表示アイコン" value="cards" onChange={()=>{}} options={[{value:'cards',label:<svg width="16" height="16" aria-hidden="true"><rect width="16" height="16"/></svg>,ariaLabel:'カード'}]}/>
 <section data-measure-band><KpiBand><KpiCard title="集計" value={42}/></KpiBand></section>
+<section data-measure-label-help><KpiCard title="電話ボタンのクリック" help="押された回数です" value={3}/></section>
 <section data-measure-badges>{['neutral','success','info','warning','danger'].flatMap(tone=>[<StatusBadge key={'badge-'+tone} tone={tone}>{tone}</StatusBadge>,<StatusPill key={'pill-'+tone} tone={tone}>{tone}</StatusPill>])}</section>
 <Button onClick={()=>setWindow('dialog')}>作る窓を開く</Button><Button onClick={()=>setWindow('drawer')}>引き出しを開く</Button>
 <Dialog open={window==='dialog'} onCancel={()=>setWindow('')} title="作る窓"><p>本文</p></Dialog>
 <Drawer open={window==='drawer'} onClose={()=>setWindow('')} title="引き出し"><p>本文</p></Drawer>
+<Button onClick={()=>setWindow('settings')}>設定の間隔を見る</Button>
+{window==='settings'?<section data-measure-settings>{['accounts','wide-nav','narrow-nav','account-handover'].map(layout=><SettingsPage key={layout} layout={layout} title={layout} navigation={null}><div>最初の段</div><div>次の段</div></SettingsPage>)}</section>:null}
 </main>}createRoot(document.getElementById('root')).render(<Fixture/>);` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
   tsconfig: `${webRoot}/tsconfig.json`, define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
@@ -52,7 +58,7 @@ function Fixture(){const[value,setValue]=useState('graph');const[window,setWindo
         names[name] = prefix + name
         return `.${names[name]}`
       })
-      sheets.push(css)
+      sheets.push(css.replace(/:global\(([^()]+)\)/g, '$1'))
       return { contents: `export default ${JSON.stringify(names)}`, loader: 'js' }
     })
   } }],
@@ -96,6 +102,8 @@ test('表示切替は白いつまみで追従し、クリック・矢印と動�
     for(const reducedMotion of ['reduce','no-preference']){
       const page=await browser.newPage({reducedMotion})
       await mount(page)
+      const icon=page.getByRole('group',{name:'表示アイコン'}).getByRole('button',{name:'カード'})
+      assert.equal(await icon.evaluate(el=>{const box=el.getBoundingClientRect(),svg=el.querySelector('svg').getBoundingClientRect();return svg.y+svg.height/2-box.y-box.height/2}),0)
       const group=page.getByRole('group',{name:'表示',exact:true})
       const graph=group.getByRole('button',{name:'グラフ',exact:true})
       const table=group.getByRole('button',{name:'表',exact:true})
@@ -130,6 +138,12 @@ test('数の帯と窓は共通の値で描かれ、状態札の文字は読め�
     const numbers=page.locator('[data-measure-band] [data-kpi-number]')
     const metric=await numbers.evaluate(el=>{const s=getComputedStyle(el);return{size:s.fontSize,line:s.lineHeight}})
     assert.deepEqual(metric,{size:'32px',line:'38px'})
+    const help=page.getByRole('button',{name:'電話ボタンのクリックの説明',exact:true})
+    assert.equal(await help.evaluate(el=>el.getBoundingClientRect().height),18)
+    for(const name of ['その他操作','要対応の説明']){
+      const control=page.getByRole('button',{name,exact:true})
+      assert.equal(await control.evaluate(el=>{const box=el.getBoundingClientRect(),svg=el.querySelector('svg').getBoundingClientRect();return svg.y+svg.height/2-box.y-box.height/2}),0)
+    }
     const ratios=await page.locator('[data-measure-badges] > span').evaluateAll(els=>els.map(el=>{
       const s=getComputedStyle(el),rgb=value=>value.match(/[0-9.]+/g).slice(0,3).map(Number)
       const light=channels=>channels.map(c=>{c/=255;return c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4}).reduce((sum,c,i)=>sum+c*[0.2126,0.7152,0.0722][i],0)
@@ -154,5 +168,25 @@ test('数の帯と窓は共通の値で描かれ、状態札の文字は読め�
     await numbers.evaluate(el=>el.closest('[data-kpi-strip]').style.removeProperty('--tpl-band-number-size'))
     await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-measure-band] [data-kpi-number]')).fontSize==='32px')
     assert.equal(await numbers.evaluate(el=>getComputedStyle(el).fontSize),'32px')
+  } finally { await browser.close() }
+})
+
+test('設定の型を切り替えても段間を16pxに保つ', async () => {
+  const browser=await connectGuardBrowser()
+  try {
+    const page=await browser.newPage({reducedMotion:'reduce'})
+    await mount(page)
+    await page.getByRole('button',{name:'設定の間隔を見る',exact:true}).click()
+    const contents=page.locator('[data-measure-settings] [data-template-region="content"]')
+    await contents.first().waitFor()
+    const gaps=()=>contents.evaluateAll(els=>els.map(el=>getComputedStyle(el).gap))
+    assert.deepEqual(await gaps(),['16px','16px','16px','16px'])
+    const frame=page.locator('[data-measure-settings] [data-template-layout="accounts"]')
+    await frame.evaluate(el=>el.style.setProperty('--tpl-sa-gap','14px'))
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-measure-settings] [data-template-layout="accounts"] [data-template-region="content"]')).gap==='14px',{},{timeout:2000})
+    assert.equal((await gaps())[0],'14px')
+    await frame.evaluate(el=>el.style.removeProperty('--tpl-sa-gap'))
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-measure-settings] [data-template-layout="accounts"] [data-template-region="content"]')).gap==='16px',{},{timeout:2000})
+    assert.deepEqual(await gaps(),['16px','16px','16px','16px'])
   } finally { await browser.close() }
 })

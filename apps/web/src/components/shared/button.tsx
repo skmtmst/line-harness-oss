@@ -132,7 +132,7 @@ export default function Button(props: ButtonProps) {
     const { children, icon, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, filterActive: _filterActive, ...linkProps } = props
     const newTab = external || linkProps.target === '_blank'
     return (
-      <Link href={href} className={classes} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
+      <Link href={href} className={classes} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} data-text-content={hasButtonText(children) || undefined} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {icon}{props.actionWording ? normalizeActionNode(children) : children}
         {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
       </Link>
@@ -292,6 +292,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       disabled={disabled || busyNow}
       aria-busy={busyNow ? true : undefined}
       {...buttonProps}
+      data-text-content={hasButtonText(busyNow ? busyLabel : shownDone ? doneLabel : children) || undefined}
       title={disabled && disabledReason ? disabledReason : buttonProps.title}
       aria-description={disabled && disabledReason ? disabledReason : buttonProps['aria-description']}
       aria-label={iconButtonLabel(props)}

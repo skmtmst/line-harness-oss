@@ -31,7 +31,7 @@ describe('選ぶ欄の幅と枠なし', () => {
       icon={<svg aria-hidden="true" />} iconOnly showChevron={false} />)
     const button = screen.getByRole('button', { name: 'よく使う絞り込み' })
     expect(button.getAttribute('data-icon-only')).toBe('true')
-    expect(button.getAttribute('data-size')).toBe('compact')
+    expect(button.getAttribute('data-size')).toBeNull()
     expect(button.getAttribute('data-design-node')).toBe('H0V8EK')
     expect(button.querySelector('[data-select-value]')?.hasAttribute('hidden')).toBe(true)
     expect(button.querySelector('[class*="chevron"]')).toBeNull()
