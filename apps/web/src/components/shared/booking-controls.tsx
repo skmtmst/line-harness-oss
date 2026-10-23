@@ -9,7 +9,7 @@ type ControlProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 
 
 /** 行をまたぐ予約を開く操作。内容・予約元は呼び出し側が渡す。 */
 export function BookingBlock({ tone = 'confirmed', state, placement, children, ...props }: ControlProps & { placement?: 'cell' | 'calendar' | 'month' | 'board' | 'timeline'; ref?: Ref<HTMLButtonElement>; state?: BookingState; tone?: 'line' | 'media' | 'phone' | 'pending' | 'hold' | 'confirmed' | 'seated' | 'departed' | 'over' | 'warning' }) {
-  const states: Record<string, BookingState> = { line: 'confirmed', media: 'confirmed', phone: 'confirmed', pending: 'pending', hold: 'pending', confirmed: 'confirmed', seated: 'active', departed: 'completed', over: 'attention', warning: 'warning' }
+  const states: Record<string, BookingState> = { line: 'confirmed', media: 'confirmed', phone: 'confirmed', pending: 'pending', hold: 'hold', confirmed: 'confirmed', seated: 'active', departed: 'completed', over: 'attention', warning: 'warning' }
   return <button type="button" {...props} data-placement={placement} aria-description={props['aria-description'] ?? bookingStateLabels[state ?? states[tone]]} data-booking-state={state ?? states[tone]} className={`${styles.block} ${stateStyles.surface}`}>{children}</button>
 }
 

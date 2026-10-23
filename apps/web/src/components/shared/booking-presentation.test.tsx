@@ -20,8 +20,9 @@ it.each([
   ['退店済み', { status: 'visited', departedAt: base.endsAt }, 'completed'],
   ['終了', { status: 'completed', kind: 'people' }, 'completed'],
   ['承認待ち', { status: 'requested' }, 'pending'],
-  ['仮押さえ', { holdExpiresAt: base.startsAt }, 'pending'],
-  ['無断', { status: 'no_show' }, 'attention'],
+  ['期限付きの仮押さえ', { status: 'pending', holdExpiresAt: base.startsAt }, 'hold'],
+  ['仮押さえ', { holdExpiresAt: base.startsAt }, 'hold'],
+  ['無断', { status: 'no_show' }, 'no_show'],
   ['遅れ', { status: 'late' }, 'warning'],
 ] as const)('%sは経路によらず状態の札を使い、読む操作を保つ', (_label, changes, expected) => {
   const entry = { ...base, ...changes }, open = vi.fn()
@@ -47,9 +48,11 @@ it('月の札にも同じ来店状態を渡し、詳細を開く', () => {
 it('凡例は同じ状態の面を使い、塗りと枠に文字の説明を付ける', () => {
   render(<BookingLegend />)
   const list = screen.getByRole('list', { name: '予約の状態' })
-  expect(within(list).getAllByRole('listitem')).toHaveLength(7)
+  expect(within(list).getAllByRole('listitem')).toHaveLength(9)
   expect(list.querySelector('[data-booking-state="active"]')?.getAttribute('aria-hidden')).toBe('true')
-  expect(list.textContent).toContain('承認待ち・仮押さえ')
+  expect(list.textContent).toContain('要対応（承認待ち）')
+  expect(list.textContent).toContain('仮押さえ')
+  expect(list.textContent).toContain('無断キャンセル')
   expect(list.textContent).toContain('要対応')
 })
 
@@ -94,6 +97,7 @@ it('同じ卓の重なりは要対応、次の実予約までの空きだけを�
   expect(screen.queryByLabelText('次の予約まで空き24分')).toBeNull()
   expect(screen.getByRole('button', { name: /次のお客さま/ }).getAttribute('data-booking-state')).toBe('attention')
   view.rerender(<ReservationBoard {...props} entries={[{ ...base, status: 'no_show' }, next]} />)
-  expect(screen.getByRole('button', { name: /予約のお客さま/ }).getAttribute('data-booking-state')).toBe('attention')
+  expect(screen.getByRole('button', { name: /予約のお客さま/ }).getAttribute('data-booking-state')).toBe('no_show')
   expect(screen.getByRole('button', { name: /次のお客さま/ }).getAttribute('data-booking-state')).toBe('confirmed')
+  expect(screen.queryByLabelText('次の予約まで空き24分')).toBeNull()
 })

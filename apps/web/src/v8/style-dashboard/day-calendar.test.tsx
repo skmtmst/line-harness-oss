@@ -125,10 +125,11 @@ it.each([
   ['seated', false, null, 'active'],
   ['confirmed', true, null, 'completed'],
   ['requested', false, null, 'pending'],
-  ['no_show', false, null, 'attention'],
+  ['no_show', false, null, 'no_show'],
 ] as const)('日週表示も%sの実状態を札へ渡し、予定時刻だけで来店扱いしない', (status, visited, attendance, expected) => {
   const { snapshot, schedule } = fixture('salon')
   const entry = schedule.entries[0]
   const next = { ...schedule, entries: [{ ...entry, booking: { ...entry.booking!, status, visited, attendance } }] }
   expect(toToday('salon', snapshot, next, '2026-10-21', 'today').week?.entries[0].state).toBe(expected)
+  expect(toToday('salon', snapshot, next, '2026-10-21', 'today').board?.entries[0].state).toBe(({ confirmed: 'booked', completed: 'done' } as Record<string, string>)[expected] ?? expected)
 })

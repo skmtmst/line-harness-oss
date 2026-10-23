@@ -70,7 +70,7 @@ export interface StyleBoardEntry {
   end: string
   name: string
   menu: string
-  state: 'done' | 'active' | 'booked' | 'pending' | 'off' | 'attention' | 'warning'
+  state: 'done' | 'active' | 'booked' | 'pending' | 'off' | 'attention' | 'no_show' | 'warning'
   stateLabel: string
   nominated?: boolean
   unpaid?: boolean

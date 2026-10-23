@@ -73,7 +73,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     expect(within(board as HTMLElement).getAllByText('承認待ち', { selector: 'span' }).length).toBeGreaterThan(0)
     expect(screen.getAllByText('仮押さえ', { selector: 'span' }).length).toBeGreaterThan(0)
     const hold = screen.getByRole('button', { name: /^押さえ / })
-    expect(hold.getAttribute('data-booking-state')).toBe('pending')
+    expect(hold.getAttribute('data-booking-state')).toBe('hold')
     expect(hold.textContent).toMatch(/\d{2}:\d{2}〜\d{2}:\d{2}/)
     expect(screen.getByText('個室B は停止中のため出していません')).not.toBeNull()
     expect(board.textContent).toContain('・承認待ちが 1 件（山田さん・食べログ）')

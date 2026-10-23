@@ -1,17 +1,18 @@
 import type { ReservationBoardEntry } from '@line-crm/shared'
 
-export type BookingState = 'confirmed' | 'active' | 'completed' | 'pending' | 'attention' | 'warning' | 'closed'
+export type BookingState = 'confirmed' | 'active' | 'completed' | 'hold' | 'pending' | 'attention' | 'no_show' | 'warning' | 'closed'
 
 export const bookingStateLabels: Record<BookingState, string> = {
   confirmed: '確定', active: '来店中・進行中', completed: '終了・来店済み',
-  pending: '承認待ち・仮押さえ', attention: '要対応', warning: '注意', closed: '休み',
+  hold: '仮押さえ', pending: '要対応（承認待ち）', attention: '要対応', no_show: '無断キャンセル', warning: '注意', closed: '休み',
 }
 
 /** 経路や現在時刻から来店を推測せず、記録された状態を表示する。 */
 export function reservationBookingState(entry: Pick<ReservationBoardEntry, 'status' | 'holdExpiresAt' | 'arrivedAt' | 'departedAt'>): BookingState {
-  if (entry.status === 'no_show') return 'attention'
+  if (entry.status === 'no_show') return 'no_show'
   if (entry.departedAt || ['completed', 'done', 'cancelled', 'rejected', 'expired'].includes(entry.status)) return 'completed'
-  if (entry.holdExpiresAt || ['requested', 'pending'].includes(entry.status)) return 'pending'
+  if (entry.holdExpiresAt) return 'hold'
+  if (['requested', 'pending'].includes(entry.status)) return 'pending'
   if (entry.arrivedAt || ['seated', 'visited', 'active', 'in_progress'].includes(entry.status)) return 'active'
   if (['late', 'expiring'].includes(entry.status)) return 'warning'
   return 'confirmed'

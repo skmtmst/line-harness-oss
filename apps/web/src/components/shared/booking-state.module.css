@@ -19,12 +19,14 @@
   --booking-ink: var(--color-ink-secondary);
   --booking-border: transparent;
 }
-.surface[data-booking-state='pending'] { --booking-line: dashed; }
-.surface[data-booking-state='attention'] {
+.surface[data-booking-state='hold'] { --booking-line: dashed; --booking-border: var(--color-ink-faint); }
+.surface[data-booking-state='pending'] { --booking-line: dashed; --booking-border: var(--color-danger); border-width: 2px; }
+.surface[data-booking-state='no_show'] {
   --booking-bg: var(--color-status-danger-soft);
   --booking-ink: var(--color-danger);
   --booking-border: var(--color-danger);
-  --booking-line: dashed;
+  --booking-line: solid;
+  border-width: 2px;
 }
 .surface[data-booking-state='warning'] {
   --booking-bg: var(--color-status-warn-soft);
@@ -48,10 +50,12 @@
 .gap { position: absolute; bottom: var(--polish-space-row); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; pointer-events: none; color: var(--color-ink-secondary); font-size: var(--text-micro); font-variant-numeric: tabular-nums; }
 .category { display: inline-flex; align-items: center; gap: var(--polish-space-row); min-width: 0; max-width: 100%; color: inherit; font-size: inherit; white-space: nowrap; }
 .categoryText { overflow: hidden; text-overflow: ellipsis; }
-.now { position: absolute; z-index: 3; pointer-events: none; color: var(--color-ink); font-variant-numeric: tabular-nums; }
-.now[data-direction='vertical'] { inset-block: 0; border-inline-start: 1px solid var(--color-ink); }
-.now[data-direction='horizontal'] { inset-inline: 0; border-block-start: 1px solid var(--color-ink); }
-.now > span { position: absolute; padding: 0 var(--polish-space-row); border-radius: var(--radius-mini); background: var(--color-ink); color: var(--color-on-accent); font-size: var(--text-micro); white-space: nowrap; }
+.now { position: absolute; z-index: 3; pointer-events: none; color: var(--color-ink-faint); font-variant-numeric: tabular-nums; }
+.now[data-direction='vertical'] { inset-block: 0; border-inline-start: 1px solid var(--color-ink-faint); }
+.now[data-direction='horizontal'] { inset-inline: 0; border-block-start: 1px solid var(--color-ink-faint); }
+.now > span { position: absolute; padding: 0 var(--polish-space-row); border-radius: var(--radius-mini); background: var(--color-ink-faint); color: var(--color-on-accent); font-size: var(--text-micro); white-space: nowrap; }
 .now[data-direction='vertical'] > span { inset-block-start: 0; transform: translateX(-50%); }
 .now[data-direction='horizontal'] > span { inset-inline-start: 0; transform: translateY(-50%); }
 }
+
+.surface[data-booking-state='attention'] { --booking-bg: var(--color-status-danger-soft); --booking-ink: var(--color-danger); --booking-border: var(--color-danger); --booking-line: dashed; border-width: 2px; }
