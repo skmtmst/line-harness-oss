@@ -216,3 +216,20 @@ html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset:
 :root .fieldAction { color: var(--color-ink); }
 
 :root .fieldAction { color: var(--color-ink-faint); }
+
+/* 画面の選ぶ欄も線ではなく影で浮かせる。 */
+:root .field {
+  border: 0;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+}
+
+:root .field[data-invalid] {
+  border: 0;
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
+}
+
+:root .field[data-disabled] {
+  background: var(--color-canvas-sunken);
+  box-shadow: none;
+}

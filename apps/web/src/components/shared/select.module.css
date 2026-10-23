@@ -223,3 +223,28 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
 :root .trigger:not(.textTrigger):not([data-tone]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 
 :root .textTrigger { height: var(--tpl-button-h); padding-inline: var(--tpl-select-inset); gap: var(--tpl-select-gap); outline: 1px solid var(--color-control-border); outline-offset: -1px; background: var(--color-canvas); }
+
+/*
+ * 選ぶ欄は1pxの線をやめ、影で浮かせる。
+ * 開いた・焦点・誤り（赤）・無効の見え方は今の決まりを保つ。
+ */
+:root .trigger:not(.textTrigger):not([data-tone]) {
+  border: 0;
+  outline: 0;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+}
+
+:root .trigger:not(.textTrigger):not([data-tone]):hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+:root .trigger:not(.textTrigger):not([data-tone]):focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
+}
+
+:root .invalid .trigger:not(.textTrigger) {
+  outline: 0;
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
+}

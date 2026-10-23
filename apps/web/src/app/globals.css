@@ -806,7 +806,7 @@
   --shadow-controls-selected: 0 0 0 #087a3e33;
   --text-lh: 1.5;
   --color-control-border: #1d1d1f1f;
-  --control-shadow: 0 0 #0000;
+  --control-shadow: 0 0 #0000; /* 線ではなく影で浮かせる面（選ぶ欄・日付・白い副ボタン・お知らせ） */ --shadow-raised-control: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 1px 2px rgba(0, 0, 0, 0.1), 0 1px 1px rgba(0, 0, 0, 0.04); --shadow-raised-card: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.06); --radius-raised-card: 14px;
   --color-toggle-locked: #dadde2;
   --color-status-warn-soft: #f973161a;
   --color-track: #1d1d1f0a;

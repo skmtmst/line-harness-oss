@@ -207,7 +207,7 @@
 :root .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
 .danger-outline { border-color: var(--color-hairline); }
-:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); }
+:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 0; box-shadow: var(--shadow-raised-control); }
 
 /* 本文中の小さな操作。通常のボタンの高さは変えない。 */
 :root .inline { height: auto; min-height: 0; padding: 0; font-size: var(--text-caption); line-height: 19px; }
@@ -275,13 +275,17 @@ html:root .button:not([data-part='row-name']):not([data-part='attention-star']):
 
 html:root .button.filterActive { outline: 1px solid var(--color-focus-ring); color: var(--color-action); }
 
-/* 副操作は灰色の面。文字・アイコンだけの口と主操作はそれぞれ保つ。 */
+/*
+ * 白い副操作は線ではなく影で浮かせる。
+ * 文字・アイコンだけの口と主操作（緑）はそれぞれ保つ。
+ */
 :root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']) {
-  border: 0; box-shadow: none;
-  background: var(--polish-control-bg);
+  border: 0;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
   font-size: var(--polish-control-text); font-weight: var(--polish-control-weight);
 }
-:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):hover:not(:disabled) { background: var(--polish-control-hover); }
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):hover:not(:disabled) { background: var(--color-canvas-sunken); }
 :root .button:is(.text, .inline.text)[data-presentation], :root .button.inline.text { color: var(--color-ink); font-weight: var(--polish-control-weight); }
 :root .button.text:hover:not(:disabled) { text-decoration: underline; }
 html:root .button.filterActive { outline-color: var(--color-control-border); color: var(--color-ink); }
@@ -316,10 +320,10 @@ html:root .button:is(.standard, .field, .compact)[data-text-content]:is(:not([da
 
 /* 設定行の操作は札から区別できる白地の枠。通常の副操作は灰色のまま。 */
 html:root .button.secondary[data-presentation='row-action'] {
-  border: 1px solid var(--color-control-border);
+  border: 0;
   outline-color: transparent;
   background: var(--color-canvas);
-  box-shadow: var(--control-shadow);
+  box-shadow: var(--shadow-raised-control);
   color: var(--color-ink);
   font-size: var(--polish-control-text);
   font-weight: var(--polish-control-weight);

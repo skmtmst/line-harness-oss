@@ -51,9 +51,8 @@
 }
 
 /*
- * うまくいった（緑）。
- * #669 成功の通知の文字は success に1本化する（status-badge と同じ）。
- * 地は同値（#e8f8ee）の success-bg に名前をそろえる。
+ * うまくいった（緑）。カードの地は白にし、種類の色は左の丸い印だけに残す。
+ * 文字は success（status-badge と同じ）。
  */
 .success {
   background: var(--color-notice-success-bg);
@@ -62,15 +61,11 @@
 
 /* 注意（黄）。文字は必ず warn-deep（地に warn は読めないため）。 */
 .warn {
-  border: 1px solid var(--color-status-warn);
-  background: var(--color-notice-warning-bg);
   color: var(--color-status-warn-deep);
 }
 
 /* 危険（赤）。止まっている・失敗していることだけに使う。 */
 .danger {
-  border: 1px solid var(--color-status-danger);
-  background: var(--color-notice-danger-bg);
   color: var(--color-status-danger);
 }
 
@@ -225,4 +220,79 @@ html:root :is(:global([data-design-part='dialog']), :global([data-design-part='d
   background: color-mix(in srgb, currentColor 9%, transparent);
 }
 
-:root .action > a { white-space: nowrap; color: var(--color-action); font-weight: 600; }
+:root .action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-action); font-weight: 600; }
+
+/*
+ * お知らせは、線ではなく影で浮かせた白いカード。左に32pxの丸い印を置き、
+ * 種類の色（情報＝青・成功＝緑・注意＝琥珀・危険＝赤）はその丸だけに使う。
+ * 文は題（14px/600・濃い文字）と説明（13px・灰）の2段。題が無いときは
+ * 今の文をそのまま説明として1段で縦の中央にそろえる。
+ */
+:root .notice:not([data-presentation]):not([data-compact]) {
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: var(--radius-raised-card);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-card);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+:root .notice:not([data-presentation]):not([data-compact]) .icon {
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  padding: 8px;
+  border-radius: var(--radius-pill);
+  color: var(--color-on-accent);
+}
+
+:root .notice:not([data-presentation]):not([data-compact]) .icon > svg {
+  width: 16px;
+  height: 16px;
+}
+
+:root .notice:not([data-presentation]):not([data-compact]).info .icon { background: var(--color-status-info); color: var(--color-on-accent); }
+:root .notice:not([data-presentation]):not([data-compact]).success .icon { background: var(--color-success); color: var(--color-on-accent); }
+:root .notice:not([data-presentation]):not([data-compact]).warn .icon { background: var(--color-status-warn); color: var(--color-on-accent); }
+:root .notice:not([data-presentation]):not([data-compact]).danger .icon { background: var(--color-status-danger); color: var(--color-on-accent); }
+
+/* 2段の題と説明。題は濃い文字、説明は灰。 */
+:root .notice:not([data-presentation]) .heading {
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+:root .notice:not([data-presentation]) .description {
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+:root .notice:not([data-presentation]).twoLine {
+  padding: 14px 16px;
+}
+
+:root .notice:not([data-presentation]).twoLine .message {
+  gap: 0;
+}
+
+/* カードの中の小さな帯も、線ではなく影で浮かせる（大きさは今のまま）。 */
+:root .notice[data-compact] {
+  border: 0;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-card);
+}
+
+/* アカウントの短い説明・運営の注意帯・窓の中は、それぞれの今の形を保つ。 */
+:root .notice[data-presentation] {
+  box-shadow: none;
+}
+
+html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) .notice {
+  box-shadow: none;
+}

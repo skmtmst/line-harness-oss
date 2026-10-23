@@ -3,6 +3,7 @@
 import PeriodPicker from '@/components/shared/period-picker'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ChevronDown, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { StoreComparisonDetail, HqAttentionKind, StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates'
@@ -120,11 +121,14 @@ export default function StoreComparisonList() {
       filters={<>
         <PeriodPicker days={days} onChange={(value) => { setPage(1); setDays(Number(value)) }} />
         <Select aria-label="比べる相手" value={compare} options={COMPARE_OPTIONS} onChange={(value) => { setPage(1); setCompare(value as 'previous' | 'average') }} />
-        <Button variant="secondary" onClick={() => preparing.open('店の組での絞り込み')}>店の組：すべて</Button>
+        <Button variant="secondary" className="justify-between" onClick={() => preparing.open('店の組での絞り込み')}>
+          <span>店の組：すべて</span>
+          <ChevronDown size={16} aria-hidden="true" />
+        </Button>
       </>}
       trailing={<>
         <PageSizeSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next as 10 | 20 | 50) }} />
-        <Button variant="secondary" onClick={() => void exportCsv()} busy={exporting} disabled={exporting}>CSVで書き出す</Button>
+        <Button variant="secondary" icon={<Download size={16} aria-hidden="true" />} onClick={() => void exportCsv()} busy={exporting} disabled={exporting}>CSVで書き出す</Button>
       </>}
     />
   )
