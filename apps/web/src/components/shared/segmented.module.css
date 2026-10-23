@@ -7,7 +7,7 @@
  *     角丸 control（高さ 36。Pencil は余白 3→2 に更新済み）
  *   つまみ（選択中）：canvas の白・角丸 8・薄い影・中の文字 13/600 ink
  *   未選択：文字 13/500 ink-secondary（地は器の track が透ける）
- *   つまみは前の位置から 120ms で滑って着く。
+ *   つまみは前の位置から 200ms で滑って着く。
  *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない。
  */
 
@@ -77,11 +77,10 @@
   outline-offset: 2px;
 }
 
-/* ★V8 仕上げ3回目（M10）②：つまみの滑り・文字の色を --motion-* にそろえる（120ms）。V8 にだけ生えた部品のため 管理画面 の規定は持たない。 */
+/* ★V8 仕上げ3回目（M10）②：つまみは共通FLIP、文字の色は --motion-fast（120ms）。V8 にだけ生えた部品のため 管理画面 の規定は持たない。 */
 :root .thumb {
-  transition:
-    transform var(--motion-fast) var(--motion-ease-out),
-    width var(--motion-fast) var(--motion-ease-out);
+  transform-origin: left center;
+  transition-property: none;
 }
 
 :root .item {
@@ -172,3 +171,11 @@ html:root .root .item, html:root .root .thumb, html:root .root[data-size] .thumb
 :root .thumb { background: var(--color-selection-bg); box-shadow: var(--choice-selected-shadow); }
 :root .selected, :root .root[data-appearance] .selected { background: var(--color-selection-bg); color: var(--color-selection-border); outline: 1px solid var(--color-selection-border); outline-offset: -1px; font-weight: 600; }
 html:root .item { white-space: nowrap; flex-shrink: 0; }
+
+/* 選択面を一枚にし、文字の背景で滑るつまみを覆わない。 */
+html:root .root[data-sliding] .selected { background: transparent; outline-color: transparent; }
+html:root .root .thumb { outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
+html:root .root:is([data-appearance='choices'], [data-appearance='reservation'], [data-appearance='intake-stop']) .thumb { top: 0; bottom: 0; }
+html:root .root:is([data-appearance='choices'], [data-appearance='reservation']) .thumb { border-radius: var(--radius-pill); }
+
+html:root .root .item:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

@@ -8,9 +8,10 @@ vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, duplicates: { stats: net.stats }, identityCandidates: net } }
 })
-vi.mock('@/components/shared/list-url-state', async () => {
+vi.mock('@/components/shared/list-url-state', async original => {
+  const actual = await original<typeof import('@/components/shared/list-url-state')>()
   const React = await import('react')
-  return { useListLocation: () => null, useListUrlValue: (_key: string, initial: unknown) => React.useState(initial) }
+  return { ...actual, useListLocation: () => null, useListUrlValue: (_key: string, initial: unknown) => React.useState(initial) }
 })
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({ id: 'staff-test' }) }))

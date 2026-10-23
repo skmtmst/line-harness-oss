@@ -1,10 +1,11 @@
 import { responseApiError } from './errors'
 import type { FeatureDisabledEventDetail, FetchApiOptions, ApiAccountEventDetail } from '../types/transport'
 import { getFeatureDisabledContext } from '../../feature-disabled-context'
-import { FEATURE_DISABLED_EVENT, getCsrfToken, API_URL, MUTATING_METHODS } from './session'
+import { FEATURE_DISABLED_EVENT, getCsrfToken, API_URL, MUTATING_METHODS, apiReadScope } from './session'
 import { adminSessionHeaders } from '../../admin-session'
 import { fetchWithNetworkMessage, extractApiErrorCode, extractApiErrorData } from './errors'
 import { SESSION_LOST_EVENT } from '../../session-events'
+import { canonicalApiPath, clearApiReadCache, shareApiRead, synchronizeApiReadScope } from './read-cache'
 
 /** FEATURE_DISABLED の公開情報だけを共通 shell へ渡す。 */
 export function extractFeatureDisabledDetail(raw: string): FeatureDisabledEventDetail {
@@ -117,6 +118,38 @@ export function reportServerFailure(path: string, status: number): void {
 
 export async function fetchApi<T>(path: string, options?: FetchApiOptions): Promise<T> {
   const context = apiAccountContext(path, options)
+  const method = (options?.method ?? 'GET').toUpperCase()
+  const load = () => requestApi<T>(path, options, context)
+  if (typeof window === 'undefined') return load()
+  const scope = apiReadScope()
+  synchronizeApiReadScope(scope.key)
+  // Cookieだけで本人の世代を識別できない間は、別ログインの答えを共有しない。
+  if (!scope.identified) return load()
+  if (method !== 'GET' || options?.signal) return load()
+  const { headers, accountId: _accountId, method: _method, cache: _cache, suppressFeatureDisabledEvent: _suppress, ...requestOptions } = options ?? {}
+  const key = JSON.stringify([method, canonicalApiPath(path), context.accountId, context.accountIds, scope.key, [...new Headers(headers)].sort(), requestOptions])
+  const shared = shareApiRead(path, key, () => requestApi<T>(path, options), options?.cache === 'reload' || options?.cache === 'no-store', options?.cache === 'no-store')
+  return shared.catch(error => {
+    const detail = error instanceof Error ? responseEvents.get(error) : undefined
+    if (detail) announceRequestFailure(detail, context, options)
+    throw error
+  })
+}
+
+type ResponseEvent = { status: number; code: string | undefined; feature: FeatureDisabledEventDetail }
+const responseEvents = new WeakMap<Error, ResponseEvent>()
+
+function announceRequestFailure(detail: ResponseEvent, context: ApiAccountEventDetail, options?: FetchApiOptions): void {
+  if (typeof window === 'undefined') return
+  if (detail.status === 401 && !isSessionLostExempt(detail.code)) {
+    window.dispatchEvent(new CustomEvent<ApiAccountEventDetail>(SESSION_LOST_EVENT, { detail: context }))
+  }
+  if (!options?.suppressFeatureDisabledEvent && shouldAnnounceFeatureDisabled(detail.status, detail.code)) {
+    window.dispatchEvent(new CustomEvent<FeatureDisabledEventDetail>(FEATURE_DISABLED_EVENT, { detail: { ...detail.feature, ...context } }))
+  }
+}
+
+async function requestApi<T>(path: string, options: FetchApiOptions | undefined, context?: ApiAccountEventDetail): Promise<T> {
   const { accountId: _accountId, suppressFeatureDisabledEvent: _suppressEvent, ...requestInit } = options ?? {}
   const method = (options?.method ?? 'GET').toUpperCase()
   const csrfHeaders: Record<string, string> = {}
@@ -159,13 +192,22 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
      * STEP_UP_REQUIRED などの業務401だけは画面が自分で処理するので出さない。
      */
     if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
-      window.dispatchEvent(new CustomEvent<ApiAccountEventDetail>(SESSION_LOST_EVENT, { detail: context }))
+      clearApiReadCache()
     }
-    if (!options?.suppressFeatureDisabledEvent) announceFeatureDisabled(res.status, code, raw, context)
-    throw responseApiError(res, raw, code, res.status === 409 || res.status === 429 || res.status === 502
+    const error = responseApiError(res, raw, code, res.status === 409 || res.status === 429 || res.status === 502
         ? extractApiErrorData(raw)
         : undefined)
+    const detail = { status: res.status, code, feature: extractFeatureDisabledDetail(raw) }
+    responseEvents.set(error, detail)
+    if (context) announceRequestFailure(detail, context, options)
+    throw error
   }
-  if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+  if (res.status === 204) {
+    if (MUTATING_METHODS.has(method)) clearApiReadCache()
+    return undefined as T
+  }
+  const body = await res.json() as T
+  // 更新の影響は別資源の表示にも及ぶため、成功後は保守的に全読取を失効させる。
+  if (MUTATING_METHODS.has(method) && !(body && typeof body === 'object' && 'success' in body && body.success === false)) clearApiReadCache()
+  return body
 }

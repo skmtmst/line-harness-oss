@@ -47,6 +47,7 @@ beforeEach(() => {
     const url = String(input)
     calls.push(url)
     if (url.includes('/api/staff/me')) return json({ success: true, data: { id: 'staff-1', role: 'admin' } })
+    if (url.includes('/api/media/counts')) return json({ success: true, data: { total: 1, byKind: { image: 1, video: 0, audio: 0, file: 0 }, unused: 0, archived: 0 } })
     if (url.includes('/api/media/quota')) {
       return json({ success: true, data: { usageBytes: 1, reservedBytes: 0, limitBytes: 100, remainingBytes: 99, usageRate: 0.01, state: 'normal' } })
     }

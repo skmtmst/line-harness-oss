@@ -1,4 +1,5 @@
 'use client'
+import { notifySaved } from '@/components/shared/toast'
 
 import { japaneseDetailOf } from '@/components/shared/api-error-message';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
@@ -270,6 +271,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     detailAccountRef,
     selectedChatIdRef,
     selectedChatId,
+    getFriendName: () => chatDetail?.id === selectedChatId ? chatDetail.friendName : undefined,
     messageContent,
     pendingImage,
     pendingAttachment,
@@ -336,7 +338,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     savedViewError,
     setSavedViewError,
     savingView,
-    savedViewSuccess,
     setSavedViewSuccess,
     savedViewNotice,
     operatorNames,
@@ -385,7 +386,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setSavedViewError(message)
         return { success: false, error: message }
       }
-      const response = await api.chats.savedViews.create(selectedAccountId, {
+      const savingAccountId = selectedAccountId
+      const response = await api.chats.savedViews.create(savingAccountId, {
         name,
         conditions: currentSavedViewConditions(draft),
         isFavorite: draft?.favorite ?? false,
@@ -395,11 +397,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setSavedViewError(message)
         return { success: false, error: message }
       }
+      if (detailAccountRef.current !== savingAccountId) return { success: true }
       setSavedViewName('')
       await loadSavedViews()
+      if (detailAccountRef.current !== savingAccountId) return { success: true }
       setSaveDialogOpen(false)
       setSavedViewsOpen(true)
-      setSavedViewSuccess(true)
+      notifySaved(`保存した検索「${name}」を保存しました`)
       return { success: true }
     } catch (reason) {
       saveErrors.capture(reason)
@@ -655,6 +659,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       // 開いている紙を閉じるのは、いまも同じ会話を見ているときだけ。
       if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
         setShowMemoEditor(false)
+        notifySaved(`「${chatDetail?.friendName ?? '友だち'}」の内部メモを保存しました`)
       }
     } catch (memoSaveError) {
       if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
@@ -724,7 +729,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   return (
     <SaveErrorScope errors={saveErrors}><div className="space-y-3">
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した内部メモ" onConfirm={confirmLeave} onCancel={cancelLeave} />
-      {savedViewSuccess ? <Notice tone="success" onClose={() => setSavedViewSuccess(false)}>保存しました</Notice> : null}
 
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {savedViewNotice ? <Notice tone="info" message={savedViewNotice} /> : null}

@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const visibility = vi.hoisted(() => vi.fn())
-vi.mock('./api', () => ({ api: { featureSettings: { visibility } } }))
+
 
 import { clearFeatureVisibilityCache, loadFeatureVisibility } from './feature-visibility-cache'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from './feature-settings-event'
@@ -15,16 +15,23 @@ const ok = { success: true as const, data: { features: { broadcasts: true } } }
 
 describe('表示可否の共有（V6R-S0-b）', () => {
   beforeEach(() => {
+    localStorage.setItem('lh_csrf', 'fixture-session')
     clearFeatureVisibilityCache()
     visibility.mockReset()
     visibility.mockResolvedValue(ok)
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const url = new URL(input)
+      if (url.pathname === '/api/staff/me') return new Response(JSON.stringify({ success: true, data: { id: 'me' } }))
+      return new Response(JSON.stringify(await visibility(url.searchParams.get('account_id'))))
+    }))
   })
-  afterEach(() => vi.restoreAllMocks())
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
   it('同時に来た要求は1本にまとめ、同じ答えを返す', async () => {
     const [a, b] = await Promise.all([loadFeatureVisibility('acc-1'), loadFeatureVisibility('acc-1')])
     expect(visibility).toHaveBeenCalledTimes(1)
-    expect(a).toBe(b)
+    expect(a).toEqual(b)
+    expect(a).not.toBe(b)
   })
 
   it('アカウントが違えば別に取る', async () => {

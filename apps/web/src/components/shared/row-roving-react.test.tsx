@@ -98,3 +98,18 @@ describe('一覧の行の Tab と矢印キー', () => {
     expect(stops().map((el) => el.textContent)).toEqual(['一', '二'])
   })
 })
+
+it('消えている行を矢印で飛ばし、操作可能になった行は同じ列へ戻す', async () => {
+  render(<List />)
+  const first = screen.getByText('名前a'), last = screen.getByText('名前c')
+  const middle = screen.getByText('名前b').closest('tr')!
+  act(() => middle.setAttribute('inert', ''))
+  first.focus()
+  fireEvent.keyDown(first, { key: 'ArrowDown' })
+  expect(document.activeElement).toBe(last)
+  fireEvent.keyDown(last, { key: 'ArrowUp' })
+  expect(document.activeElement).toBe(first)
+  await act(async () => { middle.removeAttribute('inert'); await Promise.resolve() })
+  fireEvent.keyDown(first, { key: 'ArrowDown' })
+  expect(document.activeElement).toBe(screen.getByText('名前b'))
+})

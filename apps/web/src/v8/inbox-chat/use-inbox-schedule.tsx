@@ -1,4 +1,5 @@
 'use client'
+import { notifyToast } from '@/components/shared/toast'
 import { type ImageUploaderValue } from '@/components/shared/image-uploader';
 import { api, type ChatDetailMessage, type ScheduledChatSend } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
@@ -13,6 +14,7 @@ import { describeSendFailure } from './send-failure';
 type Options = {
   detailAccountRef: RefObject<string | null>
   selectedChatIdRef: RefObject<string | null>
+  getFriendName?: () => string | undefined
   selectedChatId: string | null
   messageContent: string
   pendingImage: ImageUploaderValue | null
@@ -31,7 +33,7 @@ type Options = {
   setQuotedMessage: Dispatch<SetStateAction<ChatDetailMessage | null>>
 }
 
-export function useInboxSchedule({ detailAccountRef, selectedChatIdRef, selectedChatId, messageContent, pendingImage, pendingAttachment, setError, selectedAccountId, dropSentDraft, pendingImageRef, setPendingImage, setPendingImageMeta, attachDraftsRef, putAttachment, setMessageContent, quotedMessage, sendKeysRef, setQuotedMessage }: Options) {
+export function useInboxSchedule({ getFriendName, detailAccountRef, selectedChatIdRef, selectedChatId, messageContent, pendingImage, pendingAttachment, setError, selectedAccountId, dropSentDraft, pendingImageRef, setPendingImage, setPendingImageMeta, attachDraftsRef, putAttachment, setMessageContent, quotedMessage, sendKeysRef, setQuotedMessage }: Options) {
 
   // N-025: 送信予約。JSTの datetime-local 値をそのまま口へ渡し、
   // 保存はサーバー側でUTCへ正規化される。
@@ -113,6 +115,7 @@ export function useInboxSchedule({ detailAccountRef, selectedChatIdRef, selected
       return
     }
 
+    const friendName = getFriendName?.()
     const schedulingChatId = selectedChatId
     const schedulingAccountId = selectedAccountId
     setScheduling(true)
@@ -156,6 +159,7 @@ export function useInboxSchedule({ detailAccountRef, selectedChatIdRef, selected
         })
       }
       let allScheduled = true
+      let completed = 0
       for (const item of items) {
         /*
          * 同じ送信版には同じ操作キーを使い回す(#965)。通信中の二度押しや
@@ -179,17 +183,22 @@ export function useInboxSchedule({ detailAccountRef, selectedChatIdRef, selected
           quotedMessageId: quotedMessage?.id,
         }, sendKeysRef.current.get(signature))
         if (!res.success) {
+          if (detailAccountRef.current === schedulingAccountId && selectedChatIdRef.current === schedulingChatId) {
+            setError(completed > 0 ? '一部のメッセージを予約できませんでした。未予約の入力を残しています。内容を確認してもう一度お試しください。' : '予約できませんでした。入力を確認してもう一度お試しください。')
+          }
           allScheduled = false
           break
         }
         sendKeysRef.current.clear(signature)
         // 予約した版だけを消す。切替先の下書きや開いたパネルは触らない(#962 F06)。
         item.done()
+        completed += 1
       }
       if (allScheduled && selectedChatIdRef.current === schedulingChatId && detailAccountRef.current === schedulingAccountId) {
         setQuotedMessage((prev) => (prev === quotedMessage ? null : prev))
         setScheduleInput((prev) => (prev === scheduleInput ? '' : prev))
         setShowSchedulePanel(false)
+        notifyToast(friendName ? `「${friendName}」へのメッセージを予約しました` : 'メッセージを予約しました')
       }
       await loadScheduledSends(schedulingChatId)
     } catch (scheduleError) {

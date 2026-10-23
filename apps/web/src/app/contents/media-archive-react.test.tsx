@@ -60,6 +60,7 @@ vi.mock('@/lib/api', () => {
         list: () => Promise.resolve({ success: true, data: [], unfiledCount: 0 }),
       },
       media: {
+        counts: () => Promise.resolve({ success: true, data: { total: fixture.archived ? 0 : 1, byKind: { image: fixture.archived ? 0 : 1, video: 0, audio: 0, file: 0 }, unused: fixture.archived ? 0 : 1, archived: fixture.archived ? 1 : 0 } }),
         list: (accountId: string, params?: { archived?: string }) => {
           fixture.listCalls.push({ accountId, params })
           const items = params?.archived === 'only'

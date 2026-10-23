@@ -426,6 +426,8 @@
 <a id="select"></a>
 ## select プルダウン（許される範囲）
 
+- 浮く面の位置・はみ出し・押した角からの開きは共通 `shared/menu-portal` と同CSSが持つ。絞り込みの入力と操作を置く面は `shared/filter-popover`。画面は入力・解除・閉じる操作だけを渡す。内側の日付候補はEscで先に閉じ、外側の面は残す。
+
 - **役目**：数が決まっていて少ない選択（種類・並び・期間・件数・役割など7個まで）だけ
 - **持ち主（コード）**：`apps/web/src/components/shared/select.tsx`・`apps/web/src/components/shared/select.module.css`・`apps/web/src/components/shared/select-menu.tsx`・`apps/web/src/components/shared/select-menu.module.css`・`apps/web/src/components/shared/menu-portal.tsx`（部品 `Select`・`SelectMenu`）
   - 読む変数：`--color-control-border`・`--radius-control`
@@ -598,6 +600,8 @@
 
 <a id="tabs"></a>
 ## tabs タブ
+
+- 選択の下線と切り替えの背景は共通 `shared/sliding-indicator` が動かす。寸法を一度だけ更新し、選び直しは現在位置からtransformで200ms。初回・同じ選択の幅調整・動きを減らす設定では即時。
 
 - **役目**：中身を切り替える。?tab= と router.replace
 - **持ち主（コード）**：`apps/web/src/components/shared/tabs.tsx`・`apps/web/src/components/shared/tabs.module.css`・`apps/web/src/components/layout/scrollable-tabs.tsx`・`apps/web/src/components/layout/merged-tabs.tsx`（部品 `Tabs`・`ScrollableTabs`・`MergedTabs`）

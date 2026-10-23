@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ChatsPage from './page'
+import * as toast from '@/components/shared/toast'
 
 /**
  * 受信箱の「保存した検索」保存失敗の文言分け(N-027)。
@@ -213,4 +214,13 @@ describe('保存した検索の保存失敗(N-027)', () => {
     // API内部文言は素通ししない。
     expect(dialog.textContent).not.toContain('Internal server error')
   })
+})
+
+it('保存できた検索は名前付きのトーストで一度だけ知らせる', async () => {
+  const saved = vi.spyOn(toast, 'notifySaved').mockImplementation(() => () => {})
+  const dialog = await openSaveDialog()
+  await typeName(dialog, '朝イチの未対応')
+  await submit(dialog)
+  expect(saved).toHaveBeenCalledExactlyOnceWith('保存した検索「朝イチの未対応」を保存しました')
+  expect(document.body.querySelector('[aria-label="保存した検索を作成"]')).toBeNull()
 })

@@ -16,6 +16,7 @@ import type { MediaItem } from '@line-crm/shared'
 const fixture = vi.hoisted(() => ({
   accountId: 'account-a' as string | null,
   mediaBehavior: 'ok' as 'ok' | 'fail503' | 'failFalse' | 'empty' | 'twoItems',
+  countsFailed: false,
   foldersBehavior: 'ok' as 'ok' | 'fail503',
   detailBehavior: 'ok' as 'ok' | 'fail503' | 'fail404' | 'fail403' | 'failFalse',
   detailCalls: [] as Array<{ id: string; accountId: string }>,
@@ -90,6 +91,13 @@ vi.mock('@/lib/api', () => {
         },
       },
       media: {
+        counts: () => {
+          if (fixture.countsFailed) return Promise.reject(new ApiError(503, 'Service Unavailable'))
+          if (fixture.mediaBehavior === 'fail503') return Promise.reject(new ApiError(503, 'Service Unavailable'))
+          if (fixture.mediaBehavior === 'failFalse') return Promise.resolve({ success: false, error: 'unknown failure' })
+          const total = fixture.mediaBehavior === 'empty' ? 0 : fixture.mediaBehavior === 'twoItems' ? 2 : 1
+          return Promise.resolve({ success: true, data: { total, byKind: { image: total > 0 ? 1 : 0, video: total === 2 ? 1 : 0, audio: 0, file: 0 }, unused: total, archived: 0 } })
+        },
         list: (accountId: string, params?: { kind?: string }) => {
           void accountId
           if (fixture.mediaBehavior === 'fail503') {
@@ -207,6 +215,7 @@ function folderPanel(): HTMLElement {
 beforeEach(() => {
   fixture.accountId = 'account-a'
   fixture.mediaBehavior = 'ok'
+  fixture.countsFailed = false
   fixture.foldersBehavior = 'ok'
   fixture.detailBehavior = 'ok'
   fixture.detailCalls.length = 0
@@ -424,5 +433,17 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
     expect(folderRowButton('すべて').textContent).toBe('すべて2')
     expect(host.textContent).toContain(MEDIA_A.filename)
     expect(host.textContent).not.toContain(MEDIA_B.filename)
+  })
+
+  it('一括件数だけ失敗したら、表示できた行の数を総数として代用しない', async () => {
+    fixture.mediaBehavior = 'twoItems'
+    fixture.countsFailed = true
+    await renderPage()
+    await waitForText(MEDIA_B.filename)
+    expect(folderRowButton('すべて').textContent).toBe('すべて')
+    const registered = [...host.querySelectorAll('[data-kpi-presentation]')]
+      .find(element => element.textContent?.startsWith('登録メディア'))!
+    expect(registered.textContent).toContain('—')
+    expect(host.textContent).toContain('12%')
   })
 })
