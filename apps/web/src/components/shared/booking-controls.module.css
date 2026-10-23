@@ -31,7 +31,8 @@
 }
 .block[data-placement='calendar'] > span { max-inline-size: 100%; min-inline-size: 0; }
 
-.block[data-placement='timeline'] { gap: 0; padding: var(--polish-space-row); line-height: var(--tpl-rs-lh-10); }
+.block[data-placement='timeline'] { gap: 0; padding: calc(var(--polish-space-row) - var(--booking-stroke)); line-height: var(--tpl-rs-lh-11); }
+.block[data-placement='timeline'] > * { flex-shrink: 0; }
 .block[data-placement='board'] { position: static; width: 100%; height: 100%; gap: 0; padding: var(--tpl-sd-entry-pad); }
 .block[data-placement='month'] { position: static; width: 100%; padding: var(--polish-space-row); gap: 0; font-size: var(--text-micro); }
 .block > strong { font-weight: 600; }

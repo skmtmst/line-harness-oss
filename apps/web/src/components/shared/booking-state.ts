@@ -4,7 +4,7 @@ export type BookingState = 'confirmed' | 'active' | 'completed' | 'hold' | 'pend
 
 export const bookingStateLabels: Record<BookingState, string> = {
   confirmed: '確定', active: '来店中・進行中', completed: '終了・来店済み',
-  hold: '仮押さえ', pending: '要対応（承認待ち）', attention: '要対応', no_show: '無断キャンセル', warning: '注意', closed: '休み',
+  hold: '仮押さえ', pending: '要対応（承認待ち）', attention: '重なり・受付数超過', no_show: '無断キャンセル', warning: '注意', closed: '休み',
 }
 
 /** 経路や現在時刻から来店を推測せず、記録された状態を表示する。 */

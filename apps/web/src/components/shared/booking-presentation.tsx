@@ -45,6 +45,6 @@ export function BookingGap({ minutes, style }: { minutes: number; style?: CSSPro
   return <span className={styles.gap} style={style} aria-label={`次の予約まで空き${minutes}分`}>{minutes}分</span>
 }
 
-export function BookingNowLine({ time, direction = 'vertical', style }: { time: string; direction?: 'vertical' | 'horizontal'; style?: CSSProperties }) {
-  return <div className={styles.now} data-booking-now data-direction={direction} style={style} aria-label={`今 ${time}`}><span>{time}</span></div>
+export function BookingNowLine({ time, direction = 'vertical', labelPosition = 'inline', style }: { time: string; direction?: 'vertical' | 'horizontal'; labelPosition?: 'inline' | 'above'; style?: CSSProperties }) {
+  return <div className={styles.now} data-booking-now data-direction={direction} data-label-position={labelPosition} style={style} aria-label={`今 ${time}`}><span>{time}</span></div>
 }

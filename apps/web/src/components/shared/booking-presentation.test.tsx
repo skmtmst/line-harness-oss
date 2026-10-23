@@ -53,7 +53,7 @@ it('凡例は同じ状態の面を使い、塗りと枠に文字の説明を付�
   expect(list.textContent).toContain('要対応（承認待ち）')
   expect(list.textContent).toContain('仮押さえ')
   expect(list.textContent).toContain('無断キャンセル')
-  expect(list.textContent).toContain('要対応')
+  expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(expect.arrayContaining(['要対応（承認待ち）', '重なり・受付数超過']))
 })
 
 it('種類は名前の前の装飾の丸だけに色を持ち、経路名を文字で残す', () => {
