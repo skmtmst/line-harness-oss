@@ -58,7 +58,7 @@ html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][da
   }
 }
 
-/* 帯の数は絵どおり 22px（--tpl- の変数で1か所管理）。 */
+/* 帯の数は共通の文字の値（--tpl- の変数で1か所管理）。 */
 :root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-value],
 :root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
   font-size: var(--tpl-band-number-size);
@@ -100,10 +100,10 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail-layout
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* ：一覧は116の帯。マスのcompact指定を残しても段の寸法は共通。 */
+/* 一覧の最低高さも共通の値。マスのcompact指定を残しても帯の寸法を優先する。 */
 :root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > [data-design-version] {
   min-height: var(--tpl-list-band-h); box-sizing: border-box;
-  padding: var(--tpl-list-band-pad); gap: var(--tpl-list-gap);
+  padding: var(--tpl-list-band-pad); gap: var(--tpl-band-cell-gap);
 }
 
 /* ：補足はマスでなく帯全体で有無を決める。1つでもあれば全マスをそろえる。 */
@@ -116,7 +116,7 @@ html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:no
 html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) {
   --tpl-band-cell-pad-block: var(--space-16);
   --tpl-band-cell-pad-side: var(--tpl-list-inset);
-  --tpl-band-cell-gap: var(--space-8);
+  --tpl-band-cell-gap: var(--space-4);
 }
 
 /* 題の文字も帯が持つ。画面側の本文サイズを継承させない。 */
@@ -172,7 +172,7 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
   line-height: var(--tpl-band-number-lh); letter-spacing: var(--tpl-band-number-tracking);
 }
 
-html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { padding-block: var(--space-16); }
+html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { padding-block: var(--space-16); gap: var(--tpl-band-cell-gap); }
 /* 大きな金額は文字を縮めず2列にし、単位まで読み取れる幅を確保する。 */
 html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-wide-values] { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-wide-values] > :last-child:nth-child(odd) { grid-column: 1 / -1; }

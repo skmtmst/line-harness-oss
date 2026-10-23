@@ -1416,7 +1416,7 @@
   /* 自動応答の一覧（・・）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: var(--polish-table-row); --tpl-ar-narrow-head-h: 34px; --tpl-badge-dot: 6px;
   --tpl-ro-band-pad: 12px 16px; --tpl-ro-band-gap: 12px; --tpl-ro-band-bg: #e9f1ff; --tpl-ro-band-radius: var(--polish-radius-control); --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
-  --tpl-band-number-size: 34px; --tpl-band-number-lh: 40px; --tpl-band-number-weight: 500; --tpl-band-number-tracking: -0.02em; --tpl-band-unit-lh: 18px;
+  --tpl-band-number-size: 34px; --tpl-band-number-lh: 36px; --tpl-band-number-weight: 500; --tpl-band-number-tracking: -0.02em; --tpl-band-unit-lh: 18px;
   /* 外部連携（・・・・・・・）。 */
   --tpl-wh-ro-row-pad: 12px 24px; --tpl-wh-notice-after: 6px; --tpl-wh-saved-w: 153px; --tpl-wh-create-w: 135px; --tpl-wh-create-after: 16px; --tpl-wh-add-space: 31px; --tpl-wh-note-lh: 17px;
   --tpl-wh-col-gap: 16px; --tpl-wh-head-h: var(--polish-table-head); --tpl-wh-head-pad: 13px 20px; --tpl-wh-row-h: var(--polish-table-row); --tpl-wh-row-pad: 9px 20px; --tpl-wh-num-pad-end: 8px;
@@ -1427,7 +1427,7 @@
   --tpl-wh-value-lh: 21px; --tpl-wh-pick-pad: 0 10px 0 12px; --tpl-wh-mini-head-pad: 10px 16px; --tpl-wh-mini-row-pad: 12px 16px; --tpl-wh-mini-row-h: var(--polish-table-row);
   --tpl-wh-mini-when: 120px; --tpl-wh-mini-value: 200px; --tpl-wh-mini-candidate: 160px; --tpl-wh-mini-ops: 120px; --tpl-wh-sample-lh: 16px; --tpl-wh-textarea-h: 144px; --tpl-wh-textarea-pad: 8px 12px;
   --tpl-wh-dialog-pull-top: 14px; --tpl-wh-dialog-pull-bottom: 10px; --tpl-wh-sheets-gap: 16px; --tpl-wh-small-select-w: 104px; --tpl-wh-log-row-h: var(--polish-table-row); --tpl-wh-log-body-w: 180px; --tpl-wh-log-reply-w: 100px; --tpl-wh-log-time-w: 84px; --tpl-wh-log-ops-w: 130px; --tpl-wh-detail-row-pad: 8px 0; --tpl-wh-pager-margin: 12px 24px; --tpl-wh-pager-lead-pad: 20px; --tpl-wh-new-card-gap: var(--polish-space-row); --tpl-wh-check-gap: 16px; --tpl-wh-event-pad: 12px 14px; --tpl-wh-sample-line-gap: 1px; --tpl-wh-sheets-side-w: 320px; --tpl-wh-care-lh: 19px; --tpl-wh-run-row-h: var(--polish-table-row); --tpl-wh-run-when: 140px; --tpl-wh-run-kind: 80px; --tpl-wh-run-what: 220px; --tpl-wh-skel-dot: 32px; --tpl-wh-skel-bar: 10px;
-  --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 24px; --tpl-band-cell-gap: 8px;
+  --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 24px; --tpl-band-cell-gap: 4px;
   /* シナリオ配信の編集（src/v8/scenario-detail・絵の） */
   --tpl-sd-head-pad: 20px 24px 16px; --tpl-sd-head-gap: 12px; --tpl-sd-head-text-gap: 6px; --tpl-sd-title-gap: 10px; --tpl-sd-back-size: 13px; --tpl-sd-back-lh: 19px; --tpl-sd-title-size: var(--polish-text-section); --tpl-sd-title-lh: 32px; --tpl-sd-meta-size: 12px; --tpl-sd-meta-lh: 17px; --tpl-sd-icon-btn: 28px; --tpl-sd-icon-btn-radius: var(--polish-radius-small); --tpl-sd-icon: 16px;
   --tpl-sd-conflict-wrap-pad: 0 24px 8px; --tpl-sd-conflict-pad: 12px 16px; --tpl-sd-conflict-gap: 12px; --tpl-sd-conflict-icon: 18px; --tpl-sd-conflict-bg: #fdf3e1; --tpl-sd-conflict-text-gap: 2px; --tpl-sd-conflict-title-size: var(--polish-text-section); --tpl-sd-conflict-title-lh: 20px; --tpl-sd-conflict-body-size: var(--polish-text-body); --tpl-sd-conflict-body-lh: 19px;
@@ -3041,7 +3041,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-list-head-h: 40px;
   --tpl-list-search-w: 240px;
   --tpl-list-search-min: 120px;
-  --tpl-list-band-h: 116px;
+  --tpl-list-band-h: 112px;
   --tpl-list-band-pad: 16px 24px;
   --tpl-list-gap: 8px;
   --tpl-list-cell-side: 16px;
@@ -3155,7 +3155,7 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 
 :root { --tpl-list-state-w: 104px; }
 
-:root { --tpl-band-detail-h: 18px; --tpl-list-band-no-detail-h: 90px; --tpl-insert-icon: 16px; --tpl-insert-footer-pad: 8px 12px; }
+:root { --tpl-band-detail-h: 18px; --tpl-list-band-no-detail-h: 88px; --tpl-insert-icon: 16px; --tpl-insert-footer-pad: 8px 12px; }
 
 /* 固定V8 登録メディアの縮小見本。 */
 :root { --tpl-media-file-surface: #e9ecef; --tpl-media-video-surface: #5a6577; --tpl-media-thumbnail-icon: 40px; }

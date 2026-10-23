@@ -26,8 +26,7 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-toolbar-pad-block', '14px'], ['--tpl-toolbar-pad-side', '24px'], ['--tpl-toolbar-gap', '8px'],
       ['--tpl-folder-width', '200px'],
       ['--tpl-page-pad-block', '10px'], ['--tpl-page-pad-side', '24px'],
-      ['--tpl-band-number-size', '34px'], ['--tpl-band-number-lh', '40px'],
-      ['--tpl-band-cell-pad-block', '16px'], ['--tpl-band-cell-pad-side', '24px'], ['--tpl-band-cell-gap', '8px'],
+      // 数の帯の寸法はcontrol-feedbackの実ブラウザで、適用された値と操作を検証する。
       ['--tpl-create-head-pad-top', 'var(--tpl-head-pad-top)'], ['--tpl-create-head-pad-side', '24px'], ['--tpl-create-head-pad-bottom', 'var(--tpl-head-pad-bottom)'],
       ['--tpl-create-head-gap', '8px'],
       ['--tpl-detail-head-pad-top', 'var(--tpl-head-pad-top)'], ['--tpl-detail-head-pad-side', '24px'], ['--tpl-detail-head-pad-bottom', 'var(--tpl-head-pad-bottom)'],

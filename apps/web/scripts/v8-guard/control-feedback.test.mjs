@@ -147,7 +147,7 @@ test('数の帯と窓は共通の値で描かれ、状態札の文字は読め�
     await mount(page)
     const numbers=page.locator('[data-measure-band] [data-kpi-number]')
     const metric=await numbers.evaluate(el=>{const s=getComputedStyle(el);return{size:s.fontSize,line:s.lineHeight,weight:s.fontWeight}})
-    assert.deepEqual(metric,{size:'34px',line:'40px',weight:'500'})
+    assert.deepEqual(metric,{size:'34px',line:'36px',weight:'500'})
     const amounts=await page.locator('[data-measure-wide-band] [data-kpi-number],[data-measure-range] [data-kpi-number],[data-measure-fraction] [data-kpi-number]').evaluateAll(els=>els.map(el=>{const range=document.createRange();range.selectNodeContents(el);const r=range.getBoundingClientRect(),cell=el.closest('[data-design-version]'),c=cell.getBoundingClientRect(),s=getComputedStyle(cell),unit=el.parentElement.querySelector('[data-kpi-unit]');return{excess:Math.max(0,r.right-c.right+parseFloat(s.paddingRight)),unitExcess:unit?Math.max(0,unit.getBoundingClientRect().right-c.right+parseFloat(s.paddingRight)):0,font:getComputedStyle(el).fontSize,pad:s.paddingTop}}))
     for(const amount of amounts){assert.equal(amount.excess,0);assert.equal(amount.unitExcess,0);assert.equal(amount.font,'34px');assert.equal(amount.pad,'16px')}
 
