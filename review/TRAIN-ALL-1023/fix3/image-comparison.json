@@ -1,0 +1,80 @@
+[
+  {
+    "kind": "confirm",
+    "width": 1152,
+    "before": [
+      960,
+      410
+    ],
+    "after": [
+      960,
+      360
+    ],
+    "identical": false
+  },
+  {
+    "kind": "discard",
+    "width": 1152,
+    "before": [
+      960,
+      362
+    ],
+    "after": [
+      960,
+      312
+    ],
+    "identical": false
+  },
+  {
+    "kind": "create",
+    "width": 1152,
+    "before": [
+      1120,
+      904
+    ],
+    "after": [
+      1120,
+      904
+    ],
+    "identical": true
+  },
+  {
+    "kind": "confirm",
+    "width": 1440,
+    "before": [
+      960,
+      410
+    ],
+    "after": [
+      960,
+      360
+    ],
+    "identical": false
+  },
+  {
+    "kind": "discard",
+    "width": 1440,
+    "before": [
+      960,
+      362
+    ],
+    "after": [
+      960,
+      312
+    ],
+    "identical": false
+  },
+  {
+    "kind": "create",
+    "width": 1440,
+    "before": [
+      1120,
+      904
+    ],
+    "after": [
+      1120,
+      904
+    ],
+    "identical": true
+  }
+]

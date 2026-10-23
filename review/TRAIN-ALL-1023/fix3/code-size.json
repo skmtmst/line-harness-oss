@@ -1,0 +1,468 @@
+{
+  "files": {
+    "count": 4439,
+    "median": 72,
+    "p75": 210,
+    "p90": 433,
+    "p95": 632,
+    "p99": 1194,
+    "max": 1954,
+    "over": {
+      "80": 2119,
+      "120": 1709,
+      "200": 1153,
+      "400": 490,
+      "800": 132
+    }
+  },
+  "functionsFull": {
+    "count": 54585,
+    "median": 3,
+    "p75": 10,
+    "p90": 27,
+    "p95": 50,
+    "p99": 182,
+    "max": 1360,
+    "over": {
+      "80": 1548,
+      "120": 931,
+      "200": 486,
+      "400": 164,
+      "800": 31
+    }
+  },
+  "functionsBody": {
+    "count": 54585,
+    "median": 3,
+    "p75": 9,
+    "p90": 25,
+    "p95": 47,
+    "p99": 176,
+    "max": 1343,
+    "over": {
+      "80": 1450,
+      "120": 878,
+      "200": 473,
+      "400": 155,
+      "800": 30
+    }
+  },
+  "componentsBody": {
+    "count": 2309,
+    "median": 22,
+    "p75": 84,
+    "p90": 255,
+    "p95": 427,
+    "p99": 850,
+    "max": 1343,
+    "over": {
+      "80": 595,
+      "120": 447,
+      "200": 297,
+      "400": 123,
+      "800": 29
+    }
+  },
+  "largest": [
+    {
+      "path": "apps/web/src/components/broadcasts/broadcast-form.tsx",
+      "name": "BroadcastForm",
+      "line": 76,
+      "full": 1360,
+      "body": 1343,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/contents/list.tsx",
+      "name": "MediaLibraryListV8",
+      "line": 66,
+      "full": 1324,
+      "body": 1324,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/rich-menus/new/create.tsx",
+      "name": "RichMenuCreateV8",
+      "line": 121,
+      "full": 1313,
+      "body": 1313,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/rich-menus/list.tsx",
+      "name": "RichMenusListV8",
+      "line": 186,
+      "full": 1223,
+      "body": 1223,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/booking-menus/menu-form.tsx",
+      "name": "MenuFormV8",
+      "line": 146,
+      "full": 1195,
+      "body": 1195,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/hq-templates/console.tsx",
+      "name": "HqTemplatesBody",
+      "line": 107,
+      "full": 1192,
+      "body": 1187,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/scenarios/list.tsx",
+      "name": "ScenariosListV8",
+      "line": 132,
+      "full": 1173,
+      "body": 1173,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/forms/list.tsx",
+      "name": "FormsListV8",
+      "line": 70,
+      "full": 1169,
+      "body": 1169,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/reminders/list.tsx",
+      "name": "RemindersListV8",
+      "line": 168,
+      "full": 1150,
+      "body": 1150,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/hq-broadcasts/create.tsx",
+      "name": "HqBroadcastCreate",
+      "line": 106,
+      "full": 1132,
+      "body": 1132,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/broadcasts/list.tsx",
+      "name": "BroadcastListV8",
+      "line": 182,
+      "full": 1114,
+      "body": 1114,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/booking-staff/shifts.tsx",
+      "name": "StaffShiftsDetail",
+      "line": 313,
+      "full": 1109,
+      "body": 1109,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/conversions/list.tsx",
+      "name": "ConversionList",
+      "line": 230,
+      "full": 1066,
+      "body": 1066,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/auto-replies/list.tsx",
+      "name": "AutoRepliesListV8",
+      "line": 91,
+      "full": 1058,
+      "body": 1058,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/app/booking/bookings/new/page.tsx",
+      "name": "NewProxyBookingPage",
+      "line": 131,
+      "full": 1022,
+      "body": 1022,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/form-edit/edit.tsx",
+      "name": "FormEditInner",
+      "line": 49,
+      "full": 984,
+      "body": 984,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/common-vars-edit/edit.tsx",
+      "name": "EditCommonVarV8Inner",
+      "line": 54,
+      "full": 980,
+      "body": 980,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/friends/list/list.tsx",
+      "name": "FriendsListV8",
+      "line": 117,
+      "full": 979,
+      "body": 979,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/components/layout/sidebar.tsx",
+      "name": "Sidebar",
+      "line": 84,
+      "full": 954,
+      "body": 948,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/templates/list.tsx",
+      "name": "TemplatesListV8",
+      "line": 54,
+      "full": 934,
+      "body": 934,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/webhooks/incoming.tsx",
+      "name": "WebhooksIncomingV8",
+      "line": 117,
+      "full": 912,
+      "body": 912,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/app/analytics/reports/new/page.tsx",
+      "name": "AnalyticsReportFormPage",
+      "line": 269,
+      "full": 906,
+      "body": 906,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/inflow-links/list.tsx",
+      "name": "InflowListV8",
+      "line": 90,
+      "full": 876,
+      "body": 869,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/auto-replies/edit/wizard.tsx",
+      "name": "AutoReplyWizardV8Inner",
+      "line": 70,
+      "full": 850,
+      "body": 850,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/mileage/earning-rules.tsx",
+      "name": "EarningRulesTab",
+      "line": 158,
+      "full": 843,
+      "body": 843,
+      "component": true
+    },
+    {
+      "path": "apps/worker/src/client/webinar/main.tsx",
+      "name": "WebinarApp",
+      "line": 187,
+      "full": 842,
+      "body": 842,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/automations/create/create.tsx",
+      "name": "NewAutomationV8",
+      "line": 52,
+      "full": 844,
+      "body": 838,
+      "component": true
+    },
+    {
+      "path": "apps/worker/src/routes/forms-public-submit.ts",
+      "name": "post__api_forms_id_submit_1",
+      "line": 29,
+      "full": 834,
+      "body": 834,
+      "component": false
+    },
+    {
+      "path": "apps/web/src/v8/common-vars/list.tsx",
+      "name": "CommonVarsListInner",
+      "line": 54,
+      "full": 825,
+      "body": 825,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/events/bookings.tsx",
+      "name": "Bookings",
+      "line": 96,
+      "full": 804,
+      "body": 804,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/scenario-detail/detail.tsx",
+      "name": "ScenarioDetailV8",
+      "line": 49,
+      "full": 802,
+      "body": 796,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/app/booking/bookings/use-booking-ledger.ts",
+      "name": "useBookingLedger",
+      "line": 22,
+      "full": 794,
+      "body": 794,
+      "component": false
+    },
+    {
+      "path": "apps/web/src/v8/inbox-chat/screen.tsx",
+      "name": "ChatsPageInner",
+      "line": 45,
+      "full": 778,
+      "body": 778,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/emergency/control.tsx",
+      "name": "EmergencyControlV8",
+      "line": 119,
+      "full": 780,
+      "body": 777,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/restaurant/delivery/delivery.tsx",
+      "name": "DeliveryInner",
+      "line": 96,
+      "full": 767,
+      "body": 767,
+      "component": true
+    },
+    {
+      "path": "apps/worker/src/cron/scheduled.ts",
+      "name": "scheduled",
+      "line": 48,
+      "full": 770,
+      "body": 766,
+      "component": false
+    },
+    {
+      "path": "apps/web/src/v8/mileage/rewards.tsx",
+      "name": "RewardsTab",
+      "line": 145,
+      "full": 764,
+      "body": 764,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/webinars/list.tsx",
+      "name": "WebinarList",
+      "line": 313,
+      "full": 764,
+      "body": 764,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/friend-add/list.tsx",
+      "name": "FriendAddList",
+      "line": 178,
+      "full": 758,
+      "body": 758,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/tags/tags-tab.tsx",
+      "name": "TagsTab",
+      "line": 178,
+      "full": 766,
+      "body": 752,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/hq-banners/project.tsx",
+      "name": "ProjectInner",
+      "line": 75,
+      "full": 751,
+      "body": 751,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/webhooks/outgoing.tsx",
+      "name": "WebhooksOutgoingV8",
+      "line": 87,
+      "full": 738,
+      "body": 738,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/components/friends/advanced-search-dialog.tsx",
+      "name": "AdvancedSearchDialog",
+      "line": 75,
+      "full": 769,
+      "body": 734,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/scenario-first-step/first-step.tsx",
+      "name": "ScenarioFirstStepV8",
+      "line": 86,
+      "full": 722,
+      "body": 722,
+      "component": true
+    },
+    {
+      "path": "apps/worker/src/routes/webhook-follow-event.ts",
+      "name": "handleFollowEvent",
+      "line": 31,
+      "full": 734,
+      "body": 721,
+      "component": false
+    },
+    {
+      "path": "apps/web/src/app/booking/bookings/detail/detail-screen.tsx",
+      "name": "BookingDetailScreen",
+      "line": 41,
+      "full": 717,
+      "body": 717,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/inflow-links/detail.tsx",
+      "name": "InflowDetailContent",
+      "line": 105,
+      "full": 705,
+      "body": 705,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/mileage/score.tsx",
+      "name": "ScoreTab",
+      "line": 153,
+      "full": 703,
+      "body": 703,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/settings/line-notifications/screen.tsx",
+      "name": "LineNotificationsPage",
+      "line": 684,
+      "full": 692,
+      "body": 692,
+      "component": true
+    },
+    {
+      "path": "apps/web/src/v8/visit-stamps/visit-stamps.tsx",
+      "name": "VisitStampsScreen",
+      "line": 127,
+      "full": 692,
+      "body": 692,
+      "component": true
+    }
+  ]
+}

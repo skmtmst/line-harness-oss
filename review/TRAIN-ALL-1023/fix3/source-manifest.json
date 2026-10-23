@@ -1,0 +1,18 @@
+{
+  "startHead": "a13521bf1e6f6eaa1f562ffd36d03d50b817b830",
+  "development": "c586bffe1b9c50641666eb1ba9f06c6ef93c054a",
+  "sources": {
+    "apps/web/src/components/shared/dialog.tsx": {
+      "beforeSha256": "33e460fd10a48226018e6d608e6566e7a7eecc58e470e21bba81a64ca2393acd",
+      "afterSha256": "96b1a5707419ac2bac9026188a9c719db76edd82501905dfc65d9a696ca2abe5"
+    },
+    "apps/web/src/components/shared/dialog.module.css": {
+      "beforeSha256": "2aa77dc890a4c353edb230548074846a6a6d436eb8c4e4c042b370faff45417f",
+      "afterSha256": "d0498ded26ecff1c1eb050a2dc7f58626f543d2ce6303b5b39bbbd38fb895017"
+    },
+    "apps/web/scripts/v8-guard/booking-dialog-layout.test.mjs": {
+      "beforeSha256": "6cc2a953553aaafeea38e3908a56bd79e72c71aecc661a71a0bd63b686521c02",
+      "afterSha256": "03f204edbda6dcc2e0a0942c253cb21da323dfadb6ed054e554c366a93bec01f"
+    }
+  }
+}

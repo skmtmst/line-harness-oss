@@ -358,7 +358,7 @@
 <a id="dialog"></a>
 ## dialog 窓（確かめ・編集）
 
-- **役目**：確かめ・編集・選ぶを、頭・本文・下の帯を線で分けた窓で出す
+- **役目**：確かめ・編集・選ぶを共通の窓で出す。短い確認は説明から操作まで24px・区切り線なし、作成・長い入力の窓は線を保つ。共通Dialogが確認用途と本文・手順の有無で判別する（2026-10-23オーナー決定B）。
 - **持ち主（コード）**：`apps/web/src/components/shared/dialog.tsx`・`apps/web/src/components/shared/dialog.module.css`・`apps/web/src/components/shared/confirm-dialog.tsx`・`apps/web/src/components/shared/overlay-utils.ts`（部品 `Dialog`・`ConfirmDialog`・`DialogSteps`）
   - 窓の頭の任意の印は `Dialog.headerIcon`・`ConfirmDialog.headerIcon`・`Drawer.headerIcon`。淡い色の丸へ置き、説明は既存の `description` で題の下に出す。標準の頭には既定の線の印を補い、`false` なら省く。固定高さの頭には既定の印を足さない。危険な操作の `titleIcon` は独立して保つ。明るい面・角16・柔らかい影・薄い背景と軽いぼかしは共通値、開閉はtransformとopacityのみ。
   - 窓の閉じる印は薄い線の丸、取消の副操作は窓内だけ薄灰の塗り。フォームのまとまりは `DialogContentRow` の `tone="muted"` とフォルダ編集の共通部品が持ち、画面側で装飾を足さない。

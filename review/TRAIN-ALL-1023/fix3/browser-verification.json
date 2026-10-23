@@ -1,0 +1,26 @@
+{
+  "browser": "Browser plugin / Chrome extension",
+  "page": "http://127.0.0.1:63346/broadcasts",
+  "title": "一斉配信 | musubo",
+  "widths": [
+    {
+      "width": 1152,
+      "descriptionToButton": 24,
+      "footerBorder": 0,
+      "buttonBottom": 24,
+      "cancelCloses": true
+    },
+    {
+      "width": 1440,
+      "descriptionToButton": 24,
+      "footerBorder": 0,
+      "buttonBottom": 24,
+      "cancelCloses": true
+    }
+  ],
+  "consoleErrors": [],
+  "blank": false,
+  "frameworkOverlay": false,
+  "viewportReset": true,
+  "network": "local fixture API only"
+}
