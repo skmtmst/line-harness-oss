@@ -37,12 +37,26 @@ export const opsMethods = {
 /** 運営コンソール（★管理画面 37）。形は `apps/worker/src/routes/ops.ts`。 */
   ops: {
     me: () => fetchApi<ApiResponse<OpsMe>>('/api/ops/me'),
-    tenants: (params?: { q?: string; status?: string }) => {
+    tenants: async (params?: { q?: string; status?: string }) => {
       const query = new URLSearchParams()
       if (params?.q) query.set('q', params.q)
       if (params?.status) query.set('status', params.status)
-      const qs = query.toString()
-      return fetchApi<ApiResponse<OpsTenantRow[]> & { summary: OpsTenantSummary }>(`/api/ops/tenants${qs ? `?${qs}` : ''}`)
+      query.set('limit', '100')
+      type TenantPage = ApiResponse<OpsTenantRow[]> & { summary: OpsTenantSummary; nextCursor?: string | null }
+      const rows: OpsTenantRow[] = []
+      const ids = new Set<string>()
+      const cursors = new Set<string>()
+      while (true) {
+        const page = await fetchApi<TenantPage>(`/api/ops/tenants?${query}`)
+        if (!page.success) return page
+        for (const row of page.data) {
+          if (!ids.has(row.id)) { rows.push(row); ids.add(row.id) }
+        }
+        if (!page.nextCursor) return { ...page, data: rows }
+        if (cursors.has(page.nextCursor)) throw new Error('契約先一覧の続きを読み込めませんでした')
+        cursors.add(page.nextCursor)
+        query.set('cursor', page.nextCursor)
+      }
     },
     tenant: (id: string) => fetchApi<ApiResponse<OpsTenantDetail>>(`/api/ops/tenants/${encodeURIComponent(id)}`),
     createTenant: (name: string, featurePacks?: string[]) =>

@@ -1,5 +1,5 @@
 import { escapeHtml as escapeHtmlAttribute } from './lib/html-escape.js';
-import { logger, resumeInvocation, withInvocation } from '@line-crm/shared/server';
+import { logger, withInvocation } from '@line-crm/shared/server';
 import { setHolidayCoverageWarningHandler } from '@line-crm/shared';
 import { stagingQa } from './routes/staging-qa.js';
 import { qaEnabled, qaOutboundStopped, qaSafeBindings, withQaOutboundBoundary } from './services/staging-qa-safety.js';
@@ -212,8 +212,7 @@ import { securityAlerts } from './routes/security-alerts.js';
 import { unhandledWorkerError } from './lib/unhandled-error.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 
-import { classifyCodexMonitorError, markCodexMentionFailed, processCodexMentionMessage, shouldStopCodexQueueRetry } from './services/codex-cloud-monitor.js';
-import { type CodexMentionQueueMessage } from './services/codex-cloud-types.js';
+import { consumeWorkerQueue } from './services/worker-queue.js';
 import { createQrImage, isQrDataAllowed, normalizeQrFormat, normalizeQrSize, qrResponseHeaders, QrInputError, QR_MAX_RESPONSE_BYTES } from './lib/qr-response.js';
 import { storedRedirectTarget } from './lib/safe-redirect.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -1146,42 +1145,7 @@ export default {
     if (qaOutboundStopped(env)) return;
     return withInvocation('cron', () => scheduled(event, env, ctx));
   },
-  async queue(
-    batch: MessageBatch<CodexMentionQueueMessage>,
-    env: Env['Bindings'],
-  ): Promise<void> {
-    if (qaOutboundStopped(env)) {
-      for (const message of batch.messages) message.retry({ delaySeconds: 60 });
-      return;
-    }
-    for (const message of batch.messages) {
-      await withInvocation('queue', () => resumeInvocation(message.body?.requestId, async () => {
-        try {
-          await processCodexMentionMessage(env, message.body);
-          message.ack();
-        } catch (error) {
-          const reason = classifyCodexMonitorError(error);
-          const stopped = shouldStopCodexQueueRetry(
-            message.attempts,
-            env.CODEX_QUEUE_MAX_ATTEMPTS,
-          );
-          logger.error("src_index_failed");
-          if (stopped) {
-            try {
-              if (message.body.kind !== 'auto_merge') {
-                await markCodexMentionFailed(env.DB, message.body.slackEventId);
-              }
-            } catch {
-              logger.error("codex_cloud_monitor_queue_ledger_failed");
-            }
-            message.ack();
-          } else {
-            message.retry({ delaySeconds: 60 });
-          }
-        }
-      }));
-    }
-  },
+  queue: consumeWorkerQueue,
   async email(
     message: ForwardableEmailMessage,
     env: Env['Bindings'],

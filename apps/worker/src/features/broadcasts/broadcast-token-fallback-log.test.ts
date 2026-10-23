@@ -76,7 +76,7 @@ describe.each([
   it('logs the missing account ID without exposing a token', async () => {
     const logs = await run(kind, 'missing-account', false);
     expect(logs).toHaveLength(1);
-    expect(JSON.parse(logs[0])).toEqual({ code: 'line_token_default_fallback', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
+    expect(JSON.parse(logs[0])).toEqual({ code: kind === 'queued' ? 'broadcast_account_unavailable' : 'line_token_default_fallback', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
     expect(logs.join('\n')).not.toContain(ACCOUNT_TOKEN);
   });
 

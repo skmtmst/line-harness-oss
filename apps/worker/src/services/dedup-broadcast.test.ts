@@ -1126,3 +1126,24 @@ it('SCALE-02 仲間: 201店舗と201件の優先順でも変数上限を超え�
     expect(result.perAccount).toHaveLength(201);
   } finally { seed.raw.close(); }
 });
+
+it.each([false,true])('dedupの部分成功後429を共有予算へ通知する（差込=%s）',async personalized=>{
+  const {db}=makeSendDb({
+    selectedCounts:[{line_account_id:'acc1',cnt:2}],
+    rankedRows:[1,2].map(i=>({friend_id:`f${i}`,line_user_id:`u${i}`,line_account_id:'acc1',display_name:'合成'})),
+    accountMeta:[{id:'acc1',name:'合成',country:'JP'}],
+  });
+  vi.mocked(getLineAccountById).mockResolvedValue({id:'acc1',channel_access_token:'synthetic',is_active:1} as never);
+  let requests=0;
+  const send=async()=>{if(++requests===2)throw Object.assign(new Error('synthetic 429'),{status:429});return {requestId:'synthetic'};};
+  const onAccepted=vi.fn(),onDeliveryFailure=vi.fn(),onDispatch=vi.fn();
+  const result=await processMultiAccountDedupBroadcast(db,{
+    id:'b-budget',account_ids:'["acc1"]',dedup_priority:'["acc1"]',message_type:'text',message_content:personalized?'{{name}} さん':'合成',
+  },()=>({pushMessage:send,multicast:send}) as unknown as LineClient,{
+    batchAllowance:()=>1,onAccepted,onDeliveryFailure,onDispatch,
+  });
+  expect(onDispatch).toHaveBeenCalledTimes(2);
+  expect(onAccepted).toHaveBeenCalledExactlyOnceWith(1);
+  expect(onDeliveryFailure).toHaveBeenCalledOnce();
+  expect(result.failedAccountIds).toEqual(['acc1']);
+});

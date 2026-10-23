@@ -66,13 +66,6 @@ export async function runSixHourlyHeavyJobs(
       },
     },
     {
-      name: 'friend snapshot',
-      run: async () => {
-        const { recordFriendSnapshot } = await import('@line-crm/db');
-        await recordFriendSnapshot(env.DB, null);
-      },
-    },
-    {
       // 日常更新は各保存経路で原子的に行う。ここは欠損補修だけの経路。
       name: 'media usage scan',
       run: async () => {

@@ -10,6 +10,7 @@ import {
   type AutomationActionExecutor,
 } from '../automations/automation-engine/index.js';
 import { validateActionShape } from '../../services/common-actions.js';
+import { BroadcastDispatchBudget } from './broadcast-dispatch-budget.js';
 
 /*
  * 一斉配信の送信後動作（タグ付け等）。
@@ -23,6 +24,8 @@ import { validateActionShape } from '../../services/common-actions.js';
 const MAX_EXPAND_DEPTH = 5;
 const MAX_EXPANDED_ACTIONS = 100;
 const DEFAULT_MAX_ATTEMPTS = 5;
+const BLOCKED_BY_PREDECESSOR = 'blocked_by_failed_action';
+const afterActionBudget = () => new BroadcastDispatchBudget({ maxSqlStatements: 700, maxRunMs: 15_000 });
 
 export interface BroadcastAfterActionResult {
   /** 台帳に残った実行のうち、今回 done になった数。 */
@@ -44,9 +47,12 @@ export async function sweepBroadcastAfterActions(
     limit?: number;
     executors?: Record<string, AutomationActionExecutor>;
     executorDependencies?: AutomationActionExecutorDependencies;
+    budget?: BroadcastDispatchBudget;
   } = {},
 ): Promise<{ broadcasts: number; done: number; failed: number }> {
   const total = { broadcasts: 0, done: 0, failed: 0 };
+  const budget = input.budget ?? afterActionBudget();
+  db = budget.database(db);
   const rows = await db.prepare(
     `SELECT DISTINCT c.broadcast_id AS broadcast_id
        FROM broadcast_send_claims c
@@ -55,14 +61,20 @@ export async function sweepBroadcastAfterActions(
         AND NOT EXISTS (
           SELECT 1 FROM broadcast_after_action_runs r
            WHERE r.broadcast_id = c.broadcast_id AND r.friend_id = c.friend_id
-             AND r.status = 'done'
         )
       UNION
-     SELECT DISTINCT broadcast_id FROM broadcast_after_action_runs
-      WHERE status IN ('pending', 'failed') AND attempt_count < max_attempts
+     SELECT DISTINCT r.broadcast_id FROM broadcast_after_action_runs r
+      WHERE r.status IN ('pending', 'failed') AND r.attempt_count < r.max_attempts
+        AND COALESCE(r.error_code, '') != 'blocked_by_failed_action'
+        AND NOT EXISTS (
+          SELECT 1 FROM broadcast_after_action_runs active
+           WHERE active.broadcast_id=r.broadcast_id AND active.friend_id=r.friend_id
+             AND active.status='running'
+        )
       LIMIT ?`,
   ).bind(input.limit ?? 50).all<{ broadcast_id: string }>();
   for (const row of rows.results ?? []) {
+    if (!budget.canStart(150)) break;
     total.broadcasts += 1;
     try {
       const result = await processBroadcastAfterActions(db, {
@@ -70,6 +82,7 @@ export async function sweepBroadcastAfterActions(
         limit: 200,
         executors: input.executors,
         executorDependencies: input.executorDependencies,
+        budget,
       });
       total.done += result.done;
       total.failed += result.failed;
@@ -155,9 +168,14 @@ export async function processBroadcastAfterActions(
     limit?: number;
     executors?: Record<string, AutomationActionExecutor>;
     executorDependencies?: AutomationActionExecutorDependencies;
+    /** A sweep shares one measured budget; standalone calls get the same finite default. */
+    budget?: BroadcastDispatchBudget;
   },
 ): Promise<BroadcastAfterActionResult> {
   const result: BroadcastAfterActionResult = { done: 0, failed: 0, skipped: 0 };
+  const budget = input.budget ?? afterActionBudget();
+  if (!input.budget) db = budget.database(db);
+  if (!budget.canStart(150)) return result;
   const limit = input.limit ?? 200;
   const broadcast = await db.prepare(
     `SELECT id, line_account_id, after_action_version_id FROM broadcasts WHERE id = ?`,
@@ -188,53 +206,74 @@ export async function processBroadcastAfterActions(
        FROM broadcast_send_claims c
       WHERE c.broadcast_id = ? AND c.state = 'sent'
         AND NOT EXISTS (
+          SELECT 1 FROM broadcast_after_action_runs active
+           WHERE active.broadcast_id=c.broadcast_id AND active.friend_id=c.friend_id
+             AND active.status='running'
+        )
+        AND (NOT EXISTS (
           SELECT 1 FROM broadcast_after_action_runs r
            WHERE r.broadcast_id = c.broadcast_id AND r.friend_id = c.friend_id
-             AND r.status = 'done'
-        )
+        ) OR EXISTS (
+          SELECT 1 FROM broadcast_after_action_runs r
+           WHERE r.broadcast_id = c.broadcast_id AND r.friend_id = c.friend_id
+             AND r.status IN ('pending', 'failed') AND r.attempt_count < r.max_attempts
+             AND COALESCE(r.error_code, '') != 'blocked_by_failed_action'
+        ))
       ORDER BY c.friend_id
       LIMIT ?`,
   ).bind(input.broadcastId, limit).all<{ friend_id: string }>();
 
   const executors = input.executors ?? createAutomationActionExecutors(input.executorDependencies);
   for (const target of targets.results ?? []) {
+    if (!budget.canStart(25)) return result;
     const friendId = target.friend_id;
-    const doneRow = await db.prepare(
-      `SELECT 1 FROM broadcast_after_action_runs
-        WHERE broadcast_id = ? AND friend_id = ? AND status = 'done' LIMIT 1`,
-    ).bind(input.broadcastId, friendId).first();
-    if (doneRow) {
-      result.skipped += 1;
-      continue;
-    }
+    const preparedAt = jstNow();
+    // Save the whole plan before its first side effect. A crash after action N
+    // leaves N+1 pending; JSON1 keeps even a 100-action plan to one SQL statement.
+    await db.prepare(`INSERT OR IGNORE INTO broadcast_after_action_runs
+      (id,broadcast_id,friend_id,common_action_version_id,action_id,status,
+       attempt_count,max_attempts,created_at,updated_at)
+      SELECT ? || ':' || key, ?, ?, ?, value, 'pending', 0, ?, ?, ? FROM json_each(?)`)
+      .bind(crypto.randomUUID(), input.broadcastId, friendId, version.id,
+        DEFAULT_MAX_ATTEMPTS, preparedAt, preparedAt, JSON.stringify(plan.map(action => action.id))).run();
+    // Completion belongs to each action. One completed action must not hide a
+    // retryable sibling; exhausted actions remain audit records, not queue heads.
     let stopped = false;
-    for (const action of plan) {
+    for (let actionIndex = 0; actionIndex < plan.length; actionIndex += 1) {
       if (stopped) break;
+      // Executors finish and record their outcome once started. Their internal
+      // SQL expansion cannot be bounded here; this reserve covers our own writes.
+      if (!budget.canStart(20)) return result;
+      const action = plan[actionIndex]!;
       const now = jstNow();
-      await db.prepare(
-        `INSERT OR IGNORE INTO broadcast_after_action_runs
-           (id, broadcast_id, friend_id, common_action_version_id, action_id, status,
-            attempt_count, max_attempts, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)`,
-      ).bind(
-        crypto.randomUUID(), input.broadcastId, friendId, version.id, action.id,
-        DEFAULT_MAX_ATTEMPTS, now, now,
-      ).run();
       const claimed = await db.prepare(
         `UPDATE broadcast_after_action_runs
             SET status = 'running', attempt_count = attempt_count + 1, updated_at = ?
           WHERE broadcast_id = ? AND friend_id = ? AND action_id = ?
-            AND status IN ('pending', 'failed') AND attempt_count < max_attempts`,
+            AND status IN ('pending', 'failed') AND attempt_count < max_attempts
+            AND COALESCE(error_code, '') != 'blocked_by_failed_action'`,
       ).bind(now, input.broadcastId, friendId, action.id).run();
       // done・実行中・上限到達は触らない（上限到達は人手の見直し対象として残す）。
       if (Number(claimed.meta.changes ?? 0) !== 1) {
         const row = await db.prepare(
-          `SELECT status FROM broadcast_after_action_runs
+          `SELECT status,attempt_count,max_attempts FROM broadcast_after_action_runs
             WHERE broadcast_id = ? AND friend_id = ? AND action_id = ?`,
-        ).bind(input.broadcastId, friendId, action.id).first<{ status: string }>();
+        ).bind(input.broadcastId, friendId, action.id).first<{ status: string; attempt_count: number; max_attempts: number }>();
+        // Another worker owns this predecessor. Never overtake it with a later
+        // action, including when our candidate list was read before its claim.
+        if (row?.status === 'running') break;
         if (row?.status === 'failed') {
           result.failed += 1;
-          if (action.onFailure === 'stop') stopped = true;
+          if (action.onFailure === 'stop') {
+            stopped = true;
+            if (row.attempt_count >= row.max_attempts) {
+              await db.prepare(`UPDATE broadcast_after_action_runs SET error_code=?,updated_at=?
+                WHERE broadcast_id=? AND friend_id=? AND status IN ('pending','failed')
+                  AND action_id IN (SELECT value FROM json_each(?))`)
+                .bind(BLOCKED_BY_PREDECESSOR, jstNow(), input.broadcastId, friendId,
+                  JSON.stringify(plan.slice(actionIndex + 1).map(next => next.id))).run();
+            }
+          }
         }
         continue;
       }

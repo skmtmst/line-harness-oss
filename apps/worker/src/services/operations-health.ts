@@ -2,6 +2,7 @@ import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import {
   completeOperationHealthRun,
+  resolveLineCredential,
   enqueuePendingOperationAlertNotifications,
   failOperationHealthRun,
   reconcileOperationHealthAlerts,
@@ -22,6 +23,7 @@ import type { WorkerBindings } from '../worker-bindings.js';
 type AccountRow = {
   id: string;
   channel_access_token: string;
+  channel_access_token_encrypted?: string | null;
   is_active: number;
   token_expires_at: string | null;
   tenant_id: string | null;
@@ -30,6 +32,7 @@ type AccountRow = {
 /** R2・Queue の束縛は環境次第で無いので、持っているものだけ渡す。 */
 export type OperationInfraDeps = {
   security?: WorkerBindings;
+  credentialEncryptionKey?: string;
   r2?: R2Bucket;
   queue?: Queue<unknown>;
 };
@@ -176,7 +179,9 @@ async function collectChecks(
       // 予定済み配信の見込み通数を引いた forecast も返す（-32 §5-2）。
       const { monthStart, monthEnd, resetAt } = jstMonthBounds(observedAt);
       const [quota, harnessUsedRow, tenantRow, scheduledRow] = await Promise.all([
-        fetchQuota(account.channel_access_token),
+        resolveLineCredential(account.channel_access_token_encrypted, account.channel_access_token,
+          {lineAccountId:account.id,field:'channel_access_token'},
+          deps.credentialEncryptionKey ?? deps.security?.LINE_CREDENTIAL_ENCRYPTION_KEY).then(fetchQuota),
         db.prepare(
           `SELECT COUNT(*) AS used FROM messages_log
             WHERE line_account_id = ? AND direction = 'outgoing'
@@ -508,7 +513,7 @@ export async function runOperationHealthChecks(
   let completed = false;
   try {
     const account = await db.prepare(
-      'SELECT id, channel_access_token, is_active, token_expires_at, tenant_id FROM line_accounts WHERE id = ?',
+      'SELECT id, channel_access_token, channel_access_token_encrypted, is_active, token_expires_at, tenant_id FROM line_accounts WHERE id = ?',
     ).bind(input.lineAccountId).first<AccountRow>();
     if (!account || account.is_active !== 1) throw new Error('line_account_not_active');
     const observedAt = input.now ?? new Date().toISOString();

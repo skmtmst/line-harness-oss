@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encryptCredential, setAccountSetting } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -9,6 +9,8 @@ import {
   processDueGoogleSheetsSyncs,
   syncGoogleSheetsIntegration,
   syncOneDataType,
+  SCHEDULED_SYNC_BATCH_SIZE,
+  SCHEDULED_SYNC_BUDGET_MS,
   type GoogleSheetsIntegrationRow,
 } from './google-sheets.js';
 
@@ -145,6 +147,11 @@ function envFor(testDb: SqliteD1): Env['Bindings'] {
 }
 
 const sleep = async () => {};
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 describe('parseSpreadsheetId', () => {
   it('URLとIDの両方を受け取る', () => {
@@ -474,7 +481,8 @@ describe('processDueGoogleSheetsSyncs', () => {
     const first = await processDueGoogleSheetsSyncs(env, { now: NOW, fetch: fetch as never, sleep });
     expect(first).toEqual({ synced: 1, skipped: 0, failed: 0 });
     const second = await processDueGoogleSheetsSyncs(env, { now: NOW, fetch: fetch as never, sleep });
-    expect(second).toEqual({ synced: 0, skipped: 1, failed: 0 });
+    // 完了済みはSQLで除外され、アカウント判定や外部通信を繰り返さない。
+    expect(second).toEqual({ synced: 0, skipped: 0, failed: 0 });
   });
 
   it('機能 external_integrations がオフのアカウントは同期しない', async () => {
@@ -506,12 +514,17 @@ describe('processDueGoogleSheetsSyncs', () => {
          (id, integration_id, kind, data_type, status, started_at, run_date, spreadsheet_id)
        VALUES ('run-jst-today', 'int-1', 'scheduled', 'friends', 'ok', '2026-09-26T16:30:00Z', '2026-09-27', ?)`,
     ).run(SPREADSHEET_ID);
+    testDb.raw.prepare(
+      `INSERT INTO google_sheets_sync_runs
+         (id, integration_id, kind, data_type, status, started_at, run_date, spreadsheet_id)
+       VALUES ('run-jst-answers', 'int-1', 'scheduled', 'form_answers', 'ok', '2026-09-26T16:30:00Z', '2026-09-27', ?)`,
+    ).run(SPREADSHEET_ID);
     const sheet: FakeSheet = { tabs: new Map() };
     // NOW = 2026-09-27T06:00:00Z → JST 2026-09-27 15:00
     const result = await processDueGoogleSheetsSyncs(envFor(testDb), {
       now: NOW, fetch: makeGoogleFetch(sheet).fetch as never, sleep,
     });
-    expect(result).toEqual({ synced: 0, skipped: 1, failed: 0 });
+    expect(result).toEqual({ synced: 0, skipped: 0, failed: 0 });
   });
 
   it('出力先を変えた日は、変える前のシートへの定期実行が残っていても新しい先へ走る（R442）', async () => {
@@ -541,5 +554,137 @@ describe('processDueGoogleSheetsSyncs', () => {
       now: NOW, fetch: makeGoogleFetch(sheet).fetch as never, sleep,
     });
     expect(result.synced).toBe(1);
+  });
+
+  async function seedConnections(count: number) {
+    const encrypted = await encryptCredential('refresh-token-scale', ENCRYPTION_KEY);
+    const account = testDb.raw.prepare(`INSERT INTO line_accounts
+      (id, channel_id, name, channel_access_token, channel_secret, is_active)
+      VALUES (?, ?, 'scale', 'token', 'secret', 1)`);
+    const integration = testDb.raw.prepare(`INSERT INTO google_sheets_integrations
+      (id, line_account_id, refresh_token_enc, status, spreadsheet_id)
+      VALUES (?, ?, ?, 'connected', ?)`);
+    testDb.raw.transaction(() => {
+      for (let index = 0; index < count; index += 1) {
+        const id = `scale-${String(index).padStart(5, '0')}`;
+        account.run(id, `channel-${id}`);
+        integration.run(id, id, encrypted, SPREADSHEET_ID);
+      }
+    })();
+  }
+
+  it('5,000接続の完了済みをSQLで除外し、残る25件も1,000 SQL未満で処理する', async () => {
+    await seedConnections(5_000);
+    const completed = testDb.raw.prepare(`INSERT INTO google_sheets_sync_runs
+      (id, integration_id, kind, data_type, status, started_at, run_date, spreadsheet_id)
+      VALUES (?, ?, 'scheduled', ?, 'ok', ?, '2026-09-27', ?)`);
+    testDb.raw.transaction(() => {
+      for (let index = 0; index < 5_000 - SCHEDULED_SYNC_BATCH_SIZE; index += 1) {
+        const id = `scale-${String(index).padStart(5, '0')}`;
+        for (const type of ['friends', 'form_answers']) completed.run(`${id}-${type}`, id, type, NOW, SPREADSHEET_ID);
+      }
+    })();
+    let queries = 0;
+    const counted = new Proxy(testDb.db, { get(target, property, receiver) {
+      if (property === 'prepare') return (sql: string) => { queries += 1; return target.prepare(sql); };
+      return Reflect.get(target, property, receiver);
+    } });
+    const google = makeGoogleFetch({ tabs: new Map() });
+    const result = await processDueGoogleSheetsSyncs({ ...envFor(testDb), DB: counted }, { now: NOW, fetch: google.fetch, sleep });
+    expect(result).toEqual({ synced: 25, skipped: 0, failed: 0 });
+    expect(queries).toBeLessThan(1_000);
+    expect(testDb.raw.prepare(`SELECT COUNT(DISTINCT integration_id) AS total FROM google_sheets_sync_runs WHERE status = 'ok'`).get())
+      .toEqual({ total: 5_000 });
+  });
+
+  it('無効な先頭25件と失敗接続を隔離し、次のtickで後続を進める', async () => {
+    await seedConnections(27);
+    for (let index = 0; index < 25; index += 1) {
+      await setAccountSetting(testDb.db, `scale-${String(index).padStart(5, '0')}`, 'feature.external_integrations', 'false');
+    }
+    testDb.raw.prepare(`UPDATE google_sheets_integrations SET refresh_token_enc = 'invalid-encrypted-token' WHERE id = 'scale-00025'`).run();
+    const google = makeGoogleFetch({ tabs: new Map() });
+    const first = await processDueGoogleSheetsSyncs(envFor(testDb), { now: NOW, fetch: google.fetch, sleep });
+    expect(first).toEqual({ synced: 0, skipped: 25, failed: 0 });
+    expect(google.calls).toHaveLength(0);
+    const second = await processDueGoogleSheetsSyncs(envFor(testDb), { now: '2026-09-27T06:05:00Z', fetch: google.fetch, sleep });
+    expect(second).toEqual({ synced: 1, skipped: 0, failed: 1 });
+    const count = google.calls.length;
+    const third = await processDueGoogleSheetsSyncs(envFor(testDb), { now: '2026-09-27T06:10:00Z', fetch: google.fetch, sleep });
+    expect(third).toEqual({ synced: 0, skipped: 0, failed: 0 });
+    expect(google.calls).toHaveLength(count);
+  });
+
+  it('1種別500行で止めた部分同期を同日に続行し、完了済み種別を再実行しない', async () => {
+    await makeIntegration(testDb);
+    const friend = testDb.raw.prepare(`INSERT INTO friends
+      (id, line_user_id, line_account_id, display_name, is_following, metadata, created_at, updated_at)
+      VALUES (?, ?, 'acc-1', 'scale', 1, '{}', ?, ?)`);
+    testDb.raw.transaction(() => {
+      for (let index = 0; index < 550; index += 1) friend.run(`many-${index}`, `U-many-${index}`, NOW, NOW);
+    })();
+    const sheet: FakeSheet = { tabs: new Map() };
+    const google = makeGoogleFetch(sheet);
+    expect(await processDueGoogleSheetsSyncs(envFor(testDb), { now: NOW, fetch: google.fetch, sleep }))
+      .toEqual({ synced: 0, skipped: 0, failed: 1 });
+    expect(sheet.tabs.get('友だち')?.length).toBe(501);
+    expect(await processDueGoogleSheetsSyncs(envFor(testDb), { now: '2026-09-27T06:05:00Z', fetch: google.fetch, sleep }))
+      .toEqual({ synced: 1, skipped: 0, failed: 0 });
+    expect(sheet.tabs.get('友だち')?.length).toBe(554);
+    expect(new Set(sheet.tabs.get('友だち')!.slice(1).map((row) => row[0])).size).toBe(553);
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS total FROM google_sheets_sync_runs WHERE data_type = 'form_answers'`).get())
+      .toEqual({ total: 1 });
+  });
+
+  it('重複tickは単一ownerだけが開始し、解放後は同日完了を再送しない', async () => {
+    await makeIntegration(testDb);
+    const google = makeGoogleFetch({ tabs: new Map() });
+    const results = await Promise.all([
+      processDueGoogleSheetsSyncs(envFor(testDb), { now: NOW, fetch: google.fetch, sleep }),
+      processDueGoogleSheetsSyncs(envFor(testDb), { now: NOW, fetch: google.fetch, sleep }),
+    ]);
+    expect(results.reduce((total, result) => total + result.synced, 0)).toBe(1);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS total FROM google_sheets_sync_runs').get()).toEqual({ total: 2 });
+    expect(testDb.raw.prepare(`SELECT key FROM platform_settings WHERE key = 'scheduled-work:google-sheets-sync'`).get()).toBeUndefined();
+  });
+
+  it('50秒合計予算を使った後は次の種別・接続を開始せず、次回は後続から再開する', async () => {
+    await seedConnections(2);
+    const started = Date.now();
+    let clock = started;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const google = makeGoogleFetch({ tabs: new Map() });
+    const slowFetch = async (url: string, init?: RequestInit) => {
+      const response = await google.fetch(url, init);
+      clock = started + SCHEDULED_SYNC_BUDGET_MS + 1;
+      return response;
+    };
+    expect(await processDueGoogleSheetsSyncs(envFor(testDb), { now: NOW, fetch: slowFetch, sleep }))
+      .toEqual({ synced: 0, skipped: 0, failed: 1 });
+    expect(google.calls).toHaveLength(1);
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS total FROM platform_settings WHERE key LIKE 'google-sheets-sync:attempt:%'`).get())
+      .toEqual({ total: 1 });
+    expect(await processDueGoogleSheetsSyncs(envFor(testDb), { now: '2026-09-27T06:01:00Z', fetch: google.fetch, sleep }))
+      .toEqual({ synced: 1, skipped: 0, failed: 0 });
+  });
+
+  it('応答しないOAuthリクエストも合計deadlineで中断して実行権を解放する', async () => {
+    await makeIntegration(testDb);
+    vi.useFakeTimers();
+    const hangingFetch = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+    }));
+    // Node の AbortSignal.timeout は Vitest の偽時計外なので、同じsignal契約を偽時計へ接続。
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException('deadline', 'TimeoutError')), ms);
+      return controller.signal;
+    });
+    const pending = processDueGoogleSheetsSyncs(envFor(testDb), { now: NOW, fetch: hangingFetch, sleep });
+    // 暗号復号は実WebCryptoなので、ネットワーク開始まで実イベントループを進める。
+    await vi.waitFor(() => expect(hangingFetch).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(SCHEDULED_SYNC_BUDGET_MS);
+    expect(await pending).toEqual({ synced: 0, skipped: 0, failed: 1 });
+    expect(testDb.raw.prepare(`SELECT key FROM platform_settings WHERE key = 'scheduled-work:google-sheets-sync'`).get()).toBeUndefined();
   });
 });

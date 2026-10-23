@@ -645,21 +645,71 @@ export async function updateInsightResult(
 }
 
 
-export async function getQueuedBroadcasts(db: D1Database): Promise<Broadcast[]> {
-  // Pick up broadcasts explicitly queued for batch processing:
-  //   - segment_conditions IS NOT NULL: tag/segment queued batches
-  //   - account_ids IS NOT NULL: multi-account-dedup queued batches
-  // batch_offset >= 0: ロック中（-1）のものは除外
-  // sent_at IS NULL: 完了済みは除外
-  const result = await db
-    .prepare(
-      // stopped_at IS NOT NULL は停止を受け付けた配信。**新しい送信権を取らせない**
-      // ので、ここで拾わない（#662）。止めたあと再開すると stopped_at が NULL に
-      // 戻り、次の tick から続きを送る。
-      `SELECT * FROM broadcasts WHERE status = 'sending' AND batch_offset >= 0 AND sent_at IS NULL AND stopped_at IS NULL AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL) ORDER BY created_at ASC`,
-    )
+const DISPATCH_ACCOUNT_CURSOR = 'broadcast.dispatch.account';
+const DISPATCH_BROADCAST_CURSOR_PREFIX = 'broadcast.dispatch.broadcast:';
+export const BROADCAST_DISPATCH_NOT_BEFORE_PREFIX = 'broadcast.dispatch.not-before:';
+const DISPATCH_READY_AT = `CASE WHEN COALESCE(b.stealth_spread_minutes,0)>0 THEN
+  COALESCE((SELECT CAST(value AS REAL) FROM platform_settings
+    WHERE key='${BROADCAST_DISPATCH_NOT_BEFORE_PREFIX}'||b.id),0) ELSE 0 END`;
+const QUEUED_BROADCAST_WHERE = `b.status='sending' AND b.batch_offset>=0 AND b.sent_at IS NULL
+  AND b.stopped_at IS NULL AND (b.segment_conditions IS NOT NULL OR b.account_ids IS NOT NULL)`;
+
+export async function getQueuedBroadcasts(
+  db: D1Database,
+  options: { accountId?: string | null; limit?: number; nowMs?: number } = {},
+): Promise<Broadcast[]> {
+  const scoped = options.accountId !== undefined;
+  const limit = Math.max(1, Math.min(20, Math.floor(options.limit ?? 20)));
+  // 店ごとに1件を選び、店と配信の両方を永続カーソルで巡回する。
+  // 古い大口配信や毎回失敗する配信が、後続を占有しない。
+  const result = await db.prepare(`WITH candidates AS (
+      SELECT b.*, COALESCE(b.line_account_id,'') AS dispatch_account,
+        ROW_NUMBER() OVER (PARTITION BY COALESCE(b.line_account_id,'')
+          ORDER BY CASE WHEN b.id > COALESCE(s.value,'') THEN 0 ELSE 1 END, b.id) AS dispatch_rank
+        FROM broadcasts b
+        LEFT JOIN platform_settings s ON s.key=? || COALESCE(b.line_account_id,'')
+       WHERE ${QUEUED_BROADCAST_WHERE} AND (${DISPATCH_READY_AT})<=?${scoped ? ' AND b.line_account_id IS ?' : ''}
+    ) SELECT * FROM candidates WHERE dispatch_rank=1
+    ORDER BY CASE WHEN dispatch_account > COALESCE((SELECT value FROM platform_settings WHERE key=?),'')
+      THEN 0 ELSE 1 END, dispatch_account LIMIT ?`)
+    .bind(DISPATCH_BROADCAST_CURSOR_PREFIX, options.nowMs ?? Date.now(), ...(scoped ? [options.accountId] : []), DISPATCH_ACCOUNT_CURSOR, limit)
     .all<Broadcast>();
   return result.results;
+}
+
+export async function advanceBroadcastDispatchCursor(db: D1Database, broadcast: Broadcast): Promise<void> {
+  const accountId = broadcast.line_account_id ?? '';
+  await db.batch([
+    db.prepare(`INSERT INTO platform_settings(key,value) VALUES(?,?)
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')`)
+      .bind(DISPATCH_ACCOUNT_CURSOR, accountId),
+    db.prepare(`INSERT INTO platform_settings(key,value) VALUES(?,?)
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')`)
+      .bind(DISPATCH_BROADCAST_CURSOR_PREFIX + accountId, broadcast.id),
+  ]);
+}
+
+export async function hasQueuedBroadcasts(db: D1Database, accountId?: string | null): Promise<boolean> {
+  const scoped = accountId !== undefined;
+  const row = await db.prepare(`SELECT 1 FROM broadcasts b WHERE ${QUEUED_BROADCAST_WHERE}
+    ${scoped ? ' AND b.line_account_id IS ?' : ''} LIMIT 1`)
+    .bind(...(scoped ? [accountId] : [])).first();
+  return row !== null;
+}
+
+/** Account-wide delay: a paced broadcast never delays another ready broadcast. */
+export async function nextQueuedBroadcastDelaySeconds(db: D1Database, accountId: string | null | undefined, nowMs: number): Promise<number | null> {
+  const row = await db.prepare(`SELECT MIN(MAX(0,(${DISPATCH_READY_AT})-?)) AS delay_ms
+    FROM broadcasts b WHERE ${QUEUED_BROADCAST_WHERE}${accountId === undefined ? '' : ' AND b.line_account_id IS ?'}`)
+    .bind(nowMs, ...(accountId === undefined ? [] : [accountId])).first<{delay_ms:number|null}>();
+  return row?.delay_ms == null ? null : Math.max(0,Math.ceil(row.delay_ms/1000));
+}
+
+/** Persist before external dispatch; redelivery and later cron windows share this gate. */
+export async function reserveBroadcastDispatchMinute(db: D1Database, broadcastId: string, nowMs: number): Promise<void> {
+  await db.prepare(`INSERT INTO platform_settings(key,value) VALUES(?,?)
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')`)
+    .bind(BROADCAST_DISPATCH_NOT_BEFORE_PREFIX + broadcastId, String(nowMs + 60_000)).run();
 }
 
 /**

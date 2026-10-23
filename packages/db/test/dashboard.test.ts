@@ -356,6 +356,28 @@ describe('友だち数の推移', () => {
         { line_account_id: 'account-c' },
       ]);
   });
+
+  test('5,000店舗と未割当を100件ずつ、1日以内・各回2クエリで記録する', async () => {
+    sqlite.transaction(() => {
+      for (let index = 0; index < 5_000; index++) insertAccount(`store-${String(index).padStart(5, '0')}`);
+    })();
+    insertFriend('unassigned');
+    let queries = 0;
+    const counted = new Proxy(db, { get(target, key) {
+      if (key === 'prepare') return (sql: string) => { queries++; return target.prepare(sql); };
+      return Reflect.get(target, key);
+    } });
+    const ticks = Math.ceil(5_001 / 100);
+    for (let tick = 0; tick < ticks; tick++) {
+      queries = 0;
+      await recordFriendSnapshot(counted, null, jstDate(0), 100);
+      expect(queries).toBe(2);
+    }
+    expect(ticks * 5).toBeLessThan(24 * 60);
+    expect(sqlite.prepare('SELECT count(*) n FROM friend_daily_snapshots').get()).toEqual({ n: 5_001 });
+    expect(sqlite.prepare("SELECT total FROM friend_daily_snapshots WHERE line_account_id='__unassigned__'").get())
+      .toEqual({ total: 1 });
+  });
 });
 
 describe('受信箱の状態', () => {

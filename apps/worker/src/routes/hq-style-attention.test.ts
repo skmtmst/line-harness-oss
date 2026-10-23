@@ -95,7 +95,7 @@ test.each(['staff', 'inactive', 'foreign'] as const)('権限がない利用者�
   expect(batch).not.toHaveBeenCalled();
 });
 
-test('5アカウントは集計5batchと名前1読取で開始し、先のアカウントの応答を待たない', async () => {
+test('複数アカウントの集計は5文の1batchにまとめ、名前の読取と同時に開始する', async () => {
   for (let i = 2; i <= 5; i++) {
     d.raw.prepare(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES(?,?,?,'token','secret','t')`)
       .run('a' + i, 'channel-' + i, '店' + i);
@@ -111,11 +111,31 @@ test('5アカウントは集計5batchと名前1読取で開始し、先のアカ
   const prepare = vi.spyOn(d.db, 'prepare');
   const pending = read();
   try {
-    await vi.waitFor(() => expect(batch).toHaveBeenCalledTimes(5));
-    expect(batch.mock.calls.every(([statements]) => statements.length === 10)).toBe(true);
-    expect(prepare.mock.calls).toHaveLength(55); // 集計50文＋名前1文＋権限/scope4文。
+    await vi.waitFor(() => expect(batch).toHaveBeenCalledTimes(1));
+    expect(batch.mock.calls[0][0]).toHaveLength(5);
+    expect(prepare.mock.calls).toHaveLength(10);
   } finally { release(); }
   expect((await pending).data.items).toHaveLength(5);
+});
+
+test.each([150, 5000])('%iアカウントも同じSQL数で全件を返し、代表明細は1件に制限する', async count => {
+  const insert = d.raw.prepare(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id)
+    VALUES(?,?,?,'synthetic','synthetic','t')`);
+  d.raw.transaction(() => {
+    for (let i = 1; i < count; i++) insert.run('scale-' + i, 'scale-' + i, 'Synthetic ' + i);
+  })();
+  chat('first-scale', 'scale-' + (count - 1));
+  chat('second-scale', 'scale-' + (count - 1));
+  const batch = vi.spyOn(d.db, 'batch'), prepare = vi.spyOn(d.db, 'prepare');
+  const body = await read();
+  expect(body.data.items).toHaveLength(count);
+  expect(batch).toHaveBeenCalledTimes(1);
+  expect(batch.mock.calls[0][0]).toHaveLength(5);
+  expect(prepare).toHaveBeenCalledTimes(10);
+  const last = body.data.items.find(item => item.accountId === 'scale-' + (count - 1))!;
+  expect(last.counts.unhandledChats).toBe(2);
+  expect(last.details.unhandledChats).toHaveLength(1);
+  expect(body.data.items.some(item => item.accountId === 'b')).toBe(false);
 });
 
 test('通常の明細100件とincludeDetails=falseの件数別行き先は変えない', async () => {

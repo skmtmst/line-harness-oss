@@ -250,7 +250,14 @@ export async function processMultiAccountDedupBroadcast(
     common_var_snapshot?: string | null;
   },
   lineClientFactory: (token: string) => LineClient = (t) => new LineClient(t),
-  opts: { maxRunMs?: number; now?: () => number } = {},
+  opts: {
+    maxRunMs?: number; now?: () => number;
+    batchAllowance?: (messageParts: number, personalized: boolean) => number;
+    onDispatch?: (recipients: number) => void;
+    onAccepted?: (recipients: number) => void;
+    onDeliveryFailure?: () => void;
+    deferAfterActions?: boolean;
+  } = {},
 ): Promise<ProcessMultiAccountDedupResult> {
   // 時間バジェット制御 (テストでは clock を注入して yield を決定的に再現できる)。
   // 変数名は clock — batch ループ内の `const now = jstNow` (timestamp 文字列) と
@@ -414,7 +421,9 @@ export async function processMultiAccountDedupBroadcast(
     });
     const personalized = hasRecipientVariablesInParts(accountParts);
     if (!personalized) assertMessagePartsResolved(accountParts);
-    const deliveryBatchSize = personalized ? PERSONALIZED_PUSH_BATCH_SIZE : MULTICAST_BATCH_SIZE;
+    const desiredBatchSize = personalized ? PERSONALIZED_PUSH_BATCH_SIZE : MULTICAST_BATCH_SIZE;
+    const deliveryBatchSize = Math.min(desiredBatchSize, opts.batchAllowance?.(accountParts.length, personalized) ?? desiredBatchSize);
+    if (deliveryBatchSize < 1) { timeExceeded = true; break; }
     const totalBatches = Math.ceil(remaining.length / deliveryBatchSize);
 
     // Per-account の liff_id でテンプレ変数 ({{liff_id}}) を置換してから
@@ -425,6 +434,12 @@ export async function processMultiAccountDedupBroadcast(
     try {
       for (let i = 0; i < remaining.length; i += deliveryBatchSize) {
         const batchIdx = Math.floor(i / deliveryBatchSize);
+        const allowance = opts.batchAllowance?.(accountParts.length, personalized) ?? deliveryBatchSize;
+        if (allowance < deliveryBatchSize && allowance < remaining.length - i) {
+          // 一束の永続化を途中で切らず、残りは同じ宛先台帳から次の実行へ渡す。
+          timeExceeded = true;
+          break;
+        }
         const candidates = remaining.slice(i, i + deliveryBatchSize);
         const suppressed = await suppressedFriendIds(db,candidates.map(r=>r.friendId));
         await recordSuppressedBroadcastRecipients(db,broadcast.id,[...suppressed]);
@@ -486,11 +501,14 @@ export async function processMultiAccountDedupBroadcast(
                 friendIds: [recipient.friendId],
               });
               dispatchedIds.push(recipient.friendId);
+              opts.onDispatch?.(1);
               await client.pushMessage(recipient.lineUserId, recipientMessages, retryKey, [unit]);
+              opts.onAccepted?.(1);
               for (const part of renderedParts) {
                 delivered.push({ recipient, messageType: part.messageType, content: part.messageContent });
               }
             } catch (err) {
+              opts.onDeliveryFailure?.();
               batchDeliveryError = err;
               failedRecipientIds = [recipient.friendId];
               break;
@@ -514,8 +532,11 @@ export async function processMultiAccountDedupBroadcast(
           });
           dispatchedIds.push(...batch.map((r) => r.friendId));
           try {
+            opts.onDispatch?.(batch.length);
             await client.multicast(batch.map((r) => r.lineUserId), batchMessages, [unit], retryKey);
+            opts.onAccepted?.(batch.length);
           } catch (err) {
+            opts.onDeliveryFailure?.();
             // 誰が落ちたかを台帳へ残してから、従来どおりアカウント単位の
             // 失敗として投げ直す。残さないと再送の対象が作れない。
             const outcome = classifyDeliveryFailure(err);
@@ -573,7 +594,7 @@ export async function processMultiAccountDedupBroadcast(
         for (const id of deliveredIds) blocked.add(id);
         // 送信後動作: この束で受け付けられた宛先にだけ固定版を実行する。
         try {
-          await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
+          if (!opts.deferAfterActions) await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
         } catch (afterError) {
           logger.error("services_dedup_broadcast_failed");
         }

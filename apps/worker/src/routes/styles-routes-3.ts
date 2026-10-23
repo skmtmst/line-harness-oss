@@ -1,4 +1,4 @@
-import { readAccountAttention } from '../services/hq-account-attention.js';
+import { readAccountsAttention } from '../services/hq-account-attention.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { Hono } from 'hono';
 
@@ -272,15 +272,15 @@ styles.get('/api/hq/style-attention', async (c) => {
            WHERE a.id IN (SELECT value FROM json_each(?))`,
         ).bind(JSON.stringify(scope.allowedAccountIds)).all<{ id: string; name: string; style: AccountStyle | null }>()
       : Promise.resolve({ results: [] }),
-    Promise.all(scope.accounts.map(account => readAccountAttention(c.env.DB, account.id, true, 1))),
+    readAccountsAttention(c.env.DB, scope.allowedAccountIds),
   ]);
   const byId = new Map(metadata.results.map(row => [row.id, row]));
-  const items = scope.accounts.map((account, index) => ({
+  const items = scope.accounts.map((account) => ({
     accountId: account.id,
     style: byId.get(account.id)?.style ?? 'standard',
     name: byId.get(account.id)?.name ?? '',
-    counts: attention[index].counts,
-    details: attention[index].details,
+    counts: attention.get(account.id)!.counts,
+    details: attention.get(account.id)!.details,
   }));
   return c.json({
     success: true,

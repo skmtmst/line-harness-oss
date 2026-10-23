@@ -1,10 +1,13 @@
 import type { CodexMentionQueueMessage } from './services/codex-cloud-types.js';
+import type { AccountWorkMessage } from './services/account-work-types.js';
 
 export type WorkerBindings = {
     OPERATOR_PUSH_VAPID_PUBLIC_KEY?:string;
     OPERATOR_PUSH_VAPID_PRIVATE_KEY?:string;
     OPERATOR_PUSH_VAPID_SUBJECT?:string;
     DB: D1Database;
+    /** Dedicated account work queue. Provisioning and activation are separate from code deployment. */
+    ACCOUNT_WORK_QUEUE?: Queue<AccountWorkMessage>;
     BUILD_GIT_COMMIT?: string;
     BUILD_VERSION?: string;
     BUILD_RELEASED_AT?: string;

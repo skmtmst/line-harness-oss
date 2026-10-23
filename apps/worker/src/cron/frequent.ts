@@ -1,4 +1,4 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { jstCalendar as japanCalendar, jstDate as japanDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sweepOperatorPush, retryOperatorPush } from '../services/operator-push.js';
 
@@ -21,7 +21,7 @@ import { purgeExpiredScenarioDrafts } from '../routes/scenario-drafts.js';
 import { processVisitStampQueue } from '../services/visit-stamps.js';
 
 import { LineClient } from '@line-crm/line-sdk';
-import { getLineAccounts, processPendingMileageEvents, processActionScoreInactivity } from '@line-crm/db';
+import { getLineAccounts, getLineAccountById, processPendingMileageEvents, processActionScoreInactivity } from '@line-crm/db';
 
 import { processFriendFieldReminders } from '../features/friends/friend-field-reminders/index.js';
 import { toJstParts } from '@line-crm/shared';
@@ -39,6 +39,7 @@ import { pruneSensitiveRateLimits } from '../middleware/sensitive-rate-limit.js'
 import { dbFor } from '../services/db-router.js';
 
 import { runIsolatedScheduledJobs, type ScheduledJob } from '../services/scheduled-job-isolation.js';
+import { withScheduledWorkLease } from '../services/scheduled-work-lease.js';
 
 import { googleBusinessEnabled, restaurantTestEnabled } from '../lib/environment-features.js';
 
@@ -48,11 +49,6 @@ export async function runFrequentHeavyJobs(
 ): Promise<void> {
   try { await pruneSensitiveRateLimits(env.DB, new Date(event.scheduledTime)); }
   catch { logger.error("sensitive_rate_limit_cleanup_failed"); }
-  const dbAccounts = await getLineAccounts(env.DB);
-  const lineClients = new Map<string, LineClient>();
-  for (const account of dbAccounts) {
-    if (account.is_active) lineClients.set(account.id, new LineClient(account.channel_access_token));
-  }
   try {
     const { processAutoReplyDeliveries } = await import('../features/auto-replies/auto-reply-delivery/index.js');
     await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
@@ -60,6 +56,18 @@ export async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {
+      // 100 accounts per five minutes complete 5,000 accounts within one day.
+      // The database selects missing/oldest snapshots, so retries also stay fair.
+      name: 'friend snapshot',
+      run: async () => {
+        const { recordFriendSnapshot } = await import('@line-crm/db');
+        await withScheduledWorkLease(env.DB, 'friend-snapshot', async () => {
+          await recordFriendSnapshot(env.DB, null,
+            japanDate(new Date(event.scheduledTime)), 100);
+        });
+      },
+    },
     {name:'operator push digest',run:async()=>{await sweepOperatorPush(env.DB,env,new Date(event.scheduledTime));await retryOperatorPush(env.DB,env,new Date(event.scheduledTime));}},
     {name:'makeup credit expiry',run:()=>expireMakeup(env.DB,new Date(event.scheduledTime))},
     {name:'AB test decisions (test transport)',run:()=>decideAbTests(env.DB,new Date(event.scheduledTime))},
@@ -97,7 +105,7 @@ export async function runFrequentHeavyJobs(
     },
     {
       name: 'calendar busy cache and switch jobs',
-      run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('../features/booking/booking-calendar-settings/index.js');const credentials={email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY};await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime));},
+      run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('../features/booking/booking-calendar-settings/index.js');const credentials={email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY};if(!env.ACCOUNT_WORK_QUEUE)await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime));},
     },
     {
       name: 'booking sync notices',
@@ -281,7 +289,10 @@ export async function runFrequentHeavyJobs(
     {
       name: 'analytics projection',
       run: async () => {
+        if (env.ACCOUNT_WORK_QUEUE) return;
         const { refreshRecentAnalyticsProjections } = await import('../services/analytics-projection.js');
+        const dbAccounts = (await env.DB.prepare("SELECT id,is_active,COALESCE(timezone,'Asia/Tokyo') AS timezone FROM line_accounts WHERE is_active=1")
+          .all<{id:string;is_active:number;timezone:string}>()).results;
         const result = await refreshRecentAnalyticsProjections(
           env.DB,
           dbAccounts,
@@ -334,7 +345,13 @@ export async function runFrequentHeavyJobs(
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',
-      run: async () => { await processInsightFetch(env.DB, lineClients, defaultLineClient); },
+      run: async () => {
+        // Credential failures belong to this job, not the entire heavy tick.
+        const accounts = await getLineAccounts(env.DB, env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+        const clients = new Map(accounts.filter(account => account.is_active)
+          .map(account => [account.id, new LineClient(account.channel_access_token)]));
+        await processInsightFetch(env.DB, clients, defaultLineClient);
+      },
     },
     {
       name: 'NEN rich menu jobs',
@@ -427,11 +444,13 @@ export async function runFrequentHeavyJobs(
           limit: 200,
         });
         for (const transition of result.transitions) {
-          const account = dbAccounts.find((item) => item.id === transition.lineAccountId);
-          await dispatchActionScoreApplications(env.DB, {
-            ...transition,
-            lineAccessToken: account?.channel_access_token,
-          });
+          try {
+            const account = await getLineAccountById(env.DB, transition.lineAccountId, env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+            await dispatchActionScoreApplications(env.DB, {
+              ...transition,
+              lineAccessToken: account?.channel_access_token,
+            });
+          } catch { logger.error('action_score_account_failed'); }
         }
         if (result.candidates > 0) {
           logger.log("action_score_inactivity_tick");
