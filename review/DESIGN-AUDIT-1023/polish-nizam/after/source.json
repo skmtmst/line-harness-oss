@@ -1,0 +1,31 @@
+{
+  "purpose": "ビルド開始時の製品ソース指紋。撮影後に同じ指紋とコミット内容を照合する。",
+  "testedDevelopment": "3668bf8b0a90bf952d0acf42508198c9ba7a0019",
+  "files": {
+    "apps/web/src/app/globals.css": "6bfd5142d5c0479bf1b4228e683058f8346132a269054898197066489cee95ec",
+    "apps/web/src/components/shared/button.module.css": "cf8b8e7e4929bc7a3874506979cd17f01e78e6fba660d3be39936ccb50d84075",
+    "apps/web/src/components/shared/check-card.module.css": "46b6f9ed1a8018a5af4e7b61d1a36b939ee734634e3c9cd39f20cb67abebda43",
+    "apps/web/src/components/shared/checkbox.module.css": "4a7929d2a892f95ef9b10a9ed332f6c6fe9d057b6c306276903d2386acc54c4d",
+    "apps/web/src/components/shared/confirm-dialog.tsx": "322b54ca008fab451050f8985220c203738c357d203efedadff793652d62f922",
+    "apps/web/src/components/shared/dialog-content-row.module.css": "a02fae48983be601f73e84ed8cf079456cde67b46a057d9aa14530188bf007c5",
+    "apps/web/src/components/shared/dialog.module.css": "6798b6ff48f3134ff6a07a3c5257dde2becdf0b82be21d957fd270a77d1fb337",
+    "apps/web/src/components/shared/dialog.tsx": "28f7a344b1658a7844cab3d1b22d8b85a7b680dad67947680bdb5664b0eaf58e",
+    "apps/web/src/components/shared/drawer.module.css": "212c303112ebc8d4948f1fc4b4c269b0d8ec6377012a2e0f230db068506a0d00",
+    "apps/web/src/components/shared/drawer.tsx": "dd0fe7213568189dda35fd2cb72cc4996fa4a6912a1b008608bfce14aee78776",
+    "apps/web/src/components/shared/folder-editor-dialog.module.css": "e1b91d5102604618d66deb4e5bb01fbef6683a985a955d7924219a68e6ac78b7",
+    "apps/web/src/components/shared/folder-editor-dialog.tsx": "7418460852ca6e17d992ee400568a0171ff16f819b3ffd7917a87e195d558fe3",
+    "apps/web/src/components/shared/notice.module.css": "76557b9bfa9fdd65819d488ed4f2075029ef4c07f9e84f535e9a628ad9e91ec2",
+    "apps/web/src/components/templates/steps.module.css": "bd562d9f69079cef394925122071dc57930a4588c0541871f246a214e80d44cd",
+    "apps/web/src/components/templates/steps.tsx": "ae96ea015f6f0148333f360436f09921dfbffbf1a4c80240ac0d7b7c9842f74c"
+  },
+  "sourceCommit": "87d02a5f102815958d2dafbf9e73ca0e720ec603",
+  "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+  "htmlHashes": {
+    "templates.html": "580c6f35e81f1308787b69d89aa541c9511d32aa9a5a82a598bc891d774a9629",
+    "friends.html": "6953e34aa98daac4868b738a80bc63fee939e83c1ab46108be2772ede051efb0",
+    "accounts/new.html": "b5fe730e8373fafa317ca937ef4b65b77082566d6c919937c0e20dd1fa63bcb7",
+    "scenarios/new.html": "e1db31d56164d10e48b9e8203d5c912c1f8645b7d50c37069db6c2f1f8fad97f",
+    "index.html": "ae6463ae7c6ec6b3eb9c50d7dfa7a1ad82d630507a7f01ebe9e9d2fa65cf4033",
+    "broadcasts.html": "739a5da2acf5d3685a5978669480c3a39aa492f9e2c18974df0b35c080507092"
+  }
+}

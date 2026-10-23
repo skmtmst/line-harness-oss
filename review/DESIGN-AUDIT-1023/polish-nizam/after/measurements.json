@@ -1,0 +1,2744 @@
+[
+  {
+    "name": "list-templates",
+    "route": "/templates",
+    "kind": "list",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/templates",
+    "width": 1440,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [],
+    "controls": {
+      "measured": [
+        {
+          "kind": "checkbox",
+          "name": "このページのテンプレートをすべて選択",
+          "target": "th",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 358,
+            "width": 16,
+            "height": 16,
+            "top": 358,
+            "right": 323,
+            "bottom": 374,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 346,
+            "width": 86,
+            "height": 40,
+            "top": 346,
+            "right": 350,
+            "bottom": 386,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「初回お問い合わせへの返信」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 404,
+            "width": 16,
+            "height": 16,
+            "top": 404,
+            "right": 323,
+            "bottom": 420,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 386,
+            "width": 86,
+            "height": 52,
+            "top": 386,
+            "right": 350,
+            "bottom": 438,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約前日のご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 456,
+            "width": 16,
+            "height": 16,
+            "top": 456,
+            "right": 323,
+            "bottom": 472,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 438,
+            "width": 86,
+            "height": 52,
+            "top": 438,
+            "right": 350,
+            "bottom": 490,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「発送完了のお知らせ」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 508,
+            "width": 16,
+            "height": 16,
+            "top": 508,
+            "right": 323,
+            "bottom": 524,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 490,
+            "width": 86,
+            "height": 52,
+            "top": 490,
+            "right": 350,
+            "bottom": 542,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「定期便 初回のご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 560,
+            "width": 16,
+            "height": 16,
+            "top": 560,
+            "right": 323,
+            "bottom": 576,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 542,
+            "width": 86,
+            "height": 52,
+            "top": 542,
+            "right": 350,
+            "bottom": 594,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「秋の新商品（画像）」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 612,
+            "width": 16,
+            "height": 16,
+            "top": 612,
+            "right": 323,
+            "bottom": 628,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 594,
+            "width": 86,
+            "height": 52,
+            "top": 594,
+            "right": 350,
+            "bottom": 646,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「折り返しのご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 664,
+            "width": 16,
+            "height": 16,
+            "top": 664,
+            "right": 323,
+            "bottom": 680,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 646,
+            "width": 86,
+            "height": 52,
+            "top": 646,
+            "right": 350,
+            "bottom": 698,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 1」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 716,
+            "width": 16,
+            "height": 16,
+            "top": 716,
+            "right": 323,
+            "bottom": 732,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 698,
+            "width": 86,
+            "height": 52,
+            "top": 698,
+            "right": 350,
+            "bottom": 750,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 2」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 768,
+            "width": 16,
+            "height": 16,
+            "top": 768,
+            "right": 323,
+            "bottom": 784,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 750,
+            "width": 86,
+            "height": 52,
+            "top": 750,
+            "right": 350,
+            "bottom": 802,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 3」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 820,
+            "width": 16,
+            "height": 16,
+            "top": 820,
+            "right": 323,
+            "bottom": 836,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 802,
+            "width": 86,
+            "height": 52,
+            "top": 802,
+            "right": 350,
+            "bottom": 854,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 4」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 872,
+            "width": 16,
+            "height": 16,
+            "top": 872,
+            "right": 323,
+            "bottom": 888,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 854,
+            "width": 86,
+            "height": 52,
+            "top": 854,
+            "right": 350,
+            "bottom": 906,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 5」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 924,
+            "width": 16,
+            "height": 16,
+            "top": 924,
+            "right": 323,
+            "bottom": 940,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 906,
+            "width": 86,
+            "height": 52,
+            "top": 906,
+            "right": 350,
+            "bottom": 958,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 6」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 976,
+            "width": 16,
+            "height": 16,
+            "top": 976,
+            "right": 323,
+            "bottom": 992,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 958,
+            "width": 86,
+            "height": 52,
+            "top": 958,
+            "right": 350,
+            "bottom": 1010,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約確定のお知らせ」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 1028,
+            "width": 16,
+            "height": 16,
+            "top": 1028,
+            "right": 323,
+            "bottom": 1044,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 1010,
+            "width": 86,
+            "height": 52,
+            "top": 1010,
+            "right": 350,
+            "bottom": 1062,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約変更のご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 1080,
+            "width": 16,
+            "height": 16,
+            "top": 1080,
+            "right": 323,
+            "bottom": 1096,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 1062,
+            "width": 86,
+            "height": 52,
+            "top": 1062,
+            "right": 350,
+            "bottom": 1114,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「来店後フォロー」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 1132,
+            "width": 16,
+            "height": 16,
+            "top": 1132,
+            "right": 323,
+            "bottom": 1148,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 1114,
+            "width": 86,
+            "height": 52,
+            "top": 1114,
+            "right": 350,
+            "bottom": 1166,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約のひな形 4」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 1184,
+            "width": 16,
+            "height": 16,
+            "top": 1184,
+            "right": 323,
+            "bottom": 1200,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 1166,
+            "width": 86,
+            "height": 52,
+            "top": 1166,
+            "right": 350,
+            "bottom": 1218,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約のひな形 5」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 1236,
+            "width": 16,
+            "height": 16,
+            "top": 1236,
+            "right": 323,
+            "bottom": 1252,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 1218,
+            "width": 86,
+            "height": 52,
+            "top": 1218,
+            "right": 350,
+            "bottom": 1270,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「ECのひな形 1」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 1288,
+            "width": 16,
+            "height": 16,
+            "top": 1288,
+            "right": 323,
+            "bottom": 1304,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 1270,
+            "width": 86,
+            "height": 52,
+            "top": 1270,
+            "right": 350,
+            "bottom": 1322,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「ECのひな形 2」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 1340,
+            "width": 16,
+            "height": 16,
+            "top": 1340,
+            "right": 323,
+            "bottom": 1356,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 1322,
+            "width": 86,
+            "height": 52,
+            "top": 1322,
+            "right": 350,
+            "bottom": 1374,
+            "left": 264
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「ECのひな形 3」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 307,
+            "y": 1392,
+            "width": 16,
+            "height": 16,
+            "top": 1392,
+            "right": 323,
+            "bottom": 1408,
+            "left": 307
+          },
+          "frame": {
+            "x": 264,
+            "y": 1374,
+            "width": 86,
+            "height": 52,
+            "top": 1374,
+            "right": 350,
+            "bottom": 1426,
+            "left": 264
+          }
+        }
+      ],
+      "skipped": [],
+      "findings": []
+    }
+  },
+  {
+    "name": "list-friends",
+    "route": "/friends",
+    "kind": "list",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/friends",
+    "width": 1440,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [],
+    "controls": {
+      "measured": [
+        {
+          "kind": "checkbox",
+          "name": "表示中の友だちをすべて選ぶ",
+          "target": "th",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 402,
+            "width": 16,
+            "height": 16,
+            "top": 402,
+            "right": 280,
+            "bottom": 418,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 390,
+            "width": 52,
+            "height": 40,
+            "top": 390,
+            "right": 292,
+            "bottom": 430,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "Kyohei Yamamotoを選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 452,
+            "width": 16,
+            "height": 16,
+            "top": 452,
+            "right": 280,
+            "bottom": 468,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 430,
+            "width": 52,
+            "height": 60,
+            "top": 430,
+            "right": 292,
+            "bottom": 490,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "Masato.Sを選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 512,
+            "width": 16,
+            "height": 16,
+            "top": 512,
+            "right": 280,
+            "bottom": 528,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 490,
+            "width": 52,
+            "height": 60,
+            "top": 490,
+            "right": 292,
+            "bottom": 550,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "菅野 亮を選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 572,
+            "width": 16,
+            "height": 16,
+            "top": 572,
+            "right": 280,
+            "bottom": 588,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 550,
+            "width": 52,
+            "height": 60,
+            "top": 550,
+            "right": 292,
+            "bottom": 610,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "Kenta Kawanoを選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 632,
+            "width": 16,
+            "height": 16,
+            "top": 632,
+            "right": 280,
+            "bottom": 648,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 610,
+            "width": 52,
+            "height": 60,
+            "top": 610,
+            "right": 292,
+            "bottom": 670,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "山田 花子を選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 692,
+            "width": 16,
+            "height": 16,
+            "top": 692,
+            "right": 280,
+            "bottom": 708,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 670,
+            "width": 52,
+            "height": 60,
+            "top": 670,
+            "right": 292,
+            "bottom": 730,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "坂本 真人を選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 752,
+            "width": 16,
+            "height": 16,
+            "top": 752,
+            "right": 280,
+            "bottom": 768,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 730,
+            "width": 52,
+            "height": 60,
+            "top": 730,
+            "right": 292,
+            "bottom": 790,
+            "left": 240
+          }
+        }
+      ],
+      "skipped": [],
+      "findings": []
+    }
+  },
+  {
+    "name": "dialog-create",
+    "route": "/templates",
+    "kind": "dialog",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/templates",
+    "width": 1440,
+    "pageOverflow": 0,
+    "panel": {
+      "title": "フォルダを追加",
+      "rect": {
+        "x": 440,
+        "y": 358,
+        "width": 560,
+        "height": 284,
+        "top": 358,
+        "right": 1000,
+        "bottom": 642,
+        "left": 440
+      },
+      "overflow": 0,
+      "bounds": true,
+      "hidden": [],
+      "radius": "16px"
+    },
+    "steps": [],
+    "controls": null
+  },
+  {
+    "name": "dialog-confirm",
+    "route": "/broadcasts",
+    "kind": "dialog",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/broadcasts",
+    "width": 1440,
+    "pageOverflow": 0,
+    "panel": {
+      "title": "「未購入者フォロー」を削除しますか？",
+      "rect": {
+        "x": 480,
+        "y": 260,
+        "width": 480,
+        "height": 169,
+        "top": 260,
+        "right": 960,
+        "bottom": 429,
+        "left": 480
+      },
+      "overflow": 0,
+      "bounds": true,
+      "hidden": [],
+      "radius": "16px"
+    },
+    "steps": [],
+    "controls": null
+  },
+  {
+    "name": "drawer",
+    "route": "/?edit=1",
+    "kind": "dialog",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/?edit=1",
+    "width": 1440,
+    "pageOverflow": 0,
+    "panel": {
+      "title": "ダッシュボード編集",
+      "rect": {
+        "x": 900,
+        "y": 0,
+        "width": 540,
+        "height": 1000,
+        "top": 0,
+        "right": 1440,
+        "bottom": 1000,
+        "left": 900
+      },
+      "overflow": 0,
+      "bounds": true,
+      "hidden": [],
+      "radius": "16px"
+    },
+    "steps": [],
+    "controls": null
+  },
+  {
+    "name": "steps-account",
+    "route": "/accounts/new",
+    "kind": "steps",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/accounts/new",
+    "width": 1440,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [
+      {
+        "overflow": 0,
+        "positions": [
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          }
+        ]
+      }
+    ],
+    "controls": null
+  },
+  {
+    "name": "steps-scenario",
+    "route": "/scenarios/new",
+    "kind": "steps",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/scenarios/new",
+    "width": 1440,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [
+      {
+        "overflow": 0,
+        "positions": [
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0.0078125
+          }
+        ]
+      }
+    ],
+    "controls": null
+  },
+  {
+    "name": "list-templates",
+    "route": "/templates",
+    "kind": "list",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/templates",
+    "width": 1152,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [],
+    "controls": {
+      "measured": [
+        {
+          "kind": "checkbox",
+          "name": "このページのテンプレートをすべて選択",
+          "target": "th",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 402,
+            "width": 16,
+            "height": 16,
+            "top": 402,
+            "right": 123,
+            "bottom": 418,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 390,
+            "width": 86,
+            "height": 40,
+            "top": 390,
+            "right": 150,
+            "bottom": 430,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「初回お問い合わせへの返信」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 448,
+            "width": 16,
+            "height": 16,
+            "top": 448,
+            "right": 123,
+            "bottom": 464,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 430,
+            "width": 86,
+            "height": 52,
+            "top": 430,
+            "right": 150,
+            "bottom": 482,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約前日のご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 500,
+            "width": 16,
+            "height": 16,
+            "top": 500,
+            "right": 123,
+            "bottom": 516,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 482,
+            "width": 86,
+            "height": 52,
+            "top": 482,
+            "right": 150,
+            "bottom": 534,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「発送完了のお知らせ」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 552,
+            "width": 16,
+            "height": 16,
+            "top": 552,
+            "right": 123,
+            "bottom": 568,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 534,
+            "width": 86,
+            "height": 52,
+            "top": 534,
+            "right": 150,
+            "bottom": 586,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「定期便 初回のご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 604,
+            "width": 16,
+            "height": 16,
+            "top": 604,
+            "right": 123,
+            "bottom": 620,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 586,
+            "width": 86,
+            "height": 52,
+            "top": 586,
+            "right": 150,
+            "bottom": 638,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「秋の新商品（画像）」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 656,
+            "width": 16,
+            "height": 16,
+            "top": 656,
+            "right": 123,
+            "bottom": 672,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 638,
+            "width": 86,
+            "height": 52,
+            "top": 638,
+            "right": 150,
+            "bottom": 690,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「折り返しのご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 708,
+            "width": 16,
+            "height": 16,
+            "top": 708,
+            "right": 123,
+            "bottom": 724,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 690,
+            "width": 86,
+            "height": 52,
+            "top": 690,
+            "right": 150,
+            "bottom": 742,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 1」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 760,
+            "width": 16,
+            "height": 16,
+            "top": 760,
+            "right": 123,
+            "bottom": 776,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 742,
+            "width": 86,
+            "height": 52,
+            "top": 742,
+            "right": 150,
+            "bottom": 794,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 2」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 812,
+            "width": 16,
+            "height": 16,
+            "top": 812,
+            "right": 123,
+            "bottom": 828,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 794,
+            "width": 86,
+            "height": 52,
+            "top": 794,
+            "right": 150,
+            "bottom": 846,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 3」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 864,
+            "width": 16,
+            "height": 16,
+            "top": 864,
+            "right": 123,
+            "bottom": 880,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 846,
+            "width": 86,
+            "height": 52,
+            "top": 846,
+            "right": 150,
+            "bottom": 898,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 4」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 916,
+            "width": 16,
+            "height": 16,
+            "top": 916,
+            "right": 123,
+            "bottom": 932,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 898,
+            "width": 86,
+            "height": 52,
+            "top": 898,
+            "right": 150,
+            "bottom": 950,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 5」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 968,
+            "width": 16,
+            "height": 16,
+            "top": 968,
+            "right": 123,
+            "bottom": 984,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 950,
+            "width": 86,
+            "height": 52,
+            "top": 950,
+            "right": 150,
+            "bottom": 1002,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 6」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 1020,
+            "width": 16,
+            "height": 16,
+            "top": 1020,
+            "right": 123,
+            "bottom": 1036,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 1002,
+            "width": 86,
+            "height": 52,
+            "top": 1002,
+            "right": 150,
+            "bottom": 1054,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約確定のお知らせ」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 1072,
+            "width": 16,
+            "height": 16,
+            "top": 1072,
+            "right": 123,
+            "bottom": 1088,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 1054,
+            "width": 86,
+            "height": 52,
+            "top": 1054,
+            "right": 150,
+            "bottom": 1106,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約変更のご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 1124,
+            "width": 16,
+            "height": 16,
+            "top": 1124,
+            "right": 123,
+            "bottom": 1140,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 1106,
+            "width": 86,
+            "height": 52,
+            "top": 1106,
+            "right": 150,
+            "bottom": 1158,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「来店後フォロー」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 1176,
+            "width": 16,
+            "height": 16,
+            "top": 1176,
+            "right": 123,
+            "bottom": 1192,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 1158,
+            "width": 86,
+            "height": 52,
+            "top": 1158,
+            "right": 150,
+            "bottom": 1210,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約のひな形 4」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 1228,
+            "width": 16,
+            "height": 16,
+            "top": 1228,
+            "right": 123,
+            "bottom": 1244,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 1210,
+            "width": 86,
+            "height": 52,
+            "top": 1210,
+            "right": 150,
+            "bottom": 1262,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約のひな形 5」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 1280,
+            "width": 16,
+            "height": 16,
+            "top": 1280,
+            "right": 123,
+            "bottom": 1296,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 1262,
+            "width": 86,
+            "height": 52,
+            "top": 1262,
+            "right": 150,
+            "bottom": 1314,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「ECのひな形 1」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 1332,
+            "width": 16,
+            "height": 16,
+            "top": 1332,
+            "right": 123,
+            "bottom": 1348,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 1314,
+            "width": 86,
+            "height": 52,
+            "top": 1314,
+            "right": 150,
+            "bottom": 1366,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「ECのひな形 2」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 1384,
+            "width": 16,
+            "height": 16,
+            "top": 1384,
+            "right": 123,
+            "bottom": 1400,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 1366,
+            "width": 86,
+            "height": 52,
+            "top": 1366,
+            "right": 150,
+            "bottom": 1418,
+            "left": 64
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「ECのひな形 3」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 107,
+            "y": 1436,
+            "width": 16,
+            "height": 16,
+            "top": 1436,
+            "right": 123,
+            "bottom": 1452,
+            "left": 107
+          },
+          "frame": {
+            "x": 64,
+            "y": 1418,
+            "width": 86,
+            "height": 52,
+            "top": 1418,
+            "right": 150,
+            "bottom": 1470,
+            "left": 64
+          }
+        }
+      ],
+      "skipped": [],
+      "findings": []
+    }
+  },
+  {
+    "name": "list-friends",
+    "route": "/friends",
+    "kind": "list",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/friends",
+    "width": 1152,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [],
+    "controls": {
+      "measured": [
+        {
+          "kind": "checkbox",
+          "name": "表示中の友だちをすべて選ぶ",
+          "target": "th",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 446,
+            "width": 16,
+            "height": 16,
+            "top": 446,
+            "right": 280,
+            "bottom": 462,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 434,
+            "width": 52,
+            "height": 40,
+            "top": 434,
+            "right": 292,
+            "bottom": 474,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "Kyohei Yamamotoを選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 496,
+            "width": 16,
+            "height": 16,
+            "top": 496,
+            "right": 280,
+            "bottom": 512,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 474,
+            "width": 52,
+            "height": 60,
+            "top": 474,
+            "right": 292,
+            "bottom": 534,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "Masato.Sを選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 556,
+            "width": 16,
+            "height": 16,
+            "top": 556,
+            "right": 280,
+            "bottom": 572,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 534,
+            "width": 52,
+            "height": 60,
+            "top": 534,
+            "right": 292,
+            "bottom": 594,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "菅野 亮を選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 616,
+            "width": 16,
+            "height": 16,
+            "top": 616,
+            "right": 280,
+            "bottom": 632,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 594,
+            "width": 52,
+            "height": 60,
+            "top": 594,
+            "right": 292,
+            "bottom": 654,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "Kenta Kawanoを選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 676,
+            "width": 16,
+            "height": 16,
+            "top": 676,
+            "right": 280,
+            "bottom": 692,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 654,
+            "width": 52,
+            "height": 60,
+            "top": 654,
+            "right": 292,
+            "bottom": 714,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "山田 花子を選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 736,
+            "width": 16,
+            "height": 16,
+            "top": 736,
+            "right": 280,
+            "bottom": 752,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 714,
+            "width": 52,
+            "height": 60,
+            "top": 714,
+            "right": 292,
+            "bottom": 774,
+            "left": 240
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "坂本 真人を選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 264,
+            "y": 796,
+            "width": 16,
+            "height": 16,
+            "top": 796,
+            "right": 280,
+            "bottom": 812,
+            "left": 264
+          },
+          "frame": {
+            "x": 240,
+            "y": 774,
+            "width": 52,
+            "height": 60,
+            "top": 774,
+            "right": 292,
+            "bottom": 834,
+            "left": 240
+          }
+        }
+      ],
+      "skipped": [],
+      "findings": []
+    }
+  },
+  {
+    "name": "dialog-create",
+    "route": "/templates",
+    "kind": "dialog",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/templates",
+    "width": 1152,
+    "pageOverflow": 0,
+    "panel": {
+      "title": "フォルダを追加",
+      "rect": {
+        "x": 296,
+        "y": 358,
+        "width": 560,
+        "height": 284,
+        "top": 358,
+        "right": 856,
+        "bottom": 642,
+        "left": 296
+      },
+      "overflow": 0,
+      "bounds": true,
+      "hidden": [],
+      "radius": "16px"
+    },
+    "steps": [],
+    "controls": null
+  },
+  {
+    "name": "dialog-confirm",
+    "route": "/broadcasts",
+    "kind": "dialog",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/broadcasts",
+    "width": 1152,
+    "pageOverflow": 0,
+    "panel": {
+      "title": "「未購入者フォロー」を削除しますか？",
+      "rect": {
+        "x": 336,
+        "y": 260,
+        "width": 480,
+        "height": 169,
+        "top": 260,
+        "right": 816,
+        "bottom": 429,
+        "left": 336
+      },
+      "overflow": 0,
+      "bounds": true,
+      "hidden": [],
+      "radius": "16px"
+    },
+    "steps": [],
+    "controls": null
+  },
+  {
+    "name": "drawer",
+    "route": "/?edit=1",
+    "kind": "dialog",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/?edit=1",
+    "width": 1152,
+    "pageOverflow": 0,
+    "panel": {
+      "title": "ダッシュボード編集",
+      "rect": {
+        "x": 612,
+        "y": 0,
+        "width": 540,
+        "height": 1000,
+        "top": 0,
+        "right": 1152,
+        "bottom": 1000,
+        "left": 612
+      },
+      "overflow": 0,
+      "bounds": true,
+      "hidden": [],
+      "radius": "16px"
+    },
+    "steps": [],
+    "controls": null
+  },
+  {
+    "name": "steps-account",
+    "route": "/accounts/new",
+    "kind": "steps",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/accounts/new",
+    "width": 1152,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [
+      {
+        "overflow": 0,
+        "positions": [
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          }
+        ]
+      }
+    ],
+    "controls": null
+  },
+  {
+    "name": "steps-scenario",
+    "route": "/scenarios/new",
+    "kind": "steps",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/scenarios/new",
+    "width": 1152,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [
+      {
+        "overflow": 0,
+        "positions": [
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0.0078125
+          }
+        ]
+      }
+    ],
+    "controls": null
+  },
+  {
+    "name": "list-templates",
+    "route": "/templates",
+    "kind": "list",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/templates",
+    "width": 1920,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [],
+    "controls": {
+      "measured": [
+        {
+          "kind": "checkbox",
+          "name": "このページのテンプレートをすべて選択",
+          "target": "th",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 358,
+            "width": 16,
+            "height": 16,
+            "top": 358,
+            "right": 405.5,
+            "bottom": 374,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 346,
+            "width": 86,
+            "height": 40,
+            "top": 346,
+            "right": 432.5,
+            "bottom": 386,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「初回お問い合わせへの返信」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 404,
+            "width": 16,
+            "height": 16,
+            "top": 404,
+            "right": 405.5,
+            "bottom": 420,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 386,
+            "width": 86,
+            "height": 52,
+            "top": 386,
+            "right": 432.5,
+            "bottom": 438,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約前日のご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 456,
+            "width": 16,
+            "height": 16,
+            "top": 456,
+            "right": 405.5,
+            "bottom": 472,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 438,
+            "width": 86,
+            "height": 52,
+            "top": 438,
+            "right": 432.5,
+            "bottom": 490,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「発送完了のお知らせ」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 508,
+            "width": 16,
+            "height": 16,
+            "top": 508,
+            "right": 405.5,
+            "bottom": 524,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 490,
+            "width": 86,
+            "height": 52,
+            "top": 490,
+            "right": 432.5,
+            "bottom": 542,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「定期便 初回のご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 560,
+            "width": 16,
+            "height": 16,
+            "top": 560,
+            "right": 405.5,
+            "bottom": 576,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 542,
+            "width": 86,
+            "height": 52,
+            "top": 542,
+            "right": 432.5,
+            "bottom": 594,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「秋の新商品（画像）」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 612,
+            "width": 16,
+            "height": 16,
+            "top": 612,
+            "right": 405.5,
+            "bottom": 628,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 594,
+            "width": 86,
+            "height": 52,
+            "top": 594,
+            "right": 432.5,
+            "bottom": 646,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「折り返しのご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 664,
+            "width": 16,
+            "height": 16,
+            "top": 664,
+            "right": 405.5,
+            "bottom": 680,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 646,
+            "width": 86,
+            "height": 52,
+            "top": 646,
+            "right": 432.5,
+            "bottom": 698,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 1」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 716,
+            "width": 16,
+            "height": 16,
+            "top": 716,
+            "right": 405.5,
+            "bottom": 732,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 698,
+            "width": 86,
+            "height": 52,
+            "top": 698,
+            "right": 432.5,
+            "bottom": 750,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 2」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 768,
+            "width": 16,
+            "height": 16,
+            "top": 768,
+            "right": 405.5,
+            "bottom": 784,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 750,
+            "width": 86,
+            "height": 52,
+            "top": 750,
+            "right": 432.5,
+            "bottom": 802,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 3」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 820,
+            "width": 16,
+            "height": 16,
+            "top": 820,
+            "right": 405.5,
+            "bottom": 836,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 802,
+            "width": 86,
+            "height": 52,
+            "top": 802,
+            "right": 432.5,
+            "bottom": 854,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 4」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 872,
+            "width": 16,
+            "height": 16,
+            "top": 872,
+            "right": 405.5,
+            "bottom": 888,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 854,
+            "width": 86,
+            "height": 52,
+            "top": 854,
+            "right": 432.5,
+            "bottom": 906,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 5」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 924,
+            "width": 16,
+            "height": 16,
+            "top": 924,
+            "right": 405.5,
+            "bottom": 940,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 906,
+            "width": 86,
+            "height": 52,
+            "top": 906,
+            "right": 432.5,
+            "bottom": 958,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「お問い合わせのひな形 6」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 976,
+            "width": 16,
+            "height": 16,
+            "top": 976,
+            "right": 405.5,
+            "bottom": 992,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 958,
+            "width": 86,
+            "height": 52,
+            "top": 958,
+            "right": 432.5,
+            "bottom": 1010,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約確定のお知らせ」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 1028,
+            "width": 16,
+            "height": 16,
+            "top": 1028,
+            "right": 405.5,
+            "bottom": 1044,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 1010,
+            "width": 86,
+            "height": 52,
+            "top": 1010,
+            "right": 432.5,
+            "bottom": 1062,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約変更のご案内」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 1080,
+            "width": 16,
+            "height": 16,
+            "top": 1080,
+            "right": 405.5,
+            "bottom": 1096,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 1062,
+            "width": 86,
+            "height": 52,
+            "top": 1062,
+            "right": 432.5,
+            "bottom": 1114,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「来店後フォロー」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 1132,
+            "width": 16,
+            "height": 16,
+            "top": 1132,
+            "right": 405.5,
+            "bottom": 1148,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 1114,
+            "width": 86,
+            "height": 52,
+            "top": 1114,
+            "right": 432.5,
+            "bottom": 1166,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約のひな形 4」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 1184,
+            "width": 16,
+            "height": 16,
+            "top": 1184,
+            "right": 405.5,
+            "bottom": 1200,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 1166,
+            "width": 86,
+            "height": 52,
+            "top": 1166,
+            "right": 432.5,
+            "bottom": 1218,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「予約のひな形 5」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 1236,
+            "width": 16,
+            "height": 16,
+            "top": 1236,
+            "right": 405.5,
+            "bottom": 1252,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 1218,
+            "width": 86,
+            "height": 52,
+            "top": 1218,
+            "right": 432.5,
+            "bottom": 1270,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「ECのひな形 1」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 1288,
+            "width": 16,
+            "height": 16,
+            "top": 1288,
+            "right": 405.5,
+            "bottom": 1304,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 1270,
+            "width": 86,
+            "height": 52,
+            "top": 1270,
+            "right": 432.5,
+            "bottom": 1322,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「ECのひな形 2」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 1340,
+            "width": 16,
+            "height": 16,
+            "top": 1340,
+            "right": 405.5,
+            "bottom": 1356,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 1322,
+            "width": 86,
+            "height": 52,
+            "top": 1322,
+            "right": 432.5,
+            "bottom": 1374,
+            "left": 346.5
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "「ECのひな形 3」を選択",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 389.5,
+            "y": 1392,
+            "width": 16,
+            "height": 16,
+            "top": 1392,
+            "right": 405.5,
+            "bottom": 1408,
+            "left": 389.5
+          },
+          "frame": {
+            "x": 346.5,
+            "y": 1374,
+            "width": 86,
+            "height": 52,
+            "top": 1374,
+            "right": 432.5,
+            "bottom": 1426,
+            "left": 346.5
+          }
+        }
+      ],
+      "skipped": [],
+      "findings": []
+    }
+  },
+  {
+    "name": "list-friends",
+    "route": "/friends",
+    "kind": "list",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/friends",
+    "width": 1920,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [],
+    "controls": {
+      "measured": [
+        {
+          "kind": "checkbox",
+          "name": "表示中の友だちをすべて選ぶ",
+          "target": "th",
+          "offset": 0,
+          "control": {
+            "x": 266,
+            "y": 402,
+            "width": 16,
+            "height": 16,
+            "top": 402,
+            "right": 282,
+            "bottom": 418,
+            "left": 266
+          },
+          "frame": {
+            "x": 242,
+            "y": 390,
+            "width": 52,
+            "height": 40,
+            "top": 390,
+            "right": 294,
+            "bottom": 430,
+            "left": 242
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "Kyohei Yamamotoを選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 266,
+            "y": 452,
+            "width": 16,
+            "height": 16,
+            "top": 452,
+            "right": 282,
+            "bottom": 468,
+            "left": 266
+          },
+          "frame": {
+            "x": 242,
+            "y": 430,
+            "width": 52,
+            "height": 60,
+            "top": 430,
+            "right": 294,
+            "bottom": 490,
+            "left": 242
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "Masato.Sを選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 266,
+            "y": 512,
+            "width": 16,
+            "height": 16,
+            "top": 512,
+            "right": 282,
+            "bottom": 528,
+            "left": 266
+          },
+          "frame": {
+            "x": 242,
+            "y": 490,
+            "width": 52,
+            "height": 60,
+            "top": 490,
+            "right": 294,
+            "bottom": 550,
+            "left": 242
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "菅野 亮を選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 266,
+            "y": 572,
+            "width": 16,
+            "height": 16,
+            "top": 572,
+            "right": 282,
+            "bottom": 588,
+            "left": 266
+          },
+          "frame": {
+            "x": 242,
+            "y": 550,
+            "width": 52,
+            "height": 60,
+            "top": 550,
+            "right": 294,
+            "bottom": 610,
+            "left": 242
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "Kenta Kawanoを選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 266,
+            "y": 632,
+            "width": 16,
+            "height": 16,
+            "top": 632,
+            "right": 282,
+            "bottom": 648,
+            "left": 266
+          },
+          "frame": {
+            "x": 242,
+            "y": 610,
+            "width": 52,
+            "height": 60,
+            "top": 610,
+            "right": 294,
+            "bottom": 670,
+            "left": 242
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "山田 花子を選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 266,
+            "y": 692,
+            "width": 16,
+            "height": 16,
+            "top": 692,
+            "right": 282,
+            "bottom": 708,
+            "left": 266
+          },
+          "frame": {
+            "x": 242,
+            "y": 670,
+            "width": 52,
+            "height": 60,
+            "top": 670,
+            "right": 294,
+            "bottom": 730,
+            "left": 242
+          }
+        },
+        {
+          "kind": "checkbox",
+          "name": "坂本 真人を選ぶ",
+          "target": "td",
+          "offset": 0,
+          "control": {
+            "x": 266,
+            "y": 752,
+            "width": 16,
+            "height": 16,
+            "top": 752,
+            "right": 282,
+            "bottom": 768,
+            "left": 266
+          },
+          "frame": {
+            "x": 242,
+            "y": 730,
+            "width": 52,
+            "height": 60,
+            "top": 730,
+            "right": 294,
+            "bottom": 790,
+            "left": 242
+          }
+        }
+      ],
+      "skipped": [],
+      "findings": []
+    }
+  },
+  {
+    "name": "dialog-create",
+    "route": "/templates",
+    "kind": "dialog",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/templates",
+    "width": 1920,
+    "pageOverflow": 0,
+    "panel": {
+      "title": "フォルダを追加",
+      "rect": {
+        "x": 680,
+        "y": 358,
+        "width": 560,
+        "height": 284,
+        "top": 358,
+        "right": 1240,
+        "bottom": 642,
+        "left": 680
+      },
+      "overflow": 0,
+      "bounds": true,
+      "hidden": [],
+      "radius": "16px"
+    },
+    "steps": [],
+    "controls": null
+  },
+  {
+    "name": "dialog-confirm",
+    "route": "/broadcasts",
+    "kind": "dialog",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/broadcasts",
+    "width": 1920,
+    "pageOverflow": 0,
+    "panel": {
+      "title": "「未購入者フォロー」を削除しますか？",
+      "rect": {
+        "x": 720,
+        "y": 260,
+        "width": 480,
+        "height": 169,
+        "top": 260,
+        "right": 1200,
+        "bottom": 429,
+        "left": 720
+      },
+      "overflow": 0,
+      "bounds": true,
+      "hidden": [],
+      "radius": "16px"
+    },
+    "steps": [],
+    "controls": null
+  },
+  {
+    "name": "drawer",
+    "route": "/?edit=1",
+    "kind": "dialog",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/?edit=1",
+    "width": 1920,
+    "pageOverflow": 0,
+    "panel": {
+      "title": "ダッシュボード編集",
+      "rect": {
+        "x": 1380,
+        "y": 0,
+        "width": 540,
+        "height": 1000,
+        "top": 0,
+        "right": 1920,
+        "bottom": 1000,
+        "left": 1380
+      },
+      "overflow": 0,
+      "bounds": true,
+      "hidden": [],
+      "radius": "16px"
+    },
+    "steps": [],
+    "controls": null
+  },
+  {
+    "name": "steps-account",
+    "route": "/accounts/new",
+    "kind": "steps",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/accounts/new",
+    "width": 1920,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [
+      {
+        "overflow": 0,
+        "positions": [
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          }
+        ]
+      }
+    ],
+    "controls": null
+  },
+  {
+    "name": "steps-scenario",
+    "route": "/scenarios/new",
+    "kind": "steps",
+    "buildId": "ih4Iu1cN9Esis4MpS3cYo",
+    "url": "/scenarios/new",
+    "width": 1920,
+    "pageOverflow": 0,
+    "panel": null,
+    "steps": [
+      {
+        "overflow": 0,
+        "positions": [
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0
+          },
+          {
+            "below": true,
+            "offset": 0.0078125
+          }
+        ]
+      }
+    ],
+    "controls": null
+  }
+]
