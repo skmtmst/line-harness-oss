@@ -46,8 +46,8 @@ describe('サイドバーの会社表示・設定・版', () => {
     const desktop = within(view.container.querySelector('aside:not(#mobile-menu)') as HTMLElement)
     expect(desktop.getByTitle('試験会社').textContent).toBe('試験会社')
     expect(desktop.getByText('musubo')).toBeTruthy()
-    expect(desktop.getByRole('link', { name: label, exact: true }).getAttribute('href')).toBe(href)
-    expect(desktop.queryByRole('link', { name: otherLabel, exact: true })).toBeNull()
+    expect(desktop.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
+    expect(desktop.queryByRole('link', { name: otherLabel })).toBeNull()
     expect(await desktop.findByText('Ver. 2.7.0（a1b2c3d）')).toBeTruthy()
     expect(desktop.getByText('検証環境')).toBeTruthy()
     expect(fixture.version).toHaveBeenCalled()
@@ -58,7 +58,7 @@ describe('サイドバーの会社表示・設定・版', () => {
     ['/hq', '試験会社'],
   ])('%sの見本では見出しを保ち、設定と版の取得を出さない', (pathname, heading) => {
     fixture.pathname = pathname
-    const view = render(createElement(Sidebar, { preview: true }))
+    const view = render(createElement<NonNullable<Parameters<typeof Sidebar>[0]>>(Sidebar, { preview: true }))
     const desktop = within(view.container.querySelector('aside:not(#mobile-menu)') as HTMLElement)
     expect(desktop.getByText(heading)).toBeTruthy()
     expect(desktop.queryByRole('link', { name: /^(統括の)?設定$/ })).toBeNull()
