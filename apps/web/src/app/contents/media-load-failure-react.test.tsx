@@ -17,6 +17,7 @@ const fixture = vi.hoisted(() => ({
   accountId: 'account-a' as string | null,
   mediaBehavior: 'ok' as 'ok' | 'fail503' | 'failFalse' | 'empty' | 'twoItems',
   countsFailed: false,
+  countsShape: 'ok' as 'ok' | 'array',
   foldersBehavior: 'ok' as 'ok' | 'fail503',
   detailBehavior: 'ok' as 'ok' | 'fail503' | 'fail404' | 'fail403' | 'failFalse',
   detailCalls: [] as Array<{ id: string; accountId: string }>,
@@ -93,6 +94,7 @@ vi.mock('@/lib/api', () => {
       media: {
         counts: () => {
           if (fixture.countsFailed) return Promise.reject(new ApiError(503, 'Service Unavailable'))
+          if (fixture.countsShape === 'array') return Promise.resolve({ success: true, data: [] })
           if (fixture.mediaBehavior === 'fail503') return Promise.reject(new ApiError(503, 'Service Unavailable'))
           if (fixture.mediaBehavior === 'failFalse') return Promise.resolve({ success: false, error: 'unknown failure' })
           const total = fixture.mediaBehavior === 'empty' ? 0 : fixture.mediaBehavior === 'twoItems' ? 2 : 1
@@ -216,6 +218,7 @@ beforeEach(() => {
   fixture.accountId = 'account-a'
   fixture.mediaBehavior = 'ok'
   fixture.countsFailed = false
+  fixture.countsShape = 'ok'
   fixture.foldersBehavior = 'ok'
   fixture.detailBehavior = 'ok'
   fixture.detailCalls.length = 0
@@ -254,6 +257,19 @@ describe('R587 フォルダだけの失敗は一覧と容量を隠さない', ()
     const retry = [...panel.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent === 'もう一度読み込む')
     expect(retry).toBeTruthy()
+  })
+
+  it('集計の形が違っても一覧を落とさず、一覧の口から登録メディア数を出す', async () => {
+    fixture.countsShape = 'array'
+    await renderPage()
+    await waitForText(MEDIA_A.filename)
+    expect(host.querySelector('[data-list-state="error"]')).toBeNull()
+    const total = () => [...host.querySelectorAll('[data-kpi-presentation]')]
+      .find((element) => element.textContent?.startsWith('登録メディア'))!
+    for (let index = 0; index < 30 && !total().textContent?.includes('1'); index += 1) {
+      await act(async () => { await settle() })
+    }
+    expect(total().textContent).toContain('1')
   })
 
   it('フォルダ欄の再試行で復旧する', async () => {

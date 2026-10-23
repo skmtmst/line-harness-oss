@@ -4,7 +4,7 @@ import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { api,ApiError,type MediaQuota } from '@/lib/api'
 import type { Folder,MediaItem } from '@line-crm/shared'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
-import { MediaSort } from './list-model'
+import { MediaSort, usableMediaCounts } from './list-model'
 
 
 type LoadMediaListContext = {
@@ -98,9 +98,24 @@ export async function loadMediaSummary({ latestAccountRef, selectedAccountId, se
       api.media.counts(accountAtRequest).catch(() => null),
     ])
     if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
-    setOverallTotal(overallResponse?.success
-      ? showArchivedOnly ? overallResponse.data.archived : overallResponse.data.total
-      : null)
+    const counts = overallResponse?.success ? usableMediaCounts(overallResponse.data) : null
+    if (counts) {
+      setOverallTotal(showArchivedOnly ? counts.archived : counts.total)
+    } else if (overallResponse?.success) {
+      /*
+        集計の口が成功を返しても形が違う（古いAPIや画面確認の見本）ときは、
+        一覧の口の総数へ切り替える。失敗のときは「—」のままにする。
+      */
+      const listResponse = await api.media.list(accountAtRequest, {
+        archived: showArchivedOnly ? 'only' : undefined,
+        limit: 1,
+        offset: 0,
+      }).catch(() => null)
+      if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
+      setOverallTotal(listResponse?.success ? listResponse.data.total : null)
+    } else {
+      setOverallTotal(null)
+    }
     if (quotaResponse?.success) setQuota(quotaResponse.data)
     else {
       setQuota(null)

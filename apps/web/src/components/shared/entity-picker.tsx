@@ -297,7 +297,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
     {Icon ? <Icon className={styles.fieldIcon} size={16} aria-hidden="true" /> : null}
     {selection ? <span className={styles.fieldChips}>{selection}</span> :
     <span className={styles.fieldValue}>
-      {empty ? <span className={styles.fieldPlaceholder}>{placeholder ?? `${noun}を選ぶ`}</span> : <>
+      {empty ? <span className={styles.fieldPlaceholder} title={placeholder ?? `${noun}を選ぶ`}>{placeholder ?? `${noun}を選ぶ`}</span> : <>
         <>{valuePrefix ? <span className={styles.fieldName} title={name}>{name}</span> : <TagPill size={compact ? 'sm' : 'md'} name={name} color={color} aria-label={`選択中の${noun}：${name}`} />}</>
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}

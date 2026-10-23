@@ -1,7 +1,7 @@
 'use client'
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
-import type { MediaItem } from '@line-crm/shared'
+import type { MediaItem, MediaTabCounts } from '@line-crm/shared'
 import { formatMediaSize } from './media-usage-display'
 
 
@@ -68,6 +68,18 @@ export function mediaDetailIdFromLocation(): string | null {
   if (typeof window === 'undefined') return null
   const id = new URLSearchParams(window.location.search).get('id')?.trim()
   return id || null
+}
+
+/**
+ * 一括集計の返事が使える形かを見る。口が古い・見本が別の形でも
+ * 画面を落とさず、呼ぶ側が一覧の口へ切り替えられるようにする。
+ */
+export function usableMediaCounts(value: unknown): MediaTabCounts | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const counts = value as Partial<MediaTabCounts>
+  if (typeof counts.total !== 'number' || typeof counts.unused !== 'number' || typeof counts.archived !== 'number') return null
+  if (!counts.byKind || typeof counts.byKind !== 'object' || Array.isArray(counts.byKind)) return null
+  return counts as MediaTabCounts
 }
 
 /** 数の帯の4マス。失敗・未取得は null（「—」表示）にする。 */
