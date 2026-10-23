@@ -346,6 +346,22 @@ export interface SafeDeliveryError {
 }
 
 const DELIVERY_ERROR_MESSAGES: Record<string, { message: string; retryable: boolean }> = {
+  delivery_action_unsupported: {
+    message: 'この操作は現在のUber Eats連携では利用できません。Uber Eats側で操作してください。',
+    retryable: false,
+  },
+  delivery_result_unknown: {
+    message: '送信結果を確認できません。重複操作を防ぐため再送を止めています。Uber Eats側の注文状態を確認してください。',
+    retryable: false,
+  },
+  delivery_order_conflict: {
+    message: 'この注文は操作中か、状態が変わっています。画面を開き直してください。',
+    retryable: false,
+  },
+  delivery_operation_failed: {
+    message: 'この操作は完了していません。Uber Eats側の注文状態と連携設定を確認してください。',
+    retryable: false,
+  },
   delivery_send_disabled: {
     message: 'この環境では各サービスへの送信が止まっています。設定を有効にしてからやり直してください。',
     retryable: false,
@@ -440,6 +456,8 @@ export async function dispatchToDeliveryService(
   };
 
   if (!deliverySendEnabled(env)) return failWith(safeDeliveryError('delivery_send_disabled'));
+  // Uber は注文ごとの実行権と公式APIを使う専用経路だけに送る。
+  if (request.service === 'ubereats') return failWith(safeDeliveryError('delivery_action_unsupported'));
   const config = apiConfigFor(env, request.service);
   if (!config) return failWith(safeDeliveryError('delivery_not_configured'));
   if (options.completedAttempts >= EXTERNAL_DELIVERY_MAX_ATTEMPTS) {

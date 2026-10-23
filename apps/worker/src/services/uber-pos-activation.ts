@@ -18,7 +18,10 @@ export async function claimPosActivation(db: D1Database, input: {
     SET uber_store_id = ?, uber_store_name = ?, external_store_id = ?,
         last_error = '${POS_ACTIVATION_STARTED}', version = version + 1, updated_at = ?
     WHERE store_id = ? AND account_id = ? AND version = ? AND status = 'pending_store'
-      AND COALESCE(last_error, '') NOT IN ('${POS_ACTIVATION_STARTED}', '${POS_ACTIVATION_UNKNOWN}')
+      AND COALESCE(last_error, '') NOT IN ('${POS_ACTIVATION_STARTED}', '${POS_ACTIVATION_UNKNOWN}',
+        'pos_deactivation_started', 'pos_deactivation_unknown',
+        'pos_disconnect_reauthorization_pending',
+        'store_provision_review_required', 'store_menu_refresh_review_required')
       AND EXISTS (SELECT 1 FROM rt_delivery_uber_store_candidates c
         WHERE c.store_id = rt_delivery_uber_connections.store_id AND c.uber_store_id = ?
           AND c.uber_store_name = ? AND c.external_store_id IS ?)`)

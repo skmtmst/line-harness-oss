@@ -16,7 +16,16 @@ import { fail, staffTenantId } from './restaurant-google.js';
 import { UBER_OAUTH_CALLBACK_PATH, uberOAuthClient } from '../services/restaurant-delivery.js';
 import { isoFromMs, deliveryStore } from './restaurant-delivery-common.js';
 import { registerUberStoreRoutes } from './restaurant-delivery-ubereats-stores.js';
+import { registerUberConnectionManagementRoutes } from './restaurant-delivery-uber-connection-management.js';
 import { posActivationUnresolved, POS_ACTIVATION_STARTED, POS_ACTIVATION_UNKNOWN } from '../services/uber-pos-activation.js';
+import { saveUberOAuthConnection } from '../features/uber-delivery/index.js';
+
+export function uberOAuthModeForConnection(
+  connection: { status: string; uber_store_id: string | null } | null,
+): 'connect' | 'reconnect' {
+  return connection && connection.status !== 'disconnected' && connection.uber_store_id
+    ? 'reconnect' : 'connect';
+}
 
 export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
   // ---------- Uber Eats のログイン連携（店舗が自分でつなぐ経路） ----------
@@ -44,6 +53,7 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
     mode: 'connect' | 'reconnect';
     expires_at: number;
     used_at: number | null;
+    created_at: number;
   }
 
   interface UberConnectionRow {
@@ -56,6 +66,7 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
     status: 'pending_store' | 'connected' | 'expired' | 'no_permission' | 'disconnected';
     connected_at: number | null;
     provisioned_at: number | null;
+    disconnected_at: number | null;
     updated_at: number | null;
     last_error: string | null;
     version: number;
@@ -93,7 +104,7 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
     return dbFor(c.env, storeId)
       .prepare(
         `SELECT store_id, account_id, uber_store_id, uber_store_name, access_token_expires_at,
-              granted_scope, status, connected_at, provisioned_at, updated_at, last_error, version
+              granted_scope, status, connected_at, provisioned_at, disconnected_at, updated_at, last_error, version
          FROM rt_delivery_uber_connections WHERE store_id = ? LIMIT 1`,
       )
       .bind(storeId)
@@ -132,6 +143,8 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
     },
   );
 
+  registerUberConnectionManagementRoutes(restaurantDelivery, { deliveryStore, isoFromMs });
+
   /**
    * 認可画面へ渡す入口。店舗管理者以上だけが押せる。
    * ここでは一時状態を作るだけで、接続情報には触らない。
@@ -149,11 +162,15 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
       if (!store.lineAccountId) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
 
       const existing = await uberConnectionFor(c, store.id);
-      if (posActivationUnresolved(existing?.last_error)) {
+      if (posActivationUnresolved(existing?.last_error)
+        || existing?.last_error === 'pos_deactivation_started'
+        || existing?.last_error === 'pos_deactivation_unknown'
+        || existing?.last_error === 'pos_disconnect_reauthorization_pending'
+        || existing?.last_error === 'store_provision_review_required'
+        || existing?.last_error === 'store_menu_refresh_review_required') {
         return fail(c, 409, 'お店をつないだ結果の確認が必要です。送り直さず musubo へお知らせください', { code: POS_ACTIVATION_UNKNOWN });
       }
-      const mode =
-        existing && existing.status !== 'disconnected' ? 'reconnect' : 'connect';
+      const mode = uberOAuthModeForConnection(existing);
       const state = randomToken(32);
       const now = Date.now();
       await dbFor(c.env, store.id)
@@ -215,7 +232,7 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
       const stateRow = state
         ? await dbFor(c.env)
             .prepare(
-              `SELECT state, account_id, store_id, staff_id, mode, expires_at, used_at
+              `SELECT state, account_id, store_id, staff_id, mode, expires_at, used_at, created_at
                FROM rt_delivery_uber_oauth_states WHERE state = ? LIMIT 1`,
             )
             .bind(state)
@@ -260,8 +277,18 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
         .bind(stateRow.store_id, staffTenantId(c))
         .first<{ id: string; line_account_id: string | null }>();
       if (!store) return c.redirect(uberReturnUrl(c, lineAccountId, 'error:store_missing'));
-      if (posActivationUnresolved((await uberConnectionFor(c, store.id))?.last_error)) {
+      const currentConnection = await uberConnectionFor(c, store.id);
+      if (posActivationUnresolved(currentConnection?.last_error)
+        || currentConnection?.last_error === 'pos_deactivation_started'
+        || currentConnection?.last_error === 'pos_deactivation_unknown'
+        || currentConnection?.last_error === 'pos_disconnect_reauthorization_pending'
+        || currentConnection?.last_error === 'store_provision_review_required'
+        || currentConnection?.last_error === 'store_menu_refresh_review_required') {
         return c.redirect(uberReturnUrl(c, lineAccountId, `error:${POS_ACTIVATION_UNKNOWN}`));
+      }
+      if (currentConnection?.disconnected_at
+        && stateRow.created_at <= currentConnection.disconnected_at) {
+        return c.redirect(uberReturnUrl(c, lineAccountId, 'error:connection_changed'));
       }
 
       const client = uberOAuthClient(c.env);
@@ -279,40 +306,13 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
         const accessEnc = await encryptCredential(token.accessToken, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
         const now = Date.now();
         // つなぐ店舗を選ぶ手順（設計 DL-4）が残っているので、まだ `connected` にしない。
-        const saved = await db
-          .prepare(
-            `INSERT INTO rt_delivery_uber_connections
-             (store_id, account_id, access_token_enc, access_token_expires_at, granted_scope,
-              status, connected_by_staff_id, connected_at, disconnected_at, last_error,
-              version, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, 'pending_store', ?, ?, NULL, NULL, 1, ?, ?)
-           ON CONFLICT(store_id) DO UPDATE SET
-             account_id = excluded.account_id,
-             access_token_enc = excluded.access_token_enc,
-             access_token_expires_at = excluded.access_token_expires_at,
-             granted_scope = excluded.granted_scope,
-             status = 'pending_store',
-             connected_by_staff_id = excluded.connected_by_staff_id,
-             connected_at = excluded.connected_at,
-             disconnected_at = NULL,
-             last_error = NULL,
-             version = rt_delivery_uber_connections.version + 1,
-             updated_at = excluded.updated_at
-           WHERE COALESCE(rt_delivery_uber_connections.last_error, '') NOT IN ('${POS_ACTIVATION_STARTED}', '${POS_ACTIVATION_UNKNOWN}')`,
-          )
-          .bind(
-            store.id,
-            store.line_account_id ?? stateRow.account_id,
-            accessEnc,
-            token.expiresAtMs,
-            token.scope.join(' '),
-            stateRow.staff_id,
-            now,
-            now,
-            now,
-          )
-          .run();
-        if (Number(saved.meta?.changes ?? 0) !== 1) {
+        const saved = await saveUberOAuthConnection({
+          db, storeId: store.id, accountId: stateRow.account_id, tenantId: staffTenantId(c), mode: stateRow.mode,
+          staffId: stateRow.staff_id, accessTokenEnc: accessEnc,
+          accessTokenExpiresAt: token.expiresAtMs, grantedScope: token.scope.join(' '),
+          stateCreatedAt: stateRow.created_at, expectedVersion: currentConnection?.version ?? 1, nowMs: now,
+        });
+        if (!saved) {
           return c.redirect(uberReturnUrl(c, lineAccountId, `error:${POS_ACTIVATION_UNKNOWN}`));
         }
         auditLog(
@@ -321,7 +321,8 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
           { id: store.id, kind: 'rt_store' },
           { lineAccountId },
         );
-        return c.redirect(uberReturnUrl(c, lineAccountId, 'pending_store'));
+        return c.redirect(uberReturnUrl(c, lineAccountId,
+          stateRow.mode === 'reconnect' ? 'reauthorized' : 'pending_store'));
       } catch (error) {
         // 残すのは分類済みの符号だけ。Uber から返った自由文・本文・例外は保存も表示もしない。
         if (error instanceof CredentialEncryptionKeyError) {
@@ -332,7 +333,11 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
         await db
           .prepare(
             `UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ?
-             AND COALESCE(last_error, '') NOT IN ('${POS_ACTIVATION_STARTED}', '${POS_ACTIVATION_UNKNOWN}')`,
+             AND COALESCE(last_error, '') NOT IN
+               ('${POS_ACTIVATION_STARTED}', '${POS_ACTIVATION_UNKNOWN}',
+                'pos_deactivation_started', 'pos_deactivation_unknown',
+                'pos_disconnect_reauthorization_pending',
+                'store_provision_review_required', 'store_menu_refresh_review_required')`,
           )
           .bind(code_, Date.now(), store.id)
           .run();

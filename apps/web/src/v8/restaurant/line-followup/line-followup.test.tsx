@@ -5,6 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), updateLineFlow: vi.fn(), role: 'owner' as string | null }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
+vi.mock('@/lib/use-feature-visibility', () => ({
+  useFeatureVisibility: () => ({
+    status: 'ready',
+    features: { friend_fields: true, common_vars: true },
+    enabled: () => true,
+  }),
+}))
+vi.mock('@/components/scenarios/scenario-reference-data', () => ({
+  scenarioReferenceData: {
+    friendFields: async () => ({ success: true, data: [] }),
+    commonVars: async () => ({ success: true, data: [] }),
+  },
+}))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { snapshot: fixture.snapshot, updateLineFlow: fixture.updateLineFlow } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))
 import LineFollowupV8, { timingLabel } from './line-followup'

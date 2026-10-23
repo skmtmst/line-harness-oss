@@ -738,6 +738,8 @@
 - [v8-change-map](v8-change-map.md)
 - [見つからないページのコード案内](../apps/web/src/v8/not-found/README.md)
 - [デリバリー注文連携の提供状況](release-log/unreleased/1781-kenta-cleanup-u01l.md)
+- [Uber Eatsの注文受信と重複操作の防止](release-log/unreleased/1800-masato-uber-orders.md)
+- [Uber Eatsの接続確認・解除・再ログイン](release-log/unreleased/1806-masato-uber-connection-management.md)
 - [検査結果と品質記録の整合](release-log/unreleased/1781-kenta-cleanup-f04.md)
 - [デリバリー連携の準備状況を明確化](release-log/unreleased/1781-kenta-cleanup-u01m.md)
 - [公開前の点検と更新履歴の参照](release-log/unreleased/1781-kenta-cleanup-f05.md)
