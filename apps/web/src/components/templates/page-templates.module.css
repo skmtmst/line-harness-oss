@@ -64,6 +64,10 @@
   :global(:root) .listCards[data-card-columns='4'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   :global(:root) .listCards[data-card-narrow-columns] { grid-template-columns: repeat(var(--tpl-list-card-narrow-columns), minmax(0, 1fr)); }
 }
+/* スマートフォンの幅では、カードの一覧はどれも1列にする（列の指定より勝つ）。 */
+@container v8-page (max-width: 639px) {
+  :global(:root) .listCards, :global(:root) .listCards:is([data-card-columns], [data-card-narrow-columns]) { grid-template-columns: minmax(0, 1fr); }
+}
 :global(:root) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
 :global(:root) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global(:root) .folders { box-sizing: content-box; width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-row); }
