@@ -1,7 +1,7 @@
 'use client'
 
 import { revealInScroller } from './sidebar-current-item'
-import { V8_NAV_ICONS } from './sidebar-icons'
+import { V8_NAV_ICONS, V8_SETTINGS_ICON } from './sidebar-icons'
 export { revealInScroller } from './sidebar-current-item'
 
 import { readStaffIdentity } from '@/lib/staff-identity-state'
@@ -34,7 +34,7 @@ import styles from './sidebar.module.css'
 
 function NavIcon({ d, className }: { d: string; className?: string }) {
   return (
-    <svg className={className ?? "h-[18px] w-[18px]"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className={className ?? "h-[18px] w-[18px]"} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
     </svg>
   )
@@ -57,9 +57,6 @@ const HQ_SETTINGS_PATHS = ['/hq/settings', '/hq/members', '/hq/billing', '/hq/su
 const SIDEBAR_GROUPS_KEY = 'lh-sidebar-groups'
 /** 保存が無いとき、この幅より狭ければ左メニューを畳んで開く。1152 の絵は開いたまま。 */
 export const SIDEBAR_AUTO_COLLAPSE_BELOW = 1152
-
-/** 左メニューのいちばん下の「設定」（夕41・部品 njl8e）。歯車は予約設定と同じ形。 */
-const SETTINGS_GEAR_ICON = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31-.826 2.37-2.37 1.04-.6 2.296-.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
 
 /*
  * PERF-08: バッジ件数をアカウント単位で共有する直近値。
@@ -829,7 +826,7 @@ export default function Sidebar({
                   }`}
                 >
                   <span className="shrink-0">{(() => {
-                    const V8Icon = !isHq ? V8_NAV_ICONS[item.id] : undefined
+                    const V8Icon = V8_NAV_ICONS[item.id]
                     return V8Icon ? <V8Icon className={styles.v8NavIcon} aria-hidden="true" /> : <NavIcon className={styles.v8NavIcon} d={item.iconV8 ? item.iconV8 : item.icon} />
                   })()}</span>
                   <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>{visibleLabel}</span>
@@ -881,7 +878,7 @@ export default function Sidebar({
             data-rail-label="設定"
             className={`${styles.item} ${settingsActive ? styles.active : ''}`}
           >
-            <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
+            <span className="shrink-0"><V8_SETTINGS_ICON className={styles.v8NavIcon} aria-hidden="true" /></span>
             <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>設定</span>
           </Link>
         </div>
@@ -901,7 +898,7 @@ export default function Sidebar({
             data-rail-label="統括の設定"
             className={`${styles.item} ${hqSettingsActive ? styles.active : ''}`}
           >
-            <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
+            <span className="shrink-0"><V8_SETTINGS_ICON className={styles.v8NavIcon} aria-hidden="true" /></span>
             <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>統括の設定</span>
           </Link>
         </div>
