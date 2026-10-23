@@ -109,6 +109,10 @@
 }
 @container v8-page (max-width: 639px) {
   .cardButtons { flex-wrap: wrap; }
+  /* スマートフォンの幅では、状態の札を名前の下へ回し、名前と補足に幅をゆずる。 */
+  .cardHead { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; row-gap: var(--tpl-hq-nav-gap); }
+  .cardHead > .logo { grid-row: span 2; }
+  .cardHead > :last-child:not(.cardName) { grid-column: 2; justify-self: start; }
 }
 
 .grow { flex: 1; min-width: 0; }
