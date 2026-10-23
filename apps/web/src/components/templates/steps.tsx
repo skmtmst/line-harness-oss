@@ -16,8 +16,8 @@ type DotState = 'done' | 'current' | 'todo' | 'attention'
 /**
  * ★V8 の手順（共通部品 Fa8ED「手順（共通・題と説明の下・左寄せ）」・決まりの板 q1xNMz。2026-10-08 オーナー）。
  *
- * - 置き場所：作る画面の題と説明のすぐ下・左寄せ・1行（型の PageHeading の `steps` に渡す）。横いっぱいに広げない
- * - 段：丸24（済み＝緑に白い✓・今＝墨に白い数字・まだ＝薄い枠に灰の数字）・名13（今だけ太字）・段の間に線24
+ * - 作る画面の題と説明の下に置き、丸を等間隔に並べ、名前を丸の下で中央にそろえる。
+ * - 済みは薄い緑にチェック、今は緑の輪と数字、まだは灰の輪と数字。段の間を線でつなぐ。
  * - 済みの段（と直すところがある段）は押して戻れる。まだの段・今の段は押せない（reachable の付いたまだの段だけ、番号のまま押して進める）
  * - 入らない幅では各名を1行で省略し、全文は読み上げと title に残す
  *
@@ -85,7 +85,7 @@ export function Steps({
           const dot = (
             <span className={styles.dot} data-step-dot={state} title={state === 'attention' ? '直すところがあります' : undefined}>
               {state === 'done'
-                ? <><Check className={styles.check} aria-hidden="true" strokeWidth={2.5} /><span className={styles.srOnly}>済み</span></>
+                ? <><Check className={styles.check} aria-hidden="true" strokeWidth={2} /><span className={styles.srOnly}>済み</span></>
                 : state === 'attention'
                   ? <><span aria-hidden="true">△</span><span className={styles.srOnly}>直すところあり</span></>
                   : step.order}

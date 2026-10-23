@@ -3,7 +3,7 @@
 
 import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { PanelsTopLeft, X } from 'lucide-react'
 import { OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
 import Dialog from './dialog'
@@ -18,6 +18,8 @@ export type DrawerProps = {
   open: boolean
   title: string
   titleAccessory?: ReactNode
+  /** 題と説明の左に置く、線のアイコン。false なら印を省く。 */
+  headerIcon?: ReactNode
   closeAppearance?: 'box'
   description?: ReactNode
   contentSpacing?: 'sections'
@@ -64,6 +66,7 @@ export default function Drawer({
   open,
   title,
   titleAccessory,
+  headerIcon = <PanelsTopLeft />,
   closeAppearance,
   description,
   contentSpacing,
@@ -102,12 +105,15 @@ export default function Drawer({
   if (!open && !leaving) return null
 
   const titleBlock = (
-    <div>
-      <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</h2>{titleAccessory}</div>
-      {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
+    <div className={styles.heading}>
+      {headerIcon ? <span className={styles.headerIcon} aria-hidden="true">{headerIcon}</span> : null}
+      <div className={styles.headingText}>
+        <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</h2>{titleAccessory}</div>
+        {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
+      </div>
     </div>
   )
-  const closeButton = closeAppearance === 'box' ? <IconButton onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></IconButton> : <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
+  const closeButton = closeAppearance === 'box' ? <IconButton className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></IconButton> : <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={18} /></button>
 
   const panel = (
     <aside
@@ -153,7 +159,7 @@ export default function Drawer({
       </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {band ? <div className={styles.band}>{band}</div> : null}
-      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
+      {footer ? <footer className={styles.footer} data-window-actions>{footer}</footer> : null}
     </aside>
   )
   const discardDialog = discard.confirming ? <Dialog open title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null

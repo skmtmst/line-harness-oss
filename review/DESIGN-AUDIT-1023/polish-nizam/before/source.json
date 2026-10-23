@@ -1,0 +1,12 @@
+{
+  "note": "前回作業から残る本番形式の出力を修正前として保存。参照するコードは835b15750f（前回の引き継ぎ）。出力へのGit SHA埋め込みの照合はしておらず、正式な同一SHAの照合とは扱わない。今回取り込んだ最新開発の追加はスマホ用カード1列と文書のみ。",
+  "htmlHashes": {
+    "apps/web/out/templates.html": "37739f1b16bfa49c7b1161e605bf1715c6bfccf71134331f1a0dd63d228d9f2a",
+    "apps/web/out/friends.html": "091eadbb400e77193eb479293d9c773064d5fa4c33a2e2603d1a105ff22d3cb0",
+    "apps/web/out/accounts/new.html": "bed4a0a109551ab2236c99a5dc3ce186d4fb95ac2cf5944a7c04e8160761b8a5",
+    "apps/web/out/scenarios/new.html": "9b1def93ccd2a8816569f66fa108d0403dc7a989c557d9bfa4a89e3a5e70acc9",
+    "apps/web/out/index.html": "78a4bca9ac8260dccf049b98d2ddfc087cb0b8e43c6b221472d624a75316512f",
+    "apps/web/out/broadcasts.html": "cbae72be7bd6e4dbf418b12a0d5ceb440435e3edea80bd960b965ac2f3b0255a"
+  },
+  "referenceCommit": "835b15750fe380d6e2423051dfbeefeec7882295"
+}

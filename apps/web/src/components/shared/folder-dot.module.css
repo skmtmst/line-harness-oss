@@ -45,3 +45,7 @@ html:root [data-list-name] .name :is(a, button) { color: var(--color-ink); font-
 
 .line[data-has-annotation] { width: max-content; }
 .line[data-has-annotation] > :last-child { flex: none; }
+
+/* セルでは名前を行の塊として置き、選択の箱もセルの中央にそろえる。 */
+:global(td) > .line,
+:global([role='cell']) > .line { display: flex; }
