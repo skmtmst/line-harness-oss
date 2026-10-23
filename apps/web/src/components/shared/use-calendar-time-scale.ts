@@ -7,7 +7,7 @@ type Interval = { start: string; end: string }
 const px = (value: string) => Number.parseFloat(value) || 0
 
 /** Scale the complete time axis instead of extending short controls over their neighbours. */
-export function useCalendarTimeScale(entries: readonly Interval[], free: readonly Interval[], canWrite: boolean) {
+export function useCalendarTimeScale(entries: readonly Interval[], free: readonly Interval[], canWrite: boolean, placement: 'calendar' | 'board' = 'calendar') {
   const host = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const element = host.current
@@ -15,7 +15,7 @@ export function useCalendarTimeScale(entries: readonly Interval[], free: readonl
     const intervals = [...entries, ...(canWrite ? free : [])].flatMap(slot => { const interval = calendarInterval(slot); return interval ? [interval.end - interval.start] : [] })
     if (!intervals.length) return
     const minimum = Math.min(...intervals)
-    const property = '--tpl-sd-week-hour'
+    const property = placement === 'board' ? '--tpl-sd-hour' : '--tpl-sd-week-hour'
     const original = element.style.getPropertyValue(property), priority = element.style.getPropertyPriority(property)
     let baseHour: number | null = null
     let active = true
@@ -25,7 +25,7 @@ export function useCalendarTimeScale(entries: readonly Interval[], free: readonl
       const css = getComputedStyle(element)
       baseHour ??= px(css.getPropertyValue(property))
       const gap = px(css.getPropertyValue('--tpl-sd-entry-gap'))
-      const samples = [element.querySelector<HTMLElement>('button[data-placement="calendar"]:not([data-calendar-slot])'), element.querySelector<HTMLElement>('button[data-calendar-slot]')]
+      const samples = [element.querySelector<HTMLElement>(`button[data-placement="${placement}"]:not([data-calendar-slot])`), element.querySelector<HTMLElement>('button[data-calendar-slot]')]
       const required = Math.max(0, ...samples.filter((sample): sample is HTMLElement => Boolean(sample)).map(button => {
         const style = getComputedStyle(button)
         const heights = [...button.children].map(child => (child as HTMLElement).scrollHeight || child.getBoundingClientRect().height)
@@ -53,6 +53,6 @@ export function useCalendarTimeScale(entries: readonly Interval[], free: readonl
       if (original) element.style.setProperty(property, original, priority)
       else element.style.removeProperty(property)
     }
-  }, [entries, free, canWrite])
+  }, [entries, free, canWrite, placement])
   return host
 }

@@ -1,8 +1,9 @@
 'use client'
 import { formatYen } from '@line-crm/shared';
-import { statusTone } from './booking-status-tone'
 
-import ReservationBoard, { ReservationLegend } from '@/components/shared/reservation-board'
+import ReservationBoard from '@/components/shared/reservation-board'
+import { BookingSourceLegend, BookingStatus } from '@/components/shared/booking-presentation'
+import { reservationBookingState } from '@/components/shared/booking-state'
 
 import { PeopleDayList } from '@/v8/booking-bookings/public/day-list/index'
 
@@ -56,7 +57,6 @@ import FilterChip from '@/components/shared/filter-chip'
 
 import { ListToolbarEnd, ListToolbarRow, ListToolbarSearchSlot, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 
-import StatusBadge from '@/components/shared/status-badge'
 
 import { RowMenu } from '@/components/shared/row-actions'
 
@@ -268,7 +268,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<p>担当者か予約メニューが未設定です</p>:null}
             slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
-            trailingToolbar={view==='day'?<><ReservationLegend label="予約元の色" items={[{label:'LINE',tone:'success'},{label:'電話',tone:'neutral'}]}/><EntitySelect aria-label={`${words.staff}で絞り込む`} value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'担当者：すべて'},...staffList.map(r=>({value:r.id,label:`担当者：${r.display_name}`}))]}/></>:undefined}
+            trailingToolbar={view==='day'?<><BookingSourceLegend sources={['line','phone']}/><EntitySelect aria-label={`${words.staff}で絞り込む`} value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'担当者：すべて'},...staffList.map(r=>({value:r.id,label:`担当者：${r.display_name}`}))]}/></>:undefined}
             resources={staffList.filter(r=>view!=='day'||boardStaff==='all'||r.id===boardStaff).map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
             renderList={view === 'day' ? () => <PeopleDayList usageStyle={usageStyle} rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
@@ -541,7 +541,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                         <Td align="right" className="tabular-nums">
                           {formatYen(b.price_at_booking)}
                         </Td>
-                        <StatusCell primary={<StatusBadge tone={statusTone[b.status] ?? 'neutral'}>{statusLabel[b.status] ?? b.status}</StatusBadge>} />
+                        <StatusCell primary={<BookingStatus state={reservationBookingState({status:b.status,holdExpiresAt:null})}>{statusLabel[b.status] ?? b.status}</BookingStatus>} />
                         <ActionCell>
                           {/* 行全体が詳細パネルを開くので、操作列の押下は行へ伝えない。
                               行の右端は「…」1つ（B-253）。詳細・会話・承認などは中へ。承認待ちは状態の札で分かる。 */}
