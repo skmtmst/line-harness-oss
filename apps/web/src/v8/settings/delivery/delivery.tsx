@@ -16,15 +16,15 @@ import StatusBadge from '@/components/shared/status-badge'
 import { usePageTitle, usePageCrumbs, useHideSettingsNav } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { restaurantDeliveryApi } from '@/lib/restaurant-delivery-api'
+import { ApiError } from '@/lib/api'
+import { isUberConnectionMutationData, restaurantDeliveryApi } from '@/lib/restaurant-delivery-api'
 import { formatDate } from '@/lib/format'
 import {
   SERVICES,
   STATUS,
-  UBER_DESIGN_STATUS,
-  UBER_STATE_NOTE,
   WAITING,
   connectLabel,
+  uberConnectionPatch,
   uberPatch,
   withParticle,
   type DeliveryService,
@@ -78,6 +78,22 @@ import styles from './delivery.module.css'
 export { SERVICES } from './delivery-services'
 export type { DeliveryService, DeliveryStore } from './delivery-services'
 
+type BusyAction = 'connect' | 'reauthorize' | 'stores' | 'select' | 'check' | 'disconnect'
+type BusyState = { serviceId: DeliveryService['id']; action: BusyAction }
+/** この符号は Uber への解除送信前に終わるため、結果不明として接続操作全体を止める必要はない。 */
+const DISCONNECT_PRE_FLIGHT_FAILURES = new Set([
+  'connection_busy',
+  'connection_not_active',
+  'confirmation_required',
+  'reauthorization_required',
+  'provider_ownership_unverified',
+  'order_dispatch_in_progress',
+  'delivery_send_disabled',
+  'oauth_not_configured',
+  'encryption_key_invalid',
+  'connection_check_failed',
+])
+
 export default function DeliverySettingsPage({ services: initialServices = SERVICES }: { services?: DeliveryService[] } = {}) {
   usePageTitle('デリバリー連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
@@ -90,10 +106,12 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   const uberReturn = searchParams.get('ubereats') ?? ''
 
   const [services, setServices] = useState<DeliveryService[]>(initialServices)
-  /** ログインの経路を用意している間、ボタンを押しっぱなしにしないための印。 */
-  const [busy, setBusy] = useState<DeliveryService['id'] | null>(null)
+  /** 外部通信を伴う操作を重ねず、どのボタンが処理中かを示す印。 */
+  const [busy, setBusy] = useState<BusyState | null>(null)
   /** 解除を確かめる窓（`kJLks`）で外そうとしている会社 */
   const [disconnecting, setDisconnecting] = useState<DeliveryService | null>(null)
+  const [disconnectError, setDisconnectError] = useState('')
+  const [disconnectBlocked, setDisconnectBlocked] = useState(false)
   /** つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻ったときに開く。 */
   const [picking, setPicking] = useState<{ service: DeliveryService; stores: DeliveryStore[]; accountId: string } | null>(null)
   const [pickedStoreId, setPickedStoreId] = useState('')
@@ -103,6 +121,16 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
    * 承認済みの札は4つのままなので、この続きがあることは画面の状態では持たず別に覚える。
    */
   const [uberPendingStore, setUberPendingStore] = useState(false)
+  const accountRef = useRef(selectedAccountId)
+  const canManageRef = useRef(canManage)
+  const initialServicesRef = useRef(initialServices)
+  const loadRequestRef = useRef(0)
+  const operationRequestRef = useRef(0)
+  const operationLockRef = useRef(false)
+  const autoPickedRef = useRef(false)
+  accountRef.current = selectedAccountId
+  canManageRef.current = canManage
+  initialServicesRef.current = initialServices
 
   const anyConnected = services.some((service) => service.status !== 'disconnected')
 
@@ -111,24 +139,81 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     setServices((prev) => prev.map((service) => (service.id === id ? { ...service, ...next } : service)))
   }, [])
 
+  const beginOperation = useCallback((serviceId: DeliveryService['id'], action: BusyAction) => {
+    if (operationLockRef.current) return null
+    operationLockRef.current = true
+    // 同じアカウントでも、操作開始前の読み取り結果があとから確定結果を上書きしないようにする。
+    loadRequestRef.current += 1
+    const request = ++operationRequestRef.current
+    setBusy({ serviceId, action })
+    return request
+  }, [])
+
+  const operationIsCurrent = useCallback((request: number, accountId: string, requireManage = true) => (
+    operationRequestRef.current === request
+    && accountRef.current === accountId
+    && (!requireManage || canManageRef.current)
+  ), [])
+
+  const finishOperation = useCallback((request: number, accountId: string) => {
+    if (operationRequestRef.current !== request || accountRef.current !== accountId) return
+    operationLockRef.current = false
+    setBusy(null)
+  }, [])
+
+  /** LINE公式アカウントを替えたら、前の店の表示・窓・遅い応答を持ち越さない。 */
+  useEffect(() => {
+    loadRequestRef.current += 1
+    operationRequestRef.current += 1
+    operationLockRef.current = false
+    autoPickedRef.current = false
+    setServices(initialServicesRef.current)
+    setBusy(null)
+    setDisconnecting(null)
+    setDisconnectError('')
+    setDisconnectBlocked(false)
+    setPicking(null)
+    setPickedStoreId('')
+    setUberPendingStore(false)
+  }, [selectedAccountId])
+
+  /** 権限を失った後に、開始済みの変更結果や確認窓を残さない。 */
+  useEffect(() => {
+    if (canManage) return
+    loadRequestRef.current += 1
+    operationRequestRef.current += 1
+    operationLockRef.current = false
+    setBusy(null)
+    setDisconnecting(null)
+    setDisconnectError('')
+    setDisconnectBlocked(false)
+    setPicking(null)
+    setPickedStoreId('')
+  }, [canManage])
+
   /**
    * いまの接続の状態をサーバから読み直す。画面を開くたびと、Uber から戻った直後に通る。
    * 読むのはサーバの受け口（D1だけ）で、ここから Uber へは問い合わせない。
    */
   const load = useCallback(async () => {
-    if (!selectedAccountId) return
+    if (!canManage || !selectedAccountId) return
+    const accountId = selectedAccountId
+    const request = ++loadRequestRef.current
+    const stale = () => loadRequestRef.current !== request || accountRef.current !== accountId || !canManageRef.current
     try {
-      const data = await restaurantDeliveryApi.ubereatsConnection(selectedAccountId)
+      const data = await restaurantDeliveryApi.ubereatsConnection(accountId)
+      if (stale()) return
       setUberPendingStore(data.connection.status === 'pending_store')
       patch('uber', uberPatch(data, uberReturn))
     } catch {
+      if (stale()) return
       // 読めなかっただけなので、出ている状態はそのまま残し、つなぐ操作も止めない。
       patch('uber', {
         stateNote: 'いまの接続の状態を読み取れませんでした。少し待ってから画面を開き直してください。',
         stateNoteTone: 'warn',
       })
     }
-  }, [patch, selectedAccountId, uberReturn])
+  }, [canManage, patch, selectedAccountId, uberReturn])
 
   useEffect(() => { void load() }, [load])
 
@@ -140,9 +225,12 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
    */
   const openStorePicker = useCallback(async (service: DeliveryService) => {
     if (!canManage || !selectedAccountId) return
-    setBusy(service.id)
+    const accountId = selectedAccountId
+    const request = beginOperation(service.id, 'stores')
+    if (request === null) return
     try {
-      const { stores } = await restaurantDeliveryApi.ubereatsStores(selectedAccountId)
+      const { stores } = await restaurantDeliveryApi.ubereatsStores(accountId)
+      if (!operationIsCurrent(request, accountId)) return
       if (stores.length === 0) {
         patch(service.id, {
           stateNote: `${withParticle(service.name, 'で')}お店が見つかりませんでした。${withParticle(service.name, 'で')}お店の管理権限があるアカウントでログインし直してください。`,
@@ -152,23 +240,23 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       }
       patch(service.id, { stores })
       setPickedStoreId('')
-      setPicking({ service, stores, accountId: selectedAccountId })
+      setPicking({ service, stores, accountId })
     } catch {
+      if (!operationIsCurrent(request, accountId)) return
       // 失敗の符号はサーバに残る。画面には符号を出さず、次にできることだけ伝える。
       patch(service.id, {
         stateNote: `${withParticle(service.name, 'から')}お店の一覧を取れませんでした。少し待ってからもう一度お試しください。`,
         stateNoteTone: 'danger',
       })
     } finally {
-      setBusy(null)
+      finishOperation(request, accountId)
     }
-  }, [canManage, patch, selectedAccountId])
+  }, [beginOperation, canManage, finishOperation, operationIsCurrent, patch, selectedAccountId])
 
   /**
    * ログインから戻った直後（`?ubereats=pending_store`）だけ、続きの選び口を自動で開く。
    * 一度きりにして、窓を閉じたあとに開き直らないようにする（Uber への問い合わせも増やさない）。
    */
-  const autoPickedRef = useRef(false)
   useEffect(() => {
     if (!canManage || autoPickedRef.current) return
     if (uberReturn !== 'pending_store' || !uberPendingStore) return
@@ -178,36 +266,42 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     void openStorePicker(uber)
   }, [canManage, openStorePicker, services, uberPendingStore, uberReturn])
 
+  /** Uber の認可画面を開く。再ログインでは reconnect 応答だけを受け入れる。 */
+  const startUberOAuth = useCallback(async (service: DeliveryService, reauthorize = false) => {
+    if (!canManage || !selectedAccountId) return
+    const accountId = selectedAccountId
+    const request = beginOperation(service.id, reauthorize ? 'reauthorize' : 'connect')
+    if (request === null) return
+    try {
+      const response = await restaurantDeliveryApi.ubereatsConnectStart(accountId)
+      if (!operationIsCurrent(request, accountId)) return
+      if (reauthorize && response.mode !== 'reconnect') throw new Error('reauthorization_not_confirmed')
+      // 認可URLはサーバが組み立てる。鍵も合言葉も画面には来ない。
+      window.location.href = response.authorizeUrl
+    } catch {
+      if (!operationIsCurrent(request, accountId)) return
+      patch(service.id, {
+        stateNote: `${withParticle(service.name, 'の')}ログイン画面を開けませんでした。少し待ってからもう一度お試しください。`,
+        stateNoteTone: 'danger',
+      })
+    } finally {
+      finishOperation(request, accountId)
+    }
+  }, [beginOperation, canManage, finishOperation, operationIsCurrent, patch, selectedAccountId])
+
   /**
-   * つなぐボタン。
-   * login の会社は各社のログイン画面へ送り出す。ログインが済んでいて
-   * つなぐお店だけ決まっていない場合は、ログインをやり直さず選ぶ窓（`X5d8UF`）を開く。
+   * つなぐボタン。ログイン済みで店舗だけ未選択なら選び口を開き、それ以外は認可画面へ送る。
    * apply の会社は musubo が申し込みを代行するため、受付中の状態にする。
    */
   const connect = useCallback(async (service: DeliveryService) => {
     if (!canManage) return
     if (service.connect === 'login') {
-      if (service.id === 'uber' && uberPendingStore) {
-        await openStorePicker(service)
-        return
-      }
-      if (!selectedAccountId) return
-      setBusy(service.id)
-      try {
-        const res = await restaurantDeliveryApi.ubereatsConnectStart(selectedAccountId)
-        // 認可URLはサーバが組み立てる。鍵も合言葉も画面には来ない。
-        window.location.href = res.authorizeUrl
-      } catch {
-        setBusy(null)
-        patch(service.id, {
-          stateNote: `${withParticle(service.name, 'の')}ログイン画面を開けませんでした。少し待ってからもう一度お試しください。`,
-          stateNoteTone: 'danger',
-        })
-      }
+      if (service.id === 'uber' && uberPendingStore) await openStorePicker(service)
+      else await startUberOAuth(service)
       return
     }
     preparing.open(`${service.name}の連携の申し込み`)
-  }, [canManage, openStorePicker, patch, preparing, selectedAccountId, uberPendingStore])
+  }, [canManage, openStorePicker, preparing, startUberOAuth, uberPendingStore])
 
   /**
    * 選んだお店でつなぐ（`X5d8UF` の確定）。ここで Uber 側の連携が有効になる。
@@ -217,40 +311,130 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   const pickStore = useCallback(async () => {
     if (!canManage || !picking || !pickedStoreId || !selectedAccountId || picking.accountId !== selectedAccountId || busy !== null) return
     const service = picking.service
-    setBusy(service.id)
+    const accountId = selectedAccountId
+    const request = beginOperation(service.id, 'select')
+    if (request === null) return
     try {
-      const { connection } = await restaurantDeliveryApi.ubereatsSelectStore(selectedAccountId, pickedStoreId)
-      const note = UBER_STATE_NOTE[connection.status]
-      patch(service.id, {
-        status: UBER_DESIGN_STATUS[connection.status],
-        storeName: connection.storeName ?? undefined,
-        connectedAt: connection.connectedAt ?? undefined,
-        checkedAt: connection.checkedAt ?? undefined,
-        stores: undefined,
-        stateNote: note?.text,
-        stateNoteTone: note?.tone,
-      })
+      const response = await restaurantDeliveryApi.ubereatsSelectStore(accountId, pickedStoreId)
+      if (!operationIsCurrent(request, accountId)) return
+      if (!isUberConnectionMutationData(response)) throw new Error('invalid_connection_response')
+      const { connection } = response
+      patch(service.id, { ...uberConnectionPatch(connection), stores: undefined })
       setUberPendingStore(connection.status === 'pending_store')
+      setPicking(null)
+      setPickedStoreId('')
     } catch {
+      if (!operationIsCurrent(request, accountId)) return
       patch(service.id, {
         ready: false,
         stateNote: `${withParticle(service.name, 'で')}お店をつなげませんでした。結果を確認する必要があります。送り直さず musubo へお知らせください。`,
         stateNoteTone: 'danger',
       })
-    } finally {
-      setBusy(null)
       setPicking(null)
       setPickedStoreId('')
+    } finally {
+      finishOperation(request, accountId)
     }
-  }, [busy, canManage, patch, picking, pickedStoreId, selectedAccountId])
+  }, [beginOperation, busy, canManage, finishOperation, operationIsCurrent, patch, picking, pickedStoreId, selectedAccountId])
 
-  /** 実際の解除の口ができるまでは、接続を変えず準備中の案内を出す。 */
-  const disconnect = useCallback(() => {
+  /** Uber Eats 側の状態を明示的に確認し、確定した結果だけを表示へ反映する。 */
+  const checkConnection = useCallback(async (service: DeliveryService) => {
+    if (service.id !== 'uber') {
+      preparing.open(`${service.name}の接続の確認`)
+      return
+    }
+    if (!canManage || !selectedAccountId) return
+    const accountId = selectedAccountId
+    const request = beginOperation(service.id, 'check')
+    if (request === null) return
+    try {
+      const response = await restaurantDeliveryApi.ubereatsCheckConnection(accountId)
+      if (!operationIsCurrent(request, accountId)) return
+      if (!isUberConnectionMutationData(response)) throw new Error('invalid_connection_response')
+      patch(service.id, uberConnectionPatch(response.connection))
+      setUberPendingStore(response.connection.status === 'pending_store')
+    } catch (error) {
+      if (!operationIsCurrent(request, accountId)) return
+      if (error instanceof ApiError && error.code === 'pos_deactivation_unknown') {
+        patch(service.id, {
+          ready: false,
+          status: 'error',
+          connectionCheckBlocked: true,
+          connectionDisconnectBlocked: true,
+          stateNote: '連携を解除した結果を確認する必要があります。操作を繰り返さず musubo へお知らせください。',
+          stateNoteTone: 'danger',
+        })
+      } else {
+        patch(service.id, {
+          stateNote: '接続を確かめられませんでした。表示中の接続状態は変更していません。少し待ってからもう一度お試しください。',
+          stateNoteTone: 'danger',
+        })
+      }
+    } finally {
+      finishOperation(request, accountId)
+    }
+  }, [beginOperation, canManage, finishOperation, operationIsCurrent, patch, preparing, selectedAccountId])
+
+  /** 確認窓で確定した1回だけ解除し、明示的な解除済み応答だけを成功として扱う。 */
+  const disconnect = useCallback(async () => {
     if (!disconnecting || !canManage) return
-    const name = disconnecting.name
-    setDisconnecting(null)
-    preparing.open(`${name}の連携の解除`)
-  }, [canManage, disconnecting, preparing])
+    if (disconnecting.id !== 'uber') {
+      const name = disconnecting.name
+      setDisconnecting(null)
+      preparing.open(`${name}の連携の解除`)
+      return
+    }
+    if (!selectedAccountId) return
+    const accountId = selectedAccountId
+    const service = disconnecting
+    const request = beginOperation(service.id, 'disconnect')
+    if (request === null) return
+    setDisconnectError('')
+    try {
+      const response = await restaurantDeliveryApi.ubereatsDisconnect(accountId)
+      if (!operationIsCurrent(request, accountId)) return
+      if (!isUberConnectionMutationData(response) || response.connection.status !== 'disconnected') {
+        throw new Error('disconnect_not_confirmed')
+      }
+      patch(service.id, uberConnectionPatch(response.connection))
+      setUberPendingStore(false)
+      setDisconnecting(null)
+      setDisconnectError('')
+      setDisconnectBlocked(false)
+    } catch (error) {
+      if (!operationIsCurrent(request, accountId)) return
+      const reauthorizationRequired = error instanceof ApiError && error.code === 'reauthorization_required'
+      const resultUnknown = !(error instanceof ApiError)
+        || !error.code
+        || !DISCONNECT_PRE_FLIGHT_FAILURES.has(error.code)
+      if (resultUnknown) {
+        patch(service.id, {
+          ready: false,
+          status: 'error',
+          connectionCheckBlocked: true,
+          connectionDisconnectBlocked: true,
+          stateNote: '連携を解除した結果を確認する必要があります。操作を繰り返さず musubo へお知らせください。',
+          stateNoteTone: 'danger',
+        })
+      }
+      if (reauthorizationRequired) {
+        patch(service.id, {
+          connectionDisconnectBlocked: true,
+          needsReauthorization: true,
+          stateNote: 'Uber Eats へログインし直す必要があります。「Uber Eats にログインし直す」から、もう一度許可してください。',
+          stateNoteTone: 'warn',
+        })
+      }
+      setDisconnectBlocked(reauthorizationRequired || resultUnknown)
+      setDisconnectError(reauthorizationRequired
+        ? 'Uber Eats へログインし直す必要があります。この窓を閉じて「Uber Eats にログインし直す」から、もう一度許可してください。'
+        : resultUnknown
+          ? '連携の解除結果を確認できませんでした。送り直さず musubo へお知らせください。'
+          : '連携を解除できませんでした。画面を開き直して接続の状態を確認してください。')
+    } finally {
+      finishOperation(request, accountId)
+    }
+  }, [beginOperation, canManage, disconnecting, finishOperation, operationIsCurrent, patch, preparing, selectedAccountId])
 
   return (
     <>
@@ -272,6 +456,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           {services.map((service) => {
             const state = STATUS[service.status]
             const connectable = service.connect !== 'login' || service.ready
+            const serviceBusy = busy?.serviceId === service.id
             return (
               /* 角丸・線・影は共通の Card に任せる。中の間と余白だけ承認案 v03 の寸法で足す。 */
               <Card key={service.id} appearance="outlined" layout="vertical" className={styles.card} aria-labelledby={`delivery-${service.id}-title`}>
@@ -312,9 +497,9 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                     {service.status === 'disconnected' ? (
                       <Button
                         variant="primary"
-                        disabled={!connectable}
+                        disabled={!connectable || busy !== null}
                         title={connectable ? undefined : WAITING}
-                        busy={busy === service.id}
+                        busy={serviceBusy && (busy?.action === 'connect' || busy?.action === 'stores')}
                         busyLabel="開いています…"
                         onClick={() => void connect(service)}
                       >
@@ -326,6 +511,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                         <span className={styles.rowSpacer} />
                         <Button
                           variant="secondary"
+                          disabled={busy !== null}
                           onClick={() => preparing.open(`${service.name}の申し込みの取り消し`)}
                         >
                           <X size={15} aria-hidden="true" />
@@ -334,15 +520,36 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                       </>
                     ) : (
                       <>
+                        {service.needsReauthorization ? (
+                          <Button
+                            variant="secondary"
+                            disabled={!service.ready || busy !== null}
+                            busy={serviceBusy && busy?.action === 'reauthorize'}
+                            busyLabel="開いています…"
+                            onClick={() => void startUberOAuth(service, true)}
+                          >
+                            <LogIn size={15} aria-hidden="true" />
+                            Uber Eats にログインし直す
+                          </Button>
+                        ) : null}
                         <Button
                           variant="secondary"
-                          onClick={() => preparing.open(`${service.name}の接続の確認`)}
+                          disabled={busy !== null || service.connectionCheckBlocked}
+                          title={service.connectionCheckBlocked ? '結果の確認が終わるまで操作できません' : undefined}
+                          busy={serviceBusy && busy?.action === 'check'}
+                          busyLabel="確認しています…"
+                          onClick={() => void checkConnection(service)}
                         >
                           <Plug size={15} aria-hidden="true" />
                           接続を確かめる
                         </Button>
                         <span className={styles.rowSpacer} />
-                        <Button variant="danger" onClick={() => setDisconnecting(service)}>
+                        <Button
+                          variant="danger"
+                          disabled={busy !== null || service.connectionDisconnectBlocked}
+                          title={service.connectionDisconnectBlocked ? '結果の確認が終わるまで操作できません' : undefined}
+                          onClick={() => { setDisconnectError(''); setDisconnectBlocked(false); setDisconnecting(service) }}
+                        >
                           連携を解除する
                         </Button>
                       </>
@@ -366,8 +573,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         title={`${withParticle(disconnecting?.name ?? '', 'の')}連携を解除しますか`}
         description={`${withParticle(disconnecting?.name ?? '', 'との')}つなぎを外します。保存済みの注文や過去の履歴はそのまま残ります。`}
         confirmLabel="解除する"
+        busy={busy?.serviceId === disconnecting?.id && busy?.action === 'disconnect'}
+        busyLabel="解除しています…"
+        confirmDisabled={disconnectBlocked}
+        confirmDisabledReason={disconnectBlocked ? '解除結果の確認が必要です' : undefined}
+        error={disconnectError}
         onConfirm={disconnect}
-        onCancel={() => setDisconnecting(null)}
+        onCancel={() => { setDisconnectError(''); setDisconnectBlocked(false); setDisconnecting(null) }}
       >
         <p className={styles.note}>
           もう一度つなぐときは、この画面の「{disconnecting ? connectLabel(disconnecting) : ''}」からやり直してください。鍵を調べたり入力したりする必要はありません。
@@ -385,6 +597,8 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         confirmLabel="このお店につなぐ"
         confirmIcon={<Check size={15} aria-hidden="true" />}
         confirmDisabled={pickedStoreId === '' || busy !== null}
+        busy={busy?.action === 'select'}
+        busyLabel="接続しています…"
         onConfirm={pickStore}
         onCancel={() => { setPicking(null); setPickedStoreId('') }}
       >

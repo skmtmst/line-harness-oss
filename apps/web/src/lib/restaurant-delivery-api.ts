@@ -2,6 +2,7 @@ import { downloadApiFile, fetchApi } from './api'
 import type {
   UberConnectStartData,
   UberConnectionData,
+  UberConnectionMutationData,
   UberStoreSelectData,
   UberStoresData,
 } from './restaurant-delivery-ubereats-types'
@@ -227,11 +228,14 @@ export interface DeliveryIntakeResumeData {
 /** Uber Eats 接続の型は `restaurant-delivery-ubereats-types` にある（ここから出し直す）。 */
 export type {
   UberConnectionStatus,
+  UberConnection,
   UberConnectionData,
+  UberConnectionMutationData,
   UberStoresData,
   UberStoreSelectData,
   UberConnectStartData,
 } from './restaurant-delivery-ubereats-types'
+export { isUberConnectionMutationData } from './restaurant-delivery-ubereats-types'
 
 function withAccount(
   path: string,
@@ -393,6 +397,22 @@ export const restaurantDeliveryApi = {
    */
   ubereatsConnection(accountId: string): Promise<UberConnectionData> {
     return fetchApi<UberConnectionData>(withAccount(`${BASE}/ubereats/connection`, accountId))
+  },
+
+  /** Uber 側の店舗を読み、保存済みの接続状態を確かめ直す。 */
+  ubereatsCheckConnection(accountId: string): Promise<UberConnectionMutationData> {
+    return fetchApi<UberConnectionMutationData>(withAccount(`${BASE}/ubereats/connection/check`, accountId), {
+      method: 'POST',
+      body: '{}',
+    })
+  },
+
+  /** 確認窓で明示的に確定したときだけ、Uber Eats の接続を解除する。 */
+  ubereatsDisconnect(accountId: string): Promise<UberConnectionMutationData> {
+    return fetchApi<UberConnectionMutationData>(withAccount(`${BASE}/ubereats/connection`, accountId), {
+      method: 'DELETE',
+      body: JSON.stringify({ confirmed: true }),
+    })
   },
 
   /**
