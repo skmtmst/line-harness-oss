@@ -14,6 +14,25 @@ import { UberEatsError, type FetchLike } from '../../services/uber-eats.js';
 import { uberHosts, type UberHosts } from '../../services/uber-eats-hosts.js';
 import { getUberApplicationToken } from './application-token.js';
 import { sendUberOrderAction } from './order-api.js';
+import {
+  MAX_SEND_ATTEMPTS,
+  acquireOrderMutationLease,
+  claimDispatchReservation,
+  claimRateLimitRetry,
+  currentVersionDispatch,
+  dispatchReservationId,
+  dispatchRow as existingDispatch,
+  existingDispatchFailure,
+  hasCancellationTombstone,
+  markDispatchSendStarted,
+  markOrderRateLimited,
+  orderMutationLeaseIsLive,
+  readyDispatchConnection,
+  releaseOrderMutationLease,
+  type DispatchConnection as ConnectionRow,
+  type DispatchRow,
+  type OrderMutationLease,
+} from './order-dispatch-retry.js';
 
 export type UberMutationOrder = Pick<
   DeliveryOrderRow,
@@ -39,43 +58,13 @@ interface UberClient {
   hosts: UberHosts;
 }
 
-interface ConnectionRow {
-  uber_store_id: string;
-  version: number;
-}
-
-interface DispatchRow {
-  status: string;
-  error_code: string | null;
-}
-
 type LocalReasonCode = 'out_of_stock' | 'store_busy' | 'equipment_trouble' | 'customer_request' | 'other';
 const LOCAL_REASON_CODES = new Set<LocalReasonCode>(
   ['out_of_stock', 'store_busy', 'equipment_trouble', 'customer_request', 'other'],
 );
 
-const CONNECTION_JOINS = `FROM rt_delivery_uber_connections c
-  JOIN rt_stores s ON s.id = c.store_id
-  JOIN rt_organizations o ON o.id = s.organization_id
-  JOIN line_accounts a ON a.id = c.account_id
-  JOIN tenants t ON t.id = o.tenant_id`;
-const CONNECTION_ELIGIBILITY = `c.status = 'connected' AND c.provisioned_at IS NOT NULL
-  AND c.uber_store_id IS NOT NULL AND trim(c.uber_store_id) <> ''
-  AND COALESCE(c.last_error, '') NOT IN ('pos_activation_started', 'pos_activation_unknown')
-  AND s.status = 'active' AND s.line_account_id = c.account_id
-  AND o.status <> 'archived'
-  AND a.is_active = 1 AND a.archived_at IS NULL AND a.tenant_id = o.tenant_id
-  AND t.status = 'active'
-  AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(t.feature_packs) THEN t.feature_packs ELSE '[]' END)
-    WHERE value = 'restaurant')
-  AND NOT EXISTS (SELECT 1 FROM rt_store_feature_flags f
-    WHERE f.store_id = c.store_id AND f.feature = 'delivery' AND f.enabled = 0)
-  AND (SELECT COUNT(*) FROM rt_delivery_uber_connections duplicate
-    WHERE duplicate.uber_store_id = c.uber_store_id AND duplicate.status = 'connected'
-      AND duplicate.provisioned_at IS NOT NULL) = 1`;
-
-function failure(code: string): DeliveryDispatchResult {
-  return { ok: false, error: safeDeliveryError(code), nextAttemptAt: null };
+function failure(code: string, nextAttemptAt: number | null = null): DeliveryDispatchResult {
+  return { ok: false, error: safeDeliveryError(code), nextAttemptAt };
 }
 
 function localReasonCode(value: string | undefined): LocalReasonCode {
@@ -99,11 +88,6 @@ function mutationIsSupported(input: UberOrderMutationInput): boolean {
   return false;
 }
 
-function reservationId(order: UberMutationOrder): string {
-  // actionを含めない。同じ注文版でacceptとrejectが競合しても、外部へ出るのは片方だけにする。
-  return `uber-order-mutation:v1:${order.id}:${order.version}`;
-}
-
 async function orderIsCurrent(input: UberOrderMutationInput): Promise<boolean> {
   const row = await input.db
     .prepare(
@@ -118,77 +102,8 @@ async function orderIsCurrent(input: UberOrderMutationInput): Promise<boolean> {
   return row?.id === input.order.id;
 }
 
-async function readyConnection(input: UberOrderMutationInput): Promise<ConnectionRow | null> {
-  const row = await input.db
-    .prepare(
-      `SELECT c.uber_store_id, c.version ${CONNECTION_JOINS}
-        WHERE c.store_id = ? AND c.account_id = ? AND ${CONNECTION_ELIGIBILITY}
-        LIMIT 1`,
-    )
-    .bind(input.store.id, input.store.lineAccountId)
-    .first<ConnectionRow>();
-  return row ?? null;
-}
-
-async function claimReservation(
-  input: UberOrderMutationInput,
-  connection: ConnectionRow,
-  id: string,
-): Promise<boolean> {
-  const result = await input.db
-    .prepare(
-      `INSERT OR IGNORE INTO rt_delivery_dispatches
-         (id, account_id, store_id, service, action, target_kind, target_id,
-          status, error_code, attempts, next_attempt_at, requested_at, completed_at,
-          version, created_at, updated_at)
-       SELECT ?, order_row.account_id, order_row.store_id, 'ubereats', ?, 'order', order_row.id,
-              'pending', NULL, 0, NULL, ?, NULL, 1, ?, ?
-         FROM rt_delivery_orders order_row
-        WHERE order_row.id = ? AND order_row.account_id = ? AND order_row.store_id = ?
-          AND order_row.service = 'ubereats' AND order_row.external_order_id = ?
-          AND order_row.status = ? AND order_row.version = ?
-          AND EXISTS (SELECT 1 ${CONNECTION_JOINS}
-            WHERE c.store_id = order_row.store_id AND c.account_id = order_row.account_id
-              AND c.uber_store_id = ? AND c.version = ? AND ${CONNECTION_ELIGIBILITY})`,
-    )
-    .bind(
-      id,
-      input.action,
-      input.now,
-      input.now,
-      input.now,
-      input.order.id,
-      input.store.lineAccountId,
-      input.store.id,
-      input.order.external_order_id,
-      input.order.status,
-      input.order.version,
-      connection.uber_store_id,
-      connection.version,
-    )
-    .run();
-  return Number(result.meta?.changes ?? 0) === 1;
-}
-
 function sameConnection(actual: ConnectionRow | null, expected: ConnectionRow): boolean {
   return actual?.uber_store_id === expected.uber_store_id && actual.version === expected.version;
-}
-
-async function existingDispatch(db: D1Database, id: string): Promise<DispatchRow | null> {
-  return db
-    .prepare('SELECT status, error_code FROM rt_delivery_dispatches WHERE id = ? LIMIT 1')
-    .bind(id)
-    .first<DispatchRow>();
-}
-
-async function markSendStarted(db: D1Database, id: string, now: number): Promise<boolean> {
-  const result = await db.prepare(
-    `UPDATE rt_delivery_dispatches
-        SET error_code = 'delivery_result_unknown', attempts = 1,
-            next_attempt_at = NULL, updated_at = ?, version = version + 1
-      WHERE id = ? AND status = 'pending' AND attempts = 0`,
-  ).bind(now, id).run();
-  return Number(result.meta?.changes ?? 0) === 1;
 }
 
 async function markBeforeSendFailure(db: D1Database, id: string, code: string, now: number): Promise<void> {
@@ -207,12 +122,12 @@ async function markConfirmedFailure(db: D1Database, id: string, now: number): Pr
   const result = await db
     .prepare(
       `UPDATE rt_delivery_dispatches
-          SET status = 'failed', error_code = 'delivery_operation_failed', attempts = 1,
+          SET status = 'failed', error_code = 'delivery_operation_failed',
               next_attempt_at = NULL, completed_at = ?, version = version + 1, updated_at = ?
-        WHERE id = ? AND status = 'pending' AND attempts = 1
+        WHERE id = ? AND status = 'pending' AND attempts >= 1 AND attempts <= ?
           AND error_code = 'delivery_result_unknown'`,
     )
-    .bind(now, now, id)
+    .bind(now, now, id, MAX_SEND_ATTEMPTS)
     .run();
   return Number(result.meta?.changes ?? 0) === 1;
 }
@@ -233,7 +148,13 @@ async function markResultUnknown(db: D1Database, id: string, now: number): Promi
   }
 }
 
-function updateOrderStatement(input: UberOrderMutationInput, dispatchId: string): D1PreparedStatement {
+function updateOrderStatement(
+  input: UberOrderMutationInput,
+  dispatchId: string,
+  lease: OrderMutationLease,
+  now: number,
+  uberStoreId: string,
+): D1PreparedStatement {
   const assignments = ['status = ?'];
   const bindings: unknown[] = [input.to];
   if (input.timeColumn) {
@@ -252,8 +173,15 @@ function updateOrderStatement(input: UberOrderMutationInput, dispatchId: string)
         WHERE id = ? AND account_id = ? AND store_id = ? AND service = 'ubereats'
           AND external_order_id = ? AND status = ? AND version = ?
           AND EXISTS (SELECT 1 FROM rt_delivery_dispatches
-            WHERE id = ? AND status = 'pending' AND attempts = 1
-              AND error_code = 'delivery_result_unknown')`,
+            WHERE id = ? AND status = 'pending' AND attempts >= 1 AND attempts <= ?
+              AND error_code = 'delivery_result_unknown')
+          AND EXISTS (SELECT 1 FROM rt_resource_locks
+            WHERE resource_key = ? AND owner_token = ? AND julianday(expires_at) > julianday(?))
+          AND NOT EXISTS (SELECT 1 FROM rt_delivery_events event
+            WHERE event.account_id = rt_delivery_orders.account_id AND event.service = 'ubereats'
+              AND event.external_order_id = rt_delivery_orders.external_order_id
+              AND event.event_type IN ('orders.cancel', 'orders.failure')
+              AND json_extract(event.payload_json, '$.meta.user_id') = ?)`,
     )
     .bind(
       ...bindings,
@@ -264,22 +192,33 @@ function updateOrderStatement(input: UberOrderMutationInput, dispatchId: string)
       input.order.status,
       input.order.version,
       dispatchId,
+      MAX_SEND_ATTEMPTS,
+      lease.key,
+      lease.owner,
+      new Date(now * 1000).toISOString(),
+      uberStoreId,
     );
 }
 
-async function finalizeSuccess(input: UberOrderMutationInput, id: string): Promise<boolean> {
+async function finalizeSuccess(
+  input: UberOrderMutationInput,
+  id: string,
+  lease: OrderMutationLease,
+  connection: ConnectionRow,
+  now: number,
+): Promise<boolean> {
   try {
     const results = await input.db.batch([
-      updateOrderStatement(input, id),
+      updateOrderStatement(input, id, lease, now, connection.uber_store_id),
       input.db
         .prepare(
           `UPDATE rt_delivery_dispatches
-              SET status = 'succeeded', error_code = NULL, attempts = 1, next_attempt_at = NULL,
+              SET status = 'succeeded', error_code = NULL, next_attempt_at = NULL,
                   completed_at = ?, version = version + 1, updated_at = ?
-            WHERE id = ? AND status = 'pending' AND attempts = 1
+            WHERE id = ? AND status = 'pending' AND attempts >= 1 AND attempts <= ?
               AND error_code = 'delivery_result_unknown' AND changes() = 1`,
         )
-        .bind(input.now, input.now, id),
+        .bind(input.now, input.now, id, MAX_SEND_ATTEMPTS),
     ]);
     const orderChanged = Number(results[0]?.meta?.changes ?? 0) === 1;
     const dispatchChanged = Number(results[1]?.meta?.changes ?? 0) === 1;
@@ -317,83 +256,144 @@ export async function runUberOrderMutation(input: UberOrderMutationInput): Promi
   if (!deliverySendEnabled(input.env)) return failure('delivery_send_disabled');
   const client = clientFor(input.env);
   let connection: ConnectionRow | null = null;
-  try { connection = await readyConnection(input); }
+  try { connection = await readyDispatchConnection(input); }
   catch { return failure('delivery_temporary_failure'); }
   if (!client || !input.env.LINE_CREDENTIAL_ENCRYPTION_KEY || !connection) {
     return failure('delivery_not_configured');
   }
 
+  const dispatchId = dispatchReservationId(input.order, connection);
+  let previous: DispatchRow | null;
+  try { previous = await currentVersionDispatch(input); }
+  catch { return failure('delivery_temporary_failure'); }
+  if (previous) {
+    const stopped = existingDispatchFailure(previous, input, dispatchId);
+    if (stopped) return stopped;
+  }
+
   const fetcher = input.fetcher ?? ((url, init) => fetch(url, init));
-  let accessToken: string;
+  const wallClockStartedAtMs = Date.now();
+  const elapsedNow = () => input.now + Math.floor(Math.max(0, Date.now() - wallClockStartedAtMs) / 1000);
+  const lease = await acquireOrderMutationLease(input.db, input.order.external_order_id, input.now)
+    .catch(() => null);
+  if (!lease) return failure('delivery_order_conflict');
   try {
-    accessToken = (await getUberApplicationToken({
-      db: input.db,
-      client,
-      encryptionKey: input.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
-      fetcher,
-      nowMs: input.now * 1000,
-    })).accessToken;
-  } catch (error) {
-    return tokenFailure(error);
-  }
-
-  const dispatchId = reservationId(input.order);
-  let claimed: boolean;
-  try {
-    claimed = await claimReservation(input, connection, dispatchId);
-  } catch {
-    return failure('delivery_temporary_failure');
-  }
-  if (!claimed) {
-    const existing = await existingDispatch(input.db, dispatchId).catch(() => null);
-    if (existing?.status === 'pending') return failure('delivery_result_unknown');
-    if (existing?.status === 'failed') return failure('delivery_operation_failed');
-    return failure('delivery_order_conflict');
-  }
-
-  // 永続予約の直後に、送信停止・注文版・店舗接続をもう一度読む。
-  if (!deliverySendEnabled(input.env)) {
-    await markBeforeSendFailure(input.db, dispatchId, 'delivery_send_disabled', input.now).catch(() => {});
-    return failure('delivery_send_disabled');
-  }
-  if (!await orderIsCurrent(input).catch(() => false)) {
-    await markBeforeSendFailure(input.db, dispatchId, 'delivery_order_conflict', input.now).catch(() => {});
-    return failure('delivery_order_conflict');
-  }
-  const currentConnection = await readyConnection(input).catch(() => null);
-  if (!clientFor(input.env) || !sameConnection(currentConnection, connection)) {
-    await markBeforeSendFailure(input.db, dispatchId, 'delivery_not_configured', input.now).catch(() => {});
-    return failure('delivery_not_configured');
-  }
-  if (!await markSendStarted(input.db, dispatchId, input.now).catch(() => false)) {
-    await markResultUnknown(input.db, dispatchId, input.now);
-    return failure('delivery_result_unknown');
-  }
-
-  try {
-    await sendUberOrderAction(
-      { hosts: client.hosts, accessToken, fetch: fetcher },
-      {
-        action: input.action as 'accept' | 'reject' | 'cancel',
-        orderId: input.order.external_order_id,
-        reasonCode: localReasonCode(input.reasonCode),
-      },
-    );
-  } catch (error) {
-    const confirmed = error instanceof UberEatsError
-      && error.status !== null
-      && error.status >= 400
-      && error.status < 500
-      && error.status !== 408;
-    if (confirmed) {
-      const saved = await markConfirmedFailure(input.db, dispatchId, input.now).catch(() => false);
-      if (saved) return failure('delivery_operation_failed');
+    let accessToken: string;
+    try {
+      accessToken = (await getUberApplicationToken({
+        db: input.db,
+        client,
+        encryptionKey: input.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        fetcher,
+        nowMs: input.now * 1000,
+      })).accessToken;
+    } catch (error) {
+      return tokenFailure(error);
     }
-    await markResultUnknown(input.db, dispatchId, input.now);
-    return failure('delivery_result_unknown');
-  }
+    if (!await orderMutationLeaseIsLive(input.db, lease, elapsedNow()).catch(() => false)
+      || await hasCancellationTombstone(input.db, input, connection).catch(() => true)) {
+      return failure('delivery_order_conflict');
+    }
 
-  if (await finalizeSuccess(input, dispatchId)) return { ok: true };
-  await markResultUnknown(input.db, dispatchId, input.now);
-  return failure('delivery_result_unknown');
+    let claimed: boolean;
+    try {
+      claimed = previous
+        ? await claimRateLimitRetry(input, connection, dispatchId, lease, elapsedNow())
+        : await claimDispatchReservation(input, connection, dispatchId, lease, elapsedNow());
+    } catch {
+      return failure('delivery_temporary_failure');
+    }
+    if (!claimed) {
+      if (!await orderIsCurrent(input).catch(() => false)) return failure('delivery_order_conflict');
+      if (!sameConnection(await readyDispatchConnection(input).catch(() => null), connection)) {
+        return failure('delivery_not_configured');
+      }
+      const existing = await existingDispatch(input.db, dispatchId).catch(() => null);
+      if (existing) return existingDispatchFailure(existing, input, dispatchId)
+        ?? failure('delivery_temporary_failure');
+      return failure('delivery_order_conflict');
+    }
+
+    // 永続予約の直後に、送信停止・注文版・店舗接続をもう一度読む。
+    if (!deliverySendEnabled(input.env)) {
+      if (previous) {
+        await markResultUnknown(input.db, dispatchId, elapsedNow());
+        return failure('delivery_result_unknown');
+      }
+      await markBeforeSendFailure(input.db, dispatchId, 'delivery_send_disabled', input.now).catch(() => {});
+      return failure('delivery_send_disabled');
+    }
+    if (!await orderIsCurrent(input).catch(() => false)) {
+      if (previous) {
+        await markResultUnknown(input.db, dispatchId, elapsedNow());
+        return failure('delivery_result_unknown');
+      }
+      await markBeforeSendFailure(input.db, dispatchId, 'delivery_order_conflict', input.now).catch(() => {});
+      return failure('delivery_order_conflict');
+    }
+    const currentConnection = await readyDispatchConnection(input).catch(() => null);
+    if (!clientFor(input.env) || !sameConnection(currentConnection, connection)) {
+      if (previous) {
+        await markResultUnknown(input.db, dispatchId, elapsedNow());
+        return failure('delivery_result_unknown');
+      }
+      await markBeforeSendFailure(input.db, dispatchId, 'delivery_not_configured', input.now).catch(() => {});
+      return failure('delivery_not_configured');
+    }
+    if (!previous && !await markDispatchSendStarted(
+      input, dispatchId, connection, lease, elapsedNow(),
+    ).catch(() => false)) {
+      await markResultUnknown(input.db, dispatchId, input.now);
+      return failure('delivery_result_unknown');
+    }
+    if (!await orderMutationLeaseIsLive(input.db, lease, elapsedNow()).catch(() => false)
+      || await hasCancellationTombstone(input.db, input, connection).catch(() => true)) {
+      await markResultUnknown(input.db, dispatchId, elapsedNow());
+      return failure('delivery_result_unknown');
+    }
+
+    try {
+      await sendUberOrderAction(
+        { hosts: client.hosts, accessToken, fetch: fetcher },
+        {
+          action: input.action as 'accept' | 'reject' | 'cancel',
+          orderId: input.order.external_order_id,
+          reasonCode: localReasonCode(input.reasonCode),
+        },
+      );
+    } catch (error) {
+      const completedNow = elapsedNow();
+      if (error instanceof UberEatsError && error.kind === 'rate_limited') {
+        const saved = await markOrderRateLimited(input.db, dispatchId, completedNow).catch(() => null);
+        if (saved?.status === 'retryable_failed') {
+          return failure('delivery_rate_limited', saved.next_attempt_at);
+        }
+        if (saved?.status === 'failed') return failure('delivery_operation_failed');
+        await markResultUnknown(input.db, dispatchId, completedNow);
+        return failure('delivery_result_unknown');
+      }
+      const confirmed = error instanceof UberEatsError
+        && error.status !== null
+        && error.status >= 400
+        && error.status < 500
+        && error.status !== 408;
+      if (confirmed) {
+        const saved = await markConfirmedFailure(input.db, dispatchId, completedNow).catch(() => false);
+        if (saved) return failure('delivery_operation_failed');
+      }
+      await markResultUnknown(input.db, dispatchId, completedNow);
+      return failure('delivery_result_unknown');
+    }
+
+    const completedNow = elapsedNow();
+    if (!await orderMutationLeaseIsLive(input.db, lease, completedNow).catch(() => false)) {
+      await markResultUnknown(input.db, dispatchId, completedNow);
+      return failure('delivery_result_unknown');
+    }
+    if (await finalizeSuccess(input, dispatchId, lease, connection, completedNow)) return { ok: true };
+    await markResultUnknown(input.db, dispatchId, completedNow);
+    return failure('delivery_result_unknown');
+  } finally {
+    await releaseOrderMutationLease(input.db, lease).catch(() => {});
+  }
 }

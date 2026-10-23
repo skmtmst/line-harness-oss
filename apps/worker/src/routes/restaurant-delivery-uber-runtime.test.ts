@@ -123,7 +123,28 @@ describe('Uberの署名付き受信から注文操作まで', () => {
     const response = await app.request(`${BASE}/orders?account_id=delivery-account`, {}, env);
     expect(response.status).toBe(200);
     const json = await response.json() as { services: unknown[] };
-    expect(json.services).toEqual(expect.arrayContaining([expect.objectContaining({ service: 'ubereats', connectionStatus: status })]));
+    expect(json.services).toEqual(expect.arrayContaining([expect.objectContaining({
+      service: 'ubereats',
+      connectionStatus: status,
+      orderActionsEnabled: false,
+    })]));
+    expect(transport).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['RT_DELIVERY_SEND_ENABLED', 'false'],
+    ['RT_DELIVERY_UBEREATS_CLIENT_ID', undefined],
+    ['LINE_CREDENTIAL_ENCRYPTION_KEY', undefined],
+  ] as const)('%s が使えないときは注文操作を利用可能と返さない', async (key, value) => {
+    env = { ...env, [key]: value };
+    const response = await app.request(`${BASE}/orders?account_id=delivery-account`, {}, env);
+    expect(response.status).toBe(200);
+    const json = await response.json() as { services: unknown[] };
+    expect(json.services).toEqual(expect.arrayContaining([expect.objectContaining({
+      service: 'ubereats',
+      connectionStatus: 'connected',
+      orderActionsEnabled: false,
+    })]));
     expect(transport).not.toHaveBeenCalled();
   });
 
@@ -134,9 +155,16 @@ describe('Uberの署名付き受信から注文操作まで', () => {
     expect((await notify()).status).toBe(200);
     const listing = await app.request(`${BASE}/orders?account_id=delivery-account&tab=new`, {}, env);
     expect(listing.status).toBe(200);
-    const json = await listing.json() as { orders: { id: string }[]; services: { service: string; connectionStatus: string }[] };
+    const json = await listing.json() as {
+      orders: { id: string }[];
+      services: { service: string; connectionStatus: string; orderActionsEnabled?: boolean }[];
+    };
     expect(json.orders).toHaveLength(1);
-    expect(json.services).toEqual(expect.arrayContaining([expect.objectContaining({ service: 'ubereats', connectionStatus: 'connected' })]));
+    expect(json.services).toEqual(expect.arrayContaining([expect.objectContaining({
+      service: 'ubereats',
+      connectionStatus: 'connected',
+      orderActionsEnabled: true,
+    })]));
     expect((await act('accept')).status).toBe(200);
     expect(localOrder().status).toBe('cooking');
     expect((await act('accept')).status).toBe(409);
@@ -146,14 +174,17 @@ describe('Uberの署名付き受信から注文操作まで', () => {
       .toMatchObject({ note: '卵を使わないでください', amount: 1200 });
   });
 
-  it('未対応の準備完了操作で外部送信もローカル更新もしない', async () => {
+  it('準備完了は外部へ送らず店舗内の進行として記録する', async () => {
     await notify();
     await act('accept');
     transport.mockClear();
     const response = await act('ready');
-    expect(response.status).toBe(422);
-    expect(await response.json()).toMatchObject({ code: 'delivery_action_unsupported', retryable: false });
-    expect(localOrder().status).toBe('cooking');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      synchronization: 'local',
+      order: { status: 'ready' },
+    });
+    expect(localOrder().status).toBe('ready');
     expect(transport).not.toHaveBeenCalled();
   });
 

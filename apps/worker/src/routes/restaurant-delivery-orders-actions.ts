@@ -6,7 +6,7 @@ import { requireIrreversibleConfirmation, requireRole } from '../middleware/role
 import { auditLog } from '../lib/audit-log.js';
 import type { AuditAction } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
-import { runUberOrderMutation } from '../features/uber-delivery/index.js';
+import { advanceUberOrderLocally, runUberOrderMutation } from '../features/uber-delivery/index.js';
 import { fail } from './restaurant-google.js';
 
 import { canTransitionOrder, nowSec } from '../services/restaurant-delivery.js';
@@ -33,8 +33,8 @@ export function registerDeliveryOrderActions(restaurantDelivery: Hono<Env>): voi
   /**
    * 注文の状態を1つ進める共通処理。
    *
-   * 順番は必ず「台帳へ記録 → サービスへ送信 → 成功した時だけD1を進める」。
-   * 送信が失敗した注文を画面上だけ進めてしまうと、店舗とサービスの状態がずれる。
+   * 外部操作は「台帳へ記録 → サービスへ送信 → 成功した時だけD1を進める」。
+   * 現在のUber Restaurant連携契約では、準備完了・受け渡し済みを競合を塞いで店舗内の進行として記録する。
    */
   async function runOrderMutation(
     c: Context<Env>,
@@ -63,7 +63,17 @@ export function registerDeliveryOrderActions(restaurantDelivery: Hono<Env>): voi
     }
 
     const now = nowSec();
-    const result = order.service === 'ubereats' ? await runUberOrderMutation({
+    const localUberProgress = order.service === 'ubereats'
+      && (input.action === 'ready' || input.action === 'handed_over');
+    const result = localUberProgress ? await advanceUberOrderLocally({
+      db: dbFor(c.env, store.id),
+      env: c.env,
+      store,
+      order,
+      to: input.action === 'ready' ? 'ready' : 'handed_over',
+      timeColumn: input.action === 'ready' ? 'ready_at' : 'handed_over_at',
+      now,
+    }) : order.service === 'ubereats' ? await runUberOrderMutation({
       db: dbFor(c.env, store.id),
       env: c.env,
       store,
@@ -117,6 +127,7 @@ export function registerDeliveryOrderActions(restaurantDelivery: Hono<Env>): voi
     auditLog(c, input.audit, target, { lineAccountId: order.account_id });
     return c.json({
       success: true,
+      ...(localUberProgress ? { synchronization: 'local' as const } : {}),
       order: {
         id: order.id,
         status: input.to,

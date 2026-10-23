@@ -172,7 +172,7 @@ describe('Uber Eats注文操作の一送信予約', () => {
     release();
 
     await expect(accept).resolves.toEqual({ ok: true });
-    expect(reject).toMatchObject({ ok: false, error: { code: 'delivery_result_unknown' } });
+    expect(reject).toMatchObject({ ok: false, error: { code: 'delivery_order_conflict' } });
     expect(actionFetch).toHaveBeenCalledTimes(1);
     expect(dispatchRow()).toMatchObject({ action: 'accept', status: 'succeeded', attempts: 1 });
   });
@@ -267,7 +267,7 @@ describe('Uber Eats注文操作の一送信予約', () => {
 
     const result = await runUberOrderMutation(input(fetcher));
 
-    expect(result).toMatchObject({ ok: false, error: { code: 'delivery_order_conflict' } });
+    expect(result).toMatchObject({ ok: false, error: { code: 'delivery_not_configured' } });
     expect(mutationCalls).toBe(0);
     expect(dispatchRow()).toBeUndefined();
   });
