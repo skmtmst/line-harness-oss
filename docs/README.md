@@ -464,6 +464,7 @@
 - [対応が要るものの速さとお知らせの下の空き](release-log/unreleased/1798-kenta-hq-attention-speed.md)
 - [統括のアカウントの空きと受信箱の見た目](release-log/unreleased/1799-kenta-beui-round1.md)
 - [一覧・数の帯・手順・ログの見た目と速さ](release-log/unreleased/1802-kenta-beui-round2.md)
+- [細部の直し（左メニューの吹き出し・「？」・2段階認証の欄・主ボタン）](release-log/unreleased/1803-kenta-detail-polish.md)
 - [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
 - [スマートフォンの幅で店名を切れにくく](release-log/unreleased/1804-kenta-hq-card-narrow.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)

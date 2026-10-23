@@ -80,7 +80,8 @@ describe('KpiCardの説明ポップオーバー', () => {
 
   it('絵に？がある題の指定だけ、説明の印を追加する', async () => {
     await render({ helpDisplay: 'question' })
-    expect(host.querySelector('[data-kpi-label]')?.textContent).toBe('視聴?')
+    expect(host.querySelector('[data-kpi-label]')?.textContent).toBe('視聴')
+    expect(host.querySelector('[data-kpi-label] svg[data-help-mark]')).not.toBeNull()
     const button = host.querySelector('button[aria-label="視聴の説明"]') as HTMLButtonElement
     await act(async () => { button.click() })
     expect(host.textContent).toContain('実際に見た区間の記録をまだ集計できないため')

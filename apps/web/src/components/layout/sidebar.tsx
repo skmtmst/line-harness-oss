@@ -154,6 +154,8 @@ export default function Sidebar({
    * 1152px 未満では畳んだ形で開く。保存済みの状態があればそちらを優先する。
    */
   const [collapsed, setCollapsed] = useState(false)
+  /* 畳んだ時、アイコンに乗せた・フォーカスした項目の名前を右の吹き出しに出す。メニューは縦に送れるので中に描くと切れる。画面に固定して出す。 */
+  const [railTip, setRailTip] = useState<{ label: string; count: string; top: number } | null>(null)
   const collapsedInitRef = useRef(false)
   useIsoLayoutEffect(() => {
     if (collapsedInitRef.current) return
@@ -674,6 +676,14 @@ export default function Sidebar({
    * @param drawer ドロワーとして開いているか。先頭の見出しだけ変える
    *   （ドロワーは公式アカウントの名前、常時表示は「管理メニュー」）。
    */
+  const showRailTip = (target: EventTarget) => {
+    if (!collapsed || !(target instanceof Element)) return
+    const item = target.closest<HTMLElement>('[data-rail-label]')
+    if (!item) { setRailTip(null); return }
+    const box = item.getBoundingClientRect()
+    setRailTip({ label: item.dataset.railLabel ?? '', count: item.dataset.railCount ?? '', top: box.top + box.height / 2 })
+  }
+
   const sidebarContent = (drawer: boolean) => (
     <>
       {drawer ? (
@@ -796,7 +806,10 @@ export default function Sidebar({
                   // V8は多数の別画面を先読みせず、選んだ画面だけ読み込む。
                   prefetch={false}
                   onClick={(event) => allowFeatureNavigation(event, item.href, item.label, preparing) && setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
-                  title={visibleLabel}
+                  title={collapsed && !drawer ? undefined : visibleLabel}
+                  aria-label={collapsed && !drawer ? visibleLabel : undefined}
+                  data-rail-label={visibleLabel}
+                  data-rail-count={badgeCount(item) > 0 ? (badgeCount(item) > 99 ? '99+' : String(badgeCount(item))) : undefined}
                   aria-current={active ? 'page' : undefined}
                   data-nav-active={active ? '' : undefined}
                   /*
@@ -863,7 +876,9 @@ export default function Sidebar({
           <Link
             href="/settings"
             prefetch={false}
-            title="設定"
+            title={collapsed ? undefined : "設定"}
+            aria-label={collapsed ? "設定" : undefined}
+            data-rail-label="設定"
             className={`${styles.item} ${settingsActive ? styles.active : ''}`}
           >
             <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
@@ -881,7 +896,9 @@ export default function Sidebar({
           <Link
             href="/hq/settings"
             prefetch={false}
-            title="統括の設定"
+            title={collapsed ? undefined : "統括の設定"}
+            aria-label={collapsed ? "統括の設定" : undefined}
+            data-rail-label="統括の設定"
             className={`${styles.item} ${hqSettingsActive ? styles.active : ''}`}
           >
             <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
@@ -997,9 +1014,24 @@ export default function Sidebar({
 
         中身は常に展開表示。幅で文字を出し分ける必要がなくなった。
       */}
-      <aside ref={desktopRef} className={styles.desktop} data-design-node="J33xq" data-collapsed={collapsed ? '' : undefined}>
+      <aside
+        ref={desktopRef}
+        className={styles.desktop}
+        data-design-node="J33xq"
+        data-collapsed={collapsed ? '' : undefined}
+        onPointerOver={(event) => showRailTip(event.target)}
+        onPointerLeave={() => setRailTip(null)}
+        onFocus={(event) => showRailTip(event.target)}
+        onBlur={() => setRailTip(null)}
+      >
         {sidebarContent(false)}
       </aside>
+      {collapsed && railTip ? (
+        <div role="tooltip" className={styles.railTip} style={{ top: railTip.top }}>
+          {railTip.label}
+          {railTip.count ? <span className={styles.railTipCount}>{railTip.count}</span> : null}
+        </div>
+      ) : null}
     </>
   )
 }

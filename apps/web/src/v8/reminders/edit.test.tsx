@@ -170,7 +170,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     expect(host.querySelector('[aria-label="設定済みの内容"]')?.textContent).toContain('予約前日のご案内・予約日時')
     await act(async () => { (host.querySelector('[aria-label="基本設定を変える"]') as HTMLButtonElement).click() })
     expect(pushMock).toHaveBeenCalledWith('/reminders/edit?id=reminder-new&stage=basics')
-    await act(async () => { buttonByText('?')!.click() })
+    await act(async () => { (host.querySelector('svg[data-help-mark]')!.closest('button') as HTMLButtonElement).click() })
     expect(host.textContent).toContain('名前：予約前日のご案内・いまは下書きです')
     expect(host.textContent).toContain('186 人')
     expect(host.textContent).toContain('172 人')
