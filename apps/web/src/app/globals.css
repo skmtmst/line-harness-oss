@@ -579,6 +579,9 @@
 }
 :root {
   --polish-space-row: 8px;
+  --polish-control-bg: #f0f0f2; --polish-control-hover: #e8e8eb; --polish-control-text: 13px; --polish-control-weight: 500; --polish-value-weight: 600;
+  --polish-selection-bg: #f0f0f2; --polish-selection-ink: var(--color-ink); --polish-selection-shadow: var(--shadow-nav-active); --polish-selection-outline: 1px solid var(--color-control-border); --polish-band-radius: 16px;
+  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06); --polish-nav-tracking: 0.06em; --polish-icon-small: 14px; --polish-icon-large: 18px; --polish-text-center-inset: 1px; --tpl-tabs-center-inset: 3px; --tpl-funnel-window-min-width: 208px;
   --polish-space-field: 12px;
   --polish-space-card: 16px;
   --polish-space-section: 24px;
@@ -1428,7 +1431,7 @@
   /* シナリオ配信の編集（src/v8/scenario-detail・絵の） */
   --tpl-sd-head-pad: 20px 24px 16px; --tpl-sd-head-gap: 12px; --tpl-sd-head-text-gap: 6px; --tpl-sd-title-gap: 10px; --tpl-sd-back-size: 13px; --tpl-sd-back-lh: 19px; --tpl-sd-title-size: var(--polish-text-section); --tpl-sd-title-lh: 32px; --tpl-sd-meta-size: 12px; --tpl-sd-meta-lh: 17px; --tpl-sd-icon-btn: 28px; --tpl-sd-icon-btn-radius: var(--polish-radius-small); --tpl-sd-icon: 16px;
   --tpl-sd-conflict-wrap-pad: 0 24px 8px; --tpl-sd-conflict-pad: 12px 16px; --tpl-sd-conflict-gap: 12px; --tpl-sd-conflict-icon: 18px; --tpl-sd-conflict-bg: #fdf3e1; --tpl-sd-conflict-text-gap: 2px; --tpl-sd-conflict-title-size: var(--polish-text-section); --tpl-sd-conflict-title-lh: 20px; --tpl-sd-conflict-body-size: var(--polish-text-body); --tpl-sd-conflict-body-lh: 19px;
-  --tpl-sd-left-pad: 20px 28px; --tpl-sd-left-gap: 18px; --tpl-sd-right-w: 379.5px; --tpl-sd-right-pad: 20px 24px; --tpl-sd-right-gap: 14px; --tpl-sd-right-title-size: var(--polish-text-section); --tpl-sd-right-title-lh: 23px;
+  --tpl-sd-left-pad: 20px 28px; --tpl-sd-left-gap: 18px; --tpl-sd-right-w: 379.5px; --tpl-sd-right-pad: 20px 24px; --tpl-sd-right-gap: var(--polish-space-card); --tpl-sd-right-title-size: var(--polish-text-section); --tpl-sd-right-title-lh: 23px;
   --tpl-sd-band-pad: 12px 14px; --tpl-sd-band-gap: 10px; --tpl-sd-band-radius: var(--polish-radius-card); --tpl-sd-band-icon: 16px; --tpl-sd-band-size: 13px; --tpl-sd-band-lh: 20px; --tpl-sd-started-shadow: 0 1px 2px #1d1d1f0f, 0 8px 24px #1d1d1f14;
   --tpl-sd-cards-gap: 12px; --tpl-sd-card-h: 172px; --tpl-sd-card-pad: var(--polish-space-card); --tpl-sd-card-gap: var(--polish-space-row); --tpl-sd-card-radius: var(--polish-radius-card); --tpl-sd-card-head-gap: 8px; --tpl-sd-num: 20px; --tpl-sd-num-size: 11px; --tpl-sd-card-title-size: var(--polish-text-section); --tpl-sd-card-title-lh: 19px; --tpl-sd-card-main-size: 14px; --tpl-sd-card-main-lh: 20px; --tpl-sd-note-size: var(--polish-text-note); --tpl-sd-note-lh: 16px; --tpl-sd-state-gap: 6px; --tpl-sd-state-size: 13px; --tpl-sd-state-lh: 19px;
   --tpl-sd-kpi-pad: 12px 14px; --tpl-sd-kpi-gap: 2px; --tpl-sd-kpi-label-size: 12px; --tpl-sd-kpi-label-lh: 17px; --tpl-sd-kpi-num-size: 20px; --tpl-sd-kpi-num-lh: 24px; --tpl-sd-kpi-wide-lh: 29px; --tpl-sd-kpi-unit-gap: 3px;
@@ -3010,7 +3013,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-dialog-title-weight: 700;
   --tpl-tabs-h: 36px;
   --tpl-tabs-weight: 500;
-  --tpl-tabs-current-weight: 500;
+  --tpl-tabs-current-weight: 600;
   --tpl-badge-h: 22px;
   --tpl-tag-pill-h: 24px;
   --tpl-section-title-size: 15px;
@@ -3192,23 +3195,7 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 
 :root { --tpl-sender-icon: 32px; --tpl-sender-row: 48px; --tpl-sender-tile: 88px; --tpl-sender-icon-text: 13px; --tpl-sender-note-lh: 18px; --tpl-sender-outline: 2px; }
 
-/* 操作・ラベル・数の役割を共通の値でそろえる。 */
-:root {
-  --polish-control-bg: #f0f0f2;
-  --polish-control-hover: #e8e8eb;
-  --polish-control-text: 13px;
-  --polish-control-weight: 500;
-  --polish-value-weight: 600;
-  --polish-selection-bg: #f0f0f2;
-  --polish-selection-ink: var(--color-ink);
-  --polish-selection-shadow: var(--shadow-nav-active);
-  --polish-selection-outline: 1px solid var(--color-control-border);
-  --polish-band-radius: 16px;
-  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06);
-  --polish-nav-tracking: 0.06em;
-  --polish-icon-small: 14px;
-  --polish-icon-large: 18px;
-}
+
 /* 複合部品や画面が渡す線幅も、同じlucideの値へそろえる。 */
 :root svg.lucide { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
 

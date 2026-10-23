@@ -223,3 +223,5 @@
 :root .list .items[data-sliding='true'] .current { border-bottom-color: transparent; }
 /* 通知の固定絵は文字を段の上へ置く。高さ36と切り替えの動きは共通。 */
 :root .list[data-size='notification'] .tab.tab { align-items: flex-start; }
+
+:root .list .tab.tab { padding-block-start: var(--tpl-tabs-center-inset); }

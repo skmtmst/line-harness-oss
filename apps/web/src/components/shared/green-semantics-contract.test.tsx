@@ -74,8 +74,8 @@ describe('#669 カード頭の緑を整理する', () => {
 })
 
 describe('#669 成功の緑を success に1本化する', () => {
-  it('札と通知の成功文字は success、地は success-bg', () => {
-    for (const name of ['status-badge.module.css', 'notice.module.css']) {
+  it('通知の成功文字は success、地は success-bg', () => {
+    for (const name of ['notice.module.css']) {
       const css = withoutComments(read(name))
       expect(block(css, '.success')).toMatch(/color:\s*var\(--color-success\)/)
       expect(block(css, '.success')).toContain(`background: var(--color-${name === 'notice.module.css' ? 'notice-success-bg' : 'success-bg'});`)

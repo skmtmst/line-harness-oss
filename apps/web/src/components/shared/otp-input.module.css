@@ -206,3 +206,10 @@
 html:root .group .slot:focus-visible { outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
 html:root .group .slot[aria-invalid='true']:focus-visible { outline-color: var(--color-status-danger); }
 html:root .group .slot[value='']:focus { background-image: linear-gradient(var(--color-ink), var(--color-ink)); }
+
+:root .group[data-format='digits'] {
+  --otp-rounded-gap: round(up, calc((100% - 312px) / 5), 0.5px);
+  justify-content: flex-start;
+  gap: var(--otp-rounded-gap);
+}
+:root .group[data-format='digits'] .slot:nth-child(2) { margin-inline-start: calc(100% - 312px - 5 * var(--otp-rounded-gap)); }

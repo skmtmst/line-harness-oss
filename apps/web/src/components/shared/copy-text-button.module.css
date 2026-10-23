@@ -15,3 +15,5 @@
 @media (prefers-reduced-motion: reduce) { :root .button:active { transform: none; } }
 
 }
+
+:root .button { padding-block-start: calc(2px + var(--polish-text-center-inset)); }

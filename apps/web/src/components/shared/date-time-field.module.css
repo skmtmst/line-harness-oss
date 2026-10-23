@@ -92,3 +92,5 @@
 }
 
 .compactField { height: var(--tpl-chip-h); }
+
+:root .closeBtn { box-sizing: border-box; height: 32px; padding-block-start: calc(4px + var(--polish-text-center-inset)); }

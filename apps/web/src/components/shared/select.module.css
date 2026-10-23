@@ -211,9 +211,16 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
 
 /* 選択欄は線なしの灰色。文字だけ・状態の札の口は保つ。 */
 :root .trigger:not(.textTrigger):not([data-tone]) {
-  outline: none; border: 0; box-shadow: none; background: var(--polish-control-bg);
+  outline-color: transparent; border: 0; box-shadow: none; background: var(--polish-control-bg);
   font-size: var(--polish-control-text); font-weight: var(--polish-control-weight);
 }
 :root .trigger:not(.textTrigger):not([data-tone]):hover:not(:disabled) { background: var(--polish-control-hover); }
 :root .invalid .trigger:not(.textTrigger) { outline: 1px solid var(--color-danger); outline-offset: -1px; }
 :root .leadingIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+
+:root .trigger { padding-block-start: var(--polish-text-center-inset); }
+:root .value { flex-shrink: 0; }
+:root .standard { min-width: max-content; }
+:root .standard .trigger { min-width: max-content; }
+
+:root .trigger:not(.textTrigger):not([data-tone]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

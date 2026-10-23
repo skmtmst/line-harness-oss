@@ -303,3 +303,5 @@
   display: none;
 }
 }
+
+:root .frame { gap: var(--polish-space-field); }

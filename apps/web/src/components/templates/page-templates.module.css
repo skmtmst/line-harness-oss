@@ -566,3 +566,14 @@
 /* 数の帯を白い板の余白の内側へ置く。道具に含む帯は道具の余白を使う。 */
 :global(:root) .stats:has([data-kpi-strip]) { padding-inline: var(--tpl-list-inset); }
 :global(:root) .section { border-bottom: 0; }
+
+@container v8-page (width < 1100px) {
+ :global(:root) .dashboardRow:not([data-row='restaurant']) { flex-direction: column; }
+ :global(:root) .dashboardRow:not([data-row='restaurant']) > .dashboardAside { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
+ :global(:root) .dashboardColumns:not([data-layout='cards']) { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+:global(:root) .toolbar :global(.v6-filter-chip) { height: var(--tpl-button-h); }
+
+@container v8-page (width < 1100px) {
+ :global(:root) .dashboardRow[data-aside-size='column'] { display: flex; }
+}

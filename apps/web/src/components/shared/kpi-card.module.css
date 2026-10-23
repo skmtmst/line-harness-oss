@@ -325,7 +325,7 @@
 
 /* ラベルと値の強弱。アイコンに小箱を重ねない。 */
 :root .label { color: var(--color-ink-secondary); font-weight: var(--polish-control-weight); }
-:root .icon { width: var(--polish-icon-large); height: var(--polish-icon-large); border: 0; outline: none; border-radius: 0; background: none; }
+:root .icon { width: var(--polish-icon-large); height: var(--polish-icon-large); border: 0; outline-color: transparent; border-radius: 0; background: none; }
 :root .icon svg { width: var(--polish-icon-large); height: var(--polish-icon-large); stroke-width: var(--polish-icon-stroke); }
 :root .number, :root .card[data-kpi-presentation='inline'] .number { font-weight: var(--polish-value-weight); font-variant-numeric: tabular-nums; }
 :root .link { color: var(--color-ink); }

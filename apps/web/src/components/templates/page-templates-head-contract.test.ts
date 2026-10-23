@@ -26,7 +26,7 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-toolbar-pad-block', '14px'], ['--tpl-toolbar-pad-side', '24px'], ['--tpl-toolbar-gap', '8px'],
       ['--tpl-folder-width', '200px'],
       ['--tpl-page-pad-block', '10px'], ['--tpl-page-pad-side', '24px'],
-      ['--tpl-band-number-size', '22px'], ['--tpl-band-number-lh', '26px'],
+      ['--tpl-band-number-size', '32px'], ['--tpl-band-number-lh', '38px'],
       ['--tpl-band-cell-pad-block', '16px'], ['--tpl-band-cell-pad-side', '24px'], ['--tpl-band-cell-gap', '8px'],
       ['--tpl-create-head-pad-top', '24px'], ['--tpl-create-head-pad-side', '24px'], ['--tpl-create-head-pad-bottom', '16px'],
       ['--tpl-create-head-gap', '8px'],

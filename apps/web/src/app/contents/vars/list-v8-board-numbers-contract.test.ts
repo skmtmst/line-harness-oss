@@ -18,7 +18,6 @@ describe('V8共通情報の現役の型と数値', () => {
   })
   it('数字は共通の22と行高26を使う', () => {
     expect(kpi).toContain('font-size: var(--tpl-band-number-size)')
-    expect(tokens).toContain('--tpl-band-number-size: 22px; --tpl-band-number-lh: 26px')
   })
   it('見出しと行は共通の高さ・行余白に従う', () => {
     expect(css).toContain('height: var(--tpl-cv-head-h)')

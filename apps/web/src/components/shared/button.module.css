@@ -293,7 +293,7 @@ html:root .button.filterActive { outline-color: var(--color-control-border); col
 :root .button.inline.text.textAccent { color: var(--color-accent-deep); }
 
 /* 灰色の面でもキーボードの焦点だけは輪で示す。 */
-:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):not(:focus-visible) { outline: none; }
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):not(:focus-visible) { outline-color: transparent; }
 html:root .button:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 :root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):active:not(:disabled) { background: var(--polish-control-hover); }
 
@@ -311,3 +311,5 @@ html:root :is(:global([data-design-part='dialog']), :global([data-design-part='d
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);
 }
+
+html:root .button:is(.standard, .field, .compact, .slot):not([data-presentation]) { padding-block-start: var(--polish-text-center-inset); }

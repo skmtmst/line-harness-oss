@@ -220,7 +220,6 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   // 配信の自動応答の編集は、一覧と同じ console.tsx の中で開く。書きかけの有無は親が持ち、番兵は親が持つ。
   'v8/hq-deliveries/auto-reply-editor.tsx': 'v8/hq-deliveries/console.tsx',
   // 作る・直す型（CreatePage）に dirty を渡す画面。離脱の番兵は型が持つ。
-  'v8/restaurant/menu/edit.tsx': 'components/templates/create-page.tsx',
 }
 
 /*

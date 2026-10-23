@@ -242,3 +242,8 @@ html:root .button[data-help-trigger='text']:active { scale: 1; }
 /* 「?」は文字ではなく図形のアイコンで描く。文字は上下の余白のくせで丸の真ん中に来ない。 */
 :root .markIcon { display: block; flex: none; width: 16px; height: 16px; color: var(--color-ink-faint); transition: color var(--motion-fast) var(--motion-ease-out); }
 :root .button:hover .markIcon { color: var(--color-ink-secondary); }
+
+:root .button { padding-block-start: var(--polish-text-center-inset); }
+:root .tip { max-width: min(300px, calc(100vw - 24px)); overflow-wrap: anywhere; }
+
+:root .tip { position: fixed; }

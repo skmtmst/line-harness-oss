@@ -568,6 +568,4 @@
 @media (max-width: 1279px) { .table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); } }
 @media (max-width: 1279px) {
   .readOnlyTable { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); }
-  .readOnlyTable .colRole { order: 1; }
-  .readOnlyTable .colLast { order: 2; }
 }

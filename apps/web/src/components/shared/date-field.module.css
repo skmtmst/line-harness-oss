@@ -329,3 +329,5 @@
 :root .field[data-open] { border-color: transparent; box-shadow: none; }
 :root .field:hover:not(:disabled):not([data-readonly]) { background: var(--polish-control-hover); }
 :root .field[data-invalid] { border-color: var(--color-danger); }
+
+:root .day[data-selected] { font-weight: 600; }

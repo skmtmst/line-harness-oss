@@ -324,3 +324,5 @@
   outline-offset: 2px;
 }
 }
+
+:root .now { padding-block: 2.5px 1.5px; }

@@ -1,6 +1,6 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-.badge {
+:root .badge {
   display: inline-flex;
   box-sizing: border-box;
   align-items: center;
@@ -45,3 +45,5 @@
 .badge[data-size='delivery']:has(> svg) { gap: var(--tpl-rt-dlv-badge-mark-gap); }
 .badge a:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
 }
+
+:root .badge { padding-block-start: calc(2px + var(--polish-text-center-inset)); }

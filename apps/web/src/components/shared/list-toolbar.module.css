@@ -340,3 +340,5 @@ html:root .leading > :is(button, a) { width: max-content; flex: none; }
     width: auto; min-width: 0; max-width: 100%; flex: 0 0 auto;
   }
 }
+
+html:root .trailing:has([data-period-range]) { min-width: 0; flex: 1 1 100%; width: 100%; flex-wrap: wrap; }

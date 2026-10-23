@@ -7,7 +7,7 @@
  * 失敗・警告・操作の結果・必須の印・入力の直し方・数字そのものは入れない
  * （帯や欄の下の文で見せる）。
  */
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { CircleHelp } from 'lucide-react'
 import styles from './help-tip.module.css'
 
@@ -42,6 +42,26 @@ export default function HelpTip({
   const tipId = useId()
   const wrapRef = useRef<HTMLSpanElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const tipRef = useRef<HTMLSpanElement>(null)
+  const [position, setPosition] = useState<{ left: number; top: number }>()
+
+  useLayoutEffect(() => {
+    if (!open) return
+    let frame = 0
+    const place = () => {
+      const anchor = buttonRef.current?.getBoundingClientRect()
+      const tip = tipRef.current?.getBoundingClientRect()
+      if (!anchor || !tip) return
+      const left = Math.max(12, Math.min(anchor.left, window.innerWidth - tip.width - 12))
+      const top = Math.max(12, Math.min(anchor.bottom + 4, window.innerHeight - tip.height - 12))
+      setPosition(previous => previous?.left === left && previous.top === top ? previous : { left, top })
+    }
+    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(place) }
+    place()
+    window.addEventListener('resize', queue)
+    window.addEventListener('scroll', queue, true)
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', queue); window.removeEventListener('scroll', queue, true) }
+  }, [open, children])
 
   // 1つ開くと他は閉じる。開いた側が合図し、違う持ち主だけ閉じる。
   useEffect(() => {
@@ -107,7 +127,7 @@ export default function HelpTip({
         {trigger ?? <span aria-hidden="true">{icon ? <span className={styles.sourceMark}>{icon}</span> : <CircleHelp className={styles.markIcon} strokeWidth={1.75} aria-hidden="true" data-help-mark="" />}</span>}
       </button>
       {open ? (
-        <span role="note" id={tipId} className={styles.tip}>
+        <span ref={tipRef} role="note" id={tipId} className={styles.tip} style={position}>
           {children}
         </span>
       ) : null}

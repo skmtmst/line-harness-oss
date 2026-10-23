@@ -25,7 +25,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/friend-fields/tag-csv-import-dialog.module.css", ".tableFrame", "取り込み内容の表の枠。影を重ねない。"],
   ["components/hq/account-menu.module.css", ".menu", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/account-switch-menu.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
-  ["components/shared/command-palette.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/data-table.module.css", ":root .frame[data-table-presentation='account-list'], :root .frame[data-table-presentation='account-handover']", "アカウント一覧と乗り換えの表の枠。影を重ねない。"],
   ["components/shared/file-drop.module.css", ".zone", "ファイルを落とす入力欄。内容のカードではない。"],
   ["components/shared/file-drop.module.css", ".row", "選んだファイルの入力行。外側の入力欄と影を重ねない。"],

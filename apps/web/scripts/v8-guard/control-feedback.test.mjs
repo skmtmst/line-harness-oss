@@ -17,8 +17,13 @@ import Button from './src/components/shared/button';
 import SegmentedControl from './src/components/shared/segmented';
 import Pagination from './src/components/shared/pagination';
 import KpiCard from './src/components/shared/kpi-card';
+import KpiBand from './src/components/shared/kpi-band';
+import StatusBadge from './src/components/shared/status-badge';
+import StatusPill from './src/components/shared/status-pill';
+import Dialog from './src/components/shared/dialog';
+import Drawer from './src/components/shared/drawer';
 import {RowNameButton} from './src/components/shared/table';
-function Fixture(){const[value,setValue]=useState('graph');return <main>
+function Fixture(){const[value,setValue]=useState('graph');const[window,setWindow]=useState('');return <main>
 <Button variant="secondary">副操作</Button><Button variant="secondary" filterActive>絞り込み中</Button>
 <Button variant="secondary" presentation="restaurant">店の副操作</Button><Button>主操作</Button>
 <Pagination page={1} pageCount={3} onPageChange={()=>{}}/>
@@ -26,6 +31,11 @@ function Fixture(){const[value,setValue]=useState('graph');return <main>
 <RowNameButton>行の名前</RowNameButton>
 <SegmentedControl aria-label="表示" value={value} onChange={setValue} options={[{value:'graph',label:'グラフ'},{value:'table',label:'表'}]}/>
 <SegmentedControl aria-label="選択札" appearance="choices" value="one" onChange={()=>{}} options={[{value:'one',label:'候補'}]}/>
+<section data-measure-band><KpiBand><KpiCard title="集計" value={42}/></KpiBand></section>
+<section data-measure-badges>{['neutral','success','info','warning','danger'].flatMap(tone=>[<StatusBadge key={'badge-'+tone} tone={tone}>{tone}</StatusBadge>,<StatusPill key={'pill-'+tone} tone={tone}>{tone}</StatusPill>])}</section>
+<Button onClick={()=>setWindow('dialog')}>作る窓を開く</Button><Button onClick={()=>setWindow('drawer')}>引き出しを開く</Button>
+<Dialog open={window==='dialog'} onCancel={()=>setWindow('')} title="作る窓"><p>本文</p></Dialog>
+<Drawer open={window==='drawer'} onClose={()=>setWindow('')} title="引き出し"><p>本文</p></Drawer>
 </main>}createRoot(document.getElementById('root')).render(<Fixture/>);` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
   tsconfig: `${webRoot}/tsconfig.json`, define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
@@ -108,5 +118,41 @@ test('表示切替は白いつまみで追従し、クリック・矢印と動�
       assert.equal(await page.getByRole('group',{name:'選択札',exact:true}).getByRole('button').getAttribute('aria-pressed'),'true')
       await page.close()
     }
+  } finally { await browser.close() }
+})
+
+
+test('数の帯と窓は共通の値で描かれ、状態札の文字は読める濃さを保つ', async () => {
+  const browser=await connectGuardBrowser()
+  try {
+    const page=await browser.newPage({reducedMotion:'reduce'})
+    await mount(page)
+    const numbers=page.locator('[data-measure-band] [data-kpi-number]')
+    const metric=await numbers.evaluate(el=>{const s=getComputedStyle(el);return{size:s.fontSize,line:s.lineHeight}})
+    assert.deepEqual(metric,{size:'32px',line:'38px'})
+    const ratios=await page.locator('[data-measure-badges] > span').evaluateAll(els=>els.map(el=>{
+      const s=getComputedStyle(el),rgb=value=>value.match(/[0-9.]+/g).slice(0,3).map(Number)
+      const light=channels=>channels.map(c=>{c/=255;return c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4}).reduce((sum,c,i)=>sum+c*[0.2126,0.7152,0.0722][i],0)
+      const a=light(rgb(s.color)),b=light(rgb(s.backgroundColor))
+      return{tone:el.textContent,ratio:(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05)}
+    }))
+    assert.equal(ratios.length,10)
+    for(const result of ratios)assert.ok(result.ratio>=4.5,JSON.stringify(result))
+    for(const name of ['作る窓を開く','引き出しを開く']){
+      await page.getByRole('button',{name,exact:true}).click()
+      const panel=page.getByRole('dialog')
+      await panel.waitFor()
+      const shadows=await panel.evaluate(el=>{const s=getComputedStyle(el),probe=document.createElement('div');probe.style.boxShadow='var(--polish-window-shadow)';el.append(probe);const expected=getComputedStyle(probe).boxShadow;probe.remove();return{actual:s.boxShadow,expected}})
+      assert.equal(shadows.actual,shadows.expected)
+      assert.notEqual(shadows.actual,'none')
+      await page.keyboard.press('Escape')
+      await panel.waitFor({state:'hidden'})
+    }
+    await numbers.evaluate(el=>el.closest('[data-kpi-strip]').style.setProperty('--tpl-band-number-size','22px'))
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-measure-band] [data-kpi-number]')).fontSize!=='32px')
+    assert.notEqual(await numbers.evaluate(el=>getComputedStyle(el).fontSize),'32px')
+    await numbers.evaluate(el=>el.closest('[data-kpi-strip]').style.removeProperty('--tpl-band-number-size'))
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-measure-band] [data-kpi-number]')).fontSize==='32px')
+    assert.equal(await numbers.evaluate(el=>getComputedStyle(el).fontSize),'32px')
   } finally { await browser.close() }
 })

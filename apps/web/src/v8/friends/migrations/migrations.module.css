@@ -171,3 +171,5 @@
 
 /* 行（乗せたときの地の変化は共通の動きの速さ）。 */
 .row { transition: background-color var(--motion-fast) var(--motion-ease-out); }
+
+.runButton[aria-current], .runButton[aria-selected='true'] { font-weight: 600; }
