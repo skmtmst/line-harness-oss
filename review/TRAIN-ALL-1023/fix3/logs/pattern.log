@@ -1,0 +1,55 @@
+people-day-grid  a    0 b    0 c     0 d    0/   0  効く 6f/0板  未定:Pen
+card             a   19 b    5 c    37 d    0/   0  効く 199f/0板  未定:Pen
+kpi-band         a   15 b   15 c    17 d    0/   0  効く 130f/0板
+page-head        a   26 b    3 c    34 d    0/   0  効く 272f/0板
+toolbar          a   75 b    0 c     5 d    0/   0  効く 76f/0板
+filter           a   61 b    5 c     7 d    0/   0  効く 66f/0板
+folder-column    a   43 b    0 c     3 d    0/   0  効く 16f/0板
+table            a  143 b  194 c    34 d    0/   0  効く 166f/0板
+row-menu         a   17 b    3 c     1 d    0/   0  効く 144f/0板
+pagination       a  125 b    0 c     1 d    0/   0  効く 89f/0板
+detail-panel     a   39 b    0 c     1 d    0/   0  効く 42f/0板  未定:Pen
+dialog           a   25 b   12 c     7 d    0/   0  効く 273f/0板
+picker-dialog    a    2 b    1 c     0 d    0/   0  効く 9f/0板
+picker-field     a   15 b    0 c     0 d    0/   0  効く 27f/0板  未定:Pen
+select           a   50 b   10 c     2 d    0/   0  効く 182f/0板
+tap-action       a   61 b    0 c     0 d    0/   0  効く 7f/0板
+tap-extra        a   28 b    0 c     0 d    0/   0  効く 7f/0板
+action-list      a   12 b    0 c     0 d    0/   0  効く 15f/0板  未定:Pen
+media-slot       a   64 b    1 c     0 d    0/   0  効く 29f/0板  未定:Pen
+field            a  196 b   20 c    32 d    0/   0  効く 262f/0板
+field-error      a  160 b   10 c     5 d    0/   0  効く 231f/0板
+sticky-bar       a  135 b    1 c     2 d    0/   0  効く 93f/0板  未定:Pen
+tabs             a   40 b    9 c     2 d    0/   0  効く 53f/0板
+status-badge     a  216 b   28 c    10 d    0/   0  効く 167f/0板
+list-state       a  356 b    6 c     7 d    0/   0  効く 336f/0板
+viewer-band      a   79 b    0 c     0 d    0/   0  効く 101f/0板  未定:Pen
+notice           a   35 b    0 c     2 d    0/   0  効く 415f/0板
+save-conflict    a  162 b    0 c     3 d    0/   0  効く 39f/0板  未定:Pen
+customer-info    a   16 b    0 c     0 d    0/   0  効く 2f/0板
+phone-preview    a   18 b    1 c    27 d    0/   0  効く 46f/0板
+period           a   78 b    0 c     0 d    0/   0  効く 8f/0板  未定:Pen
+chart            a    7 b    0 c     1 d    0/   0  効く 3f/0板  未定:Pen
+external-link    a   15 b   12 c    11 d    0/   0  効く 27f/0板
+csv              a   37 b    0 c     0 d    0/   0  効く 0f/0板  未定:コード・Pen
+primary-button   a   66 b   97 c     9 d    0/   0  効く 559f/0板
+date-time        a    1 b    0 c     1 d    0/   0  効く 74f/0板  未定:Pen
+toggle           a  103 b   11 c     7 d    0/   0  効く 227f/0板
+copy             a    4 b    0 c     0 d    0/   0  効く 25f/0板  未定:Pen
+steps            a   11 b    7 c     7 d    0/   0  効く 27f/0板
+bulk-bar         a    4 b    0 c     1 d    0/   0  効く 13f/0板
+back-link        a    1 b    0 c     1 d    0/   0  効く 0f/0板  未定:Pen
+folder-select    a   14 b    0 c     0 d    0/   0  効く 32f/0板
+inbox-frame      a    0 b    0 c     0 d    0/   0  効く 7f/0板
+screen-explanation a    0 b    0 c     0 d    0/   0  効く 0f/0板  未定:Pen
+save-feedback    a    0 b    0 c     0 d    0/   0  効く 3f/0板  未定:Pen
+friend-filter-band a    0 b    0 c     0 d    0/   0  効く 1f/0板  未定:Pen
+aggregation-status a    0 b    0 c     0 d    0/   0  効く 3f/0板  未定:Pen
+list-date-time   a    0 b    0 c     0 d    0/   0  効く 8f/0板  未定:Pen
+list-status-cell a    0 b    0 c     0 d    0/   0  効く 2f/0板  未定:Pen
+auth-page        a    0 b    0 c     0 d    0/   0  効く 5f/0板  未定:Pen
+verification-list a    0 b    0 c     0 d    0/   0  効く 0f/0板  未定:Pen
+(型なし) b 39 c 144
+→ /Users/kentakenta/lh-work/design/v8/review/TRAIN-ALL-1023/fix3/pattern/pattern-audit.md
+持ち主の見張り: base c586bffe1b9c50641666eb1ba9f06c6ef93c054a / 新しい候補 0
+一時許可 0 / 未許可 0（対象・理由・担当・期限は pattern-new-findings.json）

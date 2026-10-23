@@ -48,9 +48,9 @@
 次のタスクはこれ：司令塔が比較画像を目視し、Pencilと正式な合否の記録へ反映する。反映履歴は共通ルールどおり司令塔がPR採番後に作成する。
 
 - 修正・実描画試験：`a1cdb181c1`（`apps/web/src/components/shared/dialog.tsx:239`・`:292`、`dialog.module.css:440`・`:576`・`:588`、`apps/web/scripts/v8-guard/booking-dialog-layout.test.mjs:94`）。
-- 正本・修正指示・Memory・画像と本記録：このFINAL.mdを含む記録コミット。
+- 正本・修正指示・Memory・画像と本記録：`889ed6f6ea`。検査ログと記録補足は、このFINAL.mdの最新コミット。
 - 文書の入口・掲載回数・ローカルリンクの検査、各コミット前の `git diff --cached --check` は成功。最終状態は追跡・ステージ・未追跡の残り0で引き継ぐ。
 - 試験のstderrにhappy-domの`localhost:3000/detail`への接続拒否が出るが、全2,220件と終了コード0を確認した。実画面とBrowser pluginの警告・エラーは0。
-- ログは [logs](logs/)、画像のSHA256は [image-manifest.json](image-manifest.json)、ソースの前後SHA256は [source-manifest.json](source-manifest.json)。全台本・試行ログは前述の司令塔の手元にも保持。
+- ログは [logs](logs/)（Gitの差分検査に合わせて末尾空白だけ正規化し、原ログは司令塔の手元へ保持）、画像のSHA256は [image-manifest.json](image-manifest.json)、ソースの前後SHA256は [source-manifest.json](source-manifest.json)。全台本・試行ログは前述の司令塔の手元にも保持。
 
 Pencil原本・正式な合格台帳は変更していない。Co-Authored-Byなし。push・PR・統合・配備・DB更新・Slack送信なし。

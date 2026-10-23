@@ -1,0 +1,42 @@
+
+ RUN  v4.1.11 /Users/kentakenta/lh-work/lh-train-all-1023/apps/web
+
+AggregateError:
+    at internalConnectMultiple (node:net:1135:18)
+    at afterConnectMultiple (node:net:1716:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:1679:14)
+        at afterConnectMultiple (node:net:1709:16) {
+      errno: -61,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:1679:14)
+        at afterConnectMultiple (node:net:1709:16) {
+      errno: -61,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+DOMException [NetworkError]: Failed to execute "fetch()" on "Window" with URL "http://localhost:3000/detail":
+    at Fetch.onError (file:///Users/kentakenta/lh-work/lh-train-all-1023/node_modules/.pnpm/happy-dom@20.14.0/node_modules/happy-dom/lib/fetch/Fetch.js:540:21)
+    at ClientRequest.emit (node:events:519:28)
+    at emitErrorEvent (node:_http_client:108:11)
+    at Socket.socketErrorListener (node:_http_client:575:5)
+    at Socket.emit (node:events:519:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at processTicksAndRejections (node:internal/process/task_queues:89:21)
+
+ Test Files  352 passed (352)
+      Tests  2220 passed (2220)
+   Start at  16:25:00
+   Duration  38.18s (transform 5.75s, setup 2.08s, import 52.92s, tests 31.90s, environment 29.54s)

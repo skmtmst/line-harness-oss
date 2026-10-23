@@ -1,0 +1,2265 @@
+
+> web@0.24.0 prebuild /Users/kentakenta/lh-work/lh-train-all-1023/apps/web
+> pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs
+
+Scope: 2 of 13 workspace projects
+../../packages/shared build$ tsc -p tsconfig.build.json
+../../packages/shared build: Done
+../../packages/line-sdk build$ tsc -p tsconfig.build.json
+../../packages/line-sdk build: Done
+[release-log] unreleased/448-kenta-reminders-v6-visual.md: 見出しの外に項目があります — - 送る前に何通いくかを見せる場所が無い（配信予定プレビュー） @kenta #448 2026-08-28
+[release-log] unreleased/448-kenta-reminders-v6-visual.md: 見出しの外に項目があります — - 止める条件が無い（予約取消・対応完了・ブロックでの停止）
+[release-log] unreleased/448-kenta-reminders-v6-visual.md: 見出しの外に項目があります — - テスト送信が無い（一斉配信とシナリオには在る）
+[release-log] unreleased/448-kenta-reminders-v6-visual.md: 見出しの外に項目があります — - 作る画面でフォルダを選べなかったのを直した。受け口は前から受け取れていた
+[release-log] unreleased/448-kenta-reminders-v6-visual.md: 見出しの外に項目があります — - 設計の大きさを書き出したHTMLから読むようにした（手で書き写さない）
+[release-log] unreleased/450-kenta-auto-replies-v6-visual.md: 見出しの外に項目があります — - 編集を開いて保存すると、そのルールがフォルダから外れて未分類へ落ちていた。 @kenta #450 2026-08-28
+[release-log] unreleased/450-kenta-auto-replies-v6-visual.md: 見出しの外に項目があります — - URLから開いたほうは曜日・アクション・キーワードの複数行まで落としていた
+[release-log] unreleased/450-kenta-auto-replies-v6-visual.md: 見出しの外に項目があります — - 段の番号が上から 1 → 3 → 2 の順に出ていたのを直した
+[release-log] unreleased/450-kenta-auto-replies-v6-visual.md: 見出しの外に項目があります — - 条件が重なっていることを教える場所が無い（後ろのルールが一度も動かない）
+[release-log] unreleased/450-kenta-auto-replies-v6-visual.md: 見出しの外に項目があります — - 試す場所が無い（届いた瞬間に返るので、気づく機会が実際の受信までない）
+[release-log] unreleased/568-masato-opsa-tenant-create.md: 見出しの外に項目があります — - 運営が新しい統括を作り、飲食店向け機能を割り当てられるようにした @masato #568 2026-08-29 21:47
+[release-log] 3 版 / 6347 件を書き出しました
+
+> web@0.24.0 build /Users/kentakenta/lh-work/lh-train-all-1023/apps/web
+> next build
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/kentakenta/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles:
+   * /Users/kentakenta/lh-work/lh-train-all-1023/pnpm-lock.yaml
+
+   ▲ Next.js 15.5.27
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 21.9s
+   Linting and checking validity of types ...
+
+./src/app/accounts/migration.tsx
+3:10  Warning: 'runStatusView' is defined but never used.  @typescript-eslint/no-unused-vars
+3:25  Warning: 'MigrationItemDialog' is defined but never used.  @typescript-eslint/no-unused-vars
+3:46  Warning: 'ExecuteConfirmDialog' is defined but never used.  @typescript-eslint/no-unused-vars
+3:68  Warning: 'RollbackConfirmDialog' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/affiliates/affiliate-link-url.test.tsx
+15:27  Warning: '_text' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/affiliates/affiliate-report-shape.test.ts
+14:35  Warning: '_prefetch' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/analytics/analytics-controls-react.test.tsx
+23:14  Warning: 'path' is defined but never used.  @typescript-eslint/no-unused-vars
+23:28  Warning: 'init' is defined but never used.  @typescript-eslint/no-unused-vars
+459:40  Warning: 'init' is defined but never used.  @typescript-eslint/no-unused-vars
+527:40  Warning: 'init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/analytics/analytics-cross-queue-contract.test.ts
+3:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/analytics/analytics-measure-retry-react.test.tsx
+24:28  Warning: 'init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/analytics/analytics-pending-value-contract.test.ts
+2:8  Warning: 'fs' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/analytics/analytics-saved-reports-react.test.tsx
+152:10  Warning: 'button' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/analytics/analytics-saved-tab-audit-react.test.tsx
+157:25  Warning: 'init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/analytics/analytics-unavailable-words-contract.test.ts
+2:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/analytics/reports/new/page.tsx
+305:10  Warning: 'savedOpen' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+528:27  Warning: The ref value 'conflictActionSeq.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'conflictActionSeq.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/app/auto-replies/auto-replies-viewer-gating-react.test.tsx
+11:10  Warning: 'dirname' is defined but never used.  @typescript-eslint/no-unused-vars
+11:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+12:10  Warning: 'fileURLToPath' is defined but never used.  @typescript-eslint/no-unused-vars
+159:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/auto-replies/auto-reply-boards-nodes.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/auto-replies/auto-reply-delete-confirm-contract.test.ts
+2:10  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/auto-replies/auto-reply-hits-unavailable-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+8:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/auto-replies/edit/edit-viewer-gating-react.test.tsx
+11:10  Warning: 'dirname' is defined but never used.  @typescript-eslint/no-unused-vars
+11:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+12:10  Warning: 'fileURLToPath' is defined but never used.  @typescript-eslint/no-unused-vars
+97:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/auto-replies/edit/page-r528-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/auto-replies/edit/wizard-save-notice-contract.test.ts
+2:10  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/auto-replies/runs/auto-reply-runs-retry.test.tsx
+253:34  Warning: '_text' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/auto-replies/runs/runs-viewer-gating-react.test.tsx
+11:10  Warning: 'dirname' is defined but never used.  @typescript-eslint/no-unused-vars
+11:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+12:10  Warning: 'fileURLToPath' is defined but never used.  @typescript-eslint/no-unused-vars
+155:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/automations/runs/automation-runs-audit.test.tsx
+150:27  Warning: 'el' is defined but never used.  @typescript-eslint/no-unused-vars
+258:11  Warning: 'el' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+278:13  Warning: 'el' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/booking/bookings/detail/page.tsx
+2:15  Warning: 'BookingDetailModel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/booking/bookings/detail/use-booking-detail.ts
+174:6  Warning: React Hook useCallback has a missing dependency: 'isCurrentTarget'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/booking/bookings/ledger-screen.tsx
+125:5  Warning: 'page' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+702:10  Warning: 'BookingDetailPanel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/booking/bookings/page.tsx
+2:15  Warning: 'BookingLedgerModel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/booking/bookings/use-booking-ledger.ts
+107:6  Warning: React Hook useEffect has a missing dependency: 'setActiveBookingId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+662:6  Warning: React Hook useEffect has missing dependencies: 'calendarAnchor', 'menuFilter', 'page', 'query', 'range', 'sourceFilter', 'staffFilter', 'tab', and 'view'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/booking/menus/channels-tab-v8.test.tsx
+23:7  Warning: 'flush' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/booking/menus/new/menu-form-blur-react.test.tsx
+10:10  Warning: 'act' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/booking/menus/new/page.test.tsx
+159:10  Warning: 'optionLabels' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/booking/menus/page-reorder.test.tsx
+20:10  Warning: 'act' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/booking/menus/page.test.tsx
+560:12  Warning: 'priceModeSelect' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/booking/staff/page.tsx
+228:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/broadcasts/broadcast-delete-confirm-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/broadcast-empty-filtered-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/broadcast-resume-menu-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+14:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/broadcasts-list-columns-contract.test.ts
+2:10  Warning: 'dirname' is defined but never used.  @typescript-eslint/no-unused-vars
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+3:10  Warning: 'fileURLToPath' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/detail/broadcast-detail-draft-resume-preview.test.tsx
+16:15  Warning: 'ApiBroadcast' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/detail/broadcast-detail-polling.test.tsx
+16:9  Warning: '_id' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/detail/page.tsx
+5:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+8:49  Warning: 'BroadcastDisplayStatus' is defined but never used.  @typescript-eslint/no-unused-vars
+11:8  Warning: 'Progress' is defined but never used.  @typescript-eslint/no-unused-vars
+12:10  Warning: 'Tabs' is defined but never used.  @typescript-eslint/no-unused-vars
+14:8  Warning: 'BroadcastStatusRail' is defined but never used.  @typescript-eslint/no-unused-vars
+14:31  Warning: 'isApprovalInvolved' is defined but never used.  @typescript-eslint/no-unused-vars
+18:3  Warning: 'ApprovalBadge' is defined but never used.  @typescript-eslint/no-unused-vars
+19:3  Warning: 'ApprovalRequestFields' is defined but never used.  @typescript-eslint/no-unused-vars
+20:3  Warning: 'ApprovalStatusSection' is defined but never used.  @typescript-eslint/no-unused-vars
+21:3  Warning: 'ApproverSection' is defined but never used.  @typescript-eslint/no-unused-vars
+22:3  Warning: 'formatApprovalDateTime' is defined but never used.  @typescript-eslint/no-unused-vars
+26:69  Warning: 'messageTypeLabel' is defined but never used.  @typescript-eslint/no-unused-vars
+28:10  Warning: 'clickInsightDetail' is defined but never used.  @typescript-eslint/no-unused-vars
+28:55  Warning: 'openInsightDetail' is defined but never used.  @typescript-eslint/no-unused-vars
+32:8  Warning: 'BroadcastMessagePreview' is defined but never used.  @typescript-eslint/no-unused-vars
+34:10  Warning: 'formatNumber' is defined but never used.  @typescript-eslint/no-unused-vars
+52:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+348:9  Warning: 'failed' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+349:9  Warning: 'pct' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/new/page.tsx
+109:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/reserved/page.tsx
+5:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+7:10  Warning: 'CalendarCheck2' is defined but never used.  @typescript-eslint/no-unused-vars
+7:26  Warning: 'Copy' is defined but never used.  @typescript-eslint/no-unused-vars
+7:32  Warning: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars
+7:37  Warning: 'List' is defined but never used.  @typescript-eslint/no-unused-vars
+7:43  Warning: 'Send' is defined but never used.  @typescript-eslint/no-unused-vars
+11:8  Warning: 'ConfirmDialog' is defined but never used.  @typescript-eslint/no-unused-vars
+12:8  Warning: 'NoteBar' is defined but never used.  @typescript-eslint/no-unused-vars
+13:8  Warning: 'Notice' is defined but never used.  @typescript-eslint/no-unused-vars
+70:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+280:9  Warning: 'bubbleCount' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+291:9  Warning: 'audienceLabel' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+292:9  Warning: 'scheduledLabel' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+293:9  Warning: 'scheduledSentenceLabel' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/reserved/reserved-complete-contract.test.ts
+2:10  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/broadcasts/reserved/reserved-missing.test.tsx
+61:7  Warning: 'flush' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/chats/inbox-stale-response-react.test.tsx
+31:27  Warning: 'init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/contents/vars/common-vars-contract.test.ts
+2:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/contents/vars/common-vars-delete-confirm-contract.test.ts
+1:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/contents/vars/copy-key-react.test.tsx
+91:36  Warning: '_text' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/contents/vars/delete-screen-contract.test.ts
+2:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/conversions/conversion-936-contract.test.ts
+2:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/conversions/conversion-mid-contract.test.ts
+7:7  Warning: 'DIALOGS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/conversions/conversion-revise-react.test.tsx
+4:10  Warning: 'fireEvent' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/conversions/conversions-light-batch7-contract.test.ts
+2:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/conversions/list-board-numbers-contract.test.ts
+12:7  Warning: 'TOKENS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/dashboard-supplement-once-react.test.tsx
+28:7  Warning: 'pending' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/emergency/alert-impact-wording.test.tsx
+15:10  Warning: 'act' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/events/bookings/event-booking-interactions.test.tsx
+46:47  Warning: '_size' is defined but never used.  @typescript-eslint/no-unused-vars
+191:57  Warning: '_action' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/form-submissions/edit/form-name-blur-react.test.tsx
+11:15  Warning: 'ApiForm' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/friend-add-settings/runs/detail/friend-add-run-detail-react.test.tsx
+173:11  Warning: 'badge' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/friend-add-settings/u972-table-scroll.test.ts
+2:10  Warning: 'dirname' is defined but never used.  @typescript-eslint/no-unused-vars
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+3:10  Warning: 'fileURLToPath' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/friends/detail/friend-detail-load-states-m012.test.tsx
+20:15  Warning: '_id' is defined but never used.  @typescript-eslint/no-unused-vars
+20:28  Warning: '_options' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/friends/friends-owner-feedback-contract.test.ts
+7:7  Warning: 'DETAIL' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+9:7  Warning: 'DUPLICATES' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/friends/friends-shared-parts-contract.test.ts
+22:7  Warning: 'TOKENS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/friends/friends-stale-response-contract.test.tsx
+60:11  Warning: 'view' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/friends/u970-friends-search.test.ts
+7:7  Warning: 'DIALOG' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/health/page.tsx
+12:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/help-tip-square-contract.test.ts
+23:7  Warning: 'SIDE_CARDS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+25:7  Warning: 'PAGE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/hq/banners/banner-search-row-contract.test.ts
+47:7  Warning: 'TOOLBAR' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/hq/billing/failure-message.ts
+13:72  Warning: '_forbidden' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/hq/templates/scenario-authoring.test.tsx
+2:32  Warning: 'vi' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/hq/templates/template-console-v8.test.tsx
+21:77  Warning: '_name' is defined but never used.  @typescript-eslint/no-unused-vars
+21:92  Warning: '_description' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/hq/templates/template-definition-editor.tsx
+135:110  Warning: 'removed' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/inflow-links/detail/inflow-copy-fallback-react.test.tsx
+8:46  Warning: 'waitFor' is defined but never used.  @typescript-eslint/no-unused-vars
+8:55  Warning: 'within' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/inflow-links/page.tsx
+59:9  Warning: 'handleAdCounts' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/issue-636-responsive-contract.test.ts
+77:9  Warning: 'page' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/issue-670-polish-contract.test.ts
+23:7  Warning: 'AUTO_REPLIES' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+28:7  Warning: 'FRIENDS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+29:7  Warning: 'NOTIFY' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+30:7  Warning: 'NOTIFY_KPIS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/issue-673-visual-quality-contract.test.tsx
+61:11  Warning: 'drawer' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/mileage/mileage-history-fidelity-react.test.tsx
+135:11  Warning: 'body' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/nen/health/health-v8.test.tsx
+115:13  Warning: 'container' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/nen/health/summary-target.test.tsx
+25:15  Warning: 'open' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/nen/pets/page.tsx
+3:10  Warning: 'jstDate' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/nen/pets/pets-v8.test.tsx
+33:7  Warning: 'flush' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/nen-campaigns/nen-history-search.test.tsx
+7:10  Warning: 'StrictMode' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/nen-campaigns/nen-overview-retry.test.tsx
+43:21  Warning: '_reaction' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/nen-members/photo-duplicate-reward-817.test.tsx
+3:27  Warning: 'Root' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/nen-members/photo-review-a11y-react.test.tsx
+39:10  Warning: 'deferred' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/nen-members/photo-review-v8.test.tsx
+126:13  Warning: 'container' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/no-duplicate-page-title-contract.test.ts
+65:7  Warning: 'ALLOWED_H1' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/ops/login/ops-login-failure-reason-contract.test.tsx
+27:5  Warning: 'responder' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/ops/login/ops-login-v8-react.test.tsx
+9:21  Warning: 'beforeEach' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/ops/ops-failure-m038-m042-m504.test.tsx
+129:67  Warning: 'init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/pools/pool-create-labels-rendered.test.tsx
+3:19  Warning: 'fireEvent' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/reminders/edit/reminder-403429-render-react.test.tsx
+8:10  Warning: 'act' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/reminders/reminder-v8-flow.test.tsx
+9:38  Warning: 'within' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/restaurant-test/v8/inventory-channels.test.tsx
+30:7  Warning: 'connectors' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/rich-menus/new/create-account-scope-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/rich-menus/new/create-f4g-e-lj-sections.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+11:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/rich-menus/new/create-order-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/rich-menus/new/rich-menu-load-failure-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/rich-menus/new/rich-menu-new-steps.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'here' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/rich-menus/new/rich-menu-tag-account-scope.test.tsx
+9:10  Warning: 'pickEntities' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/rich-menus/new/rich-menu-template-account-scope.test.tsx
+77:10  Warning: 'clickOption' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/scenarios/mode/scenario-mode-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'here' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/scenarios/mode/scenario-mode-load-retry-contract.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'here' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/scenarios/results/csv-button-contract.test.ts
+2:8  Warning: 'path' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/settings/feature-settings-ux-react.test.tsx
+95:16  Warning: 'settle' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/settings/feature-usage-react.test.tsx
+120:64  Warning: 'init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/staff/staff-suspended-filter-react.test.tsx
+121:35  Warning: 'label' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/table-gutter-m22b-contract.test.ts
+2:10  Warning: 'readUiSource' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/templates/edit/page-mount.test.tsx
+39:10  Warning: '_href' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/templates/template-asset-save.test.tsx
+98:10  Warning: 'buttonContaining' is defined but never used.  @typescript-eslint/no-unused-vars
+118:10  Warning: 'input' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/templates/template-create-board-1152-react.test.tsx
+4:43  Warning: 'expect' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/users/u970-users-layout.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webhooks/interactions-v8-react.test.tsx
+4:10  Warning: 'fireEvent' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webhooks/webhook-interactions-contract.test.ts
+3:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webhooks/webhook-load-state-contract.test.ts
+2:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webhooks/webhook-operator-words-contract.test.ts
+2:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webhooks/webhook-source-preset-contract.test.ts
+3:8  Warning: 'fs' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webhooks/webhook-test-result-contract.test.ts
+2:10  Warning: 'readFileSync' is defined but never used.  @typescript-eslint/no-unused-vars
+7:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webinars/edit/webinar-edit-failure-recovery-contract.test.tsx
+80:47  Warning: '_size' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webinars/edit/webinar-participants-classification-react.test.tsx
+39:47  Warning: '_size' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webinars/edit/webinar-participants-role-react.test.tsx
+44:47  Warning: '_size' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webinars/edit/webinar-unsaved-flow-react.test.tsx
+75:47  Warning: '_size' is defined but never used.  @typescript-eslint/no-unused-vars
+238:10  Warning: 'paneVisible' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webinars/new-board-numbers-contract.test.ts
+11:7  Warning: 'CSS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/app/webinars/published/page.tsx
+4:10  Warning: 'usePermissionAccess' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/accounts/test-recipients-setting.tsx
+170:32  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+192:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+225:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/auto-replies/action-options.ts
+2:1  Warning: Expected an assignment or function call and instead saw an expression.  @typescript-eslint/no-unused-expressions
+
+./src/components/broadcasts/broadcast-asset-manager.tsx
+140:64  Warning: The ref value 'loadGeneration.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'loadGeneration.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/broadcasts/broadcast-editor-dialogs.tsx
+248:43  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/broadcasts/broadcast-form-gap-parts.tsx
+3:10  Warning: 'LinePreviewFlex' is defined but never used.  @typescript-eslint/no-unused-vars
+5:42  Warning: 'BroadcastBubbleType' is defined but never used.  @typescript-eslint/no-unused-vars
+5:68  Warning: 'BroadcastMessageButton' is defined but never used.  @typescript-eslint/no-unused-vars
+9:8  Warning: 'BroadcastTextBubble' is defined but never used.  @typescript-eslint/no-unused-vars
+10:15  Warning: 'MessageKindState' is defined but never used.  @typescript-eslint/no-unused-vars
+11:8  Warning: 'Button' is defined but never used.  @typescript-eslint/no-unused-vars
+12:10  Warning: 'ComposerCarouselPreview' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/broadcasts/broadcast-form.tsx
+145:69  Warning: React Hook useEffect has a missing dependency: 'saveConflict'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+500:6  Warning: React Hook useEffect has a missing dependency: 'saveConflict'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+647:6  Warning: React Hook useEffect has a missing dependency: 'placeTemplateBubble'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+899:9  Warning: 'urlCount' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/broadcasts/broadcast-persist-draft.tsx
+30:71  Warning: 'currentStep' is defined but only used as a type.  @typescript-eslint/no-unused-vars
+116:13  Warning: 'fieldFailure' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/broadcasts/broadcast-preview-model.tsx
+20:9  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+47:50  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+52:195  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+54:99  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/broadcasts/media-upload-audit.test.tsx
+3:43  Warning: 'screen' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/broadcasts/recent-broadcasts-state.test.tsx
+76:7  Warning: 'TAGS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/chats/inbox-panel-inline-edit-react.test.tsx
+144:5  Warning: Expected an assignment or function call and instead saw an expression.  @typescript-eslint/no-unused-expressions
+
+./src/components/chats/template-picker-perf-12-react.test.tsx
+15:15  Warning: 'params' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/chats/use-virtual-window.ts
+85:3  Warning: React Hook useLayoutEffect contains a call to 'setScrollerEl'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [getScroller, scrollerEl] as a second argument to the useLayoutEffect Hook.  react-hooks/exhaustive-deps
+257:3  Warning: React Hook useLayoutEffect contains a call to 'setVersion'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [measure, restore, readViewport, contentRef] as a second argument to the useLayoutEffect Hook.  react-hooks/exhaustive-deps
+
+./src/components/dashboard/qr-dialog.tsx
+119:9  Warning: The 'routes' logical expression could make the dependencies of useEffect Hook (at line 200) change on every render. To fix this, wrap the initialization of 'routes' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+
+./src/components/dashboard/qr-stopped-notice.tsx
+6:41  Warning: '_props' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/events/event-form-slot-edit.test.tsx
+13:10  Warning: 'fireEvent' is defined but never used.  @typescript-eslint/no-unused-vars
+129:10  Warning: 'button' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/events/event-name-blur-react.test.tsx
+10:15  Warning: 'EventDetail' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/flex-preview.tsx
+141:10  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+148:10  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/forms/action-editor.tsx
+8:8  Warning: 'EntitySelect' is defined but never used.  @typescript-eslint/no-unused-vars
+8:24  Warning: 'entityOptionMetadata' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/friend-fields/friend-attributes-design-fit.test.ts
+7:31  Warning: 'savedSearchKpiValues' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/friend-fields/tag-editor-mobile-r137.test.tsx
+21:163  Warning: '_values' is defined but never used.  @typescript-eslint/no-unused-vars
+21:181  Warning: '_retroactive' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/friend-fields/tags-list-m21o-react.test.tsx
+28:19  Warning: 'args' is defined but never used.  @typescript-eslint/no-unused-vars
+35:19  Warning: 'args' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/friends/advanced-search-dialog.tsx
+305:6  Warning: React Hook useMemo has a missing dependency: 'rankTiers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/friends/friend-list-row.tsx
+10:24  Warning: 'MessageCircle' is defined but never used.  @typescript-eslint/no-unused-vars
+10:39  Warning: 'UserRound' is defined but never used.  @typescript-eslint/no-unused-vars
+13:10  Warning: 'RowActions' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/friends/single-friend-actions.tsx
+12:10  Warning: 'TextArea' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/hq/sidebar-account-menu-react.test.tsx
+43:43  Warning: '_prefetch' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/layout/sidebar.tsx
+85:3  Warning: 'friendAttributesV2Mode' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+198:10  Warning: 'staffName' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/line-notifications/notification-run-list-mount.test.tsx
+187:22  Warning: 'container' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/ops/notice-line-account-card.tsx
+7:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/rich-menus/apply-to-tag-modal.tsx
+10:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/rich-menus/area-properties-tap.test.tsx
+9:43  Warning: 'vi' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/rich-menus/area-properties.tsx
+4:8  Warning: 'TagPickerField' is defined but never used.  @typescript-eslint/no-unused-vars
+7:8  Warning: 'MultiSelect' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/rich-menus/canvas-editor.test.tsx
+4:45  Warning: 'vi' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/rich-menus/rich-menu-create-form.tsx
+2:15  Warning: 'RichMenuOption' is defined but never used.  @typescript-eslint/no-unused-vars
+2:31  Warning: 'RichMenuFolderOption' is defined but never used.  @typescript-eslint/no-unused-vars
+2:53  Warning: 'RichMenuCreateValue' is defined but never used.  @typescript-eslint/no-unused-vars
+3:10  Warning: 'STORE_NEW_MENU_INTENTS' is defined but never used.  @typescript-eslint/no-unused-vars
+3:34  Warning: 'NEW_MENU_INTENTS_WITH_SWITCH' is defined but never used.  @typescript-eslint/no-unused-vars
+3:64  Warning: 'freshRichMenuCreateValue' is defined but never used.  @typescript-eslint/no-unused-vars
+3:90  Warning: 'RichMenuTemplatePreview' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/scenarios/action-editor-audit-react.test.tsx
+9:21  Warning: 'describe' is defined but never used.  @typescript-eslint/no-unused-vars
+94:16  Warning: 'openCondition' is defined but never used.  @typescript-eslint/no-unused-vars
+100:10  Warning: 'orAddButton' is defined but never used.  @typescript-eslint/no-unused-vars
+104:10  Warning: 'kindPickers' is defined but never used.  @typescript-eslint/no-unused-vars
+108:10  Warning: 'pickKind' is defined but never used.  @typescript-eslint/no-unused-vars
+115:16  Warning: 'saveCondition' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/scenarios/action-editor.tsx
+6:10  Warning: 'useOverlayFocus' is defined but never used.  @typescript-eslint/no-unused-vars
+9:8  Warning: 'styles' is defined but never used.  @typescript-eslint/no-unused-vars
+407:6  Warning: React Hook useCallback has an unnecessary dependency: 'selectedAccountId'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/scenarios/carousel-picker.tsx
+5:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+123:34  Warning: The ref value 'generationRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'generationRef.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/scenarios/condition-dialog-empty-or.test.tsx
+88:33  Warning: '_next' is defined but never used.  @typescript-eslint/no-unused-vars
+104:33  Warning: '_next' is defined but never used.  @typescript-eslint/no-unused-vars
+119:33  Warning: '_next' is defined but never used.  @typescript-eslint/no-unused-vars
+128:33  Warning: '_next' is defined but never used.  @typescript-eslint/no-unused-vars
+156:33  Warning: '_next' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/scenarios/question-editor.tsx
+16:8  Warning: 'EntitySelect' is defined but never used.  @typescript-eslint/no-unused-vars
+16:24  Warning: 'entityOptionMetadata' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/action-menu.tsx
+177:98  Warning: The ref value 'menuRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'menuRef.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+282:10  Warning: 'MenuCommand' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/booking-controls.tsx
+13:10  Warning: The attribute aria-description is not supported by the role button. This role is implicit on the element button.  jsx-a11y/role-supports-aria-props
+
+./src/components/shared/button.tsx
+132:44  Warning: '_actionWording' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+132:71  Warning: '_className' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+132:105  Warning: '_size' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+132:121  Warning: '_variant' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+132:159  Warning: '_textTone' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+132:198  Warning: '_filterActive' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+149:20  Warning: '_actionWording' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+151:16  Warning: '_className' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+152:14  Warning: '_variant' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+153:11  Warning: '_size' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+156:15  Warning: '_textTone' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+157:19  Warning: '_filterActive' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+159:11  Warning: '_href' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+286:5  Warning: The attribute aria-description is not supported by the role button. This role is implicit on the element button.  jsx-a11y/role-supports-aria-props
+
+./src/components/shared/calendar-period.test.tsx
+13:44  Warning: '_frames' is defined but never used.  @typescript-eslint/no-unused-vars
+13:65  Warning: '_options' is defined but never used.  @typescript-eslint/no-unused-vars
+44:26  Warning: '_frames' is defined but never used.  @typescript-eslint/no-unused-vars
+44:47  Warning: '_options' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/command-palette.tsx
+87:102  Warning: The ref value 'backdropRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'backdropRef.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/shared/composer-stickers.tsx
+17:39  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/shared/condition-builder-gap-parts.tsx
+7:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/copy-text-button.tsx
+66:5  Warning: React Hook useEffect has a missing dependency: 'getValue'. Either include it or remove the dependency array. If 'setCopiedValue' needs the current value of 'getValue', you can also switch to useReducer instead of useState and read 'getValue' in the reducer.  react-hooks/exhaustive-deps
+
+./src/components/shared/customer-info-panel.tsx
+54:69  Warning: The ref value 'generation.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'generation.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/shared/customer-look-preview.tsx
+3:25  Warning: 'DEFAULT_CUSTOMER_LOOK' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/date-field.tsx
+164:7  Warning: The attribute aria-required is not supported by the role button. This role is implicit on the element button.  jsx-a11y/role-supports-aria-props
+164:7  Warning: The attribute aria-invalid is not supported by the role button. This role is implicit on the element button.  jsx-a11y/role-supports-aria-props
+
+./src/components/shared/date-time-field.tsx
+3:20  Warning: 'Clock' is defined but never used.  @typescript-eslint/no-unused-vars
+168:7  Warning: The attribute aria-invalid is not supported by the role button. This role is implicit on the element button.  jsx-a11y/role-supports-aria-props
+168:7  Warning: The attribute aria-required is not supported by the role button. This role is implicit on the element button.  jsx-a11y/role-supports-aria-props
+
+./src/components/shared/dialog-stack.test.tsx
+3:38  Warning: 'screen' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/entity-picker-sources.tsx
+3:10  Warning: 'useCallback' is defined but never used.  @typescript-eslint/no-unused-vars
+3:43  Warning: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
+7:3  Warning: 'Bell' is defined but never used.  @typescript-eslint/no-unused-vars
+7:9  Warning: 'BookOpen' is defined but never used.  @typescript-eslint/no-unused-vars
+7:19  Warning: 'CalendarDays' is defined but never used.  @typescript-eslint/no-unused-vars
+7:33  Warning: 'ClipboardList' is defined but never used.  @typescript-eslint/no-unused-vars
+7:48  Warning: 'FileText' is defined but never used.  @typescript-eslint/no-unused-vars
+7:58  Warning: 'LayoutGrid' is defined but never used.  @typescript-eslint/no-unused-vars
+7:77  Warning: 'TagIcon' is defined but never used.  @typescript-eslint/no-unused-vars
+7:86  Warning: 'UserRound' is defined but never used.  @typescript-eslint/no-unused-vars
+7:97  Warning: 'Workflow' is defined but never used.  @typescript-eslint/no-unused-vars
+7:112  Warning: 'LucideIcon' is defined but never used.  @typescript-eslint/no-unused-vars
+11:13  Warning: 'accountContext' is defined but never used.  @typescript-eslint/no-unused-vars
+16:54  Warning: 'EntityPickerCategory' is defined but never used.  @typescript-eslint/no-unused-vars
+16:81  Warning: 'EntityPickerFolder' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/entity-picker.tsx
+3:63  Warning: 'EntityPickerCategory' is defined but never used.  @typescript-eslint/no-unused-vars
+3:176  Warning: 'FieldBase' is defined but never used.  @typescript-eslint/no-unused-vars
+17:28  Warning: 'StatusBadgeTone' is defined but never used.  @typescript-eslint/no-unused-vars
+294:33  Warning: The attribute aria-invalid is not supported by the role button. This role is implicit on the element button.  jsx-a11y/role-supports-aria-props
+
+./src/components/shared/folder-panel-heading-contract.test.ts
+13:7  Warning: 'src' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/form-controls.tsx
+30:33  Warning: 'appearance' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+63:3  Warning: 'requiredAppearance' is defined but never used.  @typescript-eslint/no-unused-vars
+191:6  Warning: React Hook useEffect has a missing dependency: 'requirement'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+229:21  Warning: The attribute aria-invalid is not supported by the role group.  jsx-a11y/role-supports-aria-props
+
+./src/components/shared/form-file-attachments.tsx
+34:57  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+38:140  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/shared/form-input-dirty.ts
+23:3  Warning: React Hook useLayoutEffect contains a call to 'setDirty'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [open, update, dirty] as a second argument to the useLayoutEffect Hook.  react-hooks/exhaustive-deps
+
+./src/components/shared/form-leave-guard.tsx
+25:6  Warning: React Hook useEffect has a missing dependency: 'guard'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/shared/hq-message-inserts.tsx
+29:105  Warning: 'invalid' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/image-uploader.test.tsx
+13:30  Warning: 'ImageUploaderValue' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/inbox-content.tsx
+9:10  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/shared/list-url-state.ts
+330:197  Warning: React Hook useCallback has missing dependencies: 'decode' and 'encode'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/shared/log-entry-details.test.tsx
+18:34  Warning: '_text' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/media-picker-dialog.tsx
+194:23  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/shared/menu-portal.tsx
+277:6  Warning: React Hook useLayoutEffect has a missing dependency: 'dismissOnEscape'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/shared/message-composer.tsx
+120:289  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+120:425  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+142:35  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/shared/radio-card.tsx
+172:7  Warning: The attribute aria-invalid is not supported by the role radio. This role is implicit on the element input.  jsx-a11y/role-supports-aria-props
+
+./src/components/shared/reorder-handle.tsx
+84:3  Warning: 'disabledLook' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+97:3  Warning: React Hook useLayoutEffect contains a call to 'setParentDraggable'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [] as a second argument to the useLayoutEffect Hook.  react-hooks/exhaustive-deps
+
+./src/components/shared/resource-table.tsx
+3:10  Warning: 'FolderDotName' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/restaurant-floor-map.tsx
+20:9  Warning: The attribute aria-invalid is not supported by the role group.  jsx-a11y/role-supports-aria-props
+
+./src/components/shared/search-field.tsx
+29:106  Warning: '_shortcut' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/segmented.tsx
+103:6  Warning: React Hook useLayoutEffect has missing dependencies: 'options' and 'value'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/shared/send-confirm-dialog.tsx
+124:21  Warning: 'scheduled' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/sender-select.tsx
+14:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/table.tsx
+139:3  Warning: React Hook useEffect contains a call to 'setCreatedId'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [urlState.highlight, actionWidthRef, setUrlState] as a second argument to the useEffect Hook.  react-hooks/exhaustive-deps
+409:3  Warning: 'retryLabel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/tag-picker-field.tsx
+59:67  Warning: The attribute aria-invalid is not supported by the role button. This role is implicit on the element button.  jsx-a11y/role-supports-aria-props
+
+./src/components/shared/tap-target-hover-639-contract.test.tsx
+59:11  Warning: 'css' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/shared/v5-b3-controls-contract.test.tsx
+57:11  Warning: 'html' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/support/email-thread.tsx
+3:8  Warning: 'EntitySelect' is defined but never used.  @typescript-eslint/no-unused-vars
+13:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+161:10  Warning: 'headerSubjectExpanded' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+340:6  Warning: React Hook useEffect has a missing dependency: 'threadId'. Either include it or remove the dependency array. If 'setReply' needs the current value of 'threadId', you can also switch to useReducer instead of useState and read 'threadId' in the reducer.  react-hooks/exhaustive-deps
+
+./src/components/support/support-inbox.tsx
+7:8  Warning: 'StatusBadge' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/templates/message-template-editor.tsx
+3:37  Warning: 'previewDateValue' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/ui/sort-select.tsx
+20:3  Warning: 'className' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/update/progress-modal.tsx
+100:21  Warning: 'err' is defined but never used.  @typescript-eslint/no-unused-vars
+111:14  Warning: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/update/use-update-status.ts
+75:16  Warning: 'e' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/users/user-row-no-line-uid-contract.test.ts
+2:8  Warning: 'path' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/users/users-table-padding.test.ts
+2:19  Warning: 'join' is defined but never used.  @typescript-eslint/no-unused-vars
+6:7  Warning: 'HERE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/api/helpers/audit3-contract.test.ts
+7:30  Warning: '_input' is defined but never used.  @typescript-eslint/no-unused-vars
+7:57  Warning: '_init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/api/helpers/friend-field-time.test.ts
+13:35  Warning: '_input' is defined but never used.  @typescript-eslint/no-unused-vars
+13:62  Warning: '_init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/api/helpers/scenario-stop.test.ts
+13:35  Warning: '_input' is defined but never used.  @typescript-eslint/no-unused-vars
+13:62  Warning: '_init' is defined but never used.  @typescript-eslint/no-unused-vars
+26:35  Warning: '_input' is defined but never used.  @typescript-eslint/no-unused-vars
+26:62  Warning: '_init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/api/transport/request.ts
+129:31  Warning: '_accountId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+129:51  Warning: '_method' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+129:67  Warning: '_cache' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+129:105  Warning: '_suppress' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+153:22  Warning: '_accountId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+153:64  Warning: '_suppressEvent' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/api.test.ts
+55:35  Warning: '_url' is defined but never used.  @typescript-eslint/no-unused-vars
+55:65  Warning: '_init' is defined but never used.  @typescript-eslint/no-unused-vars
+69:35  Warning: '_url' is defined but never used.  @typescript-eslint/no-unused-vars
+1866:32  Warning: '_url' is defined but never used.  @typescript-eslint/no-unused-vars
+1866:47  Warning: '_init' is defined but never used.  @typescript-eslint/no-unused-vars
+1881:32  Warning: '_url' is defined but never used.  @typescript-eslint/no-unused-vars
+1881:61  Warning: '_options' is defined but never used.  @typescript-eslint/no-unused-vars
+1895:32  Warning: '_url' is defined but never used.  @typescript-eslint/no-unused-vars
+1895:61  Warning: '_options' is defined but never used.  @typescript-eslint/no-unused-vars
+1981:30  Warning: '_url' is defined but never used.  @typescript-eslint/no-unused-vars
+1981:54  Warning: '_init' is defined but never used.  @typescript-eslint/no-unused-vars
+1996:30  Warning: '_url' is defined but never used.  @typescript-eslint/no-unused-vars
+1996:54  Warning: '_init' is defined but never used.  @typescript-eslint/no-unused-vars
+2009:35  Warning: '_url' is defined but never used.  @typescript-eslint/no-unused-vars
+2009:65  Warning: '_init' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/design-structure.test.ts
+87:63  Warning: 'file' is defined but never used.  @typescript-eslint/no-unused-vars
+87:69  Warning: 'template' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/undoable-coupled.test.tsx
+40:13  Warning: 'container' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+101:13  Warning: 'container' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+183:13  Warning: 'container' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+215:13  Warning: 'container' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/lib/use-server-list.ts
+180:6  Warning: React Hook useEffect has a missing dependency: 'pageUrlKey'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+274:6  Warning: React Hook useEffect has a missing dependency: 'setState'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/test-utils/staging14/deployed-liff.test.tsx
+2:8  Warning: 'React' is defined but never used.  @typescript-eslint/no-unused-vars
+4:19  Warning: 'render' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/accounts-detail/handover.tsx
+30:8  Warning: 'TruncatedText' is defined but never used.  @typescript-eslint/no-unused-vars
+82:10  Warning: 'copyState' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+82:21  Warning: 'setCopyState' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/accounts-detail/senders-card.tsx
+21:10  Warning: 'ApiError' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliate-offer-new/create.tsx
+6:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliates/affiliators.tsx
+7:10  Warning: 'jstDate' is defined but never used.  @typescript-eslint/no-unused-vars
+42:3  Warning: 'planText' is defined but never used.  @typescript-eslint/no-unused-vars
+110:9  Warning: 'samePageUrl' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+118:135  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+329:6  Warning: React Hook useCallback has a missing dependency: 'setDrawerId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+354:6  Warning: React Hook useCallback has an unnecessary dependency: 'openDrawer'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/affiliates/approvals.tsx
+138:6  Warning: React Hook useCallback has a missing dependency: 'accountId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+174:6  Warning: React Hook useCallback has a missing dependency: 'accountId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/affiliates/create.tsx
+9:8  Warning: 'Toggle' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliates/dialogs.tsx
+18:10  Warning: 'formatDay' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliates/display.ts
+13:10  Warning: 'formatDay' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliates/drawer.tsx
+106:10  Warning: 'copiedLinkId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+106:24  Warning: 'setCopiedLinkId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliates/offer-form.tsx
+3:8  Warning: 'Toggle' is defined but never used.  @typescript-eslint/no-unused-vars
+9:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliates/offer-terms-failure.test.tsx
+11:92  Warning: '_kind' is defined but never used.  @typescript-eslint/no-unused-vars
+11:108  Warning: '_accountId' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliates/offers.tsx
+5:10  Warning: 'jstDate' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliates/payment-read-failure.test.tsx
+4:41  Warning: 'waitFor' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/affiliates/report.tsx
+21:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/ai-reply/api.ts
+97:110  Warning: '_stepUpToken' is defined but never used.  @typescript-eslint/no-unused-vars
+103:29  Warning: '_refresh' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/common.tsx
+9:8  Warning: 'SegmentedControl' is defined but never used.  @typescript-eslint/no-unused-vars
+11:8  Warning: 'styles' is defined but never used.  @typescript-eslint/no-unused-vars
+18:7  Warning: 'JST' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+19:7  Warning: 'JST_DAY' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/conversion-report.tsx
+32:10  Warning: 'rangeOf' is defined but never used.  @typescript-eslint/no-unused-vars
+78:9  Warning: 'max' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/cross.tsx
+25:8  Warning: 'Notice' is defined but never used.  @typescript-eslint/no-unused-vars
+92:7  Warning: 'PERIODS' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+283:9  Warning: The 'rows' logical expression could make the dependencies of useMemo Hook (at line 297) change on every render. To fix this, wrap the initialization of 'rows' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+283:9  Warning: The 'rows' logical expression could make the dependencies of useMemo Hook (at line 321) change on every render. To fix this, wrap the initialization of 'rows' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+284:9  Warning: The 'cols' logical expression could make the dependencies of useMemo Hook (at line 297) change on every render. To fix this, wrap the initialization of 'cols' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+
+./src/v8/analytics/friends.tsx
+29:3  Warning: 'rangeFor' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/funnel.tsx
+28:8  Warning: 'Notice' is defined but never used.  @typescript-eslint/no-unused-vars
+110:10  Warning: 'noRun' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+310:9  Warning: 'top' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/parts.tsx
+13:10  Warning: 'formatDateTime' is defined but never used.  @typescript-eslint/no-unused-vars
+13:26  Warning: 'formatDay' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/reactions.tsx
+11:10  Warning: 'useMemo' is defined but never used.  @typescript-eslint/no-unused-vars
+11:19  Warning: 'useState' is defined but never used.  @typescript-eslint/no-unused-vars
+20:54  Warning: 'rangeFor' is defined but never used.  @typescript-eslint/no-unused-vars
+74:9  Warning: 'maxHourly' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/routes.tsx
+10:10  Warning: 'useMemo' is defined but never used.  @typescript-eslint/no-unused-vars
+10:19  Warning: 'useState' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/search-console.tsx
+5:10  Warning: 'DashboardColumns' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/segments.tsx
+59:10  Warning: 'levelOf' is defined but never used.  @typescript-eslint/no-unused-vars
+90:9  Warning: 'max' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/url-clicks.tsx
+4:21  Warning: 'useMemo' is defined but never used.  @typescript-eslint/no-unused-vars
+17:63  Warning: 'rangeFor' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/analytics/usage.tsx
+9:21  Warning: 'useMemo' is defined but never used.  @typescript-eslint/no-unused-vars
+26:86  Warning: 'rangeFor' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/auto-replies/edit/wizard-preview.tsx
+97:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/auto-replies/edit/wizard-trigger-step.tsx
+244:19  Warning: The attribute aria-invalid is not supported by the role group.  jsx-a11y/role-supports-aria-props
+
+./src/v8/auto-replies/edit/wizard.tsx
+75:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+449:6  Warning: React Hook useCallback has unnecessary dependencies: 'loadOrder', 'loadPriorityData', 'loadValidation', 'matchedAccountId', and 'selectedAccountId'. Either exclude them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/auto-replies/list-toggle-action.tsx
+38:11  Warning: 'beforeStopReason' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/auto-replies/list.tsx
+97:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/auto-replies/runs.tsx
+17:10  Warning: 'ArrowLeft' is defined but never used.  @typescript-eslint/no-unused-vars
+18:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+194:6  Warning: React Hook useEffect has missing dependencies: 'setFilter', 'setPage', and 'setSearch'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/automations/branch-editor.tsx
+11:8  Warning: 'EntitySelect' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/automations/common-actions.tsx
+189:35  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/automations/create/create.tsx
+424:6  Warning: React Hook useEffect has a missing dependency: 'triggerConfig'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/automations/create/weekday-select.tsx
+41:7  Warning: The attribute aria-invalid is not supported by the role group.  jsx-a11y/role-supports-aria-props
+
+./src/v8/automations/definition-entry.tsx
+29:6  Warning: React Hook useEffect has a missing dependency: 'saveErrors'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/automations/list.tsx
+42:8  Warning: 'SearchField' is defined but never used.  @typescript-eslint/no-unused-vars
+159:9  Warning: 'searchParams' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+253:6  Warning: React Hook useEffect has a missing dependency: 'setFolderFilter'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+288:35  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+461:9  Warning: 'notice' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+523:23  Warning: 'busy' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/automations/runs.tsx
+228:35  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+428:6  Warning: React Hook useEffect has a missing dependency: 'selectedRun?.id'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/booking-gap/series-drawer.tsx
+7:30  Warning: 'CONFLICT_TEXT' is defined but never used.  @typescript-eslint/no-unused-vars
+25:10  Warning: 'ApiError' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-menus/assign.tsx
+112:10  Warning: 'saveDone' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-menus/audience-section.tsx
+16:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-menus/channels-tab.tsx
+9:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-menus/menu-conflict-reload.test.tsx
+4:51  Warning: 'waitFor' is defined but never used.  @typescript-eslint/no-unused-vars
+5:33  Warning: 'describe' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-menus/menu-form-followup.test.tsx
+9:10  Warning: 'pickEntities' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-menus/menu-form-resources.test.tsx
+16:22  Warning: 'pickEntities' is defined but never used.  @typescript-eslint/no-unused-vars
+174:10  Warning: 'optionLabels' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-menus/menu-form.tsx
+12:8  Warning: 'Combobox' is defined but never used.  @typescript-eslint/no-unused-vars
+1123:17  Warning: The attribute aria-invalid is not supported by the role group.  jsx-a11y/role-supports-aria-props
+
+./src/v8/booking-menus/staff-edit-dialog.tsx
+12:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+13:8  Warning: 'Button' is defined but never used.  @typescript-eslint/no-unused-vars
+42:9  Warning: 'busySave' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-menus/tabs/hours-tab.tsx
+3:37  Warning: 'HoursProblem' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-menus/use-booking-settings.ts
+284:10  Warning: 'saveDone' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+286:3  Warning: React Hook useEffect contains a call to 'setSaveDone'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [tabEdit] as a second argument to the useEffect Hook.  react-hooks/exhaustive-deps
+
+./src/v8/booking-passes/create.tsx
+7:44  Warning: 'useMemo' is defined but never used.  @typescript-eslint/no-unused-vars
+9:10  Warning: 'Pencil' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-passes/passes-tab.tsx
+8:8  Warning: 'Button' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-payments/assignment.tsx
+5:10  Warning: 'DataTable' is defined but never used.  @typescript-eslint/no-unused-vars
+5:21  Warning: 'Tr' is defined but never used.  @typescript-eslint/no-unused-vars
+5:25  Warning: 'Th' is defined but never used.  @typescript-eslint/no-unused-vars
+5:29  Warning: 'Td' is defined but never used.  @typescript-eslint/no-unused-vars
+7:10  Warning: 'isConflictResponse' is defined but never used.  @typescript-eslint/no-unused-vars
+7:30  Warning: 'CONFLICT_TEXT' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-payments/payments-tab.tsx
+12:8  Warning: 'StatusBadge' is defined but never used.  @typescript-eslint/no-unused-vars
+23:8  Warning: 'TestModeNote' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-staff/phone.tsx
+14:15  Warning: 'ReactNode' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/booking-staff/shifts.tsx
+67:7  Warning: 'WEEKDAY_JP' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+550:6  Warning: React Hook useCallback has missing dependencies: 'breakSaveConflict' and 'dateSaveConflict'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/broadcast-detail/detail.tsx
+19:3  Warning: 'RefreshCw' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/broadcast-detail/display.ts
+2:10  Warning: 'formatDateTime' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/broadcasts/list.tsx
+4:10  Warning: 'canManageRole' is defined but never used.  @typescript-eslint/no-unused-vars
+10:8  Warning: 'SharedStatusBadge' is defined but never used.  @typescript-eslint/no-unused-vars
+19:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+21:10  Warning: 'ArrowUpDown' is defined but never used.  @typescript-eslint/no-unused-vars
+21:23  Warning: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars
+21:38  Warning: 'FolderIcon' is defined but never used.  @typescript-eslint/no-unused-vars
+36:8  Warning: 'BulkBar' is defined but never used.  @typescript-eslint/no-unused-vars
+36:19  Warning: 'useEscapeToClearSelection' is defined but never used.  @typescript-eslint/no-unused-vars
+37:8  Warning: 'Checkbox' is defined but never used.  @typescript-eslint/no-unused-vars
+37:20  Warning: 'UnavailableSelection' is defined but never used.  @typescript-eslint/no-unused-vars
+55:27  Warning: 'messageTypeLabel' is defined but never used.  @typescript-eslint/no-unused-vars
+80:7  Warning: 'EDIT_KEY' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+86:10  Warning: 'hasStaffEditKey' is defined but never used.  @typescript-eslint/no-unused-vars
+189:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+233:9  Warning: 'bulkAnchorRef' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+397:6  Warning: React Hook useCallback has an unnecessary dependency: 'listScope'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+526:128  Warning: Expected an assignment or function call and instead saw an expression.  @typescript-eslint/no-unused-expressions
+860:9  Warning: 'statusSelect' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+895:9  Warning: 'folderSelect' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/broadcasts/quick-send.tsx
+13:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/common-vars/list.tsx
+74:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+96:10  Warning: 'orderMenuOpen' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+96:25  Warning: 'setOrderMenuOpen' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+97:9  Warning: 'orderAnchorRef' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+98:10  Warning: 'folderMenuOpen' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+98:26  Warning: 'setFolderMenuOpen' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+99:9  Warning: 'folderMenuAnchorRef' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+216:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+656:9  Warning: 'folderOptions' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+720:9  Warning: 'orderLabel' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/common-vars-edit/edit.tsx
+85:10  Warning: 'saved' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/common-vars-edit/new.tsx
+8:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+149:10  Warning: 'copied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+149:18  Warning: 'setCopied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/contents/list.tsx
+404:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+646:9  Warning: 'applyUnusedFilter' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+670:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+721:9  Warning: 'unusedText' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+722:9  Warning: 'archivedText' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/contents/media-replacement-dialog.tsx
+9:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/conversions/list.tsx
+47:8  Warning: 'Card' is defined but never used.  @typescript-eslint/no-unused-vars
+88:7  Warning: 'READONLY_REASON' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+299:9  Warning: 'canExport' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+429:6  Warning: React Hook useEffect has a missing dependency: 'beginEdit'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+751:65  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+752:35  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+766:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+866:9  Warning: 'notice' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+869:9  Warning: 'searchBox' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/dashboard/dashboard-editor.tsx
+203:10  Warning: 'reloading' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/dashboard/friend-add.tsx
+12:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+35:21  Warning: 'setCopyState' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/dashboard/inbox.tsx
+101:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/events/bookings.tsx
+2:10  Warning: 'Inbox' is defined but never used.  @typescript-eslint/no-unused-vars
+6:31  Warning: 'EventBookingItem' is defined but never used.  @typescript-eslint/no-unused-vars
+16:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+102:10  Warning: 'slotsStatus' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/events/change-review-model.ts
+160:9  Warning: The 'slotList' logical expression could make the dependencies of useCallback Hook (at line 216) change on every render. To fix this, wrap the initialization of 'slotList' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+
+./src/v8/events/create-recovery.test.tsx
+4:33  Warning: 'describe' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/events/list.tsx
+11:46  Warning: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars
+32:10  Warning: 'FolderDotName' is defined but never used.  @typescript-eslint/no-unused-vars
+47:8  Warning: 'TruncatedText' is defined but never used.  @typescript-eslint/no-unused-vars
+209:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/form-edit/after-tab.tsx
+6:10  Warning: 'FileText' is defined but never used.  @typescript-eslint/no-unused-vars
+6:20  Warning: 'IdCard' is defined but never used.  @typescript-eslint/no-unused-vars
+6:28  Warning: 'MessageSquare' is defined but never used.  @typescript-eslint/no-unused-vars
+6:43  Warning: 'Bell' is defined but never used.  @typescript-eslint/no-unused-vars
+6:49  Warning: 'Tag' is defined but never used.  @typescript-eslint/no-unused-vars
+6:54  Warning: 'Workflow' is defined but never used.  @typescript-eslint/no-unused-vars
+10:8  Warning: 'Button' is defined but never used.  @typescript-eslint/no-unused-vars
+11:8  Warning: 'Dialog' is defined but never used.  @typescript-eslint/no-unused-vars
+13:10  Warning: 'RowActions' is defined but never used.  @typescript-eslint/no-unused-vars
+14:8  Warning: 'ReorderHandle' is defined but never used.  @typescript-eslint/no-unused-vars
+14:25  Warning: 'useReorder' is defined but never used.  @typescript-eslint/no-unused-vars
+16:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+17:10  Warning: 'ACTION_ADDERS' is defined but never used.  @typescript-eslint/no-unused-vars
+17:25  Warning: 'describeAfterAction' is defined but never used.  @typescript-eslint/no-unused-vars
+17:46  Warning: 'emptyAction' is defined but never used.  @typescript-eslint/no-unused-vars
+21:8  Warning: 'EntitySelect' is defined but never used.  @typescript-eslint/no-unused-vars
+21:24  Warning: 'entityOptionMetadata' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/form-edit/appearance-tab.tsx
+31:8  Warning: 'MediaSlot' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/form-edit/content-tab.tsx
+82:29  Warning: 'index' is defined but never used.  @typescript-eslint/no-unused-vars
+470:9  Warning: The 'menus' logical expression could make the dependencies of useMemo Hook (at line 473) change on every render. To fix this, wrap the initialization of 'menus' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+
+./src/v8/form-edit/edit.tsx
+59:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/form-edit/header-entry.test.tsx
+2:10  Warning: 'fireEvent' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/form-edit/phone.tsx
+121:10  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/form-responses/responses.tsx
+205:6  Warning: React Hook useCallback has missing dependencies: 'setPage' and 'setPageSize'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+266:7  Warning: React Hook useMemo has a missing dependency: 'blockByKey'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/forms/list.tsx
+102:20  Warning: 'setMoveBusy' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+180:6  Warning: React Hook useEffect has a missing dependency: 'setActiveFolderId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+315:6  Warning: React Hook useCallback has a missing dependency: 'setActiveId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+816:9  Warning: 'folderSelectOptions' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1053:21  Warning: 'sub' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friend-add/editor.tsx
+167:20  Warning: 'current' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friend-add/list.tsx
+13:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+77:7  Warning: 'SINK_NOTE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+79:7  Warning: 'ROUTE_NOTICE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+271:6  Warning: React Hook useCallback has a missing dependency: 'saveErrors'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+628:9  Warning: 'notice' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+731:43  Warning: 'index' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friend-add-publish/publish.tsx
+73:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friend-add-runs/bulk-retry-failure.test.tsx
+39:27  Warning: 'actionText' is defined but never used.  @typescript-eslint/no-unused-vars
+39:39  Warning: 'resultView' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friend-add-runs/detail.tsx
+120:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friend-add-runs/runs.tsx
+8:10  Warning: 'canManageRole' is defined but never used.  @typescript-eslint/no-unused-vars
+37:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+124:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+137:57  Warning: 'canPrev' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friend-add-runs/status.ts
+9:10  Warning: 'formatDateTime' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friend-detail/delivery-consent.tsx
+12:8  Warning: 'ListState' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friend-detail/history-tab.tsx
+6:10  Warning: 'useState' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friends/duplicates/list.tsx
+3:10  Warning: 'jstDate' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friends/duplicates/use-duplicates-data.ts
+100:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+190:6  Warning: React Hook useCallback has a missing dependency: 'setQuery'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/friends/list/list.tsx
+179:9  Warning: 'columnsButtonRef' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+212:40  Warning: React Hook useMemo has an unnecessary dependency: 'selectionScope'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+214:44  Warning: React Hook useMemo has an unnecessary dependency: 'listScope'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+281:6  Warning: React Hook useEffect has missing dependencies: 'setAdvanced', 'setAttentionOnly', 'setOperatorId', 'setPage', 'setPageSize', 'setResponseFilter', 'setScenarioId', 'setSearchInput', 'setSearchSubmitted', 'setSelectedTagId', and 'setSortMode'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+299:6  Warning: React Hook useEffect has missing dependencies: 'setPage' and 'setSearchSubmitted'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+475:31  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+496:6  Warning: React Hook useEffect has missing dependencies: 'setAdvanced', 'setPage', 'setPageSize', and 'setSortMode'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+504:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/friends/merged/merged.tsx
+6:10  Warning: 'useSearchParams' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/friends/merged/use-merged-users.ts
+35:6  Warning: React Hook useCallback has missing dependencies: 'setPage' and 'setPageSizeState'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+64:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/friends/migrations/uid.tsx
+9:33  Warning: 'UidMigrationRun' is defined but never used.  @typescript-eslint/no-unused-vars
+46:7  Warning: 'PRE_EXECUTE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq/account-dialogs.tsx
+10:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq/company-contact.tsx
+65:80  Warning: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/hq/member-dialog.tsx
+6:43  Warning: 'ReactNode' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq/support.tsx
+103:6  Warning: React Hook useEffect has a missing dependency: 'loadHistory'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/hq-banners/dialogs.tsx
+10:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-banners/list.tsx
+177:18  Warning: 'setBusyId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-banners/words.ts
+5:10  Warning: 'parseJstDateTime' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-broadcasts/candidates-read-failure.test.tsx
+9:33  Warning: 'describe' is defined but never used.  @typescript-eslint/no-unused-vars
+57:10  Warning: 'pickEntity' is defined but never used.  @typescript-eslint/no-unused-vars
+99:16  Warning: 'fillToConfirm' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-broadcasts/create.tsx
+117:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+182:9  Warning: 'setKind' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+191:9  Warning: 'assetId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+192:9  Warning: 'setAssetId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+382:9  Warning: 'kindAssets' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+612:9  Warning: 'chooseCarousel' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+659:9  Warning: 'insert' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+686:9  Warning: 'bubbleSummary' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-broadcasts/detail.tsx
+2:10  Warning: 'canManageRole' is defined but never used.  @typescript-eslint/no-unused-vars
+8:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+374:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-broadcasts/list.tsx
+5:10  Warning: 'canManageRole' is defined but never used.  @typescript-eslint/no-unused-vars
+10:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+12:82  Warning: 'ArrowUpDown' is defined but never used.  @typescript-eslint/no-unused-vars
+93:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-templates/attribute-tabs.tsx
+19:8  Warning: 'styles' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-templates/console.test.tsx
+1:28  Warning: 'pickEntities' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-templates/console.tsx
+114:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-templates/detail.tsx
+12:10  Warning: 'ArrowLeft' is defined but never used.  @typescript-eslint/no-unused-vars
+79:3  Warning: 'onBack' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-templates/message-form.tsx
+164:77  Warning: '_removed' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/hq-templates/store-list.tsx
+469:19  Warning: 'sub' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/inbox-chat/inbox-reply-composer.tsx
+238:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/inbox-chat/routing-drawer.tsx
+26:8  Warning: 'SegmentedControl' is defined but never used.  @typescript-eslint/no-unused-vars
+31:10  Warning: 'ApiError' is defined but never used.  @typescript-eslint/no-unused-vars
+40:7  Warning: 'STRATEGIES' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/inbox-chat/use-inbox-scroll.tsx
+77:6  Warning: React Hook useLayoutEffect has a missing dependency: 'chatDetail'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/inflow-links/ads.tsx
+28:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/inflow-links/detail.tsx
+4:26  Warning: 'PAGE_SIZE_SELECT_OPTIONS' is defined but never used.  @typescript-eslint/no-unused-vars
+9:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+12:10  Warning: 'ArrowLeft' is defined but never used.  @typescript-eslint/no-unused-vars
+135:10  Warning: 'copied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+135:18  Warning: 'setCopied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+136:22  Warning: 'setCopyFailed' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/inflow-links/edit-route-dialog.tsx
+10:8  Warning: 'Combobox' is defined but never used.  @typescript-eslint/no-unused-vars
+11:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+15:8  Warning: 'Dialog' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/inflow-links/list.tsx
+14:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+16:10  Warning: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars
+141:10  Warning: 'copiedId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+141:20  Warning: 'setCopiedId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+142:10  Warning: 'copyFailedId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+142:24  Warning: 'setCopyFailedId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+247:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+404:6  Warning: React Hook useEffect has a missing dependency: 'setSelectedGenre'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+428:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/inflow-links/new/create.tsx
+10:8  Warning: 'Toggle' is defined but never used.  @typescript-eslint/no-unused-vars
+16:31  Warning: 'useMemo' is defined but never used.  @typescript-eslint/no-unused-vars
+16:55  Warning: 'ReactNode' is defined but never used.  @typescript-eslint/no-unused-vars
+17:44  Warning: 'TriangleAlert' is defined but never used.  @typescript-eslint/no-unused-vars
+34:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+35:10  Warning: 'EntityKindDialog' is defined but never used.  @typescript-eslint/no-unused-vars
+40:10  Warning: 'groupTagsByFolder' is defined but never used.  @typescript-eslint/no-unused-vars
+131:5  Warning: React Hook useEffect has a missing dependency: 'clearConflict'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/inflow-links/ref-orders.tsx
+27:10  Warning: 'formatDay' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/inflow-links/site-script.tsx
+87:10  Warning: 'copied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+87:18  Warning: 'setCopied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+88:22  Warning: 'setCopyFailed' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+89:10  Warning: 'messageCopied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+89:25  Warning: 'setMessageCopied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/line-notifications/operator-edit.tsx
+124:35  Warning: The ref value 'teamGeneration.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'teamGeneration.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/v8/mcp-connect/log.tsx
+35:8  Warning: 'styles' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/mileage/balances.tsx
+44:8  Warning: 'TruncatedText' is defined but never used.  @typescript-eslint/no-unused-vars
+192:6  Warning: React Hook useEffect has missing dependencies: 'setOffset' and 'setSearch'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/mileage/display.ts
+8:10  Warning: 'formatDateTime' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/mileage/earning-rules.tsx
+269:6  Warning: React Hook useCallback has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+282:6  Warning: React Hook useEffect has missing dependencies: 'setPage' and 'setSearch'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/mileage/friend-detail.tsx
+195:6  Warning: React Hook useEffect has missing dependencies: 'setPage' and 'setSearch'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/mileage/history.tsx
+41:9  Warning: 'router' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+151:6  Warning: React Hook useEffect has missing dependencies: 'setPage' and 'setSearch'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/mileage/reward-edit.tsx
+20:8  Warning: 'HelpTip' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/mileage/rewards.tsx
+9:10  Warning: 'jstDate' is defined but never used.  @typescript-eslint/no-unused-vars
+85:7  Warning: 'FOLDERS' is assigned a value but only used as a type.  @typescript-eslint/no-unused-vars
+198:6  Warning: React Hook useEffect has a missing dependency: 'setRedemptionsPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+282:6  Warning: React Hook useCallback has a missing dependency: 'setRedemptionsPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+294:6  Warning: React Hook useEffect has missing dependencies: 'setPage' and 'setSearch'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/mileage/score.tsx
+14:10  Warning: 'jstDate' is defined but never used.  @typescript-eslint/no-unused-vars
+107:10  Warning: 'frequencyText' is defined but never used.  @typescript-eslint/no-unused-vars
+286:6  Warning: React Hook useEffect has missing dependencies: 'setPage' and 'setSearch'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+291:6  Warning: React Hook useEffect has a missing dependency: 'setRuleSearch'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/nen-campaigns/column-new.tsx
+8:10  Warning: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars
+121:9  Warning: 'longTitle' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/nen-campaigns/display.ts
+7:10  Warning: 'formatDateTime' is defined but never used.  @typescript-eslint/no-unused-vars
+105:10  Warning: 'parse' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/nen-campaigns/edit.tsx
+205:45  Warning: React Hook useEffect has a missing dependency: 'saveConflict'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/nen-campaigns/list.tsx
+3:8  Warning: 'Toggle' is defined but never used.  @typescript-eslint/no-unused-vars
+14:10  Warning: 'jstDate' is defined but never used.  @typescript-eslint/no-unused-vars
+18:10  Warning: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars
+128:7  Warning: 'NO_MANAGE_NOTE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+716:23  Warning: 'draft' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/nen-health/health.tsx
+16:8  Warning: 'Notice' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/nen-health/parts.tsx
+3:10  Warning: 'statusLabel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/nen-members/ranks.tsx
+14:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/nen-pets/list.tsx
+10:8  Warning: 'Notice' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/nen-pets/parts.tsx
+3:10  Warning: 'statusLabel' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/nen-posts/detail.tsx
+149:26  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+164:34  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+185:24  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/notifications/list.tsx
+152:9  Warning: 'openNotification' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/ops/list-page.tsx
+5:8  Warning: 'parts' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/ops/shell.tsx
+227:3  Warning: 'stats' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/ops/support.tsx
+8:8  Warning: 'KpiBand' is defined but never used.  @typescript-eslint/no-unused-vars
+9:8  Warning: 'KpiCard' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/ops/tenant-detail.tsx
+5:8  Warning: 'KpiBand' is defined but never used.  @typescript-eslint/no-unused-vars
+6:8  Warning: 'KpiCard' is defined but never used.  @typescript-eslint/no-unused-vars
+53:6  Warning: 'TabKey' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/ops/tenants.tsx
+106:6  Warning: React Hook useEffect has a missing dependency: 'setFilter'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/reminders/detail.tsx
+3:10  Warning: 'JST_LOCAL' is defined but never used.  @typescript-eslint/no-unused-vars
+16:10  Warning: 'ChevronLeft' is defined but never used.  @typescript-eslint/no-unused-vars
+16:23  Warning: 'CircleAlert' is defined but never used.  @typescript-eslint/no-unused-vars
+20:24  Warning: 'canManageRole' is defined but never used.  @typescript-eslint/no-unused-vars
+21:10  Warning: 'formatDateTime' is defined but never used.  @typescript-eslint/no-unused-vars
+180:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+736:65  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+829:65  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+987:65  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/reminders/list.tsx
+6:10  Warning: 'useDeferredDelete' is defined but never used.  @typescript-eslint/no-unused-vars
+8:10  Warning: 'canManageRole' is defined but never used.  @typescript-eslint/no-unused-vars
+9:23  Warning: 'ListToolbarFrame' is defined but never used.  @typescript-eslint/no-unused-vars
+9:41  Warning: 'ListToolbarRow' is defined but never used.  @typescript-eslint/no-unused-vars
+9:57  Warning: 'ListToolbarEnd' is defined but never used.  @typescript-eslint/no-unused-vars
+9:73  Warning: 'ListToolbarSearchSlot' is defined but never used.  @typescript-eslint/no-unused-vars
+24:8  Warning: 'SearchField' is defined but never used.  @typescript-eslint/no-unused-vars
+28:51  Warning: 'Calendar' is defined but never used.  @typescript-eslint/no-unused-vars
+28:160  Warning: 'Plus' is defined but never used.  @typescript-eslint/no-unused-vars
+29:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+31:10  Warning: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars
+31:15  Warning: 'MoreHorizontal' is defined but never used.  @typescript-eslint/no-unused-vars
+56:10  Warning: 'FolderDotName' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/reminders/ui.tsx
+7:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+9:10  Warning: 'ChevronLeft' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/approvals/approvals.tsx
+9:17  Warning: 'Inbox' is defined but never used.  @typescript-eslint/no-unused-vars
+13:10  Warning: 'DialogFormRow' is defined but never used.  @typescript-eslint/no-unused-vars
+23:10  Warning: 'permissionDeniedMessage' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/booking-kit/shell.tsx
+117:165  Warning: 'headSize' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/close-tasks/close-tasks.tsx
+41:6  Warning: 'Tab' is defined but never used.  @typescript-eslint/no-unused-vars
+97:86  Warning: The ref value 'latest.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'latest.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/v8/restaurant/close-tasks/read-retry.test.tsx
+16:8  Warning: 'Shell' is defined but never used.  @typescript-eslint/no-unused-vars
+18:9  Warning: 'EditReservationDialog' is defined but never used.  @typescript-eslint/no-unused-vars
+19:20  Warning: 'reservation' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/closures/closure-dialog.tsx
+19:17  Warning: 'OptionalBadge' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/common-a/frame.tsx
+17:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/front-desk/phone-drawer.tsx
+17:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/google/performance.tsx
+3:25  Warning: 'LineChart' is defined but never used.  @typescript-eslint/no-unused-vars
+3:36  Warning: 'FunnelChart' is defined but never used.  @typescript-eslint/no-unused-vars
+71:10  Warning: 'shortDate' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/google/posts.tsx
+13:8  Warning: 'Toggle' is defined but never used.  @typescript-eslint/no-unused-vars
+602:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/restaurant/google/profile-confirm.tsx
+19:36  Warning: '_withYear' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/google/profile-edit.tsx
+175:295  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/restaurant/google/profile-hours.tsx
+20:131  Warning: 'GoogleWeekday' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/google/reviews.tsx
+105:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+218:58  Warning: 'go' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/inventory/stock.tsx
+21:20  Warning: 'SettingCheckbox' is defined but never used.  @typescript-eslint/no-unused-vars
+64:24  Warning: 'id' is defined but never used.  @typescript-eslint/no-unused-vars
+64:48  Warning: 'describedBy' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/organization/organization-forms.tsx
+164:10  Warning: 'copiedId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+164:20  Warning: 'setCopiedId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/organization/store-groups.tsx
+87:31  Warning: The ref value 'generation.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'generation.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/v8/restaurant/reservations/dialogs.tsx
+17:41  Warning: 'pad2' is defined but never used.  @typescript-eslint/no-unused-vars
+19:26  Warning: 'polishFormatNumber' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/reservations/list.tsx
+27:8  Warning: 'StatusBadge' is defined but never used.  @typescript-eslint/no-unused-vars
+29:10  Warning: 'DataTable' is defined but never used.  @typescript-eslint/no-unused-vars
+29:21  Warning: 'TableHeadRow' is defined but never used.  @typescript-eslint/no-unused-vars
+29:35  Warning: 'Td' is defined but never used.  @typescript-eslint/no-unused-vars
+29:39  Warning: 'Th' is defined but never used.  @typescript-eslint/no-unused-vars
+29:43  Warning: 'Tr' is defined but never used.  @typescript-eslint/no-unused-vars
+31:26  Warning: 'Status' is defined but never used.  @typescript-eslint/no-unused-vars
+32:89  Warning: 'sourceName' is defined but never used.  @typescript-eslint/no-unused-vars
+97:9  Warning: 'tableById' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/reservations/phone.tsx
+24:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+35:23  Warning: 'polishFormatYen' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/reservations/reservations.tsx
+40:38  Warning: 'view' is defined but never used.  @typescript-eslint/no-unused-vars
+40:74  Warning: 'onView' is defined but never used.  @typescript-eslint/no-unused-vars
+298:7  Warning: 'DESCRIPTION' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/reservations/today.tsx
+22:10  Warning: 'BookingBlock' is defined but never used.  @typescript-eslint/no-unused-vars
+22:24  Warning: 'BookingSlot' is defined but never used.  @typescript-eslint/no-unused-vars
+26:10  Warning: 'DataTable' is defined but never used.  @typescript-eslint/no-unused-vars
+26:21  Warning: 'TableHeadRow' is defined but never used.  @typescript-eslint/no-unused-vars
+26:35  Warning: 'Td' is defined but never used.  @typescript-eslint/no-unused-vars
+26:39  Warning: 'Th' is defined but never used.  @typescript-eslint/no-unused-vars
+26:43  Warning: 'Tr' is defined but never used.  @typescript-eslint/no-unused-vars
+31:45  Warning: 'sourceKind' is defined but never used.  @typescript-eslint/no-unused-vars
+38:7  Warning: 'SLOT' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+39:7  Warning: 'ROW_START' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+40:7  Warning: 'ROW_END' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+42:120  Warning: 'onOpen' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/tables/move.ts
+10:7  Warning: 'INACTIVE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+33:7  Warning: 'WEEKDAY' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant/tables/tables.tsx
+22:8  Warning: 'SeatTile' is defined but never used.  @typescript-eslint/no-unused-vars
+85:202  Warning: React Hook useEffect has a missing dependency: 'store'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+172:9  Warning: 'moveTable' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/restaurant-reservations/detail-dialog.tsx
+29:26  Warning: 'polishFormatNumber' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/rich-menu-edit/compatibility-form.tsx
+14:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/rich-menu-edit/detail.tsx
+7:10  Warning: 'ArrowLeft' is defined but never used.  @typescript-eslint/no-unused-vars
+8:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+10:10  Warning: 'CircleAlert' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/rich-menus/list.test.tsx
+18:32  Warning: '_id' is defined but never used.  @typescript-eslint/no-unused-vars
+18:45  Warning: '_accountId' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/rich-menus/list.tsx
+4:10  Warning: 'canManageRole' is defined but never used.  @typescript-eslint/no-unused-vars
+5:23  Warning: 'ListToolbarEnd' is defined but never used.  @typescript-eslint/no-unused-vars
+5:39  Warning: 'ListToolbarFrame' is defined but never used.  @typescript-eslint/no-unused-vars
+5:57  Warning: 'ListToolbarRow' is defined but never used.  @typescript-eslint/no-unused-vars
+5:73  Warning: 'ListToolbarSearchSlot' is defined but never used.  @typescript-eslint/no-unused-vars
+6:42  Warning: 'formatDay' is defined but never used.  @typescript-eslint/no-unused-vars
+10:98  Warning: 'ListOrdered' is defined but never used.  @typescript-eslint/no-unused-vars
+19:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+21:10  Warning: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars
+34:8  Warning: 'SearchField' is defined but never used.  @typescript-eslint/no-unused-vars
+100:7  Warning: 'PRIORITY_NOTE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+103:7  Warning: 'NO_MANAGE_NOTE' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+197:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+521:6  Warning: React Hook useCallback has a missing dependency: 'duplicateFeedback'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+855:9  Warning: 'folderSelect' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1018:21  Warning: 'shape' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/rich-menus/new/create-draft.ts
+97:27  Warning: '_dropped' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/rich-menus/new/create.tsx
+456:6  Warning: React Hook useCallback has a missing dependency: 'hydrate'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+790:6  Warning: React Hook useEffect has a missing dependency: 'host'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/scenario-detail/scenario-detail-body.tsx
+501:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/scenario-detail/scenario-step-form.tsx
+7:62  Warning: 'ScenarioQuestion' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/scenario-first-step/first-step.tsx
+9:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+94:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/scenarios/create.tsx
+5:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+58:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/scenarios/list.tsx
+12:8  Warning: 'StatusBadge' is defined but never used.  @typescript-eslint/no-unused-vars
+23:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+41:8  Warning: 'SearchField' is defined but never used.  @typescript-eslint/no-unused-vars
+56:8  Warning: 'Dialog' is defined but never used.  @typescript-eslint/no-unused-vars
+219:6  Warning: React Hook useEffect has a missing dependency: 'setFolderFilter'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+898:23  Warning: 'sub' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/booking-media/screen.tsx
+3:8  Warning: 'Toggle' is defined but never used.  @typescript-eslint/no-unused-vars
+8:17  Warning: 'Copy' is defined but never used.  @typescript-eslint/no-unused-vars
+17:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+42:8  Warning: 'EntitySelect' is defined but never used.  @typescript-eslint/no-unused-vars
+390:9  Warning: 'askLink' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/customer-look/screen.tsx
+38:25  Warning: The ref value 'generation.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'generation.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+39:4  Warning: React Hook useEffect has a missing dependency: 'clearConflict'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/settings/ec-commerce/connector.tsx
+151:45  Warning: React Hook useEffect has a missing dependency: 'saveConflict'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+175:13  Warning: 'fieldFailure' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+210:30  Warning: '_ev' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+210:50  Warning: '_sec' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+211:30  Warning: '_ev2' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+211:51  Warning: '_sec2' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/ec-commerce/identity.tsx
+91:105  Warning: React Hook useEffect has a missing dependency: 'review'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/settings/ec-commerce/screen.tsx
+257:6  Warning: React Hook useEffect has a missing dependency: 'setSearchQuery'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/settings/ec-commerce/subscriptions.tsx
+95:35  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/settings/emergency/health.tsx
+16:3  Warning: 'ApiError' is defined but never used.  @typescript-eslint/no-unused-vars
+320:40  Warning: The ref value 'receiptGeneration.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'receiptGeneration.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/v8/settings/features/screen.tsx
+24:10  Warning: 'permissionDeniedMessage' is defined but never used.  @typescript-eslint/no-unused-vars
+271:10  Warning: 'savedTick' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/features/use-feature-settings.ts
+33:10  Warning: 'formatDay' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/file-scan/use-file-scan.ts
+127:6  Warning: React Hook useCallback has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/settings/line-notifications/operator-tab.tsx
+12:10  Warning: 'jstDate' is defined but never used.  @typescript-eslint/no-unused-vars
+13:8  Warning: 'Notice' is defined but never used.  @typescript-eslint/no-unused-vars
+14:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+26:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/line-notifications/runs-tab.tsx
+134:6  Warning: React Hook useEffect has missing dependencies: 'setFilter', 'setPage', 'setPeriodFilter', 'setQuery', and 'setRecipientFilter'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/settings/line-notifications/screen.tsx
+530:26  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/settings/pools/create.tsx
+18:8  Warning: 'Select' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/pools/pools.tsx
+164:10  Warning: 'copied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+164:18  Warning: 'setCopied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+165:21  Warning: 'setCopyError' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/sb-frame/settings-screen.tsx
+4:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+80:30  Warning: 'href' is defined but never used.  @typescript-eslint/no-unused-vars
+80:36  Warning: 'label' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/sns/sns.tsx
+90:9  Warning: 'googleStatus' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/staff/staff-field-errors.test.tsx
+4:46  Warning: 'waitFor' is defined but never used.  @typescript-eslint/no-unused-vars
+4:55  Warning: 'within' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/settings/staff/staff.tsx
+162:10  Warning: 'Modal' is defined but never used.  @typescript-eslint/no-unused-vars
+945:39  Warning: React Hook useEffect has a missing dependency: 'setUserPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/style-dashboard/day-calendar.test.tsx
+52:26  Warning: '_frames' is defined but never used.  @typescript-eslint/no-unused-vars
+52:47  Warning: '_options' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tag-edit/edit-form.tsx
+11:53  Warning: 'ReactNode' is defined but never used.  @typescript-eslint/no-unused-vars
+13:15  Warning: 'Tag' is defined but never used.  @typescript-eslint/no-unused-vars
+13:20  Warning: 'TagGroup' is defined but never used.  @typescript-eslint/no-unused-vars
+14:20  Warning: 'TagDependencies' is defined but never used.  @typescript-eslint/no-unused-vars
+28:29  Warning: 'FolderSelectCreate' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tag-edit/search-edit.tsx
+6:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tags/field-edit.tsx
+2:8  Warning: 'Notice' is defined but never used.  @typescript-eslint/no-unused-vars
+113:6  Warning: React Hook useEffect has a missing dependency: 'collision'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/tags/field-editor.tsx
+5:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+14:17  Warning: 'RequiredBadge' is defined but never used.  @typescript-eslint/no-unused-vars
+108:3  Warning: 'backHref' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tags/field-migrate.tsx
+5:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tags/fields-table.tsx
+22:94  Warning: 'type' is defined but never used.  @typescript-eslint/no-unused-vars
+22:136  Warning: 'page' is defined but never used.  @typescript-eslint/no-unused-vars
+49:19  Warning: 'key' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tags/fields-view.tsx
+30:50  Warning: 'error' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+30:232  Warning: 'folders' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tags/mark-editor.tsx
+9:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tags/marks-tab.tsx
+7:79  Warning: 'AlertCircle' is defined but never used.  @typescript-eslint/no-unused-vars
+11:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+111:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+137:111  Warning: React Hook useEffect has a missing dependency: 'setItems'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+179:31  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/tags/searches-tab.tsx
+15:10  Warning: 'AlertCircle' is defined but never used.  @typescript-eslint/no-unused-vars
+185:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+268:31  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+366:19  Warning: 'summaryText' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tags/tags-retry-order.test.tsx
+10:33  Warning: 'describe' is defined but never used.  @typescript-eslint/no-unused-vars
+10:51  Warning: 'it' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/tags/tags-tab.tsx
+29:8  Warning: 'Dialog' is defined but never used.  @typescript-eslint/no-unused-vars
+43:8  Warning: 'TagPill' is defined but never used.  @typescript-eslint/no-unused-vars
+295:6  Warning: React Hook useEffect has a missing dependency: 'setGroups'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/tags/use-fields-tab.tsx
+70:6  Warning: React Hook useEffect has missing dependencies: 'setFolderFilter' and 'setPage'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+105:205  Warning: React Hook useEffect has a missing dependency: 'setItems'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+139:31  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+142:6  Warning: React Hook useEffect has a missing dependency: 'setFolderFilter'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/template-edit/asset.tsx
+10:10  Warning: 'canManageRole' is defined but never used.  @typescript-eslint/no-unused-vars
+31:8  Warning: 'Combobox' is defined but never used.  @typescript-eslint/no-unused-vars
+47:8  Warning: 'MediaSlot' is defined but never used.  @typescript-eslint/no-unused-vars
+102:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+160:6  Warning: React Hook useEffect has a missing dependency: 'host'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/template-edit/carousel-image.tsx
+6:8  Warning: 'MediaSlot' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/template-edit/insert-row.tsx
+10:8  Warning: 'Button' is defined but never used.  @typescript-eslint/no-unused-vars
+113:9  Warning: 'over' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/template-edit/message.tsx
+69:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/template-edit/rich-video.tsx
+80:5  Warning: React Hook useEffect has a missing dependency: 'host'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+80:21  Warning: React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked.  react-hooks/exhaustive-deps
+82:428  Warning: React Hook useEffect has a missing dependency: 'snapshotOf'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+108:28  Warning: The ref value 'generation.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'generation.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+109:5  Warning: React Hook useEffect has missing dependencies: 'host?.initialContent', 'saveErrors', and 'snapshotOf'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/template-edit/rich.tsx
+193:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+255:6  Warning: React Hook useEffect has a missing dependency: 'host'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/templates/carousel.tsx
+11:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+22:8  Warning: 'Dialog' is defined but never used.  @typescript-eslint/no-unused-vars
+210:6  Warning: React Hook useEffect has a missing dependency: 'host'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/templates/list-table.tsx
+154:23  Warning: 'excerpt' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/templates/list.test.tsx
+53:8  Warning: 'ToastHost' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/templates/list.tsx
+65:9  Warning: 'staffRole' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+157:10  Warning: 'duplicating' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+753:9  Warning: 'folderSelectOptions' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/templates/question-new.tsx
+15:10  Warning: 'isOwnerOrAdmin' is defined but never used.  @typescript-eslint/no-unused-vars
+18:44  Warning: 'useMemo' is defined but never used.  @typescript-eslint/no-unused-vars
+22:10  Warning: 'ChevronDown' is defined but never used.  @typescript-eslint/no-unused-vars
+22:23  Warning: 'GitBranch' is defined but never used.  @typescript-eslint/no-unused-vars
+22:34  Warning: 'MousePointerClick' is defined but never used.  @typescript-eslint/no-unused-vars
+22:72  Warning: 'TagIcon' is defined but never used.  @typescript-eslint/no-unused-vars
+22:94  Warning: 'LucideIcon' is defined but never used.  @typescript-eslint/no-unused-vars
+31:10  Warning: 'EntityPickerSummary' is defined but never used.  @typescript-eslint/no-unused-vars
+110:6  Warning: React Hook useEffect has a missing dependency: 'host'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+122:6  Warning: React Hook useEffect has a missing dependency: 'host'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/v8-boundary.test.ts
+46:27  Warning: 'value' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/visit-stamps/dialogs.tsx
+247:14  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/visit-stamps/qr.tsx
+45:49  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/visit-stamps/visit-stamps.tsx
+20:8  Warning: 'MediaSlot' is defined but never used.  @typescript-eslint/no-unused-vars
+22:8  Warning: 'Combobox' is defined but never used.  @typescript-eslint/no-unused-vars
+113:16  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+287:33  Warning: The ref value 'paperRequest.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'paperRequest.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+310:6  Warning: React Hook useCallback has a missing dependency: 'setLogPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+311:38  Warning: React Hook useEffect has a missing dependency: 'setLogPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+314:31  Warning: The ref value 'logRequest.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'logRequest.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+556:52  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/v8/webhooks/outgoing.tsx
+8:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+18:23  Warning: 'ListToolbarFrame' is defined but never used.  @typescript-eslint/no-unused-vars
+18:41  Warning: 'ListToolbarRow' is defined but never used.  @typescript-eslint/no-unused-vars
+18:57  Warning: 'ListToolbarSearchSlot' is defined but never used.  @typescript-eslint/no-unused-vars
+18:80  Warning: 'ListToolbarEnd' is defined but never used.  @typescript-eslint/no-unused-vars
+52:34  Warning: 'maskedUrl' is defined but never used.  @typescript-eslint/no-unused-vars
+476:9  Warning: 'notice' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+479:9  Warning: 'searchBox' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+614:25  Warning: 'target' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/webhooks/use-api-tokens.tsx
+48:10  Warning: 'copied' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/webinar-edit/analytics.tsx
+124:9  Warning: 'top' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+161:9  Warning: 'path' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+164:9  Warning: 'ctaPct' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/webinar-edit/edit.tsx
+92:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/webinar-edit/new.tsx
+57:9  Warning: 'role' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/webinar-edit/notifications.tsx
+5:8  Warning: 'Toggle' is defined but never used.  @typescript-eslint/no-unused-vars
+9:10  Warning: 'Plus' is defined but never used.  @typescript-eslint/no-unused-vars
+13:8  Warning: 'Dialog' is defined but never used.  @typescript-eslint/no-unused-vars
+15:10  Warning: 'RowMenu' is defined but never used.  @typescript-eslint/no-unused-vars
+23:10  Warning: 'notifyToast' is defined but never used.  @typescript-eslint/no-unused-vars
+40:10  Warning: 'Field' is defined but never used.  @typescript-eslint/no-unused-vars
+45:8  Warning: 'EntityRemoteField' is defined but never used.  @typescript-eslint/no-unused-vars
+45:34  Warning: 'RemoteEntityKind' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/v8/webinar-edit/participants.tsx
+7:8  Warning: 'Link' is defined but never used.  @typescript-eslint/no-unused-vars
+132:6  Warning: React Hook useEffect has a missing dependency: 'setPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/v8/webinars/list.tsx
+3:10  Warning: 'canManageRole' is defined but never used.  @typescript-eslint/no-unused-vars
+4:23  Warning: 'ListToolbarEnd' is defined but never used.  @typescript-eslint/no-unused-vars
+4:39  Warning: 'ListToolbarFrame' is defined but never used.  @typescript-eslint/no-unused-vars
+4:57  Warning: 'ListToolbarRow' is defined but never used.  @typescript-eslint/no-unused-vars
+4:73  Warning: 'ListToolbarSearchSlot' is defined but never used.  @typescript-eslint/no-unused-vars
+18:10  Warning: 'Eye' is defined but never used.  @typescript-eslint/no-unused-vars
+54:8  Warning: 'TruncatedText' is defined but never used.  @typescript-eslint/no-unused-vars
+318:9  Warning: 'narrow' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+607:90  Warning: React Hook useCallback has a missing dependency: 'setActiveId'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+799:9  Warning: 'notice' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+802:9  Warning: 'searchBox' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/211) ...
+   Generating static pages (52/211)
+   Generating static pages (105/211)
+   Generating static pages (158/211)
+ ✓ Generating static pages (211/211)
+   Finalizing page optimization ...
+   Collecting build traces ...
+   Exporting (0/2) ...
+ ✓ Exporting (2/2)
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    62.9 kB         325 kB
+├ ○ /_not-found                            155 B         107 kB
+├ ○ /accounts                            33.3 kB         328 kB
+├ ○ /accounts/detail                     39.3 kB         287 kB
+├ ○ /accounts/handover                   23.1 kB         280 kB
+├ ○ /accounts/new                        53.5 kB         248 kB
+├ ○ /affiliate-offers                      463 B         107 kB
+├ ○ /affiliate-offers/new                8.27 kB         284 kB
+├ ○ /affiliates                          71.7 kB         356 kB
+├ ○ /affiliates/new                      12.6 kB         277 kB
+├ ○ /analytics                           63.7 kB         343 kB
+├ ○ /analytics/reports/new               24.5 kB         284 kB
+├ ○ /auto-replies                        53.7 kB         315 kB
+├ ○ /auto-replies/edit                   39.5 kB         363 kB
+├ ○ /auto-replies/publish                11.7 kB         185 kB
+├ ○ /auto-replies/runs                   26.7 kB         273 kB
+├ ○ /automations                         22.6 kB         296 kB
+├ ○ /automations/drafts                  1.26 kB         325 kB
+├ ○ /automations/new                       406 B         324 kB
+├ ○ /automations/runs                    26.7 kB         273 kB
+├ ○ /booking/bookings                    57.6 kB         328 kB
+├ ○ /booking/bookings/detail             35.1 kB         253 kB
+├ ○ /booking/bookings/new                33.6 kB         251 kB
+├ ○ /booking/menus                       21.9 kB         299 kB
+├ ○ /booking/menus/new                   38.5 kB         300 kB
+├ ○ /booking/menus/staff                 21.6 kB         239 kB
+├ ○ /booking/passes/new                  25.7 kB         259 kB
+├ ○ /booking/sales                       11.2 kB         195 kB
+├ ○ /booking/staff                       26.5 kB         253 kB
+├ ○ /booking/staff/new                   17.3 kB         273 kB
+├ ○ /booking/staff/shifts                16.4 kB         279 kB
+├ ○ /broadcasts                          35.9 kB         335 kB
+├ ○ /broadcasts/detail                   11.2 kB         306 kB
+├ ○ /broadcasts/new                        43 kB         417 kB
+├ ○ /broadcasts/reserved                 6.79 kB         301 kB
+├ ○ /chats                               97.7 kB         366 kB
+├ ○ /common-actions                      22.7 kB         288 kB
+├ ○ /common-actions/edit                 3.32 kB         282 kB
+├ ○ /common-actions/new                  9.44 kB         288 kB
+├ ○ /common-actions/versions             25.5 kB         266 kB
+├ ○ /contents                            55.2 kB         312 kB
+├ ○ /contents/vars                       34.7 kB         308 kB
+├ ○ /contents/vars/edit                  29.3 kB         285 kB
+├ ○ /contents/vars/new                   27.8 kB         276 kB
+├ ○ /conversions                         4.64 kB         327 kB
+├ ○ /conversions/edit                      487 B         322 kB
+├ ○ /conversions/new                     21.5 kB         291 kB
+├ ○ /duplicates                          11.8 kB         222 kB
+├ ○ /ec-commerce                          2.4 kB         318 kB
+├ ○ /ec-commerce/identity-candidates     12.2 kB         328 kB
+├ ○ /emergency                             53 kB         322 kB
+├ ○ /events                              19.9 kB         292 kB
+├ ○ /events/bookings                     23.3 kB         279 kB
+├ ○ /events/change-review                15.6 kB         267 kB
+├ ○ /events/edit                         18.8 kB         316 kB
+├ ○ /events/new                          15.3 kB         266 kB
+├ ○ /events/preview                      16.8 kB         257 kB
+├ ○ /form-submissions                    34.5 kB         288 kB
+├ ○ /form-submissions/edit                 30 kB         370 kB
+├ ○ /form-submissions/responses          22.3 kB         277 kB
+├ ○ /friend-add-settings                 59.8 kB         354 kB
+├ ○ /friend-add-settings/publish         23.7 kB         261 kB
+├ ○ /friend-add-settings/runs            15.1 kB         273 kB
+├ ○ /friend-add-settings/runs/detail     24.7 kB         220 kB
+├ ○ /friends                             76.6 kB         367 kB
+├ ○ /friends/detail                      51.9 kB         328 kB
+├ ○ /friends/identity-candidates         14.7 kB         261 kB
+├ ○ /friends/migrations                  42.9 kB         279 kB
+├ ○ /getting-started                     11.9 kB         261 kB
+├ ○ /health                              25.5 kB         252 kB
+├ ○ /hq                                  35.8 kB         310 kB
+├ ○ /hq/attention                          21 kB         277 kB
+├ ○ /hq/banners                          13.9 kB         304 kB
+├ ○ /hq/banners/project                  29.5 kB         304 kB
+├ ○ /hq/billing                            28 kB         279 kB
+├ ○ /hq/broadcasts                       29.1 kB         275 kB
+├ ○ /hq/broadcasts/detail                24.8 kB         307 kB
+├ ○ /hq/broadcasts/new                   29.1 kB         701 kB
+├ ○ /hq/form-submissions                 1.03 kB         628 kB
+├ ○ /hq/friend-attributes                1.03 kB         628 kB
+├ ○ /hq/members                          29.4 kB         289 kB
+├ ○ /hq/open                             24.7 kB         207 kB
+├ ○ /hq/rich-menus                         543 B         678 kB
+├ ○ /hq/settings                         14.9 kB         263 kB
+├ ○ /hq/store-comparison                 29.5 kB         270 kB
+├ ○ /hq/support                          11.7 kB         283 kB
+├ ○ /hq/support/detail                   12.8 kB         273 kB
+├ ○ /hq/templates                        14.2 kB         641 kB
+├ ○ /hq/templates/starter-sets           19.9 kB         319 kB
+├ ○ /icon.svg                                0 B            0 B
+├ ○ /inflow-links                        27.7 kB         337 kB
+├ ○ /inflow-links/detail                 12.8 kB         304 kB
+├ ○ /inflow-links/edit                   1.42 kB         311 kB
+├ ○ /inflow-links/new                    36.9 kB         295 kB
+├ ○ /line-notifications                    40 kB         334 kB
+├ ○ /line-notifications/operator/new     24.9 kB         292 kB
+├ ○ /login                               6.73 kB         169 kB
+├ ○ /login/two-factor                    3.42 kB         209 kB
+├ ○ /login/two-factor/setup              7.66 kB         213 kB
+├ ○ /mileage                             48.3 kB         334 kB
+├ ○ /mileage/earning-rules/edit          39.9 kB         268 kB
+├ ○ /mileage/earning-rules/new           12.4 kB         290 kB
+├ ○ /mileage/friends/detail              22.4 kB         281 kB
+├ ○ /mileage/rewards/edit                8.53 kB         293 kB
+├ ○ /mileage/score-rules                 32.9 kB         246 kB
+├ ○ /nen-campaigns                         34 kB         312 kB
+├ ○ /nen-campaigns/columns/new           18.3 kB         299 kB
+├ ○ /nen-campaigns/edit                  35.4 kB         309 kB
+├ ○ /nen-members                         41.1 kB         303 kB
+├ ○ /nen/health                          22.4 kB         278 kB
+├ ○ /nen/members                         26.2 kB         288 kB
+├ ○ /nen/pets                            12.5 kB         292 kB
+├ ○ /notifications                       12.4 kB         253 kB
+├ ○ /ops                                   155 B         107 kB
+├ ○ /ops/announcements                   30.8 kB         253 kB
+├ ○ /ops/audit                           24.8 kB         249 kB
+├ ○ /ops/dashboard                       38.2 kB         256 kB
+├ ○ /ops/invite                          11.9 kB         207 kB
+├ ○ /ops/knowledge                       9.95 kB         284 kB
+├ ○ /ops/login                           8.08 kB         171 kB
+├ ○ /ops/members                         27.1 kB         269 kB
+├ ○ /ops/support                         38.6 kB         290 kB
+├ ○ /ops/tenants                         20.8 kB         267 kB
+├ ○ /ops/tenants/detail                    33 kB         248 kB
+├ ○ /ops/two-factor                      8.38 kB         249 kB
+├ ○ /password/forgot                     8.01 kB         159 kB
+├ ○ /password/reset                      8.62 kB         204 kB
+├ ○ /pools                               12.9 kB         268 kB
+├ ○ /pools/new                           15.1 kB         275 kB
+├ ○ /recipes                             2.48 kB         200 kB
+├ ○ /recipes/clone                       7.56 kB         205 kB
+├ ○ /register                              19 kB         170 kB
+├ ○ /register/complete                   9.88 kB         205 kB
+├ ○ /register/sent                       3.98 kB         155 kB
+├ ○ /reminders                           18.1 kB         291 kB
+├ ○ /reminders/detail                    44.6 kB         273 kB
+├ ○ /reminders/edit                      25.5 kB         333 kB
+├ ○ /reminders/new                       9.42 kB         300 kB
+├ ○ /restaurant-test                       155 B         107 kB
+├ ○ /restaurant-test/approvals           13.7 kB         262 kB
+├ ○ /restaurant-test/close-tasks         24.8 kB         255 kB
+├ ○ /restaurant-test/dashboard           88.8 kB         351 kB
+├ ○ /restaurant-test/delivery            33.7 kB         294 kB
+├ ○ /restaurant-test/google              59.6 kB         334 kB
+├ ○ /restaurant-test/inventory           45.2 kB         332 kB
+├ ○ /restaurant-test/line-followup       46.2 kB         299 kB
+├ ○ /restaurant-test/menu                13.8 kB         271 kB
+├ ○ /restaurant-test/menu/edit           26.1 kB         248 kB
+├ ○ /restaurant-test/organization        27.4 kB         276 kB
+├ ○ /restaurant-test/reservations        28.6 kB         331 kB
+├ ○ /restaurant-test/stores                155 B         107 kB
+├ ○ /restaurant-test/stores/new            20 kB         240 kB
+├ ○ /restaurant-test/tables              26.9 kB         294 kB
+├ ○ /restaurant-test/terms               1.01 kB         208 kB
+├ ○ /rich-menus                          27.3 kB         332 kB
+├ ○ /rich-menus/connections              18.5 kB         250 kB
+├ ○ /rich-menus/edit                     41.8 kB         395 kB
+├ ○ /rich-menus/new                      34.3 kB         387 kB
+├ ○ /rich-menus/sample                   25.5 kB         270 kB
+├ ○ /scenarios                           23.2 kB         333 kB
+├ ○ /scenarios/detail                    54.6 kB         385 kB
+├ ○ /scenarios/first-step                39.6 kB         355 kB
+├ ○ /scenarios/mode                        386 B         263 kB
+├ ○ /scenarios/new                         388 B         263 kB
+├ ○ /scenarios/results                   27.6 kB         313 kB
+├ ○ /scoring                               155 B         107 kB
+├ ○ /scoring/new                           155 B         107 kB
+├ ○ /search-console                      13.1 kB         273 kB
+├ ○ /settings                            23.6 kB         271 kB
+├ ○ /settings/booking-media              22.4 kB         271 kB
+├ ○ /settings/customer-look                45 kB         263 kB
+├ ○ /settings/delivery                   21.5 kB         216 kB
+├ ○ /settings/file-scan                  21.2 kB         269 kB
+├ ○ /settings/manual-links                 15 kB         269 kB
+├ ○ /settings/sns                        29.9 kB         227 kB
+├ ○ /staff                                 334 B         330 kB
+├ ○ /staff/edit                            396 B         330 kB
+├ ○ /staff/email-change                  11.9 kB         185 kB
+├ ○ /staff/invite                        11.9 kB         185 kB
+├ ○ /staff/new                           21.1 kB         255 kB
+├ ○ /support                             23.7 kB         207 kB
+├ ○ /tags                                  434 B         333 kB
+├ ○ /tags/edit                           25.4 kB         305 kB
+├ ○ /tags/fields/edit                    20.4 kB         267 kB
+├ ○ /tags/fields/migrate                 24.8 kB         292 kB
+├ ○ /tags/fields/new                     16.5 kB         263 kB
+├ ○ /tags/folders/new                    3.58 kB         336 kB
+├ ○ /tags/marks/edit                       703 B         281 kB
+├ ○ /tags/marks/new                        407 B         281 kB
+├ ○ /tags/new                            22.8 kB         260 kB
+├ ○ /tags/searches/edit                    29 kB         292 kB
+├ ○ /templates                           54.2 kB         308 kB
+├ ○ /templates/carousel                  25.8 kB         332 kB
+├ ○ /templates/detail                    33.4 kB         258 kB
+├ ○ /templates/edit                      30.9 kB         390 kB
+├ ○ /templates/questions/new             21.4 kB         291 kB
+├ ○ /updates                             14.3 kB         207 kB
+├ ○ /users                               28.7 kB         268 kB
+├ ○ /version.json                          155 B         107 kB
+├ ○ /visit-stamps                        42.7 kB         319 kB
+├ ○ /visual-qa/v8-parts                  18.2 kB         134 kB
+├ ○ /webhooks                            54.3 kB         336 kB
+├ ○ /webhooks/ai-log                     10.9 kB         282 kB
+├ ○ /webhooks/edit                       18.7 kB         218 kB
+├ ○ /webhooks/new                        16.4 kB         258 kB
+├ ○ /webinars                              28 kB         282 kB
+├ ○ /webinars/edit                       67.3 kB         359 kB
+├ ○ /webinars/new                        12.9 kB         269 kB
+└ ○ /webinars/published                  17.1 kB         201 kB
++ First Load JS shared by all             107 kB
+  ├ chunks/4045-d977ab81ac1d7144.js      46.7 kB
+  ├ chunks/9df6514c-ca9a3be35eddd0f5.js  54.2 kB
+  └ other shared chunks (total)          5.55 kB
+
+
+○  (Static)  prerendered as static content
+
+
+> web@0.24.0 postbuild /Users/kentakenta/lh-work/lh-train-all-1023/apps/web
+> node ../../scripts/security/externalize-bootstrap.mjs out
+
+{"pages":208,"scripts":657}
