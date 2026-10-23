@@ -55,16 +55,11 @@ export interface DedupPreviewResult {
  *   - identKey は dedup の意味論上ユニークな key なので、横断 set で持てば論理
  *     重複を完全に防げる。
  *
- * 容量見積り: 2000 人 × ~40 文字 (url_token または uid:UUID) = ~80KB。
- * D1 row 1MB 上限内。
- *
- * **スケール限界**: ~25,000 人を超える broadcast では JSON サイズが 1MB を超え、
- * UPDATE が失敗してその時点で resume 機能が止まる (multicast 自体は LINE 側に
- * 届くが、進捗は記録されない → 完了時に重複扱いになる)。それ以上の規模が
- * 必要になったら別テーブル `broadcast_dedup_progress(broadcast_id, ident_key)` に
- * row 単位で持つ設計へ移行すること (現状は対応せず、コメントで明示)。
- *
- * 安全マージン: 2000-5000 人なら問題なし。10000 人で要監視 (~400KB)。
+ * 容量にはsentIdentKeysだけでなく固定audience全体も含まれる。
+ * D1の行/値上限は2,000,000バイト。人数だけから安全とは判定できず、
+ * 10店舗×1,000宛先の合成試験でも送信後のJSONはこの制限を超える。
+ * 大口対応には固定宛先の行単位保存が必要。送達の正本は既存claimsに保ち、
+ * 別の送信leaseやattempt台帳を追加しない。未達条件はdocs/multi-tenant-scale.md。
  */
 export interface DedupProgress {
   sentIdentKeys: string[];
