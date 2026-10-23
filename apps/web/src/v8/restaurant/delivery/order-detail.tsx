@@ -107,11 +107,13 @@ export interface OrderDetailDialogProps {
   detail: DeliveryOrderDetailData | null
   busy: boolean
   canManage: boolean
+  uberOrderActionsEnabled: boolean
   onClose: () => void
   onRetry: () => void
   onAccept: () => void
   onReject: () => void
   onReady: () => void
+  onHandOver: () => void
   /** キャンセルの確認（`dgeTy`）を開く。 */
   onCancelOrder: () => void
 }
@@ -123,15 +125,18 @@ export function OrderDetailDialog({
   detail,
   busy,
   canManage,
+  uberOrderActionsEnabled,
   onClose,
   onRetry,
   onAccept,
   onReject,
   onReady,
+  onHandOver,
   onCancelOrder,
 }: OrderDetailDialogProps) {
   const order = detail?.order ?? null
-  const preparing = order?.service === 'ubereats'
+  const uberOrder = order?.service === 'ubereats'
+  const preparing = uberOrder && !uberOrderActionsEnabled
   const items = detail?.items ?? []
   const serviceLabel = order
     ? order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]
@@ -194,6 +199,20 @@ export function OrderDetailDialog({
         </>
       )
     }
+    if (order.status === 'ready') {
+      return (
+        <>
+          <Button variant={preparing ? 'secondary' : 'danger-outline'} disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onCancelOrder}>
+            <Ban size={16} aria-hidden="true" />注文をキャンセルする
+          </Button>
+          <span className={styles.spacer} />
+          <Button onClick={onClose} disabled={busy}>閉じる</Button>
+          <Button variant={preparing ? 'secondary' : 'primary'} busy={busy} busyLabel="変更中…" widthReserve="idle" disabled={preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onHandOver}>
+            受け渡し済みにする
+          </Button>
+        </>
+      )
+    }
     return <Button onClick={onClose}>閉じる</Button>
   })()
 
@@ -226,7 +245,11 @@ export function OrderDetailDialog({
       ) : null}
       {order ? (
         <>
-          {preparing ? <Notice tone="info" density="compact">{`Uber Eats の注文の連携は${PREPARING_WORD}です。受け付け・拒否・キャンセル・準備完了の操作はまだ利用できません。注文内容と履歴は確認できます。`}</Notice> : null}
+          {preparing ? (
+            <Notice tone="info" density="compact">{`この店舗では Uber Eats の個別注文操作をまだ利用できません。注文内容と履歴は確認できます。`}</Notice>
+          ) : uberOrder ? (
+            <Notice tone="info" density="compact">Uber Eats の準備完了・受け渡し済みは、店舗内の進行記録として更新します。</Notice>
+          ) : null}
           <div className={styles.detailHead}>
             <span className={styles.orderNumber}>{formatOrderNumber(order.orderNumber)}</span>
             {/*

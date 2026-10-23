@@ -12,6 +12,7 @@ import { canTransitionOrder, isDeliveryService, judgeUrgency, nowSec } from '../
 import type { DeliveryOrderStatus } from '../services/restaurant-delivery.js';
 import type { DeliveryService } from '../services/delivery-service-types.js';
 import { cookingCountFor } from './restaurant-delivery-common.js';
+import { handleUberWebhook } from '../features/uber-delivery/index.js';
 
 export function registerDeliveryWebhooks(restaurantDelivery: Hono<Env>): void {
   // ---------- 受信（各サービスの公式窓口からの通知） ----------
@@ -196,6 +197,7 @@ export function registerDeliveryWebhooks(restaurantDelivery: Hono<Env>): void {
     } catch {
       return c.json({ success: false, error: 'Invalid JSON' }, 400);
     }
+    if (service === 'ubereats') return handleUberWebhook(c, parsedJson, rawBody, now);
     const parsed = parseWebhookPayload(parsedJson, now);
     if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
     const payload = parsed.payload;

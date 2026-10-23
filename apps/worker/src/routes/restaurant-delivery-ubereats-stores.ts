@@ -78,14 +78,21 @@ async function uberMarkConnectionError(
       .prepare(
         `UPDATE rt_delivery_uber_connections
             SET last_error = ?, status = ?, version = version + 1, updated_at = ?
-          WHERE store_id = ? AND COALESCE(last_error, '') NOT IN ('pos_activation_started', 'pos_activation_unknown')`,
+          WHERE store_id = ? AND COALESCE(last_error, '') NOT IN
+            ('pos_activation_started', 'pos_activation_unknown', 'pos_deactivation_started', 'pos_deactivation_unknown',
+             'pos_disconnect_reauthorization_pending',
+             'store_provision_review_required', 'store_menu_refresh_review_required')`,
       )
       .bind(code, status, now, storeId)
       .run();
     return;
   }
   await db
-    .prepare("UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ? AND COALESCE(last_error, '') NOT IN ('pos_activation_started', 'pos_activation_unknown')")
+    .prepare(`UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ?
+      AND COALESCE(last_error, '') NOT IN
+        ('pos_activation_started', 'pos_activation_unknown', 'pos_deactivation_started', 'pos_deactivation_unknown',
+         'pos_disconnect_reauthorization_pending',
+         'store_provision_review_required', 'store_menu_refresh_review_required')`)
     .bind(code, now, storeId)
     .run();
 }
@@ -108,7 +115,12 @@ async function uberMerchantToken(
     )
     .bind(storeId)
     .first<UberTokenRow>();
-  if (posActivationUnresolved(row?.last_error)) return { ok: false, code: POS_ACTIVATION_UNKNOWN };
+  if (posActivationUnresolved(row?.last_error)
+    || row?.last_error === 'pos_deactivation_started'
+    || row?.last_error === 'pos_deactivation_unknown'
+    || row?.last_error === 'pos_disconnect_reauthorization_pending'
+    || row?.last_error === 'store_provision_review_required'
+    || row?.last_error === 'store_menu_refresh_review_required') return { ok: false, code: POS_ACTIVATION_UNKNOWN };
   if (!row?.access_token_enc || row.status === 'disconnected') {
     return { ok: false, code: 'not_connected' };
   }

@@ -15,7 +15,7 @@
  */
 
 import { PackageX, Pause, RefreshCw } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
@@ -81,7 +81,7 @@ const REFRESH_MS = 30_000
 const PAGE_META: Record<DeliveryView, { title: string; description: string }> = {
   orders: {
     title: 'デリバリー受注',
-    description: '保存済みの注文を確認できます。Uber Eats の注文の取り込みと操作はまだ利用できません',
+    description: '保存済みの注文を確認し、利用可能なサービスの注文を操作できます',
   },
   history: {
     title: '注文履歴・売上',
@@ -98,7 +98,7 @@ function DeliveryInner() {
   const samePageUrl = useSamePageUrl()
   const { selectedAccountId, setSelectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
-  const preparing = usePreparingDialog({ note: '接続の完了とは別の機能です。注文の取り込み・受ける・断る・取消・準備完了・営業状態の変更・メニュー同期はまだ利用できません。保存済みの注文や商品、過去の履歴は確認できます。' })
+  const preparing = usePreparingDialog({ note: 'Uber Eats の個別注文操作は、一覧で利用可能と確認できた店舗で使えます。営業状態の変更・メニュー同期・一括受付はまだ利用できません。' })
   /* 閲覧のみの人には送るボタンを置かず、閲覧のみの帯を出す（Worker側の 403 が最後の守り）。役割を読み込む前も置かない。 */
   const canManage = role !== null && canManageRole(role)
   // 接続情報の読み口も管理者専用。閲覧のみでは照会せず、接続未確認として扱う。
@@ -121,6 +121,8 @@ function DeliveryInner() {
 
   /* ── 注文一覧（kDQHr） ───────────────────────────────────── */
   const [data, setData] = useState<DeliveryOrdersData | null>(null)
+  const [dataAccountId, setDataAccountId] = useState<string | null>(null)
+  const ordersRequestId = useRef(0)
   const [stores, setStores] = useState<RestaurantStore[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -136,6 +138,8 @@ function DeliveryInner() {
 
   /* ── 注文の詳細（hjdqV）とキャンセル（dgeTy） ─────────────── */
   const [detail, setDetail] = useState<DeliveryOrderDetailData | null>(null)
+  const [detailAccountId, setDetailAccountId] = useState<string | null>(null)
+  const detailRequestId = useRef(0)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailBusy, setDetailBusy] = useState(false)
@@ -188,6 +192,8 @@ function DeliveryInner() {
    * 失敗したときは最後に読めた時刻をそのまま残し、古い数字を今の数字に見せない。
    */
   const loadOrders = useCallback(async (silent = false) => {
+    const requestId = ++ordersRequestId.current
+    setDataAccountId(null)
     if (!selectedAccountId) {
       setData(null)
       setStores([])
@@ -203,18 +209,25 @@ function DeliveryInner() {
         restaurantDeliveryApi.orders(selectedAccountId, { tab }),
         restaurantTestApi.snapshot(selectedAccountId).catch(() => null),
       ])
+      if (requestId !== ordersRequestId.current) return
       setData(orders)
+      setDataAccountId(selectedAccountId)
       setStores(snapshot?.data.stores ?? [])
       setLoadedAt(Date.now())
       setError('')
     } catch (err) {
+      if (requestId !== ordersRequestId.current) return
       if (silent) return
       setData(null)
+      setDataAccountId(null)
       setError(ordersErrorText(err))
     } finally {
-      if (!silent) setLoading(false)
+      if (!silent && requestId === ordersRequestId.current) setLoading(false)
     }
   }, [selectedAccountId, tab, ordersErrorText])
+
+  const uberOrderActionsEnabled = dataAccountId === selectedAccountId
+    && data?.services.find((state) => state.service === 'ubereats')?.orderActionsEnabled === true
 
   useEffect(() => { void loadOrders() }, [loadOrders])
 
@@ -234,33 +247,45 @@ function DeliveryInner() {
   }, [tab])
 
   const loadDetail = useCallback(async (id: string, silent = false) => {
-    if (!selectedAccountId) return
+    const requestId = ++detailRequestId.current
+    setDetailAccountId(null)
+    if (!selectedAccountId) {
+      setDetail(null)
+      return
+    }
     if (!silent) {
       setDetailLoading(true)
       setDetailError(null)
     }
     try {
       const next = await restaurantDeliveryApi.order(selectedAccountId, id)
+      if (requestId !== detailRequestId.current) return
       setDetail(next)
+      setDetailAccountId(selectedAccountId)
       setDetailError(null)
     } catch (err) {
+      if (requestId !== detailRequestId.current) return
       if (silent) return
       setDetail(null)
+      setDetailAccountId(null)
       setDetailError(errorMessage(err, '注文を読み込めませんでした。'))
     } finally {
-      if (!silent) setDetailLoading(false)
+      if (!silent && requestId === detailRequestId.current) setDetailLoading(false)
     }
   }, [selectedAccountId])
 
   useEffect(() => {
     if (!orderId) {
       setDetail(null)
+      setDetailAccountId(null)
       setDetailError(null)
       setCancelOpen(false)
       return
     }
     void loadDetail(orderId)
   }, [orderId, loadDetail])
+
+  const currentDetail = detailAccountId === selectedAccountId ? detail : null
 
   const loadHistory = useCallback(async () => {
     if (!selectedAccountId) return
@@ -339,8 +364,14 @@ function DeliveryInner() {
     successText: string,
     fallback: string,
   ) => {
-    const order = data?.orders.find((item) => item.id === id) ?? (detail?.order.id === id ? detail.order : null)
-    if (!canManage || !selectedAccountId || !order || order.service === 'ubereats') return
+    const order = data?.orders.find((item) => item.id === id)
+      ?? (currentDetail?.order.id === id ? currentDetail.order : null)
+    if (
+      !canManage
+      || !selectedAccountId
+      || !order
+      || (order.service === 'ubereats' && !uberOrderActionsEnabled)
+    ) return
     setBusyOrderId(id)
     setDetailBusy(true)
     setNotice(null)
@@ -355,7 +386,7 @@ function DeliveryInner() {
       setBusyOrderId(null)
       setDetailBusy(false)
     }
-  }, [canManage, data, detail, selectedAccountId, loadOrders, loadDetail, orderId])
+  }, [canManage, data, currentDetail, selectedAccountId, uberOrderActionsEnabled, loadOrders, loadDetail, orderId])
 
   const acceptOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
     void runOrderAction(
@@ -381,6 +412,15 @@ function DeliveryInner() {
       restaurantDeliveryApi.ready,
       '準備完了にしました。',
       '準備完了にできませんでした。',
+    )
+  }, [runOrderAction])
+
+  const handOverOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
+    void runOrderAction(
+      order.id,
+      restaurantDeliveryApi.handOver,
+      '受け渡し済みにしました。',
+      '受け渡し済みにできませんでした。',
     )
   }, [runOrderAction])
 
@@ -420,8 +460,13 @@ function DeliveryInner() {
   }, [canManage, selectedAccountId, selected, data, loadOrders])
 
   const submitCancel = useCallback(async () => {
-    const order = detail?.order
-    if (!canManage || !selectedAccountId || !order || order.service === 'ubereats') return
+    const order = currentDetail?.order
+    if (
+      !canManage
+      || !selectedAccountId
+      || !order
+      || (order.service === 'ubereats' && !uberOrderActionsEnabled)
+    ) return
     setCancelBusy(true)
     setCancelError(null)
     try {
@@ -435,7 +480,7 @@ function DeliveryInner() {
     } finally {
       setCancelBusy(false)
     }
-  }, [canManage, selectedAccountId, detail, cancelReason, loadOrders, closeDetail])
+  }, [canManage, selectedAccountId, currentDetail, cancelReason, uberOrderActionsEnabled, loadOrders, closeDetail])
 
   /* ── 受付の停止・再開 ───────────────────────────────────── */
   const openStop = useCallback((service?: DeliveryService) => {
@@ -654,6 +699,7 @@ function DeliveryInner() {
         busyOrderId={busyOrderId}
         busyService={busyService}
         canManage={canManage}
+        uberOrderActionsEnabled={uberOrderActionsEnabled}
         nowMs={nowMs}
         selected={selected}
         bulkBusy={bulkBusy}
@@ -670,6 +716,7 @@ function DeliveryInner() {
         onAccept={acceptOrder}
         onReject={rejectOrder}
         onReady={readyOrder}
+        onHandOver={handOverOrder}
         onStopService={(service) => openStop(service)}
         onResumeService={(service) => { void resumeService(service) }}
         onPage={setPage}
@@ -730,7 +777,7 @@ function DeliveryInner() {
     />
   ) : ordersBody
 
-  const detailOrder = detail?.order ?? null
+  const detailOrder = currentDetail?.order ?? null
 
   return (
     <RestaurantPage
@@ -743,7 +790,7 @@ function DeliveryInner() {
       {role !== null && !canManage ? <ReadOnlyNotice /> : null}
       <BoundaryBanner note="デリバリー3社とは検証用の接続・本番の注文は流れません" />
 
-      <Button onClick={() => preparing.open('Uber Eats の注文の連携')}>{`Uber Eats の注文の連携は${PREPARING_WORD}`}</Button>
+      <Button onClick={() => preparing.open('Uber Eats の営業状態変更・メニュー同期')}>{`Uber Eats の営業状態変更・メニュー同期は${PREPARING_WORD}`}</Button>
 
       {notice ? (
         <Notice tone={notice.tone} density="compact" onClose={() => setNotice(null)}>
@@ -764,14 +811,16 @@ function DeliveryInner() {
         open={Boolean(orderId) && !cancelOpen}
         loading={detailLoading}
         error={detailError}
-        detail={detail}
+        detail={currentDetail}
         busy={detailBusy}
         canManage={canManage}
+        uberOrderActionsEnabled={uberOrderActionsEnabled}
         onClose={closeDetail}
         onRetry={() => { if (orderId) void loadDetail(orderId) }}
         onAccept={() => { if (detailOrder) acceptOrder(detailOrder) }}
         onReject={() => { if (detailOrder) rejectOrder(detailOrder) }}
         onReady={() => { if (detailOrder) readyOrder(detailOrder) }}
+        onHandOver={() => { if (detailOrder) handOverOrder(detailOrder) }}
         onCancelOrder={() => {
           setCancelReason('out_of_stock')
           setCancelError(null)
