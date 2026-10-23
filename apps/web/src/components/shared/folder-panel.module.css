@@ -30,7 +30,7 @@
   display: flex; justify-content: flex-start; width: fit-content;
   height: auto; min-height: 0; padding: 6px 10px; gap: 6px;
   border: 0; border-radius: 0; background: transparent; box-shadow: none;
-  font-size: 13px; font-weight: 600; color: var(--color-action);
+  font-size: 13px; font-weight: 600; color: var(--color-ink);
 }
 :root .footer { font-size: 11px; line-height: 17px; color: var(--color-ink-faint); }
 

@@ -514,7 +514,7 @@
   max-width: 85%;
   padding: 10px 12px;
   border-radius: var(--v8-line-bubble-out-radius);
-  background: var(--color-action);
+  background: var(--color-accent-deep);
   color: var(--color-canvas);
   font-size: 13px;
   line-height: 1.6;

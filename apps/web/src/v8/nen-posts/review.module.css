@@ -28,7 +28,6 @@
 
 /* 数の帯の数字は絵どおりの字幅（等幅の数字にすると「1 枚」の単位が右へずれる）。 */
 .stats :global([data-kpi-number]) {
-  font-variant-numeric: normal;
 }
 
 /* 数の帯の右上の「…」：由来の説明を title で見せる印（絵の 16 角）。 */

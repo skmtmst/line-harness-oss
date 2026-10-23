@@ -491,3 +491,7 @@
 @media (prefers-reduced-motion: reduce) {
   :root .railTip { animation: none; }
 }
+
+/* 組の見出しは小さな灰色。畳んだ帯の吹き出しは既存のまま。 */
+:root .sectionHeading, :root .sectionToggle { color: var(--color-ink-secondary); font-size: var(--polish-text-note); font-weight: var(--polish-control-weight); letter-spacing: var(--polish-nav-tracking); }
+:root .sectionChevron { width: var(--polish-icon-small); height: var(--polish-icon-small); color: var(--color-ink-faint); stroke-width: var(--polish-icon-stroke); }

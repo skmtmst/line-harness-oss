@@ -134,6 +134,6 @@
   flex-shrink: 0;
   width: var(--tpl-hq2-switch-icon);
   height: var(--tpl-hq2-switch-icon);
-  color: var(--color-accent-deep);
+  color: var(--color-ink);
 }
 }

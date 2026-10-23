@@ -107,7 +107,7 @@ html:root .table:is([data-table-presentation='dashboard'], [data-table-presentat
 html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .cell[data-align='right'] {
   align-items: flex-end;
 }
-html:root .table[data-table-presentation='dashboard'] .row[data-selected] { background: var(--color-accent-soft); }
+html:root .table[data-table-presentation='dashboard'] .row[data-selected] { background: var(--polish-selection-bg); }
 /* 分析の列幅は見出しと全行の内容から一度だけ決める。 */
 html:root .table[data-table-presentation='metrics'] { display: grid; grid-template-columns: var(--grid-table-columns); }
 html:root .table[data-table-presentation='metrics'] .row { display: contents; }
@@ -125,3 +125,10 @@ html:root .table[data-table-presentation='metrics'] .row[data-head] > :last-chil
 
 html:root .cell[data-list-action-cell] { display: flex; align-items: center; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }
 html:root .cell[data-tone='danger'] { color: var(--color-danger); }
+
+html:root .table [data-list-name-cell] { font-weight: var(--polish-value-weight); }
+html:root .row[data-head] { background: var(--color-canvas); border-block-start: 0; font-size: var(--polish-text-support); font-weight: var(--polish-control-weight); }
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row[data-head] { border-radius: 0; border-block-end: 1px solid var(--color-hairline); }
+html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row[data-head] .cell { font-size: var(--polish-text-support); font-weight: var(--polish-control-weight); }
+
+:root .row:not([data-head]):hover { background: var(--polish-table-hover); box-shadow: var(--shadow-row-line), var(--polish-band-shadow); }

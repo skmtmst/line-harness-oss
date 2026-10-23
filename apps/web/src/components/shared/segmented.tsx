@@ -145,6 +145,7 @@ export default function SegmentedControl<T extends string>({
           className={[styles.item, option.value === value ? styles.selected : null]
             .filter(Boolean)
             .join(' ')}
+          data-part={appearance === 'track' ? 'joined-segment' : undefined}
           aria-label={option.ariaLabel}
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}

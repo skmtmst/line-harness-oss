@@ -8,7 +8,6 @@
 .createWide { width: 100%; }
 
 /* 数の帯の数字は字の幅どおり（絵どおり。全体の既定は等幅）。 */
-.kpis [data-kpi-number] { font-variant-numeric: proportional-nums; }
 
 /* 見るだけの人への帯。数の帯の上。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-rml-ro-after); }

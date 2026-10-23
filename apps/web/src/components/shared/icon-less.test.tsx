@@ -11,7 +11,7 @@ afterEach(() => {
 
 /**
  * 図柄なしの形（ の選ぶ箱・ の数のマス。絵は題＋説明／数だけ）。
- * `icon={null}` で図柄を消す。省略時は今までどおり既定の図柄。
+ * 図柄を指定しないときは、題と値だけを表示する。
  */
 describe('図柄なしの形', () => {
   it('RadioCard は省略時・null とも図柄なし（本線の既定：印は渡したときだけ）', () => {
@@ -27,13 +27,14 @@ describe('図柄なしの形', () => {
     expect(screen.getByText('はい')).toBeTruthy()
   })
 
-  it('KpiCard は省略時に数のマスの標準Inbox・null で図柄なし', () => {
-    const { container, unmount } = render(<KpiCard title="対応が必要" value="3" unit="件" />)
-    expect(container.querySelector('[class*="icon"]')).not.toBeNull()
-    expect(container.querySelector('[data-kpi-icon] .lucide-inbox')).not.toBeNull()
+  it('KpiCard は省略時・null とも図柄なしで題と値を保つ', () => {
+    const { container, unmount } = render(<KpiCard title="対応が必要" value={3} unit="件" />)
+    expect(container.querySelector('[data-kpi-icon]')).toBeNull()
+    expect(screen.getByText('3')).toBeTruthy()
     unmount()
-    const none = render(<KpiCard title="対応が必要" value="3" unit="件" icon={null} />)
+    const none = render(<KpiCard title="対応が必要" value={3} unit="件" icon={null} />)
     expect(none.container.querySelector('p [class*="icon"]')).toBeNull()
     expect(screen.getByText('対応が必要')).toBeTruthy()
+    expect(screen.getByText('3')).toBeTruthy()
   })
 })

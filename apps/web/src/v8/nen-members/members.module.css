@@ -9,7 +9,6 @@
   border-block: 1px solid var(--color-hairline);
 }
 .band [data-kpi-number] {
-  font-variant-numeric: normal;
 }
 /* 数の帯の「…」は枠なしの小さな印（絵の 16 の印）。共通の枠つき 36 を外す。 */
 /* 枠の線（outline）も外す。キーボードで選んだときの輪は残す。 */

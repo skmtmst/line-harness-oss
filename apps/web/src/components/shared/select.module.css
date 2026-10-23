@@ -208,3 +208,12 @@ html:root .content { width: var(--list-select-content-width, max-content); min-w
 html:root .content .trigger { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); max-width: none; }
 
 :root .root[data-select-icon-only] { width: var(--select-menu-field-h); min-width: var(--select-menu-field-h); flex: none; }
+
+/* 選択欄は線なしの灰色。文字だけ・状態の札の口は保つ。 */
+:root .trigger:not(.textTrigger):not([data-tone]) {
+  outline: none; border: 0; box-shadow: none; background: var(--polish-control-bg);
+  font-size: var(--polish-control-text); font-weight: var(--polish-control-weight);
+}
+:root .trigger:not(.textTrigger):not([data-tone]):hover:not(:disabled) { background: var(--polish-control-hover); }
+:root .invalid .trigger:not(.textTrigger) { outline: 1px solid var(--color-danger); outline-offset: -1px; }
+:root .leadingIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }

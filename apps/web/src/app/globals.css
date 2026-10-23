@@ -65,10 +65,10 @@
   --color-accent-deep: #087a3e;
   --color-on-accent: #ffffff;
 
-  /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
-  --color-action: var(--color-accent-deep);
-  --color-action-hover: var(--color-accent);
-  --color-action-soft: var(--color-accent-soft);
+  /* 文字の操作は濃い字。主ボタンと成功は専用の緑を使う。 */
+  --color-action: var(--color-ink);
+  --color-action-hover: var(--color-ink);
+  --color-action-soft: var(--polish-selection-bg);
   --color-focus-ring: var(--polish-focus);
   --color-on-action: #ffffff;
 
@@ -478,7 +478,7 @@
   --color-notice-warning-bg: #fff7e6;
   --color-notice-danger-bg: #fef0f0;
   --color-menu-danger: #e5484d;
-  --color-link: var(--color-accent-deep);
+  --color-link: var(--color-ink);
   --color-checkbox-line: #dadde2;
   --radius-checkbox-mark: 3px;
   --text-callout: 14px;
@@ -529,7 +529,7 @@
   --tpl-select-inset: 12px;
   --tpl-select-gap: 8px;
   --tpl-select-page-size: 112px;
-  --polish-icon-heading: 20px;
+  --polish-icon-heading: 18px;
   --polish-icon-empty: 40px;
   --polish-icon-stroke: 1.75;
 }
@@ -545,27 +545,27 @@
   --polish-status-gap: 8px;
   --polish-status-pad: 2px 8px;
   --polish-status-success-dot: #16a34a;
-  --polish-status-success-bg: #16a34a1a;
-  --polish-status-success-ink: #087a3e;
+  --polish-status-success-bg: var(--color-canvas);
+  --polish-status-success-ink: var(--color-ink);
   --polish-status-warning-dot: #f97316;
-  --polish-status-warning-bg: #f973161a;
+  --polish-status-warning-bg: var(--color-canvas);
   --polish-status-warning-ink: #c2410c;
   --polish-status-danger-dot: #ef4444;
-  --polish-status-danger-bg: #ef44441a;
+  --polish-status-danger-bg: var(--color-canvas);
   --polish-status-danger-ink: #b91c1c;
   --polish-status-info-dot: #2563eb;
-  --polish-status-info-bg: #2563eb1a;
-  --polish-status-info-ink: #1d4ed8;
+  --polish-status-info-bg: var(--color-canvas);
+  --polish-status-info-ink: var(--color-ink);
   --polish-status-neutral-dot: #94a3b8;
-  --polish-status-neutral-bg: #94a3b81a;
-  --polish-status-neutral-ink: #475569;
+  --polish-status-neutral-bg: var(--color-canvas);
+  --polish-status-neutral-ink: var(--color-ink);
 }
 :root {
   --polish-table-row: 56px;
   --polish-table-head: 40px;
   --polish-table-number-gap: 24px;
-  --polish-table-head-bg: #f7f8fa;
-  --polish-table-hover: #1d1d1f05;
+  --polish-table-head-bg: var(--color-canvas);
+  --polish-table-hover: var(--color-canvas);
 }
 :root {
   --polish-text-page: 22px;
@@ -1407,13 +1407,13 @@
   --tpl-rml-blocker-pad: 9px 0; --tpl-rml-blocker-gap: 8px; --tpl-rml-blocker-lh: 17px; --tpl-rml-dlg-w: 600px; --tpl-rml-dlg-pad: 24px; --tpl-rml-dlg-gap: 14px; --tpl-rml-dlg-top: 240px; --tpl-rml-dlg-title-size: var(--polish-text-section); --tpl-rml-dlg-title-lh: 25px; --tpl-rml-dlg-desc-lh: 22px; --tpl-rml-icon-btn: 28px; --tpl-rml-notice-after: var(--polish-space-row); --tpl-rml-grip-w: 14px; --tpl-rml-row-line: inset 0 -1px 0 var(--color-divider);
   --tpl-rml-ext-max-w: 1584px; --tpl-rml-ext-side-w: 430px; --tpl-rml-ext-thumb-w: 48px; --tpl-rml-ext-col-a: 100px; --tpl-rml-ext-col-b: 110px; --tpl-rml-ext-col-c: 120px; --tpl-rml-ext-area-w: 24px; --tpl-rml-ext-ratio-large: 2500 / 1686; --tpl-rml-ext-ratio-compact: 2500 / 843;
   --tpl-band-gap: 0;
-  --tpl-band-line: rgb(0 0 0 / 0.07);
+  --tpl-band-line: rgb(29 29 31 / 0.04);
   --tpl-band-compact-number-size: 20px; --tpl-band-compact-number-lh: 24px;
   --tpl-viewer-create-space-h: 36px; --tpl-viewer-create-space-col-h: 49px; --tpl-viewer-folder-add-space: 17px; /* 閲覧のみで隠した作るボタンの高さ（場所だけ空ける）。列の上に直接置く画面はボタンの下の間 13 も含める */
   /* 自動応答の一覧（・・）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: var(--polish-table-row); --tpl-ar-narrow-head-h: 34px; --tpl-badge-dot: 6px;
   --tpl-ro-band-pad: 12px 16px; --tpl-ro-band-gap: 12px; --tpl-ro-band-bg: #e9f1ff; --tpl-ro-band-radius: var(--polish-radius-control); --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
-  --tpl-band-number-size: 22px; --tpl-band-number-lh: 26px; --tpl-band-unit-lh: 18px;
+  --tpl-band-number-size: 32px; --tpl-band-number-lh: 38px; --tpl-band-unit-lh: 18px;
   /* 外部連携（・・・・・・・）。 */
   --tpl-wh-ro-row-pad: 12px 24px; --tpl-wh-notice-after: 6px; --tpl-wh-saved-w: 153px; --tpl-wh-create-w: 135px; --tpl-wh-create-after: 16px; --tpl-wh-add-space: 31px; --tpl-wh-note-lh: 17px;
   --tpl-wh-col-gap: 16px; --tpl-wh-head-h: var(--polish-table-head); --tpl-wh-head-pad: 13px 20px; --tpl-wh-row-h: var(--polish-table-row); --tpl-wh-row-pad: 9px 20px; --tpl-wh-num-pad-end: 8px;
@@ -3010,7 +3010,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-dialog-title-weight: 700;
   --tpl-tabs-h: 36px;
   --tpl-tabs-weight: 500;
-  --tpl-tabs-current-weight: 600;
+  --tpl-tabs-current-weight: 500;
   --tpl-badge-h: 22px;
   --tpl-tag-pill-h: 24px;
   --tpl-section-title-size: 15px;
@@ -3191,3 +3191,25 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 :root { --tpl-layout-zero: 0; --tpl-layout-auto: auto; --tpl-layout-full: 100%; --tpl-layout-relaxed: 1.6; }
 
 :root { --tpl-sender-icon: 32px; --tpl-sender-row: 48px; --tpl-sender-tile: 88px; --tpl-sender-icon-text: 13px; --tpl-sender-note-lh: 18px; --tpl-sender-outline: 2px; }
+
+/* 操作・ラベル・数の役割を共通の値でそろえる。 */
+:root {
+  --polish-control-bg: #f0f0f2;
+  --polish-control-hover: #e8e8eb;
+  --polish-control-text: 13px;
+  --polish-control-weight: 500;
+  --polish-value-weight: 600;
+  --polish-selection-bg: #f0f0f2;
+  --polish-selection-ink: var(--color-ink);
+  --polish-selection-shadow: var(--shadow-nav-active);
+  --polish-selection-outline: 1px solid var(--color-control-border);
+  --polish-band-radius: 16px;
+  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06);
+  --polish-nav-tracking: 0.06em;
+  --polish-icon-small: 14px;
+  --polish-icon-large: 18px;
+}
+/* 複合部品や画面が渡す線幅も、同じlucideの値へそろえる。 */
+:root svg.lucide { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
+
+html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][data-align='right']) { font-variant-numeric: tabular-nums; }

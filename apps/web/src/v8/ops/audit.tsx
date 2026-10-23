@@ -1,6 +1,8 @@
 'use client'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Download } from 'lucide-react'
+
+import { CircleDot, Download } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
@@ -139,6 +141,13 @@ export default function OpsAuditV8() {
       <div className={parts.stack}>
         <div className={styles.tools}>
           <Tabs size="compact" wrap label="監査ログの種類" items={[{ key: '', label: 'すべて' }, ...FILTERS].map(item => ({ label: item.label, count: counts[item.key], current: filter === item.key, onClick: () => { setFilter(item.key); setPage(1); setEntry(null) } }))} />
+
+          <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => { setFilter(''); setPage(1) }}>すべて</FilterChip>
+          {FILTERS.map((f) => (
+            <FilterChip key={f.key} selected={filter === f.key} onChange={(selected) => { setFilter(selected ? f.key : ''); setPage(1) }}>
+              {f.label}
+            </FilterChip>
+          ))}
           <span className={styles.spacer} />
           <div className={styles.dateGroup} role="group" aria-label="開始日"><span className={styles.dateLabel}>開始日</span><span className={styles.date}>
             <SaveErrorField names={["from"]}><DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" placeholder="指定なし" displayFormat="short" /></SaveErrorField>

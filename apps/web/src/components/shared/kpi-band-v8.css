@@ -147,3 +147,16 @@ html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='ba
   /* 複数段だけは、各帯の既定の自動列より優先して最後の段も同じ列幅にする。 */
   :root [data-shared-part='kpi-band-rows'] > [data-kpi-strip][data-kpi-presentation='band'] { grid-auto-flow: row; grid-template-columns: repeat(var(--kpi-band-row-columns), minmax(0, 1fr)); }
 }
+
+/* 数の帯は白い一枚の面。縦の薄い線だけを残す。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-border] {
+  border: 0; border-radius: var(--polish-band-radius); background: var(--color-canvas);
+  box-shadow: var(--polish-band-shadow);
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-icon] { display: none; }
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] { color: var(--color-ink-secondary); font-weight: var(--polish-control-weight); }
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:first-child { padding-inline-start: var(--tpl-list-inset); }
+html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:last-child { padding-inline-end: var(--tpl-list-inset); }
+
+html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { background: transparent; }

@@ -98,3 +98,13 @@
   border-radius: var(--radius-pill);
   background: var(--color-status-info);
 }
+
+/* 色の意味を持つ札だけを状態の点と文字へ寄せ、分類の中立タグは保つ。 */
+:root .chip:not(.neutral) { align-items: center; gap: var(--polish-status-gap); outline: none; background: var(--color-canvas); color: var(--color-ink); font-weight: var(--polish-status-weight); }
+:root .chip:not(.neutral)::before { content: ''; width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex: 0 0 var(--polish-status-dot-size); border-radius: var(--radius-pill); }
+:root .chip.info::before { background: var(--polish-status-info-dot); }
+:root .chip.ok::before { background: var(--polish-status-success-dot); }
+:root .chip.warn::before { background: var(--polish-status-warning-dot); }
+:root .chip.danger::before { background: var(--polish-status-danger-dot); }
+:root .chip.warn { color: var(--polish-status-warning-ink); }
+:root .chip.danger { color: var(--polish-status-danger-ink); }

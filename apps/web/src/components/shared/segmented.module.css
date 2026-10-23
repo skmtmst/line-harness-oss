@@ -179,3 +179,14 @@ html:root .root:is([data-appearance='choices'], [data-appearance='reservation'],
 html:root .root:is([data-appearance='choices'], [data-appearance='reservation']) .thumb { border-radius: var(--radius-pill); }
 
 html:root .root .item:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
+/* 表示を切り替える帯は白いつまみ。離れた選択札の意味色は別に保つ。 */
+:root .root[data-appearance='track'] .thumb { background: var(--color-canvas); box-shadow: var(--shadow-segment-thumb); }
+:root .root[data-appearance='track'] .selected { background: transparent; color: var(--color-ink); box-shadow: none; }
+:root .root[data-appearance='track'] .selected:not(:focus-visible) { outline: none; }
+:root .root[data-appearance='track'] .item:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+
+/* 切り替え帯は白いつまみ一枚で現在地を示す。 */
+html:root .root[data-appearance="track"] .thumb { background: var(--color-canvas); outline: none; box-shadow: var(--shadow-segment-thumb); }
+html:root .root[data-appearance="track"] .selected { color: var(--color-ink); background: transparent; outline: none; box-shadow: none; }
+html:root .root[data-appearance="track"] .item:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }

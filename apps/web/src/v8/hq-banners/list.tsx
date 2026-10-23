@@ -694,7 +694,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
         <ListToolbar search={{placeholder:'テキスト・指示で探す',label:'テキスト・指示で探す',value:query,onChange:(value)=>{setQuery(value);resetPage()}}}
           filters={<><ViewChips chips={viewChips} active={view} onChange={(next) => selectView((next ?? 'all') as LibraryView)} /><ResponsiveFilterChips label="用途">
             <FilterChip selected={shape === null} icon={<CircleDot size={14} aria-hidden="true" />} onChange={()=>{setShape(null);resetPage()}}>すべて</FilterChip>
-            {SHAPE_FILTERS.map((item) => <FilterChip key={item.key} selected={shape === item.key} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => {setShape(on ? item.key : null);resetPage()}}>{item.label}</FilterChip>)}
+            {SHAPE_FILTERS.map((item) => <FilterChip key={item.key} selected={shape === item.key} onChange={(on) => {setShape(on ? item.key : null);resetPage()}}>{item.label}</FilterChip>)}
           </ResponsiveFilterChips></>}
           trailing={<span>並び：作成が新しい順</span>} />
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
