@@ -3103,7 +3103,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --color-code-bg: #f5f6f8;
   --color-code-border: #e5e7eb;
   --color-choice-border: #c9ced6;
-  --choice-size: 16px; --choice-checkbox-radius: 4px;
+  --choice-size: 16px; --choice-checkbox-radius: 4px; --polish-choice-ring: 1px; --polish-choice-border: #8b929e; --polish-choice-mark-stroke: 2;
   --choice-ring: 1.5px;
   --choice-dot: 8px;
   --choice-card-ring: 2px;

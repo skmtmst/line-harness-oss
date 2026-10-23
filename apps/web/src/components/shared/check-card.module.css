@@ -63,7 +63,7 @@
 .mark path {
   fill: none;
   stroke: var(--color-canvas);
-  stroke-width: 1.8;
+  stroke-width: var(--polish-choice-mark-stroke);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: 14;
@@ -110,7 +110,7 @@
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
 :root .checked, :root .checked:hover { outline-color: var(--color-accent-deep); }
-:root .box { border: 0; border-radius: var(--polish-radius-small); outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
+:root .box { border: 0; border-radius: var(--choice-checkbox-radius); outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); }
 :root .box:checked { outline-color: var(--color-accent-deep); }
 :root .box:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
 :root .body { display: flex; flex: 1; flex-direction: column; gap: 2px; }
@@ -179,7 +179,7 @@ html:root .invalid { outline-color: var(--color-danger); }
 /* 単独の確認行（・ の担当の札）：上の共通の内側16（--tpl-card-pad）に負けないよう、高さ36・内側 8/10・印は真ん中。 */
 html:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; }
 /* 箱は行の高さ（24）の中で下へ落ちないよう、包みの中で塊として置く（印と箱の位置をそろえる）。 */
-html:root .box { display: block; }
+html:root .card .box.box { display: block; border: 0; border-radius: var(--choice-checkbox-radius); background-image: none; }
 
 /* 箱と説明のかたまりを、カードの高さの中央にそろえる。 */
 html:root .card { align-items: center; }

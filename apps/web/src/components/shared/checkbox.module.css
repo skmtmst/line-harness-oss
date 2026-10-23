@@ -180,11 +180,11 @@
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .label { line-height: 20px; font-weight: 400; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-:root .box { border: 0; border-radius: var(--polish-radius-small); outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
+:root .box { border: 0; border-radius: var(--polish-radius-small); outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); }
 :root .input:checked + .box, :root .input:indeterminate + .box { outline-color: var(--color-accent-deep); }
 :root .input[aria-invalid='true']:not(:checked) + .box { outline-color: var(--color-status-danger); }
 :root .input:focus-visible + .box { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
-:root .mark { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
+:root .mark { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-choice-mark-stroke); }
 
 :root .root { gap: 8px; }
 :root .box { gap: 0; }
