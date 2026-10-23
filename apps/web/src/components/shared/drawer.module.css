@@ -400,3 +400,8 @@ html:root .heading { align-items: center; }
 html:root .panel .title:has(.headerIcon) { display: flex; align-items: flex-start; gap: var(--space-12); }
 html:root .title .headerIcon { margin-top: calc((1lh - var(--polish-window-icon-size)) / 2); }
 html:root .headingText:has(.headerIcon) .description { margin-inline-start: calc(var(--polish-window-icon-size) + var(--space-12)); }
+
+/* 説明と頭の区切り線の間を、窓と同じ段の余白にそろえる。 */
+html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order']) .header:has(.description) {
+  padding-block-end: var(--space-16);
+}

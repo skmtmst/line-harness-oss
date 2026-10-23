@@ -570,3 +570,11 @@ html:root .footer :is(button, a)[data-dialog-action='secondary']:focus-visible {
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);
 }
+
+/* 区切り線のある次の段までの余白は頭が持ち、説明の行数で変えない。 */
+html:root .panel:not([data-layout]):not([data-design-layout]) > .headerRow:has(.description):has(+ .steps),
+html:root .panel:not([data-layout]):not([data-design-layout]) > .headerRow:has(.description):has(+ .footer .actions:not([data-padding='none'])) {
+  padding-block-end: var(--space-16);
+  height: auto;
+  min-height: var(--dialog-design-header-height, 0px);
+}
