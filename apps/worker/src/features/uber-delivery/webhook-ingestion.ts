@@ -29,7 +29,10 @@ export interface UberWebhookEvent {
 
 /** 外部取得中にも変わり得る所属・有効設定・接続を、保存するSQLでも再検査する。 */
 export const UBER_STORE_ELIGIBILITY = `u.status = 'connected' AND u.provisioned_at IS NOT NULL
-  AND COALESCE(u.last_error, '') NOT IN ('pos_activation_started', 'pos_activation_unknown')
+  AND COALESCE(u.last_error, '') NOT IN ('pos_activation_started', 'pos_activation_unknown',
+    'pos_deactivation_started', 'pos_deactivation_unknown',
+    'pos_disconnect_reauthorization_pending',
+    'store_provision_review_required', 'store_menu_refresh_review_required')
   AND s.status = 'active' AND s.line_account_id = u.account_id
   AND o.status <> 'archived'
   AND a.is_active = 1 AND a.archived_at IS NULL AND a.tenant_id = o.tenant_id AND t.status = 'active'

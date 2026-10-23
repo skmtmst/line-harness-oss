@@ -116,7 +116,10 @@ export async function serviceStates(
   ).bind(store.id, store.lineAccountId).first<{
     status: string; uber_store_id: string | null; provisioned_at: number | null; last_error: string | null; connected_count: number;
   }>();
-  const uberUnresolved = uber?.last_error === 'pos_activation_started' || uber?.last_error === 'pos_activation_unknown';
+  const uberUnresolved = ['pos_activation_started', 'pos_activation_unknown',
+    'pos_deactivation_started', 'pos_deactivation_unknown',
+    'pos_disconnect_reauthorization_pending',
+    'store_provision_review_required', 'store_menu_refresh_review_required'].includes(uber?.last_error ?? '');
   const uberAmbiguous = (uber?.connected_count ?? 0) > 1;
   const uberStatus = uber?.status === 'connected' && uber.uber_store_id && uber.provisioned_at !== null && !uberUnresolved && !uberAmbiguous
     ? 'connected' as const

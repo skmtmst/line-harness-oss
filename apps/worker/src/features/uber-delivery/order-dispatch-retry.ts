@@ -43,7 +43,10 @@ const CONNECTION_JOINS = `FROM rt_delivery_uber_connections c
   JOIN tenants t ON t.id = o.tenant_id`;
 const CONNECTION_ELIGIBILITY = `c.status = 'connected' AND c.provisioned_at IS NOT NULL
   AND c.uber_store_id IS NOT NULL AND trim(c.uber_store_id) <> ''
-  AND COALESCE(c.last_error, '') NOT IN ('pos_activation_started', 'pos_activation_unknown')
+  AND COALESCE(c.last_error, '') NOT IN ('pos_activation_started', 'pos_activation_unknown',
+    'pos_deactivation_started', 'pos_deactivation_unknown',
+    'pos_disconnect_reauthorization_pending',
+    'store_provision_review_required', 'store_menu_refresh_review_required')
   AND s.status = 'active' AND s.line_account_id = c.account_id
   AND o.status <> 'archived'
   AND a.is_active = 1 AND a.archived_at IS NULL AND a.tenant_id = o.tenant_id

@@ -1209,7 +1209,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       store_id: 'store-shibuya',
       account_id: 'account-2',
       status: 'connected',
-      uber_store_name: null,
+      uber_store_id: 'uber-store-1', uber_store_name: null,
       connected_at: null,
       provisioned_at: null,
       last_error: null,
@@ -1219,14 +1219,13 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     testDb.raw
       .prepare(
         `INSERT INTO rt_delivery_uber_connections
-           (store_id, account_id, status, uber_store_name, connected_at, provisioned_at,
-            last_error, version, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+           (store_id, account_id, status, uber_store_id, uber_store_name, connected_at, provisioned_at,
+            last_error, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       )
       .run(
-        row.store_id,
-        row.account_id,
+        row.store_id, row.account_id,
         row.status,
+        row.uber_store_id,
         row.uber_store_name,
         row.connected_at,
         row.provisioned_at,
@@ -1508,11 +1507,12 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
     stubTokenEndpoint();
 
     const res = await callback({ state, code: 'auth-code' }, { cookie: state });
-    expect(resultCodeOf(res)).toBe('pending_store');
+    expect(resultCodeOf(res)).toBe('reauthorized');
 
     const rows = connectionRows();
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ status: 'pending_store', version: 2 });
+    expect(rows[0]).toMatchObject({ status: 'pending_store', uber_store_id: 'uber-store-1',
+      last_error: 'pos_disconnect_reauthorization_pending', version: 2 });
   });
 
   it('権限が足りないときは接続情報を作らず、符号だけを残す（受入条件4）', async () => {

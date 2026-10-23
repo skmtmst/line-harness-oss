@@ -41,6 +41,7 @@ interface ConnectionRow {
   connected_at: number | null;
   provisioned_at: number | null;
   disconnected_at: number | null;
+  last_error: string | null;
   version: number;
 }
 interface LifecycleEventRow {
@@ -106,7 +107,7 @@ export function parseUberStoreLifecycleNotification(raw: unknown): UberStoreLife
 
 async function exactConnection(db: D1Database, uberStoreId: string): Promise<ConnectionRow | null> {
   const rows = await db.prepare(`SELECT u.store_id, u.account_id, u.uber_store_id,
-    u.status, u.connected_at, u.provisioned_at, u.disconnected_at, u.version
+    u.status, u.connected_at, u.provisioned_at, u.disconnected_at, u.last_error, u.version
     ${LIFECYCLE_JOINS} WHERE u.uber_store_id = ? AND ${LIFECYCLE_OWNERSHIP}
       AND (SELECT COUNT(*) FROM rt_delivery_uber_connections duplicate
         WHERE duplicate.uber_store_id = u.uber_store_id) = 1 LIMIT 2`)
@@ -347,6 +348,19 @@ export async function processUberStoreLifecycleNotification(input: {
         db: input.db, connection, notice, rawBody: input.rawBody, nowSeconds, lease: currentLease(),
       });
       if (!event || !sameEvent(event, connection, notice)) return { status: 503, error: 'Connection changed' };
+    }
+    if (notice.eventType === 'store.provisioned' && connection.status === 'disconnected') {
+      if (!await finishWithoutConnection({ db: input.db, event, status: 'ignored',
+        code: 'store_lifecycle_stale', nowSeconds, lease: currentLease() })) return INTERRUPTED;
+      return { status: 200 };
+    }
+    if (notice.eventType === 'store.provisioned'
+      && (connection.last_error === 'pos_deactivation_started'
+        || connection.last_error === 'pos_deactivation_unknown'
+        || connection.last_error === 'pos_disconnect_reauthorization_pending')) {
+      if (!await finishWithoutConnection({ db: input.db, event, status: 'ignored',
+        code: 'pos_deactivation_unresolved', nowSeconds, lease: currentLease() })) return INTERRUPTED;
+      return { status: 200 };
     }
 
     const eventMs = notice.eventTimestampSeconds * 1000;
