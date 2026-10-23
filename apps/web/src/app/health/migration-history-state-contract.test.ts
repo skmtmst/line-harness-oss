@@ -1,27 +1,67 @@
-import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+// @vitest-environment happy-dom
+import { createElement, act } from 'react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const calls = vi.hoisted(() => ({ accounts: vi.fn(), health: vi.fn(), migrations: vi.fn() }))
+vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), api: { health: { accounts: calls.accounts, getHealth: calls.health, migrations: calls.migrations } } }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+import HealthPage from './page'
 
-describe('/health のUID移行履歴状態契約', () => {
-  it('成功0件だけを「移行履歴はありません」と表示する', () => {
-    expect(PAGE).toContain("type MigrationLoadState = 'loading' | 'ready' | 'error'")
-    expect(PAGE).toContain("setMigrationLoadState('ready')")
-    expect(PAGE).toContain(") : migrations.length === 0 ? (")
-    expect(PAGE).toContain('移行履歴はありません')
+const record = (status: string, id = status) => ({
+  id, fromAccountId: 'a', toAccountId: 'b', status, migratedCount: 3, totalCount: 5,
+  createdAt: '2026-10-22T00:00:00Z', completedAt: status === 'completed' ? '2026-10-22T00:05:00Z' : null,
+})
+beforeEach(() => {
+  calls.accounts.mockResolvedValue({ success: true, data: [
+    { id: 'a', name: '移行元', channelId: 'a', isActive: true },
+    { id: 'b', name: '移行先', channelId: 'b', isActive: true },
+  ] })
+  calls.health.mockResolvedValue({ success: true, data: {} })
+  calls.migrations.mockResolvedValue({ success: true, data: [] })
+})
+afterEach(() => cleanup())
+
+describe('監視画面の移行履歴の読込状態', () => {
+  it('読込中は0件にせず、成功0件になってから空の案内を出す', async () => {
+    let resolve!: (value: unknown) => void
+    calls.migrations.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    render(createElement(HealthPage))
+    expect(await screen.findByText('移行履歴を読み込んでいます...')).toBeTruthy()
+    expect(screen.queryByText('移行履歴はありません')).toBeNull()
+    await act(async () => resolve({ success: true, data: [] }))
+    expect(await screen.findByText('移行履歴はありません')).toBeTruthy()
+    expect(screen.queryByText('移行履歴を読み込んでいます...')).toBeNull()
   })
 
-  it('成功複数件は移行履歴を描画する', () => {
-    expect(PAGE).toContain('res.success && Array.isArray(res.data)')
-    expect(PAGE).toContain('setMigrations(res.data as AccountMigration[])')
-    expect(PAGE).toContain('{migrations.map((migration) => {')
+  it('複数の履歴を元・先の名前と実際の状態・件数で表示する', async () => {
+    calls.migrations.mockResolvedValue({ success: true, data: ['pending', 'in_progress', 'completed', 'failed'].map((status) => record(status)) })
+    render(createElement(HealthPage))
+    const table = await screen.findByRole('table')
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(4)
+    for (const [index, label] of ['待機中', '移行中', '完了', '失敗'].entries()) {
+      const row = within(rows[index])
+      expect(row.getByText('移行元')).toBeTruthy()
+      expect(row.getByText('移行先')).toBeTruthy()
+      expect(within(row.getAllByRole('cell')[2]).getByText(label, { exact: true })).toBeTruthy()
+    }
+    expect(within(rows[1]).getByText('3 / 5 人')).toBeTruthy()
+    expect(screen.queryByText('移行履歴はありません')).toBeNull()
   })
 
-  it('API失敗を空表示と分け、同じ画面で再読み込みできる', () => {
-    expect(PAGE.match(/setMigrationLoadState\('error'\)/g)).toHaveLength(2)
-    expect(PAGE).toContain("migrationLoadState === 'error'")
-    expect(PAGE).toContain('移行履歴を取得できませんでした。')
-    expect(PAGE).toContain('onClick={() => void loadMigrations()}')
-    expect(PAGE).toContain('再読み込み')
+  it.each(['api', 'shape', 'network'])('%sの失敗を0件にせず、再読み込みで保存済みの履歴へ復帰する', async (failure) => {
+    if (failure === 'network') calls.migrations.mockRejectedValueOnce(new Error('offline'))
+    else calls.migrations.mockResolvedValueOnce(failure === 'api' ? { success: false, error: 'offline' } : { success: true, data: {} })
+    render(createElement(HealthPage))
+    expect(await screen.findByText('移行履歴を取得できませんでした。')).toBeTruthy()
+    expect(screen.queryByText('移行履歴はありません')).toBeNull()
+    calls.migrations.mockResolvedValueOnce({ success: true, data: [record('completed')] })
+    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+    await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
+    expect(within(screen.getByRole('table')).getByText('完了')).toBeTruthy()
+    expect(screen.queryByText('移行履歴を取得できませんでした。')).toBeNull()
+    expect(calls.migrations).toHaveBeenCalledTimes(2)
   })
 })
