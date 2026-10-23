@@ -120,7 +120,7 @@ export default function McpLogV8() {
         </ListToolbarEnd>
       </ListToolbarRow></ListToolbarFrame>}
       pagination={load.kind === 'ready' && total > size ? <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / size))} onPageChange={(next) => setUrl({ page: String(next) })} range={{ total, first: (page - 1) * size + 1, last: Math.min(total, page * size) }} /> : undefined}
-      overlays={<><LogEntryDetails entry={entry} onClose={() => setEntry(null)} /><ConfirmDialog
+      overlays={<><LogEntryDetails canCopy={permissions.see && !permissions.viewer} entry={entry} onClose={() => setEntry(null)} /><ConfirmDialog
         open={stopOpen}
         title={`「${connection?.name ?? ''}」を止めますか？`}
         description="すぐ使えなくなり、次の呼び出しから断ります。止めた人は記録に残ります。もう一度使うときは、接続を作り直します。"

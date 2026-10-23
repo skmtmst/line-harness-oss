@@ -10,6 +10,7 @@ import { notificationDestination, notificationLinkLabel } from '@/v8/notificatio
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import { formatRelative, formatYmd } from '@/lib/format'
 import { runOptimistic } from '@/lib/undoable'
+import { useStaffRole } from '@/lib/staff-role'
 
 /** 小窓に出す最大の件数（絵 mV28V）。 */
 export const BELL_POPOVER_LIMIT = 5
@@ -41,6 +42,8 @@ export default function BellNotifications({
   onUnreadChange: (count: number) => void
 }) {
   const router = useRouter()
+  const role = useStaffRole()
+  const canMarkRead = role === 'owner' || role === 'admin' || role === 'staff'
   const { open, onClose } = popover
   const [filter, setFilter] = useState<BellFilter>('all')
   const [data, setData] = useState<NotificationCenterData | null>(null)
@@ -87,7 +90,7 @@ export default function BellNotifications({
   }, [])
 
   const markRead = useCallback((item: NotificationCenterItem) => {
-    if (!accountId || !data || item.isRead) return
+    if (!canMarkRead || !accountId || !data || item.isRead) return
     const before = data
     apply({
       ...data,
@@ -100,10 +103,10 @@ export default function BellNotifications({
       revert: () => apply(before),
       failureMessage: '通知を既読にできませんでした。',
     })
-  }, [accountId, apply, data])
+  }, [accountId, apply, canMarkRead, data])
 
   const markAllRead = useCallback(() => {
-    if (!accountId || !data || data.counts.unread === 0) return
+    if (!canMarkRead || !accountId || !data || data.counts.unread === 0) return
     const before = data
     apply({
       ...data,
@@ -116,7 +119,7 @@ export default function BellNotifications({
       revert: () => apply(before),
       failureMessage: '通知をまとめて既読にできませんでした。',
     })
-  }, [accountId, apply, data])
+  }, [accountId, apply, canMarkRead, data])
 
   const shown = useMemo(() => (data ? bellOrder(data.items).slice(0, BELL_POPOVER_LIMIT) : []), [data])
   const today = formatYmd(new Date())
@@ -156,7 +159,7 @@ export default function BellNotifications({
       errorMessage={error?.message}
       onRetry={error?.retryable ? () => { void load() } : undefined}
       onSelect={select}
-      onMarkAllRead={markAllRead}
+      onMarkAllRead={canMarkRead ? markAllRead : undefined}
       onViewAll={() => { onClose(); router.push('/notifications') }}
     />
   )

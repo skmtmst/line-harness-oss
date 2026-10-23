@@ -15,12 +15,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NotificationCenterItem } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
+  role: 'owner' as string | null,
   push: vi.fn(),
   list: vi.fn(),
   markRead: vi.fn(),
   markAllRead: vi.fn(),
   toast: vi.fn(),
 }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: fixture.push }), usePathname: () => '/' }))
 vi.mock('next/link', async () => {
@@ -93,6 +95,7 @@ async function openPopover() {
 
 describe('★V8 ベルの小窓', () => {
   beforeEach(() => {
+    fixture.role = 'owner'
     document.documentElement.dataset.theme = 'v8'
     fixture.push.mockReset()
     fixture.toast.mockReset()
@@ -110,6 +113,18 @@ describe('★V8 ベルの小窓', () => {
       item('r4', { isRead: true }),
       item('u3', { eventType: 'ec.sync_failed', title: 'EC連携が止まった' }),
     ]))
+  })
+
+  it.each(['viewer', null])('権限が %s の間は既読操作を出さず、通知の移動はできる', async (role) => {
+    fixture.role = role
+    render(<Harness />)
+    const panel = await openPopover()
+    await within(panel).findByText('未読のエラー')
+    expect(within(panel).queryByRole('button', { name: 'すべて既読にする' })).toBeNull()
+    await act(async () => { fireEvent.click(within(panel).getByText('未読のエラー')) })
+    expect(fixture.markRead).not.toHaveBeenCalled()
+    expect(fixture.markAllRead).not.toHaveBeenCalled()
+    expect(fixture.push).toHaveBeenCalled()
   })
 
   afterEach(() => {

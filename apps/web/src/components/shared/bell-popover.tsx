@@ -42,7 +42,7 @@ export type BellPopoverProps = {
   errorMessage?: string
   onRetry?: () => void
   onSelect: (id: string) => void
-  onMarkAllRead: () => void
+  onMarkAllRead?: () => void
   onViewAll: () => void
 }
 
@@ -119,7 +119,7 @@ export default function BellPopover({
         <header className={styles.head}>
           <h2 className={styles.title}>お知らせ</h2>
           {state === 'ready' ? <span className={styles.unread}>{`未読 ${unreadCount}`}</span> : null}
-          {state === 'ready' ? (
+          {state === 'ready' && onMarkAllRead ? (
             <button type="button" className={styles.markAll} onClick={onMarkAllRead} disabled={unreadCount === 0}>
               すべて既読にする
             </button>

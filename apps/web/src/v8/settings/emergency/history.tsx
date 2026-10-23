@@ -97,7 +97,7 @@ export function releaseResult(deployment: Deployment | null, historyState: 'load
   return { label: '配備の記録なし', tone: 'muted' }
 }
 
-export default function UpdateHistoryV8() {
+export default function UpdateHistoryV8({ canCopy }: { canCopy: boolean }) {
   const [entry, setEntry] = useState<LogEntryFacts | null>(null)
   const runningVersion = useRunningVersion()
   const [history, setHistory] = useState<OperationHistoryEntry[]>([])
@@ -130,7 +130,7 @@ export default function UpdateHistoryV8() {
 
   return (
     <div className={styles.board}>
-      <LogEntryDetails entry={entry} onClose={() => setEntry(null)} />
+      <LogEntryDetails canCopy={canCopy} entry={entry} onClose={() => setEntry(null)} />
       <KpiBand aria-label="更新の集計">
         <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} valueText={current ? `v${current}` : '—'} unit="" detail={currentAt ? `${shortWhen(currentAt)} に更新` : runningVersion.statusText} />
         <KpiCard title="この30日の更新" icon={<RefreshCw size={14} />} value={ready ? Math.max(recent.length, recentReleases.length) : null} unit="回" detail={ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'} />

@@ -589,7 +589,7 @@ export default function AutoReplyRunsV8() {
 
       {actionMessage ? <p className={styles.hint} role="status">{actionMessage}</p> : null}
 
-      <LogEntryDetails entry={logEntry} onClose={() => setLogEntry(null)} />
+      <LogEntryDetails canCopy={canManage} entry={logEntry} onClose={() => setLogEntry(null)} />
       <ConfirmDialog
         open={stopOpen}
         title="この自動応答を止めますか？"

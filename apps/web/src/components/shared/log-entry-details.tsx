@@ -15,15 +15,16 @@ function facts(entry: LogEntryFacts) {
   ]
 }
 
-export function LogEntryCopy({ entry }: { entry: LogEntryFacts }) {
+export function LogEntryCopy({ entry, canCopy = false }: { entry: LogEntryFacts; canCopy: boolean | undefined }) {
+  if (!canCopy) return null
   return <CopyTextButton value={facts(entry).map(([label, value]) => `${label}：${value}`).join('\n')} aria-label="この記録をコピー" feedbackDurationMs={1600} />
 }
 
-export default function LogEntryDetails({ entry, onClose }: { entry: LogEntryFacts | null; onClose: () => void }) {
+export default function LogEntryDetails({ entry, onClose, canCopy = false }: { entry: LogEntryFacts | null; onClose: () => void; canCopy: boolean | undefined }) {
   return <Dialog open={entry !== null} title="実行記録の中身" onCancel={onClose} cancelLabel="閉じる">
     {entry ? <div className={styles.body}>
       <dl className={styles.facts}>{facts(entry).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-      <LogEntryCopy entry={entry} />
+      <LogEntryCopy entry={entry} canCopy={canCopy} />
     </div> : null}
   </Dialog>
 }

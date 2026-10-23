@@ -26,6 +26,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import Card from '@/components/shared/card'
+import { useOpsReadOnly } from './use-ops-read-only'
 
 /**
  * 運営の監査ログ V8。
@@ -66,6 +67,7 @@ function shortDateTime(value: string | null | undefined): string {
 }
 
 export default function OpsAuditV8() {
+  const readOnly = useOpsReadOnly()
   const [entry, setEntry] = useState<LogEntryFacts | null>(null)
   const [rows, setRows] = useState<OpsAuditRow[]>([])
   const [total, setTotal] = useState(0)
@@ -178,7 +180,7 @@ export default function OpsAuditV8() {
               <Tr key={row.id}>
                 <Td title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</Td>
                 <Td><TruncatedText value={row.staff_name ?? ''} /></Td>
-                <Td><RowNameButton onClick={() => setEntry({ occurredAt: row.created_at, target: row.tenant_name ?? '運営全体', status: actionWord(row.action), reason: row.reason ?? '理由の記録なし' })}>{actionWord(row.action)}</RowNameButton></Td>
+                <Td><RowNameButton title={actionWord(row.action)} onClick={() => setEntry({ occurredAt: row.created_at, target: row.tenant_name ?? '運営全体', status: actionWord(row.action), reason: row.reason ?? '理由の記録なし' })}>{actionWord(row.action)}</RowNameButton></Td>
                 <Td title={row.tenant_name ?? ''}><TruncatedText value={row.tenant_name ?? emptyValue('unknown')} /></Td>
                 <Td grow title={`${row.reason ?? ''}・IP ${row.ip ?? '—'}・${row.visible_to_tenant ? '契約先に表示' : '運営のみ'}`}><TruncatedText value={row.reason ?? emptyValue('unknown')} /></Td>
               </Tr>
@@ -190,7 +192,7 @@ export default function OpsAuditV8() {
         ) : null}
         <p className={parts.note} title={`${total}件中 ${total === 0 ? 0 : (page - 1) * PAGE + 1}〜${Math.min(page * PAGE, total)}件を表示`}>記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>
       </div>
-      <LogEntryDetails entry={entry} onClose={() => setEntry(null)} />
+      <LogEntryDetails canCopy={!readOnly} entry={entry} onClose={() => setEntry(null)} />
     </PageFrame>
   )
 }
