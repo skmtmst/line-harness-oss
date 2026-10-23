@@ -839,7 +839,7 @@ export default function HqBroadcastCreate() {
             この一括配信はもう送った（予約した）ので直せません。新しく作るときは、送るアカウントと中身を入れてください。
           </Notice>
         ) : null}
-        {draftState === 'error' ? <Notice tone="danger" role="alert">下書きを読み込めませんでした。一括配信の一覧から開き直してください。</Notice> : null}
+        {draftState === 'error' ? <Notice tone="danger" role="alert" action={<Link href="/hq/broadcasts">一括配信へ →</Link>}>下書きを読み込めませんでした。一括配信の一覧から開き直してください。</Notice> : null}
 
 
             {/* ① 基本設定（lmWCZ） */}

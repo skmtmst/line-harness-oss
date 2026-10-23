@@ -224,3 +224,5 @@ html:root :is(:global([data-design-part='dialog']), :global([data-design-part='d
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, currentColor 9%, transparent);
 }
+
+:root .action > a { white-space: nowrap; color: var(--color-action); font-weight: 600; }
