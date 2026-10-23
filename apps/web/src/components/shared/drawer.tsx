@@ -153,7 +153,7 @@ export default function Drawer({
           {closeButton}
         </header>
       )}
-      <div className={`${styles.body} ${modal ? '' : styles.inlineBody}`} data-content-spacing={contentSpacing}>
+      <div className={`${styles.body} ${modal ? '' : styles.inlineBody}`} data-window-body data-content-spacing={contentSpacing}>
         {details ? <dl className={styles.rows}>{details.map((detail) => <div className={styles.row} key={detail.label}><dt>{detail.label}</dt><dd className={styles.rowValue}>{detail.value}</dd></div>)}</dl> : children}
       </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}

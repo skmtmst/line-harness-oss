@@ -1,6 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @import "tailwindcss";
 @import "../components/shared/kpi-band-v8.css";
+@import "../components/shared/focus-ring.css";
 
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
 [data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
@@ -2935,11 +2936,6 @@ select:not([multiple]):not(.appearance-none) {
   width: var(--polish-icon-heading); height: var(--polish-icon-heading); stroke-width: var(--polish-icon-stroke); color: inherit;
 }
 
-/* キーボードの輪は、画面から渡されたクラスにも共通で効く。 */
-html:root :is(button, a, input, textarea, select, [tabindex], [role='button'], [role='tab'], [role='menuitem'], [role='option']):focus-visible:not(:where([data-dialog-choice-cards] a)) {
-  outline: var(--polish-focus-width) solid var(--polish-focus);
-  outline-offset: var(--polish-focus-offset);
-}
 /* 数値として登録し、地の濃さを120msで連続して変える（文字には重ねない）。 */
 @property --polish-overlay-strength { syntax: '<number>'; inherits: false; initial-value: 0; }
 html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):not(:where([data-dialog-choice-cards] a)) {

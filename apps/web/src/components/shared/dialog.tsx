@@ -319,7 +319,7 @@ export default function Dialog({
       </div>
       {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><div className={`${styles.callout} ${styles.calloutDanger}`} data-qa-dialog-callout>{descriptionNode}</div></div> : designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
-      {children ? <div className={styles.content} data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
+      {children ? <div className={styles.content} data-window-body data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
       <div className={styles.footer} data-window-actions>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (

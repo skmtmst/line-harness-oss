@@ -28,7 +28,7 @@
 
 .trigger:focus-visible {
   outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--polish-focus-offset);
 }
 
 .closedTrigger {
@@ -119,7 +119,7 @@
 :root .trigger { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -1px; padding: 0 var(--tpl-select-inset); gap: var(--tpl-select-gap); box-shadow: var(--control-shadow); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 :root .value { font-size: 13px; font-weight: 500; line-height: 20px; }
 :root .chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); }
-:root .trigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+:root .trigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 :root .invalid .trigger { outline-color: var(--color-danger); }
 :root .chevron { flex-basis: var(--polish-icon-control); }
 }
@@ -198,7 +198,7 @@
 :root .trigger[data-icon-only] .value { display: none; }
 
 /* WEB-006: 枠なしでも焦点の輪を残す。 */
-:root .textTrigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+:root .textTrigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 
 /* ・仕上げ7 */
 :root .trigger:disabled { opacity: var(--polish-disabled-opacity); }
@@ -220,6 +220,6 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
 
 :root .trigger { padding-block-start: var(--polish-text-center-inset); }
 
-:root .trigger:not(.textTrigger):not([data-tone]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+:root .trigger:not(.textTrigger):not([data-tone]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 
 :root .textTrigger { height: var(--tpl-button-h); padding-inline: var(--tpl-select-inset); gap: var(--tpl-select-gap); outline: 1px solid var(--color-control-border); outline-offset: -1px; background: var(--color-canvas); }
