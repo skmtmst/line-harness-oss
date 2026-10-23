@@ -120,7 +120,7 @@ button.step:focus-visible {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--color-ink);
+  color: var(--color-ink-secondary);
   font-size: var(--tpl-steps-text-size);
   font-weight: 400;
   line-height: var(--tpl-steps-text-lh);
@@ -128,6 +128,7 @@ button.step:focus-visible {
 }
 
 .name[data-step-name='current'] {
+  color: var(--color-ink);
   font-weight: 600;
 }
 

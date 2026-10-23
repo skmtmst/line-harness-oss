@@ -75,7 +75,7 @@ export function Steps({
           const dot = (
             <span className={styles.dot} data-step-dot={state} title={state === 'attention' ? '直すところがあります' : undefined}>
               {state === 'done'
-                ? <><Check className={styles.check} aria-hidden="true" strokeWidth={2.5} /><span className={styles.srOnly}>済み</span></>
+                ? <><Check className={styles.check} aria-hidden="true" strokeWidth={2} /><span className={styles.srOnly}>済み</span></>
                 : state === 'attention'
                   ? <><span aria-hidden="true">△</span><span className={styles.srOnly}>直すところあり</span></>
                   : step.order}
