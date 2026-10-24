@@ -193,7 +193,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        title={collapsed ? shownName : undefined}
+        title={shownName}
         // Enter・Space はボタンそのものが開く。矢印でも開けるようにする（メニューの決まり）。
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(event) => {
