@@ -350,7 +350,9 @@ export function ResponsiveFilterChips({ children, label = '状態', preserveChip
     const row = choices?.closest<HTMLElement>('[data-toolbar-row]')
     const flat = row && getComputedStyle(row).display === 'contents'
     const toolbar = owner?.dataset.toolbarLayout?.includes('stacked') && !flat ? row ?? owner : owner
-    if (preserveChips || !choices || !toolbar || !window.ResizeObserver) return
+    // 左にフォルダの列がある一覧は、幅で札を選ぶ欄へ変えない（畳むのは列だけ）。
+    const inFolderList = Boolean(choices?.closest('[data-list-folders]'))
+    if (preserveChips || inFolderList || !choices || !toolbar || !window.ResizeObserver) return
     const measure = () => {
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
