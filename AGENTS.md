@@ -179,7 +179,7 @@
 - 要件の正本は [docs/v6-requirements/v6-requirements-master-index.md](docs/v6-requirements/v6-requirements-master-index.md) が指す 34 本と、その §5 の横断契約、[docs/v8-requirements/](docs/v8-requirements/README.md) だけです。それ以外を要件として読まないでください。
 - 動きは要件が正本、見た目は V8 の絵と決まりが勝ちます。要件と実装が食い違うときは、実装ではなく要件を先に直します。
 - 終わった版（V2〜V7）の文書や作業の記録は、リポジトリから外して保管しました。保管先と一覧は [docs/document-archives.md](docs/document-archives.md) にあります。読まず、引用せず、実装の根拠にしないでください。リポジトリへ戻して要件として使うこともしません。
-- 見た目の進捗は ★V8 との照合の記録（§17 の `PASSED.tsv` と `SWITCH-READINESS.md`）を見てください。
+- 見た目の進捗は ★V8 との照合の記録（§17 の `PASSED-V8FREEZE.tsv` と `SWITCH-READINESS.md`。`PASSED.tsv` は 10-07 までの履歴）を見てください。
 - Lステップ・Liny との比較の根拠には [docs/lstep-liny-screen-behavior-research-2026-08.md](docs/lstep-liny-screen-behavior-research-2026-08.md) と [docs/lstep-unverified-assumptions.md](docs/lstep-unverified-assumptions.md) を使ってください。
 
 ## 17. リポジトリの外にある司令塔の資料
@@ -190,7 +190,7 @@
 | --- | --- | --- |
 | Pencil ★V8 | `~/Downloads/LINE-Harness-V8.pen`（部品の正本と主な画面）、`~/Downloads/LINE-Harness-V8-B.pen`（残りの画面） | 画面ごとの絵 |
 | 画面を合わせる手順書 | `~/lh-work/design/v8/HOW-TO-90.md` | 画面の担当の必読 |
-| 合格の記録・準備表 | `~/lh-work/design/v8/PASSED.tsv`、`~/lh-work/design/v8/SWITCH-READINESS.md` | 見た目の進捗 |
+| 合格の記録・準備表 | `~/lh-work/design/v8/PASSED-V8FREEZE.tsv`（今の照合台帳。`PASSED.tsv` は 10-07 までの履歴）、`~/lh-work/design/v8/SWITCH-READINESS.md`（準備表） | 見た目の進捗 |
 | 照合の道具 | `~/lh-work/tools/hq/measure.sh` | 絵と画面の文字位置の照合 |
 | 検証環境への配備 | `~/lh-work/tools/hq/deploy-staging.sh` | 司令塔が使う手動配備 |
 | 後回しの一覧 | `~/lh-work/design/v8/LATER.md` | §14 の5種類に当たらない指摘 |
