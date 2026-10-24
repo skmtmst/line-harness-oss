@@ -5,7 +5,7 @@ import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { inputError } from '../lib/input-errors.js';
 import { redeemCoupon } from '../services/coupon-redemption.js';
-
+import { fail } from '../lib/fail.js';
 import { getFriendByLineUserIdForAccount, createUser, getUserByEmailForAccess, linkFriendToUser, getEntryRouteByRefCode, recordRefTracking, recordFriendAddAttributionCandidate, getLineAccounts } from '@line-crm/db';
 import { isStoppedEntryRouteRef, recordStopSuppressionSafe } from '../services/entry-route-stop.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
@@ -84,7 +84,7 @@ export const post__api_liff_friend_add_intent_2 = async (c: Context<Env, "/api/l
       });
     }
     if (!friend || friend.line_account_id !== identity.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     if (stoppedIntentRef) {
       return c.json({ success: false, error: 'このリンクは現在利用できません' }, 410);
@@ -188,7 +188,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
       }
     }
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     let linkedUserId = (friend as unknown as Record<string, unknown>).user_id as string | null;
@@ -207,7 +207,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
         .bind(crossAccount.userId)
         .first<{ id: string }>();
       if (!targetUser) {
-        return inputError(c, { success: false, error: 'Cross-account user not found' }, 400, ["crossAccountToken"]);
+        return fail(c, 400, 'CROSS_ACCOUNT_USER_NOT_FOUND', {}, ["crossAccountToken"]);
       }
       const consumed = await bumpAuthThrottle(db, `cross-account-used:${await tokenDigest(body.crossAccountToken)}`, 15 * 60_000);
       if (consumed !== 1 || !await linkFriendToUser(db, friend.id, crossAccount.userId)) return inputError(c, { success: false, error: 'Invalid cross-account token' }, 400, ['crossAccountToken']);

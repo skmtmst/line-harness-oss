@@ -12,7 +12,7 @@ import {
   type IntegrationApiScope,
   type IntegrationApiTokenRow,
 } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { fireEvent } from '../services/event-bus.js';
@@ -128,7 +128,7 @@ publicApi.post('/api/public/v1/friends/:friendId/tags', inputJsonBoundary(), asy
     const friend = await getFriendById(db, friendId);
     // 別アカウントの友だちは存在を漏らさず 404。
     if (!friend || friend.line_account_id !== lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const tag = await db.prepare(
       `SELECT id, line_account_id, manual_assignment_allowed FROM tags
@@ -138,7 +138,7 @@ publicApi.post('/api/public/v1/friends/:friendId/tags', inputJsonBoundary(), asy
       || (tag.line_account_id === null && !auth.canSeeUnassigned)
       || (tag.line_account_id !== null && tag.line_account_id !== lineAccountId)
       || Number(tag.manual_assignment_allowed ?? 1) !== 1) {
-      return c.json({ success: false, error: 'Tag not found' }, 404);
+      return fail(c, 404, 'TAG_NOT_FOUND');
     }
 
     const added = await addTagToFriend(db, friendId, tagId);

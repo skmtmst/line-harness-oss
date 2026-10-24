@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { countInboxSavedViewMatches } from './inbox-saved-view-matches.js';
 import { serializeInboxSavedView } from '../services/inbox-saved-view-response.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getOperatorById, getChatById, createChat, getFriendById, getSavedSearches, getSavedSearchById, createSavedSearch, updateSavedSearch, deleteSavedSearch, validateInboxSavedViewConditions, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
@@ -285,7 +285,7 @@ export const post__api_chats_id_loading_7 = async (c: Context<Env, "/api/chats/:
   try {
     const chatId = c.req.param('id');
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
-    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!chat) return fail(c, 404, 'CHAT_NOT_FOUND');
 
     let loadingSecondsInput: number | undefined;
     try {
@@ -302,7 +302,7 @@ export const post__api_chats_id_loading_7 = async (c: Context<Env, "/api/chats/:
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
       'chats.loading-animation',
     );
-    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!friend) return fail(c, 404, 'FRIEND_NOT_FOUND');
 
     await startLoadingAnimation(
       accessToken,

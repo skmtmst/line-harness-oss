@@ -6,7 +6,7 @@ import type { Scenario as DbScenario, ScenarioStep as DbScenarioStep, FriendScen
 import { SUPPORTED_CONDITION_TYPES, isSupportedConditionType } from '../services/step-delivery.js';
 import { parseQuestion } from '../features/scenarios/scenario-question/index.js';
 import { isScenarioActionComplete } from '../features/scenarios/scenario-actions/index.js';
-
+import { fail } from '../lib/fail.js';
 
 
 import type { Env } from '../worker-env.js';
@@ -52,7 +52,7 @@ const requireScenarioEditBoundary: MiddlewareHandler<Env> = async (c, next) => {
     return;
   }
   const scenario = await getScenarioById(c.env.DB, c.req.param('id') ?? '');
-  if (!scenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
+  if (!scenario) return fail(c, 404, 'SCENARIO_NOT_FOUND');
   const accountId = (scenario as { line_account_id?: string | null }).line_account_id ?? null;
   const decision = await resolveRequestBoundary(c.env.DB, staff, accountId, {
     requiredPermissionKey: 'scenario.definition.edit',
@@ -61,14 +61,14 @@ const requireScenarioEditBoundary: MiddlewareHandler<Env> = async (c, next) => {
     if (decision.reason === 'forbidden') {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }
-    return c.json({ success: false, error: 'Scenario not found' }, 404);
+    return fail(c, 404, 'SCENARIO_NOT_FOUND');
   }
   // スタッフが別のシナリオの通をIDだけで更新・削除しないようにする。
   const stepId = c.req.param('stepId');
   if (stepId) {
     const step = await c.env.DB.prepare('SELECT id FROM scenario_steps WHERE id = ? AND scenario_id = ?')
       .bind(stepId, scenario.id).first();
-    if (!step) return c.json({ success: false, error: 'Step not found' }, 404);
+    if (!step) return fail(c, 404, 'STEP_NOT_FOUND');
   }
   await next();
 }
@@ -80,7 +80,7 @@ export async function requireVisibleScenario(c: Context<Env>, next: () => Promis
     c.get('staff'),
     [(scenario as { line_account_id?: string | null }).line_account_id ?? null],
   )) {
-    return c.json({ success: false, error: 'Scenario not found' }, 404);
+    return fail(c, 404, 'SCENARIO_NOT_FOUND');
   }
   await next();
 }
@@ -444,7 +444,7 @@ async function runTestSend(
   )
     .bind(scenarioId)
     .first<{ id: string; line_account_id: string | null }>();
-  if (!scenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
+  if (!scenario) return fail(c, 404, 'SCENARIO_NOT_FOUND');
 
   // テスト送信は本物のLINE送信。IDを直接渡されても、見えない友だちや
   // 別アカウントの友だちへシナリオ側のトークンで送らない。

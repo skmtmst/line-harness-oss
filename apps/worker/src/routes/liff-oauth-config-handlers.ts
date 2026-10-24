@@ -6,7 +6,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { accountCustomerStyle } from '../services/customer-style.js';
 import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
-
+import { fail } from '../lib/fail.js';
 import { accountCustomerLook } from '../services/customer-look.js';
 import { customerLookPublicSettings, DEFAULT_CUSTOMER_LOOK } from '@line-crm/shared';
 import { receiveEntryRouteCoupon } from '../services/entry-route-coupon.js';
@@ -626,7 +626,7 @@ export const post__api_liff_profile_4 = async (c: Context<Env, "/api/liff/profil
       identity.lineAccountId,
     );
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     c.header('Cache-Control', 'no-store');

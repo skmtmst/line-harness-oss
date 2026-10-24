@@ -1,7 +1,7 @@
 import { slaChatList, enrichSlaChats } from '../services/inbox-sla-list.js';
 import { refreshInboxSla } from '../services/inbox-sla.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
-
+import { fail } from '../lib/fail.js';
 import { getChatById, getFriendById, markInboxConversationRead, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { buildCursorListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
@@ -397,7 +397,7 @@ export const get__api_chats_id_2 = async (c: Context<Env, "/api/chats/:id">) => 
 
     if (!chatRow) {
       const friendRow = await getFriendById(c.env.DB, rawId);
-      if (!friendRow) return c.json({ success: false, error: 'Chat not found' }, 404);
+      if (!friendRow) return fail(c, 404, 'CHAT_NOT_FOUND');
       friendId = friendRow.id;
       // 同じ friend に紐づく chats 行があれば採用（lazy-create 後の再読みで status/notes を拾うため）
       const existing = await c.env.DB
@@ -545,7 +545,7 @@ export const get__api_chats_id_2 = async (c: Context<Env, "/api/chats/:id">) => 
 export const post__api_chats_id_read_3 = async (c: Context<Env, "/api/chats/:id/read">) => {
   try {
     const resolved = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
-    if (!resolved) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!resolved) return fail(c, 404, 'CHAT_NOT_FOUND');
     const latest = await c.env.DB
       .prepare(
         `SELECT MAX(created_at) AS last_read_at
@@ -606,7 +606,7 @@ export const post__api_chats_read_all_4 = async (c: Context<Env, "/api/chats/rea
 
 export const get__api_chats_id_events_5 = async (c: Context<Env, "/api/chats/:id/events">) => {
     const resolved = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
-    if (!resolved) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!resolved) return fail(c, 404, 'CHAT_NOT_FOUND');
     const rows = await c.env.DB.prepare(
       `SELECT id, event_type, before_json, after_json, actor_staff_id,
               (SELECT name FROM staff_members sm WHERE sm.id = e.actor_staff_id) AS actor_staff_name,

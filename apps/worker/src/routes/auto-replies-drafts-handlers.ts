@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getAutoReplies, getAutoReplyById, getAutoReplyHitCounts, getAutoReplyHitCountSince, getFriendById, createAutoReplyWithDraftVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, publishAutoReplyDraftVersion, recordAutoReplyDraftTest, saveAutoReplyDraftVersion, jstNow } from '@line-crm/db';
 import type { AutoReplyVersionRow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -184,7 +184,7 @@ export const get__api_auto_replies_id_4 = async (c: Context<Env, "/api/auto-repl
     const id = c.req.param('id');
     const item = await getAutoReplyById(c.env.DB, id);
     if (!item) {
-      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+      return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
     }
     const memos = await internalMemosOf(c.env.DB, [id]);
     const data = serializeAutoReply(item, memos.get(id) ?? null);

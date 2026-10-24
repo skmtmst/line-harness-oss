@@ -18,7 +18,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { importAdCostNow } from '../services/ad-cost-import.js';
 import { auditLog } from '../lib/audit-log.js';
-
+import { fail } from '../lib/fail.js';
 /**
  * 流入の広告費の台帳 (#818)。
  *
@@ -48,7 +48,7 @@ async function resolveAccountId(
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   return scope.allowedAccountIds.length === 1
     ? scope.allowedAccountIds[0]
-    : inputError(c, { success: false, error: 'accountId required' }, 400, ["accountId"]);
+    : fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
 }
 
 // GET /api/ad-costs — 流入元ごとの費用と取込状況

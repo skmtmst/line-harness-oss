@@ -9,7 +9,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { builtinFileScan, checkKeyGate, checkMediaGate } from '../services/file-scan.js';
 import { isWebinarSource, privateImageKey, privateImageSignatureValid, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
 import { imageDimensions } from '../features/media/media-metadata/index.js';
-
+import { fail } from '../lib/fail.js';
 const images = new Hono<Env>();
 
 // 汎用画像の管理口は所有者をR2の記録から読む。未記録の古い画像は操作しない。
@@ -132,9 +132,9 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c, nex
 // 管理画面から原本を読む口も、削除と同じ所有権を確かめる。
 images.get('/api/images/:key', requireRole('owner', 'admin'), async (c) => {
   const key = c.req.param('key');
-  if (!await ownedImage(c, key)) return c.json({ success: false, error: 'Image not found' }, 404);
+  if (!await ownedImage(c, key)) return fail(c, 404, 'IMAGE_NOT_FOUND');
   const object = await c.env.IMAGES.get(key);
-  if (!object) return c.json({ success: false, error: 'Image not found' }, 404);
+  if (!object) return fail(c, 404, 'IMAGE_NOT_FOUND');
   return new Response(object.body, { headers: {
     'Content-Type': object.httpMetadata?.contentType ?? 'image/png',
     'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
@@ -151,18 +151,18 @@ images.get('/images/*', async (c) => {
   }
   // 写真審査の原本は公開配信しない。管理画面もreview/public派生画像だけを使う。
   if (key.startsWith('nen-photo-originals/') || key.startsWith('private/') || /^hq-templates\/[^/]+\/pending\//.test(key)) {
-    return c.json({ success: false, error: 'Image not found' }, 404);
+    return fail(c, 404, 'IMAGE_NOT_FOUND');
   }
   const isPrivate = privateImageKey(key);
   if (isPrivate ? !await privateImageSignatureValid(new URL(c.req.url), c.env.API_KEY) : !publicImageKey(key)) {
-    return c.json({ success: false, error: 'Image not found' }, 404);
+    return fail(c, 404, 'IMAGE_NOT_FOUND');
   }
   if (key.startsWith('nen-photo-review/') || key.startsWith('nen-photo-public/')) {
     if (!await photoImageScanAllowed(c.env.DB,key)) return c.json({ success: false, error: 'ファイルの安全性を確かめています' }, 409);
   }
   // Webinar originals use the existing enrollment-gated playback API.
   // A webinar may refer to a media key, so namespace checks alone are insufficient.
-  if (!isPrivate && await isWebinarSource(c.env.DB, key)) return c.json({ success: false, error: 'Image not found' }, 404);
+  if (!isPrivate && await isWebinarSource(c.env.DB, key)) return fail(c, 404, 'IMAGE_NOT_FOUND');
   let mediaEtag: string | undefined;
   if (key.startsWith('media/')) {
     // Only the exact current or published historical object is a public asset.
@@ -174,7 +174,7 @@ images.get('/images/*', async (c) => {
       FROM media m LEFT JOIN media_versions v ON v.media_id = m.id AND v.r2_key = ? AND v.published_at IS NOT NULL
       WHERE m.r2_key = ? OR v.id IS NOT NULL LIMIT 1
     `).bind(key, key).first<{ id: string; line_account_id: string; filename: string; mime_type: string; size_bytes: number; width: number | null; height: number | null }>();
-    if (!published) return c.json({ success: false, error: 'Image not found' }, 404);
+    if (!published) return fail(c, 404, 'IMAGE_NOT_FOUND');
     const gate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
       id: published.id, lineAccountId: published.line_account_id, r2Key: key,
       filename: published.filename, mimeType: published.mime_type, sizeBytes: published.size_bytes,
@@ -201,11 +201,11 @@ images.get('/images/*', async (c) => {
   const object = await getPinnedMediaObject(c.env.IMAGES, key, mediaEtag);
 
   if (!object) {
-    return c.json({ success: false, error: 'Image not found' }, 404);
+    return fail(c, 404, 'IMAGE_NOT_FOUND');
   }
 
   const contentType = object.httpMetadata?.contentType || 'image/png';
-  if (!isPrivate && !publicDeliveryContentType(contentType)) return c.json({ success: false, error: 'Image not found' }, 404);
+  if (!isPrivate && !publicDeliveryContentType(contentType)) return fail(c, 404, 'IMAGE_NOT_FOUND');
   const headers = new Headers();
   headers.set('Content-Type', contentType);
   headers.set('Cache-Control', isPrivate ? 'private, no-store' : 'public, max-age=300');
@@ -234,7 +234,7 @@ images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async 
   try {
     const key = c.req.param('key');
     if (key.startsWith('hq-templates/')) return c.json({success:false,error:'統括のファイルは統括の削除操作から外してください'},403);
-    if (!await ownedImage(c, key)) return c.json({ success: false, error: 'Image not found' }, 404);
+    if (!await ownedImage(c, key)) return fail(c, 404, 'IMAGE_NOT_FOUND');
     await c.env.IMAGES.delete(key);
     return c.json({ success: true, data: null });
   } catch (err) {

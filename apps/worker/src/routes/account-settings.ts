@@ -18,7 +18,7 @@ import {accountCustomerLook, CUSTOMER_LOOK_KEY} from '../services/customer-look.
 import {customerLookError, resolveCustomerLook} from '@line-crm/shared';
 import { validateAllergyValues } from '@line-crm/shared';
 import { ALLERGY_OPTIONS_KEY, accountAllergyOptions } from '../services/allergy-options.js';
-
+import { fail } from '../lib/fail.js';
 const accountSettings = new Hono<Env>();
 accountSettings.route('/', personalDataRetention);
 accountSettings.put('/api/account-settings/customer-look',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
@@ -58,7 +58,7 @@ accountSettings.put('/api/account-settings/allergy-options', requireRole('owner'
 // GET /api/account-settings/test-recipients?accountId=xxx
 accountSettings.get('/api/account-settings/test-recipients', async (c) => {
   const accountId = c.req.query('accountId');
-  if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
 
   const row = await c.env.DB.prepare(
     `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`
@@ -91,7 +91,7 @@ accountSettings.get('/api/account-settings/test-recipients', async (c) => {
 // line_user_idで両方が一致する有効な行だけを候補にする。
 accountSettings.get('/api/account-settings/test-recipient-login-users', async (c) => {
   const accountId = c.req.query('accountId');
-  if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   const tenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
 
   const result = await c.env.DB.prepare(
@@ -157,7 +157,7 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
 // PUT /api/account-settings/test-recipients
 accountSettings.put('/api/account-settings/test-recipients', requireRole('owner', 'admin'), inputJsonBoundary({"accountId":["string"],"friendIds":["array"]}), async (c) => {
   const body = await c.req.json<{ accountId: string; friendIds: string[] }>();
-  if (!body.accountId) return inputError(c, { success: false, error: 'accountId required' }, 400, ["accountId"]);
+  if (!body.accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!Array.isArray(body.friendIds)) {
     return inputError(c, { success: false, error: 'friendIds must be an array' }, 400, ["friendIds"]);
   }

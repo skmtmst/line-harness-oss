@@ -3,7 +3,7 @@ import { readCappedBodyText } from './webhook-receive-envelope.js';
 import { encryptCredential } from '@line-crm/db';
 import { getIncomingWebhookById, resolveWebhookSecret, resolvePreviousWebhookSecret, WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH, listIntegrationApiTokens, getIntegrationApiTokenById, createIntegrationApiToken, revokeIntegrationApiToken, reactivateIntegrationApiToken, rotateIntegrationApiToken, INTEGRATION_API_SCOPES, type IncomingWebhookIdentityMatch, type IncomingWebhookActionRef } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 
 
 import type { Env } from '../worker-env.js';
@@ -24,7 +24,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
     const id = c.req.param('id');
     const wh = await getIncomingWebhookById(c.env.DB, id);
     if (!wh || !wh.is_active) {
-      return c.json({ success: false, error: 'Webhook not found or inactive' }, 404);
+      return fail(c, 404, 'WEBHOOK_NOT_FOUND_OR_INACTIVE');
     }
     // N-384: 巨大な本文を署名計算の前に止める。申告サイズが超えていれば
     // 読まずに413、申告が無くても実バイト数で止める。

@@ -12,7 +12,7 @@ import { attachTagAndFireSideEffects } from '../features/friends/friend-tag-atta
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { fail } from '../lib/fail.js';
 
 
 
@@ -42,7 +42,7 @@ export const requireVisibleConversionEvent: MiddlewareHandler<Env> = async (c, n
       WHERE ce.id = ?`,
   ).bind(c.req.param('id')).first<{ line_account_id: string | null }>();
   if (!row || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [row.line_account_id])) {
-    return c.json({ success: false, error: 'Attributed conversion event not found' }, 404);
+    return fail(c, 404, 'ATTRIBUTED_CONVERSION_EVENT_NOT_FOUND');
   }
   await next();
 };

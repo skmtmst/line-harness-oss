@@ -11,8 +11,9 @@ vi.mock('@line-crm/db', async importOriginal => ({
 }));
 afterEach(() => vi.unstubAllGlobals());
 
-function app() {
-  const api = new Hono<Env>().use('*', apiContractMiddleware);
+function app(normalize = true) {
+  const api = new Hono<Env>();
+  if (normalize) api.use('*', apiContractMiddleware);
   api.use('*', async (c, next) => {
     c.set('staff', { id: 'owner', name: '担当者', role: 'owner', readOnly: false });
     await next();
@@ -23,6 +24,22 @@ function app() {
 }
 
 describe('既存の業務APIから返す日本語の案内', () => {
+  it('共通の応答境界を通る前にもアカウントの選択案内を返す', async () => {
+    const response = await app(false).request('/api/account-settings/test-recipients');
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ success: false, code: 'ACCOUNT_ID_REQUIRED',
+      error: 'LINE公式アカウントを選んでください。' });
+  });
+
+  it('友だちがないときも境界に頼らず同じ失敗の形で返す', async () => {
+    const response = await app(false).request('/api/friends/missing/rich-menu', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ richMenuId: 'menu' }) },
+    { DB: {} as D1Database });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ success: false, code: 'FRIEND_NOT_FOUND',
+      error: '友だちが見つかりません。一覧から開き直してください。' });
+  });
+
   it.each(['test-recipients', 'test-recipient-login-users'])('アカウント未選択: %s', async path => {
     const fetch = vi.fn(() => { throw new Error('外部接続は禁止'); });
     vi.stubGlobal('fetch', fetch);

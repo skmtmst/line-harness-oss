@@ -4,7 +4,7 @@ import { inputError } from '../lib/input-errors.js';
 import { hydrateDocumentAnswers } from '../features/forms/form-documents/index.js';
 import { getFriendSummary } from '@line-crm/db';
 import { getFriendUpcomingItems } from '../features/friends/friend-upcoming-items/index.js';
-
+import { fail } from '../lib/fail.js';
 import { getFriendById, getFriendWithFirstTrackedLinkName, addTagToFriend, getFriendTags, getFormSubmissionsByFriend, getFormSubmissionsByFriendCursor, countFriendFormSubmissions, enrollFriendInScenario, getMileageSummaryForFriend, getMileageHistoryForFriend, getMileageSelfInsights, getMileageConnectedAccountsForFriend, jstNow, getTagAddedScenarioIdsForAccount } from '@line-crm/db';
 import type { Tag as DbTag } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
@@ -21,13 +21,13 @@ export const get__api_friends_id_mileage_1 = async (c: Context<Env, "/api/friend
     const friendId = c.req.param('id');
     const friend = await getFriendById(c.env.DB, friendId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const requestedAccountId = c.req.query('accountId')?.trim();
     const friendAccountId =
       ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
     if (requestedAccountId && friendAccountId !== requestedAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const requestedLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
@@ -58,7 +58,7 @@ export const get__api_friends_id_upcoming_2 = async (c: Context<Env, "/api/frien
     const db = c.env.DB;
     const friend = await getFriendById(db, friendId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const accountId =
       ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
@@ -253,7 +253,7 @@ export const get__api_friends_stats_3 = async (c: Context<Env, "/api/friends/sta
 export const get__api_friends_id_summary_4 = async (c: Context<Env, "/api/friends/:id/summary">) => {
   try {
     const friend = await getFriendById(c.env.DB, c.req.param('id'));
-    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!friend) return fail(c, 404, 'FRIEND_NOT_FOUND');
     const data = await getFriendSummary(c.env.DB, friend.id, friend.line_account_id ?? null);
     return c.json({ success: true, data });
   } catch (error) {
@@ -310,7 +310,7 @@ export const get__api_friends_id_5 = async (c: Context<Env, "/api/friends/:id">)
     ]);
 
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     return c.json({
@@ -369,11 +369,11 @@ export const post__api_friends_id_tags_7 = async (c: Context<Env, "/api/friends/
       'SELECT id, line_account_id, manual_assignment_allowed FROM tags WHERE id = ?',
     ).bind(body.tagId).first<Pick<DbTag, 'id' | 'line_account_id' | 'manual_assignment_allowed'>>();
     if (!tag) {
-      return c.json({ success: false, error: 'Tag not found' }, 404);
+      return fail(c, 404, 'TAG_NOT_FOUND');
     }
     const friend = await getFriendById(db, friendId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const friendAccountId = ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
     const tagAccountId = tag.line_account_id ?? null;
@@ -386,15 +386,15 @@ export const post__api_friends_id_tags_7 = async (c: Context<Env, "/api/friends/
       if (boundary.reason === 'forbidden') {
         return c.json({ success: false, error: 'Forbidden' }, 403);
       }
-      return c.json({ success: false, error: 'Tag not found' }, 404);
+      return fail(c, 404, 'TAG_NOT_FOUND');
     }
     // 別所属の組合せは存在を漏らさず拒否する。所属なしタグ(共通)は従来どおり付けられる。
     if (tagAccountId !== null && tagAccountId !== friendAccountId) {
-      return c.json({ success: false, error: 'Tag not found' }, 404);
+      return fail(c, 404, 'TAG_NOT_FOUND');
     }
     // 手動付与禁止のタグは付けられない。
     if (Number(tag.manual_assignment_allowed ?? 1) !== 1 || await db.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(body.tagId).first()) {
-      return c.json({ success: false, error: 'Tag not found' }, 404);
+      return fail(c, 404, 'TAG_NOT_FOUND');
     }
 
     await addTagToFriend(db, friendId, body.tagId);
@@ -467,7 +467,7 @@ export const put__api_friends_id_metadata_9 = async (c: Context<Env, "/api/frien
 
     const friend = await getFriendById(db, friendId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const body = await c.req.json<Record<string, unknown>>();
@@ -487,7 +487,7 @@ export const put__api_friends_id_metadata_9 = async (c: Context<Env, "/api/frien
       if (!applied) {
         const current = await getFriendById(db, friendId);
         if (!current) {
-          return c.json({ success: false, error: 'Friend not found' }, 404);
+          return fail(c, 404, 'FRIEND_NOT_FOUND');
         }
         return c.json({
           success: false,

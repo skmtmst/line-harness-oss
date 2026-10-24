@@ -163,7 +163,7 @@ tenants.patch('/api/tenants/:id/status', inputJsonBoundary(), async (c) => {
     WHERE id = ?`)
     .bind(status, c.req.param('id'))
     .run();
-  if (!result.meta.changes) return c.json({ success: false, error: 'tenant not found' }, 404);
+  if (!result.meta.changes) return fail(c, 404, 'TENANT_NOT_FOUND');
   return c.json({ success: true, data: { status: status as TenantStatus } });
 });
 
@@ -179,7 +179,7 @@ tenants.patch('/api/tenants/:id/feature-packs', inputJsonBoundary(), async (c) =
     WHERE id = ?`)
     .bind(JSON.stringify(featurePacks), c.req.param('id'))
     .run();
-  if (!result.meta.changes) return c.json({ success: false, error: 'tenant not found' }, 404);
+  if (!result.meta.changes) return fail(c, 404, 'TENANT_NOT_FOUND');
   return c.json({ success: true, data: { featurePacks } });
 });
 
@@ -190,7 +190,7 @@ tenants.get('/api/tenants/me', async (c) => {
   const tenant = await db.prepare(`SELECT name FROM tenants WHERE id = ?`)
     .bind(staffTenantId)
     .first<{ name: string }>();
-  if (!tenant) return c.json({ success: false, error: 'tenant not found' }, 404);
+  if (!tenant) return fail(c, 404, 'TENANT_NOT_FOUND');
   return c.json({ success: true, data: { name: tenant.name } });
 });
 
@@ -208,7 +208,7 @@ tenants.patch('/api/tenants/me', requireRole('owner', 'admin'), inputJsonBoundar
     WHERE id = ?`)
     .bind(name, staffTenantId)
     .run();
-  if (!result.meta.changes) return c.json({ success: false, error: 'tenant not found' }, 404);
+  if (!result.meta.changes) return fail(c, 404, 'TENANT_NOT_FOUND');
   return c.json({ success: true, data: { name } });
 });
 

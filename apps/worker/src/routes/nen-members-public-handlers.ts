@@ -2,7 +2,7 @@ import { jstDate as japanDate, jstDateOffset as japanDateOffset } from '@line-cr
 import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { currentFriend } from '../services/nen-member-identity.js';
@@ -81,7 +81,7 @@ export const get__api_public_nen_adopted_photos_2 = async (c: Context<Env, "/api
   const requestedLineAccountId = c.req.query('lineAccountId')?.trim() ?? '';
   const officialAccountBasicId = c.req.query('officialAccountBasicId')?.trim() ?? '';
   if (!requestedLineAccountId && !officialAccountBasicId) {
-    return c.json({ success: false, error: 'lineAccountId or officialAccountBasicId is required' }, 400);
+    return fail(c, 400, 'LINE_ACCOUNT_ID_OR_OFFICIAL_ACCOUNT_BASIC_ID_IS_REQUIRED');
   }
 
   let lineAccountId = requestedLineAccountId;
@@ -92,7 +92,7 @@ export const get__api_public_nen_adopted_photos_2 = async (c: Context<Env, "/api
         ORDER BY id LIMIT 2`,
     ).bind(officialAccountBasicId).all<{ id: string }>();
     if (accounts.results.length !== 1) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const resolvedLineAccountId = String(accounts.results[0].id);
     if (lineAccountId && lineAccountId !== resolvedLineAccountId) {
@@ -231,7 +231,7 @@ export const put__api_liff_nen_pets_id_5 = async (c: Context<Env, "/api/liff/nen
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const petId = c.req.param('id');
   const current = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ? AND friend_id = ?`).bind(petId, friend.id).first<Record<string, unknown>>();
-  if (!current) return c.json({ success: false, error: 'Pet not found' }, 404);
+  if (!current) return fail(c, 404, 'PET_NOT_FOUND');
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body || typeof body !== 'object') return inputError(c, { success: false, error: '入力内容を確認してください' }, 400, []);
 
@@ -306,7 +306,7 @@ export const put__api_liff_nen_pets_id_5 = async (c: Context<Env, "/api/liff/nen
     }
   }
   const updated = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ?`).bind(petId).first<Record<string, unknown>>();
-  if (!updated) return c.json({ success: false, error: 'Pet not found' }, 404);
+  if (!updated) return fail(c, 404, 'PET_NOT_FOUND');
   const plan = planForPetRow({
     id: petId, animal_type: String(updated.animal_type), weight_kg: updated.weight_kg as number | null, birthday: (updated.birthday as string | null) ?? null,
     neutered: updated.neutered as number | null, activity_level: (updated.activity_level as string | null) ?? null,
@@ -323,7 +323,7 @@ export const post__api_liff_nen_pets_id_photo_6 = async (c: Context<Env, "/api/l
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const pet = await c.env.DB.prepare(`SELECT id, image_r2_key FROM nen_pet_profiles WHERE archived_at IS NULL AND id=? AND friend_id=?`)
     .bind(c.req.param('id'), friend.id).first<{ id: string; image_r2_key: string | null }>();
-  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
+  if (!pet) return fail(c, 404, 'PET_NOT_FOUND');
   const body = await c.req.json<{ data?: string }>().catch(() => null);
   const bytes = decodeJpegData(body?.data);
   if (!bytes) return inputError(c, { success: false, error: 'ペット写真を確認してください' }, 400, ["data"]);
@@ -430,7 +430,7 @@ export const get__api_liff_nen_health_logs_summary_9 = async (c: Context<Env, "/
   const petId = (c.req.query('petId') ?? '').trim();
   const pet = await c.env.DB.prepare(`SELECT id, name, gender, animal_type, breed, birthday, weight_kg FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ? AND friend_id = ?`)
     .bind(petId, friend.id).first<{ id: string; name: string; gender: string | null; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null }>();
-  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
+  if (!pet) return fail(c, 404, 'PET_NOT_FOUND');
   const today = new Date();
   const since = japanDateOffset(-30, today);
   const logs = await c.env.DB.prepare(

@@ -4,7 +4,7 @@ import { navigationProof } from '../lib/navigation-proof.js';
 import { storedRedirectTarget } from '../lib/safe-redirect.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getFriendByLineUserIdForAccount, getLineAccountById, getLineAccounts, getTrackedLinkById, getMessageTemplateById } from '@line-crm/db';
 import { isStoppedEntryRouteRef } from '../services/entry-route-stop.js';
 import { buildIntroMessage } from '../services/intro-message.js';
@@ -210,7 +210,7 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
       verifiedLineAccountId,
     );
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const friendAccountId = verifiedLineAccountId ?? friend.line_account_id ?? null;

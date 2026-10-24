@@ -1,6 +1,6 @@
 import { readPriority } from '../features/auto-replies/auto-reply-priority/index.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getAutoReplyById, createAutoReply, updateAutoReply, deleteAutoReply, restoreAutoReply, stopAutoReply, getTemplateById, autoReplyDraftSettingsFromRow, autoReplyRuleCreateFingerprint, createAutoReplyWithDraftVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, saveAutoReplyDraftVersion } from '@line-crm/db';
 import type { AutoReply as DbAutoReply, AutoReplyDraftSettings } from '@line-crm/db';
 
@@ -334,7 +334,7 @@ export const put__api_auto_replies_id_2 = async (c: Context<Env, "/api/auto-repl
     // m26c R562/R569: 分岐のために既存行を読む。可視性は middleware が見ている。
     const existing = await getAutoReplyById(c.env.DB, id);
     if (!existing) {
-      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+      return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
     }
     // isActive の素の切替以外の入力は、内容の変更として扱う。
     const contentChanged = Object.keys(input).some((key) => key !== 'isActive');
@@ -417,7 +417,7 @@ export const put__api_auto_replies_id_2 = async (c: Context<Env, "/api/auto-repl
     const updated = await updateAutoReply(c.env.DB, id, input as Parameters<typeof updateAutoReply>[2]);
 
     if (!updated) {
-      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+      return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
     }
 
     const memos = await internalMemosOf(c.env.DB, [updated.id]);
@@ -457,7 +457,7 @@ export const post__api_auto_replies_id_stop_3 = async (c: Context<Env, "/api/aut
       idempotencyKey: requestKey,
     });
     if (!stopped) {
-      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+      return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
     }
     const memos = await internalMemosOf(c.env.DB, [stopped.id]);
     const data = serializeAutoReply(stopped, memos.get(stopped.id) ?? null);
@@ -473,7 +473,7 @@ export const delete__api_auto_replies_id_4 = async (c: Context<Env, "/api/auto-r
     const id = c.req.param('id');
     const item = await getAutoReplyById(c.env.DB, id);
     if (!item) {
-      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+      return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
     }
     await deleteAutoReply(c.env.DB, id, c.get('staff')?.id ?? null);
     return c.json({ success: true, data: null });
@@ -486,7 +486,7 @@ export const post__api_auto_replies_id_restore_5 = async (c: Context<Env, "/api/
   try {
     const restored = await restoreAutoReply(c.env.DB, c.req.param('id'));
     if (!restored) {
-      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+      return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
     }
     const memos = await internalMemosOf(c.env.DB, [restored.id]);
     const data = serializeAutoReply(restored, memos.get(restored.id) ?? null);

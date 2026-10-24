@@ -2,7 +2,7 @@ import {staffName} from './broadcast-approval-actor.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { getBroadcastById, createNotification, type Broadcast } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import { BROADCAST_APPROVE_KEY, BROADCAST_DEFINITION_PUBLISH_KEY } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
@@ -169,7 +169,7 @@ broadcastApprovals.get('/api/broadcasts/approval-config', async (c) => {
 broadcastApprovals.get('/api/broadcasts/:id/approval', async (c) => {
   const staff = c.get('staff');
   const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
-  if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
+  if (!broadcast) return fail(c, 404, 'BROADCAST_NOT_FOUND');
   const gate = await evaluateApprovalGate(c.env.DB, broadcast);
   const approval = serializeApproval(broadcast);
   return c.json({
@@ -197,7 +197,7 @@ broadcastApprovals.get('/api/broadcasts/:id/approval', async (c) => {
 broadcastApprovals.post('/api/broadcasts/:id/approval-request', inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
-  if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
+  if (!broadcast) return fail(c, 404, 'BROADCAST_NOT_FOUND');
   if (!await senderBoundary(c.env.DB, staff, accountIdsOf(broadcast))) {
     return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
   }
@@ -277,7 +277,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', inputJsonBoundar
 broadcastApprovals.post('/api/broadcasts/:id/approval-approve', inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
-  if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
+  if (!broadcast) return fail(c, 404, 'BROADCAST_NOT_FOUND');
   if (!canApproveBroadcast(staff)) {
     return c.json({ success: false, error: '承認する権限がありません' }, 403);
   }
@@ -335,7 +335,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-approve', inputJsonBoundar
 broadcastApprovals.post('/api/broadcasts/:id/approval-reject', inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
-  if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
+  if (!broadcast) return fail(c, 404, 'BROADCAST_NOT_FOUND');
   if (!canApproveBroadcast(staff)) {
     return c.json({ success: false, error: '差し戻す権限がありません' }, 403);
   }
@@ -376,7 +376,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-reject', inputJsonBoundary
 broadcastApprovals.post('/api/broadcasts/:id/approval-cancel', inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
-  if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
+  if (!broadcast) return fail(c, 404, 'BROADCAST_NOT_FOUND');
   if (!await senderBoundary(c.env.DB, staff, accountIdsOf(broadcast))) {
     return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
   }
@@ -402,7 +402,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-cancel', inputJsonBoundary
 broadcastApprovals.post('/api/broadcasts/:id/approval-remind', inputJsonBoundary(), async (c) => {
   const staff = c.get('staff');
   const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
-  if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
+  if (!broadcast) return fail(c, 404, 'BROADCAST_NOT_FOUND');
   if (!await senderBoundary(c.env.DB, staff, accountIdsOf(broadcast))) {
     return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
   }
