@@ -19,11 +19,11 @@ describe("友だちの顔", () => {
     expect(root.dataset.avatar).toBe('image')
     fireEvent.error(container.querySelector('img')!)
     expect(root.dataset.avatar).toBe('initials')
-    expect(root.textContent).toBe('KY')
+    expect(root.textContent).toBe('K')
   })
 
-  it('頭文字：英字は単語の頭2つ、日本語は最初の1字', () => {
-    expect(avatarInitials('Kyohei Yamamoto')).toBe('KY')
+  it('頭文字はいつも1字（英字は頭の1字・日本語は最初の1字）', () => {
+    expect(avatarInitials('Kyohei Yamamoto')).toBe('K')
     expect(avatarInitials('Masato.S')).toBe('M')
     expect(avatarInitials('菅野 亮')).toBe('菅')
   })

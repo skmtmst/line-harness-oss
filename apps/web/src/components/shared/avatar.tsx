@@ -45,16 +45,10 @@ export default function Avatar({
   )
 }
 
-/** 英字は単語の頭2つ（Kyohei Yamamoto → KY）、それ以外は最初の1字。 */
+/** 頭文字はいつも1字。英字は最初の1字を大文字、日本語は最初の1字。 */
 export function avatarInitials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  if (words.length > 0 && /^[A-Za-z]/.test(words[0])) {
-    return words
-      .slice(0, 2)
-      .map((word) => word[0].toUpperCase())
-      .join('')
-  }
-  return [...name.trim()][0] ?? ''
+  const first = [...name.trim()][0] ?? ''
+  return /^[a-z]$/.test(first) ? first.toUpperCase() : first
 }
 
 /** 名前から 0〜5 を決める。同じ名前はいつも同じ色。 */
