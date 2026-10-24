@@ -58,4 +58,15 @@ describe('KpiCardの値なし', () => {
     await renderValue(12345)
     expect(host.textContent).toContain('12,345')
   })
+
+  it('値が無いときは「—」に単位を付けない', async () => {
+    await renderValue(undefined)
+    expect(host.textContent).toContain('—')
+    expect(host.textContent).not.toContain('マイル')
+  })
+
+  it('0 は値なので単位を付ける', async () => {
+    await renderValue(0)
+    expect(host.textContent).toContain('0マイル')
+  })
 })
