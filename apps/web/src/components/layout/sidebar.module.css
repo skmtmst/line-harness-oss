@@ -510,3 +510,25 @@
 :root .sectionChevron { width: var(--polish-icon-small); height: var(--polish-icon-small); color: var(--color-ink-faint); stroke-width: var(--polish-icon-stroke); }
 
 :root .desktop:not([data-collapsed]) .badge { padding-block-start: var(--polish-text-center-inset); }
+
+/*
+ * 左メニューの送るバー。普段は見せず、メニューに乗せた時だけ見える形にする。
+ * 触れない端末では常に見せる。
+ */
+@media (hover: hover) {
+  :root .nav {
+    scrollbar-color: transparent transparent;
+  }
+
+  :root .nav:hover {
+    scrollbar-color: var(--color-scroll-thumb) transparent;
+  }
+
+  :root .nav::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+
+  :root .nav:hover::-webkit-scrollbar-thumb {
+    background-color: var(--color-scroll-thumb);
+  }
+}

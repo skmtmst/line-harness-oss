@@ -1,0 +1,30 @@
+/*
+ * 送るバーは細く、普段は薄く。動かす時だけ目立つ。
+ * 画面の右（.main）と左メニュー（.nav）は、乗せた時だけ見える形にする
+ * （app-shell.module.css・sidebar.module.css）。
+ */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scroll-thumb) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background-color: var(--color-scroll-thumb);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-scroll-thumb-hover);
+  }
+}
