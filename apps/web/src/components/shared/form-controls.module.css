@@ -125,6 +125,20 @@
 :root .field[data-field-size='compact'] .label { font-size: var(--tpl-rest3-ec-small); line-height: var(--tpl-rest3-ec-label-lh); }
 :root .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
 
+/* 説明は左・文字数は右の同じ1行。欄との間は6に詰める。 */
+.supportRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  /* 欄との間は6。欄の並びが持つ8を引いて、合計を6にする。 */
+  margin-top: calc(6px - var(--polish-space-row));
+}
+:root .supportRow .note,
+:root .supportRow .count { margin-top: 0; }
+:root .supportRow .note { flex: 1 1 auto; min-width: 0; }
+/* 説明が無い欄でも文字数は右端へ。 */
+:root .supportRow .count { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
+
 /* ・仕上げ1：ラベルと欄 */
 :root .field { gap: var(--polish-space-row); }
 :root .labelRow { margin-bottom: 0; }

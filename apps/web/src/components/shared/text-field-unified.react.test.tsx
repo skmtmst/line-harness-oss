@@ -103,6 +103,17 @@ describe('Field と入力欄の読み上げ', () => {
     expect(view.container.querySelector('[data-field-count]')?.getAttribute('data-field-count')).toBe('over')
   })
 
+  it('説明と文字数を同じ行のまとまりに置く', () => {
+    const view = render(
+      <Field label="本文" htmlFor="body" note="入力の説明" count={{ value: 3, max: 10 }}>
+        <TextArea id="body" />
+      </Field>,
+    )
+    const support = view.container.querySelector('[data-field-support]')
+    expect(support?.textContent).toContain('入力の説明')
+    expect(support?.textContent).toContain('3/10文字')
+  })
+
   it('Field の外では何も足さない', () => {
     render(<TextField aria-label="名前" />)
     const input = screen.getByLabelText('名前')
