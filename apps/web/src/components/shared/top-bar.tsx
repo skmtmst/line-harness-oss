@@ -290,11 +290,11 @@ export default function TopBar({
                     <span className={`${styles.accountName}`} title={hq.name}>{hq.name}</span>
                   </>
                 ) : (
-                  <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+                  <span className={styles.accountName} title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
                 )}
               </span>
             ) : (
-              <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+              <span className={styles.accountName} title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
             )}
             {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
 

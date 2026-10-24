@@ -411,11 +411,11 @@
 }
 
 /*
- * 帯が混まないよう、V8 は名前の見せる幅を固定する（128 / 104）。
- * はみ出た分は「…」。全文は title 属性で読める。
+ * 帯が混まないよう名前の幅に上限を置く（最大260）。入る名前を切らずに出し、
+ * 入らない分だけ「…」。全文は title 属性で読める。
  */
 :root .accountName {
-  max-width: 128px;
+  max-width: 260px;
 }
 
 /*
@@ -587,8 +587,8 @@
 :root .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
 :root .root[data-v8-chrome='shell'] .logout svg { width: 15px; height: 15px; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton:not(:focus-visible) { outline-color: transparent; }
-/* 展開時は絵の名前欄128/104px、畳んだ外側は内容に合わせた幅。 */
-:root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: 128px; height: 20px; line-height: 17px; }
+/* 展開時は名前を最大260px・自分の名前を104px、畳んだ外側は内容に合わせた幅。 */
+:root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: auto; max-width: 260px; height: 20px; line-height: 17px; }
 :root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .user { width: 104px; height: 20px; line-height: 17px; }
 :root .root[data-v8-chrome='shell'] .identity { border-radius: var(--polish-radius-control); }
 :root .root[data-v8-chrome='shell'] .bellBadge { border: 0; border-radius: var(--polish-radius-pill); }
