@@ -6863,7 +6863,7 @@ const server = createServer((req, res) => {
     res.writeHead(200).end(JSON.stringify({ success: true, data: { config: FILE_SCAN_CONFIG } }))
     return
   }
-  if (method === 'GET' && url.pathname === '/api/media') {
+  if (method === 'GET' && (url.pathname === '/api/media' || url.pathname === '/api/media/counts')) {
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 20)))
     const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
     const kind = url.searchParams.get('kind')
@@ -6887,10 +6887,10 @@ const server = createServer((req, res) => {
       if (sort === 'usage') return (right.usageCount ?? -1) - (left.usageCount ?? -1)
       return right.createdAt.localeCompare(left.createdAt)
     })
-    res.writeHead(200).end(JSON.stringify({
-      success: true,
-      data: { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset },
-    }))
+    const countsOnly = url.pathname === '/api/media/counts', active = MEDIA_ITEMS.filter((item) => item.archivedAt == null) // 本物（apps/worker の mediaTabCounts）と同じ形。絞り込みには左右されない。
+    const counts = { total: active.length, byKind: Object.fromEntries(['image', 'video', 'audio', 'file'].map((kindName) => [kindName, active.filter((item) => item.kind === kindName).length])), unused: active.filter((item) => item.usageCount === 0).length, archived: MEDIA_ITEMS.filter((item) => item.archivedAt != null).length }
+    const data = countsOnly ? counts : { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset }
+    res.writeHead(200).end(JSON.stringify({ success: true, data }))
     return
   }
 
