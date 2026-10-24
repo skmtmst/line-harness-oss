@@ -37,9 +37,16 @@ export function formatMetric(key: StoreComparisonKey, value: number | null): str
   return `${nf.format(Math.round(value))} 件`
 }
 
+/** 札に出る桁に丸めたら 0 になる差は、差なしとして扱う（「+0」「−0」を出さない）。 */
+export function displayedDiffIsZero(key: StoreComparisonKey, diff: number): boolean {
+  const abs = Math.abs(diff)
+  if (key === 'blockRate' || key === 'clickRate' || key === 'noShowRate') return one.format(abs) === '0.0'
+  return Math.round(abs) === 0
+}
+
 /** 平均との差（「−2.1 pt」「+3 件」）。差が無い・取れないときは null。 */
 export function formatDiff(key: StoreComparisonKey, diff: number | null): string | null {
-  if (diff === null || diff === 0) return null
+  if (diff === null || diff === 0 || displayedDiffIsZero(key, diff)) return null
   const sign = diff > 0 ? '+' : '−'
   const abs = Math.abs(diff)
   /* 札は符号と数だけ（単位は値と見出しにあり、全文は title に残す）。札を細くして 1152 でも右端を越えない。 */
@@ -48,7 +55,7 @@ export function formatDiff(key: StoreComparisonKey, diff: number | null): string
 }
 
 export function diffTone(def: MetricDef, diff: number | null): 'up' | 'down' | null {
-  if (diff === null || diff === 0) return null
+  if (diff === null || diff === 0 || displayedDiffIsZero(def.key, diff)) return null
   const better = def.good === 'high' ? diff > 0 : diff < 0
   return better ? 'up' : 'down'
 }
