@@ -229,7 +229,7 @@
 :root .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
 .danger-outline { border-color: var(--color-hairline); }
-:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 0; box-shadow: var(--shadow-raised-control); }
+:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline-color: transparent; box-shadow: var(--shadow-raised-control); }
 
 /* 本文中の小さな操作。通常のボタンの高さは変えない。 */
 :root .inline { height: auto; min-height: 0; padding: 0; font-size: var(--text-caption); line-height: 19px; }

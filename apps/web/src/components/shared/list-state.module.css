@@ -128,7 +128,7 @@
 :root [data-list-state='empty'] .iconWrap {
   width: 48px; height: 48px; flex: none;
   border-radius: var(--radius-pill);
-  outline: 0;
+  outline-color: transparent;
   background: var(--color-shell);
   color: var(--color-ink-secondary);
 }

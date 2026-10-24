@@ -241,7 +241,8 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
  */
 :root .trigger:not(.textTrigger):not([data-tone]) {
   border: 0;
-  outline: 0;
+  outline-width: 0;
+  outline-style: none;
   background: var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
 }
@@ -256,6 +257,7 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
 }
 
 :root .invalid .trigger:not(.textTrigger) {
-  outline: 0;
+  outline-width: 0;
+  outline-style: none;
   box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
 }

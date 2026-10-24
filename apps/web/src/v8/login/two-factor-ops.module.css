@@ -49,16 +49,16 @@
 
 .foot {
   color: var(--color-ink-faint);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-ms-otp-foot-lh);
   text-align: center;
 }
 
 /* 題の上の薄い緑の丸と盾。 */
 .hero {
   display: inline-flex;
-  width: 40px;
-  height: 40px;
+  width: var(--tpl-ms-otp-hero);
+  height: var(--tpl-ms-otp-hero);
   align-items: center;
   justify-content: center;
   align-self: center;
@@ -68,8 +68,8 @@
 }
 
 .heroIcon {
-  width: 20px;
-  height: 20px;
+  width: var(--tpl-ms-otp-hero-icon);
+  height: var(--tpl-ms-otp-hero-icon);
 }
 
 /* コードが使えないときの道は、灰色の箱ではなく小さな青い文字のリンクにする。 */
@@ -78,7 +78,7 @@
   width: 100%;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .helpToggle,
@@ -89,9 +89,9 @@
   background: none;
   color: var(--color-focus-ring);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--text-body);
   font-weight: 500;
-  line-height: 20px;
+  line-height: var(--tpl-ms-otp-label-lh);
   text-align: center;
   cursor: pointer;
 }
@@ -103,8 +103,8 @@
 
 .helpToggle:focus-visible,
 .helpLink:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
   border-radius: var(--radius-control);
 }
 
@@ -119,5 +119,5 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px 16px;
+  gap: var(--space-8) var(--space-16);
 }
