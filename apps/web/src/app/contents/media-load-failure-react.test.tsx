@@ -18,6 +18,7 @@ const fixture = vi.hoisted(() => ({
   mediaBehavior: 'ok' as 'ok' | 'fail503' | 'failFalse' | 'empty' | 'twoItems',
   countsFailed: false,
   countsShape: 'ok' as 'ok' | 'array',
+  listCalls: [] as Array<{ kind?: string; unusedOnly?: boolean; archived?: string; limit?: number }>,
   foldersBehavior: 'ok' as 'ok' | 'fail503',
   detailBehavior: 'ok' as 'ok' | 'fail503' | 'fail404' | 'fail403' | 'failFalse',
   detailCalls: [] as Array<{ id: string; accountId: string }>,
@@ -100,8 +101,9 @@ vi.mock('@/lib/api', () => {
           const total = fixture.mediaBehavior === 'empty' ? 0 : fixture.mediaBehavior === 'twoItems' ? 2 : 1
           return Promise.resolve({ success: true, data: { total, byKind: { image: total > 0 ? 1 : 0, video: total === 2 ? 1 : 0, audio: 0, file: 0 }, unused: total, archived: 0 } })
         },
-        list: (accountId: string, params?: { kind?: string }) => {
+        list: (accountId: string, params?: { kind?: string; unusedOnly?: boolean; archived?: string; limit?: number }) => {
           void accountId
+          fixture.listCalls.push(params ?? {})
           if (fixture.mediaBehavior === 'fail503') {
             return Promise.reject(new ApiError(503, 'Service Unavailable'))
           }
@@ -219,6 +221,7 @@ beforeEach(() => {
   fixture.mediaBehavior = 'ok'
   fixture.countsFailed = false
   fixture.countsShape = 'ok'
+  fixture.listCalls.length = 0
   fixture.foldersBehavior = 'ok'
   fixture.detailBehavior = 'ok'
   fixture.detailCalls.length = 0
@@ -259,17 +262,30 @@ describe('R587 フォルダだけの失敗は一覧と容量を隠さない', ()
     expect(retry).toBeTruthy()
   })
 
-  it('集計の形が違っても一覧を落とさず、一覧の口から登録メディア数を出す', async () => {
+  it('集計の形が違っても一覧を落とさず、数の帯は「—」にして一覧の口を読み足さない', async () => {
     fixture.countsShape = 'array'
     await renderPage()
     await waitForText(MEDIA_A.filename)
     expect(host.querySelector('[data-list-state="error"]')).toBeNull()
-    const total = () => [...host.querySelectorAll('[data-kpi-presentation]')]
-      .find((element) => element.textContent?.startsWith('登録メディア'))!
-    for (let index = 0; index < 30 && !total().textContent?.includes('1'); index += 1) {
-      await act(async () => { await settle() })
-    }
-    expect(total().textContent).toContain('1')
+    const total = [...host.querySelectorAll('[data-kpi-label]')]
+      .find((element) => element.textContent?.startsWith('登録メディア'))!.closest('[data-kpi-presentation]')!
+    expect(total.textContent).toContain('—')
+    expect(total.textContent).not.toContain('1件')
+    // 一覧の口は最初の1回だけ。集計を作るための種別・未使用・保管済みの読み足しはしない。
+    expect(fixture.listCalls).toHaveLength(1)
+    expect(fixture.listCalls.every((call) =>
+      call.kind == null && call.unusedOnly !== true && call.archived == null)).toBe(true)
+  })
+
+  it('集計が失敗しても一覧は出し、数の帯は「—」にする', async () => {
+    fixture.countsFailed = true
+    await renderPage()
+    await waitForText(MEDIA_A.filename)
+    expect(host.querySelector('[data-list-state="error"]')).toBeNull()
+    const total = [...host.querySelectorAll('[data-kpi-label]')]
+      .find((element) => element.textContent?.startsWith('登録メディア'))!.closest('[data-kpi-presentation]')!
+    expect(total.textContent).toContain('—')
+    expect(fixture.listCalls).toHaveLength(1)
   })
 
   it('フォルダ欄の再試行で復旧する', async () => {
