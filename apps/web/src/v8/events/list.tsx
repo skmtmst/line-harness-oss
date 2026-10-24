@@ -325,7 +325,7 @@ export default function EventsListV8() {
   const kpis = [
     {
       key: 'upcoming', title: 'これからの回', icon: CalendarClock, value: dataReady ? kpi.upcoming_slots : null, unit: '回',
-      detail: kpiDetail(kpi.nearest_upcoming_starts_at ? `いちばん近いのは ${jstDay(kpi.nearest_upcoming_starts_at)}` : '予定されている回はありません'),
+      detail: kpiDetail(kpi.nearest_upcoming_starts_at ? `いちばん近い回 ${jstDay(kpi.nearest_upcoming_starts_at)}` : '予定されている回はありません'),
     },
     {
       key: 'active', title: '申込', icon: Users, value: dataReady ? kpi.upcoming_active : null, unit: '人',

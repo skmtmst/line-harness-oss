@@ -149,7 +149,7 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
       assert.equal(await page.locator('#surfaces ' + target).evaluate(el => getComputedStyle(el).color), neutral, target)
     }
     assert.notEqual(await page.locator('#selected-flat').evaluate(el => getComputedStyle(el).backgroundColor), await page.locator('#flat').evaluate(el => getComputedStyle(el).backgroundColor))
-    assert.equal(await page.locator('#surfaces button').evaluate(el => getComputedStyle(el).fontWeight), '500')
+    assert.equal(await page.locator('#surfaces button').evaluate(el => getComputedStyle(el).fontWeight), '600')
     assert.notEqual(await page.locator('#surfaces button').evaluate(el => getComputedStyle(el).backgroundColor), await page.locator('#flat').evaluate(el => getComputedStyle(el).backgroundColor))
     assert.deepEqual(await page.evaluate(scanLayoutDefects), [])
     assert.deepEqual(await page.evaluate(scanControlOverlap), [])

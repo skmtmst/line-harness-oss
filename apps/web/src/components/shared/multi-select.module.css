@@ -143,7 +143,7 @@
 }
 
 .input:focus-visible {
-  outline: none;
+  outline: 1px solid transparent;
 }
 
 .chipRemove:focus-visible,

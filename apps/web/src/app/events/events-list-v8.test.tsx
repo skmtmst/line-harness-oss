@@ -162,7 +162,7 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     expect(document.body.textContent).toContain('申し込みが少ない')
   })
 
-  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
+  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は丸を出さない）', async () => {
     fetchApi.mockImplementation(async (url: string) => {
       if (url.includes('filter=pending')) return { items: [], total: 0 }
       return { ...listPayload(), items: [item({ id: 'e1', folderId: 'ef-class' }), item({ id: 'e2', name: '冬のしつけ教室', folderId: null })], total: 2 }
@@ -174,8 +174,7 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     expect(filed[0].getAttribute('data-folder-dot')).toBe('filed')
     expect(filed[0].getAttribute('aria-label')).toBe('フォルダ：教室')
     const unfiled = document.querySelector('tr[data-row-id="e2"]')?.querySelectorAll('[data-folder-dot]') ?? []
-    expect(unfiled).toHaveLength(1)
-    expect(unfiled[0].getAttribute('data-folder-dot')).toBe('unfiled')
+    expect(unfiled).toHaveLength(0)
   })
 
   it('行の「…」に中身・申込者・プレビュー・削除がそろう', async () => {

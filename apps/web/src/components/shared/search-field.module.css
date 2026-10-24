@@ -123,7 +123,7 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-:root .input:focus-visible { outline: none; }
+:root .input:focus-visible { outline: 1px solid transparent; }
 
 :root .input {
   font-size: var(--text-body);
@@ -155,7 +155,7 @@
 
 /* ・仕上げ7：輪は検索欄の外側だけに出す。 */
 html:root .search:has(.input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
-html:root .search .input:focus-visible { outline: none; }
+html:root .search .input:focus-visible { outline: 1px solid transparent; }
 html:root .disabled { opacity: var(--polish-disabled-opacity); }
 html:root .disabled .input:disabled { opacity: 1; }
 

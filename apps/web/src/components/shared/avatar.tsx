@@ -1,7 +1,7 @@
 'use client'
 
 import { User } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import styles from './avatar.module.css'
 
 /**
@@ -18,11 +18,22 @@ export default function Avatar({
   src,
   size = 40,
   className,
+  shape = 'circle',
+  tone = 'neutral',
+  alt,
+  style,
 }: {
   name?: string | null
   src?: string | null
-  size?: 24 | 28 | 32 | 34 | 40 | 52 | 56
+  size?: 24 | 28 | 32 | 34 | 36 | 40 | 52 | 56
   className?: string
+  /** アカウントなどは丸角の四角、人・友だちは丸。 */
+  shape?: 'circle' | 'rounded'
+  /** 薄い灰の地（既定）か、青い淡色の地か。 */
+  tone?: 'neutral' | 'soft'
+  /** 画像に意味を持たせる時だけ渡す（アカウント名）。省略時は飾り。 */
+  alt?: string | null
+  style?: CSSProperties
 }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const showImage = Boolean(src) && failedSrc !== src
@@ -30,12 +41,22 @@ export default function Avatar({
   const classes = [styles.avatar, styles[`s${size}`], showImage ? '' : styles[`t${avatarToneIndex(label)}`], className]
     .filter(Boolean)
     .join(' ')
+  const labelled = typeof alt === 'string' && alt.trim().length > 0
 
   return (
-    <span className={classes} aria-hidden="true" data-avatar={showImage ? 'image' : label ? 'initials' : 'icon'}>
+    <span
+      className={classes}
+      aria-hidden={labelled ? undefined : 'true'}
+      role={labelled ? 'img' : undefined}
+      aria-label={labelled ? alt : undefined}
+      data-avatar={showImage ? 'image' : label ? 'initials' : 'icon'}
+      data-avatar-shape={shape}
+      data-avatar-tone={tone === 'soft' ? 'soft' : undefined}
+      style={style}
+    >
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element -- LINE CDN の利用者画像。大きさは固定で最適化は要らない。
-        <img src={src!} alt="" className={styles.image} onError={() => setFailedSrc(src ?? null)} />
+        <img src={src!} alt={labelled ? alt : ''} className={styles.image} onError={() => setFailedSrc(src ?? null)} />
       ) : label ? (
         avatarInitials(label)
       ) : (

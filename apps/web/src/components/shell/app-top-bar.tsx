@@ -229,7 +229,7 @@ export default function AppTopBar() {
   }
 
   const options = useMemo(
-    () => accounts.map((a) => ({ id: a.id, label: a.displayName || a.name })),
+    () => accounts.map((a) => ({ id: a.id, label: a.displayName || a.name, iconUrl: a.iconUrl || a.pictureUrl || null })),
     [accounts],
   )
 

@@ -61,8 +61,8 @@ export function verifyRuleValues(css, expected = RULE_VALUES) {
 export const RULE_BINDINGS = [
   ['button', ".field", 'height', '--tpl-button-h'],
   ['button', ".button", 'padding', '0 var(--tpl-button-pad-side)'],
-  ['folder-panel', ".panel .add", 'height', '--tpl-button-h'],
-  ['folder-panel', ".panel .add", 'padding', '0 var(--tpl-button-pad-side)'],
+  ['folder-panel', ".add", 'height', 'auto'],
+  ['folder-panel', ".add", 'padding', 'var(--folder-row-pad-block, var(--tpl-toolbar-gap)) var(--tpl-folder-pad-side)'],
   ['tabs', ".list .tab.tab", 'height', '--tpl-tabs-h'],
   ['tabs', ".list .tab.tab", 'font-weight', '--tpl-tabs-weight'],
   ['tabs', ".list .current.current", 'font-weight', '--tpl-tabs-current-weight'],

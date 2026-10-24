@@ -39,7 +39,7 @@
 }
 
 .panel:focus:not(:focus-visible) {
-  outline: none;
+  outline: 1px solid transparent;
 }
 
 .panel:focus-visible {

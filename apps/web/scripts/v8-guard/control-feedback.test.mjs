@@ -222,11 +222,11 @@ test('白い選択欄と予約の線を実描画で見分け、選択操作を�
     const page=await browser.newPage({reducedMotion:'reduce'})
     await mount(page)
     const select=page.getByRole('button',{name:'表示の条件',exact:true})
-    const surface=await select.evaluate(el=>{const s=getComputedStyle(el);return{background:s.backgroundColor,outline:s.outlineStyle,width:s.outlineWidth,shadow:s.boxShadow}})
-    // 線ではなく影で浮かせる。
+    const surface=await select.evaluate(el=>{const s=getComputedStyle(el);return{background:s.backgroundColor,outline:s.outlineStyle,width:s.outlineWidth,color:s.outlineColor,shadow:s.boxShadow}})
+    // 線ではなく影で浮かせる。透明の輪郭は見えない線として扱う。
     assert.equal(surface.background,'rgb(255, 255, 255)')
-    assert.equal(surface.outline,'none')
-    assert.equal(surface.width,'0px')
+    assert.ok(surface.color==='rgba(0, 0, 0, 0)'||surface.color==='transparent', `outline color: ${surface.color}`)
+    assert.ok(surface.width==='0px'||surface.width==='1px', `outline width: ${surface.width}`)
     assert.notEqual(surface.shadow,'none')
     await select.press('ArrowDown')
     await page.getByRole('option',{name:'正常',exact:true}).getByRole('button').click()

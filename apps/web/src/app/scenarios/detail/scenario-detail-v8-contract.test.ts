@@ -72,7 +72,9 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
     for (const [label, value, unit] of expected) {
       const cell = within(band as HTMLElement).getByText(label).closest('[data-kpi-presentation]')!
       expect(cell.querySelector('[data-kpi-number]')?.textContent).toBe(value)
-      expect(cell.textContent).toContain(value + unit)
+      // 取れない数（—）には単位を付けない（共通のKPIの決まり）。
+      if (value === '—') expect(cell.textContent).not.toContain('—' + unit)
+      else expect(cell.textContent).toContain(value + unit)
     }
   })
 

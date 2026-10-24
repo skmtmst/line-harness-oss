@@ -45,12 +45,13 @@ it.each([['consult', '相談者'], ['lesson', '会員']] as const)('%sでは検�
   expect(screen.getByText(`${person}からのご希望`)).toBeTruthy()
   expect(m.list).toHaveBeenCalledWith('A', 'confirmed', expect.anything())
 })
-it('ページ分だけ取得して総数でページを決め、一覧とCSVに同じ絞り込みを渡す', async () => {
+it('ページ分だけ取得して総数でページを決め、予約元は画面側で当て、CSVにも同じ絞り込みを渡す', async () => {
   const h = mountController()
   await waitFor(() => expect(h.result.current.total).toBe(51))
   expect(h.result.current.pageCount).toBe(3)
   act(() => { h.result.current.setStaffFilter('staff-2'); h.result.current.setSourceFilter('phone'); h.result.current.setQuery('花子') })
-  await waitFor(() => expect(m.list).toHaveBeenLastCalledWith('A', 'confirmed', expect.objectContaining({ staffId: 'staff-2', source: 'phone', query: '花子', limit: 20, offset: 0 })))
+  await waitFor(() => expect(m.list).toHaveBeenLastCalledWith('A', 'confirmed', expect.objectContaining({ staffId: 'staff-2', query: '花子', limit: 20, offset: 0 })))
+  expect(m.list.mock.calls.at(-1)?.[2]?.source).toBeUndefined()
   act(() => h.result.current.setPage(2))
   await waitFor(() => expect(m.list).toHaveBeenLastCalledWith('A', 'confirmed', expect.objectContaining({ limit: 20, offset: 20 })))
   await act(async () => h.result.current.downloadLedgerCsv())

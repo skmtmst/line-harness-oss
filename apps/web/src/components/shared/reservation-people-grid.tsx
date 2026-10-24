@@ -66,7 +66,7 @@ export default function ReservationPeopleGrid({ entries, resources, date, slots 
   return <GridTable presentation="calendar" label={`${formatDay(`${date}T00:00:00+09:00`)}の担当別予約`} design={{ columns, gap: '0', rowPadding: '0', fontSize: 'var(--text-caption)' }} data-people-day-grid>
     <div role="row" className={styles.row} style={{ gridTemplateColumns: columns }} data-people-grid-head>
       <div role="columnheader" className={styles.head}>時刻</div>
-      {staff.map(resource => <div role="columnheader" key={resource.id} className={styles.head} title={resource.label}><Avatar name={resource.label} size={24} /><strong>{resource.label}</strong>{resource.capacity ? <span className={styles.capacity}>{`受付${resource.capacity}人${resource.capacity === 1 ? 'ずつ' : 'まで'}`}</span> : null}</div>)}
+      {staff.map(resource => <div role="columnheader" key={resource.id} className={styles.head} title={resource.label}><Avatar name={resource.label} size={24} tone="soft" /><strong>{resource.label}</strong>{resource.capacity ? <span className={styles.capacity}>{`受付${resource.capacity}人${resource.capacity === 1 ? 'ずつ' : 'まで'}`}</span> : null}</div>)}
     </div>
     {hours.map(minute => <div role="row" key={minute} className={styles.row} style={{ gridTemplateColumns: columns }} data-people-grid-hour={minute}>
       <div role="rowheader" className={styles.time}>{`${Math.floor(minute / 60)}:00`}</div>
