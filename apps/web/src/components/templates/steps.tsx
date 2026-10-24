@@ -6,7 +6,7 @@ import Button from '@/components/shared/button'
 import { Check, Circle, CircleCheck, CircleDot } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
 import { useLayoutEffect, useRef, type HTMLAttributes } from 'react'
-import { motionMs, shouldAnimateLeave } from '@/components/shared/overlay-utils'
+import { motionMs, prefersReducedMotion, shouldAnimateLeave } from '@/components/shared/overlay-utils'
 import styles from './steps.module.css'
 
 export type { StepperStep as StepsStep } from '@/components/shared/stepper'
@@ -31,6 +31,8 @@ export function Steps({
   layout = 'horizontal',
   summaries,
   readOnly = false,
+  variant = 'default',
+  animate = false,
 }: {
   /** 何の進みか（例：「リッチメニューを作る手順」）。nav の読み上げ名。 */
   label: string
@@ -43,7 +45,12 @@ export function Steps({
   /** 済んだ入力の要約。値を持つ画面だけが渡す。 */
   summaries?: Readonly<Record<string, string>>
   readOnly?: boolean
+  /** `auth` はログイン前の画面の小さな帯（丸 24・文字 12・線 2）。 */
+  variant?: 'default' | 'auth'
+  /** 画面が出たときに、済み → 線 → 今の段の順に動かす（動きを減らす設定では動かさない）。 */
+  animate?: boolean
 }) {
+  const rootRef = useRef<HTMLElement>(null)
   const items = steps.map((raw, index) => ({ ...raw, key: raw.key ?? raw.label, order: raw.order ?? index + 1 }))
   const currentIndex = currentKey !== undefined
     ? items.findIndex((step) => step.key === currentKey)
@@ -55,6 +62,36 @@ export function Steps({
   }
 
   const summaryItems = summaries ? items.filter((step, index) => stateOf(index) === 'done' && summaries[step.key]) : []
+
+  useLayoutEffect(() => {
+    if (!animate || layout === 'sidebar' || typeof window === 'undefined' || prefersReducedMotion()) return
+    const root = rootRef.current
+    if (!root || typeof root.querySelector !== 'function') return
+    const done = root.querySelector<HTMLElement>('[data-step-dot="done"]')
+    const current = root.querySelector<HTMLElement>('[data-step-dot="current"]')
+    const line = root.querySelector<HTMLElement>('[data-step-line]')
+    const target = done ?? current
+    if (!target?.animate) return
+    const rootStyle = window.getComputedStyle?.(document.documentElement)
+    const easing = rootStyle?.getPropertyValue('--motion-ease-out').trim() || 'ease-out'
+    const spring = rootStyle?.getPropertyValue('--motion-spring').trim() || 'cubic-bezier(0.34, 1.36, 0.64, 1)'
+    const dotMs = motionMs('--motion-exit', 150)
+    const lineMs = motionMs('--motion-base', 200)
+    const animations: Animation[] = []
+    if (done?.animate) animations.push(done.animate([
+      { transform: 'scale(0.8)' },
+      { transform: 'scale(1)' },
+    ], { duration: dotMs, easing: spring, fill: 'both' }))
+    if (line?.animate) animations.push(line.animate([
+      { transform: 'scaleX(0)' },
+      { transform: 'scaleX(1)' },
+    ], { duration: lineMs, delay: dotMs, easing, fill: 'both' }))
+    if (current?.animate) animations.push(current.animate([
+      { transform: 'scale(0.8)', opacity: 0 },
+      { transform: 'scale(1)', opacity: 1 },
+    ], { duration: dotMs, delay: dotMs + lineMs, easing, fill: 'both' }))
+    return () => animations.forEach((animation) => animation.cancel())
+  }, [animate, layout])
 
   if (layout === 'sidebar') return (
     <nav aria-label={label} data-part="steps" data-layout="sidebar" className={styles.root}>
@@ -74,7 +111,7 @@ export function Steps({
   )
 
   return (
-    <nav aria-label={label} data-part="steps" data-connector-size={connectorSize} className={styles.root}>
+    <nav ref={rootRef} aria-label={label} data-part="steps" data-connector-size={connectorSize} data-variant={variant === 'auth' ? 'auth' : undefined} className={styles.root}>
       <ol className={styles.list} data-design="Steps">
         {items.map((step, index) => {
           const state = stateOf(index)
