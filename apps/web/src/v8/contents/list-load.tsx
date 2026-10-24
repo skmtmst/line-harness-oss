@@ -99,23 +99,8 @@ export async function loadMediaSummary({ latestAccountRef, selectedAccountId, se
     ])
     if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
     const counts = overallResponse?.success ? usableMediaCounts(overallResponse.data) : null
-    if (counts) {
-      setOverallTotal(showArchivedOnly ? counts.archived : counts.total)
-    } else if (overallResponse?.success) {
-      /*
-        集計の口が成功を返しても形が違う（古いAPIや画面確認の見本）ときは、
-        一覧の口の総数へ切り替える。失敗のときは「—」のままにする。
-      */
-      const listResponse = await api.media.list(accountAtRequest, {
-        archived: showArchivedOnly ? 'only' : undefined,
-        limit: 1,
-        offset: 0,
-      }).catch(() => null)
-      if (seq !== summarySeqRef.current || accountAtRequest !== latestAccountRef.current) return
-      setOverallTotal(listResponse?.success ? listResponse.data.total : null)
-    } else {
-      setOverallTotal(null)
-    }
+    // 形が違う・失敗のときは「—」のまま。一覧の口を読み直して総数を作らない。
+    setOverallTotal(counts ? (showArchivedOnly ? counts.archived : counts.total) : null)
     if (quotaResponse?.success) setQuota(quotaResponse.data)
     else {
       setQuota(null)

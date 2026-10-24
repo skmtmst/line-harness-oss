@@ -381,45 +381,22 @@ export default function MediaLibraryListV8() {
     }
     const response = await api.media.counts(accountAtRequest).catch(() => null)
     if (accountAtRequest !== latestAccountRef.current) return
-    const counts = response?.success ? usableMediaCounts(response.data) : null
-    if (counts) {
-      setKpis({
-        known: true,
-        total: null,
-        kindTotals: counts.byKind,
-        unusedTotal: counts.unused,
-        archivedTotal: counts.archived,
-      })
-      return
-    }
     /*
-      集計の口が成功を返しても形が違う（古いAPIや画面確認の見本）ときは、
-      一覧の口から種別ごとの総数を読む。画面を落とさず、偽ゼロも置かない。
-      失敗（拒否・成功でない）のときは「—（未取得）」のままにする。
+      集計の形が違う（古いAPIや画面確認の見本）・失敗のときは、
+      数の帯を「—（未取得）」のままにする。一覧の口を読み直して数を作らない。
+      画面は落とさず、偽ゼロも置かない。
     */
-    if (!response?.success) {
+    const counts = response?.success ? usableMediaCounts(response.data) : null
+    if (!counts) {
       setKpis(EMPTY_KPIS)
       return
     }
-    const [kindResponses, unusedResponse, archivedResponse] = await Promise.all([
-      Promise.all(KINDS.map((kind) =>
-        api.media.list(accountAtRequest, { kind: kind.key, limit: 1, offset: 0 }).catch(() => null),
-      )),
-      api.media.list(accountAtRequest, { unusedOnly: true, limit: 1, offset: 0 }).catch(() => null),
-      api.media.list(accountAtRequest, { archived: 'only', limit: 1, offset: 0 }).catch(() => null),
-    ])
-    if (accountAtRequest !== latestAccountRef.current) return
-    const kindTotals: Record<MediaItem['kind'], number | null> = { image: null, audio: null, video: null, file: null }
-    KINDS.forEach((kind, index) => {
-      const kindResponse = kindResponses[index]
-      if (kindResponse?.success) kindTotals[kind.key] = kindResponse.data.total
-    })
     setKpis({
       known: true,
       total: null,
-      kindTotals,
-      unusedTotal: unusedResponse?.success ? unusedResponse.data.total : null,
-      archivedTotal: archivedResponse?.success ? archivedResponse.data.total : null,
+      kindTotals: counts.byKind,
+      unusedTotal: counts.unused,
+      archivedTotal: counts.archived,
     })
   }, [selectedAccountId])
 
