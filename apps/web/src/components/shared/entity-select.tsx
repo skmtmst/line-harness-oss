@@ -58,7 +58,7 @@ type CommonProps = {
   createLabel?: (query: string) => string
   onCreate?: (query: string) => void
   defaultOpen?: boolean
-  size?: 'standard' | 'page-size' | 'full'
+  size?: 'standard' | 'page-size' | 'full' | 'content'
   width?: number
   /** 選択した名前が長い小さな設定欄だけ、札を小さい口で出す。 */
   compact?: boolean
@@ -100,7 +100,7 @@ export default function EntitySelect(props: EntitySelectProps) {
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,
     describedBy: [props['aria-describedby'], error ? errorId : undefined].filter(Boolean).join(' ') || undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix, actionHidden: props.actionHidden,
   }
-  return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%', flexShrink: 0 } : undefined} data-entity-picker-field>
+  return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%', flexShrink: 0 } : undefined} data-entity-picker-field data-entity-content={size === 'content' || undefined}>
     {name ? <input type="hidden" name={name} value={props.values ? props.values.join(',') : props.value} disabled={disabled} /> : null}
     {props.values !== undefined ? <EntityPickerField key={account?.selectedAccountId ?? 'unscoped'} {...common} multiple value={props.values} onChange={props.onChange} />
       : <EntityPickerField key={account?.selectedAccountId ?? 'unscoped'} {...common} value={props.value} onChange={props.onChange} clearable={props.clearable}

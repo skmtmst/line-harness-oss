@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react'
 
 import { useRef, useState, useLayoutEffect, Fragment, Children, isValidElement, cloneElement, createContext, useContext, type ReactNode, type HTMLAttributes } from 'react'
 import Select, { type SelectProps } from './select'
+import EntitySelect from './entity-select'
 import SearchField from './search-field'
 import FilterChip from './filter-chip'
 import PageSizeSelect from './page-size-select'
@@ -292,8 +293,20 @@ export function ListToolbarSort(props: ListToolbarSortProps) {
 }
 
 /** /192/205：入らない札と狭い列だけを選ぶ欄へ畳む。 */
-function contentSizedSelect(child: React.ReactElement<SelectProps>) {
-  return cloneElement(child, { size: 'content', width: undefined, pageSizeControl: child.props.pageSizeControl || toolbarRole(child) === 'count' })
+type ToolbarControlProps = { iconOnly?: boolean; size?: string; width?: number; pageSizeControl?: boolean }
+
+function contentSizedControl(child: React.ReactElement<ToolbarControlProps>) {
+  if (child.type === Select) {
+    const select = child as React.ReactElement<SelectProps>
+    return cloneElement(select, { size: 'content', width: undefined, pageSizeControl: select.props.pageSizeControl || toolbarRole(select) === 'count' })
+  }
+  return cloneElement(child, { size: 'content', width: undefined })
+}
+
+function isContentSizedControl(node: ReactNode): node is React.ReactElement<ToolbarControlProps> {
+  return isValidElement<ToolbarControlProps>(node)
+    && (node.type === Select || node.type === EntitySelect)
+    && !node.props.iconOnly
 }
 
 /** 畳んだ欄の入力だけを直し、作る操作や子のキーはそのまま渡す。 */
@@ -302,7 +315,7 @@ function contentSizedSelects(node: ReactNode): ReactNode {
     const children = node.map(contentSizedSelects)
     return children.every((child, index) => child === node[index]) ? node : children
   }
-  if (isValidElement<SelectProps>(node) && node.type === Select && !node.props.iconOnly) return contentSizedSelect(node)
+  if (isContentSizedControl(node)) return contentSizedControl(node)
   if (isValidElement<{ children?: ReactNode }>(node) && node.props.children) {
     const children = contentSizedSelects(node.props.children)
     return children === node.props.children ? node : cloneElement(node, {}, children)
@@ -316,8 +329,7 @@ function compactFilterGroups(node: ReactNode, preserveChips = false): ReactNode 
     return <ResponsiveFilterChips preserveChips={preserveChips}>{children}</ResponsiveFilterChips>
   return children.map(child => {
     if (isValidElement(child) && child.type === ResponsiveFilterChips) return child
-    if (isValidElement<SelectProps>(child) && child.type === Select && !child.props.iconOnly)
-      return contentSizedSelect(child)
+    if (isContentSizedControl(child)) return contentSizedControl(child)
     if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {
       const nested = compactFilterGroups(child.props.children, preserveChips)
       // Field wrappers receive one control, not a one-element children array.
