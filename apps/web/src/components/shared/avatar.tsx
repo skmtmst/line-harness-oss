@@ -39,7 +39,18 @@ export default function Avatar({
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const showImage = Boolean(src) && failedSrc !== src
   const label = (name ?? '').trim()
-  const classes = [styles.avatar, styles[`s${size}`], showImage ? '' : styles[`t${avatarToneIndex(label)}`], className]
+  /*
+   * アカウント・会社の印（丸角の四角）は、画像が無いときも会社の印と同じ
+   * 緑の地に白の1文字にする。人の顔（丸）は
+   * 今までどおり薄い地のまま。同じ帯に画像あり／なしが並んでもそろって見える。
+   */
+  const accountMark = !showImage && Boolean(label) && shape === 'rounded'
+  const classes = [
+    styles.avatar,
+    styles[`s${size}`],
+    showImage ? '' : accountMark ? styles.accountInitials : styles[`t${avatarToneIndex(label)}`],
+    className,
+  ]
     .filter(Boolean)
     .join(' ')
   const labelled = typeof alt === 'string' && alt.trim().length > 0
@@ -52,7 +63,7 @@ export default function Avatar({
       aria-label={labelled ? alt : undefined}
       data-avatar={showImage ? 'image' : label ? 'initials' : 'icon'}
       data-avatar-shape={shape}
-      data-avatar-tone={tone === 'soft' ? 'soft' : undefined}
+      data-avatar-tone={accountMark ? 'account' : tone === 'soft' ? 'soft' : undefined}
       style={style}
     >
       {showImage ? (

@@ -44,6 +44,21 @@ describe("友だちの顔", () => {
     expect((container.firstElementChild as HTMLElement).dataset.avatar).toBe('icon')
   })
 
+  it('アカウント・会社の印は、画像が無いと緑の地に白の1文字', () => {
+    const { container } = render(<Avatar name="株式会社 然" shape="rounded" />)
+    const root = container.firstElementChild as HTMLElement
+    expect(root.dataset.avatar).toBe('initials')
+    expect(root.dataset.avatarTone).toBe('account')
+    expect(root.textContent).toBe('然')
+  })
+
+  it('人の顔（丸）は今までどおり薄い地のまま', () => {
+    const { container } = render(<Avatar name="菅野 亮" />)
+    const root = container.firstElementChild as HTMLElement
+    expect(root.dataset.avatar).toBe('initials')
+    expect(root.dataset.avatarTone).toBeUndefined()
+  })
+
   it('同じ名前はいつも同じ色', () => {
     expect(avatarToneIndex('菅野 亮')).toBe(avatarToneIndex('菅野 亮'))
     expect(avatarToneIndex('')).toBeGreaterThanOrEqual(0)
