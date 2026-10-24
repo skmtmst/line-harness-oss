@@ -44,6 +44,7 @@
 
 /* 日の予約盤は、道具を表と同じ左端に置き、1152 でも1段に保つ。 */
 .board[data-kind='people'] > .toolbar { padding-inline: 0; gap: var(--space-4); }
+.board[data-kind='people'] > .toolbar > :has(+ .printButton) { margin-inline: var(--space-4); }
 /* 入りきらない幅では印刷を印だけにする（読み上げ名は残す）。 */
 @media (max-width: 1440px) {
   .printLabel { display: none; }
