@@ -218,6 +218,45 @@ export default function OtpInput({
     writeFrom(index, event.clipboardData.getData('text'))
   }
 
+  const renderSlot = (index: number) => (
+    <input
+      key={index}
+      ref={(node) => { refs.current[index] = node }}
+      id={index === 0 ? id : undefined}
+      type="text"
+      inputMode={format === 'recovery' ? 'text' : 'numeric'}
+      pattern={format === 'recovery' ? '[A-Za-z2-9]*' : '[0-9]*'}
+      autoComplete={format === 'digits' && index === 0 ? 'one-time-code' : 'off'}
+      aria-label={`${index + 1}${format === 'recovery' ? '文字目' : '桁目'}`} autoCapitalize={format === 'recovery' ? 'characters' : undefined}
+      aria-invalid={invalid || undefined}
+      disabled={locked}
+      value={digits[index] ?? ''}
+      className={styles.slot}
+      onKeyDown={(event) => onKeyDown(index, event)}
+      onPaste={(event) => onPaste(index, event)}
+      // 変換確定・自動入力・携帯のキーボードなど、keydown で数字が来ない入力はここで受ける。
+      onChange={(event) => {
+        const typed = normalize(event.target.value)
+        const current = digits[index] ?? ''
+        if (!typed) {
+          if (current) commit(digits.slice(0, index) + digits.slice(index + 1), index)
+          return
+        }
+        // 入った数字は、このマスから順に書き込む。フォーカスのたびに中身を選ぶので、
+        // 普通に打てば1桁で上書きになる。まとめて入った（自動入力・続けて打たれた）ときは順に並ぶ。
+        writeFrom(index, typed)
+      }}
+      onFocus={(event) => {
+        // 空いたマスが先にあるなら、そこへ移る（左から詰めて入れる）。
+        if (index > digits.length) {
+          focusSlot(digits.length)
+          return
+        }
+        event.currentTarget.select?.()
+      }}
+    />
+  )
+
   return (
     <div className={styles.field}>
       {visualLabel ? <span className={styles.label}>{visualLabel}</span> : null}
@@ -232,46 +271,19 @@ export default function OtpInput({
       data-state={invalid ? 'error' : success ? 'success' : undefined}
       aria-busy={busy || undefined}
     >
-      {Array.from({ length }, (_, index) => (
-        <Fragment key={index}>
-        {format === 'recovery' && index === 4 ? <span className={styles.separator} aria-hidden="true">−</span> : null}
-        <input
-          ref={(node) => { refs.current[index] = node }}
-          id={index === 0 ? id : undefined}
-          type="text"
-          inputMode={format === 'recovery' ? 'text' : 'numeric'}
-          pattern={format === 'recovery' ? '[A-Za-z2-9]*' : '[0-9]*'}
-          autoComplete={format === 'digits' && index === 0 ? 'one-time-code' : 'off'}
-          aria-label={`${index + 1}${format === 'recovery' ? '文字目' : '桁目'}`} autoCapitalize={format === 'recovery' ? 'characters' : undefined}
-          aria-invalid={invalid || undefined}
-          disabled={locked}
-          value={digits[index] ?? ''}
-          className={styles.slot}
-          onKeyDown={(event) => onKeyDown(index, event)}
-          onPaste={(event) => onPaste(index, event)}
-          // 変換確定・自動入力・携帯のキーボードなど、keydown で数字が来ない入力はここで受ける。
-          onChange={(event) => {
-            const typed = normalize(event.target.value)
-            const current = digits[index] ?? ''
-            if (!typed) {
-              if (current) commit(digits.slice(0, index) + digits.slice(index + 1), index)
-              return
-            }
-            // 入った数字は、このマスから順に書き込む。フォーカスのたびに中身を選ぶので、
-            // 普通に打てば1桁で上書きになる。まとめて入った（自動入力・続けて打たれた）ときは順に並ぶ。
-            writeFrom(index, typed)
-          }}
-          onFocus={(event) => {
-            // 空いたマスが先にあるなら、そこへ移る（左から詰めて入れる）。
-            if (index > digits.length) {
-              focusSlot(digits.length)
-              return
-            }
-            event.currentTarget.select?.()
-          }}
-        />
-        </Fragment>
-      ))}
+      {format === 'digits' ? (
+        <>
+          <span className={styles.cluster}>{[0, 1, 2].map(renderSlot)}</span>
+          <span className={styles.cluster}>{[3, 4, 5].map(renderSlot)}</span>
+        </>
+      ) : (
+        Array.from({ length }, (_, index) => (
+          <Fragment key={index}>
+            {index === 4 ? <span className={styles.separator} aria-hidden="true">−</span> : null}
+            {renderSlot(index)}
+          </Fragment>
+        ))
+      )}
       {busy ? <span className={styles.spinner} aria-hidden="true" /> : null}
       {success && !busy ? <Check className={styles.check} size={18} aria-hidden="true" /> : null}
     </div>

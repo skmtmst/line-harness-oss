@@ -47,27 +47,29 @@
 }
 
 @media (max-width: 380px) {
-  /* 幅の狭い電話でも6マスが1行に収まるように詰める（6×40 + 5×6 = 270px）。 */
+  /* 幅の狭い電話でも6マスが1行に収まるように詰める（6×40 + 4×8 + 組の間 = 約287px）。 */
   .group {
     gap: 6px;
   }
   .slot {
     width: 40px;
-    height: 48px;
+    height: 44px;
     font-size: 20px;
+  }
+  .cluster {
+    gap: 8px;
   }
 }
 
 /*
- * ★V8「OTP入力」（RfHCo・rareui 採用）：くぼんだマス。入力中のマスは
- * 緑の輪郭、全部そろって確認できたら緑の輪郭が順に描かれる、
- * まちがえると横に揺れる（MOTION.md「OTP」）。
+ * ★V8「OTP入力」：白地に影で浮かせたマス。入力中のマスは青い輪、
+ * 全部そろって確認できたら緑の輪郭、まちがえると横に揺れる（MOTION.md「OTP」）。
  */
 :root .slot {
   border-color: var(--color-control-border);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas-sunken);
-  box-shadow: inset 0 1px 2px var(--color-board-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
 }
 
 /* 誤り（違うコード）の赤い枠は v8 でも変えない。 */
@@ -77,14 +79,14 @@
 
 :root .slot:focus,
 :root .slot:focus-visible {
-  outline-color: var(--color-accent-deep);
+  outline-color: var(--color-focus-ring);
 }
 
-/* 確認できた：左から順に緑の輪郭が描かれる。 */
+/* 確認できた：緑の輪郭が描かれる。 */
 :root .group[data-state='success'] .slot {
-  border-color: var(--color-accent-deep);
+  border-color: var(--color-success);
   background: var(--color-canvas);
-  box-shadow: 0 0 0 1px var(--color-accent-deep);
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 1.5px var(--color-success);
   transition:
     border-color var(--motion-base) var(--motion-ease-out),
     box-shadow var(--motion-base) var(--motion-ease-out),
@@ -101,10 +103,10 @@
 :root .group[data-state='success'] .slot:nth-child(5) { transition-delay: calc(var(--motion-instant) * 2); }
 :root .group[data-state='success'] .slot:nth-child(n + 6) { transition-delay: var(--motion-base); }
 
-/* まちがえた：横に揺れる（300ms）。動きを減らす設定では揺らさない（赤い枠と文で伝わる）。 */
+/* まちがえた：横に小さく揺れる（120ms を2回）。動きを減らす設定では揺らさない（赤い枠と文で伝わる）。 */
 @media (prefers-reduced-motion: no-preference) {
   :root .group[data-state='error'] .slot {
-    animation: otp-v8-shake var(--motion-slow) var(--motion-ease-out);
+    animation: otp-v8-shake var(--motion-fast) var(--motion-ease-out) 2;
   }
 }
 
@@ -131,10 +133,11 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .slot { height: 48px; border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -1px; background: var(--color-shell); box-shadow: none; font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 20px; font-weight: 500; line-height: normal; caret-color: var(--color-ink); }
-:root .slot:focus { outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
-:root .group[data-state='success'] .slot { outline: 1.5px solid var(--color-success); outline-offset: -0.75px; background: var(--color-shell); box-shadow: none; }
-:root .slot[aria-invalid='true'] { outline-color: var(--color-status-danger); background: var(--color-status-danger-soft); }
+:root .slot { height: 52px; border: 0; outline: 0; background: var(--color-canvas); box-shadow: var(--shadow-raised-control); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 24px; font-weight: 600; line-height: normal; caret-color: var(--color-ink); }
+:root .slot:focus,
+:root .slot:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+:root .group[data-state='success'] .slot { outline: 0; background: var(--color-canvas); box-shadow: var(--shadow-raised-control), inset 0 0 0 1.5px var(--color-success); }
+:root .slot[aria-invalid='true'] { border-color: var(--color-status-danger); outline-color: var(--color-status-danger); background: var(--color-canvas); box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-status-danger); }
 
 .field { display: contents; }
 :root .field:has(.label) { display: inline-flex; flex-direction: column; gap: 6px; }
@@ -185,9 +188,10 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-/* 6桁のコードは、マスを 52px の正方形にし、両端を下のボタンにそろえて間を均等にあける。 */
-:root .group[data-format='digits'] { display: flex; justify-content: space-between; width: 100%; }
+/* 6桁のコードは 52px の正方形を 3＋3 の 2 組にし、両端を下のボタンにそろえる。 */
+:root .group[data-format='digits'] { display: flex; width: 100%; gap: 0; justify-content: space-between; }
 :root .group[data-format='digits'] .slot { width: 52px; height: 52px; flex: 0 0 52px; }
+.cluster { display: flex; gap: 12px; }
 :root .field:has(.label):has(.group[data-format='digits']) { display: flex; width: 100%; align-items: stretch; }
 /* 確かめている輪と ✓ は、広げたまとまりの外に出ないよう、右下の下に置く。 */
 :root .group[data-format='digits'] :is(.spinner, .check) { top: calc(100% + 8px); left: auto; right: 0; translate: 0 0; }
@@ -203,13 +207,17 @@
  * html:root :is(input, …):focus-visible・青）は層の外にあって上の層の中の決まりより強いので、
  * このマスだけ層の外で緑に戻す。誤りの赤と、空のマスの入力の目印（2×24）も同じ理由で層の外に置く。
  */
-html:root .group .slot:focus-visible { outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
+html:root .group .slot:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 html:root .group .slot[aria-invalid='true']:focus-visible { outline-color: var(--color-status-danger); }
 html:root .group .slot[value='']:focus { background-image: linear-gradient(var(--color-ink), var(--color-ink)); }
 
-:root .group[data-format='digits'] {
-  --otp-rounded-gap: round(up, calc((100% - 312px) / 5), 0.5px);
-  justify-content: flex-start;
-  gap: var(--otp-rounded-gap);
+/* 狭い電話でも 3＋3 の6マスが1行に収まるように、組の中の間だけを詰める。 */
+@media (max-width: 380px) {
+  :root .group[data-format='digits'] .slot { width: 36px; height: 44px; flex-basis: 36px; font-size: 20px; }
+  .cluster { gap: 6px; }
 }
-:root .group[data-format='digits'] .slot:nth-child(2) { margin-inline-start: calc(100% - 312px - 5 * var(--otp-rounded-gap)); }
+
+@media (max-width: 340px) {
+  :root .group[data-format='digits'] .slot { width: 32px; height: 44px; flex-basis: 32px; font-size: 18px; }
+  .cluster { gap: 4px; }
+}
