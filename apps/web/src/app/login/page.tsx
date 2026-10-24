@@ -130,7 +130,12 @@ export default function LoginPage() {
       node="UufG8"
       cardNode="m3tWJ"
       title="ログイン"
-      description="メールアドレスとパスワードでログインします。LINE で登録した人は「LINE でログイン」を使ってください。"
+      description={
+        <>
+          メールアドレスとパスワードでログインします。<br />
+          LINE で登録した人は「LINE でログイン」を使ってください。
+        </>
+      }
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
@@ -149,7 +154,15 @@ export default function LoginPage() {
             aria-describedby={emailMessage ? 'login-email-error' : undefined}
           />
         </AuthField>
-        <AuthField label="パスワード" htmlFor="login-password">
+        <AuthField
+          label="パスワード"
+          htmlFor="login-password"
+          action={
+            <Link href="/password/forgot" className="shrink-0 whitespace-nowrap text-body font-medium text-accent-deep hover:underline">
+              パスワードを忘れた方
+            </Link>
+          }
+        >
           <PasswordField id="login-password" value={password} onChange={handlePasswordChange} autoComplete="current-password" />
         </AuthField>
         <Turnstile onToken={setTurnstileToken} handleRef={setTurnstileHandle} />
@@ -157,11 +170,6 @@ export default function LoginPage() {
           checked={remember}
           onCheckedChange={setRemember}
         >この端末では7日間ログインを保持する</Checkbox>
-        <div className="flex justify-end">
-          <Link href="/password/forgot" className="text-caption font-semibold text-action hover:underline">
-            パスワードを忘れた方はこちら
-          </Link>
-        </div>
         <Button fullWidth type="submit" variant="primary" disabled={busy !== null || !TURNSTILE_SITE_KEY} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
         </Button>
       </form>

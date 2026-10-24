@@ -58,7 +58,7 @@ export default function AuthCard({
         data-design-node={cardNode}
         className="flex w-full max-w-130 flex-col items-center gap-5 rounded-large border border-hairline bg-canvas px-6 py-9 shadow-float sm:px-10"
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-control bg-accent-deep text-heading font-bold text-on-accent">
             m
           </span>
@@ -66,7 +66,7 @@ export default function AuthCard({
         </div>
         <div className="flex w-full flex-col items-center gap-2 text-center">
           <h1 className="text-heading font-bold text-ink">{title}</h1>
-          <p className="text-caption text-ink-faint">{description}</p>
+          <p className="text-caption text-balance text-ink-faint">{description}</p>
         </div>
         {children}
       </section>
@@ -101,24 +101,30 @@ export function AuthField({
   hint,
   error,
   htmlFor,
+  action,
   children,
 }: {
   label: string
   hint?: string
   error?: string | null
   htmlFor: string
+  /** ラベルの行の右端に置く小さな導線（パスワードを忘れた方など）。 */
+  action?: ReactNode
   children: ReactNode
 }) {
   return (
-    <div className="flex w-full flex-col gap-1.5">
+    <div className="flex w-full flex-col gap-2">
       {/*
         U100: ラベルと補足を同じ行に並べると、320pxや200%拡大で
         補足が幅を取ってラベルが途中で折れる（「メールアド／レス」）。
         縦に積めば、ラベル→補足→入力→エラーの順でそのまま読める。
       */}
-      <label htmlFor={htmlFor} className="text-label font-medium text-ink">
-        {label}
-      </label>
+      <div className="flex w-full items-baseline justify-between gap-2">
+        <label htmlFor={htmlFor} className="text-label font-medium text-ink">
+          {label}
+        </label>
+        {action}
+      </div>
       {hint ? <p className="text-micro text-ink-faint">{hint}</p> : null}
       {children}
       {error ? (
