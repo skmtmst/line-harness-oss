@@ -69,6 +69,12 @@ async function submit() {
   await settle()
 }
 
+/** 「コードが使えない場合」の小さなリンクを開く。 */
+async function openHelpChoices() {
+  const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === 'コードが使えない場合')
+  await act(async () => { toggle?.click() })
+}
+
 beforeEach(() => {
   fixture.hash = ''
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
@@ -97,7 +103,8 @@ describe('R614 合言葉なしの直リンク', () => {
     // 進み具合で「LINEログイン済み」と断定しない。
     expect(host.textContent).not.toContain('LINEログイン')
     expect(host.textContent).not.toContain('メールログイン')
-    // 戻り先はLINE限定にしない。
+    // 戻り先はLINE限定にしない（小さなリンクを開いた先に出す）。
+    await openHelpChoices()
     expect(host.textContent).toContain('ログインに戻る')
     expect(host.textContent).not.toContain('別のLINEアカウントでログイン')
   })
@@ -120,6 +127,7 @@ describe('R507残部 戻りリンクの経路合わせ', () => {
     await render()
 
     expect(host.textContent).toContain('メールログイン')
+    await openHelpChoices()
     expect(host.textContent).toContain('ログインに戻る')
     expect(host.textContent).not.toContain('別のLINEアカウントでログイン')
   })
@@ -127,10 +135,11 @@ describe('R507残部 戻りリンクの経路合わせ', () => {
   it('LINE経路では今までどおりの案内を守る', async () => {
     window.history.replaceState(null, '', '/login/two-factor#lh_2fa=verify-tok-1')
     await render()
-    await enterCode('123456')
+    await openHelpChoices()
 
     expect(host.textContent).toContain('LINEログイン')
     expect(host.textContent).toContain('別のLINEアカウントでログイン')
+    await enterCode('123456')
     expect(host.textContent).not.toContain('ログインからやり直してください')
     // 合言葉があるので、6桁目が入った瞬間に確かめを送る（押さなくてよい）。
     expect(fetchMock).toHaveBeenCalled()

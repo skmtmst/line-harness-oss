@@ -25,6 +25,7 @@ export default function AuthCard({
   authLayout,
   brandName,
   titleAlign,
+  hero,
 }: {
   title: string
   description: ReactNode
@@ -39,15 +40,18 @@ export default function AuthCard({
   authLayout?: 'admin' | 'ops'
   brandName?: string
   titleAlign?: 'center' | 'start'
+  /** 題の上に置く印（二段階認証の盾など）。 */
+  hero?: ReactNode
 }) {
   // ログイン前の画面もタブの題を「<見出し> | musubo」にする。
   useEffect(() => { setDocumentTitle(title) }, [title])
   // V8 login confirmation/enrollment inherits its existing card tokens.
   if (variant === 'totp') return <main className={authStyles.page} data-auth-layout={authLayout}>
     {authLayout === 'admin' ? <div className={authStyles.brand}><span className={authStyles.brandMark} aria-hidden="true">{brandName?.slice(0, 1) ?? 'm'}</span><div><strong>{brandName ?? 'musubo'}</strong><small>musubo</small></div></div> : null}
-    <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-title-align={titleAlign} data-design-node={cardNode}>
+    <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-title-align={titleAlign} data-hero={hero ? '' : undefined} data-design-node={cardNode}>
     {steps}
-    <PageHeading title={title} titleAs="h1" titleId={titleId} inset="none" help={authLayout === 'admin' ? undefined : description} />
+    {hero}
+    <PageHeading title={title} titleAs="h1" titleId={titleId} inset="none" padTop={0} help={authLayout === 'admin' ? undefined : description} />
     {authLayout === 'admin' && description ? <p className={authStyles.help}>{description}</p> : null}
     {children}
   </section></main>

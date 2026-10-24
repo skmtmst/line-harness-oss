@@ -22,9 +22,9 @@
 .stack { display: flex; flex-direction: column; gap: var(--polish-space-field); min-width: 0; }
 
 .page[data-auth-layout='admin'] { flex-direction: column; gap: var(--space-16); }
-.card[data-auth-layout='admin'] { max-width: 440px; padding: var(--tpl-auth-admin-card-pad); gap: var(--space-16); }
+.card[data-auth-layout='admin'] { max-width: 440px; padding: 24px var(--tpl-auth-admin-card-pad) var(--tpl-auth-admin-card-pad); gap: var(--space-16); }
 .card[data-auth-layout='admin'] h1 { text-align: left; width: 100%; }
-.help { color: var(--color-ink-secondary); font-size: var(--polish-text-note); line-height: var(--tpl-ms-otp-desc-lh); margin: 0; }
+.help { color: var(--color-ink-secondary); font-size: 13px; line-height: 20px; margin: 0; }
 
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); }
 .brand { display: flex; align-items: center; justify-content: center; gap: var(--space-8); }
@@ -34,6 +34,8 @@
 
 .card[data-title-align='start'] h1 { text-align: left; }
 .card[data-title-align='center'] h1 { text-align: center; }
+.card[data-hero] h1 { font-size: 28px; font-weight: 600; line-height: 36px; }
+.card[data-hero] .help { text-align: center; }
 
 .detailRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); min-width: 0; }
 .detailValue { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-8); min-width: 0; }

@@ -49,6 +49,75 @@
 
 .foot {
   color: var(--color-ink-faint);
-  font-size: var(--tpl-ms-otp-foot-size);
-  line-height: var(--tpl-ms-otp-foot-lh);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* 題の上の薄い緑の丸と盾。 */
+.hero {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.heroIcon {
+  width: 20px;
+  height: 20px;
+}
+
+/* コードが使えないときの道は、灰色の箱ではなく小さな青い文字のリンクにする。 */
+.helpArea {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.helpToggle,
+.helpLink {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--color-focus-ring);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.helpToggle:hover,
+.helpLink:hover {
+  text-decoration: underline;
+}
+
+.helpToggle:focus-visible,
+.helpLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
+.helpToggle:disabled,
+.helpLink:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.helpChoices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
 }
