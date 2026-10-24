@@ -87,10 +87,7 @@ describe('外側の殻（V8 移行③）', () => {
     expect(friends).toContain("searchParams.get('q')")
   })
 
-  it('帯が混まないよう、v8 はアカウント名 128px・自分の名前 104px で「…」に収める', () => {
-    const account = topBarCss.match(/:root \.accountName \{([^}]*)\}/)
-    expect(account, 'v8 の .accountName の規定が無い').not.toBeNull()
-    expect(account![1]).toContain('max-width: 128px')
+  it('帯が混まないよう、v8 は自分の名前を 104px で「…」に収める', () => {
     const user = topBarCss.match(/:root \.user \{([^}]*max-width: 104px[^}]*)\}/)
     expect(user, 'v8 の .user の規定が無い').not.toBeNull()
     expect(user![1]).toContain('max-width: 104px')

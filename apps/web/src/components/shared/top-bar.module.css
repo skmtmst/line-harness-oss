@@ -112,6 +112,7 @@
   min-width: 0;
   align-items: center;
   background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
 }
 
 /* `cBSCb/KZ9W9`。22px・radius-mini・accent-soft。 */
@@ -145,10 +146,13 @@
   cursor: pointer;
 }
 
+.accountPill:hover {
+  background: var(--color-canvas-sunken);
+}
+
 .accountPill:focus-within {
-  border-color: var(--color-status-info);
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 /* `cBSCb/ENVf3`。1×24 の縦線。 */
@@ -350,20 +354,21 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--color-hairline);
+  border: 0;
   border-radius: var(--radius-control);
   background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
   color: var(--color-ink-secondary);
   cursor: pointer;
 }
 
 .iconButton:hover {
-  background: var(--color-surface-pearl);
+  background: var(--color-canvas-sunken);
 }
 
 .iconButton:focus-visible {
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 /* 未読の数。ベルの右上へ赤い丸（白い数字）。 */
@@ -596,3 +601,29 @@
 :root .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome > svg { display: none; }
 
 }
+
+/* 選ぶ欄と同じ「白地＋影で浮かせる」形。開いた・押した・焦点は選ぶ欄にそろえる。 */
+:root .accountPill,
+:root .iconButton[data-topbar-bell] {
+  border: 0;
+  outline: 1px solid transparent;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+}
+:root .accountPill:hover,
+:root .iconButton[data-topbar-bell]:hover {
+  background: var(--color-canvas-sunken);
+}
+:root .iconButton[data-topbar-bell]:not(:focus-visible) {
+  outline: 1px solid transparent;
+}
+:root .accountPill:focus-within,
+:root .iconButton[data-topbar-bell]:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
+}
+:root .accountPill:has(.accountSelect:active),
+:root .iconButton[data-topbar-bell]:active:not(:disabled) { filter: brightness(0.97); }
+:root .accountPill > [data-avatar] { flex: 0 0 auto; }
+:root .accountPill { transition: background-color var(--motion-fast) var(--motion-ease-out), box-shadow var(--motion-fast) var(--motion-ease-out); }
+:root .iconButton[data-topbar-bell] { transition: background-color var(--motion-fast) var(--motion-ease-out); }
