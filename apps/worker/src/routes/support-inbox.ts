@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -188,8 +188,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     }
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
-    const limit = Math.min(200, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 100, { format: 'integer-prefix' }) || 100));
-    const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0, { format: 'integer-prefix' }) || 0);
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 100, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: 200 }, offsetPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 0 } });
     // LINEとメールを待ち時間順で統合してからページを切るため、要求ページの末尾まで
     // 両方の候補を取得する。1回に読む件数は従来どおり最大200件に抑える。
     const fetchLimit = Math.min(200, limit + offset);

@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { purgeUnsafeFormDocuments } from '../features/forms/form-documents/index.js';
@@ -181,8 +181,7 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
    * 件数と同じ条件で絞るので、一覧と総件数がずれない。
    */
   const query = (c.req.query('q') ?? '').trim();
-  const limit = Math.min(Math.max(listQueryNumber(c.req.query('limit'), 20) || 20, 1), 100);
-  const offset = Math.max(listQueryNumber(c.req.query('offset'), 0) || 0, 0);
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 20, limitPolicy: { fallback: 'falsy', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'falsy', minimum: 0 } });
   if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
@@ -241,7 +240,7 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
           : row.media_id ? uploaders.get(`media:${row.media_id}`) : undefined;
         return { ...serializeScan(row), uploaderLabel: uploader ?? '—' };
       }),
-      total: Number(total?.n ?? 0), limit, offset, paging: { limit }, sort: [{ field: 'updatedAt', direction: 'desc' }] }),
+      total: Number(total?.n ?? 0), limit, offset, paging: { limit, offset }, sort: [{ field: 'updatedAt', direction: 'desc' }] }),
   });
 });
 

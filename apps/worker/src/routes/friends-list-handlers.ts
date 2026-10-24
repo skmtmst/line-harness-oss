@@ -13,7 +13,7 @@ import { hasStaffPermission } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listResponse } from '../lib/list-etag.js';
 import { compileSavedSearch, friendFieldValueSql } from '../services/saved-search-filter.js';
-import { buildOffsetListResponse, listLimit, listOffset } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { adminAccountScope, escapeLikePattern, serializeFriendListRow, serializeTag } from './friends-definition.js';
 import type { Context } from 'hono';
 
@@ -44,8 +44,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       if (!validated.ok) return c.json({ success: false, error: validated.error }, 422);
       directConditions = validated.value;
     }
-    const limit = listLimit(c.req.query('limit'), directConditions?.list?.limit ?? 50);
-    const offset = listOffset(c.req.query('offset'));
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: directConditions?.list?.limit ?? 50 });
     const tagId = c.req.query('tagId');
     const lineAccountId = c.req.query('lineAccountId');
     const audienceId = c.req.query('audienceId')?.trim();
@@ -569,7 +568,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
         total,
         page: Math.floor(offset / limit) + 1,
         limit,
-        hasNextPage: offset + limit < total, paging: { limit }, sort: [...(search ? [{ field: 'match_score', direction: 'asc' as const }] : []),{field:'createdAt',direction:createdOrder === 'ASC' ? 'asc' : 'desc'},{field:'id',direction:createdOrder === 'ASC' ? 'asc' : 'desc'}] }),
+        hasNextPage: offset + limit < total, paging: { limit, ...(!cursorMode ? { offset } : {}) }, sort: [...(search ? [{ field: 'match_score', direction: 'asc' as const }] : []),{field:'createdAt',direction:createdOrder === 'ASC' ? 'asc' : 'desc'},{field:'id',direction:createdOrder === 'ASC' ? 'asc' : 'desc'}] }),
     });
   } catch (err) {
     throw err;

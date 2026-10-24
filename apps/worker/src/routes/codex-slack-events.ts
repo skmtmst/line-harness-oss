@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { logger, traceQueueMessage } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -317,8 +317,7 @@ codexSlackEvents.get('/api/integrations/codex-monitor/status', async (c) => {
   if (!c.env.API_KEY || authorization !== `Bearer ${c.env.API_KEY}`) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
-  const parsedLimit = listQueryNumber(c.req.query('limit'), 20, { format: 'integer-prefix' });
-  const limit = Number.isFinite(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 20;
+  const { limit } = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { format: 'integer-prefix', fallback: 'finite', minimum: 1, maximum: 100 } });
   const result = await c.env.DB.prepare(`
     SELECT slack_event_id, team_id, channel_id, message_ts, thread_ts, status,
            official_task_url, fallback_conversation_url, detected_at, updated_at
@@ -326,5 +325,5 @@ codexSlackEvents.get('/api/integrations/codex-monitor/status', async (c) => {
      ORDER BY detected_at DESC
      LIMIT ?
   `).bind(limit).all();
-  return c.json({ success: true, tasks: result.results });
+  return c.json(buildOffsetListResponse({ success: true, tasks: result.results, items: result.results, total: null, paging: { limit, offset: 0 }, sort: [] }));
 });

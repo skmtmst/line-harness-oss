@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging } from '../lib/list-paging.js';
 import { isCalendarDate as isExistingCalendarDate, scheduledJstIso } from '@line-crm/shared';
 import type { Context } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -47,11 +47,10 @@ export function parseReservationFilter(c: Context<Env>, orgId: string, scopedSto
     where += ` AND r.status IN (${list.map(() => '?').join(', ')})`;
     params.push(...list);
   }
-  const limit = listQueryNumber(c.req.query('reservationLimit') || undefined, '300');
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('reservationLimit') || undefined, offset: c.req.query('reservationOffset') || undefined }, { defaultLimit: 300, limitPolicy: {}, offsetPolicy: {} });
   if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
     return { ok: false, error: '件数の指定が正しくありません' };
   }
-  const offset = listQueryNumber(c.req.query('reservationOffset') || undefined, '0');
   if (!Number.isInteger(offset) || offset < 0) {
     return { ok: false, error: '開始位置の指定が正しくありません' };
   }

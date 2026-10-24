@@ -8,7 +8,7 @@ import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { parseOffsetPaging } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import type { ConversionDefinitionUsageKind } from '@line-crm/db';
 import { conversionContractError, conversionRange, definitionFilters, conversionDefinitionScope, csvCell, jstDate, adminAccountScope, ConversionPointBody, readMeasureOptions, positiveVersion, CONVERSION_MEASURE_PATCH_KEYS, parseDate, APPROVAL_STATUSES } from './conversions-definition.js';
 import type { Context } from 'hono';
@@ -388,9 +388,7 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
     // 「取り消し中」として返す。
     const reversedIds = await getReversedEventIds(c.env.DB, events.map((e) => e.id));
 
-    return c.json({
-      success: true,
-      data: events.map((e) => ({
+    const responseItems = events.map((e) => ({
         id: e.id,
         conversionPointId: e.conversion_point_id,
         friendId: e.friend_id,
@@ -399,8 +397,8 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
         metadata: e.metadata,
         createdAt: e.created_at,
         reversed: reversedIds.has(e.id),
-      })),
-    });
+      }));
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit: paging.limit, offset: paging.offset }, sort: [] }));
   } catch (err) {
     throw err;
   }
@@ -599,7 +597,8 @@ export const get__api_conversions_approvals_13 = async (c: Context<Env, "/api/co
       offset,
     });
 
-    return c.json({ success: true, data: rows });
+    const responseItems = rows;
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset }, sort: [] }));
   } catch (err) {
     throw err;
   }

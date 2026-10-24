@@ -12,7 +12,7 @@ import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
-import { buildCursorListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
+import { buildCursorListResponse, listLimit, parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { serializeTag, serializeFriendFormSubmission } from './friends-definition.js';
 import type { Context } from 'hono';
 
@@ -30,10 +30,7 @@ export const get__api_friends_id_mileage_1 = async (c: Context<Env, "/api/friend
       return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
-    const requestedLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
-    const limit = Number.isFinite(requestedLimit)
-      ? Math.min(100, Math.max(1, requestedLimit))
-      : 10;
+    const { limit } = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 10, limitPolicy: { format: 'integer-prefix', fallback: 'finite', minimum: 1, maximum: 100 } });
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const [summary, history, insights, connections] = await Promise.all([
       getMileageSummaryForFriend(c.env.DB, friendId),
@@ -46,7 +43,7 @@ export const get__api_friends_id_mileage_1 = async (c: Context<Env, "/api/friend
       getMileageSelfInsights(c.env.DB, friendId),
       getMileageConnectedAccountsForFriend(c.env.DB, friendId, accountScope.allowedAccountIds),
     ]);
-    return c.json({ success: true, data: { summary, history, insights, connections } });
+    return c.json({ success: true, data: buildOffsetListResponse({ summary, history, insights, connections, items: history, total: null, paging: { limit, offset: 0 }, sort: [] }) });
   } catch (err) {
     throw err;
   }

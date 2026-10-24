@@ -45,7 +45,7 @@ import {
   retryAutomationRun,
 } from '../features/automations/automation-engine/index.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
-import { buildOffsetListResponse, listLimit, boundedListInteger } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
 
 const automations = new Hono<Env>();
@@ -603,8 +603,8 @@ automations.get(
     }
     const rawLimit = c.req.query('limit');
     const rawOffset = c.req.query('offset');
-    const limit = rawLimit === undefined ? undefined : boundedListInteger(rawLimit, -1, 200);
-    const offset = rawOffset === undefined ? undefined : boundedListInteger(rawOffset, -1, 1_000_000);
+    const limit = rawLimit === undefined ? undefined : parseOffsetPaging({ limit: rawLimit }, { defaultLimit: -1, limitPolicy: { fallback: 'nonnegative-integer', maximum: 200 } }).limit;
+    const offset = rawOffset === undefined ? undefined : parseOffsetPaging({ offset: rawOffset }, { defaultOffset: -1, offsetPolicy: { fallback: 'nonnegative-integer', maximum: 1_000_000 } }).offset;
     if ((rawLimit !== undefined && limit === -1) || (rawOffset !== undefined && offset === -1)) {
       return c.json({ success: false, error: 'ページ指定を確認してください' }, 400);
     }
@@ -622,7 +622,7 @@ automations.get(
         total: result.total,
         limit: limit ?? null,
         offset: offset ?? 0,
-      }, items: responseItems, total: result.total, paging: { limit: limit ?? result.total }, sort: [{ field: 'priority', direction: 'desc' }, { field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
+      }, items: responseItems, total: result.total, paging: { limit: limit ?? result.total, offset: offset ?? 0 }, sort: [{ field: 'priority', direction: 'desc' }, { field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (err) {
     throw err;
   }
@@ -709,8 +709,8 @@ automations.get(
     // CSVは画面の1頁ではなく絞り込み全体を出す。暴走だけ上限で留める。
     const limit = wantsCsv
       ? 5_000
-      : Math.max(1, boundedListInteger(c.req.query('limit'), 20, 100));
-    const offset = wantsCsv ? 0 : boundedListInteger(c.req.query('offset'), 0, 1_000_000);
+      : parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { fallback: 'nonnegative-integer', minimum: 1, maximum: 100 } }).limit;
+    const offset = wantsCsv ? 0 : parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: { fallback: 'nonnegative-integer', maximum: 1_000_000 } }).offset;
     const defaults = defaultWindow();
     const from = c.req.query('from') || defaults.from;
     const to = c.req.query('to') || defaults.to;
@@ -761,7 +761,7 @@ automations.get(
       items,
       pagination: { total: result.total, limit, offset },
     };
-    return c.json({ success: true, data: buildOffsetListResponse({ ...body, total: result.total, paging: { limit }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...body, total: result.total, paging: { limit, offset }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
   } catch (err) {
     throw err;
   }
@@ -1075,11 +1075,9 @@ automations.get(
   async (c) => {
   try {
     const automationId = c.req.param('id');
-    const limit = listLimit(c.req.query('limit'), 100);
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 100 }).limit;
     const logs = await getAutomationLogs(c.env.DB, automationId, limit);
-    return c.json({
-      success: true,
-      data: logs.map((l) => ({
+    const responseItems = logs.map((l) => ({
         id: l.id,
         automationId: l.automation_id,
         friendId: l.friend_id,
@@ -1087,8 +1085,8 @@ automations.get(
         actionsResult: l.actions_result ? JSON.parse(l.actions_result) : null,
         status: l.status,
         createdAt: l.created_at,
-      })),
-    });
+      }));
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
     throw err;
   }

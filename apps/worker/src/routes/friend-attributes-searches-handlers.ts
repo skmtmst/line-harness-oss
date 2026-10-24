@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getSupportMarkById, setFriendSupportMarkBulk, getSavedSearches, getSavedSearchById, createSavedSearch, reorderSavedSearches, updateSavedSearchWithRevision, deleteSavedSearch, countSavedSearches, getSavedSearchReferences, getSavedSearchUsageCounts, getSavedSearchReferenceUsageCounts, validateSearchConditions, SAVED_SEARCH_LIMIT, getLoginAudit, getStaffMembers, LOGIN_AUDIT_ACTIONS, type LoginAuditRow, type LoginAuditAction, getFolders, getFolderItemCounts, isFolderKind, getWebinarFolderCounts } from '@line-crm/db';
@@ -442,13 +442,11 @@ export const get__api_login_audit_9 = async (c: Context<Env, "/api/login-audit">
     const items = await getLoginAudit(c.env.DB, {
       adminUserId: c.req.query('userId') || undefined,
       action,
-      limit: listQueryNumber(c.req.query('limit'), 100),
+      limit: parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 100, limitPolicy: {} }).limit,
     });
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
     const staffById = new Map((await getStaffMembers(c.env.DB, tenantId)).map((member) => [member.id, member]));
-    return c.json({
-      success: true,
-      data: items.map((row: LoginAuditRow) => ({
+    const responseItems = items.map((row: LoginAuditRow) => ({
         id: row.id,
         adminUserId: row.admin_user_id,
         userName: row.admin_user_id ? staffById.get(row.admin_user_id)?.name ?? '不明なユーザー' : '不明なユーザー',
@@ -467,8 +465,8 @@ export const get__api_login_audit_9 = async (c: Context<Env, "/api/login-audit">
         connectionSource: [row.ip ? maskIp(row.ip) : null, row.user_agent ? row.user_agent.slice(0, 42) : null].filter(Boolean).join(' / ') || null,
         result: row.result,
         createdAt: row.created_at,
-      })),
-    });
+      }));
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit: parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 100, limitPolicy: {} }).limit, offset: 0 }, sort: [] }));
   } catch (err) {
     throw err;
   }

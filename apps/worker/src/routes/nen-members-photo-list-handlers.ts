@@ -1,4 +1,4 @@
-import { buildCursorListResponse } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 import { getPublicationThirtyDayViews } from '@line-crm/db';
@@ -11,7 +11,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { photoRewardDisplayState, PHOTO_REWARD_REASON_LABELS, PHOTO_REWARD_STALE_MS } from '../services/photo-reward-sync.js';
 import { petCallName } from '../services/nen-pet-name.js';
 import { syncNenHealthTags } from '../services/nen-tag-sync.js';
-import { photoPageSize, photoPageOffset, PHOTO_REWARD_STATE_CASE } from './nen-members-definition.js';
+import { PHOTO_REWARD_STATE_CASE } from './nen-members-definition.js';
 import type { Context } from 'hono';
 
 export const put__api_nen_members_care_flags_id_1 = async (c: Context<Env, "/api/nen-members/care-flags/:id">) => {
@@ -56,8 +56,7 @@ export const get__api_nen_members_photos_2 = async (c: Context<Env, "/api/nen-me
    * 201 枚以上あるとダッシュボードの件数に届かなかった（#666）。
    * 1ページの上限は 200 のまま。offset で次の 200 枚を取る。
    */
-  const limit = photoPageSize(c.req.query('limit'));
-  const offset = photoPageOffset(c.req.query('offset'));
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 200, limitPolicy: { fallback: 'finite', truncate: true, minimum: 1, maximum: 200 }, offsetPolicy: { fallback: 'finite', truncate: true, minimum: 0 } });
   /*
    * 名前・ペット名・コメントの部分一致で絞る（#931 N-308）。
    * 200 枚ずつの区切りでしか見られない一覧だと、目的の1枚を探すのに
@@ -99,8 +98,8 @@ export const get__api_nen_members_photos_2 = async (c: Context<Env, "/api/nen-me
       ...row,
       pet_call_name: petCallName(String(row.pet_name ?? ''), row.pet_gender),
     }));
-  return c.json(buildCursorListResponse({ success: true,
-    data: responseItems, items: responseItems, paging: { limit }, sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
+  return c.json(buildOffsetListResponse({ success: true,
+    data: responseItems, items: responseItems, total: null, paging: { limit, offset }, sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
 };
 
 export const get__api_nen_members_photos_publications_3 = async (c: Context<Env, "/api/nen-members/photos/publications">) => {

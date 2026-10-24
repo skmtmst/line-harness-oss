@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, truncatedListLimit, truncatedListOffset } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { runJson } from './friend-migration-display.js';
 import { consentRollbackConflicts, suppressionReconciliation } from '@line-crm/db/src/friend-delivery-consents.js';
@@ -196,8 +196,7 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
       **対応表はページで区切って返す。** 全件返すと数千行で応答が重く、
       画面も先頭しか触れない。分類と「未判断のみ」の絞り込みもここで受ける。
     */
-    const limit = truncatedListLimit(c.req.query('limit') || undefined, 20, 500);
-    const offset = truncatedListOffset(c.req.query('offset') || undefined);
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: { fallback: 'finite', truncate: true, minimum: 1, maximum: 500 }, offsetPolicy: { fallback: 'finite', truncate: true, minimum: 0 } });
     const classification = c.req.query('classification');
     if (classification !== undefined && !(ITEM_CLASSIFICATIONS as readonly string[]).includes(classification)) {
       return c.json({ success: false, error: '分類を確認してください' }, 400);
@@ -228,7 +227,7 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
         itemOffset: offset,
         unresolved,
         decisionCounts,
-        suppressionReconciliation: await suppressionReconciliation(c.env.DB, run.id), total: itemTotal, paging: { limit }, sort: [] }),
+        suppressionReconciliation: await suppressionReconciliation(c.env.DB, run.id), total: itemTotal, paging: { limit, offset }, sort: [] }),
     });
   } catch (error) {
     throw error;

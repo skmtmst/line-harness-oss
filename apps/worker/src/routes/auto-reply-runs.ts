@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, boundedListInteger } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
@@ -246,8 +246,8 @@ autoReplyRuns.get(
       const status = statusRaw && DOMAIN_STATUSES.has(statusRaw as AutoReplyEvaluationStatus)
         ? statusRaw as AutoReplyEvaluationStatus
         : undefined;
-      const limit = Math.max(1, boundedListInteger(c.req.query('limit'), 20, 100));
-      const offset = boundedListInteger(c.req.query('offset'), 0, 1_000_000);
+      const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { fallback: 'nonnegative-integer', minimum: 1, maximum: 100 } }).limit;
+      const offset = parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: { fallback: 'nonnegative-integer', maximum: 1_000_000 } }).offset;
       const search = c.req.query('search')?.trim() || undefined;
       const staff = c.get('staff');
       const canViewInput = staff.role !== 'staff' || staff.permissionKeys?.includes('/chats') === true;
@@ -313,7 +313,7 @@ autoReplyRuns.get(
         )),
         pagination: { total: runs.total, limit, offset },
       };
-      return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: runs.total, paging: { limit }, sort: [{ field: 'evaluatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: runs.total, paging: { limit, offset }, sort: [{ field: 'evaluatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
     } catch (error) {
       throw error;
     }

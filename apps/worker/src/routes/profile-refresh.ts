@@ -9,7 +9,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { getBroadcastById, resolveLineCredential } from '@line-crm/db';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { listLimit, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 const profileRefresh = new Hono<Env>();
 
@@ -568,7 +568,7 @@ profileRefresh.get('/api/admin/auto-reply-stats', requireRole('owner'), async (c
  * 直近 N 件の incoming + outgoing messages_log を返す。debug 用。
  */
 profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c) => {
-  const limit = listLimit(c.req.query('limit'), 20, 100);
+  const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, maxLimit: 100 }).limit;
   const db = c.env.DB;
   const adminScope = await adminAccountScope(c, 'COALESCE(ml.line_account_id, f.line_account_id)');
 
@@ -589,9 +589,7 @@ profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c)
 
   const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
 
-  return c.json({
-    success: true,
-    data: (res.results ?? []).map((r) => {
+  const responseItems = (res.results ?? []).map((r) => {
       const row = r as Record<string, unknown>;
       const accId = row.line_account_id as string | null;
       return {
@@ -606,8 +604,8 @@ profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c)
         preview: row.preview,
         createdAt: row.created_at,
       };
-    }),
-  });
+    });
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
 });
 
 /**

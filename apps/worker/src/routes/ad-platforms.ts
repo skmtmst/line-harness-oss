@@ -31,7 +31,7 @@ import { sendAdConversions, retryAdConversion, AdConversionRetryError } from '..
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { listLimit, parseOffsetPaging } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 
 /**
  * 画面へ返す形。秘密の値は出さず、設定済みの鍵名だけ出す。
@@ -499,7 +499,7 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
 
     return c.json({
       success: true,
-      data: {
+      data: buildOffsetListResponse({
         items: logs.results.map(serializeLog),
         total: Number(count?.total ?? 0),
         summary: {
@@ -513,7 +513,8 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
           { field: 'createdAt', direction: 'desc' },
           { field: 'id', direction: 'desc' },
         ],
-      },
+        paging: { limit, offset: (page - 1) * limit },
+      }),
     });
   } catch (err) {
     throw err;
@@ -531,13 +532,15 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
-    const limit = listLimit(c.req.query('limit'), 50);
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 50 }).limit;
     const logs = await getAdConversionLogs(c.env.DB, id, limit);
 
-    return c.json({
+    const responseItems = logs.map(serializeLog);
+    return c.json(buildOffsetListResponse({
       success: true,
-      data: logs.map(serializeLog),
-    });
+      data: responseItems,
+      items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [],
+    }));
   } catch (err) {
     throw err;
   }

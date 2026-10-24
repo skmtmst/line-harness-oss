@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
@@ -57,8 +57,7 @@ export const get__api_mileage_overview_2 = async (c: Context<Env, "/api/mileage/
     if (!accountScope.allowedAccountIds.includes(accountId)) {
       return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
-    const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 50)));
-    const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0));
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 50, limitPolicy: { minimum: 1, maximum: 100 }, offsetPolicy: { minimum: 0 } });
     const overview = await getMileageAdminOverview(c.env.DB, {
       accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
@@ -66,7 +65,7 @@ export const get__api_mileage_overview_2 = async (c: Context<Env, "/api/mileage/
       limit: Number.isFinite(limit) ? limit : 50,
       offset: Number.isFinite(offset) ? offset : 0,
     });
-    return c.json({ success: true, data: buildOffsetListResponse({ ...overview, items: overview.members, total: overview.pagination.total, paging: { limit: overview.pagination.limit }, sort: [] }) });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...overview, items: overview.members, total: overview.pagination.total, paging: { limit: overview.pagination.limit, offset: overview.pagination.offset }, sort: [] }) });
   } catch (err) {
     throw err;
   }
@@ -111,8 +110,7 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
     if (fromValue && toValue && fromValue > toValue) {
       return c.json({ success: false, error: 'from must not be after to' }, 400);
     }
-    const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 50);
-    const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
+    const { limit: requestedLimit, offset: requestedOffset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 50, limitPolicy: { fallback: 'finite', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'finite', minimum: 0 } });
     const historyInput = {
       ...(kind ? { kind: kind as 'earned' | 'spent' | 'voided' } : {}),
       accountId,
@@ -126,8 +124,8 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
       mode: modeValue as 'automatic' | 'manual' | undefined,
       from: fromValue || undefined,
       to: toValue || undefined,
-      limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50,
-      offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+      limit: requestedLimit,
+      offset: requestedOffset,
     };
     const [history, summary] = await Promise.all([
       getMileageAdminHistory(c.env.DB, historyInput),
@@ -137,7 +135,7 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
         to: toValue || undefined,
       }),
     ]);
-    return c.json({ success: true, data: buildOffsetListResponse({ ...history, summary, total: history.pagination.total, paging: { limit: history.pagination.limit }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...history, summary, total: history.pagination.total, paging: { limit: history.pagination.limit, offset: history.pagination.offset }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
   } catch (err) {
     throw err;
   }

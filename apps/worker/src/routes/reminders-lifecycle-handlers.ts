@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
 import { getFriendById, getReminderById, createReminder, updateReminder, deleteReminder, restoreReminder, createReminderStep, deleteReminderStep, enrollFriendInReminder, getFriendReminders, listReminderRegistrants, moveReminderRegistrantTargetDate, cancelReminderRegistrant, resumeReminderRegistrant, getReminderRegistrantById, getReminderDeliveryRunById, getReminderDeliveryRunSummary, getReminderDeliveryStepSummaries, listReminderDeliveryRuns, retryReminderDeliveryRun, getReminderPublishedVersion, parseReminderVersionSettings, type ReminderDeliveryRunStatus } from '@line-crm/db';
@@ -41,8 +41,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
         (executedOnly !== undefined && !['true', 'false'].includes(executedOnly))) {
       return c.json({ success: false, error: '取得条件が正しくありません' }, 400);
     }
-    const limit = clampedListInteger(c.req.query('limit'), 20, 1, 100);
-    const offset = clampedListInteger(c.req.query('offset'), 0, 0);
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 20, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'integer', minimum: 0 } });
     const search = c.req.query('search')?.trim().slice(0, 100) || undefined;
 
     const [runs, summary, stepRows, publishedVersion] = await Promise.all([
@@ -120,7 +119,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
           lineRequestId: row.line_request_id,
           messageLogId: row.message_log_id,
         })),
-        pagination: { total: runs.total, limit, offset }, total: runs.total, paging: { limit }, sort: [] }),
+        pagination: { total: runs.total, limit, offset }, total: runs.total, paging: { limit, offset }, sort: [] }),
     });
   } catch (err) {
     throw err;

@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -54,7 +54,7 @@ function validationResponse(c: Context<Env>, error: CommonActionValidationError)
 
 function nonNegativeInteger(value: string | undefined, field: string): number | undefined {
   if (value === undefined) return undefined;
-  const parsed = listQueryNumber(value, Number.NaN);
+  const parsed = parseOffsetPaging({ limit: value }, { defaultLimit: Number.NaN, limitPolicy: {} }).limit;
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new CommonActionValidationError('pagination_invalid', 'ページ指定を確認してください', field);
   }
@@ -111,7 +111,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
       }
     }
     const requestedLimit = nonNegativeInteger(c.req.query('limit'), 'limit');
-    const limit = requestedLimit === undefined ? undefined : Math.max(1, Math.min(requestedLimit, 500));
+    const limit = requestedLimit === undefined ? undefined : parseOffsetPaging({ limit: String(requestedLimit) }, { limitPolicy: { minimum: 1, maximum: 500 } }).limit;
     const offset = nonNegativeInteger(c.req.query('offset'), 'offset') ?? 0;
     const [result, summary] = await Promise.all([
       listCommonActions(c.env.DB, {
@@ -137,7 +137,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
       data: responseItems,
       pagination: { total: result.total, limit: limit ?? null, offset },
       summary,
-      freshness: 'available', items: responseItems, total: result.total, paging: { limit: limit ?? result.total }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
+      freshness: 'available', items: responseItems, total: result.total, paging: { limit: limit ?? result.total, offset }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
     throw error;

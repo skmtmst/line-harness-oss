@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
@@ -403,8 +403,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
   }
   const denied = await requireAccount(c, lineAccountId);
   if (denied) return denied;
-  const limit = clampedListInteger(c.req.query('limit'), 20, 1, 100);
-  const offset = clampedListInteger(c.req.query('offset'), 0, 0);
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 20, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'integer', minimum: 0 } });
   const view = c.req.query('view') ?? 'all';
   if (view !== 'all' && view !== 'failures') {
     return inputError(c, { success: false, error: '表示条件が正しくありません' }, 400, ["view"]);
@@ -434,7 +433,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
         attemptHistoryAvailable: true,
         retryAvailable: true,
       },
-      ...(quota ? { quota } : {}), total: result.total, paging: { limit }, sort: [] }),
+      ...(quota ? { quota } : {}), total: result.total, paging: { limit, offset }, sort: [] }),
     pagination: { total: result.total, limit, offset },
   });
 }

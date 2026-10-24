@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
 import { createMileageRuleIdempotent, serializeMileageRule } from './mileage-rule-create.js';
 import { inputError } from '../lib/input-errors.js';
@@ -366,8 +366,7 @@ export const get__api_action_scores_friends_9 = async (c: Context<Env, "/api/act
     if (!ACTION_SCORE_SORTS.has(sortValue as ActionScoreSort)) {
       return c.json({ success: false, error: 'sort is invalid' }, 400);
     }
-    const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 20);
-    const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
+    const { limit: requestedLimit, offset: requestedOffset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: { fallback: 'finite', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'finite', minimum: 0 } });
     const bands = await getActionScoreBands(c.env.DB, accountId);
     const data = await getActionScoreOverview(c.env.DB, {
       accountId,
@@ -376,10 +375,10 @@ export const get__api_action_scores_friends_9 = async (c: Context<Env, "/api/act
       search: c.req.query('search') || '',
       filter: filterValue as ActionScoreFilter,
       sort: sortValue as ActionScoreSort,
-      limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
-      offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+      limit: requestedLimit,
+      offset: requestedOffset,
     });
-    return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [] }) });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit, offset: data.pagination.offset }, sort: [] }) });
   } catch (err) {
     throw err;
   }

@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -373,6 +373,7 @@ nenRanks.get('/api/nen/members', async (c) => {
     .map((key) => key.trim())
     .filter((key) => key && ranks.some((rank) => rank.rank_key === key))
     .slice(0, 8);
+  const { page, limit: pageSize } = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('pageSize') }, { defaultLimit: 20, pagePolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1 }, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: 100 } });
   const options: NenMemberListOptions = {
     accountIds,
     rankKey: c.req.query('rank') || null,
@@ -381,8 +382,8 @@ nenRanks.get('/api/nen/members', async (c) => {
     petFilter: petParam === 'with' || petParam === 'without' ? petParam : 'any',
     query: c.req.query('q') ?? '',
     sort: sortParam === 'lifetime_desc' || sortParam === 'balance_desc' || sortParam === 'recent' ? sortParam : 'annual_desc',
-    page: Math.max(1, listQueryNumber(c.req.query('page'), 1, { format: 'integer-prefix' }) || 1),
-    pageSize: Math.max(1, Math.min(listQueryNumber(c.req.query('pageSize'), 20, { format: 'integer-prefix' }) || 20, 100)),
+    page,
+    pageSize,
   };
   const [{ items, total }, kpis] = await Promise.all([
     listNenMembers(c.env.DB, options),
@@ -417,7 +418,7 @@ nenRanks.get('/api/nen/members', async (c) => {
       page: options.page,
       pageSize: options.pageSize,
       kpis,
-      ranks: ranks.map((rank) => ({ key: rank.rank_key, name: rank.name, annualThresholdYen: rank.annual_threshold_yen, mileRatePercent: rank.mile_rate_percent })), paging: { limit: options.pageSize ?? 20 }, sort: [] }),
+      ranks: ranks.map((rank) => ({ key: rank.rank_key, name: rank.name, annualThresholdYen: rank.annual_threshold_yen, mileRatePercent: rank.mile_rate_percent })), paging: { limit: pageSize, offset: (page - 1) * pageSize }, sort: [] }),
   });
 });
 

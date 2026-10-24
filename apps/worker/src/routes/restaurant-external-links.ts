@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID, RESTAURANT_EXTERNAL_PROVIDERS, reservationInstant, type RestaurantExternalLink, type RestaurantExternalProvider } from '@line-crm/shared';
@@ -135,8 +135,7 @@ async function inputBody(c: Context<Env>): Promise<Record<string, unknown> | Res
 
 restaurantExternalLinks.get(path, async (c) => {
   const store = await selectedStore(c); if (store instanceof Response) return store;
-  const limit = c.req.query('limit') === undefined ? 100 : listQueryNumber(c.req.query('limit'), Number.NaN);
-  const offset = c.req.query('offset') === undefined ? 0 : listQueryNumber(c.req.query('offset'), Number.NaN);
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 100, limitPolicy: {}, offsetPolicy: {} });
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100 || !Number.isSafeInteger(offset) || offset < 0) {
     return inputError(c, { success: false, error: '表示件数または開始位置が正しくありません' }, 400, ['limit', 'offset']);
   }
@@ -148,7 +147,7 @@ restaurantExternalLinks.get(path, async (c) => {
   const count = await db.prepare(`SELECT count(*) AS total FROM rt_reservation_external_links l WHERE ${filter}`)
     .bind(store.id, reservationId, reservationId).first<{ total: number }>();
   const responseItems = rows.results.map(publicLink);
-  return c.json({ success: true, data: buildOffsetListResponse({ links: responseItems, total: count!.total, limit, offset, items: responseItems, paging: { limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
+  return c.json({ success: true, data: buildOffsetListResponse({ links: responseItems, total: count!.total, limit, offset, items: responseItems, paging: { limit, offset }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
 });
 restaurantExternalLinks.get(`${path}/:id`, async (c) => {
   const store = await selectedStore(c); if (store instanceof Response) return store;
