@@ -2,7 +2,6 @@
 
 import { Children, Fragment, isValidElement, useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
-import Button from './button'
 import HelpTip from './help-tip'
 import { folderDisplayColor } from './folder-dot'
 import { ArrowDown, ArrowUp, Ellipsis, Folder, FolderOpen, FolderPlus, Inbox, Palette, Pencil, Star, Trash2 } from 'lucide-react'
@@ -307,21 +306,26 @@ export default function FolderPanel({
             </Fragment>
           )
         })}
+        {/*
+          フォルダの最後の行と同じ形の「行」にする（Apple の Finder・メモの脇の列と同じ）。
+          地の塗りなし・左端と印の位置・文字の大きさ・行の高さをフォルダの行にそろえる。
+          乗せた時だけ行と同じ薄い地にする。閲覧のみには出さない。
+        */}
+        {!readOnly && (onAddFolder || addFolderDisabled) && (
+          <button
+            type="button"
+            onClick={onAddFolder}
+            disabled={addFolderDisabled}
+            title={addFolderTitle}
+            className={styles.add}
+          >
+            <span className={styles.addIcon} aria-hidden="true"><FolderPlus size={15} /></span>
+            <span className={styles.addLabel}>{addFolderLabel}</span>
+          </button>
+        )}
       </nav>
-      {!readOnly && (onAddFolder || addFolderDisabled || addNotes.content.length > 0 || notes.content.length > 0) && (
+      {!readOnly && (addNotes.content.length > 0 || notes.content.length > 0) && (
         <div className={styles.footer}>
-          {(onAddFolder || addFolderDisabled) && (
-            <Button
-              type="button"
-              onClick={onAddFolder}
-              disabled={addFolderDisabled}
-              title={addFolderTitle}
-              className={styles.add}
-            >
-              <FolderPlus size={14} aria-hidden="true" />
-              {addFolderLabel}
-            </Button>
-          )}
           {addNotes.content}
           {notes.content}
         </div>

@@ -26,15 +26,24 @@
 :root .folderIcon { display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-folder-dot-indent); flex-shrink: 0; }
 :root .count { font-family: var(--font-inter), Inter, sans-serif; font-size: 12px; font-weight: 400; line-height: normal; }
 :root .footer { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border: 0; padding: 0; margin-top: 12px; }
+/* 追加はボタンではなく、フォルダの行と同じ形の「行」にする（地の塗りなし・同じ余白と高さ）。 */
 :root .add {
-  display: flex; justify-content: flex-start; width: fit-content;
-  height: auto; min-height: 0; padding: 6px 10px; gap: 6px;
-  border: 0; border-radius: 0; background: transparent; box-shadow: none;
-  font-size: 13px; font-weight: 600; color: var(--color-ink);
+  display: flex; align-items: center; justify-content: flex-start;
+  width: 100%; height: auto; min-height: 0;
+  margin-top: 2px;
+  padding: var(--folder-row-pad-block, var(--tpl-toolbar-gap)) var(--tpl-folder-pad-side);
+  gap: 8px;
+  border: 0; border-radius: var(--polish-radius-control);
+  background: transparent; box-shadow: none;
+  color: var(--color-ink-secondary);
+  font-family: inherit; font-size: 13px; font-weight: 500; line-height: normal;
+  text-align: left; cursor: pointer;
 }
+:root .add:hover:not(:disabled) { background: var(--color-canvas-sunken); color: var(--color-ink); }
+:root .add:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
+:root .addIcon { display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-folder-dot-indent); flex-shrink: 0; }
+:root .add:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 :root .footer { font-size: 11px; line-height: 17px; color: var(--color-ink-faint); }
-
-:root .panel .add { height: auto; padding: 6px 10px; box-shadow: none; }
 /* ：主ボタンの縁と影は Button が持つ。 */
 :root .label { min-width: 0; }
 :root .row[data-active] .label { font-weight: 600; }
@@ -86,9 +95,6 @@
 .leading { display: inline-flex; align-items: center; flex-shrink: 0; }
 }
 
-/* controls のボタンの輪郭を継承せず、layout 正本の文字操作を保つ。 */
-@layer components { :root .panel .add:not(:focus-visible) { outline: none; } }
-
 /* ★V8 型のフォルダの列（[data-template-region=folders]）の中では、列が余白と線を持つので部品は二重に持たない（司令塔 2026-10-05） */
 :global(:root) :global([data-template-region='folders']) .panel { padding: 0; border-right: 0; width: auto; }
 
@@ -96,9 +102,3 @@
 :root .create { width: fit-content; max-width: 100%; align-self: flex-start; margin-bottom: 16px; }
 :root .create > * { width: fit-content; max-width: 100%; height: var(--tpl-folder-create-h); min-height: 0; padding: var(--tpl-folder-create-pad); }
 :root .createPlaceholder { height: var(--tpl-folder-create-h); }
-
-/*  / ：フォルダの追加も通常のボタンの寸法を読む。 */
-:root .panel .add {
-  height: var(--tpl-button-h);
-  padding: 0 var(--tpl-button-pad-side);
-}
