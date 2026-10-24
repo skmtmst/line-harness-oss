@@ -566,7 +566,7 @@
   --polish-table-head: 40px;
   --polish-table-number-gap: 24px;
   --polish-table-head-bg: var(--color-canvas);
-  --polish-table-hover: var(--color-canvas);
+  --polish-table-hover: var(--color-canvas-sunken);
 }
 :root {
   --polish-text-page: 32px;
