@@ -40,7 +40,19 @@ export const scanLayoutOverflow = () => {
     }
     return false
   }
-  const res = { pageX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1, overflow: [], outOfMain: [], noTitle: [] }
+  /*
+   * 上の帯のアカウント名は、長い名前で帯を混ませないよう最大 260px で
+   * 「…」に収める。文字を固定せず、描いた結果の幅で見る。
+   */
+  const accountName = []
+  for (const e of document.querySelectorAll('[data-part="account-name"]')) {
+    const cs = getComputedStyle(e)
+    if (cs.display === 'none' || cs.visibility === 'hidden') continue
+    if (cs.maxWidth !== '260px' || cs.textOverflow !== 'ellipsis') {
+      accountName.push(`${label(e)} max-width=${cs.maxWidth} text-overflow=${cs.textOverflow}`)
+    }
+  }
+  const res = { pageX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1, overflow: [], outOfMain: [], noTitle: [], accountName }
   for (const e of main.querySelectorAll('*')) {
     const r = e.getBoundingClientRect()
     if (r.width <= 1 || r.height <= 1) continue
@@ -57,7 +69,7 @@ export const scanLayoutOverflow = () => {
     }
     if (r.right > mr.right + 1 && cs.position !== 'fixed') res.outOfMain.push(`${label(e)} +${Math.round(r.right - mr.right)}`)
   }
-  for (const k of ['overflow', 'outOfMain', 'noTitle']) res[k] = [...new Set(res[k])]
+  for (const k of ['overflow', 'outOfMain', 'noTitle', 'accountName']) res[k] = [...new Set(res[k])]
   return res
 }
 
@@ -90,10 +102,10 @@ for (const theme of ['v8']) {
       const r = await page.evaluate(scanLayoutOverflow)
       await page.close()
       res[`${theme} ${width} ${name}`] = r
-      const n = (r.pageX ? 1 : 0) + r.overflow.length + r.outOfMain.length + r.noTitle.length
+      const n = (r.pageX ? 1 : 0) + r.overflow.length + r.outOfMain.length + r.noTitle.length + r.accountName.length
       if (n) {
         bad += n
-        console.log(`崩れ ${theme} ${width} ${route}`, JSON.stringify({ pageX: r.pageX, overflow: r.overflow.slice(0, 5), outOfMain: r.outOfMain.slice(0, 5), noTitle: r.noTitle.slice(0, 5) }))
+        console.log(`崩れ ${theme} ${width} ${route}`, JSON.stringify({ pageX: r.pageX, overflow: r.overflow.slice(0, 5), outOfMain: r.outOfMain.slice(0, 5), noTitle: r.noTitle.slice(0, 5), accountName: r.accountName.slice(0, 5) }))
       }
     }
   }

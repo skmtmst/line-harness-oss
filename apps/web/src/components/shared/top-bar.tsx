@@ -287,14 +287,14 @@ export default function TopBar({
                 {/* ★V8 統括の画面：札は統括にいることを示す（絵 `V8-B/JKjsE`）。v7 は今までどおり。 */}
                 {hq ? (
                   <>
-                    <span className={`${styles.accountName}`} title={hq.name}>{hq.name}</span>
+                    <span className={`${styles.accountName}`} data-part="account-name" title={hq.name}>{hq.name}</span>
                   </>
                 ) : (
-                  <span className={styles.accountName} title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
+                  <span className={styles.accountName} data-part="account-name" title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
                 )}
               </span>
             ) : (
-              <span className={styles.accountName} title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
+              <span className={styles.accountName} data-part="account-name" title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
             )}
             {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
 
