@@ -25,7 +25,7 @@ import {
   type BulkPhotoDecisionItem,
   type BulkPhotoDecisionResult,
 } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import {
   deliverPhotoReviewNotification,
   loadPhotoReviewRecipient,
@@ -96,7 +96,7 @@ nenPhotoOperations.get(
   requirePhotoPermission('photo.submission.view'),
   async (c) => {
     const accountId = accountIdFromQuery(c);
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await accountVisible(c, accountId)) return c.json({ success: false, error: '写真審査情報が見つかりません' }, 404);
     try {
       return c.json({ success: true, data: await getPhotoReviewMetrics(c.env.DB, accountId) });
@@ -328,7 +328,7 @@ nenPhotoOperations.get(
   async (c) => {
     const photoId = c.req.param('id');
     const accountId = accountIdFromQuery(c);
-    if (!photoId || !accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!photoId || !accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await accountVisible(c, accountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
     try {
       const data = await getPhotoAssetStatus(c.env.DB, { photoId, lineAccountId: accountId });
@@ -345,7 +345,7 @@ nenPhotoOperations.get(
   async (c) => {
     const photoId = c.req.param('id');
     const accountId = accountIdFromQuery(c);
-    if (!photoId || !accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!photoId || !accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await accountVisible(c, accountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
     try {
       const data = await getPhotoDerivatives(c.env.DB, { photoId, lineAccountId: accountId });

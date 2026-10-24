@@ -23,7 +23,7 @@ import {
   updateCommonVarExportProgress,
   type CommonVarExportJobMeta,
 } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import type { Env } from '../worker-env.js';
 import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -167,7 +167,7 @@ async function accessibleExportJob(
 commonVarExports.get('/api/common-vars/exports', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }

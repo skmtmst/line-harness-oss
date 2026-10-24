@@ -10,7 +10,7 @@ import { formAvailability } from '../features/forms/form-availability/index.js';
 import { applyAccountAllergyOptions } from '../services/allergy-options.js';
 import { accountCustomerLook } from '../services/customer-look.js';
 import { resolveCustomerFormTheme } from '@line-crm/shared';
-
+import { fail } from '../lib/fail.js';
 import { getFormsWithStats, getFormById, getFormLatestEdit, getFormAccountIds, getFolderById, formBelongsToLineAccount, createForm, updateForm, setFormFolder, publishFormVersion, type UpdateFormInput, countActiveFormTestTokens, insertFormTestToken, deleteExpiredFormTestTokens, getFriendByLineUserIdForAccount, jstNow, toJstString } from '@line-crm/db';
 
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
@@ -29,7 +29,7 @@ function validWebhookTemplate(value: string): boolean {
 export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
   const accountId = c.req.query('account_id');
   if (!accountId) {
-    return c.json({ success: false, error: 'account_id is required' }, 400);
+    return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
@@ -114,7 +114,7 @@ export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
 export const get__api_forms_unassigned_2 = async (c: Context<Env, "/api/forms/unassigned">) => {
   const accountId = c.req.query('account_id');
   if (!accountId) {
-    return c.json({ success: false, error: 'account_id is required' }, 400);
+    return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
@@ -153,7 +153,7 @@ export const get__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) => 
     }
     const draft = await getFormById(c.env.DB, id);
     if (!draft) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+      return fail(c, 404, 'FORM_NOT_FOUND');
     }
     const testAccounts = await getFormAccountIds(c.env.DB, id);
     let testLayout = parseLayout(draft.layout, draft.fields);
@@ -168,10 +168,10 @@ export const get__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) => 
   const adminView = Boolean(staff && c.req.query('account_id'));
   const form = await getFormById(c.env.DB, id, { published: !adminView });
   if (!form) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   if (adminView && !await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   let friendId: string | null = null;
   let layout = parseLayout(form.layout, form.fields);
@@ -180,7 +180,7 @@ export const get__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) => 
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) return c.json({ success: false, error: 'Unauthorized' }, 401);
     if (!identity.lineAccountId || !await formBelongsToLineAccount(c.env.DB, id, identity.lineAccountId)) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+      return fail(c, 404, 'FORM_NOT_FOUND');
     }
     friendId = (await getFriendByLineUserIdForAccount(c.env.DB, identity.lineUserId, identity.lineAccountId))?.id ?? null;
     publicAccountId = identity.lineAccountId;
@@ -208,7 +208,7 @@ export const post__api_forms_id_publish_4 = async (c: Context<Env, "/api/forms/:
   const manageGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
   if (manageGate) return manageGate;
   if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const body = await c.req.json<{ expectedContentRevision?: unknown }>()
     .catch(() => ({} as { expectedContentRevision?: unknown }));
@@ -233,7 +233,7 @@ export const post__api_forms_id_publish_4 = async (c: Context<Env, "/api/forms/:
   }
   const result = await publishFormVersion(c.env.DB, id, expected);
   if (result.kind === 'not_found') {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   if (result.kind === 'conflict') {
     return c.json({
@@ -263,11 +263,11 @@ export const post__api_forms_id_test_token_5 = async (c: Context<Env, "/api/form
   const manageGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
   if (manageGate) return manageGate;
   if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const draft = await getFormById(c.env.DB, id);
   if (!draft) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const now = jstNow();
   await deleteExpiredFormTestTokens(c.env.DB, now);
@@ -318,7 +318,7 @@ export const post__api_forms_6 = async (c: Context<Env, "/api/forms">) => {
   const createGate = await requireFormManage(c, [body.accountId]);
   if (createGate) return createGate;
   if (!body.accountId) {
-    return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+    return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
@@ -370,7 +370,7 @@ export const post__api_forms_drafts_7 = async (c: Context<Env, "/api/forms/draft
   const draftsGate = await requireFormManage(c, [body.accountId]);
   if (draftsGate) return draftsGate;
   if (!body.accountId) {
-    return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+    return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
@@ -392,11 +392,11 @@ export const post__api_forms_id_duplicate_8 = async (c: Context<Env, "/api/forms
   if (duplicateGate) return duplicateGate;
   const source = await getFormById(c.env.DB, id);
   if (!source) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const requestAccountId = c.req.query('account_id');
   if (requestAccountId && !await canUseFormFromAccount(c, id, requestAccountId)) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const body = await c.req.json<{ name?: unknown }>()
     .catch(() => ({} as { name?: unknown }));
@@ -441,7 +441,7 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
   const putGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
   if (putGate) return putGate;
   if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const body = await c.req.json<{
     name?: string;
@@ -513,10 +513,10 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
     }
     if (!hasContentUpdate) {
       if (!await setFormFolder(c.env.DB, id, nextFolderId)) {
-        return c.json({ success: false, error: 'Form not found' }, 404);
+        return fail(c, 404, 'FORM_NOT_FOUND');
       }
       const moved = await getFormById(c.env.DB, id);
-      if (!moved) return c.json({ success: false, error: 'Form not found' }, 404);
+      if (!moved) return fail(c, 404, 'FORM_NOT_FOUND');
       return c.json({ success: true, data: serializeForm(moved) });
     }
   }
@@ -553,7 +553,7 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
   if (body.onSubmitWebhookUrl !== undefined) updates.onSubmitWebhookUrl = body.onSubmitWebhookUrl;
   if (body.onSubmitWebhookUrl !== undefined && body.onSubmitWebhookHeaders === undefined) {
     const previous = await getFormById(c.env.DB, id);
-    if (!previous) return c.json({ success: false, error: 'Form not found' }, 404);
+    if (!previous) return fail(c, 404, 'FORM_NOT_FOUND');
     // The existing content-revision CAS fences this read with the update.
     // An editor who cannot reveal a saved credential cannot carry it to a
     // newly chosen origin. Explicit new credentials belong to that new origin.
@@ -573,7 +573,7 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
   const updated = await updateForm(c.env.DB, id, updates as UpdateFormInput, expectedContentRevision,c.get('staff')?.id);
 
   if (updated.kind === 'not_found') {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   if (updated.kind === 'conflict') {
     // 画面は入力を捨てず、この時刻を添えて「ほかの人が先に保存しました」と出す。
@@ -596,10 +596,10 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
 export const get__api_forms_id_delete_impact_10 = async (c: Context<Env, "/api/forms/:id/delete-impact">) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
     if (authorized.kind === 'not_found') {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     if (authorized.kind === 'forbidden') {
       return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);

@@ -2,7 +2,7 @@ import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import type { Context } from 'hono';
 import { getChatById, getFriendById, getLineAccountById, type InboxSavedViewConditions, type SavedSearchAccess, type ScheduledChatSendRow, jstNow } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 
 import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
@@ -48,7 +48,7 @@ export async function requireVisibleChat(c: Context<Env>, next: () => Promise<vo
     c.get('staff'),
     [lineAccountId],
   )) {
-    return c.json({ success: false, error: 'Chat not found' }, 404);
+    return fail(c, 404, 'CHAT_NOT_FOUND');
   }
   await next();
 }

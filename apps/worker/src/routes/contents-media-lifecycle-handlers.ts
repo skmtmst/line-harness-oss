@@ -5,7 +5,7 @@ import { getMediaVersionKeys } from '@line-crm/db';
 import { getMediaById, getFolderById, updateMedia, deleteMedia, getMediaUsages, getMediaDeleteImpactSnapshot, isMissingTableError, applyMediaReplacementPlan, getMediaVersionList, getMediaLiveTarget, getMediaUsageReferenceStates, retargetMediaUsageReference, MediaUsageReferenceError, MEDIA_REF_KINDS, jstNow, getCommonVars, countCommonVars, COMMON_VARS_LIST_LIMIT, getCommonVarUsageSummaries, getCommonVarByIdIncludingArchived, getCommonVarUsageImpact, getCommonVarVersions, type CommonVar } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 import { isWebinarSource, privateImageKey, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
-
+import { fail } from '../lib/fail.js';
 
 
 import type { Env } from '../worker-env.js';
@@ -64,7 +64,7 @@ export const get__media_id_content_1 = async (c: Context<Env, "/media/:id/conten
 export const patch__api_media_id_2 = async (c: Context<Env, "/api/media/:id">) => {
   const id = c.req.param('id');
   const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -256,7 +256,7 @@ export const post__api_media_id_restore_4 = async (c: Context<Env, "/api/media/:
 export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/media/:id/delete-impact">) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -474,7 +474,7 @@ export const delete__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) 
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -533,7 +533,7 @@ export const delete__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) 
 
 export const get__api_common_vars_9 = async (c: Context<Env, "/api/common-vars">) => {
   const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -567,7 +567,7 @@ export const get__api_common_vars_9 = async (c: Context<Env, "/api/common-vars">
 export const get__api_common_vars_id_10 = async (c: Context<Env, "/api/common-vars/:id">) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }

@@ -1,7 +1,7 @@
 import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getFriendById, jstNow } from '@line-crm/db';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../worker-env.js';
@@ -188,7 +188,7 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
     const db = c.env.DB;
     const friend = await getFriendById(db, friendId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const messageType = body.messageType ?? 'text';

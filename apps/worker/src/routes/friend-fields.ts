@@ -36,7 +36,7 @@ import {
   type FriendFieldType,
 } from '@line-crm/db';
 import { recordLoginAudit } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 
 import type { Env } from '../worker-env.js';
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
@@ -941,7 +941,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
     }
     const accountScope = await getVisibleLineAccountScope(c.env.DB, staff);
     if (!accountScope.allowedAccountIds.includes(lineAccountId)) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const scope = { tenantId: staff.tenantId, lineAccountId };
     const friendIds = Array.isArray(body.friendIds) ? body.friendIds.map(String) : [];
@@ -986,7 +986,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
     for (const friendId of friendIds) {
       const friend = await getFriendById(c.env.DB, friendId);
       if (!friend || friend.line_account_id !== lineAccountId) {
-        return c.json({ success: false, error: 'Friend not found' }, 404);
+        return fail(c, 404, 'FRIEND_NOT_FOUND');
       }
     }
 

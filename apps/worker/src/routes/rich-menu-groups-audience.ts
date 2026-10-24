@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getRichMenuGroupById, getRichMenuGroupWithPages, getLineAccountById, getFollowingLineUserIdsByTag, recordRichMenuAssignmentsByLineUserIds, duplicateRichMenuGroupAtomic, createRichMenuTestApplyAtomic, getActiveRichMenuTestApply, getRichMenuTestApplyById, listRichMenuTestApplies, captureRichMenuTestApplyPrevious, recordRichMenuTestApplyShells, markRichMenuTestApplyApplied, markRichMenuTestApplyFailed, getStaffById, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
@@ -33,7 +33,7 @@ export const post__api_rich_menu_groups_groupId_apply_to_tag_1 = async (c: Conte
 
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
   if (group.status !== 'published') {
     return inputError(c, { success: false, error: 'group must be published before applying to friends' }, 400, []);
@@ -47,7 +47,7 @@ export const post__api_rich_menu_groups_groupId_apply_to_tag_1 = async (c: Conte
   }
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
-  if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+  if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
 
   // ---- mode: set-default (LINE 全員のデフォルトに設定) ----
   if (mode === 'set-default') {
@@ -135,7 +135,7 @@ export const post__api_rich_menu_groups_groupId_duplicate_2 = async (c: Context<
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupById(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!idempotencyKey) {
@@ -163,7 +163,7 @@ export const post__api_rich_menu_groups_groupId_duplicate_2 = async (c: Context<
       );
     }
     const created = await getRichMenuGroupWithPages(c.env.DB, result.groupId);
-    if (!created) return c.json({ success: false, error: 'duplicate target not found' }, 500);
+    if (!created) return fail(c, 500, 'DUPLICATE_TARGET_NOT_FOUND');
 
     const staff = c.get('staff');
     c.set('auditRecorded', true);
@@ -197,7 +197,7 @@ export const post__api_rich_menu_groups_groupId_duplicate_2 = async (c: Context<
 export const get__api_rich_menu_groups_groupId_audience_summary_3 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/audience-summary">) => {
   const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
   try {
     const condition = group.targeting_enabled === 1
@@ -294,7 +294,7 @@ export const get__api_rich_menu_groups_groupId_audience_summary_3 = async (c: Co
 export const get__api_rich_menu_groups_groupId_test_apply_4 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/test-apply">) => {
   const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
   const staff = c.get('staff');
   const member = await getStaffById(c.env.DB, staff.id);
@@ -330,7 +330,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!idempotencyKey) {
@@ -401,7 +401,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
     }
 
     const account = await getLineAccountById(c.env.DB, group.account_id);
-    if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+    if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
     const line = createLineClient(account.channel_access_token);
     if (!line.getRichMenuIdOfUser || !line.linkRichMenuToUser) {
       return c.json({ success: false, error: 'LINE client does not support per-user rich menu operations' }, 500);

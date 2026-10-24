@@ -17,7 +17,7 @@ import {
   toJstString,
   decryptCredential,
 } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import { GoogleCalendarClient } from '../services/google-calendar.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -66,7 +66,7 @@ calendar.post('/api/integrations/google-calendar/connect', requireRole('owner', 
   try {
     const body = await c.req.json<{ accountId: string; calendarId: string; authType: string; accessToken?: string; refreshToken?: string; apiKey?: string }>();
     if (!body.accountId || !body.calendarId) {
-      return inputError(c, { success: false, error: 'accountId and calendarId are required' }, 400, ["accountId","calendarId"]);
+      return fail(c, 400, 'ACCOUNT_ID_AND_CALENDAR_ID_ARE_REQUIRED', {}, ["accountId","calendarId"]);
     }
     const scope = await resolveCalendarScope(c);
     if (!scope.allowedAccountIds.includes(body.accountId)) {
@@ -94,7 +94,7 @@ calendar.delete('/api/integrations/google-calendar/:id', requireRole('owner', 'a
   try {
     const scope = await resolveCalendarScope(c);
     const deleted = await deleteCalendarConnection(c.env.DB, c.req.param('id'), scope);
-    if (!deleted) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
+    if (!deleted) return fail(c, 404, 'CALENDAR_CONNECTION_NOT_FOUND');
     return c.json({ success: true, data: null });
   } catch (err) {
     throw err;
@@ -118,7 +118,7 @@ calendar.get('/api/integrations/google-calendar/slots', requireRole('owner', 'ad
     const scope = await resolveCalendarScope(c);
     const conn = await getCalendarConnectionById(c.env.DB, connectionId, scope);
     if (!conn) {
-      return c.json({ success: false, error: 'Calendar connection not found' }, 404);
+      return fail(c, 404, 'CALENDAR_CONNECTION_NOT_FOUND');
     }
 
     const dayStart = `${date}T${String(startHour).padStart(2, '0')}:00:00`;
@@ -190,14 +190,14 @@ calendar.get('/api/integrations/google-calendar/bookings', requireRole('owner', 
     const friendId = c.req.query('friendId');
     const scope = await resolveCalendarScope(c);
     if (connectionId && !await getCalendarConnectionById(c.env.DB, connectionId, scope)) {
-      return c.json({ success: false, error: 'Calendar connection not found' }, 404);
+      return fail(c, 404, 'CALENDAR_CONNECTION_NOT_FOUND');
     }
     if (friendId) {
       const friend = await getFriendById(c.env.DB, friendId);
       const friendVisible = friend && (friend.line_account_id === null
         ? scope.includeUnassigned
         : scope.allowedAccountIds.includes(friend.line_account_id));
-      if (!friendVisible) return c.json({ success: false, error: 'Friend not found' }, 404);
+      if (!friendVisible) return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const items = await getCalendarBookings(c.env.DB, scope, {
       connectionId: connectionId ?? undefined,
@@ -232,7 +232,7 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
 
     const scope = await resolveCalendarScope(c);
     const conn = await getCalendarConnectionById(c.env.DB, body.connectionId, scope);
-    if (!conn) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
+    if (!conn) return fail(c, 404, 'CALENDAR_CONNECTION_NOT_FOUND');
     // Resolve before writing a booking; bad keys/legacy plaintext must not create partial work.
     const accessToken = conn.access_token
       ? await decryptCredential(conn.access_token, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY) : null;
@@ -240,7 +240,7 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
     if (body.friendId) {
       const friend = await getFriendById(c.env.DB, body.friendId);
       if (!friend || !canUseConnectionForFriend(conn.line_account_id, friend.line_account_id)) {
-        return c.json({ success: false, error: 'Friend not found' }, 404);
+        return fail(c, 404, 'FRIEND_NOT_FOUND');
       }
     }
 
@@ -249,7 +249,7 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
       ...body,
       metadata: body.metadata ? JSON.stringify(body.metadata) : undefined,
     }, scope);
-    if (!booking) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
+    if (!booking) return fail(c, 404, 'CALENDAR_CONNECTION_NOT_FOUND');
 
     // Google Calendar にイベントを作成（access_token がある場合のみ、ベストエフォート）
     if (accessToken) {
@@ -306,7 +306,7 @@ calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRol
     const { status } = await c.req.json<{ status: string }>();
     const scope = await resolveCalendarScope(c);
     const booking = await getCalendarBookingById(c.env.DB, id, scope);
-    if (!booking) return c.json({ success: false, error: 'Calendar booking not found' }, 404);
+    if (!booking) return fail(c, 404, 'CALENDAR_BOOKING_NOT_FOUND');
 
     const conn = status === 'cancelled' && booking.event_id && booking.connection_id
       ? await getCalendarConnectionById(c.env.DB, booking.connection_id, scope) : null;
@@ -314,7 +314,7 @@ calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRol
       ? await decryptCredential(conn.access_token, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY) : null;
 
     const updated = await updateCalendarBookingStatus(c.env.DB, id, status, scope);
-    if (!updated) return c.json({ success: false, error: 'Calendar booking not found' }, 404);
+    if (!updated) return fail(c, 404, 'CALENDAR_BOOKING_NOT_FOUND');
 
     // DB更新後に、Google Calendar のイベントも削除する（ベストエフォート）
     if (status === 'cancelled') {

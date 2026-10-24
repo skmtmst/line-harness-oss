@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { inputError, readBoundedBytes } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
-
+import { fail } from '../lib/fail.js';
 import { getFormById, formBelongsToLineAccount, getLatestFormSubmission, getFriendByLineUserIdForAccount, jstNow } from '@line-crm/db';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { builtinFileScan, markFileScanClean } from '../services/file-scan.js';
@@ -28,7 +28,7 @@ export const post__api_forms_id_opened_1 = async (c: Context<Env, "/api/forms/:i
       }
       const draft = await getFormById(c.env.DB, formId);
       if (!draft) {
-        return c.json({ success: false, error: 'Form not found' }, 404);
+        return fail(c, 404, 'FORM_NOT_FOUND');
       }
       const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
       if (identity && (!identity.lineAccountId
@@ -71,7 +71,7 @@ export const post__api_forms_id_opened_1 = async (c: Context<Env, "/api/forms/:i
      */
     const openedForm = await getFormById(c.env.DB, formId, { published: true });
     if (!openedForm) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+      return fail(c, 404, 'FORM_NOT_FOUND');
     }
     if (!openedForm.is_active) {
       return c.json({ success: true });
@@ -121,7 +121,7 @@ export const post__api_forms_id_partial_2 = async (c: Context<Env, "/api/forms/:
   }
   if (!identity.lineAccountId
     || !await formBelongsToLineAccount(c.env.DB, c.req.param('id'), identity.lineAccountId)) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
 
   const friend = await getFriendByLineUserIdForAccount(
@@ -131,12 +131,12 @@ export const post__api_forms_id_partial_2 = async (c: Context<Env, "/api/forms/:
   );
 
   if (!friend) {
-    return c.json({ success: false, error: 'Friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
 
   const form = await getFormById(c.env.DB, c.req.param('id'), { published: true });
   if (!form) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   /*
    * 受付を止めたフォームへ下書きを書かない（#722）。ここは友だちの
@@ -194,13 +194,13 @@ export const post__api_forms_id_files_3 = async (c: Context<Env, "/api/forms/:id
     }
     const draft = await getFormById(c.env.DB, formId);
     if (!draft) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+      return fail(c, 404, 'FORM_NOT_FOUND');
     }
     form = draft;
   } else {
     const published = await getFormById(c.env.DB, formId, { published: true });
     if (!published) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+      return fail(c, 404, 'FORM_NOT_FOUND');
     }
     if (!published.is_active) {
       return inputError(c, { success: false, error: 'このフォームは受け付けていません' }, 400, []);
@@ -221,7 +221,7 @@ export const post__api_forms_id_files_3 = async (c: Context<Env, "/api/forms/:id
   }
   if (!identity.lineAccountId
     || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const friend = await getFriendByLineUserIdForAccount(
     c.env.DB,
@@ -229,7 +229,7 @@ export const post__api_forms_id_files_3 = async (c: Context<Env, "/api/forms/:id
     identity.lineAccountId,
   );
   if (!friend) {
-    return c.json({ success: false, error: 'Friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
 
   const blockId = c.req.query('block_id');
@@ -311,7 +311,7 @@ export const get__api_forms_id_my_latest_4 = async (c: Context<Env, "/api/forms/
   const formId = c.req.param('id');
   const form = await getFormById(c.env.DB, formId, { published: true });
   if (!form) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
 
   const layout = parseLayout(form.layout, form.fields);
@@ -325,7 +325,7 @@ export const get__api_forms_id_my_latest_4 = async (c: Context<Env, "/api/forms/
   }
   if (!identity.lineAccountId
     || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const friend = await getFriendByLineUserIdForAccount(
     c.env.DB,

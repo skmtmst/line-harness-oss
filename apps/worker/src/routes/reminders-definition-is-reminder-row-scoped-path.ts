@@ -1,7 +1,7 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { type Context } from 'hono';
 import { getReminderById, getFolderById, type ReminderDraftSettings, type ReminderDeliveryRunStatus } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import { describeReminderTiming, LEAP_YEAR_POLICIES } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -32,7 +32,7 @@ export async function requireVisibleReminder(c: Context<Env>, next: () => Promis
       c.get('staff'),
       [row.line_account_id ?? null],
     )) {
-      return c.json({ success: false, error: 'Reminder not found' }, 404);
+      return fail(c, 404, 'REMINDER_NOT_FOUND');
     }
     await next();
     return;
@@ -43,7 +43,7 @@ export async function requireVisibleReminder(c: Context<Env>, next: () => Promis
     c.get('staff'),
     [(reminder as { line_account_id?: string | null }).line_account_id ?? null],
   )) {
-    return c.json({ success: false, error: 'Reminder not found' }, 404);
+    return fail(c, 404, 'REMINDER_NOT_FOUND');
   }
   await next();
 }

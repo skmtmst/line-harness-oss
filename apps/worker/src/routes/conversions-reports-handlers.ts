@@ -1,7 +1,7 @@
 import { serializeConversionPoint } from './conversion-point-serialization.js';
 import { inputError } from '../lib/input-errors.js';
 import { conversionApprovalCounts } from '../services/tab-counts.js';
-
+import { fail } from '../lib/fail.js';
 import { getConversionPoints, getConversionPointById, canRecordConversion, createConversionPoint, hasConversionPointActivity, updateConversionPoint, stopConversionPoint, trackConversion, getConversionEvents, getConversionApprovalQueue, addConversionDefinitionUsage, getConversionDefinitionReport, listConversionDefinitionsForExport, appendConversionReversal, getReversedEventIds, listConversionReversals, CONVERSION_DEFINITION_USAGE_KINDS } from '@line-crm/db';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import type { Env } from '../worker-env.js';
@@ -419,12 +419,12 @@ export const get__api_conversions_events_id_reversals_9 = async (c: Context<Env,
         )
         .bind(eventId)
         .first<{ id: string; line_account_id: string | null }>();
-      if (!event) return c.json({ success: false, error: 'Event not found' }, 404);
+      if (!event) return fail(c, 404, 'EVENT_NOT_FOUND');
       if (
         event.line_account_id !== null
         && !scope.allowedAccountIds.includes(event.line_account_id)
       ) {
-        return c.json({ success: false, error: 'Event not found' }, 404);
+        return fail(c, 404, 'EVENT_NOT_FOUND');
       }
       const rows = await listConversionReversals(c.env.DB, eventId);
       return c.json({
@@ -455,12 +455,12 @@ export const post__api_conversions_events_id_reversals_10 = async (c: Context<En
         )
         .bind(eventId)
         .first<{ id: string; line_account_id: string | null }>();
-      if (!event) return c.json({ success: false, error: 'Event not found' }, 404);
+      if (!event) return fail(c, 404, 'EVENT_NOT_FOUND');
       if (
         event.line_account_id !== null
         && !scope.allowedAccountIds.includes(event.line_account_id)
       ) {
-        return c.json({ success: false, error: 'Event not found' }, 404);
+        return fail(c, 404, 'EVENT_NOT_FOUND');
       }
 
       const body = await c.req.json<{ kind?: unknown; reason?: unknown }>();

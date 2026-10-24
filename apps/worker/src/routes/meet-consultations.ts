@@ -6,7 +6,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { cancelMeetConsultation, registerMeetConsultation } from '../services/meet-consultation-reminders.js';
 import { type RegisterMeetConsultationInput } from '../services/meet-reminder-types.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { fail } from '../lib/fail.js';
 const meetConsultations = new Hono<Env>();
 
 meetConsultations.get('/api/meet-consultations', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -60,7 +60,7 @@ meetConsultations.post('/api/meet-consultations', requireRole('owner', 'admin', 
     if (!friend || !await canAccessAllLineAccounts(
       c.env.DB, c.get('staff'), [friend.line_account_id, existing?.line_account_id],
     )) {
-      return c.json({ success: false, error: 'friend not found or not following' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND_OR_NOT_FOLLOWING');
     }
     const registered = await registerMeetConsultation(c.env.DB, body);
     return c.json({ success: true, data: registered }, 201);
@@ -82,13 +82,13 @@ meetConsultations.delete('/api/meet-consultations/:externalEventId', requireRole
   if (!consultation || !await canAccessAllLineAccounts(
     c.env.DB, c.get('staff'), [consultation.line_account_id],
   )) {
-    return c.json({ success: false, error: 'consultation not found' }, 404);
+    return fail(c, 404, 'CONSULTATION_NOT_FOUND');
   }
   try {
     const cancelled = await cancelMeetConsultation(c.env.DB, externalEventId, new Date(), {
       failOnSendInFlight: true,
     });
-    if (!cancelled) return c.json({ success: false, error: 'consultation not found' }, 404);
+    if (!cancelled) return fail(c, 404, 'CONSULTATION_NOT_FOUND');
   } catch (error) {
     // 送信権の貸出中は確定させず 409 で再試行させる (取消確定後の送信を起こさない)。
     if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {

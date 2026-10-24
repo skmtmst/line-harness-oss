@@ -5,7 +5,7 @@ import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { type AutoReplyCandidateReasonCode } from '../features/auto-replies/auto-reply/index.js';
-
+import { fail } from '../lib/fail.js';
 export /*
  * R200: 「連投を防ぐ」の範囲外は、対象欄の名前と許容範囲が分かる日本語で断る。
  * 英語の内部項目名（cooldownMinutes ...）をそのまま出さない。
@@ -65,7 +65,7 @@ export async function requireVisibleAutoReply(c: Context<Env>, next: () => Promi
       c.get('staff'),
       [row.line_account_id ?? null],
     )) {
-      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+      return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
     }
     await next();
     return;
@@ -76,7 +76,7 @@ export async function requireVisibleAutoReply(c: Context<Env>, next: () => Promi
     c.get('staff'),
     [item.line_account_id ?? null],
   )) {
-    return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+    return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
   }
   await next();
 }

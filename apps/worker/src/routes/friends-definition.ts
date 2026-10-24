@@ -4,7 +4,7 @@ import { inputError } from '../lib/input-errors.js';
 import { type Context, type MiddlewareHandler } from 'hono';
 import { getFriendById, jstNow, validateSearchConditions } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag, SavedSearch, SavedSearchAccess, FriendFormSubmission } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 
 
 
@@ -41,7 +41,7 @@ export const requireVisibleFriend: MiddlewareHandler<Env> = async (c, next) => {
     ? ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null
     : null;
   if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'Friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
   await next();
 };

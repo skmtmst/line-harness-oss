@@ -2150,7 +2150,7 @@ describe('共通情報', () => {
   });
 
   it.each([
-    ['accountId不足', { nextValue: '11-20' }, 'accountId is required'],
+    ['accountId不足', { nextValue: '11-20' }, 'LINE公式アカウントを選んでください。'],
     ['nextValue不足', { accountId: 'account-1' }, '変更後の値を入力してください'],
   ])('%sは400で返し、使用先を走査しない', async (_case, body, error) => {
     const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', body);

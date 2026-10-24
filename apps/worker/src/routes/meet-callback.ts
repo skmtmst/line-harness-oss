@@ -11,7 +11,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import { verifySupportRelay } from '../services/support-relay.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { readBoundedText } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 const app = new Hono<Env>();
 
 // Meet Harness calls this when a hearing session completes
@@ -77,7 +77,7 @@ app.post('/api/meet-callback', async (c) => {
     scenario?.line_account_id ?? null,
   );
   if (!friend) {
-    return c.json({ success: false, error: 'friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
 
   const ref = {scopeId:`line:${friend.line_account_id ?? 'default'}`,processKind:'meet_callback',subjectId:body.session_id};

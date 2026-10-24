@@ -2,7 +2,7 @@ import { inputError } from '../lib/input-errors.js';
 import { type Context, type MiddlewareHandler } from 'hono';
 import { getFriendById, MileageV6Error, getMileageRedemption, updateMileageRewardDraft, MileageRewardError } from '@line-crm/db';
 import type { ActionScoreFilter, ActionScoreSort, MileageEntryStatus, MileageEntryType, MileageRewardDraftInput } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 
 
 import type { Env } from '../worker-env.js';
@@ -54,7 +54,7 @@ const requireVisibleFriendForScore: MiddlewareHandler<Env> = async (c, next) => 
   const friend = await getFriendById(c.env.DB, c.req.param('id') ?? '');
   const accountId = (friend as unknown as Record<string, unknown> | null)?.line_account_id as string | null ?? null;
   if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'Friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
   await next();
 };
