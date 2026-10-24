@@ -127,7 +127,7 @@ describe('V8 ウェビナー一覧', () => {
     expect(dialog?.textContent).toContain('旧機能説明会')
   })
 
-  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
+  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は丸を出さない）', async () => {
     await render()
     const filed = host.querySelector('[data-row-id="webinar-1"]')?.querySelectorAll('[data-folder-dot]') ?? []
     expect(filed).toHaveLength(1)
@@ -135,8 +135,7 @@ describe('V8 ウェビナー一覧', () => {
     expect(filed[0].getAttribute('aria-label')).toBe('フォルダ：セミナー')
     expect((filed[0] as HTMLElement).style.backgroundColor).toBeTruthy()
     const unfiled = host.querySelector('[data-row-id="webinar-5"]')?.querySelectorAll('[data-folder-dot]') ?? []
-    expect(unfiled).toHaveLength(1)
-    expect(unfiled[0].getAttribute('data-folder-dot')).toBe('unfiled')
+    expect(unfiled).toHaveLength(0)
   })
 
   it('終わった公開は「非公開」、公開ページの道は /webinar/〇〇', async () => {

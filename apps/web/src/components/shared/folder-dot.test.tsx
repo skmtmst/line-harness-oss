@@ -48,6 +48,12 @@ describe('フォルダの色の丸', () => {
     expect(css).toMatch(/\.unfiled \{\s*background: transparent;\s*border: 1px solid var\(--color-ink-faint\);/)
   })
 
+  it('フォルダが未分類のときは、名前の前に白い丸を出さない', () => {
+    const html = renderToStaticMarkup(<FolderDotName folder={null}>未分類の資料</FolderDotName>)
+    expect(html).not.toContain('data-folder-dot')
+    expect(html).toContain('title="未分類の資料"')
+  })
+
   it('丸＋名前は1行で、名前の前に丸が来る', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={{ name: '会員', color: '#e07b24' }}>NEN会員</FolderDotName>)
     expect(html.indexOf('data-folder-dot')).toBeLessThan(html.indexOf('>NEN会員'))
@@ -69,7 +75,7 @@ describe('フォルダの色の丸', () => {
   it('行を選ぶチェックは省略する名前の外に出し、操作と全文を保つ', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={null}><Checkbox aria-label="資料を選ぶ" checked={false} onCheckedChange={() => {}} /><button>資料をダウンロードした</button></FolderDotName>)
     expect(html).toContain('aria-label="資料を選ぶ"')
-    expect(html.indexOf('aria-label="資料を選ぶ"')).toBeLessThan(html.indexOf('data-folder-dot'))
+    expect(html).not.toContain('data-folder-dot')
     expect(html).toContain('title="資料をダウンロードした"')
     expect(html).toContain('<button>資料をダウンロードした</button>')
   })
@@ -80,7 +86,7 @@ describe('フォルダの色の丸', () => {
       name={<div><a href="/events/edit?id=event">教室</a></div>}
     /></tr></tbody></table>)
     expect(html).toContain('aria-label="教室を選ぶ"')
-    expect(html.indexOf('aria-label="教室を選ぶ"')).toBeLessThan(html.indexOf('data-folder-dot'))
+    expect(html).not.toContain('data-folder-dot')
     expect(html).toContain('href="/events/edit?id=event"')
   })
 
