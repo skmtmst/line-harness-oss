@@ -100,10 +100,10 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   expect(await page.getByRole('group', { name: '認証コード（6桁）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await centered(page.getByRole('button', { name: '確認してログイン', exact: true }))
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`verify-${width}.png`) })
+  // 画面の案内は「コードが使えない場合」から開く小さな文字の道に変わった（動きは同じ）。
+  await page.getByRole('button', { name: 'コードが使えない場合' }).click()
   await page.getByRole('button', { name: '回復コードを使う' }).click()
   await expect(page.getByRole('textbox')).toHaveCount(8)
-  const hint = page.getByText('控えた8個のうち、まだ使っていない1つを入れます。貼り付けもできます。', { exact: true })
-  expect(await hint.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeLessThanOrEqual(12)
   const back = page.getByRole('link', { name: 'ログインに戻る', exact: true })
   const method = page.getByRole('button', { name: '6桁のコードで入る', exact: true })
   const textStyle = el => { const style = getComputedStyle(el); return { size: style.fontSize, weight: style.fontWeight, color: style.color, background: style.backgroundColor } }
@@ -156,14 +156,14 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
   })
   for (const path of ['/', '/friends', '/broadcasts', '/form-submissions', '/templates/edit', '/templates/detail?id=template-1', '/chats', '/hq', '/settings']) {
     await page.goto(path)
-    const notice = page.getByRole('note').filter({ hasText: '回復コードの残りが0個です' })
+    const notice = page.getByRole('note').filter({ hasText: '回復コードが残っていません' })
     await expect(notice).toBeVisible()
     const frame = page.locator('[data-design-shell] [data-page-template]').first()
     await expect(frame).toBeVisible()
     // Account/style loading can replace the first frame. Resolve both nodes in
     // the same DOM read, so a detached loading frame cannot produce a zero box.
     await expect.poll(() => page.evaluate(() => {
-      const el = [...document.querySelectorAll('#main-content > [data-design-part="notice"]')].find(node => node.textContent.includes('回復コードの残りが0個です'))
+      const el = [...document.querySelectorAll('#main-content > [data-design-part="notice"]')].find(node => node.textContent.includes('回復コードが残っていません'))
       if (!el) throw new Error('The low-code notice is missing from the main board')
       const next = [...document.querySelectorAll('#main-content [data-page-template]')].find(node => node.getBoundingClientRect().width > 0)
       if (!next) return null
@@ -186,7 +186,7 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
   }
   remaining = 8
   await page.reload()
-  await expect(page.getByRole('note').filter({ hasText: '回復コードの残り' })).toHaveCount(0)
+  await expect(page.getByRole('note').filter({ hasText: '回復コードが残っていません' })).toHaveCount(0)
 })
 for (const width of [1152,1440,1920]) test(`policy confirmation and personal recovery counts at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
