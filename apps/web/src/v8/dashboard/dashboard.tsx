@@ -127,9 +127,11 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           value={total}
           unit="件"
           loading={d.pendingDetailState === 'loading'}
-          delta={total !== null && total > 0 && d.pendingOldest !== null ? <Tag>{`最長 ${formatWaitRough(d.pendingOldest)}`}</Tag> : null}
           detail={d.pendingDetailState === 'ready'
-            ? `LINE ${d.lineUnread === null ? '未取得' : d.lineUnread}・メール ${d.mailUnread === null ? '未取得' : d.mailUnread}`
+            ? <span className={styles.pendingMeta}>
+                {total !== null && total > 0 && d.pendingOldest !== null ? <Tag>{`最長 ${formatWaitRough(d.pendingOldest)}`}</Tag> : null}
+                <span>{`LINE ${d.lineUnread === null ? '未取得' : d.lineUnread}・メール ${d.mailUnread === null ? '未取得' : d.mailUnread}`}</span>
+              </span>
             : d.pendingDetailState === 'error' ? STATE_TEXT.error : STATE_TEXT.loading}
           action={{ label: '受信箱を開く', href: '/chats?status=unread' }}
         />,
@@ -397,7 +399,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       /> : null}
     >
       {todayCells.length > 0 ? (
-        <KpiBand className={styles.todayBand} data-design="TodayTasks">
+        <KpiBand className={styles.todayBand} frame="card" data-design="TodayTasks">
           {todayCells.map((entry) => entry.cell?.node)}
         </KpiBand>
       ) : null}

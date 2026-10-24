@@ -154,6 +154,12 @@ html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-border] {
   border: 0; border-radius: var(--polish-band-radius); background: var(--color-canvas);
   box-shadow: var(--polish-band-shadow);
 }
+/* 1マスだけの帯は、白い面に浮いて見えないようカードと同じ枠を持つ。 */
+html:root [data-kpi-strip][data-kpi-presentation='band']:has(> [data-design-version]:only-child),
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-frame='card'] {
+  border: 1px solid var(--color-hairline);
+  box-shadow: var(--card-shadow);
+}
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-icon] { display: none; }
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] { color: var(--color-ink-secondary); font-weight: var(--polish-control-weight); }
 html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-edge-inset='parent']:not([data-kpi-density='compact']) > [data-design-version]:first-child { padding-inline-start: var(--tpl-list-inset); }
