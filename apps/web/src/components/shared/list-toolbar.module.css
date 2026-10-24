@@ -274,6 +274,17 @@ html:root :is(.slots, .toolbar) [data-toolbar-row][data-toolbar-fit='single'] { 
 html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) {
   width: max-content; min-width: max-content; max-width: none; flex: none;
 }
+/* 札が入りきらない幅では、並び・件数を 2 段目の右端に残したまま札だけを折り返す。 */
+@container v8-page (max-width: 1099px) {
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> .filterChoices) { flex: 1 1 0; min-width: 0; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> .filterChoices) > .filterChoices { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> .filterChoices) .filterWide { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) { flex: 1 1 0; min-width: 0; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) > [role='group'] { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) .filterChoices { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) .filterWide { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotsEnd { flex: none; align-self: flex-start; }
+}
 /* Narrow list frames own the two rows, including a formerly stacked caller. */
 @container v8-page (max-width: 1099px) {
   html:root .slots[data-toolbar-layout='slots-stacked'] { flex-direction: row; flex-wrap: wrap; }
