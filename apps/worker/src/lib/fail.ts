@@ -18,10 +18,10 @@ export function failureDetail(reason: unknown, status: number, existingCode?: st
 
 /** Shared route failure. HTTP/envelope normalization and redaction stay at the outer boundary. */
 export function fail(c: Context, status: ContentfulStatusCode, code: string,
-  extra: Record<string, unknown> = {}, fieldKeys: readonly string[] = []) {
+  extra: Record<string, unknown> = {}, fieldKeys: readonly string[] = [], validationReason?: string) {
   const detail = failureDetail(code, status, typeof extra.code === 'string' ? extra.code : undefined);
   const message = typeof extra.error === 'string' ? extra.error
     : /[ぁ-んァ-ヶ一-龠]/u.test(code) ? code : detail.message;
   return inputError(c, { ...extra, success: false, code: detail.code, error: message }, status, fieldKeys,
-    typeof extra.error === 'string' ? extra.error : code);
+    validationReason ?? (typeof extra.error === 'string' ? extra.error : code));
 }

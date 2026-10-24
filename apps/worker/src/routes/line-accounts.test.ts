@@ -163,7 +163,7 @@ describe('GET /api/line-accounts/:id/registration-receipt', () => {
     });
     const denied = await app.request('/api/line-accounts/acc-other/registration-receipt');
     expect(denied.status).toBe(404);
-    expect(await denied.json()).toEqual({ success: false, error: 'LINE account not found' });
+    expect(await denied.json()).toEqual({ success: false, code: 'LINE_ACCOUNT_NOT_FOUND', error: 'LINE公式アカウントが見つかりません。一覧から開き直してください。' });
   });
 });
 
@@ -556,7 +556,7 @@ describe('GET /api/line-accounts/:id/credential-health', () => {
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({
       success: false,
-      error: 'LINE account not found',
+      code: 'LINE_ACCOUNT_NOT_FOUND', error: 'LINE公式アカウントが見つかりません。一覧から開き直してください。',
     });
     expect(dbMocks.getLineAccountCredentialHealth).not.toHaveBeenCalled();
     expect(dbMocks.getLineAccountById).not.toHaveBeenCalled();

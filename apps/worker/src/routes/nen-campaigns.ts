@@ -60,7 +60,7 @@ import {
 import { auditLog } from '../lib/audit-log.js';
 import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
 import { buildOffsetListResponse, listLimit, parseOffsetPaging, listQueryNumber } from '../lib/list-paging.js';
-
+import { fail } from '../lib/fail.js';
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
   'arrival_check', 'review_request', 'cross_sell', 'column', 'birthday_coupon',
@@ -268,7 +268,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireDeliveryAcce
     return inputError(c, { success: false, error: 'Invalid campaign values' }, 400, ["title","delayDays","deliveryTime","buttonLabel","buttonUrl","imageUrl"]);
   }
   const current = await getNenCampaign(c.env.DB, key, accountId);
-  if (!current) return c.json({ success: false, error: 'Campaign not found' }, 404);
+  if (!current) return fail(c, 404, 'CAMPAIGN_NOT_FOUND');
   const dedupWindowDays = body.dedupWindowDays === undefined
     ? (current.dedup_window_days ?? 30)
     : Number(body.dedupWindowDays);
@@ -409,7 +409,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireDeli
     return inputError(c, { success: false, error: 'isEnabled is required' }, 400, ["isEnabled"]);
   }
   const current = await getNenCampaign(c.env.DB, key, accountId);
-  if (!current) return c.json({ success: false, error: 'Campaign not found' }, 404);
+  if (!current) return fail(c, 404, 'CAMPAIGN_NOT_FOUND');
   /*
    * NEN-07 (#1078): つなぐ回答フォームが使えない設定は稼働開始を止める。
    * 停止はどんな状態でも実行できる(止められなくなると復旧できない)。
@@ -463,7 +463,7 @@ function applyCampaignDraft(campaign: CampaignRow, draft: NenCampaignDraft | und
 nenCampaigns.post('/api/nen-campaigns/test-send', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"campaignKey":["string"],"accountId":["string"],"friendId":["string"],"draft":["object"]}), async (c) => {
   const body = await c.req.json<{ campaignKey?: string; accountId?: string; friendId?: string; draft?: NenCampaignDraft }>().catch(() => null);
   if (!body?.campaignKey || !CAMPAIGN_KEYS.has(body.campaignKey) || !body.accountId || !body.friendId) {
-    return inputError(c, { success: false, error: 'campaignKey, accountId and friendId are required' }, 400, ["campaignKey","accountId","friendId"]);
+    return fail(c, 400, 'CAMPAIGN_KEY_ACCOUNT_ID_AND_FRIEND_ID_ARE_REQUIRED', {}, ["campaignKey","accountId","friendId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -476,7 +476,7 @@ nenCampaigns.post('/api/nen-campaigns/test-send', requireDeliveryAccess('nenCamp
   // テスト送信先は「設定 › アカウント › テスト送信先」に登録され、かつ友だち追加中の人だけ。
   // 画面が理由を言えるよう、送信先の問題は code で分ける。
   if (!friend) return c.json({ success: false, code: 'test_recipient_unavailable', error: 'テスト送信先が登録されていないか、友だち追加されていません' }, 404);
-  if (!savedCampaign || !account) return c.json({ success: false, error: 'Test target not found' }, 404);
+  if (!savedCampaign || !account) return fail(c, 404, 'TEST_TARGET_NOT_FOUND');
   const campaign = applyCampaignDraft(savedCampaign, body.draft);
   if ('error' in campaign) return inputError(c, { success: false, error: campaign.error }, 400, ["draft"]);
   const sample = {
@@ -766,7 +766,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireDeliveryAcc
 nenCampaigns.post('/api/nen-campaigns/columns/:id/test-send', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"],"friendId":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; friendId?: string }>().catch(() => null);
   if (!body?.accountId || !body.friendId) {
-    return inputError(c, { success: false, error: 'accountId and friendId are required' }, 400, ["accountId","friendId"]);
+    return fail(c, 400, 'ACCOUNT_ID_AND_FRIEND_ID_ARE_REQUIRED', {}, ["accountId","friendId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
@@ -782,7 +782,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/test-send', requireDeliveryAcc
   ]);
   if (!friend) return c.json({ success: false, code: 'test_recipient_unavailable', error: 'テスト送信先が登録されていないか、友だち追加されていません' }, 404);
   if (!campaign || !account || !column) {
-    return c.json({ success: false, error: 'Test target not found' }, 404);
+    return fail(c, 404, 'TEST_TARGET_NOT_FOUND');
   }
   const { pushViaHarnessProxy } = await import('../services/line-proxy-send.js');
   const { dispatchLineProxyLocally } = await import('../services/local-line-proxy.js');
@@ -840,7 +840,7 @@ nenCampaigns.post('/api/nen-campaigns/deliveries/pending-now', requireDeliveryAc
 
 nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary({"accountId":["string"],"scheduledAt":["string"]}), async (c) => {
   const body = await c.req.json<{ accountId?: string; scheduledAt?: string }>().catch(() => null);
-  if (!body?.accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+  if (!body?.accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
@@ -888,14 +888,14 @@ nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireDeliveryAccess
     const result = await c.env.DB.prepare(
       `UPDATE nen_columns SET intro_text = ?, updated_at = ? WHERE id = ? AND line_account_id = ?`,
     ).bind(introText, stamped, c.req.param('id'), accountId).run();
-    if (!result.meta.changes) return c.json({ success: false, error: 'Column not found' }, 404);
+    if (!result.meta.changes) return fail(c, 404, 'COLUMN_NOT_FOUND');
     auditLog(c, 'nen.column.save', {kind:'nen_column',id:c.req.param('id')}, {lineAccountId:accountId});
     return c.json({ success: true, data: { updatedAt: stamped } });
   }
   const seen = await c.env.DB.prepare(
     `SELECT intro_text, updated_at FROM nen_columns WHERE id = ? AND line_account_id = ?`,
   ).bind(c.req.param('id'), accountId).first<{ intro_text: string | null; updated_at: string }>();
-  if (!seen) return c.json({ success: false, error: 'Column not found' }, 404);
+  if (!seen) return fail(c, 404, 'COLUMN_NOT_FOUND');
   if (seen.updated_at !== expectedUpdatedAt) {
     return c.json({
       success: false, code: 'VERSION_CONFLICT',
@@ -911,7 +911,7 @@ nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireDeliveryAccess
     const latest = await c.env.DB.prepare(
       `SELECT intro_text, updated_at FROM nen_columns WHERE id = ? AND line_account_id = ?`,
     ).bind(c.req.param('id'), accountId).first<{ intro_text: string | null; updated_at: string }>();
-    if (!latest) return c.json({ success: false, error: 'Column not found' }, 404);
+    if (!latest) return fail(c, 404, 'COLUMN_NOT_FOUND');
     return c.json({
       success: false, code: 'VERSION_CONFLICT',
       error: 'ほかの人が先に紹介文を変えました。最新の内容を確認してから保存し直してください。',
@@ -991,7 +991,7 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireDeliveryAccess('nenCampaigns
   const friend = await c.env.DB.prepare(`SELECT id, line_account_id FROM friends WHERE id = ?`)
     .bind(body.friendId).first<{ id: string; line_account_id: string | null }>();
   if (!friend || friend.line_account_id !== accountId) {
-    return c.json({ success: false, error: 'Friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
   const customerId = typeof body.customerId === 'string' ? body.customerId : null;
   const rawKey = c.req.header('Idempotency-Key')?.trim() || null;
@@ -1051,7 +1051,7 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireDeliveryAccess('nenCampai
     updated_at: string; line_account_id: string | null;
   }>();
   if (!pet || pet.line_account_id !== accountId) {
-    return c.json({ success: false, error: 'Pet not found' }, 404);
+    return fail(c, 404, 'PET_NOT_FOUND');
   }
   /*
    * M511: ペット更新の同時保存は後勝ちで先の変更が黙って消えていた。
@@ -1090,7 +1090,7 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireDeliveryAccess('nenCampai
       breed: string | null; weight_kg: number | null; updated_at: string; line_account_id: string | null;
     }>();
     if (!latest || latest.line_account_id !== accountId) {
-      return c.json({ success: false, error: 'Pet not found' }, 404);
+      return fail(c, 404, 'PET_NOT_FOUND');
     }
     return c.json({
       success: false, code: 'VERSION_CONFLICT',
@@ -1122,7 +1122,7 @@ nenCampaigns.delete('/api/nen-campaigns/pets/:id', requireDeliveryAccess('nenCam
   const pet = await c.env.DB.prepare(`SELECT p.friend_id, f.line_account_id FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.archived_at IS NULL AND p.id = ?`)
     .bind(c.req.param('id')).first<{ friend_id: string; line_account_id: string | null }>();
   if (!pet || pet.line_account_id !== accountId) {
-    return c.json({ success: false, error: 'Pet not found' }, 404);
+    return fail(c, 404, 'PET_NOT_FOUND');
   }
   await c.env.DB.batch([
     c.env.DB.prepare(`UPDATE nen_pet_profiles SET archived_at=?, updated_at=? WHERE id=? AND archived_at IS NULL`).bind(jstNow(), jstNow(), c.req.param('id')),
@@ -1208,7 +1208,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/import', requireDeliveryAccess('ne
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const account = await getLineAccountById(c.env.DB, accountId);
-  if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+  if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   const result = await c.env.DB.prepare(
     `UPDATE nen_columns SET line_account_id = ?, updated_at = ? WHERE line_account_id IS NULL`,
   ).bind(accountId, jstNow()).run();
@@ -1248,7 +1248,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
   }
   const requestedLineAccountId = typeof body.line_account_id === 'string' ? body.line_account_id : null;
   if (requestedLineAccountId && !await getLineAccountById(c.env.DB, requestedLineAccountId)) {
-    return c.json({ success: false, error: 'LINE account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   // EC-CUBE 標準（LineColumnSyncService）は line_account_id を送らない。アカウントが 1 つなら
   // そこへ入れる。NULL のままだと管理画面の一覧（WHERE line_account_id = ?）に出ず、
@@ -1339,7 +1339,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', inputJsonBoundary(),
       `SELECT id FROM nen_coupon_issues WHERE coupon_code = ?`,
     ).bind(code).first<{ id: string }>();
     // こちらが発行していないコードは拾わない。再送は成功として返して送り止める。
-    if (!known) return c.json({ success: false, error: 'Coupon not found' }, 404);
+    if (!known) return fail(c, 404, 'COUPON_NOT_FOUND');
     return c.json({ success: true, data: { couponCode: code, alreadyUsed: true } });
   }
   const issue = await c.env.DB.prepare(

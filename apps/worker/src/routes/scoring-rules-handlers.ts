@@ -2,7 +2,7 @@ import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js'
 import { jstDate as japanDate } from '@line-crm/shared';
 import { createMileageRuleIdempotent, serializeMileageRule } from './mileage-rule-create.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getFriendScore, getFriendScoreHistory, addScore, getMileageRules, getMileageRuleById, createMileageRule, updateMileageRule, deleteMileageRule, getMileageEarningRulesV6, applyMileageRulesForEvent, getMileageAdjustmentNotificationRecord, getActionScoreOverview, getActionScoreBands, testMileageEarningRuleDraft, validateMileageEarningRuleDraft } from '@line-crm/db';
 import type { ActionScoreFilter, ActionScoreSort } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -34,7 +34,7 @@ export const post__api_mileage_entries_id_notification_retry_1 = async (c: Conte
         amount: number; metadata: string | null;
       }>();
       if (!entry || !entry.beneficiary_friend_id) {
-        return c.json({ success: false, error: 'Notification target not found' }, 404);
+        return fail(c, 404, 'NOTIFICATION_TARGET_NOT_FOUND');
       }
       const record = await getMileageAdjustmentNotificationRecord(c.env.DB, {
         lineAccountId: accountId,
@@ -117,11 +117,11 @@ export const get__api_mileage_rules_export_4 = async (c: Context<Env, "/api/mile
     const staff = c.get('staff');
     const accountId = (c.req.query('accountId') ?? '').trim();
     if (!accountId) {
-      return c.json({ success: false, error: 'LINE account not found' }, 400);
+      return fail(c, 400, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const decision = await resolveRequestBoundary(c.env.DB, staff, accountId);
     if (!decision.allowed) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     type RuleItem = Awaited<ReturnType<typeof getMileageEarningRulesV6>>['items'][number];
     const items: RuleItem[] = [];
@@ -233,7 +233,7 @@ export const post__api_mileage_rules_6 = async (c: Context<Env, "/api/mileage/ru
       return inputError(c, { success: false, error: 'name, eventType and a positive integer amount are required' }, 400, ["name","eventType","amount"]);
     }
     if (!body.lineAccountId?.trim()) {
-      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -353,10 +353,10 @@ export const delete__api_mileage_rules_id_8 = async (c: Context<Env, "/api/milea
 export const get__api_action_scores_friends_9 = async (c: Context<Env, "/api/action-scores/friends">) => {
   try {
     const accountId = c.req.query('accountId')?.trim() ?? '';
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!scope.allowedAccountIds.includes(accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const filterValue = c.req.query('filter') ?? 'all';
     const sortValue = c.req.query('sort') ?? 'score_desc';

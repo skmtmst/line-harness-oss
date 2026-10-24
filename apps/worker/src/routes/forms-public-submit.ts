@@ -4,7 +4,7 @@ import { callFormWebhook, publicFormWebhookData } from '../features/forms/form-w
 import { inputError, validatedInputBody } from '../lib/input-errors.js';
 import { validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../features/forms/form-documents/index.js';
 import { applyAccountAllergyOptions } from '../services/allergy-options.js';
-
+import { fail } from '../lib/fail.js';
 import { getFormById, type FormSubmitClaimScope, formBelongsToLineAccount, getFormSubmissionById, insertFormSubmissionRecord, resyncFormSubmitCount, claimFormCapacitySlot, releaseFormCapacityClaims, createFormSubmitClaim, getFormSubmitClaim, takeoverFormSubmitClaim, readFormSubmitClaimSteps, appendFormSubmitClaimStep, saveFormSubmitClaimWebhook, completeFormSubmitClaim, failFormSubmitClaim, ensureFormSubmitOutboxEvent, getFormSubmitOutbox, markFormSubmitOutboxDelivered, readFormSubmitOutboxPayload, readFormSubmitClaimEffectStats, saveFormSubmitClaimEffectStats, findUnfinishedFormSubmitClaimByHash, getFormVersionContent, updateFormSubmissionDestinationWriteResult, getFriendByLineUserIdForAccount, getLineAccountById, toJstString } from '@line-crm/db';
 import type { Form as DbForm, FormSubmission as DbFormSubmission, FormDestinationWriteResult } from '@line-crm/db';
 import { recordConversionSourceEvent } from '@line-crm/db';
@@ -69,7 +69,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
       }
       testDraft = await getFormById(c.env.DB, formId);
       if (!testDraft) {
-        return c.json({ success: false, error: 'Form not found' }, 404);
+        return fail(c, 404, 'FORM_NOT_FOUND');
       }
     }
     let form: DbForm;
@@ -78,7 +78,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
     } else {
       const published = await getFormById(c.env.DB, formId, { published: true });
       if (!published) {
-        return c.json({ success: false, error: 'Form not found' }, 404);
+        return fail(c, 404, 'FORM_NOT_FOUND');
       }
       if (!published.is_active) {
         return inputError(c, { success: false, error: 'This form is no longer accepting responses' }, 400, []);
@@ -111,7 +111,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
     }
     if (!identity.lineAccountId
       || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
+      return fail(c, 404, 'FORM_NOT_FOUND');
     }
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,
@@ -119,7 +119,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
       identity.lineAccountId,
     );
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const friendId = friend.id;
 

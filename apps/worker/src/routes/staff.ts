@@ -29,7 +29,7 @@ import type { Env } from '../worker-env.js';
 import { getLineAccounts } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-
+import { fail } from '../lib/fail.js';
 
 import {
   getStaffPermissionReceipt, saveStaffPermissionReceipt,
@@ -361,7 +361,7 @@ staff.get('/api/staff/me', async (c) => {
       return c.json({ success: true, data: { id: current.id, tenantId: current.tenantId ?? DEFAULT_TENANT_ID, name: '管理者', role: 'admin', email: null, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all', scopedLineAccountIds: [] } });
     }
     const member = readAuthenticatedStaffRecord(c.env.DB, current) ?? await getStaffById(c.env.DB, current.id);
-    if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
+    if (!member) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
     return c.json({ success: true, data: { ...await serializeStaff(c.env.DB, member), readOnly: current.readOnly } });
   } catch (error) {
     throw error;
@@ -399,7 +399,7 @@ staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (
   try {
     const id = c.req.param('id');
     const member = await getStaffById(c.env.DB, id);
-    if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+    if (!member || !isInCurrentTenant(c, member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
     const loginCount = await countLoginAudit(c.env.DB, { adminUserId: id, action: 'login' });
     return c.json({ success: true, data: { loginCount } });
   } catch (error) {
@@ -429,7 +429,7 @@ staff.post('/api/staff/:id/resend-invite', requireRole('owner', 'admin'), inputJ
   try {
     const id = c.req.param('id');
     const member = await getStaffById(c.env.DB, id);
-    if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+    if (!member || !isInCurrentTenant(c, member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
     if (member.invite_status !== 'pending_email' || !member.email) {
       return c.json({ success: false, error: 'この権限者はすでにメールを確認しているため、送り直す必要はありません' }, 409);
     }
@@ -462,7 +462,7 @@ staff.get('/api/staff/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
   const member = await getStaffById(c.env.DB, id);
   return member && isInCurrentTenant(c, member)
     ? c.json({ success: true, data: await serializeStaff(c.env.DB, member, staffEmailVisibility(c, member.id)) })
-    : c.json({ success: false, error: 'Staff member not found' }, 404);
+    : fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
 });
 
 staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"email":["string"],"role":["string"],"permissionKeys":["array"],"notificationPreferences":["object"],"assignedLineAccountId":["null","string"],"canAccessDescendantAccounts":["boolean"],"accountScope":["string"],"scopedLineAccountIds":["array"],"managementContext":["string"]}), async (c) => {
@@ -610,7 +610,7 @@ staff.post('/api/staff/invitations/confirm/verify', inputJsonBoundary({"token":[
 staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const target = await getStaffById(c.env.DB, id);
-  if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (!target || !isInCurrentTenant(c, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   if (target.invite_status === 'active') {
     return c.json({ success: false, error: 'このユーザーはすでに利用を開始しています。招待の再送はできません。' }, 409);
   }
@@ -623,7 +623,7 @@ staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), in
       invite_token_hash: await sha256Hex(token),
       invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
     });
-    if (!updated) return c.json({ success: false, error: 'Staff member not found' }, 404);
+    if (!updated) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
     try {
       /*
        * どこで止まっているかで送る便りを変える。メール確認まで済んでいる人
@@ -693,7 +693,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   if ('error' in accountScope) return inputError(c, { success: false, error: accountScope.error }, 400, ["accountScope","scopedLineAccountIds"]);
 
   const target = await getStaffById(c.env.DB, id);
-  if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (!target || !isInCurrentTenant(c, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   const current = c.get('staff');
   if (body.managementContext === 'hq' && !await hasAllAccountScope(c.env.DB, current)) {
     return c.json({ success: false, error: '全店舗の担当者だけが統括側の権限者を変更できます' }, 403);
@@ -936,7 +936,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
         data: await serializeStaff(c.env.DB, latest, staffEmailVisibility(c, latest.id)),
       }, 409);
     }
-    return c.json({ success: false, error: 'Staff member not found' }, 404);
+    return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   }
   if (updated && accountScope.accountScope !== undefined) {
     await replaceStaffAccountScopes(c.env.DB, id, accountScope.scopedLineAccountIds);
@@ -978,7 +978,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
     await storeReceipt(payload);
     return c.json(payload);
   }
-  if (!updated) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (!updated) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   const payload = { success: true as const, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) };
   await storeReceipt(payload);
   return c.json(payload);
@@ -1048,7 +1048,7 @@ function totpMasterKey(c: { env: Env['Bindings'] }): string | null {
 staff.post('/api/staff/:id/two-factor/setup', inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
-  if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (!member || !isInCurrentTenant(c, member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   if (c.get('staff').id !== id) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
@@ -1089,7 +1089,7 @@ staff.post('/api/staff/:id/two-factor/setup', inputJsonBoundary(), async (c) => 
 staff.post('/api/staff/:id/two-factor/confirm', inputJsonBoundary({"code":["string"]}), async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
-  if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (!member || !isInCurrentTenant(c, member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   if (c.get('staff').id !== id) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
@@ -1143,7 +1143,7 @@ staff.post('/api/staff/:id/two-factor/confirm', inputJsonBoundary({"code":["stri
 staff.delete('/api/staff/:id/two-factor', async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
-  if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (!member || !isInCurrentTenant(c, member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ解除できます' }, 403);
   // 二段階認証の解除は本人・他人どちらでも高危険。解除後は対象の全セッションも切る（N-427）。
   if (!await consumeStaffStepUp(c, 'staff.two_factor.remove')) {
@@ -1156,14 +1156,14 @@ staff.delete('/api/staff/:id/two-factor', async (c) => {
     totp_last_used_step: null,
   });
   if (updated) await revokeStaffAuthentication(c.env.DB, id);
-  return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
+  return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) }) : fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
 });
 
 staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
   const id = c.req.param('id');
   if (id === c.get('staff').id) return c.json({ success: false, error: '自分自身は利用停止できません' }, 400);
   const target = await getStaffById(c.env.DB, id);
-  if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (!target || !isInCurrentTenant(c, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   const guard = await guardLastAdmin(c.env.DB, target, currentTenantId(c), { isActive: false, self: false });
   if (guard) return c.json({ success: false, error: guard }, 400);
   // 利用停止は権限変更と同じ高危険操作として再認証を要求する（N-427）。
@@ -1183,12 +1183,12 @@ staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
         code: 'STAFF_POLICY_CONFLICT',
       }, 409);
     }
-    return c.json({ success: false, error: 'Staff member not found' }, 404);
+    return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   }
   if (updated) await revokeStaffAuthentication(c.env.DB, id);
   return updated
     ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) })
-    : c.json({ success: false, error: 'Staff member not found' }, 404);
+    : fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
 });
 
 export { staff };

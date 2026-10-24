@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { resolveLineSender } from '../services/line-senders.js';
 import { GapError } from '../services/gap-common.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import type { Message } from '@line-crm/line-sdk';
 import { getChatById, updateChat, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -27,7 +27,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
       return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
     }
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
-    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!chat) return fail(c, 404, 'CHAT_NOT_FOUND');
 
     // 壊れたJSONは外側catchの500に落とさない。運用者が原因を判別できるよう400で返す。
     let body: { messageType?: string; content: string; revision?: number; quotedMessageId?: string; correctionOfMessageId?: string; senderId?: string };
@@ -52,7 +52,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
       'chats.manual-send',
     );
-    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!friend) return fail(c, 404, 'FRIEND_NOT_FOUND');
     if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
 
     if (!await canAccessAllLineAccounts(
@@ -60,7 +60,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
       c.get('staff'),
       [friend.line_account_id ?? null],
     )) {
-      return c.json({ success: false, error: 'Chat not found' }, 404);
+      return fail(c, 404, 'CHAT_NOT_FOUND');
     }
 
     if (body.correctionOfMessageId !== undefined) {
@@ -372,7 +372,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
 export const post__api_chats_id_render_preview_2 = async (c: Context<Env, "/api/chats/:id/render-preview">) => {
   try {
     const chat = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
-    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!chat) return fail(c, 404, 'CHAT_NOT_FOUND');
 
     let body: { messageType?: unknown; content?: unknown };
     try {
@@ -387,11 +387,11 @@ export const post__api_chats_id_render_preview_2 = async (c: Context<Env, "/api/
     const { friend, liffId } = await resolveFriendAndAccessToken(
       c.env.DB, chat.friend_id, c.env.LINE_CHANNEL_ACCESS_TOKEN, 'chats.render-preview',
     );
-    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!friend) return fail(c, 404, 'FRIEND_NOT_FOUND');
     if (!await canAccessAllLineAccounts(
       c.env.DB, c.get('staff'), [friend.line_account_id ?? null],
     )) {
-      return c.json({ success: false, error: 'Chat not found' }, 404);
+      return fail(c, 404, 'CHAT_NOT_FOUND');
     }
 
     // 送信しないプレビュー。共通情報の厳格解決・台帳記録は行わない（lenient）。

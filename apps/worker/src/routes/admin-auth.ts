@@ -60,7 +60,7 @@ import { isStepUpPurpose } from '../lib/step-up.js';
 import { verifyPassword } from '../services/password-hash.js';
 import { toImpersonationContext } from '../middleware/impersonation.js';
 import { candidateFromStaffRow, isPlatformAdmin, isPlatformAdminRow } from '../middleware/platform-admin.js';
-
+import { fail } from '../lib/fail.js';
 import { loginMfaChallenge, loginMfaRequired, mfaPolicyKey, mfaAudit, reserveMfaAttempt, consumeMfaChallenge } from '../services/login-mfa.js';
 import { consumeStepUpToken, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditEventStatement, getPlatformSetting } from '@line-crm/db';
@@ -940,7 +940,7 @@ adminAuth.delete('/api/auth/sessions/:tokenHash', async (c) => {
     }, 409);
   }
   if (!await deleteAdminSessionForStaff(c.env.DB, staff.id, tokenHash)) {
-    return c.json({ success: false, error: 'Session not found' }, 404);
+    return fail(c, 404, 'SESSION_NOT_FOUND');
   }
   if (currentHash === tokenHash) {
     const { sameSite } = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });

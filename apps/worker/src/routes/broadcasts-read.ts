@@ -6,7 +6,7 @@ import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 import { parseExecutionDateRange } from '@line-crm/shared';
-
+import { fail } from '../lib/fail.js';
 import { getBroadcastListPage, getBroadcastById, getVersionedAccountSetting, saveVersionedAccountSetting, countBroadcastLedger, classifyBroadcastRecipient, deriveBroadcastDisplayStatus, listBroadcastActivity, BROADCAST_DISPLAY_STATUS_LABELS } from '@line-crm/db';
 import type { BroadcastDisplayStatus } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -205,10 +205,10 @@ export const get__api_broadcasts_id_8 = async (c: Context<Env, "/api/broadcasts/
   const broadcast = await getBroadcastById(c.env.DB, id);
 
   if (!broadcast) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
 
   const view = await broadcastStatusView(c.env.DB, broadcast as unknown as Record<string, unknown>);
@@ -227,7 +227,7 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
   const id = c.req.param('id');
   const broadcast = await getBroadcastById(c.env.DB, id);
   if (!broadcast || !await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   const raw = broadcast as unknown as Record<string, unknown>;
   const result = c.req.query('result') ?? 'all';
@@ -321,7 +321,7 @@ export const get__api_broadcasts_id_activity_10 = async (c: Context<Env, "/api/b
   const id = c.req.param('id');
   const broadcast = await getBroadcastById(c.env.DB, id);
   if (!broadcast || !await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   const cursor = Math.max(0, listQueryNumber(c.req.query('cursor'), '0', { format: 'integer-prefix' }) || 0);
   const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit'), 50, { format: 'integer-prefix' }) || 50));
@@ -343,10 +343,10 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
   const id = c.req.param('id');
   const broadcast = await getBroadcastById(c.env.DB, id);
   if (!broadcast) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
 
   const raw = broadcast as unknown as Record<string, unknown>;
@@ -432,10 +432,10 @@ export const get__api_broadcasts_id_per_account_stats_13 = async (c: Context<Env
   const id = c.req.param('id');
   const broadcast = await getBroadcastById(c.env.DB, id);
   if (!broadcast) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
 
   const raw = broadcast as unknown as Record<string, unknown>;

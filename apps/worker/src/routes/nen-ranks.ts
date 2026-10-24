@@ -22,7 +22,7 @@ import {
   type NenMemberListOptions,
   type NenRankSetting,
 } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -58,7 +58,7 @@ function accountIdFrom(c: Context<Env>, body?: Record<string, unknown> | null): 
 }
 
 async function requireAccount(c: Context<Env>, accountId: string): Promise<Response | null> {
-  if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }

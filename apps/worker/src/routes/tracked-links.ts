@@ -27,7 +27,7 @@ import { buildOgHtml } from '../lib/og-html.js';
 import { resolveOgForTrackedLink } from '../lib/og-resolver.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { fail } from '../lib/fail.js';
 const trackedLinks = new Hono<Env>();
 
 async function adminAccountScope(c: Context<Env>) {
@@ -44,7 +44,7 @@ const requireVisibleTrackedLink: MiddlewareHandler<Env> = async (c, next) => {
   const link = await getTrackedLinkById(c.env.DB, c.req.param('id') ?? '');
   const accountId = link ? await resolveTrackedLinkAccountId(c.env.DB, link) : undefined;
   if (!link || accountId === undefined || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'Tracked link not found' }, 404);
+    return fail(c, 404, 'TRACKED_LINK_NOT_FOUND');
   }
   await next();
 };
@@ -131,7 +131,7 @@ trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) 
     const id = c.req.param('id');
     const link = await getTrackedLinkById(c.env.DB, id);
     if (!link) {
-      return c.json({ success: false, error: 'Tracked link not found' }, 404);
+      return fail(c, 404, 'TRACKED_LINK_NOT_FOUND');
     }
     const clicks = await getLinkClicks(c.env.DB, id);
     const base = await resolveApiLinkBase(c);
@@ -219,7 +219,7 @@ trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requ
 
     const link = await updateTrackedLink(c.env.DB, id, body);
     if (!link) {
-      return c.json({ success: false, error: 'Tracked link not found' }, 404);
+      return fail(c, 404, 'TRACKED_LINK_NOT_FOUND');
     }
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: serializeTrackedLink(link, base) });
@@ -234,7 +234,7 @@ trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), req
     const id = c.req.param('id');
     const link = await getTrackedLinkById(c.env.DB, id);
     if (!link) {
-      return c.json({ success: false, error: 'Tracked link not found' }, 404);
+      return fail(c, 404, 'TRACKED_LINK_NOT_FOUND');
     }
     await deleteTrackedLink(c.env.DB, id);
     return c.json({ success: true, data: null });
@@ -324,9 +324,9 @@ trackedLinks.post('/api/liff/tracked-link-identity', inputJsonBoundary({ linkId:
   const { linkId, idToken } = await c.req.json<{ linkId: string; idToken: string }>();
   if (!linkId || !idToken) return c.json({ success: false, error: 'Identity required' }, 401);
   const link = await getTrackedLinkByIdOrShortCode(c.env.DB, linkId);
-  if (!link?.is_active) return c.json({ success: false, error: 'Link not found' }, 404);
+  if (!link?.is_active) return fail(c, 404, 'LINK_NOT_FOUND');
   const accountId = await resolveLinkAccountId(c.env.DB, link);
-  if (accountId === undefined) return c.json({ success: false, error: 'Link not found' }, 404);
+  if (accountId === undefined) return fail(c, 404, 'LINK_NOT_FOUND');
   const account = await trackedLinkSigningAccount(c.env.DB, accountId);
   if (!account?.is_active || account.archived_at || !await isLineAccountTenantActive(c.env.DB, account.id)) {
     return c.json({ success: false, error: 'Account unavailable' }, 503);
@@ -342,7 +342,7 @@ trackedLinks.post('/api/liff/tracked-link-identity', inputJsonBoundary({ linkId:
   if (typeof identity.sub !== 'string' || !identity.sub) return c.json({ success: false, error: 'Invalid ID token' }, 401);
   const friend = await getFriendByLineUserIdForAccount(c.env.DB, identity.sub, accountId);
   const token = friend ? await issueTrackedLinkIdentity(c.env.DB, link, friend.id, 5 * 60) : null;
-  if (!token) return c.json({ success: false, error: 'Friend not found' }, 404);
+  if (!token) return fail(c, 404, 'FRIEND_NOT_FOUND');
   c.header('Cache-Control', 'no-store');
   return c.json({ success: true, data: { token } });
 });
@@ -359,7 +359,7 @@ trackedLinks.get('/t/:linkId', async (c) => {
   const link = await getTrackedLinkByIdOrShortCode(c.env.DB, linkId);
 
   if (!link || !link.is_active) {
-    return c.json({ success: false, error: 'Link not found' }, 404);
+    return fail(c, 404, 'LINK_NOT_FOUND');
   }
 
   // Bot UA (LINE/X/Facebook 等のリンクプレビュー) → OGP HTML を返して終了。

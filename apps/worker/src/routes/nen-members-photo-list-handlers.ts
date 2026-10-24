@@ -2,7 +2,7 @@ import { buildCursorListResponse } from '../lib/list-paging.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 import { getPublicationThirtyDayViews } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import { findRewardedAdoptedDuplicate, getEffectivePhotoRewardPolicy, jstNow, publishPhoto, savePhotoPublicationOrder, nextVersionToken, toJstString } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
@@ -47,7 +47,7 @@ export const put__api_nen_members_care_flags_id_1 = async (c: Context<Env, "/api
 
 export const get__api_nen_members_photos_2 = async (c: Context<Env, "/api/nen-members/photos">) => {
   const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }
@@ -105,7 +105,7 @@ export const get__api_nen_members_photos_2 = async (c: Context<Env, "/api/nen-me
 
 export const get__api_nen_members_photos_publications_3 = async (c: Context<Env, "/api/nen-members/photos/publications">) => {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
@@ -224,7 +224,7 @@ export const get__api_nen_members_photos_publications_3 = async (c: Context<Env,
 
 export const get__api_nen_members_photos_publications_order_4 = async (c: Context<Env, "/api/nen-members/photos/publications/order">) => {
   const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   const rows = await c.env.DB.prepare(`SELECT pub.id,pub.version,p.name AS pet_name
     FROM nen_photo_publications pub JOIN nen_photo_submissions ps ON ps.id=pub.photo_id AND ps.line_account_id=pub.line_account_id
@@ -382,7 +382,7 @@ export const put__api_nen_members_photos_publications_id_placements_8 = async (c
 
 export const get__api_nen_members_photos_id_9 = async (c: Context<Env, "/api/nen-members/photos/:id">) => {
   const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }

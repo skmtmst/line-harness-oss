@@ -3,7 +3,7 @@ import { logger } from '@line-crm/shared/server';
 import { parseJsonArray } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getBroadcastById, countBroadcastLedger, deriveBroadcastDisplayStatus, BROADCAST_DISPLAY_STATUS_LABELS } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { addTestLabel, assertMessagePartsResolved, autoTrackMessageParts, buildMessages, combinedMessageContent, parseBroadcastMessageParts, renderMessageParts } from '../features/broadcasts/broadcast-message-set/index.js';
@@ -20,7 +20,7 @@ export const get__api_broadcasts_id_insight_1 = async (c: Context<Env, "/api/bro
   const id = c.req.param('id');
   const broadcast = await getBroadcastById(c.env.DB, id);
   if (!broadcast || !await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   const insight = await c.env.DB.prepare(
     'SELECT * FROM broadcast_insights WHERE broadcast_id = ? ORDER BY created_at DESC LIMIT 1'
@@ -90,10 +90,10 @@ export const post__api_broadcasts_id_fetch_insight_2 = async (c: Context<Env, "/
   const broadcast = await getBroadcastById(c.env.DB, id);
   if (broadcast?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
   if (!broadcast) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (broadcast.status !== 'sent') {
     return inputError(c, { success: false, error: 'Broadcast has not been sent yet' }, 400, []);
@@ -264,9 +264,9 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
   const id = c.req.param('id');
   const broadcast = await getBroadcastById(c.env.DB, id);
   if (broadcast?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
-  if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
+  if (!broadcast) return fail(c, 404, 'BROADCAST_NOT_FOUND');
   if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (broadcast.status !== 'draft' && broadcast.status !== 'scheduled') {
     return inputError(c, { success: false, error: 'Only draft or scheduled broadcasts can be test-sent' }, 400, []);
@@ -321,7 +321,7 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
   ).bind(...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string; display_name: string | null }>();
 
   const account = await getLineAccountById(c.env.DB, accountId);
-  if (!account) return inputError(c, { success: false, error: 'LINE account not found' }, 400, []);
+  if (!account) return fail(c, 400, 'LINE_ACCOUNT_NOT_FOUND', {}, []);
   const lineClient = new LineClient(account.channel_access_token);
 
   let parts;
