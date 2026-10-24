@@ -3,11 +3,13 @@
 import { Building2, Check, ArrowRight } from 'lucide-react'
 import { useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
+import Avatar from './avatar'
 import styles from './account-switch-menu.module.css'
 
 export interface AccountSwitchMenuAccount {
   id: string
   label: string
+  iconUrl?: string | null
   mark?: string
 }
 
@@ -107,7 +109,7 @@ export default function AccountSwitchMenu({
                 className={selected ? `${styles.row} ${styles.rowSelected}` : styles.row}
                 onClick={() => { onClose(); if (!selected) onSelect(account.id) }}
               >
-                <span className={styles.mark} aria-hidden="true">{account.mark ?? account.label.slice(0, 1)}</span>
+                <Avatar name={account.label} src={account.iconUrl ?? null} size={24} shape="rounded" alt={account.label} />
                 <span className={styles.name} title={account.label}>{account.label}</span>
                 {selected ? <Check aria-hidden="true" className={styles.check} /> : null}
               </button>

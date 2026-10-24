@@ -229,7 +229,7 @@
 :root .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
 .danger-outline { border-color: var(--color-hairline); }
-:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 0; box-shadow: var(--shadow-raised-control); }
+:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid transparent; box-shadow: var(--shadow-raised-control); }
 
 /* 本文中の小さな操作。通常のボタンの高さは変えない。 */
 :root .inline { height: auto; min-height: 0; padding: 0; font-size: var(--text-caption); line-height: 19px; }
@@ -358,4 +358,17 @@ html:root .button.secondary[data-presentation='row-action']:is(:hover, :active):
 html:root .button.secondary[data-presentation='row-action']:focus-visible {
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);
+}
+/* 主ボタンと白い副ボタンは、文字 14/600・印 16（線 2）・間 6。高さは変えない。 */
+:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action']) {
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action']) > svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+  flex: none;
 }
