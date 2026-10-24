@@ -101,8 +101,10 @@ describe('白文字を載せる緑', () => {
     const hits: string[] = []
     for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.css'))) {
       const css = readUiSource(path.join(dir, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-      // 宣言のかたまりごとに、地と文字色を突き合わせる
+      // 宣言のかたまりごとに、地と文字色を突き合わせる。
+      // LINE ログインのボタンだけは、LINE の緑に白文字を使う。
       for (const block of css.split('}')) {
+        if (name === 'button.module.css' && block.includes('.line {')) continue
         if (!/color:\s*var\(--color-on-accent\)/.test(block)) continue
         if (/background:\s*var\(--color-accent\)/.test(block)) hits.push(`${name}: ${block.trim().slice(0, 60)}`)
       }

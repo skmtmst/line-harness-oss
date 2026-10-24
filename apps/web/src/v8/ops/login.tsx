@@ -1,9 +1,10 @@
 'use client'
 
 import { beginAdminLoginHandoff, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
-import { LogIn, MessageCircle } from 'lucide-react'
+import { LogIn } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import LineLoginMark from '@/components/auth/line-login-mark'
 import PasswordField from '@/components/auth/password-field'
 import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
 import Button from '@/components/shared/button'
@@ -178,8 +179,8 @@ export default function OpsLoginV8() {
           <span>または</span>
           <span className={styles.rule} />
         </div>
-        <Button fullWidth onClick={lineLogin} disabled={busy !== null} className={styles.wide} busy={busy === 'line'} busyLabel="LINEへ移動中…">
-          <MessageCircle aria-hidden="true" />LINE でログイン
+        <Button fullWidth variant="line" onClick={lineLogin} disabled={busy !== null} className={styles.wide} busy={busy === 'line'} busyLabel="LINEへ移動中…">
+          <LineLoginMark />LINE でログイン
         </Button>
         <Link href="/password/forgot" className={styles.forgot}>パスワードを忘れた方はこちら</Link>
         <p className={styles.note}>運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</p>

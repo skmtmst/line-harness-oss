@@ -2,10 +2,10 @@
 
 import { beginAdminLoginHandoff, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 
-import { MessageCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
+import LineLoginMark from '@/components/auth/line-login-mark'
 import PasswordField from '@/components/auth/password-field'
 import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
 import Button from '@/components/shared/button'
@@ -172,8 +172,8 @@ export default function LoginPage() {
         <span className="h-px flex-1 bg-hairline" />
       </div>
 
-      <Button fullWidth onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
-        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />LINE でログイン
+      <Button fullWidth variant="line" onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
+        <LineLoginMark className="h-4.5 w-4.5" />LINE でログイン
       </Button>
 
       <p className="text-caption text-ink-faint">
