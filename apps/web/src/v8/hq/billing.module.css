@@ -53,7 +53,7 @@
 
 /* ボタンが無いカードは、下の余白を24にして大きな空きを残さない。 */
 .plan:not(:has(.planFoot > *)) {
-  padding-bottom: 24px;
+  padding-bottom: var(--space-24);
 }
 
 .planCurrent {

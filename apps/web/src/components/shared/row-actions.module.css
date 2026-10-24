@@ -186,7 +186,7 @@ html:root .action[data-row-menu] {
 }
 /* 見える枠は28角、押せる所は既存の36角。型の列幅を動かさない。 */
 html:root .action[data-row-menu]:not(:focus-visible) {
-  outline: none;
+  outline: 1px solid transparent;
 }
 
 html:root .action[data-row-menu]::after {
