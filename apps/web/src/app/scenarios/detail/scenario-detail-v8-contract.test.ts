@@ -68,13 +68,13 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
   it('配信結果の数の帯は人数と購読の件数を分けて描く', async () => {
     const { container } = await renderResults()
     const band = container.querySelector('[data-design="KPIs"]')!
-    const expected = [['始まった', '10', '人'], ['読み終えた', '5', '件'], ['途中', '4', '件'], ['離れた', '—', '人']]
+    // 取れない値は単位を付けない（「— 人」にしない）。0 は値なので単位を残す。
+    const expected = [['始まった', '10', '人'], ['読み終えた', '5', '件'], ['途中', '4', '件'], ['離れた', '—', '']]
     for (const [label, value, unit] of expected) {
       const cell = within(band as HTMLElement).getByText(label).closest('[data-kpi-presentation]')!
       expect(cell.querySelector('[data-kpi-number]')?.textContent).toBe(value)
-      // 取れない数（—）には単位を付けない（共通のKPIの決まり）。
-      if (value === '—') expect(cell.textContent).not.toContain('—' + unit)
-      else expect(cell.textContent).toContain(value + unit)
+      expect(cell.textContent).toContain(value + unit)
+      expect(cell.querySelector('[data-kpi-unit]') !== null, `${label} の単位の有無`).toBe(unit !== '')
     }
   })
 

@@ -10,7 +10,7 @@ for (const width of [1152,1440,1920]) test(`overflow, right edge and missing ful
     const markup = '<style>body{margin:0}main{width:80vw}</style><main><div id="text">本文</div></main>'
     await page.setContent(markup)
     const normal = await page.evaluate(scanLayoutOverflow)
-    assert.deepEqual(normal,{pageX:false,overflow:[],outOfMain:[],noTitle:[]})
+    assert.deepEqual(normal,{pageX:false,overflow:[],outOfMain:[],noTitle:[],accountName:[]})
     await page.locator('#text').evaluate(el=>{el.style.cssText='width:10px;white-space:nowrap;overflow:hidden';el.textContent='はみ出す長い文字列'})
     assert.ok((await page.evaluate(scanLayoutOverflow)).overflow.length)
     await page.locator('#text').evaluate(el=>{el.style.textOverflow='ellipsis'})
@@ -21,6 +21,10 @@ for (const width of [1152,1440,1920]) test(`overflow, right edge and missing ful
     const broken=await page.evaluate(scanLayoutOverflow)
     assert.ok(broken.pageX)
     assert.ok(broken.outOfMain.length)
+    await page.setContent('<style>body{margin:0}main{width:80vw}</style><header><span data-part="account-name" style="display:inline-block;max-width:128px;width:128px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="長い名前">長い名前</span></header><main></main>')
+    assert.ok((await page.evaluate(scanLayoutOverflow)).accountName.length)
+    await page.locator('[data-part="account-name"]').evaluate(el=>{el.style.maxWidth='260px'})
+    assert.equal((await page.evaluate(scanLayoutOverflow)).accountName.length,0)
     await page.setContent(markup)
     assert.deepEqual(await page.evaluate(scanLayoutOverflow),normal)
   } finally { await browser.close() }

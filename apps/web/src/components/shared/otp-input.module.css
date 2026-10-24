@@ -133,10 +133,10 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .slot { height: 52px; border: 0; outline: 0; background: var(--color-canvas); box-shadow: var(--shadow-raised-control); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 24px; font-weight: 600; line-height: normal; caret-color: var(--color-ink); }
+:root .slot { height: 52px; border: 0; outline-color: transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 24px; font-weight: 600; line-height: normal; caret-color: var(--color-ink); }
 :root .slot:focus,
 :root .slot:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
-:root .group[data-state='success'] .slot { outline: 0; background: var(--color-canvas); box-shadow: var(--shadow-raised-control), inset 0 0 0 1.5px var(--color-success); }
+:root .group[data-state='success'] .slot { outline-color: transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control), inset 0 0 0 1.5px var(--color-success); }
 :root .slot[aria-invalid='true'] { border-color: var(--color-status-danger); outline-color: var(--color-status-danger); background: var(--color-canvas); box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-status-danger); }
 
 .field { display: contents; }

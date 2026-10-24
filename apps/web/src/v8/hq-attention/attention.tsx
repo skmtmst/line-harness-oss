@@ -127,7 +127,7 @@ export default function HqAttentionV8() {
       <ListToolbarRow>
         <Select aria-label="種類" value={kind} onChange={(value) => setKind(value as typeof kind)} options={[{ value: 'all', label: '種類：すべて' }, ...KINDS.map((item) => ({ value: item.key, label: `種類：${item.label}` }))]} />
         <EntitySelect compact aria-label="アカウントのフォルダ" noun="フォルダ" valuePrefix="フォルダ：" value={folder} onChange={setFolder} options={[{ value: 'all', label: 'すべて' }, ...folders.map((item) => ({ value: item.id, label: item.name }))]} />
-        <ListToolbarEnd><Select aria-label="並び" value={order} onChange={(value) => setOrder(value as 'count' | 'name')} options={[{ value: 'count', label: '並び：件数の多い順' }, { value: 'name', label: '並び：名前順' }]} /></ListToolbarEnd>
+        <ListToolbarEnd><Select aria-label="並び" label="並び" value={order} onChange={(value) => setOrder(value as 'count' | 'name')} options={[{ value: 'count', label: '件数の多い順' }, { value: 'name', label: '名前順' }]} /></ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
   )
