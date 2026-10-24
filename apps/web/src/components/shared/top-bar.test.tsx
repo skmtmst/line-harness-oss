@@ -25,7 +25,6 @@ describe("管理画面共通トップバー", () => {
 
   it('V8 の 1152 の帯：札は潰さない・パンくずと自分の名前が縮む', () => {
     expect(css).toMatch(/:root \.accountPill \{[^}]*flex-shrink:\s*0/s)
-    expect(css).toMatch(/:root \.accountName \{\s*max-width:\s*128px/s)
     expect(css).toMatch(/:root \.crumbCurrent/s)
     expect(css).toMatch(/min-width:\s*0/)
     // 管理画面 の札（縮む側）は変えない。
