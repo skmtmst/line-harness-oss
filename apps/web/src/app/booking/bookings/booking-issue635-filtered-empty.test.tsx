@@ -131,8 +131,10 @@ describe('#635 予約管理一覧の絞り込み0件', () => {
     await waitFor(() => expect(screen.getByText('LINEの人')).toBeTruthy())
     expect(screen.getByText('電話の人')).toBeTruthy()
     expect(screen.getByText('店頭の人')).toBeTruthy()
+    expect(screen.getByLabelText('予約元で絞り込む').textContent).toContain('予約元：すべて')
 
     await chooseSelect('予約元で絞り込む', '電話')
+    expect(screen.getByLabelText('予約元で絞り込む').textContent).toContain('予約元：電話')
     await waitFor(() => expect(screen.getByText('電話の人')).toBeTruthy())
     expect(screen.queryByText('LINEの人')).toBeNull()
     expect(screen.queryByText('店頭の人')).toBeNull()

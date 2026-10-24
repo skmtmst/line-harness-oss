@@ -88,7 +88,7 @@ import { formatNumber } from '@/lib/format'
 
 import { DetailRow, ActionButtons } from "./page-gap-parts"
 
-import { STATUS_TABS, SOURCE_FILTERS, statusBadgeColor, sourceLabel, formatLedgerDateTime, statusLabel, actionLabel, PAGE_SIZE, formatJpDateTime, formatJpTime, formatJpDay, jstDay } from './ledger-model'
+import { STATUS_TABS, SOURCE_FILTER_OPTIONS, SOURCE_FILTER_NAME, sourceFilterText, statusBadgeColor, sourceLabel, formatLedgerDateTime, statusLabel, actionLabel, PAGE_SIZE, formatJpDateTime, formatJpTime, formatJpDay, jstDay } from './ledger-model'
 
 import type { BookingLedgerModel } from './use-booking-ledger'
 import { bookingWords } from '@/v8/booking-bookings/public/words/index'
@@ -263,12 +263,12 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             onRetry={() => { setError(''); setCalendarSeq((n) => n + 1); void load() }}
           />
         ) : (
-          <ReservationBoard breaks={view === 'day' ? staffBreaks : undefined} timeDirection={view === 'day' ? 'vertical' : undefined} printContext={selectedAccount?.name??selectedAccountId??'予約管理'} kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
+          <ReservationBoard breaks={view === 'day' ? staffBreaks : undefined} timeDirection={view === 'day' ? 'vertical' : undefined} printContext={`${selectedAccount?.name??selectedAccountId??'予約管理'} ／ ${sourceFilterText(sourceFilter)}`} kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
             toolbar={<><Button size="compact" onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?-7:-1))}>‹</Button><strong>{Number(calendarFrom.slice(5,7))}月{Number(calendarFrom.slice(8))}日{view==='week'?`〜${Number(calendarTo.slice(5,7))}月${Number(calendarTo.slice(8))}日`:null}</strong><Button size="compact" onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?7:1))}>›</Button><Button size="compact" onClick={()=>setCalendarAnchor(jstDay(new Date().toISOString()))}>今日</Button></>}
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<Notice tone="warn" action={<Button href="/booking/menus">設定する</Button>}>担当者か予約メニューが未設定です。予約設定で登録すると空き枠が出ます。</Notice>:null}
             slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
-            trailingToolbar={view==='day'||view==='week'?<><BookingSourceLegend sources={['line','phone']}/><EntitySelect width={154} aria-label={`${words.staff}で絞り込む`} valuePrefix={`${words.staff}：`} value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'すべて'},...staffList.map(r=>({value:r.id,label:r.display_name}))]}/><Select size="content" width={124} aria-label="予約元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}/></>:undefined}
+            trailingToolbar={view==='day'||view==='week'?<><BookingSourceLegend sources={['line','phone']}/><EntitySelect width={146} aria-label={`${words.staff}で絞り込む`} valuePrefix={`${words.staff}：`} value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'すべて'},...staffList.map(r=>({value:r.id,label:r.display_name}))]}/><Select size="content" label={SOURCE_FILTER_NAME} aria-label="予約元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTER_OPTIONS}/></>:undefined}
             resources={staffList.filter(r=>view!=='day'||boardStaff==='all'||r.id===boardStaff).map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
             renderList={view === 'day' ? () => <PeopleDayList usageStyle={usageStyle} rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
@@ -368,10 +368,11 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               ]}
             />
             <Select
+              label={SOURCE_FILTER_NAME}
               aria-label="予約元で絞り込む"
               value={sourceFilter}
               onChange={setSourceFilter}
-              options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
+              options={SOURCE_FILTER_OPTIONS}
             />
             {selectedAccountId ? <ListToolbarEnd>
               <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv} busy={csvBusy} busyLabel="書き出しています…"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
@@ -425,10 +426,11 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                   ]}
                 />
                 <Select
+                  label={SOURCE_FILTER_NAME}
                   aria-label="予約元で絞り込む"
                   value={sourceFilter}
                   onChange={setSourceFilter}
-                  options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
+                  options={SOURCE_FILTER_OPTIONS}
                 />
               </>
             }

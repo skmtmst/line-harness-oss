@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ledgerSourceGroup, matchesLedgerFilters, matchesLedgerSource } from './ledger-model'
+import { ledgerSourceGroup, matchesLedgerFilters, matchesLedgerSource, sourceFilterText } from './ledger-model'
 
 const row = (source: string | null, friendId: string | null = null, staffId = 'staff-1') => ({
   source, friend_id: friendId, staff_id: staffId,
@@ -20,6 +20,13 @@ describe('予約元の絞り込み', () => {
     expect(matchesLedgerSource(row('liff'), 'line')).toBe(true)
     expect(matchesLedgerSource(row('phone'), 'line')).toBe(false)
     expect(matchesLedgerSource(row('counter'), 'other')).toBe(true)
+  })
+
+  it('絞り込みと同じ言い方で「予約元：電話」と出す', () => {
+    expect(sourceFilterText('all')).toBe('予約元：すべて')
+    expect(sourceFilterText('line')).toBe('予約元：LINE')
+    expect(sourceFilterText('phone')).toBe('予約元：電話')
+    expect(sourceFilterText('unknown')).toBe('予約元：すべて')
   })
 
   it('担当と予約元は両方に合うものだけを通す', () => {

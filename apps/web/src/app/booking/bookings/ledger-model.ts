@@ -28,11 +28,23 @@ export const STATUS_TABS: Array<{ key: string; label: string }> = [
 
 /** 予約元の絞り込み。今読んでいる予約の source を LINE・電話・その他の3つへまとめる。 */
 export const SOURCE_FILTERS: Array<{ key: string; label: string }> = [
-  { key: 'all', label: '予約元: すべて' },
+  { key: 'all', label: 'すべて' },
   { key: 'line', label: 'LINE' },
   { key: 'phone', label: '電話' },
   { key: 'other', label: 'その他' },
 ]
+
+/** 選ぶ欄に渡す予約元の候補。 */
+export const SOURCE_FILTER_OPTIONS = SOURCE_FILTERS.map(({ key, label }) => ({ value: key, label }))
+
+/** 絞り込み欄・印刷で同じ言い方にする予約元の見出し。 */
+export const SOURCE_FILTER_NAME = '予約元'
+
+/** 印刷などで出す「予約元：電話」。絞り込みと同じ語彙を使う。 */
+export function sourceFilterText(key: string): string {
+  const label = SOURCE_FILTERS.find((item) => item.key === key)?.label ?? 'すべて'
+  return `${SOURCE_FILTER_NAME}：${label}`
+}
 
 export type LedgerSourceGroup = 'line' | 'phone' | 'other'
 
