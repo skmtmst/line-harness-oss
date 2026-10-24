@@ -24,7 +24,7 @@ import {
   summarizeDashboardFreshness,
   type DashboardPeriod,
 } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -175,7 +175,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     const { accountId } = access;
     const selectedAccount = await getLineAccountById(c.env.DB, accountId);
     if (!selectedAccount) {
-      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
 
     const statsScope = { allowedAccountIds: [accountId], includeUnassigned: false };
@@ -481,7 +481,7 @@ dashboard.get('/api/list-stats', async (c) => {
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const selectedAccountId = readAccountId(c);
     if (selectedAccountId && !accountScope.allowedAccountIds.includes(selectedAccountId)) {
-      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const scope = selectedAccountId
       ? { allowedAccountIds: [selectedAccountId], includeUnassigned: false }

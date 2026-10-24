@@ -31,7 +31,7 @@ import {
   TagArchiveError,
 } from '@line-crm/db';
 import type { Tag as DbTag, TagGroup as DbTagGroup, TagWithUsage } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 
 import type {
   TagCsvImportInputRow,
@@ -171,7 +171,7 @@ async function resolveLegacyTagAccount(
   if (scope.allowedAccountIds.length === 1) {
     return { accountId: scope.allowedAccountIds[0] };
   }
-  return { error: inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]) };
+  return { error: fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]) };
 }
 
 async function visibleTagFolder(c: Context<Env>, id: string, accountId?: string | null): Promise<Response | null> {
@@ -661,7 +661,7 @@ tags.patch('/api/tags/:id/group', requireRole('owner', 'admin'), inputJsonBounda
   } catch (err) {
     // 存在しない分類を指定した場合。500 にすると原因が分からない。
     if (err instanceof Error && err.message.includes('FOREIGN KEY constraint')) {
-      return inputError(c, { success: false, error: 'group not found' }, 400, ["groupId"]);
+      return fail(c, 400, 'GROUP_NOT_FOUND', {}, ["groupId"]);
     }
     throw err;
   }
@@ -819,7 +819,7 @@ tags.get('/api/tags/:id/dependencies', requireRole('owner', 'admin'), async (c) 
   try {
     const lineAccountId = requestedLineAccountId(c);
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
@@ -844,13 +844,13 @@ tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const lineAccountId = requestedLineAccountId(c);
     if (!lineAccountId) {
-      return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
     // 編集画面が保管済みタグでも開けるよう、除外しない(#710)。
     const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
-    if (!detail) return c.json({ success: false, error: 'tag not found' }, 404);
+    if (!detail) return fail(c, 404, 'TAG_NOT_FOUND');
     return c.json({
       success: true,
       data: c.req.query('withActions') === '1'
@@ -984,7 +984,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
       }
       // 版付き経路は従来どおり担当必須。ここへ来るのは範囲内の対象だけ。
       if (!lineAccountId) {
-        return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
+        return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
       }
       const name = text(body.name);
       if (body.name !== undefined && (!name || name.length > 80)) {
@@ -1146,7 +1146,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async
       || body.automationDraft !== undefined;
     if (usesV6Contract) {
       if (!lineAccountId) {
-        return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
+        return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
       }
       const denied = await requireVisibleLineAccount(c, lineAccountId);
       if (denied) return denied;
@@ -1243,7 +1243,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async
       return c.json({ success: false, error: 'tag name already exists' }, 409);
     }
     if (err instanceof Error && err.message.includes('FOREIGN KEY constraint')) {
-      return inputError(c, { success: false, error: 'group not found' }, 400, ["groupId"]);
+      return fail(c, 400, 'GROUP_NOT_FOUND', {}, ["groupId"]);
     }
     throw err;
   }
@@ -1262,7 +1262,7 @@ tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     if (current instanceof Response) return current;
     const impact = await getTagDeleteImpact(c.env.DB, id);
     if (!impact) {
-      return c.json({ success: false, error: 'tag not found' }, 404);
+      return fail(c, 404, 'TAG_NOT_FOUND');
     }
     if (!impact.canDelete) {
       return c.json({
@@ -1292,7 +1292,7 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), inputJsonBound
   try {
     const body = await c.req.json<Record<string, unknown>>();
     const lineAccountId = requestedLineAccountId(c, body);
-    if (!lineAccountId) return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
+    if (!lineAccountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
@@ -1340,7 +1340,7 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), inputJsonBound
 tags.post('/api/tags/:id/restore', requireRole('owner', 'admin'), denyReadOnly(), async (c) => {
   try {
     const accountId = requestedLineAccountId(c);
-    if (!accountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     const denied = await requireVisibleLineAccount(c, accountId);
     if (denied) return denied;
     const body = await c.req.json<Record<string, unknown>>().catch((): Record<string, unknown> => ({}));

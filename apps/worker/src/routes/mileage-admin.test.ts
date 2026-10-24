@@ -1060,6 +1060,29 @@ describe('mileage admin API', () => {
     expect(adjustmentNotificationMocks.sendMileageAdjustmentNotification).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['/api/mileage/adjustment-policy', 'PUT', { accountId: 'account-1' }, 'approvalThreshold'],
+    ['/api/mileage/adjustments', 'POST', { accountId: 'account-1', friendId: 'friend-1', direction: 'increase' }, 'amount'],
+  ] as const)('%sで未入力の欄だけに理由を返し、保存へ進まない', async (path, method, body, missingField) => {
+    const response = await call(path, {
+      method,
+      headers: method === 'POST' ? {
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+      } : {},
+      body: JSON.stringify(body),
+    });
+    expect(response.status).toBe(400);
+    const failure = await response.json() as { success: boolean; code: string; error: string; fields: Record<string, string> };
+    expect(failure.success).toBe(false);
+    expect(failure.code).not.toMatch(/required/i);
+    expect(failure.error).toMatch(/[ぁ-んァ-ヶ一-龠]/u);
+    expect(failure.fields).toEqual({ [missingField]: failure.error });
+    expect(dbMocks.setMileageManualAdjustmentPolicy).not.toHaveBeenCalled();
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+    expect(accountAccessMocks.getVisibleLineAccountScope).not.toHaveBeenCalled();
+  });
+
   it('lets only owners configure the approval threshold', async () => {
     const owner = await call('/api/mileage/adjustment-policy', {
       method: 'PUT', body: JSON.stringify({ accountId: 'account-1', approvalThreshold: 5_000 }),

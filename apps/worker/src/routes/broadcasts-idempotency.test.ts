@@ -333,7 +333,7 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     });
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ success: false, error: 'Broadcast not found' });
+    expect(await response.json()).toEqual({ success: false, code: 'BROADCAST_NOT_FOUND', error: '配信が見つかりません。一覧から開き直してください。' });
     expect(accountAccess.canAccessAllLineAccounts).not.toHaveBeenCalled();
     expect(d1Prepare).not.toHaveBeenCalled();
   });

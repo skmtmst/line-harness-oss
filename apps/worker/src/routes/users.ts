@@ -19,7 +19,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { fail } from '../lib/fail.js';
 const users = new Hono<Env>();
 
 function serializeUser(row: DbUser) {
@@ -66,7 +66,7 @@ users.get('/api/users/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
     const id = c.req.param('id');
     const user = await visibleUser(c, id);
     if (!user) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeUser(user) });
   } catch (err) {
@@ -105,7 +105,7 @@ users.put('/api/users/:id', requireRole('owner', 'admin'), inputJsonBoundary({"e
   try {
     const id = c.req.param('id');
     if (!await visibleUser(c, id)) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     const body = await c.req.json<{
       email?: string | null;
@@ -122,7 +122,7 @@ users.put('/api/users/:id', requireRole('owner', 'admin'), inputJsonBoundary({"e
     });
 
     if (!updated) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeUser(updated) });
   } catch (err) {
@@ -147,7 +147,7 @@ users.delete('/api/users/:id', requireRole('owner'), async (c) => {
         && (gone.tenant_id ?? DEFAULT_TENANT_ID) === (staff?.tenantId ?? DEFAULT_TENANT_ID)) {
         return c.json({ success: true, data: null });
       }
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     if (user.status === 'archived') {
       return c.json({ success: true, data: null });
@@ -178,7 +178,7 @@ users.post('/api/users/:id/link', requireRole('owner', 'admin'), inputJsonBounda
     }
 
     if (!await visibleUser(c, userId)) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     const friend = await getFriendById(c.env.DB, body.friendId);
     if (!friend || !await canAccessAllLineAccounts(
@@ -186,7 +186,7 @@ users.post('/api/users/:id/link', requireRole('owner', 'admin'), inputJsonBounda
       c.get('staff'),
       [friend.line_account_id],
     )) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     /*
@@ -213,7 +213,7 @@ users.get('/api/users/:id/accounts', requireRole('owner', 'admin', 'staff'), asy
   try {
     const userId = c.req.param('id');
     if (!await visibleUser(c, userId)) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     const friends = await getUserFriends(c.env.DB, userId);
     return c.json({
@@ -245,7 +245,7 @@ users.post('/api/users/match', requireRole('owner', 'admin'), inputJsonBoundary(
     }
 
     if (!user) {
-      return c.json({ success: false, error: 'User not found' }, 404);
+      return fail(c, 404, 'USER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeUser(user) });
   } catch (err) {

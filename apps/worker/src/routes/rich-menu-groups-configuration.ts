@@ -3,7 +3,7 @@ import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getRichMenuGroups, getRichMenuGroupById, getRichMenuGroupWithPages, getRichMenuDeleteImpact, createRichMenuGroup, saveRichMenuGroupDraft, deleteRichMenuGroup, setRichMenuPageImage, listRichMenuSchedulesByGroup, cancelRichMenuSchedule, getMediaById, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
@@ -21,7 +21,7 @@ export const get__api_rich_menu_groups_groupId_delete_impact_1 = async (c: Conte
         !impact
         || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [impact.group.accountId])
       ) {
-        return c.json({ success: false, error: 'not found' }, 404);
+        return fail(c, 404, 'NOT_FOUND');
       }
       return c.json({ success: true, data: impact });
     } catch (error) {
@@ -36,7 +36,7 @@ export const get__api_rich_menu_groups_groupId_delete_impact_1 = async (c: Conte
 export const post__api_rich_menu_groups_groupId_preview_targets_2 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/preview-targets">) => {
   const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
 
   let body: { conditions?: unknown } = {};
@@ -151,7 +151,7 @@ export const get__api_rich_menu_groups_groupId_usages_3 = async (c: Context<Env,
   try {
     const impact = await getRichMenuDeleteImpact(c.env.DB, c.req.param('groupId'));
     if (!impact || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [impact.group.accountId])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     return c.json({
       success: true,
@@ -171,7 +171,7 @@ export const get__api_rich_menu_groups_groupId_usages_3 = async (c: Context<Env,
 export const post__api_rich_menu_groups_groupId_schedule_4 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/schedule">) => {
     const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!idempotencyKey) {
@@ -252,7 +252,7 @@ export const post__api_rich_menu_groups_groupId_schedule_4 = async (c: Context<E
 export const get__api_rich_menu_groups_groupId_schedules_5 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/schedules">) => {
   const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
   const rows = await listRichMenuSchedulesByGroup(c.env.DB, group.id, 50);
   return c.json({
@@ -278,14 +278,14 @@ export const get__api_rich_menu_groups_groupId_schedules_5 = async (c: Context<E
 export const post__api_rich_menu_groups_groupId_schedules_scheduleId_cancel_6 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/schedules/:scheduleId/cancel">) => {
     const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const scheduleId = c.req.param('scheduleId');
     const cancelled = await cancelRichMenuSchedule(c.env.DB, scheduleId, group.id, group.account_id);
     if (cancelled) return c.json({ success: true, data: { id: scheduleId, status: 'cancelled' } });
     const rows = await listRichMenuSchedulesByGroup(c.env.DB, group.id, 200);
     const current = rows.find((row) => row.id === scheduleId);
-    if (!current) return c.json({ success: false, error: 'not found' }, 404);
+    if (!current) return fail(c, 404, 'NOT_FOUND');
     return c.json({ success: false, error: 'already started', status: current.status }, 409);
   };
 
@@ -293,7 +293,7 @@ export const get__api_rich_menu_groups_groupId_7 = async (c: Context<Env, "/api/
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
   return c.json({ success: true, data: (await withStyleSampleMetadata(c.env.DB,[serializeGroupWithPages(group)],'rich_menu'))[0] });
 };
@@ -308,7 +308,7 @@ export const post__api_rich_menu_groups_8 = async (c: Context<Env, "/api/rich-me
   const parsed = parseCreateBody(body);
   if (!parsed.ok) return inputError(c, { success: false, error: parsed.error, field: parsed.field }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.accountId])) {
-    return c.json({ success: false, error: 'line account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   const created = await createRichMenuGroup(c.env.DB, parsed.value);
   // N-164: 登録メディアを選んで作った場合、既定ページの画像としてここで登録する。
@@ -383,7 +383,7 @@ export const patch__api_rich_menu_groups_groupId_9 = async (c: Context<Env, "/ap
   const groupId = c.req.param('groupId');
   const existing = await getRichMenuGroupById(c.env.DB, groupId);
   if (!existing || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
 
   let body: unknown;
@@ -487,13 +487,13 @@ export const post__api_rich_menu_groups_reorder_priorities_10 = async (c: Contex
     }
     const r = isJsonRecord(body) ? body : {};
     if (typeof r.accountId !== 'string' || r.accountId.length === 0) {
-      return inputError(c, { success: false, error: 'accountId required' }, 400, ["accountId"]);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
     }
     if (!Array.isArray(r.orderedIds) || r.orderedIds.some((id) => typeof id !== 'string')) {
       return inputError(c, { success: false, error: 'orderedIds must be string array' }, 400, ["orderedIds"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [r.accountId])) {
-      return c.json({ success: false, error: 'line account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const current = await getRichMenuGroups(c.env.DB, r.accountId);
     const currentIds = new Set(current.map((g) => g.id));
@@ -538,7 +538,7 @@ export const delete__api_rich_menu_groups_groupId_11 = async (c: Context<Env, "/
     !impact
     || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [impact.group.accountId])
   ) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
   // query に force=true が残っていても、影響確認を迂回させない。公開中、LINE上に
   // 実体が残る、別設定から参照される、のどれかなら必ず止める。
@@ -554,6 +554,6 @@ export const delete__api_rich_menu_groups_groupId_11 = async (c: Context<Env, "/
     );
   }
   const ok = await deleteRichMenuGroup(c.env.DB, groupId);
-  if (!ok) return c.json({ success: false, error: 'not found' }, 404);
+  if (!ok) return fail(c, 404, 'NOT_FOUND');
   return c.json({ success: true });
 };

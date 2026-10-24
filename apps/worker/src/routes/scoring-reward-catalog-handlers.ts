@@ -1,7 +1,7 @@
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { recordAuditEvent } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { listMileageRewardFolders, createMileageRewardFolder, reorderMileageRewardFolders, moveMileageRewardToFolder, getMileageAdminHistory, getMileageEarningRulesV6, getMileageFriendsV6, getMileageRewardReachMetrics, saveMileageEarningRuleDraft, getActionScoreOverview, createMileageRewardDraft, createMileageRewardDraftFromPublished, getMileageReward, getMileageRewardAdminOverview, getMileageRedemption, isMileageRefundComplete, listMileageRedemptions, refundMileageRewardRedemption, importMileageRewardCodes, publishMileageReward, reorderMileageEarningRules, reorderMileageRewards, reserveMileageRewardRedemption, setMileageRewardStatus, encryptCredential, MileageRewardError } from '@line-crm/db';
 import type { MileageRedemptionListStatus, MileageRewardDraftInput } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -483,10 +483,10 @@ export const post__api_mileage_redemptions_id_retry_fulfillment_20 = async (c: C
 export const get__api_mileage_friends_21 = async (c: Context<Env, "/api/mileage/friends">) => {
   try {
     const accountId = c.req.query('accountId')?.trim() ?? '';
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!accountScope.allowedAccountIds.includes(accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 20);
     const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);

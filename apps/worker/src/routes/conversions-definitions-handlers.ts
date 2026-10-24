@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { consumePublicIngressReceipt } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { trackConversion, listConversionDefinitions, getConversionDefinitionDetail, createConversionDefinition, previewConversionDefinition, getConversionDefinitionDeleteImpact, stopConversionDefinition, replaceConversionDefinitionUsages, reviseConversionDefinition, deleteUnusedConversionDefinition, publishConversionDefinition, issueConversionIngestSecret, setConversionIngestDisabled, getConversionPointForIngest, resolveConversionIngestSecret, recordConversionIngestionEvent, listConversionIngestionEvents, listConversionDefinitionEvents, CONVERSION_DEFINITION_USAGE_KINDS } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -404,7 +404,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
     const point = await getConversionPointForIngest(c.env.DB, pointId);
     if (!point) {
       await log({ result: 'rejected', reason: 'point_not_found' });
-      return c.json({ success: false, error: 'Conversion point not found' }, 404);
+      return fail(c, 404, 'CONVERSION_POINT_NOT_FOUND');
     }
     if (point.status !== 'active') {
       await log({
@@ -571,7 +571,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
           sourceEventId: sourceEventId.trim().slice(0, 200),
           friendId: resolvedFriendId, payloadShape, signatureSha256: signatureHash,
         });
-        return inputError(c, { success: false, error: 'Friend not found or out of scope' }, 422, []);
+        return fail(c, 422, 'FRIEND_NOT_FOUND_OR_OUT_OF_SCOPE', {}, []);
       }
       // R40: 数えない条件に当てはまる受信は、失敗ではなく対象外として残す。
       if (message === 'conversion_excluded') {

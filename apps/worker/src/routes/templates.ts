@@ -17,7 +17,7 @@ import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../service
 import { parseQuestion, type ScenarioQuestion } from '../features/scenarios/scenario-question/index.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { validateFlexContent } from '@line-crm/shared';
-
+import { fail } from '../lib/fail.js';
 const templates = new Hono<Env>();
 
 /**
@@ -212,7 +212,7 @@ templates.get('/api/templates', async (c) => {
     const requestedAccountId = c.req.query('account_id');
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
-      return c.json({ success: false, error: 'Template not found' }, 404);
+      return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
     // 共通一覧契約。page/limit を付けたときだけ DB 側で切り出して新形で返す。
     const wantsPaging = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
@@ -375,7 +375,7 @@ templates.get('/api/templates/:id', async (c) => {
     const id = c.req.param('id');
     const item = await getTemplateById(c.env.DB, id);
     if (!item || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [item.line_account_id])) {
-      return c.json({ success: false, error: 'Template not found' }, 404);
+      return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
     const usedBy = await usageWithVersions(c.env.DB, id, item.line_account_id);
     // 467: 一斉配信の参照は参照表から足す（送った時の版のまま）。
@@ -451,7 +451,7 @@ templates.get('/api/templates/:id/usages', async (c) => {
 
     const tpl = await getTemplateById(c.env.DB, templateId);
     if (!tpl || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [tpl.line_account_id])) {
-      return c.json({ success: false, error: 'Template not found' }, 404);
+      return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
 
     // 467: 一斉配信の参照は参照表から足す（送った時の版のまま）。
@@ -492,7 +492,7 @@ templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBo
       return inputError(c, { success: false, error: 'account_id_required' }, 400, ["accountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
-      return c.json({ success: false, error: 'Template not found' }, 404);
+      return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
     // N-146: 空白だけの値も「無い」と同じに扱う。
     if (isBlankText(body.name) || isBlankText(body.messageType) || isBlankText(body.messageContent)) {
@@ -744,7 +744,7 @@ templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'),
     if (!existing || !await canAccessAllLineAccounts(
       c.env.DB, c.get('staff'), [existing.line_account_id],
     )) {
-      return c.json({ success: false, error: 'Template not found' }, 404);
+      return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
     // 独立審査P2: 版の確認は任意にしない。確認なしの公開は受け付けない。
     // 詳細口が返す publishedVersion・draftRevision をそのまま送る。
@@ -838,7 +838,7 @@ templates.get('/api/templates/:id/versions', async (c) => {
     const id = c.req.param('id');
     const item = await getTemplateById(c.env.DB, id);
     if (!item || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [item.line_account_id])) {
-      return c.json({ success: false, error: 'Template not found' }, 404);
+      return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
     const versions = await listTemplateVersions(c.env.DB, id);
     return c.json({
@@ -881,7 +881,7 @@ templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), 
     if (!existing || !await canAccessAllLineAccounts(
       c.env.DB, c.get('staff'), [existing.line_account_id],
     )) {
-      return c.json({ success: false, error: 'Template not found' }, 404);
+      return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
     const body: { versionNumber?: unknown; expectedVersion?: unknown } =
       await c.req.json().catch(() => ({}));
@@ -914,7 +914,7 @@ templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), 
   } catch (err) {
     const code = err instanceof Error ? err.message : '';
     if (code === 'TEMPLATE_NOT_FOUND') {
-      return c.json({ success: false, error: 'Template not found' }, 404);
+      return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
     if (code === 'TEMPLATE_VERSION_NOT_FOUND') {
       return c.json({ success: false, error: 'その版はありません。開き直して確認してください' }, 404);

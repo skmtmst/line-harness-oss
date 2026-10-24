@@ -1,7 +1,7 @@
 import { validateConditionForStorage } from './scenario-condition-validation.js';
 import type { ActionBody } from './scenario-action-input-types.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getScenarioById, getFriendScenarioById, pauseFriendScenarioManual, resumeFriendScenarioById, retryFailedFriendScenario, moveFriendScenarioTo, getFriendById, publishScenarioVersion, validateScenarioActionReferences } from '@line-crm/db';
 import { getScenarioTriggers, addScenarioTrigger, removeScenarioTrigger } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -279,7 +279,7 @@ export const post__api_scenarios_id_triggers_9 = async (c: Context<Env, "/api/sc
     const scenario = await c.env.DB.prepare(`SELECT id, line_account_id FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
       .first<{ id: string; line_account_id: string | null }>();
-    if (!scenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
+    if (!scenario) return fail(c, 404, 'SCENARIO_NOT_FOUND');
 
     if (kind === 'tag_added') {
       const tag = await c.env.DB.prepare(`SELECT id, line_account_id FROM tags WHERE id = ?`)

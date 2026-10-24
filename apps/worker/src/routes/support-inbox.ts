@@ -18,7 +18,7 @@ import {
   acquireInboxReplyLease,
   releaseInboxReplyLease,
 } from '../services/inbox-events.js';
-
+import { fail } from '../lib/fail.js';
 export const supportInbox = new Hono<Env>();
 
 export function paginateSupportInboxItems<T>(items: T[], offset: number, limit: number): T[] {
@@ -359,7 +359,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
 supportInbox.use('/api/support/email/*', async (c, next) => {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!scope.canSeeUnassigned) {
-    return c.json({ success: false, error: 'Thread not found' }, 404);
+    return fail(c, 404, 'THREAD_NOT_FOUND');
   }
   return next();
 });
@@ -385,7 +385,7 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
             last_message_at, last_incoming_at, last_outgoing_at, resolved_at, revision
      FROM support_email_threads WHERE id = ?`,
   ).bind(id).first();
-  if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
+  if (!thread) return fail(c, 404, 'THREAD_NOT_FOUND');
   /*
     PERF-11: 毎回全件は返さない。初回は新しい側から limit 件、
     before= で古い履歴、after= で新着の差分を取る。
@@ -466,7 +466,7 @@ supportInbox.post(
       .prepare(`SELECT last_incoming_at FROM support_email_threads WHERE id = ?`)
       .bind(id)
       .first<{ last_incoming_at: string | null }>();
-    if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!thread) return fail(c, 404, 'THREAD_NOT_FOUND');
     if (thread.last_incoming_at) {
       await markInboxConversationRead(c.env.DB, {
         staffId: c.get('staff').id,
@@ -514,7 +514,7 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
   const current = await c.env.DB.prepare(
     `SELECT status, revision, assigned_staff_id FROM support_email_threads WHERE id = ?`,
   ).bind(id).first<{ status: string; revision: number; assigned_staff_id: string | null }>();
-  if (!current) return c.json({ success: false, error: 'Thread not found' }, 404);
+  if (!current) return fail(c, 404, 'THREAD_NOT_FOUND');
   const expectedRevision = body.revision ?? current.revision;
   if (expectedRevision !== current.revision) {
     return c.json({
@@ -584,7 +584,7 @@ supportInbox.patch(
     const current = await c.env.DB.prepare(
       `SELECT assigned_staff_id, revision FROM support_email_threads WHERE id = ?`,
     ).bind(id).first<{ assigned_staff_id: string | null; revision: number }>();
-    if (!current) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!current) return fail(c, 404, 'THREAD_NOT_FOUND');
     const expectedRevision = body.revision ?? current.revision;
     if (expectedRevision !== current.revision) {
       return c.json({ success: false, error: 'ほかの担当者が先に更新しました。最新の内容を確認してください', code: 'REVISION_CONFLICT' }, 409);
@@ -635,7 +635,7 @@ supportInbox.patch(
     const current = await c.env.DB.prepare(
       `SELECT notes, revision FROM support_email_threads WHERE id = ?`,
     ).bind(id).first<{ notes: string | null; revision: number }>();
-    if (!current) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!current) return fail(c, 404, 'THREAD_NOT_FOUND');
     const expectedRevision = body.revision ?? current.revision;
     if (expectedRevision !== current.revision) {
       return c.json({ success: false, error: 'ほかの担当者が先に更新しました。最新の内容を確認してください', code: 'REVISION_CONFLICT' }, 409);
@@ -681,7 +681,7 @@ supportInbox.get(
     const exists = await c.env.DB.prepare(`SELECT 1 FROM support_email_threads WHERE id = ?`)
       .bind(id)
       .first();
-    if (!exists) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!exists) return fail(c, 404, 'THREAD_NOT_FOUND');
     const rows = await c.env.DB.prepare(
       `SELECT id, event_type, before_json, after_json, actor_staff_id,
               (SELECT name FROM staff_members sm WHERE sm.id = e.actor_staff_id) AS actor_staff_name,
@@ -725,7 +725,7 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     const thread = await c.env.DB.prepare(
       `SELECT revision FROM support_email_threads WHERE id = ?`,
     ).bind(id).first<{ revision: number }>();
-    if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (!thread) return fail(c, 404, 'THREAD_NOT_FOUND');
     if (body.revision !== undefined && body.revision !== thread.revision) {
       return c.json({
         success: false,
@@ -754,7 +754,7 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     return c.json({ success: true, data: result });
   } catch (error) {
     if (error instanceof Error && error.message === 'THREAD_NOT_FOUND') {
-      return c.json({ success: false, error: 'Thread not found' }, 404);
+      return fail(c, 404, 'THREAD_NOT_FOUND');
     }
     if (error instanceof Error && error.message === 'INVALID_CUSTOMER_RECIPIENT') {
       return c.json({ success: false, error: '顧客のメールアドレスを確認できないため送信を停止しました' }, 409);

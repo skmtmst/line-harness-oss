@@ -7,7 +7,7 @@ import { signDownload, validDownload } from '../services/download-capability.js'
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { getAffiliateByFriendId, createAffiliate, createAffiliateLink, listAffiliateLinks, countAffiliateLinks, generateRefSlug, getAffiliateLinkStats, listAffiliateOffers, getCurrentOfferVersion, getOfferCapStatus, enrollAffiliateInOffer, getMileageSummaryForFriend, getMileageHistoryForFriend, getMileageSelfInsights, getMileageEarningOpportunitiesForFriend, listMileageRewards, getMileageRewardRedemptionCounts, reserveMileageRewardRedemption, MileageRewardError, encryptCredential, getAffiliateBankProfile, saveAffiliateBankProfile, listAffiliateStatementsForSelf, getAffiliateStatementDownload, type Affiliate, type AffiliateLink, type AffiliateLinkStat } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 
 
 import { affiliateBankFields } from '@line-crm/shared';
@@ -162,7 +162,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
     // 紹介機能のlegacy fallbackは維持するが、残高を動かすマイル交換では
     // トークンのLINE Loginチャネルと友だちの所属が一致しない限り閉じる。
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const [rewards, mileage, redemptionCounts] = await Promise.all([
       listMileageRewards(c.env.DB, {
@@ -226,7 +226,7 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', inputJsonBounda
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const rewardId = c.req.param('id');
     const requestFingerprint = await sha256Hex(
@@ -278,7 +278,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', inputJsonBoundary(), as
     }
     const friend = resolved.friend;
     if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const existing = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
@@ -356,7 +356,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
     }
     const friend = resolved.friend;
     if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
@@ -387,7 +387,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/bank', async (c) => {
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
     if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
@@ -424,7 +424,7 @@ affiliateSelfRoutes.put('/api/liff/affiliate/bank', inputJsonBoundary(), async (
     const resolved = await resolveFriendFromLineToken(c.env, body.lineAccessToken);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
     if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
@@ -466,7 +466,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
     if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
@@ -495,7 +495,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
     if (!resolved.lineAccountId || resolved.friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const affiliate = await getAffiliateByFriendId(c.env.DB, resolved.friend.id, resolved.lineAccountId);
     if (!affiliate) return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
@@ -562,7 +562,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async
     }
     const friend = resolved.friend;
     if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
@@ -587,7 +587,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async
       });
       const offer = activeOffers.find((o) => o.id === offerId);
       if (!offer) {
-        return c.json({ success: false, error: 'Offer not found' }, 404);
+        return fail(c, 404, 'OFFER_NOT_FOUND');
       }
       const existingLinks = await listAffiliateLinks(db, affiliate.id, {
         lineAccountId: resolved.lineAccountId,
@@ -638,7 +638,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
     }
     const friend = resolved.friend;
     if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
@@ -718,7 +718,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', inputJsonBound
     }
     const friend = resolved.friend;
     if (!resolved.lineAccountId || friend.line_account_id !== resolved.lineAccountId) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const affiliate = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
@@ -735,7 +735,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', inputJsonBound
     });
     const offer = activeOffers.find((o) => o.id === c.req.param('id'));
     if (!offer) {
-      return c.json({ success: false, error: 'Offer not found' }, 404);
+      return fail(c, 404, 'OFFER_NOT_FOUND');
     }
 
     // 上限に達した案件の受付は自動で止める(#823)。参加済みの人の紹介リンクは

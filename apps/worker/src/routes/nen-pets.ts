@@ -1,6 +1,5 @@
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { jstDate as japanDate, jstDateOffset as japanDateOffset, jstMonthStart as japanMonthStart } from '@line-crm/shared';
-import { inputError } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -10,7 +9,7 @@ import { toPetAnimalType } from '../lib/nen-pet-species.js';
 import {
   APPETITE_LABELS, STOOL_LABELS, lastLoggedLabel, summarizePetHealth, thirtyDaySummary, type HealthLogRow,
 } from '../services/nen-health-admin.js';
-
+import { fail } from '../lib/fail.js';
 /**
  * 然-NEN- マイペット（★37-3 `hetvN`）／健康日記（★37-4 `mtoCA`）の管理画面。
  *
@@ -36,7 +35,7 @@ function accountIdFrom(c: Context<Env>): string {
 }
 
 async function requireAccount(c: Context<Env>, accountId: string): Promise<Response | null> {
-  if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -324,7 +323,7 @@ nenPets.get('/api/nen/health/:petId/summary', async (c) => {
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
       WHERE p.id = ? AND f.line_account_id = ?`,
   ).bind(petId, accountId).first<{ id: string; name: string; gender: string | null; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null; friend_id: string; owner_name: string | null }>();
-  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
+  if (!pet) return fail(c, 404, 'PET_NOT_FOUND');
   const since = japanDateOffset(-30);
   const logs = await c.env.DB.prepare(
     `SELECT pet_id, logged_on, weight_kg, stool_status, appetite, skin_status, tear_stain_status, heart_rate_bpm, respiratory_rate_bpm, note

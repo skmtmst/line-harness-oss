@@ -27,7 +27,7 @@ import {
   type AffiliateScope,
 } from '@line-crm/db';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
-
+import { fail } from '../lib/fail.js';
 
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
@@ -337,7 +337,7 @@ affiliates.get('/api/affiliates/:id', async (c) => {
     const { scope } = await getAffiliateScope(c);
     const item = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
     if (!item) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeAffiliate(item) });
   } catch (err) {
@@ -401,10 +401,10 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
     if (friendId) {
       const friend = await getFriendById(c.env.DB, friendId);
       if (!friend || !accountVisible(friend.line_account_id, visible) || !friend.line_account_id) {
-        return c.json({ success: false, error: 'Friend not found' }, 404);
+        return fail(c, 404, 'FRIEND_NOT_FOUND');
       }
       if (lineAccountId && lineAccountId !== friend.line_account_id) {
-        return c.json({ success: false, error: 'Friend not found' }, 404);
+        return fail(c, 404, 'FRIEND_NOT_FOUND');
       }
       lineAccountId = friend.line_account_id;
       if (!resolvedName) {
@@ -415,10 +415,10 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
       [lineAccountId] = visible.allowedAccountIds;
     }
     if (!lineAccountId) {
-      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     if (!visible.allowedAccountIds.includes(lineAccountId)) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     if (body.rewardMode !== undefined && !['none', 'fixed', 'rate'].includes(body.rewardMode)) {
       return inputError(c, { success: false, error: 'rewardMode must be none, fixed or rate' }, 400, ["rewardMode"]);
@@ -564,7 +564,7 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBo
     }, scope);
 
     if (!updated) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeAffiliate(updated) });
   } catch (err) {
@@ -581,7 +581,7 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBo
 affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) => {
   const { scope } = await getAffiliateScope(c);
   const item = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
-  if (!item) return c.json({ success: false, error: 'Affiliate not found' }, 404);
+  if (!item) return fail(c, 404, 'AFFILIATE_NOT_FOUND');
   return c.json(
     {
       success: false,
@@ -600,7 +600,7 @@ affiliates.get('/api/affiliates/:id/report', affiliateReportPermission(), async 
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
     if (!affiliate) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     const report = await getAffiliateReportV2(c.env.DB, c.req.param('id'), {
       startDate: c.req.query('startDate'),
@@ -610,7 +610,7 @@ affiliates.get('/api/affiliates/:id/report', affiliateReportPermission(), async 
     });
 
     if (!report) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     return c.json({ success: true, data: report });
   } catch (err) {
@@ -625,7 +625,7 @@ affiliates.get('/api/affiliates/:id/journeys', affiliateReportPermission(), asyn
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
     if (!affiliate) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     const limitParam = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
     const page = await getAffiliateJourneys(c.env.DB, c.req.param('id'), {
@@ -646,7 +646,7 @@ affiliates.get('/api/affiliates/:id/links', affiliateReportPermission(), async (
     const { scope } = await getAffiliateScope(c);
     const affiliate = await getAffiliateById(c.env.DB, c.req.param('id'), scope);
     if (!affiliate) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     const links = await listAffiliateLinks(c.env.DB, c.req.param('id'), {
       lineAccountId: affiliate.line_account_id,
@@ -675,7 +675,7 @@ affiliates.get('/api/friends/:id/journey', async (c) => {
     const { visible } = await getAffiliateScope(c);
     const friend = await getFriendById(c.env.DB, c.req.param('id'));
     if (!friend || !accountVisible(friend.line_account_id, visible)) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const events = await getFriendJourney(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: { events } });
@@ -698,7 +698,7 @@ affiliates.post('/api/affiliates/click', inputJsonBoundary({"code":["string"],"u
 
     const affiliate = await getAffiliateByCode(c.env.DB, body.code);
     if (!affiliate || affiliate.is_active !== 1) {
-      return c.json({ success: false, error: 'Affiliate not found' }, 404);
+      return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
 
     const ipAddress = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? null;

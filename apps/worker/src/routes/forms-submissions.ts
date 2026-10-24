@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { auditLog } from '../lib/audit-log.js';
 import { reportPeriod, type ReportPeriodInput } from '@line-crm/shared';
 import { parseLayout } from '@line-crm/shared';
-
+import { fail } from '../lib/fail.js';
 import { callFormWebhook, publicFormWebhookData } from '../features/forms/form-webhook/index.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError } from '../lib/input-errors.js';
@@ -24,7 +24,7 @@ import type { Context } from 'hono';
 export const post__api_forms_id_archive_1 = async (c: Context<Env, "/api/forms/:id/archive">) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
-    if (!accountId) return inputError(c, { success: false, error: 'account_id is required' }, 400, ["account_id"]);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["account_id"]);
     const body = await c.req.json<Record<string, unknown>>();
     const expectedRevision = typeof body.expectedRevision === 'number'
       ? body.expectedRevision
@@ -35,7 +35,7 @@ export const post__api_forms_id_archive_1 = async (c: Context<Env, "/api/forms/:
 
     const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
     if (authorized.kind === 'not_found') {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     if (authorized.kind === 'forbidden') {
       return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
@@ -87,7 +87,7 @@ export const post__api_forms_id_archive_1 = async (c: Context<Env, "/api/forms/:
 export const post__api_forms_id_unarchive_2 = async (c: Context<Env, "/api/forms/:id/unarchive">) => {
   try {
     const accountId = c.req.query('account_id')?.trim();
-    if (!accountId) return inputError(c, { success: false, error: 'account_id is required' }, 400, ["account_id"]);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["account_id"]);
     const body = await c.req.json<Record<string, unknown>>();
     const expectedRevision = typeof body.expectedRevision === 'number'
       ? body.expectedRevision
@@ -98,7 +98,7 @@ export const post__api_forms_id_unarchive_2 = async (c: Context<Env, "/api/forms
 
     const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
     if (authorized.kind === 'not_found') {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     if (authorized.kind === 'forbidden') {
       return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
@@ -149,7 +149,7 @@ export const delete__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) 
     const id = c.req.param('id');
     const accountId = c.req.query('account_id')?.trim();
     const expectedRevision = Number(c.req.query('expected_revision'));
-    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
       return c.json({ success: false, error: '確認した版が必要です' }, 400);
     }
@@ -157,7 +157,7 @@ export const delete__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) 
     if (deleteGate) return deleteGate;
     const authorized = await authorizedDeleteImpact(c, id, accountId);
     if (authorized.kind === 'not_found') {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     if (authorized.kind === 'forbidden') {
       return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
@@ -219,9 +219,9 @@ export const delete__api_forms_id_submissions_submissionId_4 = async (c: Context
 export const post__api_forms_id_exports_5 = async (c: Context<Env, "/api/forms/:id/exports">) => {
   const id = c.req.param('id');
   const accountId = c.req.query('account_id');
-  if (!await canUseFormFromAccount(c, id, accountId)) return c.json({ success: false, error: 'Form not found' }, 404);
+  if (!await canUseFormFromAccount(c, id, accountId)) return fail(c, 404, 'FORM_NOT_FOUND');
   const form = await getFormById(c.env.DB, id);
-  if (!form) return c.json({ success: false, error: 'Form not found' }, 404);
+  if (!form) return fail(c, 404, 'FORM_NOT_FOUND');
   const fields = JSON.parse(form.fields || '[]') as Array<{ id?: string; name: string; label?: string }>;
   const cell = (value: unknown) => {
     let text = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
@@ -251,11 +251,11 @@ export const post__api_forms_id_exports_5 = async (c: Context<Env, "/api/forms/:
 export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/forms/:id/submissions">) => {
   const id = c.req.param('id');
   if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const form = await getFormById(c.env.DB, id);
   if (!form) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   let period: ReturnType<typeof reportPeriod>;
   try { period = reportPeriod({from:c.req.query('from'),to:c.req.query('to'),period:c.req.query('period') as ReportPeriodInput['period']}); }
@@ -317,7 +317,7 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
 export const get__api_forms_id_submissions_submissionId_7 = async (c: Context<Env, "/api/forms/:id/submissions/:submissionId">) => {
   const formId = c.req.param('id');
   if (!await canUseFormFromAccount(c, formId, c.req.query('account_id'))) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const form = await getFormById(c.env.DB, formId);
   const submission = await getFormSubmissionById(c.env.DB, c.req.param('submissionId'));
@@ -334,11 +334,11 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
   const manageGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, formId));
   if (manageGate) return manageGate;
   if (!await canUseFormFromAccount(c, formId, c.req.query('account_id'))) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const form = await getFormById(c.env.DB, formId);
   if (!form) {
-    return c.json({ success: false, error: 'Form not found' }, 404);
+    return fail(c, 404, 'FORM_NOT_FOUND');
   }
   const submission = await getFormSubmissionById(c.env.DB, submissionId);
   if (!submission || submission.form_id !== formId || !submission.friend_id) {

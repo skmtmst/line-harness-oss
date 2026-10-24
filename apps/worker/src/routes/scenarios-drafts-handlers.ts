@@ -2,7 +2,7 @@ import { validateConditionForStorage } from './scenario-condition-validation.js'
 import { hasDeliveryAccess } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getScenarioById, createScenario, updateScenario, deleteScenario, createScenarioStep, listMoveReferrers } from '@line-crm/db';
 import { reorderScenarios } from '@line-crm/db';
 import type { ScenarioWithStepCount as DbScenarioWithStepCount, ScenarioTriggerType, MessageType, DeliveryMode } from '@line-crm/db';
@@ -74,11 +74,11 @@ export const patch__api_scenarios_reorder_3 = async (c: Context<Env, "/api/scena
     if (c.get('staff').role === 'staff') {
       for (const id of body.ids as string[]) {
         const target = await getScenarioById(c.env.DB, id);
-        if (!target) return c.json({ success: false, error: 'Scenario not found' }, 404);
+        if (!target) return fail(c, 404, 'SCENARIO_NOT_FOUND');
         const decision = await resolveRequestBoundary(c.env.DB, c.get('staff'), target.line_account_id ?? null, {
           requiredPermissionKey: 'scenario.definition.edit',
         });
-        if (!decision.allowed) return c.json({ success: false, error: 'Scenario not found' }, 404);
+        if (!decision.allowed) return fail(c, 404, 'SCENARIO_NOT_FOUND');
       }
     }
     await reorderScenarios(c.env.DB, body.ids as string[]);
@@ -221,7 +221,7 @@ export const get__api_scenarios_id_5 = async (c: Context<Env, "/api/scenarios/:i
     const scenario = await getScenarioById(c.env.DB, id);
 
     if (!scenario) {
-      return c.json({ success: false, error: 'Scenario not found' }, 404);
+      return fail(c, 404, 'SCENARIO_NOT_FOUND');
     }
 
     return c.json({
@@ -395,7 +395,7 @@ export const put__api_scenarios_id_7 = async (c: Context<Env, "/api/scenarios/:i
     } : undefined);
 
     if (!updated) {
-      return c.json({ success: false, error: 'Scenario not found' }, 404);
+      return fail(c, 404, 'SCENARIO_NOT_FOUND');
     }
 
     return c.json({ success: true, data: serializeScenario(updated) });
@@ -409,7 +409,7 @@ export const get__api_scenarios_id_move_referrers_8 = async (c: Context<Env, "/a
     const id = c.req.param('id')!;
     const scenario = await getScenarioById(c.env.DB, id);
     if (!scenario) {
-      return c.json({ success: false, error: 'Scenario not found' }, 404);
+      return fail(c, 404, 'SCENARIO_NOT_FOUND');
     }
     // 見える範囲だけに絞る。見えないアカウントの名前は数えない。
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -480,7 +480,7 @@ export const post__api_scenarios_id_steps_10 = async (c: Context<Env, "/api/scen
       .bind(scenarioId)
       .first<{ delivery_mode: DeliveryMode }>();
     if (!scenarioRow) {
-      return c.json({ success: false, error: 'Scenario not found' }, 404);
+      return fail(c, 404, 'SCENARIO_NOT_FOUND');
     }
 
     const v = validateStepSchedule(scenarioRow.delivery_mode, body);
@@ -495,14 +495,14 @@ export const post__api_scenarios_id_steps_10 = async (c: Context<Env, "/api/scen
         .prepare(`SELECT id FROM templates WHERE id = ?`)
         .bind(body.templateId)
         .first<{ id: string }>();
-      if (!tpl) return inputError(c, { success: false, error: 'templateId not found' }, 400, ["templateId"]);
+      if (!tpl) return fail(c, 400, 'TEMPLATE_ID_NOT_FOUND', {}, ["templateId"]);
     }
     if (body.onReachTagId != null) {
       const tag = await c.env.DB
         .prepare(`SELECT id FROM tags WHERE id = ?`)
         .bind(body.onReachTagId)
         .first<{ id: string }>();
-      if (!tag) return inputError(c, { success: false, error: 'onReachTagId not found' }, 400, ["onReachTagId"]);
+      if (!tag) return fail(c, 400, 'ON_REACH_TAG_ID_NOT_FOUND', {}, ["onReachTagId"]);
     }
 
     /*

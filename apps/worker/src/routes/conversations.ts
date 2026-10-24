@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { listLimit } from '../lib/list-paging.js';
-
+import { fail } from '../lib/fail.js';
 const conversations = new Hono<Env>();
 
 // GET /api/conversations?lineAccountId=&minHoursSince=&maxHoursSince=&limit=&offset=
@@ -19,7 +19,7 @@ conversations.get('/api/conversations', async (c) => {
 
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (accountId && !scope.ids.includes(accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const accountIds = accountId ? [accountId] : scope.allowedAccountIds;
     const includeUnassigned = !accountId && scope.canSeeUnassigned;
@@ -213,14 +213,14 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       }>();
 
     if (!friend) {
-      return c.json({ success: false, error: 'friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const canReadFriend = friend.line_account_id
       ? scope.allowedAccountIds.includes(friend.line_account_id)
       : scope.canSeeUnassigned;
     if (!canReadFriend) {
-      return c.json({ success: false, error: 'friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const tagRows = await c.env.DB.prepare(

@@ -3,7 +3,7 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
 import { getMediaById, archiveMedia, restoreMedia, getStaffNameMap, getMediaReplacementPlan, getMediaUploadSession, getCurrentMediaVersionNo, getLatestMediaVersion, evaluateMediaVersionCompat, backfillMediaVersionMetadata, type MediaMetadata, jstNow, normalizeCommonVarValidityAt, type Media, type MediaKind, type CommonVar, type CommonVarSchedule, type CommonVarExpiryBehavior, type CommonVarUsageImpact, type CommonVarUsageItem } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 
 
 
@@ -308,7 +308,7 @@ async function serveMediaFile(
   const id = c.req.param('id');
   const accountId = c.req.query('accountId')?.trim();
   if (!id) return c.json({ success: false, error: 'Not found' }, 404);
-  if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     if (opts.auditDownload) {
       auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
@@ -369,7 +369,7 @@ async function mediaArchiveRoute(c: Context<Env>, archive: boolean, mediaId: str
     : null;
   const bodyAccountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
   const accountId = c.req.query('accountId')?.trim() || bodyAccountId;
-  if (!accountId) return inputError(c, { success: false, error: 'accountId required' }, 400, ["accountId"]);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }

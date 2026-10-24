@@ -10,7 +10,7 @@ import { getBroadcastById, resolveLineCredential } from '@line-crm/db';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { listLimit, listQueryNumber } from '../lib/list-paging.js';
-
+import { fail } from '../lib/fail.js';
 const profileRefresh = new Hono<Env>();
 
 /**
@@ -180,7 +180,7 @@ profileRefresh.post('/api/admin/broadcasts/:id/reset-to-draft', requireRole('own
     .bind(id)
     .first<{ cnt: number }>();
   if (!logged) {
-    return c.json({ success: false, error: 'broadcast not found or query failed' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND_OR_QUERY_FAILED');
   }
   if (logged.cnt > 0) {
     return c.json({
@@ -659,7 +659,7 @@ profileRefresh.get('/api/admin/friend-debug/:id', requireRole('owner'), async (c
     .bind(id, ...accountScopeBindings(adminScope.scope))
     .first();
   if (!friend) {
-    return c.json({ success: false, error: 'Friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
   const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
   const accId = (friend as Record<string, unknown> | null)?.line_account_id as string | null | undefined;

@@ -3,7 +3,7 @@ import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { serializeGroup } from './rich-menu-group-display.js';
 import { type ExternalLineArea } from './rich-menu-external-types.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getRichMenuGroups, createRichMenuGroup, setRichMenuPageImage, acquirePublishLease, releasePublishLease, renewPublishLease, setPageRichMenuId, markRichMenuGroupPublished, getLineAccountById, getRichMenuTapStats, getRichMenuAudienceStats, listRichMenuGroupIdsByAreaLabel, normalizeRichMenuSearchText, jstNow, type RichMenuAreaInput } from '@line-crm/db';
 
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared';
@@ -20,12 +20,12 @@ import type { Context } from 'hono';
 export const get__api_rich_menu_groups_external_richMenuId_image_1 = async (c: Context<Env, "/api/rich-menu-groups/external/:richMenuId/image">) => {
   const richMenuId = c.req.param('richMenuId');
   const accountId = c.req.query('accountId');
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'line account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   const account = await getLineAccountById(c.env.DB, accountId);
-  if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
+  if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   const res = await fetch(
     `https://api-data.line.me/v2/bot/richmenu/${encodeURIComponent(richMenuId)}/content`,
     { headers: { Authorization: `Bearer ${account.channel_access_token}` } },
@@ -51,13 +51,13 @@ export const post__api_rich_menu_groups_import_2 = async (c: Context<Env, "/api/
   const accountId = c.req.query('accountId');
   const richMenuId = c.req.query('richMenuId');
   if (!accountId || !richMenuId) {
-    return inputError(c, { success: false, error: 'accountId and richMenuId query params required' }, 400, ["accountId","richMenuId"]);
+    return fail(c, 400, 'ACCOUNT_ID_AND_RICH_MENU_ID_QUERY_PARAMS_REQUIRED', {}, ["accountId","richMenuId"]);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'line account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   const account = await getLineAccountById(c.env.DB, accountId);
-  if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
+  if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
 
   // 既に admin 管理下にあるかチェック
   const existing = await c.env.DB
@@ -289,12 +289,12 @@ export const post__api_rich_menu_groups_import_2 = async (c: Context<Env, "/api/
 
 export const get__api_rich_menu_groups_external_3 = async (c: Context<Env, "/api/rich-menu-groups/external">) => {
   const accountId = c.req.query('accountId');
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'line account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   const account = await getLineAccountById(c.env.DB, accountId);
-  if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
+  if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   const auth = `Bearer ${account.channel_access_token}`;
 
   type LineMenu = {
@@ -380,12 +380,12 @@ export const get__api_rich_menu_groups_external_3 = async (c: Context<Env, "/api
 export const delete__api_rich_menu_groups_external_richMenuId_4 = async (c: Context<Env, "/api/rich-menu-groups/external/:richMenuId">) => {
   const richMenuId = c.req.param('richMenuId');
   const accountId = c.req.query('accountId');
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'line account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   const account = await getLineAccountById(c.env.DB, accountId);
-  if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
+  if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
 
   // admin 管理下の richmenu はここでは削除させない
   const adminRow = await c.env.DB
@@ -423,9 +423,9 @@ export const delete__api_rich_menu_groups_external_richMenuId_4 = async (c: Cont
 
 export const get__api_rich_menu_groups_tap_stats_5 = async (c: Context<Env, "/api/rich-menu-groups/tap-stats">) => {
   const accountId = c.req.query('accountId');
-  if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'line account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   const range = currentMonthRange(jstNow());
   const from = c.req.query('from') || range.from;
@@ -440,9 +440,9 @@ export const get__api_rich_menu_groups_tap_stats_5 = async (c: Context<Env, "/ap
 
 export const get__api_rich_menu_groups_6 = async (c: Context<Env, "/api/rich-menu-groups">) => {
   const accountId = c.req.query('accountId');
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-    return c.json({ success: false, error: 'line account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   try {
     const wantsPaging = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;

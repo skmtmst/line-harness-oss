@@ -104,6 +104,19 @@ describe('使う人への失敗の理由', () => {
     } });
   });
 
+  it('複数の必須欄を固定コードで返しても入力済みの欄を赤くしない', async () => {
+    const api = new Hono().use('*', apiContractMiddleware);
+    api.post('/api/input', inputJsonBoundary(), c => fail(c, 400,
+      'ACCOUNT_ID_AND_FRIEND_ID_ARE_REQUIRED', {}, ['accountId', 'friendId']));
+    const response = await api.request('/api/input', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accountId: 'selected' }) });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ success: false, error: {
+      code: 'ACCOUNT_ID_AND_FRIEND_ID_ARE_REQUIRED', message: 'LINE公式アカウントと友だちを指定してください。',
+      fieldErrors: [{ field: 'friendId', message: 'LINE公式アカウントと友だちを指定してください。' }],
+    } });
+  });
+
   it('動的な理由の識別番号や外部本文を案内へ埋め込まない', () => {
     const cases = [
       ['Platform "customer@example.invalid" not found', 'PLATFORM_NOT_FOUND'],

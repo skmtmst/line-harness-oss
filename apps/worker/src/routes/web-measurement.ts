@@ -22,7 +22,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 import { auditLog } from '../lib/audit-log.js';
-
+import { fail } from '../lib/fail.js';
 /**
  * Web計測の公開口と計測サイトの管理 (#819)。
  *
@@ -187,7 +187,7 @@ webMeasurement.get(
     try {
       const accountId = await scopedAccountId(c);
       if (!accountId) {
-        return c.json({ success: false, error: 'account_id is required' }, 400);
+        return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
       }
       const sites = await listMeasurementSites(c.env.DB, accountId);
       return c.json({
@@ -224,7 +224,7 @@ webMeasurement.post('/api/measurement-sites', requireRole('owner', 'admin'), inp
     const accountId = String(body.accountId ?? body.account_id ?? '').trim()
       || (scope.allowedAccountIds.length === 1 ? scope.allowedAccountIds[0] : '');
     if (!accountId || !scope.allowedAccountIds.includes(accountId)) {
-      return inputError(c, { success: false, error: 'account_id is required' }, 400, ["accountId","account_id"]);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId","account_id"]);
     }
     const label = String(body.label ?? '').trim();
     if (!label || label.length > 100) {
@@ -249,10 +249,10 @@ webMeasurement.post('/api/measurement-sites', requireRole('owner', 'admin'), inp
 webMeasurement.patch('/api/measurement-sites/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const site = await getMeasurementSite(c.env.DB, c.req.param('id'));
-    if (!site) return c.json({ success: false, error: 'Site not found' }, 404);
+    if (!site) return fail(c, 404, 'SITE_NOT_FOUND');
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!scope.allowedAccountIds.includes(site.line_account_id)) {
-      return c.json({ success: false, error: 'Site not found' }, 404);
+      return fail(c, 404, 'SITE_NOT_FOUND');
     }
     const body = await c.req.json<{ label?: unknown; domains?: unknown }>();
     const label = body.label === undefined ? undefined : String(body.label).trim();

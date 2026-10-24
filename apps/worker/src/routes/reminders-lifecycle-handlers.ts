@@ -1,6 +1,6 @@
 import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getFriendById, getReminderById, createReminder, updateReminder, deleteReminder, restoreReminder, createReminderStep, deleteReminderStep, enrollFriendInReminder, getFriendReminders, listReminderRegistrants, moveReminderRegistrantTargetDate, cancelReminderRegistrant, resumeReminderRegistrant, getReminderRegistrantById, getReminderDeliveryRunById, getReminderDeliveryRunSummary, getReminderDeliveryStepSummaries, listReminderDeliveryRuns, retryReminderDeliveryRun, getReminderPublishedVersion, parseReminderVersionSettings, type ReminderDeliveryRunStatus } from '@line-crm/db';
 
 import { REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE } from '@line-crm/shared';
@@ -16,7 +16,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
     const reminderId = c.req.param('id');
     const reminder = await getReminderById(c.env.DB, reminderId);
     if (!reminder) {
-      return c.json({ success: false, error: 'Reminder not found' }, 404);
+      return fail(c, 404, 'REMINDER_NOT_FOUND');
     }
     const accountId = (reminder as { line_account_id?: string | null }).line_account_id ?? null;
     // R349: 個人名を返す口は、親の今の所属ではなく実行行の送信元
@@ -56,7 +56,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
     ]);
     // 見える行がなく親も見えないときは、あるなしを区別せず 404。
     if (runs.total === 0 && !canSeeParent) {
-      return c.json({ success: false, error: 'Reminder not found' }, 404);
+      return fail(c, 404, 'REMINDER_NOT_FOUND');
     }
     // 公開版のスナップショットが実際の停止条件。下書きや旧API由来の行で
     // 取れないときは null にし、画面側で「未取得」と区別する。
@@ -234,7 +234,7 @@ export const post__api_reminders_id_restore_5 = async (c: Context<Env, "/api/rem
   try {
     const restored = await restoreReminder(c.env.DB, c.req.param('id'));
     if (!restored) {
-      return c.json({ success: false, error: 'Reminder not found' }, 404);
+      return fail(c, 404, 'REMINDER_NOT_FOUND');
     }
     return c.json({
       success: true,
@@ -307,7 +307,7 @@ export const delete__api_reminders_id_steps_stepId_7 = async (c: Context<Env, "/
   try {
     const deleted = await deleteReminderStep(c.env.DB, c.req.param('id'), c.req.param('stepId'));
     if (!deleted) {
-      return c.json({ success: false, error: 'Reminder step not found' }, 404);
+      return fail(c, 404, 'REMINDER_STEP_NOT_FOUND');
     }
     return c.json({ success: true, data: null });
   } catch (err) {
@@ -331,7 +331,7 @@ export const post__api_reminders_id_enroll_friendId_8 = async (c: Context<Env, "
       ? ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null
       : null;
     if (!reminder || !friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [reminderAccountId, friendAccountId])) {
-      return c.json({ success: false, error: 'Reminder or friend not found' }, 404);
+      return fail(c, 404, 'REMINDER_OR_FRIEND_NOT_FOUND');
     }
     const enrollment = await enrollFriendInReminder(c.env.DB, { friendId, reminderId, targetDate: body.targetDate });
     return c.json({
@@ -355,7 +355,7 @@ export const get__api_reminders_id_registrants_9 = async (c: Context<Env, "/api/
         : null;
       // 見える行がなく親も見えないときは、あるなしを区別せず 404。
       if (!reminder || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-        return c.json({ success: false, error: 'Reminder not found' }, 404);
+        return fail(c, 404, 'REMINDER_NOT_FOUND');
       }
     }
     return c.json({ success: true, data: items.map(publicRegistrant) });
@@ -434,7 +434,7 @@ export const get__api_friends_friendId_reminders_13 = async (c: Context<Env, "/a
       ? ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null
       : null;
     if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
     const items = await getFriendReminders(c.env.DB, friendId);
     return c.json({
@@ -460,7 +460,7 @@ export const delete__api_friend_reminders_id_14 = async (c: Context<Env, "/api/f
       `SELECT friend_id, reminder_id FROM friend_reminders WHERE id = ?`,
     ).bind(c.req.param('id')).first<{ friend_id: string; reminder_id: string }>();
     if (!enrollmentRow) {
-      return c.json({ success: false, error: 'Friend reminder not found' }, 404);
+      return fail(c, 404, 'FRIEND_REMINDER_NOT_FOUND');
     }
     const friend = await getFriendById(c.env.DB, enrollmentRow.friend_id);
     const reminder = await getReminderById(c.env.DB, enrollmentRow.reminder_id);
@@ -471,7 +471,7 @@ export const delete__api_friend_reminders_id_14 = async (c: Context<Env, "/api/f
       ? (reminder as { line_account_id?: string | null }).line_account_id ?? null
       : null;
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friendAccountId, reminderAccountId])) {
-      return c.json({ success: false, error: 'Friend reminder not found' }, 404);
+      return fail(c, 404, 'FRIEND_REMINDER_NOT_FOUND');
     }
     // R350: 一覧側の取消と同じ処理へ寄せる。番号・理由・未送信の停止を
     // 一貫させ、送信待ちが残って通知が続くのを防ぐ。応答の形は変えない。
@@ -480,7 +480,7 @@ export const delete__api_friend_reminders_id_14 = async (c: Context<Env, "/api/f
       c.env.DB, enrollmentRow.reminder_id, c.req.param('id'), scope,
     );
     if (!current) {
-      return c.json({ success: false, error: 'Friend reminder not found' }, 404);
+      return fail(c, 404, 'FRIEND_REMINDER_NOT_FOUND');
     }
     const cancelled = await cancelReminderRegistrant(c.env.DB, {
       reminderId: enrollmentRow.reminder_id,
@@ -490,7 +490,7 @@ export const delete__api_friend_reminders_id_14 = async (c: Context<Env, "/api/f
       scope,
     });
     if (cancelled.state === 'not_found') {
-      return c.json({ success: false, error: 'Friend reminder not found' }, 404);
+      return fail(c, 404, 'FRIEND_REMINDER_NOT_FOUND');
     }
     if (cancelled.state === 'conflict') {
       return c.json({ success: false, error: 'ほかの担当者による変更があります。一覧を読み直してください。' }, 409);

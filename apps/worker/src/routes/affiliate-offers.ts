@@ -14,7 +14,7 @@ import {
 } from '@line-crm/db';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-
+import { fail } from '../lib/fail.js';
 
 import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -40,7 +40,7 @@ async function requireVisibleAffiliateOffer(c: Context<Env>, next: () => Promise
     c.get('staff'),
     [item.line_account_id ?? null],
   )) {
-    return c.json({ success: false, error: 'Offer not found' }, 404);
+    return fail(c, 404, 'OFFER_NOT_FOUND');
   }
   await next();
 }
@@ -140,7 +140,7 @@ affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
   try {
     const item = await getAffiliateOfferById(c.env.DB, c.req.param('id'));
     if (!item) {
-      return c.json({ success: false, error: 'Offer not found' }, 404);
+      return fail(c, 404, 'OFFER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeOffer(item) });
   } catch (err) {
@@ -302,7 +302,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
 
     const existing = await getAffiliateOfferById(c.env.DB, id);
     if (!existing) {
-      return c.json({ success: false, error: 'Offer not found' }, 404);
+      return fail(c, 404, 'OFFER_NOT_FOUND');
     }
     const effectiveAccountId = body.lineAccountId ?? existing.line_account_id;
     if ((body.tagId || body.scenarioId) && !effectiveAccountId) {
@@ -354,7 +354,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     });
 
     if (!updated) {
-      return c.json({ success: false, error: 'Offer not found' }, 404);
+      return fail(c, 404, 'OFFER_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeOffer(updated) });
   } catch (err) {
@@ -477,7 +477,7 @@ affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 
     return c.json({ success: true, data: serializeOfferVersion(version) }, 201);
   } catch (err) {
     if (err instanceof Error && err.message === 'offer not found') {
-      return c.json({ success: false, error: 'Offer not found' }, 404);
+      return fail(c, 404, 'OFFER_NOT_FOUND');
     }
     if (err instanceof Error && /windowDays|cap/.test(err.message)) {
       return inputError(c, { success: false, error: err.message }, 400, ["windowDays","cap"]);

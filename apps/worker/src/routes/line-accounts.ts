@@ -5,7 +5,7 @@ import { verifyLineMessagingIdentity } from '../services/line-messaging-identity
 import { expectedWebhookUrl as accountWebhookUrl } from '../lib/webhook-endpoint.js';
 import { readOfficialProfileUrl } from './line-account-profile-url.js';
 import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
-
+import { fail } from '../lib/fail.js';
 import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -454,7 +454,7 @@ lineAccounts.post(
     try {
       const id = c.req.param('id')!;
       const account = await getAuthorizedLineAccount(c, id);
-      if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+      if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       if (account.archived_at) return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
 
       const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
@@ -514,11 +514,11 @@ lineAccounts.put('/api/line-accounts/default', requireRole('owner'), inputJsonBo
   try {
     const body = await c.req.json<{ accountId?: string }>();
     if (!body.accountId) {
-      return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
     }
     const account = await getAuthorizedLineAccount(c, body.accountId);
     if (!account) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     if (account.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
@@ -528,7 +528,7 @@ lineAccounts.put('/api/line-accounts/default', requireRole('owner'), inputJsonBo
     }
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
     if ((account.tenant_id ?? DEFAULT_TENANT_ID) !== tenantId) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const updated = await setDefaultLineAccount(c.env.DB, account.id, tenantId);
     if (!updated?.is_default) {
@@ -549,7 +549,7 @@ async function archiveAccountResponse(
   const id = c.req.param('id')!;
   const account = await getAuthorizedLineAccount(c, id);
   if (!account) {
-    return c.json({ success: false, error: 'LINE account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   // アカウントの停止・削除は大事な操作（V）。セッションの10分窓か、
   // この操作専用の1回限り grant が必要。
@@ -579,7 +579,7 @@ async function archiveAccountResponse(
     return inputError(c, { success: false, error: 'reason must be 500 characters or fewer' }, 422, ["reason"]);
   }
   const archived = await archiveLineAccount(c.env.DB, id, c.get('staff').id, reason);
-  if (!archived) return c.json({ success: false, error: 'LINE account not found' }, 404);
+  if (!archived) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   return c.json({ success: true, data: serializeLineAccount(archived) });
 }
 
@@ -602,7 +602,7 @@ lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), inputJ
     const id = c.req.param('id')!;
     const account = await getAuthorizedLineAccount(c, id);
     if (!account) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const restored = await restoreLineAccount(c.env.DB, id);
     return c.json({ success: true, data: serializeLineAccount(restored!) });
@@ -625,7 +625,7 @@ lineAccounts.post('/api/line-accounts/:id/deactivate', requireRole('owner', 'adm
     }
     const id = c.req.param('id')!;
     const account = await getAuthorizedLineAccount(c, id);
-    if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     if (account.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
@@ -669,7 +669,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
     }
     const id = c.req.param('id')!;
     const account = await getAuthorizedLineAccount(c, id);
-    if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     if (account.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
@@ -740,7 +740,7 @@ lineAccounts.get(
     try {
       const id = c.req.param('id')!;
       const account = await getAuthorizedLineAccount(c, id);
-      if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+      if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       const rows = await listSkippedDeliveries(c.env.DB, id);
       return c.json({
         success: true,
@@ -763,7 +763,7 @@ lineAccounts.get(
 lineAccounts.get('/api/line-accounts/:id/registration-receipt', requireRole('owner', 'admin'), async (c) => {
   c.header('Cache-Control', 'no-store');
   const account = await getAuthorizedLineAccount(c, c.req.param('id'));
-  if (!account || account.archived_at) return c.json({ success: false, error: 'LINE account not found' }, 404);
+  if (!account || account.archived_at) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   return c.json({ success: true, data: await getLineRegistrationReceipt(c.env.DB, account.id) });
 });
 
@@ -772,7 +772,7 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
   try {
     const account = await getAuthorizedLineAccount(c, c.req.param('id'));
     if (!account) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeLineAccount(account) });
   } catch (err) {
@@ -788,14 +788,14 @@ lineAccounts.get(
     try {
       const id = c.req.param('id');
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
+        return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
       const health = await getLineAccountCredentialHealth(
         c.env.DB,
         id,
       );
       if (!health) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
+        return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
       return c.json({ success: true, data: health });
     } catch (error) {
@@ -816,7 +816,7 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
 
     const account = await getAuthorizedLineAccount(c, c.req.param('id'));
     if (!account) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const client = new LineClient(account.channel_access_token);
     const insight = await client.getFollowersInsight(date);
@@ -845,7 +845,7 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
 lineAccounts.get('/api/line-accounts/:id/follower-import', async (c) => {
   const id = c.req.param('id')!;
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
-    return c.json({ success: false, error: 'LINE account not found' }, 404);
+    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   const state = await getFollowerImportState(c.env.DB, id);
   return c.json({ success: true, data: state });
@@ -857,7 +857,7 @@ lineAccounts.post(
   inputJsonBoundary(), async (c) => {
     try {
       const account = await getAuthorizedLineAccount(c, c.req.param('id')!);
-      if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+      if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       if (account.archived_at) {
         return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
       }
@@ -881,7 +881,7 @@ lineAccounts.post(
   requireRole('owner', 'admin'),
   inputJsonBoundary(), async (c) => {
     const account = await getVisibleLineAccountEntry(c, c.req.param('id')!);
-    if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     if (account.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
@@ -902,7 +902,7 @@ lineAccounts.post(
   requireRole('owner', 'admin'),
   inputJsonBoundary(), async (c) => {
     const account = await getAuthorizedLineAccount(c, c.req.param('id')!);
-    if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     if (account.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
@@ -1375,7 +1375,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     }
     if (parentLineAccountId) {
       const parent = visibleAccounts.find((item) => item.id === parentLineAccountId);
-      if (!parent) return c.json({ success: false, error: 'parent LINE account not found' }, 404);
+      if (!parent) return fail(c, 404, 'PARENT_LINE_ACCOUNT_NOT_FOUND');
       if (parent.archived_at) {
         return c.json({ success: false, error: 'archived account cannot be selected as parent' }, 409);
       }
@@ -1619,11 +1619,11 @@ lineAccounts.patch(
     try {
       const id = c.req.param('id')!;
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
+        return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
       const currentAccount = await getLineAccountById(c.env.DB, id);
       if (!currentAccount) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
+        return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
       if (currentAccount.archived_at) {
         return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
@@ -1750,7 +1750,7 @@ lineAccounts.patch(
           officialProfileUrl: officialProfileUrl.value,
           ...capacity.value,
         });
-        if (!updated) return c.json({ success: false, error: 'not found' }, 404);
+        if (!updated) return fail(c, 404, 'NOT_FOUND');
         return c.json({ success: true, data: serializeLineAccount(updated) });
       }
 
@@ -1769,7 +1769,7 @@ lineAccounts.patch(
         capacity_warn_at: capacity.value.capacityWarnAt,
         official_profile_url: officialProfileUrl.value,
       });
-      if (!updated) return c.json({ success: false, error: 'LINE account not found' }, 404);
+      if (!updated) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       return c.json({ success: true, data: serializeLineAccount(updated) });
     } catch (err) {
       const conflict = lifecycleConflict(err);
@@ -1791,11 +1791,11 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
   try {
     const id = c.req.param('id')!;
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const currentAccount = await getLineAccountById(c.env.DB, id);
     if (!currentAccount) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     if (currentAccount.archived_at) {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
@@ -1903,7 +1903,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
       : await getLineAccountById(c.env.DB, id);
 
     if (!updated) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
 
     if (
@@ -1925,7 +1925,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
         officialProfileUrl: officialProfileUrl.value,
       });
       if (!updated) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
+        return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
     }
 

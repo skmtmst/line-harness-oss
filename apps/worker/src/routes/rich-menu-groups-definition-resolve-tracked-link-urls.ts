@@ -3,7 +3,7 @@ import { inputError } from '../lib/input-errors.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../features/rich-menus/rich-menu-group-input/index.js';
 import { type Context } from 'hono';
 import { getRichMenuGroupWithPages, acquirePublishLease, releasePublishLease, renewPublishLease, isPublishLeaseHeld, setPageRichMenuId, markRichMenuGroupPublished, getLineAccountById, getTrackedLinkById, createRichMenuManualPublishRequestAtomic, getRichMenuManualPublishRequest, getRichMenuManualPublishShells, claimRichMenuManualPublishRequest, markRichMenuManualPublishFailed, markRichMenuManualPublishSucceeded, recordRichMenuManualPublishShells, restartRichMenuManualPublishRequest, ensureRichMenuVersion, markRichMenuVersionPublished, findRichMenuDeviceConfirmation, ensureRichMenuPublishRun, markRichMenuPublishRun, ensureRichMenuPublishRunPages, markRichMenuPublishRunPageStep, jstNow, type RichMenuGroupWithPages } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { createRichMenuShells, switchRichMenuLive, deleteRichMenuShells, resolveSwitcherActions, validateRichMenuGroupForPublish, validateRichMenuPagesWithLine, PublishLeaseLostError, RichMenuValidationError, buildAliasId, type LineRichMenuClient, type R2Like, type GroupInput } from '../lib/rich-menu-publisher.js';
@@ -275,7 +275,7 @@ async function handleManualPublish(
 ) {
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
   const fingerprint = manualPublishFingerprint(group);
   const requestResult = await createRichMenuManualPublishRequestAtomic(c.env.DB, {
@@ -309,7 +309,7 @@ async function handleManualPublish(
     return c.json({ success: false, error: 'already publishing' }, 409);
   }
   const account = await getLineAccountById(c.env.DB, group.account_id);
-  if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+  if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
 
   const publishOwner = `manual-${request.id}`;
   const publishGeneration = await acquirePublishLease(c.env.DB, groupId, publishOwner, new Date().toISOString());

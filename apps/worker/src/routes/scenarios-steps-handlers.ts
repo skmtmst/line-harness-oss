@@ -1,7 +1,7 @@
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { validateConditionForStorage } from './scenario-condition-validation.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getScenarioById, updateScenarioStep, deleteScenarioStep, enrollFriendInScenario, getFriendById, getScenarioPublishedVersion, computeNextDeliveryAt } from '@line-crm/db';
 import { resolveStepContent } from '@line-crm/db';
 import type { MessageType, DeliveryMode } from '@line-crm/db';
@@ -72,7 +72,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
         .bind(stepId, scenarioId)
         .first<{ condition_type: string | null; condition_value: string | null }>();
       if (!existingCond) {
-        return c.json({ success: false, error: 'Step not found' }, 404);
+        return fail(c, 404, 'STEP_NOT_FOUND');
       }
       const effectiveType = body.conditionType !== undefined ? body.conditionType : existingCond.condition_type;
       const effectiveValue = body.conditionValue !== undefined ? body.conditionValue : existingCond.condition_value;
@@ -88,7 +88,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
         .prepare(`SELECT id, message_type, message_content FROM templates WHERE id = ? AND message_bubbles_json IS NULL`)
         .bind(body.templateId)
         .first<{ id: string; message_type: string; message_content: string }>();
-      if (!tpl) return inputError(c, { success: false, error: 'templateId not found' }, 400, ["templateId"]);
+      if (!tpl) return fail(c, 400, 'TEMPLATE_ID_NOT_FOUND', {}, ["templateId"]);
       templateSnapshot = { message_type: tpl.message_type, message_content: tpl.message_content };
     }
     if (body.onReachTagId !== undefined && body.onReachTagId !== null) {
@@ -96,7 +96,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
         .prepare(`SELECT id FROM tags WHERE id = ?`)
         .bind(body.onReachTagId)
         .first<{ id: string }>();
-      if (!tag) return inputError(c, { success: false, error: 'onReachTagId not found' }, 400, ["onReachTagId"]);
+      if (!tag) return fail(c, 400, 'ON_REACH_TAG_ID_NOT_FOUND', {}, ["onReachTagId"]);
     }
 
     // スケジュールフィールドが1つでも指定されている場合は、既存値を DB から読んで
@@ -114,7 +114,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
         .bind(scenarioId)
         .first<{ delivery_mode: DeliveryMode }>();
       if (!scenarioRow) {
-        return c.json({ success: false, error: 'Scenario not found' }, 404);
+        return fail(c, 404, 'SCENARIO_NOT_FOUND');
       }
       const existingStep = await c.env.DB
         .prepare(
@@ -129,7 +129,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
           delivery_time: string | null;
         }>();
       if (!existingStep) {
-        return c.json({ success: false, error: 'Step not found' }, 404);
+        return fail(c, 404, 'STEP_NOT_FOUND');
       }
       // mode mismatch (relative scenario に offsetDays を投げる等) は body の生値で検出する。
       // 一方、対応 mode のフィールドが片方だけ送られた場合 (例: absolute_time で deliveryTime のみ)
@@ -188,7 +188,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
         .prepare(`SELECT message_type, message_content FROM scenario_steps WHERE id = ? AND scenario_id = ?`)
         .bind(stepId, scenarioId)
         .first<{ message_type: MessageType; message_content: string }>();
-      if (!existingMessage) return c.json({ success: false, error: 'Step not found' }, 404);
+      if (!existingMessage) return fail(c, 404, 'STEP_NOT_FOUND');
       effectiveMessageType ??= existingMessage.message_type;
       effectiveMessageContent ??= existingMessage.message_content;
     }
@@ -232,7 +232,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
     });
 
     if (!updated) {
-      return c.json({ success: false, error: 'Step not found' }, 404);
+      return fail(c, 404, 'STEP_NOT_FOUND');
     }
 
     return c.json({ success: true, data: serializeStep(updated) });
@@ -342,7 +342,7 @@ export const get__api_scenarios_id_preview_4 = async (c: Context<Env, "/api/scen
       .prepare(`SELECT delivery_mode, line_account_id FROM scenarios WHERE id = ?`)
       .bind(scenarioId)
       .first<{ delivery_mode: DeliveryMode; line_account_id: string | null }>();
-    if (!scenarioRow) return c.json({ success: false, error: 'Scenario not found' }, 404);
+    if (!scenarioRow) return fail(c, 404, 'SCENARIO_NOT_FOUND');
 
     const stepsResult = await c.env.DB
       .prepare(
@@ -448,7 +448,7 @@ export const get__api_scenarios_id_stats_5 = async (c: Context<Env, "/api/scenar
       .bind(scenarioId)
       .first<{ id: string }>();
     if (!scenario) {
-      return c.json({ success: false, error: 'Scenario not found' }, 404);
+      return fail(c, 404, 'SCENARIO_NOT_FOUND');
     }
     const stats = await computeScenarioStats(c.env.DB, scenarioId);
     return c.json({ success: true, data: stats });
@@ -571,10 +571,10 @@ export const post__api_scenarios_id_enroll_friendId_10 = async (c: Context<Env, 
     ]);
 
     if (!scenario) {
-      return c.json({ success: false, error: 'Scenario not found' }, 404);
+      return fail(c, 404, 'SCENARIO_NOT_FOUND');
     }
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     /*

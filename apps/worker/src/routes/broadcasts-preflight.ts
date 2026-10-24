@@ -1,7 +1,7 @@
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getBroadcastById, createBroadcast } from '@line-crm/db';
 import type { Broadcast as DbBroadcast } from '@line-crm/db';
 import { MAX_BROADCAST_MESSAGES, parseBroadcastMessageParts, unsupportedMessageVariables } from '../features/broadcasts/broadcast-message-set/index.js';
@@ -241,7 +241,7 @@ export const post__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">)
 
   if (targetType === 'multi-account-dedup') {
     if (!Array.isArray(body.accountIds) || body.accountIds.length < 1) {
-      return inputError(c, { success: false, error: 'accountIds (length >= 1) required for multi-account-dedup' }, 400, ["accountIds"]);
+      return fail(c, 400, 'ACCOUNT_IDS_LENGTH_1_REQUIRED_FOR_MULTI_ACCOUNT_DEDUP', {}, ["accountIds"]);
     }
     if (!Array.isArray(body.dedupPriority)) {
       return inputError(c, { success: false, error: 'dedupPriority (array, may be empty) required for multi-account-dedup' }, 400, ["dedupPriority"]);

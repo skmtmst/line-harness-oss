@@ -1,4 +1,4 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   getAccountHealthLogs,
@@ -15,7 +15,7 @@ import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { buildMetadata } from '../lib/build-metadata.js';
-
+import { fail } from '../lib/fail.js';
 const health = new Hono<Env>();
 
 // ========== Liveness ==========
@@ -64,7 +64,7 @@ health.get('/api/accounts/:id/health', async (c) => {
     const lineAccountId = c.req.param('id');
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!scope.ids.includes(lineAccountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const [riskLevel, logs] = await Promise.all([
       getLatestRiskLevel(c.env.DB, lineAccountId),
@@ -122,7 +122,7 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary
   try {
     const fromAccountId = c.req.param('id');
     const body = await c.req.json<{ toAccountId: string }>();
-    if (!body.toAccountId) return inputError(c, { success: false, error: 'toAccountId is required' }, 400, ["toAccountId"]);
+    if (!body.toAccountId) return fail(c, 400, 'TO_ACCOUNT_ID_IS_REQUIRED', {}, ["toAccountId"]);
 
     const db = c.env.DB;
 
@@ -139,7 +139,7 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary
       || (source.tenant_id ?? DEFAULT_TENANT_ID) !== (target.tenant_id ?? DEFAULT_TENANT_ID)
       || !await isLineAccountTenantActive(db, fromAccountId)
       || !await isLineAccountTenantActive(db, body.toAccountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
 
     // Never include another account's friends in this migration's count.
@@ -179,11 +179,11 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary
 health.get('/api/accounts/migrations/:migrationId', async (c) => {
   try {
     const item = await getAccountMigrationById(c.env.DB, c.req.param('migrationId'));
-    if (!item) return c.json({ success: false, error: 'Migration not found' }, 404);
+    if (!item) return fail(c, 404, 'MIGRATION_NOT_FOUND');
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!scope.allowedAccountIds.includes(item.from_account_id)
       || !scope.allowedAccountIds.includes(item.to_account_id)) {
-      return c.json({ success: false, error: 'Migration not found' }, 404);
+      return fail(c, 404, 'MIGRATION_NOT_FOUND');
     }
     return c.json({
       success: true,

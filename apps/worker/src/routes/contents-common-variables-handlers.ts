@@ -1,7 +1,7 @@
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { jstNow, getCommonVarById, createCommonVar, updateCommonVar, CommonVarFolderError, CommonVarKeyConflictError, deleteCommonVar, getCommonVarUsageImpact, getCommonVarReplacementCandidates, getCommonVarReplacementPlan, applyCommonVarReplacementPlan, CommonVarVersionConflictError, getCommonVarSchedules, createCommonVarSchedule, deleteCommonVarSchedule, validateFieldKey, COMMON_VAR_TYPES, normalizeCommonVarValue, isSecretLikeValue, setCommonVarStatus, CommonVarReasonRequiredError, CommonVarStatusTransitionError, type CommonVarType } from '@line-crm/db';
 
 import type { Env } from '../worker-env.js';
@@ -14,7 +14,7 @@ export const post__api_common_vars_1 = async (c: Context<Env, "/api/common-vars"
   try {
     const body = await c.req.json<Record<string, unknown>>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
-    if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -110,7 +110,7 @@ export const patch__api_common_vars_id_2 = async (c: Context<Env, "/api/common-v
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -260,7 +260,7 @@ export const post__api_common_vars_id_status_3 = async (c: Context<Env, "/api/co
   try {
     const id = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -314,7 +314,7 @@ export const post__api_common_vars_id_status_3 = async (c: Context<Env, "/api/co
 export const get__api_common_vars_id_delete_impact_4 = async (c: Context<Env, "/api/common-vars/:id/delete-impact">) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -335,7 +335,7 @@ export const post__api_common_vars_id_impact_preview_5 = async (c: Context<Env, 
   try {
     const body = await c.req.json<Record<string, unknown>>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
-    if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -395,7 +395,7 @@ export const post__api_common_vars_id_replace_6 = async (c: Context<Env, "/api/c
   try {
     const body = await c.req.json<Record<string, unknown>>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
-    if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -503,7 +503,7 @@ export const post__api_common_vars_id_replace_6 = async (c: Context<Env, "/api/c
 export const delete__api_common_vars_id_7 = async (c: Context<Env, "/api/common-vars/:id">) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -543,7 +543,7 @@ export const delete__api_common_vars_id_7 = async (c: Context<Env, "/api/common-
 
 export const get__api_common_vars_id_schedules_8 = async (c: Context<Env, "/api/common-vars/:id/schedules">) => {
   const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -557,7 +557,7 @@ export const post__api_common_vars_id_schedules_9 = async (c: Context<Env, "/api
   try {
     const varId = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -613,7 +613,7 @@ export const post__api_common_vars_id_schedules_9 = async (c: Context<Env, "/api
 
 export const delete__api_common_vars_id_schedules_scheduleId_10 = async (c: Context<Env, "/api/common-vars/:id/schedules/:scheduleId">) => {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }

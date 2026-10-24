@@ -15,7 +15,7 @@ import {
   isOperationCapabilityStopped,
   type AutomationRunDomainStatus,
 } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import type { Env } from '../worker-env.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -441,7 +441,7 @@ async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<voi
   ).bind(id).first<{ line_account_id: string }>();
   if (definition) {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [definition.line_account_id])) {
-      return c.json({ success: false, error: 'Automation not found' }, 404);
+      return fail(c, 404, 'AUTOMATION_NOT_FOUND');
     }
     await next();
     return;
@@ -452,7 +452,7 @@ async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<voi
     c.get('staff'),
     [item.line_account_id ?? null],
   )) {
-    return c.json({ success: false, error: 'Automation not found' }, 404);
+    return fail(c, 404, 'AUTOMATION_NOT_FOUND');
   }
   await next();
 }
@@ -969,7 +969,7 @@ automations.get(
   async (c) => {
   try {
     const item = await getAutomationById(c.env.DB, c.req.param('id'));
-    if (!item) return c.json({ success: false, error: 'Automation not found' }, 404);
+    if (!item) return fail(c, 404, 'AUTOMATION_NOT_FOUND');
 
     // ログも取得
     const logs = await getAutomationLogs(c.env.DB, item.id, 50);

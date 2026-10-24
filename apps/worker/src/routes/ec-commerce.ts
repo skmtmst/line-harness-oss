@@ -16,7 +16,7 @@ import { ecFlexMessage } from '../features/ec-commerce/ec-notification-message/i
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import { notificationDeliveriesResponse } from './line-notifications.js';
-
+import { fail } from '../lib/fail.js';
 const ecCommerce = new Hono<Env>();
 // テスト送信の連打防止。同一の店・種別は30秒に1回だけ。全体の rateLimit とは
 // 別に、LINE API へ直接届く口だけ短いクールダウンを置く。
@@ -1062,7 +1062,7 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inp
     return inputError(c, { success: false, error: 'Invalid eventType' }, 400, ["eventType"]);
   }
   if (typeof body.accountId !== 'string' || !body.accountId) {
-    return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+    return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   }
   if (typeof body.title !== 'string' || !body.title.trim() || body.title.trim().length > 80
       || typeof body.introText !== 'string' || body.introText.trim().length > 800
