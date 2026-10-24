@@ -52,8 +52,20 @@ export default function AuthCard({
     <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-title-align={titleAlign} data-hero={hero ? '' : undefined} data-design-node={cardNode}>
     {steps}
     {hero}
-    <PageHeading title={title} titleAs="h1" titleId={titleId} inset="none" padTop={0} help={authLayout === 'admin' ? undefined : description} />
-    {authLayout === 'admin' && description ? <p className={authStyles.help}>{description}</p> : null}
+    {/*
+      ★オーナー決定（2026-10-24）：題 32/600・題の上 16・題と説明の間 8。
+      題と説明は1組の見出しとして PageHeading に渡す（別の行に分けると
+      題と入力の間が 16＋20＋16＝52 になり、48 の上限を超えていた）。
+    */}
+    <PageHeading
+      title={title}
+      titleAs="h1"
+      titleId={titleId}
+      inset="none"
+      subtitle={authLayout === 'admin' ? description : undefined}
+      subtitleSize="body"
+      help={authLayout === 'admin' ? undefined : description}
+    />
     {children}
   </section></main>
 

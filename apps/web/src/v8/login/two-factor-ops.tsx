@@ -132,7 +132,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
           <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Button variant="text" size="inline" href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>} />
         ) : error ? <Notice tone="danger" id="ops-two-factor-error" message={error} /> : null}
         {isAdmin ? <span id="ops-two-factor-code-label" className="sr-only">{codeLabel}</span> : null}
-        <Field density="input" contentGap={isAdmin ? 8 : 12} optional={false} label={isAdmin ? undefined : <span id="ops-two-factor-code-label">{codeLabel}</span>}>
+        <Field density="input" contentGap={12} optional={false} label={isAdmin ? undefined : <span id="ops-two-factor-code-label">{codeLabel}</span>}>
           <SaveErrorField names={["typedCode","code"]} key={`${recovery}-${attempt}`}><OtpInput
             length={recovery ? 8 : 6} format={recovery ? 'recovery' : 'digits'} id={recovery ? 'recovery-code' : undefined}
             value={typedCode} onComplete={recovery ? undefined : entered => void submit(entered)}
