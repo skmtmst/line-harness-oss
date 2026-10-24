@@ -53,14 +53,14 @@
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar:is([data-toolbar-spacing='section'], [data-toolbar-spacing='stats']) { padding-block: var(--polish-space-card); }
 /* 題から最初の道具・数の帯までは道具側の余白だけ。間にタブ・帯・閲覧案内がある板は対象外。 */
-:global(:root) .frame > .heading + .listBody > .split:first-child > .main > .toolbar:first-child:not([data-collapsed-only]) { padding-top: 0; }
+:global(:root) .frame > .heading + .listBody > .split:first-child > .main > .toolbar:first-child:not([data-collapsed-only]):not(:has(> [data-kpi-strip])) { padding-top: 0; }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
-/* 数の帯の直後は型が12を持ち、帯側のmarginと重ねない。 */
-:global(:root) .toolbar:has(> [data-kpi-strip]) { row-gap: var(--space-12); }
+/* 数の帯の直後は型が16を持ち、帯側のmarginと重ねない。 */
+:global(:root) .toolbar:has(> [data-kpi-strip]) { row-gap: var(--space-16); padding-top: var(--space-8); padding-bottom: var(--space-16); }
 :global(:root) .stats [data-kpi-strip]:last-child { margin-bottom: 0; }
-:global(:root) .stats:has([data-kpi-strip]) + .split > .main > .toolbar:first-child { padding-top: var(--space-12); }
+:global(:root) .stats:has([data-kpi-strip]) + .split > .main > .toolbar:first-child { padding-top: var(--space-16); padding-bottom: var(--space-16); }
 :global(:root) .frame > [data-kpi-strip] + * { margin-top: var(--space-12); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .listCards { display: grid; grid-template-columns: repeat(var(--tpl-list-card-columns), minmax(0, 1fr)); gap: var(--polish-space-card); padding-inline: var(--tpl-list-inset); align-items: start; }
@@ -569,7 +569,7 @@
 :global(:root) .content > .listSection:last-child { padding-bottom: 0; }
 
 /* 数の帯を白い板の余白の内側へ置く。道具に含む帯は道具の余白を使う。 */
-:global(:root) .stats:has([data-kpi-strip]) { padding-inline: var(--tpl-list-inset); }
+:global(:root) .stats:has([data-kpi-strip]) { padding: var(--space-8) var(--tpl-list-inset) 0; min-width: 0; max-width: 100%; }
 :global(:root) .section { border-bottom: 0; }
 
 @container v8-page (width < 1100px) {

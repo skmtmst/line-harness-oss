@@ -1,6 +1,8 @@
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-booking-aside-width); min-width: 0; }
 .main { min-width: 0; }
 .content { min-width: 0; padding: var(--space-12) var(--tpl-head-pad-side) var(--tpl-page-pad-block); }
+/* 日の数の帯も本文と同じ左右の内側へ。上は題との間を 8〜12 に取る。 */
+.layout > .main > [data-template-region='stats'] { min-width: 0; padding: var(--space-8) var(--tpl-head-pad-side) 0; }
 .aside { min-width: 0; border-left: 1px solid var(--color-hairline); }
 .launcher { display: none; }
 .sidebarSection { min-width: 0; padding: var(--polish-space-card); border-bottom: 1px solid var(--color-hairline); font-size: var(--text-caption); }

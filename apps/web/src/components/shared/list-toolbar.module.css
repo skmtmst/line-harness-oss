@@ -123,7 +123,7 @@
 :root .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
 :root .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
 /* 切り替え（SegmentedControl）の項目は器の地で区切る。1つずつ枠で囲まない（期間）。 */
-:root .trailing [data-appearance] > button:not(:focus-visible) { outline: 0; }
+:root .trailing [data-appearance] > button:not(:focus-visible) { outline: 1px solid transparent; }
   /*
    * ★V8「道具の1段」（c4n9Kr）：探す欄は幅 280px・縮まない
    * （flex-shrink: 0）。中の文だけが flex:1 で伸び縮みする。
@@ -156,7 +156,7 @@
  * 2段目＝札。段の間 10・段の中の間 6。管理画面 の2段組みは変えない。
  * layout="stacked" のときだけ段を残し、それ以外は1本の帯。
  */
-:root .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
+:root .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: var(--space-12); }
 :root .toolbar[data-toolbar-layout='stacked'] .row1,
 :root .toolbar[data-toolbar-layout='stacked'] .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 :root .toolbar[data-toolbar-layout='stacked'] .filters { display: contents; }
@@ -201,7 +201,7 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
 .filterChoices[data-filter-collapsed] .filterNarrow { display: flex; }
 .slots { flex-direction: row; flex-wrap: wrap; align-items: center; }
 .slots > .slotsRow { display: contents; }
-.slots[data-toolbar-layout='slots-stacked'] { flex-direction: column; align-items: stretch; }
+.slots[data-toolbar-layout='slots-stacked'] { flex-direction: column; align-items: stretch; gap: var(--space-12); }
 .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; }
 .slots[data-toolbar-layout='slots-stacked'] > .slotsRow:has(.slotsEnd) { flex-wrap: nowrap; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
@@ -280,6 +280,14 @@ html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) 
   html:root .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: contents; }
   html:root .slots:has([data-toolbar-role='search']) > .rowBreak { display: none; }
   html:root .slots .slotTool[data-toolbar-role='search'] { flex-basis: calc(100% - var(--toolbar-leading-width, 0px) - var(--tpl-toolbar-gap)); }
+  /* 狭い板で左の列を畳んだ時は、1段目＝作る・フォルダ・検索、2段目＝札・表示・並び・件数。 */
+  html:root .slots:has([data-toolbar-leading]) .slotTool[data-toolbar-role='search'] {
+    flex: 0 1 var(--list-search-width, var(--tpl-list-search-w));
+    min-width: min(var(--tpl-list-search-min), 100%);
+  }
+  html:root .slots:has([data-toolbar-leading]) { row-gap: 0; }
+  html:root .slots:has([data-toolbar-leading]) > .rowBreak { display: block; margin-block: 0; }
+  html:root .slots:has([data-toolbar-leading]) .slotTool:not([data-toolbar-role='search']) { margin-top: var(--space-12); }
   html:root .leading { flex: none; flex-wrap: nowrap; }
   html:root .leading > :is(button, a),
   html:root .leading :global(.v8-folder-create) { width: max-content; flex: none; }
