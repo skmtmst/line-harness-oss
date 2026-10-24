@@ -109,7 +109,8 @@ export default function AccountSwitchMenu({
                 className={selected ? `${styles.row} ${styles.rowSelected}` : styles.row}
                 onClick={() => { onClose(); if (!selected) onSelect(account.id) }}
               >
-                <Avatar name={account.label} src={account.iconUrl ?? null} size={24} shape="rounded" alt={account.label} />
+                {/* 名前は隣の行が読ませるので、印は飾り（alt を渡すと読み上げが二重になる）。 */}
+                <Avatar name={account.label} src={account.iconUrl ?? null} size={24} shape="rounded" />
                 <span className={styles.name} title={account.label}>{account.label}</span>
                 {selected ? <Check aria-hidden="true" className={styles.check} /> : null}
               </button>
