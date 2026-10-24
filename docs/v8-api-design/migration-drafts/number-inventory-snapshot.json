@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-01T15:11:48.302396+00:00",
+  "baseSha": "4639c6e9615fbf22f7b2818e9937630aab668d1e",
+  "baseFileCount": 490,
+  "baseLargest": 543,
+  "openPRsScanned": 25,
+  "maxBaseAndOpenPR": 543,
+  "remoteD1Inspected": false,
+  "remoteD1PendingCount": null,
+  "proposedCandidates": [
+    544,
+    545,
+    546,
+    547
+  ],
+  "source": "https://github.com/skmtmst/line-harness-oss/tree/4639c6e9615fbf22f7b2818e9937630aab668d1e/packages/db/migrations",
+  "openPRMigrationFileCount": 0,
+  "numberReservation": "candidate only; rescan before promotion"
+}
