@@ -54,6 +54,17 @@
   color: var(--color-ink);
 }
 
+/* 件数は文字の後ろに小さく添える（「要確認 3」）。選んだ位置は文字の太さで示す。 */
+.count {
+  margin-inline-start: var(--tpl-chip-gap);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.selected .count { color: var(--color-ink-secondary); }
+
 /* 通常の切り替えでは数の左だけが間を持つ。予約用のflex gapとは重ねない。 */
 :root .root:not([data-size='booking']) .count { margin-inline-start: var(--tpl-chip-gap); }
 
@@ -192,3 +203,8 @@ html:root .root[data-appearance="track"] .selected { color: var(--color-ink); ba
 html:root .root[data-appearance="track"] .item:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 
 :root .root[data-size='booking'] .item { padding-block-start: var(--polish-text-center-inset); }
+
+/* 切り替えの項目は、指を乗せても地を塗らない（文字の色だけ変える）。つまみの白を濁らせない。 */
+html:root .root .item.item:hover:not(:disabled) {
+  --polish-overlay-strength: 0;
+}

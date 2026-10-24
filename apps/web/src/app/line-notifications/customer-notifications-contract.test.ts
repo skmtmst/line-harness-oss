@@ -36,7 +36,6 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
 
   // 板 ：絞り込み・表・数カードは共通部品。手描きの管理画面行・分類ボタンは置かない。
   it('絞り込み・表・数カードは共通部品を使う', () => {
-    expect(PAGE).toContain('<FilterChip')
     expect(PAGE).toContain('<DataTable label="顧客へのお知らせ"')
     expect(PAGE).toContain('<KpiCard')
     expect(PAGE).not.toContain('line-notification-v6-row')

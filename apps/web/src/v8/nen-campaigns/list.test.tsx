@@ -186,7 +186,7 @@ describe('V8 NEN配信の一覧', () => {
     expect(chip).toBeTruthy()
     await act(async () => { fireEvent.click(chip!) })
     expect(rowNames()).toEqual(['困っていませんか'])
-    await act(async () => { fireEvent.click(button('止めている 1')!) })
+    await act(async () => { fireEvent.click(button('すべて')!) })
     expect(rowNames()).toHaveLength(4)
   })
 

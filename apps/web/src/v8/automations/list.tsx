@@ -45,7 +45,7 @@ import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import { useListUrlState } from '@/components/shared/list-url-state'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { managedFolderOptions } from '@/components/shared/managed-folder-panel'
@@ -437,15 +437,21 @@ export default function AutomationListV8() {
 
   /* ===== 道具の段 ===== */
   const filterChips = (
-    <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={onlyActive} onChange={(next) => { setOnlyActive(next); if (next) { setOnlyStopped(false); setView({ archived: '' }) } }} icon={<Play size={13} aria-hidden="true" />}>
-        {`動いている ${ready ? activeCount : emptyValue('unknown')}`}
-      </FilterChip>
-      <FilterChip selected={onlyStopped} onChange={(next) => { setOnlyStopped(next); if (next) { setOnlyActive(false); setView({ archived: '' }) } }} icon={<Pause size={13} aria-hidden="true" />}>
-        {`止めている ${ready ? stoppedCount : emptyValue('unknown')}`}
-      </FilterChip>
-      <FilterChip selected={onlyArchived} onChange={(next) => { setView({ archived: next ? '1' : '' }); if (next) { setOnlyActive(false); setOnlyStopped(false) } }} icon={<Archive size={13} aria-hidden="true" />}>保管</FilterChip>
-    </div>
+    <SegmentedControl
+      aria-label="状態で絞り込む"
+      value={onlyActive ? 'active' : onlyStopped ? 'stopped' : onlyArchived ? 'archived' : 'all'}
+      onChange={(next) => {
+        setOnlyActive(next === 'active')
+        setOnlyStopped(next === 'stopped')
+        setView({ archived: next === 'archived' ? '1' : '' })
+      }}
+      options={[
+        { value: 'all', label: 'すべて' },
+        { value: 'active', label: '動いている', count: ready ? activeCount : undefined },
+        { value: 'stopped', label: '止めている', count: ready ? stoppedCount : undefined },
+        { value: 'archived', label: '保管' },
+      ]}
+    />
   )
   const savedBox = (
     <div className={styles.savedBox}>

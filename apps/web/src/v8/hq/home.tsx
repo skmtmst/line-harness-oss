@@ -18,7 +18,6 @@ import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import EmptyList from '@/components/shared/empty-list';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
-import FilterChip from '@/components/shared/filter-chip';
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import ListState from '@/components/shared/list-state';
 import Notice from '@/components/shared/notice';
@@ -444,13 +443,13 @@ export default function HqHomeV8() {
           />
         </div></ListToolbarRow>
         <ListToolbarRow>
-          <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
-            {STATUS_FILTERS.map((item) => (
-              <FilterChip key={item.value} selected={status === item.value} selectedIcon={false} onChange={() => { setStatus(item.value); resetPage() }}>
-                {`${item.label} ${statusCount(item.value)}`}
-              </FilterChip>
-            ))}
-          </div>
+          <SegmentedControl<StatusFilter>
+            aria-label="状態で絞り込む"
+            className={styles.statusSwitch}
+            value={status}
+            onChange={(next) => { setStatus(next); resetPage() }}
+            options={STATUS_FILTERS.map((item) => ({ value: item.value, label: item.label, count: statusCount(item.value) }))}
+          />
           <ListToolbarEnd>
           <SaveErrorField names={["view"]}><SegmentedControl<View>
             aria-label="表示の切り替え"

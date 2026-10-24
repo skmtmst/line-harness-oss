@@ -7,12 +7,12 @@ import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { CircleDot, Plug, Star, CircleCheck, Clock, CircleSlash, TriangleAlert } from 'lucide-react'
+import { Plug, CircleCheck, Clock, CircleSlash, TriangleAlert } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import HelpTip from '@/components/shared/help-tip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -351,19 +351,12 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
           onChange={setQuery}
           className={styles.search}
         />
-        {chips.map((chip) => (
-          <FilterChip
-            key={chip.value}
-            selected={status === chip.value}
-            icon={chip.value === 'all' ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />}
-            onChange={() => {
-              setPage(1)
-              setStatus(chip.value)
-            }}
-          >
-            {chip.count === undefined ? chip.label : `${chip.label} ${formatNumber(chip.count)}`}
-          </FilterChip>
-        ))}
+        <SegmentedControl<ActionTab>
+          aria-label="取り込みの状態で絞り込む"
+          value={status}
+          onChange={(next) => { setPage(1); setStatus(next) }}
+          options={chips.map((chip) => ({ value: chip.value, label: chip.label, count: chip.count }))}
+        />
         <span className={styles.spacer} />
         <span className={styles.sortBox}>
           <SaveErrorField names={["sort"]}><ListToolbarSort

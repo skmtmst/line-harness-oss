@@ -14,7 +14,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Activity, Bookmark, ChevronDown, ChevronUp, CircleMinus, CirclePlus, Download, Minus, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
+import { Activity, Bookmark, ChevronDown, ChevronUp, Download, Minus, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
@@ -34,7 +34,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { DialogFormRow } from '@/components/shared/dialog-form-row'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Card from '@/components/shared/card'
@@ -617,20 +617,19 @@ export default function ScoreTab() {
               onClear={() => { setRuleSearchInput(''); setRuleSearch('') }}
             />
           </div>
-          <FilterChip
-            selected={gainOnly}
-            icon={<CirclePlus size={13} aria-hidden="true" />}
-            onChange={(selected) => { setGainOnly(selected); if (selected) setLoseOnly(false) }}
-          >
-            足す点
-          </FilterChip>
-          <FilterChip
-            selected={loseOnly}
-            icon={<CircleMinus size={13} aria-hidden="true" />}
-            onChange={(selected) => { setLoseOnly(selected); if (selected) setGainOnly(false) }}
-          >
-            引く点
-          </FilterChip>
+          <SegmentedControl
+            aria-label="点の増減で絞り込む"
+            value={gainOnly ? 'gain' : loseOnly ? 'lose' : 'all'}
+            onChange={(next) => {
+              setGainOnly(next === 'gain')
+              setLoseOnly(next === 'lose')
+            }}
+            options={[
+              { value: 'all', label: 'すべて' },
+              { value: 'gain', label: '足す点' },
+              { value: 'lose', label: '引く点' },
+            ]}
+          />
           <span className={styles.spacer} aria-hidden="true" />
           {!readonly && publishedVersionNo !== null ? (
             <div className={styles.menuBox}>

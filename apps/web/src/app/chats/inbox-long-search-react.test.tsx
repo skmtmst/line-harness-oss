@@ -60,7 +60,7 @@ function base(url: URL) {
 }
 const list = () => host.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"]')!
 const searchInput = () => host.querySelector<HTMLInputElement>('input[aria-label="名前・メールアドレス・内容で検索"]')!
-const quickTabCounts = () => [...host.querySelectorAll<HTMLElement>('[aria-label="受信箱のクイック絞り込み"] button span.tabular-nums')]
+const quickTabCounts = () => [...host.querySelectorAll<HTMLElement>('[aria-label="受信箱のクイック絞り込み"] button [data-segment-count]')]
   .map((span) => span.textContent?.trim())
 async function settle() {
   await act(async () => { await Promise.resolve(); await Promise.resolve() })

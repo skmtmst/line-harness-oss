@@ -12,7 +12,7 @@ import { useMergedTab } from '@/components/layout/merged-tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import { ListFolderContext } from '@/components/shared/list-folder-context'
 import Toggle from '@/components/shared/toggle'
-import { CircleDot, Download, Inbox, Plus, Star } from 'lucide-react'
+import { Download, Inbox, Plus } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
@@ -38,7 +38,7 @@ import { canOpenCustomerNotificationKpi, customerNotificationKpis, type Customer
 import KpiCard from '@/components/shared/kpi-card'
 import Card from '@/components/shared/card'
 import TruncatedText from '@/components/shared/truncated-text'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
@@ -1312,7 +1312,16 @@ function LineNotificationsPage() {
 
     {/* 板 g3iDs：絞り込みは共通の札。並びは送った数が多い順のまま。 */}
     <div className={styles.toolbar} aria-label="お知らせの絞り込み">
-      {customerFilters.map(([value, label]) => <FilterChip key={value} selected={filter === value} icon={value === 'all' ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />} onChange={() => setFilter(value)}>{`${label} ${loadState === 'ready' ? filterCount(value) : emptyValue('unknown')}`}</FilterChip>)}
+      <SegmentedControl
+        aria-label="お知らせの絞り込み"
+        value={filter}
+        onChange={setFilter}
+        options={customerFilters.map(([value, label]) => ({
+          value,
+          label,
+          count: loadState === 'ready' ? filterCount(value) : undefined,
+        }))}
+      />
     </div>
 
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}

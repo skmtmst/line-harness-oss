@@ -4,7 +4,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ArrowUpDown, CircleDot, Plus, Star, Cable, CircleCheck, TriangleAlert, Users } from 'lucide-react'
+import { ArrowUpDown, Plus, Cable, CircleCheck, TriangleAlert, Users } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -17,7 +17,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import { TextArea } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -113,7 +113,7 @@ export default function AccountsV8() {
   const ready = status === 'ready'
   // 未取得（読み込み中・取得失敗）を 0 と出さない。成功した空一覧だけ 0。
   const kpis = ready ? accountKpis(accounts) : null
-  const filterCount = (value: AccountFilter) => (ready ? accounts.filter((a) => matchesFilter(a, value)).length : emptyValue('unknown'))
+  const filterCount = (value: AccountFilter) => (ready ? accounts.filter((a) => matchesFilter(a, value)).length : undefined)
 
   /** このアカウントの接続を、新しく確かめ直す。一覧全体を最新で取り直す。 */
   const recheck = useCallback(async (account: LineAccount) => {
@@ -222,18 +222,12 @@ export default function AccountsV8() {
             onChange={setQuery}
             onClear={() => setQuery('')}
           />
-          <div className={styles.chips} role="group" aria-label="状態で絞り込む">
-            {ACCOUNT_FILTERS.map((item) => (
-              <FilterChip
-                key={item.value}
-                selected={filter === item.value}
-                onChange={() => setFilter(item.value)}
-                icon={filter === item.value ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />}
-              >
-                {`${item.label} ${filterCount(item.value)}`}
-              </FilterChip>
-            ))}
-          </div>
+          <SegmentedControl<AccountFilter>
+            aria-label="状態で絞り込む"
+            value={filter}
+            onChange={setFilter}
+            options={ACCOUNT_FILTERS.map((item) => ({ value: item.value, label: item.label, count: filterCount(item.value) }))}
+          />
         </div>
 
         {status === 'loading' ? (

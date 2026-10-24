@@ -8,7 +8,7 @@ import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dial
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { emptyValue } from '@/components/shared/empty-value'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import ListState from '@/components/shared/list-state'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -613,11 +613,16 @@ function ProjectInner() {
               <span className={styles.hint}>画像を押すと詳細</span>
             </div>
             <div className={styles.galleryTools}>
-              <div role="group" aria-label="画像の絞り込み" className={styles.chips}>
-                <FilterChip selected={filter === 'all'} icon={<Sparkles size={14} aria-hidden="true" />} onChange={() => setFilter('all')}>{`すべて ${images.length}`}</FilterChip>
-                <FilterChip selected={filter === 'favorite'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>{`お気に入り ${favoriteCount}`}</FilterChip>
-                <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>{`配布済み ${deliveredCount}`}</FilterChip>
-              </div>
+              <SegmentedControl<Filter>
+                aria-label="画像の絞り込み"
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { value: 'all', label: 'すべて', count: images.length },
+                  { value: 'favorite', label: 'お気に入り', count: favoriteCount },
+                  { value: 'delivered', label: '配布済み', count: deliveredCount },
+                ]}
+              />
               {canManage ? <div className={styles.selectionTools}>
                 <SaveErrorField names={["length","visible.length","selectedImages","selected_images"]}><Checkbox checked={visible.length > 0 && visible.every((image) => selectedImages.includes(image.id))}
                   indeterminate={visible.some((image) => selectedImages.includes(image.id)) && !visible.every((image) => selectedImages.includes(image.id))}

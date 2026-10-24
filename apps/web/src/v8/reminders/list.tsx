@@ -25,7 +25,7 @@ import SearchField from '@/components/shared/search-field'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useListScrollMemory, useListUrlParam, useListUrlValue } from '@/components/shared/list-url-state';
-import { Activity, AlertCircle, ArrowRight, Bell, Calendar, CalendarClock, FilePen, CircleCheck, Copy, Folder as FolderIcon, FolderInput, Pause, Pencil, Play, Plus, Send, Square, Trash2, TriangleAlert, Users } from 'lucide-react';
+import { Activity, AlertCircle, ArrowRight, Bell, Calendar, CalendarClock, Copy, Folder as FolderIcon, FolderInput, Pause, Pencil, Play, Plus, Send, Square, Trash2, TriangleAlert, Users } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye, MoreHorizontal } from 'lucide-react';
@@ -42,7 +42,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import ManagedFolderPanel, { useManagedFolders } from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
@@ -97,14 +97,6 @@ const SORT_OPTIONS = [
   { value: 'name', label: '名前順' },
 ]
 const STATUS_CHIPS = ['有効', '下書き', '停止中', '失敗あり'] as const
-/* 板 ：札には状態の図柄を付ける（有効=丸チェック・下書き=鉛筆・停止中=一時停止・失敗あり=三角注意）。 */
-const STATUS_CHIP_ICONS = {
-  '有効': <CircleCheck size={14} aria-hidden="true" />,
-  '下書き': <FilePen size={14} aria-hidden="true" />,
-  '停止中': <Pause size={14} aria-hidden="true" />,
-  '失敗あり': <TriangleAlert size={14} aria-hidden="true" />,
-} as const
-
 interface ReminderRow {
   id: string
   name: string
@@ -1098,18 +1090,15 @@ export default function RemindersListV8() {
     /></SaveErrorField>
   )
   const statusChips = (
-    <div role="group" aria-label="状態で絞り込む">
-      {STATUS_CHIPS.map((status) => (
-        <FilterChip
-          key={status}
-          selected={statusFilter === status}
-          onChange={() => setStatusFilter(statusFilter === status ? '' : status)}
-          icon={STATUS_CHIP_ICONS[status]}
-        >
-          {status}
-        </FilterChip>
-      ))}
-    </div>
+    <SegmentedControl
+      aria-label="状態で絞り込む"
+      value={statusFilter}
+      onChange={setStatusFilter}
+      options={[
+        { value: '', label: 'すべて' },
+        ...STATUS_CHIPS.map((status) => ({ value: status, label: status })),
+      ]}
+    />
   )
   const sortSelect = <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} label="並び：" />
   const perPageSelect = <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />

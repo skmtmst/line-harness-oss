@@ -9,7 +9,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { AlertCircle, ArrowLeftRight, CircleDot, Download, FilePen, Gift, Plus, RotateCcw, Star } from 'lucide-react'
+import { AlertCircle, ArrowLeftRight, Download, Gift, Plus, RotateCcw, Star } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -26,7 +26,7 @@ import { csvCell } from '@/lib/presentation'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import ManagedFolderPanel, { managedFolderNavRows, useManagedFolders, folderDotFor } from '@/components/shared/managed-folder-panel'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -605,30 +605,20 @@ export default function RewardsTab() {
   })
 
   const chips = (
-    <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      <FilterChip
-        selected={publishedOnly}
-        icon={<CircleDot size={13} aria-hidden="true" />}
-        onChange={(selected) => {
-          setPage(1)
-          setPublishedOnly(selected)
-          if (selected) setDraftOnly(false)
-        }}
-      >
-        {`出している ${formatMileageNumber(publishedCount)}`}
-      </FilterChip>
-      <FilterChip
-        selected={draftOnly}
-        icon={<FilePen size={13} aria-hidden="true" />}
-        onChange={(selected) => {
-          setPage(1)
-          setDraftOnly(selected)
-          if (selected) setPublishedOnly(false)
-        }}
-      >
-        {`下書き ${formatMileageNumber(draftCount)}`}
-      </FilterChip>
-    </div>
+    <SegmentedControl
+      aria-label="状態で絞り込む"
+      value={publishedOnly ? 'published' : draftOnly ? 'draft' : 'all'}
+      onChange={(next) => {
+        setPage(1)
+        setPublishedOnly(next === 'published')
+        setDraftOnly(next === 'draft')
+      }}
+      options={[
+        { value: 'all', label: 'すべて' },
+        { value: 'published', label: '出している', count: publishedCount },
+        { value: 'draft', label: '下書き', count: draftCount },
+      ]}
+    />
   )
 
   const toolbar = (

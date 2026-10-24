@@ -13,7 +13,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
@@ -152,18 +152,12 @@ export default function DuplicatesListV8() {
           <div className={styles.search}>
             <SearchField aria-label="名前・メール・電話で探す" value={d.query} onChange={d.setQuery} onClear={() => d.setQuery('')} placeholder={narrow ? '名前・電話で探す' : '名前・メール・電話で探す'} />
           </div>
-          <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
-            {STATUS_FILTERS.map((filter) => (
-              <FilterChip
-                key={filter.value || 'all'}
-                selected={d.status === filter.value}
-                selectedIcon={false}
-                onChange={() => d.setStatus(filter.value)}
-              >
-                {filter.label}
-              </FilterChip>
-            ))}
-          </div>
+          <SegmentedControl
+            aria-label="状態で絞り込む"
+            value={d.status}
+            onChange={(next) => d.setStatus(next)}
+            options={STATUS_FILTERS.map((filter) => ({ value: filter.value, label: filter.label }))}
+          />
           <span className={styles.spacer} />
           {d.data?.computedAt ? <span className={styles.reviewed}>{`${slashDateTime(d.data.computedAt)} に見直した`}</span> : null}
           <Button type="button" variant="secondary" onClick={() => void d.detect()} disabled={d.refreshing} busy={d.refreshing} busyLabel="見直し中…">

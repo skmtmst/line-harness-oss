@@ -22,7 +22,7 @@ import EmptyList from '@/components/shared/empty-list'
 import TagPill from '@/components/shared/tag-pill'
 import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -390,12 +390,16 @@ export default function EventsListV8() {
           maxLength: SEARCH_QUERY_MAX_LENGTH,
         }}
         filters={(
-          <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-            <FilterChip selected={filter === 'open'} onChange={(selected) => setFilter(selected ? 'open' : 'all')}>公開中のみ</FilterChip>
-            <FilterChip selected={filter === 'pending'} onChange={(selected) => setFilter(selected ? 'pending' : 'all')}>
-              {`承認待ちあり${pendingTotal !== null && pendingTotal > 0 ? ` ${pendingTotal}` : ''}`}
-            </FilterChip>
-          </div>
+          <SegmentedControl
+            aria-label="状態で絞り込む"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'all', label: 'すべて' },
+              { value: 'open', label: '公開中のみ' },
+              { value: 'pending', label: '承認待ちあり', count: pendingTotal !== null && pendingTotal > 0 ? pendingTotal : undefined },
+            ]}
+          />
         )}
         trailing={(
           <>

@@ -16,7 +16,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { RowActions } from '@/components/shared/row-actions'
 import { formatDate } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
@@ -103,10 +103,15 @@ export default function ManualLinksScreen() {
       {!canEdit ? <ReadOnlyNotice /> : null}
       <ListToolbar
         search={{ value: query, onChange: setQuery, placeholder: '画面ID・画面名で探す' }}
-        filters={<>
-          <FilterChip selectedIcon={false} selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
-          <FilterChip selectedIcon={false} selected={filter === 'broken'} onChange={(selected) => setFilter(selected ? 'broken' : 'all')}>{`開けない ${brokenCount}`}</FilterChip>
-        </>}
+        filters={<SegmentedControl
+          aria-label="状態で絞り込む"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'すべて' },
+            { value: 'broken', label: '開けない', count: brokenCount },
+          ]}
+        />}
         trailing={<>
           <span className={styles.schedule}>{SCHEDULE}</span>
           {canEdit ? <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…"><RefreshCw aria-hidden="true" />いま全部を確かめる</Button> : null}

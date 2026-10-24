@@ -32,7 +32,7 @@ export default function SegmentedControl<T extends string>({
 }: {
   id?: string
   invalid?: boolean
-  options: { value: T; label: ReactNode; ariaLabel?: string; count?: number }[]
+  options: { value: T; label: ReactNode; ariaLabel?: string; title?: string; count?: number | string }[]
   value: T
   onChange: (value: T) => void
   'aria-label': string
@@ -146,11 +146,12 @@ export default function SegmentedControl<T extends string>({
             .filter(Boolean)
             .join(' ')}
           data-part={appearance === 'track' ? 'joined-segment' : undefined}
-          aria-label={option.ariaLabel}
+          aria-label={option.ariaLabel ?? (option.count !== undefined && typeof option.label === 'string' ? `${option.label} ${option.count}` : undefined)}
+          title={option.title}
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
         >
-          {option.label}{option.count !== undefined ? <span className={styles.count}>{option.count}</span> : null}
+          {option.label}{option.count !== undefined ? <>{' '}<span className={styles.count} data-segment-count>{option.count}</span></> : null}
         </button>
       ))}
     </div>

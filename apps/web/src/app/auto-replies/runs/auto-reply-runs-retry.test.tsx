@@ -254,8 +254,8 @@ it('件数はこのページの実行結果で数え、詳細とコピーへ顧�
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
   await renderPage()
   expect(container.textContent).not.toMatch(/顧客だけの本文|private-secret/)
-  expect(container.querySelector('button[aria-label="すべて 2件（このページ）"]')?.textContent).toBe('すべて2')
-  expect(container.querySelector('button[aria-label="確認待ち 1件（このページ）"]')?.textContent).toBe('確認待ち1')
+  expect(container.querySelector('button[aria-label="すべて 2件（このページ）"]')?.textContent).toBe('すべて 2')
+  expect(container.querySelector('button[aria-label="確認待ち 1件（このページ）"]')?.textContent).toBe('確認待ち 1')
   const detail = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent === '実行の詳細を見る')!
   await act(async () => detail.click())
   const dialog = document.querySelector('[role="dialog"]')!

@@ -34,7 +34,7 @@ import { DetailColumns } from '@/components/templates/detail-columns';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -1054,12 +1054,16 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
             onChange={(value) => { setSearch(value); setPage(1) }}
             onClear={() => { setSearch(''); setPage(1) }}
           /></ListToolbarSearchSlot>
-          <FilterChip selected={filter === 'active'} onChange={(on) => { setFilter(on ? 'active' : 'all'); setPage(1) }}>
-            {`有効 ${formatNumber(activeCount)}`}
-          </FilterChip>
-          <FilterChip selected={filter === 'cancelled'} onChange={(on) => { setFilter(on ? 'cancelled' : 'all'); setPage(1) }}>
-            {`取消済み ${formatNumber(cancelledCount)}`}
-          </FilterChip>
+          <SegmentedControl
+            aria-label="登録者の状態で絞り込む"
+            value={filter}
+            onChange={(next) => { setFilter(next); setPage(1) }}
+            options={[
+              { value: 'all', label: 'すべて' },
+              { value: 'active', label: '有効', count: activeCount },
+              { value: 'cancelled', label: '取消済み', count: cancelledCount },
+            ]}
+          />
           <ListToolbarEnd>
           <PageSizeSelect value={pageSize} options={[10, 20, 50]} onChange={(value) => { setPageSize(value); setPage(1) }} />
           </ListToolbarEnd>
