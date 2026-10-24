@@ -28,6 +28,17 @@ describe("友だちの顔", () => {
     expect(avatarInitials('菅野 亮')).toBe('菅')
   })
 
+  it('会社名は法人格と記号を飛ばしてから1字（アカウントのアイコンも同じ）', () => {
+    expect([
+      avatarInitials('株式会社 然'),
+      avatarInitials('（株）然-NEN-'),
+      avatarInitials('Shed Products株式会社'),
+      avatarInitials('一般社団法人 日本〇〇協会'),
+      avatarInitials(' ・ 株式会社 むすび'),
+      avatarInitials('株式会社'),
+    ]).toEqual(['然', '然', 'S', '日', 'む', '株'])
+  })
+
   it('名前も無い時は人の印', () => {
     const { container } = render(<Avatar name="  " />)
     expect((container.firstElementChild as HTMLElement).dataset.avatar).toBe('icon')

@@ -2,6 +2,7 @@
 
 import { User } from 'lucide-react'
 import { useState, type CSSProperties } from 'react'
+import { nameInitial } from '@/lib/name-initial'
 import styles from './avatar.module.css'
 
 /**
@@ -66,9 +67,12 @@ export default function Avatar({
   )
 }
 
-/** 頭文字はいつも1字。英字は最初の1字を大文字、日本語は最初の1字。 */
+/**
+ * 頭文字はいつも1字。英字は最初の1字を大文字、日本語は最初の1字。
+ * 会社名は先頭の「株式会社」などの法人格と記号を飛ばす（`nameInitial`）。
+ */
 export function avatarInitials(name: string): string {
-  const first = [...name.trim()][0] ?? ''
+  const first = nameInitial(name)
   return /^[a-z]$/.test(first) ? first.toUpperCase() : first
 }
 

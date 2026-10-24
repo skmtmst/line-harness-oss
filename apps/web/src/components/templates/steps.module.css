@@ -229,8 +229,10 @@ button.step:focus-visible {
 }
 
 .root[data-variant='auth'] .list {
-  width: auto;
+  width: fit-content;
+  max-width: 100%;
   margin-inline: auto;
+  justify-content: center;
 }
 
 .root[data-variant='auth'] .item {

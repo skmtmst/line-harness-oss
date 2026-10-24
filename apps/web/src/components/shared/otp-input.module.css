@@ -208,6 +208,7 @@
  * このマスだけ層の外で緑に戻す。誤りの赤と、空のマスの入力の目印（2×24）も同じ理由で層の外に置く。
  */
 html:root .group .slot:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
 html:root .group .slot[aria-invalid='true']:focus-visible { outline-color: var(--color-status-danger); }
 html:root .group .slot[value='']:focus { background-image: linear-gradient(var(--color-ink), var(--color-ink)); }
 
@@ -220,4 +221,19 @@ html:root .group .slot[value='']:focus { background-image: linear-gradient(var(-
 @media (max-width: 340px) {
   :root .group[data-format='digits'] .slot { width: 32px; height: 44px; flex-basis: 32px; font-size: 18px; }
   .cluster { gap: 4px; }
+}
+
+/* 指を乗せた・押した時の薄い地を、入力済みのマスに残さない（層の外の共通の乗せた色より後ろで消す）。 */
+html:root .group .slot.slot:hover:not(:disabled),
+html:root .group .slot.slot:active:not(:disabled) {
+  --polish-overlay-strength: 0;
+}
+
+/* ブラウザが1マス目を自動入力の欄と見て内側を灰色に塗っても、ほかのマスと同じ白地にする。 */
+html:root .group .slot:-webkit-autofill,
+html:root .group .slot:-webkit-autofill:hover,
+html:root .group .slot:-webkit-autofill:focus {
+  box-shadow: var(--shadow-raised-control), 0 0 0 1000px var(--color-canvas) inset;
+  -webkit-text-fill-color: var(--color-ink);
+  caret-color: var(--color-ink);
 }

@@ -5,6 +5,7 @@ import { setDocumentTitle } from '@/lib/document-title'
 import { PageHeading } from '@/components/templates/page-frame'
 import authStyles from '@/components/templates/auth-page.module.css'
 import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
+import { nameInitial } from '@/lib/name-initial'
 
 /**
  * ログイン前の画面の入れ物。★管理画面 0-1／36-4／36-6 の「登録カード」（幅 520）。
@@ -47,7 +48,7 @@ export default function AuthCard({
   useEffect(() => { setDocumentTitle(title) }, [title])
   // V8 login confirmation/enrollment inherits its existing card tokens.
   if (variant === 'totp') return <main className={authStyles.page} data-auth-layout={authLayout}>
-    {authLayout === 'admin' ? <div className={authStyles.brand}><span className={authStyles.brandMark} aria-hidden="true">{brandName?.slice(0, 1) ?? 'm'}</span><div><strong>{brandName ?? 'musubo'}</strong><small>musubo</small></div></div> : null}
+    {authLayout === 'admin' ? <div className={authStyles.brand}><span className={authStyles.brandMark} aria-hidden="true">{brandName ? nameInitial(brandName) : 'm'}</span><div><strong>{brandName ?? 'musubo'}</strong><small>musubo</small></div></div> : null}
     <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-title-align={titleAlign} data-hero={hero ? '' : undefined} data-design-node={cardNode}>
     {steps}
     {hero}
