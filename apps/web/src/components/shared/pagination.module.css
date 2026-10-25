@@ -86,7 +86,7 @@ button.item:disabled {
 :root .pagination {
   gap: 6px;
   padding: 10px 20px;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
 }
 
 :root .summary {

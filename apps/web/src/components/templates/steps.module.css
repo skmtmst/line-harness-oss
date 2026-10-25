@@ -84,7 +84,7 @@ button.step:focus-visible {
   font-size: var(--tpl-steps-num-size);
   font-weight: 600;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
 }
 
 .dot[data-step-dot='done'] {

@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 .friendListCell { padding: var(--tpl-fr-row-block) var(--tpl-fr-cell-gap) var(--tpl-fr-row-block) 0; font-size: var(--polish-text-body); line-height: var(--tpl-fr-delta-lh); vertical-align: middle; }
-.templatePlainCell { color: var(--color-ink); font-size: var(--polish-text-body); line-height: var(--tpl-tl-cell-lh); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.templatePlainCell { color: var(--color-ink); font-size: var(--polish-text-body); line-height: var(--tpl-tl-cell-lh); font-variant-numeric: var(--font-numeric); white-space: nowrap; }
 
 :global(:root) .friendList th {
   height: var(--tpl-fr-thead-h); padding: 0 var(--tpl-fr-cell-gap) 0 0; color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: 500; line-height: var(--tpl-fr-delta-lh);

@@ -3195,7 +3195,8 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 /* 複合部品や画面が渡す線幅も、同じlucideの値へそろえる。 */
 :root svg.lucide { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
 
-html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][data-align='right']) { font-variant-numeric: tabular-nums; }
+/* 数の帯・表の数・件数・時刻は桁をそろえる（共通の値 --font-numeric）。 */
+html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][data-align='right'], [data-count], [data-part='count']) { font-variant-numeric: var(--font-numeric); }
 
 /*
  * 共通の値（直し③-0・2026-10-25 オーナー決定）。部品と画面はここの値を読むだけにし、

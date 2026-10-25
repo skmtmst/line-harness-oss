@@ -245,7 +245,7 @@
   color: var(--color-ink);
   font: inherit;
   font-size: var(--text-body);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
   cursor: pointer;
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),

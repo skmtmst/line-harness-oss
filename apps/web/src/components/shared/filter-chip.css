@@ -49,7 +49,7 @@
 .v6-filter-chip__count {
   font-size: var(--text-micro);
   font-weight: 500;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
   color: var(--color-ink-faint);
 }
 

@@ -61,3 +61,15 @@ describe('#976 デザイン統一', () => {
     expect(searchFieldTsx).toMatch(/'aria-label':\s*string/)
   })
 })
+
+describe('数字の桁をそろえる（2026-10-25）', () => {
+  const globals = read('../../app/globals.css')
+  it('桁そろえは共通の値 --font-numeric（tabular-nums）で、本文の既定と数の帯・表の数・件数が読む', () => {
+    expect(globals).toMatch(/--font-numeric:\s*tabular-nums;/)
+    expect(globals).toMatch(/body\s*\{[^}]*font-variant-numeric:\s*var\(--font-numeric\)/)
+    expect(globals).toMatch(/\[data-kpi-number\][^{]*\[data-count\][^{]*\{\s*font-variant-numeric:\s*var\(--font-numeric\)/)
+    for (const name of ['kpi-card.module.css', 'table.module.css', 'pagination.module.css', 'segmented.module.css', 'filter-chip.css']) {
+      expect(read(`./${name}`)).toContain('font-variant-numeric: var(--font-numeric)')
+    }
+  })
+})

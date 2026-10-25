@@ -58,7 +58,7 @@
 .excludeTag { min-width: 0; }
 .audienceCount { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-14); border-radius: var(--radius-control); background: var(--color-surface-pearl); font-size: 13px; }
 .audienceCount span { display: flex; align-items: center; gap: var(--space-8); }
-.audienceCount strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.audienceCount strong { white-space: nowrap; font-variant-numeric: var(--font-numeric); }
 .details { border-top: 1px solid var(--color-hairline); padding-top: var(--space-12); font-size: 12px; }
 .details summary { cursor: pointer; color: var(--color-ink-secondary); }
 .details[open] > :not(summary) { margin-top: var(--space-10); }

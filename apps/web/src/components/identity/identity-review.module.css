@@ -91,7 +91,7 @@
 
 .rowValue {
   color: var(--color-ink);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
   font-weight: 600;
   text-align: right;
 }
