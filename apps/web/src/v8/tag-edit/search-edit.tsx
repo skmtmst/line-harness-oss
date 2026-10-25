@@ -854,11 +854,10 @@ export default function SavedSearchEditV8() {
       </p>
       {previewError ? <Notice tone="danger" >{previewError}</Notice> : null}
       {previewStale ? (
-        <div className={styles.staleBox} role="status">
-          <p className={styles.staleTitle}>条件を変えました。上の人数は変える前の条件のもので、変えたあとの条件はまだ数えていません。</p>
+        <Notice tone="warn" role="status" heading={<>条件を変えました。上の人数は変える前の条件のもので、変えたあとの条件はまだ数えていません。</>}>
           <p className={styles.staleLine}>{`変える前：${beforeSummary.length ? beforeSummary.join('・') : '条件なし'}`}</p>
           <p className={styles.staleLine}>{`変えたあと：${afterSummary.length ? afterSummary.join('・') : '条件なし'}`}</p>
-        </div>
+        </Notice>
       ) : <p className={styles.countNote}>{countNote}</p>}
       <div className={styles.sideButtons}>
         <Button type="button" onClick={() => recount()} busyLabel="処理中…"><RefreshCw size={14} aria-hidden="true" />数え直す</Button>
@@ -876,10 +875,9 @@ export default function SavedSearchEditV8() {
           </div>
         ))}
       </dl>
-      <p className={styles.infoBand}>
-        <TriangleAlert size={16} aria-hidden="true" className={styles.infoIcon} />
+      <Notice tone="info" icon={<TriangleAlert size={16} aria-hidden="true" />}>
         <span>{hasLive ? '条件を変えると、上の配信の宛先も変わります。' : inUse ? '固定で使っている所は、条件を変えても宛先は変わりません。' : '使っている所はないので、条件を変えてもほかに影響しません。'}{inUse ? '使っている間は削除できません。' : ''}</span>
-      </p>
+      </Notice>
     </div>
   )
 

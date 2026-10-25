@@ -15,21 +15,6 @@
 
 .body { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); padding: var(--tpl-fr-area-pad); min-width: 0; }
 
-.band {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-fm-band-gap);
-  margin: 0;
-  padding: var(--tpl-fm-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-fm-band-lh);
-}
-
-.band > svg { flex-shrink: 0; color: var(--color-action); }
-
 .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); align-items: stretch; }
 
 .subject,

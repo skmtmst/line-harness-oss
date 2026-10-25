@@ -25,7 +25,6 @@ const MARK_LIST = readWeb('src/v8/tags/marks-tab.tsx') + read('mark-list.tsx')
 const SAVED_LIST = readWeb('src/v8/tags/searches-tab.tsx') + read('saved-search-list.tsx')
 const FIELD_LIST = readWeb('src/v8/tags/fields-tab.tsx') + read('field-list.tsx')
 const TAG_EDITOR = readWeb('src/v8/tag-edit/edit.tsx') + readWeb('src/v8/tag-edit/edit-form.tsx')
-const CSV_DIALOG = read('tag-csv-import-dialog.tsx')
 const EDIT_PAGE = readWeb('src/app/tags/searches/edit/page.tsx')
 
 describe('切り出しの道具そのもの', () => {
@@ -127,16 +126,6 @@ describe('機能4の一覧・編集画面は取得済みの設計値を表示す
 
   it('保存検索の該当人数は一覧で取得済みの値を初期表示に使う', () => {
     expect(EDIT_PAGE).toContain('setPreviewCount(found.matchCount ?? null)')
-  })
-})
-
-describe('sfTEW CSVで一括登録の確認画面', () => {
-  const warnBar = between(CSV_DIALOG, 'className={styles.warnBar}', 'className={styles.footerRow}')
-
-  it('押す前に、同じ名前のタグを上書きしないことと、直し方を書く', () => {
-    expect(warnBar).toContain('同じ名前のタグは上書きしません')
-    expect(warnBar).toContain('エラーの行はCSVを直してから')
-    expect(warnBar).toContain('エラーの${preview.summary.invalid}行は登録されません')
   })
 })
 

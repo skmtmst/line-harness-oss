@@ -6,7 +6,7 @@ import { shortUid, historyBadge } from './uid-labels'
 
 import { useState } from 'react'
 import { Inbox, CheckCheck, CircleCheck, Download, Plus, Undo2 } from 'lucide-react'
-import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
+import type { UidMigrationItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
@@ -33,6 +33,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 UID移行（Pencil  要確認の判断・ 本移行と照合の完了）。/friends/migrations?tab=uid（`&run=` で履歴を選ぶ）。
@@ -44,7 +45,6 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  */
 
 const PRE_EXECUTE = ['dry_run', 'review', 'ready']
-
 
 export default function UidMigrationV8({ initialRunId }: { initialRunId: string | null }) {
   usePageTitle('友だち')
@@ -265,17 +265,13 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
 
         {active && !reviewing ? (
           <>
-            <div className={active.status === 'completed' ? `${styles.band} ${styles.bandDone}` : styles.band} role="note">
-              <CircleCheck size={18} aria-hidden="true" />
-              <span>
-                <span className={styles.bandTitle}>{active.status === 'completed' ? '本移行と照合が終わりました' : statusView?.badgeLabel}</span>
-                <span className={styles.bandText}>
-                  {active.status === 'completed'
-                    ? `${formatNumber(active.counts.applied)} 人を引き継ぎました。必要ならこの履歴から切り戻せます。`
-                    : statusView?.description}
-                </span>
+            <Notice tone={active.status === "completed" ? "success" : "info"} role="note" icon={<CircleCheck size={18} aria-hidden="true" />} heading={<>{active.status === 'completed' ? '本移行と照合が終わりました' : statusView?.badgeLabel}</>}>
+              <span className={styles.bandText}>
+                {active.status === 'completed'
+                  ? `${formatNumber(active.counts.applied)} 人を引き継ぎました。必要ならこの履歴から切り戻せます。`
+                  : statusView?.description}
               </span>
-            </div>
+            </Notice>
             <section className={styles.card} aria-labelledby="uid-result">
               <h3 id="uid-result" className={styles.cardTitle}>照合の結果</h3>
               <ul className={styles.lines}>

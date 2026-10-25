@@ -25,6 +25,7 @@ import {
 import styles from './tag-csv-import-dialog.module.css'
 import { formatYmd } from '@/lib/format'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 const PREVIEW_ROW_STEP = 100
 
@@ -238,10 +239,14 @@ export default function TagCsvImportDialog({
                 )}
               </div>
             ) : null}
-            <div className={styles.note}><Info aria-hidden="true" size={18} /><span>フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。</span></div>
+            <Notice tone="info" icon={<Info aria-hidden="true" size={18} />}>
+              <span>フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。</span>
+            </Notice>
           </div>
           {/* ファイル由来の誤りは上の行に出ているので、ここでは重ねて出さない。 */}
-          {error && !(fileName && rows.length === 0) ? <p className={styles.error} role="alert">{error}</p> : null}
+          {error && !(fileName && rows.length === 0) ? <Notice tone="danger" role="alert">
+            {error}
+          </Notice> : null}
           <div className={styles.actions}>
             <Button type="button" onClick={close}>キャンセル</Button>
             <Button type="button" variant="primary" disabled={rows.length === 0} onClick={() => void confirmRows()}>取り込む内容を確認</Button>
@@ -314,23 +319,19 @@ export default function TagCsvImportDialog({
               とくに「同じ名前のタグは上書きしない」は、CSVでフォルダを
               直そうとして見送られたときに、どこへ行けばよいか分からなくなる。
             */}
-            <div className={styles.warnBar}>
-              <TriangleAlert aria-hidden="true" size={18} />
-              <div>
-                <p className={styles.warnTitle}>
-                  {preview.summary.invalid > 0
-                    ? `エラーの${preview.summary.invalid}行は登録されません`
-                    : '登録できる行だけを登録します'}
-                </p>
+              <Notice tone="warn" icon={<TriangleAlert aria-hidden="true" size={18} />} heading={<>{preview.summary.invalid > 0
+                ? `エラーの${preview.summary.invalid}行は登録されません`
+                : '登録できる行だけを登録します'}</>}>
                 <p className={styles.warnBody}>
                   通る{preview.summary.ready}行はそのまま登録します。
                   エラーの行はCSVを直してから、もう一度取り込んでください。同じ名前のタグは上書きしません。
                 </p>
-              </div>
-            </div>
+              </Notice>
           </> : null}
           </div>
-          {error ? <p className={styles.error} role="alert">{error}</p> : null}
+          {error ? <Notice tone="danger" role="alert">
+            {error}
+          </Notice> : null}
           <div className={styles.footerRow}>
             <div className={styles.actions}>
               <Button type="button" disabled={busy} onClick={resetSelection}>キャンセル</Button>
@@ -362,14 +363,13 @@ export default function TagCsvImportDialog({
 
         {phase === 'partial' && result ? <>
           <div className={styles.body}>
-            <div className={`${styles.resultBanner} ${styles.warningBanner}`}>
-              <TriangleAlert aria-hidden="true" size={20} />
+            <Notice tone="warn" icon={<TriangleAlert aria-hidden="true" size={20} />}>
               <h2 id="tag-csv-title" className={styles.resultTitle}>
                 {result.summary.created > 0
                   ? `${result.summary.created}件を登録し、${result.summary.invalid + result.summary.failed}件は入りませんでした`
                   : 'タグを登録できませんでした'}
               </h2>
-            </div>
+            </Notice>
             <p className={styles.partialDescription}>入らなかった行だけを下に出しています。直して取り込み直せば、この{result.summary.invalid + result.summary.failed}件だけが登録されます。すでに登録した{result.summary.created}件は二重になりません（同じ名前は飛ばすため）。</p>
             <div className={styles.tableFrame}>
               <table className={styles.table}>

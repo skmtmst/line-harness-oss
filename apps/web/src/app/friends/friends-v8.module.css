@@ -152,30 +152,6 @@
 }
 
 /* 操作の失敗の帯。 */
-.errorBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-control);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.errorBand button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: underline;
-  cursor: pointer;
-}
 
 /* 区画（白い箱）。見出しつき。 */
 .section {
@@ -521,20 +497,6 @@
 }
 
 /* 一致した根拠の緑の帯。 */
-.evidenceBand {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--color-success);
-  border-radius: var(--radius-control);
-  background: var(--color-success-bg);
-  color: var(--color-success);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.6;
-}
 
 /* 画面の下の段：左に説明、右に状態の札と判定の押し口。 */
 .decideBar {
@@ -1043,4 +1005,4 @@ legend.fieldLabel {
   font-weight: 400;
 }
 
-.errorBand, .errorBandNoticePlacement { margin: 0; }
+.errorBandNoticePlacement { margin: 0; }
