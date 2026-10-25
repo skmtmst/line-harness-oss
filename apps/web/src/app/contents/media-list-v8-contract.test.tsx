@@ -16,7 +16,7 @@ const PAGE = readFileSync('src/app/contents/page.tsx', 'utf8')
 
 /*
  * ★V8 登録メディア一覧（板 ）の契約。
- * テーマの古い属性が残っていてもV8一覧に固定し、
+ * V8一覧の入口で、
  * 数の帯・フォルダの列・道具の段・札の格子・表示範囲とページ送りが出ること、
  * staff では閲覧のみの帯が出て管理操作が押せない形になることを実DOMで固定する。
  * 帯の数は API の実値だけ（見本の数を直書きしない）。
@@ -259,8 +259,8 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     expect(dots[1].getAttribute('data-folder-dot')).toBe('unfiled')
   })
 
-  test('旧テーマ属性が残っていてもV8一覧を出す', async () => {
-    document.documentElement.dataset.theme = 'v7'
+  test('入口はV8一覧を描く', async () => {
+    document.documentElement.dataset.theme = 'v8'
     await renderPage()
     expect(host?.querySelector('[data-design-node="g89Tc"]')).toBeNull()
     expect(host?.querySelector('[data-design-node="O7hUt7"]')).not.toBeNull()

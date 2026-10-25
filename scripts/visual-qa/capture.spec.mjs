@@ -69,7 +69,6 @@ for (const width of [1152, 1440, 1920]) {
     test(`hqtabs ${tab} ${width}px 横幅と操作`, async ({ page }) => {
       await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
       await signIn(page)
-      await page.addInitScript(() => localStorage.setItem('lh-admin-theme', 'v8'))
       await page.goto(`${BASE}/hq/friend-attributes?tab=${tab}`, { waitUntil: 'networkidle' })
       await expectLanded(page, '/hq/friend-attributes')
       await expect(page.getByRole('columnheader', { name: column, exact: true })).toBeVisible()
