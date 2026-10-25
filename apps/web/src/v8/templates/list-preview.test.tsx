@@ -116,6 +116,11 @@ describe('テンプレートの一覧：LINEでの見え方', () => {
     })
     await renderList()
     expect(screen.getByRole('columnheader', { name: 'LINEでの見え方' })).toBeTruthy()
+    // 名前の幅を保つため、種類の列は名前の下の2行目へ移す。名前の全文の title はそのまま。
+    expect(screen.queryByRole('columnheader', { name: '種類' })).toBeNull()
+    const textName = document.querySelector('tr[data-row-id="text"] [data-list-name]')
+    expect(textName?.textContent).toBe('テンプレートtextテキスト')
+    expect(textName?.getAttribute('title')).toBe('テンプレートtext')
     // 下書きがある行は下書きの中身を出す。差し込みは札。
     expect(thumbOf('text')?.textContent).toBe('名前さま 下書きの本文')
     expect(thumbOf('image')?.querySelector('img')?.getAttribute('src')).toBe('https://example.com/s.jpg')
@@ -150,6 +155,8 @@ describe('テンプレートの一覧：LINEでの見え方', () => {
     listTemplates.mockResolvedValue({ success: true, data: [row('text', 'text', '本文')] })
     await renderList()
     expect(screen.queryByRole('columnheader', { name: 'LINEでの見え方' })).toBeNull()
+    expect(screen.getByRole('columnheader', { name: '種類' })).toBeTruthy()
+    expect(screen.getByLabelText('種類：テキスト')).toBeTruthy()
     expect(thumbOf('text')).toBeNull()
     expect(screen.getByText('テンプレートtext')).toBeTruthy()
   })

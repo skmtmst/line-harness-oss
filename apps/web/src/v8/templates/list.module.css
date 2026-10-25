@@ -100,6 +100,8 @@
 /* LINEでの見え方の列。狭い幅（1280 以下）では畳むので、広い幅の時だけの幅。 */
 .colPreview { --preview-col-w: 216px; width: var(--preview-col-w); }
 .previewCell { min-width: 0; }
+/* 名前と、その下の種類の2行。 */
+.nameStack { display: flex; flex-direction: column; min-width: 0; }
 
 .headCell {
   text-align: left;
