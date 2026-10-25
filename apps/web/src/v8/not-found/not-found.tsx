@@ -7,27 +7,21 @@
  * 説明の下に開けなかった道（クエリ抜き）、ボタンの下に「よく使うページ」の文字リンク。
  * ログインしていない時は、外枠の認証の確かめがログインへ送るので、この画面は出ない。
  */
-import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { CircleHelp } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import TextLink from '@/components/shared/text-link'
-import { readStaffIdentity } from '@/lib/staff-identity-state'
-import { useStaffRole } from '@/lib/staff-role'
-import { frequentDestinations, missingPathLabel, readPermissionKeys } from './frequent-destinations'
+import { useStaffIdentity } from '@/lib/staff-role'
+import { frequentDestinations, missingPathLabel } from './frequent-destinations'
 import styles from './not-found.module.css'
 
 export default function NotFoundV8() {
   const router = useRouter()
   const missingPath = missingPathLabel(usePathname())
-  const staffRole = useStaffRole()
-  const role = readStaffIdentity()?.role ?? staffRole
-  const [permissions, setPermissions] = useState<{ edit: string[]; view: string[] }>({ edit: [], view: [] })
-  useEffect(() => {
-    setPermissions({ edit: readPermissionKeys('lh_staff_permissions'), view: readPermissionKeys('lh_staff_view_permissions') })
-  }, [])
-  const destinations = frequentDestinations(role, permissions.edit, permissions.view)
+  // 役割と権限は本人の API（/api/staff/me）から。手元の保存値は書き換えられるので使わない。
+  const staff = useStaffIdentity()
+  const destinations = frequentDestinations(staff?.role ?? null, staff?.permissionKeys ?? [], staff?.permissionViewKeys ?? [])
   const goBack = () => {
     // 直接開いた（戻る先が無い）ときは、ダッシュボードへ。
     if (typeof window !== 'undefined' && window.history.length > 1) router.back()

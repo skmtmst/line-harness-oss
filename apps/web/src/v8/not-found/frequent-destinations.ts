@@ -36,13 +36,3 @@ export function missingPathLabel(pathname: string | null | undefined): string | 
     return path
   }
 }
-
-/** 保存値の権限の一覧。壊れていたら空（出しすぎない）。 */
-export function readPermissionKeys(storageKey: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(storageKey) || '[]')
-    return Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === 'string') : []
-  } catch {
-    return []
-  }
-}

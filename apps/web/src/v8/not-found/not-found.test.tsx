@@ -5,10 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const router = vi.hoisted(() => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }))
 const nav = vi.hoisted(() => ({ pathname: '/no-such-page' as string | null }))
-const staff = vi.hoisted(() => ({ role: 'owner' as string | null }))
+const staff = vi.hoisted(() => ({ role: 'owner' as string | null, permissionKeys: [] as string[], permissionViewKeys: [] as string[] }))
 vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => nav.pathname }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => staff.role }))
-vi.mock('@/lib/staff-identity-state', () => ({ readStaffIdentity: () => null }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => (staff.role ? staff : null) }))
 
 import NotFoundV8 from './not-found'
 import { frequentDestinations, missingPathLabel } from './frequent-destinations'
@@ -26,7 +25,8 @@ const linkLabels = (host: HTMLElement) => [...host.querySelectorAll('nav[aria-la
 afterEach(() => {
   nav.pathname = '/no-such-page'
   staff.role = 'owner'
-  window.localStorage.clear()
+  staff.permissionKeys = []
+  staff.permissionViewKeys = []
 })
 
 /** ★V8 見つからない画面（板 ）。戻る道を2つ（前のページ・ダッシュボード）とよく使うページを出す。 */
@@ -63,7 +63,14 @@ describe('見つからない画面（V8）', () => {
 
   it('一斉配信を任されていない担当者には一斉配信のリンクを出さない', () => {
     staff.role = 'staff'
-    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/friends']))
+    staff.permissionKeys = ['/friends']
+    const { host, close } = render()
+    expect(linkLabels(host)).toEqual(['受信箱=/chats', '友だち=/friends'])
+    close()
+  })
+
+  it('本人の情報を読み終えるまでは一斉配信のリンクを出さない', () => {
+    staff.role = null
     const { host, close } = render()
     expect(linkLabels(host)).toEqual(['受信箱=/chats', '友だち=/friends'])
     close()
@@ -71,7 +78,7 @@ describe('見つからない画面（V8）', () => {
 
   it('見るだけで任された担当者には一斉配信のリンクを出す', () => {
     staff.role = 'staff'
-    window.localStorage.setItem('lh_staff_view_permissions', JSON.stringify(['/broadcasts']))
+    staff.permissionViewKeys = ['/broadcasts']
     const { host, close } = render()
     expect(linkLabels(host)).toContain('一斉配信=/broadcasts')
     close()
