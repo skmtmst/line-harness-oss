@@ -147,7 +147,7 @@
 - 検査の入口は [docs/code-structure.md §5](docs/code-structure.md#5-検査の入口)、運用と検査の台本は [scripts/README.md](scripts/README.md) にあります。
 - 保存・送信・権限・失敗時の扱い・読み直しを守る動きの試験は消さないでください。書き換えが必要なら同じ動きを守る形に書き換え、消したときは PR に「何を・なぜ」を書きます。
 
-- 品質の検査は `pnpm quality:check --base <比較元SHA>`、解析器の型と故障対照は `pnpm quality:typecheck`・`pnpm quality:test` で実行します。詳しくは [docs/code-structure.md §7](docs/code-structure.md#7-品質を後戻りさせない) を読んでください。
+- 品質の検査は `pnpm quality:check --base <比較元SHA>`、解析器の型と故障対照は `pnpm quality:typecheck`・`pnpm quality:test` で実行します。違反を減らしたときだけ `pnpm quality:update --base <同じSHA>` で一覧も減らします（増やす更新は拒まれます）。詳しくは [docs/code-structure.md §7](docs/code-structure.md#7-品質を後戻りさせない) を読んでください。
 - 新しい画面の入口は `pnpm new:screen <機能名> --title <題名> --board <板ID> --dry-run` で確認してから作ります（[雛形の手順](docs/code-structure.md#8-新しい入口の雛形)）。
 - 新しい route の入口は `pnpm new:route <機能名> --method get --dry-run` で確認してから作ります（同じ雛形の手順）。
 
