@@ -151,10 +151,11 @@
 - 新しい画面の入口は `pnpm new:screen <機能名> --title <題名> --board <板ID> --dry-run` で確認してから作ります（[雛形の手順](docs/code-structure.md#8-新しい入口の雛形)）。
 - 新しい route の入口は `pnpm new:route <機能名> --method get --dry-run` で確認してから作ります（同じ雛形の手順）。
 
-## 14. 公開前に入れる直しの線
+## 14. 後回しの一覧の進め方
 
-- 外部の独立点検と本番公開の前に入れる直しは、**セキュリティ・お金・データの消失や破損・権限・使う人に見える不具合**の5種類だけです。
-- 新しい指摘は、まずこの5種類に当たるかで振り分けてください。当たらない物は直さず、司令塔の後回し一覧（§17 の `LATER.md`）へ送ります。書けない人は報告に書いてください。後回しの物も §13 の見張りで増やしません。
+- 2026-10-25 のオーナーの決定で、「公開前に入れるのはセキュリティ・お金・データ・権限・見える不具合の5種類だけ」という線は終わりました。後回しの一覧（§17 の `LATER.md`）は時期を待たず、司令塔が順に作業へ回して進めます。
+- ただし時期が決まっている物（V8 切り替えの1週間後・両方のテストが終わった後の計画・管理者やオーナーの判断待ち・保留の物）は、その時期まで待ちます。
+- 新しい指摘はすぐ直すか、`LATER.md` に足して順番を待ちます。書けない人は報告に書いてください。後回しの物も §13 の見張りで増やしません。
 
 ## 15. 管理画面の見た目（V8）
 
@@ -179,7 +180,7 @@
 - 要件の正本は [docs/v6-requirements/v6-requirements-master-index.md](docs/v6-requirements/v6-requirements-master-index.md) が指す 34 本と、その §5 の横断契約、[docs/v8-requirements/](docs/v8-requirements/README.md) だけです。それ以外を要件として読まないでください。
 - 動きは要件が正本、見た目は V8 の絵と決まりが勝ちます。要件と実装が食い違うときは、実装ではなく要件を先に直します。
 - 終わった版（V2〜V7）の文書や作業の記録は、リポジトリから外して保管しました。保管先と一覧は [docs/document-archives.md](docs/document-archives.md) にあります。読まず、引用せず、実装の根拠にしないでください。リポジトリへ戻して要件として使うこともしません。
-- 見た目の進捗は ★V8 との照合の記録（§17 の `PASSED.tsv` と `SWITCH-READINESS.md`）を見てください。
+- 見た目の進捗は ★V8 との照合の記録（§17 の `PASSED-V8FREEZE.tsv` と `SWITCH-READINESS.md`。`PASSED.tsv` は 10-07 までの履歴）を見てください。
 - Lステップ・Liny との比較の根拠には [docs/lstep-liny-screen-behavior-research-2026-08.md](docs/lstep-liny-screen-behavior-research-2026-08.md) と [docs/lstep-unverified-assumptions.md](docs/lstep-unverified-assumptions.md) を使ってください。
 
 ## 17. リポジトリの外にある司令塔の資料
@@ -190,10 +191,10 @@
 | --- | --- | --- |
 | Pencil ★V8 | `~/Downloads/LINE-Harness-V8.pen`（部品の正本と主な画面）、`~/Downloads/LINE-Harness-V8-B.pen`（残りの画面） | 画面ごとの絵 |
 | 画面を合わせる手順書 | `~/lh-work/design/v8/HOW-TO-90.md` | 画面の担当の必読 |
-| 合格の記録・準備表 | `~/lh-work/design/v8/PASSED.tsv`、`~/lh-work/design/v8/SWITCH-READINESS.md` | 見た目の進捗 |
+| 合格の記録・準備表 | `~/lh-work/design/v8/PASSED-V8FREEZE.tsv`（今の照合台帳。`PASSED.tsv` は 10-07 までの履歴）、`~/lh-work/design/v8/SWITCH-READINESS.md`（準備表） | 見た目の進捗 |
 | 照合の道具 | `~/lh-work/tools/hq/measure.sh` | 絵と画面の文字位置の照合 |
 | 検証環境への配備 | `~/lh-work/tools/hq/deploy-staging.sh` | 司令塔が使う手動配備 |
-| 後回しの一覧 | `~/lh-work/design/v8/LATER.md` | §14 の5種類に当たらない指摘 |
+| 後回しの一覧 | `~/lh-work/design/v8/LATER.md` | §14 の順に進める直し |
 
 ## 18. Slack と Codex の共同開発運用
 

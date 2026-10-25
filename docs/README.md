@@ -753,5 +753,6 @@
 - [手動テスト版の見た目と予約の状態の更新](release-log/unreleased/1807-kenta-manual-test-polish.md)
 - [失敗の文を日本語に](release-log/unreleased/1809-kenta-japanese-failure-messages.md)
 - [登録メディアの件数が取れない時の表示](release-log/unreleased/1810-kenta-media-count-dash.md)
+- [画面づくりの説明書の更新](release-log/unreleased/1812-kenta-v8-docs-drift.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
