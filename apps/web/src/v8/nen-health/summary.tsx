@@ -2,7 +2,6 @@
 
 import { jstDateOffset } from '@/lib/jst-datetime'
 
-
 import { TrendLineChart } from '@/components/shared/charts'
 
 /*
@@ -27,6 +26,7 @@ import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-ap
 import { SKIN_LABELS, TEAR_LABELS, countText, md } from './parts'
 import styles from './health.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 type Logs = NenHealthSummaryData['summary']['logs']
 
@@ -95,7 +95,9 @@ export default function SummaryDrawerV8({
           />
         ) : (
           <>
-            <p className={styles.summaryNote}>お客さまがマイページで付けた記録をまとめたものです。診断や治療の判断は含みません。</p>
+                <Notice tone="info">
+                  お客さまがマイページで付けた記録をまとめたものです。診断や治療の判断は含みません。
+                </Notice>
             <KpiBand density="compact">
               <KpiCard density="compact" icon={null} title="記録" value={s.records} unit="日" detail={null} />
               <KpiCard density="compact" icon={null} title="体重" value={null} valueRange={{ from: s.weight?.first, to: s.weight?.last }} unit="kg" detail={null} />

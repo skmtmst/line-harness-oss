@@ -27,14 +27,6 @@
 .conflictSlot {
   padding: var(--tpl-mb-conflict-slot-pad);
 }
-.conflictBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-mb-gap);
-  padding: var(--tpl-mb-conflict-pad);
-  border-radius: var(--tpl-mb-conflict-radius);
-  background: var(--color-status-warn-soft);
-}
 .conflictIcon {
   flex-shrink: 0;
   color: var(--color-status-warn-deep);
@@ -245,15 +237,6 @@
   font-size: var(--tpl-mb-text-12);
   font-weight: 600;
   line-height: var(--tpl-mb-lh-17);
-}
-.removeNote {
-  margin: 0;
-  padding: var(--tpl-mb-note-pad);
-  border-radius: var(--tpl-mb-field-radius);
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-  font-size: var(--tpl-mb-text-11);
-  line-height: var(--tpl-mb-lh-16);
 }
 .editToggle {
   display: flex;

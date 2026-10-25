@@ -8,10 +8,9 @@ const FIELD_REQUIREMENTS = {
   reason: requiredText("理由を入力してください。"),
 }
 
-
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Activity, Bookmark, ChevronDown, ChevronUp, Download, Minus, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
@@ -89,7 +88,6 @@ const FRIEND_BAND_LABELS: Record<ActionScoreBand, string> = {
   normal: 'ふつう',
   low: '低い',
 }
-
 
 function bandName(band: ActionScoreBand, highMin: number, normalMin: number) {
   if (band === 'high') return `点が高い（${formatMileageNumber(highMin)} 点〜）`
@@ -1015,11 +1013,11 @@ export function ScoreAdjustDialog({
         </div>
 
         {/* 帯の行は常に出す（点数を打ち変えても窓の下が上下に動かない。絵 Nv7An は帯が変わる時の形）。 */}
-        <p className={styles.dlgWarn} data-tone={bandChanges ? 'warn' : 'neutral'} role="note">
+        <Notice tone="warn" data-tone={bandChanges ? 'warn' : 'neutral'} role="note">
           {bandChanges
             ? `帯が「${BAND_LABELS[band]}」から「${bandName(bandAfter, highMin, normalMin)}」に変わります。帯で選んでいる配信・オートメーションの宛先から外れることがあります。`
             : `帯は「${bandName(bandAfter, highMin, normalMin)}」のまま変わりません。`}
-        </p>
+        </Notice>
       </div>
     </Dialog></SaveErrorScope>
   )
