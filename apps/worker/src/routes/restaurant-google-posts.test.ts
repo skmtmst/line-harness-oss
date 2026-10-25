@@ -722,4 +722,16 @@ describe('削除', () => {
     const body = (await r.json()) as { post: { status: string } };
     expect(body.post.status).toBe('deleted');
   });
+
+  it('公開済みの削除も、確認なしは400・担当者は403で、GoogleへDELETEしない', async () => {
+    const draft = await createDraft();
+    await publish(draft.json.post!.id);
+    const unconfirmed = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/remove`, { body: { confirmed: false } });
+    expect(unconfirmed.status).toBe(400);
+    expect(await unconfirmed.json()).toMatchObject({ code: 'confirmation_required' });
+    useStaffRole('staff');
+    const byStaff = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/remove`, { body: { confirmed: true }, token: 'staff-session' });
+    expect(byStaff.status).toBe(403);
+    expect(googleCalls.some((x) => x.init?.method === 'DELETE')).toBe(false);
+  });
 });

@@ -109,6 +109,22 @@ describe('回答フォームの応答契約（Worker の形）', () => {
     expect(await api.submitForm('f1', { data: {} }, '00000000-0000-4000-8000-000000000001'))
       .toEqual({ status: 409, body });
   });
+
+  /*
+   * サーバはキー無し・UUID でないキーの送信を 400 で断る。共有のヘッダ関数を通して
+   * キーを必ず載せ、UUID でないキーは送る前に止める（送信の重複を防ぐ要）。
+   */
+  test('送信は Idempotency-Key を必ず載せ、UUID でないキーは送る前に止める', async () => {
+    const fetcher = stubFetch({ success: true, data: { complete: true } });
+    await api.submitForm('f1', { data: {} }, '00000000-0000-4000-8000-000000000001');
+    const init = (fetcher.mock.calls[0] as unknown[] | undefined)?.[1] as RequestInit | undefined;
+    expect(new Headers(init?.headers).get('Idempotency-Key')).toBe('00000000-0000-4000-8000-000000000001');
+    expect(init?.method).toBe('POST');
+
+    fetcher.mockClear();
+    await expect(api.submitForm('f1', { data: {} }, 'not-a-uuid')).rejects.toThrow('idempotency_key_must_be_uuid');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
 
 describe('撮影用の偽 API も同じ契約で読める', () => {

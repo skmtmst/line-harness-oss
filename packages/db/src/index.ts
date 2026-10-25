@@ -1032,6 +1032,9 @@ export type {
   DashboardUpcoming, UpcomingItem, UpcomingKind,
 } from './dashboard-upcoming';
 export {
+  getDashboardComparisons,
+} from './dashboard-comparisons';
+export {
   createBookingCustomer, getBookingCustomer, normalizeBookingCustomerPhone, searchBookingCustomers,
 } from './booking/customers';
 export type {

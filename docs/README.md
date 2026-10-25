@@ -776,5 +776,10 @@
 - [不安定な試験の直し](release-log/unreleased/1830-kenta-flaky-iat-1026.md)
 - [直し①②（不具合とiPad横の幅）](release-log/unreleased/1831-kenta-train-m1-1026.md)
 - [Next.js の版上げ](release-log/unreleased/1833-kenta-next-patch.md)
+- [LINEの鍵の期限の知らせ](release-log/unreleased/1834-kenta-token-expiry.md)
+- [更新履歴を配備1回ごとに分ける下ごしらえ](release-log/unreleased/1834-kenta-release-summary.md)
+- [友だちのブロックの数が毎日 0 のまま記録されていたのを直し、日本時間の日の区切](release-log/unreleased/1834-kenta-block-count.md)
+- [受信箱の一覧を、未読を先にせず新しい順だけで並べて取り出せるようにした](release-log/unreleased/1834-kenta-inbox-sort.md)
+- [ダッシュボードの数を先週の同じ曜日](release-log/unreleased/1834-kenta-kpi-compare.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

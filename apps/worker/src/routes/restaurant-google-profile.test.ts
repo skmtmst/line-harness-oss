@@ -417,6 +417,15 @@ describe('Googleビジネス：変更の送信（GB-12 / GB-15）', () => {
     expect(patchCalls()).toHaveLength(0);
   });
 
+  it('確認なしの送信は書き込み無効より先に400で、patch を呼ばない', async () => {
+    const r = await propose({ source: 'shortcut', shortcut: 'close_today' });
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    const s = await send(r.json.change!.id, undefined, false);
+    expect(s.status).toBe(400);
+    expect(s.json.code).toBe('confirmation_required');
+    expect(patchCalls()).toHaveLength(0);
+  });
+
   it('通信結果が不明なら pending_confirm のまま残し、次回は照合して applied にできる', async () => {
     const r = await propose({ source: 'shortcut', shortcut: 'close_today' });
     const original = fetch;
