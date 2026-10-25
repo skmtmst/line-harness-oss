@@ -760,6 +760,7 @@
 - [アフィリエイト登録の上書き防止](release-log/unreleased/1815-kenta-affiliate-save-conflict.md)
 - [手動テストの指摘の直し（浮いた部品・すべる切り替え・予約元）](release-log/unreleased/1816-kenta-raised-controls.md)
 - [予約の LIFF のやり取りの形をそろえる](release-log/unreleased/1817-kenta-liff-booking-response.md)
+- [コメントと使われていない部品の片づけ（まとめ）](release-log/unreleased/1826-kenta-train-later-b.md)
 - [決まりの説明書の整理](release-log/unreleased/1822-kenta-docs-current-rules.md)
 - [使われていない部品の片づけ](release-log/unreleased/1823-kenta-remove-unused-files.md)
 - [共通の仕組みの説明の書き方をそろえる](release-log/unreleased/1824-kenta-package-comments.md)
