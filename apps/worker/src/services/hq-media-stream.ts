@@ -1,4 +1,4 @@
-/** Keep 200MB files out of the Worker's heap; both reads are pinned to an ETag. */
+/** 200MBの動画をメモリへ載せず、2回の読込を同じ ETag へ固定する。 */
 export const HQ_MEDIA_MAX_BYTES = 200 * 1024 * 1024;
 export interface HqMediaStreamSource {
   r2Key: string;
@@ -23,13 +23,13 @@ export async function hashHqMedia(bucket: Pick<R2Bucket, 'get'>, key: string, et
   return hex(await digest.digest);
 }
 
-/** Every retry opens a new conditional read. Hash/length failure prevents publication. */
+/** 再試行ごとに条件付きで読み、ハッシュや長さが違えば公開しない。 */
 export async function copyHqMediaStream(bucket: Pick<R2Bucket, 'get' | 'put'>, source: HqMediaStreamSource, key: string, options: R2PutOptions) {
   if (source.sizeBytes < 1 || source.sizeBytes > HQ_MEDIA_MAX_BYTES || !/^[a-f0-9]{64}$/.test(source.contentHash)) throw new Error('MEDIA_SIZE_LIMIT');
   const object = await bucket.get(source.r2Key, { onlyIf: { etagMatches: source.etag } });
   if (!object || !('body' in object) || object.size !== source.sizeBytes) throw new Error('SOURCE_MEDIA_UNAVAILABLE');
   const digest = new crypto.DigestStream('SHA-256'), writer = digest.getWriter();
-  // Attach a handler immediately: aborting a stream also rejects its digest promise.
+  // stream の中断で digest も拒否されるため、直ちに例外処理を付ける。
   void digest.digest.catch(() => undefined);
   let actual = 0;
   const fixed = new FixedLengthStream(source.sizeBytes);
@@ -49,7 +49,7 @@ export async function copyHqMediaStream(bucket: Pick<R2Bucket, 'get' | 'put'>, s
   try {
     const result = await bucket.put(key, fixed.readable, options);
     if (!result) {
-      // Conditional PUT lost a race and may return without consuming the stream.
+      // 条件付き PUT が競合すると stream を読み切らず戻る場合がある。
       await fixed.readable.cancel().catch(() => undefined);
       await piping.catch(() => undefined);
       await writer.abort().catch(() => undefined);

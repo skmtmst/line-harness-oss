@@ -5,7 +5,7 @@ import { imageDimensions } from '../features/media/media-metadata/index.js';
 import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
 
 /*
- * 危険なファイルの検査（m12b）。
+ * 危険なファイルの検査。
  *
  * 上げる口（メディア・写真の投稿・フォームの添付・友だち属性の画像/PDF）で
  * 保存の前後にこの検査を通す。状態は pending → clean / rejected / quarantined。
@@ -550,7 +550,7 @@ export async function checkMediaGate(
   },
 ): Promise<MediaGateResult> {
   const pending: MediaGateResult = { allowed: false, code: 'file_scan_pending', message: '確かめています。確かめ終わるまで使えません' };
-  // A clean replacement must never override the quarantine of its parent media.
+  // 代替画像が安全でも、親メディアの隔離を上書きしない。
   const parent = await getFileScanBySubject(db, 'media', media.id);
   if (parent?.status === 'pending') return pending;
   if (parent && (parent.status === 'quarantined' || parent.status === 'rejected')) {
@@ -564,12 +564,10 @@ export async function checkMediaGate(
     || (!isFinalMediaKey(media.r2Key) && Date.parse(session.expires_at) > Date.now()))) return pending;
   const version = await db.prepare(`SELECT id, etag FROM media_versions WHERE media_id = ? AND r2_key = ? AND published_at IS NOT NULL LIMIT 1`)
     .bind(media.id, media.r2Key).first<{ id: string; etag: string | null }>();
-  // Old signed requests can finish after their URL expires. Pin every scan and
-  // subsequent read to the originally verified version, even after that hold.
+  // 署名 URL が期限後に完了しても、最初に検証した版へすべての検査と読取を固定する。
   const etag = session && !isFinalMediaKey(media.r2Key) ? version?.etag?.replace(/^"|"$/g, '') : undefined;
   if (session && !isFinalMediaKey(media.r2Key) && !etag) return pending;
-  // Exact bytes get their own result. In particular, 'verified' on a version is
-  // only format validation, and another version's clean result is not reusable.
+  // verified は形式確認だけなので、別の版の安全判定を再利用せず、実際のバイトごとに結果を付ける。
   const subjectKind = session && isFinalMediaKey(media.r2Key) ? 'upload_session' : version ? 'media_version' : 'media';
   const subjectId = subjectKind === 'upload_session' ? session!.id : subjectKind === 'media_version' ? version!.id : media.id;
   let scanFilename = session?.filename ?? media.filename;
@@ -577,8 +575,7 @@ export async function checkMediaGate(
     const current = version && !media.r2Key.startsWith('banner/')
       ? await db.prepare('SELECT r2_key FROM media WHERE id = ?').bind(media.id).first<{ r2_key: string }>()
       : null;
-    // Historical files have no stored original name. A later replacement's
-    // display name cannot determine their format. Keep current upload checks strict.
+    // 元の名前がない過去ファイルの形式を、後からの代替ファイル名で決めない。現在のアップロード検査は緩めない。
     if (media.r2Key.startsWith('banner/') || (version && current?.r2_key !== media.r2Key)) {
       const basename = media.r2Key.slice(media.r2Key.lastIndexOf('/') + 1);
       const spec = ALLOWED_MIME[media.mimeType];

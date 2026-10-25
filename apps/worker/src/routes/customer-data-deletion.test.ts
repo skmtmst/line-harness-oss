@@ -194,7 +194,7 @@ describe('private data deletion', () => {
       }
       if (table !== 'form_capacity_claims') expect(relation.references).toEqual([...grouped.values()]);
     }
-    // Every generated predicate must compile against the real schema.
+    // 生成した条件式が、実スキーマに対して実行可能なことを確かめる。
     for (const table of Object.keys(relations)) sqlite.raw.prepare(`SELECT * FROM "${table}" WHERE ${friendDeletionCondition(table)}`);
   });
 });

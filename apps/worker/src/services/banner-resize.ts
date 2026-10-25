@@ -2,18 +2,9 @@ import { logger } from '@line-crm/shared/server';
 import type { BannerPreset } from './banner-prompt.js';
 
 /**
- * 生成画像を用途の指定寸法へ整える（R120）。
- *
- * 画像生成APIが受け付ける大きさは3種類（1024x1024・1536x1024・1024x1536）
- * だけなので、生成後に用途（13）の指定寸法へ Cloudflare Images binding
- * （`env.CF_IMAGES.input(...).transform({ width, height, fit }).output(...)`）
- * で `fit: 'cover'` 整形する。寸法の正本は `BANNER_PRESETS`
- *（`banner-prompt.ts`）の `targetWidth` / `targetHeight` で、ここに
- * 2つ目の表は作らない。
- *
- * binding が無い環境（手元・試験）では変換を飛ばして元の画像をそのまま
- * 返し、`resized: false` にする。呼び出し側は保存を止めず、画面に
- * 「大きさの調整は検証環境で確認」と出す（R120 のオーナー決定 2026-09-28）。
+ * 画像生成 API の3サイズから用途の指定寸法へ合わせるため、Cloudflare Images binding で fit: 'cover' に変換する。
+ * 寸法は BANNER_PRESETS の targetWidth / targetHeight を使い、別の対応表を作らない。
+ * binding がない環境では保存を止めず元画像と resized: false を返し、寸法確認が必要なことを画面へ伝える。
  */
 
 export const BANNER_CROP_POSITIONS = ['center', 'top', 'bottom'] as const;

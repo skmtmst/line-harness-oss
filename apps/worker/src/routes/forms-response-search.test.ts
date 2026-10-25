@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-// N-171/N-179: 回答一覧APIが検索条件を受け取り、ページング前にサーバー側で絞り込む。
+// 回答一覧APIが検索条件を受け取り、ページング前にサーバー側で絞り込む。
 // 実 route＋実SQLiteで確かめる。件数・一覧・CSV（ページ巡回）が同じ条件になる。
 
 vi.mock('../services/account-access.js', () => ({

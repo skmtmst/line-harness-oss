@@ -43,7 +43,7 @@ import { parseFeaturePacks } from './tenants.js';
  * 運営コンソール（★37 マスター）の API。すべて運営マスターだけが呼べる。
  *
  * ここでは統括（tenants）をまたいで読む。tenantScopeMiddleware は LINE アカウント
- * の query しか見ないので、この下の各ルートで統括 ID を必ず検証する。
+ * query しか見ないので、この下の各ルートで統括 ID を必ず検証する。
  */
 export const ops = new Hono<Env>();
 
@@ -136,7 +136,7 @@ ops.get('/api/ops/tenants', async (c) => {
   const summary = {
     // 「契約中」は請求状態だけで数える（active ＋決済失敗の past_due は請求が
     // まだ生きている）。請求が解約・課金対象外のものを契約中に混ぜない
-    // （監査 R153：一覧・詳細・ダッシュボードで定義をそろえる）。
+    // （監査 ：一覧・詳細・ダッシュボードで定義をそろえる）。
     active: rows.filter((r) => r.plan_status === 'active' || r.plan_status === 'past_due').length,
     trialing: rows.filter((r) => r.plan_status === 'trialing').length,
     suspended: rows.filter((r) => r.status === 'suspended').length,

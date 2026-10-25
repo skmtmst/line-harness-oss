@@ -120,7 +120,7 @@ async function findMatches(
         // （staging実測：85文字のR2キーで発生、D1側のLIKEパターン長の壁は50文字）。
         // ワイルドカードを使わない単純な部分一致なので instr に替える。
         // 副作用として、トークンに %・_ が含まれていても誤ってワイルドカード
-        // 扱いされなくなる（以前は意図せずヒットが広がる可能性があった）。
+        // として扱われず、検索対象が意図せず広がるのを防ぐ。
         const conditions = source.columns
           .flatMap((col) => chunk.map(() => source.mediaIdMatch ? `${col} = ?` : `instr(${col}, ?) > 0`))
           .join(' OR ');

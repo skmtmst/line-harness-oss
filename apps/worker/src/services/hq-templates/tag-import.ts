@@ -10,7 +10,7 @@ function summary(rows:TagCsvImportRowResult[]):TagCsvImportSummary {
 async function digest(value:string) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
-/** Same parsed CSV rows and row outcomes as store import, but only HQ definitions are created. */
+/** 店舗取込と同じ CSV 解析・行結果を使うが、作るのは統括定義だけとする。 */
 export async function importHqTags(db:D1Database,authority:HqTemplateAuthority,input:Record<string,unknown>,execute:boolean) {
   if(!Array.isArray(input.rows)||input.rows.length===0||input.rows.length>500)throw new HqTemplateError('INVALID_IMPORT_ROWS',400,['rows']);
   const existing=(await db.prepare(`SELECT t.name,v.definition_json FROM hq_templates t LEFT JOIN hq_template_versions v ON v.id=t.current_version_id AND v.tenant_id=t.tenant_id
@@ -39,7 +39,7 @@ export async function importHqTags(db:D1Database,authority:HqTemplateAuthority,i
   });
   for(const row of planned) {
     if(!execute||row.status!=='ready')continue;
-    // Re-read before every write; never overwrite an existing definition or distribute to stores.
+    // 書込ごとに再取得し、既存定義を上書きしたり店舗へ配布したりしない。
     const found=await db.prepare(`SELECT id FROM hq_templates WHERE tenant_id=? AND template_type='tag' AND friend_attribute_type IS NULL AND name=?`).bind(authority.tenantId,row.name).first();
     if(found){row.status='skipped';row.code='already_exists';continue;}
     const requestId=`hq-tag-csv-${await digest(normalizeScopedTagName(row.name))}`;

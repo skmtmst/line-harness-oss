@@ -16,7 +16,9 @@ const { opsAnnouncements } = await import('./ops-announcements.js');
 const { hqNotices } = await import('./hq-notices.js');
 const { processDueAnnouncements, tryLinkStaffByCode } = await import('../services/platform-announcements.js');
 
-/** ★37-7 お知らせ配信と契約者専用LINE（決定 2026-09-18 案A）。 */
+/**
+ * 統括のお知らせ配信と契約者専用 LINE の登録案内を検証する。設計図 ★37-7 と照合する。
+ */
 
 let testDb: SqliteD1;
 

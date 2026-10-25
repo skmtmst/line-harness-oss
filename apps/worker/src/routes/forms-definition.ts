@@ -1,4 +1,4 @@
-/** Public exports remain stable; implementation lives with its related helpers. */
+/** 既存の公開名を保ち、関連する補助関数と実装を近くに置く。 */
 export { stoppedPublicFormResponse } from './forms-definition-stopped-public-form-response.js';
 export { FORM_TEST_TOKEN_TTL_MS } from './forms-definition-stopped-public-form-response.js';
 export { FORM_TEST_TOKEN_MAX_ACTIVE } from './forms-definition-stopped-public-form-response.js';

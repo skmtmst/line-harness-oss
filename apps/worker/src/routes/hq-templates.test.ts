@@ -63,7 +63,7 @@ beforeEach(() => {
   app.use('*', async (c,next) => { c.set('staff', staff); await next(); }); app.route('/', hqTemplates);
 });
 afterEach(() => {
- // distribution must never silently enable account AI.
+ // 配布を理由にアカウントの AI を黙って有効にしない。
  expect(sql.prepare("SELECT count(*) n FROM ai_settings WHERE mode NOT IN('off','suspended')").get()).toEqual({n:0});
  expect(sql.prepare('SELECT count(*) n FROM account_ai_features WHERE enabled=1').get()).toEqual({n:0});
  sql.close();
@@ -391,7 +391,7 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
   });
   test('simultaneous same request converges on one store result', async () => {
     const t = await create(), p = await preflight(t.id,['a1']);
-    // D1 serializes whole batches. Keep that property in the asynchronous SQLite adapter.
+    // 非同期の試験アダプターでも、D1 と同じく batch 全体を直列に確定する。
     const original = db.batch.bind(db); let tail: Promise<unknown> = Promise.resolve();
     db.batch = ((statements: D1PreparedStatement[]) => { const next = tail.then(() => original(statements)); tail = next.catch(() => {}); return next; }) as D1Database['batch'];
     const responses = await Promise.all([execute(t.id,p),execute(t.id,p)]);
@@ -399,9 +399,7 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(count('tags')).toBe(1); expect(count('hq_template_distribution_results')).toBe(1);
   });
   test('concurrent different decisions bind exactly the winning claim before the first store writes', async () => {
-    // Alternate launch order and repeat against one SQLite database. Promise scheduling may
-    // legitimately let either decision claim the run, so validate the persisted winner rather
-    // than assuming the overwrite request always wins.
+    // 同じ SQLite に開始順を変えて繰り返す。並列の勝者を決め付けず、保存された結果に基づいて検証する。
     for (let iteration=0;iteration<8;iteration++) {
       const t = await create(); await execute(t.id,await preflight(t.id,['a1']));
       const p = await preflight(t.id,['a1']),before=count('tags');

@@ -7,7 +7,7 @@ export async function bannerGenerationOperationId(tenantId: string, projectId: s
   return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/** Compare only immutable caller choices. Quota, engine settings and references may change after success. */
+/** 成功後に変わり得る割当・エンジン設定・参照を混ぜず、呼出元の不変の選択だけを比較する。 */
 export function bannerGenerationRequestMatches(row: BannerGeneration, request: Request): boolean {
   const stored = [row.mode, row.preset_key, JSON.parse(row.text_lines), JSON.parse(row.emphasis_lines ?? '[]'),
     row.base_color, row.main_color, row.sub_color, row.accent_color, row.person_option,

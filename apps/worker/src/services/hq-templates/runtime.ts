@@ -39,7 +39,7 @@ function nextAliasName(name: string, existing: readonly string[]): string {
   return fail('SELECTION_REQUIRED');
 }
 
-/** Store-scoped planner: never writes; all reference creation joins the form batch. */
+/** 店舗範囲の計画だけを作り、参照作成はすべてフォームの batch で行う。 */
 export function createFormReferenceResolver({ db, authority }: { db: D1Database; authority: HqTemplateAuthority }): FormTemplateDependencies['resolveReference'] {
   const resolved = new Map<string, { targetId: string; aliasName?: string; planned?: boolean }>();
   const emitted = new Set<string>();
@@ -213,14 +213,14 @@ export interface AtomicStoreOptions {
   templateId: string;
   runId: string;
   context: HqTemplateAdapterContext;
-  /** Trusted server planner only. Never pass SQL or this callback from request JSON. */
+  /** SQL やこのコールバックを要求 JSON から受け取らず、信頼済みサーバーだけが計画する。 */
   buildPlan: (context: HqTemplateAdapterContext, input: HqTemplateAdapterInput) => Promise<HqTemplateStoreAtomicCommitPlan>;
 }
 export type AtomicStoreOutcome = { status: HqTemplateDistributionResult['status']; reused: boolean };
 
 const MAX_DB_COMMIT_ATTEMPTS = 3;
 
-/** Atomic DB store with bounded retry; stale interrupted claims terminate safely. */
+/** DB の確定は原子的かつ有限の再試行とし、古い実行権は安全に終了する。 */
 export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise<AtomicStoreOutcome> {
   const { db, authority, templateId, runId } = options;
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || options.context.tenantId !== authority.tenantId) fail('FORBIDDEN');
@@ -260,7 +260,7 @@ export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise
   if (!p!.expires_at || !Number.isFinite(Date.parse(p!.expires_at)) || Date.parse(p!.expires_at) <= Date.now()) fail('VERSION_CONFLICT');
   const run = await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });
   if (run.run.status !== 'running' || run.run.created_by !== authority.actorId) fail('INVALID_RUN');
-  // Write receipt before the first claim, so even a crash in pending binds the decision.
+  // pending 中の中断でも判断が変わらないよう、最初の実行権取得前に受領票を保存する。
   await db.prepare(`INSERT OR IGNORE INTO audit_events(id,source_kind,source_id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,'hq_template_store_request',?,?,'business',?,?,'hq_template.store_requested','hq_template',?,'success',?)`).bind(crypto.randomUUID(), sourceId, authority.tenantId, authority.actorId, authority.role, templateId, JSON.stringify({ requestHash })).run();
   await checkReceipt();
   const begun = await beginHqTemplateStoreResult(db, { runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, targetAccountId: context.targetAccountId, preflightId: p!.id, idempotencyFingerprint: runId, snapshotToken: p!.snapshot_token });
@@ -293,7 +293,7 @@ export async function executeHqAtomicStore(options: AtomicStoreOptions): Promise
     }
     return fail('STORE_COMMIT_FAILED');
   } catch (error) {
-    // A successful batch may lose its response. Never replay the business writes.
+    // batch が成功して応答だけ失われても、業務の書込を再実行しない。
     const row = await read().catch(() => null);
     if (!row) fail('RESULT_UNAVAILABLE');
     if (row!.status !== 'staged' || row!.attempt_count !== attempt) return { status: row!.status, reused: true };

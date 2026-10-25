@@ -1,4 +1,4 @@
-/** Tenant-wide inbox states and observed mark changes are different measures. */
+/** 統括全体の受信箱状態と、観測されたマーク変更は別の指標として扱う。 */
 export async function markListStats(db: D1Database, tenantId: string, now = new Date()) {
   const until = now.toISOString();
   const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();

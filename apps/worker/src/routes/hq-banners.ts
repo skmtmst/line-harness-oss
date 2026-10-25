@@ -467,7 +467,7 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', inputJsonBoundary(), 
       references: v.references,
       createdBy: c.get('staff')?.id ?? null,
     });
-    // Concurrent requests share the primary key; the winner's choices remain authoritative.
+    // 同時要求は主キーを共有し、最初に確定した選択を正本として保つ。
     if (operationId && (generation.ai_account_id!==c.req.query('account_id') || !bannerGenerationRequestMatches(generation, v) || (generation.crop_gravity ?? 'center')!==crop)) {
       return c.json({ success: false, code: 'idempotency_conflict', error: '同じ操作キーで生成条件が変わっています' }, 409);
     }
@@ -484,7 +484,7 @@ hqBanners.get('/api/hq/banners/generations/:id', async (c) => {
   return c.json({ success: true, data: serializeGeneration(generation) });
 });
 
-/** Compatibility entry point; generation ownership is shared with cron. New clients only poll GET. */
+/** 生成の実行権は cron と共有する。新しいクライアントは GET のポーリングだけを使い、この入口は互換用に残す。 */
 hqBanners.post('/api/hq/banners/generations/:id/run',inputJsonBoundary(), async(c)=>{
   const tenantId=tenantOf(c),id=c.req.param('id');
   const generation=await getBannerGeneration(c.env.DB,id,tenantId);

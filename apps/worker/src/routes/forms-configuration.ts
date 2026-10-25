@@ -34,7 +34,7 @@ export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
-  // N-175 (#805): folder条件もサーバーで絞る。kind=formの既存フォルダだけ受け付け、
+  //  folder条件もサーバーで絞る。kind=formの既存フォルダだけ受け付け、
   // 存在なし・異種別はfail-closedにする。未分類はfolder_id IS NULLで絞る。
   const folderParam = c.req.query('folder_id')?.trim();
   let folderScope: { folderId?: string; unfiledOnly?: boolean } = {};
@@ -62,7 +62,7 @@ export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
   // 付けない呼び出しは従来どおり配列のまま返す。
   if (c.req.query('with_list_summary') === '1') {
     /*
-     * #1060: サーバーページング。これまで画面が全件を受け取ってから
+     * サーバーページング。これまで画面が全件を受け取ってから
      * 絞り込み・並び替え・ページ切りをしていた。`limit`（+`page`）と
      * `q` / `filter` / `sort` を新たに受け付け、Worker 側で同じ規則を
      * 適用してから切り出す。規則の正本は @line-crm/shared に寄せてある。
@@ -468,18 +468,9 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
   if (body.isActive !== undefined && !hasDeliveryAccess(c.get('staff'), 'forms', 'publish')) return c.json({ success: false, error: '公開・停止には管理者権限が必要です' }, 403);
 
   /*
-   * #723: 確認した編集の版を必ず受け取る。
-   *
-   * 以前はここに版が無く、2人が同時に編集すると後から保存した人の内容で
-   * 黙って上書きされていた。保存は成功と返り、先の人の変更は消えた。
-   *
-   * 見るのは `content_revision`（migration 379）で、`revision` ではない。
-   * `revision` は migration 259 のトリガが来訪・回答で増やす「削除影響の
-   * 確認版」なので、編集の楽観ロックに使うと誰も編集していないのに 409 に
-   * なる。保管・削除は引き続き `revision` を見る。
-   *
-   * 受付停止（一覧の `stopAccepting`）も同じ口を通るので、版を免除しない。
-   * 免除すると、停止したはずのフォームが編集画面の保存で公開中に戻る。
+   * 同時編集による上書きを防ぐため、保存と受付停止は確認済みの content_revision を必須とする。
+   * revision は来訪・回答でも増える削除影響の確認版なので、編集の楽観ロックへ混ぜない。保管・削除は revision を使う。
+   * 停止を版照合から除外すると、古い編集内容の保存で再公開されるため、停止にも同じ照合を適用する。
    */
   const expectedContentRevision = typeof body.expectedContentRevision === 'number'
     ? body.expectedContentRevision
@@ -487,7 +478,7 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
   /*
    * R25: フォルダへの移し変え（`folderId`）は、中身の更新と一緒でなければ
    * 版の確認を要しない。所属は版管理の対象外で、確認を強いると一覧からの
-   * 移動のたびに詳細の取得が要る。#723 の例外ではなく、中身が無い要求に
+   * 移動のたびに詳細の取得が要る。 の例外ではなく、中身が無い要求に
    * 対して確認する版が無いだけ。**中身の更新と一緒のときは確認を免除しない。**
    * 複合保存は内容と所属を同じ条件付き UPDATE で書く。先に所属だけ
    * 動かすと、400・422・409 のとき移動だけが残る。
@@ -521,7 +512,7 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
     }
   }
 
-  // Only include fields that were explicitly sent (avoid undefined → null conversion)
+  // 未指定を null へ変えないよう、明示的に送られた項目だけを更新する。
   const updates: Record<string, unknown> = {};
   if ('folderId' in body) updates.folderId = nextFolderId;
   if (body.name !== undefined) updates.name = body.name;
@@ -554,9 +545,7 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
   if (body.onSubmitWebhookUrl !== undefined && body.onSubmitWebhookHeaders === undefined) {
     const previous = await getFormById(c.env.DB, id);
     if (!previous) return fail(c, 404, 'FORM_NOT_FOUND');
-    // The existing content-revision CAS fences this read with the update.
-    // An editor who cannot reveal a saved credential cannot carry it to a
-    // newly chosen origin. Explicit new credentials belong to that new origin.
+    // 内容の版 CAS で読取と更新を守る。伏せた資格情報を閲覧できない担当者が別の origin へ持ち出せないよう、宛先変更時は既存の秘密を継承しない。
     const origin = (value: string | null): string | null => {
       try { return value ? new URL(value).origin : null; } catch { return null; }
     };

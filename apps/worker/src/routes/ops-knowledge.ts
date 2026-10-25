@@ -123,8 +123,7 @@ opsKnowledge.post('/api/ops/knowledge/:id/feedback', requirePlatformAdminWrite()
   return c.json({ success: true, data: null });
 });
 
-// Await on this dedicated request, not waitUntil (45s AI budget exceeds its 30s
-// post-response lifetime). Resolution stays fast; no scheduled notification job runs.
+// AI の45秒予算は waitUntil の応答後30秒を超えるため、専用要求内で完了を待つ。通知の定期ジョブは実行しない。
 opsKnowledge.post('/api/ops/knowledge/tickets/:id/process', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
   const id = c.req.param('id');

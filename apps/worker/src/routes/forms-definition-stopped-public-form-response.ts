@@ -88,19 +88,8 @@ export /**
 const PARTIAL_MERGED_MAX_BYTES = 32 * 1024;
 
 export /*
- * ページ分けなしの回答一覧の天井。**この数がただ1つの出どころ。**
- * SQL の `LIMIT` にもこれを渡し、`Warning` でもこれを名乗る。
- *
- * #722 の前はここが 500、DB 側が 200 の直書きで、**名乗りと実際が食い違って
- * いた。**利用先は 201件目から黙って取り落としていて、応答は 200 OK、
- * `Warning` は「500件まで」。取り落としに気づく手がかりが無かった。
- *
- * 200 なのは、この現場の一覧ヘルパが全部 `boundedListLimit` で
- * `MAX_LIST_LIMIT`（200）に抑えられているから。ここだけ 500 にすると、
- * ほかのどの一覧よりも 2.5 倍重い応答を1つだけ作ることになる
- * （そもそも上限を置いた理由が「重い応答」だった）。
- * この数と `MAX_LIST_LIMIT` が離れていないことは
- * `forms-limit-and-opens-guard.test.ts` が見張っている。
+ * ページ分けなしの回答一覧は、SQL の LIMIT と Warning が同じ上限を使う。
+ * 重い応答を避ける MAX_LIST_LIMIT（200）と一致させ、件数の名乗りと実取得をずらさない。forms-limit-and-opens-guard.test.ts で両者の一致を守る。
  */
 const NON_PAGINATED_SUBMISSIONS_MAX = 200;
 
@@ -125,7 +114,7 @@ export /** 紐付けリンク id の上限。長すぎる値は受け付けな�
 const FORM_SUBMIT_TRACKED_LINK_MAX_LENGTH = 128;
 
 export /**
- * 一覧のサーバーページング（#1060）で `limit` が読めない値のときの既定。
+ * 一覧のサーバーページングで `limit` が読めない値のときの既定。
  * 画面の既定表示件数と揃える。
  */
 const FORM_LIST_PAGE_FALLBACK_LIMIT = 20;
@@ -146,7 +135,7 @@ export function optionalExecutionCtx(c: Context<Env>): ExecutionContext | undefi
   try {
     return c.executionCtx;
   } catch {
-    // Hono unit tests do not provide a Workers ExecutionContext.
+    // Hono の単体試験には Workers ExecutionContext がない場合がある。
     return undefined;
   }
 }
@@ -235,7 +224,7 @@ export async function canUseFormFromAccount(
 }
 
 export /**
- * N-170 (#802): フォームの管理操作の関門。owner/adminは従来どおり通す。
+ *  フォームの管理操作の関門。owner/adminは従来どおり通す。
  * それ以外は /form-submissions 鍵の完全一致とDB解決した所属を共通土台が決める。
  * readOnlyの更新拒否は鍵指定時の土台側とauthMiddlewareの両方で止まる。
  */
@@ -293,8 +282,7 @@ export function publicWebhookConfig(row: DbForm): {
     const gateMatch = url.pathname.match(/\/engagement-gates\/([^/]+)\/verify\/?$/);
     return {
       hasSubmitWebhook: true,
-      // The LIFF client needs the service origin for its public replier/verify
-      // UX. Never expose the stored path, query string, or secret headers.
+      // 公開の確認画面にはサービスの origin だけを渡し、保存済みのパス・クエリ・秘密ヘッダは返さない。
       webhookOrigin: url.origin,
       webhookGateId: gateMatch ? decodeURIComponent(gateMatch[1]) : null,
     };
@@ -321,7 +309,7 @@ export function serializePublicForm(row: DbForm, layout = parseLayout(row.layout
 }
 
 export /**
- * 回答の後処理の見え方(N-168)。一覧・詳細・再実行の応答で共有する。
+ * 回答の後処理の見え方。一覧・詳細・再実行の応答で共有する。
  *
  * 送信は予約(claim)に工程を記録しながら進む。その記録と「あるべき工程」
  * を見比べて、失敗・中断で残った工程を運用者へ見せる。
@@ -353,7 +341,7 @@ export function serializeSubmission(
 }
 
 export /**
- * 送信1件が通るはずの工程名の一覧(N-168)。
+ * 送信1件が通るはずの工程名の一覧。
  *
  * 送信処理の締め(settleClaim)が要求する並びと同じにし、layout の内側の
  * 工程は `layout:<id>` で畳み込む。予約の記録に無いものが未完になる。

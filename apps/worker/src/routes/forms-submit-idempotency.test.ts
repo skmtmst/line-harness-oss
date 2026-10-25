@@ -5,7 +5,7 @@ import { emptyLayout, newBlockId, type FormLayout } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 
 /**
- * フォーム回答の冪等化(N-165)の契約テスト。
+ * フォーム回答の冪等化の契約テスト。
  *
  * 外部副作用(Webhook・LINE通知)より前に scope
  * (テナント・LINEアカウント・フォーム・友だち・キー)つきの予約行を原子的に
@@ -108,7 +108,7 @@ vi.mock('@line-crm/db', () => ({
   listLineAccountsWithTenantStatus: vi.fn(async () => [
     { id: 'account-a', tenant_status: 'active' },
   ]),
-  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
   // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
   recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
   getForms: vi.fn(),
@@ -610,7 +610,7 @@ describe('フォーム回答の冪等予約', () => {
     expect(claim.status).toBe('completed');
     const steps = readSteps(claim);
     // 粗い完了だけでなく、layout の効果ごとの記録も残る。
-    // capacity(#751): 全体上限・選択肢定員の原子的な確保も工程の1つ。
+    // capacity: 全体上限・選択肢定員の原子的な確保も工程の1つ。
     expect(steps.filter((step) => !step.startsWith('layout:')).sort()).toEqual(
       ['answer', 'automation', 'capacity', 'submit_count', 'mileage', 'layout_effects', 'reply', 'destination_status'].sort(),
     );
@@ -1074,8 +1074,7 @@ test.each(['once','total'])('W14: 自分の保存済み回答を受付上限(%s)
   expect(claimOf().status).toBe('completed');
 });
 
-// Keep the real URL/private-IP policy and webhook fetch. Only DNS is synthetic,
-// so concurrency/event-id assertions still count actual webhook attempts.
+// URL・内部 IP の検査と Webhook 通信は実物を使い、DNS だけを差し替えて実際の試行回数を数える。
 vi.mock('../features/forms/form-webhook.js', async original => {
   const actual = await original<typeof import('../features/forms/form-webhook.js')>();
   return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>

@@ -3,8 +3,7 @@ import { requireHqTemplateAuthority, type HqTemplateAuthority } from './contract
 import { readMessageTemplateSourceBytes, TemplateHqTemplateError } from './template.js';
 import { type MessageTemplateMediaDefinition } from '@line-crm/shared';
 
-// This marker denotes an HQ-authored resource, not a synthetic line account.
-// Runtime authority must still come from the immutable tenant-scoped HQ version.
+// 統括作成の印であり架空のアカウントではない。実行権限は統括と不変の版の DB 記録から確認する。
 export const HQ_AUTHORED_MESSAGE_ID = 'hq-authored-message';
 const error = (code: string): never => { throw new TemplateHqTemplateError(code, 422); };
 const hash = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
@@ -25,13 +24,12 @@ const dimensionParam = (value: string | null): number | null => {
   return parsed;
 };
 
-/** Authenticated raw upload. No fetch-by-URL, client-selected key or account credential. */
+/** 認証済みの生のアップロードだけを受け、外部 URL の取得・利用者指定キー・アカウント資格情報は受け付けない。 */
 export async function uploadHqImage(bucket: R2Bucket, authority: HqTemplateAuthority, request: Request, publicBaseUrl: string) {
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || !/^[A-Za-z0-9_-]{1,128}$/.test(authority.tenantId)) error('FORBIDDEN');
   const url = new URL(request.url), purpose = url.searchParams.get('purpose'), filename = url.searchParams.get('filename') ?? '';
   if (!['message', 'rich_menu', 'rich_video_preview'].includes(purpose ?? '') || !filename.trim() || filename.length > 200 || /[\\/\u0000-\u001f]/.test(filename)) error('INVALID_IMAGE');
-  // R568: the editor tells which size it can adopt. A declared size that the
-  // image does not match is rejected here, before any R2 write.
+  // 画像の実寸と編集画面が申告したサイズが違えば、R2 への書込前に拒む。
   const expectedWidth = dimensionParam(url.searchParams.get('width')), expectedHeight = dimensionParam(url.searchParams.get('height'));
   if ((expectedWidth === null) !== (expectedHeight === null)) error('INVALID_IMAGE');
   const max = purpose === 'rich_menu' || purpose === 'rich_video_preview' ? 1024 * 1024 : 8 * 1024 * 1024;
@@ -54,8 +52,7 @@ export async function uploadHqImage(bucket: R2Bucket, authority: HqTemplateAutho
     if (!isRegisteredHqMedia(existing, media, authority.tenantId)) error('SOURCE_MEDIA_UNAVAILABLE');
     return media;
   }
-  // Immutable content-addressed key: retries recover the same receipt. Unknown PUT
-  // outcomes never trigger destructive compensation or a different key.
+  // 内容に基づく不変キーで再試行を同じ受領票へ戻す。PUT の結果不明を理由に別キーを作ったり破壊的に巻き戻したりしない。
   try {
     const saved = await bucket.put(r2Key, bytes, { onlyIf: { etagDoesNotMatch: '*' }, httpMetadata: { contentType: mimeType }, customMetadata: { hqTenant: authority.tenantId, hqMedia: JSON.stringify(media) } });
     if (saved) return media;
@@ -64,13 +61,7 @@ export async function uploadHqImage(bucket: R2Bucket, authority: HqTemplateAutho
   return media;
 }
 
-/**
- * R568: reclaim an upload that was never adopted (cancelled edit, replaced
- * image). Only the owning tenant's own uploads path can be removed, and only
- * after the stored ownership mark is verified. Missing objects are a
- * successful no-op so cancel cleanup stays idempotent; anything outside the
- * caller's ownership is NOT_FOUND without revealing what exists.
- */
+/** 未採用のアップロードは、保存済みの所有印を確認した自統括のパスだけを回収する。存在しなければ冪等な成功、範囲外は存在を漏らさず NOT_FOUND とする。 */
 export async function deleteHqImage(bucket: R2Bucket, authority: HqTemplateAuthority, r2Key: unknown): Promise<{ deleted: boolean }> {
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || !/^[A-Za-z0-9_-]{1,128}$/.test(authority.tenantId)) error('FORBIDDEN');
   const key = typeof r2Key === 'string' ? r2Key : '';

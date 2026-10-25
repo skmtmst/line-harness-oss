@@ -1,4 +1,4 @@
-/* N-170 直接試験: 実route＋実SQLite。/form-submissions 鍵のstaffが操作できること。 */
+/*  直接試験: 実route＋実SQLite。/form-submissions 鍵のstaffが操作できること。 */
 import { Hono } from 'hono';
 import { expect, test } from 'vitest';
 

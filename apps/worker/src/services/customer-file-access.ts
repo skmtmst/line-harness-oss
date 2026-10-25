@@ -3,7 +3,7 @@ import { activeTenantLineAccountSql, getFriendById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { verifyCallerLineIdentity } from './liff-auth.js';
 
-/** R2 selects the owner; a caller cannot choose a friend or a different shop. */
+/** 所有者は R2 の記録から選び、呼出元に別の友だちや店を指定させない。 */
 export async function customerFileOwner(c: Context<Env>, object: R2Object): Promise<{ lineAccountId: string; friendId: string } | null> {
   const accountId = object.customMetadata?.lineAccountId;
   const friendId = object.customMetadata?.friendId;
@@ -20,7 +20,7 @@ export async function customerFileOwner(c: Context<Env>, object: R2Object): Prom
     ? { lineAccountId: accountId, friendId } : null;
 }
 
-/** Compatibility predicate for existing download handlers. */
+/** 既存のダウンロード処理と同じ条件で利用可否を判定する。 */
 export async function isCustomerFileOwner(c: Context<Env>, object: R2Object): Promise<boolean> {
   return Boolean(await customerFileOwner(c, object));
 }

@@ -283,8 +283,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
       }
     }
 
-    // Browser-side verification is UX only. The server always performs the
-    // authoritative webhook check; client-supplied skip flags are discarded.
+    // ブラウザの確認は表示補助にとどめ、サーバーで必ず Webhook を検証する。利用者が送った省略フラグは採用しない。
     delete submissionData._webhookVerified;
     delete submissionData._skipWebhook;
 
@@ -534,7 +533,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
       if (lost) throw new ClaimOwnershipLost(lost);
     };
 
-    // 全体上限・選択肢定員を原子的に確保する(N-167 / #751)。
+    // 全体上限・選択肢定員を原子的に確保する。
     //
     // 上の checkFormGates は「数えてから比べる」だけの安い先読みで、
     // 比べたあと保存するまでの間に別の回答が割り込む隙間がある。ここが
@@ -706,7 +705,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
         }
         webhookData = publicFormWebhookData(webhookOutcome);
         if (!webhookPassed) {
-          // Webhook rejected — send fail message and stop
+          // Webhook が拒否した場合は失敗を案内し、後続の配信を止める。
           const needsFailMessage = Boolean(form.on_submit_webhook_fail_message)
             && Boolean(friend.line_user_id);
           if (needsFailMessage && !claimDone('fail_message')) {
@@ -733,7 +732,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
               logger.error("forms.forms_id_submit_post_failed");
             }
           }
-          // Still save the submission for records
+          // 配信を止めても回答自体は記録に残す。
           submission = await ensureAnswer(JSON.stringify({ ...submissionData, _webhookResult: webhookOutcome }));
           await ensureSubmitCount();
           await updateDestinationWriteResult({ attempted: 0, succeeded: 0, failed: 0 });
@@ -754,13 +753,13 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
         }
       }
 
-      // Save submission against the authenticated caller only.
+      // 回答は認証で確定した本人にだけ保存する。
       submission = await ensureAnswer(JSON.stringify(submissionData));
       await ensureSubmitCount();
 
     const executionCtx = optionalExecutionCtx(c);
 
-    // 回答の保存を成果計測へ接続する(#648)。「フォームが送信された」を起点に
+    // 回答の保存を成果計測へ接続する。「フォームが送信された」を起点に
     // 選んだ地点は、ここを通らないと 0 件のままになる。
     //
     // Webhook に弾かれた回答はここまで来ない(上で早期に返す)。冪等キーには
@@ -794,7 +793,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
           subjectKey: formId,
           occurredAt: submission.created_at,
         }),
-        // R150: 送信Webhookの購読対象としても発火する。回答の中身は
+        // 送信Webhookの購読対象としても発火する。回答の中身は
         // 個人情報を含むので送らず、識別子とフォーム名だけ渡す。
         fireOutgoingWebhooks(c.env.DB, 'form_submitted', {
           friendId,
@@ -822,7 +821,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
     );
 
     // 回答後の処理は工程つきで進める。終わった工程は記録で飛ばし、
-    // 未完の工程だけを残す。管理画面からの再実行(N-168)も同じ道を通る。
+    // 未完の工程だけを残す。管理画面からの再実行も同じ道を通る。
     const pending = await runFormPostEffects({
       db: c.env.DB,
       formId,
