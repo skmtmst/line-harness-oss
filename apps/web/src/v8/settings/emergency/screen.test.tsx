@@ -83,7 +83,8 @@ describe('運用状態の外側', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['健全性チェック', '更新履歴', '緊急コントロール', 'セキュリティの見張り'])
     expect(screen.getByRole('tab', { name: '健全性チェック' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('heading', { name: '運用状態' })).toBeTruthy()
-    expect(view.container.querySelectorAll('h1')).toHaveLength(0)
+    // 画面の題が唯一の h1。上の帯のパンくずは見出しにしないので、h1 は題の1つだけ。
+    expect([...view.container.querySelectorAll('h1')].map((el) => el.textContent)).toEqual(['運用状態'])
     expect(screen.getByRole('button', { name: 'いますぐ確かめる' })).toBeTruthy()
     await openHelp()
     expect(screen.getByText(/9 つの項目を5分ごとに自動で確かめます。/)).toBeTruthy()
