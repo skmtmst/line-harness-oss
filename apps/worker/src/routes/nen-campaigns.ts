@@ -1357,7 +1357,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', inputJsonBoundary(),
         metadata: { couponCode: code, orderNumber },
       });
     } catch (conversionError) {
-      logger.error("nen_coupon_usage_conversion_failed");
+      logger.error("nen_campaigns.record_coupon_conversion_failed");
     }
   }
   return c.json({ success: true, data: { couponCode: code, usedAt: when } });

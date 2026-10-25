@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { checkMediaGate } from '../services/file-scan.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
@@ -365,15 +366,11 @@ export const post__api_rich_menu_groups_8 = async (c: Context<Env, "/api/rich-me
       const refreshed = await getRichMenuGroupWithPages(c.env.DB, created.id);
       return c.json({ success: true, data: serializeGroupWithPages(refreshed ?? created) });
     } catch (error) {
-      logger.error("rich_menu_groups.rich_menu_groups_post_failed");
-      return c.json(
-        {
+      throw new UnexpectedRouteError(c, {
           success: false,
           error: '下書きは作成しましたが、画像の登録に失敗しました。編集画面で画像を登録してください。',
           data: serializeGroupWithPages(created),
-        },
-        500,
-      );
+        });
     }
   }
   return c.json({ success: true, data: serializeGroupWithPages(created) });

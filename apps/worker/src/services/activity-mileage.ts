@@ -10,6 +10,6 @@ export async function awardActivityMileage(
     const { applyMileageRulesForEvent } = await import('@line-crm/db');
     await applyMileageRulesForEvent(db, input);
   } catch (error) {
-    logger.error("services_activity_mileage_failed");
+    logger.error("mileage.award_activity_failed");
   }
 }

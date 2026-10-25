@@ -67,7 +67,7 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
         startsAt: entry.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      logger.error("booking_waitlist_promote_failed");
+      logger.error("booking.promote_waitlist_failed");
     }
   }
   return c.json({ status: 'cancelled' });

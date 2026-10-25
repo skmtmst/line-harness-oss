@@ -221,7 +221,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       );
     } catch (kickErr) {
       // waitUntil が使えない環境では cron が拾う。送れないわけではない。
-      logger.warn("routes_broadcasts_warn");
+      logger.warn("broadcasts.kick_queue_processing_failed");
     }
 
     return c.json({
@@ -292,7 +292,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
         }),
       );
     } catch (kickErr) {
-      logger.warn("routes_broadcasts_warn");
+      logger.warn("broadcasts.kick_queue_processing_failed");
     }
 
     return c.json({
@@ -364,7 +364,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       );
     } catch (kickErr) {
       // ExecutionContext 未利用環境 (test 等) — cron 経由にフォールバック
-      logger.warn("routes_broadcasts_warn");
+      logger.warn("broadcasts_delivery.count_followers_failed");
     }
 
     return c.json({

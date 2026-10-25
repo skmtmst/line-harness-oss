@@ -103,7 +103,7 @@ booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 
         startsAt: entry.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      logger.error("booking_waitlist_promote_failed");
+      logger.error("booking.promote_waitlist_failed");
     }
   }
   return c.json({ status: 'cancelled' });

@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { getBroadcastApprovalThreshold } from '../features/broadcasts/broadcast-approval/index.js';
 import { sendAudienceCounts } from '../services/gap-send-preview.js';
@@ -21,7 +22,10 @@ import { hqBroadcastAuthority, prepareHqBroadcast, getHqBroadcastRun, readHqBroa
   excludeHqBroadcastTargets, dispatchHqBroadcast, stopHqBroadcast, retryHqBroadcastTarget } from '../services/hq-broadcasts.js';
 export const hqBroadcasts=new Hono<Env>();
 const mediaRuntime = (c: import('hono').Context<Env>) => ({bucket:c.env.IMAGES,publicBaseUrl:c.env.WORKER_URL || new URL(c.req.url).origin});
-hqBroadcasts.onError((e,c)=>inputError(c, {success:false,...(e instanceof StampError && (e.status === 400 || e.status === 422) ? {fields:e.fields} : {}),error:e instanceof StampError?e.message:'統括配信を確認できません'}, e instanceof StampError?e.status:500, []));
+hqBroadcasts.onError((e, c) => {
+  if (!(e instanceof StampError)) throw new UnexpectedRouteError(c, { success: false, error: '統括配信を確認できません' });
+  return inputError(c, { success: false, ...((e.status === 400 || e.status === 422) ? { fields: e.fields } : {}), error: e.message }, e.status);
+});
 hqBroadcasts.use('/api/hq/broadcasts/*',requireRole('owner','admin'),async(c,next)=>{await hqBroadcastAuthority(dbFor(c.env),c.get('staff'),['GET','HEAD'].includes(c.req.method));await next();});
 hqBroadcasts.get('/api/hq/broadcasts',async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method));

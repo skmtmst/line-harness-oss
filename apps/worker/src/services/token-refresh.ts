@@ -127,7 +127,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
 
         logger.log("services_token_refresh_log");
       } catch (err) {
-        logger.error("services_token_refresh_failed");
+        logger.error("token_refresh.refresh_line_access_tokens_failed");
       }
     }
 
@@ -143,7 +143,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
           });
         }
       } catch (err) {
-        logger.error("services_token_refresh_failed");
+        logger.error("token_refresh.refresh_line_access_tokens_failed");
       }
     }
   }

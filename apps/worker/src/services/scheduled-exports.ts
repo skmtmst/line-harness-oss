@@ -64,7 +64,7 @@ export async function processDueScheduledExports(
       else skipped += 1;
     } catch (error) {
       failed += 1;
-      logger.error("scheduled_export_failed");
+      logger.error("analytics.process_scheduled_export_failed");
     }
   }
   return { generated, skipped, failed };

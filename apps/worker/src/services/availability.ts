@@ -157,7 +157,7 @@ export function normalizeTimeZone(raw: unknown): string {
     new Intl.DateTimeFormat('en-US', { timeZone: candidate });
     return candidate;
   } catch {
-    logger.error("booking_availability_invalid_timezone_falling_back_to_Asia_Tokyo");
+    logger.error("booking_availability.validate_timezone_failed");
     return FALLBACK_TIME_ZONE;
   }
 }
@@ -823,7 +823,7 @@ async function loadAvailabilityData(
     } catch (error) {
       // Configured calendar must fail closed. Showing slots while Google is
       // unreachable can create double bookings.
-      logger.error("services_availability_failed");
+      logger.error("booking_availability.load_failed");
       googleBusyByStaff.set(staff.id, []);
       calendarSync.push({ staff_id: staff.id, configured: true, ok: false, error: 'unavailable' });
     }

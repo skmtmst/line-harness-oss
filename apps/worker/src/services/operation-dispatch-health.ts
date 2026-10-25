@@ -501,7 +501,7 @@ async function safeHeartbeat(write: () => Promise<void>, jobName: string, phase:
   try {
     await write();
   } catch (error) {
-    logger.error("operation_dispatcher_heartbeat_write_failed");
+    logger.error("operation_dispatcher.write_heartbeat_failed");
   }
 }
 

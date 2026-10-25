@@ -71,7 +71,7 @@ export async function runSelfBookingCancelSideEffects(
       startsAt: row.starts_at,
     }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch {
-    logger.error("booking_waitlist_promote_failed");
+    logger.error("booking.promote_waitlist_failed");
   }
   return {
     calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',

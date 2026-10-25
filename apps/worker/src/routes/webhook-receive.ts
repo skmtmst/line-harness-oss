@@ -38,7 +38,7 @@ export const post__webhook_1 = async (c: Context<Env>) => {
   // for junk traffic on a public endpoint.
   const LINE_SIGNATURE_LENGTH = 44;
   if (signature.length !== LINE_SIGNATURE_LENGTH) {
-    logger.error("Missing_or_malformed_LINE_signature");
+    logger.error("line_webhook.verify_signature_failed");
     return c.json({ status: 'ok' }, 200);
   }
 
@@ -52,7 +52,7 @@ export const post__webhook_1 = async (c: Context<Env>) => {
     if (channelId !== undefined && account.channel_id !== channelId) continue;
     if (!account.channel_secret || !await verifySignature(account.channel_secret, rawBody, signature)) continue;
     if (matched) {
-      logger.error('line_webhook_ambiguous_account');
+      logger.error("line_webhook.resolve_account_failed");
       return c.json({ status: 'ok' }, 200);
     }
     matched = account;

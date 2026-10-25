@@ -94,7 +94,7 @@ export async function processInsightFetch(
             aggMedia += (overview.uniqueMediaPlayed as number) ?? 0
             if (messages && messages.length > 0) hasAnyData = true
           } catch (err) {
-            logger.error("services_insight_fetcher_failed")
+            logger.error("insight_fetcher.process_insight_fetch_failed")
             perAccountResponses.push({ accountId: aid, data: { error: String(err) } })
           }
         }
@@ -145,7 +145,7 @@ export async function processInsightFetch(
         await markInsightFailed(db, item.insightId, item.retryCount)
       }
     } catch (error) {
-      logger.error("services_insight_fetcher_failed")
+      logger.error("insight_fetcher.process_insight_fetch_failed")
       await markInsightFailed(db, item.insightId, item.retryCount)
     }
   }

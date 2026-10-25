@@ -36,14 +36,14 @@ export async function checkAccountHealth(
     try {
       await checkSingleAccount(db, account);
     } catch (err) {
-      logger.error("services_ban_monitor_failed");
+      logger.error("ban_monitor.check_account_health_failed");
     }
   }
 
   try {
     await returnRecoveredAccountsToPools(db);
   } catch (err) {
-    logger.error("services_ban_monitor_failed");
+    logger.error("ban_monitor.check_account_health_failed");
   }
 }
 
@@ -151,7 +151,7 @@ async function checkSingleAccount(
   }
 
   if (riskLevel === 'danger') {
-    logger.error("services_ban_monitor_failed");
+    logger.error("ban_monitor.check_single_account_failed");
     /*
      * 自動切替（-33 §11-2、X-2）。トラフィックプールに入っている
      * アカウントが danger になったら、プールの中だけで止めて、

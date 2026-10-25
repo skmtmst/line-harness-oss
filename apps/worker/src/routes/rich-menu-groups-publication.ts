@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, readBoundedBytes } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
@@ -364,7 +365,7 @@ export const post__api_rich_menu_groups_groupId_publish_runs_requestId_retry_9 =
           { 'Idempotency-Replayed': 'true' },
         );
       } catch {
-        return c.json({ success: false, error: '公開結果を再取得できません。最新状態を確認してください。' }, 500);
+        throw new UnexpectedRouteError(c, { success: false, error: '公開結果を再取得できません。最新状態を確認してください。' });
       }
     }
     return handleManualPublish(c, groupId, request.idempotency_key);

@@ -151,7 +151,7 @@ codexSlackEvents.post('/api/integrations/codex-slack/events', async (c) => {
     const result = await relayCodexSlackEvent(c.env, event);
     return c.json({ success: true, ...result });
   } catch (error) {
-    logger.error("codex_slack_relay_failed");
+    logger.error("codex_slack.relay_event_failed");
     return c.json({ success: false, error: 'Slack relay failed' }, 502);
   }
 });
@@ -192,7 +192,7 @@ codexSlackEvents.post('/api/integrations/slack/actions', async (c) => {
     if (message.includes('INVALID_')) {
       return c.json({ success: false, error: 'Invalid Slack task action' }, 400);
     }
-    logger.error("slack_task_action_failed");
+    logger.error("codex_slack.update_task_failed");
     return c.json({ success: false, error: 'Slack task action failed' }, 502);
   }
 });

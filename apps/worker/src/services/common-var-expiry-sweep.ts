@@ -51,7 +51,7 @@ export async function sweepCommonVarExpiryNotices(
       result.notified += notified;
     } catch (error) {
       result.errors += 1;
-      logger.error("common_var_expiry_notice_error");
+      logger.error("common_vars.expiry_notice_failed");
     }
   }
   return result;

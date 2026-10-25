@@ -111,7 +111,7 @@ async function notifyUnfamiliarLogin(
       after: { note: 'いつもと違う端末・場所からのログイン' },
     });
   } catch (error) {
-    logger.error("services_admin_session_failed");
+    logger.error("admin_session.record_unfamiliar_login_failed");
   }
   try {
     if (c.env.DEPLOY_ENV === 'staging' || c.env.DEPLOY_ENV === 'test') {
@@ -141,7 +141,7 @@ async function notifyUnfamiliarLogin(
       ].join('\n'),
     });
   } catch (error) {
-    logger.error("services_admin_session_failed");
+    logger.error("admin_session.notify_unfamiliar_login_failed");
   }
 }
 
@@ -169,7 +169,7 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
     }
   } catch (error) {
     unfamiliarAt = new Date().toISOString();
-    logger.error("services_admin_session_failed");
+    logger.error("admin_session.check_device_familiarity_failed");
   }
   await c.env.DB.prepare(`INSERT INTO auth_known_devices(staff_id, device_hash, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?)
     ON CONFLICT(staff_id, device_hash) DO UPDATE SET last_seen_at=excluded.last_seen_at`).bind(staffId, knownDeviceHash, new Date().toISOString(), new Date().toISOString()).run();

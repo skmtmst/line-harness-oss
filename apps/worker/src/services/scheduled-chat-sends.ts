@@ -108,7 +108,7 @@ async function dispatchOne(
         title: null,
       });
     } catch (skipError) {
-      logger.error("services_scheduled_chat_sends_failed");
+      logger.error("scheduled_chat_sends.dispatch_one_failed");
     }
     return;
   }
@@ -293,7 +293,7 @@ export async function processDueScheduledChatSends(
     try {
       await dispatchOne(env, row);
     } catch (error) {
-      logger.error("services_scheduled_chat_sends_failed");
+      logger.error("scheduled_chat_sends.dispatch_due_failed");
       failed += 1;
       continue;
     }

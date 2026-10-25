@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { createLineAccountTag, deleteLineAccountTag, getLineAccountTag, getLineAccountById,
@@ -12,7 +13,10 @@ import { readAccountClassificationInput } from './line-account-tags.js';
 export const lineAccountFolders = new Hono<Env>();
 const tenantOf = (c: Context<Env>) => c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
 const folder = (row: Parameters<typeof serializeLineAccountTag>[0]) => ({...serializeLineAccountTag(row),kind:'line_account',parentId:null});
-lineAccountFolders.onError((error,c) => inputError(c, {success:false,error:error.message.includes('UNIQUE constraint') ? '同じ名前のフォルダがあります' : 'フォルダを保存・取得できませんでした'}, error.message.includes('UNIQUE constraint') ? 409 : 500, []));
+lineAccountFolders.onError((error, c) => {
+  if (error.message.includes('UNIQUE constraint')) return inputError(c, { success: false, error: '同じ名前のフォルダがあります' }, 409, []);
+  throw new UnexpectedRouteError(c, { success: false, error: 'フォルダを保存・取得できませんでした' });
+});
 lineAccountFolders.get('/api/line-account-folders', async c => {
   const scope = await getVisibleLineAccountScope(c.env.DB,c.get('staff'));
   return c.json({success:true,data:await listLineAccountFolders(c.env.DB,tenantOf(c),scope.allowedAccountIds)});

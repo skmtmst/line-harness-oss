@@ -101,7 +101,7 @@ export async function resizeBannerToPreset(
     if (resizedBytes.byteLength === 0) return fallback();
     return { bytes: resizedBytes, width: preset.targetWidth, height: preset.targetHeight, resized: true };
   } catch (error) {
-    logger.warn("services_banner_resize_warn");
+    logger.warn("banner_resize.resize_banner_to_preset_failed");
     return fallback();
   }
 }

@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { readLineAccountListMetadata } from '../services/line-account-list-metadata.js';
 import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
@@ -1438,8 +1439,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
         await copyLineAccountSettings(c.env.DB, copyFromAccountId, account.id, copyItems);
       } catch (copyError) {
         await deleteUncommittedLineAccount(c.env.DB, account.id);
-        logger.error("line_accounts.create_failed");
-        return c.json({ success: false, error: '設定のコピーに失敗したため、アカウントは追加していません' }, 500);
+        throw new UnexpectedRouteError(c, { success: false, error: '設定のコピーに失敗したため、アカウントは追加していません' });
       }
     }
 

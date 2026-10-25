@@ -755,5 +755,6 @@
 - [登録メディアの件数が取れない時の表示](release-log/unreleased/1810-kenta-media-count-dash.md)
 - [画面づくりの説明書の更新](release-log/unreleased/1812-kenta-v8-docs-drift.md)
 - [一覧の読み込みの作りをそろえる](release-log/unreleased/1813-kenta-worker-list-paging.md)
+- [失敗の記録の名前をそろえる](release-log/unreleased/1814-kenta-worker-failure-names.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

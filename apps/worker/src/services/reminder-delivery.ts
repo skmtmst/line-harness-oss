@@ -696,7 +696,7 @@ export async function processReminderDeliveries(
         // push と確定の間に取消が確定すると成功にできない (0 件)。
         // 外部送信の有無が曖昧なため送り直さず、運用の追跡用に記録する。
         if (Number(completed[2]?.meta?.changes ?? 0) !== 1) {
-          logger.error("reminder_delivery_completed_after_cancel");
+          logger.error("reminder_delivery.confirm_cancelled_delivery_failed");
         }
       } catch (error) {
         const status=externalDeliveryStatus(error);
@@ -734,7 +734,7 @@ export async function processReminderDeliveries(
         if (!recorded) continue;
         if (retryAt) result.retrying++;
         else result.failed++;
-        logger.error("reminder_delivery_failed");
+        logger.error("reminder_delivery.process_reminder_deliveries_failed");
       }
     }
 

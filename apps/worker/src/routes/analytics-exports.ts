@@ -115,7 +115,7 @@ export async function runAnalyticsExportJob(db: D1Database, jobId: string): Prom
       finishedAt: finishedAt(),
     });
   } catch (error) {
-    logger.error("analytics_export_failed");
+    logger.error("analytics.export_failed");
     const message = error instanceof Error && error.message === 'analytics_export_not_ready'
       ? '集計がまだ終わっていません。集計が終わってから書き出してください'
       : error instanceof Error && error.message === 'analytics_export_not_found'
