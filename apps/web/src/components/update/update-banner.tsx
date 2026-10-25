@@ -2,6 +2,7 @@
 
 import { MANUAL_UPDATE_GUIDE_URL, useUpdateStatus } from './use-update-status'
 import { UpdateButton } from './update-button'
+import Notice from '@/components/shared/notice'
 
 export { MANUAL_UPDATE_GUIDE_URL }
 
@@ -22,8 +23,7 @@ export function UpdateBanner() {
     // 「改造検知」のような警告調は使わない: カスタマイズ運用は正当な使い方で、
     // ここで伝えるべきは「自動更新の対象外」という事実だけ (詳細 reason は title に)。
     return (
-      <div
-        className="bg-status-warn-soft text-status-warn-deep px-4 py-2 border-b text-sm"
+      <Notice tone="warn"
         title={status.reason}
       >
         カスタマイズ版で動作中です（v{status.version}）。そのままお使いいただけます。
@@ -37,16 +37,12 @@ export function UpdateBanner() {
           手動アップデートガイド
         </a>{' '}
         をご覧ください。
-      </div>
+      </Notice>
     )
   }
 
   return (
-    <div className="bg-status-info-soft text-status-info-deep px-4 py-2 border-b flex items-center gap-3 text-sm">
-      <div>
-        <strong>v{status.target.version}</strong> が利用可能（現 v
-        {status.current}）
-      </div>
+    <Notice tone="info" action={<>
       {status.target.changelog_url ? (
         <a
           className="text-xs underline"
@@ -57,9 +53,9 @@ export function UpdateBanner() {
           変更内容
         </a>
       ) : null}
-      <div className="ml-auto">
         <UpdateButton targetVersion={status.target.version} />
-      </div>
-    </div>
+    </>}>
+      <strong>v{status.target.version}</strong> が利用可能（現 v{status.current}）
+    </Notice>
   )
 }
