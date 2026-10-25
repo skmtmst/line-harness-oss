@@ -15,7 +15,6 @@ vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: React.Props
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/v8/events/application-preview', () => ({ default: () => null }))
 import EventsCreate from '@/v8/events/create'
 

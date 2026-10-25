@@ -1,12 +1,11 @@
 /*
- * ★V8 移行③「外側 v8」の固定。
+ * 管理画面の外側の共通構造。
  *
  *   - 地は灰（--color-shell）、中身は白い板1枚（radius 16・枠・影・右下左 12px）
  *   - 上の帯は高さ 60・パンくず（アカウント › 画面名）・通知ベル・自分。
  *     探す欄は帯から外した（オーナー決定 2026-10-01）。
  *     左メニューは畳める（64px・⌘\・localStorage）
  *   - 黄色の版の帯は v8 では出さない
- *   - 全部 v8 だけに効く（管理画面 の見た目を動かさない）
  */
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
@@ -23,7 +22,7 @@ const appTopBar = readFileSync(join(WEB, 'src/components/shell/app-top-bar.tsx')
 const events = readFileSync(join(WEB, 'src/lib/events.ts'), 'utf8')
 const friends = readFileSync(join(WEB, 'src/app/friends/page.tsx'), 'utf8')
 
-describe('外側の殻（V8 移行③）', () => {
+describe('管理画面の外側', () => {
   it('旧テーマで出し入れする表示印を残さない', () => {
     expect(globals).not.toMatch(/\.v[78]-only\s*\{/)
   })
@@ -33,7 +32,7 @@ describe('外側の殻（V8 移行③）', () => {
     expect(globals).not.toMatch(/:not\(\[data-theme=/)
   })
 
-  it('中身は白い板1枚（radius 16・枠・薄い影・右下左に 12px）で、v8 のときだけ', () => {
+  it('中身は白い板1枚（radius 16・枠・薄い影・右下左に 12px）で表示する', () => {
     const board = appShellCss.match(/:root \.main \{([\s\S]*?)\}/)
     expect(board, 'v8 の .main の板の規定が無い').not.toBeNull()
     expect(board![1]).toContain('border-radius: var(--radius-panel)')
@@ -98,7 +97,7 @@ describe('外側の殻（V8 移行③）', () => {
     expect(topBar).toContain('aria-label="ログアウト"')
   })
 
-  it("v8 の帯は 1024px から出す（既存の見た目は 1280px のまま）", () => {
+  it("帯は 1024px から出す", () => {
     expect(globals).toContain('.v8-topbar-wrap')
     expect(appTopBar).toContain('hidden xl:block v8-topbar-wrap')
   })

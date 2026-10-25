@@ -222,10 +222,9 @@ function stubBrowser(theme: string | undefined, measured: unknown) {
   }
 }
 
-describe('撮る前に V8 テーマ＋偽ログインを置く', () => {
-  it('合言葉に 8 つの鍵がある', () => {
+describe('撮る前に偽ログインを置く', () => {
+  it('偽ログインの値だけを置く', () => {
     expect(PARITY_INIT).toEqual({
-      'lh-admin-theme': 'v8',
       lh_csrf: 'visual-qa-csrf',
       lh_staff_role: 'owner',
       lh_staff_name: 'K',
@@ -243,7 +242,8 @@ describe('撮る前に V8 テーマ＋偽ログインを置く', () => {
     expect(got.url).toBe('http://localhost:3101/friends')
     const store: Record<string, string> = {}
     stub.runInit(store)
-    expect(store).toMatchObject(PARITY_INIT)
+    expect(store).toEqual(PARITY_INIT)
+    expect(store).not.toHaveProperty('lh-admin-theme')
   })
 
   it('ROOT-14 予約とリマインダは見本サーバーと同じ時計で撮る', async () => {

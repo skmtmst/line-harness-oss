@@ -15,7 +15,7 @@ const makePage = async (url, width, rows) => {
   const page = await browser.newPage({ viewport: { width, height: 1000 }, reducedMotion: 'reduce' })
   const errors = []; page.on('pageerror', (error) => errors.push(error.message))
   await page.addInitScript(() => {
-    for (const [key, value] of Object.entries({ lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K', lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1', 'lh-admin-theme': 'v8' })) localStorage.setItem(key, value)
+    for (const [key, value] of Object.entries({ lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K', lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1' })) localStorage.setItem(key, value)
   })
   const state = { rows, retries: 0 }
   await page.route('**/api/line-webhook-events**', async (route) => {

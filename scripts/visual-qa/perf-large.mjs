@@ -63,7 +63,6 @@ async function newPage(browser) {
     try {
       for (const [k, v] of Object.entries(session)) localStorage.setItem(k, v)
       localStorage.setItem('lh_auth_selection_cleared', '1')
-      localStorage.setItem('lh-admin-theme', 'v8')
     } catch { /* 無ければ何もしない */ }
   }, [SESSION])
   await page.route(/^https:\/\/(large\.invalid|stickershop\.line-scdn\.net)\//, async (route) => {

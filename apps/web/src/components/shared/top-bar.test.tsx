@@ -27,7 +27,7 @@ describe("管理画面共通トップバー", () => {
     expect(css).toMatch(/:root \.accountPill \{[^}]*flex-shrink:\s*0/s)
     expect(css).toMatch(/:root \.crumbCurrent/s)
     expect(css).toMatch(/min-width:\s*0/)
-    // 管理画面 の札（縮む側）は変えない。
+    // 札の縮みを止める指定は共通の器で持つ。
     expect(css).not.toMatch(/^\.accountPill \{[^}]*flex-shrink/m)
   })
 })
@@ -35,7 +35,7 @@ describe("管理画面共通トップバー", () => {
 /*
  * V8 殻合わせ。統括もふだんの画面も同じ帯：
  * ホーム › 画面名・切替札（役割＋名前）・鈴・名前と役割・ログアウト。
- * 管理画面 の土台クラスは触らない（V8 の上書きだけ）。
+ * 役割と名前の配置は共通の帯で持つ。
  */
 describe('V8 の帯は絵どおり（殻合わせ）', () => {
   it('パンくずの手前はホーム（格子印＋リンク。統括の画面は統括のホームへ）', () => {
@@ -46,7 +46,7 @@ describe('V8 の帯は絵どおり（殻合わせ）', () => {
     expect(source).toContain('HomeGridIcon')
   })
 
-  it("切替の札に役割を添える（v8-only・既存の見た目の1行札は不変）", () => {
+  it("切替の札に役割と名前を縦に添える", () => {
     expect(source).toContain('pillText')
     expect(source).toContain('pillRole')
     expect(css).toMatch(/:root \.pillText \{[^}]*flex-direction:\s*column/s)
