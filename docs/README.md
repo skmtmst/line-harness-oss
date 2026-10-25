@@ -776,5 +776,6 @@
 - [不安定な試験の直し](release-log/unreleased/1830-kenta-flaky-iat-1026.md)
 - [直し①②（不具合とiPad横の幅）](release-log/unreleased/1831-kenta-train-m1-1026.md)
 - [LINEの鍵の期限の知らせ](release-log/unreleased/0000-kenta-token-expiry.md)
+- [更新履歴を配備1回ごとに分ける下ごしらえ](release-log/unreleased/0000-kenta-release-summary.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
