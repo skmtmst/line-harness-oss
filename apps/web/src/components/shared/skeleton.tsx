@@ -10,8 +10,8 @@ import { motionMs } from './overlay-utils'
  *
  * - 出来上がりと同じ大きさの灰色の面（`canvas-sunken`）。ずれがないので
  *   本物と入れ替わってもガタつかない（CLS 0）
- * - 明滅は不透明度 1↔0.55・1.2秒（globals.css で `.animate-pulse` を
- *   管理画面 の速さに揃えてある）。光が流れる演出は使わない
+ * - 薄い光りが左から右へ流れる（CSS だけ・1.2秒・2026-10-25 オーナー）。
+ *   値は globals.css の `[data-skeleton]` と --motion-pulse。動きを減らす設定では止まる
  * - 「0.3秒以内に来たら出さない・出したら最低0.4秒」は `DelayedSkeleton` が
  *   面倒を見る。瞬き防止のため骨組みを描く側は必ずこの判定を通す
  *   （`loading && <Skeleton/>` を直接書かない）

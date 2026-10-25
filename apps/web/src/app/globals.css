@@ -2951,7 +2951,8 @@ html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'],
 }
 html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-disabled-opacity); }
 
-:root [data-skeleton] { background: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); background-image: none; animation: none; }
+/* 骨組みの地と角丸。光りの動き（v8-skeleton-shimmer）は上の「動きを減らさない設定」の規則が付け、ここでは消さない（2026-10-25 オーナー）。 */
+:root [data-skeleton] { background-color: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
 
 /* ・仕上げ9。旧テーマの角丸は維持する。 */
 :root {
