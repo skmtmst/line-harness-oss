@@ -1066,6 +1066,26 @@ export async function getTemplatesWithUsageCount(
   };
 }
 
+/** タブの種類で数えるための行。一覧と同じく消したものを除き、種類の判定に使う列だけ読む。 */
+export interface TemplateSectionRow {
+  folder_id: string | null;
+  message_type: string;
+  message_content: string;
+  draft_message_content: string | null;
+  question_json: string | null;
+}
+
+export async function getTemplateSectionRows(db: D1Database, scope: TemplateListScope): Promise<TemplateSectionRow[]> {
+  const accountSql = scope.accountIds.length > 0
+    ? `(line_account_id IN (${sqlIdSet(scope.accountIds).sql})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+    : scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
+  const binds = scope.accountIds.length > 0 ? sqlIdSet(scope.accountIds).binds : [];
+  const statement = db.prepare(`SELECT folder_id, message_type, message_content, draft_message_content, question_json
+    FROM templates WHERE deleted_at IS NULL AND ${accountSql}`);
+  const rows = await (binds.length > 0 ? statement.bind(...binds) : statement).all<TemplateSectionRow>();
+  return rows.results ?? [];
+}
+
 /**
  * フォルダごとの件数。選択画面のフォルダ欄は件数を出すが、
  * 一覧を全件読まなくても分かるように、スコープ内で GROUP BY だけする。

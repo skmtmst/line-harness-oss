@@ -329,12 +329,12 @@ export type {
 } from './action-score-rules';
 export {
   createTemplate, deleteTemplate, getAssociableTemplate, getSendableTemplate, getTemplateById, getTemplateFolderCounts,
-  getTemplateSendCounts, getTemplateUsage, getTemplates, getTemplatesWithUsageCount, hasTemplateDraft, isTemplateAssociable,
+  getTemplateSectionRows, getTemplateSendCounts, getTemplateUsage, getTemplates, getTemplatesWithUsageCount, hasTemplateDraft, isTemplateAssociable,
   isTemplateSendable, publishTemplate, publishedVersionStatement, saveTemplateDraft, templateDraftFingerprint, updateTemplate,
 } from './templates';
 export type {
   CarouselOptions, QuestionOptions, TemplateDraftUpdates, TemplateListFilter, TemplateListScope, TemplatePublishResult,
-  TemplateRow, TemplateRowWithUsage, TemplateSendCounts, TemplateUsage,
+  TemplateRow, TemplateRowWithUsage, TemplateSectionRow, TemplateSendCounts, TemplateUsage,
 } from './templates';
 export {
   extractBroadcastTemplateIds, getBroadcastDeleteBlockers, getPinnedReminderDeleteBlockers, getTemplateVersion, listBroadcastReferences, listPinnedReminderTemplateReferences,
