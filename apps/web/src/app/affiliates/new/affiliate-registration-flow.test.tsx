@@ -292,6 +292,24 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(pushed[0]).toContain('highlight=affiliate-1')
   })
 
+  it('追加情報の破棄は確認してから一覧へ移り、戻れば入力を残す', async () => {
+    affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
+    await mount(<NewAffiliatePage />)
+    await type(byId<HTMLInputElement>('af-name'), '入力を残す紹介者')
+    await click(buttonByText('登録して紹介リンクを発行する'))
+    const discard = screen.getByRole('link', { name: '追加情報を破棄して一覧へ戻る' })
+    await click(discard)
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(pushed).toHaveLength(0)
+    await click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(byId<HTMLInputElement>('af-name').value).toBe('入力を残す紹介者')
+    await click(discard)
+    await click(screen.getByRole('button', { name: '保存せずに移る' }))
+    expect(pushed[0]).toContain('highlight=affiliate-1')
+    expect(affiliatesCreate).toHaveBeenCalledTimes(1)
+    expect(affiliatesUpdate).toHaveBeenCalledTimes(1)
+  })
+
   it('途中保存の知らせは、計測が既に始まっているか正しく伝える（R525）', async () => {
     // オンで作ると行は最初から稼働で残る。追加情報の保存に失敗しても、
     // 「追加情報を保存すると計測も始まります」とは言わない。
