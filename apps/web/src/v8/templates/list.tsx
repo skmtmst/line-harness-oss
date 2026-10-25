@@ -100,7 +100,6 @@ export default function TemplatesListV8() {
   const setPage = useCallback((next: number) => setUrlView({ page: String(next) }), [setUrlView])
 
   const [folders, setFolders] = useState<Folder[]>([])
-  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderError, setFolderError] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
@@ -169,7 +168,6 @@ export default function TemplatesListV8() {
     activeAccountRef.current = selectedAccountId
     // フォルダはアカウント単位。切り替えたら前のアカウントの帯も選択も残さない。
     setFolders([])
-    setUnfiledCount(null)
     setFolderDialogOpen(false)
     setEditingFolder(null)
     setDeletingFolder(null)
@@ -243,7 +241,6 @@ export default function TemplatesListV8() {
   const loadFolders = useCallback(async () => {
     if (!selectedAccountId) {
       setFolders([])
-      setUnfiledCount(null)
       return
     }
     const accountId = selectedAccountId
@@ -251,10 +248,8 @@ export default function TemplatesListV8() {
     try {
       const res = await api.folders.list('template', accountId)
       if (activeAccountRef.current !== accountId) return
-      if (res.success) {
-        setFolders(res.data)
-        setUnfiledCount(res.unfiledCount ?? null)
-      } else setFolderError('フォルダを読み込めませんでした。')
+      if (res.success) setFolders(res.data)
+      else setFolderError('フォルダを読み込めませんでした。')
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure);
 
@@ -733,13 +728,18 @@ export default function TemplatesListV8() {
     const folder = folders.find((f) => f.id === t.folderId)
     return folder ? { name: folder.name, color: folder.color } : null
   }
+  /*
+   * フォルダの数は、表に出すのと同じテンプレート（今のタブ）から数える。
+   * API の数は全種類を数えるので、「すべて 0」なのに「未分類 1」と食い違っていた。
+   */
+  const folderCountOf = (folderId: string | null) => (ready ? tabItems.filter((t) => t.folderId === folderId).length : null)
   const folderRows: FolderPanelRow[] = [
     { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? tabItems.length : null },
     ...folders.map((folder, index) => ({
       kind: 'folder' as const,
       id: folder.id,
       label: folder.name,
-      count: folder.itemCount ?? null,
+      count: folderCountOf(folder.id),
       color: folder.color,
       qaOpen: canMutateTemplates && folder.name === '予約' ? 'CzndJ' : undefined,
       onEdit: canMutateTemplates ? () => setEditingFolder(folder) : undefined,
@@ -748,7 +748,7 @@ export default function TemplatesListV8() {
       onDelete: canMutateTemplates ? () => setDeletingFolder(folder) : undefined,
       deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
     })),
-    { kind: 'unfiled' as const, id: 'unfiled', label: '未分類', count: ready ? unfiledCount : null },
+    { kind: 'unfiled' as const, id: 'unfiled', label: '未分類', count: folderCountOf(null) },
   ]
   const folderSelectOptions = [
     { value: 'all', label: 'フォルダ：すべて' },
