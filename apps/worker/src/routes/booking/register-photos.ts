@@ -36,7 +36,7 @@ export function registerPhotos(booking: Hono<Env>): void {
     try {
       return c.json({ success: true, data: await getBookingPhotos(c.env.DB, accountId, origin(c)) });
     } catch {
-      logger.error('booking_photos_read_failed');
+      logger.error("booking.read_menu_photos_failed");
       return c.json({ error: 'booking_photos_unavailable' }, 503);
     }
   });
@@ -67,7 +67,7 @@ export function registerPhotos(booking: Hono<Env>): void {
       return photo ? [{ slot, url: photo.url }] : [];
     }) });
     } catch {
-      logger.error('booking_store_photos_read_failed');
+      logger.error("booking.read_store_photos_failed");
       return c.json({ error: 'booking_photos_unavailable' }, 503);
     }
   });

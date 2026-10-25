@@ -403,7 +403,7 @@ trackedLinks.get('/t/:linkId', async (c) => {
   const click=await recordTrackedClick(c.env.DB,{linkId:link.id,friendId,accountId,tagId:link.tag_id,scenarioId:link.scenario_id,
     linkName:link.name,identityVerified:friendId ? true : undefined,conversionPointIds:points.map(point=>point.id),tapExtras:extrasFromTrackedLink(link)});
   c.executionCtx.waitUntil(processTrackedClick(c.env,click.id,click.plan).catch(()=>{
-    logger.error("tracked_click_work_pending");
+    logger.error("tracked_links.process_click_failed");
   }));
 
   // App-link domains: return HTML with JS redirect for Universal Link support

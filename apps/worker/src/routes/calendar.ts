@@ -142,7 +142,7 @@ calendar.get('/api/integrations/google-calendar/slots', requireRole('owner', 'ad
         googleBusyIntervals = await gcal.getFreeBusy(timeMin, timeMax);
       } catch (err) {
         // Google API 失敗はベストエフォート — D1 のみでフォールバック
-        logger.warn("routes_calendar_warn");
+        logger.warn("calendar.read_free_busy_failed");
       }
     }
 
@@ -270,14 +270,14 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
           try {
             await gcal.deleteEvent(eventId);
           } catch (cleanupError) {
-            logger.warn("routes_calendar_warn");
+            logger.warn("calendar.delete_unsaved_event_failed");
           }
           return c.json({ success: false, error: 'Calendar booking changed during sync' }, 409);
         }
         booking.event_id = eventId;
       } catch (err) {
         // Google API 失敗はベストエフォート — D1 予約は維持する
-        logger.warn("routes_calendar_warn");
+        logger.warn("calendar.create_event_failed");
       }
     }
 
@@ -327,7 +327,7 @@ calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRol
             });
             await gcal.deleteEvent(booking.event_id);
           } catch (err) {
-            logger.warn("routes_calendar_warn");
+            logger.warn("calendar.delete_cancelled_event_failed");
           }
         }
       }

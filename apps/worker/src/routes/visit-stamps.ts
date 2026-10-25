@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -17,7 +18,10 @@ import { StampError, stampId, stampCard, readStampCard, saveStampCard, stampWall
 
 export const visitStamps=new Hono<Env>();
 visitStamps.use('/api/visit-stamps/*',async(c,next)=>{c.header('Cache-Control','private, no-store');await next();});
-visitStamps.onError((e,c)=>inputError(c, {success:false,...(e instanceof StampError && (e.status === 400 || e.status === 422) ? {fields:e.fields} : {}),error:e instanceof StampError?e.message:'スタンプの処理を確認できません'},e instanceof StampError?e.status:500));
+visitStamps.onError((e, c) => {
+  if (!(e instanceof StampError)) throw new UnexpectedRouteError(c, { success: false, error: 'スタンプの処理を確認できません' });
+  return inputError(c, { success: false, ...((e.status === 400 || e.status === 422) ? { fields: e.fields } : {}), error: e.message }, e.status);
+});
 const tenant=(c:Context<Env>)=>{const t=c.get('staff')?.tenantId;if(!t)throw new StampError('ログインが必要です',401);return t;};
 async function account(c:Context<Env>,id:unknown) {
   const a=stampId(id);const db=dbFor(c.env),row=await db.prepare('SELECT tenant_id FROM line_accounts WHERE id=?').bind(a).first<{tenant_id:string}>();

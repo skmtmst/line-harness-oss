@@ -28,7 +28,7 @@ export async function routeInboundEmail(
     try {
       await handlers.receiveRestaurantIntakeEmail(message, env);
     } catch (error) {
-      logger.error("restaurant_email_receive_failed");
+      logger.error("restaurant_email.receive_failed");
       message.setReject('予約メール受信処理に失敗しました');
     }
     return;
@@ -38,7 +38,7 @@ export async function routeInboundEmail(
   try {
     await handlers.receiveSupportEmail(message, env);
   } catch (error) {
-    logger.error("support_email_receive_failed");
+    logger.error("support_email.receive_failed");
     message.setReject('メール受信処理に失敗しました');
   }
 }

@@ -43,7 +43,7 @@ booking.use('/api/booking/*',async(c,next)=>{await next();if(!['GET','HEAD','OPT
 
 booking.onError((error,c)=>{if(error instanceof GapError||error instanceof EntitlementError)return c.json({error:error.code},error.status);if(/entitlement_month_change|entitlement_unavailable/.test(String(error)))return c.json({error:String(error).includes('entitlement_month_change')?'entitlement_month_change':'entitlement_unavailable'},409);if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
 
-booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{logger.error("waitlist_reconcile_failed");}}});
+booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{logger.error("booking.reconcile_waitlist_failed");}}});
 
 booking.use('*', async (c, next) => {
   await next();

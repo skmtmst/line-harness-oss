@@ -302,7 +302,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
         });
       }
     } catch (error) {
-      logger.warn("routes_hq_support_warn");
+      logger.warn("hq_support.send_request_notification_failed");
     }
     if (notified) await markHqSupportRequestNotified(c.env.DB, request.id);
 
@@ -411,7 +411,7 @@ hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'ad
         });
       }
     } catch (error) {
-      logger.warn("routes_hq_support_warn");
+      logger.warn("hq_support.send_reply_notification_failed");
     }
     return c.json({
       success: true,

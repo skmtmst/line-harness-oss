@@ -8,7 +8,7 @@ export function logWebhookStepFailure(
   lineAccountId: string | null,
   event?: WebhookEvent,
 ): void {
-  logger.error("line_webhook_step_failed");
+  logger.error("line_webhook.process_step_failed");
 }
 
 export async function recordWebhookAnalyticsEvent(

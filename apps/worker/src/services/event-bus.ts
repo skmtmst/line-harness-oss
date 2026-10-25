@@ -191,7 +191,7 @@ export async function fireEvent(
         numericValue: enrichedPayload.conversionValue,
       });
     } catch (error) {
-      logger.error("analytics_event_record_failed");
+      logger.error("analytics.record_event_failed");
     }
   }
 
@@ -241,7 +241,7 @@ async function reevaluateRichMenuTargeting(
     if (await isOperationCapabilityStopped(db, lineAccountId, 'automation_actions')) return;
     await applyRichMenuTargeting(db, payload.friendId, lineAccountId, lineAccessToken);
   } catch (err) {
-    logger.error("services_event_bus_failed");
+    logger.error("event_bus.reevaluate_rich_menu_targeting_failed");
   }
 }
 
@@ -295,7 +295,7 @@ export async function fireOutgoingWebhooks(
           try {
             await recordDeliveryOutcome(db, wh.id, result.ok);
           } catch (outcomeError) {
-            logger.error("services_event_bus_failed");
+            logger.error("event_bus.record_delivery_outcome_failed");
           }
           if (execution && !result.ok) throw new Error('incoming_outgoing_delivery_failed');
           return;
@@ -339,13 +339,13 @@ export async function fireOutgoingWebhooks(
             interactionId = interaction.id;
           } catch (logError) {
             // 記録の一時障害で、本体の外部通知まで止めない。
-            logger.error("services_event_bus_failed");
+            logger.error("event_bus.create_outgoing_interaction_failed");
           }
         }
         const result = await deliverOnce(wh, body, { idempotencyKey });
         const outcome = await finishOutgoingDelivery(db, queued, lease, outgoingAttemptOf(result));
         if (outcome !== 'delivered') {
-          logger.error("services_event_bus_failed");
+          logger.error("event_bus.deliver_webhook_failed");
         }
         if (interactionId && lineAccountId) {
           try {
@@ -358,7 +358,7 @@ export async function fireOutgoingWebhooks(
             });
           } catch (logError) {
             // 届いた通知を、台帳更新の失敗だけで「送信失敗」とは扱わない。
-            logger.error("services_event_bus_failed");
+            logger.error("event_bus.finish_outgoing_interaction_failed");
           }
         }
         // 連続失敗は配送単位で数える。再送待ち(retry_wait)は未確定なので
@@ -368,7 +368,7 @@ export async function fireOutgoingWebhooks(
             await recordDeliveryOutcome(db, wh.id, outcome === 'delivered');
           } catch (outcomeError) {
             // 連続失敗数の更新は補助情報。配送結果そのものを巻き戻さない。
-            logger.error("services_event_bus_failed");
+            logger.error("event_bus.record_delivery_outcome_failed");
           }
         }
       } catch (err) {
@@ -382,16 +382,16 @@ export async function fireOutgoingWebhooks(
               failureReason: 'unknown',
             });
           } catch (logError) {
-            logger.error("services_event_bus_failed");
+            logger.error("event_bus.record_outgoing_failure_failed");
           }
         }
-        logger.error("services_event_bus_failed");
+        logger.error("event_bus.deliver_webhook_failed");
         if (execution) throw err;
       }
       });
     }
   } catch (err) {
-    logger.error("services_event_bus_failed");
+    logger.error("event_bus.dispatch_outgoing_webhooks_failed");
     if (execution) throw err;
   }
 }
@@ -432,7 +432,7 @@ export async function processScoring(
     if (scoreSourceEventId) await applyScoring(db, payload.friendId, eventType, scoreSourceEventId);
     else await applyScoring(db, payload.friendId, eventType);
   } catch (err) {
-    logger.error("services_event_bus_failed");
+    logger.error("event_bus.apply_scoring_failed");
     if (execution) throw err;
   }
 }
@@ -502,7 +502,7 @@ async function processAutomations(
       });
     }
   } catch (err) {
-    logger.error("services_event_bus_failed");
+    logger.error("event_bus.process_automations_failed");
     if (execution) throw err;
   }
 }
@@ -764,7 +764,7 @@ async function executeAction(
     }
 
     default:
-      logger.warn("services_event_bus_warn");
+      logger.warn("event_bus.validate_action_failed");
   }
 }
 
@@ -800,7 +800,7 @@ export async function logOutgoingMessage(
       .run();
     return id;
   } catch (err) {
-    logger.error("services_event_bus_failed");
+    logger.error("event_bus.log_outgoing_message_failed");
     return null;
   }
 }

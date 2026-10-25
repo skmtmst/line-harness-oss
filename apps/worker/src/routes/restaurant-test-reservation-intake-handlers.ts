@@ -380,7 +380,7 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
         tableId: next.table_id,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      logger.error("seat_waitlist_promote_failed");
+      logger.error("restaurant_booking.promote_seat_waitlist_failed");
     }
   }
   return c.json({ success: true, data: { id: current.id, version: current.customer_version+1 } });
@@ -479,7 +479,7 @@ export const delete__api_restaurant_test_seat_waitlist_id_8 = async (c: Context<
         tableId: entry.table_id,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      logger.error("seat_waitlist_promote_failed");
+      logger.error("restaurant_booking.promote_seat_waitlist_failed");
     }
   }
   return c.json({ success: true, data: { status: 'cancelled' } });

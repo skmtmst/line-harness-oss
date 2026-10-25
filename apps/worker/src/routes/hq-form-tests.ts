@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { dbFor } from '../services/db-router.js';
@@ -14,7 +15,11 @@ export const hqFormTests=new Hono<Env>();
 hqFormTests.use('/api/liff/hq-form-tests/*',async(c,next)=>{
   c.header('Cache-Control','no-store');c.header('Referrer-Policy','no-referrer');await next();
 });
-hqFormTests.onError((error,c)=>c.json({success:false,code:error instanceof HqTemplateError?error.code:'UNAVAILABLE',error:'試しのURLと有効期限を確認してください'},error instanceof HqTemplateError?error.status:500));
+hqFormTests.onError((error, c) => {
+  const body = { success: false, code: error instanceof HqTemplateError ? error.code : 'UNAVAILABLE', error: '試しのURLと有効期限を確認してください' };
+  if (error instanceof HqTemplateError) return c.json(body, error.status);
+  throw new UnexpectedRouteError(c, body);
+});
 hqFormTests.get('/api/liff/hq-form-tests/:id',async c=>c.json({success:true,data:await readHqFormTest(dbFor(c.env),c.req.param('id'),formTestToken(c))}));
 hqFormTests.post('/api/liff/hq-form-tests/:id/submit',inputJsonBoundary({answers:['object']}),async c=>{
   const text=await c.req.text();

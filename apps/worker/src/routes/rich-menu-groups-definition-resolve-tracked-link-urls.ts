@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../features/rich-menus/rich-menu-group-input/index.js';
@@ -299,7 +300,7 @@ async function handleManualPublish(
       });
     } catch {
       // 成功済み行の壊れた応答を直すためにLINEを再実行してはいけない。
-      return c.json({ success: false, error: '公開結果を再取得できません。最新状態を確認してください。' }, 500);
+      throw new UnexpectedRouteError(c, { success: false, error: '公開結果を再取得できません。最新状態を確認してください。' });
     }
   }
   if (request.status === 'failed') await restartRichMenuManualPublishRequest(c.env.DB, request.id);

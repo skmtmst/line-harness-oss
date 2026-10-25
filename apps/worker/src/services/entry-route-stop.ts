@@ -111,7 +111,7 @@ export async function getActiveStopSuppressionSafe(
   try {
     return await lookup(db, { lineAccountId, lineUserId });
   } catch (err) {
-    logger.error("services_entry_route_stop_failed");
+    logger.error("entry_route_stop.get_active_stop_suppression_safe_failed");
     return 'unknown';
   }
 }

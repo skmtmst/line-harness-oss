@@ -379,7 +379,7 @@ async function logProxySend(
 
     if (path === '/v2/bot/message/push' && typeof parsed.to === 'string') {
       if (!LINE_USER_ID_RE.test(parsed.to)) {
-        logger.warn("routes_line_proxy_warn");
+        logger.warn("line_proxy.record_push_send_failed");
         return;
       }
       const friend =
@@ -414,7 +414,7 @@ async function logProxySend(
         if (friend) rows.push(...rowsFor(friend.id, 'push'));
       }
       if (skipped > 0) {
-        logger.warn("routes_line_proxy_warn");
+        logger.warn("line_proxy.record_multicast_send_failed");
       }
       await insertLogRows(db, rows, source, logKey);
       return;
@@ -460,7 +460,7 @@ async function logProxySend(
     }
 
     if (path === '/v2/bot/message/reply' || path === '/v2/bot/message/narrowcast') {
-      logger.warn("routes_line_proxy_warn");
+      logger.warn("line_proxy.record_broadcast_send_failed");
     }
   } catch (err) {
     logger.error("line_proxy.log_proxy_send_failed");

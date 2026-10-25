@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
@@ -123,11 +124,11 @@ export const post__api_rich_menu_groups_groupId_apply_to_tag_1 = async (c: Conte
   } catch (e) {
     // どこまで届いたか分からないままにしない。同じ鍵でやり直せるよう
     // runId と済んだ chunk 数を返す (途中からの再開には未対応)。
-    return c.json({
+    throw new UnexpectedRouteError(c, {
       success: false,
       error: '一括適用の途中で失敗しました。同じ操作でやり直せます',
       data: { runId: idempotencyKey, completedChunks, total: userIds.length },
-    }, 500);
+    });
   }
 };
 
@@ -521,6 +522,6 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
       if (e instanceof RichMenuValidationError) {
         return inputError(c, { success: false, error: message }, 400, ["pages"]);
       }
-      return c.json({ success: false, error: message, data: { applyId: apply.id } }, 500);
+      throw new UnexpectedRouteError(c, { success: false, error: message, data: { applyId: apply.id } });
     }
   };

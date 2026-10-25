@@ -81,7 +81,7 @@ export async function deliveryIntegrationFailures(
     };
   } catch {
     // 符号だけ残す。例外の本文・相手の注文の中身は記録に出さない。
-    logger.error("services_operations_health_delivery_failed");
+    logger.error("operations_health_delivery.delivery_integration_failures_failed");
     return { activeCount: 0, failingCount: 0, maxFailures: 0 };
   }
 }

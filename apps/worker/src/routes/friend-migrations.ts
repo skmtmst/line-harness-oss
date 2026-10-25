@@ -581,7 +581,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           }
         }
       } catch (compensationError) {
-        logger.error("friend_migration_create_compensation_failed");
+        logger.error("friend_migrations.compensate_create_failed");
       }
       /*
         途中例外でも executing のまま放置しない。ここまでに反映・失敗した

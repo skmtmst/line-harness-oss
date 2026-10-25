@@ -385,7 +385,7 @@ export async function processMultiAccountDedupBroadcast(
           continue;
         }
       } catch (err) {
-        logger.error("services_dedup_broadcast_failed");
+        logger.error("dedup_broadcast.resolve_account_variables_failed");
         failedAccountIds.push(account.id);
         continue;
       }
@@ -402,7 +402,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
       if (missing.size > 0) {
-        logger.error("services_dedup_broadcast_failed");
+        logger.error("dedup_broadcast.validate_account_variables_failed");
         failedAccountIds.push(account.id);
         continue;
       }
@@ -575,7 +575,7 @@ export async function processMultiAccountDedupBroadcast(
         try {
           await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
         } catch (afterError) {
-          logger.error("services_dedup_broadcast_failed");
+          logger.error("dedup_broadcast.process_after_actions_failed");
         }
         sentAnyBatch = true; // 1 batch 以上 durable に記録した → 前進保証 & yield 可
         if (batchDeliveryError) {
@@ -593,7 +593,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
     } catch (err) {
-      logger.error("services_dedup_broadcast_failed");
+      logger.error("dedup_broadcast.send_account_batch_failed");
       failedAccountIds.push(account.id);
     }
   }

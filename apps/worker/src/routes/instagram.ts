@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -35,12 +36,10 @@ import {
   type InstagramConfig,
 } from '../services/instagram.js';
 export const instagram = new Hono<Env>();
-instagram.onError((e, c) =>
-  inputError(c, {
-      success: false,
-      error: e instanceof InstagramError ? e.code : 'instagram_failed',
-    }, e instanceof InstagramError ? e.status : 500, e instanceof InstagramError && e.code === 'account_required' ? ['lineAccountId'] : []),
-);
+instagram.onError((e, c) => {
+  if (!(e instanceof InstagramError)) throw new UnexpectedRouteError(c, { success: false, error: 'instagram_failed' });
+  return inputError(c, { success: false, error: e.code }, e.status, e.code === 'account_required' ? ['lineAccountId'] : []);
+});
 type Connection = {
   line_account_id: string;
   page_id: string;

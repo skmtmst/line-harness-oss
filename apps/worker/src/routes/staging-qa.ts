@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { Hono } from 'hono';
 import type { StagingQaJob, StagingQaSafety, StagingQaSession, StagingQaCronReceipt } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
@@ -234,7 +235,7 @@ stagingQa.post(`${BASE}/runs/:id/cron`, async (c) => {
       return c.json({ success: true, data: receipt, replayed: false });
     } catch {
       await db.prepare('UPDATE platform_settings SET value=? WHERE key=?').bind(JSON.stringify({ job, status: 'failed' }), receiptKey).run();
-      return c.json({ success: false, error: '試験処理に失敗しました。記録を確認してください' }, 500);
+      throw new UnexpectedRouteError(c, { success: false, error: '試験処理に失敗しました。記録を確認してください' });
     }
   } finally { await release(db, id, owner); }
 });
