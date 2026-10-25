@@ -911,7 +911,7 @@ export async function processTiktokPnlTick(
       if (one.status === 'error') result.failed += 1;
     } catch (error) {
       result.failed += 1;
-      logger.error("tiktok_pnl_sync_failed");
+      logger.error("tiktok_pnl.sync_failed");
     }
   }
   return result;

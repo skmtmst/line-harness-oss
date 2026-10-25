@@ -292,7 +292,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   try {
     updated = await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
   } catch {
-    logger.error('broadcast_definition_approval_update_failed');
+    logger.error("broadcasts.update_approval_definition_failed");
     return c.json({ success: false, error: '本文と承認状態を保存できませんでした。画面を読み直し、内容を確かめてから保存し直してください。', code: 'BROADCAST_SAVE_FAILED' }, 503);
   }
 

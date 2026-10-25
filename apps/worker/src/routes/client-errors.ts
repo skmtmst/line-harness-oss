@@ -34,7 +34,7 @@ clientErrors.post('/api/client-errors', requireRole('owner', 'admin', 'staff'), 
         : undefined,
     });
   } catch (error) {
-    logger.error("client_error_slack_report_failed");
+    logger.error("client_errors.report_to_slack_failed");
   }
   return c.json({ success: true }, 202);
 });

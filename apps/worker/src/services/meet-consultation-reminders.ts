@@ -311,7 +311,7 @@ export async function registerMeetConsultation(
     }).catch((error) => {
       if (error instanceof Error && error.message === 'V6_WRITE_GUARDED') return;
 
-      logger.error("services_meet_consultation_reminders_failed");
+      logger.error("meet_reminders.enroll_scenario_failed");
     });
   }
   // phase の後の最終確認。共有呼出しの間に勝者が動いていたら stale。
@@ -864,7 +864,7 @@ export async function processDueMeetConsultationReminders(
         // 共通checkpointと同じ取引ですでにsentなら通常の完了。
         const saved = await db.prepare('SELECT status FROM meet_consultation_notification_runs WHERE id=?')
           .bind(row.id).first<{status:string}>();
-        if (saved?.status !== 'sent') logger.error("meet_reminder_sent_after_cancel");
+        if (saved?.status !== 'sent') logger.error("meet_reminders.confirm_cancelled_delivery_failed");
       }
     } catch (error) {
       // 送信前に遮断された分を結果不明や上限到達にしない。次のcronで同じ段を拾う。

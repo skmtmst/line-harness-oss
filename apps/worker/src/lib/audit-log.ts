@@ -279,7 +279,7 @@ export function auditLog(
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    logger.error("lib_audit_log_failed");
+    logger.error("audit_log.write_failed");
   });
   try {
     c.executionCtx.waitUntil(task);

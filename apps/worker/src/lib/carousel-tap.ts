@@ -63,7 +63,7 @@ export function pickCarouselActions(
     const actions = column?.[String(actionIndex)];
     return Array.isArray(actions) ? actions : [];
   } catch {
-    logger.error("carouselTap_unreadable_carousel_actions_json_ignored");
+    logger.error("carousel_tap.parse_actions_failed");
     return [];
   }
 }

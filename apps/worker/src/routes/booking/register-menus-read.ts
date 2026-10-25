@@ -143,7 +143,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
       })),
     });
   } catch {
-    logger.error("booking_menu_list_failed");
+    logger.error("booking.list_menus_failed");
     return c.json({ error: 'booking_menu_data_unavailable' }, 503);
   }
 });
@@ -180,7 +180,7 @@ booking.put('/api/booking/admin/menus/:id/resources', requirePermission(BOOKING_
       data: { id: c.req.param('id'), version: result.version, resources: result.resources },
     });
   } catch {
-    logger.error("booking_menu_resources_update_failed");
+    logger.error("booking.update_menu_resources_failed");
     return c.json({ success: false, error: 'booking_menu_resources_save_failed' }, 503);
   }
 });

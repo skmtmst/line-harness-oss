@@ -719,7 +719,7 @@ export async function processDueGoogleSheetsSyncs(
     } catch (error) {
       failed += 1;
       // 詳細メッセージは応答内容を含み得るので、種別名だけを記録する。
-      logger.error("google_sheets_sync_failed");
+      logger.error("google_sheets.sync_failed");
     }
   }
   return { synced, skipped, failed };

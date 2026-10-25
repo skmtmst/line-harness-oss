@@ -246,7 +246,7 @@ async function markRawStorageFailure(
     await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails
       SET status = 'storage_failed', r2_key = '' WHERE id = ?`).bind(inboundId).run();
   } catch (recordError) {
-    logger.error("restaurant_email_storage_failure_record_failed");
+    logger.error("restaurant_email.record_storage_failure_failed");
   }
 }
 
@@ -446,7 +446,7 @@ export async function deleteExpiredRestaurantRawEmails(
       deleted += results.length;
     } catch (error) {
       failed += results.length;
-      logger.error("restaurant_raw_mail_retention_failed");
+      logger.error("restaurant_email.delete_expired_raw_mail_failed");
       break;
     }
   }

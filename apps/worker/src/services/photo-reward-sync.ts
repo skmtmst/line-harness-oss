@@ -207,7 +207,7 @@ async function deliverClaimedReward(
       ? { kind: 'retry_later', reason: classified.reason, nextAttemptAt: backoffNextAttempt(now, attemptCount, classified.reason) }
       : classified;
   } catch (error) {
-    logger.error("services_photo_reward_sync_failed");
+    logger.error("photo_reward_sync.deliver_claimed_reward_failed");
     outcome = {
       kind: 'retry_later',
       reason: 'ec_unavailable',

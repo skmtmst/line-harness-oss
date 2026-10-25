@@ -102,7 +102,7 @@ export async function handleCarouselTap(
             lineAccountId,
           });
         } catch (err) {
-          logger.error("services_carousel_tap_failed");
+          logger.error("carousel_tap.reply_limit_notice_failed");
         }
       }
       return { kind: 'blocked', replyTokenConsumed };
@@ -126,7 +126,7 @@ export async function handleCarouselTap(
       lineAccountId,
     });
   } catch (err) {
-    logger.error("services_carousel_tap_failed");
+    logger.error("carousel_tap.record_tap_failed");
   }
 
   if (rows.length === 0) return { kind: 'ran', executed: 0 };
@@ -135,7 +135,7 @@ export async function handleCarouselTap(
     const result = await runActionRows(db, rows, friend.id, {accountId:lineAccountId,sourceEventId:options.sourceEventId,executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}});
     return { kind: 'ran', executed: result.executed };
   } catch (err) {
-    logger.error("services_carousel_tap_failed");
+    logger.error("carousel_tap.run_actions_failed");
     return { kind: 'ran', executed: 0 };
   }
 }

@@ -85,7 +85,7 @@ export async function notifyAffiliate(db: D1Database, env: AffiliateNotifierEnv,
   try {
     await pushAffiliate(db, env, affiliateId, text);
   } catch (err) {
-    logger.error("services_affiliate_notifier_failed");
+    logger.error("affiliate_notifier.notify_affiliate_failed");
   }
 }
 

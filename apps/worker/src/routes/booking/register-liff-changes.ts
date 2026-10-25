@@ -249,7 +249,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       startsAt: row.starts_at,
     }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch (error) {
-    logger.error("booking_waitlist_promote_failed");
+    logger.error("booking.promote_waitlist_failed");
   }
   return c.json({
     ...(await bookingCancellationQuote(c.env.DB,bookingId,accountId)),

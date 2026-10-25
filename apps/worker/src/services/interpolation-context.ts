@@ -133,7 +133,7 @@ export async function resolveSendCommonVars(
       )));
     } catch (ledgerError) {
       // 台帳の書き込み失敗で送信拒否自体を潰さない。拒否は必ず成立させる。
-      logger.error("services_interpolation_context_failed");
+      logger.error("interpolation_context.resolve_send_common_vars_failed");
     }
     throw new CommonVarResolutionFailedError(resolved.failures, source);
   }

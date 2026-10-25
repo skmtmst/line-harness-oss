@@ -511,7 +511,7 @@ function kickQueueProcessing(c: Context<Env>, label: string): void {
       }),
     );
   } catch (kickErr) {
-    logger.warn("routes_broadcasts_warn");
+    logger.warn("broadcasts_definition.kick_queue_processing_failed");
   }
 }
 

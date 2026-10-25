@@ -51,7 +51,7 @@ export async function getSendPermissionForTenant(
     const entitlements = resolveEntitlements(billing);
     result = { allowed: entitlements.canSend, reason: entitlements.blockedReason, tenantId, state: entitlements.state };
   } catch (error) {
-    logger.warn("services_send_entitlements_warn");
+    logger.warn("send_entitlements.get_send_permission_for_tenant_failed");
     result = { ...ALLOW_UNKNOWN, tenantId };
   }
   cache?.set(tenantId, result);

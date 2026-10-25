@@ -231,7 +231,7 @@ async function deleteR2Objects(
     return { deleted: keys.length, failed: 0 };
   } catch (error) {
     // 画像が消せなくても行の削除は進める。顧客データを残し続ける方が重い。
-    logger.error("services_tenant_data_purge_failed");
+    logger.error("tenant_data_purge.delete_r2_objects_failed");
     return { deleted: 0, failed: keys.length };
   }
 }

@@ -278,7 +278,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     ? await getConnectorSecret(c.env.DB, requestedLineAccountId, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY)
     : null;
   if (!globalSecret && !headerConnectorSecret) {
-    logger.error("ec_event_no_usable_webhook_secret_global_or_connector");
+    logger.error("ec_integrations.resolve_webhook_secret_failed");
     return c.json({ success: false, error: 'Integration is not configured' }, 503);
   }
 
@@ -477,7 +477,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       return c.json({ success: true, status: 'view_counts_saved', ...result });
     } catch (viewError) {
       await c.env.DB.prepare(`UPDATE ec_events SET status = 'failed', error_message = 'publication_views_failed', updated_at = ? WHERE id = ?`).bind(now,row.id).run().catch(() => undefined);
-      logger.error("ec_event_publication_views_failed");
+      logger.error("ec_integrations.publish_event_views_failed");
       return c.json({ success: false, error: 'Event processing failed' }, 503);
     }
   }

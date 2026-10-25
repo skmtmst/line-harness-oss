@@ -81,7 +81,7 @@ export async function runEventBookingExpirer(
         cancelReason: `event_expired:${row.id}:by:system`,
       });
     } catch (error) {
-      logger.error("services_event_booking_expirer_failed");
+      logger.error("event_booking.cancel_reminders_failed");
     }
     await enqueueEventWaitlistPromotion(db, {
       lineAccountId: row.line_account_id,
@@ -125,11 +125,11 @@ export async function runEventBookingExpirer(
           allowLegacyFallback: false,
         });
       } catch (error) {
-        logger.error("services_event_booking_expirer_failed");
+        logger.error("event_booking.repair_reminders_failed");
       }
     }
   } catch (error) {
-    logger.error("services_event_booking_expirer_failed");
+    logger.error("event_booking.scan_stale_reminders_failed");
   }
 
   const idempotencyPurged = await purgeExpiredEventIdempotency(db, params.now);
