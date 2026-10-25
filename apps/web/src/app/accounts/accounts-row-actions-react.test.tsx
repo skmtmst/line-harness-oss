@@ -13,6 +13,7 @@ vi.hoisted(() => {
 
 const listAccounts = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
+const staff = vi.hoisted(() => ({ role: 'owner' as string | null }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -46,7 +47,10 @@ vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/tes
 }))
 
 import AccountsPage from './page'
-vi.mock('@/lib/staff-role', async original => ({ ...await original(), useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original(), useStaffRole: () => staff.role }))
+vi.mock('@/components/accounts/account-ordering', () => ({
+  default: () => <div role="dialog" aria-label="LINEアカウント階層を編集" data-testid="account-ordering" />,
+}))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -57,6 +61,7 @@ beforeEach(() => {
   document.documentElement.dataset.theme='v8'
   window.history.replaceState(null,'','/accounts')
   push.mockClear()
+  staff.role = 'owner'
   listAccounts.mockImplementation(async () => ({
     success: true,
     data: [{
@@ -128,5 +133,117 @@ describe('V7vn3 LINEアカウント一覧の行操作', () => {
     await act(async () => { detail?.click() })
     await flush()
     expect(host.querySelector('[aria-label="本店アカウントの操作"]')?.getAttribute('aria-expanded')).toBe('false')
+  })
+})
+
+const ROW = {
+  channelSecret: null, timezone: 'Asia/Tokyo', parentLineAccountId: null,
+  createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+}
+
+function listOf(...rows: Array<Record<string, unknown>>) {
+  listAccounts.mockImplementation(async () => ({ success: true, data: rows.map((row) => ({ ...ROW, ...row })) }))
+}
+
+const rowNames = () => [...host.querySelectorAll('tbody tr[data-row-id]')].map((row) => row.getAttribute('data-row-id'))
+
+async function renderList() {
+  await act(async () => { root.render(<AccountsPage />) })
+  await flush()
+}
+
+describe('V7vn3 LINEアカウント一覧の骨組みと道具の段', () => {
+  beforeEach(() => {
+    listOf(
+      { id: 'main', name: '本店', channelId: '2007000001', isActive: true, isDefault: true, webhook: { status: 'matched' }, stats: { friendCount: 120 }, archivedAt: null },
+      { id: 'branch', name: '支店', channelId: '2007000002', isActive: false, isDefault: false, webhook: { status: 'unknown' }, stats: { friendCount: 5 }, archivedAt: null },
+      { id: 'old', name: '旧店', channelId: '2007000003', isActive: false, isDefault: false, webhook: null, archivedAt: '2026-09-01T00:00:00.000Z' },
+    )
+  })
+
+  it('板 V7vn3 の枠に、数の4枚と共通の表を出し、既定の行に印を付ける', async () => {
+    await renderList()
+    expect(host.querySelector('[data-design-node="V7vn3"]'), '板の枠').toBeTruthy()
+    const cards = host.querySelector('[data-design="KPIs"]')?.children
+    expect(cards).toHaveLength(4)
+    expect([...cards!].map((card) => card.textContent)).toEqual([
+      expect.stringContaining('つないでいる'), expect.stringContaining('有効'), expect.stringContaining('接続に問題'), expect.stringContaining('友だちの合計'),
+    ])
+    const table = host.querySelector('table[aria-label="LINEアカウントの一覧"]')
+    expect(table?.getAttribute('data-table-presentation')).toBe('account-list')
+    expect(table?.querySelector('tr[data-row-id="main"] [aria-label="既定のアカウント"]')).toBeTruthy()
+    expect(table?.querySelector('tr[data-row-id="branch"] [aria-label="既定のアカウント"]')).toBeNull()
+  })
+
+  it('並び替えの部品は一覧に置かず、「並び順と親子を変える」で窓として開く', async () => {
+    await renderList()
+    expect(document.querySelector('[data-testid="account-ordering"]')).toBeNull()
+    const open = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('並び順と親子を変える'))
+    await act(async () => { open?.click() })
+    await flush()
+    expect(document.querySelector('[data-testid="account-ordering"]')).toBeTruthy()
+  })
+
+  it('検索欄は道具の段に1つだけで、打った言葉で行を絞り込む', async () => {
+    await renderList()
+    const searches = host.querySelectorAll('input[aria-label="アカウント名・チャネル ID で探す"]')
+    expect(searches).toHaveLength(1)
+    const search = searches[0] as HTMLInputElement
+    expect(search.placeholder).toBe('アカウント名・チャネル ID で探す')
+    const filters = host.querySelector('[aria-label="状態で絞り込む"]')
+    expect(filters, '絞り込みの札は検索欄と同じ段').toBeTruthy()
+    expect(search.closest('div:has([aria-label="状態で絞り込む"])')).toBeTruthy()
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, '2007000002')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    // 検索欄は打ち終わりを 300ms 待ってから絞り込む。
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)) })
+    await flush()
+    expect(rowNames()).toEqual(['branch'])
+  })
+
+  it('絞り込みの札は状態ごとの実数を出し、選べない件数表示は置かない', async () => {
+    await renderList()
+    const filters = host.querySelector('[aria-label="状態で絞り込む"]')!
+    const count = (label: string) => [...filters.querySelectorAll('button')].find((button) => button.textContent?.startsWith(label))?.querySelector('[data-segment-count]')?.textContent
+    expect(count('すべて')).toBe('3')
+    expect(count('稼働中')).toBe('1')
+    expect(count('停止中')).toBe('1')
+    expect(count('アーカイブ')).toBe('1')
+    expect(host.textContent).not.toContain('20件表示')
+  })
+
+  it('読み込みに失敗している間は、札に件数を出さない', async () => {
+    listAccounts.mockImplementation(async () => { throw new TypeError('fetch failed') })
+    await renderList()
+    const filters = host.querySelector('[aria-label="状態で絞り込む"]')!
+    expect(filters.querySelectorAll('[data-segment-count]')).toHaveLength(0)
+  })
+
+  it('アーカイブ済みの行の「⋯」は「アーカイブから戻す」を出し、「アーカイブ」は出さない', async () => {
+    await renderList()
+    const filters = host.querySelector('[aria-label="状態で絞り込む"]')!
+    const archived = [...filters.querySelectorAll('button')].find((button) => button.textContent?.startsWith('アーカイブ'))
+    await act(async () => { archived?.click() })
+    await flush()
+    expect(rowNames()).toEqual(['old'])
+    const menu = host.querySelector('button[aria-label="旧店の操作"]') as HTMLButtonElement
+    await act(async () => { menu.click() })
+    await flush()
+    const items = [...document.body.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())
+    expect(items).toContain('アーカイブから戻す')
+    expect(items).not.toContain('アーカイブ')
+  })
+
+  it('閲覧のみには、行の操作を詳細と確かめ直しだけにして、頭の変える操作を出さない', async () => {
+    staff.role = 'staff'
+    await renderList()
+    expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('並び順と親子を変える'))).toBe(false)
+    const menu = host.querySelector('button[aria-label="本店の操作"]') as HTMLButtonElement
+    await act(async () => { menu.click() })
+    await flush()
+    const items = [...document.body.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())
+    expect(items).toEqual(['詳細', '接続をもう一度確かめる'])
   })
 })
