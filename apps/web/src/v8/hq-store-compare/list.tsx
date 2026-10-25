@@ -29,7 +29,7 @@ import { fetchApi } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import type { AccountWithStats } from '@/contexts/account-context'
-import { diffTitle, formatDiff, formatMetric, METRICS, diffTone, worseCount, type MetricDef } from './metrics'
+import { coverageLabel, diffTitle, formatDiff, formatMetric, METRICS, diffTone, worseCount, type MetricDef } from './metrics'
 import styles from './list.module.css'
 
 /*
@@ -194,7 +194,7 @@ export default function StoreComparisonList() {
                 <Tr interactive onOpen={() => setOpenId(row.accountId)} data-row-id={row.accountId}>
                   <Td grow><span className={styles.storeName}><TruncatedText value={row.name} /></span></Td>
                   {METRICS.map((def) => (
-                    <Td key={def.key} align="right"><MetricCell def={def} metric={row.metrics[def.key]} compare={compare} computed={!!row.computedAt} /></Td>
+                    <Td key={def.key} align="right"><MetricCell def={def} metric={row.metrics[def.key]} compare={compare} computed={!!row.computedAt} coverage={coverageLabel(def.key, row)} /></Td>
                   ))}
                 </Tr>
                 {expired ? (
@@ -226,7 +226,7 @@ export default function StoreComparisonList() {
         skeleton
         boardId="W4fI7A"
         title="店の比較"
-        help={<>店ごとに、友だち・予約・来店・返事の速さを並べて見ます。平均より悪い数は赤の札で知らせます。数は毎朝、前の日の分まで更新します。数の横の札は、「比べる相手」（前の期間か全店の平均）との差で、赤は悪い方・緑は良い方です。{METRICS.map((def) => <span key={def.key}><br />{`${def.label}：${def.help}`}</span>)}</>}
+        help={<>店ごとに、友だち・予約・来店・返事の速さを並べて見ます。平均より悪い数は赤の札で知らせます。数は毎朝、前の日の分まで更新します。数の横の札は、「比べる相手」（前の期間か全店の平均）との差で、赤は悪い方・緑は良い方です。期間の途中から集計した店は、集計できた日の分だけで数を出し、件数の横に「12 日分」のように日数を出します（日数が違うので差の札は出しません）。{METRICS.map((def) => <span key={def.key}><br />{`${def.label}：${def.help}`}</span>)}</>}
         toolbar={toolbar}
         pagination={status === 'ready' && total > 0 ? (
           <ListPagePagination>
@@ -240,8 +240,8 @@ export default function StoreComparisonList() {
             {notice ? <Notice tone="danger" message={notice} /> : null}
             {status === 'ready' && notComputed > 0 ? (
               <Notice tone="info" message={notComputed === data?.rows.length
-                ? `${NOT_COMPUTED}。期間のすべての日がそろうと数が出ます。`
-                : `集計がそろっていない店が ${notComputed} 店あります。${SNAPSHOT_TIME}から前の日の分まで集計し、期間のすべての日がそろうと数が出ます。`} />
+                ? `${NOT_COMPUTED}。集計できた日の分から数が出ます。`
+                : `まだ集計していない店が ${notComputed} 店あります。${SNAPSHOT_TIME}から前の日の分まで集計し、集計できた日の分から数が出ます。`} />
             ) : null}
           </ListPageSection>
         ) : null}
@@ -253,16 +253,16 @@ export default function StoreComparisonList() {
   )
 }
 
-function MetricCell({ def, metric, compare, computed }: { def: MetricDef; metric: StoreComparisonRow['metrics'][MetricDef['key']] | undefined; compare: 'previous' | 'average'; computed: boolean }) {
+function MetricCell({ def, metric, compare, computed, coverage }: { def: MetricDef; metric: StoreComparisonRow['metrics'][MetricDef['key']] | undefined; compare: 'previous' | 'average'; computed: boolean; coverage: string | null }) {
   if (!metric || !metric.available || metric.value === null) {
     return <span className={styles.cellEmpty} title={computed ? 'この数はまだ取れていません' : NOT_COMPUTED}>—</span>
   }
   const diff = formatDiff(def.key, metric.diff)
   const tone = diffTone(def, metric.diff)
   return (
-    <span className={styles.cell} title={diffTitle(def.key, metric.diff, compare)}>
+    <span className={styles.cell} title={coverage ? `期間のうち${coverage}の数です（日数が違うので差は出しません）` : diffTitle(def.key, metric.diff, compare)}>
       {formatMetric(def.key, metric.value)}
-      <span className={styles.chipSlot}>{diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : null}</span>
+      <span className={styles.chipSlot}>{diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : coverage ? <span className={styles.coverage}>{coverage}</span> : null}</span>
     </span>
   )
 }
@@ -336,13 +336,14 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
                 const metric = row.metrics[def.key]
                 const tone = diffTone(def, metric?.diff ?? null)
                 const diff = formatDiff(def.key, metric?.diff ?? null)
+                const coverage = metric?.available && metric.value !== null ? coverageLabel(def.key, row) : null
                 return (
                   <div key={def.key}>
                   <div className={styles.metricRow}>
                     <span className={styles.metricName}>{def.label}</span>
                     <span className={styles.metricValue}>
                       {metric?.available && metric.value !== null ? formatMetric(def.key, metric.value) : <span className={styles.cellEmpty}>—</span>}
-                      {diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : null}
+                      {diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : coverage ? <span className={styles.coverage}>{coverage}</span> : null}
                     </span>
                   </div>
                   {current.status === 'ready' && current.data?.trend?.length ? <ValueBarChart label={`${def.label}の日ごとの推移`} unit={metric?.unit ?? ''} signed={def.key === 'friendChange'} items={current.data.trend.map(day => ({key:day.date,label:day.date,value:day.values[def.key],note:day.state==='failed'?'集計に失敗':day.state==='missing'?'取得待ち':undefined}))} /> : null}
