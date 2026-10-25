@@ -72,13 +72,13 @@ it.each(paths)('%sの保存済み失敗は再実行せず事故番号と通報�
   expect(mocks.report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
 });
 
-it.each(paths)('%sの保存済み成功はそのまま返し、作り直しも事故通報もしない', async path => {
+it.each(paths)('%sの保存済み成功の予約情報を返し、作り直しも事故通報もしない', async path => {
   const saved = { booking_id: 'already-created', status: 'confirmed' };
   mocks.reserve.mockResolvedValue({ kind: 'cached', status: 201, body: saved });
   const { request, work } = setup();
   const response = await request(path);
   expect(response.status).toBe(201);
-  expect(await response.json()).toEqual(saved);
+  expect(await response.json()).toEqual(path.startsWith('/api/liff/') ? { ...saved, success: true } : saved);
   expect(work).not.toHaveBeenCalled();
   expect(mocks.finalize).not.toHaveBeenCalled();
   expect(mocks.report).not.toHaveBeenCalled();

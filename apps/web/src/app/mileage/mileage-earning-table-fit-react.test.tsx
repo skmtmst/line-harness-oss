@@ -179,7 +179,7 @@ function installWebStorage(): void {
 beforeEach(() => {
   installWebStorage()
   globalThis.localStorage.setItem('lh_selected_account', 'account-1')
-  /* V8 の器で描く（`useAdminTheme` は `<html data-theme>` を読む）。 */
+  /* 管理画面と同じ V8 の器で描く。 */
   document.documentElement.dataset.theme = 'v8'
   createdRulePayloads.length = 0
   stubFetch()

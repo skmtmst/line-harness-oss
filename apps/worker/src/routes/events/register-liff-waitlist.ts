@@ -1,3 +1,4 @@
+import { liffBookingJson, liffBookingResponse } from '../liff-booking-response.js';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
@@ -18,28 +19,28 @@ import { startsAtJst } from './time-input.js';
 export function registerLiffWaitlist(events: Hono<Env>): void {
 events.get('/api/liff/events/waitlist/:token', async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  if (!callerLineUserId) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const offerAccountId = await getEventWaitlistOfferAccountId(c.env.DB, c.req.param('token'));
-  if (!offerAccountId) return bad(c, 'waitlist_offer_not_found', 404);
-  if (!await verifyCallerLineUserId(c.req.header('Authorization'), c.env, offerAccountId)) return bad(c, 'unauthorized', 401);
+  if (!offerAccountId) return liffBookingResponse(c, bad(c, 'waitlist_offer_not_found', 404));
+  if (!await verifyCallerLineUserId(c.req.header('Authorization'), c.env, offerAccountId)) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const data = await getEventWaitlistOffer(c.env.DB, { token: c.req.param('token'), callerLineUserId });
-  if (!data) return bad(c, 'waitlist_offer_not_found', 404);
-  return c.json({ success: true, data });
+  if (!data) return liffBookingResponse(c, bad(c, 'waitlist_offer_not_found', 404));
+  return liffBookingJson(c, { success: true, data });
 });
 
 events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  if (!callerLineUserId) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const offerAccountId = await getEventWaitlistOfferAccountId(c.env.DB, c.req.param('token'));
-  if (!offerAccountId) return bad(c, 'waitlist_offer_not_found', 404);
-  if (!await verifyCallerLineUserId(c.req.header('Authorization'), c.env, offerAccountId)) return bad(c, 'unauthorized', 401);
+  if (!offerAccountId) return liffBookingResponse(c, bad(c, 'waitlist_offer_not_found', 404));
+  if (!await verifyCallerLineUserId(c.req.header('Authorization'), c.env, offerAccountId)) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const result = await acceptEventWaitlistOffer(c.env.DB, {
     token: c.req.param('token'),
     callerLineUserId,
   });
-  if (result.kind === 'not_found') return bad(c, 'waitlist_offer_not_found', 404);
-  if (result.kind === 'expired') return bad(c, 'waitlist_offer_expired', 410);
-  if (result.kind === 'unavailable') return bad(c, 'waitlist_offer_unavailable', 409);
+  if (result.kind === 'not_found') return liffBookingResponse(c, bad(c, 'waitlist_offer_not_found', 404));
+  if (result.kind === 'expired') return liffBookingResponse(c, bad(c, 'waitlist_offer_expired', 410));
+  if (result.kind === 'unavailable') return liffBookingResponse(c, bad(c, 'waitlist_offer_unavailable', 409));
 
   // DB上の予約確定が先。以降の派生処理が失敗しても、承諾そのものを失敗へ戻さない。
   const reminders = computeRemindersForBooking({
@@ -127,7 +128,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     }
   }
 
-  return c.json({
+  return liffBookingJson(c, {
     success: true,
     data: {
       bookingId: result.bookingId,

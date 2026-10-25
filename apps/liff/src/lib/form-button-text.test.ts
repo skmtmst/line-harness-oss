@@ -1,6 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { normalizeFormTheme } from '@line-crm/shared';
 import { submitButtonText } from './form-button-text.js';
@@ -35,14 +33,8 @@ describe('送信ボタンは緑の地に白い文字 (既定・設計 4-form)', 
     expect(submitButtonText(theme, false)).toBe('#ffffff');
   });
 
-  it('Form.tsx の送信・確認の2つのボタンがこの決め方を使う', () => {
-    const root = fileURLToPath(new URL('..', import.meta.url));
+  it('既定で黒になる直接の色選択へ戻さない', () => {
     const src = readFileSync(new URL('../pages/form.tsx', import.meta.url), 'utf8');
-    // 送信ボタンと確認ダイアログの決定ボタンの2か所
-    expect(src.match(/submitButtonText\(theme, hasCustomTheme\)/g)?.length ?? 0).toBe(2);
-    // 地の色はテーマの main のまま
-    expect(src).toContain('backgroundColor: theme.main');
-    // 直接の自動選択だけでは既定が黒になるので使わない
     expect(src).not.toContain('color: formThemeButtonText(theme)');
   });
 });

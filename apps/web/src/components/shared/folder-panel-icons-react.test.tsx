@@ -79,8 +79,7 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     expect(button.querySelector('.' + styles.folderIcon + ' [data-caller-icon]')).toBeNull()
   })
 
-  it('旧テーマ指定でもすべての印は現役の中立の色に固定する', async () => {
-    document.documentElement.dataset.theme = 'v7'
+  it('すべての印を旧テーマ専用の要素で描かない', async () => {
     const { button, icon } = await render({ id: 'all', kind: 'all', label: 'すべて', count: 1, color: 'red' })
     expect(icon.classList.contains('lucide-inbox')).toBe(true)
     expect(icon.style.color).toBe('var(--color-ink)')

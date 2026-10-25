@@ -1,3 +1,4 @@
+import { liffBookingJson } from '../liff-booking-response.js';
 import type { Context, Hono } from 'hono';
 import { BOOKING_MENUS_KEY, BOOKING_SETTINGS_KEY } from '@line-crm/shared';
 import type { Env } from '../../worker-env.js';
@@ -53,7 +54,7 @@ export function registerPhotos(booking: Hono<Env>): void {
     saveBookingStorePhotos(c.env.DB, accountId, readStorePhotos(body))));
   booking.get('/api/liff/booking/store-photos', async c => {
     const accountId = await resolveAccountIdFromLiff(c);
-    if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+    if (!accountId) return liffBookingJson(c, { error: 'unknown_liff' }, 404);
     try {
     const row = await c.env.DB.prepare(`SELECT bs.store_photo_media_id,bs.store_photo_interior_media_id,bs.store_photo_waiting_media_id,bs.store_photo_order_json,flags.value AS visibility_json
       FROM booking_settings bs LEFT JOIN account_settings flags ON flags.line_account_id=bs.line_account_id AND flags.key='booking.store_photo_visibility' WHERE bs.line_account_id=?`).bind(accountId)
@@ -61,14 +62,14 @@ export function registerPhotos(booking: Hono<Env>): void {
     const values = { exterior: row?.store_photo_media_id, interior: row?.store_photo_interior_media_id, waiting: row?.store_photo_waiting_media_id };
     const order = row ? JSON.parse(row.store_photo_order_json) as Array<keyof typeof values> : [];
     const visibility = storePhotoVisibility(row?.visibility_json);
-    return c.json({ success: true, data: order.flatMap(slot => {
+    return liffBookingJson(c, { success: true, data: order.flatMap(slot => {
       if (!visibility[slot]) return [];
       const photo = bookingPhoto(origin(c), values[slot]);
       return photo ? [{ slot, url: photo.url }] : [];
     }) });
     } catch {
       logger.error("booking.read_store_photos_failed");
-      return c.json({ error: 'booking_photos_unavailable' }, 503);
+      return liffBookingJson(c, { error: 'booking_photos_unavailable' }, 503);
     }
   });
 }

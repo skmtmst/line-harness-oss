@@ -1,56 +1,50 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
+import Button from './Button.js';
+import { styleBrowser } from '../../test-utils/style-browser.js';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const root = join(HERE, '..', '..');
-const src = (...parts: string[]): string => readFileSync(join(root, ...parts), 'utf8');
-const css = (src('index.css') + src('components', 'ui', 'liff-skin.css'));
+let view: Awaited<ReturnType<typeof styleBrowser>>;
+beforeAll(async () => { view = await styleBrowser(); }, 30000);
+afterAll(async () => { await view?.browser.close(); });
+afterEach(async () => { await view.page.mouse.up(); await view.page.emulateMedia({ reducedMotion: 'no-preference' }); });
 
-/*
- * ★A LIFF の手応え (オーナー決定。V8.pen 修正案 L-1・L-4)。
- * 色・書体 (L-2・L-3) は変えない。
- */
-describe('押す手応え (0.96・80ms・離すとばね160ms)', () => {
-  it('ボタン・選ぶ行・日時の枠が共通の押しを通す', () => {
-    expect(src('components', 'ui', 'Button.tsx')).toContain('liff-press');
-    expect(src('components', 'menu-list.tsx')).toContain('<Button variant="option"');
-    expect(src('components', 'staff-list.tsx')).toContain('<Button variant="option"');
-    expect(src('components', 'date-time-picker.tsx')).toContain('<Button variant="time"');
-  });
-
-  it('押しの値は指示どおり (80ms・0.96・ばね160ms)', () => {
-    expect(css).toContain('transition-duration: 80ms');
-    expect(css).toContain('scale(0.96)');
-    expect(css).toContain('cubic-bezier(0.34, 1.36, 0.64, 1)');
-    expect(css).toContain('160ms');
-  });
+it('押すと縮み、離すと元に戻る', async () => {
+  await view.show(renderToStaticMarkup(createElement(Button, {}, '選ぶ')));
+  const button = view.page.getByRole('button', { name: '選ぶ' });
+  await button.hover();
+  await view.page.mouse.down();
+  await expect.poll(() => button.evaluate(el => getComputedStyle(el).transform)).toBe('matrix(0.96, 0, 0, 0.96, 0, 0)');
+  expect(await button.evaluate(el => getComputedStyle(el).transitionDuration)).toBe('0.08s');
+  await view.page.mouse.up();
+  expect(await button.evaluate(el => getComputedStyle(el).transitionTimingFunction)).toContain('cubic-bezier(0.34, 1.36, 0.64, 1)');
+  await expect.poll(() => button.evaluate(el => getComputedStyle(el).transform)).toBe('none');
+  expect(await button.evaluate(el => getComputedStyle(el).transitionDuration)).toBe('0.16s, 0.16s');
 });
 
-describe('読み込みの光 (1.2s・0.3秒以内は出さない)', () => {
-  it('光が左から右へ 1.2s で流れる', () => {
-    expect(css).toContain('liff-feel-shimmer');
-    expect(css).toContain('1.2s');
-    expect(css).toContain('translateX(-100%)');
-    expect(css).toContain('translateX(100%)');
-  });
+it('骨組みの光が左から右へ流れ、段の中身は右から現れる', async () => {
+  await view.show('<div class="liff-shimmer-bone" style="width:200px;height:40px"></div><main class="liff-step" style="animation-fill-mode:both">中身</main>');
+  const animations = await view.page.evaluate(() => document.getAnimations().map(animation => {
+    animation.pause();
+    const effect = animation.effect as KeyframeEffect;
+    return { duration: effect.getTiming().duration, frames: effect.getKeyframes().map(frame => ({ transform: frame.transform, opacity: frame.opacity })) };
+  }));
+  expect(animations).toContainEqual({ duration: 1200, frames: [{ transform: 'translateX(-100%)', opacity: undefined }, { transform: 'translateX(100%)', opacity: undefined }] });
+  expect(animations).toContainEqual({ duration: 240, frames: [{ transform: 'translateX(24px)', opacity: '0' }, { transform: 'translateX(0px)', opacity: '1' }] });
 });
 
-describe('手順の移り変わり (右から24px＋薄く・240ms)', () => {
-  it('段が替わるたび中身だけ移り変わる', () => {
-    const booking = src('pages', 'booking.tsx');
-    expect(booking).toContain('key={step}');
-    expect(booking).toContain('liff-step');
-    expect(css).toContain('translateX(24px)');
-    expect(css).toContain('240ms');
-    expect(css).toContain('cubic-bezier(0.2, 0.8, 0.2, 1)');
-  });
-});
-
-describe('動きを減らす設定では薄く入れ替えるだけ', () => {
-  it('prefers-reduced-motion で押し・光・滑りを止める', () => {
-    expect(css).toContain('prefers-reduced-motion');
-    expect(css).toContain('liff-feel-fade');
-  });
+it('動きを減らす設定では押しと光を止め、段は薄く入れ替わる', async () => {
+  await view.page.emulateMedia({ reducedMotion: 'reduce' });
+  await view.show(renderToStaticMarkup(createElement(Button, {}, '選ぶ')) + '<div class="liff-shimmer-bone"></div><main class="liff-step" style="animation-fill-mode:both">中身</main>');
+  const button = view.page.getByRole('button');
+  await button.hover();
+  await view.page.mouse.down();
+  expect(await button.evaluate(el => getComputedStyle(el).transform)).toBe('none');
+  expect(await button.evaluate(el => getComputedStyle(el).transitionProperty)).toBe('none');
+  expect(await view.page.locator('.liff-shimmer-bone').evaluate(el => getComputedStyle(el, '::after').animationName)).toBe('none');
+  const frames = await view.page.locator('main').evaluate(el => (el.getAnimations()[0].effect as KeyframeEffect).getKeyframes());
+  expect(frames.map(frame => frame.opacity)).toEqual(['0', '1']);
+  expect(frames.every(frame => frame.transform === undefined)).toBe(true);
+  await view.page.mouse.up();
+  await view.page.emulateMedia({ reducedMotion: 'no-preference' });
 });

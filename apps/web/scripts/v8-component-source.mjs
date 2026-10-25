@@ -21,7 +21,7 @@ export function isV8Adapter(ast) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const name = node.tagName.getText(ast)
       if (/V8$/.test(name)) {
-        // 直通の入口を拾い、テーマ分岐を持つ旧画面の中身まで新たに広げない。
+        // 直接返す部品と、状態によって出し分ける子要素を区別する。
         let conditional = false
         let returned = false
         for (let parent = node.parent; parent; parent = parent.parent) {

@@ -9,7 +9,6 @@ vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'f
 vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn(),replace:vi.fn(),prefetch:vi.fn()}),usePathname:()=>'/restaurant-test',useSearchParams:()=>new URLSearchParams()}));
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}));
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> 'owner',canManageRole:()=>true}));
-vi.mock('@/lib/use-admin-theme',()=>({useAdminTheme:()=> 'v8'}));
 vi.mock('@/components/shared/toast',()=>({notifySaved:saved,notifyToast:vi.fn(),notifyError:vi.fn()}));
 import Shell from '@/v8/restaurant/booking-kit/shell';
 import {snapshotOf} from '@/v8/restaurant/booking-kit/test-data';

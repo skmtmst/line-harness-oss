@@ -1,10 +1,11 @@
+import { liffBookingInputError, liffBookingJson, liffBookingResponse } from '../liff-booking-response.js';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bookingCancellationQuote } from '../../features/booking/booking-cancellation/index.js';
 import { syncSelfBookingMeet } from '../booking-self-meet-sync.js';
 import type { SelfBookingChange } from '../booking-self-meet-sync.js';
-import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
+import { inputJsonBoundary } from '../../lib/input-errors.js';
 import { cancelByTrigger } from '../../services/reminder-trigger.js';
 import { enqueueCalendarDeleteOperation, removeBookingFromGoogle, runCalendarDeleteOperation } from '../../features/booking/booking-calendar-sync/index.js';
 import { type BookingStatus } from '../../features/booking/booking-types/index.js';
@@ -19,16 +20,16 @@ import { googleCredentials } from './availability.js';
 export function registerLiffChanges(booking: Hono<Env>): void {
 booking.post('/api/liff/booking/:id/reschedule', inputJsonBoundary(), async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
+  if (!caller.ok) return liffBookingInputError(c, { error: caller.error }, caller.status, []);
   const bookingId = c.req.param('id');
   const body = await c.req.json<{
     starts_at?: unknown;
     lock_version?: unknown;
     reason?: unknown;
   }>().catch(() => null);
-  if (!body) return inputError(c, { error: 'invalid_json' }, 400, []);
+  if (!body) return liffBookingInputError(c, { error: 'invalid_json' }, 400, []);
   if (!Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
-    return inputError(c, { error: 'missing_lock_version' }, 400, ["lock_version"]);
+    return liffBookingInputError(c, { error: 'missing_lock_version' }, 400, ["lock_version"]);
   }
   const self: SelfBookingChange = {
     accountId: caller.accountId,
@@ -45,7 +46,7 @@ booking.post('/api/liff/booking/:id/reschedule', inputJsonBoundary(), async (c) 
     starts_at: typeof body.starts_at === 'string' ? body.starts_at : undefined,
     reason: typeof body.reason === 'string' ? body.reason : undefined,
   }, self);
-  if (res.status !== 200) return res;
+  if (res.status !== 200) return liffBookingResponse(c, res);
   const after = await c.env.DB
     .prepare(`SELECT external_event_id FROM bookings WHERE id = ? AND line_account_id = ?`)
     .bind(bookingId, caller.accountId)
@@ -58,17 +59,17 @@ booking.post('/api/liff/booking/:id/reschedule', inputJsonBoundary(), async (c) 
     before?.external_event_id ?? after?.external_event_id ?? null,
     Number(out.lock_version),
   );
-  return c.json({ ...out, meet_sync: meetSync });
+  return liffBookingJson(c, { ...out, meet_sync: meetSync });
 });
 
 booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
+  if (!caller.ok) return liffBookingInputError(c, { error: caller.error }, caller.status, []);
   const accountId = caller.accountId;
   const bookingId = c.req.param('id');
   const body = await c.req.json<{ lock_version?: unknown; feeAccepted?:unknown;expectedFeeAmount?:unknown }>().catch(() => null);
   if (!body || !Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
-    return inputError(c, { error: 'missing_lock_version' }, 400, ["lock_version"]);
+    return liffBookingInputError(c, { error: 'missing_lock_version' }, 400, ["lock_version"]);
   }
   const expectedVersion = Number(body.lock_version);
   const row = await c.env.DB
@@ -90,7 +91,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       external_event_id: string | null;
     }>();
   if (!row || row.friend_id !== caller.friendId) {
-    return c.json({ error: 'booking_not_found' }, 404);
+    return liffBookingJson(c, { error: 'booking_not_found' }, 404);
   }
   const self: SelfBookingChange = {
     accountId, friendId: caller.friendId, lineUserId: caller.lineUserId,
@@ -101,7 +102,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   // 同じ UPDATE のため、claim→監査の別 await 窓は存在しない。時計の同msでも区別できる。
   if (row.status === 'cancelled' || row.status === 'expired') {
     if (Number(row.lock_version) !== expectedVersion) {
-      return c.json({ error: 'version_conflict' }, 409);
+      return liffBookingJson(c, { error: 'version_conflict' }, 409);
     }
     const claimAt = new Date().toISOString();
     const claimId = crypto.randomUUID();
@@ -120,8 +121,8 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
         .prepare(`SELECT lock_version, status FROM bookings WHERE id = ? AND line_account_id = ?`)
         .bind(bookingId, accountId)
         .first<{ lock_version: number; status: string }>();
-      if (!current) return c.json({ error: 'booking_not_found' }, 404);
-      return c.json({ error: 'version_conflict' }, 409);
+      if (!current) return liffBookingJson(c, { error: 'booking_not_found' }, 404);
+      return liffBookingJson(c, { error: 'version_conflict' }, 409);
     }
     // 主張の証跡 (排他には使わない。所有権は上の単文 CAS の cancel_claim_id)。
     await recordBookingAudit(c.env.DB, {
@@ -139,7 +140,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
     // 送信中は 409 で再試行させる。未実施の副作用を適用対象外にしない。
     try {
       const retry = await runSelfBookingCancelSideEffects(c, self, row);
-      return c.json({
+      return liffBookingJson(c, {
         status: row.status,
         lock_version: Number(row.lock_version),
         retried: true,
@@ -147,23 +148,23 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       });
     } catch (error) {
       if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
-        return c.json({ error: 'send_in_flight_retry' }, 409);
+        return liffBookingJson(c, { error: 'send_in_flight_retry' }, 409);
       }
       throw error;
     }
   }
   if (row.status !== 'requested' && row.status !== 'confirmed') {
-    return c.json({ error: 'not_editable' }, 409);
+    return liffBookingJson(c, { error: 'not_editable' }, 409);
   }
   if (Number(row.lock_version) !== expectedVersion) {
-    return c.json({ error: 'version_conflict' }, 409);
+    return liffBookingJson(c, { error: 'version_conflict' }, 409);
   }
   const cancellationAt=new Date();
   const quote=await bookingCancellationQuote(c.env.DB,bookingId,accountId,cancellationAt);
-  if(quote.feeNow>0 && (body.feeAccepted!==true||body.expectedFeeAmount!==quote.feeNow))return c.json({error:'cancellation_fee_confirmation_required',data:quote},409);
+  if(quote.feeNow>0 && (body.feeAccepted!==true||body.expectedFeeAmount!==quote.feeNow))return liffBookingJson(c, {error:'cancellation_fee_confirmation_required',data:quote},409);
   const rules = await readSelfBookingRules(c.env.DB, accountId, row.menu_id);
   if (cancellationAt.getTime() >= new Date(row.starts_at).getTime() || (!quote.policyAcceptedRequired && cancellationAt.getTime() > new Date(row.starts_at).getTime() - rules.cancelDeadlineMinutesBefore * 60_000)) {
-    return c.json({ error: 'self_deadline_passed' }, 403);
+    return liffBookingJson(c, { error: 'self_deadline_passed' }, 403);
   }
   // 条件付き確定: 同時取消の race では片方だけが通る。副作用は通った方だけ走る。
   // 所有権は cancel_claim_id (uuid) を同じ UPDATE で書く単文 CAS。
@@ -184,8 +185,8 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       .prepare(`SELECT lock_version, status FROM bookings WHERE id = ? AND line_account_id = ?`)
       .bind(bookingId, accountId)
       .first<{ lock_version: number; status: string }>();
-    if (!current) return c.json({ error: 'booking_not_found' }, 404);
-    return c.json({ error: 'version_conflict' }, 409);
+    if (!current) return liffBookingJson(c, { error: 'booking_not_found' }, 404);
+    return liffBookingJson(c, { error: 'version_conflict' }, 409);
   }
   try {
     await cancelByTrigger(c.env.DB, {
@@ -214,7 +215,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
         .bind(row.status, row.decided_at, bookingId, accountId, 'cancelled',
           decidedAt, expectedVersion, caller.friendId, claimId)
         .run();
-      return c.json({ error: 'send_in_flight_retry' }, 409);
+      return liffBookingJson(c, { error: 'send_in_flight_retry' }, 409);
     }
     throw error;
   }
@@ -251,7 +252,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   } catch (error) {
     logger.error("booking.promote_waitlist_failed");
   }
-  return c.json({
+  return liffBookingJson(c, {
     ...(await bookingCancellationQuote(c.env.DB,bookingId,accountId)),
     status: 'cancelled',
     lock_version: expectedVersion,

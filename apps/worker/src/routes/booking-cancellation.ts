@@ -1,3 +1,4 @@
+import { liffBookingJson } from './liff-booking-response.js';
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {gapAccount,gapBody,gapKey,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
@@ -5,7 +6,7 @@ import {cancellationPolicy,validCancellationPolicy,requireCancellationTestConnec
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
 import {verifyStripeSignature} from '../services/stripe-signature.js';
 export const bookingCancellation=new Hono<Env>();
-bookingCancellation.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'cancellation_unavailable'},e instanceof GapError?e.status:503));
+bookingCancellation.onError((e,c)=>(c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:e instanceof GapError?e.code:'cancellation_unavailable'}, e instanceof GapError?e.status:503) : c.json({success:false,error:e instanceof GapError?e.code:'cancellation_unavailable'},e instanceof GapError?e.status:503)));
 async function liff(c:import('hono').Context<Env>){
  const account=await resolveAccountIdFromLiff(c),user=await verifyCallerLineUserId(c);
  if(!account||!user)throw new GapError('unauthorized',401);
@@ -29,7 +30,7 @@ bookingCancellation.put('/api/booking/admin/cancellation-policy',async (c:Contex
 bookingCancellation.get('/api/liff/booking/cancellation-quote',async (c:Context<Env>):Promise<Response>=>{
  const {account,friend}=await liff(c),id=c.req.query('booking_id');
  if(!id||!await c.env.DB.prepare('SELECT id FROM bookings WHERE id=? AND line_account_id=? AND friend_id=?').bind(id,account,friend).first())throw new GapError('not_found',404);
- return c.json({success:true,data:await bookingCancellationQuote(c.env.DB,id,account)});
+ return liffBookingJson(c, {success:true,data:await bookingCancellationQuote(c.env.DB,id,account)});
 });
 bookingCancellation.post('/api/liff/booking/setup-intent',async (c:Context<Env>):Promise<Response>=>{
  const {account,friend}=await liff(c),key=gapKey(c),b=await gapBody(c);await requireCancellationTestConnection(c.env.DB,account);
@@ -39,7 +40,7 @@ bookingCancellation.post('/api/liff/booking/setup-intent',async (c:Context<Env>)
  await c.env.DB.prepare(`INSERT INTO booking_payment_methods(id,friend_id,line_account_id,setup_id,idempotency_key,created_at)
  VALUES(?,?,?,?,?,?) ON CONFLICT(line_account_id,friend_id,idempotency_key) DO NOTHING`).bind(id,friend,account,`seti_test_${id}`,key,new Date().toISOString()).run();
  const row=(await c.env.DB.prepare('SELECT setup_id,status FROM booking_payment_methods WHERE line_account_id=? AND friend_id=? AND idempotency_key=?').bind(account,friend,key).first<{setup_id:string;status:string}>())!;
- return c.json({success:true,data:{setupIntentId:row.setup_id,url:cancellationSetupUrl(row.setup_id),status:row.status,testMode:true}},201);
+ return liffBookingJson(c, {success:true,data:{setupIntentId:row.setup_id,url:cancellationSetupUrl(row.setup_id),status:row.status,testMode:true}},201);
 });
 // 署名を検証した試験イベントだけが登録済みに進められる。クライアントの自己申告は受けない。
 bookingCancellation.post('/api/liff/booking/setup-webhook',async (c:Context<Env>):Promise<Response>=>{
@@ -51,7 +52,7 @@ bookingCancellation.post('/api/liff/booking/setup-webhook',async (c:Context<Env>
  const o=b.data?.object;
  if(b.type!=='setup_intent.succeeded'||o?.status!=='succeeded'||typeof o.id!=='string'||typeof o.customer!=='string'||typeof o.payment_method!=='string')throw new GapError('invalid_event');
  await c.env.DB.prepare(`UPDATE booking_payment_methods SET status='ready',stripe_customer_id=?,stripe_payment_method_id=? WHERE setup_id=? AND test_mode=1 AND status='pending'`).bind(o.customer,o.payment_method,o.id).run();
- return c.json({success:true});
+ return liffBookingJson(c, {success:true});
 });
 bookingCancellation.get('/api/booking/admin/bookings/:id/charges',async (c:Context<Env>):Promise<Response>=>{
  const a=await gapAccount(c),id=c.req.param('id')!,quote=await bookingCancellationQuote(c.env.DB,id,a);

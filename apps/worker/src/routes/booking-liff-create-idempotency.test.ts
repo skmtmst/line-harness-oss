@@ -169,7 +169,7 @@ describe('W1 LIFF予約のキー確保と保存失敗回収（実SQL・FK有効�
       VALUES ('other-w1-friend', 'Uw1-other', '別', 'w1-account', 1);`);
     verifiedUserId = 'Uw1-other';
     const result = await create(); expect(result.status).toBe(409);
-    expect(await result.json()).toEqual({ error: 'idempotency_key_conflict' }); expect(count('bookings')).toBe(1);
+    expect(await result.json()).toEqual({ success: false, code: 'idempotency_key_conflict', error: 'idempotency_key_conflict' }); expect(count('bookings')).toBe(1);
   });
   it('予約INSERTの失敗では自分の確保だけを解放して再送できる', async () => {
     failInsert = true; expect((await create()).status).toBe(500);

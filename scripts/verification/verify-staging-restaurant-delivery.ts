@@ -500,7 +500,6 @@ async function inspectScreens(
             localStorage.setItem('lh_auth_selection_cleared', '1');
             sessionStorage.setItem('lh_auth_selection_cleared', '1');
             localStorage.setItem('lh_selected_account', accountId);
-            localStorage.setItem('lh-admin-theme', 'v8');
           } catch { /* 既定のまま進む */ }
         },
         [sessionToken, lineAccountId] as [string, string],

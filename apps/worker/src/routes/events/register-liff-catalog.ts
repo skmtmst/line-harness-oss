@@ -1,3 +1,4 @@
+import { liffBookingJson, liffBookingResponse } from '../liff-booking-response.js';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -13,7 +14,7 @@ export function registerLiffCatalog(events: Hono<Env>): void {
 
 events.get('/api/liff/events/:id', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
-  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
+  if (!account_id) return liffBookingResponse(c, bad(c, 'liff_account_resolution_failed', 400));
   const row = await c.env.DB
     .prepare(
       `SELECT * FROM events
@@ -26,7 +27,7 @@ events.get('/api/liff/events/:id', async (c) => {
     )
     .bind(c.req.param('id'), account_id, account_id)
     .first<Record<string, unknown>>();
-  if (!row) return bad(c, 'not_found', 404);
+  if (!row) return liffBookingResponse(c, bad(c, 'not_found', 404));
 
   // 既存予約検出: caller が認証済 + friend が存在するなら identity_key で
   // active 予約を引いて my_existing_booking としてレスポンスに含める。
@@ -69,7 +70,7 @@ events.get('/api/liff/events/:id', async (c) => {
   // 公開対象を絞っているイベントは、そのタグを持たない人には無いものとして扱う。
   // 「あるが見られない」だと、存在すること自体が伝わってしまう。
   if (row.visible_tag_id) {
-    if (!caller) return bad(c, 'not_found', 404);
+    if (!caller) return liffBookingResponse(c, bad(c, 'not_found', 404));
     const me = await c.env.DB
       .prepare(
         `SELECT 1 FROM friend_tags ft
@@ -79,7 +80,7 @@ events.get('/api/liff/events/:id', async (c) => {
       )
       .bind(caller, account_id, row.visible_tag_id as string)
       .first<{ 1: number }>();
-    if (!me) return bad(c, 'not_found', 404);
+    if (!me) return liffBookingResponse(c, bad(c, 'not_found', 404));
   }
 
   // questions_json は生JSON文字列のまま返すと利用側で二重parseになるので、
@@ -87,7 +88,7 @@ events.get('/api/liff/events/:id', async (c) => {
   // U: オンラインの URL は確定した人にだけ見せる。確定前・未申込には
   // 渡さない（会場名の表示はそのまま残す）。
   const venueVisible = myExistingBooking?.status === 'confirmed';
-  return c.json({
+  return liffBookingJson(c, {
     ...row,
     venue_url: venueVisible ? row.venue_url : null,
     questions: parseEventQuestions(row.questions_json),
@@ -97,7 +98,7 @@ events.get('/api/liff/events/:id', async (c) => {
 
 events.get('/api/liff/events/:id/slots', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
-  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
+  if (!account_id) return liffBookingResponse(c, bad(c, 'liff_account_resolution_failed', 400));
   const ev = await c.env.DB
     .prepare(
       `SELECT id FROM events
@@ -110,11 +111,11 @@ events.get('/api/liff/events/:id/slots', async (c) => {
     )
     .bind(c.req.param('id'), account_id, account_id)
     .first<{ id: string }>();
-  if (!ev) return bad(c, 'not_found', 404);
+  if (!ev) return liffBookingResponse(c, bad(c, 'not_found', 404));
   const items = await getSlotsWithRemaining(c.env.DB, c.req.param('id'), {
     only_active: true,
     only_future: true,
   });
-  return c.json({ items });
+  return liffBookingJson(c, { items });
 });
 }

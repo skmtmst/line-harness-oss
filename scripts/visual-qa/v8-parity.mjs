@@ -231,7 +231,6 @@ export const MEASURE_CALL = `(${MEASURE_SCRIPT})()`
  * 中身は V8 の見張り（browser-env.mjs）と同じ。
  */
 export const PARITY_INIT = {
-  'lh-admin-theme': 'v8',
   lh_csrf: 'visual-qa-csrf',
   lh_staff_role: 'owner',
   lh_staff_name: 'K',
@@ -241,7 +240,7 @@ export const PARITY_INIT = {
   lh_auth_selection_cleared: '1',
 }
 
-/** 撮った絵が V8 でなければ落とす（V7 を撮って比べない）。 */
+/** 撮った絵が V8 でなければ比較を止める。 */
 export function assertV8Theme(theme) {
   if (theme !== 'v8') {
     throw new Error(`V8 で撮れていない（theme=${theme ?? 'なし'}）。比べずに止める`)

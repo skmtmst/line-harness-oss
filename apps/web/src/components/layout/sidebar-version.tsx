@@ -53,9 +53,8 @@ export default function SidebarVersion() {
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-caption font-medium text-ink-secondary">
         <span className="whitespace-nowrap">{lines.line1}</span>
         {/*
-          ★V8（夕12・FK5m7 ZT5kI）：上の版の帯を隠した v8 では、新しい版・
-          カスタマイズ版の案内を版の行の右に出す。どちらも /updates へ。
-          v7 は帯が出るので出さない（v8-only）。
+          新しい版・カスタマイズ版の案内を版の行の右に出す。
+          どちらも /updates へ。
         */}
         {update.kind === 'upgrade' ? (
           <TextLink href="/updates" className="shrink-0">更新あり</TextLink>

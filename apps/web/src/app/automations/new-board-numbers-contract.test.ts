@@ -7,7 +7,7 @@ const ENTRY = read('new/page.tsx')
 
 describe('automation 作成の現役の寸法と入口', () => {
 
-  it('旧の高さ40へ分岐する入口を残さない', () => {
+  it('作成の入口はV8本体に直結し、旧テーマの選択口を残さない', () => {
     expect(ENTRY).toContain('<NewAutomationV8 chrome="create"')
     expect(ENTRY).not.toContain('useAdminTheme')
     expect(ENTRY).not.toContain('NewAutomationPageV7')

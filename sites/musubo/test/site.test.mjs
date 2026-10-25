@@ -17,7 +17,7 @@ const preview = await build({ output: join(dir, "preview") });
 const page = (route, output = preview.output) =>
   readFile(join(output, route, "index.html"), "utf8");
 
-test("all five pages have a Japanese title, heading, landmark, registration and login", async () => {
+test("5ページに日本語の題・主領域・登録とログインの入口を出す", async () => {
   assert.deepEqual(preview.paths, [
     "/",
     "/terms/",
@@ -37,7 +37,7 @@ test("all five pages have a Japanese title, heading, landmark, registration and 
   }
 });
 
-test("internal links, assets and fragment targets resolve on every page", async () => {
+test("生成した全ページの内部リンク・画像・ページ内リンクに行き止まりを作らない", async () => {
   for (const route of preview.paths) {
     const html = await page(route);
     const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
@@ -68,7 +68,7 @@ test("internal links, assets and fragment targets resolve on every page", async 
   }
 });
 
-test("preview is unmistakably a review site, non-indexable and cannot be used as production", async () => {
+test("確認用サイトを検索対象にせず、未承認の本番出力を拒む", async () => {
   for (const route of preview.paths) {
     const html = await page(route);
     assert.match(html, /確認用サイト/);
@@ -94,7 +94,7 @@ test("preview is unmistakably a review site, non-indexable and cannot be used as
   await assert.rejects(stat(join(dir, "blocked")), { code: "ENOENT" });
 });
 
-test("review hostname is separated and the alternate apex path is denied", async () => {
+test("確認用の住所を本番と分け、本番側の別経路を拒む", async () => {
   assert.equal(config.previewOrigin, "https://stg.musubo.jp");
   assert.equal(config.origin, "https://musubo.jp");
   const htaccess = await readFile(join(preview.output, ".htaccess"), "utf8");
@@ -121,7 +121,7 @@ test("review hostname is separated and the alternate apex path is denied", async
   }
 });
 
-test("company identity and contacts come from the config, prices are never invented", async () => {
+test("会社情報は設定から出し、決まっていない料金を作らない", async () => {
   const commerce = await page("/legal/");
   for (const field of [
     "name",
@@ -138,7 +138,7 @@ test("company identity and contacts come from the config, prices are never inven
   assert.match(await page("/privacy/"), /AI画像生成では/);
 });
 
-test("publication gate checks every commercial and legal requirement", () => {
+test("公開前に商取引・法律上の必須条件をすべて確かめる", () => {
   assert.deepEqual(publicationIssues(config), []);
   const cases = {
     本番登録: { productionAppOrigin: "" },
@@ -163,7 +163,7 @@ test("publication gate checks every commercial and legal requirement", () => {
   }
 });
 
-test("origins and official LINE URLs reject insecure, credential-bearing and spoofed values", () => {
+test("危険なURL・認証情報付きURL・公式LINEに似せた住所を拒む", () => {
   for (const url of [
     "",
     "http://example.com",
@@ -185,7 +185,7 @@ test("origins and official LINE URLs reject insecure, credential-bearing and spo
   assert.equal(isSupportLine("https://lin.ee/test-fixture"), true);
 });
 
-test("configuration content is escaped before rendering", async () => {
+test("設定に含まれるHTMLを実行せず文字として出す", async () => {
   const settings = structuredClone(config);
   settings.operator.name = '<script>alert("x")</script>';
   const escaped = await build({ settings, output: join(dir, "escaped") });
@@ -195,7 +195,7 @@ test("configuration content is escaped before rendering", async () => {
   assert.equal(escapeHtml("&<>\"'"), "&amp;&lt;&gt;&quot;&#39;");
 });
 
-test("approved fixture builds production with correct URLs and without draft copy", async () => {
+test("承認済みの設定で本番用URLを出し、草案を残さない", async () => {
   // Synthetic fixture ONLY. It is never written back to site.config.mjs or deployed.
   const settings = structuredClone(config);
   settings.productionAppOrigin = "https://app.example.com";
@@ -246,7 +246,7 @@ test("approved fixture builds production with correct URLs and without draft cop
   );
 });
 
-test("static site does not collect information, install trackers, or embed external scripts", async () => {
+test("情報収集・追跡・外部スクリプトを静的サイトへ持ち込まない", async () => {
   const js = await readFile(
     new URL("../public/assets/site.js", import.meta.url),
     "utf8",
@@ -268,7 +268,7 @@ test("static site does not collect information, install trackers, or embed exter
   assert.match(htaccess, /frame-ancestors 'none'/);
 });
 
-test("mobile controls, native FAQ, reduced motion and sample disclosures are present", async () => {
+test("スマホの入口・標準FAQ・動きを減らす指定・サンプルの説明を保つ", async () => {
   const html = await page("/");
   assert.match(html, /aria-controls="mobile-nav"/);
   assert.match(html, /id="mobile-nav"[^>]*hidden/);
@@ -289,7 +289,7 @@ test("mobile controls, native FAQ, reduced motion and sample disclosures are pre
   assert.match(css, /\[hidden\]/);
 });
 
-test("package contains only static public output, not source or configuration", async () => {
+test("配布物に公開用の静的出力以外のソースと設定を含めない", async () => {
   const files = await readdir(preview.output);
   assert.deepEqual(files.sort(), [
     ".htaccess",
@@ -305,7 +305,7 @@ test("package contains only static public output, not source or configuration", 
   ]);
 });
 
-test("the retention notice uses the same day count as the deletion implementation", async () => {
+test("保存期間の案内を削除処理と同じ日数にする", async () => {
   // 案内文の日数は packages/shared/src/data-retention.json が唯一の出どころ。
   // Workerの削除処理も同じファイルを読むので、ここが一致していれば案内と運用がずれない。
   const spec = JSON.parse(
@@ -323,7 +323,7 @@ test("the retention notice uses the same day count as the deletion implementatio
   }
 });
 
-test("pages carry no inline styles or external fonts, so the strict CSP renders them as designed", async () => {
+test("厳しい配信制限で消えるインライン指定と外部フォントを入れない", async () => {
   const css = await readFile(join(preview.output, "assets", "site.css"), "utf8");
   for (const route of preview.paths) {
     const html = await page(route);
@@ -337,14 +337,14 @@ test("pages carry no inline styles or external fonts, so the strict CSP renders 
   assert.doesNotMatch(js, /setAttribute\(\s*["']style/);
 });
 
-test("Google Business Profile and Instagram are both described with the confirm-before-send rule", async () => {
+test("GoogleとInstagramへの投稿は内容を確かめて実行すると案内する", async () => {
   const html = await page("/");
   assert.match(html, /GoogleとInstagramへ同時に投稿/);
   assert.match(html, /あなたが内容を確かめて実行したときだけ/);
   assert.match(html, /自動で送ることはありません/);
 });
 
-test("release checklist: titles, descriptions, OGP, icons and structured data", async () => {
+test("正式公開の題・説明・共有画像・アイコン・構造化データと404をそろえる", async () => {
   const production = await build({ production: true, output: join(dir, "production-meta") });
   for (const route of production.paths) {
     const html = await page(route, production.output);

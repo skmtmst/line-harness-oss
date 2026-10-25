@@ -73,7 +73,7 @@ try {
     const base = process.env.VISUAL_QA_BASE ?? 'http://127.0.0.1:3101'
     const out = process.env.LIST_BOUNDARIES_OUT ?? '.measure/dline'; mkdirSync(out, { recursive: true })
     const results = []
-    const init = { 'lh-admin-theme': 'v8', lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K', lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1' }
+    const init = { lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K', lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1' }
     const routes = process.env.LIST_BOUNDARIES_ROUTES?.split(',') ?? ['/auto-replies', '/tags', '/friends', '/broadcasts', '/reminders', '/templates', '/hq', '/hq/templates', '/scenarios', '/webinars', '/events', '/contents/vars', '/rich-menus', '/form-submissions', '/contents', '/automations', '/common-actions', '/automations/runs', '/nen-campaigns', '/inflow-links', '/conversions', '/mileage', '/affiliates', '/webhooks', '/tags?tab=fields', '/tags?tab=marks', '/tags?tab=searches', '/nen/pets', '/nen/health', '/nen-members', '/friend-add-settings', '/mileage?tab=rewards', '/mileage?tab=balances', '/mileage?tab=history', '/mileage?tab=score', '/affiliates?tab=offers', '/affiliates?tab=approvals', '/affiliates?tab=payment', '/affiliates?tab=report', '/webhooks?tab=interactions', '/webhooks?tab=api-tokens', '/webhooks?tab=notify']
     for (const width of [1440, 1152]) for (const route of routes) {
       const context = await browser.newContext({ viewport: { width, height: 1000 }, deviceScaleFactor: 1 })

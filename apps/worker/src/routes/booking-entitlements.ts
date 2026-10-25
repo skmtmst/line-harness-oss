@@ -1,3 +1,4 @@
+import { liffBookingJson, liffBookingInputError } from './liff-booking-response.js';
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { validateEventEntitlement } from '../services/event-entitlements.js';
 import { logger } from '@line-crm/shared/server';
@@ -12,9 +13,9 @@ import { resolveAccountIdFromLiff, resolveFriendId, verifyCallerLineUserId } fro
 
 export const bookingEntitlements=new Hono<Env>();
 bookingEntitlements.onError((error,c)=>{
-  if(error instanceof EntitlementError)return c.json({success:false,error:error.code},error.status);
+  if(error instanceof EntitlementError)return (c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:error.code}, error.status) : c.json({success:false,error:error.code},error.status));
   logger.error("booking_entitlements_unavailable");
-  return c.json({success:false,error:'booking_entitlements_unavailable'},503);
+  return (c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:'booking_entitlements_unavailable'}, 503) : c.json({success:false,error:'booking_entitlements_unavailable'},503));
 });
 bookingEntitlements.use('/api/booking/admin/entitlements/*', requireRole('owner','admin','staff'),requirePermission('/booking/bookings'),async(c,next)=>{
   c.header('Cache-Control','no-store');
@@ -53,13 +54,13 @@ bookingEntitlements.get('/api/booking/admin/entitlements/:id/history',async c=>{
 });
 bookingEntitlements.get('/api/liff/booking/entitlements',async c=>{
   c.header('Cache-Control','private, no-store');
-  const account=await resolveAccountIdFromLiff(c);if(!account)return c.json({error:'unknown_liff'},404);
-  const caller=await verifyCallerLineUserId(c);if(!caller)return c.json({error:'unauthorized'},401);
-  const friend=await resolveFriendId(c,caller,account);if(!friend)return c.json({error:'friend_not_found'},404);
+  const account=await resolveAccountIdFromLiff(c);if(!account)return liffBookingJson(c, {error:'unknown_liff'},404);
+  const caller=await verifyCallerLineUserId(c);if(!caller)return liffBookingJson(c, {error:'unauthorized'},401);
+  const friend=await resolveFriendId(c,caller,account);if(!friend)return liffBookingJson(c, {error:'friend_not_found'},404);
   const at=c.req.query('starts_at')??new Date().toISOString();
-  if(!Number.isFinite(Date.parse(at)))return inputError(c,{error:'invalid_starts_at'},400,['starts_at']);
+  if(!Number.isFinite(Date.parse(at)))return liffBookingInputError(c,{error:'invalid_starts_at'},400,['starts_at']);
   const menu=c.req.query('menu_id'),event=c.req.query('event_id');
-  if(event&&!await c.env.DB.prepare("SELECT id FROM events WHERE id=? AND line_account_id=? AND is_published=1 AND deleted_at IS NULL AND (lifecycle_status IS NULL OR lifecycle_status='published')").bind(event,account).first())return c.json({error:'not_found'},404);
+  if(event&&!await c.env.DB.prepare("SELECT id FROM events WHERE id=? AND line_account_id=? AND is_published=1 AND deleted_at IS NULL AND (lifecycle_status IS NULL OR lifecycle_status='published')").bind(event,account).first())return liffBookingJson(c, {error:'not_found'},404);
   const rows=await entitlementViews(c.env.DB,account,friend,at);
   // 管理側の理由や操作担当者はお客さまへ出さない。
   const data=await Promise.all(rows.filter(e=>e.status==='active').map(async e=>{let unusableReason=await passUnusable(c.env.DB,e,account,menu,at);if(event){try{await validateEventEntitlement(c.env.DB,account,friend,event,e.id,at);unusableReason=null;}catch(error){if(!(error instanceof EntitlementError))throw error;unusableReason='event_out_of_scope';}}return ({
@@ -67,5 +68,5 @@ bookingEntitlements.get('/api/liff/booking/entitlements',async c=>{
     monthAllowance:e.monthAllowance,monthUsed:e.monthUsed,monthRemaining:e.monthRemaining,validFrom:e.valid_from,expiresAt:e.expires_at,
     periodStart:e.periodStart,periodEnd:e.periodEnd,
     usable:!unusableReason,unusableReason,
-  });}));return c.json({success:true,data});
+  });}));return liffBookingJson(c, {success:true,data});
 });
