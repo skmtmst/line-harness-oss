@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsAnnouncementsPage from './page'
 import OpsAnnouncementsV8 from '@/v8/ops/announcements'
-import { previewLabel, toLocalInput, toPublishAt } from './format'
 import { pickDateTime } from '@/test-utils/rich-menu-editor'
 import { notifySaved } from '@/components/shared/toast'
 import { screen, fireEvent } from '@testing-library/react'
@@ -56,6 +55,7 @@ let root: Root
 let calls: Array<{ url: string; method: string; body: unknown; headers: Record<string, string> }>
 let lineConfigured = true
 let announcements: unknown[] = []
+let previewReady: Promise<void> | null = null
 /** M513: PUT の応答を差し替えて競合を起こす（null のときは通常応答）。 */
 let putOverride: { status: number; payload: unknown } | null = null
 
@@ -65,6 +65,7 @@ beforeEach(() => {
   calls = []
   lineConfigured = true
   announcements = [sent, draft]
+  previewReady = null
   putOverride = null
   navigation.push.mockClear()
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
@@ -83,7 +84,10 @@ beforeEach(() => {
       return new Response(JSON.stringify(putOverride.payload), { status: putOverride.status, headers: { 'Content-Type': 'application/json' } })
     }
     let payload: unknown
-    if (url.endsWith('/api/ops/announcements/preview')) payload = { success: true, data: { tenants: 12, staff: 24, lineLinked: 21, withEmail: 24 } }
+    if (url.endsWith('/api/ops/announcements/preview')) {
+      if (previewReady) await previewReady
+      payload = { success: true, data: { tenants: 12, staff: 24, lineLinked: 21, withEmail: 24 } }
+    }
     else if (url.endsWith('/api/ops/announcements') && method === 'POST') payload = { success: true, data: { ...sent, id: 'a3', recipientsTotal: 24, lineSent: 21, mailSent: 24 } }
     else if (url.endsWith('/api/ops/announcements')) payload = { success: true, data: announcements, linked: { linked: 21, total: 24 }, noticeLineConfigured: lineConfigured }
     else if (url.endsWith('/api/ops/me')) payload = { success: true, data: { readOnly: false } }
@@ -125,15 +129,38 @@ const setValue = (el: HTMLInputElement | HTMLTextAreaElement, value: string) => 
 }
 
 describe('表記の決まり', () => {
-  it('公開日時は日本時間の ISO に、宛先の見込みは送り方に合わせて出す', () => {
-    expect(toPublishAt('2026-09-20T02:00')).toBe('2026-09-20T02:00:00+09:00')
-    expect(toPublishAt('')).toBeNull()
-    expect(toLocalInput('2026-09-20T02:00:00+09:00')).toBe('2026-09-20T02:00')
-    expect(toLocalInput(null)).toBe('')
-    expect(previewLabel(null, ['line'])).toBe('宛先を数えています…')
-    expect(previewLabel({ tenants: 12, staff: 24, lineLinked: 21, withEmail: 24 }, ['line', 'email']))
-      .toBe('12件の契約先・24人の権限者。うち契約者専用LINEに登録済みの21人へ届きます。メールは24人に届きます')
-    expect(previewLabel({ tenants: 12, staff: 24, lineLinked: 21, withEmail: 24 }, ['screen'])).toBe('12件の契約先・24人の権限者')
+  it('宛先の取得中と、実際に選んだ送り方に合わせて見込みを表示する', async () => {
+    let resolvePreview!: () => void
+    previewReady = new Promise<void>((resolve) => { resolvePreview = resolve })
+    await act(async () => { root.render(<OpsAnnouncementsPage />) })
+    await flush()
+    const previewButton = screen.getByRole('button', { name: '宛先の見込み', exact: true })
+    const previewText = () => document.getElementById(previewButton.getAttribute('aria-describedby')!)?.textContent
+    await act(async () => { previewButton.click() })
+    expect(previewText()).toBe('宛先を数えています…')
+    await act(async () => { resolvePreview() })
+    await flush()
+    expect(previewText()).toBe('12 件の契約先・24 人の権限者。メールは24 人に届きます')
+    await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: '契約者専用LINE', exact: true })) })
+    expect(previewText()).toBe('12 件の契約先・24 人の権限者。うち契約者専用LINEに登録済みの21 人へ届きます。メールは24 人に届きます')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('checkbox', { name: 'メール', exact: true }))
+      fireEvent.click(screen.getByRole('checkbox', { name: '契約者専用LINE', exact: true }))
+    })
+    expect(previewText()).toBe('12 件の契約先・24 人の権限者')
+  })
+
+  it.each([
+    { publishAt: null, label: '空のままならすぐに送る' },
+    { publishAt: '2026-09-20T02:00:00+09:00', label: '2026年9月20日（日）02:00' },
+  ])('保存済み日時 $publishAt を編集欄へ復元する', async ({ publishAt, label }) => {
+    announcements = [{ ...draft, publishAt }]
+    await act(async () => { root.render(<OpsAnnouncementsPage />) })
+    await flush()
+    const editItem = await openRowEdit(draft.subject)
+    await act(async () => { editItem.click() })
+    await flush()
+    expect(screen.getByRole('button', { name: '公開日時（日本時間）', exact: true }).textContent).toBe(label)
   })
 })
 
