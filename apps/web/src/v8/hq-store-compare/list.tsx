@@ -30,7 +30,7 @@ import { fetchApi } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import type { AccountWithStats } from '@/contexts/account-context'
-import { columnsWithDiff, diffCount, diffCountLabel, diffTitle, formatDiff, formatMetric, METRICS, diffTone, sameAsAverage, worseCount, type MetricDef, type StoreAverage } from './metrics'
+import { columnsWithDiff, diffCount, diffCountLabel, diffCountShortLabel, diffTitle, formatDiff, formatMetric, METRICS, diffTone, sameAsAverage, worseCount, type MetricDef, type StoreAverage } from './metrics'
 import styles from './list.module.css'
 
 /*
@@ -294,8 +294,7 @@ function DiffCountLine({ row, average }: { row: StoreComparisonRow; average: Sto
   if (!row.computedAt) return null
   const count = diffCount(row, average)
   if (count.compared === 0) return null
-  const label = diffCountLabel(count)
-  return <span className={styles.diffCount} data-diff-count={row.accountId} title={`${DIFF_BASE}、${label}`}>{label}</span>
+  return <span className={styles.diffCount} data-diff-count={row.accountId} title={`${DIFF_BASE}、${diffCountLabel(count)}`}>{diffCountShortLabel(count)}</span>
 }
 
 function MetricCell({ def, metric, compare, computed }: { def: MetricDef; metric: StoreComparisonRow['metrics'][MetricDef['key']] | undefined; compare: 'previous' | 'average'; computed: boolean }) {
@@ -368,7 +367,7 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
     <Drawer
       open={row !== null}
       title={row?.name ?? ''}
-      description={row ? (count && count.compared > 0 ? `${DIFF_BASE} ${diffCountLabel(count)}・${worseText}` : worseText) : undefined}
+      description={row ? (count && count.compared > 0 ? <><span className={styles.descriptionLine}>{`${DIFF_BASE} ${diffCountLabel(count)}`}</span><span className={styles.descriptionLine}>{worseText}</span></> : worseText) : undefined}
       closeAppearance="box"
       heightMode="viewport"
       onClose={onClose}
@@ -408,10 +407,10 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
               })}
             </div>
             {hidden.length > 0 ? (
-              <p className={styles.mute} data-diff-hidden>
-                {`全店の平均と同じ ${hidden.length} 項目（${hidden.map((def) => def.label).join('・')}）を隠しています。`}
+              <div className={styles.hiddenNote} data-diff-hidden>
+                <p className={styles.mute}>{`全店の平均と同じ ${hidden.length} 項目（${hidden.map((def) => def.label).join('・')}）を隠しています。`}</p>
                 <Button variant="text" onClick={() => onDiffOnly(false)}>すべて表示</Button>
-              </p>
+              </div>
             ) : null}
           </Card>
           <Card padding="default" layout="vertical" gap="normal" aria-label="最近の配信">

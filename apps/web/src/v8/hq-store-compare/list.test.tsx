@@ -230,12 +230,12 @@ describe('違いだけ表示と「7 項目中 5 つが違う」（全店の平�
     expect(columnsWithDiff(ROWS as never, AVERAGE).map((def) => def.key)).toEqual(['blockRate', 'clickRate', 'bookings', 'visits', 'noShowRate'])
   })
 
-  it('表の店の名前の下に「6 項目中 N つが違う」を出す。集計前の店には出さない', async () => {
+  it('表の店の名前の下に「N つが違う（6 項目中）」を出す。集計前の店には出さない', async () => {
     api.get.mockResolvedValue({ success: true, data: { ...DIFF_DATA, rows: [...ROWS, { ...store('s3', '川口店', { blockRate: 1, bookings: 1, visits: 1, noShowRate: 1 }), computedAt: null }], total: 3 } })
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')
     const lines = [...document.querySelectorAll('[data-diff-count]')]
-    expect(lines.map((node) => [node.getAttribute('data-diff-count'), node.textContent])).toEqual([['s1', '6 項目中 3 つが違う'], ['s2', '6 項目中 2 つが違う']])
+    expect(lines.map((node) => [node.getAttribute('data-diff-count'), node.textContent])).toEqual([['s1', '3 つが違う（6 項目中）'], ['s2', '2 つが違う（6 項目中）']])
     expect(lines[0].getAttribute('title')).toBe('全店の平均と比べて、6 項目中 3 つが違う')
   })
 
@@ -267,13 +267,13 @@ describe('違いだけ表示と「7 項目中 5 つが違う」（全店の平�
     api.get.mockResolvedValue({ success: true, data: DIFF_DATA })
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')
-    expect(document.querySelector('[data-diff-count="s2"]')?.textContent).toBe('6 項目中 2 つが違う')
+    expect(document.querySelector('[data-diff-count="s2"]')?.textContent).toBe('2 つが違う（6 項目中）')
     const next = { ...DIFF_DATA, rows: [ROWS[0], store('s2', '渋谷店', { blockRate: 1.0, bookings: 72, visits: 31, noShowRate: 1.2 }, 'previous')] }
     api.get.mockResolvedValue({ success: true, data: next })
     fireEvent.click(screen.getByRole('button', { name: '比べる相手' }))
     await act(async () => { fireEvent.click(within(await screen.findByRole('option', { name: /全店の平均/ })).getByRole('button')) })
     await waitFor(() => expect(api.get).toHaveBeenLastCalledWith(expect.objectContaining({ compare: 'average' })))
-    await waitFor(() => expect(document.querySelector('[data-diff-count="s2"]')?.textContent).toBe('6 項目中 4 つが違う'))
+    await waitFor(() => expect(document.querySelector('[data-diff-count="s2"]')?.textContent).toBe('4 つが違う（6 項目中）'))
   })
 
   it('引き出しでは平均と同じ数の行を隠し、隠した数と［すべて表示］を出す', async () => {

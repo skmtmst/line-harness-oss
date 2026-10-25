@@ -121,6 +121,11 @@ export function diffCountLabel(count: { differ: number; compared: number }): str
   return `${count.compared} 項目中 ${count.differ} つが違う`
 }
 
+/** 表の名前の下に出す短い形。狭い幅で省略されても、違う数が先に見える。 */
+export function diffCountShortLabel(count: { differ: number; compared: number }): string {
+  return `${count.differ} つが違う（${count.compared} 項目中）`
+}
+
 export function formatAverage(key: StoreComparisonKey, value: number | null): string {
   return formatMetric(key, value)
 }
