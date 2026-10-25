@@ -595,6 +595,7 @@
 - [pending-kenta-one-f2x-j7-1015.md](release-log/unreleased/pending-kenta-one-f2x-j7-1015.md)
 - [pending-kenta-testfix-1015.md](release-log/unreleased/pending-kenta-testfix-1015.md)
 - [pending-kenta-train40-evening.md](release-log/unreleased/pending-kenta-train40-evening.md)
+- [pending-kenta-fix1-bugs-1025.md](release-log/unreleased/pending-kenta-fix1-bugs-1025.md)
 - [1781-kenta-cleanup-f01.md](release-log/unreleased/1781-kenta-cleanup-f01.md)
 - [1775-masato-line-webhook-v07.md](release-log/unreleased/1775-masato-line-webhook-v07.md)
 - [1776-masato-line-webhook-padding.md](release-log/unreleased/1776-masato-line-webhook-padding.md)
@@ -773,5 +774,6 @@
 - [部品の弱点とコードの自動点検](release-log/unreleased/1828-kenta-security-ci.md)
 - [マイレージの試験の書き換え（B-04）](release-log/unreleased/1829-kenta-q02b-b04.md)
 - [不安定な試験の直し](release-log/unreleased/1830-kenta-flaky-iat-1026.md)
+- [直し①②（不具合とiPad横の幅）](release-log/unreleased/1831-kenta-train-m1-1026.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
