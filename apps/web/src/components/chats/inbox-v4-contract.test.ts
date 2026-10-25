@@ -2,7 +2,7 @@ import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mj
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { buildSupportEmailInboxQuery } from '../../app/chats/support-email-query'
+import { buildSupportEmailInboxQuery } from '@/v8/inbox-chat/support-email-query'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSupportEmailInboxQuery } from './support-email-query'
+import { buildSupportEmailInboxQuery } from '@/v8/inbox-chat/support-email-query'
 
 describe('buildSupportEmailInboxQuery', () => {
   it('LINEアカウントの選択に関係なくメール問い合わせを取得する', () => {
