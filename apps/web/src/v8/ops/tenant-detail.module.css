@@ -63,16 +63,6 @@
   width: var(--tpl-op-mem-mail-w);
 }
 
-.dangerNote {
-  margin: 0;
-  border-radius: var(--tpl-op-caution-radius);
-  background: var(--color-status-danger-soft);
-  padding: var(--tpl-op-note-pad);
-  color: var(--color-danger);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-op-note-lh);
-}
-
 .field {
   display: flex;
   flex-direction: column;

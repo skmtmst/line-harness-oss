@@ -48,9 +48,7 @@ describe('一斉配信のV8構造（視覚一致は撮影で確認）', () => {
     expect(FORM).not.toContain('broadcast-test-page')
     // 結果は作成フォームと詳細で同じ分類（testSendResult）を通す。
     expect(FORM).toContain('testSendResult(')
-    // 成功だけ緑。一部失敗は要対応、届かなかったときは赤で出す。
-    expect(FORM).toContain('bg-warning-bg')
-    expect(FORM).toContain('bg-danger-bg')
+    // 全失敗・部分成功・全成功の実表示は broadcast-form-test-send で確かめる。
   })
 
   it('配信枠不足の確認は設計どおり3項目に絞る', () => {

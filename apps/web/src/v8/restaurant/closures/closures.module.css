@@ -12,15 +12,6 @@
   padding: var(--tpl-e10-band-row-pad);
 }
 
-.band {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-e1-gap-l);
-  padding: var(--tpl-e1-band-pad);
-  border-radius: var(--tpl-e1-radius-l);
-  background: var(--color-notice-warning-bg);
-}
-
 .bandIcon {
   flex: 0 0 auto;
   color: var(--color-ink-secondary);

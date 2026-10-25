@@ -764,10 +764,13 @@
 - [決まりの説明書の整理](release-log/unreleased/1822-kenta-docs-current-rules.md)
 - [使われていない部品の片づけ](release-log/unreleased/1823-kenta-remove-unused-files.md)
 - [共通の仕組みの説明の書き方をそろえる](release-log/unreleased/1824-kenta-package-comments.md)
+- [お知らせを白いカードにそろえる](release-log/unreleased/1825-kenta-notice-card.md)
+- [見た目の決まりを 10-25 の決定に合わせる](release-log/unreleased/1827-kenta-rules-1025.md)
 - [LIFF の自動点検の書き換え](release-log/unreleased/1820-kenta-liff-behavior-tests.md)
 - [仕組みの説明の書き方をそろえる](release-log/unreleased/1821-kenta-worker-comments.md)
 - [古い見た目の切り替えの片づけ](release-log/unreleased/1818-kenta-remove-v7-leftovers.md)
 - [見た目の自動点検の整理](release-log/unreleased/1819-kenta-q02d-tests.md)
+- [部品の弱点とコードの自動点検](release-log/unreleased/1828-kenta-security-ci.md)
 - [マイレージの試験の書き換え（B-04）](release-log/unreleased/1829-kenta-q02b-b04.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import Notice from '@/components/shared/notice'
+import Button from '@/components/shared/button'
 
 /**
  * 見本・比較画面の明示（UI監査 #975 U101）。
@@ -21,23 +22,14 @@ export default function SampleScreenNotice({
   backLabel: string
 }) {
   return (
-    <div
+    <Notice tone="warn"
       role="note"
       data-sample-screen
-      className="border-warning bg-warning-bg mb-4 flex flex-wrap items-center justify-between gap-2 rounded-card border px-4 py-3"
+      className="mb-4"
+      heading={<>これは{what}の見本です</>}
+      action={<Button href={backHref}>{backLabel}</Button>}
     >
-      <p className="text-status-warn-deep text-sm font-semibold">
-        これは{what}の見本です
-        <span className="text-warning mt-0.5 block text-xs font-normal">
           固定の例データを表示しています。実際のデータの閲覧・編集はできません。
-        </span>
-      </p>
-      <Link
-        href={backHref}
-        className="border-warning text-status-warn-deep hover:bg-canvas rounded-control shrink-0 border px-3 py-1.5 text-xs font-medium"
-      >
-        {backLabel}
-      </Link>
-    </div>
+    </Notice>
   )
 }

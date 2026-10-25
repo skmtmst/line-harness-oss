@@ -42,6 +42,7 @@ import { SIZE_OPTIONS,type StepKey } from './create-options'
 import { CheckIcon,MenuContent } from './create-preview'
 import { type Group,type Page,type PrepublishState } from './create-types'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
+import Notice from '@/components/shared/notice'
 
 type RenderHqPublishStepContext = {
   areaActionSummary: (area: Area) => string
@@ -169,10 +170,9 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
               note="今のメニューは残し、別に作る"
             />
           </RadioCardGroup>
-          <div className={styles.infoBand}>
-            <span className={styles.infoBandIcon}><Info size={16} aria-hidden /></span>
+          <Notice tone="info" icon={<span><Info size={16} aria-hidden /></span>}>
             <span>同じ名前のメニューがあるアカウントだけ、この扱いになります。どのアカウントに同じ名前があるかは、配る前の確認で一覧にし、そこで1つずつ変えられます。</span>
-          </div>
+          </Notice>
         </Card>
       </>
     )
@@ -465,21 +465,20 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
           ) : null}
         </Card>
         {/* 板 `F4gELj`：案内の帯は段の外（左の直下）。 */}
-        <div className={styles.infoBand}>
-            <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
-            <span title={publishEffectNote}>
-              {audience === 'all'
-                ? `公開すると、すべての友だちの既定のメニューが入れ替わります。`
-                : audience === 'none'
-                  ? 'LINEへの登録だけでは、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください。'
-                  : conditionEmpty
+        <Notice tone="info" icon={<Repeat size={16} aria-hidden />}>
+          <span title={publishEffectNote}>
+            {audience === 'all'
+              ? `公開すると、すべての友だちの既定のメニューが入れ替わります。`
+              : audience === 'none'
+                ? 'LINEへの登録だけでは、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください。'
+                : conditionEmpty
                   ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
                   : '公開すると、条件に当てはまる人に出来事のタイミングで順次出ます。'}
-              {targetPreview?.higherMenus && targetPreview.higherMenus.length > 0 && targetPreview.overlap?.value
-                ? `${targetPreview.higherMenus[0]}の${formatNumber(targetPreview.overlap.value)}人には、いままでどおり上のメニューが出ます。`
-                : ''}
-            </span>
-        </div>
+            {targetPreview?.higherMenus && targetPreview.higherMenus.length > 0 && targetPreview.overlap?.value
+              ? `${targetPreview.higherMenus[0]}の${formatNumber(targetPreview.overlap.value)}人には、いままでどおり上のメニューが出ます。`
+              : ''}
+          </span>
+        </Notice>
       </>
     )
   }

@@ -612,10 +612,10 @@ function AccountRegistrationForm() {
                   ))}
                 </ul>
                 {checkNotice && (
-                  <div className={checkNotice.tone === 'info' ? `${styles.errorBox} ${styles.errorBoxInfo}` : styles.errorBox} role={checkNotice.tone === 'danger' ? 'alert' : undefined}>
+                  <Notice tone={checkNotice.tone} role={checkNotice.tone === 'danger' ? 'alert' : undefined}>
                     <p>{checkNotice.title}</p>
                     <p>{checkNotice.body}</p>
-                  </div>
+                  </Notice>
                 )}
                 <Card surface="inset" contentPadding="var(--polish-space-card)">
                   <SaveErrorField names={["importFriends","form.importFriends","import_friends","form.import_friends"]}><Checkbox checked={form.importFriends} onCheckedChange={(next) => update('importFriends', next)} description="登録のあと、いまの友だちを musubo に引き継ぎます（数分かかります）">いまの友だちの引き継ぎ</Checkbox></SaveErrorField>

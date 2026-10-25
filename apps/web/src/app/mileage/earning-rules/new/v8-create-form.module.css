@@ -38,13 +38,6 @@
   line-height: 1.6;
 }
 
-.conflict {
-  border: 1px solid var(--color-status-warn-deep);
-  border-radius: var(--radius-card);
-  background: var(--color-status-warn-soft);
-  padding: 12px 16px;
-}
-
 .conflictTitle {
   margin: 0;
   color: var(--color-ink);

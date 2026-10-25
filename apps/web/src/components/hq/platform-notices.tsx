@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type HqNotice } from '@/lib/api'
 import { shortDateTime } from '@/lib/hq-banners'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営からのお知らせ（★管理画面 37-7「画面のお知らせ」）。統括の管理画面の上部に出し、「読みました」で消える。
@@ -39,17 +40,12 @@ export default function PlatformNotices() {
   return (
     <section data-design-node="EJ6sm" aria-label="運営からのお知らせ" className="mb-4 grid gap-2">
       {notices.map((n) => (
-        <div key={n.id} className="flex flex-wrap items-start gap-3 rounded-card border border-accent-border bg-accent-soft px-4 py-3">
-          <Megaphone aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-info" />
-          <div className="min-w-0 flex-1">
-            <p className="text-label font-medium text-ink">
+        <Notice key={n.id} tone="info" icon={<Megaphone aria-hidden="true" />} heading={<>
               {n.subject}
               <span className="ml-2 text-micro font-normal text-ink-faint">musubo 運営{n.sentAt ? `・${shortDateTime(n.sentAt)}` : ''}</span>
-            </p>
+            </>} action={<Button size="field" onClick={() => void markRead(n.id)} disabled={busyId === n.id}>読みました</Button>}>
             <p className="mt-1 whitespace-pre-wrap text-caption text-ink">{n.body}</p>
-          </div>
-          <Button size="field" onClick={() => void markRead(n.id)} disabled={busyId === n.id}>読みました</Button>
-        </div>
+        </Notice>
       ))}
     </section>
   )

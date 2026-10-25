@@ -154,11 +154,6 @@
   background: var(--color-canvas); border: 1px solid var(--color-hairline);
 }
 .precheckNoteInfo .precheckNoteTitle { color: var(--color-accent-deep); }
-.precheckNoteWarn {
-  padding: var(--tpl-htn6-pre-note-pad); gap: var(--tpl-htn6-pre-row-gap);
-  background: var(--color-caution-band);
-}
-.precheckNoteWarn .precheckNoteTitle { color: var(--color-warning); }
 .precheckNoteTitle { font-weight: 700; }
 .precheckNoteLink { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-htn6-pre-link-gap); }
 .precheckAck { padding: var(--tpl-htn-ack-pad); }
@@ -189,16 +184,8 @@
 }
 
 /* ③Step1 止まったときの赤い案内箱。カードのいちばん上。 */
-.errorBox {
-  display: flex; flex-direction: column; gap: var(--tpl-htn6-err-gap);
-  padding: var(--tpl-htn6-err-pad); border-radius: var(--tpl-htn-radius-m);
-  background: var(--color-status-danger-soft); box-shadow: var(--tpl-htn-ring-danger);
-}
-.errorBox p { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink); }
-.errorBox p:first-child { font-weight: 700; color: var(--color-danger); }
 /* Webhook が「オフ」のときは失敗ではなく案内なので青で出す（絵 Lwxyh の案内の箱）。 */
-.errorBoxInfo { background: var(--color-info-bg); box-shadow: var(--tpl-htn-ring-info); }
-.errorBoxInfo p:first-child { color: var(--color-accent-deep); }
+
 
 /* ③Step1 確認の5行。行は上下中央そろえ。 */
 .checkList { margin: 0; padding: 0; list-style: none; }

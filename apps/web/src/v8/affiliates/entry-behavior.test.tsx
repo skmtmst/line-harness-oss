@@ -179,6 +179,11 @@ describe('アフィリエイターを作る（今の入口 /affiliates/new）', 
     fireEvent.change(screen.getByLabelText(/メール/), { target: { value: 'mine@example.com' } })
     fireEvent.click(screen.getByRole('button', { name: /登録して紹介リンクを発行する/ }))
     await screen.findByText('ほかの人が先にこのアフィリエイターを保存しました')
+    const notice = document.querySelector('[data-save-conflict]')!
+    expect(notice.querySelectorAll('[data-design-part="notice"]')).toHaveLength(0)
+    expect(notice.textContent).toContain('基本情報は保存済み')
+    expect(notice.textContent).toContain('追加情報は未保存')
+    expect(notice.querySelector('a')?.textContent).toBe('追加情報を破棄して一覧へ戻る')
     expect((screen.getByLabelText(/メール/) as HTMLInputElement).value).toBe('mine@example.com')
     expect(push).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '追加情報の保存を再開する' }))

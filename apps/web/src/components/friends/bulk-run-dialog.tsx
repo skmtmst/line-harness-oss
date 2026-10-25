@@ -27,6 +27,7 @@ import { formatNumber } from '@/lib/format'
 import BulkOperationEditor from './bulk-operation-editor'
 import { buildBulkOperation, EMPTY_BULK_INPUT, type BulkOperationInput } from './bulk-operation-input'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 type Phase = 'operation' | 'confirm' | 'result'
 type ResultState = 'idle' | 'loading' | 'ready' | 'error'
@@ -376,10 +377,11 @@ export default function BulkRunDialog({
         {<Steps label="一括操作の手順" currentKey={phase} steps={phaseSteps} />}
 
         {failure ? (
-          <div className={phase === 'result' || failure.kind === 'forbidden' ? styles.notice : styles.warn} role="alert" data-failure-kind={failure.kind}>
-            <p>{failure.message}</p>
+          <Notice tone={phase === "result" || failure.kind === "forbidden" ? "danger" : "warn"} role="alert" data-failure-kind={failure.kind} action={<>
             {failure.canReload ? <Button onClick={reloadFailure}>読み直す</Button> : null}
-          </div>
+          </>}>
+            <p>{failure.message}</p>
+          </Notice>
         ) : null}
 
         {phase === 'operation' ? (

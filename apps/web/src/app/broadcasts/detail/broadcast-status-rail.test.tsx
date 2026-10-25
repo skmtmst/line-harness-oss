@@ -103,7 +103,7 @@ describe('状態の段', () => {
     )
     // 6段すべて済み（✓）。輪（aria-current）はどこにも無い。
     expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(0)
-    expect(container.querySelectorAll('svg')).toHaveLength(6)
+    expect(container.querySelectorAll('ol svg')).toHaveLength(6)
   })
 
   it('途中だけ「いまいる所」の輪を1つ出す', () => {

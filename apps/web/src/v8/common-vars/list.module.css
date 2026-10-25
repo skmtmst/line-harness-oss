@@ -61,31 +61,6 @@
   margin-bottom: var(--tpl-cv-alert-after);
 }
 
-.alertBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-cv-alert-gap);
-  padding: var(--tpl-cv-alert-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-cv-alert-lh);
-}
-
-.alertBand > svg {
-  flex-shrink: 0;
-  color: var(--color-status-warn);
-}
-
-.alertBand[data-tone='danger'] {
-  background: var(--color-danger-bg);
-}
-
-.alertBand[data-tone='danger'] > svg {
-  color: var(--color-danger);
-}
-
 .alertText {
   min-width: 0;
   overflow: hidden;
@@ -543,24 +518,6 @@
   font-size: var(--text-label);
   font-weight: 600;
   line-height: var(--tpl-cv-name-lh);
-}
-
-.dialogWarn {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tpl-cv-gap-s);
-  margin: 0;
-  padding: var(--tpl-cv-alert-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-cv-alert-lh);
-}
-
-.dialogWarn > svg {
-  flex-shrink: 0;
-  color: var(--color-status-warn);
 }
 
 .dialogField {

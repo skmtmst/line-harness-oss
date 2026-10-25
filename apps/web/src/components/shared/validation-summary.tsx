@@ -2,6 +2,7 @@
 
 import { AlertCircle } from 'lucide-react'
 import type { FormFieldProblem } from '@/lib/use-form-errors'
+import Notice from './notice'
 
 /**
  * 送信時に落ちた欄のまとめ（★管理画面 sTJsh §6）。
@@ -33,11 +34,8 @@ export default function ValidationSummary({
     <div
       role="alert"
       data-design-part="validation-summary"
-      className="border-danger bg-danger-bg text-danger rounded-control border px-4 py-3"
     >
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium">
-          <AlertCircle size={15} aria-hidden className="mr-1.5 -mt-0.5 inline-block" />
+      <Notice tone="danger" role="presentation" icon={<AlertCircle aria-hidden="true" />} heading={<>
           {problems.length}か所直してください：
           {problems.map((problem, index) => (
             <span key={problem.key}>
@@ -45,8 +43,7 @@ export default function ValidationSummary({
               {problem.label}
             </span>
           ))}
-        </p>
-        {onFocusFirst ? (
+        </>} action={onFocusFirst ? (
           <button
             type="button"
             onClick={onFocusFirst}
@@ -54,8 +51,7 @@ export default function ValidationSummary({
           >
             1つ目へ→
           </button>
-        ) : null}
-      </div>
+        ) : null} />
     </div>
   )
 }

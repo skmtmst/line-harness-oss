@@ -9,7 +9,7 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Info, Pause, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag, RotateCcw } from 'lucide-react'
+import { Info, Pause, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag, RotateCcw } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -265,7 +265,6 @@ function InflowDetailContent() {
   const url = route ? `${workerBase}/r/${encodeURIComponent(route.refCode)}` : null
 
   /** コピーできなかったとき、選んでコピーできる欄をその場に出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
-
 
   async function applyDeleteChoice() {
     if (!route || deleting) return
@@ -550,23 +549,20 @@ function InflowDetailContent() {
           </Card>
         </div>
 
-        <div className={styles.happenBand}>
-          <Info size={18} className={styles.happenIcon} aria-hidden="true" />
-          <div className={styles.happenText}>
-            <p className={styles.happenTitle} title={happenTitle}>{happenTitle}</p>
+          <Notice tone="info" icon={<Info size={18} aria-hidden="true" />} action={<>
+            {readonly ? null : <>
+              {route.isActive ? (
+                <Button onClick={() => openDelete('stop')}><Pause size={15} aria-hidden="true" />止める</Button>
+              ) : (
+                <Button onClick={() => reopenRoute()} busyLabel="処理中…">受付を再開する</Button>
+              )}
+              <Button variant="primary" onClick={() => setEditingRoute(true)}>
+                <Pencil size={15} aria-hidden="true" />{happenParts.length > 0 ? 'することを変える' : 'することを決める'}
+              </Button>
+            </>}
+          </>} heading={<>{happenTitle}</>}>
             <p className={styles.happenNote}>何も決めないと「動きが未設定」になります。変えると、これから友だちになる人に効きます（もういる人には効きません）</p>
-          </div>
-          {readonly ? null : <>
-            {route.isActive ? (
-              <Button onClick={() => openDelete('stop')}><Pause size={15} aria-hidden="true" />止める</Button>
-            ) : (
-              <Button onClick={() => reopenRoute()} busyLabel="処理中…">受付を再開する</Button>
-            )}
-            <Button variant="primary" onClick={() => setEditingRoute(true)}>
-              <Pencil size={15} aria-hidden="true" />{happenParts.length > 0 ? 'することを変える' : 'することを決める'}
-            </Button>
-          </>}
-        </div>
+          </Notice>
 
         <Card overflow="hidden" aria-label="この経路から来た友だち">
           <div className={styles.tools}>
@@ -755,7 +751,9 @@ function InflowDetailContent() {
                 <li>追加時の動き：新しい友だちへのタグ付けとシナリオ開始が止まります</li>
               </ul>
             </Notice>
-            <p className={styles.deleteSafe}>この経路から来た友だちと、付いたタグ・進んでいるシナリオは消えません。</p>
+            <Notice tone="success">
+              この経路から来た友だちと、付いたタグ・進んでいるシナリオは消えません。
+            </Notice>
             <SaveErrorField names={["inflow-delete-choice","value","deleteChoice"]}><RadioCardGroup legend="どうしますか？" legendVisible className={styles.deleteChoices}>
               {DELETE_CHOICES.filter(([value]) => value !== 'delete' || canPermanentlyDelete).map(([value, title, description]) => (
                 <RadioCard

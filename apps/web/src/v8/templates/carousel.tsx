@@ -555,7 +555,9 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} title={panels.length >= MAX_COLUMNS ? `カードは${MAX_COLUMNS} 枚までです` : undefined} onClick={() => duplicatePanel(selectedIndex)}><Copy size={15} aria-hidden="true" />このカードを複製</Button>
                   <Button type="button" variant="text" disabled={busy || panels.length <= 1} title={panels.length <= 1 ? 'カードは1枚必要です' : undefined} onClick={() => removePanel(selectedIndex)}><Trash2 size={15} aria-hidden="true" />このカードを消す</Button>
                 </div>
-                <p className={own.info} title="画像は横1024 × 縦678pxを推奨。本文はタイトルか画像があると60文字、両方なければ120文字までです。"><TriangleAlert className={own.icon} aria-hidden="true" />画像は全部のカードに入れるか、全部入れないかにします。1枚だけ違うと、高さがそろわず崩れます。</p>
+                <Notice tone="warn" title="画像は横1024 × 縦678pxを推奨。本文はタイトルか画像があると60文字、両方なければ120文字までです。" icon={<TriangleAlert aria-hidden="true" />}>
+                  画像は全部のカードに入れるか、全部入れないかにします。1枚だけ違うと、高さがそろわず崩れます。
+                </Notice>
               </Card>
             ) : null}
 

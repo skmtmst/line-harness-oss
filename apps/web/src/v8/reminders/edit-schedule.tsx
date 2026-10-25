@@ -24,6 +24,7 @@ import { useState } from 'react'
 import { countLabel,formatMd } from './edit-model'
 import styles from './edit.module.css'
 import { PhoneV8,SummaryCardV8,WizardFooterV8 } from './ui'
+import Notice from '@/components/shared/notice'
 
 /* ---------------- 手順4：配信予定 ---------------- */
 export function ScheduleStageV8({
@@ -154,10 +155,9 @@ export function ScheduleStageV8({
         )}
       </section>
       {preview && preview.summary.duplicateCount > 0 ? (
-        <p className={styles.infoBand}>
-          <Layers size={16} aria-hidden="true" />
-          同じ時刻に送る通知は、止めずに1通にまとめて送ります（{formatNumber(preview.summary.duplicateCount)} 件）。まとめたくないときは時刻をずらしてください。
-        </p>
+        <Notice tone="info" icon={<Layers size={16} aria-hidden="true" />}>
+          同じ時刻に送る通知は、止めずに1通にまとめて送ります（
+          {formatNumber(preview.summary.duplicateCount)}{" 件）。まとめたくないときは時刻をずらしてください。"}</Notice>
       ) : null}
     </CreatePage>
   )

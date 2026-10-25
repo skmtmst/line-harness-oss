@@ -434,10 +434,9 @@ export function ScenarioDetailDialogs({
             <p className={styles.dupBoxTitle}>引き継がないもの</p>
             <p className={styles.dupBoxBody}>・購読中の人・配信の記録</p>
           </div>
-          <p className={styles.dupNote}>
-            <ShieldCheck aria-hidden />
-            <span>複製は「停止中」で作られます。開始のきっかけも写しますが、配信を始めるまで誰にも届きません。</span>
-          </p>
+        <Notice tone="info" icon={<ShieldCheck aria-hidden />}>
+          <span>複製は「停止中」で作られます。開始のきっかけも写しますが、配信を始めるまで誰にも届きません。</span>
+        </Notice>
           {/* 絵（Al4Ek）は操作が真ん中。共通の窓の右寄せの操作の段は使わず、本文の続きに置く。 */}
           <div className={styles.dupActions}>
             <Button variant="secondary" onClick={() => setDuplicateOpen(false)} disabled={duplicating}>

@@ -16,7 +16,6 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
 
-
 export default function MediaReplacementDialog({
   source,
   accountId,
@@ -111,7 +110,6 @@ export default function MediaReplacementDialog({
       setPhase('error')
       { if (!fieldFailure)
 
-
       setError(describeApiFailure(caught, '読み込み')) }
     }
   }
@@ -145,10 +143,8 @@ export default function MediaReplacementDialog({
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
 
-
       const message = describeApiFailure(caught, '保存')
       { if (!fieldFailure)
-
 
       setError(message) }
       setBusy(false)
@@ -249,13 +245,13 @@ export default function MediaReplacementDialog({
           <Notice tone="danger" >影響を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
         ) : impact ? (
           <div className="space-y-3">
-            <div className={`rounded-control p-3 text-xs ${impact.canReplace ? 'bg-accent-soft text-accent-deep' : 'bg-danger-bg text-danger'}`}>
+            <Notice tone={impact.canReplace ? 'success' : 'danger'}>
               {impact.canReplace
                 ? `${impact.replaceableCount}か所すべてを差し替えられます。`
                 : impact.canPartiallyReplace
                   ? `${impact.usageCount}か所のうち${impact.replaceableCount}か所を差し替えられます。残り${impact.blockedCount}か所は元のメディアを使い続けます。`
                   : 'この画面からは差し替えられる使用先がありません。'}
-            </div>
+            </Notice>
             {impact.blockedCount > 0 ? (
               <p className="text-ink-faint text-xs">
                 差し替えられない使用先：

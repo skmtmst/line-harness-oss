@@ -127,30 +127,31 @@ export function ScenarioDetailBody({
 
           {/* 複製が途中で止まって残った作りかけの知らせ（SCENARIO-09）。 */}
           {duplicateRemainder && (
-            <div className={styles.remainderBand}>
-              <p>前回の複製が途中で止まり、作りかけのコピーが残っています</p>
-              <p className={styles.remainderDetail}>
-                「{duplicateRemainder.copyName}」は{duplicateRemainder.stage}の途中で止まりました。
-                続きからやり直すか、作りかけのコピーを削除してください。
-              </p>
-              <div className={styles.remainderActions}>
-                <Button type="button" disabled={duplicating} onClick={() => void handleDuplicate()} variant="text" size="inline" busy={duplicating} busyLabel="複製中…">
-                  続きからやり直す
-                </Button>
-                <Link href={`/scenarios/detail?id=${duplicateRemainder.copyId}`}>コピーを確認する</Link>
-                <button
-                  type="button"
-                  className={styles.dangerLink}
-                  disabled={discardingDuplicate}
-                  onClick={() => {
-                    setDiscardDuplicateError('')
-                    setDiscardDuplicateOpen(true)
-                  }}
-                >
-                  作りかけのコピーを削除する
-                </button>
-              </div>
-            </div>
+        <Notice tone="warn" action={<>
+          <div className={styles.remainderActions}>
+            <Button type="button" disabled={duplicating} onClick={() => void handleDuplicate()} variant="text" size="inline" busy={duplicating} busyLabel="複製中…">
+              続きからやり直す
+            </Button>
+            <Link href={`/scenarios/detail?id=${duplicateRemainder.copyId}`}>コピーを確認する</Link>
+            <button
+              type="button"
+              className={styles.dangerLink}
+              disabled={discardingDuplicate}
+              onClick={() => {
+                setDiscardDuplicateError('')
+                setDiscardDuplicateOpen(true)
+              }}
+            >
+              作りかけのコピーを削除する
+            </button>
+          </div>
+        </>}>
+          <p>前回の複製が途中で止まり、作りかけのコピーが残っています</p>
+          <p className={styles.remainderDetail}>
+            「{duplicateRemainder.copyName}」は{duplicateRemainder.stage}の途中で止まりました。
+            続きからやり直すか、作りかけのコピーを削除してください。
+          </p>
+        </Notice>
           )}
 
           {/* 上の3つの箱：保存・開始のきっかけ・配信。ボタンは箱の下にそろう。 */}

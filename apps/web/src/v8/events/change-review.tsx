@@ -169,12 +169,11 @@ function ChangeReview({ eventId }: { eventId: string }) {
       <div aria-live="polite"><CreateSummaryCard title="影響の確認" rows={[]}>
         {preview ? (
           <>
-            <div className={preview.blocked ? styles.bandDanger : styles.band}>
-              <p className={styles.bandTitle}>{preview.blocked ? 'このままでは変えられません' : moved ? '日時が変わります' : '内容が変わります'}</p>
+            <Notice tone={preview.blocked ? "danger" : "warn"} heading={<>{preview.blocked ? 'このままでは変えられません' : moved ? '日時が変わります' : '内容が変わります'}</>}>
               <p className={styles.bandText}>
                 確定した申込 {preview.total_confirmed} 人へ、LINE で新旧の日時をお知らせします。キャンセル待ち {preview.total_waiting} 人は順番のままです。
               </p>
-            </div>
+            </Notice>
             {moved ? (
               <div className={styles.beforeAfter}>
                 <p className={styles.beforeAfterLabel}>変える前 → 変えた後</p>

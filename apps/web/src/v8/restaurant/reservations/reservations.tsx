@@ -30,7 +30,6 @@ import styles from './reservations.module.css'
 import TodayView,{ type PhonePreset } from './today'
 import SeatWaitlistDialog from './waitlist'
 
-
 /** 予約を変えられる役割か（口は owner・admin・staff。閲覧のみは 403）。読めるまでは出す（最後の守りは口の 403）。 */
 function canWriteRole(role: string | null | undefined): boolean {
   return canManageRole(role) || role === 'staff'
@@ -191,12 +190,13 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     <>
       {lineWarning ? <Notice tone="warn" role="alert" message={lineWarning} /> : null}
       {dayClosures && dayClosures.closures.length > 0 ? (
-        <div role="status" className={styles.closureBand} data-closure-day={dayClosures.day}>
+        <Notice tone="warn" role="status" data-closure-day={dayClosures.day} action={<>
+          <TextLink href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</TextLink>
+        </>}>
           <p className={styles.closureText}>
             {`${dayTitle(dayClosures.day)}は${dayClosures.closures.map((c) => `${KIND_LABEL[c.kind]}（${scopeText(c, tables)}）`).join('・')}です。閉じた時間帯は LINE からの予約を受け付けません。入っている予約は取り消していません。`}
           </p>
-          <TextLink href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</TextLink>
-        </div>
+        </Notice>
       ) : null}
       {view === 'today' ? dayError !== null ? <ListState kind="error" title="予約を読み込めませんでした" error={dayError} onRetry={()=>setDayRetry(n=>n+1)}/> : todayRows === null ? <ListState kind="loading"/> : (
         <TodayView

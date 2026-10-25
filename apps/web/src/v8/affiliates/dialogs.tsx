@@ -15,12 +15,11 @@ import {
   type AffiliateArchiveImpact,
   type AffiliateSettlementPreview,
 } from '@/lib/api'
-import { formatDay, formatNumber } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * 紹介を止める・アーカイブの確かめ（AffiliateArchiveDialog）と、1人ぶんの支払いの確定
@@ -29,8 +28,6 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  */
 
 type LoadPhase = 'loading' | 'ready' | 'empty' | 'error'
-
-
 
 function dateLabel(value: string | null): string {
   return polishFormatDate(value, { style: 'day', fallback: '—' })
@@ -137,22 +134,22 @@ export function AffiliateArchiveDialog({
         />
       ) : impact ? (
         <div className="space-y-4">
-          <section className="rounded-control border border-danger bg-danger-bg p-4">
-            <h3 className="text-danger text-sm font-bold">アーカイブすると、次の3つが変わります</h3>
+          <Notice tone="danger" heading={<> <h3>アーカイブすると、次の3つが変わります</h3> </>}>
+
             {/*
               R291: 「ここを開く」は確認中の紹介者の明細へ飛ぶ。案件一覧や
               成果地点の設定へ迷い込ませない。承認待ちは成果承認タブをこの
               紹介者で絞ったもの、リンクはこの紹介者の内訳（リンク一覧）を開く。
             */}
             <dl className="mt-2 divide-y divide-danger/20 text-sm">
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.activeLinks)}本</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href={`/affiliates?affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-semibold">{yen(impact.unsettledReward)}</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href="/affiliates?tab=payment">ここを開く</Button></div>
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.pendingConversions)} 件</dd></div><Button variant="danger" className="bg-canvas px-3 py-1.5 text-xs text-danger h-auto whitespace-normal" href={`/affiliates?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.activeLinks)}本</dd></div><Button variant="danger-outline" size="compact" href={`/affiliates?affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-semibold">{yen(impact.unsettledReward)}</dd></div><Button variant="danger-outline" size="compact" href="/affiliates?tab=payment">ここを開く</Button></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.pendingConversions)} 件</dd></div><Button variant="danger-outline" size="compact" href={`/affiliates?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
             </dl>
-            <p className="text-danger mt-2 text-xs leading-5">
+            <p className="mt-2 text-xs leading-5">
               紹介リンクは開けなくなります。過去の成果・報酬・支払いの記録は消えません。
             </p>
-          </section>
+          </Notice>
 
           <SaveErrorField names={["archive-choice","value","choice"]}><RadioCardGroup legend="どうしますか？">
             {([

@@ -21,7 +21,6 @@ import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
-
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
   if (blockers.includes('different_kind')) {
@@ -479,11 +478,11 @@ export default function MediaDetailDialog({
               {versionFile ? <p className="text-ink mt-2 truncate text-xs font-medium" title={versionFile.name}>{`選んだファイル：${versionFile.name}`}</p> : null}
             </div>
             {versionPreview ? (
-              <div className={versionPreview.canReplace ? 'bg-accent-soft text-accent-deep mt-3 rounded-control p-3 text-xs' : 'bg-danger-bg text-danger mt-3 rounded-control p-3 text-xs'}>
+              <Notice tone={versionPreview.canReplace ? 'success' : 'danger'}>
                 {versionPreview.canReplace
                   ? `現在の第${versionPreview.currentVersionNo}版から第${versionPreview.currentVersionNo + 1}版へ追加できます。`
                   : versionBlockerText(versionPreview.blockers)}
-              </div>
+              </Notice>
             ) : null}
             {versionPreview?.canReplace ? (
               <div className="mt-3"><Field label="変更理由" htmlFor={`${fileInputId}-reason`} requirement={changeReasonRequirement}><SaveErrorField names={["changeReason","change_reason"]}><input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" /></SaveErrorField></Field></div>

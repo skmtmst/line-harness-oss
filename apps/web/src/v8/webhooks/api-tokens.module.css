@@ -90,8 +90,6 @@
   padding: 0;
 }
 
-
-
 .srOnly {
   position: absolute;
   width: 1px;
@@ -125,7 +123,6 @@
   font-weight: 600;
   line-height: var(--tpl-ms-key-info-lh);
 }
-
 
 .fieldError {
   margin: 0;
@@ -165,16 +162,6 @@
   width: 100%;
   flex-direction: column;
   gap: var(--tpl-ms-key-gap);
-}
-
-.issuedNote {
-  margin: 0;
-  padding: var(--tpl-ms-key-box-pad);
-  border-radius: var(--tpl-ms-key-box-radius);
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-ms-key-note-lh);
 }
 
 .issuedTokenRow {

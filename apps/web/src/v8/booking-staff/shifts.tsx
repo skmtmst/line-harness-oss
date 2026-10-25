@@ -1146,7 +1146,9 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               <p className={styles.switcherNote}>保存すると、右の予約画面にすぐ出ます。</p>
             </div>
           )}
-          {canEdit ? null : <p className={layout.warnBand} role="status">閲覧のみです。勤務を変えるには、管理者に「自分の勤務」の権限を頼んでください。</p>}
+      {canEdit ? null : <Notice tone="warn" role="status">
+        閲覧のみです。勤務を変えるには、管理者に「自分の勤務」の権限を頼んでください。
+      </Notice>}
 
           {/* 閲覧のみのときは選ぶ部品・押す口を置かず、いまの値を文字で見せる（API も 403 で断る。2026-10-06 オーナー決定）。 */}
           <fieldset className={styles.fieldset}>
@@ -1356,7 +1358,9 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               <p className={layout.cardNote}>{isSelf
                 ? 'あなたの Google カレンダーの予定がある時間は、予約枠から自動で外れます。LINE で入った予約は、このカレンダーに書き込みます。'
                 : '予定がある時間は、予約枠から自動で外れます。LINE で入った予約は、このカレンダーに書き込みます。ほかの予約サービスがこのカレンダーへ書き出せば、そちらの予約でも自動で枠が埋まります。'}</p>
-              {!serviceConfigured ? <p className={layout.warnBand} role="status">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p> : null}
+          {!serviceConfigured ? <Notice tone="warn" role="status">
+            Googleの接続設定がまだなのでつなげません。管理者に連絡してください。
+          </Notice> : null}
               <div className={styles.calRow}>
                 <div className={`${layout.field} ${styles.calField}`}><Field label="カレンダーの ID" htmlFor="bks-cal-id"><SaveErrorField names={["calendarInput","calendarId","calendar_input","calendar_id"]}><TextField
                     id="bks-cal-id"

@@ -11,15 +11,7 @@ import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/g
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import {
-  api,
-  ApiError,
-  type LineWebhookRecoveryEvent,
-  type OperationAlert,
-  type OperationHealthCheckKey,
-  type OperationHealthSnapshot,
-  type OperationHistoryEntry,
-} from '@/lib/api'
+import { api, type LineWebhookRecoveryEvent, type OperationAlert, type OperationHealthCheckKey, type OperationHealthSnapshot, type OperationHistoryEntry } from '@/lib/api'
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
 import { onlyWhenVisible } from '@/lib/visible-polling'
@@ -31,7 +23,6 @@ import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
-
 /*
  * ★V8 運用状態 健全性チェック（Pencil ）。
  *
@@ -41,7 +32,6 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  */
 
 // 全文（release-log.json）ではなく要約を読む（V6R-S3-a）。
-
 
 const HISTORY_FETCH_LIMIT = 200
 
@@ -520,18 +510,17 @@ export function HealthPanelV8({
   return (
     <>
       {loginSecurityNotice ? <Notice tone="warn" message={loginSecurityNotice} /> : null}
-      <div className={styles.banner} data-tone={banner.tone} role="status">
-        <BannerIcon className={styles.bannerIcon} aria-hidden="true" />
-        <div className={styles.bannerText}>
-          <p className={styles.bannerTitle}>{banner.title}</p>
-          <p className={styles.bannerBody}>{banner.body}</p>
-        </div>
+      <Notice tone={banner.tone === "good" ? "success" : banner.tone} data-tone={banner.tone} role="status" icon={<BannerIcon aria-hidden="true" />} action={<>
         {worst ? <Link href={worst.href} className={styles.bannerLink}>{`${worst.sub.split('・')[0]}を開く →`}</Link> : null}
-      </div>
+      </>} heading={<>{banner.title}</>}>
+        <p className={styles.bannerBody}>{banner.body}</p>
+      </Notice>
       {!accountId && !loading ? (
         <p className={styles.minor}>上のバーでLINEアカウントを選択してください。アカウントを選ぶと9つの項目を確かめます。</p>
       ) : null}
-      {alertNotice ? <p className={styles.notice} data-tone={alertNotice.tone} role="status">{alertNotice.text}</p> : null}
+      {alertNotice ? <Notice tone={alertNotice.tone === "warning" ? "warn" : alertNotice.tone} data-tone={alertNotice.tone} role="status">
+        {alertNotice.text}
+      </Notice> : null}
       <section className={styles.table} aria-label="チェック結果">
         <OpenAlerts
           alerts={openAlerts}

@@ -57,7 +57,6 @@ import FilterChip from '@/components/shared/filter-chip'
 
 import { ListToolbarEnd, ListToolbarRow, ListToolbarSearchSlot, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 
-
 import { RowMenu } from '@/components/shared/row-actions'
 
 import { BookingChipsLabel, BookingMonthBar, BookingUrlCopy } from '@/v8/booking-bookings/public/month-bar/index'
@@ -821,10 +820,10 @@ function BookingDetailPanel({
             {detail?.customer.tags.length ? <DetailRow label="タグ">{detail.customer.tags.map((tag) => tag.name).join('、')}</DetailRow> : null}
             {detail?.customer.mileageBalance !== null && detail?.customer.mileageBalance !== undefined ? <DetailRow label="マイル">{formatNumber(detail.customer.mileageBalance)}</DetailRow> : null}
           </section>
-          <section className="border-warning bg-warning-bg rounded-card border p-5">
-            <h3 className="text-warning text-sm font-semibold">当日 気をつけること</h3>
-            <p className="text-warning mt-3 text-xs">{detail?.previousHandover ?? '前回の申し送りはありません。'}</p>
-          </section>
+          <Notice tone="warn" heading={<> <h3>当日 気をつけること</h3> </>}>
+
+            <p className="mt-3 text-xs">{detail?.previousHandover ?? '前回の申し送りはありません。'}</p>
+          </Notice>
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">つながる先</h3>
             <div className="mt-3 space-y-2 text-xs"><p><Link href="/booking/menus" className="text-action font-semibold hover:underline focus-visible:underline">→ 予約設定</Link>　メニューと受付枠</p><p><Link href="/reminders" className="text-action font-semibold hover:underline focus-visible:underline">→ リマインダ</Link>　前日・開始前のお知らせ</p>{b.friend_id ? <p><Link href={`/chats?friend=${b.friend_id}`} className="text-action font-semibold hover:underline focus-visible:underline">→ 受信箱</Link>　この方とのやりとり</p> : null}<p><Link href="/mileage" className="text-action font-semibold hover:underline focus-visible:underline">→ マイル</Link>　来店時の付与</p></div>

@@ -1200,9 +1200,9 @@ function BookingConfirmPreview({ friendName, menuName, staffName, timeZone, star
 
 function WarningCard({ title, lines }: { title: string; lines: string[] }) {
   return (
-    <section className="border-warning bg-warning-bg rounded-card border p-4">
-      <h2 className="text-warning text-sm font-semibold">{title}</h2>
-      <ul className="text-warning mt-3 space-y-2 text-xs">{lines.map((line) => <li key={line}>・{line}</li>)}</ul>
-    </section>
+    <Notice tone="warn" heading={<> <h2>{title}</h2> </>}>
+
+      <ul className="mt-3 space-y-2 text-xs">{lines.map((line) => <li key={line}>・{line}</li>)}</ul>
+    </Notice>
   )
 }

@@ -242,19 +242,19 @@ function EditInner() {
       </div>
 
       {conflict ? (
-        <div className={formStyles.conflict} role="alert">
-          <p className={formStyles.conflictTitle}>ほかの人が先にこの決めごとを直しました</p>
-          <p className={formStyles.conflictText}>
-            開いている間に下書きが変わっています。そのまま保存すると上書きになります。
-            最新を読み込んで違いを比べてから、もう一度直してください。
-          </p>
+        <Notice tone="warn" role="alert" heading={<>ほかの人が先にこの決めごとを直しました</>} action={<>
           <div className={formStyles.conflictActions}>
             <Button onClick={() => void load()}>最新を読み込んで続ける</Button>
             <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="保存しています">
               比べてから保存
             </Button>
           </div>
-        </div>
+        </>}>
+          <p className={formStyles.conflictText}>
+            開いている間に下書きが変わっています。そのまま保存すると上書きになります。
+            最新を読み込んで違いを比べてから、もう一度直してください。
+          </p>
+        </Notice>
       ) : null}
       {saveError ? <Notice tone="danger" message={saveError} /> : null}
 

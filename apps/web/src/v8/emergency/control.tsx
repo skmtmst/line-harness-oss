@@ -514,7 +514,6 @@ const EmergencyControlV8 = (
     if (isStopped) stopBlockers.push('stopped')
   }
 
-
   const stopIncident = operations.find((item) => item.id === control?.activeIncidentId) ?? null
   const recordRows = operations.filter(entry => recordFilter === 'all' || entry.status === recordFilter)
     .slice()
@@ -596,8 +595,7 @@ const EmergencyControlV8 = (
         </div>
 
         {isStopped && control ? (
-          <div className={`${styles.stoppedBand} ${styles.stoppedBandOn}`} role="status">
-            <p className={styles.stoppedTitle}>止めているとき</p>
+          <Notice tone="danger" role="status" heading={<>止めているとき</>}>
             <div className={styles.stoppedLine}>
               <p className={styles.stoppedText}>
                 <span className={styles.stoppedDot}>● </span>
@@ -616,7 +614,7 @@ const EmergencyControlV8 = (
             <p className={styles.stoppedNote}>
               復旧するとき：止める前に動いていたものだけを戻します。理由を書いて、本人確認（6桁）をしてから戻します。
             </p>
-          </div>
+          </Notice>
         ) : (
           /* 絵：止めているときの帯の置き場は、動いているあいだも空けておく（止めると、ここに時刻・担当・止めたものと「復旧する」が出る）。 */
           <div className={styles.stoppedBand}>
@@ -741,9 +739,11 @@ const EmergencyControlV8 = (
             </table>
           </div>
         )}
-        <p className={styles.tableNote}>
-          {historyState === 'ready' ? `種類の件数は、取得した直近${operations.length}件の記録から数えています。` : ''}だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。緊急停止はオーナーと許可された人だけが実行できます。
-        </p>
+        <Notice tone="info">
+          {historyState === 'ready' ? `種類の件数は、取得した直近${operations.length}件の記録から数えています。` : ''}
+          だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。緊急停止はオーナーと許可された人だけが実行できます。
+
+        </Notice>
       </section>
 
       <LogEntryDetails canCopy={canControl} entry={recordEntry} onClose={() => setRecordEntry(null)} />
@@ -825,13 +825,13 @@ const EmergencyControlV8 = (
             <>
               <p className={styles.confirmReason}>{accountName}</p>
               {restoreDrift && describeRestoreDrift(restoreDrift).length > 0 ? (
-                <div className={styles.confirmTargets}>
-                  <p className={styles.dialogLabel}>停止しているあいだに変わったものがあります</p>
-                  <ul className={styles.infoList}>
-                    {describeRestoreDrift(restoreDrift).map((line) => <li key={line}>{line}</li>)}
-                  </ul>
-                  <p className={styles.dialogHint}>変更・追加があった配信は再開しません。期限切れの予約は下書きへ戻します。</p>
-                </div>
+                  <Notice tone="warn">
+                    <p className={styles.dialogLabel}>停止しているあいだに変わったものがあります</p>
+                    <ul className={styles.infoList}>
+                      {describeRestoreDrift(restoreDrift).map((line) => <li key={line}>{line}</li>)}
+                    </ul>
+                    <p className={styles.dialogHint}>変更・追加があった配信は再開しません。期限切れの予約は下書きへ戻します。</p>
+                  </Notice>
               ) : null}
             </>
           )}

@@ -121,27 +121,6 @@
   gap: var(--polish-space-card);
 }
 
-.info,
-.doneBand,
-.chooseBand {
-  display: flex;
-  align-items: center;
-  gap: var(--polish-space-row);
-  padding: var(--polish-space-field) var(--polish-space-card);
-  border-radius: var(--polish-radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink);
-  font-size: var(--text-body);
-}
-
-.doneBand {
-  background: var(--color-accent-soft);
-}
-
-.chooseBand {
-  background: var(--color-warning-bg);
-}
-
 .chooseText {
   min-width: 0;
   flex: 1;
@@ -152,10 +131,6 @@
   height: var(--polish-icon-control);
   flex: none;
   color: var(--color-status-info);
-}
-
-.doneBand .infoIcon {
-  color: var(--color-accent-deep);
 }
 
 .variants {

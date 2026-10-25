@@ -30,7 +30,6 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import Notice from '@/components/shared/notice'
 
-
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagId: string | null; tagName: string | null; memberCount: number }
 
 const MAX_RANKS = 8
@@ -472,9 +471,10 @@ export default function RankSettingsV8({
                 ]}
               /></SaveErrorField>
             </Field>
-            <p className={styles.removeNote}>
+            <Notice tone="warn">
               移し先のランクは、各会員のいまの有効期限まで使います。期限のあとは通常のランク判定に戻ります。ECへ反映したあと、次の購入から還元率が変わります。タグも付け替えます。
-            </p>
+
+            </Notice>
           </>) : null}
         </div>
       </Dialog>

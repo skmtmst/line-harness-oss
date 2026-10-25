@@ -3,7 +3,6 @@
  * 頭・左右の列・下の帯の余白は型（CreatePage）が持つ。ここはカードの中身と右の列の箱だけ。
  */
 
-
 .field { display: flex; flex-direction: column; gap: var(--tpl-field-gap-basic); min-width: 0; }
 .nameRow { display: flex; gap: var(--tpl-rule-row-gap); }
 .nameRow > .field:first-child { flex: 1 1 0; }
@@ -31,13 +30,6 @@
 }
 
 .formError { color: var(--color-danger); font-size: var(--text-label); font-weight: 600; }
-.secretConfirm {
-  padding: var(--tpl-side-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--color-danger);
-  outline-offset: -1px;
-  background: var(--color-danger-bg);
-}
 .secretConfirmTitle { margin: 0; color: var(--color-danger); font-size: var(--tpl-card-title-size); font-weight: 700; }
 .secretConfirmText { margin: var(--tpl-body-gap) 0 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-body-lh); }
 .secretConfirmActions { display: flex; flex-wrap: wrap; gap: var(--tpl-body-gap); margin-top: var(--tpl-rule-row-gap); }

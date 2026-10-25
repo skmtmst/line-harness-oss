@@ -4,10 +4,10 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw, ShieldCheck } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { CircleAlert } from 'lucide-react';
+
 import { api, ApiError, type RichMenuPublishRun, type RichMenuTargetPreview } from '@/lib/api';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
@@ -107,7 +107,6 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   }
   }, [groupId, samePageUrl, saveErrors]);
 
-
   const loadProgress = useCallback(async () => {
     try {
       const res = await api.richMenuGroups.publishProgress(groupId)
@@ -121,7 +120,6 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     }
   }
   }, [groupId, saveErrors]);
-
 
   const loadRuns = useCallback(async () => {
     try {
@@ -358,10 +356,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
             {failed ? (
               <Notice tone="danger" heading={<> 公開が途中で止まりました </>} action={<> {canOperate ? <Button variant="primary" onClick={() => void republish()} busy={republishing} busyLabel="公開しています…"><RefreshCw size={14} aria-hidden="true" />もう一度公開する</Button> : null} </>} >{progress?.message ?? 'それまでの段を元に戻し、前のメニューのままにしました。もう一度公開できます。'}</Notice>
             ) : progress?.completed ? (
-              <div className={styles.doneBand} role="status">
-                <CircleCheck size={18} aria-hidden="true" className={styles.doneIcon} />
-                <div className={styles.bandText}>
-                  <p className={styles.bandTitle}>{audience === 'all' ? 'LINEへの登録が終わり、すべての友だちの既定のメニューになりました' : audience === 'targeted' ? 'LINEへの登録が終わり、条件に当てはまる友だちに順に出ます' : 'LINEへの登録が終わりました'}</p>
+                <Notice tone="success" role="status" icon={<CircleCheck size={18} aria-hidden="true" />} heading={<>{audience === 'all' ? 'LINEへの登録が終わり、すべての友だちの既定のメニューになりました' : audience === 'targeted' ? 'LINEへの登録が終わり、条件に当てはまる友だちに順に出ます' : 'LINEへの登録が終わりました'}</>}>
                   <p className={styles.bandNote}>
                     {audience === 'all'
                       ? '条件で出し分けている人には、いままでどおり上の順番のメニューが出ます。'
@@ -369,8 +364,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                         ? 'その人に関係する出来事（友だち追加・タグ付けなど）が起きたときに切り替わります。すぐ全員に出るわけではありません。'
                         : '友だちの画面に出すには、一覧の「表示先」で出す相手を決めてください。'}
                   </p>
-                </div>
-              </div>
+                </Notice>
             ) : null}
             {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
             {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}

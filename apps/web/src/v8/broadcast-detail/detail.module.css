@@ -222,16 +222,6 @@ a.railStep:hover .railLabel {
   padding: var(--tpl-bd-conflict-wrap-pad);
 }
 
-.conflict {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-bd-conflict-gap);
-  padding: var(--tpl-bd-conflict-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft);
-  box-shadow: var(--tpl-bd-ring-warning);
-}
-
 .conflictIcon {
   flex-shrink: 0;
   width: var(--tpl-bd-conflict-icon);

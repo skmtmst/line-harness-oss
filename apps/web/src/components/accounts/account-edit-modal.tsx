@@ -1,5 +1,6 @@
 'use client'
 
+import Notice from '@/components/shared/notice'
 import { useId, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
@@ -315,9 +316,9 @@ export default function AccountEditModal({
           />
 
           {error && (
-            <div className="p-3 bg-danger-bg border border-status-danger-border rounded-mini text-danger text-xs">
+            <Notice tone="danger">
               {error}
-            </div>
+            </Notice>
           )}
 
           <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-divider-soft bg-canvas px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">

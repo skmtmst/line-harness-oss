@@ -1,7 +1,7 @@
 'use client'
 
-import { CircleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { nextMonthResetLabel, type BannerUsage } from '@/lib/hq-banners'
 
 /**
@@ -25,32 +25,13 @@ export default function LimitState({ usage, onReload, compact }: { usage: Banner
       : kind === 'month'
         ? `今月の上限 ${usage?.month.limit ?? '—'}枚のうち ${usage?.month.used ?? '—'}枚を使いました。${nextMonthResetLabel()} に戻ります。`
         : `1日の上限 ${usage?.today.limit ?? '—'}枚のうち ${usage?.today.used ?? '—'}枚を使いました。明日以降にお試しください。`
-  if (compact) {
-    return (
-      <div data-design-node="oaFjL" role="status" className="flex flex-col items-start gap-2 rounded-card bg-status-warn-soft p-4">
-        <p className="flex items-center gap-2 text-label font-bold text-ink">
-          <CircleAlert aria-hidden="true" className="h-5 w-5 shrink-0 text-status-warn-deep" />
-          {title}
-        </p>
-        <p className="text-caption text-ink-secondary">{body}</p>
-        <div className="flex flex-wrap gap-2">
-          {kind === 'blocked' || kind === 'month' ? <Button href="/hq/billing">課金プランを見る</Button> : null}
-          {onReload ? <Button onClick={onReload}>利用量を読み直す</Button> : null}
-        </div>
-      </div>
-    )
-  }
   return (
-    <div
-      data-design-node="oaFjL"
-      role="status"
-      className="flex flex-col items-center gap-3 rounded-card bg-status-warn-soft px-6 py-8 text-center"
-    >
-      <CircleAlert aria-hidden="true" className="h-9 w-9 text-status-warn-deep" />
-      <p className="text-body font-bold text-ink">{title}</p>
-      <p className="max-w-sm text-caption text-ink-secondary">{body}</p>
-      {kind === 'blocked' || kind === 'month' ? <Button href="/hq/billing">課金プランを見る</Button> : null}
-      {onReload ? <Button onClick={onReload}>利用量を読み直す</Button> : null}
-    </div>
+    <Notice tone="warn" role="status" data-design-node="oaFjL" heading={title}
+      data-limit-layout={compact ? 'compact' : 'full'}
+      action={<>
+        {kind === 'blocked' || kind === 'month' ? <Button href="/hq/billing">課金プランを見る</Button> : null}
+        {onReload ? <Button onClick={onReload}>利用量を読み直す</Button> : null}
+      </>}
+    >{body}</Notice>
   )
 }

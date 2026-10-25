@@ -391,8 +391,9 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen, onDateClick
 }
 
 function SidePanel({ title, children, tone = 'plain' }: { title: string; children: React.ReactNode; tone?: 'plain' | 'warning' }) {
+  if (tone === 'warning') return <Notice tone="warn" heading={<h2>{title}</h2>}>{children}</Notice>
   return (
-    <section className={`rounded-card border p-4 ${tone === 'warning' ? 'border-warning bg-warning-bg' : 'border-hairline bg-canvas'}`}>
+    <section className="rounded-card border border-hairline bg-canvas p-4">
       <h2 className="text-ink text-sm font-semibold">{title}</h2>
       <div className="text-ink-secondary mt-3 space-y-2 text-xs leading-5">{children}</div>
     </section>

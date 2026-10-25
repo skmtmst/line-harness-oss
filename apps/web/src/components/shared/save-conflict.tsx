@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { GitCompare, RefreshCw, TriangleAlert } from 'lucide-react'
+import { GitCompare, RefreshCw } from 'lucide-react'
 import Button from './button'
+import Notice, { type NoticeProps } from './notice'
 import { ApiError } from '@/lib/api'
 import Dialog from './dialog'
 import { formatDateTime } from '@/lib/format'
@@ -149,8 +150,12 @@ export function SaveConflictBand({
   compareHref,
   onReload,
   designNode,
+  states,
+  footer,
 }: {
   title: ReactNode
+  states?: NoticeProps['states']
+  footer?: ReactNode
   description?: ReactNode
   compareBusy?: boolean
   compareDisabled?: boolean
@@ -166,12 +171,7 @@ export function SaveConflictBand({
   designNode?: string
 }) {
   return (
-    <div className={styles.band} role="alert" data-design-node={designNode} data-save-conflict="">
-      <TriangleAlert aria-hidden="true" className={styles.icon} />
-      <span className={styles.text}>
-        <span className={styles.title}>{title}</span>
-        <span className={styles.desc}>{description}</span>
-      </span>
+    <Notice tone="warn" marker="dot" actionLayout="stack-on-narrow" role="alert" heading={title} states={states} footer={footer} data-design-node={designNode} data-save-conflict="" action={<>
       {compareHref ? (
         <Button href={compareHref}>
           <GitCompare aria-hidden="true" className={styles.buttonIcon} />
@@ -187,7 +187,7 @@ export function SaveConflictBand({
         <RefreshCw aria-hidden="true" className={styles.buttonIcon} />
         最新を読み込んで続ける
       </Button>}
-    </div>
+    </>}>{description}</Notice>
   )
 }
 

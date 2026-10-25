@@ -17,7 +17,7 @@ import { formatDate, formatYen, periodText } from './display'
 import styles from './affiliates.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * 支払いのタブの窓。
@@ -69,7 +69,6 @@ export function SettlementCloseDialog({
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause);
 
-
       if (!fieldFailure) {
       setError(describeApiFailure(cause, '締め処理')) }
     } finally {
@@ -107,12 +106,11 @@ export function SettlementCloseDialog({
             </div>
           </dl>
           {missing.length > 0 ? (
-            <p className={styles.closeWarn} role="note">
-              <CircleHelp size={14} aria-hidden="true" />
+            <Notice tone="warn" role="note" icon={<CircleHelp size={14} aria-hidden="true" />}>
               <span>
                 {`振込先が未登録の人が ${formatNumber(missing.length)} 人います（${missing.slice(0, 3).map((item) => `${item.affiliateName} ${formatYen(item.amount)}`).join('・')}${missing.length > 3 ? ` ほか${formatNumber(missing.length - 3)} 人` : ''}）。締めても、登録されるまで振り込めません。`}
               </span>
-            </p>
+            </Notice>
           ) : null}
           {excludedZero && excludedZero.count > 0 ? (
             <div className={styles.closeExcluded}>

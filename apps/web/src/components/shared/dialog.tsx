@@ -1,6 +1,5 @@
 'use client'
 
-
 import { isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
 import React, { useContext, useEffect, useLayoutEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -13,6 +12,7 @@ import { useFormInputDirty } from './form-input-dirty'
 import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
 import { useStepMotion } from './use-step-motion'
 import { dialogWidth } from './destination-policy'
+import Notice from '@/components/shared/notice'
 
 export type DialogProps = {
   open: boolean
@@ -309,7 +309,7 @@ export default function Dialog({
     >
       <div className={styles.headerRow}>
         <div className={styles.headerContent}>
-          {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
+          {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
         </div>
         {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
@@ -317,10 +317,12 @@ export default function Dialog({
           <X aria-hidden="true" size={18} />
         </IconButton>
       </div>
-      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><div className={`${styles.callout} ${styles.calloutDanger}`} data-qa-dialog-callout>{descriptionNode}</div></div> : designLayout === 'stacked' ? descriptionNode : null}
+      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} data-window-body data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
-      {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
+      {error || automaticError ? <Notice tone="danger" role="alert">
+        {error || automaticError}
+      </Notice> : null}
       <div className={styles.footer} data-window-actions>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*

@@ -75,9 +75,14 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
             </div>
           </div>
           {approvalThreshold !== null && total !== null && total >= approvalThreshold ? (
-            <p className={styles.info}><Info aria-hidden="true" className={styles.infoIcon} />{`${formatNumber(approvalThreshold)} 人以上の配信なので、送る前に承認が要ります。承認は 1 回で、試しと残りの両方を送れます。`}{ab.settings.undecidedPolicy === 'stop' ? '決まらないときは 24 時間お待ちし、選ばなければ送らずに終えます。' : ''}</p>
+                <Notice tone="info" icon={<Info aria-hidden="true" />}>
+                  {`${formatNumber(approvalThreshold)} 人以上の配信なので、送る前に承認が要ります。承認は 1 回で、試しと残りの両方を送れます。`}
+                  {ab.settings.undecidedPolicy === 'stop' ? '決まらないときは 24 時間お待ちし、選ばなければ送らずに終えます。' : ''}
+                </Notice>
           ) : (
-            <p className={styles.info}><Info aria-hidden="true" className={styles.infoIcon} />{`${hm(decideAt)} に勝ちを決め、残りの人へ送ります。決まらないときは${ab.settings.undecidedPolicy === 'stop' ? '止めて知らせ、24 時間選ばなければ送らずに終えます' : ' A 案を送ります'}。夜の静かな時間（21〜8 時）にかかるときは 8:00 に送ります。`}</p>
+                  <Notice tone="info" icon={<Info aria-hidden="true" />}>
+                    {`${hm(decideAt)} に勝ちを決め、残りの人へ送ります。決まらないときは${ab.settings.undecidedPolicy === 'stop' ? '止めて知らせ、24 時間選ばなければ送らずに終えます' : ' A 案を送ります'}。夜の静かな時間（21〜8 時）にかかるときは 8:00 に送ります。`}
+                  </Notice>
           )}
         </>
       ) : null}

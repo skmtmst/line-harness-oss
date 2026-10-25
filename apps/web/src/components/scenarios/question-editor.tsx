@@ -1,5 +1,6 @@
 'use client'
 
+import Notice from '@/components/shared/notice'
 import { useEffect, useId, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import Checkbox from '@/components/shared/checkbox'
@@ -549,27 +550,27 @@ export default function QuestionEditor({
                 )}
 
                 {uriOnly ? (
-                  <div className="border-warning bg-warning-bg rounded-control space-y-2 border px-3 py-3">
-                    <p className="text-warning text-xs leading-relaxed">
+                  <Notice tone="warn">
+                    <p className="text-xs leading-relaxed">
                       この挙動はLINE側でURLなどを開くだけで、押された通知は届きません。
                       「選択時の返信」「タグ」「友だち情報」「アクション」は実行されません。
                       押した記録や返信が要るときは「何もしない」にして、本文にURLを書いてください。
                     </p>
                     {dead.length > 0 ? (
                       <>
-                        <p className="text-warning text-xs font-medium">
+                        <p className="text-xs font-medium">
                           いま設定されている {dead.join('・')} は実行されません。
                         </p>
                         <button
                           type="button"
                           onClick={() => setChoice(index, clearDeadAnswerSettings(choice))}
-                          className="text-danger text-xs font-medium hover:underline"
+                          className="text-xs font-medium hover:underline"
                         >
                           実行されない設定を消す
                         </button>
                       </>
                     ) : null}
-                  </div>
+                  </Notice>
                 ) : (
                   <>
                 {choiceOnly === undefined ? <>

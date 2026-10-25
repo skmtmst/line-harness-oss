@@ -1,6 +1,7 @@
 'use client'
 
 import Notice from './notice'
+import Button from './button'
 import styles from './save-conflict-bar.module.css'
 
 export type SaveConflictBarProps = {
@@ -40,14 +41,9 @@ export default function SaveConflictBar({
 }: SaveConflictBarProps) {
   return (
     <div className={styles.bar} data-design-part="save-conflict-bar">
-      <div className={styles.inner}>
-        <Notice tone="danger" message={message} className={styles.notice} />
-        {actionLabel && onAction ? (
-          <button type="button" onClick={onAction} data-qa={actionQa} className={styles.action}>
-            {actionLabel}
-          </button>
-        ) : null}
-      </div>
+      <Notice tone="danger" message={message} className={styles.inner} action={actionLabel && onAction ? (
+        <Button onClick={onAction} data-qa={actionQa}>{actionLabel}</Button>
+      ) : null} />
     </div>
   )
 }

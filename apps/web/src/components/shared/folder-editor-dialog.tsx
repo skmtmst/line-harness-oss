@@ -12,6 +12,7 @@ import FolderColorButton, { type FolderColorOption } from './folder-color-button
 import { isImeComposing } from './ime'
 import { SaveErrorField } from './save-form-errors'
 import styles from './folder-editor-dialog.module.css'
+import Notice from '@/components/shared/notice'
 
 export interface FolderNameColorFieldsProps {
   name: string
@@ -75,7 +76,9 @@ export default function FolderEditorDialog({ name, nameError, nameRef, onNameCha
       <FolderNameColorFields name={name} nameError={nameError} nameRef={nameRef} onNameChange={onNameChange} color={color} onColorChange={onColorChange}
         colors={colors} allowClear={allowClear} disabled={disabled || busy} nameId={nameId} nameLabel={nameLabel}
         placeholder={placeholder} maxLength={maxLength} onSubmit={confirmDisabled ? undefined : onConfirm} />
-      {error ? <p className={styles.error} role="alert" data-folder-dialog-error="">{error}</p> : null}
+      {error ? <Notice className={styles.error} tone="danger" role="alert" data-folder-dialog-error="">
+        {error}
+      </Notice> : null}
     </div>
   </Dialog>
 }

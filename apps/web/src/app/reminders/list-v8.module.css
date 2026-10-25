@@ -113,30 +113,6 @@
 }
 
 /* 操作の失敗の帯。 */
-.errorBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.errorBand button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: underline;
-  cursor: pointer;
-}
 
 /* 表。 */
 /* 表。見出しと行の区切り線だけ（）。外側の枠は作らない。 */
@@ -295,9 +271,6 @@
   justify-content: flex-end;
 }
 
-
-
-
 /* まとめての帯の内側（選択中に表の下へ出る）。 */
 .bulkRow {
   /* 長い一覧でも画面の下に付いてくる（動きの点検 12 番）。表が短ければ今までどおり表のすぐ下。 */
@@ -420,18 +393,6 @@
 }
 
 /* 止める窓・削除の窓の注意の帯（黄）。 */
-.warnNote {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0;
-  padding: 8px 10px;
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-status-warn-soft, var(--color-warning-bg));
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
-}
 
 /* 「代わりに一時停止」。削除の窓の中のやさしい別口。 */
 .altAction {
@@ -560,4 +521,4 @@
 
 .folderNote, .folderNoteNoticePlacement { margin: 0; }
 
-.errorBand, .errorBandNoticePlacement { margin: 0; }
+.errorBandNoticePlacement { margin: 0; }

@@ -2,7 +2,6 @@
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
-
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
@@ -612,13 +611,14 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             })()}
           />
           {unsetAreas.length > 0 ? (
-            <p className={rich.warn}>
-              {unsetAreas.map((area) => `面 ${area.label}`).join('・')}の動きが未設定です。そのまま送ると、押しても何も起きません。
-            </p>
+            <Notice tone="warn">
+              {unsetAreas.map((area) => `面 ${area.label}`).join('・')}
+              の動きが未設定です。そのまま送ると、押しても何も起きません。
+
+            </Notice>
           ) : null}
         </Card>
       </TemplateEditFrame>
-
 
       <ConfirmDialog
         open={pendingShape !== null}

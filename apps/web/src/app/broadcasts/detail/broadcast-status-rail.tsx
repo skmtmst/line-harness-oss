@@ -1,3 +1,4 @@
+import Notice from '@/components/shared/notice'
 import { Check } from 'lucide-react'
 import type { ApiBroadcast, BroadcastApprovalState, BroadcastDisplayStatus, BroadcastLedger } from '@/lib/api'
 
@@ -130,9 +131,9 @@ export default function BroadcastStatusRail({
           </li>
         ) : null}
       </ol>
-      <p className="bg-info-bg text-ink-secondary mt-3 rounded-control px-3 py-2 text-xs leading-relaxed">
+      <Notice tone="info">
         {bandText(displayStatus, ledger, total, scheduledAt, formatDateTime)}
-      </p>
+      </Notice>
       {displayStatus === 'partial_failed' || displayStatus === 'failed' ? (
         <p className="mt-2 text-xs">
           <HelpTip label="失敗の内訳の説明">

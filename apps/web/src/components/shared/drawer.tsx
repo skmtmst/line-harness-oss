@@ -1,6 +1,5 @@
 'use client'
 
-
 import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { PanelsTopLeft, X } from 'lucide-react'
@@ -11,6 +10,7 @@ import IconButton from './icon-button'
 import { useFormInputDirty } from './form-input-dirty'
 import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
 import { drawerWidth } from './destination-policy'
+import Notice from '@/components/shared/notice'
 
 export type DrawerDetail = { label: string; value: ReactNode }
 
@@ -156,7 +156,9 @@ export default function Drawer({
       <div className={`${styles.body} ${modal ? '' : styles.inlineBody}`} data-window-body data-content-spacing={contentSpacing}>
         {details ? <dl className={styles.rows}>{details.map((detail) => <div className={styles.row} key={detail.label}><dt>{detail.label}</dt><dd className={styles.rowValue}>{detail.value}</dd></div>)}</dl> : children}
       </div>
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {error ? <Notice tone="danger" role="alert">
+        {error}
+      </Notice> : null}
       {band ? <div className={styles.band}>{band}</div> : null}
       {footer ? <footer className={styles.footer} data-window-actions>{footer}</footer> : null}
     </aside>

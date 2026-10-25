@@ -5,44 +5,6 @@
  * 見た目は回答フォームの編集の帯をそのまま共通にしたもの。
  * リマインダの編集も同じ絵。値は globals.css の --save-conflict-*。
  */
-.band {
-  display: flex;
-  align-items: center;
-  gap: var(--save-conflict-gap);
-  padding: var(--save-conflict-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft);
-  box-shadow: var(--save-conflict-ring);
-}
-
-.icon {
-  flex: none;
-  width: var(--save-conflict-icon);
-  height: var(--save-conflict-icon);
-  color: var(--color-warning);
-}
-
-.text {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--save-conflict-head-gap);
-}
-
-.title {
-  color: var(--color-ink);
-  font-size: var(--save-conflict-title-size);
-  font-weight: 600;
-  line-height: var(--save-conflict-title-lh);
-}
-
-.desc {
-  color: var(--color-ink-secondary);
-  font-size: var(--save-conflict-desc-size);
-  line-height: var(--save-conflict-desc-lh);
-}
-
 .buttonIcon {
   flex: none;
   width: var(--save-conflict-button-icon);
@@ -74,6 +36,3 @@
   color: var(--color-danger);
 }
 }
-
-/* 固定した競合の帯：題13/700・19、説明12・17。帯の高さは内容で決める。 */
-:root .title { font-weight: var(--polish-weight-title); }

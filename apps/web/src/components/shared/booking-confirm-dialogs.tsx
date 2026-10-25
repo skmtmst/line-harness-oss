@@ -10,6 +10,7 @@ import Radio from './radio'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
 import TestModeNote from './test-mode-note'
 import styles from './booking-confirm-dialogs.module.css'
+import Notice from '@/components/shared/notice'
 
 /*
  * 予約・お金・連絡が絡む、戻せない操作の確かめの窓（・2026-10-16）。どの画面も同じ部品で出す。
@@ -140,7 +141,9 @@ export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy
               ...(actorLabel ? [{ label: '記録', value: `${actorLabel} として残ります` }] : []),
             ]} />
             {notify && messageFor ? <Field label="お客さまに送る LINE" optional={false}><Message text={messageFor({ amount, reason, notify })} /></Field> : <p className={styles.note}>{notify ? 'LINE でお客さまに知らせます。' : 'LINE では知らせません。'}</p>}
-            <p className={styles.info}>返金は取り消せません。カードへの反映は 5〜10 日かかります。</p>
+              <Notice tone="info">
+                返金は取り消せません。カードへの反映は 5〜10 日かかります。
+              </Notice>
           </div>
         )}
       </div>
@@ -218,7 +221,9 @@ export function ClosureOverlapStep({ rows, message, mediaNote, mode, onMode, onM
         </div>
       </Field>
       <Field label={`${rows.length}人に送る LINE`} optional={false}><TextArea value={message} onChange={(e) => onMessage(e.target.value)} rows={3} /></Field>
-      {mediaNote ? <p className={styles.info}>{mediaNote}</p> : null}
+      {mediaNote ? <Notice tone="info">
+        {mediaNote}
+      </Notice> : null}
     </div>
   )
 }

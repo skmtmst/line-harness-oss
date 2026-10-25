@@ -1,5 +1,6 @@
 'use client'
 
+import Notice from '@/components/shared/notice'
 import AuthCard from '@/components/auth/auth-card'
 import PlatformNotices from '@/components/hq/platform-notices'
 import Button from '@/components/shared/button'
@@ -14,12 +15,12 @@ export default function TenantSuspended() {
       description="ご契約の利用が停止されています。"
     >
       <div className="w-full">
-        <div data-design-node="R7p6Ba" className="rounded-control border border-status-danger bg-status-danger-soft px-6 py-5 text-left">
+        <Notice tone="danger" data-design-node="R7p6Ba">
           <p className="text-caption text-ink-secondary">
             ご不明な点は「お問い合わせ」からお送りください。<br />
             運営からのお知らせは引き続き確認できます。
           </p>
-        </div>
+        </Notice>
         <div className="mt-4"><PlatformNotices /></div>
       </div>
       <Button href="/hq/support" variant="primary" className="w-full">

@@ -155,16 +155,6 @@
   line-height: var(--tpl-bks-note-lh);
 }
 
-.warnBand {
-  margin: 0;
-  padding: var(--tpl-bks-link-band-pad);
-  border-radius: var(--tpl-bks-link-band-radius);
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-  font-size: var(--text-label);
-  line-height: var(--tpl-bks-switch-lh);
-}
-
 /* 下の操作（キャンセル・保存）。中身が短いときはカードのすぐ下、長いときは画面の下に追従する。 */
 .actions {
   position: sticky;

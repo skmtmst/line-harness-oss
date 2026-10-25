@@ -9,13 +9,6 @@
 
 /* 競合の帯の段（「帯の段 競合」）：頭のすぐ下・左右24・下8。 */
 .bandRow { padding: var(--tpl-te-band-row-pad); flex-shrink: 0; }
-.band {
-  display: flex; align-items: center; gap: var(--tpl-te-band-gap);
-  padding: var(--tpl-te-band-pad);
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-warning); outline-offset: -1px;
-  background: var(--color-status-warn-soft);
-}
 .bandIcon { flex-shrink: 0; color: var(--color-warning); }
 .bandText { display: flex; flex-direction: column; gap: var(--tpl-te-band-text-gap); flex: 1 1 0; min-width: 0; }
 .bandTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-te-band-title-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -28,7 +21,6 @@
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-te-card-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 .hint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-te-hint-lh); }
-
 
 /* 名前とフォルダの並び：名前は伸びる・フォルダ 220・間12・下でそろえる。 */
 .pair { display: flex; align-items: flex-end; gap: var(--tpl-rule-row-gap); width: 100%; }

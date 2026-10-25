@@ -1,43 +1,24 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+// @vitest-environment happy-dom
+import React from 'react'
+import { render, cleanup, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import Notice from './notice'
+import ReadOnlyNotice, { READ_ONLY_MESSAGE } from './read-only-notice'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
+afterEach(cleanup)
 
-/*
- * 帯/案内（ThDed）の数値の固定。
- * 画面の絵での使われ方を調べた結果、案内の帯は正本どおり
- * （地 #2563eb1a・文 #4a5565・印 #2563eb・余白 10/14・間 10・
- * 角丸 10・文 13px lh20）で、足す変わり形はなかった。
- * この試験はその一致を守る。灰色の注意書きは絵の指定が
- * 決まりしだい別に足す。
- */
-describe('帯/案内（ThDed）の数値', () => {
-  it('案内の地・文・印の色は絵の値', () => {
-    const css = read('notice.module.css')
-    const info = css.match(/:root\s*\.info\s*{[^}]*}/s)
-    expect(info, '案内の地の指定がありません').toBeTruthy()
-    expect(info![0]).toContain('var(--color-status-info-soft)')
-    const icon = css.match(/:root\s*\.info\s*\.icon\s*{[^}]*}/s)
-    expect(icon, '案内の印の色指定がありません').toBeTruthy()
-    expect(icon![0]).toContain('var(--color-status-info)')
-    // トークン自体が絵の値（地 #2563eb1a・文 #4a5565・印 #2563eb）。
-    const tokens = read('../../app/globals.css')
-    expect(tokens).toMatch(/--color-status-info-soft:\s*#2563eb1a/)
-    expect(tokens).toMatch(/--color-ink-secondary:\s*#4a5565/)
-    expect(tokens).toMatch(/--color-status-info:\s*var\(--color-focus-ring\)/)
+describe('共通の案内と閲覧のみの知らせ', () => {
+  it('題・説明・保存状態を同じ知らせで読み上げる', () => {
+    render(React.createElement(Notice, { tone: 'info', heading: '保存の結果', message: '続きから保存できます。',
+      states: [{ state: 'done', label: '基本情報は保存済み' }, { state: 'pending', label: '追加情報は未保存' }] }))
+    const notice = screen.getByRole('note')
+    expect(notice.textContent).toContain('保存の結果')
+    expect(notice.textContent).toContain('続きから保存できます。')
+    expect(screen.getByRole('list', { name: '保存の状態' }).children).toHaveLength(2)
   })
-
-  it('案内の余白・間・角丸・文は絵の値', () => {
-    const css = read('notice.module.css')
-    const notice = css.match(/:root\s*\.notice\s*{[^}]*}/s)
-    expect(notice, 'V8 の帯の指定がありません').toBeTruthy()
-    expect(notice![0]).toMatch(/gap:\s*10px/)
-    expect(notice![0]).toMatch(/padding:\s*10px 14px/)
-    expect(notice![0]).toMatch(/border-radius:\s*var\(--polish-radius-control\)/)
-    expect(notice![0]).toMatch(/line-height:\s*20px/)
-    expect(css).toMatch(/\.message\s*{[^}]*flex:\s*1/s)
+  it('閲覧のみの文言とstatusの役割を保つ', () => {
+    render(React.createElement(ReadOnlyNotice))
+    expect(screen.getByRole('status').textContent).toBe(READ_ONLY_MESSAGE)
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })

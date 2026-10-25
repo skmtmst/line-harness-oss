@@ -292,6 +292,24 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(pushed[0]).toContain('highlight=affiliate-1')
   })
 
+  it('追加情報の破棄は確認してから一覧へ移り、戻れば入力を残す', async () => {
+    affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
+    await mount(<NewAffiliatePage />)
+    await type(byId<HTMLInputElement>('af-name'), '入力を残す紹介者')
+    await click(buttonByText('登録して紹介リンクを発行する'))
+    const discard = screen.getByRole('link', { name: '追加情報を破棄して一覧へ戻る' })
+    await click(discard)
+    expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(pushed).toHaveLength(0)
+    await click(screen.getByRole('button', { name: '編集を続ける' }))
+    expect(byId<HTMLInputElement>('af-name').value).toBe('入力を残す紹介者')
+    await click(discard)
+    await click(screen.getByRole('button', { name: '保存せずに移る' }))
+    expect(pushed[0]).toContain('highlight=affiliate-1')
+    expect(affiliatesCreate).toHaveBeenCalledTimes(1)
+    expect(affiliatesUpdate).toHaveBeenCalledTimes(1)
+  })
+
   it('途中保存の知らせは、計測が既に始まっているか正しく伝える（R525）', async () => {
     // オンで作ると行は最初から稼働で残る。追加情報の保存に失敗しても、
     // 「追加情報を保存すると計測も始まります」とは言わない。
@@ -306,7 +324,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
 
     expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: true })
     expect(hasText('基本情報は保存済みです')).toBe(true)
-    expect(hasText('基本情報の登録で計測は既に始まっています')).toBe(true)
+    expect(hasText('計測は始まっています')).toBe(true)
     expect(hasText('追加情報を保存すると計測も始まります')).toBe(false)
 
     // やり直しの前にオフへ変えても、保存済みの真実は変わらない。
@@ -317,7 +335,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await act(async () => { fireEvent.click(within(tracking as HTMLElement).getByRole('button', { name: /操作/ })) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '削除する' })) })
     await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' })) })
-    expect(hasText('計測は既に始まっています')).toBe(true)
+    expect(hasText('計測は始まっています')).toBe(true)
     expect(hasText('計測はまだ始まっていません')).toBe(false)
     expect(hasText('オフに切り替えて保存')).toBe(true)
 
@@ -349,7 +367,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: false })
     expect(hasText('基本情報は保存済みです')).toBe(true)
     expect(hasText('計測はまだ始まっていません')).toBe(true)
-    expect(hasText('計測は既に始まっています')).toBe(false)
+    expect(hasText('計測は始まっています')).toBe(false)
 
     // やり直しの前にオンへ変えても、保存済みの真実は変わらない。
     // 知らせは「まだ始まっていません」のまま、再開の送り先だけを言う。
@@ -357,7 +375,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: 'すぐに計測を始める' })) })
     expect(hasText('計測はまだ始まっていません')).toBe(true)
-    expect(hasText('計測は既に始まっています')).toBe(false)
+    expect(hasText('計測は始まっています')).toBe(false)
     expect(hasText('オンに切り替えて保存')).toBe(true)
 
     await click(buttonByText('追加情報の保存を再開する'))

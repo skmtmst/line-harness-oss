@@ -1,5 +1,6 @@
 'use client'
 
+import Notice from '@/components/shared/notice'
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
@@ -364,13 +365,13 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
 
         {/* 設計 `WrDxu`。使用中で止まっているときだけ、その理由をここに出す。 */}
         {impactStatus === 'ready' && impact && !impact.canDelete && (
-          <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-2 text-sm text-danger">
+          <Notice tone="danger" data-qa="tag-delete-blocked-warning">
             {impact.referenceCounts.affiliateOffers > 0 ? (
               <><p className="font-bold">アフィリエイトのオファーで使用中のタグは保管できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。保管しても、過去のマイル履歴と配信ログは残ります。</p></>
             ) : (
               <><p className="font-bold">有効な参照があるタグは保管できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
             )}
-          </div>
+          </Notice>
         )}
 
         {/* 設計 `seGRS`。 */}

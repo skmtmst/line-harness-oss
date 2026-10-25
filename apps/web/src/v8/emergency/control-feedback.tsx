@@ -2,6 +2,7 @@
 import Button from '@/components/shared/button'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
 import styles from '../../app/emergency/control-v8.module.css'
+import Notice from '@/components/shared/notice'
 
 type StopBlocker = 'unavailable' | 'forbidden' | 'scope' | 'empty' | 'stopped'
 const blockerText: Record<StopBlocker, string> = {
@@ -30,28 +31,27 @@ export function EmergencyControlFeedback({ message, needsReload, reloading, stop
       ) : null}
 
       {stopBlockers.length > 0 ? (
-        <div className={`${styles.feedbackBand} ${styles.feedbackWarn}`} role="status">
-          <span>{stopBlockers.map((blocker) => blockerText[blocker]).join('')}</span>
-          {stopBlockers.includes('unavailable') ? (
-            <Button type="button" onClick={() => onReload()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
-              最新の状態を読み直す
-            </Button>
-          ) : null}
-        </div>
+      <Notice tone="warn" role="status" action={<>
+        {stopBlockers.includes('unavailable') ? (
+          <Button type="button" onClick={() => onReload()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
+            最新の状態を読み直す
+          </Button>
+        ) : null}
+      </>}>
+        <span>{stopBlockers.map((blocker) => blockerText[blocker]).join('')}</span>
+      </Notice>
       ) : null}
 
       {message ? (
-        <div
-          className={`${styles.feedbackBand} ${message.tone === 'danger' ? styles.feedbackDanger : message.tone === 'warning' ? styles.feedbackWarn : styles.feedbackSuccess}`}
-          role={message.tone === 'success' ? 'status' : 'alert'}
-        >
-          <span>{message.text}</span>
-          {message.tone !== 'success' && needsReload ? (
-            <Button type="button" onClick={() => onReload()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
-              最新の状態を読み直す
-            </Button>
-          ) : null}
-        </div>
+      <Notice tone={message.tone === "warning" ? "warn" : message.tone} role={message.tone === 'success' ? 'status' : 'alert'} action={<>
+        {message.tone !== 'success' && needsReload ? (
+          <Button type="button" onClick={() => onReload()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
+            最新の状態を読み直す
+          </Button>
+        ) : null}
+      </>}>
+        <span>{message.text}</span>
+      </Notice>
       ) : null}
 
   </>
