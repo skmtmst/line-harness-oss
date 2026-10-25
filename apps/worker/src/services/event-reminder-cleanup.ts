@@ -1,8 +1,6 @@
 import { reverseSourceConversions } from '@line-crm/db';
 import { returnEventEntitlement } from './event-entitlements.js';
-// Cancel pending and retryable failed reminders linked to a booking
-// (cancel/reject/expire flows). The cron retries `failed` rows, so a stale
-// failed row left here would still notify after the booking is gone.
+// 予約取消・否認・失効後にも通知されないよう、pending だけでなく cron が再試行する failed も取り消す。
 export async function cancelPendingRemindersFor(
   db: D1Database,
   booking_id: string,

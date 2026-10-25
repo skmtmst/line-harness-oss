@@ -23,32 +23,7 @@ import { fireEvent } from '../../services/event-bus.js';
 import { pushImmediateFirstStep, type ImmediatePushContext } from '../../services/immediate-first-step.js';
 
 
-// friend に tag を attach し、`POST /api/friends/:id/tags` と同じ side effects を発火する。
-// side effects: tag_added シナリオ enrollment + tag_change イベント (automation/webhook/scoring 用)。
-//
-// 新規付与のときだけ side effects を発火する (`changes` を見る)。同じ friend に同じ tag を
-// 自動付与で繰り返し叩いたとき、シナリオの重複 enrollment や tag_change の重複発火を防ぐ。
-//
-// POST /api/friends/:id/tags は手動操作の signal として「毎クリックで発火」する設計のため、
-// この helper には合流させていない (重複 enroll はチェックがあるが tag_change は冪等でない)。
-// 自動経路 (予約 auto-tag 等) はここ経由で呼ぶ。
-// `push` (optional): when supplied, a tag_added scenario whose first step is
-// delay-0 gets that step pushed IMMEDIATELY after enrollment instead of
-// waiting for the delivery cron — welcome messages should land the moment
-// the user arrives. Callers without a push context keep cron delivery.
-//
-// #699: 付与は INSERT OR IGNORE で先に確定するため、そのあとの副作用が落ちると
-// 次回この経路へ来ても changes=0 で早期 return し、落ちた副作用は二度と走らな
-// かった。工程別の台帳 (friend_tag_side_effect_runs / migration 376) に
-// 「付与は済んだが未了」を残し、次にこの経路へ来たときに未了の工程だけを
-// 走り直す。
-//
-// 走り直してよいかは status ではなく**工程**で決める。外へ出る工程
-// (event_tag_change) は結末が不明なら走り直さない (at-most-once)。判断の根拠と
-// 状態の意味は migration 376 に書いてある。
-//
-// 自動で走り直さない行は、止まった時点で通知センターへ1件残す。放っておくと
-// 「タグは付いているのに副作用だけが黙って永久に欠ける」に戻るため。
+// タグ付与時だけシナリオ登録と tag_change を発火し、繰り返し付与による副作用の重複を防ぐ。手動操作は毎クリックの signal なので分ける。自動経路はこの関数を使う。push があれば遅延0の初回メッセージを即送し、なければ cron に委ねる。付与後の失敗は工程別台帳へ未完了として残し、未完了だけを再開する。外部へ出る event_tag_change は結果不明なら再実行しない。自動回復できない行は通知センターへ残し、静かな欠落を防ぐ。
 
 /** 工程1本の中身。走り直しでも同じ本体を、同じ assignedAt で呼ぶ。 */
 interface StepDefinition {
@@ -93,7 +68,7 @@ const STEP_DEFINITIONS: Record<FriendTagSideEffectStep, StepDefinition> = {
    * 「このタグが付いたら始まる」は scenario_triggers から引く（128）。
    * 1本のシナリオが複数のタグで始まる形も作れるようになったので、
    * scenarios.trigger_tag_id は判断に使わない。
-   * 友だちと同じアカウント・全体共通の公開済みだけを始める（R435）。
+   * 友だちと同じアカウント・全体共通の公開済みだけを始める。
    * 共通タグをきっかけにした別組織のシナリオは混ぜない。
    */
   scenario_enroll: {
@@ -325,7 +300,7 @@ export async function attachTagAndFireSideEffects(
       propagated = error;
     }
   }
-  // 新規付与を成果計測へ接続する(#648)。地点がなければ何もしない。
+  // 新規付与を成果計測へ接続する。地点がなければ何もしない。
   // 友だちの所属アカウントはサービス側で台帳から解決する。
   //
   // 工程台帳(friend_tag_side_effect_runs)の工程としては開かない。工程の一覧は

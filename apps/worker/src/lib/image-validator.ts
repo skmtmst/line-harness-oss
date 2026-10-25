@@ -1,10 +1,4 @@
-// Lightweight PNG/JPEG header parser to validate LINE rich menu images
-// without external dependencies (runs on Cloudflare Workers).
-//
-// LINE のリッチメニュー画像規定 (v1):
-//   Large   2500 x 1686
-//   Compact 2500 x 843
-//   PNG / JPEG, 1MB 以下
+// 外部依存なしで Worker 上の画像を検証するため、PNG/JPEG のヘッダだけを読む。LINE のリッチメニューは大2500×1686、小2500×843、PNG/JPEG で1MB以下に限る。
 
 import { RICH_MENU_DIMENSIONS, type RichMenuSize } from '@line-crm/shared';
 
@@ -53,13 +47,13 @@ function isJpeg(bytes: Uint8Array): boolean {
 export function detectImageMeta(bytes: Uint8Array): ImageMeta | null {
   if (isPng(bytes)) {
     if (bytes.length < 24) return null;
-    // IHDR is the first chunk; width/height live at offsets 16..23.
+    // PNG は最初の IHDR の16〜23バイトに幅・高さを持つ。
     const width = readUint32BE(bytes, 16);
     const height = readUint32BE(bytes, 20);
     return { format: 'png', width, height };
   }
   if (isJpeg(bytes)) {
-    // Walk JFIF segments looking for SOF0/SOF2 (start of frame markers).
+    // JPEG のフレーム開始 SOF0/SOF2 を探し、画像寸法を読む。
     let i = 2;
     while (i + 9 < bytes.length) {
       if (bytes[i] !== 0xff) {
@@ -72,7 +66,7 @@ export function detectImageMeta(bytes: Uint8Array): ImageMeta | null {
         const width = readUint16BE(bytes, i + 7);
         return { format: 'jpeg', width, height };
       }
-      // Skip the segment using its declared length.
+      // 次のセグメントは宣言された長さを使って探す。
       const segLen = readUint16BE(bytes, i + 2);
       if (segLen < 2) return null;
       i += 2 + segLen;

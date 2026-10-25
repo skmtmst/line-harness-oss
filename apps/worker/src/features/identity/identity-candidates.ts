@@ -349,7 +349,7 @@ function listItem(row: CandidateRow): IdentityCandidateListItem {
 }
 
 /**
- * FRIEND-11: 候補の名前・一致した根拠をサーバー側で絞る。
+ * 候補の名前・一致した根拠をサーバー側で絞る。
  * 取得済みの先頭ページだけを画面内検索すると、51件目以降にしか
  * 無い名前へ辿れない。スナップショットの label と根拠の label を対象にする。
  * LIKE の `%` `_` `\` は検索語から退避する。
@@ -412,7 +412,7 @@ export async function listIdentityCandidates(
         WHERE ${baseWhere}${statusSql}${searchSql}`,
     ).bind(...baseBindings, ...statusBindings, ...searchBindings).first<{ count: number }>(),
     /*
-      集計カードは「同じ検索条件・全状態」の母数で出す（FRIEND-11）。
+      集計カードは「同じ検索条件・全状態」の母数で出す。
       状態の絞り込み自体は含めない。含めると「確認済み」を選んだ画面で
       確認待ちの件数が 0 に見えてしまう。
     */
@@ -532,7 +532,7 @@ async function linkedUserId(db: D1Database, row: CandidateRow): Promise<string> 
 }
 
 /*
- * R397: 同時実行で負けた側は競合409にする。版ガードで大半は0件更新になるが、
+ * 同時実行で負けた側は競合409にする。版ガードで大半は0件更新になるが、
  * 実D1で書込みが重なったときの一意制約違反はここで409へ言い換える。
  * DB本来の障害はそのまま投げ、500と区別する。
  */
@@ -629,7 +629,7 @@ export async function decideIdentityCandidate(
   const now = isoNow();
   const nextVersion = row.version + 1;
   /*
-   * R392/R397: 結び付きを変える文はすべて候補の版で守る。版が進んでいると
+   * 結び付きを変える文はすべて候補の版で守る。版が進んでいると
    * 全文が0件になり、負けた側は何も書かず409になる。判定の記録INSERTも
    * 版条件付きにし、同時実行の一意制約違反を起こさない。
    */
@@ -680,10 +680,7 @@ export async function decideIdentityCandidate(
           ...versionBinds,
         ),
       );
-      /*
-       * R392の裏返し: 別の人が同時に結び直した友だちは上書きしない。
-       * 未連携か、この判定と同じ結び先のときだけ付ける。
-       */
+      /** 同時に別の本人へ結び直した友だちを上書きしないよう、未連携か今回と同じ結び先だけを更新する。 */
       friendUpdateIndexes.push(statements.length);
       statements.push(
         db.prepare(
@@ -693,7 +690,7 @@ export async function decideIdentityCandidate(
       );
     }
     /*
-     * R392: 結び付きが変わるので本人の版を進める。後に開いた保存は409になり、
+     * 結び付きが変わるので本人の版を進める。後に開いた保存は409になり、
      * 古い採用値・配信順位が再保存されない。新規作成の本人も+1されるが、
      * 版は1から始まる連番であり支障はない。
      */
@@ -824,7 +821,7 @@ export async function undoIdentityCandidate(
   const candidateGuard = `EXISTS (SELECT 1 FROM identity_candidates WHERE id = ? AND version = ?)`;
   const versionBinds = [row.id, row.version] as const;
   /*
-   * R394: この候補が付けた結び付きか、現在の本人と突き合わせる。
+   * この候補が付けた結び付きか、現在の本人と突き合わせる。
    * 後に別の本人へ結び直した友だちがある場合は、古い取消で上書きせず
    * 競合409で止める（変更0）。再連携は結び付き行を外す運用なので、
    * 行が残っていても friends 側が動いていれば後続変更とみなす。
@@ -890,12 +887,7 @@ export async function undoIdentityCandidate(
           WHERE candidate_id = ? AND unlinked_at IS NULL AND ${detachGuard}`,
       ).bind(actor.id, now, reason, row.id, ...detachBinds),
     );
-    /*
-     * R392の逆順: 取消で外れる友だち由来の設定はここで整理する。
-     * 配信先は利用対象外へ、情報源を失う採用値は無効化する。
-     * 外れる本人（detachingUsers）の行だけを対象にし、結び直し先で
-     * 作り直した設定には触らない。行は消さないので履歴は残る。
-     */
+    /** 解除する本人の設定だけを無効化し、別の結び付け先で作った設定には触れない。履歴を残すため行は保持する。 */
     const detachingPlaceholders = detachingUsers.map(() => '?').join(', ');
     for (const friendId of [row.left_subject_id, row.right_subject_id]) {
       if (detachingUsers.length > 0) {
@@ -943,7 +935,7 @@ export async function undoIdentityCandidate(
     }
     if (detachingUsers.length > 0) {
       /*
-       * R392: 結び付きが変わるので外れる本人の版を進める。後に開いた
+       * 結び付きが変わるので外れる本人の版を進める。後に開いた
        * プロフィール・配信順位の保存は409になり、解除済みの設定が
        * 再保存されない。
        */
@@ -955,7 +947,7 @@ export async function undoIdentityCandidate(
         ).bind(now, ...detachingUsers, ...detachBinds),
       );
       /*
-       * R391/R394: 取消の解除履歴を本人ごとに残す。結び付き0件の保管状態でも
+       * 取消の解除履歴を本人ごとに残す。結び付き0件の保管状態でも
        * 履歴で本人を開け、誰が何を訂正したか追える。判定の記録とは別建て。
        */
       for (const detachedUserId of detachingUsers) {

@@ -18,8 +18,7 @@ export async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string 
   return acc?.id ?? null;
 }
 
-// The token must be verified against the account selected by the stored LIFF ID.
-// A JWT's unverified aud is never a source of trusted login-channel configuration.
+// 未検証 JWT の aud を信用せず、保存済み LIFF ID が指すアカウントのログインチャネルでトークンを検証する。
 export async function verifyCallerLineUserId(c: Context<Env>, expectedAccountId?: string): Promise<string | null> {
   const auth = c.req.header('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) return null;
@@ -37,8 +36,7 @@ export async function verifyCallerLineUserId(c: Context<Env>, expectedAccountId?
   if (account.login_channel_id) {
     push(account.login_channel_id);
   } else {
-    // Legacy configured channels remain scoped to this account. The environment
-    // fallback is only meaningful when the installation has a single account.
+    // 保存済みのチャネルも対象アカウントへ限定し、環境の代替値はアカウントが1つの場合だけに使う。
     if (accounts.length === 1) push(c.env.LINE_LOGIN_CHANNEL_ID);
     push(account.liff_id?.split('-')[0]);
     push(account.channel_id);
@@ -127,7 +125,7 @@ export async function resolveSelfBookingCaller(
 }
 
 /**
- * N-411 本人勤務: staff ロールは「自分に紐づく予約スタッフ」だけを対象にする。
+ *  本人勤務: staff ロールは「自分に紐づく予約スタッフ」だけを対象にする。
  * owner/admin は全員分を通す。staff は対象行の staff_member_id が自分と
  * 一致し、かつ `booking.staff.own` キーを持つときだけ通す
  * （キー判定は middleware の permissionForApiPath が済ませている）。

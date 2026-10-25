@@ -147,7 +147,7 @@ const listOperatorRules = async (c: Context<Env>) => {
 };
 
 notifications.get('/api/notifications/operator-rules', requireRole('owner', 'admin'), listOperatorRules);
-// N-342 (#943): 要件の正本名は /api/line-notifications。旧パスも残す。
+//  要件の正本名は /api/line-notifications。旧パスも残す。
 notifications.get('/api/line-notifications/operator-rules', requireRole('owner', 'admin'), listOperatorRules);
 
 const previewOperatorRecipients = async (c: Context<Env>) => {
@@ -188,7 +188,7 @@ notifications.post('/api/notifications/operator-rules/recipients-preview', requi
 notifications.post('/api/line-notifications/operator-rules/recipients-preview', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"recipientIds":["array"],"channels":["array"]}), previewOperatorRecipients);
 
 /**
- * N-342: ルール1件を指定するプレビュー。保存済みルールの受け取る人・
+ * ルール1件を指定するプレビュー。保存済みルールの受け取る人・
  * 通知方法を既定にし、本文で上書きもできる。作る前のプレビューは
  * 上の集合口(recipients-preview)を使う。
  */
@@ -247,7 +247,7 @@ const publishOperatorRule = async (c: Context<Env>) => {
     /*
      * 登録簿に無いきっかけは、公開できても自動発火しない(dispatch が
      * unknown_event_type で断る)。公開の時点で断らないと「公開したのに
-     * 届かない」を静かに作る。N-327 の芯はそこなので、ここで閉じる。
+     * 届かない」を静かに作る。 の芯はそこなので、ここで閉じる。
      *
      * 画面の選択肢も登録簿に合わせてあるが、この口は API を直接叩いても
      * 通るので、入口の数だけ塞いでおく。
@@ -283,7 +283,7 @@ notifications.post('/api/notifications/operator-rules/:id/publish', requireRole(
 notifications.post('/api/line-notifications/operator-rules/:id/publish', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"]}), publishOperatorRule);
 
 /**
- * N-342: 公開の反対。停止は新規受付を止めるだけで、送信中のものは
+ * 公開の反対。停止は新規受付を止めるだけで、送信中のものは
  * 無断で取り消さない(要件 §5-1)。
  */
 const stopOperatorRule = async (c: Context<Env>) => {
@@ -596,7 +596,7 @@ const updateOperatorRule = async (c: Context<Env>) => {
 notifications.put('/api/notifications/rules/:id', requireRole('owner', 'admin'), inputJsonBoundary({"lineAccountId":["string"],"name":["string"],"eventType":["string"],"conditions":["object"],"channels":["array"],"isActive":["boolean"]}), updateOperatorRule);
 
 /*
- * N-342: 要件の正本名は PATCH .../operator-rules/:id/draft。下書きの
+ * 要件の正本名は PATCH .../operator-rules/:id/draft。下書きの
  * 編集だけを受け、公開・停止はそれぞれの口へ分ける(ここで isActive を
  * 触らせない)。内容は PUT /api/notifications/rules/:id と同じ検証。
  */
@@ -615,7 +615,7 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
     const lineAccountId = body.lineAccountId?.trim();
     if (!lineAccountId) return inputError(c, { success: false, error: 'LINEアカウントを選択してください' }, 400, ["lineAccountId"]);
     // 顧客通知の下書きとそろえ、読んだ版を必須にする。版なしの保存は
-    // 古い画面からの上書きを許すので受け付けない(m26e R565)。
+    // 古い画面からの上書きを許すので受け付けない。
     const expectedVersion = typeof body.expectedVersion === 'number'
       && Number.isInteger(body.expectedVersion) && body.expectedVersion > 0
       ? body.expectedVersion
@@ -648,7 +648,7 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
     }, { expectedVersion });
     if (!saved) {
       // 読んだ後にほかの担当者が保存した。先行内容は保たれたまま、
-      // 比較と開き直しのために現在値を返す(m26e R565)。
+      // 比較と開き直しのために現在値を返す。
       const latest = await getNotificationRuleById(c.env.DB, id, lineAccountId);
       if (!latest) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
       return c.json({

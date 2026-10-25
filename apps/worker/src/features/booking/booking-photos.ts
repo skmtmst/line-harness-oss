@@ -1,8 +1,7 @@
 import { BOOKING_STORE_PHOTO_SLOTS, type BookingPhoto, type BookingPhotoCatalog, type BookingPhotoOwner, type BookingStorePhotoSlot, type BookingStorePhotoVisibility, type BookingStorePhotosWrite } from '@line-crm/shared';
 import { recordMenuVersion } from '@line-crm/db';
 
-// Public selection belongs to the existing photo save, never to media ownership.
-// The order column intentionally remains a three-slot array protected by migration 735.
+// 公開選択はメディアの所有権と分け、既存の写真保存で扱う。順序は migration 735 が守る3枠の配列を保つ。
 export const STORE_PHOTO_VISIBILITY_KEY = 'booking.store_photo_visibility';
 export const PRIVATE_STORE_PHOTOS: BookingStorePhotoVisibility = { exterior: false, interior: false, waiting: false };
 export function storePhotoVisibility(raw: string | null | undefined): BookingStorePhotoVisibility {
@@ -83,7 +82,7 @@ async function checkMedia(db: D1Database, accountId: string, mediaId: string | n
     .bind(mediaId, accountId).first()) throw new BookingPhotoError('booking_photo_media_unavailable');
 }
 
-/** The 735 triggers update the usage ledger in the same statement as the photo CAS. */
+/** 写真の CAS と利用台帳の更新は、同じ文のトリガーで確定する。 */
 export async function saveBookingPhoto(db: D1Database, accountId: string, owner: Exclude<BookingPhotoOwner, 'store'>, id: string, expectedVersion: number, mediaId: string | null, staffId: string | null = null): Promise<number> {
   const table = owner === 'menu' ? 'menus' : 'staff';
   const versionColumn = owner === 'menu' ? 'version' : 'photo_version';
@@ -112,8 +111,7 @@ export async function saveBookingStorePhotos(db: D1Database, accountId: string, 
       store_photo_waiting_media_id=?,store_photo_order_json=?,version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')
       WHERE line_account_id=? AND version=?`)
       .bind(input.photos.exterior, input.photos.interior, input.photos.waiting, JSON.stringify(input.order), accountId, input.expectedVersion);
-  // D1 batch is a transaction. changes() sees only the preceding CAS, excluding
-  // its usage triggers: a losing writer cannot publish or hide the winner's photos.
+  // D1 batch 内で直前の CAS の changes だけを見て、競合に負けた処理が勝者の写真を公開・非公開にしないようにする。
   const statements = [photoWrite];
   if (input.visibility) statements.push(db.prepare(`INSERT INTO account_settings(id,line_account_id,key,value)
     SELECT ?,?,?,? WHERE changes()=1

@@ -1,5 +1,5 @@
 /*
- * N-243 (#817): 「たまる決めごと」の並び順保存を部分適用しない。
+ *  「たまる決めごと」の並び順保存を部分適用しない。
  *
  * 実SQLite（better-sqlite3 + bootstrap.sql）に実物の scoring ルートを
  * 当て、認証も実物（Bearer APIキー→staff→権限・account境界）で通す。
@@ -143,7 +143,7 @@ beforeEach(async () => {
   sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
   sqlite.pragma('foreign_keys = OFF');
   seed(sqlite);
-  // Explicit Off fixture for resource authorization and idempotency.
+  // 権限と冪等性の試験を MFA で先に止めないよう、明示的に無効の fixture を使う。
   sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
 
   db = asD1(sqlite);
@@ -165,7 +165,7 @@ describe('決めごと並び順の部分適用(N-243)', () => {
     expect(swappedA.status).toBe(200);
     expect(swappedB.status).toBe(409);
 
-    // Aだけ新しい順序、Bは古いまま = 部分適用。これが直す前の振る舞い。
+    // 並び順が片側だけ変わる部分適用を検出する。
     expect(draftRow(ruleA).sort_order).toBe(1);
     expect(draftRow(ruleB).sort_order).toBe(1);
   });

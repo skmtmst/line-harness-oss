@@ -14,7 +14,7 @@ import { readBoundedText } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
 const app = new Hono<Env>();
 
-// Meet Harness calls this when a hearing session completes
+
 app.post('/api/meet-callback', async (c) => {
   const secret = c.env.MEET_CALLBACK_SECRET;
   if (!secret) return c.json({ success: false, error: 'Meet callback not configured' }, 503);
@@ -82,7 +82,7 @@ app.post('/api/meet-callback', async (c) => {
 
   const ref = {scopeId:`line:${friend.line_account_id ?? 'default'}`,processKind:'meet_callback',subjectId:body.session_id};
   if (existing && !await getWorkflowStep(c.env.DB,{...ref,stepKey:'__run'})) {
-    // Old receipts do not prove whether LINE accepted a notification. Repair only the result.
+    // 保存済みの受領票は LINE の受理を証明しないため、通知を再送せず結果だけを回復する。
     await patchFriendMetadata(c.env.DB,friend.id,{meet_hearing:body});
     return c.json({success:false,code:'MEET_DELIVERY_REVIEW_REQUIRED'},202);
   }
@@ -116,7 +116,7 @@ app.post('/api/meet-callback', async (c) => {
     }
 
 
-  // Resolve LINE access token (multi-account support)
+  // 別アカウントから送らないよう、対応するトークンを解決する。
   let accountToken: string | null = null;
   let accountId = ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
   if ((friend as unknown as Record<string, unknown>).line_account_id) {
@@ -133,7 +133,7 @@ app.post('/api/meet-callback', async (c) => {
   });
   const lineClient = new LineClient(accessToken,{transport:lineTransport(AbortSignal.timeout(10_000))});
 
-  // Build Flex message with requirements doc
+
   const transcriptRows = body.transcripts.map((t) => ({
     type: 'box' as const, layout: 'vertical' as const, margin: 'md' as const,
     contents: [

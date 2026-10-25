@@ -6,7 +6,7 @@ import { FAILURE_CODE_MESSAGES, FAILURE_MESSAGES } from './failure-messages.js';
 import { HTTP_ERROR_CODES } from './http-errors.js';
 import { patternedFailure } from './failure-patterns.js';
 
-/** Only reviewed fixed reasons are translated. Never translate or echo arbitrary provider text. */
+/** 確認済みの固定理由だけを翻訳し、任意の外部本文は翻訳も反射もしない。 */
 export function failureDetail(reason: unknown, status: number, existingCode?: string, fallbackMessage?: string): { code: string; message: string; localized: boolean } {
   const fixed = (typeof reason === 'string' && Object.hasOwn(FAILURE_MESSAGES, reason) ? FAILURE_MESSAGES[reason] : undefined)
     ?? patternedFailure(reason);
@@ -16,7 +16,7 @@ export function failureDetail(reason: unknown, status: number, existingCode?: st
   return { code, message: fixed?.[1] ?? codeMessage ?? inputErrorMessage(code, fallbackMessage ?? fallback.message), localized: fixed !== undefined };
 }
 
-/** Shared route failure. HTTP/envelope normalization and redaction stay at the outer boundary. */
+/** HTTP と応答形式の正規化、秘密値の伏せ方は共通の外側で適用する。 */
 export function fail(c: Context, status: ContentfulStatusCode, code: string,
   extra: Record<string, unknown> = {}, fieldKeys: readonly string[] = [], validationReason?: string) {
   const detail = failureDetail(code, status, typeof extra.code === 'string' ? extra.code : undefined);

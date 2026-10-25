@@ -2,21 +2,9 @@ import { logger } from '@line-crm/shared/server';
 import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from '../friends/friend-tag-attach/index.js';
 import { applyTapExtras } from '../../services/tap-extras.js'
 /*
- * 質問メッセージの選択肢が押されたときの処理。
- *
- * webhook の postback 経路から呼ぶ。押された選択肢に紐づく
- *   返信 / タグ / 友だち情報 / シナリオ操作 / アクション
- * をこの順で行う。返信を最後にしないのは、タグ付けに失敗しても返信は
- * 返したいため。押したのに無反応、が利用者からいちばん困る。
- *
- * 読む先は**購読が固定している公開版の写し**（#644）。live の
- * scenario_steps / scenario_actions は読まない。押されたときに live を
- * 読むと、公開後に直した返信・タグ・遷移・アクションが、旧版のまま進んで
- * いる人の回答へ混入する。下書きの通を消したあとは、そもそも引けない。
- *
- * この変更より前に送った質問（`sq:<下書き通ID>:<番号>`）がまだトークに
- * 残っている。旧形の押下も受け取り、その人が固定している版の写しへ
- * 繋ぎ直してから実行する。繋ぎ先が無いときだけ live を読む。
+ * 質問への回答は、返信・タグ・友だち情報・シナリオ操作・アクションの順で処理する。タグ付けが失敗しても押した人へ返信を返すため、返信を先に行う。
+ * 後から編集された内容が混入しないよう、購読が固定した公開版の写しを読む。
+ * 保存済みの sq:<下書き通ID>:<番号> 形式の押下は、固定版の写しへ解決してから実行する。解決できないときだけ live を読む。
  */
 import {
   validateScenarioActionReferences,
@@ -141,7 +129,7 @@ export async function handleQuestionAnswer(
   const ref = { scopeId: `line:${accountId ?? 'default'}`, processKind: 'question_answer', subjectId, stepKey: '__run' }
   const known = await getWorkflowStep(db, ref)
   if (answered || known) {
-    // A repeated tap never resumes failed effects automatically. Legacy logs need human reconciliation.
+    // 繰り返し押下で失敗した副作用を自動再開しない。受領記録のない履歴は人が照合する。
     if (!known) await ensureWorkflowStep(db,ref,{status:'unknown',maxAttempts:50,
       input:{friendId:friend.id,target,choiceIndex:input.choiceIndex}})
     result.repeat = true
@@ -164,7 +152,7 @@ export async function handleQuestionAnswer(
   return result
 }
 
-/** Run only the unfinished stages, using the originally pinned choice and action plan. */
+/** 最初に固定した選択肢とアクションを使い、未完了の工程だけを再実行する。 */
 export async function executeQuestionAnswer(
   db:D1Database,execution:WorkflowExecution,lineClient:LineClient,
   friend:{id:string;line_user_id:string},target:ResolvedAnswerTarget,choiceIndex:number,
@@ -219,8 +207,7 @@ export async function executeQuestionAnswer(
       if(outcome.failed || outcome.skippedIncomplete) throw new Error('answer_action_failed')
       return outcome
     })
-  // Persist a reply-attempt receipt BEFORE using the non-repeatable replyToken.
-  // A crash or lost acknowledgement remains uncertain; administrators never send it again on resume.
+  // 再利用できない replyToken を消費する前に試行記録を保存する。実行中断や応答喪失は送達不明とし、管理者による再開でも再送しない。
   if(choice.reply?.trim() && !resuming) {
     try {
       const {expandSendCommonVars}=await import('../../services/interpolation-context.js')
@@ -292,7 +279,7 @@ export async function resumeQuestionAnswer(db:D1Database,input:{
   }catch(error){await execution.fail();throw error}
 }
 
-/** Old postbacks carry no effect receipts. Show them as unknown until an administrator reconciles them. */
+/** 工程の受領記録がない押下は、人が照合するまで送達不明として扱う。 */
 export async function registerLegacyQuestionAnswers(db:D1Database,scenarioId:string,canSee:(accountId:string|null)=>Promise<boolean>):Promise<void>{
   const logs=await db.prepare(`SELECT m.friend_id,m.content,f.line_account_id FROM messages_log m
     JOIN friends f ON f.id=m.friend_id WHERE m.source='postback' AND m.direction='incoming' AND m.content LIKE 'sq:%'

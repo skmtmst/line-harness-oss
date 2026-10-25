@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
-// N-316(#626): events / subscriptions / connector / settings の4 GET が
+// events / subscriptions / connector / settings の4 GET が
 // overview / orders 等と同じ requireEcPermission('ec.event.view') で守られること。
 // 権限なしstaffは403、許可staff・owner/adminは既存どおり、アカウント不可視の403秘匿を保つ。
 const dbMocks = vi.hoisted(() => ({

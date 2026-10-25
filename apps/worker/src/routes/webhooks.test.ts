@@ -4,16 +4,16 @@ import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 
 vi.mock('@line-crm/db', async (importOriginal) => {
-  // N-383: 発火種別の正本リストと判定は純粋関数なので実物を通す。
+  // 発火種別の正本リストと判定は純粋関数なので実物を通す。
   const actual = await importOriginal<typeof import('@line-crm/db')>();
   return {
   encryptCredential:actual.encryptCredential,
   decryptCredential:actual.decryptCredential,
   KNOWN_OUTGOING_EVENT_TYPES: actual.KNOWN_OUTGOING_EVENT_TYPES,
   isKnownOutgoingEventType: actual.isKnownOutgoingEventType,
-  // F-13：フォルダの所属が正しくないときの誤り（instanceof で見分けるので実物を通す）。
+  // フォルダの所属が正しくないときの誤り（instanceof で見分けるので実物を通す）。
   FolderAssignmentError: actual.FolderAssignmentError,
-  // #1050: 緊急停止の判定。個別の試験で立てる場合は mockResolvedValue で差し替える。
+  // 緊急停止の判定。個別の試験で立てる場合は mockResolvedValue で差し替える。
   isOperationCapabilityStopped: vi.fn(async () => false),
   getIncomingWebhooks: vi.fn(),
   getIncomingWebhookById: vi.fn(),
@@ -30,16 +30,16 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   getWebhookInteractionById: vi.fn(),
   listFailedWebhookInteractionsForRetry: vi.fn(),
   countFailedWebhookInteractionsForRetry: vi.fn().mockResolvedValue(0),
-  // IDEA-26: 結果不明の失敗件数(まとめて再送しない対象)。
+  // 結果不明の失敗件数(まとめて再送しない対象)。
   countUnverifiedWebhookInteractions: vi.fn().mockResolvedValue(0),
-  // d23b R408: まとめて再送の対象外に残った件数(消えた・止まった送り先等)。
+  // d23b : まとめて再送の対象外に残った件数(消えた・止まった送り先等)。
   countExcludedFailedWebhookInteractions: vi.fn().mockResolvedValue(0),
   listWebhookInteractions: vi.fn(),
   getOutgoingWebhookDeliverySummaries: vi.fn(),
   updateIncomingWebhookConfig: vi.fn(),
   updateIncomingWebhookMaskedSample: vi.fn(),
   backfillWebhookSecrets: vi.fn(),
-  // #939: 未照合の箱と公開APIトークンの台帳。
+  // 未照合の箱と公開APIトークンの台帳。
   listIncomingWebhookUnmatched: vi.fn().mockResolvedValue([]),
   countIncomingWebhookUnmatched: vi.fn().mockResolvedValue(0),
   getIncomingWebhookUnmatchedById: vi.fn(),
@@ -60,11 +60,11 @@ vi.mock('@line-crm/db', async (importOriginal) => {
     }
     return (row?.secret as string | null) ?? null;
   }),
-  // S: 前の合言葉の併用。個別の試験で立てる場合は mockResolvedValue で差し替える。
+  // 前の合言葉の併用。個別の試験で立てる場合は mockResolvedValue で差し替える。
   resolvePreviousWebhookSecret: vi.fn(async () => null),
   WEBHOOK_SECRET_PREVIOUS_GRACE_MS: actual.WEBHOOK_SECRET_PREVIOUS_GRACE_MS,
   WEBHOOK_SECRET_MIN_LENGTH: 32,
-  // V: 秘密の値の登録・APIトークン操作は直前の再確認が必要。ここでは
+  // 秘密の値の登録・APIトークン操作は直前の再確認が必要。ここでは
   // 入力検証を見たいので、再確認済みとして通す。
   consumeStepUpGrant: vi.fn(async () => true),
   getAdminSessionByTokenHash: vi.fn(async () => null),
@@ -75,18 +75,17 @@ vi.mock('../services/webhook-interactions.js', () => ({
   retryWebhookInteraction: vi.fn(),
   webhookFailureLabel: vi.fn((reason: string | null) => reason ? '安全な失敗理由' : null),
   webhookResponseLabel: vi.fn((row: { status: string }) => row.status === 'failed' ? '処理できませんでした' : '届きました'),
-  // d23d R407: 試しの結果印。実物と同じ形で返す（ラベル化はサービス側の試験で見る）。
+  // d23d : 試しの結果印。実物と同じ形で返す（ラベル化はサービス側の試験で見る）。
   incomingTestIdempotencyKey: vi.fn((outcome: string) => `incoming-test:${outcome}:uuid-1`),
 }));
 
-// Stub fireEvent to keep receive-endpoint tests focused on signature
-// verification rather than the full event-bus + DB graph.
+// 署名検証を試すため、イベントバスとその DB 依存は差し替える。
 vi.mock('../services/event-bus.js', () => ({
   fireEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../services/incoming-webhook-actions.js', async (importOriginal) => {
-  // maskedPayloadShape は純粋関数で、route が届物の見本を作るのに実物を使う(#939)。
+  // maskedPayloadShape は純粋関数で、route が届物の見本を作るのに実物を使う。
   const actual = await importOriginal<typeof import('../services/incoming-webhook-actions.js')>();
   return {
     ...actual,
@@ -99,12 +98,12 @@ vi.mock('../services/incoming-webhook-actions.js', async (importOriginal) => {
 
 vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => {
   // 封筒の組み立ては純粋関数なので実物を通し、実際に外へ出る本文の形を
-  // この試験でも確かめられるようにする（N-371）。
+  // この試験でも確かめられるようにする。
   const actual = await importOriginal<typeof import('../services/outgoing-webhook-delivery.js')>();
   return {
     ...actual,
     deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
-    // d23b R419: 試し送信は1回固定の配送経路を呼ぶ。deliverWebhook を
+    // d23b : 試し送信は1回固定の配送経路を呼ぶ。deliverWebhook を
     // 別途モックしても内部呼び出しは通らないので、deliverOnce も差し替える。
     deliverOnce: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
   };
@@ -184,7 +183,7 @@ function setupApp(
     c.set('staff', {
       id: 'staff-1', name: 'Staff', role, readOnly: false, tenantId, permissionKeys,
     });
-    // V: 大事な操作の直前再確認。ここでは入力検証を見たいので確認済みとして通す。
+    // 大事な操作の直前再確認。ここでは入力検証を見たいので確認済みとして通す。
     c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     return next();
   });
@@ -194,7 +193,7 @@ function setupApp(
 
 /*
  * この試験は `@line-crm/db` を丸ごとモックしているので、これまで `c.env.DB` は
- * 一度も触られず空オブジェクトで足りていた。N-365 (#746) で受信口が
+ * 一度も触られず空オブジェクトで足りていた。  で受信口が
  * `incoming_webhook_receipts` へ直接 INSERT するようになったため、
  * **実 D1 と同じく `meta.changes` を返す**最小の代役を置く。
  * 1 を返す = 予約が取れた(初回)。重複時の挙動は実SQLiteで
@@ -206,7 +205,7 @@ const receiptPrepare = (sql: string) => ({ bind: () => ({
   first: async () => sql.includes('SELECT source_event_id,status,received_at')
     ? { source_event_id: 'receipt-event-1', status: 'processing', received_at: '2026-09-12T00:00:00.000Z' }
     : null,
-  // S: 複数一致の届物が候補の友だち名を引く口（/unmatched の一覧）。
+  // 複数一致の届物が候補の友だち名を引く口（/unmatched の一覧）。
   all: async () => ({
     results: sql.includes('display_name FROM friends')
       ? friendNameRows
@@ -588,7 +587,7 @@ describe('DELETE /api/webhooks/outgoing/:id — tenant scope', () => {
 });
 
 // =====================================================
-// GET /api/webhooks/outgoing — secret must NOT be exposed
+// 送信 Webhook の GET でも秘密値を返さない。
 // =====================================================
 
 describe('GET /api/webhooks/outgoing — secret exposure', () => {
@@ -617,7 +616,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
     expect(text).not.toContain(VALID_SECRET);
     const body = JSON.parse(text) as { data: Array<Record<string, unknown>> };
     expect(body.data[0]).not.toHaveProperty('secret');
-    // Caller should be told a secret IS configured, just not its value
+    // 設定済みであることだけを返し、秘密値は返さない。
     expect(body.data[0].hasSecret).toBe(true);
   });
 
@@ -855,7 +854,7 @@ describe('DELETE /api/webhooks/incoming/:id — tenant scope', () => {
 });
 
 // =====================================================
-// GET /api/webhooks/incoming — secret must NOT be exposed
+// 受信 Webhook の GET でも秘密値を返さない。
 // =====================================================
 
 describe('GET /api/webhooks/incoming — secret exposure', () => {
@@ -1262,7 +1261,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
     // 試しは実行しない。行動の実行と受領の予約は呼ばれない。
     expect(executeIncomingWebhookActions).not.toHaveBeenCalled();
     // 結果はやり取り台帳へ test 種別で分けて残る(-26 §9)。
-    // d23d R407: 試算の結果（照合できた）を記録へ残す。試しなので
+    // d23d : 試算の結果（照合できた）を記録へ残す。試しなので
     // 相手への応答番号は残さない（実際の受信とは分ける）。
     expect(createWebhookInteraction).toHaveBeenCalledWith(
       expect.anything(),
@@ -1279,7 +1278,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
     );
   });
 
-  // d23d R407: 照合相手がいない試しを「結びつきました」と記録しない。
+  // d23d : 照合相手がいない試しを「結びつきました」と記録しない。
   test.each([
     [
       'not_found（照合相手なし）',
@@ -1390,9 +1389,9 @@ describe('POST /api/webhooks/outgoing/:id/test', () => {
       baseEnv,
     );
     expect(res.status).toBe(200);
-    // N-371: 試し送信も共通封筒 {id,type,occurred_at,account_id,data,attempt}
+    // 試し送信も共通封筒 {id,type,occurred_at,account_id,data,attempt}
     // で送る。封筒の id と冪等キーは同じ値（再送しても同じ出来事）。
-    // d23b R419: 試し送信は送り直し無しの1回固定経路(deliverOnce)を呼ぶ。
+    // d23b : 試し送信は送り直し無しの1回固定経路(deliverOnce)を呼ぶ。
     const call = vi.mocked(deliverOnce).mock.calls[0];
     expect(call?.[0]).toMatchObject({ id: 'wh-1' });
     const sentBody = JSON.parse(call?.[1] ?? '{}') as Record<string, unknown>;
@@ -1447,7 +1446,7 @@ describe('Webhookやり取り記録', () => {
     const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
     expect(body.data.items[0]).toMatchObject({
       id: 'run-a', webhookName: '顧客管理', responseLabel: '処理できませんでした', canRetry: true,
-      // IDEA-26: 判定用の記号も返す。'unknown' は無条件に再送しない目印。
+      // 判定用の記号も返す。'unknown' は無条件に再送しない目印。
       failureReasonCode: 'response_5xx',
     });
     expect(body.data.items[0]).not.toHaveProperty('request_body_json');
@@ -1502,7 +1501,7 @@ describe('Webhookやり取り記録', () => {
     expect(retryBody.error).toBe('secret を確認できないため送り直しを止めました');
   });
 
-  // N-387: 1回で処理できるのは5件まで。残りを黙って置き去りにせず、
+  // 1回で処理できるのは5件まで。残りを黙って置き去りにせず、
   // 残件数(remaining)を応答へ入れて画面が明示できるようにする。
   test('まとめてやり直しは上限を超えた分を remaining として返す', async () => {
     const items = Array.from({ length: 5 }, (_, index) => ({
@@ -1538,7 +1537,7 @@ describe('Webhookやり取り記録', () => {
     expect(body.data.remaining).toBe(0);
   });
 
-  // IDEA-26: 「届いたか分からない」失敗を無条件で再送しない。
+  // 「届いたか分からない」失敗を無条件で再送しない。
   // 確認なしの要求は 409 で止め、確かめた旨(confirmed)を添えた要求だけ通す。
   test('届いたか分からない失敗は、確認なしの送り直しを409で止める', async () => {
     vi.mocked(getWebhookInteractionById).mockResolvedValue({ ...failedRow, failure_reason: 'unknown' });
@@ -1587,7 +1586,7 @@ describe('Webhookやり取り記録', () => {
 });
 
 // =====================================================
-// #506 中: 壊れた event_types の1行で一覧全体を500にしない (W2)
+//  中: 壊れた event_types の1行で一覧全体を500にしない (W2)
 // =====================================================
 
 describe('GET /api/webhooks/outgoing — broken event_types (#506 W2)', () => {
@@ -1614,7 +1613,7 @@ describe('GET /api/webhooks/outgoing — broken event_types (#506 W2)', () => {
 });
 
 // =====================================================
-// #506 中: 一覧にも受信詳細と同じ権限境界を適用する (W4)
+//  中: 一覧にも受信詳細と同じ権限境界を適用する (W4)
 // =====================================================
 
 describe('webhook 一覧の権限統一 (#506 W4)', () => {
@@ -1654,7 +1653,7 @@ describe('webhook 一覧の権限統一 (#506 W4)', () => {
 });
 
 // =====================================================
-// #506 中: 使われない受信設定口は API 単体テストで担保する (W5)
+//  中: 使われない受信設定口は API 単体テストで担保する (W5)
 // =====================================================
 
 describe('PATCH /api/webhooks/incoming/:id/config (#506 W5)', () => {
@@ -1722,7 +1721,7 @@ describe('名前・種別の上限 (#506 軽)', () => {
 });
 
 // =====================================================
-// #829 N-383: eventTypes は実際に発火する種別だけを受け付ける
+//  eventTypes は実際に発火する種別だけを受け付ける
 // =====================================================
 //
 // 形だけ見ていた検査では `mesage_received` のような誤記や
@@ -1791,7 +1790,7 @@ describe('N-383 送信eventTypesは実発火種別と照合する', () => {
 });
 
 // =====================================================
-// #650 再審査: secret-backfill口の契約
+//  secret-backfill口の契約
 // =====================================================
 
 describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
@@ -1881,11 +1880,11 @@ describe('#650 POST /api/webhooks/maintenance/secret-backfill', () => {
 });
 
 // =====================================================
-// #650 secret の暗号化保存 — secret-safe と fail-closed の契約
+//  secret の暗号化保存 — secret-safe と fail-closed の契約
 // =====================================================
 
 const TEST_KEY = btoa('k'.repeat(32));
-// baseEnv と同じ理由で、受信口の予約 INSERT を受ける代役を置く(#746)。
+// baseEnv と同じ理由で、受信口の予約 INSERT を受ける代役を置く。
 const keyedEnv = {
   DB: { prepare: receiptPrepare } as unknown as D1Database,
   LINE_CREDENTIAL_ENCRYPTION_KEY: TEST_KEY,
@@ -2045,8 +2044,8 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), { current: TEST_KEY, previous: undefined });
     // 署名用の復号は配送側が行う。ここでは鍵がそのまま渡ることを見る。
     // 呼び出し元で復号した値を詰め替える形に戻すと、鍵を渡し忘れた経路が
-    // 黙って署名なしで送るので、鍵の受け渡しの方を固定する(#650 再審査)。
-    // N-371/N-372(#940): 本文は共通封筒で、冪等キーは封筒の id と同じ値。
+    // 黙って署名なしで送るので、鍵の受け渡しの方を固定する。
+    // 本文は共通封筒で、冪等キーは封筒の id と同じ値。
     const testCall = vi.mocked(deliverOnce).mock.calls[0]!;
     const sentBody = testCall[1] as string;
     const sendOptions = testCall[2] as { idempotencyKey?: string };

@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import type { AccountStyle } from '@line-crm/shared';
-// Cron handler: expire 24h-old request bookings + purge idempotency rows.
+
 
 import { recoverExpiredBookingPayments, recoverPaidBookingPayments, recoverOrphanedOnlineBookings } from './booking-payment-recovery.js';
 import { recoverConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
@@ -23,7 +23,7 @@ interface StaleRow {
   channel_access_token: string;
   channel_access_token_encrypted: string | null;
   line_user_id: string;
-  /** 店舗のタイムゾーン。文面の日時に使う (R332)。 */
+  /** 店舗のタイムゾーン。文面の日時に使う。 */
   timezone: string | null;
   notification_style: AccountStyle | null;
 }
@@ -97,7 +97,7 @@ export async function runExpirer(
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'booking expirer' })) {
       continue;
     }
-    // 緊急停止 (#1050): reminder_dispatch 停止中は期限切れ通知を出せない
+    // 緊急停止 : reminder_dispatch 停止中は期限切れ通知を出せない
     // ので、期限切れ化そのものを保留し requested のまま残す。
     if (row.line_account_id && await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')) {
       continue;
@@ -112,7 +112,7 @@ export async function runExpirer(
       .bind(params.now.toISOString(), row.id)
       .run();
     if ((upd.meta?.changes ?? 0) === 0) continue;
-    // N-394: 期限切れも状態遷移として監査へ残す。誰がではなく system。
+    // 期限切れも状態遷移として監査へ残す。誰がではなく system。
     await recordBookingAudit(db, {
       bookingId: row.id,
       lineAccountId: row.line_account_id,
@@ -129,7 +129,7 @@ export async function runExpirer(
       )
       .bind(row.id)
       .run();
-    // N-065: 期限切れも取消と同じく の未送信予定だけを止める。送信済み履歴は残す。
+    // 期限切れも取消と同じく の未送信予定だけを止める。送信済み履歴は残す。
     // 1件の失敗で残り200件を止めないよう行単位で握る。失敗行は末尾の修復走査で拾い直す。
     try {
       await cancelByTrigger(db, {

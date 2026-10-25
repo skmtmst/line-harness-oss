@@ -49,7 +49,7 @@ export async function scheduleSimulation(db:D1Database,id:string,b:Record<string
  db.prepare(`INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state,error_code) SELECT b.id,f.id,f.line_account_id,'claimed','simulation_pending' FROM broadcasts b JOIN broadcast_execution_contexts x ON x.broadcast_id=b.id JOIN friends f ON ${audience} WHERE b.id=? AND ${permitted}`).bind(id),clearAssertions(db)]);}catch(e){const saved=await simulationContext(db,id);if(saved?.execution_key===key&&saved.execution_request_json===request)return {scheduled:true,replayed:true,testMode:true,sent:false};if(/CHECK constraint/.test(String(e)))throw new GapError('version_conflict',409);throw e;}
  return {scheduled:true,scheduledAt:scheduled,quietHoursShiftTo:shift,testMode:true,sent:false,replayed:false};
 }
-/** Called by the existing immediate, scheduled and queued entry points before any transport. */
+/** 即時・予約・待機中のすべての経路で、通信より前にシミュレーションを判定する。 */
 export async function processBroadcastSimulation(db:D1Database,id:string,now=new Date()){
  const x=await simulationContext(db,id);if(!x)return false;
  if(x.state!=='scheduled')return true;

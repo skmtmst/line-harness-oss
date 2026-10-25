@@ -121,7 +121,7 @@ export async function processLineWebhookEvents(input: {
         safeLog('error',{...logBase,event:'line_webhook_event_failed',reason});
       }
     }catch {
-      // A missing checkpoint store must never enable duplicate external sends.
+      // チェックポイントが使えない場合も、外部への二重送信を許可しない。
       safeLog('error',{...logBase,event:'line_webhook_ledger_reserve_failed',reason:'db_error'});
     }
   }

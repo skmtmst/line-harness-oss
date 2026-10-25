@@ -1,5 +1,5 @@
 /*
- * IDEA-23: GET /api/ec-commerce/orders/:id のルート契約。
+ * GET /api/ec-commerce/orders/:id のルート契約。
  * 権限・アカウント可視範囲・404 の区別を固定する。中身の組み立ては
  * packages/db の getEcOrderDetail 実DB試験が受け持つ。
  */

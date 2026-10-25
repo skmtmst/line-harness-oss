@@ -433,7 +433,7 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
           409,
         );
       }
-      // N-042: 実行（一括操作の行を作る副作用）の前に全値を検証する。
+      // 実行（一括操作の行を作る副作用）の前に全値を検証する。
       // 通らない値が1つでもあれば422で止め、正規化した値を操作へ載せる。
       const byId = new Map(rows.results.map((row) => [row.id, row]));
       const normalized: Record<string, string | null> = {};
@@ -760,7 +760,7 @@ async function executeOperation(
       ).bind(friend.id, ...(ids.length ? sqlIdSet(ids).binds : [])).all<{ field_id: string; value: string | null }>();
       const before = Object.fromEntries(ids.map((id) => [id, rows.results.find((row) => row.field_id === id)?.value ?? null]));
       if (JSON.stringify(before) === JSON.stringify(operation.values)) return { status: 'skipped', before, after: before };
-      // N-042: 書き込みは中央の口へ寄せ、項目定義で検証・正規化する。
+      // 書き込みは中央の口へ寄せ、項目定義で検証・正規化する。
       // 作成時に検証済みのはずだが、列車合流前の古い操作が残っていても不正値を書かない。
       const defs = await db.prepare(
         `SELECT id, COALESCE(type_v8, type_v6, type) AS resolved_type, options_json
@@ -799,7 +799,7 @@ async function executeOperation(
       const id = `${item.id}:conversion`;
       const existing = await db.prepare(`SELECT id FROM conversion_events WHERE id = ?`).bind(id).first<{ id: string }>();
       if (existing) return { status: 'skipped', before: null, after: { id } };
-      // #718: 主経路(conversions.ts)と同じ4つのsnapshotを保存時点で凍結する。
+      // 主経路(conversions.ts)と同じ4つのsnapshotを保存時点で凍結する。
       // affiliate_id はNULLのままにする。これは控え忘れではない。一括操作は
       // 紹介コードの文脈を持たず attribution を解決しないため、埋めるほうが嘘になる。
       // なお一括ダイアログに成果タイルは無く通常はUIから到達不能だが、
@@ -812,7 +812,7 @@ async function executeOperation(
       }>();
       if (!point) throw new ItemExecutionError('conversion_point_not_found', '成果地点が見つかりません', false);
       /*
-       * N-263: 主経路(trackConversion)と同じ境界をここでも閉じる。
+       * 主経路(trackConversion)と同じ境界をここでも閉じる。
        * 一括操作はAPIの直接呼び出しで任意の地点×友だちを結べるため、
        * アカウントも統括も一致しない組合せでは成果を書かない。
        */

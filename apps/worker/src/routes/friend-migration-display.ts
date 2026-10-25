@@ -28,7 +28,7 @@ export function runJson(row: UidMigrationRunRow) {
     rolledBackAt: row.rolled_back_at,
     failureReason: row.failure_reason,
     /*
-      FRIEND-34: 一部成功・一部失敗（status='failed' かつ applied>0）でも
+      一部成功・一部失敗（status='failed' かつ applied>0）でも
       反映済みの行だけは切り戻せる。画面が status 文字列を推測しなくて
       済むよう、復旧可否をここで1つに決める。
     */

@@ -293,7 +293,7 @@ export const get__api_webinars_id_analytics_9 = async (c: Context<Env, "/api/web
     getWebinarFormFunnelStats(c.env.DB, id),
     getWebinarViewSegmentCoverage(c.env.DB, id),
     getWebinarEditorSettings(c.env.DB, id),
-    // J #821: 維持率の線・視聴開始（有効区間30秒以上）・異常の除外件数
+    // J : 維持率の線・視聴開始（有効区間30秒以上）・異常の除外件数
     getWebinarRetention(c.env.DB, id),
     countWebinarStartedViewers(c.env.DB, id),
     countWebinarHeartbeatRejects(c.env.DB, id),
@@ -348,7 +348,7 @@ export const get__api_webinars_id_analytics_9 = async (c: Context<Env, "/api/web
         endSeconds: segment.end_seconds,
         viewers: Number(segment.viewers),
       })),
-      // J #821: J-1「どこまで見られたか」の線と3つの数字の材料
+      // J : J-1「どこまで見られたか」の線と3つの数字の材料
       retention: {
         bucketSeconds: retention.bucketSeconds,
         started: retention.started,

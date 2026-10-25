@@ -19,7 +19,7 @@ const SUPPORTED_TYPES = new Set([
   'text', 'image', 'imagemap', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel',
   // 配信用素材（カルーセル・リッチ・クーポン・リサーチ）は、画面の保存と
   // 同じ変換（`@line-crm/shared`）で LINE の種別に直してから送る。
-  // 画面では通るのに送信で断られる形にしない（監査 R144）。
+  // 画面では通るのに送信で断られる形にしない。
   'rich_message', 'rich_video', 'card_message', 'coupon', 'research',
 ]);
 
@@ -81,7 +81,7 @@ function contentForBubble(type: string, value: unknown): string {
     const flexJson = nonEmptyString(content.flexJson, 'flexJson');
     const parsed = jsonObject(flexJson, 'flexJson');
     /*
-     * R234: `{}` のような「JSON としては正しいが中身が無い」も送る前（保存・
+     * `{}` のような「JSON としては正しいが中身が無い」も送る前（保存・
      * 配信前検査・送信）に止める。送れるのはバブルかカルーセルだけ。
      */
     if (parsed.type !== 'bubble' && parsed.type !== 'carousel') {
@@ -98,7 +98,7 @@ function contentForBubble(type: string, value: unknown): string {
     if (!Array.isArray(columns) || columns.length === 0) {
       throw new Error('messageBubbles columnsJson must be a non-empty JSON array');
     }
-    // R234: `[{}]` のような「配列だが中身が空」も止める。選んだテンプレートの
+    // `[{}]` のような「配列だが中身が空」も止める。選んだテンプレートの
     // 中身は必ず 1 枚以上のパネル（キーを持つ object）のはず。
     const broken = columns.some((column) =>
       !column || typeof column !== 'object' || Array.isArray(column) || Object.keys(column).length === 0,
@@ -122,7 +122,7 @@ function contentForBubble(type: string, value: unknown): string {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       throw new Error('messageBubbles location coordinates are required');
     }
-    // 監査 R210: 地図上に無い数字を完成扱いにしない。画面の検査とそろえる。
+    // 監査 : 地図上に無い数字を完成扱いにしない。画面の検査とそろえる。
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
       throw new Error('位置情報の緯度は-90〜90、経度は-180〜180で入力してください');
     }
@@ -140,7 +140,7 @@ function contentForBubble(type: string, value: unknown): string {
       throw new Error('messageBubbles audio duration is required');
     }
     /*
-     * R234: LINE は https で公開された音声しか受けない。not-a-url のような値は
+     * LINE は https で公開された音声しか受けない。not-a-url のような値は
      * 保存できても送信で断られるので、保存・配信前検査の時点で止める。
      */
     const audioUrl = nonEmptyString(audio.originalContentUrl, 'audio originalContentUrl');
@@ -157,7 +157,7 @@ function contentForBubble(type: string, value: unknown): string {
     const packageId = nonEmptyString(sticker.packageId, 'sticker packageId');
     const stickerId = nonEmptyString(sticker.stickerId, 'sticker stickerId');
     /*
-     * R234: LINE の番号はどちらも数字だけ。not-a-package のような文字は
+     * LINE の番号はどちらも数字だけ。not-a-package のような文字は
      * 保存できても送信で断られるので、保存・配信前検査の時点で止める。
      */
     if (!/^\d+$/.test(packageId) || !/^\d+$/.test(stickerId)) {
@@ -202,7 +202,7 @@ function parseStoredBroadcastMessageParts(input: {
     /*
      * 配信用素材は、画面の保存（1吹き出し）と同じ変換で LINE の種別に直す。
      * 直せない素材は、送信の直前で利用者への直し方とともに止める。
-     * 中身の JSON を本文に落とさない（監査 R144）。
+     * 中身の JSON を本文に落とさない。
      */
     if (type === 'rich_video') {
       const content = record(bubble.content);

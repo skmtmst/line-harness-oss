@@ -20,8 +20,7 @@ import {
   type HqTemplateStoreAtomicCommitPlan,
 } from './contract.js';
 
-// The current commit plan retains copied bytes in memory. Keep enough headroom
-// for the Worker, SHA-256 buffers and one bounded streaming read.
+// 複製バイトを確定までメモリに持つため、Worker 本体・ハッシュ・制限付き読込の余裕を残す。
 export const MESSAGE_TEMPLATE_MEDIA_MAX_BYTES = 8 * 1024 * 1024;
 export const MESSAGE_TEMPLATE_TOTAL_MEDIA_MAX_BYTES = 16 * 1024 * 1024;
 
@@ -36,16 +35,13 @@ export type { MessageTemplateDefinition, MessageTemplateMediaDefinition } from '
 
 import { parseQuestion } from '../../features/scenarios/scenario-question/index.js';
 
-/**
- * The factory is bound to this authority before it receives an adapter input.
- * A route must derive it from the authenticated tenant and source account.
- */
+/** route は認証済み統括と元アカウントから権限を導き、入力を渡す前に生成元へ固定する。 */
 export type MessageTemplateSourceAuthority = Readonly<{
   tenantId: string;
   sourceAccountId: string;
 }>;
 
-/** Result of a tenant-scoped DB lookup by immutable template version id. */
+/** 不変のテンプレート版 ID を、統括内の DB で解決した結果。 */
 export type MessageTemplateSourceVersion = Readonly<{
   tenantId: string;
   templateVersionId: string;
@@ -73,25 +69,18 @@ export type MessageTemplatePreflightItem = Readonly<{
 
 export interface MessageTemplateAdapterDependencies {
   stageSourceObject?: (media: MessageTemplateMediaDefinition, binding: MessageTemplateSourceMediaBinding) => Promise<HqMediaStreamSource>;
-  /** Trusted runtime resolutions of card references, checked against the preflight snapshot. */
+  /** 実行時のカード参照は、事前確認のスナップショットと照合する。 */
   cardTargets?: Readonly<Record<string, string>>;
   liffTargets?: Readonly<Record<string, string>>;
   referenceTargets?: Readonly<Record<string,string>>;
-  /** Must resolve by tenant + source account + immutable version id in one authoritative DB lookup. */
+  /** 統括・元アカウント・不変の版 ID を1回の正規 DB 照会で解決する。 */
   resolveSourceVersion(input: Readonly<{
     authority: MessageTemplateSourceAuthority;
     templateVersionId: string;
   }>): Promise<MessageTemplateSourceVersion | null>;
-  /** Complete, tenant-checked account inventory; never return a filtered/paginated name list.
-   * Its token must be recomputed from current authoritative state, not copied from context.
-   */
+  /** 名前一覧はページや絞込で欠けさせず、統括を検査した全件を使う。確認票はコンテキストの値を写さず、現在の正本から再計算する。 */
   loadTargetSnapshot(context: HqTemplateAdapterContext): Promise<MessageTemplateTargetSnapshot>;
-  /**
-   * Must perform a conditional R2 read when binding.etag is present. Returning null means that
-   * the object no longer matches the version recorded by resolveSourceVersion.
-   * Check the R2 reported size and consume body with readMessageTemplateSourceBytes
-   * (or an equivalent bounded reader). Do not call unbounded arrayBuffer first.
-   */
+  /** ETag があれば R2 の条件付き読込を必須とし、版と一致しなければ null を返す。報告サイズと実際の読込上限を守り、無制限の arrayBuffer を先に呼ばない。 */
   readSourceObjectIfUnchanged(input: Readonly<{
     authority: MessageTemplateSourceAuthority;
     templateVersionId: string;
@@ -184,7 +173,7 @@ function assertMediaBudget(media: readonly { sizeBytes: number; kind: string; mi
   }
 }
 
-/** Bounded R2 body reader for the runtime dependency; cancels on actual oversize. */
+/** 実際の上限超過で中断する、R2 本文の制限付き読込。 */
 export async function readMessageTemplateSourceBytes(
   body: ReadableStream<Uint8Array>,
   maxBytes: number,
@@ -210,7 +199,7 @@ export async function readMessageTemplateSourceBytes(
   } finally { reader.releaseLock(); }
 }
 
-/** The version payload stored in hq_template_versions.definition_json. */
+/** hq_template_versions.definition_json に保存する版の内容。 */
 export function parseMessageTemplateDefinition(value: unknown): MessageTemplateDefinition {
   const root = object(value);
   const template = { ...object(root.template) };
@@ -479,7 +468,7 @@ function exactStringValues(value: string): readonly string[] {
   }
 }
 
-/** Only media actually referenced by the template body is distributed. */
+/** テンプレート本文が実際に参照するメディアだけを配布する。 */
 export function referencedMedia(definition: MessageTemplateDefinition): readonly MessageTemplateMediaDefinition[] {
   const exactValues = new Set(templateTextFields(definition).flatMap(exactStringValues));
   if(definition.asset?.kind==='rich_message') for(const width of [240,300,460,700,1040]) exactValues.add(`${definition.asset.payload.baseUrl}/${width}`);
@@ -509,7 +498,7 @@ function uniqueMatch<T>(items: readonly T[], errorCode: string): T | null {
   return items[0] ?? null;
 }
 
-/** Produces the template and every referenced-media choice shown during preflight. */
+/** 事前確認では、テンプレートと参照メディアの全選択を提示する。 */
 export function inspectMessageTemplateDefinition(
   definition: MessageTemplateDefinition,
   snapshot: MessageTemplateTargetSnapshot,
@@ -603,7 +592,7 @@ function requireResolution(
 }
 
 function conflictGuard(sql: string, bindings: readonly HqTemplateBinding[]): HqTemplateStatement {
-  // Malformed JSON is evaluated only on mismatch and aborts the surrounding atomic D1 batch.
+  // 不一致時にだけ不正 JSON を評価し、周囲の D1 batch 全体を中断する。
   return {
     sql: `SELECT CASE WHEN EXISTS(${sql}) THEN 1 ELSE json_extract('VERSION_CONFLICT', '$') END`,
     bindings,
@@ -614,9 +603,7 @@ function nameInventoryGuard(kind: 'template' | 'media', accountId: string, names
   const table = kind === 'template' ? (asset ? 'broadcast_message_assets' : 'templates') : 'media';
   const column = kind === 'template' ? 'name' : 'filename';
   const expected = JSON.stringify(names);
-  // SQLite lower cannot reproduce JavaScript NFKC/case folding. Prove the entire
-  // account name inventory is unchanged instead, then use the JS decision above.
-  // Compare sets, not JSON row ordering; Unicode ids and query ordering are immaterial.
+  // SQLite の lower は JS の NFKC/大小変換を再現できないため、名前の全件集合が不変か照合して JS の判断を使う。JSON の行順には依存しない。
   return conflictGuard(`SELECT 1 WHERE
     (SELECT COUNT(*) FROM ${table} WHERE line_account_id=?) = json_array_length(?)
     AND NOT EXISTS(SELECT 1 FROM ${table} t WHERE t.line_account_id=? AND NOT EXISTS(
@@ -683,8 +670,7 @@ export async function planMessageTemplateDistribution(input: {
       }
       occupied.push(name);
     }
-    // Renaming media does not create a media_version. Overwrite needs this guard
-    // too, otherwise a concurrent rename is silently undone by the UPDATE.
+    // メディア名の変更は版を作らないため、同時の名前変更を上書きで消さないよう別に照合する。
     if (!guardedInventories.has(item.itemKind)) {
       const names: [string, string][] = item.itemKind === 'template'
         ? snapshot.templates.map(row => [row.id, row.name])
@@ -889,11 +875,7 @@ function referenceSource(reference: HqTemplateReference): AuthorizedMessageTempl
   return metadata.source;
 }
 
-/**
- * Runtime wiring binds an authenticated source authority and supplies tenant-scoped D1/R2
- * operations without expanding the shared adapter contract. input.definitionJson is deliberately
- * ignored: the immutable version selected by input.templateVersionId is the only source of truth.
- */
+/** 認証済みの元権限と統括内 D1/R2 を実行時に接続する。input.definitionJson は信用せず、templateVersionId が選んだ不変版だけを正本とする。 */
 export function createTemplateHqTemplateAdapter(
   authority: MessageTemplateSourceAuthority,
   dependencies: MessageTemplateAdapterDependencies,
@@ -992,5 +974,5 @@ export function createTemplateHqTemplateAdapter(
   };
 }
 
-/** Registry stays fail-closed until the router supplies the D1/R2 dependency factory. */
+/** route が D1/R2 の依存を渡すまで安全側で拒む。 */
 export const templateHqTemplateAdapter = unsupportedHqTemplateAdapter('template');

@@ -85,7 +85,7 @@ export async function openSeatTables(db:D1Database,storeId:string,startsAt:strin
  return candidates.sort((a,b)=>a.maxCapacity-b.maxCapacity||a.id.localeCompare(b.id));
 }
 
-/** Calendar companion to openSeatTables: load occupancy once rather than per time cell. */
+/** カレンダーの時間セルごとに照会せず、席の使用状況を一度だけ取得する。 */
 export async function openSeatTablePeriods(
   db: D1Database,
   storeId: string,

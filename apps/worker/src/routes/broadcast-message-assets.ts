@@ -174,7 +174,7 @@ function validPublishKey(value: string | null | undefined): value is string {
  *
  * 枚数・必須項目の数え方は画面と Worker で1つ（`@line-crm/shared`）。
  * 2か所に散ると、画面では10枚まで作れるのに API が9枚で止める、
- * という作り終えてから保存できない形になる（監査 R141）。
+ * という作り終えてから保存できない形になる。
  */
 function validatePayload(kind: BroadcastMessageAssetKind, payload: unknown): string | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return 'payload must be an object';

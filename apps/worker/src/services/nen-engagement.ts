@@ -34,7 +34,7 @@ const RETRY_DELAYS_MS = [60_000, 300_000, 1_800_000];
 // 1つのアカウントが上限ぶん先頭を占めて他のアカウントを止めないようにする。
 const MAX_JOBS_PER_ACCOUNT_PER_TICK = 10;
 // 要件 -21 §5・§8: 深夜に送らない時間帯（JST）。この時間帯の予約は claim せず
-// pending のまま残し、朝8時を過ぎた tick が送る。時刻の既定は司令塔の確認待ち。
+// 朝8時前は pending のまま残し、送信可能な時刻の tick で送る。
 export const NEN_QUIET_HOURS_START_JST = 21;
 export const NEN_QUIET_HOURS_END_JST = 8;
 
@@ -81,9 +81,9 @@ export type CampaignRow = {
   button_label: string | null;
   button_url: string | null;
   image_url: string | null;
-  /** 0 disables suppression; otherwise do not schedule the same campaign within this many days. */
+  /** 0は抑止なし、それ以外は同じキャンペーンを指定日数以内に予約しない。 */
   dedup_window_days?: number;
-  /** When an open_form action is connected, skip friends who already submitted that form. */
+  /** open_form が設定されている場合、既に回答した友だちは除く。 */
   exclude_form_respondents?: number;
   after_actions?: NenCampaignAfterAction[];
   /*
@@ -143,7 +143,7 @@ export type NenBirthdayCouponSettingRow = {
   benefit_label: string;
   discount_amount: number;
   validity_days: number;
-  /** 419: 2月29日生まれの子への平年の扱い。未保存の古い設定は 'skip' 扱い（従来は平年に届かなかった）。 */
+  /** 2月29日生まれの平年の扱い。未保存の設定は、選ばれていない配信を増やさないよう skip とする。 */
   leap_year_policy?: LeapYearPolicy;
   updated_at: string;
 };
@@ -221,7 +221,7 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
 }
 
 /**
- * 送信直前の多重防御としての切り詰め。保存時の上限判定（#659）が効いて
+ * 送信直前の多重防御としての切り詰め。保存時の上限判定が効いて
  * いれば、ここで実際に切ることは起きないはず。**発動したのなら、保存時の
  * 検査をすり抜けたか、既存データが旧仕様のまま残っているなど、どこかに
  * 不具合があるということ。** 黙って切ると、利用者が保存できた本文が
@@ -245,7 +245,7 @@ function campaignResponseFormId(campaign: CampaignRow): string | null {
 }
 
 /*
- * NEN-07 (#1078): 「回答フォームを開く」配信は、つなぐフォームが使える状態に
+ * 「回答フォームを開く」配信は、つなぐフォームが使える状態に
  * あるかを保存・稼働開始・job生成の各入口で確かめる。フォームが消えた・公開を
  * 止めた・別アカウント専用になった既存の稼働中設定は「設定不足」として扱い、
  * 新しい送信jobを積まずに理由を配信履歴へ残す。
@@ -346,7 +346,7 @@ async function alreadyRespondedToCampaignForm(
 }
 
 /*
- * #749 案2: 送信直前の窓の見直し。積む側の抑止は残したまま、claim 後に
+ *  案2: 送信直前の窓の見直し。積む側の抑止は残したまま、claim 後に
  * 最新のアカウント別設定を正として代表1件だけを送る。
  * 代表は同一 campaign_key・friend_id の窓内 job を (scheduled_at, id) の
  * 昇順で並べた先頭。自分より先の pending/processing/sent/failed が1件でも
@@ -383,7 +383,7 @@ export async function hasEarlierWindowDelivery(
 }
 
 /**
- * IDEA-21: 注文の取り消し・返金が届いたとき、その注文を起点に待っている
+ * 注文の取り消し・返金が届いたとき、その注文を起点に待っている
  * 発送後の案内を「送らない」へ倒す。送信時の再検証（processNenDeliveries）の
  * 手前で一覧からも外し、「これから送ります」と表示したまま不適切な案内を
  * 残さない。既に送った記録や他の注文の予約は触らない。
@@ -456,7 +456,7 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       /*
        * 「回答フォームを開く」が保存JSONにはあるのに必須項目欠落で parse に
        * 落ちた=旧仕様の未選択設定。黙って捨てると設定不足が検出できないので
-       * 手掛かりだけ残す(NEN-07)。
+       * 手掛かりだけ残す。
        */
       form_action_dropped: (
         Array.isArray(parsed.after_actions)
@@ -475,8 +475,7 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
 }
 
 /*
- * 1500: `c7069559b`（2026-08-13）で導入。根拠の記録は無い。動かす前提が
- * 出てきたら、この数値そのものを見直すこと（#711 の司令塔裁定で確認済み）。
+ * 1500 の根拠は確認できていない。運用条件が変わる場合は数値の妥当性を再確認する。
  */
 const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
 
@@ -486,7 +485,7 @@ const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
  * ここで実際に切ることは起きないはず。**発動したのなら、入口の検査をすり
  * 抜けたか、固定文言が伸びたなど、どこかに不具合があるということ。** 黙って
  * 切ると、紹介文の結びが途中で消えたことに誰も気づけない。`truncateForSend`
- * （#659）と同じ考え方で、切ったときだけ記録する。
+ * と同じ考え方で、切ったときだけ記録する。
  */
 function truncateColumnIntro(value: string, maxLength: number, context: { title: string }): string {
   if (value.length <= maxLength) return value;
@@ -516,7 +515,7 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
     || (event?.event_type === 'ec.order.shipped' ? event.shipping?.tracking_url : event?.order?.detail_url)
     || campaign.button_url || '');
   const title = renderCampaignCopy(String(article?.title || campaign.title), payload);
-  // 保存時は差し込み前の本文だけを見ており（#659差し戻し1点目）、差し込み
+  // 保存時は差し込み前の本文だけを見ており、差し込み
   // 値（ペットの名前など）でここまで膨らみうる。保存時の検査だけに頼らず、
   // 実際にLINEへ送る直前でも同じ採用上限で切る（多重防御）。UTF-16 code
   // unit単位で、保存時の数え方と揃っている。発動したら記録する
@@ -717,7 +716,7 @@ export async function enqueuePostShippingFollowUps(
     const dedupWindowDays = campaign.dedup_window_days ?? 30;
     const excludeFormRespondents = campaign.exclude_form_respondents ?? 0;
     /*
-     * NEN-07: 稼働中でも「つなぐ回答フォーム」が使えない配信は新しい送信jobを
+     * 稼働中でも「つなぐ回答フォーム」が使えない配信は新しい送信jobを
      * 積まない。本来予約されるはずだった分だけ「対象外」の記録を配信履歴へ
      * 残し、理由コードを last_error へ入れる(重複防止で積まれない分は従来
      * どおり記録もしない)。すでに予約済みの job はここでは触らない
@@ -797,7 +796,7 @@ export async function queueColumnDelivery(
         ))`,
   ).bind(lineAccountId, column.target_mode, column.target_tag_id).all<{ id: string }>();
   const now = jstNow();
-  // 友だち1人ずつ順番に書き込むと千人規模で千回超の書き込みになる(点検 #512 の中1)。
+  // 友だち1人ずつ順番に書き込むと千人規模で千回超の書き込みになる(点検  の中1)。
   // 100件ずつまとめて送る。INSERT OR IGNORE なので入り直しても重複しない。
   const articlePayload = JSON.stringify({ article: column });
   const snapshot = campaignSnapshot(campaign);
@@ -1066,7 +1065,7 @@ export async function processNenDeliveries(
   const now = options.now ?? new Date();
   const maxJobsPerTick = options.maxJobsPerTick ?? MAX_JOBS_PER_TICK;
   const maxJobsPerAccountPerTick = options.maxJobsPerAccountPerTick ?? MAX_JOBS_PER_ACCOUNT_PER_TICK;
-  // Reuse the same proxy idempotency key after a crashed attempt.
+  // 中断後も同じプロキシの冪等キーを再利用する。
   await db.prepare(`UPDATE nen_delivery_jobs SET status='failed', next_attempt_at=?, updated_at=?
     WHERE status='processing' AND datetime(updated_at) <= datetime(?)`).bind(
       now.toISOString(), now.toISOString(), new Date(now.getTime() - DELIVERY_LEASE_MS).toISOString(),
@@ -1132,7 +1131,7 @@ export async function processNenDeliveries(
       skipped += 1;
       continue;
     }
-    // 緊急停止 (#1050): broadcast_dispatch が止まっている統括は claim せず
+    // 緊急停止 : broadcast_dispatch が止まっている統括は claim せず
     // pending のまま残す。復旧すれば次の tick が拾う。
     if (job.line_account_id &&
         await isOperationCapabilityStopped(db, job.line_account_id, 'broadcast_dispatch')) {
@@ -1175,7 +1174,7 @@ export async function processNenDeliveries(
         continue;
       }
       /*
-       * IDEA-21: 注文起点の案内は、送る直前に注文の現在状態を確かめる。
+       * 注文起点の案内は、送る直前に注文の現在状態を確かめる。
        * 発送をきっかけに予約された案内（到着確認・口コミ・次の商品）は、
        * あとから注文が取り消し・返金になっても payload の写しのまま残る。
        * EC台帳（ec_orders）の現在状態が取り消し・返金なら送らない。
@@ -1199,7 +1198,7 @@ export async function processNenDeliveries(
         skipped++;
         continue;
       }
-      // #749 案2: claim 後に最新のアカウント別設定を正として窓を見直す。
+      //  案2: claim 後に最新のアカウント別設定を正として窓を見直す。
       // 0なら頻度抑止なし。代表より後なら新しい固定理由で skip し、監査に残す。
       const windowDays = currentCampaign.dedup_window_days ?? 30;
       if (await hasEarlierWindowDelivery(db, {
@@ -1216,7 +1215,7 @@ export async function processNenDeliveries(
         continue;
       }
       // claim と送信の間に緊急停止へ切り替わった分は、claim を pending へ
-      // 差し戻す (#1050)。停止を失敗として数えない (attempts を戻す)。
+      // 差し戻す。停止を失敗として数えない (attempts を戻す)。
       if (job.line_account_id &&
           await isOperationCapabilityStopped(db, job.line_account_id, 'broadcast_dispatch')) {
         await db.prepare(

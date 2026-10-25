@@ -28,11 +28,7 @@ function json(method: string, body: unknown) {
 }
 
 /*
- * この試験の作り物（sent_at / created_at / scheduled_at）は 2026-09-07 を基準に
- * 書かれている。KPI の delivered・failed は直近28日（`jstDateString(-27)` 以降）
- * だけを数えるため、時計を固定しないと 2026-10-05 以降は作り物が窓から外れて
- * delivered が 0 になり、実行した日によって合否が変わる。
- * 時計を基準日に固定して、日付に依らず同じ結果にする（他試験と同じ `toFake: ['Date']`）。
+ * KPI は直近28日だけを集計するため、時計を fixture の基準日に固定する。実行日によって fixture が期間外となり、送達件数が変わらないようにする。
  */
 const NOW = new Date('2026-09-07T12:00:00.000Z');
 
@@ -93,7 +89,7 @@ describe('broadcast data contracts', () => {
       content: { text: `${index + 1}通目` },
     }));
 
-    // #772: 版を付けて更新する（版なしは400になる）。
+    // 版を付けて更新する（版なしは400になる）。
     const accepted = await app(testDb.db).request('/api/broadcasts/draft-five', json('PUT', {
       messageBubbles: bubbles,
       expectedVersion: 1,
@@ -108,7 +104,7 @@ describe('broadcast data contracts', () => {
     await expect(rejected.json()).resolves.toMatchObject({ error: 'messageBubbles must contain 1 to 5 items' });
   });
 
-  // #772: 版なしPUTは400で止め、行を変えない。不正値も400。
+  // 版なしPUTは400で止め、行を変えない。不正値も400。
   it('版なし・不正版のPUTは400で止める', async () => {
     seedBroadcast(testDb, 'draft-noversion', { status: 'draft', sent_at: null });
     for (const body of [
@@ -126,14 +122,14 @@ describe('broadcast data contracts', () => {
       .toEqual({ title: 'draft-noversion', lock_version: 1 });
   });
 
-  // #772: 他アカウントの行は版の有無にかかわらず404のまま（版チェックより先）。
+  // 他アカウントの行は版の有無にかかわらず404のまま（版チェックより先）。
   it('他アカウントのPUTは版なしでも404にする', async () => {
     seedBroadcast(testDb, 'draft-foreign', { status: 'draft', sent_at: null, line_account_id: 'account-2' });
     const res = await app(testDb.db).request('/api/broadcasts/draft-foreign', json('PUT', { title: '越境' }));
     expect(res.status).toBe(404);
   });
 
-  // #772: 2編集者の競合は先勝ち・後は409で、先の変更が残る。
+  // 2編集者の競合は先勝ち・後は409で、先の変更が残る。
   it('2編集者の同時更新は先勝ち・後409にする', async () => {
     seedBroadcast(testDb, 'draft-race', { status: 'draft', sent_at: null });
     const first = await app(testDb.db).request('/api/broadcasts/draft-race', json('PUT', {

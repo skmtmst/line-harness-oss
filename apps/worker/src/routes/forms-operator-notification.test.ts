@@ -1,5 +1,5 @@
 /*
- * N-327 #663: フォームの回答から運用者通知が自動発火することを、実 SQLite と
+ *  フォームの回答から運用者通知が自動発火することを、実 SQLite と
  * 実ルートで見張る。
  *
  * ここで止めたい崩れ方:
@@ -30,7 +30,7 @@ import type { Env } from '../worker-env.js';
 
 const dispatchOperatorEvent = vi.hoisted(() => vi.fn());
 vi.mock('../services/operator-notification-dispatch.js', () => ({ dispatchOperatorEvent }));
-// R150: 送信Webhookへの発火だけ差し替える。他の公開口(自動化・スコア)は本物。
+// 送信Webhookへの発火だけ差し替える。他の公開口(自動化・スコア)は本物。
 const fireOutgoingWebhooks = vi.hoisted(() => vi.fn());
 vi.mock('../services/event-bus.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -299,7 +299,7 @@ describe('N-327 #663 フォームの回答から運用者通知を自動発火�
   });
 
 /*
- * R150: 回答の送信Webhook発火。運用者通知と同じ成否境界で、回答を
+ * 回答の送信Webhook発火。運用者通知と同じ成否境界で、回答を
  * 受理したときだけ form_submitted を購読者へ届ける。回答の中身は
  * 個人情報なので封筒には載せない。
  */

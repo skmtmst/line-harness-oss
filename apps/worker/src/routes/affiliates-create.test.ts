@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Route-level test for POST /api/affiliates (admin-side create). The db layer is
-// mocked — the real collision-retry / UNIQUE behaviour is covered against SQLite
-// in packages/db/test. Here we assert the route wires body → db calls, defaults,
-// link issuance, and error mapping (404 / 409 / 400).
+// 実 SQL の一意制約と再試行は DB 側で試す。ここでは入力・既定値・リンク発行・404/409/400の変換を確かめる。
 const dbMocks = {
-  // eager module-load deps (mirror other route tests)
+
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
   getAccountSetting: vi.fn().mockResolvedValue(null),
@@ -17,7 +14,7 @@ const dbMocks = {
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // affiliates route deps
+
   getAffiliates: vi.fn(),
   getAffiliateById: vi.fn(),
   getAffiliateByCode: vi.fn(),
@@ -114,7 +111,7 @@ beforeEach(() => {
   dbMocks.getLineAccounts.mockResolvedValue([
     { id: ACCOUNT_ID, tenant_id: TENANT_ID },
   ]);
-  dbMocks.getLinkBaseUrl.mockResolvedValue(null); // fall back to WORKER_URL/r
+  dbMocks.getLinkBaseUrl.mockResolvedValue(null); // 設定がなければ WORKER_URL/r を使う。
 });
 
 describe('POST /api/affiliates — random-code create', () => {
@@ -138,7 +135,7 @@ describe('POST /api/affiliates — random-code create', () => {
     };
     expect(body.success).toBe(true);
     expect(body.data.code).toBe('Ab3xYz');
-    // No friendId + no explicit issueInitialLink → no link issued by default.
+    // 友だち指定も明示的な初期リンク発行もなければ、既定では発行しない。
     expect(body.link).toBeNull();
     expect(dbMocks.createAffiliateWithRandomCode).toHaveBeenCalledWith(env.DB, {
       tenantId: TENANT_ID,
@@ -147,7 +144,7 @@ describe('POST /api/affiliates — random-code create', () => {
       commissionRate: 10,
       friendId: null,
     });
-    // createAffiliate (legacy explicit path) must not be touched.
+    // 旧形式の明示的な作成関数は呼ばない。
     expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
   });
 });
@@ -185,9 +182,9 @@ describe('POST /api/affiliates — friend binding', () => {
       link: { refCode: string; url: string };
     };
     expect(body.success).toBe(true);
-    expect(body.data.name).toBe('Bob'); // from friend.display_name
+    expect(body.data.name).toBe('Bob');
     expect(body.data.friendId).toBe('friend-1');
-    // Link issued by default when friendId is present.
+    // 友だち指定があれば初期リンクを既定で発行する。
     expect(body.link.refCode).toBe('Ef5tSr');
     expect(body.link.url).toBe('https://worker.example.com/r/Ef5tSr');
     expect(dbMocks.createAffiliateWithRandomCode).toHaveBeenCalledWith(env.DB, {

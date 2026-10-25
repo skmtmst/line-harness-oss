@@ -1,4 +1,4 @@
-/** IDs come from an already authorized resource response; never use this as an access check. */
+/** ID は認可済みの応答から来る前提であり、ここを権限検査に使わない。 */
 export async function withStyleSampleMetadata<T extends { id: string }>(
   db: D1Database,
   items: T[],

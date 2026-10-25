@@ -6,7 +6,7 @@ export interface RichMenuReferenceResolver {
 export interface RichMenuAdapterOptions {
   db: D1Database; bucket: Pick<R2Bucket, 'head' | 'get' | 'put' | 'delete'>;
   authority: HqTemplateAuthority;
-  /** A factory is bound to one immutable version; never reuse it for another template. */
+  /** 1つの不変版へ束縛し、別テンプレートに同じ生成元を再利用しない。 */
   input: HqTemplateAdapterInput;
   resolveReference: RichMenuReferenceResolver;
 }

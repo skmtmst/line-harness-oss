@@ -6,7 +6,7 @@ afterEach(() => { for (const fixture of circuitFixtures) fixture.raw.close(); ci
 import { explainBookingSlot, getAvailability, type SlotBlockReason } from './availability.js';
 
 // ----------------------------------------------------------------
-// explainBookingSlot (IDEA-28 予約設定の「この日時はなぜ取れないか」)
+// explainBookingSlot ( 予約設定の「この日時はなぜ取れないか」)
 // 理由が実際の判定と一致することを、同じ stubDB で getAvailability と
 // 突き合わせて確認する。
 // ----------------------------------------------------------------
@@ -65,7 +65,7 @@ interface StubData {
 }
 
 function stubDB(data: StubData): D1Database {
-  // Exercise the real persisted circuit SQL while retaining the focused availability fixture.
+  // 空き判定の fixture を保ち、停止状態の永続 SQL は実際に実行する。
   const circuit = data.calendarConnection ? createTestD1() : undefined;
   if (circuit) circuitFixtures.add(circuit);
   return {

@@ -1,5 +1,5 @@
 /*
- * 引用返信と送信予約(N-025)のルート対照。
+ * 引用返信と送信予約のルート対照。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の chats ルートを当て、
  * LINE clientだけを止める。
@@ -252,7 +252,7 @@ describe('送信予約(N-025)', () => {
     expect(scheduledRows()).toHaveLength(1);
   });
 
-  // #977: 読み込み直しでクライアントの操作キーが新規発行されても、
+  // 読み込み直しでクライアントの操作キーが新規発行されても、
   // 「対象・内容・送信予定時刻」が同じ処理中の予約はサーバー側で再利用する。
   test('同じ版を別キーで再登録しても既存の予約を返し、行は1件のまま', async () => {
     const at = future();
@@ -272,7 +272,7 @@ describe('送信予約(N-025)', () => {
     expect(rows[0].status).toBe('scheduled');
   });
 
-  // #977: 連続クリックや通信中の再試行が並行に届いても処理中は最大1件。
+  // 連続クリックや通信中の再試行が並行に届いても処理中は最大1件。
   test('同じ版の予約を並行して2件投げても処理中の行は1件', async () => {
     const at = future();
     const [a, b] = await Promise.all([
@@ -286,7 +286,7 @@ describe('送信予約(N-025)', () => {
     expect(rows[0].status).toBe('scheduled');
   });
 
-  // #977: 送信中(sending)の行も照合対象。claim済みでも同じ版を二重登録しない。
+  // 送信中(sending)の行も照合対象。claim済みでも同じ版を二重登録しない。
   test('送信中に進んだ同じ版への再登録も新しい行を作らない', async () => {
     const at = future();
     const created = await postSchedule({ content: 'あとで', scheduledAt: at }, KEY1);

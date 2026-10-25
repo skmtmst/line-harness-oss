@@ -86,12 +86,7 @@ function renderJsonValue(value: unknown, context: BroadcastRenderContext): unkno
   return value;
 }
 
-/**
- * Flex content is JSON. Replacing raw bytes would break the JSON when a LINE
- * display name contains a quote, backslash, or newline, so render parsed string
- * values and serialize them again. Text content remains unchanged except for
- * the requested variables.
- */
+/** Flex は解析した文字列値を置換して再直列化し、引用符・バックスラッシュ・改行で JSON を壊さない。通常の文は指定した変数以外を変えない。 */
 export function renderBroadcastMessageContent(
   messageType: string,
   content: string,

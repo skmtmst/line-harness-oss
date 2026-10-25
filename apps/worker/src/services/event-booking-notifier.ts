@@ -99,14 +99,14 @@ export interface SendEventNotificationParams {
   channelAccessToken: string;
   signal?: AbortSignal;
   delivery?: { db: D1Database; accountId: string; operationId: string; subject?:EventNotificationSubject; authorize?: () => Promise<boolean>; deadlineAt?: number };
-  /** Fixed for one logical automatic reminder. */
+  /** 同じ論理的な自動通知では識別子を固定する。 */
   retryKey?: string;
   toLineUserId: string;
   kind: EventNotificationKind;
   ctx: EventNotificationContext;
 }
 
-/** Both live delivery and recovery send the same already rendered, immutable payload. */
+/** 通常送信と回復が、同じ組立済みの不変の本文を使う。 */
 export async function sendPreparedEventBookingNotification(
   channelAccessToken: string, snapshot: { to: string; messages: Message[] }, signal?: AbortSignal, retryKey?: string,
 ): Promise<void> {

@@ -8,7 +8,7 @@ describe('broadcast message asset validation', () => {
 
   it('requires one to ten panels', () => {
     // 画面は10枚まで作れる表示。上限を9のままにすると、作り終えてから
-    // 保存できない（監査 R141）。
+    // 保存できない。
     expect(validatePayload('card_message', { cards: [] })).toContain('1〜10');
     expect(validatePayload('card_message', { cards: Array.from({ length: 11 }, () => ({})) })).toContain('1〜10');
     expect(validatePayload('card_message', { cards: Array.from({ length: 10 }, () => ({ title: '商品' })) })).toBeNull();
@@ -16,7 +16,7 @@ describe('broadcast message asset validation', () => {
 
   it('counts the more panel in the limit and explains how to fix it', () => {
     // 「もっと見る」もLINEの10列のうち1列を使う。10枚＋もっと見るは
-    // 送れないので、保存の時点で理由と直し方を出す（監査 R141・R143）。
+    // 送れないので、保存の時点で理由と直し方を出す。
     const ten = Array.from({ length: 10 }, () => ({ title: '商品' }));
     const error = validatePayload('card_message', { cards: ten, moreCard: true });
     expect(error).toContain('9枚');

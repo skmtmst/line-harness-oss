@@ -1,7 +1,4 @@
-/*
- * N-028/N-029: 新規DM送信を N-023 の失敗契約へ接続する。
- * 実Hono route + 実SQLite(bootstrap.sql)へ当て、LINE clientだけを止める。
- */
+/** 新規 DM の送信失敗を共通の失敗契約へ接続し、実 Hono route と SQLite で確かめる。LINE の外部通信だけを差し替える。 */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';

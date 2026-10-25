@@ -351,7 +351,7 @@ describe('S01 設定の保存境界と監査', () => {
       expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM file_scan_configs').get()).toEqual({ n: 0 });
     });
   it('秘密値の存在を確認せず保存し、誰・いつ・店・ホストを監査へ残す', async () => {
-    // No dedicated secret is present in environment: the response must not reveal that fact.
+    // 専用の秘密設定がない事実を、未認証の応答から漏らさない。
     const res = await putConfig('/api/file-scans/config', 'admin-1', { ...valid, externalEndpointUrl: 'https://example.com/scan?private=query' });
     expect(res.status).toBe(200);
     const audit = testDb.raw.prepare("SELECT actor_principal_id, line_account_id, after_json, created_at FROM audit_events WHERE action = 'file_scan.config.update'").get() as Record<string, string>;

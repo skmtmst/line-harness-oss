@@ -6,9 +6,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { loadNoticeLineAccount } from '../services/platform-announcements.js';
 
 /**
- * 統括の管理画面に出す運営からのお知らせ（★37-7 の「画面のお知らせ」）と、
- * 契約者専用LINEの登録案内（LINE アカウント登録完了時のポップアップ。決定 2026-09-18）。
- * 本人（ログイン中の権限者）の分だけを扱う。
+ * 統括向けのお知らせと契約者専用 LINE の登録案内は、ログイン中の本人の分だけを扱う。
  */
 export const hqNotices = new Hono<Env>();
 

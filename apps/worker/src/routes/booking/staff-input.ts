@@ -35,7 +35,7 @@ export function staffMenusReplaceStatements(
   ];
 }
 
-// ---- staff breaks (N-405 #655; 枠への差し引きは #1471 合流後に availability 側で有効化) ----
+// ---- staff breaks ( ; 枠への差し引きは  合流後に availability 側で有効化) ----
 
 export const BREAK_WEEKLY_LIMIT = 28;
 

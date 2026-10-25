@@ -26,14 +26,13 @@ function unsafeConsoleCalls(source: string, readDependency: (specifier: string) 
     if(ts.isBinaryExpression(node)&&node.operatorToken.kind===ts.SyntaxKind.BarBarToken)return safeRoute(node.left,at,depth+1)&&safeRoute(node.right,at,depth+1);
     if(ts.isIdentifier(node)){const value=binding(node.text,at);return !!value&&safeRoute(value,at,depth+1);}
     if(ts.isTemplateExpression(node))return node.templateSpans.every(span=>safeRoute(span.expression,at,depth+1));
-    // HTTP methods can be printed only after narrowing to a closed set of fixed verbs.
+    // HTTP メソッドは固定の許可集合へ絞った後でだけ表示できる。
     if(ts.isConditionalExpression(node)&&ts.isStringLiteral(node.whenFalse)&&node.whenFalse.text==='OTHER') {
       return node.condition.getText(file)==="/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(c.req.method)";
     }
     return false;
   }
-  // A category is safe only when membership is checked against a closed,
-  // unmodified set. Imported registries must be frozen literal records.
+  // 分類名は変更されない固定集合への所属を検証した場合だけ安全とする。import した一覧は凍結した定義に限る。
   function shadows(tree:ts.Node,name:string,allowed?:ts.Node):boolean {
     let found=false;
     function visit(node:ts.Node){
@@ -144,9 +143,7 @@ function unsafeConsoleCalls(source: string, readDependency: (specifier: string) 
       &&clientId.includes("typeofid==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)?id:null");
     return server||client;
   }
-  // An incident ID is safe only when this lexical scope proves it was minted
-  // by the global Web Crypto API. Caller IDs, mutable aliases and shadowed
-  // bindings remain forbidden; this is not a file/path exception list.
+  // 障害 ID は同じスコープで Web Crypto が生成したと確認できる場合だけ許可する。入力値・可変の別名・同名の上書きは拒み、パス別の除外にしない。
   function serverIncidentId(node:ts.Expression,at:ts.Node):boolean {
     function binds(name:ts.BindingName,target:string):boolean {
       return ts.isIdentifier(name) ? name.text===target

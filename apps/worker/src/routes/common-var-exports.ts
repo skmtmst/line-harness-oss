@@ -30,13 +30,8 @@ import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 /**
- * 共通情報の監査付き非同期CSV出力（N-192）。
- *
- * 以前は画面に読み込めた最大200件を端末でCSV化していただけで、
- * 出力依頼・監査記録・期限つきダウンロードが無かった。ここでは
- * 依頼ごとに台帳行を作り、バックグラウンドで全件をページングして
- * 書き出す。成果物は出力時点の写しとして台帳行に保管し、
- * 7日間だけダウンロードできる。
+ * 全件を安全に出力するため、依頼ごとに台帳と監査を作り、バックグラウンドでページングして CSV を生成する。
+ * 成果物は出力時点の写しとして保存し、ダウンロード期限を7日間に制限する。
  */
 
 export const commonVarExports = new Hono<Env>();

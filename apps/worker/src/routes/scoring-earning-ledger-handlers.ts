@@ -116,7 +116,7 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
       accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search') || '',
-      // V6R-CX-e: 友だち詳細は、その人（名寄せした複数アカウント）の履歴だけを取る。
+      // 友だち詳細は、その人（名寄せした複数アカウント）の履歴だけを取る。
       friendId: c.req.query('friendId')?.trim() || undefined,
       ...(entryTypes ? { entryTypes: entryTypes as MileageEntryType[] } : {}),
       entryType: entryTypeValue as MileageEntryType | undefined,
@@ -264,7 +264,7 @@ export const post__api_mileage_adjustments_6 = async (c: Context<Env, "/api/mile
       };
 
       /*
-       * R378: 確定済みの同じ要求は当時の結果をそのまま返す。承認境界の
+       * 確定済みの同じ要求は当時の結果をそのまま返す。承認境界の
        * 引き下げや元の有効期限の経過は「新しい調整への判定」なので、
        * 確定済みの再送には適用しない。同じキーで別の内容なら409。
        * 通知だけの復旧（前回は残高反映済み・通知のみ失敗）もここで行い、
@@ -305,7 +305,7 @@ export const post__api_mileage_adjustments_6 = async (c: Context<Env, "/api/mile
         }, 200);
       }
 
-      // R378: 期限切れの判定と承認境界は「新しい調整」だけに適用する。
+      // 期限切れの判定と承認境界は「新しい調整」だけに適用する。
       if (expiresAt && expiresAt.getTime() <= Date.now()) {
         return inputError(c, { success: false, error: 'expiresAt must be a future date-time' }, 400, ["expiresAt"]);
       }
@@ -320,7 +320,7 @@ export const post__api_mileage_adjustments_6 = async (c: Context<Env, "/api/mile
       }
       if (amount >= policy.approvalThreshold) {
         /*
-         * R: 境界以上の調整は実行せず、別のオーナーへの承認依頼として残す
+         * 境界以上の調整は実行せず、別のオーナーへの承認依頼として残す
          * （一斉配信の二者承認と同じ形）。依頼票は同じ Idempotency-Key の
          * 再送で重複しない。
          */

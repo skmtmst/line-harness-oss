@@ -1,11 +1,4 @@
-/*
- * #643 再差戻し(4回目)の実行試験: 同時保存の敗者は1行も書かない。
- *
- * 一括設定のCASだけを条件にしていた頃は、負けた側でも専用カタログの
- * 上書きと確認トークンの削除だけがcommitされ、409を返しながら別の変更が
- * 効いていた。ここでは読み取りとcommitの間に別の管理者の保存を実際に
- * 割り込ませ、敗者側の副作用が1つも残らないことを確かめる。
- */
+/** 同時保存の敗者が1行も書かないことを確かめる。読取と確定の間へ別管理者の保存を差し込み、専用設定や確認票にも部分更新を残さない。 */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -73,7 +66,7 @@ function setting(testDb: SqliteD1, key: string) {
   ).get('account-1', key) as { value: string } | undefined;
 }
 
-/** 保存の監査行(N-444)。負けた要求は1行も残せない。 */
+/** 保存の監査行。負けた要求は1行も残せない。 */
 function audits(testDb: SqliteD1) {
   return testDb.raw.prepare(
     `SELECT * FROM audit_events WHERE action = 'feature_settings.save' ORDER BY created_at, id`,

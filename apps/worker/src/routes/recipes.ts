@@ -33,7 +33,7 @@ import { sha256Hex } from '../middleware/auth.js';
 import { type AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 /**
- * レシピ。設計 ★34-2（`y0P0Qx`）/ 34-3（`D5UaX`）。台帳 #134。
+ * レシピ。設計 ★34-2（`y0P0Qx`）/ 34-3（`D5UaX`）。台帳。
  *
  * **複製の途中失敗は全部戻す**（要件 -34 §7-3）。部分的に作らない。
  * 半分だけできた状態は、運用者が何を消せばよいか分からない。
@@ -277,7 +277,9 @@ function serialize(recipe: RecipeRow, counts: Record<string, number>, features: 
     /** 作られるものの内訳。**決まっていなければ null**（0 件の表を描かせない）。 */
     items: parseItems(recipe),
     itemCount: recipe.item_count,
-    /** これまで何回作られたか。**数えられるようになった**（台帳 #134 前は出せなかった）。 */
+    /**
+ * 利用件数は作成記録から数え、表示できる値として返す。
+ */
     cloneCount: counts[recipe.id] ?? 0,
   };
 }

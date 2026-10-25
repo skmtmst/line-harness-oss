@@ -235,10 +235,10 @@ describe('syncGoogleSheetsIntegration', () => {
     expect(results.map((r) => r.status)).toEqual(['ok', 'ok']);
     const friends = sheet.tabs.get('友だち')!;
     expect(friends[0]).toEqual(['LINEユーザーID', 'LINE表示名', '本名', 'システム表示名', 'フォロー状態', '登録日', '更新日']);
-    expect(friends.length).toBe(4); // header + 3
+    expect(friends.length).toBe(4); // 見出し行とデータ3行。
     expect(friends[1]![0]).toBe('U001');
     const answers = sheet.tabs.get('回答')!;
-    expect(answers.length).toBe(3); // header + 2
+    expect(answers.length).toBe(3); // 見出し行とデータ2行。
     const runs = await testDb.db.prepare(
       'SELECT status, rows_written FROM google_sheets_sync_runs ORDER BY data_type',
     ).all<{ status: string; rows_written: number }>();

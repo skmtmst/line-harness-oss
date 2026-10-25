@@ -1,7 +1,7 @@
 import { signedLiffState, mockLineIdToken } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// N-244 差し戻し: 停止した流入経路の ref は、停止前に入口表示→停止後に
+//  差し戻し: 停止した流入経路の ref は、停止前に入口表示→停止後に
 // LIFF/OAuth連携完了の場合も、LIFF直送の場合も、friends.ref_code 保存・
 // 候補・tracking・tracked/affiliate fallback・タグ/シナリオ開始をすべて止める。
 // active entry route・tracked link・affiliate link・traffic pool は壊さない。
@@ -10,14 +10,14 @@ const dbMocks = {
   getLineAccountLoginChannels: vi.fn().mockResolvedValue([
     { id: 'account-main', tenant_id: null, login_channel_id: '2000000000' },
   ]),
-  // eager module-load deps
+
   getLineAccounts: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000' },
   ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // ref flows
+
   getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   createUser: vi.fn().mockResolvedValue({ id: 'U-uuid' }),

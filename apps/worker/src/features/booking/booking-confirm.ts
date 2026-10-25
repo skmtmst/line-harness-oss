@@ -1,8 +1,4 @@
-// Confirmation reminder timing shared by automatic creation, approval,
-// proxy creation and payment recovery, as well as booking changes.
-//
-// Reminders already in the past are skipped so that confirming a
-// same-day booking does not immediately fire "明日のご予約" messages.
+// 自動作成・承認・代理作成・決済回復・予約変更で通知時刻を共有する。当日予約で翌日の案内を即送しないよう、過去になったリマインダーは省く。
 
 import { DEFAULT_ACCOUNT_SETTINGS } from './booking-types.js';
 import { getBookingAdminSettings } from '@line-crm/db';

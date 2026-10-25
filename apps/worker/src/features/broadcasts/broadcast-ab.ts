@@ -36,7 +36,7 @@ export async function abStats(db:D1Database,id:string,until=new Date().toISOStri
  FROM broadcast_ab_recipients r LEFT JOIN broadcast_tracked_links bl ON bl.broadcast_id=r.broadcast_id
  LEFT JOIN link_clicks lc ON lc.tracked_link_id=bl.tracked_link_id AND lc.friend_id=r.friend_id AND julianday(lc.clicked_at)>=julianday(r.sent_at) AND julianday(lc.clicked_at)<=julianday(?)
  WHERE r.broadcast_id=? AND r.variant_key IN('A','B') GROUP BY r.variant_key`).bind(until,id).all<{key:'A'|'B';sent:number;failed:number;clicks:number}>()).results;
- // Count delivery denominators separately: a recipient may click several tracked links.
+ // 同じ受信者が複数リンクを押せるため、配信数の分母はクリック数と別に数える。
  const denominators=(await db.prepare("SELECT variant_key key,SUM(state='sent') sent,SUM(state='failed') failed FROM broadcast_ab_recipients WHERE broadcast_id=? AND variant_key IN('A','B') GROUP BY variant_key").bind(id).all<{key:string;sent:number;failed:number}>()).results;
  return ['A','B'].map(key=>{const click=rows.find(x=>x.key===key)?.clicks??0,d=denominators.find(x=>x.key===key);return {key,sent:d?.sent??0,failed:d?.failed??0,clicks:click,clickRate:d?.sent?click/d.sent:null,bookings:null,purchases:null,purchaseAmount:null};});
 }

@@ -1,3 +1,3 @@
-// Public operations. Internal modules import their dependencies directly.
+// 内部から自分の公開入口を読み戻さず、実装の依存先を直接読む。
 export { IdentityCandidateError, candidateAccountIds, decideIdentityCandidate, getIdentityCandidate, listIdentityCandidates, undoIdentityCandidate, upsertIdentityCandidate } from './identity-candidates.js';
 export type { IdentityCandidateDraft } from './identity-candidates.js';

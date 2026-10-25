@@ -17,9 +17,9 @@ vi.mock('@line-crm/line-sdk', () => ({
 import { chats } from './chats.js';
 import { broadcasts } from './broadcasts.js';
 
-// #540 の直しに対する再発防止の契約テスト。
-// 機能2(#493): 一覧の上限統一・メール/詳細のページ送り・送信の入力検証。
-// 機能6(#490): 一覧の N+1 解消(集計の同梱)・limit/cursor/絞り込み/並び順の配線。
+// ページをまたぐチャット配信の取得契約を確かめる。
+// 機能2: 一覧の上限統一・メール/詳細のページ送り・送信の入力検証。
+// 機能6: 一覧の N+1 解消(集計の同梱)・limit/cursor/絞り込み/並び順の配線。
 
 const owner: AuthenticatedStaff = {
   id: 'owner-1', name: 'オーナー', role: 'owner', readOnly: false, tenantId: 'tenant-1',

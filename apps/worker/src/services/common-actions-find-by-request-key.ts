@@ -4,7 +4,7 @@ import { CommonActionValidationError, requiredString, validateActionShape, type 
 import { pinAndValidateReferences, assertPublishableExpansion } from './common-actions-pin-and-validate-references.js';
 
 /*
- * 監査 R475: 保存確定後の応答消失からの再試行で二重作成にしない。
+ * 監査 : 保存確定後の応答消失からの再試行で二重作成にしない。
  * 作成画面が初回から再試行まで同じ鍵を送り、鍵が同じ要求は最初の作成を返す。
  */
 export async function findByRequestKey(
@@ -59,7 +59,7 @@ export async function createCommonAction(
     ? input.description.trim()
     : null;
   const id = crypto.randomUUID();
-  // 監査 R479: 参照先は保存時に公開版へ固定する（表示と保存値を一致させる）。
+  // 監査 : 参照先は保存時に公開版へ固定する（表示と保存値を一致させる）。
   const actions = await pinAndValidateReferences(
     db, input.lineAccountId, id, validateActionShape(input.actions),
   );
@@ -137,19 +137,19 @@ export async function updateCommonActionDraft(
   if (!owner.current_draft_version_id || owner.current_draft_version_id !== expected) {
     throw new CommonActionValidationError('version_conflict', '別の人が新版を作りました。再読み込みしてください');
   }
-  // 監査 R473: 版IDは編集を重ねても変わらない。改訂番号で先行保存を検知する。
+  // 監査 : 版IDは編集を重ねても変わらない。改訂番号で先行保存を検知する。
   const expectedRevision = requiredDraftRevision(input.expectedDraftRevision);
   const name = requiredString(input.name, 'name', '共通アクション名');
   const description = typeof input.description === 'string' && input.description.trim()
     ? input.description.trim()
     : null;
-  // 監査 R479: 参照先は保存時に公開版へ固定する（表示と保存値を一致させる）。
+  // 監査 : 参照先は保存時に公開版へ固定する（表示と保存値を一致させる）。
   const actions = await pinAndValidateReferences(
     db, input.lineAccountId, owner.id, validateActionShape(input.actions),
   );
   const now = new Date().toISOString();
   /*
-   * 監査 R473: 2文とも改訂番号で条件付けし、競合時はどちらも
+   * 監査 : 2文とも改訂番号で条件付けし、競合時はどちらも
    * 書き換えない。親行を先に触り、版行の番号上げは後に回す。
    * 逆順にすると成功時でも親行の条件が新しい番号を見て外れる。
    */
@@ -238,7 +238,7 @@ export async function publishCommonActionDraft(
   if (owner.current_draft_version_id !== draftVersionId) {
     throw new CommonActionValidationError('version_conflict', '公開対象の下書きが変わりました。再読み込みしてください');
   }
-  // 監査 R477: 公開の読取後に保存が入ったら、古い読取の公開で上書きしない。
+  // 監査 : 公開の読取後に保存が入ったら、古い読取の公開で上書きしない。
   const expectedRevision = requiredDraftRevision(input.expectedDraftRevision);
   const draft = await db.prepare(
     `SELECT id, common_action_id, version_number, status, action_config, draft_revision,
@@ -254,7 +254,7 @@ export async function publishCommonActionDraft(
     );
   }
   const actions = validateActionShape(JSON.parse(draft.action_config));
-  // 監査 R479: 確認後に参照先が更新されていたら、別の内容を再確認なしで公開しない。
+  // 監査 : 確認後に参照先が更新されていたら、別の内容を再確認なしで公開しない。
   const drifts = await collectReferenceDrifts(db, input.lineAccountId, actions);
   if (drifts.length > 0) {
     const [first] = drifts;
@@ -265,11 +265,11 @@ export async function publishCommonActionDraft(
   }
   // 保存時に固定した版を保持し、最新へ自動で置き換えない。
   const pinned = await pinAndValidateReferences(db, input.lineAccountId, owner.id, actions, { keepPins: true });
-  // 監査 R478: 参照を展開した深さ・総数も公開前に検査する。
+  // 監査 : 参照を展開した深さ・総数も公開前に検査する。
   await assertPublishableExpansion(db, input.lineAccountId, pinned);
   const now = new Date().toISOString();
   /*
-   * 監査 R477: 保存と同じく2文とも改訂番号で条件付けし、競合時は
+   * 監査 : 保存と同じく2文とも改訂番号で条件付けし、競合時は
    * 親行の版ポインタも版行の状態も変えない。親行を先に触り、
    * 版行の公開切替は後に回す（成功時の条件外れを防ぐ）。
    */
@@ -492,7 +492,7 @@ export const ARCHIVE_CONSUMER_LABELS: Record<string, string> = {
 };
 
 /*
- * 監査 R480: 未使用の共通アクションを保管する。利用中は件数と利用先を
+ * 監査 : 未使用の共通アクションを保管する。利用中は件数と利用先を
  * 示して拒否する。保管は一方通行ではなく、戻す操作も用意する。
  * 実行記録は残る（物理削除ではない）。
  */

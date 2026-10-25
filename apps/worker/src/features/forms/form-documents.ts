@@ -49,7 +49,7 @@ export async function hydrateDocumentAnswers(db: D1Database, data: Record<string
   }
   return result;
 }
-/** Validate server-owned references, never trust kind/side/name sent by the browser. */
+/** ブラウザが送った kind/side/name を信頼せず、サーバーが管理する参照先を検証する。 */
 export async function validateDocumentAnswers(db: D1Database, layout: FormLayout | null, data: Record<string, unknown>, scope: { accountId: string; formId: string; friendId: string; versionId: string | null; submissionId?: string | null }): Promise<string | null> {
   if (!layout) return null;
   for (const block of collectInputs(layout).filter(b => b.type === 'file')) {
@@ -59,7 +59,7 @@ export async function validateDocumentAnswers(db: D1Database, layout: FormLayout
       if (formFileKind(block) === 'identity' || formFileKind(block) === 'pdf') {
         if (value) return `${block.label} の書類を送りなおしてください`;
       }
-      continue; // existing image URL answers
+      continue;
     }
     const sides: string[] = [];
     for (const v of value) {
@@ -93,7 +93,7 @@ export async function attachDocumentAnswers(db: D1Database, data: Record<string,
     if (attached.meta.changes !== 1) throw new Error('document_attachment_failed');
   }
 }
-/** A flagged document is never retained for the one-day abandoned-upload period. */
+/** 問題のある書類は、未完了アップロードの1日保持の対象にせず削除する。 */
 export async function purgeUnsafeFormDocuments(db: D1Database, store: Pick<R2Bucket, 'delete'>, scanId: string): Promise<boolean> {
   const rows = await db.prepare('SELECT * FROM form_submission_files WHERE scan_id = ? AND deleted_at IS NULL').bind(scanId).all<FormDocumentRow>().catch(() => null);
   if (!rows) { logger.error("unsafe_form_document_lookup_failed"); return false; }
@@ -106,7 +106,7 @@ export async function purgeUnsafeFormDocuments(db: D1Database, store: Pick<R2Buc
   }
   return complete;
 }
-/** Delete R2 first; a failed delete remains due for the next cron. Keep the tombstone. */
+/** 削除失敗を次の cron で再試行できるよう、R2 を先に削除し、削除の印を残す。 */
 export async function purgeExpiredFormDocuments(db: D1Database, store: Pick<R2Bucket, 'delete'>, now = new Date()): Promise<number> {
   const rows = await db.prepare(`SELECT * FROM form_submission_files WHERE deleted_at IS NULL AND expires_at <= ? UNION SELECT * FROM form_submission_files WHERE deleted_at IS NULL AND submission_id IS NULL AND created_at <= ? UNION SELECT f.* FROM form_submission_files f JOIN media_file_scans s ON s.id = f.scan_id WHERE f.deleted_at IS NULL AND s.status = 'quarantined' LIMIT 100`)
     .bind(now.toISOString(), new Date(now.getTime() - 86400000).toISOString()).all<FormDocumentRow>();

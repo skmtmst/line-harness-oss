@@ -69,17 +69,8 @@ async function legacyDefaultTenantOwnerRow(db: D1Database, candidate: PlatformAd
   if (candidate.role !== 'owner' || candidate.readOnly) return false;
   if ((candidate.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) return false;
   /*
-   * 「登録が完了して有効な運営マスター」の数え方は countActivePlatformAdmins に
-   * そろえる（is_active=1 かつ activation_state='active'）。
-   *
-   * 以前はここだけ is_active=1 のみで数えていた。招待の行は
-   * is_active=1 / activation_state='invited' で作られる（upsertPlatformAdminInvite）
-   * ため、誰も自己登録しないまま他人を招待すると、
-   *   - この互換判定は「登録済みが居る」と読んで無効になる
-   *   - 一方 getPlatformAdminByStaffId は 'invited' を運営マスターと認めない
-   * となり、運営マスターが 0 人のまま誰も /ops に入れなくなっていた。
-   * 招待メールが失効すると再送も requirePlatformAdminWrite を要求するため、
-   * 画面からは復旧できない。
+   * 有効な運営マスターの判定は countActivePlatformAdmins と同じ is_active=1 かつ activation_state='active' にする。
+   * 未登録の招待行まで有効と数えると、誰も /ops へ入れず、招待が失効した際に画面から復旧できなくなる。
    */
   return (await countActivePlatformAdmins(db)) === 0;
 }

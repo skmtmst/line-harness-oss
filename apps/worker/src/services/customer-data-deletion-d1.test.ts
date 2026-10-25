@@ -18,7 +18,7 @@ describe('local workerd D1 binding', () => {
     mf = new Miniflare({ modules: true, script: 'export default { fetch() { return new Response("ok") } }', d1Databases: ['DB'] });
     native = await mf.getD1Database('DB');
     const sql = readFileSync(new URL('../../../../packages/db/bootstrap.sql', import.meta.url), 'utf8');
-    // Same normalized bootstrap splitter as the existing real-D1 lease tests.
+    // 実 D1 相当の既存試験と同じ正規化済み bootstrap 分割を使う。
     const statements = sql.split('\n').filter(line => !line.trimStart().startsWith('--')).reduce<string[]>((result, line) => {
       result[result.length - 1] += `\n${line}`;
       if (line.trimEnd().endsWith(';')) result.push('');

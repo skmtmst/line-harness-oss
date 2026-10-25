@@ -9,7 +9,7 @@ export async function snapshotStoreMetrics(db:D1Database,a:string,day:string,now
  const style=await db.prepare("SELECT style FROM account_styles WHERE line_account_id=? AND selection_mode='configured'").bind(a).first<{style:string}>();
  const bookingEnabled=style?.style!=='ec'&&!!await db.prepare('SELECT id FROM booking_settings WHERE line_account_id=?').bind(a).first();
  const count=await db.prepare(`SELECT count(CASE WHEN b.status NOT IN('cancelled','rejected','expired') THEN 1 END) bookings,count(CASE WHEN (SELECT kind FROM booking_visit_marks v WHERE v.booking_id=b.id ORDER BY julianday(v.marked_at) DESC,v.id DESC LIMIT 1)='visited' THEN 1 END) visits,count(CASE WHEN b.status='no_show' OR (SELECT kind FROM booking_visit_marks v WHERE v.booking_id=b.id ORDER BY julianday(v.marked_at) DESC,v.id DESC LIMIT 1)='no_show' THEN 1 END) no_shows FROM bookings b WHERE b.line_account_id=? AND julianday(b.starts_at)>=julianday(?) AND julianday(b.starts_at)<julianday(?)`).bind(a,from,to).first<{bookings:number;visits:number;no_shows:number}>();
- // Lifetime friend state cannot reconstruct past block events. Leave those fields unknown.
+ // 現在の友だち状態から過去のブロック発生は復元できないため、不明のまま返す。
  await db.prepare(`INSERT OR IGNORE INTO hq_store_response_samples(account_id,chat_id,pending_since,responded_at,minutes) SELECT ?,c.id,c.pending_since,c.first_response_at,(julianday(c.first_response_at)-julianday(c.pending_since))*1440 FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.first_response_at IS NOT NULL AND c.pending_since IS NOT NULL AND julianday(c.first_response_at)>=julianday(c.pending_since) AND julianday(c.first_response_at)>=julianday(?) AND julianday(c.first_response_at)<julianday(?)`).bind(a,a,from,to).run();
  const response=(await db.prepare('SELECT minutes FROM hq_store_response_samples WHERE account_id=? AND julianday(responded_at)>=julianday(?) AND julianday(responded_at)<julianday(?) ORDER BY minutes').bind(a,from,to).all<{minutes:number}>()).results.map(r=>r.minutes);
  const median=response.length?(response[Math.floor((response.length-1)/2)]+response[Math.floor(response.length/2)])/2:null;
@@ -19,7 +19,7 @@ export function comparisonPeriod(from?:string,to?:string){
  const end=to??japanDateOffset(-1),start=from??new Date(Date.parse(end)-29*86400000).toISOString().slice(0,10);
  if(![start,end].every(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s)||start>end||Date.parse(end)-Date.parse(start)>366*86400000)throw new GapError('invalid_period');return {from:start,to:end,days:1+(Date.parse(end)-Date.parse(start))/86400000};
 }
-/** Daily values use only the saved observation, never fill a missing day with zero. */
+/** 日別の値は保存済み観測だけを使い、欠けた日を0にしない。 */
 export function comparisonTrend(rows:Record<string,unknown>[], period:ReturnType<typeof comparisonPeriod>):StoreComparisonDay[] {
  const byDay=new Map(rows.map(row=>[String(row.date),row]));
  return Array.from({length:period.days},(_,index)=>{
@@ -38,7 +38,7 @@ export async function storeNumbers(db:D1Database,a:string,period:ReturnType<type
  const rows=observations.filter(row=>row.state!=='failed');
  const full=rows.length===period.days,sum=(key:string)=>full&&rows.every(r=>r[key]!==null)?rows.reduce((n,r)=>n+Number(r[key]),0):null;
  const added=sum('friends_added'),blocked=sum('friends_blocked'),start=full?rows[0]?.friends_at_start:null,recipients=sum('broadcast_recipients'),clicks=sum('broadcast_clicks'),visits=sum('visits'),noShows=sum('no_shows');
- // Read human response timestamps to compute the actual period median, never a median of medians.
+ // 中央値同士の中央値にせず、担当者の実際の応答時刻から対象期間の中央値を計算する。
  const from=new Date(`${period.from}T00:00:00+09:00`).toISOString(),to=new Date(Date.parse(`${period.to}T00:00:00+09:00`)+86400000).toISOString();
  const minutes=full?(await db.prepare(`SELECT minutes FROM hq_store_response_samples WHERE account_id=? AND julianday(responded_at)>=julianday(?) AND julianday(responded_at)<julianday(?) ORDER BY minutes`).bind(a,from,to).all<{minutes:number}>()).results.filter(x=>x.minutes>=0).map(x=>x.minutes):[];
  const response=minutes.length?(minutes[Math.floor((minutes.length-1)/2)]+minutes[Math.floor(minutes.length/2)])/2:null;
@@ -46,7 +46,7 @@ export async function storeNumbers(db:D1Database,a:string,period:ReturnType<type
  return {values,style,computedAt:full?rows.map(r=>String(r.computed_at)).sort()[0]??null:null,trend:observations};
 }
 
-/** Reserve one historical slot and one yesterday slot per tick, so new work cannot starve repair. */
+/** 新規処理で補修が止まらないよう、毎回、過去分と昨日分の枠を1つずつ確保する。 */
 export async function processStoreComparison(db:D1Database,now=new Date()){
  const yesterday=japanDateOffset(-1, now);
  let failed:unknown;

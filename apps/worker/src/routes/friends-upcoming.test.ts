@@ -9,7 +9,7 @@ vi.mock('../services/step-delivery.js', () => ({ buildMessage: vi.fn() }));
 const { friends } = await import('./friends.js');
 
 /*
- * IDEA-02: 受信箱の顧客情報に出す「次の予定」。
+ * 受信箱の顧客情報に出す「次の予定」。
  * 確定した未来の予約と自動配信の最先着を返し、「予定なし」(null) と
  * 「未取得」( *_Error=true ) を区別する。片方の取得失敗がもう片方を
  * 隠さないことも、実SQLite・実ルートで確かめる。

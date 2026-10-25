@@ -11,7 +11,7 @@ export function privateImageKey(key: string): boolean {
   return /^(?:nen-pets|nen-pet-profiles|nen-photo-review|form-uploads)\//.test(key);
 }
 
-/** Explicit publishing locations, never arbitrary bucket keys or staged uploads. */
+/** 任意のバケットキーや未公開アップロードでなく、明示した公開先だけを使う。 */
 export function publicImageKey(key: string): boolean {
   if (!key || /[\\%\x00-\x1f]/.test(key) || key.includes('..')) return false;
   return /^[^/]+\.(?:png|jpg|jpeg|gif|webp)$/i.test(key)
@@ -20,7 +20,7 @@ export function publicImageKey(key: string): boolean {
     || /^hq-templates\/[^/]+\/uploads\//.test(key);
 }
 
-/** These objects have an enrollment-gated playback route, even in a public media namespace. */
+/** 公開メディアの名前空間でも、参加者用の再生認証が必要なオブジェクトとして扱う。 */
 export async function isWebinarSource(db: D1Database, key: string): Promise<boolean> {
   return !!await db.prepare(`SELECT id FROM webinars WHERE video_prefix IS NOT NULL AND video_prefix <> ''
     AND (video_prefix = ? OR substr(?, 1, length(video_prefix) + 1) = video_prefix || '/') LIMIT 1`)
@@ -65,12 +65,11 @@ export async function privateImageSignatureValid(url: URL, secret: string | unde
   return crypto.subtle.verify('HMAC', await signingKey(secret), bytes, signedMessage(url.pathname.slice('/images/'.length), expires));
 }
 
-/** Ownership comes from the bucket and the friend ledger, never URL caller data. */
+/** 所有者は要求 URL でなく、バケットと友だち台帳から確定する。 */
 export async function canSignPrivateImage(c: Context<Env>, key: string): Promise<boolean> {
   if (!privateImageKey(key) || key.includes('..') || /[\\%\x00-\x1f]/.test(key)) return false;
   const staff = c.get('staff');
-  // A URL injected into an unrelated profile/setting response must not become a capability.
-  // These image surfaces already enforce their module and resource permissions.
+  // 無関係なプロフィール・設定の URL だけで権限を発行しない。画像の各入口で機能と対象の権限を検査する。
   if (staff && !staffImageSurface(c.req.path, key)) return false;
   if (staff && key.startsWith('nen-photo-review/') && !hasStaffPermission(c, 'photo.submission.view')) return false;
   const object = await c.env.IMAGES.head(key);
@@ -86,7 +85,7 @@ export async function canSignPrivateImage(c: Context<Env>, key: string): Promise
   return !!identity && identity.lineAccountId === friend.line_account_id && identity.lineUserId === friend.line_user_id;
 }
 
-/** Issue fresh capabilities only after each response image's owner is checked. */
+/** 応答画像ごとの所有者を検証してから、新しい権限票を発行する。 */
 export const privateImageResponseMiddleware: MiddlewareHandler<Env> = async (c, next) => {
   await next();
   if (c.res.status >= 400 || !c.res.headers.get('Content-Type')?.includes('application/json')) return;
@@ -104,8 +103,7 @@ export const privateImageResponseMiddleware: MiddlewareHandler<Env> = async (c, 
   const cache = new Map<string, Promise<string>>();
   async function walk(value: unknown, field = '', answers = false): Promise<unknown> {
     if (typeof value === 'string') {
-      // Message content is stored as JSON text. Refresh links only inside the
-      // already-authorized conversation response, never arbitrary plain text.
+      // 保存済みメッセージ JSON は、認可済みの会話応答内でだけリンクを更新し、任意のテキストは書き換えない。
       if (value.includes('/images/chat-attachments/') && /^[\s]*[\[{]/.test(value)) {
         try { return JSON.stringify(await walk(JSON.parse(value), field, answers)); } catch { return value; }
       }

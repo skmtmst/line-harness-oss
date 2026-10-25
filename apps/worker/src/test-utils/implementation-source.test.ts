@@ -12,7 +12,7 @@ it('follows only imported implementation modules and keeps unknown or unrelated 
   writeFileSync(join(folder, 'feature-validation.ts'), 'export const handler = 1;');
   writeFileSync(join(folder, 'feature-rogue.ts'), 'unknown-sender');
   writeFileSync(join(folder, 'other.ts'), 'unrelated-resolver');
-  // Explicit same-family side-effect imports are included too.
+  // 同じ機能の明示的な副作用 import も含める。
   writeFileSync(join(folder, 'feature-unused.ts'), 'unrelated-side-effect');
   expect(implementationFiles(join(folder, 'feature.ts'))).toEqual([
     join(folder, 'feature.ts'), join(folder, 'feature-unused.ts'), join(folder, 'feature-send.ts'), join(folder, 'feature-validation.ts'),

@@ -7,16 +7,7 @@ import {GapError} from '../services/gap-common.js';
 import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 export { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
-/**
- * 飲食店向け「Googleビジネス」第1段：設定（Google接続）と口コミ。
- *
- * - 1店舗（rt_stores）＝1 LINE公式アカウント（rt_stores.line_account_id）＝1 Googleロケーション。
- * - 店舗は必ず account_id → rt_stores.line_account_id と担当者の統括（tenant）で引く。組織IDだけで信用しない。
- * - Googleとの通信は services/google-business.ts に閉じ込め、この層はDBと権限だけを扱う。
- * - Googleへの書き込みは GOOGLE_BUSINESS_WRITE_ENABLED=true の環境でしか行わない（環境ごとのスイッチ。
- *   2026-10-04からGoogleの機密スコープ審査のため実運用でも有効。自動送信はせず、確認画面で本人が押したときだけ送る）。
- * - トークンは暗号化して保存し、応答・ログに平文を出さない。
- */
+/** Google ビジネスの店舗はアカウントと担当者の統括から解決し、組織 ID だけを信用しない。外部通信はサービス層へ分ける。書込は GOOGLE_BUSINESS_WRITE_ENABLED=true かつ本人の確認操作があるときだけ実行し、自動送信しない。トークンは暗号化して保存し、ログ・応答へ平文を出さない。 */
 import { Hono } from 'hono';
 import type { Context, MiddlewareHandler } from 'hono';
 import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from '@line-crm/db';
@@ -489,7 +480,7 @@ export const googleAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
   // 長期間使えるAPIキーでは通さない。管理画面に人がログインした状態だけを受ける。
   //
   // Google Business Profile APIのポリシー
-  // （https://developers.google.com/my-business/content/policies 、2026-08-28更新）は
+  // （https://developers.google.com/my-business/content/policies、2026-08-28更新）は
   // 「End users of your Business Profile APIs need to manually sign in to use it.」
   // 「They're not allowed automatic access to make manual or programmatic changes to
   // their accounts.」「You cannot provide indirect access to your Business Profile

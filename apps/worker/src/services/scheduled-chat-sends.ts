@@ -19,7 +19,7 @@ import { buildChatMessage, ChatAttachmentError } from './chat-attachments.js';
 import type { Message } from '@line-crm/line-sdk';
 import { renderChatMessageContent } from './manual-send-interpolation.js';
 
-// N-025: 期限が来た送信予約をLINEへpushするcron側の処理。
+// 期限が来た送信予約をLINEへpushするcron側の処理。
 // 二重送信防止は3層: claimのCAS(status) + lease_token照合 + LINEへ同じ
 // idempotency_keyを渡す(retry-key)。送信結果がunknownのときは自動再送しない。
 
@@ -125,7 +125,7 @@ async function dispatchOne(
     quoteToken = quoted?.quote_token ?? null;
   }
 
-  // N-026: 差し込みは送信時の情報で解決する(予約時点と値が変わり得る)。
+  // 差し込みは送信時の情報で解決する(予約時点と値が変わり得る)。
   // 解決しきれない `{{…}}` が残るなら LINE を呼ばず、行だけ失敗で残す。
   const rendered = await renderChatMessageContent(
     env.DB, target.friend, row.message_type, row.content, target.liffId,
@@ -175,7 +175,7 @@ async function dispatchOne(
 
   const reservation = await reserveOutboundSend(env.DB, {
     key:row.idempotency_key,channel:'line',resourceId:`scheduled-chat:${row.id}`,
-    // Signed download URLs change on retry; compare the durable send intent.
+    // 署名 URL は再試行で変わるため、永続的な送信の意図を比較する。
     payloadHash:await hashOutboundPayload(JSON.stringify(hasSignedAttachment
       ? { messageType: row.message_type, content: row.content, quoteToken: quoteToken ?? null } : message)),lineAccountId:row.line_account_id,
     retryInProgress:true,now:nowIso,
@@ -269,8 +269,7 @@ export async function processDueScheduledChatSends(
   options: { now?: string; limit?: number } = {},
 ): Promise<{ claimed: number; sent: number; failed: number }> {
   const now = options.now ?? new Date().toISOString();
-  // Due while stopped is a terminal cancellation, not a retry. This preserves
-  // the unsent row and prevents restore from creating an overdue push burst.
+  // 停止中の期限到達は終端の取消にし、未送信行を保って復旧後の一斉送信を防ぐ。
   await env.DB.prepare(
     `UPDATE scheduled_chat_sends
         SET status = 'cancelled', cancelled_at = ?, updated_at = ?,

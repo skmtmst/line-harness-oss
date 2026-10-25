@@ -138,7 +138,7 @@ function makeMockR2(): R2Like {
 }
 
 /**
- * #827 以降、公開には「切替以外の行き先を持つボタン」が1つ必要で、全ボタンに
+ *  以降、公開には「切替以外の行き先を持つボタン」が1つ必要で、全ボタンに
  * 読み上げラベルが必須。publish を通す group はこれを1つ含める。
  */
 const VALID_AREA = {
@@ -199,11 +199,7 @@ describe('publishRichMenuGroup', () => {
   });
 });
 
-/**
- * Per-action-type validation. These run before any LINE call, so a mistake in
- * the editor is reported as something the operator can fix rather than as an
- * upstream 400 surfaced as a generic failure.
- */
+/** LINE の400を一般的な失敗として返す前に、操作種別ごとに検証し、運用者が直せる入力エラーとして伝える。 */
 describe('validateRichMenuGroupForPublish', () => {
   const groupWith = (
     actionType: 'message' | 'uri' | 'postback' | 'richmenuswitch',
@@ -888,7 +884,7 @@ describe('linkRichMenuBulkChunked', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 147: 運用者から見た「何をするボタンか」(intent) を LINE の action へ変換する
+// 運用者から見た「何をするボタンか」(intent) を LINE の action へ変換する
 // ---------------------------------------------------------------------------
 
 /** publish して、LINE に送られた areas の action だけを取り出す。 */
@@ -922,7 +918,7 @@ function groupWithAreas(
         imageR2Key: 'rich-menus/test/p1.png',
         imageContentType: 'image/png',
         lineRichMenuId: null,
-        // #827: 読み上げラベルは必須。試験対象の area にラベルが無ければ既定を足す。
+        // 読み上げラベルは必須。試験対象の area にラベルが無ければ既定を足す。
         areas: areas.map((area) => ({ label: 'ボタン', ...area })),
       },
     ],

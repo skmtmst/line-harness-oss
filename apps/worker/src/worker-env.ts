@@ -16,7 +16,7 @@ export type Env = {
     outputAudit?: { count: number | null; accountId?: string; accountIds?: string[]; accountCounts?: Record<string, number>; targetId?: string; phase?: 'requested' | 'download' };
     /** 代理ログイン中（★37-5）。middleware/impersonation.ts が入れる。 */
     impersonation?: ImpersonationContext;
-    /** 段ごとの経過時間（V6R-CX-a）。lib/server-timing.ts が入れる。 */
+    /** 段ごとの経過時間。lib/server-timing.ts が入れる。 */
     serverTiming?: ServerTiming;
   };
 };

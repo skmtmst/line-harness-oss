@@ -109,7 +109,7 @@ describe('S01 external scanner boundary', () => {
     const requests: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
       requests.push(url);
-      // Model fetch following a Location only when the caller permits it.
+      // 呼出元が許した場合だけ、Location をたどる fetch を再現する。
       if (init.redirect !== 'manual') requests.push('https://evil.example.com/stolen');
       return new Response(null, { status: 302, headers: { location: 'https://evil.example.com/stolen' } });
     }));

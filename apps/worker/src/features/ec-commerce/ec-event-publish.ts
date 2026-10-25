@@ -8,7 +8,7 @@ import type { EventPayload } from '../../services/event-payload.js';
  * ここで発生元の不変ID・台帳名・発生時刻をそろえて1回だけ渡す。
  * 再送・再試行の二重実行は下流の冪等キーで抑える(この層では落とさない)。
  *
- * 互換の約束(#1460との共通形式):
+ * 互換の約束(との共通形式):
  * - `sourceEventId` はEC側の `event_id`(発生元の不変ID)。台帳の行IDではない。
  * - `sourceKind` は `'eccube'`(受信口・台帳の `eccube:` にそろえる)。
  * - `eventData` は標準フラット項目に加え、`order` の互換subset

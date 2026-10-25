@@ -5,7 +5,7 @@ import { resolveHqBroadcastAudience,countHqAudience } from './hq-broadcast-audie
 import { StampError } from '../../services/visit-stamps.js';
 
 type Run=Awaited<ReturnType<typeof getHqBroadcastRun>>;
-/** Links count clicks from recorded successful recipients in a fixed 14-day window. */
+/** 配信成功が記録された受信者のクリックを、固定の14日間で数える。 */
 export async function hqBroadcastReactions(db:D1Database,run:Run) {
   const links=(await db.prepare(`SELECT t.line_account_id account_id,b.id broadcast_id,l.id link_id,l.name,l.original_url,lm.label,b.sent_at,
     (SELECT COUNT(DISTINCT c.friend_id) FROM link_clicks c JOIN broadcast_send_claims s ON s.friend_id=c.friend_id AND s.broadcast_id=b.id AND s.line_account_id=t.line_account_id AND s.state='sent'
@@ -20,7 +20,7 @@ export async function hqBroadcastReactions(db:D1Database,run:Run) {
   return {windowDays:14,minimumPeople:20,sampleBasis:'sent_recipients',links:links.map(r=>({accountId:r.account_id,broadcastId:r.broadcast_id,linkId:r.link_id,label:r.label||r.name,url:r.original_url,uniqueClickCount:r.sent>=20?r.people:null,clickCount:r.sent>=20?r.clicks:null,clickRate:r.sent>=20&&r.sent>0?Math.round(r.people/r.sent*1000)/10:null,suppressed:r.sent<20})),...await hqBroadcastBlocks(db,run.tenant_id,run.id)};
 }
 
-/** Create a draft only. Approval and send confirmation remain separate operations. */
+/** 意図しない送信を防ぐため、ここでは下書きだけを作り、承認と送信確認は別操作にする。 */
 export async function copyHqBroadcast(db:D1Database,run:Run,actorId:string,input:Record<string,unknown>,followup:boolean) {
   if(!Number.isSafeInteger(input.expectedVersion)||input.expectedVersion!==run.version)throw new StampError('配信が変わりました。読み直してください',409);
   if(typeof input.requestId!=='string')throw new StampError('作成依頼の番号を指定してください',400);

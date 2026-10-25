@@ -110,7 +110,7 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
   ]);
 
   // 「契約中」＝請求契約が生きているもの（active ＋決済失敗の past_due）。
-  // 一覧（/api/ops/tenants の集計）と同じ定義にそろえる（監査 R153）。
+  // 一覧（/api/ops/tenants の集計）と同じ定義にそろえる。
   const active = tenants.filter((t) => t.plan_status === 'active' || t.plan_status === 'past_due');
   const trialing = tenants.filter((t) => t.plan_status === 'trialing');
   const byPlan: Record<PlanKey, number> = { light: 0, standard: 0, pro: 0 };

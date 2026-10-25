@@ -8,11 +8,11 @@ import { authMiddleware } from '../middleware/auth.js';
 import { friendFields } from './friend-fields.js';
 
 /*
- * R545〜R549（情報欄の移行）の最新枝での照合。
+ * 〜（情報欄の移行）の最新枝での照合。
  *
  * 監査は古いSHA（918b8cdb）で行われた。D036〜D038 で直ったものは
  * コードを変えず「最新では再現しない」ことをここで証拠立てる。
- * 残っていた R549（16進表記の数値解釈のずれ）だけ本体を直し、
+ * 残っていた （16進表記の数値解釈のずれ）だけ本体を直し、
  * その動きをこのファイルで守る。
  *
  * 実ルート＋実認証＋メモリSQLite＋失敗注入で確かめる。
@@ -30,7 +30,7 @@ const OWNER_KEY = 'r540-owner';
 function setupSqlite() {
   const sqlite = new Database(':memory:');
   sqlite.exec(BOOTSTRAP_SQL);
-  // Explicit Off fixture: these tests exercise resource authorization, not login MFA.
+  // 対象の権限検査まで到達させるため、MFA は明示的に無効の fixture とする。
   sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
   sqlite.prepare(
     `INSERT INTO line_accounts (id, name, channel_id, channel_access_token, channel_secret)
@@ -184,7 +184,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
 });
 
-// R545: 移行の事前確認で行保存に失敗すると親の確認記録だけが残る。
+// 移行の事前確認で行保存に失敗すると親の確認記録だけが残る。
 // D038 で直し済み。最新では失敗時に run ごと片付けるため再現しない。
 describe('R545 事前確認の失敗で親だけ残さない', () => {
   it('項目の書き込み失敗では500だがrunを残さない', async () => {
@@ -197,7 +197,7 @@ describe('R545 事前確認の失敗で親だけ残さない', () => {
   });
 });
 
-// R546: 項目移行後も切替対象リマインダーが元項目を参照する（P1）。
+// 項目移行後も切替対象リマインダーが元項目を参照する（P1）。
 // D037 で直し済み。最新では全部移せたときに約束した使用先を切り替えるため再現しない。
 describe('R546 移行後は約束したリマインダーが移行先を指す', () => {
   it('切替可能と示したリマインダー参照が新項目IDになる', async () => {
@@ -215,7 +215,7 @@ describe('R546 移行後は約束したリマインダーが移行先を指す',
   });
 });
 
-// R547: 移行の最終集計失敗で値だけ移り処理記録は処理中のままになる（P1）。
+// 移行の最終集計失敗で値だけ移り処理記録は処理中のままになる（P1）。
 // D036 で直し済み。最新では送り直しで続けられ、件数は表から数え直すため再現しない。
 describe('R547 最終集計の失敗後は送り直しで実値と件数が一致する', () => {
   it('集計の失敗では値は移るが、送り直しで完了し件数が合う', async () => {
@@ -236,8 +236,8 @@ describe('R547 最終集計の失敗後は送り直しで実値と件数が一�
   });
 });
 
-// R549: 事前確認で数値扱いした16進表記を移行保存時に拒否する。
-// 本体を直した。事前確認と保存で同じ物差しを使うため、件数は合う。
+// 事前確認で数値扱いした16進表記を移行保存時に拒否する。
+// 件数の食い違いを防ぐため、事前確認と保存で同じ検証基準を使う。
 describe('R549 16進表記の数値解釈を事前確認と保存で揃える', () => {
   it('0x10は保存側でも事前確認側でも数値として通さない', () => {
     expect(validateFriendFieldValue({ type: 'number', options_json: null }, '0x10').ok).toBe(false);

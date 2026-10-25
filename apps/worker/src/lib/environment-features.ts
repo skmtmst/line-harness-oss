@@ -11,7 +11,7 @@ export function googleBusinessEnabled(env: { GOOGLE_BUSINESS_ENABLED?: string })
  * 表へ出るため、既定値は必ず無効にする。
  */
 export function restaurantTestEnabled(env: { RESTAURANT_TEST_ENABLED?: string; DEPLOY_ENV?: string }): boolean {
-  // Missing, production and unknown environments stay closed even if the flag is true.
+  // 誤って本番で有効にしないよう、環境が未指定・本番・不明ならフラグが真でも閉じる。
   const environment = env.DEPLOY_ENV?.trim().toLowerCase();
   if (environment !== 'staging' && environment !== 'development' && environment !== 'test') return false;
   return env.RESTAURANT_TEST_ENABLED?.trim().toLowerCase() === 'true';

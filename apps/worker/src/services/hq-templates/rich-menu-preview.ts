@@ -5,7 +5,7 @@ import type { HqTemplateAuthority } from './contract.js';
 
 type Reference = { kind: string; sourceId: string; name?: string };
 type Resource = { id: string; name: string; available: number };
-/** This is a read-only draft check. The persisted preflight remains mandatory before distribution. */
+/** 読み取りの下書き検査だけとし、配布前の保存済み事前確認を省略しない。 */
 export async function previewRichMenu(db: D1Database, authority: HqTemplateAuthority, input: Record<string, unknown>, bucket: Pick<R2Bucket, 'head'>) {
   if (!Array.isArray(input.accountIds) || input.accountIds.some(id => typeof id !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');
   const accounts = await requireTargetAccounts(db, authority, input.accountIds as string[]);
@@ -54,7 +54,7 @@ export async function previewRichMenu(db: D1Database, authority: HqTemplateAutho
   const references = [];
   for (const ref of new Map(refs.map(ref => [`${ref.kind}:${ref.sourceId}`,ref])).values()) {
     const source = ref.name ? {name:ref.name} : (await load(ref.kind,'')).find(row => row.id === ref.sourceId && row.available === 1);
-    // A shared form can still be a source; its target must belong only to the receiving account.
+    // 共有フォームを配布元にできても、配布先は受取アカウントだけの所有にする。
     const sourceName = source?.name ?? null;
     const matches = [];
     for (const account of accounts) {

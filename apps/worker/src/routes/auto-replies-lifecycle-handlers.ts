@@ -54,7 +54,7 @@ export const post__api_auto_replies_1 = async (c: Context<Env, "/api/auto-replie
         || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
-    // m26c R562: 全アカウント共通の作成は統括だけ。本文が null でも検査を飛ばさない。
+    // m26c : 全アカウント共通の作成は統括だけ。本文が null でも検査を飛ばさない。
     if (body.lineAccountId === null || body.lineAccountId === undefined) {
       const ownerCheck = await requireCommonRuleOwner(c.env.DB, c.get('staff'));
       if (!ownerCheck.ok) {
@@ -90,7 +90,7 @@ export const post__api_auto_replies_1 = async (c: Context<Env, "/api/auto-replie
     // クリアされた時に webhook resolve が空メッセージにフォールバックしてしまう。
     let resolvedResponseType = body.responseType ?? 'text';
     let resolvedResponseContent = body.responseContent ?? '';
-    // m26c R563: テンプレートの本文を取り込む前に所属の閲覧権限を見る。
+    // m26c : テンプレートの本文を取り込む前に所属の閲覧権限を見る。
     // 内容を送らず ID だけ送った場合も、ID を指定した場合は必ず検査する。
     if (body.templateId) {
       const { getTemplateById } = await import('@line-crm/db');
@@ -115,7 +115,7 @@ export const post__api_auto_replies_1 = async (c: Context<Env, "/api/auto-replie
     const folderError = await validateAutoReplyFolder(c.env.DB, extras.value.folderId);
     if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
     /*
-     * R201: 直接入力のカードは構造まで見る。テンプレートから写した中身
+     * 直接入力のカードは構造まで見る。テンプレートから写した中身
      * （content を送らず templateId だけ送った場合）は対象外にする。
      */
     if (body.responseContent) {
@@ -130,7 +130,7 @@ export const post__api_auto_replies_1 = async (c: Context<Env, "/api/auto-replie
     let blockedDraftSettings: AutoReplyDraftSettings | null = null;
     let activationBlocked = false;
     let activationBlockedReason: string | null = null;
-    // m26c R570: 確認キーがあれば再送を同じ行へ復帰させる。
+    // m26c : 確認キーがあれば再送を同じ行へ復帰させる。
     const ruleKey = readIdempotencyKey(c);
     const createInput = {
       ...extras.value,
@@ -258,7 +258,7 @@ export const put__api_auto_replies_id_2 = async (c: Context<Env, "/api/auto-repl
         return inputError(c, { success: false, error: `responseContent must be ${AUTO_REPLY_RESPONSE_MAX} characters or fewer` }, 400, ["responseContent"]);
       }
       /*
-       * R201: カード種別を名指しで送ってきた中身は構造まで見る。
+       * カード種別を名指しで送ってきた中身は構造まで見る。
        * 種別を送らず中身だけの更新は、既存の種別が読めないため
        * 下書き保存口の検査に任せる。
        */
@@ -331,7 +331,7 @@ export const put__api_auto_replies_id_2 = async (c: Context<Env, "/api/auto-repl
     if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
     Object.assign(input, extras.value);
 
-    // m26c R562/R569: 分岐のために既存行を読む。可視性は middleware が見ている。
+    // m26c /: 分岐のために既存行を読む。可視性は middleware が見ている。
     const existing = await getAutoReplyById(c.env.DB, id);
     if (!existing) {
       return fail(c, 404, 'AUTO_REPLY_NOT_FOUND');
@@ -340,14 +340,14 @@ export const put__api_auto_replies_id_2 = async (c: Context<Env, "/api/auto-repl
     const contentChanged = Object.keys(input).some((key) => key !== 'isActive');
     const wantsCommon = 'lineAccountId' in input
       && (input.lineAccountId === null || input.lineAccountId === undefined);
-    // m26c R562: 共通化・共通ルールの内容変更は統括だけ。
+    // m26c : 共通化・共通ルールの内容変更は統括だけ。
     if (wantsCommon || (existing.line_account_id === null && contentChanged)) {
       const ownerCheck = await requireCommonRuleOwner(c.env.DB, c.get('staff'));
       if (!ownerCheck.ok) {
         return c.json({ success: false, error: ownerCheck.error }, 403);
       }
     }
-    // m26c R563: テンプレート ID の指定は所属の閲覧権限を見る。
+    // m26c : テンプレート ID の指定は所属の閲覧権限を見る。
     if (body.templateId) {
       const { getTemplateById } = await import('@line-crm/db');
       const tpl = await getTemplateById(c.env.DB, body.templateId);
@@ -360,7 +360,7 @@ export const put__api_auto_replies_id_2 = async (c: Context<Env, "/api/auto-repl
       if (templateError) return c.json({ success: false, error: templateError }, 403);
     }
     /*
-     * m26c R569: 公開中ルールの内容変更は、稼働定義を直接書き換えない。
+     * m26c : 公開中ルールの内容変更は、稼働定義を直接書き換えない。
      * 下書き版へ保存し、検査・試し応答・競合確認を経た公開だけが版を
      * 切り替える。共通ルールの共通化は統括の直接操作のままにする。
      */

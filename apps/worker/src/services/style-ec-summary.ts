@@ -2,7 +2,7 @@ import { styleWindow } from './style-analytics.js';
 import { countMetric, missing, ratio } from './style-analytics-core.js';
 import type { EcStyleSummary } from '@line-crm/shared';
 
-/** Read the existing order projection; mock auto-LINE results are deliberately not an input. */
+/** 注文は既存の集計から読み、模擬の LINE 自動処理を根拠にしない。 */
 export async function ecStyleSummary(db: D1Database, account: string, query: Record<string, string | undefined>, now = new Date()): Promise<EcStyleSummary> {
   const window = await styleWindow(db, account, query, now.getTime());
   const connector = await db.prepare('SELECT status,updated_at FROM ec_connectors WHERE line_account_id=?')

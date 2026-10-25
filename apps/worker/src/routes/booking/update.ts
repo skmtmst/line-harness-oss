@@ -19,7 +19,7 @@ import { googleCredentials, reverifyLatestSlot, bookingConflictAlternatives } fr
 import { readNotificationPolicySnapshot, BookingNotificationPolicy, readNotificationPolicyPatch } from './notification-input.js';
 
 /**
- * 予約内容の変更 (N-389)。日時・担当・メニュー・料金・メモ・通知方針を変える。
+ * 予約内容の変更。日時・担当・メニュー・料金・メモ・通知方針を変える。
  *
  * - `lock_version` 必須。版が古い・状態が変わっていれば 409。
  * - 新しい枠の確保と旧枠の解放は同じ UPDATE のガードで一体化する。
@@ -170,7 +170,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
   }
   // 過去チェックは「日時を実際に動かす指定」があるときだけ適用する。
   // 開始時刻の過ぎた予約でも料金・メモ・担当修正は必要になるため、
-  // starts_at 未指定・同値指定の変更は塞がない (独立審査 必修1)。
+  // 開始時刻が未指定または同じ値の変更は、日程変更として拒まない。
   const startsAtMoved = body.starts_at !== undefined
     && newStartsAt.toISOString() !== row.starts_at;
   if (startsAtMoved && newStartsAt.getTime() < Date.now()) {
@@ -179,7 +179,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
   const timingChanged = newStartsAt.toISOString() !== row.starts_at
     || newStaffId !== row.staff_id
     || newMenuId !== row.menu_id;
-  // R326: 日時・担当・メニューを変えない保存では、保存ずみの終了時刻と
+  // 日時・担当・メニューを変えない保存では、保存ずみの終了時刻と
   // 占有時間をそのまま使う。メニュー改訂後の再計算で、頼んでいない
   // 時間変更が既存予約へ波及しないようにする。変えたときだけ新しい
   // 所要時間で枠を確保し、変更履歴にも残る (下の diff が拾う)。
@@ -368,7 +368,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
       ).bind(bookingId, accountId, newMenuId, accountId, bookingId, newMenuId, newVersion),
     );
   }
-  // ---- 監査履歴 (N-394): 変わった項目だけ before/after で残す ----
+  // ---- 監査履歴 : 変わった項目だけ before/after で残す ----
   const before: Record<string, unknown> = {};
   const after: Record<string, unknown> = {};
   const diff = (key: string, oldValue: unknown, newValue: unknown) => {
@@ -388,7 +388,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
     after.notification_policy = newPolicy;
   }
 
-  // R325: 予約更新・資源snapshot・監査・通知予定の作り直しは1つの batch で
+  // 予約更新・資源snapshot・監査・通知予定の作り直しは1つの batch で
   // 原子的に行う。予定の INSERT だけ失敗して「予約は新日時・予定は無し」
   // の半端な状態を残さない。失敗時は全て巻き戻り、同じ版での再送で直る。
   const friendId = row.friend_id;
@@ -461,7 +461,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
 
   // ---- トリガ連動 ----
   // 変更は「新しい起点へ移す」ので cancel ではなく reschedule を使う。
-  // R336: 応答を返す前に終わらせ、失敗は握りつぶさず応答と監査へ残す。
+  // 応答を返す前に終わらせ、失敗は握りつぶさず応答と監査へ残す。
   // 予約変更自体は成立ずみのため 200 のまま (落とさない)。
   // 処理の後は現在の予約日時から再照合し、途中失敗の置き忘れを回収する
   // (日時差分の無い再保存でも回復する。ずれが無ければ 0 件の冪等)。
@@ -492,7 +492,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
           sourceId: bookingId,
           sourceEventId: bookingId,
           friendId,
-          // R335: 移行前の行を探す起点は変更前の開始時刻。
+          // 移行前の行を探す起点は変更前の開始時刻。
           // 新日時で探すと旧登録に一致しない。
           startsAtIso: row.starts_at,
           lineAccountId: accountId,
@@ -531,7 +531,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
     });
   }
 
-  // ---- Google カレンダー同期 (N-392) ----
+  // ---- Google カレンダー同期  ----
   // 新版 (lock_version) をキーに台帳へ載せ、現在の予約状態を反映する。
   // confirmed は delete+create、requested は touched せず skipped。
   // 失敗は retry_wait で残し、/sync/retry または次の変更で回収する。
@@ -580,7 +580,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
       : googleSync === 'skipped' ? 'not_configured' : 'not_applicable',
     change_notification: wantsChangeNotice ? 'queued' : 'not_applicable',
     change_notification_reason: !wantsChangeNotice && changeNoticeRequested ? 'sending_stopped' : null,
-    // R336: 通知同期の結果。failed のときは監査 (v6_sync_failed) にも残し、
+    // 通知同期の結果。failed のときは監査 (v6_sync_failed) にも残し、
     // 日時差分の無い再保存でも reconcile で回復する。
     v6_sync: v6Sync,
     reminders: (reminderRows.results ?? []).map((reminder) => ({

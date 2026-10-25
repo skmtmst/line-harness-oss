@@ -26,33 +26,17 @@ export interface DuplicatesStats {
   msg_unit_yen: number;
   per_account: PerAccountStat[];
   pairwise_overlap: PairwiseOverlap[];
-  /** ISO timestamp when this snapshot was computed against D1. */
+  /** D1 からこの写しを計算した ISO 形式の日時。 */
   computed_at: string;
   /** 統合ユーザーの送信実績から数えた余分な通数。取得不能は null。 */
   overlapping_delivery_count: number | null;
 }
 
-/**
- * Module-level cache. The dashboard's three queries scan friends + JOIN
- * line_accounts, so back-to-back loads add up. Cache the latest snapshot
- * inside the Worker isolate for {@link CACHE_TTL_MS} so refreshes within
- * the TTL window return instantly.
- *
- * NOTE: keyed at module scope (not by db reference). Cloudflare Workers
- * gives each request a freshly constructed `env` object, so a WeakMap
- * keyed by `env.DB` never hit in production — every request looked
- * cold. The Worker isolate hosts a single D1 binding, so a singleton
- * is correct here. Test ordering can be re-isolated with the exported
- * `_resetCacheForTest` helper.
- *
- * Safety lessons from duplicate-detect.ts: never cache an empty/zero
- * result (would mask a misconfigured environment for the isolate's
- * entire lifetime), and always honor the TTL — no permanent caching.
- */
+/** 連続表示の走査を避けるため、同じ isolate 内で TTL の間だけ集計をキャッシュする。要求ごとに生成される env.DB の参照をキーにしない。設定不備を隠さないよう空・0の結果は保存せず、恒久キャッシュにもせず、試験ごとに解除できるようにする。 */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let cached: { stats: DuplicatesStats; at: number; scopeKey: string } | null = null;
 
-/** Test-only: clear the in-isolate cache so unit tests don't leak across each other. */
+/** 試験同士へ状態を漏らさないよう、isolate 内キャッシュを解除する。 */
 export function _resetCacheForTest(): void {
   cached = null;
 }
@@ -102,13 +86,7 @@ const PER_ACCOUNT_SQL = `
            la.name ASC
 `;
 
-// For pairwise overlap, the obvious "self-join ident on ident_key" pattern
-// trips D1's CPU limit because the CTE has no index — even with a dup-keys
-// pre-filter the brute-force join scanned tens of millions of rows.
-// Instead, fetch the (line_account_id, ident_key) pairs for keys that
-// belong to a duplicate group and compute the directional matrix in JS.
-// O(rows + groups·max_accounts²) is cheap for our dataset (~3k rows, ~1.7k
-// groups, max 4 accounts).
+// 索引のない CTE の自己 JOIN は D1 の CPU 上限を超えやすいため、重複グループの所属だけを取得し、方向別の組合せを JS で計算する。
 const PAIRWISE_RAW_SQL = `
   WITH ident AS (
     SELECT friends.id, friends.line_account_id, (${IDENTITY_KEY_SQL}) AS ident_key
@@ -128,7 +106,7 @@ const PAIRWISE_RAW_SQL = `
 `;
 
 /**
- * 可視アカウントへの絞り (#496-14)。
+ * 可視アカウントへの絞り (-14)。
  *
  * 絞り無し(undefined)は従来どおり全アカウント。空配列は「見られる
  * アカウントが無い」= 0件の集計になる（`IN ` は不正SQLなので
@@ -225,9 +203,7 @@ export async function computeDuplicatesStats(
     dup_rate: row.friends > 0 ? row.dups / row.friends : 0,
   }));
 
-  // Fetch raw (ident_key, line_account_id) pairs for dup groups; compute the
-  // pairwise overlap matrix in JS (D1's CPU limit can't handle a self-join
-  // on the un-indexed CTE for our dataset size).
+  // D1 の CPU 負荷を抑えるため、索引のない自己 JOIN でなく、重複グループの本人とアカウントの組を取得して JS で行列化する。
   const pairwiseRawResult = await db
     .prepare(pairwiseQuery.sql)
     .bind(...pairwiseQuery.binds)
@@ -279,13 +255,7 @@ export async function computeDuplicatesStats(
     overlapping_delivery_count: await countOverlappingDeliveries(db, accountIds),
   };
 
-  // Don't cache an empty/zero snapshot — it would mask a real outage
-  // (e.g. friends or line_accounts unexpectedly empty) for the rest of
-  // this isolate's lifetime.
-  // If a zero result comes back AND an older non-zero snapshot is still
-  // cached, drop it: the operator just intentionally bypassed the cache,
-  // so reverting to the stale non-zero value on the next normal request
-  // would be lying to them.
+  // 障害や空データを長く隠さないよう、空・0はキャッシュしない。明示再取得が0なら古い非0も破棄し、次の通常要求で古い値へ戻さない。
   if (total_following > 0) {
     cached = { stats, at: Date.now(), scopeKey };
   } else {

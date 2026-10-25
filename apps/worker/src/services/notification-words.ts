@@ -1,7 +1,7 @@
 import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
 
 
-/** Customer-facing words follow terms.md; no new style or feature is enabled. */
+/** 顧客向けの言葉は terms.md に従い、新しいスタイルや機能の有効化は行わない。 */
 export function notificationWords(style: AccountStyle = 'standard') {
   return {
     contact: style === 'consult' ? '担当' : style === 'lesson' ? '教室' : 'お店',

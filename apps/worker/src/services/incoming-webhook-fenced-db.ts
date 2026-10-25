@@ -1,4 +1,4 @@
-/** Conservatively classify exactly one supported SQLite statement, never a SQL prefix. */
+/** SQL の接頭辞だけで判断せず、対応する SQLite の1文全体を安全側で分類する。 */
 export function classifySingleStatement(
   sql: string,
   options: { withAsMutation?: boolean } = {},
@@ -13,8 +13,7 @@ export function classifySingleStatement(
     if (/\s/.test(char)) { i++; continue; }
     if (sql.startsWith('--', i)) {
       i += 2;
-      // SQLite ends -- comments at LF or EOF, not CR. Interpreting CR as a
-      // boundary would parse ignored quotes/semicolons as executable SQL.
+      // SQLite の -- コメント終端は LF または EOF であり CR ではない。CR を区切りと扱うと、無視される引用符やセミコロンを実行 SQL と誤解する。
       while (i < sql.length && sql[i] !== '\n') i++;
       continue;
     }
@@ -24,8 +23,7 @@ export function classifySingleStatement(
       i = end + 2;
       continue;
     }
-    // D1's all can execute a SELECT followed by a mutation. No token (including
-    // another semicolon) may follow the one optional terminal semicolon.
+    // D1 の all も SELECT 後の更新を実行できるため、末尾の任意のセミコロン以降はほかのトークンを許さない。
     if (terminated) unsupported();
     if (!keyword) {
       const word = /^[A-Za-z_][A-Za-z_0-9$]*/.exec(sql.slice(i))?.[0];
@@ -53,14 +51,11 @@ export function classifySingleStatement(
     i++;
   }
   if (!keyword) unsupported();
-  // WITH/PRAGMA/EXPLAIN and other unclassified SQL are deliberately unsupported,
-  // even when a particular instance could be read-only.
-  // D1 treats a comment after a terminal semicolon as an empty second statement.
-  // Only strip that terminator/tail after the entire input has passed validation.
+  // WITH/PRAGMA/EXPLAIN など未分類の SQL は読取可能でも拒む。末尾コメントを空の2文目とする D1 のため、入力全体を検証した後だけ終端を除く。
   return { readOnly: keyword === 'SELECT', sql: sql.slice(0, statementEnd) };
 }
 
-/** All receipt-owned writes share an atomic D1 transaction with their lease fence. */
+/** 受領票のすべての書込を、実行権の照合と同じ原子的 D1 トランザクションへ含める。 */
 export function incomingWebhookFencedDb(
   db: D1Database,
   fence: { sourceEventId: string; owner: string; generation: number },
@@ -73,8 +68,7 @@ export function incomingWebhookFencedDb(
     ) THEN 'true' ELSE 'incoming_receipt_lease_lost' END) AS incoming_webhook_fence`)
     .bind(fence.sourceEventId, fence.owner, fence.generation);
   const atomic = async (items: D1PreparedStatement[]) => {
-    // D1.batch is a SQL transaction. Invalid JSON deliberately raises a D1-compatible
-    // SQL error on a lost lease; the entire batch is rolled back, including its writes.
+    // 実行権を失った場合は不正 JSON で SQL を失敗させ、D1 batch のすべての書込を巻き戻す。
     const results = await db.batch([assertLease(), ...items]);
     return results.slice(1);
   };
@@ -84,8 +78,7 @@ export function incomingWebhookFencedDb(
         if (typeof property === 'symbol') return undefined;
         if (property === 'bind') return (...values: unknown[]) => wrap(target.bind(...values), readOnly);
         if (property === 'run') return async () => (await atomic([target]))[0];
-        // The executors use first/all for SELECT only. Mutation RETURNING, PRAGMA,
-        // raw, exec and sessions are not supported: fail closed rather than bypass.
+        // first/all は SELECT だけに限り、更新 RETURNING・PRAGMA・raw・exec・sessions は検査を迂回させず拒む。
         if ((property === 'first' || property === 'all') && readOnly) {
           return target[property].bind(target);
         }

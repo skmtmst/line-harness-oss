@@ -2,11 +2,7 @@ import type { TenantBilling } from '@line-crm/db';
 import type { FeatureEntitlementKey } from '@line-crm/shared';
 
 /**
- * 料金プランと、いま何ができるか（権利）の判定。★36-2。
- *
- * 金額は Stripe の価格が正本。ここに書いた金額は画面に出す「仮の表示」で、
- * Stripe から取れたときはそちらを出す（`docs/hq-banner-generation.md`、
- * 決定 2026-09-13）。課金の状態の意味は migration 291 のコメントにある。
+ * 金額は Stripe の価格を正本とし、取得できる場合は画面の仮表示より優先する。課金状態の意味は migration 291 を参照する。
  */
 
 export type PlanKey = 'light' | 'standard' | 'pro';

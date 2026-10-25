@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
 /**
- * `GET /api/folders` の件数（#631）を、本物の `@line-crm/db`（`getFolderItemCounts`
+ * `GET /api/folders` の件数を、本物の `@line-crm/db`（`getFolderItemCounts`
  * を含む）と実スキーマ（bootstrap.sql）を使って結合で確かめる。
  *
  * `friend-attributes.test.ts` は `@line-crm/db` を丸ごとモックしており、
@@ -132,7 +132,7 @@ describe('GET /api/folders の件数(#631) — 実DB結合', () => {
     expect(body.unfiledCount).toBe(0);
   });
 
-  // #730: media / common_var / rich_menu は、選択中の1件に閉じた母集団で数える。
+  // media / common_var / rich_menu は、選択中の1件に閉じた母集団で数える。
   // account_id 指定時は未割当NULLを含めない（一覧に出ないため）。
   describe('単一アカウント種別の件数(#730) — 実DB結合', () => {
     beforeEach(() => {

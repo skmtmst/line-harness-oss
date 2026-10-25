@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { maskInteractionPayload } from './mask-payload.js';
 
 /*
- * F-18: やり取りの本文を伏せて返す。伏せ方は `mask-payload.ts` の頭に書いた。
+ * やり取りの本文を伏せて返す。伏せ方は `mask-payload.ts` の頭に書いた。
  * ここでは「伏せるものは伏せ、伏せないものは残す」と「元を変えない」を見る。
  */
 describe('maskInteractionPayload', () => {

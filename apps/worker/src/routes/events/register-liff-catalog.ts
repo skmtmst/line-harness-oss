@@ -9,7 +9,7 @@ import { resolveAccountIdFromLiff, parseEventQuestions } from './input.js';
 
 export function registerLiffCatalog(events: Hono<Env>): void {
 // ============================================================
-// LIFF: read-only event/slots
+// 公開のイベントと枠は読み取り専用にする。
 // ============================================================
 
 events.get('/api/liff/events/:id', async (c) => {
@@ -85,7 +85,7 @@ events.get('/api/liff/events/:id', async (c) => {
 
   // questions_json は生JSON文字列のまま返すと利用側で二重parseになるので、
   // 画面がそのまま使える配列として添える（定義が無ければ空配列）。
-  // U: オンラインの URL は確定した人にだけ見せる。確定前・未申込には
+  // オンラインの URL は確定した人にだけ見せる。確定前・未申込には
   // 渡さない（会場名の表示はそのまま残す）。
   const venueVisible = myExistingBooking?.status === 'confirmed';
   return liffBookingJson(c, {

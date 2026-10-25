@@ -84,13 +84,13 @@ export interface UsersGroupedResult {
 }
 
 export interface UsersGroupedOptions {
-  /** Server-computed authorization, applied before identity merging or caching. */
+  /** 本人統合やキャッシュより前に、サーバーで権限を確定する。 */
   allowedAccountIds?: readonly string[];
   q?: string;
   onlyDups?: boolean;
   account?: string;
   /**
-   * FRIEND-09: UID連携の絞り込みはサーバー側の全件にかける。
+   * UID連携の絞り込みはサーバー側の全件にかける。
    * 画面側で表示中ページだけを絞ると「1人中 51〜1人」のような
    * 範囲表示になり、2ページ目以降の対象へ辿れない。
    */

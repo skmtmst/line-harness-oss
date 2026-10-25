@@ -1,7 +1,7 @@
 export const RETENTION_POLICY_KEY = 'security.personalDataRetention.v1';
 export const RETENTION_PROPOSAL = { enabled: false, hold: false, responseDays: 365, blockedFriendDays: 365 } as const;
 export type RetentionPolicy = { enabled: boolean; hold: boolean; responseDays: number; blockedFriendDays: number };
-/** Reject invalid settings: a typo must never turn into immediate deletion. */
+/** 設定の打ち間違いで即時削除にならないよう、不正な方針は拒む。 */
 export function parseRetentionPolicy(raw: string | null): RetentionPolicy {
   if (!raw) return { ...RETENTION_PROPOSAL };
   const parsed: unknown = JSON.parse(raw);

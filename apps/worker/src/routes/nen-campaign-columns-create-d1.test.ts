@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';
 
 /*
- * NEN-05 / NEN-06 の実SQL検証。
+ * / の実SQL検証。
  *
  * nen-campaign-columns-create.test.ts のモックは「組み立てたSQLの形」しか見ず、
  * 列数と値・bind がずれていても通ってしまった（実際に本番で保存が全部失敗した）。

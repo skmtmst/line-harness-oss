@@ -81,7 +81,7 @@ export async function pinAndValidateReferences(
         throw new CommonActionValidationError('common_action_cycle', '共通アクションは自分自身を呼び出せません', `${field}.commonActionId`);
       }
       /*
-       * 監査 R479: 公開時は保存時に確認した版を保持し、最新へ自動で置き換えない。
+       * 監査 : 公開時は保存時に確認した版を保持し、最新へ自動で置き換えない。
        * 保存時は最新へ固定する（編集画面の表示と保存値を一致させる）。
        */
       const pinnedId = typeof params.commonActionVersionId === 'string' && params.commonActionVersionId.trim()
@@ -132,7 +132,7 @@ export async function pinAndValidateReferences(
 }
 
 /*
- * 監査 R478: 公開前に参照先の固定版まで展開し、実行計画と同じ制限を検査する。
+ * 監査 : 公開前に参照先の固定版まで展開し、実行計画と同じ制限を検査する。
  * 公開だけ通って開始時に失敗する内容を、理由と対象経路を示して止める。
  * 制限値は automation-engine の buildExecutionPlan と同じ定数を使う。
  * - 共通アクションの呼び出し: 20段まで（利用先から1段使う前提で深さ1から数える）
@@ -241,7 +241,7 @@ export async function assertPublishableExpansion(
   actions: ActionDefinition[],
 ): Promise<void> {
   /*
-   * 監査 R478: 実行時は利用側の呼び出し1件が先に1件数えられる。
+   * 監査 : 実行時は利用側の呼び出し1件が先に1件数えられる。
    * 公開検査でも同じ1件を先に数え、1000件ちょうどの公開が
    * 実行時に1001件で失敗しないようにする（深さの1段予約と同じ考え）。
    */
@@ -256,7 +256,7 @@ export async function assertPublishableExpansion(
 }
 
 /*
- * 監査 R125: 実行回数・失敗数・最終実行を行ごとの相関副問合せ3本で取ると、
+ * 監査 : 実行回数・失敗数・最終実行を行ごとの相関副問合せ3本で取ると、
  * 実行履歴の増加に応じて一覧と集計の両方が遅くなっていた。アカウント内の
  * 実行台帳を1回だけ走査してアクション単位に集計し、一覧側は結合で受ける。
  * 一覧と集計で同じ式を共有し、内訳がずれないようにする。
@@ -301,7 +301,7 @@ export async function listCommonActions(
     if (input.status === 'old_version') {
       where.push(`EXISTS (SELECT 1 FROM common_action_bindings ob WHERE ob.common_action_id = ca.id AND ob.common_action_version_id <> ca.current_published_version_id)`);
     } else if (input.status === 'unused') {
-      // 監査 R480: 保管済みは「保管」タブで見る。「呼ばれていない」には出さない。
+      // 監査 : 保管済みは「保管」タブで見る。「呼ばれていない」には出さない。
       where.push(`ca.status <> 'archived'`);
       where.push(`NOT EXISTS (SELECT 1 FROM common_action_bindings ub WHERE ub.common_action_id = ca.id)`);
     } else {
@@ -309,14 +309,14 @@ export async function listCommonActions(
       binds.push(input.status);
     }
   } else {
-    // 監査 R480: 通常一覧（すべて）から保管済みを外す。保管タブで見る。
+    // 監査 : 通常一覧（すべて）から保管済みを外す。保管タブで見る。
     where.push(`ca.status <> 'archived'`);
   }
   if (input.folderId === '__unfiled__') where.push('ca.folder_id IS NULL');
   else if (input.folderId) { where.push('ca.folder_id = ?'); binds.push(input.folderId); }
   if (input.query?.trim()) {
     /*
-     * 監査 R124: 画面は「アクション名・中の処理で探す」と案内しているので、
+     * 監査 : 画面は「アクション名・中の処理で探す」と案内しているので、
      * 名前と説明だけでなく各版の処理内容（action_config）も検索対象にする。
      * 版は増えても数件程度なので EXISTS で済ませ、一覧の件数と同じ条件を使う。
      */
@@ -381,7 +381,7 @@ export async function listCommonActions(
 }
 
 /**
- * 一覧の札・KPIに使う集計だけを返す（#554 点検#519中2）。
+ * 一覧の札・KPIに使う集計だけを返す（ 点検中2）。
  *
  * 画面は件数表示のために全件取得をもう1回投げていたが、行単価の高い
  * 月次集計サブクエリ4本が行ごとに走るため、表示1回で2倍走っていた。
@@ -406,7 +406,7 @@ export async function getCommonActionsSummary(
   executions: number;
   failures: number;
 }> {
-  // 監査 R480: 集計は通常一覧と同じ範囲（保管済みを除く）。保管は件数だけ別に数える。
+  // 監査 : 集計は通常一覧と同じ範囲（保管済みを除く）。保管は件数だけ別に数える。
   const archivedRow = await db.prepare(
     `SELECT COUNT(*) AS archived FROM common_actions
       WHERE line_account_id = ? AND status = 'archived'`,
@@ -576,7 +576,7 @@ export async function listCommonActionResources(
     tags: tags.results ?? [],
     scenarios: scenarios.results ?? [],
     templates: templates.results ?? [],
-    // #318 が項目定義へアカウント範囲を追加するまで、別統括の項目を混ぜない。
+    //  が項目定義へアカウント範囲を追加するまで、別統括の項目を混ぜない。
     friendFields: [],
     supportMarks: supportMarks.results ?? [],
     reminders: reminders.results ?? [],

@@ -230,7 +230,7 @@ export async function registerMeetConsultation(
   };
   const staleResult = { id: consultationId, reminders: schedules, updated: false };
 
-  // N-065: 個別相談の日程変更・再送を へ連動する。
+  // 個別相談の日程変更・再送を へ連動する。
   // 予約ルール (booking) を個別相談にも使い、sourceKind='meet' で追跡する。
   // 旧起点ではなく現在の開始時刻へ直す。途中失敗後の再送でも回復でき、
   // 友だち変更で旧友だちへ残った行もここで止める (新 friend だけ active)。
@@ -597,7 +597,7 @@ export async function cancelMeetConsultation(
   ) {
     return false;
   }
-  // N-065: の未送信予定だけを止める。送信済み履歴は残す。
+  // の未送信予定だけを止める。送信済み履歴は残す。
   // 再送は active が無いため 0 件で返す。移行前の行は探さない。
   // 共有取消にも版＋操作ガードを付け、前確認→呼出しの間に勝者が動いても
   // 共有側の各文が 0 件になり、新版の通知予定を変えない。
@@ -744,7 +744,7 @@ export async function processDueMeetConsultationReminders(
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'meet consultation reminders' })) {
       continue;
     }
-    // 緊急停止 (#1050): reminder_dispatch が止まっている統括は行に触れず
+    // 緊急停止 : reminder_dispatch が止まっている統括は行に触れず
     // pending のまま残す。復旧すれば次の cron が拾う。
     if (await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')) {
       continue;

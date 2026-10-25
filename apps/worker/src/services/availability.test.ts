@@ -184,7 +184,7 @@ interface StubData {
 }
 
 function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>): D1Database {
-  // Exercise the real persisted circuit SQL while retaining the focused availability fixture.
+  // 空き判定の fixture を保ち、停止状態の永続 SQL は実際に実行する。
   const circuit = data.calendarConnection ? createTestD1() : undefined;
   if (circuit) circuitFixtures.add(circuit);
   return {
@@ -380,7 +380,7 @@ describe('getAvailability', () => {
       menu: { duration_minutes: 60, buffer_after_minutes: 0, override_duration: null, override_price: null },
       staff: [{ id: 'S1', display_name: '山田', is_designation_optional: 0 }],
       shifts: [],
-      // 2030-01-05 is Saturday. This verifies the rule does not expire.
+      // 2030-01-05 は土曜。年をまたいでもルールが失効しないことを確かめる。
       rules: [{ staff_id: 'S1', weekday: 6, start_time: '10:00', end_time: '12:00' }],
       bookings: [],
     });
@@ -1516,7 +1516,7 @@ describe('getAvailability の店舗共通ルール（監査 R92）', () => {
     override_duration: null,
     override_price: null,
   };
-  // 監査の再現: 店舗ルールは24時間前・60日先まで。2026-09-27 の 18:30 JST
+  // 店舗ルールの24時間前・60日先の境界を、2026-09-27 の18:30 JSTを基準に試す。
   // （09:30Z）に翌 9/28 09:00 を見ると、店舗締切では取れない。
   function r92db(over: Partial<StubData> = {}) {
     return stubDB({

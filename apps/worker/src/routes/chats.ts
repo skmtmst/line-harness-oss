@@ -31,14 +31,14 @@ chats.delete('/api/operators/:id', requireRole('owner', 'admin'), delete__api_op
 /**
  * 受信箱の上部に出す数（設計 `V2 2-1 受信箱` の KPIs）。
  *
- * :id より先に置く。あとに置くと 'stats' が id として解釈される。
+ * id より先に置く。あとに置くと 'stats' が id として解釈される。
  */
 chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), get__api_chats_stats_5);
 
 /**
  * 受信箱のクイック絞り込み（すべて／要返信／1時間以上待ち）の件数。
  *
- * INBOX-09: 「すべて」は読み込み済みの行数、「要返信」は別の集計口を
+ * 「すべて」は読み込み済みの行数、「要返信」は別の集計口を
  * 見ていたため、表示された件数と押したときの結果が一致しなかった。
  * ここでは一覧（GET /api/chats・GET /api/support/inbox?channel=email）と
  * 同じ条件（アカウント・検索語・担当・未読・経路）を1回の応答へまとめ、
@@ -48,7 +48,7 @@ chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), get__api_c
  * 条件」をこちらで足して数える。返すのは選択中の経路（channel）で
  * 画面に見える側だけの合計。
  *
- * :id より先に置く。あとに置くと 'quick-counts' が id として解釈される。
+ * id より先に置く。あとに置くと 'quick-counts' が id として解釈される。
  */
 chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), get__api_chats_quick_counts_6);
 
@@ -91,7 +91,7 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), req
 chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary({"messageType":["string"],"content":["string"],"revision":["number"],"quotedMessageId":["string"]}), post__api_chats_id_send_1);
 
 /**
- * POST /api/chats/:id/render-preview — 送信内容の差し込み解決プレビュー(N-026)。
+ * POST /api/chats/:id/render-preview — 送信内容の差し込み解決プレビュー。
  *
  * 送信口(`/send`)と同じ解決器を通した本文を返す。読み取りだけで
  * LINE呼出し・履歴書込みはしない。`unresolved` に残る差し込みは
@@ -100,7 +100,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
 chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), post__api_chats_id_render_preview_2);
 
 /**
- * POST /api/chats/:id/send-combined — 画像と本文を1回の送信単位にする(N-022)。
+ * POST /api/chats/:id/send-combined — 画像と本文を1回の送信単位にする。
  *
  * 単体送信口を2回呼ぶと、画像だけ届いて本文が落ちる部分送信になる。
  * 結合口は画像URL・本文長・権限・所属を外部送信前にすべて検証し、
@@ -113,7 +113,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
  * POST /api/chats/:id/schedule — 返信の予約作成。
  * Idempotency-Keyは必須で、同じキーの再送は新しい予約を作らず既存を返す。
  * 別キーでも「対象・内容・送信予定時刻」が一致する処理中の予約があれば
- * 新しい行を作らず既存行を返す(#977)。replayed=true でどちらの再利用かは
+ * 新しい行を作らず既存行を返す。replayed=true でどちらの再利用かは
  * 区別せず、画面は返された予約1件だけを表示すればよい。
  */
 chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), requireVisibleChat, inputJsonBoundary(), post__api_chats_id_schedule_2);

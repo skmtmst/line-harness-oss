@@ -19,7 +19,7 @@ export const post__api_rich_menu_groups_groupId_pages_pageId_image_1 = async (c:
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
     return fail(c, 404, 'GROUP_NOT_FOUND');
   }
-  // #827 (N-158): ページ画像も公開中の定義の一部。LINE上の表示とずれるだけなので、
+  //  ページ画像も公開中の定義の一部。LINE上の表示とずれるだけなので、
   // 本文を読む前・R2へ書く前に断る。
   if (group.status === 'published') {
     return c.json(
@@ -64,7 +64,7 @@ export const post__api_rich_menu_groups_groupId_pages_pageId_image_1 = async (c:
   try {
     await setRichMenuPageImage(c.env.DB, pageId, key, contentType);
   } catch (error) {
-    // M954: DB への記録に失敗したら、上げた画像を片付ける。
+    // DB への記録に失敗したら、上げた画像を片付ける。
     // 置きっぱなしにすると再試行のたびに孤児が溜まる。
     try {
       await c.env.IMAGES.delete(key);
@@ -389,7 +389,7 @@ export const post__api_rich_menu_groups_groupId_reconcile_10 = async (c: Context
     if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
     const line = createLineClient(account.channel_access_token);
 
-    // K-2: ずれの列挙は lib へ。dryRun（見るだけ）と修復で同じ目線にする。
+    // ずれの列挙は lib へ。dryRun（見るだけ）と修復で同じ目線にする。
     // LINE が読めないときは 502（下書きは悪くない）。
     let computed;
     try {
@@ -413,7 +413,7 @@ export const post__api_rich_menu_groups_groupId_reconcile_10 = async (c: Context
       jstNow(),
     );
 
-    // K: 直したことも台帳に残す。ずれを直すと記録が残る。
+    // ずれを修復した操作も、後から追えるよう台帳へ残す。
     const staff = c.get('staff');
     const reconcileRun = await ensureRichMenuPublishRun(c.env.DB, {
       id: crypto.randomUUID(),
@@ -481,7 +481,7 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   }
   const unpublishFence = { owner: unpublishOwner, generation: unpublishGeneration };
 
-  // K: 取り下げも台帳に残す。
+  // 取り下げも台帳に残す。
   const unpublishRun = await ensureRichMenuPublishRun(c.env.DB, {
     id: crypto.randomUUID(),
     groupId,

@@ -7,7 +7,7 @@ import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../service
 import { type AutoReplyCandidateReasonCode } from '../features/auto-replies/auto-reply/index.js';
 import { fail } from '../lib/fail.js';
 export /*
- * R200: 「連投を防ぐ」の範囲外は、対象欄の名前と許容範囲が分かる日本語で断る。
+ * 「連投を防ぐ」の範囲外は、対象欄の名前と許容範囲が分かる日本語で断る。
  * 英語の内部項目名（cooldownMinutes ...）をそのまま出さない。
  * 下書き・直接作成・更新の3つの口で同じ文言を使う。
  */
@@ -26,9 +26,9 @@ export async function validateAutoReplyFolder(
 }
 
 export /*
- * m26c R562: 全アカウント共通（lineAccountId が null）の作成・共通化は
+ * m26c : 全アカウント共通（lineAccountId が null）の作成・共通化は
  * owner だけ。要件 -08 §7「全アカウント共通ルールはownerだけが作成・変更」。
- * m26c R563: テンプレートは所属アカウントが見える人だけが使える。
+ * m26c : テンプレートは所属アカウントが見える人だけが使える。
  * 所属なし（共通）のテンプレートは共有物として扱う。
  */
 async function requireCommonRuleOwner(
@@ -131,36 +131,36 @@ export interface SerializedAutoReply {
   priority: number;
   messageKinds: string[] | null;
   receiveSources: Array<'line' | 'email'>;
-  /** 151: 応答したときに順に実行すること。 */
+  /** 応答したときに順に実行すること。 */
   actions: unknown[] | null;
-  /** 151: 応答する曜日（0=日 … 6=土）。null なら曜日を問わない。 */
+  /** 応答する曜日（0=日 … 6=土）。null なら曜日を問わない。 */
   responseWeekdays: number[] | null;
-  /** 151: 'ignore' | 'include' | 'exclude'。 */
+  /** 'ignore' | 'include' | 'exclude'。 */
   responseHolidayRule: string | null;
-  /** 151: 1人につき1回だけ応答する。 */
+  /** 1人につき1回だけ応答する。 */
   oncePerFriend: boolean;
-  /** 151: キーワードの複数行。null なら keyword / matchType を見る。 */
+  /** キーワードの複数行。null なら keyword / matchType を見る。 */
   keywords: unknown[] | null;
   /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。 */
   friendConditions: unknown | null;
-  /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
+  /** キーワードを問わず、届いたメッセージすべてに応答する。 */
   respondToAll: boolean;
-  /** 158: 管理用の名前。空なら keyword を代わりに出す。 */
+  /** 管理用の名前。空なら keyword を代わりに出す。 */
   name: string | null;
-  /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+  /** 'any'（どれか1つ）か 'all'（すべて）。 */
   keywordMatchMode: string;
   /** フォルダ。分けていなければ null。 */
   folderId: string | null;
   /** 運用者だけが読むメモ。版スナップショットに保存し、友だちへは出さない。 */
   internalMemo: string | null;
-  /** 273: 'draft'（未公開）| 'published' | 'stopped'。一覧が再開の可否を分けるのに使う。 */
+  /** 'draft'（未公開）| 'published' | 'stopped'。一覧が再開の可否を分けるのに使う。 */
   lifecycleStatus: string;
-  /** 機能08 点検 E-01: 最後に停止した日時・担当者・理由。止めたことが無ければ null。 */
+  /** 機能08 点検 最後に停止した日時・担当者・理由。止めたことが無ければ null。 */
   stoppedAt: string | null;
   stoppedByStaffId: string | null;
   stoppedByStaffName: string | null;
   stopReason: string | null;
-  /** 152: 当たった回数。一覧でだけ入る。 */
+  /** 当たった回数。一覧でだけ入る。 */
   hits?: { period: number; total: number };
   /** 実行台帳で成功を確認できた後続処理の累計。 */
   actionExecutionCount?: number | null;
@@ -528,6 +528,6 @@ export function draftVersionResponse(version: AutoReplyVersionRow): AutoReplyDra
 }
 
 export type DraftReadResult =
-  // m26c R563: テンプレートの所属も返す。呼び出し側が閲覧権限を検査する。
+  // m26c : テンプレートの所属も返す。呼び出し側が閲覧権限を検査する。
   | { ok: true; value: AutoReplyDraftSettings; templateLineAccountId: string | null }
   | { ok: false; error: string; field?: string };

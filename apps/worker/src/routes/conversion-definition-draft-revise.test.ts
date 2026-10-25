@@ -1,14 +1,6 @@
 /*
- * CONVERSION-07: 下書きの成果地点の編集が常に409で失敗していた回帰（口の結合試験）。
- *
- * 直す前は、事前検査（allowDraft）が下書きの編集を許すのに、UPDATE の
- * CAS が `status = 'active'` だけを通していた。下書きを編集すると必ず
- * 0件更新→ version_conflict(409) になり、画面上では「別の人が更新した」
- * にしか見えない失敗が毎回起きていた。
- *
- * ここでは実SQLite（bootstrap.sql を流した better-sqlite3）に実物の
- * conversions ルートと実物の認証を当て、下書きの正常編集が成功し、
- * 真の競合・停止済み・重複名だけが 409 で弾かれることを固定する。
+ * 下書きの正常編集と実際の競合を区別できることを、実 SQLite・実 route・実認証で検証する。
+ * 事前検査と UPDATE の状態条件を一致させ、真の競合・停止済み・重複名だけを409にする。
  */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';

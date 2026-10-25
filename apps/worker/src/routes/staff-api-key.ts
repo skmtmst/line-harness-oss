@@ -60,7 +60,7 @@ staffApiKey.on(['POST', 'DELETE'], '/api/auth/api-key', async c => {
       .bind(metadataKey(revoke ? 'revoked_at' : 'issued_at', staff.id), now, staff.id, now, ...guardParams),
   ];
   if (!revoke) statements.push(c.env.DB.prepare(`DELETE FROM platform_settings WHERE key=? AND ${guard}`).bind(metadataKey('revoked_at', staff.id), ...guardParams));
-  // No auth-method column exists: revoke all of this person's sessions, including sessions previously issued with the old key.
+  // 認証方式の列がないため、古いキーで作ったものを含め、この利用者のセッションをすべて失効させる。
   statements.push(
     c.env.DB.prepare(`DELETE FROM platform_settings WHERE key IN(SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=?) AND ${guard}`).bind(staff.id, ...guardParams),
     ...['admin_sessions', 'auth_step_up_grants', 'admin_two_factor_challenges'].map(table =>

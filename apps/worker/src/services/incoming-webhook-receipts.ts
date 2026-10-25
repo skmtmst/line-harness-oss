@@ -4,7 +4,7 @@ import type {
   IncomingWebhookIdentityMatch,
 } from '@line-crm/db';
 
-/** A receipt survives request failures; only completed work is acknowledged as a duplicate. */
+/** 要求が失敗しても受領票を残し、処理完了したものだけを重複として認める。 */
 const LEASE_MS = 300_000;
 
 export interface IncomingWebhookExecution {
@@ -18,7 +18,7 @@ export interface IncomingWebhookExecution {
 }
 
 /**
- * R402: 受領時の実行計画。照合方法・未一致時の扱い・処理配列全体・参照版を
+ * 受領時の実行計画。照合方法・未一致時の扱い・処理配列全体・参照版を
  * 受領行へ固定し、再試行は後日の設定変更に影響されず元の計画を使う。
  */
 export interface IncomingWebhookReceiptPlan {
@@ -98,7 +98,7 @@ export function fallbackIncomingWebhookReceiptPlan(): IncomingWebhookReceiptPlan
 export async function stableWebhookStepId(sourceEventId: string, key: string): Promise<string> {
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256',
     new TextEncoder().encode(JSON.stringify([sourceEventId, key]))));
-  // LINE retry keys must be UUIDs. A stable version-5-shaped key also survives a lost response.
+  // LINE の再試行キーは UUID を求めるため、応答喪失後も同じ値となるバージョン5形式のキーを使う。
   bytes[6] = (bytes[6]! & 0x0f) | 0x50;
   bytes[8] = (bytes[8]! & 0x3f) | 0x80;
   const hex = Array.from(bytes.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
@@ -106,7 +106,7 @@ export async function stableWebhookStepId(sourceEventId: string, key: string): P
 }
 
 /**
- * 受信口ごとの短時間回数制限の条件(#829 N-384)。
+ * 受信口ごとの短時間回数制限の条件。
  * receipts は受領ごとに1行残るので、回数制限のために新しい表は要らない。
  */
 export interface IncomingReceiptRateLimit {
@@ -121,7 +121,7 @@ export async function reserveIncomingWebhook(
   | { kind: 'acquired'; execution: IncomingWebhookExecution }> {
   const now = Date.now();
   /*
-   * R425: 合言葉の入れ替え後に同じ本文を再署名しても、同じ受領へ結び付ける。
+   * 合言葉の入れ替え後に同じ本文を再署名しても、同じ受領へ結び付ける。
    * 署名は本文だけで作られるため、新旧秘密値では signature_hash が変わる。
    * 本文のハッシュが既知なら新規行を作らず、既存受領の状態に従う
    * （完了→重複、処理中→503、失敗・期限切れ→再開）。
@@ -135,7 +135,7 @@ export async function reserveIncomingWebhook(
     if (known) return claimKnownReceipt(db, known, now);
   }
   /*
-   * N-384: 受領行の作成に窓内件数の条件を乗せる。件数の確認と行の作成を
+   * 受領行の作成に窓内件数の条件を乗せる。件数の確認と行の作成を
    * 1文にすると、並行受信がどちらも「まだ上限内」と読んで上限を超える
    * 隙間がなくなる。上限超えの新規受信は行を残さないので、窓が明けた
    * あとの正規再送を邪魔しない。同じ署名の再送は OR IGNORE で行を増やさず、
@@ -165,7 +165,7 @@ type KnownReceiptRow = {
 
 /**
  * 既知の受領行の期限付き所有権を取る。完了ずみは重複、処理中は503、
- * 失敗・期限切れは再開する。署名照合と本文照合（R425）で共有する。
+ * 失敗・期限切れは再開する。署名照合と本文照合で共有する。
  */
 async function claimKnownReceipt(
   db: D1Database,

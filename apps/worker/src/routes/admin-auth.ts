@@ -100,7 +100,7 @@ adminAuth.get('/api/auth/two-factor/policy', async c => {
   return c.json({ success: true, data: { required: await loginMfaRequired(c.env.DB, staff.tenantId, c.env.TOTP_ENCRYPTION_KEY), canEdit: Boolean(canEdit), impersonating: Boolean(activeProxy), ...mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY), ...counts } });
 });
 
-// Self-service security information contains counts only, never codes or hashes.
+// 本人向けの安全情報も件数だけを返し、コードやハッシュは返さない。
 adminAuth.get('/api/auth/two-factor/self', async c => {
   const principal = c.get('staff');
   if (c.get('impersonation') || await getActiveImpersonation(c.env.DB, principal.id, await adminSessionTokenHashFromRequest(c))) return c.json({ success: false, error: '代理ログイン中は利用できません' }, 403);
@@ -148,7 +148,7 @@ adminAuth.put('/api/auth/two-factor/policy', inputJsonBoundary({ required: ['boo
     await mfaAudit(c, staff.id, 'auth.mfa.policy', 'denied');
     return c.json({ success: false, error: MFA_KEY_NOTICE }, 400);
   }
-  // Always a fresh one-use grant. The usual ten-minute step-up window is not sufficient.
+  // 通常の10分の確認窓では足りないため、毎回新しい一度限りの確認票を使う。
   if (!body.required && !await consumeStepUpToken(c, 'auth.mfa.policy')) {
     return stepUpRequiredResponse(c, 'Offにする前に二段階認証またはパスワードで本人確認してください');
   }
@@ -173,8 +173,7 @@ adminAuth.put('/api/auth/two-factor/policy', inputJsonBoundary({ required: ['boo
       before: { required: before }, after: { required: body.required }, riskLevel: 'high', retentionClass: 'security' },
       { sql: 'changes()=1', params: [] }),
   ];
-  // Existing sessions were created without the new requirement. Invalidate them
-  // atomically with enabling the policy; every person can enroll at the next login.
+  // 要求を有効にする前のセッションが残らないよう、方針の有効化と失効を原子的に行う。次のログインで各人が登録できる。
   if (body.required && !before) statements.push(
     c.env.DB.prepare(`DELETE FROM platform_settings WHERE key IN
       (SELECT 'auth.mfa.session:'||s.token_hash FROM admin_sessions s JOIN staff_members m ON m.id=s.staff_id WHERE COALESCE(m.tenant_id,?)=?)
@@ -193,7 +192,7 @@ adminAuth.put('/api/auth/two-factor/policy', inputJsonBoundary({ required: ['boo
 const STEP_UP_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
 
 /*
- * R503: 入力上限の429には待ち秒数を付ける。画面は「約N分待ってから」と出す。
+ * 入力上限の429には待ち秒数を付ける。画面は「約N分待ってから」と出す。
  * Retry-After（秒）も付け、機械的な再試行の目安にする。本文は利用者向けの
  * 回復案内だけ（内部情報は入れない）。
  */
@@ -484,8 +483,7 @@ adminAuth.post('/api/auth/two-factor/verify', inputJsonBoundary({"challengeToken
   await recordLoginAuditBestEffort(c, staff.id);
   return c.json({
     success: true,
-    // Same-site deployments keep the credential HttpOnly. Only the documented
-    // cross-site fallback hands the opaque session token to the SPA.
+    // 同一サイトでは資格情報を HttpOnly のまま保ち、文書化した別サイトの代替経路だけで不透明なトークンを管理画面へ渡す。
     data: { sessionToken: config.crossSite ? session.sessionToken : undefined },
     csrfToken: session.csrfToken,
   });
@@ -523,7 +521,7 @@ adminAuth.post('/api/auth/two-factor/setup', inputJsonBoundary({"challengeToken"
   }
 
   /*
-   * R509: 同じ合言葉への同時取得でも画面のQRと保存がずれないよう冪等にする。
+   * 同じ合言葉への同時取得でも画面のQRと保存がずれないよう冪等にする。
    * 期限内は既発行の仮秘密を使い回す。競合で先に置かれた場合も、
    * 条件付き更新に負けた側は置かれた値を読み直して同じQRを返す。
    */
@@ -537,7 +535,7 @@ adminAuth.post('/api/auth/two-factor/setup', inputJsonBoundary({"challengeToken"
   });
 });
 
-/** R509: 置ける仮秘密を1つに決める。既発行があればそれを、無ければ条件付きで置く。 */
+/** 置ける仮秘密を1つに決める。既発行があればそれを、無ければ条件付きで置く。 */
 async function setupPendingTotpSecret(
   db: Env['Bindings']['DB'],
   staffId: string,
@@ -649,7 +647,7 @@ adminAuth.post('/api/auth/step-up', inputJsonBoundary({"code":["string"],"passwo
    * 再認証フロー専用の401。管理画面の共通401処理は code の無い
    * 'Unauthorized'（認証middlewareの応答）をセッション喪失として扱うので、
    * この口が画面側の再認証フローで処理される業務401だと分かるよう
-   * 機械コードを付ける（#1058）。
+   * 機械コードを付ける。
    */
   if (!staffContext) return c.json({ success: false, error: 'Unauthorized', code: 'STEP_UP_UNAUTHORIZED' }, 401);
   const body = await c.req.json<{ code?: string; password?: string; purpose?: string }>()
@@ -710,7 +708,7 @@ adminAuth.post('/api/auth/step-up', inputJsonBoundary({"code":["string"],"passwo
     }
   }
   /*
-   * R504: コードの一回限りの確保と確認票発行に成功した要求だけを
+   * コードの一回限りの確保と確認票発行に成功した要求だけを
    * 本人確認済みにする。並行要求に負けた側（409「使用済み」）の
    * セッションには確認済み時刻を残さない。失敗応答と保存状態を一致させる。
    */
@@ -741,19 +739,7 @@ adminAuth.post('/api/auth/step-up', inputJsonBoundary({"code":["string"],"passwo
   return c.json({ success: true, data: { token, purpose, expiresAt } }, 201);
 });
 
-/**
- * POST /api/auth/login
- *
- * Validates the API key, then issues:
- *   - lh_admin_session (HttpOnly) — the credential, never exposed to JS.
- *   - lh_csrf (readable) — the double-submit CSRF token, also returned in the
- *     body so a cross-site SPA (which cannot read the API's cookie) can echo it
- *     back via the X-CSRF-Token header.
- *
- * Refuses with a clear error when the topology cannot deliver the cookie,
- * turning the silent "login breaks after deploy" failure into an actionable
- * configuration error.
- */
+/** API キー検証後、資格情報は HttpOnly の lh_admin_session、CSRF は読取可能な lh_csrf に分ける。別サイトの管理画面は Cookie を読めないため、CSRF を本文にも返して X-CSRF-Token で提示させる。Cookie を返せない構成は、成功に見せず設定エラーとして拒む。 */
 adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) {
@@ -790,7 +776,7 @@ adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
   await mfaAudit(c, staff.id, 'auth.login.primary', 'success');
   let csrfToken: string;
   if (staff.id === 'env-owner') {
-    // Emergency recovery only. The normal UI never asks for or exposes this key.
+    // 緊急復旧専用とし、通常の画面でこのキーを求めたり表示したりしない。
     csrfToken = crypto.randomUUID();
     const maxAge = remember ? SESSION_REMEMBER_MAX_AGE : SESSION_DEFAULT_MAX_AGE;
     c.header('Set-Cookie', adminSessionCookie(apiKey, config.sameSite, maxAge), { append: true });
@@ -811,7 +797,7 @@ adminAuth.post('/api/auth/login', inputJsonBoundary(), async (c) => {
   return c.json({ success: true, data: staff, csrfToken });
 });
 
-/** Cookie logout checks trusted Origin/CSRF before revocation. */
+/** Cookie のログアウトは、失効より前に信頼できる Origin または CSRF を確かめる。 */
 adminAuth.post('/api/auth/logout', inputJsonBoundary(), async (c) => {
   const bearer = bearerToken(c);
   const cookie = adminSessionTokenFromCookie(c);
@@ -820,16 +806,14 @@ adminAuth.post('/api/auth/logout', inputJsonBoundary(), async (c) => {
     const origin = c.req.header('Origin');
     const originDenied = origin !== undefined && (!origin || !resolveCorsOrigin(c.env, origin, c.req.url));
     const suppliedCsrf = c.req.header(CSRF_HEADER);
-    // The existing logout client sends credentials + Origin without a CSRF header.
-    // A trusted Origin is sufficient for that browser request; missing Origin
-    // requires double-submit, and an explicitly mismatched token is always denied.
+    // 既存のログアウトは Origin と Cookie を送るため、信頼できる Origin なら許可する。Origin なしは double-submit を必須とし、不一致トークンは常に拒む。
     const csrfMismatch = suppliedCsrf !== undefined && (!expected || suppliedCsrf !== expected);
     if (originDenied || csrfMismatch || (origin === undefined && (!expected || suppliedCsrf !== expected))) {
       const session = await getAdminSessionByTokenHash(c.env.DB, await sha256Hex(cookie));
       const active = session && session.expires_at > new Date().toISOString();
       const emergencyCookie = !active && (cookie === c.env.API_KEY || cookie === c.env.LEGACY_API_KEY
         || await getStaffByApiKey(c.env.DB, cookie));
-      // Already expired/unknown credentials remain an idempotent logout.
+      // 期限切れ・未知の資格情報でも、ログアウトは冪等な成功として扱う。
       if (active || emergencyCookie) return c.json({ success: false, error: 'CSRF token mismatch' }, 403);
     }
   }
@@ -841,8 +825,7 @@ adminAuth.post('/api/auth/logout', inputJsonBoundary(), async (c) => {
     action: 'logout',
     ip: clientIp(c),
   });
-  // Use the same selected credential as authentication; an incidental cookie
-  // must not revoke a second person's session on a Bearer request.
+  // Bearer 要求に偶然付いた Cookie で別の人まで失効させないよう、認証時に選んだ資格情報だけを使う。
   const tokenHash = await adminSessionTokenHashFromRequest(c);
   if (tokenHash) await deleteAdminSession(c.env.DB, tokenHash);
   const { sameSite } = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
@@ -851,12 +834,7 @@ adminAuth.post('/api/auth/logout', inputJsonBoundary(), async (c) => {
   return c.json({ success: true, data: null });
 });
 
-/**
- * GET /api/auth/session — returns the authenticated staff (set by the auth
- * middleware) plus the current CSRF token, refreshing the CSRF cookie if it is
- * missing (e.g. after a reload that dropped the in-memory token). This lets the
- * SPA recover the CSRF token without forcing a re-login.
- */
+/** 再ログインせず CSRF を回復できるよう、セッション情報に現在のトークンを含め、Cookie が欠けていれば更新する。 */
 adminAuth.get('/api/auth/session', async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   let csrfToken = csrfTokenFromCookie(c);

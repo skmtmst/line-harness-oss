@@ -48,10 +48,7 @@ export const SKIN_LABELS: Record<string, string> = { normal: '問題なし', itc
 export const TEAR_LABELS: Record<string, string> = { normal: '問題なし', mild: '少し気になる', concern: '気になる' };
 
 /**
- * 「気になる便」の判定。利用者側のケア共有（nen-members.ts の health-logs POST が
- * `stool_status !== 'normal'` で3回連続を立てる）と同じ基準をここでも使う。
- * 以前は管理側だけが下痢・血便に限っていたため、利用者に「要ケアを共有しました」と
- * 出ても管理画面の「気になる変化」が空のままだった（監査 R61）。
+ * 利用者側のケア共有と管理側の気になる変化が食い違わないよう、stool_status !== 'normal' の3回連続を共通の基準とする。
  */
 export function isCareStoolStatus(status: string | null | undefined): boolean {
   return status != null && status !== 'normal';

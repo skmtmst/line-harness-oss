@@ -193,7 +193,7 @@ describe('persisted one-time follower import', () => {
     await startFollowerImport(db, 'acc-1');
 
     // 時間と人数の予算が残っている限り、1 回の呼び出しで ID とプロフィールを
-    // 続けて進める。以前は 1 回で 1 ページだけ進めていた。
+    // 1回で複数ページ進み、続きの取得を継続できることを確かめる。
     const run = await processFollowerImportStep(db, client, 'acc-1');
     expect(run.state.phase).toBe('completed');
     expect(run.state.imported).toBe(1);
@@ -238,10 +238,7 @@ describe('persisted one-time follower import', () => {
 });
 
 /**
- * 故障注入で見つかった取り残しの再発防止。
- * いずれも「書けた数と進捗の数が合っているか」「取り残したまま完了に
- * ならないか」を見る。合計が合っていても完了してしまうと、残った人が
- * 二度と引かれないまま画面上は終わったことになる。
+ * 書込件数と進捗が一致し、未取得の人を残したまま完了にならないことを故障注入で確かめる。
  */
 describe('follower import keeps progress and the cursor honest under failures', () => {
   test('credits only the chunks that were written and does not complete past a failed write', async () => {
@@ -352,7 +349,7 @@ describe('follower import keeps progress and the cursor honest under failures', 
       await startFollowerImport(db, 'acc-1');
 
       const first = await processFollowerImportStep(db, client, 'acc-1', { budgetMs: 1_000 });
-      // ページの途中で止まる。以前はページ単位でしか時間を見ていなかったため、
+      // ページ途中でも時間上限を守るため、友だちごとに残り時間を確認する。
       // 200 人を引き終わるまで止まれずロックの期限を越えることがあった。
       expect(client.getProfile.mock.calls.length).toBeLessThan(30);
       expect(first.profilesFetched).toBeLessThan(30);
@@ -407,7 +404,7 @@ describe('follower import keeps progress and the cursor honest under failures', 
 
   test('does not roll back a newer run that took over after the lock expired', async () => {
     // ロックの期限が切れるほど長引いた実行が、あとから戻ってきて
-    // 「201人・完了」を「200人・処理中」へ上書きしてしまう競合の再発防止。
+    // 完了済みの進捗を、遅れて届いた実行が処理中へ上書きしないことを確かめる。
     // ここでは 1 ページ目を処理している間に、別の実行が続きを引き継いで
     // 全員ぶんを書き終えた状況を作る。
     const seeded = seedFriends(300);
@@ -460,7 +457,7 @@ describe('follower import keeps progress and the cursor honest under failures', 
 
   test('writes no friend rows at all once a newer run has taken over', async () => {
     // 状態の保存だけを守っても、期限切れの旧実行が抱えている古いプロフィールが
-    // friends に入ってしまう競合の再発防止。画面は「201人・完了」のままなので
+    // friends への遅い書込が、完了済みの件数と食い違わないことを確かめる。
     // 気づけない上書きになる。ここでは 1 ページ目のプロフィールを引いている
     // 途中で別の実行が全員ぶんを書き終え、ロックも解放した状況を作る。
     const seeded = seedFriends(201);

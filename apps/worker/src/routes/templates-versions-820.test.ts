@@ -10,7 +10,7 @@ import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /**
- * #820: テンプレートの版履歴と参照表。
+ * テンプレートの版履歴と参照表。
  * 公開のたびに版を足す（前の版は変えない）。戻すは新しい版を作る。
  * 予約済み・送信中の配信で使うものは消せない。送った配信は送った時の版のまま。
  */
@@ -34,8 +34,7 @@ function app() {
 }
 
 async function json(method: string, path: string, body?: unknown, key?: string, db = store.db) {
-  // These integration cases exercise saving from a freshly loaded editor.
-  // Explicit versions in the body still take precedence for stale-edit cases.
+  // 読みたての編集画面から保存する経路を試す。古い版を試す場合は、本文に明示した版を優先する。
   if (method === 'PUT' && path.startsWith('/api/templates/')) {
     const row = store.raw.prepare('SELECT published_version, draft_revision FROM templates WHERE id=?').get(path.split('/').at(-1)) as {published_version:number;draft_revision:number} | undefined;
     if (row) body = { expectedVersion: row.published_version, expectedDraftRevision: row.draft_revision, ...body as Record<string, unknown> };

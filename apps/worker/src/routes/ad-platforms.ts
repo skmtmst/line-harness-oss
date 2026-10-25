@@ -102,7 +102,7 @@ import { adEventMappings } from './ad-event-mappings.js';
 const adPlatforms = new Hono<Env>();
 adPlatforms.route('/', adEventMappings);
 
-// GET /api/ad-platforms - list visible accounts only
+// 可視範囲内の広告アカウントだけを一覧に返す。
 adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
@@ -303,7 +303,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), inputJsonBoundary
   }
 });
 
-// POST /api/ad-platforms/test - test conversion send (must be before :id routes)
+// test が動的 ID と解釈されないよう、/:id より先に登録する。
 adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), inputJsonBoundary({"platform":["string"],"eventName":["string"],"friendId":["string"],"lineAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{
@@ -398,7 +398,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), inputJsonBounda
   }
 });
 
-// DELETE /api/ad-platforms/:id - delete
+
 adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
   try {
     const existing = await getAdPlatformById(c.env.DB, c.req.param('id'));
@@ -546,7 +546,7 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
   }
 });
 
-/** F-22: 再送する内容や宛先は引数で受けず、保存済みの1件を使う。 */
+/** 再送する内容や宛先は引数で受けず、保存済みの1件を使う。 */
 adPlatforms.post('/api/ad-platforms/logs/:id/retry', requireRole('owner'), inputJsonBoundary(), async (c) => {
   try {
     const row = await getAdConversionRetrySource(c.env.DB, c.req.param('id'));

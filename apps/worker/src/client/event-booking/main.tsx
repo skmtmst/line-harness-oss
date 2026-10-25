@@ -1,5 +1,5 @@
 import { responseLiffError } from '../../../../liff/src/lib/api-error.js';
-// main.tsx — Event booking LIFF entry. Loaded via dynamic import from
+// イベント予約の LIFF 画面は共通入口から必要時に読み込む。
 // apps/worker/src/client/main.ts (?page=event&id=<eventId> or ?page=event-me).
 // Mirrors salon-booking design language (LINE 緑 + sb-card + fade animations).
 
@@ -293,7 +293,7 @@ function EventDetailScreen({
               {slots.map((s) => {
                 const full = s.remaining != null && s.remaining <= 0;
                 /*
-                 * 満席でも、この枠がキャンセル待ちを受けるなら押せる (#747)。
+                 * 満席でも、この枠がキャンセル待ちを受けるなら押せる。
                  * サーバは前から満席の申込を待ち行列へ入れて 200 を返すのに、
                  * 画面が押させないので、その口へ辿り着けなかった。
                  * 予約上限に達している人は、待ちにも入れないので押せない。
@@ -358,7 +358,7 @@ export function ConfirmScreen({
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(uid);
   /*
-   * 満席の枠を選んで来た = キャンセル待ちの申込 (#747)。押せるようにした
+   * 満席の枠を選んで来た = キャンセル待ちの申込。押せるようにした
    * 以上、「予約をリクエスト」と書いたままだと何を頼んだのか分からない。
    * 実際に待ちへ入るかはサーバが決めるので、ここは見せ方だけを変える。
    */
@@ -384,7 +384,7 @@ export function ConfirmScreen({
         { 'Idempotency-Key': idemKey },
       );
       /*
-       * キャンセル待ちに入ったときの応答は 200 で `{ waitlisted: true }` (#747)。
+       * キャンセル待ちに入ったときの応答は 200 で `{ waitlisted: true }`。
        * 200 なので apiPost は投げない。ここで見分けないと res.status が
        * undefined のまま渡り、完了画面が「予約が確定しました」と出す。
        * 満席の枠を押せるようにした以上、この道は日常的に通る。
@@ -494,15 +494,7 @@ function Row({ label, value, valueClassName }: { label: string; value: string; v
 }
 
 /**
- * 申込のあとの完了画面。
- *
- * `status` は3通り (#747)。
- *  - `waitlisted`: 席が埋まっていてキャンセル待ちに入った。**予約は取れていない**
- *  - `requested` : 申込を受け付けた。運営の承認待ち
- *  - それ以外     : 予約が確定した
- *
- * 以前は `requested` かどうかの二択で、待ちに入っただけの人にも
- * 「予約が確定しました」と出していた。
+ * キャンセル待ちは予約確定と区別して表示する。waitlisted は未確保、requested は承認待ち、それ以外は確定を示す。
  */
 function DoneScreen({ status, onGoHistory }: { status: string; onGoHistory: () => void }) {
   const copy = doneScreenCopy(status as BookingOutcome);

@@ -33,7 +33,7 @@ export { EC_EVENT_TYPES } from '@line-crm/shared';
 const EVENT_TYPES = new Set<string>(EC_EVENT_TYPES);
 
 /**
- * 公式サイトの掲載閲覧数（F-20）。種類は共通名簿（@line-crm/shared の
+ * 公式サイトの掲載閲覧数。種類は共通名簿（@line-crm/shared の
  * EC_EVENT_TYPES）が正本。ここでは分岐用の名前だけ残す。
  */
 export const PUBLICATION_VIEW_EVENT_TYPE = 'ec.site.publication_viewed';
@@ -200,7 +200,7 @@ function usableGlobalSecret(value: string | undefined): string | null {
 }
 
 /**
- * 公式サイトの掲載閲覧数を保存する（F-20）。
+ * 公式サイトの掲載閲覧数を保存する。
  *
  * ECが数えた累計を、今ある数と比べて大きい方だけ残す。足し算しないので、
  * 再送や順番の入れ替わりで数が減ったり二重に増えたりしない。
@@ -404,7 +404,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
 
 
   /*
-   * IDEA-21: 注文の取り消し・返金が届いたら、その注文を起点に待っている
+   * 注文の取り消し・返金が届いたら、その注文を起点に待っている
    * 発送後の案内（到着確認・口コミ・次の商品）を「送らない」へ倒す。
    * ここで倒さないと、配信履歴に「これから送ります」と出たままになる。
    * 止め損ねても送信時の再検証（processNenDeliveries）が最後に弾くので、
@@ -444,7 +444,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     }
   }
 
-  // F-20の閲覧数は友だちに結びつけない（回数だけ数える）ので、本人探しを飛ばす。
+  // の閲覧数は友だちに結びつけない（回数だけ数える）ので、本人探しを飛ばす。
   if (!event.line_user_id && event.event_type !== PUBLICATION_VIEW_EVENT_TYPE) {
     await c.env.DB.prepare(
       `UPDATE ec_events
@@ -460,7 +460,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
 
 
   /*
-   * F-20: 公式サイトの掲載閲覧数。友だちの突き合わせは要らない（回数だけ数える）
+   * 公式サイトの掲載閲覧数。友だちの突き合わせは要らない（回数だけ数える）
    * ので、ここで受けて返す。停止中（paused）の取り込みは、他の種類と同じく
    * 受付の保存だけ残して書き込まない。
    */

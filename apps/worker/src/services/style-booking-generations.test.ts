@@ -173,7 +173,7 @@ test("the existing LIFF intake accepts a selected class pass, replays the same r
   expect(await (await send('one',e.id)).json()).toEqual(body);
   expect(f.raw.prepare('SELECT remaining FROM booking_entitlements').get()).toEqual({remaining:0});
   expect(f.raw.prepare("SELECT COUNT(*) n FROM booking_entitlement_events WHERE action='consume'").get()).toEqual({n:1});
-  // The selection boundary is checked before the duplicate-booking resolution.
+  // 重複予約の解決より先に、選択先の権限境界を確認する。
   f.raw.exec("UPDATE booking_entitlements SET friend_id='other',remaining=1");
   const denied=await send('different-key',e.id);expect(denied.status).toBe(409);
   expect(JSON.stringify(await denied.json())).not.toContain('Uother');

@@ -1,4 +1,4 @@
-// Public operations. Internal modules import their dependencies directly.
+// 内部から自分の公開入口を読み戻さず、実装の依存先を直接読む。
 export { canApproveBroadcast, countActiveOperators, evaluateApprovalGate, getBroadcastApprovalThreshold, notifyBroadcastApproval, readApprovalStatus, recordBroadcastApprovalEvent, setBroadcastApprovalThreshold } from './broadcast-approval.js';
 export { fetchQuota, releaseQuotaSlot, tryReserveQuotaSlot } from './broadcast-quota-guard.js';
 export { MAX_BROADCAST_MESSAGES, addTestLabel, assertMessagePartsResolved, autoTrackMessageParts, buildMessages, combinedMessageContent, hasRecipientVariablesInParts, parseBroadcastMessageParts, renderMessageParts, unsupportedMessageVariables, varyTextMessages } from './broadcast-message-set.js';

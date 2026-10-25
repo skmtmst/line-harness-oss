@@ -296,7 +296,7 @@ describe('Googleビジネス：営業時間の変更案（GB-11）', () => {
     expect(s.status).toBe(200);
     expect(s.json.change!.status).toBe('applied');
     const body = JSON.parse(String(patchCalls()[0].init?.body)) as { specialHours: { specialHourPeriods: unknown[] } };
-    expect(body.specialHours.specialHourPeriods).toEqual([]); // 10/1 が唯一の登録だったので空リスト
+    expect(body.specialHours.specialHourPeriods).toEqual([]); // 登録が1件も残らないため空リストになる。
   });
 
   it('毎週：変わった曜日だけを対象にし、深夜またぎも受け付ける', async () => {

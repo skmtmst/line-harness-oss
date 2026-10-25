@@ -22,7 +22,7 @@ export const CONCERNS = new Set(['tear_stain', 'coat', 'allergy', 'appetite', 's
 export const IMAGE_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 export /*
  * 採用1枚の点数は固定値ではなく、その時点で使っている報酬の決まりの版を
- * 見る (#817)。版が無い古いDBでは5ptへ倒す。ここに数は書かない。
+ * 見る。版が無い古いDBでは5ptへ倒す。ここに数は書かない。
  */
 
 /*
@@ -122,10 +122,10 @@ export /*
  * `pointsQueued` は EC 会員とつながっていて付与アウトボックスへ
  * 実際に積んだときだけ true。つながっていない採用に
  * 「ポイントを付ける手続きを始めました」と届けるのは、
- * できていない約束を本人へ伝えることになる（#931 N-307）。
+ * できていない約束を本人へ伝えることになる。
  *
  * `resubmitInvite` は差戻し画面の「もう一度送ってもらえるようお願いする」。
- * チェックを外して保存した分には案内を添えない（#931 N-312）。
+ * チェックを外して保存した分には案内を添えない。
  */
 function photoReviewMessage(
   status: 'adopted' | 'rejected',
@@ -238,7 +238,7 @@ export async function deliverPhotoReviewNotification(
     reasonCode: PhotoReviewReasonCode | null;
     reasonNote: string | null;
     decisionId: string;
-    /** 差戻しメッセージへ再投稿の案内を添えるか（#931 N-312）。省略時は添える。 */
+    /** 差戻しメッセージへ再投稿の案内を添えるか。省略時は添える。 */
     resubmitInvite?: boolean;
   },
 ): Promise<{ notificationStatus: 'sent' | 'failed'; notificationError: string | null; busy: boolean; relayed: boolean }> {
@@ -276,7 +276,7 @@ export async function deliverPhotoReviewNotification(
     await sendPhotoReviewNotification(
       c, recipient, input.status, input.reasonCode, input.reasonNote, input.decisionId,
       {
-        // EC 会員とつながっている投稿者へだけ「手続きを始めた」と伝える（#931 N-307）。
+        // EC 会員とつながっている投稿者へだけ「手続きを始めた」と伝える。
         pointsQueued: input.status === 'adopted' && Boolean(recipient.customer_id),
         resubmitInvite: input.resubmitInvite !== false,
       },
@@ -284,10 +284,7 @@ export async function deliverPhotoReviewNotification(
     relayed = true;
   } catch (error) {
     /*
-     * ここだけ生のエラー本文を使っていたため、写真の一括審査の失敗一覧
-     * （管理画面）に `LINE Harness proxy error: 500 …` と LINE 側の応答本文が
-     * そのまま出ていた。他の送信失敗と同じ安全な理由へそろえる（2026-10-02）。
-     * 原因を追うための生の本文はログにだけ残す。
+     * LINE 側の応答本文や内部情報を画面へ漏らさないよう、送信失敗は共通の安全な理由へ分類する。原因調査用の生の本文はログだけで扱う。
      */
     logger.error("nen_members.deliver_photo_review_notification_failed");
     sendError = classifyExternalDeliveryError(error).message;
@@ -540,7 +537,7 @@ async function ensureConsentedPhotoSitePublication(
   ]);
 }
 
-export // Admin APIs
+export
 async function adminAccountScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const where = scope.allowedAccountIds.length
@@ -599,7 +596,7 @@ function reviewDuplicateResponse(
 }
 
 export /*
- * 止まったポイント手続きを人が動かす口（PHOTO-06）。
+ * 止まったポイント手続きを人が動かす口。
  *
  * - point-retry …「手続き中」「確認が必要」の行を今すぐ届け直す。
  * - point-reconcile … EC側に届いているかを awardKey で照合し、

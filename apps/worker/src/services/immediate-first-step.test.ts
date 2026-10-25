@@ -1,20 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-/**
- * pushImmediateFirstStep — the single implementation behind every instant
- * first-message entry point (tag_added attach, click campaigns, follow
- * webhook, referral routes). These tests pin the per-mode semantics that the
- * three original call sites relied on before they were unified:
- *
- * - 'once': claim protocol with the cron (exactly-once), cooldown hit
- *   advances WITHOUT pushing, send failure releases the claim, skipCooldown
- *   preserves the follow-webhook's always-reply semantics
- * - 'every-click': cooldown FIRST (before enrolling); a row that still owes
- *   step 1 is claimed (fencing the cron), re-clicks on an advanced row push
- *   again without touching it
- * - reply option: webhook follow sends via the free reply token and logs
- *   delivery_type='reply' (derived — no separate option)
- */
+/** 即時初回文の once・every-click・無料 reply を検証する。once は cron と実行権を共有し、間隔内は送らず通番を進める。every-click は登録前に間隔を確認し、初回未送信なら実行権を取る。reply の履歴は実際の送信方式から決める。 */
 
 const PINNED1 = {
   id: 'v-1:1',
@@ -93,8 +79,7 @@ vi.mock('./message-log-payload.js', () => ({
   })),
 }));
 
-// Cron-parity decoration (shared decorateForFriendPush pipeline).
-// Identity by default; the decoration suite overrides per-test.
+// cron と同じ文面加工を使う。既定は恒等変換とし、加工の試験だけで差し替える。
 const autoTrackMocks = vi.hoisted(() => ({
   decorateForFriendPush: vi.fn(),
 }));
@@ -110,11 +95,7 @@ interface DbCall {
   args: unknown[];
 }
 
-/**
- * Raw-SQL stub: records every prepare/bind and routes SELECTs by table.
- * `cooldownHit` backs the messages_log probe; `enrollmentLookup` backs the
- * friend_scenarios fallback lookup.
- */
+/** 発行 SQL と引数を記録し、送信履歴の確認と購読の代替取得をそれぞれの試験値へ対応させる。 */
 function makeDb(opts: { cooldownHit?: boolean; enrollmentLookup?: { id: string; current_step_order: number; published_version_id?: string | null } | null } = {}) {
   const calls: DbCall[] = [];
   const db = {
@@ -153,7 +134,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.jstNow.mockReturnValue('2026-07-19T12:00:00.000+09:00');
   dbMocks.toJstString.mockImplementation((d: Date) => d.toISOString());
-  // delay-0 steps schedule at "now"; later steps at now + delay.
+  // 遅延0は現在、それ以外は現在に遅延を加えた時刻を予定する。
   dbMocks.computeNextDeliveryAt.mockImplementation(
     (_scenario: unknown, step: { delay_minutes: number }, args: { now: Date }) =>
       new Date(args.now.getTime() + (step.delay_minutes ?? 0) * 60_000),
@@ -194,7 +175,7 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
     expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [{ type: 'text', text: 'welcome!' }], undefined);
     const log = insertedLog(calls);
     expect(log).toBeDefined();
-    // delivery_type bind slot (7th value) stays NULL when not specified.
+    // 未指定の送信方式は、7番目の引数を NULL に保つ。
     expect(log!.args[5]).toBe(null);
     expect(dbMocks.advanceFriendScenario).toHaveBeenCalledWith(db, 'fs-1', 1, expect.any(String));
     expect(dbMocks.completeFriendScenario).not.toHaveBeenCalled();
@@ -319,9 +300,9 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
     const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, {
       enrollment: { id: 'fs-1', current_step_order: 0 },
     });
-    expect(sent).toBe(true); // the message DID go out
+    expect(sent).toBe(true); // 外部への送信は既に成功している。
     expect(dbMocks.advanceFriendScenario).toHaveBeenCalledWith(db, 'fs-1', 1, expect.any(String));
-    // The claim must not be left held once the enrollment is advanced.
+    // 通番を進めた後は実行権を保持したままにしない。
     expect(calls.some((c) => c.sql.includes(`status = 'delivering'`) && c.sql.includes(`status = 'active'`))).toBe(false);
     errorSpy.mockRestore();
   });
@@ -341,9 +322,7 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
   });
 
   it('schedules step 2 at JST wall time WITHOUT double-applying the +9h offset', async () => {
-    // computeNextDeliveryAt operates in the shifted frame (inputs are
-    // Date.now+9h), so serialization must relabel — not re-shift. A
-    // double shift schedules step 2 nine hours late (regression guard).
+    // 入力は日本時間へずらした計算用の時刻なので、直列化では表示形式だけを替え、時差を二重加算しない。
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date('2026-07-19T03:00:00.000Z')); // 12:00 JST
@@ -351,7 +330,7 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
       await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, {
         enrollment: { id: 'fs-1', current_step_order: 0 },
       });
-      // STEP2 delay is 60 min → 13:00 JST.
+      // 次の通は60分後の13時 JSTを予定する。
       expect(dbMocks.advanceFriendScenario).toHaveBeenCalledWith(
         db,
         'fs-1',
@@ -382,7 +361,7 @@ describe("mode 'every-click' — click-campaign re-delivery", () => {
     const { db } = makeDb({ cooldownHit: true });
     const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, everyClick);
     expect(sent).toBe(false);
-    // No fresh step-0 row may be left behind for the cron.
+    // cron が再送する初回待ちの行を残さない。
     expect(dbMocks.enrollFriendInScenario).not.toHaveBeenCalled();
     expect(lineClientMock.pushMessage).not.toHaveBeenCalled();
     expect(dbMocks.advanceFriendScenario).not.toHaveBeenCalled();
@@ -393,10 +372,9 @@ describe("mode 'every-click' — click-campaign re-delivery", () => {
     const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, everyClick);
     expect(sent).toBe(true);
     expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(db, 'friend-1', 'scn-1');
-    // The fresh enrollment's next_delivery_at is already due, so the cron
-    // could race the push — the claim fences it out.
+    // 新規購読は既に期限到達しているため、push と cron の競合を実行権で防ぐ。
     expect(dbMocks.claimFriendScenarioForDelivery).toHaveBeenCalledWith(db, 'fs-1', 0);
-    // Push target is the id_token-derived LINE user id, not friend.line_user_id.
+    // 宛先は未完成の友だち行でなく、検証済み ID トークンの LINE 利用者 ID を使う。
     expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-token', [{ type: 'text', text: 'welcome!' }], undefined);
     expect(insertedLog(calls)).toBeDefined();
     expect(dbMocks.advanceFriendScenario).toHaveBeenCalledWith(db, 'fs-1', 1, expect.any(String));
@@ -412,7 +390,7 @@ describe("mode 'every-click' — click-campaign re-delivery", () => {
   });
 
   it('re-click (already enrolled and advanced): pushes again but leaves the enrollment alone', async () => {
-    dbMocks.enrollFriendInScenario.mockResolvedValue(null); // INSERT OR IGNORE no-op
+    dbMocks.enrollFriendInScenario.mockResolvedValue(null);
     const { db } = makeDb({ enrollmentLookup: { id: 'fs-1', current_step_order: 1, published_version_id: 'v-1' } });
     const sent = await pushImmediateFirstStep(db, 'friend-1', 'scn-1', ctx, everyClick);
     expect(sent).toBe(true);
@@ -492,7 +470,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
     });
 
     expect(sent).toBe(true);
-    // Same helper + argument shape as processStepDeliveries.
+    // 定期配信と同じ共通関数・引数で加工する。
     expect(autoTrackMocks.decorateForFriendPush).toHaveBeenCalledWith(
       db,
       'text',
@@ -500,8 +478,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       ctx.workerUrl,
       { lineAccountId: null, friendId: 'friend-1', sourceContent: 'welcome!' },
     );
-    // What LINE receives AND what messages_log records is the decorated
-    // message, mirroring the cron.
+    // LINE に届く内容と履歴の両方が、cron と同じ加工後のメッセージになることを確かめる。
     expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [
       { type: 'flex', text: 'tracked!&f=friend-1' },
     ], undefined);

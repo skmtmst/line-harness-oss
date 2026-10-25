@@ -1239,7 +1239,7 @@ describe('フォルダ', () => {
   });
 
   it('F-13 の新しい種類でも絞れる（件数は数えていない）', async () => {
-    // 中身の folder_id 列が無い3種別。箱の一覧は返り、件数は省かれる（#730）。
+    // 中身の folder_id 列が無い3種別。箱の一覧は返り、件数は省かれる。
     for (const kind of ['automation', 'common_action', 'webhook', 'conversion']) {
       folders.getFolders.mockResolvedValue([]);
       const res = await req(`/api/folders?kind=${kind}`, 'GET');

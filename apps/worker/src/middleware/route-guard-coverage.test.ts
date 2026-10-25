@@ -18,8 +18,7 @@ vi.mock('@line-crm/db', async (original) => ({
   getActiveImpersonation: async () => null,
   getPlatformAdminByStaffId: async () => null,
   getStaffById: async () => null,
-  // The matrix tests authorization, with rate limiting tested separately in
-  // rate-limit-shared.test.ts. A fake DB must not stop requests at the throttle.
+  // 権限試験がレート制限で先に止まらないよう、偽 DB では制限を分離する。共有制限は rate-limit-shared.test.ts で検証する。
   bumpAuthThrottle: async () => 1,
   getLineAccountScopeEntries: async () => [{ id: 'coverage-account', tenant_id: 'coverage-tenant', is_active: 1 }],
   recordAuditEvent: async () => undefined,
@@ -29,8 +28,7 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { collectSecurityRoutes, routeSourceFiles } from '../test-utils/route-security-inventory.js';
 import { isLegacyGlobalApi } from './tenant-scope.js';
 
-// Exercise authorization with the staging-only routes actually enabled. Their
-// disabled/production 404 boundary is covered by the real QA entrypoint tests.
+// 検証専用経路を有効にして権限を試す。無効時・本番時の404は実際の QA 入口の試験へ分ける。
 const stagingEnvironment = {
   DEPLOY_ENV: 'staging', WORKER_NAME: 'nen-line-stg', D1_DATABASE_ID: QA_STAGING_DATABASE,
   WORKER_PUBLIC_URL: 'https://stg-api.musubo.jp', STAGING_QA_ENABLED: 'true', STAGING_QA_OUTBOUND_DISABLED: 'true',
@@ -142,9 +140,7 @@ describe('更新系の権限ガードの網羅', () => {
       ['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'].includes(route.method)
     ).map(route => `${route.method} ${route.path}`));
     expect([...runtimeKeys].filter(key => !sourceKeys.has(key))).toEqual([]);
-    // Conditional route factories can yield several possible method/path pairs.
-    // Intersect those with the actual Hono registrations, never guess a route
-    // into existence from the syntax alone. ALL endpoints are retained too.
+    // 条件付き route が作る候補は実 Hono 登録と照合し、構文だけで存在を推測しない。ALL の登録も残す。
     const sources = candidates.filter(route => runtimeKeys.has(`${route.method} ${route.path}`) || route.method === 'ALL');
     if (process.env.SECURITY_INVENTORY_REPORT) {
       const lines = sources.map(route => {
@@ -284,8 +280,7 @@ describe('更新系の権限ガードの網羅', () => {
     const routes = [...new Map(app.routes.filter(route =>
       ['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method)
       && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
-      // Preview and personal notification preferences intentionally have a
-      // separate read-only contract; they are not business write operations.
+      // プレビューと本人の通知設定は業務更新と異なるため、専用の閲覧契約で検証する。
       && !gap2ReadOperation(route.method, route.path)
       && !gap2SelfPreference(route.method, route.path)
     ).map(route => [`${route.method} ${route.path}`, route])).values()];
@@ -347,7 +342,7 @@ describe('更新系の権限ガードの網羅', () => {
 });
 
 /**
- * N-423 (#670): staff 権限の deny-by-default の網羅。
+ *  staff 権限の deny-by-default の網羅。
  *
  * authMiddleware は staff に対して、公開境界・本人系・明示許可・権限表の
  * いずれにも入らない管理 API を 403 にする。新しい管理 API を足して
@@ -528,7 +523,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/login-audit',
     'GET /api/manual-links',
     'GET /api/manual-links/lookup',
-    // Store comparison and MCP management remain owner/admin only.
+    // 店舗比較と MCP 管理は owner/admin に限る。
     'GET /api/mcp-connections',
     'GET /api/mcp-connections/logs',
     'GET /api/notifications',

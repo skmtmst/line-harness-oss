@@ -92,8 +92,7 @@ export async function processWebinarReminders(
     const reg = due[i];
     try {
       if (reg.account_id && isStoppedTenantStatus(tenantStatusByAccount.get(reg.account_id))) {
-        // notified_at is the terminal ledger for this legacy reminder path.
-        // Consuming it prevents an overdue send after the tenant is restored.
+        // 統括の復旧後に期限切れ通知を送らないよう、この経路の終端台帳 notified_at を消費する。
         await markWebinarRegistrationNotified(db, reg.id);
         continue;
       }
@@ -104,7 +103,7 @@ export async function processWebinarReminders(
       })) {
         continue;
       }
-      // 緊急停止 (#1050): reminder_dispatch が止まっている統括は通知済みにせず
+      // 緊急停止 : reminder_dispatch が止まっている統括は通知済みにせず
       // 未送信のまま残す。復旧すれば LEAD_SECONDS 内の予約が届く。
       if (await isOperationCapabilityStopped(db, reg.account_id, 'reminder_dispatch')) {
         continue;
@@ -157,7 +156,7 @@ export async function sendWebinarRegistrationConfirmation(
     if (webinar.account_id && !await isLineAccountTenantActive(db, webinar.account_id)) {
       return;
     }
-    // 緊急停止 (#1050): reminder_dispatch 停止中は受付確認も送らない。
+    // 緊急停止 : reminder_dispatch 停止中は受付確認も送らない。
     if (webinar.account_id &&
         await isOperationCapabilityStopped(db, webinar.account_id, 'reminder_dispatch')) {
       return;

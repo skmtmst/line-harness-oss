@@ -11,7 +11,9 @@ export class UnexpectedRouteError extends HTTPException {
   }
 }
 
-/** S01の事故番号を共通の依頼番号へ接続する。入力や例外の自由文は記録しない。 */
+/**
+ * 障害の識別番号を共通の依頼番号へ接続する。入力や例外の自由文は記録しない。
+ */
 export const unhandledWorkerError: ErrorHandler<Env> = (error, c) => {
   const context = currentInvocation() ?? createInvocationContext('http');
   return runWithInvocation(context, async () => {

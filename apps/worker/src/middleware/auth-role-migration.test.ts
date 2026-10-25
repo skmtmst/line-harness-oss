@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * 役割と読み取り専用を分けたときの、既存ユーザーの扱い。
- *
- * 以前は access_level='read_only' の人を役割ごと 'viewer' へ潰していた。
- * 分離後も「更新できるか」の結果が1人も変わらないことを、DBの行から
- * 導ける形で確認する。DBスキーマ（role × access_level）は変えていないので、
- * 移行はこの読み替えだけで完結する。
+ * 役割と readOnly を別々に扱っても、既存利用者の更新可否が変わらないことを DB の行から確かめる。
+ * role × access_level の保存形式を維持し、読替だけで移行する。
  */
 
 type StaffRow = { role: 'owner' | 'admin' | 'staff'; access_level: 'full' | 'read_only' };
@@ -55,7 +51,7 @@ describe('役割と読み取り専用の分離（移行の互換性）', () => {
   });
 
   it('分離後は、読み取り専用でも元の役割が残る', () => {
-    // ここが分離の目的。以前はすべて 'viewer' になり、
+    // 読み取り専用でも役割を保持し、閲覧範囲を区別できることを確かめる。
     // 「閲覧のみのオーナー」と「閲覧のみのスタッフ」を区別できなかった。
     expect(splitIdentity({ role: 'owner', access_level: 'read_only' })).toEqual({
       role: 'owner',
@@ -65,7 +61,7 @@ describe('役割と読み取り専用の分離（移行の互換性）', () => {
       role: 'staff',
       readOnly: true,
     });
-    // 分離前はどちらも同じ値になっていた
+
     expect(legacyEffectiveRole({ role: 'owner', access_level: 'read_only' })).toBe(
       legacyEffectiveRole({ role: 'staff', access_level: 'read_only' }),
     );

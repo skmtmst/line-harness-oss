@@ -15,7 +15,7 @@ export function personMetrics(
   now: number,
   settings: Record<string, number> = {},
 ) {
-  // Daily comparisons call this for many periods. Index a customer's records once per call.
+  // 多期間の日別比較で同じ読取を繰り返さないよう、1回の呼出で本人の記録を索引化する。
   const byPerson = new Map<string, StyleBooking[]>();
   for (const row of rows) {
     const group = byPerson.get(row.personKey);

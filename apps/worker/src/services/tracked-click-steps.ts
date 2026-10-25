@@ -47,7 +47,7 @@ export async function processTrackedClick(env:Env['Bindings'],clickId:string,pla
         await step('automation',async db=>{
           const outcome=await dispatchAutomationEventWithLogging(db,{lineAccountId:plan.accountId!,eventType:'link_clicked',sourceEventId:clickId,
             friendId,eventData:{trackedLinkId:plan.linkId,clickId}});
-          // The dispatcher returns a failed outcome instead of always throwing.
+          // 配信処理は例外だけでなく、失敗を示す結果を返す場合もある。
           if(outcome.some(item=>['configuration_error','failed'].includes(item.status ?? '')))throw new Error('automation_failed');
           return outcome;
         });

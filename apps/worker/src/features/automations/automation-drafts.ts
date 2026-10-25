@@ -62,7 +62,7 @@ export interface AutomationDraftDetail {
   conditions: Record<string, unknown>;
   actions: AutomationDraftAction[];
   /**
-   * 監査 R486/R487: 下書きの各「共通アクションを実行」が、確認した時点で
+   * 監査 /: 下書きの各「共通アクションを実行」が、確認した時点で
    * どの公開版を指すか。送る内容の確認と実行前の照合の両方に使う。
    * 実行計画を立てる瞬間と同じ順番（下書きの処理の並び）で返す。
    */
@@ -131,15 +131,8 @@ export async function automationVersionFingerprint(content: AutomationVersionCon
 }
 
 /**
- * 画面へ渡す「確認した版」の札（revision）。
- *
- * `<版の行のid>.<中身の指紋>` の形。**画面はこれを中身の分からない札として
- * 持ち回るだけ**で、指紋の作り方を知らない。同じ判定を画面とWorkerの2か所に
- * 置くと、片方だけ直したときに食い違うためである。
- *
- * `updateAutomationDraft` は `automation_versions` の同じ行を書き換えるので、
- * 行のidだけでは中身が変わったことを見分けられない。**指紋を札に混ぜて初めて、
- * 突き合わせが中身に効く。**
+ * 確認した版の revision は <版の行のid>.<中身の指紋> とし、画面は不透明な値として扱う。
+ * 同じ行 ID の内容更新も検出できるよう指紋を含め、判定方法を画面と Worker へ重複させない。
  */
 export async function automationRevisionToken(
   versionId: string,
@@ -334,16 +327,8 @@ function parseActions(raw: string): AutomationDraftAction[] {
 }
 
 /**
- * 対象条件を「計算できる形か」まで検査する（AUTOMATION-04）。
- *
- * 以前は `parseCondition` が外形（operator と rules 配列）だけを見ていた
- * ため、`{ type: 'name', value: '田中' }` のような文字列のままの値が
- * 保存を通り、人数確認（`previewAutomationAudience` → `buildSegmentWhere`）
- * で初めて `name rule requires an object value` と落ちていた。
- * **保存するものは、計算側と同じ部品へその場で通す。** 組み立てられない
- * 条件はここで断るので、版の作成という副作用の前に止まる。
- *
- * 空の条件（`{}`）は「絞り込みなし」の意味で許す。
+ * 保存後の人数確認で条件が壊れないよう、保存前に計算側と同じ部品で条件を組み立てる。
+ * 組み立てられない条件は版を作る前に断る。空の条件 {} は絞り込みなしとして許す。
  */
 function assertDraftConditionUsable(conditions: unknown): void {
   if (conditions === null || typeof conditions !== 'object' || Array.isArray(conditions)) {
@@ -571,14 +556,8 @@ export async function listAutomationDraftResources(
 }
 
 /**
- * 同じ「新規作成の操作」なら、いつも同じ下書きのidになるようにする（冪等鍵）。
- *
- * **操作ごとの鍵（`operationKey`）が同じものだけが同じidになる。**
- * 以前は店・見本・担当者・世代だけから決めていたため、別の新規作成でも
- * 同じ下書きへ戻り、一覧から来た新しい入力が前の下書きを上書きしていた
- * （DETAIL-13）。画面は新規作成のたびに新しい鍵を振り、同じ保存操作の
- * 再試行だけが同じ鍵を使う。世代番号は、前の下書きを公開してそのidが
- * 埋まったときに次へずらすためのもの。
+ * 別の新規作成で下書きを上書きしないよう、operationKey が同じ操作だけを同じ ID に収束させる。
+ * 画面は新規作成ごとに鍵を発行し、再試行では同じ鍵を使う。世代番号は公開済みの下書き ID と衝突しないために使う。
  */
 async function templateDraftId(
   input: {
@@ -603,22 +582,15 @@ async function templateDraftId(
 }
 
 /**
- * 見本から下書きを作る。**同じ条件で何度呼んでも1件しか作らない。**
- *
- * 以前は毎回 `crypto.randomUUID` を振っていたので、2つのタブが同時に
- * 保存を押すと下書きが2件できた。画面側の連打よけ（JSの変数と sessionStorage）は
- * タブの中でしか効かない。**冪等鍵を主鍵に載せ、DBで1件に収める。**
- *
- * 3つの文をひとつのまとまりで流すので、途中で割り込まれても
- * 「定義だけあって版が無い」状態にはならない。既にある下書きに当たったときは
- * 版を足さず、そのまま同じ下書きを返す。
+ * 連打防止はタブをまたげないため、冪等鍵を主鍵にして DB 側で下書きを1件に収める。
+ * 定義と版をひとつのまとまりで保存し、途中の割り込みで版のない定義を残さない。既存の下書きには版を追加せず、そのまま返す。
  */
 export async function createAutomationDraftFromTemplate(
   db: D1Database,
   input: {
     templateKey: string;
     lineAccountId: string;
-    /** 新規作成の操作を識別する鍵。同じ操作の再試行だけが同じ鍵を使う（DETAIL-13）。 */
+    /** 新規作成の操作を識別する鍵。同じ操作の再試行だけが同じ鍵を使う。 */
     operationKey: unknown;
     folderId?: unknown;
     createdBy?: string | null;
@@ -705,7 +677,7 @@ interface AutomationDraftRow extends AutomationVersionContent {
   current_draft_version_id: string;
   trigger_type: AutomationDraftDetail['eventType'];
   created_by: string | null;
-  /** 定義の状態。公開済みの定義にも下書きをぶら下げられる（#942 N-352）。
+  /** 定義の状態。公開済みの定義にも下書きをぶら下げられる。
       保管済みは読み取り側の WHERE で除くため、ここには現れない。 */
   definition_status: 'draft' | 'active' | 'stopped';
 }
@@ -906,7 +878,7 @@ export async function updateAutomationDraft(
   const actions: AutomationDraftAction[] = [];
   const ids = new Set<string>();
   /*
-   * 共通アクションの呼び出し束（N-356）。
+   * 共通アクションの呼び出し束。
    *
    * 版は実行計画へ焼き付けるとき `common_action_bindings` から引く
    * （`automation-engine.ts` の `resolveCommonActionVersion`）。
@@ -953,7 +925,7 @@ export async function updateAutomationDraft(
         versionId: commonAction.current_published_version_id,
       });
     } else if (raw.type === 'notify_staff') {
-      // F-14: 担当者通知のルールは、有効ないまの版をこの店の範囲で指す。
+      // 担当者通知のルールは、有効ないまの版をこの店の範囲で指す。
       // 送り先・文面の初期値はルール側、追加のひと言はここで足す。
       const notificationRuleId = requiredString(
         params.notificationRuleId, `actions.${index}.notificationRuleId`, '担当者通知',
@@ -988,24 +960,9 @@ export async function updateAutomationDraft(
   };
   const nextVersionId = crypto.randomUUID();
   /*
-   * **版の行は書き換えない。新しい行を作って、現在の下書きを差し替える。**
-   *
-   * 以前は同じ行の中身を上書きしていたので、下書きを何度更新しても
-   * `automation_versions.id` が変わらなかった。すると
-   *
-   *   - `WHERE ... current_draft_version_id = ?` の突き合わせが中身に効かず、
-   *     後から来た保存が、別の人の保存を黙って上書きしていた
-   *   - 1人テストが「確認した版」として渡した id が、中身が入れ替わった後も
-   *     そのまま通り、**利用者が見ていない文面を送れてしまった**
-   *
-   * 行を不変にすると、`startAutomationRun` の
-   * `v.id IN (現在の下書き, 現在の公開)` がそのまま CAS になる。割り込みの保存が
-   * 入った版はその場で外れるので、**実行記録を1行も作らずに**止まる。
-   * 公開済みの版が `trg_automation_published_version_immutable` で不変なのと
-   * 同じ考え方を、下書きにも広げた形になる。
-   *
-   * 古い版の行は残す。実行記録（`automation_runs.automation_version_id`）が
-   * 指していることがあり、実行記録は消せない決まりだからである。
+   * 同時保存と未確認の文面の送信を防ぐため、版の行は不変にし、新しい行へ下書きの参照を差し替える。
+   * startAutomationRun の版 ID 照合が CAS として働き、更新された版では実行記録を作る前に止まる。
+   * 過去の版は実行記録から参照されるため削除しない。
    */
   const statements = [
     db.prepare(
@@ -1051,13 +1008,8 @@ export async function updateAutomationDraft(
       nextVersionId, current.id,
     ),
     /*
-     * 共通アクションの束は「処理の番号 → 版」の対応表。下書きに載っている
-     * 呼び出しだけを足す（INSERT OR IGNORE）。
-     *
-     * **消したり版を上げたりしない。** 同じ定義にぶら下がる公開済みの版が
-     * 同じ束を見て動いている。下書きの保存で勝手に版を上げると、公開中の
-     * ルールが見ていない新版を呼び始める。束の更新・削除は共通アクション側の
-     * 利用先管理に委ねる。
+     * 下書きにある共通アクションの呼び出しだけを INSERT OR IGNORE で追加する。
+     * 公開版も同じ束を参照するため、下書き保存で既存の版を変更・削除しない。利用先の更新は共通アクション側で管理する。
      */
     ...commonActionBindings.map((binding) => db.prepare(
       `INSERT OR IGNORE INTO common_action_bindings
@@ -1085,7 +1037,7 @@ export async function publishAutomationDraft(
     expectedDraftVersionId: unknown;
     activate: unknown;
     /**
-     * 公開の確認時に画面が見ていた稼働状態（R483）。
+     * 公開の確認時に画面が見ていた稼働状態。
      * 渡されたときだけ書き込み条件に入れ、読み取り後の停止・再開を
      * 読んだ時点の状態で上書きしない。省略時は従来どおり状態を見ない。
      */
@@ -1109,7 +1061,7 @@ export async function publishAutomationDraft(
   ).bind(expectedVersionId, current.id).first<{ version_number: number }>();
   if (!version) throw new AutomationDraftError('not_found', '公開する下書きが見つかりません');
   /*
-   * 古い保存口を通った壊れた条件を、そのまま公開しない（AUTOMATION-04）。
+   * 古い保存口を通った壊れた条件を、そのまま公開しない。
    * 修復は `updateAutomationDraft` で条件を直して保存し直すだけでよい。
    * 公開は状態を確定させる操作なので、計算できない条件はここでも断る。
    */
@@ -1132,7 +1084,7 @@ export async function publishAutomationDraft(
    *
    * 読み取りから書き込みまでの間に別の担当が停止（または再開）しても、
    * 読んだ時点の状態で上書きしないよう、画面が見た状態を
-   * `expectedStatus` で受け取って書き込み条件に入れる（R483）。
+   * `expectedStatus` で受け取って書き込み条件に入れる。
    * 食い違えば当てずに 409 で返し、最新の状態変更を残す。
    */
   const status: 'active' | 'stopped' = current.definition_status === 'draft'
@@ -1192,7 +1144,7 @@ export async function publishAutomationDraft(
 }
 
 /**
- * 動いている・止めている定義に「改訂用の下書き」をぶら下げる（#942 N-352）。
+ * 動いている・止めている定義に「改訂用の下書き」をぶら下げる。
  *
  * 公開済みの版は不変（`trg_automation_published_version_immutable`）なので、
  * 直すには **公開版を写した下書き**を作ってから `publishAutomationDraft` で
@@ -1227,7 +1179,7 @@ export async function createAutomationDraftFromDefinition(
       };
     } catch (error) {
       /*
-       * 指し先が「下書きではない版」や、もう無い版を指している（AUTOMATION-05）。
+       * 指し先が「下書きではない版」や、もう無い版を指している。
        * 古い保存口が残した指し先や、途中で切れた指し替えの名残で、
        * 開ける下書きは実際には無い。ここで not_found のまま返すと一覧の
        * 「編集」が永久に失敗するので、公開版から作り直して指し直す。
@@ -1298,7 +1250,7 @@ export async function createAutomationDraftFromDefinition(
 }
 
 /**
- * 一覧の「複製」（#942 N-352）。いま見えている版を写した **新しい下書き** を作る。
+ * 一覧の「複製」。いま見えている版を写した **新しい下書き** を作る。
  *
  * 同名のままだと一覧で見分けられないので「のコピー」を付ける。
  * 共通アクションの束は利用先（consumer_id）ごとに張られているため、

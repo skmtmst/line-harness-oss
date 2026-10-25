@@ -1,14 +1,4 @@
-/*
- * N-070: テスト送信の送信先を、送る前に画面へ出せるようにする。
- *
- * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の reminders
- * ルートと実物の認証（Bearer APIキー → staff_members）を当てる。
- * LINEへの実送信だけは LineClient をモックで止める。
- *
- * 直す前: 送信先は「送ったあと」にしか分からず、未設定でも画面上に
- * 「テスト送信後に表示」と出るだけだった。POST は未設定と設定済み無効を
- * 同じ422文言で返していた。
- */
+/** テスト送信先は送る前に表示し、未設定と無効を区別する。実 route・認証・SQLite を使い、LINE の送信だけを差し替える。 */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Env } from '../worker-env.js';

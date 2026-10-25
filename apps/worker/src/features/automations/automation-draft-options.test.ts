@@ -15,7 +15,7 @@ import {
 } from './automation-drafts';
 
 /*
- * #734: 下書きで選べるきっかけ・処理は、共有の正本と実行門で集合として一致する。
+ * 下書きで選べるきっかけ・処理は、共有の正本と実行門で集合として一致する。
  * 共有の一覧は本物で import し、相手側(下書きunion・実行門・実行器)は
  * 実装を読む。実行門は実際の集合を使い、配列の展開も含めて照合する。
  *
@@ -79,12 +79,12 @@ describe('下書きの選択可能一覧(#734)', () => {
       `INSERT INTO friends (id, line_user_id, line_account_id, display_name)
        VALUES ('friend-1', 'U-1', 'account-1', '一郎')`,
     ).run();
-    // #942 N-356: 共通アクションの選択肢。呼べるのは公開済みだけ。
+    //  共通アクションの選択肢。呼べるのは公開済みだけ。
     testDb.raw.prepare(
       `INSERT INTO common_actions (id, line_account_id, name, status, current_published_version_id)
        VALUES ('common-1', 'account-1', '会員向け一式', 'published', 'cv-1')`,
     ).run();
-    // F-14: 担当者通知の選択肢。下書き保存で指せる有効なルール。
+    // 担当者通知の選択肢。下書き保存で指せる有効なルール。
     testDb.raw.prepare(
       `INSERT INTO notification_rules
          (id, name, event_type, conditions, channels, line_account_id, is_active, version)
@@ -117,7 +117,7 @@ describe('下書きの選択可能一覧(#734)', () => {
   });
 
   /*
-   * `common_action` は実行器を持たない。#942 N-356: 実行計画
+   * `common_action` は実行器を持たない。 : 実行計画
    * （automation-engine.ts の buildExecutionPlan）が公開済みの版へ固定し、
    * `common_action_marker` と中身の処理へ展開する。だから直接の実行器鍵は
    * 持たず、計画側で `type === 'common_action'` を特別扱いする。

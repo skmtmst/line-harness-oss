@@ -358,7 +358,7 @@ booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SET
 });
 
 /**
- * 例外日の削除。登録だけできて画面から消せない状態を解消する(#953 E-09)。
+ * 例外日の削除。登録だけできて画面から消せない状態を解消する。
  * 消す直前の版を expectedVersion で確認し、読み違えたまま別の版を
  * 消さないようにする。別アカウントのIDは not_found として隠す。
  */

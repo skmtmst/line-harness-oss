@@ -14,7 +14,7 @@ import { documentAnswer, documentExpired, uploadedDocumentKind, purgeUnsafeFormD
 
 const TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' };
 export async function uploadFormDocument(c: Context<Env>, block: FormInputBlock, scope: { accountId: string; formId: string; friendId: string; versionId: string | null }) {
-  // reject legacy and mixed identity fields before reading or storing bytes.
+  // バイトの読取や保存より前に、旧形式や混在する本人確認項目を拒む。
   if (formFileKinds(block).includes('identity')) return c.json({ success: false, code: 'IDENTITY_DOCUMENT_DISABLED', error: '本人確認書類は受け取れません。画像・PDFの質問を使ってください' }, 400);
   if (await customerDeletionPending(c.env.DB, scope.friendId)) return c.json({ success: false, error: 'この友だちのデータは削除中です' }, 409);
   const mime = (c.req.header('Content-Type') ?? '').split(';')[0].trim().toLowerCase();
@@ -25,7 +25,7 @@ export async function uploadFormDocument(c: Context<Env>, block: FormInputBlock,
   const side = c.req.query('side') ?? (kind === 'identity' && block.fileBothSides ? 'front' : 'single');
   if (kind === 'identity' && block.fileBothSides ? !['front', 'back'].includes(side) : side !== 'single') return c.json({ success: false, error: '表か裏を選んでください' }, 400);
   if (Number(c.req.header('Content-Length') ?? 0) > 10485760) return c.json({ success: false, error: '1ファイル10MBまでです' }, 400);
-  // Stream with a hard ceiling even if Content-Length is absent or forged.
+  // Content-Length が欠けたり偽造されたりしても、stream の読取で上限を守る。
   const reader = c.req.raw.body?.getReader();
   if (!reader) return c.json({ success: false, error: 'ファイルが空です' }, 400);
   const parts: Uint8Array[] = []; let size = 0;

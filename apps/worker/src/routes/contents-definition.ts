@@ -1,4 +1,4 @@
-/** Public exports remain stable; implementation lives with its related helpers. */
+/** 既存の公開名を保ち、関連する補助関数と実装を近くに置く。 */
 export { REPLACEMENT_BODY_MAX_BYTES } from './contents-definition-replacement-revision.js';
 export { RequestBodyError } from './contents-definition-replacement-revision.js';
 export { replacementRevision } from './contents-definition-replacement-revision.js';

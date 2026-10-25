@@ -1,6 +1,4 @@
-/** Resolve current derivatives through the submission primary key. Historical
- * custom filenames retain the old URL lookup until their key mapping is migrated.
- */
+/** 現在の派生画像は提出の主キーで解決する。名前付きの過去ファイルは、対応の移行まで URL 照会を保つ。 */
 export async function photoImageScanAllowed(db: D1Database, key: string): Promise<boolean> {
   const indexed=await db.prepare(`SELECT ps.id FROM nen_photo_submissions ps
     JOIN media_file_scans scan ON scan.subject_kind='photo' AND scan.subject_id=ps.id

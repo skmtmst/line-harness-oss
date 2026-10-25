@@ -26,7 +26,7 @@ bookingPassBilling.post('/api/booking/admin/pass-purchases/simulate-event',requi
  const row=await c.env.DB.prepare("SELECT id FROM booking_pass_purchases WHERE account_id=? AND (CASE WHEN ?='checkout.session.completed' THEN checkout_id=? ELSE subscription_id=? END)").bind(a,event.kind,event.checkoutId??null,event.subscriptionId??null).first();if(!row)throw new GapError('not_found',404);
  return c.json({success:true,data:await passBillingEvent(c.env.DB,event)});
 });
-/** Dedicated signed test webhook; no live mode or external Stripe writes. */
+/** 本番や Stripe の外部書込へつながない、専用の署名付き試験 Webhook。 */
 bookingPassBilling.post('/api/booking/pass-payments/webhook',async c=>{
  const raw=await readBodyWithinLimit(c.req.raw),secret=c.env.STRIPE_TEST_WEBHOOK_SECRET;if(raw===null)throw new GapError('body_too_large');
  if(!secret||!await verifyStripeSignature(secret,raw,c.req.header('stripe-signature')??''))throw new GapError('invalid_signature',401);

@@ -10,7 +10,7 @@ import {
 } from '../features/automations/automation-engine.js';
 import { automations } from './automations.js';
 
-// #736: 実DBで旧PUTの許可/拒否と再送受け付けを確かめる。dbのからくりは使わない。
+// 実DBで旧PUTの許可/拒否と再送受け付けを確かめる。dbのからくりは使わない。
 function setupApp(db: D1Database) {
   const app = new Hono<{
     Bindings: { DB: D1Database };

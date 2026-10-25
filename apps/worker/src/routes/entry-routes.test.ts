@@ -4,7 +4,7 @@ import type { Env } from '../worker-env.js';
 
 const mocks = {
   getEntryRoutes: vi.fn(),
-  // N-011: 一覧が共通境界へ委譲するため、範囲解決の口も用意する。
+  // 一覧が共通境界へ委譲するため、範囲解決の口も用意する。
   getLineAccountScopeEntries: vi.fn(async () => []),
   getStaffById: vi.fn(async () => null),
   getStaffAccountScopeIds: vi.fn(async () => []),

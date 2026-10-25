@@ -11,7 +11,7 @@ import { images } from './images.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /**
- * #637 差し戻し対応。本番と同じ順序
+ *  差し戻し対応。本番と同じ順序
  * auth → tenantScope → businessAudit → feature → contents で、
  * 越境拒否の正規監査 media.download/denied が1件だけ残ることを確かめる。
  *

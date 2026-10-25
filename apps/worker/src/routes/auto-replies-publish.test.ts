@@ -392,7 +392,7 @@ describe('自動応答の試験と公開', () => {
     expect(mocks.publishAutoReplyDraftVersion).toHaveBeenCalledWith(db, 'rule-draft', {
       staffId: 'staff-a',
       idempotencyKey: 'publish-test-0002',
-      // m26c R553/R554: 公開前チェック時の内容と停止状態を渡す。
+      // m26c /: 公開前チェック時の内容と停止状態を渡す。
       expectedSnapshot: JSON.stringify(settings()),
       expectedStoppedAt: null,
       expectedIsActive: 1,

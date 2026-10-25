@@ -55,7 +55,7 @@ function json(method: string, body: unknown) {
   return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
 }
 
-// V: 配信の承認は大事な操作なので直前の再確認を求める。ここでは二者承認の
+// 配信の承認は大事な操作なので直前の再確認を求める。ここでは二者承認の
 // 流れを見たいため、再確認済み（10分の窓の内側）のセッションを用意して通す。
 async function steppedUpSession(db: SqliteD1, staffId: string, token: string) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));

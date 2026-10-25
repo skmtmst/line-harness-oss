@@ -7,7 +7,7 @@ import type { HqTemplateStatement } from '@line-crm/db';
 import { HqTemplateError } from './tag.js';
 
 type Area = HqRichMenuDefinition['richMenu']['pages'][number]['areas'][number];
-/** Bind named booking pages to the receiving store, with an atomic inventory guard. */
+/** 名前付き予約ページを受取店舗へ結び、一覧の照合も原子的に行う。 */
 export async function resolvePortableMenuActions(db:D1Database,auth:HqTemplateAuthority,accountId:string,areas:Area[]) {
   if(areas.some(a=>a.bookingMenuName||a.dataBindings)&&!await db.prepare('SELECT id FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL').bind(accountId,auth.tenantId).first()) throw new HqTemplateError('FORBIDDEN',403);
   const actions=new Map<string,LiffAction>(),snapshot:unknown[]=[],statements:HqTemplateStatement[]=[],data:Record<string,Record<string,string>>={};

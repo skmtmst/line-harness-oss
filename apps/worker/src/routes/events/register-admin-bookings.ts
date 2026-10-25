@@ -90,7 +90,7 @@ events.get('/api/events/admin/events/:id/bookings', async (c) => {
     )
     .bind(...params, paging.limit, paging.offset)
     .all<{ id: string } & Record<string, unknown>>();
-  // IDEA-07: 各予約に紐づく通知予定 (前日・開始前) を同じ応答で返す。
+  // 各予約に紐づく通知予定 (前日・開始前) を同じ応答で返す。
   // 開催回の移動や取消で止まった分も status で返し、変更前後と残存を
   // 画面から確かめられるようにする。表示中のページ分だけを1回で取る。
   const bookingIds = (results ?? []).map((row) => row.id);

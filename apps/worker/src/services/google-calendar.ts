@@ -2,7 +2,7 @@ import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { API_RETRY_WAIT, createCallState, createExternalCall } from '../lib/external-call/index.js';
 import { type CallScope, type CircuitStore } from '../lib/external-call/types.js';
 import { boundedHttpRequest } from '../lib/external-call/bounded-http.js';
-// Google Calendar API client
+
 
 const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
 const TIMEZONE = 'Asia/Tokyo';
@@ -33,8 +33,8 @@ export interface CalendarEventEvidence {
 
 export interface CreateEventInput {
   summary: string;
-  start: string;   // ISO datetime string
-  end: string;     // ISO datetime string
+  start: string;   // ISO 形式の日時。
+  end: string;     // ISO 形式の日時。
   description?: string;
   // こちらで採番したイベント ID。渡すと Google 側もこの ID で登録される。
   // 外部作成とDB保存の間で障害が起きても再送が別 ID を生まない。
@@ -122,10 +122,7 @@ export class GoogleCalendarClient {
     throw new GoogleCalendarReadError(502);
   }
 
-  /**
-   * Get busy time intervals from Google Calendar FreeBusy API.
-   * Returns an array of { start, end } intervals when the calendar is busy.
-   */
+
   async getFreeBusy(timeMin: string, timeMax: string): Promise<BusyInterval[]> {
     const url = `${GCAL_BASE}/freeBusy`;
     const body = {
@@ -152,10 +149,7 @@ export class GoogleCalendarClient {
     });
   }
 
-  /**
-   * Create an event on Google Calendar.
-   * Returns the created event's ID.
-   */
+
   async createEvent(event: CreateEventInput, signal?: AbortSignal): Promise<{ eventId: string }> {
     const url = `${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events`;
 
@@ -179,9 +173,7 @@ export class GoogleCalendarClient {
     }, signal, 'write');
   }
 
-  /**
-   * Delete an event from Google Calendar.
-   */
+
   async deleteEvent(eventId: string, signal?: AbortSignal): Promise<void> {
     const url = `${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events/${encodeURIComponent(eventId)}`;
 

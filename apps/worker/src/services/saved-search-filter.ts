@@ -35,7 +35,7 @@ function dateCondition(
     const to = text(range.to);
     if (!from && !to) return `${label}の範囲がありません`;
     /*
-     * R183: 開始日より後の終了日は0人になる設定ミス。0人のまま数えて
+     * 開始日より後の終了日は0人になる設定ミス。0人のまま数えて
      * 実行すると「本当に該当者なし」と区別が付かないため、実行の時点
      * でも断る（保存時は validateSearchConditions が先に断る）。
      * 日付は YYYY-MM-DD のため文字列比較で前後が分かる。
@@ -126,7 +126,7 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
         数値・日付・日時の大小比較。値が数値として読めるときは
         CAST して数値比較する（TEXT のままだと "10" < "9" になる）。
         ISO形式の日付・日時は文字列のまま大小比較できるので、
-        数値に読めない値は文字列比較へ回す（ATTR-13）。
+        数値に読めない値は文字列比較へ回す。
       */
       const orderedOps: Record<string, string> = { gte: '>=', gt: '>', lte: '<=', lt: '<' };
       const ordered = orderedOps[condition.op];

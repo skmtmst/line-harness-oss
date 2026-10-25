@@ -211,7 +211,7 @@ export class SupportMarkRuleCreateError extends Error {
  * D034: 同じ要求キーの再送で二重に作らないための指紋。
  *
  * 名前・出来事・条件・優先度・手動保護・有効状態が1つでも違えば
- * 別の要求とみなし、作らず止める（対応マーク作成のR512と同じ約束）。
+ * 別の要求とみなし、作らず止める（対応マーク作成のと同じ約束）。
  */
 function supportMarkRuleCreateFingerprint(
   markId: string,

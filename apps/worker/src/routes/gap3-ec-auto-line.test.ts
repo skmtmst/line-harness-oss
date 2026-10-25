@@ -5,7 +5,7 @@ import {ingestBehavior,processAutoLineMock} from '../features/ec-commerce/ec-aut
 import {encryptCredential} from '@line-crm/db';
 let d:ReturnType<typeof gapFixture>;
 const encryptionKey=btoa('x'.repeat(32));
-const at=new Date('2026-10-16T03:00:00Z'); // noon in Tokyo
+const at=new Date('2026-10-16T03:00:00Z'); // 東京の正午を基準にする。
 beforeEach(()=>{d=gapFixture();vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));d.raw.exec("INSERT INTO ec_connectors(id,line_account_id,provider,shop_domain,status,created_at,updated_at) VALUES('ec','a','ec_cube','example.test','connected','now','now')");});
 afterEach(()=>{d.raw.close();vi.unstubAllGlobals();vi.useRealTimers();});
 const app=(s=gapOwner,im=false)=>gapApp(d,[ecAutoLine],s,im,{LINE_CREDENTIAL_ENCRYPTION_KEY:encryptionKey});
@@ -60,7 +60,7 @@ test('EC-23/24/25: 署名・時刻・重複・同意・他店の本人を使わ�
 });
 
 test('EC-03/12/13/23: 本人の結び付けから予定を一度だけ作り、編集後も控えを保持',async()=>{
- // The existing identity resolver owns candidate approval; this fixture is an approved link.
+ // 本人の承認判定は既存の解決処理が行うため、ここでは承認済みの結び付きを fixture に使う。
  d.raw.exec("INSERT INTO ec_identity_links(id,tenant_id,candidate_id,source_key,shop_key,external_customer_id,line_account_id,friend_id,linked_at) VALUES('link','t','approved-candidate','ec_cube','example.test','customer','a','f','2026-10-16')");
  await enable();const event={eventId:'matched',customerId:'customer',productId:'p',type:'cart_add',occurredAt:'2026-10-16T01:00:00Z',trackingConsent:true};
  await ingestBehavior(d.db,'a',event,at);await ingestBehavior(d.db,'a',event,at);expect(d.raw.prepare('SELECT count(*) n FROM ec_auto_line_sends').get()).toEqual({n:1});

@@ -5,7 +5,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { chats } from './chats.js';
 
 /*
- * INBOX-09: 「すべて／要返信／1時間以上待ち」の件数を、一覧と同じ
+ * 「すべて／要返信／1時間以上待ち」の件数を、一覧と同じ
  * 条件（アカウント・検索・担当・未読・経路）でサーバーが数える口。
  * 札に出る件数と、その札を押したときの一覧の対象が一致することを
  * 実SQLite・実ルートで確かめる。

@@ -1,4 +1,4 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const analyticsDashboardPaths = {
   // ── Analytics ──────────────────────────────────────────────────────────
   '/api/analytics/report-schedules/{id}': {
@@ -126,7 +126,7 @@ export const analyticsDashboardPaths = {
       responses: { '200': { description: 'Orders attributed to the ref code with status summary' }, '403': { description: 'LINEアカウントの表示権限なし' } },
     },
   },
-  // ── ダッシュボード: 今後の予定・数字の出どころ・印刷用PDF（L #824・M） ──
+  // ── ダッシュボード: 今後の予定・数字の出どころ・印刷用PDF（L ・M） ──
   '/api/dashboard/upcoming': {
     get: {
       tags: ['Dashboard'], summary: '今後の予定（予約配信・リマインダー・予約の7日分、読むだけ）',

@@ -8,7 +8,7 @@ import type { Env } from '../worker-env.js';
 import { AsyncTestScope } from '../test-utils/async-test-scope.js';
 
 /**
- * フォーム回答の冪等化の実DBテスト(N-165)。
+ * フォーム回答の冪等化の実DBテスト。
  *
  * 本物の bootstrap.sql を better-sqlite3 に流し、本物の @line-crm/db
  * ヘルパーと本物の送信口で動かす。差し替えるのは本人確認・LINE送信・
@@ -108,8 +108,7 @@ let sqlite: Database.Database;
 let injected: { current: Inject };
 let scope: AsyncTestScope;
 
-// A timeout rejects Vitest's wrapper, not this body. Keep owning the body until
-// its requests, assertions and finally blocks have settled in afterEach.
+// Vitest のタイムアウト後も本文の非同期処理は残るため、afterEach で要求・検証・finally が終わるまで責任を持って待つ。
 function test(name: string, body: () => Promise<void>, timeoutMs?: number) {
   vitestTest(name, () => scope.run(body), timeoutMs);
 }
@@ -203,8 +202,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // Release fake I/O first, then join work, then restore globals/close the DB.
-  // Never clear the next test's counters while an old request can still send.
+  // 次の試験の状態を古い要求が変更しないよう、偽 I/O の解除、処理完了待ち、グローバルの復元、DB の close の順で片付ける。
   await scope.dispose();
   sqlite.close();
   vi.unstubAllGlobals();
@@ -266,8 +264,7 @@ describe('W12 特典の参照先（実DB・回答API）', () => {
 });
 
 describe('フォーム回答の冪等化(実DB)', () => {
-  // Deliberately do not wrap these two probes with scope.run: the test itself
-  // stands in for afterEach after Vitest has stopped awaiting the original body.
+  // Vitest が本文を待たなくなった後の afterEach を再現するため、この2つだけは scope.run で包まない。
   vitestTest('#757 cleanup waits for the real request and its body continuation', async () => {
     const gate = scope.gate(() => new Response(JSON.stringify({ eligible: true }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
@@ -293,7 +290,7 @@ describe('フォーム回答の冪等化(実DB)', () => {
     }));
     vi.stubGlobal('fetch', vi.fn(async () => gate.promise));
     const request = app().fetch(submitRequest('form-webhook', { full_name: '山田' }, KEY, 'user-1'), env());
-    // No body awaits this request: this models an assertion failing before join.
+    // 完了待ちより先に期待値が失敗した状況を再現するため、要求を待たずに残す。
     await scope.dispose();
     expect(pushCalls).toHaveLength(1);
     expect(claimStatus(KEY, 'friend-1')).toBe('completed');
@@ -476,7 +473,7 @@ describe('フォーム回答の冪等化(実DB)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'form-2conn-'));
     const file = join(dir, 'test.sqlite');
     const primary = new Database(file);
-    // #743: 起動SQLの素の再生は文ごとに確定・fsyncし、では並行
+    // 起動SQLの素の再生は文ごとに確定・fsyncし、では並行
     // 480ファイルの確定待ちで行列して準備だけで15秒を超えた。1つの確定に
     // まとめる(判定内容・待ち時間は変えない。WAL化は確定の後)。
     primary.exec('BEGIN;');
@@ -678,8 +675,7 @@ describe('N-042 型検証の接続(#702) F1旧項目対応表', () => {
   });
 });
 
-// Keep the real URL/private-IP policy and webhook fetch. Only DNS is synthetic,
-// so concurrency/event-id assertions still count actual webhook attempts.
+// URL・内部 IP の検査と Webhook 通信は実物を使い、DNS だけを差し替えて実際の試行回数を数える。
 vi.mock('../features/forms/form-webhook.js', async original => {
   const actual = await original<typeof import('../features/forms/form-webhook.js')>();
   return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>

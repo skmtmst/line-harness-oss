@@ -8,7 +8,7 @@ import {
 } from '@line-crm/db'
 import { featureJobCanRun } from './feature-enforcement.js'
 
-// Only run once per day — check if 24 hours have passed
+// 過度な取得を防ぐため、24時間経過してから再取得する。
 const INSIGHT_INTERVAL_MS = 24 * 60 * 60 * 1000
 let lastInsightRun = 0
 
@@ -38,7 +38,7 @@ export async function processInsightFetch(
         defaultLineClient
 
       if (item.lineRequestId) {
-        // Broadcast — use message event insight
+        // broadcast はメッセージ単位の Insight を使う。
         const response = (await client.getMessageEventInsight(
           item.lineRequestId,
         )) as Record<string, unknown>
@@ -124,7 +124,7 @@ export async function processInsightFetch(
           })
         }
       } else if (item.aggregationUnit) {
-        // Multicast (single-account tag) — use unit insight
+        // 単一アカウントの multicast は集計単位の Insight を使う。
         const sentDate = item.sentAt.slice(0, 10).replace(/-/g, '')
         const response = (await client.getUnitInsight(
           item.aggregationUnit,
@@ -141,7 +141,7 @@ export async function processInsightFetch(
           rawResponse: JSON.stringify(response),
         })
       } else {
-        // No tracking info — mark as failed
+        // 計測情報がない場合は成功扱いにしない。
         await markInsightFailed(db, item.insightId, item.retryCount)
       }
     } catch (error) {

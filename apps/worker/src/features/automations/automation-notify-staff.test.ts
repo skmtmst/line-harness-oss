@@ -1,4 +1,4 @@
-// F-14 すること「担当へ知らせる」＋ F-15 下書きのまま1人で試す。
+// すること「担当へ知らせる」＋ 下書きのまま1人で試す。
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type Database from 'better-sqlite3';
 import { createNotificationRule, updateNotificationRule } from '@line-crm/db';

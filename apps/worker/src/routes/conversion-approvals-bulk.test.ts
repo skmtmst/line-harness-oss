@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Route-level test for POST /api/conversions/approvals/bulk:
-//   R353: 途中失敗でも処理済み・失敗の結果一覧を必ず返す（500で失わない）
-//   R354: 再試行の成功で欠けた承認通知を1回だけ送る（二重送信しない）
-// The db layer is mocked (real SQL is covered in packages/db/test).
+// 実 SQL は DB パッケージで検証する。ここでは部分失敗でも処理済み・失敗の一覧を返し、再試行で不足した承認通知だけが1回届くことを確かめる。
 const dbMocks = {
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
@@ -20,7 +17,7 @@ const dbMocks = {
   getConversionApprovalNotifyInfo: vi.fn(),
   getConversionOfferActionPlan: vi.fn().mockResolvedValue(null),
   syncAffiliateConversionMileage: vi.fn().mockResolvedValue(undefined),
-  // R354: 通知の送信記録。直す前は存在せず、already_set では通知が欠けた。
+  // 再送が already_set でも通知を取り残さないよう、送信記録を使う。
   getApprovalNotificationState: vi.fn(),
   markApprovalNotified: vi.fn(),
 };

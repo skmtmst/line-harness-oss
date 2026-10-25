@@ -19,7 +19,7 @@ import { fireEvent } from '../services/event-bus.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
 
 /**
- * 公開API（#939 N-380）。外部システムが `Authorization: Bearer lhp_…` で呼ぶ。
+ * 公開API。外部システムが `Authorization: Bearer lhp_…` で呼ぶ。
  *
  * 管理画面の認証(authMiddleware)は isPublicApiBoundary が /api/public/v1/ を
  * 素通しにするため、ここには届かない。この route が自分で台帳を照合する。
@@ -58,7 +58,7 @@ async function requireToken(
       }, 503),
     };
   }
-  // Resolve ownership from the token's account, never a caller-supplied tenant.
+  // 呼出元が指定する統括でなく、トークンのアカウントから所有者を解決する。
   const account = await c.env.DB.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
     .bind(token.line_account_id).first<{ tenant_id: string | null }>();
   if (!account) return { error: c.json({ success: false, error: 'Invalid or revoked token' }, 401) };
@@ -94,7 +94,7 @@ publicApi.get('/api/public/v1/tags', async (c) => {
  * 手動付与が禁じられたタグは付けない。付けたら tag_change を発火し、
  * 「このタグが付いたら始まる」シナリオも動かす。
  *
- * 書き込みは外部連携が有効なアカウントだけが使える（R432）。止めている
+ * 書き込みは外部連携が有効なアカウントだけが使える。止めている
  * アカウントのトークンで付けようとすると、管理APIと同じ 403
  * FEATURE_DISABLED で止まり、タグは増えない。読み取り（GET tags）は
  * 棚卸しのため止めない。どちらが止まるかは OpenAPI の説明にも書いてある。
@@ -144,13 +144,13 @@ publicApi.post('/api/public/v1/friends/:friendId/tags', inputJsonBoundary(), asy
     const added = await addTagToFriend(db, friendId, tagId);
     // 付与の確定時刻を台帳から読み直す。再送でも同じ値になるので、
     // そこから作る発生元IDは安定し、公開版オートメーションの受け口が
-    // 同じ出来事と判定できる（R436）。
+    // 同じ出来事と判定できる。
     const assignedAt = await readTagAssignedAt(db, friendId, tagId);
     if (added) {
       await enrollMissingTagScenarios(db, friendId, tagId, lineAccountId);
       await fireTagChange(db, friendId, tagId, lineAccountId, assignedAt);
     } else {
-      // タグだけ残って後続が落ちた前回の分を取り戻す（R433）。
+      // タグだけ残って後続が落ちた前回の分を取り戻す。
       // 不足の購読だけを作り直す。済んだ分は増やさない。
       // 前回が発火まで届かずに落ちた証拠（今回初めて購読を作った）が
       // あるときだけ発火する。届いたか分からないものを送り直さない。
@@ -167,7 +167,7 @@ publicApi.post('/api/public/v1/friends/:friendId/tags', inputJsonBoundary(), asy
 
 /**
  * 「このタグが付いたら始まる」のうち、友だちと同じアカウントの公開済みだけを
- * 始める（R435）。共通タグをきっかけにした別組織のシナリオは混ぜない。
+ * 始める。共通タグをきっかけにした別組織のシナリオは混ぜない。
  * 既に購読がある分は触らない。戻り値は今回初めて作った購読の数。
  */
 async function enrollMissingTagScenarios(
@@ -202,7 +202,7 @@ async function readTagAssignedAt(db: D1Database, friendId: string, tagId: string
 }
 
 /**
- * タグ変化を業務の受け口へ渡す（R436）。
+ * タグ変化を業務の受け口へ渡す。
  *
  * 公開版は発生元の不変IDと所属が分かる出来事だけを受け付ける。
  * IDは「公開の付与:友だち:タグ:確定時刻」で、再送でも同じになる。

@@ -312,7 +312,7 @@ export function registerUberStoreRoutes(app: Hono<Env>, deps: UberStoreRoutesDep
       try {
         if (!await finishPosActivation(db, store.id, candidate.uber_store_id)) throw new Error('activation_save_conflict');
       } catch {
-        // Keep the started fence even when D1 cannot record the unknown result.
+        // D1 が結果不明を記録できなくても、送信開始の印を残し、再送させない。
         return fail(c, 502, UBER_TOKEN_FAILURE_MESSAGES.pos_activation_unknown, { code: POS_ACTIVATION_UNKNOWN });
       }
       // 選び終わったら候補は残さない（移行 636 の注記）。

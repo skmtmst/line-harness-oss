@@ -4,7 +4,7 @@ import type { Database } from 'better-sqlite3';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 /*
- * #1060: `GET /api/forms?with_list_summary=1` のサーバーページング。
+ * `GET /api/forms?with_list_summary=1` のサーバーページング。
  * これまで画面が全件を受け取ってから絞り込み・並び替え・ページ切りをして
  * いた。`page`/`limit`/`q`/`filter`/`sort` を Worker 側で同じ規則
  * （@line-crm/shared）にそろえて処理し、`limit` 未指定なら従来どおり

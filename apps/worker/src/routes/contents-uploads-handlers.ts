@@ -184,7 +184,7 @@ export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<E
         await failMediaUploadSession(c.env.DB, session.id, accountId, 'expired');
         return c.json({ success: false, code: 'media_upload_expired', error: 'アップロード期限が切れました' }, 409);
       }
-      // Old pending sessions used their public key as the PUT target. Copy those too.
+      // 公開キーをアップロード先に持つ保存済みセッションも、確定時に複製する。
       const sourceKey = isFinalMediaKey(session.r2_key) ? mediaUploadKey(session.id) : session.r2_key;
       const object = await c.env.IMAGES.head(sourceKey);
       const objectEtag = object?.etag ? normalizedEtag(object.etag) : '';
@@ -235,7 +235,7 @@ export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<E
         session.kind === 'image',
         finalKey,
       );
-      // Each completion owns its candidate key. A losing request only deletes its own copy.
+      // 競合した完了要求が勝者のファイルを消さないよう、自分の候補キーだけを削除する。
       if (session?.r2_key !== finalKey) await c.env.IMAGES.delete(finalKey);
       if (!session) throw new Error('verified upload session is unavailable');
       if (session.status === 'completed') {
@@ -243,7 +243,7 @@ export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<E
       }
       if (session.status !== 'verified') return c.json({ success: false, code: 'media_upload_not_pending', error: 'このアップロードは確定できません' }, 409);
     }
-    // Pre-deployment verified sessions still refer to a reusable signed key.
+    // 保存済みの検証セッションは再利用可能な署名キーを参照する場合がある。
     if (!isFinalMediaKey(session.r2_key)) {
       return c.json({ success: false, code: 'media_upload_not_verified', error: 'ファイルをアップロードし直してください' }, 409);
     }

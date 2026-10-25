@@ -73,7 +73,7 @@ function boundedText(value: unknown, maximum: number): string | null {
   return value;
 }
 
-/** Uber's store events have a different envelope from order notifications. */
+/** Uber の店舗イベントは注文通知と形式が異なるため、専用に解析する。 */
 export function parseUberStoreLifecycleNotification(raw: unknown): UberStoreLifecycleParseResult {
   const body = record(raw);
   if (!body) return { matched: false };
@@ -196,7 +196,7 @@ async function finishWithConnection(input: {
   expectedStatus: ConnectionRow['status'];
   eventStatus: 'processed' | 'failed';
   eventCode: string | null;
-  /** A same-second deprovision may be accepted only after live reconciliation. */
+  /** 秒が同じ解除通知は順序を断定せず、現在の状態を照合してから受け付ける。 */
   timestampFenceMs?: number;
   lease: LifecycleLease;
 }): Promise<boolean> {
@@ -307,10 +307,7 @@ async function retainRetry(input: {
   return { status: 503, error: 'Store reconciliation failed' };
 }
 
-/**
- * Process only after the route has verified the raw-body HMAC. Unknown stores are acknowledged
- * without creating a local mapping; a store event cannot grant access or tenant ownership.
- */
+/** raw body の HMAC 検証後にだけ呼ぶ。未知の店舗は受領だけ返して対応を作らず、店舗イベントで権限や統括の所有を付与しない。 */
 export async function processUberStoreLifecycleNotification(input: {
   db: D1Database;
   notification: UberStoreLifecycleNotification;
@@ -339,7 +336,7 @@ export async function processUberStoreLifecycleNotification(input: {
     hasEventLock = await acquireWebhookLock(input.db, eventKey, owner, nowSeconds);
     if (!hasEventLock) return { status: 503, error: 'Processing is busy' };
     const connection = await exactConnection(input.db, notice.storeId);
-    // No tenant can safely own a receipt until an existing exact mapping identifies it.
+    // 統括を誤って所有者にしないよう、既存の完全一致の対応が見つかるまで受領記録の所属を確定しない。
     if (!connection) return { status: 200 };
     let event = await lifecycleEvent(input.db, notice.eventId);
     if (event && !sameEvent(event, connection, notice)) return { status: 409, error: 'Event identity conflict' };
@@ -379,8 +376,7 @@ export async function processUberStoreLifecycleNotification(input: {
           code: 'store_lifecycle_stale', nowSeconds, lease: currentLease() })) return INTERRUPTED;
         return { status: 200 };
       }
-      // Provider timestamps are only second-granular. Reconcile the ambiguous same-second case
-      // against current provider state before changing a newer local lifecycle transition.
+      // 事業者の時刻は秒単位なので、同秒の曖昧な通知は現在の状態を照合し、新しいローカルの状態遷移を上書きしない。
       try {
         const pos = await currentPos({ ...input, storeId: notice.storeId });
         const matches = posMatches(pos, connection, input.expectedClientId);

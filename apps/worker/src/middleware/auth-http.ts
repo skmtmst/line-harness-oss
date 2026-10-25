@@ -1,11 +1,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../worker-env.js';
 
-/**
- * decodeURIComponent throws on malformed percent escapes (e.g. `%`). Cookie
- * headers are client-controlled, so fall back to the raw value rather than
- * letting the exception turn a request into a 500.
- */
+/** Cookie は外部入力なので、不正な % で decodeURIComponent が投げても500にせず、生の値へ戻す。 */
 export function safeDecode(value: string): string {
   try {
     return decodeURIComponent(value);
@@ -31,7 +27,7 @@ export function bearerToken(c: Context<Env>): string | null {
   return authHeader.slice('Bearer '.length);
 }
 
-/** OAuth/signup cookies reject malformed escapes and use the first matching cookie. */
+/** OAuth・登録用 Cookie は不正なエスケープを拒み、最初に一致した Cookie を使う。 */
 export function readCookie(header: string | undefined, name: string): string | null {
   if (!header) return null;
   for (const part of header.split(';')) {

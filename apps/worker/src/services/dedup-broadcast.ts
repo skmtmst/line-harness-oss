@@ -15,20 +15,7 @@ interface RankedRow {
   display_name: string | null;
 }
 
-/**
- * Compute the per-account dedup preview for a multi-account broadcast.
- * Same function called from preview API and send executor — guarantees that
- * displayed numbers and actually-sent numbers are computed identically (modulo
- * live data drift between preview and send time, which is intentional design).
- *
- * Single SQL with WITH/ROW_NUMBER OVER does the dedup in the DB layer; JS
- * only aggregates per-account. This relies on production D1 supporting
- * ROW_NUMBER OVER PARTITION BY (SQLite 3.25+; D1 is 3.45+).
- *
- * Filters: is_following=1 AND line_account_id IS NOT NULL.
- * identity_key: COALESCE(URL_TOKEN_SQL, 'uid:'||user_id, 'solo:'||id).
- * Tie-breaking: priority JSON array order first, created_at ASC second.
- */
+/** プレビューと送信で同じ計算法を使い、送信時の実データで対象を再計算する。DB の ROW_NUMBER で本人ごとに優先アカウント・作成順から1件を選び、JS はアカウント別の集計だけを行う。フォロー中で所属のある友だちだけを対象にする。 */
 export async function computeDedupBroadcastPreview(
   db: D1Database,
   accountIds: string[],
@@ -48,9 +35,7 @@ export async function computeDedupBroadcastPreview(
     : `COALESCE((SELECT CAST(key AS INTEGER) FROM json_each(?)
         WHERE value = line_account_id ORDER BY CAST(key AS INTEGER) LIMIT 1), 999)`;
 
-  // Tag filter — applied identically to both selectedCount and ranked queries
-  // so the "selected" denominator and the dedup numerator share the same
-  // population. Empty/null targetTagId means "no tag filter".
+  // 分母と重複除外後の母集団がずれないよう、タグ条件を両方の問い合わせへ同じく適用する。空指定は制限なし。
   const hasTagFilter = !!targetTagId;
   const tagJoinForSelectedCount = hasTagFilter
     ? `AND EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = friends.id AND ft.tag_id = ?)`
@@ -59,7 +44,7 @@ export async function computeDedupBroadcastPreview(
     ? `AND EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)`
     : '';
 
-  // Per-account selectedCount.
+
   const selectedCountSql = `
     SELECT line_account_id, COUNT(*) AS cnt
     FROM friends
@@ -83,7 +68,7 @@ export async function computeDedupBroadcastPreview(
   }
   const totalSelected = (selectedCounts.results ?? []).reduce((sum, r) => sum + r.cnt, 0);
 
-  // Ranked query: returns only the rn=1 rows (primary recipients).
+
   const rankedSql = `
     WITH selected AS (
       SELECT
@@ -112,9 +97,7 @@ export async function computeDedupBroadcastPreview(
     WHERE rn = 1
     ORDER BY line_account_id, created_at
   `;
-  // Bind order matches placeholder order in the SQL: accountIds (for IN), then
-  // tag filter (if any) inside the `selected` CTE, then priority JSON (for the subquery
-  // in ORDER BY of the `ranked` CTE).
+  // SQL の出現順に、対象アカウント、タグ条件、優先順 JSON をバインドする。
   const rankedBinds = hasTagFilter
     ? [...sqlIdSet(accountIds).binds, targetTagId, ...(priority.length ? [JSON.stringify(priority)] : [])]
     : [...sqlIdSet(accountIds).binds, ...(priority.length ? [JSON.stringify(priority)] : [])];
@@ -123,7 +106,7 @@ export async function computeDedupBroadcastPreview(
     .bind(...rankedBinds)
     .all<RankedRow>();
 
-  // Aggregate per-account.
+
   const sendCountByAccount = new Map<string, RankedRow[]>();
   for (const row of rankedRows.results ?? []) {
     const list = sendCountByAccount.get(row.line_account_id) ?? [];
@@ -135,7 +118,7 @@ export async function computeDedupBroadcastPreview(
   const reduction = totalSelected - uniqueRecipients;
   const reductionRate = totalSelected > 0 ? reduction / totalSelected : 0;
 
-  // Per-account meta.
+
   const accountMetaSql = `SELECT id, name, country FROM line_accounts WHERE id IN (${inPlaceholders})`;
   const metaRows = await db
     .prepare(accountMetaSql)
@@ -218,7 +201,7 @@ export interface ProcessMultiAccountDedupResult {
   // caller は status='sent' にせず batch_offset=0 に戻して次の cron tick に継続させる。
   // true = 全 account を送り切った (= 完了)。caller が status='sent' にする。
   complete: boolean;
-  // 運用者が停止を押したので束の切れ目で降りた (#662)。complete=false と同じく
+  // 運用者が停止を押したので束の切れ目で降りた。complete=false と同じく
   // caller は status='sent' にしない。再開するまで queue は拾わない。
   stopped: boolean;
 }
@@ -262,7 +245,7 @@ export async function processMultiAccountDedupBroadcast(
   // (毎 tick 必ず success_count が伸びる → 永久に同じ所で足踏みしない)。
   let sentAnyBatch = false;
   let timeExceeded = false;
-  // 運用者が停止を押した (#662)。束の切れ目で降りる。
+  // 運用者が停止を押した。束の切れ目で降りる。
   let stopRequested = false;
 
   const accountIds = (broadcast.account_ids ? JSON.parse(broadcast.account_ids) : []) as string[];
@@ -291,7 +274,7 @@ export async function processMultiAccountDedupBroadcast(
   const sentSet = new Set(progress.sentIdentKeys);
 
   /*
-   * 送達台帳（#662）。dedup は identKey で「送った人」を覚えているが、
+   * 送達台帳。dedup は identKey で「送った人」を覚えているが、
    * **送れなかった人・外へ出たか分からない人**は覚えていない。台帳の
    * blocked は送達済み(sent)と送達不明(unknown)の friend_id で、停止をまたいだ
    * 再送で送達不明の相手へ2通目が出るのを防ぐ。identKey の集合と役割が
@@ -308,7 +291,7 @@ export async function processMultiAccountDedupBroadcast(
   const allIdentKeys = new Set<string>(progress.sentIdentKeys);
 
   const failedAccountIds: string[] = [];
-  // 緊急停止 (#1050) で止まっているアカウント。失敗とは別に覚え、
+  // 緊急停止  で止まっているアカウント。失敗とは別に覚え、
   // 残っている間は complete にしない（復旧後に残りを送るため）。
   const heldAccountIds: string[] = [];
 
@@ -333,7 +316,7 @@ export async function processMultiAccountDedupBroadcast(
       logger.log("services_dedup_broadcast_log");
       continue;
     }
-    // 緊急停止 (#1050): broadcast_dispatch が止まっているアカウントの束は
+    // 緊急停止 : broadcast_dispatch が止まっているアカウントの束は
     // 始めない。identKey が未送信のまま残るので、復旧後の tick が続きを送る。
     // 他のアカウントは止まっていなければ送る。
     if (await isOperationCapabilityStopped(db, accountResult.accountId, 'broadcast_dispatch')) {
@@ -438,9 +421,9 @@ export async function processMultiAccountDedupBroadcast(
           break;
         }
 
-        // 次の束へ進む前に停止を読み直す（#662）。送り終えた束は取り消せない
+        // 次の束へ進む前に停止を読み直す。送り終えた束は取り消せない
         // ので、新しい束を始めないことで止める。
-        // 緊急停止 (#1050) も同じ扱い: broadcast_dispatch が止まった
+        // 緊急停止  も同じ扱い: broadcast_dispatch が止まった
         // アカウントは次の束を始めず、残りは未送信のまま残す。
         if (await isBroadcastStopped(db, broadcast.id) ||
             await isOperationCapabilityStopped(db, account.id, 'broadcast_dispatch')) {

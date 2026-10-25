@@ -21,7 +21,7 @@ describe('feature job manifest', () => {
   });
 
   /*
-   * #643 機械検査: manifest の job と実装のoff強制を突き合わせる。
+   *  機械検査: manifest の job と実装のoff強制を突き合わせる。
    *
    * 名前を足しただけで「止まるつもり」になるのを防ぐ。gated の job は
    * 判定を書いたファイルが実在し、目印が実ソースに残っていることを

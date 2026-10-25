@@ -29,7 +29,7 @@ export interface SlotInput {
   capacity?: number | null;
   is_active?: number;
   sort_order?: number;
-  /** #1000: 一括追加の再送防止キー。同じイベント内で一意。 */
+  /** 一括追加の再送防止キー。同じイベント内で一意。 */
   client_key?: string | null;
 }
 

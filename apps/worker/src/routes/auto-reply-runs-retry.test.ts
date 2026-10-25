@@ -5,7 +5,7 @@ import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqli
 import { autoReplyRuns } from './auto-reply-runs.js';
 
 /*
- * N-081: permanent_failed の処理行だけを運用者がやり直す。
+ * permanent_failed の処理行だけを運用者がやり直す。
  * 実route・実SQLiteで確かめる。LINEの返信API・受信イベント・
  * matchAndReply には一切触れないことを、副作用と保存値で見る。
  */

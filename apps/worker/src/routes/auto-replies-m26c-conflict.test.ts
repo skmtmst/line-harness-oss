@@ -5,18 +5,7 @@ import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { autoReplies } from './auto-replies.js';
 
-/*
- * m26c: 自動応答の公開・権限・競合（R551/R552/R553/R554/R558 のサーバ側）。
- * 実 Hono ルート＋実 SQLite（bootstrap.sql）で、監査の隔離再現を最新枝で
- * やり直す。故障注入は D1  wrapper が行い、製品コードには触らない。
- *
- * 期待する姿（いずれも現状は赤）:
- * - R551: 版を進めずに保存するため、同じ expectedVersion の後続保存が通る。
- * - R552: 試験の記録時に内容の変わり目を見ないため、古い成功が新内容に付く。
- * - R553: 公開の読取と書込のあいだの編集を見ないため、公開版と稼働設定が食い違う。
- * - R554: 公開の直前の停止を見ないため、停止済みが再有効化される。
- * - R558: 公開後に下書きが無いと競合確認が 404 のため、完了 URL の再読込が壊れる。
- */
+/** 自動応答の公開で、版の更新・内容確認・同時編集・直前停止を検出し、完了画面の再読込も成立することを実 route と SQLite で確かめる。障害は D1 の境界へ注入する。 */
 
 const owner: AuthenticatedStaff = {
   id: 'owner-a',

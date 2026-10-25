@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
 /**
- * マニュアルの正本表。設計 ★34-4。台帳 #134。
+ * マニュアルの正本表。設計 ★34-4。台帳。
  *
  * 守りたいのは 2 点。
  *   **確かめていない URL を「開けます」と言わない**
@@ -265,7 +265,7 @@ describe('いま全部を確かめる', () => {
   });
 });
 
-// Resolve synthetic public DNS while keeping the real URL policy and HEAD call.
+// URL の実検査と HEAD は保ち、公開 DNS の応答だけを差し替える。
 vi.mock('../services/manual-link-check.js', async original => {
   const actual = await original<typeof import('../services/manual-link-check.js')>();
   return { ...actual, checkAllManualLinks: (...[db, options]: Parameters<typeof actual.checkAllManualLinks>) =>

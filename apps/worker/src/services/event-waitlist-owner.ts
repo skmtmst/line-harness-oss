@@ -1,8 +1,6 @@
 import { activeTenantLineAccountSql } from '@line-crm/db';
 
-/** Resolve only the owner needed for LINE verification; never return offer data
- * before the route has verified the token against this account's login channel.
- */
+/** 本人確認に必要な所有者だけを解決し、そのアカウントのチャネルでトークンを検証する前に案件データを返さない。 */
 export async function getEventWaitlistOfferAccountId(db: D1Database, token: string): Promise<string | null> {
   if (token.length < 32 || token.length > 256) return null;
   const row = await db.prepare(`SELECT w.line_account_id FROM event_waitlist w

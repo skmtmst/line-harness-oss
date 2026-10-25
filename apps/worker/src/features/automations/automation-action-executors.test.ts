@@ -358,7 +358,7 @@ describe('オートメーションの既存処理接続', () => {
     ).get()).toEqual({ content: 'こんにちは', source: 'automation_v6', line_account_id: 'account-1' });
   });
 
-  // N-189: send_message/send_template の本文に {{var.*}} を書ける。
+  // send_message/send_template の本文に {{var.*}} を書ける。
   // 消えた共通情報は生のまま・空文字でも送らず、fail-closed で止める。
   it('共通情報を本文の値へ置き換えて送り、送信記録にも解決後の本文が残る', async () => {
     testDb.raw.prepare(
@@ -471,7 +471,7 @@ describe('オートメーションの既存処理接続', () => {
       }),
     });
 
-    // R363: 5xxは受理した可能性があるため照合待ち（再試行は続ける）。
+    // 5xxは受理した可能性があるため照合待ち（再試行は続ける）。
     expect(temporary.status).toBe('waiting');
     expect(testDb.raw.prepare(
       `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'temporary'`,
@@ -483,9 +483,7 @@ describe('オートメーションの既存処理接続', () => {
   });
 
   /*
-   * R363: LINEが受理した後の履歴保存だけ失敗したら、未送信として
-   * 返却・再送しない。送達不明として照合待ちに残す。
-   * （直す前は line_temporary_failure になり未送信扱い＝赤）
+   * LINE の受理後に履歴保存だけが失敗しても、返却や再送はしない。二重送信を防ぐため送達不明として照合待ちに残す。
    */
   it('受理後の履歴保存失敗は未送信にせず照合待ちにする', async () => {
     const pushMessage = vi.fn(async () => ({ requestId: 'line-request-9' }));
@@ -544,7 +542,7 @@ describe('オートメーションの既存処理接続', () => {
   });
 
   /*
-   * R363の追加: 応答が返らない（タイムアウト）・受理後の5xx（status付き）・
+   * の追加: 応答が返らない（タイムアウト）・受理後の5xx（status付き）・
    * 200のJSON読取失敗は、どれも受理不明として照合待ちにする。
    * 未受理が確定した拒否（4xx）だけが即時失敗のまま。
    */
@@ -610,7 +608,7 @@ describe('オートメーションの既存処理接続', () => {
     const step = testDb.raw.prepare(
       `SELECT id FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
     ).get(result.runId) as { id: string };
-    // N-371/N-372: 冪等キーは共通契約の X-Harness-Event-Id で渡し、
+    // 冪等キーは共通契約の X-Harness-Event-Id で渡し、
     // 本文は共通封筒 {id,type,occurred_at,account_id,data,attempt}。
     expect(headers['X-Harness-Event-Id']).toBe(step.id);
     expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);
@@ -688,7 +686,7 @@ describe('オートメーションの既存処理接続', () => {
     const okStep = testDb.raw.prepare(
       `SELECT id FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
     ).get(ok.runId) as { id: string };
-    // N-372: 署名入力は「時刻.イベントID.生の本文」、名前は v1=<hex>。
+    // 署名入力は「時刻.イベントID.生の本文」、名前は v1=<hex>。
     expect(sent.headers['X-Harness-Event-Id']).toBe(okStep.id);
     expect(sent.headers['X-Harness-Signature']).toBe(
       `v1=${await hmacHex(secret, `${sent.headers['X-Harness-Timestamp']}.${okStep.id}.${sent.body}`)}`,

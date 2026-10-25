@@ -173,7 +173,7 @@ export async function sendAdConversions(
       eventValue, currency: opts?.currency, amountInMinorUnit: opts?.amountInMinorUnit,
       idempotencyKey, providerEventId, clickSnapshot,
     });
-    // 緊急停止 (#1050): ad_postback が止まっている統括は outbox へ積む
+    // 緊急停止 : ad_postback が止まっている統括は outbox へ積む
     // だけにして外部への送信試行をしない。pending の行は復旧後に
     // drainAdConversionOutbox が届ける。
     if (await isOperationCapabilityStopped(db, lineAccountId, 'ad_postback')) continue;
@@ -222,7 +222,7 @@ async function attemptPlatformSend(
     retryable,
   });
 
-  // F-22: 初回の送信要求から90日経ったものは、自動の再試行でも送らない。
+  // 初回の送信要求から90日経ったものは、自動の再試行でも送らない。
   if (adConversionRetryExpired(outbox.row.created_at)) {
     await finishOutbox('failed', 'retry_expired', false);
     return 'failed';
@@ -332,7 +332,7 @@ export async function drainAdConversionOutbox(
       if (platform.line_account_id !== row.line_account_id) {
         throw new Error(`platform account changed: ${row.ad_platform_id}`);
       }
-      // 緊急停止 (#1050): ad_postback 停止中は claim を pending へ戻して
+      // 緊急停止 : ad_postback 停止中は claim を pending へ戻して
       // 外部へ出さない。停止を失敗として数えない。
       if (await isOperationCapabilityStopped(db, row.line_account_id, 'ad_postback')) {
         await finishAdConversionOutbox(db, {
@@ -638,7 +638,7 @@ export class AdConversionRetryError extends Error {
   }
 }
 
-/** F-22: 待ち行列の固定値で1件だけ再送し、送信済みの再操作は同じ結果へ戻す。 */
+/** 待ち行列の固定値で1件だけ再送し、送信済みの再操作は同じ結果へ戻す。 */
 export async function retryAdConversion(
   db: D1Database, input: { logId: string; lineAccountId: string; credentialKey?: string },
 ): Promise<import('@line-crm/shared').AdConversionRetryResult> {

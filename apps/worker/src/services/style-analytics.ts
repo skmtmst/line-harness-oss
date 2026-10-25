@@ -62,8 +62,7 @@ export async function styleSnapshot(
     analytics: StyleAnalyticsData;
   }
 > {
-  // Audience snapshots retain live inputs. Only the display-only calculations
-  // below receive the memoized DB; creating a result never reuses an audience.
+  // 対象者の写しは毎回実データを読む。表示用の計算だけにキャッシュ DB を渡し、新しい結果の対象へ古い値を再利用しない。
   const liveDb = db;
   return withDisplayReadCache(db, async db => {
   if (

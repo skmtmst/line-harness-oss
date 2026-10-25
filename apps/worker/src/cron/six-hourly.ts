@@ -109,7 +109,7 @@ export async function runSixHourlyHeavyJobs(
       },
     },
     {
-      // Q: 共通情報の期限の14日前・3日前に運用者へ知らせる。
+      // 共通情報の期限の14日前・3日前に運用者へ知らせる。
       name: 'common var expiry notices',
       run: async () => {
         const { sweepCommonVarExpiryNotices } = await import('../services/common-var-expiry-sweep.js');
@@ -130,7 +130,7 @@ export async function runSixHourlyHeavyJobs(
       },
     },
     {
-      // #818: 広告費の日次取り込み。媒体の数字は前日分までしか確定しないので
+      // 広告費の日次取り込み。媒体の数字は前日分までしか確定しないので
       // 対象は常に昨日(JST)。実行台帳の媒体×日一意制約で、6時間ごとの
       // 再実行は成功済みの分を取り直さない。
       name: 'ad cost import',

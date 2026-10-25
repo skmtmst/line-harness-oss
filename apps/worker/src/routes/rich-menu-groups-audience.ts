@@ -81,7 +81,7 @@ export const post__api_rich_menu_groups_groupId_apply_to_tag_1 = async (c: Conte
   }
 
   // ---- mode: bulk-link (タグ or 全 follower に link) ----
-  // #502中: 予約口と同じく Idempotency-Key を必須にする。同じ鍵での
+  // 中: 予約口と同じく Idempotency-Key を必須にする。同じ鍵での
   // やり直しは同じ runId になり、台帳への記録は ON CONFLICT で重複しない。
   // LINE への link 自体は同じメニューの付け直しで無害。
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim();

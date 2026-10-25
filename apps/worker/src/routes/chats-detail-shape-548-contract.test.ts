@@ -6,7 +6,7 @@ import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqli
 
 import { chats } from './chats.js';
 
-// #548-7（点検 #493 の7番）の再発防止の契約テスト。
+// チャット詳細の応答形式を確かめる。
 // `GET /api/chats/:id` のメッセージは `direction` / `messageType` / `source` /
 // `sentByStaffName` / `scenarioName` の形で返る。`senderType` は存在しない。
 // 画面の型（`api.ts` の `ChatDetailMessage`）とここがずれると、向きの

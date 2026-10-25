@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite';
 import { listAutomationDefinitions } from './automation-definitions';
 
-// #554 点検#519中1・中9: 一覧に limit/offset を足し、集計はページ送りに
+//  点検中1・中9: 一覧に limit/offset を足し、集計はページ送りに
 // 依らず対象アカウント全体で数える。SQL そのものが仕様なので実 SQLite に当てる。
 
 describe('listAutomationDefinitions のページ送り', () => {

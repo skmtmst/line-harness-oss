@@ -631,6 +631,7 @@
 
 
 - [コードの構成と名前](code-structure.md)
+- [コメントの書き方](comment-style.md)
 
 - [構成と接続の整理の更新履歴](release-log/unreleased/1781-kenta-cleanup-s02z.md)
 - [予約写真とお客さまの画面・設定カードの表示改善](release-log/unreleased/1781-kenta-cleanup-n01.md)
@@ -761,6 +762,7 @@
 - [予約の LIFF のやり取りの形をそろえる](release-log/unreleased/1817-kenta-liff-booking-response.md)
 - [決まりの説明書の整理](release-log/unreleased/1822-kenta-docs-current-rules.md)
 - [LIFF の自動点検の書き換え](release-log/unreleased/1820-kenta-liff-behavior-tests.md)
+- [仕組みの説明の書き方をそろえる](release-log/unreleased/1821-kenta-worker-comments.md)
 - [古い見た目の切り替えの片づけ](release-log/unreleased/1818-kenta-remove-v7-leftovers.md)
 - [見た目の自動点検の整理](release-log/unreleased/1819-kenta-q02d-tests.md)
 

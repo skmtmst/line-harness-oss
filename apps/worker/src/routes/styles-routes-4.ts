@@ -26,7 +26,7 @@ import { validRestaurantDate } from '../services/restaurant-booking.js';
 import { base, account, json, edit, text, oneOf } from './styles-common.js';
 export const styles = new Hono<Env>();
 
-// Reuse availability exceptions: these writes never cancel existing reservations.
+// 空きの例外設定を使い、既存予約を取り消さない。
 styles.post(base + '/closures', async (c) => {
   edit(c, 'booking.settings');
   const a = await account(c),

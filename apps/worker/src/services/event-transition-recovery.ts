@@ -15,7 +15,7 @@ import { featureJobCanRun } from './feature-enforcement.js';
 type Transition = {id:string;line_account_id:string;event_id:string;booking_id:string;booking_version:number;
   operation_key:string;action:string;input_snapshot:string;steps_json:string};
 type Snapshot={friendId:string;recipient:string;slotId:string;startsAt:string;status:string;eventName:string;venueName:string|null;venueUrl:string|null;cancelledBy?:string|null;replacementId?:string};
-/** Recovery uses the original operation/version. A rollback also advances the version, invalidating old work. */
+/** 回復も元の操作・版を使う。巻戻しでも版を進め、古い処理を無効にする。 */
 export async function recoverEventTransitions(db:D1Database,now:Date,limit:number):Promise<number> {
   if(limit<=0)return 0;
   const rows=await db.prepare(`SELECT t.* FROM event_booking_transition_runs t
@@ -75,7 +75,7 @@ export async function recoverEventTransitions(db:D1Database,now:Date,limit:numbe
       await db.prepare(`UPDATE event_booking_transition_runs SET status='complete',updated_at=? WHERE id=? AND status='pending' AND ${guard.sql}`)
         .bind(now.toISOString(),row.id,...guard.binds).run();
     }catch(error) {
-      // No fresh send key and no increased retry budget. Busy send leases remain recoverable.
+      // 新しいキーや予算の増加で再送しない。使用中の送信権は回復可能なまま残す。
       steps.lastError=error instanceof Error&&error.message==='REMINDER_SEND_IN_FLIGHT'?'send_in_flight':'transition_incomplete';
       await save();
     }

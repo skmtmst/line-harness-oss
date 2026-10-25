@@ -560,7 +560,7 @@ describe('PATCH /api/tags/:id/mileage', () => {
     mileage_multiplier_bps: 15000,
     mileage_multiplier_priority: 1,
   };
-  // サーバー側の事前計算の固定値（N-047）。token はこの結果から発行される。
+  // サーバー側の事前計算の固定値。token はこの結果から発行される。
   const PREVIEW = {
     tagId: 'tag-1',
     lineAccountId: null,
@@ -618,7 +618,7 @@ describe('PATCH /api/tags/:id/mileage', () => {
     });
 
     expect(res.status).toBe(200);
-    // M955: 更新と投入は同じバッチ。投入は updateTagMileageSettings の内側で行う。
+    // 更新と投入は同じバッチ。投入は updateTagMileageSettings の内側で行う。
     expect(dbMocks.updateTagMileageSettings).toHaveBeenCalledWith(
       expect.anything(),
       'tag-1',

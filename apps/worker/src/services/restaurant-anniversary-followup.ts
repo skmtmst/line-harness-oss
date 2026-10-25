@@ -32,7 +32,7 @@ async function key(row:Candidate,date:string) {
 }
 function dates(row:Candidate,now:Date) {
   const md=parseMonthDay(row.value); if(!md)return [];
-  // Reject impossible dates (parseMonthDay deliberately accepts a partial legacy format).
+  // 部分的な保存形式を読む処理でも、実在しない暦日は拒む。
   if(md.day>new Date(Date.UTC(2000,md.month,0)).getUTCDate())return [];
   const year=Number(new Intl.DateTimeFormat('en',{timeZone:row.timezone,year:'numeric'}).format(now));
   return [year,year+1].flatMap(y=>{
@@ -41,7 +41,7 @@ function dates(row:Candidate,now:Date) {
     return [{date,at}];
   });
 }
-/** Reuses the common approved scenario job, retry key, entitlement and send-stop checks. */
+/** 共通の承認済みシナリオジョブ・再試行キー・権利・送信停止の検査を再利用する。 */
 export async function scheduleRestaurantAnniversaries(db:D1Database,now=new Date()) {
   const rows=(await db.prepare(anniversarySql()).all<Candidate>()).results;
   for(const row of rows) for(const {date,at} of dates(row,now)) {

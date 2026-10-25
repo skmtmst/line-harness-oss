@@ -14,10 +14,7 @@ export const ACCOUNT_QUERY_KEYS = [
   'account',
 ] as const;
 
-/** These legacy resources have no tenant/account column. Like other unassigned
- * legacy rows, only an unrestricted member of the default tenant may use them.
- * Owner/admin is a role inside a tenant, not permission to read another tenant.
- */
+/** 統括・アカウント列のない保存済みデータは、既定統括で制限のない利用者だけに許可する。owner/admin は統括内の役割であり、他の統括を読む権限ではない。 */
 export function isLegacyGlobalApi(path: string): boolean {
   return path === '/api/account-settings/link-base-url'
     || path === '/api/account-settings/tracked-link-base-url'

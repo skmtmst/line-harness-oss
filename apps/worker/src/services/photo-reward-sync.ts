@@ -3,7 +3,7 @@ import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { toJstString } from '@line-crm/db';
 
 /**
- * PHOTO-06 (#1079): 採用写真のECポイント付与（nen_photo_reward_outbox）を
+ * 採用写真のECポイント付与（nen_photo_reward_outbox）を
  * 外部ECへ届けて状態を進める消費側。
  *
  * 背景: outbox 行は採用時に pending で積まれるが、これまで処理する側が

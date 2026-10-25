@@ -15,7 +15,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 export const inbox = new Hono<Env>();
 
 // GET /api/inbox/activity-digest?hours=3
-// Codex の定期レポートなど、読み取り専用の外部クライアント向け集約 API。
+// 読み取り専用の外部クライアントが、受信箱をまとめて取得できるようにする。
 // グローバル authMiddleware 配下なので Bearer API key / admin session が必須。
 inbox.get('/api/inbox/activity-digest', async (c) => {
   const hours = parseActivityDigestHours(c.req.query('hours'));

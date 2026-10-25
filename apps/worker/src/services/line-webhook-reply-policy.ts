@@ -1,5 +1,4 @@
-/** Only an absence of rules is enough to prove no reply was required before evaluation.
- * Keep this boolean, rather than a second copy of the inbox text or a reply token. */
+/** 事前に返信不要と証明できるのはルールなしだけなので、真偽値で保持し、本文や replyToken を複製しない。 */
 export async function snapshotLineReplyPolicy(db: D1Database, accountId: string | null, messageKind: string): Promise<{ configured: boolean }> {
   const rule = await db.prepare(`SELECT 1 FROM auto_replies WHERE is_active=1 AND deleted_at IS NULL
     AND (line_account_id IS NULL OR line_account_id=?) LIMIT 1`).bind(accountId).first();

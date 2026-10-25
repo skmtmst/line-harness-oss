@@ -1,4 +1,4 @@
-/** Public exports remain stable; implementation lives with its related helpers. */
+/** 既存の公開名を保ち、関連する補助関数と実装を近くに置く。 */
 export { requireVisibleReminder } from './reminders-definition-is-reminder-row-scoped-path.js';
 export { isReminderRowScopedPath } from './reminders-definition-is-reminder-row-scoped-path.js';
 export { TRIGGER_TYPES } from './reminders-definition-is-reminder-row-scoped-path.js';

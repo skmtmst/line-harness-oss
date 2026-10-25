@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
 
-// N-244差戻(台帳): 実DB結合テスト。停止由来の引き継ぎを次の順序で固定する。
+// 実DB結合テスト。停止由来の引き継ぎを次の順序で固定する。
 // T0 対照: active経路は通常どおり帰属・シナリオが動く (0件主張の空振り防止)。
 // T1 callback→follow: 停止callback後に別followが来ても自然流入扱いにしない。
 // T2 follow→callback: intent→follow→callback の順でも抑止が共有される。
@@ -133,7 +133,7 @@ async function seedDb(dbs: SqliteD1) {
       (id, scenario_id, step_order, delay_minutes, message_type, message_content)
     VALUES ('st1', 'sc1', 0, 0, 'text', 'hello');
   `);
-  // 参加には明示公開が要る（351 / #644）。稼働中の状態にしてから試す。
+  // 参加には明示公開が要る。稼働中の状態にしてから試す。
   const { publishScenarioVersion } = await import('@line-crm/db');
   await publishScenarioVersion(dbs.db, 'sc1', {
     staffId: null,

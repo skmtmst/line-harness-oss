@@ -63,7 +63,7 @@ export const post__api_common_vars_1 = async (c: Context<Env, "/api/common-vars"
     if (validity.fallbackValue !== null && fallbackValue === null) {
       return inputError(c, { success: false, error: '代替値は種別に合う値を入力してください' }, 400, ["valid_from","valid_until","expiryBehavior","expiry_behavior","fallbackValue","fallback_value","type"]);
     }
-    // Q: 鍵やトークンのような秘密の値は共通情報に置かせない。
+    // 鍵やトークンのような秘密の値は共通情報に置かせない。
     if (isSecretLikeValue(value) || (fallbackValue !== null && isSecretLikeValue(fallbackValue))) {
       return inputError(c, {
         success: false,
@@ -156,7 +156,7 @@ export const patch__api_common_vars_id_2 = async (c: Context<Env, "/api/common-v
     if (patchMemo !== undefined && patchMemo.length > 1000) {
       return inputError(c, { success: false, error: 'メモは1000文字までで入力してください' }, 400, ["memo"]);
     }
-    // Q: 変える理由は必須。後から履歴を見た人が「なぜ変えたか」を追えるようにする。
+    // 変える理由は必須。後から履歴を見た人が「なぜ変えたか」を追えるようにする。
     const changeReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
     if (!changeReason) {
       return inputError(c, {
@@ -186,7 +186,7 @@ export const patch__api_common_vars_id_2 = async (c: Context<Env, "/api/common-v
         error: '鍵やトークンのような秘密の値は代替値にも保存できません',
       }, 422, ["accountId","valid_from","valid_until","expiryBehavior","expiry_behavior","fallbackValue","fallback_value"]);
     }
-    // N-185: 影響確認なしの保存を止める。確認値は対象ID・版・使用先集合の写し。
+    // 影響確認なしの保存を止める。確認値は対象ID・版・使用先集合の写し。
     // 形の検査は先に済ませているため、ここからは確認値だけを見る。
     const presentedProof = parseCommonVarImpactProof(body.impactProof);
     if (!presentedProof) {
@@ -375,7 +375,7 @@ export const post__api_common_vars_id_impact_preview_5 = async (c: Context<Env, 
         sendingFixedUsageCount: impact.items.filter(
           (item) => item.source_status === 'sending_fixed').length,
         usageRevision: usageHex,
-        // N-185: 保存口へ添える確認値。対象ID・版・使用先集合の写しで使い回し不可。
+        // 保存口へ添える確認値。対象ID・版・使用先集合の写しで使い回し不可。
         impactProof: buildCommonVarImpactProof(existing.id, existing.version, usageHex),
       },
     });
@@ -457,7 +457,7 @@ export const post__api_common_vars_id_replace_6 = async (c: Context<Env, "/api/c
         data: preview,
       }, 409);
     }
-    // Q: 差し替えて保管するときも、やった人の理由を版履歴に残す。
+    // 差し替えて保管するときも、やった人の理由を版履歴に残す。
     const replaceReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
     if (!replaceReason) {
       return inputError(c, { success: false, error: '変えた・消した理由を入力してください', code: 'common_var_reason_required' }, 400, ["changeReason"]);
@@ -509,7 +509,7 @@ export const delete__api_common_vars_id_7 = async (c: Context<Env, "/api/common-
     }
     const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    // Q: 消すときも理由が必須。版履歴に残すので空欄や自動入力は受けない。
+    // 消すときも理由が必須。版履歴に残すので空欄や自動入力は受けない。
     const deleteReason = c.req.query('reason')?.trim() ?? '';
     if (!deleteReason) {
       return c.json(
@@ -588,7 +588,7 @@ export const post__api_common_vars_id_schedules_9 = async (c: Context<Env, "/api
     if (normalizedScheduled === null) {
       return inputError(c, { success: false, error: '更新後の値は種別に合う値を入力してください' }, 400, ["accountId","value"]);
     }
-    // Q: 予約で入る値も秘密の値は受け付けない（登録・編集と同じ口）。
+    // 予約で入る値も秘密の値は受け付けない（登録・編集と同じ口）。
     if (isSecretLikeValue(normalizedScheduled)) {
       return inputError(c, {
         success: false,

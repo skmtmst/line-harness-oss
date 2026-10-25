@@ -1,7 +1,7 @@
-// m26g: イベント公開表示の一致と枠編集の競合検出の再現・回帰試験。
-// 実 sqlite（bootstrap 適用済み）＋実 Hono ルートで、監査 R576/R577 を守る。
-// - R576: 通常 PUT の is_published 保存と lifecycle_status・顧客 GET の一致。
-// - R577: 枠 PUT の期待版による競合検出（一方だけ確定・敗者は 409）。
+// 公開表示と実際の公開状態を一致させ、枠の同時編集を検出する。
+// 実 sqlite（bootstrap 適用済み）＋実 Hono ルートで、監査 / を守る。
+// - : 通常 PUT の is_published 保存と lifecycle_status・顧客 GET の一致。
+// - : 枠 PUT の期待版による競合検出（一方だけ確定・敗者は 409）。
 import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { readFileSync } from 'node:fs';

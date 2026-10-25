@@ -1,4 +1,4 @@
-/** Legacy templates containing sizes, counts or identifiers. Captures are never echoed. */
+/** 既存の理由に含まれるサイズ・件数・識別子は、取り出しても応答へ反射しない。 */
 const PATTERNS: ReadonlyArray<readonly [pattern: RegExp, code: string, message: string]> = [
   [/^(?:選ばれた画像を使えません: )?file size \d+ exceeds 1MB limit$/, 'RICH_MENU_IMAGE_TOO_LARGE', '画像は1MB以下にしてください。'],
   [/^(?:選ばれた画像を使えません: )?dimensions \d+x\d+ are not supported \(need \d+x\d+ or \d+x\d+\)$/, 'INVALID_RICH_MENU_IMAGE_DIMENSIONS', '画像の大きさは2500×1686、または2500×843にしてください。'],

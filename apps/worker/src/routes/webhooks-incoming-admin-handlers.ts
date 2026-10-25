@@ -22,7 +22,7 @@ export const get__api_webhooks_incoming_1 = async (c: Context<Env, "/api/webhook
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
-    // 詳細口と同じ境界に寄せる(#506 中)。以前は一覧だけ権限キーを見て
+    // 一覧からも詳細と同じ権限検査を通し、権限キーなしの参照を防ぐ。
     // おらず、権限なし職員が一覧は見られるちぐはぐな状態だった。
     const incomingStaff = c.get('staff');
     if (incomingStaff?.role === 'staff' && !incomingStaff.permissionKeys?.includes('/webhooks')) {
@@ -74,10 +74,10 @@ export const get__api_webhooks_incoming_id_2 = async (c: Context<Env, "/api/webh
     const sample = safeJson<{ fields: Array<{ path: string; type: string; maskedValue: string }>; truncated: boolean } | null>(
       item.latest_masked_sample_json, null,
     );
-    // N-367 (#939): 「未照合として確認する」「友だち候補を作る」を選んだ口が
+    //  「未照合として確認する」「友だち候補を作る」を選んだ口が
     // 溜めている未確認の件数。箱の中身は /unmatched で見せる。
     const pendingUnmatched = await countIncomingWebhookUnmatched(c.env.DB, item.id, lineAccountId);
-    // R404: 既に保存済みの未対応種類は「接続済み」にしない。理由も添える。
+    // 既に保存済みの未対応種類は「接続済み」にしない。理由も添える。
     const unexecutableReason = actions
       .map((action) => incomingUnexecutableReason(action.refKind))
       .find((reason): reason is string => reason !== null) ?? null;
@@ -89,7 +89,7 @@ export const get__api_webhooks_incoming_id_2 = async (c: Context<Env, "/api/webh
         folderId: item.folder_id ?? null,
         sourceType: item.source_type,
         hasSecret: hasWebhookSecret(item),
-        // S: 入れ替え中なら「前の合言葉が使える期限」。併用期間外は null。
+        // 入れ替え中なら「前の合言葉が使える期限」。併用期間外は null。
         previousSecretUsableUntil: previousSecretUsableUntil(item),
         isActive: Boolean(item.is_active),
         version: Number(item.version ?? 1),
@@ -191,8 +191,7 @@ export const post__api_webhooks_incoming_4 = async (c: Context<Env, "/api/webhoo
           name: item.name,
           folderId: item.folder_id ?? null,
           sourceType: item.source_type,
-          // secret is returned exactly once on create so the operator can copy it.
-          // Subsequent GETs never expose it. The row itself holds only ciphertext.
+          // 秘密値は作成時の1回だけコピー用に返し、以後の GET には出さない。行には暗号文だけを保存する。
           secret: body.secret,
           isActive: Boolean(item.is_active),
           createdAt: item.created_at,
@@ -240,11 +239,7 @@ export const put__api_webhooks_incoming_id_5 = async (c: Context<Env, "/api/webh
         return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
       }
     }
-    // Activation gate: never re-enable a webhook whose post-update secret
-    // would still be invalid. Otherwise migration 034 can be bypassed by
-    // toggling isActive without touching the legacy null/short secret.
-    // Encrypted rows are decrypted for the length check; undecryptable rows
-    // stay stopped until the secret is re-entered (#650).
+    // isActive だけの更新でも、不正な保存済み秘密値のまま再開させない。復号して長さを確認し、復号不能なら再入力まで停止する。
     if (body.isActive === true) {
       let effectiveSecret = body.secret;
       if (effectiveSecret === undefined) {
@@ -264,7 +259,7 @@ export const put__api_webhooks_incoming_id_5 = async (c: Context<Env, "/api/webh
     await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, webhookKeysOf(c));
     const updated = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
-    // N-379 (#939): 動かす/止める・合言葉の入れ直し・その他の変更を分けて記録する。
+    //  動かす/止める・合言葉の入れ直し・その他の変更を分けて記録する。
     if (body.isActive !== undefined) {
       auditLog(c, body.isActive ? 'webhook.incoming.activate' : 'webhook.incoming.deactivate',
         { kind: 'incoming_webhook', id }, { lineAccountId });
@@ -360,14 +355,14 @@ export const get__api_webhooks_incoming_id_unmatched_8 = async (c: Context<Env, 
     if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
     const status = c.req.query('status');
     const listStatus = status === 'resolved' || status === 'dismissed' ? status : 'pending';
-    // R401: 50件超えは limit/offset で辿る。空表示の判定に使う総数も返す。
+    // 50件超えは limit/offset で辿る。空表示の判定に使う総数も返す。
     const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 50, limitPolicy: { fallback: 'falsy', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'falsy', minimum: 0 } });
     const [items, total] = await Promise.all([
       listIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus, limit, offset),
       countIncomingWebhookUnmatched(c.env.DB, webhook.id, lineAccountId, listStatus),
     ]);
     /*
-     * S: 複数一致で保留した届物は、人が選べるよう候補の友だちを
+     * 複数一致で保留した届物は、人が選べるよう候補の友だちを
      * 名前つきで返す。候補に載っていない友だちが選ばれても構わない
      * (運用者が別途確かめた場合を塞がない)。
      */
@@ -440,7 +435,7 @@ export const post__api_webhooks_incoming_id_test_9 = async (c: Context<Env, "/ap
       actions: safeJson<IncomingWebhookActionRef[]>(webhook.action_refs_json, []),
     });
     // 試しの結果はやり取り台帳へ test 種別で分けて残す。本文は残さない。
-    // d23d R407: 「試しが終わった」と「照合できた」は別の話。試算の結果を
+    // d23d : 「試しが終わった」と「照合できた」は別の話。試算の結果を
     // 記録へ残し、一覧で実際の受信の「結びつきました」と見分けが付くようにする。
     const outcome: IncomingTestOutcome = preview.actions.some((action) => !action.ok)
       ? 'invalid'
@@ -548,7 +543,7 @@ export const get__api_webhooks_outgoing_11 = async (c: Context<Env, "/api/webhoo
   try {
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
-    // 受信の詳細口と同じ境界に寄せる(#506 中)。
+    // 受信の詳細口と同じ境界に寄せる( 中)。
     const outgoingStaff = c.get('staff');
     if (outgoingStaff?.role === 'staff' && !outgoingStaff.permissionKeys?.includes('/webhooks')) {
       return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);

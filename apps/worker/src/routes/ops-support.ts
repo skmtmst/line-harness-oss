@@ -426,8 +426,7 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
   }
   const names = [...knowledgeNames(ticket, messages), staff.name];
   const clean = (text: string) => redactKnowledgeText(text, names);
-  // Most recent customer details enter the bounded search vocabulary first.
-  // The generation prompt below still includes the complete conversation.
+  // 最新の顧客情報を制限付き検索語へ先に含める。生成への入力には会話全体を保つ。
   const searchText = [...messages].reverse().filter(m => m.author_kind === 'tenant').map(m => m.body)
     .concat(ticket.subject, ticket.body, [...messages].reverse().filter(m => m.author_kind === 'ops').map(m => m.body)).join('\n');
   const articles = await searchKnowledge(db, ticket.kind, clean(searchText), (body.excludeArticleIds ?? []) as string[]);

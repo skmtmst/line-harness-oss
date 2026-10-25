@@ -51,7 +51,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   getVersionedAccountSetting: vi.fn(async()=>null),
-  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
   // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
   recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
   getForms: vi.fn(),
@@ -378,13 +378,13 @@ describe('submission pagination compatibility', () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ success: true, data: [] });
-    // #722: 切る数は口が渡す。渡した数と名乗る数が同じであることが要点。
+    // 切る数は口が渡す。渡した数と名乗る数が同じであることが要点。
     expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1', 200, {lineAccountId:'account-a'});
     expect(mocks.getFormSubmissionsPage).not.toHaveBeenCalled();
   });
 
   /*
-   * #722 で書き換えた表明。
+   *  で書き換えた表明。
    *
    * **元は「DBヘルパが600件返しても口が500件へ切る」を見ていた。**その表明は
    * 緑のまま通っていたが、実際の DB ヘルパは 200 で切っていたので、
@@ -1178,15 +1178,14 @@ test('Content-Typeの申告なしでも保管本文の上限を守る', async ()
   expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
 });
 
-// Keep the real URL/private-IP policy and webhook fetch. Only DNS is synthetic,
-// so concurrency/event-id assertions still count actual webhook attempts.
+// URL・内部 IP の検査と実際の Webhook 通信は保ち、DNS だけを差し替える。競合とイベント ID の試験では実際の試行回数を数える。
 vi.mock('../features/forms/form-webhook.js', async original => {
   const actual = await original<typeof import('../features/forms/form-webhook.js')>();
   return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
     actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
 });
 
-// A URL-only edit must not carry a saved, redacted credential to another origin.
+// URL だけの変更で、伏せた保存済み資格情報を別の origin へ送れないことを確かめる。
 describe('F01 saved webhook credential origin', () => {
   test.each([
     ['different host', 'https://other.example.com/check', null],

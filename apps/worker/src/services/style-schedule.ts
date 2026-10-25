@@ -9,7 +9,7 @@ import { eventModeRemaining } from './event-mode-capacity.js';
 import { restaurantCivilTime } from './restaurant-booking.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 
-/** Data shared by the board, list and day/week/month calendar. No display strings or colors. */
+/** ボード・一覧・日週月カレンダーが同じデータを使い、表示文や色は含めない。 */
 export async function styleSchedule(
   db: D1Database,
   account: string,
@@ -89,7 +89,7 @@ export async function styleSchedule(
         .all<{ id: string; name: string; storeId: string }>()
     ).results;
     availability.resources = tables;
-    // Time × staff is the default board. A table axis is available for the seats tab.
+    // ボードの既定軸は時間と担当者とし、席のタブではテーブル軸を使える。
     if (query.axis === 'table')
       columns.splice(
         0,

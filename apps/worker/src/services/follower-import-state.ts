@@ -121,10 +121,7 @@ export async function saveState(
   );
 }
 
-/**
- * LINE exposes no account-type field in /v2/bot/info. A one-item, read-only
- * followers request is therefore the authoritative capability probe.
- */
+/** LINE の bot/info にはアカウント種別がないため、1件だけの読み取り followers 要求で利用可否を確認する。 */
 export async function detectFollowerImportCapability(
   db: D1Database,
   client: Pick<FollowerImportClient, 'getFollowerIds'>,
@@ -150,7 +147,7 @@ export async function detectFollowerImportCapability(
   return state;
 }
 
-/** Start once or resume an interrupted migration. Completed jobs stay closed. */
+/** 一度だけ開始するか中断を再開し、完了済みジョブは再開しない。 */
 export async function startFollowerImport(
   db: D1Database,
   lineAccountId: string,

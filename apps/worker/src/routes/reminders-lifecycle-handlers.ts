@@ -19,7 +19,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
       return fail(c, 404, 'REMINDER_NOT_FOUND');
     }
     const accountId = (reminder as { line_account_id?: string | null }).line_account_id ?? null;
-    // R349: 個人名を返す口は、親の今の所属ではなく実行行の送信元
+    // 個人名を返す口は、親の今の所属ではなく実行行の送信元
     // アカウントで絞る。所属変更前の履歴が担当外に漏れないようにする。
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const canSeeParent = await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId]);
@@ -68,7 +68,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
           isActive: Boolean(reminder.is_active),
           lifecycleStatus: reminder.lifecycle_status,
           stopConditions: publishedSettings?.stopConditions ?? null,
-          // R146 監査：公開版の有無を画面へ渡す。無い下書きは「停止中」と
+          //  監査：公開版の有無を画面へ渡す。無い下書きは「停止中」と
           // 出さず「下書き」と出し、再開ボタンを出さない。
           hasPublishedVersion: publishedVersion !== null,
         },
@@ -133,7 +133,7 @@ export const post__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =
       description?: string;
       lineAccountId?: string | null;
     } & Record<string, unknown>>();
-    // N-078: 下書き保存と同じ規則で、前後空白を落としてから上限を数える。
+    // 下書き保存と同じ規則で、前後空白を落としてから上限を数える。
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
     if (name.length > REMINDER_NAME_MAX_LENGTH) {
@@ -149,7 +149,7 @@ export const post__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =
     if (!trigger.ok) return inputError(c, { success: false, error: trigger.error }, 400, ["triggerType","triggerFieldId","triggerEventId","repeatYearly","leapYearPolicy","deliveryMode","triggerOffsetMinutes","sendAtTime","targetTagId","folderId"]);
     const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
     if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
-    // N-067: Idempotency-Key 付きの登録は二重作成しない。キーなしは従来通り。
+    // Idempotency-Key 付きの登録は二重作成しない。キーなしは従来通り。
     const requestKey = c.req.header('Idempotency-Key')?.trim();
     if (requestKey !== undefined && requestKey !== '') {
       if (!isValidIdempotencyKey(requestKey)) {
@@ -165,7 +165,7 @@ export const post__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =
       return c.json(result.body, result.status);
     }
     const item = await createReminder(c.env.DB, { ...body, name, ...trigger.value });
-    // Save line_account_id if provided
+
     if (body.lineAccountId) {
       await c.env.DB.prepare(`UPDATE reminders SET line_account_id = ? WHERE id = ?`)
         .bind(body.lineAccountId, item.id).run();
@@ -196,7 +196,7 @@ export const put__api_reminders_id_3 = async (c: Context<Env, "/api/reminders/:i
     }
     const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
     if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
-    // N-078: 名前の更新も作成と同じ上限で止める。画面の maxLength だけでは
+    // 名前の更新も作成と同じ上限で止める。画面の maxLength だけでは
     // API を直接叩かれたときに抜ける。
     if (body.name !== undefined) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -211,7 +211,7 @@ export const put__api_reminders_id_3 = async (c: Context<Env, "/api/reminders/:i
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: { id: updated.id, name: updated.name, isActive: Boolean(updated.is_active) } });
   } catch (err) {
-    // R146 監査：公開版の無い下書きの再開は 409 で止める。通すと公開版IDが
+    //  監査：公開版の無い下書きの再開は 409 で止める。通すと公開版IDが
     // null のまま稼働中になり、公開版との状態が不整合になる。
     if (err instanceof Error && err.message === 'REMINDER_NOT_PUBLISHED') {
       return c.json({ success: false, error: 'まだ公開していない下書きは再開できません。先に公開してください' }, 409);
@@ -344,7 +344,7 @@ export const post__api_reminders_id_enroll_friendId_8 = async (c: Context<Env, "
 
 export const get__api_reminders_id_registrants_9 = async (c: Context<Env, "/api/reminders/:id/registrants">) => {
   try {
-    // R348: 親の今の所属ではなく、友だちの所属が見える担当に出す。
+    // 親の今の所属ではなく、友だちの所属が見える担当に出す。
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const items = await listReminderRegistrants(c.env.DB, c.req.param('id'), scope);
     if (items.length === 0) {
@@ -472,7 +472,7 @@ export const delete__api_friend_reminders_id_14 = async (c: Context<Env, "/api/f
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friendAccountId, reminderAccountId])) {
       return fail(c, 404, 'FRIEND_REMINDER_NOT_FOUND');
     }
-    // R350: 一覧側の取消と同じ処理へ寄せる。番号・理由・未送信の停止を
+    // 一覧側の取消と同じ処理へ寄せる。番号・理由・未送信の停止を
     // 一貫させ、送信待ちが残って通知が続くのを防ぐ。応答の形は変えない。
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const current = await getReminderRegistrantById(
@@ -504,7 +504,7 @@ export const post__api_reminder_runs_runId_retry_15 = async (c: Context<Env, "/a
   try {
     const run = await getReminderDeliveryRunById(c.env.DB, c.req.param('runId'));
     if (!run) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
-    // R348/R349: 所属が変わったルールの旧実行行は、行の送信元アカウントで
+    // 所属が変わったルールの旧実行行は、行の送信元アカウントで
     // 判定する。親だけを見ると旧担当が再試行できず、逆に現担当が旧行へ届く。
     // 未所属の旧行だけは従来どおり親で判定する。
     const runAccountId = (run as { line_account_id?: string | null }).line_account_id ?? null;

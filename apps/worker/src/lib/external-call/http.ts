@@ -6,19 +6,19 @@ export interface HttpAttemptOptions<T> {
   url: string;
   method?: string;
   headers?: HeadersInit;
-  /** Already serialized immutable body; streams/FormData require their own adapter. */
+  /** 要求本文は直列化済みで不変とする。stream/FormData は専用アダプターで扱う。 */
   body?: string | ArrayBuffer;
-  /** Keep the caller's EXISTING limit. No global limit is raised by this adapter. */
+  /** 既存の制限を緩めないよう、呼出元の上限を保つ。 */
   maxResponseBytes: number;
   fetch?: typeof fetch;
   now?: () => number;
-  /** Provider-specific business errors / accepted-retry receipts; never auto retry here. */
+  /** 事業者ごとの業務エラーや再試行の受理票を解釈するが、ここでは自動再試行しない。 */
   interpret(response: Response, identity: Readonly<CallIdentity>): Promise<Outcome<T>>;
-  /** Prove rejection without side effects (e.g. a provider's documented 429). */
+  /** 外部の仕様に基づき、副作用なしで拒否されたことを確認する。 */
   rejectedWithoutEffect?: (status: number) => boolean;
 }
 
-/** Capture URL/headers/body NOW, before any awaited journal or authorization work. */
+/** await 中の変更が送信内容へ混入しないよう、台帳保存・認可より前に URL・ヘッダ・本文を固定する。 */
 export function createHttpAttempt<T>(options: HttpAttemptOptions<T>) {
   const url = new URL(options.url);
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password
@@ -40,8 +40,7 @@ export function createHttpAttempt<T>(options: HttpAttemptOptions<T>) {
       body: typeof body === 'string' ? body : body?.slice(0), signal, redirect: 'manual' }));
     const retryAt = parseRetryAfter(response.headers.get('retry-after'), now());
     const transient = response.status === 408 || response.status === 429 || response.status >= 500;
-    // A mutation's 5xx is not evidence that nothing happened. Even a key header
-    // alone cannot authorize replay. Unknown results go to reconciliation.
+    // 更新の5xxは未実行の根拠にならず、キーがあるだけでも再送を許可しない。結果不明は照合へ回す。
     if (!response.ok && response.status !== 409) {
       void response.body?.cancel().catch(() => {});
       return { kind: transient ? identity.effect === 'read' || rejected?.(response.status) ? 'transient' : 'unknown' : 'permanent',
@@ -74,8 +73,7 @@ export function createHttpAttempt<T>(options: HttpAttemptOptions<T>) {
       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
       buffered = new Response(bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
     }
-    // General 409 is permanent. Only the provider adapter may recognize its
-    // documented original acceptance receipt; no generic 409 -> success rule.
+    // 一般的な409は恒久的な失敗とし、事業者固有の受理票だけを専用アダプターで成功と解釈する。
     return interpret(buffered, identity);
   };
 }

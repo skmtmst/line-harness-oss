@@ -154,7 +154,7 @@ test('試験友だちだけLINE模擬成功。通常の送り先・実トーク�
   expect((await send(token, data.friends[0]!.lineUserId)).headers.get('x-staging-qa-simulated')).toBe('true');
   await expect(send(token, `U${'b'.repeat(32)}`)).rejects.toThrow('STAGING_QA_OUTBOUND_BLOCKED');
   await expect(send('real-token', data.friends[0]!.lineUserId)).rejects.toThrow('STAGING_QA_OUTBOUND_BLOCKED');
-  // Exercise the actual Harness proxy as well: it must preserve its history and manual-source behavior.
+  // 実際の送信プロキシも試し、履歴と手動送信の判定が保たれることを確かめる。
   const proxy = await app.request('https://stg-api.musubo.jp/line-api/v2/bot/message/push', {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Line-Harness-Source': 'manual' },
     body: JSON.stringify({ to: data.friends[0]!.lineUserId, messages: [{ type: 'text', text: 'QA reply' }] }),
@@ -230,7 +230,7 @@ test('失敗した処理と中断した記録は同じrequestIdで再実行せ�
   fixture.raw.prepare('UPDATE rt_stores SET line_account_id=? WHERE id=?').run('unrelated-account', run.storeId);
   const tick = { job: 'restaurant_holds', requestId: 'failed-scope' };
   expect((await request(`/runs/${run.id}/cron`, 'POST', tick)).status).toBe(500);
-  // Restoring membership does not make a failed operation safe to replay.
+  // 所属が復旧しても、失敗した操作を安全に再送できる根拠とはしない。
   fixture.raw.prepare('UPDATE rt_stores SET line_account_id=? WHERE id=?').run(run.accountId, run.storeId);
   const retry = await request(`/runs/${run.id}/cron`, 'POST', tick);
   expect(retry.status).toBe(409);

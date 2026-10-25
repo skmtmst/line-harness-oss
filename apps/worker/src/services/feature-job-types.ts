@@ -1,6 +1,6 @@
 import type { FeatureId } from '@line-crm/shared';
 /**
- * 実装側のoff強制の在り処(#643)。
+ * 実装側のoff強制の在り処。
  *
  * manifest に名前を足すだけでは「本当に止まるか」は分からない。
  * `gated` は判定を書いたファイルと、そこに必ず現れる目印を持ち、

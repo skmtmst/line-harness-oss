@@ -1,12 +1,6 @@
 import { Hono } from 'hono';
 
-/**
- * S05: HTTP self-update is retired. Deployment uses the operator CLI / CI.
- * Never accept a long-lived deployment key as an application credential.
- * No setting reopens this router; any future HTTP updater needs its own
- * reviewed session, MFA, target restriction and mandatory audit design.
- * Public /admin/version remains in the separate admin-version router.
- */
+/** 配備は運用 CLI/CI に限定し、長期の配備キーをアプリ認証に使わせない。設定で HTTP 更新を再開せず、すべて拒む。将来の追加にはセッション・MFA・対象制限・必須監査の設計が必要。公開版情報は別 route で扱う。 */
 const app = new Hono();
 app.all('*', (c) => c.notFound());
 export default app;

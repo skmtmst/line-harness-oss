@@ -29,7 +29,7 @@ function memDB(): { db: D1Database; rows: Map<string, Row> } {
         },
         async first<T>() {
           if (sql.startsWith('SELECT')) {
-            // SELECT binds: key, line_account_id, friend_id
+            // SQL の引数順: key、line_account_id、friend_id。
             const [key, accountId, friendId] = bound as [string, string, string];
             const row = rows.get(key);
             if (!row) return null;

@@ -1,7 +1,7 @@
 import { findPlan } from './billing-plans.js';
 import { hqBillingMetrics } from '../features/hq-billing/hq-billing-metrics/index.js';
 
-/** Stored counters only. A plan's list price is explicitly separate from the invoiced amount. */
+/** 保存された件数だけを使い、プランの定価と実際の請求額は区別する。 */
 export async function opsTenantMetrics(db:D1Database,tenantId:string) {
   const [billing,tenant,counts,support]=await Promise.all([
     hqBillingMetrics(db,tenantId),

@@ -1111,7 +1111,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/users',
   'POST /api/users/{id}/link',
   'POST /api/users/match',
-  // #939: 外部連携の編集・未照合の箱・公開APIトークン・公開API。
+  // 外部連携の編集・未照合の箱・公開APIトークン・公開API。
   'GET /api/webhooks/outgoing/{id}',
   'POST /api/webhooks/incoming/{id}/test',
   'POST /api/webhooks/incoming/{id}/restore',
@@ -2250,7 +2250,7 @@ describe('OpenAPIと公開APIの同期', () => {
       if (!entry) continue;
       const classification = routeClassification(entry.honoPath, method);
       const operation = spec.paths[path]?.[method.toLowerCase() as 'get'];
-      // These LIFF handlers verify the account's LINE ID token themselves.
+      // LIFF ハンドラ自身が、対象アカウントの LINE ID トークンを検証する。
       const verifiedLiff = ['/api/liff/files/:id/download',"/api/liff/booking/cost-estimate","/api/liff/booking/group-availability","/api/liff/booking/pass-purchases/:id","/api/liff/booking/series/preview","/api/liff/member-card","/api/liff/booking/pass-plans/:id/checkout","/api/liff/forms/:id/routing/resolve","/api/liff/events/bookings/:id/absence","/api/liff/events/makeup-credits","/api/liff/events/makeup-credits/:id/options","/api/liff/events/makeup-credits/:id/use","/api/liff/booking/cancellation-quote","/api/liff/booking/setup-intent",'/api/liff/notification-preferences', '/api/liff/notification-preferences/:purpose', '/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
       if (verifiedLiff) {
         if (JSON.stringify(operation?.security) !== '[{"liffIdToken":[]}]') problems.push(`${key}: LINE IDトークンの表示が無い`);

@@ -246,9 +246,7 @@ function instagramDiagnostic(failure: {
 }
 const INSTAGRAM_RETURN_PATH = '/settings/sns';
 /**
- * Instagram にログインするだけで接続が終わる口（2026-10-07 利用者承認）。
- * Facebook ページは一切見ない。認可コードを合鍵へ引き換え、その応答に入っている
- * Instagram の利用者IDとプロフィールをそのまま保存し、必ず設定 › SNS連携へ戻す。
+ * Instagram の認可コード応答の利用者 ID とプロフィールを保存し、SNS 連携設定へ戻す。Facebook ページ選択を不要にするため、その情報は参照しない。
  */
 instagram.get(
   '/api/instagram/oauth/callback',

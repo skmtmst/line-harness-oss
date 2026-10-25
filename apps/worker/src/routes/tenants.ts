@@ -40,10 +40,7 @@ export function parseFeaturePacks(value: unknown): FeaturePack[] | null {
   return [...new Set(value)];
 }
 
-/**
- * Cross-tenant operations deliberately use a route-local gate. Query scoping
- * cannot protect these endpoints because they are intended to manage tenants.
- */
+/** 統括そのものを管理する入口は問い合わせの範囲指定だけでは守れないため、route 内の専用権限を必須にする。 */
 async function canManageTenants(c: Context<Env>): Promise<boolean> {
   // ★37: 運営マスター（platform_admins）で判定する。既定の統括のオーナーを
   // 運営とみなす旧判定は、platform_admins が空の間だけの互換として
@@ -57,7 +54,7 @@ function forbidden(c: Context<Env>) {
   return fail(c, 403, 'FORBIDDEN', { error: '統括を管理する権限がありません' });
 }
 
-/** Read-only migration diagnostics. This route never returns LINE credentials. */
+/** 読み取り専用の移行診断とし、LINE の資格情報は返さない。 */
 export const tenants = new Hono<Env>();
 
 /** 会社・連絡先は統括の管理者だけに返す。汎用の名前の口には含めない。 */
@@ -99,8 +96,7 @@ tenants.post('/api/tenants', inputJsonBoundary(), async (c) => {
   if (!name || name.length > 100) {
     return inputError(c, { success: false, error: '統括名は1〜100文字で入力してください' }, 400, ["name"]);
   }
-  // The current tenants schema has nowhere to persist these fields. Rejecting
-  // them avoids pretending that supplied business data was saved.
+  // 保存先の列がない入力を成功に見せないよう、未対応の業務項目は拒む。
   if (body?.prefecture !== undefined || body?.representativeName !== undefined) {
     return inputError(c, { success: false, error: '未対応の項目が含まれています' }, 400, ["prefecture","representativeName"]);
   }
@@ -156,8 +152,7 @@ tenants.patch('/api/tenants/:id/status', inputJsonBoundary(), async (c) => {
     return inputError(c, { success: false, error: '利用できない状態です' }, 400, ["status"]);
   }
 
-  // This only records the tenant state. Enforcing it for login and delivery is
-  // a separate rollout; changing the state here does not delete child data.
+  // ここは統括状態だけを記録し、子データは消さない。ログインと配信での強制適用は別の接続で行う。
   const result = await dbFor(c.env).prepare(`UPDATE tenants
     SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
     WHERE id = ?`)

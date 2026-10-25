@@ -8,7 +8,7 @@ export interface AppliedUberStoreLifecycleState {
   reviewRequired: boolean;
 }
 
-/** Latest provider lifecycle event that durably changed this mapping, without a schema change. */
+/** 保存形式を増やさず、対応関係を変更した事業者側の最新イベントを保持する。 */
 export async function appliedUberStoreLifecycleState(
   db: D1Database,
   accountId: string,

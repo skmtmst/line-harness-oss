@@ -5,12 +5,12 @@ import { parseMessageTemplateDefinition } from './template.js';
 
 type MessageFacts = Pick<HqTemplateListDisplay, 'message_count' | 'has_interpolations'>;
 
-/** A carousel/card is one LINE message. Media dependencies are not extra messages. */
+/** カードやカルーセルは LINE の1通と数え、依存メディアを別メッセージとして増やさない。 */
 export function messageListFacts(definitionJson: string | null): MessageFacts {
   if (!definitionJson) return { message_count: null, has_interpolations: null };
   try {
     const raw = JSON.parse(definitionJson);
-    // Do not silently label an unsupported future bundle as a single message.
+    // 未対応の複数メッセージを、黙って1通と表示しない。
     if ('messages' in raw || 'bubbles' in raw) throw new Error('UNSUPPORTED_BUNDLE');
     const definition = parseMessageTemplateDefinition(raw);
     const content = [

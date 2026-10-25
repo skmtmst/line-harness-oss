@@ -369,7 +369,7 @@ async function resolveRefundedInvoiceId(c: Context<Env>, object: Record<string, 
     return typeof paymentIntent.invoice === 'string' ? paymentIntent.invoice : null;
   } catch (error) {
     logger.warn("routes_hq_billing_warn");
-    // An unavailable lookup is not evidence that the charge has no invoice.
+    // 請求書の取得失敗を、請求書なしの根拠にしない。
     throw error;
   }
 }
@@ -413,8 +413,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       ? await resolveRefundedInvoiceId(c, object)
       : undefined;
     const tenant = await findTenantForEvent(c, object);
-    // Existing rows are completed legacy receipts. New receipts remain pending until
-    // every domain write and the completion marker commit together.
+    // 保存済みの受領記録は完了済みとして扱う。新しい記録は、業務更新と完了印を一緒に確定するまで pending に残す。
     await c.env.DB.prepare('INSERT OR IGNORE INTO billing_events (id,type,tenant_id,summary) VALUES (?,?,?,?)')
       .bind(event.id,event.type,tenant?.id ?? null,'pending').run();
     const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
@@ -429,8 +428,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     const writeTenant = (patch: Parameters<typeof updateTenantBilling>[2], subscription = false) => {
       const sql = [pending.sql]; const values = [...pending.values];
       if (subscription) {
-        // Deletion/updates belong to the current subscription. A new checkout or
-        // creation may replace a canceled contract, never a different live one.
+        // 削除・更新は現在の契約だけに適用し、新しい申込で置き換えられるのは取消済みの契約だけとする。
         const canReplace = event.type === 'checkout.session.completed' || event.type === 'customer.subscription.created';
         sql.push(`(stripe_subscription_id IS NULL OR stripe_subscription_id=?${canReplace ? " OR plan_status='canceled'" : ''})`);
         values.push(subscriptionId);
@@ -438,14 +436,14 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
           sql.push('stripe_subscription_id=?'); values.push(subscriptionId);
         }
         sql.push("(stripe_customer_id IS NULL OR stripe_customer_id=?)"); values.push(stripeExpandableId(object.customer));
-        // The completed receipt carries provider time, never local arrival time.
+        // 受領記録は到着時刻でなく、事業者の発生時刻を保持する。
         if (created) {
           sql.push(`NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id
             AND json_valid(e.summary) AND json_extract(e.summary,'$.applied')=1
             AND (?=1 OR json_extract(e.summary,'$.subscriptionId')=?)
             AND json_extract(e.summary,'$.created')>?)`); values.push(canReplace?1:0,subscriptionId,created);
         }
-        // A deleted subscription cannot become active again; re-contracting has a new ID.
+        // 削除済み契約を再び有効にしない。再契約は新しい ID とする。
         if (patch.plan_status && patch.plan_status !== 'canceled') {
           sql.push("NOT (plan_status='canceled' AND stripe_subscription_id=?)"); values.push(subscriptionId);
         }

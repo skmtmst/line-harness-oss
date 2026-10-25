@@ -41,7 +41,7 @@ export type ConnectionMutationResult =
   | { ok: true; connection: ManagedUberConnection }
   | { ok: false; status: 409 | 502 | 503; code: string };
 
-/** Save a completed provisioning OAuth exchange without reviving a newer disconnect. */
+/** 遅い OAuth 完了で新しい解除を取り消さないよう、接続の状態を照合して保存する。 */
 export async function saveUberOAuthConnection(input: {
   db: D1Database;
   storeId: string;
@@ -262,8 +262,7 @@ export async function checkUberConnection(input: {
 }): Promise<ConnectionMutationResult> {
   const nowMs = input.nowMs ?? Date.now();
   return withStoreLease({ ...input, nowMs, work: async (row, lockKey, owner, elapsedNowMs) => {
-    // An ambiguous DELETE is resolved only by a signed deprovision webhook or an
-    // operator review. A later GET may be stale and must not undo the tombstone.
+    // DELETE の結果不明は署名付き解除通知か人の確認でだけ解決する。古い可能性のある GET で解除の印を消さない。
     if (unresolvedActivation(row.last_error)) {
       return { ok: false, status: 409, code: 'pos_activation_unknown' };
     }

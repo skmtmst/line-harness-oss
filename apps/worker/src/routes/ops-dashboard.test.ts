@@ -114,7 +114,7 @@ describe('集計', () => {
     expect(body.data.kpis.churnInPeriod).toBe(1);
     // 期間はじめに契約中だったのは a, b, c と（今月解約した）e の 4 社 → 25%
     expect(body.data.kpis.churnRate).toBe(25);
-    // 先月末には e も契約中だったので、前月比はマイナス
+    // 先月末には e も契約中のため、今月との比較は減少になる。
     expect(body.data.kpis.revenueDelta).toBe(-9_800);
   });
 

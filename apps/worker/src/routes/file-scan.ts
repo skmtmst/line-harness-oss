@@ -176,7 +176,7 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
   const accountId = (c.req.query('accountId') ?? '').trim();
   const status = (c.req.query('status') ?? '').trim() as FileScanStatus | 'released' | '';
   /*
-   * 監査 R132: 一覧は以前先頭50件固定で、51件目以降へ辿り着けなかった。
+   * 監査 : 一覧は以前先頭50件固定で、51件目以降へ辿り着けなかった。
    * ページ送り（limit/offset）に加えてファイル名の検索を受ける。検索は
    * 件数と同じ条件で絞るので、一覧と総件数がずれない。
    */

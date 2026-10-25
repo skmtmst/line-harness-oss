@@ -15,7 +15,7 @@ vi.mock('../services/file-scan.js', () => ({
 }));
 
 /**
- * N-202 (#832): 使用先ごとの版固定参照・ライブ参照切替。
+ *  使用先ごとの版固定参照・ライブ参照切替。
  *
  * 本番と同じ順序 auth → tenantScope → businessAudit → feature →
  * images → contents で、実D1・実認証・実走査のまま確かめる。

@@ -44,7 +44,7 @@ function serialize(pool: TrafficPoolWithAccount) {
   };
 }
 
-// ── Public: GET /pool/:slug → 302 redirect to LIFF auth URL ────────────────
+
 
 trafficPools.get('/pool/:slug', async (c) => {
   const slug = c.req.param('slug');
@@ -57,7 +57,7 @@ trafficPools.get('/pool/:slug', async (c) => {
   const baseUrl = new URL(c.req.url).origin;
   const params = new URLSearchParams();
   params.set('pool', slug);
-  // Forward safe query params (ref, form, etc.) — block 'account' to prevent pool bypass
+  // プールの迂回を防ぐため account は転送せず、安全な ref/form などだけを引き継ぐ。
   const blocked = new Set(['pool', 'account']);
   for (const [key, value] of new URL(c.req.url).searchParams) {
     if (!blocked.has(key)) params.set(key, value);
@@ -218,7 +218,7 @@ trafficPools.put('/api/traffic-pools/:id', requireRole('owner'), inputJsonBounda
   }
 });
 
-// DELETE /api/traffic-pools/:id
+
 trafficPools.delete('/api/traffic-pools/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -226,9 +226,7 @@ trafficPools.delete('/api/traffic-pools/:id', requireRole('owner'), async (c) =>
     if (!existing) {
       return fail(c, 404, 'TRAFFIC_POOL_NOT_FOUND');
     }
-    // The 'main' pool is the default fallback for /r/:ref / /auth/line and
-    // for new LINE account auto-enrollment; deleting it breaks single-account
-    // onboarding silently. Surface as 400 instead.
+    // main は友だち追加の既定先なので、削除して初期設定を壊さないよう400で拒む。
     if (existing.slug === 'main') {
       return c.json({ success: false, error: 'main pool cannot be deleted' }, 400);
     }
@@ -261,7 +259,7 @@ trafficPools.get('/api/traffic-pools/:id/accounts', async (c) => {
   }
 });
 
-// POST /api/traffic-pools/:id/accounts — add account to pool
+
 trafficPools.post('/api/traffic-pools/:id/accounts', requireRole('owner'), inputJsonBoundary({"lineAccountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ lineAccountId: string }>();
@@ -293,7 +291,7 @@ trafficPools.put('/api/traffic-pools/:id/accounts/:accountId', requireRole('owne
   }
 });
 
-// DELETE /api/traffic-pools/:id/accounts/:accountId — remove account from pool
+
 trafficPools.delete('/api/traffic-pools/:id/accounts/:accountId', requireRole('owner'), async (c) => {
   try {
     const deleted = await removePoolAccount(c.env.DB, c.req.param('accountId'));

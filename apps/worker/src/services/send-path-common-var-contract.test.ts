@@ -1,6 +1,6 @@
 import { implementationFiles, readImplementationSource } from '../test-utils/implementation-source.js';
 /*
- * N-189 機械照合: LINE送信へ繋がる全経路が、共通情報を厳格resolver
+ *  機械照合: LINE送信へ繋がる全経路が、共通情報を厳格resolver
  * （resolveSendInterpolationExtra / resolveSendCommonVars）経由で解決する
  * ことをソース走査で固定する。
  *
@@ -146,8 +146,7 @@ describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () =
     strict.add('services/reminder-draft.ts');
     const nonTemplate = new Set(NON_TEMPLATE_PATHS.map((p) => p.file));
 
-    // Preserve the existing audited feature entries. Discover extracted modules
-    // only through their real imports; unmounted/new senders still fail below.
+    // 既存の監査済み入口を保ち、分割した実装は本物の import だけからたどる。未登録の送信処理も引き続き拒む。
     const audited = new Set([...strict, ...nonTemplate].map(file => join(SRC, file)));
     const owner = new Map<string, string>();
     for (const root of [...strict, ...nonTemplate]) {

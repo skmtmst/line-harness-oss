@@ -1,7 +1,7 @@
 import { type Context } from 'hono';
 import type { Env } from '../../worker-env.js';
 
-// ---- 予約の変更履歴 (N-394) ----
+// ---- 予約の変更履歴  ----
 
 export interface BookingNotificationPolicy {
   send_line_confirmation: boolean;

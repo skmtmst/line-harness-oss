@@ -26,7 +26,7 @@ function duration(bytes: Uint8Array, box: Box): number {
   if (!Number.isSafeInteger(ms) || ms < 1) invalid();
   return ms;
 }
-/** Range reads skip mdat, including files with moov at the end. Metadata is capped at 8MB. */
+/** 動画本体の mdat を飛ばし、末尾の moov も Range で読む。metadata は8MBに制限する。 */
 export async function readHqMp4Metadata(bucket: R2Bucket, key: string, etag: string, size: number, kind: 'audio' | 'video') {
   const read = async (offset: number, length: number) => {
     const obj = await bucket.get(key, { onlyIf: { etagMatches: etag }, range: { offset, length } });

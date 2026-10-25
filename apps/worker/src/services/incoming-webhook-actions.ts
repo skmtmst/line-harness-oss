@@ -16,12 +16,12 @@ type ActionRunResult = {
   matchedFriendId: string | null;
   executed: number;
   failed: number;
-  /** S: matched / not_found / ambiguous(複数一致で保留)のどれだったか。 */
+  /** matched / not_found / ambiguous(複数一致で保留)のどれだったか。 */
   matchStatus: 'matched' | 'not_found' | 'ambiguous' | 'skipped';
 };
 
 /**
- * S (#939 機能26): 人の照合結果。0件は not_found、1件は matched、
+ * S ( 機能26): 人の照合結果。0件は not_found、1件は matched、
  * 2件以上は ambiguous。ambiguous は行動を自動実行せず箱へ保留し、
  * 人がどの友だちか選ぶ(成り済ましの取り違えを防ぐ)。
  */
@@ -36,7 +36,7 @@ function jsonPathSegment(key: string): string {
 
 /**
  * 届いた本文の「形」だけの見本。値はすべて •••• に伏せる。
- * 受け取り口の詳細画面の最新見本と、未照合の届物(#939 N-367)の両方で使う。
+ * 受け取り口の詳細画面の最新見本と、未照合の届物の両方で使う。
  */
 export function maskedPayloadShape(payload: unknown) {
   const fields: Array<{ path: string; type: string; maskedValue: '••••' }> = [];
@@ -110,7 +110,7 @@ export async function resolveFriendMatch(
   config: IncomingWebhookIdentityMatch,
 ): Promise<IncomingFriendMatch> {
   /*
-   * S (#939 機能26): 照合の決まり。
+   * S ( 機能26): 照合の決まり。
    * - 順に試し、最初に1件以上見つかった方法で決める(推奨順位どおり)
    * - 1件なら matched、2件以上なら ambiguous(先頭だけ選んで動かさない)
    * - 全部0件なら not_found。名前だけの照合は行わない。
@@ -127,7 +127,7 @@ export async function resolveFriendMatch(
       continue;
     }
     if (method.kind === 'verified_email' || method.kind === 'verified_phone') {
-      // N-377: users.email / users.phone の値だけでは「検証済み」の裏付けに
+      // users.email / users.phone の値だけでは「検証済み」の裏付けに
       // ならない。検証済みと名乗る照合は、統合ユーザー機能で運用者が
       // 「確認済み」と印を付けた採用値（user_profile_values.verified_at が
       // ある行）にだけ一致させる。裏付けが無い行は一致させず、未照合の
@@ -210,7 +210,7 @@ async function commonActionPlan(
 }
 
 /**
- * N-367 (#939): 人が見つからなかった届物を「確認する箱」へ置く。
+ *  人が見つからなかった届物を「確認する箱」へ置く。
  *
  * unmatched_box / create_candidate はどちらも同じ箱の1行で、
  * 違いは kind だけ（「未照合として確認」か「友だち候補として残す」か）。
@@ -257,7 +257,7 @@ async function recordNotFound(
 }
 
 /**
- * S (#939 機能26): 同じ値の友だちが2人以上いた届物を箱へ保留する。
+ * S ( 機能26): 同じ値の友だちが2人以上いた届物を箱へ保留する。
  * onNotFound の設定に関わらず必ず置く。自動で先頭だけ選んで動かすと、
  * まったく別の友だちにタグやメッセージが届いてしまうため。
  * 同じ受信の再送は台帳側の UNIQUE で増えない。
@@ -349,8 +349,7 @@ export async function executeIncomingWebhookActions(
     plans.push({ refIndex, ref, plan });
     sequence += plan.length;
   }
-  // LINE rich-menu link/unlink has no provider Retry-Key. A receipt may retry
-  // one final-state operation, but must never replay an earlier state over a later one.
+  // リッチメニューの関連付け API は再試行キーがないため、受領票で最終状態だけを再実行し、新しい状態を古い操作で上書きしない。
   if (input.execution && plans.flatMap(({ plan }) => plan)
     .filter(action => action.type === 'switch_rich_menu' || action.type === 'remove_rich_menu').length > 1) {
     throw new Error('incoming_rich_menu_multiple_final_states');
@@ -401,7 +400,7 @@ export async function executeIncomingWebhookActions(
 }
 
 /**
- * S (#939 機能26): 受け取りの試し。届いたつもりのJSONを照合と
+ * S ( 機能26): 受け取りの試し。届いたつもりのJSONを照合と
  * 行動の組み立てまで試すが、実行も記録(箱・見本)もしない。
  * 行動の内訳は common_action は公開済み版を展開し、直接指定は
  * 種類だけ返す(実行しないので副作用は無い)。

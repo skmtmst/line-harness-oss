@@ -12,7 +12,7 @@ vi.mock('../services/google-calendar.js', () => ({ GoogleCalendarClient: vi.fn(f
 import { GoogleCalendarClient } from '../services/google-calendar.js';
 import { calendar } from './calendar.js';
 
-// Generated fixtures only. No real credentials or external requests.
+// 作り物の資格情報だけを使い、外部へ要求しない。
 const key = btoa(String.fromCharCode(...new Uint8Array(32).fill(7)));
 const scope = { allowedAccountIds: ['account-a'], includeUnassigned: false };
 const opened: ReturnType<typeof createTestD1>[] = [];

@@ -1,18 +1,10 @@
 import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ASP — friend-add push to the affiliate on a NEW friend arriving via an
-// affiliate link. Drives GET /auth/callback (the genuine new-friend entry
-// point). The db layer + notifier are mocked; a stubbed fetch answers the LINE
-// OAuth token / verify / profile / bot-info calls.
-//
-// Cases:
-//   - new friend via affiliate link → notifies
-//   - self-click (affiliate adds own bot) → does NOT notify
-//   - existing-friend re-touch → does NOT notify
+// 実 OAuth コールバックの入口で、新規の友だちだけを参加者へ通知する。自己クリックと既存友だちの再訪は通知しない。DB・通知と LINE の応答だけを差し替える。
 
 const dbMocks = {
-  // eager module-load deps
+
   getLineAccounts: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000' },
   ]),
@@ -53,8 +45,7 @@ vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateFriendAdd }
 
 const worker = (await import('../index.js')).default;
 
-// No-op prepared statement chain; the callback's raw UPDATE/SELECT statements
-// don't matter for the notification assertions.
+// 通知の期待値に関係しない SQL は、何もしない prepared statement で依存を満たす。
 const DB = {
   prepare: () => ({
     bind: () => ({
@@ -97,7 +88,7 @@ function installFetchMock() {
           { status: 200 },
         );
       }
-      // bot/info etc → 404 so the handler falls through to the completion page
+      // bot/info などは404を返し、完了ページへの代替経路を試す。
       return new Response('not found', { status: 404 });
     }),
   );
@@ -130,7 +121,7 @@ beforeEach(() => {
 
 describe('GET /auth/callback — affiliate friend-add notification', () => {
   it('notifies the affiliate for a new friend via an offer affiliate link', async () => {
-    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null); // brand-new friend
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
     dbMocks.getAffiliateLinkByRefCode.mockResolvedValue({
       id: 'AL-1',
       affiliate_id: 'AFF-1',
@@ -200,7 +191,7 @@ describe('GET /auth/callback — affiliate friend-add notification', () => {
       scenario_id: null,
       is_active: 1,
     });
-    // affiliate's own friend_id == the friend being added
+    // 自分自身の友だち追加を再現する。
     dbMocks.getAffiliateById.mockResolvedValue({ id: 'AFF-1', friend_id: 'F-new' });
 
     await callback('aff-self');
@@ -209,7 +200,7 @@ describe('GET /auth/callback — affiliate friend-add notification', () => {
   });
 
   it('does NOT notify when the friend already existed (re-touch)', async () => {
-    // Pre-existing friend → isNewFriend is false.
+    // 保存済みの友だちは新規追加と扱わない。
     dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'F-new',
       line_user_id: 'U-new-friend',

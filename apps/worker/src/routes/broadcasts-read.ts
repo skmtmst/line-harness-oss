@@ -379,7 +379,7 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
   } else if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
     // 実送信は getFriendsByTag(db, tagId, line_account_id) で要求アカウントに
     // 絞る (services/broadcast.ts)。プレビューも同じ境界で数え、他アカウント
-    // の人数・存在を応答へ漏らさない (N-060)。
+    // の人数・存在を応答へ漏らさない。
     const tagAccountId = (raw.line_account_id as string | null) || null;
     const tagSql = tagAccountId
       ? `SELECT COUNT(*) AS cnt FROM friends f

@@ -2,11 +2,7 @@ import { scopeKey } from './policy.js';
 import type { CallScope, CircuitAdmission, CircuitLease, CircuitStore } from './types.js';
 
 type Circuit = { failures: number; until: number; probing: boolean; generation: number; recoveries: number };
-/**
- * Explicitly ISOLATE-LOCAL. Reuse one instance; not a distributed stop switch.
- * Cross-isolate callers must inject an atomic shared store, preserving fencing
- * and single-probe semantics. No automatic eviction of open / probing entries.
- */
+/** この状態は isolate 内だけで共有する。複数 isolate では実行権と単一の回復確認を守る原子的な共有ストアを注入し、停止中・確認中の記録を自動削除しない。 */
 export class MemoryCircuitStore implements CircuitStore {
   private readonly circuits = new Map<string, Circuit>();
   constructor(private readonly failureThreshold = 5, private readonly openMs = 30_000) {
@@ -28,7 +24,7 @@ export class MemoryCircuitStore implements CircuitStore {
     const circuit = this.circuits.get(lease.scopeKey);
     if (!circuit || circuit.generation !== lease.generation) return;
     if (lease.probe) circuit.probing = false;
-    if (result === 'neutral') { if (lease.probe) circuit.generation++; return; } // Auth failure / cancellation never demonstrate recovery.
+    if (result === 'neutral') { if (lease.probe) circuit.generation++; return; } // 認証失敗や取消は、接続が回復した根拠として扱わない。
     if (result === 'failure') {
       circuit.failures++;
       if (lease.probe || circuit.failures >= this.failureThreshold) {
@@ -37,7 +33,7 @@ export class MemoryCircuitStore implements CircuitStore {
         circuit.recoveries = 0;
       }
     } else if (lease.probe) {
-      // Two serial successful probes, rather than a single success releasing a burst.
+      // 単発の成功で要求が集中しないよう、順番に2回の成功を確認して解除する。
       circuit.recoveries++;
       circuit.generation++;
       if (circuit.recoveries >= 2) { circuit.until = 0; circuit.failures = 0; }

@@ -1,13 +1,9 @@
 import type { Context, Next } from 'hono';
 
 /**
- * 検索に出さない（リリース前点検 2026-10-07・司令塔の許可で worker に足した）。
- *
- * api.musubo.jp は API と旧 LIFF・共有プレビューの配り先で、検索に出す
- * 画面は1つも無い。HTML を求める GET は全部 index.html が返るので、
- * /robots.txt を先に本物の robots として返し、全部の応答に
- * X-Robots-Tag を付ける。LINE などの共有プレビュー（OG）は robots を見ない
- * ので、共有の見え方は変わらない。
+ * API と LIFF・共有プレビューは検索対象にしない。
+ * HTML を求める GET が index.html へ進む前に本物の robots.txt を返し、全応答へ X-Robots-Tag を付ける。
+ * LINE などの共有プレビューは robots を参照しないため、OG の見え方は保つ。
  */
 export const ROBOTS_TXT = 'User-agent: *\nDisallow: /\n';
 export const X_ROBOTS_TAG = 'noindex, nofollow';

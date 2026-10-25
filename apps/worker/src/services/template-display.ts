@@ -1,7 +1,7 @@
 import { hasTemplateDraft,type TemplateRow } from '@line-crm/db';
 
 import { parseQuestion } from '../features/scenarios/scenario-question/index.js';
-/** 347: 公開版の固定情報。編集・保存では変わらない。 */
+/** 公開版の固定情報。編集・保存では変わらない。 */
 export function publishedInfoOf(t: TemplateRow) {
   return {
     messageType: t.message_type,

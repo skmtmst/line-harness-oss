@@ -100,13 +100,13 @@ siteTracking.post('/api/site/collect', inputJsonBoundary(), async (c) => {
     c.header('Access-Control-Allow-Origin', origin!);
 
 
-    // 計測がオフのaccountへは書かない（#859 site_tracking）。それでも204を
+    // 計測がオフのaccountへは書かない（ site_tracking）。それでも204を
     // 返すのは、埋め込み先の公開サイトから設定状態を推測させないため。
     if (!(await accountFeatureIsEnabled(c.env.DB, lineAccountId, 'site_tracking'))) {
       return c.body(null, 204, corsHeaders());
     }
 
-    // 同意 (#818)。granted のときだけ行動を記録する。
+    // 同意。granted のときだけ行動を記録する。
     // declined/unset は件数だけ数えて、閲覧そのものは1件も残さない。
     const consent = (['granted', 'declined', 'unset'] as const)
       .includes(body.consent as SiteConsent)

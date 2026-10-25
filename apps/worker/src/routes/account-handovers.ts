@@ -30,7 +30,7 @@ import { auditLog } from '../lib/audit-log.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 
 /**
- * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。台帳 #133。
+ * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。台帳。
  *
  * 5段の流れ。
  *   1 引き継ぎコードを出す   POST /api/account-handovers

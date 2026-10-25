@@ -135,7 +135,7 @@ export function keywordMatches(
   },
   text: string,
 ): boolean {
-  // 157: 一律で応答するルールは、キーワードを見ない。
+  // 一律で応答するルールは、キーワードを見ない。
   // 「営業時間外は必ずこれを返す」を作るための形。時間帯や友だち条件は
   // このあとで見るので、いつでも誰にでも返るわけではない。
   if (rule.respond_to_all === 1) return true;
@@ -524,7 +524,7 @@ export async function matchAndReply(
     return { matched: false, replyTokenConsumed: false };
   }
 
-  // 緊急停止 (#1050): auto_reply_dispatch が止まっている統括は返さない。
+  // 緊急停止 : auto_reply_dispatch が止まっている統括は返さない。
   // replyToken は持ち越せないので追い送りはせず、台帳へ理由を残す。
   // 受信そのものは受信箱に残る（運用者が手で返せる）。
   if (await isOperationCapabilityStopped(db, lineAccountId ?? friend.line_account_id ?? null, 'auto_reply_dispatch')) {
@@ -743,9 +743,7 @@ export async function matchAndReply(
     replyTokenConsumed = true;
     lineRequestId = response.requestId;
 
-    // 送信ログ（replyMessage = 無料）— derive content from the built reply
-    // message so any cleanEmptyNodes / parse-failure fallback is reflected
-    // in the dashboard.
+    // 管理画面にも実際の送信内容が残るよう、空ノード除去や解析失敗の代替処理を済ませた返信メッセージから無料の reply 送信ログを作る。
     const replyPayload = messageToLogPayload(replyMsg);
     messageLogId = await logOutgoingMessage(db, {
       friendId: friend.id,
@@ -885,7 +883,7 @@ export interface AutoReplyActionRetryOutcome {
 }
 
 /**
- * permanent_failed の処理行だけを、保存済みの写しでやり直す（N-081）。
+ * permanent_failed の処理行だけを、保存済みの写しでやり直す。
  *
  * - LINE の返信トークン/API、受信イベント、matchAndReply には一切触れない。
  * - 現在のルール定義は読み直さない。予約時に固定した action_snapshot だけを動かす。

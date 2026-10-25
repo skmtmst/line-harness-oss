@@ -119,7 +119,7 @@ export function catalogWarnings(def:HqCatalogTemplateDefinition,snapshot:string,
  return [...(s.targets.some(t=>normalizeScopedTagName(String(t.name))===normalizeScopedTagName(settings.name as string))?['same_name_exists']:[]),...(settings.paymentMode==='online'&&!s.paymentConnected?['payment_downgraded_to_store']:[]),...(s.style==='ec'?['booking_not_used']:[]),'booking_reception_stopped','staff_selection_required'];
 }
 
-/** Tenant-bound booking_menu adapter used by the shared distribution transaction. */
+/** 配布の共通トランザクションでは、統括に限定した予約メニューのアダプターを使う。 */
 export function createBookingMenuHqAdapter(db:D1Database,authority:import('./contract.js').HqTemplateAuthority):import('./contract.js').HqTemplateAdapter {
  const ok=<T>(value:T)=>({kind:'OK' as const,value});
  return {type:'booking_menu',

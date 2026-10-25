@@ -18,7 +18,7 @@ export function parseScenarioDefinition(value: unknown): HqScenarioDefinition {
   if(new Set(steps.map(s=>s.id)).size!==steps.length) throw new HqTemplateError('INVALID_DEFINITION',422);
   return {schemaVersion:1,scenario:{name,description},steps};
 }
-// Full draft contents + usage are fenced inside the write transaction.
+// 下書き全体の内容と使用状況を、書込トランザクション内で照合する。
 const SNAPSHOT_SQL=`SELECT json_object('scenarios',json((SELECT COALESCE(json_group_array(json(row)),'[]') FROM (
  SELECT json_object('id',s.id,'name',s.name,'active',s.is_active,'trigger',s.trigger_type,'mode',s.delivery_mode,'completion',s.on_complete_scenario_id,'published',s.current_published_version_id,'updated',s.updated_at,
  'usage',(SELECT COUNT(*) FROM friend_scenarios f WHERE f.scenario_id=s.id),

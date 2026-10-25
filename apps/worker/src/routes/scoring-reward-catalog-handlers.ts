@@ -419,11 +419,11 @@ export const post__api_mileage_redemptions_id_retry_fulfillment_20 = async (c: C
        * 失敗中と配送中だけやり直せる。成功済み・返金済みの再実行は
        * 二重特典の素、予約中の再実行は最初の配送と競合するので断る。
        * 配送中（照合待ち）のやり直しも受け付けるが、送ったか
-       * 確かめられない手順は送り直さず照合待ちに残す（R364）。
+       * 確かめられない手順は送り直さず照合待ちに残す。
        * やり直しは同じ交換IDを続け、残高の減算はしない
        * (deliverMileageReward は予約時の減算に触らない)。
        *
-       * R362: 返却確定後に書き込みが中断した交換だけは例外。
+       * 返却確定後に書き込みが中断した交換だけは例外。
        * 台帳なしの refunded は残高が戻っていない取り残しなので、
        * 欠けた書き込みを足して202で返す。書き込み済みの refunded は
        * 従来どおり409で断る（二重返却なし）。
@@ -467,7 +467,7 @@ export const post__api_mileage_redemptions_id_retry_fulfillment_20 = async (c: C
       });
       auditLog(c, 'mileage.redemption.retry', { kind: 'mileage_redemption', id: redemption.id });
       /*
-       * R367: 配送成否だけでなく交換の今の状態も返す。返却が完了したら
+       * 配送成否だけでなく交換の今の状態も返す。返却が完了したら
        * 画面は返却済みとして案内し、古い再試行の行を外せる。
        */
       const fresh = await getMileageRedemption(c.env.DB, redemption.id);
@@ -492,7 +492,7 @@ export const get__api_mileage_friends_21 = async (c: Context<Env, "/api/mileage/
       lineAccountId: accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search')?.trim() ?? '',
-      // V6R-CX-e: 友だち詳細は名前ではなく友だちIDで1人を取る。
+      // 友だち詳細は名前ではなく友だちIDで1人を取る。
       friendId: c.req.query('friendId')?.trim() || undefined,
       limit: requestedLimit,
       offset: requestedOffset,

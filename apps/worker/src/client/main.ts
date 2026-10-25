@@ -1,23 +1,5 @@
 import { escapeHtml } from '../lib/html-escape.js';
-/**
- * LINE Harness LIFF — The single entry point
- *
- * This URL IS the friend-add URL. Every user enters through here.
- *
- * Flow:
- *   LIFF URL → LINE Login (auto in LINE app) → UUID issued
- *   → friendship check → not friend? show add button → friend added → Webhook → scenario enroll
- *   → already friend? → show completion
- *
- * Query params:
- *   ?ref=xxx          — attribution tracking (which LP/campaign)
- *   ?redirect=x       — redirect after linking (for wrapped URLs)
- *   ?page=book        — booking page (calendar slot picker, Google Calendar)
- *   ?page=salon-book  — salon booking flow (React, dynamic-imported)
- *   ?page=affiliate   — affiliate self-serve page (React, dynamic-imported)
- *   ?page=webinar     — auto-webinar pseudo-live viewer (React, dynamic-imported; &slug=)
- *   ?page=nen-member  — NEN customer member/pet/health portal
- */
+/** LIFF の共通入口でログイン・UUID 発行・友だち確認を済ませてから各画面へ渡す。ref は流入元、redirect は結び付け後の移動先、page は予約・フォーム・アフィリエイト・ウェビナー・会員画面を選ぶ。 */
 
 import { initBooking } from './booking.js';
 import {applyCustomerLook} from './customer-look.js';
@@ -40,11 +22,10 @@ declare const liff: {
   logout(): void;
 };
 
-// LINE returns the rich-menu query string inside `liff.state`. Restore it
-// before any routing or LIFF ID detection reads window.location.search.
+// LINE はクエリを liff.state に入れるため、経路や LIFF ID を判定する前に window.location.search へ戻す。
 restoreLiffStateInCurrentUrl();
 
-// Resolve LIFF ID: ?liffId= param (from endpoint URL) > env var (fallback to ①)
+// 接続先を正しく選ぶため、URL の liffId を環境変数より優先する。
 function detectLiffId(): string {
   const fromParam = new URLSearchParams(window.location.search).get('liffId');
   if (fromParam) return fromParam;
@@ -55,7 +36,7 @@ if (!LIFF_ID) {
   throw new Error('LIFF ID not found. Set ?liffId= in LIFF endpoint URL or VITE_LIFF_ID env.');
 }
 const UUID_STORAGE_KEY = 'lh_uuid';
-// Bot basic ID — resolved dynamically from API after liff.init
+// 複数アカウントに対応するため、Bot の基本 ID は liff.init 後に API から解決する。
 let BOT_BASIC_ID = '';
 let signedRedirectTarget: string | null = null;
 
@@ -80,10 +61,7 @@ function getPage(): string | null {
 
 function getRedirectUrl(): string | null {
   const params = new URLSearchParams(window.location.search);
-  // Guard the client-side navigation sink (window.location.href below) against
-  // open-redirect / javascript: abuse, mirroring the server-side /auth/callback
-  // guard. A directly-crafted LIFF URL never reaches the server route, so the
-  // client must validate too.
+  // 直接作られた LIFF URL はサーバーのコールバックを通らないため、クライアントでも移動先を検査し、任意サイトへの転送や javascript: を防ぐ。
   return safeRedirectTarget(params.get('redirect'), window.location.origin) || signedRedirectTarget;
 }
 
@@ -135,7 +113,7 @@ function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
 
   // 友だち追加後に戻ってきたら自動で再チェック
   // 一度発火したら listener を外して、ユーザーが LIFF をフォアグラウンド復帰するたびに
-  // 重複 push が走らないようにする（送信後にアプリ切り替えで再発火する事故を防ぐ）
+  // 送信後のアプリ切り替えで再発火しても、同じ push を二度実行しない。
   let formLinkSent = false;
   let checking = false;
   const onVisibilityChange = async () => {
@@ -148,10 +126,7 @@ function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
       // 入口と引数を追加前のまま戻す。各画面の読み出しは通常の入口に任せる。
       window.history.replaceState(window.history.state, '', returnUrl);
 
-      // Re-link now that the friends row exists. For first-time users the
-      // pre-add POST in linkAndAddFlow ran before the follow webhook created
-      // the friends row (404), dropping ref/ig/iga/igan attribution on the
-      // no-form path — this retry persists it once friendship is confirmed.
+      // 初回の友だち追加前は行が存在しない場合があるため、友だち確認後にも結び付けを試し、ref/ig/iga/igan の帰属を保存する。
       try {
         const idToken = liff.getIDToken();
         if (idToken) {
@@ -177,7 +152,7 @@ function showFriendAdd(profile: { displayName: string; pictureUrl?: string }) {
         }
       } catch { /* best-effort */ }
 
-      // Send form link if form param exists (was lost during friend-add flow)
+      // 友だち追加を挟んでもフォーム案内を失わないよう、form 指定を引き継ぐ。
       const formParam = new URLSearchParams(window.location.search).get('form');
       if (formParam && !formLinkSent) {
         formLinkSent = true;
@@ -261,7 +236,7 @@ async function linkAndAddFlow() {
   try {
     const existingUuid = getSavedUuid();
 
-    // Get profile, ID token, and friendship status in parallel
+
     const [profile, rawIdToken, friendship] = await Promise.all([
       liff.getProfile(),
       Promise.resolve(liff.getIDToken()),
@@ -293,7 +268,7 @@ async function linkAndAddFlow() {
       // Silent fail — UUID linking is best-effort
     });
 
-    // 2. Attribution tracking
+
     if (ref) {
       apiCall('/api/affiliates/click', {
         method: 'POST',
@@ -301,7 +276,7 @@ async function linkAndAddFlow() {
       }).catch(() => {});
     }
 
-    // 3. Redirect flow (for wrapped URLs)
+
     if (redirectUrl) {
       await Promise.race([
         linkPromise,
@@ -322,18 +297,18 @@ async function linkAndAddFlow() {
       return;
     }
 
-    // 4. Wait for UUID linking to complete
+    // 結び付けの完了前に後続処理を始めない。
     await linkPromise;
 
-    // 5. Friendship check — the key decision point
+
     if (!friendship.friendFlag) {
-      // Not a friend yet → show friend-add button
+
       showFriendAdd(profile);
     } else {
-      // Already a friend — check for form param
+
       const formParam = new URLSearchParams(window.location.search).get('form');
       if (formParam) {
-        // Send form link via push message, then show completion
+
         try {
           const idToken = liff.getIDToken();
           const params = new URLSearchParams(window.location.search);
@@ -493,7 +468,7 @@ async function initEventBooking(initialKind: 'detail' | 'history'): Promise<void
   const ref = getRef();
   const eventParams = new URLSearchParams(window.location.search);
 
-  // UUID linking (best-effort)
+  // 結び付けの失敗だけでは画面表示を止めない。
   apiCall('/api/liff/link', {
     method: 'POST',
     body: JSON.stringify({
@@ -711,17 +686,13 @@ async function initNenMember(): Promise<void> {
 
 // ─── Entry Point ────────────────────────────────────────
 
-// External-browser LIFF sessions persist in localStorage, and the SDK keeps
-// returning the cached id_token without refreshing it. LINE id_tokens expire
-// after 1h, so a returning PC visitor gets 401 from every verify-backed API
-// (/api/liff/link, webinar load, forms). In-client (LINE app) sessions get a
-// fresh token on every launch and never hit this.
+// 外部ブラウザでは SDK が保存済みの id_token を返し続けるため、1時間の有効期限を超えたトークンを再認証する。LINE アプリ内では起動ごとに新しい値になる。
 function isIdTokenStale(idToken: string | null): boolean {
   if (!idToken) return true;
   try {
     const payloadB64 = idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
     const payload = JSON.parse(atob(payloadB64)) as { exp?: number };
-    // 60s margin so a token about to expire mid-flow also counts as stale
+    // 処理中の失効も避けるため、期限まで60秒未満なら古いトークンと扱う。
     return typeof payload.exp !== 'number' || payload.exp * 1000 < Date.now() + 60_000;
   } catch {
     return true;
@@ -733,9 +704,7 @@ const RELOGIN_GUARD_KEY = 'lh_relogin_at';
 function forceReloginForStaleToken(): boolean {
   if (liff.isInClient()) return false;
   if (!isIdTokenStale(liff.getIDToken())) return false;
-  // Loop guard: if we already round-tripped through LINE Login within the
-  // last minute and the token is still stale (clock skew, login cancelled),
-  // fall through instead of redirecting forever.
+  // 時計のずれやログイン取消で無限に再認証しないよう、直近1分で認証を往復していればそのまま進める。
   let lastAttempt = 0;
   try {
     lastAttempt = Number(sessionStorage.getItem(RELOGIN_GUARD_KEY) || 0);
@@ -795,7 +764,7 @@ async function main() {
 
     if (forceReloginForStaleToken()) return;
 
-    // Resolve bot basic ID from API (multi-account support)
+    // 複数アカウントに対応するため、Bot の基本 ID を API で解決する。
     applyCustomerLook(undefined);
     try {
       const redirectParams = new URLSearchParams(window.location.search);

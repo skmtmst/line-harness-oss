@@ -41,13 +41,13 @@ broadcastAb.post('/api/broadcasts/:id/ab-test/choose',requirePermission(BROADCAS
  if(!rs.meta.changes)throw new GapError('already_chosen',409);if(b.variant!=='none'&&!shift)await finishMockRemainder(c.env.DB,id);
  return c.json({success:true,data:{variant:b.variant,scheduledAt:shift,testMode:true}});
 });
-/** Existing /send calls this only after its normal approval and permission checks. */
+/** 通常の承認と権限検査を通した後でだけ呼ぶ。 */
 export async function maybeStartAb(c:Context<Env>,id:string,b:{testMode?:unknown;expectedVersion?:unknown;confirmedRecipientCount?:unknown}|null){
  if(!await c.env.DB.prepare('SELECT broadcast_id FROM broadcast_ab_tests WHERE broadcast_id=?').bind(id).first())return null;
  gapWrite(c);if(!hasStaffPermission(c,BROADCAST_DEFINITION_PUBLISH_KEY))throw new GapError('forbidden',403);if(b?.testMode!==true)throw new GapError('test_mode_required',409);
  return c.json({success:true,data:await startAbMock(c.env.DB,id,gapVersion(b.expectedVersion),Number(b.confirmedRecipientCount),gapKey(c))},202);
 }
-/** Replays the already-authorized start; it cannot start or send anything new. */
+/** 許可済みの開始操作の再送だけを扱い、新しい開始や送信は行わない。 */
 export async function maybeReplayAbStart(c:Context<Env>,id:string,b:{testMode?:unknown;expectedVersion?:unknown;confirmedRecipientCount?:unknown}|null){
  const old=await c.env.DB.prepare('SELECT start_key FROM broadcast_ab_tests WHERE broadcast_id=?').bind(id).first<{start_key:string|null}>();
  if(!old?.start_key||old.start_key!==c.req.header('Idempotency-Key'))return null;

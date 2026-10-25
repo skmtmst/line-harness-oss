@@ -32,7 +32,7 @@ async function ownedImage(c: Context<Env>, key: string) {
 // POST /api/images — upload image (base64 or binary)
 images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c, next) => {
   const json = /^application\/json(?:\s*;|$)/i.test(c.req.header('content-type') ?? '');
-  // Base64 expands three bytes into four, with a small allowance for JSON fields.
+  // base64 は3バイトを4文字へ増やすため、JSON の項目分も余裕を見て制限する。
   const max = json ? Math.ceil((10 * 1024 * 1024) / 3) * 4 + 4096 : 10 * 1024 * 1024;
   const bytes = await readBoundedBytes(c.req.raw, max);
   if (bytes === null) return c.json({ success: false, code: 'image_too_large', error: 'Image too large (max 10MB)' }, 413);
@@ -160,12 +160,11 @@ images.get('/images/*', async (c) => {
   if (key.startsWith('nen-photo-review/') || key.startsWith('nen-photo-public/')) {
     if (!await photoImageScanAllowed(c.env.DB,key)) return c.json({ success: false, error: 'ファイルの安全性を確かめています' }, 409);
   }
-  // Webinar originals use the existing enrollment-gated playback API.
-  // A webinar may refer to a media key, so namespace checks alone are insufficient.
+  // ウェビナーが media キーも参照できるため、名前空間だけで公開とせず、元動画は参加者用の再生 API で守る。
   if (!isPrivate && await isWebinarSource(c.env.DB, key)) return fail(c, 404, 'IMAGE_NOT_FOUND');
   let mediaEtag: string | undefined;
   if (key.startsWith('media/')) {
-    // Only the exact current or published historical object is a public asset.
+    // 現在または公開履歴が参照する、完全一致のオブジェクトだけを公開する。
     const published = await c.env.DB.prepare(`
       SELECT m.id, m.line_account_id, m.filename,
         COALESCE(v.mime_type, m.mime_type) AS mime_type,
@@ -219,8 +218,7 @@ images.get('/images/*', async (c) => {
     contentType.toLowerCase().startsWith('image/') ? 'inline' : 'attachment',
   );
 
-  // Authorization, publishing and scan gates above run before cache validation.
-  // Signed private content keeps no-store and is never represented by a cached 304.
+  // 認可・公開・検査の判定をキャッシュ照合より先に行う。非公開の署名付き内容は no-store とし304で返さない。
   const validators = c.req.header('If-None-Match')?.split(',').map(value => value.trim().replace(/^W\//, '')) ?? [];
   if (!isPrivate && (validators.includes('*') || validators.includes(etag))) {
     if (typeof object.body?.cancel === 'function') void object.body.cancel().catch(() => {});
@@ -229,7 +227,7 @@ images.get('/images/*', async (c) => {
   return new Response(object.body, { headers });
 });
 
-// DELETE /api/images/:key — delete image
+
 images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const key = c.req.param('key');

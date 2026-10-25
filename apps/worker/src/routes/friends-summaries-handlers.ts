@@ -34,7 +34,7 @@ export const get__api_friends_id_mileage_1 = async (c: Context<Env, "/api/friend
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const [summary, history, insights, connections] = await Promise.all([
       getMileageSummaryForFriend(c.env.DB, friendId),
-      // R387: 残高は名寄せした本人で共通だが、理由・実行者・元イベントは
+      // 残高は名寄せした本人で共通だが、理由・実行者・元イベントは
       // 担当者が見られるアカウントの分だけ返す。
       getMileageHistoryForFriend(c.env.DB, friendId, {
         limit,
@@ -271,13 +271,13 @@ export const get__api_friends_id_5 = async (c: Context<Env, "/api/friends/:id">)
 
     const [friend, tags, formSubmissions, formSubmissionTotal, support] = await Promise.all([
       // 一覧と同じ first_tracked_link_id → tracked_links.name 基準で
-      // 流入元名を添える（N-036）。無い・消えた流入元は null で、
+      // 流入元名を添える。無い・消えた流入元は null で、
       // 画面側は従来どおり「不明」を出す。
       getFriendWithFirstTrackedLinkName(db, id),
       getFriendTags(db, id),
       /*
        * 回答は最新10件まで。「あと何件あるか」が分かるよう、総数を
-       * 別に数えて返す（INBOX-17）。画面側は「全N件中10件を表示」と
+       * 別に数えて返す。画面側は「全N件中10件を表示」と
        * 続きへの導線を出せる。
        */
       includeSubmissions ? getFormSubmissionsByFriend(db, id, 10) : Promise.resolve([]),
@@ -374,7 +374,7 @@ export const post__api_friends_id_tags_7 = async (c: Context<Env, "/api/friends/
     }
     const friendAccountId = ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
     const tagAccountId = tag.line_account_id ?? null;
-    // N-041/N-044(#803): friends行とtags行の所属をDBから解決し、共通境界へ渡す。
+    // friends行とtags行の所属をDBから解決し、共通境界へ渡す。
     const boundary = await resolveRequestBoundaries(db, c.get('staff'), [friendAccountId, tagAccountId]);
     if (!boundary.allowed) {
       if (boundary.reason === 'unauthenticated') {
@@ -396,12 +396,12 @@ export const post__api_friends_id_tags_7 = async (c: Context<Env, "/api/friends/
 
     await addTagToFriend(db, friendId, body.tagId);
 
-    // Enroll in tag_added scenarios that match this tag
+
     /*
      * 「このタグが付いたら始まる」は scenario_triggers から引く（128）。
      * 1本のシナリオが複数のタグで始まる形も作れるようになったので、
      * scenarios.trigger_tag_id は判断に使わない。
-     * 友だちと同じアカウントの公開済みだけを始める（R435）。
+     * 友だちと同じアカウントの公開済みだけを始める。
      * 共通タグをきっかけにした別組織のシナリオは混ぜない。
      */
     for (const scenarioId of await getTagAddedScenarioIdsForAccount(db, body.tagId, friendAccountId)) {
@@ -414,7 +414,7 @@ export const post__api_friends_id_tags_7 = async (c: Context<Env, "/api/friends/
       }
     }
 
-    // イベントバス発火: tag_change（R436）。
+    // イベントバス発火: tag_change。
     // 手動操作は毎クリックで発火する合図なので、重複付与でも発火は保つ。
     // 公開版が受け取れるよう、発生元の不変IDと所属を付ける。
     // IDは「手動の付与:友だち:タグ:確定時刻」で、台帳の値なので安定する。
@@ -476,7 +476,7 @@ export const put__api_friends_id_metadata_9 = async (c: Context<Env, "/api/frien
     }
     const now = jstNow();
 
-    // N-040(#808): 改訂値付きの更新は1回の条件付きUPDATEで突合する。
+    // 改訂値付きの更新は1回の条件付きUPDATEで突合する。
     // 指定なしは従来どおり無条件更新（既存互換）。
     const expectedUpdatedAt = c.req.query('expectedUpdatedAt')?.trim() || null;
     if (expectedUpdatedAt) {
@@ -515,11 +515,7 @@ export const put__api_friends_id_metadata_9 = async (c: Context<Env, "/api/frien
 export const get__api_friends_id_messages_10 = async (c: Context<Env, "/api/friends/:id/messages">) => {
   try {
     const friendId = c.req.param('id');
-    // Fetch the latest 200 messages (DESC) then reverse to ASC for display.
-    // Using ORDER BY ASC LIMIT 200 returns the OLDEST 200 rows, which silently
-    // hides recent activity for chatty friends. Exclude delivery_type='test'
-    // to stay consistent with /api/chats/:id, so the same friend shows the
-    // same history across DirectMessagePanel and the chat panel.
+    // 最新200件を降順で取得して表示時に反転する。昇順 LIMIT では古い履歴だけになるため。チャットと同じく test 配信は除き、同じ友だちの履歴を画面間で一致させる。
     const result = await c.env.DB
       .prepare(
         `SELECT id, direction, message_type as messageType, content, created_at as createdAt

@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', async (importOriginal) => {
-  // N-042: 検証だけは本物を使う。mock にすると「検証を外す逆変異」が
+  // 検証だけは本物を使う。mock にすると「検証を外す逆変異」が
   // 捕まらなくなる。書き込み(get/set)は上の差し替えのまま。
   const actual = await importOriginal<typeof import('@line-crm/db')>();
   return {
@@ -404,7 +404,7 @@ describe('回答を配る', () => {
     expect(mocks.attachTag).not.toHaveBeenCalled();
   });
 
-  // N-189: 選択肢の送信文に消えた共通情報が残っていても、生の差し込み名を
+  // 選択肢の送信文に消えた共通情報が残っていても、生の差し込み名を
   // 送らない。効果は未完として記録され、運用者が直せば再送で補完される。
   test('解決できない共通情報を含む送信文は送らず、その効果を未完に残す', async () => {
     const layout = layoutWith([
@@ -639,7 +639,7 @@ describe('回答を配る', () => {
     })).rejects.toThrow('claim ownership lost');
   });
 
-  // N-177: Flex テンプレートは組み立てて実際に送る。以前は warn して
+  // 選択した Flex テンプレートが配信から抜けないよう、組み立てと送信まで確かめる。
   // 素通りしていたため、選んだテンプレートが静かに不達になっていた。
   test('Flex のテンプレートは組み立てて送る', async () => {
     mocks.getMessageTemplateById.mockResolvedValue({

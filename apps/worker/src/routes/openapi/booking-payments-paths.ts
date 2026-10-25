@@ -1,6 +1,6 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const bookingPaymentsPaths = {
-  // ── Booking payments（決済の差し替え制 #1318） ──────────────────────────
+  // ── Booking payments（決済の差し替え制） ──────────────────────────
   '/api/booking/admin/payment-config': {
     get: {
       tags: ['Booking'],

@@ -1,7 +1,7 @@
 import { workflowFence, type WorkflowStepRef } from '@line-crm/db';
 
 import { classifySingleStatement } from './incoming-webhook-fenced-db.js';
-/** All receipt-owned writes share an atomic D1 transaction with their lease fence. */
+/** 受領票の書込と実行権の照合を、同じ原子的 D1 トランザクションへ入れる。 */
 export function workflowFencedDb(
   db: D1Database,
   fence: WorkflowStepRef & { owner: string },
@@ -9,8 +9,7 @@ export function workflowFencedDb(
   const statements = new WeakMap<D1PreparedStatement, D1PreparedStatement>();
   const assertLease = () => workflowFence(db,fence,fence.owner);
   const atomic = async (items: D1PreparedStatement[]) => {
-    // D1.batch is a SQL transaction. Invalid JSON deliberately raises a D1-compatible
-    // SQL error on a lost lease; the entire batch is rolled back, including its writes.
+    // 実行権を失ったら不正 JSON で SQL を失敗させ、batch の書込全体を戻す。
     const results = await db.batch([assertLease(), ...items]);
     return results.slice(1);
   };
@@ -20,7 +19,7 @@ export function workflowFencedDb(
         if (typeof property === 'symbol') return undefined;
         if (property === 'bind') return (...values: unknown[]) => wrap(target.bind(...values), readOnly);
         if (property === 'run') return async () => (await atomic([target]))[0];
-        // INSERT/UPDATE RETURNING must be fenced in the same transaction as the mutation.
+        // INSERT/UPDATE RETURNING も更新と同じトランザクション内で実行権を検査する。
         if ((property === 'first' || property === 'all') && readOnly) {
           return target[property].bind(target);
         }

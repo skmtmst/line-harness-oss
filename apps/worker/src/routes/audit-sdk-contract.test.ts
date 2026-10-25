@@ -66,8 +66,7 @@ describe('PKG03 SDKとWorkerの明示確認（実SQL・実ルート）', () => {
   });
 });
 
-// These annotations are checked by worker tsc as well as exercised over real SQL.
-// Removing revision fields from the public SDK types must fail typecheck.
+// 実 SQL の検証に加えて Worker の型検査にも含め、公開 SDK の版フィールドが欠けると失敗することを守る。
 describe('PKG04 SDKの編集版とWorkerのCAS（実SQL）', () => {
   it('配信の版を取得して保存し、古い版の保存は409で状態を保つ', async () => {
     const loaded = await client.broadcasts.get('sdk-broadcast');

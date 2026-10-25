@@ -1,9 +1,9 @@
 /**
- * N-065 契約テスト: 予約・イベント・Meet の取消/日程変更を へ同期する。
+ *  契約テスト: 予約・イベント・Meet の取消/日程変更を へ同期する。
  *
  * 本物の SQLite (createTestD1) に当て、SQL そのものが約束を守るか確かめる。
  * 外部 LINE・顧客・Calendar へは送らない。対象は enroll / cancel / reschedule
- * の DB 連携だけで、通知送信は触らない。
+ * DB 連携だけで、通知送信は触らない。
  */
 import { describe, expect, it } from 'vitest';
 
@@ -275,7 +275,7 @@ describe('予約の取消', () => {
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    // N-065 より前の登録には source が無い。
+    //  より前の登録には source が無い。
     raw.prepare(
       `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status)
        VALUES ('legacy-1', 'friend-1', 'rule-booking-1', '${at(0)}', 'active')`,

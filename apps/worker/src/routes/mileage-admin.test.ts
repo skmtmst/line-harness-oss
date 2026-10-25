@@ -299,7 +299,7 @@ describe('mileage admin API', () => {
       }],
       pagination: { total: 1, limit: 100, offset: 0 },
     });
-    // R364: 既定は要対応（失敗中＋配送中）。照合待ちを一覧から消さない。
+    // 既定は要対応（失敗中＋配送中）。照合待ちを一覧から消さない。
     const response = await call('/api/mileage/redemptions?accountId=account-1&limit=999');
     expect(response.status).toBe(200);
     expect(dbMocks.listMileageRedemptions).toHaveBeenCalledWith(env.DB, {
@@ -342,16 +342,14 @@ describe('mileage admin API', () => {
     expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledWith(
       env.DB, 'redemption-9', expect.objectContaining({}),
     );
-    // R367: 交換の今の状態も返す。画面は返却完了などを区別できる。
+    // 交換の今の状態も返す。画面は返却完了などを区別できる。
     const body = await response.json() as { data: { redemption: Record<string, unknown> } };
     expect(body.data.redemption).toMatchObject({ id: 'redemption-9', lineAccountId: 'account-1' });
     expect(JSON.stringify(body)).not.toContain('secret');
   });
 
   /*
-   * R364: 配送中（照合待ち）のやり直しも受け付ける。
-   * 送ったか確かめられない手順は送り直さない（配送側の責務）。
-   * （直す前は delivering が409＝赤）
+   * 配送中でも再試行を受け付けるが、送達不明の手順は配送側で再送しない。
    */
   it('retries a delivering redemption left unconfirmed without resending', async () => {
     dbMocks.getMileageRedemption.mockResolvedValue({
@@ -385,7 +383,7 @@ describe('mileage admin API', () => {
       expect(response.status).toBe(409);
       expect(await response.json()).toMatchObject({ code: 'redemption_not_retryable' });
     }
-    // R362: 書き込み済みの返却のやり直しも従来どおり409（二重返却なし）。
+    // 書き込み済みの返却のやり直しも従来どおり409（二重返却なし）。
     dbMocks.getMileageRedemption.mockResolvedValueOnce({
       id: 'redemption-refunded', lineAccountId: 'account-1', status: 'refunded',
     });
@@ -400,8 +398,7 @@ describe('mileage admin API', () => {
   });
 
   /*
-   * R362: 返却確定後に書き込みが中断した交換のやり直しは、
-   * 欠けた書き込みを足して202で返す（直す前は一律409で残高が戻らない＝赤）。
+   * 返却確定後の書込中断は、再試行で不足分を補い202を返す。残高を取り残さない。
    */
   it('resumes a refunded redemption whose writes were interrupted', async () => {
     const stuck = { id: 'redemption-stuck', lineAccountId: 'account-1', status: 'refunded' };
@@ -918,7 +915,7 @@ describe('mileage admin API', () => {
         reasonCategory: 'campaign', reason: 'キャンペーン調整',
       }),
     });
-    // R: 境界以上は実行せず承認依頼を作る（台帳は書かない）
+    // 境界以上は実行せず承認依頼を作る（台帳は書かない）
     expect(high.status).toBe(202);
     expect(await high.json()).toMatchObject({ data: { approvalRequired: true } });
     expect(dbMocks.createMileageAdjustmentApprovalRequest).toHaveBeenCalled();
@@ -943,7 +940,7 @@ describe('mileage admin API', () => {
   });
 
   /*
-   * R378: 確定済みの調整を同じ内容で再送したときは、あとから変わった
+   * 確定済みの調整を同じ内容で再送したときは、あとから変わった
    * 承認境界や経過した元の期限で拒否せず、当時の結果をそのまま返す。
    */
   it('replays a committed adjustment even after the approval threshold was lowered', async () => {
@@ -998,7 +995,7 @@ describe('mileage admin API', () => {
   });
 
   /*
-   * R380/R381: 通知だけをあとから再送する口。残高は動かさず、保存済みの
+   * 通知だけをあとから再送する口。残高は動かさず、保存済みの
    * 本文と送信キーで再送する。通知を依頼していない調整や、担当外の
    * アカウントの調整には使えない。
    */
@@ -1129,7 +1126,7 @@ describe('mileage admin API', () => {
     expect(dbMocks.addScore).toHaveBeenCalledWith(env.DB, {
       friendId: 'friend-1', scoreChange: 3, reason: '対応記録',
       idempotencyKey: JSON.stringify(['manual', 'env-owner', 'score-visible-test']),
-      // IDEA-17: 手で動かした点数は実行者を記録へ残す。
+      // 手で動かした点数は実行者を記録へ残す。
       executedByStaffId: 'env-owner', executedByStaffName: 'Owner',
     });
 

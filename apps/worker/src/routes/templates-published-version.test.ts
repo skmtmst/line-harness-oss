@@ -3,15 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-/**
- * テンプレートの公開版固定(#645 / 点検#497 N-131)の口の契約。
- *
- * - 編集・保存(PUTの送信文)は下書きへだけ書き、公開版は変えない
- * - 一覧の主 messageType/messageContent は公開版だけを返す
- * - 公開は確認キー必須・版が1つ進む・再試行は同じ結果(別下書きを出さない)
- * - 同時更新の負けと下書きの書き換わりは409
- * - 別アカウントの公開は存在しないものとして返す
- */
+/** 編集は下書きだけを変え、一覧と送信は公開版を使う。公開は確認キー必須で1版だけ進め、同じ再試行は同じ結果、同時更新・下書き変更は409、別アカウントは不存在として返す。 */
 
 const mocks = vi.hoisted(() => ({
   getTemplatesWithUsageCount: vi.fn(),
@@ -273,7 +265,7 @@ describe('公開口の契約', () => {
       expectedVersion: 1,
       expectedDraftRevision: 0,
       idempotencyKey: 'publish-key-0001',
-      // 466: 使い始めの日時（来なければ公開と同時）と書いた人を引き渡す。
+      // 使い始めの日時（来なければ公開と同時）と書いた人を引き渡す。
       effectiveFrom: undefined,
       createdByStaffId: 'owner-1',
     });

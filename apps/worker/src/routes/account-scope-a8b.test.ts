@@ -64,7 +64,7 @@ describe('A-8b omitted account scope', () => {
     });
 
     expect(response.status).toBe(200);
-    // IDEA-18: 友だち側3件(経路別一覧+総数+ref有り数)に、注文の計測範囲
+    // 友だち側3件(経路別一覧+総数+ref有り数)に、注文の計測範囲
     // (ec_orders側の口)が1件増えて計4件。
     expect(records).toHaveLength(4);
     expect(records[3].sql).toContain('FROM ec_orders');
@@ -109,7 +109,7 @@ describe('A-8b omitted account scope', () => {
     );
 
     expect(response.status).toBe(200);
-    // IDEA-18: 注文の計測範囲クエリ(o.line_account_id)が増えて計4件。口は全て同じアカウント。
+    // 注文の計測範囲クエリ(o.line_account_id)が増えて計4件。口は全て同じアカウント。
     expect(records).toHaveLength(4);
     expect(records.every((record) => record.sql.includes('line_account_id = ?'))).toBe(true);
     expect(records.every((record) => record.binds[0] === 'account-a')).toBe(true);

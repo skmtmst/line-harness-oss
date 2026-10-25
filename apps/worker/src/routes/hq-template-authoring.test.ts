@@ -4,7 +4,7 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
 import { hqTemplates } from './hq-templates.js';
 import { liffActionFromUrl } from '@line-crm/shared';
-// The real pure Web authoring functions feed the real HTTP + SQLite executor.
+// Web の実際の純粋な編集関数で作った入力を、実 HTTP と SQLite の実行へ通す。
 const webAuthoringPath = new URL('../../../web/src/lib/hq-template-authoring.ts', import.meta.url).href;
 const { freshDefinition, withUploadedImage, withMessageCard } = await import(/* @vite-ignore */ webAuthoringPath);
 type MessageTemplateDefinition = import('../services/hq-templates/template.js').MessageTemplateDefinition;

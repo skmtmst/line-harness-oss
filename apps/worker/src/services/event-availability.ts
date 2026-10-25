@@ -1,5 +1,4 @@
-// Event availability: slot listing with remaining capacity, and per-friend
-// active booking count. Kept thin so memDB tests can stub two simple SELECTs.
+// 空き枠と本人の有効予約数を分け、検証で個別の SELECT を差し替えられる形に保つ。
 
 import {
   ACTIVE_BOOKING_STATUSES,
@@ -132,6 +131,6 @@ export async function getFriendActiveBookingCount(
   return row?.cnt ?? 0;
 }
 
-// Re-export for callers needing the active set in queries
+// 問い合わせ側も同じ有効状態の集合を使えるよう公開する。
 export { ACTIVE_BOOKING_STATUSES };
 export type { EventBookingStatus };

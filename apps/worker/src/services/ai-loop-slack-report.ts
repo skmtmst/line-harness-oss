@@ -164,8 +164,7 @@ export async function relayAiLoopReport(
   }
 
   let slackTs = previous?.slack_ts || null;
-  // A worker may stop after Slack accepted a create but before D1 recorded its ts.
-  // Only that expired-claim recovery path scans recent history; normal updates use D1.
+  // Slack の作成成功後に ts を保存できなかった場合だけ、期限切れ実行権の回復で最近の履歴を探す。通常の更新は D1 の記録を使う。
   if (!slackTs && previous?.claim_token && Number(previous.claim_expires_at ?? 0) <= now) {
     slackTs = (await findExisting(token, channel, key, fetcher))?.ts || null;
   }

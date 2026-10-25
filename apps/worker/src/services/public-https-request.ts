@@ -1,7 +1,7 @@
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { checkWebhookUrlSafety, type WebhookSafetyOptions } from './outgoing-webhook-delivery.js';
 
-/** Same DNS policy as outgoing webhooks; no redirect or extra delivery attempt. */
+/** 送信 Webhook と同じ DNS 方針を使い、転送や追加の配送は行わない。 */
 export async function publicHttpsRequest(url: string, init: RequestInit, options: WebhookSafetyOptions = {}): Promise<Response> {
   const target = new URL(url);
   if (target.protocol !== 'https:') throw new Error('unsafe_destination');
@@ -17,7 +17,7 @@ export async function publicHttpsRequest(url: string, init: RequestInit, options
   return (options.fetchImpl ?? fetch)(url, { ...init, redirect: 'manual' });
 }
 
-/** Answer variables are data within a fixed origin, never a scheme or authority. */
+/** 回答の値は固定 origin 内のデータとして扱い、scheme や authority にしない。 */
 export function formWebhookTarget(template: string, answers: Record<string, unknown>): string {
   const authority = /^https:\/\/[^/?#]+/i.exec(template)?.[0];
   if (!authority || /[{}\\]/.test(authority)) throw new Error('unsafe_destination');

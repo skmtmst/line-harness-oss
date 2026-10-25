@@ -6,7 +6,7 @@ import type { Env } from '../worker-env.js';
 import { tags } from './tags.js';
 
 /*
- * PATCH /api/tags/:id は expectedVersion 必須(#715)。版なしの迂回は無い。
+ * PATCH /api/tags/:id は expectedVersion 必須。版なしの迂回は無い。
  *
  * 実DB・実routeで見る。missing/stale/success/archived/account境界を、
  * DBに残った値と応答の版で突き合わせる。

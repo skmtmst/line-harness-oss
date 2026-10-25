@@ -1,16 +1,4 @@
-/*
- * N-116: ウェビナーの視聴後アクションが参照する設定を、保存前に
- * 「実在する・同じアカウントのもの・使える状態」まで検証する。
- *
- * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の webinars
- * ルートを当て、認証も実物（Bearer APIキー → staff_members → 役割・
- * account境界）で通す。外部送信は走らない。
- *
- * 直す前: PUT /api/webinars/:id/actions は形（配列・trigger・種別・
- * configがオブジェクト）だけを検査し、存在しないIDや別アカウントのIDも
- * 200で保存した。幽霊参照は公開・実行時に不発になり、別アカウントの
- * 参照は境界を越える。
- */
+/** 視聴後アクションは実在・所属・有効状態まで保存前に検証し、実行時の不発と越境を防ぐ。実 route・認証・SQLite を通し、外部送信はしない。 */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';

@@ -31,7 +31,7 @@ export const get__api_rich_menu_groups_external_richMenuId_image_1 = async (c: C
     { headers: { Authorization: `Bearer ${account.channel_access_token}` } },
   );
   if (!res.ok) {
-    // #502中: 不正なIDでURLが化けないよう符号化し、外部の応答本文は利用者に出さない。
+    // 中: 不正なIDでURLが化けないよう符号化し、外部の応答本文は利用者に出さない。
     return inputError(c, {
         success: false,
         error: res.status === 404
@@ -82,7 +82,7 @@ export const post__api_rich_menu_groups_import_2 = async (c: Context<Env, "/api/
     headers: { Authorization: auth },
   });
   if (!detailRes.ok) {
-    // #502中: 外部の応答本文をそのまま利用者に返さない。固定の日本語に置き換える。
+    // 中: 外部の応答本文をそのまま利用者に返さない。固定の日本語に置き換える。
     return inputError(c, {
         success: false,
         error: detailRes.status === 404
@@ -99,7 +99,7 @@ export const post__api_rich_menu_groups_import_2 = async (c: Context<Env, "/api/
       data?: string;
       displayText?: string;
       richMenuAliasId?: string;
-      // O: 日時を選ぶ・文字をコピーするボタンの取り込み用。
+      // 日時を選ぶ・文字をコピーするボタンの取り込み用。
       mode?: string;
       initial?: string;
       max?: string;
@@ -157,7 +157,7 @@ export const post__api_rich_menu_groups_import_2 = async (c: Context<Env, "/api/
         },
       });
     } else if (a.action.type === 'datetimepicker' && typeof a.action.mode === 'string') {
-      // O: 日時を選ぶボタンは intent で持ち、DB へは postback に載せる。
+      // 日時を選ぶボタンは intent で持ち、DB へは postback に載せる。
       convertedAreas.push({
         boundsX: a.bounds.x, boundsY: a.bounds.y,
         boundsWidth: a.bounds.width, boundsHeight: a.bounds.height,
@@ -412,7 +412,7 @@ export const delete__api_rich_menu_groups_external_richMenuId_4 = async (c: Cont
     headers: { Authorization: auth },
   });
   if (!res.ok && res.status !== 404) {
-    // #502中: 外部の応答本文をそのまま利用者に返さない。固定の日本語に置き換える。
+    // 中: 外部の応答本文をそのまま利用者に返さない。固定の日本語に置き換える。
     return c.json(
       { success: false, error: 'LINE上のメニューを削除できませんでした' },
       500,
@@ -460,7 +460,7 @@ export const get__api_rich_menu_groups_6 = async (c: Context<Env, "/api/rich-men
     const audienceByGroup = new Map(audienceStats.map((item) => [item.groupId, item]));
     const tapsByGroup = new Map(tapStats.byGroup.map((item) => [item.groupId, item.taps]));
     const query = (c.req.query('query') ?? '').trim();
-    // N-163: 検索はメニュー名・トークバー文言・ボタン名（面のラベル）の3方向へ
+    // 検索はメニュー名・トークバー文言・ボタン名（面のラベル）の3方向へ
     // 当たる。大小文字と空白（半角・全角）を揃えて比較する。ボタン名は別表なので
     // 一致する group の id を先に引き、一覧の絞り込みに合成する。
     const normalizedQuery = normalizeRichMenuSearchText(query);

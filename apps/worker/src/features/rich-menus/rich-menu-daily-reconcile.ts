@@ -13,8 +13,8 @@ import { featureJobCanRun } from '../../services/feature-enforcement.js';
 import { computeRichMenuDiffs } from '../../lib/rich-menu-reconcile.js';
 import { createLineApiClient, type LineRichMenuClient } from '../../lib/rich-menu-publisher.js';
 
-// K(#822): 毎日の自動照合。公開中の group を1日1回だけ見る。
-// 見つけたずれは直さず、実行台帳に残す。直すのは運用者が K-2 画面で行う。
+// 毎日の自動照合。公開中の group を1日1回だけ見る。
+// 見つけたずれは直さず、実行台帳に残す。直すのは運用者が 照合・修復画面で行う。
 // LINE が読めない group は数えるだけで止めない（次の tick でまた見る）。
 
 export type DailyReconcileDeps = {

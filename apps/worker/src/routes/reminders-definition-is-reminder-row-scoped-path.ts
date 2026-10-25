@@ -9,7 +9,7 @@ import { completeOutboundSendStatement, hashOutboundPayload, reserveOutboundSend
 import { buildPublicSegmentQuery } from '../services/segment-query.js';
 
 export /**
- * R348/R349: 親ではなく行の送信元アカウントで担当を判定する口。
+ * 親ではなく行の送信元アカウントで担当を判定する口。
  * 履歴・登録の一覧と、登録1件の操作（日時変更・取消・再開）が対象。
  */
 function isReminderRowScopedPath(path: string): boolean {
@@ -17,7 +17,7 @@ function isReminderRowScopedPath(path: string): boolean {
 }
 
 export async function requireVisibleReminder(c: Context<Env>, next: () => Promise<void>) {
-  // R348/R349: 履歴と登録は行ごとの送信元アカウントで見る。親ルールの
+  // 履歴と登録は行ごとの送信元アカウントで見る。親ルールの
   // 今の所属だけで閉じると、所属変更後に旧登録が操作できなくなるため、
   // ここでは通して各 handler で行単位に判定する。
   if (isReminderRowScopedPath(c.req.path)) return next();
@@ -165,7 +165,7 @@ export function escapedLike(value: string): string {
 }
 
 export /*
- * N-072: 一覧の並び順。画面の `sort` 値をここで列へ写す。
+ * 一覧の並び順。画面の `sort` 値をここで列へ写す。
  * 画面から来た文字列をそのまま ORDER BY へ入れない（SQL 注入になるので、
  * 白名簿以外は 400 で止める）。
  */
@@ -225,7 +225,7 @@ export function runDurationMs(startedAt: string | null, completedAt: string | nu
 export type TriggerType = (typeof TRIGGER_TYPES)[number];
 
 export /*
- * N-067: 手動登録の二重防止。通信再送・二重押下・応答不明でも、同じ手動
+ * 手動登録の二重防止。通信再送・二重押下・応答不明でも、同じ手動
  * 登録から reminders を2行作らない。キーなしの従来呼び出しは変えない。
  *
  * 保証（キー付き経路）:
@@ -337,10 +337,7 @@ export async function validateReminderFolder(
 }
 
 export /**
- * きっかけの設定を検証して取り出す。送られた項目だけを含める。
- *
- * PUT は本文をそのまま updateReminder へ渡す作りだったので、
- * 新しい項目はここで形を確かめてから渡す。
+ * 本文を更新処理へ渡す前に、送られたきっかけ設定の型を検証する。未送信項目は更新に混ぜない。
  */
 function readTriggerInput(
   body: Record<string, unknown>,
@@ -423,7 +420,7 @@ function readTriggerInput(
     const raw = body.targetTagId;
     out.targetTagId = raw === null || raw === '' || raw === undefined ? null : String(raw);
   }
-  // 156: フォルダ。空文字は「未分類へ戻す」として扱う。画面の select は
+  // フォルダ。空文字は「未分類へ戻す」として扱う。画面の select は
   // 未分類を空の値で出すので、そこを null に読み替える。
   if (has('folderId')) {
     const raw = body.folderId;

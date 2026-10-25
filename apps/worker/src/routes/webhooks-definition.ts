@@ -24,7 +24,7 @@ export const INCOMING_ACTION_KINDS = new Set([
 ]);
 
 export /*
- * R404: 受信直後に直接動かせる種類。directAction（incoming-webhook-actions.ts）
+ * 受信直後に直接動かせる種類。directAction（incoming-webhook-actions.ts）
  * が組み立てられる5種類と、公開済み版を展開する共通アクションだけ。
  * friend_field・reminder・conversion・mileage_rule・score_rule・
  * operator_notification の直接指定は、保存できても試しも実実行も必ず失敗する
@@ -73,7 +73,7 @@ export async function incomingActionDisplayName(db: D1Database, action: Incoming
   } as Record<string, string>)[action.refKind];
   if (!table) return '保存済みの設定';
   try {
-    // #939 N-368: 送信Webhookの削除は履歴を残す印なので、印のある行は
+    //  送信Webhookの削除は履歴を残す印なので、印のある行は
     // 名づけの参照先としても使わない。他の表に deleted_at は無い。
     const notDeleted = table === 'outgoing_webhooks' ? ' AND deleted_at IS NULL' : '';
     const row = await db.prepare(`SELECT name FROM ${table} WHERE id = ?${notDeleted}`).bind(action.refId).first<{ name: string }>();
@@ -129,7 +129,7 @@ export function readIncomingConfig(body: unknown):
       || (refVersionId !== null && (!refVersionId || refVersionId.length > 200))) {
       return { ok: false, field: 'actions', error: '実行処理は許可された種類と構造化IDで指定してください' };
     }
-    // R404: 直接実行できない種類は保存200にしない。試しも実実行も必ず失敗するため。
+    // 直接実行できない種類は保存200にしない。試しも実実行も必ず失敗するため。
     const unexecutable = incomingUnexecutableReason(refKind);
     if (unexecutable) return { ok: false, field: 'actions', error: unexecutable };
     actions.push({ refKind, refId, refVersionId });
@@ -148,7 +148,7 @@ export function readIncomingConfig(body: unknown):
 export /**
  * 送り直しの回数を検証する。
  *
- * #938 以降、再送はリクエスト内の sleep ではなく配送台帳の
+ *  以降、再送はリクエスト内の sleep ではなく配送台帳の
  * next_retry_at（1分→5分→30分…の指数待ち）で行う。待ち時間が
  * Worker の実行時間を食わなくなったため、上限は要件26 §6-4 の
  * 送信Webhook上限（最大8試行 = 初回 + 再送7回）にそろえる。
@@ -162,19 +162,19 @@ function readMaxRetries(raw: unknown): { ok: true; value: number } | { ok: false
 export const MAX_WEBHOOK_NAME_LENGTH = 120;
 export const MAX_EVENT_TYPES = 20;
 export const MAX_EVENT_TYPE_LENGTH = 100;
-export // #829 N-384: 受信本文の上限と、受信口ごとの短時間回数制限。
+export //  受信本文の上限と、受信口ごとの短時間回数制限。
 const MAX_INCOMING_BODY_BYTES = 256 * 1024;
 export const RECEIVE_RATE_LIMIT = 60;
 export const RECEIVE_RATE_WINDOW_MS = 60_000;
 export /*
- * R430 (-26 §7-1): 署名時刻の受付窓。過去15分・未来5分（時計ずれ分）。
+ *  (-26 §7-1): 署名時刻の受付窓。過去15分・未来5分（時計ずれ分）。
  * 時刻を送ってきた受信だけを検査し、送らない古い送信元は壊さない。
  */
 const RECEIVE_TIMESTAMP_PAST_MS = 15 * 60_000;
 export const RECEIVE_TIMESTAMP_FUTURE_MS = 5 * 60_000;
 
 export /**
- * 名前と種別の上限。極端な値で一覧表示が崩れる・DBが膨らむのを防ぐ(#506 軽)。
+ * 名前と種別の上限。極端な値で一覧表示が崩れる・DBが膨らむのを防ぐ( 軽)。
  */
 function validateWebhookName(name: unknown): string | null {
   if (typeof name !== 'string' || !name.trim()) return 'name is required';
@@ -193,7 +193,7 @@ export function validateEventTypes(eventTypes: unknown): string | null {
     if (typeof item !== 'string' || !item.trim() || item.trim().length > MAX_EVENT_TYPE_LENGTH) {
       return `each eventType must be 1-${MAX_EVENT_TYPE_LENGTH} characters`;
     }
-    // N-383: 実際に発火する種別だけを受け付ける。誤記や不発パターンは
+    // 実際に発火する種別だけを受け付ける。誤記や不発パターンは
     // 無音の不達になるため、有効な種別の一覧を添えて拒否する。
     if (!isKnownOutgoingEventType(item.trim())) {
       return `unknown eventType "${item.trim()}". available: ${KNOWN_OUTGOING_EVENT_TYPES.join(', ')}, incoming_webhook.<source_type>, *`;
@@ -230,7 +230,7 @@ export function validateHttpsUrl(url: unknown): string | null {
 }
 
 export /**
- * 暗号化の鍵がない・壊れているときの保存失敗を見分ける(#650)。
+ * 暗号化の鍵がない・壊れているときの保存失敗を見分ける。
  *
  * secret を平文で書き残さないため、鍵なしの新規・更新は止める。
  * 判定は名前で行う(DB層はモック差し替えのため型では縛らない)。
@@ -241,7 +241,7 @@ function isEncryptionKeyError(err: unknown): boolean {
 
 export /**
  * 送受信 secret 用の鍵束。現行鍵に加え、併用期間の旧鍵を
- * LINE_CREDENTIAL_PREVIOUS_KEYS(カンマ区切り)で渡せる(#650 再審査)。
+ * LINE_CREDENTIAL_PREVIOUS_KEYS(カンマ区切り)で渡せる。
  */
 function webhookKeysOf(c: Context<Env>): { current?: string; previous?: string } {
   const env = c.env as unknown as Record<string, unknown>;
@@ -253,7 +253,7 @@ function webhookKeysOf(c: Context<Env>): { current?: string; previous?: string }
 }
 
 export /**
- * S (#939 機能26): 前の合言葉があといつまで受け付けるか。
+ * S ( 機能26): 前の合言葉があといつまで受け付けるか。
  * 併用期間(24時間)を過ぎた・前の値が無い行は null。
  */
 function previousSecretUsableUntil(
@@ -280,7 +280,7 @@ export function serializeInteraction(row: WebhookInteractionRow) {
     attemptCount: row.attempt_count,
     durationMs: row.duration_ms,
     failureReason: webhookFailureLabel(row.failure_reason),
-    // 判定用の記号も返す(IDEA-26)。'unknown' は無条件に再送せず、
+    // 判定用の記号も返す。'unknown' は無条件に再送せず、
     // 相手先で確かめてからの1件ずつ復旧として画面が扱う。
     failureReasonCode: row.failure_reason,
     startedAt: row.started_at,
@@ -290,11 +290,7 @@ export function serializeInteraction(row: WebhookInteractionRow) {
   };
 }
 
-export /**
- * 送り直せるかの判定と、送り直せない理由（d23b R412/R414）。
- * 一覧の行(listWebhookInteractions)には送り先と自動配送の現状が
- * 付いてくる。個別取得の行では分からない分は付けない（隠さず不明のまま）。
- */
+export /** 再送可否とその理由は、取得できた配送状態から判定する。一覧にだけある情報は個別行で推測せず、不明のまま扱う。 */
 function retryBlockFields(row: WebhookInteractionRow) {
   const list = row as Partial<WebhookInteractionListRow>;
   const hasJoin = 'linked_webhook_active' in row;
@@ -332,7 +328,7 @@ export async function requireInteractionAccount(c: Context<Env>) {
   return { lineAccountId };
 }
 
-export // ========== 公開APIトークン（#939 N-380） ==========
+export // ========== 公開APIトークン ==========
 //
 // 外部システムが /api/public/v1/* を呼ぶための合言葉。管理画面の認証とは
 // 別の台帳で、ここで作ったトークンは公開APIだけに効く。
@@ -352,7 +348,7 @@ function serializeApiToken(row: IntegrationApiTokenRow) {
   };
 }
 
-/** Delivery cron consumer: reception has already authenticated and fixed its plan. */
+/** 受信時に認証し固定した計画だけを、配信 cron が実行する。 */
 export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 50): Promise<number> {
   const rows = await env.DB.prepare(`SELECT * FROM incoming_webhook_queue WHERE status='pending'
     AND datetime(next_attempt_at)<=datetime('now') ORDER BY created_at LIMIT ?`).bind(limit).all<{
@@ -417,7 +413,7 @@ export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 
         { matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'skipped' };
       try {
         /*
-         * R402: 受領時に照合方法・未一致時の扱い・処理配列全体・参照版を
+         * 受領時に照合方法・未一致時の扱い・処理配列全体・参照版を
          * 一つの実行計画として保存する。再試行はその計画を最後まで使い、
          * 後日の設定変更は新規受信へだけ適用する。既存受信を別計画へ変える
          * 場合は差分と未処理分を明示する（現状は計画の固定のみ行う）。

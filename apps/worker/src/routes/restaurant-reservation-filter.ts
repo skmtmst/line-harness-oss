@@ -6,7 +6,7 @@ import type { Env } from '../worker-env.js';
 export const RESERVATION_FILTER_STATUSES = ['pending', 'confirmed', 'seated', 'visited', 'cancelled', 'no_show'];
 
 /**
- * R103: 予約台帳の絞り込み条件を読む。期間は開始日時の範囲、状態は複数可、
+ * 予約台帳の絞り込み条件を読む。期間は開始日時の範囲、状態は複数可、
  * 件数と開始位置でページを切る。既定は従来どおり先頭300件。
  */
 export function parseReservationFilter(c: Context<Env>, orgId: string, scopedStoreId: string | null):

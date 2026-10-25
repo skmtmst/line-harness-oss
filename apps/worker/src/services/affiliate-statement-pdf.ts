@@ -9,7 +9,7 @@ export function simplePdf(snapshot: {
     ...(snapshot.exportedBy && snapshot.exportedAt ? [`Exported by: ${ascii(snapshot.exportedBy)}`, `Exported at: ${ascii(snapshot.exportedAt)}`] : []),
     `Affiliate: ${ascii(snapshot.affiliateCode)}`,
     `Period: ${ascii(snapshot.periodFrom)} - ${ascii(snapshot.periodTo)}`,
-    // R288: 取消の差し引きがあるときだけ内訳を分けて出す。
+    // 取消の差し引きがあるときだけ内訳を分けて出す。
     ...(deduction > 0 ? [
       `Gross: ${snapshot.currency} ${snapshot.grossAmount ?? snapshot.totalAmount + deduction}`,
       `Adjustment: -${snapshot.currency} ${deduction}`,

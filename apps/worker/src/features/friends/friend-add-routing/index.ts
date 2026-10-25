@@ -1,2 +1,2 @@
-// Public entry for this operation; importing it does not initialize unrelated operations.
+// 不要な操作まで初期化しないよう、操作単位の公開入口を分ける。
 export { applyFriendAddRouting, areFriendAddConditionsOverlapping, collectFriendAddReferences, doFriendAddTimeWindowsOverlap, doFriendAddWeekdaySetsOverlap, evaluateFriendAddRuleConditions, evaluateFriendAddSchedule, findFriendAddUnusableReferences, friendAddJstHhmm, hasInvalidFriendAddTimeWindows, isValidFriendAddHhmm, parseFriendAddConditionAst, retryFailedFriendAddActions } from '../friend-add-routing.js';

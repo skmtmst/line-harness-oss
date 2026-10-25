@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';
 
 /**
- * R525: 「すぐに計測を始める」をオフで登録したら、最初のINSERTから
+ * 「すぐに計測を始める」をオフで登録したら、最初のINSERTから
  * 停止（is_active=0）で作る。追加情報の保存に失敗しても稼働では残らず、
  * 紹介クリックも受け付けない。
  *

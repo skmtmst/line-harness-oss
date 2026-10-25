@@ -1,5 +1,5 @@
 /*
- * R404: 受信設定が実行未対応の種類を保存できてしまい、詳細は「接続済み」と返す。
+ * 受信設定が実行未対応の種類を保存できてしまい、詳細は「接続済み」と返す。
  *
  * 落ち方（直前）: friend_field・reminder・conversion・mileage_rule・
  *   score_rule・operator_notification の直接指定が保存200になり、

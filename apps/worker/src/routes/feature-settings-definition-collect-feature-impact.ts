@@ -437,7 +437,7 @@ export async function collectFeatureImpact(
   for (const source of entry.sources) {
     const params = source.params === 2 ? [accountId, accountId] : [accountId];
     /*
-     * 対象IDは上限なしの1回の読取で全件そろえ、件数もその全IDから数える(#643)。
+     * 対象IDは上限なしの1回の読取で全件そろえ、件数もその全IDから数える。
      *
      * COUNT(*) とID読取を別々に投げると、間に1件増えただけで
      * 「件数はN、照合はN+1件分」という食い違いが起きる。結合を含む

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
-// 概要の口に viewers 以外の権限ゲートが付いているか(#517 中4)。
+// 概要の口に viewers 以外の権限ゲートが付いているか( 中4)。
 // orders / action-executions / identity-candidates と同じく
 // requireRole + requireEcPermission('ec.event.view') で守る。
 const dbMocks = vi.hoisted(() => ({
