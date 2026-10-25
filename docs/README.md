@@ -631,6 +631,7 @@
 
 
 - [コードの構成と名前](code-structure.md)
+- [コメントの書き方](comment-style.md)
 
 - [構成と接続の整理の更新履歴](release-log/unreleased/1781-kenta-cleanup-s02z.md)
 - [予約写真とお客さまの画面・設定カードの表示改善](release-log/unreleased/1781-kenta-cleanup-n01.md)
