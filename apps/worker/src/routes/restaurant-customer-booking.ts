@@ -1,3 +1,4 @@
+import { liffBookingJson, liffBookingInputError } from './liff-booking-response.js';
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { normalizePhone } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
@@ -8,7 +9,7 @@ import { collectInputs, parseLayout, normalizeBookingValue } from '@line-crm/sha
 import { respondToRestaurantConfirmation, type RestaurantConfirmationResponse } from '../services/restaurant-confirmations.js';
 import { processRestaurantEvents } from '../services/restaurant-events.js';
 import { processScenarioSourceJobs } from '../features/scenarios/scenario-source-jobs/index.js';
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import {
@@ -37,13 +38,13 @@ import { isAccountFeatureEnabled } from '@line-crm/db';
 export const restaurantCustomerBooking = new Hono<Env>();
 restaurantCustomerBooking.onError((e, c) => {
   if (/customer_table_conflict|customer_duplicate_booking|customer_line_capacity|restaurant_table_conflict|closure_conflict|UNIQUE constraint/.test(String(e))) {
-    return c.json({ success: false, error: 'slot_conflict' }, 409);
+    return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
   }
   throw new UnexpectedRouteError(c, { success: false, error: 'booking_failed' });
 });
 restaurantCustomerBooking.use('/api/liff/restaurant/*', async (c, next) => {
   if (!restaurantTestEnabled(c.env))
-    return c.json({ success: false, error: 'not_found' }, 404);
+    return liffBookingJson(c, { success: false, error: 'not_found' }, 404);
   c.header('Cache-Control', 'no-store');
   await next();
 });
@@ -82,8 +83,8 @@ restaurantCustomerBooking.get('/api/liff/restaurant/link/:token', async (c) => {
     .bind(c.req.param('token'), self.accountId)
     .first();
   return store
-    ? c.json({ success: true, data: store })
-    : c.json({ success: false, error: 'not_found' }, 404);
+    ? liffBookingJson(c, { success: true, data: store })
+    : liffBookingJson(c, { success: false, error: 'not_found' }, 404);
 });
 restaurantCustomerBooking.get(
   '/api/liff/restaurant/availability',
@@ -91,7 +92,7 @@ restaurantCustomerBooking.get(
     const self = await identity(c);
     if (self instanceof Response) return self;
     const store = await storeFor(c, self.accountId, c.req.query('storeId'));
-    if (!store) return c.json({ success: false, error: 'not_found' }, 404);
+    if (!store) return liffBookingJson(c, { success: false, error: 'not_found' }, 404);
     const result = await customerAvailability(
       dbFor(c.env, store.id),
       store,
@@ -101,8 +102,8 @@ restaurantCustomerBooking.get(
       c.req.query('courseId'),
     );
     return result
-      ? c.json({ success: true, data: result.data })
-      : c.json(
+      ? liffBookingJson(c, { success: true, data: result.data })
+      : liffBookingJson(c,
           { success: false, error: 'invalid_date_or_unconfigured_hours' },
           400,
         );
@@ -125,13 +126,13 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
     typeof body.requestId !== 'string' ||
     !/^[a-zA-Z0-9_-]{8,128}$/.test(body.requestId)
   )
-    return inputError(c, { success: false, error: 'invalid_hold' }, 400, ["note","customerPhone","startsAt","guestCount","requestId"]);
+    return liffBookingInputError(c, { success: false, error: 'invalid_hold' }, 400, ["note","customerPhone","startsAt","guestCount","requestId"]);
   const store = await storeFor(c, self.accountId, body.storeId);
-  if (!store) return c.json({ success: false, error: 'not_found' }, 404);
+  if (!store) return liffBookingJson(c, { success: false, error: 'not_found' }, 404);
   const db = dbFor(c.env, store.id),
     startsAt = new Date(body.startsAt).toISOString();
   const course = await customerCourse(db, store.id, body.courseId);
-  if (course === undefined) return inputError(c,{success:false,error:'invalid_course'},400,['courseId']);
+  if (course === undefined) return liffBookingInputError(c,{success:false,error:'invalid_course'},400,['courseId']);
   const old = await db
     .prepare(
       'SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type, (SELECT name FROM rt_menu_items m WHERE m.id=rt_reservations.course_id AND m.store_id=rt_reservations.store_id) AS course_name FROM rt_reservations WHERE store_id=? AND line_uid=? AND customer_request_id=?',
@@ -148,8 +149,8 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       old.status === 'cancelled' ||
       (old.status === 'pending' && !old.hold_expires_at)
     )
-      return c.json({ success: false, error: 'request_conflict' }, 409);
-    if(old.status!=='pending'||Date.parse(old.hold_expires_at!)>Date.now())return c.json({ success: true, data: customerBooking(old) });
+      return liffBookingJson(c, { success: false, error: 'request_conflict' }, 409);
+    if(old.status!=='pending'||Date.parse(old.hold_expires_at!)>Date.now())return liffBookingJson(c, { success: true, data: customerBooking(old) });
   }
   const result = await customerAvailability(
       db,
@@ -163,7 +164,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       (s) => s.startsAt === startsAt && s.available,
     );
   if (!result || !slot)
-    return c.json({ success: false, error: 'slot_conflict' }, 409);
+    return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
   const tables = await openSeatTables(
       db,
       store.id,
@@ -174,15 +175,15 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
     id = crypto.randomUUID();
   const assignedTable = await assignRestaurantTable(db, store.id, startsAt, body.guestCount, tables);
   if (!assignedTable)
-    return c.json({ success: false, error: 'slot_conflict' }, 409);
+    return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
   const expires = new Date(
     Math.min(Date.now() + result.holdMinutes * 60000, Date.parse(startsAt)),
   ).toISOString();
   if(old){
     const refreshed=await db.prepare(`UPDATE rt_reservations SET starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`).bind(startsAt,slot.endsAt,assignedTable.id,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null).run();
-    if(!refreshed.meta.changes)return c.json({success:false,error:'version_conflict'},409);
+    if(!refreshed.meta.changes)return liffBookingJson(c, {success:false,error:'version_conflict'},409);
     const row=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(old.id).first<CustomerReservationRow>();
-    return c.json({success:true,data:customerBooking(row!)});
+    return liffBookingJson(c, {success:true,data:customerBooking(row!)});
   }
   // 営業時間を読んだ版と同じときだけ作る。席・本人・残枠はDBトリガーでも守る。
   await db
@@ -213,8 +214,8 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
     .prepare('SELECT *, (SELECT seat_type FROM rt_tables t WHERE t.id=rt_reservations.table_id AND t.store_id=rt_reservations.store_id) AS seat_type, (SELECT name FROM rt_menu_items m WHERE m.id=rt_reservations.course_id AND m.store_id=rt_reservations.store_id) AS course_name FROM rt_reservations WHERE id=?')
     .bind(id)
     .first<CustomerReservationRow>();
-  if (!saved) return c.json({ success: false, error: 'slot_conflict' }, 409);
-  return c.json({ success: true, data: customerBooking(saved) }, 201);
+  if (!saved) return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
+  return liffBookingJson(c, { success: true, data: customerBooking(saved) }, 201);
 });
 restaurantCustomerBooking.get(
   '/api/liff/restaurant/reservations',
@@ -222,7 +223,7 @@ restaurantCustomerBooking.get(
     const self = await identity(c);
     if (self instanceof Response) return self;
     const store = await storeFor(c, self.accountId, c.req.query('storeId'));
-    if (!store) return c.json({ success: false, error: 'not_found' }, 404);
+    if (!store) return liffBookingJson(c, { success: false, error: 'not_found' }, 404);
     const rows = (
       await dbFor(c.env, store.id)
         .prepare(
@@ -231,7 +232,7 @@ restaurantCustomerBooking.get(
         .bind(store.id, self.uid)
         .all<CustomerReservationRow>()
     ).results;
-    return c.json({ success: true, data: rows.map(customerBooking) });
+    return liffBookingJson(c, { success: true, data: rows.map(customerBooking) });
   },
 );
 function acceptReferral(db:D1Database,referralId:string,storeId:string,reservationId:string,uid:string,version:number) {
@@ -254,8 +255,8 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         !Number.isSafeInteger(b.expectedVersion) ||
         b.expectedVersion < 1
       )
-        return inputError(c, { success: false, error: 'expected_version_required' }, 400, ["expectedVersion"]);
-      if (action === 'confirm' && !validCustomerDetails(b)) return inputError(c, {success:false,error:'invalid_customer_details'}, 400, ["note","customerPhone"]);
+        return liffBookingInputError(c, { success: false, error: 'expected_version_required' }, 400, ["expectedVersion"]);
+      if (action === 'confirm' && !validCustomerDetails(b)) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ["note","customerPhone"]);
       const db = dbFor(c.env),
         row = await db
           .prepare(
@@ -263,40 +264,40 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           )
           .bind(c.req.param('id'), self.uid, self.accountId)
           .first<CustomerReservationRow>();
-      if (!row) return c.json({ success: false, error: 'not_found' }, 404);
+      if (!row) return liffBookingJson(c, { success: false, error: 'not_found' }, 404);
       const store = (await storeFor(c, self.accountId, row.store_id))!;
       if (
         (action === 'confirm' && row.status === 'confirmed') ||
         (action === 'cancel' && row.status === 'cancelled')
       ) {
-        if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && (normalizePhone(b.customerPhone ?? '') || null)!==(normalizePhone(row.customer_phone ?? '') || null)))) return c.json({success:false,error:'request_conflict'},409);
+        if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && (normalizePhone(b.customerPhone ?? '') || null)!==(normalizePhone(row.customer_phone ?? '') || null)))) return liffBookingJson(c, {success:false,error:'request_conflict'},409);
         if(action==='confirm' && typeof b.referralId==='string') await acceptReferral(db,b.referralId,store.id,row.id,self.uid,row.customer_version).run();
         await finish(c, store);
-        return c.json({ success: true, data: customerBooking(row) });
+        return liffBookingJson(c, { success: true, data: customerBooking(row) });
       }
       if (row.customer_version !== b.expectedVersion)
-        return c.json({ success: false, error: 'version_conflict' }, 409);
+        return liffBookingJson(c, { success: false, error: 'version_conflict' }, 409);
       if (
         action === 'confirm' &&
         (row.status !== 'pending' ||
           !row.hold_expires_at ||
           Date.parse(row.hold_expires_at) <= Date.now())
       )
-        return c.json({ success: false, error: 'hold_expired' }, 409);
+        return liffBookingJson(c, { success: false, error: 'hold_expired' }, 409);
       if (
         action !== 'confirm' &&
         !['pending', 'confirmed'].includes(row.status)
       )
-        return c.json({ success: false, error: 'state_conflict' }, 409);
+        return liffBookingJson(c, { success: false, error: 'state_conflict' }, 409);
       const settings = await getBookingAdminSettings(db, self.accountId);
-      if (!settings) return c.json({ success: false, error: 'not_found' }, 404);
+      if (!settings) return liffBookingJson(c, { success: false, error: 'not_found' }, 404);
       if (
         action !== 'confirm' &&
         Date.now() >=
           Date.parse(row.starts_at) -
             settings.cancelDeadlineMinutesBefore * 60000
       )
-        return c.json({ success: false, error: 'self_deadline_passed' }, 403);
+        return liffBookingJson(c, { success: false, error: 'self_deadline_passed' }, 403);
       let starts = row.starts_at,
         ends = row.ends_at,
         table = row.table_id,
@@ -314,7 +315,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           b.guestCount < 1 ||
           b.guestCount > 100
         )
-          return inputError(c, { success: false, error: 'invalid_change' }, 400, ["startsAt","guestCount"]);
+          return liffBookingInputError(c, { success: false, error: 'invalid_change' }, 400, ["startsAt","guestCount"]);
         courseId = b.courseId === undefined ? courseId : b.courseId;
         starts = new Date(b.startsAt).toISOString();
         count = b.guestCount;
@@ -330,7 +331,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
             (s) => s.startsAt === starts && s.available,
           );
         if (!slot || !available)
-          return c.json({ success: false, error: 'slot_conflict' }, 409);
+          return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
         ends = slot.endsAt;
         hoursVersion = available.hoursVersion;
         // 候補を上の検査と同じく、自分の古い予約だけ除外して絞る。
@@ -348,11 +349,11 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         table=free?.id??null;
         seatType=free?.seatType??null;
         if (!table)
-          return c.json({ success: false, error: 'slot_conflict' }, 409);
+          return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
       }
       if(action==='confirm'){
         const available=await customerAvailability(db,store,tzDateStr(store.timezone,new Date(starts)),count,row.id,courseId);
-        if(!available?.data.slots.some(s=>s.startsAt===starts && s.available && s.endsAt===ends))return c.json({success:false,error:'slot_conflict'},409);
+        if(!available?.data.slots.some(s=>s.startsAt===starts && s.available && s.endsAt===ends))return liffBookingJson(c, {success:false,error:'slot_conflict'},409);
         hoursVersion=available.hoursVersion;
       }
       const next = {
@@ -412,10 +413,10 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         ...(action==='confirm' && typeof b.referralId==='string' ? [acceptReferral(db,b.referralId,store.id,row.id,self.uid,next.customer_version)] : []),
       ]);
       if (!results[0]!.meta.changes)
-        return c.json({ success: false, error: 'version_conflict' }, 409);
+        return liffBookingJson(c, { success: false, error: 'version_conflict' }, 409);
       await finish(c, store);
       const saved=await db.prepare('SELECT *,NULL seat_type,(SELECT name FROM rt_menu_items WHERE id=rt_reservations.course_id) course_name FROM rt_reservations WHERE id=?').bind(next.id).first<CustomerReservationRow>();
-      return c.json({ success: true, data: customerBooking({...saved!,seat_type:seatType}) });
+      return liffBookingJson(c, { success: true, data: customerBooking({...saved!,seat_type:seatType}) });
     },
   );
 }
@@ -423,64 +424,64 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
 restaurantCustomerBooking.post('/api/liff/restaurant/confirmations/:requestId/respond',inputJsonBoundary(),async c=>{
  const self=await identity(c);if(self instanceof Response)return self;
  const b=await c.req.json<{expectedVersion?:number;response?:RestaurantConfirmationResponse}>().catch(()=>null);
- if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['going','change_requested','cancel'].includes(b.response??''))return inputError(c,{success:false,error:'invalid_confirmation_response'},400,['expectedVersion','response']);
+ if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['going','change_requested','cancel'].includes(b.response??''))return liffBookingInputError(c,{success:false,error:'invalid_confirmation_response'},400,['expectedVersion','response']);
  const db=dbFor(c.env);const f=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_user_id=? AND is_following=1').bind(self.accountId,self.uid).first<{id:string}>();
- if(!f)return c.json({success:false,error:'not_found'},404);
+ if(!f)return liffBookingJson(c, {success:false,error:'not_found'},404);
  const result=await respondToRestaurantConfirmation(db,{requestId:c.req.param('requestId'),friendId:f.id,accountId:self.accountId,expectedVersion:b.expectedVersion!,response:b.response!});
- if(!result.ok)return c.json({success:false,error:result.error},result.status);
+ if(!result.ok)return liffBookingJson(c, {success:false,error:result.error},result.status);
  const target=await db.prepare('SELECT r.store_id FROM rt_reservation_confirmations c JOIN rt_reservations r ON r.id=c.reservation_id WHERE c.request_id=?').bind(c.req.param('requestId')).first<{store_id:string}>();
  if(target){const store=await storeFor(c,self.accountId,target.store_id);if(store)await finish(c,store);}
- return c.json({success:true,data:result});
+ return liffBookingJson(c, {success:true,data:result});
 });
 
 restaurantCustomerBooking.get('/api/liff/restaurant/courses', async c => {
   const self=await identity(c); if(self instanceof Response)return self;
-  const store=await storeFor(c,self.accountId,c.req.query('storeId')); if(!store)return c.json({success:false,error:'not_found'},404);
+  const store=await storeFor(c,self.accountId,c.req.query('storeId')); if(!store)return liffBookingJson(c, {success:false,error:'not_found'},404);
   const db=dbFor(c.env,store.id);
   const rows=await db.prepare("SELECT id FROM rt_menu_items WHERE store_id=? AND kind='course' AND status='active' AND duration_minutes BETWEEN 1 AND 1440 ORDER BY price,id").bind(store.id).all<{id:string}>();
-  return c.json({success:true,timezone:store.timezone,data:await Promise.all(rows.results.map(r=>customerCourse(db,store.id,r.id)))});
+  return liffBookingJson(c, {success:true,timezone:store.timezone,data:await Promise.all(rows.results.map(r=>customerCourse(db,store.id,r.id)))});
 });
 
 restaurantCustomerBooking.get('/api/liff/restaurant/referrals',async c=>{
  const self=await identity(c);if(self instanceof Response)return self;
- const store=await storeFor(c,self.accountId,c.req.query('storeId'));if(!store)return c.json({success:false,error:'not_found'},404);
+ const store=await storeFor(c,self.accountId,c.req.query('storeId'));if(!store)return liffBookingJson(c, {success:false,error:'not_found'},404);
  const date=c.req.query('date')??'',count=Number(c.req.query('guestCount')),starts=c.req.query('startsAt');
  const source=await customerAvailability(dbFor(c.env),store,date,count,undefined,c.req.query('courseId'));
- if(!source)return c.json({success:false,error:'invalid_date_or_unconfigured_hours'},400);
- if(starts ? source.data.slots.some(s=>s.startsAt===starts&&s.available) : source.data.slots.some(s=>s.available))return c.json({success:true,data:[]});
- return c.json({success:true,data:await referralCandidates(dbFor(c.env),store,date,count,starts)});
+ if(!source)return liffBookingJson(c, {success:false,error:'invalid_date_or_unconfigured_hours'},400);
+ if(starts ? source.data.slots.some(s=>s.startsAt===starts&&s.available) : source.data.slots.some(s=>s.available))return liffBookingJson(c, {success:true,data:[]});
+ return liffBookingJson(c, {success:true,data:await referralCandidates(dbFor(c.env),store,date,count,starts)});
 });
 restaurantCustomerBooking.post('/api/liff/restaurant/referrals',inputJsonBoundary(),async c=>{
  const self=await identity(c);if(self instanceof Response)return self;
  const b=await c.req.json<{storeId:string;targetStoreId:string;date:string;startsAt:string;guestCount:number;courseId?:string|null}>();
- if(!b || ![b.storeId,b.targetStoreId,b.date,b.startsAt].every(v=>typeof v==='string'&&v.length>0) || !Number.isFinite(Date.parse(b.startsAt)))return inputError(c,{success:false,error:'invalid_referral'},400,['storeId','targetStoreId','date','startsAt']);
- const store=await storeFor(c,self.accountId,b.storeId);if(!store)return c.json({success:false,error:'not_found'},404);
+ if(!b || ![b.storeId,b.targetStoreId,b.date,b.startsAt].every(v=>typeof v==='string'&&v.length>0) || !Number.isFinite(Date.parse(b.startsAt)))return liffBookingInputError(c,{success:false,error:'invalid_referral'},400,['storeId','targetStoreId','date','startsAt']);
+ const store=await storeFor(c,self.accountId,b.storeId);if(!store)return liffBookingJson(c, {success:false,error:'not_found'},404);
  const source=await customerAvailability(dbFor(c.env),store,b.date,b.guestCount,undefined,b.courseId);
- if(!source)return c.json({success:false,error:'invalid_date_or_unconfigured_hours'},400);
- if(source.data.slots.some(s=>s.startsAt===b.startsAt&&s.available))return c.json({success:false,error:'source_available'},409);
+ if(!source)return liffBookingJson(c, {success:false,error:'invalid_date_or_unconfigured_hours'},400);
+ if(source.data.slots.some(s=>s.startsAt===b.startsAt&&s.available))return liffBookingJson(c, {success:false,error:'source_available'},409);
  const target=(await referralCandidates(dbFor(c.env),store,b.date,b.guestCount,b.startsAt)).find(r=>r.storeId===b.targetStoreId);
- if(!target)return c.json({success:false,error:'referral_unavailable'},409);
+ if(!target)return liffBookingJson(c, {success:false,error:'referral_unavailable'},409);
  const id=crypto.randomUUID();
  await dbFor(c.env).prepare('INSERT INTO rt_reservation_referrals(id,source_store_id,target_store_id) VALUES(?,?,?)').bind(id,store.id,target.storeId).run();
- return c.json({success:true,data:{bookingUrl:target.bookingUrl+'&referralId='+encodeURIComponent(id)}});
+ return liffBookingJson(c, {success:true,data:{bookingUrl:target.bookingUrl+'&referralId='+encodeURIComponent(id)}});
 });
 /** 保存済み回答の公開版だけから、既存の席予約の口へ渡す。回答の再送も台帳を増やさない。 */
 restaurantCustomerBooking.post('/api/liff/restaurant/form-booking',inputJsonBoundary(),async c=>{
  const self=await identity(c);if(self instanceof Response)return self;
  const b=await c.req.json<{formId:string;blockId:string;submissionKey:string}>();
- if(!b || ![b.formId,b.blockId,b.submissionKey].every(v=>typeof v==='string' && v.length>0 && v.length<=200))return inputError(c,{success:false,error:'invalid_form_booking'},400,['formId','blockId','submissionKey']);
+ if(!b || ![b.formId,b.blockId,b.submissionKey].every(v=>typeof v==='string' && v.length>0 && v.length<=200))return liffBookingInputError(c,{success:false,error:'invalid_form_booking'},400,['formId','blockId','submissionKey']);
  const db=dbFor(c.env);
  const saved=await db.prepare(`SELECT s.id,s.data,v.layout,v.fields FROM form_submit_claims q
  JOIN form_submissions s ON s.id=q.submission_id JOIN friends f ON f.id=s.friend_id
  JOIN form_versions v ON v.id=s.form_version_id AND v.form_id=s.form_id
  WHERE q.form_id=s.form_id AND q.status='completed' AND q.form_id=? AND q.idempotency_key=? AND q.line_account_id=? AND q.friend_id=f.id AND f.line_user_id=? AND f.line_account_id=? AND s.is_test=0`)
  .bind(b.formId,b.submissionKey,self.accountId,self.uid,self.accountId).first<{id:string;data:string;layout:string;fields:string}>();
- if(!saved)return c.json({success:false,error:'saved_answer_required'},404);
+ if(!saved)return liffBookingJson(c, {success:false,error:'saved_answer_required'},404);
  const block=collectInputs(parseLayout(saved.layout,saved.fields)).find(x=>x.id===b.blockId&&x.type==='booking');
  const picked=block ? normalizeBookingValue(JSON.parse(saved.data)[block.name]) : null;
- if(!block || block.booking?.kind!=='seats' || !picked || picked.kind!=='seats' || picked.storeId!==block.booking.storeId || (block.booking.courseId && picked.courseId!==block.booking.courseId))return c.json({success:false,error:'invalid_booking_answer'},400);
+ if(!block || block.booking?.kind!=='seats' || !picked || picked.kind!=='seats' || picked.storeId!==block.booking.storeId || (block.booking.courseId && picked.courseId!==block.booking.courseId))return liffBookingJson(c, {success:false,error:'invalid_booking_answer'},400);
  const store=await storeFor(c,self.accountId,picked.storeId);
- if(!store)return c.json({success:false,error:'not_found'},404);
+ if(!store)return liffBookingJson(c, {success:false,error:'not_found'},404);
  const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(saved.id+':'+block.id));
  const requestId='form_'+Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,'0')).join('');
  const base=new URL(c.req.url);base.pathname='/api/liff/restaurant/holds';
@@ -490,7 +491,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/form-booking',inputJsonBoun
  if(old && (old.status!=='pending' || Date.parse(old.hold_expires_at??'')>Date.now())){
    if(old.status==='confirmed'||old.status==='cancelled'){
     const row=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(old.id).first<CustomerReservationRow>();
-    return c.json({success:true,data:customerBooking(row!)});
+    return liffBookingJson(c, {success:true,data:customerBooking(row!)});
    }
    holdId=old.id;version=old.customer_version;
  }else{

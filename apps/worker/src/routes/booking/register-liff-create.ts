@@ -1,3 +1,4 @@
+import { liffBookingJson, liffBookingInputError, liffBookingResponse } from '../liff-booking-response.js';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
@@ -12,7 +13,7 @@ import { bookingPaymentSelection, defaultBookingPaymentSelection } from '../../f
 import { resolveFormBookingAnswer, FormBookingAnswerError } from '../../features/forms/form-booking-answer/index.js';
 import { notifyForBooking } from '../../features/booking/booking-notification/index.js';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../../features/booking/booking-confirmed-effects/index.js';
-import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
+import { inputJsonBoundary } from '../../lib/input-errors.js';
 import { BOOKING_PERSON_LIMIT_GUARD_SQL, bookingPersonLimitBindings, bookingPersonLimitError } from '../../features/booking/booking-person-limit/index.js';
 import { getBookingAdminSettings, bookingPaymentInsertStatement, getBookingPaymentByBooking, decidePrepayOnly, prepayNoticeFor, resolveBookingPaymentForBooking } from '@line-crm/db';
 import { enrollByTrigger } from '../../services/reminder-trigger.js';
@@ -35,13 +36,13 @@ import { buildMenuSnapshot, isAssignableAutoTag } from './menu-snapshot.js';
 export function registerLiffCreate(booking: Hono<Env>): void {
 booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string"],"staff_id":["string"],"starts_at":["string"],"customer_note":["string"],"waitlist_id":["string"]}), async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
-  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  if (!accountId) return liffBookingJson(c, { error: 'unknown_liff' }, 404);
   let idemKey = c.req.header('Idempotency-Key');
-  if (!idemKey) return inputError(c, { error: 'missing_idempotency_key' }, 400, []);
+  if (!idemKey) return liffBookingInputError(c, { error: 'missing_idempotency_key' }, 400, []);
 
   // 認証済み caller の LINE userId を Authorization: Bearer <id_token> から取得。
   const callerLineUserId = await verifyCallerLineUserId(c, accountId);
-  if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
+  if (!callerLineUserId) return liffBookingJson(c, { error: 'unauthorized' }, 401);
 
   const body = await c.req.json<{
     menu_id: string;
@@ -61,17 +62,17 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     waitlist_id?: string;
     formAnswer?: {formId:string;blockId:string;submissionKey:string};
   }>();
-  if((body as Record<string,unknown>).routing_token!==undefined){if(body.routingToken!==undefined&&body.routingToken!==(body as Record<string,unknown>).routing_token)return c.json({error:'routing_token_invalid'},400);body.routingToken=String((body as Record<string,unknown>).routing_token);}
+  if((body as Record<string,unknown>).routing_token!==undefined){if(body.routingToken!==undefined&&body.routingToken!==(body as Record<string,unknown>).routing_token)return liffBookingJson(c, {error:'routing_token_invalid'},400);body.routingToken=String((body as Record<string,unknown>).routing_token);}
   if(body.recurrence!==undefined||body.members!==undefined){
-    const friend=await resolveFriendId(c,callerLineUserId,accountId);if(!friend)return c.json({error:'friend_not_found'},404);
-    const {createBulkBooking}=await import('../../features/booking/booking-bulk/index.js');return createBulkBooking(c,accountId,friend,body as Record<string,unknown>);
+    const friend=await resolveFriendId(c,callerLineUserId,accountId);if(!friend)return liffBookingJson(c, {error:'friend_not_found'},404);
+    const {createBulkBooking}=await import('../../features/booking/booking-bulk/index.js');return liffBookingResponse(c, await createBulkBooking(c,accountId,friend,body as Record<string,unknown>));
   }
-  try { await assertPassRequirement(c.env.DB,accountId,body.menu_id,body.entitlement_id); } catch(e) { if(e instanceof EntitlementError)return c.json({error:e.code},e.status);throw e; }
-  if (body.entitlement_id !== undefined && (typeof body.entitlement_id !== 'string' || !body.entitlement_id)) return inputError(c,{error:'invalid_entitlement_id'},400,['entitlement_id']);
-  if (body.payment_method !== undefined && !['onsite','online'].includes(body.payment_method)) return inputError(c,{error:'invalid_payment_method'},400,['payment_method']);
-  if (body.party_size !== undefined && body.party_size !== 1) return inputError(c, { error: 'unsupported_party_size' }, 422, ["party_size"]);
+  try { await assertPassRequirement(c.env.DB,accountId,body.menu_id,body.entitlement_id); } catch(e) { if(e instanceof EntitlementError)return liffBookingJson(c, {error:e.code},e.status);throw e; }
+  if (body.entitlement_id !== undefined && (typeof body.entitlement_id !== 'string' || !body.entitlement_id)) return liffBookingInputError(c,{error:'invalid_entitlement_id'},400,['entitlement_id']);
+  if (body.payment_method !== undefined && !['onsite','online'].includes(body.payment_method)) return liffBookingInputError(c,{error:'invalid_payment_method'},400,['payment_method']);
+  if (body.party_size !== undefined && body.party_size !== 1) return liffBookingInputError(c, { error: 'unsupported_party_size' }, 422, ["party_size"]);
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
-  if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
+  if (!friendId) return liffBookingJson(c, { error: 'friend_not_found' }, 404);
   let formRequiresApproval = false;
   if (body.formAnswer !== undefined) {
     try {
@@ -80,11 +81,11 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       delete body.waitlist_id;
       idemKey=source.idempotencyKey; formRequiresApproval=source.requireApproval;
     } catch(error) {
-      if(error instanceof FormBookingAnswerError)return c.json({error:error.message},error.status);
+      if(error instanceof FormBookingAnswerError)return liffBookingJson(c, {error:error.message},error.status);
       throw error;
     }
   }
-  if (!body.menu_id || !body.starts_at) return inputError(c,{error:'missing_params'},400,['menu_id','starts_at']);
+  if (!body.menu_id || !body.starts_at) return liffBookingInputError(c,{error:'missing_params'},400,['menu_id','starts_at']);
 
   // Idempotency lookup は account+friend スコープ。同じ key を別 caller が送っても
   // それぞれの caller のキャッシュを返す（=cross-tenant leak 防止）。
@@ -104,10 +105,10 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         if (saved && saved.price_at_booking > 0
           && (await resolveBookingPaymentForBooking(c.env.DB, accountId, response.booking_id, saved.menu_id)).mode === 'online'
           && !await getBookingPaymentByBooking(c.env.DB, accountId, response.booking_id)) {
-          return c.json({ error: 'booking_payment_unavailable' }, 500);
+          return liffBookingJson(c, { error: 'booking_payment_unavailable' }, 500);
         }
       }
-      return c.json(cached.body as Record<string, unknown>, cached.status as 200 | 201 | 400 | 409 | 422);
+      return liffBookingJson(c, cached.body as Record<string, unknown>, cached.status as 200 | 201 | 400 | 409 | 422);
     }
     // 完成応答を書けなかった要求は、先に確保した予約IDを本人の範囲で引く。
     // INSERT前の同時要求は409で待たせる。保存済みの予約は作り直さず、
@@ -121,12 +122,12 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         const payment = await getBookingPaymentByBooking(c.env.DB, accountId, saved.id);
         const requiresPayment = saved.price_at_booking > 0
           && (await resolveBookingPaymentForBooking(c.env.DB, accountId, saved.id, saved.menu_id)).mode === 'online';
-        if (requiresPayment && !payment) return c.json({ error: 'booking_payment_unavailable' }, 500);
-        if (['expired','cancelled','rejected'].includes(saved.status)) return c.json({ error: 'booking_unavailable' }, 409);
+        if (requiresPayment && !payment) return liffBookingJson(c, { error: 'booking_payment_unavailable' }, 500);
+        if (['expired','cancelled','rejected'].includes(saved.status)) return liffBookingJson(c, { error: 'booking_unavailable' }, 409);
         const prepayNotice = await prepayNoticeFor(
           c.env.DB, accountId, await decidePrepayOnly(c.env.DB, accountId, friendId),
         );
-        return c.json({
+        return liffBookingJson(c, {
           booking_id: saved.id,
           status: saved.status,
           payment_required: requiresPayment,
@@ -135,13 +136,13 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         }, 201);
       }
     }
-    return c.json({ error: 'request_in_progress' }, 409);
+    return liffBookingJson(c, { error: 'request_in_progress' }, 409);
   }
 
   // 案内を受けた本人・枠・有効期限を確認してから、通常の予約確定処理を使う。
   if(body.waitlist_id){
    const offer=await c.env.DB.prepare(`SELECT id FROM booking_waitlist WHERE id=? AND line_account_id=? AND friend_id=? AND staff_id=? AND menu_id=? AND julianday(starts_at)=julianday(?) AND status='invited' AND julianday(hold_expires_at)>julianday('now')`).bind(body.waitlist_id,accountId,friendId,body.staff_id,body.menu_id,body.starts_at).first();
-   if(!offer)return c.json({error:'offer_expired'},409);
+   if(!offer)return liffBookingJson(c, {error:'offer_expired'},409);
   }
   // Block check: customer cannot book
   const friend = await c.env.DB
@@ -149,12 +150,12 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     .bind(friendId)
     .first<{ is_following: number }>();
   if (!friend || friend.is_following === 0) {
-    return c.json({ error: 'cannot_book' }, 403);
+    return liffBookingJson(c, { error: 'cannot_book' }, 403);
   }
 
-  if(!(await menuAudience(c.env.DB,accountId,body.menu_id,friendId)).visible)return c.json({error:'menu_not_available'},403);
+  if(!(await menuAudience(c.env.DB,accountId,body.menu_id,friendId)).visible)return liffBookingJson(c, {error:'menu_not_available'},403);
   const addons=await bookingAddons(c.env.DB,accountId,body.menu_id,body.addonIds,friendId);
-  if((await c.env.DB.prepare('SELECT addon_only FROM menus WHERE id=?').bind(body.menu_id).first<{addon_only:number}>())?.addon_only)return c.json({error:'addon_only_menu'},400);
+  if((await c.env.DB.prepare('SELECT addon_only FROM menus WHERE id=?').bind(body.menu_id).first<{addon_only:number}>())?.addon_only)return liffBookingJson(c, {error:'addon_only_menu'},400);
   const addonDuration=addons.reduce((n,a)=>n+a.duration_minutes,0);
   const nominated=!body.routingToken&&!(await needsAutoAssignment(c,accountId,body.staff_id));
   let routingAllowedStaff:string[]|undefined;
@@ -163,7 +164,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
 
   if (await needsAutoAssignment(c,accountId,body.staff_id)) {
     const assigned = await autoAssignBookingStaff(c,accountId,body.menu_id,body.starts_at,true,addonDuration,routingAllowedStaff,!!body.routingToken);
-    if (!assigned) return c.json({ error: 'auto_assignment_unavailable' }, 409);
+    if (!assigned) return liffBookingJson(c, { error: 'auto_assignment_unavailable' }, 409);
     body.staff_id = assigned;
   }
 
@@ -184,7 +185,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     .bind(body.menu_id, body.staff_id, accountId)
     .first<{ name: string; duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; concurrent_capacity: number; dur: number; price: number; price_mode: string; meeting_mode:'online'|'in_person'|'customer_choice'; version: number; is_offered: number | null }>();
   if (!menuRow || menuRow.is_offered !== 1) {
-    return inputError(c, { error: 'menu_not_offered' }, 422, ["menu_id","staff_id"]);
+    return liffBookingInputError(c, { error: 'menu_not_offered' }, 422, ["menu_id","staff_id"]);
   }
 
   const routing=body.routingToken?await verifyRoutingToken(c.env.DB,accountId,friendId,body.routingToken,body.menu_id,body.staff_id):null;
@@ -193,25 +194,25 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   menuRow.dur+=addonDuration;
   const cancellation = await cancellationPolicy(c.env.DB, accountId);
   if(cancellation.enabled && !body.entitlement_id) {
-    if(body.policyAccepted!==true) return c.json({error:'policy_acceptance_required'},400);
-    if(body.policyVersion!==cancellation.version)return c.json({error:'policy_changed'},409);
+    if(body.policyAccepted!==true) return liffBookingJson(c, {error:'policy_acceptance_required'},400);
+    if(body.policyVersion!==cancellation.version)return liffBookingJson(c, {error:'policy_changed'},409);
     if(await cancellationCardRequired(c.env.DB,accountId,friendId)){
-    try {await requireCancellationTestConnection(c.env.DB,accountId);} catch {return c.json({error:'payment_not_connected'},409);}
+    try {await requireCancellationTestConnection(c.env.DB,accountId);} catch {return liffBookingJson(c, {error:'payment_not_connected'},409);}
     if(typeof body.setupIntentId!=='string' || !await c.env.DB.prepare("SELECT id FROM booking_payment_methods WHERE setup_id=? AND friend_id=? AND line_account_id=? AND status='ready' AND test_mode=1")
-      .bind(body.setupIntentId,friendId,accountId).first()) return c.json({error:'card_not_registered'},409);
+      .bind(body.setupIntentId,friendId,accountId).first()) return liffBookingJson(c, {error:'card_not_registered'},409);
     }
   }
 
-  if(routing?.target.meetingMode&&body.meeting_mode&&routing.target.meetingMode!==body.meeting_mode)return c.json({error:'routing_token_invalid'},400);
+  if(routing?.target.meetingMode&&body.meeting_mode&&routing.target.meetingMode!==body.meeting_mode)return liffBookingJson(c, {error:'routing_token_invalid'},400);
   if(routing?.target.meetingMode)body.meeting_mode=routing.target.meetingMode;
   const bookingMeetingMode=menuRow.meeting_mode==='customer_choice'?body.meeting_mode:menuRow.meeting_mode;
-  if(!['online','in_person'].includes(bookingMeetingMode??'') || (body.meeting_mode!==undefined&&body.meeting_mode!==bookingMeetingMode))return c.json({error:'meeting_mode_required'},400);
+  if(!['online','in_person'].includes(bookingMeetingMode??'') || (body.meeting_mode!==undefined&&body.meeting_mode!==bookingMeetingMode))return liffBookingJson(c, {error:'meeting_mode_required'},400);
   const startsAt = new Date(body.starts_at);
   if (Number.isNaN(startsAt.getTime())) {
-    return inputError(c, { error: 'invalid_starts_at' }, 422, ["starts_at"]);
+    return liffBookingInputError(c, { error: 'invalid_starts_at' }, 422, ["starts_at"]);
   }
   if (startsAt < new Date()) {
-    return inputError(c, { error: 'past_datetime' }, 422, ["starts_at"]);
+    return liffBookingInputError(c, { error: 'past_datetime' }, 422, ["starts_at"]);
   }
   const endsAt = new Date(startsAt.getTime() + menuRow.dur * 60_000);
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
@@ -234,7 +235,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     applyStoreRules: true,
     excludeWaitlistId:body.waitlist_id,waitlistOffer:!!body.waitlist_id,additionalDurationMinutes:addonDuration,
   });
-  if (!slotMatched) return inputError(c, { error: 'slot_not_available' }, 422, ["menu_id","staff_id","waitlist_id"]);
+  if (!slotMatched) return liffBookingInputError(c, { error: 'slot_not_available' }, 422, ["menu_id","staff_id","waitlist_id"]);
 
   const bookingId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
@@ -245,22 +246,22 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   let paymentConfig = paymentSelection.config;
   if (body.entitlement_id) {
     try { await validateEntitlementSelection(c.env.DB,accountId,friendId,body.menu_id,body.entitlement_id,startsAt.toISOString()); }
-    catch(error) { if(error instanceof EntitlementError)return c.json({error:error.code},error.status); throw error; }
-    if(body.payment_method) return inputError(c,{error:'choose_entitlement_or_payment'},400,['entitlement_id','payment_method']);
+    catch(error) { if(error instanceof EntitlementError)return liffBookingJson(c, {error:error.code},error.status); throw error; }
+    if(body.payment_method) return liffBookingInputError(c,{error:'choose_entitlement_or_payment'},400,['entitlement_id','payment_method']);
     paymentConfig={mode:'none',provider:'none',holdMinutes:paymentConfig.holdMinutes};
   } else if(paymentConfig.mode==='customer_choice') {
     if (body.payment_method && !paymentSelection.allowedMethods.includes(body.payment_method))
-      return inputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
+      return liffBookingInputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
     paymentConfig=body.payment_method
       ? {...paymentConfig,mode:body.payment_method,provider:body.payment_method==='online'?'stripe':'onsite'}
       : paymentSelection.allowedMethods.length === 1
       ? {...paymentConfig,mode:'online',provider:'stripe'}
       : await defaultBookingPaymentSelection(c.env.DB, accountId);
   } else if(body.payment_method && body.payment_method!==paymentConfig.mode) {
-    return inputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
+    return liffBookingInputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
   }
   const deposit=await depositEstimate(c.env.DB,accountId,body.menu_id,menuRow.price,startsAt.toISOString(),1,await getAccountTimeZone(c.env.DB,accountId));
-  if(deposit.amount>0&&!body.entitlement_id)return c.json({error:'deposit_collection_not_available'},409);
+  if(deposit.amount>0&&!body.entitlement_id)return liffBookingJson(c, {error:'deposit_collection_not_available'},409);
   const requiresOnlinePayment = paymentConfig.mode === 'online' && menuRow.price > 0;
   const autoConfirm = adminSettings?.approvalMode === 'automatic' && !requiresOnlinePayment && !formRequiresApproval;
   const initialStatus = (autoConfirm ? 'confirmed' : 'requested') satisfies BookingStatus;
@@ -278,9 +279,9 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       key: idemKey, lineAccountId: accountId, friendId, now: new Date(),
     });
     if (raced && raced.status !== 202) {
-      return c.json(raced.body as Record<string, unknown>, raced.status as 200 | 201 | 400 | 409 | 422);
+      return liffBookingJson(c, raced.body as Record<string, unknown>, raced.status as 200 | 201 | 400 | 409 | 422);
     }
-    return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
+    return liffBookingJson(c, { error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
   }
   // 競合チェックと INSERT を 1 ステートメントで原子化する。
   // INSERT ... SELECT WHERE NOT EXISTS パターンで、同一スタッフの overlap 行がある場合は
@@ -393,7 +394,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
         key: idemKey, lineAccountId: accountId, friendId, bookingId,
       });
     } catch { /* 不明な結果はキーを残して二重作成を止める。 */ }
-    if(error instanceof Error && error.message.includes('entitlement_unavailable'))return c.json({error:'entitlement_unavailable'},409);
+    if(error instanceof Error && error.message.includes('entitlement_unavailable'))return liffBookingJson(c, {error:'entitlement_unavailable'},409);
     throw error;
   }
   if (!insertResult.inserted) {
@@ -406,7 +407,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       status: limitError ? 422 : 409,
       body: err,
     });
-    return c.json(err, limitError ? 422 : 409);
+    return liffBookingJson(c, err, limitError ? 422 : 409);
   }
 
   // N-394: お客様が自分で入れた予約も履歴の起点として残す。
@@ -559,6 +560,6 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     status: 201,
     body: responseBody,
   });
-  return c.json(responseBody, 201);
+  return liffBookingJson(c, responseBody, 201);
 });
 }

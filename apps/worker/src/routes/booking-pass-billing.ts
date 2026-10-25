@@ -1,3 +1,4 @@
+import { liffBookingJson } from './liff-booking-response.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite} from '../services/gap-common.js';
@@ -6,15 +7,15 @@ import {resolveAccountIdFromLiff,verifyCallerLineUserId,resolveFriendId} from '.
 import {passCheckout,passBillingEvent,purchaseView,type PassBillingEvent} from '../features/booking/booking-pass-billing/index.js';
 import {readBodyWithinLimit,verifyStripeSignature} from '../services/stripe-signature.js';
 export const bookingPassBilling=new Hono<Env>();
-bookingPassBilling.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'pass_billing_unavailable'},e instanceof GapError?e.status:503));
+bookingPassBilling.onError((e,c)=>(c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:e instanceof GapError?e.code:'pass_billing_unavailable'}, e instanceof GapError?e.status:503) : c.json({success:false,error:e instanceof GapError?e.code:'pass_billing_unavailable'},e instanceof GapError?e.status:503)));
 bookingPassBilling.post('/api/liff/booking/pass-plans/:id/checkout',async c=>{
  const a=await resolveAccountIdFromLiff(c),user=await verifyCallerLineUserId(c);if(!a||!user)throw new GapError('unauthorized',401);const f=await resolveFriendId(c,user,a);if(!f)throw new GapError('not_found',404);
  const b=await gapBody(c);if(Object.keys(b).some(k=>k!=='testMode'))throw new GapError('invalid_checkout');
- return c.json({success:true,data:await passCheckout(c.env.DB,a,f,c.req.param('id'),gapKey(c),b.testMode)},201);
+ return liffBookingJson(c, {success:true,data:await passCheckout(c.env.DB,a,f,c.req.param('id'),gapKey(c),b.testMode)},201);
 });
 bookingPassBilling.get('/api/liff/booking/pass-purchases/:id',async c=>{
  const a=await resolveAccountIdFromLiff(c),user=await verifyCallerLineUserId(c);if(!a||!user)throw new GapError('unauthorized',401);const f=await resolveFriendId(c,user,a);
- const row=await c.env.DB.prepare('SELECT * FROM booking_pass_purchases WHERE id=? AND account_id=? AND friend_id=?').bind(c.req.param('id'),a,f).first<Record<string,unknown>>();if(!row)throw new GapError('not_found',404);return c.json({success:true,data:purchaseView(row)});
+ const row=await c.env.DB.prepare('SELECT * FROM booking_pass_purchases WHERE id=? AND account_id=? AND friend_id=?').bind(c.req.param('id'),a,f).first<Record<string,unknown>>();if(!row)throw new GapError('not_found',404);return liffBookingJson(c, {success:true,data:purchaseView(row)});
 });
 bookingPassBilling.get('/api/booking/admin/pass-purchases',requirePermission('/booking/bookings'),async c=>{
  const a=await gapAccount(c);const items=(await c.env.DB.prepare('SELECT p.id,p.plan_id planId,p.amount,p.status,p.entitlement_id entitlementId,e.billing_status billingStatus,e.grace_until graceUntil,p.test_mode testMode FROM booking_pass_purchases p LEFT JOIN booking_entitlements e ON e.id=p.entitlement_id WHERE p.account_id=? ORDER BY p.created_at DESC LIMIT 100').bind(a).all()).results;return c.json({success:true,data:{items}});
