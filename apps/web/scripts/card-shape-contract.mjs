@@ -74,8 +74,13 @@ export function cssShapeCandidates(css, tokens) {
     if (!/^(?:12px\s*){1,4}$/.test(radius)) continue
     const frame = [d.border, d['border-color'], d.outline, d['outline-color'], d['box-shadow']].filter(Boolean).join(' ')
     const resolvedFrame = compact(resolveValue(frame, local))
-    const framed = /hairline|card-edge|var\(--tpl-[\w-]*ring/.test(frame) ||
-      ['--color-hairline', '--card-edge'].some(token => local.has(token) && resolvedFrame.includes(compact(resolveValue(`var(${token})`, local))))
+    // カードの縁は影の外周が描くので --card-edge は透明（2026-10-25）。影を持たない面の縁は --surface-edge。
+    // 透明の値は「縁がある」印にしない（outline-color: transparent を縁と取り違えない）。
+    const framed = /hairline|card-edge|surface-edge|var\(--tpl-[\w-]*ring/.test(frame) ||
+      ['--color-hairline', '--card-edge', '--surface-edge'].some(token => {
+        const edge = local.has(token) ? compact(resolveValue(`var(${token})`, local)) : ''
+        return edge && edge !== 'transparent' && resolvedFrame.includes(edge)
+      })
     const shadow = compact(resolveValue(d['box-shadow'] ?? '', local))
     const cardShadow = compact(resolveValue('var(--card-shadow)', local))
     if (framed && !shadow.includes(cardShadow)) hits.push(selector)

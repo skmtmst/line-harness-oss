@@ -221,7 +221,7 @@ html:root .headerContent .meta { display: flex; flex-direction: column; align-it
 /* 固定HTMLの枠は内側のoutline。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
 html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']):where(:not([data-card-frame='ring'])) {
   border: 0;
-  outline: 1px solid var(--card-edge);
+  outline: 1px solid var(--surface-edge);
   outline-offset: -1px;
 }
 html:root .paddingCompact { padding: var(--space-16); }
@@ -238,7 +238,7 @@ html:root .card[data-card-surface='danger'] { border: 0; outline-color: transpar
 /* 回答など、頭・表・ページ送りの段がそれぞれ端の余白を持つ記録の箱。 */
 html:root .records {
   display: flex; flex-direction: column; gap: var(--polish-space-field);
-  padding-block: var(--polish-space-section); border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px;
+  padding-block: var(--polish-space-section); border: 0; outline: 1px solid var(--surface-edge); outline-offset: -1px;
 }
 html:root .records > .header { padding-inline: var(--polish-space-section); }
 html:root .records > [data-card-footer] { padding-inline: var(--polish-space-section); }
@@ -259,7 +259,7 @@ html:root .card[data-card-frame='ring'] {
 /* 一覧の平らな面。内側の線なので、既存の本文幅・高さは変えない。 */
 html:root .card[data-card-frame='flat'] {
   border: 0;
-  outline: 1px solid var(--card-edge);
+  outline: 1px solid var(--surface-edge);
   outline-offset: -1px;
   box-shadow: none;
 }

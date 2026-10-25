@@ -7,7 +7,7 @@
   z-index: 60;
   width: min(380px, calc(100vw - 32px));
   overflow: hidden;
-  border: 1px solid var(--card-edge);
+  border: 1px solid var(--surface-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
   box-shadow: var(--shadow-float);

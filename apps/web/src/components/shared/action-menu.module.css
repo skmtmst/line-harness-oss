@@ -247,5 +247,5 @@
 @media (prefers-reduced-motion: reduce) { :root .menu[data-closing] { animation: none; opacity: 0; } }
 
 /* ：浮く面の影と薄い縁を共通化。 */
-:root .menu { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
+:root .menu { border: 0; outline: 1px solid var(--surface-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
 :root .section { font-size: var(--text-micro); }

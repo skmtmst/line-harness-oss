@@ -23,10 +23,15 @@ const GLOBALS = readFileSync(join(HERE, 'globals.css'), 'utf8')
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('#673 A. カード・パネルの立体感', () => {
-  it('カードはくっきり版の4層の影（ぼかし最大8px）と黒8%の線を使う', () => {
+  it('カードはくっきり版の4層の影（ぼかし最大8px）を使い、縁は影の外周 1px が描く', () => {
     const card = GLOBALS_CODE.match(/--card-shadow:\s*([^;]+);/)?.[1] ?? ''
     expect(card).toBe('0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 2px 3px -1px rgba(0, 0, 0, 0.07), 0 6px 8px -4px rgba(0, 0, 0, 0.07)')
-    expect(GLOBALS_CODE).toMatch(/--card-edge:\s*rgba\(29, 29, 31, 0\.08\);/)
+    // 線と影の外周を重ねて縁を太く見せない。影を持たない面の縁は --surface-edge（黒8%）。
+    expect(GLOBALS_CODE).toMatch(/--card-edge:\s*transparent;/)
+    expect(GLOBALS_CODE).toMatch(/--surface-edge:\s*rgba\(29, 29, 31, 0\.08\);/)
+    // ぼかしは最大 8px（オーナー「ぼやけて見える」への直し）。
+    const blurs = [...card.matchAll(/(?:^|,)\s*-?[\d.]+(?:px)?\s+-?[\d.]+(?:px)?\s+([\d.]+)px/g)].map((m) => Number(m[1]))
+    expect(Math.max(...blurs)).toBeLessThanOrEqual(8)
     expect(GLOBALS_CODE).toMatch(/--shadow-card-surface:\s*var\(--card-shadow\);/)
   })
 
