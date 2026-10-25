@@ -77,11 +77,9 @@
 
 .disabled {
   cursor: not-allowed;
-  background: var(--color-canvas-sunken);
 }
 
 .disabled .box {
-  border-color: var(--color-ink-disabled);
   cursor: not-allowed;
 }
 
@@ -116,7 +114,6 @@
 :root .body { display: flex; flex: 1; flex-direction: column; gap: 2px; }
 :root .title { line-height: 20px; }
 :root .note { line-height: 18px; font-weight: 400; }
-:root .disabled, :root .disabled .box { outline-color: var(--color-ink-disabled); }
 
 :root .body { align-items: flex-start; }
 :root .note { width: 100%; }

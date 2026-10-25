@@ -322,7 +322,7 @@ export default function AccountEditModal({
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 rounded-control text-on-accent text-sm font-medium disabled:opacity-50"
+              className="px-4 py-2 rounded-control text-on-accent text-sm font-medium"
               style={{ backgroundColor: 'var(--color-accent)' }}
             >
               {saving ? '保存中...' : '保存する'}

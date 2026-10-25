@@ -144,10 +144,6 @@
   border-color: var(--color-accent-deep);
 }
 
-:root .disabled .radio {
-  border-color: var(--color-ink-disabled);
-}
-
 :root .invalid .radio {
   border-color: var(--color-status-danger);
 }
@@ -186,8 +182,6 @@
 :root .radio:checked { background: var(--color-canvas); outline: 5px solid var(--color-accent-deep); outline-offset: -2.5px; box-shadow: none; }
 :root .radio:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
 :root .checked, :root .checked:hover { background: var(--color-choice-selected); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
-:root .disabled { background: var(--color-canvas-sunken); outline-color: var(--color-ink-disabled); }
-:root .disabled .radio { outline-color: var(--color-ink-disabled); }
 :root .invalid, :root .invalid .radio { outline-color: var(--color-status-danger); }
 
 :root .radio { border-radius: var(--polish-radius-pill); }

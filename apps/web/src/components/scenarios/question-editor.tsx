@@ -404,7 +404,7 @@ export default function QuestionEditor({
                     onChange({ ...value, choices: value.choices.filter((_, i) => i !== index) })
                   }
                   disabled={value.choices.length <= 1}
-                  className="text-ink-faint hover:text-danger text-xs disabled:opacity-40"
+                  className="text-ink-faint hover:text-danger text-xs"
                 >
                   削除する
                 </button>

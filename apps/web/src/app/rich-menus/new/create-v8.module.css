@@ -472,8 +472,8 @@
 }
 
 .checkRetry:disabled {
-  opacity: 0.5;
-  cursor: default;
+  opacity: var(--polish-disabled-opacity);
+  cursor: not-allowed;
 }
 
 .checkName {

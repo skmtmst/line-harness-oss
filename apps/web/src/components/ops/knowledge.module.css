@@ -5,7 +5,7 @@
 .referenceLink span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .referenceLink svg { width: 16px; height: 16px; flex: 0 0 auto; }
 .referenceLink:focus-visible { outline: 2px solid var(--color-accent-deep); outline-offset: 2px; }
-.referenceLink:disabled { opacity: .5; cursor: wait; }
+.referenceLink:disabled { opacity: var(--polish-disabled-opacity); cursor: wait; }
 .referenceKind.referenceKind { flex: 0 0 auto; max-width: 188px; min-height: 22px; font-size: var(--text-nano); }
 .referenceRow > button:not(.referenceLink) { height: 32px; padding: 0 8px; flex: 0 0 auto; font-size: var(--text-micro); border-radius: var(--radius-control); }
 .referenceFits { width: 120px; }

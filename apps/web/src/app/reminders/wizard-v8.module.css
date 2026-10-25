@@ -469,7 +469,6 @@
   color: var(--color-ink);
 }
 .stepAction:disabled {
-  color: var(--color-ink-disabled);
   cursor: not-allowed;
 }
 .stepPreview {
@@ -561,7 +560,6 @@
   color: var(--color-accent-deep);
 }
 .addStep:disabled {
-  color: var(--color-ink-disabled);
   cursor: not-allowed;
 }
 

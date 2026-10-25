@@ -137,7 +137,7 @@ export function ConditionDialog({
           <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
+          <Button variant="primary" className="px-5 font-medium border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
                * 欄の下で知らせて止める。保存済みの条件は維持する。
@@ -474,7 +474,7 @@ export function OnCompleteDialog({
           <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
+          <Button variant="primary" className="px-5 font-medium border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
                * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
@@ -995,7 +995,7 @@ export function TestSendDialog({
         <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
           キャンセル
         </Button>
-        <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
+        <Button variant="primary" className="px-5 font-medium border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
           内容を確認
         </Button>
         </>

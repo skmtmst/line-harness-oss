@@ -17,7 +17,7 @@
 .editor[aria-invalid='true'] { outline: 1px solid var(--color-danger); outline-offset: -1px; }
 .editor[aria-invalid='true']:focus-visible { outline: 2px solid var(--color-danger); }
 
-.editor[aria-disabled='true'] { cursor: not-allowed; opacity: 0.6; }
+.editor[aria-disabled='true'] { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 
 /* 短い本文欄の任意の口。既定の欄と差し込み札の見た目は変えない。 */
 .editorCompact {
@@ -105,7 +105,7 @@
 }
 .insertButton svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--color-ink-secondary); }
 .insertButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
-.insertButton:disabled { cursor: not-allowed; opacity: 0.5; }
+.insertButton:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 .insertButton:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
 .insertButton[aria-expanded='true'] { outline-color: var(--color-accent); background: var(--color-accent-soft); }
 }

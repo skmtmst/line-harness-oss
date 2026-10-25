@@ -243,7 +243,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
             {active.status === 'completed' || active.status === 'failed' || active.status === 'expired' ? (
               <button
                 type="button"
-                className="text-action text-sm font-semibold hover:underline disabled:opacity-40"
+                className="text-action text-sm font-semibold hover:underline"
                 disabled={requesting}
                 onClick={() => void regenerate(active)}
               >

@@ -329,7 +329,7 @@ export default function AppTopBar() {
             type="button"
             onClick={() => { void refreshAccounts() }}
             disabled={refreshing}
-            className="font-semibold underline underline-offset-2 disabled:opacity-60"
+            className="font-semibold underline underline-offset-2"
           >
             {refreshing ? '読み込んでいます' : '再読み込み'}
           </button>

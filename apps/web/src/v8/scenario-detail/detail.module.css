@@ -94,7 +94,6 @@
 }
 
 .iconButton:disabled {
-  color: var(--color-ink-disabled);
   cursor: not-allowed;
 }
 

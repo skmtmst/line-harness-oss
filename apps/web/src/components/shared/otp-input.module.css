@@ -43,7 +43,7 @@
 /* 無効（確認中）`BYrQG`。 */
 .slot:disabled {
   cursor: not-allowed;
-  opacity: 0.5; /* opacity: 0.5 */
+  opacity: var(--polish-disabled-opacity); /* opacity: 0.5 */
 }
 
 @media (max-width: 380px) {

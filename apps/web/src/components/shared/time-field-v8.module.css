@@ -67,8 +67,7 @@
 }
 
 .field[data-disabled] {
-  background: var(--color-canvas-sunken);
-  opacity: 0.6;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .input {

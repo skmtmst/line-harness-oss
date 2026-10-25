@@ -645,7 +645,6 @@
   background: var(--color-canvas-sunken);
 }
 .insertChip:disabled {
-  color: var(--color-ink-faint);
   cursor: not-allowed;
 }
 .counter {

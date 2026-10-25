@@ -47,7 +47,7 @@
 
 .disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .chip {
@@ -201,7 +201,7 @@
 
 .clearAll:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .list {
@@ -231,7 +231,7 @@
 
 .option[aria-disabled='true'] {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 /* 行の印は見た目だけ。押すのは行なので、印へは操作を通さない。 */
@@ -382,3 +382,6 @@
   }
 }
 }
+
+/* 箱ごと薄くした時は、中の押せない部品を重ねて薄くしない。 */
+html:root .disabled :is(button, input, textarea):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-enabled-opacity); }

@@ -51,7 +51,7 @@
 }
 
 .emphasis:disabled {
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 /* 入っている行（強調カラーで目立たせる行）。 */

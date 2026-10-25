@@ -190,10 +190,6 @@
   outline: none;
 }
 
-.unitField input:disabled {
-  color: var(--color-ink-faint);
-}
-
 .unitSuffix {
   color: var(--color-ink-faint);
   font-size: var(--tpl-bm-12);

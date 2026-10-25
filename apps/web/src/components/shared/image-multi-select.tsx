@@ -27,7 +27,7 @@ export default function ImageMultiSelect({ items, selectedIds, max, onToggle, co
                   // 3 枚そろったら、選んでいないタイルは押しても増えないので触れない形にする。
                   disabled={disabled || (!selectedTile && full)}
                   onClick={() => onToggle(image.id)}
-                  className={compact ? styles.tile : "flex flex-col gap-1.5 text-left disabled:opacity-50"}
+                  className={compact ? styles.tile : "flex flex-col gap-1.5 text-left "}
                 >
                   <span
                     className={

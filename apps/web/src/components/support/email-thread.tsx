@@ -616,7 +616,7 @@ export default function EmailThread({
         */}
         {detail.hasMoreOlder ? (
           <div className="flex justify-center">
-            <Button variant="secondary" className="rounded-pill px-3 py-1.5 text-xs text-action disabled:opacity-50 h-auto whitespace-normal" type="button" onClick={() => loadOlder()} disabled={olderLoading}>
+            <Button variant="secondary" className="rounded-pill px-3 py-1.5 text-xs text-action h-auto whitespace-normal" type="button" onClick={() => loadOlder()} disabled={olderLoading}>
               {olderLoading ? '読み込み中...' : '過去のメッセージを読み込む'}
             </Button>
           </div>
@@ -777,7 +777,7 @@ export default function EmailThread({
             <span className="text-ink-faint min-w-0 truncate text-xs" title="差出人 contact-shed@nen-petfood.com">
               差出人 contact-shed@nen-petfood.com
             </span>
-            <Button variant="primary" className="shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto" onClick={() => sendReply()} disabled={!reply.trim() || sending} busy={sending} busyLabel="送信中..." widthReserve="idle">
+            <Button variant="primary" className="shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 border-0 h-auto" onClick={() => sendReply()} disabled={!reply.trim() || sending} busy={sending} busyLabel="送信中..." widthReserve="idle">
               {'メールで返信'}
             </Button>
           </div>

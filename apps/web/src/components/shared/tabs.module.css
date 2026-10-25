@@ -52,7 +52,7 @@
 
 .tab:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: var(--polish-disabled-opacity);
 }
 
 /* VPn1F 共通 ページ内タブ項目（選択中）

@@ -60,7 +60,7 @@
 .frame[data-state='busy'],
 .frame[data-readonly],
 .frame[data-disabled] {
-  cursor: default;
+  cursor: not-allowed;
 }
 
 .frame[data-disabled] {
@@ -218,7 +218,7 @@
 }
 
 .link:disabled {
-  cursor: default;
+  cursor: not-allowed;
   opacity: var(--tpl-slot-disabled-opacity);
 }
 
@@ -269,7 +269,7 @@
 }
 
 .pill:disabled {
-  cursor: default;
+  cursor: not-allowed;
   opacity: var(--tpl-slot-disabled-opacity);
 }
 

@@ -362,7 +362,7 @@
 
 .grip:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .orderNum {
@@ -694,11 +694,6 @@
   outline: var(--tpl-bm-2) solid var(--color-focus-ring);
   outline-offset: 1px;
 }
-
-.numInput:disabled {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
-}
 /* 保存で落ちた同時受付数。枠を危険の色にする。 */
 .numInput[aria-invalid='true'] { border-color: var(--color-danger); outline-color: var(--color-danger); }
 
@@ -722,7 +717,7 @@
 
 .iconRemove:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
 }
 
 /* 見本：「＋ 時間帯を足す」は文字ボタン（36px・角10・灰の文字）。 */
@@ -748,7 +743,6 @@
 
 .addLine:disabled {
   cursor: not-allowed;
-  color: var(--color-ink-faint);
 }
 
 /* ===== 休業日（月の暦） ===== */

@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
 import scan from './owner-rules-browser.mjs'
+import scanPolish from './polish-rules-browser.mjs'
 
 test('a framed box clipped by its parent fails; scrollable and restored boxes remain usable', async () => {
   const browser = await connectGuardBrowser()
@@ -14,5 +15,23 @@ test('a framed box clipped by its parent fails; scrollable and restored boxes re
     assert.deepEqual(await page.evaluate(scan),[])
     await page.locator('#parent').evaluate(el=>{el.style.height='auto';el.style.overflowY='hidden'})
     assert.deepEqual(await page.evaluate(scan),[])
+  } finally { await browser.close() }
+})
+
+test('押せない時に灰色へ塗り直す・重ねて薄くする・影や押せる形が残ると落ち、元の見た目のまま薄くすれば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    await page.setContent('<style>:root{--o:.48}.b{box-shadow:0 1px 2px #0003;cursor:pointer}.b:disabled{opacity:var(--o);box-shadow:none;cursor:not-allowed}</style><main><button class="b" disabled>保存</button></main>')
+    assert.deepEqual(await kinds(), [])
+    await page.addStyleTag({ content: '.b:disabled{background-color:#eee}' })
+    assert.ok((await kinds()).includes('disabled-repaint'))
+    await page.setContent('<style>:root{--o:.48}.b:disabled{opacity:var(--o);box-shadow:0 1px 2px #0003;cursor:not-allowed}</style><main><button class="b" disabled>保存</button></main>')
+    assert.ok((await kinds()).includes('disabled-look'))
+    await page.setContent('<style>:root{--o:.48}.w{opacity:var(--o)}.b:disabled{opacity:var(--o);cursor:not-allowed}</style><main><div class="w"><button class="b" disabled>保存</button></div></main>')
+    assert.ok((await kinds()).includes('disabled-look'))
+    await page.setContent('<style>.b:disabled{opacity:.4}</style><main><button class="b" disabled style="cursor:not-allowed">保存</button></main>')
+    assert.ok((await kinds()).includes('disabled-opacity'))
   } finally { await browser.close() }
 })

@@ -333,14 +333,14 @@ export default function ChoiceTable({
           <button
             onClick={() => addChoice(choices[choices.length - 1])}
             disabled={choices.length === 0}
-            className={`${miniButton} disabled:opacity-40`}
+            className={`${miniButton} `}
           >
             ＋ 最後の選択肢を複製
           </button>
           <button
             onClick={addOther}
             disabled={choices.some((c) => c.isOther)}
-            className={`${miniButton} disabled:opacity-40`}
+            className={`${miniButton} `}
           >
             ＋「その他」を追加する
           </button>

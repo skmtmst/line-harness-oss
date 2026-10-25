@@ -87,7 +87,7 @@
 .root ::selection { background: var(--color-accent-soft); color: var(--color-ink); }
 .root :global(.broadcast-message-type) { font-size: 12px; white-space: nowrap; padding: var(--space-4) var(--space-6); color: var(--color-ink-secondary); border-bottom: 2px solid transparent; }
 .root :global(.broadcast-message-type[data-active='true']) { border-color: var(--color-accent-deep); color: var(--color-accent-deep); }
-.root :global(.broadcast-message-type[aria-disabled='true']) { opacity: .45; cursor: not-allowed; }
+.root :global(.broadcast-message-type[aria-disabled='true']) { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
 .root :global(.broadcast-template-row) { display: flex; align-items: center; gap: var(--space-14); padding: var(--space-12); border-bottom: 1px solid var(--color-hairline); width: 100%; text-align: left; }
 .root :global(.broadcast-template-row small) { display: block; color: var(--color-ink-faint); font-size: 12px; }
 .root :global(.broadcast-url-row) { display: grid; grid-template-columns: minmax(0, .7fr) minmax(0, 1.4fr) 7rem; }

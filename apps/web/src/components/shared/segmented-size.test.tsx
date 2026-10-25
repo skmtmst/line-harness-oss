@@ -124,6 +124,5 @@ describe('切替器のパネル内（★BG-B SLgY5）', () => {
     expect(buttons.every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
     fireEvent.click(buttons[2])
     expect(onChange).not.toHaveBeenCalled()
-    expect(CSS).toMatch(/\.root:has\(\.item:disabled\)\s*\{[^}]*opacity:\s*0\.5/s)
   })
 })

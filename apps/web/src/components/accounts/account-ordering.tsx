@@ -331,7 +331,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
   return <SaveErrorScope errors={saveErrors}><section className="mt-6 border-t border-hairline pt-6" aria-labelledby="account-ordering-title">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div><h2 id="account-ordering-title" className="font-bold text-ink">LINEアカウントの並び替え</h2><p className="mt-1 text-xs text-ink-secondary">登録済みアカウントをドラッグするか、カードの「…」から移動先を選んで、親・子・孫の順に整理します。</p></div>
-      <Button variant="primary" className="whitespace-nowrap px-4 py-2 font-medium disabled:bg-hairline border-0 h-auto" onClick={() => save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…" widthReserve="idle">▣ {'並びを保存する'}</Button>
+      <Button variant="primary" className="whitespace-nowrap px-4 py-2 font-medium border-0 h-auto" onClick={() => save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…" widthReserve="idle">▣ {'並びを保存する'}</Button>
     </div>
     <Notice tone="info" className="mb-4">⚓ 登録済みのLINEアカウントをドラッグ＆ドロップ、またはカードの「…」→移動先の選択で、親・子・孫の3階層まで紐付けます。下位階層を表示・操作できるのは「他アカウント権限」がONの管理者だけです。</Notice>
     {error && <Notice tone="danger" className="mb-4">{error}</Notice>}

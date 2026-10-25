@@ -176,7 +176,7 @@ function Row({ children }: { children: React.ReactNode }) {
 
 function Go({ busy, onClick, label = '実行' }: { busy: boolean; onClick: () => void; label?: string }) {
   return (
-    <Button variant="primary" className="px-3 py-1.5 text-xs font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={onClick} disabled={busy}>
+    <Button variant="primary" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" type="button" onClick={onClick} disabled={busy}>
       {busy ? '実行中…' : label}
     </Button>
   )
@@ -357,7 +357,7 @@ function TagPanel({
     <Row>
       <div className="min-w-0 flex-1"><SaveErrorField names={["id"]}><EntityKindField kind="tag" label="タグ" options={tags} value={id} onChange={setId} /></SaveErrorField></div>
       <Go busy={busy || !id} onClick={attach} label="付ける" />
-      <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs disabled:opacity-50 h-auto whitespace-normal" type="button" disabled={busy || !id} onClick={detach}>
+      <Button variant="secondary" className="text-ink-secondary px-3 py-1.5 text-xs h-auto whitespace-normal" type="button" disabled={busy || !id} onClick={detach}>
         外す
       </Button>
     </Row>

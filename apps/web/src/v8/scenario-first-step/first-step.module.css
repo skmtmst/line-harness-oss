@@ -105,7 +105,6 @@
   font-weight: 700;
 }
 .kindChip:disabled {
-  color: var(--color-ink-faint);
   cursor: not-allowed;
 }
 .kindBreak {
