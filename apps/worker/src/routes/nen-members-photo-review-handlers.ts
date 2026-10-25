@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { findRewardedAdoptedDuplicate, getEffectivePhotoRewardPolicy, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
@@ -439,7 +439,7 @@ export const get__api_nen_members_friends_friendId_7 = async (c: Context<Env, "/
        LEFT JOIN line_accounts la ON la.id = f.line_account_id
       WHERE f.id = ?`,
   ).bind(friendId).first<Record<string, unknown>>();
-  if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id as string | null])) return c.json({ success: false, error: 'Friend not found' }, 404);
+  if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id as string | null])) return fail(c, 404, 'FRIEND_NOT_FOUND');
 
   const [member, pets, healthLogs, photos, pointLedger, ecEvents] = await Promise.all([
     c.env.DB.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friendId).first<Record<string, unknown>>(),
@@ -485,7 +485,7 @@ export const get__api_nen_members_ranks_8 = async (c: Context<Env, "/api/nen-mem
 
 export const post__api_nen_members_rich_menu_install_9 = async (c: Context<Env, "/api/nen-members/rich-menu/install">) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
-  if (!body?.accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+  if (!body?.accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }

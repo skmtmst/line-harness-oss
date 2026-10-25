@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
 import { fetchQuota } from '../services/dashboard-quota.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -24,7 +24,7 @@ import {
   summarizeDashboardFreshness,
   type DashboardPeriod,
 } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -44,12 +44,12 @@ dashboard.get('/api/dashboard/activity', requireRole('owner', 'admin', 'staff'),
   try {
     const access = await requireVisibleAccount(c);
     if ('response' in access) return access.response;
-    const limit = listQueryNumber(c.req.query('limit'), 10);
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 10, limitPolicy: {} }).limit;
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
       return c.json({ success: false, error: 'limit は1〜100の整数を指定してください' }, 400);
     }
     const items = await getDashboardActivity(c.env.DB, access.accountId, limit);
-    return c.json({ success: true, data: { items } });
+    return c.json({ success: true, data: buildOffsetListResponse({ items, total: null, paging: { limit, offset: 0 }, sort: [] }) });
   } catch (error) {
     throw error;
   }
@@ -175,7 +175,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     const { accountId } = access;
     const selectedAccount = await getLineAccountById(c.env.DB, accountId);
     if (!selectedAccount) {
-      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
 
     const statsScope = { allowedAccountIds: [accountId], includeUnassigned: false };
@@ -481,7 +481,7 @@ dashboard.get('/api/list-stats', async (c) => {
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const selectedAccountId = readAccountId(c);
     if (selectedAccountId && !accountScope.allowedAccountIds.includes(selectedAccountId)) {
-      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const scope = selectedAccountId
       ? { allowedAccountIds: [selectedAccountId], includeUnassigned: false }

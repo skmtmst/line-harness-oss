@@ -8,7 +8,7 @@ import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-c
 import { sameJsonMeaning } from './broadcast-json.js';
 import { parseJsonArray } from './broadcast-json.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getBroadcastById, deleteBroadcast } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { getSendPermissionForAccount } from '../services/send-entitlements.js';
@@ -32,7 +32,7 @@ export const delete__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcas
   const id = c.req.param('id');
   const existing = await getBroadcastById(c.env.DB, id);
   if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
   if (existing.status !== 'draft' && existing.status !== 'scheduled') {
@@ -42,7 +42,7 @@ export const delete__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcas
   if (!deleted) {
     const current = await getBroadcastById(c.env.DB, id);
     if (!current || !await canAccessBroadcast(c.env.DB, c.get('staff'), current)) {
-      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+      return fail(c, 404, 'BROADCAST_NOT_FOUND');
     }
     return c.json({ success: false, error: broadcastDeleteConflictMessage(current.status) }, 409);
   }
@@ -55,10 +55,10 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   const existing = await getBroadcastById(c.env.DB, id);
 
   if (!existing) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
   // N-061: 行のaccountを共通境界へ渡す。/broadcasts持ちstaffだけが送れる。
@@ -66,7 +66,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   if (!sendBoundary.allowed) {
     return sendBoundary.reason === 'forbidden'
       ? c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403)
-      : c.json({ success: false, error: 'Broadcast not found' }, 404);
+      : fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
 
   /*
@@ -509,10 +509,10 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
   const existing = await getBroadcastById(c.env.DB, id);
 
   if (!existing) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 

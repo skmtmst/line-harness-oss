@@ -9,8 +9,8 @@ import { requireRole } from '../middleware/role-guard.js';
 import { getBroadcastById, resolveLineCredential } from '@line-crm/db';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { listLimit, listQueryNumber } from '../lib/list-paging.js';
-
+import { parseOffsetPaging, buildOffsetListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
+import { fail } from '../lib/fail.js';
 const profileRefresh = new Hono<Env>();
 
 /**
@@ -180,7 +180,7 @@ profileRefresh.post('/api/admin/broadcasts/:id/reset-to-draft', requireRole('own
     .bind(id)
     .first<{ cnt: number }>();
   if (!logged) {
-    return c.json({ success: false, error: 'broadcast not found or query failed' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND_OR_QUERY_FAILED');
   }
   if (logged.cnt > 0) {
     return c.json({
@@ -568,7 +568,7 @@ profileRefresh.get('/api/admin/auto-reply-stats', requireRole('owner'), async (c
  * 直近 N 件の incoming + outgoing messages_log を返す。debug 用。
  */
 profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c) => {
-  const limit = listLimit(c.req.query('limit'), 20, 100);
+  const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, maxLimit: 100 }).limit;
   const db = c.env.DB;
   const adminScope = await adminAccountScope(c, 'COALESCE(ml.line_account_id, f.line_account_id)');
 
@@ -589,9 +589,7 @@ profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c)
 
   const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
 
-  return c.json({
-    success: true,
-    data: (res.results ?? []).map((r) => {
+  const responseItems = (res.results ?? []).map((r) => {
       const row = r as Record<string, unknown>;
       const accId = row.line_account_id as string | null;
       return {
@@ -606,8 +604,8 @@ profileRefresh.get('/api/admin/recent-messages', requireRole('owner'), async (c)
         preview: row.preview,
         createdAt: row.created_at,
       };
-    }),
-  });
+    });
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
 });
 
 /**
@@ -659,7 +657,7 @@ profileRefresh.get('/api/admin/friend-debug/:id', requireRole('owner'), async (c
     .bind(id, ...accountScopeBindings(adminScope.scope))
     .first();
   if (!friend) {
-    return c.json({ success: false, error: 'Friend not found' }, 404);
+    return fail(c, 404, 'FRIEND_NOT_FOUND');
   }
   const accNameById = await visibleAccountNames(db, adminScope.scope.allowedAccountIds);
   const accId = (friend as Record<string, unknown> | null)?.line_account_id as string | null | undefined;

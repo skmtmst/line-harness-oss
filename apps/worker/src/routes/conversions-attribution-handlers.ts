@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { decideConversionApproval, syncAffiliateConversionMileage, getAttributionDecisionView } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -64,10 +64,7 @@ export const patch__api_conversions_events_id_approval_2 = async (c: Context<Env
     if (decided.outcome === 'not_found') {
       // Missing event OR non-attributed CV (approval flow only applies to
       // affiliate-attributed rows) — both surface as 404.
-      return c.json(
-        { success: false, error: 'Attributed conversion event not found' },
-        404,
-      );
+      return fail(c, 404, 'ATTRIBUTED_CONVERSION_EVENT_NOT_FOUND');
     }
     if (decided.outcome === 'conflict') {
       // ほかの人が先に別の判断をしている。上書きせず409で返し、画面は

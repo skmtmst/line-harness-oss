@@ -1,12 +1,12 @@
 import { logger } from '@line-crm/shared/server';
 import { consumePublicIngressReceipt } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { trackConversion, listConversionDefinitions, getConversionDefinitionDetail, createConversionDefinition, previewConversionDefinition, getConversionDefinitionDeleteImpact, stopConversionDefinition, replaceConversionDefinitionUsages, reviseConversionDefinition, deleteUnusedConversionDefinition, publishConversionDefinition, issueConversionIngestSecret, setConversionIngestDisabled, getConversionPointForIngest, resolveConversionIngestSecret, recordConversionIngestionEvent, listConversionIngestionEvents, listConversionDefinitionEvents, CONVERSION_DEFINITION_USAGE_KINDS } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { buildOffsetListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listLimit, listQueryNumber, parseOffsetPaging } from '../lib/list-paging.js';
 import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { maskedPayloadShape } from '../services/incoming-webhook-actions.js';
 import { sha256Hex } from '../middleware/auth.js';
@@ -359,11 +359,12 @@ export const get__api_conversions_definitions_id_ingest_events_14 = async (c: Co
   try {
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
+    const paging = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 50 });
     const data = await listConversionIngestionEvents(c.env.DB, {
-      id: c.req.param('id'), scope: scope.value, limit: listLimit(c.req.query('limit'), 50),
+      id: c.req.param('id'), scope: scope.value, limit: paging.limit,
     });
     if (!data) return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
-    return c.json({ success: true, data: { items: data } });
+    return c.json({ success: true, data: buildOffsetListResponse({ items: data, total: null, paging, sort: [] }) });
   } catch (error) {
     return conversionContractError(c, error);
   }
@@ -373,11 +374,12 @@ export const get__api_conversions_definitions_id_events_15 = async (c: Context<E
   try {
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
+    const paging = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 50 });
     const data = await listConversionDefinitionEvents(c.env.DB, {
-      id: c.req.param('id'), scope: scope.value, limit: listLimit(c.req.query('limit'), 50),
+      id: c.req.param('id'), scope: scope.value, limit: paging.limit,
     });
     if (!data) return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
-    return c.json({ success: true, data: { items: data } });
+    return c.json({ success: true, data: buildOffsetListResponse({ items: data, total: null, paging, sort: [] }) });
   } catch (error) {
     return conversionContractError(c, error);
   }
@@ -404,7 +406,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
     const point = await getConversionPointForIngest(c.env.DB, pointId);
     if (!point) {
       await log({ result: 'rejected', reason: 'point_not_found' });
-      return c.json({ success: false, error: 'Conversion point not found' }, 404);
+      return fail(c, 404, 'CONVERSION_POINT_NOT_FOUND');
     }
     if (point.status !== 'active') {
       await log({
@@ -571,7 +573,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
           sourceEventId: sourceEventId.trim().slice(0, 200),
           friendId: resolvedFriendId, payloadShape, signatureSha256: signatureHash,
         });
-        return inputError(c, { success: false, error: 'Friend not found or out of scope' }, 422, []);
+        return fail(c, 422, 'FRIEND_NOT_FOUND_OR_OUT_OF_SCOPE', {}, []);
       }
       // R40: 数えない条件に当てはまる受信は、失敗ではなく対象外として残す。
       if (message === 'conversion_excluded') {

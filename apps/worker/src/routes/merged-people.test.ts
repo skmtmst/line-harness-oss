@@ -93,6 +93,15 @@ beforeEach(() => {
 });
 
 describe('merged person HTTP contract', () => {
+  it.each(['limit=0', 'limit=101', 'limit=abc', 'limit=1.5', 'offset=-1', 'offset=100001', 'offset=abc'])(
+    'ページ指定%sを400で断り、一覧を取得しない', async (query) => {
+      const response = await harness().request(`/api/friends/people?${query}`);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'INVALID_PAGINATION' });
+      expect(personMocks.listMergedPeople).not.toHaveBeenCalled();
+    },
+  );
+
   it('returns the normal detail shape only after every linked account is authorized', async () => {
     const response = await harness({ role: 'staff' }).request('/api/friends/people/user-a');
     expect(response.status).toBe(200);

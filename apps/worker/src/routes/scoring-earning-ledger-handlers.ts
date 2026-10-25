@@ -1,7 +1,7 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getMileageAdminOverview, getMileageAdminHistory, getMileageHistoryPeriodSummary, getMileageManualAdjustmentPolicy, setMileageManualAdjustmentPolicy, findCommittedMileageAdjustment, postMileageAdjustment, MileageAdjustmentError, publishMileageEarningRule, confirmPendingMileageEntry, voidMileageLedgerEntry, createMileageAdjustmentApprovalRequest, listMileageAdjustmentApprovalRequests, approveMileageAdjustmentRequest, rejectMileageAdjustmentRequest, cancelMileageAdjustmentRequest } from '@line-crm/db';
 import type { MileageEntryStatus, MileageEntryType } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -51,14 +51,13 @@ export const get__api_mileage_overview_2 = async (c: Context<Env, "/api/mileage/
   try {
     const accountId = c.req.query('accountId')?.trim() ?? '';
     if (!accountId) {
-      return c.json({ success: false, error: 'accountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     }
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!accountScope.allowedAccountIds.includes(accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
-    const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 50)));
-    const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0));
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 50, limitPolicy: { minimum: 1, maximum: 100 }, offsetPolicy: { minimum: 0 } });
     const overview = await getMileageAdminOverview(c.env.DB, {
       accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
@@ -66,7 +65,7 @@ export const get__api_mileage_overview_2 = async (c: Context<Env, "/api/mileage/
       limit: Number.isFinite(limit) ? limit : 50,
       offset: Number.isFinite(offset) ? offset : 0,
     });
-    return c.json({ success: true, data: buildOffsetListResponse({ ...overview, items: overview.members, total: overview.pagination.total, paging: { limit: overview.pagination.limit }, sort: [] }) });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...overview, items: overview.members, total: overview.pagination.total, paging: { limit: overview.pagination.limit, offset: overview.pagination.offset }, sort: [] }) });
   } catch (err) {
     throw err;
   }
@@ -76,11 +75,11 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
   try {
     const accountId = c.req.query('accountId')?.trim() ?? '';
     if (!accountId) {
-      return c.json({ success: false, error: 'accountId is required' }, 400);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     }
     const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!accountScope.allowedAccountIds.includes(accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const kind = c.req.query('kind');
     if (kind && !['earned', 'spent', 'voided'].includes(kind)) {
@@ -111,8 +110,7 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
     if (fromValue && toValue && fromValue > toValue) {
       return c.json({ success: false, error: 'from must not be after to' }, 400);
     }
-    const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, 50);
-    const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, 0);
+    const { limit: requestedLimit, offset: requestedOffset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 50, limitPolicy: { fallback: 'finite', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'finite', minimum: 0 } });
     const historyInput = {
       ...(kind ? { kind: kind as 'earned' | 'spent' | 'voided' } : {}),
       accountId,
@@ -126,8 +124,8 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
       mode: modeValue as 'automatic' | 'manual' | undefined,
       from: fromValue || undefined,
       to: toValue || undefined,
-      limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50,
-      offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+      limit: requestedLimit,
+      offset: requestedOffset,
     };
     const [history, summary] = await Promise.all([
       getMileageAdminHistory(c.env.DB, historyInput),
@@ -137,7 +135,7 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
         to: toValue || undefined,
       }),
     ]);
-    return c.json({ success: true, data: buildOffsetListResponse({ ...history, summary, total: history.pagination.total, paging: { limit: history.pagination.limit }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...history, summary, total: history.pagination.total, paging: { limit: history.pagination.limit, offset: history.pagination.offset }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
   } catch (err) {
     throw err;
   }
@@ -146,10 +144,10 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
 export const get__api_mileage_adjustment_policy_4 = async (c: Context<Env, "/api/mileage/adjustment-policy">) => {
   try {
     const accountId = c.req.query('accountId')?.trim() ?? '';
-    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!scope.allowedAccountIds.includes(accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     const policy = await getMileageManualAdjustmentPolicy(c.env.DB, accountId);
     return c.json({
@@ -169,11 +167,11 @@ export const put__api_mileage_adjustment_policy_5 = async (c: Context<Env, "/api
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     const approvalThreshold = Number(body.approvalThreshold);
     if (!accountId || !Number.isInteger(approvalThreshold) || approvalThreshold <= 0) {
-      return inputError(c, { success: false, error: 'accountId and a positive integer approvalThreshold are required' }, 400, ["accountId","approvalThreshold"]);
+      return fail(c, 400, 'ACCOUNT_ID_AND_A_POSITIVE_INTEGER_APPROVAL_THRESHOL_27EBA8DED5EF', {}, ["accountId","approvalThreshold"], 'accountId and a positive integer approvalThreshold are required');
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     if (!scope.allowedAccountIds.includes(accountId)) {
-      return c.json({ success: false, error: 'LINE account not found' }, 404);
+      return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
     await setMileageManualAdjustmentPolicy(c.env.DB, accountId, { approvalThreshold });
     auditLog(c, 'mileage.adjustment.policy.update', { kind: 'line_account', id: accountId });
@@ -219,7 +217,7 @@ export const post__api_mileage_adjustments_6 = async (c: Context<Env, "/api/mile
       const expiresAt = expiresAtValue ? new Date(expiresAtValue) : null;
       const notifyFriend = body.notifyFriend === undefined ? false : body.notifyFriend;
       if (!accountId || !friendId || !direction || !Number.isInteger(amount) || amount <= 0) {
-        return inputError(c, { success: false, error: 'accountId, friendId, direction and a positive integer amount are required' }, 400, ["accountId","friendId","direction","amount"]);
+        return fail(c, 400, 'ACCOUNT_ID_FRIEND_ID_DIRECTION_AND_A_POSITIVE_INTEG_EC4F922FA76E', {}, ["accountId","friendId","direction","amount"], 'accountId, friendId, direction and a positive integer amount are required');
       }
       if (amount > 1_000_000_000) {
         return inputError(c, { success: false, error: 'amount is too large' }, 400, ["amount"]);
@@ -242,12 +240,12 @@ export const post__api_mileage_adjustments_6 = async (c: Context<Env, "/api/mile
 
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.allowedAccountIds.includes(accountId)) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
+        return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
       const friend = await c.env.DB.prepare(
         `SELECT id FROM friends WHERE id = ? AND line_account_id = ?`,
       ).bind(friendId, accountId).first<{ id: string }>();
-      if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+      if (!friend) return fail(c, 404, 'FRIEND_NOT_FOUND');
 
       const staff = c.get('staff');
       const signedAmount = direction === 'decrease' ? -amount : amount;
@@ -395,7 +393,7 @@ export const post__api_mileage_adjustments_6 = async (c: Context<Env, "/api/mile
           return c.json({ success: false, error: '同じIdempotency-Keyが別の内容で使われています', code: err.code }, 409);
         }
         if (err.code === 'friend_not_found') {
-          return c.json({ success: false, error: 'Friend not found', code: err.code }, 404);
+          return fail(c, 404, 'FRIEND_NOT_FOUND', { code: err.code, error: '友だちが見つかりません。一覧から開き直してください。' });
         }
       }
       throw err;
@@ -523,13 +521,13 @@ export const post__api_mileage_entries_id_confirm_11 = async (c: Context<Env, "/
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
       if (!accountId) {
-        return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+        return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
       }
       if (!reason) {
         return inputError(c, { success: false, error: '理由を入力してください', code: 'reason_required' }, 400, ["reason"]);
       }
       if (!await canUseMileageAccount(c, accountId)) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
+        return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
       const staff = c.get('staff');
       const { entry, alreadyConfirmed } = await confirmPendingMileageEntry(c.env.DB, {
@@ -555,13 +553,13 @@ export const post__api_mileage_entries_id_void_12 = async (c: Context<Env, "/api
       const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
       const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
       if (!accountId) {
-        return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+        return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
       }
       if (!reason) {
         return inputError(c, { success: false, error: '理由を入力してください', code: 'reason_required' }, 400, ["reason"]);
       }
       if (!await canUseMileageAccount(c, accountId)) {
-        return c.json({ success: false, error: 'LINE account not found' }, 404);
+        return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
       }
       const staff = c.get('staff');
       const result = await voidMileageLedgerEntry(c.env.DB, {

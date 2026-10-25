@@ -19,13 +19,13 @@ import type { TrafficPoolWithAccount, PoolAccountWithDetails } from '@line-crm/d
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { fail } from '../lib/fail.js';
 const trafficPools = new Hono<Env>();
 
 async function requireVisibleTrafficPool(c: Context<Env>, next: () => Promise<void>) {
   const pool = await getTrafficPoolById(c.env.DB, c.req.param('id')!);
   if (!pool || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [pool.active_account_id])) {
-    return c.json({ success: false, error: 'Traffic pool not found' }, 404);
+    return fail(c, 404, 'TRAFFIC_POOL_NOT_FOUND');
   }
   await next();
 }
@@ -51,7 +51,7 @@ trafficPools.get('/pool/:slug', async (c) => {
   const pool = await getTrafficPoolBySlug(c.env.DB, slug);
 
   if (!pool) {
-    return c.json({ success: false, error: 'Pool not found' }, 404);
+    return fail(c, 404, 'POOL_NOT_FOUND');
   }
 
   const baseUrl = new URL(c.req.url).origin;
@@ -99,7 +99,7 @@ trafficPools.get('/api/traffic-pools/accounts', async (c) => {
         c.get('staff'),
         pools.results.map((pool) => pool.active_account_id),
       )) {
-      return c.json({ success: false, error: 'Traffic pool not found' }, 404);
+      return fail(c, 404, 'TRAFFIC_POOL_NOT_FOUND');
     }
 
     const accounts = await c.env.DB.prepare(
@@ -174,7 +174,7 @@ trafficPools.use('/api/traffic-pools/:id/*', requireVisibleTrafficPool);
 trafficPools.get('/api/traffic-pools/:id', requireRole('owner', 'admin'), async (c) => {
   const pool = await getTrafficPoolById(c.env.DB, c.req.param('id'));
   return pool ? c.json({ success: true, data: serialize(pool) })
-    : c.json({ success: false, error: 'Traffic pool not found' }, 404);
+    : fail(c, 404, 'TRAFFIC_POOL_NOT_FOUND');
 });
 
 // PUT /api/traffic-pools/:id — update (switch account here)
@@ -207,7 +207,7 @@ trafficPools.put('/api/traffic-pools/:id', requireRole('owner'), inputJsonBounda
     });
 
     if (!updated) {
-      return c.json({ success: false, error: 'Traffic pool not found' }, 404);
+      return fail(c, 404, 'TRAFFIC_POOL_NOT_FOUND');
     }
     return c.json({ success: true, data: serialize(updated) });
   } catch (err) {
@@ -224,7 +224,7 @@ trafficPools.delete('/api/traffic-pools/:id', requireRole('owner'), async (c) =>
     const id = c.req.param('id');
     const existing = await getTrafficPoolById(c.env.DB, id);
     if (!existing) {
-      return c.json({ success: false, error: 'Traffic pool not found' }, 404);
+      return fail(c, 404, 'TRAFFIC_POOL_NOT_FOUND');
     }
     // The 'main' pool is the default fallback for /r/:ref / /auth/line and
     // for new LINE account auto-enrollment; deleting it breaks single-account
@@ -266,7 +266,7 @@ trafficPools.post('/api/traffic-pools/:id/accounts', requireRole('owner'), input
   try {
     const body = await c.req.json<{ lineAccountId: string }>();
     if (!body.lineAccountId) {
-      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);

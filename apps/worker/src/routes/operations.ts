@@ -1,4 +1,4 @@
-import { clampedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { mfaConfiguration } from '../lib/mfa-config.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -87,7 +87,7 @@ function parseCapabilities(raw: unknown): OperationCapability[] | null {
 }
 
 function historyLimit(raw: string | undefined): number {
-  return clampedListInteger(raw, 100, 1, 200);
+  return parseOffsetPaging({ limit: raw }, { defaultLimit: 100, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 200 } }).limit;
 }
 
 const STEP_UP_PURPOSE = 'operations.control' as const;
@@ -570,7 +570,8 @@ operations.get('/api/operations/history', requireRole('owner', 'admin'), async (
         deployment,
       })),
     ].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).slice(0, limit);
-    return c.json({ success: true, data: history });
+    const responseItems = history;
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (error) {
     throw error;
   }

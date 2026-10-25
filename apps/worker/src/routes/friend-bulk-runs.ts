@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputJsonBoundary } from '../lib/input-errors.js';
@@ -104,8 +104,7 @@ friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin'), 
       c.req.param('id'),
       staff.tenantId ?? DEFAULT_TENANT_ID,
       {
-        page: listQueryNumber(c.req.query('page'), 1),
-        limit: listQueryNumber(c.req.query('limit'), 50),
+        ...parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') }, { defaultLimit: 50, limitPolicy: {}, pagePolicy: {} }),
       },
     );
     if (!detail) return c.json({ success: false, error: '一括操作が見つかりません' }, 404);

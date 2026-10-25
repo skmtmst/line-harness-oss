@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listIntegerInRange } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputJsonBoundary } from '../lib/input-errors.js';
@@ -185,14 +185,14 @@ async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
 
 mergedPeople.get('/api/friends/people', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const limit = listIntegerInRange(c.req.query('limit'), 20, 0, 100);
-    const offset = listIntegerInRange(c.req.query('offset'), 0, 0, 100_000);
-    if (limit === null || limit < 1 || offset === null) {
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: {}, offsetPolicy: {} });
+    const invalidPaging = !Number.isInteger(limit) || limit < 0 || limit > 100 || !Number.isInteger(offset) || offset < 0 || offset > 100_000;
+    if (invalidPaging || limit < 1) {
       return c.json({ success: false, error: 'ページ位置が正しくありません', code: 'INVALID_PAGINATION' }, 400);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
     const data = await listMergedPeople(c.env.DB, tenantId(c), scope.allowedAccountIds, limit, offset);
-    return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit, offset }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }

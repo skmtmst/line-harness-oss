@@ -6,7 +6,7 @@ import { inputError } from '../lib/input-errors.js';
 import { buildReminderStepMessage } from '../services/reminder-delivery.js';
 import { getTemplateById } from '@line-crm/db';
 import { getFriendById, getReminders, getRemindersByIds, reorderReminders, getReminderById, getReminderSteps, getReminderVersionSteps, createReminderWithDraftVersion, getReminderDraftVersion, getReminderPublishedVersion, parseReminderVersionSettings, publishReminderDraftVersion, recordReminderDraftTest, saveReminderDraftVersion, type ReminderDraftSettings } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 
 
 import type { Env } from '../worker-env.js';
@@ -64,7 +64,7 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
       const bindings: unknown[] = [];
       if (lineAccountId) {
         if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
-          return c.json({ success: false, error: 'Reminder not found' }, 404);
+          return fail(c, 404, 'REMINDER_NOT_FOUND');
         }
         clauses.push('r.line_account_id = ?');
         bindings.push(lineAccountId);
@@ -152,7 +152,7 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
     let items: Awaited<ReturnType<typeof getReminders>>;
     if (lineAccountId) {
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
-        return c.json({ success: false, error: 'Reminder not found' }, 404);
+        return fail(c, 404, 'REMINDER_NOT_FOUND');
       }
       /*
        * 並びは getReminders と同じにする（161）。
@@ -251,7 +251,7 @@ export const get__api_reminders_id_4 = async (c: Context<Env, "/api/reminders/:i
       getReminderSteps(c.env.DB, id),
       getReminderPublishedVersion(c.env.DB, id),
     ]);
-    if (!reminder) return c.json({ success: false, error: 'Reminder not found' }, 404);
+    if (!reminder) return fail(c, 404, 'REMINDER_NOT_FOUND');
     return c.json({
       success: true,
       data: {
@@ -460,7 +460,7 @@ export const get__api_reminders_id_test_recipient_11 = async (c: Context<Env, "/
     // 送信先がどのアカウントの設定かを見てから返す。別アカウントの下書きを
     // 指されたときに、そのアカウントの送信先名を漏らさない。
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [settings.lineAccountId])) {
-      return c.json({ success: false, error: 'Reminder not found' }, 404);
+      return fail(c, 404, 'REMINDER_NOT_FOUND');
     }
     // REMINDER-12: 操作者を渡して本人宛て/登録宛先を区別する。実送信も同じ
     // 解決を使うので、ここで返した届け先と実際に届く先がずれない。
@@ -483,7 +483,7 @@ export const post__api_reminders_id_test_send_12 = async (c: Context<Env, "/api/
   try {
     const settings = parseReminderVersionSettings(draft);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [settings.lineAccountId])) {
-      return c.json({ success: false, error: 'Reminder not found' }, 404);
+      return fail(c, 404, 'REMINDER_NOT_FOUND');
     }
     const referenceError = await validateReminderDraftReferences(c.env.DB, settings);
     if (referenceError) return inputError(c, { success: false, error: referenceError }, 422, ["steps"]);

@@ -6,7 +6,7 @@ import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-
+import { fail } from '../lib/fail.js';
 const richMenus = new Hono<Env>();
 
 class LineAccountRequiredError extends Error {}
@@ -94,7 +94,7 @@ richMenus.post('/api/friends/:friendId/rich-menu', requireDeliveryAccess('richMe
     const db = c.env.DB;
     const friend = await getFriendById(db, friendId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     let accountToken: string | null = null;
@@ -135,7 +135,7 @@ richMenus.delete('/api/friends/:friendId/rich-menu', requireDeliveryAccess('rich
 
     const friend = await getFriendById(db, friendId);
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     let accountToken: string | null = null;
@@ -196,7 +196,7 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
     // 認可: 隣の GET /api/friends/:id と同じく、見られる友だちだけ。
     // 存在の有無は 404 に倒して、ID列挙の手がかりを漏らさない (#496-13)。
     if (!friend || !await canAccessAllLineAccounts(db, c.get('staff'), [friendAccId])) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const cached = friendRichMenuCache.get(friendId);

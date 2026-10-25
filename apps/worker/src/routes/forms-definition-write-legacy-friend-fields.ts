@@ -4,13 +4,12 @@ import { formatAddressValue, type FormLayout } from '@line-crm/shared';
 import { parseFormFields } from './form-field-definition.js';
 import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { writeFormDestinationsOnce } from '../features/forms/form-destination-workflow/index.js';
-import { inputError } from '../lib/input-errors.js';
 import { type MiddlewareHandler } from 'hono';
 import { getFormAccountIds, getFormSubmissionById, updateFormSubmissionDestinationWriteResult, getFriendById, jstNow } from '@line-crm/db';
 import { enrollFriendInScenario } from '@line-crm/db';
 import type { Form as DbForm, FormSubmission as DbFormSubmission, FormDestinationWriteResult } from '@line-crm/db';
 import { applyMileageRulesForEvent } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 import { attachTagAndFireSideEffects } from '../features/friends/friend-tag-attach/index.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
@@ -84,12 +83,12 @@ export /** 本文の解析より前に保管・保管解除の管理権限を確
 const requireArchiveManage: MiddlewareHandler<Env> = async (c, next) => {
   if (!hasDeliveryAccess(c.get('staff'), 'forms', 'archive')) return c.json({ success: false, error: '保管には管理者権限が必要です' }, 403);
   try {
-    if (!c.req.query('account_id')?.trim()) return inputError(c, { success: false, error: 'account_id is required' }, 400, ['account_id']);
+    if (!c.req.query('account_id')?.trim()) return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ['account_id']);
     const accountIds = await getFormAccountIds(c.env.DB, c.req.param('id')!);
     const gate = await requireFormManage(c, accountIds);
     if (gate) return gate;
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [c.req.query('account_id')!.trim()])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), accountIds)) {
       return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);

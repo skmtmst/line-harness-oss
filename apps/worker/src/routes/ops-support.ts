@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -170,16 +170,15 @@ opsSupport.get('/api/ops/support/tickets', async (c) => {
   const priority = priorityRaw && (SUPPORT_PRIORITIES as readonly string[]).includes(priorityRaw) ? (priorityRaw as SupportPriority) : undefined;
   const sortRaw = c.req.query('sort');
   const sort = sortRaw === 'oldest' || sortRaw === 'priority' ? sortRaw : 'newest';
-  const limit = listQueryNumber(c.req.query('limit'), 50);
-  const offset = listQueryNumber(c.req.query('offset'), 0);
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 50, limitPolicy: { fallback: 'finite', minimum: 1, maximum: 200 }, offsetPolicy: { fallback: 'finite', minimum: 0 } });
   const { rows, total } = await listSupportTickets(db, {
     stage, priority, q: c.req.query('q') ?? '', sort,
-    limit: Number.isFinite(limit) ? limit : 50, offset: Number.isFinite(offset) ? offset : 0,
+    limit, offset,
   });
   const replies = await countRepliesForRequests(db, rows.map((r) => r.id));
   const base = workerUrl(c);
   const responseItems = rows.map((r) => serializeTicket(r, base, replies.get(r.id) ?? 0));
-  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total, items: responseItems, paging: { limit: Number.isFinite(limit) ? Math.min(200, Math.max(1, limit)) : 50 }, sort: [] }));
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total, items: responseItems, paging: { limit, offset }, sort: [] }));
 });
 
 // ---------------------------------------------------------------------------

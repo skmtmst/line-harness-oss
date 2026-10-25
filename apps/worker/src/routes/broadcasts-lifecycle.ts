@@ -4,7 +4,7 @@ import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { parseJsonArray, sameJsonMeaning } from './broadcast-json.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getBroadcastById, updateBroadcast, requestBroadcastStop, resumeBroadcastSending, beginBroadcastRetryAttempt, closeClaimsForStop, reopenFailedClaims, getRetryableRecipientIds } from '@line-crm/db';
 import type { BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { MAX_BROADCAST_MESSAGES, parseBroadcastMessageParts } from '../features/broadcasts/broadcast-message-set/index.js';
@@ -20,10 +20,10 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   const existing = await getBroadcastById(c.env.DB, id);
 
   if (!existing) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
@@ -326,7 +326,7 @@ export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/bro
   const id = c.req.param('id');
   const existing = await getBroadcastById(c.env.DB, id);
   if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
   if (existing.status !== 'scheduled' || !existing.scheduled_at) {
@@ -355,7 +355,7 @@ export const post__api_broadcasts_id_stop_3 = async (c: Context<Env, "/api/broad
   const id = c.req.param('id');
   const existing = await getBroadcastById(c.env.DB, id);
   if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
@@ -464,7 +464,7 @@ export const post__api_broadcasts_id_resume_4 = async (c: Context<Env, "/api/bro
   const id = c.req.param('id');
   const existing = await getBroadcastById(c.env.DB, id);
   if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
-    return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
   const rawExisting = existing as unknown as Record<string, unknown>;
@@ -511,7 +511,7 @@ export const post__api_broadcasts_id_retry_failed_5 = async (c: Context<Env, "/a
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
     if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
-      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+      return fail(c, 404, 'BROADCAST_NOT_FOUND');
     }
     if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
     if (existing.target_type === 'all' && !existing.segment_conditions) {

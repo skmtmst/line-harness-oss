@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getRichMenuGroupWithPages, getLineAccountById, getActiveRichMenuTestApply, getRichMenuTestApplyById, beginRichMenuTestApplyRevert, markRichMenuTestApplyReverted, markRichMenuTestApplyRevertFailed, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
@@ -15,7 +15,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_revert_1 = async (c: 
     // 本人の今の表示がテスト適用で出したものかを照合するために使う。
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!idempotencyKey) {
@@ -53,7 +53,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_revert_1 = async (c: 
     }
 
     const account = await getLineAccountById(c.env.DB, group.account_id);
-    if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+    if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
     const line = createLineClient(account.channel_access_token);
     if (!line.linkRichMenuToUser || !line.unlinkRichMenuFromUser) {
       return c.json({ success: false, error: 'LINE client does not support per-user rich menu operations' }, 500);

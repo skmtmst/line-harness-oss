@@ -4,7 +4,7 @@ import { computeDedupBroadcastPreview } from '../services/dedup-broadcast.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import type { Env } from '../worker-env.js';
-
+import { fail } from '../lib/fail.js';
 const dedupPreview = new Hono<Env>();
 
 dedupPreview.post(
@@ -13,7 +13,7 @@ dedupPreview.post(
   inputJsonBoundary(), async (c) => {
     const body = await c.req.json<{ accountIds: unknown; dedupPriority: unknown; targetTagId?: unknown }>();
     if (!Array.isArray(body.accountIds) || !body.accountIds.every((x) => typeof x === 'string')) {
-      return inputError(c, { success: false, error: 'accountIds: array of strings required' }, 400, ["accountIds"]);
+      return fail(c, 400, 'ACCOUNT_IDS_ARRAY_OF_STRINGS_REQUIRED', {}, ["accountIds"]);
     }
     if (!Array.isArray(body.dedupPriority) || !body.dedupPriority.every((x) => typeof x === 'string')) {
       return inputError(c, { success: false, error: 'dedupPriority: array of strings required' }, 400, ["dedupPriority"]);

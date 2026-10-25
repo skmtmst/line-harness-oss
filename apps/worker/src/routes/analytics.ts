@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { jstDate as japanDate, jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { serializeFunnel, funnelErrorStatus } from './analytics-funnel-display.js';
@@ -342,7 +342,7 @@ analytics.get('/api/analytics/url-clicks', async (c) => {
     const context = await overviewContext(c, account.accountId);
     if (!context.ok) return context.response;
     const limitRaw = c.req.query('limit');
-    const limit = listQueryNumber(limitRaw, 200);
+    const { limit } = parseOffsetPaging({ limit: limitRaw }, { defaultLimit: 200, limitPolicy: {} });
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
       return c.json({ success: false, error: '表示件数は1〜200で指定してください' }, 400);
     }
@@ -976,8 +976,7 @@ analytics.get('/api/analytics/funnels', async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
-    const page = listQueryNumber(c.req.query('page'), 1);
-    const pageSize = listQueryNumber(c.req.query('pageSize'), 200);
+    const { page, limit: pageSize } = parseOffsetPaging({ limit: c.req.query('pageSize'), page: c.req.query('page') }, { defaultLimit: 200, limitPolicy: {}, pagePolicy: {} });
     if (!Number.isInteger(page) || page < 1) {
       return c.json({ success: false, error: 'ページは1以上の整数で指定してください' }, 400);
     }
@@ -997,7 +996,7 @@ analytics.get('/api/analytics/funnels', async (c) => {
     const responseItems = items;
     return c.json(buildOffsetListResponse({ success: true,
       data: responseItems,
-      pagination: { page: result.page, pageSize: result.pageSize, total: result.total }, items: responseItems, total: result.total, paging: { limit: result.pageSize }, sort: [] }));
+      pagination: { page: result.page, pageSize: result.pageSize, total: result.total }, items: responseItems, total: result.total, paging: { limit: result.pageSize, offset: (page - 1) * pageSize }, sort: [] }));
   } catch (error) {
     throw error;
   }

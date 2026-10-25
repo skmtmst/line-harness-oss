@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { jstMonthStart as japanMonthStart } from '@line-crm/shared';
 import type { TenantStatus, TenantListRow } from './ops-tenant-types.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
@@ -388,8 +388,8 @@ ops.get('/api/ops/audit', async (c) => {
   const actionsRaw = (c.req.query('action') ?? '').split(',').map((a) => a.trim()).filter(Boolean);
   const actions = actionsRaw.filter((a): a is PlatformAuditAction =>
     (PLATFORM_AUDIT_ACTIONS as readonly string[]).includes(a));
-  const limit = listQueryNumber(c.req.query('limit'), 50, { format: 'integer-prefix' }) || 50;
-  const offset = listQueryNumber(c.req.query('offset'), 0, { format: 'integer-prefix' }) || 0;
+  const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 50, limitPolicy: { format: 'integer-prefix' } }).limit || 50;
+  const offset = parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: { format: 'integer-prefix' } }).offset || 0;
   const result = await listPlatformAudit(dbFor(c.env), {
     tenantId: c.req.query('tenant_id') || null,
     actions,
@@ -399,7 +399,7 @@ ops.get('/api/ops/audit', async (c) => {
     offset,
   });
   const responseItems = result.rows;
-  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total: result.total, items: responseItems, paging: { limit: Math.min(500, Math.max(1, limit)) }, sort: [{ field: 'created_at', direction: 'desc' }] }));
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total: result.total, items: responseItems, paging: { limit: Math.min(500, Math.max(1, limit)), offset }, sort: [{ field: 'created_at', direction: 'desc' }] }));
 });
 
 // ---------------------------------------------------------------------------

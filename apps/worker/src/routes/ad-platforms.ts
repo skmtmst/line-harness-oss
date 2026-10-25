@@ -24,14 +24,14 @@ import {
   type AdPlatformWriteScope,
 } from '@line-crm/db';
 import type { AdConversionLog } from '@line-crm/db';
-
+import { fail } from '../lib/fail.js';
 
 import { verifyAdPlatformReadAccess } from '../services/ad-cost-import.js';
 import { sendAdConversions, retryAdConversion, AdConversionRetryError } from '../services/ad-conversion.js';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { listLimit, parseOffsetPaging } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 
 /**
  * 画面へ返す形。秘密の値は出さず、設定済みの鍵名だけ出す。
@@ -140,7 +140,7 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), inputJsonBoundary({"
     }
     // 帰属のない設定は送信対象にならないため、作成時に必須にする。
     if (!body.lineAccountId) {
-      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -223,7 +223,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), inputJsonBoundary
 
     // 帰属を空に戻す変更は受け付けない。
     if (body.lineAccountId !== undefined && !body.lineAccountId) {
-      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     const existing = await getAdPlatformById(c.env.DB, id);
     if (!existing) {
@@ -324,7 +324,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), inputJsonBounda
         .bind(body.friendId)
         .first<{ line_account_id: string | null }>();
       if (!friend) {
-        return c.json({ success: false, error: 'Friend not found' }, 404);
+        return fail(c, 404, 'FRIEND_NOT_FOUND');
       }
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id])) {
         return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -372,7 +372,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), inputJsonBounda
     // あるときの取り違えと、認可対象・実送信対象のずれを防ぐため。
     const lineAccountId = body.lineAccountId?.trim();
     if (!lineAccountId) {
-      return inputError(c, { success: false, error: 'lineAccountId is required' }, 400, ["lineAccountId"]);
+      return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["lineAccountId"]);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -499,7 +499,7 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
 
     return c.json({
       success: true,
-      data: {
+      data: buildOffsetListResponse({
         items: logs.results.map(serializeLog),
         total: Number(count?.total ?? 0),
         summary: {
@@ -513,7 +513,8 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
           { field: 'createdAt', direction: 'desc' },
           { field: 'id', direction: 'desc' },
         ],
-      },
+        paging: { limit, offset: (page - 1) * limit },
+      }),
     });
   } catch (err) {
     throw err;
@@ -531,13 +532,15 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
-    const limit = listLimit(c.req.query('limit'), 50);
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 50 }).limit;
     const logs = await getAdConversionLogs(c.env.DB, id, limit);
 
-    return c.json({
+    const responseItems = logs.map(serializeLog);
+    return c.json(buildOffsetListResponse({
       success: true,
-      data: logs.map(serializeLog),
-    });
+      data: responseItems,
+      items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [],
+    }));
   } catch (err) {
     throw err;
   }

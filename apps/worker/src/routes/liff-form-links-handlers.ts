@@ -1,10 +1,10 @@
-import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { trackedLinkReferralMatchesAccount } from '../services/tracked-link-identity.js';
 import { navigationProof } from '../lib/navigation-proof.js';
 import { storedRedirectTarget } from '../lib/safe-redirect.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getFriendByLineUserIdForAccount, getLineAccountById, getLineAccounts, getTrackedLinkById, getMessageTemplateById } from '@line-crm/db';
 import { isStoppedEntryRouteRef } from '../services/entry-route-stop.js';
 import { buildIntroMessage } from '../services/intro-message.js';
@@ -25,8 +25,7 @@ export const get__api_analytics_ref_refCode_orders_1 = async (c: Context<Env, "/
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
 
-    const limit = clampedListInteger(c.req.query('limit'), 20, 1, 50);
-    const offset = clampedListInteger(c.req.query('offset'), 0, 0);
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 20, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 50 }, offsetPolicy: { fallback: 'integer', minimum: 0 } });
 
     const where = `f.ref_code = ? ${accountScope.where}`;
     const binds = [refCode, ...accountScope.binds];
@@ -108,7 +107,7 @@ export const get__api_analytics_ref_refCode_orders_1 = async (c: Context<Env, "/
           orderedAt: row.ordered_at,
           detailUrl: row.detail_url,
           friend: { id: row.friend_id, displayName: row.friend_name },
-        })), paging: { limit }, sort: [{ field: 'orderedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
+        })), paging: { limit, offset }, sort: [{ field: 'orderedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
     });
   } catch (err) {
     throw err;
@@ -210,7 +209,7 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
       verifiedLineAccountId,
     );
     if (!friend) {
-      return c.json({ success: false, error: 'Friend not found' }, 404);
+      return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
 
     const friendAccountId = verifiedLineAccountId ?? friend.line_account_id ?? null;

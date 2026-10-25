@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber, clampedListInteger } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { jstDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -16,7 +16,7 @@ import { ecFlexMessage } from '../features/ec-commerce/ec-notification-message/i
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import { notificationDeliveriesResponse } from './line-notifications.js';
-
+import { fail } from '../lib/fail.js';
 const ecCommerce = new Hono<Env>();
 // テスト送信の連打防止。同一の店・種別は30秒に1回だけ。全体の rateLimit とは
 // 別に、LINE API へ直接届く口だけ短いクールダウンを置く。
@@ -294,8 +294,7 @@ ecCommerce.get(
     : scope?.allowedAccountIds.length
       ? `(e.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR e.line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'e.line_account_id IS NULL' : '1 = 0';
-  const limit = clampedListInteger(c.req.query('limit') || undefined, 30, 1, 100);
-  const offset = clampedListInteger(c.req.query('offset') || undefined, 0, 0);
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 30, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'integer', minimum: 0 } });
   const eventType = c.req.query('eventType') || '';
   const status = c.req.query('status') || '';
   const view = c.req.query('view') || '';
@@ -462,7 +461,7 @@ ecCommerce.get(
           };
         }),
         total: Number(actionCount?.count ?? 0),
-        summary: actionSummary, paging: { limit }, sort: [{field:'receivedAt',direction:sort === 'oldest' ? 'asc' : 'desc'},{field:'createdAt',direction:sort === 'oldest' ? 'asc' : 'desc'}] }),
+        summary: actionSummary, paging: { limit, offset }, sort: [{field:'receivedAt',direction:sort === 'oldest' ? 'asc' : 'desc'},{field:'createdAt',direction:sort === 'oldest' ? 'asc' : 'desc'}] }),
       pagination: { total: Number(actionCount?.count ?? 0), limit, offset },
     });
   }
@@ -513,7 +512,7 @@ ecCommerce.get(
     }));
   return c.json(buildOffsetListResponse({ success: true,
     data: responseItems,
-    pagination: { total: countRow?.count ?? 0, limit, offset }, items: responseItems, total: countRow?.count ?? 0, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }] }));
+    pagination: { total: countRow?.count ?? 0, limit, offset }, items: responseItems, total: countRow?.count ?? 0, paging: { limit, offset }, sort: [{ field: 'receivedAt', direction: 'desc' }] }));
 });
 
 /**
@@ -569,8 +568,7 @@ ecCommerce.get(
     return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
   }
   const hasPagination = c.req.query('limit') !== undefined || c.req.query('offset') !== undefined;
-  const requestedLimit = listQueryNumber(c.req.query('limit') || undefined, String(SUBSCRIPTIONS_NON_PAGINATED_MAX));
-  const requestedOffset = listQueryNumber(c.req.query('offset') || undefined, '0');
+  const { limit: requestedLimit, offset: requestedOffset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: SUBSCRIPTIONS_NON_PAGINATED_MAX, limitPolicy: {}, offsetPolicy: {} });
   const limit = Number.isInteger(requestedLimit)
     ? Math.min(Math.max(requestedLimit, 1), 100)
     : SUBSCRIPTIONS_NON_PAGINATED_MAX;
@@ -750,7 +748,7 @@ ecCommerce.get(
         ruleVersion: 'subscription-payment-status-v1',
         calculatedAt: syncedRow?.synced_at ?? null,
         predictiveScoreAvailable: false,
-      }, total: Number(countRow?.count ?? 0), paging: { limit }, sort: [] }),
+      }, total: Number(countRow?.count ?? 0), paging: { limit, offset }, sort: [] }),
     pagination: { total: Number(countRow?.count ?? 0), limit, offset },
   });
 });
@@ -1062,7 +1060,7 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inp
     return inputError(c, { success: false, error: 'Invalid eventType' }, 400, ["eventType"]);
   }
   if (typeof body.accountId !== 'string' || !body.accountId) {
-    return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
+    return fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["accountId"]);
   }
   if (typeof body.title !== 'string' || !body.title.trim() || body.title.trim().length > 80
       || typeof body.introText !== 'string' || body.introText.trim().length > 800
@@ -1198,7 +1196,7 @@ function summarizeItems(raw: string | null): { text: string; count: number; quan
 }
 
 ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staff'), async (c) => {
-  const limit = clampedListInteger(c.req.query('limit') || undefined, 20, 1, 100);
+  const limit = parseOffsetPaging({ limit: c.req.query('limit') || undefined }, { defaultLimit: 20, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 } }).limit;
 
   // 出荷予定日は計算値なのでSQLでは並べ替えられない。直近のイベントを多めに
   // 取り出してから、算出した日付で並べ替えて limit で切る。

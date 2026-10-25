@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
@@ -42,10 +42,8 @@ function lineAccountId(c: Context<Env>): string | null {
 }
 
 function pagination(c: Context<Env>): { limit: number; offset: number } {
-  return {
-    limit: clampedListInteger(c.req.query('limit'), 20, 1, 100),
-    offset: clampedListInteger(c.req.query('offset'), 0, 0),
-  };
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 20, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 }, offsetPolicy: { fallback: 'integer', minimum: 0 } });
+  return { limit, offset };
 }
 
 async function visible(c: Context<Env>, accountId: string): Promise<boolean> {
@@ -81,7 +79,7 @@ ecOperations.get(
         lineAccountId: accountId, status: status as EcOrderState | null,
         query: c.req.query('query')?.trim().slice(0, 100) || '', ...page,
       });
-      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: page.limit }, sort: [{ field: 'orderedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: page, sort: [{ field: 'orderedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
       throw error;
     }
@@ -145,7 +143,7 @@ ecOperations.get(
         status: status as EcActionExecutionStatus | null,
         statuses: statusGroup ? groupStatuses[statusGroup] : null, ...page,
       });
-      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: page.limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: page, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
       throw error;
     }
@@ -218,7 +216,7 @@ ecOperations.get(
         status: rawStatus as IdentityState,
         ...page,
       });
-      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: page.limit }, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: page, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
       throw error;
     }

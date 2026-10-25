@@ -1,8 +1,7 @@
 import { type Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 
 export async function visibleAccountId(c: Context<Env>): Promise<string | Response> {
   /*
@@ -15,7 +14,7 @@ export async function visibleAccountId(c: Context<Env>): Promise<string | Respon
   if (!accountId) {
     return scope.allowedAccountIds.length === 1
       ? scope.allowedAccountIds[0]
-      : inputError(c, { success: false, error: 'accountId required' }, 400, ["account_id","accountId"]);
+      : fail(c, 400, 'ACCOUNT_ID_REQUIRED', {}, ["account_id","accountId"]);
   }
   if (!scope.allowedAccountIds.includes(accountId)) {
     return c.json({ success: false, error: '対象が見つかりません' }, 404);

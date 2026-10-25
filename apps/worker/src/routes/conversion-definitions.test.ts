@@ -436,7 +436,9 @@ describe('#1037 IDEA-19: 成果1件ずつの一覧(GET /definitions/:id/events)'
     dbMocks.listConversionDefinitionEvents.mockResolvedValueOnce(EVENT_ITEMS);
     const response = await app('staff').request('/api/conversions/definitions/point-a/events?limit=10');
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, data: { items: EVENT_ITEMS } });
+    expect(await response.json()).toEqual({
+      success: true, data: { items: EVENT_ITEMS, total: null, limit: 10, offset: 0, sort: [] },
+    });
     expect(dbMocks.listConversionDefinitionEvents).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({

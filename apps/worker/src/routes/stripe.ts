@@ -9,7 +9,7 @@ import {
 import type { Env } from '../worker-env.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { listLimit } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
@@ -36,13 +36,11 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
   try {
     const friendId = c.req.query('friendId') ?? undefined;
     const eventType = c.req.query('eventType') ?? undefined;
-    const limit = listLimit(c.req.query('limit'), 100);
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 100 }).limit;
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const items = await getStripeEvents(c.env.DB, { friendId, eventType, limit,
       lineAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned });
-    return c.json({
-      success: true,
-      data: items.map((e) => ({
+    const responseItems = items.map((e) => ({
         id: e.id,
         stripeEventId: e.stripe_event_id,
         eventType: e.event_type,
@@ -51,8 +49,8 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
         currency: e.currency,
         metadata: e.metadata ? JSON.parse(e.metadata) : null,
         processedAt: e.processed_at,
-      })),
-    });
+      }));
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
     throw err;
   }

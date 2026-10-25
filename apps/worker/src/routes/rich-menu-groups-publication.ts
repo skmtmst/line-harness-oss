@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import { inputError, readBoundedBytes } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import { getRichMenuGroupById, getRichMenuGroupWithPages, setRichMenuPageImage, pageBelongsToGroup, acquirePublishLease, releasePublishLease, renewPublishLease, markRichMenuGroupUnpublished, getLineAccountById, clearRichMenuAssignmentsForGroup, getRichMenuManualPublishRequestById, getRichMenuManualPublishShells, listRichMenuManualPublishRequests, getLatestRichMenuVersion, recordRichMenuDeviceConfirmation, findRichMenuDeviceConfirmation, ensureRichMenuPublishRun, markRichMenuPublishRun, getLatestRichMenuPublishRun, listRichMenuPublishRunPages, recordAuditEvent, maskAuditIp, auditDeviceFamily, jstNow } from '@line-crm/db';
 import { RICH_MENU_MAX_PAGES } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
@@ -16,7 +16,7 @@ export const post__api_rich_menu_groups_groupId_pages_pageId_image_1 = async (c:
   const { groupId, pageId } = c.req.param();
   const group = await getRichMenuGroupById(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'group not found' }, 404);
+    return fail(c, 404, 'GROUP_NOT_FOUND');
   }
   // #827 (N-158): ページ画像も公開中の定義の一部。LINE上の表示とずれるだけなので、
   // 本文を読む前・R2へ書く前に断る。
@@ -35,7 +35,7 @@ export const post__api_rich_menu_groups_groupId_pages_pageId_image_1 = async (c:
   }
 
   const exists = await pageBelongsToGroup(c.env.DB, groupId, pageId);
-  if (!exists) return c.json({ success: false, error: 'page not found in group' }, 404);
+  if (!exists) return fail(c, 404, 'PAGE_NOT_FOUND_IN_GROUP');
 
   // 巨大ファイルは全量読む前に断る（上限1MBは image-validator と同じ）。
   const declaredBytes = Number.parseInt(c.req.header('content-length') ?? '', 10);
@@ -112,7 +112,7 @@ export const get__api_rich_menu_groups_groupId_prepublish_check_4 = async (c: Co
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const fingerprint = manualPublishFingerprint(group);
     let selfCheck: { ok: boolean; message: string };
@@ -158,10 +158,10 @@ export const post__api_rich_menu_groups_groupId_validate_5 = async (c: Context<E
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const account = await getLineAccountById(c.env.DB, group.account_id);
-    if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+    if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
     const groupInput = await buildPublishGroupInput(c, group, account);
     const checks: Array<{ key: 'self' | 'line'; ok: boolean; message: string }> = [];
     try {
@@ -188,7 +188,7 @@ export const post__api_rich_menu_groups_groupId_device_confirm_6 = async (c: Con
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const fingerprint = manualPublishFingerprint(group);
     const version = await getLatestRichMenuVersion(c.env.DB, groupId);
@@ -209,7 +209,7 @@ export const get__api_rich_menu_groups_groupId_publish_progress_7 = async (c: Co
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const run = await getLatestRichMenuPublishRun(c.env.DB, groupId);
     if (!run) {
@@ -265,7 +265,7 @@ export const get__api_rich_menu_groups_groupId_publish_progress_7 = async (c: Co
 export const get__api_rich_menu_groups_groupId_publish_runs_8 = async (c: Context<Env, "/api/rich-menu-groups/:groupId/publish-runs">) => {
     const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const requests = await listRichMenuManualPublishRequests(c.env.DB, group.id, 50);
     const runs = [];
@@ -347,11 +347,11 @@ export const post__api_rich_menu_groups_groupId_publish_runs_requestId_retry_9 =
     const requestId = c.req.param('requestId');
     const group = await getRichMenuGroupById(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     const request = await getRichMenuManualPublishRequestById(c.env.DB, requestId);
     if (!request || request.group_id !== groupId || request.account_id !== group.account_id) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     if (request.status === 'running') {
       return c.json({ success: false, error: 'この公開はまだ実行中です', status: 'running' }, 409);
@@ -374,7 +374,7 @@ export const post__api_rich_menu_groups_groupId_reconcile_10 = async (c: Context
     const groupId = c.req.param('groupId');
     const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-      return c.json({ success: false, error: 'not found' }, 404);
+      return fail(c, 404, 'NOT_FOUND');
     }
     let body: { dryRun?: unknown } = {};
     try {
@@ -385,7 +385,7 @@ export const post__api_rich_menu_groups_groupId_reconcile_10 = async (c: Context
     const dryRun = body.dryRun !== false;
 
     const account = await getLineAccountById(c.env.DB, group.account_id);
-    if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+    if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
     const line = createLineClient(account.channel_access_token);
 
     // K-2: ずれの列挙は lib へ。dryRun（見るだけ）と修復で同じ目線にする。
@@ -463,11 +463,11 @@ export const post__api_rich_menu_groups_groupId_unpublish_11 = async (c: Context
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
   if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
+    return fail(c, 404, 'NOT_FOUND');
   }
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
-  if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+  if (!account) return fail(c, 500, 'LINE_ACCOUNT_NOT_FOUND');
 
   // 停止も group の状態を変える経路なので、公開と同じ lease 契約で行う。
   // lease なしで畳むと、同じ group を公開中の実行の owner と期限を消してしまう。

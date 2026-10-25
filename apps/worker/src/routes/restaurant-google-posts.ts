@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
@@ -464,8 +464,7 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const filter = (c.req.query('filter') ?? 'all') as PostFilter;
   const kind = c.req.query('kind') ?? 'all';
-  const page = Math.max(1, listQueryNumber(c.req.query('page'), 1, { format: 'integer-prefix' }) || 1);
-  const perPage = Math.min(LIST_LIMIT_MAX, Math.max(1, listQueryNumber(c.req.query('per_page'), 20, { format: 'integer-prefix' }) || 20));
+  const { page, limit: perPage } = parseOffsetPaging({ limit: c.req.query('per_page'), page: c.req.query('page') }, { defaultLimit: 20, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: LIST_LIMIT_MAX }, pagePolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1 } });
 
   const rows = (await dbFor(c.env, store.id).prepare('SELECT * FROM rt_google_posts WHERE store_id = ? ORDER BY created_at DESC LIMIT 1000').bind(store.id).all<PostRow>()).results;
 
@@ -495,7 +494,7 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
     perPage,
     counts,
     writeEnabled: writeEnabled(c.env),
-    permissions: { canPublish: staff?.role === 'owner' || staff?.role === 'admin' }, items: responseItems, paging: { limit: perPage }, sort: [{ field: 'createdAt', direction: 'desc' }] }));
+    permissions: { canPublish: staff?.role === 'owner' || staff?.role === 'admin' }, items: responseItems, paging: { limit: perPage, offset: (page - 1) * perPage }, sort: [{ field: 'createdAt', direction: 'desc' }] }));
 });
 
 // ---------- 取り込み（sync） ----------

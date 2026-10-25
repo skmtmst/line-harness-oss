@@ -1,3 +1,4 @@
+import { buildOffsetListResponse } from '../lib/list-paging.js';
 import { parseReservationFilter } from './restaurant-reservation-filter.js';
 import { restaurantRotation } from '../services/restaurant-rotation.js';
 import { validRestaurantFloor, saveRestaurantFloor } from '../services/restaurant-floor.js';
@@ -275,7 +276,8 @@ export const get__api_restaurant_test_board_18 = async (c: Context<Env, "/api/re
  FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id LEFT JOIN rt_tables t ON t.id=r.table_id LEFT JOIN rt_menu_items m ON m.id=r.course_id
  WHERE ${filter.where} ORDER BY r.starts_at,r.id LIMIT ? OFFSET ?`).bind(...filter.params,filter.limit,filter.offset).all<Record<string,unknown>>();
  const total=await db.prepare(`SELECT COUNT(*) total FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE ${filter.where}`).bind(...filter.params).first<{total:number}>();
- return c.json({success:true,data:{entries:rows.results.map(seatBoardEntry),total:total!.total,limit:filter.limit,offset:filter.offset}});
+ const items = rows.results.map(seatBoardEntry);
+ return c.json({success:true,data:buildOffsetListResponse({ entries:items,items,total:total!.total,limit:filter.limit,offset:filter.offset,paging:filter,sort:[{field:'starts_at',direction:'asc'},{field:'id',direction:'asc'}] })});
 };
 
 export const post__api_restaurant_test_floors_19 = async (c: Context<Env, "/api/restaurant-test/floors">) => {

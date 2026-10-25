@@ -1,9 +1,9 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { hasMediaSignature } from './media-signature.js';
 import { inputError } from '../lib/input-errors.js';
 import { mediaTabCounts } from '../services/tab-counts.js';
-
+import { fail } from '../lib/fail.js';
 import { getMedia, countMedia, getMediaById, getFolderById, getMediaStorageQuota, getMediaVersionByNo, createMediaUploadSession, getMediaUploadSession, failMediaUploadSession, verifyMediaUploadSession, completeNewMediaUpload, createMediaVersionFromUpload, MediaVersionConflictError, MediaVersionIncompatibleError, type MediaMetadata, type MediaKind } from '@line-crm/db';
 
 
@@ -22,7 +22,7 @@ import type { Context } from 'hono';
 export const get__api_media_quota_1 = async (c: Context<Env, "/api/media/quota">) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -453,7 +453,7 @@ export const post__api_media_id_replacement_preview_5 = async (c: Context<Env, "
 
 export const get__api_media_counts_6 = async (c: Context<Env, "/api/media/counts">) => {
   const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -462,7 +462,7 @@ export const get__api_media_counts_6 = async (c: Context<Env, "/api/media/counts
 
 export const get__api_media_7 = async (c: Context<Env, "/api/media">) => {
   const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -470,8 +470,7 @@ export const get__api_media_7 = async (c: Context<Env, "/api/media">) => {
   const kind = kindRaw && ['image', 'video', 'audio', 'file'].includes(kindRaw)
     ? (kindRaw as MediaKind)
     : undefined;
-  const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 20, { format: 'integer-prefix' }) || 20));
-  const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0, { format: 'integer-prefix' }) || 0);
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: 100 }, offsetPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 0 } });
   const sortRaw = c.req.query('sort');
   const sort = sortRaw && ['newest', 'oldest', 'name', 'size', 'usage'].includes(sortRaw)
     ? sortRaw as 'newest' | 'oldest' | 'name' | 'size' | 'usage'
@@ -496,13 +495,13 @@ export const get__api_media_7 = async (c: Context<Env, "/api/media">) => {
   const names = await uploaderNameMap(c.env.DB, items);
   return c.json({
     success: true,
-    data: buildOffsetListResponse({ items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset, paging: { limit }, sort: sort === 'oldest' ? [{field:'createdAt',direction:'asc'}] : sort === 'name' ? [{field:'filename',direction:'asc'}] : sort === 'size' ? [{field:'sizeBytes',direction:'desc'}] : sort === 'usage' ? [{field:'usageCount',direction:'desc'},{field:'createdAt',direction:'desc'}] : [{field:'createdAt',direction:'desc'}] }),
+    data: buildOffsetListResponse({ items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset, paging: { limit, offset }, sort: sort === 'oldest' ? [{field:'createdAt',direction:'asc'}] : sort === 'name' ? [{field:'filename',direction:'asc'}] : sort === 'size' ? [{field:'sizeBytes',direction:'desc'}] : sort === 'usage' ? [{field:'usageCount',direction:'desc'},{field:'createdAt',direction:'desc'}] : [{field:'createdAt',direction:'desc'}] }),
   });
 };
 
 export const get__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) => {
   const accountId = c.req.query('accountId')?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -537,7 +536,7 @@ export const get__api_media_id_versions_versionNo_download_11 = async (c: Contex
   if (!id || !Number.isInteger(versionNo) || versionNo < 1) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
-  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!accountId) return fail(c, 400, 'ACCOUNT_ID_REQUIRED');
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
     return c.json({ success: false, error: 'Not found' }, 404);

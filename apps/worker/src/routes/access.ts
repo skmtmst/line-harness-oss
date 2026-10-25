@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listIntegerInRange } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
   ACCESS_ROLE_BUNDLES,
@@ -83,9 +83,9 @@ access.get(
   async (c) => {
     const status = enumQuery(c.req.query('status'), USER_STATUSES);
     const roleBundle = enumQuery(c.req.query('roleBundle'), ROLE_BUNDLES);
-    const limit = listIntegerInRange(c.req.query('limit'), 50, 1, 200);
-    const offset = listIntegerInRange(c.req.query('offset'), 0, 0, 100_000);
-    if (status === null || roleBundle === null || limit === null || offset === null) {
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 50, limitPolicy: {}, offsetPolicy: {} });
+    const invalidPaging = !Number.isInteger(limit) || limit < 1 || limit > 200 || !Number.isInteger(offset) || offset < 0 || offset > 100_000;
+    if (status === null || roleBundle === null || invalidPaging) {
       return c.json({ success: false, error: '絞り込み条件を確認してください' }, 400);
     }
     const accessScope = await visibleScope(c);
@@ -116,7 +116,7 @@ access.get(
             email: emailLevel === 'full' ? item.email : emailLevel === 'masked' ? maskEmail(item.email) : null,
           })),
           summary: result.summary,
-          pagination: { total: result.total, limit: result.limit, offset: result.offset }, total: result.total, paging: { limit: result.limit }, sort: [{ field: 'last_login_at', direction: 'desc' }, { field: 'created_at', direction: 'asc' }] }),
+          pagination: { total: result.total, limit: result.limit, offset: result.offset }, total: result.total, paging: { limit: result.limit, offset: result.offset }, sort: [{ field: 'last_login_at', direction: 'desc' }, { field: 'created_at', direction: 'asc' }] }),
       });
     } catch (error) {
       throw error;
@@ -167,9 +167,9 @@ access.get(
     const sort = enumQuery(c.req.query('sort'), AUDIT_SORTS);
     const from = dateQuery(c.req.query('from'));
     const to = dateQuery(c.req.query('to'));
-    const limit = listIntegerInRange(c.req.query('limit'), 20, 1, 200);
-    const offset = listIntegerInRange(c.req.query('offset'), 0, 0, 100_000);
-    if (category === null || result === null || attention === null || group === null || sort === null || from === null || to === null || limit === null || offset === null) {
+    const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 20, limitPolicy: {}, offsetPolicy: {} });
+    const invalidPaging = !Number.isInteger(limit) || limit < 1 || limit > 200 || !Number.isInteger(offset) || offset < 0 || offset > 100_000;
+    if (category === null || result === null || attention === null || group === null || sort === null || from === null || to === null || invalidPaging) {
       return c.json({ success: false, error: '絞り込み条件を確認してください' }, 400);
     }
     if (from && to && Date.parse(from) > Date.parse(to)) {
@@ -200,7 +200,7 @@ access.get(
         success: true,
         data: buildOffsetListResponse({ items: audit.items,
           summary: audit.summary,
-          pagination: { total: audit.total, limit: audit.limit, offset: audit.offset }, total: audit.total, paging: { limit: audit.limit }, sort: [{field:'created_at',direction:sort ?? 'desc'},{field:'id',direction:sort ?? 'desc'}] }),
+          pagination: { total: audit.total, limit: audit.limit, offset: audit.offset }, total: audit.total, paging: { limit: audit.limit, offset }, sort: [{field:'created_at',direction:sort ?? 'desc'},{field:'id',direction:sort ?? 'desc'}] }),
       });
     } catch (error) {
       throw error;

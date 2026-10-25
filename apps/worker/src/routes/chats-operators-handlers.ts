@@ -3,7 +3,7 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getOperators, getOperatorById, createOperator, updateOperator, deleteOperator } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
-import { listLimit } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 
 import { listOutboundSendFailures } from '../services/outbound-idempotency.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -293,11 +293,9 @@ export const get__api_chats_outbound_failures_7 = async (c: Context<Env, "/api/c
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: '送信失敗履歴が見つかりません' }, 404);
     }
-    const failures = await listOutboundSendFailures(c.env.DB, {
-      lineAccountId,
-      limit: listLimit(c.req.query('limit'), 50, 100),
-    });
-    return c.json({ success: true, data: failures });
+    const paging = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 50, maxLimit: 100 });
+    const failures = await listOutboundSendFailures(c.env.DB, { lineAccountId, limit: paging.limit });
+    return c.json(buildOffsetListResponse({ success: true, data: failures, items: failures, total: null, paging, sort: [] }));
   } catch (err) {
     throw err;
   }

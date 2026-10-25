@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { parseReservationFilter } from './restaurant-reservation-filter.js';
 import { deriveStoreLineStatuses, isValidTimezone, uniqueStoreConflict } from './restaurant-store-status.js';
@@ -302,7 +302,7 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
 
   return c.json({
     success: true,
-    data: {
+    data: buildOffsetListResponse({
       environment: 'staging_test',
       integrationPolicy: 'inbound_only',
       organization: publicOrganization(organization),
@@ -320,7 +320,8 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
       reviews: reviews.results,
       posts: posts.results,
       lineFlows: lineFlows.results,
-    },
+      items: reservations.results, total: reservationTotal?.total ?? 0, paging: reservationFilter, sort: [{ field: 'starts_at', direction: 'asc' }],
+    }),
   });
 };
 
@@ -632,8 +633,7 @@ export const get__api_restaurant_test_inbound_emails_20 = async (c: Context<Env,
   const storeId = c.req.query('storeId') || organization.scopedStoreId;
   if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   if ((c.req.query('status') || 'quarantined') !== 'quarantined') return c.json({ success: false, error: 'status は quarantined を指定してください' }, 400);
-  const limit = Math.min(200, Math.max(1, listQueryNumber(c.req.query('limit') || undefined, 100, { format: 'integer-prefix' }) || 100));
-  const offset = Math.max(0, listQueryNumber(c.req.query('offset') || undefined, 0, { format: 'integer-prefix' }) || 0);
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit') || undefined, offset: c.req.query('offset') || undefined }, { defaultLimit: 100, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: 200 }, offsetPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 0 } });
   const rows = await dbFor(c.env, storeId).prepare(`SELECT e.id, e.store_id AS storeId, e.received_at AS receivedAt,
     e.status, e.quarantine_reason AS reason, m.code AS mediaCode, m.name AS mediaName
     FROM rt_inbound_emails e LEFT JOIN rt_media m ON m.id = e.media_id
@@ -641,5 +641,5 @@ export const get__api_restaurant_test_inbound_emails_20 = async (c: Context<Env,
     .bind(storeId, limit, offset).all();
   const count = await dbFor(c.env, storeId).prepare("SELECT COUNT(*) AS total FROM rt_inbound_emails WHERE store_id = ? AND status = 'quarantined'").bind(storeId).first<{ total: number }>();
   const responseItems = rows.results;
-  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total: count!.total, items: responseItems, paging: { limit }, sort: [{ field: 'received_at', direction: 'desc' }, { field: 'id', direction: 'asc' }] }));
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total: count!.total, items: responseItems, paging: { limit, offset }, sort: [{ field: 'received_at', direction: 'desc' }, { field: 'id', direction: 'asc' }] }));
 };

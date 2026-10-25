@@ -218,7 +218,7 @@ describe('GET /api/public/nen/adopted-photos', () => {
       `/api/public/nen/adopted-photos?officialAccountBasicId=${encodeURIComponent(basicId)}`,
     );
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ success: false, error: 'LINE account not found' });
+    expect(await response.json()).toEqual({ success: false, code: 'LINE_ACCOUNT_NOT_FOUND', error: 'LINE公式アカウントが見つかりません。一覧から開き直してください。' });
   });
 
   it.each([

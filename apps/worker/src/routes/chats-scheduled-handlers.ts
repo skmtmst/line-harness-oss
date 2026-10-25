@@ -3,7 +3,7 @@ import { resolveLineSender } from '../services/line-senders.js';
 import { GapError } from '../services/gap-common.js';
 import { validateScheduledAt } from './chat-schedule-validation.js';
 import { inputError } from '../lib/input-errors.js';
-
+import { fail } from '../lib/fail.js';
 import type { Message } from '@line-crm/line-sdk';
 import { getChatById, getFriendById, updateChat, createScheduledChatSend, getScheduledChatSend, listPendingScheduledChatSends, cancelScheduledChatSend, updateScheduledChatSend, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -28,7 +28,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
       return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
     }
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
-    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!chat) return fail(c, 404, 'CHAT_NOT_FOUND');
 
     let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; texts?: unknown; revision?: number; quotedMessageId?: string; correctionOfMessageId?: string; senderId?: string };
     try {
@@ -63,7 +63,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
       'chats.manual-send',
     );
-    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!friend) return fail(c, 404, 'FRIEND_NOT_FOUND');
     if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
 
     if (!await canAccessAllLineAccounts(
@@ -71,7 +71,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
       c.get('staff'),
       [friend.line_account_id ?? null],
     )) {
-      return c.json({ success: false, error: 'Chat not found' }, 404);
+      return fail(c, 404, 'CHAT_NOT_FOUND');
     }
 
     // 引用元の検証は外部送信より前に行う(単体送信口と同じ境界)。
@@ -390,7 +390,7 @@ export const post__api_chats_id_schedule_2 = async (c: Context<Env, "/api/chats/
       return inputError(c, { success: false, error: '有効なIdempotency-Keyが必要です' }, 400, []);
     }
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
-    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!chat) return fail(c, 404, 'CHAT_NOT_FOUND');
 
     let body: { messageType?: unknown; content?: unknown; scheduledAt?: unknown; quotedMessageId?: unknown };
     try {
@@ -422,14 +422,14 @@ export const post__api_chats_id_schedule_2 = async (c: Context<Env, "/api/chats/
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
       'chats.schedule-send',
     );
-    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    if (!friend) return fail(c, 404, 'FRIEND_NOT_FOUND');
     if (friend.is_following !== 1) return c.json({ success: false, error: 'ブロックまたは友だち解除された相手には送信できません', code: 'FRIEND_NOT_FOLLOWING' }, 409);
     if (!await canAccessAllLineAccounts(
       c.env.DB,
       c.get('staff'),
       [friend.line_account_id ?? null],
     )) {
-      return c.json({ success: false, error: 'Chat not found' }, 404);
+      return fail(c, 404, 'CHAT_NOT_FOUND');
     }
 
     // 引用元の検証は単体送信口と同じ境界。無効な引用は予約を作らない。
@@ -494,7 +494,7 @@ export const get__api_chats_id_scheduled_3 = async (c: Context<Env, "/api/chats/
     const chatId = c.req.param('id');
     const chat = await getChatById(c.env.DB, chatId)
       ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
-    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!chat) return fail(c, 404, 'CHAT_NOT_FOUND');
     const rows = await listPendingScheduledChatSends(c.env.DB, chat.friend_id);
     return c.json({
       success: true,
@@ -511,7 +511,7 @@ export const patch__api_chats_id_scheduled_scheduleId_4 = async (c: Context<Env,
     const scheduleId = c.req.param('scheduleId');
     const chat = await getChatById(c.env.DB, chatId)
       ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
-    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!chat) return fail(c, 404, 'CHAT_NOT_FOUND');
 
     const existing = await getScheduledChatSend(c.env.DB, scheduleId);
     if (!existing || existing.friend_id !== chat.friend_id) return c.json({ success: false, error: '予約が見つかりません' }, 404);
@@ -595,7 +595,7 @@ export const delete__api_chats_id_scheduled_scheduleId_5 = async (c: Context<Env
     const scheduleId = c.req.param('scheduleId');
     const chat = await getChatById(c.env.DB, chatId)
       ?? await resolveOrCreateChat(c.env.DB, chatId).catch(() => null);
-    if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
+    if (!chat) return fail(c, 404, 'CHAT_NOT_FOUND');
 
     if (c.get('staff').readOnly || c.get('impersonation')?.mode === 'read') return c.json({success:false,error:'forbidden'},403);
     let reason = c.get('impersonation') ? c.req.header('X-Impersonation-Reason')?.trim() : undefined;

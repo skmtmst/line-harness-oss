@@ -1,14 +1,14 @@
 import { serializeConversionPoint } from './conversion-point-serialization.js';
 import { inputError } from '../lib/input-errors.js';
 import { conversionApprovalCounts } from '../services/tab-counts.js';
-
+import { fail } from '../lib/fail.js';
 import { getConversionPoints, getConversionPointById, canRecordConversion, createConversionPoint, hasConversionPointActivity, updateConversionPoint, stopConversionPoint, trackConversion, getConversionEvents, getConversionApprovalQueue, addConversionDefinitionUsage, getConversionDefinitionReport, listConversionDefinitionsForExport, appendConversionReversal, getReversedEventIds, listConversionReversals, CONVERSION_DEFINITION_USAGE_KINDS } from '@line-crm/db';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { parseOffsetPaging } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import type { ConversionDefinitionUsageKind } from '@line-crm/db';
 import { conversionContractError, conversionRange, definitionFilters, conversionDefinitionScope, csvCell, jstDate, adminAccountScope, ConversionPointBody, readMeasureOptions, positiveVersion, CONVERSION_MEASURE_PATCH_KEYS, parseDate, APPROVAL_STATUSES } from './conversions-definition.js';
 import type { Context } from 'hono';
@@ -388,9 +388,7 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
     // 「取り消し中」として返す。
     const reversedIds = await getReversedEventIds(c.env.DB, events.map((e) => e.id));
 
-    return c.json({
-      success: true,
-      data: events.map((e) => ({
+    const responseItems = events.map((e) => ({
         id: e.id,
         conversionPointId: e.conversion_point_id,
         friendId: e.friend_id,
@@ -399,8 +397,8 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
         metadata: e.metadata,
         createdAt: e.created_at,
         reversed: reversedIds.has(e.id),
-      })),
-    });
+      }));
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit: paging.limit, offset: paging.offset }, sort: [] }));
   } catch (err) {
     throw err;
   }
@@ -419,12 +417,12 @@ export const get__api_conversions_events_id_reversals_9 = async (c: Context<Env,
         )
         .bind(eventId)
         .first<{ id: string; line_account_id: string | null }>();
-      if (!event) return c.json({ success: false, error: 'Event not found' }, 404);
+      if (!event) return fail(c, 404, 'EVENT_NOT_FOUND');
       if (
         event.line_account_id !== null
         && !scope.allowedAccountIds.includes(event.line_account_id)
       ) {
-        return c.json({ success: false, error: 'Event not found' }, 404);
+        return fail(c, 404, 'EVENT_NOT_FOUND');
       }
       const rows = await listConversionReversals(c.env.DB, eventId);
       return c.json({
@@ -455,12 +453,12 @@ export const post__api_conversions_events_id_reversals_10 = async (c: Context<En
         )
         .bind(eventId)
         .first<{ id: string; line_account_id: string | null }>();
-      if (!event) return c.json({ success: false, error: 'Event not found' }, 404);
+      if (!event) return fail(c, 404, 'EVENT_NOT_FOUND');
       if (
         event.line_account_id !== null
         && !scope.allowedAccountIds.includes(event.line_account_id)
       ) {
-        return c.json({ success: false, error: 'Event not found' }, 404);
+        return fail(c, 404, 'EVENT_NOT_FOUND');
       }
 
       const body = await c.req.json<{ kind?: unknown; reason?: unknown }>();
@@ -599,7 +597,8 @@ export const get__api_conversions_approvals_13 = async (c: Context<Env, "/api/co
       offset,
     });
 
-    return c.json({ success: true, data: rows });
+    const responseItems = rows;
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset }, sort: [] }));
   } catch (err) {
     throw err;
   }

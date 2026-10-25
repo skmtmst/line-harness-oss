@@ -112,7 +112,14 @@ describe('profile refresh operational debug authorization', () => {
     expect(response.status).toBe(200);
     expect(records[0].sql).toContain('COALESCE(ml.line_account_id, f.line_account_id) IN (SELECT value FROM json_each(?))');
     expect(records[0].binds).toEqual(['["account-own"]', 20]);
-    expect(await response.text()).toContain('own preview');
+    const body = await response.json<{ data: unknown[]; items: unknown[]; total: null; limit: number; offset: number }>();
+    expect(body.data).toEqual([{
+      id: 'message-own', direction: 'incoming', messageType: 'text', source: null,
+      accountId: 'account-own', accountName: 'Own Account', friendName: 'Own Friend',
+      friendId: 'friend-own', preview: 'own preview', createdAt: '2026-09-07',
+    }]);
+    expect(body.items).toEqual(body.data);
+    expect(body).toMatchObject({ total: null, limit: 20, offset: 0 });
   });
 
   test('automation condition and action previews are limited before reading rows', async () => {
