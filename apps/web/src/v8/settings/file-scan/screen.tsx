@@ -25,7 +25,6 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import styles from './screen.module.css'
 import { FILE_SCAN_PAGE_SIZE,useFileScan } from './use-file-scan'
 
-
 /*
  * ★V8 ファイルの検査（Pencil 、状態は ）。
  *
@@ -113,7 +112,6 @@ export default function FileScanScreen() {
     releaseReasonRef.current?.focus()
     releaseReasonRef.current?.scrollIntoView({ block: 'center' })
   }, [releaseReasonError])
-
 
   const openRelease = (item: FileScanItem) => { setReleaseTarget(item); setReleaseReason(''); setReleaseError('') }
   const openDelete = (item: FileScanItem) => { setDeleteTarget(item); setDeleteError('') }
@@ -232,7 +230,7 @@ export default function FileScanScreen() {
         saveActions={canEdit && configOpen && (configDirty || configBusy) ? <><Button disabled={configBusy} onClick={() => { setProvider(config?.externalProvider ?? ''); setEndpoint(config?.externalEndpointUrl ?? ''); setSecretRef(config?.externalSecretRef ?? ''); setActionError(''); configFields.reset() }}>キャンセル</Button><Button variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">外の検査の設定を保存する</Button></> : undefined}>
         {SAFETY_NOTICE}
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
-      {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
+      {actionDone ? <Notice tone="success" role="status">{actionDone}</Notice> : null}
 
       <ListToolbar
         search={{ value: query, onChange: changeQuery, label: 'ファイル名で探す', placeholder: 'ファイル名で探す' }}

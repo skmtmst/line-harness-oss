@@ -156,16 +156,6 @@
   margin-left: auto;
 }
 
-.noticeGood {
-  margin: 0;
-  padding: var(--tpl-rest3-ec-band-pad);
-  border-radius: var(--tpl-rest3-ec-band-radius);
-  font-size: var(--tpl-rest3-ec-body);
-  line-height: var(--tpl-rest3-ec-body-lh);
-}
-
-.noticeGood { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-
 .readValue {
   color: var(--color-ink-secondary);
   font-size: var(--tpl-rest3-ec-body);

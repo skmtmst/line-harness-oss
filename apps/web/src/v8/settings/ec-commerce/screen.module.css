@@ -16,15 +16,6 @@
   font-size: var(--tpl-sb-row-sub);
 }
 
-.noticeGood {
-  margin: 0;
-  padding: var(--tpl-sb-band-pad);
-  border-radius: var(--tpl-sb-band-radius);
-  font-size: var(--tpl-sb-band-text);
-}
-
-.noticeGood { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-
 .toolbar {
   display: flex;
   flex-wrap: wrap;
