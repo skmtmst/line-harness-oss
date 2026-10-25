@@ -64,14 +64,14 @@ describe('前提: 実LIFFが「日時を選んでください」＋週／カレ�
     // 読み込み中・失敗は共通部品（LoadingView・LoadErrorView）で出す。
     expect(LIFF_SOURCE).toContain('LoadingView')
     expect(LIFF_SOURCE).toContain('LoadErrorView')
-    expect(LIFF_USER_MESSAGE_SOURCE).toContain('読み込み中...')
+    expect(LIFF_USER_MESSAGE_SOURCE).toContain('読み込み中…')
     // 失敗は題「読み込めませんでした」＋本文 LOAD_FAILED_MESSAGE。
     expect(LIFF_USER_MESSAGE_SOURCE).toContain(
       '電波のよいところで、もう一度お試しください。',
     )
     expect(LIFF_USER_MESSAGE_SOURCE).toContain('もう一度読み込む')
     // 旧い見せ方（枠ごとの文言・赤いそのまま表示・題と本文の重ね）が復活していない。
-    expect(LIFF_SOURCE).not.toContain('空き枠を取得中...')
+    expect(LIFF_SOURCE).not.toContain('空き枠を取得中…')
     expect(LIFF_SOURCE).not.toContain('text-red-600')
     // ★V8: 「週で見る」は5日の並び（空き・満・休み）、時刻は選んだ日の3列。
     expect(LIFF_SOURCE).toContain('週で見る')

@@ -208,7 +208,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         </tbody></DataTable></Card>
       ) : null}
       {list && pageCount > 1 ? (
-        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${list.total} 件 ・ 新着と未返信は別に管理`} />
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${list.total} 件・新着と未返信は別に管理`} />
       ) : null}
     </>
   )

@@ -609,7 +609,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                               {chat.lastMessageDirection === 'outgoing' && (
                                 <span className="text-ink-faint mr-1">返信：</span>
                               )}
-                              {preview || <span className="text-ink-faint italic">(まだメッセージなし)</span>}
+                              {preview || <span className="text-ink-faint italic">（まだメッセージなし）</span>}
                             </p>
                           </div>
                           <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
@@ -663,7 +663,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                * 読み上げには「読み込んでいます」を残す。
                */
               <div role="status" aria-busy="true" data-inbox-list-state="loading">
-                <span className="sr-only">会話を読み込んでいます...</span>
+                <span className="sr-only">会話を読み込んでいます…</span>
                 <DelayedSkeleton
                   loading
                   skeleton={

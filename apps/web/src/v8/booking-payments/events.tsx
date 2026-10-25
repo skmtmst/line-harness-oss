@@ -31,7 +31,7 @@ const RESULT_FILTER = [
   { value: 'failed', label: '結果：失敗' },
 ]
 const PERIOD_FILTER = [
-  { value: '7d', label: '期間：この７日' },
+  { value: '7d', label: '期間：この7日' },
   { value: '30d', label: '期間：過去30日' },
   { value: '90d', label: '期間：過去90日' },
 ]

@@ -58,7 +58,7 @@ it.each(['消す', '空にしてEnter'])('予約中時刻の%sは予約を変更
   render(<ScheduleSendDialog open onClose={() => {}} content="案内" hasImage={false} value="" onChange={() => {}}
     onConfirm={() => {}} busy={false} rowsFailed={false} onRetryRows={() => {}} onReschedule={onReschedule} onCancelRow={onCancelRow}
     rows={[{ id: 'a', label: '10/1 10:00', content: '案内', editable: true, defaultValue: INITIAL }]} />)
-  fireEvent.click(screen.getByRole('button', { name: '予約時刻を変更(日本時間)' }))
+  fireEvent.click(screen.getByRole('button', { name: '予約時刻を変更（日本時間）' }))
   const time = screen.getByRole('combobox', { name: '時刻' })
   if (method === '消す') {
     fireEvent.click(screen.getByRole('button', { name: '時刻の一覧を開く' }))
@@ -67,7 +67,7 @@ it.each(['消す', '空にしてEnter'])('予約中時刻の%sは予約を変更
     fireEvent.change(time, { target: { value: '' } })
     fireEvent.keyDown(time, { key: 'Enter' })
   }
-  expect(screen.getByRole('button', { name: '予約時刻を変更(日本時間)' }).textContent).toContain('日時を選ぶ')
+  expect(screen.getByRole('button', { name: '予約時刻を変更（日本時間）' }).textContent).toContain('日時を選ぶ')
   expect(onReschedule).not.toHaveBeenCalled()
   expect(onCancelRow).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: '予約を取り消す' }))

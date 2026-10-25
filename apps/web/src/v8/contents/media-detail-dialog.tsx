@@ -687,7 +687,7 @@ export default function MediaDetailDialog({
                       {version.versionNo === 1 ? '（元ファイル）' : ''}
                     </p>
                     <p className="text-ink-faint mt-1">
-                      {formatMediaSize(version.sizeBytes)} ・ {version.mimeType} ・ {formatDate(version.createdAt)}
+                      {formatMediaSize(version.sizeBytes)}・{version.mimeType}・{formatDate(version.createdAt)}
                     </p>
                     {version.changeReason ? (
                       <p className="text-ink-faint mt-1">変更理由：{version.changeReason}</p>

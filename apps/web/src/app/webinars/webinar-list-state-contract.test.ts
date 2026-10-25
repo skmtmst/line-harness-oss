@@ -85,7 +85,7 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
     expect(PAGE).toContain('listBody = <ListSkeleton />')
     expect(PAGE).toContain('kind={loadFailure.kind}')
     /* 画面ごとに直書きすると、同じ状態が画面ごとに違う顔になる。 */
-    expect(PAGE).not.toContain('読み込み中...')
+    expect(PAGE).not.toContain('読み込み中…')
     expect(PAGE).toContain('kind={loadFailure.kind}')
   })
 

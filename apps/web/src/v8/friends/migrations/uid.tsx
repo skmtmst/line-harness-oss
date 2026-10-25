@@ -319,7 +319,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                     <Tr key={run.id} className={`${styles.row} ${styles.rowRun}`} data-row-id={run.id}>
                       <Td className={styles.td}>{slashDateTime(run.createdAt)}</Td>
                       <Td className={styles.td}>
-                        <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose} ・ ${formatNumber(run.counts.total)}件`}  onClick={() => m.selectRun(run.id)}>
+                        <button type="button" className={styles.runButton} aria-current={active?.id === run.id ? 'true' : undefined} title={`${run.purpose}・${formatNumber(run.counts.total)}件`}  onClick={() => m.selectRun(run.id)}>
                           {`${accountName(run.fromAccountId)} → ${accountName(run.toAccountId)}`}
                         </button>
                       </Td>

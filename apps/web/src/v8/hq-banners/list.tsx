@@ -411,8 +411,8 @@ function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFav
 }) {
   const running = project.runningCount > 0
   const meta = running && project.imageCount === 0
-    ? '— ・ いま作成中'
-    : `${project.imageCount} 枚 ・ ${monthDay(project.updatedAt)} 更新`
+    ? '—・いま作成中'
+    : `${project.imageCount} 枚・${monthDay(project.updatedAt)} 更新`
   return (
     <Card frame="flat" padding="rows" layout="media" overflow="hidden" aria-label={project.name}>
       <button type="button" className={styles.mosaic} onClick={onOpen} aria-label={`${project.name} を開く`}>

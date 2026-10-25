@@ -186,7 +186,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           <Button
             variant="primary"
             onClick={() => void handleSaveMemo()}
-            disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')} busy={memoSaving} busyLabel="保存中...">メモを保存する
+            disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')} busy={memoSaving} busyLabel="保存中…">メモを保存する
           </Button>
         </div>
       </InboxFloatingPanel>
@@ -247,7 +247,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           </span>
           <span className="text-ink-faint">
             {pendingImageMeta ? formatByteSize(pendingImageMeta.size) : ''}
-            {pendingImageMeta ? ' ・ 添付済み' : '添付済み'}
+            {pendingImageMeta ? '・添付済み' : '添付済み'}
           </span>
         </span>
         <button
@@ -307,7 +307,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
         {/* INBOX-29: 残りを送る前に見せる。超えたら送らせない。 */}
         <span className={messageOverLimit ? 'text-danger font-semibold' : 'text-ink-faint'}>
           {formatNumber(messageLength)} / {formatNumber(MESSAGE_MAX_LENGTH)}
-          {messageOverLimit ? ' ・ 文字数が上限を超えています' : ''}
+          {messageOverLimit ? '・文字数が上限を超えています' : ''}
         </span>
         <span className="text-ink-faint shrink-0">
           {sendMode === 'enter' ? 'Enter で送る・Shift + Enter で改行' : 'Shift+Enter で送る・Enter で改行'}

@@ -106,7 +106,7 @@ export default function BookingDetailV8({
         <div>
           <dt className="text-ink-faint text-xs">日時</dt>
           <dd className="text-ink mt-0.5">
-            {safeDateTime(b.starts_at)}〜{safeTime(b.ends_at)} ・ {words.staff} {b.staff_name}
+            {safeDateTime(b.starts_at)}〜{safeTime(b.ends_at)}・{words.staff} {b.staff_name}
           </dd>
         </div>
         <div>

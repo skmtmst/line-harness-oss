@@ -329,18 +329,18 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     apiMocks.get.mockImplementation((id: string) => (id === 'webinar-a' ? loadA.promise : loadB.promise))
 
     const view = await mount(<EditWebinarPage />)
-    expect(view.container.textContent).toContain('読み込み中...')
+    expect(view.container.textContent).toContain('読み込み中…')
 
     navigationMocks.query = 'id=webinar-b&pane=review'
     const frame = await view.rerender(<EditWebinarPage />)
     /* 切替の一コマ目から、前のウェビナーの中身を出さない。 */
-    expect(frame.text).toContain('読み込み中...')
+    expect(frame.text).toContain('読み込み中…')
 
     /* 前のウェビナーの応答が先に届く。 */
     loadA.resolve({ data: { ...webinar, id: 'webinar-a', title: '前のウェビナーA' } })
     await flush()
     expect(view.container.textContent).not.toContain('前のウェビナーA')
-    expect(view.container.textContent).toContain('読み込み中...')
+    expect(view.container.textContent).toContain('読み込み中…')
 
     loadB.resolve({ data: { ...webinar, id: 'webinar-b', title: '後のウェビナーB' } })
     await flush()
@@ -362,7 +362,7 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     navigationMocks.query = 'id=webinar-b&pane=review'
     const frame = await view.rerender(<EditWebinarPage />)
     /* 切替の一コマ目に前の失敗文を持ち越さない。 */
-    expect(frame.text).toContain('読み込み中...')
+    expect(frame.text).toContain('読み込み中…')
     expect(frame.text).not.toContain('このウェビナーは見つかりません')
     expect(view.container.textContent).toContain('後のウェビナーB')
     expect(view.container.textContent).not.toContain('このウェビナーは見つかりません')

@@ -324,7 +324,7 @@ export default function Confirm({
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || missingMeetingMode || missingPaymentChoice || (policy !== null && !accepted)}>
-          {submitting ? '送信中...'
+          {submitting ? '送信中…'
             : policy?.deposit ? `${yen(policy.deposit.amount)}の試験で予約する`
               : policy && policy.cardRequired !== false ? '試験のカードを登録して予約する'
                 : recurrence ? `${recurrence.made} 回分を予約する` : immediateConfirmation ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}

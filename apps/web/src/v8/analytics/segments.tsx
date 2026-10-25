@@ -150,7 +150,7 @@ function pickTitle(pick: Pick, data: CustomerSegments, cellAt: (r: number, f: nu
 function pickRange(pick: Pick, basis: Basis, measure: Measure): string {
   if (pick.r === 0) return '来店・購入のない人も含めた、すべてのお客さまです。'
   const word = BASIS_WORD[basis]
-  return `最後の${word}が ${R_RANGE[pick.r - 1]} ・ ${measure === 'count' ? `${word} ${F_LABEL.count[pick.f - 1]}` : `金額 ${F_LABEL.amount[pick.f - 1]}`}`
+  return `最後の${word}が ${R_RANGE[pick.r - 1]}・${measure === 'count' ? `${word} ${F_LABEL.count[pick.f - 1]}` : `金額 ${F_LABEL.amount[pick.f - 1]}`}`
 }
 
 function PickBody({ accountId, pick, basis, measure }: { accountId: string; pick: Pick; basis: Basis; measure: Measure }) {

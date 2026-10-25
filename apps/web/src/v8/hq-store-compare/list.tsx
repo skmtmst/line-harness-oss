@@ -179,7 +179,7 @@ export default function StoreComparisonList() {
         toolbar={toolbar}
         pagination={status === 'ready' && total > 0 ? (
           <ListPagePagination>
-            <span className={styles.pagerCount}>{`${total} 店中 ${first}〜${last} ・ 期間 ${rangeLabel(period.from, period.to)}`}</span>
+            <span className={styles.pagerCount}>{`${total} 店中 ${first}〜${last}・期間 ${rangeLabel(period.from, period.to)}`}</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </ListPagePagination>
         ) : undefined}

@@ -151,7 +151,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
               <>
                 <div className={styles.nextBox}>
                   <p className={styles.nextName}>{`${next.customer_name}さん・${next.guest_count}名`}</p>
-                  <p className={styles.nextMeta}>{`${nextOtherDay ? `${mdWeek(new Date(next.starts_at))} ` : ''}${hm(next.starts_at)}〜${hm(next.ends_at)} ・ ${next.table_id ? tableById.get(next.table_id)?.code ?? next.table_label : '未配席'} ・ ${shortCourse(next.course_name)}`}</p>
+                  <p className={styles.nextMeta}>{`${nextOtherDay ? `${mdWeek(new Date(next.starts_at))} ` : ''}${hm(next.starts_at)}〜${hm(next.ends_at)}・${next.table_id ? tableById.get(next.table_id)?.code ?? next.table_label : '未配席'}・${shortCourse(next.course_name)}`}</p>
 
                 </div>
                 <div className={styles.nextActions}><ReservationSource value={next.source}/>

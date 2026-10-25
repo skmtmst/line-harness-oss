@@ -113,7 +113,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
       designWidth={560}
       designTop={170}
       title={changing ? '繰り返しの予約を変えますか？' : '繰り返しの予約を取り消しますか？'}
-      description={`${target.customerName} さん ・ ${target.ruleText} ・ ${target.menuName} ・ ${target.index} 回目 ${dayOf(target.startsAt)}`}
+      description={`${target.customerName} さん・${target.ruleText}・${target.menuName}・${target.index} 回目 ${dayOf(target.startsAt)}`}
       tone={changing ? 'default' : 'destructive'}
       confirmation
       confirmLabel={`${count} 件を${changing ? '変える' : '取り消す'}`}

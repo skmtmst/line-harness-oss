@@ -441,7 +441,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 もう一度読み込む
               </button>
             </div>
-          ) : <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">会話を読み込み中...</div>}
+          ) : <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">会話を読み込み中…</div>}
         </div>
       </div>
     </div>

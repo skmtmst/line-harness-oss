@@ -239,7 +239,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
           {phase === 'running' && (
             <div className="text-center py-10 text-sm text-ink-faint">
-              <div className="mb-2">適用中...</div>
+              <div className="mb-2">適用中…</div>
               <div className="text-xs text-ink-faint">
                 LINE Messaging API に送信しています
               </div>

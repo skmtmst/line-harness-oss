@@ -201,7 +201,7 @@ describe('V8 シナリオ配信の編集', () => {
     for (let i = 0; i < 2; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     const reason = document.getElementById('step-content-error')
     expect(reason?.textContent).toBe('メッセージ内容を入力してください')
-    const body = screen.getByPlaceholderText('メッセージ内容を入力...')
+    const body = screen.getByPlaceholderText('メッセージ内容を入力…')
     expect(body.getAttribute('aria-invalid')).toBe('true')
     expect(body.contains(document.activeElement) || document.activeElement === body).toBe(true)
   })

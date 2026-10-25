@@ -155,7 +155,7 @@ export default function AnswerLogV8() {
         <Drawer
           open={detail !== null}
           title="AI が答えた記録"
-          description={opened ? `${at(opened.createdAt)} ・ ${opened.friendName} さん` : undefined}
+          description={opened ? `${at(opened.createdAt)}・${opened.friendName} さん` : undefined}
           closeAppearance="box"
           heightMode="viewport"
           onClose={() => setUrl({ log: '' })}
@@ -261,7 +261,7 @@ function LogDetailBody({ log }: { log: AiAnswerLogDetail }) {
         {log.qa ? (
           <div className={styles.qaBox}>
             <p className={styles.qaTitle}>{log.qa.title}</p>
-            <p className={styles.qaMeta}>{`${QA_STATUS_LABEL[log.qa.status]} ・ 使われた ${formatNumber(log.qa.useCount)} 回 ・ 最後に直した ${formatDate(log.qa.updatedAt, { style: 'list-day', fallback: '—' })}`}</p>
+            <p className={styles.qaMeta}>{`${QA_STATUS_LABEL[log.qa.status]}・使われた ${formatNumber(log.qa.useCount)} 回・最後に直した ${formatDate(log.qa.updatedAt, { style: 'list-day', fallback: '—' })}`}</p>
             {differs ? <p className={styles.differs}>今の答えと違います（送った時の答えを出しています）</p> : null}
             <Link className={styles.link} href="/auto-replies?tab=qa">Q&A を開く <ArrowRight size={13} aria-hidden="true" /></Link>
           </div>

@@ -66,7 +66,7 @@ describe('テスト送信先の設定欄 (N-070)', () => {
     await flush()
     expect(screen.getByText(/読み込めませんでした/)).toBeTruthy()
     // 失敗を空一覧で取り繕わない（検索欄を出さない）。
-    expect(screen.queryByPlaceholderText('友だちを検索して追加...')).toBeNull()
+    expect(screen.queryByPlaceholderText('友だちを検索して追加…')).toBeNull()
 
     apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '田中 太郎', pictureUrl: null }]))
     fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))

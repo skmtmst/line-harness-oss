@@ -506,7 +506,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps & { surfac
       footer={(
         <div className="flex justify-end gap-2">
           <Button disabled={editSaving} onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>キャンセル</Button>
-          <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()} busy={editSaving} busyLabel="保存中...">この内容にする
+          <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()} busy={editSaving} busyLabel="保存中…">この内容にする
           </Button>
         </div>
       )}

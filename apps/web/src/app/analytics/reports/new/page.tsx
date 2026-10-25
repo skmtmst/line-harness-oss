@@ -1176,7 +1176,7 @@ function AnalyticsReportFormPage() {
 export default function AnalyticsReportNewPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中…</div>}>
       <AnalyticsReportFormPage />
     </Suspense>
   )

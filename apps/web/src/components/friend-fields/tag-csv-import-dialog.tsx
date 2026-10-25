@@ -353,7 +353,7 @@ export default function TagCsvImportDialog({
                 const key = row.folderName || '未分類'
                 counts[key] = (counts[key] ?? 0) + 1
                 return counts
-              }, {})).map(([name, count]) => `${name} ${count}件`).join(' ・ ')}</p>
+              }, {})).map(([name, count]) => `${name} ${count}件`).join('・')}</p>
               {result.summary.skipped > 0 ? <p>同じ名前だった{result.summary.skipped}件は、上書きせずに飛ばしました。</p> : null}
             </div>
           </div>

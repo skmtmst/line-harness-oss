@@ -181,7 +181,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const latestSucceeded = useMemo(() => (runs ?? []).find((run) => run.status === 'succeeded') ?? null, [runs])
   const currentPublished = publishedRun === undefined ? latestSucceeded : publishedRun
   const publishedInfo = currentPublished
-    ? `いま対象に出ている版: 「${currentPublished.version.name ?? '（名前なし）'}」${currentPublished.version.pageCount !== null ? ` ・ ${currentPublished.version.pageCount}ページ` : ''} ・ ${runAudienceText(currentPublished)} ・ ${runStamp(currentPublished.updatedAt)} に公開${draftDiffers === false ? '。編集中の下書きは公開中の版と同じです。' : ''}`
+    ? `いま対象に出ている版: 「${currentPublished.version.name ?? '（名前なし）'}」${currentPublished.version.pageCount !== null ? `・${currentPublished.version.pageCount}ページ` : ''}・${runAudienceText(currentPublished)}・${runStamp(currentPublished.updatedAt)} に公開${draftDiffers === false ? '。編集中の下書きは公開中の版と同じです。' : ''}`
     : 'いま対象に出ている版はありません（まだ公開に成功していません）。'
 
   const reloadAll = useCallback(async () => {
@@ -415,7 +415,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                 <div className={styles.runList}>
                   {runs.map((run) => (
                     <div key={run.id} className={styles.runRow}>
-                      <span className={styles.runText} title={`${run.version.name ? `「${run.version.name}」 ・ ` : ''}${run.version.pageCount !== null ? `${run.version.pageCount}ページ ・ ` : ''}LINE ID ${run.pages?.length ?? 0}件${run.status === 'failed' && run.lastErrorCode ? ` ・ 失敗理由: ${run.lastErrorCode.slice(0, 80)}` : ''}`}>{`${runStamp(run.createdAt)} ${runAudienceText(run)}`}</span>
+                      <span className={styles.runText} title={`${run.version.name ? `「${run.version.name}」・` : ''}${run.version.pageCount !== null ? `${run.version.pageCount}ページ・` : ''}LINE ID ${run.pages?.length ?? 0}件${run.status === 'failed' && run.lastErrorCode ? `・失敗理由: ${run.lastErrorCode.slice(0, 80)}` : ''}`}>{`${runStamp(run.createdAt)} ${runAudienceText(run)}`}</span>
                       <span className={styles.runSpacer} />
                       {run.status === 'failed' && canOperate && run.id === latestRun?.id ? (
                         <button type="button" className={styles.linkButton} onClick={() => { setDialogError(''); setRetryTarget(run) }}>失敗だけやり直す</button>

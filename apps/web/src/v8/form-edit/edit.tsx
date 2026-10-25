@@ -798,7 +798,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
             {canEdit ? (
               <div className={styles.urlTest}>
-                <Button onClick={() => void startTest()} disabled={testBusy} busy={testBusy} busyLabel="用意しています..." title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません">
+                <Button onClick={() => void startTest()} disabled={testBusy} busy={testBusy} busyLabel="用意しています…" title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません">
                   <FlaskConical size={15} aria-hidden="true" />
                   <span className={styles.testWide}>公開前に試す（試しのURLを作る）</span>
                   <span className={styles.testNarrow}>公開前に試す</span>
@@ -895,7 +895,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
         {loading || !formLoaded ? (
-          <p className={styles.loading}>読み込み中...</p>
+          <p className={styles.loading}>読み込み中…</p>
         ) : editTab === 'content' ? (
           <ContentTab
             readOnly={!canEdit}
@@ -981,7 +981,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             ) : (
               publishChanges.map((line, index) => (
                 <p key={index} className={styles.changeLine} data-kind={line.kind}>
-                  {line.kind === 'add' ? '＋ ' : line.kind === 'remove' ? '－ ' : '・ '}
+                  {line.kind === 'add' ? '＋ ' : line.kind === 'remove' ? '－ ' : '・'}
                   {line.text}
                 </p>
               ))
@@ -1034,7 +1034,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 export default function FormEditV8({ host }: { host?: FormEditHost } = {}) {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<p>読み込み中...</p>}>
+    <Suspense fallback={<p>読み込み中…</p>}>
       <FormEditInner host={host} />
     </Suspense>
   )

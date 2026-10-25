@@ -150,7 +150,7 @@ export function FormFileControl({ label, uploading = false, onUpload, kind = 'im
       </div> : null}
     </div> : null}
     <p className={styles.note}>{kind === 'pdf' ? 'PDF・1ファイル10MBまで' : `JPG・PNG・GIF・WebP・HEIC・HEIF${allowedKinds.includes('pdf') ? '・PDF' : ''}・1ファイル10MBまで`}{`・${limit}枚まで`}</p>
-    {uploading ? <p className={styles.note}>送っています...</p> : null}
+    {uploading ? <p className={styles.note}>送っています…</p> : null}
     {error ? <p role="alert" className={styles.note}>{error}</p> : null}
   </div>
 }
@@ -163,7 +163,7 @@ export function AddressControls({ draft, placeholder, onChange, onLookup, lookin
     <div className={styles.stack}><span className={styles.note}>郵便番号</span>
     <div className={styles.postal}>
       <input type="text" inputMode="numeric" aria-label="郵便番号" value={draft.postalCode} onChange={(e) => onChange({ ...draft, postalCode: e.target.value })} className={styles.input} />
-      <button type="button" className={styles.lookup} disabled={looking} onClick={onLookup}>{looking ? '調べています...' : '住所を探す'}</button>
+      <button type="button" className={styles.lookup} disabled={looking} onClick={onLookup}>{looking ? '調べています…' : '住所を探す'}</button>
     </div></div>
     {children}
     <FormSelectControl aria-label="都道府県" value={draft.prefecture} onChange={(e) => onChange({ ...draft, prefecture: e.target.value })}>

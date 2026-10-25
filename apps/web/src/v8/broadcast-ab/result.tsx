@@ -104,7 +104,7 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend }: { broadc
       setBusy(false)
     }
   }
-  const metricLine = result ? `勝ちの決め方：${METRIC_WORD[result.metric]} ・ ${result.status === 'undecided' ? `${result.decideAfterMinutes / 60} 時間たっても差が小さく決められない` : `${result.decideAfterMinutes / 60} 時間で決めた`}` : ''
+  const metricLine = result ? `勝ちの決め方：${METRIC_WORD[result.metric]}・${result.status === 'undecided' ? `${result.decideAfterMinutes / 60} 時間たっても差が小さく決められない` : `${result.decideAfterMinutes / 60} 時間で決めた`}` : ''
   const winner = result?.winner ? result.variants.find((variant) => variant.key === result.winner) : null
   return (
     <section className={styles.resultCard} aria-labelledby="ab-result-title" data-design-node={result?.status === 'undecided' ? 'Eoi7q' : 'n4kwM'}>

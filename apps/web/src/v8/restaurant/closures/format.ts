@@ -114,7 +114,7 @@ export function timeText(closure: Pick<RestaurantClosure, 'allDay' | 'startTime'
 
 /** 右の列の2行目「終日・全卓」「18:00〜22:00 ・ 個室A・T1」。 */
 export function scopeText(closure: RestaurantClosure, tables: RestaurantTable[]): string {
-  return closure.allDay ? `終日・${tablesText(closure.tableIds, tables)}` : `${timeText(closure)} ・ ${tablesText(closure.tableIds, tables)}`
+  return closure.allDay ? `終日・${tablesText(closure.tableIds, tables)}` : `${timeText(closure)}・${tablesText(closure.tableIds, tables)}`
 }
 
 /** これから（終わりの日が今日以降）の記録。始まりの順。 */
@@ -204,7 +204,7 @@ export function statusLine(reservations: number | null, tasks: ClosureTasks, con
   /* 連絡済み：休業を作った後に担当者が LINE で連絡した予約の数（重なる予約があるときだけ）。 */
   if (reservations !== null && reservations > 0 && contacted !== null) parts.push(`連絡済み ${contacted} 件`)
   if (tasks.total > 0) parts.push(tasks.open.length > 0 ? `他サイト 未対応 ${tasks.open.length}` : `他サイト 閉じた ${tasks.done}/${tasks.total}`)
-  return parts.join(' ・ ')
+  return parts.join('・')
 }
 
 /** 入力の初めの形。日付は押した日（無ければ今日）。 */

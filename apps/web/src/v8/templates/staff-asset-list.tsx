@@ -53,7 +53,7 @@ export default function StaffAssetList({ kind }: { kind: BroadcastAssetKind }) {
   const meta = LABELS[kind]
 
   if (state === 'loading') {
-    return <p className="text-ink-faint py-8 text-center text-sm">読み込み中...</p>
+    return <p className="text-ink-faint py-8 text-center text-sm">読み込み中…</p>
   }
   if (state === 'error') {
     return <ListState kind="error" title={`${meta.title}を読み込めませんでした`} onRetry={() => void load()} />

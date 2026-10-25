@@ -155,7 +155,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
 
       {loading || !detail ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
+          読み込み中…
         </div>
       ) : (
         <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
@@ -194,7 +194,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                           disabled={retrying !== null || queuedCalendar}
                           className="text-action ml-2 underline disabled:opacity-40"
                         >
-                          {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
+                          {retrying === 'calendar' ? '再試行中…' : 'もう一度反映する'}
                         </button>
                       ) : null}
                     </span>
@@ -601,7 +601,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                           disabled={retrying !== null}
                           className="text-action mt-1 text-xs underline disabled:opacity-40"
                         >
-                          {retrying === op.id ? '再送中...' : 'もう一度送る'}
+                          {retrying === op.id ? '再送中…' : 'もう一度送る'}
                         </button>
                       ) : null}
                     </li>
@@ -621,7 +621,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                           disabled={retrying !== null || queuedCalendar}
                           className="text-action mt-1 text-xs underline disabled:opacity-40"
                         >
-                          {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
+                          {retrying === 'calendar' ? '再試行中…' : 'もう一度反映する'}
                         </button>
                       ) : null}
                     </li>
@@ -727,7 +727,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                       disabled={auditLoading}
                       className="text-action mt-3 text-xs underline disabled:opacity-40"
                     >
-                      {auditLoading ? '読み込み中...' : `あと${auditRemaining}件の記録を読み込む`}
+                      {auditLoading ? '読み込み中…' : `あと${auditRemaining}件の記録を読み込む`}
                     </button>
                   ) : null}
                 </>

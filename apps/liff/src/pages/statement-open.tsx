@@ -82,7 +82,7 @@ export default function StatementOpen() {
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="支払明細" />
       <div className="mx-auto w-full max-w-md px-4 pt-3 pb-40">
-        {state.name === 'loading' && <LoadingView label="本人確認をしています..." />}
+        {state.name === 'loading' && <LoadingView label="本人確認をしています…" />}
         {(state.name === 'ready' || state.name === 'fetching') && (
           <div className="space-y-3.5" data-statement-state={state.name}>
             <Card className="space-y-1 p-4">
@@ -119,7 +119,7 @@ export default function StatementOpen() {
       {(state.name === 'ready' || state.name === 'fetching') && (
         <BottomBar>
           <Button variant="primary" disabled={state.name === 'fetching'} onClick={() => void open(state.issued)}>
-            {state.name === 'fetching' ? '開いています...' : '明細を開く'}
+            {state.name === 'fetching' ? '開いています…' : '明細を開く'}
           </Button>
         </BottomBar>
       )}

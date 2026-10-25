@@ -138,7 +138,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
     <Drawer
       open={open}
       title="予約を入れる"
-      description={`${summary.customerName} さん ・ ${summary.menuName} ${summary.durationMin} 分`}
+      description={`${summary.customerName} さん・${summary.menuName} ${summary.durationMin} 分`}
       closeAppearance="box"
       width="editor"
       heightMode="viewport"

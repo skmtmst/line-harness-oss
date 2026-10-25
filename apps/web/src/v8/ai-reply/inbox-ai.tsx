@@ -136,7 +136,7 @@ export function InboxAiSummary({ inboxAi }: { inboxAi: InboxAi }) {
       <header className={styles.head}>
         <Sparkles size={15} aria-hidden="true" />
         <span className={styles.title}>要約</span>
-        {data ? <span className={styles.meta}>{`${time(data.generatedAt)} 時点${data.messageCount ? ` ・ 最新 ${data.messageCount} 件から` : ''}`}</span> : null}
+        {data ? <span className={styles.meta}>{`${time(data.generatedAt)} 時点${data.messageCount ? `・最新 ${data.messageCount} 件から` : ''}`}</span> : null}
         <span className={styles.spacer} />
         <RowMenu
           appearance="box"

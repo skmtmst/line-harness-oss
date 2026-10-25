@@ -91,7 +91,7 @@ export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMeth
               : recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
               <div key={broadcast.id} className={styles.recentRow}>
                 <Send size={14} aria-hidden /><span className={styles.recentName} title={broadcast.title}>{broadcast.title}</span>
-                <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'} ・ {broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>
+                <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'}・{broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>
                 <Button size="compact" onClick={() => duplicateRecent(broadcast)}>複製する</Button>
               </div>
             )) : <p className="text-xs text-ink-faint">最近の配信はまだありません。</p>}

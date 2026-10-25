@@ -18,7 +18,7 @@ export default function AffiliateOffersRedirectPage() {
 
   return (
     <div className="p-8 text-center text-ink-faint text-sm">
-      移動中...
+      移動中…
     </div>
   )
 }

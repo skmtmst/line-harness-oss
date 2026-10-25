@@ -511,7 +511,7 @@ export default function QuestionEditor({
                         {(
                           [
                             { value: 'from_start', label: '最初から' },
-                            { value: 'from_read', label: '(再開)友だちが読んだところから' },
+                            { value: 'from_read', label: '（再開）友だちが読んだところから' },
                           ] as const
                         ).map((opt) => (
                           <RadioCard

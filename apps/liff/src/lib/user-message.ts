@@ -19,7 +19,7 @@ export const LOAD_FAILED_MESSAGE = '電波のよいところで、もう一度�
 export const RETRY_LABEL = 'もう一度読み込む';
 
 /** 読み込み中の文言。全画面で同じにする。 */
-export const LOADING_LABEL = '読み込み中...';
+export const LOADING_LABEL = '読み込み中…';
 
 /**
  * 送信の失敗のときの汎用文。入力は消さず、その場で理由を出す。

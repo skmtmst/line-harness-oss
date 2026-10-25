@@ -215,7 +215,7 @@ function NewBroadcastPageContent() {
       {!canManage ? (
         <ListState kind="forbidden" title="一斉配信を作る権限がありません" description="一斉配信を作成する権限が必要です。管理者に依頼してください" action={<Link href="/broadcasts" className="text-action text-sm">一斉配信一覧へ戻る</Link>} />
       ) : loading || audiencePending || (effectiveAudienceId && accountLoading) ? (
-        <ListState kind="loading" title="読み込み中..." />
+        <ListState kind="loading" title="読み込み中…" />
       ) : audienceNoAccount ? (
         <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
           <p className="text-ink text-sm font-semibold">
@@ -288,7 +288,7 @@ function NewBroadcastPageContent() {
 
 export default function NewBroadcastPage() {
   return (
-    <Suspense fallback={<ListState kind="loading" title="読み込み中..." />}>
+    <Suspense fallback={<ListState kind="loading" title="読み込み中…" />}>
       <NewBroadcastPageContent />
     </Suspense>
   )

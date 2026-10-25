@@ -317,7 +317,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
         {imagePreviewOpen && pendingImage && pendingImage.mode === 'line-image' ? (
           <Dialog open title="添付した画像の確認" onCancel={() => setImagePreviewOpen(false)} designWidth={800}>
             <InboxMedia kind="preview" src={pendingImage.originalContentUrl} alt={pendingImageMeta?.name ?? '添付した画像'} />
-            <p className="text-ink-faint mt-3 truncate text-xs" title={pendingImageMeta?.name}>{pendingImageMeta?.name ?? '画像'}{pendingImageMeta ? ` ・ ${formatByteSize(pendingImageMeta.size)}` : ''}</p>
+            <p className="text-ink-faint mt-3 truncate text-xs" title={pendingImageMeta?.name}>{pendingImageMeta?.name ?? '画像'}{pendingImageMeta ? `・${formatByteSize(pendingImageMeta.size)}` : ''}</p>
           </Dialog>
         ) : null}
       </>

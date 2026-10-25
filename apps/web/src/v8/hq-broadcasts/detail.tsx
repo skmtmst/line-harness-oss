@@ -88,7 +88,7 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
       <div className={styles.cardHead}>
         <div className={styles.cardText}>
           <h2 id="hq-bc-result" className={styles.cardTitle}>アカウントごとの送った結果</h2>
-          <p className={styles.cardSub}>{`${jpDateTime(run.scheduledAt)} ・ ${n(sentTo.length)}店に送信 ・ 成功 ${n(success)} 人 ・ 失敗 ${n(failed)} 人`}</p>
+          <p className={styles.cardSub}>{`${jpDateTime(run.scheduledAt)}・${n(sentTo.length)}店に送信・成功 ${n(success)} 人・失敗 ${n(failed)} 人`}</p>
         </div>
         {canManage && retryable.length > 0 ? (
           <Button onClick={onRetryAll}><RotateCcw size={15} aria-hidden="true" />失敗した店にやり直す</Button>
@@ -163,7 +163,7 @@ function PreparedCard({ run }: { run: HqBroadcastRun }) {
       <div className={styles.cardHead}>
         <div className={styles.cardText}>
           <h2 id="hq-bc-prepared" className={styles.cardTitle}>送る前の確かめ</h2>
-          <p className={styles.cardSub}>{`送る：${n(totals.sendStores)}店・${n(totals.sendPeople)} 人 ・ 外す：${n(totals.skipStores)}店・${n(totals.skipPeople)} 人`}</p>
+          <p className={styles.cardSub}>{`送る：${n(totals.sendStores)}店・${n(totals.sendPeople)} 人・外す：${n(totals.skipStores)}店・${n(totals.skipPeople)} 人`}</p>
         </div>
       </div>
       <DataTable className={styles.table} data-design="hq-broadcast-prepared">

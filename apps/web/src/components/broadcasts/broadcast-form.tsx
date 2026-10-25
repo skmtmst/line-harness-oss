@@ -1350,9 +1350,9 @@ export default function BroadcastForm({
       <div className={styles.checkList}>
         {([
           { key: 'basic', label: '配信名', value: title.trim() || '配信名を入力してください', done: Boolean(title.trim()) && title.trim().length <= TITLE_MAX, move: '基本設定へ戻る' },
-          { key: 'audience', label: '配信対象', value: `${confirmAudienceLabel} ・ ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`} ・ ${exclusionNote ?? '除外の内訳は未取得'}`, done: canConfirm, move: '対象を一覧で見る' },
-          { key: 'message', label: 'メッセージ', value: `${bubbles.length}件 ・ ${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, move: 'メッセージへ戻る' },
-          { key: 'schedule', label: '送信設定', value: `${sendWhenLabel ?? '未設定'} ・ ${quotaNote ?? '送信枠は未確認'}`, done: sendMode === 'now' || Boolean(scheduledDate && scheduledTime), move: '送信設定へ戻る' },
+          { key: 'audience', label: '配信対象', value: `${confirmAudienceLabel}・${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}・${exclusionNote ?? '除外の内訳は未取得'}`, done: canConfirm, move: '対象を一覧で見る' },
+          { key: 'message', label: 'メッセージ', value: `${bubbles.length}件・${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, move: 'メッセージへ戻る' },
+          { key: 'schedule', label: '送信設定', value: `${sendWhenLabel ?? '未設定'}・${quotaNote ?? '送信枠は未確認'}`, done: sendMode === 'now' || Boolean(scheduledDate && scheduledTime), move: '送信設定へ戻る' },
         ] as const).map((row) => <div className={styles.checkRow} key={row.key}>
           {row.done ? <CheckCircle2 size={18} className="text-success" aria-hidden /> : <AlertTriangle size={18} className="text-warning" aria-hidden />}
           <div><strong>{row.label}</strong><p>{row.value}</p></div><Button variant="secondary" className={styles.textButton} size="compact" onClick={() => goToStep(row.key)}>{row.move}</Button>

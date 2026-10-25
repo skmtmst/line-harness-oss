@@ -1065,10 +1065,10 @@ export function ActionConfigEditor({
             value={String(c.op ?? 'set')}
             onChange={(value) => onChange({ ...c, op: value })}
             options={[
-              { value: 'set', label: '← (代入)' },
-              { value: 'add', label: '＋ (加算)' },
-              { value: 'sub', label: '－ (減算)' },
-              { value: 'clear', label: 'X (消去)' },
+              { value: 'set', label: '←（代入）' },
+              { value: 'add', label: '＋（加算）' },
+              { value: 'sub', label: '－（減算）' },
+              { value: 'clear', label: 'X（消去）' },
             ]}
           /></SaveErrorField>
           <span className="text-ink-secondary text-sm">する</span>
@@ -1119,8 +1119,8 @@ export function ActionConfigEditor({
               <RadioCardGroup legend="シナリオを購読する場合">
                 {(
                   [
-                    { value: 'from_start', label: '(新規)最初から／(再開)最初から' },
-                    { value: 'from_read', label: '(再開)友だちが読んだところから' },
+                    { value: 'from_start', label: '（新規）最初から／（再開）最初から' },
+                    { value: 'from_read', label: '（再開）友だちが読んだところから' },
                   ] as const
                 ).map((opt) => (
                   <RadioCard
@@ -1168,8 +1168,8 @@ export function ActionConfigEditor({
             value={String(c.op ?? 'add')}
             onChange={(value) => onChange({ ...c, op: value })}
             options={[
-              { value: 'add', label: '＋ (加算)' },
-              { value: 'sub', label: '－ (減算)' },
+              { value: 'add', label: '＋（加算）' },
+              { value: 'sub', label: '－（減算）' },
             ]}
           /></SaveErrorField>
           <span className="text-ink-secondary text-sm">する</span>

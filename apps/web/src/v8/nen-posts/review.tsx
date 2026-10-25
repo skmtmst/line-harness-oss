@@ -930,7 +930,7 @@ function PublicationsV8({
                         <Td><StatusBadge tone={consented ? 'success' : 'neutral'} size="compact">{consented ? '同意あり' : '未取得'}</StatusBadge></Td>
                         <ActionCell>
                           {canEdit ? <RowActions subjectName={name}
-                            detail={{ label: busyId === text(item.id) ? '外しています...' : '掲載先から外す', disabled: busyId === text(item.id), onClick: () => { setNotice(''); setWithdrawTarget(item) } }}
+                            detail={{ label: busyId === text(item.id) ? '外しています…' : '掲載先から外す', disabled: busyId === text(item.id), onClick: () => { setNotice(''); setWithdrawTarget(item) } }}
                             menuItems={[{ id: 'placements', label: '使う場所', onSelect: () => openPlacements(item) }]} /> : null}
                         </ActionCell>
                       </Tr>

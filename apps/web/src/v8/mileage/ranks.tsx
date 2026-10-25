@@ -163,8 +163,8 @@ export default function RanksTab() {
               <Td>{index === 0 ? <span className={styles.unavailableValue}>—</span> : downText(program, tier)}</Td>
               <Td>
                 {tier.mileMultiplier > 1
-                  ? <>{`${tier.mileMultiplier} 倍`}{tier.benefitDescriptions?.length ? <span className={styles.sub} title={tier.benefitDescriptions.join(' ・ ')}>{tier.benefitDescriptions.join(' ・ ')}</span> : null}</>
-                  : tier.benefitDescriptions?.length ? <span title={tier.benefitDescriptions.join(' ・ ')}>{tier.benefitDescriptions.join(' ・ ')}</span> : <span className={styles.unavailableValue}>—</span>}
+                  ? <>{`${tier.mileMultiplier} 倍`}{tier.benefitDescriptions?.length ? <span className={styles.sub} title={tier.benefitDescriptions.join('・')}>{tier.benefitDescriptions.join('・')}</span> : null}</>
+                  : tier.benefitDescriptions?.length ? <span title={tier.benefitDescriptions.join('・')}>{tier.benefitDescriptions.join('・')}</span> : <span className={styles.unavailableValue}>—</span>}
               </Td>
               <Td align="right">{count === undefined ? <span className={styles.unavailableValue}>—</span> : `${formatNumber(count)} 人`}</Td>
               <ActionCell>

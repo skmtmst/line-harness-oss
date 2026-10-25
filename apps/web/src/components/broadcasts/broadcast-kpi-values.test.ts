@@ -38,7 +38,7 @@ describe('帯の4枚', () => {
   it('旧 stats 契約では「下書き」を未取得のままにする', () => {
     const draft = buildBroadcastKpiCards({ ...FULL, drafts: undefined }).find((c) => c.title === '下書き')
     expect(draft?.value).toBeNull()
-    expect(draft?.detail).toBe('編集途中 ・ 未取得')
+    expect(draft?.detail).toBe('編集途中・未取得')
   })
 
   it('実測 0 は 0 のまま出す', () => {
