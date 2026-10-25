@@ -4,6 +4,7 @@ import './globals.css'
 import AppShell from '@/components/app-shell'
 import ClientErrorReporter from '@/components/client-error-reporter'
 import ToastHost from '@/components/shared/toast'
+import NameTipHost from '@/components/shared/name-tip'
 
 /**
  * 書き出しの時点で決まる題。
@@ -72,6 +73,8 @@ export default function RootLayout({
         </AppShell>
         {/* 保存の知らせ（Toast）の置き場所。全画面で1つ。画面側は置かない。 */}
         <ToastHost />
+        {/* アイコンだけのボタンの名前の吹き出し。全画面で1つ。画面側は置かない。 */}
+        <NameTipHost />
       </body>
     </html>
   )

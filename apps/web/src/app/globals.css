@@ -3241,3 +3241,10 @@ html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][dat
   --bar-scrolled-filter: saturate(180%) blur(18px);
   --bar-scrolled-line: 1px solid rgba(29, 29, 31, 0.06);
 }
+
+/*
+ * アイコンだけの小さい押し口（並び替えのつまみ・札の ×・行の小さい印）は、見た目の大きさを変えずに
+ * 押せる所を 28px 以上へ広げる（2026-10-25 オーナー）。部品が data-hit-area を付ける。
+ */
+:where([data-hit-area]) { position: relative; } /* 部品が自分で位置を決めていればそちらが勝つ */
+:root [data-hit-area]::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, var(--control-icon-min)); height: max(100%, var(--control-icon-min)); transform: translate(-50%, -50%); }
