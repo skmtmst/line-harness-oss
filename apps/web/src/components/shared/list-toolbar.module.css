@@ -207,6 +207,8 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
 
 .slotTool { display: contents; }
+/* 札の組と、その右に続く件数などのまとまり。広い板では今までどおり段に直接並べる。 */
+.chipUnit { display: contents; }
 .rowBreak { display: none; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
 
@@ -274,16 +276,38 @@ html:root :is(.slots, .toolbar) [data-toolbar-row][data-toolbar-fit='single'] { 
 html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) {
   width: max-content; min-width: max-content; max-width: none; flex: none;
 }
-/* 札が入りきらない幅では、並び・件数を 2 段目の右端に残したまま札だけを折り返す。 */
+/*
+ * 札の組は組の中で縦に積まない。
+ * 並び・件数と1段に収まる幅では同じ段の左に置く。収まらない時は、札の組を
+ * まるごと次の段の左へ下げる（部品が data-toolbar-chips-drop を付ける）。
+ * 札の組そのものが1段の幅より長い時だけ、組の中で折り返す（左寄せ）。
+ */
 @container v8-page (max-width: 1099px) {
-  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> .filterChoices) { flex: 1 1 0; min-width: 0; }
-  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> .filterChoices) > .filterChoices { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
-  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> .filterChoices) .filterWide { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
-  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) { flex: 1 1 0; min-width: 0; }
-  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) > [role='group'] { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
-  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) .filterChoices { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
-  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) .filterWide { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
-  html:root .slots[data-toolbar-layout='slots-stacked'] .slotsEnd { flex: none; align-self: flex-start; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .chipUnit {
+    display: flex; align-items: center; gap: var(--tpl-list-gap);
+    flex: 0 1 auto; min-width: 0; max-width: 100%; order: 2;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .chipUnit > .slotTool { flex: 0 1 auto; min-width: 0; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] :is(.slotTool:has(> .filterChoices), .slotTool:has(> [role='group'])) {
+    flex: 0 1 auto; min-width: 0; max-width: 100%;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> .filterChoices) > .filterChoices,
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) > [role='group'] {
+    flex: 0 1 auto; min-width: 0; max-width: 100%; flex-wrap: wrap;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] :is(.slotTool:has(> .filterChoices), .slotTool:has(> [role='group'])) .filterWide {
+    flex: 0 1 auto; min-width: 0; max-width: 100%; flex-wrap: wrap;
+  }
+  /* 件数（例「231件」）は札の組の右にくっついて動く。段の右端の並び・件数は動かさない。 */
+  html:root .slots[data-toolbar-layout='slots-stacked'] .chipUnit[data-toolbar-chips-drop] {
+    order: 5; flex: 0 0 100%;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool[data-toolbar-chips-drop],
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool[data-toolbar-chips-drop] ~ .slotTool:not(:has([data-toolbar-end])) {
+    order: 5;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [data-toolbar-end]) { flex: none; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [data-toolbar-end]) .slotsEnd { flex: none; align-self: flex-start; }
 }
 /* Narrow list frames own the two rows, including a formerly stacked caller. */
 @container v8-page (max-width: 1099px) {
