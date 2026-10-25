@@ -97,6 +97,7 @@ beforeEach(() => {
       const body = JSON.parse(String(init?.body));
       return new Response(JSON.stringify(await webinarComment('w1', body.sessionStartAt, body.atSeconds, body.body)));
     }
+    if (path.endsWith('/heartbeat')) return new Response(JSON.stringify({ ok: true }));
     if (path.endsWith('/register')) return new Response(JSON.stringify({ ok: true }));
     try { return new Response(JSON.stringify(await webinarState('w1'))); }
     catch (err) { return new Response('{}', { status: (err as { status?: number }).status ?? 500 }); }
@@ -222,4 +223,64 @@ describe('申込と視聴の画面を共用する', () => {
     expect(init?.headers).toMatchObject({ Authorization: 'Bearer token' });
     await waitFor(() => expect(webinarState).toHaveBeenCalledTimes(2));
   });
+});
+
+it('開始までの残り時間を分秒で出し、時計を進めると減る', async () => {
+  vi.useFakeTimers();
+  const start = Math.floor(Date.now() / 1000) + 125;
+  webinarState.mockResolvedValue({ live: false, title: '説明会', nextSessionAt: start });
+  open();
+  await act(async () => {});
+  await advanceSeconds(1);
+  const timer = screen.getByRole('timer');
+  expect(timer.getAttribute('aria-label')).toBe('開始まであと124秒');
+  expect(timer.textContent).toContain('02分');
+  expect(timer.textContent).toContain('04秒');
+  await advanceSeconds(2);
+  expect(screen.getByRole('timer').getAttribute('aria-label')).toBe('開始まであと122秒');
+});
+
+it('視聴終了時刻で動画を止め、終了を伝える', async () => {
+  vi.useFakeTimers();
+  webinarState.mockResolvedValue({ ...LIVE, live: true, durationSeconds: 12 } as WebinarState);
+  open();
+  await advanceSeconds(4);
+  expect(screen.getByText('ご視聴ありがとうございました')).toBeTruthy();
+  expect(document.querySelector('video')).toBeNull();
+});
+
+it('友だち追加前は再生させず、追加の案内を出す', async () => {
+  webinarState.mockRejectedValue(Object.assign(new Error('友だち追加してください'), { status: 403 }));
+  // 通信の失敗時にも、公開APIが返す利用者向けの理由を通す。
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: '友だち追加してください' }), { status: 403 })));
+  open();
+  expect(await screen.findByText('友だち追加すると見られます')).toBeTruthy();
+  expect(document.querySelector('video')).toBeNull();
+});
+
+it('視聴のずれを補正し、15秒ごとに認証付きで同じ回の視聴位置を知らせる', async () => {
+  vi.useFakeTimers();
+  webinarState.mockResolvedValue(LIVE);
+  open();
+  await act(async () => {});
+  await advanceSeconds(1);
+  const video = document.querySelector('video')!;
+  Object.defineProperty(video, 'readyState', { value: 4, configurable: true });
+  video.currentTime = 0;
+  await advanceSeconds(1);
+  expect(video.currentTime).toBeGreaterThanOrEqual(11);
+  await advanceSeconds(14);
+  const beats = vi.mocked(fetch).mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/heartbeat'));
+  expect(beats).toHaveLength(1);
+  expect(String(beats[0][0])).toContain('/webinars/w1/heartbeat');
+  expect(beats[0][1]?.headers).toMatchObject({ Authorization: 'Bearer token' });
+  expect(JSON.parse(String(beats[0][1]?.body))).toMatchObject({ sessionStartAt: 1_800_000_000, positionSeconds: expect.any(Number) });
+});
+
+it('動画を再生できない端末には別の端末を使う案内を出す', async () => {
+  vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('');
+  webinarState.mockResolvedValue(LIVE);
+  open();
+  expect(await screen.findByText('この端末では再生できません')).toBeTruthy();
+  expect(screen.getByText('別の端末かブラウザで開いてください。')).toBeTruthy();
 });
