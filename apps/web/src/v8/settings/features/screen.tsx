@@ -21,7 +21,7 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { FEATURE_SETTINGS_CONFLICT_MESSAGE } from './feature-settings-view'
 import { groupSummary, shortUsageDate, useFeatureSettings, type FeatureUsage, type UsageCategory } from './use-feature-settings'
 import styles from './screen.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
@@ -376,7 +376,6 @@ export default function FeatureSettingsScreen() {
         <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       )}
 
-
       {!selectedAccountId ? (
         <p className={styles.stateBox}>先に上部でLINEアカウントを選んでください。</p>
       ) : loading ? (
@@ -425,10 +424,12 @@ export default function FeatureSettingsScreen() {
           </div>
 
           {usageFailed && (
-            <p className={styles.warnBand}>
-              機能の利用状況を読めませんでした。設定の切替はそのまま使えます。{' '}
-              <button type="button" onClick={() => void loadUsage()} className={styles.inlineLink}>利用状況を読み直す</button>
-            </p>
+                  <Notice tone="warn" action={<>
+                    <button type="button" onClick={() => void loadUsage()} className={styles.inlineLink}>利用状況を読み直す</button>
+                  </>}>
+                    機能の利用状況を読めませんでした。設定の切替はそのまま使えます。
+                    {' '}
+                  </Notice>
           )}
 
           {filteredGroups.length === 0 ? (

@@ -4,10 +4,7 @@
  */
 
 /* 帯（案内・閲覧のみ・注意・失敗）。絵：地の色・角丸 10・余白 10/14・印 16＋間 10・文字 13/20。 */
-.infoBand,
-.viewerBand,
-.warnBand,
-.dangerBand {
+.viewerBand {
   display: flex;
   align-items: center;
   gap: var(--tpl-sb-band-gap);
@@ -19,19 +16,10 @@
   line-height: var(--tpl-sb-band-lh);
 }
 
-.infoBand { background: var(--color-status-info-soft); }
-.infoBand .bandIcon { color: var(--color-action); }
-.warnBand { background: var(--color-status-warn-soft); }
-.dangerBand { background: var(--color-status-danger-soft); color: var(--color-danger); }
-
 .bandIcon {
   flex-shrink: 0;
   width: var(--tpl-sb-band-icon);
   height: var(--tpl-sb-band-icon);
-}
-
-.infoBand > span {
-  min-width: 0;
 }
 
 .inlineLink {
@@ -287,16 +275,6 @@
   display: block;
   margin-top: var(--tpl-sb-conflict-band-top);
   margin-bottom: var(--tpl-sb-conflict-band-bottom);
-}
-
-.conflict {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sb-conflict-gap);
-  padding: var(--tpl-sb-conflict-pad);
-  border-radius: var(--tpl-sb-band-radius);
-  outline: 1px solid var(--color-status-warn-deep);
-  background: var(--color-status-warn-soft);
 }
 
 .conflictIcon {

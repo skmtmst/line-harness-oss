@@ -3,8 +3,6 @@
  * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
  */
 
-.infoBand,
-.dangerBand,
 .doneBand {
   display: flex;
   align-items: center;
@@ -16,10 +14,6 @@
   font-size: var(--tpl-sb-band-text);
   line-height: var(--tpl-sb-band-lh);
 }
-
-.infoBand { background: var(--color-status-info-soft); }
-.infoBand .bandIcon { color: var(--color-action); }
-.dangerBand { background: var(--color-status-danger-soft); color: var(--color-danger); }
 .doneBand { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 
 .bandIcon {

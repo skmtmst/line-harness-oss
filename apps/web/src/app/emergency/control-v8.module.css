@@ -51,7 +51,6 @@
   margin-top: var(--tpl-rest3-em-row-gap);
 }
 
-
 .targetImpact {
   display: none;
 }
@@ -119,22 +118,12 @@
   resize: vertical;
 }
 
-
-
-
-
-
-
 /* 止めているときの赤い帯。 */
 .stoppedBand {
   margin-top: var(--tpl-rest3-em-row-gap);
   padding: var(--tpl-rest3-em-band-pad);
   border-radius: var(--tpl-rest3-em-band-radius);
   background: var(--color-canvas-sunken);
-}
-
-.stoppedBandOn {
-  background: var(--color-status-danger-soft);
 }
 
 .stoppedTitle {
@@ -249,16 +238,6 @@
   white-space: nowrap;
 }
 
-.tableNote {
-  margin: var(--tpl-rest3-em-row-gap) 0 0;
-  padding: var(--tpl-rest3-em-note-pad);
-  border-radius: var(--tpl-rest3-em-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-rest3-em-small);
-  line-height: var(--tpl-rest3-em-small-lh);
-}
-
 /* 止められない理由・競合・結果の帯。 */
 .feedbackBand {
   display: flex;
@@ -272,11 +251,6 @@
   line-height: 1.6;
 }
 
-.feedbackWarn {
-  background: var(--color-status-warn-soft);
-  color: var(--color-ink);
-}
-
 .feedbackDanger {
   background: var(--color-status-danger-soft);
   color: var(--color-danger);
@@ -288,13 +262,6 @@
 }
 
 /* 確認の窓の中身。 */
-.confirmTargets {
-  margin: 12px 0 0;
-  padding: 12px;
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-status-danger-soft);
-}
 
 .confirmTargetRow {
   display: flex;
@@ -367,7 +334,6 @@
     min-width: var(--tpl-rest3-em-table-min);
   }
 }
-
 
 .targetItem {
   display: inline-flex;

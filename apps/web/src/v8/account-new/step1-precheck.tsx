@@ -89,7 +89,7 @@ export default function Step1Precheck({
               ))}
             </RadioCardGroup>
             {guide && (
-              <div className={`${styles.precheckNote} ${guide.tone === 'warn' ? styles.precheckNoteWarn : styles.precheckNoteInfo}`}>
+              <Notice tone={guide.tone}>
                 {guide.title && <p className={styles.precheckNoteTitle}>{guide.title}</p>}
                 <p>{guide.body}</p>
                 {guide.link && (
@@ -98,7 +98,7 @@ export default function Step1Precheck({
                     <p className={styles.help}>{guide.link.note}</p>
                   </div>
                 )}
-              </div>
+              </Notice>
             )}
             {ack && (
               <Card className={styles.precheckAck} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">

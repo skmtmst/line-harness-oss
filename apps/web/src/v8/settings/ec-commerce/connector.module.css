@@ -98,10 +98,6 @@
   line-height: var(--tpl-rest3-ec-body-lh);
 }
 
-.bandWarn {
-  background: var(--color-status-warn-soft);
-}
-
 .bandTitle {
   flex-shrink: 0;
   color: var(--color-ink);
@@ -160,8 +156,7 @@
   margin-left: auto;
 }
 
-.noticeGood,
-.noticeBad {
+.noticeGood {
   margin: 0;
   padding: var(--tpl-rest3-ec-band-pad);
   border-radius: var(--tpl-rest3-ec-band-radius);
@@ -170,7 +165,6 @@
 }
 
 .noticeGood { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.noticeBad { background: var(--color-status-danger-soft); color: var(--color-danger); }
 
 .readValue {
   color: var(--color-ink-secondary);

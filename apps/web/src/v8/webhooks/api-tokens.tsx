@@ -34,7 +34,6 @@ overviewBandCells
 import { useApiTokens } from './use-api-tokens'
 import { McpConnectionsSection } from '@/v8/mcp-connect/public/section/index'
 
-
 function SkeletonCells({ height, width }: { height: number; width: string }) {
   return (
     <>
@@ -64,7 +63,6 @@ export function tokenDate(value: string | null): string {
 export function tokenUsedAt(value: string | null): string {
   return polishFormatDate(value, { style: 'list', fallback: value ? '—' : 'まだ使っていません' })
 }
-
 
 export default function WebhooksApiTokensV8() {
   const { saveErrors, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke } = useApiTokens()
@@ -151,7 +149,9 @@ export default function WebhooksApiTokensV8() {
         >
           {issued ? (
             <div className={styles.issuedBody}>
-              <p className={styles.issuedNote}>この鍵は今だけ表示されます。閉じると二度と見られません。安全な場所に写してください。</p>
+              <Notice tone="warn">
+                この鍵は今だけ表示されます。閉じると二度と見られません。安全な場所に写してください。
+              </Notice>
               <div className={styles.issuedTokenRow}>
                 <code className={styles.issuedToken}>{issued.token}</code>
                 <CopyTextButton value={issued!.token} aria-label="発行した鍵をコピー"  />

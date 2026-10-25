@@ -182,7 +182,9 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
         <Field label="理由（お客さまには出ません）" optional={false}>
           <Select size="full" aria-label="理由" value={reason} onChange={(v: string) => setReason(v)} options={['貸切', '臨時休業', '急な休み', '研修', 'そのほか'].map((v) => ({ value: v, label: v }))} />
         </Field>
-        {affectedNote ? <p className={styles.dialogNote}><Info size={16} aria-hidden="true" />{affectedNote}</p> : null}
+        {affectedNote ? <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>
+          {affectedNote}
+        </Notice> : null}
       </div>}
     </Dialog>
   )

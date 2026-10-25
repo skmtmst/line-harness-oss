@@ -16,8 +16,7 @@
   font-size: var(--tpl-sb-row-sub);
 }
 
-.noticeGood,
-.noticeBad {
+.noticeGood {
   margin: 0;
   padding: var(--tpl-sb-band-pad);
   border-radius: var(--tpl-sb-band-radius);
@@ -25,7 +24,6 @@
 }
 
 .noticeGood { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.noticeBad { background: var(--color-status-danger-soft); color: var(--color-danger); }
 
 .toolbar {
   display: flex;

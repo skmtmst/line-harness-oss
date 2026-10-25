@@ -27,7 +27,7 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 EC連携 つなぎ先（板 ）。
@@ -238,7 +238,9 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         { text: '鍵は比較に表示しません。入力した鍵は読み直すまで残ります。' },
       ] : null} onReload={() => void saveConflict.reloadLatest()} onCancel={saveConflict.closeCompare} />
       {!canEdit ? <NoteBar tone="info">{READONLY_REASON}いまの設定はこのまま見られます。</NoteBar> : null}
-      {notice ? <p className={notice.tone === 'success' ? styles.noticeGood : styles.noticeBad} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</p> : null}
+      {notice ? <Notice tone={notice.tone === "success" ? "success" : "danger"} role={notice.tone === 'success' ? 'status' : 'alert'}>
+        {notice.text}
+      </Notice> : null}
 
       <div className={styles.top}>
         <Card spacing="settings" aria-labelledby="ec-connector-info">
@@ -284,14 +286,13 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
             <Button type="button" onClick={() => setForm({ ...form, status: paused ? 'connected' : 'paused' })}>{paused ? '取り込みを再開する' : '取り込みを止める'}</Button>
           ) : null}
         </div>
-        <div className={`${styles.band} ${pendingStatusChange ? styles.bandWarn : ''}`} role={pendingStatusChange ? 'status' : undefined}>
-          <strong className={styles.bandTitle}>{paused ? '再開したとき：' : '止めたとき：'}</strong>
+        <Notice tone={pendingStatusChange ? "warn" : "info"} role={pendingStatusChange ? 'status' : undefined} heading={<>{paused ? '再開したとき：' : '止めたとき：'}</>}>
           <span className={styles.bandText}>
             {pendingStatusChange
               ? (paused ? '「取り込みを止める」を押しましたが、まだ止まっていません。「設定を保存する」を押すと止まります。' : '「取り込みを再開する」を押しましたが、まだ再開していません。「設定を保存する」を押すと再開します。')
               : (paused ? '取り込みを再開します。保存すると再開します。保存済みの設定は残っています。' : '取り込みを止めます。保存すると止まります。保存せずに離れると確認が出ます。')}
           </span>
-        </div>
+        </Notice>
       </Card>
 
       <Card spacing="settings" aria-labelledby="ec-connector-events">
