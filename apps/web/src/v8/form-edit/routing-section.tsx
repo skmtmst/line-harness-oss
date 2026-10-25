@@ -82,7 +82,9 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
             onChange={(id) => { setPickedQuestion(id); set({ rules: [] }) }} />}
           <span className={styles.hint}>使える質問：1 つ選ぶ・いくつでも選ぶ・プルダウン</span>
         </div>
-        <p className={styles.info}><Info aria-hidden="true" size={16} />行き先はこの表で決まるので、お客さまにはメニューと担当を選ばせず日時から始めます（下の「メニューを選んでもらう」は使いません）。上の行から順に当てはめます。</p>
+        <Notice tone="info" icon={<Info aria-hidden="true" size={16} />}>
+          行き先はこの表で決まるので、お客さまにはメニューと担当を選ばせず日時から始めます（下の「メニューを選んでもらう」は使いません）。上の行から順に当てはめます。
+        </Notice>
         {trying && question ? <div id="routing-trial" className={styles.trial} role="group" aria-label="試しに答える">
           <span>もしお客さまが「{question.label}」に</span>
           <Select aria-label="試しの答え" value={trial} options={[{ value: '', label: '答えを選ぶ' }, ...(question.choices ?? []).map((c) => ({ value: c.label, label: c.label }))]} onChange={setTrial} />

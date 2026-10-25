@@ -849,10 +849,12 @@ export default function FormsListV8() {
     >
       <FolderPanelNote>フォルダを消しても、中のフォームは未分類に残ります。</FolderPanelNote>
       {folderError ? (
-        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} action={<>
           <button type="button" onClick={() => void loadForms()} className={styles.textButton}>
             もう一度
-          </button></Notice>
+          </button>
+        </>}>{folderError}
+        </Notice>
       ) : null}
     </FolderPanel>
   )
@@ -898,7 +900,6 @@ export default function FormsListV8() {
   )
 
   /* 1152 の板：1段目「作る・フォルダ・探す … 件数」、2段目「札・並び」。 */
-
 
   const wideToolbar = (
     <ListToolbarFrame>
@@ -1199,13 +1200,15 @@ export default function FormsListV8() {
           <>
             {wideToolbar}
             {reviewMode ? (
-              <div className={styles.reviewNote}>
+              <Notice tone="warn">
                 <p><strong>管理者確認中のフォーム</strong> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>
                 <p>担当の割り当ては後続の対応で行います。この画面では割り当て操作はできません。</p>
-              </div>
+              </Notice>
             ) : null}
             {createError ? (
-              <Notice tone="danger" >{createError}<button type="button" className={styles.textButton} onClick={() => setCreateError('')}>閉じる</button></Notice>
+              <Notice tone="danger" action={<>
+                <button type="button" className={styles.textButton} onClick={() => setCreateError('')}>閉じる</button>
+              </>}>{createError}</Notice>
             ) : null}
           </>
         )}
