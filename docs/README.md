@@ -744,7 +744,7 @@
 - [v8-change-map](v8-change-map.md)
 - [見つからないページのコード案内](../apps/web/src/v8/not-found/README.md)
 - [記録の JSON を開いて写す部品のコード案内](../apps/web/src/v8/log-record/README.md)
-- [送信記録の見やすさ](release-log/unreleased/0000-kenta-sendlog.md)
+- [送信記録の見やすさ](release-log/unreleased/1835-kenta-sendlog.md)
 - [デリバリー注文連携の提供状況](release-log/unreleased/1781-kenta-cleanup-u01l.md)
 - [Uber Eatsの注文受信と重複操作の防止](release-log/unreleased/1800-masato-uber-orders.md)
 - [Uber Eatsの接続確認・解除・再ログイン](release-log/unreleased/1806-masato-uber-connection-management.md)
@@ -777,8 +777,11 @@
 - [マイレージの試験の書き換え（B-04）](release-log/unreleased/1829-kenta-q02b-b04.md)
 - [不安定な試験の直し](release-log/unreleased/1830-kenta-flaky-iat-1026.md)
 - [直し①②（不具合とiPad横の幅）](release-log/unreleased/1831-kenta-train-m1-1026.md)
-- [数の帯の先週比と友だちの上限](release-log/unreleased/0000-kenta-kpi-band.md)
-- [テンプレート一覧のLINEでの見え方](release-log/unreleased/0000-kenta-template-preview.md)
-- [見つからないページの場所とよく使うページ](release-log/unreleased/0000-kenta-notfound.md)
+- [数の帯の先週比と友だちの上限](release-log/unreleased/1835-kenta-kpi-band.md)
+- [テンプレート一覧のLINEでの見え方](release-log/unreleased/1835-kenta-template-preview.md)
+- [見つからないページの場所とよく使うページ](release-log/unreleased/1835-kenta-notfound.md)
+- [ベルと通知の画面のタブを「すべて・未読・システム」にし、未読は古いものまで漏れず](release-log/unreleased/1835-kenta-bell-inbox.md)
+- [一斉配信を作る画面に「2/5 配信対象」のように今の段を出し、配信名・送る相手・](release-log/unreleased/1835-kenta-broadcast-steps.md)
+- [運用状態の更新履歴を、検証へ入れた1回ごとに1枚のカードで見られるようにした。日](release-log/unreleased/1835-kenta-release-history.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
