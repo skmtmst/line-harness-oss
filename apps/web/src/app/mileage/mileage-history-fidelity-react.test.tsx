@@ -133,7 +133,7 @@ describe('履歴の絵合わせ（板 `oRbJi`）', () => {
   it('記録の日と時刻を名前の全文表示で確認できる（日本時間）', async () => {
     await waitForRows()
     const body = container.textContent ?? ''
-    expect(container.querySelector('tbody span[title]')?.getAttribute('title')).toBe('Kenta Kawano・9月30日（水）14:12')
+    expect(container.querySelector('tbody span[title]')?.getAttribute('title')).toBe('Kenta Kawano・09/30 14:12')
   })
 
   it('付けたの帯に補足は付けない', async () => {

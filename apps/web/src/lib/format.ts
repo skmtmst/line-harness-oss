@@ -1,8 +1,9 @@
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * （2026-10-09）：管理画面の日付と数は、この共通書式を使う。
- * 一覧は MM/DD HH:mm、過去の別年は YYYY/MM/DD。
- * 詳細は M月D日（曜）HH:mm。店舗の時間帯は指定して保つ。
+ * 日時は2つの書き方だけにする。一覧は MM/DD HH:mm（今年は年を省く。過去の別年は YYYY/MM/DD）。
+ * 詳細は YYYY年M月D日 HH:mm（いつの記録か読み違えないよう年を省かない）。店舗の時間帯は指定して保つ。
+ * 時刻を持たない日付（予約日・期限）は M月D日（曜）。
  * 件数は3桁区切りと単位の前の半角空き、金額は ¥29,800、割合は12.4%。
  * 保存値・CSV・日付入力の機械向け書式は表示の書式と分ける。
  */
@@ -108,11 +109,11 @@ export function formatDate(
     if (style === 'list-day-weekday') return `${day}${weekday(p.w)}`
     return style === 'list-day' ? day : `${day} ${clock}`
   }
-  const day = `${sameYear ? '' : `${p.y}年`}${p.m}月${p.d}日${weekday(p.w)}`
-  return style === 'day' ? day : `${day}${clock}`
+  if (style === 'detail') return `${p.y}年${p.m}月${p.d}日 ${clock}`
+  return `${sameYear ? '' : `${p.y}年`}${p.m}月${p.d}日${weekday(p.w)}`
 }
 
-/** 詳細・説明文の日付。 */
+/** 詳細・説明文の日時。YYYY年M月D日 HH:mm。 */
 export function formatDateTime(value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo'): string {
   return formatDate(value, { style: 'detail', fallback, now, timeZone })
 }

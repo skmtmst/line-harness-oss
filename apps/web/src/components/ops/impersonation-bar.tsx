@@ -10,16 +10,13 @@ import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { forgetSessionSnapshot } from '@/lib/session-snapshot'
+import { formatListTimestamp } from '@/lib/format'
 import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 
 /** 帯の「10/1 15:20」（日本時間）。 */
 function startedLabel(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return formatListTimestamp(iso, { fallback: '' })
 }
 
 /**

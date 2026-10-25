@@ -42,6 +42,6 @@ describe('hQQlt 予約経路の連携', () => {
     expect(screen.getByRole('heading', { name: '読めなかったもの' })).toBeTruthy()
     const unreadLabel = document.querySelector('[data-kpi-label][title="読めなかった"]')!
     expect(unreadLabel.closest('[data-kpi-presentation]')?.querySelector('[data-kpi-number]')?.textContent).toBe('1')
-    expect(screen.getByText(/食べログ ・ 人数の欄が読めませんでした/)).toBeTruthy()
+    expect(screen.getByText(/食べログ・人数の欄が読めませんでした/)).toBeTruthy()
   })
 })

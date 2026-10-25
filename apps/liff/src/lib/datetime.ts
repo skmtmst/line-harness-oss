@@ -109,6 +109,22 @@ export function jstStartsAtIso(date: string, hhmm: string): string {
   return new Date(`${date}T${hhmm}:00+09:00`).toISOString();
 }
 
+/**
+ * 日時の詳しい書き方 '2026年10月25日 17:51'。締め切り・期限・申し込んだ枠など、年まで読む所で使う。
+ * timeZone を渡すと店の時間帯で出す。読めない値は空の文字にする。
+ */
+export function formatDateTimeLong(value: string, timeZone = 'Asia/Tokyo'): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('ja-JP', { timeZone, year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.year}年${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`;
+}
+
+/** 日付の詳しい書き方 '2026年10月25日'（日本時間）。 */
+export function formatDateLong(value: string): string {
+  return formatDateTimeLong(value).replace(/ \d{2}:\d{2}$/, '');
+}
+
 export function utcToJstDisplay(utcIso: string): string {
   const d = japanCalendar(new Date(utcIso)).toISOString();
   return `${d.slice(0, 10)} ${d.slice(11, 16)}`;

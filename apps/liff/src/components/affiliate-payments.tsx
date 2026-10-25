@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { affiliateBankFields } from '@line-crm/shared';
 import { affiliateSelfApi, SelfApiError, type BankInput, type BankProfile, type Statement } from '../lib/affiliate-self-api.js';
 import Button from './ui/button/index.js';
+import { formatDateLong } from '../lib/datetime.js';
 import Card from './ui/card.js';
 import ConfirmDialog from './ui/confirm-dialog.js';
 import { FormSelectControl, FormTextControl } from './forms/controls.js';
@@ -85,8 +86,8 @@ export default function AffiliatePayments({ editable }: { editable: boolean }) {
       <h3 className="text-sm font-bold">支払明細</h3>
       {statements?.length === 0 && <p className="text-sm">支払明細はまだありません</p>}
       {statements?.map(row => <Card key={row.id} className="space-y-2 p-3">
-        <p>{new Date(row.createdAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{formatYen(row.totalAmount)}</p>
-        {row.expiresAt && <p className="text-xs">ダウンロード期限：{new Date(row.expiresAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>}
+        <p>{formatDateLong(row.createdAt)}・{formatYen(row.totalAmount)}</p>
+        {row.expiresAt && <p className="text-xs">ダウンロード期限：{formatDateLong(row.expiresAt)}</p>}
         {!row.expiresAt || Date.now() <= Date.parse(row.expiresAt) ? <Button variant="secondary" onClick={() => void affiliateSelfApi.download(row.id).catch(() => setNotice('支払明細を取得できませんでした。もう一度お試しください。'))}>PDFをダウンロードする</Button> : <p>ダウンロード期限を過ぎています</p>}
       </Card>)}
     </>}

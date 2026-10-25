@@ -208,7 +208,7 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     expect(section()?.querySelector('[data-truncated-text][title="特典を渡せませんでした"]')?.textContent).toBe('特典を渡せませんでした')
     expect(text).toContain('3 回')
     // 最終日時は日本時間で出す。UTCの01:02は10:02。
-    expect(text).toContain('9月9日（水）10:02')
+    expect(text).toContain('2026年9月9日 10:02')
     expect(retryTriggers()).toHaveLength(1)
     expect((await openRetry(0)).textContent).toContain('もう一度届ける')
   })
