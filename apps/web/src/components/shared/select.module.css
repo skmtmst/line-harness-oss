@@ -229,7 +229,7 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
 :root .invalid .trigger:not(.textTrigger) { outline: 1px solid var(--color-danger); outline-offset: -1px; }
 :root .leadingIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 
-:root .trigger { padding-block-start: var(--polish-text-center-inset); }
+:root .trigger { padding-block: 0; }
 
 :root .trigger:not(.textTrigger):not([data-tone]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 

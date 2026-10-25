@@ -385,3 +385,5 @@ html:root .button.secondary[data-presentation='row-action']:focus-visible {
 @media (prefers-reduced-motion: no-preference) {
   :root .button.primary:active:not(:disabled) { transform: var(--press-primary-shift); }
 }
+/* 文字の上下の真ん中：行の高さだけで真ん中に置き、上に足す 1px の補正は使わない（英数字が Inter になったため）。 */
+html:root .button:is(.standard, .field, .compact)[data-text-content]:is(:not([data-presentation]), [data-presentation='row-action']) { padding-block: 0; }

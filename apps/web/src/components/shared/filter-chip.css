@@ -108,7 +108,7 @@
 :root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-ink-secondary); }
 :root .v6-filter-chip__icon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 
-:root .v6-filter-chip { padding-block-start: var(--polish-text-center-inset); }
+:root .v6-filter-chip { padding-block: 0; }
 
 :root .v6-filter-chip[aria-pressed]:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
