@@ -121,8 +121,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
             <colgroup>
               <col className={styles.colSelect} />
               <col />
-              {!narrow && <col className={styles.colPreview} />}
-              <col className={styles.colKind} />
+              {narrow ? <col className={styles.colKind} /> : <col className={styles.colPreview} />}
               <col className={styles.colPublish} />
               {!narrow && <col className={styles.colUsage} />}
               {!narrow && <col className={styles.colMonthly} />}
@@ -141,8 +140,8 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                     /></SaveErrorField>) : <UnavailableSelection label="このページのテンプレートをすべて選択" />}
                 </Th>
                 <Th className={styles.headCell}>テンプレート</Th>
-                {!narrow && <Th className={styles.headCell}>LINEでの見え方</Th>}
-                <Th className={styles.headCell}>種類</Th>
+                {/* 広い幅では種類の列の場所に見え方を出す（列を1本増やすと名前が数文字まで縮むため）。種類は吹き出しの印・title・読み上げで伝える。 */}
+                <Th className={styles.headCell}>{narrow ? '種類' : 'LINEでの見え方'}</Th>
                 <Th className={styles.headCell}>公開</Th>
                 {!narrow && <Th className={styles.headCell}>使っている所</Th>}
                 {!narrow && <Th className={styles.headCell}>今月送った数</Th>}
@@ -154,6 +153,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
               {duplicateFeedback.order(shownItems, templates).map((t, saveFieldIndex) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
+                const kindText = isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)
                 const folder = folderDotOf(t)
                 const excerpt = excerptOf(t)
                 return (
@@ -186,14 +186,16 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                       } folder={folder}
                       annotation={String(t.name ?? '').startsWith('【見本】') ? <StatusBadge tone="neutral" dot>見本</StatusBadge> : undefined}
                     />
-                    {!narrow && (
-                      <Td className={styles.previewCell}>
+                    {narrow ? (
+                      <Td>
+                        <TagPill name={kindText} color={folder ? folderDisplayColor(folder) : undefined} aria-label={`種類：${kindText}`} />
+                      </Td>
+                    ) : (
+                      <Td className={styles.previewCell} title={`種類：${kindText}`}>
+                        <span className="sr-only">{`種類：${kindText}`}</span>
                         <LineBubbleThumb thumb={bubbleThumbOf({ messageType: t.messageType, content: latestContentOf(t), question: t.question })} />
                       </Td>
                     )}
-                    <Td>
-                      <TagPill name={isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)} color={folder ? folderDisplayColor(folder) : undefined} aria-label={`種類：${isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}`} />
-                    </Td>
                     <Td>
                       <StatusBadge tone={publish.tone === 'live' ? 'success' : publish.tone === 'changes' ? 'warning' : 'neutral'}>
                         {publish.label}
