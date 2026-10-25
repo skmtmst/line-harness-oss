@@ -56,14 +56,6 @@
 .formSelect { width: 100%; }
 
 /* 同時編集の帯：琥珀の地・角10・内側 14/16・右に2つのボタン。 */
-.conflict {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-wc-an-row-gap);
-  padding: var(--tpl-wc-ct-band-pad);
-  border-radius: var(--tpl-wc-vd-row-radius);
-  background: var(--color-warning-bg);
-}
 .conflictIcon { flex-shrink: 0; color: var(--color-warning); }
 .conflictText { display: flex; flex: 1; flex-direction: column; gap: var(--tpl-wc-cm-head-gap); min-width: 0; }
 .conflictTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wc-tab-lh); }
