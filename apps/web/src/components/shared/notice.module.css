@@ -68,6 +68,8 @@
 .notice[data-compact] { padding: var(--space-6) var(--space-10); gap: var(--space-6); font-size: var(--text-micro); }
 .notice[data-compact] .message { flex-basis: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .notice[data-compact] .icon { width: var(--space-24); height: var(--space-24); padding: var(--space-4); }
+/* 警告・失敗の文は切らずに折り返す（何が起きたかを全部読めるように）。1行の省略は案内と成功だけ。 */
+.notice[data-compact]:is([data-tone='warn'], [data-tone='danger'], [role='alert']) .message { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
 .notice[data-action-layout='stack-on-narrow'] .message { flex-basis: 24em; }
 
 }

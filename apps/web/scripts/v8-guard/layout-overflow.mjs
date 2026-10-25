@@ -1,5 +1,5 @@
 /*
- * V8のページを1152・1440・1920で開き、崩れを数える。1つでもあれば終了コード1。
+ * V8のページを1024・1152・1440・1920で開き、崩れを数える。1つでもあれば終了コード1。
  *
  *   node apps/web/scripts/v8-guard/layout-overflow.mjs <baseUrl> [out.json]
  *
@@ -8,6 +8,9 @@
  *   overflow   : 中身が枠からはみ出している（… でも横送りでもない）
  *   out-of-main: 白い板（main）の右端より外へ出た部品
  *   no-title   : … で切っているのに title も aria-label も無い（全文を確かめられない）
+ *   narrow-col : 文字のある表の列が 24px より細く、中身が折り返すかはみ出す（1 文字ずつ縦に折り返す。834px の「対応が要るもの」）
+ *   cut-alert  : 警告・失敗の文（role=alert・注意と危険の知らせ）が … や行数の制限で切れている。
+ *                ボタン・リンクの短い文字は数えない（短い名前の 1 行省略の決まりはそのまま）
  * 数えないもの
  *   main より内側の横送りの枠（overflow-x: auto/scroll か [data-scroll-x]）の中。
  *   main 自体は縦スクロールの枠なので含めない（含めると全部が除外されて 0 になる。
@@ -52,12 +55,28 @@ export const scanLayoutOverflow = () => {
       accountName.push(`${label(e)} max-width=${cs.maxWidth} text-overflow=${cs.textOverflow}`)
     }
   }
-  const res = { pageX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1, overflow: [], outOfMain: [], noTitle: [], accountName }
+  /* 細い列でも、中身が 1 行で収まっていれば崩れではない（「55」だけの数の列など）。 */
+  const squeezedOk = (e) => {
+    if (e.scrollWidth > e.clientWidth + 1) return false
+    const range = document.createRange()
+    range.selectNodeContents(e)
+    const tops = new Set([...range.getClientRects()].filter((q) => q.width > 0 && q.height > 0).map((q) => Math.round(q.top / 4)))
+    return tops.size <= 1
+  }
+  const res = { pageX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1, overflow: [], outOfMain: [], noTitle: [], accountName, narrowColumn: [], cutAlert: [] }
+  const alertSelector = '[role="alert"],[data-design-part="notice"]:is([data-tone="warn"],[data-tone="danger"])'
   for (const e of main.querySelectorAll('*')) {
     const r = e.getBoundingClientRect()
     if (r.width <= 1 || r.height <= 1) continue
     const cs = getComputedStyle(e)
     if (cs.visibility === 'hidden' || cs.display === 'none') continue
+    if (e.matches('th,td,[role="columnheader"],[role="cell"],[role="gridcell"]') && r.width < 24 && (e.innerText || '').trim().length >= 2 && !squeezedOk(e)) {
+      res.narrowColumn.push(`${label(e)} ${Math.round(r.width)}px`)
+    }
+    if (e.closest(alertSelector) && !e.closest('button,a,[role="button"]')) {
+      const clamp = cs.webkitLineClamp && cs.webkitLineClamp !== 'none'
+      if ((cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1) || (clamp && e.scrollHeight > e.clientHeight + 1)) res.cutAlert.push(label(e))
+    }
     if (inScroll(e)) continue
     if (cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1) {
       if (!e.title && !e.getAttribute('aria-label') && !e.closest('[title]')) res.noTitle.push(label(e))
@@ -69,7 +88,7 @@ export const scanLayoutOverflow = () => {
     }
     if (r.right > mr.right + 1 && cs.position !== 'fixed') res.outOfMain.push(`${label(e)} +${Math.round(r.right - mr.right)}`)
   }
-  for (const k of ['overflow', 'outOfMain', 'noTitle', 'accountName']) res[k] = [...new Set(res[k])]
+  for (const k of ['overflow', 'outOfMain', 'noTitle', 'accountName', 'narrowColumn', 'cutAlert']) res[k] = [...new Set(res[k])]
   return res
 }
 
@@ -102,10 +121,10 @@ for (const theme of ['v8']) {
       const r = await page.evaluate(scanLayoutOverflow)
       await page.close()
       res[`${theme} ${width} ${name}`] = r
-      const n = (r.pageX ? 1 : 0) + r.overflow.length + r.outOfMain.length + r.noTitle.length + r.accountName.length
+      const n = (r.pageX ? 1 : 0) + r.overflow.length + r.outOfMain.length + r.noTitle.length + r.accountName.length + r.narrowColumn.length + r.cutAlert.length
       if (n) {
         bad += n
-        console.log(`崩れ ${theme} ${width} ${route}`, JSON.stringify({ pageX: r.pageX, overflow: r.overflow.slice(0, 5), outOfMain: r.outOfMain.slice(0, 5), noTitle: r.noTitle.slice(0, 5), accountName: r.accountName.slice(0, 5) }))
+        console.log(`崩れ ${theme} ${width} ${route}`, JSON.stringify({ pageX: r.pageX, overflow: r.overflow.slice(0, 5), outOfMain: r.outOfMain.slice(0, 5), noTitle: r.noTitle.slice(0, 5), accountName: r.accountName.slice(0, 5), narrowColumn: r.narrowColumn.slice(0, 5), cutAlert: r.cutAlert.slice(0, 5) }))
       }
     }
   }
