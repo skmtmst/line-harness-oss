@@ -112,7 +112,7 @@
 .labelOptional {
   margin-left: var(--tpl-label-tag-gap);
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   line-height: var(--tpl-text-sm-lh);
 }

@@ -164,7 +164,7 @@
   justify-content: center;
   margin: 0;
   padding: 0 12px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   color: var(--v8-line-empty);
   text-align: center;
@@ -188,7 +188,7 @@
   height: 30px;
   border-top: 1px solid var(--v8-line-hairline);
   background: var(--v8-line-chrome);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 17px;
   color: var(--v8-line-menu);

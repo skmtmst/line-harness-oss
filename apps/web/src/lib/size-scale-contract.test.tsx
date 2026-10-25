@@ -173,3 +173,31 @@ describe('共通の値を使うクラスの描画を保つ', () => {
     expect(getComputedStyle(hero.parentElement!).gap).toBe('calc(0.25rem * 2)')
   })
 })
+
+/*
+ * 11px の文字は使わない（2026-10-25 オーナー）。補足も 12px の段を読む。
+ * 左メニュー（sidebar.module.css）は左メニューの直しの持ち物なので、その直しが入るまで数に入れない。
+ */
+describe('11px の文字を使わない', () => {
+  const PENDING_LEFT_MENU = 'components/layout/sidebar.module.css'
+  const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name)
+    return statSync(path).isDirectory() ? walk(path) : [path]
+  })
+  const sources = walk(SRC).filter((path) => /\.(css|tsx)$/.test(path) && !/\.test\./.test(path) && !path.endsWith(PENDING_LEFT_MENU))
+  const ELEVEN = /font-size:\s*11px|text-\[11px\]|fontSize[=:]\s*\{?\s*['"]?11(?:px)?['"]?\s*\}?(?![\d.])|--(?![a-z0-9-]*(?:pad|gap|lh|after|shift|inset|offset))[a-z0-9-]*(?:size|text|font|caption|note|desc|label|title|key|heading|th|xs)[a-z0-9-]*:\s*11px/
+
+  it('画面・部品・共通の値に 11px の文字の大きさが無い', () => {
+    const found = sources.flatMap((path) => readFileSync(path, 'utf8').split('\n').map((line, index) => ELEVEN.test(line) ? `${path.slice(SRC.length + 1)}:${index + 1}` : '').filter(Boolean))
+    expect(found).toEqual([])
+  })
+
+  it('壊した見本（11px を足した行）は見つける', () => {
+    expect(ELEVEN.test('.note { font-size: 11px; }')).toBe(true)
+    expect(ELEVEN.test('<span className="text-[11px]">')).toBe(true)
+    expect(ELEVEN.test('--tpl-x-note-size: 11px;')).toBe(true)
+    expect(ELEVEN.test('<text fontSize={11}>')).toBe(true)
+    expect(ELEVEN.test('padding: 11px 0;')).toBe(false)
+    expect(ELEVEN.test('--tpl-x-th-pad: 11px;')).toBe(false)
+  })
+})

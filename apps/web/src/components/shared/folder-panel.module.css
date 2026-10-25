@@ -43,7 +43,7 @@
 :root .add:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 :root .addIcon { display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-folder-dot-indent); flex-shrink: 0; }
 :root .add:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
-:root .footer { font-size: 11px; line-height: 17px; color: var(--color-ink-faint); }
+:root .footer { font-size: 12px; line-height: 17px; color: var(--color-ink-faint); }
 /* ：主ボタンの縁と影は Button が持つ。 */
 :root .label { min-width: 0; }
 :root .row[data-active] .label { font-weight: 600; }

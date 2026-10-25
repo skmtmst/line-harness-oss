@@ -290,7 +290,7 @@
 :root .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
 /* 箱の中の小さな数も、数字と単位の文字の役割を分ける。 */
 :root .card[data-kpi-presentation='inline'] .head { min-height: 0; }
-:root .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 11px; font-weight: 400; line-height: 16px; }
+:root .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 12px; font-weight: 400; line-height: 16px; }
 :root .card[data-kpi-presentation='inline'] .number { font-size: 18px; font-weight: 600; line-height: 26px; }
 :root .card[data-kpi-presentation='inline'] .unit { font-size: var(--text-caption); font-weight: 400; }
 :root .card[data-kpi-presentation='inline'] .value { gap: 4px; }

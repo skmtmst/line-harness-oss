@@ -5,7 +5,7 @@
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .readonlyBand { margin: 0; }
 .empty { margin: 0; padding: var(--tpl-htn-empty-pad); text-align: center; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
-.note { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+.note { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 .noteStrong { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
 .fieldError { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-danger); }
 
@@ -14,7 +14,7 @@
 .topCell { vertical-align: top; }
 .tableBox .table tbody td.topCell { vertical-align: top; padding-top: var(--tpl-htn-top-cell-pad); }
 .listArea { display: flex; flex-direction: column; gap: var(--tpl-htn-list-gap); padding: var(--tpl-htn-list-pad); }
-.railNote { margin: 0; line-break: anywhere; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-faint); }
+.railNote { margin: 0; line-break: anywhere; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-faint); }
 .folderBlock { margin-top: var(--tpl-htn-folder-block-gap); }
 .folderForm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-htn-chip-gap); }
 
@@ -52,7 +52,7 @@
 .colMode { width: var(--tpl-htn-col-mode); }
 .tableBox .table thead th {
   height: var(--tpl-htn-head-h); padding: var(--tpl-htn-head-pad); background: var(--tpl-htn-soft-bg); box-shadow: none; border: 0;
-  text-align: left; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); font-weight: 600; color: var(--color-ink-secondary); white-space: nowrap;
+  text-align: left; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); font-weight: 600; color: var(--color-ink-secondary); white-space: nowrap;
 }
 .tableBox .table tbody td {
   height: var(--tpl-htn-row-h); padding: var(--tpl-htn-cell-pad); vertical-align: middle;
@@ -64,7 +64,7 @@
 .nameLabel { display: block; min-width: 0; cursor: pointer; }
 .nameLine { display: flex; align-items: center; gap: var(--tpl-htn-chip-gap); min-width: 0; margin-left: var(--tpl-htn-dot-pull); }
 .name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 600; color: var(--color-ink); }
-.sub { display: block; margin-top: var(--tpl-htn-sub-gap); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+.sub { display: block; margin-top: var(--tpl-htn-sub-gap); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 .cell { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); }
 .cellLine { display: flex; align-items: center; gap: var(--tpl-htn-chip-gap); min-width: 0; }
 .strong { display: block; font-weight: 600; color: var(--color-ink); white-space: nowrap; }
@@ -72,7 +72,7 @@
 .menuBox { display: inline-flex; align-items: center; }
 .modePick { display: block; width: var(--tpl-htn-mode-w); }
 .modePick :global(*) { max-width: 100%; }
-.tableNote { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+.tableNote { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 
 /* 作る */
 .editSplit { display: flex; align-items: flex-start; gap: var(--tpl-htn-edit-gap); }
@@ -87,9 +87,9 @@
 .field { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); min-width: 0; }
 .label { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 600; color: var(--color-ink); }
 .smallLabel { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 600; color: var(--color-ink); }
-.optional { margin-left: var(--tpl-htn-chip-gap); font-size: var(--tpl-htn-text-11); font-weight: 400; color: var(--color-ink-faint); }
+.optional { margin-left: var(--tpl-htn-chip-gap); font-size: var(--tpl-htn-text-12); font-weight: 400; color: var(--color-ink-faint); }
 .labelRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); }
-.textButton { min-height: 0; height: auto; padding: 0; border: 0; background: none; cursor: pointer; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-action); }
+.textButton { min-height: 0; height: auto; padding: 0; border: 0; background: none; cursor: pointer; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-action); }
 .input, .textarea {
   width: 100%; min-width: 0; border: 1px solid var(--color-control-border); border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas);
   font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-21); color: var(--color-ink);
@@ -114,15 +114,15 @@
 .previewRow { display: flex; align-items: flex-end; gap: var(--tpl-htn-preview-gap); }
 .previewAvatar {
   align-self: flex-start; width: var(--tpl-htn-preview-avatar); height: var(--tpl-htn-preview-avatar); flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
-  border-radius: var(--tpl-htn-radius-pill); background: var(--color-accent-deep); color: var(--color-canvas); font-size: var(--tpl-htn-text-11); font-weight: 700;
+  border-radius: var(--tpl-htn-radius-pill); background: var(--color-accent-deep); color: var(--color-canvas); font-size: var(--tpl-htn-text-12); font-weight: 700;
   margin-right: var(--tpl-htn-preview-avatar-gap);
 }
-.previewTime { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-canvas); }
+.previewTime { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-canvas); }
 .previewCard { display: flex; flex-direction: column; width: var(--tpl-htn-preview-card-w); padding-bottom: var(--tpl-htn-preview-card-tail); border-radius: var(--tpl-htn-radius-l); background: var(--color-canvas); overflow: hidden; }
 .previewImage { display: block; height: var(--tpl-htn-preview-image-h); background: var(--tpl-htn-thumb-bg) center / cover no-repeat; }
 .previewCopy { display: flex; flex-direction: column; gap: var(--tpl-htn-import-gap); padding: var(--tpl-htn-preview-copy-pad); }
 .previewCopy strong { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); }
-.previewCopy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+.previewCopy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 .previewAction { padding: var(--tpl-htn-preview-action-pad); text-align: center; box-shadow: var(--tpl-htn-line-top); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--tpl-htn-line-green); }
 
 /* 配る */
@@ -146,7 +146,7 @@
 }
 
 /* 配った結果の窓：名前 200・文・札。行は下に線、上下 8。窓の下の帯は薄い地。 */
-.resultSummary { margin: var(--tpl-htn-result-summary-pull) 0 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
+.resultSummary { margin: var(--tpl-htn-result-summary-pull) 0 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
 .resultList { display: flex; flex-direction: column; align-self: stretch; }
 .resultRow { display: flex; align-items: center; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn-result-row-pad); box-shadow: var(--tpl-htn-line-bottom); }
 .resultName { flex: 0 0 var(--tpl-htn-result-name-w); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 600; color: var(--color-ink); }
