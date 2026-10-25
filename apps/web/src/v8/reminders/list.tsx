@@ -436,7 +436,7 @@ export default function RemindersListV8() {
         );
 
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件のフォルダを移動できませんでした`)
+        if (failed > 0) throw new Error(`${formatNumber(failed)}件のフォルダを移動できませんでした`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: 'フォルダを移動できませんでした。',
@@ -514,7 +514,7 @@ export default function RemindersListV8() {
         );
 
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
+        if (failed > 0) throw new Error(`${formatNumber(failed)}件の保存に失敗しました`)
       },
       revert: () => setOptimisticRows(null),
       failureMessage: next ? '再開できませんでした。' : '一時停止できませんでした。',

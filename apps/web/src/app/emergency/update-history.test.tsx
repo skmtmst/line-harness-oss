@@ -191,7 +191,7 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
     expect(updateRows(section)).toHaveLength(10)
     expect(within(section).getByText('更新-01')).toBeTruthy()
     expect(within(section).getByText(/続きが26件あります/)).toBeTruthy()
-    expect(within(section).getByText(/まだ画面に入っていない変更が2736件あります/)).toBeTruthy()
+    expect(within(section).getByText(/まだ画面に入っていない変更が2,736件あります/)).toBeTruthy()
   })
 
   it('変更内容の取得失敗を記録なしと表示せず、読み直した内容を出す', async () => {

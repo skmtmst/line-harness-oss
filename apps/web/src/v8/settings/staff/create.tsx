@@ -19,6 +19,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CONVERSION_APPROVAL_EDIT_KEY, normalizeStaffPermissionKeys, toggleStaffPermissionKey } from '@/v8/settings/staff/permission-labels'
+import { formatNumber } from '@/lib/format'
 
 type Role = 'admin' | 'staff' | 'viewer'
 type Channel = { email: boolean; line: boolean }
@@ -114,7 +115,7 @@ export default function NewStaffPage() {
     onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys: normalizeStaffPermissionKeys(permissionKeys), notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: inheritAccounts, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
       <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-ink">1.</b> 招待メールでアドレスを確認</li><li><b className="text-ink">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-ink">3.</b> 連携完了後はLINE認証でログイン</li></ol></AsideCard>
-      <AsideCard title="設定内容"><dl className="space-y-2 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">役割</dt><dd className="text-ink">{ROLES.find((item) => item.value === role)?.label}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">表示機能</dt><dd className="text-ink">{role === 'staff' ? `${permissionKeys.length}件` : 'すべて'}</dd></div></dl></AsideCard>
+      <AsideCard title="設定内容"><dl className="space-y-2 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">役割</dt><dd className="text-ink">{ROLES.find((item) => item.value === role)?.label}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">表示機能</dt><dd className="text-ink">{role === 'staff' ? `${formatNumber(permissionKeys.length)}件` : 'すべて'}</dd></div></dl></AsideCard>
     </>}
   >
     <Notice tone="info">{selectedAccount?.name ? `${selectedAccount.name}の担当として追加されます。` : 'この店舗の担当として追加されます。'}</Notice>

@@ -23,7 +23,7 @@ import {
   TagCsvParseError,
 } from './tag-csv-import'
 import styles from './tag-csv-import-dialog.module.css'
-import { formatYmd } from '@/lib/format'
+import { formatYmd, formatNumber } from '@/lib/format'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
@@ -233,7 +233,7 @@ export default function TagCsvImportDialog({
                 ) : (
                   <AttachmentRow
                     name={fileName}
-                    meta={fileSize != null ? `${rows.length}件・${formatTagCsvBytes(fileSize)}` : `${rows.length}件`}
+                    meta={fileSize != null ? `${formatNumber(rows.length)}件・${formatTagCsvBytes(fileSize)}` : `${formatNumber(rows.length)}件`}
                     onRemove={resetSelection}
                   />
                 )}
@@ -262,7 +262,7 @@ export default function TagCsvImportDialog({
               どのファイルのものか分からないと確かめようがない。
             */}
             <p className={styles.description}>
-              {preview ? `${fileName || '選んだCSV'} ／ ${preview.summary.total}行を読み込みました。` : null}
+              {preview ? `${fileName || '選んだCSV'} ／ ${formatNumber(preview.summary.total)}行を読み込みました。` : null}
               登録するとどうなるかを、行ごとに確かめてください。
             </p>
           </header>
@@ -353,8 +353,8 @@ export default function TagCsvImportDialog({
                 const key = row.folderName || '未分類'
                 counts[key] = (counts[key] ?? 0) + 1
                 return counts
-              }, {})).map(([name, count]) => `${name} ${count}件`).join('・')}</p>
-              {result.summary.skipped > 0 ? <p>同じ名前だった{result.summary.skipped}件は、上書きせずに飛ばしました。</p> : null}
+              }, {})).map(([name, count]) => `${name} ${formatNumber(count)}件`).join('・')}</p>
+              {result.summary.skipped > 0 ? <p>同じ名前だった{formatNumber(result.summary.skipped)}件は、上書きせずに飛ばしました。</p> : null}
             </div>
           </div>
           <div className={styles.actions}><Button type="button" variant="primary" onClick={close}>一覧へ戻る</Button></div>

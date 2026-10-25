@@ -12,7 +12,7 @@ import {seatBoardEntry} from '@line-crm/shared'
  * ★V8 予約台帳「一覧」（板 `Z3FoM`）。今週・今月もこの形で、その期間の予約を出す。
  *
  * 数5（予約・ご来店人数・LINE予約・媒体予約・未配席）→ 期間・状態の絞り込みと
- * 受信データを試す・手動予約を登録する → 予約タイムラインの表（時刻・予約元・お客さま・人数・卓・
+ * 受信データを試す・手動で予約を作る → 予約タイムラインの表（時刻・予約元・お客さま・人数・卓・
  * コース・注意事項・状態・操作）→ ページ送り（一覧だけ）。
  */
 import { Inbox, Plus } from 'lucide-react'
@@ -33,13 +33,14 @@ import { toYmd,INACTIVE_STATUSES, type LedgerView, isHold, maskPhone, mdhm, sour
 import styles from './reservations.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { formatNumber } from '@/lib/format'
 
 
 /*
  * ★V8 予約台帳「一覧」（板 `Z3FoM`）。今週・今月もこの形で、その期間の予約を出す。
  *
  * 数5（予約・ご来店人数・LINE予約・媒体予約・未配席）→ 期間・状態の絞り込みと
- * 受信データを試す・手動予約を登録する → 予約タイムラインの表（時刻・予約元・お客さま・人数・卓・
+ * 受信データを試す・手動で予約を作る → 予約タイムラインの表（時刻・予約元・お客さま・人数・卓・
  * コース・注意事項・状態・操作）→ ページ送り（一覧だけ）。
  */
 
@@ -99,8 +100,8 @@ export default function ListView({ view, rows, total, tables, page, period, stat
   return (
     <>
       <StatRow fusion>
-        <KpiCard title="予約" value={total} unit="件" detail={`表示中 ${rows.length}件`} icon={undefined} presentation="band" />
-        <KpiCard title="ご来店人数" value={guests} unit="名" detail={cancelledGuests > 0 ? `取消 ${cancelledGuests}名を除く` : `表示中 ${rows.length}件`} icon={undefined} presentation="band" />
+        <KpiCard title="予約" value={total} unit="件" detail={`表示中 ${formatNumber(rows.length)}件`} icon={undefined} presentation="band" />
+        <KpiCard title="ご来店人数" value={guests} unit="名" detail={cancelledGuests > 0 ? `取消 ${cancelledGuests}名を除く` : `表示中 ${formatNumber(rows.length)}件`} icon={undefined} presentation="band" />
         <KpiCard title="LINE予約" value={lineCount} unit="件" detail="自社導線" icon={undefined} presentation="band" />
         <KpiCard title="媒体予約" value={mediaCount} unit="件" detail="受信した予約" icon={undefined} presentation="band" />
         <KpiCard title="未配席" value={unseated} unit="件" detail="卓の割当が必要" valueTone={unseated > 0 ? 'warning' : 'default'} icon={undefined} presentation="band" />
@@ -128,11 +129,11 @@ export default function ListView({ view, rows, total, tables, page, period, stat
 </>} trailingToolbar={<>        <span className={styles.dateSpacer} />
         {view === 'list' && onPageSize ? <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => onPageSize(Number(value))} options={PAGE_SIZE_SELECT_OPTIONS} /> : null}
         {canImport ? <Button presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={15} aria-hidden="true" />受信データを試す</Button> : null}
-        {canWrite ? <Button presentation="restaurant" disabled={busy} onClick={onCreate}><Plus size={15} aria-hidden="true" />手動予約を登録する</Button> : null}
+        {canWrite ? <Button presentation="restaurant" disabled={busy} onClick={onCreate}><Plus size={15} aria-hidden="true" />手動で予約を作る</Button> : null}
       </>} renderBody={body=><DetailColumns variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
         {rows.length===0?<ListState kind="empty" title="条件に合う予約はありません。"/>:body}
         {view === 'list' && pageCount > 1 ? (
-          <Pagination spacing="restaurant" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total} 件中 ${(page - 1) * pageSize + 1}〜${Math.min((page - 1) * pageSize + rows.length, total)} 件`} />
+          <Pagination spacing="restaurant" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${formatNumber(total)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min((page - 1) * pageSize + rows.length, total)} 件`} />
         ) : null}
       <Panel fusion title="顧客カルテ" description="電話番号または LINE UID で名寄せする設計です。">
         <div className={styles.karte}>

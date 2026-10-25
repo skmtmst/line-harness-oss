@@ -178,7 +178,7 @@ export default function FriendListTable({
         <div className="flex min-w-0 flex-wrap items-center gap-2">{toolbarFilters ?? <span className="text-xs text-ink-faint">{status === 'ready' ? `${formatNumber(total)}件` : '—'}</span>}</div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
-          {selectedCount > 0 ? <span className="whitespace-nowrap font-semibold text-accent-deep">{selectedCount}件選択中</span> : null}
+          {selectedCount > 0 ? <span className="whitespace-nowrap font-semibold text-accent-deep">{formatNumber(selectedCount)}件選択中</span> : null}
           <span className="relative inline-flex">
             <button
               ref={columnsButtonRef}

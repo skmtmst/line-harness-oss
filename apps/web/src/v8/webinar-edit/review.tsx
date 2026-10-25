@@ -103,7 +103,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
     try {
       const res = await webinarApi.testNotifications(webinar.id)
       setNotifyConfirm(false)
-      setNotice(`通知をテスト送信しました。成功 ${res.data.sent} 件・失敗 ${res.data.failed} 件`)
+      setNotice(`通知をテスト送信しました。成功 ${formatNumber(res.data.sent)} 件・失敗 ${formatNumber(res.data.failed)} 件`)
       const refreshed = await webinarApi.editor(webinar.id)
       ctx.onEditorChange(refreshed.data)
     } catch (cause) {
@@ -138,7 +138,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   const summary: Array<[string, string]> = [
     ['開催形式', editor.deliveryKind === 'scheduled' ? '日時指定・開催回あり' : editor.deliveryKind === 'external' ? '外部の動画' : 'オンデマンド・いつでも視聴'],
     ['公開期間', publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt) ?? '—（公開期間は未設定）'],
-    ['CTA', ctx.ctaCount > 0 ? `${ctx.ctaCount}件` : emptyValue('unconfigured')],
+    ['CTA', ctx.ctaCount > 0 ? `${formatNumber(ctx.ctaCount)}件` : emptyValue('unconfigured')],
     ['通知', notifyCount === null ? emptyValue('unknown') : `${notifyCount.on} つ${notifyCount.missedOff ? '（見逃し案内は止めている）' : ''}`],
     ['視聴後の動き', reviewActionSummaryText(validation)],
   ]

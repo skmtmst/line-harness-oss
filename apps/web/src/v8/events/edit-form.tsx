@@ -43,6 +43,7 @@ import { AddSlotDialog, EditSlotDialog } from "./edit-form-gap-parts"
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 
 import { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
+import { formatNumber } from '@/lib/format'
 export { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
 
 type Tab = 'overview' | 'slots' | 'publish'
@@ -501,7 +502,7 @@ function OverviewTab({
         </RadioCardGroup>
 
         {targetType === 'multi-account-dedup' && (
-          <Field label="対象アカウント（重複なし配信）" note={`${accountIds.length} 件選択中`}>
+          <Field label="対象アカウント（重複なし配信）" note={`${formatNumber(accountIds.length)} 件選択中`}>
             {activeAccounts.length === 0 && (
               <Notice tone="info" message="アクティブなアカウントがありません" />
             )}
@@ -678,7 +679,7 @@ function SlotsTab({
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><FormSection id="ev-form-slots" title="予約枠" description={`${slots.length} 件の予約枠`} action={<>
+    <SaveErrorScope errors={saveErrors}><FormSection id="ev-form-slots" title="予約枠" description={`${formatNumber(slots.length)} 件の予約枠`} action={<>
           <Button onClick={() => setShowAdd(true)}>
             ＋ 枠を追加する
           </Button>

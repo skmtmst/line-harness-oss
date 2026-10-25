@@ -1,5 +1,5 @@
 'use client'
-import { formatDateTime, formatListDay } from '@/lib/format'
+import { formatDateTime, formatListDay, formatNumber } from '@/lib/format'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -101,7 +101,7 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
       </svg>
       <div className={styles.body}>
         <p className={styles.title}>
-          前払いのみ（来なかった{decision.noshowCount}回・直近{decision.windowMonths}か月）
+          前払いのみ（来なかった{formatNumber(decision.noshowCount)}回・直近{decision.windowMonths}か月）
         </p>
         {dates.length > 0 ? (
           <p className={styles.dates}>{dates.join('・')}に来なかった</p>

@@ -185,8 +185,8 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
           <GroupHead title="フォーム回答" action={<Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=forms`}>すべて見る</Link>} />
           <p className={styles.value}>
             {typeof friend.formSubmissionTotal === 'number'
-              ? friend.formSubmissionTotal > 0 ? `${friend.formSubmissionTotal} 件` : '回答はまだありません'
-              : friend.formSubmissions?.length ? `${friend.formSubmissions.length} 件` : '回答はまだありません'}
+              ? friend.formSubmissionTotal > 0 ? `${formatNumber(friend.formSubmissionTotal)} 件` : '回答はまだありません'
+              : friend.formSubmissions?.length ? `${formatNumber(friend.formSubmissions.length)} 件` : '回答はまだありません'}
           </p>
         </section>
       </div>}
@@ -321,7 +321,7 @@ export default function OverviewTab({
                 : mileageStatus === 'error'
                   ? <>つながり情報を読み込めませんでした<button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度読み込む</button></>
                   : mileageInsights && mileageInsights.accountCount > 1
-                    ? `${mileageInsights.accountCount} 件のLINEアカウントで同じ人としてつながっています${mileageConnections.length ? `（${mileageConnections.map((c) => c.accountName).join('・')}）` : ''}。重複候補が見つかると、根拠と確信度を表示します。`
+                    ? `${formatNumber(mileageInsights.accountCount)} 件のLINEアカウントで同じ人としてつながっています${mileageConnections.length ? `（${mileageConnections.map((c) => c.accountName).join('・')}）` : ''}。重複候補が見つかると、根拠と確信度を表示します。`
                     : 'このアカウントのみに登録があります。重複候補が見つかると、根拠と確信度を表示します。'}
             </p>
           </div>

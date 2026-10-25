@@ -22,7 +22,7 @@ import { OpsHead } from './shell'
 import { PageFrame } from '@/components/templates/page-frame'
 import parts from './parts.module.css'
 import styles from './members.module.css'
-import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format'
+import { formatDate as polishFormatDate, formatDateTime, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
@@ -130,7 +130,7 @@ export default function OpsMembersV8() {
         {tab === 'members' ? (
           <>
             <KpiBand gridClassName="grid grid-cols-3">
-              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? <span title={`2要素認証 設定済み ${summary.totpEnabled}人 / ${summary.members}人・未設定 ${Math.max(0, summary.members - summary.totpEnabled)}人`}>{`有効 ${active}・招待中 ${summary.invited}`}</span> : emptyValue('unknown')} loading={!loaded} />
+              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? <span title={`2要素認証 設定済み ${summary.totpEnabled}人 / ${formatNumber(summary.members)}人・未設定 ${Math.max(0, summary.members - summary.totpEnabled)}人`}>{`有効 ${active}・招待中 ${summary.invited}`}</span> : emptyValue('unknown')} loading={!loaded} />
               <KpiCard presentation="cell" icon={<LogIn size={13} aria-hidden="true" />} title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
               <KpiCard presentation="cell" icon={<Eye size={13} aria-hidden="true" />} title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
             </KpiBand>

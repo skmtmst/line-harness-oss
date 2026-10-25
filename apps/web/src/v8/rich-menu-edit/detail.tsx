@@ -243,7 +243,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       if (!res.success) throw new Error(res.error)
       setFixOpen(false)
       const unapplied = res.data.unapplied ?? []
-      setNotice(`ずれを ${res.data.applied ?? 0} 件修復しました。${unapplied.length > 0 ? `取り込みが必要なずれが ${unapplied.length} 件あります。「LINEにだけあるメニュー」は「外部メニューの取り込み」画面で取り込んでください。` : ''}`)
+      setNotice(`ずれを ${res.data.applied ?? 0} 件修復しました。${unapplied.length > 0 ? `取り込みが必要なずれが ${polishFormatNumber(unapplied.length)} 件あります。「LINEにだけあるメニュー」は「外部メニューの取り込み」画面で取り込んでください。` : ''}`)
       await check()
       await loadRuns()
     } catch (saveFailure) {
@@ -397,7 +397,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                       : diffs.length === 0 ? <span>{`管理画面の記録とLINE上の状態にずれはありませんでした${checkedAt ? `（${runStamp(checkedAt.toISOString(), true)}）` : ''}`}</span>
                         : (
                           <>
-                            <span className={styles.diffTitle}>{`${diffs.length} 件のずれがあります`}</span>
+                            <span className={styles.diffTitle}>{`${polishFormatNumber(diffs.length)} 件のずれがあります`}</span>
                             <ul className={styles.diffList}>
                               {diffs.map((diff, index) => <li key={`${diff.kind}-${index}`}>{diff.detail}{diff.fix ? `（${diff.fix.label}）` : ''}</li>)}
                             </ul>

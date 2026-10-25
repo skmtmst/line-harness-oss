@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 契約者専用LINEに使うアカウントの指定（決定 2026-09-18 案A）。
@@ -57,7 +58,7 @@ export default function NoticeLineAccountCard() {
         <p className="text-caption text-ink">
           いまの指定：<span className="font-bold">{data.current.name}</span>
           {data.current.addFriendUrl ? <>　友だち追加：<a href={data.current.addFriendUrl} target="_blank" rel="noreferrer" className="text-action underline-offset-2 hover:underline">{data.current.addFriendUrl}</a></> : '　（LINE の基本ID が未取得のため、友だち追加の URL はまだ出せません）'}
-          　登録済み {data.linked.linked}人 / {data.linked.total}人
+          　登録済み {data.linked.linked}人 / {formatNumber(data.linked.total)}人
         </p>
       ) : (
         <p className="text-caption text-ink-secondary">未指定です。指定するまで、お知らせは画面とメールだけで送れます。</p>

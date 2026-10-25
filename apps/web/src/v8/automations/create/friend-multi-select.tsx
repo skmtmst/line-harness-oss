@@ -4,6 +4,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { FRIEND_SELECT_LIMIT, normalizeFriendIds } from './trigger-helpers'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import FriendPickerField from '@/components/shared/friend-picker-field'
+import { formatNumber } from '@/lib/format'
 
 export function FriendMultiSelect({
   accountId,
@@ -21,7 +22,7 @@ export function FriendMultiSelect({
   const ids = normalizeFriendIds(selectedIds)
       return <SaveErrorField names={["query","search"]}><div>
       <p>
-        対象の友だち（{ids.length} 人）<RequiredBadge />
+        対象の友だち（{formatNumber(ids.length)} 人）<RequiredBadge />
       </p>
         <FriendPickerField label="対象の友だち" accountId={accountId} multiple
           value={ids} names={names}

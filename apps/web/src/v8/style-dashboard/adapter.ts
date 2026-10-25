@@ -7,6 +7,7 @@ import type { StyleAnalyticsData, StyleBooking, StyleCard, StyleMetric, StyleSch
 import type {
   DashboardRange, IndustryStyle, StyleAnalytics, StyleBadge, StyleBoard, StyleKpi, StyleLayout, StyleMonth, StyleMonthDay, StyleRow, StyleSideCard, StyleToday, StyleWeek,
 } from './model'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 口（API 組4）の生の値 → 画面の形（API-CONTRACT-4 §10 の「共通のアダプター」）。
@@ -242,7 +243,7 @@ function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow
   const x = new Date(`${selected}T00:00:00Z`)
   return {
     title: `${start.getUTCFullYear()}年${month + 1}月`, days: cells,
-    selected: { title: `${x.getUTCMonth() + 1}月${x.getUTCDate()}日（${WEEK[x.getUTCDay()]}）の予約`, total: sel ? `${sel.bookings}組・${sel.people}人` : '0組', moreLabel: `この日の一覧を開く（${sel?.bookings ?? 0}組）`, rows: rows.slice(0, 6).map((r) => ({ time: r.time, name: r.name, sub: r.people ? `${r.people}名` : r.sub ?? '', state: r.state ?? { label: '予約', tone: 'info' } })) },
+    selected: { title: `${x.getUTCMonth() + 1}月${x.getUTCDate()}日（${WEEK[x.getUTCDay()]}）の予約`, total: sel ? `${sel.bookings}組・${formatNumber(sel.people)}人` : '0組', moreLabel: `この日の一覧を開く（${sel?.bookings ?? 0}組）`, rows: rows.slice(0, 6).map((r) => ({ time: r.time, name: r.name, sub: r.people ? `${formatNumber(r.people)}名` : r.sub ?? '', state: r.state ?? { label: '予約', tone: 'info' } })) },
   }
 }
 
@@ -277,7 +278,7 @@ export function toToday(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedu
     staff: sch.columns.filter((c) => c.kind !== 'unassigned').map((c) => ({ id: c.id, name: c.name })),
     kpis: kpisFor(style, s, range),
     alert: null,
-    rows, rowsNote: `${rows.length}件中 1〜${rows.length}件`,
+    rows, rowsNote: `${formatNumber(rows.length)}件中 1〜${formatNumber(rows.length)}件`,
     board: boardOf(style, sch, now),
     week: sch.calendarView === 'week' || range === 'week' || (sch.display === 'calendar' && sch.calendarView === 'day') ? weekOf(sch, now) : null,
     month: range === 'month' ? monthOf(sch, selected, now, dayRows) : null,

@@ -204,7 +204,7 @@ function PickBody({ accountId, pick, basis, measure }: { accountId: string; pick
             <Tr key={friend.id}>
               <Td grow><span className={styles.nameCell}>{friend.display_name || '（名前なし）'}</span></Td>
               <Td>{md(friend.last_activity_at)}</Td>
-              <Td align="right">{`${friend.activity_count} 回`}</Td>
+              <Td align="right">{`${formatNumber(friend.activity_count)} 回`}</Td>
             </Tr>
           ))}
         </tbody>

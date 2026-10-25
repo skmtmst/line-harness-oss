@@ -1,4 +1,5 @@
 import type { CommonActionStep } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 監査 R468: 版の切替確認で、処理の数だけでなく待ち時間・失敗時の動き・
@@ -51,7 +52,7 @@ function describeBranchChange(oldStep: CommonActionStep, newStep: CommonActionSt
     const newSide = newStep.params[key] as CommonActionStep[] | undefined
     if (Array.isArray(oldSide) && Array.isArray(newSide) && JSON.stringify(oldSide) !== JSON.stringify(newSide)) {
       if (oldSide.length !== newSide.length) {
-        lines.push(`条件分岐の${name}を${oldSide.length}個から${newSide.length}個にした`)
+        lines.push(`条件分岐の${name}を${formatNumber(oldSide.length)}個から${formatNumber(newSide.length)}個にした`)
       } else {
         lines.push(`条件分岐の${name}の内容を変えた`)
       }
@@ -127,7 +128,7 @@ export function versionChangeLines(
     .sort((left, right) => right.versionNumber - left.versionNumber)[0]
   if (!previous) return ['はじめて公開した']
   if (previous.actions.length !== version.actions.length) {
-    return [`処理を${previous.actions.length}個から${version.actions.length}個にした`]
+    return [`処理を${formatNumber(previous.actions.length)}個から${formatNumber(version.actions.length)}個にした`]
   }
   return describeVersionChanges(previous.actions, version.actions)
 }

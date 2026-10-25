@@ -269,10 +269,10 @@ export default function WebhooksInteractionsV8() {
       if (accountRef.current !== accountId) return
       if (!response.success) throw new Error(response.error)
       const d = response.data
-      const remainingNote = d.remaining > 0 ? `まだ失敗のまま残っているものが${d.remaining} 件あります。もう一度押すと続きをやり直します。` : ''
+      const remainingNote = d.remaining > 0 ? `まだ失敗のまま残っているものが${formatNumber(d.remaining)} 件あります。もう一度押すと続きをやり直します。` : ''
       const reviewNote = d.needsReview > 0 ? `届いたか分からないものが${d.needsReview} 件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。` : ''
       const excludedNote = d.excluded > 0 ? `送り先が消えた・止まっている・自動の送り直し中などで、対象外のものが${d.excluded} 件あります。` : ''
-      const message = `${d.requested} 件を確認し、${d.succeeded} 件が届きました。届かなかったもの ${d.failed} 件、対象外 ${d.skipped} 件です。${remainingNote}${reviewNote}${excludedNote}`
+      const message = `${d.requested} 件を確認し、${formatNumber(d.succeeded)} 件が届きました。届かなかったもの ${formatNumber(d.failed)} 件、対象外 ${formatNumber(d.skipped)} 件です。${remainingNote}${reviewNote}${excludedNote}`
       if (d.failed > 0 || d.skipped > 0 || d.remaining > 0 || d.needsReview > 0 || d.excluded > 0) setNotice(message)
       else notifyToast(message)
       await load()

@@ -20,6 +20,7 @@ import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
 import styles from '@/components/shared/entity-picker.module.css'
 import { InsertText } from '@/components/shared/insert-text-field'
+import { formatNumber } from '@/lib/format'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
@@ -89,7 +90,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               <Button onClick={props.onClose}>キャンセル</Button>
               <Button variant="primary" onClick={props.onConfirm} disabled={props.confirmDisabled}>
                 {packMode
-                  ? <><Send aria-hidden="true" size={15} />{packItems.length}通を続けて送る</>
+                  ? <><Send aria-hidden="true" size={15} />{formatNumber(packItems.length)}通を続けて送る</>
                   : <><CornerDownLeft aria-hidden="true" size={15} />入力欄に入れる</>}
               </Button>
             </div>
@@ -151,7 +152,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               )}
               {props.remaining > 0 ? (
                 <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore} busy={props.loadingMore} busyLabel="読み込み中…">
-                  {`さらに表示（残り${props.remaining} 件）`}
+                  {`さらに表示（残り${formatNumber(props.remaining)} 件）`}
                 </Button>
               ) : null}
             </div>

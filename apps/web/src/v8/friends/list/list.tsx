@@ -735,7 +735,7 @@ export default function FriendsListV8() {
         {broadcastHandoffHref ? (
           <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
             <Megaphone size={14} aria-hidden="true" />
-            この条件で配信を作成
+            この条件で配信を作る
           </Link>
         ) : null}
         </ListToolbarOptional>
@@ -752,7 +752,7 @@ export default function FriendsListV8() {
         </ResponsiveFilterChips></div>
         <span className={styles.count}>{loadStatus === 'ready' ? `${formatNumber(total)}件` : emptyValue('unknown')}</span>
         <span className={styles.spacer} />
-        {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
+        {selectedCount > 0 ? <span className={styles.selectedCount}>{formatNumber(selectedCount)} 件選択中</span> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog presentation="columns" items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/tags?tab=fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
         {/* 絵 nF4ts：表示項目を編集は2段目、件数の切り替えの左。 */}
         {/* 1152（y2n1z）は札・件数・並び・件数の切り替えを1段に収めるため、「ほかの絞り込み・操作」の中へ移す。 */}

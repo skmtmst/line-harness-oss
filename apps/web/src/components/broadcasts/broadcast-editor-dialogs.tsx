@@ -131,7 +131,7 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
           <div className="flex justify-between gap-4 px-4 py-3">
             <dt className="text-ink-faint">送る中身</dt>
             <dd className="text-ink text-right font-medium">
-              {bubbles.length}通（{bubbles.map((b) => TYPE_LABELS[b.type] ?? b.type).join('・')}）
+              {formatNumber(bubbles.length)}通（{bubbles.map((b) => TYPE_LABELS[b.type] ?? b.type).join('・')}）
             </dd>
           </div>
           <div className="flex justify-between gap-4 px-4 py-3">
@@ -173,7 +173,7 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
         */}
         {unconfirmedCount !== null && unconfirmedCount > 0 ? (
           <Notice tone="warn" className="mt-3">
-            <p className="font-semibold">配信前チェックに {unconfirmedCount}件 の未確認があります</p>
+            <p className="font-semibold">配信前チェックに {formatNumber(unconfirmedCount)}件 の未確認があります</p>
             <ul className="mt-1 list-disc pl-4">
               {(preflight?.warnings ?? []).filter((w) => w.level === 'warning').map((w) => (
                 <li key={w.message}>{w.message}</li>
@@ -240,7 +240,7 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
               役職はAPIが返さないので、名前から推定して表示しない。
             */}
             <p className="rounded-control bg-canvas-sunken p-3 text-sm text-ink-secondary">
-              登録済みのテスト送信先 {testRecipients.length}名全員へ送信します。
+              登録済みのテスト送信先 {formatNumber(testRecipients.length)}名全員へ送信します。
             </p>
             <ul className="space-y-2">
               {testRecipients.map((recipient) => (

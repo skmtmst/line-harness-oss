@@ -7,6 +7,7 @@ import MenuPortal from './menu-portal'
 import styles from './combobox.module.css'
 import { isImeComposing } from './ime'
 import { joinDescribedBy, useFieldContext } from './field-context'
+import { formatNumber } from '@/lib/format'
 
 export type ComboboxDot = 'green' | 'blue' | 'amber' | 'gray'
 
@@ -167,7 +168,7 @@ export default function Combobox({
     }
   }
 
-  const statusText = !open ? '' : loading ? '探しています' : `${matches.length}件の候補`
+  const statusText = !open ? '' : loading ? '探しています' : `${formatNumber(matches.length)}件の候補`
 
   return (
     <div

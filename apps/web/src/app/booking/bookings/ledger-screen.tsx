@@ -344,7 +344,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             ]}
             activeId={menuFilter}
             onSelect={setMenuFilter}
-            total={`${summary.total} 件`}
+            total={`${formatNumber(summary.total)} 件`}
           />}
         folderNav={{
           label: words.menu,

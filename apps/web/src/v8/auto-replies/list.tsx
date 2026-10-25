@@ -426,7 +426,7 @@ export default function AutoRepliesListV8() {
             failed += 1
           }
         }
-        if (failed > 0) throw new Error(`${failed} 件のフォルダ移動に失敗しました`)
+        if (failed > 0) throw new Error(`${formatNumber(failed)} 件のフォルダ移動に失敗しました`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
@@ -701,7 +701,7 @@ export default function AutoRepliesListV8() {
       value: ready ? rules.filter((r) => r.isActive).length : null,
       unit: '件',
       detail: ready
-        ? `動いていない ${rules.filter((r) => !r.isActive).length} 件`
+        ? `動いていない ${formatNumber(rules.filter((r) => !r.isActive).length)} 件`
         : LOAD_STATE_WORDS[visibleLoadState].label,
     },
     {
@@ -945,10 +945,10 @@ export default function AutoRepliesListV8() {
             : pendingToggle.kind === 'resume'
               ? pendingToggle.ids.length === 1
                 ? `自動応答「${pendingToggle.names[0]}」を再開しますか？`
-                : `${pendingToggle.ids.length} 件の自動応答を再開しますか？`
+                : `${formatNumber(pendingToggle.ids.length)} 件の自動応答を再開しますか？`
               : pendingToggle.ids.length === 1
                 ? `「${pendingToggle.names[0]}」を止める`
-                : `${pendingToggle.ids.length} 件の自動応答を止めますか？`
+                : `${formatNumber(pendingToggle.ids.length)} 件の自動応答を止めますか？`
         }
         description={
           pendingToggle?.kind === 'resume'

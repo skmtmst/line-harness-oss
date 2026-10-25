@@ -25,7 +25,7 @@ import TestModeNote from '@/components/shared/test-mode-note'
 import { notifyToast } from '@/components/shared/toast'
 import { DashboardPage } from '@/components/templates/dashboard-page'
 import { styleApi } from '@/lib/api/helpers/styles'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatNumber } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { Armchair,BellRing,CalendarCheck,CalendarDays,CalendarX2,Check,CircleUserRound,ClipboardList,Clock3,Copy,CreditCard,Download,ExternalLink,Link2,Mail,MessageCircle,Plus,RefreshCw,Repeat2,SlidersHorizontal,Sparkles,UserPlus,UserRoundX,Users,Video } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -151,7 +151,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     // 結果待ち（OJ4Vu）：実施した面談のうち、結果をまだ付けていない物。押すと結果を付ける窓。
     body = (
       <DetailColumns variant="style-dashboard" asideLabel="今日の動き" expanded={false} onExpandedChange={() => {}} showToggle={false} aside={side.length ? side : null}>
-          <TodayList style={style} rows={resultRows} note={`${resultRows.length}件中 1〜${resultRows.length}件・結果を付けると、分析の成約率に入ります`} canWrite={canWrite} busyId={busy} menuFor={menuFor}
+          <TodayList style={style} rows={resultRows} note={`${formatNumber(resultRows.length)}件中 1〜${formatNumber(resultRows.length)}件・結果を付けると、分析の成約率に入ります`} canWrite={canWrite} busyId={busy} menuFor={menuFor}
             onVisit={(r) => void markVisit(r)} onUndo={() => {}} onResult={(r) => setResultRow(r)}
             empty={<ListState kind="empty" title="結果待ちの面談はありません" description="実施した面談に結果を付けると、ここから消えます。" />} />
       </DetailColumns>
@@ -243,27 +243,27 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
             const res = await restaurantTestApi.previewClosure(accountId, { storeId: store.store.id, startDate: input.date, endDate: input.date, allDay: input.allDay, startTime: input.from ?? null, endTime: input.to ?? null, kind: KIND[input.reason] ?? 'other', memo: input.reason, tableIds: input.target === 'seat' ? input.ids : [] })
             return res.data.reservations.map((r) => ({ time: formatDate(r.startsAt, { style: 'time' }), name: `${r.customerName}さま`, sub: `${r.guestCount}名`, pay: null }))
           }
-          return input.date !== date ? [] : (today?.rows ?? []).filter((r) => r.live !== false && r.booking && inRange(r.time) && (input.target === 'store' || input.ids.length === 0 || input.ids.some((id) => r.staff === today?.staff.find((x) => x.id === id)?.name))).map((r) => ({ time: r.time, name: `${r.name}さま`, sub: [r.people ? `${r.people}名` : null, r.course].filter(Boolean).join('・'), pay: null }))
+          return input.date !== date ? [] : (today?.rows ?? []).filter((r) => r.live !== false && r.booking && inRange(r.time) && (input.target === 'store' || input.ids.length === 0 || input.ids.some((id) => r.staff === today?.staff.find((x) => x.id === id)?.name))).map((r) => ({ time: r.time, name: `${r.name}さま`, sub: [r.people ? `${formatNumber(r.people)}名` : null, r.course].filter(Boolean).join('・'), pay: null }))
         }}
         overlapMessage={(input) => `〇〇さま　${input.date.slice(5).replace('-', '/')} はお店の都合でお休みをいただくことになりました。ご予約の日を変えるか、取り消すかを選んでください。`}
         mediaNote={style === 'restaurant' ? '他の予約サイトの同じ時間の枠は、それぞれの管理画面で閉じてください。' : null} />
       {preparing.dialog}
       {cancelRow ? (
-        <CancelReservationDialog open title={`${cancelRow.name}さまの予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${cancelRow.people}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
+        <CancelReservationDialog open title={`${cancelRow.name}さまの予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${formatNumber(cancelRow.people)}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
           facts={[{ label: 'お支払い', value: cancelRow.booking?.price ? `${formatYen(cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1))}（支払いの記録は決済の口から）` : 'お支払いなし' }]}
           fullAmount={cancelRow.booking?.price ? cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1) : null} testMode={testMode} busy={busy === 'cancel'}
           messageFor={(i) => `${cancelRow.name}さま　${i.reason ? `${i.reason}で` : 'お店の都合で'} ${cancelRow.time} のご予約を取り消しました。申し訳ありません。${i.refund === 'full' ? 'お支払いは全額を返金します。' : ''}`}
           onClose={() => setCancelRow(null)} onConfirm={(i) => void confirmCancel(cancelRow, i)} />
       ) : null}
       {refundRow ? (
-        <RefundDialog open subtitle={`${refundRow.name}さま・${refundRow.time}${refundRow.course ? ` ${refundRow.course}` : ''}${refundRow.people ? ` ${refundRow.people}名` : ''}`}
+        <RefundDialog open subtitle={`${refundRow.name}さま・${refundRow.time}${refundRow.course ? ` ${refundRow.course}` : ''}${refundRow.people ? ` ${formatNumber(refundRow.people)}名` : ''}`}
           facts={[{ label: '支払った額', value: refundRow.booking?.price ? `${formatYen(refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1))}` : '—' }, { label: 'これまでの返金', value: 'なし' }]}
           paidAmount={refundRow.booking?.price ? refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1) : 0} testMode={testMode}
           onClose={() => setRefundRow(null)} onConfirm={() => { setRefundRow(null); openPayment() }} />
       ) : null}
       {classRow ? (
         <CancelClassDialog open subtitle={`${classRow.name}・${classRow.time}${classRow.endTime ?? ''}・${classRow.sub ?? ''}`}
-          facts={[{ label: '予約', value: roster && roster.rowId === classRow.id ? `${roster.members.filter((m) => m.attend !== 'cancel').length}人` : '名簿を開くと人数が出ます' }, { label: 'キャンセル待ち', value: classRow.waiting !== undefined ? `${classRow.waiting}人（待ちは終わりにします）` : '—' }]}
+          facts={[{ label: '予約', value: roster && roster.rowId === classRow.id ? `${formatNumber(roster.members.filter((m) => m.attend !== 'cancel').length)}人` : '名簿を開くと人数が出ます' }, { label: 'キャンセル待ち', value: classRow.waiting !== undefined ? `${classRow.waiting}人（待ちは終わりにします）` : '—' }]}
           counts={{ members: roster && roster.rowId === classRow.id ? roster.members.filter((m) => m.attend !== 'cancel').length : 0, paid: 0, paidAmount: 0, tickets: 0, unpaid: 0 }} testMode={testMode}
           messageFor={(i) => `〇〇さま　本日 ${classRow.time} の${classRow.name}は、${i.reason || '〇〇'}のため休講になりました。`}
           onClose={() => setClassRow(null)} onConfirm={() => { setClassRow(null); preparing.open('休講') }} />

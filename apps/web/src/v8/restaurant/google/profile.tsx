@@ -17,6 +17,7 @@ import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 Googleビジネス プロフィール（）。
@@ -106,7 +107,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   const moreRows: Array<[string, string]> = [
     ['通常の営業時間', summarizeWeekly(profile.regularHours)],
     ['特別営業時間', special],
-    ['写真・店舗紹介', `${data.photoCount === null ? '店舗写真 —' : `店舗写真 ${data.photoCount} 枚`} / ${profile.description ? '紹介文あり' : '紹介文なし'}`],
+    ['写真・店舗紹介', `${data.photoCount === null ? '店舗写真 —' : `店舗写真 ${formatNumber(data.photoCount)} 枚`} / ${profile.description ? '紹介文あり' : '紹介文なし'}`],
   ]
 
   return (
@@ -114,7 +115,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
       {role !== null && !canManageRole(role) ? <ReadOnlyNotice>閲覧のみです。営業時間と店舗情報を確認できます。</ReadOnlyNotice> : null}
       {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
       {!data.stale && data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
-      {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認する</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${data.pendingChangeCount} 件）。`}</Notice> : null}
+      {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認する</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${formatNumber(data.pendingChangeCount)} 件）。`}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-today-title">
@@ -170,7 +171,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         </div>
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-google-updates-title">
-        <SectionHeader size="small" title={<span id="gb-google-updates-title">Google側の変更を確認</span>} note={updates && updates.fields.length > 0 ? <StatusBadge tone="warning">{`確認が必要 ${updates.fields.length} 件`}</StatusBadge> : <StatusBadge tone="neutral">{updates ? '確認が必要な変更はありません' : '未確認'}</StatusBadge>} />
+        <SectionHeader size="small" title={<span id="gb-google-updates-title">Google側の変更を確認</span>} note={updates && updates.fields.length > 0 ? <StatusBadge tone="warning">{`確認が必要 ${formatNumber(updates.fields.length)} 件`}</StatusBadge> : <StatusBadge tone="neutral">{updates ? '確認が必要な変更はありません' : '未確認'}</StatusBadge>} />
         <Notice tone="warn" title="この画面で比較できるのは、店舗名・住所・電話番号・ウェブサイト・通常の営業時間・特別営業時間・店舗紹介文です。">
           Google やお客さまの提案で、店舗情報が変わることがあります。違いがあれば、ここで確かめて採るか戻すかを選びます。
         </Notice>

@@ -617,7 +617,7 @@ describe('UID移行の閲覧のみ', () => {
     expect(host.querySelector('[aria-labelledby="uid-history"]')).toBeTruthy()
     expect(host.textContent).toContain('閲覧のみで見ています')
     const labels = [...host.querySelectorAll('button')].map(button => button.textContent?.trim())
-    for (const label of ['テスト移行を実行', '新しい移行を登録', '本移行へ進む', '切り戻す']) expect(labels).not.toContain(label)
+    for (const label of ['テスト移行を実行', '新しい移行を作る', '本移行へ進む', '切り戻す']) expect(labels).not.toContain(label)
     expect(net.calls.filter(call => call.method !== 'GET')).toHaveLength(0)
   })
 })

@@ -19,7 +19,7 @@ const BROADCAST_STEPS = new Set<BroadcastStepKey>(['basic', 'audience', 'message
 
 /**
  * `?condition=<JSON>` から渡される絞り込み条件（IDEA-03）。
- * 友だち一覧の「この条件で配信を作成」が付ける。
+ * 友だち一覧の「この条件で配信を作る」が付ける。
  * 形が壊れているものは採用しない —— 壊れた条件を黙って全員扱いにすると
  * 誤配信になる。'invalid' を返して画面に理由を出す。
  */

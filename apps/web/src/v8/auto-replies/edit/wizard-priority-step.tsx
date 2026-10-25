@@ -155,7 +155,7 @@ export function WizardPriorityStep({ autoReplyId, conflicts, dryRun, effectiveKe
                           : friends.map((f) => ({ ...entityOptionMetadata(f),
                               value: f.id,
                               label: f.id === selectedFriendId
-                                ? `送信者：${f.displayName || '名前なし'}（名前で探す・候補 ${formatNumber(friendTotal)}人中 ${friends.length}人）`
+                                ? `送信者：${f.displayName || '名前なし'}（名前で探す・候補 ${formatNumber(friendTotal)}人中 ${formatNumber(friends.length)}人）`
                                 : f.displayName || '名前なし',
                             }))
                     }

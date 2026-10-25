@@ -13,6 +13,7 @@ import { carouselColumnsProblem, flexContentProblem } from '@/components/broadca
 import { emptyMessageKindState, messageKindProblem, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
 import { assetBubbleError } from '@/lib/broadcast-template'
 import { fromApiContent, toApiContent, type HqKind } from './model'
+import { formatNumber } from '@/lib/format'
 
 /** 吹き出し1つ。content は口へ送る中身（テキストは body）。カルーセルは素材（カードタイプ）のとき cardAsset。 */
 export type HqBubble = {
@@ -147,7 +148,7 @@ export function hqBubbleSummary(item: HqBubble): string {
   if (HQ_NOT_YET.has(item.kind)) return `${label}・統括からは送れません`
   if (item.kind === 'carousel') {
     const name = String(item.content.templateName ?? item.content.assetName ?? '')
-    return name ? `${label}・${name}（カード${carouselColumns(item).length} 枚）` : `${label}・まだ選んでいません`
+    return name ? `${label}・${name}（カード${formatNumber(carouselColumns(item).length)} 枚）` : `${label}・まだ選んでいません`
   }
   if (item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'research' || item.kind === 'flex') return `${label}・${String(item.content.assetName ?? item.content.templateName ?? '') || 'まだ選んでいません'}`
   return hqBubbleProblem(item) ? `${label}・まだ入れていません` : `${label}・入力済み`
@@ -158,7 +159,7 @@ export function hqBubblePreview(item: HqBubble): string {
   if (item.kind === 'carousel' || item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'research') {
     const name = String(item.content.templateName ?? item.content.assetName ?? '')
     if (!name) return ''
-    return item.kind === 'carousel' ? `［カルーセル］${name}（カード${carouselColumns(item).length} 枚）` : `［${HQ_KIND_LABEL[item.kind]}］${name}`
+    return item.kind === 'carousel' ? `［カルーセル］${name}（カード${formatNumber(carouselColumns(item).length)} 枚）` : `［${HQ_KIND_LABEL[item.kind]}］${name}`
   }
   if (item.kind === 'location') {
     const state = item.content.state as MessageKindState | undefined

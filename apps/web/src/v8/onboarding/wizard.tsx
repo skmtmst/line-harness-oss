@@ -26,6 +26,7 @@ import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
 import { useStarterMenu } from './use-starter-menu'
 import SetupLinks from './setup-links'
+import { formatNumber } from '@/lib/format'
 
 /*
  *  (1)：スタイルを変えると、ダッシュボードが数える予約が変わる（前の予約は消えないが、出なくなる）。
@@ -58,7 +59,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
       <div className={styles.footerCenter}>
         {step === 'summary' ? <Button onClick={() => onClose(true)} disabled={busy}>動かさずにダッシュボードへ</Button> : null}
         {step === 'summary'
-          ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${onCount}件）`}</Button>
+          ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${formatNumber(onCount)}件）`}</Button>
           : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle"><ArrowRight aria-hidden="true" className={styles.buttonIcon} />次へ</Button>}
       </div>
       <div className={styles.footerSide}>
@@ -151,7 +152,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
       <>
         <div className={styles.summaryRow}>
           <section className={styles.card} aria-labelledby="setup-inserted">
-            <div className={styles.cardHead}><h3 id="setup-inserted" className={styles.cardTitle}>入った物</h3><span className={styles.cardMeta}>{`${groupInserted(summary.inserted).length}件`}</span></div>
+            <div className={styles.cardHead}><h3 id="setup-inserted" className={styles.cardTitle}>入った物</h3><span className={styles.cardMeta}>{`${formatNumber(groupInserted(summary.inserted).length)}件`}</span></div>
             <ul className={styles.rows}>
               {groupInserted(summary.inserted).map((group) => (
                 <li key={group.kind} className={styles.row}>
@@ -247,7 +248,7 @@ function groupInserted(pairs: Pair[]): Array<{ kind: string; note: string }> {
       const menu = list[0]
       return { kind, note: `${menu.name}${menu.buttons ? `（${menu.buttons.length}つのボタン）` : ''}` }
     }
-    if (list.length > 3) return { kind, note: `${list.slice(0, 2).map((item) => item.name).join('・')} ほか ${list.length}件` }
+    if (list.length > 3) return { kind, note: `${list.slice(0, 2).map((item) => item.name).join('・')} ほか ${formatNumber(list.length)}件` }
     return { kind, note: list.map((item) => item.name).join('・') }
   })
 }

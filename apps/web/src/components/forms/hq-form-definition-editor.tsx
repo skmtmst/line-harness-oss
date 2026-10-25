@@ -30,6 +30,7 @@ import {
   hqFormPortableReferenceError,
   type HqFormEditorValue,
 } from './hq-form-definition-adapter'
+import { formatNumber } from '@/lib/format'
 
 const HEADER_TAB = -1
 
@@ -239,6 +240,6 @@ export default function HqFormDefinitionEditor({
     <ConfirmDialog open={renameSectionIndex !== null} title="ページの名前を変更" description="ページ名を入力してください。" confirmLabel="保存する" onCancel={() => { setRenameSectionIndex(null); setRenameSectionName('') }} onConfirm={applySectionName}>
       <Field label="ページの名前" htmlFor="hq-form-section-name"><TextInput id="hq-form-section-name" value={renameSectionName} onChange={event => setRenameSectionName(event.target.value)} /></Field>
     </ConfirmDialog>
-    <ConfirmDialog open={removeSectionIndex !== null} title="ページを削除" description={removeSectionIndex === null ? '' : (() => { const target = layout.sections[removeSectionIndex]; if (!target) return ''; const branchCount = formJumpsInto(layout, target.id); return `ページ「${target.name}」のブロック${target.blocks.length}個を外します。${branchCount ? ` 分岐${branchCount}件は「次へ進む」に戻ります。` : ''} 元に戻すで復元できます。集まった回答は消えません。` })()} confirmLabel="削除する" onCancel={() => setRemoveSectionIndex(null)} onConfirm={() => { if (removeSectionIndex !== null) removeSectionNow(removeSectionIndex) }} />
+    <ConfirmDialog open={removeSectionIndex !== null} title="ページを削除" description={removeSectionIndex === null ? '' : (() => { const target = layout.sections[removeSectionIndex]; if (!target) return ''; const branchCount = formJumpsInto(layout, target.id); return `ページ「${target.name}」のブロック${formatNumber(target.blocks.length)}個を外します。${branchCount ? ` 分岐${formatNumber(branchCount)}件は「次へ進む」に戻ります。` : ''} 元に戻すで復元できます。集まった回答は消えません。` })()} confirmLabel="削除する" onCancel={() => setRemoveSectionIndex(null)} onConfirm={() => { if (removeSectionIndex !== null) removeSectionNow(removeSectionIndex) }} />
   </div>
 }

@@ -405,8 +405,8 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
         <ConfirmDialog
           open={pendingPack !== null}
           title="テンプレートをまとめて送る"
-          description={pendingPack ? `${pendingPack.texts.length}通をこの順番で一度に送ります。送信すると取り消せません。` : ''}
-          confirmLabel={pendingPack ? `まとめて送る（${pendingPack.texts.length}通）` : 'まとめて送る'}
+          description={pendingPack ? `${formatNumber(pendingPack.texts.length)}通をこの順番で一度に送ります。送信すると取り消せません。` : ''}
+          confirmLabel={pendingPack ? `まとめて送る（${formatNumber(pendingPack.texts.length)}通）` : 'まとめて送る'}
           onConfirm={pendingPack ? () => void handleSendPack(pendingPack) : undefined}
           onCancel={() => setPendingPack(null)}
           busy={sending}

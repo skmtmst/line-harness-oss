@@ -489,7 +489,7 @@ function BroadcastDetailInner() {
     ? (approvalCandidates.find((item) => item.id === approvalState.approval.approverStaffId)?.name ?? null)
     : null
   const approvalMessageSummary = broadcast?.messageBubbles && broadcast.messageBubbles.length > 0
-    ? `${broadcast.messageBubbles.length}通`
+    ? `${formatNumber(broadcast.messageBubbles.length)}通`
     : null
   // 差し戻し・期限切れ・取り消しのあと、頼み直せる条件。
   const canReRequest = broadcast

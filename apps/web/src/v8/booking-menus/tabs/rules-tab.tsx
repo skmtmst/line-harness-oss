@@ -25,6 +25,7 @@ import NumberInput from '@/components/shared/number-field'
 import SaveFeedback, { useSaveFeedback } from '@/components/shared/save-feedback'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 /* ④ 予約のルール。絵に無い設定は「ほかの設定」で開く。 */
 
@@ -295,7 +296,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   const cancelOptions = withCurrent(BEFORE_MINUTE_CHOICES, draft.cancelDeadlineMinutesBefore)
     .map((minutes) => ({ value: String(minutes), label: beforeLabel(minutes) }))
   const maxOptions = withCurrent(MAX_ACTIVE_CHOICES, draft.maxActiveBookingsPerFriend)
-    .map((count) => ({ value: String(count), label: `${count} 件` }))
+    .map((count) => ({ value: String(count), label: `${formatNumber(count)} 件` }))
   const dayBeforeText = draft.reminderDayBeforeTime
     ? `前日の ${draft.reminderDayBeforeTime} に送ります`
     : '24時間前に送ります'

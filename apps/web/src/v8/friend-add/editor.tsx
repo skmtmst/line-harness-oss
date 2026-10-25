@@ -45,6 +45,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import styles from './editor.module.css'
 import { describeFriendAddFailure } from './failure'
 import { MESSAGE_TYPE_LABEL } from './flow'
+import { formatNumber } from '@/lib/format'
 
 export default function FriendAddEditorV8({ ruleId }: { ruleId?: string }) {
   return (
@@ -570,7 +571,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       boardId={step === 'routes' && narrow ? 'xHpkS' : conflict ? 'h5rm8t' : STEPS[currentIndex].node}
       title="初回案内を作る"
       actions={canEdit && ruleId ? <RowMenu label="初回案内の操作" triggerProps={{ disabled: saving || enabling || duplicating }} items={[{ id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) }]} /> : undefined}
-      steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} readOnly={!canEdit} summaries={{ basic: rule.name, routes: routeSummary, message: firstSend, actions: `${definition.actions.length}件のアクション` }} />}
+      steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} readOnly={!canEdit} summaries={{ basic: rule.name, routes: routeSummary, message: firstSend, actions: `${formatNumber(definition.actions.length)}件のアクション` }} />}
       help={<>
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'

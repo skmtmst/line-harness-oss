@@ -1182,7 +1182,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       />
     </KpiBand>}
       notices={ <>
-      {folderBatch ? <p className={styles.note}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${folderBatch.runs.length} 件目の配布方法を確かめています。`}</p> : null}
+      {folderBatch ? <p className={styles.note}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${formatNumber(folderBatch.runs.length)} 件目の配布方法を確かめています。`}</p> : null}
       {error || message ?notices : null}
         </>}
         toolbar={<DistributionToolbar>
@@ -1210,7 +1210,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           </> : stage === 'duplicates' && preflight ? <>
             <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
             {expired ? <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button> : null}
-            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={15} aria-hidden="true" /> < TruncatedText value ={folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${folderBatch.runs.length}）` : folderBatch ? `${folderBatch.runs.length} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}/></Button>
+            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={15} aria-hidden="true" /> < TruncatedText value ={folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${formatNumber(folderBatch.runs.length)}）` : folderBatch ? `${formatNumber(folderBatch.runs.length)} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}/></Button>
           </> : <>
             <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
             {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}

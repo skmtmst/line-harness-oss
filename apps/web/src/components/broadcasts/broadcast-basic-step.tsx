@@ -47,7 +47,7 @@ export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMeth
           <h3>配信方法</h3>
               <SaveErrorField names={["broadcast-delivery-method","value","deliveryMethod"]}><RadioCardGroup legend="配信方法" className={styles.methodCards}>
                 {([
-                  ['new', '新しいメッセージを作成', 'テキスト・画像・ボタンを組み合わせて一から作ります。'],
+                  ['new', '新しいメッセージを作る', 'テキスト・画像・ボタンを組み合わせて一から作ります。'],
                   ['template', 'テンプレートを選択', '保存済みテンプレートを呼び出して手直しします。'],
                   ['duplicate', '過去の配信を複製', '送信済みの配信をそのまま写して作り直します。'],
                 ] as const).map(([value, label, description]) => (

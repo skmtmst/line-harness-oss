@@ -14,6 +14,7 @@ import {
   featureLabel,
 } from './recipe-catalog'
 import styles from './recipes.module.css'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 設計 ★管理画面 34-2「レシピ一覧」（`y0P0Qx`）。
@@ -117,7 +118,7 @@ export default function RecipesPage() {
                         })}
                       </span>
                     </div>
-                    <p className={styles.count}>これまで {recipe.cloneCount} 回作られました</p>
+                    <p className={styles.count}>これまで {formatNumber(recipe.cloneCount)} 回作られました</p>
                   </div>
 
                   <div className={styles.actions}>

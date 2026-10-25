@@ -11,6 +11,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { usePageTitle } from '../../../../components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { BookingAction, POLICY_FIELD_LABELS, jstDate, jstHHMM, snapshotEditBase, EditBase, serverChangedLabels } from './detail-model'
+import { formatNumber } from '@/lib/format'
 
 export function useBookingDetail() {
   const { selectedAccountId } = useAccount()
@@ -277,7 +278,7 @@ export function useBookingDetail() {
     if (failedNotificationOps.length > 0) {
       items.push({
         key: 'notification',
-        text: `届いていないお知らせが${failedNotificationOps.length}件あります`,
+        text: `届いていないお知らせが${formatNumber(failedNotificationOps.length)}件あります`,
         href: '#sec-failures',
       })
     }

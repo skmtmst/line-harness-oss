@@ -3,6 +3,7 @@ import { normalizePhone, phoneProblem } from '@line-crm/shared'
 
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { loadStaffIdentity } from '@/lib/staff-role'
+import { formatNumber } from '@/lib/format'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import { PageHeading } from '@/components/templates/page-frame';
 import DateField from '@/components/shared/date-field';
@@ -967,7 +968,7 @@ export default function NewProxyBookingPage() {
                   <p><strong className={customerContext.isLineLinked ? 'text-success' : 'text-warning'}>{customerContext.isLineLinked ? 'LINEと結びついています' : 'LINE未連携の電話客です'}</strong></p>
                   <p><span className="text-ink-faint">電話</span>　{customerContext.phone ?? '登録なし'}</p>
                   <p><span className="text-ink-faint">ペット</span>　{customerContext.petName ?? '登録なし'}</p>
-                  <p><span className="text-ink-faint">これまでの予約</span>　{customerContext.recentBookings.length}件</p>
+                  <p><span className="text-ink-faint">これまでの予約</span>　{formatNumber(customerContext.recentBookings.length)}件</p>
                   <p><span className="text-ink-faint">前回の申し送り</span>　{customerContext.previousHandover ?? 'ありません'}</p>
                   {customerContext.tags.length > 0 ? <p><span className="text-ink-faint">タグ</span>　{customerContext.tags.map((tag) => tag.name).join('、')}</p> : null}
                 </div>
@@ -1047,7 +1048,7 @@ export default function NewProxyBookingPage() {
             <p className="text-sm font-semibold">{dateLabel(slotStartIso, slotTimeZone)} は {selectedStaff.display_name} がふさがっています</p>
             <p className="mt-1 text-xs">
               {conflictAlternatives
-                ? `${scheduleLabel(conflictAlternatives.conflict.from, slotTimeZone)}〜${scheduleLabel(conflictAlternatives.conflict.to, slotTimeZone)}に${conflictAlternatives.conflict.count}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
+                ? `${scheduleLabel(conflictAlternatives.conflict.from, slotTimeZone)}〜${scheduleLabel(conflictAlternatives.conflict.to, slotTimeZone)}に${formatNumber(conflictAlternatives.conflict.count)}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
                 : ''}
               時間か担当を変えてください。
             </p>

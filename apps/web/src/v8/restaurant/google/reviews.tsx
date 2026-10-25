@@ -135,7 +135,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
       {!canEdit ? <ReadOnlyNotice /> : null}
       <StatRow>
         <KpiCard density="compact" title="未返信" valueText={`${data.summary.unrepliedCount}`} detail="返信を待っている口コミ" valueTone={data.summary.unrepliedCount > 0 ? 'warning' : 'default'} icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
-        <KpiCard density="compact" title="平均の評価" valueText={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} detail={`総合・${reviewTotal}件`} icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
+        <KpiCard density="compact" title="平均の評価" valueText={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} detail={`総合・${polishFormatNumber(reviewTotal)}件`} icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
         <KpiCard density="compact" title="要確認" valueText={`${data.summary.attentionCount}`} detail="評価2以下" icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
         {/* Google経由の予約：結ぶ口がまだ無いので「—」（数を推測しない）。 */}
         <KpiCard density="compact" title="Google経由の予約" valueText="—" detail="この30日" help="予約の連携サービスと結ぶと数えます。いまは取れないので「—」です。" icon={<Inbox size={14} />} presentation="band" value={null} unit="" />
@@ -208,7 +208,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         </tbody></DataTable></Card>
       ) : null}
       {list && pageCount > 1 ? (
-        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${list.total} 件・新着と未返信は別に管理`} />
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${polishFormatNumber(list.total)} 件・新着と未返信は別に管理`} />
       ) : null}
     </>
   )

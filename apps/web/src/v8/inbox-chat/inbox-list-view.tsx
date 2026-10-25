@@ -1,6 +1,7 @@
 'use client'
 import Notice from '@/components/shared/notice'
 import { RefreshCover } from '@/components/shared/refresh-cover'
+import { formatNumber } from '@/lib/format'
 import { unreadLookup } from '@/components/chats/assignee-unread';
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
 import { buildOperatorRows } from '@/components/chats/inbox-dropdown';
@@ -171,7 +172,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                       </span>
                     </button>
                     <span className="text-ink-secondary shrink-0 text-xs tabular-nums">
-                      {typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'}
+                      {typeof view.matchCount === 'number' ? `${formatNumber(view.matchCount)}件` : '—件'}
                     </span>
                     <div className="relative shrink-0">
                       <RowMenu

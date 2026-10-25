@@ -423,7 +423,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                   <>
                     {detail.history.length < (detail.historyTotal ?? detail.history.length) ? (
                       <span>
-                        最新{detail.history.length}件を表示（全{detail.historyTotal}件）
+                        最新{formatNumber(detail.history.length)}件を表示（全{formatNumber(detail.historyTotal)}件）
                       </span>
                     ) : (
                       <span>{detail.historyTotal ?? detail.history.length}件</span>
@@ -727,7 +727,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                       disabled={auditLoading}
                       className="text-action mt-3 text-xs underline disabled:opacity-40"
                     >
-                      {auditLoading ? '読み込み中…' : `あと${auditRemaining}件の記録を読み込む`}
+                      {auditLoading ? '読み込み中…' : `あと${formatNumber(auditRemaining)}件の記録を読み込む`}
                     </button>
                   ) : null}
                 </>

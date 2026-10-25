@@ -3,6 +3,7 @@ import type {
   AutoReplyDryRunResult,
   AutoReplyValidationResult,
 } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 export type PublishStage = 'conflicts' | 'test' | 'confirm' | 'done'
 
@@ -69,8 +70,8 @@ export function publishGates(
           : conflicts.length === 0
             ? '重なる自動応答はありません'
             : unacknowledged.length === 0
-              ? `${conflicts.length}件を確認しました`
-              : `${unacknowledged.length}件が未確認です`,
+              ? `${formatNumber(conflicts.length)}件を確認しました`
+              : `${formatNumber(unacknowledged.length)}件が未確認です`,
     },
   ]
 }

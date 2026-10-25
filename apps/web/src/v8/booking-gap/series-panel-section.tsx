@@ -12,6 +12,7 @@ import type { Gap2Booking, Gap2Series } from '@line-crm/shared'
 import SeriesScopeDialog from './series-scope-dialog'
 import { dayWithWeekday, hm, ruleLabel } from './series-model'
 import styles from './series-panel-section.module.css'
+import { formatNumber } from '@/lib/format'
 
 const TIMES = Array.from({ length: 19 }, (_, i) => `${String(9 + Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`)
 
@@ -42,7 +43,7 @@ export default function SeriesPanelSection({ series, bookings, accountId, custom
 
   return (
     <Card padding="compact" layout="vertical" gap="var(--polish-space-field)" aria-label="繰り返し">
-      <h3 className={styles.title}>繰り返し（{target.ruleText}・全 {sorted.length} 回）</h3>
+      <h3 className={styles.title}>繰り返し（{target.ruleText}・全 {formatNumber(sorted.length)} 回）</h3>
       <ol className={styles.list}>
         {sorted.map((o, i) => (
           <li className={styles.occurrence} key={o.id} data-current={o.id === bookingId || undefined}>

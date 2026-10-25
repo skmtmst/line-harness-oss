@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import type { UserRowData } from '@/components/users/users-types'
+import { formatNumber } from '@/lib/format'
 
 export const USERS_PAGE_SIZE = 50
 
@@ -156,7 +157,7 @@ export function useMergedUsers() {
         }
       }
       if (!complete) {
-        setExportError(`人数が多すぎるため、CSVに書き出せませんでした（${all.length}人より先があります）。条件で絞ってからやり直してください。`)
+        setExportError(`人数が多すぎるため、CSVに書き出せませんでした（${formatNumber(all.length)}人より先があります）。条件で絞ってからやり直してください。`)
         return
       }
       const lines = [

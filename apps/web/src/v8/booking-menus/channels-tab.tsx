@@ -1,5 +1,5 @@
 'use client'
-import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -333,7 +333,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
       </Notice>
       {firstConflict ? (
         <NoteBar tone="warn">
-          予約が {conflicts.length} 件重なっています。
+          予約が {formatNumber(conflicts.length)} 件重なっています。
           {/* WEB059：閲覧のみには、付け替え（書き込み）へ進む口を置かない。重なりの知らせは出す。 */}
           <Button size="compact" onClick={() => setConflictOpen(true)}>{canEdit ? '重なりを解消する' : '重なりを見る'}</Button>
         </NoteBar>

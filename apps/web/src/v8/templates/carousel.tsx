@@ -53,6 +53,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CarouselButtons from './carousel-buttons'
+import { formatNumber } from '@/lib/format'
 export { inlineActionsText } from './carousel-button-options'
 
 /*
@@ -276,10 +277,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   panels.forEach((p, i) => {
     const opts = { reveal: () => setSelected(i), group: `card-${i}` }
     fields.define(`card-${i}-image`, `カード${i + 1}の画像`, () => (someImage && !p.thumbnailImageUrl.trim() ? '画像は全部のカードに入れるか、全部入れないかにしてください' : null), { ...(opts), required: someImage })
-    fields.define(`card-${i}-title`, `カード${i + 1}のタイトル`, () => ([...p.title].length > TITLE_MAX ? `タイトルは${TITLE_MAX}文字までです（いま${[...p.title].length}文字）` : null), { ...(opts), required: false })
+    fields.define(`card-${i}-title`, `カード${i + 1}のタイトル`, () => ([...p.title].length > TITLE_MAX ? `タイトルは${TITLE_MAX}文字までです（いま${formatNumber([...p.title].length)}文字）` : null), { ...(opts), required: false })
     fields.define(`card-${i}-text`, `カード${i + 1}の本文`, () => (
       !p.text.trim() ? '本文を入力してください'
-        : [...p.text].length > textMaxFor(p) ? `本文は${textMaxFor(p)}文字までです（いま${[...p.text].length}文字）` : null
+        : [...p.text].length > textMaxFor(p) ? `本文は${textMaxFor(p)}文字までです（いま${formatNumber([...p.text].length)}文字）` : null
     ), { ...(opts), required: true })
     p.actions.forEach((a, ai) => {
       fields.define(`card-${i}-button-${ai}`, `カード${i + 1}のボタン${ai + 1}`, () => buttonProblem(a, liffId, hqHost), { ...(opts), required: true })
@@ -434,7 +435,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         description={`横にめくるカード。最大 ${MAX_COLUMNS} 枚`}
         side={(
           <>
-            {inline ? null : <CreateSummaryCard title="気をつけること" rows={[{ label: 'カードの数', value: `${panels.length} / ${MAX_COLUMNS}` }, { label: '画像', value: `${panels.length} 枚とも同じ比率` }, { label: '押された数', value: 'ボタンごとに数える' }]} />}
+            {inline ? null : <CreateSummaryCard title="気をつけること" rows={[{ label: 'カードの数', value: `${formatNumber(panels.length)} / ${MAX_COLUMNS}` }, { label: '画像', value: `${formatNumber(panels.length)} 枚とも同じ比率` }, { label: '押された数', value: 'ボタンごとに数える' }]} />}
             <h2 className={te.previewHead}>届き方</h2>
             <div className={te.phone}>{phone}</div>
           </>

@@ -29,7 +29,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError, Field } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './support.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -421,7 +421,7 @@ export default function OpsSupportV8() {
               </div>
               <div className={styles.detailMeta}>
                 <StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge>
-                <span title={`起票者 ${ticket.staffName || emptyValue('unknown')}${ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}・受付 ${ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}・プラン ${planLabel(ticket.tenantPlanKey)}／${PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}${detail ? `・店舗 ${detail.tenant.accountCount}・LINE登録 ${detail.tenant.staffCount}人中${detail.tenant.staffWithLine}人・これまで${detail.tenant.pastTickets}のうち未解決${detail.tenant.pastOpen}件` : ''}`}>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : emptyValue('none')}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
+                <span title={`起票者 ${ticket.staffName || emptyValue('unknown')}${ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}・受付 ${ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}・プラン ${planLabel(ticket.tenantPlanKey)}／${PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}${detail ? `・店舗 ${detail.tenant.accountCount}・LINE登録 ${formatNumber(detail.tenant.staffCount)}人中${detail.tenant.staffWithLine}人・これまで${detail.tenant.pastTickets}のうち未解決${detail.tenant.pastOpen}件` : ''}`}>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : emptyValue('none')}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
                 {ticket.subjectAuto ? <StatusBadge tone="neutral">自動で付けた件名</StatusBadge> : null}
               </div>
               {detail ? <TicketKnowledge key={ticket.id} detail={detail} onRefresh={() => void loadDetail(ticket.id)} /> : null}

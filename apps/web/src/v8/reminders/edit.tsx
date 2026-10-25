@@ -790,7 +790,7 @@ export function TargetStageV8({
       <Dialog
         open={facesOpen}
         title="対象者を確認"
-        description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${faces.sample.length} 人です。` : undefined}
+        description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${formatNumber(faces.sample.length)} 人です。` : undefined}
         onCancel={() => setFacesOpen(false)}
       >
         {!faces || faces.loading

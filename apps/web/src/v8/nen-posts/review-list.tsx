@@ -131,7 +131,7 @@ export function ReviewListV8(props: ReviewListV8Props) {
   const more = !loading && !loadError && props.hasMorePhotos ? (
     <div>
       <Button variant="secondary" disabled={props.loadingMore} onClick={props.onLoadMore} busy={props.loadingMore} busyLabel="読み込み中…">
-        {`さらに読み込む（いま${photos.length} 枚）`}
+        {`さらに読み込む（いま${formatNumber(photos.length)} 枚）`}
       </Button>
     </div>
   ) : null

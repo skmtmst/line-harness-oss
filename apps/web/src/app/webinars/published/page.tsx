@@ -17,6 +17,7 @@ import NoteBar from '@/components/shared/note-bar'
 import { useAccount } from '@/contexts/account-context'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import { formatNumber } from '@/lib/format'
 
 type PublishedWebinar = Webinar & {
   publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
@@ -156,7 +157,7 @@ function PublishedWebinarContent() {
         setNotice('公開を止めました。いまは下書きです。編集画面から内容を確かめて、もう一度公開できます。')
       } else if (action === 'test') {
         const response = await webinarApi.testNotifications(id)
-        setNotice(`通知テスト: 成功 ${response.data.sent}件・失敗 ${response.data.failed}件`)
+        setNotice(`通知テスト: 成功 ${formatNumber(response.data.sent)}件・失敗 ${formatNumber(response.data.failed)}件`)
       } else {
         const response = await webinarApi.duplicate(id, editor.version)
         window.location.assign(`/webinars/edit?id=${encodeURIComponent(response.data.id)}`)

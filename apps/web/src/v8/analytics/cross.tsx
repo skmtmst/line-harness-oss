@@ -29,7 +29,7 @@ import AggregationStatus from '@/components/shared/aggregation-status'
  * ★V8 分析「クロス分析」（Pencil ）。
  * 数の帯 → 選ぶ段（数えるもの・たての軸・よこの軸・期間・集計する・この分析を保存）
  * → 左に掛け合わせの表（濃さはその表の最大が基準・マスを押して選ぶ・凡例）、
- *   右に選んだマス（対象者を開く・この対象者へ配信を作成）とこの表から読めること → 見かたの注意。
+ *   右に選んだマス（対象者を開く・この対象者へ配信を作る）とこの表から読めること → 見かたの注意。
  * 集計は重いので開いただけでは走らせない（「集計する」で受け付け、結果は待ち順で届く）。
  * 呼ぶ口・待ち順の確認（打ち切り・再接続・控え）・世代の守り・CSV は今の画面（CrossTab）と同じ。
  * よこの軸は友だち情報だけでなく、流入経路・タグなど口が受け付ける軸を選べる（絵どおり）。
@@ -434,7 +434,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
             <h2 id="cross-picked-title" className={styles.hoursTitle}>{picked ? `${picked.rowLabel} × ${picked.columnLabel}（${formatNumber(picked.value)}${unit}${unit === '回' ? `・${formatNumber(picked.uniqueFriends)} 人` : ''}）` : 'マスを選んでください'}</h2>
             {picked && canManage ? <>
               <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('friends')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={15} aria-hidden="true" />対象者を開く</Button></span>
-              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('broadcast')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={15} aria-hidden="true" />この対象者へ配信を作成</Button></span>
+              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('broadcast')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={15} aria-hidden="true" />この対象者へ配信を作る</Button></span>
             </> : picked ? <p className={styles.caption}>結果の保存と対象者づくりは、統括・管理者だけが行えます。</p> : null}
             {readings.length > 0 ? <>
               <h3 className={styles.compareTitle}>この表から読めること</h3>

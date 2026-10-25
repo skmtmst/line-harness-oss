@@ -598,7 +598,7 @@ describe('予約設備の編集', () => {
     let resolveCreate!: (value: unknown) => void
     fixture.createResource.mockImplementationOnce(() => new Promise((resolve) => { resolveCreate = resolve }))
     await renderEditor()
-    fireEvent.click(screen.getByRole('button', { name: '設備を追加する' }))
+    fireEvent.click(screen.getByRole('button', { name: '設備を作る' }))
     fireEvent.change(await screen.findByLabelText('設備名'), { target: { value: '新個室' } })
     fireEvent.change(screen.getByLabelText('種類'), { target: { value: 'room' } })
     const add = screen.getByRole('button', { name: '保存する' })
@@ -618,7 +618,7 @@ describe('予約設備の編集', () => {
     let resolveCreate!: (value: unknown) => void
     fixture.createResource.mockImplementationOnce(() => new Promise((resolve) => { resolveCreate = resolve }))
     await renderEditor()
-    fireEvent.click(screen.getByRole('button', { name: '設備を追加する' }))
+    fireEvent.click(screen.getByRole('button', { name: '設備を作る' }))
     fireEvent.change(await screen.findByLabelText('設備名'), { target: { value: '旧個室' } })
     fireEvent.change(screen.getByLabelText('種類'), { target: { value: 'room' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))

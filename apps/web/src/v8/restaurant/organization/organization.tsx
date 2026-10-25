@@ -25,6 +25,7 @@ import styles from './organization.module.css'
 import StoreGroups from './store-groups'
 
 import { IntakeAddressPanel,LoginConnection,loginSummary,MATRIX,MemberForm,roleLabel,StoreForm,tableDesign } from './organization-forms'
+import { formatNumber } from '@/lib/format'
 
 function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   const saveErrors = useSaveFormErrors()
@@ -139,7 +140,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           <div className={styles.treeExpanded}>
             <Panel title="組織階層" flush>{organizationTree}</Panel>
           </div>
-          <Disclosure className={styles.treeCollapsed} title="組織階層" hint={`${data.stores.length} 店舗`}>
+          <Disclosure className={styles.treeCollapsed} title="組織階層" hint={`${formatNumber(data.stores.length)} 店舗`}>
             {organizationTree}
           </Disclosure>
         </div>
@@ -147,7 +148,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           <Panel
             title="店舗管理"
             description="1店舗につき1つのLINE公式アカウントを割り当てます。"
-            aside={readOnly ? null : <Button onClick={() => { setShowStoreForm(true); setEditingStoreId('') }}><Plus aria-hidden className={styles.buttonIcon} />店舗を追加する</Button>}
+            aside={readOnly ? null : <Button onClick={() => { setShowStoreForm(true); setEditingStoreId('') }}><Plus aria-hidden className={styles.buttonIcon} />店舗を作る</Button>}
             flush
           >
             <GridTable label="店舗管理" framed={false} design={{ ...tableDesign, columns: 'minmax(0, 1fr) max-content max-content' }}>
@@ -174,7 +175,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
             designTop={160}
             designHeaderPadding="24px 24px 0"
             designHeaderHeight={50}
-            title={editingStore ? `${editingStore.name}を編集` : '店舗を追加する'}
+            title={editingStore ? `${editingStore.name}を編集` : '店舗を作る'}
             onCancel={closeStoreDialog}
           >
             <StoreForm
@@ -189,9 +190,9 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           <StoreGroups key={accountId} accountId={accountId} stores={data.stores} readOnly={readOnly} />
           <IntakeAddressPanel accountId={accountId} store={store} readOnly={readOnly} />
           <StatRow>
-            <KpiCard title="所属ユーザー" valueText={`${members.length}名`} detail="名簿に載っている人数" icon={null} presentation="band" value={null} unit="" />
-            <KpiCard title="店舗管理者" valueText={`${members.filter((m) => m.role === 'store_manager').length}名`} detail="名簿上の役割（操作権限は別）" icon={null} presentation="band" value={null} unit="" />
-            <KpiCard title="連携アカウント" valueText={`${members.filter((m) => m.line_uid || m.google_email).length}件`} detail="LINE UID / Google" icon={null} presentation="band" value={null} unit="" />
+            <KpiCard title="所属ユーザー" valueText={`${formatNumber(members.length)}名`} detail="名簿に載っている人数" icon={null} presentation="band" value={null} unit="" />
+            <KpiCard title="店舗管理者" valueText={`${formatNumber(members.filter((m) => m.role === 'store_manager').length)}名`} detail="名簿上の役割（操作権限は別）" icon={null} presentation="band" value={null} unit="" />
+            <KpiCard title="連携アカウント" valueText={`${formatNumber(members.filter((m) => m.line_uid || m.google_email).length)}件`} detail="LINE UID / Google" icon={null} presentation="band" value={null} unit="" />
           </StatRow>
           <Panel
             title="アカウント一覧"

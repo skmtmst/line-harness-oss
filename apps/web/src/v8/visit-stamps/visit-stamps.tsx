@@ -379,7 +379,7 @@ function VisitStampsScreen() {
         requestId: grantRequest.current, source: reason === 'paper' ? 'paper' : 'manual',
       })
       grantRequest.current = newRequestId()
-      notifyToast(`${count} 個 押しました。`)
+      notifyToast(`${polishFormatNumber(count)} 個 押しました。`)
       setCount(1); setMemo('')
       await loadLog()
     } catch (caught) {
@@ -762,7 +762,7 @@ function VisitStampsScreen() {
                         <span className={styles.label}>押印数</span>
                         <span className={styles.stepper}>
                           <IconButton aria-label="1個へらす" disabled={count <= 1} onClick={() => setCount((c) => Math.max(1, c - 1))}><Minus size={16} aria-hidden="true" /></IconButton>
-                          <span className={styles.stepValue} aria-live="polite">{`＋${count} 個`}</span>
+                          <span className={styles.stepValue} aria-live="polite">{`＋${polishFormatNumber(count)} 個`}</span>
                           <IconButton aria-label="1個ふやす" disabled={count >= 100} onClick={() => setCount((c) => Math.min(100, c + 1))}><Plus size={16} aria-hidden="true" /></IconButton>
                         </span>
                       </div>

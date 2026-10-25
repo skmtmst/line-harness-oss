@@ -24,6 +24,7 @@ Users
 import type { Dispatch,JSX,SetStateAction } from 'react'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 type RenderHqAudienceStepContext = {
   audience: "all" | "tag" | "none" | "targeted"
@@ -203,7 +204,7 @@ export function renderAudienceStep({ aggregateOnly, audience, canOperate, condit
               />
               </fieldset>
               {editGroupId && !conditionEmpty ? (
-                <p className={styles.fieldHint}>{conditionUnsaved ? `条件 ${conditionCount}件（未保存）` : `保存済み条件 ${conditionCount}件`}</p>
+                <p className={styles.fieldHint}>{conditionUnsaved ? `条件 ${formatNumber(conditionCount)}件（未保存）` : `保存済み条件 ${formatNumber(conditionCount)}件`}</p>
               ) : null}
               {conditionEmpty ? (
                 <p className={styles.fieldHint}>条件が空のままだと、公開しても誰にも出ません。</p>

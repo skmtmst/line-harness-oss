@@ -290,7 +290,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
             {active && canDecideItems ? (
               <button type="button" className={styles.textButton} aria-expanded={registerOpen} onClick={() => setRegisterOpen((open) => !open)}>
                 <Plus size={16} aria-hidden="true" />
-                新しい移行を登録
+                新しい移行を作る
               </button>
             ) : null}
           </div>

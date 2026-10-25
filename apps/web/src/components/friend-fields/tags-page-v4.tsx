@@ -249,7 +249,7 @@ function deleteImpactRows(
     tag.mileageReward ? `本人+${tag.mileageReward}` : null,
     tag.referralMileageReward ? `紹介者+${tag.referralMileageReward}` : null,
     tag.mileageMultiplierBps ? `${tag.mileageMultiplierBps / 10000}倍` : null,
-    tag.otherActionCount ? `アクション${tag.otherActionCount}件` : null,
+    tag.otherActionCount ? `アクション${formatNumber(tag.otherActionCount)}件` : null,
   ].filter(Boolean).join('／')
 
   const rows = [

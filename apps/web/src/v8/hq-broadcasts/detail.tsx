@@ -491,7 +491,7 @@ export default function HqBroadcastDetail() {
   const people = run ? (run.status === 'prepared' ? (totals?.sendPeople ?? 0) : sentTo.reduce((sum, t) => sum + (t.totalCount ?? 0), 0)) : 0
   const bubbles = (() => { try { return run?.input?.messageBubblesJson ? JSON.parse(run.input.messageBubblesJson) : null } catch { return null } })()
   const messageText = Array.isArray(bubbles) && bubbles.length > 1
-    ? `吹き出し ${bubbles.length} 通`
+    ? `吹き出し ${polishFormatNumber(bubbles.length)} 通`
     : bubbles?.length ? (bubbles[0].type === 'coupon' ? 'クーポン 1通' : bubbles[0].type === 'text' ? 'テキスト 1通' : 'リッチメッセージ 1通') : 'テキスト 1通'
   const exampleStore = sentTo[0]?.accountName ?? '店の名前'
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'

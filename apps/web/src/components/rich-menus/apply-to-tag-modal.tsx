@@ -12,6 +12,7 @@ import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { formatNumber } from '@/lib/format'
 
 type Tag = { id: string; name: string; color: string }
 
@@ -252,7 +253,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 <div className="font-medium mb-1">✓ 完了しました</div>
                 <div className="text-xs">
                   {result.message ??
-                    `${result.total} 名の友だちに適用しました (${result.chunks} chunk)`}
+                    `${formatNumber(result.total)} 名の友だちに適用しました (${result.chunks} chunk)`}
                 </div>
               </Notice>
               <div className="flex justify-end">
