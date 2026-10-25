@@ -771,5 +771,6 @@
 - [古い見た目の切り替えの片づけ](release-log/unreleased/1818-kenta-remove-v7-leftovers.md)
 - [見た目の自動点検の整理](release-log/unreleased/1819-kenta-q02d-tests.md)
 - [部品の弱点とコードの自動点検](release-log/unreleased/1828-kenta-security-ci.md)
+- [マイレージの試験の書き換え（B-04）](release-log/unreleased/1829-kenta-q02b-b04.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
