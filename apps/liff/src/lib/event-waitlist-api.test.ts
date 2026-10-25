@@ -35,3 +35,16 @@ describe('イベント待ちのAPI呼び出し', () => {
     expect(new URL(url).pathname).toBe('/api/liff/webinars/%E8%A9%A6%E9%A8%93%2F%E9%85%8D%E4%BF%A1/audience');
   });
 });
+
+test('繰上げの承諾は案内の鍵を符号化し、本人確認付きで専用の口へ送る', async () => {
+  vi.stubGlobal('window', { location: { origin: 'https://example.test' } });
+  const response = { success: true, data: { bookingId: 'booking', status: 'confirmed', alreadyConfirmed: false } };
+  const fetcher = vi.fn(async () => new Response(JSON.stringify(response)));
+  vi.stubGlobal('fetch', fetcher);
+  expect(await api.acceptEventWaitlistOffer('offer/token')).toEqual(response);
+  const [input, init] = fetcher.mock.calls[0] as unknown as [URL, RequestInit];
+  const url = new URL(String(input));
+  expect(url.pathname).toBe('/api/liff/events/waitlist/offer%2Ftoken/accept');
+  expect(url.searchParams.get('liffId')).toBe('試験用LIFF');
+  expect(init).toMatchObject({ method: 'POST', body: '{}', headers: { Authorization: 'Bearer 試験用本人確認' } });
+});

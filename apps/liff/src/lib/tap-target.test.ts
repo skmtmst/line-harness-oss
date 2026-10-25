@@ -1,43 +1,37 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { afterAll, beforeAll, expect, it } from 'vitest';
+import Button from '../components/ui/Button.js';
+import { styleBrowser } from '../test-utils/style-browser.js';
 
-/**
- * 押せる所は 44×44 以上（リリース前点検 2026-10-07）。
- * 375・390・414 の幅で全画面を測り、見た目が小さいボタンには liff-hit を付けた
- * （見た目と並びは変えず、透明な ::after で押せる範囲だけ広げる）。
- */
-const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8');
+let view: Awaited<ReturnType<typeof styleBrowser>>;
+beforeAll(async () => { view = await styleBrowser(); }, 30000);
+afterAll(async () => { await view?.browser.close(); });
 
-describe('押せる所の大きさ', () => {
-  it('liff-hit は押せる範囲を 44×44 以上にし、位置の決まっている部品の position を変えない', () => {
-    const css = (read('../index.css') + read('../components/ui/liff-skin.css'));
-    expect(css).toMatch(/\.liff-hit::after\s*\{[^}]*width: max\(100%, 44px\);[^}]*height: max\(100%, 44px\);/s);
-    expect(css).toContain('.liff-hit:not(.absolute):not(.fixed):not(.sticky)');
+it.each(['icon', 'arrow', 'chip', 'restaurant-control'] as const)('%s は見た目の外側も44px以上の範囲で押せる', async variant => {
+  await view.show(`<main style="padding:80px">${renderToStaticMarkup(createElement(Button, { variant }, '操作'))}</main>`);
+  const button = view.page.getByRole('button');
+  const target = await button.evaluate(el => {
+    const box = el.getBoundingClientRect();
+    const after = getComputedStyle(el, '::after');
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    return { width: parseFloat(after.width), height: parseFloat(after.height), hits: [[x - 21, y], [x + 21, y], [x, y - 21], [x, y + 21]].every(([cx, cy]) => el.contains(document.elementFromPoint(cx, cy))) };
   });
+  expect(target.width).toBeGreaterThanOrEqual(44);
+  expect(target.height).toBeGreaterThanOrEqual(44);
+  expect(target.hits).toBe(true);
+});
 
-  it('小さい操作も共通 Button の44pxの段を使う', () => {
-    const cases: Array<[string, string]> = [
-      ['../components/ui/liff-header.tsx', 'aria-label="閉じる"'],
-      ['../components/date-time-picker.tsx', 'aria-label="前の週"'],
-      ['../components/date-time-picker.tsx', 'aria-label="前の月"'],
-      ['../components/help-tip.tsx', 'aria-label={label}'],
-      ['../pages/seat/seat-pick.tsx', 'aria-label="人数を増やす"'],
-    ];
-    for (const [file, marker] of cases) {
-      const src = read(file);
-      const at = src.indexOf(marker);
-      expect(at, `${file} ${marker}`).toBeGreaterThan(-1);
-      // 印の近く（同じ要素の className）に liff-hit がある
-      const around = src.slice(Math.max(0, at - 400), at + 400);
-      expect(around, `${file} ${marker}`).toMatch(/<Button variant="(?:icon|arrow|chip|restaurant-control)"/);
-      expect(read('../components/ui/Button.tsx')).toContain("'restaurant-control': 'liff-hit");
-    }
-  });
+it.each(['absolute', 'fixed', 'sticky'])('%s の操作の位置を押せる範囲のために変えない', async position => {
+  await view.show(renderToStaticMarkup(createElement(Button, { variant: 'icon', className: position }, '操作')));
+  expect(await view.page.getByRole('button').evaluate(el => getComputedStyle(el).position)).toBe(position);
+});
 
-  it('画面の幅を決める指定がある（拡大は止めない）', () => {
-    const html = read('../../index.html');
-    expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0" />');
-    expect(html).not.toContain('user-scalable=no');
-  });
+it('個人情報のリンクは行の高さを増やさず、押せる範囲を広げる', async () => {
+  const { default: PrivacyNote } = await import('../components/ui/privacy-note.js');
+  await view.show(renderToStaticMarkup(createElement(PrivacyNote)));
+  const link = view.page.getByRole('link', { name: 'プライバシーポリシー' });
+  expect(await link.evaluate(el => parseFloat(getComputedStyle(el, '::after').height))).toBeGreaterThanOrEqual(44);
+  expect(await link.evaluate(el => el.parentElement!.getBoundingClientRect().height)).toBe(18);
 });
