@@ -1,48 +1,18 @@
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-/* 止める窓は 管理画面 共用の `_components/conversion-dialogs.tsx` にある。 */
-const DIALOGS = readFileSync(new URL('../../v8/conversions/dialogs.tsx', import.meta.url), 'utf8')
 
 /**
- * #513「中」M2〜M6 の契約(成果地点一覧)。
- *
- * M2: 先頭100件の切り取りをやめ、cursor/nextCursor で条件に合うものを残らず読む。
- * M3: 探す言葉と並びは口(q/sort)へ渡す。画面で探し直し・並べ直しはしない。
- * M4: 影響が読めていない確定は黙って終わらせず、読み込み中は確定を止める。
- * M5: レポート側のCSVボタンは中身(成果地点の一覧)を名乗る。
- * M6: 古い読み込みの応答は捨て、新しい表示を上書きさせない。
+ * 成果地点一覧の禁止の見張り。続きの頁の読み足し・50頁での打ち切り・並びと探す言葉を口へ渡すこと・
+ * 影響が読めないまま止めないこと・古い応答を捨てることは v8/conversions/list.test.tsx が描画して確かめる。
  */
-describe('成果地点一覧の点検契約(#513 中)', () => {
-  it('M2: 先頭だけの表示をやめ、nextCursor を追って50頁まで読む', () => {
-    expect(PAGE).toContain('pagination.nextCursor')
-    expect(PAGE).toContain('pageIndex < 50')
-    expect(PAGE).toContain('truncated')
+describe('成果地点一覧の点検契約', () => {
+  it('無制限の取得に戻さない', () => {
     expect(PAGE, '無制限の取得に戻っている').not.toContain('for (;;)')
   })
 
-  it('M3: 探す言葉と並びを口へ渡し、画面で探し直さない', () => {
-    expect(PAGE).toContain('SORT_TO_API')
-    expect(PAGE).toContain('q: debouncedQuery')
-    expect(PAGE).toContain('sort: SORT_TO_API[sort]')
-    expect(PAGE).toContain("'cv-desc': 'count_desc'")
-    expect(PAGE).toContain("'value-desc': 'value_desc'")
-    expect(PAGE).toContain("name: 'name_asc'")
+  it('画面で探し直さない', () => {
     expect(PAGE, '画面内で探し直している').not.toContain('p.name.includes(q)')
-  })
-
-  it('M4: 影響なしの確定は理由を出し、読み込み中は確定を止める', () => {
-    expect(PAGE).toContain('if (!stopTarget || stopping || !canEdit || stopImpactLoading) return')
-    expect(PAGE).toContain('if (!stopImpact)')
-    expect(PAGE).toContain('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
-    expect(PAGE).toContain('busy={stopping || stopImpactLoading}')
-  })
-
-
-  it('M6: 世代番号で古い応答を捨てる', () => {
-    expect(PAGE).toContain('loadSeq')
-    expect(PAGE).toContain('loadSeq.current !== seq')
   })
 })
