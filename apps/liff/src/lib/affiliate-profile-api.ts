@@ -34,7 +34,7 @@ export interface OfferData {
   windowDays: number | null;
   receptionFrom: string | null;
   receptionTo: string | null;
-  /** 上限に達して受付が止まっているか。(PR823) */
+  /** 上限に達して受付が止まっているか。 */
   halted: boolean;
   totalRemaining: number | null;
   monthlyRemaining: number | null;

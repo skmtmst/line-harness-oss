@@ -226,10 +226,10 @@ export const api = {
       {},
       'PUT',
     ).then((r) => unwrapSuccessData<NotificationPreferences>(r, '/api/liff/notification-preferences')),
-  /** F-6 本人の取消。版（lock_version）が合わないと 409。期限を過ぎると 403 self_deadline_passed。 */
+  /** 本人の取消。版（lock_version）が合わないと 409。期限を過ぎると 403 self_deadline_passed。 */
   cancelMyBooking: (id: string, lockVersion: number) =>
     post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/cancel`, { lock_version: lockVersion }),
-  /** F-6 本人の日時変更。starts_at は UTC の ISO。埋まっていると 409 slot_not_available。 */
+  /** 本人の日時変更。starts_at は UTC の ISO。埋まっていると 409 slot_not_available。 */
   rescheduleMyBooking: (id: string, body: { lock_version: number; starts_at: string; reason?: string }) =>
     post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/reschedule`, body),
   /** 前回と同じで予約：本人の前回の予約を返す。失敗・対象外は呼び側が黙って隠す。 */
@@ -297,7 +297,7 @@ export const api = {
   cancelMyEventBooking: (bookingId: string) =>
     post<{ ok: true }>(`/api/liff/events/me/${bookingId}/cancel`, {}),
   /**
-   * U-3: 自分の申込の開催回変更。新しい席を確保できた時だけ元の申込を
+   * 自分の申込の開催回変更。新しい席を確保できた時だけ元の申込を
    * 取り消す、まとめて1つの操作。Idempotency-Key は呼び出し側が
    * 1操作ぶん安定した鍵を使い回す。
    */
@@ -330,7 +330,7 @@ export const api = {
    * Worker は `{ success: true, data: { answers, createdAt } | null }` で返す。
    */
   /**
-   * 答えで予約の行き先を決める（B6）。口（Worker）は Codex の gap2 が作る。
+   * 答えで予約の行き先を決める。
    * 行き先はこの口の返事で決まり、お客さまは書き換えられない（予約には routingToken を添える）。
    */
   resolveFormRouting: (id: string, answers: Record<string, unknown>, blockId?: string) =>
@@ -361,7 +361,7 @@ export const api = {
   submitForm: async (
     id: string,
     body: { data: Record<string, unknown>; trackedLinkId?: string; testToken?: string },
-    // #729: 第3引数は必須のまま(付け忘れは従来どおり型で落ちる)。
+    // 第3引数は必須のまま(付け忘れは従来どおり型で落ちる)。
     // 共有ヘッダ関数へ渡す際に UUID 検証を通す。呼び出し側(Form.tsx)は
     // 所有パス外のため、この境界で検証する形に留める。
     idempotencyKey: string,
@@ -373,7 +373,7 @@ export const api = {
     url.searchParams.set('liffId', getLiffId());
     const res = await fetch(url.toString(), {
       method: 'POST',
-      // #729: ヘッダ組立は共有部品へ寄せる。認証の取得・URL・応答判定はここに残す。
+      // ヘッダ組立は共有部品へ寄せる。認証の取得・URL・応答判定はここに残す。
       headers: authHeaders(buildFormSubmitHeaders(toFormIdempotencyKey(idempotencyKey))),
       body: JSON.stringify(testToken ? { ...body, testToken } : body),
     });
@@ -393,14 +393,14 @@ export const api = {
       file,
     ),
   /**
-   * F-11：郵便番号から住所の候補を返す（外部通信なし・日本郵便の公開データ）。
+   * 郵便番号から住所の候補を返す（外部通信なし・日本郵便の公開データ）。
    * 候補が複数の番号は全部返す。選ばなければ手入力の住所はそのまま残す。
    */
   postalCodeSearch: (code: string) =>
     get<PostalCodeSearchResponse>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
 
   /**
-   * F11 郵便番号→住所の候補。選んだ候補だけ住所へ入れ、手入力は残す。
+   * 郵便番号→住所の候補。選んだ候補だけ住所へ入れ、手入力は残す。
    * 見つからない・通信失敗のときは投げず、その旨を状態で返す。
    */
   postalSearch: (code: string) =>

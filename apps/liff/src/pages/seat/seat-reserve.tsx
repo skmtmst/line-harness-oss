@@ -49,7 +49,7 @@ const STEPS = ['人数・日時・コース', '確認'];
 const DEFAULT_GUESTS = 2;
 
 /**
- * 飲食店の席の予約 (E-11・★V8 →→sAnyy)。入口は ?page=restaurant&token=...。
+ * 飲食店の席の予約 (★V8 sAnyy)。入口は ?page=restaurant&token=...。
  * token は管理画面の「LINE 予約の URL」から店を決める。?view=mine で変更・取り消しから開く。
  * 流れ：① 人数と日時 → 仮押さえ → ② 確認 (残り時間) → 確定 → ③ 受け付けました。
  * 変更は ① で選び直して ② で「この内容に変える」(仮押さえなし・版を指定)。
