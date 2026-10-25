@@ -777,6 +777,7 @@
 - [マイレージの試験の書き換え（B-04）](release-log/unreleased/1829-kenta-q02b-b04.md)
 - [不安定な試験の直し](release-log/unreleased/1830-kenta-flaky-iat-1026.md)
 - [直し①②（不具合とiPad横の幅）](release-log/unreleased/1831-kenta-train-m1-1026.md)
+- [Next.js の版上げ](release-log/unreleased/1833-kenta-next-patch.md)
 - [数の帯の先週比と友だちの上限](release-log/unreleased/1835-kenta-kpi-band.md)
 - [テンプレート一覧のLINEでの見え方](release-log/unreleased/1835-kenta-template-preview.md)
 - [見つからないページの場所とよく使うページ](release-log/unreleased/1835-kenta-notfound.md)
