@@ -5,7 +5,7 @@ import Card,{ CardHeader } from '@/components/shared/card'
 import { HorizontalBarChart } from '@/components/shared/charts'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { emptyValue } from '@/components/shared/empty-value'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -448,11 +448,12 @@ function Responses() {
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
       <Card variant="aside" aria-labelledby="fr-filter">
         <CardHeader size="stacked" title="絞り込み" titleId="fr-filter" meta={total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`} />
-        <div role="group" aria-label="集計する期間" className={styles.periodChips}>
-          {([['this_month', '今月'], ['last_month', '先月'], ['all', 'すべて']] as const).map(([value, label]) => (
-            <FilterChip key={value} selected={period === value} onChange={() => setPeriod(value)}>{label}</FilterChip>
-          ))}
-        </div>
+        <SegmentedControl
+          aria-label="集計する期間"
+          value={period}
+          onChange={setPeriod}
+          options={([['this_month', '今月'], ['last_month', '先月'], ['all', 'すべて']] as const).map(([value, label]) => ({ value, label }))}
+        />
         <ListToolbar searchSlot={<SaveErrorField names={["query"]}><SearchField updateMode="immediate" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・答えで探す（全件から）" aria-label="名前・答えで探す（全件から）" /></SaveErrorField>} />
       </Card>
     </div>

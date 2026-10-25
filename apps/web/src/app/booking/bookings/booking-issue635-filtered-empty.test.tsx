@@ -9,7 +9,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   staffMe: vi.fn(),
@@ -82,6 +82,24 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
+const bookingRows = [
+  { id: 'b-line', starts_at: '2026-10-15T01:00:00Z', ends_at: '2026-10-15T02:00:00Z', status: 'confirmed', friend_id: 'friend-1', friend_name: 'LINEの人', booking_customer_id: null, menu_name: 'カット', staff_name: '山田', staff_id: 'staff-1', requested_at: '2026-10-14T00:00:00Z', decided_at: null, customer_note: null, internal_note: null, price_at_booking: 5000, external_event_id: null, source: 'liff' },
+  { id: 'b-phone', starts_at: '2026-10-15T03:00:00Z', ends_at: '2026-10-15T04:00:00Z', status: 'confirmed', friend_id: null, friend_name: '電話の人', booking_customer_id: null, menu_name: 'カット', staff_name: '佐藤', staff_id: 'staff-2', requested_at: '2026-10-14T00:00:00Z', decided_at: null, customer_note: null, internal_note: null, price_at_booking: 5000, external_event_id: null, source: 'phone' },
+  { id: 'b-other', starts_at: '2026-10-15T05:00:00Z', ends_at: '2026-10-15T06:00:00Z', status: 'confirmed', friend_id: null, friend_name: '店頭の人', booking_customer_id: null, menu_name: 'カット', staff_name: '山田', staff_id: 'staff-1', requested_at: '2026-10-14T00:00:00Z', decided_at: null, customer_note: null, internal_note: null, price_at_booking: 5000, external_event_id: null, source: 'counter' },
+]
+
+async function chooseSelect(label: string, option: string) {
+  fireEvent.click(screen.getByLabelText(label))
+  const choice = await screen.findByRole('option', { name: option })
+  fireEvent.click(within(choice).getByRole('button'))
+}
+
+async function chooseEntitySelect(label: string, option: string) {
+  fireEvent.click(screen.getByLabelText(label))
+  fireEvent.click(await screen.findByRole('radio', { name: option }))
+  fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+}
+
 describe('#635 予約管理一覧の絞り込み0件', () => {
   it('予約そのものが無いときは「まだ予約はありません」を出す', async () => {
     render(<BookingsPage />)
@@ -101,6 +119,37 @@ describe('#635 予約管理一覧の絞り込み0件', () => {
     expect(screen.getByText('検索語や絞り込みを変えてください。')).toBeTruthy()
     expect(screen.getByRole('button', { name: '絞り込みを解除' })).toBeTruthy()
     expect(screen.queryByText('まだ予約はありません')).toBeNull()
+  })
+
+  it('予約元で絞ると件数が変わり、担当と両方で絞ると0件の言い方と解除導線を出す', async () => {
+    fixture.listRequests.mockImplementation(async (_accountId: string, _tab: string, options: { staffId?: string }) => {
+      const rows = options?.staffId ? bookingRows.filter((row) => row.staff_id === options.staffId) : bookingRows
+      return { requests: rows, total: rows.length }
+    })
+    fixture.requestsSummary.mockResolvedValue({ ...summary, total: 3, monthTotal: 3 })
+    render(<BookingsPage />)
+    await waitFor(() => expect(screen.getByText('LINEの人')).toBeTruthy())
+    expect(screen.getByText('電話の人')).toBeTruthy()
+    expect(screen.getByText('店頭の人')).toBeTruthy()
+    expect(screen.getByLabelText('予約元で絞り込む').textContent).toContain('予約元：すべて')
+
+    await chooseSelect('予約元で絞り込む', '電話')
+    expect(screen.getByLabelText('予約元で絞り込む').textContent).toContain('予約元：電話')
+    await waitFor(() => expect(screen.getByText('電話の人')).toBeTruthy())
+    expect(screen.queryByText('LINEの人')).toBeNull()
+    expect(screen.queryByText('店頭の人')).toBeNull()
+    expect(screen.getByText(/1件中 1〜1件/)).toBeTruthy()
+
+    await chooseSelect('予約元で絞り込む', 'その他')
+    await waitFor(() => expect(screen.getByText('店頭の人')).toBeTruthy())
+    expect(screen.queryByText('電話の人')).toBeNull()
+
+    await chooseEntitySelect('担当で絞り込む', '山田')
+    await waitFor(() => expect(screen.getByText('店頭の人')).toBeTruthy())
+
+    await chooseSelect('予約元で絞り込む', '電話')
+    await waitFor(() => expect(screen.getByText('条件に合う予約はありません')).toBeTruthy())
+    expect(screen.getByRole('button', { name: '絞り込みを解除' })).toBeTruthy()
   })
 
   it('「絞り込みを解除」で検索語と状態を外して全件へ戻す', async () => {

@@ -222,8 +222,12 @@ test('白い選択欄と予約の線を実描画で見分け、選択操作を�
     const page=await browser.newPage({reducedMotion:'reduce'})
     await mount(page)
     const select=page.getByRole('button',{name:'表示の条件',exact:true})
-    const surface=await select.evaluate(el=>{const s=getComputedStyle(el);return{background:s.backgroundColor,outline:s.outlineStyle,width:s.outlineWidth}})
-    assert.deepEqual(surface,{background:'rgb(255, 255, 255)',outline:'solid',width:'1px'})
+    const surface=await select.evaluate(el=>{const s=getComputedStyle(el);return{background:s.backgroundColor,outline:s.outlineStyle,width:s.outlineWidth,color:s.outlineColor,shadow:s.boxShadow}})
+    // 線ではなく影で浮かせる。透明の輪郭は見えない線として扱う。
+    assert.equal(surface.background,'rgb(255, 255, 255)')
+    assert.ok(surface.color==='rgba(0, 0, 0, 0)'||surface.color==='transparent', `outline color: ${surface.color}`)
+    assert.ok(surface.width==='0px'||surface.width==='1px', `outline width: ${surface.width}`)
+    assert.notEqual(surface.shadow,'none')
     await select.press('ArrowDown')
     await page.getByRole('option',{name:'正常',exact:true}).getByRole('button').click()
     assert.equal(await page.getByRole('listbox').count(),0)
@@ -241,25 +245,28 @@ for(const width of [1152,1440])test(`設定行の札と操作を区別でき、�
     await mount(page)
     const section=page.locator('[data-measure-status-actions]')
     const rows=await section.locator('[data-shared-part="row-status-actions"]').evaluateAll(elements=>elements.map(e=>{
-      const badge=e.firstElementChild,button=e.lastElementChild.firstElementChild,s=getComputedStyle(button),b=badge.getBoundingClientRect(),a=button.getBoundingClientRect()
-      return {bg:s.backgroundColor,border:s.borderTopWidth,color:s.color,borderColor:s.borderTopColor,center:b.y+b.height/2-a.y-a.height/2,width:a.width,height:a.height}
+      const badge=e.firstElementChild,button=e.lastElementChild.firstElementChild,s=getComputedStyle(button),bs=getComputedStyle(badge),b=badge.getBoundingClientRect(),a=button.getBoundingClientRect()
+      return {bg:s.backgroundColor,badgeBg:bs.backgroundColor,badgeShadow:bs.boxShadow,border:s.borderTopWidth,shadow:s.boxShadow,color:s.color,center:b.y+b.height/2-a.y-a.height/2,width:a.width,height:a.height}
     }))
     assert.equal(new Set(rows.map(r=>r.width)).size,1)
-    for(const row of rows){assert.equal(row.bg,'rgb(255, 255, 255)');assert.equal(row.border,'1px');assert.equal(row.height,36);assert.ok(Math.abs(row.center)<1)}
-    // 枠を消す故障が同じ描画検査で検出され、復旧後に通ることを確かめる。
-    const fault=await page.addStyleTag({content:'[data-presentation="row-action"]{border:0!important}'})
-    const broken=await section.getByRole('button',{name:'選ぶ',exact:true}).evaluate(e=>getComputedStyle(e).borderTopWidth)
-    assert.throws(()=>assert.equal(broken,'1px'))
-    await fault.evaluate(e=>e.remove())
-    assert.equal(await section.getByRole('button',{name:'選ぶ',exact:true}).evaluate(e=>getComputedStyle(e).borderTopWidth),'1px')
-    assert.notEqual(rows[0].borderColor,rows[1].borderColor)
+    for(const row of rows){assert.equal(row.bg,'rgb(255, 255, 255)');assert.equal(row.border,'0px');assert.notEqual(row.shadow,'none');assert.equal(row.height,36);assert.ok(Math.abs(row.center)<1)}
+    // 影を消す故障が同じ描画検査で検出され、復旧後に通ることを確かめる。
+    const target=section.getByRole('button',{name:'選ぶ',exact:true})
+    await target.evaluate(e=>{e.style.setProperty('transition','none','important');e.style.setProperty('box-shadow','none','important')})
+    const broken=await target.evaluate(e=>getComputedStyle(e).boxShadow)
+    assert.throws(()=>assert.notEqual(broken,'none'))
+    await target.evaluate(e=>{e.style.removeProperty('box-shadow');e.style.removeProperty('transition')})
+    assert.notEqual(await target.evaluate(e=>getComputedStyle(e).boxShadow),'none')
+    assert.notEqual(rows[0].badgeShadow,rows[0].shadow)
     assert.notEqual(rows[0].color,rows[1].color)
     assert.equal(await section.getByRole('link',{name:'中身を見る'}).getAttribute('href'),'/settings')
     await section.getByRole('button',{name:'選ぶ',exact:true}).click()
     await section.getByRole('button',{name:'決まりを入れる',exact:true}).press('Enter')
     assert.equal(await page.getByLabel('行の操作回数').textContent(),'2')
     assert.equal(await focusedRing(page),true)
-    assert.notEqual(await page.getByRole('button',{name:'副操作',exact:true}).evaluate(e=>getComputedStyle(e).backgroundColor),rows[0].bg)
+    const secondary=await page.getByRole('button',{name:'副操作',exact:true}).evaluate(e=>{const s=getComputedStyle(e);return{background:s.backgroundColor,shadow:s.boxShadow}})
+    assert.equal(secondary.background,'rgb(255, 255, 255)')
+    assert.notEqual(secondary.shadow,'none')
   }finally{await page.close();await browser.close()}
 })
 

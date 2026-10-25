@@ -2,7 +2,7 @@
 import ListDateTime from '@/components/shared/list-date-time'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional, ResponsiveFilterChips } from '@/components/shared/list-toolbar';
 import { RowNameLink } from '@/components/shared/table';
 
 
@@ -843,7 +843,7 @@ export default function BroadcastListV8() {
   )
 
   const statusChips = (
-    <div className={styles.chips} role="group" aria-label="状態で絞る">
+    <ResponsiveFilterChips preserveChips label="状態">
       {STATUS_CHIPS.map((chip) => (
         <FilterChip
           key={chip.key}
@@ -854,21 +854,7 @@ export default function BroadcastListV8() {
           {chipText(chip.label, chipCount(statusCounts, chip.key))}
         </FilterChip>
       ))}
-    </div>
-  )
-
-  const statusSelect = (
-    <div className={styles.statusSelect}>
-      <SaveErrorField names={["statusFilter","status_filter"]}><Select
-        aria-label="状態で絞る"
-        value={statusFilter}
-        onChange={(value) => setStatusFilter(value as StatusChipKey)}
-        options={STATUS_CHIPS.map((chip) => ({
-          value: chip.key,
-          label: `状態：${chipText(chip.label, chipCount(statusCounts, chip.key))}`,
-        }))}
-      /></SaveErrorField>
-    </div>
+    </ResponsiveFilterChips>
   )
 
   const pageSizeBox = (

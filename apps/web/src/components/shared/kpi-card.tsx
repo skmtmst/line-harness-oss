@@ -201,9 +201,17 @@ export default function KpiCard({
   const explanationLabel = descriptionLabel ?? `${helpLabel ?? title}の説明`
 
   const displayedNumber = `${numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : ''}${numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}`
+  /*
+   * 値が無いとき（「—」）は単位だけを残さない。「— 件」のように、無い値に
+   * 単位が付いて数があるように見えるのを防ぐ。0 は値なので単位を付ける。
+   */
+  const showUnit = statusText ? false
+    : valueRange !== undefined ? rangeText !== '—'
+      : valueText !== undefined ? textIsNumber && valueTextWithUnit
+        : isCountableValue(value)
   const numberAndUnit = <>
     <KpiRollingValue text={displayedNumber} identity={cardProps.id ?? title} loading={loading || Boolean(cardProps.hidden)} />
-    {(numberText !== undefined && valueRange === undefined && !valueTextWithUnit) || statusText ? null : <span data-kpi-unit className={styles.unit}>{unit}</span>}
+    {showUnit ? <span data-kpi-unit className={styles.unit}>{unit}</span> : null}
   </>
 
   return (

@@ -8,8 +8,8 @@ describe('V8 の採用済みの値をCIで守る', () => {
   })
   it('変数を無視して部品の高さが旧い31pxに戻った場合を検出する', () => {
     const errors = verifyRuleBindings(file => readFileSync(new URL(`./${file}.module.css`, import.meta.url), 'utf8') +
-      (file === 'folder-panel' ? `:root .panel .add { height: 31px; }` : ''))
-    expect(errors).toEqual(['folder-panel .panel .add height: 決まり var(--tpl-button-h) / 実際 31px'])
+      (file === 'folder-panel' ? `:root .add { height: 31px; }` : ''))
+    expect(errors).toEqual(['folder-panel .add height: 決まり auto / 実際 31px'])
   })
   it('上書きと参照を解いた値が決まりと一致する', () => {
     expect(verifyRuleValues(css)).toEqual([])

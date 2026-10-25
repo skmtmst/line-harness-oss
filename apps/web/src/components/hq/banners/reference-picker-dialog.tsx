@@ -1,12 +1,12 @@
 'use client'
 
-import { Check, Star, Upload } from 'lucide-react'
+import { Check, Upload } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentType } from 'react'
 import Button from '@/components/shared/button'
 import Dialog, { type DialogProps } from '@/components/shared/dialog'
 import ImageMultiUpload from '@/components/shared/image-multi-upload'
 import ImageMultiSelect from '@/components/shared/image-multi-select'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import ListState from '@/components/shared/list-state'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import SearchField from '@/components/shared/search-field'
@@ -235,9 +235,16 @@ export default function ReferencePickerDialog({
       <div className="flex flex-col gap-3">
         {/* 絞り込み行（`cOgWE`）。チップが左、検索が右。 */}
         <div className="flex flex-wrap items-center gap-2">
-          <FilterChip selected={scope === 'all'} onChange={() => setScope('all')}>すべて</FilterChip>
-          <FilterChip selected={scope === 'project'} icon={hqLayout ? <Star size={14} aria-hidden="true" /> : undefined} onChange={() => setScope('project')}>このプロジェクト</FilterChip>
-          <FilterChip selected={scope === 'favorite'} icon={hqLayout ? <Star size={14} aria-hidden="true" /> : undefined} onChange={() => setScope('favorite')}>お気に入り</FilterChip>
+          <SegmentedControl
+            aria-label="参照画像の範囲"
+            value={scope}
+            onChange={setScope}
+            options={[
+              { value: 'all', label: 'すべて' },
+              { value: 'project', label: 'このプロジェクト' },
+              { value: 'favorite', label: 'お気に入り' },
+            ]}
+          />
           <span className={hqLayout ? "w-full" : "flex-1"} />
           <div className="w-60 max-w-full">
             <SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="画像名・プロジェクト名で検索" aria-label="参照画像を検索" />

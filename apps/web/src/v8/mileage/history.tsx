@@ -8,7 +8,7 @@ import Select from '@/components/shared/select'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { CircleDot, Download, Plus, Undo2 } from 'lucide-react'
+import { Download, Plus } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
@@ -21,7 +21,7 @@ import {
 import { csvCell } from '@/lib/presentation'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { mileagePaginationTotal } from './display'
@@ -239,32 +239,21 @@ export default function HistoryTab() {
     grantAmount={amountOf('grant')} spendAmount={amountOf('spend')} />
 
   const chips = (
-    <div role="group" aria-label="種類で絞り込む" className={styles.chipGroup}>
-      <FilterChip
-        selected={grantedOnly}
-        icon={<CircleDot size={13} aria-hidden="true" />}
-        onChange={(selected) => {
-          setPreset('all')
-          setPage(1)
-          setGrantedOnly(selected)
-          if (selected) setSpentOnly(false)
-        }}
-      >
-        付けた
-      </FilterChip>
-      <FilterChip
-        selected={spentOnly}
-        icon={<Undo2 size={13} aria-hidden="true" />}
-        onChange={(selected) => {
-          setPreset('all')
-          setPage(1)
-          setSpentOnly(selected)
-          if (selected) setGrantedOnly(false)
-        }}
-      >
-        使った・取り消し
-      </FilterChip>
-    </div>
+    <SegmentedControl
+      aria-label="種類で絞り込む"
+      value={grantedOnly ? 'granted' : spentOnly ? 'spent' : 'all'}
+      onChange={(next) => {
+        setPreset('all')
+        setPage(1)
+        setGrantedOnly(next === 'granted')
+        setSpentOnly(next === 'spent')
+      }}
+      options={[
+        { value: 'all', label: 'すべて' },
+        { value: 'granted', label: '付けた' },
+        { value: 'spent', label: '使った・取り消し' },
+      ]}
+    />
   )
 
   const toolbar = (

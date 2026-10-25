@@ -10,15 +10,14 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListItemHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Banknote, Calculator, Download, ListOrdered, ShoppingBag, Trophy, Users } from 'lucide-react'
+import { Banknote, Calculator, Download, ShoppingBag, Trophy } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { downloadCsv, pageCountOf, pageOf, formatYen, listAllConversionApprovals, reportMonthKey, type AffiliateItem, type AffiliateListRow, type ReportPeriod } from './display'
 import AffiliateDrawer from './drawer'
@@ -66,7 +65,6 @@ export default function ReportTab() {
   }
   const [saved, setSaved] = useState('')
   /* 見方の札を押したか（はじめはアフィリエイターごとで、どちらの札も押していない形）。 */
-  const [viewPicked, setViewPicked] = useState(false)
   const [drawerId, setDrawerId] = useDetailPanelUrl('affiliate')
   const itemHref = useListItemHref()
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null)
@@ -231,10 +229,15 @@ export default function ReportTab() {
   )
 
   const chips = (
-    <div role="group" aria-label="見方" className={styles.chipGroup}>
-      <FilterChip selected={view === 'affiliate' && viewPicked} icon={<Users size={13} aria-hidden="true" />} onChange={(on) => { setView('affiliate'); setViewPicked(on); setSaved('') }}>アフィリエイターごと</FilterChip>
-      <FilterChip selected={view === 'offer'} icon={<ListOrdered size={13} aria-hidden="true" />} onChange={(on) => { setView(on ? 'offer' : 'affiliate'); setViewPicked(on); setSaved('') }}>案件ごと</FilterChip>
-    </div>
+    <SegmentedControl<'affiliate' | 'offer'>
+      aria-label="見方"
+      value={view}
+      onChange={(next) => { setView(next); setSaved('') }}
+      options={[
+        { value: 'affiliate', label: 'アフィリエイターごと' },
+        { value: 'offer', label: '案件ごと' },
+      ]}
+    />
   )
 
   const trailing = (

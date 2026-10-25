@@ -334,3 +334,27 @@
 
 :root .chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); flex: none; color: var(--color-ink-faint); margin-inline-start: auto; }
 :root .field:not([data-clearable]) { padding-inline-end: var(--tpl-select-inset); }
+
+/* 日付の欄も線ではなく影で浮かせる。 */
+:root .field {
+  border: 0;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+}
+
+:root .field:not([data-open]):not([data-invalid]),
+:root .field[data-open] {
+  border: 0;
+  box-shadow: var(--shadow-raised-control);
+}
+
+:root .field[data-invalid] {
+  border: 0;
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
+}
+
+:root .field[data-readonly],
+:root .field:disabled {
+  background: var(--color-canvas-sunken);
+  box-shadow: none;
+}

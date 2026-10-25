@@ -11,7 +11,7 @@ import { useListScrollMemory,useListUrlValue } from '@/components/shared/list-ur
 import { pageSizeOptions } from '@/components/shared/page-size-options'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { Archive,CircleCheck,ClipboardList,FileText,IdCard,Inbox,Percent,Plus,TriangleAlert } from 'lucide-react'
+import { CircleCheck,ClipboardList,Inbox,Percent,Plus,TriangleAlert } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useCallback,useEffect,useMemo,useRef,useState,type MouseEvent as ReactMouseEvent,type ReactNode } from 'react'
 
@@ -24,7 +24,7 @@ import Button from '@/components/shared/button'
 import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-menu'
 import EmptyList from '@/components/shared/empty-list'
 import { emptyValue } from '@/components/shared/empty-value'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import FolderPanel,{ FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -860,38 +860,19 @@ export default function FormsListV8() {
   /* ===== 道具の段の部品（広い板と 1152 で同じものを並べ替える） ===== */
   const onSearch = (value: string) => updateListState({ query: value, page: 1 })
   const filterChips = (
-    <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      <FilterChip
-        selected={formFilter === 'published'}
-        onChange={(next) => updateListState({ filter: next ? 'published' : 'all', page: 1 })}
-        icon={<CircleCheck size={13} aria-hidden="true" />}
-      >
-        公開中
-      </FilterChip>
-      <FilterChip
-        selected={formFilter === 'draft'}
-        onChange={(next) => updateListState({ filter: next ? 'draft' : 'all', page: 1 })}
-        icon={<FileText size={13} aria-hidden="true" />}
-      >
-        下書き
-      </FilterChip>
-      <FilterChip
-        selected={formFilter === 'stored'}
-        onChange={(next) => updateListState({ filter: next ? 'stored' : 'all', page: 1 })}
-        icon={<IdCard size={13} aria-hidden="true" />}
-      >
-        情報欄に保存
-      </FilterChip>
-      <FilterChip icon={<Archive size={13} aria-hidden="true" />} selected={formFilter === 'archived'} onChange={(next) => updateListState({ filter: next ? 'archived' : 'all', page: 1 })}>
-        アーカイブ済み
-      </FilterChip>
-      {/* 「後処理未完」は数の帯の「未完を見る」から入る絞り込み。選んでいる間だけ札を出す。 */}
-      {formFilter === 'pending' ? (
-        <FilterChip selected onChange={() => updateListState({ filter: 'all', page: 1 })}>
-          後処理未完
-        </FilterChip>
-      ) : null}
-    </div>
+    <SegmentedControl<FormFilter>
+      aria-label="状態で絞り込む"
+      value={formFilter}
+      onChange={(next) => updateListState({ filter: next, page: 1 })}
+      options={([
+        { value: 'all', label: 'すべて' },
+        { value: 'published', label: '公開中' },
+        { value: 'draft', label: '下書き' },
+        { value: 'stored', label: '情報欄に保存' },
+        { value: 'archived', label: 'アーカイブ済み' },
+        ...(formFilter === 'pending' ? [{ value: 'pending' as const, label: '後処理未完' }] : []),
+      ] satisfies Array<{ value: FormFilter; label: string }>)}
+    />
   )
   const sortBox = (
     <div className={styles.sortBox}>

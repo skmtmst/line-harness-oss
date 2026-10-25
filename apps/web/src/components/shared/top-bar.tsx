@@ -7,12 +7,15 @@ import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-me
 import type { MenuPortalRect } from './menu-portal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
+import Avatar from './avatar'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import styles from './top-bar.module.css'
 
 export interface TopBarAccount {
   id: string
   label: string
+  /** アカウントのアイコン。無ければ名前の1文字目を出す。 */
+  iconUrl?: string | null
   /** 頭の1文字。アイコンの代わりに出す。無ければ名前の1文字目。 */
   mark?: string
 }
@@ -86,7 +89,7 @@ export interface TopBarProps {
    * ★V8 統括の画面（/hq）のとき、切替の札に「統括」と統括名を出す。
    * 渡さなければ店の画面の札（「LINEアカウント」と選んでいるアカウント）。互換経路では描かない。
    */
-  hq?: { name: string; mark: string } | null
+  hq?: { name: string; mark: string; iconUrl?: string | null } | null
   /** ★V8 パンくずの「ホーム」の行き先。統括の画面は統括のホーム（/hq）。 */
   homeHref?: string
   /**
@@ -270,13 +273,13 @@ export default function TopBar({
             ブラウザの実装のまま使えるほうが確かなため。
           */}
           <span className={styles.accountPill}>
-            <span className={styles.accountMark} aria-hidden="true">
-              {hq ? (
-                <>
-                  <span >{hq.mark}</span>
-                </>
-              ) : (current?.mark ?? current?.label.slice(0, 1) ?? '')}
-            </span>
+            <Avatar
+              name={hq ? hq.name : current?.label ?? ''}
+              src={hq ? hq.iconUrl ?? null : current?.iconUrl ?? null}
+              size={24}
+              shape="rounded"
+              alt={hq ? hq.name : current?.label ?? null}
+            />
             {/*
               ★V8 殻合わせ（絵 `V8-B/JKjsE`）：札に役割（統括など）を小さい
               行で添える。v8-only なので v7 の1行札は変わらない。
@@ -287,14 +290,14 @@ export default function TopBar({
                 {/* ★V8 統括の画面：札は統括にいることを示す（絵 `V8-B/JKjsE`）。v7 は今までどおり。 */}
                 {hq ? (
                   <>
-                    <span className={`${styles.accountName}`} title={hq.name}>{hq.name}</span>
+                    <span className={`${styles.accountName}`} data-part="account-name" title={hq.name}>{hq.name}</span>
                   </>
                 ) : (
-                  <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+                  <span className={styles.accountName} data-part="account-name" title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
                 )}
               </span>
             ) : (
-              <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+              <span className={styles.accountName} data-part="account-name" title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
             )}
             {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
 
@@ -334,6 +337,7 @@ export default function TopBar({
                 ref={bellRef}
                 type="button"
                 className={`${styles.iconButton}`}
+                data-topbar-bell=""
                 aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
                 aria-haspopup="dialog"
                 aria-expanded={bellOpen}

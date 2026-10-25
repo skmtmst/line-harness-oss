@@ -123,7 +123,7 @@
 :root .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
 :root .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
 /* 切り替え（SegmentedControl）の項目は器の地で区切る。1つずつ枠で囲まない（期間）。 */
-:root .trailing [data-appearance] > button:not(:focus-visible) { outline: 0; }
+:root .trailing [data-appearance] > button:not(:focus-visible) { outline: 1px solid transparent; }
   /*
    * ★V8「道具の1段」（c4n9Kr）：探す欄は幅 280px・縮まない
    * （flex-shrink: 0）。中の文だけが flex:1 で伸び縮みする。
@@ -156,7 +156,7 @@
  * 2段目＝札。段の間 10・段の中の間 6。管理画面 の2段組みは変えない。
  * layout="stacked" のときだけ段を残し、それ以外は1本の帯。
  */
-:root .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
+:root .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: var(--space-12); }
 :root .toolbar[data-toolbar-layout='stacked'] .row1,
 :root .toolbar[data-toolbar-layout='stacked'] .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 :root .toolbar[data-toolbar-layout='stacked'] .filters { display: contents; }
@@ -201,12 +201,14 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
 .filterChoices[data-filter-collapsed] .filterNarrow { display: flex; }
 .slots { flex-direction: row; flex-wrap: wrap; align-items: center; }
 .slots > .slotsRow { display: contents; }
-.slots[data-toolbar-layout='slots-stacked'] { flex-direction: column; align-items: stretch; }
+.slots[data-toolbar-layout='slots-stacked'] { flex-direction: column; align-items: stretch; gap: var(--space-12); }
 .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; }
 .slots[data-toolbar-layout='slots-stacked'] > .slotsRow:has(.slotsEnd) { flex-wrap: nowrap; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
 
 .slotTool { display: contents; }
+/* 札の組と、その右に続く件数などのまとまり。広い板では今までどおり段に直接並べる。 */
+.chipUnit { display: contents; }
 .rowBreak { display: none; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
 
@@ -274,12 +276,53 @@ html:root :is(.slots, .toolbar) [data-toolbar-row][data-toolbar-fit='single'] { 
 html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) {
   width: max-content; min-width: max-content; max-width: none; flex: none;
 }
+/*
+ * 札の組は組の中で縦に積まない。
+ * 並び・件数と1段に収まる幅では同じ段の左に置く。収まらない時は、札の組を
+ * まるごと次の段の左へ下げる（部品が data-toolbar-chips-drop を付ける）。
+ * 札の組そのものが1段の幅より長い時だけ、組の中で折り返す（左寄せ）。
+ */
+@container v8-page (max-width: 1099px) {
+  html:root .slots[data-toolbar-layout='slots-stacked'] .chipUnit {
+    display: flex; align-items: center; gap: var(--tpl-list-gap);
+    flex: 0 1 auto; min-width: 0; max-width: 100%; order: 2;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .chipUnit > .slotTool { flex: 0 1 auto; min-width: 0; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] :is(.slotTool:has(> .filterChoices), .slotTool:has(> [role='group'])) {
+    flex: 0 1 auto; min-width: 0; max-width: 100%;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> .filterChoices) > .filterChoices,
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [role='group']) > [role='group'] {
+    flex: 0 1 auto; min-width: 0; max-width: 100%; flex-wrap: wrap;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] :is(.slotTool:has(> .filterChoices), .slotTool:has(> [role='group'])) .filterWide {
+    flex: 0 1 auto; min-width: 0; max-width: 100%; flex-wrap: wrap;
+  }
+  /* 件数（例「231件」）は札の組の右にくっついて動く。段の右端の並び・件数は動かさない。 */
+  html:root .slots[data-toolbar-layout='slots-stacked'] .chipUnit[data-toolbar-chips-drop] {
+    order: 5; flex: 0 0 100%;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool[data-toolbar-chips-drop],
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool[data-toolbar-chips-drop] ~ .slotTool:not(:has([data-toolbar-end])) {
+    order: 5;
+  }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [data-toolbar-end]) { flex: none; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] .slotTool:has(> [data-toolbar-end]) .slotsEnd { flex: none; align-self: flex-start; }
+}
 /* Narrow list frames own the two rows, including a formerly stacked caller. */
 @container v8-page (max-width: 1099px) {
   html:root .slots[data-toolbar-layout='slots-stacked'] { flex-direction: row; flex-wrap: wrap; }
   html:root .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: contents; }
   html:root .slots:has([data-toolbar-role='search']) > .rowBreak { display: none; }
   html:root .slots .slotTool[data-toolbar-role='search'] { flex-basis: calc(100% - var(--toolbar-leading-width, 0px) - var(--tpl-toolbar-gap)); }
+  /* 狭い板で左の列を畳んだ時は、1段目＝作る・フォルダ・検索、2段目＝札・表示・並び・件数。 */
+  html:root .slots:has([data-toolbar-leading]) .slotTool[data-toolbar-role='search'] {
+    flex: 0 1 var(--list-search-width, var(--tpl-list-search-w));
+    min-width: min(var(--tpl-list-search-min), 100%);
+  }
+  html:root .slots:has([data-toolbar-leading]) { row-gap: 0; }
+  html:root .slots:has([data-toolbar-leading]) > .rowBreak { display: block; margin-block: 0; }
+  html:root .slots:has([data-toolbar-leading]) .slotTool:not([data-toolbar-role='search']) { margin-top: var(--space-12); }
   html:root .leading { flex: none; flex-wrap: nowrap; }
   html:root .leading > :is(button, a),
   html:root .leading :global(.v8-folder-create) { width: max-content; flex: none; }
@@ -292,9 +335,12 @@ html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) 
 .optional[data-toolbar-overflow-group]:not([data-collapsed])::details-content { flex: 1; min-width: 0; width: 100%; }
 .optional[data-collapsed] { position: relative; min-width: 0; }
 .optional[data-collapsed] > summary {
-  display: inline-flex; align-items: center; height: var(--tpl-chip-h); padding: 0 var(--tpl-toolbar-gap);
-  border: 1px solid var(--color-hairline); border-radius: var(--radius-control); cursor: pointer;
-  gap: var(--tpl-toolbar-gap); font: inherit; font-size: var(--polish-text-body); line-height: var(--tpl-chip-label-lh); font-weight: 500; white-space: nowrap; box-shadow: var(--control-shadow);
+  display: inline-flex; align-items: center; height: var(--tpl-chip-h);
+  padding: var(--polish-text-center-inset) var(--tpl-select-inset) 0;
+  border: 0; border-radius: var(--radius-control); cursor: pointer;
+  gap: var(--tpl-toolbar-gap); font: inherit; font-size: var(--polish-control-text); line-height: var(--tpl-chip-label-lh); font-weight: var(--polish-control-weight); white-space: nowrap;
+  background: var(--color-canvas); box-shadow: var(--shadow-raised-control);
+  outline: 1px solid transparent; outline-offset: -1px;
 }
 .optional > summary::-webkit-details-marker { display: none; }
 .optional > summary:focus-visible { outline: 2px solid var(--color-focus-ring); }

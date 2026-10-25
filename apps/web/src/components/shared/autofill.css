@@ -1,0 +1,16 @@
+/*
+ * ブラウザの自動入力（メールアドレスなど）で欄の地が薄い青にならないよう、
+ * 白い地に保つ。焦点の青い輪はそのまま残す。Chrome は自動入力の地を
+ * background-color ではなく内部の色で塗るため、白の inset の影で覆う。
+ */
+@layer base {
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px var(--color-canvas) inset;
+    -webkit-text-fill-color: var(--color-ink);
+    caret-color: var(--color-ink);
+  }
+}

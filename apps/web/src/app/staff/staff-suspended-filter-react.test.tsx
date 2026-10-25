@@ -134,7 +134,7 @@ describe('R500 無効にした人の再有効化', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '停止担当の中身を見る' })).toBeTruthy()
     })
-    expect(screen.getByText('止めた')).toBeTruthy()
+    expect(screen.getAllByText('止めた').length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: '有効担当の中身を見る' })).toBeNull()
   })
 

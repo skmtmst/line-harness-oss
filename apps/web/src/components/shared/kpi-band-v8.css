@@ -152,7 +152,15 @@ html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='ba
 html:root [data-kpi-strip][data-kpi-presentation='band'],
 html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-border] {
   border: 0; border-radius: var(--polish-band-radius); background: var(--color-canvas);
-  box-shadow: var(--polish-band-shadow);
+  /* 4辺の縁・角丸・影を同じ強さで見せる。 */
+  box-shadow: var(--polish-band-shadow), 0 0 0 1px var(--card-edge);
+  max-width: 100%;
+}
+/* 1マスだけの帯は、白い面に浮いて見えないようカードと同じ枠を持つ。 */
+html:root [data-kpi-strip][data-kpi-presentation='band']:has(> [data-design-version]:only-child),
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-frame='card'] {
+  border: 1px solid var(--color-hairline);
+  box-shadow: var(--card-shadow);
 }
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-icon] { display: none; }
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] { color: var(--color-ink-secondary); font-weight: var(--polish-control-weight); }
@@ -161,7 +169,12 @@ html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band'][da
 
 html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { background: transparent; }
 
-@container v8-page (width < 1100px) {
+/*
+ * 4マスは、1マスの中身（題・数・補足）が収まる幅がある限り4つ横並びを保つ。
+ * 1152 の画面幅（白い板が約 880）でも4つ。2段にするのは、1マス約 200 を
+ * 割る白い板だけにする（約 800 未満）。
+ */
+@container v8-page (width < 800px) {
  html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
  html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }

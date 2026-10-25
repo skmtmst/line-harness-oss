@@ -164,7 +164,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     await flush()
     expect(host.textContent).toContain('秋のキャンペーン')
     expect(host.textContent).not.toContain('2周年 春の感謝祭')
-    act(() => { (Array.from(chips.querySelectorAll('button')).find((b) => b.textContent?.startsWith('お気に入り')) as HTMLButtonElement).click() })
+    act(() => { (Array.from(chips.querySelectorAll('button')).find((b) => b.textContent?.startsWith('すべて')) as HTMLButtonElement).click() })
     await flush()
     expect(host.textContent).toContain('2周年 春の感謝祭')
   })

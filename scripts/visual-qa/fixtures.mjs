@@ -7008,6 +7008,7 @@ export const LINE_ACCOUNTS = [
   }),
   lineAccount('visual-qa-account-prod', '2007111222', '然-NEN- 本店', 0, {
     basicId: 'nen-honten', stats: { friendCount: 1284, activeScenarios: 3, messagesThisMonth: 1820, staffCount: 4 },
+    iconUrl: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%23087a3e%22/%3E%3Ctext x=%2232%22 y=%2243%22 text-anchor=%22middle%22 font-family=%22sans-serif%22 font-size=%2230%22 font-weight=%22700%22 fill=%22white%22%3EN%3C/text%3E%3C/svg%3E',
     tags: tagSummary('tag-shibuya'), connection: { status: 'ok', checkedAt: '2026-09-30T09:00:00.000Z' },
   }),
   lineAccount('visual-qa-account-store', '2007333444', '然-NEN- 渋谷店', 1, {
@@ -7025,7 +7026,6 @@ export const LINE_ACCOUNTS = [
     tags: tagSummary('tag-event'), connection: { status: 'ok', checkedAt: '2026-09-30T09:00:00.000Z' },
   }),
 ]
-
 /** 運用状態画面だけが読む固定ヘルスログ。見出し行を実データ状態で撮る。 */
 export const ACCOUNT_HEALTH_LOGS = {
   'visual-qa-account': [

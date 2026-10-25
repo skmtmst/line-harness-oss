@@ -228,11 +228,15 @@ export function Field({
       {labelHidden && actualRequired ? <RequiredBadge /> : null}
       {errorFrame ? <div className={styles.errorFrame} data-invalid={Boolean(shownError) || undefined} role="group" aria-invalid={Boolean(shownError) || undefined} aria-describedby={describedBy}>{children}</div> : children}
       {shownError ? <p id={errorId} className={styles.error} role="alert">{shownError}</p> : null}
-      {showNote ? <p id={noteId} className={styles.note}>{note}</p> : null}
-      {actualCount ? (
-        <p id={countId} className={[styles.count, over && styles.countOver].filter(Boolean).join(' ')} data-field-count={over ? 'over' : ''}>
-          {actualCount.value.toLocaleString('ja-JP')}/{actualCount.max.toLocaleString('ja-JP')}文字
-        </p>
+      {showNote || actualCount ? (
+        <div className={styles.supportRow} data-field-support>
+          {showNote ? <p id={noteId} className={styles.note}>{note}</p> : null}
+          {actualCount ? (
+            <p id={countId} className={[styles.count, over && styles.countOver].filter(Boolean).join(' ')} data-field-count={over ? 'over' : ''}>
+              {actualCount.value.toLocaleString('ja-JP')}/{actualCount.max.toLocaleString('ja-JP')}文字
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
     </FieldContext.Provider>

@@ -14,7 +14,7 @@ import { type HqBroadcastRun, FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates/list-page';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -265,13 +265,12 @@ export default function HqBroadcastList() {
         </ListToolbarSearchSlot>
       </ListToolbarRow>
       <ListToolbarRow>
-        <div className={styles.chips} role="group" aria-label="状態で絞る">
-          {STATUS_CHIPS.map((chip) => (
-            <FilterChip key={chip.key} selected={status === chip.key} onChange={() => { setStatus(chip.key); setPage(1) }} icon={<chip.icon size={13} aria-hidden="true" />}>
-              {`${chip.label} ${formatNumber(counts[chip.key])}`}
-            </FilterChip>
-          ))}
-        </div>
+        <SegmentedControl<StatusKey>
+          aria-label="状態で絞る"
+          value={status}
+          onChange={(next) => { setStatus(next); setPage(1) }}
+          options={STATUS_CHIPS.map((chip) => ({ value: chip.key, label: chip.label, count: counts[chip.key] }))}
+        />
         <ListToolbarEnd>
         <div className={styles.pageSizeBox}>
           <SaveErrorField names={["pageSize","page_size"]}><Select

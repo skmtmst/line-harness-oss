@@ -46,8 +46,14 @@
 /* 28 / 34 / 52 are the V8 small / medium / large face sizes. */
 :root .avatar { gap: 0; border-radius: var(--polish-radius-pill); font-family: var(--font-noto-sans-jp), system-ui, sans-serif; }
 :root .s28, :root .s24 { width: 28px; height: 28px; font-size: 11px; line-height: 17px; }
-:root .s34, :root .s32, :root .s40 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }
+:root .s34, :root .s32 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }
+:root .s36 { width: 36px; height: 36px; font-size: 15px; line-height: 22px; }
+:root .s40 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }
 :root .s52, :root .s56 { width: 52px; height: 52px; font-size: 21px; line-height: 32px; }
 :root .avatar[data-avatar='initials'] { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
+/* アカウント・会社の印。画像が無いときは会社の印と同じ緑に白の1文字。 */
+:root .avatar.accountInitials { background: var(--color-accent-deep); color: var(--color-on-accent); }
+:root .avatar[data-avatar-shape='rounded'] { border-radius: var(--polish-radius-control); }
+:root .avatar[data-avatar-tone='soft'] { background: var(--color-avatar-blue-bg); color: var(--color-avatar-blue-ink); }
 
 }

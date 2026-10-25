@@ -3,7 +3,7 @@
 import { useListUrlValue, useListUrlJsonValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { CircleDot, Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
+import { Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -15,14 +15,13 @@ import IconButton from '@/components/shared/icon-button'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowNameButton } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
-import ListToolbar, { ResponsiveFilterChips } from '@/components/shared/list-toolbar'
+import ListToolbar from '@/components/shared/list-toolbar'
 import KpiBand from '@/components/shared/kpi-band'
-import { formatNumber } from '@/lib/format'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ActionMenu from '@/components/shared/action-menu'
 import { notifyToast } from '@/components/shared/toast'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -388,13 +387,15 @@ function ViewChips<K extends string>({ chips, active, onChange }: {
   return (
     <ListToolbarRow>
       <span className={styles.toolLabel}>見る</span>
-      <div role="group" aria-label="見るもので絞り込む" className={styles.chips}>
-        {chips.map((chip) => (
-          <FilterChip key={chip.key} selected={active === chip.key} onChange={(on) => onChange(on ? chip.key : null)}>
-            {chip.count === null ? chip.label : `${chip.label} ${formatNumber(chip.count)}`}
-          </FilterChip>
-        ))}
-      </div>
+      <SegmentedControl
+        aria-label="見るもので絞り込む"
+        value={active}
+        onChange={(next) => onChange(next === 'all' ? null : next as K)}
+        options={[
+          { value: 'all', label: 'すべて' },
+          ...chips.map((chip) => ({ value: chip.key as string, label: chip.label, count: chip.count ?? undefined })),
+        ]}
+      />
     </ListToolbarRow>
   )
 }
@@ -692,10 +693,15 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       pagination={images.length > 0 && status === 'ready' ? pager : undefined}
       toolbar={<>
         <ListToolbar search={{placeholder:'テキスト・指示で探す',label:'テキスト・指示で探す',value:query,onChange:(value)=>{setQuery(value);resetPage()}}}
-          filters={<><ViewChips chips={viewChips} active={view} onChange={(next) => selectView((next ?? 'all') as LibraryView)} /><ResponsiveFilterChips label="用途">
-            <FilterChip selected={shape === null} icon={<CircleDot size={14} aria-hidden="true" />} onChange={()=>{setShape(null);resetPage()}}>すべて</FilterChip>
-            {SHAPE_FILTERS.map((item) => <FilterChip key={item.key} selected={shape === item.key} onChange={(on) => {setShape(on ? item.key : null);resetPage()}}>{item.label}</FilterChip>)}
-          </ResponsiveFilterChips></>}
+          filters={<><ViewChips chips={viewChips} active={view} onChange={(next) => selectView((next ?? 'all') as LibraryView)} /><SegmentedControl
+            aria-label="用途"
+            value={shape ?? 'all'}
+            onChange={(next) => { setShape(next === 'all' ? null : next as ShapeFilter); resetPage() }}
+            options={[
+              { value: 'all', label: 'すべて' },
+              ...SHAPE_FILTERS.map((item) => ({ value: item.key as string, label: item.label })),
+            ]}
+          /></>}
           trailing={<span>並び：作成が新しい順</span>} />
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
       </>}

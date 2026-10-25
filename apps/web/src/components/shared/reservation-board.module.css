@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 .board{min-width:0;}
-.board:has(>[class] [data-detail-columns])>.toolbar{padding:0 0 13px;}.toolbar{display:flex;align-items:center;gap:8px;padding:12px 16px;flex-wrap:wrap;}
+.board:has(>[class] [data-detail-columns])>.toolbar{padding:0 0 13px;}.toolbar{display:flex;align-items:center;gap:var(--space-6);padding:12px 16px;flex-wrap:wrap;}
 .timeHead{display:flex;padding-left:var(--tpl-board-resource-w);border-block:1px solid var(--color-hairline);font-size:var(--text-micro);}
 .timeHead>span{flex:1;padding:4px;}
 .board[data-kind='seats'] .timeHead,.board[data-kind='seats'] .resource{max-width:820px;}
@@ -21,7 +21,7 @@
 .booking .bookingMeta{display:flex;align-items:center;gap:4px;}.booking .bookingMeta{font-size:10px;line-height:15px;}.bookingMeta>span{flex:0 1 auto;}.booking button{justify-content:center;}
 .contact{display:block;font-size:10px;line-height:15px;color:var(--color-ink-secondary);}
 .facts{margin:0;padding:0;}.facts>div{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;gap:0;min-height:44px;border-bottom:1px solid var(--color-hairline);font-size:13px;line-height:20px;}.facts dt{color:var(--color-ink-secondary);}.facts dd{margin:0;font-weight:600;overflow-wrap:anywhere;}.denseDining{font-size:13px;line-height:20px;}.denseDining>strong{display:block;margin-bottom:8px;}
-.board[data-columns='today']>.toolbar>:first-child{flex:1;min-width:0;}.axisButton{display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 12px;outline:1px solid var(--color-accent);outline-offset:-1px;border:0;border-radius:var(--radius-pill);color:var(--color-accent-deep);background:var(--color-accent-soft);font-size:12px;white-space:nowrap;}
+.board[data-columns='today']>.toolbar>:first-child{flex:1;min-width:0;}.printLabel{display:inline;}.stateLegend{display:flex;min-width:0;}.axisButton{display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 12px;outline:1px solid var(--color-accent);outline-offset:-1px;border:0;border-radius:var(--radius-pill);color:var(--color-accent-deep);background:var(--color-accent-soft);font-size:12px;white-space:nowrap;}
 }
 
 @media print{.print .screen{display:block;}.print .toolbar{display:none;}.print .board{break-inside:auto;}.print .resource{break-inside:avoid;}}
@@ -41,3 +41,12 @@
 .timeline{position:relative;margin-block-start:var(--polish-space-section);}
 .nowTrack{position:absolute;inset-block:var(--tpl-board-block-top) 0;inset-inline:var(--tpl-board-resource-w) 0;pointer-events:none;max-width:calc(820px - var(--tpl-board-resource-w));}
 .contentCols :is(th,td):not(:last-child){padding-inline-end:12px;}
+
+/* 日の予約盤は、道具を表と同じ左端に置き、1152 でも1段に保つ。 */
+.board[data-kind='people'] > .toolbar { padding-inline: 0; gap: var(--space-4); }
+.board[data-kind='people'] > .toolbar > :has(+ .printButton) { margin-inline: var(--space-4); }
+/* 入りきらない幅では印刷を印だけにする（読み上げ名は残す）。 */
+@media (max-width: 1440px) {
+  .printLabel { display: none; }
+  .printButton { padding-inline: 10px; }
+}

@@ -13,12 +13,11 @@ import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/s
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
 import Button from '@/components/shared/button';
+import Avatar from '@/components/shared/avatar';
 import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
-import { brandInitial } from '@/components/layout/brand-initial';
 import EmptyList from '@/components/shared/empty-list';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
-import FilterChip from '@/components/shared/filter-chip';
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import ListState from '@/components/shared/list-state';
 import Notice from '@/components/shared/notice';
@@ -31,6 +30,7 @@ import { describeApiFailure, classifyApiFailure, loadFailureNotice } from '@/com
 import { usePageTitle } from '@/components/shell/page-chrome';
 import AccountEditModal from '@/components/accounts/account-edit-modal';
 import PlatformNotices from '@/components/hq/platform-notices';
+import { accountIconUrl } from '@/components/hq/account-list';
 import { api, bookingApi, fetchApi } from '@/lib/api';
 import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared';
 import { resolveStoreReturnPath } from '@/lib/hq-navigation';
@@ -443,13 +443,13 @@ export default function HqHomeV8() {
           />
         </div></ListToolbarRow>
         <ListToolbarRow>
-          <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
-            {STATUS_FILTERS.map((item) => (
-              <FilterChip key={item.value} selected={status === item.value} selectedIcon={false} onChange={() => { setStatus(item.value); resetPage() }}>
-                {`${item.label} ${statusCount(item.value)}`}
-              </FilterChip>
-            ))}
-          </div>
+          <SegmentedControl<StatusFilter>
+            aria-label="状態で絞り込む"
+            className={styles.statusSwitch}
+            value={status}
+            onChange={(next) => { setStatus(next); resetPage() }}
+            options={STATUS_FILTERS.map((item) => ({ value: item.value, label: item.label, count: statusCount(item.value) }))}
+          />
           <ListToolbarEnd>
           <SaveErrorField names={["view"]}><SegmentedControl<View>
             aria-label="表示の切り替え"
@@ -518,7 +518,7 @@ export default function HqHomeV8() {
             return (
               <Card frame="flat" key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
                 <div className={styles.cardHead}>
-                  <span className={styles.logo} aria-hidden="true">{brandInitial(tenantName || name)}</span>
+                  <Avatar name={name} src={accountIconUrl(account)} size={40} shape="rounded" alt={name} style={{ width: 'var(--tpl-hq-logo)', height: 'var(--tpl-hq-logo)' }} />
                   <div className={styles.cardName}>
                     {/* 絵 `JKjsE`：名前の前に左の列（フォルダ）の色の丸。未分類は色の無い輪。 */}
                     <p className={styles.name} title={name}>
@@ -568,7 +568,7 @@ export default function HqHomeV8() {
             const name = account.displayName || account.name
             return (
               <Tr key={account.id}>
-                <PersonCell avatarName={brandInitial(tenantName || name)} avatarSize={32} nameTitle={[name, state.label, accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))].filter(Boolean).join(' / ')} name={
+                <PersonCell avatarName={name} avatarSrc={accountIconUrl(account)} avatarShape="rounded" avatarAlt={name} avatarSize={32} nameTitle={[name, state.label, accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))].filter(Boolean).join(' / ')} name={
                   <span className={styles.cardName}>
                     <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>}>
                       <TruncatedText className={styles.name} value={String(name ?? '')} />

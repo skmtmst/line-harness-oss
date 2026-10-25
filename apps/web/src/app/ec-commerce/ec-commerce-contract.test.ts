@@ -166,9 +166,7 @@ describe('V8 EC integration screens', () => {
     expect(page).not.toContain('actionSummary?.pending ?? 0')
   })
 
-  it('filters subscriptions with the shared FilterChip and types impact metrics (#580)', () => {
-    expect(subscriptions).toContain("from '@/components/shared/filter-chip'")
-    expect(subscriptions).toContain('<FilterChip')
+  it('filters subscriptions and types impact metrics (#580)', () => {
     expect(subscriptions).not.toContain('styles.filterCurrent')
     expect(identity).toContain('impactText(order)')
     expect(identity).toContain('isImpactMetric')

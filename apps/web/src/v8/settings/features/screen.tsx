@@ -372,7 +372,6 @@ export default function FeatureSettingsScreen() {
       ) : undefined}
 
     >
-      {ready && canManage ? <Button variant="secondary" onClick={() => setResetToDefaultsOpen(true)} disabled={saving}><RotateCcw className={styles.btnIcon} aria-hidden="true" />初期値に戻す</Button> : null}
       {!canManage && (
         <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       )}
@@ -412,10 +411,16 @@ export default function FeatureSettingsScreen() {
             <SearchField aria-label="機能の名前で探す" placeholder="機能の名前で探す" value={query} onChange={setQuery} className={styles.search} />
             <span className={styles.spacer} />
             {canManage && (
-              <Button variant="secondary" onClick={() => setReorderOpen(true)} disabled={saving}>
-                <ArrowUpDown className={styles.btnIcon} aria-hidden="true" />
-                並びを変える
-              </Button>
+              <>
+                <Button variant="secondary" onClick={() => setReorderOpen(true)} disabled={saving}>
+                  <ArrowUpDown className={styles.btnIcon} aria-hidden="true" />
+                  並びを変える
+                </Button>
+                <Button variant="secondary" onClick={() => setResetToDefaultsOpen(true)} disabled={saving}>
+                  <RotateCcw className={styles.btnIcon} aria-hidden="true" />
+                  初期値に戻す
+                </Button>
+              </>
             )}
           </div>
 

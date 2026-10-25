@@ -4,7 +4,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Ban, Check, CircleCheck, CircleHelp, Download, Hourglass, ListChecks, ShieldAlert, X } from 'lucide-react'
+import { Check, CircleHelp, Download, Hourglass, ListChecks, X } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -12,6 +12,7 @@ import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import SegmentedControl from '@/components/shared/segmented'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -362,24 +363,26 @@ export default function ApprovalsTab() {
   )
 
   const chips = (
-    <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
+    <div className={styles.chipGroup}>
       {affiliateFilter ? (
         <FilterChip selected onChange={() => resetPage(() => setAffiliateFilter(null))} title="紹介者の絞りを外して、すべての成果に戻ります">
           {`紹介者：${affiliateFilterName ?? '名前を確認できません'}`}
         </FilterChip>
       ) : null}
-      <FilterChip selected={status === 'pending' && !flaggedOnly} icon={<ListChecks size={13} aria-hidden="true" />} onChange={(on) => { if (on) pickStatus('pending') }}>
-        {ready ? `承認待ち ${formatNumber(counts.pending)}` : '承認待ち'}
-      </FilterChip>
-      <FilterChip selected={status === 'rejected'} icon={<Ban size={13} aria-hidden="true" />} onChange={(on) => { if (on) pickStatus('rejected') }}>
-        {ready ? `認めなかった ${formatNumber(counts.rejected)}` : '認めなかった'}
-      </FilterChip>
-      <FilterChip selected={status === 'approved'} icon={<CircleCheck size={13} aria-hidden="true" />} onChange={(on) => { if (on) pickStatus('approved') }}>
-        {ready ? `認めた ${formatNumber(counts.approved)}` : '認めた'}
-      </FilterChip>
-      <FilterChip selected={flaggedOnly} icon={<ShieldAlert size={13} aria-hidden="true" />} onChange={(on) => pickStatus('pending', on)}>
-        {ready ? `確認したほうがよい ${formatNumber(flaggedCount)}` : '確認したほうがよい'}
-      </FilterChip>
+      <SegmentedControl
+        aria-label="状態で絞り込む"
+        value={flaggedOnly ? 'flagged' : status}
+        onChange={(next) => {
+          if (next === 'pending' || next === 'rejected' || next === 'approved') pickStatus(next)
+          else if (next === 'flagged') pickStatus('pending', true)
+        }}
+        options={[
+          { value: 'pending', label: '承認待ち', count: ready ? formatNumber(counts.pending) : undefined },
+          { value: 'rejected', label: '認めなかった', count: ready ? formatNumber(counts.rejected) : undefined },
+          { value: 'approved', label: '認めた', count: ready ? formatNumber(counts.approved) : undefined },
+          { value: 'flagged', label: '確認したほうがよい', count: ready ? formatNumber(flaggedCount) : undefined },
+        ]}
+      />
     </div>
   )
 

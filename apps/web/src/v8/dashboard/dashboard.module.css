@@ -10,7 +10,8 @@
 /* ── 板の頭の下の帯（閲覧のみ・失敗）。はじめにやることのカードは first-steps.module.css ── */
 .notices { display: flex; flex-direction: column; gap: var(--tpl-db-row-gap); }
 
-/* 数の帯の寸法はKpiBandとKpiCardの共通値を使う。 */
+/* 数の帯の寸法はKpiBandとKpiCardの共通値を使う。左右はカードと同じ内側へそろえる。 */
+.todayBand { margin: 0 var(--tpl-list-inset) var(--space-16); }
 .cellDetail {
   display: flex; flex-wrap: wrap; gap: var(--tpl-db-row-gap) var(--tpl-db-fig-gap);
   padding: var(--tpl-db-th-pad); border-bottom: 1px solid var(--color-hairline);
@@ -157,3 +158,4 @@ a.planTitle:hover { text-decoration: underline; }
 
 /* 数のマスの下の補足は1行（狭い幅で2行に割らない）。全文は内訳で読める。 */
 .todayBand > * > p:last-child > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pendingMeta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); }

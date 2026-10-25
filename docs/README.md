@@ -757,5 +757,6 @@
 - [一覧の読み込みの作りをそろえる](release-log/unreleased/1813-kenta-worker-list-paging.md)
 - [失敗の記録の名前をそろえる](release-log/unreleased/1814-kenta-worker-failure-names.md)
 - [アフィリエイト登録の上書き防止](release-log/unreleased/1815-kenta-affiliate-save-conflict.md)
+- [手動テストの指摘の直し（浮いた部品・すべる切り替え・予約元）](release-log/unreleased/1816-kenta-raised-controls.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

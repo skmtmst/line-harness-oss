@@ -13,7 +13,7 @@ import type {
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
@@ -277,17 +277,17 @@ export default function TagCsvImportDialog({
               </div>)}
             </div>
             <div className={styles.filters}>
-              {([
-                ['all', 'すべて', preview.summary.total],
-                ['ready', '新規', preview.summary.ready],
-                ['skipped', '飛ばす', preview.summary.skipped],
-                ['invalid', 'エラー', preview.summary.invalid],
-              ] as Array<[PreviewFilter, string, number]>).map(([key, label, total]) => <FilterChip
-                key={key}
-                selected={filter === key}
-                onChange={() => { setFilter(key); setShownRows(PREVIEW_ROW_STEP) }}
-                count={total}
-              >{label}</FilterChip>)}
+              <SegmentedControl<PreviewFilter>
+                aria-label="取り込む行の絞り込み"
+                value={filter}
+                onChange={(next) => { setFilter(next); setShownRows(PREVIEW_ROW_STEP) }}
+                options={([
+                  ['all', 'すべて', preview.summary.total],
+                  ['ready', '新規', preview.summary.ready],
+                  ['skipped', '飛ばす', preview.summary.skipped],
+                  ['invalid', 'エラー', preview.summary.invalid],
+                ] as Array<[PreviewFilter, string, number]>).map(([value, label, count]) => ({ value, label, count }))}
+              />
             </div>
             <div className={styles.tableFrame}>
               <table className={styles.table}>

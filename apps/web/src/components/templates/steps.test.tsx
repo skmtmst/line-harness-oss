@@ -127,3 +127,57 @@ it('完了した入力が無いときは、空の要約の段を置かない', (
   render(<Steps label="作る" currentKey="first" summaries={{ first: '入力中' }} steps={[{ key: 'first', label: '基本', state: 'todo' }]} />)
   expect(screen.queryByRole('list', { name: '設定済みの内容' })).toBeNull()
 })
+
+
+describe('ログイン前の手順の帯（済み → 線 → 今の段・0.5秒以内）', () => {
+  const originalAnimate = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate')
+  const calls: Array<{ keyframes: unknown; options: KeyframeAnimationOptions | undefined }> = []
+
+  function stubAnimation(reduced: boolean) {
+    calls.length = 0
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: reduced && query.includes('reduce'), media: query, addEventListener() {}, removeEventListener() {} }))
+    Object.defineProperty(HTMLElement.prototype, 'animate', {
+      configurable: true,
+      value: function (keyframes: unknown, options?: KeyframeAnimationOptions) {
+        calls.push({ keyframes, options })
+        return { cancel() {} } as unknown as Animation
+      },
+    })
+  }
+
+  afterEach(() => {
+    if (originalAnimate) Object.defineProperty(HTMLElement.prototype, 'animate', originalAnimate)
+    else Reflect.deleteProperty(HTMLElement.prototype, 'animate')
+    vi.unstubAllGlobals()
+  })
+
+  const authSteps: StepperStep[] = [
+    { label: 'メールログイン', state: 'done' },
+    { label: '二段階認証', state: 'current' },
+  ]
+
+  it('済みの丸・線・今の丸の順に、transform と opacity だけで動かす', () => {
+    stubAnimation(false)
+    render(<Steps variant="auth" animate label="ログインの手順" steps={authSteps} />)
+    expect(calls).toHaveLength(3)
+    expect(calls[0].options?.duration).toBe(150)
+    expect(calls[1].options?.duration).toBe(200)
+    expect(calls[1].options?.delay).toBe(150)
+    expect(calls[2].options?.duration).toBe(150)
+    expect(calls[2].options?.delay).toBe(350)
+    for (const call of calls) {
+      for (const frame of call.keyframes as Array<Record<string, string>>) {
+        expect(Object.keys(frame).every((key) => key === 'transform' || key === 'opacity')).toBe(true)
+      }
+    }
+    expect(JSON.stringify(calls[1].keyframes)).toContain('scaleX(0)')
+  })
+
+  it('動きを減らす設定では動かさず、最後の状態のまま出す', () => {
+    stubAnimation(true)
+    render(<Steps variant="auth" animate label="ログインの手順" steps={authSteps} />)
+    expect(calls).toHaveLength(0)
+    expect(document.querySelector('[data-step-dot="done"]')).toBeTruthy()
+    expect(document.querySelector('[data-step-dot="current"]')?.textContent).toBe('2')
+  })
+})

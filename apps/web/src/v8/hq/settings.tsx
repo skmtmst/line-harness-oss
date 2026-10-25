@@ -157,7 +157,7 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
 
   return (
     <SaveErrorScope errors={saveErrors}><form onSubmit={save} className={styles.form}><Card variant="form" gap="normal">
-      <div className={styles.field}><Field label="統括名" htmlFor={`${uid}-name`}><SaveErrorField names={["name"]}><TextField
+      <div className={styles.field}><Field label="統括名" htmlFor={`${uid}-name`} note="会社名やブランド名など、メンバーが見てわかる名前にします"><SaveErrorField names={["name"]}><TextField
           id={`${uid}-name`}
           value={name}
           maxLength={100}
@@ -168,7 +168,6 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
           className={styles.full}
         /></SaveErrorField>
 {nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
-      <p className={styles.hint}>会社名やブランド名など、メンバーが見てわかる名前にします</p>
       {error ? <Notice tone="danger" >{error}</Notice> : null}
       {null}
 

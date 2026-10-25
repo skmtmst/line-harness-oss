@@ -23,6 +23,7 @@ export default function KpiBand({
   density,
   layout,
   maxColumns,
+  frame,
   ...rest
 }: {
   children: ReactNode
@@ -30,6 +31,8 @@ export default function KpiBand({
   gridClassName?: string
   presentation?: 'band'
   className?: string
+  /** 隣に線やカードが無い所では、帯をカードの枠つきで置く。 */
+  frame?: 'card'
   /** 型が区切りを持つ帯はinset-top、マスの間だけ区切る帯はdividers。 */
   border?: 'inset-top' | 'dividers'
   /** 親の本文が左右の余白を持つ場合、帯の両端では重ねない。 */
@@ -62,6 +65,7 @@ export default function KpiBand({
       className={`${kpiStyles.strip} ${gridClassName}${className ? ` ${className}` : ''}`}
       data-kpi-layout={layout}
       data-kpi-border={border}
+      data-kpi-frame={frame}
       data-kpi-edge-inset={edgeInset}
       data-kpi-density={density}
       data-shared-part="kpi-band"

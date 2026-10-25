@@ -3,7 +3,7 @@
 import Toggle from '@/components/shared/toggle'
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Bookmark, CalendarDays, Check, CircleHelp, Columns2, Copy, Download, History, PenLine, Send, Undo2 } from 'lucide-react';
+import { Bookmark, Check, CircleHelp, Copy, Download, History, PenLine, Send, Undo2 } from 'lucide-react';
 import type { NenCampaignSetting, NenColumn, NenColumnMetrics, NenDeliveryDetail, NenDeliveryList, NenFlowMetrics } from '@/lib/api';
 import { useListItemHref } from '@/components/shared/list-navigation';
 
@@ -26,7 +26,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Drawer from '@/components/shared/drawer'
 import Dialog from '@/components/shared/dialog'
 import ColumnPreview, { replaceCampaignSamples } from './preview'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -315,7 +315,6 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
   const safePage = Math.min(page, pageCount)
   const rows = visible.slice((safePage - 1) * pageSize, safePage * pageSize)
   const filtering = query !== '' || filter !== '' || saved !== ''
-  const pick = (next: AutoFilter) => (selected: boolean) => { setFilter(selected ? next : ''); setPage(1) }
   const monthLabel = kpis?.monthLabel ?? ''
 
   const savedOptions: Array<{ value: string; label: string }> = [
@@ -348,11 +347,17 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
         <ListToolbar
           search={{ placeholder: '配信名で探す', width: 240, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
           filters={pausedOnly ? undefined : (
-            <div role="group" aria-label="きっかけで絞り込む" className={styles.chips}>
-              <FilterChip selected={filter === 'follow_up'} onChange={pick('follow_up')} icon={<Columns2 size={13} aria-hidden="true" />} title="注文のあとに送る配信だけ出します">{`注文のあと ${followUpCount}`}</FilterChip>
-              <FilterChip selected={filter === 'birthday'} onChange={pick('birthday')} icon={<CalendarDays size={13} aria-hidden="true" />} title="ペットの誕生日に送る配信だけ出します">{`誕生日 ${birthdayCount}`}</FilterChip>
-              <FilterChip selected={filter === 'off'} onChange={pick('off')} icon={<CalendarDays size={13} aria-hidden="true" />} title="止めている配信だけ出します">{`止めている ${offCount}`}</FilterChip>
-            </div>
+            <SegmentedControl<AutoFilter>
+              aria-label="きっかけで絞り込む"
+              value={filter}
+              onChange={(next) => { setFilter(next); setPage(1) }}
+              options={[
+                { value: '', label: 'すべて' },
+                { value: 'follow_up', label: '注文のあと', count: followUpCount, title: '注文のあとに送る配信だけ出します' },
+                { value: 'birthday', label: '誕生日', count: birthdayCount, title: 'ペットの誕生日に送る配信だけ出します' },
+                { value: 'off', label: '止めている', count: offCount, title: '止めている配信だけ出します' },
+              ]}
+            />
           )}
           trailing={(
             <>
@@ -635,7 +640,6 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const safePage = Math.min(page, pageCount)
   const rows = visible.slice((safePage - 1) * pageSize, safePage * pageSize)
   const filtering = query !== '' || filter !== '' || category !== ''
-  const pick = (next: ColumnFilter) => (selected: boolean) => { setFilter(selected ? next : ''); setPage(1) }
 
   const menuFor = (column: NenColumn): ActionMenuItem[] => canEdit ? [
     { id: 'reserve', label: 'この内容で予約する', onSelect: () => props.onSelectColumn(column.id) },
@@ -654,13 +658,17 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
         <ListToolbar
           search={{ placeholder: 'コラムを探す', width: 240, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
           filters={(
-            <div role="group" aria-label="コラムを絞り込む" className={styles.chips}>
-              <FilterChip selected={filter === 'published'} onChange={pick('published')} icon={<Columns2 size={13} aria-hidden="true" />} title="公開中のコラムだけ出します">{`公開中 ${publishedCount}`}</FilterChip>
-              <FilterChip selected={filter === 'draft'} onChange={pick('draft')} icon={<CalendarDays size={13} aria-hidden="true" />} title="下書きのコラムだけ出します">{`下書き ${columns.length - publishedCount}`}</FilterChip>
-              {topCategory ? (
-                <FilterChip selected={filter === 'category'} onChange={pick('category')} icon={<CalendarDays size={13} aria-hidden="true" />} title={`分類「${topCategory[0]}」のコラムだけ出します`}>{`${topCategory[0]} ${topCategory[1]}`}</FilterChip>
-              ) : null}
-            </div>
+            <SegmentedControl<ColumnFilter>
+              aria-label="コラムを絞り込む"
+              value={filter}
+              onChange={(next) => { setFilter(next); setPage(1) }}
+              options={[
+                { value: '', label: 'すべて' },
+                { value: 'published', label: '公開中', count: publishedCount },
+                { value: 'draft', label: '下書き', count: columns.length - publishedCount },
+                ...(topCategory ? [{ value: 'category' as const, label: topCategory[0], count: topCategory[1] }] : []),
+              ]}
+            />
           )}
           trailing={(
             <>
@@ -878,9 +886,6 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
     // 履歴の検索はサーバ全体へ効く。打つたびに呼ばず、手が止まってから1回。
     searchTimer.current = setTimeout(() => props.onChangeDeliveryView(historyStatus(filter), undefined, value.trim()), 400)
   }
-  const chip = (value: HistoryFilter, label: string) => (
-    <FilterChip key={value} selected={filter === value} onChange={(selected) => { const next = selected ? value : 'all'; setFilter(next); props.onChangeDeliveryView(historyStatus(next), undefined, query.trim()) }}>{label}</FilterChip>
-  )
   const page = Math.floor(cursor / limit) + 1
   const pageCount = Math.max(1, Math.ceil(total / limit))
 
@@ -892,10 +897,18 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
           search={{ placeholder: '友だち・配信の名前で探す', width: 240, value: query, onChange: changeQuery }}
           filters={(
             <div role="group" aria-label="送った結果で絞り込む" className={styles.chips}>
-              {chip('sent', `送りました ${summary ? formatNumber(summary.sent) : emptyValue('unknown')}`)}
-              {chip('pending', `これから ${summary ? formatNumber(summary.pending + summary.processing) : emptyValue('unknown')}`)}
-              {chip('failed', `届きませんでした ${summary ? formatNumber(summary.failed) : emptyValue('unknown')}`)}
-              {chip('skipped', `送りませんでした ${summary ? formatNumber(summary.skipped) : emptyValue('unknown')}`)}
+              <SegmentedControl<HistoryFilter>
+                aria-label="送った結果で絞り込む"
+                value={filter}
+                onChange={(next) => { setFilter(next); props.onChangeDeliveryView(historyStatus(next), undefined, query.trim()) }}
+                options={[
+                  { value: 'all', label: 'すべて' },
+                  { value: 'sent', label: '送りました', count: summary ? formatNumber(summary.sent) : emptyValue('unknown') },
+                  { value: 'pending', label: 'これから', count: summary ? formatNumber(summary.pending + summary.processing) : emptyValue('unknown') },
+                  { value: 'failed', label: '届きませんでした', count: summary ? formatNumber(summary.failed) : emptyValue('unknown') },
+                  { value: 'skipped', label: '送りませんでした', count: summary ? formatNumber(summary.skipped) : emptyValue('unknown') },
+                ]}
+              />
             </div>
           )}
           trailing={<span className={styles.muted}>送った日が新しい順</span>}

@@ -23,7 +23,6 @@ import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
 
 import SearchField from '@/components/shared/search-field'
-import FilterChip from '@/components/shared/filter-chip'
 import { Tabs } from '@/components/shared/tabs';
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -1156,10 +1155,16 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
               <div className={styles.toolbar}>
                 <SearchField aria-label="名前・メールで探す" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・メールで探す" className={styles.search} />
                 {tab === 'members' ? (
-                  <div className={styles.chips} role="group" aria-label="利用状態で絞り込む">
-                    <FilterChip selectedIcon={false} selected={statusFilter === 'active'} onChange={(selected) => setStatusFilter(selected ? 'active' : 'all')}>{`有効 ${summaryReady ? activeCount : emptyValue('unknown')}`}</FilterChip>
-                    <FilterChip selectedIcon={false} selected={statusFilter === 'suspended'} onChange={(selected) => setStatusFilter(selected ? 'suspended' : 'all')}>{`止めた ${summaryReady ? suspendedCount : emptyValue('unknown')}`}</FilterChip>
-                  </div>
+                  <SegmentedControl<'active' | 'suspended' | 'all'>
+                    aria-label="利用状態で絞り込む"
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={[
+                      { value: 'active', label: '有効', count: summaryReady ? activeCount : undefined },
+                      { value: 'suspended', label: '止めた', count: summaryReady ? suspendedCount : undefined },
+                      { value: 'all', label: 'すべて' },
+                    ]}
+                  />
                 ) : null}
                 <span className={styles.spacer} />
                 {administrator ? (

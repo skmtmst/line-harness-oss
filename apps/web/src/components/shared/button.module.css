@@ -107,6 +107,27 @@
 }
 
 /*
+ * LINE ログインのボタン。LINE の緑 #06c755 の地に白文字。
+ * 高さ・角丸は主ボタンと同じ。白文字との比は 2.26:1 だが、LINE のボタンと
+ * 分かることを優先するため、濃い緑へ置き換えない。
+ * 乗せた時・押した時だけ少し濃くする。
+ */
+.line {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.line:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.line:active:not(:disabled) {
+  background: var(--color-accent-hover);
+  filter: var(--press-dim);
+}
+
+/*
  * ★管理画面 仕上げ §2「保存中」の回る印。文字の切り替えと幅の固定は
  * 部品側（button.tsx）が持つ——DOM に出す文字は今のラベル1つだけで、
  * 平常時の幅を min-width に留めてぶれを防ぐ。
@@ -193,6 +214,7 @@
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 :root .primary { border: 0; outline: 1px solid var(--color-primary-border); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
+:root .line { border: 0; outline: 1px solid var(--color-accent); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
 :root .secondary { outline: 1px solid var(--color-control-border); outline-offset: -1px; }
 .text { border-color: transparent; }
 :root .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
@@ -207,7 +229,7 @@
 :root .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
 .danger-outline { border-color: var(--color-hairline); }
-:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); }
+:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid transparent; box-shadow: var(--shadow-raised-control); }
 
 /* 本文中の小さな操作。通常のボタンの高さは変えない。 */
 :root .inline { height: auto; min-height: 0; padding: 0; font-size: var(--text-caption); line-height: 19px; }
@@ -275,13 +297,17 @@ html:root .button:not([data-part='row-name']):not([data-part='attention-star']):
 
 html:root .button.filterActive { outline: 1px solid var(--color-focus-ring); color: var(--color-action); }
 
-/* 副操作は灰色の面。文字・アイコンだけの口と主操作はそれぞれ保つ。 */
+/*
+ * 白い副操作は線ではなく影で浮かせる。
+ * 文字・アイコンだけの口と主操作（緑）はそれぞれ保つ。
+ */
 :root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']) {
-  border: 0; box-shadow: none;
-  background: var(--polish-control-bg);
+  border: 0;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
   font-size: var(--polish-control-text); font-weight: var(--polish-control-weight);
 }
-:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):hover:not(:disabled) { background: var(--polish-control-hover); }
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):hover:not(:disabled) { background: var(--color-canvas-sunken); }
 :root .button:is(.text, .inline.text)[data-presentation], :root .button.inline.text { color: var(--color-ink); font-weight: var(--polish-control-weight); }
 :root .button.text:hover:not(:disabled) { text-decoration: underline; }
 html:root .button.filterActive { outline-color: var(--color-control-border); color: var(--color-ink); }
@@ -316,10 +342,10 @@ html:root .button:is(.standard, .field, .compact)[data-text-content]:is(:not([da
 
 /* 設定行の操作は札から区別できる白地の枠。通常の副操作は灰色のまま。 */
 html:root .button.secondary[data-presentation='row-action'] {
-  border: 1px solid var(--color-control-border);
+  border: 0;
   outline-color: transparent;
   background: var(--color-canvas);
-  box-shadow: var(--control-shadow);
+  box-shadow: var(--shadow-raised-control);
   color: var(--color-ink);
   font-size: var(--polish-control-text);
   font-weight: var(--polish-control-weight);
@@ -332,4 +358,17 @@ html:root .button.secondary[data-presentation='row-action']:is(:hover, :active):
 html:root .button.secondary[data-presentation='row-action']:focus-visible {
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);
+}
+/* 主ボタンと白い副ボタンは、文字 14/600・印 16（線 2）・間 6。高さは変えない。 */
+:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action']) {
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action']) > svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+  flex: none;
 }

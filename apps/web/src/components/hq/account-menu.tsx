@@ -14,6 +14,7 @@ import { canReturnToHqFrom } from '@/lib/hq-return'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { notifyToast } from '@/components/shared/toast'
+import { nameInitial } from '@/lib/name-initial'
 import styles from './account-menu.module.css'
 
 const ROLE_LABELS: Record<string, string> = {
@@ -121,7 +122,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
   const planNote = chip ? `${chip.label}${daysLeft ? ` ${daysLeft}` : ''}` : ''
   const headNote = [roleLabel, planNote].filter(Boolean).join('・')
   const shownName = name || '—'
-  const initial = shownName.trim().slice(0, 1).toUpperCase() || '?'
+  const initial = nameInitial(shownName).toUpperCase() || '?'
 
   const close = () => setOpen(false)
   const returnToHq = () => {
@@ -193,7 +194,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        title={collapsed ? shownName : undefined}
+        title={shownName}
         // Enter・Space はボタンそのものが開く。矢印でも開けるようにする（メニューの決まり）。
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(event) => {

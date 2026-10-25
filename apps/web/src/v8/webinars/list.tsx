@@ -13,7 +13,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Archive, Bookmark, Download, FilePen, Inbox, Plus, Radio, Video } from 'lucide-react';
+import { Archive, Bookmark, Download, Inbox, Plus, Video } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye } from 'lucide-react';
 import { ListPage, ListPagePagination } from '@/components/templates';
@@ -25,7 +25,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
@@ -766,10 +766,16 @@ function WebinarList() {
   /* ===== 道具の段 ===== */
   const shownChipCounts = chipCounts && chipCounts.accountId === selectedAccountId ? chipCounts : null
   const filterChips = (
-    <div role="group" aria-label="状態で絞り込む">
-      <FilterChip selected={savedFilter === 'active'} onChange={(next) => setSavedFilter(next ? 'active' : '')} icon={<Radio size={13} aria-hidden="true" />}>{shownChipCounts ? `公開中 ${formatNumber(shownChipCounts.active)}` : '公開中'}</FilterChip>
-      <FilterChip selected={savedFilter === 'draft'} onChange={(next) => setSavedFilter(next ? 'draft' : '')} icon={<FilePen size={13} aria-hidden="true" />}>{shownChipCounts ? `下書き ${formatNumber(shownChipCounts.draft)}` : '下書き'}</FilterChip>
-    </div>
+    <SegmentedControl
+      aria-label="状態で絞り込む"
+      value={savedFilter}
+      onChange={setSavedFilter}
+      options={[
+        { value: '', label: 'すべて' },
+        { value: 'active', label: '公開中', count: shownChipCounts?.active },
+        { value: 'draft', label: '下書き', count: shownChipCounts?.draft },
+      ]}
+    />
   )
   const sortBox = (
     <SortSelect
