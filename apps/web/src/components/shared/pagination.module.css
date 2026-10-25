@@ -183,7 +183,7 @@ html:root .current {
  */
 html:root nav[data-pagination] .current {
   border-color: transparent !important;
-  background: var(--color-ink) !important;
+  background: var(--gradient-selected-chip) !important; /* 選んだ黒い札と同じ奥行き（2026-10-25） */
   color: var(--color-canvas) !important;
-  box-shadow: none !important;
+  box-shadow: var(--shadow-selected-chip) !important;
 }

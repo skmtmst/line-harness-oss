@@ -372,3 +372,16 @@ html:root .button.secondary[data-presentation='row-action']:focus-visible {
   stroke-width: 2;
   flex: none;
 }
+
+/*
+ * 奥行き（2026-10-25 オーナー決定・くっきり版）。値は globals.css の共通の値だけを読む。
+ * 緑の主ボタン：薄いグラデと上端の光、乗せると影が少し深く、押すと 0.5px 沈む。
+ * 白い副ボタン：白から #fafafc への薄いグラデと、外周 1px の影。
+ */
+:root .button.primary { background: var(--gradient-primary-action); }
+:root .button.primary:hover:not(:disabled) { box-shadow: var(--shadow-primary-action-hover); }
+/* 窓の取消（淡い面）・選んだ札・乗せた時・押した時は、それぞれの規則（詳しさが上）が勝つ。 */
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']) { background: var(--gradient-raised-control); }
+@media (prefers-reduced-motion: no-preference) {
+  :root .button.primary:active:not(:disabled) { transform: var(--press-primary-shift); }
+}

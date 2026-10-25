@@ -242,7 +242,7 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
 :root .trigger:not(.textTrigger):not([data-tone]) {
   border: 0;
   outline: 1px solid transparent;
-  background: var(--color-canvas);
+  background: var(--gradient-raised-control);
   box-shadow: var(--shadow-raised-control);
 }
 

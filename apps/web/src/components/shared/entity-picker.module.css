@@ -220,7 +220,7 @@ html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset:
 /* 画面の選ぶ欄も線ではなく影で浮かせる。 */
 :root .field {
   border: 0;
-  background: var(--color-canvas);
+  background: var(--gradient-raised-control);
   box-shadow: var(--shadow-raised-control);
 }
 
