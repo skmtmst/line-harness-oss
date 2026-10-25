@@ -390,3 +390,10 @@ html:root .button:is(.standard, .field, .compact)[data-text-content]:is(:not([da
 
 /* ［LINE でログイン］は LINE の決まりの明るい緑。画面の緑（--color-accent＝深い緑）をこのボタンの中だけ LINE の緑に読み替える。 */
 :root .line { --color-accent: var(--color-line-green); --color-accent-hover: var(--color-line-green-hover); }
+
+/* ［LINE でログイン］：色は LINE の決まりのまま、文字を大きく太くして読みやすくする。高さは主ボタンと同じ。 */
+:root .button.line:not([data-presentation]) {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+}
