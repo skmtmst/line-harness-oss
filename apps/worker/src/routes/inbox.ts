@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import {
@@ -52,14 +52,14 @@ inbox.get('/api/inbox/unanswered', async (c) => {
       q: q || undefined,
       account,
       minWaitMinutes: minWaitMinutesStr ? Number.parseInt(minWaitMinutesStr, 10) : undefined,
-      page: pageStr ? listQueryNumber(pageStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
-      pageSize: pageSizeStr ? listQueryNumber(pageSizeStr, Number.NaN, { format: 'integer-prefix' }) : undefined,
+      page: pageStr ? parseOffsetPaging({ page: pageStr }, { pagePolicy: { format: 'integer-prefix' } }).page : undefined,
+      pageSize: pageSizeStr ? parseOffsetPaging({ limit: pageSizeStr }, { defaultLimit: Number.NaN, limitPolicy: { format: 'integer-prefix' } }).limit : undefined,
       allowedAccountIds: scope.allowedAccountIds,
       canSeeUnassigned: scope.canSeeUnassigned,
     };
 
     const result = await computeUnansweredInbox(c.env.DB, opts);
-    return c.json({ success: true, data: buildOffsetListResponse({ ...result, items: result.rows, paging: { limit: result.pageSize }, sort: [{ field: 'lastIncomingAt', direction: 'desc' }, { field: 'friendId', direction: 'desc' }] }) });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...result, items: result.rows, paging: { limit: result.pageSize, offset: (result.page - 1) * result.pageSize }, sort: [{ field: 'lastIncomingAt', direction: 'desc' }, { field: 'friendId', direction: 'desc' }] }) });
   } catch (err) {
     throw err;
   }

@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { getCookie, setCookie } from 'hono/cookie';
 import { logger } from '@line-crm/shared/server';
 import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affiliate-self-auth.js';
@@ -119,10 +119,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
 
-    const requestedLimit = listQueryNumber(c.req.query('limit'), '', { format: 'integer-prefix' });
-    const limit = Number.isFinite(requestedLimit)
-      ? Math.min(100, Math.max(1, requestedLimit))
-      : 20;
+    const { limit } = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { format: 'integer-prefix', fallback: 'finite', minimum: 1, maximum: 100 } });
     const [mileage, history, insights, rawOpportunities] = await Promise.all([
       getMileageSummaryForFriend(c.env.DB, resolved.friend.id),
       getMileageHistoryForFriend(c.env.DB, resolved.friend.id, { limit }),
@@ -146,7 +143,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       const separator = opportunity.url.includes('?') ? '&' : '?';
       return { ...opportunity, url: `${opportunity.url}${separator}crossAccountToken=${encodeURIComponent(token)}` };
     }));
-    return c.json({ success: true, mileage, history, insights, opportunities });
+    return c.json(buildOffsetListResponse({ success: true, mileage, history, insights, opportunities, items: history, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
     throw err;
   }

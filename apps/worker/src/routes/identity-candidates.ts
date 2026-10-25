@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, boundedListInteger } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse, boundedListInteger } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -165,12 +165,12 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
     const data = await listIdentityCandidates(c.env.DB, {
       tenantId: tenantId(c), kind, status,
       allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
-      limit: Math.max(1, boundedListInteger(c.req.query('limit'), 20, 100)),
-      offset: boundedListInteger(c.req.query('offset'), 0, 100_000),
+      limit: parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { fallback: 'nonnegative-integer', minimum: 1, maximum: 100 } }).limit,
+      offset: parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: { fallback: 'nonnegative-integer', maximum: 100_000 } }).offset,
       // FRIEND-11: 名前・根拠の検索は全件へかける。
       q: c.req.query('q') ?? undefined,
     });
-    return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: data.limit }, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: data.limit, offset: data.offset }, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }

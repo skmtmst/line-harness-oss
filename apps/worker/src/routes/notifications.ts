@@ -1,4 +1,4 @@
-import { clampedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -689,16 +689,14 @@ notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin
 notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const status = c.req.query('status') ?? undefined;
-    const limit = clampedListInteger(c.req.query('limit'), 100, 1, 100);
+    const limit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 100, limitPolicy: { fallback: 'integer', minimum: 1, maximum: 100 } }).limit;
     const lineAccountId = c.req.query('lineAccountId')?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
     const items = await getNotifications(c.env.DB, { lineAccountId, status, limit });
-    return c.json({
-      success: true,
-      data: items.map((n) => ({
+    const responseItems = items.map((n) => ({
         id: n.id,
         ruleId: n.rule_id,
         eventType: n.event_type,
@@ -708,8 +706,8 @@ notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), 
         status: n.status,
         metadata: n.metadata ? JSON.parse(n.metadata) : null,
         createdAt: n.created_at,
-      })),
-    });
+      }));
+    return c.json(buildOffsetListResponse({ success: true, data: responseItems, items: responseItems, total: null, paging: { limit, offset: 0 }, sort: [] }));
   } catch (err) {
     throw err;
   }

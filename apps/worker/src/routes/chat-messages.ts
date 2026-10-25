@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber, parseOffsetPaging } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -62,8 +62,7 @@ chatMessages.get('/api/chats/:friendId/messages/search', async (c) => {
   if (friend instanceof Response) return friend;
   const q = c.req.query('q')?.trim() ?? '',
     needle = normalizeConversationSearch(q);
-  const limit = listQueryNumber(c.req.query('limit'), 30),
-    offset = listQueryNumber(c.req.query('offset'), 0);
+  const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 30, limitPolicy: {}, offsetPolicy: {} });
   if (
     !q ||
     Array.from(q).length > 200 ||
@@ -126,7 +125,7 @@ chatMessages.get('/api/chats/:friendId/messages/search', async (c) => {
     success: true,
     data: buildOffsetListResponse({ total,
       hits: responseItems,
-      nextOffset: offset + hits.length < total ? offset + hits.length : null, items: responseItems, paging: { limit }, sort: [{ field: 'at', direction: 'asc' }, { field: 'id', direction: 'asc' }] }),
+      nextOffset: offset + hits.length < total ? offset + hits.length : null, items: responseItems, paging: { limit, offset }, sort: [{ field: 'at', direction: 'asc' }, { field: 'id', direction: 'asc' }] }),
   });
 });
 chatMessages.get('/api/chats/:friendId/messages', async (c) => {

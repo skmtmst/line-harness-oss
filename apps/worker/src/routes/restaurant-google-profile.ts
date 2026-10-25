@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -851,8 +851,7 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/changes', async (c) => 
   const result = c.req.query('result') ?? 'all';
   const days = Math.min(365, Math.max(1, Number.parseInt(c.req.query('days') ?? '30', 10) || 30));
   const q = (c.req.query('q') ?? '').trim().toLowerCase();
-  const page = Math.max(1, listQueryNumber(c.req.query('page'), 1, { format: 'integer-prefix' }) || 1);
-  const perPage = Math.min(HISTORY_LIMIT_MAX, Math.max(1, listQueryNumber(c.req.query('per_page'), 20, { format: 'integer-prefix' }) || 20));
+  const { page, limit: perPage } = parseOffsetPaging({ limit: c.req.query('per_page'), page: c.req.query('page') }, { defaultLimit: 20, limitPolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1, maximum: HISTORY_LIMIT_MAX }, pagePolicy: { format: 'integer-prefix', fallback: 'falsy', minimum: 1 } });
   const since = new Date(Date.now() - days * 86_400_000).toISOString();
   const db = dbFor(c.env, store.id);
 
@@ -912,7 +911,7 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/changes', async (c) => 
     else counts.review_reply += 1;
   }
   const responseItems = filtered.slice((page - 1) * perPage, page * perPage);
-  return c.json(buildOffsetListResponse({ success: true, changes: responseItems, total: filtered.length, page, perPage, counts, days, items: responseItems, paging: { limit: perPage }, sort: [] }));
+  return c.json(buildOffsetListResponse({ success: true, changes: responseItems, total: filtered.length, page, perPage, counts, days, items: responseItems, paging: { limit: perPage, offset: (page - 1) * perPage }, sort: [] }));
 });
 
 restaurantGoogleProfile.get('/api/restaurant-test/google/changes/:id', async (c) => {

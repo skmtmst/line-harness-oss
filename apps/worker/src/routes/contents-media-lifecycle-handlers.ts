@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import { getMediaVersionKeys } from '@line-crm/db';
@@ -537,10 +537,7 @@ export const get__api_common_vars_9 = async (c: Context<Env, "/api/common-vars">
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
-  const rawLimit = listQueryNumber(c.req.query('limit'), Number.NaN);
-  const limit = Number.isFinite(rawLimit)
-    ? Math.max(1, Math.min(Math.floor(rawLimit), COMMON_VARS_LIST_LIMIT))
-    : COMMON_VARS_LIST_LIMIT;
+  const { limit } = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: COMMON_VARS_LIST_LIMIT, limitPolicy: { fallback: 'finite', truncate: true, minimum: 1, maximum: COMMON_VARS_LIST_LIMIT } });
   const folderId = c.req.query('folderId') || undefined;
   const [items, total] = await Promise.all([
     getCommonVars(c.env.DB, { lineAccountId: accountId, folderId, limit }),
@@ -561,7 +558,7 @@ export const get__api_common_vars_9 = async (c: Context<Env, "/api/common-vars">
   const responseItems = items.map(serializeVar);
   return c.json(buildOffsetListResponse({ success: true,
     data: responseItems,
-    meta: { total, limited: total > items.length, limit }, items: responseItems, total: total, paging: { limit }, sort: [{ field: 'name', direction: 'asc' }] }));
+    meta: { total, limited: total > items.length, limit }, items: responseItems, total: total, paging: { limit, offset: 0 }, sort: [{ field: 'name', direction: 'asc' }] }));
 };
 
 export const get__api_common_vars_id_10 = async (c: Context<Env, "/api/common-vars/:id">) => {

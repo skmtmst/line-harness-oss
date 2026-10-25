@@ -6,7 +6,7 @@ import { trackConversion, listConversionDefinitions, getConversionDefinitionDeta
 import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { buildOffsetListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listLimit, listQueryNumber, parseOffsetPaging } from '../lib/list-paging.js';
 import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { maskedPayloadShape } from '../services/incoming-webhook-actions.js';
 import { sha256Hex } from '../middleware/auth.js';
@@ -359,11 +359,12 @@ export const get__api_conversions_definitions_id_ingest_events_14 = async (c: Co
   try {
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
+    const paging = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 50 });
     const data = await listConversionIngestionEvents(c.env.DB, {
-      id: c.req.param('id'), scope: scope.value, limit: listLimit(c.req.query('limit'), 50),
+      id: c.req.param('id'), scope: scope.value, limit: paging.limit,
     });
     if (!data) return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
-    return c.json({ success: true, data: { items: data } });
+    return c.json({ success: true, data: buildOffsetListResponse({ items: data, total: null, paging, sort: [] }) });
   } catch (error) {
     return conversionContractError(c, error);
   }
@@ -373,11 +374,12 @@ export const get__api_conversions_definitions_id_events_15 = async (c: Context<E
   try {
     const scope = await conversionDefinitionScope(c);
     if (!scope.ok) return scope.response;
+    const paging = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 50 });
     const data = await listConversionDefinitionEvents(c.env.DB, {
-      id: c.req.param('id'), scope: scope.value, limit: listLimit(c.req.query('limit'), 50),
+      id: c.req.param('id'), scope: scope.value, limit: paging.limit,
     });
     if (!data) return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
-    return c.json({ success: true, data: { items: data } });
+    return c.json({ success: true, data: buildOffsetListResponse({ items: data, total: null, paging, sort: [] }) });
   } catch (error) {
     return conversionContractError(c, error);
   }

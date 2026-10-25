@@ -1,4 +1,4 @@
-import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
+import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { outgoingEventTypes } from './webhook-event-types.js';
@@ -427,8 +427,7 @@ export const get__api_webhooks_interactions_8 = async (c: Context<Env, "/api/web
       direction: direction === 'incoming' || direction === 'outgoing' ? direction : undefined,
       status: status === 'succeeded' || status === 'failed' ? status : undefined,
       search: c.req.query('search'),
-      page: listQueryNumber(c.req.query('page'), 1),
-      limit: listQueryNumber(c.req.query('limit'), 20),
+      ...parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: {}, pagePolicy: {} }),
     });
     return c.json({
       success: true,
@@ -436,7 +435,7 @@ export const get__api_webhooks_interactions_8 = async (c: Context<Env, "/api/web
         total: result.total,
         page: result.page,
         limit: result.limit,
-        summary: result.summary, paging: { limit: result.limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
+        summary: result.summary, paging: { limit: result.limit, offset: (result.page - 1) * result.limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
     });
   } catch (err) {
     throw err;

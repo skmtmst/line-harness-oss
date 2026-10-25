@@ -16,6 +16,22 @@ export type ListPagingOptions = Readonly<{
   maxLimit?: number;
 }>;
 
+/** 入口ごとの数値変換・不正値の扱いを、既存の契約のまま指定する。 */
+export type ListNumberPolicy = Readonly<{
+  format?: 'number' | 'integer-prefix';
+  fallback?: 'falsy' | 'integer' | 'nonnegative-integer' | 'finite';
+  minimum?: number;
+  maximum?: number;
+  truncate?: boolean;
+}>;
+
+export type OffsetPagingOptions = ListPagingOptions & Readonly<{
+  defaultOffset?: number;
+  limitPolicy?: ListNumberPolicy;
+  offsetPolicy?: ListNumberPolicy;
+  pagePolicy?: ListNumberPolicy;
+}>;
+
 export type OffsetPaging = Readonly<{
   page: number;
   limit: number;
@@ -118,14 +134,28 @@ function parseLimit(raw: string | undefined, options: ListPagingOptions): number
   return listLimit(raw, defaultLimit, maxLimit);
 }
 
+function parseListNumber(raw: string | undefined, fallback: number, policy: ListNumberPolicy): number {
+  let value = listQueryNumber(raw, fallback, policy);
+  if ((policy.fallback === 'falsy' && !value)
+    || (policy.fallback === 'integer' && !Number.isInteger(value))
+    || (policy.fallback === 'nonnegative-integer' && (!Number.isInteger(value) || value < 0))
+    || (policy.fallback === 'finite' && !Number.isFinite(value))) value = fallback;
+  if (policy.truncate) value = Math.trunc(value);
+  if (policy.minimum !== undefined) value = Math.max(policy.minimum, value);
+  if (policy.maximum !== undefined) value = Math.min(policy.maximum, value);
+  return value;
+}
+
 export function parseOffsetPaging(
   query: ListPagingQuery,
-  options: ListPagingOptions = {},
+  options: OffsetPagingOptions = {},
 ): OffsetPaging {
-  const page = listPage(query.page);
-  const limit = parseLimit(query.limit, options);
+  const page = options.pagePolicy ? parseListNumber(query.page, 1, options.pagePolicy) : listPage(query.page);
+  const limit = options.limitPolicy
+    ? parseListNumber(query.limit, options.defaultLimit ?? DEFAULT_LIST_LIMIT, options.limitPolicy)
+    : parseLimit(query.limit, options);
   if (query.offset !== undefined) {
-    const offset = listOffset(query.offset);
+    const offset = options.offsetPolicy ? parseListNumber(query.offset, options.defaultOffset ?? 0, options.offsetPolicy) : listOffset(query.offset);
     return { page: Math.floor(offset / limit) + 1, limit, offset };
   }
   return { page, limit, offset: (page - 1) * limit };
@@ -160,11 +190,11 @@ export function buildOffsetListResponse<T, Details extends object = object>({
   ...details
 }: {
   items: T[];
-  total: number;
-  paging: Pick<OffsetPaging, 'limit'>;
+  total: number | null;
+  paging: Pick<OffsetPaging, 'limit'> & Partial<Pick<OffsetPaging, 'offset'>>;
   sort: ListSort;
 } & Details) {
-  return { ...details, items, total, limit: paging.limit, sort };
+  return { ...details, items, total, limit: paging.limit, ...(paging.offset === undefined ? {} : { offset: paging.offset }), sort };
 }
 
 type ListResponseCursor = string | null | Readonly<Record<string, string>>;
