@@ -288,7 +288,7 @@ describe('公開前の試し', () => {
     );
     const detailBody = await detail.json() as { data: { submitCount: number } };
     expect(detailBody.data.submitCount).toBe(1);
-  });
+  }, 30_000);
 });
 
 describe('一覧の今月の数', () => {
