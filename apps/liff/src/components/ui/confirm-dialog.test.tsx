@@ -124,3 +124,21 @@ describe('題と本文の折れ方', () => {
     }
   });
 });
+
+it('閉じている窓は描かず、処理中は実行も取消も送らない', () => {
+  const onCancel = vi.fn();
+  const onConfirm = vi.fn();
+  const view = render(<ConfirmDialog open={false} title="確認" description="操作を確かめます" onCancel={onCancel} onConfirm={onConfirm} />);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  view.rerender(<ConfirmDialog open busy destructive title="確認" description="操作を確かめます" onCancel={onCancel} onConfirm={onConfirm} />);
+  expect(screen.getByRole('alertdialog')).toBeTruthy();
+  for (const button of screen.getAllByRole('button')) {
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(button);
+  }
+  expect(onCancel).not.toHaveBeenCalled();
+  expect(onConfirm).not.toHaveBeenCalled();
+  view.rerender(<ConfirmDialog open destructive title="確認" description="操作を確かめます" onCancel={onCancel} onConfirm={onConfirm} />);
+  fireEvent.click(screen.getByRole('button', { name: '実行する' }));
+  expect(onConfirm).toHaveBeenCalledOnce();
+});

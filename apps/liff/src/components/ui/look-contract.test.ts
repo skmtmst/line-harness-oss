@@ -1,134 +1,82 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { join } from 'node:path';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { afterAll, beforeAll, expect, it } from 'vitest';
+import Button from './Button.js';
+import { styleBrowser } from '../../test-utils/style-browser.js';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const root = join(HERE, '..', '..');
-const src = (...parts: string[]): string => readFileSync(join(root, ...parts), 'utf8');
-const css = (src('index.css') + src('components', 'ui', 'liff-skin.css')) + src('tokens.css');
-const html = src('..', 'index.html');
+let view: Awaited<ReturnType<typeof styleBrowser>>;
+beforeAll(async () => { view = await styleBrowser(); }, 30000);
+afterAll(async () => { await view?.browser.close(); });
 
-/*
- * M2 LIFF の見た目の型 (V8.pen 修正案 L-2・L-3。値は色見本どおり) の契約。
- * 流儀は feel-contract と同じ (描画試験はしない。文面を読む)。
- * ⑤ LINE らしい (＝今の見た目そのまま) は型の上書きを持たない。
- * 司令塔の直し：⑤の主は #03873a のまま・③の主は #b5532f (白字 4.95)・
- * ②の主は真っ黒を避けた #2b2d31。角丸・見出し・数字は一括で当てる。
- */
-
-function themeBlock(theme: string): string {
-  const m = css.match(new RegExp(`\\[data-liff-theme="${theme}"\\]\\s*\\{([^}]*)\\}`));
-  if (!m) throw new Error(`theme block missing: ${theme}`);
-  return m[1];
-}
-
-describe('5つの型は CSS 変数の組 (色見本どおり)', () => {
-  it('①ナチュラル (地 #fbfaf7・面 #ffffff・主 #123d2f・しっぽり明朝・角丸 23)', () => {
-    const block = themeBlock('natural');
-    expect(block).toContain('--color-canvas: #fbfaf7');
-    expect(block).toContain('--color-ground: #ffffff');
-    expect(block).toContain('--color-liff-line: #e9e4dc');
-    expect(block).toContain('--color-liff-sub: #76716a');
-    expect(block).toContain('--color-ink: #1a1a1a');
-    expect(block).toContain('--color-liff-primary: #123d2f');
-    expect(block).toContain('--liff-on-primary: #ffffff');
-    expect(block).toContain('--color-liff-dot-few: #c9a96a');
-    expect(block).toContain('--color-liff-full: #c4beb4');
-    expect(block).toContain('Shippori Mincho');
-    expect(block).toContain('--liff-radius: 23px');
-    expect(block).toContain('--liff-radius-lg: 23px');
+it.each([
+  ['natural', 'rgb(251, 250, 247)', 'rgb(18, 61, 47)', 'rgb(255, 255, 255)', '23px', 'Shippori Mincho'],
+  ['modern', 'rgb(255, 255, 255)', 'rgb(43, 45, 49)', 'rgb(255, 255, 255)', '10px', 'Noto Sans JP'],
+  ['gentle', 'rgb(255, 248, 243)', 'rgb(181, 83, 47)', 'rgb(255, 255, 255)', '21px', 'Zen Maru Gothic'],
+  ['night', 'rgb(15, 28, 51)', 'rgb(201, 169, 106)', 'rgb(15, 28, 51)', '23px', 'Shippori Mincho'],
+  ['line', 'rgb(255, 255, 255)', 'rgb(3, 135, 58)', 'rgb(255, 255, 255)', '10px', 'Noto Sans JP'],
+])('%s の型で地・主ボタン・見出しを描く', async (theme, canvas, primary, ink, radius, font) => {
+  await view.show(`<main data-liff-theme="${theme}" class="bg-canvas"><h1>見出し</h1><span class="liff-num">123</span><aside class="bg-liff-note">お知らせ</aside>${renderToStaticMarkup(createElement(Button, {}, '申し込む'))}</main>`);
+  expect(await view.page.locator('main').evaluate(el => getComputedStyle(el).backgroundColor)).toBe(canvas);
+  const button = await view.page.getByRole('button').evaluate(el => {
+    const s = getComputedStyle(el);
+    return { background: s.backgroundColor, color: s.color, radius: s.borderRadius, height: el.getBoundingClientRect().height };
   });
-
-  it('②モダン (主 #2b2d31・見出し Noto 800・角丸 10)', () => {
-    const block = themeBlock('modern');
-    expect(block).toContain('--color-canvas: #ffffff');
-    expect(block).toContain('--color-ground: #f5f5f5');
-    expect(block).toContain('--color-ink: #111111');
-    expect(block).toContain('--color-liff-primary: #2b2d31');
-    expect(block).toContain('--liff-on-primary: #ffffff');
-    expect(block).toContain('--color-liff-dot-few: #ff9f0a');
-    expect(block).toContain('--color-liff-full: #c7c7cc');
-    expect(block).toContain('--liff-radius: 10px');
-    // 真っ黒は使わない (オーナー)。
-    expect(block).not.toMatch(/#000\b/);
-    expect(block).not.toContain('#000000');
-    // 見出しは Noto Sans JP の 800。
-    expect(css).toContain('[data-liff-theme="modern"] h1');
-    expect(css).toContain('font-weight: 800');
-  });
-
-  it('③やさしい (主 #b5532f・Zen Maru Gothic・角丸 21)', () => {
-    const block = themeBlock('gentle');
-    expect(block).toContain('--color-canvas: #fff8f3');
-    expect(block).toContain('--color-ink: #3b2a22');
-    expect(block).toContain('--color-liff-primary: #b5532f');
-    expect(block).toContain('--liff-on-primary: #ffffff');
-    expect(block).toContain('--color-liff-dot-few: #e8b04a');
-    expect(block).toContain('--color-liff-full: #d6c6bb');
-    expect(block).toContain('Zen Maru Gothic');
-    expect(block).toContain('--liff-radius: 21px');
-  });
-
-  it('④夜は深い紺 (主は金・字は紺・黒は使わない・角丸 23)', () => {
-    const block = themeBlock('night');
-    expect(block).toContain('--color-canvas: #0f1c33');
-    expect(block).toContain('--color-ground: #172a47');
-    expect(block).toContain('--color-liff-line: #27406a');
-    expect(block).toContain('--color-liff-sub: #a9b8d0');
-    expect(block).toContain('--color-ink: #f2f5fa');
-    expect(block).toContain('--color-liff-primary: #c9a96a');
-    expect(block).toContain('--liff-on-primary: #0f1c33');
-    expect(block).toContain('--color-liff-dot-few: #e0c48a');
-    expect(block).toContain('--color-liff-full: #4a5f82');
-    expect(block).toContain('Shippori Mincho');
-    expect(block).toContain('--liff-radius: 23px');
-    // オーナー：黒は使わない。
-    expect(block).not.toMatch(/#000\b/);
-    expect(block).not.toContain('#000000');
-  });
-
-  it('⑤ LINE らしいに専用の上書きは無い (今の見た目のまま)', () => {
-    expect(css).not.toMatch(/\[data-liff-theme="line"\]\s*\{/);
-    // 土台の主の色は LIFF 専用の濃い緑のまま。
-    expect(css).toContain('--color-liff-primary: #03873a');
-  });
+  expect(button).toEqual({ background: primary, color: ink, radius, height: 48 });
+  expect(await view.page.locator('h1').evaluate(el => getComputedStyle(el).fontFamily)).toContain(font);
+  expect(await view.page.locator('.liff-num').evaluate(el => getComputedStyle(el).fontFamily)).toContain(theme === 'gentle' ? 'Zen Maru Gothic' : 'Inter');
+  expect(await view.page.locator('aside').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(242, 246, 254)');
+  if (theme === 'modern') expect(await view.page.locator('h1').evaluate(el => getComputedStyle(el).fontWeight)).toBe('800');
 });
 
-describe('型を替えても壊れない決まり', () => {
-  it('知らせ (注意書きの箱) はどの型でも白地のまま', () => {
-    for (const theme of ['natural', 'modern', 'gentle', 'night']) {
-      expect(themeBlock(theme)).not.toContain('--color-liff-note');
-    }
-  });
-
-  it('主の色の上の字は既定で白。店の色で上書きする', () => {
-    expect(css).toContain('--liff-on-primary: #ffffff');
-  });
-
-  it('見出しの書体は型・店の設定で替える', () => {
-    expect(css).toContain('--liff-font-heading');
-  });
-
-  it('数字の書体は型ごとに替える (liff-num)', () => {
-    expect(css).toContain('.liff-num');
-    expect(css).toContain('font-weight: 300');
-    expect(css).toContain('font-weight: 500');
-  });
-
-  it('角丸の素は今の値が既定 (10・箱は14)', () => {
-    expect(css).toContain('--liff-radius: 10px');
-    expect(css).toContain('--liff-radius-lg: 14px');
-  });
+it('型の禁止の見張りを保つ', () => {
+  const root = join(import.meta.dirname, '../..');
+  const css = readFileSync(join(root, 'index.css'), 'utf8') + readFileSync(join(root, 'components/ui/liff-skin.css'), 'utf8') + readFileSync(join(root, 'tokens.css'), 'utf8');
+  for (const theme of ['modern', 'night']) {
+    const block = css.match(new RegExp(`\\[data-liff-theme="${theme}"\\]\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    expect(block).not.toMatch(/#000\b/);
+    expect(block).not.toContain('#000000');
+  }
+  expect(css).not.toMatch(/\[data-liff-theme="line"\]\s*\{/);
+  for (const theme of ['natural', 'modern', 'gentle', 'night']) {
+    const block = css.match(new RegExp(`\\[data-liff-theme="${theme}"\\]\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    expect(block).not.toContain('--color-liff-note');
+  }
 });
 
-describe('書体の読み込み', () => {
-  it('しっぽり明朝と Zen Maru Gothic を読む。数字の 300 と見出しの 800 も足す', () => {
-    expect(html).toContain('Shippori+Mincho');
-    expect(html).toContain('Zen+Maru+Gothic');
-    expect(html).toContain('Inter:wght@300');
-    expect(html).toContain('Noto+Sans+JP:wght@400;500;600;700;800');
-    // 今の Inter・Noto Sans JP も残す。
-    expect(html).toContain('Noto+Sans+JP');
-  });
+it.each([375, 414])('幅%sでも主ボタンを画面内に収める', async width => {
+  await view.page.setViewportSize({ width, height: 812 });
+  await view.show(`<main class="max-w-md mx-auto px-4">${renderToStaticMarkup(createElement(Button, {}, '内容を確かめる'))}</main>`);
+  const box = await view.page.getByRole('button').boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+});
+
+it('副操作と危険な操作・押せない選択を別の表示で伝える', async () => {
+  await view.show(renderToStaticMarkup(createElement('div', {},
+    createElement(Button, { variant: 'secondary' }, '読み直す'),
+    createElement(Button, { variant: 'danger' }, '取り消す'),
+    createElement(Button, { variant: 'optionRow', unavailable: true, disabled: true }, '満席'),
+  )));
+  const secondary = await view.page.getByRole('button', { name: '読み直す' }).evaluate(el => ({ background: getComputedStyle(el).backgroundColor, border: getComputedStyle(el).borderTopWidth, height: el.getBoundingClientRect().height }));
+  expect(secondary).toEqual({ background: 'rgb(255, 255, 255)', border: '1px', height: 44 });
+  expect(await view.page.getByRole('button', { name: '取り消す' }).evaluate(el => getComputedStyle(el).color)).toBe('rgb(255, 255, 255)');
+  expect(await view.page.getByRole('button', { name: '取り消す' }).evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe('rgb(255, 255, 255)');
+  expect(await view.page.getByRole('button', { name: '満席' }).isDisabled()).toBe(true);
+});
+
+it.each([
+  ['natural', '#ffffff', '#e9e4dc', '#76716a', '#1a1a1a', '#c9a96a', '#c4beb4', '23px', '300'],
+  ['modern', '#f5f5f5', '#e8e8e8', '#6e6e73', '#111111', '#ff9f0a', '#c7c7cc', '10px', '500'],
+  ['gentle', '#ffffff', '#f1e2d6', '#8a7468', '#3b2a22', '#e8b04a', '#d6c6bb', '21px', '500'],
+  ['night', '#172a47', '#27406a', '#a9b8d0', '#f2f5fa', '#e0c48a', '#4a5f82', '23px', '300'],
+  ['line', '#f5f5f7', '#e6e9ed', '#5f6670', '#1d1d1f', '#b26b00', '#c3c8cf', '14px', '400'],
+])('%s の本文・線・空きの印・箱の角丸を描く', async (theme, ground, line, sub, ink, few, full, radius, weight) => {
+  await view.show(`<main data-liff-theme="${theme}"><article class="bg-ground border border-liff-line rounded-(--liff-radius-lg)"><p class="text-ink">本文</p><p class="text-liff-sub">補足</p><p class="text-liff-dot-few">残りわずか</p><p class="text-liff-full">満席</p><span class="liff-num">123</span></article></main>`);
+  const rgb = (hex: string) => `rgb(${[1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16)).join(', ')})`;
+  const card = await view.page.locator('article').evaluate(el => { const s = getComputedStyle(el); return { background: s.backgroundColor, border: s.borderTopColor, radius: s.borderRadius }; });
+  expect(card).toEqual({ background: rgb(ground), border: rgb(line), radius });
+  for (const [label, color] of [['本文', ink], ['補足', sub], ['残りわずか', few], ['満席', full]]) expect(await view.page.getByText(label, { exact: true }).evaluate(el => getComputedStyle(el).color)).toBe(rgb(color));
+  expect(await view.page.locator('.liff-num').evaluate(el => getComputedStyle(el).fontWeight)).toBe(weight);
 });

@@ -20,7 +20,7 @@ const sources = Object.fromEntries(
   targets.map((path) => [path, readFileSync(join(SRC, path), 'utf8')]),
 )
 
-describe('表見出しの第1段階移行', () => {
+describe('共通化済みの表見出しに直書きと重複指定を戻さない', () => {
   it('一覧に登録した画面の標準見出しを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),

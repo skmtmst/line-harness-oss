@@ -34,7 +34,7 @@ function violations(source: string, file = 'fixture.tsx'): string[] {
   return errors
 }
 
-describe("処理中の文字は共通Buttonのbusy／busyLabelで出す", () => {
+describe("実行ボタンに処理中の文字の独自切替を作らない", () => {
   it('V8全体とappのV8ファイルに手作りの切替が残っていない', () => {
     const found = files.flatMap((file) => violations(readFileSync(file, 'utf8'), relative(root, file)))
     expect(found).toEqual([])

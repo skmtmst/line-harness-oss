@@ -95,6 +95,7 @@ function setup(detail: EventDetail, slots: EventSlot[], bookings: EventBookingMi
     <MemoryRouter initialEntries={['/events/e1?liffId=test']}>
       <Routes>
         <Route path="/events/:id" element={<Event />} />
+        <Route path="/events/:id/confirm" element={<p>申込の確認先</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -174,6 +175,16 @@ it('会場の住所を表示する', async () => {
   getEvent.mockResolvedValue(eventDetail({ venue_address: 'テスト会場の住所' }));
   getEventSlots.mockResolvedValue({items:[slot()]});
   myEventBookings.mockResolvedValue({items:[]});
-  render(<MemoryRouter initialEntries={['/events/e1']}><Routes><Route path="/events/:id" element={<Event />} /></Routes></MemoryRouter>);
+  render(<MemoryRouter initialEntries={['/events/e1']}><Routes><Route path="/events/:id" element={<Event />} />
+        <Route path="/events/:id/confirm" element={<p>申込の確認先</p>} /></Routes></MemoryRouter>);
   expect(await screen.findByText('テスト会場の住所')).toBeTruthy();
+});
+
+it('イベント画像は名前を読み上げ、枠を選ぶだけでは移動せず、主操作で確認へ進む', async () => {
+  setup(eventDetail({ image_url: 'https://example.test/event.png' }), [slot()], []);
+  expect((await screen.findByRole('img', { name: '秋の交流会' })).getAttribute('src')).toBe('https://example.test/event.png');
+  fireEvent.click(screen.getByRole('button', { name: '10:00〜11:00 残り 5' }));
+  expect(screen.queryByText('申込の確認先')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'この時間で申し込む' }));
+  expect(await screen.findByText('申込の確認先')).toBeTruthy();
 });
