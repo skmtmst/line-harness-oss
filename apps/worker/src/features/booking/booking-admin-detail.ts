@@ -3,7 +3,7 @@ import { listBookingOperations, type BookingOperationRun } from './booking-opera
 import { listBookingAuditLogs } from '@line-crm/db';
 
 /**
- * IDEA-27: 詳細の初回応答に同梱する変更履歴は要点だけ（直近10件）。
+ * 詳細の初回応答に同梱する変更履歴は要点だけ（直近10件）。
  * 長い履歴は GET .../audit-logs で追加取得する。総数は auditLogTotal で返す。
  */
 const AUDIT_PREVIEW_LIMIT = 10;
@@ -133,7 +133,7 @@ interface CustomerHistoryFilter {
 }
 
 /**
- * R320: 同じ顧客の予約が何件あるか（対象予約を除く）。
+ * 同じ顧客の予約が何件あるか（対象予約を除く）。
  * 一覧は直近10件だけなので、総数で打ち切りを伝える。
  */
 async function historyTotalForCustomer(
@@ -158,7 +158,7 @@ async function historyTotalForCustomer(
 }
 
 /**
- * R320: 「前回来店の申し送り」は過去の来店完了だけから選ぶ。
+ * 「前回来店の申し送り」は過去の来店完了だけから選ぶ。
  * 未来の予約・キャンセル・お断り・来店なしのメモは混ぜない。
  * beforeStartsAt より前の completed で、店内メモのある最新の1件を返す。
  */
@@ -214,7 +214,7 @@ export async function getBookingCustomerContext(
   const [profile, history, handover] = await Promise.all([
     friendProfile(db, resolvedFriendId),
     historyForCustomer(db, { lineAccountId: input.lineAccountId, friendId: resolvedFriendId, bookingCustomerId }),
-    // R320: 新規受付の文脈では「今より前」の来店完了だけを前回とする。
+    // 新規受付の文脈では「今より前」の来店完了だけを前回とする。
     previousHandoverForCustomer(db, {
       lineAccountId: input.lineAccountId,
       friendId: resolvedFriendId,
@@ -272,14 +272,14 @@ export async function getBookingAdminDetail(
       bookingCustomerId: row.booking_customer_id,
       excludeId: row.id,
     }),
-    // R321: 一覧は直近10件だけなので総数を別途数える。
+    // 一覧は直近10件だけなので総数を別途数える。
     historyTotalForCustomer(db, {
       lineAccountId: input.lineAccountId,
       friendId: row.friend_id,
       bookingCustomerId: row.booking_customer_id,
       excludeId: row.id,
     }),
-    // R320: この予約より前の来店完了だけを「前回」とする。
+    // この予約より前の来店完了だけを「前回」とする。
     previousHandoverForCustomer(db, {
       lineAccountId: input.lineAccountId,
       friendId: row.friend_id,
@@ -319,7 +319,7 @@ export async function getBookingAdminDetail(
     /* 壊れた snapshot は既定値へ倒す */
   }
   // Google 同期の実態はイベントIDだけでは分からない。最新の台帳行の
-  // 状態を優先し、失敗・再試行中を「同期失敗」として見せる (N-392/N-393)。
+  // 状態を優先し、失敗・再試行中を「同期失敗」として見せる。
   const latestCalendarOp: BookingOperationRun | undefined = operations
     .filter((op) => op.kind === 'google_calendar')
     .pop();

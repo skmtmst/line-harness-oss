@@ -9,11 +9,7 @@ import { BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES } from '../../features/booking
 import { resolveAccountIdAdmin } from './identity.js';
 
 export function registerCustomers(booking: Hono<Env>): void {
-// ================================================================
-// Admin endpoints (/api/booking/admin/*)
-// authMiddleware enforces staff/owner auth at index.ts level.
-// All endpoints require ?account_id= query.
-// ================================================================
+// 管理用の予約操作はスタッフ認証を継承し、対象を決める account_id を必須とする。
 
 // ---- Booking customers (LINE未連携の電話客) ----
 
@@ -59,7 +55,7 @@ booking.post(
     const accountId = await resolveAccountIdAdmin(c);
     if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
     /*
-     * R559: 応答消失後の再送で同じ電話客を2件作らない。呼び出し側が
+     * 応答消失後の再送で同じ電話客を2件作らない。呼び出し側が
      * 確定操作ごとに付ける一意キーで作成済み応答を返す。検証で落ちた
      * 要求は保存しないので、入力を直して同じキーで送り直せる。キーの無い
      * 従来の呼び出しは従来どおり毎回作成する。migration 無しで済ませるため、LIFF用の
@@ -103,7 +99,7 @@ booking.post(
       return inputError(c, { error: 'missing_customer_fields' }, 400, ["display_name","phone"]);
     }
     /*
-     * R559残差: 同じキーで同時に届いた2件がどちらも未保存と判断し、
+     * 残差: 同じキーで同時に届いた2件がどちらも未保存と判断し、
      * 別の顧客を2件作っていた。完了後の保存だけでは同時到着に負けるので、
      * 代理予約と同じく先に202の仮応答を1行だけ確保し、確保できた
      * 呼び出しだけが作成へ進む。検証落ちは確保前に返すので、入力を
@@ -134,7 +130,7 @@ booking.post(
         email: body.email,
         encryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
       });
-      // R559: 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
+      // 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
       if (idemKey) {
         await completeIdempotencyResponse(c.env.DB, {
           ...idemScope,
@@ -145,7 +141,7 @@ booking.post(
       return c.json({ customer }, 201);
     } catch (error) {
       /*
-       * R559再残差: 顧客INSERTの成功後に完了書き込みだけ落ちると、
+       * 再残差: 顧客INSERTの成功後に完了書き込みだけ落ちると、
        * 仮応答を消すだけでは再送が同じ顧客を作り直して2件になる。
        * 作られた顧客を読み直し、完了行を修復してから503を返す。
        * 再送は修復済みの作成済み顧客へ届く。作られていないときだけ

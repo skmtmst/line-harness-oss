@@ -19,12 +19,9 @@ events.delete('/api/events/admin/events/:id', requireRole('owner', 'admin'), asy
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400, []);
   const id = c.req.param('id');
-  // Authorize via multi-account ownership: shared events can be deleted by
-  // any account listed in account_ids, not only the sentinel line_account_id.
+  // 共有イベントの所有権は代表アカウントだけでなく account_ids 全体で判定する。
   if (!(await ownsEvent(c.env.DB, id, account_id))) return bad(c, 'not_found', 404);
-  // Block deletion while live bookings exist — once the event row is
-  // soft-deleted ownsEvent hides it from admin endpoints, leaving any
-  // requested/confirmed bookings unmanageable but still firing reminders.
+  // 削除後は管理入口から見えなくなるため、生きた予約を残して管理不能・通知継続にならないよう削除を拒む。
   const active = await c.env.DB
     .prepare(
       `SELECT

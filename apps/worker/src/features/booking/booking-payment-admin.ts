@@ -68,7 +68,7 @@ export async function paymentSummary(db: D1Database, account: string, now = new 
   return paymentSummaryInWindow(db, account, await paymentPeriod(db, account, period, now), staffId);
 }
 
-/** Aggregate transaction dates within a validated, half-open account window. */
+/** 検証済みのアカウントと半開期間で決済日を集計する。 */
 export async function paymentSummaryInWindow(db: D1Database, account: string, window: { from: string; to: string }, staffId?: string) {
   const { from, to } = window;
   const start = Date.parse(from), end = Date.parse(to);
@@ -122,7 +122,7 @@ export async function staffTodayCounts(db: D1Database, account: string, now = ne
   return { items: rows.results, date: new Intl.DateTimeFormat('sv-SE',{timeZone:timezone}).format(now), timezone };
 }
 
-/** Same saved payment records and status names as the payment list, without a creation-date filter. */
+/** 支払一覧と同じ保存済み記録・状態名を使い、作成日で対象を落とさない。 */
 export async function paymentBadges(db:D1Database,account:string,bookingIds:string[]) {
  const byBooking=new Map<string,{bookingId:string;status:AdminPaymentRecord['status'];method:string|null;amount:number}>();
  const ids=[...new Set(bookingIds)];

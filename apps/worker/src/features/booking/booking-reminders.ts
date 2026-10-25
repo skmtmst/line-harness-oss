@@ -2,9 +2,7 @@ import type { AccountStyle } from '@line-crm/shared';
 import { runBookingExternalStep } from './booking-external-step.js';
 import { API_RETRY_WAIT, lineFailure } from '../../lib/external-call/index.js';
 import {bookingCancellationQuote} from './booking-cancellation.js';
-// Cron handler: send due booking reminders.
-// Joined with bookings/menus/staff/line_accounts/friends for everything
-// the notification text renderer needs in one query.
+// 通知文面の組立に必要な予約・メニュー・担当者・アカウント・友だちは、まとめて取得して問い合わせを増やさない。
 
 import type { BookingNotificationSender, NotificationKind } from './booking-notifier.js';
 import { formatStartsAtForStore, notificationTiming, renderNotificationText } from './booking-notifier.js';
@@ -52,7 +50,7 @@ export interface ProcessRemindersParams {
 }
 
 /**
- * R330: 送信権の貸出期限（分）。claim 時に sent_at を刻み、期限内の行は
+ * 送信権の貸出期限（分）。claim 時に sent_at を刻み、期限内の行は
  * 別 cron が拾わない。処理中に止まった worker の行は期限切れで回収する。
  * 期限の起点は「貸出開始」のため、成功時は送信完了時刻で上書きし、
  * 失敗時は NULL に戻して次回すぐに拾えるようにする。
@@ -67,9 +65,7 @@ export async function processDueReminders(
   db: D1Database,
   params: ProcessRemindersParams,
 ): Promise<{ sent: number; failed: number }> {
-  // Stop due rows before selection. `cancelled` is terminal but is neither a
-  // delivery success nor failure, so restoring a tenant never emits an
-  // overdue reminder burst.
+  // 統括の復旧後に期限切れの通知をまとめて送らないよう、取得前に期限到達分を取消へ進める。cancelled は終端であり送信の成功・失敗に数えない。
   await db.prepare(
     `UPDATE booking_reminders
         SET status = 'cancelled', last_error = 'tenant_suspended'
@@ -123,7 +119,7 @@ export async function processDueReminders(
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'booking reminders' })) {
       continue;
     }
-    // 緊急停止 (#1050): reminder_dispatch が止まっている統括は claim せず
+    // 緊急停止 : reminder_dispatch が止まっている統括は claim せず
     // pending のまま残す。復旧すれば次の cron が拾う。
     if (await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')) {
       continue;
@@ -169,7 +165,7 @@ export async function processDueReminders(
       // (retry_count を claim epoch に、sent_at を貸出印に使う)。
       // 取消・方針OFFが先なら 0 件になり送らない。0 件は別 cron が担当
       // した場合も同じなので、どちらでもこの実行は手を引く。
-      // R331: 方針の判定は保存ずみの snapshot を読む。未保存の旧予約
+      // 方針の判定は保存ずみの snapshot を読む。未保存の旧予約
       // (NULL/'{}') は従来どおり送る側に倒す (route 側の既定値と同じ)。
       const claim = await db
         .prepare(
@@ -199,7 +195,7 @@ export async function processDueReminders(
       claimed = true;
 
       // claim と送信の間に緊急停止へ切り替わった分は、握った retry_count を
-      // 差し戻して pending のまま残す (#1050)。停止を失敗として数えない。
+      // 差し戻して pending のまま残す。停止を失敗として数えない。
       // 貸出印も消し、次回すぐに拾えるようにする。
       if (await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')) {
         await db
@@ -276,7 +272,7 @@ export async function processDueReminders(
       }
     } catch (e) {
       // fence で握れていれば DB 上も同じ値まで進んでいる (二重に数えない)。
-      // R331: ここでも取消ずみの行は触らない。貸出印は消して次回に備える。
+      // ここでも取消ずみの行は触らない。貸出印は消して次回に備える。
       // claim 前の失敗は読み出した回数・貸出期限、claim 後は自分の貸出を
       // 照合する。古い応答で新しい試行の回数や結果を巻き戻さない。
       const newStatus = attemptedRetry >= REMINDER_MAX_RETRY ? 'failed_permanent' : 'failed';

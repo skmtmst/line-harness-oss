@@ -58,7 +58,7 @@ describe('renderNotificationText', () => {
     expect(t).toContain('本日のご予約まであと 2 時間');
   });
 
-  // R333: 送るのが遅れて当日になっても「明日」とは言わない。
+  // 送るのが遅れて当日になっても「明日」とは言わない。
   test('遅れて当日になった前日リマインダは本日と言う', () => {
     const t = renderNotificationText('day_before', { ...ctx, daysUntil: 0 });
     expect(t).toContain('本日のご予約');
@@ -76,7 +76,7 @@ describe('renderNotificationText', () => {
   });
 });
 
-// R332: 通知の日時は店舗の時間帯で書く。日本時間に固定しない。
+// 通知の日時は店舗の時間帯で書く。日本時間に固定しない。
 describe('formatStartsAtForStore', () => {
   // 現地 2026-11-02 10:00 (America/New_York) = 15:00Z
   const startsAt = '2026-11-02T15:00:00.000Z';
@@ -96,7 +96,7 @@ describe('formatStartsAtForStore', () => {
   });
 });
 
-// R333: 「本日/明日」と残り時間は送信時点と店舗暦日から実測する。
+// 「本日/明日」と残り時間は送信時点と店舗暦日から実測する。
 describe('notificationTiming', () => {
   test('東京: 当日と翌日を店舗暦日で数える', () => {
     const now = new Date('2026-05-10T05:01:00Z'); // JST 14:01

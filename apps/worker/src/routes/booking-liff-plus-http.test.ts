@@ -189,7 +189,7 @@ describe('LIFF 前回と同じで予約', () => {
 });
 
 describe('LIFF 自分のキャンセル待ち', () => {
-  // キャンセル待ちは「埋まっている枠」だけ受け付ける（F-6）。営業時間・担当の出勤を置き、別の人の予約で枠を埋める。
+  // キャンセル待ちは「埋まっている枠」だけ受け付ける。営業時間・担当の出勤を置き、別の人の予約で枠を埋める。
   function fillSlot() {
     sqlite.exec(`INSERT INTO booking_settings(id,line_account_id,business_hours_configured,cutoff_minutes_before,booking_window_days) VALUES('settings-a','account-a',1,0,365);`);
     for (let i = 0; i < 7; i++) {

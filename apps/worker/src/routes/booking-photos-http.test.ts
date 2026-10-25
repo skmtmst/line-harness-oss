@@ -17,8 +17,7 @@ let app: Hono<Env>;
 let staff: Env['Variables']['staff'];
 const order = ['exterior', 'interior', 'waiting'];
 
-/** D1 accepts positional ?1/?2; better-sqlite3's spread binding needs plain ?.
- * Expand their repeated appearances without changing the production query. */
+/** D1 の位置引数 ?1/?2 を better-sqlite3 の引数形式へ展開し、製品 SQL を変えずに試す。 */
 function testD1(sqlite: Database.Database): D1Database {
   const base = asD1(sqlite);
   return { ...base, prepare(query: string) {
@@ -158,7 +157,7 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
     expect(plan?.impact.references.every(row => row.replaceable === false)).toBe(true);
     for (const [sourceIndex, expected] of [[7, 1], [8, 1], [9, 2]] as const) {
       raw.prepare(`UPDATE media_usage_scan_state SET source_index=?,last_ref_id='' WHERE id=1`).run(sourceIndex);
-      // Ensure state exists even before the first periodic scan.
+      // 初回の定期検査より前でも状態が得られることを確かめる。
       if (!raw.prepare('SELECT id FROM media_usage_scan_state').get()) await scanMediaUsage(db, '2026-10-01');
       raw.prepare(`UPDATE media_usage_scan_state SET source_index=?,last_ref_id='' WHERE id=1`).run(sourceIndex);
       const scanned = await scanMediaUsage(db, '2026-10-02');
@@ -201,7 +200,7 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
     ] });
     const admin = await (await request('/api/booking/admin/menus/photos')).json() as { data: { store: { version: number; photos: unknown; visibility: unknown } } };
     expect(admin.data.store).toMatchObject({ version: 2, photos: { exterior: { mediaId: 'p' } }, visibility: { exterior: false, interior: true, waiting: true } });
-    // An old writer cannot silently republish the hidden slot.
+    // 古い版の保存で非公開の枠を黙って再公開しないことを確かめる。
     expect((await request('/api/booking/admin/store-photos', { photos: photos('p', 'p-more', 'p'), order, expectedVersion: 2 })).status).toBe(200);
     expect((await publicPhotos() as { data: Array<{ slot: string }> }).data.map(p => p.slot)).toEqual(['interior', 'waiting']);
     expect((await storeSave(photos('p', 'p-more', 'p'), 3, order, { exterior: false, interior: false, waiting: false })).status).toBe(200);

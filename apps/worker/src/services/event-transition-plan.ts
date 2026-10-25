@@ -1,4 +1,4 @@
-/** The replacement booking and its recovery intent are committed in the same batch. */
+/** 変更先の予約と回復の意図は、同じ batch で確定する。 */
 export function replacementEventTransition(db:D1Database,oldId:string,newId:string) {
  return db.prepare(`INSERT INTO event_booking_transition_runs
   (id,line_account_id,event_id,booking_id,booking_id_history,expected_booking_version,booking_version,event_version,

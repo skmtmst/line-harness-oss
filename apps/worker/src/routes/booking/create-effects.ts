@@ -4,7 +4,7 @@ import { queueBookingOperation } from '../../features/booking/booking-operation-
 import { BOOKING_CONFIRMED_AUTOMATION_EVENT } from './availability.js';
 
 /**
- * R560: 予約INSERTの後に履歴・予定処理の書き込みが欠けた保留予約へ、
+ * 予約INSERTの後に履歴・予定処理の書き込みが欠けた保留予約へ、
  * 同じ要求の再送で不足を埋める。存在するものは作り直さない。
  * - 履歴: action='created' が無ければ1件だけ足す。
  * - カレンダー連携の予定行: 同じ一意キーで置く（重ね書きしない）。

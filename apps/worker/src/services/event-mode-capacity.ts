@@ -1,4 +1,4 @@
-/** Null capacity means unlimited. Legacy classes keep their one shared capacity. */
+/** null の定員は無制限、既存の教室は共有の1つの定員として扱う。 */
 export async function eventModeRemaining(
   db: D1Database,
   slotId: string,

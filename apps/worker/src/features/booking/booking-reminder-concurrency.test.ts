@@ -1,6 +1,5 @@
 /**
- * 予約リマインダー定期送信の同時実行と取消の食い違い (m22l)。
- * R330・R331 の回帰試験。実 SQLite で重なりと取消を再現する。
+ * 実 SQLite で定期通知の同時実行と取消を重ね、予約リマインダーが二重に送られないことを確かめる。
  */
 import { beforeEach, describe, expect, test, vi, afterEach } from 'vitest';
 import Database from 'better-sqlite3';

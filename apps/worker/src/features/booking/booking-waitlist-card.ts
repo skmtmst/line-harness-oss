@@ -1,16 +1,8 @@
 /**
- * キャンセル待ちの空き知らせカード（booking-plus 2 の LINE の1通）。
- *
- * fLNQx の絵どおりの吹き出し：見出し（いつに空きが出たか）、
- * 中身（メニュー・担当と仮押さえの期限）、押し先2つ。
- * 2つの押し先はどちらもお客さまの予約画面（LIFF）を開く。
- * 飛び先の画面自体は M6（codex/muse-v8-booking-plus-liff）が作る。
- *
- * - この時間で予約する → {LIFF}/booking?waitlist=<待ちID>（空き枠入りで開く）
- * - 今回は見送る → {LIFF}/booking/waitlist/<待ちID>/decline（取り消しの確認を開く。
- *   確定したら待ちを取り消し、次の組へすぐ回す）
- *
- * 自動送信なので手動の印（X-Line-Harness-Source: manual）は付けない。
+ * キャンセル待ちの空き知らせは、空いた日時、メニュー・担当者、仮押さえ期限を伝える。
+ * この時間で予約する → {LIFF}/booking?waitlist=<待ちID>
+ * 今回は見送る → {LIFF}/booking/waitlist/<待ちID>/decline
+ * 見送りの確定後は待ちを取り消して次の組へ回す。自動通知なので X-Line-Harness-Source: manual は付けない。設計図 fLNQx と照合する。
  */
 import { LineClient } from '@line-crm/line-sdk';
 import {

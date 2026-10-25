@@ -24,7 +24,7 @@ export interface EventDbRow {
   waitlist_enabled: number;
   /** 申込の締め切り（開始の何時間前まで）。null なら開始まで受ける */
   entry_cutoff_hours_before: number | null;
-  /** 申込時のカスタム質問定義 (#841)。未設定なら NULL。 */
+  /** 申込時のカスタム質問定義。未設定なら NULL。 */
   questions_json: string | null;
 }
 

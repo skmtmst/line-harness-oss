@@ -17,18 +17,18 @@ export type NotificationKind =
 
 export interface NotificationContext {
   style?: AccountStyle;
-  /** Prepared from the same menu/store deadline and real LIFF history link. */
+  /** 予約メニュー・店舗と同じ締切条件と、実際の LIFF 履歴 URL を使う。 */
   selfManagement?: { historyUrl: string; deadlineLabel: string };
   meetingUrl?:string|null;
   meetingMode?:string|null;
   cancellationText?:string;
   menuName: string;
   staffName: string;
-  /** 店舗の時間帯で書いた予約日時（例: "2026-05-10 14:00"）。日本時間に固定しない (R332)。 */
+  /** 店舗の時間帯で書いた予約日時（例: "2026-05-10 14:00"）。日本時間に固定しない。 */
   startsAt: string;
-  /** 店舗暦日で送信日から予約日までの日数。0=本日、1=明日、それ以上は日付に任せる (R333)。 */
+  /** 店舗暦日で送信日から予約日までの日数。0=本日、1=明日、それ以上は日付に任せる。 */
   daysUntil: number;
-  /** 送信時点から予約開始までの実際の残り時間（時間。1時間未満は1）。設定値ではなく実測 (R333)。 */
+  /** 送信時点から予約開始までの実際の残り時間（時間。1時間未満は1）。設定値ではなく実測。 */
   hoursUntil: number;
   /** キャンセル待ちの招待だけ使う仮押さえ分数。それ以外は入れない。 */
   holdMinutes?: number;
@@ -47,7 +47,7 @@ export function formatStartsAtForStore(startsAtUtcIso: string, timeZone: string)
 /**
  * 送信時点の文面部品。店舗の暦日で「本日/明日」を数え、
  * 残り時間は設定値ではなく送信時点と開始時点の差から実測する。
- * 送るのが遅れても、通知設定を変えても、文面が実予約とずれないようにする (R333)。
+ * 送るのが遅れても、通知設定を変えても、文面が実予約とずれないようにする。
  */
 export function notificationTiming(
   startsAtUtcIso: string,
@@ -75,7 +75,7 @@ export function renderNotificationText(
     : `変更・キャンセルは${words.contact}にLINEでご連絡ください。`;
   const detail = `\n${words.menu}: ${ctx.menuName}\n${words.staff}: ${ctx.staffName}\n日時: ${ctx.startsAt}${meeting}${ctx.cancellationText?`\n${ctx.cancellationText}`:''}`;
   // 「本日」「明日」は店舗暦日での実際のずれ。2日以上離れている・遅れて
-  // 当日を過ぎた場合は曖昧な言い方を避け、日時欄だけで伝える (R333)。
+  // 当日を過ぎた場合は曖昧な言い方を避け、日時欄だけで伝える。
   const relDay = ctx.daysUntil === 0 ? '本日' : ctx.daysUntil === 1 ? '明日' : null;
   switch (kind) {
     case 'requested':
@@ -105,7 +105,7 @@ export interface SendNotificationParams {
   kind: NotificationKind;
   ctx: NotificationContext;
   /**
-   * R323: LINE の再試行キー (X-Line-Retry-Key)。同じ操作の再送・回収で
+   * LINE の再試行キー (X-Line-Retry-Key)。同じ操作の再送・回収で
    * 同じ値を渡すと、LINE 側の到達ずみ再送は 409 で冪等に吸収される
    * (client が成功として扱う)。未指定なら付けずに従来どおり送る。
    */

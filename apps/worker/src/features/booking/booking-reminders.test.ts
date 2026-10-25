@@ -12,7 +12,7 @@ interface DueRow {
   staff_name: string;
   channel_access_token: string;
   line_user_id: string;
-  /** 店舗のタイムゾーン。文面の日時と相対表現に使う (R332/R333)。 */
+  /** 店舗のタイムゾーン。文面の日時と相対表現に使う。 */
   timezone?: string | null;
 }
 
@@ -109,7 +109,7 @@ describe('processDueReminders', () => {
       .toEqual({status:'failed_permanent',retry_count:1,last_error:'delivery_unknown'});
   });
 
-  // R333: 文面の残り時間は送信時点の実測。店舗設定のオフセットは
+  // 文面の残り時間は送信時点の実測。店舗設定のオフセットは
   // 通知予定を作る側だけが使い、文面には混入しない。
   test('残り時間は設定値ではなく送信時点からの実測 (R333)', async () => {
     const due: DueRow[] = [
@@ -138,7 +138,7 @@ describe('processDueReminders', () => {
     expect(ctx.daysUntil).toBe(0);
   });
 
-  // R332: 文面の日時は店舗の時間帯。日本以外の店舗では現地日時を出す。
+  // 文面の日時は店舗の時間帯。日本以外の店舗では現地日時を出す。
   test('店舗がニューヨークなら日時は現地時間で組み立てる (R332)', async () => {
     const due: DueRow[] = [
       {
@@ -166,7 +166,7 @@ describe('processDueReminders', () => {
     expect(ctx.daysUntil).toBe(0); // NY の暦日では当日
   });
 
-  // R333: 前日通知の送信が遅れて予約当日になっても「明日」とは言わせない。
+  // 前日通知の送信が遅れて予約当日になっても「明日」とは言わせない。
   test('遅れて当日になった前日リマインダは daysUntil=0 (R333)', async () => {
     const lateNow = new Date('2026-05-11T00:00:00Z'); // JST 09:00
     const due: DueRow[] = [

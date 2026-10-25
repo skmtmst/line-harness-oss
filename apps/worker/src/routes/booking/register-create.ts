@@ -24,7 +24,7 @@ import { needsAutoAssignment, autoAssignBookingStaff } from './assignment.js';
 import { buildMenuSnapshot } from './menu-snapshot.js';
 
 export function registerCreate(booking: Hono<Env>): void {
-// IDEA-28 予約設定: 指定した日時がなぜ予約できないかを説明する確認口。
+//  予約設定: 指定した日時がなぜ予約できないかを説明する確認口。
 // 読み取りだけで予約は作らない。判定はお客様の予約画面（LIFF）と同じ
 // リードタイムを使い、結果は理由コードだけを返す（他担当の非公開予定の
 // 件名・相手など詳細は含めない）。
@@ -56,10 +56,7 @@ booking.get('/api/booking/admin/availability-check', async (c) => {
   return c.json(result);
 });
 
-// Proxy booking: the operator creates a CONFIRMED booking on behalf of a
-// friend, straight from the iOS chat screen. Same shift/slot/conflict
-// validation as the LIFF flow, but NO min-lead-time check (the operator
-// may book a slot starting sooner than customers are allowed to).
+// 担当者の代理予約も LIFF と同じ勤務・枠・競合検査を通す。顧客対応中の直前予約を許すため最小リードタイムだけを適用せず、確定予約として作る。
 booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"friend_id":["string"],"booking_customer_id":["string"],"menu_id":["string"],"staff_id":["string"],"starts_at":["string"],"customer_note":["string"],"send_line_confirmation":["boolean"]}), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
@@ -70,10 +67,10 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     booking_customer_id?: string;
     menu_id: string;
     staff_id: string;
-    starts_at: string; // UTC ISO8601
+    starts_at: string; // UTC の ISO8601。
     customer_note?: string;
     send_line_confirmation?: boolean;
-    /** N-391: 確認・前日・当日のお知らせを個別に切る。未指定は従来どおり全て送る。 */
+    /** 確認・前日・当日のお知らせを個別に切る。未指定は従来どおり全て送る。 */
     notification_policy?: unknown;
     party_size?: unknown;
   }>();
@@ -118,7 +115,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       if (!friend || friend.is_following === 0) return c.json({ error: 'cannot_book' }, 403);
     }
   }
-  // N-391: 通知方針。send_line_confirmation は旧キー、notification_policy は新しい器。
+  // 通知方針。send_line_confirmation は旧キー、notification_policy は新しい器。
   // 両方あるときは notification_policy が勝つ。未連携で明示オンは 422。
   let policyPatch: Partial<BookingNotificationPolicy> = {};
   if (body.notification_policy !== undefined) {
@@ -180,13 +177,13 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
         }>();
       if (created) {
         /*
-         * R560残差: 仮応答のまま取り消された予約へ同じキーで再送したとき、
+         * 残差: 仮応答のまま取り消された予約へ同じキーで再送したとき、
          * 補完がカレンダー作成などの副作用を積み直していた。取り消し済みの
          * 予約に作り直しは要らないので、今の状態をそのまま返し、
          * 副作用は確定中の予約にだけ足す。
          */
         if (created.status === 'confirmed') {
-          // R560: 予約は残っているのに履歴・予定処理が欠けているときは、
+          // 予約は残っているのに履歴・予定処理が欠けているときは、
           // 成功を返す前に不足を埋める。あるものは作り直さない。
           await ensureProxyBookingSideEffects(
             c.env.DB,
@@ -251,9 +248,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   // availability再計算または原子的なversion guardのどちらかで止める。
   const storeCapacity = await getStoreCapacitySnapshot(c.env.DB, accountId, startsAt, blockEndsAt);
 
-  // Recurring-hours + Google Calendar + internal-booking validation.
-  // LIFF と同じ契約で照合する。店舗タイムゾーンの暦日で取り直した候補の
-  // instant と、要求の instant が完全に一致したときだけ通す。
+  // 営業・Google Calendar・既存予約を検査し、店舗の暦日で再取得した候補の瞬間と要求の瞬間が完全一致するときだけ許可する。
   if (!(await reverifyLatestSlot(c.env.DB, c.env, {
     lineAccountId: accountId,
     menuId: body.menu_id,
@@ -296,7 +291,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
   }
   const nowIso = new Date().toISOString();
-  // N-391: 選んだ方針を予約へ固定する。後から設定を変えても
+  // 選んだ方針を予約へ固定する。後から設定を変えても
   // この予約へ送るものは変わらない。
   const notificationPolicy = JSON.stringify({
     send_line_confirmation: sendLineConfirmation,
@@ -444,7 +439,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     return c.json(response, 409);
   }
 
-  // N-394: 作成も履歴の起点として残す。操作者 (代理登録したスタッフ) を記録する。
+  // 作成も履歴の起点として残す。操作者 (代理登録したスタッフ) を記録する。
   await recordBookingAudit(c.env.DB, {
     bookingId,
     lineAccountId: accountId,
@@ -477,7 +472,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     }
   }
   if (friendId) {
-    // R150: 「予約が入ったとき」の送信Webhook購読者へも届ける。
+    // 「予約が入ったとき」の送信Webhook購読者へも届ける。
     c.executionCtx.waitUntil(
       fireOutgoingWebhooks(c.env.DB, 'booking_created', {
         friendId,

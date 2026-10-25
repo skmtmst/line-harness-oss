@@ -5,7 +5,7 @@ import { prepareEventReminders } from './event-reminder-plan.js';
 import type { EventReminderKind } from './event-booking-types.js';
 
 
-// Reminders that fall in the past are dropped. Pure function, no DB.
+// 過去になった予定は送らない。予定計算は DB を使わない純粋関数にする。
 export function computeRemindersForBooking(input: ComputeRemindersInput): ComputedReminder[] {
   const out: ComputedReminder[] = [];
   const startMs = new Date(input.starts_at_utc).getTime();
@@ -39,8 +39,7 @@ export function computeRemindersForBooking(input: ComputeRemindersInput): Comput
   return out;
 }
 
-// Persist reminders for a single booking. Caller decides when to invoke
-// (e.g. after status -> 'confirmed').
+// 保存のタイミングは確定後などの呼出元が決め、ここでは1予約の予定だけを保存する。
 export async function insertRemindersForBooking(
   db: D1Database,
   booking_id: string,

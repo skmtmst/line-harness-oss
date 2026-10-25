@@ -1,8 +1,8 @@
 /**
- * R559: 電話客の保存は応答再送で二重作成しない。
+ * 電話客の保存は応答再送で二重作成しない。
  *
  * 実 Worker + 実 D1（better-sqlite3 に bootstrap.sql を流したもの）で検証する。
- * Miniflare はこの環境で listen できないため、R535 と同じ better-sqlite3 方式を使う。
+ * Miniflare はこの環境で listen できないため、 と同じ better-sqlite3 方式を使う。
  *
  * - 同じ Idempotency-Key での顧客POST再送は作り直さず、作成済み顧客を返す
  *   （応答消失後の再操作で台帳が2件にならない）。
@@ -26,7 +26,7 @@ const access = vi.hoisted(() => ({
 }));
 vi.mock('../services/account-access.js', () => access);
 
-// R559再残差: 顧客INSERTの成功後に完了書き込みだけを1回落とす仕掛け。
+// 再残差: 顧客INSERTの成功後に完了書き込みだけを1回落とす仕掛け。
 // 修復UPDATE・救出SELECTの故障も再現できる。
 let failCompletionOnce = false;
 let failRepairUpdate = false;

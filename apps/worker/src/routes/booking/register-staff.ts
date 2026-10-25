@@ -24,7 +24,7 @@ booking.get('/api/booking/admin/staff', async (c) => {
   return c.json({ staff: rows.results });
 });
 
-// N-411 本人勤務: ログイン中のスタッフに紐づく予約スタッフを返す。
+//  本人勤務: ログイン中のスタッフに紐づく予約スタッフを返す。
 // account_id 指定時はそのアカウントの1件、省略時は紐づく全件。
 booking.get('/api/booking/admin/staff/me', async (c) => {
   const me = c.get('staff');
@@ -239,7 +239,7 @@ booking.put('/api/booking/admin/staff/:id/menus', requirePermission(BOOKING_MENU
   return c.json({ ok: true });
 });
 
-// 担当割り当ての一括読み取り（#1060）。マトリクス画面は全スタッフ分を
+// 担当割り当ての一括読み取り。マトリクス画面は全スタッフ分を
 // 1行ずつ GET していた（N+1）。staff×menus の CROSS JOIN 1本で
 // 全員分を返す。応答は一括PUTと同じ `{ staff: [{ staff_id, matrix }] }` の形。
 booking.get('/api/booking/admin/staff-menus', async (c) => {

@@ -2,8 +2,7 @@ import { type Context } from 'hono';
 import type { Env } from '../../worker-env.js';
 import { computeRemindersForBooking, insertRemindersForBooking, cancelPendingRemindersFor } from '../../services/event-booking-reminders.js';
 
-// Cancel all pending reminders for an event's confirmed bookings, then
-// regenerate them from the latest event settings + slot starts_at.
+// 古い時刻の通知を残さないよう、確定予約の未送信通知を取り消し、最新設定と starts_at で作り直す。
 export async function rebuildRemindersForEvent(db: D1Database, event_id: string): Promise<void> {
   const ev = await db
     .prepare(
@@ -66,7 +65,7 @@ export async function rebuildRemindersForSlot(db: D1Database, slot_id: string): 
 }
 
 // ============================================================
-// U: イベントの状態・変更確認・待ちの手動操作
+// イベントの状態・変更確認・待ちの手動操作
 // -29 §10・§11-2。状態を変える操作は event_change_logs に残す。
 // ============================================================
 
