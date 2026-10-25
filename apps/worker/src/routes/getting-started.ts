@@ -7,6 +7,8 @@ import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { expectedWebhookUrl, fetchWebhookEndpoint } from '../lib/webhook-endpoint.js';
+import { starterApplication } from '../services/style-starter-ensure.js';
+import { firstRunTimes } from '../services/getting-started-first-run.js';
 
 /**
  * はじめの設定の順路。設計 ★34-1（`RAW35`）。台帳。
@@ -231,11 +233,20 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
         ).bind(staff.id).first<{ dismissed_at: string | null }>()
       : null;
 
+    /*
+      初期セットが入っているかと、最初の10分の時刻。どちらも読むだけで行を作らない
+      （作成の口以外で設定を書かない決まり）。アカウントを1つ選んでいる時だけ返す。
+    */
+    const starter = accountId ? await starterApplication(c.env.DB, accountId, staff?.tenantId ?? null) : null;
+    const firstRun = accountId ? await firstRunTimes(c.env.DB, accountId) : null;
+
     return c.json({
       success: true,
       data: {
         steps,
         accountId,
+        starter,
+        firstRun,
         doneCount: steps.filter((s) => s.state === 'done').length,
         total: steps.length,
         /** 全部終わったら、ダッシュボードの帯を出さない。 */
