@@ -342,6 +342,40 @@ describe('外部連携 V8', () => {
     expect(row?.textContent).toContain('30.0 秒')
   })
 
+  it('やり取りの中身：状態は共通の札・時刻は time。技術的な記録で伏せた後の JSON を開いて写せる', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    await render(<WebhooksInteractionsV8 />)
+    const row = host.querySelector('tr[data-row-id="wi-1"]')!
+    expect(row.querySelector('time')?.getAttribute('dateTime')).toBe('2026-09-30T00:58:00.000Z')
+    expect(row.querySelector('[data-design-node="xRvDB"]')?.getAttribute('data-tone')).toBe('danger')
+    await act(async () => { fireEvent.click(within(row as HTMLElement).getByRole('button', { name: '「予約台帳」の操作' })) })
+    await act(async () => { fireEvent.click(document.querySelector('[role="menuitem"]') as HTMLElement) })
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement
+    expect(within(dialog).queryByRole('button', { name: /JSON を開く/ })).toBeNull()
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /技術的な記録を開く/ })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /この記録の JSON を開く/ })) })
+    const text = dialog.querySelector('pre')?.textContent ?? ''
+    expect(text).toContain('"id": "wi-1"')
+    expect(text).toContain('"status": "failed"')
+    expect(text).not.toContain('Masato')
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'この記録の JSON をコピー' })) })
+    expect(writeText).toHaveBeenLastCalledWith(text)
+  })
+
+  it('やり取りの中身：閲覧のみは JSON を読めるが写す操作は出さない', async () => {
+    role = 'viewer'
+    await render(<WebhooksInteractionsV8 />)
+    const row = host.querySelector('tr[data-row-id="wi-1"]') as HTMLElement
+    await act(async () => { fireEvent.click(within(row).getByRole('button', { name: '「予約台帳」の操作' })) })
+    await act(async () => { fireEvent.click(document.querySelector('[role="menuitem"]') as HTMLElement) })
+    const dialog = document.querySelector('[role="dialog"]') as HTMLElement
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /技術的な記録を開く/ })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /この記録の JSON を開く/ })) })
+    expect(dialog.querySelector('pre')?.textContent).toContain('"id": "wi-1"')
+    expect(within(dialog).queryByRole('button', { name: /JSON をコピー/ })).toBeNull()
+  })
+
   it('作る：既定は「選んだものだけ送る」。絵に無い出来事は詳細条件を開くと選べる', async () => {
     await render(<WebhooksCreateV8 />)
     const selected = host.querySelector('input[name="wh-new-mode"][value="selected"]') as HTMLInputElement
