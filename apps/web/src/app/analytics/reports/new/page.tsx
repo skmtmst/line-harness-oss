@@ -1085,7 +1085,7 @@ function AnalyticsReportFormPage() {
           </Card>
           <Card variant="form" gap="normal">
             {/* 絵に無い「使われ方」は、段の頭の右に小さく置く（落とさない）。 */}
-            <CardHeader size="stacked" title={<>何を入れますか <HelpTip label="レポートに入れるもの">チェックしたものが、この順にレポートへ並びます。</HelpTip></>}
+            <CardHeader size="stacked" title="何を入れますか" help={<HelpTip label="レポートに入れるもの">チェックしたものが、この順にレポートへ並びます。</HelpTip>}
               action={<Checkbox checked={sections.includes('usage')} onCheckedChange={() => toggleSection('usage')}>使われ方も入れる</Checkbox>} />
             <div className="report-v8-sectionCards">
               {SECTION_CHOICES.filter((choice) => choice.id !== 'usage').map((choice) => {
@@ -1133,7 +1133,7 @@ function AnalyticsReportFormPage() {
             </div>
           </Card>
           <Card variant="form" gap="normal">
-            <CardHeader size="stacked" title={<>いつ送りますか<HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip></>} />
+            <CardHeader size="stacked" title="いつ送りますか" help={<HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip>} />
             <SettingsFormRow layout="columns">
               <Field label="間かく" required><Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></Field>
               {cadence === 'weekly' ? <Field label="送る曜日" required><Select aria-label="送る曜日" value={weekday} onChange={setWeekday} options={WEEKDAY_JA.map((day, value) => ({ value: String(value), label: `${day}曜` }))} size="full" /></Field> : <Field label="送る日" required><Select aria-label="送る日" value={monthDay} onChange={setMonthDay} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></Field>}
@@ -1144,7 +1144,7 @@ function AnalyticsReportFormPage() {
           <Card variant="form" gap="normal">
             {/* 全体の入り切りは段の頭の右に小さく置く（絵は条件ごとのチェックだけ）。 */}
             <CardHeader size="stacked"
-              title={<>知らせの決めごと <HelpTip label="変化の判定">前の期間と比べ、条件に合えばレポートに含めて知らせます。集計待ちや一部だけ取れた期間は比べません。</HelpTip></>}
+              title="知らせの決めごと" help={<HelpTip label="変化の判定">前の期間と比べ、条件に合えばレポートに含めて知らせます。集計待ちや一部だけ取れた期間は比べません。</HelpTip>}
               meta="数が急に動いたときだけ、すぐに知らせます。少ない数でさわがないよう、最低件数も決めます"
               action={<Checkbox id="report-alerts-enabled" invalid={!!fieldMessage('report-alerts-enabled')} aria-describedby={fieldMessage('report-alerts-enabled') ? 'report-alerts-enabled-error' : undefined} checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>} />
             {fieldMessage('report-alerts-enabled') && <p id="report-alerts-enabled-error" className="report-v8-fieldError" role="alert">{fieldMessage('report-alerts-enabled')}</p>}

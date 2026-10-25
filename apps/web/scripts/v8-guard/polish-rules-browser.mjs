@@ -140,5 +140,21 @@ export default function scanPolishRules() {
     const label = link.getAttribute('aria-label') ?? ''
     if (!/、\d+件$/.test(label) || !badge.closest('[aria-hidden="true"]')) add('nav-count-name', link, { label, badgeHidden: Boolean(badge.closest('[aria-hidden="true"]')) }, link.textContent)
   }
+  // 18. 「？」：押せる範囲は 28×28、見た目の丸は 16、隣の見出し・ラベル・札との間は 8。
+  for (const button of document.querySelectorAll('[class*="help-tip_button"]:not([data-help-trigger="text"])')) {
+    if (!visible(button)) continue
+    const mark = button.querySelector('svg, [class*="help-tip_mark"]')
+    const br = button.getBoundingClientRect(), mr = mark?.getBoundingClientRect()
+    const wrap = button.closest('[class*="help-tip_wrap"]') ?? button
+    let before = null
+    for (let node = wrap.previousSibling; node && !before; node = node.previousSibling) {
+      if (node.nodeType === 3 && node.textContent.trim()) { const last = node.textContent.trimEnd().length - 1, range = document.createRange(); range.setStart(node, last); range.setEnd(node, last + 1); before = range.getBoundingClientRect() }
+      else if (node.nodeType === 1 && visible(node)) before = node.getBoundingClientRect()
+    }
+    // 文字の後ろの空白は字の箱に入るので、空白を除いた最後の字の右端で見る。
+    const gap = before && mr && Math.abs((before.top + before.bottom) / 2 - (mr.top + mr.bottom) / 2) < 12 ? mr.left - before.right : null
+    const bad = br.width < 28 || br.height < 28 || (mr && Math.abs(Math.max(mr.width, mr.height) - 16) > 0.5) || (gap !== null && gap < 30 && Math.abs(gap - 8) > 0.5)
+    if (bad) add('help-tip', button, { hit: `${Math.round(br.width)}x${Math.round(br.height)}`, mark: mr ? Math.round(mr.width) : null, gap: gap === null ? null : Math.round(gap * 10) / 10 }, button.getAttribute('aria-label'))
+  }
   return findings
 }

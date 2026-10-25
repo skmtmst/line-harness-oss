@@ -63,12 +63,12 @@
   gap: 8px;
 }
 
-/* 題と「？」の行（CardHeader の help）。「？」は題の行の真ん中、間 6。 */
+/* 題と「？」の行（CardHeader の help）。「？」は題の行の真ん中、間 8。 */
 .titleRow {
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: var(--polish-space-row);
 }
 
 .title {

@@ -494,7 +494,7 @@ export default function ScenarioCreateV8() {
       </Card>
 
       <Card variant="form" gap="normal" aria-label="配信方式">
-        <CardHeader size="stacked" title={<>配信方式 <HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip></>} />
+        <CardHeader size="stacked" title="配信方式" help={<HelpTip label="配信方式の説明">作ったあとは変えられません</HelpTip>} />
         <SaveErrorField names={["delivery-mode","selectedMode"]}><RadioCardGroup legend="配信方式" className={styles.modeRow}>
           <RadioCard
             name="delivery-mode"

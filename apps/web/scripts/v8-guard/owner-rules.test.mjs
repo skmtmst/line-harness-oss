@@ -126,3 +126,18 @@ test('左メニューの件数の札は「名前、33件」と区切って読ま
     assert.deepEqual(await kinds(), ['nav-count-name'])
   } finally { await browser.close() }
 })
+
+test('「？」の押せる範囲が 28 未満・見出しとの間が 8 でないと落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind === 'help-tip')
+    const tip = (gap, size = 28) => `<main><div style="display:flex;align-items:center;gap:${gap}px"><h2 style="margin:0;font-size:15px">題</h2><span class="help-tip_wrap__x"><button class="help-tip_button__x" style="display:inline-flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;margin:-6px;padding:0;border:0;background:none"><svg width="16" height="16" viewBox="0 0 24 24"></svg></button></span></div></main>`
+    await page.setContent(tip(8))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(tip(14))
+    assert.deepEqual(await kinds(), ['help-tip'])
+    await page.setContent(tip(8, 20))
+    assert.deepEqual(await kinds(), ['help-tip'])
+  } finally { await browser.close() }
+})

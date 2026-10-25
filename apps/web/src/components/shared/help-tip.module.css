@@ -247,3 +247,8 @@ html:root .button[data-help-trigger='text']:active { scale: 1; }
 :root .tip { max-width: min(300px, calc(100vw - 24px)); overflow-wrap: anywhere; }
 
 :root .tip { position: fixed; }
+
+/* 「？」と隣の見出し・ラベルの間は 8（並べる側の間の値によらずそろえる。§6.5 の 5）。 */
+html:root :has(> .wrap):not(th, td, [role='columnheader'], [role='cell']) { column-gap: var(--polish-space-row); }
+/* 表の見出しのセルは文字の流れの中に置くので、間は「？」の側で取る。 */
+html:root :is(th, td, [role='columnheader'], [role='cell']) > .wrap { margin-inline-start: var(--polish-space-row); }
