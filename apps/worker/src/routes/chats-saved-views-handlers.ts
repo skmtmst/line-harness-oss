@@ -312,8 +312,6 @@ export const post__api_chats_id_loading_7 = async (c: Context<Env, "/api/chats/:
 
     return c.json({ success: true, data: { started: true, loadingSeconds } });
   } catch (err) {
-    logger.error("chats.chats_id_loading_post_failed");
-    const message = err instanceof Error ? err.message : 'Internal server error';
     throw err;
   }
 };

@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { normalizePhone } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { identity } from './restaurant-customer-identity.js';
@@ -34,13 +35,12 @@ import { reconcileRestaurantInventory } from '../services/restaurant-inventory-r
 import { processBookingWaitlists } from '../services/waitlist-tick.js';
 import { isAccountFeatureEnabled } from '@line-crm/db';
 export const restaurantCustomerBooking = new Hono<Env>();
-restaurantCustomerBooking.onError((e, c) =>
-  /customer_table_conflict|customer_duplicate_booking|customer_line_capacity|restaurant_table_conflict|closure_conflict|UNIQUE constraint/.test(
-    String(e),
-  )
-    ? c.json({ success: false, error: 'slot_conflict' }, 409)
-    : c.json({ success: false, error: 'booking_failed' }, 500),
-);
+restaurantCustomerBooking.onError((e, c) => {
+  if (/customer_table_conflict|customer_duplicate_booking|customer_line_capacity|restaurant_table_conflict|closure_conflict|UNIQUE constraint/.test(String(e))) {
+    return c.json({ success: false, error: 'slot_conflict' }, 409);
+  }
+  throw new UnexpectedRouteError(c, { success: false, error: 'booking_failed' });
+});
 restaurantCustomerBooking.use('/api/liff/restaurant/*', async (c, next) => {
   if (!restaurantTestEnabled(c.env))
     return c.json({ success: false, error: 'not_found' }, 404);
@@ -69,7 +69,7 @@ async function finish(c: Context<Env>, store: CustomerStore) {
     await processScenarioSourceJobs(c.env);
     await processRestaurantCustomerNotices(c.env, store.id);
   } catch {
-    logger.error("restaurant_customer_notice_pending");
+    logger.error("restaurant_booking.send_customer_notice_failed");
   }
 }
 restaurantCustomerBooking.get('/api/liff/restaurant/link/:token', async (c) => {

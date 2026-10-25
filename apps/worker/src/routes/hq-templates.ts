@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { searchHqResources } from '../services/hq-templates/resource-search.js';
 import { listDistributionTargets } from '../services/hq-templates/distribution-display.js';
 import { testHqForm, issueHqFormTestToken, revokeHqFormTestToken } from '../services/hq-templates/form-test.js';
@@ -71,16 +72,19 @@ async function body(c: { req: { text(): Promise<string> } }): Promise<Record<str
   return value as Record<string, unknown>;
 }
 hqTemplates.onError((error, c) => {
-  const typed = error instanceof HqTemplateError, code = typed ? error.code : 'UNAVAILABLE';
-  return inputError(c, { success: false, code, ...(typed && (error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。再確認してください') }, typed ? error.status : 500);
+  if (error instanceof UnexpectedRouteError) throw error;
+  if (!(error instanceof HqTemplateError)) throw new UnexpectedRouteError(c, { success: false, code: 'UNAVAILABLE', error: '処理結果を確認できません。再確認してください' });
+  const code = error.code;
+  return inputError(c, { success: false, code, ...((error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。再確認してください') }, error.status);
 });
 // The route-local boundary also protects direct route mounting in tests/other apps.
 hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, next) => {
   try { await authority(c); await next(); }
   catch (error) {
-    const typed = error instanceof HqTemplateError;
-    const code = typed ? error.code : 'UNAVAILABLE';
-    return inputError(c, { success: false, ...(typed && (error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (typed && error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。しばらくしてから再確認してください'), code }, typed ? error.status : 500);
+    if (error instanceof UnexpectedRouteError) throw error;
+    if (!(error instanceof HqTemplateError)) throw new UnexpectedRouteError(c, { success: false, code: 'UNAVAILABLE', error: '処理結果を確認できません。しばらくしてから再確認してください' });
+    const code = error.code;
+    return inputError(c, { success: false, ...((error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。しばらくしてから再確認してください'), code }, error.status);
   }
 });
 hqTemplates.get('/api/hq/templates/media',async c=>c.json({success:true,data:await listHqRegisteredMedia(dbFor(c.env),c.env.IMAGES,await authority(c),{kind:c.req.query('kind'),cursor:c.req.query('cursor'),limit:c.req.query('limit')})}));

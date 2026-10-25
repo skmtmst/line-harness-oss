@@ -1,5 +1,5 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
-import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
 import { getFriendById, jstNow } from '@line-crm/db';
@@ -321,13 +321,12 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
         nextRetryAt: null,
         now: failedAt,
       });
-      logger.error("friends.friends_id_messages_post_failed");
-      return c.json({
+      throw new UnexpectedRouteError(c, {
         success: false,
         error: '送信の準備に失敗しました',
         code: 'OUTBOUND_PREPARATION_FAILED',
         data: { retryable: true, nextRetryAt: null },
-      }, 500);
+      });
     }
 
     const message = buildMessage(tracked.messageType, tracked.content, body.altText);

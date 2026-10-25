@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { getCompanySettings, getStaffById, isCompanyLogo, saveCompanySettings } from '@line-crm/db';
@@ -7,7 +8,9 @@ import { requireRole } from '../middleware/role-guard.js';
 import { dbFor } from '../services/db-router.js';
 
 export const companySettings = new Hono<Env>();
-companySettings.onError((_error, c) => c.json({ success: false, code: 'UNAVAILABLE', error: '会社の設定を確認できません。再確認してください' }, 500));
+companySettings.onError((_error, c) => {
+  throw new UnexpectedRouteError(c, { success: false, code: 'UNAVAILABLE', error: '会社の設定を確認できません。再確認してください' });
+});
 companySettings.use('/api/settings/company', async (c, next) => {
   const staff = c.get('staff');
   if (!staff?.tenantId) return c.json({ success: false, code: 'FORBIDDEN', error: '所属する会社を確認できません' }, 403);
