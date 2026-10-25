@@ -6815,7 +6815,7 @@ const server = createServer((req, res) => {
   }
 
   /* ③-2 第3波（お客さまの分け方・会員ランク・店の比較・自動の LINE・回数券・月謝）の見本。保存はしない。 */
-  if (/^\/api\/(analytics\/customer-segments|member-ranks|hq\/store-comparison|ec\/auto-line|booking\/admin\/pass-plans|friends\/[^/]+\/member-rank|friends\/[^/]+\/delivery-consents)/.test(url.pathname)) {
+  if (/^\/api\/(analytics\/customer-segments|member-ranks|hq\/store-comparison|ec\/auto-line|booking\/admin\/pass-plans|friends\/[^/]+\/member-rank|friends\/[^/]+\/delivery-consents|dashboard\/comparisons$)/.test(url.pathname)) {
     let raw = ''
     req.on('data', (chunk) => { raw += chunk })
     req.on('end', () => {
