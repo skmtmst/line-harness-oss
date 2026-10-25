@@ -12,8 +12,8 @@ const read = (rel: string) => readFileSync(join(SRC, rel), 'utf8')
  */
 describe('空の一覧は共通の形', () => {
   it.each([
-    ['v8/hq-deliveries/console.tsx', /<EmptyList[^>]*title=\{`まだ\$\{titleOf\(type\)\}のひな形がありません`\}[^>]*create=\{\{ label: 'ひな形を作る'/s],
-    ['v8/hq/support.tsx', /<EmptyList[^>]*title="まだ問い合わせはありません"[^>]*canCreate=\{false\}/s],
+    ['v8/hq-deliveries/console.tsx', /<EmptyList[\s\S]{0,200}?title=\{`まだ\$\{titleOf\(type\)\}のひな形がありません`\}[\s\S]{0,200}?create=\{\{ label: 'ひな形を作る'/s],
+    ['v8/hq/support.tsx', /<EmptyList[\s\S]{0,200}?title="まだ問い合わせはありません"[\s\S]{0,200}?canCreate=\{false\}/s],
   ])('%s は EmptyList を使い、素の文で空を書かない', (rel, pattern) => {
     const src = read(rel)
     expect(src).toMatch(pattern)
