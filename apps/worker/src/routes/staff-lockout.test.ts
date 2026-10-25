@@ -125,7 +125,7 @@ describe('スタッフの店舗権限範囲', () => {
   it('全店舗では紐付けを空にして保存する', async () => {
     const res = await send('/api/staff', 'POST', invitation('all', ['line-1']));
     expect(res.status).toBe(201);
-    // M957: 本人と担当範囲は同じ取引で書く。範囲は作成の第2引数で渡す。
+    // 本人と担当範囲は同じ取引で書く。範囲は作成の第2引数で渡す。
     expect(dbMocks.createStaffMemberWithScopes).toHaveBeenCalledWith(
       env.DB, expect.objectContaining({ account_scope: 'all' }), [],
     );
@@ -317,7 +317,7 @@ describe('スタッフ経路の統括分離', () => {
     expect(res.status).toBe(200);
     /*
      * メール以外の本人設定(通知の好みなど)はこれまでどおり即時に書き込む。
-     * 本人のメール変更だけは N-433 の確認フローへ載る。email 列はこの場では
+     * 本人のメール変更だけは  の確認フローへ載る。email 列はこの場では
      * 変えず、保留分(email_change_*)を書いて新アドレスへ確認メールを送る。
      */
     const { data } = await res.json() as { data: { emailChangePending?: boolean; pendingEmail?: string } };
@@ -368,7 +368,7 @@ describe('最後の管理者を締め出さない', () => {
     const res = await send('/api/staff/admin-a', 'PATCH', { isActive: false });
 
     expect(res.status).toBe(200);
-    // R501: 管理者を外す書き込みは「ほかに有効な管理者が残る」を同じ条件にする。
+    // 管理者を外す書き込みは「ほかに有効な管理者が残る」を同じ条件にする。
     expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
       env.DB, 'admin-a', expect.objectContaining({ is_active: 0 }),
       expect.objectContaining({ requireRemainingAdmin: expect.objectContaining({ tenantId: expect.any(String) }) }),

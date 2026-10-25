@@ -5,11 +5,11 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /*
- * M957〜M959（/staff/new の招待作成）。
+ * 〜（/staff/new の招待作成）。
  * 実D1（better-sqlite3＋bootstrap.sql）で通し、動きで守る。
- * - M957: 作成の後片付けが残す幽霊行を作らない・残っても再招待で掃除する
- * - M958: 招待中メールも一意制約で守る（確認してから入れる間の窓をなくす）
- * - M959: メールアドレスは254文字まで
+ * - 作成の後片付けが残す幽霊行を作らない・残っても再招待で掃除する
+ * - 招待中メールも一意制約で守る（確認してから入れる間の窓をなくす）
+ * - メールアドレスは254文字まで
  */
 const mail = vi.hoisted(() => ({ send: vi.fn(), line: vi.fn() }));
 vi.mock('../services/staff-invite.js', () => ({
@@ -97,7 +97,7 @@ describe('M957 招待作成の後片付け', () => {
   });
 
   it('後片付けの削除自体が失敗して幽霊行が残っても、同じメールの招待し直しで上書き・掃除できる', async () => {
-    // 送信されなかった招待が幽霊として残った状態（M957の証拠 W1-partial-rollback-fail）。
+    // 送信されなかった招待が幽霊として残った状態（の証拠 W1-partial-rollback-fail）。
     testDb.raw.prepare(
       `INSERT INTO staff_members (id, name, email, role, api_key, is_active, invite_status, invite_token_hash, invite_expires_at, tenant_id)
        VALUES ('ghost-1', '幽霊', 'ghost@example.test', 'staff', 'ghost-key', 0, 'pending_email', 'ghost-hash', '2030-01-01T00:00:00.000Z', ?)`,

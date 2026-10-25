@@ -6,7 +6,7 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { businessAuditMiddleware } from '../middleware/business-audit.js';
 
 /*
- * N-425/N-432(#668)。期限切れ招待の再送と7日期限の契約試験。
+ * /。期限切れ招待の再送と7日期限の契約試験。
  * 実D1で通し、旧トークンの失効・2回目の保存・境界を確かめる。
  */
 const mail = vi.hoisted(() => ({

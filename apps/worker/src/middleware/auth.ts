@@ -1,7 +1,7 @@
 import { timingMiddleware, timingSpan } from '../lib/server-timing.js';
 import { rememberAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { logger } from '@line-crm/shared/server';
-/** Public auth facade. Internal auth.ts modules retain the existing manual-review gate. */
+/** 内部の認証モジュールにある手動確認の境界を保ち、既存の公開入口を提供する。 */
 import { bearerToken } from './auth-http.js';
 import { isPublicApiBoundary, isPublicFormDefinition } from './public-api-boundary.js';
 import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
@@ -53,25 +53,18 @@ async function authenticateCookieToken(
 ): Promise<AuthenticatedStaff | null> {
   const session = await authenticateAdminSession(c, token);
   if (session) return session;
-  // Backward-compatible emergency session created by the hidden API-key route.
+  // 非公開の API キー経路で作成した緊急用セッションとの互換性を保つ。
   return authenticateApiToken(c, token);
 }
 
-/**
- * Resolve a token (from a Bearer header or the session cookie) to a staff
- * identity. Shared by the auth middleware and the /api/auth/login endpoint so
- * cookie and Bearer auth accept exactly the same credentials.
- */
+/** Cookie と Bearer で受け付ける資格情報がずれないよう、認証 middleware とログインが同じトークン解決を使う。 */
 export async function authenticateApiToken(
   c: Context<Env>,
   token: string | null,
 ): Promise<AuthenticatedStaff | null> {
   if (!token) return null;
 
-  // Some iOS/LINE WebViews reject the workers.dev cookie when the admin SPA
-  // is hosted on pages.dev. In that cross-site topology the OAuth callback
-  // hands the existing opaque admin-session token to the SPA via a URL
-  // fragment, and the SPA presents it as a Bearer credential.
+  // iOS/LINE WebView で別サイトの Cookie が拒まれる場合に備え、OAuth コールバックは既存の不透明なセッショントークンを fragment で渡し、管理画面が Bearer で提示する。
   if (token.startsWith(ADMIN_SESSION_BEARER_PREFIX)) {
     return authenticateAdminSession(c, token.slice(ADMIN_SESSION_BEARER_PREFIX.length));
   }
@@ -79,23 +72,18 @@ export async function authenticateApiToken(
   const staff = await timingSpan(c, 'staff', () => getStaffByApiKey(c.env.DB, token));
   if (staff) {
     const required = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
-    // This endpoint exchanges the primary credential for a challenge, never
-    // for an authenticated staff context usable by other APIs.
+    // この入口は一次資格情報を確認課題へ交換するだけとし、ほかの API が使える認証済みコンテキストを渡さない。
     if (c.req.path !== '/api/auth/login' && (required || staff.totp_enabled_at)) return null;
     return rememberAuthenticatedStaffRecord(c.env.DB, { ...toAuthenticatedStaff(staff), credential: 'api-key' }, staff);
   }
 
-  // Fallback: env API_KEY acts as owner (current rotation slot)
+  // 環境変数の現行 API_KEY は owner として扱う。
   if (token === c.env.API_KEY) {
     if (mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
-  // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
-  // Same-value guard: if both env vars are set to the same secret, the primary
-  // check above already accepts it; this branch must skip to avoid false
-  // LEGACY counters. Logs accept_via=LEGACY_API_KEY so operators can confirm
-  // zero legacy usage before deleting the secret.
+  // ローテーション猶予中は LEGACY_API_KEY も受け付ける。同じ値なら現行キーで処理済みなので旧キーの計数を増やさない。削除前に利用が0か確認できるよう accept_via を記録する。
   if (
     c.env.LEGACY_API_KEY &&
     c.env.LEGACY_API_KEY !== c.env.API_KEY &&
@@ -110,8 +98,7 @@ export async function authenticateApiToken(
 }
 
 async function authenticateRequest(c: Context<Env>, next: Next): Promise<Response | void> {
-  // Skip auth for the LINE webhook endpoint — it uses signature verification instead
-  // Skip auth for OpenAPI docs — public documentation
+  // LINE Webhook は署名認証、OpenAPI は公開文書のため、スタッフ認証を省く。
   const path = c.req.path;
   // LIFF / admin の SPA アセットは Authorization ヘッダなしで HTML を取りに
   // くる。Worker は API 以外のパスを ASSETS バインディングから配信するので、
@@ -133,12 +120,7 @@ async function authenticateRequest(c: Context<Env>, next: Next): Promise<Respons
     }
   }
 
-  // A form definition is public because the LIFF client must render it before
-  // submission. Authenticate opportunistically so the same GET can still
-  // return the full admin representation to SDK/admin callers, while an
-  // unauthenticated LIFF caller receives the redacted public representation.
-  // Crucially, this exception is method-aware: PUT/DELETE on the same path
-  // must continue through the normal admin authentication below.
+  // LIFF は回答前にフォーム定義が必要なので GET は公開用に伏せた内容を返す。認証済みの管理 API には完全な定義を返す。同じパスの PUT/DELETE は例外にせず通常の管理認証を通す。
   const publicForm = isPublicFormDefinition(method, path);
   if (publicForm && !c.req.query('account_id')) {
     const bearer = bearerToken(c);
@@ -193,7 +175,7 @@ async function authenticateRequest(c: Context<Env>, next: Next): Promise<Respons
     return c.json({ success: false, error: '閲覧のみの権限では書き出しを実行できません' }, 403);
   }
 
-  // N-423 (#670): staff は deny-by-default。権限表に無い管理 API は
+  //  staff は deny-by-default。権限表に無い管理 API は
   // 本人・自組織と明示許可の口以外すべて 403。owner/admin は従来どおり通す。
   // 運営メンバーは、運営会社の統括に属する通常の staff として作る。
   // /api/ops/* は直後の route 側で requirePlatformAdmin が全件を守るため、
@@ -205,7 +187,7 @@ async function authenticateRequest(c: Context<Env>, next: Next): Promise<Respons
       && !isStaffSelfEndpoint(method, path, staff.id)
       && !isStaffExplicitAllow(method, path)) {
     const requiredPermission = permissionForApiPath(path);
-    // N-424: 「見えるだけ」の key は GET系だけを許可する。変更系は edit の key が要る。
+    // 「見えるだけ」の key は GET系だけを許可する。変更系は edit の key が要る。
     const granted = requiredPermission
       && (staff.permissionKeys?.includes(requiredPermission)
         || ((SAFE_METHODS.has(method)||gap2ReadOperation(method,path)) && !outputRequest && staff.viewPermissionKeys?.includes(requiredPermission)));
@@ -214,10 +196,7 @@ async function authenticateRequest(c: Context<Env>, next: Next): Promise<Respons
     }
   }
 
-  // CSRF protection applies ONLY to cookie-authenticated, state-changing
-  // requests. Bearer callers (SDK/MCP) cannot be driven cross-site by a
-  // browser (an attacker cannot set the Authorization header), so they are
-  // exempt. Safe methods (GET/HEAD/OPTIONS) never mutate, so they are exempt.
+  // CSRF は Cookie 認証の更新要求だけに適用する。Bearer は攻撃側が Authorization を付けられず、GET/HEAD/OPTIONS は更新しないため対象外とする。
   if (!bearer && cookie && !SAFE_METHODS.has(c.req.method.toUpperCase())) {
     const header = c.req.header(CSRF_HEADER);
     const expected = csrfTokenFromCookie(c);

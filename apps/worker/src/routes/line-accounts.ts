@@ -65,7 +65,7 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-// GET /api/line-accounts - list all. LINE live data is opt-in with ?live=1.
+// LINE の実データ取得は重いため、live=1 の明示要求時だけにする。
 lineAccounts.get('/api/line-accounts', async (c) => {
   try {
     const db = c.env.DB;
@@ -137,7 +137,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
   }
 });
 
-// GET /api/line-accounts/summary - visible accounts only
+// 可視範囲内のアカウントだけを要約する。
 lineAccounts.get('/api/line-accounts/summary', async (c) => {
   try {
     const db = c.env.DB;
@@ -183,11 +183,7 @@ function trimTrailingSlash(value: string): string {
   return value.trim().replace(/\/+$/, '');
 }
 
-/**
- * Webhook URLs that reach this Worker. The canonical public URL comes first;
- * WORKER_URL and the configured aliases (such as the workers.dev address) are
- * the same Worker, so LINE registered on any of them is not a mismatch.
- */
+/** 正規 URL と WORKER_URL・設定済みの別名は同じ Worker を指すため、いずれに LINE が登録されていても不一致としない。 */
 export function acceptedWebhookUrls(
   env: Pick<Env['Bindings'], 'WORKER_PUBLIC_URL' | 'WORKER_URL' | 'WORKER_ALIAS_URLS'>,
   canonicalWebhookUrl: string,
@@ -334,8 +330,7 @@ async function collectConnectionChecks(
   );
   checks.push({
     kind: 'liff_config',
-    // LINE has no public API for reading the registered endpoint URL. A valid
-    // local pairing is therefore still unknown, never falsely reported as matched.
+    // LINE は登録済み Webhook URL の読取 API を公開しないため、ローカルの組合せが正しくても一致と断定せず不明にする。
     result: loginMatchesLiff ? 'unknown' : 'failed',
     expectedUrl: expectedLiffEndpointUrl,
     registeredUrl: null,
@@ -447,7 +442,7 @@ lineAccounts.post(
   },
 );
 
-// Persisted re-check for the account list, detail, and operations dashboard.
+// 一覧・詳細・運用画面で共有できるよう、再確認の結果を保存する。
 lineAccounts.post(
   '/api/line-accounts/:id/connection-checks',
   requireRole('owner', 'admin'),
@@ -510,7 +505,7 @@ lineAccounts.post(
   },
 );
 
-// PUT /api/line-accounts/default - switch the organization default.
+// 組織の既定アカウントを切り替える。
 lineAccounts.put('/api/line-accounts/default', requireRole('owner'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
   try {
     const body = await c.req.json<{ accountId?: string }>();
@@ -760,7 +755,7 @@ lineAccounts.get(
   },
 );
 
-// Only the registered account's signed inbound receipt can unlock the wizard.
+// 登録アカウントの署名付き受信記録だけで、設定の完了を確認する。
 lineAccounts.get('/api/line-accounts/:id/registration-receipt', requireRole('owner', 'admin'), async (c) => {
   c.header('Cache-Control', 'no-store');
   const account = await getAuthorizedLineAccount(c, c.req.param('id'));
@@ -781,7 +776,7 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
   }
 });
 
-// Read-only owner diagnostic. Credential values never leave the DB layer.
+// オーナー向けの読み取り診断とし、資格情報は DB 層から外へ出さない。
 lineAccounts.get(
   '/api/line-accounts/:id/credential-health',
   requireRole('owner'),
@@ -800,14 +795,13 @@ lineAccounts.get(
       }
       return c.json({ success: true, data: health });
     } catch (error) {
-      // Do not serialize the underlying error: crypto/runtime errors can contain
-      // implementation details that are unnecessary for this diagnostic.
+      // 暗号や実行環境の例外に内部情報が含まれ得るため、元の例外は応答へ直列化しない。
       throw error;
     }
   },
 );
 
-// GET /api/line-accounts/:id/follower-insight - compare DB state with LINE official follower stats
+// DB の状態を LINE 公式のフォロワー統計と比較する。
 lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
   try {
     const date = c.req.query('date');
@@ -839,10 +833,7 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
   }
 });
 
-// Existing-follower migration is an explicit, persisted, one-time job. The D1
-// cursor is the source of truth: the scheduled lane carries it to completion
-// with no browser open, and step requests resume it under the same lock, each
-// run spending its whole time/subrequest budget instead of one fixed page.
+// 既存友だちの移行は、明示的な一度限りのジョブとして保存する。D1 のカーソルを正本とし、ブラウザを閉じても cron が同じロックで継続する。1ページで止めず、時間と問い合わせ予算の範囲で進める。
 lineAccounts.get('/api/line-accounts/:id/follower-import', async (c) => {
   const id = c.req.param('id')!;
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
@@ -916,20 +907,13 @@ lineAccounts.post(
   },
 );
 
-// Reject duplicate login_channel_id / liff_id across accounts.
-// /auth/callback and /api/liff/config both resolve the row with `.first`
-// after a `WHERE col = ?` lookup, so duplicates would silently bind events
-// to whichever row D1 happens to return first. Two layers:
-//   1. this app-level pre-check for the sequential path (409 with the value),
-//   2. DB UNIQUE indexes from migration 542 for the concurrent path.
-// A request that passes 1 but loses the INSERT race lands in
-// duplicateAccountError below, with the same wording.
+// OAuth と LIFF の参照は先頭1行を選ぶため、login_channel_id/liff_id が重複すると別アカウントへ結び付く。事前確認に加え DB の UNIQUE で同時要求も防ぎ、どちらの競合も同じ理由で409を返す。
 async function checkUniqueLoginAndLiff(
   db: D1Database,
   values: { loginChannelId?: string | null | undefined; liffId?: string | null | undefined },
   excludeId: string | null,
 ): Promise<string | null> {
-  // Only check fields we're explicitly setting to non-null.
+  // 明示的に空でない値へ更新する項目だけを検査する。
   const checks: Array<{ column: string; value: string; label: string }> = [];
   if (typeof values.loginChannelId === 'string' && values.loginChannelId !== '') {
     checks.push({ column: 'login_channel_id', value: values.loginChannelId, label: 'loginChannelId' });
@@ -954,10 +938,7 @@ async function checkUniqueLoginAndLiff(
   return null;
 }
 
-// Map a D1 UNIQUE-constraint failure to the identifier the caller can act on.
-// The concurrent loser passes checkUniqueLoginAndLiff but hits migration 542
-// on INSERT. Report which identifier is taken so the UI can point at the
-// existing account instead of showing a generic channel error.
+// 事前確認後の同時 INSERT も UNIQUE で検出し、使われている識別子を示して一般的な接続失敗と区別する。
 function duplicateAccountError(
   message: string,
   values: { loginChannelId?: string | null; liffId?: string | null },
@@ -1100,7 +1081,7 @@ function publicConnectData(
     basicId: prepared.bot?.basicId ?? null,
     liffId: prepared.liffId,
     followerImport,
-    // R175: 「チャット」オンでもWebhookは届く（LINEは2022-11-30から併用を
+    // 「チャット」オンでもWebhookは届く（LINEは2022-11-30から併用を
     // サポート）。残す案内は自動返信の重複だけにする。チャットのまま
     // 運用している店舗にオフを求めない。
     remainingActions: prepared.bot?.chatMode === 'chat'
@@ -1339,9 +1320,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
       return inputError(c, { success: false, error: 'country or role is too long' }, 422, ["country","role"]);
     }
 
-    // Optional fields: empty string from UI = "not provided" → store NULL.
-    // Trim whitespace defensively (LINE IDs/secrets shouldn't have spaces;
-    // accidental spaces from copy-paste would silently break OAuth otherwise).
+    // コピー時の余分な空白で OAuth を壊さないよう文字列を trim し、空は NULL へ正規化する。
     const loginChannelId = normalizeOptionalString(body.loginChannelId) ?? null;
     const loginChannelSecret = normalizeOptionalString(body.loginChannelSecret) ?? null;
     const liffId = normalizeOptionalString(body.liffId) ?? null;
@@ -1443,9 +1422,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
       }
     }
 
-    // One read-only request at connection time records whether this account
-    // can use followers/ids. This never starts the migration and is non-fatal:
-    // a temporary LINE outage must not roll back account registration.
+    // 接続時に1回だけ followers/ids の利用可否を確認する。移行は始めず、一時的な LINE 障害でもアカウント登録は取り消さない。
     try {
       await detectFollowerImportCapability(
         c.env.DB,
@@ -1466,11 +1443,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     if (err instanceof CredentialEncryptionKeyError) {
       return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
     }
-    // D1 surfaces UNIQUE-constraint violations as a thrown error. Surface
-    // those as 409 so idempotent callers (e.g. create-line-harness retry
-    // loop) can treat "already registered" as a non-fatal success.
-    // Migration 542 can also surface login_channel_id / liff_id here when
-    // a concurrent request wins the race after the pre-check passed.
+    // 同時登録の一意制約エラーは409へ変換し、CLI が登録済みとして安全に扱えるようにする。ログインチャネルと LIFF の重複も含める。
     const message = err instanceof Error ? err.message : String(err);
     const duplicate = duplicateAccountError(message, {
       loginChannelId: attemptedLoginChannelId,
@@ -1483,16 +1456,9 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
   }
 });
 
-// Authorization split:
-//   PUT  (credentials replace)                                       -> owner only
-//   PATCH /:id   (metadata: country/role/is_active/display_order)    -> owner|admin
-//   PATCH /order (display_order bulk reorder)                        -> owner|admin
-// Rationale: PUT replaces channel_access_token / channel_secret which is high-risk
-// (mistake or misuse can stop production). PATCH only edits display metadata that
-// is operationally safe for admins to change without owner intervention.
+// Messaging の資格情報を誤って変更すると受信全体を止めるため、PUT は owner のみにする。表示情報の PATCH と順序変更は owner/admin に許可する。
 
-// PATCH /api/line-accounts/order — bulk update display_order
-// IMPORTANT: must be declared BEFORE /:id so Hono matches the literal "order" first.
+// order を動的 ID と誤認しないよう、まとめて順序を変える入口を /:id より先に置く。
 lineAccounts.patch(
   '/api/line-accounts/hierarchy',
   requireRole('owner', 'admin'),
@@ -1602,16 +1568,7 @@ lineAccounts.patch(
   },
 );
 
-// PATCH /api/line-accounts/:id — partial update of metadata + optional Login/LIFF wiring.
-// Scope: name, isActive, country, role, loginChannelId, loginChannelSecret, liffId.
-// Out-of-scope (use PUT instead): channelAccessToken, channelSecret — those are
-// production-impacting credentials and require owner-only PUT.
-//
-// Why loginChannelSecret is allowed via PATCH (admin) but channelSecret isn't:
-// rotating the LINE Login secret only breaks the auth/friend-add flow for new
-// users (recoverable). Rotating the Messaging channelSecret breaks webhook
-// verification for *all* incoming events from LINE → silent message loss, no
-// observability until users complain. Different blast radius, different role.
+// PATCH は表示情報と Login/LIFF の接続を扱い、Messaging の資格情報は owner 専用 PUT へ分ける。Login の秘密値の変更は新規認証に限るが、Messaging の変更は全 Webhook の署名検証に及ぶため、異なる権限境界を保つ。
 lineAccounts.patch(
   '/api/line-accounts/:id',
   requireRole('owner', 'admin'),
@@ -1652,9 +1609,7 @@ lineAccounts.patch(
         }, 422, ["isActive"]);
       }
 
-      // Normalize: trim non-empty strings; treat empty/whitespace-only as null.
-      // Empty-string-from-UI represents "user cleared the field" — store as NULL,
-      // not as empty string, so countryFlag lookup degrades gracefully.
+      // 画面で消去した空文字を NULL にし、国旗などの表示が安全に代替できるようにする。
       const country = normalizeOptionalString(body.country);
       const role = normalizeOptionalString(body.role);
       const loginChannelId = normalizeOptionalString(body.loginChannelId);
@@ -1679,17 +1634,7 @@ lineAccounts.patch(
       );
       if (!capacity.ok) return inputError(c, { success: false, error: capacity.error }, 400, ["friendCapacity","capacityWarnAt"]);
 
-      // Pre-validate Login pair + uniqueness against the existing row so the
-      // caller gets a clean error before we mutate. Skip the lookup entirely
-      // if the request doesn't touch any of the fields we'd validate, to
-      // avoid a wasted SELECT on the toggle-isActive hot path.
-      //
-      // The pair check only runs when the request itself touches Login
-      // fields. That matters because the setup CLI (packages/create-line-
-      // harness/.../setup.ts:646-665) persists `login_channel_id` without
-      // `login_channel_secret` as a best-effort step, so accounts in the
-      // wild can have a half-set Login pair. A LIFF-only dashboard save
-      // shouldn't be blocked by that pre-existing inconsistency.
+      // 書込前にログインの組合せと一意性を検査する。該当項目に触れない更新では不要な SELECT を省き、既存の片側だけの設定で LIFF の保存まで拒まない。
       const touchesLogin =
         loginChannelId !== undefined || loginChannelSecret !== undefined;
       const touchesLoginOrLiff = touchesLogin || liffId !== undefined;
@@ -1734,7 +1679,7 @@ lineAccounts.patch(
         iconUrl !== undefined;
       const touchesOfficialProfileUrl = officialProfileUrl.value !== undefined;
 
-      // Route to the fields helper when name is not being changed.
+      // 名前が未指定なら、項目だけを更新する関数へ渡す。
       if (body.name === undefined && (fieldsTouched || touchesOfficialProfileUrl)) {
         const updated = await updateLineAccountFields(c.env.DB, id, {
           country,
@@ -1754,7 +1699,7 @@ lineAccounts.patch(
         return c.json({ success: true, data: serializeLineAccount(updated) });
       }
 
-      // name is present — use the full updateLineAccount path
+      // 名前が指定されていれば、アカウント全体の更新関数へ渡す。
       const updated = await updateLineAccount(c.env.DB, id, {
         name: body.name,
         is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
@@ -1779,14 +1724,8 @@ lineAccounts.patch(
   },
 );
 
-// PUT /api/line-accounts/:id - update
-// Despite the verb, behaves as a partial update (only provided fields are
-// touched). Kept on PUT + owner-only because it's the entry point for
-// rotating Messaging credentials (channelAccessToken / channelSecret).
-// Also accepts the metadata fields that PATCH handles so an owner can update
-// "everything" in one call (e.g. AccountSettingsSection sends country/role
-// through this same `api.lineAccounts.update` helper). Without this, country
-// and role were silently dropped because PUT used to ignore them.
+// PUT は指定された項目だけを更新するが、Messaging の資格情報交換を含むため owner に限る。表示情報も同じ要求で更新できるよう、PATCH と同じ country/role などを受け付ける。
+
 lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBoundary({"timezone":["string"],"name":["string"],"channelAccessToken":["string"],"channelSecret":["string"],"loginChannelId":["null","string"],"loginChannelSecret":["null","string"],"liffId":["null","string"],"isActive":["boolean"],"country":["null","string"],"role":["null","string"],"ogSiteName":["null","string"],"ogDefaultImageUrl":["null","string"],"ogDefaultDescription":["null","string"],"officialProfileUrl":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id')!;
@@ -1843,9 +1782,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
     const officialProfileUrl = readOfficialProfileUrl(body.officialProfileUrl);
     if (!officialProfileUrl.ok) return inputError(c, { success: false, error: officialProfileUrl.error }, 400, ["officialProfileUrl"]);
 
-    // Validate Login pair + uniqueness identically to PATCH. PUT is the
-    // owner-only credential rotation endpoint, so the same correctness
-    // guarantees should apply here.
+    // PUT でも PATCH と同じログインの組合せ・重複検査を行い、資格情報交換時の整合性を守る。
     const putTouchesLogin =
       loginChannelId !== undefined || loginChannelSecret !== undefined;
     if (putTouchesLogin || liffId !== undefined) {
@@ -1864,9 +1801,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
       if (dupError) return c.json({ success: false, error: dupError }, 409);
     }
 
-    // Two-step update because metadata (country/role) lives on a separate
-    // helper from the credentials/name path. Skip whichever step has nothing
-    // to do so we don't bump updated_at gratuitously.
+    // 表示項目と資格情報は別関数で更新する。不要な updated_at の変更を防ぐため、対象のない側は呼ばない。
     const credentialsTouched =
       body.name !== undefined ||
       body.channelAccessToken !== undefined ||
@@ -1940,7 +1875,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
   }
 });
 
-// DELETE /api/line-accounts/:id - backward-compatible archive endpoint.
+// 履歴を保つため、互換 DELETE も保管として扱う。
 lineAccounts.delete('/api/line-accounts/:id', requireRole('owner'), async (c) => {
   try {
     return await archiveAccountResponse(c, '旧DELETE APIからのアーカイブ');

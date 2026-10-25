@@ -11,7 +11,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
 
 /*
- * 公開APIトークンとタグ付与の後続（監査 R431〜R436）。
+ * 公開APIトークンとタグ付与の後続（監査 〜）。
  * 実D1（better-sqlite3 + bootstrap.sql）で本物の route・DB関数を走らせる。
  * 外部通信はしない。event-bus だけは発火の引数を掴むための殻にする
  * （加点・旧自動化の二重実行を数える試験ではないため）。

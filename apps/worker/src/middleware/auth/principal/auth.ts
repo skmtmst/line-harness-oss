@@ -7,14 +7,8 @@ export const TENANT_SUSPENDED_ERROR = '現在ご利用いただけません。�
 export type StaffRole = 'owner' | 'admin' | 'staff';
 
 /**
- * 認証済みの利用者。
- *
- * 役割と読み取り専用は別々に持つ。以前は access_level='read_only' の人を
- * 役割にかかわらず 'viewer' へ潰していたため、「閲覧のみのオーナー」と
- * 「閲覧のみのスタッフ」を区別できず、機密情報の閲覧をサーバー側で
- * 制御できなかった。
- *
- * 更新の可否は readOnly、閲覧の可否は role で判定する。
+ * 更新可否は readOnly、閲覧可否は role で判定する。
+ * 読み取り専用でも役割を保持し、オーナーとスタッフで異なる機密情報の閲覧範囲をサーバー側で制御する。
  */
 export type AuthenticatedStaff = {
   id: string;
@@ -23,9 +17,9 @@ export type AuthenticatedStaff = {
   /** true なら役割にかかわらず更新・削除・設定変更をさせない。 */
   readOnly: boolean;
   permissionKeys?: string[];
-  /** N-424: 「見えるだけ」の key。GET系だけを許可し、変更系は edit の key が要る。 */
+  /** 「見えるだけ」の key。GET系だけを許可し、変更系は edit の key が要る。 */
   viewPermissionKeys?: string[];
-  /** N-424: スタッフのメール表示。未設定は従来判定（access.user.email.view）。 */
+  /** スタッフのメール表示。未設定は従来判定（access.user.email.view）。 */
   emailMask?: 'full' | 'masked' | 'none' | null;
   assignedLineAccountId?: string | null;
   canAccessDescendantAccounts?: boolean;
@@ -41,7 +35,7 @@ export type AuthenticatedStaff = {
    * APIキー）をプログラムから提示した状態。
    *
    * Googleビジネスのルートはこれを見て 'api-key' を拒む。Google Business Profile
-   * APIのポリシー（https://developers.google.com/my-business/content/policies 、
+   * APIのポリシー（https://developers.google.com/my-business/content/policies、
    * 2026-08-28更新）が「End users of your Business Profile APIs need to manually
    * sign in to use it.」「You cannot provide indirect access to your Business
    * Profile project.」と定めているため、鍵1本で外部スクリプトからGoogleへ
@@ -64,7 +58,7 @@ type StaffAuthenticationRecord = {
   tenant_status?: TenantStatus;
 };
 
-/** Stored permission JSON is untrusted; only arrays of string keys can grant access. */
+/** 保存された権限 JSON も信頼せず、文字列キーの配列だけで許可する。 */
 function permissionKeysFromJson(raw: string | null | undefined): string[] {
   if (!raw) return [];
   try {

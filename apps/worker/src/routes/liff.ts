@@ -18,36 +18,13 @@ const liffRoutes = new Hono<Env>();
 
 // ─── LINE Login OAuth (bot_prompt=aggressive) ───────────────────
 
-/**
- * GET /auth/line — redirect to LINE Login with bot_prompt=aggressive
- *
- * This is THE friend-add URL. Put this on LPs, SNS, ads.
- * Query params:
- *   ?ref=xxx     — attribution tracking
- *   ?redirect=url — redirect after completion
- *   ?gclid=xxx   — Google Ads click ID
- *   ?fbclid=xxx  — Meta Ads click ID
- *   ?utm_source=xxx, utm_medium, utm_campaign, utm_content, utm_term — UTM params
- */
+/** 友だち追加の公開 URL。ref・完了後の移動先・広告クリック ID・UTM をログイン後へ引き継ぐ。 */
 liffRoutes.get('/auth/line', get__auth_line_1);
 
-/**
- * GET /auth/oauth — force OAuth flow (skips LIFF, skips X detection)
- *
- * This endpoint always 302's to access.line.me OAuth, regardless of UA.
- * Used by /r/'s X-warning-page "このまま LINE を開く" button so the user
- * can complete friend-add in-place when LINE Universal Link is broken
- * (e.g. inside X's custom WKWebView since v11.42).
- *
- * Same query params as /auth/line. No HTML rendering, no smart logic.
- */
+/** Universal Link が開けない場合にも、その場で友だち追加を完了できるよう、端末によらず OAuth へ302で進む。/auth/line と同じ入力を使う。 */
 liffRoutes.get('/auth/oauth', get__auth_oauth_2);
 
-/**
- * GET /auth/callback — LINE Login callback
- *
- * Exchanges code for tokens, extracts sub (UUID), links friend.
- */
+
 liffRoutes.get('/auth/callback', get__auth_callback_1);
 
 // ─── LIFF config endpoint ──────────────────────────────────────
@@ -55,12 +32,12 @@ liffRoutes.get('/auth/callback', get__auth_callback_1);
 // 見た目だけの公開口。予約機能の有無に依存せず、LIFF IDで店を固定する。
 liffRoutes.get('/api/liff/customer-look',get__api_liff_customer_look_2);
 
-// GET /api/liff/config - resolve account info from LIFF ID (public, no auth)
+// LIFF ID から公開に必要なアカウント情報だけを解決する。
 liffRoutes.get('/api/liff/config', get__api_liff_config_3);
 
 // ─── Existing LIFF endpoints ────────────────────────────────────
 
-// POST /api/liff/profile - get the authenticated LIFF caller's friend profile
+// プロフィールは認証済み LIFF 本人の分だけを返す。
 liffRoutes.post('/api/liff/profile', inputJsonBoundary(), post__api_liff_profile_4);
 
 // クーポン画面用。本人以外・別アカウント・未フォローには渡さない。
@@ -72,7 +49,7 @@ liffRoutes.post('/api/liff/entry-route-coupon/use', post__api_liff_entry_route_c
 // POST /api/liff/friend-add-intent - 「今回開いたリンク」を追加イベント候補として記録
 liffRoutes.post('/api/liff/friend-add-intent', inputJsonBoundary({"ref":["string"],"source":["string"]}), post__api_liff_friend_add_intent_2);
 
-// POST /api/liff/link - link friend to user UUID (public, verified via LINE ID token)
+// 公開の結び付けも LINE ID トークンで本人を検証する。
 liffRoutes.post('/api/liff/link', inputJsonBoundary({"idToken":["string"],"displayName":["null","string"],"ref":["string"],"existingUuid":["string"],"crossAccountToken":["string"],"ig":["string"],"iga":["string"],"igan":["string"]}), post__api_liff_link_3);
 
 // ─── Attribution Analytics ──────────────────────────────────────
@@ -82,15 +59,13 @@ liffRoutes.post('/api/liff/link', inputJsonBoundary({"idToken":["string"],"displ
  */
 liffRoutes.get('/api/analytics/ref-summary', requireRole('owner', 'admin', 'staff'), get__api_analytics_ref_summary_4);
 
-/**
- * GET /api/analytics/ref/:refCode — detailed friend list for a single ref code
- */
+
 liffRoutes.get('/api/analytics/ref/:refCode', requireRole('owner', 'admin', 'staff'), get__api_analytics_ref_refCode_5);
 
 /**
  * GET /api/analytics/ref/:refCode/orders — その経路から来た友だちの注文明細
  *
- * IDEA-18: 経路別集計(ref-summary の orderCount)と同じ条件の明細を返し、
+ * 経路別集計(ref-summary の orderCount)と同じ条件の明細を返し、
  * 画面上で集計と注文をつき合わせられるようにする。
  *
  * 帰属ルールは first-touch: friends.ref_code がこの経路の友だちに結びついた
@@ -101,11 +76,10 @@ liffRoutes.get('/api/analytics/ref/:refCode', requireRole('owner', 'admin', 'sta
  */
 liffRoutes.get('/api/analytics/ref/:refCode/orders', requireRole('owner', 'admin', 'staff'), get__api_analytics_ref_refCode_orders_1);
 
-// POST /api/links/wrap - wrap a URL with LIFF redirect proxy
+
 liffRoutes.post('/api/links/wrap', requireRole('owner', 'admin'), inputJsonBoundary({"url":["string"],"ref":["string"]}), post__api_links_wrap_2);
 
-// POST /api/liff/send-form-link — send form URL as push message (public, used by LIFF)
-// Security: requires idToken to verify the caller is the actual LINE user
+// フォーム URL を本人へ送る前に idToken を検証し、任意の lineUserId への送信を防ぐ。
 liffRoutes.post('/api/liff/send-form-link', inputJsonBoundary({"lineUserId":["string"],"formId":["string"],"idToken":["string"],"ref":["string"],"gate":["string"],"xh":["string"],"ig":["string"],"iga":["string"],"igan":["string"]}), post__api_liff_send_form_link_3);
 
 export { liffRoutes };

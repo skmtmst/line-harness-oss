@@ -2,14 +2,7 @@ import { d1BindingIdentity } from '../lib/d1-timing.js';
 import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// GET /auth/callback — the friend_add auto-enroll loop must delegate the
-// instant welcome to the unified pushImmediateFirstStep service ('once' mode,
-// pre-created enrollment). The pre-unification inline block pushed step 1
-// itself WITHOUT advancing the enrollment, leaving the fresh row at step -1
-// with next_delivery_at already due — the next cron tick then re-sent step 1
-// (double welcome). These tests pin the delegation contract; the claim /
-// cooldown / advance semantics themselves are covered by
-// ../services/immediate-first-step.test.ts.
+// 即時の歓迎文を共通サービスの once へ委ね、送信後に購読を進めて次の cron の二重送信を防ぐ。ここでは接続契約を検証し、実行権・間隔・通番はサービスの試験で守る。
 
 const dbMocks = {
   /*
@@ -27,7 +20,7 @@ const dbMocks = {
       .filter((s) => s.trigger_type === 'friend_add' && s.is_active)
       .map((s) => s.id);
   }),
-  // eager module-load deps
+
   getLineAccounts: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000' },
   ]),
@@ -67,8 +60,7 @@ vi.mock('../services/immediate-first-step.js', () => ({ pushImmediateFirstStep }
 
 const worker = (await import('../index.js')).default;
 
-// No-op prepared statement chain; the callback's raw UPDATE/SELECT statements
-// don't matter for the delegation assertions.
+// 委譲の期待値に関係しない SQL は、何もしない prepared statement で依存を満たす。
 const DB = {
   prepare: () => ({
     bind: () => ({
@@ -111,7 +103,7 @@ function installFetchMock() {
           { status: 200 },
         );
       }
-      // bot/info etc → 404 so the handler falls through to the completion page
+      // bot/info などは404を返し、完了ページへの代替経路を試す。
       return new Response('not found', { status: 404 });
     }),
   );
@@ -149,7 +141,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   installFetchMock();
   pushImmediateFirstStep.mockResolvedValue(true);
-  dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null); // brand-new friend
+  dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
   dbMocks.createUser.mockResolvedValue({ id: 'U-uuid' });
   dbMocks.upsertFriend.mockResolvedValue({
     id: 'F-new',
@@ -178,9 +170,7 @@ describe('GET /auth/callback — friend_add auto-enroll delegates to pushImmedia
         workerUrl: 'https://worker.example.com',
         accountChannelId: null,
       },
-      // No mode override → the service defaults to 'once' (claim protocol,
-      // advance-after-send). The push target is the id_token sub, which is
-      // known before friend.line_user_id is fully wired.
+      // once の既定で実行権と送信後の通番更新を守る。follow 前でも、検証済み ID トークンの sub なら宛先が確定している。
       { enrollment: ENROLLMENT, targetLineUserId: 'U-new-friend' },
     );
   });
@@ -255,7 +245,7 @@ describe('GET /auth/callback — friend_add auto-enroll delegates to pushImmedia
     const res = await callback({ ref: '' });
 
     expect(res.status).toBe(200);
-    // scn-a failed, scn-b must still be enrolled and pushed.
+    // あるシナリオが失敗しても、残りの登録と配信を続ける。
     expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledTimes(2);
     expect(pushImmediateFirstStep).toHaveBeenCalledTimes(2);
     expect(pushImmediateFirstStep).toHaveBeenLastCalledWith(
