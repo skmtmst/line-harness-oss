@@ -24,16 +24,59 @@ const SUMMARY_KEEP = 50
 /** 見出しは3つだけ。増やすと、読む側が分類を覚えないといけなくなる。 */
 const KINDS = { 追加: 'added', 変更: 'changed', 修正: 'fixed' }
 
+/** front-matter のうち、字下げした `- 行` の並びとして読む項目。ほかは1行の値のまま。 */
+const LIST_KEYS = new Set(['highlights'])
+
 function parseFrontMatter(text) {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
   if (!match) return { meta: {}, body: text }
   const meta = {}
+  let listKey = null
   for (const line of match[1].split(/\r?\n/)) {
+    const item = line.match(/^\s+-\s+(.*?)\s*$/)
+    if (item && listKey) {
+      meta[listKey].push(item[1])
+      continue
+    }
+    listKey = null
     const i = line.indexOf(':')
     if (i < 0) continue
-    meta[line.slice(0, i).trim()] = line.slice(i + 1).trim()
+    const key = line.slice(0, i).trim()
+    const value = line.slice(i + 1).trim()
+    if (LIST_KEYS.has(key) && value === '') {
+      meta[key] = []
+      listKey = key
+    } else {
+      meta[key] = value
+    }
   }
   return { meta, body: text.slice(match[0].length) }
+}
+
+/** その回の3行のまとめ。人が書くもので、無ければ空のまま（機械で作らない）。 */
+const HIGHLIGHT_LIMIT = 3
+
+/*
+ * 版のファイルの `highlights:` を読む。書き方の誤りでビルドを落とさないよう、
+ * 読めない形は警告して空にする。PRごとのファイルには書かない決まりなので無視する。
+ */
+function readHighlights(meta, name) {
+  if (meta.highlights === undefined) return []
+  if (name.startsWith('unreleased')) {
+    console.warn(`[release-log] ${name}: highlights は版のファイルにだけ書きます — 無視しました`)
+    return []
+  }
+  if (!Array.isArray(meta.highlights)) {
+    console.warn(`[release-log] ${name}: highlights は「- 行」を字下げして並べます — 無視しました`)
+    return []
+  }
+  const lines = meta.highlights
+    .map((line) => line.replace(/^(["'])(.*)\1$/, '$2').trim())
+    .filter(Boolean)
+  if (lines.length > HIGHLIGHT_LIMIT) {
+    console.warn(`[release-log] ${name}: highlights は${HIGHLIGHT_LIMIT}行までです — 先の${HIGHLIGHT_LIMIT}行だけ使います`)
+  }
+  return lines.slice(0, HIGHLIGHT_LIMIT)
 }
 
 /**
@@ -73,7 +116,7 @@ function parseEntry(line) {
   return out
 }
 
-function parseFile(name, summaryExcludedVersions) {
+function parseFile(name, summaryExcludedVersions, highlightsByVersion) {
   // name にはサブディレクトリ（`unreleased/196-kenta-....md`）も来る。
   const raw = readFileSync(join(LOG_DIR, name), 'utf8')
   const { meta, body } = parseFrontMatter(raw)
@@ -99,6 +142,8 @@ function parseFile(name, summaryExcludedVersions) {
   const version = meta.version ?? name.replace(/\.md$/, '')
   // 過去の未公開行を保管する版は、全文を残したまま要約の候補から外せる。
   if (meta.summary === 'false') summaryExcludedVersions.add(version)
+  const highlights = readHighlights(meta, name)
+  if (highlights.length > 0) highlightsByVersion.set(version, highlights)
   return {
     version,
     released: meta.released ?? null,
@@ -115,13 +160,14 @@ function main() {
     console.warn('[release-log] docs/release-log がありません。空で出します。')
     mkdirSync(OUT_DIR, { recursive: true })
     writeFileSync(OUT_FILE, JSON.stringify({ releases: [] }, null, 2))
-    writeFileSync(SUMMARY_FILE, JSON.stringify({ releases: [] }) + '\n')
+    writeFileSync(SUMMARY_FILE, JSON.stringify(summarize([])) + '\n')
     return
   }
 
   const files = readdirSync(LOG_DIR).filter((f) => f.endsWith('.md') && f !== 'README.md')
   const summaryExcludedVersions = new Set()
-  const releases = files.map((name) => parseFile(name, summaryExcludedVersions))
+  const highlightsByVersion = new Map()
+  const releases = files.map((name) => parseFile(name, summaryExcludedVersions, highlightsByVersion))
 
   /*
    * 未リリースぶんは、PRごとの1ファイルからも拾う。
@@ -140,7 +186,7 @@ function main() {
       .filter((f) => f.endsWith('.md') && f !== 'README.md')
       .sort()
     for (const name of parts) {
-      const parsed = parseFile(join('unreleased', name), summaryExcludedVersions)
+      const parsed = parseFile(join('unreleased', name), summaryExcludedVersions, highlightsByVersion)
       if (unreleased) unreleased.entries.push(...parsed.entries)
       else releases.push({ version: 'unreleased', released: null, entries: parsed.entries })
     }
@@ -159,9 +205,29 @@ function main() {
 
   mkdirSync(OUT_DIR, { recursive: true })
   writeFileSync(OUT_FILE, JSON.stringify({ releases }, null, 2) + '\n')
-  writeFileSync(SUMMARY_FILE, JSON.stringify(summarize(releases, summaryExcludedVersions)) + '\n')
+  const options = { deployments: readDeployments(), highlights: highlightsByVersion }
+  writeFileSync(SUMMARY_FILE, JSON.stringify(summarize(releases, summaryExcludedVersions, options)) + '\n')
   const total = releases.reduce((n, r) => n + r.entries.length, 0)
   console.log(`[release-log] ${releases.length} 版 / ${total} 件を書き出しました`)
+}
+
+/*
+ * 検証への配備の記録。ビルドの時に手元のファイルとして渡されたときだけ使う
+ * （`RELEASE_LOG_DEPLOYMENTS` にファイルの場所。中身は `[{ "at": "...", "environment": "staging", "phase": "succeeded" }]`）。
+ * 実行時に取りに行かないのは頭のコメントと同じ理由。渡されない・読めないときは、
+ * 回の区切りを日本時間の日ごとにする。ビルドは落とさない。
+ */
+function readDeployments() {
+  const path = process.env.RELEASE_LOG_DEPLOYMENTS
+  if (!path) return []
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    if (parsed instanceof Array) return parsed
+    console.warn('[release-log] 配備の記録が並びの形ではありません — 日ごとに区切ります')
+  } catch {
+    console.warn('[release-log] 配備の記録を読めませんでした — 日ごとに区切ります')
+  }
+  return []
 }
 
 /*
@@ -177,8 +243,10 @@ function main() {
  * 「新しい行」の並べ方は画面（update-history.ts の collectRecentUpdates）と同じ
  * `at ?? released` の新しい順。画面は配備記録と混ぜて新しい10行を出すので、
  * 反映済みの新しい10行より多く残しておけば、表示される行は全文のときと変わらない。
+ *
+ * `updates` は更新1回ごとの並び（groupUpdates）、`pending` は次回反映予定の件数。
  */
-export function summarize(releases, summaryExcludedVersions = new Set()) {
+export function summarize(releases, summaryExcludedVersions = new Set(), options = {}) {
   const rows = []
   releases.forEach((release, r) => {
     if (!release.released || summaryExcludedVersions.has(release.version)) return
@@ -188,6 +256,7 @@ export function summarize(releases, summaryExcludedVersions = new Set()) {
   })
   rows.sort((a, b) => b.key - a.key)
   const keep = new Set(rows.slice(0, SUMMARY_KEEP).map((row) => `${row.r}:${row.e}`))
+  const pendingEntries = releases.filter((release) => !release.released).flatMap((release) => release.entries)
   return {
     releases: releases.map((release, r) => ({
       version: release.version,
@@ -195,7 +264,111 @@ export function summarize(releases, summaryExcludedVersions = new Set()) {
       entryCount: release.entries.length,
       entries: release.entries.filter((_, e) => keep.has(`${r}:${e}`)),
     })),
+    updates: groupUpdates(releases, summaryExcludedVersions, options),
+    pending: { entryCount: pendingEntries.length, counts: countKinds(pendingEntries) },
   }
+}
+
+const JST_OFFSET = '+09:00'
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000
+
+/** 反映履歴の日時（日本時間・オフセット無し）も、配備の記録（UTC）も同じ物差しの数にする。 */
+function toTime(value) {
+  if (typeof value !== 'string' || value === '') return NaN
+  const text = value.trim().replace(' ', 'T')
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return Date.parse(`${text}T00:00${JST_OFFSET}`)
+  if (/T.*(?:[zZ]|[+-]\d{2}:\d{2})$/.test(text)) return Date.parse(text)
+  return Date.parse(`${text}${JST_OFFSET}`)
+}
+
+/** `<time datetime>` にそのまま入る日本時間の形（年-月-日T時:分+09:00）。 */
+function toJstIso(time) {
+  return new Date(time + JST_OFFSET_MS).toISOString().slice(0, 16) + JST_OFFSET
+}
+
+function countKinds(entries) {
+  const counts = { added: 0, changed: 0, fixed: 0 }
+  for (const entry of entries) if (entry.kind in counts) counts[entry.kind] += 1
+  return counts
+}
+
+function isStagingSuccess(deployment) {
+  if (!deployment || typeof deployment !== 'object') return false
+  if (deployment.environment !== undefined && deployment.environment !== 'staging') return false
+  if (deployment.phase !== undefined && deployment.phase !== 'succeeded') return false
+  return true
+}
+
+/*
+ * 更新1回ごとの並び（新しい順）。1回＝検証への配備1回（オーナーの決定）。
+ *
+ * - 行は、その行の日時より後で最初の配備の回に入る。ただし最初の配備の記録より前と、
+ *   最後の配備より後の行は、どの配備で入ったか分からないので日本時間の日ごとにする。
+ * - 同じ回でも版が違えば分ける（版の札を正しく出すため）。
+ * - `summary: false` の保管用の版は日付で割らず、版1つを1回（source: 'archive'）にする。
+ * - 3行のまとめは版の `highlights:` を、その版のいちばん新しい回に載せる。無ければ空。
+ * - 「最新」（latest）は並びの先頭の1回だけ。
+ */
+export function groupUpdates(releases, summaryExcludedVersions = new Set(), options = {}) {
+  const highlights = options.highlights ?? new Map()
+  const deploys = (options.deployments instanceof Array ? options.deployments : [])
+    .filter(isStagingSuccess)
+    .map((deployment) => toTime(deployment.at ?? deployment.occurredAt))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b)
+  const groups = new Map()
+  const open = (key, init) => {
+    if (!groups.has(key)) groups.set(key, { ...init, key, entries: [] })
+    return groups.get(key)
+  }
+
+  for (const release of releases) {
+    if (!release.released) continue
+    const { version } = release
+    const releasedAt = toTime(release.released)
+    if (summaryExcludedVersions.has(version)) {
+      open(`archive|${version}`, { source: 'archive', version, time: releasedAt }).entries.push(...release.entries)
+      continue
+    }
+    for (const entry of release.entries) {
+      let time = toTime(entry.at)
+      if (!Number.isFinite(time)) time = releasedAt
+      const index = Number.isFinite(time) ? deploys.findIndex((deployedAt) => deployedAt >= time) : -1
+      if (index > 0) {
+        open(`deployment|${deploys[index]}|${version}`, { source: 'deployment', version, time: deploys[index] }).entries.push(entry)
+        continue
+      }
+      const day = Number.isFinite(time) ? toJstIso(time).slice(0, 10) : 'unknown'
+      const group = open(`day|${day}|${version}`, { source: 'day', version, time })
+      if (Number.isFinite(time) && !(group.time >= time)) group.time = time
+      group.entries.push(entry)
+    }
+  }
+
+  const sorted = [...groups.values()].sort((a, b) => {
+    const [at, bt] = [Number.isFinite(a.time) ? a.time : -Infinity, Number.isFinite(b.time) ? b.time : -Infinity]
+    if (at !== bt) return bt - at
+    const [av, bv] = [versionKey(a.version), versionKey(b.version)]
+    for (let i = 0; i < Math.max(av.length, bv.length); i++) {
+      if ((bv[i] ?? 0) !== (av[i] ?? 0)) return (bv[i] ?? 0) - (av[i] ?? 0)
+    }
+    return 0
+  })
+  const highlighted = new Set()
+  return sorted.map((group, i) => {
+    const lines = highlighted.has(group.version) ? [] : highlights.get(group.version) ?? []
+    if (lines.length > 0) highlighted.add(group.version)
+    return {
+      key: group.key,
+      source: group.source,
+      version: group.version,
+      at: Number.isFinite(group.time) ? toJstIso(group.time) : null,
+      latest: i === 0,
+      counts: countKinds(group.entries),
+      entryCount: group.entries.length,
+      highlights: [...lines],
+    }
+  })
 }
 
 // 試験から summarize だけを読むとき（import）は書き出さない。

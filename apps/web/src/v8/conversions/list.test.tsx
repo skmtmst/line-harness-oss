@@ -17,11 +17,12 @@ vi.hoisted(() => {
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const narrow = vi.hoisted(() => ({ value: false }))
 const push = vi.hoisted(() => vi.fn())
+const search = vi.hoisted(() => ({ value: '' }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/conversions',
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(search.value),
 }));
 
 
@@ -54,6 +55,7 @@ vi.mock('@/lib/use-narrow-viewport', () => ({
 
 
 import ConversionListV8 from './list'
+import { originInfoOf } from './origin-labels'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -100,6 +102,7 @@ beforeEach(() => {
   narrow.value = false
   window.history.replaceState(null, '', '/conversions')
   push.mockReset()
+  search.value = ''
   calls.length = 0
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input))
@@ -142,8 +145,13 @@ describe('V8 コンバージョンの一覧', () => {
       return json({ ...body, data: { ...body.data, items: matched, pagination: { ...body.data.pagination, total: matched.length } } })
     })
     await mount()
+    expect(sorts[0]).toBe('count_desc')
     fireEvent.click(screen.getByRole('button', { name: '並び' }))
     expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual(['件数が多い順', '金額が多い順', '名前順'])
+    fireEvent.click(within(screen.getByRole('option', { name: '金額が多い順' })).getByRole('button'))
+    await flush()
+    await waitFor(() => expect(sorts).toContain('value_desc'))
+    fireEvent.click(screen.getByRole('button', { name: '並び' }))
     fireEvent.click(within(screen.getByRole('option', { name: '名前順' })).getByRole('button'))
     await flush()
     await waitFor(() => expect(sorts).toContain('name_asc'))
@@ -230,7 +238,8 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.queryByRole('link', { name: '使う場所を足す' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '成果地点「商品を買った」の操作' }))
     await flush()
-    expect(screen.getByRole('menuitem', { name: '使う場所を足す' }).getAttribute('href')).toContain('/analytics?')
+    expect(screen.getByRole('menuitem', { name: '使う場所を足す' }).getAttribute('href'))
+      .toBe(`/analytics?tab=funnel&conversionPointId=cp-1&conversionPointName=${encodeURIComponent('商品を買った')}`)
     expect(screen.getByRole('menuitem', { name: '編集する' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '複製する' })).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitem', { name: '止める' }))
@@ -336,5 +345,352 @@ describe('V8 コンバージョンの一覧', () => {
     await mount()
     expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'フォルダ「通販」の操作' })).toBeNull()
+  })
+})
+
+/* 口の返事を1つだけ差し替える（ほかは上の既定のまま）。 */
+function overrideFetch(handler: (url: URL, init?: RequestInit) => Promise<Response> | Response | null) {
+  const base = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input))
+    const response = await handler(url, init)
+    if (response) {
+      calls.push(`${init?.method ?? 'GET'} ${url.pathname}`)
+      return response
+    }
+    return base(input, init)
+  })
+}
+
+const listBody = (list: unknown[], pagination: Record<string, unknown> = {}) => ({
+  success: true,
+  data: { items: list, stateCounts: { active: list.length, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0, unused: 0 }, range: {}, pagination: { total: list.length, limit: 100, cursor: '0', nextCursor: null, ...pagination } },
+})
+
+const stopDialog = () => screen.getByRole('dialog', { name: '「商品を買った」を止めますか？' })
+/* 確定のボタンは「キャンセル」の隣（処理中は文字が変わるため、文字では探さない）。 */
+const confirmButton = () => {
+  const buttons = Array.from(stopDialog().querySelectorAll('button'))
+  return buttons[buttons.findIndex((button) => button.textContent === 'キャンセル') + 1] as HTMLButtonElement
+}
+
+async function openStopDialog() {
+  fireEvent.click(screen.getByRole('button', { name: '成果地点「商品を買った」の操作' }))
+  await flush()
+  fireEvent.click(screen.getByRole('menuitem', { name: '止める' }))
+  await flush()
+}
+
+describe('V8 コンバージョンの一覧：読み込みの扱い', () => {
+  it('続きの頁を cursor で読み足し、全部の行を出す', async () => {
+    const cursors: Array<string | null> = []
+    overrideFetch((url) => {
+      if (url.pathname !== '/api/conversions/definitions') return null
+      const cursor = url.searchParams.get('cursor')
+      cursors.push(cursor)
+      return cursor === 'next-1' ? json(listBody([items[1]])) : json(listBody([items[0]], { nextCursor: 'next-1' }))
+    })
+    await mount()
+    expect(cursors).toEqual([null, 'next-1'])
+    expect(screen.getByText('商品を買った')).toBeTruthy()
+    expect(screen.getByText('資料をダウンロードした')).toBeTruthy()
+    expect(screen.queryByText(/先頭5000個まで/)).toBeNull()
+  })
+
+  it('50頁で読むのを止め、切れたことを帯と数の帯で知らせる', async () => {
+    let requests = 0
+    overrideFetch((url) => {
+      if (url.pathname !== '/api/conversions/definitions') return null
+      requests += 1
+      return json(listBody([point(`cp-page-${requests}`, `成果${requests}`)], { nextCursor: `next-${requests}` }))
+    })
+    await mount()
+    expect(requests).toBe(50)
+    expect(screen.getByText(/一覧は先頭5000個までを表示しています/)).toBeTruthy()
+    expect(screen.getByText('直近5000件までの合計です')).toBeTruthy()
+  })
+
+  it('一覧の形でない返事は成功と扱わず、前の行も残さない', async () => {
+    let broken = false
+    overrideFetch((url) => {
+      if (url.pathname !== '/api/conversions/definitions' || !broken) return null
+      return json({ success: true, data: { items: null, pagination: { total: 0, nextCursor: null } } })
+    })
+    await mount()
+    expect(screen.getByText('商品を買った')).toBeTruthy()
+    broken = true
+    fireEvent.change(screen.getByLabelText('成果地点の名前で探す'), { target: { value: '商品' } })
+    await flush()
+    await waitFor(() => expect(screen.getByText('成果地点を読み込めませんでした')).toBeTruthy())
+    expect(screen.queryByText('商品を買った')).toBeNull()
+    expect(screen.queryByText('まだ成果地点がありません')).toBeNull()
+  })
+
+  it('読み込み中は骨組みを出し、0件なら作るボタンと同じ名前で案内する', async () => {
+    let release: (response: Response) => void = () => {}
+    overrideFetch((url) => (url.pathname === '/api/conversions/definitions'
+      ? new Promise<Response>((resolve) => { release = resolve })
+      : null))
+    await act(async () => { root.render(<ConversionListV8 accountId="account-a" />) })
+    expect(screen.getByText('成果地点を読み込んでいます')).toBeTruthy()
+    await act(async () => { release(json(listBody([]))) })
+    await flush()
+    expect(screen.getByText('まだ成果地点がありません')).toBeTruthy()
+    const create = screen.getByRole('link', { name: '最初の成果地点を作る' })
+    expect(create.getAttribute('href')).toBe('/conversions/new')
+  })
+
+  it('アカウントを切り替えたら、遅れて届いた前のアカウントの一覧で上書きしない', async () => {
+    let releaseA: (response: Response) => void = () => {}
+    overrideFetch((url) => {
+      if (url.pathname !== '/api/conversions/definitions') return null
+      if (url.searchParams.get('lineAccountId') === 'account-a') return new Promise<Response>((resolve) => { releaseA = resolve })
+      return json(listBody([point('cp-b', 'B店の成果', { lineAccountId: 'account-b' })]))
+    })
+    await act(async () => { root.render(<ConversionListV8 accountId="account-a" />) })
+    await act(async () => { root.render(<ConversionListV8 accountId="account-b" />) })
+    await flush()
+    expect(screen.getByText('B店の成果')).toBeTruthy()
+    await act(async () => { releaseA(json(listBody([point('cp-a', 'A店の成果')]))) })
+    await flush()
+    expect(screen.getByText('B店の成果')).toBeTruthy()
+    expect(screen.queryByText('A店の成果')).toBeNull()
+  })
+
+  it('行に件数を出し、切れる文言は title で全文を読める', async () => {
+    await mount()
+    const urlRow = host.querySelector('tr[data-row-id="cp-6"]')!
+    expect(urlRow.querySelector('[title="サイトの「https://example.com/dl」に到達"]')?.textContent).toBe('ページのURLを開いたとき')
+    const orderRow = host.querySelector('tr[data-row-id="cp-1"]')!
+    expect(orderRow.querySelector('[title="ファネル 1・アフィリエイト 1"]')).not.toBeNull()
+    expect(Array.from(orderRow.querySelectorAll('td'), (cell) => cell.textContent)).toContain('52 件')
+  })
+
+  it('表は共通の表に列の寸法を渡し、見出し行は共通の見出し行を使う', async () => {
+    await mount()
+    const frame = host.querySelector('[data-shared-part="list-table"][data-column-layout]') as HTMLElement
+    expect(frame.style.getPropertyValue('--table-column-padding')).toBe('0 var(--tpl-list-inset)')
+    expect(frame.querySelector('thead tr[data-shared-part="list-head"]')).not.toBeNull()
+    expect(frame.querySelectorAll('tbody tr[data-shared-part="list-row"]')).toHaveLength(2)
+  })
+
+  it('作って戻った行を ?highlight= で色を付けて見せ、そこまで送り、保存したことを知らせる', async () => {
+    search.value = 'highlight=cp-6'
+    const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
+    await mount()
+    expect(screen.getByText('「資料をダウンロードした」を保存しました。色の付いた行です。')).toBeTruthy()
+    const row = host.querySelector('tr[data-row-id="cp-6"]') as HTMLElement
+    expect(row.getAttribute('aria-selected')).toBe('true')
+    expect(host.querySelector('tr[data-row-id="cp-1"]')?.getAttribute('aria-selected')).toBe('false')
+    expect(scroll.mock.contexts).toContain(row)
+    scroll.mockRestore()
+  })
+
+  it('CSV は1回だけ書き出し、失敗したら理由を出す', async () => {
+    const created = vi.fn(() => 'blob:points')
+    const revoked = vi.fn()
+    vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL: created, revokeObjectURL: revoked }))
+    const clicked = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    let fail = false
+    overrideFetch((url) => (url.pathname === '/api/conversions/export'
+      ? fail ? json({ success: false, error: 'forbidden' }, 403) : new Response('name\n', { status: 200, headers: { 'Content-Type': 'text/csv' } })
+      : null))
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: /CSV で書き出す/ }))
+    await flush()
+    expect(calls.filter((call) => call === 'GET /api/conversions/export')).toHaveLength(1)
+    expect(created).toHaveBeenCalledTimes(1)
+    expect(clicked).toHaveBeenCalledTimes(1)
+    expect((clicked.mock.contexts[0] as HTMLAnchorElement).download).toMatch(/^成果地点.*\.csv$/)
+    expect(revoked).toHaveBeenCalledWith('blob:points')
+    fail = true
+    fireEvent.click(screen.getByRole('button', { name: /CSV で書き出す/ }))
+    await flush()
+    expect(screen.getByText('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')).toBeTruthy()
+    expect(created).toHaveBeenCalledTimes(1)
+    clicked.mockRestore()
+  })
+})
+
+describe('V8 コンバージョンの一覧：止める・差し替える・削除する', () => {
+  it('影響の読み込み中は確定できず、読めなかったら理由を出して送らない', async () => {
+    let release: (response: Response) => void = () => {}
+    overrideFetch((url) => (url.pathname.endsWith('/delete-impact')
+      ? new Promise<Response>((resolve) => { release = resolve })
+      : null))
+    await mount()
+    await openStopDialog()
+    fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: '計測の仕方を変えるため' } })
+    expect(confirmButton().disabled).toBe(true)
+    await act(async () => { release(json({ success: false, error: 'unavailable' }, 503)) })
+    await flush()
+    expect(stopDialog().textContent).toContain('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
+    fireEvent.click(confirmButton())
+    await flush()
+    expect(calls.some((call) => call.startsWith('POST ') && call.endsWith('/stop'))).toBe(false)
+    // 押したあとも「影響を読めない」のまま。止める処理の失敗と取り違えない。
+    expect(stopDialog().textContent).toContain('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
+    expect(stopDialog().textContent).not.toContain('計測を止められませんでした')
+  })
+
+  it('3つの選び方と過去の記録が残ることを示し、使えない選び方は選べない', async () => {
+    await mount()
+    await openStopDialog()
+    const dialog = stopDialog()
+    const radios = within(dialog).getAllByRole('radio') as HTMLInputElement[]
+    expect(radios.map((radio) => radio.value)).toEqual(['stop', 'replace', 'delete'])
+    expect(radios[0].checked).toBe(true)
+    expect(within(dialog).getByRole('radio', { name: /止める（使う所の計測も止まる）/ })).toBeTruthy()
+    expect((within(dialog).getByRole('radio', { name: /別の成果地点に差し替えてから止める/ }) as HTMLInputElement).disabled).toBe(true)
+    expect((within(dialog).getByRole('radio', { name: /削除する/ }) as HTMLInputElement).disabled).toBe(true)
+    expect(dialog.textContent).toContain('過去の記録と分析は残します。')
+  })
+
+  it('止める操作の失敗は窓の中に業務の言葉で出し、押せる状態へ戻す。二度押しでも1回だけ送る', async () => {
+    const stops: unknown[] = []
+    let mode: 'conflict' | 'soft' = 'conflict'
+    overrideFetch((url, init) => {
+      if (!url.pathname.endsWith('/stop')) return null
+      stops.push(JSON.parse(String(init?.body ?? '{}')))
+      return mode === 'conflict' ? json({ success: false, error: 'version_conflict' }, 409) : json({ success: false, error: 'raw failure code' })
+    })
+    await mount()
+    await openStopDialog()
+    fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: '計測の仕方を変えるため' } })
+    fireEvent.click(confirmButton())
+    fireEvent.click(confirmButton())
+    await flush()
+    expect(stops).toEqual([{ expectedVersion: 3, reason: '計測の仕方を変えるため' }])
+    const message = 'この成果地点の計測を止められませんでした。状態を読み直してから、もう一度お試しください。'
+    expect(stopDialog().textContent).toContain(message)
+    expect(confirmButton().disabled).toBe(false)
+    mode = 'soft'
+    fireEvent.click(confirmButton())
+    await flush()
+    expect(stops).toHaveLength(2)
+    expect(stopDialog().textContent).toContain(message)
+    expect(stopDialog().textContent).not.toContain('raw failure code')
+  })
+
+  it('差し替えは選んだ先と両方の版を送り、削除は削除の口へ送る', async () => {
+    const writes: Array<{ call: string; body: unknown }> = []
+    overrideFetch((url, init) => {
+      if (url.pathname.endsWith('/delete-impact')) {
+        return json({ success: true, data: { definition: { ...items[0], version: 3 }, usages: [], eventCount: 0, canDelete: true, stopImpact: { affectedUsageCount: 0, preservesPastEvents: true, preservesUsages: true }, replacementCandidates: [{ ...items[1], id: 'cp-9', name: '新しい購入', version: 2 }] } })
+      }
+      if (init?.method === 'POST' || init?.method === 'DELETE') {
+        writes.push({ call: `${init.method} ${url.pathname}`, body: JSON.parse(String(init.body ?? '{}')) })
+        return json({ success: true, data: { id: 'cp-1' } })
+      }
+      return null
+    })
+    await mount()
+    await openStopDialog()
+    fireEvent.click(within(stopDialog()).getByRole('radio', { name: /別の成果地点に差し替えてから止める/ }))
+    fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: '新しい成果地点へ移すため' } })
+    expect(confirmButton().disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '差し替え先の成果地点' }))
+    const picker = screen.getAllByRole('dialog').at(-1)!
+    fireEvent.click(within(picker).getByRole('radio', { name: /新しい購入/ }))
+    fireEvent.click(within(picker).getByRole('button', { name: '選ぶ' }))
+    await flush()
+    fireEvent.click(confirmButton())
+    await flush()
+    expect(writes).toEqual([{ call: 'POST /api/conversions/definitions/cp-1/replace', body: { replacementId: 'cp-9', expectedVersion: 3, replacementExpectedVersion: 2, reason: '新しい成果地点へ移すため' } }])
+
+    await openStopDialog()
+    fireEvent.click(within(stopDialog()).getByRole('radio', { name: /削除する/ }))
+    fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: '試しに作ったため' } })
+    expect(confirmButton().textContent).toBe('削除する')
+    fireEvent.click(confirmButton())
+    await flush()
+    expect(writes[1]).toEqual({ call: 'DELETE /api/conversions/definitions/cp-1', body: { expectedVersion: 3, reason: '試しに作ったため' } })
+  })
+})
+
+describe('V8 コンバージョンの一覧：中身を見る窓', () => {
+  const definitionEvents = [
+    { id: 'e1', friendId: 'f1', friendName: '佐藤', status: 'confirmed', approvalStatus: null, cancelled: false, reversed: false, value: 1200, source: null, sourceEventId: null, createdAt: '2026-09-01T10:00:00.000Z' },
+    { id: 'e2', friendId: 'f2', friendName: '鈴木', status: 'pending', approvalStatus: 'pending', cancelled: false, reversed: false, value: null, source: null, sourceEventId: null, createdAt: '2026-09-02T10:00:00.000Z' },
+    { id: 'e3', friendId: 'f3', friendName: '高橋', status: 'rejected', approvalStatus: 'rejected', cancelled: false, reversed: false, value: 500, source: null, sourceEventId: null, createdAt: '2026-09-03T10:00:00.000Z' },
+    { id: 'e4', friendId: 'f4', friendName: '田中', status: 'cancelled', approvalStatus: null, cancelled: true, reversed: true, value: 800, source: null, sourceEventId: null, createdAt: '2026-09-04T10:00:00.000Z' },
+  ]
+  const ingest = (id: string, result: string, reason: string | null, isTest: boolean) => ({ id, conversionPointId: 'cp-1', result, reason, isTest, sourceEventId: null, friendId: null, payloadShape: null, signatureSha256: null, createdAt: '2026-09-05T10:00:00.000Z' })
+  const ingestEvents = [
+    ingest('i1', 'rejected', 'signature_mismatch', false),
+    ingest('i2', 'rejected', 'source_event_id_missing', false),
+    ingest('i3', 'recorded', null, true),
+    ingest('i4', 'rejected', 'signature_missing', true),
+  ]
+  const eventPaths: string[] = []
+
+  async function openDetail(name: string, eventsOk: boolean | 'soft' = true) {
+    eventPaths.length = 0
+    overrideFetch((url) => {
+      if (url.pathname.endsWith('/events')) {
+        eventPaths.push(`${url.pathname}?${url.searchParams}`)
+        if (eventsOk === 'soft') return json({ success: false, error: 'unavailable' })
+        return eventsOk ? json({ success: true, data: { items: definitionEvents } }) : json({ success: false, error: 'unavailable' }, 503)
+      }
+      if (url.pathname.endsWith('/ingest-events')) {
+        eventPaths.push(`${url.pathname}?${url.searchParams}`)
+        return json({ success: true, data: { items: ingestEvents } })
+      }
+      return null
+    })
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: `成果地点「${name}」の操作` }))
+    await flush()
+    fireEvent.click(screen.getByRole('menuitem', { name: '成果地点の詳細を見る' }))
+    await flush()
+    return screen.getByRole('dialog', { name })
+  }
+
+  it('成果1件ずつの状態と金額なしを業務の言葉で出す', async () => {
+    const dialog = await openDetail('商品を買った')
+    expect(eventPaths).toContain('/api/conversions/definitions/cp-1/events?limit=10')
+    const rows = Array.from(dialog.querySelectorAll('li'), (row) => row.textContent ?? '')
+    expect(rows.find((row) => row.includes('佐藤'))).toContain('確定')
+    expect(rows.find((row) => row.includes('鈴木'))).toContain('確認待ち')
+    expect(rows.find((row) => row.includes('鈴木'))).toContain('金額なし')
+    expect(rows.find((row) => row.includes('高橋'))).toContain('却下')
+    expect(rows.find((row) => row.includes('田中'))).toContain('取消')
+  })
+
+  it('外部受信の失敗理由は訳して出し、検証の受信は実績と分けて名乗る', async () => {
+    const dialog = await openDetail('商品を買った')
+    expect(eventPaths).toContain('/api/conversions/definitions/cp-1/ingest-events?limit=5')
+    const text = dialog.textContent ?? ''
+    expect(text).toContain('受け取れなかった（署名が一致しませんでした。連携先の鍵を確認してください）')
+    expect(text).toContain('受け取れなかった（送信側のイベントIDが無いため、重複かどうかを判定できませんでした）')
+    expect(text).toContain('検証の受信（実績には数えません）')
+    expect(text).toContain('検証の受信（受け取れなかった）（署名のない送信でした）')
+    expect(text).not.toContain('signature_mismatch')
+  })
+
+  it.each([[false, '通信の失敗'], ['soft', '失敗の返事']] as const)('成果の記録が読めなければ空と言わずに失敗を出す（%s・%s）', async (mode) => {
+    const dialog = await openDetail('商品を買った', mode)
+    expect(dialog.textContent).toContain('成果の記録を読み込めませんでした')
+    expect(dialog.textContent).not.toContain('まだ成果がありません')
+  })
+
+  it('対象・金額・数えない条件・数え方を対応表と同じ言葉で出す', async () => {
+    const dialog = await openDetail('資料をダウンロードした')
+    const term = (label: string) => Array.from(dialog.querySelectorAll('dt')).find((dt) => dt.textContent?.trim() === label)?.nextElementSibling?.textContent
+    expect(term('何が起きたら数えるか')).toBe('サイトの「https://example.com/dl」に到達')
+    expect(term('対象')).toBe(originInfoOf('url_reach').target)
+    expect(term('金額')).toBe('金額を集計しない')
+    expect(term('数えない条件')).toBe('除外なし')
+    expect(term('数え方')).toBe('1人1回だけ')
+  })
+})
+
+describe('V8 コンバージョンの一覧：編集の窓', () => {
+  it('起点を確かめられ、数え方の選択肢は一覧・詳細と同じ呼び名を使う', async () => {
+    await act(async () => { root.render(<ConversionListV8 accountId="account-a" editId="cp-1" />) })
+    await flush()
+    expect(host.textContent).toContain('起点：EC連携の「注文が確定」／すべての注文。')
+    fireEvent.click(screen.getByRole('button', { name: '同じ人を何回数えるか' }))
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['何回でも数える', '1人1回だけ', '決めた日数に1回まで'])
   })
 })

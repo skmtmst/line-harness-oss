@@ -138,6 +138,22 @@ describe('運用履歴の期間集計(N-454)', () => {
     expect(screen.queryByText('理由-old')).toBeNull()
   })
 
+  it('同じ応答に混ざる配備の記録は、止めた・戻した記録と回数に入れない', async () => {
+    historyFixture.data = [
+      incident('stop', 3, 10),
+      { ...incident('deploy', 2), historyKind: 'deployment', reason: '理由-deploy' },
+    ]
+    render(<HistoryPanel />)
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '履歴のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '止めた・戻した記録を見る' }))
+    const dialog = await screen.findByRole('dialog', { name: '止めた・戻した記録' })
+    await flush()
+    expect(within(dialog).getByText('理由-stop')).toBeTruthy()
+    expect(within(dialog).queryByText('理由-deploy')).toBeNull()
+    expect(summaryCard('止めた回数').getByText('1回')).toBeTruthy()
+  })
+
   it('30日ちょうどの境界は30日側へ含める', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(Date.now())
     historyFixture.data = [
@@ -177,7 +193,7 @@ describe('運用履歴の期間集計(N-454)', () => {
     fireEvent.click(screen.getByRole('button', { name: '履歴のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '止めた・戻した記録を見る' }))
     const dialog = await screen.findByRole('dialog', { name: '止めた・戻した記録' }); await flush()
-    expect(within(dialog).getByText(/日付を読み取れない記録が1件/)).toBeTruthy()
+    expect(within(dialog).getByText('日付を読み取れない記録が1件あります。期間の絞り込みから外しています。')).toBeTruthy()
     expect(within(dialog).getByText('理由-valid')).toBeTruthy()
     expect(within(dialog).queryByText('理由-invalid')).toBeNull()
     expect(summaryCard('止めた回数').getByText('1回')).toBeTruthy()

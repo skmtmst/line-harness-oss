@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import RegisterV8 from '@/v8/account-new/register'
 import { allV8RowsPassed, toV8CheckRows } from '@/v8/account-new/logic'
 import type { LineAccountConnectData } from '@/lib/api'
@@ -185,6 +185,21 @@ describe('V8 登録ウィザードの gated 進行', () => {
     await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
     next()
     await waitFor(() => expect(current()).toContain('使い方を選ぶ'))
+  })
+
+  it('登録までは済んだ段を押して戻れ、入れた値は残る。登録したら戻れない', async () => {
+    enterCheckStep()
+    const nav = () => screen.getByRole('navigation', { name: '登録の進捗' })
+    fireEvent.click(within(nav()).getByRole('button', { name: 'アカウント接続に戻る' }))
+    expect(nav().querySelector('[aria-current="step"]')?.textContent).toContain('アカウント接続')
+    expect((document.getElementById('v8-channel-id') as HTMLInputElement).value).toBe('123456789')
+    nextStep()
+    nextStep()
+    nextStep()
+    await runCheck()
+    fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+    await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
+    expect(within(nav()).queryByRole('button', { name: 'アカウント接続に戻る' })).toBeNull()
   })
 
   it('友だち人数があっても今回の受信が未確認なら次へ進めない', async () => {

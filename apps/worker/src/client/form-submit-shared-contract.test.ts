@@ -12,35 +12,29 @@ const WEBINAR = read('webinar', 'main.tsx');
 const LIFF = read('..', '..', '..', 'liff', 'src', 'lib', 'api.ts');
 
 /**
- * フォーム回答の3経路が共有の送信ヘッダを使い、Idempotency-Key の渡し忘れを検出する。fetch 自体は禁止せず、送信契約を確かめる。
+ * フォーム回答の3経路が送信ヘッダを直に組み立てた旧形へ戻らないことを見張る。
+ *
+ * 3経路とも Idempotency-Key を実際に載せることは、送信して fetch へ渡ったヘッダで見る：
+ * 内蔵フォーム＝form-submit-key.test.ts、webinar＝webinar/form-sheet-submit-key.test.ts、
+ * LIFF＝apps/liff/src/lib/form-api-contract.test.ts（UUID でないキーを送る前に止めることも）。
+ * キーを branded 型の必須引数で受けることは型検査が守る。
  */
-describe('フォーム回答3経路は共有ヘッダ関数を通す(#729)', () => {
-  it('内蔵フォームは buildFormSubmitHeaders を使い、直組み立てをしない', () => {
-    expect(EMBEDDED).toContain('buildFormSubmitHeaders');
+describe('フォーム回答3経路は送信ヘッダを直に組み立てない', () => {
+  it('内蔵フォームは Idempotency-Key を直に書かない', () => {
     expect(EMBEDDED).not.toMatch(/headers:\s*\{\s*'Idempotency-Key'/);
   });
 
-  it('webinar は buildFormSubmitHeaders を使い、直組み立てをしない', () => {
-    expect(WEBINAR).toContain('buildFormSubmitHeaders');
+  it('webinar は回答送信の旧行へ戻らない', () => {
     // 予約系の別関数にも同形があるため、回答送信の旧行だけを指す。
     expect(WEBINAR).not.toContain(
       "headers: buildAuthHeaders(ctx, { 'Content-Type': 'application/json', 'Idempotency-Key': key })",
     );
   });
 
-  it('LIFF は buildFormSubmitHeaders を使い、直組み立てをしない', () => {
-    expect(LIFF).toContain('buildFormSubmitHeaders');
+  it('LIFF は回答送信の旧行へ戻らない', () => {
     // 予約系の別経路にも同名ヘッダがあるため、回答送信の旧行だけを指す。
     expect(LIFF).not.toContain(
       "headers: authHeaders({ 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey })",
     );
-  });
-
-  it('3経路ともキーは branded 型で受け、空・非UUIDを通さない', () => {
-    expect(EMBEDDED).toContain('key: FormIdempotencyKey');
-    expect(WEBINAR).toContain('key: FormIdempotencyKey');
-    // LIFF の呼び出し側(Form.tsx)は所有パス外のため、submitForm の境界で
-    // UUID 検証を通す形に留める。付け忘れは必須第3引数のまま型で落ちる。
-    expect(LIFF).toContain('toFormIdempotencyKey(idempotencyKey)');
   });
 });

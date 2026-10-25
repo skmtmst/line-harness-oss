@@ -1,12 +1,13 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { jstCalendar as japanCalendar, type LineTokenRefreshFailureReason } from '@line-crm/shared';
 import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 /** LINE の client_credentials で有効期限30日のトークンを発行する。5分の cron ごとに、期限まで7日以内か期限不明のアカウントだけを更新し、失効前に交換する。 */
 
 import { getLineAccounts, updateLineAccount, updateLineAccountFields } from '@line-crm/db';
 import type { LineAccount } from '@line-crm/db';
 import { fetchBotProfile } from '../lib/bot-profile.js';
+import { LINE_TOKEN_REFRESH_WINDOW_MS, recordLineTokenRefreshFailure } from './line-token-notices.js';
 
-const REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60_000; // 7 days
+const REFRESH_THRESHOLD_MS = LINE_TOKEN_REFRESH_WINDOW_MS; // 7 days
 
 function jstNow(): string {
   const jst = japanCalendar();
@@ -113,7 +114,19 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
 
         logger.log("services_token_refresh_log");
       } catch (err) {
-        logger.error("token_refresh.refresh_line_access_tokens_failed");
+        const reason: LineTokenRefreshFailureReason = err instanceof LineTokenIssueError ? err.reason : 'unexpected';
+        // ログは固定のイベント名と状態番号だけ。理由は知らせの記録に残す。
+        logger.error(reason === 'credentials'
+          ? 'token_refresh.refresh_failed.credentials'
+          : 'token_refresh.refresh_failed', {
+          status: err instanceof LineTokenIssueError ? err.status ?? undefined : undefined,
+        });
+        // 自動で直らない失敗だけを知らせに残す。書けなくても取り替えとプロフィールの同期は続ける。
+        try {
+          await recordLineTokenRefreshFailure(db, account, reason);
+        } catch {
+          logger.error("token_refresh.failure_notice_failed");
+        }
       }
     }
 

@@ -35,7 +35,7 @@ vi.mock('@/lib/session-snapshot', () => ({ readSessionSnapshot: () => ({ imperso
 import AccountDetailV8 from './detail'
 import { CredentialsDialog } from './dialogs'
 import AccountHandoverV8 from './handover'
-import { credentialLine, summaryLine, type AccountDetailView } from './view'
+import { credentialLine, shortDateTime, summaryLine, type AccountDetailView } from './view'
 import { countsLine, handoverPill, totalsMatch } from './handover-view'
 
 /** 欄の読み上げにつながる誤りの文（共通の Field が欄の下に出す）。 */
@@ -312,6 +312,69 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     await settle()
     expect(sent.find((s) => s.url.includes('/auth/step-up'))?.body).toMatchObject({ code: '123456', purpose: 'line_account.archive' })
     expect(sent.find((s) => s.url.endsWith('/archive'))?.stepUp).toBe('grant-1')
+  })
+})
+
+describe('LINEアカウントの詳細の状態ごとの出し分け（V8 ihjfd）', () => {
+  const renderDetail = async () => {
+    await act(async () => root.render(<AccountDetailV8 />))
+    await settle()
+  }
+
+  it('?id= で選んだアカウントを読み、資格情報と Webhook の見出しへ飛べる', async () => {
+    search = 'id=acc-2'
+    await renderDetail()
+    expect(document.body.textContent).toContain('@nen-honten')
+    const credentials = document.getElementById('acd-credentials')
+    expect(credentials?.textContent).toBe('資格情報')
+    expect(host.querySelector('[aria-labelledby="acd-credentials"]')).toBeTruthy()
+    expect(document.getElementById('acd-webhook')?.textContent).toContain('Webhookの利用')
+  })
+
+  it('?id= なしで開くと、読み込みのままにせず一覧へ戻す口を出す', async () => {
+    search = ''
+    await renderDetail()
+    expect(document.body.textContent).toContain('見るアカウントが指定されていません')
+    expect(host.querySelector('a[href="/accounts"]')).toBeTruthy()
+  })
+
+  it('資格情報は値を出さず、登録・最後の確認だけを言う', async () => {
+    account = { ...ACCOUNT, connection: { lastTestAt: '2026-10-01T21:00:00.000Z', lastTestStatus: 'ok', lastReceivedAt: '2026-10-02T03:04:00.000Z' } }
+    await renderDetail()
+    expect(document.body.textContent).toContain('秘密値そのものは表示しません')
+    expect(document.body.textContent).toContain(`登録済み・最後の確認 ${shortDateTime('2026-10-01T21:00:00.000Z')}`)
+    expect(document.body.textContent).toContain(`最後の受信 ${shortDateTime('2026-10-02T03:04:00.000Z')}`)
+    expect(document.body.textContent).toContain('LINE側に登録したURL')
+  })
+
+  it('止める前に、何が止まって何が残るかを窓と注意で読ませる', async () => {
+    await renderDetail()
+    expect(document.body.textContent).toContain('停止しても、友だちと履歴は消えません')
+    await click(buttons('送受信を止める')[0])
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(dialog?.textContent).toContain('予約した配信は送られません')
+    const label = [...(dialog?.querySelectorAll('label') ?? [])].find((el) => el.textContent?.startsWith('止める理由'))
+    expect(label?.parentElement?.querySelector('[data-required-badge]'), '止める理由は必須の札つき').toBeTruthy()
+  })
+
+  it('止まっているアカウントは「再開する」になり、理由を必須にして自動で送り直さないと言う', async () => {
+    account = { ...ACCOUNT, isActive: false }
+    await renderDetail()
+    expect(buttons('送受信を止める')).toHaveLength(0)
+    await click(buttons('送受信を再開する')[0])
+    const dialog = document.querySelector('[role="dialog"]')
+    const label = [...(dialog?.querySelectorAll('label') ?? [])].find((el) => el.textContent?.startsWith('再開する理由'))
+    expect(label?.parentElement?.querySelector('[data-required-badge]'), '再開する理由は必須の札つき').toBeTruthy()
+    expect(dialog?.textContent).toContain('自動で送り直しません')
+  })
+
+  it('アーカイブ済みは「アーカイブから戻す」だけを出し、押すと戻す窓を開く', async () => {
+    account = { ...ACCOUNT, isActive: false, archivedAt: '2026-10-01T00:00:00.000Z' }
+    await renderDetail()
+    expect(buttons('送受信を再開する')).toHaveLength(0)
+    expect(buttons('アーカイブする')).toHaveLength(0)
+    await click(buttons('アーカイブから戻す')[0])
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('アーカイブから戻す')
   })
 })
 
