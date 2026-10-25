@@ -31,6 +31,7 @@ export * from "./booking-staff";
 export * from "./staff-permissions";
 export * from "./menu-catalog";
 export * from "./dashboard-cards";
+export * from "./kpi-comparison";
 export * from "./saved-search-conditions";
 export * from "./form-list-summary";
 export * from "./google-sheets";
