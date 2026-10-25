@@ -896,3 +896,11 @@ it('追加メニューは空き枠検索と選択時の終了時刻に含まれ�
   await waitFor(() => expect(availability).toHaveBeenCalledWith('m1', 's1', expect.any(String), expect.any(String), ['extra']));
   expect(await screen.findByText(/10:00〜11:30/)).toBeTruthy();
 });
+
+it('選んでいる日を見える位置へ寄せ、時刻選択後に確認の操作を出す', async () => {
+  const scroll = vi.fn();
+  vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(scroll);
+  render(<DateTimePicker menu={MENU} staff={STAFF} selected={null} onSelect={() => {}} onConfirm={() => {}} onBackToStaff={() => {}} />);
+  await screen.findByRole('button', { name: /10:00/ });
+  await waitFor(() => expect(scroll).toHaveBeenCalledWith({ inline: 'center', block: 'nearest' }));
+});

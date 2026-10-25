@@ -1,0 +1,122 @@
+// @vitest-environment happy-dom
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import EventConfirm from './event-confirm.js';
+import { api } from '../lib/api.js';
+
+vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));
+vi.mock('../lib/api.js', () => ({ api: {
+  getEvent: vi.fn(), getEventSlots: vi.fn(), createEventBooking: vi.fn(),
+  customerLook: vi.fn().mockResolvedValue({ success: true, data: { settings: {} } }), liffConfig: vi.fn().mockResolvedValue({ data: {} }),
+} }));
+vi.mock('../lib/user-message.js', async original => ({ ...await original<typeof import('../lib/user-message.js')>(), logFailure: vi.fn() }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+const detail = { id: 'event', name: '交流会', requires_approval: 1, cancel_deadline_hours_before: 24 };
+const slot = { id: 'slot', starts_at: '2099-10-20T01:00:00Z', ends_at: '2099-10-20T02:00:00Z' };
+beforeEach(() => {
+  vi.mocked(api.getEvent).mockResolvedValue(detail as Awaited<ReturnType<typeof api.getEvent>>);
+  vi.mocked(api.getEventSlots).mockResolvedValue({ items: [slot] } as Awaited<ReturnType<typeof api.getEventSlots>>);
+});
+function Destination() { const location = useLocation(); return <p data-testid="destination">{location.pathname + location.search}</p>; }
+function open() {
+  render(<MemoryRouter initialEntries={['/events/event/confirm?slotId=slot&liffId=account']}><Routes>
+    <Route path="/events/:id/confirm" element={<EventConfirm />} />
+    <Route path="/events/:id/done" element={<Destination />} />
+  </Routes></MemoryRouter>);
+}
+
+const ROOT = join(import.meta.dirname, '..');
+
+function src(...parts: string[]): string {
+  return readFileSync(join(ROOT, ...parts), 'utf8');
+}
+
+const event = src('pages', 'event.tsx');
+const confirm = src('pages', 'event-confirm.tsx');
+const done = src('pages', 'event-done.tsx');
+const bookings = src('pages', 'event-bookings.tsx');
+const offer = src('pages', 'event-waitlist-offer.tsx');
+const EVENT_FILES = [event, confirm, done, bookings, offer];
+
+describe('素の Tailwind 色・16進数・絵文字が無い', () => {
+  it('5画面のどこにも無い', () => {
+    for (const text of EVENT_FILES) {
+      expect(text).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+      for (const banned of [
+        'bg-green-',
+        'text-green-',
+        'bg-blue-',
+        'text-blue-',
+        'bg-gray-',
+        'text-gray-',
+        'border-gray-',
+        'bg-red-',
+        'text-red-',
+        '#06c755',
+        '#0b63ce',
+        '📍',
+        '📅',
+        '⏳',
+        '✅',
+      ]) {
+        expect(text).not.toContain(banned);
+      }
+    }
+  });
+});
+
+
+it.each([false, true])('申込結果の待ち=%sに従う行き先へ、同じ枠とアカウントを引き継ぐ', async waitlisted => {
+  vi.mocked(api.createEventBooking).mockResolvedValue(waitlisted ? { waitlisted: true, slot_id: 'slot' } : { id: 'booking', status: 'requested' } as Awaited<ReturnType<typeof api.createEventBooking>>);
+  open();
+  await screen.findByRole('button', { name: '申し込む' });
+  expect(screen.getByText(/受付後、ご利用先の確認をお待ちください。キャンセルは/).textContent).toContain('10月19日 10:00');
+  expect(screen.getAllByRole('button', { name: '申し込む' })).toHaveLength(1);
+  fireEvent.click(screen.getByRole('button', { name: '申し込む' }));
+  const target = new URL((await screen.findByTestId('destination')).textContent!, 'https://example.test');
+  expect(target.pathname).toBe('/events/event/done');
+  expect(target.searchParams.get('status')).toBe(waitlisted ? 'waitlisted' : 'requested');
+  expect(target.searchParams.get('liffId')).toBe('account');
+  expect(target.searchParams.get('waitSlot')).toBe(waitlisted ? 'slot' : null);
+  expect(api.createEventBooking).toHaveBeenCalledWith('event', { slot_id: 'slot', customer_note: null }, expect.any(String));
+});
+
+it('読込中と失敗時は申込を隠し、読み直して回復する', async () => {
+  vi.mocked(api.getEvent).mockRejectedValueOnce(new Error('offline'));
+  open();
+  expect(screen.queryByRole('button', { name: '申し込む' })).toBeNull();
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }));
+  expect(await screen.findByRole('button', { name: '申し込む' })).toBeTruthy();
+});
+
+it('送信中は連打できず、失敗しても備考を残し同じ鍵で再試行する', async () => {
+  let reject!: (error: unknown) => void;
+  vi.mocked(api.createEventBooking).mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; })).mockResolvedValueOnce({ id: 'booking', status: 'confirmed' });
+  open();
+  fireEvent.change(await screen.findByRole('textbox', { name: '備考' }), { target: { value: '連絡事項' } });
+  const send = screen.getByRole('button', { name: '申し込む' });
+  fireEvent.click(send); fireEvent.click(send);
+  expect(api.createEventBooking).toHaveBeenCalledTimes(1);
+  expect((send as HTMLButtonElement).disabled).toBe(true);
+  reject({ body: { error: 'slot_full' } });
+  expect(await screen.findByRole('alert')).toBeTruthy();
+  expect(screen.getByDisplayValue('連絡事項')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: '申し込む' }));
+  await waitFor(() => expect(api.createEventBooking).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(api.createEventBooking).mock.calls[0][2]).toBe(vi.mocked(api.createEventBooking).mock.calls[1][2]);
+});
+
+it('イベント画面の禁止の見張りを保つ', () => {
+  expect(event).not.toContain('/confirm?slotId=${s.id}');
+  expect(confirm).not.toContain('予約をリクエスト');
+  expect(confirm).not.toContain('>戻る<');
+  expect(bookings).not.toContain('過去');
+  expect(done).not.toContain('LoadingView');
+  expect(offer).not.toContain('LoadingView');
+  expect(confirm).not.toContain('bg-info-bg');
+  expect(confirm).not.toContain('bg-yellow');
+  expect(event).not.toContain('text-danger');
+});
