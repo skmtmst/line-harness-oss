@@ -111,7 +111,7 @@ const NON_PAGE_PREFIXES = [
 const ROUTES = listRoutes();
 const ROUTE_SET = new Set(ROUTES);
 
-describe('画面の一覧', () => {
+describe('静的に書き出す画面の住所と必要な入口を維持する', () => {
   it('動的セグメントの画面が無い（静的書き出しでは書き出せない）', () => {
     // [id] のような画面はビルド時に全IDが分からないと書き出せない。
     // 詳細画面はクエリ（?id=）で表す。
@@ -189,7 +189,7 @@ describe('画面の一覧', () => {
   });
 });
 
-describe('行き止まり', () => {
+describe('画面に存在しない住所へのリンクを入れない', () => {
   it('画面から出ているリンクの行き先がすべて実在する', () => {
     const broken: string[] = [];
     for (const { file, target } of collectInternalLinks()) {
@@ -206,7 +206,7 @@ describe('行き止まり', () => {
   });
 });
 
-describe('旧ルートのリダイレクト', () => {
+describe('旧住所の転送とクエリを扱う専用の入口を維持する', () => {
   const legacy = [
     ['/duplicates', '/friends'],
     ['/users', '/friends'],

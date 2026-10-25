@@ -761,5 +761,6 @@
 - [予約の LIFF のやり取りの形をそろえる](release-log/unreleased/1817-kenta-liff-booking-response.md)
 - [LIFF の自動点検の書き換え](release-log/unreleased/1820-kenta-liff-behavior-tests.md)
 - [古い見た目の切り替えの片づけ](release-log/unreleased/1818-kenta-remove-v7-leftovers.md)
+- [見た目の自動点検の整理](release-log/unreleased/1819-kenta-q02d-tests.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

@@ -102,7 +102,7 @@ describe('統括の配布画面への入口', () => {
     expect(page.queryByText('まだ使えません')).toBeNull()
   })
 
-  it('旧テーマの機能停止と代替ページを戻さない', () => {
+  it('統括の配布機能を停止するフラグと代替ページを戻さない', () => {
     const here = dirname(fileURLToPath(import.meta.url))
     const sidebar = readFileSync(join(here, '../../components/layout/sidebar.tsx'), 'utf8')
     const form = readFileSync(join(here, 'form-submissions/page.tsx'), 'utf8')
