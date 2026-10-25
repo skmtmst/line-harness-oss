@@ -2,7 +2,8 @@
 /*
  * ★V8 上の帯のベルの小窓（V8.pen DIHFx/D2eAyQ・小窓 mV28V・オーナー 2026-10-07）。
  *
- *   - ベルを押すと、ページを移らずに小窓（role=dialog「お知らせ」）が開く。もう一度押すと閉じる
+ *   - ベルを押すと、ページを移らずに小窓（role=dialog「通知」）が開く。もう一度押すと閉じる
+ *   - タブは「すべて・未読・システム」。未読は口の unread=1、システムは category=error で読む
  *   - Esc で閉じ、焦点はベルへ戻る。小窓の外を押しても閉じる。小窓の中を押しても閉じない
  *   - 一覧は最大5件・未読が先。行を押すと既読にして行き先へ移る
  *   - すべて既読は押した瞬間に反映し、失敗したら戻す
@@ -22,7 +23,7 @@ const fixture = vi.hoisted(() => ({
   markAllRead: vi.fn(),
   toast: vi.fn(),
 }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...(await original<object>()), useStaffRole: () => fixture.role }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: fixture.push }), usePathname: () => '/' }))
 vi.mock('next/link', async () => {
@@ -90,7 +91,7 @@ const bell = () => screen.getByRole('button', { name: /^通知(（未読 \d+ 件
 
 async function openPopover() {
   await act(async () => { fireEvent.click(bell()) })
-  return screen.findByRole('dialog', { name: 'お知らせ' })
+  return screen.findByRole('dialog', { name: '通知' })
 }
 
 describe('★V8 ベルの小窓', () => {
@@ -143,7 +144,7 @@ describe('★V8 ベルの小窓', () => {
     expect(bell().getAttribute('aria-controls')).toBe(dialog.id)
     expect(fixture.push).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(bell()) })
-    expect(screen.queryByRole('dialog', { name: 'お知らせ' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '通知' })).toBeNull()
     expect(bell().getAttribute('aria-expanded')).toBe('false')
   })
 
@@ -151,7 +152,7 @@ describe('★V8 ベルの小窓', () => {
     render(<Harness />)
     await openPopover()
     await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
-    expect(screen.queryByRole('dialog', { name: 'お知らせ' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '通知' })).toBeNull()
     expect(document.activeElement).toBe(bell())
   })
 
@@ -165,10 +166,10 @@ describe('★V8 ベルの小窓', () => {
   it('小窓の外を押すと閉じ、中を押しても閉じない', async () => {
     render(<Harness />)
     const dialog = await openPopover()
-    await act(async () => { fireEvent.pointerDown(within(dialog).getByText('お知らせ', { selector: 'h2' })) })
-    expect(screen.getByRole('dialog', { name: 'お知らせ' })).toBeTruthy()
+    await act(async () => { fireEvent.pointerDown(within(dialog).getByText('通知', { selector: 'h2' })) })
+    expect(screen.getByRole('dialog', { name: '通知' })).toBeTruthy()
     await act(async () => { fireEvent.pointerDown(document.body) })
-    expect(screen.queryByRole('dialog', { name: 'お知らせ' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '通知' })).toBeNull()
   })
 
   it('最大5件・未読が先（新しい順のまま）。未読の数を頭に出す', async () => {
@@ -180,15 +181,52 @@ describe('★V8 ベルの小窓', () => {
     expect(rows.map((row) => row.getAttribute('data-unread'))).toEqual(['true', 'true', 'true', 'false', 'false'])
     expect(rows[0].textContent).toContain('未読のエラー')
     expect(rows[2].textContent).toContain('EC連携を開く →')
-    expect(fixture.list).toHaveBeenCalledWith('account-1', { category: 'all', limit: 50 })
+    expect(fixture.list).toHaveBeenCalledWith('account-1', { limit: 50 })
   })
 
-  it('分類を変えると、その分類で読み直す', async () => {
+  it('タブは「すべて・未読・システム」。アップデートのタブは無い', async () => {
     render(<Harness />)
     const dialog = await openPopover()
     await within(dialog).findByText('未読 3')
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'エラー' })) })
+    const tabs = within(dialog).getByRole('group', { name: '通知の種類' })
+    expect(within(tabs).getAllByRole('button').map((button) => button.textContent)).toEqual(['すべて', '未読', 'システム'])
+    expect(within(dialog).queryByRole('button', { name: 'アップデート' })).toBeNull()
+  })
+
+  it('未読のタブは口で未読だけに絞って読む（先頭5件に切っても6件目より後ろの未読が埋もれない）', async () => {
+    render(<Harness />)
+    const dialog = await openPopover()
+    await within(dialog).findByText('未読 3')
+    const buried = [1, 2, 3, 4, 5, 6].map((n) => item(`old-unread-${n}`, { title: `古い未読 ${n}`, createdAt: `2026-09-0${n}T00:00:00.000Z` }))
+    fixture.list.mockImplementation(async (_account: string, query: { unread?: boolean }) => centerData(query.unread ? buried.slice(4) : []))
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '未読' })) })
+    await waitFor(() => expect(fixture.list).toHaveBeenLastCalledWith('account-1', { unread: true, limit: 50 }))
+    expect(await within(dialog).findByText('古い未読 6')).toBeTruthy()
+  })
+
+  it('システムのタブは運用の異常（category=error）で読み直す', async () => {
+    render(<Harness />)
+    const dialog = await openPopover()
+    await within(dialog).findByText('未読 3')
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'システム' })) })
     await waitFor(() => expect(fixture.list).toHaveBeenLastCalledWith('account-1', { category: 'error', limit: 50 }))
+  })
+
+  it.each([
+    ['owner', '更新する →'],
+    ['admin', '更新する →'],
+    ['staff', 'アカウントを見る →'],
+    ['viewer', 'アカウントを見る →'],
+    [null, 'アカウントを見る →'],
+  ])('LINE の鍵の知らせは、そのアカウントの設定へ。権限 %s の行の言葉は %s', async (role, label) => {
+    fixture.role = role
+    fixture.list.mockResolvedValue(centerData([item('token', { eventType: 'line_token_expiring', title: 'LINEの鍵があと6日で切れます' })]))
+    render(<Harness />)
+    const dialog = await openPopover()
+    const row = await within(dialog).findByRole('button', { name: /LINEの鍵があと6日で切れます/ })
+    expect(row.textContent).toContain(label)
+    await act(async () => { fireEvent.click(row) })
+    expect(fixture.push).toHaveBeenCalledWith('/accounts/detail?id=account-1')
   })
 
   it('日本時間の今日とそれより前に分け、各組の中では未読を先にする', async () => {
@@ -227,7 +265,7 @@ describe('★V8 ベルの小窓', () => {
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /EC連携が止まった/ })) })
     expect(fixture.markRead).toHaveBeenCalledWith('u3', 'account-1')
     expect(fixture.push).toHaveBeenCalledWith('/ec-commerce')
-    expect(screen.queryByRole('dialog', { name: 'お知らせ' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '通知' })).toBeNull()
     expect(bell().getAttribute('aria-label')).toBe('通知（未読 2 件）')
   })
 
@@ -246,19 +284,19 @@ describe('★V8 ベルの小窓', () => {
     expect(fixture.toast).toHaveBeenCalled()
   })
 
-  it('すべて見るは小窓を閉じてお知らせの画面へ。下に押すものは「すべて見る」1つだけ（歯車は置かない）', async () => {
+  it('すべて見るは小窓を閉じて通知の画面へ。下に押すものは「すべて見る」1つだけ（歯車は置かない）', async () => {
     render(<Harness />)
     const dialog = await openPopover()
     expect(within(dialog).queryByRole('button', { name: '通知設定' })).toBeNull()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'すべて見る →' })) })
     expect(fixture.push).toHaveBeenLastCalledWith('/notifications')
-    expect(screen.queryByRole('dialog', { name: 'お知らせ' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '通知' })).toBeNull()
   })
 
   it('店を選んでいないとき（統括）は読まずに案内だけ', async () => {
     render(<Harness accountId={null} />)
     const dialog = await openPopover()
-    expect(within(dialog).getByText('LINEアカウントを選ぶと、そのアカウントのお知らせが出ます。')).toBeTruthy()
+    expect(within(dialog).getByText('LINEアカウントを選ぶと、そのアカウントの通知が出ます。')).toBeTruthy()
     expect(fixture.list).not.toHaveBeenCalled()
     expect(within(dialog).getByRole('button', { name: 'すべて見る →' })).toBeTruthy()
   })

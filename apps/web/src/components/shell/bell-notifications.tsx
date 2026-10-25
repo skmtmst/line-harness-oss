@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
-import BellPopover, { type BellFilter, type BellItem, type BellPopoverState } from '@/components/shared/bell-popover'
+import { BellPanel, isSystemNotification, notificationQueryForTab, type BellPanelItem, type BellPanelState, type NotificationTab } from '@/v8/notifications/public/bell/index'
 import type { TopBarNotificationsPopover } from '@/components/shared/top-bar'
 import { isDashboardNotificationData } from '@/components/dashboard/notification-summary'
 import { notificationDestination, notificationLinkLabel } from '@/v8/notifications/public/destination/index'
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import { formatRelative, formatYmd } from '@/lib/format'
 import { runOptimistic } from '@/lib/undoable'
-import { useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 
 /** 小窓に出す最大の件数（絵 mV28V）。 */
 export const BELL_POPOVER_LIMIT = 5
@@ -23,10 +23,11 @@ export function bellOrder(items: NotificationCenterItem[]): NotificationCenterIt
 }
 
 /**
- * ★V8 ベルの小窓の中身（取得・既読・行き先）。見た目は `shared/bell-popover.tsx`。
+ * ★V8 ベルの小窓の中身（取得・既読・行き先）。見た目は `v8/notifications/bell-panel.tsx`。
  *
  * 通知の一覧（`v8/notifications/list.tsx`）と同じ口・同じ判定を使う：
  *   一覧 `api.notifications.center.list`・既読 `markRead`・まとめて既読 `markAllRead`
+ *   タブ「すべて・未読・システム」（未読は口の unread=1、システムは category=error）
  *   行き先 `notificationDestination`（ダッシュボードの通知パネルと同じ判定＋EC連携）。
  * 既読は押した瞬間に反映し、失敗したら戻して「もう一度」の知らせ（runOptimistic）。
  * 未読の数が変わったら onUnreadChange でベルの赤い札へ返す。
@@ -44,10 +45,11 @@ export default function BellNotifications({
   const router = useRouter()
   const role = useStaffRole()
   const canMarkRead = role === 'owner' || role === 'admin' || role === 'staff'
+  const destinationContext = { accountId, canManage: canManageRole(role) }
   const { open, onClose } = popover
-  const [filter, setFilter] = useState<BellFilter>('all')
+  const [tab, setTab] = useState<NotificationTab>('all')
   const [data, setData] = useState<NotificationCenterData | null>(null)
-  const [state, setState] = useState<BellPopoverState>('loading')
+  const [state, setState] = useState<BellPanelState>('loading')
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null)
   const requestId = useRef(0)
   const unreadRef = useRef(onUnreadChange)
@@ -64,7 +66,7 @@ export default function BellNotifications({
     setError(null)
     try {
       const { api } = await import('@/lib/api')
-      const response = await api.notifications.center.list(accountId, { category: filter, limit: FETCH_LIMIT })
+      const response = await api.notifications.center.list(accountId, { ...notificationQueryForTab(tab), limit: FETCH_LIMIT })
       if (id !== requestId.current) return
       if (!response.success) throw new Error(response.error)
       if (!isDashboardNotificationData(response.data)) throw new Error('invalid notification center response')
@@ -74,12 +76,12 @@ export default function BellNotifications({
     } catch (caught) {
       if (id !== requestId.current) return
       setData(null)
-      setError({ message: loadFailureNotice(caught, 'お知らせ'), retryable: loadFailureCopy(caught, 'お知らせ').retryable })
+      setError({ message: loadFailureNotice(caught, '通知'), retryable: loadFailureCopy(caught, '通知').retryable })
       setState('error')
     }
-  }, [accountId, filter])
+  }, [accountId, tab])
 
-  // 開くたび・分類を変えるたびに読み直す（閉じている間は読まない）。
+  // 開くたび・タブを変えるたびに読み直す（閉じている間は読まない）。
   useEffect(() => {
     if (open) void load()
   }, [open, load])
@@ -123,17 +125,17 @@ export default function BellNotifications({
 
   const shown = useMemo(() => (data ? bellOrder(data.items).slice(0, BELL_POPOVER_LIMIT) : []), [data])
   const today = formatYmd(new Date())
-  const items: BellItem[] = shown.map((item) => {
+  const items: BellPanelItem[] = shown.map((item) => {
     const day = formatYmd(item.createdAt)
     return {
       id: item.id,
       title: item.title,
       body: item.body,
-      category: item.category === 'error' ? 'error' : 'update',
+      kind: isSystemNotification(item) ? 'system' : 'other',
       unread: !item.isRead,
       time: formatRelative(item.createdAt, undefined, '日時不明'),
       period: day === '' ? 'unknown' : day === today ? 'today' : 'earlier',
-      linkLabel: notificationLinkLabel(item),
+      linkLabel: notificationLinkLabel(item, destinationContext),
     }
   })
 
@@ -142,11 +144,11 @@ export default function BellNotifications({
     if (!item) return
     markRead(item)
     onClose()
-    router.push(notificationDestination(item))
+    router.push(notificationDestination(item, destinationContext))
   }
 
   return (
-    <BellPopover
+    <BellPanel
       open={open}
       onClose={onClose}
       getAnchor={popover.getAnchor}
@@ -154,8 +156,8 @@ export default function BellNotifications({
       state={state}
       items={items}
       unreadCount={data?.counts.unread ?? 0}
-      filter={filter}
-      onFilterChange={setFilter}
+      tab={tab}
+      onTabChange={setTab}
       errorMessage={error?.message}
       onRetry={error?.retryable ? () => { void load() } : undefined}
       onSelect={select}

@@ -29,6 +29,8 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
+// 既読はオーナー・管理者・担当者だけが付けられる（閲覧のみ・権限が分からない間は付けない）。
+vi.mock('@/lib/staff-role', async (original) => ({ ...(await original<object>()), useStaffRole: () => 'owner' }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
