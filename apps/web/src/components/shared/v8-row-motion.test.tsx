@@ -33,7 +33,7 @@ afterEach(() => cleanup())
 
 describe('④ 表の行の登場と退場', () => {
   it('実際の Tr の退場開始で登場の指定が外れる（登場完了前の削除も含む）', () => {
-    const selectors = rules(globals).filter((rule) => /animation:\s*v8-content-in.*both/.test(rule.body))
+    const selectors = rules(globals).filter((rule) => /animation:\s*v8-content-in/.test(rule.body))
     const screen = (leaving: boolean) => <DataTable><tbody><Tr leaving={leaving}><Td>行</Td></Tr></tbody></DataTable>
     document.documentElement.dataset.theme = 'v8'
     const view = render(screen(false))
@@ -61,6 +61,18 @@ describe('④ 表の行の登場と退場', () => {
     const entering = trRules.filter((r) => /animation:\s*v8-content-in/.test(r.body))
     expect(entering.length).toBe(1)
     expect(entering[0].selector).toContain('tr:not([data-leaving="true"])')
+  })
+
+  it('動きが進まない時も行は見えている（始めの形が透明でない・保持は始めの側だけ）', () => {
+    // 裏のタブや動きを止める道具では、動きが始めの形のまま残る。
+    // そこで透明だと、DOM に行があるのに表は見出しだけに見える。
+    const keyframes = globals.match(/@keyframes v8-content-in \{([\s\S]*?)\n\}/)
+    expect(keyframes, 'v8-content-in の動きが無い').not.toBeNull()
+    expect(keyframes![1]).not.toMatch(/opacity|visibility/)
+    const entering = rules(globals).filter((r) => /tbody[^,{]*>\s*tr/.test(r.selector) && /animation:\s*v8-content-in/.test(r.body))
+    expect(entering.length).toBe(1)
+    expect(entering[0].body).toMatch(/\bbackwards\b/)
+    expect(entering[0].body).not.toMatch(/\b(both|forwards)\b/)
   })
 
   function table(rows: string[]) {
