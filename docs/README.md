@@ -759,5 +759,6 @@
 - [アフィリエイト登録の上書き防止](release-log/unreleased/1815-kenta-affiliate-save-conflict.md)
 - [手動テストの指摘の直し（浮いた部品・すべる切り替え・予約元）](release-log/unreleased/1816-kenta-raised-controls.md)
 - [予約の LIFF のやり取りの形をそろえる](release-log/unreleased/1817-kenta-liff-booking-response.md)
+- [見た目の自動点検の整理](release-log/unreleased/1819-kenta-q02d-tests.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
