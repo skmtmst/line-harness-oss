@@ -25,11 +25,6 @@
 .areaChip[data-unset] { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
 .areaTap { flex: 1 1 0; min-width: 0; }
 .areaNone { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
-.warn {
-  margin: 0; padding: var(--tpl-wa-rich-warn-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft); color: var(--color-ink); font-size: var(--text-caption);
-}
 
 /* 届き方：トークに流れる正方形の画像（幅200・角丸14）。面は見本の線だけ。 */
 .phoneImage {

@@ -23,6 +23,7 @@ Users
 } from 'lucide-react'
 import type { Dispatch,JSX,SetStateAction } from 'react'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
+import Notice from '@/components/shared/notice'
 
 type RenderHqAudienceStepContext = {
   audience: "all" | "tag" | "none" | "targeted"
@@ -79,8 +80,7 @@ export function renderHqAudienceStep({ audience, defaultOpen, host, hqTagName, s
               <SaveErrorField names={["displayTagName","tag"]}><TextInput id="rm-hq-tag" value={hqTagName} onChange={(e) => setHqTagName(e.target.value)} placeholder="例：会員" maxLength={100} /></SaveErrorField>
             </Field>
           ) : null}
-          <div className={styles.infoBand}>
-            <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+          <Notice tone="info" icon={<span><Repeat size={16} aria-hidden /></span>}>
             <span>
               {audience === 'all'
                 ? '「全員」にすると、配った先で既定のメニューとして届きます。LINE に出て、いまの既定のメニューと入れ替わるのは、各アカウントで公開したときです。'
@@ -88,7 +88,7 @@ export function renderHqAudienceStep({ audience, defaultOpen, host, hqTagName, s
                   ? '配った先では、同じ名前のタグが付いた人に出します。タグが無い・同じ名前が複数あるアカウントは、配る前の確認で止まります。'
                   : '配った先では下書きのまま届きます。誰に出すかは、各アカウントで決めます。'}
             </span>
-          </div>
+          </Notice>
         </Card>
         <Card variant="form" gap="normal">
           <SectionHeader title="トークを開いたとき" />
@@ -181,15 +181,14 @@ export function renderAudienceStep({ aggregateOnly, audience, canOperate, condit
           </RadioCardGroup></SaveErrorField>
 
           {audience === 'all' ? (
-            <div className={styles.infoBand}>
-              <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+            <Notice tone="info" icon={<span><Repeat size={16} aria-hidden /></span>}>
               <span>
                 公開すると LINE の既定のメニューになります。
                 {currentDefaultMenu
                   ? `いまの既定「${currentDefaultMenu.name}」と入れ替わります。`
                   : 'いま既定のメニューはありません。'}
               </span>
-            </div>
+            </Notice>
           ) : audience === 'none' ? (
             <p className={styles.cardNote}>このメニューはLINEへの登録だけです。出す相手は一覧の「表示先」で決めてください。</p>
           ) : (
