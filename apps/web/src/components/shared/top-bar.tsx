@@ -239,14 +239,15 @@ export default function TopBar({
                 <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
               </span>
             ))}
-            {title ? <h1 className={styles.crumbCurrent} title={title}>{titleHref ? <Link prefetch={false} href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</h1>
-              : (() => { const last = (crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').at(-1); return last ? <h1 className={styles.crumbCurrent} title={last.label}>{last.href ? <Link prefetch={false} href={last.href} className={styles.crumbCurrentLink}>{last.label}</Link> : last.label}</h1> : null })()}
+            {/* パンくずの今いる所は見出しにしない。画面の題（h1）は本文の頭（PageHeading）が持つ。 */}
+            {title ? <span className={styles.crumbCurrent} title={title} aria-current="page">{titleHref ? <Link prefetch={false} href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</span>
+              : (() => { const last = (crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').at(-1); return last ? <span className={styles.crumbCurrent} title={last.label} aria-current="page">{last.href ? <Link prefetch={false} href={last.href} className={styles.crumbCurrentLink}>{last.label}</Link> : last.label}</span> : null })()}
           </nav>
         </div>
       ) : null}
 
       {!v8Chrome ? <div className={styles.titleGroup}>
-        <h1 className={styles.title} title={title}>{title}</h1>
+        <span className={styles.title} title={title}>{title}</span>
         {manualHref
           ? <Link prefetch={false} href={manualHref} className={styles.manual}><BookIcon /><span>マニュアル</span></Link>
           : null}
