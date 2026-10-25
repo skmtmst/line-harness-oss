@@ -116,13 +116,13 @@ describe('V8 テンプレートの一覧', () => {
     expect(screen.getByText('11か所')).toBeTruthy()
   })
 
-  it('フォルダの数は表と同じテンプレートから数え、「すべて」と食い違わない', async () => {
-    // API の数は全種類（質問など別のタブの物も）を数えるので、そのまま出すと食い違う。
+  it('「すべて」はフォルダと未分類と同じサーバーの数の合計で、食い違わない', async () => {
+    // 今のタブの行数で数えると、全種類を数えるサーバーの「未分類」と食い違う。
     folderList.value = { success: true, data: [{ id: 'f1', name: '予約', color: null, displayOrder: 0, itemCount: 5 }], unfiledCount: 9 }
     listTemplates.mockResolvedValue({ success: true, data: [{ ...used, folderId: 'f1' }, unused, { ...unused, id: 't-question', name: '質問', question: { type: 'single' } }] })
     await renderList()
     const counts = Object.fromEntries([...document.querySelectorAll('[data-part="folder-row"]')].map((row) => [row.getAttribute('title'), row.lastElementChild?.textContent]))
-    expect(counts).toEqual({ すべて: '2', 予約: '1', 未分類: '1' })
+    expect(counts).toEqual({ すべて: '14', 予約: '5', 未分類: '9' })
   })
 
   it('画像は中身の JSON を出さず「画像 1枚」、一度も公開していないものの送信数は「—」', async () => {
