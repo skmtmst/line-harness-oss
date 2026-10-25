@@ -12,9 +12,10 @@
  * - 人数が数えられていない・0 人・権限が無い・代理ログイン中は主ボタンを出さない／押せない。
  */
 import { useRef, useState, type ReactNode } from 'react'
-import { ChevronDown, ChevronRight, Send, ShieldAlert, TriangleAlert } from 'lucide-react'
+import { ChevronDown, ChevronRight, Send, ShieldAlert } from 'lucide-react'
 import ConfirmDialog from './confirm-dialog'
 import Button from './button'
+import Notice from './notice'
 import { Skeleton } from './skeleton'
 import { formatNumber } from '@/lib/format'
 import styles from './send-confirm-dialog.module.css'
@@ -235,15 +236,11 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
         </Row>
         {approval && approvalFields ? <Row label="承認する人">{approvalFields}</Row> : null}
       </dl>
-      <div className={styles.caution} role="note">
-        <TriangleAlert size={16} aria-hidden="true" />
-        <div>
-          <strong>送ったあとは取り消せません。</strong>
-          <p>間違いに気づいたら、送ったあとに［訂正を送る］で正しい内容を送れます。</p>
-          {extraCaution ? <p>{extraCaution}</p> : null}
-          {allRecipients ? <p>全員への配信は、送り始めると途中で止められません。</p> : null}
-        </div>
-      </div>
+      <Notice tone="warn" heading="送ったあとは取り消せません。">
+        <p>間違いに気づいたら、送ったあとに［訂正を送る］で正しい内容を送れます。</p>
+        {extraCaution ? <p>{extraCaution}</p> : null}
+        {allRecipients ? <p>全員への配信は、送り始めると途中で止められません。</p> : null}
+      </Notice>
       {unavailableNote ? <div className={styles.blocked} role="status">{unavailableNote}</div> : null}
       {blockText ? (
         <div className={styles.blocked} role="status"><ShieldAlert size={16} aria-hidden="true" />{blockText}</div>

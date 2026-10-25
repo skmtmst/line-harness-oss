@@ -1,6 +1,6 @@
 'use client'
 
-import type { HTMLAttributes, ReactNode } from 'react'
+import type { ComponentPropsWithRef, HTMLAttributes, ReactNode } from 'react'
 import { Check, CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import styles from './notice.module.css'
@@ -26,12 +26,13 @@ const ICON_BY_TONE: Record<CanonicalTone, typeof CircleCheck> = {
 }
 
 export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
+  ref?: ComponentPropsWithRef<'div'>['ref']
   'data-design-node'?: string
   tone: NoticeTone
   density?: 'compact'
   /** 2行の競合通知。既定の案内帯は変えない。 */
   heading?: ReactNode
-  /** 保存済み・未保存など、説明の下に並べる状態。 */
+  /** 保存の状況など、説明の下に並べる状態。 */
   states?: readonly { label: string; state: 'done' | 'pending' }[]
   /** 区切り線の下の控えめな操作。確認と遷移は呼び出し側が持つ。 */
   footer?: ReactNode
@@ -121,6 +122,7 @@ export default function Notice({
       data-density={density}
       data-presentation={presentation}
       data-action-layout={action ? actionLayout : undefined}
+      data-has-action={!!action || undefined}
       data-marker={marker}
       data-design-node={props['data-design-node'] ?? node}
     >
@@ -130,7 +132,7 @@ export default function Notice({
         <span className={styles.icon} aria-hidden="true">{icon}</span>
       )}
       <div className={styles.message}>
-        {heading ? <><span className={styles.headingRow}><span className={styles.heading}>{heading}</span>{hasHelp ? helpTip : null}</span><div className={styles.description}>{typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}</div></>
+        {heading ? <><div className={styles.headingRow}><div className={styles.heading}>{heading}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}</div></>
           : typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}
         {hasHelp && !heading ? helpTip : null}
         {states?.length ? <NoticeStates items={states} /> : null}

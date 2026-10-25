@@ -146,15 +146,6 @@
   font-weight: 600;
 }
 
-.error {
-  margin: 0 24px 16px;
-  border-radius: var(--radius-control);
-  background: var(--color-status-danger-soft);
-  padding: 10px 12px;
-  color: var(--color-status-danger);
-  font-size: var(--text-caption);
-}
-
 .footer {
   flex: 0 0 auto;
   border-top: 1px solid var(--color-hairline);

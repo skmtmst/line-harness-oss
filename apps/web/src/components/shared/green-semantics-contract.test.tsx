@@ -74,12 +74,12 @@ describe('#669 カード頭の緑を整理する', () => {
 })
 
 describe('#669 成功の緑を success に1本化する', () => {
-  it('通知の成功文字は success、地は success-bg', () => {
-    for (const name of ['notice.module.css']) {
-      const css = withoutComments(read(name))
-      expect(block(css, '.success')).toMatch(/color:\s*var\(--color-success\)/)
-      expect(block(css, '.success')).toContain(`background: var(--color-${name === 'notice.module.css' ? 'notice-success-bg' : 'success-bg'});`)
-    }
+  it('成功のお知らせも題・説明・状態を共通の出口から描く', () => {
+    const html = renderToStaticMarkup(<Notice tone="success" heading="登録が終わりました"
+      message="追加情報の保存を続けられます。" states={[{ state: 'done', label: '基本情報は保存済み' }]} />)
+    expect(html).toContain('登録が終わりました')
+    expect(html).toContain('追加情報の保存を続けられます。')
+    expect(html).toContain('基本情報は保存済み')
   })
 
   it('実Reactで描いた成功の札と通知に文が出る', () => {

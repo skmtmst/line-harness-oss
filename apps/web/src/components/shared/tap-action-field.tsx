@@ -31,6 +31,7 @@ import Select from './select'
 import { TextField } from './text-field'
 import styles from './tap-action-field.module.css'
 import { Field } from './form-controls'
+import Notice from '@/components/shared/notice'
 
 export const TAP_ACTION_ICONS: Record<TapActionKind, LucideIcon> = {
   uri: ExternalLink,
@@ -159,11 +160,12 @@ export default function TapActionField({
     body = null
   } else if (liffMissing) {
     body = (
-      <p className={styles.liffNote} role="note">
-        <Info className={styles.icon} aria-hidden="true" />
-        <span className={styles.liffText}>この動きは LIFF の設定が要ります</span>
+      <Notice tone="info" role="note" icon={<Info aria-hidden="true" />} action={<>
         {readOnly ? null : <Link href={liffSettingsHref} className={styles.liffLink}>設定を開く</Link>}
-      </p>
+      </>}>
+        <span className={styles.liffText}>この動きは LIFF の設定が要ります</span>
+
+      </Notice>
     )
   } else if (def.kind === 'uri') {
     body = readOnly

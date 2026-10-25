@@ -171,7 +171,7 @@ export function SaveConflictBand({
   designNode?: string
 }) {
   return (
-    <Notice tone="warn" marker="dot" role="alert" heading={title} states={states} footer={footer} data-design-node={designNode} data-save-conflict="" action={<>
+    <Notice tone="warn" marker="dot" actionLayout="stack-on-narrow" role="alert" heading={title} states={states} footer={footer} data-design-node={designNode} data-save-conflict="" action={<>
       {compareHref ? (
         <Button href={compareHref}>
           <GitCompare aria-hidden="true" className={styles.buttonIcon} />
