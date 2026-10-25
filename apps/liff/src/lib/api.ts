@@ -1,5 +1,5 @@
 import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
-import { responseLiffError } from './api-error.js';
+import { readLiffResponse, responseLiffError } from './api-error.js';
 import type { BookingCancellationPreview, MenuAddon, RoutedTarget, MakeupCredit, MakeupOption } from './api-types.js';
 export type { BookingCancellationPreview, MenuAddon, RoutedTarget, MakeupCredit, MakeupOption, EventBookingMakeup } from './api-types.js';
 import type { AcceptBookingWaitlistInput,BookingHistoryResponse,CustomerBookingWaitlist,CustomerSeatWaitlist,EntryRouteCouponReceived,EventWaitlistMine,EventWaitlistOfferDetail,LiffBookingChangeResponse,RegisterSeatWaitlistInput,WebinarAudience } from '@line-crm/shared';
@@ -23,12 +23,20 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
   return { Authorization: `Bearer ${getIdToken()}`, ...extra };
 }
 
+/** 予約の通信で新旧の成功フラグを読む。ほかの機能の応答検査は各読み口が行う。 */
+async function readResponse<T>(response: Response, path: string): Promise<T> {
+  if (/^\/api\/liff\/(?:booking|restaurant|events)(?:\/|$)|^\/api\/events\/liff\//.test(path)) {
+    return readLiffResponse<T>(response);
+  }
+  if (!response.ok) throw await responseLiffError(response);
+  return response.json();
+}
+
 async function get<T>(path: string): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
   url.searchParams.set('liffId', getLiffId());
   const res = await fetch(url.toString(), { headers: authHeaders() });
-  if (!res.ok) throw await responseLiffError(res);
-  return res.json();
+  return readResponse<T>(res, path);
 }
 
 /**
@@ -89,7 +97,7 @@ async function getLatestFormAnswer(path: string): Promise<{ answers: Record<stri
 
 async function remove<T>(path:string):Promise<T>{
  const url=new URL(`${BASE}${path}`,window.location.origin);url.searchParams.set('liffId',getLiffId());
- const res=await fetch(url,{method:'DELETE',headers:authHeaders()});if(!res.ok)throw await responseLiffError(res);return res.json();
+ const res=await fetch(url,{method:'DELETE',headers:authHeaders()});return readResponse<T>(res, path);
 }
 async function post<T>(path: string, body: unknown, headers: Record<string, string> = {}, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
@@ -99,8 +107,7 @@ async function post<T>(path: string, body: unknown, headers: Record<string, stri
     headers: authHeaders({ 'Content-Type': 'application/json', ...headers }),
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw await responseLiffError(res);
-  return res.json();
+  return readResponse<T>(res, path);
 }
 
 async function postBinary<T>(path: string, file: Blob): Promise<T> {
@@ -113,8 +120,7 @@ async function postBinary<T>(path: string, file: Blob): Promise<T> {
     headers: authHeaders({ 'Content-Type': file.type || 'application/octet-stream' }),
     body: file,
   });
-  if (!res.ok) throw await responseLiffError(res);
-  return res.json();
+  return readResponse<T>(res, path);
 }
 
 export const api = {
@@ -249,8 +255,7 @@ export const api = {
       method: 'DELETE',
       headers: authHeaders(),
     }).then(async (res) => {
-      if (!res.ok) throw await responseLiffError(res);
-      return res.json() as Promise<{ status: string }>;
+      return readLiffResponse<{ status: string }>(res);
     }),
 
   // ===== Event booking =====

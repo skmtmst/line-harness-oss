@@ -20,7 +20,9 @@ export class LiffApiError extends Error {
     this.code = detail.code;
     this.requestId = detail.requestId ?? requestId;
     this.fields = detail.fields;
-    this.body = legacyApiErrorBody(payload);
+    const legacy = legacyApiErrorBody(payload);
+    this.body = detail.code && legacy !== null && typeof legacy === 'object'
+      ? { ...legacy, error: detail.code } : legacy;
   }
 }
 
@@ -28,4 +30,17 @@ export async function responseLiffError(response: Response): Promise<LiffApiErro
   let payload: unknown;
   try { payload = await response.json(); } catch { /* 内部の本文を表示しない。 */ }
   return new LiffApiError(response.status, payload, response.headers?.get('X-Request-ID') ?? undefined);
+}
+
+/** 新しい成功フラグを優先し、無いときだけ古いok・errorとHTTP状態を見る。 */
+export async function readLiffResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) throw await responseLiffError(response);
+  const payload: unknown = await response.json();
+  if (payload !== null && typeof payload === 'object') {
+    const body = payload as Record<string, unknown>;
+    const failed = typeof body.success === 'boolean' ? !body.success
+      : body.ok === false || body.error !== undefined;
+    if (failed) throw new LiffApiError(response.status, payload, response.headers.get('X-Request-ID') ?? undefined);
+  }
+  return payload as T;
 }
