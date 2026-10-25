@@ -1,6 +1,6 @@
 /*
- * ★V8 運用状態 更新履歴。数字は書かない（globals.css の [data-theme="v8"] の --tpl-rest3-em-*・--tpl-rest3-uh-*）。
- * 数のマスは緊急コントロールと同じ形で3つ。
+ * ★V8 運用状態 更新履歴。数字は書かない（globals.css の [data-theme="v8"] の --tpl-rest3-em-*・--space-*）。
+ * 数のマスは緊急コントロールと同じ形で3つ。1回の更新は共通の Card 1枚。
  */
 .board {
   display: flex;
@@ -10,24 +10,57 @@
   container-type: inline-size;
 }
 
-.cell {
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rest3-em-row-gap);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.line {
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-body-lh);
+  overflow-wrap: anywhere;
+}
+
+.kind {
+  margin-right: var(--space-8);
+  color: var(--color-ink-faint);
   white-space: nowrap;
 }
 
-.strong {
-  color: var(--color-ink);
-  font-weight: 600;
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-rest3-em-body);
+  line-height: var(--tpl-rest3-em-body-lh);
 }
 
-.num {
-  padding-right: var(--tpl-rest3-em-num-pad);
-  text-align: right;
+.more {
+  display: flex;
+  justify-content: center;
 }
-
-.judge { display: flex; align-items: center; }
 
 .foot {
   display: flex;
@@ -43,6 +76,3 @@
   font-size: var(--tpl-rest3-em-small);
   line-height: var(--tpl-rest3-em-th-lh);
 }
-
- .table { --sett-history-columns: minmax(0, 130px) minmax(0, 1fr) minmax(0, 100px) 100px minmax(110px, max-content); }
-@container (max-width: 760px) { .table { --sett-history-columns: minmax(0, 80px) minmax(0, 1fr) 64px 72px minmax(110px, max-content); } }
