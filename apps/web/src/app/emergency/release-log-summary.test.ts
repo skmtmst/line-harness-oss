@@ -56,4 +56,15 @@ describe('運用状態の更新履歴の要約（V6R-S3-a）', () => {
     expect(summary.find((r) => r.released === null)?.entries).toHaveLength(0)
     expect(summary.map((r) => r.entryCount)).toEqual([300, 40, 35])
   })
+
+  it('回ごとの並びを足しても、版ごとの要約は変えない', () => {
+    const summary = summarize(full)
+    expect(summary.releases.map((r) => r.version)).toEqual(['unreleased', '0.24.0', '0.23.0'])
+    const updates = summary.updates as Array<{ version: string; latest: boolean; entryCount: number; highlights: string[] }>
+    expect(updates.filter((u) => u.latest)).toEqual([updates[0]])
+    expect(updates[0].version).toBe('0.24.0')
+    expect(updates.reduce((n, u) => n + u.entryCount, 0)).toBe(75)
+    expect(updates.every((u) => u.highlights.length === 0)).toBe(true)
+    expect(summary.pending.entryCount).toBe(300)
+  })
 })
