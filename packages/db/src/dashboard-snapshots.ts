@@ -1,4 +1,6 @@
+import { jstCalendar, jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { sqlIdSet } from './id-queries.js';
+import { followTimeSql } from './utils.js';
 import { jstDate, nextDate, latestDashboardTime, periodStart } from './dashboard-freshness.js';
 import { friendBreakdown, count, accountScopeSql } from './dashboard-inbox.js';
 import { type AccountStatsScope, type DashboardOverview, type DashboardPeriod } from './dashboard-types.js';
@@ -14,17 +16,22 @@ export const UNASSIGNED_SNAPSHOT_ACCOUNT_ID = '__unassigned__';
 /**
  * 1つのLINEアカウント（または未割り当て）のその日の友だち数を記録する。
  *
- * cron から毎日呼ぶ。同じ日に何度呼んでも最後の値で上書きする
- * （日中に呼んでも、その日の終わりに呼び直せば正しくなる）。
+ * cron から6時間ごとに呼ぶ。同じ日に何度呼んでも最後の値で上書きする。
+ * 日付は日本時間の暦の日。6時間ごとの記録は日本時間21時が最後になるので、
+ * 日付を指定しない全体の記録では、まだ締めていない前の日の行の
+ * 増えた数・ブロックした数を1回だけ数え直して締める。
  */
 export async function recordFriendSnapshot(
   db: D1Database,
   accountId: string | null,
   date?: string,
   limit = 1_000,
+  now: Date = new Date(),
 ): Promise<void> {
-  const day = date ?? jstDate(0);
+  const day = date ?? japanDateOffset(0, now);
+  const updatedAt = snapshotTime(now);
   if (accountId === null) {
+    if (date === undefined) await closePreviousDay(db, day, updatedAt);
     const batchLimit = Number.isFinite(limit)
       ? Math.max(1, Math.min(Math.trunc(limit), 1_000))
       : 1_000;
@@ -45,38 +52,101 @@ export async function recordFriendSnapshot(
       )
       .bind(UNASSIGNED_SNAPSHOT_ACCOUNT_ID, day, batchLimit)
       .all<{ id: string }>();
-    await writeFriendSnapshots(db, targets.results.map(target => target.id), day);
+    await writeFriendSnapshots(db, targets.results.map(target => target.id), day, updatedAt);
     return;
   }
-  await writeFriendSnapshots(db, [accountId], day);
+  await writeFriendSnapshots(db, [accountId], day, updatedAt);
 }
 
-/** 選ばれた店舗を一文で記録し、店舗数による問い合わせ上限超過を防ぐ。 */
-async function writeFriendSnapshots(db: D1Database, accountIds: string[], day: string): Promise<void> {
-  if (accountIds.length === 0) return;
-  await db.prepare(`
-    INSERT INTO friend_daily_snapshots
-      (date, line_account_id, active, total, blocked_by_them, hidden_by_us, added, blocked, updated_at)
+/** 記録の時刻。表の既定値と同じ、時差の印なしの日本時間で持つ。 */
+function snapshotTime(now: Date): string {
+  return jstCalendar(now).toISOString().replace('Z', '');
+}
+
+/** その日（日本時間）の始まりと終わりを `bounds` として読む、時差の印の違いに強い比べ方。 */
+function inDaySql(column: string): string {
+  return `(${followTimeSql(column)} >= bounds.starts AND ${followTimeSql(column)} < bounds.ends)`;
+}
+
+/**
+ * 店ごとの数を1文で数える。並びは
+ * 日付・記録時刻・`targetsSql` の値・その日の始まり・終わり・未割り当てキー。
+ *
+ * 増えた＝その日に友だち追加した人（初めて＋ブロック解除で戻った人）。
+ * 追加の時刻の列が無い古い行だけは登録日で数える。
+ * ブロック＝最後のブロックの時刻がその日の人。同じ人の1日2回は1と数える。
+ */
+function friendCountsSql(targetsSql: string): string {
+  return `
     SELECT ?, targets.value,
            SUM(CASE WHEN f.is_following = 1 AND f.is_hidden = 0 THEN 1 ELSE 0 END),
            COUNT(f.id),
            SUM(CASE WHEN f.is_following = 0 AND f.is_hidden = 0 THEN 1 ELSE 0 END),
            SUM(CASE WHEN f.is_following = 1 AND f.is_hidden = 1 THEN 1 ELSE 0 END),
-           SUM(CASE WHEN f.created_at >= ? AND f.created_at < ? THEN 1 ELSE 0 END),
-           0, strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-      FROM json_each(?) targets
+           SUM(CASE WHEN ${inDaySql('f.current_follow_started_at')} OR ${inDaySql('f.last_followed_at')}
+                     OR (f.first_followed_at IS NULL AND f.last_followed_at IS NULL
+                         AND f.last_unfollowed_at IS NULL AND ${inDaySql('f.created_at')})
+                    THEN 1 ELSE 0 END),
+           SUM(CASE WHEN ${inDaySql('f.last_unfollowed_at')} THEN 1 ELSE 0 END),
+           ?
+      FROM (${targetsSql}) targets
+      CROSS JOIN (SELECT julianday(?) AS starts, julianday(?) AS ends) bounds
       LEFT JOIN friends f ON f.line_account_id = targets.value
         OR (targets.value = ? AND f.line_account_id IS NULL)
      WHERE 1
-     GROUP BY targets.value
+     GROUP BY targets.value`;
+}
+
+function dayBounds(day: string): [string, string] {
+  return [`${day}T00:00:00+09:00`, `${nextDate(day)}T00:00:00+09:00`];
+}
+
+/** 選ばれた店舗を一文で記録し、店舗数による問い合わせ上限超過を防ぐ。 */
+async function writeFriendSnapshots(
+  db: D1Database,
+  accountIds: string[],
+  day: string,
+  updatedAt: string,
+): Promise<void> {
+  if (accountIds.length === 0) return;
+  await db.prepare(`
+    INSERT INTO friend_daily_snapshots
+      (date, line_account_id, active, total, blocked_by_them, hidden_by_us, added, blocked, updated_at)
+    ${friendCountsSql('SELECT value FROM json_each(?)')}
     ON CONFLICT (date, line_account_id) DO UPDATE SET
       active = excluded.active,
       total = excluded.total,
       blocked_by_them = excluded.blocked_by_them,
       hidden_by_us = excluded.hidden_by_us,
       added = excluded.added,
+      blocked = excluded.blocked,
       updated_at = excluded.updated_at
-  `).bind(day, day, nextDate(day), JSON.stringify(accountIds), UNASSIGNED_SNAPSHOT_ACCOUNT_ID).run();
+  `).bind(
+    day, updatedAt, JSON.stringify(accountIds), ...dayBounds(day), UNASSIGNED_SNAPSHOT_ACCOUNT_ID,
+  ).run();
+}
+
+/**
+ * 前の日の行を締める。最後の記録が日をまたぐ前（その日の中）の行だけを数え直し、
+ * 締めた行は記録時刻が次の日になるので2回目からは触らない。
+ * その日の終わりの状態（友だち数など）は前の日の最後の記録のまま残す。
+ * 前の日の行が無い店は作らない（取れなかった日は取れなかったまま）。
+ */
+async function closePreviousDay(db: D1Database, today: string, updatedAt: string): Promise<void> {
+  const previous = japanDateOffset(-1, new Date(`${today}T00:00:00+09:00`));
+  const closedAfter = `${today}T00:00:00`;
+  await db.prepare(`
+    INSERT INTO friend_daily_snapshots
+      (date, line_account_id, active, total, blocked_by_them, hidden_by_us, added, blocked, updated_at)
+    ${friendCountsSql(`SELECT line_account_id AS value FROM friend_daily_snapshots
+       WHERE date = ? AND updated_at < ? AND line_account_id <> ''`)}
+    ON CONFLICT (date, line_account_id) DO UPDATE SET
+      added = excluded.added,
+      blocked = excluded.blocked,
+      updated_at = excluded.updated_at
+  `).bind(
+    previous, updatedAt, previous, closedAfter, ...dayBounds(previous), UNASSIGNED_SNAPSHOT_ACCOUNT_ID,
+  ).run();
 }
 
 /**
