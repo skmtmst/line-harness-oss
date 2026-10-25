@@ -1,0 +1,44 @@
+// @vitest-environment happy-dom
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import UnfamiliarLoginNotice from './unfamiliar-login-notice'
+const route = vi.hoisted(() => ({ pathname: '/friends' }))
+vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }))
+const snapshot = (unfamiliarAt: string | null) => ({ impersonation: null, unfamiliarAt, stepUpMethod: 'totp' as const, recoveryCodesRemaining: 8 })
+beforeEach(() => { route.pathname = '/friends' })
+afterEach(() => { cleanup(); forgetSessionSnapshot(); localStorage.clear() })
+
+it('［閉じる］でその日は出さず、端末の確認への道は閉じる前に出している', async () => {
+  rememberSessionSnapshot(snapshot('2026-10-25T01:00:00Z'))
+  render(<UnfamiliarLoginNotice />)
+  expect((await screen.findByRole('link', { name: 'ログイン中の端末を確認する' })).getAttribute('href')).toBe('/staff')
+  fireEvent.click(screen.getByRole('button', { name: '通知を閉じる' }))
+  expect(screen.queryByRole('note')).toBeNull()
+  cleanup()
+  route.pathname = '/chats'
+  render(<UnfamiliarLoginNotice />)
+  await Promise.resolve()
+  expect(screen.queryByRole('note')).toBeNull()
+})
+
+it('閉じた後に別のいつもと違うログインがあれば、また出す', async () => {
+  rememberSessionSnapshot(snapshot('2026-10-25T01:00:00Z'))
+  render(<UnfamiliarLoginNotice />)
+  fireEvent.click(await screen.findByRole('button', { name: '通知を閉じる' }))
+  cleanup()
+  rememberSessionSnapshot(snapshot('2026-10-25T05:00:00Z'))
+  render(<UnfamiliarLoginNotice />)
+  expect(await screen.findByRole('link', { name: 'ログイン中の端末を確認する' })).toBeTruthy()
+})
+
+it.each(['/', '/settings'])('%sでは閉じた日も残し、閉じる印を出さない', async pathname => {
+  rememberSessionSnapshot(snapshot('2026-10-25T01:00:00Z'))
+  render(<UnfamiliarLoginNotice />)
+  fireEvent.click(await screen.findByRole('button', { name: '通知を閉じる' }))
+  cleanup()
+  route.pathname = pathname
+  render(<UnfamiliarLoginNotice />)
+  expect(await screen.findByRole('link', { name: 'ログイン中の端末を確認する' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '通知を閉じる' })).toBeNull()
+})
