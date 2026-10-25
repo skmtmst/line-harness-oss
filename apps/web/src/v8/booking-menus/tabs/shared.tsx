@@ -80,7 +80,7 @@ export function useV8TabEdit(input: V8TabEdit) {
 
 export function Band({ tone, children }: { tone: 'hint' | 'warn'; children: ReactNode }) {
   return (
-    <Notice tone={tone === 'warn' ? 'warn' : 'info'} icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+    <Notice tone={tone === 'warn' ? 'warn' : 'info'} icon={<svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
       <circle cx="7" cy="7" r="5.6" />
       <path d="M7 6.2v3" strokeLinecap="round" />
       <circle cx="7" cy="4.1" r="0.9" fill="currentColor" stroke="none" />
@@ -117,7 +117,7 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
 
 export function AccountIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <svg width="20" height="20" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.75">
       <rect x="3" y="4" width="16" height="14" rx="2" />
       <path d="M3 8h16" />
     </svg>

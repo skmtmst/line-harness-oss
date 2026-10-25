@@ -343,7 +343,7 @@
 }
 
 .grip {
-  width: var(--tpl-bm-14);
+  width: var(--polish-icon-control);
   min-width: 0;
   height: var(--tpl-bm-18);
   min-height: 0;
@@ -355,7 +355,7 @@
 /* 閲覧のみ：つまみは置かず、同じ大きさの場所だけ空ける。 */
 .gripSlot {
   display: block;
-  width: var(--tpl-bm-14);
+  width: var(--polish-icon-control);
   height: var(--tpl-bm-18);
   flex-shrink: 0;
 }
