@@ -23,7 +23,7 @@ export const ROUTES = {
   'hq-attention': '/hq/attention',
 }
 
-/** iPad 横（1024px）まで崩れないことを見張る（2026-10-25 オーナー）。 */
+/** iPad 横（1024px）まで崩れないことを見張る。 */
 export const WIDTHS = [1024, 1152, 1440, 1920]
 
 const SESSION = {
