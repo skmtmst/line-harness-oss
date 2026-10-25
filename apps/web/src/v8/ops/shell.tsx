@@ -1,7 +1,7 @@
 'use client'
 
 import Link from '@/components/shared/list-navigation'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import {
   BookOpen,
   Building2,
@@ -19,6 +19,7 @@ import { PageChromeProvider, usePageChrome } from '@/components/shell/page-chrom
 import SidebarUserMenu from '@/components/shared/sidebar-user-menu'
 import SidebarVersion from '@/components/layout/sidebar-version'
 import { SidebarBrand } from '@/components/layout/sidebar-identity'
+import { SIDEBAR_AUTO_COLLAPSE_BELOW } from '@/components/layout/sidebar-collapse'
 import Notice from '@/components/shared/notice'
 import { humanizeErrorText } from '@/components/shared/human-error-text'
 import { PageHeading } from '@/components/templates/page-frame'
@@ -29,6 +30,8 @@ import type { OpsMe } from '@/lib/api'
 import shellStyles from '@/components/app-shell.module.css'
 import nav from '@/components/layout/sidebar.module.css'
 import styles from './shell.module.css'
+
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 /**
  * 運営コンソールの V8 の外枠（絵  ほか運営の板一式）。
@@ -89,6 +92,8 @@ function OpsShellFrame({
   const [drawer, setDrawer] = useState(false)
   const drawerRef = useOverlayFocus<HTMLElement>(drawer, () => setDrawer(false))
 
+  // iPad 横（1024px）ではアイコンだけの列で開く。店の画面の左メニューと同じ幅の決まり。
+  useIsoLayoutEffect(() => { if (window.innerWidth < SIDEBAR_AUTO_COLLAPSE_BELOW) setCollapsed(true) }, [])
   // 上の帯の畳むボタン（⌘\）を受ける。共通の左メニューと同じ合図。
   useEffect(() => {
     const onToggle = () => setCollapsed((v) => !v)

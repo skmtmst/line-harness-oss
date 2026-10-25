@@ -79,3 +79,13 @@ describe('運営の自分の操作とメニューを閉じる動き', () => {
     expect(document.body.style.overflow).not.toBe('hidden')
   })
 })
+
+describe('運営の左メニュー：iPad 横（1024px）だけ畳んで開く', () => {
+  const realWidth = window.innerWidth
+  afterEach(() => { Object.defineProperty(window, 'innerWidth', { configurable: true, value: realWidth }) })
+  it.each([[1024, true], [1025, false], [1440, false]])('幅 %ipx で畳むか：%s', (width, collapsed) => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+    const { container } = render(<OpsShellV8 {...props} />)
+    expect(container.querySelector('aside[data-collapsed]') !== null).toBe(collapsed)
+  })
+})

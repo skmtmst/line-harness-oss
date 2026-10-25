@@ -18,6 +18,7 @@ import { EMPTY_TEMPLATE_REFERENCES } from '../../components/templates/template-p
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import TruncatedText from '@/components/shared/truncated-text'
 import MediaSlot from '@/components/shared/media-slot'
 import TapActionField from '@/components/shared/tap-action-field'
 import type { TapActionKind, TapActionValue } from '@/lib/tap-actions'
@@ -164,7 +165,7 @@ export default function MessageForm({
                 onRemove={card.imageMediaId ? () => { const { imageMediaId: _removed, ...next } = card; updateCard(next) } : undefined}
                 onUploaded={(media) => { const next = withUploadedImage(value, media); onChange(withMessageCard(next, { ...card, imageMediaId: media.id })) }}
               />
-              {image ? <span className={styles.imageName}>{`${image.filename} ・ ${image.width ?? emptyValue('unknown')}×${image.height ?? emptyValue('unknown')}`}</span> : null}
+              {image ? <TruncatedText className={styles.imageName} value={`${image.filename} ・ ${image.width ?? emptyValue('unknown')}×${image.height ?? emptyValue('unknown')}`} /> : null}
             </div>
           )}
           <Field label="タイトル"><SaveErrorField names={["title","card.title"]}><input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} /></SaveErrorField></Field>

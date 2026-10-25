@@ -3,7 +3,7 @@ import type { Friend } from './types.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { getFriendByLineUserIdForAccount } from '../friend-account-identity.js';
 import { sqlIdSet } from '../id-queries.js';
-import { boundedListLimit, jstNow, nonNegativeListOffset } from '../utils.js';
+import { boundedListLimit, followTimeSql, jstNow, nonNegativeListOffset } from '../utils.js';
 
 export interface GetFriendsOptions {
   limit?: number;
@@ -179,12 +179,6 @@ function isMissingFollowLifecycleColumn(error: unknown): boolean {
 export function isFriendLineUserIdConflict(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /unique constraint failed: friends\.line_user_id/i.test(message);
-}
-
-/** Legacy columns without an offset contain JST, as in the schema defaults. */
-function followTimeSql(column:string):string {
-  return `julianday(CASE WHEN substr(${column},-1) IN ('Z','z') OR substr(${column},-6,1) IN ('+','-') OR substr(${column},-5,1) IN ('+','-') THEN ${column}
-    WHEN length(${column})=10 THEN ${column}||'T00:00:00+09:00' ELSE ${column}||'+09:00' END)`;
 }
 
 export async function upsertFriend(

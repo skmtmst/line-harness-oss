@@ -132,3 +132,17 @@ html:root .table:is([data-table-presentation='dashboard'], [data-table-presentat
 html:root .table:is([data-table-presentation='dashboard'], [data-table-presentation='metrics']) .row[data-head] .cell { font-size: var(--polish-text-support); font-weight: var(--polish-control-weight); }
 
 :root .row:not([data-head]):hover { background: var(--polish-table-hover); box-shadow: var(--shadow-row-line), var(--polish-band-shadow); }
+
+/*
+ * 名前の列（1列目）が細すぎる幅では、行を2段にする：1段目に名前、2段目にほかの列。
+ * 見出しの行も同じ形にして列をそろえる。幅ではなく表に入りきるかで決める（use-grid-table-stack）。
+ */
+html:root .table[data-stacked][data-stacked] .row {
+  grid-template-columns: var(--grid-table-rest-columns);
+  row-gap: var(--space-4);
+  height: auto;
+  min-height: var(--polish-table-row);
+  padding-block: var(--polish-space-row);
+}
+html:root .table[data-stacked][data-stacked] .row[data-head] { min-height: var(--polish-table-head); }
+html:root .table[data-stacked] .row > :first-child { grid-column: 1 / -1; }

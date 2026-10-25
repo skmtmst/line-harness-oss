@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest'
 const ROOT = join(import.meta.dirname, '..', '..', '..', '..')
 const MANUAL = readFileSync(join(ROOT, 'public', 'manuals', 'line-connect', 'index.html'), 'utf8')
 const MANUAL_DOC = readFileSync(join(ROOT, '..', '..', 'docs', 'manuals', 'line-connect', 'index.html'), 'utf8')
-const ROUTE = readFileSync(join(ROOT, '..', 'worker', 'src', 'routes', 'line-accounts.ts'), 'utf8')
 
 /*
  * R175: LINEは2022-11-30からチャットとWebhookの併用をサポートしている。
@@ -23,8 +22,6 @@ describe('R175 LINE接続の案内はチャットとWebhookの併用を妨げな
     }
   })
 
-  it('接続後の案内もチャットを切らせず、自動返信の確認だけを残す', () => {
-    expect(ROUTE).not.toContain('チャットをオフにしてください')
-    expect(ROUTE).toContain('受信はそのまま動きます')
-  })
+  // 接続後の案内（Worker の接続確認の答え）は apps/worker/src/routes/line-accounts.test.ts が
+  // チャットのオン・オフで実際に呼んで確かめる（「受信を止めずに自動返信の重複だけを案内する」）。
 })

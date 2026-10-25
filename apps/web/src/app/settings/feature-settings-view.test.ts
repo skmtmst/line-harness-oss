@@ -1,8 +1,7 @@
 import { FEATURE_CATALOG, FEATURE_IDS } from '@line-crm/shared'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { FeatureGroup } from '@/lib/feature-settings'
+import { MANUAL_LINKS } from '../../../../../scripts/visual-qa/fixtures.mjs'
 import {
   CATALOG_DEFAULT_FEATURES,
   FEATURE_SETTINGS_CONFLICT_MESSAGE,
@@ -82,10 +81,8 @@ describe('機能設定の画面契約', () => {
   // 撮影用の全機能・版の確認は mock-api-method-contract.test.ts のHTTP試験へ移した。
 
   it('マニュアル一覧の固定件数は固定行数と一致する', () => {
-    const fixtures = readFileSync(resolve(process.cwd(), '../../scripts/visual-qa/fixtures.mjs'), 'utf8')
-    const start = fixtures.indexOf('export const MANUAL_LINKS')
-    const section = fixtures.slice(start, fixtures.indexOf('const booking', start))
-    expect(section.match(/key: '[^']+'/g)).toHaveLength(3)
-    expect(section).toContain('total: 3')
+    expect(MANUAL_LINKS.items).toHaveLength(3)
+    expect(MANUAL_LINKS.total).toBe(MANUAL_LINKS.items.length)
+    expect(MANUAL_LINKS.brokenCount).toBe(MANUAL_LINKS.items.filter((item) => item.status === 'broken').length)
   })
 })

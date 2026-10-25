@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
-import Notice from '@/components/shared/notice'
+import Notice, { useNoticeClosedToday } from '@/components/shared/notice'
+import { isSecurityNoticePinned } from '@/components/recovery-code-notice'
 
 /**
  * V-2: いつもと違う端末・場所からのログイン帯（管理画面-30 §14）。
@@ -16,9 +18,13 @@ import Notice from '@/components/shared/notice'
  * この帯が出ているあいだ、そのセッションの大事な操作は毎回の本人確認が要る
  * （Worker側で強制）。心当たりがない人の逃げ道として、セッション管理への
  * リンク（他の端末のログイン解除）を右に置く。
+ * ［閉じる］でその日は（その端末で）出さない。ダッシュボードと設定の画面には残す。
  */
 export default function UnfamiliarLoginNotice() {
   const [unfamiliarAt, setUnfamiliarAt] = useState<string | null>(null)
+  const pathname = usePathname()
+  const pinned = isSecurityNoticePinned(pathname)
+  const { closed, close } = useNoticeClosedToday(`unfamiliar-login:${unfamiliarAt ?? ''}`)
 
   useEffect(() => {
     let cancelled = false
@@ -37,10 +43,11 @@ export default function UnfamiliarLoginNotice() {
     return () => { cancelled = true }
   }, [])
 
-  if (!unfamiliarAt) return null
+  if (!unfamiliarAt || (closed && !pinned)) return null
   return (
     <Notice
       tone="warn"
+      onClose={pinned ? undefined : close}
       actionLayout="stack-on-narrow"
       action={
         <Link href="/staff" className="text-action whitespace-nowrap text-xs font-medium underline underline-offset-2">

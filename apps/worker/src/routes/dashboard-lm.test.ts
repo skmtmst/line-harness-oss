@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
 const dbMocks = vi.hoisted(() => ({
+  getDashboardComparisons: vi.fn(),
   getDashboardUpcoming: vi.fn(),
   getDeliveryFailureOrigins: vi.fn(),
   getLineAccounts: vi.fn(),
@@ -112,5 +113,52 @@ describe('dashboard delivery-failure-origins (L 数字の出どころ)', () => {
     expect(response.status).toBe(200);
     const [, arg] = dbMocks.getDeliveryFailureOrigins.mock.calls[0] as [{}, { since: string }];
     expect(arg.since).toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00\+09:00$/);
+  });
+});
+
+describe('dashboard comparisons（数の帯の比べる値）', () => {
+  const sample = {
+    generatedAt: '2026-10-25T17:51:00.000+09:00',
+    comparisons: {
+      todayBookings: {
+        current: 12, previous: 10, basis: 'same_weekday_last_week', better: 'high',
+        asOf: '2026-10-25T17:51:00.000+09:00',
+        previousFrom: '2026-10-18T00:00:00.000+09:00', previousTo: '2026-10-19T00:00:00.000+09:00',
+      },
+      activeFriends: null,
+      deliveryFailures: null,
+      monthlySent: null,
+      monthlyBroadcasts: null,
+    },
+    skipped: { activeFriends: 'no_previous_record', deliveryFailures: 'source_failed' },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockVisibleScope();
+    dbMocks.getDashboardComparisons.mockResolvedValue(sample);
+  });
+
+  test('アカウント未指定は400で集計を呼ばない', async () => {
+    const response = await app().request('/api/dashboard/comparisons', {}, env());
+    expect(response.status).toBe(400);
+    expect(dbMocks.getDashboardComparisons).not.toHaveBeenCalled();
+  });
+
+  test('範囲外のアカウントは404で集計を呼ばない', async () => {
+    dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['account-1']);
+    const response = await app().request('/api/dashboard/comparisons?account_id=account-2', {}, env());
+    expect(response.status).toBe(404);
+    expect(dbMocks.getDashboardComparisons).not.toHaveBeenCalled();
+  });
+
+  test('選んだアカウントだけを数え、比べない数は null のまま返す', async () => {
+    const response = await app().request('/api/dashboard/comparisons?account_id=account-1', {}, env());
+    expect(response.status).toBe(200);
+    expect(dbMocks.getDashboardComparisons).toHaveBeenCalledWith(expect.anything(), { lineAccountId: 'account-1' });
+    const body = await response.json() as { success: boolean; data: typeof sample };
+    expect(body).toEqual({ success: true, data: sample });
+    expect(body.data.comparisons.activeFriends).toBeNull();
   });
 });

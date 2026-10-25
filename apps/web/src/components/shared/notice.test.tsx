@@ -42,6 +42,8 @@ describe('帯（Notice）の4種類', () => {
       const { container, unmount } = render(<Notice tone={tone} message="お知らせ" />)
       expect(container.firstElementChild!.className).toContain(tone)
       expect(container.firstElementChild!.getAttribute('role')).toBe(tone === 'danger' ? 'alert' : 'note')
+      // 崩れの見張りは data-tone で警告・失敗の文が切れていないかを見る。
+      expect(container.firstElementChild!.getAttribute('data-tone')).toBe(tone)
       unmount()
     }
   })

@@ -154,7 +154,7 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
     assert.notEqual(await page.locator('#surfaces button').evaluate(el => getComputedStyle(el).backgroundColor), await page.locator('#flat').evaluate(el => getComputedStyle(el).backgroundColor))
     assert.deepEqual(await page.evaluate(scanLayoutDefects), [])
     assert.deepEqual(await page.evaluate(scanControlOverlap), [])
-    assert.deepEqual(await page.evaluate(scanLayoutOverflow), { pageX: false, overflow: [], outOfMain: [], noTitle: [], accountName: [] })
+    assert.deepEqual(await page.evaluate(scanLayoutOverflow), { pageX: false, overflow: [], outOfMain: [], noTitle: [], accountName: [], narrowColumn: [], cutAlert: [] })
   } finally { await browser.close() }
 })
 

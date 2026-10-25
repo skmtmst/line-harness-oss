@@ -31,8 +31,8 @@ const account = (over: Partial<LineAccount> = {}): LineAccount => ({
  * Webhook は「正常／未確認」の2択で出す。
  */
 describe('V7vn3 LINEアカウント一覧', () => {
-  it('板 V7vn3 の骨組みで作る', () => {
-    expect(PAGE).toContain('boardId="V7vn3"')
+  it('古い板 QT91v の骨組みへ戻さない', () => {
+    // 板 V7vn3 の枠・数の4枚・表・行の操作は accounts-row-actions-react.test.tsx が描いて確かめる。
     expect(PAGE).not.toContain('data-design-node="QT91v"')
   })
 
@@ -92,28 +92,7 @@ describe('V7vn3 LINEアカウント一覧', () => {
     expect(parentName(account(), [])).toBe('—')
   })
 
-  it('数は採用済みV8の接続数・有効・問題・友だちの4枚', () => {
-    for (const title of ['つないでいる','有効','接続に問題','友だちの合計']) expect(PAGE).toContain(`title="${title}"`)
-    expect(PAGE.match(/<KpiCard\b/g)).toHaveLength(4)
-  })
-
-  it('現役の表と既定の印を使い、並び替えは窓の中だけ', () => {
-    expect(PAGE).toContain('<DataTable')
-    expect(PAGE).toContain('account.isDefault')
-    expect(PAGE).toContain('{orderingOpen ? <AccountOrdering')
+  it('一覧に「ここで見えること」の説明の塊を置かない', () => {
     expect(PAGE).not.toContain('ここで見えること')
-  })
-
-  it('行の操作は「⋯」にまとめ、4項目を置く', () => {
-    expect(PAGE).toContain('の操作')
-    expect(PAGE).toContain("label: '詳細'")
-    expect(PAGE).toContain("label: '接続をもう一度確かめる'")
-    expect(PAGE).toContain("label: '引き継ぎ'")
-    expect(PAGE).toContain("label: 'アーカイブ'")
-    expect(PAGE).toContain("label: 'アーカイブから戻す'")
-  })
-
-  it('失敗したときに、運用者ができることを置く', () => {
-    expect(PAGE).toContain('onRetry=')
   })
 })

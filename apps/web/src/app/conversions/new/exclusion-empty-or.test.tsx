@@ -13,6 +13,7 @@ import NewConversionPage from './page'
 const st = vi.hoisted(() => ({
   accountId: 'account-a' as string | null,
   created: [] as unknown[],
+  counted: 0,
 }))
 
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn() }) }))
@@ -57,6 +58,7 @@ vi.mock('@/lib/api', () => {
       friendFields: { list: async () => ({ success: true, data: [] }) },
       supportMarks: { list: async () => ({ success: true, data: [] }) },
       scenarios: { list: async () => ({ success: true, data: [] }) },
+      segments: { count: async () => { st.counted += 1; return { success: true, count: 0 } } },
     },
   }
 })
@@ -67,6 +69,7 @@ let host: HTMLDivElement
 beforeEach(() => {
   st.accountId = 'account-a'
   st.created = []
+  st.counted = 0
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   host = document.createElement('div')
   document.body.append(host)
@@ -125,6 +128,9 @@ describe('S4-OR 成果地点の数えない条件', () => {
     const fields = screen.getAllByRole('button', { name: '追加する条件を選ぶ' })
     expect(fields).toHaveLength(2)
     pickKind(fields[1], '行動スコア')
+    /* 作る画面は数えない条件の人数を出さないので、条件を入れても数え上げの口は呼ばない。 */
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 500)) })
+    expect(st.counted).toBe(0)
     await act(async () => {
       save()
     })

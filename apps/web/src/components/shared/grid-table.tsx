@@ -2,6 +2,7 @@
 
 import { useTableActionWidth } from './use-table-action-width'
 import { useListRowDensity } from './use-list-row-density'
+import { restGridTracks, useGridTableStack } from './use-grid-table-stack'
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import { Children, cloneElement, isValidElement, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import styles from './grid-table.module.css'
@@ -38,7 +39,10 @@ export function GridTable({ children, label, design, framed = true, className, p
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
   useListRowDensity(actionWidthRef)
+  // 名前の列が細すぎる幅では行を2段にする（横送りより先に形を変える）。盤と分析の表は列の並びが意味を持つので変えない。
+  useGridTableStack(actionWidthRef, design.columns, presentation === undefined || presentation === 'dashboard')
   const variables = Object.fromEntries(Object.entries(design).map(([key, value]) => [`--grid-table-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value]))
+  variables['--grid-table-rest-columns'] = restGridTracks(design.columns)
   return <div {...props} ref={actionWidthRef} data-shared-part="list-table" role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-framed={presentation === 'calendar' ? undefined : framed || undefined} data-table-presentation={presentation} data-booking-calendar={presentation === 'calendar' ? '' : undefined} style={variables as CSSProperties}>{children}</div>
 }
 

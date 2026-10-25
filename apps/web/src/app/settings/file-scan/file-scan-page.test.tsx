@@ -259,6 +259,19 @@ describe('ファイルの検査の設定画面', () => {
     })
   })
 
+  test('探す言葉で0件なら「条件を外す」を出し、押すと言葉を外して読み直す', async () => {
+    ready()
+    mocks.list.mockImplementation((_id: string, params?: { q?: string }) =>
+      Promise.resolve({ success: true, data: { items: params?.q ? [] : [scanOf()], total: params?.q ? 0 : 1, limit: 50, offset: 0 } }))
+    render(<FileScanSettingsPage />)
+    await screen.findByRole('button', { name: '使えるように戻す' })
+    fireEvent.change(screen.getByLabelText('ファイル名で探す'), { target: { value: 'nothing' } })
+    await screen.findByText('条件に合うものはありません')
+    fireEvent.click(screen.getByRole('button', { name: '条件を外す' }))
+    await screen.findByRole('button', { name: '使えるように戻す' })
+    expect((screen.getByLabelText('ファイル名で探す') as HTMLInputElement).value).toBe('')
+  })
+
   test('ファイル名で探すと検索語をAPIへ渡す (監査R132)', async () => {
     ready()
     mocks.list.mockResolvedValue({ success: true, data: { items: [], total: 0, limit: 50, offset: 0 } })

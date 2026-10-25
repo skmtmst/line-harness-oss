@@ -175,6 +175,13 @@ export const analyticsDashboardPaths = {
       },
     },
   },
+  '/api/dashboard/comparisons': {
+    get: {
+      tags: ['Dashboard'], summary: '数の帯の比べる値（今日は先週の同じ曜日・今月は前の月の同じ日まで。前の記録が無い数は null）',
+      parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+      responses: { '200': { description: 'Comparisons' }, '400': { description: 'アカウント未指定' }, '404': { description: 'LINEアカウント範囲外' } },
+    },
+  },
   '/api/dashboard/delivery-failure-origins': {
     get: {
       tags: ['Dashboard'], summary: '失敗の数を通知の送達台帳から出どころ別に数える（同じ失敗は1件・送り直し除外）',
