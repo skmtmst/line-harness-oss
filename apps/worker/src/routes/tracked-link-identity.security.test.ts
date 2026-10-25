@@ -80,7 +80,7 @@ describe('tracked click caller identity and current ownership', () => {
     const now = Math.floor(Date.now() / 1000);
     for (const data of [
       { ...original, friend: 'fa2' }, { ...original, account: 'b' }, { ...original, link: 'link-b' },
-      { ...original, iat: now - 5, exp: now - 1 }, { ...original, iat: now + 1, exp: now + 5 },
+      { ...original, iat: now - 5, exp: now - 1 }, { ...original, iat: now + 3600, exp: now + 3700 },
       { ...original, exp: now + 31 * 86400 }, { ...original, exp: `${now + 1}` },
     ]) {
       const altered = btoa(JSON.stringify(data)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
