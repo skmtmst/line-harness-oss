@@ -72,6 +72,9 @@
 
 }
 
+/* 配置先の帯用クラスや余白の指定に頼らず、前後の部品から最低12px離す。 */
+:root .notice { margin-block: var(--polish-space-field); }
+
 /* PCの狭幅では、長い説明を読める幅を残して操作を次の行へ送る。 */
 @media (max-width: 1279px) {
   :root .notice[data-action-layout='stack-on-narrow'] .action { flex-basis: 100%; justify-content: flex-end; }
