@@ -160,6 +160,18 @@ describe('段ごとの確かめで［次へ］を止める', () => {
     }
   })
 
+  it('下書きの保存も、帯と同じ理由で止める（帯は通るのに保存で断られる、を作らない）', async () => {
+    await renderForm('basic')
+    try {
+      expect(footerReason()).toBe('管理用タイトルを入力してください')
+      await click(button('下書きを保存する'))
+      expect(createApi).not.toHaveBeenCalled()
+      expect(container.textContent).toContain('管理用タイトルを入力してください')
+    } finally {
+      unmount()
+    }
+  })
+
   it('宛先の条件が空のときは宛先の段の［次へ］を押せない（絞ったつもりで全員に届くのを防ぐ）', async () => {
     await renderForm('audience', { visualQaAugustCampaign: true, initialCondition: { operator: 'AND', rules: [] } })
     try {

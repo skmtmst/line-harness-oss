@@ -62,7 +62,7 @@ describe('作成画面の5段の帯（設計 LMiL2）', () => {
   it('段の判定は保存の検査と同じ関数を通す', () => {
     // 帯の ✓ も保存の検査も、段ごとの確かめ（broadcast-step-gate）の結果だけを読む。
     expect(['basic', 'audience', 'message', 'schedule'].filter((step) => !STEP_CALL.includes(`broadcastStepPassed(liveStepProblems, '${step}')`))).toEqual([])
-    expect(FORM).toContain('const validate = () => broadcastSaveProblem(stepProblems())')
+    // 保存の検査が同じ結果を読むことは、画面を動かす試験（broadcast-form-step-gate-react）で見る。
   })
 
   it('送信設定は「今すぐ」か、日付と時刻がそろって初めて済みになる', () => {
