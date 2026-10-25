@@ -1,3 +1,4 @@
+import { liffBookingJson } from './liff-booking-response.js';
 import {EntitlementError} from '../features/booking/booking-entitlements/index.js';
 import {partyInput,previewParty,createBulkBooking} from '../features/booking/booking-bulk/index.js';
 import {previewSeries,recurrenceDates} from '../features/booking/booking-series/index.js';
@@ -13,7 +14,7 @@ import {bookingPaymentSelection} from '../features/booking/booking-payment-selec
 import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 export const bookingGap3=new Hono<Env>();
 bookingGap3.use('/api/booking/admin/*',requirePermission('/booking/bookings'));
-bookingGap3.onError((e,c)=>c.json({success:false,error:e instanceof GapError||e instanceof EntitlementError?e.code:'booking_unavailable'},e instanceof GapError||e instanceof EntitlementError?e.status:503));
+bookingGap3.onError((e,c)=>(c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:e instanceof GapError||e instanceof EntitlementError?e.code:'booking_unavailable'}, e instanceof GapError||e instanceof EntitlementError?e.status:503) : c.json({success:false,error:e instanceof GapError||e instanceof EntitlementError?e.code:'booking_unavailable'},e instanceof GapError||e instanceof EntitlementError?e.status:503)));
 async function book(c:Context<Env>,a:string){const r=await c.env.DB.prepare('SELECT * FROM bookings WHERE id=? AND line_account_id=?').bind(c.req.param('id'),a).first<Record<string,unknown>>();if(!r)throw new GapError('not_found',404);return r;}
 async function deposit(c:Context<Env>,menu=''){
  const a=await gapAccount(c);if(menu&&!await c.env.DB.prepare('SELECT id FROM menus WHERE id=? AND line_account_id=? AND deleted_at IS NULL').bind(menu,a).first())throw new GapError('not_found',404);
@@ -69,16 +70,16 @@ bookingGap3.get('/api/liff/booking/cost-estimate',async c=>{
    LEFT JOIN staff s ON s.id=sm.staff_id AND s.line_account_id=m.line_account_id AND s.is_active=1 AND s.deleted_at IS NULL
    WHERE m.id=? AND m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL`)
    .bind(staffId??null,id,a).first<{base_price:number;price:number;is_offered:number|null}>();if(!m)throw new GapError('not_found',404);
- if(staffId&&m.is_offered!==1)return c.json({success:false,error:'menu_not_offered'},422);
+ if(staffId&&m.is_offered!==1)return liffBookingJson(c, {success:false,error:'menu_not_offered'},422);
  const price=staffId?m.price:m.base_price,policy=await cancellationPolicy(c.env.DB,a);
  const payment=await bookingPaymentSelection(c.env.DB,a,String(id),friend);
- return c.json({success:true,data:{cancellation:{...policy,price,...cancellationQuote(policy,start,price),cardRequired:await cancellationCardRequired(c.env.DB,a,friend)},deposit:await depositEstimate(c.env.DB,a,String(id),price,start,people,await getAccountTimeZone(c.env.DB,a)),payment:{mode:payment.config.mode,allowedMethods:payment.allowedMethods}}});
+ return liffBookingJson(c, {success:true,data:{cancellation:{...policy,price,...cancellationQuote(policy,start,price),cardRequired:await cancellationCardRequired(c.env.DB,a,friend)},deposit:await depositEstimate(c.env.DB,a,String(id),price,start,people,await getAccountTimeZone(c.env.DB,a)),payment:{mode:payment.config.mode,allowedMethods:payment.allowedMethods}}});
 });
 
 async function self(c:Context<Env>){const a=await resolveAccountIdFromLiff(c),u=await verifyCallerLineUserId(c,a??undefined);if(!a||!u)throw new GapError('unauthorized',401);const f=await resolveFriendId(c,u,a);if(!f)throw new GapError('not_found',404);return {a,f};}
 bookingGap3.get('/api/liff/booking/group-availability',async c=>{
  const {a,f}=await self(c);let members:unknown;try{members=JSON.parse(c.req.query('members')??'null');}catch{throw new GapError('invalid_members');}
- return c.json({success:true,data:await previewParty(c.env.DB,a,await partyInput(c.env.DB,a,f,members),c.req.query('startMode')??'parallel',c.req.query('from')??'',c.req.query('to')??c.req.query('from')??'',c.env)});
+ return liffBookingJson(c, {success:true,data:await previewParty(c.env.DB,a,await partyInput(c.env.DB,a,f,members),c.req.query('startMode')??'parallel',c.req.query('from')??'',c.req.query('to')??c.req.query('from')??'',c.env)});
 });
 bookingGap3.post('/api/booking/admin/groups',async c=>{gapWrite(c);const a=await gapAccount(c),b=await gapBody(c);if(typeof b.friendId!=='string')throw new GapError('friend_id_required');return createBulkBooking(c,a,b.friendId,b,true);});
 bookingGap3.on(['GET','POST'],'/api/liff/booking/series/preview',async c=>{
@@ -87,6 +88,6 @@ bookingGap3.on(['GET','POST'],'/api/liff/booking/series/preview',async c=>{
  const menu=await c.env.DB.prepare('SELECT customer_recurring_enabled,recurring_freqs_json,recurring_max_count FROM menus WHERE id=? AND line_account_id=? AND is_active=1 AND deleted_at IS NULL').bind(menuId,a).first<{customer_recurring_enabled:number;recurring_freqs_json:string;recurring_max_count:number}>();if(!menu||!rule||!menu.customer_recurring_enabled||!JSON.parse(menu.recurring_freqs_json).includes(rule.freq))throw new GapError('recurring_not_allowed');
  if(recurrenceDates(startsAt,rule,await getAccountTimeZone(c.env.DB,a)).length>Math.min(12,menu.recurring_max_count))throw new GapError('invalid_count');
  const {menuAudience}=await import('../features/booking/booking-audience/index.js');if(!(await menuAudience(c.env.DB,a,menuId,f)).visible)throw new GapError('menu_not_available',403);
- return c.json({success:true,data:{occurrences:await previewSeries(c.env.DB,a,{menuId,friendId:f,staffId:typeof b.staffId==='string'?b.staffId:undefined,startsAt,rule},c.env,undefined,true)}});
+ return liffBookingJson(c, {success:true,data:{occurrences:await previewSeries(c.env.DB,a,{menuId,friendId:f,staffId:typeof b.staffId==='string'?b.staffId:undefined,startsAt,rule},c.env,undefined,true)}});
 });
 bookingGap3.get('/api/booking/admin/meeting-capabilities',async c=>{await gapAccount(c);return c.json({success:true,data:{meetingTypes:['online','in_person','customer_choice'],providers:[{id:'google_meet',automatic:false},{id:'zoom',automatic:false},{id:'teams',automatic:false}],outlook:{available:false},manualMeetingUrl:true,reconnectGoogle:true}});});

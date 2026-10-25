@@ -3388,7 +3388,7 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     const res = await book(setupApp(state));
     expect(res.status).toBe(409);
     // 「タグが無い」ではなく「公開されていない」として返す。存在を伝えない。
-    expect((await res.json()) as { error: string; code: string }).toEqual({ error: 'event_unpublished' });
+    expect((await res.json()) as { error: string; code: string }).toEqual({ success: false, code: 'event_unpublished', error: 'event_unpublished' });
     expect(state.bookings).toHaveLength(0);
   });
 
@@ -3421,7 +3421,7 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
     const res = await book(setupApp(state));
     expect(res.status).toBe(410);
-    expect((await res.json()) as { error: string; code: string }).toEqual({ error: 'entry_closed' });
+    expect((await res.json()) as { error: string; code: string }).toEqual({ success: false, code: 'entry_closed', error: 'entry_closed' });
   });
 
   test('締め切りより前なら申し込める', async () => {
@@ -3452,7 +3452,7 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
     const res = await book(setupApp(state));
     expect(res.status).toBe(409);
-    expect((await res.json()) as { error: string; code: string }).toEqual({ error: 'slot_full' });
+    expect((await res.json()) as { error: string; code: string }).toEqual({ success: false, code: 'slot_full', error: 'slot_full' });
     expect(state.waitlist).toHaveLength(0);
   });
 
@@ -3514,7 +3514,7 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
     const res = await book(setupApp(state));
     expect(res.status).toBe(409);
-    await expect(res.json()).resolves.toEqual({ error: 'slot_full' });
+    await expect(res.json()).resolves.toEqual({ success: false, code: 'slot_full', error: 'slot_full' });
   });
 });
 
@@ -3642,7 +3642,7 @@ describe('イベント申込のカスタム質問 (#841)', () => {
     const app = setupApp(state);
     const res = await book(app, { slot_id: 's1', answers: { q2: ['A'] } });
     expect(res.status).toBe(422);
-    expect((await res.json()) as { error: string; code: string }).toEqual({ error: 'missing_required_answers' });
+    expect((await res.json()) as { error: string; code: string }).toEqual({ success: false, code: 'missing_required_answers', error: 'missing_required_answers', fields: {} });
     expect(state.bookings).toHaveLength(0);
   });
 

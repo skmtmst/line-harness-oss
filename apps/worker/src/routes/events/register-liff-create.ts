@@ -1,3 +1,4 @@
+import { liffBookingJson, liffBookingResponse } from '../liff-booking-response.js';
 import { EntitlementError } from '../../features/booking/booking-entitlements/index.js';
 import { discardUnacceptedEventBooking, assertEventPassRequirement, validateEventEntitlement, eventEntitlementUse } from '../../services/event-entitlements.js';
 import { logger } from '@line-crm/shared/server';
@@ -26,11 +27,11 @@ import { EventDbRow, SlotDbRow, startsAtJst } from './time-input.js';
 export function registerLiffCreate(events: Hono<Env>): void {
 events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
-  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
+  if (!account_id) return liffBookingResponse(c, bad(c, 'liff_account_resolution_failed', 400, []));
   const idemKey = c.req.header('Idempotency-Key');
-  if (!idemKey) return bad(c, 'idempotency_key_required', 400, []);
+  if (!idemKey) return liffBookingResponse(c, bad(c, 'idempotency_key_required', 400, []));
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
-  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  if (!callerLineUserId) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
 
   // is_following=1 必須: フォロー解除した友だちは push が届かない。
   // Salon booking と同じ防御を入れる。user_id / picture_url は identity_key
@@ -42,7 +43,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     )
     .bind(callerLineUserId, account_id)
     .first<{ id: string; user_id: string | null; picture_url: string | null }>();
-  if (!friend) return bad(c, 'friend_not_found', 404);
+  if (!friend) return liffBookingResponse(c, bad(c, 'friend_not_found', 404));
 
   // Reserve idempotency key BEFORE the booking work to dedupe concurrent
   // double-taps (the key is held for the full TTL window).
@@ -55,13 +56,13 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   });
   if (reservation.kind === 'cached') {
     if (reservation.status >= 500) throw new Error('event_booking_cached_failure');
-    return c.json(
+    return liffBookingJson(c,
       reservation.body as Record<string, unknown>,
       reservation.status as 200 | 201 | 400 | 409 | 410 | 422,
     );
   }
   if (reservation.kind === 'in_progress') {
-    return bad(c, 'idempotent_in_progress', 429);
+    return liffBookingResponse(c, bad(c, 'idempotent_in_progress', 429));
   }
 
   // Helper that finalizes the reservation row before returning. Wraps every
@@ -74,7 +75,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       status,
       body,
     });
-    return c.json(body as Record<string, unknown>, status as 200 | 201 | 400 | 409 | 410 | 422);
+    return liffBookingJson(c, body as Record<string, unknown>, status as 200 | 201 | 400 | 409 | 410 | 422);
   };
   // try/catch wrapper so an unexpected DB error does not strand the
   // idempotency reservation in the in_progress state for the full TTL.

@@ -1,3 +1,4 @@
+import { liffBookingJson } from '../liff-booking-response.js';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { cancellationQuote } from '../../features/booking/booking-cancellation/index.js';
@@ -9,12 +10,12 @@ import { resolveAccountIdFromLiff, verifyCallerLineUserId, resolveFriendId } fro
 export function registerLiffHistory(booking: Hono<Env>): void {
 booking.get('/api/liff/booking/me', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
-  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  if (!accountId) return liffBookingJson(c, { error: 'unknown_liff' }, 404);
   // 履歴も idToken 検証必須。query の lineUserId に頼ると他人の履歴を覗けてしまう。
   const callerLineUserId = await verifyCallerLineUserId(c, accountId);
-  if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
+  if (!callerLineUserId) return liffBookingJson(c, { error: 'unauthorized' }, 401);
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
-  if (!friendId) return c.json({ upcoming: [], past: [] });
+  if (!friendId) return liffBookingJson(c, { upcoming: [], past: [] });
 
   const upcoming = await c.env.DB
     .prepare(
@@ -54,7 +55,7 @@ booking.get('/api/liff/booking/me', async (c) => {
   const payments = await customerBookingPayments(c.env.DB,accountId,friendId);
   const historyItem = <T extends BookingHistoryItem>(row: T) => ({...bookingHistoryItem(row),
     ...(payments.has(row.id) ? {payment:payments.get(row.id)!} : {})});
-  return c.json({ upcoming: upcoming.results.map(row => {
+  return liffBookingJson(c, { upcoming: upcoming.results.map(row => {
     const {policy_snapshot_json,price_at_booking,ticket,...item}=historyItem(row);
     const policy=policy_snapshot_json?JSON.parse(policy_snapshot_json):null;
     const quote=policy?.enabled?cancellationQuote(policy,row.starts_at,price_at_booking,new Date(),!!ticket):null;

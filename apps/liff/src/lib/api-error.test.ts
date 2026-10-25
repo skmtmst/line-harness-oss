@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { responseLiffError } from './api-error.js';
+import { readLiffResponse, responseLiffError } from './api-error.js';
 import { decideFormSubmitStep } from './form-submit-flow.js';
 import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
 import { errorCode } from '../pages/booking-history-messages.js';
@@ -11,6 +11,27 @@ const body = (code: string) => ({ success: false, error: { code, message: '内�
   fieldErrors: [{ field: 'name', message: '名前を入力してください。' }] } });
 
 describe('LIFFの共通失敗契約', () => {
+  it.each(['policy_changed', 'slot_conflict', 'hold_expired', 'card_not_registered', 'payment_not_connected'])(
+    '新しいコード%sを古いerrorより先に読み、既存画面の分岐へ渡す', async code => {
+      const error = await responseLiffError(new Response(JSON.stringify({ success: false, code, error: '内容を確認してください。' }), { status: 409 }));
+      expect(error.code).toBe(code);
+      expect(errorCode(error)).toBe(code);
+      expect(error.message).toBe('内容を確認してください。');
+      const old = await responseLiffError(new Response(JSON.stringify({ error: code }), { status: 409 }));
+      expect(old.code).toBe(code);
+      expect(errorCode(old)).toBe(code);
+    },
+  );
+  it.each([{ success: true, ok: false, id: 'new' }, { ok: true, id: 'old' }, { available: false, reason: 'no_history' }])(
+    '新旧の成功応答と空の結果をそのまま返す: %j', async payload => {
+      expect(await readLiffResponse(new Response(JSON.stringify(payload)))).toEqual(payload);
+    },
+  );
+  it.each([{ success: false, ok: true, code: 'policy_changed', error: '旧理由' }, { ok: false, error: 'slot_conflict' }, { error: 'hold_expired' }])(
+    'HTTP成功でも本文の失敗を成功扱いしない: %j', async payload => {
+      await expect(readLiffResponse(new Response(JSON.stringify(payload)))).rejects.toMatchObject({ code: 'code' in payload ? payload.code : payload.error });
+    },
+  );
   it('本人の予約変更・取消のコード分岐と追跡・項目の理由を保つ', async () => {
     const error = await responseLiffError(new Response(JSON.stringify(body('self_deadline_passed')), { status: 409 }));
     expect(errorCode(error)).toBe('self_deadline_passed');
@@ -38,4 +59,14 @@ it('実際のフォーム通信境界を通しても、409は新しい回答と�
   expect(result.body).toMatchObject({ code: 'idempotency_content_mismatch', requestId: id, fields: { name: '名前を入力してください。' }, error: '内容を確認してください。' });
   expect(decideFormSubmitStep(result)).toEqual({ action: 'conflict', code: 'idempotency_content_mismatch' });
   expect(transport).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  { success: false, ok: true, code: 'slot_conflict', error: '内容を確認してください。' },
+  { error: 'slot_conflict' },
+])('実際の予約の読み口でも新旧の本文の失敗を受け止める: %j', async payload => {
+  vi.stubGlobal('window', { location: { origin: 'http://localhost' } });
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload))));
+  const { api } = await import('./api.js');
+  await expect(api.menus()).rejects.toMatchObject({ code: 'slot_conflict', body: { error: 'slot_conflict' } });
 });

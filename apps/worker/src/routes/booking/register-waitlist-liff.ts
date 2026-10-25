@@ -1,7 +1,8 @@
+import { liffBookingInputError, liffBookingJson } from '../liff-booking-response.js';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
-import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
+import { inputJsonBoundary } from '../../lib/input-errors.js';
 import { openSeatTables, closuresForRange, closureAffectsTable } from '../../services/restaurant-closures.js';
 import { explainBookingSlot, getAccountTimeZone, tzDateStr, tzHHMM } from '../../services/availability.js';
 import { finishExpiredWaitlists, promoteBookingWaitlist } from '../../features/booking/booking-waitlist/index.js';
@@ -15,17 +16,17 @@ import { insertWaitlistEntry, WAITLIST_ERROR_STATUS } from './waitlist-input.js'
 export function registerWaitlistLiff(booking: Hono<Env>): void {
 booking.post('/api/liff/booking/waitlist', inputJsonBoundary(), async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
+  if (!caller.ok) return liffBookingInputError(c, { error: caller.error }, caller.status, []);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body) return inputError(c, { error: 'invalid_json' }, 400, []);
+  if (!body) return liffBookingInputError(c, { error: 'invalid_json' }, 400, []);
   const start=typeof body.starts_at==='string'?new Date(body.starts_at):new Date(NaN);
-  if(!Number.isFinite(start.getTime()))return inputError(c, {error:'invalid_starts_at'}, 400, ["starts_at"]);
-  if(start.getTime()<=Date.now()+60*60_000)return c.json({error:'registration_closed'},409);
+  if(!Number.isFinite(start.getTime()))return liffBookingInputError(c, {error:'invalid_starts_at'}, 400, ["starts_at"]);
+  if(start.getTime()<=Date.now()+60*60_000)return liffBookingJson(c, {error:'registration_closed'},409);
   const tz=await getAccountTimeZone(c.env.DB,caller.accountId),date=tzDateStr(tz,start);
   const check=await explainBookingSlot(c.env.DB,{lineAccountId:caller.accountId,menuId:String(body.menu_id??''),staffId:String(body.staff_id??''),date,time:tzHHMM(tz,start),now:new Date(),minLeadTimeMinutes:0,waitlistOffer:true,applyStoreRules:true,googleCredentials:googleCredentials(c.env)});
   const full=check.per_staff.find(s=>s.staff_id===body.staff_id);
   const fullReasons=new Set(['other_booking','capacity_full','google_busy','store_full','resource_shortage']);
-  if(!full||full.bookable||!full.reasons.length||full.reasons.some(reason=>!fullReasons.has(reason)))return c.json({error:'slot_not_full'},409);
+  if(!full||full.bookable||!full.reasons.length||full.reasons.some(reason=>!fullReasons.has(reason)))return liffBookingJson(c, {error:'slot_not_full'},409);
   const result = await insertWaitlistEntry(c.env.DB, {
     lineAccountId: caller.accountId,
     staffId: typeof body.staff_id === 'string' ? body.staff_id : '',
@@ -34,13 +35,13 @@ booking.post('/api/liff/booking/waitlist', inputJsonBoundary(), async (c) => {
     friendId: caller.friendId,
     bookingCustomerId: null,
   });
-  if (!result.ok) return inputError(c, { error: result.error }, WAITLIST_ERROR_STATUS[result.error] as 400 | 404 | 409, []);
-  return c.json({ id: result.id }, 201);
+  if (!result.ok) return liffBookingInputError(c, { error: result.error }, WAITLIST_ERROR_STATUS[result.error] as 400 | 404 | 409, []);
+  return liffBookingJson(c, { id: result.id }, 201);
 });
 
 booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
+  if (!caller.ok) return liffBookingInputError(c, { error: caller.error }, caller.status, []);
   const id = c.req.param('id');
   const entry = await c.env.DB
     .prepare(`SELECT staff_id, starts_at, status FROM booking_waitlist
@@ -48,7 +49,7 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
     .bind(id, caller.accountId, caller.friendId)
     .first<{ staff_id: string; starts_at: string; status: string }>();
   if (!entry || (entry.status !== 'waiting' && entry.status !== 'invited')) {
-    return c.json({ error: 'not_found' }, 404);
+    return liffBookingJson(c, { error: 'not_found' }, 404);
   }
   const wasInvited = entry.status === 'invited';
   const updated = await c.env.DB
@@ -57,7 +58,7 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
       WHERE id = ? AND status IN ('waiting', 'invited')`)
     .bind(id)
     .run();
-  if ((updated.meta?.changes ?? 0) === 0) return c.json({ error: 'not_found' }, 404);
+  if ((updated.meta?.changes ?? 0) === 0) return liffBookingJson(c, { error: 'not_found' }, 404);
   if (wasInvited) {
     // 見送りで仮押さえが空いたら、次の人へすぐ回す。
     try {
@@ -70,7 +71,7 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
       logger.error("booking.promote_waitlist_failed");
     }
   }
-  return c.json({ status: 'cancelled' });
+  return liffBookingJson(c, { status: 'cancelled' });
 });
 
 /**
@@ -79,7 +80,7 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
  */
 booking.get('/api/liff/booking/waitlist', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
+  if (!caller.ok) return liffBookingInputError(c, { error: caller.error }, caller.status, []);
   await finishExpiredWaitlists(c.env.DB,caller.accountId);
   const rows = await c.env.DB
     .prepare(
@@ -95,70 +96,70 @@ booking.get('/api/liff/booking/waitlist', async (c) => {
     )
     .bind(caller.accountId, caller.friendId,c.req.query('id')??null,c.req.query('id')??null)
     .all();
-  return c.json({ waitlist: rows.results });
+  return liffBookingJson(c, { waitlist: rows.results });
 });
 
 booking.get('/api/liff/booking/seat-waitlist',async(c)=>{
- const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
- if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return liffBookingInputError(c, {error:caller.error}, caller.status, []);
+ if(!restaurantTestEnabled(c.env))return liffBookingJson(c, {error:'not_found'},404);
  await finishExpiredWaitlists(c.env.DB,caller.accountId);
  const rows=await c.env.DB.prepare(`SELECT w.id,w.store_id,w.starts_at,w.ends_at,w.guest_count,w.status,w.hold_minutes,w.hold_expires_at,w.created_at,s.name store_name FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? AND w.line_uid=? AND (? IS NULL OR w.id=?) ORDER BY w.starts_at DESC,w.created_at LIMIT 100`).bind(caller.accountId,caller.lineUserId,c.req.query('id')??null,c.req.query('id')??null).all();
- return c.json({waitlist:rows.results});
+ return liffBookingJson(c, {waitlist:rows.results});
 });
 
 booking.post('/api/liff/booking/seat-waitlist',inputJsonBoundary({"store_id":["string"],"starts_at":["string"],"guest_count":["number"]}), async(c)=>{
- const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
- if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
- const body=await c.req.json<{store_id?:string;starts_at?:string;guest_count?:number}>().catch(()=>null);if(!body)return inputError(c, {error:'invalid_json'}, 400, []);
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return liffBookingInputError(c, {error:caller.error}, caller.status, []);
+ if(!restaurantTestEnabled(c.env))return liffBookingJson(c, {error:'not_found'},404);
+ const body=await c.req.json<{store_id?:string;starts_at?:string;guest_count?:number}>().catch(()=>null);if(!body)return liffBookingInputError(c, {error:'invalid_json'}, 400, []);
  const store=await c.env.DB.prepare(`SELECT id FROM rt_stores WHERE id=? AND line_account_id=? AND status='active'`).bind(body.store_id??'',caller.accountId).first<{id:string}>();
- if(!store)return c.json({error:'not_found'},404);
+ if(!store)return liffBookingJson(c, {error:'not_found'},404);
  const starts=typeof body.starts_at==='string'?Date.parse(body.starts_at):NaN;
- if(!Number.isFinite(starts))return inputError(c, {error:'invalid_starts_at'}, 400, ["starts_at"]);
- if(starts<=Date.now()+60*60_000)return c.json({error:'registration_closed'},409);
- const count=body.guest_count;if(!Number.isInteger(count)||!count||count<1||count>100)return inputError(c, {error:'invalid_party'}, 400, ["guest_count"]);
+ if(!Number.isFinite(starts))return liffBookingInputError(c, {error:'invalid_starts_at'}, 400, ["starts_at"]);
+ if(starts<=Date.now()+60*60_000)return liffBookingJson(c, {error:'registration_closed'},409);
+ const count=body.guest_count;if(!Number.isInteger(count)||!count||count<1||count>100)return liffBookingInputError(c, {error:'invalid_party'}, 400, ["guest_count"]);
  const end=new Date(starts+120*60_000).toISOString(),start=new Date(starts).toISOString();
  const fitting=await openSeatTables(c.env.DB,store.id,start,end,count,true);
  if(!fitting.length){
-  if((await closuresForRange(c.env.DB,store.id,start,end)).length)return c.json({error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);
-  return inputError(c, {error:'invalid_slot'}, 400, ["store_id","starts_at","guest_count"]);
+  if((await closuresForRange(c.env.DB,store.id,start,end)).length)return liffBookingJson(c, {error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);
+  return liffBookingInputError(c, {error:'invalid_slot'}, 400, ["store_id","starts_at","guest_count"]);
  }
  // 閉じていない卓だけで満席を判定する。一部貸切の空卓を「予約できる」と数えない。
- if((await openSeatTables(c.env.DB,store.id,start,end,count)).length)return c.json({error:'slot_not_full'},409);
+ if((await openSeatTables(c.env.DB,store.id,start,end,count)).length)return liffBookingJson(c, {error:'slot_not_full'},409);
  const friend=await c.env.DB.prepare('SELECT display_name FROM friends WHERE id=? AND line_account_id=?').bind(caller.friendId,caller.accountId).first<{display_name:string|null}>();
  const result=await insertSeatWaitlistEntry(c.env.DB,{storeId:store.id,startsAt:start,endsAt:end,guestCount:count,customerName:friend?.display_name||'LINEのお客さま',customerPhone:null,lineUid:caller.lineUserId});
- return result.ok?c.json({id:result.id},201):inputError(c, {error:result.error}, result.error==='already_waiting'||result.error==='registration_closed'||result.error==='waitlist_limit'||result.error==='closure_conflict'?409:400, []);
+ return result.ok?liffBookingJson(c, {id:result.id},201):liffBookingInputError(c, {error:result.error}, result.error==='already_waiting'||result.error==='registration_closed'||result.error==='waitlist_limit'||result.error==='closure_conflict'?409:400, []);
 });
 
 booking.delete('/api/liff/booking/seat-waitlist/:id',async(c)=>{
- const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
- if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return liffBookingInputError(c, {error:caller.error}, caller.status, []);
+ if(!restaurantTestEnabled(c.env))return liffBookingJson(c, {error:'not_found'},404);
  const result=await c.env.DB.prepare(`UPDATE rt_seat_waitlist SET status='cancelled',updated_at=? WHERE id=? AND line_uid=? AND store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?) AND status IN ('waiting','invited')`).bind(new Date().toISOString(),c.req.param('id'),caller.lineUserId,caller.accountId).run();
- return result.meta.changes?c.json({status:'cancelled'}):c.json({error:'not_found'},404);
+ return result.meta.changes?liffBookingJson(c, {status:'cancelled'}):liffBookingJson(c, {error:'not_found'},404);
 });
 
 booking.post('/api/liff/booking/seat-waitlist/:id/accept',inputJsonBoundary(), async(c)=>{
- const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return inputError(c, {error:caller.error}, caller.status, []);
- if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
- const key=c.req.header('Idempotency-Key');if(!key)return inputError(c, {error:'missing_idempotency_key'},400, []);
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return liffBookingInputError(c, {error:caller.error}, caller.status, []);
+ if(!restaurantTestEnabled(c.env))return liffBookingJson(c, {error:'not_found'},404);
+ const key=c.req.header('Idempotency-Key');if(!key)return liffBookingInputError(c, {error:'missing_idempotency_key'},400, []);
  const id=c.req.param('id');
  const entry=await c.env.DB.prepare(`SELECT w.* FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE w.id=? AND w.line_uid=? AND s.line_account_id=? AND s.status='active'`).bind(id,caller.lineUserId,caller.accountId).first<{store_id:string;table_id:string;starts_at:string;ends_at:string;guest_count:number;customer_name:string;status:string;hold_expires_at:string}>();
- if(!entry)return c.json({error:'not_found'},404);
+ if(!entry)return liffBookingJson(c, {error:'not_found'},404);
  const existing=await c.env.DB.prepare('SELECT id,status FROM rt_reservations WHERE store_id=? AND waitlist_entry_id=? AND line_uid=?').bind(entry.store_id,id,caller.lineUserId).first<{id:string;status:string}>();
- if(existing)return c.json({reservation_id:existing.id,status:existing.status});
- if(entry.status!=='invited'||Date.parse(entry.hold_expires_at)<=Date.now())return c.json({error:'offer_expired'},409);
+ if(existing)return liffBookingJson(c, {reservation_id:existing.id,status:existing.status});
+ if(entry.status!=='invited'||Date.parse(entry.hold_expires_at)<=Date.now())return liffBookingJson(c, {error:'offer_expired'},409);
  const checked=validateInboundReservation({externalId:`waitlist:${id}`,customerName:entry.customer_name,lineUid:caller.lineUserId,guestCount:entry.guest_count,startsAt:entry.starts_at,endsAt:entry.ends_at,status:'confirmed'});
- if(!checked.ok)return inputError(c, {error:checked.error}, 400, []);
+ if(!checked.ok)return liffBookingInputError(c, {error:checked.error}, 400, []);
  const table=await c.env.DB.prepare('SELECT id FROM rt_tables WHERE id=? AND store_id=? AND is_active=1 AND min_capacity<=? AND max_capacity>=?').bind(entry.table_id,entry.store_id,entry.guest_count,entry.guest_count).first();
- if(!table)return c.json({error:'slot_conflict'},409);
+ if(!table)return liffBookingJson(c, {error:'slot_conflict'},409);
  const closed=await closuresForRange(c.env.DB,entry.store_id,entry.starts_at,entry.ends_at);
- if(closed.some(r=>closureAffectsTable(r,entry.table_id)))return c.json({error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);
+ if(closed.some(r=>closureAffectsTable(r,entry.table_id)))return liffBookingJson(c, {error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);
  const reservationId=crypto.randomUUID();
  try { await c.env.DB.batch([
  c.env.DB.prepare(`INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,waitlist_entry_id) VALUES(?,?,'line',?,?,?,?,?,?,?,'confirmed',?)`).bind(reservationId,entry.store_id,`waitlist:${id}`,entry.customer_name,caller.lineUserId,entry.guest_count,entry.starts_at,entry.ends_at,entry.table_id,id),
  c.env.DB.prepare(`UPDATE rt_inventory_slots SET reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND julianday(r.starts_at)<julianday(rt_inventory_slots.starts_at,'+'||rt_inventory_slots.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(rt_inventory_slots.starts_at)),0) WHERE store_id=?`).bind(entry.store_id),
  ]);
- }catch(error){if(String(error).includes('closure_conflict'))return c.json({error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);throw error;}
- return c.json({reservation_id:reservationId,status:'confirmed'},201);
+ }catch(error){if(String(error).includes('closure_conflict'))return liffBookingJson(c, {error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);throw error;}
+ return liffBookingJson(c, {reservation_id:reservationId,status:'confirmed'},201);
 });
 
 /**
@@ -171,7 +172,7 @@ booking.post('/api/liff/booking/seat-waitlist/:id/accept',inputJsonBoundary(), a
  */
 booking.get('/api/liff/booking/last-booking', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
+  if (!caller.ok) return liffBookingInputError(c, { error: caller.error }, caller.status, []);
   const row = await c.env.DB
     .prepare(
       `SELECT b.id, b.starts_at, b.status,
@@ -205,17 +206,17 @@ booking.get('/api/liff/booking/last-booking', async (c) => {
       staff_deleted_at: string | null;
       staff_offers_menu: number | null;
     }>();
-  if (!row) return c.json({ available: false, reason: 'no_history' });
+  if (!row) return liffBookingJson(c, { available: false, reason: 'no_history' });
   if (Number(row.menu_active) !== 1 || row.menu_deleted_at !== null) {
-    return c.json({ available: false, reason: 'menu_inactive' });
+    return liffBookingJson(c, { available: false, reason: 'menu_inactive' });
   }
   if (Number(row.staff_active) !== 1 || row.staff_deleted_at !== null) {
-    return c.json({ available: false, reason: 'staff_inactive' });
+    return liffBookingJson(c, { available: false, reason: 'staff_inactive' });
   }
   if (row.staff_offers_menu !== null && Number(row.staff_offers_menu) !== 1) {
-    return c.json({ available: false, reason: 'not_offered' });
+    return liffBookingJson(c, { available: false, reason: 'not_offered' });
   }
-  return c.json({
+  return liffBookingJson(c, {
     available: true,
     booking: {
       id: row.id,
@@ -233,13 +234,13 @@ booking.get('/api/liff/booking/last-booking', async (c) => {
  */
 booking.get('/api/liff/booking/waitlist/mine', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
-  if (!caller.ok) return inputError(c, { error: caller.error }, caller.status, []);
+  if (!caller.ok) return liffBookingInputError(c, { error: caller.error }, caller.status, []);
   const staffId = c.req.query('staff_id')?.trim() || '';
   const menuId = c.req.query('menu_id')?.trim() || '';
   const startsAtRaw = c.req.query('starts_at')?.trim() || '';
-  if (!staffId || !menuId || !startsAtRaw) return c.json({ error: 'missing_params' }, 400);
+  if (!staffId || !menuId || !startsAtRaw) return liffBookingJson(c, { error: 'missing_params' }, 400);
   const startsAtMs = Date.parse(startsAtRaw);
-  if (Number.isNaN(startsAtMs)) return c.json({ error: 'invalid_starts_at' }, 400);
+  if (Number.isNaN(startsAtMs)) return liffBookingJson(c, { error: 'invalid_starts_at' }, 400);
   const entry = await c.env.DB
     .prepare(
       `SELECT id, status, created_at,hold_expires_at,hold_minutes FROM booking_waitlist
@@ -250,7 +251,7 @@ booking.get('/api/liff/booking/waitlist/mine', async (c) => {
     )
     .bind(caller.accountId, staffId, menuId, new Date(startsAtMs).toISOString(), caller.friendId)
     .first<{ id: string; status: string; created_at: string }>();
-  if (!entry) return c.json({ entry: null });
-  return c.json({ entry });
+  if (!entry) return liffBookingJson(c, { entry: null });
+  return liffBookingJson(c, { entry });
 });
 }

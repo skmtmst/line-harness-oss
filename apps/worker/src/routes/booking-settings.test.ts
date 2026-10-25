@@ -1005,7 +1005,7 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
     const own = await app.request('/api/liff/booking/settings?liffId=liff-a', {}, env);
     expect(own.status).toBe(200);
     await expect(own.json()).resolves.toEqual({
-      liff_date_view: 'calendar',
+      success: true, liff_date_view: 'calendar',
       booking_window_days: 45,
       // 承認なし確定の店だけ automatic。ここは通常の店なので manual。
       approval_mode: 'manual',
@@ -1015,7 +1015,7 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
     const other = await app.request('/api/liff/booking/settings?liffId=liff-empty', {}, env);
     expect(other.status).toBe(200);
     await expect(other.json()).resolves.toEqual({
-      liff_date_view: 'list',
+      success: true, liff_date_view: 'list',
       booking_window_days: 60,
       approval_mode: 'manual',
       cancel_deadline_minutes_before: 1440,
