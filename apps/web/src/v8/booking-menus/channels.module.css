@@ -4,15 +4,7 @@
  * 表は角丸の枠の中に、頭の行（40）と本文の行（54）。列の間は16、左右は20。
  */
 
-.band {
-  margin: 0;
-  padding: var(--tpl-bm-10) var(--tpl-bm-12);
-  border-radius: var(--tpl-bm-8);
-  background: var(--tpl-r2-ch-band-bg);
-  color: var(--tpl-r2-ch-band-ink);
-  font-size: var(--tpl-bm-11);
-  line-height: var(--tpl-bm-17);
-}
+
 
 .card {
   display: flex;

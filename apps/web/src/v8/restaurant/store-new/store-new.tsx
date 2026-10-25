@@ -79,7 +79,7 @@ function HelpPanel({ step }: { step: number }) {
       {step === STEP.OFFICIAL_ACCOUNT ? (
         <>
           <ManualButton href={MANUAL_LINKS.createOfficialAccount}>LINE公式アカウントを作る</ManualButton>
-          <p className={styles.warnBox}>{PROVIDER_NOTE}</p>
+          <Notice tone="warn">{PROVIDER_NOTE}</Notice>
         </>
       ) : step === STEP.CREDENTIALS ? (
         <>
@@ -302,7 +302,7 @@ export default function StoreNewV8() {
                 <Field label="店舗の略称" required={false} error={undefined}>
                   <SaveErrorField names={["alias"]}><TextField value={alias} onChange={(event) => setAlias(event.target.value)} placeholder="空欄なら店舗名を使います" /></SaveErrorField>
                 </Field>
-                <p className={styles.warnBox}>{PROVIDER_NOTE}</p>
+                <Notice tone="warn">{PROVIDER_NOTE}</Notice>
                 {termsAgreedAt ? <p className={styles.agreed}><CircleCheck aria-hidden className={styles.checkIcon} />{`利用規約に同意済み${agreedLabel ? `（${agreedLabel}）` : ''}`}</p> : null}
               </>
             ) : null}

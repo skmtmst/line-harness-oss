@@ -111,15 +111,7 @@
 }
 
 /* 検証環境の帯：薄い金色の地＋緑の札＋右の注意 */
-.boundary {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rs-band-gap);
-  padding: var(--tpl-rs-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--tpl-rs-band-bg);
-  box-shadow: var(--tpl-rs-ring-band);
-}
+
 
 .boundaryBadge {
   flex: 0 0 auto;
@@ -130,34 +122,6 @@
   font-size: var(--text-micro);
   font-weight: 600;
   line-height: var(--tpl-rs-lh-11);
-}
-
-.boundaryText {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-rs-lh-12);
-}
-
-.boundaryNote {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-rs-band-gap);
-  margin-left: auto;
-  color: var(--color-accent-deep);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-rs-lh-12);
-  white-space: nowrap;
-}
-
-.boundaryNote::before {
-  width: var(--tpl-rs-dot);
-  height: var(--tpl-rs-dot);
-  flex: 0 0 var(--tpl-rs-dot);
-  border-radius: var(--radius-chart-bar);
-  background: var(--tpl-rs-gold);
-  content: '';
 }
 
 /* 白い枠：頭は題14/700＋説明11、下に細い線（線は内側の影にして高さを足さない） */

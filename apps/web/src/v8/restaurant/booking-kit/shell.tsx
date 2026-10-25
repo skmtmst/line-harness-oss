@@ -72,11 +72,10 @@ export function Status({ value, label }: { value: string; label?: string }) {
 /** 検証環境の帯。全画面で同じ。 */
 export function BoundaryBanner() {
   return (
-    <div className={styles.boundary}>
-      <span className={styles.boundaryBadge}>検証環境専用</span>
-      <p className={styles.boundaryText}>既存の然-NEN運用とは分離された飲食店向けテスト領域です。</p>
-      <span className={styles.boundaryNote}>予約媒体は受信専用・外部更新なし</span>
-    </div>
+    <Notice tone="warn" marker="dot" heading={<span className={styles.boundaryBadge}>検証環境専用</span>}>
+      既存の然-NEN運用とは分離された飲食店向けテスト領域です。{' '}
+      予約媒体は受信専用・外部更新なし
+    </Notice>
   )
 }
 

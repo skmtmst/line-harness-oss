@@ -116,16 +116,6 @@
   line-height: normal;
 }
 
-.warnBox {
-  margin: 0;
-  padding: var(--tpl-rt-gray-note-pad);
-  border-radius: var(--tpl-rt-inner-radius);
-  background: var(--tpl-rt-comment-bg);
-  color: var(--color-warning);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-rt-kind-lh);
-}
-
 .agreed {
   display: flex;
   align-items: center;

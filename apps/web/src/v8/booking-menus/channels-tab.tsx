@@ -328,10 +328,9 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack}>
-      {/* 絵 ZyDd6：緑の帯に1行で全文。 */}
-      <p className={ch.band}>
+      <Notice tone="info">
         いちばん確かなのは「スタッフの Google カレンダー」です。ほかの予約サービスがスタッフの Google カレンダーへ予約を書き出せれば、その時間は自動で LINE の予約受付から外れます（いまの作りでできます）。
-      </p>
+      </Notice>
       {firstConflict ? (
         <NoteBar tone="warn">
           予約が {conflicts.length} 件重なっています。
