@@ -344,10 +344,9 @@ export default function TagCsvImportDialog({
 
         {phase === 'success' && result ? <>
           <div className={styles.body}>
-            <div className={styles.resultBanner}>
-              <CircleCheck aria-hidden="true" size={20} />
+            <Notice tone="success" icon={<CircleCheck aria-hidden="true" size={20} />}>
               <h2 id="tag-csv-title" className={styles.resultTitle}>{result.summary.created}件を登録しました</h2>
-            </div>
+            </Notice>
             <div className={styles.breakdown}>
               <strong>フォルダの内訳</strong>
               <p>{Object.entries(result.rows.filter((row) => row.status === 'created').reduce<Record<string, number>>((counts, row) => {

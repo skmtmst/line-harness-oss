@@ -1,5 +1,6 @@
 'use client'
 
+import Notice from '@/components/shared/notice'
 import { TAG_ADD_ACTION_LABEL } from '@/components/shared/action-words'
 import { useEffect, useState } from 'react'
 import { Coins } from 'lucide-react'
@@ -163,15 +164,15 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
             <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>連動アクションの送信</dt><dd>さかのぼって送りません</dd><dd className="text-right">送信0件</dd></div>
           </dl>
         </div>
-        <div className="mt-3 rounded-control border border-danger/25 bg-danger-bg p-3 text-xs leading-5 text-danger">
-          <p className="font-bold">この操作は取り消せません</p>
+        <Notice tone="warn" heading={<> この操作は取り消せません </>}>
+
           <p>さかのぼって積んだマイルは自動では戻せません。取り消すにはマイル画面から手動で調整が必要です。</p>
-        </div>
+        </Notice>
         {previewError && (
-          <p role="alert" className="mt-3 rounded-control border border-danger/25 bg-danger-bg p-3 text-xs leading-5 text-danger">
+          <Notice tone="danger" action={<> <button type="button" onClick={fetchPreview} className="ml-2 font-semibold underline">再計算する</button> </>} role="alert">
             {previewError}
-            <button type="button" onClick={fetchPreview} className="ml-2 font-semibold underline">再計算する</button>
-          </p>
+
+          </Notice>
         )}
         <SaveErrorField names={["accepted"]}><Checkbox className="mt-3" checked={accepted} onCheckedChange={setAccepted}>人数と合計マイルを確認しました</Checkbox></SaveErrorField>
         <p className="mt-3 whitespace-nowrap text-xs leading-4 text-ink-faint">新規作成のときはこのダイアログは出ません。まだ誰にもタグが付いていないため、送信やマイル付与も起きません。</p>

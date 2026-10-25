@@ -307,16 +307,6 @@
   flex: 1;
 }
 
-.resultBanner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-radius: var(--radius-control);
-  background: var(--color-accent-soft);
-  padding: 14px 16px;
-  color: var(--color-accent-deep);
-}
-
 .resultTitle {
   margin: 0;
   font-size: 16px;

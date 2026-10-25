@@ -156,9 +156,9 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
 
       {/* FRIEND-15: 「まだ変更していません」は本移行前の履歴だけに出す。 */}
       {(!active || PRE_EXECUTE_STATUSES.includes(active.status)) && (
-        <div className={styles.infoBand} role="note">
+        <Notice tone="info" role="note">
           <p>本移行まで、既存ユーザー・配信・シナリオには影響しません。</p>
-        </div>
+        </Notice>
       )}
 
       {/* 移行の登録（いつでも新しいテスト移行を始められる）。 */}
