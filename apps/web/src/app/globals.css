@@ -583,7 +583,7 @@
   --polish-space-row: 8px;
   --polish-control-bg: #f0f0f2; --polish-control-hover: #e8e8eb; --polish-control-text: 13px; --polish-control-weight: 500; --polish-value-weight: 600;
   --polish-selection-bg: #f0f0f2; --polish-selection-ink: var(--color-ink); --polish-selection-shadow: var(--shadow-nav-active); --polish-selection-outline: 1px solid var(--color-control-border); --polish-band-radius: 16px;
-  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06); --polish-nav-tracking: 0.06em; --polish-icon-small: 14px; --polish-icon-large: 18px; --polish-text-center-inset: 1px; --tpl-tabs-center-inset: 3px; --tpl-funnel-window-min-width: 208px; --tpl-cv-period-preview-width: 320px; --tpl-cv-period-content-width: 288px;
+  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06); --polish-nav-tracking: 0.06em; --polish-heading-tracking: 0.02em; --polish-icon-small: 14px; --polish-icon-large: 18px; --polish-text-center-inset: 1px; --tpl-tabs-center-inset: 3px; --tpl-funnel-window-min-width: 208px; --tpl-cv-period-preview-width: 320px; --tpl-cv-period-content-width: 288px;
   --polish-space-field: 12px;
   --polish-space-card: 16px;
   --polish-space-section: 24px;
@@ -2550,6 +2550,17 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   h2,
   h3 {
     text-wrap: balance;
+  }
+
+  /*
+   * 和文の題・見出しは字の間を少し空けて読みやすくする（0.02em）。型と共通部品の
+   * 見出しはどれも h1〜h4 で描くので、ここ1か所で効く。部品が字間を決めた所はそちらが勝つ。
+   */
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: var(--polish-heading-tracking);
   }
 
   /*
