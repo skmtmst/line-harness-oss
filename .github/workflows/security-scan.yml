@@ -1,0 +1,85 @@
+name: Security scan
+
+# Report-only security checks. Nothing here blocks a merge: findings are left in
+# the job summary (and the code scanning tab for CodeQL) for the owner to read.
+#
+# - pnpm audit: known vulnerabilities in production dependencies (high and above).
+# - CodeQL: risky patterns in the JavaScript / TypeScript source.
+#
+# This workflow does not open dependency update pull requests. The owner has
+# held back "wait 7 days before taking a freshly published npm version", so
+# version bumps stay a manual decision.
+
+on:
+  pull_request:
+  push:
+    branches: [codex/development]
+  schedule:
+    # Mondays 03:17 JST.
+    - cron: '17 18 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-audit:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.23.4'
+
+      - name: pnpm audit (production dependencies, report only)
+        continue-on-error: true
+        run: |
+          set +e
+          pnpm audit --prod --audit-level=high > audit.txt 2>&1
+          status=$?
+          set -e
+          {
+            echo '## pnpm audit --prod --audit-level=high'
+            echo
+            if [ "$status" -eq 0 ]; then
+              echo 'No high or critical vulnerabilities in production dependencies.'
+            else
+              echo "Found high or critical vulnerabilities (exit $status). Report only; nothing is blocked."
+            fi
+            echo
+            echo '```'
+            tail -n 200 audit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat audit.txt
+          exit "$status"
+
+  codeql:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: '/language:javascript-typescript'

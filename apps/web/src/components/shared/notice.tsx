@@ -1,10 +1,11 @@
 'use client'
 
-import type { ComponentPropsWithRef, HTMLAttributes, ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
 import { Check, CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import styles from './notice.module.css'
 import { humanizeErrorText } from './human-error-text'
+import { jstDate } from '@/lib/jst-datetime'
 
 /** 知らせは案内・成功・注意・危険の4種類。呼び名と見た目はここが持つ。 */
 export type NoticeTone = 'info' | 'success' | 'warn' | 'danger'
@@ -38,7 +39,7 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   footer?: ReactNode
   /** 内容を短い丸の印で伝える。既定の図柄も引き続き使える。 */
   marker?: 'dot'
-  /** カード内などの小さな帯。本文を1行に省略し、title で全文を渡す。 */
+  /** カード内などの小さな帯。案内・成功の本文は1行に省略し、title で全文を渡す。警告・危険は折り返す。 */
   compact?: boolean
   /** 枠線のない注意帯を描く板だけで指定する。既定の帯は変えない。 */
   appearance?: 'soft'
@@ -119,6 +120,7 @@ export default function Notice({
       data-compact={compact || undefined}
       data-appearance={appearance}
       data-design-part="notice"
+      data-tone={canonical}
       data-density={density}
       data-presentation={presentation}
       data-action-layout={action ? actionLayout : undefined}
@@ -152,4 +154,22 @@ export function NoticeStates({ items }: { items: NonNullable<NoticeProps['states
       {label}
     </li>)}
   </ul>
+}
+
+const CLOSED_TODAY_PREFIX = 'lh:notice-closed:'
+
+/**
+ * 帯の［閉じる］（`onClose`）を、その端末でその日だけ効かせる。
+ * 日本時間で日が変わると、また出る。保存できない端末では、その画面の間だけ閉じる。
+ */
+export function useNoticeClosedToday(key: string) {
+  const [closed, setClosed] = useState(false)
+  useEffect(() => {
+    try { setClosed(localStorage.getItem(CLOSED_TODAY_PREFIX + key) === jstDate()) } catch { setClosed(false) }
+  }, [key])
+  const close = useCallback(() => {
+    setClosed(true)
+    try { localStorage.setItem(CLOSED_TODAY_PREFIX + key, jstDate()) } catch { /* この画面の間だけ閉じる */ }
+  }, [key])
+  return { closed, close }
 }

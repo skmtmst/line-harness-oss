@@ -168,7 +168,7 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
       const next = [...document.querySelectorAll('#main-content [data-page-template]')].find(node => node.getBoundingClientRect().width > 0)
       if (!next) return null
       const rect = el.getBoundingClientRect()
-      const text = el.querySelector('span:last-child').getBoundingClientRect()
+      const text = [...el.querySelectorAll('div, span, p')].filter(node => node.textContent.includes('作り直してください')).pop().getBoundingClientRect()
       const painted = document.elementFromPoint(rect.x + rect.width / 2, rect.bottom - 2)
       return { separated: next.getBoundingClientRect().top >= rect.bottom, textInside: text.bottom < rect.bottom, uncovered: el.contains(painted), overflow: document.documentElement.scrollWidth - innerWidth }
     })).toEqual({ separated: true, textInside: true, uncovered: true, overflow: 0 })

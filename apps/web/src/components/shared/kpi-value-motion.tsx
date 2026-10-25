@@ -13,6 +13,8 @@ type MotionScope = {
   ready: boolean
 }
 const ValueMotion = createContext<MotionScope | null>(null)
+/** 回る動き（--motion-kpi-roll の 500ms）が終わったはずの時間に少し足したもの。 */
+const ROLL_FALLBACK_MS = 700
 
 /** 初期の表・集計の読み込みが落ち着くまで、装飾のDOMを増やさない。 */
 function useInitialContentReady() {
@@ -121,13 +123,20 @@ export function KpiRollingValue({ text, identity, loading }: { text: string; ide
   }, [scope, values, firstScope, updates, initialAllowed, ready, text, identity, loading])
 
   const active = !loading && roll?.scope === scope && roll?.text === text
+  // 動きの終わりが届かない時（裏のタブ・動きを止める道具）も、決まった時間で装飾を外す。
+  useEffect(() => {
+    if (!active) return
+    const timer = window.setTimeout(() => setRoll(null), ROLL_FALLBACK_MS)
+    return () => window.clearTimeout(timer)
+  }, [active])
   return <span className={`${styles.number} ${styles.rollingValue}`} data-kpi-value data-kpi-rolling={active || undefined}>
     <span data-kpi-number className={styles.actualValue}>{text}</span>
     {active ? <span aria-hidden="true" data-kpi-roll className={styles.rollingOverlay} onAnimationEnd={() => setRoll(null)}>
       {Array.from(text, (character, index) => /[0-9]/.test(character) ? (
         <span key={index} className={styles.digitWindow}>
           <span className={styles.digitColumn}>
-            <span>{(Number(character) + 1) % 10}</span>
+            {/* 始めと終わりを本当の数字にし、動きが止まっても正しい値に見せる。 */}
+            <span>{character}</span>
             <span>{(Number(character) + 5) % 10}</span>
             <span>{character}</span>
           </span>

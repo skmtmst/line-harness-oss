@@ -34,6 +34,15 @@ describe('統括の旧メッセージ編集（保存結果の再確認にも使�
     expect(JSON.parse(save.mock.calls[0][0].template.messageContent).body.contents.some((row: { text?: string }) => row.text === '直した本文')).toBe(true)
   })
 
+  it('画像の長いファイル名は省略しても全文を title で見られる', async () => {
+    const filename = 'とても長いファイル名の秋の新メニューのご案内用の画像_2026年10月版.png'
+    const media = { id: 'media-old', kind: 'image' as const, filename, mimeType: 'image/png', sizeBytes: 1, width: 1040, height: 1040, durationMs: null, r2Key: 'k', publicUrl: null, versionId: 'v-1', versionNo: 1, contentHash: 'h' }
+    const card = { format: 'flex' as const, title: 'ご案内', body: '本文', imageMediaId: 'media-old', buttons: [] }
+    render(<Harness initial={{ ...base, media: [media], card, template: { ...base.template, messageType: 'flex' } }} save={vi.fn()} />)
+    const name = await screen.findByText(`${filename} ・ 1040×1040`)
+    expect(name.getAttribute('title')).toBe(`${filename} ・ 1040×1040`)
+  })
+
   it('既存の画像は切り替えを出さず、URLを直しても画像のまま保存できる', async () => {
     const save = vi.fn()
     render(<Harness initial={{ ...base, template: { ...base.template, messageType: 'image', messageContent: 'https://img.test/old.png' } }} save={save} />)

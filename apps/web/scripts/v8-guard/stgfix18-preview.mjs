@@ -15,7 +15,7 @@ try {
    const tabs=page.getByRole('tablist',{name:'見本の画面',includeHidden:true})
    await tabs.waitFor({state:'attached'})
    if(!await tabs.isVisible()) {
-    if(width!==1152) throw new Error('広い幅で予約見本が表示されません')
+    if(width>1152) throw new Error('広い幅で予約見本が表示されません')
     await page.screenshot({path:join(out,`${width}.png`)})
     results.push({width,previewCollapsed:true});checkpoint();continue
    }

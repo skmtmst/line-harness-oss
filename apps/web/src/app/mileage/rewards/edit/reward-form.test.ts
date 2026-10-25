@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import { optionalInteger, validateReward, type FormState } from './reward-form'
 
 const RAW_PAGE = readFileSync(join(__dirname, 'v8-reward-edit.tsx'), 'utf8')
-const API = readFileSync(join(__dirname, '..', '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 
 /**
  * 注釈を落とす。**見張りたいのは画面に出る言葉だけ。**
@@ -16,7 +15,6 @@ const PAGE = RAW_PAGE
   .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '')
-const LIST = readFileSync(join(__dirname, '../../../../v8/mileage/rewards.tsx'), 'utf8')
 
 const base: FormState = {
   name: '送料無料クーポン',
@@ -82,68 +80,24 @@ describe('使い道の入力の確かめ', () => {
   })
 })
 
-describe("管理画面 17-1-G の配線", () => {
-  it('数の限りで「限りなし」と「品切れ」を混ぜない', () => {
-    /*
-      **空欄は限りなし、0 は品切れ。** 同じ扱いにすると、出したつもりの
-      ものが誰にも交換できない状態を見分けられない。
-    */
-    expect(PAGE).toContain('空欄なら限りなし。0 と書くと品切れ（交換できません）')
-    expect(PAGE).toContain('optionalInteger(value)')
-    // 0 を null へ潰さない。数にならない入力も null（無制限）へ潰さない。
+/*
+ * 画面の配線（数の限りの保存・欄ごとの止め方・選べる種類・版つき保存・確認後の公開・
+ * 壊れた1件取得・共通アクションの公開版・交換対象の条件）は、本物の React で押して
+ * 確かめる reward-edit-react.test.tsx が守る。ここには「書いてはいけない形」だけを残す。
+ */
+describe('管理画面 17-1-G で書いてはいけない形', () => {
+  it('数の限りの 0・数にならない入力を null（無制限）へ潰さない', () => {
     expect(PAGE).not.toContain('Number(value) || null')
     expect(PAGE).not.toContain('Number.isFinite(parsed) ? parsed : null')
   })
 
-  it('R298: 数の限り・上限・日数の不正入力を欄ごとに止める', () => {
-    // 画面の確かめと保存側の変換が同じ `optionalInteger` を使う。
-    expect(PAGE).toContain('LIMIT_FIELD_ERRORS.stockLimit')
-    expect(PAGE).toContain('LIMIT_FIELD_ERRORS.perFriendLimit')
-    expect(PAGE).toContain('LIMIT_FIELD_ERRORS.benefitExpiresDays')
-    expect(PAGE).toContain('error={touched')
-    // 全角数字は半角へそろえて受け取る。
-    expect(PAGE).toContain('normalizeDigits(e.target.value)')
-  })
-
-  it('渡すものは保存できる種類だけ出す', () => {
+  it('保存できない渡すものの種類を出さない', () => {
     /*
       設計には「回答フォームへ」「品もの」もあるが、`MileageRewardKind` に
       無い。出すと**選べるように見えて保存できない。**
     */
-    for (const kind of ['coupon', 'tag', 'scenario', 'template', 'early_access', 'rank']) {
-      expect(PAGE).toContain(`value: '${kind}'`)
-    }
     expect(PAGE).not.toContain('回答フォームへ')
     expect(PAGE).not.toContain('品もの')
-  })
-
-  it('渡せなかったときの決めごとを画面から選べる', () => {
-    for (const label of ['もう一度試す（おすすめ）', 'マイルを返す', '担当者が手で対応する']) {
-      expect(PAGE).toContain(label)
-    }
-  })
-
-  it('既存の使い道は版IDつきで更新し、確認後だけ公開する', () => {
-    expect(PAGE).toContain('currentDraftVersionId')
-    expect(PAGE).toContain('createRewardDraft')
-    expect(PAGE).toContain('<ConfirmDialog')
-    expect(API).toContain("method: 'PATCH'")
-    expect(API).toContain('expectedVersionId')
-    expect(API).toContain("'X-Confirm-Irreversible': 'mileage-reward-publish'")
-  })
-
-  it('保存した下書きを、残高と在庫を動かさず交換テストする', () => {
-    expect(PAGE).toContain('自分で交換をテスト')
-    expect(PAGE).toContain('api.mileage.testReward(saved.id, selectedAccountId)')
-    expect(PAGE).toContain('残高と在庫は動かしていません')
-    expect(API).toContain('/api/mileage/rewards/${encodeURIComponent(id)}/test')
-    expect(API).toContain('ApiResponse<MileageRewardTestResult>')
-  })
-
-  it('一覧から行き止まりを作らない', () => {
-    expect(LIST).toContain('href="/mileage/rewards/edit"')
-    expect(LIST).toContain('使い道を作る')
-    expect(LIST).toContain("label: readonly ? '中身を見る' : '編集'")
   })
 
   it('内部の記号を画面に出さない', () => {
@@ -153,25 +107,8 @@ describe("管理画面 17-1-G の配線", () => {
     expect(PAGE).not.toMatch(/\*\*[^*\n]+\*\*[^\n]*<\/NoteBar>/)
   })
 
-  it('1件取得の形が壊れていても一覧から同じIDを探し、画面全体を落とさない', () => {
-    expect(PAGE).toContain('isMileageRewardSummary(detail.data)')
-    expect(PAGE).toContain('overview.data.rewards.find((item) => item.id === rewardId)')
-    expect(PAGE).toContain('const [detail, overview] = await Promise.all([')
-  })
-
-  it('共通アクションの公開版を選択肢から保存する', () => {
-    expect(PAGE).toContain('api.commonActions.resources(selectedAccountId)')
-    expect(PAGE).toContain('item.currentPublishedVersionId')
+  it('共通アクションは版の手入力や下書きの読み込みに戻さない', () => {
     expect(PAGE).not.toContain('api.commonActions.get(item.id')
-    expect(PAGE).toContain('公開中の共通アクションを選ぶ')
     expect(PAGE).not.toContain('placeholder="共通アクションの版"')
-  })
-
-  it('交換対象を15軸の共通条件部品で作り、下書きへ保存する', () => {
-    expect(PAGE).toContain("import ConditionBuilder, { pruneCondition }")
-    expect(PAGE).toContain('value={form.targetConditions}')
-    expect(PAGE).toContain("set('targetConditions', next)")
-    expect(PAGE).toContain('targetConditions: pruneCondition(form.targetConditions)')
-    expect(API).toContain('targetConditions?: MileageTargetConditionV6 | null')
   })
 })
