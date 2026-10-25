@@ -31,6 +31,7 @@ import SidebarIdentity from './sidebar-identity'
 import { isBooleanRecord,watchNavOverflow } from './sidebar-nav-overflow'
 import SidebarVersion from './sidebar-version'
 import styles from './sidebar.module.css'
+import { SIDEBAR_AUTO_COLLAPSE_BELOW } from './sidebar-collapse'
 
 function NavIcon({ d, className }: { d: string; className?: string }) {
   return (
@@ -55,11 +56,6 @@ const HQ_SETTINGS_PATHS = ['/hq/settings', '/hq/members', '/hq/billing', '/hq/su
 
 /** 組の開閉を覚えるキー（ブラウザごと）。 */
 const SIDEBAR_GROUPS_KEY = 'lh-sidebar-groups'
-/**
- * 保存が無いとき、この幅より狭ければ左メニューを畳んで開く。iPad 横（1024px）だけ
- * アイコンの列にし、1025px からは名前つきのまま（2026-10-25 オーナー）。1023px 以下は引き出し。
- */
-export const SIDEBAR_AUTO_COLLAPSE_BELOW = 1025
 
 /*
  * PERF-08: バッジ件数をアカウント単位で共有する直近値。
