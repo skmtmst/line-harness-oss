@@ -149,7 +149,7 @@ export async function runCommonVarExportJob(db: D1Database, jobId: string): Prom
       finishedAt: finishedAt(),
     });
   } catch (error) {
-    logger.error("common_var_export_failed");
+    logger.error("common_vars.export_failed");
     await failCommonVarExport(db, jobId, '書き出しの途中で失敗しました', finishedAt());
   }
 }

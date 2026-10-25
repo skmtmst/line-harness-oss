@@ -889,11 +889,11 @@ export async function enqueueBirthdayCoupons(
   let queued = 0;
   let failed = 0;
   const report = async (failure: NenCouponIssueFailure) => {
-    logger.error("nen_birthday_coupon_issue_failed");
+    logger.error("nen_engagement.issue_birthday_coupon_failed");
     try {
       await onIssueFailed?.(failure);
     } catch (notifyError) {
-      logger.error("services_nen_engagement_failed");
+      logger.error("nen_engagement.report_failed");
     }
   };
   for (const pet of pets.results) {

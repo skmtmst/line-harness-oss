@@ -1,3 +1,4 @@
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
@@ -126,7 +127,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_revert_1 = async (c: 
             }
           }
         } catch (aliasError) {
-          logger.warn("routes_rich_menu_groups_warn");
+          logger.warn("rich_menu_groups_repair.restore_default_menu_failed");
         }
       }
       await deleteRichMenuShells(line, testShellIds);
@@ -167,6 +168,6 @@ export const post__api_rich_menu_groups_groupId_test_apply_revert_1 = async (c: 
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await markRichMenuTestApplyRevertFailed(c.env.DB, apply.id, message);
-      return c.json({ success: false, error: message, data: { applyId: apply.id } }, 500);
+      throw new UnexpectedRouteError(c, { success: false, error: message, data: { applyId: apply.id } });
     }
   };

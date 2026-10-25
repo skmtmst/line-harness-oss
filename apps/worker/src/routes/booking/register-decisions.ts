@@ -221,7 +221,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         startsAt: row.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      logger.error("booking_waitlist_promote_failed");
+      logger.error("booking.promote_waitlist_failed");
     }
   }
 

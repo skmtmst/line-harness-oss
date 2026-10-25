@@ -341,7 +341,7 @@ booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KE
     }
     return c.json({ success: true, data: { id: c.req.param('id'), version: result.version } });
   } catch {
-    logger.error("booking_menu_settings_update_failed");
+    logger.error("booking.update_menu_settings_failed");
     return c.json({ success: false, error: 'booking_menu_save_failed' }, 503);
   }
 });

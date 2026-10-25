@@ -473,7 +473,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       c.executionCtx.waitUntil(enrollByTrigger(c.env.DB, {
         triggerType: 'booking', friendId, startsAtIso: startsAt.toISOString(), sourceId: bookingId,
         sourceEventId: bookingId, lineAccountId: accountId,
-      }).catch(() => logger.error("proxy_reminder_enrollment_failed")));
+      }).catch(() => logger.error("booking.enroll_proxy_reminder_failed")));
     }
   }
   if (friendId) {

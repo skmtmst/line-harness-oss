@@ -456,10 +456,10 @@ analytics.post('/api/analytics/cross/query', inputJsonBoundary(), async (c) => {
     return c.json({ success: true, data: result }, 202);
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) logger.error("analytics.cross_query_create_failed");
+    if (status === 500) throw error;
     return inputError(c, {
       success: false,
-      error: status === 500 ? 'Internal server error' : (error as Error).message,
+      error: (error as Error).message,
     }, status, []);
   }
 });
@@ -516,10 +516,10 @@ analytics.post('/api/analytics/saved', requireRole('owner', 'admin'), inputJsonB
     return c.json({ success: true, data: result }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) logger.error("analytics.saved_create_failed");
+    if (status === 500) throw error;
     return inputError(c, {
       success: false,
-      error: status === 500 ? 'Internal server error' : (error as Error).message,
+      error: (error as Error).message,
     }, status, []);
   }
 });
@@ -1173,10 +1173,10 @@ analytics.get('/api/analytics/funnels/:id/runs/latest', async (c) => {
     return c.json({ success: true, data: result });
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) logger.error("analytics.funnels_by_id_runs_latest_get_failed");
+    if (status === 500) throw error;
     return inputError(c, {
       success: false,
-      error: status === 500 ? 'Internal server error' : (error as Error).message,
+      error: (error as Error).message,
     }, status, []);
   }
 });

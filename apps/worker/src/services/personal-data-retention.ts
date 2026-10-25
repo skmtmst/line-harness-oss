@@ -69,7 +69,7 @@ export async function processPersonalDataRetention(env: RetentionEnvironment, no
       });
     } catch {
       failed++;
-      logger.error("personal_data_retention_failed");
+      logger.error("personal_data.enforce_retention_failed");
     }
   }
   return { deleted, failed, held };

@@ -82,7 +82,7 @@ export async function matchesReminderTargetCondition(
   try {
     return await matchesCondition(db, friendId, condition);
   } catch (err) {
-    logger.error("services_reminder_trigger_failed");
+    logger.error("reminder_trigger.matches_reminder_target_condition_failed");
     return false;
   }
 }

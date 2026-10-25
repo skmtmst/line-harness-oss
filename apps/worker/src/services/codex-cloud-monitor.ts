@@ -617,7 +617,7 @@ async function processOfficialInspection(
       message.threadTs,
       '【中継失敗】Slack User OAuthによる公式Codexへの自動中継に失敗しました。重複防止のため再送せず停止しています。',
     );
-    logger.error("codex_user_relay_failed");
+    logger.error("codex_monitor.relay_user_message_failed");
     return;
   }
 

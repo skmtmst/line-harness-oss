@@ -764,7 +764,7 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     if (error instanceof Error && error.message === 'IDEMPOTENCY_IN_PROGRESS') {
       return c.json({ success: false, error: '前回の送信結果を確認中です。再送せず受信履歴を確認してください' }, 409);
     }
-    logger.error("support_email_reply_failed");
+    logger.error("support_email.send_reply_failed");
     return c.json({ success: false, error: 'メール送信に失敗しました' }, 502);
   } finally {
     if (leaseAcquired) {

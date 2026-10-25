@@ -886,7 +886,7 @@ export async function switchRichMenuLive(
         }
       }
     } catch (e) {
-      logger.warn("lib_rich_menu_publisher_warn");
+      logger.warn("rich_menu_publisher.clear_switched_default_failed");
     }
   }
 }
@@ -912,7 +912,7 @@ export async function restorePreSwitchLive(
         await line.deleteRichMenuAlias(aliasId);
       }
     } catch (e) {
-      logger.warn("lib_rich_menu_publisher_warn");
+      logger.warn("rich_menu_publisher.restore_live_menu_failed");
       unrestored.add(old.pageId);
     }
   }
@@ -951,7 +951,7 @@ export async function restorePreSwitchDefault(
   } catch (e) {
     // 読めない = 新メニューを指したままかもしれない。どれかも分からないので、
     // 新メニューは1つも消さない(消すと default がリンク切れになる)。
-    logger.warn("lib_rich_menu_publisher_warn");
+    logger.warn("rich_menu_publisher.restore_default_menu_failed");
     return { state: 'failed', retainedId: null };
   }
   if (!current || !newIds.includes(current)) return { state: 'untouched' };
@@ -963,7 +963,7 @@ export async function restorePreSwitchDefault(
     }
     return { state: 'restored' };
   } catch (e) {
-    logger.warn("lib_rich_menu_publisher_warn");
+    logger.warn("rich_menu_publisher.restore_default_menu_failed");
     return { state: 'failed', retainedId: current };
   }
 }

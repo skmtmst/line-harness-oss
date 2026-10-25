@@ -158,7 +158,7 @@ export function registerDeliveryWebhooks(restaurantDelivery: Hono<Env>): void {
       });
       if (!isDeliveryWebhookIpAllowed(sourceIp, allowlist)) {
         // 符号と道筋だけを記録する。相手のIPやサービス名は記録に残さない。
-        logger.error("routes_restaurant_delivery_webhook_ip_not_allowed");
+        logger.error("restaurant_delivery.authorize_webhook_ip_failed");
         return c.json({ success: false, error: 'Forbidden' }, 403);
       }
     }

@@ -100,7 +100,7 @@ booking.get('/api/booking/admin/settings', async (c) => {
     if (!settings) return c.json({ success: false, error: 'not_found' }, 404);
     return c.json({ success: true, data: settings });
   } catch {
-    logger.error("booking_settings_read_failed");
+    logger.error("booking.read_settings_failed");
     return c.json({ success: false, error: 'booking_settings_unavailable' }, 503);
   }
 });
@@ -162,7 +162,7 @@ booking.get('/api/booking/admin/resources', async (c) => {
     const resources = await listBookingAdminResources(c.env.DB, accountId);
     return c.json({ success: true, data: { resources } });
   } catch {
-    logger.error("booking_resources_read_failed");
+    logger.error("booking.read_resources_failed");
     return c.json({ success: false, error: 'booking_resources_unavailable' }, 503);
   }
 });
@@ -240,7 +240,7 @@ booking.patch('/api/booking/admin/resources/:id', requirePermission(BOOKING_SETT
     };
     return c.json({ success: true, data: item });
   } catch {
-    logger.error("booking_resource_update_failed");
+    logger.error("booking.update_resource_failed");
     return c.json({ success: false, error: 'booking_resource_save_failed' }, 503);
   }
 });
@@ -286,7 +286,7 @@ booking.get('/api/booking/admin/exceptions', async (c) => {
     const items = await listBookingAvailabilityExceptions(c.env.DB, accountId);
     return c.json({ success: true, data: { items } });
   } catch {
-    logger.error("booking_exceptions_read_failed");
+    logger.error("booking.read_exceptions_failed");
     return c.json({ success: false, error: 'booking_exceptions_unavailable' }, 503);
   }
 });
@@ -306,7 +306,7 @@ booking.post('/api/booking/admin/exceptions', requirePermission(BOOKING_SETTINGS
     if (!item) return inputError(c, { success: false, error: 'scope_not_found' }, 422, ["scopeKind","kind","dateFrom","dateTo","scopeId","reason","intervals"]);
     return c.json({ success: true, data: item }, 201);
   } catch {
-    logger.error("booking_exception_create_failed");
+    logger.error("booking.create_exception_failed");
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
   }
 });
@@ -352,7 +352,7 @@ booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SET
     }
     return c.json({ success: true, data: result.item });
   } catch {
-    logger.error("booking_exception_update_failed");
+    logger.error("booking.update_exception_failed");
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
   }
 });

@@ -1,4 +1,4 @@
-import { logger } from '@line-crm/shared/server';
+import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -529,18 +529,17 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), i
         202,
       );
     } catch (err) {
-      logger.error("recipes.by_id_clone_create_failed");
       await finishCloneRun(c.env.DB, run.id, {
         status: 'rolled_back',
         createdCount: 0,
         failureReason: 'CLONE_TRANSACTION_FAILED',
       });
-      return c.json({
+      throw new UnexpectedRouteError(c, {
         success: false,
         error: '作れませんでした。何も作られていません',
         code: 'CLONE_TRANSACTION_FAILED',
         runId: run.id,
-      }, 500);
+      });
     }
   } catch (err) {
     throw err;

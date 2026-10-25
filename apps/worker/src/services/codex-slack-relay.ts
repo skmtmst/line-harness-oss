@@ -595,7 +595,7 @@ async function updateTrackedParentStatus(
       },
     }, fetcher);
   } catch (error) {
-    logger.warn("slack_parent_status_update_failed");
+    logger.warn("codex_slack.update_parent_status_failed");
     if (strict) throw error;
   }
 }
@@ -970,7 +970,7 @@ async function refreshSlackCommandCenter(
       }, fetcher);
     }
   } catch (error) {
-    logger.warn("slack_command_center_refresh_failed");
+    logger.warn("codex_slack.refresh_command_center_failed");
     if (strict) throw error;
   }
 }

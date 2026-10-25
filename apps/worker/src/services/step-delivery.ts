@@ -123,7 +123,7 @@ export async function processStepDeliveries(
             title: `friend_scenario:${fs.scenario_id}`,
           });
         } catch (skipError) {
-          logger.error("services_step_delivery_failed");
+          logger.error("step_delivery.record_feature_skip_failed");
         }
         await db.prepare(
           `UPDATE friend_scenarios
@@ -160,13 +160,13 @@ export async function processStepDeliveries(
       const sent = await processSingleDelivery(db, lineClient, fs, workerUrl, sendPermissions, credentialKey);
       if (sent) sendCount++;
     } catch (err) {
-      logger.error("services_step_delivery_failed");
+      logger.error("step_delivery.deliver_step_failed");
       // A permanent LINE 4xx (invalid/unreachable recipient, invalid payload,
       // unauthorized channel, etc.) must not be recovered and retried forever.
       // 408/409/429 are transient and retain the existing 5-minute recovery.
       if (isPermanentLineDeliveryError(err)) {
         await pauseFriendScenarioDelivery(db, fs.id);
-        logger.warn("services_step_delivery_warn");
+        logger.warn("step_delivery.deliver_permanent_failed");
       }
       // Continue with next one.
     }
@@ -275,7 +275,7 @@ async function processSingleDelivery(
   );
   if (!friend) {
     await pauseFriendScenarioDelivery(db, fs.id);
-    logger.warn("services_step_delivery_warn");
+    logger.warn("step_delivery.resolve_friend_failed");
     return false;
   }
   if (await isFriendDeliverySuppressed(db, friend.id)) {
@@ -299,7 +299,7 @@ async function processSingleDelivery(
   const source = await getStepsForDelivery(db, fs.scenario_id, fs.published_version_id ?? null);
   if (!source) {
     await pauseFriendScenarioDelivery(db, fs.id);
-    logger.warn("services_step_delivery_warn");
+    logger.warn("step_delivery.resolve_published_steps_failed");
     return false;
   }
   const steps = source.steps.filter((s) => (s.is_draft ?? 0) === 0);
@@ -317,7 +317,7 @@ async function processSingleDelivery(
    */
   const audience = parseCondition(source.audienceConditionJson);
   if (source.audienceConditionJson && !audience) {
-    logger.error("services_step_delivery_failed");
+    logger.error("step_delivery.parse_audience_failed");
     await pauseFriendScenarioDelivery(db, fs.id);
     return false;
   }
@@ -390,7 +390,7 @@ async function processSingleDelivery(
    */
   const stepTarget = parseCondition(currentStep.target_condition_json);
   if (currentStep.target_condition_json && !stepTarget) {
-    logger.error("services_step_delivery_failed");
+    logger.error("step_delivery.parse_step_target_failed");
   }
   const stepTargeted = currentStep.target_condition_json
     ? stepTarget
@@ -512,7 +512,7 @@ async function processSingleDelivery(
     const account = await getLineAccountById(db, deliveryAccountId, credentialKey);
     if (!account) {
       await pauseFriendScenarioDelivery(db, fs.id);
-      logger.warn("services_step_delivery_warn");
+      logger.warn("step_delivery.resolve_account_failed");
       return false;
     }
     const { LineClient: LC } = await import('@line-crm/line-sdk');
@@ -589,7 +589,7 @@ async function processSingleDelivery(
     try {
       await addTagToFriend(db, friend.id, currentStep.on_reach_tag_id);
     } catch (err) {
-      logger.error("services_step_delivery_failed");
+      logger.error("step_delivery.attach_reach_tag_failed");
     }
   }
 
@@ -649,7 +649,7 @@ export async function finishScenario(
       });
     }
   } catch (err) {
-    logger.error("services_step_delivery_failed");
+    logger.error("step_delivery.start_completion_scenario_failed");
   }
 
   await runScenarioActions(db, {
@@ -695,12 +695,12 @@ export async function evaluateCondition(
   if (!step.condition_type) return true;
 
   if (!isSupportedConditionType(step.condition_type)) {
-    logger.error("services_step_delivery_failed");
+    logger.error("step_delivery.validate_condition_type_failed");
     return false;
   }
 
   if (!step.condition_value) {
-    logger.error("services_step_delivery_failed");
+    logger.error("step_delivery.validate_condition_value_failed");
     return false;
   }
 
@@ -747,7 +747,7 @@ export async function evaluateCondition(
       try {
         raw = JSON.parse(step.condition_value);
       } catch {
-        logger.error("services_step_delivery_failed");
+        logger.error("step_delivery.parse_metadata_condition_failed");
         return false;
       }
       if (
@@ -760,7 +760,7 @@ export async function evaluateCondition(
         // 既存行や直接 INSERT された行で {"key":"x"} のように value が欠落しているケースは
         // friend.metadata[x] === undefined と比較されて「key 不在の全友だち」に一致する
         // (= 同じ OSS issue #120 の over-delivery を再現する) ので明示的にスキップする。
-        logger.error("services_step_delivery_failed");
+        logger.error("step_delivery.validate_metadata_condition_failed");
         return false;
       }
       const parsed = raw as { key: string; value: unknown };

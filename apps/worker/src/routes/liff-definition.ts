@@ -90,7 +90,7 @@ export async function saveFriendAddCandidate(
     });
   } catch (err) {
     // 既存のLIFF連携を止めない。台帳だけ監視ログへ残して再調査できるようにする。
-    logger.error("friend_add_candidate_record_failed");
+    logger.error("friend_add.record_candidate_failed");
   }
 }
 
@@ -135,7 +135,7 @@ async function linkIgIgsid(
   }
 
   if (!linked) {
-    logger.warn("routes_liff_warn");
+    logger.warn("liff_definition.link_ig_igsid_failed");
     return false;
   }
 

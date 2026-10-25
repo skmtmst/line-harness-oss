@@ -387,7 +387,7 @@ export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 
             maskedPayloadShape(payload),
           );
         } catch {
-          logger.error("incoming_webhook_masked_sample_update_failed");
+          logger.error("incoming_webhooks.update_masked_sample_failed");
         }
       }
 
