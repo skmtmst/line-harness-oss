@@ -97,6 +97,9 @@
 .colMonthly { width: var(--tpl-tl-col-monthly); }
 .colUpdated { width: var(--tpl-tl-col-updated); }
 .colMenu { width: var(--tpl-tl-col-menu); }
+/* LINEでの見え方の列。狭い幅（1280 以下）では畳むので、広い幅の時だけの幅。 */
+.colPreview { --preview-col-w: 216px; width: var(--preview-col-w); }
+.previewCell { min-width: 0; }
 
 .headCell {
   text-align: left;

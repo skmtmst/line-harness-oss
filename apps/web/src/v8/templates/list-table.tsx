@@ -27,7 +27,9 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { formatListTimestamp,formatNumber } from '@/lib/format'
 import { FileText,Folder as FolderIcon,Trash2 } from 'lucide-react'
 import type { Dispatch,SetStateAction } from 'react'
-import { Template,excerptOf,publishStateOf,sendCountText } from './list-model'
+import LineBubbleThumb from './line-bubble-thumb'
+import { bubbleThumbOf } from './line-bubble-thumb-model'
+import { Template,excerptOf,latestContentOf,publishStateOf,sendCountText } from './list-model'
 import styles from './list.module.css'
 import { messageTypeText,type TemplatesFailure } from './words'
 
@@ -119,6 +121,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
             <colgroup>
               <col className={styles.colSelect} />
               <col />
+              {!narrow && <col className={styles.colPreview} />}
               <col className={styles.colKind} />
               <col className={styles.colPublish} />
               {!narrow && <col className={styles.colUsage} />}
@@ -138,6 +141,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                     /></SaveErrorField>) : <UnavailableSelection label="このページのテンプレートをすべて選択" />}
                 </Th>
                 <Th className={styles.headCell}>テンプレート</Th>
+                {!narrow && <Th className={styles.headCell}>LINEでの見え方</Th>}
                 <Th className={styles.headCell}>種類</Th>
                 <Th className={styles.headCell}>公開</Th>
                 {!narrow && <Th className={styles.headCell}>使っている所</Th>}
@@ -182,6 +186,11 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                       } folder={folder}
                       annotation={String(t.name ?? '').startsWith('【見本】') ? <StatusBadge tone="neutral" dot>見本</StatusBadge> : undefined}
                     />
+                    {!narrow && (
+                      <Td className={styles.previewCell}>
+                        <LineBubbleThumb thumb={bubbleThumbOf({ messageType: t.messageType, content: latestContentOf(t), question: t.question })} />
+                      </Td>
+                    )}
                     <Td>
                       <TagPill name={isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)} color={folder ? folderDisplayColor(folder) : undefined} aria-label={`種類：${isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}`} />
                     </Td>
