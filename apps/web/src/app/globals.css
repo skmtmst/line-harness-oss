@@ -479,7 +479,8 @@
   --color-notice-warning-bg: #fff7e6;
   --color-notice-danger-bg: #fef0f0;
   --color-menu-danger: #e5484d;
-  --color-link: var(--color-ink);
+  /* 本文・説明の中のリンク。ボタン・左メニュー・パンくずには使わない。 */
+  --color-link: var(--color-accent-deep);
   --color-checkbox-line: #dadde2;
   --radius-checkbox-mark: 3px;
   --text-callout: 14px;
