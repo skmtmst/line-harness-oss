@@ -8,7 +8,7 @@ import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '
 import Avatar from '@/components/shared/avatar';
 import Button from '@/components/shared/button';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
-import FilterChip from '@/components/shared/filter-chip';
+import SegmentedControl from '@/components/shared/segmented';
 import { InboxFloatingPanel } from '@/components/shared/inbox-content';
 import { InboxFilterControls, InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { RowMenu } from '@/components/shared/row-actions';
@@ -20,7 +20,7 @@ import { api, fetchApi, type ChatListItem } from '@/lib/api';
 import { SEARCH_QUERY_MAX_LENGTH, clampSearchQuery } from '@/lib/search-query';
 import { formatInboxListTime } from '@/v8/inbox-chat/list-time';
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
-import { Bookmark, Clock3, ListFilter, Reply } from 'lucide-react';
+import { Bookmark, ListFilter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { CHANNELS, ChannelBadge, EmailInboxItem, InboxSavedView, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd, statusFiltersV8 } from './inbox-model';
@@ -229,35 +229,24 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           <InboxRulesPopover accountId={selectedAccountId ?? null} onRoutingSaved={() => setSlaReload((n) => n + 1)} />
         )}
       </InboxListHeadline>
-      {[
-        { key: 'all' as const, label: 'すべて', title: undefined, icon: null },
-        { key: 'reply' as const, label: '要返信', title: '対応状況が「未対応」の会話', icon: Reply },
-        /*
-         * INBOX-10: ここで数えるのは対応期限ではなく、未対応のまま
-         * 最後のやり取りから1時間以上たった会話。「期限超過」と書くと
-         * 設定した期限の超過に読めるため、実態に合う名前にする。
-         *
-         * m22c: 右の操作（絞り込み・保存した検索・対応ルール）と同じ
-         * 高さ32にそろえる。行の中で高さが違うと、同じ1行でも上端が
-         * ずれて2行に見える（見た目の自動点検 k=5）。
-         */
-        slaEnabled
-          ? { key: 'overdue' as const, label: overdueTotal === null ? '期限超過' : `期限超過 ${overdueTotal}`, title: '最初の返事の期限を過ぎた会話', icon: Clock3 }
-          : { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話', icon: Clock3 },
-      ].sort((a, b) => (slaEnabled ? Number(b.key === 'overdue') - Number(a.key === 'overdue') : 0)).map((filter) => (
-        <FilterChip
-          size="inbox"
-          key={filter.key}
-          selected={quickFilter === filter.key}
-          onChange={() => { setQuickFilter(filter.key); dropSavedViewParam() }}
-          title={filter.title}
-          showCheck={false}
-          icon={filter.icon ? <filter.icon aria-hidden size={14} /> : undefined}
-        >
-          {filter.label}
-          {quickCountsNow && !(slaEnabled && filter.key === 'overdue') ? <span className="sr-only tabular-nums">{quickCountsNow[filter.key]}</span> : null}
-        </FilterChip>
-      ))}
+      <SegmentedControl<'all' | 'reply' | 'overdue'>
+        aria-label="受信箱のクイック絞り込み"
+        value={quickFilter}
+        onChange={(next) => { setQuickFilter(next); dropSavedViewParam() }}
+        options={[
+          { key: 'all' as const, label: 'すべて' },
+          { key: 'reply' as const, label: '要返信' },
+          slaEnabled
+            ? { key: 'overdue' as const, label: '期限超過' }
+            : { key: 'overdue' as const, label: '1時間以上待ち' },
+        ].map((filter) => ({
+          value: filter.key,
+          label: filter.label,
+          count: slaEnabled && filter.key === 'overdue'
+            ? overdueTotal ?? undefined
+            : quickCountsNow?.[filter.key],
+        }))}
+      />
       <SavedViewDialog
         open={saveDialogOpen}
         initialValue={{

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { trustedChallengeUrl } from '@/test-utils/trusted-auth-handoff'
 import React, { act, type ReactNode } from 'react'
+import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -87,5 +88,87 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
     await open('/login/two-factor?next=ops#lh_2fa=challenge-1', 'v7')
     expect(host.textContent).toContain('6桁の確認')
     expect(host.querySelector('[data-design-node="tOPeY"]')).not.toBeNull()
+  })
+})
+
+describe('二段階認証の6桁（自動で確かめる・間違い・回復コード・戻る）', () => {
+  const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
+    status, headers: { 'Content-Type': 'application/json' },
+  })
+  let bodies: Array<Record<string, unknown>> = []
+  let verifyAnswer: () => Response
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
+    bodies = []
+    verifyAnswer = () => json({ success: true, data: { sessionToken: 'session-1' }, csrfToken: 'csrf-1' })
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      if (url.endsWith('/api/auth/two-factor/verify')) {
+        if (init?.body) bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+        return verifyAnswer()
+      }
+      return json({ success: false, error: 'unexpected' }, 500)
+    }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  async function openAdmin() {
+    await open('/login/two-factor#lh_2fa=challenge-1&lh_method=password', 'v8')
+  }
+
+  function slots() {
+    return [...host.querySelectorAll('input[aria-label$="桁目"], input[aria-label$="文字目"]')] as HTMLInputElement[]
+  }
+
+  it('6桁そろうと押さずに確かめ、正しいコードでログインへ進む', async () => {
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    try {
+      await openAdmin()
+      await act(async () => {
+        fireEvent.change(slots()[0], { target: { value: '482917' } })
+        await Promise.resolve()
+      })
+      expect(bodies[0]).toMatchObject({ challengeToken: 'challenge-1', code: '482917' })
+      expect(host.textContent).toContain('確認しています…')
+      expect(host.querySelector('[role="status"]')?.textContent).toBe('確認できました')
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 500)) })
+      expect(assign).toHaveBeenCalledTimes(1)
+      expect(String(assign.mock.calls[0][0])).toContain('lh_session=session-1')
+    } finally {
+      assign.mockRestore()
+    }
+  })
+
+  it('間違えると赤い理由を出し、四角を空にして1つ目へ戻る', async () => {
+    verifyAnswer = () => json({ success: false, error: '認証コードが正しくありません' }, 400)
+    await openAdmin()
+    await act(async () => {
+      fireEvent.change(slots()[0], { target: { value: '000000' } })
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('コードが違います。もう一度入れてください')
+    expect(slots().map((input) => input.value).join('')).toBe('')
+    expect(document.activeElement).toBe(slots()[0])
+  })
+
+  it('回復コードを使う道とログインへ戻る道を小さなリンクから開く', async () => {
+    await openAdmin()
+    const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === 'コードが使えない場合')
+    await act(async () => { toggle?.click() })
+    const back = [...host.querySelectorAll('a')].find((link) => link.textContent === 'ログインに戻る')
+    expect(back?.getAttribute('href')).toBe('/login')
+    const useRecovery = [...host.querySelectorAll('button')].find((button) => button.textContent === '回復コードを使う')
+    await act(async () => { useRecovery?.click() })
+    expect(host.querySelector('h1')?.textContent).toBe('回復コードでログイン')
+    expect(slots()).toHaveLength(8)
+    expect(host.textContent).toContain('回復コード（8文字）')
+    const useDigits = [...host.querySelectorAll('button')].find((button) => button.textContent === '6桁のコードで入る')
+    await act(async () => { useDigits?.click() })
+    expect(host.querySelector('h1')?.textContent).toBe('二段階認証')
+    expect(slots()).toHaveLength(6)
   })
 })

@@ -84,7 +84,7 @@ export default function FriendKpis() {
       value: stats?.addedThisMonth ?? null,
       unit: '人',
       detail: stats ? `前月 ${stats.addedLastMonth}人` : '—',
-      badge: stats ? diffLabel : undefined,
+      badge: stats && diff !== 0 ? diffLabel : undefined,
       badgeTone: diff < 0 ? 'neutral' as const : 'accent' as const,
       help: '今月の月初から現在までの追加人数を、前月の1か月全体と比べています。',
     },

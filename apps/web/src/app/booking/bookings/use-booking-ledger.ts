@@ -17,7 +17,7 @@ import { usePageTitle } from '../../../components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { fetchAllPages } from './fetch-all-pages'
 import { moveDay, startOfWeek, type CalendarAvailability, type CalendarSlot } from './booking-calendar'
-import { STATUS_TABS, SOURCE_FILTERS, PAGE_SIZE, jstDay, LEDGER_QUERY_KEYS, LEDGER_STORAGE_KEY, LedgerSavedState, readLedgerState } from './ledger-model'
+import { STATUS_TABS, SOURCE_FILTERS, PAGE_SIZE, jstDay, LEDGER_QUERY_KEYS, LEDGER_STORAGE_KEY, LedgerSavedState, readLedgerState, matchesLedgerSource } from './ledger-model'
 
 export function useBookingLedger() {
   usePageTitle('予約管理')
@@ -277,7 +277,7 @@ export function useBookingLedger() {
         query: query.trim() || undefined,
         menuName: menuFilter === 'all' ? undefined : menuFilter,
         staffId: staffFilter === 'all' ? undefined : staffFilter,
-        source: sourceFilter === 'all' ? undefined : sourceFilter,
+        // 予約元は今読んでいる予約へ画面側で当てる（LINE・電話・その他の3つにまとめる）。
         ...rangeFilterParams(),
       })
       if (requestId !== listRequestRef.current || listAccountRef.current !== requestedAccountId) return
@@ -346,7 +346,7 @@ export function useBookingLedger() {
       query: query.trim() || undefined,
       menuName: menuFilter === 'all' ? undefined : menuFilter,
       staffId: staffFilter === 'all' ? undefined : staffFilter,
-      source: sourceFilter === 'all' ? undefined : sourceFilter,
+      source: sourceFilter === 'line' ? 'liff' : sourceFilter === 'phone' ? 'phone' : undefined,
       ...rangeFilterParams(),
     })
       .catch(() => setError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
@@ -574,9 +574,13 @@ export function useBookingLedger() {
     rate: summary.monthTotal > 0 ? Math.round((summary.monthCancelled / summary.monthTotal) * 100) : null,
   }
   const menuCounts = new Map(summary.byMenu.map((item) => [item.name, item.total]))
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const current = Math.min(page, pageCount)
-  const shown = items
+  // 予約元はサーバの総数ではなく、いま読んでいる予約に当てる。件数もその範囲で数える。
+  const sourceScoped = sourceFilter !== 'all'
+  const shown = sourceScoped ? items.filter((row) => matchesLedgerSource(row, sourceFilter)) : items
+  const visibleCalendarItems = sourceScoped ? calendarItems.filter((row) => matchesLedgerSource(row, sourceFilter)) : calendarItems
+  const visibleTotal = sourceScoped ? shown.length : total
+  const pageCount = Math.max(1, Math.ceil(visibleTotal / PAGE_SIZE))
+  const current = sourceScoped ? 1 : Math.min(page, pageCount)
 
   /*
    * 「まだ予約が無い」と「絞り込みで0件」は言い分ける（#635）。
@@ -752,8 +756,9 @@ export function useBookingLedger() {
     page,
     setPage,
     items,
-    total,
-    calendarItems,
+    shown,
+    total: visibleTotal,
+    calendarItems: visibleCalendarItems,
     calendarLoad,
     calendarAnchor,
     setCalendarAnchor,
@@ -799,7 +804,6 @@ export function useBookingLedger() {
     menuCounts,
     pageCount,
     current,
-    shown,
     nonTabNarrowing,
     showFilteredEmpty,
     clearListFilters,

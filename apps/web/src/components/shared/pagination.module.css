@@ -163,3 +163,27 @@ html:root button.control:disabled {
   box-shadow: var(--control-shadow);
 }
 html:root button.control:disabled .controlGlyph { opacity: .5; }
+
+/*
+ * 選ばれているページ番号は黒い地に白い数字。枠と薄い緑の地はやめる。
+ * ほかの番号・前後の矢印は今のまま。
+ */
+html:root .current {
+  outline: 1px solid transparent;
+  border-color: transparent;
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+/*
+ * 全体の「選ばれている操作」の面（globals の aria-current 指定）より
+ * ページ送りの現在地を優先する。黒い地に白い数字のまま。
+ */
+html:root nav[data-pagination] .current {
+  border-color: transparent !important;
+  background: var(--color-ink) !important;
+  color: var(--color-canvas) !important;
+  box-shadow: none !important;
+}

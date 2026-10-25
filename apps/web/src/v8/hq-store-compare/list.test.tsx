@@ -43,6 +43,9 @@ describe('数の書き方', () => {
     expect(formatDiff('blockRate', -2.1)).toBe('−2.1')
     expect(formatDiff('bookings', 3)).toBe('+3')
     expect(formatDiff('bookings', 0)).toBeNull()
+    expect(formatDiff('responseMinutes', 0.4)).toBeNull()
+    expect(formatDiff('blockRate', 0.04)).toBeNull()
+    expect(formatDiff('responseMinutes', 0.6)).toBe('+1')
     expect(formatMetric('clickRate', null)).toBe('—')
   })
   it('良い悪いは数ごとに向きが逆：ブロック率は下がると良い、予約は上がると良い', () => {
@@ -52,6 +55,7 @@ describe('数の書き方', () => {
     expect(diffTone(def('bookings'), 5)).toBe('up')
     expect(diffTone(def('bookings'), -5)).toBe('down')
     expect(diffTone(def('bookings'), 0)).toBeNull()
+    expect(diffTone(def('responseMinutes'), 0.3)).toBeNull()
   })
 })
 

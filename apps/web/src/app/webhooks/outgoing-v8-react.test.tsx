@@ -159,7 +159,7 @@ test('v8 の左のフォルダの列（共通・種類 webhook）で絞れる。
   expect(nav.querySelector('button[title="顧客"]')?.textContent).toContain('1')
   expect(nav.querySelector('button[title="未分類"]')?.textContent).toContain('1')
   expect(host.querySelector('tr[data-row-id="wh-1"] [aria-label="フォルダ：顧客"]')).not.toBeNull()
-  expect(host.querySelector('tr[data-row-id="wh-2"] [aria-label="フォルダ：未分類"]')).not.toBeNull()
+  expect(host.querySelector('tr[data-row-id="wh-2"] [data-folder-dot]')).toBeNull()
   await act(async () => { (nav.querySelector('button[title="顧客"]') as HTMLButtonElement).click() })
   expect(host.querySelector('tr[data-row-id="wh-1"]')).not.toBeNull()
   expect(host.querySelector('tr[data-row-id="wh-2"]')).toBeNull()
@@ -169,15 +169,13 @@ test('v8 の左のフォルダの列（共通・種類 webhook）で絞れる。
   await act(async () => { (nav.querySelector('button[title="すべて"]') as HTMLButtonElement).click() })
 })
 
-test('v8 の行の名前の前にフォルダの丸が付く。フォルダに入っていない送り先は未分類の輪（閲覧のみでも出す）', async () => {
+test('v8 の行の名前の前にフォルダの丸が付く。フォルダに入っていない送り先は丸を出さない（閲覧のみでも出す）', async () => {
   staffRole = 'staff'
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const row = host.querySelector('[data-design-node="ZSbFY"] tr[data-row-id="wh-1"]')
   const dots = row?.querySelectorAll('[data-folder-dot]') ?? []
-  expect(dots).toHaveLength(1)
-  expect(dots[0].getAttribute('data-folder-dot')).toBe('unfiled')
-  expect(dots[0].getAttribute('aria-label')).toBe('フォルダ：未分類')
+  expect(dots).toHaveLength(0)
 })
 
 test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async () => {

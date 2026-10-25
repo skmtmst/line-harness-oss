@@ -217,3 +217,33 @@ button.step:focus-visible {
 }
 
 .summaries { display: flex; flex-direction: column; gap: var(--polish-space-field); margin-top: var(--polish-space-card); }
+
+/* ログイン前の画面の小さな帯（丸 24・文字 12・線 2・真ん中にまとめる）。 */
+.root[data-variant='auth'] {
+  --tpl-steps-dot: 24px;
+  --tpl-steps-text-size: 12px;
+  --tpl-steps-text-lh: 16px;
+  --tpl-steps-line-h: 2px;
+  --tpl-steps-num-size: 12px;
+  --tpl-steps-check: 12px;
+}
+
+.root[data-variant='auth'] .list {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  justify-content: center;
+}
+
+.root[data-variant='auth'] .item {
+  flex: 0 0 96px;
+}
+
+.root[data-variant='auth'] .line {
+  border-radius: var(--radius-pill);
+  transform-origin: left center;
+}
+
+.root[data-variant='auth'] .name {
+  max-width: 100%;
+}

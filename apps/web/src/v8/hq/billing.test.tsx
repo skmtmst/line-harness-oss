@@ -195,6 +195,7 @@ describe('V8 統括の請求：いまのプランと変えるボタン', () => {
       plans: [plan('light', 'ライト'), plan('standard', 'スタンダード'), plan('pro', 'プロ')],
     }))
     expect(document.body.textContent).not.toContain('利用中')
+    expect(document.body.textContent).toContain('課金の対象外です。この統括は運営用のため')
     for (const name of ['ライト', 'スタンダード', 'プロ']) {
       expect(buttonsIn(card(name))).toEqual([{ text: 'このプランにする', disabled: false }])
     }

@@ -12,6 +12,7 @@ import EntitySelect from '@/components/shared/entity-select'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowMenu } from '@/components/shared/row-actions'
+import { RowNameButton } from '@/components/shared/table'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import { ListToolbarEnd, ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -61,6 +62,7 @@ export default function HqAttentionV8() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [kind, setKind] = useState<'all' | HqAttentionKind>('all')
+  const [order, setOrder] = useState<'count' | 'name'>('count')
   const [folder, setFolder] = useState('all')
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
 
@@ -87,8 +89,10 @@ export default function HqAttentionV8() {
   const shown = useMemo(() => (items ?? [])
     .filter((item) => (kind === 'all' ? total(item) > 0 : count(item, kind) > 0))
     .filter((item) => folder === 'all' || folderOf(item.accountId) === folder)
-    .sort((a, b) => (kind === 'all' ? total(b) - total(a) : count(b, kind) - count(a, kind))),
-  [items, kind, folder, accounts]) // eslint-disable-line react-hooks/exhaustive-deps
+    .sort((a, b) => order === 'name'
+      ? a.name.localeCompare(b.name, 'ja')
+      : (kind === 'all' ? total(b) - total(a) : count(b, kind) - count(a, kind))),
+  [items, kind, folder, order, accounts]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* そのアカウントに切り替えてから開く。 */
   const open = (accountId: string, href: string) => {
@@ -123,7 +127,7 @@ export default function HqAttentionV8() {
       <ListToolbarRow>
         <Select aria-label="種類" value={kind} onChange={(value) => setKind(value as typeof kind)} options={[{ value: 'all', label: '種類：すべて' }, ...KINDS.map((item) => ({ value: item.key, label: `種類：${item.label}` }))]} />
         <EntitySelect compact aria-label="アカウントのフォルダ" noun="フォルダ" valuePrefix="フォルダ：" value={folder} onChange={setFolder} options={[{ value: 'all', label: 'すべて' }, ...folders.map((item) => ({ value: item.id, label: item.name }))]} />
-        <ListToolbarEnd><span className={styles.sort}>件数の多い順</span></ListToolbarEnd>
+        <ListToolbarEnd><Select aria-label="並び" label="並び" value={order} onChange={(value) => setOrder(value as 'count' | 'name')} options={[{ value: 'count', label: '件数の多い順' }, { value: 'name', label: '名前順' }]} /></ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
   )
@@ -152,7 +156,7 @@ export default function HqAttentionV8() {
           {shown.map((item) => (
             <GridRow key={item.accountId}>
               <GridCell className={styles.account}>
-                <span className={styles.name} title={item.name}>{item.name}</span>
+                <RowNameButton className={styles.name} title={item.name} onClick={() => router.push(`/accounts/detail?id=${encodeURIComponent(item.accountId)}`)}>{item.name}</RowNameButton>
                 {item.style ? <span className={styles.style}>{styleLabel(item.style)}</span> : null}
               </GridCell>
               {KINDS.map((entry) => {

@@ -33,6 +33,9 @@
 
 .chips { display: flex; flex-wrap: wrap; gap: var(--tpl-hq-plan-head-gap); }
 
+/* 状態の切り替えは幅で形を変えず、1段のまま収める。 */
+.statusSwitch { flex-wrap: nowrap; max-width: 100%; }
+
 .cardHead {
   display: flex;
   align-items: center;

@@ -4,11 +4,62 @@ import { ChevronDown } from 'lucide-react'
 
 import { useRef, useState, useLayoutEffect, Fragment, Children, isValidElement, cloneElement, createContext, useContext, type ReactNode, type HTMLAttributes } from 'react'
 import Select, { type SelectProps } from './select'
+import EntitySelect from './entity-select'
 import SearchField from './search-field'
 import FilterChip from './filter-chip'
 import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
 import { toolbarContentFit, fitToolbarWrap, measureToolbarOptionalWidth, fitToolbarOptionalWidth, fitToolbarOverflowPanel, observeToolbarContent } from './list-toolbar-fit.mjs'
+
+/**
+ * 札の組は組の中で縦に積まない。
+ * 並び・件数と1段に収まらない時だけ、組をまるごと次の段の左へ下げる。
+ * 組そのものが1段の幅より長い時は、CSS が組の中で折り返す。
+ */
+function placeChipGroups(toolbar: HTMLElement, slotClass: string, choicesClass: string) {
+  const slots = Array.from(toolbar.querySelectorAll<HTMLElement>(`.${slotClass}:has(> .${choicesClass}), .${slotClass}:has(> [role="group"])`))
+  if (!slots.length) return
+  // 段の切り替えは transition の途中値を読まないよう、測る間だけ止める。
+  const measured = Array.from(toolbar.querySelectorAll<HTMLElement>(`.${slotClass}, [data-toolbar-chip-unit]`))
+    .map(slot => ({ slot, value: slot.style.getPropertyValue('transition'), priority: slot.style.getPropertyPriority('transition') }))
+  for (const { slot } of measured) slot.style.setProperty('transition', 'none', 'important')
+  const css = getComputedStyle(toolbar)
+  const gap = parseFloat(css.columnGap) || 0
+  const lineLeft = toolbar.getBoundingClientRect().left + (parseFloat(css.paddingLeft) || 0)
+  const flexItems = Array.from(toolbar.querySelectorAll<HTMLElement>(`.${slotClass}, [data-toolbar-chip-unit]`))
+  const placed = new Set<HTMLElement>()
+  try {
+    for (const slot of slots) {
+      const group = slot.querySelector<HTMLElement>(`:scope > .${choicesClass}, :scope > [role="group"]`)
+      if (!group || group.hasAttribute('data-filter-collapsed') || group.querySelector(':scope > [data-filter-collapsed]') || group.getBoundingClientRect().width <= 0) continue
+      const target = slot.closest<HTMLElement>('[data-toolbar-chip-unit]') ?? slot
+      const endSlot = slot.closest('[data-toolbar-row]')?.querySelector<HTMLElement>('[data-toolbar-end]')?.closest<HTMLElement>(`.${slotClass}`)
+      if (!endSlot || endSlot === slot || endSlot.contains(target) || placed.has(target)) continue
+      placed.add(target)
+      const end = endSlot.getBoundingClientRect(), here = target.getBoundingClientRect()
+      if (Math.abs(end.top - here.top) < 2) { target.removeAttribute('data-toolbar-chips-drop'); continue }
+      if (!target.hasAttribute('data-toolbar-chips-drop')) { target.setAttribute('data-toolbar-chips-drop', ''); continue }
+      // 下げている段で、並び・件数の段の空きに戻せるか（組の実幅で比べる）。
+      const width = [...target.children].filter(child => getComputedStyle(child).display !== 'none')
+        .reduce((sum, child, index) => sum + child.getBoundingClientRect().width + (index > 0 ? gap : 0), 0)
+      let used = lineLeft, beside = false
+      for (const item of flexItems) {
+        if (item === endSlot || item === target || target.contains(item) || endSlot.contains(item)) continue
+        const rect = item.getBoundingClientRect()
+        if (rect.width <= 0 || Math.abs(rect.top - end.top) >= 2) continue
+        beside = true
+        used = Math.max(used, rect.right)
+      }
+      // 並び・件数が絞り込みと同じ段にあり、その空きに組が収まる時だけ戻す。
+      if (beside && width <= end.left - used - gap + 0.5) target.removeAttribute('data-toolbar-chips-drop')
+    }
+  } finally {
+    for (const { slot, value, priority } of measured) {
+      if (value) slot.style.setProperty('transition', value, priority)
+      else slot.style.removeProperty('transition')
+    }
+  }
+}
 
 function useToolbarFit() {
   const ref = useRef<HTMLDivElement>(null)
@@ -16,6 +67,7 @@ function useToolbarFit() {
     const toolbar = ref.current
     if (!toolbar || !window.ResizeObserver) return
     const measure = () => {
+      placeChipGroups(toolbar, styles.slotTool, styles.filterChoices)
       // この継承値を使うのは、入れ子を含む枠内の検索欄だけ。
       const slotSearches = toolbar.querySelectorAll(`.${styles.slotTool}[data-toolbar-role="search"]`)
       if (Array.from(slotSearches).some(slot => slot.closest(`.${styles.slots}`))) {
@@ -186,11 +238,25 @@ export function ListToolbarFrame({ children, layout = 'band', singleRow = false,
 export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'form' }) {
   const { leading, persistent } = useContext(LeadingContext)
   const inFrame = useContext(FrameContext)
+  const items = Children.toArray(compactFilterGroups(children))
+  const slots = items.map((child, index) => <span key={isValidElement(child) ? child.key ?? index : index} className={styles.slotTool} data-toolbar-role={toolbarRole(child)}>{child}</span>)
+  const endIndex = items.findIndex(node => isValidElement(node) && node.type === ListToolbarEnd)
+  const chipIndex = items.findIndex(containsFilterChips)
+  // 札の組と、その右に続く件数などは1つのまとまりとして段を決める（組の中で積まない）。
+  const unit = endIndex > chipIndex && chipIndex >= 0
   return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools data-toolbar-row>
     {!inFrame && leading ? <span className={styles.leading} data-toolbar-leading data-toolbar-persistent={persistent || undefined}>{leading}</span> : null}
     {!inFrame ? <span className={styles.rowBreak} aria-hidden="true" /> : null}
-    {Children.toArray(compactFilterGroups(children)).map((child, index) => <span key={isValidElement(child) ? child.key ?? index : index} className={styles.slotTool} data-toolbar-role={toolbarRole(child)}>{child}</span>)}
+    {unit
+      ? <>{slots.slice(0, chipIndex)}<span key="chip-unit" className={styles.chipUnit} data-toolbar-chip-unit>{slots.slice(chipIndex, endIndex)}</span>{slots.slice(endIndex)}</>
+      : slots}
   </Tag>
+}
+
+function containsFilterChips(node: ReactNode): boolean {
+  if (!isValidElement<{ children?: ReactNode }>(node)) return false
+  if (node.type === ResponsiveFilterChips) return true
+  return Children.toArray(node.props.children).some(containsFilterChips)
 }
 
 /** 保存検査の包みを含め、部品の役目から並べる。画面CSSで順序を上書きしない。 */
@@ -284,16 +350,28 @@ function OverflowTools({ children, label }: { children: ReactNode; label: string
 }
 
 export type ListToolbarSortProps = Omit<SelectProps, 'aria-label' | 'label'> & { label?: string; 'aria-label'?: string }
-/** 並びの名前と選ぶ操作はこの欄にそろえる。 */
+/** 並びの名前と選ぶ操作はこの欄にそろえる。見た目は表示件数と同じ箱に固定する。 */
 export function ListToolbarSort(props: ListToolbarSortProps) {
   if (props.options.length === 0) return null
   const options = props.options.map(option => ({ ...option, label: option.label.replace('使われている数が多い順', '使用数が多い順') }))
-  return <span data-list-sort><Select {...props} options={options} size="content" width={undefined} label="並び" aria-label="並び" /></span>
+  return <span data-list-sort><Select {...props} options={options} size="content" width={undefined} treatment="box" label="並び" aria-label="並び" /></span>
 }
 
 /** /192/205：入らない札と狭い列だけを選ぶ欄へ畳む。 */
-function contentSizedSelect(child: React.ReactElement<SelectProps>) {
-  return cloneElement(child, { size: 'content', width: undefined, pageSizeControl: child.props.pageSizeControl || toolbarRole(child) === 'count' })
+type ToolbarControlProps = { iconOnly?: boolean; size?: string; width?: number; pageSizeControl?: boolean }
+
+function contentSizedControl(child: React.ReactElement<ToolbarControlProps>) {
+  if (child.type === Select) {
+    const select = child as React.ReactElement<SelectProps>
+    return cloneElement(select, { size: 'content', width: undefined, pageSizeControl: select.props.pageSizeControl || toolbarRole(select) === 'count' })
+  }
+  return cloneElement(child, { size: 'content', width: undefined })
+}
+
+function isContentSizedControl(node: ReactNode): node is React.ReactElement<ToolbarControlProps> {
+  return isValidElement<ToolbarControlProps>(node)
+    && (node.type === Select || node.type === EntitySelect)
+    && !node.props.iconOnly
 }
 
 /** 畳んだ欄の入力だけを直し、作る操作や子のキーはそのまま渡す。 */
@@ -302,7 +380,7 @@ function contentSizedSelects(node: ReactNode): ReactNode {
     const children = node.map(contentSizedSelects)
     return children.every((child, index) => child === node[index]) ? node : children
   }
-  if (isValidElement<SelectProps>(node) && node.type === Select && !node.props.iconOnly) return contentSizedSelect(node)
+  if (isContentSizedControl(node)) return contentSizedControl(node)
   if (isValidElement<{ children?: ReactNode }>(node) && node.props.children) {
     const children = contentSizedSelects(node.props.children)
     return children === node.props.children ? node : cloneElement(node, {}, children)
@@ -316,8 +394,7 @@ function compactFilterGroups(node: ReactNode, preserveChips = false): ReactNode 
     return <ResponsiveFilterChips preserveChips={preserveChips}>{children}</ResponsiveFilterChips>
   return children.map(child => {
     if (isValidElement(child) && child.type === ResponsiveFilterChips) return child
-    if (isValidElement<SelectProps>(child) && child.type === Select && !child.props.iconOnly)
-      return contentSizedSelect(child)
+    if (isContentSizedControl(child)) return contentSizedControl(child)
     if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {
       const nested = compactFilterGroups(child.props.children, preserveChips)
       // Field wrappers receive one control, not a one-element children array.
@@ -338,7 +415,9 @@ export function ResponsiveFilterChips({ children, label = '状態', preserveChip
     const row = choices?.closest<HTMLElement>('[data-toolbar-row]')
     const flat = row && getComputedStyle(row).display === 'contents'
     const toolbar = owner?.dataset.toolbarLayout?.includes('stacked') && !flat ? row ?? owner : owner
-    if (preserveChips || !choices || !toolbar || !window.ResizeObserver) return
+    // 左にフォルダの列がある一覧は、幅で札を選ぶ欄へ変えない（畳むのは列だけ）。
+    const inFolderList = Boolean(choices?.closest('[data-list-folders]'))
+    if (preserveChips || inFolderList || !choices || !toolbar || !window.ResizeObserver) return
     const measure = () => {
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)

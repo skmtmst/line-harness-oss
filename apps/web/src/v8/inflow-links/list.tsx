@@ -32,6 +32,7 @@ import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
+import SegmentedControl from '@/components/shared/segmented'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
@@ -566,16 +567,12 @@ export default function InflowListV8({
         <div className={styles.presetPanel} role="dialog" aria-label="よく使う絞り込みと並び順">
           <span className={styles.presetLabel}>絞り込み</span>
           <div className={styles.presetChips}>
-            {presetCounts.map(([value, label, total]) => (
-              <FilterChip
-                key={value}
-                selected={filter === value}
-                onChange={() => { setFilter(value); setPage(1); setPresetOpen(false) }}
-                count={total}
-              >
-                {label}
-              </FilterChip>
-            ))}
+            <SegmentedControl
+              aria-label="絞り込み"
+              value={filter}
+              onChange={(next) => { setFilter(next); setPage(1); setPresetOpen(false) }}
+              options={presetCounts.map(([value, label, count]) => ({ value, label, count }))}
+            />
           </div>
           <span className={styles.presetLabel}>並び順</span>
           <SaveErrorField names={["sort"]}><ListToolbarSort

@@ -206,17 +206,22 @@ function BillingInner() {
 
   const invoiceUnreachable = invoiceError instanceof ApiError && invoiceError.status === 502
 
+  /*
+   * 設定の画面はどれも「左に設定の列・右に中身」にそろえる（メンバーと同じ）。
+   * 数の帯も右の中身の先頭に置き、左の列より上へ横いっぱいに張り出さない。
+   */
+  const metricsBand = status === 'ready' && canManageRole(role) ? (
+    <KpiBand data-template-region="stats">
+      <KpiCard title="今月の請求" value={metrics?.thisMonthBilledYen} valueText={metrics?.thisMonthBilledYen != null ? yen(metrics.thisMonthBilledYen) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.thisMonthBilledYen == null ? '今月の請求は未取得' : '保存済みの請求から集計'} loading={metricsLoading} onRetry={metricsFailed ? () => setMetricsAttempt((attempt) => attempt + 1) : undefined} />
+      <KpiCard title="契約中" value={metrics?.contractCount} unit="契約" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.activeAccountCount != null && metrics.trialCount != null ? `稼働中 ${metrics.activeAccountCount}アカウント・トライアル ${metrics.trialCount}` : '未取得'} help="統括単位の契約数です。LINEアカウントごとの契約数ではありません。" loading={metricsLoading} />
+      <KpiCard title="未払い" value={metrics?.unpaidInvoiceCount} unit="件" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.unpaidInvoiceCount == null ? '請求の記録は未取得' : '保存済みの請求から集計'} loading={metricsLoading} />
+      <KpiCard title="次の請求日" value={null} valueText={metrics?.nextBillingAt ? polishFormatDate(metrics.nextBillingAt, { style: 'list-day' }) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.nextBillingAt ? '現在の契約の更新日' : '予定は未取得'} loading={metricsLoading} />
+    </KpiBand>
+  ) : null
+
   const frame = (body: React.ReactNode) => (
-    <ListPage boardId="JB8V1" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}
-      stats={status === 'ready' && canManageRole(role) ? (
-        <KpiBand>
-          <KpiCard title="今月の請求" value={metrics?.thisMonthBilledYen} valueText={metrics?.thisMonthBilledYen != null ? yen(metrics.thisMonthBilledYen) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.thisMonthBilledYen == null ? '今月の請求は未取得' : '保存済みの請求から集計'} loading={metricsLoading} onRetry={metricsFailed ? () => setMetricsAttempt((attempt) => attempt + 1) : undefined} />
-          <KpiCard title="契約中" value={metrics?.contractCount} unit="契約" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.activeAccountCount != null && metrics.trialCount != null ? `稼働中 ${metrics.activeAccountCount}アカウント・トライアル ${metrics.trialCount}` : '未取得'} help="統括単位の契約数です。LINEアカウントごとの契約数ではありません。" loading={metricsLoading} />
-          <KpiCard title="未払い" value={metrics?.unpaidInvoiceCount} unit="件" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.unpaidInvoiceCount == null ? '請求の記録は未取得' : '保存済みの請求から集計'} loading={metricsLoading} />
-          <KpiCard title="次の請求日" value={null} valueText={metrics?.nextBillingAt ? polishFormatDate(metrics.nextBillingAt, { style: 'list-day' }) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.nextBillingAt ? '現在の契約の更新日' : '予定は未取得'} loading={metricsLoading} />
-        </KpiBand>
-      ) : undefined}>
-      <PageContent>{body}</PageContent>
+    <ListPage boardId="JB8V1" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="billing" />} folderNav={settingsNav}>
+      <PageContent>{metricsBand}{body}</PageContent>
     </ListPage>
   )
 
@@ -261,7 +266,7 @@ function BillingInner() {
       {banner.tone === 'info' ? (
         <p className={styles.contract} data-design="Status"><ContractText summary={summary} /></p>
       ) : (
-        <div data-design="Status"><Notice tone={banner.tone} message={`${banner.title} ${banner.body}`} /></div>
+        <div data-design="Status"><Notice tone={banner.tone} message={bannerSentence(banner.title, banner.body)} /></div>
       )}
 
       <div className={styles.intervalRow} data-design="Interval">
@@ -418,6 +423,11 @@ function BillingInner() {
   )
 }
 
+/** 見出しと本文の間に句点を入れる。見出しが句点で終わっていれば重ねない。 */
+function bannerSentence(title: string, body: string): string {
+  return `${title}${/[。！？]$/u.test(title) ? '' : '。'}${body}`
+}
+
 /** 契約の帯（板の灰色の箱）。契約中は絵の文面、ほかは帯の文面をそのまま出す。 */
 function ContractText({ summary }: { summary: BillingSummary }) {
   if (summary.state === 'active' && summary.planName) {
@@ -440,5 +450,5 @@ function ContractText({ summary }: { summary: BillingSummary }) {
     )
   }
   const banner = billingBanner(summary)
-  return <>{banner.title} {banner.body}</>
+  return <>{bannerSentence(banner.title, banner.body)}</>
 }

@@ -58,6 +58,11 @@ describe('数の帯（Pp3nS）', () => {
     expect(html).toContain('custom-grid')
   })
 
+  it('隣に線が無い所はカードの枠を指定できる', () => {
+    const html = renderToStaticMarkup(<KpiBand frame="card"><span>数</span></KpiBand>)
+    expect(html).toContain('data-kpi-frame="card"')
+  })
+
   it('帯の指定は層の外にある（ユーティリティ層の gap 等に勝つ）', () => {
     const css = read('kpi-card.module.css')
     const marker = 'どの層より強い'

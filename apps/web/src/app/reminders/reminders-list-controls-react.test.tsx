@@ -140,16 +140,13 @@ describe('一覧の操作が実クエリへつながる (N-072)', () => {
     expect(latest).toContain('page=1')
   })
 
-  it('状態の札4つは図柄付き（apLqS）', async () => {
+  it('状態は「すべて」と4つのすべる切り替え（apLqS）', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
-    for (const label of ['有効', '下書き', '停止中', '失敗あり']) {
-      const chip = Array.from(host.querySelectorAll('button')).find(
-        (button) => button.textContent?.trim() === label,
-      )
-      expect(chip, `${label} の札が見つかりません`).toBeTruthy()
-      expect(chip?.querySelector('svg'), `${label} の札に図柄がありません`).toBeTruthy()
-    }
+    const control = host.querySelector('[data-segmented-control][aria-label="状態で絞り込む"]')
+    expect(control).toBeTruthy()
+    const names = [...control!.querySelectorAll('button')].map((button) => button.textContent?.trim())
+    expect(names).toEqual(['すべて', '有効', '下書き', '停止中', '失敗あり'])
   })
 
   it('実データに対応しない「基準日」の日付入力は置かない', async () => {

@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @import "tailwindcss";
 @import "../components/shared/kpi-band-v8.css";
-@import "../components/shared/focus-ring.css";
+@import "../components/shared/focus-ring.css"; @import "../components/shared/scrollbars.css"; @import "../components/shared/autofill.css";
 
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
 [data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
@@ -566,7 +566,7 @@
   --polish-table-head: 40px;
   --polish-table-number-gap: 24px;
   --polish-table-head-bg: var(--color-canvas);
-  --polish-table-hover: var(--color-canvas);
+  --polish-table-hover: var(--color-canvas-sunken);
 }
 :root {
   --polish-text-page: 32px;
@@ -806,7 +806,7 @@
   --shadow-controls-selected: 0 0 0 #087a3e33;
   --text-lh: 1.5;
   --color-control-border: #1d1d1f1f;
-  --control-shadow: 0 0 #0000;
+  --control-shadow: 0 0 #0000; /* 線ではなく影で浮かせる面（選ぶ欄・日付・白い副ボタン・お知らせ） */ --shadow-raised-control: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 1px 2px rgba(0, 0, 0, 0.1), 0 1px 1px rgba(0, 0, 0, 0.04); --shadow-raised-card: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.06); --radius-raised-card: 14px; --color-scroll-thumb: rgba(29, 29, 31, 0.22); --color-scroll-thumb-hover: rgba(29, 29, 31, 0.4);
   --color-toggle-locked: #dadde2;
   --color-status-warn-soft: #f973161a;
   --color-track: #1d1d1f0a;
@@ -1559,7 +1559,7 @@
   /* 作っていない画面の一式（運営 ログイン2段目  ほか）。 */
   --tpl-ms-otp-page-pad: 32px 16px; --tpl-ms-otp-card-w: 420px; --tpl-ms-otp-card-pad: var(--polish-space-card); --tpl-ms-otp-card-gap: var(--polish-space-row); --tpl-ms-otp-card-radius: var(--polish-radius-card); --tpl-ms-otp-card-shadow: var(--card-shadow); --tpl-auth-admin-card-pad: 28px;
   --tpl-ms-otp-title-size: var(--polish-text-section); --tpl-ms-otp-title-lh: 29px; --tpl-ms-otp-desc-size: var(--polish-text-body); --tpl-ms-otp-desc-lh: 19px; --tpl-ms-otp-label-size: var(--polish-text-support); --tpl-ms-otp-label-lh: 20px; --tpl-ms-otp-field-gap: var(--polish-space-field);
-  --tpl-ms-otp-btn-h: 36px; --tpl-ms-otp-icon: 15px; --tpl-ms-otp-foot-size: 11px; --tpl-ms-otp-foot-lh: 16px;
+  --tpl-ms-otp-btn-h: 36px; --tpl-ms-otp-icon: 15px; --tpl-ms-otp-foot-size: 11px; --tpl-ms-otp-foot-lh: 16px; --tpl-ms-otp-hero: 40px; --tpl-ms-otp-hero-icon: 20px;
   --tpl-ms-key-gap: 14px; --tpl-ms-key-box-pad: 10px 12px; --tpl-ms-key-box-radius: var(--polish-radius-control); --tpl-ms-key-row-gap: 8px; --tpl-ms-key-note-lh: 17px; --tpl-ms-key-token-size: 12px; --tpl-ms-key-btn-h: 36px;
   --tpl-ms-key-head-pad: 24px 24px 0; --tpl-ms-key-title-size: var(--polish-text-section); --tpl-ms-key-title-lh: 25px; --tpl-ms-key-content-pad: 14px 24px 0; --tpl-ms-key-foot-margin: 14px 24px 24px;
   --tpl-ms-key-body-gap: 12px; --tpl-ms-key-micro-lh: 16px; --tpl-ms-key-info-gap: 10px; --tpl-ms-key-info-pad: 10px 14px; --tpl-ms-key-info-lh: 20px; --tpl-ms-key-col-gap: 12px; --tpl-ms-key-head-row-pad: 10px 16px;

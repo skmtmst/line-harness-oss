@@ -36,7 +36,7 @@ import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiBand from '@/components/shared/kpi-band'
@@ -866,19 +866,15 @@ export default function RichMenusListV8() {
 
   /* ===== 道具の段 ===== */
   const filterChips = (
-    <div role="group" aria-label="絞り込み" className={styles.chips}>
-      {FILTER_CHIPS.map((f) => (
-        <FilterChip
-          key={f.key}
-          selected={savedFilter === f.key}
-          onChange={() => setSavedFilter(savedFilter === f.key ? '' : f.key)}
-          title={f.note}
-          icon={<f.icon size={13} aria-hidden="true" />}
-        >
-          {f.label}
-        </FilterChip>
-      ))}
-    </div>
+    <SegmentedControl
+      aria-label="絞り込み"
+      value={savedFilter}
+      onChange={setSavedFilter}
+      options={[
+        { value: '', label: 'すべて' },
+        ...FILTER_CHIPS.map((f) => ({ value: f.key as string, label: f.label })),
+      ]}
+    />
   )
   /* 並びの文字・幅は共通の選ぶ欄が持つ。 */
   const sortBox = (

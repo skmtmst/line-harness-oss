@@ -41,13 +41,19 @@
   flex-direction: column;
   gap: var(--tpl-hq-plan-gap);
   min-width: 0;
-  min-height: var(--tpl-hq-plan-h);
+  /* 中身の高さで決める。並ぶカードは grid の引き伸ばしでそろえる。 */
+  min-height: 0;
   padding: var(--tpl-hq-plan-pad);
   border-radius: var(--radius-panel);
   outline: 1px solid var(--card-edge);
   outline-offset: -1px;
   background: var(--color-canvas);
   box-shadow: var(--card-shadow);
+}
+
+/* ボタンが無いカードは、下の余白を24にして大きな空きを残さない。 */
+.plan:not(:has(.planFoot > *)) {
+  padding-bottom: var(--space-24);
 }
 
 .planCurrent {

@@ -160,14 +160,14 @@ it('X1: a one-choice rail places creation before other heading actions', () => {
   expect(container.querySelector('[data-template-region="toolbar"]')?.contains(create)).toBe(false)
 })
 
-it('X2: folderless names retain selection and links; changing capability restores unfiled dots', () => {
+it('X2: folderless names retain selection and links; an unfiled name has no dot', () => {
   const select=vi.fn()
   const body=<FolderDotName><a href="/detail">決めごと</a></FolderDotName>
   const {container,rerender}=render(<ListPage title="一覧" folderNav={{rows:[rows[0]],activeId:'',onSelect:select}}>{body}</ListPage>)
   expect(container.querySelector('[data-folder-dot]')).toBeNull()
   expect(screen.getByRole('link',{name:'決めごと'}).getAttribute('href')).toBe('/detail')
   rerender(<ListPage title="一覧" folderNav={{rows,activeId:'',onSelect:select}}>{body}</ListPage>)
-  expect(container.querySelector('[data-folder-dot="unfiled"]')).toBeTruthy()
+  expect(container.querySelector('[data-folder-dot]')).toBeNull()
   fireEvent.click(screen.getByRole('button',{name:'フォルダ'}))
   fireEvent.click(screen.getByRole('button',{name:'春の案内'}))
   expect(select).toHaveBeenCalledWith('f1')

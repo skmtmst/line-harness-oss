@@ -19,18 +19,44 @@ describe("友だちの顔", () => {
     expect(root.dataset.avatar).toBe('image')
     fireEvent.error(container.querySelector('img')!)
     expect(root.dataset.avatar).toBe('initials')
-    expect(root.textContent).toBe('KY')
+    expect(root.textContent).toBe('K')
   })
 
-  it('頭文字：英字は単語の頭2つ、日本語は最初の1字', () => {
-    expect(avatarInitials('Kyohei Yamamoto')).toBe('KY')
+  it('頭文字はいつも1字（英字は頭の1字・日本語は最初の1字）', () => {
+    expect(avatarInitials('Kyohei Yamamoto')).toBe('K')
     expect(avatarInitials('Masato.S')).toBe('M')
     expect(avatarInitials('菅野 亮')).toBe('菅')
+  })
+
+  it('会社名は法人格と記号を飛ばしてから1字（アカウントのアイコンも同じ）', () => {
+    expect([
+      avatarInitials('株式会社 然'),
+      avatarInitials('（株）然-NEN-'),
+      avatarInitials('Shed Products株式会社'),
+      avatarInitials('一般社団法人 日本〇〇協会'),
+      avatarInitials(' ・ 株式会社 むすび'),
+      avatarInitials('株式会社'),
+    ]).toEqual(['然', '然', 'S', '日', 'む', '株'])
   })
 
   it('名前も無い時は人の印', () => {
     const { container } = render(<Avatar name="  " />)
     expect((container.firstElementChild as HTMLElement).dataset.avatar).toBe('icon')
+  })
+
+  it('アカウント・会社の印は、画像が無いと緑の地に白の1文字', () => {
+    const { container } = render(<Avatar name="株式会社 然" shape="rounded" />)
+    const root = container.firstElementChild as HTMLElement
+    expect(root.dataset.avatar).toBe('initials')
+    expect(root.dataset.avatarTone).toBe('account')
+    expect(root.textContent).toBe('然')
+  })
+
+  it('人の顔（丸）は今までどおり薄い地のまま', () => {
+    const { container } = render(<Avatar name="菅野 亮" />)
+    const root = container.firstElementChild as HTMLElement
+    expect(root.dataset.avatar).toBe('initials')
+    expect(root.dataset.avatarTone).toBeUndefined()
   })
 
   it('同じ名前はいつも同じ色', () => {

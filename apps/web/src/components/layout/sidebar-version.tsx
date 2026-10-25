@@ -50,8 +50,8 @@ export default function SidebarVersion() {
   if (!lines) return <p className="border-t border-hairline px-4 pb-3 pt-2.5 text-micro text-ink-faint">版の情報なし</p>
   return (
     <div className="border-t border-hairline px-4 pb-3 pt-2.5">
-      <p className="flex items-baseline gap-2 text-caption font-medium text-ink-secondary">
-        <span className="truncate" title={lines.line1}>{lines.line1}</span>
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-caption font-medium text-ink-secondary">
+        <span className="whitespace-nowrap">{lines.line1}</span>
         {/*
           ★V8（夕12・FK5m7 ZT5kI）：上の版の帯を隠した v8 では、新しい版・
           カスタマイズ版の案内を版の行の右に出す。どちらも /updates へ。

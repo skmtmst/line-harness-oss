@@ -121,6 +121,23 @@
 /* ・仕上げ2 */
 :root .title { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
 
-/* ・仕上げ5：空の表示 */
-:root [data-list-state='empty'] .iconWrap { width: var(--polish-icon-empty); height: var(--polish-icon-empty); border-radius: 0; outline-color: transparent; background: transparent; }
-:root [data-list-state='empty'] .iconWrap svg { width: var(--polish-icon-empty); height: var(--polish-icon-empty); stroke-width: var(--polish-icon-stroke); color: inherit; }
+/*
+ * 空の表示の印：48px の薄い灰の丸に、24px の線画。
+ * 題・説明・操作と同じ縦の中心にそろえる（左右は .root の中央寄せ）。
+ */
+:root [data-list-state='empty'] .iconWrap {
+  width: 48px; height: 48px; flex: none;
+  border-radius: var(--radius-pill);
+  outline: 1px solid transparent;
+  background: var(--color-shell);
+  color: var(--color-ink-secondary);
+}
+:root [data-list-state='empty'] .iconWrap svg { width: 24px; height: 24px; stroke-width: var(--polish-icon-stroke); color: inherit; }
+
+/* レイヤーの外にある共通の `svg.lucide`（16px）より強く、空の表示の印だけ 24px にする。 */
+html:root [data-list-state='empty'] .iconWrap svg:global(.lucide) {
+  width: 24px;
+  height: 24px;
+  stroke-width: var(--polish-icon-stroke);
+  color: inherit;
+}

@@ -13,7 +13,7 @@ import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import ListToolbar, { ListToolbarFrame } from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -257,13 +257,15 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
           <ListToolbar
             search={{ placeholder: '友だちの名前で探す', label: '友だちの名前で探す', width: 240, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
             filters={(
-              <div role="group" aria-label="視聴の結果で絞り込む" className={styles.chips}>
-                {chips.map((chip) => (
-                  <FilterChip key={chip.key} selected={filter === chip.key} onChange={(selected) => setFilter(selected ? chip.key : '')} icon={<chip.icon size={13} aria-hidden="true" />}>
-                    {chip.count === null ? chip.label : `${chip.label} ${formatNumber(chip.count)}`}
-                  </FilterChip>
-                ))}
-              </div>
+              <SegmentedControl
+                aria-label="視聴の結果で絞り込む"
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { value: '' as const, label: 'すべて' },
+                  ...chips.map((chip) => ({ value: chip.key, label: chip.label, count: chip.count ?? undefined })),
+                ]}
+              />
             )}
             trailing={<>
               <Select size="content" icon={<Bookmark size={15} aria-hidden="true" />} aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} />

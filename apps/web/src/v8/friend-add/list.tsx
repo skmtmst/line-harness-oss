@@ -33,7 +33,7 @@ import { FOLDER_SELECT_COLORS, type FriendAddRuleFolder } from '@line-crm/shared
 import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel';
 import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import SearchField from '@/components/shared/search-field'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { Tabs } from '@/components/shared/tabs';
@@ -611,18 +611,15 @@ function FriendAddList() {
     </div>
   )
   const statusChips = (
-    <div className={styles.chips} role="group" aria-label="状態で絞り込む">
-      {STATUS_CHIPS.map((chip) => (
-        <FilterChip
-          key={chip.key}
-          selected={statusFilter === chip.key}
-          onChange={(on) => selectStatus(on ? chip.key : '')}
-          icon={<chip.icon size={13} aria-hidden="true" />}
-        >
-          {chip.label}
-        </FilterChip>
-      ))}
-    </div>
+    <SegmentedControl
+      aria-label="状態で絞り込む"
+      value={statusFilter}
+      onChange={selectStatus}
+      options={[
+        { value: '', label: 'すべて' },
+        ...STATUS_CHIPS.map((chip) => ({ value: chip.key, label: chip.label })),
+      ]}
+    />
   )
   const perPageBox = <PageSizeSelect value={perPage} onChange={changePerPage} options={[10, 20, 50]} label={null} />
   const notice = (

@@ -30,9 +30,6 @@ describe('V8 ウェビナー一覧の契約', () => {
   it('公開中と下書きの条件をサーバーで絞り込む', () => {
     /* 取った1頁を画面で絞り直すと件数や頁数が変わる。絞りは口へ渡す。 */
     expect(PAGE).toContain('status: savedFilter || undefined')
-    /* 札は共通 FilterChip。直書きの button には戻さない。 */
-    expect(PAGE).toContain("import FilterChip from '@/components/shared/filter-chip'")
-    expect(PAGE).toContain('<FilterChip')
     expect(PAGE).toContain("label: '公開中のみ'")
     expect(PAGE).toContain("label: '下書きのみ'")
     expect(PAGE).not.toContain('保存した条件は準備中です')

@@ -225,6 +225,14 @@ it('U4：並びの候補が無ければ空の欄を置かない', () => {
   expect(change).not.toHaveBeenCalled()
 })
 
+it('並びは画面の指定にかかわらず表示件数と同じ箱で、上下の印を出さない', () => {
+  render(<ListToolbarSort treatment="text" value="newest" options={[{ value: 'newest', label: '新しい順' }]} onChange={vi.fn()} />)
+  const trigger = screen.getByRole('button', { name: '並び' })
+  expect(trigger.className).not.toContain('textTrigger')
+  expect(trigger.className).toContain('closedTrigger')
+  expect(trigger.querySelector('.lucide-arrow-up-down')).toBeNull()
+})
+
 
 it.each([false, true])('単独の検索を渡した一覧も、畳む先へフォルダと許可された作成を渡す（閲覧のみ=%s）', readOnly => {
   const create = vi.fn(), folder = vi.fn(), search = vi.fn()

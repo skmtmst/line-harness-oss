@@ -151,7 +151,7 @@ describe('V8 回答フォーム一覧', () => {
     expect(unfiled.textContent).toContain('3')
   })
 
-  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
+  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は丸を出さない）', async () => {
     fetchApi.mockImplementation(async (path: string) => {
       if (path.startsWith('/api/forms?')) {
         return {
@@ -174,8 +174,7 @@ describe('V8 回答フォーム一覧', () => {
     expect(filed[0].getAttribute('data-folder-dot')).toBe('filed')
     expect(filed[0].getAttribute('aria-label')).toBe('フォルダ：来店・予約')
     const unfiled = host.querySelector('tr[data-row-id="f-2"]')?.querySelectorAll('[data-folder-dot]') ?? []
-    expect(unfiled).toHaveLength(1)
-    expect(unfiled[0].getAttribute('data-folder-dot')).toBe('unfiled')
+    expect(unfiled).toHaveLength(0)
   })
 
   it('行の「…」は「「〇〇」のその他の操作」で押せて、項目が開く', async () => {

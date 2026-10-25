@@ -1,10 +1,15 @@
 import {
-  Bell, CalendarCheck, CalendarCog, Clipboard, ClipboardList, Clock, FileText, Folder, House, Inbox,
-  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Trophy, Type, UserPlus, Users, Video, type LucideIcon,
+  Bell, BellRing, Boxes, Building2, CalendarCheck, CalendarCog, CalendarDays, Camera, ChartColumn,
+  CircleAlert, CircleCheckBig, Clipboard, ClipboardList, Clock, Coins, FileText, Folder, HeartPulse,
+  House, Image, Inbox, LayoutDashboard, LayoutGrid, Link, Megaphone, MessageCircle, MessageCircleMore,
+  Network, PawPrint, Plug, Search, Send, Settings, ShieldCheck, ShoppingBag, SlidersHorizontal,
+  Stamp, TableProperties, Tag, Target, Ticket, Trophy, Truck, Type, UserPlus, Users, Utensils, Video,
+  Workflow, Zap, type LucideIcon,
 } from 'lucide-react'
 /*
  * ★V8 の左メニューの印（絵 d8X09・ の「項目 〇〇 / 印」は lucide）。
  * V8 のときだけ使い、互換経路は MENU_SECTIONS の線画のまま。載っていない項目も 管理画面 の線画。鍵は MENU_SECTIONS の id。
+ * 線画の濃さをそろえるため、独自のパスを持つ項目も近い形の lucide にする（オーナー指示）。
  */
 export const V8_NAV_ICONS: Record<string, LucideIcon> = {
   dashboard: House,
@@ -26,5 +31,47 @@ export const V8_NAV_ICONS: Record<string, LucideIcon> = {
   'booking-menus': CalendarCog,
   events: Ticket,
   'booking-own-shifts': Clock,
+  'visit-stamps': Stamp,
   affiliates: Trophy,
+  mileage: Coins,
+  inflow: Link,
+  conversions: Target,
+  analytics: ChartColumn,
+  automations: Workflow,
+  webhooks: Plug,
+  'nen-members': Users,
+  'nen-pets': PawPrint,
+  'nen-health': HeartPulse,
+  'photo-review': Camera,
+  'nen-campaigns': Megaphone,
+  'getting-started': CircleCheckBig,
+  'line-accounts': MessageCircle,
+  pools: Boxes,
+  staff: ShieldCheck,
+  settings: SlidersHorizontal,
+  emergency: Zap,
+  'ec-commerce': ShoppingBag,
+  'line-notifications': BellRing,
+  'restaurant-dashboard': LayoutDashboard,
+  'restaurant-organization': Network,
+  'restaurant-approvals': CircleCheckBig,
+  'restaurant-reservations': CalendarDays,
+  'restaurant-tables': TableProperties,
+  'restaurant-inventory': Boxes,
+  'restaurant-menu': Utensils,
+  'restaurant-delivery': Truck,
+  'restaurant-google': Search,
+  'restaurant-line-followup': MessageCircle,
+  'hq-attention': CircleAlert,
+  'hq-stores': Building2,
+  'hq-store-compare': ChartColumn,
+  'hq-tags': Tag,
+  'hq-templates': FileText,
+  'hq-rich-menus': LayoutGrid,
+  'hq-forms': Clipboard,
+  'hq-banners': Image,
+  'hq-broadcasts': Send,
 }
+
+/** 左メニューのいちばん下（設定・統括の設定）の歯車。 */
+export const V8_SETTINGS_ICON: LucideIcon = Settings

@@ -2,7 +2,7 @@
 import { twoFactorFailureMessage } from '@/v8/login/two-factor/two-factor-error'
 import { responseApiError } from '@/lib/api'
 import { useEffect, useState } from 'react'
-import { LogIn } from 'lucide-react'
+import { LogIn, ShieldCheck } from 'lucide-react'
 import {
   adminSessionHandoffPath,
   adminSessionHeaders,
@@ -50,6 +50,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [method, setMethod] = useState<TwoFactorMethod>('line')
+  const [helpOpen, setHelpOpen] = useState(false)
 
   // 方法の受け取りは合言葉より先に（合言葉の受け取りで hash が消えるため。管理画面 と同じ順）。
   useEffect(() => { setMethod(captureTwoFactorMethod()); setChallenge(captureTwoFactorChallenge()); setReady(true) }, [])
@@ -115,15 +116,23 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
     } finally { setLoading(false) }
   }
 
+  const isAdmin = scope === 'admin'
+  const codeLabel = recovery ? '回復コード（8文字）' : '認証コード（6桁）'
+  const title = recovery ? '回復コードでログイン' : isAdmin ? '二段階認証' : '6桁の確認'
+  const adminHelp = recovery
+    ? '登録の時に控えた回復コードを1つ入れてください。使ったコードは、もう使えません。'
+    : '認証アプリに表示されている 6 桁のコードを入力してください。'
+
   return (
-    <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} brandName={brandName} title={recovery ? "回復コードでログイン" : scope === 'admin' ? "二段階認証" : "6桁の確認"} steps={ready && challenge && scope === 'admin' ? <Steps label="ログインの手順" steps={[{ label: method === 'password' ? 'メールログイン' : 'LINEログイン', state: 'done' }, { label: recovery ? '回復コード' : '二段階認証', state: 'current' }]} /> : undefined} boardId={recovery ? undefined : 'tOPeY'} titleId="ops-two-factor-title" help={scope === 'admin' && recovery ? '登録の時に控えた回復コードを1つ入れてください。使ったコードは、もう使えません。' : undefined}>
+    <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} brandName={brandName} title={title} titleAlign={isAdmin ? 'center' : 'start'} hero={isAdmin ? <span className={styles.hero} aria-hidden="true"><ShieldCheck className={styles.heroIcon} strokeWidth={2} /></span> : undefined} steps={ready && challenge && isAdmin ? <Steps variant="auth" animate label="ログインの手順" steps={[{ label: method === 'password' ? 'メールログイン' : 'LINEログイン', state: 'done' }, { label: recovery ? '回復コード' : '二段階認証', state: 'current' }]} /> : undefined} boardId={recovery ? undefined : 'tOPeY'} titleId="ops-two-factor-title" help={isAdmin ? adminHelp : undefined}>
 
         {scope === 'ops' && ready && challenge ? <AuthHelp>{recovery ? '登録の時に控えた回復コードを1つ入れてください。使ったコードは、もう使えません。' : `${method === 'password' ? 'パスワード' : 'LINEでのログイン'}を確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。`}</AuthHelp> : null}
 
         {missingChallenge ? (
           <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Button variant="text" size="inline" href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>} />
         ) : error ? <Notice tone="danger" id="ops-two-factor-error" message={error} /> : null}
-        <Field density="input" contentGap={12} optional={false} label={<span id="ops-two-factor-code-label">{recovery ? '回復コード（8文字）' : '認証コード（6桁）'}</span>}>
+        {isAdmin ? <span id="ops-two-factor-code-label" className="sr-only">{codeLabel}</span> : null}
+        <Field density="input" contentGap={12} optional={false} label={isAdmin ? undefined : <span id="ops-two-factor-code-label">{codeLabel}</span>}>
           <SaveErrorField names={["typedCode","code"]} key={`${recovery}-${attempt}`}><OtpInput
             length={recovery ? 8 : 6} format={recovery ? 'recovery' : 'digits'} id={recovery ? 'recovery-code' : undefined}
             value={typedCode} onComplete={recovery ? undefined : entered => void submit(entered)}
@@ -132,24 +141,38 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
             invalid={Boolean(error)} success={succeeded} busy={loading} disabled={missingChallenge || succeeded} autoFocus
           /></SaveErrorField>
         </Field>
-        {recovery ? <><AuthHelp>控えた8個のうち、まだ使っていない1つを入れます。貼り付けもできます。</AuthHelp><AuthHelp>回復コードも無い時は、オーナー（運営）に連絡して、登録をやり直します。</AuthHelp></> : scope === 'admin' ? <p className={styles.foot}>コードは約30秒ごとに更新されます</p> : null}
+        {recovery && scope === 'ops' ? <><AuthHelp>控えた8個のうち、まだ使っていない1つを入れます。貼り付けもできます。</AuthHelp><AuthHelp>回復コードも無い時は、オーナー（運営）に連絡して、登録をやり直します。</AuthHelp></> : scope === 'admin' ? <p className={styles.foot}>コードは約30秒ごとに更新されます</p> : null}
         <Button
           variant="primary" fullWidth
           className={styles.submit}
           onClick={() => void submit()}
-          disabled={loading || missingChallenge || succeeded || (recovery ? typedCode.length !== 8 : scope === 'admin' && typedCode.length !== 6)}
+          disabled={loading || missingChallenge || succeeded || (recovery ? typedCode.length !== 8 : isAdmin && typedCode.length !== 6)}
           busy={loading || succeeded}
           busyLabel="確認しています…"
         >
           {scope === 'ops' && !recovery ? <LogIn aria-hidden="true" className={styles.icon} /> : null}{scope === 'ops' && !recovery ? 'ログイン' : '確認してログイン'}
         </Button>
-        <Card surface="muted" padding="compact" layout="vertical" gap="normal">
-          <SectionHeader title={recovery ? '認証アプリが手元に在る時' : 'コードを入力できない場合'} />
-          <AuthActions><Button variant="text" size="inline" disabled={loading || succeeded} onClick={() => { setRecovery(value => !value); setCode(''); setError('') }}>{recovery ? '6桁のコードで入る' : '回復コードを使う'}</Button>
-            <Button variant="text" size="inline" href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>
-            {scope === 'admin' && !recovery && challenge && method === 'line' ? <Button variant="text" size="inline" href="/login" onClick={clearTwoFactorChallenge}>別のLINEアカウントでログイン</Button> : null}
-          </AuthActions>
-        </Card>
+        {isAdmin ? (
+          <div className={styles.helpArea}>
+            <button type="button" className={styles.helpToggle} aria-expanded={helpOpen} aria-controls="two-factor-help-choices" onClick={() => setHelpOpen(open => !open)}>
+              コードが使えない場合
+            </button>
+            {helpOpen ? (
+              <div id="two-factor-help-choices" className={styles.helpChoices} role="group" aria-label="コードが使えない場合の選択肢">
+                <button type="button" className={styles.helpLink} disabled={loading || succeeded} onClick={() => { setRecovery(value => !value); setCode(''); setError('') }}>{recovery ? '6桁のコードで入る' : '回復コードを使う'}</button>
+                <a className={styles.helpLink} href="/login" onClick={clearTwoFactorChallenge}>ログインに戻る</a>
+                {!recovery && challenge && method === 'line' ? <a className={styles.helpLink} href="/login" onClick={clearTwoFactorChallenge}>別のLINEアカウントでログイン</a> : null}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <Card surface="muted" padding="compact" layout="vertical" gap="normal">
+            <SectionHeader title={recovery ? '認証アプリが手元に在る時' : 'コードを入力できない場合'} />
+            <AuthActions><Button variant="text" size="inline" disabled={loading || succeeded} onClick={() => { setRecovery(value => !value); setCode(''); setError('') }}>{recovery ? '6桁のコードで入る' : '回復コードを使う'}</Button>
+              <Button variant="text" size="inline" href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>
+            </AuthActions>
+          </Card>
+        )}
 
     </AuthPage></SaveErrorScope>
   )

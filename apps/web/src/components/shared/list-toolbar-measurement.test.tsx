@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import FilterChip from './filter-chip'
-import { ListToolbarFrame, ListToolbarOptional, ListToolbarRow, ResponsiveFilterChips } from './list-toolbar'
+import { ListToolbarEnd, ListToolbarFrame, ListToolbarOptional, ListToolbarRow, ResponsiveFilterChips } from './list-toolbar'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
@@ -261,4 +261,34 @@ it.each([0, 216])('操作の自然幅%dをsnapshotで渡しても即時fitと同
     expect(fitToolbarOptionalWidth(item)).toBe(0)
     expect(item.style.getPropertyValue('--toolbar-optional-width')).toBe(`${width}px`)
   } finally { toolbar.remove() }
+})
+
+it('並び・件数と同じ段に収まらない時だけ札の組をまとめて次の段へ下げ、収まる幅では戻す', async () => {
+  const { observers } = environment()
+  let trailingTop = 140
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    if (this.querySelector(':scope > [data-toolbar-end]')) return new DOMRect(0, trailingTop, 300, 36)
+    if (this.getAttribute('role') === 'group') return new DOMRect(0, 100, 200, 36)
+    return new DOMRect(0, 100, 100, 36)
+  })
+  const view = <ListToolbarFrame layout="stacked"><ListToolbarRow>
+    <div role="group" aria-label="すばやく絞り込む"><ResponsiveFilterChips preserveChips>
+      <FilterChip selected={false} onChange={() => {}}>未対応</FilterChip>
+      <FilterChip selected={false} onChange={() => {}}>注目のみ</FilterChip>
+    </ResponsiveFilterChips></div>
+    <span>231件</span>
+    <ListToolbarEnd><span>20件表示</span></ListToolbarEnd>
+  </ListToolbarRow></ListToolbarFrame>
+  render(view)
+  await act(async () => { await Promise.resolve() })
+  const group = screen.getByRole('group', { name: 'すばやく絞り込む' })
+  const unit = group.closest('[data-toolbar-chip-unit]')!
+  expect(unit).toBeTruthy()
+  // 件数は札の組と同じまとまりに入り、一緒に次の段へ動く。
+  expect(unit.textContent).toContain('231件')
+  expect(unit.hasAttribute('data-toolbar-chips-drop')).toBe(true)
+  // 1段に収まる幅へ戻したら、次の計測で札の組を元の段へ戻す（属性を残さない）。
+  trailingTop = 100
+  act(() => { observers.forEach(observer => observer.callback([], {} as ResizeObserver)) })
+  expect(unit.hasAttribute('data-toolbar-chips-drop')).toBe(false)
 })

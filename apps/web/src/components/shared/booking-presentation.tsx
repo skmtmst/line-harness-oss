@@ -13,8 +13,8 @@ export function BookingLegendItem({ state, children }: { state: BookingState; ch
   return <span className={styles.legendItem}><span aria-hidden="true" className={`${styles.surface} ${styles.sample}`} data-booking-state={state} />{children ?? bookingStateLabels[state]}</span>
 }
 
-export function BookingLegend() {
-  return <div className={styles.legend} role="list" aria-label="予約の状態">{(Object.keys(bookingStateLabels) as BookingState[]).map(state => <span key={state} role="listitem"><BookingLegendItem state={state} /></span>)}</div>
+export function BookingLegend({ dense = false }: { dense?: boolean }) {
+  return <div className={dense ? `${styles.legend} ${styles.legendDense}` : styles.legend} role="list" aria-label="予約の状態">{(Object.keys(bookingStateLabels) as BookingState[]).map(state => <span key={state} role="listitem"><BookingLegendItem state={state} /></span>)}</div>
 }
 
 /** 種類名を文字で伝え、分類色を装飾の丸だけに使う。 */

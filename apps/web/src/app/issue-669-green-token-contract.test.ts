@@ -33,16 +33,22 @@ const offenders = (test: (line: string) => boolean) =>
   )
 
 describe('緑トークンの意味（#669 A7）', () => {
+  /*
+   * パスワードを忘れた方の導線は、ログイン前の画面で使う文字リンクの緑にする。
+   * ここだけは「押せるものは青」の例外として、文字リンクの共通色を使う。
+   */
+  const forgotPassword = (line: string) => line.includes('href="/password/forgot"')
+
   it('リンク・a要素に text-accent-deep を付けない（リンクはリンク色）', () => {
     const hits = offenders(
-      (l) => /<Link|<a\s/.test(l) && l.includes('text-accent-deep') && !/bg-accent|border-accent/.test(l),
+      (l) => /<Link|<a\s/.test(l) && l.includes('text-accent-deep') && !/bg-accent|border-accent/.test(l) && !forgotPassword(l),
     )
     expect(hits, `text-action へ直す: ${hits.join(', ')}`).toEqual([])
   })
 
   it('下線つき文字に text-accent-deep を付けない（押せる見た目は青）', () => {
     const hits = offenders(
-      (l) => l.includes('text-accent-deep') && /hover:underline|\bunderline\b/.test(l) && !/bg-accent|border-accent/.test(l),
+      (l) => l.includes('text-accent-deep') && /hover:underline|\bunderline\b/.test(l) && !/bg-accent|border-accent/.test(l) && !forgotPassword(l),
     )
     expect(hits, `text-action へ直す: ${hits.join(', ')}`).toEqual([])
   })

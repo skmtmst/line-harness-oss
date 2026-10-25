@@ -5,6 +5,7 @@ import { setDocumentTitle } from '@/lib/document-title'
 import { PageHeading } from '@/components/templates/page-frame'
 import authStyles from '@/components/templates/auth-page.module.css'
 import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
+import { nameInitial } from '@/lib/name-initial'
 
 /**
  * ログイン前の画面の入れ物。★管理画面 0-1／36-4／36-6 の「登録カード」（幅 520）。
@@ -25,6 +26,7 @@ export default function AuthCard({
   authLayout,
   brandName,
   titleAlign,
+  hero,
 }: {
   title: string
   description: ReactNode
@@ -39,16 +41,31 @@ export default function AuthCard({
   authLayout?: 'admin' | 'ops'
   brandName?: string
   titleAlign?: 'center' | 'start'
+  /** 題の上に置く印（二段階認証の盾など）。 */
+  hero?: ReactNode
 }) {
   // ログイン前の画面もタブの題を「<見出し> | musubo」にする。
   useEffect(() => { setDocumentTitle(title) }, [title])
   // V8 login confirmation/enrollment inherits its existing card tokens.
   if (variant === 'totp') return <main className={authStyles.page} data-auth-layout={authLayout}>
-    {authLayout === 'admin' ? <div className={authStyles.brand}><span className={authStyles.brandMark} aria-hidden="true">{brandName?.slice(0, 1) ?? 'm'}</span><div><strong>{brandName ?? 'musubo'}</strong><small>musubo</small></div></div> : null}
-    <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-title-align={titleAlign} data-design-node={cardNode}>
+    {authLayout === 'admin' ? <div className={authStyles.brand}><span className={authStyles.brandMark} aria-hidden="true">{brandName ? nameInitial(brandName) : 'm'}</span><div><strong>{brandName ?? 'musubo'}</strong><small>musubo</small></div></div> : null}
+    <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-title-align={titleAlign} data-hero={hero ? '' : undefined} data-design-node={cardNode}>
     {steps}
-    <PageHeading title={title} titleAs="h1" titleId={titleId} inset="none" help={authLayout === 'admin' ? undefined : description} />
-    {authLayout === 'admin' && description ? <p className={authStyles.help}>{description}</p> : null}
+    {hero}
+    {/*
+      ★オーナー決定（2026-10-24）：題 32/600・題の上 16・題と説明の間 8。
+      題と説明は1組の見出しとして PageHeading に渡す（別の行に分けると
+      題と入力の間が 16＋20＋16＝52 になり、48 の上限を超えていた）。
+    */}
+    <PageHeading
+      title={title}
+      titleAs="h1"
+      titleId={titleId}
+      inset="none"
+      subtitle={authLayout === 'admin' ? description : undefined}
+      subtitleSize="body"
+      help={authLayout === 'admin' ? undefined : description}
+    />
     {children}
   </section></main>
 
@@ -58,7 +75,7 @@ export default function AuthCard({
         data-design-node={cardNode}
         className="flex w-full max-w-130 flex-col items-center gap-5 rounded-large border border-hairline bg-canvas px-6 py-9 shadow-float sm:px-10"
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-control bg-accent-deep text-heading font-bold text-on-accent">
             m
           </span>
@@ -66,7 +83,7 @@ export default function AuthCard({
         </div>
         <div className="flex w-full flex-col items-center gap-2 text-center">
           <h1 className="text-heading font-bold text-ink">{title}</h1>
-          <p className="text-caption text-ink-faint">{description}</p>
+          <p className="text-caption text-balance text-ink-faint">{description}</p>
         </div>
         {children}
       </section>
@@ -101,24 +118,30 @@ export function AuthField({
   hint,
   error,
   htmlFor,
+  action,
   children,
 }: {
   label: string
   hint?: string
   error?: string | null
   htmlFor: string
+  /** ラベルの行の右端に置く小さな導線（パスワードを忘れた方など）。 */
+  action?: ReactNode
   children: ReactNode
 }) {
   return (
-    <div className="flex w-full flex-col gap-1.5">
+    <div className="flex w-full flex-col gap-2">
       {/*
         U100: ラベルと補足を同じ行に並べると、320pxや200%拡大で
         補足が幅を取ってラベルが途中で折れる（「メールアド／レス」）。
         縦に積めば、ラベル→補足→入力→エラーの順でそのまま読める。
       */}
-      <label htmlFor={htmlFor} className="text-label font-medium text-ink">
-        {label}
-      </label>
+      <div className="flex w-full items-baseline justify-between gap-2">
+        <label htmlFor={htmlFor} className="text-label font-medium text-ink">
+          {label}
+        </label>
+        {action}
+      </div>
       {hint ? <p className="text-micro text-ink-faint">{hint}</p> : null}
       {children}
       {error ? (

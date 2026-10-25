@@ -2,22 +2,18 @@
 
 import type { AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Avatar from '@/components/shared/avatar'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { formatNumber } from '@/lib/format'
 
 export function accountIconUrl(account: AccountWithStats): string | null {
-  return account.pictureUrl || account.iconUrl || null
+  return account.iconUrl || account.pictureUrl || null
 }
 
 function AccountIcon({ account }: { account: AccountWithStats }) {
-  const src = accountIconUrl(account)
-  if (src) {
-    // eslint-disable-next-line @next/next/no-img-element -- LINE公式アカウントのCDN画像
-    return <img src={src} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
-  }
-  const label = (account.displayName || account.name).trim().slice(0, 1)
-  return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-sm font-bold text-accent-deep">{label}</span>
+  const name = account.displayName || account.name
+  return <Avatar name={name} src={accountIconUrl(account)} size={36} shape="rounded" alt={name} />
 }
 
 function ConnectionStatus({ status }: { status: 'ok' | 'warn' | 'unknown' | undefined }) {

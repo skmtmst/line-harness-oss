@@ -26,15 +26,53 @@ export const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'all', label: '全件' },
 ]
 
-/** 種別（予約経路）の絞り込み。bookings.source の CHECK 制約と同じ語彙。 */
+/** 予約元の絞り込み。今読んでいる予約の source を LINE・電話・その他の3つへまとめる。 */
 export const SOURCE_FILTERS: Array<{ key: string; label: string }> = [
-  { key: 'all', label: '経路: すべて' },
-  { key: 'liff', label: 'LINE' },
+  { key: 'all', label: 'すべて' },
+  { key: 'line', label: 'LINE' },
   { key: 'phone', label: '電話' },
-  { key: 'counter', label: '店頭' },
-  { key: 'operator', label: 'スタッフ入力' },
-  { key: 'import', label: '取り込み' },
+  { key: 'other', label: 'その他' },
 ]
+
+/** 選ぶ欄に渡す予約元の候補。 */
+export const SOURCE_FILTER_OPTIONS = SOURCE_FILTERS.map(({ key, label }) => ({ value: key, label }))
+
+/** 絞り込み欄・印刷で同じ言い方にする予約元の見出し。 */
+export const SOURCE_FILTER_NAME = '予約元'
+
+/** 印刷などで出す「予約元：電話」。絞り込みと同じ語彙を使う。 */
+export function sourceFilterText(key: string): string {
+  const label = SOURCE_FILTERS.find((item) => item.key === key)?.label ?? 'すべて'
+  return `${SOURCE_FILTER_NAME}：${label}`
+}
+
+export type LedgerSourceGroup = 'line' | 'phone' | 'other'
+
+/** 予約1件の予約元。LINE は source が無い古い応答も friend_id で判別する。 */
+export function ledgerSourceGroup(row: Pick<BookingRequest, 'source' | 'friend_id'>): LedgerSourceGroup {
+  if (row.source === 'liff' || (!row.source && Boolean(row.friend_id))) return 'line'
+  if (row.source === 'phone') return 'phone'
+  return 'other'
+}
+
+/** 予約元の絞り込みに合うか。'all' は全部。 */
+export function matchesLedgerSource(row: Pick<BookingRequest, 'source' | 'friend_id'>, source: string): boolean {
+  return source === 'all' || ledgerSourceGroup(row) === source
+}
+
+/** 担当と予約元の両方の絞り込みに合うか。 */
+export function matchesLedgerFilters(row: Pick<BookingRequest, 'source' | 'friend_id' | 'staff_id'>, staff: string, source: string): boolean {
+  return (staff === 'all' || row.staff_id === staff) && matchesLedgerSource(row, source)
+}
+
+/** 表に出す予約元の言葉。 */
+export const SOURCE_VALUE_LABELS: Record<string, string> = {
+  liff: 'LINE',
+  phone: '電話',
+  counter: '店頭',
+  operator: 'スタッフ入力',
+  import: '取り込み',
+}
 
 export const statusBadgeColor: Record<string, string> = {
   requested: 'bg-warning-bg text-warning',
@@ -46,10 +84,9 @@ export const statusBadgeColor: Record<string, string> = {
   no_show: 'bg-danger-bg text-danger',
 }
 
-/** 表の予約経路（LINE 以外）。絞り込みの名前と同じ語。古い応答は「電話」。 */
+/** 表の予約経路（LINE 以外）。古い応答は「電話」。 */
 export function sourceLabel(b: BookingRequest): string {
-  const found = SOURCE_FILTERS.find((item) => item.key !== 'all' && item.key === b.source)
-  return found?.label ?? '電話'
+  return SOURCE_VALUE_LABELS[b.source ?? ''] ?? '電話'
 }
 
 /** 表の日時：MM/DD（曜）HH:mm（ の一覧の形）。 */

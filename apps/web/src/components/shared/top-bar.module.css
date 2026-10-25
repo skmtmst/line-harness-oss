@@ -112,6 +112,7 @@
   min-width: 0;
   align-items: center;
   background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
 }
 
 /* `cBSCb/KZ9W9`。22px・radius-mini・accent-soft。 */
@@ -145,10 +146,13 @@
   cursor: pointer;
 }
 
+.accountPill:hover {
+  background: var(--color-canvas-sunken);
+}
+
 .accountPill:focus-within {
-  border-color: var(--color-status-info);
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 /* `cBSCb/ENVf3`。1×24 の縦線。 */
@@ -250,7 +254,7 @@
  * パンくず（アカウント › 画面名・13px）、右は アカウント切替・通知
  * （36 角丸10の枠ボタン）・自分・ログアウト。区切り線は出さない。
  * 探す欄は V8 の帯から外した（オーナー決定 2026-10-01）。探すのは
- * 各一覧の中の欄が受ける。長いアカウント名は 128px、自分の名前は
+ * 各一覧の中の欄が受ける。長いアカウント名は 260px、自分の名前は
  * 104px で「…」に収める。
  * ------------------------------------------------------------------- */
 :root .root {
@@ -350,20 +354,21 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--color-hairline);
+  border: 0;
   border-radius: var(--radius-control);
   background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
   color: var(--color-ink-secondary);
   cursor: pointer;
 }
 
 .iconButton:hover {
-  background: var(--color-surface-pearl);
+  background: var(--color-canvas-sunken);
 }
 
 .iconButton:focus-visible {
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 /* 未読の数。ベルの右上へ赤い丸（白い数字）。 */
@@ -411,16 +416,16 @@
 }
 
 /*
- * 帯が混まないよう、V8 は名前の見せる幅を固定する（128 / 104）。
- * はみ出た分は「…」。全文は title 属性で読める。
+ * 帯が混まないよう名前の幅に上限を置く（最大260）。入る名前を切らずに出し、
+ * 入らない分だけ「…」。全文は title 属性で読める。
  */
 :root .accountName {
-  max-width: 128px;
+  max-width: 260px;
 }
 
 /*
  * ★V8 1152 の帯（parity 1003-2106：1152 の 29/31 板で札が 20px に
- * 潰れて見えなくなっていた）。札は縮めない（長い名前は 128px の
+ * 潰れて見えなくなっていた）。札は縮めない（長い名前は 260px の
  * 「…」で受ける）。代わりにパンくずと自分の名前が縮む（どちらも
  * 「…」持ち）。互換経路は今までどおり。
  */
@@ -442,7 +447,7 @@
 /*
  * ★V8 1152 の帯（M3 報告・parity 1003-2106：1152 の 29/31 板で札が
  * 20px に潰れて見えなくなっていた）。札は縮めない（長い名前は
- * 128px の「…」で受ける）。代わりにパンくずと自分の名前が縮む
+ * 260px の「…」で受ける）。代わりにパンくずと自分の名前が縮む
  * （どちらも「…」持ち）。互換経路は今までどおり。
  */
 :root .accountPill {
@@ -587,8 +592,8 @@
 :root .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
 :root .root[data-v8-chrome='shell'] .logout svg { width: 15px; height: 15px; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton:not(:focus-visible) { outline-color: transparent; }
-/* 展開時は絵の名前欄128/104px、畳んだ外側は内容に合わせた幅。 */
-:root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: 128px; height: 20px; line-height: 17px; }
+/* 展開時は名前を最大260px・自分の名前を104px、畳んだ外側は内容に合わせた幅。 */
+:root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: auto; max-width: 260px; height: 20px; line-height: 17px; }
 :root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .user { width: 104px; height: 20px; line-height: 17px; }
 :root .root[data-v8-chrome='shell'] .identity { border-radius: var(--polish-radius-control); }
 :root .root[data-v8-chrome='shell'] .bellBadge { border: 0; border-radius: var(--polish-radius-pill); }
@@ -596,3 +601,29 @@
 :root .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome > svg { display: none; }
 
 }
+
+/* 選ぶ欄と同じ「白地＋影で浮かせる」形。開いた・押した・焦点は選ぶ欄にそろえる。 */
+:root .accountPill,
+:root .iconButton[data-topbar-bell] {
+  border: 0;
+  outline: 1px solid transparent;
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+}
+:root .accountPill:hover,
+:root .iconButton[data-topbar-bell]:hover {
+  background: var(--color-canvas-sunken);
+}
+:root .iconButton[data-topbar-bell]:not(:focus-visible) {
+  outline: 1px solid transparent;
+}
+:root .accountPill:focus-within,
+:root .iconButton[data-topbar-bell]:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
+}
+:root .accountPill:has(.accountSelect:active),
+:root .iconButton[data-topbar-bell]:active:not(:disabled) { filter: brightness(0.97); }
+:root .accountPill > [data-avatar] { flex: 0 0 auto; }
+:root .accountPill { transition: background-color var(--motion-fast) var(--motion-ease-out), box-shadow var(--motion-fast) var(--motion-ease-out); }
+:root .iconButton[data-topbar-bell] { transition: background-color var(--motion-fast) var(--motion-ease-out); }

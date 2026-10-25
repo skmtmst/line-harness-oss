@@ -6,7 +6,7 @@ import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { emptyValue } from '@/components/shared/empty-value'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
 import { GridCell,GridHeadRow,GridRow,GridTable } from '@/components/shared/grid-table'
 import ListState from '@/components/shared/list-state'
@@ -236,7 +236,16 @@ export default function FileScanScreen() {
 
       <ListToolbar
         search={{ value: query, onChange: changeQuery, label: 'ファイル名で探す', placeholder: 'ファイル名で探す' }}
-        filters={<>{STATUS_CHIPS.map((chip) => <FilterChip key={chip.value} selectedIcon={false} selected={statusFilter === chip.value} onChange={() => changeStatusFilter(chip.value)}>{chip.value === 'released' ? chip.label : `${chip.label} ${counts[chip.value]}`}</FilterChip>)}</>}
+        filters={<SegmentedControl
+          aria-label="状態で絞り込む"
+          value={statusFilter}
+          onChange={changeStatusFilter}
+          options={STATUS_CHIPS.map((chip) => ({
+            value: chip.value,
+            label: chip.label,
+            count: chip.value === 'released' ? undefined : counts[chip.value],
+          }))}
+        />}
       />
 
       {items.length === 0 ? (

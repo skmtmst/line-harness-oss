@@ -40,6 +40,8 @@
 .label { display: inline-flex; align-items: center; padding: 0 var(--polish-space-row); border-radius: var(--radius-segment); font-size: var(--text-micro); white-space: nowrap; }
 .legend { display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-field); min-width: 0; font-size: var(--text-micro); color: var(--color-ink-secondary); }
 .legendItem { display: inline-flex; align-items: center; gap: var(--polish-space-row); white-space: nowrap; }
+.legendDense { gap: var(--space-6); }
+.legendDense .legendItem { gap: var(--space-4); }
 .sample { width: 12px; height: 12px; flex-shrink: 0; border-radius: var(--radius-mini); }
 .name, .time, .detail { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .name { font-weight: 600; }

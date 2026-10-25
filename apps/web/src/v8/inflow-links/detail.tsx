@@ -23,7 +23,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import Dialog from '@/components/shared/dialog'
 import KpiBand from '@/components/shared/kpi-band'
@@ -579,22 +579,17 @@ function InflowDetailContent() {
                 onClear={() => { setFriendSearch(''); setFriendPage(1) }}
               />
             </div>
-            <div className={styles.chips} role="group" aria-label="友だちを絞り込む">
-              {([
-                ['all', `すべて ${formatNumber(friends.length)}`],
-                ['month', `今月 ${formatNumber(monthFriends.length)}`],
-                ['blocked', `ブロック ${formatNumber(blockedFriends.length)}`],
-                ['converted', `成果あり ${formatNumber(convertedFriends.length)}`],
-              ] as Array<[FriendChip, string]>).map(([value, label]) => (
-                <FilterChip
-                  key={value}
-                  selected={friendChip === value}
-                  onChange={() => { setFriendChip(friendChip === value && value !== 'all' ? 'all' : value); setFriendPage(1) }}
-                >
-                  {label}
-                </FilterChip>
-              ))}
-            </div>
+            <SegmentedControl<FriendChip>
+              aria-label="友だちを絞り込む"
+              value={friendChip}
+              onChange={(next) => { setFriendChip(next); setFriendPage(1) }}
+              options={[
+                { value: 'all', label: 'すべて', count: friends.length },
+                { value: 'month', label: '今月', count: monthFriends.length },
+                { value: 'blocked', label: 'ブロック', count: blockedFriends.length },
+                { value: 'converted', label: '成果あり', count: convertedFriends.length },
+              ]}
+            />
             <span className={styles.toolsSpacer} aria-hidden="true" />
             <div className={styles.periodBox}>
               <SaveErrorField names={["friendPeriod","friend_period"]}><Select

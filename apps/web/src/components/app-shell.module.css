@@ -258,3 +258,25 @@
 
 /* 固定絵が内容の下で終わる板。送りは main 内に保つ。 */
 :root .main:has([data-height-mode='content']) { flex: 0 1 auto; }
+
+/*
+ * 板の右の送るバー。普段は見せず、板に乗せて送る時だけ濃くする。
+ * 触れない端末では常に見せる（送る口が無いと気づけないため）。
+ */
+@media (hover: hover) {
+  :root .main {
+    scrollbar-color: transparent transparent;
+  }
+
+  :root .main:hover {
+    scrollbar-color: var(--color-scroll-thumb-hover) transparent;
+  }
+
+  :root .main::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+
+  :root .main:hover::-webkit-scrollbar-thumb {
+    background-color: var(--color-scroll-thumb-hover);
+  }
+}

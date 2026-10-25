@@ -1,5 +1,23 @@
+import { Children, isValidElement, type ReactNode } from 'react'
 import { TrendingDown, TrendingUp, TriangleAlert } from 'lucide-react'
 import styles from './delta-chip.module.css'
+
+function textOf(node: ReactNode): string {
+  return Children.toArray(node).map((child) => {
+    if (typeof child === 'string' || typeof child === 'number') return String(child)
+    return isValidElement<{ children?: ReactNode }>(child) ? textOf(child.props.children) : ''
+  }).join('')
+}
+
+/** 差の札の文字が 0（「+0」「−0」「0.0%」など）なら、札を出さない。 */
+export function isZeroDelta(children: ReactNode): boolean {
+  const normalized = textOf(children)
+    .replace(/[−ー–—]/gu, '-')
+    .replace(/[+±]/gu, '')
+    .replace(/[,\s]/gu, '')
+    .replace(/(%|pt|ポイント|件|人|分|円)$/iu, '')
+  return normalized !== '' && Number(normalized) === 0
+}
 
 /**
  * 増減の札（Pencil ★V8 `C6DGX`・`OEQxt`・`r9qfM2`）。
@@ -18,6 +36,7 @@ export default function DeltaChip({
   direction?: 'up' | 'down'
   children: React.ReactNode
 }) {
+  if (tone !== 'attention' && isZeroDelta(children)) return null
   const Icon = tone === 'attention' ? TriangleAlert : (direction ?? tone) === 'up' ? TrendingUp : TrendingDown
   return (
     <span className={[styles.root, styles[tone]].join(' ')}>

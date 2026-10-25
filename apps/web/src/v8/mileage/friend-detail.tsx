@@ -25,7 +25,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
 import { TextArea } from '@/components/shared/text-field'
 import KpiBand from '@/components/shared/kpi-band'
@@ -412,18 +412,16 @@ function FriendDetailInner() {
               onClear={() => { setSearchInput(''); setSearch(''); setPage(1) }}
             />
 
-          <div role="group" aria-label="種類で絞り込む" className={styles.chipGroup}>
-            {chips.map((chip) => (
-              <FilterChip
-                key={chip.key}
-                selected={kindFilter === chip.key}
-                icon={chip.icon}
-                onChange={() => { setPage(1); setKindFilter(chip.key) }}
-              >
-                {`${chip.label} ${formatNumber(chip.key === 'all' ? counts.all : counts[chip.key])}`}
-              </FilterChip>
-            ))}
-          </div>
+          <SegmentedControl
+            aria-label="種類で絞り込む"
+            value={kindFilter}
+            onChange={(next) => { setPage(1); setKindFilter(next) }}
+            options={chips.map((chip) => ({
+              value: chip.key,
+              label: chip.label,
+              count: chip.key === 'all' ? counts.all : counts[chip.key],
+            }))}
+          />
 
 
             <SaveErrorField names={["period","page"]}><Select

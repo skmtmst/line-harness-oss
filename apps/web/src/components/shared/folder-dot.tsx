@@ -71,7 +71,7 @@ export function FolderDotName({ folder, nameCarriesDot, children, annotation, se
   return (
     <span className={styles.line} data-list-name="" data-has-annotation={annotation ? true : undefined} title={nameText(name)}>
       {selection}{selectionNodes}
-      {hasFolders ? <FolderDot folder={folder} /> : null}
+      {hasFolders && folder ? <FolderDot folder={folder} /> : null}
       {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{name}</span>}
       {annotation}
     </span>

@@ -26,7 +26,7 @@ import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
 import Select from '@/components/shared/select'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions } from '@/components/shared/managed-folder-panel'
@@ -441,14 +441,16 @@ export default function WebhooksOutgoingV8() {
 
   /* ===== 道具の段 ===== */
   const chips = (
-    <div role="group" aria-label="状態で絞り込む" className={styles.chips}>
-      <FilterChip selected={chip === 'active'} onChange={(next) => setChip(next ? 'active' : '')} icon={<Pause size={13} aria-hidden="true" />}>
-        {ready ? `動いている ${activeCount}` : '有効'}
-      </FilterChip>
-      <FilterChip selected={chip === 'paused'} onChange={(next) => setChip(next ? 'paused' : '')} icon={<Play size={13} aria-hidden="true" />}>
-        {ready ? `止めている ${pausedCount}` : '停止中'}
-      </FilterChip>
-    </div>
+    <SegmentedControl
+      aria-label="状態で絞り込む"
+      value={chip}
+      onChange={setChip}
+      options={[
+        { value: '', label: 'すべて' },
+        { value: 'active', label: '動いている', count: ready ? activeCount : undefined },
+        { value: 'paused', label: '止めている', count: ready ? pausedCount : undefined },
+      ]}
+    />
   )
   /* 絵に並びの部品は無い。並びは「よく使う絞り込み」の中で選ぶ（機能は残す）。 */
   const savedBox = (
