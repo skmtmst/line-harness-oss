@@ -6,7 +6,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { StoreComparisonDetail, HqAttentionKind, StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
-import { ListPage, ListPagePagination } from '@/components/templates'
+import { ListPage, ListPagePagination, ListPageSection } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { ValueBarChart } from '@/components/shared/charts'
@@ -235,11 +235,15 @@ export default function StoreComparisonList() {
           </ListPagePagination>
         ) : undefined}
       >
-        {notice ? <Notice tone="danger" message={notice} /> : null}
-        {status === 'ready' && notComputed > 0 ? (
-          <Notice tone="info" message={notComputed === data?.rows.length
-            ? `${NOT_COMPUTED}。期間のすべての日がそろうと数が出ます。`
-            : `集計がそろっていない店が ${notComputed} 店あります。${SNAPSHOT_TIME}から前の日の分まで集計し、期間のすべての日がそろうと数が出ます。`} />
+        {notice || (status === 'ready' && notComputed > 0) ? (
+          <ListPageSection>
+            {notice ? <Notice tone="danger" message={notice} /> : null}
+            {status === 'ready' && notComputed > 0 ? (
+              <Notice tone="info" message={notComputed === data?.rows.length
+                ? `${NOT_COMPUTED}。期間のすべての日がそろうと数が出ます。`
+                : `集計がそろっていない店が ${notComputed} 店あります。${SNAPSHOT_TIME}から前の日の分まで集計し、期間のすべての日がそろうと数が出ます。`} />
+            ) : null}
+          </ListPageSection>
         ) : null}
         {body}
       </ListPage>
