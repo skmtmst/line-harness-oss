@@ -122,7 +122,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
               <col className={styles.colSelect} />
               <col />
               {!narrow && <col className={styles.colPreview} />}
-              {narrow && <col className={styles.colKind} />}
+              <col className={styles.colKind} />
               <col className={styles.colPublish} />
               {!narrow && <col className={styles.colUsage} />}
               {!narrow && <col className={styles.colMonthly} />}
@@ -142,7 +142,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                 </Th>
                 <Th className={styles.headCell}>テンプレート</Th>
                 {!narrow && <Th className={styles.headCell}>LINEでの見え方</Th>}
-                {narrow && <Th className={styles.headCell}>種類</Th>}
+                <Th className={styles.headCell}>種類</Th>
                 <Th className={styles.headCell}>公開</Th>
                 {!narrow && <Th className={styles.headCell}>使っている所</Th>}
                 {!narrow && <Th className={styles.headCell}>今月送った数</Th>}
@@ -154,7 +154,6 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
               {duplicateFeedback.order(shownItems, templates).map((t, saveFieldIndex) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
-                const kindText = isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)
                 const folder = folderDotOf(t)
                 const excerpt = excerptOf(t)
                 return (
@@ -177,14 +176,12 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                         /></SaveErrorField>) : <UnavailableSelection label={`「${t.name}」を選択`} />}
                     </Td>
                     <NameCell name={
-                        <div className={styles.nameStack} title={t.name}>
-                          <div className={styles.dotLine}>
+                        <div className={styles.dotLine}>
+                          <>
                             <RowNameLink href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
                               <TruncatedText value={String(t.name ?? '')} />
                             </RowNameLink>
-                          </div>
-                          {/* 見え方の列を出す幅では、種類は名前の下の2行目へ（列を1本空けて名前の幅を保つ）。 */}
-                          {!narrow && <span className={styles.cellSub}>{kindText}</span>}
+                          </>
                         </div>
                       } folder={folder}
                       annotation={String(t.name ?? '').startsWith('【見本】') ? <StatusBadge tone="neutral" dot>見本</StatusBadge> : undefined}
@@ -194,11 +191,9 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                         <LineBubbleThumb thumb={bubbleThumbOf({ messageType: t.messageType, content: latestContentOf(t), question: t.question })} />
                       </Td>
                     )}
-                    {narrow && (
-                      <Td>
-                        <TagPill name={kindText} color={folder ? folderDisplayColor(folder) : undefined} aria-label={`種類：${kindText}`} />
-                      </Td>
-                    )}
+                    <Td>
+                      <TagPill name={isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)} color={folder ? folderDisplayColor(folder) : undefined} aria-label={`種類：${isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}`} />
+                    </Td>
                     <Td>
                       <StatusBadge tone={publish.tone === 'live' ? 'success' : publish.tone === 'changes' ? 'warning' : 'neutral'}>
                         {publish.label}
