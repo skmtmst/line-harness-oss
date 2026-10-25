@@ -373,7 +373,7 @@ export default function FeatureSettingsScreen() {
 
     >
       {!canManage && (
-        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
+        <ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice>
       )}
 
       {!selectedAccountId ? (
