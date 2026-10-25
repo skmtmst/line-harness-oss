@@ -4,7 +4,7 @@ import PeriodPicker from '@/components/shared/period-picker'
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Download } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { StoreComparisonDetail, HqAttentionKind, StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
 import { ListPage, ListPagePagination, ListPageSection } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -21,6 +21,7 @@ import { pastPeriod } from '@/components/shared/period-picker'
 import Select from '@/components/shared/select'
 import { DataTable, SortTh, TableHeadRow, Td, Th, Tr, type SortDirection } from '@/components/shared/table'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
+import Toggle from '@/components/shared/toggle'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -29,12 +30,13 @@ import { fetchApi } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import type { AccountWithStats } from '@/contexts/account-context'
-import { diffTitle, formatDiff, formatMetric, METRICS, diffTone, worseCount, type MetricDef } from './metrics'
+import { columnsWithDiff, diffCount, diffCountLabel, diffTitle, formatDiff, formatMetric, METRICS, diffTone, sameAsAverage, worseCount, type MetricDef, type StoreAverage } from './metrics'
 import styles from './list.module.css'
 
 /*
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`）。行＝店、列＝7つの数。
  * 各マスに値と平均との差の札（良い＝緑・悪い＝赤）。行を押すと右の引き出し（G7-2 `z0fSYt`）。
+ * 「違いだけ表示」（?diffOnly=1）は全店の平均と同じ数を隠す。表は全部の店で同じ列、引き出しは同じ数の行。CSV は切り替えに関係なく全部の列。
  * CSV は書き出しの口（頼む→待つ→受け取る）につないだ。「店の組」の絞り込みは口がまだ無いので、形を残して共通の準備中の窓を出す。
  */
 
@@ -49,6 +51,8 @@ const COMPARE_OPTIONS = [
 /** 集計は毎朝 4 時半から、前の日の分まで（Worker の店の比較の集計と同じ時刻）。 */
 const SNAPSHOT_TIME = '毎朝 4 時半'
 const NOT_COMPUTED = `まだ集計していません（${SNAPSHOT_TIME}から、前の日の分まで集計します）`
+/** 「N つが違う」の基準。違いは比べる相手の選択に関係なく全店の平均と比べる。 */
+const DIFF_BASE = '全店の平均と比べて'
 
 function rangeLabel(from: string, to: string): string {
   const f = (v: string) => `${Number(v.slice(5, 7))}/${Number(v.slice(8, 10))}`
@@ -59,6 +63,10 @@ export default function StoreComparisonList() {
   usePageTitle('店の比較')
   usePageCrumbs([{ label: 'ホーム', href: '/hq' }])
   const preparing = usePreparingDialog()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [diffOnly, setDiffOnlyState] = useState(() => searchParams.get('diffOnly') === '1')
   const { accounts, refreshAccounts } = useAccount()
   const role = useStaffRole()
   const canManage = readSessionSnapshot()?.impersonation?.mode !== 'read' && canManageRole(role)
@@ -142,6 +150,17 @@ export default function StoreComparisonList() {
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1
   const last = Math.min(page * pageSize, total)
   const openRow = data?.rows.find((row) => row.accountId === openId) ?? null
+  const columns = data && diffOnly ? columnsWithDiff(data.rows, data.average) : METRICS
+
+  /* 切り替えは URL に残す（再読込・共有でも同じ表示）。ほかの URL の条件は消さない。 */
+  const setDiffOnly = (next: boolean) => {
+    setDiffOnlyState(next)
+    const params = new URLSearchParams(window.location.search)
+    if (next) params.set('diffOnly', '1')
+    else params.delete('diffOnly')
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }
 
   const sortDirection = (key: MetricDef['key']): SortDirection => (sort === key ? order : 'none')
   const changeSort = (key: MetricDef['key']) => {
@@ -155,6 +174,7 @@ export default function StoreComparisonList() {
       filters={<>
         <PeriodPicker days={days} onChange={(value) => { setPage(1); setDays(Number(value)) }} />
         <Select aria-label="比べる相手" value={compare} options={COMPARE_OPTIONS} onChange={(value) => { setPage(1); setCompare(value as 'previous' | 'average') }} />
+        <DiffOnlyToggle checked={diffOnly} onChange={setDiffOnly} />
         <Button variant="secondary" className="justify-between" onClick={() => preparing.open('店の組での絞り込み')}>
           <span>店の組：すべて</span>
           <ChevronDown size={16} aria-hidden="true" />
@@ -173,13 +193,15 @@ export default function StoreComparisonList() {
     <ListState kind="error" error={error} onRetry={() => void load()} />
   ) : !data || data.rows.length === 0 ? (
     <ListState kind="empty" emptyPreset="readonly" title="比べる店がまだありません" description="統括に店が入ると、ここで数を並べて見られます。" />
+  ) : columns.length === 0 ? (
+    <ListState kind="empty" emptyPreset="filtered" title="全店の平均と違う数はありません" description="どの店も、7 つの数が全店の平均と同じです。" action={<Button variant="secondary" onClick={() => setDiffOnly(false)}>すべて表示</Button>} />
   ) : (
     <>
-      <DataTable columns="minmax(0, 1.1fr) repeat(7, minmax(0, 1fr))">
+      <DataTable columns={`minmax(0, 1.1fr) repeat(${columns.length}, minmax(0, 1fr))`}>
         <thead>
           <TableHeadRow>
             <Th grow>店</Th>
-            {METRICS.map((def) => (
+            {columns.map((def) => (
               <SortTh key={def.key} align="right" sort={sortDirection(def.key)} onSort={() => changeSort(def.key)} sortLabel={`${def.label}で並べ替える`}>{def.short}</SortTh>
             ))}
           </TableHeadRow>
@@ -192,14 +214,19 @@ export default function StoreComparisonList() {
             return (
               <Fragment key={row.accountId}>
                 <Tr interactive onOpen={() => setOpenId(row.accountId)} data-row-id={row.accountId}>
-                  <Td grow><span className={styles.storeName}><TruncatedText value={row.name} /></span></Td>
-                  {METRICS.map((def) => (
+                  <Td grow>
+                    <span className={styles.storeCell}>
+                      <span className={styles.storeName}><TruncatedText value={row.name} /></span>
+                      <DiffCountLine row={row} average={data.average} />
+                    </span>
+                  </Td>
+                  {columns.map((def) => (
                     <Td key={def.key} align="right"><MetricCell def={def} metric={row.metrics[def.key]} compare={compare} computed={!!row.computedAt} /></Td>
                   ))}
                 </Tr>
                 {expired ? (
                   <Tr data-store-connection={row.accountId}>
-                    <Td colSpan={METRICS.length + 1}>
+                    <Td colSpan={columns.length + 1}>
                       <Notice tone="warn" compact
                         message={checkFailed === row.accountId ? 'LINE の接続が切れています。確かめ直せませんでした。時間をおいてもう一度押してください。' : 'LINE の接続が切れています。この店の数は取れないことがあります。'}
                         action={canRecheck ? <Button variant="text" onClick={() => void recheck(expired)} busy={checkingId === row.accountId} disabled={checkingId !== null}>更新する</Button> : undefined}
@@ -215,7 +242,7 @@ export default function StoreComparisonList() {
       <div className={styles.averageBand}>
         <span className={styles.averageTitle}>{`${total} 店の平均`}</span>
         <TruncatedText className={styles.averageText} value={METRICS.map((def) => `${def.label} ${formatMetric(def.key, data.average[def.key] ?? null)}`).join('・')} />
-        <span className={styles.averageNote}>{`札は${compare === 'average' ? '全店の平均' : '前の期間'}との差（赤＝悪い・緑＝良い）`}</span>
+        <span className={styles.averageNote}>{`札は${compare === 'average' ? '全店の平均' : '前の期間'}との差（赤＝悪い・緑＝良い）${compare === 'average' ? '' : '・「違う」の数は全店の平均と比べます'}`}</span>
       </div>
     </>
   )
@@ -247,10 +274,28 @@ export default function StoreComparisonList() {
         ) : null}
         {body}
       </ListPage>
-      <StoreDrawer row={openRow} period={period} compare={compare} onClose={() => setOpenId(null)} />
+      <StoreDrawer row={openRow} period={period} compare={compare} average={data?.average ?? null} diffOnly={diffOnly} onDiffOnly={setDiffOnly} onClose={() => setOpenId(null)} />
       {preparing.dialog}
     </>
   )
+}
+
+function DiffOnlyToggle({ checked, onChange }: { checked: boolean; onChange: (next: boolean) => void }) {
+  return (
+    <span className={styles.diffToggle}>
+      <Toggle checked={checked} label="違いだけ表示" onChange={onChange} />
+      <span aria-hidden="true">違いだけ表示</span>
+    </span>
+  )
+}
+
+/** 店の名前の下の「7 項目中 5 つが違う」。集計前・比べられる数が無い店には出さない（「差が無い」と読ませない）。 */
+function DiffCountLine({ row, average }: { row: StoreComparisonRow; average: StoreAverage }) {
+  if (!row.computedAt) return null
+  const count = diffCount(row, average)
+  if (count.compared === 0) return null
+  const label = diffCountLabel(count)
+  return <span className={styles.diffCount} data-diff-count={row.accountId} title={`${DIFF_BASE}、${label}`}>{label}</span>
 }
 
 function MetricCell({ def, metric, compare, computed }: { def: MetricDef; metric: StoreComparisonRow['metrics'][MetricDef['key']] | undefined; compare: 'previous' | 'average'; computed: boolean }) {
@@ -284,7 +329,7 @@ function attentionTargetLabel(href:string) {
  return '接続の状態を開く';
 }
 
-function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRow | null; period: { from: string; to: string }; compare: 'previous' | 'average'; onClose: () => void }) {
+function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onClose }: { row: StoreComparisonRow | null; period: { from: string; to: string }; compare: 'previous' | 'average'; average: StoreAverage | null; diffOnly: boolean; onDiffOnly: (next: boolean) => void; onClose: () => void }) {
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
   const [detail, setDetail] = useState<{ id: string; status: Status; data: StoreComparisonDetail | null }>({ id: '', status: 'loading', data: null })
@@ -305,10 +350,16 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
   }, [accountId, period.from, period.to])
 
   const worse = row ? worseCount(row) : 0
+  const count = row && average && row.computedAt ? diffCount(row, average) : null
+  const base = compare === 'average' ? '全店の平均' : '前の期間'
+  const worseText = worse > 0 ? `${base}より悪い数 ${worse} つ` : `${base}より悪い数はありません`
   /* 平均より下の数を上に並べる（G7 §2-1）。 */
-  const ordered = row
+  const sorted = row
     ? [...METRICS].sort((a, b) => Number(diffTone(b, row.metrics[b.key]?.diff ?? null) === 'down') - Number(diffTone(a, row.metrics[a.key]?.diff ?? null) === 'down'))
     : []
+  /* 「違いだけ表示」：全店の平均と同じ数の行を隠す。取れない数は「同じ」に数えず残す。 */
+  const hidden = row && average && diffOnly ? sorted.filter((def) => sameAsAverage(row, average, def.key)) : []
+  const ordered = sorted.filter((def) => !hidden.includes(def))
   const current = detail.id === accountId ? detail : { id: '', status: 'loading' as Status, data: null }
 
   const attention = current.data?.attention
@@ -317,7 +368,7 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
     <Drawer
       open={row !== null}
       title={row?.name ?? ''}
-      description={row ? `${worse > 0 ? `${compare === 'average' ? '全店の平均' : '前の期間'}より悪い数 ${worse} つ` : `${compare === 'average' ? '全店の平均' : '前の期間'}より悪い数はありません`}` : undefined}
+      description={row ? (count && count.compared > 0 ? `${DIFF_BASE} ${diffCountLabel(count)}・${worseText}` : worseText) : undefined}
       closeAppearance="box"
       heightMode="viewport"
       onClose={onClose}
@@ -330,7 +381,10 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
       {row ? (
         <div className={styles.drawerBody}>
           <Card padding="default" layout="vertical" gap="normal" aria-label="7つの数">
-            <h3 className={styles.cardTitle}>7 つの数</h3>
+            <div className={styles.cardHead}>
+              <h3 className={styles.cardTitle}>7 つの数</h3>
+              <DiffOnlyToggle checked={diffOnly} onChange={onDiffOnly} />
+            </div>
             <div>
               {ordered.map((def) => {
                 const metric = row.metrics[def.key]
@@ -353,6 +407,12 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
                 )
               })}
             </div>
+            {hidden.length > 0 ? (
+              <p className={styles.mute} data-diff-hidden>
+                {`全店の平均と同じ ${hidden.length} 項目（${hidden.map((def) => def.label).join('・')}）を隠しています。`}
+                <Button variant="text" onClick={() => onDiffOnly(false)}>すべて表示</Button>
+              </p>
+            ) : null}
           </Card>
           <Card padding="default" layout="vertical" gap="normal" aria-label="最近の配信">
             <h3 className={styles.cardTitle}>最近の配信</h3>

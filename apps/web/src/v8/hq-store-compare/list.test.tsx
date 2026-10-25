@@ -3,18 +3,18 @@
  * 統括「店の比較」（G7）：店×7つの数・平均との差の札・並べ替え・行の引き出し・準備中の窓。
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { diffTone, formatDiff, formatMetric, METRICS } from './metrics'
+import { columnsWithDiff, diffCount, diffTone, formatDiff, formatMetric, METRICS } from './metrics'
 
-const navigation = vi.hoisted(() => ({push:vi.fn(),select:vi.fn()}))
+const navigation = vi.hoisted(() => ({push:vi.fn(),select:vi.fn(),replace:vi.fn(),search:''}))
 const accountState = vi.hoisted(() => ({ accounts: [] as Array<Record<string, unknown>>, refresh: vi.fn(), role: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), fetchApi }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => accountState.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))
 const api = vi.hoisted(() => ({ get: vi.fn(), detail: vi.fn(), export: vi.fn(), exportStatus: vi.fn(), download: vi.fn() }))
 vi.mock('@/lib/api/helpers/gap3', () => ({ storeComparisonApi: api }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: navigation.push, replace: vi.fn() }), usePathname: () => '/hq/store-comparison', useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: navigation.push, replace: navigation.replace }), usePathname: () => '/hq/store-comparison', useSearchParams: () => new URLSearchParams(navigation.search) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: navigation.select, loading: false, accounts: accountState.accounts, refreshAccounts: accountState.refresh }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 
@@ -39,7 +39,7 @@ beforeEach(() => {
   api.get.mockResolvedValue({ success: true, data: DATA })
   api.detail.mockResolvedValue({ success: true, data: { recentBroadcasts: [{ id: 'b1', title: '秋の新メニュー', status: 'sent', sent_at: '2026-10-14T01:00:00Z' }], attention: null } })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks(); accountState.accounts = []; accountState.role = 'owner' })
+afterEach(() => { cleanup(); vi.clearAllMocks(); accountState.accounts = []; accountState.role = 'owner'; navigation.search = ''; window.history.replaceState(null, '', '/hq/store-comparison') })
 
 describe('数の書き方', () => {
   it('単位と符号：人は ±、割合は pt、件・分はそのまま', () => {
@@ -195,5 +195,127 @@ describe('数が取れない理由', () => {
     await screen.findByText('大宮店')
     expect(document.querySelector('[data-store-connection]')?.textContent).toContain('LINE の接続が切れています')
     expect(screen.queryByRole('button', { name: '更新する' })).toBeNull()
+  })
+})
+
+describe('違いだけ表示と「7 項目中 5 つが違う」（全店の平均と比べる）', () => {
+  /* 平均：友だちの増減・返事の速さは全店で平均と同じ（返事の速さは 0.3 分の差で札では 0）。クリック率は全店で取れない。 */
+  const AVERAGE = { friendChange: 4, blockRate: 2.5, clickRate: null, bookings: 40, visits: 30, noShowRate: 2, responseMinutes: 8.3 }
+  const store = (id: string, name: string, values: { blockRate: number; bookings: number; visits: number; noShowRate: number }, compare: 'previous' | 'average' = 'average') => {
+    const make = (key: keyof typeof AVERAGE, value: number | null, unit: string) => ({ value, unit, available: value !== null, diff: value === null || AVERAGE[key] === null ? null : compare === 'average' ? value - (AVERAGE[key] as number) : 1 })
+    return {
+      accountId: id, name, style: null, computedAt: '2026-10-24T19:30:00.000Z',
+      metrics: {
+        friendChange: make('friendChange', 4, '人'), blockRate: make('blockRate', values.blockRate, '%'), clickRate: make('clickRate', null, '%'),
+        bookings: make('bookings', values.bookings, '件'), visits: make('visits', values.visits, '件'), noShowRate: make('noShowRate', values.noShowRate, '%'), responseMinutes: make('responseMinutes', 8, '分'),
+      },
+    }
+  }
+  /* 大宮：ブロック率・予約・来店が違う（無断率は +0.04 で札では 0）。渋谷：予約・無断率が違う。 */
+  const ROWS = [store('s1', '大宮店', { blockRate: 3.8, bookings: 12, visits: 20, noShowRate: 2.04 }), store('s2', '渋谷店', { blockRate: 2.5, bookings: 72, visits: 30, noShowRate: 1.2 })]
+  const DIFF_DATA = { rows: ROWS, average: AVERAGE, total: 2, computedAt: '2026-10-24T19:30:00.000Z' }
+  const headers = () => screen.getAllByRole('button', { name: /で並べ替える$/ }).map((node) => node.getAttribute('aria-label') ?? node.textContent)
+
+  it('取れない数は分母から外し、札に出ない差（+0.0）は数えない。札の数と N は同じ関数で一致する', () => {
+    expect(diffCount(ROWS[0] as never, AVERAGE)).toEqual({ differ: 3, compared: 6 })
+    expect(diffCount(ROWS[1] as never, AVERAGE)).toEqual({ differ: 2, compared: 6 })
+    for (const row of ROWS) {
+      const chips = METRICS.filter((def) => formatDiff(def.key, row.metrics[def.key].diff) !== null).length
+      expect(chips).toBe(diffCount(row as never, AVERAGE).differ)
+    }
+    /* 平均が出ない数（店が 3 未満など）も比べられないので分母から外す。値が null の数は「違い」に数えない。 */
+    expect(diffCount(ROWS[0] as never, { ...AVERAGE, bookings: null })).toEqual({ differ: 2, compared: 5 })
+    const missing = { ...ROWS[0], metrics: { ...ROWS[0].metrics, blockRate: { value: null, diff: null, unit: '%', available: true } } }
+    expect(diffCount(missing as never, AVERAGE)).toEqual({ differ: 2, compared: 5 })
+    expect(columnsWithDiff(ROWS as never, AVERAGE).map((def) => def.key)).toEqual(['blockRate', 'clickRate', 'bookings', 'visits', 'noShowRate'])
+  })
+
+  it('表の店の名前の下に「6 項目中 N つが違う」を出す。集計前の店には出さない', async () => {
+    api.get.mockResolvedValue({ success: true, data: { ...DIFF_DATA, rows: [...ROWS, { ...store('s3', '川口店', { blockRate: 1, bookings: 1, visits: 1, noShowRate: 1 }), computedAt: null }], total: 3 } })
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    const lines = [...document.querySelectorAll('[data-diff-count]')]
+    expect(lines.map((node) => [node.getAttribute('data-diff-count'), node.textContent])).toEqual([['s1', '6 項目中 3 つが違う'], ['s2', '6 項目中 2 つが違う']])
+    expect(lines[0].getAttribute('title')).toBe('全店の平均と比べて、6 項目中 3 つが違う')
+  })
+
+  it('切り替えを入れると全店で平均と同じ列だけが消え、URL に残る。取れない列は残す', async () => {
+    api.get.mockResolvedValue({ success: true, data: DIFF_DATA })
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    expect(headers()).toHaveLength(7)
+    fireEvent.click(screen.getByRole('switch', { name: '違いだけ表示' }))
+    expect(navigation.replace).toHaveBeenLastCalledWith('/hq/store-comparison?diffOnly=1', { scroll: false })
+    expect(screen.queryByRole('button', { name: '友だちの増減で並べ替える' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '返事の速さで並べ替える' })).toBeNull()
+    for (const label of ['ブロック率', '配信のクリック率', '予約', '来店', '無断率']) expect(screen.getByRole('button', { name: `${label}で並べ替える` })).toBeTruthy()
+    fireEvent.click(screen.getByRole('switch', { name: '違いだけ表示' }))
+    expect(navigation.replace).toHaveBeenLastCalledWith('/hq/store-comparison', { scroll: false })
+    expect(headers()).toHaveLength(7)
+  })
+
+  it('URL に ?diffOnly=1 があれば、読み直しても違いだけの表示で開く', async () => {
+    navigation.search = 'diffOnly=1'
+    api.get.mockResolvedValue({ success: true, data: DIFF_DATA })
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    expect(screen.getByRole('switch', { name: '違いだけ表示' }).getAttribute('aria-checked')).toBe('true')
+    expect(headers()).toHaveLength(5)
+  })
+
+  it('比べる相手を変えると届いた新しい数で数え、違いは全店の平均と比べる', async () => {
+    api.get.mockResolvedValue({ success: true, data: DIFF_DATA })
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    expect(document.querySelector('[data-diff-count="s2"]')?.textContent).toBe('6 項目中 2 つが違う')
+    const next = { ...DIFF_DATA, rows: [ROWS[0], store('s2', '渋谷店', { blockRate: 1.0, bookings: 72, visits: 31, noShowRate: 1.2 }, 'previous')] }
+    api.get.mockResolvedValue({ success: true, data: next })
+    fireEvent.click(screen.getByRole('button', { name: '比べる相手' }))
+    await act(async () => { fireEvent.click(within(await screen.findByRole('option', { name: /全店の平均/ })).getByRole('button')) })
+    await waitFor(() => expect(api.get).toHaveBeenLastCalledWith(expect.objectContaining({ compare: 'average' })))
+    await waitFor(() => expect(document.querySelector('[data-diff-count="s2"]')?.textContent).toBe('6 項目中 4 つが違う'))
+  })
+
+  it('引き出しでは平均と同じ数の行を隠し、隠した数と［すべて表示］を出す', async () => {
+    navigation.search = 'diffOnly=1'
+    window.history.replaceState(null, '', '/hq/store-comparison?diffOnly=1')
+    api.get.mockResolvedValue({ success: true, data: DIFF_DATA })
+    render(<StoreComparisonList />)
+    fireEvent.click(await screen.findByText('渋谷店'))
+    const drawer = await screen.findByRole('dialog')
+    expect(drawer.textContent).toContain('全店の平均と比べて 6 項目中 2 つが違う')
+    const note = drawer.querySelector('[data-diff-hidden]')
+    expect(note?.textContent).toContain('全店の平均と同じ 4 項目（友だちの増減・ブロック率・来店・返事の速さ）を隠しています。')
+    /* 行の名前（完全一致）で見る。隠した行は無く、取れない数（クリック率）は「同じ」に数えず残す。 */
+    for (const label of ['友だちの増減', 'ブロック率', '来店', '返事の速さ']) expect(within(drawer).queryByText(label)).toBeNull()
+    for (const label of ['配信のクリック率', '予約', '無断率']) expect(within(drawer).getByText(label)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'すべて表示' }))
+    expect(navigation.replace).toHaveBeenLastCalledWith('/hq/store-comparison', { scroll: false })
+    expect(drawer.querySelector('[data-diff-hidden]')).toBeNull()
+    for (const def of METRICS) expect(within(drawer).getByText(def.label)).toBeTruthy()
+  })
+
+  it('全部の列が平均と同じなら空の状態を出し、［すべて表示］で戻す', async () => {
+    navigation.search = 'diffOnly=1'
+    const flat = store('s1', '大宮店', { blockRate: 2.5, bookings: 40, visits: 30, noShowRate: 2 })
+    const same = { ...flat, metrics: { ...flat.metrics, clickRate: { value: 5, diff: 0, unit: '%', available: true } } }
+    api.get.mockResolvedValue({ success: true, data: { ...DIFF_DATA, rows: [same], average: { ...AVERAGE, clickRate: 5 }, total: 1 } })
+    render(<StoreComparisonList />)
+    expect(await screen.findByText('全店の平均と違う数はありません')).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'すべて表示' })) })
+    expect(await screen.findByText('大宮店')).toBeTruthy()
+    expect(headers()).toHaveLength(7)
+  })
+
+  it('CSV は「違いだけ表示」に関係なく全部の列を頼む（表示の切り替えを口へ送らない）', async () => {
+    navigation.search = 'diffOnly=1'
+    api.get.mockResolvedValue({ success: true, data: DIFF_DATA })
+    api.export.mockResolvedValue({ success: true, data: { id: 'x1', replayed: false } })
+    api.exportStatus.mockResolvedValue({ success: true, data: { id: 'x1', status: 'completed', rowCount: 2, downloadUrl: null, errorCode: null } })
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' })) })
+    await waitFor(() => expect(api.download).toHaveBeenCalledWith('x1'))
+    expect(Object.keys(api.export.mock.calls[0][0]).sort()).toEqual(['compare', 'from', 'order', 'sort', 'to'])
   })
 })
