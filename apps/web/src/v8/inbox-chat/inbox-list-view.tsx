@@ -10,6 +10,7 @@ import Avatar from '@/components/shared/avatar';
 import Button from '@/components/shared/button';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import SegmentedControl from '@/components/shared/segmented';
+import Select from '@/components/shared/select';
 import { InboxFloatingPanel } from '@/components/shared/inbox-content';
 import { InboxFilterControls, InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { RowMenu } from '@/components/shared/row-actions';
@@ -19,12 +20,12 @@ import { InboxListPane } from '@/components/templates/inbox-page';
 import { PageTitle } from '@/components/templates/page-frame';
 import { api, fetchApi, type ChatListItem } from '@/lib/api';
 import { SEARCH_QUERY_MAX_LENGTH, clampSearchQuery } from '@/lib/search-query';
-import { formatInboxListTime } from '@/v8/inbox-chat/list-time';
+import { formatListRecent, formatListRecentTitle } from '@/lib/format';
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
 import { Bookmark, ListFilter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import { CHANNELS, ChannelBadge, EmailInboxItem, InboxSavedView, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd, statusFiltersV8 } from './inbox-model';
+import { CHANNELS, ChannelBadge, EmailInboxItem, INBOX_SORT_OPTIONS, InboxSavedView, InboxSort, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd, statusFiltersV8 } from './inbox-model';
 import styles from './list-parts.module.css';
 import { savedViewSummary } from './saved-view-summary';
 import { normalizeSavedViewConditions } from './saved-view-types';
@@ -101,9 +102,11 @@ type Props = {
   loadingMore: boolean
   loadMoreChats: () => Promise<void>
   loadingMoreEmails: boolean
+  sortOrder: InboxSort
+  setSortOrder: (next: InboxSort) => void
 }
 
-export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef, setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats, handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails }: Props) {
+export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef, setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats, handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
   return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
     {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
@@ -398,7 +401,21 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
       </div>
     </div>
 
-    <p data-inbox-sort="fixed" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>{slaEnabled ? '並び順：期限が近い順（過ぎた物が先）' : '並び順：未読が先・新しい順'}</p>
+    {slaEnabled ? (
+      <p data-inbox-sort="fixed" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>並び順：期限が近い順（過ぎた物が先）</p>
+    ) : (
+      /* 並びは「未読が先」「新しい順」から選ぶ。選んだ並びは URL の ?sort= に残る。 */
+      <div data-inbox-sort="choice" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>
+        <Select
+          aria-label="並び順"
+          treatment="text"
+          size="content"
+          value={sortOrder}
+          onChange={(value) => setSortOrder(value === 'latest' ? 'latest' : 'unread_first')}
+          options={INBOX_SORT_OPTIONS}
+        />
+      </div>
+    )}
     {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
     <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
       <>
@@ -508,7 +525,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                           {/* 板 `M0393`：未対応は顔の赤い点＋名前の太字。行の地は塗らない。 */}
                           <p className={`text-ink truncate text-sm ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
                           {(
-                            <span className={styles.rowTime} data-unread={item.isUnread || undefined}>{formatInboxListTime(item.lastIncomingAt)}</span>
+                            <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt) || undefined}>{formatListRecent(item.lastIncomingAt)}</span>
                           )}
                         </div>
                         <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
@@ -594,8 +611,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                               <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
                             </div>
                             {(
-                              /* ★V8（XqSvX）：右上は「2時間前」「昨日」「8月16日」。未読は濃い字・太字。待ち時間の札は置かない。 */
-                              <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={waitingLabel ?? undefined}>{formatInboxListTime(chat.lastMessageAt)}</span>
+                              /* 右上は「17:51」「昨日」「木曜日」「10/18」。未読は濃い字・太字。待ち時間の札は置かず、全文と一緒に title へ。 */
+                              <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>
                             )}
                           </div>
                           {/* 板 `M0393`：行ごとの状態の札は置かない（赤い点＋太字と上の切り替えで足りる）。 */}
@@ -630,14 +647,18 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                 return node
               },
             }))
-          // 両方とも口側で「未読が先・新しい順」。未読の有無が違う
+          // 既定は両方とも口側で「未読が先・新しい順」。未読の有無が違う
           // 行同士は時刻に関わらず未読が先、同じ中では新しい順。
+          // 新しい順のときは未読を見ず時刻だけで混ぜる。メールの口には並びの指定が無いので、
+          // 読み込んだ範囲の中で新しい順に並べ直してから混ぜる。
+          const latest = sortOrder === 'latest'
           const precedes = (
             a: { at: string; unread: boolean },
             b: { at: string; unread: boolean },
           ): number =>
-            Number(b.unread) - Number(a.unread)
+            (latest ? 0 : Number(b.unread) - Number(a.unread))
             || String(b.at).localeCompare(String(a.at))
+          if (latest) mailRows.sort((a, b) => String(b.at).localeCompare(String(a.at)))
           const rows: ChatListWindowItem[] = []
           if (slaEnabled) {
             // 期限が近い順（過ぎた物が先）。期限の無い行・メールは後ろへ。「期限超過」は期限を過ぎた行だけ。

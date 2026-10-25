@@ -27,12 +27,18 @@ import { Tabs } from '@/components/shared/tabs'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import { runOptimistic } from '@/lib/undoable'
-import {
-  isDashboardNotificationData,
-  notificationTime,
-  type DashboardNotificationFilter,
-} from '@/components/dashboard/notification-summary'
+import { isDashboardNotificationData, notificationTime } from '@/components/dashboard/notification-summary'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { notificationDestination, notificationLinkLabel } from './destination'
+import {
+  NOTIFICATION_TABS,
+  isSystemNotification,
+  markAllCategoryForTab,
+  notificationQueryForTab,
+  notificationTabCount,
+  notificationTabFromParam,
+  type NotificationTab,
+} from './tabs'
 import styles from './list.module.css'
 
 const PAGE_SIZE = 50
@@ -43,9 +49,12 @@ export default function NotificationsV8() {
   const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
-  const categoryParam = params.get('category')
-  const filter: DashboardNotificationFilter =
-    categoryParam === 'error' || categoryParam === 'update' ? categoryParam : 'all'
+  const role = useStaffRole()
+  // 既読は自分の印なので担当者まで付けられる。閲覧のみ・権限が分からない間は操作を出さない。
+  const canMarkRead = role === 'owner' || role === 'admin' || role === 'staff'
+  const destinationContext = { accountId: selectedAccountId, canManage: canManageRole(role) }
+  // タブ「すべて・未読・システム」。前の ?category=error はシステム、update はすべてとして読む。
+  const filter: NotificationTab = notificationTabFromParam(params.get('category'))
   const [items, setItems] = useState<NotificationCenterItem[]>([])
   // 読み込んだ範囲を未読が先・新しい順にする。追加取得後も同じ順を保つ。
   const orderedItems = useMemo(
@@ -63,7 +72,7 @@ export default function NotificationsV8() {
   const renderViewKey = `${selectedAccountId ?? ''}|${filter}`
   if (viewKeyRef.current !== renderViewKey) { viewKeyRef.current = renderViewKey; viewGeneration.current += 1 }
 
-  const selectFilter = (next: DashboardNotificationFilter) => {
+  const selectFilter = (next: NotificationTab) => {
     const query = new URLSearchParams(params.toString())
     if (next === 'all') query.delete('category')
     else query.set('category', next)
@@ -89,7 +98,7 @@ export default function NotificationsV8() {
     }
     try {
       const response = await api.notifications.center.list(selectedAccountId, {
-        category: filter,
+        ...notificationQueryForTab(filter),
         limit: PAGE_SIZE,
         offset,
       })
@@ -126,7 +135,7 @@ export default function NotificationsV8() {
 
   /* 既読は押した瞬間に画面へ反映し、裏で保存する。失敗したら未読へ戻してやり直せる知らせ。 */
   const markRead = (item: NotificationCenterItem) => {
-    if (!selectedAccountId || item.isRead) return
+    if (!canMarkRead || !selectedAccountId || item.isRead) return
     const accountId = selectedAccountId
     const viewKey = viewKeyRef.current
     const generation = viewGeneration.current
@@ -151,11 +160,11 @@ export default function NotificationsV8() {
 
   const openNotification = (item: NotificationCenterItem) => {
     markRead(item)
-    router.push(notificationDestination(item))
+    router.push(notificationDestination(item, destinationContext))
   }
 
   const markAllRead = () => {
-    if (!selectedAccountId || !counts || counts.unread === 0) return
+    if (!canMarkRead || !selectedAccountId || !counts || counts.unread === 0) return
     const accountId = selectedAccountId
     const viewKey = viewKeyRef.current
     const generation = viewGeneration.current
@@ -167,7 +176,7 @@ export default function NotificationsV8() {
     setCounts((current) => (current ? { ...current, unread: 0 } : current))
     runOptimistic({
       isCurrent,
-      request: () => api.notifications.center.markAllRead(accountId, filter),
+      request: () => api.notifications.center.markAllRead(accountId, markAllCategoryForTab(filter)),
       revert: () => {
         if (!isCurrent()) return
         setItems(beforeItems)
@@ -179,12 +188,8 @@ export default function NotificationsV8() {
     })
   }
 
-  const filters: Array<{ id: DashboardNotificationFilter; label: string; count: number | null }> = [
-    { id: 'all', label: 'すべて', count: counts?.all ?? null },
-    { id: 'error', label: 'エラー', count: counts?.error ?? null },
-    { id: 'update', label: 'アップデート', count: counts?.update ?? null },
-  ]
-  const total = counts ? (filter === 'error' ? counts.error : filter === 'update' ? counts.update : counts.all) : 0
+  const filters = NOTIFICATION_TABS.map((tab) => ({ id: tab.value, label: tab.label, count: counts ? notificationTabCount(counts, tab.value) : null }))
+  const total = counts ? notificationTabCount(counts, filter) : 0
   const hasMore = items.length < total
   const listFailed = loadError !== null && items.length === 0
   const listFailure = loadError !== null ? loadFailureCopy(loadError, '通知') : null
@@ -193,13 +198,13 @@ export default function NotificationsV8() {
     <ListPage
       boardId="y8QQV"
       title="通知"
-      help="musubo からのお知らせです。エラーやメンテナンス、新しい版のお知らせが届きます。"
-      actions={(
+      help="musubo からの通知です。運用の異常、メンテナンス、新しい版の知らせが届きます。"
+      actions={canMarkRead ? (
         <Button variant="secondary" onClick={() => { void markAllRead() }} disabled={!counts || counts.unread === 0}>
           <CheckCheck aria-hidden="true" className={styles.buttonIcon} />
-          {filter !== 'all' ? 'この分類をすべて既読にする' : 'すべて既読にする'}
+          {filter === 'system' ? 'この分類をすべて既読にする' : 'すべて既読にする'}
         </Button>
-      )}
+      ) : undefined}
     >
       <div className={styles.body}>
         <Tabs
@@ -233,21 +238,21 @@ export default function NotificationsV8() {
           ) : items.length === 0 && !loading ? (
             <ListState
               kind="empty"
-              title="通知はまだありません"
-              description="お知らせが届くと、ここに並びます。"
+              title={filter === 'unread' ? '未読の通知はありません' : filter === 'system' ? 'システムの通知はありません' : '通知はまだありません'}
+              description="通知が届くと、ここに並びます。"
             />
           ) : (
             <ul className={styles.list}>
               {orderedItems.map((item) => (
                 <li key={item.id} className={styles.item} data-unread={!item.isRead}>
                   <Link
-                    href={notificationDestination(item)}
+                    href={notificationDestination(item, destinationContext)}
                     className={styles.row}
                     onClick={() => markRead(item)}
                     title={item.body || undefined}
                   >
-                    <span className={styles.icon} data-category={item.category} aria-hidden="true">
-                      {item.category === 'error' ? <TriangleAlert /> : <Sparkles />}
+                    <span className={styles.icon} data-category={isSystemNotification(item) ? 'error' : 'update'} aria-hidden="true">
+                      {isSystemNotification(item) ? <TriangleAlert /> : <Sparkles />}
                     </span>
                     <span className={styles.text}>
                       <span className={styles.titleLine}>
@@ -257,7 +262,7 @@ export default function NotificationsV8() {
                       </span>
                       <span className={styles.time}>{notificationTime(item.createdAt)}</span>
                     </span>
-                    <span className={styles.go}>{`${notificationLinkLabel(item)} →`}</span>
+                    <span className={styles.go}>{`${notificationLinkLabel(item, destinationContext)} →`}</span>
                   </Link>
                 </li>
               ))}
@@ -269,7 +274,7 @@ export default function NotificationsV8() {
         <div className={styles.foot}>
           <p className={styles.note}>
             {counts?.unread === 0 && !loading && !listFailed
-              ? '未読のお知らせはありません。'
+              ? '未読の通知はありません。'
               : '未読は青い点と太字。押すと既読になり、行の右から関係する画面へ移れます'}
           </p>
           <TextLink href="/line-notifications?tab=operator">通知設定</TextLink>

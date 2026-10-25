@@ -40,6 +40,19 @@ export interface EmailInboxItem {
 /** 受信箱一覧の続きを読む位置。口の並び（未読が先・新しい順）と同じ3点。 */
 export type ListCursor = { at: string; id: string; unread: 0 | 1 }
 
+/** 一覧の並び。既定は未読が先。`latest` は未読を先にせず新しい順だけ。URL の `?sort=` に残す。 */
+export type InboxSort = 'unread_first' | 'latest'
+
+export const INBOX_SORT_OPTIONS: { value: InboxSort; label: string }[] = [
+  { value: 'unread_first', label: '未読が先・新しい順' },
+  { value: 'latest', label: '新しい順' },
+]
+
+/** URL の `?sort=` から並びを読む。知らない値は既定（未読が先）。 */
+export function inboxSortFromParam(value: string | null | undefined): InboxSort {
+  return value === 'latest' ? 'latest' : 'unread_first'
+}
+
 export const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'すべて' },
   { key: 'unread', label: '未対応' },
