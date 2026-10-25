@@ -191,7 +191,7 @@ export async function updateScenario(
  * - 参照解除（entry_routes / tracked_links / forms の送信後シナリオ・
  *   他シナリオ完了時の遷移先）も同じ batch に入れる。FK OFF の環境では
  *   CASCADE も SET NULL も走らないので、明示で NULL に寄せる。
- * - 他シナリオ完了時の遷移先（R250）は、移動先だけを NULL にしない。
+ * - 他シナリオ完了時の遷移先は、移動先だけを NULL にしない。
  *   mode='move' のまま target だけ空になると、通常の保存では作れない
  *   「移動先のない移動」が残り、運用者は気づけない。削除と同時に
  *   mode='pause'（何もしない）へ戻し、整合した設定にする。削除の確認窓で
@@ -204,7 +204,7 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
   if (dependent) throw new Error('SCENARIO_HAS_DEPENDENTS');
 
   /*
-   * R250: 参照元は消す前に押さえる。外部キーが有効な環境では親 DELETE の
+   * 参照元は消す前に押さえる。外部キーが有効な環境では親 DELETE の
    * 時点で SET NULL が走り、あとの `WHERE on_complete_scenario_id = ?` が
    * 誰にも当たらなくなる。ID 指定ならどちらの環境でも同じ終状態になる。
    */

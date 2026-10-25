@@ -117,7 +117,7 @@ export interface ReactionCampaignCsv {
   sentAt: string;
   targetPeople: AnalyticsMetric<number>;
   delivered: AnalyticsMetric<number>;
-  /** シナリオの送信通数。届いた人数とは別の欄にする（監査R225）。 */
+  /** シナリオの送信通数。届いた人数とは別の欄にする。 */
   sentMessages: AnalyticsMetric<number>;
   opened: AnalyticsMetric<number>;
   lineClicked: AnalyticsMetric<number>;

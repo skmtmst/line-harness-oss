@@ -31,7 +31,7 @@ export async function listWebhookInteractions(
   const cutoff = toJstString(new Date(Date.now() - periodDays * 86_400_000));
   const page = input.exportAll ? 1 : Math.max(1, integerOr(input.page, 1));
   const limit = input.exportAll ? 5001 : Math.min(50, Math.max(10, integerOr(input.limit, 20)));
-  // d23b R409: 結果を書く途中で止まった「処理中」を先に回収する。
+  // 結果を書く途中で止まった「処理中」を先に回収する。
   // 一覧を開いた時点で回収すれば、滞留分はここで失敗として見える。
   try {
     await markStalePendingWebhookInteractions(db, input.lineAccountId);
@@ -55,9 +55,9 @@ export async function listWebhookInteractions(
     binds.push(like, like, like);
   }
   const where = clauses.join(' AND ');
-  // d23b R414: 送り先の現状と、同じ通知の自動配送の現状を添える。
+  // 送り先の現状と、同じ通知の自動配送の現状を添える。
   // 画面は「消えた・止まった・自動で動いている」理由を行ごとに出せる。
-  // 削除印のある送り先は「無い」として扱う（N-368）。
+  // 削除印のある送り先は「無い」として扱う。
   const joinedTables = `webhook_interaction_logs l
     LEFT JOIN outgoing_webhooks ow
            ON ow.id = l.webhook_id AND ow.deleted_at IS NULL

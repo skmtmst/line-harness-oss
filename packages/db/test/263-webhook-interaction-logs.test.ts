@@ -125,7 +125,7 @@ describe('migration 263 Webhookやり取り記録', () => {
   });
 
   it('失敗した送信だけを1回だけ再試行へ確保し、作成失敗時は戻せる', async () => {
-    // d23b R405: 送り直せるのは生きている送り先の失敗だけ。送り先を立てる。
+    // 送り直せるのは生きている送り先の失敗だけ。送り先を立てる。
     sqlite.exec(`INSERT INTO outgoing_webhooks (id, is_active) VALUES ('webhook-a', 1)`);
     const row = await createWebhookInteraction(db, {
       id: 'failed-a',
@@ -151,7 +151,7 @@ describe('migration 263 Webhookやり取り記録', () => {
     expect((await getWebhookInteractionById(db, row.id, 'account-a'))?.status).toBe('failed');
   });
 
-  // IDEA-26: 「届いたか分からない」失敗は無条件のまとめて再送に乗せない。
+  // 「届いたか分からない」失敗は無条件のまとめて再送に乗せない。
   // 相手先で確かめてから1件ずつやり直す対象として別に数える。
   it('届いたか分からない失敗はまとめて再送の対象と件数から外す', async () => {
     sqlite.exec(`INSERT INTO outgoing_webhooks (id, is_active) VALUES ('webhook-a', 1)`);
@@ -184,7 +184,7 @@ describe('migration 263 Webhookやり取り記録', () => {
     const result = await listWebhookInteractions(db, { lineAccountId: 'account-a' });
     expect(result.summary.failed).toBe(2);
     expect(result.summary.resultUnknown).toBe(1);
-    // d23b R408: 送信の失敗と、まとめて送り直せる件数を分けて数える。
+    // 送信の失敗と、まとめて送り直せる件数を分けて数える。
     expect(result.summary.outgoingFailed).toBe(2);
     expect(result.summary.retryable).toBe(1);
   });

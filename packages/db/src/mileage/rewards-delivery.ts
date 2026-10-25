@@ -15,7 +15,7 @@ export class MileageRedemptionConfirmError extends Error {
 }
 
 /**
- * R344: LINE 再試行キーの有効期限（24時間。公式仕様による）。
+ * LINE 再試行キーの有効期限（24時間。公式仕様による）。
  * 最初の送信からこの時間を過ぎた手順は、同じキーで送り直さない。
  * 期限を過ぎると LINE 側の重複防止が切れ、同じキーが新規受付されるため。
  * リマインダ側の `LINE_RETRY_KEY_VALIDITY_MS` と同じ考え方。
@@ -23,7 +23,7 @@ export class MileageRedemptionConfirmError extends Error {
 export const MILEAGE_REWARD_RETRY_KEY_VALIDITY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * R361: 渡し終えた手順があるか。部分成功の交換は全額返却しない。
+ * 渡し終えた手順があるか。部分成功の交換は全額返却しない。
  * `sent` の行が1つでもあれば、一部の特典は相手に渡っている。
  */
 export async function hasSentRedemptionSteps(
@@ -85,7 +85,7 @@ export async function claimRedemptionStep(
   }
   if (existing.status === 'sent') return 'sent';
   /*
-   * R344: 最初の送信から24時間を過ぎた手順は、同じキーで送り直さない。
+   * 最初の送信から24時間を過ぎた手順は、同じキーで送り直さない。
    * 期限を過ぎると LINE 側の重複防止が切れ、同じキーが新規受付されて
    * 二重に届く。照合待ちとして残し、人が確かめる。
    */
@@ -129,7 +129,7 @@ export async function claimRedemptionStep(
 }
 
 /**
- * R364: 照合待ちの手順の回復引き継ぎ。送ったか確かめられない行を、
+ * 照合待ちの手順の回復引き継ぎ。送ったか確かめられない行を、
  * 送り直しても安全な手順だけ、期限内にもう一度だけ実行する。
  *
  * 返すのは次の4つのどれか。
@@ -200,7 +200,7 @@ export async function markRedemptionStepSent(
  * **貸出も一緒に返す。** 証言を消すだけで持ち主と期限を残すと、行は
  * 「送っていないのに、まだ誰かが送信中」に見える。次の走者は貸出が
  * 生きている間 `'busy'` しか受け取れず、失敗した直後のやり直しが
- * 貸出の残り時間ぶん空振りする(#641 司令塔独立審査で実測: 失敗から
+ * 貸出の残り時間ぶん空振りする(失敗から
  * 5分間、管理画面のやり直しが1回も送らない)。送らないことが決まった
  * 行に貸出を握らせない。
  */
@@ -264,7 +264,7 @@ export async function getMileageRewardDeliveryPlan(
   if (!row) throw new MileageRewardError('not_found', '交換履歴が見つかりません', 404);
   return {
     redemption: mapRedemption(row),
-    // R373: 交換が決まったときの名前・種類を優先する。未公開の名前変更や
+    // 交換が決まったときの名前・種類を優先する。未公開の名前変更や
     // 種類変更が、処理中・成功済みの交換へ混ざらない。凍結前の古い行は親行を読む。
     rewardName: row.reward_name_snapshot ?? row.reward_name,
     rewardKind: row.reward_kind_snapshot ?? row.reward_kind,

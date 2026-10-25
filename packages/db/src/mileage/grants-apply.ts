@@ -38,7 +38,7 @@ export async function applyMileageRulesImmediately(
     occurredAt,
   });
 
-  // N-231 案1: snapshot がある行は固定版を、無い行(NULL 互換)は従来どおり live を読む。
+  // snapshot がある行は固定版を、無い行(NULL 互換)は従来どおり live を読む。
   // 全店共通(line_account_id IS NULL)は版を持たないので、どちらの場合も live を読む。
   const pinned = input.publishedSnapshot ?? null;
   let ruleRows: MileageRuleRow[];
@@ -174,7 +174,7 @@ export async function applyMileageRulesImmediately(
     }
 
     /*
-     * R52: 公開版の対象条件に合わない友だちには付けない。
+     * 公開版の対象条件に合わない友だちには付けない。
      * 条件が壊れて読めないとき・評価で失敗したときも付けない。
      * 「壊れているのに全員へ配る」のがいちばん困るため、閉じる側へ倒す。
      */

@@ -752,7 +752,7 @@ describe('保存した配信対象条件', () => {
 
 describe('サイトの記録', () => {
   test('URLのクエリ文字列を落とす', () => {
-    // ?email=... や ?token=... が入る事故は必ず起きるので、通す判断はしない。
+    // ?email=... や ?token=... が入ることは必ず起きるので、通す判断はしない。
     expect(sanitizePath('/thanks?email=a@example.com')).toBe('/thanks');
     expect(sanitizePath('/thanks#section')).toBe('/thanks');
     expect(sanitizePath('https://example.com/thanks?x=1')).toBe('/thanks');
@@ -842,7 +842,7 @@ describe('サイトの記録', () => {
     ]);
   });
 
-  // #818 合格条件: 同意していない閲覧は1件も記録されない
+  // 同意していない閲覧は1件も記録しない
   test('同意が無い閲覧は1件も記録されず、件数だけ数える', async () => {
     const unset = await recordSiteEvent(db, {
       visitorId: 'v-new', lineAccountId: 'account-1', eventType: 'page_view', path: '/a',

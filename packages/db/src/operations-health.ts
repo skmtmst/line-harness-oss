@@ -386,7 +386,7 @@ export async function failOperationHealthRun(
 }
 
 /**
- * R571: 結果保存の失敗で failed になった実行枠を、同じ5分枠の押し直しで再実行する。
+ * 結果保存の失敗で failed になった実行枠を、同じ5分枠の押し直しで再実行する。
  *
  * failed の行が枠を塞いだままだと、再送は failed 行を重複扱いで返すだけで
  * 確認処理が走らない。running に戻して呼び出し側が確認・保存をやり直せる
@@ -710,7 +710,7 @@ export async function acknowledgeOperationAlert(
       && row.acknowledgement_note === note;
     if (duplicate) return { status: 'duplicate', alert: await getOperationAlert(db, row.id) };
     /*
-     * R572: 受領の状態更新までは成功し、受領イベントの保存だけ失敗したときの
+     * 受領の状態更新までは成功し、受領イベントの保存だけ失敗したときの
      * 再送を補う。行は acknowledged・版が1つ進んだまま、イベントが無い状態で
      * 同じ版の再送は版競合になる。同じ担当者・同じ内容で版がちょうど1つ
      * 進んでおり、対応する受領イベントが無いときだけ、欠けたイベントを足して
@@ -733,7 +733,7 @@ export async function acknowledgeOperationAlert(
   return { status: 'changed', alert: await getOperationAlert(db, row.id) };
 }
 
-/** R572: 版に対応する受領イベントが無いときだけ true。 repair の二重書きを防ぐ。 */
+/** 版に対応する受領イベントが無いときだけ true。 repair の二重書きを防ぐ。 */
 async function operationAlertAcknowledgedEventMissing(
   db: D1Database,
   alertId: string,
@@ -997,7 +997,7 @@ export async function reserveStepUpAttempt(
 }
 
 /**
- * R503: 入力上限で止めたとき、次に試せるまでの秒数。
+ * 入力上限で止めたとき、次に試せるまでの秒数。
  *
  * 10分窓の開始から数える。行が無い・読めないときは窓全体（10分）を返す。
  * 画面は「約N分待ってからやり直してください」と出す。
@@ -1148,7 +1148,7 @@ export async function saveOperationRequestReceipt(
 }
 
 /**
- * R573: 対象に結び付いた再実行記録があるか。
+ * 対象に結び付いた再実行記録があるか。
  *
  * 停止・復旧は状態確定のあとで receipt を保存する。receipt の保存だけ失敗すると
  * 状態だけ残り、同じキー・版の再送は版競合になる。再送の修復では「誰かの完了した

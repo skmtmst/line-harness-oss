@@ -1,5 +1,5 @@
 /*
- * migration 379: フォームの編集の版(#723)。
+ * migration 379: フォームの編集の版。
  *
  * `bootstrap.sql` をそのまま流すので、migration 259 のトリガ（来訪・回答で
  * `forms.revision` を増やす）も入った状態で実物の `updateForm` を通す。

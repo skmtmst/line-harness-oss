@@ -20,7 +20,7 @@ export async function claimReminderDeliveryRun(
     now: string;
     leaseExpiresAt: string;
     /**
-     * R339: 候補読込後に日時変更が入っても古い基準日で実行行を作らない。
+     * 候補読込後に日時変更が入っても古い基準日で実行行を作らない。
      * 呼び出し側が直前に読み直した target_date を渡し、一致するときだけ
      * 握る。未指定なら従来どおり起点を問わない。
      */
@@ -82,7 +82,7 @@ export async function claimReminderDeliveryRun(
 
   // 取消と取得の競合対策: 登録が active のままのときだけ握る (原子的)。
   // getPending (active 読み) から claim の間に取消が入っても、ここで弾く。
-  // R338/R339: 予約の通知方針 OFF とルール停止もここで読み直す。
+  // 予約の通知方針 OFF とルール停止もここで読み直す。
   // 日時変更で起点がずれた登録は、読み直した起点と合うときだけ握る。
   const targetBindings: unknown[] = [];
   const targetGate = input.expectedTargetDate != null
@@ -143,7 +143,7 @@ export async function claimReminderDeliveryRun(
 }
 
 /**
- * 緊急停止のために握ったまま送らなかった claim をキューへ戻す (#1050)。
+ * 緊急停止のために握ったまま送らなかった claim をキューへ戻す。
  *
  * claim で進めた attempt 系のカウンタを差し戻し、status を queued へ戻す。
  * 自分が握った claimed 行だけが対象で、取消や別実行の確定は上書きしない。
@@ -153,7 +153,7 @@ export async function releaseClaimedReminderRun(
   db: D1Database,
   input: { id: string; now: string; expectedLeaseExpiresAt: string | string[] },
 ): Promise<void> {
-  // R340: 自分が握った claimed 行だけキューへ戻す。
+  // 自分が握った claimed 行だけキューへ戻す。
   const owner = ownerGateSql(
     Array.isArray(input.expectedLeaseExpiresAt)
       ? input.expectedLeaseExpiresAt
@@ -182,8 +182,8 @@ export async function releaseClaimedReminderRun(
  * だめなら実行行を止めて false を返す (送らない)。
  * 取消側が先に実行行を止めていた場合も false になる (二重に送らない)。
  *
- * R338/R339: 予約の通知方針 OFF・ルール停止・起点ずれもここで読み直す。
- * R340: 自分が今の持ち主のときだけ通す。期限切れの古い処理の検証は
+ * 予約の通知方針 OFF・ルール停止・起点ずれもここで読み直す。
+ * 自分が今の持ち主のときだけ通す。期限切れの古い処理の検証は
  * 0 件になり、新しい処理の期限を縮めない。持ち主でないときは行に
  * 触らず false を返す (別処理の claim を殺さない)。
  */

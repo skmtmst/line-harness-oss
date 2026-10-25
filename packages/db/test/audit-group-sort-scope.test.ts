@@ -7,11 +7,11 @@ import { getTrackedLinkStats } from '../src/analytics.js';
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * 監査 R68/R69/R70/R72 の回帰。
- *  - R68: 「古い順」の並び替えはDBがページ分割と同じ順序で行う
- *  - R69: タブの絞り込み（group）と件数の集計は同じ分類を使う
- *  - R70: LINEアカウント未所属の認証記録はアカウント絞り込みでも残る
- *  - R72: URL分析の検索はSQLで絞り、上位200件の外のURLにも届く
+ * 監査記録・URL分析の並び・分類・範囲の試験。
+ *  - 「古い順」の並び替えはDBがページ分割と同じ順序で行う
+ *  - タブの絞り込み（group）と件数の集計は同じ分類を使う
+ *  - LINEアカウント未所属の認証記録はアカウント絞り込みでも残る
+ *  - URL分析の検索はSQLで絞り、上位200件の外のURLにも届く
  */
 const TENANT = '00000000-0000-4000-8000-000000000001';
 let sqlite: Database.Database;

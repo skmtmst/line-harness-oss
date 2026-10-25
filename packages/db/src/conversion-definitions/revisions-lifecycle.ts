@@ -35,7 +35,7 @@ export async function deleteUnusedConversionDefinition(
 }
 
 /**
- * N-268: 下書きを計測中へ。設定は変えずに status だけ進める。
+ * 下書きを計測中へ。設定は変えずに status だけ進める。
  * 版は他操作と同じく +1 して、同時操作の競合を版の一致で検出する。
  */
 export async function publishConversionDefinition(

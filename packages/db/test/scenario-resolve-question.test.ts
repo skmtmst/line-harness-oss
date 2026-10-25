@@ -19,7 +19,7 @@ describe('resolveStepContent question template', () => {
     const result = await resolveStepContent(
       mockDb({
         message_type: 'text', message_content: '続けますか？', question_json: latest,
-        // 独立審査(指摘3): 公開済みかつ送り先と同じ持ち主だけ送る。
+        // 公開済みかつ送り先と同じ持ち主だけ送る。
         // 持ち主不明は送らない(fail-close)。
         published_version: 1, line_account_id: 'account-1',
       }),

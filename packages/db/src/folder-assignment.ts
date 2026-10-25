@@ -1,4 +1,4 @@
-/** F-13: 省略は維持、nullは未分類。別の種類・アカウントの分類先は使わない。 */
+/** 省略は維持、nullは未分類。別の種類・アカウントの分類先は使わない。 */
 export class FolderAssignmentError extends Error {
   readonly code = 'folder_invalid';
   constructor() { super('分類先が見つかりません。種類とLINEアカウントを確認してください'); }

@@ -22,7 +22,7 @@ export async function createRichMenuGroup(
     aliasId: buildRichMenuAliasId(groupId, p.orderIndex),
     areas: p.areas,
   }));
-  // N-161: 既定ページは作成時に決められる。未指定なら先頭ページ（従来どおり）。
+  // 既定ページは作成時に決められる。未指定なら先頭ページ（従来どおり）。
   const defaultPage =
     (input.defaultPageIndex !== undefined && input.defaultPageIndex !== null
       ? pageRecords.find((p) => p.orderIndex === input.defaultPageIndex)
@@ -68,7 +68,7 @@ export async function createRichMenuGroup(
         .bind(p.id, groupId, p.orderIndex, p.name, p.aliasId, now, now),
     );
     for (const a of p.areas) {
-      // N-161: 作成時の richmenuswitch はまだ page.id が無いので、画面からは
+      // 作成時の richmenuswitch はまだ page.id が無いので、画面からは
       // actionData.targetPageIndex (orderIndex) で受け、ここで実IDへ解決する。
       // 解決しても1 batch 内なので、失敗時に半分だけ残ることはない。
       let area = a;

@@ -1,5 +1,5 @@
 /*
- * N-328 (#943): EC顧客通知を共通送信台帳へ書く `recordCustomerEcDelivery`
+ * EC顧客通知を共通送信台帳へ書く `recordCustomerEcDelivery`
  * と、送信の正本を決める `getCustomerNotificationSource` を実SQLiteで固定する。
  *
  * 見る点:

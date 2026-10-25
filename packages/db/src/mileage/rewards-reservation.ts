@@ -27,7 +27,7 @@ export async function reserveMileageRewardRedemption(
     return { kind: 'existing', redemption: mapRedemption(existing) };
   }
 
-  // R371: 交換は公開版を直接読む。下書きの有無に左右されない。
+  // 交換は公開版を直接読む。下書きの有無に左右されない。
   const publishedRow = await db.prepare(
     `${rewardSelect('r.current_published_version_id')}
       WHERE r.id = ? AND r.line_account_id = ? AND r.status = 'published'`,
@@ -39,7 +39,7 @@ export async function reserveMileageRewardRedemption(
   }
   const nowMs = Date.now();
   const now = new Date(nowMs).toISOString();
-  // R369: 保存値はUTCへ正規化済み。比較も時刻値で行い、表記ゆれに左右されない。
+  // 保存値はUTCへ正規化済み。比較も時刻値で行い、表記ゆれに左右されない。
   const startsMs = version.startsAt ? new Date(version.startsAt).getTime() : Number.NaN;
   const endsMs = version.endsAt ? new Date(version.endsAt).getTime() : Number.NaN;
   if ((Number.isFinite(startsMs) && startsMs > nowMs) || (Number.isFinite(endsMs) && endsMs <= nowMs)) {
@@ -49,7 +49,7 @@ export async function reserveMileageRewardRedemption(
     `SELECT id, user_id FROM friends WHERE id = ? AND line_account_id = ?`,
   ).bind(input.friendId, input.lineAccountId).first<{ id: string; user_id: string | null }>();
   if (!friend) throw new MileageRewardError('friend_not_found', '友だち情報を確認できませんでした', 404);
-  // R368: 保存した交換対象条件を消費前に評価する。条件に合わない友だちへ
+  // 保存した交換対象条件を消費前に評価する。条件に合わない友だちへ
   // 特典を渡さない。管理・LIFFの両経路はこの関数を通るため、ここで守る。
   if (version.targetConditions
     && ((version.targetConditions.rules?.length ?? 0) > 0
@@ -66,7 +66,7 @@ export async function reserveMileageRewardRedemption(
   }
   const beneficiaryKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
   /*
-   * R388: 確定文と事後確認も事前確認と同じキー集合で数える。確認だけ広げると
+   * 確定文と事後確認も事前確認と同じキー集合で数える。確認だけ広げると
    * 同時実行の隙間で抜けるため、INSERT時の条件と対にしておく。
    * perFriendLimit が無い特典では現在のキーだけ（余計な読みを足さない）。
    */
@@ -84,7 +84,7 @@ export async function reserveMileageRewardRedemption(
   }
   if (version.perFriendLimit) {
     /*
-     * R388: 一人一回は現在の本人識別だけでなく、統合・解除・移行の前後で
+     * 一人一回は現在の本人識別だけでなく、統合・解除・移行の前後で
      * 同じ友だちが名乗った識別キーすべてで数える。現在のキー・友だちキー・
      * 同じ本人に結び付く友だちのキー・結び付き履歴の本人キーをまとめる。
      * 規則:
@@ -130,7 +130,7 @@ export async function reserveMileageRewardRedemption(
     remaining -= amount;
   }
   if (remaining > 0) {
-    // m22u R360: 残高はあるのに内訳が足りない主因は期限切れ。期限切れの
+    // 残高はあるのに内訳が足りない主因は期限切れ。期限切れの
     // ロットが不足分を説明できるときは「足りません」として案内し、
     // 内訳エラー（確認できませんでした）にはしない。
     const expiredHeld = await db.prepare(
@@ -149,9 +149,9 @@ export async function reserveMileageRewardRedemption(
     throw new MileageRewardError('mileage_lots_unavailable', '交換できるマイルの内訳を確認できませんでした', 409);
   }
 
-  // R370: 特定コードの取得競合を在庫全体の枯渇と混ぜない。
+  // 特定コードの取得競合を在庫全体の枯渇と混ぜない。
   // 選んだコードを横取りされたら、別の利用可能コードを取り直す。
-  // R388: 確定文の上限判定も事前確認と同じ本人キー集合で数える。
+  // 確定文の上限判定も事前確認と同じ本人キー集合で数える。
   for (let attempt = 0; attempt < 5; attempt++) {
     if (reward.rewardKind === 'coupon') {
       const tried = [...triedCodeIds];
@@ -199,7 +199,7 @@ export async function reserveMileageRewardRedemption(
       ).bind(
         redemptionId, reward.lineAccountId, reward.programId, beneficiaryKey,
         friend.user_id, friend.id, reward.id, version.id,
-        // R373: 交換が決まったときの名前・種類をこの行に凍結する。
+        // 交換が決まったときの名前・種類をこの行に凍結する。
         null, code?.id ?? null, reward.name, reward.rewardKind,
         input.idempotencyKey, input.requestFingerprint,
         now, now, reward.programId, beneficiaryKey, wallet.version, version.requiredMiles,
@@ -353,7 +353,7 @@ export async function recordMileageRedemptionAttempt(
   if (current.status === 'succeeded') return current;
   if (current.status === 'refunded') {
     /*
-     * R362: 返却確定後に台帳・ロットの書き込みが中断した行は、
+     * 返却確定後に台帳・ロットの書き込みが中断した行は、
      * ここでも欠けた分を足してから返す。失敗したら回復（再試行・cron）
      * に任せ、記録の呼び出し自体は壊さない。
      */

@@ -75,7 +75,7 @@ export function mileageGrantExpiresAt(occurredAt: string, days: number | null | 
   return new Date(base + (days as number) * 86400_000).toISOString();
 }
 
-/** m22o: 見本の {balance} に入れる、いま使える残高。m22u R360: 期限切れは数えない。 */
+/** 見本の {balance} に入れる、いま使える残高。期限切れは数えない。 */
 export async function getMileageAvailableBalance(
   db: D1Database,
   input: { userId: string | null; friendId: string },
@@ -151,8 +151,8 @@ export async function reserveMileageGrantNotification(
 }
 
 /**
- * m22o: ルールで決めた取消の条件で、過去の付与を取り消す。
- * 紹介成果の却下(#978 の取消の台帳)と同じ考え方: まだ取り消していない
+ * ルールで決めた取消の条件で、過去の付与を取り消す。
+ * 紹介成果の却下(取消の台帳)と同じ考え方: まだ取り消していない
  * 付与だけに、負の reversal を1件ずつ残す。同じアカウントの中だけ。
  *
  * 合わせる鍵は「同じルール・同じ人・同じ出どころの番号(source_event_id)」。

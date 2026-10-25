@@ -15,7 +15,7 @@ export interface ResolvedContent {
   /** 質問テンプレートなら、その時点の質問。通常テンプレートは step の控え。 */
   questionJson: string | null;
   /**
-   * テンプレート参照があるのに step の控えを使った理由(R237)。
+   * テンプレート参照があるのに step の控えを使った理由。
    * null は「控えが正規」（template_id 自体が無い）か、テンプレート解決済み。
    * 一括プレビューが「公開版・控えのどれか」と「なぜ控えか」を出すために使う。
    * 配信の動きは変えない。
@@ -31,7 +31,7 @@ export interface ResolvedContent {
  */
 function normalizeMessageType(type: string): string {
   /*
-   * 以前は carousel を flex に寄せていたが、**別物**だった。
+   * carousel を flex に寄せない。**別物**だから。
    * カルーセルの中身は columns の配列で、Flex が要求するのは bubble か
    * carousel のオブジェクト。配列を渡すと LINE が 400 を返し、400 は
    * 永続エラー扱いなので、その人の購読ごと止まっていた。
@@ -44,7 +44,7 @@ function normalizeMessageType(type: string): string {
 /**
  * step.template_id がセットされていれば templates テーブルから内容を resolve。
  * テンプレが見つからない (削除直後のレース等)・未公開・別アカウントは
- * step 側にフォールバックして配信を止めない。再審査対応(#645):
+ * step 側にフォールバックして配信を止めない。ただし
  * 未公開の下書きや別アカウントの公開版を送らない。
  */
 export async function resolveStepContent(
@@ -71,7 +71,7 @@ export async function resolveStepContent(
       published_version: number; line_account_id: string | null;
     }>();
   if (!tpl || !isTemplateSendable(tpl, lineAccountId)) {
-    // R237: 控えに落ちた理由を分ける（isTemplateSendable と同じ判定順）。
+    // 控えに落ちた理由を分ける（isTemplateSendable と同じ判定順）。
     const fallbackReason = !tpl
       ? 'missing' as const
       : Number(tpl.published_version ?? 0) < 1

@@ -26,7 +26,7 @@ export async function buildVersionSnapshotSteps(
 ): Promise<Array<Record<string, unknown>>> {
   const out: Array<Record<string, unknown>> = [];
   for (const s of steps) {
-    // template の解決はシナリオの持ち主アカウントの中だけで行う（#645）。
+    // template の解決はシナリオの持ち主アカウントの中だけで行う。
     // よそのアカウントの template や未公開の template は使わず、通の控えへ
     // 倒す。配信時にはもう templates 表を読まないので、境界の判断はここが
     // 最後の砦になる。

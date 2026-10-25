@@ -3,7 +3,7 @@
 
 export type ConversionDefinitionStatus = 'active' | 'stopped' | 'draft';
 /**
- * N-268: 画面で区別する成果地点の状態。status 列そのものではなく、
+ * 画面で区別する成果地点の状態。status 列そのものではなく、
  * 設定の壊れ(入力不良)や外部受信の停止(起点停止)も含めて導出する。
  *
  * - draft          : 作成だけして公開していない。計測には乗らない。
@@ -45,7 +45,7 @@ export type ConversionDefinitionListInput = {
   lineAccountId?: string;
   query?: string;
   status?: ConversionDefinitionStatus;
-  /** N-268: 導出した状態での絞り込み。status よりこちらが正確。 */
+  /** 導出した状態での絞り込み。status よりこちらが正確。 */
   state?: ConversionDefinitionFilter;
   sourceType?: string;
   range: ConversionDefinitionRange;
@@ -86,11 +86,11 @@ export type ConversionDefinitionListItem = {
   reversalPolicy: ConversionReversalPolicy;
   lineAccountId: string | null;
   status: ConversionDefinitionStatus;
-  /** N-268: 画面表示用の導出状態。 */
+  /** 画面表示用の導出状態。 */
   state: ConversionDefinitionState;
   /** 入力不良・起点停止のとき、直すべき中身を運用者の言葉で返す。 */
   stateReason: string | null;
-  /** N-270: 外部受信の設定状況。秘密値そのものは絶対に返さない。 */
+  /** 外部受信の設定状況。秘密値そのものは絶対に返さない。 */
   ingest: { configured: boolean; disabledAt: string | null };
   version: number;
   usageCount: number;
@@ -99,7 +99,7 @@ export type ConversionDefinitionListItem = {
     recordedCount: number;
     netCount: number;
     reversedCount: number | null;
-    /** #819: 取消分の金額の合計(追記台帳+アフィリエイト調整)。 */
+    /** 取消分の金額の合計(追記台帳+アフィリエイト調整)。 */
     reversedValue: number | null;
     netValue: number;
     reversalState: 'available' | 'unavailable';
@@ -190,7 +190,7 @@ export type CreateConversionDefinitionInput = {
   lineAccountId: string;
   usages: Array<Pick<AddConversionDefinitionUsageInput, 'refKind' | 'refId' | 'refVersionId'>>;
   staffId: string;
-  /** N-268: true のとき下書きで保存し、公開するまで計測しない。 */
+  /** true のとき下書きで保存し、公開するまで計測しない。 */
   draft?: boolean;
 };
 
@@ -198,7 +198,7 @@ export type PreviewConversionDefinitionInput = {
   scope: ConversionDefinitionScope;
   lineAccountId: string;
   sourceType: string;
-  /** 保存される起点設定。url_reach のURL一致など、試算にも同じ条件を使う(N-257)。 */
+  /** 保存される起点設定。url_reach のURL一致など、試算にも同じ条件を使う。 */
   sourceConfig?: Record<string, unknown>;
   measureMethod?: 'url_reach' | 'webhook' | 'manual';
   targetUrl?: string | null;
@@ -254,7 +254,7 @@ export type ReviseConversionDefinitionInput = {
 } & Omit<DefinitionConfig, 'targetUrl' | 'deduplicationWindowDays' | 'fixedValue' | 'attributionDays'>
   & Partial<Pick<DefinitionConfig, 'targetUrl' | 'deduplicationWindowDays' | 'fixedValue' | 'attributionDays'>>;
 
-// ── 外部受信 (N-270) ─────────────────────────────────────────────────────────
+// ── 外部受信 ─────────────────────────────────────────────────────────
 //
 // 外部システムが POST /api/conversions/ingest/:id へ成果を送るときの
 // 地点ごとの受信鍵と受信台帳。鍵は受信Webhookと同じ暗号化形式で保存し、
@@ -273,7 +273,7 @@ export type ConversionIngestionEvent = {
   result: 'recorded' | 'duplicate' | 'rejected';
   reason: string | null;
   /**
-   * IDEA-19: 検証の受信か。true の受信は成果表へ書かず台帳だけに残るので、
+   * 検証の受信か。true の受信は成果表へ書かず台帳だけに残るので、
    * 売上・報酬・集計へ混入しない。本番の受信は false。
    */
   isTest: boolean;
@@ -298,7 +298,7 @@ export type IngestionEventRow = {
 };
 
 /**
- * IDEA-19: 成果1件ごとの業務状態。
+ * 成果1件ごとの業務状態。
  *
  * - confirmed : 確定。承認が要らない成果は記録と同時にここへ来る。
  * - pending   : 確認待ち。アフィリエイト経由の成果で承認がまだのもの。
@@ -319,7 +319,7 @@ export type ConversionDefinitionEventItem = {
   /** 取消台帳に取消が入っているか(アフィリエイト調整・取消追記のどちらでも立つ)。 */
   cancelled: boolean;
   /**
-   * #819: 取消追記台帳(conversion_event_reversals)でいま取り消しか。
+   * 取消追記台帳(conversion_event_reversals)でいま取り消しか。
    * アフィリエイト調整の取消と区別するため別に持つ。こちらだけ
    * 「取消を戻す」操作の対象になる。
    */

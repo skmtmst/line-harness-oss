@@ -8,7 +8,7 @@ import { type Tag, type TagRetroactiveMileagePreview } from './types.js';
 /**
  * 友だちにタグを1本付ける。新しく付いたときだけ副作用を起こす。
  *
- * **この関数を通らない付け方が2つある(#648)。**どちらも `friend_tags` へ直に
+ * **この関数を通らない付け方が2つある。**どちらも `friend_tags` へ直に
  * INSERT していて、マイルも成果計測も通らない。
  *
  *  - `packages/db/src/tag-definitions.ts` のタグ廃止時の置き換え
@@ -22,7 +22,7 @@ import { type Tag, type TagRetroactiveMileagePreview } from './types.js';
  *
  * コラム読了タグの方は「本来数えるべき」に見えるが、ここ経由にすると
  * 成果計測と同時にマイル加算も始まり、利用者の残高が変わる。その扱いは
- * この票の外なので別票で決める(司令塔裁定 2026-09-12)。
+ * ここでは決めず、別に決める。
  */
 export async function addTagToFriend(
   db: D1Database,
@@ -30,13 +30,13 @@ export async function addTagToFriend(
   tagId: string,
   options?: {
     /**
-     * R403: 連動処理の冪等キー。受信Webhookの再試行など、同じ出来事を
+     * 連動処理の冪等キー。受信Webhookの再試行など、同じ出来事を
      * 繰り返す呼び出し元が安定した値を渡す。同じ値の再実行は二重計上しない。
      * 省略時は従来どおり付与時刻入りの値を使う（単発の手動付与用）。
      */
     sourceEventId?: string;
     /**
-     * R403: true のとき連動処理の失敗を握りつぶさず投げる。
+     * true のとき連動処理の失敗を握りつぶさず投げる。
      * 受信Webhookの受領は失敗状態で残り、同じ受信の再送で欠けた記録だけを
      * 復旧できる。手動付与など単発の呼び出しは従来どおり false。
      */
@@ -70,19 +70,19 @@ export async function addTagToFriend(
       logger.error("src_tags_failed");
       if (options?.strictSideEffects) throw error;
     }
-    // 「タグが付いた」を成果として数える(#648)。
+    // 「タグが付いた」を成果として数える。
     //
     // マイルの隣に置くのは、**呼び出し元を1つも触らずに全経路へ届かせる**ため。
-    // 以前はこの計測を worker の attachTagAndFireSideEffects の中だけに置いて
-    // いたので、友だち詳細画面の手動タグ付け・オートメーションのタグ付け
-    // アクション(どちらもこの関数を直に呼ぶ)では 0 件のままだった。
+    // この計測を worker の attachTagAndFireSideEffects の中だけに置くと、
+    // 友だち詳細画面の手動タグ付け・オートメーションのタグ付け
+    // アクション(どちらもこの関数を直に呼ぶ)では 0 件のままになる。
     // 画面の起点一覧は「タグが付いた」としか書いておらず、誰が付けたかで
     // 数えたり数えなかったりする境界は運用者に説明できない。
     //
     // 冪等キーは安定キー（受領起点）か付与時刻。単発の付け直しは上の
     // INSERT OR IGNORE が 0 行になり added=false なので、ここへ来ない。
     // 単発では失敗しても握って進む。タグ付与そのものを巻き添えにしない。
-    // R403: strict のときは失敗を残す。欠けた記録は同じ安定キーの再送で復旧する。
+    // strict のときは失敗を残す。欠けた記録は同じ安定キーの再送で復旧する。
     try {
       const conversion = await recordConversionSourceEvent(db, {
         sourceType: 'tag_added',

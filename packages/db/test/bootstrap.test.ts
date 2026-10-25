@@ -17,9 +17,9 @@ const MIGRATIONS_DIR = join(PKG_ROOT, 'migrations');
 const BENIGN_SQLITE_ERROR = /duplicate column name|already exists/i;
 
 /*
- * 309→329本まで伸びた migration を1文ずつ同期実行し続けると、vitest worker
+ * 300本を超える migration を1文ずつ同期実行し続けると、vitest worker
  * のRPC心拍(onTaskUpdate)を1秒以上返せず、心拍タイムアウトで異常終了する
- * (#698、試験は1件も落ちていないのに `[vitest-worker]: Timeout calling
+ * (試験は1件も落ちていないのに `[vitest-worker]: Timeout calling
  * "onTaskUpdate"` で落ちる)。db.exec自体は同期APIで分割できないため、
  * 一定件数ごとにsetImmediateへ制御を返し、心拍を通す隙間を作る。
  */
@@ -93,7 +93,7 @@ describe('bootstrap.sql', () => {
     /*
      * 子プロセスを execFileSync で同期起動すると、node起動+329本の
      * migration読み込みが終わるまでworkerスレッドが完全に止まり、
-     * 同じ理由でRPC心拍タイムアウトを踏む(#698)。execFile を
+     * 同じ理由でRPC心拍タイムアウトを踏む。execFile を
      * promisify して await するだけで、子プロセス待ちの間もイベント
      * ループが空くため、検査の強さ(非0終了で失敗)は変えずに直る。
      */

@@ -9,12 +9,12 @@ import {
 } from '../src/friends/index.js';
 
 /**
- * Issue #961: 同一 LINE user ID が複数アカウントに存在するとき、
+ * 同一 LINE user ID が複数アカウントに存在するとき、
  * アカウントAの解決がアカウントBの friend 行を返したり、Bの行を
  * Aへ「移動」したりしてはいけない。
  *
  * 現行スキーマは line_user_id がグローバル UNIQUE で1ユーザー1行しか
- * 持てない（複合一意制約への移行は C-2b）。その制約の下で:
+ * 持てない（複合一意制約へは別の段で移る）。その制約の下で:
  * - 別アカウント所有の行は解決・更新・移動の対象にしない
  * - 未割当 (NULL) の行だけは、受信したアカウントへ明示的に引き当てる
  */
@@ -109,7 +109,7 @@ describe('現行スキーマ (line_user_id グローバルUNIQUE) でのスコ�
     const { sqlite, db } = makeDb({ globalUniqueLineUserId: true });
     insertFriend(sqlite, { id: 'friend-b', lineUserId: 'U-shared', accountId: 'account-b' });
 
-    // C-2b の複合一意制約が無いうちは A 用の行を作れない。失敗が呼出側へ
+    // 複合一意制約が無いうちは A 用の行を作れない。失敗が呼出側へ
     // 返ることで「friend=B・送信元=A」の履歴が作られない。
     const error = await upsertFriend(db, {
       lineUserId: 'U-shared',

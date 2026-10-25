@@ -13,7 +13,7 @@ import { type WebhookInteractionDirection, type WebhookInteractionRow } from './
 export const WEBHOOK_SECRET_MIN_LENGTH = 32;
 
 /**
- * 送信WebhookのeventTypesに指定できる種別の正本(#829 N-383)。
+ * 送信WebhookのeventTypesに指定できる種別の正本。
  * 実際にイベントバスへ発火され送信Webhookへ届く種別だけを載せる。
  * `*` は全種別を受け取る明示規約。受信口の発火は `incoming_webhook.<source_type>` で届く。
  */
@@ -26,7 +26,7 @@ export const KNOWN_OUTGOING_EVENT_TYPES: readonly string[] = [
   'cv_fire',
   'staff_assigned',
   'manual_reply_sent',
-  // R150: 見本にある出来事は実際に購読できるようにする。
+  // 見本にある出来事は実際に購読できるようにする。
   // 送信側は forms.ts / booking.ts の発火点。
   'form_submitted',
   'booking_created',

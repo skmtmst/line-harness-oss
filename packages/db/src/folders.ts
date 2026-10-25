@@ -31,7 +31,7 @@ export const FOLDER_KINDS = [
   // 友だち情報欄の分類。友だち詳細の上に並ぶタブ（飼い主情報・ペット
   // プロフィールなど）がこれ。friend_fields.folder_id が指す先。
   'friend_field',
-  // F-13（自動化と外部連携）。所属先はアカウント別に保存する。
+  // 自動化と外部連携。所属先はアカウント別に保存する。
   'common_action',
   'webhook',
   'conversion',
@@ -183,8 +183,8 @@ export async function updateFolder(
 /**
  * 隣り合う2つのフォルダの並びを入れ替える（V6R-S2-c）。
  *
- * 以前は画面が2つのフォルダを別々に更新していたので、1回目だけ成功すると
- * 同じ番号のフォルダが2つ残った。2つの更新を1回のまとめ書き（batch）にする。
+ * 画面が2つのフォルダを別々に更新すると、1回目だけ成功したとき
+ * 同じ番号のフォルダが2つ残る。2つの更新を1回のまとめ書き（batch）にする。
  *
  * 一覧は display_order → name の順に並ぶ。番号が同じ2つは名前で並んでいるので、
  * 番号を交換しても並びが変わらない。そのときは「後ろへ行くほう」を +1 する。
@@ -244,7 +244,7 @@ export async function countFoldersByKind(db: D1Database): Promise<Record<string,
 }
 
 /**
- * `GET /api/folders` がフォルダごとの件数を返すための、kind→対象テーブル対応表（#631）。
+ * `GET /api/folders` がフォルダごとの件数を返すための、kind→対象テーブル対応表。
  *
  * ここに載っているのは、一覧画面のアカウント可視範囲が
  * `allowedAccountIds`（配列）＋`canSeeUnassigned`（未割当を含むか）という
@@ -253,8 +253,8 @@ export async function countFoldersByKind(db: D1Database): Promise<Record<string,
  *
  * 対応表に無い理由:
  * - `friend_field`: scope 表（`friend_field_scopes`）基準が正しいことは確定しているが
- *   （#730 調査）、現時点では件数の利用先が無い。利用画面を作る時に接続する。
- *   テナント全体の無条件集計は採らない（他テナント混入のため）（#730 裁定）。
+ *   現時点では件数の利用先が無い。利用画面を作る時に接続する。
+ *   テナント全体の無条件集計は採らない（他テナント混入のため）。
  * - `entry_route` / `mileage_rule`: `folder_id` 列を
  *   持つテーブルが存在せず、どの画面からも `kind` 指定で呼ばれていない
  *   （汎用フォルダ機構が未使用の種別）
@@ -271,7 +271,7 @@ export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
   accountColumn: string;
   /**
    * 一覧が既定で掛けている絞り込み。件数も同じ母集団で数えるために要る。
-   * ここが無いと、一覧に出ない行がフォルダ件数にだけ残る（独立審査 #631）。
+   * ここが無いと、一覧に出ない行がフォルダ件数にだけ残る。
    *
    * 残りの種別には付けない。いま一覧側が何も絞っていないため、付けると
    * 逆に母集団がずれる。一覧側の絞り込みが増えたら、そのときここへ足す。
@@ -290,10 +290,10 @@ export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
   // 一覧は deleted_at IS NULL で絞る(packages/db/src/auto-replies.ts:76)。
   auto_reply: { table: 'auto_replies', accountColumn: 'line_account_id', listFilter: 'deleted_at IS NULL' },
   broadcast: { table: 'broadcasts', accountColumn: 'line_account_id' },
-  // #730: media / common_var / rich_menu は一覧が単一アカウントに閉じて
+  // media / common_var / rich_menu は一覧が単一アカウントに閉じて
   // いるため、単一アカウント方式で数える。common_var は一覧と同じく
   // archived（archived_at IS NOT NULL）を除く。media の kind 等の追加絞りは
-  // 件数へ入れず、選択中アカウント内のフォルダ総数にする（#631 の流儀）。
+  // 件数へ入れず、選択中アカウント内のフォルダ総数にする。
   media: { table: 'media', accountColumn: 'line_account_id' },
   common_var: { table: 'common_vars', accountColumn: 'line_account_id', listFilter: 'archived_at IS NULL' },
   rich_menu: { table: 'rich_menu_groups', accountColumn: 'account_id' },

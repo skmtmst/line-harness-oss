@@ -75,7 +75,7 @@ export async function recoverStuckDeliveries(db: D1Database): Promise<number> {
  * scenarios that do not have a safe destination friend for that account.
  *
  * pause_reason='delivery_failed' を残す。画面はこれを見て「再開」ではなく
- * 「失敗を再送」を出す（432 / #949 N-054）。
+ * 「失敗を再送」を出す（migration 432）。
  */
 export async function pauseFriendScenarioDelivery(
   db: D1Database,

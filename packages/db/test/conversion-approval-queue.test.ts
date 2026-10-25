@@ -417,7 +417,7 @@ describe('setConversionApproval', () => {
 
 /*
  * offerActionsIncomplete — 承認済みの行に「案件の付帯動作がまだ終わって
- * いない」目印を立てる(N-212)。判定は runApprovedConversionOfferActions の
+ * いない」目印を立てる。判定は runApprovedConversionOfferActions の
  * 成功条件と同じ: タグは付与済みかつ台帳未完なし、シナリオは未完購読か
  * 'conversion-offer:'+eventId の購読(完了含む)があれば済み。
  */
@@ -498,7 +498,7 @@ describe('offerActionsIncomplete', () => {
 });
 
 /*
- * IDEA-16: 承認キューの行から注文番号・注文の最新状態・同じ注文の重複候補・
+ * 承認キューの行から注文番号・注文の最新状態・同じ注文の重複候補・
  * 確定報酬・支払い確定の状態へ辿れることの固定。
  *
  *  - orderNumber は記録時に metadata へ残した根拠

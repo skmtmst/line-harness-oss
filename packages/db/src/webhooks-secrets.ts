@@ -6,7 +6,7 @@ import { WEBHOOK_SECRET_MIN_LENGTH } from './webhooks-interactions.js';
 
 
 /**
- * S (#939 機能26): 入れ替えた前の合言葉を受け付ける併用期間。
+ * 入れ替えた前の合言葉を受け付ける併用期間。
  * 新しい合言葉を保存した時点から24時間だけ、前の合言葉の署名も通す。
  */
 export const WEBHOOK_SECRET_PREVIOUS_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -120,7 +120,7 @@ export async function resolveWebhookSecret(
 }
 
 /**
- * S (#939 機能26): 併用期間内の前の合言葉を返す。
+ * 併用期間内の前の合言葉を返す。
  * 期限切れ・未設定・前の値が無い行は null。復号に失敗しても例外にせず、
  * 「前の合言葉では通せない」だけにする(現行の合言葉の判定は別で行う)。
  */

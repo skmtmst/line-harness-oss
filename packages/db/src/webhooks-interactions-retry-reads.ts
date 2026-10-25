@@ -6,15 +6,15 @@ import { type WebhookInteractionRow, type OutgoingWebhookDeliverySummaryRow } fr
  * まとめて再送で選ぶ失敗の条件（webhook_interaction_logs を `l` で参照）。
  *
  * 除外するもの:
- *   - 届いたか分からない記録(unknown) … 届いていた処理を二重に送る恐れ(IDEA-26)
- *   - 署名の合言葉が読めなかった記録(secret_unavailable) … 鍵を戻すまで届かない(d23b R415)
- *   - 送り先が消えた・止められた記録 … やり直しても必ず外す(d23b R405)
+ *   - 届いたか分からない記録(unknown) … 届いていた処理を二重に送る恐れ
+ *   - 署名の合言葉が読めなかった記録(secret_unavailable) … 鍵を戻すまで届かない
+ *   - 送り先が消えた・止められた記録 … やり直しても必ず外す
  *   - 送った内容が残っていない記録 … 同じ出来事を再現できない
- *   - 自動の送り直しがまだ動いている記録 … 手動と並ぶと二重に届く(d23b R412)
- *   - 自動の送り直しですでに届いた記録 … もう一度送ると二重に届く(d23b R412)
+ *   - 自動の送り直しがまだ動いている記録 … 手動と並ぶと二重に届く
+ *   - 自動の送り直しですでに届いた記録 … もう一度送ると二重に届く
  *
- * d23b R405: 以前は先頭から固定件数だけ読んでいたため、消えた・止まった
- * 送り先の記録が先頭に固まると、後ろの送れる記録へ何度押しても届かなかった。
+ * 先頭から固定件数だけ読むと、消えた・止まった
+ * 送り先の記録が先頭に固まったとき、後ろの送れる記録へ何度押しても届かない。
  * 選ぶ段階で対象外を外し、残りを必ず処理できるようにする。
  */
 export const RETRYABLE_FAILURE_CORE = `
@@ -50,8 +50,8 @@ export async function listFailedWebhookInteractionsForRetry(
 /**
  * まとめて再試行の対象になる失敗記録の総数。
  * 1リクエストの外部通信上限で一部しか処理できないとき、残り件数を
- * 画面へ明示するために使う（N-387: 対象外を黙って残さない）。
- * 結果不明の記録は対象外なので、ここでも数えない(IDEA-26)。
+ * 画面へ明示するために使う（対象外を黙って残さない）。
+ * 結果不明の記録は対象外なので、ここでも数えない。
  */
 export async function countFailedWebhookInteractionsForRetry(
   db: D1Database,
@@ -65,7 +65,7 @@ export async function countFailedWebhookInteractionsForRetry(
 }
 
 /**
- * まとめて再送の対象外に残った失敗記録の総数(d23b R405/R408)。
+ * まとめて再送の対象外に残った失敗記録の総数。
  * 送り先が消えた・止まった・内容が残っていない・自動の送り直しが
  * 動いている・署名の合言葉が読めない、のどれかに当たる記録を数える。
  * 「届いたか分からない」記録は別口(needsReview)で数えるので含めない。
@@ -84,7 +84,7 @@ export async function countExcludedFailedWebhookInteractions(
 }
 
 /**
- * 「届いたか分からない」失敗記録の総数(IDEA-26)。
+ * 「届いたか分からない」失敗記録の総数。
  * まとめて再送には乗せず、画面へ「相手先で確かめる必要がある件数」として返す。
  */
 export async function countUnverifiedWebhookInteractions(

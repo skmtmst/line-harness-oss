@@ -3,8 +3,8 @@ import { sqlIdSet } from './id-queries.js';
 /*
  * 友だちの絞り込み条件を SQL に組み立てる。
  *
- * 以前は worker の services にあったが、成果の「数えない条件」(R40)でも
- * 同じ条件を記録時・試算時に評価する必要があり、packages/db 側へ移した。
+ * 成果の「数えない条件」でも
+ * 同じ条件を記録時・試算時に評価する必要があるため、packages/db 側に置く。
  * worker からは `services/segment-query.js` の再公開を通して従来どおり
  * 使える。実体はここ1つ。
  *
@@ -317,7 +317,7 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
         (t): t is string => typeof t === 'string' && t in NAME_COLUMNS,
       )
       /*
-       * R258: targets の指定と未指定を区別する。空配列は「選んでいない」
+       * targets の指定と未指定を区別する。空配列は「選んでいない」
        * 状態のまま保存されたもので、全欄への拡大はしない（fail-closed。
        * 空文字や空IDと同じく作り直しを促す）。未指定（古い保存形）は
        * これまでどおり全欄で探す。
@@ -470,7 +470,7 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
         bindings.push(max)
       }
       /*
-       * R300: 行動スコア一覧の帯は「点数がついている人」だけを数える
+       * 行動スコア一覧の帯は「点数がついている人」だけを数える
        * （`f.score != 0 OR 履歴あり`）。低い帯の引き継ぎで未採点の0点まで
        * 拾わないよう、引き継ぎ側が `scoredOnly: true` を付けて同じ定義にする。
        * 付けない既存の条件は従来どおり（点数範囲だけ）。

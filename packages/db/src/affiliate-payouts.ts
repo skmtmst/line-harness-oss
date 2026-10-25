@@ -165,7 +165,7 @@ export interface AffiliateSettlementPreviewRow {
 /**
  * 締め対象から外れた成果。報酬が0円(以下)の行は支払えないため締めへ
  * 含めないのは仕様どおりだが、件数と対象を運用者が確認できるよう
- * プレビューへ出す(N-219)。
+ * プレビューへ出す。
  */
 export interface AffiliateSettlementExcludedRow {
   conversionEventId: string;
@@ -204,7 +204,7 @@ export interface AffiliateAccountSettlementPreview {
   /** 今回差し引く取消額の合計。 */
   totalDeduction: number;
   /**
-   * R288: 今回引ききれず次回へ繰り越す取消額。次回200円・取消300円なら
+   * 今回引ききれず次回へ繰り越す取消額。次回200円・取消300円なら
    * 200を引き、残り100を繰り越す(正の振込はしない)。
    */
   carriedDeduction: {
@@ -221,7 +221,7 @@ async function sha256(value: string): Promise<string> {
 
 /**
  * 締め対象候補の全行。0円以下の行も含めて返すので、呼び出し側が
- * 「含める行」と「外れた行」を分けて数えられる(N-219)。
+ * 「含める行」と「外れた行」を分けて数えられる。
  */
 async function eligibleRewardRows(
   db: D1Database,
@@ -292,7 +292,7 @@ async function eligibleRewards(
  * プレビュー版の算出。プレビュー表示と全体締めで同じ行集合から同じ版を
  * 作るための共通関数。締めはこの版の照合に使った行集合をそのまま明細へ
  * 書き込む(照合後に取り直さない = TOCTOU排除)。
- * R288: 版は取消の差し引き計画も含める。プレビュー後に新しい取消が
+ * 版は取消の差し引き計画も含める。プレビュー後に新しい取消が
  * 来たら版が変わり、締めは changed で止まる(黙って別額では締めない)。
  */
 export async function accountPreviewVersion(rows: EligibleRewardRow[], deductionFingerprint = ''): Promise<string> {
@@ -314,13 +314,13 @@ type UnappliedDebit = {
 };
 
 /**
- * R288: まだ次の締めへ入れていない取消(debit)を古い順で返す。
+ * まだ次の締めへ入れていない取消(debit)を古い順で返す。
  * 消費の記録は締め明細行(entry_id 参照)。行が付けば適用済みで、
  * もう次の締めには出てこない(二重控除しない)。
  * 台帳が無い環境(移行前)では空を返して既存表示を壊さない。
  */
 /**
- * m22u R358 の回帰用に公開する、未適用の取り立て(clawback)の読み取り。
+ * 試験から確かめるために公開する、未適用の取り立て(clawback)の読み取り。
  * 締め→却下で起こした相殺は、再承認で確定が戻ると取り立て対象から外す。
  */
 export async function unappliedSettlementDebits(
@@ -378,7 +378,7 @@ type DeductionPlan = {
 };
 
 /**
- * R288: 紹介者の今回報酬へ、未適用の古い取消から充てる計画。
+ * 紹介者の今回報酬へ、未適用の古い取消から充てる計画。
  * 同一アカウント・同一紹介者の締めへ一度だけ適用する。
  * 報酬を超える取消は報酬分だけ引き、残りは繰り越す(正の振込はしない)。
  * プレビューと締めはこの同じ計画から作る。
@@ -456,7 +456,7 @@ export async function previewAffiliateAccountSettlement(
       (grossByAffiliate.get(row.affiliate_id) ?? 0) + Math.round(Number(row.reward_amount)),
     );
   }
-  // R288: 締め後の取消は次の締めで差し引く。紹介者ごとに未適用の
+  // 締め後の取消は次の締めで差し引く。紹介者ごとに未適用の
   // 古い取消から充て、引ききれない分は次回へ繰り越す。
   const plan = planDeductionApplication(
     grossByAffiliate,
@@ -545,7 +545,7 @@ export async function closeAffiliateAccountSettlement(
   // 照合後に取り直すと、その隙に承認・締めが変わってheaderと明細がずれる。
   const rows = await eligibleRewards(db, input);
   if (rows.length === 0) return { kind: 'empty' };
-  // R288: プレビューと同じ差し引き計画を作り、版で照合する。
+  // プレビューと同じ差し引き計画を作り、版で照合する。
   // 報酬だけでなく未適用の取消も版に入るため、プレビュー後に来た
   // 取消は changed で止まる(黙って別額では締めない)。
   const grossByAffiliate = new Map<string, number>();
@@ -593,7 +593,7 @@ export async function closeAffiliateAccountSettlement(
       amount: Math.round(Number(row.reward_amount)),
       approvedAt: row.approved_at,
     })),
-    // R288: 取消の消費行。同じ取消を別締めが先に付けたら書かず、
+    // 取消の消費行。同じ取消を別締めが先に付けたら書かず、
     // 巻き戻しで締めごと消える(部分適用は残らない)。
     expectedDebitEntryIds: plan.lines.map((line) => line.debitId),
     debitLines: plan.lines,
@@ -860,7 +860,7 @@ export interface AffiliateStatementSnapshot {
   settlementId: string; settlementVersion: number; affiliateId: string;
   affiliateName: string; affiliateCode: string; periodFrom: string; periodTo: string;
   totalAmount: number; currency: string; lineCount: number;
-  /** R288: 明細でも元報酬・差し引きを分けて見せる。無いときは 0。 */
+  /** 明細でも元報酬・差し引きを分けて見せる。無いときは 0。 */
   grossAmount: number;
   deductionAmount: number;
 }
@@ -987,7 +987,7 @@ export async function getAffiliateStatementDownload(
 }
 
 /**
- * R43: 締め済み台帳の再開情報。画面を離れても `closed` 状態が消えるだけで
+ * 締め済み台帳の再開情報。画面を離れても `closed` 状態が消えるだけで
  * 台帳自体は残るため、期間で引き直して明細発行・CSV準備を再開できる
  * ようにする。
  */

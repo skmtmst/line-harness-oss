@@ -59,7 +59,7 @@ export function buildAdjustmentFingerprint(input: PostMileageAdjustmentInput): s
 }
 
 /**
- * R378: 確定済みの調整を Idempotency-Key で探す。
+ * 確定済みの調整を Idempotency-Key で探す。
  *
  * 承認境界の引き下げや元の有効期限の経過は「新しい調整への判定」なので、
  * すでに台帳へ入った同じ要求の再送には適用しない。呼び出し側は
@@ -89,7 +89,7 @@ export async function findCommittedMileageAdjustment(
  * before/after values instead of applying the delta again.
  */
 /**
- * m25d R359: 手動減算で使う内訳の選び方。交換の予約と同じ「使える」基準で、
+ * 手動減算で使う内訳の選び方。交換の予約と同じ「使える」基準で、
  * 期限の近いロットから順に消費する。台帳の INSERT と同じ batch へ積むため、
  * 台帳が書かれなかった同時操作の負け分は EXISTS の条件でロットへ触らない。
  */
@@ -98,7 +98,7 @@ export function adjustmentLotSpendOrderSql(): string {
 }
 
 /**
- * R359: この調整で内訳から消費済みの分を台帳の印から読む。
+ * この調整で内訳から消費済みの分を台帳の印から読む。
  * 取り直しの batch が落ちた後の再送は、この印だけが「残り」の根拠。
  * 印が無ければ未記録として全額を請求対象にする（上限は残高との照合で守る）。
  */
@@ -133,7 +133,7 @@ export async function recordLotConsumed(
 }
 
 /**
- * R359: 取り直しの1件ごとに「いまの超過分」を確かめる条件。
+ * 取り直しの1件ごとに「いまの超過分」を確かめる条件。
  * 同じ不足の再送が重なっても、文の実行時点で使える内訳が残高を
  * 上回っている分だけしか消費しない。batch 内では前の文の効果が見える
  * ため、直列化された2件目は超過が無くなり止まる（二重消費防止）。
@@ -153,7 +153,7 @@ export function lotRepairLiveExcessGateSql(): string {
 }
 
 /**
- * R359: 同じ依頼キーの再送で、残っている内訳の不足を取り直す。
+ * 同じ依頼キーの再送で、残っている内訳の不足を取り直す。
  * 初回の取り直し batch が落ちると台帳はあるのに内訳が残り、
  * 従来は再送が何もせずずれが固定されていた。請求は印の残りだけに絞り、
  * さらに「使える内訳が残高を上回る分」を上限にするため、

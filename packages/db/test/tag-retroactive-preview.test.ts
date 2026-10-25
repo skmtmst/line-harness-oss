@@ -7,7 +7,7 @@ import { getTagRetroactiveMileagePreview } from '../src/tags/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * N-047: 遡及マイル実行の前にサーバー側で数える事前計算。
+ * 遡及マイル実行の前にサーバー側で数える事前計算。
  * 実行側(mileage.ts)と同じ条件で数えることを、実SQLで確かめる。
  */
 let sqlite: Database.Database;

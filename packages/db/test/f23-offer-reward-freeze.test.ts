@@ -19,7 +19,7 @@ import { trackConversion } from '../src/conversions/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 /**
- * F-23 追補（2026-10-03 オーナー指示 O担当）。
+ * 案件の報酬の凍結。
  *
  * 公開案件の報酬変更をはさんだ成果の扱いを、実入口（trackConversion へ
  * 処理時刻を固定で渡す）で有限に再現する。合成DB（:memory: + bootstrap）

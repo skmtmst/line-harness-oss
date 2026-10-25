@@ -25,7 +25,7 @@ function execSafe(db: Database.Database, sql: string): void {
 }
 
 /**
- * F-13: 置き場の種類に common_action・webhook・conversion を足す（556）。
+ * 置き場の種類に common_action・webhook・conversion を足す（556）。
  * CHECK は作り直しでしか変えられないので、表の再建が正しく当たることを見る。
  * 適用はしない（本番・D1 に触らない）。PR 本文に番号だけ書く。
  */
@@ -49,7 +49,7 @@ function setupDbWithMigrations(): Database.Database {
 }
 
 /**
- * #1269: D1 では外部キーが有効。folders を DROP すると暗黙の削除が走り、
+ * D1 では外部キーが有効。folders を DROP すると暗黙の削除が走り、
  * 子の folder_id が ON DELETE SET NULL で全部 NULL になるおそれがある。
  * 子に中身を入れてから 556 を当て、ひも付けが残ることを見る。
  */

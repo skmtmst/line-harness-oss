@@ -244,7 +244,7 @@ export interface RedemptionStepLease {
   leaseExpiresAt: string;
   now: string;
   /**
-   * R344: 再試行キーの期限切れ境界（ISO時刻）。この時刻より前に
+   * 再試行キーの期限切れ境界（ISO時刻）。この時刻より前に
    * 作られた手順（＝最初の送信から24時間超）は、同じキーで送り直さない。
    * 省略時は期限を見ない。
    */

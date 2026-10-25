@@ -52,7 +52,7 @@ export async function importMileageRewardCodes(
   if (!unique.length || unique.length > 10_000) {
     throw new MileageRewardError('invalid_codes', '交換コードは1〜10,000件で登録してください');
   }
-  // R372: 重複判定を版の外へ持ち、同じ店舗内の配布履歴まで照合する。
+  // 重複判定を版の外へ持ち、同じ店舗内の配布履歴まで照合する。
   // 配布済み（issued/reserved）はもちろん、未使用の旧版コードも再登録では
   // 増やさない。単発在庫が二重に確保され、別の人へ同じコードを配らない。
   const existing = new Set<string>();

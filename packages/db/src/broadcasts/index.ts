@@ -69,7 +69,7 @@ export interface Broadcast {
   message_options_json?: string | null;
   after_action_version_id?: string | null;
   lock_version?: number;
-  /** 停止を受け付けた時刻（JST）。NULL なら止まっていない。#662 */
+  /** 停止を受け付けた時刻（JST）。NULL なら止まっていない。 */
   stopped_at?: string | null;
   /** 停止を押した担当者。監査で「誰が止めたか」を読むために残す。 */
   stopped_by?: string | null;
@@ -368,7 +368,7 @@ export type UpdateBroadcastInput = Partial<
   resetDeliveryAttempt?: boolean;
 };
 
-// #772: 版を必須にし、版なし迂回を残さない。呼び元は PUT 経路だけ。
+// 版を必須にし、版なし迂回を残さない。呼び元は PUT 経路だけ。
 export async function updateBroadcast(
   db: D1Database,
   id: string,
@@ -654,7 +654,7 @@ export async function getQueuedBroadcasts(db: D1Database): Promise<Broadcast[]> 
   const result = await db
     .prepare(
       // stopped_at IS NOT NULL は停止を受け付けた配信。**新しい送信権を取らせない**
-      // ので、ここで拾わない（#662）。止めたあと再開すると stopped_at が NULL に
+      // ので、ここで拾わない。止めたあと再開すると stopped_at が NULL に
       // 戻り、次の tick から続きを送る。
       `SELECT * FROM broadcasts WHERE status = 'sending' AND batch_offset >= 0 AND sent_at IS NULL AND stopped_at IS NULL AND (segment_conditions IS NOT NULL OR account_ids IS NOT NULL) ORDER BY created_at ASC`,
     )
@@ -681,7 +681,7 @@ export async function getQueuedBroadcasts(db: D1Database): Promise<Broadcast[]> 
  *
  * 3 系統とも `stopped_at IS NULL` で絞る。停止中の配信はロックを持ったまま
  * Worker が消えていても**戻さない**。戻すと次の cron が拾って送信を続け、
- * 運用者が押した停止が黙って無効になる (#662)。停止中のロックは再開
+ * 運用者が押した停止が黙って無効になる。停止中のロックは再開
  * (resumeBroadcastSending) が外す。
  */
 export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
@@ -709,7 +709,7 @@ export async function recoverStalledBroadcasts(db: D1Database): Promise<void> {
   //    再開できる row だけを短い閾値で素早く resume する。success_count=0 の row は
   //    系統 1) が長い閾値で扱う。success_count > 0 だが dedup_progress=NULL のケース
   //    (resume 機能 deploy 前の停滞 / 030 migration 直後の在庫) は ID 集合が無く安全な
-  //    再開ができず、resume すると全件再送 → 重複配信事故になるため両系統とも対象外。
+  //    再開ができず、resume すると全件再送 → 重複配信になるため両系統とも対象外。
   //
   //    閾値は batch_lock_at (= ロック取得時刻) のみ。created_at にフォールバック
   //    すると jstNow の `+09:00` suffix で 9 時間ズレるバグが出るので使わない。
@@ -784,7 +784,7 @@ export async function updateBroadcastStatus(
   }
   // 注: status='draft' では dedup_progress / batch_lock_at をクリアしない。
   // 失敗 rollback (processBroadcastSend の catch) で draft に戻すケースで partial
-  // state を捨てると、次回 retry が全件再送 → 重複配信事故になる。resume を成立
+  // state を捨てると、次回 retry が全件再送 → 重複配信になる。resume を成立
   // させるには partial state を保持する必要がある。
   // 「ユーザーが draft を編集して送り直す」場合の clean reset は別途 PUT API 側で
   // 明示的に対応する設計にする (現状未実装。必要になったら追加)。
@@ -815,7 +815,7 @@ export async function updateBroadcastFailedAccountIds(
 }
 
 /*
- * 送信中の一斉配信を止める／再開する／失敗した相手だけ送り直す（#662 / N-059）。
+ * 送信中の一斉配信を止める／再開する／失敗した相手だけ送り直す。
  *
  * どれも**版（lock_version）付きの条件付き UPDATE 1本**で決める。
  * 読んでから書くと、2人が同時に押したときに両方が「自分が勝った」と読む。

@@ -68,7 +68,7 @@ export async function enqueueMileageEvent(
     .first<{ id: string; user_id: string | null; line_account_id: string | null }>();
   if (!friend) throw new Error(`Mileage friend not found: ${input.friendId}`);
 
-  // N-231 案1: 受付時点で適用版の集合を固定する。後で公開されてもこの行は旧版のまま。
+  // 受付時点で適用版の集合を固定する。後で公開されてもこの行は旧版のまま。
   const versionMap = friend.line_account_id
     ? await getAccountRuleVersionMap(db, friend.line_account_id)
     : {};

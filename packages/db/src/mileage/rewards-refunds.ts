@@ -5,7 +5,7 @@ import { MileageRewardError, requiredText } from './rewards-validation.js';
 
 
 /**
- * R362: 返却の勝者決め。自動返却と再試行が重なっても、残高・内訳の
+ * 返却の勝者決め。自動返却と再試行が重なっても、残高・内訳の
  * 書き換えは1回だけにする。`batch` の中の条件付き更新だけでは、
  * 状態の更新が0件でもロット復元が走り、二重に戻る。
  *
@@ -65,7 +65,7 @@ export function refundReversalIdempotencyKey(redemptionId: string): string {
 /**
  * 勝者だけが呼ぶ、台帳・ロット・コード解放の書き込み。
  *
- * R362: 台帳 INSERT とロット復元・コード解放を1つの batch で書く。
+ * 台帳 INSERT とロット復元・コード解放を1つの batch で書く。
  * batch は原子（一部だけ残らない）なので、中断後に残るのは
  * 「台帳なし」（未実行）だけになる。INSERT は厳しい書き込み
  * （OR IGNORE なし）にする。同時に走った相手の batch は一意制約で
@@ -97,7 +97,7 @@ export async function completeRefundWrites(
           JSON.stringify({ redemptionId: current.id, spendLedgerId: current.spendLedgerEntryId }),
         ),
         ...allocations.map((allocation) => db.prepare(
-          // m22u R359: 返却は有効なロットだけへ戻す。成果の取消で無効化した
+          // 返却は有効なロットだけへ戻す。成果の取消で無効化した
           // ロット(void)へは戻さない（取り消した付与が交換で復活しないように）。
           `UPDATE mileage_grant_lots
               SET remaining_amount = remaining_amount + ?,
@@ -165,7 +165,7 @@ export async function selectRefundReversal(
 }
 
 /**
- * R362: 旧処理で残り得る「台帳あり・コード未解放」の照合。
+ * 旧処理で残り得る「台帳あり・コード未解放」の照合。
  * batch は原子なので、コードが未解放ならロット復元も未実行。
  * ロットの復元は読んだ残数への条件付き更新（CAS）で行う。同時修復で
  * 誰かが直した分は残数が変わっているため触らず、合計は1回分になる。
@@ -173,7 +173,7 @@ export async function selectRefundReversal(
  * 読み直しが遅れて新しい残数で条件を作り直しても、先に終わった修復が
  * コードを解放していれば1件も通らず、二重に戻らない。コード解放も
  * 予約中のときだけ通る。照合自体は何度呼んでも壊さない。
- * R362: updated_at の一致だけの柵では、同じ時刻の同時修復が両方通って
+ * updated_at の一致だけの柵では、同じ時刻の同時修復が両方通って
  * 内訳を二重に戻していた（時刻が同じだと柵が開いたままになる）。
  */
 export async function verifyRefundWrites(
@@ -227,7 +227,7 @@ export async function verifyRefundWrites(
 }
 
 /**
- * R362: 返却の書き込みが最後まで終わっているか。
+ * 返却の書き込みが最後まで終わっているか。
  * 台帳が無ければ残高も内訳も未復旧。台帳があってもコードが
  * 未解放なら旧処理の残り（ロット未復旧）。どちらも無ければ完了。
  */
@@ -246,7 +246,7 @@ export async function isMileageRefundComplete(
 }
 
 /**
- * R362: 返却確定後に書き込みが中断した交換（台帳なしの refunded）。
+ * 返却確定後に書き込みが中断した交換（台帳なしの refunded）。
  * 再試行は409、cronも要対応一覧も拾わない取り残し。回復処理と
  * 要対応一覧がこの口で見つけて再開する。
  * 旧処理の残り「台帳あり・コード未解放」（ロット未復旧）も拾う。
@@ -284,7 +284,7 @@ export async function findIncompleteMileageRefunds(
 }
 
 /**
- * R362: 中断した返却を残高・台帳・状態が一致するまで再開する。
+ * 中断した返却を残高・台帳・状態が一致するまで再開する。
  * 冪等なので何度でも呼べる。同時に走っても台帳・ロット復元は各1回。
  * 成功へ移っていた行は返却せず済みとして数える（二重返却なし）。
  */

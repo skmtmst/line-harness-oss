@@ -71,7 +71,7 @@ describe('getFriendByLineUserIdForAccount', () => {
   });
 
   test('他アカウント所有の行しか無い場合は null を返す（跨ぎフォールバック廃止）', async () => {
-    // Issue #961: account-missing に該当者が無くても account-a/b の行を
+    // account-missing に該当者が無くても account-a/b の行を
     // 返してはいけない。返すと「friend=別アカウント・送信元=受信アカウント」の
     // 履歴が作られる。
     const friend = await getFriendByLineUserIdForAccount(db, 'U-shared', 'account-missing');

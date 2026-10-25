@@ -34,7 +34,7 @@ export interface LoginAuditRow {
  * 記録を残す。
  *
  * 例外を投げない。記録に失敗したせいでログインそのものが失敗する、
- * という向きの事故を作らないため。失敗はログに出す。
+ * という向きの失敗を作らないため。失敗はログに出す。
  */
 export async function recordLoginAudit(
   db: D1Database,

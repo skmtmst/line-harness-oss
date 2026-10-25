@@ -105,7 +105,7 @@ export async function getMileageRewardRedemptionCounts(
   if (!friend) throw new MileageRewardError('friend_not_found', '友だち情報を確認できませんでした', 404);
   const beneficiaryKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
   /*
-   * R388: 交換済みの表示も上限と同じ本人キー集合で数える。統合後に
+   * 交換済みの表示も上限と同じ本人キー集合で数える。統合後に
    * 「交換できる」と出して上限で止める食い違いを出さない。
    */
   const limitKeys = await collectBeneficiaryKeysForLimit(db, input.friendId, friend.user_id, beneficiaryKey);

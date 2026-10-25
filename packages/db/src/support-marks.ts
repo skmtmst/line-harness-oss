@@ -314,7 +314,7 @@ export class SupportMarkCreateError extends Error {
 }
 
 /**
- * R512: 同じ要求キーの再送で二重に作らないための指紋。
+ * 同じ要求キーの再送で二重に作らないための指紋。
  *
  * 名前・色・並び順・初期値・受信時自動付与・自動変更ルールが
  * 1文字でも違えば別の要求とみなし、作らず止める。
@@ -346,7 +346,7 @@ export interface SupportMarkCreateResult {
 }
 
 /**
- * R512: 要求キー付きで対応マークを作る。
+ * 要求キー付きで対応マークを作る。
  *
  * 応答だけ失った再試行は、同じキー・同じ内容なら保存済みのマークを
  * 返す（作り直さない）。同じキーに異なる内容が来たら作らず止める。
@@ -520,7 +520,7 @@ export async function createSupportMarkWithAutomationRules(
     JSON.stringify({ lineAccountId: scope.lineAccountId, automationRuleCount: automationRules.length }),
   ));
   if (idempotency) {
-    // R512: 要求キーの行も同じバッチで確定する。本体より後に積むため、
+    // 要求キーの行も同じバッチで確定する。本体より後に積むため、
     // 外部キーのある環境でも制約に当たらない。同じキーの同時実行は
     // UNIQUE 制約で負けた側だけ巻き戻り、二重に残らない。
     statements.push(db.prepare(
@@ -543,7 +543,7 @@ export async function createSupportMarkWithAutomationRules(
 }
 
 /**
- * R513: 読んだときの版（expectedVersion）と違えば、ほかの担当者が
+ * 読んだときの版（expectedVersion）と違えば、ほかの担当者が
  * 先に変えている。黙って上書きせず 'conflict' を返す。
  */
 export async function updateSupportMark(
@@ -716,7 +716,7 @@ export async function updateSupportMark(
 
 /**
  * 画面から届いた「動かせる行だけの新しい順」を、届いていない行の位置を
- * 保ったまま全体の並びへ戻して、1回のバッチで書く（#1014 ATTR-03/04）。
+ * 保ったまま全体の並びへ戻して、1回のバッチで書く。
  *
  * 共有マーク（is_inherited=1）は触らない。`updateSupportMark` に流すと
  * 複製＋付け替えが走るため、並び替えからは必ず外す。
@@ -854,9 +854,9 @@ export interface SupportMarkArchiveResult {
  * の確認版に一致する場合だけ、友だちの置換と保管を一括で行う。
  * 同じIdempotency-Keyの再送は保存済み結果を返す。
  *
- * R180: 使っている友だちが0人のときは置換先なし（null）で保管できる。
- * 以前は0人でも置換先が必須で、独自マーク1件だけのアカウントでは候補が
- * 空（共有マークは除外・自身も除外）になり保管できなかった。友だちが
+ * 使っている友だちが0人のときは置換先なし（null）で保管できる。
+ * 0人でも置換先を必須にすると、独自マーク1件だけのアカウントでは候補が
+ * 空（共有マークは除外・自身も除外）になり保管できない。友だちが
  * いるのに置換先が無い要求は `replacement_invalid` で止める。使用中・
  * 参照ありの保護（canArchive）と初期値・共有の禁止は変えない。
  */

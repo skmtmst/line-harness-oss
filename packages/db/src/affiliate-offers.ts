@@ -57,7 +57,7 @@ export interface CreateAffiliateOfferInput {
    */
   isActive?: boolean;
   /**
-   * Stable per-attempt UUID from the client (#686). When the create commits
+   * Stable per-attempt UUID from the client. When the create commits
    * but the response is lost, the client retries with the SAME operationId;
    * this lets the retry recover the original row instead of creating a
    * duplicate offer.
@@ -65,7 +65,7 @@ export interface CreateAffiliateOfferInput {
   operationId?: string | null;
 }
 
-/** Look up a prior create by its client-supplied operation UUID (idempotent replay, #686). */
+/** Look up a prior create by its client-supplied operation UUID (idempotent replay). */
 async function findAffiliateOfferByOperationId(
   db: D1Database,
   lineAccountId: string | null,
@@ -331,7 +331,7 @@ export async function setConversionApproval(
   status: 'approved' | 'rejected',
 ): Promise<boolean | 'already_set'> {
   const now = jstNow();
-  // F-23 ケース6・交差：版管理下の案件なのに記録時刻の版が無い成果を
+  // 版管理下の案件なのに記録時刻の版が無い成果を
   // 承認すると現在額で固まるため、状態を変えずに拒む（false）。通すときは
   // 判断時の根拠を凍結・計算へそのまま渡し、間の割り込みでずらさない。
   // 承認済みの再送による修復は従来どおり通す。
@@ -362,9 +362,9 @@ export async function setConversionApproval(
     // 金額/条件/対象が変わらないようにする。曖昧な行は版を作らずnullで
     // 終える(版が無い行は締め・支払い・レポートで0として扱う)。
     // 版の書き込みが落ちた場合は再試行(already_set側)で修復する。
-    // m22u R356・R357: 版より先に承認時の金額・マイルを凍結する。
-    // m22u R358: 締め後の却下→再承認では取り消し済みの確定を戻す。
-    // F-23 交差：判断時の根拠をそのまま渡し、間の割り込みでずらさない。
+    // 版より先に承認時の金額・マイルを凍結する。
+    // 締め後の却下→再承認では取り消し済みの確定を戻す。
+    // 判断時の根拠をそのまま渡し、間の割り込みでずらさない。
     if (status === 'approved') await freezeConversionApproval(db, eventId, flipBasis);
     if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now, flipBasis);
     if (status === 'approved') await restoreSettledRewardOnReapproval(db, eventId);
@@ -384,8 +384,8 @@ export async function setConversionApproval(
   if (!existing) return false;
   // 二重押しの再試行は承認済みの修復にも使う: 承認だけ通って版が無い
   // 行があればここで作る(締めは版優先のため、版が無いと後編集で金額が動く)。
-  // m22u R356・R357: 凍結が無ければここで埋め直し、版の修復は凍結値を優先する。
-  // m22u R358: 復活の戻し忘れもここで修復する（再送では何も起きない）。
+  // 凍結が無ければここで埋め直し、版の修復は凍結値を優先する。
+  // 復活の戻し忘れもここで修復する（再送では何も起きない）。
   if (status === 'approved') await freezeConversionApproval(db, eventId);
   if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
   if (status === 'approved') await restoreSettledRewardOnReapproval(db, eventId);
@@ -395,7 +395,7 @@ export async function setConversionApproval(
 }
 
 /**
- * m22u R356・R357：承認した時点の金額・マイルの凍結。
+ * 承認した時点の金額・マイルの凍結。
  *
  * 承認の UPDATE が通った直後に、その時点で見える計算入力（率/基準額/
  * 固定額・版の固定を優先）とマイル数を conversion_events の列へ写す。
@@ -417,7 +417,7 @@ async function readApprovalFreezeInputs(
   eventId: string,
   /**
    * 承認判断時に確定した根拠。渡されたときは再解決せず同じ値を使う
-   * （F-23 交差の有限barrier）。省略時はその場で確かめ直す。
+   * 省略時はその場で確かめ直す。
    */
   basisOverride?: ApprovalRewardBasis | null,
 ): Promise<ApprovalFreezeInputs | null> {
@@ -463,7 +463,7 @@ async function readApprovalFreezeInputs(
   if (!row) return null;
   // 固定額・マイルの出どころ。判断の版があればその値。判断が無い行は
   // 記録時刻の版で旧額を保つ。版管理下で記録時刻の版が無いときは凍結
-  // しない（null で返し、呼び出し側は承認自体を拒む。F-23 ケース6）。
+  // しない（null で返し、呼び出し側は承認自体を拒む）。
   if (row.reward_mode === 'none') {
     return { formula: 'fixed', commissionRate: null, baseAmount: null, fixedReward: 0, amountMinor: 0, rewardMiles: 0 };
   }
@@ -535,7 +535,7 @@ export async function freezeConversionApproval(
 }
 
 /**
- * m22u R354：承認通知の送信記録。
+ * 承認通知の送信記録。
  *
  * 承認状態（updated/already_set）と通知の送信状態を分ける。同じ承認世代
  * （approved_at）の通知は1回だけ送り、再試行の修復で欠けた通知だけ送る。
@@ -579,7 +579,7 @@ export async function markApprovalNotified(
 }
 
 /**
- * m22u R354：送信権の解放。送信の途中で落ちたとき、同じ承認世代の
+ * 送信権の解放。送信の途中で落ちたとき、同じ承認世代の
  * 記録だけを NULL に戻し、再試行で送り直せるようにする（欠落防止）。
  * 世代が変わっていたら（却下→再承認の新しい世代）何もしない。
  */
@@ -607,7 +607,7 @@ export interface ApprovalDecisionResult {
 }
 
 /**
- * 期待した状態付きで成果を承認・却下する(N-208)。
+ * 期待した状態付きで成果を承認・却下する。
  *
  * conversion_eventsに版列は無いため、版の代わりに「いま見えている状態」
  * そのものをCASの比較対象にする。UPDATEのWHEREへ期待状態を埋め込むので、
@@ -625,7 +625,7 @@ export async function decideConversionApproval(
   // 読み直し側でalready_set（修復付き）かconflictに振り分ける。こうしないと
   // 同じ判断の再送が「変更1件」になり、反対仕訳などを二重に起こしてしまう。
   if (expectedStatus !== status) {
-    // F-23 ケース6・交差：版管理下の案件なのに記録時刻の版が無い成果は、
+    // 版管理下の案件なのに記録時刻の版が無い成果は、
     // 承認すると現在額で固まるため、状態を変えず unbillable で返す。通す
     // ときは判断時の根拠を凍結・計算へそのまま渡し、間の割り込みでずらさ
     // ない。却下は金額を固めないので従来どおり通す。
@@ -659,11 +659,11 @@ export async function decideConversionApproval(
       .bind(status, now, eventId, ...expectedBinds)
       .run();
     if ((result.meta?.changes ?? 0) > 0) {
-      // m22u R356・R357: 版より先に承認時の金額・マイルを凍結する。
-      // F-23 交差：判断時の根拠をそのまま渡し、間の割り込みでずらさない。
+      // 版より先に承認時の金額・マイルを凍結する。
+      // 判断時の根拠をそのまま渡し、間の割り込みでずらさない。
       if (status === 'approved') await freezeConversionApproval(db, eventId, flipBasis);
       if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now, flipBasis);
-      // m22u R358: 締め後の却下→再承認では取り消し済みの確定を戻す。
+      // 締め後の却下→再承認では取り消し済みの確定を戻す。
       if (status === 'approved') await restoreSettledRewardOnReapproval(db, eventId);
       if (status === 'rejected') await reverseSettledRewardOnRejection(db, eventId, now);
       return { outcome: 'updated', currentStatus: status };
@@ -682,8 +682,8 @@ export async function decideConversionApproval(
     : 'pending';
   if (current === status) {
     // 同じ判断の再送は冪等成功にし、版・反対仕訳の欠落だけ修復する。
-    // m22u R356・R357: 凍結が無ければここで埋め直し、版の修復は凍結値を優先する。
-    // m22u R358: 復活の戻し忘れもここで修復する（再送では何も起きない）。
+    // 凍結が無ければここで埋め直し、版の修復は凍結値を優先する。
+    // 復活の戻し忘れもここで修復する（再送では何も起きない）。
     if (status === 'approved') await freezeConversionApproval(db, eventId);
     if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
     if (status === 'approved') await restoreSettledRewardOnReapproval(db, eventId);
@@ -694,7 +694,7 @@ export async function decideConversionApproval(
 }
 
 /**
- * 承認確定時に走らせる案件の動作（タグ付与・シナリオ開始）の実行計画(N-212)。
+ * 承認確定時に走らせる案件の動作（タグ付与・シナリオ開始）の実行計画。
  *
  * 案件に設定された参照は「案件と同じLINEアカウントで、いま有効なもの」だけを
  * 実行してよい。保存時の検査 (offerReferenceError) をすり抜けた古い参照や、
@@ -813,11 +813,10 @@ export async function getConversionApprovalNotifyInfo(
   const row = await db
     .prepare(
       /*
-       * R48/R49:
        * - 紹介者の通知設定(notify_on_conversion)を一緒に取る。呼び出し側は
        *   0 のとき送信処理へ進まない。
        * - 通知の額は案件の設定額ではなく、承認時に固定された計算版の
-       *   報酬額を優先する(率の案件で設定額を見せる事故を防ぐ)。
+       *   報酬額を優先する(率の案件で設定額を見せないため)。
        */
       `SELECT ce.affiliate_id AS affiliate_id,
               off.name AS offer_name,
@@ -849,7 +848,7 @@ export async function getConversionApprovalNotifyInfo(
   return {
     affiliateId: row.affiliate_id,
     offerName: row.offer_name,
-    // m22u R357: 版が無い(保存失敗後)ときは凍結した承認時金額を使い、
+    // 版が無い(保存失敗後)ときは凍結した承認時金額を使い、
     // 変更後の案件額を見せない。凍結も無ければ従来どおり案件額。
     rewardAmount: row.calculated_reward_amount
       ?? (row.frozen_reward_amount === null || row.frozen_reward_amount === undefined
@@ -861,7 +860,7 @@ export async function getConversionApprovalNotifyInfo(
 }
 
 // =============================================================================
-// Affiliate Offer Versions — 案件の決まりの版 (#823)
+// Affiliate Offer Versions — 案件の決まりの版
 // =============================================================================
 //
 // 保存するたびに1行足す。前の版は変えない。「この版に戻す」は中身で新しい版を作る。

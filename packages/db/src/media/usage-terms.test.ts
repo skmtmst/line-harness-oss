@@ -6,7 +6,7 @@ import { createMedia, getMediaById, updateMedia } from './index.js';
 import { getMediaVersionByNo } from './uploads.js';
 
 /*
- * IDEA-15 登録メディア。既知の利用期限・同意情報の記録と、
+ * 登録メディア。既知の利用期限・同意情報の記録と、
  * 版ごとの実体（元ファイルの取り戻し）へのアカウント境界。
  */
 

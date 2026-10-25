@@ -75,7 +75,7 @@ async function dashboardOverview(
     /*
      * ダッシュボードの「UID移行状況」カードが見るのは UID 移行の実行記録。
      * 旧アカウント移行（account_migrations）の件数を出すと別機能の数字が
-     * 混ざるので、uid_migration_runs から数える（DASH-07）。
+     * 混ざるので、uid_migration_runs から数える。
      * active = 確認・実行待ちを含む未完了の実行、completed = 完了済み。
      */
     db.prepare(

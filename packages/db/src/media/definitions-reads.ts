@@ -8,12 +8,12 @@ export const LOOKUP_CHUNK = 90;
 export const MEDIA_USAGE_WRITE_CHUNK = 20;
 
 /**
- * 表が無いときの読み口失敗（R34）。
+ * 表が無いときの読み口失敗。
  *
  * 古い検証環境などで機能の表がまだ無いと、D1 は `no such table` で
  * 落ちる。使用先の確認は「読めなかったら例外」が原則だが、表そのものが
  * 無い読み口まで例外にすると、どの画像でも取得が失敗し、読み直しても
- * 直らない（監査 R34）。表が無い読み口は「未確認」として残し、ほかの
+ * 直らない。表が無い読み口は「未確認」として残し、ほかの
  * 読み口は続ける。一時的なD1障害はここでは救わず、例外のままにする。
  */
 export function isMissingTableError(error: unknown): boolean {
@@ -22,7 +22,7 @@ export function isMissingTableError(error: unknown): boolean {
 }
 
 /**
- * N-198/N-204 (#796):「上限に近い」は1ファイルの固定値(旧: 画像8MB等)では
+ * 「上限に近い」は1ファイルの固定値(旧: 画像8MB等)では
  * なく、契約上限への圧迫で決める。契約上限のこの割合以上を1行で占める
  * ファイルだけを返す。分母は getMediaStorageQuota と同じ計算元の
  * limitBytes を使い、要求値や画面内推定は使わない。既定10GBの0.1%は
