@@ -5,11 +5,8 @@ import { renderCommonVarDialogs } from './list-dialogs'
 import { CHIP_FILTER,EXPIRING_SOON_MS,ORDER_OPTIONS,PAGE_SIZE_OPTIONS,UNGROUPED,VarsChip } from './list-model'
 import { renderCommonVarList } from './list-table'
 
-
 import ListToolbar,{ ListToolbarFrame,ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useStaffRole } from '@/lib/staff-role'
-
-
 
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -48,8 +45,6 @@ import type { CommonVar,CommonVarDeleteImpact,Folder } from '@line-crm/shared'
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import { filterAndSortCommonVars,placeholderText,reasonRequirement,type CommonVarOrder } from './model'
-
-
 
 function CommonVarsListInner() {
   const saveErrors = useSaveFormErrors()
@@ -365,7 +360,6 @@ function CommonVarsListInner() {
   const selectReplacement = async (nextId: string) => {
     if (!deleteTarget || !selectedAccountId)
 
-
  return
     setReplacementId(nextId)
     setReplacementImpact(null)
@@ -659,7 +653,6 @@ function CommonVarsListInner() {
     { value: UNGROUPED, label: '未分類' },
   ]
 
-
   /* 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。 */
   const createButton = (full: boolean) => canWrite ? (
     <Button href="/contents/vars/new" variant="primary" className={full ? 'v8-folder-create w-full' : undefined}>
@@ -739,7 +732,6 @@ function CommonVarsListInner() {
    * フォルダの追加・名前変更・削除は、縦の列が無いぶん、フォルダの印のメニューから。
    */
 
-
   const wideToolbar = (
     <ListToolbarFrame>
       <ListToolbar
@@ -760,20 +752,18 @@ function CommonVarsListInner() {
   const alerts = (
     <>
       {firstEmpty && !listFailed ? (
-        <div className={styles.alertBand} role="status">
-          <TriangleAlert size={16} aria-hidden="true" />
+        <Notice tone="warn" role="status" icon={<TriangleAlert size={16} aria-hidden="true" />} action={<>
+          <Button type="button" actionWording onClick={applyEmptyFilter}>{canWrite ? "直す" : "空のままを見る"}</Button>
+        </>}>
           <span className={styles.alertText}>
             {`「${firstEmpty.name}」が空のまま ${typeof firstEmpty.usageCount === 'number' ? `${formatNumber(firstEmpty.usageCount)}か所` : '何か所か'}で使われています。差し込んだところが空欄のまま送られます。`}
           </span>
-          <span className={styles.alertSpacer} aria-hidden="true" />
-          <Button type="button" actionWording onClick={applyEmptyFilter}>{canWrite ? "直す" : "空のままを見る"}</Button>
-        </div>
+        </Notice>
       ) : null}
       {listLimited && !listFailed ? (
-        <div className={styles.alertBand} role="status">
-          <TriangleAlert size={16} aria-hidden="true" />
+        <Notice tone="warn" role="status" icon={<TriangleAlert size={16} aria-hidden="true" />}>
           <span className={styles.alertText}>表示は最初の200件までです。フォルダや検索で絞り込んでください。</span>
-        </div>
+        </Notice>
       ) : null}
       {error && !listFailed ? (
         <Notice tone="danger" onClose={() => setError('')}>{error}</Notice>
