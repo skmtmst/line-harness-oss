@@ -42,18 +42,9 @@ export function inspectPickers(text, file = 'component.tsx') {
     for (const edit of edits.sort((a, b) => b.start - a.start)) value = value.slice(0, edit.start) + edit.text + value.slice(edit.end)
     return value
   }
-  // V8 already replaces these explicitly hidden 管理画面 branches. No filename exemption.
-  function legacyOnly(node) {
-    for (let child = node, parent = node.parent; parent; child = parent, parent = parent.parent) {
-      const element = ts.isJsxElement(parent) ? parent.openingElement : ts.isJsxSelfClosingElement(parent) ? parent : undefined
-      if (element?.attributes.properties.some((attr) => ts.isJsxAttribute(attr) && attr.name.getText(source) === 'className' && /\bv7-only\b/.test(attr.initializer?.getText(source) ?? ''))) return true
-      if (ts.isConditionalExpression(parent) && child === parent.whenFalse && /\bisV8\b/.test(parent.condition.getText(source)) && /<EntitySelect\b/.test(parent.whenTrue.getText(source))) return true
-    }
-    return false
-  }
   const violations = []
   function visit(node) {
-    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && dropdowns.has(node.tagName.getText(source)) && !legacyOnly(node)) {
+    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && dropdowns.has(node.tagName.getText(source))) {
       const attrs = new Map(node.attributes.properties.filter(ts.isJsxAttribute).map((attr) => [attr.name.getText(source), attr.initializer?.getText(source) ?? '']))
       const label = attrs.get('aria-label') ?? attrs.get('label') ?? ''
       let options = attrs.get('options') ?? (node.tagName.getText(source) === 'select' && ts.isJsxElement(node.parent) ? node.parent.children.map((child) => child.getText(source)).join('') : '')
@@ -91,12 +82,6 @@ export function checkProject() {
     seen.add(file)
     const text = fs.readFileSync(file, 'utf8')
     const imports = [...text.matchAll(/import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g)]
-    // Older entry files return the V8 component before their former implementation.
-    const early = text.match(/if\s*\(theme\s*===\s*['"]v8['"]\)\s*(?:\{\s*)?return\s*(?:\(\s*)?<([A-Z]\w*)/) ?? text.match(/return\s+theme\s*===\s*['"]v8['"]\s*\?\s*<([A-Z]\w*)/)
-    if (early) {
-      const entry = imports.find((item) => new RegExp(`\\b${early[1]}\\b`).test(item[1]))
-      if (entry) { visit(resolve(file, entry[2])); return }
-    }
     issues.push(...inspectPickers(text, path.relative(sourceRoot, file)))
     for (const item of imports) visit(resolve(file, item[2]))
     for (const item of text.matchAll(/(?:import\(\s*|export\s+[^;]*?from\s+)['"]([^'"]+)['"]/g)) visit(resolve(file, item[1]))

@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * WEB-117：現役の画面が自分で取るので、入口では二重に取らない。
- * 旧の設定や印が残っていても現役へ固定する。
+ * 一覧が自分で取るので、入口では二重に取らない。
  */
 import React from 'react'
 import { act, cleanup, render } from '@testing-library/react'
@@ -46,21 +45,8 @@ afterEach(() => {
   delete document.documentElement.dataset.theme
 })
 
-// 検証環境と同じ「既定が v8」の環境（最初の描画から v8）。
-it('V8 の見た目では 管理画面 の画面の一覧・見本・共通アクションを取らない', async () => {
-  vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', 'v8')
+it('入口では一覧・見本・共通アクションを二重に取らない', async () => {
   document.documentElement.dataset.theme = 'v8'
-  const { container } = render(<AutomationsPage />)
-  await act(async () => { await Promise.resolve() })
-  expect(container.textContent).toContain('V8 の一覧')
-  expect(calls.list).not.toHaveBeenCalled()
-  expect(calls.templates).not.toHaveBeenCalled()
-  expect(calls.commonActions).not.toHaveBeenCalled()
-})
-
-it('旧の印が残っていても現役へ固定し、別の一覧を取得しない', async () => {
-  vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', '')
-  document.documentElement.dataset.theme = 'v7'
   const { container } = render(<AutomationsPage />)
   await act(async () => { await Promise.resolve() })
   expect(container.textContent).toContain('V8 の一覧')

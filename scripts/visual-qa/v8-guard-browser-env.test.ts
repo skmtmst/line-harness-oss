@@ -1,7 +1,7 @@
 /*
  * V8 ガードの撮影準備（browser-env.mjs）の契約試験。ブラウザは要らない。
  *
- * v7 友だち詳細の右上が時々違うのは、Webフォントの来る前と来た後で
+ * 友だち詳細の右上が時々違うのは、Webフォントの来る前と来た後で
  * 文字の濃さが変わるため。撮る前に `document.fonts.ready` を待つ。
  */
 import { describe, expect, it } from 'vitest'
@@ -68,7 +68,7 @@ function stubBrowser(options: { fontsReady?: boolean } = {}) {
 describe('ガードの撮影準備', () => {
   it('フォントが来るのを待ってから渡す', async () => {
     const stub = stubBrowser()
-    const page = await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends/detail?id=f-1', width: 1440, theme: 'v7', stable: true })
+    const page = await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends/detail?id=f-1', width: 1440, stable: true })
     expect(page).toBeTruthy()
     expect(stub.calls).toContain('evaluate:fonts')
     const fontsAt = stub.calls.indexOf('evaluate:fonts')
@@ -78,7 +78,7 @@ describe('ガードの撮影準備', () => {
 
   it('偽ログインと選択中アカウントだけを置き、旧テーマの値は書かない', async () => {
     const stub = stubBrowser()
-    await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends', width: 1152, theme: 'v7', stable: true })
+    await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends', width: 1152, stable: true })
     const store: Record<string, string> = {}
     stub.runInit(store)
     expect(store).not.toHaveProperty('lh-admin-theme')
@@ -88,20 +88,20 @@ describe('ガードの撮影準備', () => {
 
   it('フォントなし環境でも落とさない', async () => {
     const stub = stubBrowser({ fontsReady: false })
-    const page = await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends', width: 1152, theme: 'v7', stable: true })
+    const page = await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends', width: 1152, stable: true })
     expect(page).toBeTruthy()
   })
 
   it('時刻を決まった日時に固定する', async () => {
     const stub = stubBrowser()
-    await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends/detail?id=f-1', width: 1440, theme: 'v7', stable: true })
+    await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends/detail?id=f-1', width: 1440, stable: true })
     expect(stub.calls).toContain('setFixedTime')
     expect(stub.fixedTime()).toBe('2026-10-01T05:00:00.000Z')
   })
 
   it('安定化なしでは時計を触らない', async () => {
     const stub = stubBrowser()
-    await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends', width: 1152, theme: 'v8' })
+    await openPage(stub.browser, { baseUrl: 'http://127.0.0.1:4310', route: '/friends', width: 1152 })
     expect(stub.calls).not.toContain('setFixedTime')
     expect(stub.calls).toContain('evaluate:fonts')
   })

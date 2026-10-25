@@ -186,9 +186,9 @@ export default function TopBar({
     <header ref={rootRef} className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
       {/*
         ★V8 外側（Pencil `y3gx8R`）：左に畳むボタンとパンくず
-        （アカウント › 画面名）。v7 では .v8-only が消す。
+        （アカウント › 画面名）。
         左メニューを持つ殻（v8Chrome）のときだけ出す。
-        現在位置はここでも h1 を持つ（v7 の h1 は v8 で隠れるため）。
+        現在位置を h1 で示す。
       */}
       {v8Chrome ? (
         <div className={`${styles.v8Left}`}>
@@ -205,7 +205,6 @@ export default function TopBar({
             {/*
               ★V8 殻合わせ（絵 `V8-B/JKjsE`）：手前はホーム。格子印＋
               「ホーム」で最初の画面へ（統括もふだんの画面も同じ殻）。
-              の帯にだけ出すので v7 は変わらない。
             */}
             <Link prefetch={false} href={homeHref} className={styles.crumbHome}>
               <HomeGridIcon /><span>ホーム</span>
@@ -282,12 +281,12 @@ export default function TopBar({
             />
             {/*
               ★V8 殻合わせ（絵 `V8-B/JKjsE`）：札に役割（統括など）を小さい
-              行で添える。v8-only なので v7 の1行札は変わらない。
+              行で添える。
             */}
             {roleLabel ? (
               <span className={styles.pillText}>
                 <span className={`${styles.pillRole}`}>{accountScopeLabel ?? (hq ? '統括' : 'LINEアカウント')}</span>
-                {/* ★V8 統括の画面：札は統括にいることを示す（絵 `V8-B/JKjsE`）。v7 は今までどおり。 */}
+                {/* ★V8 統括の画面：札は統括にいることを示す（絵 `V8-B/JKjsE`）。 */}
                 {hq ? (
                   <>
                     <span className={`${styles.accountName}`} data-part="account-name" title={hq.name}>{hq.name}</span>
@@ -302,7 +301,7 @@ export default function TopBar({
             {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
 
             {/*
-              ★V8：開くと自前の一覧（統括に戻る・店の一覧）。v7 はブラウザの選ぶ欄のまま。
+              開くと統括に戻る操作と店の一覧を出す。
               札の上に透明のボタンを敷き、押すと一覧を出す。
               選ぶ欄より後ろに置く（外の見出しが指すのは選ぶ欄のまま）。
             */}
@@ -366,7 +365,7 @@ export default function TopBar({
         {showIdentity ? <>
         {/*
           ★V8 殻合わせ（絵 `V8-B/JKjsE`）：名前を太字・役割を下の小さい行に
-          積む。v7 は中箱を素通し（display: contents）にするので並びは不変。
+          積む。
         */}
         <div className={styles.identity}>
           {/* ★V8: 自分（36px の顔）。名まえの頭1文字を丸いタイルで出す。 */}
@@ -383,8 +382,6 @@ export default function TopBar({
               : <span className={styles.role}>{roleLabel}</span>}
           </span>
         </div>
-
-        {/* v7 の区切り線は残す（V8 では消す決まり）。 */}
 
         <button type="button" className={styles.logout} onClick={onLogout} aria-label="ログアウト">
           <LogOutIcon /><span aria-hidden="true">ログアウト</span>

@@ -3,7 +3,7 @@ import { chromium } from '@playwright/test'
 
 const base = process.env.MAINA_BASE ?? 'http://127.0.0.1:3428'
 const init = {
-  'lh-admin-theme': 'v8', lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K',
+  lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K',
   lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1',
 }
 const browser = await chromium.launch({ headless: true })
