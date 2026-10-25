@@ -114,3 +114,15 @@ test('選んだ文字の地・タップの光・画像の幅と高さ・動き�
     assert.ok((await kindsOf(page)).includes('selection-color'))
   } finally { await browser.close() }
 })
+
+test('左メニューの件数の札は「名前、33件」と区切って読ませ、札の数字は読ませない', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind === 'nav-count-name')
+    await page.setContent('<nav><a href="#" aria-label="受信箱、33件"><span>受信箱</span><span aria-hidden="true">33</span></a></nav>')
+    assert.deepEqual(await kinds(), [])
+    await page.setContent('<nav><a href="#"><span>受信箱</span><span>33</span><span style="position:absolute;width:1px;height:1px;overflow:hidden">33件</span></a></nav>')
+    assert.deepEqual(await kinds(), ['nav-count-name'])
+  } finally { await browser.close() }
+})

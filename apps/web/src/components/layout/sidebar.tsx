@@ -803,7 +803,8 @@ export default function Sidebar({
                   prefetch={false}
                   onClick={(event) => allowFeatureNavigation(event, item.href, item.label, preparing) && setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={collapsed && !drawer ? undefined : visibleLabel}
-                  aria-label={collapsed && !drawer ? visibleLabel : undefined}
+                  // 件数の札がある時は「名前、33件」と区切って読ませる（札の数字は読ませない）。
+                  aria-label={badgeCount(item) > 0 ? `${visibleLabel}、${badgeCount(item)}件` : collapsed && !drawer ? visibleLabel : undefined}
                   data-rail-label={visibleLabel}
                   data-rail-count={badgeCount(item) > 0 ? (badgeCount(item) > 99 ? '99+' : String(badgeCount(item))) : undefined}
                   aria-current={active ? 'page' : undefined}
@@ -834,11 +835,9 @@ export default function Sidebar({
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
                       {/* 地が薄い緑になったので、選ばれていても札の色は変えない。
                           緑ベタの上に置いていたころは白抜きにする必要があった。 */}
-                      <span className={styles.badge}>
+                      <span className={styles.badge} aria-hidden="true">
                         {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
                       </span>
-                      {/* 読み上げは「33件」と続け、数字と単位の間に空白を入れない（§2-6）。 */}
-                      <span className="sr-only">{badgeCount(item)}件</span>
                     </>
                   )}
                 </Link>

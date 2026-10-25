@@ -133,5 +133,12 @@ export default function scanPolishRules() {
       if (delayed) { add('reduced-motion-delay', el, { animation: c.animationDelay, transition: c.transitionDelay }); break }
     }
   }
+  // 16. 左メニューの件数の札：読み上げの名前は「名前、33件」と区切り、札の数字は読ませない。
+  for (const link of document.querySelectorAll('nav a[href], aside a[href]')) {
+    const badge = [...link.querySelectorAll('span')].find((span) => !span.children.length && /^\d+\+?$/.test(span.textContent.trim()) && visible(span))
+    if (!badge) continue
+    const label = link.getAttribute('aria-label') ?? ''
+    if (!/、\d+件$/.test(label) || !badge.closest('[aria-hidden="true"]')) add('nav-count-name', link, { label, badgeHidden: Boolean(badge.closest('[aria-hidden="true"]')) }, link.textContent)
+  }
   return findings
 }
