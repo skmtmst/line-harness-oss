@@ -37,14 +37,6 @@
 .ordersTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-cn-name-lh); }
 
 /* 友だちになったときの帯：うすい青の地・角12・余白12/16・間12。 */
-.happenBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rule-row-gap);
-  padding: var(--tpl-ar-ed-band-pad);
-  border-radius: var(--radius-card);
-  background: var(--color-info-bg);
-}
 .happenIcon { flex-shrink: 0; color: var(--color-action); }
 .happenText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
 .happenTitle { margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-ar-run-fail-title-lh); text-overflow: ellipsis; white-space: nowrap; }
@@ -100,7 +92,6 @@
 /* 削除の窓（UIaM7）の中身。 */
 .deleteBody { display: flex; flex-direction: column; gap: var(--tpl-cn-panel-inner-gap); }
 .deleteEffects { margin: 0; padding-left: var(--tpl-rsa-list-indent); font-size: var(--text-caption); line-height: var(--tpl-rsa-after-note-lh); }
-.deleteSafe { margin: 0; padding: var(--tpl-ro-band-pad); border-radius: var(--radius-control); background: var(--color-success-bg); color: var(--color-success); font-size: var(--text-caption); font-weight: 600; }
 .deleteChoices { display: flex; flex-direction: column; gap: var(--tpl-body-gap); }
 .deleteChoiceTitle { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; }
 .deleteField { display: flex; flex-direction: column; gap: var(--tpl-cn-field-gap); }
