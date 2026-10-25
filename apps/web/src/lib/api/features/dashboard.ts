@@ -1,5 +1,5 @@
 import { fetchApi } from '../transport/request'
-import type { ApiResponse, DashboardActivityItem } from '@line-crm/shared'
+import type { ApiResponse, DashboardActivityItem, DashboardComparisons } from '@line-crm/shared'
 import type { DashboardOverview, DashboardUpcoming, DashboardPreferenceResponse } from '../types/dashboard'
 import type { DeliveryFailureOrigins } from '../types/commerce'
 
@@ -34,6 +34,11 @@ export const dashboardMethods = {
       if (since) query.set('since', since)
       return fetchApi<ApiResponse<DeliveryFailureOrigins>>(`/api/dashboard/delivery-failure-origins?${query}`)
     },
+    /** 数の帯の比べる値。後から読む。比べられない数は null（0 として比べない）。 */
+    comparisons: (accountId: string) =>
+      fetchApi<ApiResponse<DashboardComparisons>>(
+        `/api/dashboard/comparisons?account_id=${encodeURIComponent(accountId)}`,
+      ),
     preferences: {
       get: (accountId: string) => fetchApi<ApiResponse<DashboardPreferenceResponse>>(
         `/api/dashboard/preferences?account_id=${encodeURIComponent(accountId)}`,

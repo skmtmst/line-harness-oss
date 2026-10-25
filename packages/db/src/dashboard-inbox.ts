@@ -65,6 +65,22 @@ export function accountScopeSql(scope: AccountStatsScope, column: string): { sql
   return { sql: scope.includeUnassigned ? `${column} IS NULL` : '1 = 0', binds: [] };
 }
 
+/**
+ * 一斉配信（別名 b）の範囲。複数アカウントの重複除外の配信は、宛先の
+ * アカウントの一覧（account_ids）に範囲のアカウントがあれば含める。
+ */
+export function broadcastScopeSql(scope: AccountStatsScope): { sql: string; binds: string[] } {
+  const account = accountScopeSql(scope, 'b.line_account_id');
+  const jsonAccount = accountScopeSql(scope, 'value');
+  return {
+    sql: `(${account.sql} OR (
+    b.target_type = 'multi-account-dedup' AND b.account_ids IS NOT NULL
+    AND EXISTS (SELECT 1 FROM json_each(b.account_ids) WHERE ${jsonAccount.sql})
+  ))`,
+    binds: [...account.binds, ...jsonAccount.binds],
+  };
+}
+
 export const ZERO_BREAKDOWN: InboxStatusBreakdown = { unanswered: 0, inProgress: 0, onHold: 0, resolved: 0 };
 
 export async function getInboxStatusCounts(
