@@ -1066,7 +1066,7 @@ export async function getTemplatesWithUsageCount(
   };
 }
 
-/** タブの種類で数えるための行。一覧と同じく消したものを除き、種類の判定に使う列だけ読む。 */
+/** タブの種類で数えるための行。一覧と同じく削除済みを除き、種類の判定に使う列だけ読む。 */
 export interface TemplateSectionRow {
   folder_id: string | null;
   message_type: string;

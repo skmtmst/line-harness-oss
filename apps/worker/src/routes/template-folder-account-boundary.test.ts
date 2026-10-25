@@ -72,12 +72,12 @@ describe('テンプレートフォルダのアカウント境界（N-147）', ()
       const body = await (await req(`/api/folders?kind=template&account_id=a${query}`)).json() as { data: { id: string; itemCount?: number }[]; unfiledCount?: number };
       return { folder: body.data.find((row) => row.id === 'folder-a')?.itemCount, unfiled: body.unfiledCount };
     };
-    // メッセージ：本文と壊れた質問（一覧でも質問にならない）。消したものは数えない。未分類は beforeEach の tpl-a。
+    // メッセージ：本文と壊れた質問（一覧でも質問にならない）。削除済みは数えない。未分類は beforeEach の tpl-a。
     expect(await counts('&section=message')).toEqual({ folder: 2, unfiled: 1 });
     // 動画で質問のもの（未分類）は、画面と同じく質問とリッチビデオの両方のタブで数える。
     expect(await counts('&section=question')).toEqual({ folder: 1, unfiled: 2 });
     expect(await counts('&section=rich_video')).toEqual({ folder: 1, unfiled: 1 });
-    // 種類が無い時は全種類（1件は1回）。消したものは一覧と同じく数えない。
+    // 種類が無い時は全種類（1件は1回）。削除済みは一覧と同じく数えない。
     expect(await counts('')).toEqual({ folder: 4, unfiled: 3 });
     // 知らない種類・テンプレート以外のフォルダへの種類は断る。
     expect((await req('/api/folders?kind=template&account_id=a&section=card_message')).status).toBe(400);
