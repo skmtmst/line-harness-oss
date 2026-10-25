@@ -84,7 +84,7 @@ describe('紹介者の内訳は、集計が読めないときに落ちない', (
     expect(screen.getByText('クリック 2・友だち追加 1・認めなかった 0')).toBeTruthy()
   })
 
-  it('集計の型を検査なしで偽装しない', () => {
+  it('紹介者の集計を二重の型変換で偽装しない', () => {
     const source = ['drawer.tsx', 'display.ts'].map(name =>
       readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../v8/affiliates', name), 'utf8')).join('\n')
       .replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')

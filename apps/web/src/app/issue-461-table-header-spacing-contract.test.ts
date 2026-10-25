@@ -12,7 +12,7 @@ const targets = [
   'webinars/edit/page.tsx',
 ]
 
-describe('Issue #461 表見出しの余白', () => {
+describe('共通の表見出しまたは定められた余白を使う', () => {
   it.each(targets)('%s の全thを共通余白にそろえる', (path) => {
     const source = readFileSync(join(APP, path), 'utf8')
     const headers = [...source.matchAll(/<th\b[^>]*className="([^"]*)"/g)]

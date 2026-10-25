@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { verifyRuleValues, verifyRuleBindings } from '../../../scripts/verify-v8-rule-values.mjs'
 const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')
-describe('V8 の採用済みの値をCIで守る', () => {
+describe('共通部品の決まりの値と参照先を維持する', () => {
   it('共通部品が決まりの変数を読む', () => {
     expect(verifyRuleBindings(file => readFileSync(new URL(`./${file}.module.css`, import.meta.url), 'utf8'))).toEqual([])
   })
