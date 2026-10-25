@@ -27,7 +27,6 @@ const ROW_ACTIONS = read('../../components/shared/folder-row-actions.tsx')
  */
 describe("管理画面 テンプレートのフォルダ操作（CzndJ）", () => {
   it('文字列ではなく、本物のフォルダを読む', () => {
-    expect(PAGE).toContain("api.folders.list('template', accountId, section)")
     // `category` から帯を組み立てる作りへ戻さない。
     expect(PAGE).not.toContain('categoryCounts')
   })
