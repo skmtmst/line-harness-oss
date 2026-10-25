@@ -22,6 +22,7 @@ vi.hoisted(() => {
 const fixture = vi.hoisted(() => ({ role: null as string | null }))
 const create = vi.hoisted(() => vi.fn())
 const update = vi.hoisted(() => vi.fn())
+const getAffiliate = vi.hoisted(() => vi.fn())
 const friendsList = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const pageTitle = vi.hoisted(() => vi.fn())
@@ -46,6 +47,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         settlementPreview: async () => ({ success: true, data: { totalAmount: 0, conversionCount: 0, affiliates: [], periodFrom: '', periodTo: '' } }),
         create,
         update,
+        get: getAffiliate,
       },
       affiliateOffers: { ...actual.api.affiliateOffers, list: async () => ({ success: true, data: [] }) },
       conversionApprovals: { ...actual.api.conversionApprovals, list: approvalsList },
@@ -81,6 +83,7 @@ vi.mock('@/lib/use-unsaved-guard', () => ({
 // 今の入口そのものを通す（入口が別の画面を出すように変われば、この試験も追いかける）。
 import AffiliatesPage from '@/app/affiliates/page'
 import NewAffiliatePage from '@/app/affiliates/new/page'
+import { ApiError } from '@/lib/api'
 
 beforeEach(() => {
   fixture.role = null
@@ -89,6 +92,7 @@ beforeEach(() => {
   friendsList.mockReset().mockResolvedValue({ success: true, data: { items: [], total: 0 } })
   create.mockReset().mockResolvedValue({ success: false, error: 'このコードは既に使われています' })
   update.mockReset().mockResolvedValue({ success: true, data: { id: 'a1' } })
+  getAffiliate.mockReset()
   approvalsList.mockReset().mockResolvedValue({ success: true, data: [] })
 })
 afterEach(() => cleanup())
@@ -146,6 +150,87 @@ describe('アフィリエイターを作る（今の入口 /affiliates/new）', 
 
   const fillName = (value: string) => fireEvent.change(screen.getByLabelText(/名前（表示名）/), { target: { value } })
   const fillCode = (value: string) => fireEvent.change(screen.getByRole('textbox', { name: /紹介コード（/ }), { target: { value } })
+
+  const registered = {
+    id: 'a1', name: '紹介者', code: 'referral', commissionRate: 0, rewardMode: 'fixed',
+    isActive: true, email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false,
+  }
+
+  it('登録応答の編集値を最初の追加保存に送り、成功すると一覧へ戻る', async () => {
+    create.mockResolvedValue({ success: true, data: registered })
+    render(<NewAffiliatePage />)
+    fillName('紹介者')
+    fireEvent.click(screen.getByRole('button', { name: /登録して紹介リンクを発行する/ }))
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/affiliates?affiliate=a1&highlight=a1'))
+    expect(update.mock.calls[0][1].expected).toEqual({
+      name: '紹介者', commissionRate: 0, rewardMode: 'fixed', isActive: true,
+      email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false,
+    })
+    expect(getAffiliate).not.toHaveBeenCalled()
+  })
+
+  it('409で入力を残して最新と比較し、明示的な読込後に新しい比較値で再保存する', async () => {
+    create.mockResolvedValue({ success: true, data: registered })
+    update.mockRejectedValueOnce(new ApiError(409, 'ほかの人が先に変えました', 'VERSION_CONFLICT'))
+    const latest = { ...registered, name: '相手の名前', email: 'other@example.com', holdDays: 7, payoutCycle: '月末', notifyOnConversion: true, isActive: false }
+    getAffiliate.mockResolvedValue({ success: true, data: latest })
+    render(<NewAffiliatePage />)
+    fillName('紹介者')
+    fireEvent.change(screen.getByLabelText(/メール/), { target: { value: 'mine@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /登録して紹介リンクを発行する/ }))
+    await screen.findByText('ほかの人が先にこのアフィリエイターを保存しました')
+    expect((screen.getByLabelText(/メール/) as HTMLInputElement).value).toBe('mine@example.com')
+    expect(push).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '追加情報の保存を再開する' }))
+    expect(update).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: '違いを比べる' }))
+    await screen.findByRole('dialog', { name: '最新の保存と比べる' })
+    expect(screen.getByText(/メールアドレス：あなたの下書き「mine@example.com」／最新「other@example.com」/)).toBeTruthy()
+    expect((screen.getByLabelText(/名前（表示名）/) as HTMLInputElement).value).toBe('紹介者')
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect((screen.getByLabelText(/メール/) as HTMLInputElement).value).toBe('mine@example.com')
+    fireEvent.click(await screen.findByRole('button', { name: '最新を読み込んで続ける' }))
+    await waitFor(() => expect((screen.getByLabelText(/名前（表示名）/) as HTMLInputElement).value).toBe('相手の名前'))
+    expect((screen.getByLabelText(/メール/) as HTMLInputElement).value).toBe('other@example.com')
+    fillName('確認後の名前')
+    fireEvent.click(screen.getByRole('button', { name: '追加情報の保存を再開する' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2))
+    expect(update.mock.calls[1][1]).toMatchObject({ name: '確認後の名前', expected: { name: '相手の名前', email: 'other@example.com', isActive: false, holdDays: 7 } })
+    await waitFor(() => expect(push).toHaveBeenCalled())
+    expect(create).toHaveBeenCalledTimes(1)
+  })
+
+  it('比較と再読込が失敗しても入力と競合を保持する', async () => {
+    create.mockResolvedValue({ success: true, data: registered })
+    update.mockRejectedValueOnce(new ApiError(409, '競合', 'VERSION_CONFLICT'))
+    getAffiliate.mockRejectedValue(new Error('offline'))
+    render(<NewAffiliatePage />)
+    fillName('紹介者')
+    fireEvent.click(screen.getByRole('button', { name: /登録して紹介リンクを発行する/ }))
+    await screen.findByText('ほかの人が先にこのアフィリエイターを保存しました')
+    fireEvent.click(screen.getByRole('button', { name: '違いを比べる' }))
+    await screen.findByText('最新の内容を取れませんでした。もう一度お試しください。')
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(await screen.findByRole('button', { name: '最新を読み込んで続ける' }))
+    await screen.findByText('最新の内容を読み込めませんでした。入力は残っています。もう一度お試しください。')
+    expect((screen.getByLabelText(/名前（表示名）/) as HTMLInputElement).value).toBe('紹介者')
+    expect(screen.getByText('ほかの人が先にこのアフィリエイターを保存しました')).toBeTruthy()
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('通信失敗の再試行でも最初の比較値を保ち、登録を増やさない', async () => {
+    create.mockResolvedValue({ success: true, data: registered })
+    update.mockRejectedValueOnce(new Error('offline'))
+    render(<NewAffiliatePage />)
+    fillName('紹介者')
+    fireEvent.click(screen.getByRole('button', { name: /登録して紹介リンクを発行する/ }))
+    await screen.findByRole('button', { name: '追加情報の保存を再開する' })
+    fillName('自分の修正')
+    fireEvent.click(screen.getByRole('button', { name: '追加情報の保存を再開する' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2))
+    expect(update.mock.calls[1][1]).toMatchObject({ name: '自分の修正', expected: { name: '紹介者', email: null } })
+    expect(create).toHaveBeenCalledTimes(1)
+  })
 
   it('WEB208 報酬なしを保存時に明示する', async () => {
     render(<NewAffiliatePage />)

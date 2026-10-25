@@ -6,8 +6,6 @@ const FIELD_REQUIREMENTS = {
   name: requiredText("名前・屋号を入力してください"),
 }
 
-import Toggle from '@/components/shared/toggle';
-
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
@@ -38,9 +36,11 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict, isConflictResponse } from '@/components/shared/save-conflict'
+import { affiliateEditValues, affiliateEditDifferences, type AffiliateEditValues } from './create-conflict'
 
 /*
- * ★V8 アフィリエイターを作る（板 、競合の絵  は同時編集APIが必要）。
+ * ★V8 アフィリエイターを作る。
  *
  * app/affiliates/new-affiliate-v8.tsx から動きを写し、作る型（CreatePage）で組み直した。
  * データの口・動きは今と同じ：登録（合言葉 operationId つき）→ 追加情報の保存。追加情報だけ
@@ -49,7 +49,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 絵との違い：
  * - 「タグを付ける」の段は、登録の口にタグを付ける項目が無いので置かない。同じ場所に
  *   「すぐに計測を始める」（今の画面にある）を同じ形で置く。
- * -  の同時編集の比較・再読込はAPIが無いため出さない。紹介コードの重複は欄で知らせる。
+ * - 紹介コードの重複は欄で知らせ、登録後の保存の競合は共通の比較・再読込へつなぐ。
  */
 
 const FRIEND_PAGE_SIZE = 20
@@ -115,12 +115,48 @@ export default function CreateAffiliateV8() {
   const [linkBaseUrl, setLinkBaseUrl] = useState<string | null>(null)
   const [issuedUrl, setIssuedUrl] = useState<string | null>(null)
   const [createdId, setCreatedId] = useState<string | null>(null)
+  const [baseline, setBaseline] = useState<AffiliateEditValues | null>(null)
   const [partialSave, setPartialSave] = useState(false)
   const [savedIsActive, setSavedIsActive] = useState<boolean | null>(null)
   const [operationId, setOperationId] = useState(() => crypto.randomUUID())
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saveNote, setSaveNote] = useState('')
+  const conflict = useSaveConflict({
+    contextKey: `${selectedAccountId}:${operationId}`,
+    fetchLatest: async () => {
+      if (!createdId) return null
+      const res = await api.affiliates.get(createdId)
+      return res.success ? res.data : null
+    },
+    reload: async () => {
+      if (!createdId) return
+      const accountAtStart = selectedAccountId
+      try {
+        const res = await api.affiliates.get(createdId)
+        if (draftAccountRef.current !== accountAtStart) return
+        if (!res.success) throw new Error('reload_failed')
+        const latest = affiliateEditValues(res.data)
+        setBaseline(latest)
+        setName(latest.name)
+        setCode(res.data.code)
+        setPayoutKind(latest.rewardMode === 'fixed' ? 'per_conversion' : latest.rewardMode)
+        setCommissionRate(String(latest.commissionRate))
+        setEmail(latest.email ?? '')
+        setHoldDays(latest.holdDays === null ? '' : String(latest.holdDays))
+        setPayoutCycle(latest.payoutCycle ?? '')
+        setNotifyOnConversion(latest.notifyOnConversion)
+        setStartTracking(latest.isActive)
+        setSavedIsActive(latest.isActive)
+        setFieldErrors({})
+        saveErrors.reset()
+        setSaveError('')
+        conflict.clear()
+      } catch {
+        if (draftAccountRef.current === accountAtStart) setSaveError('最新の内容を読み込めませんでした。入力は残っています。もう一度お試しください。')
+      }
+    },
+  })
   /* 紹介コードの重なり（ほかの人が先に同じコードで登録した）。入力は残す。 */
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<'name' | 'code' | 'rate' | 'hold', string>>>({})
   const focusField = (key: 'name' | 'code' | 'rate' | 'hold') => {
@@ -147,6 +183,7 @@ export default function CreateAffiliateV8() {
     if (draftAccountRef.current === selectedAccountId) return
     draftAccountRef.current = selectedAccountId
     setCreatedId(null)
+    setBaseline(null)
     setIssuedUrl(null)
     setPartialSave(false)
     setSavedIsActive(null)
@@ -224,6 +261,8 @@ export default function CreateAffiliateV8() {
     setNotifyOnConversion(true)
     setStartTracking(true)
     setCreatedId(null)
+    setBaseline(null)
+    conflict.clear()
     setIssuedUrl(null)
     setPartialSave(false)
     setSavedIsActive(null)
@@ -233,6 +272,7 @@ export default function CreateAffiliateV8() {
   const save = async (): Promise<string> => {
     if (!selectedAccountId) throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
     let affiliateId = createdId
+    let expected = baseline
     if (!affiliateId) {
       try {
         const res = await api.affiliates.create({
@@ -253,6 +293,8 @@ export default function CreateAffiliateV8() {
           throw new Error('create_failed')
         }
         affiliateId = res.data.id
+        expected = affiliateEditValues(res.data)
+        setBaseline(expected)
         setCreatedId(affiliateId)
         setIssuedUrl(res.link?.url ?? null)
         const persistedIsActive = typeof res.data.isActive === 'boolean' ? res.data.isActive : startTracking
@@ -279,11 +321,13 @@ export default function CreateAffiliateV8() {
         payoutCycle: payoutCycle.trim() || null,
         notifyOnConversion,
         isActive: startTracking,
+        expected: expected ?? undefined,
       })
       if (!update.success) throw new Error('update_failed')
     } catch (saveFailure) {
       saveErrors.capture(saveFailure)
       setPartialSave(true)
+      if (isConflictResponse(saveFailure) && saveFailure.code === 'VERSION_CONFLICT') throw saveFailure
       throw new Error('基本情報は登録済みですが、追加情報を保存できませんでした。もう一度押すと、追加情報だけを保存します。')
     }
     setPartialSave(false);
@@ -294,6 +338,7 @@ export default function CreateAffiliateV8() {
   const runSave = async (after: 'continue' | 'finish') => {
     if (!canEdit) return
     if (saving) return
+    if (conflict.conflict) return
     setSaveError('')
     setSaveNote('')
     if (!validate()) return
@@ -310,6 +355,7 @@ export default function CreateAffiliateV8() {
         notifySaved('保存しました。続けて作れます。')
       }
     } catch (caught) {
+      if (isConflictResponse(caught) && caught.code === 'VERSION_CONFLICT') { conflict.mark(); return }
       const fieldFailure = saveErrors.capture(caught);
 
 
@@ -365,21 +411,30 @@ export default function CreateAffiliateV8() {
       boardId="RaMf3"
       title="アフィリエイターを作る"
       help="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
+      notice={conflict.conflict ? <SaveConflictBand title="ほかの人が先にこのアフィリエイターを保存しました" compareBusy={conflict.compareBusy} onCompare={conflict.compare} onReload={conflict.reloadLatest} /> : null}
       previewLabel="紹介リンクを見る"
       previewTitle="紹介リンク"
       preview={preview}
       status={saving ? '登録しています' : partialSave ? '基本情報は保存済み・追加情報は未保存' : 'まだ保存していません'}
       footerActions={<>
         <Button href={LIST_PATH}>キャンセル</Button>
-        {canEdit ? <><Button variant="secondary" disabled={saving} busy={saving} busyLabel="保存しています" onClick={() => void runSave('continue')}>
+        {canEdit ? <><Button variant="secondary" disabled={saving || !!conflict.conflict} busy={saving} busyLabel="保存しています" onClick={() => void runSave('continue')}>
           {partialSave ? '追加情報の保存を再開する' : '保存して続けて作る'}
         </Button>
-        <Button variant="primary" disabled={saving} busy={saving} busyLabel="登録しています" onClick={() => void runSave('finish')}>
+        <Button variant="primary" disabled={saving || !!conflict.conflict} busy={saving} busyLabel="登録しています" onClick={() => void runSave('finish')}>
           <Check size={15} aria-hidden="true" /> 登録して紹介リンクを発行する
         </Button>
       </> : null}</>} dirty={false}
     >
 
+      <SaveConflictCompareDialog open={conflict.compareOpen} error={conflict.compareError}
+        lines={conflict.latest ? affiliateEditDifferences({
+          name: name.trim(), rewardMode: payoutKind === 'per_conversion' ? 'fixed' : payoutKind,
+          commissionRate: payoutKind === 'rate' ? Number(commissionRate) : baseline?.commissionRate ?? 0,
+          email: email.trim() || null, holdDays: holdDays.trim() ? Number(holdDays) : null,
+          payoutCycle: payoutCycle.trim() || null, notifyOnConversion, isActive: startTracking,
+        }, conflict.latest) : null}
+        onReload={conflict.reloadLatest} onCancel={conflict.closeCompare} />
       {partialSave && createdId ? (
         <Notice tone="warn" action={<a href={`${LIST_PATH}?affiliate=${encodeURIComponent(createdId)}&highlight=${encodeURIComponent(createdId)}`}>未保存の追加情報を破棄して一覧へ戻る</a>}>
           <p className={styles.noticeTitle}>基本情報は保存済みです</p>

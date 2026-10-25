@@ -25,6 +25,7 @@ import {
   listAffiliateLinks,
   listAffiliateOffers,
   type AffiliateScope,
+  type UpdateAffiliateInput,
 } from '@line-crm/db';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { fail } from '../lib/fail.js';
@@ -554,6 +555,31 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBo
     const rateError = commissionRateError(body.commissionRate);
     if (rateError) return inputError(c, { success: false, error: rateError }, 400, ["commissionRate"]);
 
+    let expected: UpdateAffiliateInput | undefined;
+    if (body.expected !== undefined) {
+      const source = body.expected as Record<string, unknown> | null;
+      if (!source || typeof source !== 'object' || Array.isArray(source)
+        || typeof source.name !== 'string'
+        || typeof source.commissionRate !== 'number' || commissionRateError(source.commissionRate)
+        || typeof source.rewardMode !== 'string' || !['none', 'fixed', 'rate'].includes(source.rewardMode)
+        || typeof source.isActive !== 'boolean' || typeof source.notifyOnConversion !== 'boolean'
+        || !(source.email === null || typeof source.email === 'string')
+        || !(source.holdDays === null || (typeof source.holdDays === 'number' && Number.isInteger(source.holdDays)))
+        || !(source.payoutCycle === null || typeof source.payoutCycle === 'string')) {
+        return inputError(c, { success: false, error: '比較する保存内容が不正です。最新を読み直してください。' }, 400, ['expected']);
+      }
+      expected = {
+        name: source.name,
+        commission_rate: source.commissionRate,
+        reward_mode: source.rewardMode as 'none' | 'fixed' | 'rate',
+        is_active: source.isActive ? 1 : 0,
+        email: source.email as string | null,
+        hold_days: source.holdDays as number | null,
+        payout_cycle: source.payoutCycle as string | null,
+        notify_on_conversion: source.notifyOnConversion ? 1 : 0,
+      };
+    }
+
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
       folder_id: body.folderId,
@@ -561,13 +587,16 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBo
       reward_mode: body.rewardMode,
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
       ...settlement.value,
-    }, scope);
+    }, scope, expected);
 
     if (!updated) {
       return fail(c, 404, 'AFFILIATE_NOT_FOUND');
     }
     return c.json({ success: true, data: serializeAffiliate(updated) });
   } catch (err) {
+    if (err instanceof Error && err.message === 'AFFILIATE_VERSION_CONFLICT') {
+      return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に変えました。最新を読み直してください。' }, 409);
+    }
     if (err instanceof Error && err.message === 'APPROVED_REWARD_SNAPSHOT_MISSING') {
       return c.json({ success: false, code: err.message, error: '過去の承認額を確かめられないため、報酬方式を変更できません。過去の記録を照合してください。' }, 409);
     }
