@@ -178,11 +178,11 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
           </section>
 
           {!connected ? (
-            <div className={styles.broken} role="status">
-              <Unplug size={18} aria-hidden="true" />
-              <span><strong>この人の空きは閉じています</strong><span className={styles.minor}>Google の接続が切れました。つなぎ直すまで、この人の枠は予約できません。</span></span>
-              {canEdit ? <Button size="compact" onClick={() => preparing.open('カレンダーのつなぎ直し')}>つなぎ直す</Button> : null}
-            </div>
+              <Notice tone="danger" role="status" icon={<Unplug size={18} aria-hidden="true" />} action={<>
+                {canEdit ? <Button size="compact" onClick={() => preparing.open('カレンダーのつなぎ直し')}>つなぎ直す</Button> : null}
+              </>}>
+                <span><strong>この人の空きは閉じています</strong><span className={styles.minor}>Google の接続が切れました。つなぎ直すまで、この人の枠は予約できません。</span></span>
+              </Notice>
           ) : null}
 
           {/* 書き込みをオフにする確かめ（GcYWx）：書いた予定を残すか、これから先の予定を消すか。 */}

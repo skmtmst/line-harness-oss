@@ -319,7 +319,9 @@ export default function StoreNewV8() {
 
             {step === STEP.CREDENTIALS ? (
               <>
-                <p className={styles.infoBox}>LINE公式アカウントのチャネルIDとチャネルシークレットを使用して、アカウントセットアップを行います。</p>
+                <Notice tone="info">
+                  LINE公式アカウントのチャネルIDとチャネルシークレットを使用して、アカウントセットアップを行います。
+                </Notice>
                 <Field label="チャネルID" required help="LINE Developersの「チャネル基本設定」にある数字をコピーしてください。" error={errors.channelId}>
                   <SaveErrorField names={["channelId"]}><TextField value={channelId} onChange={(event) => setChannelId(event.target.value)} inputMode="numeric" autoComplete="off" /></SaveErrorField>
                 </Field>
@@ -332,10 +334,10 @@ export default function StoreNewV8() {
             {step === STEP.CONNECT ? (
               created ? (
                 <>
-                  <div className={styles.doneBox}>
+                  <Notice tone="success">
                     <p className={styles.doneTitle}>接続できました</p>
                     <p className={styles.cardText}>{`「${created.storeName}」とLINE公式アカウント「${created.lineAccountName}」を登録しました。`}</p>
-                  </div>
+                  </Notice>
                   {connectionError ? <Notice tone="danger" className={styles.errorBoxNoticePlacement} >{connectionError}</Notice> : null}
                 </>
               ) : (

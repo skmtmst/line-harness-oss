@@ -89,14 +89,6 @@
   font-weight: 600;
 }
 
-.errorBox {
-  padding: var(--tpl-rt-notice-pad);
-  border-radius: var(--tpl-rt-band-radius);
-  background: var(--color-status-danger-soft);
-  color: var(--color-danger);
-  font-size: var(--text-label);
-}
-
 /* ②の入力欄：見出し 13/500/20・間6、欄の下の補足 11。 */
 .fieldBlock {
   display: flex;
@@ -167,15 +159,6 @@
   font-weight: 600;
 }
 
-.infoBox {
-  margin: 0;
-  padding: var(--tpl-rt-notice-pad);
-  border-radius: var(--tpl-rt-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-}
-
 .summary {
   display: flex;
   flex-direction: column;
@@ -192,17 +175,6 @@
   color: var(--color-ink);
   font-size: var(--text-label);
   font-weight: 600;
-}
-
-.doneBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-rt-payload-gap);
-  padding: var(--tpl-rt-stat-pad);
-  border-radius: var(--tpl-rt-band-radius);
-  outline: 1px solid var(--color-accent);
-  outline-offset: -1px;
-  background: var(--color-success-bg);
 }
 
 .doneTitle {
@@ -270,4 +242,4 @@
   box-shadow: var(--tpl-rt-line-top);
 }
 
-.errorBox, .errorBoxNoticePlacement { margin: 0; }
+.errorBoxNoticePlacement { margin: 0; }

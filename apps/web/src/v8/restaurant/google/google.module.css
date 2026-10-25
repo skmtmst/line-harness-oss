@@ -100,16 +100,6 @@
   line-height: var(--tpl-rt-rich-body-lh);
 }
 
-.warnNote {
-  margin: 0;
-  padding: var(--tpl-rt-gray-note-pad);
-  border-radius: var(--tpl-rt-inner-radius);
-  background: var(--tpl-rt-caution-bg);
-  color: var(--tpl-rt-caution-ink);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-rt-rich-body-lh);
-}
-
 /* 口コミの一覧の下の注：上下10・左右14。 */
 .footNote {
   margin: 0;

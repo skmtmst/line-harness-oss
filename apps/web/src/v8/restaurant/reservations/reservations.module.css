@@ -49,14 +49,6 @@
   flex: 1 1 0;
 }
 
-.dateNote {
-  display: block; padding: var(--polish-space-row) var(--polish-space-field); background: var(--color-status-warn-soft);
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-rs-lh-11);
-  white-space: nowrap;
-}
-
 .sourcePicker {
   flex: 0 0 var(--tpl-rs-rsv-source-w);
   width: var(--tpl-rs-rsv-source-w);
@@ -110,17 +102,6 @@
 }
 
 /* 予約の箱（行をまたぐ。上下2・左右3 の内側） */
-
-
-
-
-
-
-
-
-
-
-
 
 .blockName,
 .holdName {
@@ -178,9 +159,6 @@
 .srcPending { color: var(--color-warning); }
 
 /* 空いている枠の「＋ 予約を入れる」。指を乗せたとき・選んだときだけ見せる */
-
-
-
 
 /* 右の4枚 */
 .side {
@@ -349,14 +327,6 @@
 }
 
 /* その日の臨時休業・貸切（提案 E-10）：琥珀の帯＋右に休業日・貸切への行き先 */
-.closureBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-e1-gap-l);
-  padding: var(--tpl-rs-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft);
-}
 
 .closureText {
   flex: 1 1 0;
@@ -533,12 +503,6 @@
   flex-wrap: wrap;
   gap: var(--tpl-rs-row-actions-gap);
 }
-
-
-
-
-
-
 
 .phoneLegend {
   margin: 0;

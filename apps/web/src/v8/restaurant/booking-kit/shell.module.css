@@ -223,18 +223,6 @@
   line-height: var(--tpl-rs-lh-13);
 }
 
-.noticeSuccess {
-  background: var(--color-success-bg);
-  box-shadow: var(--tpl-rs-ring-success);
-  color: var(--color-success);
-}
-
-.noticeError {
-  background: var(--color-danger-bg);
-  box-shadow: var(--tpl-rs-ring-danger);
-  color: var(--color-danger);
-}
-
 .stateBox {
   padding: var(--tpl-rs-state-pad);
 }

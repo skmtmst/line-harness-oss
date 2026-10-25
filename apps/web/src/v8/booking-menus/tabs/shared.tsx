@@ -13,6 +13,7 @@ import { type BookingMenu, type BookingSettings } from '@/lib/api'
 import styles from '../settings.module.css'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
+import Notice from '@/components/shared/notice'
 
 export type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -79,14 +80,13 @@ export function useV8TabEdit(input: V8TabEdit) {
 
 export function Band({ tone, children }: { tone: 'hint' | 'warn'; children: ReactNode }) {
   return (
-    <p className={tone === 'warn' ? styles.warnBand : styles.hintBand}>
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-        <circle cx="7" cy="7" r="5.6" />
-        <path d="M7 6.2v3" strokeLinecap="round" />
-        <circle cx="7" cy="4.1" r="0.9" fill="currentColor" stroke="none" />
-      </svg>
+    <Notice tone={tone === 'warn' ? 'warn' : 'info'} icon={<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <circle cx="7" cy="7" r="5.6" />
+      <path d="M7 6.2v3" strokeLinecap="round" />
+      <circle cx="7" cy="4.1" r="0.9" fill="currentColor" stroke="none" />
+    </svg>}>
       <span>{children}</span>
-    </p>
+    </Notice>
   )
 }
 

@@ -76,8 +76,6 @@
   line-height: var(--tpl-bm-17);
 }
 
-
-
 /* 予約の受け方の1行（文字・間・トグル）。行の高さはトグルの20。 */
 .ruleLine {
   display: flex;
@@ -211,23 +209,6 @@
 /* ===== 帯・段 ===== */
 
 /* 青い案内の帯（ⓘ）。 */
-.hintBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-bm-10);
-  margin: 0;
-  padding: var(--tpl-bm-10) var(--tpl-bm-14);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-13);
-  line-height: var(--tpl-bm-20);
-}
-
-.hintBand svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
 
 /* 注意の帯（黄）。 */
 .warnBand {
@@ -940,7 +921,6 @@
 }
 
 /* ===== ルール ===== */
-
 
 .fieldLabel {
   display: block;

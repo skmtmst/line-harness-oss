@@ -188,8 +188,7 @@
   font-size: var(--text-caption);
   line-height: var(--tpl-wh-care-lh);
 }
-.band,
-.bandDanger {
+.band {
   display: flex;
   flex-direction: column;
   gap: var(--tpl-wh-ops-gap);
@@ -197,10 +196,6 @@
   border-radius: var(--radius-segment);
   background: var(--tpl-ev-band-bg);
   color: var(--tpl-ev-band-ink);
-}
-.bandDanger {
-  background: var(--color-status-danger-soft);
-  color: var(--color-danger);
 }
 .bandTitle {
   margin: 0;

@@ -20,6 +20,7 @@ import { bookingCancellationApi } from '@/lib/api/helpers/gap1'
 import { bookingAdvancedApi } from '@/lib/api/helpers/booking-advanced'
 type BookingCard = NonNullable<Awaited<ReturnType<typeof bookingAdvancedApi.card>>['data']>
 import styles from './booking-charges.module.css'
+import Notice from '@/components/shared/notice'
 
 /*
  * 予約の詳細の「お支払い」の段（B1・絵 Ae1W1・fom2A）。キャンセル料の請求・請求しない・返金（2 段の確かめ）。
@@ -155,7 +156,9 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
           <div><dt>わけ</dt><dd>{reasonLine}</dd></div>
         </dl>
         {load.testMode ? <TestModeNote>本当の請求は起きません</TestModeNote> : null}
-        <p className={styles.info}><MessageCircle size={15} aria-hidden="true" />試験の請求を記録します。実際のカード請求・LINE送信はしていません。金額は決まりの額より上げられません。</p>
+        <Notice tone="info" icon={<MessageCircle size={15} aria-hidden="true" />}>
+          試験の請求を記録します。実際のカード請求・LINE送信はしていません。金額は決まりの額より上げられません。
+        </Notice>
       </Dialog>
 
       {/* 請求しない：理由は必須。 */}
@@ -185,7 +188,9 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
           <div><dt>カード</dt><dd>{cardLabel}</dd></div>
           <div><dt>わけ</dt><dd>{`${reason.trim()}（理由は記録に残ります）`}</dd></div>
         </dl>
-        <p className={styles.warn}><AlertTriangle size={15} aria-hidden="true" />試験の返金を記録すると元に戻せません。実際のカードへの返金はしません。操作できるのはオーナー・管理者だけです。</p>
+        <Notice tone="warn" icon={<AlertTriangle size={15} aria-hidden="true" />}>
+          試験の返金を記録すると元に戻せません。実際のカードへの返金はしません。操作できるのはオーナー・管理者だけです。
+        </Notice>
       </Dialog>
     </section>
   )

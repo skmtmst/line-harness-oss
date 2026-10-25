@@ -87,11 +87,6 @@
   font-weight: 600;
 }
 
-.noticeSuccess {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
 .noticeError {
   background: var(--color-status-danger-soft);
   color: var(--color-danger);

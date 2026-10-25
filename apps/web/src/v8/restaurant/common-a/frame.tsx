@@ -19,6 +19,7 @@ import styles from './frame.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 飲食店向け（テスト）の器（担当 a：ダッシュボード・承認・組織・LINE来店フォロー・Googleビジネス）。
@@ -218,7 +219,6 @@ export default function RestaurantFrame({
   ) : (
     <SaveErrorField names={["selectedStoreId","selected_store_id"]}><StoreFilterTabs
 
-
       value={selectedStoreId}
       onChange={setSelectedStoreId}
       options={[
@@ -244,9 +244,9 @@ export default function RestaurantFrame({
     >
       {banner ? <BoundaryBanner note={bannerNote} /> : null}
       {notice ? (
-        <div role="status" className={`${styles.notice} ${notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError}`}>
+        <Notice tone={notice.tone === "success" ? "success" : "danger"} role="status">
           {notice.text}
-        </div>
+        </Notice>
       ) : null}
       {loading ? (
         <div className={styles.stateBox}><ListState kind="loading" /></div>
