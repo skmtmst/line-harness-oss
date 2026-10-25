@@ -44,7 +44,7 @@ export interface MergedPersonLinkedFriend {
   linkMethod: string;
   /** null は移行前の既存リンクなど、確信度を記録していない状態。 */
   confidence: number | null;
-  /** #598 の候補画面へ戻すための操作用ID。本文へは表示しない。 */
+  /** 統合候補の画面へ戻すための操作用ID。本文へは表示しない。 */
   candidateId: string | null;
   candidateVersion: number | null;
 }

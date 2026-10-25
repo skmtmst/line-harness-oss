@@ -1,11 +1,11 @@
 /**
- * 下書きで選べるきっかけ・処理の正本(#734)。
+ * 下書きで選べるきっかけ・処理の正本。
  *
  * 動くものだけを並べる。下書きunion(`apps/worker/src/services/automation-drafts.ts`
  * の `AutomationDraftTriggerType` / `AutomationDraftActionType`)と一致させ、
  * 新規作成(`apps/web/src/app/automations/new/page.tsx`)と下書き編集
  * (`apps/web/src/components/automations/automation-draft-editor.tsx`)の
- * 両方がここから描画する。片方だけ直してもう片方に届かない事故を防ぐ。
+ * 両方がここから描画する。片方だけ変えてもう片方に届かないことを防ぐ。
  *
  * 表示名の正本(`automation-labels.ts`)とは別物。あちらは型全17件の表示名で
  * 未知値のフォールバックを持つため、「選ばせてよいものの一覧」にはならない。
@@ -50,8 +50,8 @@ export const AUTOMATION_DRAFT_ACTION_OPTIONS: readonly AutomationDraftActionOpti
   { value: 'add_tag', label: 'タグを付ける' },
   { value: 'start_scenario', label: 'シナリオを始める' },
   { value: 'send_message', label: 'メッセージを送る' },
-  // #942 N-356: 公開済みの共通アクションを呼ぶ。実行時に版が固定される。
+  // 公開済みの共通アクションを呼ぶ。実行時に版が固定される。
   { value: 'common_action', label: '共通アクションを実行' },
-  // F-14: 担当者通知のルールを動かす。送り先はルール側の受信者に従う。
+  // 担当者通知のルールを動かす。送り先はルール側の受信者に従う。
   { value: 'notify_staff', label: '担当へ知らせる' },
 ];

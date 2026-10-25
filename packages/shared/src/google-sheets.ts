@@ -1,9 +1,9 @@
 /**
- * #838 第2段: Google Sheets 連携の出入り口の形。
+ * Google Sheets 連携の出入り口の形。
  *
  * Worker（返す側）と管理画面（読む側）でこの1つの型を使う。
- * 「読み込み中」のまま止まる事故は、返す形（包みなし）と
- * 読む形（`data` の包みを想定）のずれが原因だった。
+ * 返す形（包みなし）と読む形（`data` の包みを想定）がずれると、
+ * 画面が「読み込み中」のまま止まる。
  * 応答は `{ success: true, data: <ここ> }` の包みでそろえる。
  */
 export type GoogleSheetsConnectionStatus =

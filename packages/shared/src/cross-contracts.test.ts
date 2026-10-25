@@ -16,7 +16,7 @@ describe("横断契約の正本", () => {
       large: { width: 2500, height: 1686 },
       compact: { width: 2500, height: 843 },
     });
-    // O(#822): LINE が後から足した2つの動き。DB の action_type は4つのまま。
+    // O: LINE が後から足した2つの動き。DB の action_type は4つのまま。
     expect(RICH_MENU_ACTION_TYPE_BY_INTENT).toEqual({
       url: "uri", tel: "uri", form: "uri", booking: "uri", booking_history: "uri", visit_stamp: "uri", text: "message",
       template: "postback", switch: "richmenuswitch", postback: "postback",
@@ -32,7 +32,7 @@ describe("横断契約の正本", () => {
   });
 
   /*
-   * 画面確認の見本が、実口の返す形からずれていないか(#735)。
+   * 画面確認の見本が、実口の返す形からずれていないか。
    *
    * 実行記録の `triggerLabel` は、実口が
    * `automationTriggerLabel(row.trigger_type)` で**正本から引く**。
