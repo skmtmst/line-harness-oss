@@ -3240,7 +3240,7 @@ html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][dat
 
   --bar-scrolled-bg: rgba(255, 255, 255, 0.72);
   --bar-scrolled-filter: saturate(180%) blur(18px);
-  --bar-scrolled-line: 1px solid rgba(29, 29, 31, 0.06);
+  --bar-scrolled-line: inset 0 -1px 0 rgba(29, 29, 31, 0.06); /* 下端の 1px の線。帯の高さを変えないよう内側の影で描く */
 }
 
 /*
