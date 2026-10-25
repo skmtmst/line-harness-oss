@@ -261,3 +261,17 @@ it('画面の残りが読み込み中の間も実値を出し、読み込み完�
   paint()
   expect(rollOf(container)).not.toBeNull()
 })
+
+it('動きが始めで止まっても、終わりが届かなくても、見える数字は本当の値', () => {
+  const { container } = render(view(undefined, { value: 2013 }))
+  paint()
+  const decoration = rollOf(container)
+  expect(decoration).not.toBeNull()
+  // 動きが進まない時は列の最初の段が見えたまま残る。そこも本当の数字にする。
+  expect(Array.from(decoration!.children, node => node.firstElementChild?.firstElementChild?.textContent ?? node.textContent).join('')).toBe('2,013')
+  // animationend が来なくても、決まった時間で装飾を外して本当の値だけにする。
+  act(() => { vi.advanceTimersByTime(700) })
+  expect(rollOf(container)).toBeNull()
+  expect(numberOf(container)?.closest('[data-kpi-rolling]')).toBeNull()
+  expect(numberOf(container)?.textContent).toBe('2,013')
+})

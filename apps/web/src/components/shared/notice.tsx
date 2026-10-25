@@ -1,10 +1,11 @@
 'use client'
 
-import type { ComponentPropsWithRef, HTMLAttributes, ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
 import { Check, CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import styles from './notice.module.css'
 import { humanizeErrorText } from './human-error-text'
+import { jstDate } from '@/lib/jst-datetime'
 
 /** 知らせは案内・成功・注意・危険の4種類。呼び名と見た目はここが持つ。 */
 export type NoticeTone = 'info' | 'success' | 'warn' | 'danger'
@@ -152,4 +153,22 @@ export function NoticeStates({ items }: { items: NonNullable<NoticeProps['states
       {label}
     </li>)}
   </ul>
+}
+
+const CLOSED_TODAY_PREFIX = 'lh:notice-closed:'
+
+/**
+ * 帯の［閉じる］（`onClose`）を、その端末でその日だけ効かせる。
+ * 日本時間で日が変わると、また出る。保存できない端末では、その画面の間だけ閉じる。
+ */
+export function useNoticeClosedToday(key: string) {
+  const [closed, setClosed] = useState(false)
+  useEffect(() => {
+    try { setClosed(localStorage.getItem(CLOSED_TODAY_PREFIX + key) === jstDate()) } catch { setClosed(false) }
+  }, [key])
+  const close = useCallback(() => {
+    setClosed(true)
+    try { localStorage.setItem(CLOSED_TODAY_PREFIX + key, jstDate()) } catch { /* この画面の間だけ閉じる */ }
+  }, [key])
+  return { closed, close }
 }
