@@ -9,7 +9,12 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { installSharedStyles } from '../components/shared/shared-style-test-support'
+
+let removeStyles: () => void
+beforeAll(async () => { removeStyles = await installSharedStyles([], ['text-body', 'text-hero', 'rounded-card', 'gap-1', 'gap-2', 'gap-3', 'gap-4', 'gap-6']) })
+afterAll(() => removeStyles?.())
 
 // globals: false のため Testing Library の自動 cleanup は登録されない。
 afterEach(async () => {
@@ -62,7 +67,7 @@ function increased(counts: Map<string, number>, baseline: Record<string, number>
   return bad
 }
 
-describe('#704 正規のサイズトークンがある', () => {
+describe('文字と角丸の共通値を役割ごとに維持する', () => {
   it('V8の文字の段（10/12/13/15/20/28）', () => {
     expect(token('text-nano')).toBe('10px')
     expect(token('text-caption')).toBe('12px')
@@ -81,9 +86,9 @@ describe('#704 正規のサイズトークンがある', () => {
     expect(token('radius-pill')).toBe('999px')
   })
 
-  it('余白の正規5段（4/8/12/16/24）は gap-1/2/3/4/6 で読む', () => {
-    const flat = GLOBALS.replace(/\s+/g, ' ')
-    expect(flat).toContain('gap-1 / gap-2 / gap-3 / gap-4 / gap-6')
+  it.each([1, 2, 3, 4, 6])('gap-%sは共通の0.25rem単位で余白を描画する', step => {
+    const { container } = render(<div className={`gap-${step}`}>間隔</div>)
+    expect(getComputedStyle(container.firstElementChild!).gap).toBe(`calc(0.25rem * ${step})`)
   })
 
   it('補助の段もV8の写しに合わせる', () => {
@@ -100,7 +105,7 @@ describe('#704 正規のサイズトークンがある', () => {
   })
 })
 
-describe('#704 半端値を新規で使わない（ラチェット）', () => {
+describe('共通の段にない文字・角丸・余白の直書きを増やさない', () => {
   it('文字サイズの任意値 text-[Npx] を増やさない', () => {
     const counts = countUsages(/text-\[\d+px\]/g)
     expect(
@@ -152,25 +157,19 @@ function TokenProbe() {
   return (
     <div className="flex gap-2 rounded-card bg-canvas p-4">
       <p className="text-body text-ink">本文</p>
-      {/* ★V7: 700 は大きな数だけ。text-hero が自分で 700 を持つので font-bold は付けない */}
       <p className="text-hero text-ink">大きな数値</p>
     </div>
   )
 }
 
-describe('#704 正規トークンを実Reactで読む', () => {
-  it('正規クラスの綴りで描画でき、globals.css の定義と一致する', () => {
+describe('共通の値を使うクラスの描画を保つ', () => {
+  it('本文・大きな数・カードに共通の値を実際に適用する', () => {
     render(<TokenProbe />)
     const body = screen.getByText('本文')
-    expect(body.className).toContain('text-body')
     const hero = screen.getByText('大きな数値')
-    expect(hero.className).toContain('text-hero')
-    const card = hero.parentElement
-    expect(card?.className).toContain('rounded-card')
-    expect(card?.className).toContain('gap-2')
-    // 描画した綴りが、定義されたトークンを指している。
-    expect(token('text-body')).toBe('13px')
-    expect(token('text-hero')).toBe('28px')
-    expect(token('radius-card')).toBe('12px')
+    expect(getComputedStyle(body).fontSize).toBe('13px')
+    expect(getComputedStyle(hero).fontSize).toBe('28px')
+    expect(getComputedStyle(hero.parentElement!).borderRadius).toBe('12px')
+    expect(getComputedStyle(hero.parentElement!).gap).toBe('calc(0.25rem * 2)')
   })
 })
