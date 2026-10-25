@@ -37,7 +37,6 @@ describe('★V8 枠線の色（--color-control-border）', () => {
   it.each([
     ['チェック', 'checkbox.module.css', 'box'],
     ['ラジオ', 'radio-card.module.css', 'radio'],
-    ['チェックのカード', 'check-card.module.css', 'box'],
   ])('%s の枠は元の色を保つ', (_name, file, cls) => {
     expect(css(file)).toMatch(new RegExp(`${V8}[^}]*\\.${cls}[^}]*\\{[^}]*border-color:\\s*var\\(--color-choice-border\\)`))
     expect(css(file)).not.toContain('var(--color-control-border)')
@@ -74,9 +73,9 @@ describe('★V8 枠線の色（--color-control-border）', () => {
     expect(css('radio-card.module.css')).toMatch(
       new RegExp(`${V8} \\.radio:checked[^}]*border-color:\\s*var\\(--color-accent-deep\\)`),
     )
-    expect(css('check-card.module.css')).toMatch(
-      new RegExp(`${V8} \\.box:checked[^}]*border-color:\\s*var\\(--color-accent-deep\\)`),
-    )
+    // チェックのカードの四角は共通の CheckboxControl（チェックボックスは1種類・2026-10-25）。選んだ色は checkbox.module.css が持つ。
+    expect(css('check-card.module.css')).not.toMatch(/\.box\b/)
+    expect(css('checkbox.module.css')).toMatch(/\.input:checked \+ \.box[^}]*\{[^}]*var\(--color-accent-deep\)/)
     expect(css('otp-input.module.css')).toMatch(
       new RegExp(`${V8} \\.slot\\[aria-invalid='true'\\][^}]*border-color:\\s*var\\(--color-status-danger\\)`),
     )

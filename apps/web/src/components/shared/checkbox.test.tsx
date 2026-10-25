@@ -6,10 +6,11 @@
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import Checkbox, { SettingCheckbox } from './checkbox'
+import Checkbox, { CheckboxControl, SettingCheckbox } from './checkbox'
+import CheckCard from './check-card'
 
 afterEach(() => cleanup())
 
@@ -83,5 +84,31 @@ describe('固定の設定の理由と通常の切り替え', () => {
     expect(box.hasAttribute('aria-description')).toBe(false)
     fireEvent.click(box)
     expect(changes).toEqual([true])
+  })
+})
+
+describe('チェックボックスは1種類（2026-10-25）', () => {
+  const SRC = join(dirname(fileURLToPath(import.meta.url)), '../..')
+  const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name)
+    return statSync(path).isDirectory() ? walk(path) : [path]
+  })
+  // 素の <input type="checkbox"> を書いてよいのは共通部品の中だけ。
+  const RAW = /<input[^>]*type=["']checkbox["']/s
+
+  it('画面と部品は共通の Checkbox・CheckboxControl を使い、素のチェックを置かない', () => {
+    const found = walk(SRC)
+      .filter((path) => path.endsWith('.tsx') && !path.includes('.test.') && !path.endsWith('components/shared/checkbox.tsx'))
+      .filter((path) => RAW.test(readFileSync(path, 'utf8')))
+      .map((path) => path.slice(SRC.length + 1))
+    expect(found).toEqual([])
+    expect(RAW.test('<input\n  type="checkbox"\n  checked />')).toBe(true)
+  })
+
+  it('選ぶカードの四角は Checkbox と同じ作り（同じ四角と同じ印）', () => {
+    const { container: card } = render(<CheckCard title="店頭QR" checked onChange={() => {}} />)
+    const { container: plain } = render(<CheckboxControl checked onCheckedChange={() => {}} aria-label="店頭QR" />)
+    const shape = (root: HTMLElement) => root.querySelector('input[type="checkbox"]')!.parentElement!.innerHTML.replace(/ (id|aria-[a-z]+)="[^"]*"/g, '')
+    expect(shape(card)).toBe(shape(plain))
   })
 })

@@ -3141,8 +3141,9 @@ html:root input:is([type='radio'], [type='checkbox']) { appearance: none; width:
 html:root input[type='radio'] { border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
 html:root input[type='radio']:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
 
-html:root input[type='checkbox'] { border: var(--choice-ring) solid var(--color-choice-border); border-radius: var(--radius-checkbox, 3px); background: var(--color-canvas); }
-html:root input[type='checkbox']:checked { border-color: var(--color-selection-border); background: var(--color-selection-border) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='m3 8 3 3 7-7'/%3E%3C/svg%3E") center/contain no-repeat; }
+/* 共通の Checkbox を通らない素のチェックも、同じ1種類の形（16px・角丸4・線1px・選ぶと濃い緑に白い印）。 */
+html:root input[type='checkbox'] { margin: 0; border: 0; border-radius: var(--choice-checkbox-radius); outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); background: var(--color-canvas); }
+html:root input[type='checkbox']:checked { outline-color: var(--color-accent-deep); background: var(--color-accent-deep) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M4 12l5 5L20 6'/%3E%3C/svg%3E") center/var(--polish-icon-control) no-repeat; }
 html:root input:is([type='radio'], [type='checkbox']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 /* ：素の切り替えも同じ選択の色。ページ内タブはの黒い下線を保つ。フォルダの列の行は列の選んだ形（灰の地）を保つ（選ぶ窓で aria-pressed が付く）。注目の星は黄色い塗りだけ（緑の箱にしない）。曜日のつなげた並びは地の色だけ。ファネルの段の行は薄い緑の地と濃い棒だけ（枠を足さない・絵 ）。表の行の名前は行の地の色で選んだことを示す（名前に枠を足さない・絵 ）。 */
