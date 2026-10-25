@@ -173,9 +173,7 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
         expect(result.result).toMatchObject({ failed: 0, skipped: 0, heldByStop: 0 });
       }
       expect(counts).toEqual([20, 20, 20, 20, 20]);
-      // +1 query/件は #960 の緊急停止判定 (broadcast_dispatch) — 自動pushも
-      // 送信直前に operation_control_sets を読む分。
-      // tenant suspension is consumed in one batch query before each tick.
+      // 送信直前の緊急停止判定で1件につき1問い合わせ増える。統括の停止状態は tick ごとの一括読込で取得する。
       expect(queries).toEqual([302, 302, 302, 302, 302]);
       expect((await real.tick()).result.sent).toBe(0);
       expect(upstream).toHaveBeenCalledTimes(100);
@@ -416,8 +414,7 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
     let stopReads = 0;
     const racedDb = intercept(store.db, async (sql, method, run) => {
       const result = await run();
-      // Flip the switch after the post-claim check has read 'running'. The
-      // last check must still re-read it even though LIFF is now preloaded.
+      // 実行権取得後の確認を通った後に停止へ変え、LIFF 情報の先読み後でも最後に停止状態を読み直すことを確かめる。
       if (method === 'all' && sql.includes('SELECT states_json, active_incident_id') && ++stopReads === 2) stop(store);
       return result;
     });
@@ -697,7 +694,7 @@ describe('webinar notification jobs', () => {
   });
 
   /*
-   * #745 の裁定で契約が変わりました。**緊急停止は「捨てる」から「止める」へ。**
+   *  の裁定で契約が変わりました。**緊急停止は「捨てる」から「止める」へ。**
    *
    * 元の表明（`status='skipped'`, `last_error_code='operation_stopped'` に
    * なること）が捕まえていた壊し方は2つです。
@@ -766,7 +763,7 @@ describe('webinar notification jobs', () => {
   });
 
   /*
-   * 落とす理由は「期限を過ぎた」であって「止まっていた」ではない（#745）。
+   * 落とす理由は「期限を過ぎた」であって「止まっていた」ではない。
    * 停止中は判断そのものを先送りし、復旧したときに、そのジョブ自身の
    * 予定時刻で改めて判断する。
    */
@@ -814,7 +811,7 @@ describe('webinar notification jobs', () => {
   });
 
   /*
-   * 「見送り 5件」だけでは、取るべき行動が決まらない（#745）。
+   * 「見送り 5件」だけでは、取るべき行動が決まらない。
    * 視聴済み（正常）と対象回の終了（届かないまま終わった）を分けて出す。
    */
   test('見送りの内訳を理由ごとに数えて返す', async () => {

@@ -623,22 +623,9 @@ export async function processWebinarNotificationJobs(
       continue;
     }
     /*
-     * 緊急停止中は**行に触らない**（#745）。
-     *
-     * 以前はここで claim してから `status='skipped'` で確定させていた。
-     * `skipped` を `queued` へ戻す経路はどこにも無く、積み直しも
-     * `UNIQUE (registration_id, settings_version, kind)` に当たるので、
-     * **復旧しても永久に届かなかった**。「止める」と書いてあるボタンが
-     * 実際には「捨てる」になっていた。
-     *
-     * 緊急停止は一時的な操作なので、`queued` のまま残して次の tick に
-     * 拾い直させる。**claim もしない**——claim すると `attempt_count` が
-     * 毎 tick 増え、取り出しの上限に当たった時点で、やはり黙って
-     * 届かなくなる。
-     *
-     * 送る意味が無くなったジョブ（対象回が終了済みなど）は、この先の
-     * `notification_expired` が落とす。**停止を理由に落とさない。**
-     * 落とす理由は「期限を過ぎた」であって「止まっていた」ではない。
+     * 緊急停止は一時的な抑止なので、queued のまま次の tick に残す。
+     * claim すると attempt_count が増え、skipped にすると再開も UNIQUE 制約による積み直しもできず、復旧後に届かなくなるため、停止中は行へ触れない。
+     * 対象回の終了などで送る意味がなくなったジョブは、後続の notification_expired で期限切れとして処理する。
      */
     // 未停止の結果は使い回さない。1件の送信中にも緊急停止は切り替わる。
     if (await isOperationCapabilityStopped(db, row.account_id, 'reminder_dispatch')) {
@@ -766,14 +753,14 @@ export async function processWebinarNotificationJobs(
 }
 
 /**
- * 見送った理由の表示名（#745）。
+ * 見送った理由の表示名。
  *
  * 「見送り 5件」とだけ出しても、運用者は**何が起きたのか分かりません。**
  * 「視聴済みだから送らなかった」（正常）と「対象回が終了済みで落ちた」
  * （取り戻せない）は、取るべき行動がまったく違います。理由ごとに分けて
  * 出すために、この対応表を正本として持ちます。
  *
- * `operation_stopped` は #745 以降**新しく付きません**（緊急停止は行を
+ * `operation_stopped` は  以降**新しく付きません**（緊急停止は行を
  * 確定させず `queued` のまま残すため）。ただし過去に付いた行が残って
  * いる可能性があるので、読む側からは外しません。
  */

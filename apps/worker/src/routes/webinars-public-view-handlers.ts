@@ -310,7 +310,7 @@ export const post__api_liff_webinars_slug_heartbeat_3 = async (c: Context<Env, "
   if (auth instanceof Response) return auth;
   const loaded = { webinar: auth.webinar };
 
-  // J #821: 再生中だけ15秒ごとに送る。状態・速度・申告時刻も受け、
+  // J : 再生中だけ15秒ごとに送る。状態・速度・申告時刻も受け、
   // 受信はサーバー時刻基準で異常を除外する（recordWebinarHeartbeat）。
   const body = await c.req.json<{
     sessionStartAt?: unknown; positionSeconds?: unknown;
@@ -370,7 +370,7 @@ export const post__api_liff_webinars_slug_heartbeat_3 = async (c: Context<Env, "
       auth.friendId,
       sessionStartAt,
     ));
-    // 視聴完了を成果計測へ接続する(#648)。同じ視聴の再送は冪等キーで1件にまとまる。
+    // 視聴完了を成果計測へ接続する。同じ視聴の再送は冪等キーで1件にまとまる。
     c.executionCtx.waitUntil(recordConversionSourceEvent(c.env.DB, {
       sourceType: 'webinar_completed',
       lineAccountId: loaded.webinar.account_id,

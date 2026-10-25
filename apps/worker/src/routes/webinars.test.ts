@@ -89,7 +89,7 @@ const dbMocks = {
   getWebinarMonitoringSummary: vi.fn(),
   getWebinarPublicAccount: vi.fn(),
   formBelongsToLineAccount: vi.fn(),
-  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
   // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
   recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
 };
@@ -1953,7 +1953,7 @@ describe('admin CRUD', () => {
     expect(res.headers.get('content-type')).toContain('text/csv');
     const text = await res.text();
     expect(text).toContain("'=HYPERLINK")
-    // 分類・ライブ/録画の列が出る（IDEA-10: 分類の根拠と区別をCSVでも確認できる）。
+    // 分類・ライブ/録画の列が出る（: 分類の根拠と区別をCSVでも確認できる）。
     expect(text).toContain('分類');
     expect(text).toContain('途中離脱');
   });
@@ -2133,8 +2133,7 @@ describe('webinar CTA cards', () => {
 });
 
 /*
- * 監査 R95・R96・R97・R99 の回帰試験。直しを戻すと赤くなることを
- * 確かめたうえで残す（赤確認は各 test の期待値が直しの分岐に依存する）。
+ * ウェビナーの入力・公開・配信条件の境界を、失敗すべき条件も含めて確かめる。
  */
 describe('R95 公開は公開専用口へ集約する', () => {
   test('PUT 基本更新で下書き→公開中は409で止まり更新しない', async () => {
