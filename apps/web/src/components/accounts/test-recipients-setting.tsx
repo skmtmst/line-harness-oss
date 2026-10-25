@@ -168,7 +168,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
         <div className="flex flex-wrap gap-1.5 mb-2">
           {recipients.map(r => (
             <span key={r.id} className="inline-flex items-center gap-1 px-2 py-1 bg-status-info-soft text-action rounded-pill text-xs">
-              {r.pictureUrl && <img src={r.pictureUrl} alt="" className="w-4 h-4 rounded-pill" />}
+              {r.pictureUrl && <img width={16} height={16} src={r.pictureUrl} alt="" className="w-4 h-4 rounded-pill" />}
               {r.displayName}
               <CloseButton aria-label={`${r.displayName}を外す`} onClick={() => removeRecipient(r.id)} />
             </span>
@@ -190,7 +190,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
                 title={`${candidate.staffName}をテスト送信先に追加`}
               >
                 {candidate.pictureUrl ? (
-                  <img src={candidate.pictureUrl} alt="" className="h-4 w-4 rounded-pill" />
+                  <img width={16} height={16} src={candidate.pictureUrl} alt="" className="h-4 w-4 rounded-pill" />
                 ) : (
                   <span className="flex h-4 w-4 items-center justify-center rounded-pill bg-accent-soft text-micro font-medium">{candidate.staffName.charAt(0)}</span>
                 )}
@@ -223,7 +223,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
                   className="w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-pearl text-left text-xs"
                 >
                   {f.pictureUrl ? (
-                    <img src={f.pictureUrl} alt="" className="w-5 h-5 rounded-pill" />
+                    <img width={20} height={20} src={f.pictureUrl} alt="" className="w-5 h-5 rounded-pill" />
                   ) : (
                     <div className="w-5 h-5 rounded-pill bg-shell-gray" />
                   )}

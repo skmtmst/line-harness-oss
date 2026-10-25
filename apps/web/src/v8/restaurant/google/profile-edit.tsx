@@ -172,7 +172,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
           {picker.loading ? <ListState kind="loading" title="登録メディアを読み込んでいます" /> : null}
           {picker.error ? <ListState kind="error" title="登録メディアを読み込めませんでした" description={picker.error} onRetry={() => void openPicker()} /> : null}
           {!picker.loading && !picker.error && picker.items.length === 0 ? <ListState kind="empty" title="登録メディアに画像がありません" description="先に「登録メディア」で画像を追加してください。" emptyPreset="readonly" /> : null}
-          <div className={styles.pickerGrid}>{picker.items.filter((m) => !adds.some((a) => a.id === m.id)).map((m) => <Button key={m.id} variant="text" size="thumbnail" title={m.filename} aria-label={`${m.filename} を追加`} disabled={!editable} onClick={() => setAdds((values) => [...values, m])}><img src={m.url} alt="" /></Button>)}</div>
+          <div className={styles.pickerGrid}>{picker.items.filter((m) => !adds.some((a) => a.id === m.id)).map((m) => <Button key={m.id} variant="text" size="thumbnail" title={m.filename} aria-label={`${m.filename} を追加`} disabled={!editable} onClick={() => setAdds((values) => [...values, m])}><img width={120} height={120} src={m.url} alt="" /></Button>)}</div>
         </Card> : null}
         <p className={styles.muted}>追加・削除した写真はGoogleの審査後に反映されます。人物の顔や個人情報が写った写真は追加しないでください。</p>
       </Card>

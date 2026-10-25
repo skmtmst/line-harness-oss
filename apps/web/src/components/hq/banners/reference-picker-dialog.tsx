@@ -294,7 +294,7 @@ export default function ReferencePickerDialog({
               {pickedImages.map(({ reference, image }) => (
                 <li key={reference.imageId} className="flex flex-wrap items-center gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={image.media.url} alt="" className="h-7 w-7 shrink-0 rounded-mini object-cover" loading="lazy" />
+                  <img width={28} height={28} src={image.media.url} alt="" className="h-7 w-7 shrink-0 rounded-mini object-cover" loading="lazy" />
                   <span className="w-36 truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
                   {/* 使い方は 3 択を行の中に並べて直接選ぶ（★BG-C `B3hdL4`「ルール3択」）。
                       素の radio は使わず、共通の RadioCard の行版で出す。

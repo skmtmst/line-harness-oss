@@ -161,7 +161,7 @@ export default function GenerationPanel({
                   {/* 統括の画像は Worker から配信されるので next/image の最適化は使わない（image-tile と同じ） */}
                   {image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={image.media.url} alt="" className="h-12 w-12 shrink-0 rounded-mini bg-step-idle object-cover" />
+                    <img width={48} height={48} src={image.media.url} alt="" className="h-12 w-12 shrink-0 rounded-mini bg-step-idle object-cover" />
                   ) : (
                     <span className="h-12 w-12 shrink-0 rounded-mini bg-step-idle" />
                   )}

@@ -356,7 +356,7 @@ export default function StepPreview({
             <Bubble>
               {/* 目印なので次の最適化には載せない。 */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <img width={80} height={80}
                 src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${kindState.sticker.stickerId}/android/sticker.png`}
                 alt="スタンプ"
                 className="h-20 w-20"

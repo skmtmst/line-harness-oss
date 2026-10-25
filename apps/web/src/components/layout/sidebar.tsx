@@ -686,7 +686,7 @@ export default function Sidebar({
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-hairline px-4 pr-16">
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
-            <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
+            <img width={36} height={36} src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
           ) : (
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
@@ -965,7 +965,7 @@ export default function Sidebar({
         <div className={styles.mobileBrand}>
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
-            <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
+            <img width={28} height={28} src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
           ) : (
             <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}

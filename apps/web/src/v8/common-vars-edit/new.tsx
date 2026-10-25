@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { createPageReturnHref } from '@/components/shared/create-page';
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -233,7 +234,7 @@ export default function NewCommonVarV8() {
   }, [selectedAccountId])
 
   useEffect(() => {
-    if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: scrollMotion(), block: 'center' })
   }, [secretWarningFields])
 
   const valueErrorMessageRef = useRef('')

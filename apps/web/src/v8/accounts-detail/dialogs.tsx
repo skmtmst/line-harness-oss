@@ -1,4 +1,5 @@
 'use client'
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, ShieldCheck } from 'lucide-react'
@@ -71,7 +72,7 @@ function useInvalidFocus(errors: Record<string, string>, ids: Record<string, str
     const frame = requestAnimationFrame(() => {
       const input = document.getElementById(idsRef.current[key])
       input?.focus()
-      input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+      input?.scrollIntoView?.({ block: 'center', behavior: scrollMotion() })
     })
     return () => cancelAnimationFrame(frame)
   }, [errors])

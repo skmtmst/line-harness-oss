@@ -405,7 +405,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
             <div key={index} className={own.slide} data-peek={index > 0 || undefined}>
               {/^https?:\/\//.test(item.thumbnailImageUrl) ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.thumbnailImageUrl} alt="" className={own.slideImage} />
+                <img width={240} height={110} src={item.thumbnailImageUrl} alt="" className={own.slideImage} />
               ) : <span className={own.slideImage}>{chipName(item.title)}</span>}
               {index === 0 ? (
                 <>

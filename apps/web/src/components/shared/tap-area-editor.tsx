@@ -88,7 +88,7 @@ export default function TapAreaEditor({
               <div className={styles.image} style={{ aspectRatio: String(aspectRatio) }} data-image={imageUrl ? '' : undefined}>
                 {imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- 管理用の画像（認証つき・外部の URL）
-                  <img src={imageUrl} alt="" />
+                  <img width={2500} height={1686} src={imageUrl} alt="" />
                 ) : null}
                 {items.map((item, index) => {
                   const selected = item.id === selectedId

@@ -277,7 +277,7 @@ export default function HqSupportV8() {
               {attachments.map((a, i) => (
                 <li key={`${a.name}-${i}`} className={styles.thumb}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={a.previewUrl} alt={a.name} className={styles.thumbImage} />
+                  <img width={112} height={80} src={a.previewUrl} alt={a.name} className={styles.thumbImage} />
                   <button type="button" onClick={() => removeAttachment(i)} aria-label={`${a.name} を外す`} className={styles.thumbRemove}>
                     <X aria-hidden="true" className={styles.smallIcon} />
                   </button>

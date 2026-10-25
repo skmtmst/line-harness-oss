@@ -42,7 +42,7 @@ export function StorefrontQr({card,accountId,shop,canManage}: {card:VisitStampCa
   const note=card.settings.stampInterval?.mode==='hours'?`1日1回まで・前の押印から${card.settings.stampInterval.hours}時間`:'1日1回まで'
   return <section className={styles.storefront} aria-label="店頭の QR（印刷用）">
     <div className={styles.titleLine}><h3>店頭の QR（印刷用）</h3><HelpTip label="店頭のQRの説明">店頭に貼るQRです。読んだ人に押します。同じ日は1回までです。作り直すと古いQRは使えません。</HelpTip></div>
-    <div className={styles.storeRow}>{image.src?<img className={styles.thumb} src={image.src} alt="店頭のQR" />:null}
+    <div className={styles.storeRow}>{image.src?<img width={96} height={96} className={styles.thumb} src={image.src} alt="店頭のQR" />:null}
       <div className={styles.storeDetails}><span className={styles.sub}>{`${card.name} ・ この店で1つ`}</span>
         {qr?.status==='active'?<><div className={styles.actions}><Button variant="secondary" disabled={!image.src} onClick={()=>setPrint(true)}><QrCode size={16} aria-hidden="true" />保存・印刷</Button></div>
           <div className={styles.actions}>{canManage?<Button variant="text" onClick={()=>{pending.current=null;setConfirm(true)}}><RefreshCw size={16} aria-hidden="true" />作り直す</Button>:null}<span className={styles.sub}>{`最後に作り直した日 ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric'}).format(new Date(qr.issuedAt))}`}</span></div></>

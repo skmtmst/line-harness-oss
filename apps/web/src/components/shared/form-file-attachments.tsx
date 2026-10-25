@@ -31,7 +31,7 @@ function Attachment({ file }: { file: FormFileAnswer }) {
   const pdf = file.mimeType === 'application/pdf'
   return <>
     <Button size="compact" onClick={() => setOpen(true)} aria-label={`${file.filename || '書類'}を開く`}>
-      {pdf ? <FileText size={16} aria-hidden /> : url ? <img src={url} alt="添付の小さな見本" className={styles.thumbnail} /> : null}
+      {pdf ? <FileText size={16} aria-hidden /> : url ? <img width={32} height={32} src={url} alt="添付の小さな見本" className={styles.thumbnail} /> : null}
       {file.filename || '書類'}
     </Button>
     <Dialog open={open} title={file.filename || '書類'} designWidth={720} onCancel={() => setOpen(false)} cancelLabel="閉じる">

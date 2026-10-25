@@ -399,7 +399,7 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
         <span className={styles.petCell}>
           {row.pet.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- お客様がマイページで登録した写真
-            <img src={row.pet.imageUrl} alt="" className={styles.face} />
+            <img width={28} height={28} src={row.pet.imageUrl} alt="" className={styles.face} />
           ) : (
             <span aria-hidden="true" className={styles.face}>{name.slice(0, 1)}</span>
           )}

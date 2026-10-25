@@ -1,4 +1,5 @@
 'use client'
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Clock, Link as LinkIcon, UserX } from 'lucide-react'
@@ -92,7 +93,7 @@ function CompareInner() {
   const openPanel = (next: IdentityCandidateDecision) => {
     setDecision(next)
     setPanelOpen(true)
-    requestAnimationFrame(() => panelRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
+    requestAnimationFrame(() => panelRef.current?.scrollIntoView({ block: 'center', behavior: scrollMotion() }))
   }
 
   const linkedReady = decision !== 'linked' || (

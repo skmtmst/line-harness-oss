@@ -130,7 +130,7 @@ export function BannerImageDetailV8({
             <div className={styles.preview}>
               {previewFailed ? null : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={image.media.url} alt="" onError={() => setPreviewFailed(true)} />
+                <img width={1200} height={628} src={image.media.url} alt="" onError={() => setPreviewFailed(true)} />
               )}
             </div>
             <div className={styles.buttons}>

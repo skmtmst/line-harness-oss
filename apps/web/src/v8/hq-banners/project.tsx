@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useAttentionStarMotion } from '@/components/shared/use-attention-star-motion'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
@@ -131,7 +132,7 @@ function ProjectInner() {
   const panelRef = useRef<HTMLDivElement>(null)
   const [panelExpanded, setPanelExpanded] = useState(false)
   const [panelRequest, setPanelRequest] = useState(0)
-  useEffect(() => { if (panelRequest) panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, [panelRequest])
+  useEffect(() => { if (panelRequest) panelRef.current?.scrollIntoView({ behavior: scrollMotion(), block: 'start' }) }, [panelRequest])
   const revealPanel = () => { setPanelExpanded(true); setPanelRequest(n => n + 1) }
   const fileRef = useRef<HTMLInputElement>(null)
 

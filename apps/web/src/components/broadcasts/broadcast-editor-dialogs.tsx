@@ -245,7 +245,7 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
             <ul className="space-y-2">
               {testRecipients.map((recipient) => (
                 <li key={recipient.id} className="flex items-center gap-3 rounded-control border border-hairline p-3">
-                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-pill object-cover" /> : (
+                  {recipient.pictureUrl ? <img width={36} height={36} src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-pill object-cover" /> : (
                     <span className="flex h-9 w-9 items-center justify-center rounded-pill bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
                   )}
                   <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{recipient.displayName}</span>

@@ -527,7 +527,7 @@ function NotificationToggle({ setting, busy, onToggle }: { setting: EcNotificati
 
 function CardPreview({ setting }: { setting: EcNotificationSetting }) {
   return <div className="border-nen-border bg-nen-ivory overflow-hidden rounded-card border shadow-float">
-    {setting.imageUrl && <img src={setting.imageUrl} alt="" className={styles.previewImage} />}
+    {setting.imageUrl && <img width={400} height={180} src={setting.imageUrl} alt="" className={styles.previewImage} />}
     <div className="p-5">
       <div className="border-nen-gold-soft flex items-center gap-2 border-b pb-3">
         <span className="text-nen-gold font-serif text-xl font-bold">然</span>

@@ -235,7 +235,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           aria-label="添付した画像を大きく見る"
           className="shrink-0"
         >
-          <img
+          <img width={40} height={40}
             src={pendingImage.previewImageUrl}
             alt={pendingImageMeta?.name ?? '添付した画像'}
             className="h-10 w-10 rounded-mini border border-hairline object-cover"

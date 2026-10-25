@@ -222,7 +222,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
             <span className={styles.sender}>
               {sender.iconUrl
                 // eslint-disable-next-line @next/next/no-img-element -- 送り手のアイコン（同じ店の登録メディア）
-                ? <img src={sender.iconUrl} alt="" className={styles.senderIcon} />
+                ? <img width={24} height={24} src={sender.iconUrl} alt="" className={styles.senderIcon} />
                 : <span className={styles.senderIcon} aria-hidden="true">{sender.name.slice(0, 1)}</span>}
               <strong className={styles.strong}>{sender.name}</strong>
             </span>

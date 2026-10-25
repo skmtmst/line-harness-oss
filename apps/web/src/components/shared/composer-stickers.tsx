@@ -14,7 +14,7 @@ const PACKS = [
 ] as const
 function Thumb({ id }: { id: string }) {
   const [failed, setFailed] = useState(false)
-  return failed ? <span>{id}</span> : <img alt={`スタンプ ${id}`} src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${id}/android/sticker.png`} onError={() => setFailed(true)} />
+  return failed ? <span>{id}</span> : <img width={72} height={72} alt={`スタンプ ${id}`} src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${id}/android/sticker.png`} onError={() => setFailed(true)} />
 }
 export default function ComposerStickers({ value, onChange }: { value: { packageId: string; stickerId: string }; onChange: (next: { packageId: string; stickerId: string }) => void }) {
   const [mode, setMode] = useState<'pick' | 'manual'>('pick')

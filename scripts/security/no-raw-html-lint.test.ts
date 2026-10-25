@@ -34,3 +34,14 @@ describe('閉じるの「×」を文字で描かない', () => {
     expect(await lint('export const D = () => <button aria-label="閉じる"><svg /></button>\n')).toEqual([]);
   });
 });
+
+describe('なめらかなスクロールを直書きしない', () => {
+  const lint = (code: string) => new ESLint({ overrideConfigFile: resolve('eslint.config.mjs') })
+    .lintText(code, { filePath: resolve('apps/web/src/components/shared/scroll-fixture.tsx') })
+    .then(([result]) => result.messages.filter((message) => message.ruleId === 'no-restricted-syntax'));
+
+  it("behavior: 'smooth' を書くと lint が落ち、scrollMotion() なら通る", async () => {
+    expect(await lint("export const go = (el: HTMLElement) => el.scrollIntoView({ behavior: 'smooth' })\n")).toHaveLength(1);
+    expect(await lint("declare const scrollMotion: () => ScrollBehavior\nexport const go = (el: HTMLElement) => el.scrollIntoView({ behavior: scrollMotion() })\n")).toEqual([]);
+  });
+});

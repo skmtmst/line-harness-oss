@@ -599,7 +599,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             <div className={styles.pickerGrid}>
               {picker.items.map((m) => (
                 <Button key={m.id} variant="text" size="thumbnail" title={m.filename} aria-label={`${m.filename} を選ぶ`} onClick={() => { set({ mediaId: m.id, mediaFilename: m.filename, mediaSourceUrl: m.url }); setPicker({ ...picker, open: false }) }}>
-                  <img src={m.url} alt="" />
+                  <img width={120} height={120} src={m.url} alt="" />
                 </Button>
               ))}
             </div>

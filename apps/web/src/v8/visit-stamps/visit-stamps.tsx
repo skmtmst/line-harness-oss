@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import Checkbox from '@/components/shared/checkbox'
 import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
@@ -110,7 +111,7 @@ function usePhotoUrl(accountId: string | null, url: string | null | undefined): 
 
 function PaperThumb({ accountId, url }: { accountId: string | null; url: string }) {
   const src = usePhotoUrl(accountId, url)
-  return src ? <img src={src} alt="" /> : <ImageIcon size={16} aria-hidden="true" />
+  return src ? <img width={96} height={96} src={src} alt="" /> : <ImageIcon size={16} aria-hidden="true" />
 }
 const newRequestId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `req-${Date.now()}-${Math.random().toString(36).slice(2)}`)
 
@@ -162,7 +163,7 @@ function VisitStampsScreen() {
     if (!issue) return
     const input = document.getElementById(`stamp-${issue.field}`)
     input?.focus()
-    input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    input?.scrollIntoView?.({ block: 'center', behavior: scrollMotion() })
   }, [issue])
   const uploadImage = async (file: File) => {
     if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 3 * 1024 * 1024 || !file.size) { notifyToast('背景画像はJPG・PNG、3MBまでです。', { tone: 'error' }); return }
@@ -553,7 +554,7 @@ function VisitStampsScreen() {
                 <div className={styles.preview} aria-label="お客さまの見え方">
                   <span className={styles.previewLabel}>お客さまの見え方</span>
                   <div className={styles.customerCard} style={{ backgroundColor: cardColor, color: visitStampDarkInk(cardColor) ? 'var(--color-ink)' : 'var(--color-canvas)' }}>
-                    {settings.backgroundImageUrl ? <img className={styles.cardImage} src={settings.backgroundImageUrl} alt="" /> : null}
+                    {settings.backgroundImageUrl ? <img width={400} height={250} className={styles.cardImage} src={settings.backgroundImageUrl} alt="" /> : null}
                     <div className={styles.customerCardContent}>
                       <div className={styles.cardTitle} style={settings.backgroundImageUrl ? { backgroundColor: cardColor } : undefined}>
                         <span ><TruncatedText value={String(name ?? '')} /></span><span>{`${filled} / ${slotCount(settings)}`}</span>

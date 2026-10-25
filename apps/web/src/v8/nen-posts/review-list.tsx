@@ -218,7 +218,7 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
       <div className={styles.cardPhoto}>
         {imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element -- お客様が投稿した写真
-          <img src={imageSrc} alt={`${name}の投稿写真`} loading="lazy" />
+          <img width={240} height={240} src={imageSrc} alt={`${name}の投稿写真`} loading="lazy" />
         ) : (
           <div className={styles.cardPhotoEmpty}>画像を表示できません</div>
         )}
@@ -343,7 +343,7 @@ export function RejectDialogV8({
           <div className={styles.dialogPhoto}>
             {imageSrc ? (
               // eslint-disable-next-line @next/next/no-img-element -- お客様が投稿した写真
-              <img src={imageSrc} alt="" className={styles.dialogPhotoThumb} />
+              <img width={44} height={44} src={imageSrc} alt="" className={styles.dialogPhotoThumb} />
             ) : <span className={styles.dialogPhotoThumb} aria-hidden="true" />}
             <div className={styles.dialogPhotoText}>
               <p className={styles.dialogPhotoName}>{name}</p>

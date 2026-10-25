@@ -386,7 +386,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
           <div className={styles.assetImage}>
             {imageSet ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl.trim()} alt="" />
+              <img width={320} height={240} src={imageUrl.trim()} alt="" />
             ) : <span>{couponTitle || name || 'クーポン'}</span>}
           </div>
           <div className={styles.assetBody}>

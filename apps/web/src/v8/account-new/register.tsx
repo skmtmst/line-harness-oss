@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
@@ -147,7 +148,7 @@ function AccountRegistrationForm() {
     if (!Object.keys(fieldErrors).length) return
     const invalid = stepPanelRef.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')
     invalid?.focus()
-    invalid?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    invalid?.scrollIntoView?.({ block: 'center', behavior: scrollMotion() })
   }, [fieldErrors, currentStep, sub])
 
   // 端末の下書きがあれば一度だけ戻す（秘密値は書いていないので入れ直す）。

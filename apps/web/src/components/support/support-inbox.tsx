@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Avatar from '@/components/shared/avatar'
 import Notice from '@/components/shared/notice'
@@ -190,7 +191,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       if (isStale()) return true
       if (response.success) {
         setDetail(response.data)
-        if (!quiet) window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+        if (!quiet) window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: scrollMotion() }), 50)
         return true
       }
       return false

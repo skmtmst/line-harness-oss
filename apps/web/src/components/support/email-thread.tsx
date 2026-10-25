@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import EntitySelect from '@/components/shared/entity-select'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -262,7 +263,7 @@ export default function EmailThread({
           })
           setLoadError('')
           if (!quiet) {
-            window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+            window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: scrollMotion() }), 50)
           }
           return true
         }

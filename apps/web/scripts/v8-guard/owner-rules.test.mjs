@@ -22,7 +22,7 @@ test('押せない時に灰色へ塗り直す・重ねて薄くする・影や�
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => !['selection-color', 'tap-highlight'].includes(kind))
     await page.setContent('<style>:root{--o:.48}.b{box-shadow:0 1px 2px #0003;cursor:pointer}.b:disabled{opacity:var(--o);box-shadow:none;cursor:not-allowed}</style><main><button class="b" disabled>保存</button></main>')
     assert.deepEqual(await kinds(), [])
     await page.addStyleTag({ content: '.b:disabled{background-color:#eee}' })
@@ -40,7 +40,7 @@ test('動きの時間を手書きすると落ち、共通の --motion-* と動�
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => !['selection-color', 'tap-highlight'].includes(kind))
     await page.setContent('<style>:root{--motion-fast:120ms}.a{transition:background-color var(--motion-fast) linear}@media (prefers-reduced-motion: reduce){*{transition-duration:.01ms!important}}</style><main><a class="a" href="#">リンク</a></main>')
     assert.deepEqual(await kinds(), [])
     await page.addStyleTag({ content: '.a{transition:background-color 200ms linear}' })
@@ -54,7 +54,7 @@ test('動きの曲線を手書きすると落ち、共通の --motion-ease-* と
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => !['selection-color', 'tap-highlight'].includes(kind))
     await page.setContent('<style>:root{--motion-fast:120ms;--motion-ease-out:cubic-bezier(.22,1,.36,1);--motion-spin:1s}.a{transition:color var(--motion-fast) var(--motion-ease-out)}.s{animation:r var(--motion-spin) linear infinite}@keyframes r{to{rotate:1turn}}</style><main><a class="a" href="#">リンク</a><i class="s"></i></main>')
     assert.deepEqual(await kinds(), [])
     await page.addStyleTag({ content: '.b{animation:none;transition:none}' })
@@ -72,7 +72,7 @@ test('印が 16・20 以外の大きさや 1.75 以外の線だと落ち、左�
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => !['selection-color', 'tap-highlight'].includes(kind))
     const icon = (size, stroke = 1.75, cls = 'lucide') => `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}"><path d="M4 12h16"/></svg>`
     await page.setContent(`<main><button>${icon(16)}保存</button><h2>${icon(20)}見出し</h2><div data-list-state="empty">${icon(40)}</div><span style="display:inline-flex;width:16px;height:16px;border-radius:50%;background:#087a3e">${icon(10)}</span></main><aside><a class="sidebar_item__x" href="#">${icon(18)}友だち</a></aside>`)
     assert.deepEqual(await kinds(), [])
@@ -89,11 +89,28 @@ test('共通のボタンの印と文字の間が 8 でないと落ち、8 なら
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => !['selection-color', 'tap-highlight'].includes(kind))
     const button = gap => `<main><button class="button_button__x" style="display:inline-flex;align-items:center;gap:${gap}px"><svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 12h16"/></svg>保存する</button></main>`
     await page.setContent(button(8))
     assert.deepEqual(await kinds(), [])
     await page.setContent(button(6))
     assert.ok((await kinds()).includes('button-icon-gap'))
+  } finally { await browser.close() }
+})
+
+test('選んだ文字の地・タップの光・画像の幅と高さ・動きを減らす設定の遅れを見張る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const kindsOf = async (page) => (await page.evaluate(scanPolish)).map(f => f.kind)
+    const ok = '<style>::selection{background:#087a3e33}html{-webkit-tap-highlight-color:transparent}.t{width:40px;height:40px}:root{--m:1s}.r{transition:opacity var(--m) linear}</style>'
+    const page = await browser.newPage({ reducedMotion: 'reduce' })
+    await page.setContent(`${ok}<style>@media (prefers-reduced-motion: reduce){*{transition-delay:0s!important}}</style><main><img class="t" width="40" height="40" alt=""><img alt="" style="max-width:100%"><p class="r" style="transition-delay:.2s">本文</p></main>`)
+    assert.deepEqual(await kindsOf(page), [])
+    await page.setContent(`${ok}<main><img class="t" alt=""></main>`)
+    assert.ok((await kindsOf(page)).includes('img-size'))
+    await page.setContent(`${ok}<main><p class="r" style="transition-delay:.2s">本文</p></main>`)
+    assert.ok((await kindsOf(page)).includes('reduced-motion-delay'))
+    await page.setContent('<main>本文</main>')
+    assert.ok((await kindsOf(page)).includes('selection-color'))
   } finally { await browser.close() }
 })

@@ -913,7 +913,7 @@ function PublicationsV8({
                         <Td>
                           {imageSrc ? (
                             // eslint-disable-next-line @next/next/no-img-element -- 掲載中の公開写真
-                            <img src={imageSrc} alt={`${name}の公開写真`} loading="lazy" className={styles.pubThumb} />
+                            <img width={56} height={56} src={imageSrc} alt={`${name}の公開写真`} loading="lazy" className={styles.pubThumb} />
                           ) : (
                             <span aria-hidden="true" className={styles.pubThumb} />
                           )}

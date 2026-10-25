@@ -191,7 +191,7 @@ export default function MediaPickerDialog({
                     onClick={() => onSelect(item)}
                   >
                     {item.kind === 'image' && accountId ? (
-                      <img
+                      <img width={40} height={40}
                         src={api.media.contentUrl(item.id, accountId)}
                         alt=""
                         className="border-hairline h-10 w-10 shrink-0 rounded-control border object-cover"

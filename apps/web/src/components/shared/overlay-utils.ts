@@ -160,6 +160,11 @@ export function prefersReducedMotion(): boolean {
 /**
  * 閉じる動きを付けてよいか。動きを減らす設定では即時に外す。
  */
+/** 画面の中を動かす時の速さ。動きを減らす設定では、なめらかに流さず一度で移る。 */
+export function scrollMotion(): ScrollBehavior {
+  return prefersReducedMotion() ? 'auto' : 'smooth'
+}
+
 export function shouldAnimateLeave(): boolean {
   return typeof document !== 'undefined'
     && !prefersReducedMotion()

@@ -10,6 +10,17 @@ const compat = new FlatCompat({
   baseDirectory,
 });
 
+// 閉じる・外すの「×」は文字で描かず、共通の CloseButton（SVG の印）を使う。
+const CLOSE_GLYPH = {
+  selector: "JSXElement[openingElement.name.name=/^(button|Button)$/] > JSXText[value=/^\\s*[×✕✖]\\s*$/]",
+  message: '閉じる・外すの「×」は文字ではなく CloseButton（components/shared/close-button）を使ってください。',
+};
+// 動きを減らす設定でも流れてしまうので、なめらかなスクロールは scrollMotion() を通す（試験の期待値は除く）。
+const SMOOTH_SCROLL = {
+  selector: "Property[key.name='behavior'][value.value='smooth']",
+  message: "behavior: 'smooth' ではなく scrollMotion()（components/shared/overlay-utils）を使ってください。",
+};
+
 export default [
   {
     ignores: ['**/.next/**', '**/dist/**', '**/coverage/**'],
@@ -26,11 +37,14 @@ export default [
     rules: {
       'jsx-a11y/alt-text': 'error',
       'react/no-danger': 'error',
-      // 閉じる・外すの「×」は文字で描かず、共通の CloseButton（SVG の印）を使う。
-      'no-restricted-syntax': ['error', {
-        selector: "JSXElement[openingElement.name.name=/^(button|Button)$/] > JSXText[value=/^\\s*[×✕✖]\\s*$/]",
-        message: '閉じる・外すの「×」は文字ではなく CloseButton（components/shared/close-button）を使ってください。',
-      }],
+      'no-restricted-syntax': ['error', CLOSE_GLYPH],
+    },
+  },
+  {
+    files: ['**/*.{js,jsx,mjs,ts,tsx}'],
+    ignores: ['**/*.test.*', '**/*.spec.*'],
+    rules: {
+      'no-restricted-syntax': ['error', CLOSE_GLYPH, SMOOTH_SCROLL],
     },
   },
 ];

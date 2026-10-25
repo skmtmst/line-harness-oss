@@ -78,7 +78,7 @@ export default function NoticeLineDialogV8({ open, onClose }: { open: boolean; o
               <div className={styles.qrBox}>
                 {qr ? (
                   // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
-                  <img src={qr} alt={`${info.accountName} の友だち追加 QR コード`} className={styles.qr} />
+                  <img width={120} height={120} src={qr} alt={`${info.accountName} の友だち追加 QR コード`} className={styles.qr} />
                 ) : null}
               </div>
               <div className={styles.qrText}>

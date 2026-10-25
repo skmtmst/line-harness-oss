@@ -118,7 +118,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
             <li key={sender.id} className={styles.row}>
               {sender.iconUrl
                 // eslint-disable-next-line @next/next/no-img-element -- 送り手のアイコン（同じ店の登録メディア）
-                ? <img src={sender.iconUrl} alt="" className={styles.icon} />
+                ? <img width={32} height={32} src={sender.iconUrl} alt="" className={styles.icon} />
                 : <span className={styles.icon} aria-hidden="true">{sender.name.slice(0, 1)}</span>}
               <span className={styles.name} title={sender.name}>{sender.name}{sender.iconMissing ? '（画像が見つかりません）' : ''}</span>
               <span className={styles.who}>{sender.visibility === 'all' ? '全員' : '本人だけ'}</span>
@@ -145,7 +145,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
           <button type="button" className={styles.iconTile} onClick={() => setIconPickerOpen(true)} aria-label={icon ? '画像を変える' : '画像を選ぶ'}>
             {icon?.url
               // eslint-disable-next-line @next/next/no-img-element -- 登録メディアの画像
-              ? <img src={icon.url} alt="" className={styles.iconTileImage} />
+              ? <img width={88} height={88} src={icon.url} alt="" className={styles.iconTileImage} />
               : <><ImagePlus size={20} aria-hidden="true" /><span>画像を選ぶ</span></>}
           </button>
           <div className={styles.iconText}>

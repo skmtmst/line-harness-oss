@@ -115,5 +115,23 @@ export default function scanPolishRules() {
     const gap = r.right <= text.left + 0.5 ? text.left - r.right : r.left >= text.right - 0.5 ? r.left - text.right : null
     if (gap !== null && Math.abs(gap - 8) > 0.5) add('button-icon-gap', el, { gap: Math.round(gap * 10) / 10 }, el.textContent)
   }
+  // 9. 最後の仕上げ：文字を選んだ時の地（ブランドの深い緑の薄い色）・端末のタップの光なし・画像の幅と高さ・動きを減らす設定の遅れなし。
+  const selection = getComputedStyle(document.body, '::selection').backgroundColor
+  if (/^rgba\(0, 0, 0, 0\)$|^transparent$/.test(selection)) add('selection-color', document.body, { selection })
+  const tap = css(document.documentElement).webkitTapHighlightColor
+  if (tap && !/rgba\(0, 0, 0, 0\)|transparent/.test(tap)) add('tap-highlight', document.documentElement, { tap })
+  for (const img of document.querySelectorAll('img')) {
+    if (!visible(img) || (img.hasAttribute('width') && img.hasAttribute('height'))) continue
+    // 元の大きさのまま出す写真（幅を CSS が決めない物）は、属性で幅を決めると見た目が変わるので数えない。
+    const fixed = (prop) => { const v = img.style[prop] || [...rules].reverse().find(({ rule }) => img.matches(rule.selectorText) && rule.style[prop] && rule.style[prop] !== 'auto')?.rule.style[prop]; return Boolean(v) }
+    if (fixed('width') || fixed('height')) add('img-size', img, { width: img.getAttribute('width'), height: img.getAttribute('height') }, img.alt)
+  }
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (const el of document.querySelectorAll('body *')) {
+      const c = css(el)
+      const delayed = (c.animationName !== 'none' && c.animationDelay.split(',').some((v) => parseFloat(v) > 0)) || (c.transitionProperty !== 'none' && c.transitionDelay.split(',').some((v) => parseFloat(v) > 0))
+      if (delayed) { add('reduced-motion-delay', el, { animation: c.animationDelay, transition: c.transitionDelay }); break }
+    }
+  }
   return findings
 }

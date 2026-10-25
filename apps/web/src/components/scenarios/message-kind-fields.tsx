@@ -221,7 +221,7 @@ function StickerThumb({ stickerId, label }: { stickerId: string; label: string }
   return (
     // 目印なので次の最適化には載せない。
     // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <img width={48} height={48}
       src={stickerImageUrl(stickerId, attempt)}
       alt={label}
       className="h-12 w-12"

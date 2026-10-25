@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useCallback, useEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from '../shared/button'
@@ -91,7 +92,7 @@ export default function ScrollableTabs({
   const scrollByEdge = (direction: 1 | -1) => {
     const el = scrollerRef.current
     if (!el) return
-    el.scrollBy({ left: direction * Math.max(160, el.clientWidth * 0.6), behavior: 'smooth' })
+    el.scrollBy({ left: direction * Math.max(160, el.clientWidth * 0.6), behavior: scrollMotion() })
   }
 
   /*

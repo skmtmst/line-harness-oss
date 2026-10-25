@@ -409,7 +409,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         <div className={rich.phoneImage}>
           {imageSet ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl.trim()} alt="" />
+            <img width={1040} height={1040} src={imageUrl.trim()} alt="" />
           ) : null}
           {shapeDef.rows.map((row, rowIndex) => (
             <div key={rowIndex} className={rich.phoneRow}>

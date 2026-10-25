@@ -1058,7 +1058,7 @@ export default function RichMenusListV8() {
                     <span className={styles.thumb} data-rows={cells.rows} aria-hidden="true">
                       {g.thumbnailR2Key ? (
                         // eslint-disable-next-line @next/next/no-img-element -- 管理画面内のサムネ。Worker の認証つき口をそのまま使う
-                        <img src={api.richMenuGroups.imageUrl(g.thumbnailR2Key)} alt="" loading="lazy" />
+                        <img width={2500} height={1686} src={api.richMenuGroups.imageUrl(g.thumbnailR2Key)} alt="" loading="lazy" />
                       ) : (
                         Array.from({ length: cells.rows }, (_, r) => (
                           <span key={r} className={styles.thumbRow}>
