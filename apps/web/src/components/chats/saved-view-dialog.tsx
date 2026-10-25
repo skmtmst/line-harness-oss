@@ -10,6 +10,7 @@ import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import CloseButton from '@/components/shared/close-button'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -159,7 +160,7 @@ export default function SavedViewDialog({
             <h2 className="text-ink text-base font-bold">保存した検索を作成</h2>
             <p className="text-ink-secondary mt-1 text-xs">検索名と絞り込み条件を変更して保存できます</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="text-ink-faint ml-auto text-lg leading-none">✕</button>
+          <CloseButton onClick={onClose} className="ml-auto" />
         </header>
 
         {done ? (

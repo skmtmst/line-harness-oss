@@ -182,6 +182,7 @@ const NEW_BASELINE = JSON.stringify([
 const ROLE_LABEL = { owner: 'オーナー', admin: '管理者', staff: 'スタッフ' } as const
 
 import { isEmail } from './report-email'
+import CloseButton from '@/components/shared/close-button'
 
 /*
  * R454: 1回送信の結果を見る画面。しまうと一覧から消えるため、
@@ -1105,7 +1106,7 @@ function AnalyticsReportFormPage() {
             {editing && editing.recipients.some((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)) && <Notice tone="warn" message={`前に選んでいた${editing.recipients.filter((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)).map((item) => `「${item.label}」`).join('・')}は、いまは受け取れません（利用停止・閲覧範囲外の可能性があります）。このまま保存すると宛先から外れます。`} />}
             <EntitySelect aria-label="レポートを受け取る人" noun="担当者" values={staffIds} onChange={setStaffIds} readOnly={!canManage} options={options.recipients.map((person) => ({ value: person.id, label: person.name, description: `${ROLE_LABEL[person.role]}${person.lineLinked ? ' ／ LINE連携済み' : ''}` }))} />
             <div className="report-v8-chips">
-              {emails.map((email, index) => email.trim() && <span className="report-v8-chip" key={index}><span className="report-v8-chipText" title={email}>{email}（メール）</span>{canManage && <button type="button" className="report-v8-chipRemove" aria-label={`${email}を宛先から外す`} onClick={() => setEmails((current) => current.filter((_, value) => value !== index))}>×</button>}</span>)}
+              {emails.map((email, index) => email.trim() && <span className="report-v8-chip" key={index}><span className="report-v8-chipText" title={email}>{email}（メール）</span>{canManage && <CloseButton className="report-v8-chipRemove" aria-label={`${email}を宛先から外す`} onClick={() => setEmails((current) => current.filter((_, value) => value !== index))} />}</span>)}
               {!hasRecipient && <span className="report-v8-chipEmpty">受け取る人を1人以上選んでください。選ぶまで作れません。</span>}
             </div>
             <div className="report-v8-linkRow">

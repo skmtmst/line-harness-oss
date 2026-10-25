@@ -1,5 +1,6 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { memberRanksApi } from '@/lib/api/helpers/gap3';
 import { useOverlayLayer } from '@/components/shared/overlay-utils';
@@ -443,14 +444,7 @@ export default function AdvancedSearchDialog({
                 保存した検索から読み込む
               </Button>
             ) : null}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="閉じる"
-              className="flex h-8 w-8 items-center justify-center rounded-control text-xl leading-none text-ink-faint hover:bg-canvas-sunken"
-            >
-              ×
-            </button>
+            <CloseButton onClick={onClose} />
           </div>
         </div>
 

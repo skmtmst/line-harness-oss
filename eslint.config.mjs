@@ -26,6 +26,11 @@ export default [
     rules: {
       'jsx-a11y/alt-text': 'error',
       'react/no-danger': 'error',
+      // 閉じる・外すの「×」は文字で描かず、共通の CloseButton（SVG の印）を使う。
+      'no-restricted-syntax': ['error', {
+        selector: "JSXElement[openingElement.name.name=/^(button|Button)$/] > JSXText[value=/^\\s*[×✕✖]\\s*$/]",
+        message: '閉じる・外すの「×」は文字ではなく CloseButton（components/shared/close-button）を使ってください。',
+      }],
     },
   },
 ];

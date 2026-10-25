@@ -1,5 +1,6 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
 import type { EventQuestion } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -123,16 +124,9 @@ export default function EventQuestionsEditor({
                     placeholder={`選択肢${oi + 1}`}
                     className="border-hairline rounded-control flex-1 border px-3 py-1.5 text-sm"
                   /></SaveErrorField>
-                  <button
-                    type="button"
-                    onClick={() =>
+                  <CloseButton aria-label={`選択肢${oi + 1}を削除`} onClick={() =>
                       setAt(index, { options: (q.options ?? []).filter((_, i) => i !== oi) })
-                    }
-                    className="text-ink-faint hover:text-danger px-1 text-sm"
-                    aria-label={`選択肢${oi + 1}を削除`}
-                  >
-                    ×
-                  </button>
+                    } />
                 </div>
               ))}
               <button

@@ -1,5 +1,6 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
 import Notice from '@/components/shared/notice'
 import { useId, useRef, useState } from 'react'
 import { api } from '@/lib/api'
@@ -208,14 +209,7 @@ export default function AccountEditModal({
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-canvas px-4 py-4 sm:px-6">
           <h2 id={modalTitleId} className="text-base font-bold text-ink">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ink-faint hover:text-ink-secondary text-xl leading-none"
-            aria-label="閉じる"
-          >
-            ×
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
 
         <form onSubmit={handleSave} className="space-y-4 p-4 sm:p-6">

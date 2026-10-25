@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import CloseButton from '@/components/shared/close-button'
 
 interface Friend {
   id: string
@@ -169,7 +170,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
             <span key={r.id} className="inline-flex items-center gap-1 px-2 py-1 bg-status-info-soft text-action rounded-pill text-xs">
               {r.pictureUrl && <img src={r.pictureUrl} alt="" className="w-4 h-4 rounded-pill" />}
               {r.displayName}
-              <button onClick={() => removeRecipient(r.id)} className="text-action hover:text-action ml-0.5">×</button>
+              <CloseButton aria-label={`${r.displayName}を外す`} onClick={() => removeRecipient(r.id)} />
             </span>
           ))}
         </div>

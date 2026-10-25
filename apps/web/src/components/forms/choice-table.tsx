@@ -12,6 +12,7 @@
  *   動作           … 選択肢ごとに、送る・付ける・開始するを組む
  */
 
+import CloseButton from '@/components/shared/close-button'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useState } from 'react'
 import { newBlockId, type FormChoice, type FormInputBlock, type FormSection } from '@line-crm/shared'
@@ -194,13 +195,7 @@ export default function ChoiceTable({
                   >
                     複製
                   </button>
-                  <button
-                    onClick={() => removeChoice(choice.id)}
-                    className="text-danger px-1 text-xs"
-                    aria-label="削除"
-                  >
-                    ×
-                  </button>
+                  <CloseButton aria-label="削除" onClick={() => removeChoice(choice.id)} />
                 </div>
               </div>
 
