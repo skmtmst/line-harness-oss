@@ -1,3 +1,4 @@
+import { templateFolderList } from './mock-template-folders.mjs'
 import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
 import {DEFAULT_CUSTOMER_LOOK} from '../../packages/shared/dist/customer-look.js'
 /**
@@ -4526,27 +4527,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: formFolders, unfiledCount: 3 }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
-    // 本物の口はフォルダごとの件数（itemCount）と未分類の件数（unfiledCount）も返す。無いとフォルダの脇の数が出ない。
-    // section（今のタブの種類）があれば、本物と同じくその種類のテンプレートだけを数える。
-    const section = query.get('section')
-    if (section) {
-      const richVideo = (item) => {
-        if (item.messageType !== 'imagemap') return false
-        try { return Boolean(JSON.parse(item.draftMessageContent ?? item.messageContent).video) } catch { return false }
-      }
-      const inSection = (item) => section === 'rich_video' ? richVideo(item) : section === 'question' ? Boolean(item.question) : !item.question && !richVideo(item)
-      const items = TEMPLATES.filter(inSection)
-      return {
-        success: true,
-        data: TEMPLATE_FOLDERS.map((folder) => ({ ...folder, itemCount: items.filter((item) => item.folderId === folder.id).length })),
-        unfiledCount: items.filter((item) => item.folderId === null).length,
-      }
-    }
-    return {
-      success: true,
-      data: TEMPLATE_FOLDERS.map((folder) => ({ ...folder, itemCount: folder.templateCount })),
-      unfiledCount: TEMPLATES.filter((item) => item.folderId === null).length,
-    }
+    return templateFolderList(TEMPLATES, TEMPLATE_FOLDERS, query.get('section'))
   }
   if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
     // 板 `NtCE3`：未分類は `folderId: null` の5件。
