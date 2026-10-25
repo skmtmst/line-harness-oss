@@ -20,9 +20,11 @@ export const ROUTES = {
   'broadcast-confirm': '/broadcasts/new?step=confirm',
   booking: '/booking/bookings',
   login: '/login',
+  'hq-attention': '/hq/attention',
 }
 
-export const WIDTHS = [1152, 1440, 1920]
+/** iPad 横（1024px）まで崩れないことを見張る（2026-10-25 オーナー）。 */
+export const WIDTHS = [1024, 1152, 1440, 1920]
 
 const SESSION = {
   lh_csrf: 'visual-qa-csrf',
