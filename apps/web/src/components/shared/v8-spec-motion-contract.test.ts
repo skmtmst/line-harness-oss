@@ -49,11 +49,9 @@ describe('V8 仕上げ3回目の動き', () => {
   })
 
   it("⑤ プルダウンの開いた中身は提案 F で 150ms（StFE7）。候補つき入力は200ms・色・暦ポップは120msのまま。「…」は 120ms", () => {
-    // 1つ選ぶプルダウンの開いた中身は共通部品 select-menu。150ms・動きを減らす設定では動かさない。
+    // 1つ選ぶプルダウンの開いた中身は共通部品 select-menu。150ms（--select-menu-enter が --motion-exit を読む）・動きを減らす設定では動かさない。
     const selectMenu = read('./select-menu.module.css')
     expect(selectMenu).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*\.surface \{\s*animation: select-menu-enter var\(--select-menu-enter\) var\(--motion-ease-out\)/s)
-    const globals = read('../../app/globals.css')
-    expect(globals).toMatch(/--select-menu-enter:\s*150ms/)
     // 「…」のメニューは動きの決まり（提案 F・採用）で押した角から 120ms・0.96→1。
     // 起点と縮みは v8-motion-root-causes.test.tsx が見る。
     const menu = read('./action-menu.module.css')

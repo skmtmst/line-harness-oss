@@ -398,11 +398,12 @@
   /*
    * Tailwind の transition-colors などの既定の速さ（★管理画面 修正方針 §4）。
    * 既定は 150ms・cubic-bezier(0.4,0,0.2,1) で、共通部品（120ms・motion-ease-out）と
-   * 速さが2通りあった（189か所）。物差しの値にそろえる。`@theme` は :root の
-   * --motion-* より先に読まれるので、値をそのまま書く。
+   * 速さが2通りあった（189か所）。物差しの --motion-* を読む（var は描く時に解くので、
+   * :root の --motion-* より先に書いてあっても効く）。
    */
-  --default-transition-duration: 120ms;
+  --default-transition-duration: var(--motion-fast);
   --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-spin: spin var(--motion-spin) linear infinite; /* Tailwind の animate-spin も回る印の 1 周を読む。 */
 
   /* --- ★V8 で増える語彙 -------------------------------------------------
    * V8 移行② で足した名前。値はどのテーマでも同じ新しい語彙なので
@@ -524,7 +525,7 @@
   --polish-focus-offset: 2px;
   /* 押せない時は元の見た目のまま薄くする。本文の墨色が白地で 3:1 を保つ所（0.45 前後で 0.48）。 */
   --polish-disabled-opacity: 0.48;
-  --polish-interaction-duration: 120ms;
+  --polish-interaction-duration: var(--motion-fast);
 }
 :root {
   --polish-icon-control: 16px;
@@ -612,7 +613,6 @@
   --tpl-slot-links-gap: 14px;         /* 文字リンクの間 */
   --tpl-slot-pill-shadow: 0 1px 2px rgb(15 23 32 / 0.12); /* ［差し替える］［消す］の薄い影 */
   --tpl-slot-disabled-opacity: var(--polish-disabled-opacity);
-  --tpl-slot-spin: 1s;                /* 取り込み中の印が1回まわる時間 */
 }
 
 :root {
@@ -864,7 +864,7 @@
   --tap-action-note-pad: 8px 12px;
   --tap-action-option-pad: 8px 10px;
   --tap-action-list-max-h: 320px;
-  --select-menu-enter: 150ms;
+  --select-menu-enter: var(--motion-exit);
   --select-menu-enter-scale: 0.97;
   /* 同じ板で「新しいフォルダ」の名前を入れる（iBuZH）。内側 10・間 8・欄 32・色の見本 18（間 6）・ボタン 28。 */
   --select-menu-panel-pad: 10px;
@@ -1104,7 +1104,7 @@
   --tpl-htn-image-gap: 10px; --tpl-htn-image-pad: 10px; --tpl-htn-thumb: 64px; --tpl-htn-thumb-bg: #c8a47a; --tpl-htn-preview-w: 360px; --tpl-htn-preview-card-w: 186px; --tpl-htn-preview-image-h: 100px;
   --tpl-htn-preview-copy-pad: 10px 12px 33px; --tpl-htn-preview-action-pad: 8px 12px; --tpl-htn-line-green: #06c755; --tpl-htn-progress-pad: 18px 16px 12px; --tpl-htn-seg-h: 34px; --tpl-htn-preview-gap: 4px; --tpl-htn-preview-avatar: 28px; --tpl-htn-preview-avatar-gap: 7px; --tpl-htn-rail-pad: 12px; --tpl-htn-list-gap: 14px; --tpl-htn-list-pad: 0 23px 24px 16px; --tpl-htn-list-pad-narrow: 24px; --tpl-htn-top-cell-pad: 10px; --tpl-htn-result-name-w: 200px; --tpl-htn-result-row-pad: 8px 0; --tpl-htn-result-summary-pull: -10px; --tpl-htn-folder-block-gap: 16px; --tpl-htn-dist-progress-h: 8px; --tpl-htn-toolbar-pull: -8px; --tpl-htn-dot-pull: -14px;
   /* LINE新規追加 v06（p6zMkA・Fqy29・Lwxyh・X0pGdw・Plmq1）。確認の行の回るリング、引き継ぎ中の箱。ひな型の札は共通の StatusBadge が持つ。 */
-  --tpl-htn6-ring: 16px; --tpl-htn6-ring-w: 2px; --tpl-htn6-spin: 0.8s; --tpl-htn6-err-pad: 12px 14px; --tpl-htn6-err-gap: 4px; --tpl-htn6-ack-gap: 12px; --tpl-htn6-ack-note-pad: 26px;
+  --tpl-htn6-ring: 16px; --tpl-htn6-ring-w: 2px; --tpl-htn6-err-pad: 12px 14px; --tpl-htn6-err-gap: 4px; --tpl-htn6-ack-gap: 12px; --tpl-htn6-ack-note-pad: 26px;
   --tpl-htn6-qr: 180px; --tpl-htn6-qr-pad: 16px; --tpl-htn6-qr-gap: 12px;
   --tpl-htn6-text-20: 20px; --tpl-htn6-lh-28: 28px; --tpl-htn6-hero: 48px; --tpl-htn6-done-pad: 24px 0 8px; --tpl-htn6-acct-pad: 14px 16px; --tpl-htn6-hand-pad: 16px; --tpl-htn6-hand-gap: 10px; --tpl-htn6-stat-gap: 16px;
   /* ①事前確認（p6zMkA）。カードの頭・答えの一覧・いまの質問・このあとの質問・チェック結果。 */

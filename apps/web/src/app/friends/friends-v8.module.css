@@ -704,7 +704,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-track);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--motion-fast) var(--motion-ease-out);
 }
 
 .switch:disabled {
@@ -722,7 +722,7 @@
   height: 16px;
   border-radius: var(--radius-pill);
   background: var(--color-canvas);
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .switchOn .switchKnob {

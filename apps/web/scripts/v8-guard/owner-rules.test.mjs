@@ -35,3 +35,17 @@ test('押せない時に灰色へ塗り直す・重ねて薄くする・影や�
     assert.ok((await kinds()).includes('disabled-opacity'))
   } finally { await browser.close() }
 })
+
+test('動きの時間を手書きすると落ち、共通の --motion-* と動きを減らす設定の 0.01ms は通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    await page.setContent('<style>:root{--motion-fast:120ms}.a{transition:background-color var(--motion-fast) linear}@media (prefers-reduced-motion: reduce){*{transition-duration:.01ms!important}}</style><main><a class="a" href="#">リンク</a></main>')
+    assert.deepEqual(await kinds(), [])
+    await page.addStyleTag({ content: '.a{transition:background-color 200ms linear}' })
+    assert.ok((await kinds()).includes('motion-literal'))
+    await page.setContent('<style>:root{--x-spin:.8s}</style><main>本文</main>')
+    assert.ok((await kinds()).includes('motion-literal'))
+  } finally { await browser.close() }
+})

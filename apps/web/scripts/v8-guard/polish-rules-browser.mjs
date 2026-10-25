@@ -60,5 +60,17 @@ export default function scanPolishRules() {
     const cursor = c.pointerEvents !== 'none' && c.cursor !== 'not-allowed'
     if (opacity < 0.4 || opacity > 0.55 || shadow || cursor) add('disabled-look', el, { opacity: Math.round(opacity * 100) / 100, shadow, cursor: c.cursor }, el.getAttribute('aria-label') || el.textContent)
   }
+  // 4. 動きの時間：transition・animation は共通の --motion-* を読む（動きを減らす設定の 0.01ms は止めるための値）。
+  const withoutVars = (value) => { let out = value; while (/var\([^()]*\)/.test(out)) out = out.replace(/var\([^()]*\)/g, ' '); return out }
+  for (const { rule, reduced } of rules) {
+    if (reduced) continue
+    for (let i = 0; i < rule.style.length; i++) {
+      const prop = rule.style[i]
+      const motionProp = /^(transition|animation)(-duration|-delay)?$/.test(prop) || (/^--[\w-]*(-spin|-enter|transition-duration)$/.test(prop) && !prop.startsWith('--motion-'))
+      if (!motionProp) continue
+      const value = rule.style.getPropertyValue(prop)
+      if (/(?<![\w.-])(?!0m?s\b)\d*\.?\d+m?s\b/.test(withoutVars(value))) add('motion-literal', null, { prop, value: value.trim() }, rule.selectorText)
+    }
+  }
   return findings
 }

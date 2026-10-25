@@ -20,7 +20,7 @@
 .icon16 { width: var(--tpl-rt-icon-16); height: var(--tpl-rt-icon-16); flex-shrink: 0; }
 
 .spin {
-  animation: spin 1s linear infinite;
+  animation: spin var(--motion-spin) linear infinite;
 }
 
 @keyframes spin {
