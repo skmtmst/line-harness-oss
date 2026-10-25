@@ -121,4 +121,21 @@ describe('★V8 機能設定の閲覧のみ', () => {
     expect(buttonNames().some((name) => name.includes('初期値に戻す'))).toBe(false)
     expect(host.textContent).toContain('オフ')
   })
+
+  it('探す言葉に合う機能が無いときは「条件を外す」を出し、押すと一覧へ戻る', async () => {
+    fixture.role = 'owner'
+    await act(async () => { root.render(<FeatureSettingsScreen />) })
+    await flush()
+    const search = host.querySelector<HTMLInputElement>('input[aria-label="機能の名前で探す"]')!
+    await act(async () => { fireEvent.change(search, { target: { value: '存在しない機能の名前' } }) })
+    /* 探す欄は打ち終わりを少し待ってから絞る。 */
+    await act(async () => { await new Promise<void>((resolve) => setTimeout(resolve, 350)) })
+    await flush()
+    expect(host.textContent).toContain('条件に合うものはありません')
+    expect(host.querySelector('[data-design="機能の一覧"]')).toBeNull()
+    const clear = [...host.querySelectorAll('button')].find((button) => button.textContent === '条件を外す')!
+    await act(async () => { fireEvent.click(clear) })
+    await flush()
+    expect(host.querySelector('[data-design="機能の一覧"]')).not.toBeNull()
+  })
 })
