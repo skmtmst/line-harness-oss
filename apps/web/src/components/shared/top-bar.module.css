@@ -568,7 +568,7 @@
 :root .root[data-v8-chrome='shell'] { padding-right: var(--tpl-hq2-topbar-pad-end); }
 :root .root[data-v8-chrome='shell'] .actions { gap: 10px; }
 :root .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
-:root .root[data-v8-chrome='shell'] .crumbHome { gap: 6px; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--color-ink-faint); }
+:root .root[data-v8-chrome='shell'] .crumbHome { gap: var(--polish-space-row); font-size: 13px; font-weight: 400; line-height: 20px; color: var(--color-ink-faint); }
 :root .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 16px; height: 16px; }
 :root .root[data-v8-chrome='shell'] .crumbCurrent { font-size: 13px; font-weight: 500; line-height: 20px; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: var(--polish-radius-control); background: transparent; }

@@ -3,7 +3,7 @@
 /*
  * リンク（→つき。Pencil ★V8 `g5Db8`）。
  *
- *   文字 12px/500 action・矢印 12px、間 4
+ *   文字 12px/500 action・矢印 16px、間 8（§6.5 の 5）
  *   乗せると矢印が 2px 右へ滑る（120ms）
  *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない
  */
@@ -11,7 +11,7 @@
 .root {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--polish-space-row);
   color: var(--color-action);
   text-decoration: none;
 }

@@ -223,7 +223,7 @@
 }
 .strip { min-width: 0; }
 /* 数の帯の v8 指定は層の外（ファイル末尾）に置く。 */
-:root .link { display: inline-flex; align-items: center; gap: 4px; }
+:root .link { display: inline-flex; align-items: center; gap: var(--polish-space-row); }
 :root .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
 }
 

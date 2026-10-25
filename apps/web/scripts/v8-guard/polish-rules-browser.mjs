@@ -95,5 +95,25 @@ export default function scanPolishRules() {
     const stroke = parseFloat(sc.strokeWidth)
     if (Math.abs(stroke - 1.75) > 0.01) add('icon-stroke', svg, { stroke }, '')
   }
+  // 5. 共通のボタン・→つきのリンク・パンくずの家の中の、印と文字の間は 8（§6.5 の 5）。
+  const textBox = (el) => {
+    const rects = []
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.textContent.trim() || node.parentElement.closest('svg, [aria-hidden="true"]:not(svg)')) continue
+      const range = document.createRange(); range.selectNodeContents(node)
+      for (const rect of range.getClientRects()) if (rect.width > 0) rects.push(rect)
+    }
+    return rects.length ? { left: Math.min(...rects.map((x) => x.left)), right: Math.max(...rects.map((x) => x.right)), top: Math.min(...rects.map((x) => x.top)), bottom: Math.max(...rects.map((x) => x.bottom)) } : null
+  }
+  for (const el of document.querySelectorAll('[class*="button_button"], [class*="text-link_root"], [class*="top-bar_crumbHome"]')) {
+    if (!visible(el)) continue
+    const svg = [...el.querySelectorAll(':scope > svg, :scope > span > svg:only-child')].find(visible), text = textBox(el)
+    if (!svg || !text) continue
+    const r = svg.getBoundingClientRect()
+    if (r.top >= text.bottom || r.bottom <= text.top) continue
+    const gap = r.right <= text.left + 0.5 ? text.left - r.right : r.left >= text.right - 0.5 ? r.left - text.right : null
+    if (gap !== null && Math.abs(gap - 8) > 0.5) add('button-icon-gap', el, { gap: Math.round(gap * 10) / 10 }, el.textContent)
+  }
   return findings
 }

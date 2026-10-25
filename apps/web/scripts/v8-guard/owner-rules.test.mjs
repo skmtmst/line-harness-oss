@@ -84,3 +84,16 @@ test('印が 16・20 以外の大きさや 1.75 以外の線だと落ち、左�
     assert.ok((await kinds()).includes('icon-stroke'))
   } finally { await browser.close() }
 })
+
+test('共通のボタンの印と文字の間が 8 でないと落ち、8 なら通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    const button = gap => `<main><button class="button_button__x" style="display:inline-flex;align-items:center;gap:${gap}px"><svg class="lucide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 12h16"/></svg>保存する</button></main>`
+    await page.setContent(button(8))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(button(6))
+    assert.ok((await kinds()).includes('button-icon-gap'))
+  } finally { await browser.close() }
+})
