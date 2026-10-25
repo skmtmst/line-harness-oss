@@ -105,7 +105,8 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     const src = read('row-actions.tsx')
     expect(src).toContain('size="compact"')
     const buttonCss = read('button.module.css')
-    expect(buttonCss).toMatch(/\.compact\s*{[^}]*height:\s*32px/s)
+    expect(buttonCss).toMatch(/\.compact\s*{[^}]*height:\s*var\(--control-h-compact\)/s)
+    expect(read('../../app/globals.css')).toMatch(/--control-h-compact:\s*32px/)
   })
 
   it("項目がない行も同じその他操作の入口を持つ", () => {
