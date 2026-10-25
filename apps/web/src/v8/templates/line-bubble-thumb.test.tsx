@@ -3,7 +3,7 @@
  * 一覧の小さな吹き出し：種類ごとの形・壊れた中身・差し込みの札・画像の読み込みを遅らせる。
  */
 import React from 'react'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { TemplateQuestion } from '@/lib/api'
 import LineBubbleThumb from './line-bubble-thumb'
@@ -87,6 +87,13 @@ describe('LineBubbleThumb', () => {
     expect(img?.getAttribute('width')).toBe('48')
     expect(img?.getAttribute('height')).toBe('30')
     expect(img?.getAttribute('alt')).toBe('')
+  })
+
+  it('読めなかった画像は壊れた印を出さず「画像」にする', () => {
+    const root = draw({ kind: 'image', src: 'https://example.com/missing.jpg' })
+    fireEvent.error(root.querySelector('img') as HTMLImageElement)
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.textContent).toBe('画像')
   })
 
   it('種類ごとの文と数', () => {
