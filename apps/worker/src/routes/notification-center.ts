@@ -48,6 +48,14 @@ notificationCenter.get('/api/notifications/center', async (c) => {
     }
     const category = categoryFrom(c.req.query('category'));
     if (category === null) return c.json({ success: false, error: '通知の種類が正しくありません' }, 400);
+    // 未読だけ（ベル・通知の一覧の「未読」）。この担当者の既読で決める。
+    const unreadParam = c.req.query('unread');
+    if (unreadParam !== undefined && unreadParam !== '' && unreadParam !== '0' && unreadParam !== '1') {
+      return c.json({ success: false, error: '未読の指定が正しくありません' }, 400);
+    }
+    const unreadOnly = unreadParam === '1';
+    // 件数（total）は種類ごとの未読を数えていないので、組み合わせは受けない（残りの件数がずれる）。
+    if (unreadOnly && category) return c.json({ success: false, error: '未読と種類は一緒に指定できません' }, 400);
     const rawLimit = parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: {} }).limit;
     if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > 100) {
       return c.json({ success: false, error: '表示件数は1〜100で指定してください' }, 400);
@@ -59,7 +67,7 @@ notificationCenter.get('/api/notifications/center', async (c) => {
     }
     const staffId = c.get('staff').id;
     const [items, counts] = await Promise.all([
-      getNotificationCenter(c.env.DB, { lineAccountId, staffId, category, limit: rawLimit, offset: rawOffset }),
+      getNotificationCenter(c.env.DB, { lineAccountId, staffId, category, ...(unreadOnly ? { unreadOnly } : {}), limit: rawLimit, offset: rawOffset }),
       getNotificationCenterCounts(c.env.DB, { lineAccountId, staffId }),
     ]);
     return c.json({
@@ -77,7 +85,7 @@ notificationCenter.get('/api/notifications/center', async (c) => {
         })),
         counts,
         unreadCount: counts.unread,
-        total: category ? counts[category] : counts.all,
+        total: unreadOnly ? counts.unread : category ? counts[category] : counts.all,
         paging: { limit: rawLimit, offset: rawOffset },
         sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }],
       }),
