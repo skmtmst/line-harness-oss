@@ -3,7 +3,7 @@
 import { isRichVideoTemplate } from './list-model'
 
 import { renderTemplateDialogs } from './list-dialogs'
-import { ChipKey,PAGE_SIZE_OPTIONS,PendingDelete,SAVED_FILTER_OPTIONS,Section,Template,latestContentOf,normalizeTemplateSearchText } from './list-model'
+import { ChipKey,FolderCountSection,PAGE_SIZE_OPTIONS,PendingDelete,SAVED_FILTER_OPTIONS,Section,Template,latestContentOf,normalizeTemplateSearchText } from './list-model'
 import { renderTemplateList } from './list-table'
 
 
@@ -69,6 +69,10 @@ export default function TemplatesListV8() {
   const narrow = useNarrowViewport()
 
   const [activeSection, setActiveSection] = useState<Section>('message')
+  /* フォルダの数を数えるタブの種類。カルーセル・リッチメッセージのタブでは前のテンプレートのタブのまま。 */
+  const [folderSection, setFolderSection] = useState<FolderCountSection>('message')
+  /* 古いタブの答えが後から届いても数を上書きしない。 */
+  const folderRequestRef = useRef(0)
   const [templates, setTemplates] = useState<Template[]>([])
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
@@ -247,10 +251,13 @@ export default function TemplatesListV8() {
       return
     }
     const accountId = selectedAccountId
+    const section = folderSection
+    const request = ++folderRequestRef.current
     setFolderError('')
     try {
-      const res = await api.folders.list('template', accountId)
-      if (activeAccountRef.current !== accountId) return
+      // フォルダと未分類の数は、今のタブの種類だけをサーバーで数える。
+      const res = await api.folders.list('template', accountId, section)
+      if (activeAccountRef.current !== accountId || folderRequestRef.current !== request) return
       if (res.success) {
         setFolders(res.data)
         setUnfiledCount(res.unfiledCount ?? null)
@@ -258,10 +265,10 @@ export default function TemplatesListV8() {
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure);
 
-      if (activeAccountRef.current === accountId) { if (!fieldFailure) setFolderError('フォルダを読み込めませんでした。')
+      if (activeAccountRef.current === accountId && folderRequestRef.current === request) { if (!fieldFailure) setFolderError('フォルダを読み込めませんでした。')
     }
   }
-  }, [selectedAccountId, saveErrors])
+  }, [selectedAccountId, folderSection, saveErrors])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
 
@@ -903,6 +910,7 @@ export default function TemplatesListV8() {
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
   const switchSection = (next: Section) => {
     setActiveSection(next)
+    if (next === 'message' || next === 'question' || next === 'rich_video') setFolderSection(next)
     setPage(1)
     setSelectedIds(new Set())
   }

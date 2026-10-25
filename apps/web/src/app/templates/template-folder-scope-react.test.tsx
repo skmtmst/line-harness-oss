@@ -111,7 +111,7 @@ describe('テンプレートのフォルダはアカウント単位 (N-147)', ()
     render(<TemplatesPage />)
     await flush()
     await screen.findByText('A店の予約')
-    expect(foldersList).toHaveBeenCalledWith('template', 'account-a')
+    expect(foldersList).toHaveBeenCalledWith('template', 'account-a', 'message')
   })
 
   test('アカウントを切り替えると前のフォルダを残さず、新しいアカウントで読み直す', async () => {
@@ -126,7 +126,7 @@ describe('テンプレートのフォルダはアカウント単位 (N-147)', ()
     // Bのフォルダが出て、Aのフォルダ名は残っていない
     await screen.findByText('B店の案内')
     expect(screen.queryByText('A店の予約')).toBeNull()
-    expect(foldersList).toHaveBeenCalledWith('template', 'account-b')
+    expect(foldersList).toHaveBeenCalledWith('template', 'account-b', 'message')
     expect(foldersList.mock.calls.filter(([, account]) => account === 'account-a')).toHaveLength(1)
   })
 

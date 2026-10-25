@@ -32,18 +32,23 @@ export function comparisonTrend(rows:Record<string,unknown>[], period:ReturnType
   return {date,values,state:row?.state==='failed'?'failed':!row?'missing':row.state==='ready'?'ready':'partial'};
  });
 }
+/** 件数（足し上げる数）。そろった日数が違う店どうしでは比べられないので、平均と差は期間の全部の日がそろった時だけ出す。 */
+export const comparisonCountKeys:readonly ComparisonKey[]=['friendChange','bookings','visits'];
+/** 期間のうち、集計がそろった日（失敗の日・未集計の日を除く）だけで数を出す。何日分かは coveredDays で返す。 */
 export async function storeNumbers(db:D1Database,a:string,period:ReturnType<typeof comparisonPeriod>){
  const style=(await db.prepare("SELECT style FROM account_styles WHERE line_account_id=? AND selection_mode='configured'").bind(a).first<{style:string}>())?.style??null;
  const observations=(await db.prepare("SELECT * FROM hq_store_daily_metrics WHERE account_id=? AND date BETWEEN ? AND ? ORDER BY date").bind(a,period.from,period.to).all<Record<string,unknown>>()).results;
- const rows=observations.filter(row=>row.state!=='failed');
- const full=rows.length===period.days,sum=(key:string)=>full&&rows.every(r=>r[key]!==null)?rows.reduce((n,r)=>n+Number(r[key]),0):null;
- const added=sum('friends_added'),blocked=sum('friends_blocked'),start=full?rows[0]?.friends_at_start:null,recipients=sum('broadcast_recipients'),clicks=sum('broadcast_clicks'),visits=sum('visits'),noShows=sum('no_shows');
- // 中央値同士の中央値にせず、担当者の実際の応答時刻から対象期間の中央値を計算する。
+ const rows=observations.filter(row=>row.state!=='failed'),coveredDays=rows.length;
+ // 数ごとに、そろった日の全部に値がある時だけ足す。一部の日だけの値を混ぜない。
+ const sum=(key:string)=>coveredDays>0&&rows.every(r=>r[key]!==null)?rows.reduce((n,r)=>n+Number(r[key]),0):null;
+ const added=sum('friends_added'),blocked=sum('friends_blocked'),start=coveredDays?rows[0]?.friends_at_start:null,recipients=sum('broadcast_recipients'),clicks=sum('broadcast_clicks'),visits=sum('visits'),noShows=sum('no_shows');
+ // 中央値同士の中央値にせず、担当者の実際の応答時刻から、そろった日の中央値を計算する。
  const from=new Date(`${period.from}T00:00:00+09:00`).toISOString(),to=new Date(Date.parse(`${period.to}T00:00:00+09:00`)+86400000).toISOString();
- const minutes=full?(await db.prepare(`SELECT minutes FROM hq_store_response_samples WHERE account_id=? AND julianday(responded_at)>=julianday(?) AND julianday(responded_at)<julianday(?) ORDER BY minutes`).bind(a,from,to).all<{minutes:number}>()).results.filter(x=>x.minutes>=0).map(x=>x.minutes):[];
+ const days=new Set(rows.map(r=>String(r.date)));
+ const minutes=coveredDays?(await db.prepare(`SELECT minutes,date(responded_at,'+9 hours') day FROM hq_store_response_samples WHERE account_id=? AND julianday(responded_at)>=julianday(?) AND julianday(responded_at)<julianday(?) ORDER BY minutes`).bind(a,from,to).all<{minutes:number;day:string}>()).results.filter(x=>x.minutes>=0&&days.has(x.day)).map(x=>x.minutes):[];
  const response=minutes.length?(minutes[Math.floor((minutes.length-1)/2)]+minutes[Math.floor(minutes.length/2)])/2:null;
  const values:Record<ComparisonKey,number|null>={friendChange:added!==null&&blocked!==null?added-blocked:null,blockRate:start&&blocked!==null?100*blocked/Number(start):null,clickRate:recipients&&clicks!==null?100*clicks/recipients:null,bookings:sum('bookings'),visits,noShowRate:visits!==null&&noShows!==null&&visits+noShows>0?100*noShows/(visits+noShows):null,responseMinutes:response};
- return {values,style,computedAt:full?rows.map(r=>String(r.computed_at)).sort()[0]??null:null,trend:observations};
+ return {values,style,computedAt:coveredDays?rows.map(r=>String(r.computed_at)).sort()[0]??null:null,trend:observations,coveredDays,periodDays:period.days};
 }
 
 /** 新規処理で補修が止まらないよう、毎回、過去分と昨日分の枠を1つずつ確保する。 */
