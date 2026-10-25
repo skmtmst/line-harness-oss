@@ -583,6 +583,26 @@ describe('webinarApi notifications', () => {
   })
 })
 
+describe('folders.list', () => {
+  it('テンプレートのフォルダだけ、今のタブの種類を添えて数えさせる', async () => {
+    const fetchSpy = vi.fn(async () => new Response(
+      JSON.stringify({ success: true, data: [] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await api.folders.list('template', 'account/1', 'question')
+    await api.folders.list('template', 'account/1')
+    await api.folders.list('tag', 'account/1', 'question')
+
+    expect(fetchSpy.mock.calls.map((call) => (call as unknown[])[0])).toEqual([
+      'https://worker.example.com/api/folders?kind=template&account_id=account%2F1&section=question',
+      'https://worker.example.com/api/folders?kind=template&account_id=account%2F1',
+      'https://worker.example.com/api/folders?kind=tag&account_id=account%2F1',
+    ])
+  })
+})
+
 describe('webinarApi list data', () => {
   it('一覧とフォルダ集計を選択中のLINE公式アカウントへ絞る', async () => {
     const fetchSpy = vi.fn(async () => new Response(

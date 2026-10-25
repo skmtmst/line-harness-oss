@@ -18,7 +18,8 @@ import { ClipboardList,GalleryHorizontalEnd,HelpCircle,LayoutGrid,MessageSquare,
  */
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
-export type Section = 'message' | 'question' | 'rich_video' | BroadcastAssetKind
+export type FolderCountSection = 'message' | 'question' | 'rich_video'
+export type Section = FolderCountSection | BroadcastAssetKind
 
 /** 絞り込み札。独立に切り替える（1通のみと複数通だけは片方）。 */
 export type ChipKey = 'single' | 'multiple' | 'variables' | 'unused'
