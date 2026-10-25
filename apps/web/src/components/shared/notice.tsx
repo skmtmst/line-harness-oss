@@ -38,7 +38,7 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   footer?: ReactNode
   /** 内容を短い丸の印で伝える。既定の図柄も引き続き使える。 */
   marker?: 'dot'
-  /** カード内などの小さな帯。本文を1行に省略し、title で全文を渡す。 */
+  /** カード内などの小さな帯。案内・成功の本文は1行に省略し、title で全文を渡す。警告・危険は折り返す。 */
   compact?: boolean
   /** 枠線のない注意帯を描く板だけで指定する。既定の帯は変えない。 */
   appearance?: 'soft'
@@ -119,6 +119,7 @@ export default function Notice({
       data-compact={compact || undefined}
       data-appearance={appearance}
       data-design-part="notice"
+      data-tone={canonical}
       data-density={density}
       data-presentation={presentation}
       data-action-layout={action ? actionLayout : undefined}
