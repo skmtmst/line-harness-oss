@@ -72,6 +72,14 @@ beforeEach(() => {
 });
 
 describe('紹介者の成績・動線の参照権限', () => {
+  it('閲覧担当は比較条件を付けても紹介者を保存できない', async () => {
+    const res = await app('staff').fetch(new Request('https://example.com/api/affiliates/aff-1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '不可', expected: { name: '元の名前' } }),
+    }), { DB: {} } as unknown as Env['Bindings']);
+    expect(res.status).toBe(403);
+    expect(dbMocks.updateAffiliate).not.toHaveBeenCalled();
+  });
   it.each(['/api/affiliates/aff-1/report', '/api/affiliates/aff-1/journeys', '/api/affiliates/aff-1/links'])(
     '%s は鍵のないstaffに403を返す', async (path) => {
       expect((await request(path, { role: 'staff' })).status).toBe(403);
