@@ -2,7 +2,7 @@
 
 import PeriodPicker from '@/components/shared/period-picker'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { StoreComparisonDetail, HqAttentionKind, StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
@@ -25,6 +25,10 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { storeComparisonApi } from '@/lib/api/helpers/gap3'
+import { fetchApi } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
+import type { AccountWithStats } from '@/contexts/account-context'
 import { diffTitle, formatDiff, formatMetric, METRICS, diffTone, worseCount, type MetricDef } from './metrics'
 import styles from './list.module.css'
 
@@ -42,6 +46,10 @@ const COMPARE_OPTIONS = [
   { value: 'average', label: '比べる相手：全店の平均' },
 ]
 
+/** 集計は毎朝 4 時半から、前の日の分まで（Worker の店の比較の集計と同じ時刻）。 */
+const SNAPSHOT_TIME = '毎朝 4 時半'
+const NOT_COMPUTED = `まだ集計していません（${SNAPSHOT_TIME}から、前の日の分まで集計します）`
+
 function rangeLabel(from: string, to: string): string {
   const f = (v: string) => `${Number(v.slice(5, 7))}/${Number(v.slice(8, 10))}`
   return `${f(from)}〜${f(to)}`
@@ -51,6 +59,11 @@ export default function StoreComparisonList() {
   usePageTitle('店の比較')
   usePageCrumbs([{ label: 'ホーム', href: '/hq' }])
   const preparing = usePreparingDialog()
+  const { accounts, refreshAccounts } = useAccount()
+  const role = useStaffRole()
+  const canManage = readSessionSnapshot()?.impersonation?.mode !== 'read' && canManageRole(role)
+  const [checkingId, setCheckingId] = useState<string | null>(null)
+  const [checkFailed, setCheckFailed] = useState<string | null>(null)
   const [days, setDays] = useState(30)
   const [compare, setCompare] = useState<'previous' | 'average'>('previous')
   /* 初期は予約の少ない順（G7 §2-1）。 */
@@ -103,6 +116,27 @@ export default function StoreComparisonList() {
     }
   }
 
+  /* LINE の鍵が切れた店は、統括のアカウントと同じ確認（接続の確かめ直し）を頼んで読み直す。 */
+  const recheck = async (account: AccountWithStats) => {
+    if (checkingId) return
+    setCheckingId(account.id)
+    setCheckFailed(null)
+    try {
+      await fetchApi(`/api/line-accounts/${encodeURIComponent(account.id)}/connection-checks`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': `store-comparison-check-${account.id}-${crypto.randomUUID()}` },
+        body: JSON.stringify({ expectedRevision: account.revision }),
+      })
+      await Promise.all([refreshAccounts(), load()])
+    } catch {
+      setCheckFailed(account.id)
+    } finally {
+      setCheckingId(null)
+    }
+  }
+  const expiredOf = (accountId: string) => accounts.find((account) => account.id === accountId && account.connection?.tokenExpired) ?? null
+  const notComputed = data?.rows.filter((row) => !row.computedAt).length ?? 0
+
   const total = data?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1
@@ -151,14 +185,31 @@ export default function StoreComparisonList() {
           </TableHeadRow>
         </thead>
         <tbody>
-          {data.rows.map((row) => (
-            <Tr key={row.accountId} interactive onOpen={() => setOpenId(row.accountId)} data-row-id={row.accountId}>
-              <Td grow><span className={styles.storeName}><TruncatedText value={row.name} /></span></Td>
-              {METRICS.map((def) => (
-                <Td key={def.key} align="right"><MetricCell def={def} metric={row.metrics[def.key]} compare={compare} /></Td>
-              ))}
-            </Tr>
-          ))}
+          {data.rows.map((row) => {
+            const expired = expiredOf(row.accountId)
+            const revision = expired?.revision
+            const canRecheck = canManage && typeof revision === 'number' && Number.isInteger(revision) && revision >= 1
+            return (
+              <Fragment key={row.accountId}>
+                <Tr interactive onOpen={() => setOpenId(row.accountId)} data-row-id={row.accountId}>
+                  <Td grow><span className={styles.storeName}><TruncatedText value={row.name} /></span></Td>
+                  {METRICS.map((def) => (
+                    <Td key={def.key} align="right"><MetricCell def={def} metric={row.metrics[def.key]} compare={compare} computed={!!row.computedAt} /></Td>
+                  ))}
+                </Tr>
+                {expired ? (
+                  <Tr data-store-connection={row.accountId}>
+                    <Td colSpan={METRICS.length + 1}>
+                      <Notice tone="warn" compact
+                        message={checkFailed === row.accountId ? 'LINE の接続が切れています。確かめ直せませんでした。時間をおいてもう一度押してください。' : 'LINE の接続が切れています。この店の数は取れないことがあります。'}
+                        action={canRecheck ? <Button variant="text" onClick={() => void recheck(expired)} busy={checkingId === row.accountId} disabled={checkingId !== null}>更新する</Button> : undefined}
+                      />
+                    </Td>
+                  </Tr>
+                ) : null}
+              </Fragment>
+            )
+          })}
         </tbody>
       </DataTable>
       <div className={styles.averageBand}>
@@ -185,6 +236,11 @@ export default function StoreComparisonList() {
         ) : undefined}
       >
         {notice ? <Notice tone="danger" message={notice} /> : null}
+        {status === 'ready' && notComputed > 0 ? (
+          <Notice tone="info" message={notComputed === data?.rows.length
+            ? `${NOT_COMPUTED}。期間のすべての日がそろうと数が出ます。`
+            : `集計がそろっていない店が ${notComputed} 店あります。${SNAPSHOT_TIME}から前の日の分まで集計し、期間のすべての日がそろうと数が出ます。`} />
+        ) : null}
         {body}
       </ListPage>
       <StoreDrawer row={openRow} period={period} compare={compare} onClose={() => setOpenId(null)} />
@@ -193,9 +249,9 @@ export default function StoreComparisonList() {
   )
 }
 
-function MetricCell({ def, metric, compare }: { def: MetricDef; metric: StoreComparisonRow['metrics'][MetricDef['key']] | undefined; compare: 'previous' | 'average' }) {
+function MetricCell({ def, metric, compare, computed }: { def: MetricDef; metric: StoreComparisonRow['metrics'][MetricDef['key']] | undefined; compare: 'previous' | 'average'; computed: boolean }) {
   if (!metric || !metric.available || metric.value === null) {
-    return <span className={styles.cellEmpty} title="この数はまだ取れていません">—</span>
+    return <span className={styles.cellEmpty} title={computed ? 'この数はまだ取れていません' : NOT_COMPUTED}>—</span>
   }
   const diff = formatDiff(def.key, metric.diff)
   const tone = diffTone(def, metric.diff)

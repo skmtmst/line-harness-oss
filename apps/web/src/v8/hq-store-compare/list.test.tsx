@@ -8,17 +8,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { diffTone, formatDiff, formatMetric, METRICS } from './metrics'
 
 const navigation = vi.hoisted(() => ({push:vi.fn(),select:vi.fn()}))
+const accountState = vi.hoisted(() => ({ accounts: [] as Array<Record<string, unknown>>, refresh: vi.fn(), role: 'owner' as string | null }))
+const fetchApi = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), fetchApi }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => accountState.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))
 const api = vi.hoisted(() => ({ get: vi.fn(), detail: vi.fn(), export: vi.fn(), exportStatus: vi.fn(), download: vi.fn() }))
 vi.mock('@/lib/api/helpers/gap3', () => ({ storeComparisonApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: navigation.push, replace: vi.fn() }), usePathname: () => '/hq/store-comparison', useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: navigation.select, loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: navigation.select, loading: false, accounts: accountState.accounts, refreshAccounts: accountState.refresh }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 
 const { default: StoreComparisonList } = await import('./list')
 
 const metric = (value: number | null, diff: number | null, unit = '件') => ({ value, diff, unit, available: value !== null })
 const row = (id: string, name: string, bookings: number, bookingsDiff: number, block: number, blockDiff: number) => ({
-  accountId: id, name, style: null, computedAt: null,
+  accountId: id, name, style: null, computedAt: '2026-10-24T19:30:00.000Z',
   metrics: {
     friendChange: metric(4, 0, '人'), blockRate: metric(block, blockDiff, '%'), clickRate: metric(null, null, '%'),
     bookings: metric(bookings, bookingsDiff), visits: metric(10, 1), noShowRate: metric(2, -0.5, '%'), responseMinutes: metric(8, 0, '分'),
@@ -27,14 +31,15 @@ const row = (id: string, name: string, bookings: number, bookingsDiff: number, b
 const DATA = {
   rows: [row('s1', '大宮店', 12, -25, 3.8, 1.4), row('s2', '渋谷店', 72, 35, 1.2, -1.2)],
   average: { friendChange: 10, blockRate: 2.5, clickRate: null, bookings: 40, visits: 30, noShowRate: 3, responseMinutes: 9 },
-  total: 2, computedAt: null,
+  total: 2, computedAt: '2026-10-24T19:30:00.000Z',
 }
+const NOTHING = Object.fromEntries(Object.entries(DATA.rows[0].metrics).map(([key, value]) => [key, { ...value, value: null, diff: null, available: false }]))
 
 beforeEach(() => {
   api.get.mockResolvedValue({ success: true, data: DATA })
   api.detail.mockResolvedValue({ success: true, data: { recentBroadcasts: [{ id: 'b1', title: '秋の新メニュー', status: 'sent', sent_at: '2026-10-14T01:00:00Z' }], attention: null } })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); accountState.accounts = []; accountState.role = 'owner' })
 
 describe('数の書き方', () => {
   it('単位と符号：人は ±、割合は pt、件・分はそのまま', () => {
@@ -137,3 +142,58 @@ it('対応取得失敗時は0件ボタンを作らず配信は残す',async()=>{
  api.detail.mockResolvedValue({success:true,data:{trend:[],recentBroadcasts:[{id:'b',title:'実際の配信',status:'sent',sent_at:null}],attention:{status:'unavailable',counts:null}}});
  render(<StoreComparisonList/>);fireEvent.click(await screen.findByText('大宮店'));expect(await screen.findByText('対応が要るものを読み込めませんでした。')).toBeTruthy();expect(screen.queryByRole('button',{name:'未払い 0件'})).toBeNull();expect(screen.getByText('実際の配信')).toBeTruthy();
 });
+
+describe('数が取れない理由', () => {
+  const uncomputed = (rows: typeof DATA.rows) => ({ ...DATA, rows, computedAt: null })
+
+  it('全店の集計がまだなら、集計の時刻と「—」の理由を出す', async () => {
+    api.get.mockResolvedValue({ success: true, data: uncomputed(DATA.rows.map((r) => ({ ...r, computedAt: null, metrics: NOTHING as typeof r.metrics }))) })
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    expect(screen.getByText(/^まだ集計していません（毎朝 4 時半から、前の日の分まで集計します）/)).toBeTruthy()
+    expect(screen.getAllByTitle('まだ集計していません（毎朝 4 時半から、前の日の分まで集計します）').length).toBe(METRICS.length * 2)
+    expect(screen.queryByTitle('この数はまだ取れていません')).toBeNull()
+  })
+
+  it('一部の店だけ集計がそろっていないときは店の数を出し、集計済みの店では出さない', async () => {
+    api.get.mockResolvedValueOnce({ success: true, data: uncomputed([{ ...DATA.rows[0], computedAt: null, metrics: NOTHING as typeof DATA.rows[0]['metrics'] }, DATA.rows[1]]) })
+    const view = render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    expect(screen.getByText(/集計がそろっていない店が 1 店あります/)).toBeTruthy()
+    view.unmount()
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    expect(screen.queryByText(/集計していません|集計がそろっていない/)).toBeNull()
+  })
+
+  it('LINE の鍵が切れた店の行に知らせを出し、［更新する］で確かめ直して読み直す', async () => {
+    accountState.accounts = [{ id: 's1', name: '大宮店', revision: 3, connection: { status: 'warn', checkedAt: null, tokenExpired: true, issues: [] } }, { id: 's2', name: '渋谷店', revision: 2, connection: { status: 'ok', checkedAt: null, tokenExpired: false } }]
+    fetchApi.mockResolvedValue({ success: true })
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    const notices = document.querySelectorAll('[data-store-connection]')
+    expect([...notices].map((node) => node.getAttribute('data-store-connection'))).toEqual(['s1'])
+    expect(notices[0].textContent).toContain('LINE の接続が切れています')
+    const calls = api.get.mock.calls.length
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '更新する' })) })
+    expect(fetchApi).toHaveBeenCalledWith('/api/line-accounts/s1/connection-checks', expect.objectContaining({ method: 'POST', body: JSON.stringify({ expectedRevision: 3 }) }))
+    expect(accountState.refresh).toHaveBeenCalled()
+    await waitFor(() => expect(api.get.mock.calls.length).toBeGreaterThan(calls))
+    expect(navigation.push).not.toHaveBeenCalled()
+  })
+
+  it('確かめ直しに失敗したら行の知らせで伝え、閲覧だけの人には［更新する］を出さない', async () => {
+    accountState.accounts = [{ id: 's1', name: '大宮店', revision: 3, connection: { status: 'warn', checkedAt: null, tokenExpired: true } }]
+    fetchApi.mockRejectedValue(new Error('down'))
+    const view = render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '更新する' })) })
+    expect(await screen.findByText(/確かめ直せませんでした/)).toBeTruthy()
+    view.unmount()
+    accountState.role = 'staff'
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    expect(document.querySelector('[data-store-connection]')?.textContent).toContain('LINE の接続が切れています')
+    expect(screen.queryByRole('button', { name: '更新する' })).toBeNull()
+  })
+})
