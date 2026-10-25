@@ -52,7 +52,9 @@ const CSS = readUiSource(path.join(SRC, 'app', 'globals.css'), 'utf8')
 describe('白文字を載せる緑', () => {
   it('トークンが決定の色になっている', () => {
     expect(CSS).toContain('--color-accent-deep: #087a3e;')
-    expect(CSS, 'LINEの緑は残す').toContain('--color-accent: #06c755;')
+    // 画面の緑は深い緑 1 色。LINE の明るい緑は LINE の決まりの所（［LINE でログイン］・LINE の見え方）だけが読む（2026-10-25）。
+    expect(CSS).toContain('--color-accent: var(--color-accent-deep);')
+    expect(CSS, 'LINEの緑は LINE の所だけに残す').toContain('--color-line-green: #06c755;')
   })
 
   /*

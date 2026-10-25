@@ -40,11 +40,15 @@
   --font-sans: var(--font-inter), Inter, var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
 
   /* --- 色 ---------------------------------------------------------------
-   * アクセントはLINEブランドの緑1色。状態色（成功・注意・危険）とは
-   * 役割が別で、アクセントを状態表示に使わない。
+   * 画面で使う緑は深い緑 1 色（主ボタンと同じ #087a3e・2026-10-25 オーナー）。
+   * 明るい LINE の緑（#06c755）は［LINE でログイン］など LINE の決まりの所だけが
+   * --color-line-green を読む。数を知らせる丸は赤（緑にしない）。
+   * 状態色（成功・注意・危険）とは役割が別で、アクセントを状態表示に使わない。
    */
-  --color-accent: #06c755;
-  --color-accent-hover: #05b34c;
+  --color-line-green: #06c755;
+  --color-line-green-hover: #05b34c;
+  --color-accent: var(--color-accent-deep);
+  --color-accent-hover: #066a35;
   --color-accent-soft: #e8f8ee;
   /*
    * 主ボタンの背景。**白文字が載る前提の緑。**

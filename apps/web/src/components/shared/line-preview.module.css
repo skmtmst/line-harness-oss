@@ -289,3 +289,6 @@
   font-size: var(--tpl-section-title-size);
   font-weight: var(--tpl-section-title-weight);
 }
+
+/* LINE の見え方の中の緑は LINE の明るい緑のまま（管理画面の緑は深い緑・2026-10-25）。 */
+:root .phoneRoot { --color-accent: var(--color-line-green); --color-accent-hover: var(--color-line-green-hover); }
