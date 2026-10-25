@@ -64,7 +64,7 @@ describe('前提: 実LIFFが「日時を選んでください」＋週／カレ�
     // 読み込み中・失敗は共通部品（LoadingView・LoadErrorView）で出す。
     expect(LIFF_SOURCE).toContain('LoadingView')
     expect(LIFF_SOURCE).toContain('LoadErrorView')
-    expect(LIFF_USER_MESSAGE_SOURCE).toContain('読み込み中…')
+    // 読み込み中の言葉は LIFF の user-message.test.ts が値で見張る。
     // 失敗は題「読み込めませんでした」＋本文 LOAD_FAILED_MESSAGE。
     expect(LIFF_USER_MESSAGE_SOURCE).toContain(
       '電波のよいところで、もう一度お試しください。',

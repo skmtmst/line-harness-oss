@@ -91,7 +91,7 @@ describe('一覧の帯（設計 6-1 `q76C35`）', () => {
      * 絞れるのに集計は絞らない）ので、足しても合わない4枚になる。
      */
     expect(KPIS).toContain("detail: '今日 —（未取得）'")
-    expect(KPIS).toContain("stats?.drafts == null ? '編集途中・未取得' : '編集途中'")
+    // 下書きの補足の言葉は broadcast-kpi-values.test.ts が関数の結果で見張る。
     expect(KPIS, '一覧の新しい集計値を捨てている').toMatch(/title: '下書き',\s*\n\s*value: numberOrNull\(stats\?\.drafts\),/)
   })
 

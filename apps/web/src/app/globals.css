@@ -479,8 +479,7 @@
   --color-notice-warning-bg: #fff7e6;
   --color-notice-danger-bg: #fef0f0;
   --color-menu-danger: #e5484d;
-  /* 本文・説明の中のリンク。ボタン・左メニュー・パンくずには使わない。 */
-  --color-link: var(--color-accent-deep);
+  --color-link: var(--color-accent-deep); /* 本文・説明の中のリンク。ボタン・左メニュー・パンくずには使わない。 */
   --color-checkbox-line: #dadde2;
   --radius-checkbox-mark: 3px;
   --text-callout: 14px;
@@ -2546,22 +2545,9 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
     word-break: auto-phrase;
   }
 
-  h1,
-  h2,
-  h3 {
-    text-wrap: balance;
-  }
-
-  /*
-   * 和文の題・見出しは字の間を少し空けて読みやすくする（0.02em）。型と共通部品の
-   * 見出しはどれも h1〜h4 で描くので、ここ1か所で効く。部品が字間を決めた所はそちらが勝つ。
-   */
-  h1,
-  h2,
-  h3,
-  h4 {
-    letter-spacing: var(--polish-heading-tracking);
-  }
+  h1, h2, h3 { text-wrap: balance; }
+  /* 和文の題・見出しは字の間を少し空ける（0.02em）。型と共通部品の見出しは h1〜h4 なのでここ1か所で効き、部品が決めた字間はそちらが勝つ。 */
+  h1, h2, h3, h4 { letter-spacing: var(--polish-heading-tracking); }
 
   /*
    * ★V8 複数行の入力欄の決まり（2026-10-08 共通部品の1本化）：縦にだけ手で広げられ、

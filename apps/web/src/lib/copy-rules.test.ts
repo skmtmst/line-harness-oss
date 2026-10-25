@@ -20,7 +20,7 @@ describe('画面の言葉の書き方の見張り', () => {
     expect(rules("globalThis.confirm('消しますか')")).toEqual(['browser-confirm'])
   })
 
-  it('直した書き方と、画面に出ない文字は通す', () => {
+  it('決まりどおりの書き方と、画面に出ない文字は通す', () => {
     expect(rules("const label = 'この7日'; const view = <p>読み込み中…</p>")).toEqual([])
     // 全角の数字を半角へ直す正規表現、受け取った値との比較、英字だけの省略は画面の文ではない。
     expect(rules("const half = (value: string) => value.replace(/[０-９]/g, toHalf)")).toEqual([])
