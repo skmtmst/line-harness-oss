@@ -60,7 +60,9 @@ export const affiliatesMethods = {
           | 'payoutCycle'
           | 'notifyOnConversion'
         >
-      >,
+      > & {
+        expected?: Required<Pick<Affiliate, 'name' | 'rewardMode' | 'commissionRate' | 'isActive' | 'email' | 'holdDays' | 'payoutCycle' | 'notifyOnConversion'>>
+      },
     ) =>
       fetchApi<ApiResponse<Affiliate>>(`/api/affiliates/${id}`, {
         method: 'PUT',

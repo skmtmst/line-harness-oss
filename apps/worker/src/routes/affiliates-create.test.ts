@@ -376,6 +376,7 @@ describe('紹介者APIの所属境界', () => {
         tenantId: TENANT_ID,
         allowedLineAccountIds: [ACCOUNT_ID],
       }),
+      undefined,
     );
     expect(dbMocks.getAffiliateReportV2).not.toHaveBeenCalled();
     expect(dbMocks.getAffiliateJourneys).not.toHaveBeenCalled();
@@ -391,6 +392,49 @@ describe('紹介者APIの所属境界', () => {
     // 存在の有無を route まで届けない。作成は起きない。
     expect(response.status).toBe(403);
     expect(dbMocks.createAffiliateWithRandomCode).not.toHaveBeenCalled();
+  });
+});
+
+describe('紹介者の比較付き保存', () => {
+  const expected = {
+    name: 'Alice', rewardMode: 'fixed', commissionRate: 0, isActive: true,
+    email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false,
+  };
+
+  it('画面が読んだ値をDBの比較条件へ渡し、保存結果を返す', async () => {
+    dbMocks.updateAffiliate.mockResolvedValue({ id: 'aff-1', name: '更新後', code: 'code1', commission_rate: 0, is_active: 1 });
+    const res = await put('/api/affiliates/aff-1', { name: '更新後', expected });
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateAffiliate).toHaveBeenCalledWith(env.DB, 'aff-1', expect.objectContaining({ name: '更新後' }), expect.objectContaining({ tenantId: TENANT_ID }), {
+      name: 'Alice', reward_mode: 'fixed', commission_rate: 0, is_active: 1,
+      email: null, hold_days: null, payout_cycle: null, notify_on_conversion: 0,
+    });
+    expect(await res.json()).toMatchObject({ success: true, data: { name: '更新後' } });
+  });
+
+  it('同時保存の失敗をVERSION_CONFLICTの409にする', async () => {
+    dbMocks.updateAffiliate.mockRejectedValueOnce(new Error('AFFILIATE_VERSION_CONFLICT'));
+    const res = await put('/api/affiliates/aff-1', { name: '更新後', expected });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'VERSION_CONFLICT' } });
+  });
+
+  it.each([null, [], {}, { ...expected, rewardMode: ['fixed'] }, { ...expected, rewardMode: { toString: 'fixed' } }, { ...expected, isActive: 1 }, { ...expected, email: 1 }, { ...expected, commissionRate: null }, { ...expected, holdDays: '7' }])('不正な比較条件 %j は保存前に400にする', async value => {
+    expect((await put('/api/affiliates/aff-1', { name: '更新後', expected: value })).status).toBe(400);
+    expect(dbMocks.updateAffiliate).not.toHaveBeenCalled();
+  });
+
+  it('比較なしの既存入力は比較を要求しない', async () => {
+    dbMocks.updateAffiliate.mockResolvedValue({ id: 'aff-1', name: '従来', commission_rate: 0, is_active: 0 });
+    expect((await put('/api/affiliates/aff-1', { isActive: false })).status).toBe(200);
+    expect(dbMocks.updateAffiliate.mock.calls[0][4]).toBeUndefined();
+  });
+
+  it('過去の承認額が不明な409は版の競合と区別する', async () => {
+    dbMocks.updateAffiliate.mockRejectedValueOnce(new Error('APPROVED_REWARD_SNAPSHOT_MISSING'));
+    const res = await put('/api/affiliates/aff-1', { rewardMode: 'none', expected });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: { code: 'APPROVED_REWARD_SNAPSHOT_MISSING' } });
   });
 });
 

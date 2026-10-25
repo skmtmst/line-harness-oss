@@ -286,6 +286,7 @@ export async function updateAffiliate(
   id: string,
   updates: UpdateAffiliateInput,
   scope?: AffiliateScope,
+  expected?: UpdateAffiliateInput,
 ): Promise<Affiliate | null> {
   if(updates.folder_id!==undefined) {
     const current=await getAffiliateById(db,id,scope);if(!current)return null;
@@ -344,13 +345,28 @@ export async function updateAffiliate(
 
   const scoped = scope ? affiliateScopeSql(scope) : null;
   values.push(id, ...(scoped?.binds ?? []));
-  await db
+  const conditions: string[] = [];
+  // 比較と更新を同じSQLで行い、読み取り後に入った他の保存も上書きしない。
+  for (const column of ['name', 'commission_rate', 'reward_mode', 'is_active', 'email', 'hold_days', 'payout_cycle', 'notify_on_conversion', 'folder_id'] as const) {
+    if (expected?.[column] === undefined) continue;
+    // APIで補完される旧い行の報酬方式は、画面が読んだ値と同じ意味で比べる。
+    const expression = column === 'reward_mode' && expected[column] !== null
+      ? "COALESCE(reward_mode, CASE WHEN commission_rate > 0 THEN 'rate' ELSE 'fixed' END)"
+      : column;
+    conditions.push(`${expression} IS ?`);
+    values.push(expected[column]);
+  }
+  const result = await db
     .prepare(
-      `UPDATE affiliates SET ${fields.join(', ')} WHERE id = ?${scoped ? ` AND ${scoped.sql}` : ''}`,
+      `UPDATE affiliates SET ${fields.join(', ')} WHERE id = ?${scoped ? ` AND ${scoped.sql}` : ''}${conditions.length ? ` AND ${conditions.join(' AND ')}` : ''}`,
     )
     .bind(...values)
     .run();
 
+  if (conditions.length && result.meta.changes === 0) {
+    if (!await getAffiliateById(db, id, scope)) return null;
+    throw new Error('AFFILIATE_VERSION_CONFLICT');
+  }
   return getAffiliateById(db, id, scope);
 }
 
