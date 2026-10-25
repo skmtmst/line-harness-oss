@@ -32,6 +32,12 @@ export function toJstString(date: Date): string {
   return jstTimestamp(date);
 }
 
+/** Legacy columns without an offset contain JST, as in the schema defaults. */
+export function followTimeSql(column:string):string {
+  return `julianday(CASE WHEN substr(${column},-1) IN ('Z','z') OR substr(${column},-6,1) IN ('+','-') OR substr(${column},-5,1) IN ('+','-') THEN ${column}
+    WHEN length(${column})=10 THEN ${column}||'T00:00:00+09:00' ELSE ${column}||'+09:00' END)`;
+}
+
 /**
  * Compare two timestamp strings (any format) as epoch milliseconds.
  * Handles both Z and +09:00 formats correctly.
