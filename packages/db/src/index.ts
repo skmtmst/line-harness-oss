@@ -758,7 +758,7 @@ export {
   FolderAssignmentError, readFolderAssignment,
 } from './folder-assignment';
 export {
-  GETTING_STARTED_STEPS, countUsableAccounts, hasFirstDeliveredMessage,
+  GETTING_STARTED_STEPS, countUsableAccounts, firstDeliveredMessageAt, hasFirstDeliveredMessage,
 } from './getting-started';
 export type {
   GettingStartedStep, StepFacts,
