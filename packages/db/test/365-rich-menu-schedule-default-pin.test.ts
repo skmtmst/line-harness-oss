@@ -232,8 +232,8 @@ describe('365 default固定とlease所有権（実D1）', () => {
   })
 
   test('停止確定は1つの原子的更新。札が合わなければpage IDも消さない', async () => {
-    // 以前は page を先に消してから group を落としていたため、間に引き継がれると
-    // 「page ID だけ null、group は published のまま」を作れた。
+    // page を先に消してから group を落とすと、間に引き継がれたとき
+    // 「page ID だけ null、group は published のまま」を作れてしまう。
     const genA = (await acquirePublishLease(db, 'menu-1', 'run-A', NOW)) as number
     const fenceA = { owner: 'run-A', generation: genA }
     // 期限切れでBが回収する。

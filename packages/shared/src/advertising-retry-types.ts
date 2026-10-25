@@ -1,5 +1,5 @@
 
-/** F-22: 同じ出来事の目印を維持した広告送信のやり直し結果。 */
+/** 同じ出来事の目印を維持した広告送信のやり直し結果。 */
 export interface AdConversionRetryResult {
   logId: string;
   outboxId: string;

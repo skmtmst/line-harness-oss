@@ -15,7 +15,7 @@ import { ensureConversionRewardSnapshot } from '../src/affiliate-settlements.js'
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * R288: 締め後の取消は次の支払いで差し引く。実SQLite(bootstrap.sql)で
+ * 締め後の取消は次の支払いで差し引く。実SQLite(bootstrap.sql)で
  * プレビュー・締め・明細・CSVの全工程を通す。
  * - 次回1000円と未適用取消300円から700円を算出し、締め→明細→CSVまで一致
  * - 次回200円・取消300円なら正の振込をせず残り100円を繰り越す

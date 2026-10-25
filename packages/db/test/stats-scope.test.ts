@@ -44,7 +44,7 @@ describe('tenant-scoped dashboard aggregations', () => {
     })).toBe(true);
 
     /*
-     * 「UID移行状況」カードの数は uid_migration_runs から取る（DASH-07）。
+     * 「UID移行状況」カードの数は uid_migration_runs から取る。
      * 旧アカウント移行(account_migrations)の件数と混ぜない。
      */
     const migrations = queries.find(({ sql }) => sql.includes('FROM uid_migration_runs'));

@@ -31,7 +31,7 @@ export function estimateWindowDedupCount(
 }
 
 /**
- * 取消の試算(N-257)。reversalPolicy = source_cancelled のときだけ、
+ * 取消の試算。reversalPolicy = source_cancelled のときだけ、
  * 同じ起点条件の過去成果に対する取消台帳の件数を数える。
  * 台帳(affiliate_adjustments 系)が無い環境では 0 を返す。
  */
@@ -65,15 +65,15 @@ export async function previewConversionDefinition(
 ) {
   const account = accountWhere('cp.', input.scope, input.lineAccountId);
   /*
-   * N-257: 試算は「保存したときと同じ条件」で数える。
+   * 試算は「保存したときと同じ条件」で数える。
    *
-   * 直す前は起点種別・期間・アカウントだけを見ていたため、url_reach の
-   * 対象URLや窓つき重複除外を変えても同じ数字が返っていた。
+   * 起点種別・期間・アカウントだけを見ると、url_reach の
+   * 対象URLや窓つき重複除外を変えても同じ数字が返ってしまう。
    * - url_reach: 同じ対象URLを見ていた地点の成果だけを数える。
    * - それ以外の起点: 対象URLを持たない地点の成果だけを数える
    *   (URL条件のある地点の成果を混ぜない)。
    */
-  // N-269: 暦日は先頭10文字で比較する(ISOの'T'が空白より大きく、
+  // 暦日は先頭10文字で比較する(ISOの'T'が空白より大きく、
   // 文字列の大小比較だと期間末の行が抜けるため)。
   const conditions = [`cp.event_type = ?`, `substr(ce.created_at, 1, 10) >= ?`, `substr(ce.created_at, 1, 10) <= ?`];
   const values: unknown[] = [input.sourceType, input.range.from.slice(0, 10), input.range.to.slice(0, 10)];
@@ -86,7 +86,7 @@ export async function previewConversionDefinition(
   conditions.push(account.sql);
   values.push(...account.values);
   /*
-   * R40: 「数えない条件」は試算の過去集計にも効かせる。友だちの条件は
+   * 「数えない条件」は試算の過去集計にも効かせる。友だちの条件は
    * friends を `f` で繋いで評価する(segment 条件の組み立てと同じ別名)。
    * 壊れた条件は全件のままにし、理由だけ返す(記録側と同じ倒し方)。
    */
@@ -113,12 +113,12 @@ export async function previewConversionDefinition(
     .first<{ matched_count: number; unique_friends: number; source_value: number; valued_count: number }>();
   const matchedCount = Number(row?.matched_count ?? 0);
   const uniqueFriends = Number(row?.unique_friends ?? 0);
-  // R42: 金額の平均は金額のある成果だけで割る。金額なしの行を分母に
+  // 金額の平均は金額のある成果だけで割る。金額なしの行を分母に
   // 入れると、注文金額を使う設定の試算が小さく見える。
   const valuedCount = Number(row?.valued_count ?? 0);
   const missingValueCount = Math.max(0, matchedCount - valuedCount);
 
-  // R40: 除外で除いた過去の件数。試算の数字から消えている分を見せる。
+  // 除外で除いた過去の件数。試算の数字から消えている分を見せる。
   let excludedPastCount = 0;
   if (exclusionSql && exclusion.condition) {
     const positive = exclusionWhere(exclusion.condition, { negate: false });
@@ -167,7 +167,7 @@ export async function previewConversionDefinition(
 
   const excludedReasons: string[] = [];
   if (matchedCount === 0) excludedReasons.push('選んだ起点の過去データがありません');
-  // R40: 数えない条件は試算にも効く。効き方を隠さず画面へ返す。
+  // 数えない条件は試算にも効く。効き方を隠さず画面へ返す。
   if (exclusion.invalid) {
     excludedReasons.push('「数えない条件」が読み取れないため、試算では全件を対象にしています');
   } else if (exclusion.condition) {
@@ -179,7 +179,7 @@ export async function previewConversionDefinition(
   } else if (exclusion.legacyMemoMigrated) {
     excludedReasons.push('以前の「数えない条件」のメモは記録に影響しません。条件として効かせるには選び直してください');
   }
-  // R42: 金額なしの成果があるときは、試算の金額が金額のある成果だけの
+  // 金額なしの成果があるときは、試算の金額が金額のある成果だけの
   // 平均であることを隠さない。
   if (missingValueCount > 0 && input.valueMode === 'source') {
     excludedReasons.push(`金額のない過去の成果${missingValueCount}件は金額の試算に入っていません`);

@@ -9,7 +9,7 @@ vi.mock('../lib/api.js', () => ({ api: { liffConfig: () => Promise.resolve({ dat
 
 import NotFound, { closeOrBackToLine } from './not-found.js';
 
-/** ★V8 見つからない画面（板 ）。以前は灰色の文字1行だけで戻る道が無かった。 */
+/** 見つからない画面。迷った人が戻れる道を必ず出す。 */
 describe('LIFF の見つからない画面', () => {
   it('題・説明・LINE に戻る・閉じる を出す', () => {
     const html = renderToStaticMarkup(<NotFound />);

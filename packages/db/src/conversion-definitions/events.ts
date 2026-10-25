@@ -24,7 +24,7 @@ export function readEventMetadataSource(metadata: string | null): {
 }
 
 /**
- * IDEA-19: 成果地点ごとの成果1件ずつの一覧(新しい順)。
+ * 成果地点ごとの成果1件ずつの一覧(新しい順)。
  *
  * 「検知・確認待ち・確定・取消」を業務の言葉で画面へ渡すため、
  * 承認状態と取消台帳(affiliate_adjustments の cancel)から状態を導出する。
@@ -53,7 +53,7 @@ export async function listConversionDefinitionEvents(
               JOIN affiliate_adjustments aa ON aa.source_entry_id = re.id
              WHERE re.conversion_event_id = ce.id AND aa.reason_type = 'cancel')`);
   }
-  // #819: 成果の取消は追記台帳。最新の追記が 'reverse' の成果を取消扱いにする。
+  // 成果の取消は追記台帳。最新の追記が 'reverse' の成果を取消扱いにする。
   const reversedSql = names.has('conversion_event_reversals')
     ? `EXISTS(SELECT 1 FROM conversion_event_reversals r
              WHERE r.conversion_event_id = ce.id AND r.kind = 'reverse'

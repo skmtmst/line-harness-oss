@@ -1,4 +1,4 @@
-/** 受信箱の添付。動画はAPI-6と同じR2直接アップロードを使う。 */
+/** 受信箱の添付。動画は動画素材と同じR2直接アップロードを使う。 */
 export const CHAT_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
 export const CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 export const CHAT_PREVIEW_MAX_BYTES = 1024 * 1024;

@@ -1,5 +1,5 @@
 /**
- * 確定待ちの確定と付与内訳の一致（m25d R359 の続き）。
+ * 確定待ちの確定と付与内訳の一致。
  *
  * 確定待ち（pending）の付与は INSERT 時の trigger が内訳（mileage_grant_lots）
  * を作らず、確定（confirmPendingMileageEntry）は UPDATE のため trigger が

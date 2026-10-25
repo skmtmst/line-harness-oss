@@ -146,7 +146,7 @@ export async function getAnalyticsUsageOverview(
   const manualSends = Number(activity?.manual_sends ?? 0);
   const automaticReason = '現在はオートメーションの実行記録だけを数えています';
   /*
-   * 全任意機能の利用状況（N-448）。共有カタログの全 featureId を必ず返し、
+   * 全任意機能の利用状況。共有カタログの全 featureId を必ず返し、
    * 画面側は featureId で機械照合する。計測できる機能は直近90日の回数と
    * 最終利用、計測できない機能は未計測理由を返す。取得不可を 0 にしない。
    */

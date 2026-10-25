@@ -13,7 +13,7 @@ export async function listReminderDeliveryRuns(
     search?: string;
     limit: number;
     offset: number;
-    /** R349: 実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
+    /** 実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
     scope?: ReminderRowScope;
   },
 ): Promise<{ items: ReminderDeliveryRunListRow[]; total: number }> {
@@ -66,7 +66,7 @@ export async function listReminderDeliveryRuns(
 export async function getReminderDeliveryRunSummary(
   db: D1Database,
   reminderId: string,
-  /** R349: 集計も実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
+  /** 集計も実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
   scope?: ReminderRowScope,
 ): Promise<{
   sent: number;
@@ -133,7 +133,7 @@ export async function getReminderDeliveryRunSummary(
 export async function getReminderDeliveryStepSummaries(
   db: D1Database,
   reminderId: string,
-  /** R349: 通ごとの集計も実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
+  /** 通ごとの集計も実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
   scope?: ReminderRowScope,
 ): Promise<ReminderDeliveryStepSummaryRow[]> {
   // 結合条件の `?` が WHERE より前にあるため、束ねる順序も合わせる。

@@ -6,12 +6,12 @@ export interface IncomingWebhookRow {
   id: string;
   name: string;
   source_type: string;
-  /** 旧平文。#650 以降の新規・更新では NULL になる。読み取りの後方互換だけに使う。 */
+  /** 旧平文。暗号化後の新規・更新では NULL になる。読み取りの後方互換だけに使う。 */
   secret: string | null;
-  /** AES-GCM 暗号文。#650 以降の正本。旧スキーマの行には無いことがある。 */
+  /** AES-GCM 暗号文。こちらが正本。旧スキーマの行には無いことがある。 */
   secret_encrypted?: string | null;
   /**
-   * S (#939 機能26): 入れ替え前の合言葉の暗号文。入れ替えから24時間だけ
+   * 入れ替え前の合言葉の暗号文。入れ替えから24時間だけ
    * 署名の照合に使える。期限は secret_rotated_at から数える。
    */
   secret_previous_encrypted?: string | null;
@@ -24,7 +24,7 @@ export interface IncomingWebhookRow {
   action_refs_json: string;
   latest_masked_sample_json: string | null;
   latest_received_at: string | null;
-  /** #939 N-368: 履歴保持の削除印。NULL 以外の行は読み取り・実行から外す。 */
+  /** 履歴保持の削除印。NULL 以外の行は読み取り・実行から外す。 */
   deleted_at?: string | null;
   deleted_by_staff_id?: string | null;
   created_at: string;
@@ -52,9 +52,9 @@ export interface OutgoingWebhookRow {
   name: string;
   url: string;
   event_types: string; // JSON配列
-  /** 旧平文。#650 以降の新規・更新では NULL になる。読み取りの後方互換だけに使う。 */
+  /** 旧平文。暗号化後の新規・更新では NULL になる。読み取りの後方互換だけに使う。 */
   secret: string | null;
-  /** AES-GCM 暗号文。#650 以降の正本。旧スキーマの行には無いことがある。 */
+  /** AES-GCM 暗号文。こちらが正本。旧スキーマの行には無いことがある。 */
   secret_encrypted?: string | null;
   is_active: number;
   /** 失敗したとき何回まで送り直すか。0 なら送り直さない */
@@ -64,12 +64,12 @@ export interface OutgoingWebhookRow {
   /** 最後に失敗した時刻。成功すると NULL に戻る */
   last_failed_at: string | null;
   /**
-   * 連続失敗で自動停止した時刻(#938)。手動停止(NULL)と区別する。
+   * 連続失敗で自動停止した時刻。手動停止(NULL)と区別する。
    * 運用者が再有効化すると NULL に戻る。
    */
   auto_stopped_at?: string | null;
   line_account_id?: string | null;
-  /** #939 N-368: 履歴保持の削除印。NULL 以外の行は読み取り・実行から外す。 */
+  /** 履歴保持の削除印。NULL 以外の行は読み取り・実行から外す。 */
   deleted_at?: string | null;
   deleted_by_staff_id?: string | null;
   created_at: string;
@@ -107,18 +107,18 @@ export interface WebhookInteractionSummary {
   succeeded: number;
   failed: number;
   /**
-   * 送信の失敗の総数(d23b R408)。失敗の内訳を画面へ説明するとき、
+   * 送信の失敗の総数。失敗の内訳を画面へ説明するとき、
    * 受信の失敗と混ぜないために使う。
    */
   outgoingFailed: number;
   /**
-   * 送信の失敗のうち、今この画面からまとめて送り直せる件数(d23b R408)。
+   * 送信の失敗のうち、今この画面からまとめて送り直せる件数。
    * 届いたか分からない記録・署名の合言葉が読めない記録・送り先が
    * 消えた/止まった記録・自動の送り直しが動いている記録は含まない。
    */
   retryable: number;
   /**
-   * 失敗のうち「相手先へ届いたか分からない」件数(IDEA-26)。
+   * 失敗のうち「相手先へ届いたか分からない」件数。
    * この件数は無条件のまとめて再送へ入れず、相手先で確かめてから
    * 1件ずつやり直す対象として画面へ示す。
    */
@@ -130,7 +130,7 @@ export interface WebhookInteractionSummary {
 export type OutgoingDeliveryStatus = 'pending' | 'sending' | 'retry_wait' | 'delivered' | 'failed';
 
 /**
- * 一覧用の行(d23b R412/R414)。やり取りの記録に、送り先と自動配送の
+ * 一覧用の行。やり取りの記録に、送り先と自動配送の
  * 現状を添えたもの。個別取得(getWebhookInteractionById)では付かない。
  */
 export interface WebhookInteractionListRow extends WebhookInteractionRow {
@@ -146,7 +146,7 @@ export interface WebhookInteractionListRow extends WebhookInteractionRow {
 }
 
 /**
- * Webhook secret の暗号化の約束(#650)。
+ * Webhook secret の暗号化の約束。
  *
  * 保存形式: secret_encrypted 列に `k<鍵ID>.v1.<iv>.<暗号文>` を入れる。
  * 鍵ID は鍵素材の SHA-256 先頭12桁で、鍵そのものは含まない。
@@ -229,7 +229,7 @@ export type IncomingWebhookActionRef = {
   refVersionId: string | null;
 };
 
-// --- 人が見つからなかった届物（#939 N-367） ---
+// --- 人が見つからなかった届物 ---
 //
 // 受信Webhookの「未照合時の扱い」で unmatched_box / create_candidate を
 // 選んだとき、見つからなかった届物をここへ置く。どちらも「あとで人が
@@ -240,7 +240,7 @@ export type IncomingWebhookActionRef = {
 // 同じ受信の再送は (webhook_id, source_event_id) の UNIQUE で増やさない。
 
 //   ambiguous        … 同じ値の友だちが2人以上いて自動では決められない
-//                      (S #939 機能26)。人が候補から選ぶまで保留する。
+//                      人が候補から選ぶまで保留する。
 export type IncomingWebhookUnmatchedKind = 'unmatched' | 'candidate' | 'ambiguous';
 export type IncomingWebhookUnmatchedStatus = 'pending' | 'resolved' | 'dismissed';
 

@@ -26,15 +26,15 @@ const step = (templateId: string) => ({
 });
 
 /*
- * #1470/#645 の退行(resolveStepContent の呼び出し元が lineAccountId を渡さず、
- * fail-close でシナリオ配信のテンプレートが一切引かれなくなる)に対する肯定側の
+ * resolveStepContent の呼び出し元が lineAccountId を渡さないと、
+ * fail-close でシナリオ配信のテンプレートが一切引かれなくなる。それを防ぐ肯定側の
  * 試験。否定側(未公開・別アカウント・引数未指定)は scenario-resolve-fail-close.test.ts
  * にある。ここでは「公開版・同一アカウントなら、実際に本文が引かれる」側を、
  * 本配信が辿る経路(createTemplate → publishTemplate → 複数ステップを順に
  * resolveStepContent → saveTemplateDraft で編集 → 再publish)に沿って、実SQLite
  * (bootstrap.sql)で固定する。
  *
- * #706(Issue): resolveStepContent の第3引数は必須になったが、それで守られるのは
+ * resolveStepContent の第3引数は必須だが、それで守られるのは
  * 「引数を丸ごと落とす」形の退行だけ(型検査が捕まえる)。ここは「正しい形で
  * 呼んだときに、本当に公開版が届く」という挙動そのものを固定する。
  */

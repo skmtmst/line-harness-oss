@@ -69,7 +69,7 @@ export async function addConversionDefinitionUsage(
     return { created: false, usage: serializeUsage(existing), currentVersion: Number(point.version) };
   }
 
-  // N-258: 実在しない・別アカウントの利用先は保存しない。
+  // 実在しない・別アカウントの利用先は保存しない。
   await assertUsageRefExists(db, input, input.lineAccountId);
 
   const id = crypto.randomUUID();
@@ -128,7 +128,7 @@ export async function createConversionDefinition(
   if (duplicate) {
     throw new ConversionDefinitionError('duplicate_name', '同じ名前の成果地点があります', 409);
   }
-  // N-258: 実在しない・別アカウントの利用先を仮IDのまま保存しない。
+  // 実在しない・別アカウントの利用先を仮IDのまま保存しない。
   for (const usage of input.usages) {
     await assertUsageRefExists(db, usage, input.lineAccountId);
   }

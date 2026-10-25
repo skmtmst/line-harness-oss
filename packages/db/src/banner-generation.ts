@@ -117,7 +117,7 @@ export interface BannerGeneration {
   quality: BannerQuality;
   text_lines: string;
   /**
-   * 行ごとの「強調」（Pencil ★修正案 `g64HOD`・2026-10-06 承認）。
+   * 行ごとの「強調」（Pencil `g64HOD`）。
    * `text_lines` と同じ順の `[true,false,…]` の JSON 文字。
    * 列を足す前に作った生成は null で、そのときは強調なしとして読む。
    */

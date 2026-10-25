@@ -100,7 +100,7 @@ export async function getLinkClickSummary(
   range: DateRange,
   limit = 50,
 ): Promise<LinkClickSummary[]> {
-  // 監査 R227: 時刻の列は Z と +09:00 が混在するため、範囲判定は
+  // 時刻の列は Z と +09:00 が混在するため、範囲判定は
   // 索引に乗る先読み＋julianday の正確判定の2段にする（上限は込み）。
   const win = analyticsWindow(range.from, range.to);
   const result = await db
@@ -163,12 +163,12 @@ export async function getTrackedLinkStats(
   query?: string,
 ): Promise<TrackedLinkStat[]> {
   /*
-   * 監査 R72: 検索語は取得前のSQLへ渡す。上位200件を取ってから画面で絞ると、
+   * 検索語は取得前のSQLへ渡す。上位200件を取ってから画面で絞ると、
    * 201件目以降は検索しても見つからなかった。利用場所はタグ名・シナリオ名に
    * 対応するので、リンク名・URL・紐づく名前を対象にする。
    */
   const needle = query?.trim().toLowerCase() ?? '';
-  // 監査 R227: クリック時刻は表記が混在するため、範囲判定は
+  // クリック時刻は表記が混在するため、範囲判定は
   // 索引に乗る先読み＋julianday の正確判定の2段にする（上限は込み）。
   const win = analyticsWindow(range.from, range.to);
   const result = await db
@@ -260,7 +260,7 @@ export async function getBroadcastSummary(
   range: DateRange,
   limit = 50,
 ): Promise<BroadcastSummary[]> {
-  // 監査 R227: 送信時刻は表記が混在するため、範囲判定は
+  // 送信時刻は表記が混在するため、範囲判定は
   // 索引に乗る先読み＋julianday の正確判定の2段にする（上限は込み）。
   const win = analyticsWindow(range.from, range.to);
   const result = await db

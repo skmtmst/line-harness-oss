@@ -223,7 +223,7 @@ export async function getAutoReplyInternalMemos(
  * 下書きは未公開の作業中なので、そのまま書き換えてよい。
  */
 /**
- * m26c R569/R570: 社内メモの書込文だけを組み立てて返す。呼び出し側が
+ * 社内メモの書込文だけを組み立てて返す。呼び出し側が
  * ルール行・参照表と1回の batch に束ね、途中失敗で食い違わないようにする。
  */
 export async function planAutoReplyInternalMemoStatements(

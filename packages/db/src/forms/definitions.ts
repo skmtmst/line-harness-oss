@@ -304,7 +304,7 @@ export async function updateForm(
 }
 
 /**
- * フォームのフォルダ所属だけを変える（R25）。
+ * フォームのフォルダ所属だけを変える。
  *
  * 編集保存（`updateForm`）とは別の細い口。所属は版管理の対象外のため、
  * 編集の版（`content_revision`）の確認も加算もしない。版を動かすと、

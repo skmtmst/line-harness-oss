@@ -9,7 +9,7 @@ export interface NotificationRuleRow {
   channels: string;    // JSON配列
   line_account_id: string | null;
   is_active: number;
-  version: number; // 内容の版。更新のたびに+1し、発火時に台帳へ写す(N-327)
+  version: number; // 内容の版。更新のたびに+1し、発火時に台帳へ写す
   created_at: string;
   updated_at: string;
 }
@@ -116,7 +116,7 @@ export async function updateNotificationRule(
   values.push(id);
   values.push(lineAccountId);
   // 画面が読んだ版と1文で突き合わせる。違う版からの保存は1行も
-  // 触らず false を返し、呼ぶ側が409で止める(m26e R565)。
+  // 触らず false を返し、呼ぶ側が409で止める。
   const conditions = ['id = ?', 'line_account_id = ?'];
   if (opts?.expectedVersion !== undefined) {
     conditions.push('version = ?');

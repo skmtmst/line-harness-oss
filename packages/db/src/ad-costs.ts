@@ -2,7 +2,7 @@ import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 
 /**
- * 流入の広告費の台帳 (#818)。
+ * 流入の広告費の台帳。
  *
  * 外部連携(ad_platforms)の暗号化された秘密で媒体から毎日取り込む分と、
  * 管理画面から手入力する分を同じ表に置く。どちらの分かは `source` で
@@ -26,9 +26,9 @@ export interface AdCostEntry {
   created_by: string | null;
   created_at: string;
   updated_at: string;
-  /** R275: 取り消した日時。NULL なら集計に数える行。 */
+  /** 取り消した日時。NULL なら集計に数える行。 */
   cancelled_at: string | null;
-  /** R275: 取消の理由(画面で入力)。履歴として残す。 */
+  /** 取消の理由(画面で入力)。履歴として残す。 */
   cancel_reason: string | null;
 }
 
@@ -94,7 +94,7 @@ export async function upsertAdCostEntry(
     .first<{ id: string }>();
 
   if (existing) {
-    // R275: 取り消した記録と同じ識別条件・同じ日への再登録は「新しい記録」
+    // 取り消した記録と同じ識別条件・同じ日への再登録は「新しい記録」
     // として受け、取消の印を外す(そうしないと再登録が永久に集計から外れる)。
     await db
       .prepare(
@@ -150,7 +150,7 @@ export async function upsertAdCostEntry(
 }
 
 /**
- * R275: 手入力の費用を1行ずつ一覧にする(取消ボタンと取消済みの履歴表示用)。
+ * 手入力の費用を1行ずつ一覧にする(取消ボタンと取消済みの履歴表示用)。
  * 取消済みの行も履歴として返す。新しい日付が先に来る順。
  */
 export async function listManualAdCostEntries(
@@ -176,7 +176,7 @@ export type CancelAdCostResult =
   | 'already_cancelled';
 
 /**
- * R275: 手入力の費用を取消する。行は消さず、取消した日時と理由を残し、
+ * 手入力の費用を取消する。行は消さず、取消した日時と理由を残し、
  * 集計からは外れる。取込分は媒体側の記録なのでここでは取り消せない。
  */
 export async function cancelAdCostEntry(

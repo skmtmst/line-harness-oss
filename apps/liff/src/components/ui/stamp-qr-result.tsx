@@ -3,7 +3,7 @@ import {VISIT_STAMP_DEFAULT_COLOR,visitStampDarkInk} from '@line-crm/shared';
 import Icon from './icon.js';
 import styles from './stamp-qr-result.module.css';
 
-/** G-8g/h のカード。保存済みの設定・残高だけで描き、未取得を見本の数字で補わない。 */
+/** 押した結果のカード。保存済みの設定・残高だけで描き、未取得を見本の数字で補わない。 */
 export function StampQrCard({card,wallet,awarded=0}:{card:VisitStampCard;wallet:VisitStampWallet;awarded?:number}) {
  const slots=card.settings.slotCount??Math.max(...card.settings.rewards.map(r=>r.stamps));
  const color=card.settings.backgroundColor??VISIT_STAMP_DEFAULT_COLOR;

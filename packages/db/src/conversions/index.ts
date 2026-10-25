@@ -30,7 +30,7 @@ export interface ConversionPoint {
   /** 集計対象を1アカウントに絞る場合。NULL なら全アカウント */
   line_account_id: string | null;
   /**
-   * 所属する統括(N-263)。アカウントを絞っていない地点も必ずどこかの
+   * 所属する統括。アカウントを絞っていない地点も必ずどこかの
    * 統括に属する。移行435より前の行は既定の統括へ寄せてある。
    */
   tenant_id: string | null;
@@ -44,10 +44,10 @@ export interface ConversionPoint {
   stopped_at: string | null;
   updated_at: string;
   created_at: string;
-  /** 金額の決め方(N-252)。source のときは起点イベントの申告値を写す。 */
+  /** 金額の決め方。source のときは起点イベントの申告値を写す。 */
   value_mode?: 'source' | 'fixed' | 'none' | null;
   /**
-   * 友だちと結び付かない成果を匿名の合計として数えるか(#819)。
+   * 友だちと結び付かない成果を匿名の合計として数えるか。
    * 0=数えない(既定)。1=conversion_anonymous_days へ日別の件数だけ残す。
    */
   count_anonymous?: number;
@@ -69,10 +69,10 @@ export interface ConversionEvent {
   point_name_snapshot: string | null;
   event_type_snapshot: string | null;
   value_snapshot: number | null;
-  /** 計測したときの成果地点の版（N-252）。移行377より前の行は NULL。 */
+  /** 計測したときの成果地点の版。移行377より前の行は NULL。 */
   point_version_snapshot: number | null;
   idempotency_key: string | null;
-  /** 計測したときの地点の統括(N-263)。移行435より前の行は既定の統括。 */
+  /** 計測したときの地点の統括。移行435より前の行は既定の統括。 */
   tenant_id: string | null;
 }
 
@@ -128,7 +128,7 @@ export interface CreateConversionPointInput extends ConversionPointOptions {
 }
 
 /**
- * 地点の統括を決める(N-263)。
+ * 地点の統括を決める。
  *
  * アカウントを絞る地点はそのアカウントの統括に従う。絞らない地点は
  * 既定の統括に属する——未割当行を見られるのが既定の統括だけという
@@ -241,7 +241,7 @@ export async function updateConversionPoint(
   if ('attributionDays' in input) put('attribution_days', input.attributionDays ?? null);
   if ('lineAccountId' in input) {
     put('line_account_id', input.lineAccountId ?? null);
-    // N-263: 所属アカウントを移したら統括も移す。古い統括のまま残すと、
+    // 所属アカウントを移したら統括も移す。古い統括のまま残すと、
     // 移管先の統括の友だちへ記録できず、元の統括へは記録し続ける穴になる。
     put('tenant_id', await resolveConversionPointTenantId(db, input.lineAccountId));
   }
@@ -272,7 +272,7 @@ export async function updateConversionPoint(
 }
 
 /**
- * ページ到達の照合用にURLを同じ形へ直す（R282）。
+ * ページ到達の照合用にURLを同じ形へ直す。
  *
  * - `?` 以降（パラメータ）と `#` 以降（ページ内位置）を外す。
  *   画面の説明どおり「パラメータは無視」する。保存した側に残っている
@@ -301,7 +301,7 @@ export function normalizeUrlReachUrl(raw: unknown): string | null {
 }
 
 /**
- * 保存した対象URLが受信URLに当てはまるか（R282）。
+ * 保存した対象URLが受信URLに当てはまるか。
  *
  * 両方を normalizeUrlReachUrl で同じ形へ直してから、文字どおりの
  * 前方一致で見る。SQL の LIKE に任せない（`_`・`%` が別の文字へ
@@ -320,7 +320,7 @@ export function matchesUrlReachTarget(targetUrl: unknown, url: string): boolean 
  * （?utm_source=... など）が付いた瞬間に数えられなくなる。
  * 逆に部分一致にすると、URLの途中にたまたま含まれるだけで数えてしまう。
  *
- * R282: 照合は matchesUrlReachTarget（文字どおりの前方一致）で行う。
+ * 照合は matchesUrlReachTarget（文字どおりの前方一致）で行う。
  * 保存済みの設定を SQL で正規化し直すのはやめ、候補を絞ったあと
  * JS で1件ずつ見る。既存の設定（パラメータ付きの保存など）も
  * 作り直さずに正しく当てはまる。
@@ -334,7 +334,7 @@ export async function getUrlReachConversionPoints(
   lineAccountId: string | null,
 ): Promise<ConversionPoint[]> {
   if (normalizeUrlReachUrl(url) === null) return [];
-  // N-263: 統括も一致条件にする。アカウントを絞っていない地点でも
+  // 統括も一致条件にする。アカウントを絞っていない地点でも
   // tenant_id を持つので、リンクのアカウントの統括と同じ地点だけを返せば、
   // 「全アカウント対象の地点が別の統括のリンクで反応する」ことがない。
   // アカウントが取れないリンクは既定の統括に倒す(fail-closed)。
@@ -388,7 +388,7 @@ export interface TrackConversionInput {
   metadata?: string | null;
   idempotencyKey?: string | null;
   /**
-   * N-270: 外部受信など起点側が金額を持つ場合の1件あたりの金額。
+   * 外部受信など起点側が金額を持つ場合の1件あたりの金額。
    * value_mode='source' の地点だけに効く。fixed の地点では地点の設定が
    * 常に勝つ(固定金額の証跡を起点側の申告で上書きしない)。
    */
@@ -446,7 +446,7 @@ const JST_DAY_MS = 86_400_000;
  * 友だちが同じアカウントのときだけ記録できる。両方を見られる職員でも
  * 交差記録はできない。
  *
- * N-263: 統括を渡したときは統括の一致も条件にする。NULL(未割当)は
+ * 統括を渡したときは統括の一致も条件にする。NULL(未割当)は
  * 既定の統括に倒すので、「どこにも属さない」側がすり抜けない。
  * 統括を渡さない呼び出しは従来どおりアカウント一致だけを見る。
  */
@@ -467,7 +467,7 @@ export function canRecordConversion(
 
 /**
  * 同じ冪等キーで送られた中身が同じか。同じ再送は同じ結果を返し、
- * 別内容の使い回しは409で弾く(N-255)。中身の比較は呼び出し側で
+ * 別内容の使い回しは409で弾く。中身の比較は呼び出し側で
  * 文字列化済みの metadata まで含めて行う。
  */
 function isSameIdempotencyContent(existing: ConversionEvent, input: TrackConversionInput): boolean {
@@ -531,12 +531,12 @@ async function findBlockingEvent(
 }
 
 /**
- * 固定金額の控え（N-252）。**必ず数値を返す。NULL を返さない。**
+ * 固定金額の控え。**必ず数値を返す。NULL を返さない。**
  *
  * fixed の地点では `point.value` に決まった額が入るので、そのまま写すと
  * 後から地点を編集しても過去の成果の控えは動かない。`?? 0` は fixed で
  * value が空のまま残った行の転び止め。source/none の地点には使わない
- * (R42)。source は起点の申告(`asSourceValue`)、none は金額なし(NULL)を
+ * source は起点の申告(`asSourceValue`)、none は金額なし(NULL)を
  * 残し、0円と区別する。source 地点の `point.value` は NULL のため、
  * 報酬計算の `value_snapshot ?? point_value` は NULL のまま 0 扱いになり、
  * 編集で過去の報酬が動くことはない。
@@ -546,7 +546,7 @@ function measuredValue(point: { value: number | null }): number {
 }
 
 /**
- * 起点が申告した1件あたりの金額(R42)。0以上の有限数だけを受け付け、
+ * 起点が申告した1件あたりの金額。0以上の有限数だけを受け付け、
  * 無い・不正なときは NULL(金額なし)を返す。0 へ倒さない。
  */
 function asSourceValue(value: number | null | undefined): number | null {
@@ -560,7 +560,7 @@ export async function trackConversion(
   input: TrackConversionInput,
   runtime?: { now?: number },
   /**
-   * N-270: 既存の1件を返して終わった(重複・冪等)ことを呼び出し側へ
+   * 既存の1件を返して終わった(重複・冪等)ことを呼び出し側へ
    * 伝えるだけの出力先。受信台帳が「数えた」と「再送だった」を
    * 分けて残せるようにする。
    */
@@ -580,12 +580,12 @@ export async function trackConversion(
   ]);
   if (!point) throw new Error('conversion_point_not_found');
   if (!friend) throw new Error('conversion_friend_not_found');
-  // N-268: 下書き・停止はどちらも「計測しない」。呼び出し側で区別できるよう
+  // 下書き・停止はどちらも「計測しない」。呼び出し側で区別できるよう
   // 理由は分けて返す。
   if (point.status === 'stopped') throw new Error('conversion_point_stopped');
   if (point.status === 'draft') throw new Error('conversion_point_draft');
   // 管理API・公開 /t/:linkId・将来のcallerすべてに同じ境界を適用する。
-  // アカウントの一致に加えて統括の一致も見る(N-263)。地点が全アカウント
+  // アカウントの一致に加えて統括の一致も見る。地点が全アカウント
   // 対象(NULL)でも、別の統括の友だちへは記録しない。
   if (!canRecordConversion(
     point.line_account_id,
@@ -595,7 +595,7 @@ export async function trackConversion(
   )) {
     throw new Error('conversion_account_mismatch');
   }
-  // R40: 「数えない条件」に当てはまる友だちは記録しない。外部受信・
+  // 「数えない条件」に当てはまる友だちは記録しない。外部受信・
   // 手動記録・起点の自動計測のすべてがこの関数を通るので、ここ1か所で
   // 効く。壊れた条件は保存口で弾くが、直書きされた行に備えてここでは
   // 例外にせず条件なしとして数え続け、記録を止めない。
@@ -630,10 +630,10 @@ export async function trackConversion(
   const policy = resolveDedupPolicy(point);
 
   /*
-   * N-270/R42: 金額のスナップショット。
+   * 金額のスナップショット。
    * source の地点は起点の申告値を採る。申告が無い・不正なときは 0 へ
    * 倒さず NULL(金額なし)で残す。0円と金額なしを混ぜると、注文金額を
-   * 使う設定なのに成果が 0円に見える(R42)。fixed では地点の設定だけを
+   * 使う設定なのに成果が 0円に見える。fixed では地点の設定だけを
    * 写し、呼び出し側の申告で固定金額を上書きさせない。none は金額を
    * 集計しないので常に NULL。集計側は COALESCE(value_snapshot, 0) で
    * 合計し、表示側は NULL を「金額なし」として 0円と区別する。
@@ -644,7 +644,7 @@ export async function trackConversion(
       ? measuredValue(point)
       : null;
 
-  // 付け方の判断(#823)。候補を新しい順に並べ、決まりをすべて満たす
+  // 付け方の判断。候補を新しい順に並べ、決まりをすべて満たす
   // 最初の紹介に付ける。地点ごとに期間を狭めたい場合は attribution_days を渡す。
   // 付けなかった理由も残し、成果の詳細で1件ずつ説明できるようにする。
   const explanation = await explainAffiliateAttribution(db, input.friendId, now, {
@@ -673,7 +673,7 @@ export async function trackConversion(
     snapshotValue,
     point.version,
     input.idempotencyKey ?? null,
-    // 記録時点の地点の統括を写す(N-263)。後で地点が編集・移管されても
+    // 記録時点の地点の統括を写す。後で地点が編集・移管されても
     // 計測当時の所属が分かるようにする。
     point.tenant_id ?? DEFAULT_TENANT_ID,
   ];
@@ -905,7 +905,7 @@ export async function getConversionEvents(
 }
 
 /*
- * N-269: 旧来の getConversionReport の実装は conversion-definitions 側の
+ * 旧来の getConversionReport の実装は conversion-definitions 側の
  * reportRows(新レポートと同じ集計)へ集約した。暦日解釈とスナップショット
  * 固定は新レポートと一致する。呼び出し互換のため再公開する。
  */

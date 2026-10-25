@@ -73,7 +73,7 @@ export function optionalDate(value: unknown, label: string): string | null {
   if (Number.isNaN(parsed.getTime())) {
     throw new MileageRewardError('invalid_date', `${label}を確認してください`);
   }
-  // R369: 時差付きのまま保存すると文字列比較で期間を誤判定する。
+  // 時差付きのまま保存すると文字列比較で期間を誤判定する。
   // 保存時にUTCへ正規化し、比較は同じ基準の時刻値で行う。
   return parsed.toISOString();
 }

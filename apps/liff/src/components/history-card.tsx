@@ -14,7 +14,7 @@ import OnlineMeetingCard from './online-meeting-card.js';
 /**
  * 予約の履歴の札 (★V8・nWby5)。日付の四角＋メニュー名＋支払いの札（無いときは予約の状態の札）。
  * 支払い済み・返金済みは「領収書を見る」（Stripe のページ）。未払いは払う期限と［お支払いへ進む］。
- * 下に「日時を変える／キャンセル」の2ボタン (F-6 本人の変更・取消)。
+ * 下に「日時を変える／キャンセル」の2ボタン (本人の変更・取消)。
  * 押す口が渡されたときだけ出す (履歴の口が版などを返さないと送れないため、呼び側が決める)。
  */
 export default function HistoryCard({
@@ -75,7 +75,7 @@ export default function HistoryCard({
             <span className="truncate text-[11px] text-liff-sub">{payment?.receiptUrl ? '領収書のページが開きます' : '領収書は準備中です'}</span>
           </div>
         )}
-        {/* 未払い（B-338・nWby5）：払う期限と、［お支払いへ進む］を日時を変えるの位置に（主ボタン）。 */}
+        {/* 未払い（nWby5）：払う期限と、［お支払いへ進む］を日時を変えるの位置に（主ボタン）。 */}
         {payment?.kind === 'unpaid' && payment.holdUntil ? <UnpaidPaymentNote holdUntil={payment.holdUntil} /> : <BookingCancelDeadline deadline={booking.cancel_deadline_at} />}
         {hasActions && (
           <div className="flex gap-2">

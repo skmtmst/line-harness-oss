@@ -30,13 +30,13 @@ export interface StaffMember {
   can_access_descendant_accounts?: number;
   account_scope?: 'all' | 'accounts';
   policy_version?: number;
-  /** N-424: 明示保存された役割bundle。NULL は従来どおり role+access_level から導出。 */
+  /** 明示保存された役割bundle。NULL は従来どおり role+access_level から導出。 */
   role_bundle?: string | null;
-  /** N-424: 「見えるだけ」の permission key(JSON配列)。GET系だけを許可する。 */
+  /** 「見えるだけ」の permission key(JSON配列)。GET系だけを許可する。 */
   view_permission_keys?: string | null;
-  /** N-424: スタッフのメール表示。'full'|'masked'|'none'、NULL は従来判定。 */
+  /** スタッフのメール表示。'full'|'masked'|'none'、NULL は従来判定。 */
   email_mask?: string | null;
-  /** N-433: 確認待ちの新しいメールアドレス。確認するまで email は変えない。 */
+  /** 確認待ちの新しいメールアドレス。確認するまで email は変えない。 */
   email_change_new?: string | null;
   email_change_token_hash?: string | null;
   email_change_expires_at?: string | null;
@@ -190,7 +190,7 @@ export async function getStaffById(
 }
 
 /**
- * 担当者の表示名をまとめて引く（R35）。
+ * 担当者の表示名をまとめて引く。
  *
  * 登録メディアの `uploaded_by` は内部ID（UUID）のまま残し、画面には
  * この名前を出す。退職・削除済みで引けないIDは載せない（呼び出し側が
@@ -344,9 +344,9 @@ export async function updateStaffMember(
   if (input.email_change_expires_at !== undefined) { sets.push('email_change_expires_at = ?'); values.push(input.email_change_expires_at); }
 
   values.push(id);
-  // R499: 版を指定されたら「読んだときの版のまま」を更新条件にする。
+  // 版を指定されたら「読んだときの版のまま」を更新条件にする。
   // 他者が先に変えていたら1行も当たらず、呼び出し側が409で止める。
-  // R501: 管理者を外す変更は「ほかに有効な管理者が残る」ことも同じ書き込みの
+  // 管理者を外す変更は「ほかに有効な管理者が残る」ことも同じ書き込みの
   // 条件にする。同時に互いを止めても0人にならない（後勝ちではなく競合で止まる）。
   let where = 'WHERE id = ?';
   if (options?.expectedPolicyVersion !== undefined) {
@@ -377,7 +377,7 @@ export async function updateStaffMember(
 }
 
 /**
- * R509: 仮秘密の条件付き確保。まだ無いときだけ置く。
+ * 仮秘密の条件付き確保。まだ無いときだけ置く。
  *
  * 同じ合言葉への同時取得で両方が新しい秘密を作っても、保存は1つだけ。
  * 置けた側が true。負けた側は置かれた値を読み直して同じQRを返す。
@@ -395,7 +395,7 @@ export async function claimTotpPendingSecret(
 }
 
 /**
- * R498: 権限保存の要求キー台帳。同じ保存の送り直しを版を重ねずに返す。
+ * 権限保存の要求キー台帳。同じ保存の送り直しを版を重ねずに返す。
  *
  * 同じキーで内容が違う送り直しは受け付けない（request_hash で照合）。
  * 行が無いときは null。
@@ -490,7 +490,7 @@ export async function getStaffByInviteTokenHash(db: D1Database, tokenHash: strin
     .first<StaffMember>();
 }
 
-/** N-433: メール変更の確認リンクから本人の行を引く。トークンは指紋で照合する。 */
+/** メール変更の確認リンクから本人の行を引く。トークンは指紋で照合する。 */
 export async function getStaffByEmailChangeTokenHash(db: D1Database, tokenHash: string): Promise<StaffMember | null> {
   return db.prepare('SELECT * FROM staff_members WHERE email_change_token_hash = ?').bind(tokenHash).first<StaffMember>();
 }

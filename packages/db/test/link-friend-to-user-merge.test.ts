@@ -1,8 +1,8 @@
 /**
- * linkFriendToUser の結合回帰試験（R385 + R392/R394）。
+ * linkFriendToUser の結合試験。
  *
- * base が素の付け替えだけだったところへ、origin がマイル移管（R385）、
- * 自分の枝が競合対策（R392/R394）を足し、merge で両方を残した。
+ * base が素の付け替えだけだったところへ、origin がマイル移管、
+ * 自分の枝が競合対策を足し、merge で両方を残した。
  * 片方だけに戻ると赤くなるよう、1回の結び直しで両方が動くことを確かめる。
  */
 import Database from 'better-sqlite3';
@@ -84,21 +84,21 @@ describe('linkFriendToUser の結合: 結び直しとマイル移管', () => {
     expect(
       (sqlite.prepare(`SELECT user_id FROM friends WHERE id = 'friend-a'`).get() as { user_id: string }).user_id,
     ).toBe('user-u2');
-    // R394: 古い候補の結び付き行は外れる。
+    // 古い候補の結び付き行は外れる。
     expect(
       (sqlite.prepare(
         `SELECT COUNT(*) AS n FROM friend_identity_links
           WHERE friend_id = 'friend-a' AND unlinked_at IS NULL`,
       ).get() as { n: number }).n,
     ).toBe(0);
-    // R392: 両本人の版が進む。
+    // 両本人の版が進む。
     expect(
       (sqlite.prepare(`SELECT revision FROM users WHERE id = 'user-a'`).get() as { revision: number }).revision,
     ).toBe(2);
     expect(
       (sqlite.prepare(`SELECT revision FROM users WHERE id = 'user-u2'`).get() as { revision: number }).revision,
     ).toBe(2);
-    // R385: 友だち名義の財布・ロットは本人へ移り、再実行しても重複しない。
+    // 友だち名義の財布・ロットは本人へ移り、再実行しても重複しない。
     expect(
       sqlite.prepare(`SELECT * FROM mileage_wallets WHERE beneficiary_key = 'friend:friend-a'`).get(),
     ).toBeUndefined();

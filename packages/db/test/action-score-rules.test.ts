@@ -76,7 +76,7 @@ describe('action score rule versions', () => {
   it('returns a non-persisted safe draft and excludes unavailable LINE read scoring', async () => {
     const config = await getActionScoreRuleConfiguration(db, 'account-1');
     expect(config).toMatchObject({ configured: false, status: 'not_configured' });
-    // N-239: friend_add（友だち追加）は実際に届く出来事なので初期ルールに入る。
+    // friend_add（友だち追加）は実際に届く出来事なので初期ルールに入る。
     expect(config.editableVersion.rules).toHaveLength(8);
     expect(config.editableVersion.rules.some((rule) => rule.eventType === 'friend_add' && rule.source === 'line_webhook')).toBe(true);
     expect(config.editableVersion.rules.some((rule) => rule.eventType === 'message_opened')).toBe(false);
@@ -216,7 +216,7 @@ describe('action score rule versions', () => {
     expect(sqlite.prepare(`SELECT score FROM friends WHERE id = 'friend-1'`).get()).toEqual({ score: 99 });
   });
 
-  // N-239: 選べるようになった出来事（friend_add）は公開ルールからそのまま加点される。
+  // 選べるようになった出来事（friend_add）は公開ルールからそのまま加点される。
   it('applies the newly selectable friend_add event from the published defaults', async () => {
     await publishDefaults(db);
     const result = await applyPublishedActionScoreRules(db, {
@@ -227,7 +227,7 @@ describe('action score rule versions', () => {
     expect(sqlite.prepare(`SELECT score FROM friends WHERE id = 'friend-1'`).get()).toEqual({ score: 3 });
   });
 
-  // N-235: 手で直した点数は、履歴の追記だけで表す（過去の行は書き換えない）。
+  // 手で直した点数は、履歴の追記だけで表す（過去の行は書き換えない）。
   it('appends a manual adjustment with staff identity and replays without double-applying', async () => {
     const adjusted = await postActionScoreManualAdjustment(db, {
       lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 12,
@@ -288,7 +288,7 @@ describe('action score rule versions', () => {
     })).rejects.toMatchObject({ code: 'friend_not_found' });
   });
 
-  // N-235: 帯の分けかたの試算は人数だけを返し、点数も履歴も動かさない。
+  // 帯の分けかたの試算は人数だけを返し、点数も履歴も動かさない。
   it('previews the band distribution without mutating scores or history', async () => {
     await postActionScoreManualAdjustment(db, {
       lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 50,

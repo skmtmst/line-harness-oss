@@ -985,7 +985,7 @@ export function validateFormDefinition(layout: FormLayout): string | null {
     let imageCount = 0;
     for (const block of group.blocks) {
       /*
-       * R197: 画像のURLと、押したときに開くURLもボタンのリンク先と
+       * 画像のURLと、押したときに開くURLもボタンのリンク先と
        * 同じ決めごとで見る。空は「未指定」（下書きでは許す）とし、
        * 入っているのにURLの形でないものだけ止める。
        */
@@ -1261,7 +1261,7 @@ function validateFormBranchGraph(layout: FormLayout): string | null {
 /**
  * 初期値が、その欄の回答の決まりに合っているか。
  *
- * R196: 空の初期値は「未設定」で許す。入っているのに型・選択肢・
+ * 空の初期値は「未設定」で許す。入っているのに型・選択肢・
  * 入力制限に合わないものは、公開の直前で止める。そのまま公開すると
  * 管理者が入れた初期値のせいで回答者が送信できなくなるため。
  * 判定は回答検証 `validateAnswer` と同じものを使う（必須だけ外す。

@@ -125,7 +125,7 @@ export async function updateReminder(
   if (updates.description !== undefined) { sets.push('description = ?'); values.push(updates.description); }
   if (updates.isActive === true) {
     /*
-     * R146 監査：公開版の無い下書きを「再開」させない。通すと公開版IDが
+     * 公開版の無い下書きを「再開」させない。通すと公開版IDが
      * null のまま is_active=1・lifecycle_status=published になり、公開して
      * いない設定が稼働中に見える。止める方（false）は従来どおり通す。
      */

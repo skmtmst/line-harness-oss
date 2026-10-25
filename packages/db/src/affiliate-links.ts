@@ -58,7 +58,7 @@ export interface CreateAffiliateLinkInput {
   /** Offer to scope this link to (ASP Phase 2). Omit for a 汎用リンク. */
   offerId?: string | null;
   /**
-   * Stable per-attempt UUID from the client (#686). The registration screen
+   * Stable per-attempt UUID from the client. The registration screen
    * passes the SAME id on a response-loss retry, so the initial link is issued
    * at most once even when two attempts run concurrently. Omit for links that
    * are issued by hand — those stay NULL and may be created freely.
@@ -66,7 +66,7 @@ export interface CreateAffiliateLinkInput {
   operationId?: string | null;
 }
 
-/** Look up a prior link issued under the same operation UUID (#686). */
+/** Look up a prior link issued under the same operation UUID. */
 async function findLinkByOperationId(
   db: D1Database,
   affiliateId: string,
@@ -114,7 +114,7 @@ export async function createAffiliateLink(
     }
   }
 
-  // 同じ操作UUIDで既に発行済みなら、それを返す（#686）。応答だけ失われた
+  // 同じ操作UUIDで既に発行済みなら、それを返す。応答だけ失われた
   // 再送でリンクを増やさない。
   if (input.operationId) {
     const existing = await findLinkByOperationId(db, input.affiliateId, input.operationId);

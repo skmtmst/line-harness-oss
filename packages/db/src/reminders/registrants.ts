@@ -58,7 +58,7 @@ export async function enrollFriendInReminder(
   const versionId = await ensureReminderPublishedVersion(db, reminder);
   const id = crypto.randomUUID();
   const now = jstNow();
-  // R346: この登録が使うテンプレートの公開版を写す。新しい版にするのは
+  // この登録が使うテンプレートの公開版を写す。新しい版にするのは
   // 登録し直した時だけ。版履歴に無い分は送るときに今の版を読む。
   const versionSteps = await getReminderVersionSteps(db, versionId);
   const templateSnapshot = await snapshotReminderTemplateVersions(
@@ -105,7 +105,7 @@ export async function getFriendReminders(db: D1Database, friendId: string): Prom
 }
 
 /**
- * R348: リマインダの登録者一覧。親ルールの今の所属ではなく、友だちの
+ * リマインダの登録者一覧。親ルールの今の所属ではなく、友だちの
  * 所属（＝送信元アカウント）が見える担当に出す。所属を変えても旧登録が
  * 一覧から消えず、取消・日時変更の対象に残る。担当外の友だちの行は出さない。
  * scope 未指定の内部呼び出しは従来どおり親子の所属一致だけを通す。
@@ -131,7 +131,7 @@ export async function listReminderRegistrants(
 }
 
 /**
- * R348: 一覧操作の対象行を、友だちの所属が見える担当にだけ読む。
+ * 一覧操作の対象行を、友だちの所属が見える担当にだけ読む。
  * scope 未指定の内部呼び出しは従来どおり親子の所属一致だけを通す。
  */
 export async function getReminderRegistrantById(
@@ -249,7 +249,7 @@ export async function cancelReminderRegistrant(
 }
 
 /**
- * R341: 再開で取消の記録を外して予定を作り直す。
+ * 再開で取消の記録を外して予定を作り直す。
  *
  * 取消時に止めた未来の実行行は cancelled のまま残り、一意制約が新しい
  * 行の作成を塞ぐ。そのままでは再開後に送られない。未来の予定時刻に
@@ -324,7 +324,7 @@ export async function reopenCancelledDeliveryRuns(
 
 /**
  * 取消済み登録を再開する。未送信の未来予定は expectedRuns から作り直す
- * (R341)。保存済み版と送信済み履歴には触れない。
+ * 保存済み版と送信済み履歴には触れない。
  */
 export async function resumeReminderRegistrant(
   db: D1Database,

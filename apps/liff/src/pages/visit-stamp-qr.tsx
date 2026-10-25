@@ -12,7 +12,7 @@ import Button from '../components/ui/button/index.js';
 import {StampQrCard,StampQrMessage} from '../components/ui/stamp-qr-result.js';
 import styles from './visit-stamp-qr.module.css';
 
-/** G-8g〜j。QRの個数・友だちIDは渡さず、サーバの押印結果だけを表示。 */
+/** 来店スタンプのQRを読んだ後の画面。QRの個数・友だちIDは渡さず、サーバの押印結果だけを表示。 */
 export default function VisitStampQr() {
  const [params]=useSearchParams(),navigate=useNavigate();
  const token=params.get('token')??'',account=params.get('accountId')??'';

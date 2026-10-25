@@ -63,7 +63,7 @@ export async function describeMediaUsage(
     return await describeMediaUsageInner(db, usage, lineAccountId);
   } catch (err) {
     // 表そのものが無い読み口は、その参照だけ「未確認」に倒す。全体を
-    // 503にすると、どの画像でも取得が失敗する（R34）。参照自体は落とさず
+    // 503にすると、どの画像でも取得が失敗する。参照自体は落とさず
     // 残すため、削除は止まったままになる。
     if (!isMissingTableError(err)) throw err;
     return {
@@ -222,7 +222,7 @@ export async function getMediaDeleteImpactSnapshot(
       checkedAt,
       lastScannedAt,
       // 台帳の読み切りはここで確定する。走査の読み残し（表が無い読み口）は
-      // 呼び出し側（Workerの口）が走査結果から判定して上書きする（R34）。
+      // 呼び出し側（Workerの口）が走査結果から判定して上書きする。
       verified: true,
       canDelete: references.length === 0,
       recommendedAction: references.length === 0 ? 'delete' : 'review_references',
@@ -298,8 +298,8 @@ export async function describeMediaReplacementUsage(
  * 使用中メディアを別の登録メディアへ差し替える前の計画。
  *
  * source / replacement は同じLINEアカウントで引く。参照不明・共有参照・
- * ウェビナー動画を含む場合、以前は計画全体を止めていたが（全部替わったと
- * 誤認させないため）、#918 からは「置換できる箇所だけ」を選べる。
+ * ウェビナー動画を含む場合でも、全部替わったと誤認させないよう
+ * 「置換できる箇所だけ」を選べるようにする。
  * そのため影響には、差し替えられない使用先の件数と種類別内訳も載せる。
  * `canReplace` は全件一括、`canPartiallyReplace` は部分実行の可否。
  * 差し替え元と先の組み合わせ自体が不正な場合（同一・種類違い）は

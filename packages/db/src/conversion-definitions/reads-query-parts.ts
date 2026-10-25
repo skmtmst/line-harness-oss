@@ -34,7 +34,7 @@ export class ConversionDefinitionError extends Error {
 }
 
 /**
- * 利用先の実在確認(N-258)。
+ * 利用先の実在確認。
  *
  * `ref_kind` ごとの参照表を決め打ちし、存在しないIDや別アカウントの
  * オブジェクトを利用先として保存させない。画面が出す候補と同じ台帳を
@@ -91,7 +91,7 @@ export function accountWhere(
 }
 
 /**
- * N-268: 「入力不良」の SQL 条件。作成口では弾いているが、旧口
+ * 「入力不良」の SQL 条件。作成口では弾いているが、旧口
  * (/api/conversions/points) や途中の版で欠けた設定が残り得る。
  * ここで導出しないと「計測中」と出ながら実際には数えられない行が
  * 埋もれる。
@@ -103,14 +103,14 @@ export const INVALID_CONFIG_SQL = `(
     OR cp.deduplication_window_days < 1 OR cp.deduplication_window_days > 365))
 )`;
 
-/** N-270: 「起点停止」= 地点は動いているが外部受信を明示的に止めている。 */
+/** 「起点停止」= 地点は動いているが外部受信を明示的に止めている。 */
 export const SOURCE_STOPPED_SQL = `(cp.measure_method = 'webhook' AND cp.ingest_disabled_at IS NOT NULL)`;
 
-/** N-267: 「どこからも使われていない」は利用先台帳の不存在で判定する。 */
+/** 「どこからも使われていない」は利用先台帳の不存在で判定する。 */
 export const UNUSED_SQL = `NOT EXISTS (SELECT 1 FROM conversion_definition_usages u WHERE u.conversion_point_id = cp.id)`;
 
 /**
- * N-268: state 絞り込みを SQL へそのまま落とす。導出状態の並びは
+ * state 絞り込みを SQL へそのまま落とす。導出状態の並びは
  * serializeDefinition 側の deriveDefinitionState と必ず一致させる。
  */
 export function stateFilterSql(state: ConversionDefinitionFilter): string {
@@ -218,7 +218,7 @@ export async function cancellationMetrics(db: D1Database, from: string, to: stri
 }
 
 /**
- * #819: 成果イベントの取消台帳(conversion_event_reversals)の集計。
+ * 成果イベントの取消台帳(conversion_event_reversals)の集計。
  * 最新の追記が 'reverse' の成果だけを「取り消し中」として数える。
  * 'restore' が最後に来たものは数え直しの対象に戻る。
  * 台帳がまだ無い環境(移行前)では空を返して既存表示を壊さない。
@@ -249,7 +249,7 @@ export async function reversalMetrics(db: D1Database, from: string, to: string, 
 }
 
 /**
- * N-268: 表示状態の導出。stateFilterSql と同じ優先順で決める。
+ * 表示状態の導出。stateFilterSql と同じ優先順で決める。
  * 入力不良は「何が足りないか」を reason へ入れて、詳細画面がそのまま
  * 直す場所を示せるようにする。
  */
@@ -281,7 +281,7 @@ export function deriveDefinitionState(row: Pick<DefinitionRow,
 
 export function serializeDefinition(row: DefinitionRow, cancellation?: CancellationMetric, reversal?: CancellationMetric): ConversionDefinitionListItem {
   const derived = deriveDefinitionState(row);
-  // #819: 取消は追記台帳(reversal)とアフィリエイト調整(cancellation)の両方から来る。
+  // 取消は追記台帳(reversal)とアフィリエイト調整(cancellation)の両方から来る。
   // 純数・純額は両方を引いた値にする。
   const reversedTotal = (reversal?.count ?? 0) + (cancellation?.count ?? 0);
   const reversedValue = (reversal?.value ?? 0) + (cancellation?.value ?? 0);

@@ -7,7 +7,7 @@ import { asD1 } from './d1-test-helper.js'
 import { FOLDER_ITEM_COUNT_TABLES, FOLDER_KINDS, getFolderItemCounts } from '../src/folders.js'
 
 /**
- * フォルダ件数（#631）を、一覧画面と同じ母集団（アカウント可視範囲）で
+ * フォルダ件数を、一覧画面と同じ母集団（アカウント可視範囲）で
  * 数えることを、実スキーマ（bootstrap.sql）へ実データを入れて確かめる。
  *
  * 固定モックではなく、`reminders` テーブルへ実際に行を挿入し、
@@ -139,7 +139,7 @@ describe('getFolderItemCounts(#631)', () => {
   })
 
   /**
-   * 独立審査#631: 一覧（apps/worker/src/routes/reminders.ts:425）は
+   * 一覧（apps/worker/src/routes/reminders.ts）は
    * `deleted_at IS NULL` で論理削除済みを除くが、件数側にその絞りが
    * 無かった。一覧5件・フォルダ6件のような食い違いが、リマインダを
    * 1件消すだけで起きる。
@@ -217,7 +217,7 @@ describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {
   })
 
   it('対応表は統一パターンの16種別ちょうど。新しい種別が増減したらこの試験が気づく', () => {
-    // F-13（582）で自動化・共通アクション・成果に folder_id 列ができ、件数を数えるようになった。
+    // 自動化・共通アクション・成果も folder_id 列（migration 582）で件数を数える。
     expect(Object.keys(FOLDER_ITEM_COUNT_TABLES).sort()).toEqual(
       ['affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule', 'auto_reply', 'automation', 'broadcast', 'common_action', 'common_var', 'conversion', 'media', 'reminder', 'rich_menu', 'scenario', 'tag', 'template'].sort(),
     )

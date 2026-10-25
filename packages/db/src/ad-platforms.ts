@@ -29,7 +29,7 @@ const AD_PLATFORM_COMMON_KEYS: readonly string[] = [
   'failed_count',
   'retry_success_count',
   'connection_error',
-  // 広告費の取込 (#818)。取込費用を帰属させる流入元。
+  // 広告費の取込。取込費用を帰属させる流入元。
   'entry_route_id',
 ];
 
@@ -193,7 +193,7 @@ export interface AdPlatformConfig {
   pixel_code?: string;
   /** 表示に使う通貨コード(JPYなど)。費用の換算はしない。 */
   currency?: string;
-  /** 費用取込に使う媒体側のアカウントID (#818) */
+  /** 費用取込に使う媒体側のアカウントID */
   ad_account_id?: string;
   account_id?: string;
   advertiser_id?: string;
@@ -944,7 +944,7 @@ export async function connectVerifiedAdPlatform(db: D1Database, platform: AdPlat
   return Number(result.meta.changes ?? 0) === 1;
 }
 
-/** F-22: 保存済みの送信と待ち行列を、同じ目印で結び付ける。 */
+/** 保存済みの送信と待ち行列を、同じ目印で結び付ける。 */
 export interface AdConversionRetrySource extends AdConversionOutboxRow {
   log_id: string;
   log_status: string;

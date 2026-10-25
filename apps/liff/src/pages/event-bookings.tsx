@@ -90,7 +90,7 @@ export default function EventBookings() {
   const [pendingCancel, setPendingCancel] = useState<EventBookingMine | null>(null);
 
   /**
-   * U-3: 開催回を変える予約。窓を開けている間だけ持つ。
+   * 開催回を変える予約。窓を開けている間だけ持つ。
    * 冪等鍵は窓を開けたときに1つ作り、失敗後の再試行でも使い回す
    * (応答を失った成功を二重にしない)。
    */

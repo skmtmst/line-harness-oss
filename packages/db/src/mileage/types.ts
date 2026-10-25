@@ -162,10 +162,10 @@ export interface MileageHistoryItem {
   /*
    * true の行は、見ている担当者の権限外アカウントの記録。
    * 残高は名寄せした本人で共通だが、調整の理由・実行者・元イベントは
-   * アカウントの閲覧権限で区切るため、この行では伏せてある（R387）。
+   * アカウントの閲覧権限で区切るため、この行では伏せてある。
    */
   restricted: boolean;
-  /** R380: 手動調整につけた友だち通知の状態。通知なし・権限外の行は null。 */
+  /** 手動調整につけた友だち通知の状態。通知なし・権限外の行は null。 */
   notificationStatus: string | null;
   notificationErrorCode: string | null;
 }
@@ -214,7 +214,7 @@ export interface MileageRuleRow {
   initial_status: 'pending' | 'available';
   conditions: string | null;
   /**
-   * R52: 公開版が持つ対象条件(JSON文字列)。live の `mileage_rules` に列はなく、
+   * 公開版が持つ対象条件(JSON文字列)。live の `mileage_rules` に列はなく、
    * 公開版から組み立てた行だけが持つ(実行時のみ)。live 読みの行は
    * undefined で、従来どおり条件なしとして付与する。
    */
@@ -228,7 +228,7 @@ export interface MileageRuleRow {
   expires_after_days?: number | null;
   cancellation_event_types?: string[] | null;
   notification?: { enabled: boolean; messageTemplate: string } | null;
-  /** 334(#521): 帰属アカウント。NULL は変更不可の既存全店ルール。 */
+  /** 334: 帰属アカウント。NULL は変更不可の既存全店ルール。 */
   line_account_id?: string | null;
   is_active: number;
   valid_from: string | null;
@@ -256,7 +256,7 @@ export interface MileageRuleConditions {
 
 /**
  * 公開版の中身。is_active は含めない。停止・再開は live の稼働で見る。
- * R52: 下書きの対象条件(target_conditions)もここへ載せる。載せないと
+ * 下書きの対象条件(target_conditions)もここへ載せる。載せないと
  * 公開版だけ条件が消え、対象外の友だちへ付与される。
  * m22o: 期限・取消・通知も同じく公開版へ載せる。載せないと画面の設定が
  * 実際の付与に効かない。content_json は形を持たないので、列を足さずに載る。
@@ -288,7 +288,7 @@ export interface ApplyMileageRulesInput {
   metadata?: Record<string, unknown> | null;
   occurredAt?: string;
   /**
-   * N-231 案1: 受付時に固定した適用版の集合。null は旧来互換でそのまま live を読む。
+   * 受付時に固定した適用版の集合。null は旧来互換でそのまま live を読む。
    * 空集合 {} は「所属ルールなし」(全店共通のみ)で、旧来の持ち主不明行と同じ結果になる。
    * 版 0 は「受付時に未公開」。後の初公開で残る v0 があれば v0、無ければ live。
    */
@@ -400,7 +400,7 @@ export interface AffiliateConversionMileageContext {
   offer_id: string | null;
   offer_name: string | null;
   reward_miles: number | null;
-  /** m22u R356: 承認時に凍結したマイル数。NULL の行は従来どおり現在値。 */
+  /** 承認時に凍結したマイル数。NULL の行は従来どおり現在値。 */
   frozen_miles: number | null;
   mileage_program_id: string | null;
 }

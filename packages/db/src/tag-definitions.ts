@@ -122,7 +122,7 @@ async function getAutomation(
 
 /**
  * 対応マーク（`getSupportMarkById`）・回答フォーム（`getFormById`）と同じ
- * 形で archived を除外する（Issue #710）。既定では見えない。編集画面
+ * 形で archived を除外する。既定では見えない。編集画面
  * ・削除影響確認など、archived でも読む必要がある呼び出し側は
  * `includeArchived: true` を明示する。
  */
@@ -276,7 +276,7 @@ export type UpdateTagDefinitionInput = {
  * 挙動を決める設定（フォルダ・スター・手動付与可否・再付与方針・連動の
  * 有効無効・マイル・連動アクションの中身）は変えられない。
  *
- * 根拠（Issue #710 司令塔裁定）: タグには archived を active へ戻す口が
+ * 根拠: タグには archived を active へ戻す口が
  * 無い（`git grep` で確認済み）。戻せないのに表示名まで凍結すると、
  * 誤字が永久に残る。かといって挙動を決める設定まで自由に変えられると、
  * 「保管したのに中身が変わる」に気づけない状態になる
@@ -284,7 +284,7 @@ export type UpdateTagDefinitionInput = {
  * 編集自体ができない。タグだけ「気づかず開けて、気づかず保存できる」
  * 状態だった）。
  *
- * `PATCH /api/tags/:id` は `expectedVersion` 必須（#715）のため、
+ * `PATCH /api/tags/:id` は `expectedVersion` 必須のため、
  * この保護の迂回経路は塞がっている。
  */
 function assertArchivedTagUpdateAllowed(current: Tag, input: UpdateTagDefinitionInput): void {
@@ -779,12 +779,12 @@ export async function archiveTag(
    *
    * 止めないと version が無意味に増え、operation_audit に「保管した」記録が
    * 実際の回数より多く残る。監査ログは、あとから読む人が事実を確かめるための
-   * ものなので、そこに嘘が入るのは他と害の種類が違う（#708）。
+   * ものなので、そこに嘘が入るのは他と害の種類が違う。
    *
    * 呼び出し側はこの code を「失敗」ではなく「もう着いている」として見せる。
-   * 望んだ状態には着いているので、利用者から見れば成功と同じ（#708 の裁定）。
+   * 望んだ状態には着いているので、利用者から見れば成功と同じ。
    * なお、この API の Idempotency-Key は受け取って検査するだけで、保存も
-   * 照合もしていない（冪等ではない）。#709 で扱う。
+   * 照合もしていない（冪等ではない）。
    */
   if (tag.status !== 'active') throw new TagArchiveError('already_archived');
   if (Number(tag.version) !== input.expectedVersion) throw new TagArchiveError('version_conflict');

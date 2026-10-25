@@ -93,7 +93,7 @@ export async function recordConversionIngestionEvent(
     conversionPointId: string;
     result: 'recorded' | 'duplicate' | 'rejected';
     reason?: string | null;
-    /** IDEA-19: 検証の受信なら true。成果表には書かない受信の目印。 */
+    /** 検証の受信なら true。成果表には書かない受信の目印。 */
     isTest?: boolean;
     sourceEventId?: string | null;
     friendId?: string | null;

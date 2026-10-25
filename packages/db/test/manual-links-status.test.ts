@@ -3,7 +3,7 @@ import { statusFor } from '../src/manual-links.js';
 import { missingFeatures, prefixedName } from '../src/recipes.js';
 
 /**
- * マニュアルの正本表とレシピの判定。台帳 #134。
+ * マニュアルの正本表とレシピの判定。
  */
 
 describe('リンクの状態', () => {

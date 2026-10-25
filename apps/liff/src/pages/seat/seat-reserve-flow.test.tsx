@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { RestaurantCustomerBooking, RestaurantCustomerSlot } from '@line-crm/shared';
 
 /**
- * 席の予約 (E-11) の動き。
+ * 席の予約の動き。
  * - ① で時刻を選ぶと仮押さえ (店・時刻・人数・受付番号) → ② で返った版を指定して確定 → ③
  * - 届いたか分からない失敗の再試行は同じ受付番号、断られたら新しい番号
  * - 仮押さえの期限切れは確定できない

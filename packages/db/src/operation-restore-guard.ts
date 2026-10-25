@@ -2,7 +2,7 @@ import { sqlIdSet } from './id-queries.js';
 import type { OperationCapability, OperationIncident } from './operation-types.js';
 
 /*
- * N-451: 緊急停止の「復旧前検査」。
+ * 緊急停止の「復旧前検査」。
  *
  * 停止した瞬間に、止めた対象（予約配信・シナリオ・リマインダ・
  * オートメーション・自動応答）の定義の版と期限を incident へ保存する。

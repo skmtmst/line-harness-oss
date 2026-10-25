@@ -151,7 +151,7 @@ describe('リマインダ実行記録', () => {
       message: 'LINEへの送信に一時的に失敗しました。自動で再試行します。',
       retryAt: '2026-08-28T09:05:00.000Z',
       now: '2026-08-28T09:00:01.000Z',
-      // R340: 持ち主の貸出期限が合うときだけ失敗を記録する。
+      // 持ち主の貸出期限が合うときだけ失敗を記録する。
       expectedLeaseExpiresAt: run!.lease_expires_at,
     })
 
@@ -181,7 +181,7 @@ describe('リマインダ実行記録', () => {
       now: '2026-08-28T09:06:00.000Z',
     })
     expect(scheduled?.kind).toBe('scheduled')
-    // R342: 手動再試行でも同じ通知には同じ X-Line-Retry-Key を使い回す。
+    // 手動再試行でも同じ通知には同じ X-Line-Retry-Key を使い回す。
     expect(scheduled?.run.line_retry_key).toBe(oldRetryKey)
     expect(sqlite.prepare(
       `SELECT status FROM friend_reminders WHERE id = 'enrollment-1'`,

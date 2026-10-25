@@ -1,5 +1,5 @@
 /**
- * N-282 form参照部分 (#802): ファネルと参照フォームのaccount所属をDBで検査する。
+ * ファネルと参照フォームのaccount所属をDBで検査する。
  * 別account・存在なし・未割当legacy行はfail-closedにする。
  *
  * 実SQLite(bootstrap.sql再生)に実物の createVersionedFunnel を当てる。

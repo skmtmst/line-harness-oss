@@ -76,7 +76,7 @@ export interface CommonVarDeleteImpact {
   /**
    * 配信中で、送信開始時に固定した値の写し（スナップショット）を持つ
    * 使用先の件数。共通情報を直しても、その配信は固定済みの値のまま
-   * 送られる（IDEA-14）。
+   * 送られる。
    */
   sendingFixedTotal: number;
   unscopedFormTotal: number;

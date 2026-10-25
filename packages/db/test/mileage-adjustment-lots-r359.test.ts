@@ -1,5 +1,5 @@
 /**
- * R359: 手動減算と付与内訳の一致（m25d）。
+ * 手動減算と付与内訳の一致（m25d）。
  *
  * 手動減算（postMileageAdjustment の decrease）は台帳だけを動かし、
  * 交換用の付与内訳（mileage_grant_lots）を更新しないため、

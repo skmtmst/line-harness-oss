@@ -21,7 +21,7 @@ export async function listConversionDefinitions(db: D1Database, input: Conversio
       .bind(...where.values)
       .first<{ total: number }>(),
     /*
-     * N-267/N-268: 状態の内訳は「絞り込み全体」から導出する。表示頁の行だけ
+     * 状態の内訳は「絞り込み全体」から導出する。表示頁の行だけ
      * 数えると打ち切りでずれるため、状態判定に足りる列だけを全件ぶん引いて
      * JS で数える(件数は成果地点数なので実用上の上限内に収まる)。
      */

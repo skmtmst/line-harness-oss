@@ -40,7 +40,7 @@ export async function getTemplateById(db: D1Database, id: string): Promise<Templ
 }
 
 /**
- * 独立審査対応(P1): 下書き全文の指紋(SHA-256 hex)。同じ内容なら同じ値に
+ * 下書き全文の指紋(SHA-256 hex)。同じ内容なら同じ値に
  * なり、1文字でも違えば(削除も含めて)変わる。同キー再試行が別操作か
  * どうかの見分けに使う(成功時の控えと比べる)。32bit 非暗号ハッシュは不可。
  */
@@ -66,7 +66,7 @@ export async function templateDraftFingerprint(
 }
 
 /**
- * 独立審査P2相当(指摘3): いま送ってよいテンプレートかどうか。
+ * いま送ってよいテンプレートかどうか。
  * 公開版があること(版1以上)に加え、送る側と持ち主の両方が分かり、
  * 完全一致すること。どちらかが null の wildcard 照合はしない(fail-close)。
  * 未公開・別アカウント・持ち主不明は送らない。
@@ -92,7 +92,7 @@ export async function getSendableTemplate(
 }
 
 /**
- * 独立審査P2相当(指摘3): 結びつけてよいテンプレートかどうか。
+ * 結びつけてよいテンプレートかどうか。
  * 公開版があり、結びつける側と完全一致すること。持ち主不明は通さない
  * (fail-close)。持ち主未定のシナリオに結ぶと、送る側で別アカウントの
  * 公開版が混ざる。送信時と同じ条件にする。
@@ -147,7 +147,7 @@ export async function createTemplate(
   const id = crypto.randomUUID();
   const now = jstNow();
   /*
-   * 347(差し戻し対応・要件4): 新規作成は未公開の下書きで始める。
+   * 新規作成は未公開の下書きで始める。
    * live 列には初期内容を入れる(NOT NULL のため)が、版は 0・公開日時は空にし、
    * 初回の明示 publish でだけ公開版 1 になる。作った直後は送信候補に出さない。
    */
@@ -326,7 +326,7 @@ export async function saveTemplateDraft(
     if (value !== undefined) { metadata.push(`${column} = ?`); metadataValues.push(value); }
   }
   /*
-   * 差し戻し対応(要件2): 下書きがある行の draft 列 NULL は「削除した」。
+   * 下書きがある行の draft 列 NULL は「削除した」。
    * 下書きがない行の NULL は「下書きなし」。`??` で一列ずつ落とすと、
    * 削除したはずの値が公開版から復活して新しい下書きへ混入する。
    * 下書きは全文スナップショットなので、行単位でどちらかを見る。
@@ -518,7 +518,7 @@ export async function publishTemplate(
   const publishedFingerprint = await templateDraftFingerprint(current);
   const nextVersion = Number(current.published_version) + 1;
   /*
-   * 独立審査P1: 公開版の更新とキー記録は単一の原子操作にする。
+   * 公開版の更新とキー記録は単一の原子操作にする。
    * 記録に載せる版・本文は、下書き(成功すれば消える)から先に決める。
    * 2文の間で落ちても版だけ進むことはない。
    */
@@ -668,7 +668,7 @@ export interface TemplateUsage {
  * templateAccountId を渡すと、使用先もテンプレートと同じアカウント
  * （またはアカウント未設定）のものだけに絞る。別アカウントの設定は
  * 名前・遷移先ともに見せられず、そこへ直しに行けないまま削除だけが
- * 止まるので、ここで除外する（#891 N-135/142/143）。
+ * 止まるので、ここで除外する。
  */
 export async function getTemplateUsage(
   db: D1Database,
@@ -841,7 +841,7 @@ export async function getTemplateSendCounts(
   ]));
 }
 
-/** PERF-12: テンプレート選択の絞り込み。ページに切る前に適用する。 */
+/** テンプレート選択の絞り込み。ページに切る前に適用する。 */
 export type TemplateListFilter = {
   /** 名前・本文の部分一致（大文字小文字は LIKE の ASCII 規則に従う）。 */
   q?: string;
@@ -931,8 +931,7 @@ export async function getTemplatesWithUsageCount(
   // 2. 列で参照している設定を1回の問い合わせでまとめて取る。
   // 使用先のアカウントも一緒に返し、テンプレートと同じアカウント
   // （または未設定）の使用先だけを数える。詳細の getTemplateUsage と
-  // 同じ粒度・同じ境界にしないと「一覧の数」と「詳細の件数」がずれる
-  // （#891 N-135/142/143）。
+  // 同じ粒度・同じ境界にしないと「一覧の数」と「詳細の件数」がずれる。
   // D1 の compound SELECT 上限(5項)を超えないよう2本に分けて問い合わせる。
   const relationalResA = await db.prepare(
     `SELECT template_id, acct FROM (
@@ -1004,7 +1003,7 @@ export async function getTemplatesWithUsageCount(
 
   // テンプレートがアカウント所属なら、使用先は同じアカウント or
   // 未設定のものだけ。別アカウントの設定は名前も遷移先も見せられず、
-  // 数だけ残ると削除が永久に止まる（#891）。
+  // 数だけ残ると削除が永久に止まる。
   const countVisible = (template: { id: string; line_account_id: string | null }): number => {
     const refs = usageRefs.get(template.id) ?? [];
     const account = template.line_account_id;
@@ -1015,7 +1014,7 @@ export async function getTemplatesWithUsageCount(
   let templates: TemplateRow[];
   if (filter?.quick === 'frequent') {
     /*
-      PERF-12 「よく使う」: 送信実績順は行を切る前に決める必要がある。
+      「よく使う」: 送信実績順は行を切る前に決める必要がある。
       絞り込んだ全件の id だけを取り、スコア順に切ってからその区画の
       行だけ SELECT * で読む。画面側の従来順（月間→累計→使用箇所数の
       多い順）と同じスコアにする。
@@ -1068,7 +1067,7 @@ export async function getTemplatesWithUsageCount(
 }
 
 /**
- * PERF-12: フォルダごとの件数。選択画面のフォルダ欄は件数を出すが、
+ * フォルダごとの件数。選択画面のフォルダ欄は件数を出すが、
  * 一覧を全件読まなくても分かるように、スコープ内で GROUP BY だけする。
  */
 export async function getTemplateFolderCounts(

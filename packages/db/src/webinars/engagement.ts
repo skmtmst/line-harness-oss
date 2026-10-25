@@ -270,7 +270,7 @@ export async function getWebinarSessionStats(
 }
 
 /**
- * 離脱位置分布（J #821）。
+ * 離脱位置分布。
  * 離脱の位置＝最後の有効な区間の終わり。最後に報告された位置
  * （last_position_seconds）では決めつけない。区間が無い人
  * （見ていない・異常だけの人）は数えない。

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * LIFF の画像の alt の見張り（リリース前点検 2026-10-07）。
+ * LIFF の画像の alt の見張り。
  *
  * LIFF は lint が CI に無いので、ここで見る。<img> には必ず alt を書く
  * （意味のある画像は中身、飾りは alt=""）。イベントの画像は中身なので空にしない。

@@ -59,9 +59,9 @@ export async function listMileageRedemptions(
   const limit = Math.min(100, Math.max(1, Math.floor(input.limit)));
   const offset = Math.max(0, Math.floor(input.offset));
   const status = input.status ?? 'needs_attention';
-  // R364: 既定は「要対応」（届かなかった交換＋送ったか分からない交換）。
+  // 既定は「要対応」（届かなかった交換＋送ったか分からない交換）。
   // `delivering` のままの照合待ちを既定の一覧から消さない。
-  // R362: 返却確定後に書き込みが中断した交換（台帳なしの refunded）も
+  // 返却確定後に書き込みが中断した交換（台帳なしの refunded）も
   // 要対応に入れる。入れないと残高が戻らないまま誰にも見えない。
   // 旧処理の残り「台帳あり・コード未解放」（ロット未復旧）も入れる。
   // 返却済みの交換に結び付いたままの予約コードは解放漏れのため、
@@ -103,7 +103,7 @@ export async function listMileageRedemptions(
 }
 
 /*
- * R388: 一人一回の上限を数える識別キーの集め方。現在のキーに加え、
+ * 一人一回の上限を数える識別キーの集め方。現在のキーに加え、
  * - この友だち自身の友だちキー（統合前はこのキーで交換していた）
  * - 今同じ本人に結び付く友だちの友だちキー（統合相手の交換も一人分）
  * - これらの友だちが結び付いたことのある本人キー（解除・移行後も引き継ぐ）

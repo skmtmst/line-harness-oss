@@ -1,5 +1,5 @@
 /*
- * タグ付与の工程別台帳(#699 / migration 376)。
+ * タグ付与の工程別台帳(migration 376)。
  *
  * friend_tags への付与は INSERT OR IGNORE で先に確定する。そのあとに走る
  * 副作用が落ちると、次回同じ経路へ来ても changes=0 で早期 return するため、

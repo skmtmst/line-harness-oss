@@ -2,7 +2,7 @@ import { sqlIdSet } from './id-queries.js';
 import { jstNow, jstDateString } from './utils.js';
 
 /**
- * Web計測の公開口 (#819)。
+ * Web計測の公開口。
  *
  * サイトごとの公開IDと許可ドメインを持ち、タグはサイトIDだけを載せる
  * (秘密の鍵はタグに含めない)。許可にないドメインからの送信は成果に
@@ -18,9 +18,9 @@ export interface MeasurementSite {
   label: string;
   created_at: string;
   updated_at: string | null;
-  /** R275: 停止した日時。NULL なら計測を受け付ける。 */
+  /** 停止した日時。NULL なら計測を受け付ける。 */
   stopped_at: string | null;
-  /** R275: 停止の理由(画面で入力)。履歴として残す。 */
+  /** 停止の理由(画面で入力)。履歴として残す。 */
   stopped_reason: string | null;
   last_received_at: string | null;
 }
@@ -153,7 +153,7 @@ export async function updateMeasurementSiteDomains(
 }
 
 /**
- * R275: 計測を止める。行は消さず、サイトと許可ドメイン・これまでの
+ * 計測を止める。行は消さず、サイトと許可ドメイン・これまでの
  * 記録は残る。止めると公開口は成果を受け付けなくなる。
  * すでに止まっているサイトへの重ねがけは 'already_stopped' を返す。
  */
@@ -174,7 +174,7 @@ export async function stopMeasurementSite(
   return result.meta.changes > 0 ? 'stopped' : 'already_stopped';
 }
 
-/** R275: 止めた計測をもう一度受け付ける。止まっていなければ 'not_stopped'。 */
+/** 止めた計測をもう一度受け付ける。止まっていなければ 'not_stopped'。 */
 export async function resumeMeasurementSite(
   db: D1Database,
   siteId: string,

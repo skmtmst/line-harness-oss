@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 
 /**
- * 一斉配信の操作の記録（#816 / migration 459）。
+ * 一斉配信の操作の記録（migration 459）。
  *
  * 作成・編集・予約・送信の開始・停止・再開・再送・予約の取消を残す。
  * 承認の依頼・承認・差し戻し・期限切れは broadcast_approval_events（455）に

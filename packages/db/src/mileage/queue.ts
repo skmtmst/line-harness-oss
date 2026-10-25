@@ -103,7 +103,7 @@ export async function processPendingMileageEvents(
         subjectKey: typeof metadata.subjectKey === 'string' ? metadata.subjectKey : null,
         metadata,
         occurredAt: event.occurred_at,
-        // N-231 案1: 現在版ではなく受付時に固定した版を読む。NULL は旧来互換。
+        // 現在版ではなく受付時に固定した版を読む。NULL は旧来互換。
         publishedSnapshot: parsePublishedSnapshot(item.applied_published_snapshot),
       });
       result.granted += projection.granted.length;

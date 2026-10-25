@@ -44,7 +44,7 @@ export default function BookingHistoryCancelDialog({ booking, payment, busy, err
         onCancel={onCancel}
         onConfirm={onConfirm}
       >
-        {/* 払い済みの予約のキャンセル（hOILq・B-338）：試験の返金であることを先に知らせる。 */}
+        {/* 払い済みの予約のキャンセル（hOILq）：試験の返金であることを先に知らせる。 */}
         {paid ? (
           <div className="flex flex-col gap-1 rounded-(--liff-radius) bg-liff-ok-bg px-3.5 py-3" data-refund-note>
             <p className="text-[14px] leading-[20px] font-bold text-liff-ok-ink">{paid.amount == null ? '試験の全額返金を記録します（金額は未取得です）' : `試験のお支払い ${formatYen(paid.amount)} の全額返金を試験で記録します`}</p>

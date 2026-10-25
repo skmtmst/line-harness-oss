@@ -229,7 +229,7 @@ export async function executeFieldMigration(
     ).bind(reason.slice(0, 300), runId, friendId).run();
   };
   for (const item of result.results) {
-    // N-042: 変換済みでも保存前に同じ検証へ通す。通らない値は書かず失敗に倒す。
+    // 変換済みでも保存前に同じ検証へ通す。通らない値は書かず失敗に倒す。
     const checked = validateFriendFieldValue(
       { type: target?.resolved_type ?? '', options_json: target?.options_json ?? null },
       item.converted_value,

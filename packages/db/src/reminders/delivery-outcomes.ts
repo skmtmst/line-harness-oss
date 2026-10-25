@@ -17,7 +17,7 @@ export function completeReminderDeliveryRunStatement(
     lineRequestId: string | null;
     messageLogId: string;
     now: string;
-    /** R340: 自分が今の持ち主のときだけ成功にする。 */
+    /** 自分が今の持ち主のときだけ成功にする。 */
     expectedLeaseExpiresAt: string | string[];
   },
 ): D1PreparedStatement {
@@ -48,7 +48,7 @@ export async function skipReminderDeliveryRun(
   db: D1Database,
   input: { id: string; code: string; message: string; now: string; expectedLeaseExpiresAt: string | string[] },
 ): Promise<void> {
-  // R340: 自分が握った行だけ止める。
+  // 自分が握った行だけ止める。
   const owner = ownerGateSql(
     Array.isArray(input.expectedLeaseExpiresAt)
       ? input.expectedLeaseExpiresAt
@@ -73,7 +73,7 @@ export async function failReminderDeliveryRun(
     notBeforeAt?: string | null;
     retryAt: string | null;
     now: string;
-    /** R340: 自分が今の持ち主のときだけ失敗にする。書けたら true。 */
+    /** 自分が今の持ち主のときだけ失敗にする。書けたら true。 */
     expectedLeaseExpiresAt: string | string[];
   },
 ): Promise<boolean> {
@@ -115,7 +115,7 @@ export async function getReminderDeliveryRunById(
 }
 
 /**
- * R345: 初回に送った本文（差し込み済み）を読む。
+ * 初回に送った本文（差し込み済み）を読む。
  * まだ送っていなければ null（呼び出し側は今までどおり最新の内容で作る）。
  */
 export async function getReminderDeliveryRunSentPayload(
@@ -141,7 +141,7 @@ export async function getReminderDeliveryRunSentPayload(
 }
 
 /**
- * R345: 初回に送る本文を残し、残っている本文を返す。
+ * 初回に送る本文を残し、残っている本文を返す。
  * 先に残した処理があるときはそちらを返し、上書きしない
  * （同じ実行の二重保存・別処理の上書きをしない）。
  * 貸出を失っているときは残せず null を返す（呼び出し側は作りたてを使うが、
@@ -156,7 +156,7 @@ export async function saveReminderDeliveryRunSentPayload(
     templateId: string | null;
     templateVersion: number | null;
     now: string;
-    /** R340: 自分が今の持ち主のときだけ残す。 */
+    /** 自分が今の持ち主のときだけ残す。 */
     expectedLeaseExpiresAt: string | string[];
   },
 ): Promise<ReminderDeliveryRunSentPayload | null> {
@@ -216,9 +216,9 @@ export async function retryReminderDeliveryRun(
     return { kind: 'conflict', run: row };
   }
 
-  // R342: 手動再試行でも同じ通知には同じ X-Line-Retry-Key を使う。
+  // 手動再試行でも同じ通知には同じ X-Line-Retry-Key を使う。
   // 受理ずみの通知を別キーで送り直すと重複する。同じキーなら LINE 側が
-  // 受理ずみを 409 で返し、元の受理IDで履歴を回復できる (R343)。
+  // 受理ずみを 409 で返し、元の受理IDで履歴を回復できる。
   const [changed] = await db.batch([
     db.prepare(
       `UPDATE reminder_delivery_runs
