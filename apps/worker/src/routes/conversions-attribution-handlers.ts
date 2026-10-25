@@ -43,7 +43,7 @@ export const get__api_conversions_events_id_attribution_1 = async (c: Context<En
 };
 
 export const patch__api_conversions_events_id_approval_2 = async (c: Context<Env, "/api/conversions/events/:id/approval">) => {
-  // 監査は更新の成功が確定してから残す(#513 M7)。以前は検証の前に
+  // 保存されていない変更を監査へ載せないよう、更新の成功確定後に記録する。
   // 書いていたため、400/404の失敗も「更新」の記録に混ざっていた。
   try {
     const body = await c.req
@@ -62,8 +62,7 @@ export const patch__api_conversions_events_id_approval_2 = async (c: Context<Env
       parsed.expectedStatus,
     );
     if (decided.outcome === 'not_found') {
-      // Missing event OR non-attributed CV (approval flow only applies to
-      // affiliate-attributed rows) — both surface as 404.
+      // 存在しない成果とアフィリエイト帰属のない成果は、どちらも404にする。
       return fail(c, 404, 'ATTRIBUTED_CONVERSION_EVENT_NOT_FOUND');
     }
     if (decided.outcome === 'conflict') {
@@ -80,7 +79,7 @@ export const patch__api_conversions_events_id_approval_2 = async (c: Context<Env
       );
     }
     if (decided.outcome === 'unbillable') {
-      // F-23: 記録した当時の報酬額を確認できない成果は、承認すると今の額で
+      // 記録した当時の報酬額を確認できない成果は、承認すると今の額で
       // 固まってしまうため承認しない。状態は変えず、監査にも残さない。
       // 422 を返す: fetchApi は本文だけを文言として画面へ渡す。
       return inputError(c, {
@@ -92,25 +91,23 @@ export const patch__api_conversions_events_id_approval_2 = async (c: Context<Env
     }
     auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: c.req.param('id') });
 
-    // Mileage projection is retry-safe and runs even for `already_set`. This is
-    // deliberate: if an earlier request updated the approval row but failed
-    // before writing the ledger, the operator's retry repairs the partial work.
+    // 承認更新後の台帳書込失敗を回復できるよう、already_set でも再試行可能なマイル反映を行う。
     await syncAffiliateConversionMileage(
       c.env.DB,
       c.req.param('id'),
       parsed.status,
     );
 
-    // ASP: notify the attributed affiliate on approval only (never on reject).
+    // 参加者向けの通知は承認時だけ行い、否認時には送らない。
     // Best-effort で承認を巻き添えにしない。案件動作の結果には左右されない
     // （承認そのものは成立している）。
-    // m22u R354: 初回（updated）・再試行（already_set）のどちらでも、欠けた
+    // m22u : 初回（updated）・再試行（already_set）のどちらでも、欠けた
     // 通知は1回だけ送る。同じ承認世代の二重送信は送信記録で止める。
     if (parsed.status === 'approved') {
       await notifyApprovalOnce(c.env.DB, c.env, c.req.param('id'));
     }
 
-    // 承認確定で案件の動作（タグ付与・シナリオ開始）を実行する(N-212)。
+    // 承認確定で案件の動作（タグ付与・シナリオ開始）を実行する。
     // already_set の再送でも走らせて未完の修復にする。未完が残ったら
     // 成功とは返さない — 運用者は再送するか案件の設定を直す。
     // 422 を返す: fetchApi は BODY_MESSAGE_STATUSES の本文だけを文言として
@@ -132,8 +129,7 @@ export const patch__api_conversions_events_id_approval_2 = async (c: Context<Env
     }
 
     if (decided.outcome === 'already_set') {
-      // Idempotent re-click: the status is already set to the requested value.
-      // Return 200 so the UI does not show an error to the operator.
+      // 同じ状態へのクリックはエラーを見せず、冪等な200として返す。
       return c.json({
         success: true,
         data: { id: c.req.param('id'), approvalStatus: parsed.status, alreadySet: true },
@@ -155,7 +151,7 @@ export const post__api_conversions_approvals_bulk_3 = async (c: Context<Env, "/a
       return inputError(c, { success: false, error: `items must be 1-${BULK_APPROVAL_MAX_ITEMS} approval decisions` }, 400, ["items"]);
     }
     const result: BulkApprovalItemResult = { succeeded: [], conflicted: [], denied: [], failed: [] };
-    // m22u R355: 入口で有効と判定されたアカウントの集合。対象ごとに機能オフを
+    // m22u : 入口で有効と判定されたアカウントの集合。対象ごとに機能オフを
     // 確認し、オフなら1件ずつ失敗として返す（A指定でB対象を通さない）。
     const enabledAccounts = c.get('staff')?.featureEnabledLineAccountIds;
     for (const raw of body.items) {
@@ -193,18 +189,18 @@ export const post__api_conversions_approvals_bulk_3 = async (c: Context<Env, "/a
           continue;
         }
         if (decided.outcome === 'unbillable') {
-          // F-23: 記録した当時の報酬額を確認できない成果は承認しない。
+          // 記録した当時の報酬額を確認できない成果は承認しない。
           // 成功には入れず、失敗として分けて返す。
           result.failed.push({ id: itemId, error: '記録した当時の報酬額を確認できないため承認できません' });
           continue;
         }
         auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: itemId });
         await syncAffiliateConversionMileage(c.env.DB, itemId, parsed.status);
-        // m22u R354: 初回・再試行のどちらでも、欠けた通知は1回だけ送る。
+        // m22u : 初回・再試行のどちらでも、欠けた通知は1回だけ送る。
         if (parsed.status === 'approved') {
           await notifyApprovalOnce(c.env.DB, c.env, itemId);
         }
-        // 単体と同じく、承認確定で案件の動作を実行する(N-212)。未完は
+        // 単体と同じく、承認確定で案件の動作を実行する。未完は
         // succeeded へ入れず failed に分け、全成功とは表示させない。
         if (parsed.status === 'approved') {
           try {
@@ -221,7 +217,7 @@ export const post__api_conversions_approvals_bulk_3 = async (c: Context<Env, "/a
         }
         result.succeeded.push(itemId);
       } catch (err) {
-        // m22u R353: 途中の失敗で全体を500にしない。処理済み・失敗の一覧を
+        // m22u : 途中の失敗で全体を500にしない。処理済み・失敗の一覧を
         // 必ず返し、一部だけ承認済みのまま黙って止まらないようにする。
         logger.error("conversions.conversions_approvals_bulk_post_failed");
         result.failed.push({ id: itemId, error: '処理できませんでした。もう一度お試しください' });

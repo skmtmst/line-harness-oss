@@ -1,9 +1,9 @@
 import type { Friend } from '@line-crm/db';
 
-// Chunk size for friend lookups via IN (...) — same 100-bind ceiling.
+// D1 のバインド数上限に当てないよう、友だち照会を100件単位に分ける。
 export const LOOKUP_CHUNK = 90;
 
-/** Look up friends for a set of userIds in IN-clause chunks (≤100 binds each). */
+/** userId の集合を、各100バインド以内の IN 句で取得する。 */
 export async function getFriendsByLineUserIds(
   db: D1Database,
   userIds: string[],
@@ -25,7 +25,7 @@ export async function getFriendsByLineUserIds(
       for (const row of scoped.results ?? []) found.set(row.line_user_id, row);
     }
 
-    // 別アカウント所有の行には触れない (Issue #961)。拾うのは未割当
+    // 別アカウント所有の行には触れない。拾うのは未割当
     // (line_account_id IS NULL) の行だけ。他アカウントの友だちへ送信を
     // 記録する場合は、行を移す代わりにこのアカウント用の行を作る側へ回す。
     const unresolved = chunk.filter((lineUserId) => !found.has(lineUserId));
@@ -45,7 +45,7 @@ export async function getFriendsByLineUserIds(
   return found;
 }
 
-/** Reuse the send-time lookup when writing the successful push's history. */
+/** 成功した push の履歴保存でも、送信時の解決結果を再利用する。 */
 export async function readProxyPushRecipient(db: D1Database, accountId: string, uid: string) {
   const row = await db.prepare(`SELECT f.*, EXISTS (
       SELECT 1 FROM friend_delivery_consents c JOIN friends recipient

@@ -222,7 +222,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
     const staffName = member?.name ?? staff?.name ?? '';
 
     /*
-     * M028：確定応答を失った再送で重複チケットを作らない。
+     * 確定応答を失った再送で重複チケットを作らない。
      * 同じ人・同じ内容の直近の送信があれば、新しく作らず既存のものを返す。
      * 作り直さないので、運営への知らせも送り直さない。R2 への置き場確保より前で見る。
      */

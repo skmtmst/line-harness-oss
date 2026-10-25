@@ -29,7 +29,7 @@ broadcasts.get('/api/broadcasts', get__api_broadcasts_2);
 /**
  * 一覧の上部に出す数（設計 `V2 4-2 一斉配信` の KPIs）。
  *
- * :id より前に置くこと。あとに置くと 'stats' が id として拾われる。
+ * id より前に置くこと。あとに置くと 'stats' が id として拾われる。
  */
 broadcasts.get('/api/broadcasts/stats', get__api_broadcasts_stats_3);
 
@@ -46,7 +46,7 @@ broadcasts.get('/api/broadcasts/:id', get__api_broadcasts_id_8);
 
 broadcasts.get('/api/broadcasts/:id/recipients', get__api_broadcasts_id_recipients_9);
 
-// GET /api/broadcasts/:id/activity — 操作の記録（#816）
+// GET /api/broadcasts/:id/activity — 操作の記録
 //
 // 作成・編集・予約・送信・停止・再送と、承認の依頼・承認・差し戻しを
 // 時刻順（新しい順）に混ぜて返す。記録は消せない（追記だけ）。
@@ -61,19 +61,7 @@ broadcasts.get('/api/broadcasts/:id/send-preview', get__api_broadcasts_id_send_p
 // このエンドポイントが「送ったらこの人数」を返す唯一の手段。
 broadcasts.get('/api/broadcasts/:id/preview-count', get__api_broadcasts_id_preview_count_12);
 
-// GET /api/broadcasts/:id/per-account-stats — multi-account-dedup などで
-// アカウント別の配信数 + insight 内訳を返す。
-//
-// 返り値:
-//   data: [{
-//     accountId, accountName,
-//     sent: number,                    // messages_log での実送信数
-//     uniqueImpression: number | null, // LINE Insight (アカ token で個別 fetch)
-//     uniqueClick: number | null,
-//   }]
-//
-// insight は live で各アカウントの token を使って LINE API を叩く (sent and aggregation_unit 必須)。
-// キャッシュしない (broadcast_insights は集計値しか持たない設計のため)。
+// アカウント別の送信数と LINE Insight の閲覧・クリックを返す。送信数は履歴、Insight は送信済みの aggregation_unit を使って各アカウントのトークンで取得する。既存キャッシュは全体集計なので流用しない。未知の閲覧・クリックは null のまま返す。
 broadcasts.get('/api/broadcasts/:id/per-account-stats', get__api_broadcasts_id_per_account_stats_13);
 
 // POST /api/broadcasts - create
@@ -82,7 +70,7 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', get__api_broadcasts_id_p
 // 何人に届くかと、気をつけることを返す。送信は何もしない。
 // 一斉配信は取り消せないので、押す前に見せる。
 //
-// :id を使う経路より先に置く。後ろだと 'preflight' が :id として拾われる。
+// id を使う経路より先に置く。後ろだと 'preflight' が :id として拾われる。
 broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINITION_PUBLISH_KEY), inputJsonBoundary(), post__api_broadcasts_preflight_1);
 
 broadcasts.post('/api/broadcasts', inputJsonBoundary({"title":["string"],"messageType":["string"],"messageContent":["string"],"messageBubbles":["array"],"targetType":["string"],"targetTagId":["null","string"],"scheduledAt":["null","string"],"lineAccountId":["null","string"],"altText":["null","string"],"accountIds":["array"],"dedupPriority":["array"],"trackLinks":["boolean"],"stealthSpreadMinutes":["number"],"folderId":["null","string"],"measureOpens":["boolean"],"saveAsDraft":["boolean"],"draftStep":["string"],"internalMemo":["null","string"],"afterActionVersionId":["null","string"]}), post__api_broadcasts_2);
@@ -119,7 +107,7 @@ broadcasts.delete('/api/broadcasts/:id', requirePermission(BROADCAST_DEFINITION_
 //
 // Atomic UPDATE-WHERE で多重起動を防ぐ。check-then-act の TOCTOU race だと、
 // 並列リクエストが同時に status='draft' を読んで両方が processBroadcastSend に
-// 進入しうる (2026-04-10 19:50 の重複配信事故 broadcast 0069eb9f / 57c9667d)。
+// 入れるため、送信済み記録と実行権の照合で重複配信を防ぐ。
 // 既存の lock 修正 (a27ad9f / bffcdf8 / 3ac2fec) は cron / scheduled 経路を
 // 守ったが、API direct 経路は未対応のままだった。
 // 友だちへ実際に届き、取り消せない。権限に加えて明示的な確認を要求する。

@@ -5,12 +5,8 @@ import { MAX_LIST_LIMIT } from '@line-crm/db';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 /*
- * #722: 「直したはずの所に残っていた半分」を実 D1（bootstrap.sql）と実ルートで固定する。
- *
- * ここを手書きのDBモックでやると意味が無い。見張りたいのは
- *   - **SQL の `LIMIT` に何が渡るか**（名乗りと実際がずれていた）
- *   - **行が本当に増えるか／metadata が本当に書き換わるか**（記録の副作用）
- * で、どちらもモックだと自分で書いた答えを読み返すだけになる。
+ * 実 D1 相当と実 route で、SQL に渡る上限、行の追加、metadata の更新を確かめる。
+ * DB モックの返答だけでは、実際の件数制限と記録の副作用を検証できないため。
  */
 
 const liff = vi.hoisted(() => ({ verify: vi.fn(async () => null as unknown) }));
@@ -91,14 +87,14 @@ describe('#722 N1 ページ分けなしの回答一覧は、名乗った数だ�
 
     expect(response.status).toBe(200);
     expect(body.data).toHaveLength(200);
-    // 名乗りと実際が一致していること。**ここがずれていたのが #722 N1。**
+    // 名乗りと実際が一致していること。**ここがずれていたのが  N1。**
     const warning = response.headers.get('Warning');
     expect(warning).toBe('299 - "non-paginated submissions are limited to 200 rows; use page/limit"');
     expect(warning).toContain(String(body.data.length));
     /*
      * 口が名乗る数と、DB ヘルパの天井（`MAX_LIST_LIMIT`）が離れていないこと。
      * 離れると `boundedListLimit` が黙って切り直し、名乗りだけが大きくなる
-     * ——#722 とまったく同じ形に戻る。
+     * —— とまったく同じ形に戻る。
      */
     expect(body.data).toHaveLength(MAX_LIST_LIMIT);
   });

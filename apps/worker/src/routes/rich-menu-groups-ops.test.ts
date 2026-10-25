@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 
-// N-151/#900・N-152/#901・N-154/#902・N-156/#903 の route 契約試験。
+// /・/・/・/ の route 契約試験。
 // @line-crm/db はまるごとモックし、LINE API は fetch を止めて外部を切る。
 const dbMocks = {
   getRichMenuGroups: vi.fn(),
@@ -150,7 +150,7 @@ beforeEach(() => {
   dbMocks.listRichMenuGroupIdsByAreaLabel.mockImplementation(async () => new Set<string>());
   dbMocks.jstNow.mockImplementation(() => '2026-09-16T00:00:00.000Z');
   dbMocks.listAccountReferencedLineRichMenuIds.mockImplementation(async () => []);
-  // K: 照合の修復は実行台帳へ残す。見るだけのdryRunでは呼ばない。
+  // 照合の修復は実行台帳へ残す。見るだけのdryRunでは呼ばない。
   dbMocks.ensureRichMenuPublishRun.mockImplementation(
     async (_db: unknown, input: { id: string }) => ({ id: input.id, status: 'running' }),
   );
@@ -160,7 +160,7 @@ beforeEach(() => {
 });
 
 // =============================================================================
-// #900 / N-151: 公開履歴
+//  公開履歴
 // =============================================================================
 describe('GET /api/rich-menu-groups/:groupId/publish-runs', () => {
   test('版の要約・状態・最終エラー・ページごとのLINE IDを返す', async () => {
@@ -284,7 +284,7 @@ describe('GET /api/rich-menu-groups/:groupId/publish-runs', () => {
 });
 
 // =============================================================================
-// #900 / N-151: 失敗した公開runだけの再試行
+//  失敗した公開runだけの再試行
 // =============================================================================
 describe('POST /api/rich-menu-groups/:groupId/publish-runs/:requestId/retry', () => {
   const baseRequest = {
@@ -347,7 +347,7 @@ describe('POST /api/rich-menu-groups/:groupId/publish-runs/:requestId/retry', ()
 });
 
 // =============================================================================
-// #900 / N-151: DBとLINEの照合
+//  DBとLINEの照合
 // =============================================================================
 describe('POST /api/rich-menu-groups/:groupId/reconcile', () => {
   function lineFetchStub(menus: Array<{ richMenuId: string }>, defaultId: string | null) {
@@ -433,7 +433,7 @@ describe('POST /api/rich-menu-groups/:groupId/reconcile', () => {
 });
 
 // =============================================================================
-// #902 / N-154: 複製
+//  複製
 // =============================================================================
 describe('POST /api/rich-menu-groups/:groupId/duplicate', () => {
   test('Idempotency-Key 必須', async () => {
@@ -477,7 +477,7 @@ describe('POST /api/rich-menu-groups/:groupId/duplicate', () => {
 });
 
 // =============================================================================
-// #903 / N-156: staffへは合計だけ
+//  staffへは合計だけ
 // =============================================================================
 describe('GET /api/rich-menu-groups/:groupId/audience-summary', () => {
   function countingDb(counts: Record<string, number>): D1Database {
@@ -519,7 +519,7 @@ describe('GET /api/rich-menu-groups/:groupId/audience-summary', () => {
 });
 
 // =============================================================================
-// #901 / N-152: 本人LINEへのテスト適用
+//  本人LINEへのテスト適用
 // =============================================================================
 describe('test-apply', () => {
   const APPLY = {

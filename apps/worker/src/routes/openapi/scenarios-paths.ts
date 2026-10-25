@@ -1,4 +1,4 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const scenariosPaths = {
   // ── Scenarios ────────────────────────────────────────────────────────────
   '/api/scenarios': {
@@ -253,7 +253,7 @@ export const scenariosPaths = {
       },
     },
   },
-  // ── 友だち単位の購読操作（#949 N-054 / 機能05）─────────────────────────
+  // ── 友だち単位の購読操作（機能05）─────────────────────────
   '/api/scenario-subscriptions/{subscriptionId}/pause': {
     post: {
       tags: ['Scenarios'],

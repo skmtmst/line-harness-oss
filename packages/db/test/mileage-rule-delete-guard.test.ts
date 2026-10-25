@@ -55,7 +55,7 @@ describe('マイル決めごとの原子削除', () => {
     seen = [];
     sqlite = new Database(':memory:');
     // 本番D1と同じく外部キーを効かせる。切ったままだと下書き行を持つ
-    // 決めごとの削除失敗（R296）をこの試験は再現できない。
+    // 決めごとの削除失敗をこの試験は再現できない。
     sqlite.pragma('foreign_keys = ON');
     sqlite.exec(readFileSync(join(ROOT, 'bootstrap.sql'), 'utf8'));
     sqlite.exec(`

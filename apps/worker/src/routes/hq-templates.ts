@@ -33,7 +33,7 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   if(c.get('impersonation')&&!['GET','HEAD'].includes(c.req.method))throw new HqTemplateError('FORBIDDEN',403);
   if (!staff || !staff.tenantId) throw new HqTemplateError('FORBIDDEN', 403);
   const member = await getStaffById(dbFor(c.env), staff.id);
-  // A missing database identity does not turn into a tenant-wide administrator.
+  // DB 上の本人が見つからないことを、統括全体の管理権限として扱わない。
   if (!member || member.is_active !== 1 || member.tenant_id !== staff.tenantId) throw new HqTemplateError('FORBIDDEN', 403);
   const auth = requireHqTemplateAuthority({ tenantId: staff.tenantId, actorId: staff.id,
     role: member.role, readOnly: !['GET','HEAD'].includes(c.req.method) && (staff.readOnly || member.access_level === 'read_only'), accountScoped: member.account_scope === 'accounts' });
@@ -77,7 +77,7 @@ hqTemplates.onError((error, c) => {
   const code = error.code;
   return inputError(c, { success: false, code, ...((error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。再確認してください') }, error.status);
 });
-// The route-local boundary also protects direct route mounting in tests/other apps.
+// 単独で route を登録しても保護されるよう、入口内にも境界を置く。
 hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, next) => {
   try { await authority(c); await next(); }
   catch (error) {
@@ -109,14 +109,13 @@ hqTemplates.post('/api/hq/templates/media', inputJsonBoundary(), async c => {
     throw error;
   }
 });
-// R568: reclaim an upload that was never adopted. Ownership is verified
-// inside deleteHqImage; anything outside the caller tenant is NOT_FOUND.
+// 未採用のアップロードを回収する。deleteHqImage 内で所有権を確認し、別統括は NOT_FOUND にする。
 hqTemplates.delete('/api/hq/templates/media', async c => {
   const auth = await authority(c);
   try {
     const key = c.req.query('r2Key');
     if (key?.startsWith(`hq-templates/${auth.tenantId}/uploads/`)) {
-      // Retain files referenced by any saved HQ version/run, including history.
+      // 履歴を含む保存済みの版・実行が参照するファイルは保持する。
       const adopted = await dbFor(c.env).prepare(`SELECT 1 AS used WHERE EXISTS(
         SELECT 1 FROM hq_template_versions v,json_tree(v.definition_json) j WHERE v.tenant_id=? AND j.type='text' AND (j.value=? OR j.value LIKE ?))
         OR EXISTS(SELECT 1 FROM hq_broadcast_runs r,json_tree(r.input_json) j WHERE r.tenant_id=? AND j.type='text' AND (j.value=? OR j.value LIKE ?))`)

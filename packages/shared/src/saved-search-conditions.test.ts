@@ -8,7 +8,7 @@ import {
 import type { SavedSearchConditionKind } from './types/saved-searches.js';
 
 /*
- * ATTR-13: 画面・DB検証・Worker実行の3か所が同じ表を見るための契約。
+ * 画面・DB検証・Worker実行の3か所が同じ表を見るための契約。
  * kind が増えたらここで表への登録忘れを検出する。
  */
 const ALL_KINDS: SavedSearchConditionKind[] = [

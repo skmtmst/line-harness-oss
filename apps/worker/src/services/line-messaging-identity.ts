@@ -1,7 +1,4 @@
-/** Bind manually supplied send credentials to the same channel as the receive secret.
- * A successful bot/info call alone cannot prove this: it may be another shop's token.
- * Nothing from LINE responses or credentials is returned to the browser/logs.
- */
+/** bot/info の成功だけでは別店舗のトークンも通るため、手入力の送信資格情報を受信の秘密値と同じチャネルへ結ぶ。LINE 応答と秘密値はブラウザ・ログへ返さない。 */
 export async function verifyLineMessagingIdentity(input: {
   channelId: string;
   channelSecret: string;
@@ -9,8 +6,7 @@ export async function verifyLineMessagingIdentity(input: {
 }): Promise<boolean> {
   if (!/^\d+$/.test(input.channelId) || !input.channelSecret || !input.channelAccessToken) return false;
   try {
-    // Stateless proof expires in 15 minutes and never displaces existing send
-    // credentials from LINE's 30-token quota. Do not persist or return it.
+    // 15分の短期確認とし、既存送信トークンの30個上限を消費しない。確認用トークンは保存・返却しない。
     const proof = await fetch('https://api.line.me/oauth2/v3/token', {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'client_credentials', client_id: input.channelId, client_secret: input.channelSecret }),

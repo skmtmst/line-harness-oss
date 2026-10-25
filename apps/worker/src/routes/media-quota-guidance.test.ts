@@ -1,5 +1,5 @@
 /**
- * N-198/N-204 (#796): 実route＋実SQLiteで容量の絞り込みと案内の元を確かめる。
+ * 実route＋実SQLiteで容量の絞り込みと案内の元を確かめる。
  *
  * - nearLimitOnly=1 は契約上限への圧迫ファイルだけを返し、件数と一致する
  * - 79%・80%・100%で quota の state が normal・notice・full へ変わる

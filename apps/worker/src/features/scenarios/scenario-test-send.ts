@@ -23,12 +23,12 @@ export interface TestSendResult {
   error?: string
   /** 実際に送った通の数。 */
   sent: number
-  /** 送信先単位の間隔制限（N-057）で控えたとき true。 */
+  /** 送信先単位の間隔制限で控えたとき true。 */
   deduped?: boolean
 }
 
 /**
- * 同じ送信先へのテスト送信を短い間隔で繰り返させない上限（N-057）。
+ * 同じ送信先へのテスト送信を短い間隔で繰り返させない上限。
  *
  * 連打・複数タブ・同時リクエストで実送信が重なるのを防ぐためのもので、
  * 通常の「確認→修正→再送」の間隔（分単位）は邪魔しない。
@@ -64,9 +64,8 @@ async function claimScenarioTestSend(
 }
 
 /**
- * 1通ぶんを組み立てる。送信はしない（プレビューにも使える）。
- * 独立審査(指摘5): 送る側のアカウントは必須。未公開・別アカウントは
- * step の控えに落とす。
+ * プレビューにも使えるよう、組み立てだけを行い送信しない。
+ * 送信元アカウントを必須とし、未公開・別アカウントの参照は step の控えへ戻す。
  */
 export async function buildStepMessages(
   db: D1Database,
@@ -129,7 +128,7 @@ export async function testSendSteps(
   scenarioAccountId: string | null,
   workerUrl?: string,
   /**
-   * 送信先単位のデバウンス用キー（N-057）。呼び出し側は
+   * 送信先単位のデバウンス用キー。呼び出し側は
    * 「シナリオ+通」単位のキーを渡す。省略時は従来どおり制限しない
    * （非routeの利用箇所向け後方互換）。
    */
@@ -154,7 +153,7 @@ export async function testSendSteps(
     }
   }
 
-  // 独立審査(指摘5): 送り先の持ち主では送らない。口で決めた持ち主だけで送る。
+  // 別アカウントから送らないよう、宛先の所有者ではなく入口で確定した送信元だけを使う。
   if (!scenarioAccountId) {
     return { ok: false, error: 'シナリオのLINEアカウントが未設定のため、テスト送信できません。', sent: 0 }
   }

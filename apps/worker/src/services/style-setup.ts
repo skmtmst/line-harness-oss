@@ -98,7 +98,7 @@ export async function saveProfile(
   }
   const cards = current?.style === style ? current.cards_json : null;
   const statements: D1PreparedStatement[] = [];
-  // A failed compare-and-swap aborts the whole D1 batch, including created samples.
+  // CAS が失敗したら、作成した見本も含め D1 batch 全体を中断する。
   statements.push(
     db
       .prepare(
@@ -137,7 +137,7 @@ export async function saveProfile(
         JSON.stringify(previousAnswers[key]) !== JSON.stringify(value),
     ),
   );
-  // Saving answers never writes live reservation settings. UI confirms these changes through the existing versioned settings API.
+  // 回答保存で実予約設定を変更しない。画面の確認後、既存の版付き設定 API で反映する。
   const bookingSettingsChanges = Object.entries(changedAnswers).map(
     ([key, answer]) => ({ key, answer }),
   );
@@ -189,7 +189,7 @@ export async function saveProfile(
     starterSet: { id: set.id, version: set.version },
   };
 }
-/** Called by account creation after ownership and connection validation, never by a read. */
+/** 所有権と接続を検証した作成処理からだけ呼び、読取で設定を書かない。 */
 export async function initializeAccountStyle(
   db: D1Database,
   account: string,

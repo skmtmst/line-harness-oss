@@ -1,5 +1,5 @@
 /*
- * migration 376: タグ付与の工程別台帳(#699)。
+ * migration 376: タグ付与の工程別台帳。
  *
  * schema.sql + migrations を順に当てた実 SQLite で、台帳の状態遷移・予約・
  * 「止まっている行」の判定を確かめる。

@@ -201,7 +201,7 @@ export async function getSavedAnalytics(
   db: D1Database,
   lineAccountId: string,
 ): Promise<SavedAnalyticsSummary[]> {
-  // R461: 旧版判定は、期限削除される元 run（analytics_funnel_runs）への
+  // 旧版判定は、期限削除される元 run（analytics_funnel_runs）への
   // JOIN に頼らない。保存時に固定した定義（versions 表の definition_json）
   // から使った版を読む。元 run が13か月で消えても判定が解除されない。
   const funnelCurrent = await db.prepare(
@@ -252,7 +252,7 @@ export async function getSavedAnalytics(
   return rows.results.map((row) => {
     const snapshotAnalysisStale = row.snapshot_analysis_version != null
       && row.snapshot_analysis_version < row.current_version_number;
-    // R461: 使った版は保存時の定義から読む。元 run が期限削除で消えても
+    // 使った版は保存時の定義から読む。元 run が期限削除で消えても
     // 版は残る。定義が読めない（壊れている）ときは「最新」と言わず
     // 古い側に倒して注意を残す。
     let sourceVersion = row.snapshot_source_version;

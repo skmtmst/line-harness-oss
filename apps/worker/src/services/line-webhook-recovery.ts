@@ -35,7 +35,7 @@ export async function lineWebhookRecoveryView(db: D1Database, row: LineWebhookEv
   return null;
 }
 
-/** Read-only eligibility: a retry needs saved inputs and unfinished recoverable work. */
+/** 再試行は保存済み入力と未完了の回復可能な工程がある場合だけに許可する。 */
 export async function lineWebhookCanRetry(db: D1Database, row: LineWebhookEventRow): Promise<boolean> {
   if (row.status !== 'failed') return false;
   const ref = refFor(row);
@@ -88,7 +88,7 @@ export async function lineWebhookCanRetry(db: D1Database, row: LineWebhookEventR
   return false;
 }
 
-/** Rebuild only from an exact checkpoint-to-domain reference, never by matching text/time. */
+/** 文字や時刻の類似で推測せず、チェックポイントと業務記録の完全一致からだけ再構成する。 */
 export async function retryLineWebhookEvent(env: Env['Bindings'], row: LineWebhookEventRow): Promise<LineRecoveryResult> {
   const db = env.DB, ref = refFor(row), rootRef = { ...ref, stepKey: '__run' };
   if (row.status === 'succeeded') return { status: 'succeeded' };
@@ -120,8 +120,7 @@ export async function retryLineWebhookEvent(env: Env['Bindings'], row: LineWebho
     if (row.event_type === 'message') {
       let recorded = value<{ id: string; inserted: boolean; isUnsent: boolean }>(await step('incoming_message'));
       if (!recorded) {
-        // The INSERT and SQL receipt may have committed before the parent checkpoint.
-        // Only a proven successful INSERT identifies this event's exact inbox row.
+        // 親のチェックポイントより先に INSERT と SQL 受領票が確定する場合があるため、成功の証明された INSERT だけから受信箱の行を特定する。
         const sqlStep = await step('incoming_message:sql:0');
         const results = value<Array<{ meta: { changes: number } }>>(sqlStep);
         const plan = sqlStep?.input_json ? JSON.parse(sqlStep.input_json) as Array<{ sql: string; args: unknown[] }> : [];
@@ -161,7 +160,7 @@ export async function retryLineWebhookEvent(env: Env['Bindings'], row: LineWebho
       }
       if (!reply && policy?.configured === false) reply = await execution.step('auto_reply', async () => ({ matched: false, replyTokenConsumed: false }));
       if (!reply) {
-        // Score rules depend on the receipt identity, friend and event time, not the reply decision.
+        // スコアは返信判定でなく、受領票・友だち・イベント時刻に基づいて処理する。
         if (text && message.line_event_at) await execution.step('event:scoring', () => processScoring(execution.db, 'message_received', {
           sourceEventId: row.webhook_event_id, sourceKind: 'line_webhook', occurredAt: eventTime(message.line_event_at!), friendId: friend.id,
           eventData: { text: message.content },
@@ -253,7 +252,7 @@ export async function retryLineWebhookEvent(env: Env['Bindings'], row: LineWebho
         }
       }
     } else return hold('input_unavailable');
-    // The root is completed first. A lost ledger update is repaired without repeating steps.
+    // 親を先に完了し、台帳の保存を失っても工程を繰り返さず補修する。
     await execution.complete();
     await markLineWebhookEventSucceeded(db, row.webhook_event_id);
     return { status: 'succeeded' };
@@ -266,7 +265,7 @@ export async function retryLineWebhookEvent(env: Env['Bindings'], row: LineWebho
   }
 }
 
-/** Bounded, sequential recovery; unknown/exhausted work is never automatically reclaimed. */
+/** 回復は順番に有限件だけ行い、結果不明や予算超過を自動取得しない。 */
 export async function processDueLineWebhookRetries(env: Env['Bindings'], limit = 20): Promise<void> {
   const rows = await env.DB.prepare(`SELECT e.webhook_event_id FROM line_webhook_events e
     LEFT JOIN workflow_steps w ON w.scope_id='line:'||COALESCE(e.line_account_id,'default') AND w.process_kind='line_event'

@@ -6,13 +6,13 @@ export const WEBINAR_HEARTBEAT_PLAYER_STATES: readonly WebinarHeartbeatPlayerSta
   'playing', 'paused', 'hidden', 'buffering', 'seeking',
 ];
 
-/** heartbeat の送信間隔（秒）。再生中だけ15秒ごとに送る（J #821）。 */
+/** heartbeat の送信間隔（秒）。再生中だけ15秒ごとに送る。 */
 export const WEBINAR_HEARTBEAT_WINDOW_SECONDS = 15;
 
-/** 有効な視聴区間の合計がこの秒数以上で「視聴開始」とする（J #821）。 */
+/** 有効な視聴区間の合計がこの秒数以上で「視聴開始」とする。 */
 export const WEBINAR_VIEW_START_SECONDS = 30;
 
-/** 離脱・維持率の集計バケット（秒）。設計 J-1 の「いちばん離れた所 12〜15分」に合わせる。 */
+/** 離脱・維持率の集計バケット（秒）。「いちばん離れた所 12〜15分」を読める刻みにする。 */
 export const WEBINAR_RETENTION_BUCKET_SECONDS = 60;
 
 export function parseWebinarHeartbeatPlayerState(
@@ -45,7 +45,7 @@ export async function insertWebinarHeartbeatReject(
 }
 
 /**
- * heartbeat を1件受け付ける（J #821）。
+ * heartbeat を1件受け付ける。
  *
  * - 基準はサーバー受信時刻。クライアント申告の時刻は記録だけで判定に使わない。
  * - 再生中（playing）だけ有効な視聴区間を作る。一時停止・非表示・
@@ -214,7 +214,7 @@ export async function recordWebinarViewSegment(
 }
 
 /**
- * 重なる区間を束ね、重複時間を足さない合計秒数を返す（J #821）。
+ * 重なる区間を束ね、重複時間を足さない合計秒数を返す。
  * 同じ区間の再送は呼び出し前に冪等キーで1行になっている前提。
  */
 export async function getWebinarWatchedSeconds(db: D1Database, webinarId: string, friendId: string, sessionStartAt: number): Promise<number> {
@@ -247,7 +247,7 @@ export function mergeWebinarWatchedSeconds(
 }
 
 /**
- * 視聴開始した人（有効な区間の合計が閾値以上）の人数（J #821）。
+ * 視聴開始した人（有効な区間の合計が閾値以上）の人数。
  * 一時停止・非表示の時間は区間が無いので数えない。
  */
 export async function countWebinarStartedViewers(
@@ -275,7 +275,7 @@ export async function countWebinarStartedViewers(
 }
 
 /**
- * 維持率の線の材料（J-1）。各バケットを見ていた人（区間が被る人）の数。
+ * 維持率の線の材料。各バケットを見ていた人（区間が被る人）の数。
  * 分母は視聴開始した人の数。割合の計算は画面側で行う。
  */
 export async function getWebinarRetention(

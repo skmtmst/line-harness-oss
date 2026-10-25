@@ -78,9 +78,7 @@ it('independent: line comments preserve SQLite CR semantics', async () => {
   const f = incomingWebhookFencedDb(db, owner);
   const sql = "SELECT 1 AS x -- ignored\r'; ignored to LF\n";
   expect((await f.prepare(sql).all()).results).toEqual((await db.prepare(sql).all()).results);
-  // The second independent example has a comment after its terminal semicolon.
-  // Native D1 rejects that empty tail; the validated wrapper intentionally strips
-  // it. Compare with the retained statement, not native D1's invalid empty tail.
+  // 検証済みラッパーは末尾セミコロン後のコメントを除くため、D1 が拒む空の2文目でなく、保持した1文と結果を比較する。
   const trailingComment = 'SELECT 1 AS x; -- ignored\r UPDATE effects SET value=2\n';
   await expect(db.prepare(trailingComment).all()).rejects.toThrow('SQL code did not contain a statement');
   expect((await f.prepare(trailingComment).all()).results).toEqual([{ x: 1 }]);
@@ -89,8 +87,7 @@ it('independent: line comments preserve SQLite CR semantics', async () => {
 it.each(['all', 'first'] as const)('independent: CR comment quote confusion cannot bypass stale-owner fence through %s', async api => {
   const f = incomingWebhookFencedDb(db, owner);
   await db.prepare("UPDATE incoming_webhook_receipts SET lease_owner='reclaimed',attempt_count=8,lease_expires_at=0").run();
-  // SQLite -- comments end at LF, not CR. A CR-ending scanner would read the
-  // ignored quotes and could mistake the intervening second statement for text.
+  // -- の終端を CR と誤ると2文目を文字列として見逃すため、SQLite と同じ LF 終端で解析する。
   const sql = "SELECT 1 AS x --\r'\n; UPDATE effects SET value=2; --\r'\n";
   try { await f.prepare(sql)[api](); } catch { /* rejection is allowed */ }
   expect((await db.prepare('SELECT * FROM effects').all()).results).toEqual([{ id: 'original', value: 'safe' }]);
@@ -104,7 +101,7 @@ const readCases = (['all', 'first'] as const).flatMap(api => lineEndings.map(end
 it.each(readCases)('実D1と分類器の行コメント規則が一致する: $api / $label', async ({ api, text }) => {
   const f = incomingWebhookFencedDb(db, owner);
   for (const sql of [
-    // CR keeps the second column inside the comment; LF/CRLF expose it.
+    // CR は列をコメント内に保ち、LF/CRLF はコメントを終える。
     `SELECT 1 AS x -- comment${text}, 2 AS y`,
     `SELECT 'a${text};--/*' AS value /* ${text}; */`,
     `SELECT 'a;''b' AS "quoted;${text}name" -- comment${text}`,

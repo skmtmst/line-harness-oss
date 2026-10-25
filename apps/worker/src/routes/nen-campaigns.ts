@@ -137,7 +137,7 @@ nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
          FROM nen_delivery_jobs WHERE line_account_id = ?`,
     ).bind(accountId).first<{ total: number; pending: number; sent: number; failed: number }>(),
     /*
-     * #935 N-299: 編集画面が「これから届く◯通」を実数で言うため、
+     *  編集画面が「これから届く◯通」を実数で言うため、
      * 上の pending と同じ決めごと（未来ぶんだけ数える）で配信ごとに分ける。
      */
     c.env.DB.prepare(
@@ -156,7 +156,7 @@ nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
     ).bind(accountId).first<{ count: number }>(),
   ]);
   // jobs.pending は「これから送る未来ぶん」の件数。pending-now 口の数え方と
-  // 同じ決めごとにする(点検 #512 の中2)。一覧の窓付き集計とは別物。
+  // 同じ決めごとにする(点検  の中2)。一覧の窓付き集計とは別物。
   return c.json({ success: true, data: {
     activeCampaigns: settings.filter((setting) => setting?.is_enabled === 1).length,
     jobs: {
@@ -184,7 +184,7 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
     keys.results.map((row) => getNenCampaign(c.env.DB, row.campaign_key, accountId)),
   )).filter((row): row is CampaignRow => Boolean(row));
   /*
-   * NEN-07: つなぐ回答フォームが使えなくなった稼働中設定を一覧・編集画面で
+   * つなぐ回答フォームが使えなくなった稼働中設定を一覧・編集画面で
    * 「設定不足」と出せるよう、配信ごとに判定を行へ添えてから返す。
    */
   const settings = await Promise.all(campaigns.map(async (row) => ({
@@ -195,7 +195,7 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
 });
 
 /**
- * 一覧の1行の写し。M507 の409（data.latest）でも同じ形で最新の内容を返す。
+ * 一覧の1行の写し。の409（data.latest）でも同じ形で最新の内容を返す。
  * formIssue は付けない（競合時は画面が読み直すため）。
  */
 function toCampaignSettingPayload(row: CampaignRow) {
@@ -280,7 +280,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireDeliveryAcce
     return inputError(c, { success: false, error: 'Invalid delivery safeguards' }, 400, ["dedupWindowDays","excludeFormRespondents"]);
   }
   /*
-   * NEN-07 (#1078): 「回答フォームを開く」設定はつなぐフォームが今も使える
+   * 「回答フォームを開く」設定はつなぐフォームが今も使える
    * ことを確かめる。ボタンのURLだけフォームを指している(押されたあとの
    * 設定を外した残り・古い設定)は「開くつもりなのに未選択」と同じ扱いにして
    * 保存を止める。口コミ回答の除外も有効なフォーム選択が前提。
@@ -316,7 +316,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireDeliveryAcce
     return inputError(c, { success: false, error: NEN_CAMPAIGN_FORM_ISSUE_LABELS[formIssue] }, 400, ["afterActions","excludeFormRespondents","buttonUrl"]);
   }
   /*
-   * M507: 配信設定の同時保存は後勝ちで先の変更が黙って消えていた。
+   * 配信設定の同時保存は後勝ちで先の変更が黙って消えていた。
    * 版（expectedUpdatedAt）が送られてきたときだけ、保存前の値と
    * 照合してから書く。古い画面からの保存は409で止め、最新の内容を
    * data.latest で返す。送られてこない従来の呼び出しはそのまま通す。
@@ -396,7 +396,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireDeliveryAcce
 
 // 一覧の停止・再開（isEnabledだけの切り替え）専用の口。上のPUTと同じ口を
 // 使うと、本文・題名などを送り直すことになり、保存済み本文が上限を超えて
-// いる場合に停止すらできなくなる（#659差し戻し2点目）。停止は本文の長さに
+// いる場合に停止すらできなくなる。停止は本文の長さに
 // 関わらず必ず実行できる必要があるため、is_enabled以外は今の値のまま
 // 変えず、本文の長さ検査も行わない。
 nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {
@@ -411,7 +411,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireDeli
   const current = await getNenCampaign(c.env.DB, key, accountId);
   if (!current) return fail(c, 404, 'CAMPAIGN_NOT_FOUND');
   /*
-   * NEN-07 (#1078): つなぐ回答フォームが使えない設定は稼働開始を止める。
+   * つなぐ回答フォームが使えない設定は稼働開始を止める。
    * 停止はどんな状態でも実行できる(止められなくなると復旧できない)。
    */
   if (body.isEnabled) {
@@ -618,7 +618,7 @@ nenCampaigns.post('/api/nen-campaigns/deliveries/:id/retry', requireDeliveryAcce
 nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
-  // 件数制限なしの全件取得は件数が増えると重い(点検 #512 の中6)。上限200・page送り付き。
+  // 件数制限なしの全件取得は件数が増えると重い(点検  の中6)。上限200・page送り付き。
   const { limit, offset } = parseOffsetPaging(
     { limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 200 },
   );
@@ -690,8 +690,8 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireDeliveryAccess('nenCampai
   const now = jstNow();
   const fields = buildNenColumnStorageFields(input);
   /*
-   * NEN-05: 列・値・bind を一致させる（delivery_at が抜けていて INSERT が必ず失敗していた）。
-   * NEN-06: 下書き保存はこのINSERTだけ。配信日時が入っていても配信待ち行列へは入れず、
+   * 列・値・bind を一致させる（delivery_at が抜けていて INSERT が必ず失敗していた）。
+   * 下書き保存はこのINSERTだけ。配信日時が入っていても配信待ち行列へは入れず、
    * 「配信したい日時」として delivery_at に残す（予約は POST /columns/:id/deliver の
    * 明示操作だけが行う）。ISO8601(Z付き)で保存し、表示側が日本時間で読める形にする。
    */
@@ -723,7 +723,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireDeliveryAcc
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
   /*
-   * M506: 複製の要求キー。二重押し・応答消失後の再送は同じ複製へ戻し、
+   * 複製の要求キー。二重押し・応答消失後の再送は同じ複製へ戻し、
    * 2本目を作らない。キーは複製行の主キーになる。
    */
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
@@ -845,7 +845,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireDeliveryAcces
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
   /*
-   * #935 N-304: 予約日時を先に確かめる。解釈できない文字列をnowへ潰さず断り、
+   *  予約日時を先に確かめる。解釈できない文字列をnowへ潰さず断り、
    * 過去の日時は「予約」の約束を守れない（次のtickで即送になる）ため断る。
    * 予約作成(POST /columns)と同じくDBを触る前に落とす。
    */
@@ -876,7 +876,7 @@ nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireDeliveryAccess
     return inputError(c, { success: false, error: 'introText is required and must be 1500 characters or fewer' }, 400, ["introText"]);
   }
   /*
-   * M507: 紹介文の同時保存は後勝ちで先の変更が黙って消えていた。
+   * 紹介文の同時保存は後勝ちで先の変更が黙って消えていた。
    * 版（expectedUpdatedAt）が送られてきたときだけ照合してから書く。
    * 古い画面からの保存は409で止め、最新の紹介文を data.latest で返す。
    * 送られてこない従来の呼び出しは以前とまったく同じ書き方で通す。
@@ -939,13 +939,13 @@ nenCampaigns.get('/api/nen-campaigns/pets', requireRole('owner', 'admin', 'staff
     id: row.id, friendId: row.friend_id, customerId: row.customer_id, name: row.name,
     animalType: row.animal_type, gender: row.gender, birthday: row.birthday,
     ownerName: row.display_name, lineUserId: row.line_user_id,
-    // M511: 更新の版照合に使う。無ければ送らず従来どおり通す。
+    // 更新の版照合に使う。無ければ送らず従来どおり通す。
     updatedAt: typeof row.updated_at === 'string' ? row.updated_at : '',
   })) });
 });
 
 /*
- * M510: 登録ボタンの二重押し・通信再送で同じペットが2頭できないよう、
+ * 登録ボタンの二重押し・通信再送で同じペットが2頭できないよう、
  * Idempotency-Key を行IDにする（broadcasts と同じ決めごと）。キーが無い
  * 従来の呼び出しはそのまま作る。同じキーで内容が違う再送は取り違えなので
  * 409 で止める。再送の返しは作り直さない。
@@ -1054,7 +1054,7 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireDeliveryAccess('nenCampai
     return fail(c, 404, 'PET_NOT_FOUND');
   }
   /*
-   * M511: ペット更新の同時保存は後勝ちで先の変更が黙って消えていた。
+   * ペット更新の同時保存は後勝ちで先の変更が黙って消えていた。
    * 版（expectedUpdatedAt）が送られてきたときだけ updated_at の一致も
    * 条件に入れる。古い画面からの保存は409で止め、最新の名前つきで返す。
    * 送られてこない従来の呼び出しはそのまま通す。
@@ -1072,7 +1072,7 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireDeliveryAccess('nenCampai
   };
   // 監査 R57: 「体重の更新」は体重が実際に変わったときだけ動かす。
   // 名前だけの編集や同じ値の再送では日付を維持する。
-  // M511: 版つきの保存は版を必ず単調に進める（同じミリ秒の連打でも見分けられる）。
+  // 版つきの保存は版を必ず単調に進める（同じミリ秒の連打でも見分けられる）。
   const weightTouched = patch.weightKg !== undefined && patch.weightKg !== pet.weight_kg;
   const petNewUpdatedAt = petExpectedUpdatedAt === null ? jstNow() : nextVersionToken(pet.updated_at);
   const petWritten = await c.env.DB.prepare(
@@ -1141,7 +1141,7 @@ nenCampaigns.get('/api/nen-campaigns/birthday-coupon', async (c) => {
     isEnabled: row?.is_enabled === 1, codePrefix: row?.code_prefix ?? '',
     benefitLabel: row?.benefit_label ?? '', discountAmount: row?.discount_amount ?? 0,
     validityDays: row?.validity_days ?? 0,
-    // 419: キー無しの既存設定は従来動作（平年に届かない）= 'skip'。
+    // キー無しの既存設定は従来動作（平年に届かない）= 'skip'。
     // まだ保存したことが無いアカウントは要件の既定 'feb28' を見せる。
     leapYearPolicy: row ? (row.leap_year_policy ?? 'skip') : 'feb28',
     updatedAt: row?.updated_at ?? '',
@@ -1160,7 +1160,7 @@ nenCampaigns.put('/api/nen-campaigns/birthday-coupon', requireDeliveryAccess('ne
       || !Number.isInteger(days) || days < 1 || days > 365) {
     return inputError(c, { success: false, error: 'Invalid coupon settings' }, 400, ["isEnabled","codePrefix","benefitLabel","discountAmount","validityDays"]);
   }
-  // 419: 2月29日生まれの扱い。送られてきたら検証し、省略なら既存値を守る
+  // 2月29日生まれの扱い。送られてきたら検証し、省略なら既存値を守る
   // （旧クライアントからの保存で 'skip' 扱いの設定を無断で変えない）。
   let leapYearPolicy: 'feb28' | 'mar1' | 'skip' | undefined;
   if (body.leapYearPolicy !== undefined) {
@@ -1237,10 +1237,10 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
       || (body.image_url && (typeof body.image_url !== 'string' || !isUrl(body.image_url)))) {
     return inputError(c, { success: false, error: 'Invalid column' }, 400, ["slug","title","article_url","image_url"]);
   }
-  // 120: 管理画面経路（validateNenColumnCreateBody）と同じ値に揃えた。送信元の
+  // 管理画面の validateNenColumnCreateBody と同じ値で検証し、送信元の
   // EC-Cube側フォームも独立に120字で制約している（JournalController.php の
   // titleフィールド、Assert\Length(max:120)）が、それはLHが保証されたもの
-  // ではない。#711 の司令塔裁定で、経路ごとに違う上限を持たないことを優先し、
+  // ではない。経路ごとに異なる上限を作らず、
   // 管理画面と同じ120を採った。
   if (body.title.length > 120) {
     logger.error("nen_eccube_column_title_rejected");
@@ -1273,7 +1273,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
   // intro_textはON CONFLICTのSET句に含めない（意図的）。EC-Cubeはintro_textを
   // 送らないので、再同期のたびに既定文で上書きすると、LHの画面で人が直した
   // 紹介文が消える。既定文のまま古くなるより、人が直した内容が消えるほうが
-  // 害が大きいという判断（未確認・推測）。#711 の司令塔裁定を参照。
+  // 害が大きいため、編集済みの内容を優先する。
   // https://github.com/kentavndng/line-harness-board/issues/711
   await c.env.DB.prepare(
     `INSERT INTO nen_columns

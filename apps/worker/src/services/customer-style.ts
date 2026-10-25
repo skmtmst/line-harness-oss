@@ -1,7 +1,7 @@
 import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
 
 
-/** Only the selected public style crosses the customer boundary. Answers and internal flags stay private. */
+/** 顧客側へ渡すのは選択済みの公開スタイルだけとし、回答と内部フラグは返さない。 */
 export async function accountCustomerStyle(db: D1Database, accountId: string): Promise<AccountStyle | null> {
   const row = await db.prepare(
     "SELECT style FROM account_styles WHERE line_account_id=? AND selection_mode='configured' AND selected_at IS NOT NULL",

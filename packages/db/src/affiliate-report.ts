@@ -796,14 +796,14 @@ export interface ConversionApprovalRow {
    */
   offerActionsIncomplete: boolean;
   /**
-   * 成果地点が属するLINEアカウント。キューのアカウント絞り(N-218)は
+   * 成果地点が属するLINEアカウント。キューのアカウント絞りは
    * scope と同じ `cp.line_account_id` で数える。未割当の地点は null。
    */
   lineAccountId: string | null;
   /** アカウント名。削除済み・未割当は null（画面側で未設定と出す）。 */
   lineAccountName: string | null;
   /**
-   * IDEA-16: 成果の起こりになった注文番号（記録時に metadata へ残した
+   * 成果の起こりになった注文番号（記録時に metadata へ残した
    * 根拠）。注文由来でない成果は null。検索と詳細の根拠表示に使う。
    */
   orderNumber: string | null;

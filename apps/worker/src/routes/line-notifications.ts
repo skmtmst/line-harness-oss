@@ -290,7 +290,7 @@ lineNotifications.post(
     const draft = jsonObject(current.definition.draft_config_json) as CustomerDraft;
     const draftError = validateCustomerDraft(draft);
     if (draftError) return inputError(c, { success: false, error: draftError }, 400, ["lineAccountId"]);
-    // N-330 (#943): ECイベントがきっかけの定義は、送信文面をイベント内容
+    //  ECイベントがきっかけの定義は、送信文面をイベント内容
     // から組み立てる(ecFlexMessage)ので、静的なLINEテンプレートは要らない。
     // それ以外の定義は、送る中身が無いまま公開できないようテンプレートを必須にする。
     if (!current.definition.source_event_type.startsWith('ec.')
@@ -902,7 +902,7 @@ lineNotifications.post(
       : false;
     if (quota.state === 'available' && !reserved) {
       // 枠の予約より先に作った再送行を、未送信のまま(pending)に残さない。
-      // 送らなかった理由つきの失敗で確定し、履歴に残す(m26e R566)。
+      // 送らなかった理由つきの失敗で確定し、履歴に残す。
       const finalized = await finishNotificationResendDelivery(c.env.DB, {
         id: created.id,
         lineAccountId,
@@ -1051,7 +1051,7 @@ lineNotifications.post(
           );
           if (!reserved) {
             // 枠の予約より先に作った記録先を、送達のない成功前提のままに
-            // 残さない。失敗で確定し、送れなかった理由を監査に残す(m26e R567)。
+            // 残さない。失敗で確定し、送れなかった理由を監査に残す。
             const finalized = await failCustomerTestInstance(c.env.DB, {
               lineAccountId, instanceId,
             });

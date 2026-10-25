@@ -74,7 +74,7 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 // =============================================================================
-// 承認時の固定報酬の根拠 — 記録時刻の版 (F-23 ケース6)
+// 承認時の固定報酬の根拠 — 記録時刻の版
 // =============================================================================
 //
 // 判断記録がある成果はその版を使う。判断の保存に失敗した成果は、記録時刻に
@@ -86,8 +86,7 @@ async function sha256Hex(value: string): Promise<string> {
 //   ただし最新版が記録時刻と同時刻で他に候補があるときは確定不能として null）
 // - 'legacy-live' … 版管理前の昔の案件・汎用リンク・率の紹介者・古いスキーマ。
 //   旧来どおり今の案件額を使う。版0の公開案件にも到達する（POSTの案件行
-//   INSERT成功→初版INSERT失敗で残り、同キー再送が回収する。F-23 交差の
-//   有限barrierで再現）。機能保証の変更はしない。
+//   INSERT成功→初版INSERT失敗で残り、同キー再送が回収する）。機能保証の変更はしない。
 // - null … 版管理下の案件なのに記録時刻の版が無い（欠落・改ざん）。
 //   承認してはならない。呼び出し側が状態を変えずに拒む。
 
@@ -100,7 +99,7 @@ export type ApprovalRewardBasis =
   | { kind: 'version'; version: ApprovalRewardVersionBasis }
   // 旧来経路の現在額。承認判断時点で読んだ値をそのまま持ち、承認・凍結・
   // 計算で同じ値を使い回す（precheck→UPDATE→freezeの間の割り込みで
-  // 根拠がずれないようにする。F-23 交差の有限barrier）。
+  // 根拠がずれないようにする）。
   | { kind: 'legacy-live'; rewardAmount: number | null; rewardMiles: number | null };
 
 /**
@@ -109,7 +108,7 @@ export type ApprovalRewardBasis =
  * 最新の候補が記録時刻と同時刻で、他にも候補があるときは前後が決め
  * られないため null を返す（同時刻で確定不能→呼び出し側が承認を拒む。
  * jstNow はms精度のため、処理now採取→判断保存失敗→同じmsで新版保存
- * という有限順序が実在する。F-23 独立SOURCE監査）。候補が1件だけの
+ * という有限順序が実在する）。候補が1件だけの
  * 同時刻はその版を使う（他に選びようが無い）。
  */
 export async function getOfferVersionAtTime(
@@ -208,7 +207,7 @@ export async function resolveApprovalRewardBasis(
     .first<{ n: number }>();
   // 版が1つも無い案件は旧来どおり。POSTの案件行INSERT成功→初版INSERT失敗
   // でも到達する（同キー再送が回収する）が、版なしの一般仕様の選択は
-  // 司令塔の判断前には広げない。
+  // 仕様が決まるまで広げない。
   if ((versionCount?.n ?? 0) === 0) {
     return { kind: 'legacy-live', rewardAmount: row.offer_reward, rewardMiles: row.offer_miles };
   }
@@ -234,17 +233,17 @@ export async function ensureConversionRewardSnapshot(
   /**
    * 承認判断時に確定した根拠。渡されたときは再解決せず同じ値を使う
    * （precheck→UPDATE→freezeの間の割り込みで根拠がずれないようにする。
-   * F-23 交差の有限barrier）。省略時はその場で確かめ直す。
+   * 省略時はその場で確かめ直す。
    */
   basisOverride?: ApprovalRewardBasis | null,
 ): Promise<AffiliateRewardCalculation | null> {
-  // 付けた時点の版があれば、その版の決まりを優先する(#823)。
+  // 付けた時点の版があれば、その版の決まりを優先する。
   // 版の表が無い古いスキーマ（最小構成の単体試験など）では、
   // 従来どおり今の案件の値を使う。
   const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
     && (await dbTableExists(db, 'affiliate_attribution_decisions'));
   // 判断の版があればその額。無い行の扱いは下の JS で根拠ごとに分ける
-  //（記録時刻の版で旧額を保つ。F-23 ケース6）。
+  //（記録時刻の版で旧額を保つ）。
   const versionRewardSelect = hasVersionTables
     ? 'ov.reward_amount AS version_reward'
     : 'NULL AS version_reward';
@@ -360,7 +359,7 @@ export async function ensureConversionRewardSnapshot(
   ).bind(eventId).first<{ 1: number }>();
   if (settled) return null;
 
-  // m22u R356・R357: 承認時に凍結した入力があれば、現在の設定ではなく
+  // 承認時に凍結した入力があれば、現在の設定ではなく
   // 凍結値を優先する(承認後の設定変更で過去の承認額が動かない)。
   const frozenFormula = row.frozen_formula === 'rate' || row.frozen_formula === 'fixed'
     ? row.frozen_formula
@@ -378,7 +377,7 @@ export async function ensureConversionRewardSnapshot(
     : null;
   // 固定報酬の出どころ。判断の版があればその額。判断が無い行は根拠を
   // 確かめ直す：記録時刻の版があれば旧額、版管理下で版が無ければ版を
-  // 作らない（null で終え、締め・支払い・レポートから外す。F-23 ケース6）。
+  // 作らない（null で終え、締め・支払い・レポートから外す）。
   let pricedFixedReward = 0;
   if (formula === 'fixed' && row.reward_mode !== 'none') {
     if (row.version_reward !== null && row.version_reward !== undefined) {
@@ -537,7 +536,7 @@ export async function reverseSettledRewardOnRejection(
 }
 
 /**
- * m22u R358：締め済みの成果を却下→再承認したときの復活。
+ * 締め済みの成果を却下→再承認したときの復活。
  *
  * 締めは成果ごとに確定(credit)を1件しか持てない（UNIQUE のため再承認で
  * 新しい確定は作れない）。そのため再承認では、却下で reversed にした確定を
@@ -617,13 +616,13 @@ export function settlementWriteStatements(
     targets: SettlementWriteTarget[];
     now: string;
     /**
-     * R288: 全体締めが同時に付ける取消(entry_id 参照)の消費行。
+     * 全体締めが同時に付ける取消(entry_id 参照)の消費行。
      * 別締めに先取りされて1行でも欠けたら、報酬行もろとも巻き戻す。
      * 個別締めは渡さない(従来どおり報酬行だけを見る)。
      */
     expectedDebitEntryIds?: string[];
     /**
-     * R288: 取り込む取消行。巻き戻し文より先に積むため、ここで受け取る。
+     * 取り込む取消行。巻き戻し文より先に積むため、ここで受け取る。
      * amount は負数(差し引き)。書込みは条件付きで、別締めが先に同じ
      * 取消を付けていたら0行になる(entry_id の UNIQUE との二重構え)。
      */
@@ -687,7 +686,7 @@ export function settlementWriteStatements(
     );
   }
 
-  // R288: 取消の消費行は報酬行の直後・巻き戻し文より先に積む。
+  // 取消の消費行は報酬行の直後・巻き戻し文より先に積む。
   // 順序が逆だと巻き戻しがまだ無い行を数えて締めごと消してしまう。
   for (const line of input.debitLines ?? []) {
     statements.push(db.prepare(
@@ -703,7 +702,7 @@ export function settlementWriteStatements(
   // 巻き戻しの3文。fenceを通らなかった対象が1件でもあれば、この確定で
   // 書いた明細行 → credit → header の順に消す(子から先に消してFKを壊さない)。
   // 述語はいずれも「自分が消す表」を数えないため、途中経過に左右されない。
-  // R288: 取消の消費行も数える。別締めに先取りされて欠けたら、
+  // 取消の消費行も数える。別締めに先取りされて欠けたら、
   // 報酬行が全部書けていても締めごと消す(部分適用は残らない)。
   const writtenEntries =
     `(SELECT COUNT(*) FROM affiliate_reward_entries re

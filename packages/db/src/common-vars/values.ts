@@ -8,7 +8,7 @@ export function normalizeCommonVarValue(type: CommonVarType, value: string): str
   if (type === 'boolean') return value === 'true' || value === 'false' ? value : null;
   /*
    * 画像はLINEへ画像URLとして差し込まれる。URLでない文字列や https 以外の
-   * scheme は送信時に壊れるため、口で止める（VAR-03）。空は「空のまま」
+   * scheme は送信時に壊れるため、口で止める。空は「空のまま」
    * 運用があるため通す。要件のメディアID参照(-14 §5-2)へ移るまでは、
    * 最小の形式検査として https URL だけを受ける。
    */
@@ -18,7 +18,7 @@ export function normalizeCommonVarValue(type: CommonVarType, value: string): str
   }
   /*
    * URL型はリンク先として差し込まれる。URLでない文章は配信・予約導線で
-   * 壊れるため、口で止める（R36）。画像と違い、社内・検証環境の http
+   * 壊れるため、口で止める。画像と違い、社内・検証環境の http
    * リンクも運用するため http/https の両方を受ける。空は「空のまま」
    * 運用があるため通す。
    */

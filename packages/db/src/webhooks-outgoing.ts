@@ -81,7 +81,7 @@ export async function updateOutgoingWebhook(
     sets.push('is_active = ?');
     values.push(updates.isActive ? 1 : 0);
     // 再有効化は「自動停止の記録」を消す。止まった事実は連続失敗数と
-    // 通知センターの履歴に残る(#938)。
+    // 通知センターの履歴に残る。
     if (updates.isActive) sets.push('auto_stopped_at = NULL');
   }
   if (updates.maxRetries !== undefined) { sets.push('max_retries = ?'); values.push(updates.maxRetries); }
@@ -102,7 +102,7 @@ export async function updateOutgoingWebhook(
   return (result.meta.changes ?? 0) > 0;
 }
 
-/** N-368 (#939): 受信側と同じく、削除は履歴を残す印。返り値は印を付けられたか。 */
+/** 受信側と同じく、削除は履歴を残す印。返り値は印を付けられたか。 */
 export async function deleteOutgoingWebhook(
   db: D1Database,
   id: string,
@@ -147,7 +147,7 @@ export async function getActiveOutgoingWebhooksByEvent(
     `)
     .bind(lineAccountId)
     .all<OutgoingWebhookRow>();
-  // N-376: event_types が壊れた1行で配送全体を止めない。壊れた行だけを
+  // event_types が壊れた1行で配送全体を止めない。壊れた行だけを
   // 構造化ログで記録して除外し、健全な行への配送は継続する。
   const matched: OutgoingWebhookRow[] = [];
   for (const w of all.results) {

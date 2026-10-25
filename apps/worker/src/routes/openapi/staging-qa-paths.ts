@@ -1,4 +1,4 @@
-// QA routes are mounted normally, but their environment gate runs before authentication/DB.
+// QA の環境判定は認証・DB より先に実行する。
 const roles = ['hq', 'store', 'viewer', 'impersonation'];
 const jobs = ['booking_waitlists', 'restaurant_holds', 'restaurant_menu_prices'];
 const uuid = { type: 'string', format: 'uuid' };

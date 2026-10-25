@@ -96,7 +96,7 @@ function nextRun(schedule: AnalyticsReportSchedule): string {
 }
 
 /**
- * 滞留した予定を未来へ進める（R457）。
+ * 滞留した予定を未来へ進める。
  *
  * 止まっていた間に何回分も過ぎていたら、古い予定から1周期ずつ
  * 送り直さない。最新の期間を1回だけ送り、飛ばした回数を数えて
@@ -308,8 +308,7 @@ async function evaluateConversionStreak(
 }
 
 /**
- * 知らせの決めごとを、前期間と実際に比べる（R77）。
- * 以前は設定値をそのまま「判定済み」として写していた。
+ * 通知条件を設定値だけで判定済みにせず、前期間の実データと比較して評価する。
  */
 export async function evaluateAlertRules(
   db: D1Database, schedule: AnalyticsReportSchedule,
@@ -356,7 +355,7 @@ async function buildReport(db: D1Database, schedule: AnalyticsReportSchedule, no
     current[section] = await load(db, currentContext);
     previous[section] = await load(db, previousContext);
   }
-  // R459: 全体の状態は通常の節だけでなく、添えた保存済み分析の
+  // 全体の状態は通常の節だけでなく、添えた保存済み分析の
   // 状態も見る。保存済みだけ選んだ場合、current={} は「集計済み」に
   // 見えてしまう。無い写し（消された分析）は未取得として扱う。
   const savedAnalyses = [];
@@ -404,7 +403,7 @@ function headlineLines(schedule: AnalyticsReportSchedule, report: Awaited<Return
   if (schedule.sections.includes('reactions')) {
     const delivered = envelopeNumber(current.reactions, ['metrics', 'delivered']);
     const opened = envelopeNumber(current.reactions, ['metrics', 'opened']);
-    // 監査 R225: シナリオは届いた人数が取れないため、シナリオを含む期間は
+    // 監査 : シナリオは届いた人数が取れないため、シナリオを含む期間は
     // delivered が partial（取れた一斉配信だけの合計）になる。行を消さず、
     // 取れた分だけだと分かる添え書きを付けて出す。
     if (delivered && (delivered.state === 'available' || delivered.state === 'partial')
@@ -480,7 +479,7 @@ function alertLines(evaluation: { state: string; results?: AlertRuleEvaluation[]
 }
 
 /**
- * 添えた保存済み分析は、その結果が「いつのものか」を添える（R460）。
+ * 添えた保存済み分析は、その結果が「いつのものか」を添える。
  *
  * 保存結果は不変（1月のまま）が正しい。問題は通知だけが今回の
  * 期間・締切を名乗り、受け手が9月の集計と受け取る点。分析ごとに
@@ -532,7 +531,7 @@ export type DeliveryOutcome = {
 };
 
 /**
- * 送信直前の宛先の再検査（R449）。
+ * 送信直前の宛先の再検査。
  *
  * 作成時は宛先の権限を検査するが、保存後に担当者が停止されたり
  * 閲覧範囲から外れたりしても、送信時は getStaffById で引けるだけで
@@ -564,7 +563,7 @@ async function deliver(env: AnalyticsReportEnv, schedule: AnalyticsReportSchedul
     if (recipient.kind !== 'staff' || !recipient.staffId) continue;
     const checked = await validStaffFor(env.DB, recipient.staffId, schedule.lineAccountId);
     if (!checked.ok) {
-      // R449: 除外した理由を履歴に残す。有効な宛先への送信は続ける。
+      // 除外した理由を履歴に残す。有効な宛先への送信は続ける。
       for (const channel of schedule.channels) {
         if (channel === 'dashboard') continue;
         results.push({ channel, recipient: recipient.staffId, status: 'skipped', reason: checked.reason });
@@ -618,7 +617,7 @@ async function deliver(env: AnalyticsReportEnv, schedule: AnalyticsReportSchedul
 }
 
 /**
- * 取り残された実行中を「中断」とみなすまでの時間（R450）。
+ * 取り残された実行中を「中断」とみなすまでの時間。
  *
  * 正常な同時実行（開始直後の running 行）を回収しないよう、
  * この時間より古いものだけを対象にする。
@@ -626,7 +625,7 @@ async function deliver(env: AnalyticsReportEnv, schedule: AnalyticsReportSchedul
 const STALE_RUN_MS = 2 * 3_600_000;
 
 /**
- * 読み取り後に変わった設定を見分ける（R451）。
+ * 読み取り後に変わった設定を見分ける。
  *
  * 止める・しまう・内容変更のいずれも、版（updatedAt）か次回予定か
  * 状態が変わる。読み取ったまま送ると旧宛先へ送るので、変わって
@@ -641,7 +640,7 @@ export function isClaimStale(
 
 export async function processDueAnalyticsReports(env: AnalyticsReportEnv, now = new Date()) {
   const nowISO = now.toISOString();
-  // R450: 前回取り残された running 行を先に回収する。回収しないと
+  // 前回取り残された running 行を先に回収する。回収しないと
   // 同じ予定時刻の begin がずっと null になり、次回以降も止まる。
   const staleCutoff = new Date(now.getTime() - STALE_RUN_MS).toISOString();
   const reclaimed = await reclaimStaleAnalyticsReportRuns(env.DB, staleCutoff);
@@ -654,7 +653,7 @@ export async function processDueAnalyticsReports(env: AnalyticsReportEnv, now = 
     if (!await featureJobCanRun(env.DB, { accountId: schedule.lineAccountId, featureId: 'analytics', job: 'analytics scheduled reports' })) {
       continue;
     }
-    // R451: 読み取った設定でそのまま送らない。実行開始の直前に
+    // 読み取った設定でそのまま送らない。実行開始の直前に
     // 最新を読み直し、止める・しまう・内容変更の後なら送らない。
     // 変更後の予定は編集側が未来へ置き直すので、ここでは進めない。
     const fresh = await getAnalyticsReportSchedule(env.DB, schedule.id, schedule.lineAccountId);
@@ -666,7 +665,7 @@ export async function processDueAnalyticsReports(env: AnalyticsReportEnv, now = 
       timeZone: schedule.timeZone, dataCutoffAt: context.dataCutoffAt,
     });
     if (!runId) {
-      // R450: 送信済みの記録があるのに予定だけ古いままなら、送り直さず
+      // 送信済みの記録があるのに予定だけ古いままなら、送り直さず
       // 予定だけ未来へ補修する。running 行は上の回収で既に処理済み。
       const existing = await getAnalyticsReportRun(env.DB, {
         scheduleId: schedule.id, scheduledFor: schedule.nextRunAt,
@@ -678,12 +677,12 @@ export async function processDueAnalyticsReports(env: AnalyticsReportEnv, now = 
       }
       continue;
     }
-    // R452: 履歴保存が失敗しても、確認済みの送信結果を空にしない。
+    // 履歴保存が失敗しても、確認済みの送信結果を空にしない。
     // catch 側でもここまでの deliveryResults を引き継ぐ。
     let deliveryResults: DeliveryOutcome[] = [];
     try {
       const report = await buildReport(env.DB, schedule, now);
-      // R451: 集計中に止める・しまう・内容変更があれば、旧設定で送らない。
+      // 集計中に止める・しまう・内容変更があれば、旧設定で送らない。
       const latest = await getAnalyticsReportSchedule(env.DB, schedule.id, schedule.lineAccountId);
       if (!latest || latest.status !== 'active' || latest.updatedAt !== schedule.updatedAt) {
         await finishAnalyticsReportRun(env.DB, {
@@ -700,7 +699,7 @@ export async function processDueAnalyticsReports(env: AnalyticsReportEnv, now = 
       const backlog = futureRunAt(schedule, nowISO);
       await finishAnalyticsReportRun(env.DB, {
         id: runId, state: deliveryFailed && report.state === 'available' ? 'partial' : report.state,
-        // R457: 滞留分をまとめて1回送ったときは、省略した回数を履歴に残す。
+        // 滞留分をまとめて1回送ったときは、省略した回数を履歴に残す。
         result: backlog.skipped > 0
           ? { ...report.result, backlog: { scheduledFor: schedule.nextRunAt, sentPeriods: 1, skippedPeriods: backlog.skipped } }
           : report.result,

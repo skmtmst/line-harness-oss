@@ -42,11 +42,10 @@ const step = (templateId: string) => ({
 });
 
 /*
- * #645 差し戻し(2026-09-09T02:26:35Z)・司令塔独立審査REJECT対応: resolveStepContent の
+ * resolveStepContent の
  * fail-close を実SQLiteで検証する否定試験。scenario-resolve.test.ts(src/)は
- * account-1 で常に一致する肯定側の試験しか無く、未公開・別アカウント・
- * lineAccountId 未指定のどれも拒まれることを確認していなかった
- * (審査者の指摘: 「否定側が一切試験されていない」)。
+ * account-1 で常に一致する肯定側の試験なので、未公開・別アカウント・
+ * lineAccountId 未指定のどれも拒まれることをここで確かめる。
  */
 describe('resolveStepContent の fail-close(実SQLite・否定試験)', () => {
   it('未公開(published_version=0)のテンプレートは解決せず step の控えへ落ちる', async () => {

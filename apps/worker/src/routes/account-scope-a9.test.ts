@@ -62,7 +62,7 @@ vi.mock('@line-crm/db', () => ({
   addConversionDefinitionUsage: vi.fn(),
   getConversionDefinitionReport: mocks.getDefinitionReport,
   listConversionDefinitionsForExport: vi.fn(),
-  // #819: 取消台帳。スコープ試験では「取り消し無し」にする。
+  // 取消台帳。スコープ試験では「取り消し無し」にする。
   getReversedEventIds: vi.fn(async () => new Set<string>()),
   listConversionReversals: vi.fn(async () => []),
   appendConversionReversal: vi.fn(),

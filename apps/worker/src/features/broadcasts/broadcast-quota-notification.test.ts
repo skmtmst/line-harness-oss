@@ -1,5 +1,5 @@
 /*
- * IDEA-24 (#1042): 送信枠不足の通知が通知センターへ届く契約試験。
+ *  送信枠不足の通知が通知センターへ届く契約試験。
  *
  * 背景: `guardScheduledBroadcastQuota` は「止めた理由」を
  * `channel: 'center'` で書いていたが、通知センターは 'dashboard' しか

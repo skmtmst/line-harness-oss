@@ -157,10 +157,7 @@ function draftFromRow(row: PostRow): PostDraft {
 }
 
 /**
- * Instagram 同時投稿の見え方（★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。
- * 画面のことばは「なし／済み／失敗」の3つだけなので、DBの5値をそこへ畳む。
- * 送信前（出す設定だがまだ結果が無い）は札を出さないので 'none' で足りる。
- * この口は同時投稿に対応しているので、つないでいない店でも null は返さず常にこの形を返す。
+ * 画面では同時投稿をなし・済み・失敗の3つで示すため、DB の状態をまとめる。送信前は none とし、未接続の店でも同じ形を返す。設計図 ★V8-B U1X7T2・HEEN9 と照合する。
  */
 function publicInstagram(row: PostRow) {
   const status =
@@ -395,10 +392,8 @@ interface InstagramConnectionRow {
 }
 
 /**
- * Google へ出したあと、同じ写真と文章を Instagram へも出す（★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。
- * ここは例外を投げない。Instagram だけ失敗しても Google の公開は残すのが決めごとなので、
- * 失敗はぜんぶ instagram_status / instagram_error に書くだけにして、画面の「Instagram へ再送」へ任せる。
- * Meta の応答本文やトークンは error 列に入れず、自前のコードだけを残す。
+ * Instagram だけの失敗で Google の公開まで取り消さないよう、例外を投げず instagram_status / instagram_error に分類済みの結果を保存する。
+ * 再送は画面から行い、Meta の応答本文やトークンは error 列へ入れない。設計図 ★V8-B U1X7T2・HEEN9 と照合する。
  */
 async function crossPostToInstagram(c: Context<Env>, store: StoreContext, row: PostRow): Promise<void> {
   try {
@@ -476,7 +471,7 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
     (filter === 'attention' && (r.status === 'rejected' || r.status === 'failed')) ||
     (filter === 'scheduled' && r.status === 'scheduled');
   // deleted（Googleから消えた／削除した）も「すべて」には残す。理由が分からないまま消えたように
-  // 見えないようにするため（GB-17統合前はこの一覧だけが唯一の記録）。
+  // 見えないようにするため。
   const filtered = rows.filter((r) => byKind(r) && byFilter(r));
   const counts = {
     all: rows.length,

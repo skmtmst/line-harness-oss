@@ -6,18 +6,9 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';
 
 /**
- * Issue #686 差し戻し対応の実 Worker + 実 D1（better-sqlite3 に bootstrap.sql
- * を流したもの）による検証。
- *
- *  1. commit 後に応答だけ失われて再送されても、安定した操作UUID
- *     (operationId) で同じ登録を回収し、二重作成しない。
- *  2. 途中保存後に直した項目は、全項目を送るPUTで失われない
- *     （narrow な PUT だと失われることの対比で示す）。
- *  3. 選択中LINEアカウントの範囲外（cross-account）へは作成・参照できない。
- *
- * `apps/worker/src/routes/affiliates.ts` は本物のまま mount し、
- * `@line-crm/db` はモックしない。DB は better-sqlite3 + bootstrap.sql の
- * 実SQLiteで、D1 の prepare/bind/first/all/run/batch だけを被せる。
+ * 応答喪失後の再送でも operationId で同じ登録を回収し、二重作成を防ぐ。
+ * 途中保存後の編集は全項目の PUT で保持し、選択中の LINE アカウントを越えた作成・参照は拒む。
+ * route と DB 関数は実物を使い、bootstrap.sql を適用した SQLite に D1 の prepare/bind/first/all/run/batch を被せて検証する。
  */
 
 function asD1(sqlite: Database.Database): D1Database {
@@ -78,7 +69,7 @@ function seed(sqlite: Database.Database) {
   ).run(ACCOUNT_A);
 
   // account-b だけを見られるスタッフ。操作UUIDの回収が account を跨がない
-  // ことを確かめる側（#686 審査3）。
+  // ことを確かめる側（ 審査3）。
   sqlite.prepare(
     `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)
      VALUES ('scoped-staff-b', '担当者B', 'admin', 'key-scoped-staff-b', ?, 'accounts')`,
@@ -109,9 +100,7 @@ function makeApp(db: D1Database, staff: { id: string; role: 'owner' | 'admin' | 
   return { app, env };
 }
 
-// The scope-restricted staff row must be real (getVisibleLineAccountScope falls
-// back to full/unscoped access when getStaffById finds nothing), so `env-owner`
-// is used only for the "unrestricted" side of each test.
+// staff 行なしでは可視範囲が制限なしへ戻るため、制限付き試験には実 staff 行を用意する。env-owner は無制限側だけに使う。
 const OWNER = { id: 'env-owner', role: 'owner' as const };
 const SCOPED = { id: 'scoped-staff', role: 'admin' as const };
 const SCOPED_B = { id: 'scoped-staff-b', role: 'admin' as const };
@@ -173,7 +162,7 @@ describe('POST /api/affiliates — response-loss retry recovers the same registr
     };
 
     // 逐次の再送ではなく、同じ操作UUIDを2本まとめて投げる。read-then-write
-    // だと両方が「まだリンクが無い」と読み、リンクが2本できる（#686 審査2）。
+    // だと両方が「まだリンクが無い」と読み、リンクが2本できる（ 審査2）。
     const [first, second] = await Promise.all([
       app.request('/api/affiliates', { method: 'POST', body: JSON.stringify(body) }, env),
       app.request('/api/affiliates', { method: 'POST', body: JSON.stringify(body) }, env),
@@ -247,7 +236,7 @@ describe('POST /api/affiliates — cross-account への作成を拒む (#686)', 
   });
 
   /*
-   * 操作UUIDの回収は、tenant と LINEアカウントの内側だけで効かせる（#686 審査3）。
+   * 操作UUIDの回収は、tenant と LINEアカウントの内側だけで効かせる（ 審査3）。
    *
    * 回収SELECTから tenant_id / line_account_id を落とすと、operation_id だけで
    * 引くことになる。そうすると別アカウントのスタッフが他店の operationId を
@@ -353,7 +342,7 @@ describe('PUT /api/affiliates/:id — 途中保存後の再開は全項目を保
     }, env);
     const { data: created } = await create.json() as { data: { id: string } };
 
-    // ユーザーは画面上で名前・報酬率を直したが、旧実装の再開PUTは
+    // 画面で編集した名前・報酬率を含まない再開 PUT では、
     // email/holdDays/payoutCycle/notifyOnConversion/isActive しか送らない。
     const narrow = await app.request(`/api/affiliates/${created.id}`, {
       method: 'PUT',
@@ -369,7 +358,7 @@ describe('PUT /api/affiliates/:id — 途中保存後の再開は全項目を保
 
     const row = sqlite.prepare(`SELECT name, commission_rate FROM affiliates WHERE id = ?`)
       .get(created.id) as { name: string; commission_rate: number };
-    // 直したはずの値が失われている＝narrow PUTでは画面上の編集が消えることの証明。
+    // 編集した値を保持できないことを対照として確かめる。
     expect(row.name).toBe('編集前の名前2');
     expect(row.commission_rate).toBe(10);
   });

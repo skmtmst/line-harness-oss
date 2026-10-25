@@ -160,7 +160,7 @@ export const post__api_auto_replies_drafts_3 = async (c: Context<Env, "/api/auto
       parsed.templateLineAccountId,
     );
     if (templateError) return c.json({ success: false, error: templateError }, 403);
-    // m26c R556: 確認キーがあれば再送を同じ下書きへ復帰させる。
+    // m26c : 確認キーがあれば再送を同じ下書きへ復帰させる。
     const draftKey = readIdempotencyKey(c);
     try {
       const created = await createAutoReplyWithDraftVersion(
@@ -246,7 +246,7 @@ export const put__api_auto_replies_id_draft_6 = async (c: Context<Env, "/api/aut
       parsed.templateLineAccountId,
     );
     if (templateError) return c.json({ success: false, error: templateError }, 403);
-    // m26c R551: 読んだ版番号を更新条件に含め、同じ版からの後続保存を競合にする。
+    // m26c : 読んだ版番号を更新条件に含め、同じ版からの後続保存を競合にする。
     const version = await saveAutoReplyDraftVersion(
       c.env.DB,
       c.req.param('id'),
@@ -261,7 +261,7 @@ export const put__api_auto_replies_id_draft_6 = async (c: Context<Env, "/api/aut
     }
     // 同時作成の負け側は一意制約で落ちる。版の競合として同じ 409 に寄せる。
     if (code === 'AUTO_REPLY_VERSION_CONFLICT' || /unique constraint/i.test(code)) {
-      // m26c R551: 先行内容を保ったまま、比較と読み直しの手がかりを返す。
+      // m26c : 先行内容を保ったまま、比較と読み直しの手がかりを返す。
       const current = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'))
         ?? await getAutoReplyPublishedVersion(c.env.DB, c.req.param('id'));
       const currentSettings = current ? parseAutoReplyVersionSettings(current) : null;
@@ -297,7 +297,7 @@ export const post__api_auto_replies_id_validate_7 = async (c: Context<Env, "/api
 
 export const get__api_auto_replies_id_conflicts_8 = async (c: Context<Env, "/api/auto-replies/:id/conflicts">) => {
   try {
-    // m26c R558: 公開後は下書きが無い。下書き取得と同じく公開版へ読み替え、
+    // m26c : 公開後は下書きが無い。下書き取得と同じく公開版へ読み替え、
     // 404 で完了 URL を壊さない。読み替えたことは source で区別する。
     const version = await getAutoReplyDraftVersion(c.env.DB, c.req.param('id'));
     const published = version ? null : await getAutoReplyPublishedVersion(c.env.DB, c.req.param('id'));
@@ -375,7 +375,7 @@ export const post__api_auto_replies_id_test_9 = async (c: Context<Env, "/api/aut
       : winner
         ? { messageType: 'silent', content: '返信せず、設定した処理だけを実行します' }
         : null;
-    // m26c R552: 試験を始めたときの内容を掴む。記録時に変わっていたら
+    // m26c : 試験を始めたときの内容を掴む。記録時に変わっていたら
     // 古い成功を新内容に付けず、再試験を求める。
     const startedSnapshot = version.definition_snapshot;
     const result: AutoReplyDryRunResult = {
@@ -428,7 +428,7 @@ export const post__api_auto_replies_id_publish_10 = async (c: Context<Env, "/api
       return inputError(c, { success: false, error: '公開操作の確認キーが必要です' }, 400, []);
     }
     const version = await getAutoReplyDraftVersion(c.env.DB, id);
-    // m26c R553/R554: 公開前チェック時の内容と、読取時の停止状態を掴む。
+    // m26c /: 公開前チェック時の内容と、読取時の停止状態を掴む。
     // 公開 batch までの割込みは DB helper が競合として止める。
     const ruleBefore = await getAutoReplyById(c.env.DB, id);
     if (!version) {

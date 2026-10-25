@@ -51,8 +51,7 @@ async function upload(side = 'single', bytes: Uint8Array = png, mime = 'image/pn
   const response = await app().fetch(new Request(`https://app.test/upload?side=${side}&kind=${kind}`, { method: 'POST', headers: { 'Content-Type': mime }, body: bytes as unknown as BodyInit }), env());
   return { response, body: await response.json() as any };
 }
-// Seed a historical identity row through a normal scanned image, then restore its stored legacy classification.
-// This is fixture setup, never an upload API compatibility bypass.
+// 保存済みの本人確認行は通常の検査済み画像から用意し、分類を fixture として戻す。アップロード API の検証を迂回する入口は作らない。
 async function legacyDocument(side = 'front') {
   const result = await upload();
   const id = result.body.data.file.fileId;

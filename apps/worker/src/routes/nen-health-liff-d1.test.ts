@@ -100,7 +100,7 @@ describe('POST /api/liff/nen/health-logs（監査 R59/R61）', () => {
     }
     const res = await post({ petId: 'pet-momo', stoolStatus: 'soft', appetite: 'normal' });
     expect((await res.json() as any).data.careRequired).toBe(true);
-    // 管理側の要約も同じ記録から同じ「便の異常」を出す（以前は下痢・血便だけだった）。
+    // 利用者側と管理側で同じ記録から同じ便の異常を判定する。
     const { summarizePetHealth } = await import('../services/nen-health-admin.js');
     const logs = sql.prepare(`SELECT * FROM nen_health_logs WHERE pet_id = 'pet-momo'`).all() as any[];
     const changes = summarizePetHealth(logs, new Date()).changes.map((ch) => ch.key);

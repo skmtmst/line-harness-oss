@@ -171,8 +171,8 @@ describe('event waitlist and applicants', () => {
 
   test('IDEA-29: 席数別の集計・終了した待ち履歴・当日受付を人数で返す', async () => {
     // 確定2人・承認待ち1人・待機1人・案内中2人・繰上げ済み1人・期限切れ1人・参加済1人。
-    seedBooking(); // booking-a: confirmed party_size=2
-    seedWaitlist(); // wait-a: waiting party_size=1
+    seedBooking(); // booking-a は確定済みで2人分。
+    seedWaitlist(); // wait-a は待機中で1人分。
     sqlite.exec(`
       INSERT INTO event_bookings (
         id, line_account_id, event_id, slot_id, friend_id, status, requested_at,

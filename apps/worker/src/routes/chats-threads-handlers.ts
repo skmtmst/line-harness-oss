@@ -96,25 +96,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       return c.json(buildCursorListResponse({ success: true, data, items: responseItems, paging: { limit }, sort: [] }));
     }
 
-    // List everyone who has any message history (incoming or outgoing — push/broadcast/scenario included)
-    // PLUS any chats row that exists even before any messages_log entry is written.
-    // Source = messages_log ∪ chats.friend_id; chats は status/operator/notes 用に LEFT JOIN で最新1件だけ採用。
-    //
-    // recent_msg CTE で friend_id ごとに最新の messages_log 行をひとつ取得し、本文 preview と
-    // direction (incoming/outgoing) を一覧に出す。
-    //
-    // パフォーマンス対策 (2026-07-06 本番実測で全面改修):
-    //   旧実装は messages_log (96k 行) を ROW_NUMBER × 2 + GROUP BY で 3 回スキャンし、
-    //   さらに LIMIT なしで全 friend (10k 行) を返していた → 本番 D1 実測 3.47 秒 / 781k rows_read。
-    //   新実装は (a) ROW_NUMBER を argmax GROUP BY に置換 (SQLite の bare-column +
-    //   単一 MAX は max 行の値を返す documented 挙動)、(b) CTE を MATERIALIZED して
-    //   二重評価を防止、(c) page CTE で先に対象 friend を limit 件に確定してから
-    //   preview を計算、(d) デフォルト LIMIT 200
-    //   (最終行は 未読 DESC, last_message_at DESC, friend_id DESC)。
-    //   同条件の本番実測: 459ms / 165k rows_read (旧 LIMIT 300 時)。
-    //   - content は text のみ先頭 200 文字まで切り詰めて返す (flex/image など raw JSON を
-    //     返すと broadcast 後の rows で multi-MB レスポンスになる)。
-    //   - lineAccountId 指定時は messages_log スキャンを対象アカの friend に絞る。
+    // 送受信履歴と chats の和集合で、初回メッセージ前のチャットも一覧へ含める。履歴の最大値と MATERIALIZED CTE を使い、ページの友だちを先に確定してからプレビューを求める。大きな応答を防ぐため、テキストだけ先頭200文字へ制限し、アカウント指定時はその友だちへ絞る。並びは未読・最終日時・友だち ID の降順で安定させる。
     for(const account of visibleScope.allowedAccountIds) await refreshInboxSla(c.env.DB,account);
     const accountFilterBindings: string[] = [];
     let accountFilterSql: string;
@@ -178,7 +160,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     if (quickFilter) {
       conditions.push(`COALESCE(c.status, 'resolved') = 'unread'`);
       if (quickFilter === 'overdue') {
-        // R111: 一覧に表示する最新時刻と同じ定義（受信時刻 line_event_at があれば
+        // 一覧に表示する最新時刻と同じ定義（受信時刻 line_event_at があれば
         // そちらを正とし、無ければ保存時刻。件数側の overdue_count と共通）。
         // created_at だけを見ると、遅れて届いた受信の待ち時間を短く数え、
         // 札の件数を押しても対象が一覧に出なくなる。
@@ -195,7 +177,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       conditionBindings.push(lineAccountId);
     }
     if (query) {
-      // #625: LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+      // LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
       conditions.push(`(
         instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
           SELECT 1 FROM messages_log mq

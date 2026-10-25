@@ -245,7 +245,7 @@ export function serializeFolder(row: Folder, count?: number, itemCount?: number)
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     ...(count === undefined ? {} : { count }),
-    // #631: 一覧画面が読む正式なフィールド。undefinedなら「数えていない」
+    // 一覧画面が読む正式なフィールド。undefinedなら「数えていない」
     // という意味で、レスポンスからキーごと落とす（0件と区別するため）。
     ...(itemCount === undefined ? {} : { itemCount }),
   };

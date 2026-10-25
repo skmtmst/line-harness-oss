@@ -39,7 +39,7 @@ vi.mock('@line-crm/db', async original => ({
     if (token === 'auto-replies-key') return { id: 'auto-replies-1', name: 'Auto Replies Staff', role: 'staff', permission_keys: '["/auto-replies"]' };
     if (token === 'automations-key') return { id: 'automations-1', name: 'Automations Staff', role: 'staff', permission_keys: '["/automations"]' };
     if (token === 'booking-key') return { id: 'booking-1', name: 'Booking Staff', role: 'staff', permission_keys: '["/booking/bookings"]' };
-    // N-411: 予約の細かい権限。管理(booking)・メニュー・設定・本人勤務は別キー。
+    // 予約の細かい権限。管理(booking)・メニュー・設定・本人勤務は別キー。
     if (token === 'booking-menus-key') return { id: 'bm-1', name: 'Menus Staff', role: 'staff', permission_keys: '["/booking/menus"]' };
     if (token === 'booking-settings-key') return { id: 'bs-1', name: 'Settings Staff', role: 'staff', permission_keys: '["booking.settings"]' };
     if (token === 'booking-own-key') return { id: 'bo-1', name: 'Own Shift Staff', role: 'staff', permission_keys: '["booking.staff.own"]' };
@@ -68,19 +68,19 @@ vi.mock('@line-crm/db', async original => ({
   }),
   getStaffByLineUserId: vi.fn(async (_db: unknown, lineUserId: string) => {
     if (lineUserId !== 'authorized-line-user') return null;
-    // 管理者束はTOTP必須のため、セッション発行の確認は必須でない役割で行う（N-426）。
+    // 管理者束はTOTP必須のため、セッション発行の確認は必須でない役割で行う。
     return { id: 'staff-1', name: 'Staff One', role: 'staff', is_active: 1 };
   }),
   createAdminSession: vi.fn(async () => undefined),
   createTwoFactorChallenge: vi.fn(async () => undefined),
-  // N-426: 実装と同じ判定（owner/admin かつ閲覧専用でない人はMFA必須）。
+  // 実装と同じ判定（owner/admin かつ閲覧専用でない人はMFA必須）。
   staffRequiresMfa: vi.fn((row: { role: string; access_level?: string }) =>
     (row.role === 'owner' || row.role === 'admin') && row.access_level !== 'read_only'),
   activatePlatformAdminIfAwaitingTotp: vi.fn(async () => false),
   deleteExpiredTwoFactorChallenges: vi.fn(async () => undefined),
   getTwoFactorChallenge: vi.fn(async () => null),
   getStaffById: vi.fn(async (_db: unknown, id: string) => id === 'staff-1' ? { id, name: 'Staff One', role: 'admin', is_active: 1, totp_enabled_at: null, totp_secret_enc: null } : null),
-  // V: セッション行の再確認・見なれない判定。既定は「行なし・履歴なし」。
+  // セッション行の再確認・見なれない判定。既定は「行なし・履歴なし」。
   getAdminSessionByTokenHash: vi.fn(async () => null),
   adminSessionFamiliarity: vi.fn(async () => ({
     hasBaseline: false, deviceKnown: false, ipKnown: false,
@@ -124,8 +124,7 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
 const sessionDatabases: ReturnType<typeof createTestD1>[] = [];
 afterEach(() => { for (const db of sessionDatabases.splice(0)) db.raw.close(); });
 
-// Session issuance also records the known device, so successful login fixtures
-// need the real schema and a staff row for its foreign key.
+// セッション発行は既知端末も記録するため、成功するログインの fixture には実スキーマと外部キー先の staff 行を用意する。
 function sessionEnv(bindings: Env['Bindings']): Env['Bindings'] {
   const db = createTestD1();
   sessionDatabases.push(db);
@@ -133,7 +132,7 @@ function sessionEnv(bindings: Env['Bindings']): Env['Bindings'] {
   return { ...bindings, DB: db.db };
 }
 
-// Cross-site production topology with explicit opt-in (the supported case).
+// 明示的に許可した本番の別サイト構成を試す。
 function crossSiteEnv(): Env['Bindings'] {
   return env({ ADMIN_ORIGIN: PAGES, ADMIN_ALLOW_CROSS_SITE: 'true' });
 }
@@ -188,7 +187,7 @@ function app() {
   a.get('/api/booking/admin/customers', (c) => c.json({ success: true }));
   a.post('/api/booking/admin/customers', (c) => c.json({ success: true }));
   a.patch('/api/booking/admin/requests/:id', (c) => c.json({ success: true }));
-  // N-411: 細かい権限の検証用スタブ（route 側ガードは別試験で担保）。
+  // 細かい権限の検証用スタブ（route 側ガードは別試験で担保）。
   a.get('/api/booking/admin/menus', (c) => c.json({ success: true }));
   a.post('/api/booking/admin/menus', (c) => c.json({ success: true }));
   a.put('/api/booking/admin/settings', (c) => c.json({ success: true }));
@@ -219,7 +218,7 @@ function app() {
   a.patch('/api/staff/friends-1', (c) => c.json({ success: true }));
   a.get('/api/staff/export', (c) => c.json({ success: true }));
   a.patch('/api/staff/policy', (c) => c.json({ success: true }));
-  // N-423 の未登録経路。permissionForApiPath が null を返す口。
+  //  の未登録経路。permissionForApiPath が null を返す口。
   a.get('/api/coverage-unmapped-demo', (c) => c.json({ success: true }));
   a.post('/api/coverage-unmapped-demo', (c) => c.json({ success: true }));
   return a;
@@ -257,12 +256,12 @@ describe('admin login cookie attributes', () => {
     expect(session).toContain('HttpOnly');
     expect(session).toContain('Secure');
     expect(session).toContain('SameSite=None');
-    // 既定は8時間（N-434）。「記憶する」選択時だけ7日。
+    // 既定は8時間。「記憶する」選択時だけ7日。
     expect(session).toContain('Max-Age=28800');
 
     const csrf = cookieFor(res, 'lh_csrf') ?? '';
     expect(csrf).toContain(`lh_csrf=${body.csrfToken}`);
-    expect(csrf).not.toContain('HttpOnly'); // SPA-readable (double-submit)
+    expect(csrf).not.toContain('HttpOnly'); // double-submit 用に管理画面から読める Cookie とする。
     expect(csrf).toContain('SameSite=None');
   });
 
@@ -422,7 +421,7 @@ describe('topology guard', () => {
       method: 'POST',
       body: JSON.stringify({ apiKey: 'staff-key' }),
       headers: { 'Content-Type': 'application/json' },
-    }, env({ ADMIN_ORIGIN: PAGES })); // no ADMIN_ALLOW_CROSS_SITE
+    }, env({ ADMIN_ORIGIN: PAGES })); // 別サイト Cookie の明示許可がない構成を試す。
 
     expect(res.status).toBe(500);
     const body = await res.json() as { success: boolean; error: string };
@@ -522,7 +521,7 @@ describe('protected API access', () => {
   });
 
   test('a malformed cookie value yields 401, not a 500', async () => {
-    // `%` is an invalid percent escape — decoding must not throw.
+    // 不正な % の復号で例外を投げないことを確かめる。
     const res = await app().request('/api/protected', {
       headers: { Cookie: 'lh_admin_session=%; other=%E0%A4%A' },
     }, crossSiteEnv());
@@ -649,7 +648,7 @@ describe('staff feature permissions', () => {
     expect(permissionForApiPath('/api/events/admin/events/ev-1/bookings/bk-1/cancel')).toBe('/events');
     // 公開コールバックは権限の対象外。
     expect(permissionForApiPath('/api/meet-callback')).toBeNull();
-    // N-411: 細かい権限のマッピング。広い /api/booking → /booking/bookings より先に解決する。
+    // 細かい権限のマッピング。広い /api/booking → /booking/bookings より先に解決する。
     expect(permissionForApiPath('/api/booking/admin/menus')).toBe('/booking/menus');
     expect(permissionForApiPath('/api/booking/admin/menus/m-1')).toBe('/booking/menus');
     expect(permissionForApiPath('/api/booking/admin/staff-menus')).toBe('/booking/menus');

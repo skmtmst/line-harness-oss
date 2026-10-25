@@ -326,7 +326,7 @@ describe('safety regressions', () => {
         `SELECT a.label FROM rich_menu_areas a JOIN rich_menu_pages p ON p.id=a.page_id JOIN rich_menu_groups g ON g.id=p.group_id WHERE g.account_id='a' ORDER BY a.bounds_y,a.bounds_x`,
       )
       .all();
-    // Reuse the original draft ID and refresh its untouched industry contents.
+    // 元の下書き ID を維持し、未編集の業種内容だけを更新する。
     expect(declared.map((b: any) => b.label)).toContain('お問い合わせ');
     expect(actual).toEqual(declared.map((b: any) => ({ label: b.label })));
   });

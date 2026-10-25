@@ -39,7 +39,7 @@ export async function createMileageRule(
     /** 期間限定のキャンペーン。列も突き合わせも前からあったが、書き込む口が無かった。 */
     validFrom?: string | null;
     validUntil?: string | null;
-    /** 334(#521): 帰属アカウント。新規ルールでは必須。 */
+    /** 334: 帰属アカウント。新規ルールでは必須。 */
     lineAccountId: string;
     /**
      * DRAFT-01: false なら最初のINSERTから停止(is_active=0)。未指定は従来どおり稼働。
@@ -137,7 +137,7 @@ export function publishedRuleContentFromDraft(
     initialStatus: 'pending' | 'available';
     validFrom: string | null;
     validUntil: string | null;
-    /** R52: 下書きの対象条件。そのまま公開版へ載せる(条件なしは null)。 */
+    /** 下書きの対象条件。そのまま公開版へ載せる(条件なしは null)。 */
     targetConditions?: SegmentCondition | null;
     /** m22o: 下書きの有効期限・取消・通知。そのまま公開版へ載せる。 */
     expiresAfterDays?: number | null;
@@ -199,7 +199,7 @@ export async function resolvePinnedRuleRow(
       amount: v0.amount,
       initial_status: v0.initial_status,
       conditions: v0.conditions,
-      // R52: 旧公開版の対象条件も引き継ぐ。無ければ null(条件なし)。
+      // 旧公開版の対象条件も引き継ぐ。無ければ null(条件なし)。
       target_conditions: v0.target_conditions ? JSON.stringify(v0.target_conditions) : null,
       valid_from: v0.valid_from,
       valid_until: v0.valid_until,
@@ -219,7 +219,7 @@ export async function resolvePinnedRuleRow(
     amount: content.amount,
     initial_status: content.initial_status,
     conditions: content.conditions,
-    // R52: 公開版の対象条件を実行時の行へ載せる。無ければ null(条件なし)。
+    // 公開版の対象条件を実行時の行へ載せる。無ければ null(条件なし)。
     target_conditions: content.target_conditions ? JSON.stringify(content.target_conditions) : null,
     valid_from: content.valid_from,
     valid_until: content.valid_until,
@@ -271,7 +271,7 @@ export async function updateMileageRule(
 }
 
 /**
- * 決めごとを履歴ごと消さないための原子削除。N-232 用。
+ * 決めごとを履歴ごと消さないための原子削除。
  * 台帳(mileage_ledger)に1件でも参照があれば消さない。void の行も数える。
  * SELECTとDELETEを分けると、その間に付与履歴が作られる競合で履歴付き決めごとを
  * 消せるため、DELETE文自体に NOT EXISTS 条件を持たせて1文で実行する。
@@ -279,7 +279,7 @@ export async function updateMileageRule(
  */
 export async function deleteMileageRule(db: D1Database, id: string): Promise<number> {
   /*
-   * R296: の決めごとは下書き行が mileage_rules への FK を持つので、
+   * の決めごとは下書き行が mileage_rules への FK を持つので、
    * 下書きを残したまま本体を消すと外部キー違反で落ちる。先に下書きを消す。
    * 両文に履歴ガードを付けて1トランザクション(batch)で送る——下書きだけ
    * 消えて本体が残ると、一覧に出ないのに付与が動く決めごとになる。

@@ -12,7 +12,7 @@ booking.get('/api/booking/admin/reminder-preview', async (c) => {
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const startsAt = new Date(c.req.query('starts_at') ?? '');
   if (Number.isNaN(startsAt.getTime())) return c.json({ error: 'invalid_starts_at' }, 400);
-  // N-395: 店舗ごとの設定時刻で予定を出す。設定が無い店舗は従来の既定値。
+  // 店舗ごとの設定時刻で予定を出す。設定が無い店舗は従来の既定値。
   const timing = await getReminderTiming(c.env.DB, accountId);
   return c.json({
     reminders: buildConfirmationReminderSchedule({

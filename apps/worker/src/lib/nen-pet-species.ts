@@ -1,10 +1,5 @@
 /**
- * ペットの動物種別の共通定義（監査 DEEP-24）。
- *
- * DB（nen_pet_profiles.animal_type）は CHECK で 'dog' | 'cat' | 'other' に
- * 限定されている。以前は API や主食計算が `=== 'cat' ? 'cat' : 'dog'` と
- * 書いていて、「その他」が犬に変換されて表示・印刷・計算されていた。
- * ここで1本にそろえ、other は other のまま保持する。
+ * DB が保持する dog / cat / other を、表示・印刷・計算で同じ意味のまま扱う。その他の動物を犬として計算しないよう、種別判定を共有する。
  */
 
 export type PetAnimalType = 'dog' | 'cat' | 'other';

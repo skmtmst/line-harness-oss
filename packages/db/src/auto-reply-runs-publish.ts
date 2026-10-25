@@ -5,7 +5,7 @@ import { getAutoReplyDraftVersion, parseAutoReplyVersionSettings, getAutoReplyVe
 
 
 /**
- * m26c R552: 試験の記録は、試験を始めたときの内容と同じ版にだけ付ける。
+ * 試験の記録は、試験を始めたときの内容と同じ版にだけ付ける。
  * expectedSnapshot（試験開始時に読んだ definition_snapshot）を渡すと、
  * 記録時に内容が変わっていないか1文で照合する。試験中に編集が入った
  * 場合は反映行数 0 になり、applied: false を返す。古い成功が新内容の
@@ -42,7 +42,7 @@ export async function recordAutoReplyDraftTest(
 /**
  * 下書きを公開版へ進め、実行中の定義を同じbatchで差し替える。
  *
- * m26c R553/R554: 公開の読取と書込のあいだに編集・停止が割り込んだら、
+ * 公開の読取と書込のあいだに編集・停止が割り込んだら、
  * 公開を止めて競合にする。expectedSnapshot（公開前チェック時の内容）、
  * expectedStoppedAt / expectedIsActive（読取時の停止状態）を渡すと、
  * batch 内の3文すべてに割込み条件を付け、成功した公開版と稼働設定が

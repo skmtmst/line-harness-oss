@@ -1,15 +1,4 @@
-// Idempotency-Key store for event booking POSTs.
-// Returns same response for repeated submissions within the TTL window.
-// Mirrors booking-idempotency.ts pattern but on event_booking_idempotency_keys.
-//
-// Reservation flow (added to prevent double-tap duplicates):
-//   1) Caller invokes reserveEventIdempotency at request start.
-//      - 'inserted' → first request, proceed with the booking.
-//      - 'cached'   → previous request finished, replay {status, body}.
-//      - 'in_progress' → previous request still running, return 429.
-//   2) On finish (success or terminal error), caller invokes
-//      finalizeEventIdempotencyResponse to overwrite the placeholder row
-//      with the real response. Subsequent retries then hit the cached path.
+// 同時の二重押下を防ぐため、要求開始時にキーを確保する。新規だけが進み、処理中は429、完了済みは保存応答を返す。成功・終端エラーのいずれも最後に実応答で確定する。
 
 export interface SaveEventIdempotencyParams {
   key: string;
@@ -74,10 +63,7 @@ export type ReservationOutcome =
   | { kind: 'cached'; status: number; body: unknown }
   | { kind: 'in_progress' };
 
-// Atomically reserve a key. status=0 / body='' means "in flight" — caller
-// must finalize on completion. INSERT OR IGNORE guarantees only one writer
-// wins for a given (key, account, friend); subsequent callers read the
-// existing row and branch on whether response_status is still 0.
+// status=0/body空は処理中の印とする。キー・アカウント・友だちの INSERT OR IGNORE で実行者を1人に絞り、後続は保存行の状態で分岐する。
 export async function reserveEventIdempotency(
   db: D1Database,
   args: { key: string; lineAccountId: string; friendId: string; ttlMinutes: number; now: Date },

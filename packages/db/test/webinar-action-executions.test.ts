@@ -9,7 +9,7 @@ import {
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * R97: 視聴後アクションの実行記録は冪等キーで1件にまとめる。
+ * 視聴後アクションの実行記録は冪等キーで1件にまとめる。
  * 直しを戻す（INSERT OR IGNORE を外す・結末更新を消す）と赤くなる。
  */
 describe('webinar action executions idempotency', () => {

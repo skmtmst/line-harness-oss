@@ -7,12 +7,8 @@ import { authMiddleware } from '../middleware/auth.js';
 import { friendAttributes } from './friend-attributes.js';
 
 /*
- * D028〜D035（対応マークの作成・編集・自動変更ルール）の深い再調査の回帰試験。
- *
- * Devin の監査（round-D60/D61）は古いコード（#1029 時点）で行われ、
- * その後の #1032（R510〜R519：要求キー・版照合）が一部を解消した。
- * 各指摘が最新のコードで起きるかを、実ルート＋実認証＋メモリSQLite＋
- * 失敗注入（SQL片に引っかけてわざと落とす）で確かめる。
+ * 対応マークの作成・編集・自動変更を、実 route・実認証・メモリ SQLite で検証する。
+ * SQL への失敗注入により、要求キーと版照合が部分失敗や競合を防ぐことも確かめる。
  */
 
 const BOOTSTRAP_SQL = readFileSync(
@@ -29,7 +25,7 @@ const SCOPED_KEY = 'deep-scoped';
 function setupSqlite() {
   const sqlite = new Database(':memory:');
   sqlite.exec(BOOTSTRAP_SQL);
-  // Explicit Off fixture: these tests exercise resource authorization, not login MFA.
+  // 対象の権限検査まで到達させるため、MFA は明示的に無効の fixture とする。
   sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
   sqlite.prepare(
     `INSERT INTO line_accounts (id, name, channel_id, channel_access_token, channel_secret)
@@ -168,7 +164,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
 });
 
-// D029: 作成の二重実行。#1032（R512）で要求キーが必須になり、
+// D029: 作成の二重実行。で要求キーが必須になり、
 // キー無しは作らず400・同じキー＋同じ内容は保存済みを返す・違う内容は409で止める。
 describe('D029 対応マーク作成の冪等化', () => {
   it('要求キーが無い作成は400で、1行も作らない', async () => {
@@ -247,7 +243,7 @@ describe('D030 対応マーク名の長さ上限', () => {
   });
 });
 
-// D031: 本体編集の版照合。#1032（R513）で expectedVersion を送れば409で止まる。
+// D031: 本体編集の版照合。で expectedVersion を送れば409で止まる。
 // 送った版が古いのに黙って上書きしないことを確かめる。
 describe('D031 対応マーク編集の版照合', () => {
   it('古い版の保存は409で止めて相手の変更を残し、最新の内容を返す', async () => {

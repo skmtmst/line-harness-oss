@@ -7,7 +7,7 @@ import { holidaysOfYear } from '../../services/jp-holidays.js';
 import { matchesCondition, parseCondition } from '../../services/segment-query.js';
 
 /**
- * 祝日かどうか（R253）。
+ * 祝日かどうか。
  *
  * 共有の祝日表（`packages/shared`・年ごとに手で足す形）は2026年までで、
  * 2027年の元日を誤判定する。ここでは祝日法の規則を計算で再現する
@@ -46,11 +46,11 @@ export interface AutoReplyConditionRow {
   active_until: string | null;
   cooldown_minutes: number | null;
   skip_when_operator_active: number;
-  /** 151: 応答する曜日（0=日 … 6=土）の JSON 配列。NULL なら曜日を問わない。 */
+  /** 応答する曜日（0=日 … 6=土）の JSON 配列。NULL なら曜日を問わない。 */
   response_weekdays_json?: string | null;
-  /** 151: 'ignore' | 'include' | 'exclude'。NULL なら 'ignore'。 */
+  /** 'ignore' | 'include' | 'exclude'。NULL なら 'ignore'。 */
   response_holiday_rule?: string | null;
-  /** 151: 1人につき1回だけ応答する。 */
+  /** 1人につき1回だけ応答する。 */
   once_per_friend?: number;
   reply_delay_seconds?: number | null;
   /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。NULL なら絞らない。 */

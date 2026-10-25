@@ -19,7 +19,7 @@ export function inputError<T extends Record<string, unknown>>(
     || (payload.errors && typeof payload.errors === 'object' && !Array.isArray(payload.errors));
   // 必須欄が複数ある検査でも、すでに入っている欄は赤にしない。
   const body = c.get('validatedInputBody') as Record<string, unknown> | undefined;
-  // fail()で文言を言い換えた場合も、必須欄の判定には元の理由を使う。
+  // failで文言を言い換えた場合も、必須欄の判定には元の理由を使う。
   const missingKeys = body && /required|必須/i.test(validationReason ?? legacyError)
     ? keys.filter(key => body[key] === undefined || body[key] === null || body[key] === '')
     : [];
@@ -89,7 +89,7 @@ export async function readBoundedText(request: Pick<Request, 'headers' | 'body'>
   return bytes === null ? null : new TextDecoder().decode(bytes);
 }
 
-/** Read only the allowed body bytes; never allocate the full incoming upload. */
+/** 巨大なアップロードをすべてメモリへ置かないよう、許可したバイト数だけを読む。 */
 export async function readBoundedBytes(request: Pick<Request, 'headers' | 'body'>, maxBytes: number): Promise<Uint8Array | null> {
   const declared = Number(request.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) return null;
@@ -120,7 +120,7 @@ export async function readBoundedBytes(request: Pick<Request, 'headers' | 'body'
 
 export type InputKind = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
 
-/** Bound binary and JSON/base64 uploads before parsing or decoding. */
+/** 解析・復号より前に、バイナリと JSON/base64 のサイズを制限する。 */
 export function boundedUploadBody(maxBinaryBytes: number): MiddlewareHandler {
   return async (c, next) => {
     const json = /^application\/json(?:\s*;|$)/i.test(c.req.header('content-type') ?? '');

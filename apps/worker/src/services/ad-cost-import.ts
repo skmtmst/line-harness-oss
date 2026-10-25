@@ -1,7 +1,7 @@
 import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
- * 広告費の毎日取り込み (#818)。
+ * 広告費の毎日取り込み。
  *
  * 外部連携(ad_platforms)に暗号化して保管した秘密を復号し、媒体の
  * レポートAPIから「その日に使った費用」を取って ad_cost_entries へ

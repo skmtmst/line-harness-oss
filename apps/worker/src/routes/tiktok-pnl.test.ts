@@ -1,7 +1,7 @@
 /**
  * TikTok利益計算API：Google連携の「接続済み」判定の回帰テスト。
  *
- * 利益計算は自分でスプレッドシートを作るので、#838 の書き出し先
+ * 利益計算は自分でスプレッドシートを作るので、 の書き出し先
  * （google_sheets_integrations.spreadsheet_id）を使わない。
  * それなのに書き出し先が未選択の `pending_target` を未接続として扱うと、
  * Googleの認可を済ませた利用者の画面に「未接続」と出て、同期ボタンも
@@ -55,7 +55,7 @@ describe('TikTok利益計算：Google連携の接続済み判定', () => {
   });
 
   it('書き出し先が未選択（pending_target）でも接続済みとして扱う', async () => {
-    // Googleの認可は済んでいて更新用トークンもある。#838 の書き出し先を
+    // Googleの認可は済んでいて更新用トークンもある。 の書き出し先を
     // 選んでいないだけ。利益計算はその書き出し先を使わないので動かせる。
     seedIntegration(testDb, 'pending_target');
 

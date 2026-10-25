@@ -31,7 +31,7 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
 
 /*
  * PATCH /api/friend-add-rules/reorder — 一覧のつまみで動かした順を
- * 優先順位としてまとめて書く（★V8 ）。
+ * 優先順位としてまとめて書く（★V8）。
  *
  * priority は版ではなく行の値で、実行側がそのまま読むため下書きを経ず
  * すぐ効く。受け皿（経路が分からなかった人）は常に最後なので対象外。

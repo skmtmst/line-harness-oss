@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isHttpsUrl } from './event.js';
 
 /**
- * #607：会場URL・画像URLは安全な https だけ表示する。
+ * 会場URL・画像URLは安全な https だけ表示する。
  * 空・http・javascript:・不正文字列はリンク化も画像表示もしない。
  */
 describe('isHttpsUrl', () => {

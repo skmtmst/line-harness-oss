@@ -222,7 +222,7 @@ export async function createAutoReplyWithDraftVersion(
 /**
  * 公開中の定義は触らず、編集用の版だけを作る／更新する。
  *
- * m26c R551: 下書きの更新は版を1つ進め、呼び出し元が読んだ版番号を
+ * 下書きの更新は版を1つ進め、呼び出し元が読んだ版番号を
  * 更新条件に含める。同じ版からの後続保存は 1 件しか通らず、負けた側は
  * AUTO_REPLY_VERSION_CONFLICT になる（先行内容は保たれる）。
  * expectedVersion を渡さない旧来の呼び出しは、従来どおり条件なしで

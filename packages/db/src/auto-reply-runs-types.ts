@@ -95,7 +95,7 @@ export interface AutoReplyEvaluationRow {
 }
 
 /**
- * m26c R556/R570: 作成・複製の要求キー台帳（migration 543）。
+ * 作成・複製の要求キー台帳（migration 543）。
  * 直接作成（'rule'）と下書き付き作成（'draft'）を同じ表で受け、同じ
  * Idempotency-Key の再送は保存済みを返し、異なる内容・別操作の使い回しは
  * 作らず止める。共通ルールの所属は NULL でも重複を防げるよう、

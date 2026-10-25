@@ -6,7 +6,7 @@ import { getMediaDeleteImpactSnapshot, getMediaReplacementPlan } from '@line-crm
 import { scanSingleMediaUsage, scanMediaUsage } from '../features/media/media-usage-scan.js';
 import { images } from './images.js';
 import { hqTemplates } from './hq-templates.js';
-// The real pure Web authoring functions feed the real HTTP + SQLite executor.
+// Web の実際の純粋な編集関数で作った入力を、実 HTTP と SQLite の実行へ通す。
 const webAuthoringPath = new URL('../../../web/src/lib/hq-template-authoring.ts', import.meta.url).href;
 const { freshDefinition } = await import(/* @vite-ignore */ webAuthoringPath);
 

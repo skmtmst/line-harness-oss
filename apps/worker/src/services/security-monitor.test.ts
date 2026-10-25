@@ -49,7 +49,7 @@ describe('security detection using actual audit SQL and durable alerts', () => {
     expect(JSON.stringify(alerts())).not.toContain('private');
     await runSecurityMonitor(env(), new Date(NOW.getTime() + 10 * 60000), fetcher);
     expect(fetcher).toHaveBeenCalledTimes(1);
-    // Quiet periods do not close the incident automatically.
+    // 静かな期間だけで警告を自動解決しない。
     await runSecurityMonitor(env(), new Date(NOW.getTime() + 60 * 60000), fetcher);
     expect(alerts()[0].status).toBe('open');
   });

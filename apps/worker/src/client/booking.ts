@@ -2,15 +2,7 @@ import { escapeHtml } from '../lib/html-escape.js';
 import { responseLiffError } from '../../../liff/src/lib/api-error.js';
 import { createClientLogger } from '@line-crm/shared';
 import { jstCalendar, jstDate, jstTime } from '@line-crm/shared';
-/**
- * LIFF Booking Page — Calendar-based slot booking
- *
- * Flow:
- * 1. Show calendar date picker (current month)
- * 2. Tap date → fetch available slots from API
- * 3. Tap slot → show confirm section
- * 4. Submit booking → show confirmation
- */
+
 
 import { customerMessage } from './customer-message.js';
 const clientLogger = createClientLogger('embedded');
@@ -129,7 +121,7 @@ function renderCalendar(): string {
       <div class="cal-days">
   `;
 
-  // Empty cells before first day
+
   for (let i = 0; i < firstDay; i++) {
     html += '<span class="cal-day empty"></span>';
   }
@@ -309,7 +301,7 @@ function renderError(message: string): void {
 function attachEvents(): void {
   const app = getApp();
 
-  // Month navigation
+
   app.querySelectorAll('.cal-nav').forEach((btn) => {
     btn.addEventListener('click', () => {
       const action = (btn as HTMLElement).dataset.action;
@@ -333,7 +325,7 @@ function attachEvents(): void {
     });
   });
 
-  // Date selection
+
   app.querySelectorAll('.cal-day.active').forEach((el) => {
     el.addEventListener('click', () => {
       const date = (el as HTMLElement).dataset.date;
@@ -348,14 +340,14 @@ function attachEvents(): void {
     });
   });
 
-  // Slot selection
+
   app.querySelectorAll('.slot-btn.available').forEach((btn) => {
     btn.addEventListener('click', () => {
       const startAt = (btn as HTMLElement).dataset.start!;
       const endAt = (btn as HTMLElement).dataset.end!;
       state.selectedSlot = { startAt, endAt, available: true };
       render();
-      // Scroll to confirm
+
       setTimeout(() => {
         const confirmEl = getApp().querySelector('.confirm-section');
         confirmEl?.scrollIntoView({ behavior: 'smooth' });
@@ -363,7 +355,7 @@ function attachEvents(): void {
     });
   });
 
-  // Confirm booking
+
   const confirmBtn = app.querySelector('[data-action="confirm-booking"]');
   confirmBtn?.addEventListener('click', () => submitBooking());
   app.querySelector('[data-action="retry-slots"]')?.addEventListener('click', () => {
@@ -439,7 +431,7 @@ export async function initBooking(): Promise<void> {
   const profile = await liff.getProfile();
   state.profile = profile;
 
-  // Try to get friendId from UUID linking
+
   const UUID_STORAGE_KEY = 'lh_uuid';
   try {
     state.friendId = localStorage.getItem(UUID_STORAGE_KEY);
@@ -447,7 +439,7 @@ export async function initBooking(): Promise<void> {
     // silent
   }
 
-  // Silent UUID linking (same as main flow)
+
   const rawIdToken = liff.getIDToken();
   if (rawIdToken) {
     const existingUuid = state.friendId;

@@ -15,7 +15,7 @@ export async function getConversionDefinitionDeleteImpact(
     .bind(id).first<{ total: number }>();
   const account = accountWhere('cp.', scope, undefined);
   /*
-   * N-261: 差替え候補は同じ種類の成果地点だけを出す。
+   * 差替え候補は同じ種類の成果地点だけを出す。
    * 起点の種類・計測方法・対象URLが違う地点へ利用先を移すと、
    * 利用先が見ているものと別の意味の成果を数え始める。
    * 候補一覧が本実行と同じ条件で絞られていれば、画面で違う種類を

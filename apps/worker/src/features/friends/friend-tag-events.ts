@@ -2,7 +2,7 @@ import { fireEvent } from '../../services/event-bus.js';
 import { jstNow } from '@line-crm/db';
 
 
-/** Carry a stable change identity across every producer, including workflow replay. */
+/** 処理の再実行を含むすべての送信元で、同じ変更の識別子を引き継ぐ。 */
 export async function emitTagChange(db: D1Database, friendId: string, tagId: string, action: 'add'|'remove', sourceId: string): Promise<void> {
   const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id=?').bind(friendId).first<{line_account_id:string|null}>();
   await fireEvent(db, 'tag_change', {

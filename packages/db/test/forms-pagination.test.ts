@@ -66,7 +66,7 @@ describe('getFormSubmissionsPage', () => {
   });
 
   /*
-   * #722: 天井は残す。呼び出し側が渡し忘れても、渡しすぎても、
+   * 天井は残す。呼び出し側が渡し忘れても、渡しすぎても、
    * DB ヘルパを直接呼んだ一覧が無制限にならないこと。
    */
   it('falls back to MAX_LIST_LIMIT when no limit is given, and clamps a larger one', async () => {

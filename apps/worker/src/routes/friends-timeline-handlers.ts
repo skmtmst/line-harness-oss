@@ -21,14 +21,14 @@ export const get__api_friends_id_timeline_1 = async (c: Context<Env, "/api/frien
       }
       const friendId = c.req.param('id');
       /*
-        N-717: compound SELECTはD1の SQLITE_MAX_COMPOUND_SELECT(既定5)を超えて
+        compound SELECTはD1の SQLITE_MAX_COMPOUND_SELECT(既定5)を超えて
         "too many terms in compound SELECT" になる（better-sqlite3の既定上限は
         500なので手元試験は通ってしまい、D1でだけ落ちる）。
         4項ずつのCTEへ割り、外側でUNION ALLへまとめて5項以下に収める形を保つ。
-        IDEA-03 で注文・写真投稿を足したので、専用ソース10項を
+         で注文・写真投稿を足したので、専用ソース10項を
         group_a(4) + group_b(4) + group_c(2) の3CTEへ分け、外側は3項。
 
-        重複の扱い（IDEA-03「重複なし」）:
+        重複の扱い（「重複なし」）:
         analytics_events は事実の分析用の写しで、同じ出来事が専用台帳にも
         1行ある（受信メッセージ→messages_log、フォーム回答→form_submissions、
         予約の確定/取消→各予約台帳、注文→ec_orders、postback→messages_log）。
@@ -192,7 +192,7 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
     }
 
     const messageType = body.messageType ?? 'text';
-    // アカウントは予約の範囲キーにも使うので先に解く（N-028/N-029）。
+    // アカウントは予約の範囲キーにも使うので先に解く。
     const friendAccountId =
       ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
 
@@ -275,7 +275,7 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
     let lineClient: InstanceType<typeof LineClient>;
     let tracked: { messageType: string; content: string };
     try {
-      // Resolve access token from friend's account (multi-account support)
+      // 別アカウントから送らないよう、友だちの所属からアクセストークンを解決する。
       let accountToken: string | null = null;
       if (friendAccountId) {
         const { getLineAccountById } = await import('@line-crm/db');
@@ -290,8 +290,7 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
       });
       lineClient = new LineClient(accessToken);
 
-      // Auto-wrap URLs with tracking links (text with URLs → Flex with button)
-      // trackLinks=false で明示的に短縮 OFF (URL をそのまま送る)
+      // URL を計測リンクへ変換する。ただし trackLinks=false の場合は元の URL のまま送る。
       const sendWorkerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
       tracked = { messageType, content: resolvedContent };
       if (body.trackLinks !== false) {
@@ -354,7 +353,7 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
       }, failure.httpStatus, []);
     }
 
-    // Log outgoing message
+
     const logId = idempotencyKey;
     const sentAt = jstNow();
     try {

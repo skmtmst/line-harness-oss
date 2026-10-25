@@ -13,8 +13,8 @@ import { type FriendReminderRow, type ReminderStepRow } from './types.js';
  * 日本時間の暦の計算が要り、そのための部品は packages/shared にある。
  * db パッケージは shared に依存していないので、絞り込みは呼び出し側で行う。
  *
- * 以前はここで `target_date + offset_minutes` を計算していたが、方式が
- * 2つになった時点で、この場所では決められなくなった。
+ * 送る時刻の方式が2つあるため、この場所では
+ * `target_date + offset_minutes` を決められない。
  */
 export async function getPendingReminderDeliveries(
   db: D1Database,
@@ -91,7 +91,7 @@ export async function markReminderStepDelivered(db: D1Database, friendReminderId
 /**
  * 全ステップ配信済みならcompletedにする。
  *
- * R337: 完了の判定は「今の通知予定が全部済んだ時だけ」。日時変更で古い
+ * 完了の判定は「今の通知予定が全部済んだ時だけ」。日時変更で古い
  * 実行行が cancelled になり新しい queued 行が積まれた状態では、旧行を
  * 完了数に含めない。未送信の将来予定 (queued/retry_wait/claimed) が
  * 1通でもあれば active を保持する。
@@ -143,13 +143,13 @@ export async function completeReminderIfDone(db: D1Database, friendReminderId: s
 // =============================================================================
 
 /**
- * R344: LINE 再試行キーの有効期限 (24時間。公式仕様による)。
+ * LINE 再試行キーの有効期限 (24時間。公式仕様による)。
  * 最初の外部要求からこの時間を過ぎた結果不明の通知は、自動で再送しない。
  */
 export const LINE_RETRY_KEY_VALIDITY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * R344: 有効期限を過ぎた結果不明の通知を自動送信から外す。
+ * 有効期限を過ぎた結果不明の通知を自動送信から外す。
  *
  * 受理ずみか未送信か分からないまま 24 時間を超えた retry_wait 行は、
  * 再試行予定を止めて要確認として残す (last_error に理由を残し、一覧に
@@ -183,7 +183,7 @@ export async function holdExpiredLineRetryRuns(
 
 /**
  * 送信直前の照合で使う登録の現在値。候補読込後の日時変更・ルール停止を
- * 実行行作成・claim・送信の各境界で見直す (R339)。
+ * 実行行作成・claim・送信の各境界で見直す。
  */
 export async function getFriendReminderSendGate(
   db: D1Database,
@@ -195,7 +195,7 @@ export async function getFriendReminderSendGate(
 }
 
 /**
- * R338: 予約に紐づく登録は、予約の通知方針が両方 OFF なら送らない。
+ * 予約に紐づく登録は、予約の通知方針が両方 OFF なら送らない。
  *
  * 予約変更 PATCH が方針を OFF にしても、送信権取得ずみの登録は active の
  * まま残る。最終送信の claim・検証で現在の方針を読み直し、止める。
@@ -214,7 +214,7 @@ export function bookingPolicyGateSql(): string {
 }
 
 /**
- * R339: 候補読込後にルールが止まっても古い候補のまま送らない。
+ * 候補読込後にルールが止まっても古い候補のまま送らない。
  * 一覧の読込条件 (getPendingReminderDeliveries) と同じ述語。
  */
 export function activeRuleGateSql(): string {
@@ -225,7 +225,7 @@ export function activeRuleGateSql(): string {
 }
 
 /**
- * R340: 持ち主付きの貸出述語。lease_expires_at を貸出ごとの識別子として
+ * 持ち主付きの貸出述語。lease_expires_at を貸出ごとの識別子として
  * 使い、検証・完了・失敗・解放は自分が今の持ち主のときだけ通す。
  * 期限切れの古い処理の書込は 0 件になり、新しい処理を上書きしない。
  */

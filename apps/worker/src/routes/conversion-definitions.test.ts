@@ -161,7 +161,7 @@ describe('conversion definition routes', () => {
 
   it('日付・状態・cursorの入力不良を400で拒否する', async () => {
     expect((await app().request('/api/conversions/definitions?from=2026-09-07&to=2026-09-01')).status).toBe(400);
-    // N-268: draft は有効な状態になった。無効な値だけを弾く。
+    // draft は有効な状態になった。無効な値だけを弾く。
     expect((await app().request('/api/conversions/definitions?status=paused')).status).toBe(400);
     expect((await app().request('/api/conversions/definitions?cursor=-1')).status).toBe(400);
     expect(dbMocks.listConversionDefinitions).not.toHaveBeenCalled();
@@ -244,7 +244,7 @@ describe('conversion definition routes', () => {
     expect(report.status).toBe(200);
     expect(await report.json()).toMatchObject({ success: true, data: { kpis: { netCount: 0 }, daily: [] } });
 
-    // N-269: 旧日付クエリも同じ集計(getConversionDefinitionReport)から形だけ写す。
+    // 旧日付クエリも同じ集計(getConversionDefinitionReport)から形だけ写す。
     dbMocks.getConversionDefinitionReport.mockResolvedValueOnce({ byDefinition: [] });
     const legacy = await app('staff').request('/api/conversions/report?startDate=2026-09-01&endDate=2026-09-07');
     expect(legacy.status).toBe(200);

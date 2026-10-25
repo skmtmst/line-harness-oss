@@ -69,7 +69,7 @@ export const post__api_conversions_definitions_2 = async (c: Context<Env, "/api/
       folderId: body.folderId,
       usages: usages.filter((usage): usage is NonNullable<typeof usage> => usage !== null),
       staffId: c.get('staff')!.id,
-      // N-268: 下書きで保存すると公開まで計測しない。
+      // 下書きで保存すると公開まで計測しない。
       draft: body.draft === true,
     });
     auditLog(c, 'conversion.definition.create', { kind: 'conversion_definition', id: data!.id });
@@ -96,7 +96,7 @@ export const post__api_conversions_definitions_preview_3 = async (c: Context<Env
       scope: scope.value,
       lineAccountId: definition.lineAccountId,
       sourceType: definition.sourceType,
-      // N-257: 保存と同じ一式を渡し、URL・窓・取消条件も試算へ反映する。
+      // 保存と同じ一式を渡し、URL・窓・取消条件も試算へ反映する。
       sourceConfig: definition.sourceConfig,
       measureMethod: definition.measureMethod,
       targetUrl: definition.targetUrl,
@@ -232,7 +232,7 @@ export const delete__api_conversions_definitions_id_9 = async (c: Context<Env, "
     const body = await c.req.json<Record<string, unknown>>().catch(() => null);
     /*
      * 版は本文が正本。代理やプロキシで本文が落ちたときだけクエリを見る
-     * (#513 L11)。どちらも無ければ案内文で400にする。
+     * 。どちらも無ければ案内文で400にする。
      */
     const expectedVersion = positiveVersion(body?.expectedVersion)
       ?? positiveVersion(c.req.query('expectedVersion'));
@@ -480,7 +480,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
     }
     const payloadShape = maskedPayloadShape(payload);
     /*
-     * IDEA-19: 検証の受信か。
+     * 検証の受信か。
      *
      * 本文に `"test": true` が付いた受信は、署名・イベントID・友だちの
      * 解決まで本番と同じ検査を通す。違いは書き込みだけ——成果表には

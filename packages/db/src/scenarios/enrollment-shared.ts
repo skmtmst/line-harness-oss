@@ -51,7 +51,7 @@ export async function completeFriendScenario(
     .run();
 }
 
-/** 購読1件を ID で読む。友だち単位の操作（#949 N-054）の入口。 */
+/** 購読1件を ID で読む。友だち単位の操作の入口。 */
 export async function getFriendScenarioById(
   db: D1Database,
   id: string,

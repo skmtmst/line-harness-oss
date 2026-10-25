@@ -64,7 +64,7 @@ messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), i
       return inputError(c, { success: false, error: 'messageType must be text or flex' }, 400, ["messageType"]);
     }
 
-    // Validate flex JSON
+
     if (body.messageType === 'flex') {
       try {
         JSON.parse(body.messageContent);
@@ -97,7 +97,7 @@ messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin')
       return inputError(c, { success: false, error: 'messageType must be text or flex' }, 400, ["messageType"]);
     }
 
-    // Resolve effective type and content for validation
+
     const existing = await getMessageTemplateById(c.env.DB, c.req.param('id'));
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const effectiveType = body.messageType ?? existing.message_type;
@@ -123,7 +123,7 @@ messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin')
   }
 });
 
-// DELETE /api/message-templates/:id — delete
+
 messageTemplates.delete('/api/message-templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const deleted = await deleteMessageTemplate(c.env.DB, c.req.param('id'));

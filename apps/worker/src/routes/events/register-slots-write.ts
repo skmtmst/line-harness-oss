@@ -88,7 +88,7 @@ events.post(
     const accountId = getAccountId(c);
     if (!accountId) return bad(c, 'account_id_required', 400, []);
     const rawBody = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    // U: 手動の繰り上げは理由が必須（順番の変更・飛ばしと同じ決めごと）。
+    // 手動の繰り上げは理由が必須（順番の変更・飛ばしと同じ決めごと）。
     const reason = waitlistReason(rawBody);
     if (!reason) return bad(c, 'waitlist_reason_required', 422, []);
     const expectedVersion = rawBody.expectedVersion ?? rawBody.expected_version;
@@ -153,7 +153,7 @@ events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'),
   }
 
   /*
-    #1000 DETAIL-11: client_key 付きの枠は、同じイベント内の既存キーを
+     client_key 付きの枠は、同じイベント内の既存キーを
     持つ枠をそのまま返し、再送による二重登録を吸収する。日時の一意制約は
     正当な同時開催を壊すので使わない。応答喪失(作成済みだが結果が届かない)
     への再送も同じ仕組みで安全になる。
@@ -272,7 +272,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     expected_version?: unknown;
     expectedVersion?: unknown;
   };
-  // m26g R577: 枠の並行編集・有効切替の競合検出（-29 §13「変更系は
+  // m26g : 枠の並行編集・有効切替の競合検出（-29 §13「変更系は
   // 期待版を必須にし、版競合は 409 で最新内容と差分を返す」）。
   // 版なしの更新は受けず、古い版は 409 + 最新の枠を返す。画面は
   // 読み直して差分を見せる。イベント本体 PUT と同じ決め。
@@ -286,7 +286,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     // こちらは速やかな失敗のための事前確認。
     return c.json({ error: 'version_conflict', data: { current: slot } }, 409);
   }
-  // when only one of starts_at / ends_at is provided, range check uses existing values
+  // 開始か終了だけの更新でも、未指定側の保存値と合わせて範囲を検証する。
   const merged: SlotInput = {
     starts_at: body.starts_at ?? (slot.starts_at as string),
     ends_at: body.ends_at ?? (slot.ends_at as string),
@@ -317,13 +317,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
   if (setClauses.length === 0) {
     return c.json(slot);
   }
-  // If the slot time moved, reminders for the slot's confirmed bookings are
-  // now stale (they still point at the old starts_at).
-  // N-065: の未来予定だけを先に新基準日へ移す (枠更新より前)。
-  // 枠を先に更新すると、の途中失敗後の再送で旧起点が分からなくなり、
-  // 移行前の行が旧日のまま残る。を先にすると失敗時は枠が untouched の
-  // まま 500 になるため、同じリクエストの再送がそのまま回復になる。
-  // 送信済みは残し、現在の枠時刻へ直すため再送は冪等。
+  // 枠を先に更新すると再送で元の起点を失うため、未送信の未来予定を新しい日時へ移してから枠を更新する。送信済みは残し、途中失敗後も同じ要求で回復できるよう冪等にする。
   const slotStartsAtChanging = Object.prototype.hasOwnProperty.call(body, 'starts_at');
   if (slotStartsAtChanging) {
     const oldStartsAt = slot.starts_at as string;

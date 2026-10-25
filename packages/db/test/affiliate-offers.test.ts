@@ -528,7 +528,7 @@ describe('mileage foundation', () => {
       lifetimeEarned: 750,
     });
     expect(await getMileageHistoryForFriend(db, 'friend-aff')).toHaveLength(1);
-    // 直接付与の台帳イベント + ルール適用キュー用の正規化イベント（N-238）の2行。
+    // 直接付与の台帳イベント + ルール適用キュー用の正規化イベントの2行。
     // 同じ承認を再送しても、どちらも冪等キーで増えない。
     expect(
       (sqlite.prepare(`SELECT COUNT(*) AS count FROM engagement_events`).get() as { count: number }).count,
@@ -547,7 +547,7 @@ describe('mileage foundation', () => {
     expect(history.map((item) => item.amount).sort((a, b) => a - b)).toEqual([-750, 750]);
   });
 
-  // N-238: 承認された紹介成果は「たまる決めごと」のきっかけとして選べる。
+  // 承認された紹介成果は「たまる決めごと」のきっかけとして選べる。
   // キューへ乗ったイベントが、対応するルールへ実際に届くことを確かめる。
   test('an approved conversion is queued so an affiliate_conversion_approved rule can grant', async () => {
     sqlite

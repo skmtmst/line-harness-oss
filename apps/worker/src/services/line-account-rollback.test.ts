@@ -4,7 +4,7 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { detectFollowerImportCapability } from './follower-import.js';
 
 /**
- * R564: LINE接続途中の能力判定失敗で、削除済みアカウントの設定行が残る。
+ * LINE接続途中の能力判定失敗で、削除済みアカウントの設定行が残る。
  * 合格条件: 能力判定失敗を繰り返しても未確定アカウントとその設定行が残らない。
  */
 describe('R564: 接続中断時の巻き戻しは設定行を残さない', () => {

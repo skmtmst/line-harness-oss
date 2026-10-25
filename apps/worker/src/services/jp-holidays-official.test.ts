@@ -1,11 +1,7 @@
 /**
- * 監査 R253：祝日表が2026年までで、2027年元日の応答条件を誤判定する。
- *
- * 計算で出す祝日（`jp-holidays.ts`・祝日法の規則を再現）が、内閣府の
- * 公開表と一致することを守る。照合の正本は2つ：
- * - 2024〜2026年：共有の祝日表（内閣府CSVの写し）との全日一致
- * - 2027年：内閣府「国民の祝日について」掲載の令和9年17日
- *   （2026-09-28取得。出典 https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html）
+ * 祝日法の規則から計算した日付が、内閣府の公開表と一致することを確かめる。
+ * 2024〜2026年は共有の CSV 写しの全日、2027年は令和9年の17日を使う。
+ * 出典: https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html （2026-09-28取得）
  */
 import { describe, expect, it } from 'vitest';
 import { isJapaneseHoliday } from '@line-crm/shared';

@@ -1,4 +1,4 @@
-// N-327 (#663): 公開ルールの自動発火・冪等・回復・版固定・境界の契約試験。
+//  公開ルールの自動発火・冪等・回復・版固定・境界の契約試験。
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createNotificationRule,
@@ -502,7 +502,7 @@ describe('運用者通知の送る条件',()=>{
       await dispatchOperatorEvent(t.db,env,{...input,sourceEventId:'e3'});
       const result=await sweepOperatorNotifications(t.db,env,{now:new Date(Date.now()+120_000)});
       expect(result.accepted).toBeGreaterThan(0);expect(pushMessageWithRequestId).toHaveBeenCalledTimes(2);
-      // A grouped source must remain deduplicated after the first batch has closed.
+      // まとめた元イベントは、最初のバッチ完了後も重複登録しない。
       t.raw.prepare("UPDATE notification_instances SET created_at='2000-01-01T00:00:00.000Z'").run();
       await dispatchOperatorEvent(t.db,env,{...input,sourceEventId:'e2'});
       expect(t.raw.prepare('SELECT COUNT(*) count FROM notification_instances').get()).toEqual({count:1});

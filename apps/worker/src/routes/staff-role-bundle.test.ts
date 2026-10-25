@@ -12,13 +12,7 @@ vi.mock('../services/staff-invite.js', () => mail)
 
 const { staff } = await import('./staff.js')
 
-/*
- * N-424 (#852): 役割bundle（管理者/運用/受付/見るだけ/個別設定）を
- * role とは別に保存し、bundle は「初期値」として preset のキーへ展開する。
- *
- * 直す前: 画面で「受付」を選んでも role='staff' へ潰れ、運用と区別できず、
- * 「見えるだけ」の3択も保存できなかった。
- */
+/** 役割 bundle は role と別に保存して初期の権限キーへ展開し、受付や閲覧だけの設定を区別できることを確かめる。 */
 
 const NOW = '2026-09-08T01:00:00.000Z'
 const LATER = '2026-09-09T01:00:00.000Z'

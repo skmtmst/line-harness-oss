@@ -1,4 +1,4 @@
-// Public operations. Internal modules import their dependencies directly.
+// 内部から自分の公開入口を読み戻さず、実装の依存先を直接読む。
 export { AutomationActionError, AutomationRunCancelError, AutomationRunRetryError, COMMON_ACTION_MAX_BRANCH_DEPTH, COMMON_ACTION_MAX_DEPTH, COMMON_ACTION_MAX_STEPS, cancelAutomationRun, processDueAutomationRuns, retryAutomationRun } from './automation-engine.js';
 export type { ActionDefinition, AutomationActionContext, AutomationActionExecutor } from './automation-engine.js';
 export { createAutomationActionExecutors } from './automation-action-executors.js';

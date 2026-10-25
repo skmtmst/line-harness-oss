@@ -27,7 +27,7 @@ const AUDIT_SORTS = ['asc', 'desc'] as const;
 
 function hasPermission(c: Context<Env>, permission: string): boolean {
   const staff = c.get('staff');
-  // N-424: 「見えるだけ」のキーは GET 系だけを許可する。
+  // 「見えるだけ」のキーは GET 系だけを許可する。
   const safeRead = c.req.method === 'GET' || c.req.method === 'HEAD';
   return staff.role === 'owner' || staff.role === 'admin'
     || staff.permissionKeys?.includes(permission) === true
@@ -91,7 +91,7 @@ access.get(
     const accessScope = await visibleScope(c);
     if (accessScope instanceof Response) return accessScope;
     try {
-      // N-424: 保存されたメール見せ方(email_mask)が正本。
+      // 保存されたメール見せ方(email_mask)が正本。
       // 未設定の人だけ従来の access.user.email.view 判定へ落とす。
       const viewer = c.get('staff');
       const emailLevel = viewer.emailMask === 'full' || viewer.emailMask === 'masked' || viewer.emailMask === 'none'

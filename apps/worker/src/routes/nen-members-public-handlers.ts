@@ -328,7 +328,7 @@ export const post__api_liff_nen_pets_id_photo_6 = async (c: Context<Env, "/api/l
   const bytes = decodeJpegData(body?.data);
   if (!bytes) return inputError(c, { success: false, error: 'ペット写真を確認してください' }, 400, ["data"]);
   const key = `nen-pet-profiles/${friend.id}/${pet.id}-${crypto.randomUUID()}.jpg`;
-  // 公開配信される画像なので、撮影場所などの付帯メタデータは外して保存する（#931 N-310）。
+  // 公開配信される画像なので、撮影場所などの付帯メタデータは外して保存する。
   await c.env.IMAGES.put(key, stripImageMetadata(bytes, 'image/jpeg'), { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { friendId: friend.id, petId: pet.id } });
   const imageUrl = `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${key}`;
   await c.env.DB.prepare(`UPDATE nen_pet_profiles SET image_r2_key=?, image_url=?, updated_at=? WHERE id=? AND friend_id=?`)
@@ -461,7 +461,7 @@ export const post__api_liff_nen_photos_10 = async (c: Context<Env, "/api/liff/ne
     return inputError(c, { success: false, error: '画像の内容と形式が一致しません' }, 400, ["mimeType"]);
   }
   /*
-   * 実寸法をヘッダから測る（#931 N-310）。申告の mimeType と実体の一致までは
+   * 実寸法をヘッダから測る。申告の mimeType と実体の一致までは
    * 見ているが、寸法までは見ていなかった。読み取れない壊れた画像と、
    * 展開時に過大になる巨大寸法は投稿経路で止める。
    */
@@ -474,7 +474,7 @@ export const post__api_liff_nen_photos_10 = async (c: Context<Env, "/api/liff/ne
   }
   const id = crypto.randomUUID();
   /*
-   * 重複判定のため、中身の hash を付ける (#817)。
+   * 重複判定のため、中身の hash を付ける。
    * 完全に同じ写真だけを「重複」とし、似ている写真は自動で却下しない。
    */
   const hashDigest = await crypto.subtle.digest('SHA-256', bytes);
@@ -486,7 +486,7 @@ export const post__api_liff_nen_photos_10 = async (c: Context<Env, "/api/liff/ne
   const reviewKey = `nen-photo-review/${friend.id}/${id}-v1.${extension}`;
   const metadata = { friendId: friend.id, petId: body.petId || '', photoId: id };
   /*
-   * 公開配信される審査用画像は付帯メタデータを外して保存する（#931 N-310）。
+   * 公開配信される審査用画像は付帯メタデータを外して保存する。
    * 撮影場所・端末情報が /images/* から誰でも取れる状態を止める。
    * 原本は二段階認証つきの取得だけに限る証跡として、そのまま残す。
    */

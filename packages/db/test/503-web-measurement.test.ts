@@ -21,7 +21,7 @@ import {
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * #819: Web計測の公開口。サイトごとの公開ID・許可ドメイン・
+ * Web計測の公開口。サイトごとの公開ID・許可ドメイン・
  * 許可外の拒否集計・匿名の日次集計・成果の取消台帳を確かめる。
  */
 
@@ -49,7 +49,7 @@ function setup(): Database.Database {
       VALUES ('ev-1', 'point-1', 'friend-1', 1000, '2026-09-02 10:00:00'),
              ('ev-2', 'point-1', 'friend-2', 2000, '2026-09-02 11:00:00');
   `);
-  // R275の465は表の作成(503)より前の番号。新しいDBではこの順で流れるため、
+  // migration 465 は表の作成(503)より前の番号。新しいDBではこの順で流れるため、
   // ここでも同じ順で当てて「表が無くても止まらない」ことを固定する。
   for (const file of ['465_inflow_stop_cancel.sql', '503_measurement_sites.sql', '504_conversion_reversal_ledger.sql']) {
     sqlite.exec(

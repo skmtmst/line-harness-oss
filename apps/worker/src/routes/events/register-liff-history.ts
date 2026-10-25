@@ -11,10 +11,7 @@ import { resolveAccountIdFromLiff } from './input.js';
 import { eventWaitlistCaller } from './liff-input.js';
 
 export function registerLiffHistory(events: Hono<Env>): void {
-// ============================================================
-// LIFF: my bookings (history) + self-cancel
-// MUST be registered before /:id paths so "me" is not consumed as :id.
-// ============================================================
+// me が動的 ID と解釈されないよう、本人の履歴と取消を /:id より先に登録する。
 
 events.get('/api/liff/events/me', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
@@ -228,7 +225,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
     .bind(nowIso, nowIso, row.id,row.lock_version)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return liffBookingResponse(c, bad(c, 'invalid_state', 409));
-  // N-065: の未送信予定だけを止める。送信済み履歴は残す。
+  // の未送信予定だけを止める。送信済み履歴は残す。
   // 旧表の取消は fence 成功の後に回す (409 では旧表も含めて完全 rollback)。
   // 送信権の貸出中は状態更新を巻き戻して 409 にする
   // (取消確定後の送信を起こさない)。

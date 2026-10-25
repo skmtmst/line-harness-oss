@@ -77,7 +77,7 @@ export async function seatSchedule(db:D1Database,account:string,query:Record<str
             ))
         )
           closedDates.push(day.date);
-        // Opening hours are not availability: every displayed candidate must pass the existing seat check.
+        // 営業時間だけで空きと扱わず、表示する各候補を既存の席数検査へ通す。
         const seen = new Set<number>();
         for (const period of periods) {
           const minute = (t: string) =>

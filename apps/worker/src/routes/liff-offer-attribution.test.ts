@@ -1,15 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ASP Phase 2 — offer tag/scenario auto-apply on affiliate-link friend add.
-//
-// Drives POST /api/liff/link (already-linked branch) so applyRefAttribution
-// runs against a mocked @line-crm/db. The scenario-push branch requires heavy
-// dynamic imports, so these cases exercise the tag path only (scenario_id
-// NULL): the source-resolution precedence (entry_route > tracked_link > offer)
-// is what Task 2 changes, and tag application is a faithful, deterministic
-// witness of which source won.
+// 既存友だちの LIFF 入口で、経路・計測リンク・案件の優先順をタグ付与の結果から確かめる。重いシナリオ配信は別の試験へ分け、ここでは DB を差し替える。
 const dbMocks = {
-  // eager module-load deps (mirror affiliate-links-redirect.test.ts)
+
   getLineAccounts: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000' },
   ]),
@@ -33,22 +26,18 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-// Notifier is mocked so we can assert the friend-add push is NOT fired on the
-// existing-friend re-touch path (/api/liff/link never sets isNewFriend).
+// 既存友だちの再訪で参加者へ通知しないことを確かめるため、通知だけを差し替える。
 const notifyAffiliateFriendAdd = vi.fn().mockResolvedValue(undefined);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateFriendAdd }));
 
-// Ref-attribution tag attach now goes through the guarded helper (fires
-// tag_added side effects only on first-time attach) — assert on this mock.
+// 新規付与時だけ副作用が動く共通関数へ接続されることを確かめる。
 const attachTagAndFireSideEffects = vi.fn().mockResolvedValue({ added: true });
 vi.mock('../features/friends/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects }));
 
-// Import after the mock so index.ts binds the mocked helpers.
+// 差替済みのヘルパを入口へ接続するため、モック登録後に読み込む。
 const worker = (await import('../index.js')).default;
 
-// A stub DB: the already-linked branch of /api/liff/link only touches
-// @line-crm/db helpers (all mocked) plus a couple of trivial UPDATE statements,
-// so back the binding with a no-op prepared-statement chain.
+// DB ヘルパと単純な UPDATE だけを使うため、prepared statement の空の実装で依存を満たす。
 const DB = {
   prepare: () => ({
     bind: () => ({
@@ -68,7 +57,7 @@ const env = {
   LINE_LOGIN_CHANNEL_ID: LOGIN_CHANNEL_ID,
 } as unknown as import('../index.js').Env['Bindings'];
 
-// idToken verify mock: any non-empty token resolves to a fixed LINE userId.
+// 検証応答では、空でない ID トークンを固定の LINE 利用者へ対応させる。
 function installVerifyMock() {
   vi.stubGlobal(
     'fetch',
@@ -103,8 +92,7 @@ describe('POST /api/liff/link — offer tag/scenario on affiliate-link friend ad
   );
     vi.clearAllMocks();
     installVerifyMock();
-    // Already-linked friend: user_id set so applyRefAttribution runs without
-    // needing user-creation plumbing.
+    // 本人作成を分離して帰属を試すため、user_id を持つ連携済み友だちを使う。
     dbMocks.getFriendByLineUserId.mockResolvedValue({
       id: 'F-1',
       line_account_id: null,
@@ -154,7 +142,7 @@ describe('POST /api/liff/link — offer tag/scenario on affiliate-link friend ad
     const res = await link('aff-generic');
     expect(res.status).toBe(200);
 
-    // No offer lookup, no tag application — current behavior unchanged.
+    // 案件を参照しない場合、タグも適用しない。
     expect(dbMocks.getAffiliateOfferById).not.toHaveBeenCalled();
     expect(attachTagAndFireSideEffects).not.toHaveBeenCalled();
   });
@@ -175,7 +163,7 @@ describe('POST /api/liff/link — offer tag/scenario on affiliate-link friend ad
     const res = await link('aff-paused');
     expect(res.status).toBe(200);
 
-    // Offer is fetched but tag must NOT be applied — inactive offers are null-treated.
+    // 無効な案件は存在しない扱いにし、タグを付けない。
     expect(dbMocks.getAffiliateOfferById).toHaveBeenCalledWith(
       expect.anything(),
       'OFF-2',
@@ -184,8 +172,7 @@ describe('POST /api/liff/link — offer tag/scenario on affiliate-link friend ad
   });
 
   it('does NOT fire the friend-add notification on an existing-friend re-touch', async () => {
-    // /api/liff/link is a re-touch entry point (friend already exists), so the
-    // affiliate must never be notified — even for an affiliate offer link.
+    // LIFF の再訪では新規追加ではないため、案件リンクでも参加者へ通知しない。
     dbMocks.getAffiliateLinkByRefCode.mockResolvedValue({
       id: 'AL-1',
       affiliate_id: 'AFF-1',
@@ -217,7 +204,7 @@ describe('POST /api/liff/link — offer tag/scenario on affiliate-link friend ad
     const res = await link('route-ref');
     expect(res.status).toBe(200);
 
-    // entry_route wins: affiliate link / offer resolution is skipped entirely.
+    // 流入経路があれば優先し、アフィリエイトと案件の解決は省く。
     expect(dbMocks.getAffiliateLinkByRefCode).not.toHaveBeenCalled();
     expect(dbMocks.getAffiliateOfferById).not.toHaveBeenCalled();
     expect(attachTagAndFireSideEffects).toHaveBeenCalledWith(

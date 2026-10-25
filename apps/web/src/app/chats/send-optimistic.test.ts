@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic'
+import { buildOutgoingMessage, refreshChatListAfterSend } from '@/v8/inbox-chat/send-optimistic'
 
 interface Row {
   id: string

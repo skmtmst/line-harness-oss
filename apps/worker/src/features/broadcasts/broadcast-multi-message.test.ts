@@ -101,7 +101,7 @@ describe('一斉配信の複数吹き出し実送信', () => {
       JSON.stringify(personalizedBubbles),
       JSON.stringify({ operator: 'AND', rules: [{ type: 'is_following', value: true }] }),
     );
-    // 1人ずつの経路は要求ID付きの口を使う（#816）。
+    // 1人ずつの経路は要求ID付きの口を使う。
     const pushMessageWithRequestId = vi.fn().mockResolvedValue({ requestId: 'req-1' });
     await processQueuedBroadcasts(db, { pushMessageWithRequestId } as unknown as LineClient);
     expect(pushMessageWithRequestId.mock.calls[0][1]).toHaveLength(2);

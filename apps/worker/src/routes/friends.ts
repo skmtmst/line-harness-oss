@@ -21,7 +21,7 @@ const friends = new Hono<Env>();
 export { escapeLikePattern } from './friends-definition.js';
 export { requireVisibleFriend } from './friends-definition.js';
 
-// customer-requested erasure. Unfollow never calls this route.
+// 顧客が依頼した消去だけを扱い、ブロック解除・友だち解除では呼ばない。
 friends.delete('/api/friends/:id/data', requireRole('owner', 'admin'), denyReadOnly(), requireIrreversibleConfirmation('delete-friend-data'), delete__api_friends_id_data_1);
 
 registerFriendDeliveryConsents(friends, requireVisibleFriend);
@@ -31,10 +31,10 @@ friends.get('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), 
 
 friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), post__api_friends_saved_views_3);
 
-// GET /api/friends - list with pagination
+
 friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), get__api_friends_1);
 
-// GET /api/friends/count - friend count (must be before /:id)
+// count を ID と解釈しないよう、/:id より先に置く。
 // 友だち追加の内訳（設計 V2 4-6）。「はじめての人」と「以前からの友だち」を
 // 分けて数える。追加時の配信を1本しか持てないうちは、returning の人数が
 // そのまま「はじめまして」を誤って送った人数になる。
@@ -49,7 +49,7 @@ friends.get('/api/friends/ref-stats', get__api_friends_ref_stats_4);
 friends.get('/api/friends/:id/mileage', requireVisibleFriend, get__api_friends_id_mileage_1);
 
 /*
- * GET /api/friends/:id/upcoming — 受信箱の顧客情報に出す「次の予定」(IDEA-02)。
+ * GET /api/friends/:id/upcoming — 受信箱の顧客情報に出す「次の予定」。
  *
  * 返すのは確定している未来の予定だけ:
  *   - nextBooking … 予約（bookings / event_bookings / meet_consultations の
@@ -66,11 +66,11 @@ friends.get('/api/friends/:id/mileage', requireVisibleFriend, get__api_friends_i
  */
 friends.get('/api/friends/:id/upcoming', requireVisibleFriend, get__api_friends_id_upcoming_2);
 
-// GET /api/friends/:id - get single friend with tags
+
 /**
  * 友だち画面の上部に出す数（設計 `V2 2-2 友だち` の KPIs）。
  *
- * :id より前に置くこと。あとに置くと 'stats' が id として拾われる。
+ * id より前に置くこと。あとに置くと 'stats' が id として拾われる。
  */
 friends.get('/api/friends/stats', get__api_friends_stats_3);
 
@@ -90,7 +90,7 @@ friends.get('/api/friends/:id/form-submissions', requireVisibleFriend, get__api_
 // POST /api/friends/:id/tags - add tag
 friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, inputJsonBoundary({"tagId":["string"]}), post__api_friends_id_tags_7);
 
-// DELETE /api/friends/:id/tags/:tagId - remove tag
+
 friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, delete__api_friends_id_tags_tagId_8);
 
 // PUT /api/friends/:id/metadata - merge metadata fields
@@ -106,7 +106,7 @@ friends.get(
   get__api_friends_id_timeline_1,
 );
 
-// POST /api/friends/:id/messages - send message to friend
+
 friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff'), requireIdempotencyKey, requireVisibleFriend, inputJsonBoundary({"messageType":["string"],"content":["string"],"altText":["string"],"trackLinks":["boolean"]}), post__api_friends_id_messages_2);
 
 export { friends };

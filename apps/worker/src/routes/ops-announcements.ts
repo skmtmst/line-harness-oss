@@ -182,7 +182,7 @@ opsAnnouncements.post('/api/ops/announcements/preview', inputJsonBoundary(), asy
 });
 
 /*
- * M512: 作成ボタンの二重押し・通信再送で同じお知らせが2件できないよう、
+ * 作成ボタンの二重押し・通信再送で同じお知らせが2件できないよう、
  * Idempotency-Key を行IDにする（broadcasts と同じ決めごと）。キーが無い
  * 従来の呼び出しはそのまま作る。同じキーで内容が違う再送は取り違えなので
  * 409 で止める。再送の返しは送り直さず保存済みを返す。
@@ -265,7 +265,7 @@ opsAnnouncements.put('/api/ops/announcements/:id', requirePlatformAdminWrite(), 
     return c.json({ success: false, error: '契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください' }, 409);
   }
   /*
-   * M513: 古い画面からの保存は止めて最新を見せる。版（expectedUpdatedAt）が
+   * 古い画面からの保存は止めて最新を見せる。版（expectedUpdatedAt）が
    * 送られてきたときだけ照合し、合わなければ最新の件名つきで409にする。
    * 送られてこない従来の呼び出しはそのまま通す。
    */

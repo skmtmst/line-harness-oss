@@ -1,5 +1,5 @@
 /*
- * F-20 公式サイト掲載の閲覧数：ECが数えた数を musubo 側で保存して返す受け口。
+ * 公式サイト掲載の閲覧数：ECが数えた数を musubo 側で保存して返す受け口。
  *
  * 見る点:
  *  - EC連携の既存の口・署名のまま、新しい種類だけ受け付ける
@@ -170,7 +170,7 @@ describe('掲載閲覧数の受け口（F-20）', () => {
   expect((await post(event)).status).toBe(200);
   expect(publicationViews().pub_views).toBeNull();
   expect(sqlite.prepare('SELECT sum(view_count) AS n FROM nen_photo_publication_daily_views').get()).toEqual({n:20});
-  // A failed receipt must be retryable with the same stable event ID.
+  // 受領が失敗しても、同じイベント ID で再試行できることを確かめる。
   sqlite.prepare("UPDATE ec_events SET status='failed' WHERE external_event_id='daily-event-a'").run();
   expect(await (await post(event)).json()).toMatchObject({success:true,status:'view_counts_saved'});
   expect(sqlite.prepare('SELECT sum(view_count) AS n FROM nen_photo_publication_daily_views').get()).toEqual({n:20});

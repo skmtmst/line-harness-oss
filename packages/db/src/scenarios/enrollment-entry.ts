@@ -137,8 +137,7 @@ export async function enrollFriendInScenario(
   // matches the very first step (step_order=0).
   // If we initialize to 0, scenarios that only have a step_order=0 step are
   // silently completed without delivering anything (because no step has
-  // step_order > 0). This was observed in production on 2026-04-27 where
-  // ~10 friend_scenarios silently completed for a 46-hour window.
+  // step_order > 0).
   const result = await db
     .prepare(
       `INSERT OR IGNORE INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, published_version_id, updated_at)
@@ -156,7 +155,7 @@ export async function enrollFriendInScenario(
 }
 
 /**
- * 購読を別のシナリオへ移す（#949 N-054 / 機能05「友だちごとの移動」）。
+ * 購読を別のシナリオへ移す（機能05「友だちごとの移動」）。
  *
  * いまの購読を completed に閉じ、移し先へ新しい購読を作る。先に移し先へ
  * 登録してから元を閉じるので、移し先が受け付けない（停止中・未公開・

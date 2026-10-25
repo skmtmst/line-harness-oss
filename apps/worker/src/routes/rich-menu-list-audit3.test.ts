@@ -16,7 +16,7 @@ beforeEach(() => {
 });
 afterEach(()=>fixture.raw.close());
 function app() {
-  // Real SQL, with the D1 100-bind boundary enforced at the binding boundary.
+  // 実 SQL を通し、D1 の100バインド上限も接続の境界で守る。
   const db = {
     ...fixture.db,
     prepare(sql: string) {

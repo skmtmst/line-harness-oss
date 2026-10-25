@@ -24,7 +24,7 @@ export async function getFormSubmissions(
 
 /**
  * LIKE の特別文字を無効化する。`%` と `_` を含む検索語でも、その文字どおりに探す。
- * N-171: `%` を素通しすると「何にでも一致」になり、別ページの一致行を見落とす。
+ * `%` を素通しすると「何にでも一致」になり、別ページの一致行を見落とす。
  */
 export function escapeLikeLiteral(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
@@ -45,7 +45,7 @@ export async function getFormSubmissionsPage(
   const offset = (page - 1) * limit;
   const accountClause = options.lineAccountId ? ' AND f.line_account_id = ?' : '';
   const accountBindings = options.lineAccountId ? [options.lineAccountId] : [];
-  // N-171/N-179: 名前と回答内容をページング前にサーバー側で絞り込む。件数と一覧と
+  // 名前と回答内容をページング前にサーバー側で絞り込む。件数と一覧と
   // CSV が同じ条件になるよう、COUNT と取得で WHERE を共有する。空の検索語は絞らない。
   const needle = options.search?.trim() ?? '';
   const searchClause = needle ? ` AND (f.display_name LIKE ? ESCAPE '\\' OR fs.data LIKE ? ESCAPE '\\')` : '';
@@ -97,7 +97,7 @@ export async function getFormSubmissionsByFriend(
 }
 
 /**
- * 友だちのフォーム回答の総数だけを返す（PERF-13）。
+ * 友だちのフォーム回答の総数だけを返す。
  * 初期応答を軽くするため、本文を読まず件数だけを数える。
  * ※同名で「フォーム×友だち」の回数を数える countFormSubmissionsByFriend が
  * 後段にある（「1人1回」判定用）。こちらは友だちの全フォーム横断。
@@ -114,7 +114,7 @@ export async function countFriendFormSubmissions(
 }
 
 /**
- * フォーム回答履歴を古いものへ遡るカーソル式の取得（PERF-13）。
+ * フォーム回答履歴を古いものへ遡るカーソル式の取得。
  *
  * 詳細画面の回答タブは「さらに読み込む」で続きを取る。
  * cursor には前のページ末尾の `created_at|id` をそのまま渡す。
@@ -251,7 +251,7 @@ export async function createFormSubmission(
 }
 
 /**
- * 全体上限・選択肢定員の枠を1つ、原子的に確保する(N-167 / #751)。
+ * 全体上限・選択肢定員の枠を1つ、原子的に確保する。
  *
  * 「数えてから比べる」のではなく、**条件付き INSERT 1本で決める**。
  * 空きがあるかの判定(`COUNT < limit`)と確保(行を1つ増やす)を同じ文の

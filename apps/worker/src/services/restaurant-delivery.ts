@@ -5,22 +5,7 @@ export { DELIVERY_SERVICES } from './delivery-service-types.js';
 import { DELIVERY_SERVICES } from './delivery-service-types.js';
 import type { DeliveryService } from './delivery-service-types.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
-/**
- * 飲食店向け（テスト）「デリバリー受注」の土台。
- * 設計正本：デリバリー受注_v02.pen の D-1 `kDQHr` / D-2 `hjdqV` / D-3 `dgeTy`
- *           / D-4 `OzHLO` / D-5 `h7OeT` / D-6 `XCVGd`（2026-10-09 承認）。
- *
- * 考え方
- * - 対象は Uber Eats・出前館・ロケットナウの3サービスだけ。menu は2026-09-30に
- *   サービス終了しているので入れない。
- * - 外部の受注一元化サービス（Camel等）との契約・通信はない。各サービスの店舗向け
- *   公式窓口へ自社Workerが直接つなぐ。この層が「外へ出す」唯一の場所。
- * - 急ぎ度はここ（バックエンド）だけで決める。画面には結果と理由の文だけを渡し、
- *   判定に使う仕組みの名称は出さない（利用者指示 2026-10-09）。
- * - rt_delivery_* の時刻列はすべて INTEGER。単位は **エポック秒** に統一する。
- *   ミリ秒を混ぜると経過時間と急ぎ度が静かに壊れるので、時刻は必ず nowSec を通す。
- * - サービスから返った自由文・本文・例外は保存しない。分類済みの符号だけを残す。
- */
+/** 飲食店の受注・送信は Uber Eats・出前館・ロケットナウの公式 API に限定し、この層で外部通信を管理する。急ぎ度はサーバーで決め、画面へは結果と理由だけを返す。時刻はエポック秒に統一し、ミリ秒との混在を防ぐため nowSec を使う。外部の自由文や例外は保存せず、固定分類だけを残す。menu はサービス終了のため対象外。設計図 kDQHr・hjdqV・dgeTy・OzHLO・h7OeT・XCVGd と照合する。 */
 import {
   EXTERNAL_DELIVERY_MAX_ATTEMPTS,
   externalDeliveryRetryAt,

@@ -21,14 +21,14 @@ export async function deletionJournal(db: D1Database, kind: DeletionKind, id: st
     .bind(deletionJournalId(kind, id)).first<Journal>();
   return row ? { ...row, detail: JSON.parse(row.detail_json) as Detail } : null;
 }
-/** The durable intent survives R2 errors, database rollback and a lost HTTP response. */
+/** R2 失敗・DB の巻戻し・HTTP 応答喪失でも、削除の意図を永続的に保持する。 */
 export async function customerDeletionPending(db: D1Database, friendId: string | null, submissionId?: string | null): Promise<boolean> {
   return !!await db.prepare(`SELECT 1 FROM operation_audit WHERE target_kind = 'customer_deletion'
     AND action <> 'deleted' AND ((target_id = ? AND id = ?) OR (friend_id = ? AND id = ?)) LIMIT 1`)
     .bind(submissionId ?? '', deletionJournalId('form_response', submissionId ?? ''), friendId ?? '', deletionJournalId('friend_data', friendId ?? '')).first();
 }
 
-/** Values are bound; every identifier comes from the reviewed schema relation list. */
+/** 値はバインドし、SQL の識別子は確認済みスキーマの関係一覧だけから取る。 */
 export function friendDeletionCondition(table: string, seen = new Set<string>()): string {
   if (table === 'friends') return '"friends".id = ?1';
   if (seen.has(table) || !graph[table]) return '0';
@@ -37,8 +37,7 @@ export function friendDeletionCondition(table: string, seen = new Set<string>())
   const conditions = rel.friendColumns.map(col => `${q(table)}.${q(col)} = ?1`);
   if (rel.lineUserColumn) conditions.push(`(${q(table)}.line_user_id = ?2 AND ${q(table)}.line_account_id IS ?3)`);
   for (const ref of rel.references) {
-    // These are the customer's own outcome/attribution, not the referrer's data.
-    // Their nullable affiliate references are detached in the final atomic batch.
+    // 顧客自身の成果・帰属は紹介者のデータと区別し、参照だけを最後の原子的 batch で外す。
     if (ref.parent === 'affiliates' && ['conversion_events', 'affiliate_attribution_decisions'].includes(table)) continue;
     const inner = friendDeletionCondition(ref.parent, next);
     if (inner !== '0') conditions.push(`EXISTS (SELECT 1 FROM ${q(ref.parent)} WHERE ${inner} AND ${ref.columns.map(col => `${q(ref.parent)}.${q(col.parentColumn)} = ${q(table)}.${q(col.column)}`).join(' AND ')})`);
@@ -70,7 +69,7 @@ function childFirst(tables: string[]): string[] {
     if (visited.has(table)) return;
     visited.add(table);
     for (const child of tables) if (graph[child]?.references.some(ref => ref.parent === table)) visit(child);
-    // Non-FK semantic parents still need to survive until their children are removed.
+    // 外部キーでない親子関係も、子を消すまで親を保持する。
     if (table === 'form_submissions') for (const child of ['form_submission_files', 'form_submit_outbox', 'form_submit_claims', 'form_capacity_claims', 'media_file_scans']) if (tables.includes(child)) visit(child);
     if (table === 'form_submission_files' && tables.includes('media_file_scans')) visit('media_file_scans');
     if (table === 'form_submit_claims' && tables.includes('form_submit_outbox')) visit('form_submit_outbox');
@@ -87,8 +86,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   if (prior?.action === 'deleted') return { deleted: true, replayed: true };
   const conditions = conditionsFor(target);
   const params = target.kind === 'friend_data' ? [target.id, target.lineUserId ?? '', target.accountId] : [target.id];
-  // Fail closed on an unapplied/partial migration, before intent or R2 changes.
-  // SQL identifiers are only from the reviewed 13-table/15-reference manifest.
+  // 未適用・途中の移行では削除意図や R2 を変更する前に止める。SQL 識別子は確認済みの13表・15参照だけを使う。
   if (target.kind === 'friend_data') {
     for (const [table, refs] of Object.entries(protectedRelations)) {
       const columns = (await db.prepare(`PRAGMA table_info(${q(table)})`).all<{ name: string; notnull: number }>()).results;
@@ -108,8 +106,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     if (!condition) return [];
     return [{ table, condition: `EXISTS (SELECT 1 FROM ${q(ref.parent)} WHERE ${condition} AND ${ref.columns.map(col => `${q(ref.parent)}.${q(col.parentColumn)} = ${q(table)}.${q(col.column)}`).join(' AND ')})` }];
   }));
-  // An affiliate can be referenced by another customer's conversion. Do not
-  // traverse that relation by erasing the other customer's own records.
+  // 他の顧客の成果から参照される参加者を消す場合も、関係をたどって別顧客の記録まで消さない。
   if (target.kind === 'friend_data') {
     for (const [table, relation] of Object.entries(graph)) {
       if (relation.friendColumns.includes('friend_id')) protectedChecks.push({ table,
@@ -120,7 +117,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   if (preserved.some(result => result.results.length)) throw new DeletionFailure(409, 'deletion_schema_approval_required');
   const token = crypto.randomUUID();
   const detail: Detail = { accountId: target.accountId, ...(target.formId ? { formId: target.formId } : {}), token, leaseUntil: Date.now() + 300_000 };
-  // Serializes different targets for the same friend as well as a double click.
+  // 同じ友だちに対する別の対象指定や二重押下を直列化する。
   await db.prepare(`INSERT OR IGNORE INTO operation_audit (id,target_kind,target_id,action,actor_id,friend_id,detail_json,created_at)
     SELECT ?, 'customer_deletion', ?, 'deleting', ?, ?, ?, ? WHERE NOT EXISTS (
       SELECT 1 FROM operation_audit WHERE target_kind = 'customer_deletion' AND action = 'deleting'
@@ -138,7 +135,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   }
   try {
     const snapshots: Snapshot[] = [];
-    // Batched reads keep the number of database round trips bounded.
+    // DB 往復数が増え過ぎないよう、読取をまとめる。
     const entries = Object.entries(conditions);
     const results = await db.batch(entries.map(([table, condition]) => db.prepare(`SELECT rowid AS _delete_rowid, * FROM ${q(table)} WHERE ${condition}`).bind(...(condition.includes('?3') ? params : [params[0]]))));
     for (let i = 0; i < entries.length; i++) {
@@ -149,7 +146,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     }
     const keys = [...new Set(snapshots.flatMap(snapshot => snapshot.keys))];
     if (keys.length && !env.IMAGES) throw new DeletionFailure(503, 'deletion_retry_required');
-    // R2 deletion is idempotent. Never remove database keys until every delete succeeds.
+    // R2 の削除は冪等なので、全削除が成功するまで DB のキーを残して再試行可能にする。
     for (let offset = 0; offset < keys.length; offset += 100) await env.IMAGES!.delete(keys.slice(offset, offset + 100));
     const guard = (condition: string, values: unknown[]) => {
       let cursor = 0;
@@ -160,9 +157,9 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       return db.prepare(`UPDATE operation_audit SET target_kind = CASE WHEN (${normalized}) THEN 'customer_deletion' ELSE NULL END WHERE id = ?`).bind(...bindings, id);
     };
     const statements = [db.prepare('PRAGMA defer_foreign_keys = ON'), guard("action = 'deleting' AND json_extract(detail_json, '$.token') = ?", [token])];
-    // A retained record inserted during the R2 call must never be cascaded away.
+    // R2 待機中に追加された保持対象を、連動削除で失わないようにする。
     for (const check of protectedChecks) statements.push(guard(`NOT EXISTS (SELECT 1 FROM ${q(check.table)} WHERE ${check.condition})`, check.condition.includes('?3') ? params : [params[0]]));
-    // A file/child added while awaiting R2 must remain reachable for a retry.
+    // R2 待機中に増えたファイルや子行も、再試行で到達できる形を保つ。
     for (const snapshot of snapshots) {
       const rowids = JSON.stringify(snapshot.rows.map(row => row._delete_rowid));
       const bound = snapshot.condition.includes('?3') ? params : [params[0]];
@@ -170,8 +167,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       const slot = bound.length + 1;
       statements.push(guard(`(SELECT COUNT(*) FROM ${q(snapshot.table)} WHERE ${condition}) = json_array_length(?${slot})
         AND NOT EXISTS (SELECT 1 FROM ${q(snapshot.table)} WHERE ${condition} AND rowid NOT IN (SELECT value FROM json_each(?${slot})))`, [...bound, rowids]));
-      // Fence reassignment of a response/friend as well as key replacement.
-      // Snapshot values are transient bindings, never persisted in the journal.
+      // キー交換に加え回答・友だちの付替も検出する。照合のスナップショット値は一時バインドだけとし、台帳へ保存しない。
       const first = snapshot.rows[0];
       const candidates = ['id', 'line_user_id', 'line_account_id', 'form_id', 'submission_id',
         ...(graph[snapshot.table]?.friendColumns ?? []),
@@ -185,8 +181,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     const byTable = new Map(snapshots.map(snapshot => [snapshot.table, snapshot]));
     if (target.kind === 'friend_data') {
       const affiliateCondition = conditions.affiliates;
-      // No new schema outside the approved retained tables: both existing
-      // references are already nullable. Remove referrer names/codes as well.
+      // 承認済み保持表以外へスキーマを増やさず、既に NULL を許す参照を解除する。紹介者の名前とコードも除く。
       statements.push(db.prepare(`UPDATE conversion_events SET affiliate_id = NULL, affiliate_code = NULL
         WHERE affiliate_id IN (SELECT id FROM affiliates WHERE ${affiliateCondition})`).bind(...(affiliateCondition.includes('?3') ? params : [params[0]])));
       const removed = `SELECT id FROM affiliates WHERE ${affiliateCondition}`;
@@ -217,7 +212,7 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
     await db.batch(statements);
     return { deleted: true, replayed: false };
   } catch {
-    // A fixed code only: customer text, filenames, keys and provider errors are never logged.
+    // 記録は固定コードに限り、顧客本文・ファイル名・キー・外部エラーをログへ出さない。
     await db.prepare("UPDATE operation_audit SET action = 'retryable' WHERE id = ? AND action = 'deleting' AND json_extract(detail_json,'$.token') = ?").bind(id, token).run().catch(() => {});
     throw new DeletionFailure(503, 'deletion_retry_required');
   }

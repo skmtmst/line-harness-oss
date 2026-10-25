@@ -267,7 +267,7 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
     /*
      * **切るのは `getFormSubmissions` の SQL ひとつだけ。**ここで重ねて
      * `slice` すると、DB 側の天井を上げても口が黙って切り直してしまい、
-     * 「名乗りと実際がずれているのに気づけない」という #722 の形がそのまま
+     * 「名乗りと実際がずれているのに気づけない」という  の形がそのまま
      * 残る（実際、逆変異で確かめた: DB 側を 500 にしても slice があると
      * 試験が緑のままだった）。数も切る場所も1か所にする。
      */
@@ -287,7 +287,7 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
   const { page, limit } = parseOffsetPaging(
     { page: c.req.query('page'), limit: c.req.query('limit') }, { defaultLimit: 20 },
   );
-  // N-171/N-179: 一覧・件数・CSV が同じ検索条件になるよう、検索語をページング前に渡す。
+  // 一覧・件数・CSV が同じ検索条件になるよう、検索語をページング前に渡す。
   const search = (c.req.query('q') ?? '').trim().slice(0, 200) || undefined;
   const [submissions, summary] = await Promise.all([
     getFormSubmissionsPage(c.env.DB, id, { ...period, page, limit, lineAccountId: c.req.query('account_id')!, search }),
@@ -300,7 +300,7 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
       period,
     ),
   ]);
-  // N-168: 後処理の未完を運用者へ見せる。予約(claim)の工程記録と
+  // 後処理の未完を運用者へ見せる。予約(claim)の工程記録と
   // 「あるべき工程」を見比べた結果を各回答へ載せる。
   const postActions = await describePostActionsForSubmissions(c.env.DB, submissions.items, form);
   return c.json({

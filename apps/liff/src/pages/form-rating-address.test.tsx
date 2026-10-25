@@ -6,7 +6,7 @@ import type { FormLayout } from '@line-crm/shared';
 import Form from './form.js';
 
 /**
- * F11 5段階評価・住所の回答欄。
+ * 5段階評価・住所の回答欄。
  * - ★は1〜5で答え、同じ★でもう一度押すと取り消す
  * - 住所は郵便番号から候補を入れる。手入力は残す
  */

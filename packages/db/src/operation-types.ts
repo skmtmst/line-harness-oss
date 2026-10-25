@@ -46,12 +46,12 @@ export interface OperationIncident {
   restoredSnapshot: OperationControlSnapshot | null;
   errorMessage: string | null;
   /**
-   * N-451: 停止した瞬間に稼働対象だった定義の指紋（版・期限）のJSON。
+   * 停止した瞬間に稼働対象だった定義の指紋（版・期限）のJSON。
    * この仕組みより前に止めた incident では null で、復旧前検査は
    * 「記録なし」として全ての変更検査をスキップしない（検査自体は走る）。
    */
   stoppedDefinitionsJson: string | null;
-  /** N-451: 直近の復旧試行の検査結果（再開した対象・理由つきで止めた対象）。 */
+  /** 直近の復旧試行の検査結果（再開した対象・理由つきで止めた対象）。 */
   restoreReportJson: string | null;
   stoppedAt: string | null;
   resolvedAt: string | null;

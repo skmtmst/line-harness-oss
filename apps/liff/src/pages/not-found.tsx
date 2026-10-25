@@ -6,8 +6,8 @@ import BottomBar from '../components/ui/bottom-bar.js';
 import Button from '../components/ui/button/index.js';
 
 /**
- * ★V8 見つからない画面（板 ・V8.pen の修正案「採用 2026-10-07 リリース前」）。
- * どの住所にも当たらないときに出す。以前は灰色の文字1行だけで、戻る道が無かった。
+ * 見つからない画面。
+ * どの住所にも当たらないときに出す。迷った人が戻れるよう、戻る道を必ず出す。
  * 上の帯・薄い灰の丸の印（link-2-off）・題・説明2行、下の帯に［LINE に戻る］（主）［閉じる］。
  */
 export function closeOrBackToLine(kind: 'line' | 'close'): void {

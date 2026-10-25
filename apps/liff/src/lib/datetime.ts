@@ -27,7 +27,7 @@ export function formatWeekday(date: string): string {
   return '日月火水木金土'[d.getUTCDay()];
 }
 
-/** '2026-10-02' → '10月2日（金）」。★V8 の週の空き・確認の行で使う。 */
+/** '2026-10-02' → '10月2日（金）'。週の空き・確認の行で使う。 */
 export function formatJpLong(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);
   return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${'日月火水木金土'[d.getUTCDay()]}）`;

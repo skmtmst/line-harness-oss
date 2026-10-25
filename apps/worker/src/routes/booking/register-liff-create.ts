@@ -47,7 +47,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   const body = await c.req.json<{
     menu_id: string;
     staff_id: string;
-    starts_at: string; // UTC ISO8601
+    starts_at: string; // UTC の ISO8601。
     customer_note?: string;
     party_size?: unknown;
     entitlement_id?: string;
@@ -144,7 +144,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
    const offer=await c.env.DB.prepare(`SELECT id FROM booking_waitlist WHERE id=? AND line_account_id=? AND friend_id=? AND staff_id=? AND menu_id=? AND julianday(starts_at)=julianday(?) AND status='invited' AND julianday(hold_expires_at)>julianday('now')`).bind(body.waitlist_id,accountId,friendId,body.staff_id,body.menu_id,body.starts_at).first();
    if(!offer)return liffBookingJson(c, {error:'offer_expired'},409);
   }
-  // Block check: customer cannot book
+  // ブロック中の顧客は予約できない。
   const friend = await c.env.DB
     .prepare(`SELECT is_following FROM friends WHERE id = ?`)
     .bind(friendId)
@@ -168,7 +168,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     body.staff_id = assigned;
   }
 
-  // Menu + staff_menu lookup (must be offered)
+  // メニューと担当者の組が提供対象かを確認する。
   const menuRow = await c.env.DB
     .prepare(
       `SELECT m.id, m.name, m.duration_minutes, m.buffer_after_minutes, m.base_price,
@@ -410,7 +410,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     return liffBookingJson(c, err, limitError ? 422 : 409);
   }
 
-  // N-394: お客様が自分で入れた予約も履歴の起点として残す。
+  // お客様が自分で入れた予約も履歴の起点として残す。
   await recordBookingAudit(c.env.DB, {
     bookingId,
     lineAccountId: accountId,
@@ -472,7 +472,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       logger.error("booking.liff_booking_requests_create_failed");
     }
   } else {
-    // Fire-and-forget notification — failures must not roll back the booking.
+    // 通知失敗だけで予約を取り消さないよう、確定後の通知を分離する。
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, bookingId, 'requested').catch((err) =>
         logger.error("booking.liff_booking_requests_create_failed"),
@@ -493,7 +493,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     }).catch((err) => logger.error("booking.liff_booking_requests_create_failed")),
   );
 
-  // R150: 「予約が入ったとき」を購読する送信Webhookへも届ける。
+  // 「予約が入ったとき」を購読する送信Webhookへも届ける。
   // 通知が落ちても予約は成立させるため、他の副作用と同じく応答の後ろで捌く。
   c.executionCtx.waitUntil(
     fireOutgoingWebhooks(c.env.DB, 'booking_created', {

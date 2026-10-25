@@ -49,21 +49,11 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
     const lineAccountId = c.req.query('lineAccountId');
     const audienceId = c.req.query('audienceId')?.trim();
     const search = c.req.query('search');
-    // ?includeTags=false skips per-row tag enrichment (N+1 of getFriendTags
-    // → ~50 extra D1 reads on a wide list query). The list view needs tags
-    // for filter chips, but autocomplete-style consumers (test-recipient
-    // picker, broadcast recipient picker) only render id/displayName/picture
-    // and pay the cost for nothing. Default true to keep the historical
-    // behavior for existing callers.
+    // 自動補完ではタグを描画しないため includeTags=false で行ごとの N+1 取得を省く。既存の呼出元の表示を保つため、既定は true とする。
     const includeTags = c.req.query('includeTags') !== 'false';
-    // ?includeChatStatus=true — populate latestIncomingMessage,
-    // latestOutgoingAt, activeScenario, and a derived `handled` flag for
-    // each friend. Used by the L-step-style /friends listing; off by
-    // default to keep the simple list / autocomplete paths cheap.
+    // 単純一覧や自動補完を重くしないよう、最終送受信・稼働シナリオ・対応状態は includeChatStatus=true のときだけ求める。
     const includeChatStatus = c.req.query('includeChatStatus') === 'true';
-    // ?sort=oldest reverses default created_at DESC. Default = recent-first.
-    // Search mode (when `search` is set) overrides both — we keep the
-    // match-quality ranking and only flip the secondary `created_at` tier.
+    // 検索の一致度を崩さないよう、oldest は作成日時の第2順位だけを反転する。
     const requestedSort = c.req.query('sort') ?? directConditions?.list?.sort;
     const sort: 'recent' | 'oldest' = requestedSort === 'oldest' ? 'oldest' : 'recent';
     const cursorMode=c.req.query('pagination')==='cursor'||c.req.query('cursor')!==undefined;
@@ -75,10 +65,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       }catch{return c.json({success:false,error:'ページ送りの指定を確認してください'},400);}
     }
 
-    // ?handled=unhandled filters to friends whose latest activity is an
-    // incoming message (mirroring the L-step "未対応" tab). Done in SQL so
-    // pagination + total counts are correct; client-side filter would only
-    // hide rows on the current page and leave `total` misleading.
+    // 未対応の絞込は SQL で行い、ページ送りと総数を一致させる。取得後に画面で隠すだけでは総数が誤るため。
     const handledFilter: 'unhandled' | null =
       c.req.query('handled') === 'unhandled' ? 'unhandled' : null;
     const operatorId = c.req.query('operatorId');
@@ -124,7 +111,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       }
     }
 
-    // Build WHERE conditions
+
     const conditions: string[] = [];
     const binds: unknown[] = [];
     let appliedSavedSearchRevision: number | null = null;
@@ -201,7 +188,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       binds.push(scoreMax.value);
     }
     /*
-     * R300: 行動スコア一覧の帯は「点数がついている人」だけを数える
+     * 行動スコア一覧の帯は「点数がついている人」だけを数える
      * （`f.score != 0 OR 履歴あり`）。低い帯の引き継ぎ（`?scoredOnly=1`）では
      * 未採点の0点を含めず、一覧・検索・配信の対象定義をそろえる。
      * 付けない既存の呼び出しは従来どおり（点数範囲だけ）。
@@ -211,18 +198,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
         '(f.score != 0 OR EXISTS (SELECT 1 FROM friend_scores scored_only WHERE scored_only.friend_id = f.id))',
       );
     }
-    // Unhandled filter: chats.status === 'unread'.
-    //
-    // We derive 対応マーク from chats.status — the same model the /chats UI
-    // uses — instead of inferring from messages_log timestamps. Reasons:
-    //   - silent auto-replies / postbacks intentionally do NOT flip the
-    //     chat to unread (see webhook.ts), so a timestamp-based heuristic
-    //     would mark them as 未対応 against the operator's intent
-    //   - operators explicitly mark 対応済み (resolved) / 対応中 (in_progress)
-    //     via the chats UI, and that state must be honored here
-    //   - friends without any chat row default to 'resolved' (lazy-create
-    //     in chats.ts:88 also seeds with 'resolved'), matching the chats
-    //     listing's COALESCE(c.status, 'resolved') convention
+    // 未対応は chats.status から判定する。自動返信や postback は意図的に未読へ変えず、担当者が選んだ対応中・対応済みを優先するため、メッセージ時刻から推測しない。チャット行がなければ一覧と同じ resolved とする。
     if (handledFilter === 'unhandled') {
       conditions.push(
         `EXISTS (
@@ -348,28 +324,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
     const totalRow = await (binds.length > 0 ? countStmt.bind(...binds) : countStmt).first<{ count: number }>();
     const total = totalRow?.count ?? 0;
 
-    // When `search` is present we want exact / prefix matches to surface
-    // first regardless of friend age. Plain `ORDER BY created_at DESC`
-    // pushes the most-likely candidate (e.g. the operator themselves,
-    // friended on day-one of the account) below recently-added friends
-    // whose displayName happens to contain the same substring. The
-    // CASE expression below ranks: exact (0) → prefix (1) → word-start (2)
-    // → generic substring (3), then created_at DESC inside each tier.
-    //
-    // - The exact tier uses `LIKE ?` (no wildcards) instead of `= ?` so
-    //   SQLite's ASCII case-insensitive `LIKE` lets `shu` match `Shu`.
-    //   Plain `=` is byte-exact and would relegate that row to tier 1
-    //   alongside `Shun` / `shuji`, defeating the rerank.
-    // - Word-start patterns include both ASCII space and full-width
-    //   so Japanese names like `山田　太郎` match on the second name part.
-    // The tracked_links / chats / operators JOINs are only needed when the
-    // caller requested chat status. Skipping them on autocomplete-style calls
-    // (?includeChatStatus omitted, includeTags=false) keeps a single keystroke
-    // cheap. List view enables it.
-    //
-    // chats は migration 048 以降「1 friend = 1 chat」の UNIQUE 制約を持つ。
-    // 同じ行から状態・担当ID・担当名を読むため、別々の相関サブクエリで
-    // IDと名前がずれることも、行ごとに同じ検索を繰り返すこともない。
+    // 検索は友だち追加の古さより一致度を優先し、完全一致・先頭一致・単語先頭・部分一致の順にする。ASCII の大小を区別しない LIKE と半角・全角スペースを使う。自動補完では不要な JOIN を省く。チャットは1人1行の制約を使い、状態・担当 ID・名前を同じ行から読む。
     const baseSelect = includeChatStatus
       ? `f.*, tl.name AS first_tracked_link_name,
          COALESCE(lc.status, 'resolved') AS chat_status,
@@ -386,8 +341,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
          LEFT JOIN operators op ON op.id = lc.operator_id
          LEFT JOIN support_marks sm ON sm.id = f.support_mark_id`
       : `FROM friends f`;
-    // Secondary tier of the search-mode ORDER BY (after match_score) and the
-    // primary tier in non-search mode. Switched by ?sort=oldest|recent.
+    // 作成日時は通常の第1順位、検索時は一致度の次の順位とし、sort で方向を選ぶ。
     const createdOrder = sort === 'oldest' ? 'ASC' : 'DESC';
     let listStmt;
     let listBinds: unknown[];
@@ -435,10 +389,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       ...(fieldColumns.length ? {fieldValues:fieldValues.get(friend.id) ?? {}} : {}),
     }));
 
-    // Optional: hydrate chat status (latest in/out message, active scenario,
-    // derived "handled" flag). Three batched queries instead of N×3 to keep
-    // the request cheap even at limit=50. ROW_NUMBER picks the freshest
-    // row per friend; SQLite supports window functions on D1.
+    // N×3の問い合わせを防ぐため、最終送受信とシナリオは3つの一括取得で補完する。各友だちの最新行は ROW_NUMBER で選ぶ。
     if (includeChatStatus && items.length > 0) {
       const ids = items.map((f) => f.id);
 
@@ -501,9 +452,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       const outgoingByFriend = new Map(outgoingRes.results.map((r) => [r.friend_id, r.max_at]));
       const scenarioByFriend = new Map(scenarioRes.results.map((r) => [r.friend_id, r]));
 
-      // We're inside `if (includeChatStatus)` so every row was emitted by
-      // serializeFriendListRow with chatStatus populated. TS can't narrow
-      // through the union, so assert the populated shape locally.
+      // includeChatStatus 内ではシリアライザが値を補完済みだが、共用体を型が絞れないため、ここでその形を示す。
       type WithChatStatus = (typeof itemsWithTags)[number] & {
         chatStatus: 'unread' | 'in_progress' | 'resolved';
         operatorId?: string | null;

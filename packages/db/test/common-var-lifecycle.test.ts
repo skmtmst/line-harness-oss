@@ -20,8 +20,8 @@ import {
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * Q（機能）: 共通情報の状態・変える理由・期限の知らせ・秘密値。
- * 直した先が画面・API・cronの3経路なので、ここではDB層の約束ごとを固定する。
+ * 共通情報の状態・変える理由・期限の知らせ・秘密値。
+ * 使う先が画面・API・cronの3経路なので、ここではDB層の約束ごとを固定する。
  */
 describe('共通情報の状態と理由（Q）', () => {
   let sqlite: Database.Database;

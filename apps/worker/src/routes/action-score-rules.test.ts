@@ -254,7 +254,7 @@ describe('action score rule API', () => {
     });
   });
 
-  // N-235: 手で直す口は、不可逆確認・冪等キー・権限・アカウント範囲を全部通す。
+  // 手で直す口は、不可逆確認・冪等キー・権限・アカウント範囲を全部通す。
   it('requires confirmation, an idempotency key and owner/admin role before adjusting', async () => {
     const body = JSON.stringify({
       accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 12, reason: '問い合わせ対応',

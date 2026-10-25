@@ -60,7 +60,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     confirmedRecipientCount?: unknown;
   }>();
 
-  // #772: 版を必須化する。認可・境界・存在の判定は上で済ませてあるため、
+  // 版を必須化する。認可・境界・存在の判定は上で済ませてあるため、
   // 他アカウントIDは従来どおり404のまま、ここへは来ない。
   if (body.expectedVersion === undefined) {
     return inputError(c, {
@@ -92,7 +92,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     : [body.lineAccountId !== undefined
         ? body.lineAccountId
         : (existingRaw.line_account_id as string | null | undefined) ?? null];
-  // N-061: 変更後の宛先accountも共通境界へ渡す。/broadcasts持ちstaffだけが変えられる。
+  // 変更後の宛先accountも共通境界へ渡す。/broadcasts持ちstaffだけが変えられる。
   const updateBoundary = await broadcastWriteBoundary(c, requestedAccountIds, { operationKey: BROADCAST_DEFINITION_EDIT_KEY });
   if (!updateBoundary.allowed) {
     return updateBoundary.reason === 'forbidden'
@@ -183,7 +183,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     stealthSpreadMinutes = n;
   }
 
-  // Keep status in sync with scheduledAt changes
+  // 予約日時だけが変わっても、配信の状態を一致させる。
   let statusUpdate: 'draft' | 'scheduled' | undefined = body.saveAsDraft ? 'draft' : undefined;
   if (!body.saveAsDraft && body.scheduledAt !== undefined) {
     statusUpdate = body.scheduledAt ? 'scheduled' : 'draft';
@@ -205,7 +205,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     && (body.scheduledAt !== undefined || snapshotSemanticsChanged);
 
   /*
-   * 二者承認（m12a）。新しく予約を入れるとき、1人運用の組織では
+   * 二者承認。新しく予約を入れるとき、1人運用の組織では
    * 人数の手入力との一致が要る。合わなければ予約を作らない。
    * 2人以上なら承認フロー（approval-request）へ進めるので、ここでは止めない。
    */
@@ -301,7 +301,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   }
 
   /*
-   * 二者承認（m12a）。承認の対象（宛先・本文）が変わったら、もらった承認は
+   * 二者承認。承認の対象（宛先・本文）が変わったら、もらった承認は
    * 白紙に戻す。古い内容への承認で新しい内容を送らせない。
    */
   if (snapshotSemanticsChanged) {
@@ -531,7 +531,7 @@ export const post__api_broadcasts_id_retry_failed_5 = async (c: Context<Env, "/a
       }, 409);
     }
 
-    // 再送できるのは一時的な失敗だけ（#816）。恒常的な失敗（ブロックなど）は
+    // 再送できるのは一時的な失敗だけ。恒常的な失敗（ブロックなど）は
     // 送り直しても通らないので対象にしない。
     const retryable = await getRetryableRecipientIds(c.env.DB, id);
     if (retryable.length === 0) {

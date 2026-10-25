@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeCommonVarValue } from './index.js';
 
 /*
- * R36: URL型の共通情報にURLでない文章を保存できてしまう。
+ * URL型の共通情報にURLでない文章を保存できてしまう。
  * 新規・編集・代替値・予約の更新はすべてこの判定を通るため、
  * ここで止めれば4つの口すべてに同じ確かめが効く。
  */

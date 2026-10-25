@@ -119,7 +119,7 @@ describe('N-268: 下書き・公開・導出状態', () => {
     expect(byId.get('p-url-broken')).toMatchObject({ state: 'invalid', stateReason: '到達URLが決まっていません' });
     expect(byId.get('p-src-stop')).toMatchObject({ state: 'sourceStopped', stateReason: '外部からの受信を止めています' });
     expect(byId.get('p-fine')).toMatchObject({ state: 'active' });
-    // N-267: 使われていない件数は絞り込み全体から正確に数える。
+    // 使われていない件数は絞り込み全体から正確に数える。
     expect(list.stateCounts).toMatchObject({
       active: 1, invalid: 1, sourceStopped: 1, unused: 2,
     });
@@ -205,11 +205,11 @@ describe('N-265/N-269: 母数・CVRと暦日の一致', () => {
     const db = asD1(sqlite);
     const report = await getConversionDefinitionReport(db, { scope, range, previousRange });
     const routeA = report.byRoute.find((row) => row.routeKey === 'route-a');
-    // N-265: 母数・CVRが空欄のまま返らない。
+    // 母数・CVRが空欄のまま返らない。
     expect(routeA).toMatchObject({ audience: 2, conversionRate: 50 });
     const routeB = report.byRoute.find((row) => row.routeKey === 'route-b');
     expect(routeB).toMatchObject({ audience: 1, conversionRate: 100 });
-    // N-269: ISO書式(T付き)でも期間末の日(9/30)の成果を落とさない。
+    // ISO書式(T付き)でも期間末の日(9/30)の成果を落とさない。
     expect(report.kpis.netCount).toBe(2);
   });
 

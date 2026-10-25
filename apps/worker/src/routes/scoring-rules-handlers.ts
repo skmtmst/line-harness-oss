@@ -224,7 +224,7 @@ export const post__api_mileage_rules_6 = async (c: Context<Env, "/api/mileage/ru
       } | null;
       validFrom?: string | null;
       validUntil?: string | null;
-      /** 334(#521): 帰属アカウント。 */
+      /** 帰属アカウント。 */
       lineAccountId?: string;
       /** DRAFT-01: falseなら停止中で作る。省略は従来どおり稼働。 */
       isActive?: boolean;
@@ -238,7 +238,7 @@ export const post__api_mileage_rules_6 = async (c: Context<Env, "/api/mileage/ru
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
-    // N-240: Idempotency-Key 付きの作成は二重作成しない。キーなしは従来通り。
+    // Idempotency-Key 付きの作成は二重作成しない。キーなしは従来通り。
     const requestKey = c.req.header('Idempotency-Key')?.trim();
     if (requestKey !== undefined && requestKey !== '') {
       if (!isValidIdempotencyKey(requestKey)) {
@@ -308,7 +308,7 @@ export const put__api_mileage_rules_id_7 = async (c: Context<Env, "/api/mileage/
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    // N-231 案1: 公開内容の直接変更は閉じる。下書き→公開の口を使ってください。
+    //  案1: 公開内容の直接変更は閉じる。下書き→公開の口を使ってください。
     // 停止・再開(isActive)だけは公開内容を変えないため、このまま許可する。
     const directContentKeys = (['name', 'eventType', 'source', 'amount', 'initialStatus', 'conditions'] as const)
       .filter((key) => body[key] !== undefined);
@@ -337,7 +337,7 @@ export const delete__api_mileage_rules_id_8 = async (c: Context<Env, "/api/milea
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.line_account_id])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    // N-232: 付与履歴がある決めごとは1文の原子DELETEで守る。SELECTとDELETEを分けると
+    // 付与履歴がある決めごとは1文の原子DELETEで守る。SELECTとDELETEを分けると
     // その間に履歴が作られる競合で消せてしまう。0件なら履歴ありとして409で安全拒否し、
     // 停止(PUT isActive=false)へ誘導する。
     const deleted = await deleteMileageRule(c.env.DB, existing.id);
@@ -397,7 +397,7 @@ export const get__api_friends_id_score_10 = async (c: Context<Env, "/api/friends
         friendId,
         currentScore: score,
         /*
-         * IDEA-17: 点数が変わった根拠を明細から辿れるように、発生した出来事・
+         * 点数が変わった根拠を明細から辿れるように、発生した出来事・
          * 発生日時・前後の点数・動かした方法まで返す。旧行の NULL は欠損の
          * まま返し、表示側で「未取得」と書き分ける。
          */
@@ -441,7 +441,7 @@ export const post__api_friends_id_score_11 = async (c: Context<Env, "/api/friend
       friendId,
       scoreChange: body.scoreChange,
       reason: body.reason,
-      // IDEA-17: 手で動かした点数は「だれが」を明細からたどれるようにする。
+      // 手で動かした点数は「だれが」を明細からたどれるようにする。
       executedByStaffId: staff?.id ?? null,
       executedByStaffName: staff?.name ?? null,
       idempotencyKey: requestKey ? JSON.stringify(['manual', staff?.id ?? null, requestKey]) : undefined,

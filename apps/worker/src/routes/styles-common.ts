@@ -105,7 +105,7 @@ export async function staffFilter(c: Context<Env>, id: string, style: IndustrySt
   return selected;
 }
 
-/** API used by the existing analytics result-to-audience route. No messages are sent. */
+/** 分析結果から対象者を作る既存 API として扱い、メッセージは送らない。 */
 export async function bookingAudience(
   c: Context<Env>,
   id: string,

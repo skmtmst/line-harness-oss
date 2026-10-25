@@ -1,4 +1,4 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const nenMembersPaths = {
   // ── NEN Members (会員ランク・ライフタイム・マイル ★37-1) ──────────────
   '/api/public/nen/adopted-photos': {
@@ -171,7 +171,7 @@ export const nenMembersPaths = {
       responses: { '200': { description: '30-day summary (records, weight, heart/respiratory averages, stool/appetite/skin/tear counts, notes, logs)' }, '401': { description: 'LIFF identity required' }, '404': { description: 'Pet not found' } },
     },
   },
-  // ── NEN Photo Rewards（採用写真のポイント手続き・PHOTO-06） ──────────────
+  // ── NEN Photo Rewards（採用写真のポイント手続き・） ──────────────
   '/api/nen-members/photos/{id}/point-retry': {
     post: {
       tags: ['NEN Members'],

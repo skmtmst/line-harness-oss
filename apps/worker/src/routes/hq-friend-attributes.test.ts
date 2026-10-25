@@ -168,7 +168,7 @@ test('attribute counts and totals include actual definitions, population, receiv
  expect((await request(`/${template.id}/received-versions`)).body.data.map((r:any)=>r.targetVersion.version)).toEqual([1,1]);
  expect((await request(`/${template.id}/versions`)).body.data[0].is_draft).toBe(true);
  const p=await preflight(template.id);expect(p.stores[0].targetVersion).toMatchObject({version:1,latestVersion:2,status:'older'});
- // Even successful history from an account that moved tenant contributes nothing.
+ // 別の統括へ移動したアカウントの成功履歴も、元の集計に含めない。
  sql.raw.exec("UPDATE line_accounts SET tenant_id='foreign' WHERE id='b'");
  list=await request('?type=mark');expect(list.body.data[0]).toMatchObject({friend_count:1,distributed_account_count:1,distributed_account_names:['a'],outdated_account_count:1});
 });

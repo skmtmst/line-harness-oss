@@ -174,7 +174,7 @@ export interface DashboardOverview {
       used: number | null;
       limit: number | null;
       remaining: number | null;
-      /** LINE が「上限なし」の契約を返したとき true。limit=null と区別する（DASH-08）。 */
+      /** LINE が「上限なし」の契約を返したとき true。limit=null と区別する。 */
       unlimited: boolean;
     }>;
     friendTrend: DashboardMetric<DashboardFriendTrendPoint[]>;
@@ -310,7 +310,7 @@ export interface ListStats {
     inUse: number;
     unanswered: number;
     inProgress: number;
-    /** 受信箱の「保留」トーク数。未対応割合の母数を全状態にするため（#1014 ATTR-21）。 */
+    /** 受信箱の「保留」トーク数。未対応割合の母数を全状態にするため。 */
     onHold: number;
     resolved: number;
     /** 過去7日でマークを変えた回数（110）。 */

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
 
 /*
- * N-432(#668)。招待メールが伝える有効期限を、実際に送る本文で確かめる。
+ *。招待メールが伝える有効期限を、実際に送る本文で確かめる。
  *
  * 期限そのものは staff.ts の INVITE_TTL_MS が決める。本文がそれと食い違うと、
  * 受け取った人は「切れた」と思って捨てる/切れていないと思って放置する。

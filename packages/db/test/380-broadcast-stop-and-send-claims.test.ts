@@ -1,5 +1,5 @@
 /*
- * #662 / N-059 — 一斉配信の停止と送達台帳。
+ * 一斉配信の停止と送達台帳。
  *
  * 見張っているのは4つ。
  *
@@ -133,7 +133,7 @@ describe('380 一斉配信の停止と送達台帳', () => {
     /*
      * 停滞ロックの復旧は**3本ある**（未着手 / dedup の途中 / 差し込みありの絞り込み）。
      * 上の試験が見張っているのは1本目だけで、2本目と3本目の `stopped_at IS NULL` は
-     * 外しても誰も気づかなかった（PR #1612 の独立審査で指摘）。
+     * 外しても気づけないので、ここで3本とも見張る。
      *
      * 実害は今のところ出ない——ロックは解けるが `getQueuedBroadcasts` 側の
      * 絞り込みが独立に止めるので送信までは進まない。**それでも見張る。**
@@ -206,7 +206,7 @@ describe('380 一斉配信の停止と送達台帳', () => {
       ]);
 
       await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f1'], state: 'sent' });
-      // #816: 再送できるのは一時的な失敗だけなので、429（速度制限）で落とす。
+      // 再送できるのは一時的な失敗だけなので、429（速度制限）で落とす。
       await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f2'], state: 'failed', errorCode: 'line_http_429' });
       expect(await countBroadcastLedger(db, 'b1')).toEqual({ sent: 1, failed: 1, unknown: 0, claimed: 0 });
       expect([...await getBlockedRecipientIds(db, 'b1')]).toEqual(['f1']);
@@ -277,7 +277,7 @@ describe('380 一斉配信の停止と送達台帳', () => {
         broadcastId: 'b1', attemptNo: 1, lineAccountId: 'account-1', friendIds: ['f1', 'f2', 'f3'],
       });
       await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f1'], state: 'sent' });
-      // #816: 開け直すのは一時的な失敗だけなので、429（速度制限）で落とす。
+      // 開け直すのは一時的な失敗だけなので、429（速度制限）で落とす。
       await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f2'], state: 'failed', errorCode: 'line_http_429' });
       await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f3'], state: 'unknown', errorCode: 'line_no_response' });
 

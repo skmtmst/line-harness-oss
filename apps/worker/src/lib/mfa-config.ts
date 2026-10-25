@@ -1,4 +1,4 @@
-/** Configuration status only: never include the secret in responses or logs. */
+/** 設定状態だけを返し、秘密値を応答やログへ含めない。 */
 export const MFA_KEY_NOTICE = '二段階認証の鍵が未設定のため、必須にできません';
 export function mfaEncryptionConfigured(key?: string): boolean {
   return Boolean(key && key.trim().length >= 32);

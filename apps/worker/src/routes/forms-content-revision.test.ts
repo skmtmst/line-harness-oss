@@ -1,5 +1,5 @@
 /*
- * PUT /api/forms/:id の版競合(#723)。
+ * PUT /api/forms/:id の版競合。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物のルートを当てる。モックは
  * 役割の門番が見る staff だけで、保存の経路は本物のまま通す。

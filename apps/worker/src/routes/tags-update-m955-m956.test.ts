@@ -4,17 +4,7 @@ import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { tags } from './tags.js';
 
-/*
- * M955・M956（/tags/edit の保存と遡及適用）。
- *
- * - M955: 「既存友だちに適用」付き保存で遡及キュー投入だけ落ちると、
- *   500を返すのにタグ保存は確定・遡及は消失し再試行口もない。
- *   正しくは保存ごと巻き戻り、同版での再送でやり直せること。
- * - M956: 応答消失後の同版再送が「別の人が先にタグを更新しました」と
- *   嘘の競合を返す。要求キー付きの再送は保存済みの結果を返すこと。
- *
- * 実DB・実routeで見る（試験用D1の batch は本番と同じく原子）。
- */
+/** 遡及適用の投入に失敗したらタグ保存も戻し、同じ版で再試行できることを実 route と SQLite で確かめる。応答喪失後の要求キー付き再送は、競合にせず保存済み結果を返す。 */
 let testDb: SqliteD1;
 
 function app(staff: { id: string; role: 'owner' | 'staff' } = { id: 'env-owner', role: 'owner' }) {

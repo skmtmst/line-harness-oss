@@ -1,5 +1,5 @@
 /*
- * N-327 #663: 予約の受付から運用者通知が自動発火することを、実 SQLite と
+ *  予約の受付から運用者通知が自動発火することを、実 SQLite と
  * 実ルートで見張る。
  *
  * ここで止めたい崩れ方:
@@ -28,7 +28,7 @@ import type { Env } from '../worker-env.js';
 
 const dispatchOperatorEvent = vi.hoisted(() => vi.fn());
 vi.mock('../services/operator-notification-dispatch.js', () => ({ dispatchOperatorEvent }));
-// R150: 送信Webhookへの発火だけ差し替える。他の公開口は本物。
+// 送信Webhookへの発火だけ差し替える。他の公開口は本物。
 const fireOutgoingWebhooks = vi.hoisted(() => vi.fn());
 vi.mock('../services/event-bus.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -318,7 +318,7 @@ describe('N-327 #663 予約の受付から運用者通知を自動発火する',
   });
 
   /*
-   * R150: 予約の送信Webhook発火。運用者通知と同じ成否境界で、予約が
+   * 予約の送信Webhook発火。運用者通知と同じ成否境界で、予約が
    * 成立したときだけ booking_created を購読者へ届ける。発生元は予約ID
    * で固定し、作成→承認の二重発火は配送台帳の冪等キーで吸収する。
    */

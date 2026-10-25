@@ -72,7 +72,7 @@ stagingQa.get(`${BASE}/runs`, async (c) => {
   return c.json({ success: true, data: { runs, nextCursor: rows.results.length > 50 ? runs.at(-1)!.id : null } });
 });
 
-/** Caller supplies passwords; no password, token, session or key is returned. */
+/** パスワードは呼出元が渡し、パスワード・トークン・セッション・キーは返さない。 */
 stagingQa.post(`${BASE}/runs`, async (c) => {
   const input = await body(c);
   const passwords = input?.passwords;
@@ -121,7 +121,7 @@ stagingQa.get(`${BASE}/runs/:id`, async (c) => {
   return run ? c.json({ success: true, data: run }) : c.json({ success: false, error: 'Not found' }, 404);
 });
 
-/** Operators can prepare a separate browser's synthetic identity without external login. */
+/** 外部ログインなしで、別ブラウザ用の合成人物を運用者が準備できるようにする。 */
 stagingQa.post(`${BASE}/runs/:id/session`, async (c) => {
   const db = c.env.DB, id = c.req.param('id'), input = await body(c);
   const run = await readRun(db, id);
@@ -147,7 +147,7 @@ stagingQa.post(`${BASE}/runs/:id/session`, async (c) => {
     if (!active) return c.json({ success: false, error: 'Not found' }, 404);
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
     if (config.misconfigured) return c.json({ success: false, error: '試験ログインの環境設定を確認してください' }, 503);
-    // QA-only session: normal production login/MFA handling is unchanged. Values stay in cookies.
+    // QA 専用セッションの値は Cookie に限り、通常の本番ログインと MFA は変更しない。
     await issueSession(c, user.id, config.sameSite, false, true);
     return c.json({ success: true, data: { id: user.id, role: user.role, tenantId: run.tenantId } satisfies StagingQaSession });
   } finally { await release(db, id, owner); }

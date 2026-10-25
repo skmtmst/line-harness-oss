@@ -1,7 +1,7 @@
 /*
  * NEN配信の本文の上限。画面・保存・送信が同じ値・同じ単位で数える。
  *
- * 根拠（#659 差し戻し3点目: 単位の混同を修正）。`body_text` は素のテキスト
+ * 根拠。`body_text` は素のテキスト
  * メッセージではなく、`nen-engagement.ts` の `flexMessage` でFlexの
  * bubble内textコンポーネントに入る。LINEはFlexの個々のtextコンポーネント
  * には文字数上限を公開しておらず、公開されているのはFlexメッセージ全体の
@@ -63,7 +63,7 @@ export function countNenCampaignBodyLength(value: string): number {
  * 3つ。保存の時点では相手が決まらないので、既定では「送信されうる
  * いちばん長い値」（ペット名は `NEN_PET_NAME_MAX_LENGTH` いっぱい）で
  * 見積もる。既定を短い見本のままにすると、展開後に上限を超える入力が
- * 実際には1つも作れず、超過の注意文が画面に一生出ない穴になる（#659）。
+ * 実際には1つも作れず、超過の注意文が画面に一生出ない穴になる。
  */
 export function expandNenCampaignBodyPlaceholders(
   value: string,

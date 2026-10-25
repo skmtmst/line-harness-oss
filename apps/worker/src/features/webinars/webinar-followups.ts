@@ -425,7 +425,7 @@ export async function processWebinarFollowups(
   const deliver = async (candidate: Candidate | JourneyCandidate, kind: FollowupKind | WebinarJourneyFollowupKind,
     journey: boolean): Promise<void> => {
     const table = journey ? 'webinar_journey_followups' : 'webinar_followups';
-    // Stop/feature gates precede row creation; stopping never consumes a delivery.
+    // 停止と機能の検査を行作成前に行い、停止を理由に配信を消費しない。
     if (candidate.account_id && !await featureJobCanRun(db,{accountId:candidate.account_id,featureId:'webinars',job: 'webinar followups'})) return;
     if (candidate.account_id && await isOperationCapabilityStopped(db,candidate.account_id,'reminder_dispatch')) return;
     const followup = journey
@@ -455,7 +455,7 @@ export async function processWebinarFollowups(
             webinarPickerUrl(delivery.liffId,candidate.slug),(candidate as JourneyCandidate).booking_url)
         : buildCtaFollowupText(kind as FollowupKind,formUrl(delivery.liffId,(candidate as Candidate).form_id));
       const snapshot=await ensureWorkflowStep(db,ref,{input:{to:friend.line_user_id,text},retryKey:followup.retry_key,maxAttempts:EXTERNAL_DELIVERY_MAX_ATTEMPTS});
-      // Configuration failures have no wire request yet. Freeze it before the first external call.
+      // 設定不足ではまだ送信していないため、初めて外部へ送る前に要求内容を固定する。
       await db.prepare(`UPDATE workflow_steps SET input_json=? WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?
         AND input_json IS NULL AND status IN ('pending','failed')`).bind(JSON.stringify({to:friend.line_user_id,text}),ref.scopeId,ref.processKind,ref.subjectId,ref.stepKey).run();
       if(snapshot.status==='succeeded') {
@@ -493,7 +493,7 @@ export async function processWebinarFollowups(
       ]});
       sent++;
     } catch(err) {
-      // Configuration failures also use the same bounded schedule, without persisting exception bodies.
+      // 設定不足でも同じ有限の再試行予定を使い、例外本文は保存しない。
       if(!owner) {
         await ensureWorkflowStep(db,ref,{retryKey:followup.retry_key,maxAttempts:EXTERNAL_DELIVERY_MAX_ATTEMPTS});
         owner=(await claimWorkflowStep(db,ref))?.lease_owner ?? null;

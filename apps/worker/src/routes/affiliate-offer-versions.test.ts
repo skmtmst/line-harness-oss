@@ -1,13 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Route-level test for the offer version endpoints (#823):
-//   GET  /api/affiliate-offers/:id/versions
-//   GET  /api/affiliate-offers/:id/cap-status
-//   POST /api/affiliate-offers/:id/versions
-// The db layer is mocked — real version/cap behaviour is covered against
-// SQLite in packages/db/test/472_473_affiliate_rules.test.ts. Here we assert
-// wiring, validation, serialization, permission (owner/admin only for POST),
-// and the 404 for a missing offer.
+// 版・上限の実 SQL は DB パッケージの試験で守り、ここでは引数・検証・応答・POST の owner/admin 権限・不存在の404を確かめる。
 const dbMocks = {
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
@@ -21,7 +14,7 @@ const dbMocks = {
   getActiveImpersonation: vi.fn(async () => null),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // offer route deps
+
   createAffiliateOffer: vi.fn(),
   updateAffiliateOffer: vi.fn(),
   listAffiliateOffers: vi.fn(),

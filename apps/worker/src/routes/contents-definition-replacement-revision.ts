@@ -415,7 +415,7 @@ function serializeVar(row: CommonVar) {
     expiryBehavior: row.expiry_behavior ?? 'stop',
     version: Number(row.version ?? 1),
     archivedAt: row.archived_at ?? null,
-    // Q: 「期限切れ」は時刻からその都度計算する。画面は state を見るだけでよい。
+    // 「期限切れ」は時刻からその都度計算する。画面は state を見るだけでよい。
     status: row.status ?? 'active',
     stoppedAt: row.stopped_at ?? null,
     state: row.status === 'stopped'
@@ -554,7 +554,7 @@ export function commonVarUsageHref(item: CommonVarUsageItem): string {
 
 export /*
  * 使用先の状態の呼び名。画面はこの語彙だけを信用するため、処理と違う
- * 言い方をしない（IDEA-14）。
+ * 言い方をしない。
  *
  * - sending_fixed: 送信を始めた配信。値は送信開始時点の写しで固定済みで、
  *   共通情報を直してもその配信は変わらない。

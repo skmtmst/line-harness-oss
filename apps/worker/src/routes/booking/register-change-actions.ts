@@ -42,7 +42,7 @@ booking.post('/api/booking/admin/bookings/:id/reassign', requireRole('owner', 'a
 });
 
 /**
- * Google カレンダー同期の手動再試行 (N-392)。
+ * Google カレンダー同期の手動再試行。
  *
  * 失敗行 (retry_wait/permanent_failed) だけを対象にする。成功・取消ずみの
  * 行は触らず 409、実行中 (queued) は二重実行を避けて 409。
@@ -108,7 +108,7 @@ booking.post('/api/booking/admin/bookings/:id/sync/retry', requireRole('owner', 
 });
 
 /**
- * LINE 通知の手動再試行 (N-393)。
+ * LINE 通知の手動再試行。
  *
  * 対象は confirmation_line 台帳の未成功行。成功ずみは二重送信を避けて 409。
  * 失敗しても行に error_code を残したまま 200 で実状態を返す。
@@ -148,7 +148,7 @@ booking.post(
     } catch {
       /* 壊れた result_json は既定の approved で送る */
     }
-    // R324: 失効した通知は送らない。通知の意味と今の予約状態が合うときだけ送る。
+    // 失効した通知は送らない。通知の意味と今の予約状態が合うときだけ送る。
     // approved/changed は確定ずみ、requested/rejected/expired はその状態の予約にだけ送る。
     // 行の状態より先に見る。止めた行でも理由が運用者に見える。
     const retryableStatuses: Record<NotificationKind, BookingStatus[]> = {
@@ -181,7 +181,7 @@ booking.post(
     if (op.status === 'queued') {
       return c.json({ error: 'operation_in_progress' }, 409);
     }
-    // R323: 失敗行を条件付き UPDATE で一度だけ取得する。取れなければ
+    // 失敗行を条件付き UPDATE で一度だけ取得する。取れなければ
     // 別要求が送信中のため送らない (二重送信を防ぐ)。
     if (!await claimBookingOperationForRetry(c.env.DB, { id: op.id, kind: 'confirmation_line' })) {
       const current = await c.env.DB
@@ -197,7 +197,7 @@ booking.post(
     }
     let outcome: 'succeeded' | 'failed' = 'succeeded';
     try {
-      // R323: 同じ行の再送・回収は安定キーで行い、LINE 側の到達ずみ再送は冪等に吸収する。
+      // 同じ行の再送・回収は安定キーで行い、LINE 側の到達ずみ再送は冪等に吸収する。
       await notifyForBooking(c.env.DB, bookingId, notificationKind, op.id);
     } catch (error) {
       outcome = 'failed';
@@ -258,7 +258,7 @@ booking.get('/api/booking/admin/availability', async (c) => {
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const menuId = c.req.query('menu_id');
   /*
-   * #1060: メニューごとの空き枠を1要求で返す一括モード。
+   * メニューごとの空き枠を1要求で返す一括モード。
    * `menu_ids`（カンマ区切り）があると `{ by_menu: [...] }` を返す。
    * 未指定なら従来どおり `menu_id` 1件の `{ by_staff, calendar_sync }`。
    */

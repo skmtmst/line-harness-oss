@@ -135,9 +135,9 @@ export async function saveReminderDraftVersion(
   if (!reminder) throw new Error('REMINDER_NOT_FOUND');
   const existing = await getReminderDraftVersion(db, reminderId);
   const now = nextVersionToken(existing?.updated_at ?? reminder.updated_at);
-  // N-080 (#869): 開いたときの版を指定されたら照合する。別タブで先に保存・
+  // 開いたときの版を指定されたら照合する。別タブで先に保存・
   // 公開された下書きへ、古い画面の内容をそのまま上書きさせない。
-  // R148 監査：通常保存は版IDを付け替えないため、版IDだけでは A の保存後に
+  // 通常保存は版IDを付け替えないため、版IDだけでは A の保存後に
   // B が古い内容で保存しても比較が通る。保存のたびに変わる updated_at も
   // 合わせて照合し、ずれていれば 409 で止める（ミリ秒精度）。
   if (options.expectedVersionId !== undefined) {

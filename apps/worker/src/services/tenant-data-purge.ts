@@ -157,7 +157,7 @@ async function purgeOneTenant(
         out.deletedObjects += objects.deleted;
         out.failedObjects += objects.failed;
         if (table === 'form_submission_files' && objects.failed > 0) {
-          // Keep the R2 keys and parents reachable so the next run can retry.
+          // 次回も削除を再試行できるよう、R2 キーと親行への参照を保つ。
           out.finished = false;
           break tables;
         }

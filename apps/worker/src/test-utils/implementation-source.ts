@@ -2,11 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, extname, resolve } from 'node:path';
 import ts from 'typescript';
 
-/**
- * Read a feature's implementation after extraction without following unrelated
- * dependencies. Only actual same-family static imports/re-exports count. Other
- * independently audited entries remain separate; unimported files stay unknown.
- */
+/** 実際の同系統の静的 import/re-export だけをたどり、無関係な依存を混ぜず分割後の実装を読む。未接続ファイルは根拠にしない。 */
 export function implementationFiles(entry: string, auditedEntries: ReadonlySet<string> = new Set()): string[] {
   const root = resolve(entry);
   const folder = dirname(root);

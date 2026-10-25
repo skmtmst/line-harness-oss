@@ -24,12 +24,12 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
     expectedVersion?: number;
     resubmitInvite?: boolean;
     watchSubmitter?: boolean;
-    // 重複のときの「報酬なしで採用」(#817)。点数を付けずに採用だけ残す。
+    // 重複のときの「報酬なしで採用」。点数を付けずに採用だけ残す。
     withoutReward?: boolean;
   }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   // 再実行キー。連打・応答ロストのやり直しが「別の担当者が更新しました」に
-  // 化けないよう、一括審査や派生画像処理と同じく必須にする（#931 N-313）。
+  // 化けないよう、一括審査や派生画像処理と同じく必須にする。
   const key = c.req.header('Idempotency-Key')?.trim() ?? '';
   if (!accountId || key.length < 8 || key.length > 200) {
     return inputError(c, { success: false, error: '対象アカウントと再実行キーを確認してください' }, 400, ["accountId"]);
@@ -48,7 +48,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
   if (status === 'rejected' && reasonCode === 'other' && !reasonNote) {
     return inputError(c, { success: false, error: 'そのほかの理由を入力してください' }, 400, ["status","reasonCode","reasonNote"]);
   }
-  // 「もう一度送ってもらえるようお願いする」（#931 N-312）。採用には関係しない。
+  // 「もう一度送ってもらえるようお願いする」。採用には関係しない。
   const resubmitInvite = status !== 'rejected' || body?.resubmitInvite !== false;
   const watchSubmitter = status === 'rejected' && body?.watchSubmitter === true;
   const photo = await loadPhotoReviewRecipient(
@@ -119,7 +119,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
     }
   }
   /*
-   * 採用する時点の報酬の決まりを写す (#817)。版を変えても過去の付与は
+   * 採用する時点の報酬の決まりを写す。版を変えても過去の付与は
    * 変わらない。同じ写真が2回採用されても報酬は1回だけ——報酬つきで
    * 採用済みの重複があるときは、選んだ操作に関わらず点数を付けない。
    */
@@ -181,7 +181,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
         crypto.randomUUID(), photo.id, accountId, photo.friend_id, photo.customer_id,
         `nen-photo:${String(photo.id)}`, policy.policyKey, awarded, now, now, now,
       )] : []),
-      // 「この人の次の投稿は、必ず人が見る」（#931 N-312）。確認対象の印を
+      // 「この人の次の投稿は、必ず人が見る」。確認対象の印を
       // 友だちへ残し、次に届く写真の一覧へ出す。
       ...(watchSubmitter ? [c.env.DB.prepare(
         `UPDATE friends SET photo_watch_required = 1, updated_at = ?
@@ -193,7 +193,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
     }
   } catch (error) {
     /*
-     * M508: 保存の失敗を「ほかの担当者により更新されました」に化けない。
+     * 保存の失敗を「ほかの担当者により更新されました」に化けない。
      * 版の不一致だけが409で、それ以外の保存失敗は500で理由を分ける。
      * 同じ再実行キーの並行到達（UNIQUE）は保存済みを読み直して区別する。
      */
@@ -221,7 +221,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
   }
   await syncNenPhotoTags(c.env.DB, String(photo.friend_id));
   /*
-   * outbox を積んだら、その場でECへの付与を一度試す（PHOTO-06）。
+   * outbox を積んだら、その場でECへの付与を一度試す。
    * ここで届けば「手続き中」のまま残らない。失敗しても採用そのものは
    * 完了させ、行は pending/failed のまま残り、日次回収・手動の
    * 再試行・照合のどれかで後から進められる。
@@ -331,7 +331,7 @@ export const put__api_nen_members_photos_id_rotation_4 = async (c: Context<Env, 
 export const post__api_nen_members_photos_id_notification_retry_5 = async (c: Context<Env, "/api/nen-members/photos/:id/notification/retry">) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   const accountId = body?.accountId?.trim();
-  // 再実行キー（#931 N-313）。送達が確定した再送を、同じキーのやり直しが
+  // 再実行キー。送達が確定した再送を、同じキーのやり直しが
   // もう一度送らないよう、使ったキーを写真へ記録する。
   const key = c.req.header('Idempotency-Key')?.trim() ?? '';
   if (!accountId || key.length < 8 || key.length > 200) {
@@ -403,7 +403,7 @@ export const post__api_nen_members_photos_id_notification_retry_5 = async (c: Co
     reasonCode: row.reason_code,
     reasonNote: row.reason_note,
     decisionId: row.decision_id,
-    // 差戻し時に選んだ再投稿案内の有無を、審査イベントから復元する（#931 N-312）。
+    // 差戻し時に選んだ再投稿案内の有無を、審査イベントから復元する。
     resubmitInvite: row.resubmit_invite !== 0,
   });
   if (delivery.notificationStatus === 'sent') {

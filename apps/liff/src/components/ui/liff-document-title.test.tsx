@@ -10,8 +10,7 @@ import { cleanup, render } from '@testing-library/react';
 import LiffHeader, { liffDocumentTitle } from './liff-header.js';
 
 /**
- * タブ（LINE の上）の題は「<画面名> | musubo」（リリース前点検 2026-10-07）。
- * 以前は全画面が「予約」だった。
+ * タブ（LINE の上）の題は「<画面名> | musubo」。どの画面か題で分かるようにする。
  */
 const PAGES = join(import.meta.dirname, '../../pages');
 

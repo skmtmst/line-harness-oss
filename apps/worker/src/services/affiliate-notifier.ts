@@ -8,41 +8,14 @@ import {
   getLineAccountById,
 } from '@line-crm/db';
 
-/**
- * Affiliate push notifications (ASP).
- *
- * Two operator-facing events push a LINE message to the affiliate (the person
- * who owns the referral link), not to the friend who converted:
- *   A) friend-add via an affiliate link  → notifyAffiliateFriendAdd
- *   B) conversion approved               → notifyAffiliateApproval
- *
- * Both resolve:
- *   affiliates.friend_id → friends(line_user_id, line_account_id)
- *   → line_accounts.channel_access_token (fallback: env.LINE_CHANNEL_ACCESS_TOKEN)
- *   → LINE push.
- *
- * Friend-add failures are logged without interrupting attribution. Approval
- * failures propagate to notifyApprovalOnce, which releases the owned notification
- * claim and keeps the approval itself successful so a retry can repair delivery.
- */
+/** 友だち追加と成果承認は、成果を上げた友だちでなくリンク所有者へ通知する。本人の所属アカウントからトークンを解決する。友だち追加の失敗は帰属を止めず、承認通知の失敗は notifyApprovalOnce が実行権を解放し、承認を保ったまま再試行で補う。 */
 
-/** Minimal env surface needed to resolve the fallback push token. */
+/** 代替の送信トークン解決に必要な設定だけを受け取る。 */
 export interface AffiliateNotifierEnv {
   LINE_CHANNEL_ACCESS_TOKEN: string;
 }
 
-/**
- * Push a plain-text LINE message to the affiliate identified by `affiliateId`.
- *
- * Silently no-ops (returns without throwing) when:
- *   - the affiliate does not exist,
- *   - the affiliate has no bound friend (admin-created affiliate with no LIFF
- *     self-register — friend_id NULL),
- *   - the bound friend row is missing or has no line_user_id,
- *   - no push token can be resolved.
- *
- * Internal delivery errors propagate; the public best-effort wrapper logs them.
- */
+/** 参加者・結び付いた友だち・LINE ID・トークンがなければ送信しない。配送エラーは上へ渡し、公開の継続可能な入口で記録する。 */
 async function pushAffiliate(
   db: D1Database,
   env: AffiliateNotifierEnv,
@@ -51,13 +24,12 @@ async function pushAffiliate(
   retryKey?: string,
 ): Promise<void> {
     const affiliate = await getAffiliateById(db, affiliateId);
-    if (!affiliate?.friend_id) return; // unbound affiliate — nothing to push to
+    if (!affiliate?.friend_id) return; // 結び付いた友だちがなければ送信先がない。
 
     const friend = await getFriendById(db, affiliate.friend_id);
     if (!friend?.line_user_id) return;
 
-    // Resolve the push token from the friend's LINE account, falling back to
-    // the env default when the account row / token is absent.
+    // 友だちの所属トークンを優先し、行や値がない場合は環境の既定へ戻す。
     let accountToken: string | null = null;
     let accountId: string | null = friend.line_account_id ?? null;
     if (friend.line_account_id) {
@@ -89,7 +61,7 @@ export async function notifyAffiliate(db: D1Database, env: AffiliateNotifierEnv,
   }
 }
 
-/** Format the reward line with a thousands separator, e.g. 12345 → "12,345". */
+
 function formatYen(amount: number): string {
   return sharedFormatYen(amount).replace(/^¥/, '');
 }
@@ -113,13 +85,7 @@ export async function notifyAffiliateFriendAdd(
   await notifyAffiliate(db, env, affiliateId, text);
 }
 
-/**
- * B) 成果承認通知 — a conversion attributed to this affiliate was approved.
- *
- * When `offerName` is set the message includes the fixed reward line. For an
- * offer-less attribution (offerName null) the reward line is omitted and only
- * a generic approval message is sent.
- */
+/** 案件名がある承認通知だけに固定報酬を含め、案件なしは一般的な承認文だけを送る。 */
 export async function notifyAffiliateApproval(
   db: D1Database,
   env: AffiliateNotifierEnv,

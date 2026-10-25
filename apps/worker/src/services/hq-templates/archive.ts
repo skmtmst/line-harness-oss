@@ -9,7 +9,7 @@ export function templateArchiveStatus(value: string | undefined): HqTemplateArch
   throw new HqTemplateError('INVALID_STATUS');
 }
 
-/** Restore the HQ definition only. Stores keep their independently distributed copies. */
+/** 復元は統括の定義だけを戻し、店舗へ配布した独立の写しは変えない。 */
 export async function restoreArchivedTemplate(db: D1Database, auth: HqTemplateAuthority, id: string, expectedRevision: unknown) {
   if (!Number.isSafeInteger(expectedRevision) || Number(expectedRevision) < 1) throw new HqTemplateError('INVALID_REVISION');
   const current = await getHqTemplate(db, auth.tenantId, id);
@@ -20,7 +20,7 @@ export async function restoreArchivedTemplate(db: D1Database, auth: HqTemplateAu
       db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM hq_templates
         WHERE id=? AND tenant_id=? AND revision=? AND archived_at IS NOT NULL) THEN '{}' ELSE 'HQ_RESTORE_CONFLICT' END)`)
         .bind(id, auth.tenantId, expectedRevision),
-      // Confirmations and preview tokens issued before storage must not become valid again.
+      // 保管前の確認票やプレビュートークンを、復元で再び有効にしない。
       db.prepare("UPDATE hq_template_preflights SET status='expired' WHERE template_id=? AND tenant_id=? AND status='ready'").bind(id, auth.tenantId),
       db.prepare("UPDATE hq_form_test_tokens SET revoked_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE template_id=? AND tenant_id=? AND revoked_at IS NULL").bind(id, auth.tenantId),
       db.prepare(`UPDATE hq_templates SET archived_at=NULL,revision=revision+1,

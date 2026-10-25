@@ -1,4 +1,4 @@
-/** Public exports remain stable; implementation lives with its related helpers. */
+/** 既存の公開名を保ち、関連する補助関数と実装を近くに置く。 */
 export { TOGGLEABLE_FEATURES } from './feature-settings-definition-is-toggleable.js';
 export { TOGGLEABLE_FEATURE_SET } from './feature-settings-definition-is-toggleable.js';
 export type { ToggleableFeature } from './feature-settings-definition-is-toggleable.js';

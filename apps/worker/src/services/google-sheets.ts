@@ -2,7 +2,7 @@ import { jstDate as japanDate } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
 /**
- * #838 第2段: Google Sheets への直接書き出し。
+ *  第2段: Google Sheets への直接書き出し。
  *
  * - OAuth・トークン・再試行は services/google-business.ts の実装を使う。
  *   ここでは Sheets API の形（タブ・行の upsert）と同期の流れだけを持つ。
@@ -201,7 +201,7 @@ const formAnswersSource: DataSource = {
     const binds: unknown[] = [lineAccountId, lineAccountId];
     /*
      * フォームが複数アカウントへ共有されていても、書き出すのはこの
-     * アカウントの友だちの回答だけ（R441）。管理画面の回答一覧と同じ
+     * アカウントの友だちの回答だけ。管理画面の回答一覧と同じ
      * 所属条件（回答した友だちの所属アカウント）に揃える。
      * 友だちが消えて所属が分からない回答は、どのアカウントにも出さない。
      */
@@ -337,7 +337,7 @@ async function appendRows(
 ): Promise<void> {
   if (rows.length === 0) return;
   /*
-   * append は「行を足す」操作なので自動再試行しない（R439）。
+   * append は「行を足す」操作なので自動再試行しない。
    * Google が保存した直後に応答だけ落ちたとき、そのまま再送すると
    * 同じ行が二度並ぶ。送達不明のまま失敗扱いにし、次の同期が
    * キー列を読み直して既に入った分を上書きへ回すので欠落しない。
@@ -459,7 +459,7 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
  * 手動・定期・他プロセスの重複をここで1回だけ断る。
  *
  * 空を読んでから INSERT する並びだと、同時に始まった2処理がどちらも
- * 空を見て実行権を持ってしまう（R438）。先に自分の行を入れ、連携内で
+ * 空を見て実行権を持ってしまう。先に自分の行を入れ、連携内で
  * もっとも先に入った running 行だけを勝者にする。負けた側は自分の行を
  * 消して null を返すので、履歴に「失敗した実行」が勝手に増えない。
  */
@@ -687,7 +687,7 @@ export async function processDueGoogleSheetsSyncs(
         continue;
       }
       /*
-       * 実行日は日本時間で持つ（R442）。started_at のUTC日付と比べると、
+       * 実行日は日本時間で持つ。started_at のUTC日付と比べると、
        * JSTの0時〜9時に走った分と同日の9時以降の分が別日扱いになり、
        * 同じJST日に定期同期が二度走っていた。
        * 出力先も条件に入れる。出力先を変えた日に、変える前のシートへの

@@ -69,7 +69,7 @@ beforeEach(() => {
 
 describe('EC subscriptions and connector', () => {
   /*
-   * 「定期便の中身と集計を返す」の表明は、#731 で
+   * 「定期便の中身と集計を返す」の表明は、 で
    * `ec-commerce-subscriptions-pagination.test.ts` へ移した。
    *
    * ここの DB は `all` が常に同じ行を返す作りで、契約を SQL で展開・集計する
@@ -104,7 +104,7 @@ describe('EC subscriptions and connector', () => {
   })
 
   it('returns a null connector retry policy like the visual-QA mock', async () => {
-    // #517 中5b: つなぎ先単位のやり直し方針は口に無い。本番が null を返すことを
+    //  中5b: つなぎ先単位のやり直し方針は口に無い。本番が null を返すことを
     // 固定し、モックだけ別物になる逆変異(どちらかを変える)を赤で捕まえる。
     // モック側の一致は web の契約試験が見張る。
     const { app } = harness({

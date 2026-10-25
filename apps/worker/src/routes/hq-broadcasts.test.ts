@@ -195,7 +195,7 @@ describe('統括の配信一覧・複製・追送',()=>{
    const source=await sentWithLink();
    const r=await call(`/api/hq/broadcasts/${source.id}/followup`,'POST',{requestId:'followup-draft',expectedVersion:1});expect(r.status,await r.clone().text()).toBe(201);
    const b=(await r.json() as HqRunResponse).data;expect(globalThis.fetch).not.toHaveBeenCalled();expect(b).toMatchObject({status:'prepared',sent:0,followupAudienceCount:1,input:{followupOfRunId:source.id,targetType:'segment'}});
-   // The normal send flow resolves the per-account source again, even after the draft is saved.
+   // 下書き保存後も、送信時にアカウント別の送信元を再解決する。
    const {resolveHqBroadcastAudience,countHqAudience}=await import('../features/hq-broadcasts/hq-broadcast-audience.js');
    const condition=await resolveHqBroadcastAudience(f.db,tenant,'shop',b.input);expect(await countHqAudience(f.db,'shop',condition)).toEqual({count:1,consentExcluded:0});
    expect((f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get() as {n:number}).n).toBe(1);

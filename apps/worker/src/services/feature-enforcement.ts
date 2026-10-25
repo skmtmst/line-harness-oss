@@ -209,7 +209,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
-    // K(#822): 公開中のリッチメニューを1日1回だけ見て、ずれを台帳に残す。
+    // 公開中のリッチメニューを1日1回だけ見て、ずれを台帳に残す。
     name: 'rich menu daily reconcile',
     classification: { kind: 'feature', featureId: 'rich_menus' },
     enforcement: {
@@ -566,7 +566,7 @@ async function accountCompanyFeatureSettings(
     FEATURE_SETTINGS_BUNDLE_KEY,
   );
   // 一括設定に無い分だけ旧 `feature.<キー>` を読む。機能ごとの往復にせず
-  // 1往復でまとめて取る(#633)。
+  // 1往復でまとめて取る。
   const missing = featureIds.filter(
     (featureId) => typeof bundle?.data.features?.[featureId] !== 'boolean',
   );
@@ -663,7 +663,7 @@ async function contractAvailability(
       featureContractIsAvailable(entitlements, entry.entitlementKey),
     ])) as Record<FeatureId, boolean>;
   }
-  // tenant_id 読取 + tenants 読取の2往復を1往復の結合読取へ(#633)。
+  // tenant_id 読取 + tenants 読取の2往復を1往復の結合読取へ。
   const entitlements = resolveEntitlements(
     await getTenantBillingByLineAccount(db, accountId),
   );

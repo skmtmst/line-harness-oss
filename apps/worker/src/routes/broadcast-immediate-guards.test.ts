@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-// N-062: 即時送信の直前に送信枠と後続アクション版を見直す。
+// 即時送信の直前に送信枠と後続アクション版を見直す。
 // 実 route＋実DBで確かめる。通信の境界だけ差し替える：
 // LINE API の枠取得は global fetch、LINE 送信は LineClient。
 const lineCalls = vi.hoisted(() => ({ broadcast: 0, failTimes: 0 }));

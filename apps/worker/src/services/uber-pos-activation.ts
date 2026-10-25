@@ -1,7 +1,4 @@
-/** A durable one-shot fence using the existing connection revision and target columns.
- * Started/unknown are never reclaimed for sending. Reconciliation is an operator task.
- * This is not a substitute for A06's complete journal or shared circuit store.
- */
+/** 既存の接続版と対象列で、一度限りの送信権を永続化する。開始済み・不明は再取得せず、人が照合する。完全な配送台帳や共有の停止ストアの代替にはしない。 */
 export const POS_ACTIVATION_STARTED = 'pos_activation_started';
 export const POS_ACTIVATION_UNKNOWN = 'pos_activation_unknown';
 
@@ -12,8 +9,7 @@ export function posActivationUnresolved(code: string | null | undefined): boolea
 export async function claimPosActivation(db: D1Database, input: {
   storeId: string; accountId: string; uberStoreId: string; name: string; externalId: string | null; version: number;
 }): Promise<boolean> {
-  // The candidate and target snapshot are checked/written in the same CAS. A new
-  // OAuth flow, a different selection or a concurrent request cannot replace it.
+  // 候補と対象の写しを同じ CAS で確認・保存し、新しい OAuth・別選択・同時要求に置き換えさせない。
   const result = await db.prepare(`UPDATE rt_delivery_uber_connections
     SET uber_store_id = ?, uber_store_name = ?, external_store_id = ?,
         last_error = '${POS_ACTIVATION_STARTED}', version = version + 1, updated_at = ?

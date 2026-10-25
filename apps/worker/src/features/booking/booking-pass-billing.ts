@@ -40,7 +40,7 @@ export async function passBillingEvent(db:D1Database,b:PassBillingEvent,now=new 
  .bind(b.kind,p.id,b.periodStart,at,billing,b.kind,p.id,b.periodStart,b.kind,b.periodEnd,b.kind,p.id,b.periodStart,at,p.entitlement_id,p.id,b.id,b.periodStart,b.periodStart,b.occurredAt,b.kind,b.kind,b.occurredAt));
  }
  ops.push(db.prepare("UPDATE booking_pass_billing_events SET result=CASE WHEN changes()=1 THEN 'applied' ELSE 'ignored' END WHERE event_id=?").bind(b.id));
- // The existing entitlement history uses a stable event key and remains inside the same transaction.
+ // 特典履歴を二重に作らないよう、安定したイベントキーで同じトランザクションへ含める。
  ops.push(db.prepare(`INSERT INTO booking_entitlement_events(id,entitlement_id,line_account_id,action,reason,actor_type,actor_id,request_key,request_json,after_json,created_at)
  SELECT ?,e.id,e.line_account_id,?,?,'system','stripe-test',?,?,json_object('billingStatus',e.billing_status,'remaining',e.remaining,'graceUntil',e.grace_until,'testMode',1),? FROM booking_entitlements e WHERE e.id=? AND EXISTS(SELECT 1 FROM booking_pass_billing_events WHERE event_id=? AND result='applied')`).bind(crypto.randomUUID(),checkout?'grant':'adjust',checkout?'試験のオンライン購入':'試験の月謝の支払い更新','stripe-pass:'+b.id,request,at,checkout?ent:p.entitlement_id,b.id),clearAssertions(db));
  try{await db.batch(ops);}catch(e){const saved=await db.prepare('SELECT request_json,result FROM booking_pass_billing_events WHERE event_id=?').bind(b.id).first<{request_json:string;result:string}>();if(saved?.request_json===request)return {replayed:true,result:saved.result,testMode:true};throw e;}

@@ -1,14 +1,4 @@
-/*
- * N-069: 許可された友だちのリマインダ登録・取消を staff が行えるようにする。
- *
- * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の reminders
- * ルートを当て、認証も実物（Bearer APIキー → staff_members → 役割・
- * permission_keys・account境界）で通す。外部送信は走らない。
- *
- * 直す前: POST /api/reminders/:id/enroll/:friendId と
- * DELETE /api/friend-reminders/:id は requireRole('owner','admin') のため、
- * /reminders 権限を持つ staff でも 403 で止まっていた。
- */
+/** リマインダーの登録・取消は、許可された友だちに対して権限を持つ staff も操作できることを実 route・認証・SQLite で確かめる。外部送信はしない。 */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';

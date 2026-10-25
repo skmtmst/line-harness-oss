@@ -1,6 +1,6 @@
 import {normalizeScheduledAt} from './scheduled-chat-time.js';
 export {normalizeScheduledAt} from './scheduled-chat-time.js';
-// N-025 (#927): 1対1トークの送信予約の状態機械を DB で持つ。
+// 1対1トークの送信予約の状態機械を DB で持つ。
 // 時系列: scheduled -> sending(lease付きclaim) -> sent / failed / cancelled。
 // retryableな失敗はscheduledへ戻し、scheduled_atをずらして再送する。
 
@@ -49,7 +49,7 @@ export type ScheduledChatSendRow = {
  *
  * さらに「対象(friend×LINEアカウント)・内容(種別・本文・引用)・送信予定時刻」が
  * 一致する処理中(scheduled/sending)の予約があれば、別キーの要求も新しい行を
- * 作らずその既存行を返す(#977)。読み込み直しでクライアントの操作キーが
+ * 作らずその既存行を返す。読み込み直しでクライアントの操作キーが
  * 新規発行されても、同じ版の予約はサーバー側で最大1件に保つ。
  *
  * 挿入は単一の INSERT ... SELECT ... WHERE NOT EXISTS なので、並行する

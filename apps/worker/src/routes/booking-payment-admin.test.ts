@@ -32,7 +32,7 @@ function booking(id:string,account='a',status='requested',starts='2026-10-15T03:
 }
 function payment(id:string,status='paid',account='a',created='2026-10-10T04:00:00Z',paid:string|null='2026-10-10T04:00:00Z',updated='2026-10-10T04:00:00Z') {
   booking(id+'b',account);
-  // Keep the default fixture unexpired; expiration and clock-skew tests set their own deadline.
+  // 期限切れが無関係な試験へ混ざらないよう、既定の fixture は有効にし、期限・時計ずれの試験だけで個別指定する。
   f.raw.prepare(`INSERT INTO booking_payments(id,line_account_id,booking_id,amount,status,provider,provider_payment_id,idempotency_key,created_at,updated_at,paid_at,hold_until)
     VALUES(?,?,?,1000,?,'stripe',?,?,?,?,?,?)`).run(id,account,id+'b',status,`pi_test_${id}b`,id+'b',created,updated,paid,'2099-12-31T00:00:00Z');
 }

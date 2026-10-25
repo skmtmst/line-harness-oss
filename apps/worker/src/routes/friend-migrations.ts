@@ -213,7 +213,7 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
       countUidMigrationItems(c.env.DB, run.id, filter),
       countUidMigrationItems(c.env.DB, run.id, { pendingOnly: true }),
       /*
-        FRIEND-33: 実行前の確認画面に「結び付け n 件・除外 m 件」を出すための
+        実行前の確認画面に「結び付け n 件・除外 m 件」を出すための
         判断別の件数。表示中のページだけでは数えられないので口で数える。
       */
       countUidMigrationItemDecisions(c.env.DB, run.id),
@@ -239,7 +239,7 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
     const run = await accessibleRun(c, c.req.param('id'));
     if (!run) return c.json({ success: false, error: 'Not found' }, 404);
     /*
-      FRIEND-34: 失敗した移行も判断を直せるようにする。
+      失敗した移行も判断を直せるようにする。
       'failed' のままだと失敗行の再確認・再試行のどちらにも進めない。
       'completed' / 'rolled_back' / 'executing' は締めたままにする。
     */
@@ -258,7 +258,7 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
       return inputError(c, { success: false, error: '新旧の友だちが両方見つからないため結び付けられません' }, 422, ["decision"]);
     }
     /*
-      F-3: 一致先のない行の「新規作成」は、本移行で移行先UIDの友だちを
+      一致先のない行の「新規作成」は、本移行で移行先UIDの友だちを
       作る。移行先UIDがなければ作るものがなく、移行元の友だちがなければ
       引き継ぐ名前がないので、ここで止めて対応表の修正か除外へ案内する。
     */
@@ -297,7 +297,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
       return c.json({ success: false, error: 'この移行は実行中です。履歴を読み直してください' }, 409);
     }
     /*
-      FRIEND-34: 一部失敗した移行の再試行を許す。
+      一部失敗した移行の再試行を許す。
       'ready' か、未判断が残っていない 'failed' だけ実行できる。
       未判断が残るままの再実行は従来どおり止める。
     */
@@ -320,7 +320,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
       return c.json({ success: false, error: 'この移行はすでに実行中か、実行できる状態ではありません' }, 409);
     }
     /*
-     * R395: 競合した行の失敗記録。before/after は書かない（何も変えていない
+     * 競合した行の失敗記録。before/after は書かない（何も変えていない
      * ため）。成功時の before_json は確認時＝書込時の現在値になる。
      */
     const failItem = async (itemId: string, message: string) => {
@@ -329,7 +329,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
         .bind(message, now, itemId).run();
     };
     /*
-      F-3: create 経路で確定した結び付け先。成功記録と対にし、外側の例外
+      create 経路で確定した結び付け先。成功記録と対にし、外側の例外
       でも副作用を残さないための台帳。link 判断の行は従来どおり触らない。
     */
     const createdThisRun: Array<{
@@ -340,7 +340,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
     try {
       for (const item of items) {
         /*
-          FRIEND-34: 反映済み・切り戻し済み・除外済みの行は再実行でも触らない。
+          反映済み・切り戻し済み・除外済みの行は再実行でも触らない。
           触ると before_json が統合後の状態で上書きされ、切り戻しで
           元の紐付けへ戻せなくなる。
         */
@@ -353,14 +353,14 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           continue;
         }
         /*
-          F-3: 判断 create は対応表の移行先UIDで友だちを新しく作り、名前は
+          判断 create は対応表の移行先UIDで友だちを新しく作り、名前は
           移行元の友だちから引き継ぐ。同じUIDが対象アカウントにあれば新規
           の重複は作らず採用し、並行作成・再送は一人に収束させる。対象外の
           アカウントにあるUIDは越境させず、書込みなしで失敗に記録する。
         */
         let createdFriendId: string | null = null;
         /*
-          F-3: 今作った行の後始末。項目の参照を外し、未連携のままの行だけ
+          今作った行の後始末。項目の参照を外し、未連携のままの行だけ
           消す。採用した既存行・別操作で結び付いた行は残す。
         */
         const compensateCreated = async () => {
@@ -471,13 +471,13 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
         }
         const userId = oldFriend.user_id ?? newFriend.user_id ?? crypto.randomUUID();
         /*
-          F-3: この実行が割り当てた結び付きを控える。外側補償は現在値が
+          この実行が割り当てた結び付きを控える。外側補償は現在値が
           この割当てと一致するときだけ戻し、他処理の結び付きを巻戻さない。
         */
         const tracked = createdThisRun.find((entry) => entry.itemId === item.id);
         if (tracked) tracked.assigned = userId;
         /*
-         * R395: 2件の付け替えは1文で同時に行う。確認時と現在値が両方一致
+         * 2件の付け替えは1文で同時に行う。確認時と現在値が両方一致
          * したときだけ2件更新になり、確認後の再連携は上書きしない。
          * 片方でも違うと0〜1件で止まり、この行は競合として残す（変更0）。
          * `IS` 比較なので未連携（NULL）の一致も見られる。
@@ -515,7 +515,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
             SET result = 'applied', before_json = ?, after_json = ?, updated_at = ? WHERE id = ? AND result <> 'applied'`)
             .bind(JSON.stringify({ oldUserId: oldFriend.user_id, newUserId: newFriend.user_id }), JSON.stringify({ userId }), now, item.id),
           /*
-           * R392: 結び付きが変わるので本人の版を進める。後に開いた保存は
+           * 結び付きが変わるので本人の版を進める。後に開いた保存は
            * 409になり、移行前の中身が再保存されない。
            */
           c.env.DB.prepare(`UPDATE users SET revision = revision + 1, updated_at = ? WHERE id = ?`)
@@ -534,7 +534,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
       }
     } catch (error) {
       /*
-        F-3: create 経路は成功記録と対で戻す。pair まで進んで記録 batch が
+        create 経路は成功記録と対で戻す。pair まで進んで記録 batch が
         落ちると、結び付きだけ残って再試行・切り戻しのどちらからも見えなく
         なる。反映済みの行は触らず、未反映の行だけ実行前の状態へ寄せる。
         link 判断の行は従来どおり残す。
@@ -613,7 +613,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
     const run = await accessibleRun(c, c.req.param('id'));
     if (!run) return c.json({ success: false, error: 'Not found' }, 404);
     /*
-      FRIEND-34/35/36: 切り戻しの可否・照合・冪等性をここで固める。
+      切り戻しの可否・照合・冪等性をここで固める。
       - 'completed' または一部失敗（failed かつ applied>0）だけ対象。
       - 2回目以降は何も書かず 409 で止める（冪等）。
       - 移行後に統合ユーザーが変わった行は上書きせず、競合として返す。
@@ -639,7 +639,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
     }
     const now = new Date().toISOString();
     /*
-      FRIEND-35: 先に全行を照合し、競合があれば1行も書かず 409 で止める。
+      先に全行を照合し、競合があれば1行も書かず 409 で止める。
       「移行直後の状態」と違う行へ before_json を書き戻すと、別担当の
       正当な変更まで消えるため。
     */
@@ -701,7 +701,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
     let rolledBack = 0;
     for (const { item, before, afterUserId } of prepared) {
       /*
-       * R396: ペア2件の書き戻しは1文で行う。両方一致のときだけ2件更新に
+       * ペア2件の書き戻しは1文で行う。両方一致のときだけ2件更新に
        * なり、遅い競合では1件も変わらない（部分復旧を出さない）。
        * 変わらなかった行は applied のまま残り、移行後の状態も保たれるので
        * 再試行できる。`IS` 比較で未連携（NULL）の一致も見られる。
@@ -733,7 +733,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
       }
       if ((restored.meta?.changes ?? 0) !== 2) {
         /*
-         * R396: 片方だけ戻った場合は、今書いた値のままの行だけを移行後の
+         * 片方だけ戻った場合は、今書いた値のままの行だけを移行後の
          * 値へ戻す（ペア全体で変更0へ寄せ、再試行できる状態に保つ）。
          */
         await c.env.DB.batch([
@@ -748,7 +748,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
         continue;
       }
       /*
-       * R392: 結び付きが変わるので関係する本人の版を進める。後に開いた
+       * 結び付きが変わるので関係する本人の版を進める。後に開いた
        * 保存は409になり、切り戻し前の中身が再保存されない。
        */
       const bumped = [...new Set(
@@ -789,7 +789,7 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), inp
     if (!accountId || columns.some((column) => !EXPORT_COLUMNS.includes(column))) {
       return inputError(c, { success: false, error: '対象アカウントと書き出す項目を選んでください' }, 400, ["accountId","columns"]);
     }
-    // R114: タグと対応情報の書き出しは未接続。友だち情報は friend_fields で指定。
+    // タグと対応情報の書き出しは未接続。友だち情報は friend_fields で指定。
     // 5列だけのCSVを渡すより、作る前に理由を返して止める（Shift_JISと同じ扱い）。
     if (columns.some((column) => column !== 'basic' && column !== 'friend_fields')) {
       return inputError(c, { success: false, error: 'タグ・友だち情報、対応情報の書き出しはまだ使えません。基本だけ選んでください' }, 422, ["columns"]);

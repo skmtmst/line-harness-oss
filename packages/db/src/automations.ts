@@ -43,9 +43,9 @@ export interface AutomationExecutionRunRow {
   automation_id: string;
   automation_name: string;
   automation_version_id: string;
-  /** 実行時に固定された版番号（#942 N-354：詳細・CSVで見せる）。 */
+  /** 実行時に固定された版番号（詳細・CSVで見せる）。 */
   version_number: number;
-  /** 1人テストの実行は1（#942 N-354：テスト実行の印）。 */
+  /** 1人テストの実行は1（テスト実行の印）。 */
   is_test: number;
   friend_id: string | null;
   friend_name: string | null;
@@ -60,11 +60,11 @@ export interface AutomationExecutionRunRow {
   skipped_actions: string | null;
   failed_action: string | null;
   failure_code: string | null;
-  /** いま公開中の版。実行した版との違いを画面で区別する（#1043）。 */
+  /** いま公開中の版。実行した版との違いを画面で区別する。 */
   current_published_version_id: string | null;
   current_version_number: number | null;
   /**
-   * 待機中のstepに失敗の再試行が混ざっているか（#1043）。
+   * 待機中のstepに失敗の再試行が混ざっているか。
    * `wait` の待機は retry_at が NULL、失敗の再試行は retry_at を持つ。
    */
   has_retry_wait: number | null;
@@ -191,7 +191,7 @@ export async function getAutomationExecutionRuns(
 }
 
 /**
- * 1件の実行記録を、詳細表示に必要な項目つきで読む（#942 N-354）。
+ * 1件の実行記録を、詳細表示に必要な項目つきで読む。
  *
  * 版番号・テスト実行の印は実行時に `automation_version_id` / `is_test` へ
  * 固定されているものをそのまま出す。対象アカウント外は見せない。
@@ -242,7 +242,7 @@ export interface AutomationExecutionRunStepRow {
 }
 
 /**
- * 実行の処理ごとの結果を順番どおりに読む（#942 N-354：処理ごとの結果と試行数）。
+ * 実行の処理ごとの結果を順番どおりに読む（処理ごとの結果と試行数）。
  *
  * `output_json` / `input_json` は API へ出さない。友だちの情報や送った内容が
  * 入りうるため、結果の状態・回数・エラーの種類だけを返す。

@@ -66,10 +66,8 @@ function serializeTag(row: DbTag & Partial<TagWithUsage>) {
     id: row.id,
     name: row.name,
     /*
-     * 印の色は「属するフォルダの色」。tags.color は 115 以前の名残で、
-     * 読まない（画面からも書かない）。フォルダを JOIN していない読み方
-     * （作成・更新の戻り）では undefined になるので、そのときは灰色。
-     * 一覧を読み直した時点で正しい色に入れ替わる。
+     * 印はフォルダの色を使い、tags.color は読まない。
+     * 作成・更新の戻りなどフォルダを JOIN しない経路は灰色とし、一覧の再取得で所属フォルダの色を反映する。
      */
     color: row.folder_color ?? TAG_NEUTRAL_COLOR,
     // 099以降はfoldersが正本。group_idは旧tag_groups時代の互換列で、
@@ -152,7 +150,7 @@ async function visibleTag(c: Context<Env>, id: string): Promise<DbTag | Response
 }
 
 /**
- * N-048(#803): 旧作成・CSV一括の作り先所属を決める。
+ * 旧作成・CSV一括の作り先所属を決める。
  *
  * 要求の自己申告だけを信じない。明示IDは許可scopeで検証し、指定なしは
  * 割当が1件に絞れるときだけ自動確定する。所属なし・既定統括への補完は作らない。
@@ -248,7 +246,7 @@ function tagDefinitionResponse(detail: Awaited<ReturnType<typeof getTagDefinitio
   };
 }
 
-// ─── 既存友だちへの遡及マイル：事前計算と照合（N-047）──────────────
+// ─── 既存友だちへの遡及マイル：事前計算と照合──────────────
 //
 // 「既存の友だちにも適用する」を付けて保存するとき、クライアントが数えた
 // 人数・合計マイルではなくサーバー側で数えた結果を画面に出し、その結果と
@@ -588,7 +586,7 @@ tags.post('/api/tag-groups', requireRole('owner', 'admin'), inputJsonBoundary(),
   }
 });
 
-// PATCH /api/tag-groups/:id
+
 tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{ name?: unknown; sortOrder?: unknown; color?: unknown }>();
@@ -630,8 +628,7 @@ tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), inputJsonBounda
   }
 });
 
-// DELETE /api/tag-groups/:id
-// 属していたタグは消えず「未分類」に戻る（tags.folder_id は ON DELETE SET NULL）。
+// フォルダを消してもタグは残り、ON DELETE SET NULL で未分類へ戻る。
 tags.delete('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const denied = await visibleTagFolder(c, c.req.param('id'), requestedLineAccountId(c) ?? undefined);
@@ -667,9 +664,7 @@ tags.patch('/api/tags/:id/group', requireRole('owner', 'admin'), inputJsonBounda
   }
 });
 
-// GET /api/tags - list all tags
-// ?withCounts=1 adds friendCount and usage aggregates — admin UI only, so
-// the many picker/filter consumers keep the cheap plain SELECT.
+// 件数と利用集計は管理画面の withCounts=1 だけで取得し、多数の選択欄や絞込は軽い一覧のままにする。
 tags.get('/api/tags', async (c) => {
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -699,7 +694,7 @@ tags.get('/api/tags', async (c) => {
 // POST /api/tags/import/preview - CSVから読み取った行を保存せずに検査する
 tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
-    // N-048(#803): 確認だけでも作り先所属を確定し、所属なし行の計画を作らない。
+    // 確認だけでも作り先所属を確定し、所属なし行の計画を作らない。
     const resolved = await resolveLegacyTagAccount(c);
     if ('error' in resolved) return resolved.error;
     const input = await readImportRows(c);
@@ -718,7 +713,7 @@ tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), inputJsonBo
 // POST /api/tags/import - 検査をやり直し、登録可能な行だけを登録する
 tags.post('/api/tags/import', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
-    // N-048(#803): 作り先所属を確定し、所属なし行を作らない。
+    // 作り先所属を確定し、所属なし行を作らない。
     const resolved = await resolveLegacyTagAccount(c);
     if ('error' in resolved) return resolved.error;
     const importAccountId = resolved.accountId;
@@ -802,7 +797,7 @@ tags.get(
         const denied = await requireVisibleLineAccount(c, lineAccountId);
         if (denied) return denied;
       }
-      // 保管済み(archived)タグも削除影響は確認できる必要がある(#710)。
+      // 保管済み(archived)タグも削除影響は確認できる必要がある。
       const impact = lineAccountId
         ? await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true })
         : await getTagDeleteImpact(c.env.DB, c.req.param('id'));
@@ -823,7 +818,7 @@ tags.get('/api/tags/:id/dependencies', requireRole('owner', 'admin'), async (c) 
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    // 編集画面(archived タグでも開く。#710)がここを読むため、除外しない。
+    // 編集画面(archived タグでも開く。)がここを読むため、除外しない。
     const impact = await getScopedTagDeleteImpact(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
     if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -848,7 +843,7 @@ tags.get('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
     }
     const denied = await requireVisibleLineAccount(c, lineAccountId);
     if (denied) return denied;
-    // 編集画面が保管済みタグでも開けるよう、除外しない(#710)。
+    // 編集画面が保管済みタグでも開けるよう、除外しない。
     const detail = await getTagDefinition(c.env.DB, c.req.param('id'), lineAccountId, { includeArchived: true });
     if (!detail) return fail(c, 404, 'TAG_NOT_FOUND');
     return c.json({
@@ -895,7 +890,7 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), inputJsonBoundary
 /**
  * POST /api/tags/:id/retroactive-preview — 遡及実行の前に対象を数える。
  *
- * N-047: 「既存の友だちにも適用」を付ける前に、対象人数・付与済み除外・
+ * 「既存の友だちにも適用」を付ける前に、対象人数・付与済み除外・
  * 紹介者対象・合計マイルをサーバー側で計算して返す。返す previewToken は
  * PATCH /api/tags/:id や /mileage で applyToExisting を実行するときの
  * 引き換え券で、実行時に同じ計算をやり直して一致しないと止める。
@@ -962,9 +957,9 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
     if (body.color !== undefined && body.color !== null) {
       return inputError(c, { success: false, error: 'tag color is not supported; set the folder color instead' }, 400, ["color"]);
     }
-    // expectedVersion は必須(#715)。無し・不正は400、古い版は409。
-    // 保管済み(archived)タグの保護(#710)は updateTagDefinition 側（変更なし）。
-    // 順序は秘匿が先(#715差し戻し)。範囲外・不在は404で伏せ、許可対象にだけ
+    // expectedVersion は必須。無し・不正は400、古い版は409。
+    // 保管済み(archived)タグの保護は updateTagDefinition 側（変更なし）。
+    // 順序は秘匿が先(差し戻し)。範囲外・不在は404で伏せ、許可対象にだけ
     // 版の400を返す。版を先にすると範囲外のIDの有無が400/404で見分けられる。
     {
       const lineAccountId = requestedLineAccountId(c, body);
@@ -990,7 +985,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
       if (body.name !== undefined && (!name || name.length > 80)) {
         return inputError(c, { success: false, error: 'name must be between 1 and 80 characters' }, 400, ["name"]);
       }
-      // レガシー分岐の廃止(#715)で落とさない。改行入りタグが一覧・CSVの表示を崩す。
+      // レガシー分岐の廃止で落とさない。改行入りタグが一覧・CSVの表示を崩す。
       if (name !== undefined && TAG_NAME_CONTROL_CHARACTER_PATTERN.test(name)) {
         return inputError(c, { success: false, error: 'name must not contain control characters' }, 400, ["name"]);
       }
@@ -1005,7 +1000,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
         body.actions ?? (body.automationDraft as Record<string, unknown> | undefined)?.actions,
       );
       if (actions) await validateTagAddedActionResources(c.env.DB, lineAccountId, actions);
-      // 遡及実行は事前計算の照合を必須にする(N-047)。確認画面で出した
+      // 遡及実行は事前計算の照合を必須にする。確認画面で出した
       // 対象・合計とズレていれば保存も遡及もせず409で止める。
       const applyToExisting = body.applyToExisting === true;
       const mileage = body.mileage === undefined ? null : parseMileage(body.mileage, true)!;
@@ -1016,7 +1011,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
         );
         if (blocked) return blocked;
       }
-      // M956: 応答消失後の再送に備え、要求キーがあれば保存済みの結果を返す。
+      // 応答消失後の再送に備え、要求キーがあれば保存済みの結果を返す。
       // 任意（付けない呼び出しは従来どおり版だけで守る）。空・長すぎは400。
       const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
       if (idempotencyKey.length > 128) {
@@ -1024,7 +1019,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
       }
       const enqueueRetroactive = applyToExisting && mileage !== null
         && (mileage.self > 0 || mileage.referrer > 0);
-      // M955: タグの保存と遡及キューの投入は同じバッチで確定する。
+      // タグの保存と遡及キューの投入は同じバッチで確定する。
       // 投入だけ落ちたら保存も巻き戻り、同版での再送でやり直せる。
       const saved = await updateTagDefinition(c.env.DB, {
         tagId: c.req.param('id'),
@@ -1070,7 +1065,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), inputJsonBoundary(), 
   }
 });
 
-// PATCH /api/tags/:id/mileage - configure a one-time tag reward and/or tier multiplier.
+
 tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json<{
@@ -1105,7 +1100,7 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), inputJsonBoun
 
     const current = await visibleTag(c, c.req.param('id'));
     if (current instanceof Response) return current;
-    // 遡及実行は事前計算の照合を必須にする(N-047)。確認画面で出した
+    // 遡及実行は事前計算の照合を必須にする。確認画面で出した
     // 対象・合計とズレていれば保存も遡及もせず止める。
     if (applyToExisting && (rewardMiles > 0 || referralRewardMiles > 0)) {
       const blocked = await requireRetroactivePreviewMatch(
@@ -1114,7 +1109,7 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), inputJsonBoun
       );
       if (blocked) return blocked;
     }
-    // M955: マイル設定の更新と遡及キューの投入は同じバッチで確定する。
+    // マイル設定の更新と遡及キューの投入は同じバッチで確定する。
     // 投入だけ落ちたら更新も巻き戻る。
     const { tag, queued } = await updateTagMileageSettings(c.env.DB, c.req.param('id'), {
       rewardMiles,
@@ -1203,7 +1198,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async
       return inputError(c, { success: false, error: 'tag color is not supported; set the folder color instead' }, 400, ["color"]);
     }
 
-    // N-048(#803): 所属はstaffの許可scopeから確定し、所属なし行を作らない。
+    // 所属はstaffの許可scopeから確定し、所属なし行を作らない。
     const resolved = await resolveLegacyTagAccount(c, body);
     if ('error' in resolved) return resolved.error;
     const legacyAccountId = resolved.accountId;
@@ -1238,7 +1233,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async
   } catch (err) {
     const handled = tagDefinitionError(c, err);
     if (handled) return handled;
-    // Legacy name / scoped normalized-name uniqueness conflicts return 409.
+    // 保存済みの名前と所属内の正規化名の一意制約は、どちらも409で返す。
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'tag name already exists' }, 409);
     }
@@ -1249,12 +1244,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async
   }
 });
 
-// DELETE /api/tags/:id - delete tag
-// 画面を通さず直接APIを呼ばれても、運用設定から参照中のタグは消さない。
-// friend_tags rows cascade via FK (ON DELETE CASCADE) and do not block deletion;
-// the delete-impact response still reports their count as a warning.
-// The FK error remains a second guard for references created between this check
-// and the DELETE, or references that are not yet covered by the impact query.
+// 画面を通さなくても参照中のタグは削除させない。友だち付与は連動削除されるため件数を警告に出す。事前確認後の新しい参照や未対応の参照も、外部キーで二重に守る。
 tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -1303,7 +1293,7 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), inputJsonBound
      * この Idempotency-Key は、**受け取って検査しているが、保存も照合もしていない。**
      * つまりこの口は冪等ではない。必須にしておきながら冪等でないのは、呼び出し側へ
      * 「ここは冪等だ」と言っているのと同じで、無いものを有るように見せてしまう。
-     * #709 で扱う（別票）。
+     *  で扱う（別票）。
      */
     const expectedVersion = Number(body.expectedVersion);
     const impactRevision = typeof body.impactRevision === 'string' ? body.impactRevision.trim() : '';
@@ -1324,7 +1314,7 @@ tags.post('/api/tags/:id/archive', requireRole('owner', 'admin'), inputJsonBound
     if (err instanceof TagArchiveError) {
       /*
        * already_archived は「もう着いている」であって失敗ではない。画面は code で
-       * 分岐して、赤い失敗ではなく成功と同じ通知にする（#708 の裁定）。
+       * 分岐して、赤い失敗ではなく成功と同じ通知にする（ の裁定）。
        * version_conflict / impact_changed と同じ 409 に混ぜると画面が「版が古い」と
        * 誤解するので、code は分けたまま返す。
        */

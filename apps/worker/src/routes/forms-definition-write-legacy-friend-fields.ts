@@ -44,7 +44,7 @@ export async function writeLegacyFriendFields(
         result.failed += 1;
         continue;
       }
-      // N-042: 回答を項目の型で検証し、正規化した値を保存する。
+      // 回答を項目の型で検証し、正規化した値を保存する。
       // multi_select の配列回答は配列のまま検証する(先に文字列化すると
       // 正しい選択まで1つの文字列として弾かれる)。型に合わなければ
       // 保存せず失敗に数える。
@@ -101,7 +101,7 @@ const requireArchiveManage: MiddlewareHandler<Env> = async (c, next) => {
 };
 
 export /**
- * 予約(claim)への工程記録の窓口(N-168)。
+ * 予約(claim)への工程記録の窓口。
  *
  * 送信処理と管理画面からの再実行で同じ約束をする:
  *   done        … 記録済みの工程か(再開・再実行で飛ばす判定)
@@ -121,7 +121,7 @@ interface FormSubmitClaimHandle {
 }
 
 export /**
- * 回答の保存後に進める後処理一式(N-168)。
+ * 回答の保存後に進める後処理一式。
  *
  * 送信受付(POST /submit)と、管理画面からの失敗分だけの再実行
  * (POST /submissions/:sid/retry-effects)が同じ道を通る。予約の工程記録に
@@ -185,21 +185,7 @@ async function runFormPostEffects(input: {
     if (awarded && claim) await claim.checkpoint('mileage');
   }
 
-  // Resolve reward template per-campaign.
-  //
-  // Priority:
-  //   1. body.trackedLinkId (= ?ref= from /r/:ref → LIFF → form). This lets
-  //      X Harness campaign settings drive the reward, even for friends who
-  //      were originally added via a different campaign.
-  //   2. Fallback to friends.first_tracked_link_id (first-touch attribution)
-  //      so existing tracked links without ref pass-through still work.
-  //
-  // This OVERRIDES form.on_submit_message_*.
-  //
-  // Note: anti-replay (preventing the same friend from claiming the same
-  // reward twice via URL tampering) is intentionally NOT enforced. The
-  // product is opt-in oriented and the engagement gate handles real
-  // anti-fraud upstream.
+  // キャンペーン別の報酬を使うため、回答の trackedLinkId を初回流入より優先する。未指定なら friends.first_tracked_link_id へ戻し、通常の回答後メッセージを上書きする。URL 変更による重複請求防止はここで追加せず、上流の参加条件判定に委ねる。
   let rewardTemplate: import('@line-crm/db').MessageTemplate | null = null;
   {
     const { getFriendById, getTrackedLinkById, getMessageTemplateById } = await import('@line-crm/db');
@@ -225,7 +211,7 @@ async function runFormPostEffects(input: {
     failed: 0,
   };
 
-  // Save response data to friend's metadata
+  // 既存の友だち情報を失わないよう、回答を metadata に結合する。
   if (form.save_to_metadata) {
     effectRuns.push({
       step: 'metadata',
@@ -295,7 +281,7 @@ async function runFormPostEffects(input: {
             (request) => dispatchLineProxyLocally(request, input.env, input.executionCtx),
           );
         },
-        // N-177: Flex などテキスト以外のテンプレート送信。組み立ては
+        // Flex などテキスト以外のテンプレート送信。組み立ては
         // 呼び出し側(buildMessage)が済ませてあり、ここは送信だけを受け持つ。
         pushMessage: async (message, stableSuffix) => {
           const target = await getFriendById(db, friendId);
@@ -358,8 +344,7 @@ async function runFormPostEffects(input: {
     });
   }
 
-  // evaluate conditions only after every customer registration succeeded.
-  // This checkpoint also gives both resubmission and staff retry the same recovery path.
+  // 顧客登録がすべて成功してから条件を評価する。再送と担当者の再試行が同じチェックポイントから回復できるようにする。
   effectRuns.push({
     step: 'automation',
     run: async () => {
@@ -372,8 +357,7 @@ async function runFormPostEffects(input: {
     },
   });
 
-  // Add tag — guarded attach so a tag_added-triggered scenario fires on
-  // first-time submit (and never re-fires on duplicate submits).
+  // 初回付与でだけタグ起点のシナリオを動かし、重複回答で再発火しないよう共有の付与処理を通す。
   if (form.on_submit_tag_id) {
     effectRuns.push({
       step: 'tag',
@@ -384,7 +368,7 @@ async function runFormPostEffects(input: {
     });
   }
 
-  // Enroll in scenario
+
   if (form.on_submit_scenario_id) {
     effectRuns.push({
       step: 'scenario',
@@ -392,7 +376,7 @@ async function runFormPostEffects(input: {
     });
   }
 
-  // If webhook returned a join_url (e.g. Meet Harness), send a Flex button to the user
+  // 参加 URL が返った場合、利用者が開けるよう Flex ボタンで案内する。
   if (webhookData?.join_url) {
     effectRuns.push({
       step: 'meet_link',
@@ -445,7 +429,7 @@ async function runFormPostEffects(input: {
     });
   }
 
-  // Send confirmation message with submitted data back to user
+
   effectRuns.push({
     step: 'reply',
     run: async () => {
@@ -472,7 +456,7 @@ async function runFormPostEffects(input: {
         metadata: resolvedMeta,
       };
 
-      // Build diagnostic result Flex card showing their answers
+
       const entries = Object.entries(submissionData as Record<string, unknown>);
       const answerRows = entries.map(([key, value]) => {
         const field = form.fields ? (JSON.parse(form.fields) as Array<{ name: string; label: string }>).find((f: { name: string }) => f.name === key) : null;
@@ -514,10 +498,10 @@ async function runFormPostEffects(input: {
       const rewardFromTrackedLink = buildRewardMessage(rewardTemplate, friend.display_name);
 
       if (rewardFromTrackedLink) {
-        // Tracked-link reward template overrides everything (per-campaign reward)
+        // キャンペーンの報酬テンプレートを、ほかの回答後メッセージより優先する。
         messages.push(rewardFromTrackedLink as ReturnType<typeof buildMessage>);
       } else if (form.on_submit_message_type && form.on_submit_message_content) {
-        // Custom form message replaces default diagnostic result
+        // 個別指定のメッセージがあれば、既定の診断結果より優先する。
         const { resolveSendInterpolationExtra } = await import('../services/interpolation-context.js');
         const extra = await resolveSendInterpolationExtra(
           db, friend.id, form.on_submit_message_content,
@@ -529,7 +513,7 @@ async function runFormPostEffects(input: {
         const decorated = await appendFriendToTrackedLinks(db, expanded, apiOrigin, friend.id);
         messages.push(buildMessage(form.on_submit_message_type, decorated));
       } else {
-        // Default: send diagnostic result Flex
+
         messages.push(buildMessage('flex', JSON.stringify(resultFlex)));
       }
 

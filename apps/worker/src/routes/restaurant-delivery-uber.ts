@@ -255,7 +255,7 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
        * ここから先は1回使い切り。交換に失敗しても同じ符号は二度使えない。
        * 同じstateのcallbackが同時に二度来ても片方だけが通るよう、
        * 使用済みへの更新は「まだ使われていない」条件付きで行い、
-       * 1件書き換えられたときだけ先へ進む（Google Sheets 連携の R448 と同じ）。
+       * 1件書き換えられたときだけ先へ進む（Google Sheets 連携の  と同じ）。
        */
       const consumed = await dbFor(c.env, stateRow.store_id)
         .prepare('UPDATE rt_delivery_uber_oauth_states SET used_at = ? WHERE state = ? AND used_at IS NULL')

@@ -1,19 +1,13 @@
 import type { TenantRuntimeStatus } from '@line-crm/db';
 
-/** True only for a tenant that is explicitly stopped in D1. */
+/** D1 で明示的に停止した統括だけを停止と判定する。 */
 export function isStoppedTenantStatus(
   status: TenantRuntimeStatus | null | undefined,
 ): status is 'suspended' | 'archived' {
   return status === 'suspended' || status === 'archived';
 }
 
-/**
- * SQL predicate for rows that belong to an explicitly stopped tenant.
- *
- * Missing legacy account rows are not labelled as suspended here. Dispatch
- * selection still fails closed through activeTenantLineAccountSql; this helper
- * is only for terminally consuming work that must not resume after restoration.
- */
+/** 所属先のない保存済み行を停止と誤分類しない。この条件は復旧後も再開しない処理の終端化だけに使い、配信選択は別の有効統括条件で安全側に守る。 */
 export function stoppedTenantLineAccountSql(accountIdExpression: string): string {
   if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(accountIdExpression)) {
     throw new Error('Invalid line account SQL expression');

@@ -3,13 +3,12 @@ export type LineRegistrationReceipt = {
   receivedAt: string | null;
 };
 
-/** Only a persisted, signed LINE webhook for this account can unlock registration. */
+/** 登録したアカウントの署名済み Webhook が永続保存された場合だけ、登録完了へ進める。 */
 export async function getLineRegistrationReceipt(
   db: D1Database,
   accountId: string,
 ): Promise<LineRegistrationReceipt> {
-  // Both timestamps are JST. The webhook ledger stores JST without a zone,
-  // whereas the account and message rows use a +09:00 suffix.
+  // 両方とも JST だが、Webhook 台帳は時差接尾辞なし、アカウントとメッセージは +09:00 を使うため、同じ意味へ合わせる。
   const receipt = await db.prepare(`
     SELECT received_at FROM (
       SELECT e.received_at AS received_at

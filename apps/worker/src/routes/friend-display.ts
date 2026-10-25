@@ -1,14 +1,6 @@
 import type { Friend as DbFriend } from '@line-crm/db';
 
-/**
- * Convert a D1 snake_case Friend row to the shared camelCase shape.
- *
- * Bare-row variant — emits ONLY columns that exist on the friends table.
- * Used by GET /api/friends/:id and metadata-update responses where we read
- * via plain `getFriendById` and have no JOINed columns. The list endpoint
- * uses `serializeFriendListRow` instead, which adds firstTrackedLinkName +
- * chatStatus from the JOINed query.
- */
+/** JOIN のない友だち行は、実際にある列だけを共有の camelCase へ変換する。リスト専用の流入名・チャット状態は、JOIN 済みの serializeFriendListRow で扱う。 */
 export function serializeFriend(row: DbFriend) {
   return {
     id: row.id,

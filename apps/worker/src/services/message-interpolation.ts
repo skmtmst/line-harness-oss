@@ -1,14 +1,5 @@
 import { expandDateVariables } from './interpolation-date.js';
-/**
- * Replace template variables in message content.
- *
- * Supported variables:
- * - {{name}}                → friend's display name
- * - {{uid}}                 → friend's user UUID
- * - {{friend_id}}           → friend's internal ID
- * - {{auth_url:CHANNEL_ID}} → full /auth/line URL with uid for cross-account linking
- * - {{metadata.KEY}}       → friend's metadata value (from form responses etc.)
- */
+/** name・uid・friend_id・metadata.KEY を本文へ差し込む。auth_url:CHANNEL_ID は既存 UUID を含む URL を作り、別アカウントの本人連携へ使う。 */
 /**
  * 差し込みの記法について。
  *
@@ -51,11 +42,8 @@ export function expandVariables(
    */
   result = expandDateVariables(result, extra?.deliveredAt ?? new Date());
   /*
-   * カード（Flex・カルーセル）や位置情報などの中身は JSON。名前や友だち情報に
-   * " や \ や改行が入っていると、そのまま埋めると JSON が壊れ、送る形にできずに
-   * 中身の JSON が文字のままお客さまへ届く（2026-10-07 点検）。JSON の文字列の
-   * 中で安全な形にしてから入れる。置き換えは関数で渡し、値の中の $& などを
-   * 置き換えの記号として読ませない。
+   * Flex・カルーセル・位置情報の JSON が壊れないよう、名前や友だち情報の引用符・バックスラッシュ・改行を JSON 文字列として安全に差し込む。
+   * 値の $& などを置換記号にしないよう、置換には関数を渡す。壊れた JSON が文字列のまま顧客へ届くのを防ぐ。
    */
   const put = (value: string): string =>
     messageType && JSON_CONTENT_TYPES.has(messageType) ? JSON.stringify(value).slice(1, -1) : value;
@@ -63,26 +51,23 @@ export function expandVariables(
   result = result.replace(/\{\{uid\}\}/g, () => put(friend.user_id || ''));
   result = result.replace(/\{\{friend_id\}\}/g, () => put(friend.id));
   result = result.replace(/\{\{ref\}\}/g, () => put(friend.ref_code || ''));
-  // Conditional block: {{#if_ref}}...{{/if_ref}} — only shown if ref_code exists
+  // if_ref の条件ブロックは ref_code がある場合だけ表示する。
   if (friend.ref_code) {
     result = result.replace(/\{\{#if_ref\}\}([\s\S]*?)\{\{\/if_ref\}\}/g, '$1');
   } else {
     result = result.replace(/\{\{#if_ref\}\}[\s\S]*?\{\{\/if_ref\}\}/g, '');
   }
-  // Metadata variables: {{metadata.KEY}} → value from friend's metadata
+  // metadata.KEY は友だち情報の値へ置き換える。
   const meta = friend.metadata
     ? (typeof friend.metadata === 'string' ? JSON.parse(friend.metadata) as Record<string, unknown> : friend.metadata)
     : {};
-  // Conditional block: {{#if_metadata.KEY}}...{{/if_metadata.KEY}} — only shown if metadata key has a value
-  // When inside JSON arrays, removes the element and fixes trailing/leading commas
+  // if_metadata.KEY は値がある場合だけ残し、JSON 配列の項目を除く場合は前後のカンマも整える。
   result = result.replace(/\{\{#if_metadata\.([^}]+)\}\}([\s\S]*?)\{\{\/if_metadata\.\1\}\}/g, (_match, key, inner) => {
     const val = meta[key];
     if (val == null || val === '') return '';
     return inner;
   });
-  // Clean up broken JSON commas from removed conditional blocks (e.g. ",," or "[," or ",]").
-  // Flex only: this is JSON repair — running it on plain text silently rewrote
-  // user-authored bodies containing ",," / "[," / ",]" (bug present since initial release).
+  // 条件削除後のカンマ補修は Flex の JSON だけに適用し、通常本文にある連続カンマや角括弧を変更しない。
   if (messageType === 'flex') {
     result = result.replace(/,\s*,/g, ',');
     result = result.replace(/\[\s*,/g, '[');

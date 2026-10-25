@@ -1,7 +1,7 @@
 import { hqTemplateListPaths } from '../hq-template-list-openapi.js';
 import { hqTemplateMediaPaths } from '../hq-template-media-openapi.js';
 
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const hqTemplateUploadPaths = {
   // ── HQ Templates ───────────────────────────────────────────────────────
   '/api/hq/templates/media/upload-sessions': {

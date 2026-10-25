@@ -3,7 +3,7 @@ import { collectInputs, parseLayout, normalizeBookingValue } from '@line-crm/sha
 export class FormBookingAnswerError extends Error {
   constructor(public readonly status:400|404|422,code:string){super(code);}
 }
-/** The completed answer and its pinned public version are the only source of booking rules. */
+/** 下書きの変更が予約へ混入しないよう、確定した回答と固定された公開版だけから予約条件を取る。 */
 export async function resolveFormBookingAnswer(db:D1Database,input:{formId:string;blockId:string;submissionKey:string},accountId:string,friendId:string,timeZone:string,now=new Date()) {
   if(!input||typeof input!=='object'||![input.formId,input.blockId,input.submissionKey].every(v=>typeof v==='string'&&v.length>0&&v.length<=200))throw new FormBookingAnswerError(400,'invalid_form_answer');
   const saved=await db.prepare(`SELECT s.id,s.data,v.layout,v.fields FROM form_submit_claims q

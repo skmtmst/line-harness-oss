@@ -13,7 +13,7 @@ import {
 } from './interpolation-context.js';
 
 /*
- * N-026: 1対1トーク(手動返信・送信予約・プレビュー)の差し込み解決。
+ * 1対1トーク(手動返信・送信予約・プレビュー)の差し込み解決。
  *
  * 受信箱ではテンプレートの `{{name}}` がそのままLINEへ届いていた。
  * 一斉配信と同じ解決器 `renderBroadcastMessageContent` を使い、

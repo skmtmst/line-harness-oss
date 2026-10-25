@@ -38,12 +38,12 @@ import {
 const staff = new Hono<Env>();
 // 招待の有効期限は7日。要件 -30 §9-2・§17(既存の48時間招待はその期限のまま守り、新規・再送から7日)。
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-/* 本人のメール変更の確認リンクは24時間。招待より短く、放置された変更申し込みが残らないようにする(N-433)。 */
+/* 本人のメール変更の確認リンクは24時間。招待より短く、放置された変更申し込みが残らないようにする。 */
 const EMAIL_CHANGE_TTL_MS = 24 * 60 * 60 * 1000;
 const TWO_FACTOR_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
 
 /**
- * 高危険な権限変更の直前再認証（N-427 → V の共通仕組み）。
+ * 高危険な権限変更の直前再認証（ → V の共通仕組み）。
  *
  * 同じセッションでの再確認は10分の窓で再利用する。いつもと違う端末・場所の
  * セッションは窓を使わせず、操作ごとに X-Step-Up-Token の1回限り grant を
@@ -61,7 +61,7 @@ function invitationConfirmationUrl(c: { env: Env['Bindings']; req: { url: string
   return url.toString();
 }
 
-/** N-433: メール変更の確認画面。招待と同じく秘密の値は fragment に置き、アクセスログへ残さない。 */
+/** メール変更の確認画面。招待と同じく秘密の値は fragment に置き、アクセスログへ残さない。 */
 function emailChangeConfirmationUrl(c: { env: Env['Bindings']; req: { url: string } }, token: string): string {
   const base = c.env.ADMIN_PUBLIC_URL?.trim() || new URL(c.req.url).origin;
   const url = new URL('/staff/email-change', base);
@@ -74,7 +74,7 @@ function safeJson<T>(value: string | null | undefined, fallback: T): T {
 }
 
 /**
- * N-424: 役割バンドル（-30 §7 のカタログ）。
+ * 役割バンドル（-30 §7 のカタログ）。
  * role_bundle 列が正本。未保存の行は role/access_level から従来どおり推定する。
  */
 function parseRoleBundle(value: string | null | undefined): AccessRoleBundleId | null {
@@ -106,7 +106,7 @@ function parseScope(value: unknown): ScopeLevels | null | undefined {
 }
 
 /*
- * R497: 見せる範囲の表・かたまりが管理するキーの集合。
+ * 見せる範囲の表・かたまりが管理するキーの集合。
  * `/automations` のように表にも全プリセットにも載っていない既存キーは、
  * この外側として保存で落とさない（温存する）。
  */
@@ -116,7 +116,7 @@ const SCOPE_COVERED_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /*
- * R497: 個別編集の窓で付け外しできる顔ぶれ。
+ * 個別編集の窓で付け外しできる顔ぶれ。
  * web の `staff/page.tsx` の EDIT_PERMISSION_PATHS（21件）と
  * `permission-labels.ts` の成果承認の組（操作＋表示）に対応する。
  * この外側のキーはその窓から消せないので、保存で落とさない。
@@ -154,7 +154,7 @@ function maskEmail(email: string | null): string | null {
 }
 
 /**
- * スタッフのメールアドレスの見せ方（N-424 フィールド権限）。
+ * スタッフのメールアドレスの見せ方（ フィールド権限）。
  * email_mask 列が正本: full=そのまま / masked=伏せ字 / none=出さない。
  * 未設定の行は従来判定（本人・管理者・access.user.email.view だけ実アドレス）。
  */
@@ -187,8 +187,7 @@ async function serializeStaff(
   const piiLevel = emailMask === 'full' ? 'edit' : emailMask === 'none' ? 'none' : 'view';
   return {
     id: row.id,
-    // The browser uses this authenticated scope to namespace recoverable
-    // idempotency receipts. It is an identifier, never a credential.
+    // ブラウザが再試行の受領票を認証範囲で分けられるよう、資格情報ではない識別子を返す。
     tenantId: row.tenant_id ?? DEFAULT_TENANT_ID,
     name: row.name,
     email: emailVisibility === 'full' ? row.email : emailVisibility === 'masked' ? maskEmail(row.email) : null,
@@ -313,14 +312,14 @@ async function guardLastAdmin(
 
 const NOTIFICATION_KEYS = new Set(['operations', 'emergency', 'security', 'updates']);
 const PERMISSION_KEY_PATTERN = /^[A-Za-z0-9_./-]{1,200}$/;
-/* M959: メールアドレスは実用上限254文字まで。超える宛先は招待が届かない行を残すので作らない。 */
+/* メールアドレスは実用上限254文字まで。超える宛先は招待が届かない行を残すので作らない。 */
 const MAX_EMAIL_LENGTH = 254;
 function emailTooLong(email: string): boolean {
   return email.length > MAX_EMAIL_LENGTH;
 }
 
 /*
- * 権限キーと通知設定の検証(#515 中3)。
+ * 権限キーと通知設定の検証( 中3)。
  * 存在しない権限パスで「権限あり」に見える・将来の判定の抜け道になるのを防ぐ。
  * キー表は画面側( staff/page.tsx・staff/new/page.tsx )と他機能の点キー
  * (ec.event.view 等)が混在するため、ここでは形式と通知の種類を締める。
@@ -371,7 +370,7 @@ staff.get('/api/staff/me', async (c) => {
 staff.get('/api/staff', async (c) => {
   try {
     /*
-     * M025: 範囲限定の担当者には権限者の一覧を出さない。画面（/hq/members）
+     * 範囲限定の担当者には権限者の一覧を出さない。画面（/hq/members）
      * と同じ基準で拒否する（403）。氏名・役割・範囲が出るため、伏せ字の
      * メールだけでは足りない。
      */
@@ -379,7 +378,7 @@ staff.get('/api/staff', async (c) => {
       return c.json({ success: false, error: '全店舗の担当者だけが権限者の一覧を見られます' }, 403);
     }
     const members = await getStaffMembers(c.env.DB, currentTenantId(c));
-    // 担当範囲を1人ずつ読むと人数分の往復になるので一括取得する(#515 中1)。
+    // 担当範囲を1人ずつ読むと人数分の往復になるので一括取得する( 中1)。
     const scopes = await getStaffAccountScopeMap(
       c.env.DB,
       members.filter((member) => (member.account_scope ?? 'all') === 'accounts').map((member) => member.id),
@@ -507,7 +506,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
       return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
     }
     // 同じメールの行があるときの扱い。要件 -30 §9-2(既存メールは管理者へ安全な案内)。
-    // M957: 招待中・期限切れの行は作り直す（上書き・掃除）。送信されなかった
+    // 招待中・期限切れの行は作り直す（上書き・掃除）。送信されなかった
     // 幽霊行が残っていても、同じメールの招待し直しで古い行を消して作り直す
     // ので、409で永久に塞がらない。利用開始済みは従来どおり登録済みで断る。
     const duplicateInvite = (await getStaffMembers(c.env.DB, currentTenantId(c)))
@@ -525,8 +524,8 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
     }
 
     const token = randomToken();
-    // N-424: 作成時点の role から bundle を写す（role は初期値、実権限は保存キーが決める）。
-    // M957: 本人と担当範囲は同じ取引で書く。範囲の途中で止まっても幽霊行を残さない。
+    // 作成時点の role から bundle を写す（role は初期値、実権限は保存キーが決める）。
+    // 本人と担当範囲は同じ取引で書く。範囲の途中で止まっても幽霊行を残さない。
     let member: StaffMember;
     try {
       member = await createStaffMemberWithScopes(c.env.DB, {
@@ -548,7 +547,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
         tenant_id: current.tenantId ?? DEFAULT_TENANT_ID,
       }, accountScope.scopedLineAccountIds);
     } catch (error) {
-      // M958: 同時に届いた招待は一意制約で片方だけが残る。負けた側は作り直さず送り直しへ案内する。
+      // 同時に届いた招待は一意制約で片方だけが残る。負けた側は作り直さず送り直しへ案内する。
       if (error instanceof Error && /UNIQUE/i.test(error.message)) {
         return c.json({ success: false, error: 'このメールアドレスは招待中です。新しく作り直さず、ログインユーザー画面の「招待中」タブからもう一度送り直してください。' }, 409);
       }
@@ -560,7 +559,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
         verifyUrl: invitationConfirmationUrl(c, token),
       });
     } catch (error) {
-      // M957: 後片付け自体が失敗しても握り潰さない。本人と範囲を一緒に消し、
+      // 後片付け自体が失敗しても握り潰さない。本人と範囲を一緒に消し、
       // 消せなくても同じメールの招待し直しで掃除できる（上の上書き）。
       try {
         await deleteStaffMemberWithScopes(c.env.DB, member.id);
@@ -601,9 +600,9 @@ staff.post('/api/staff/invitations/confirm/verify', inputJsonBoundary({"token":[
 });
 
 /*
- * 招待の再送(N-425)。未受諾・期限切れの招待だけ owner/admin が送り直せる。
+ * 招待の再送。未受諾・期限切れの招待だけ owner/admin が送り直せる。
  * 同じ行を使い回す(新規行を作らず、作成日時などの履歴を残す)。旧トークンは
- * 上書きで失効し、新トークンの期限は7日(N-432)。二重押し・同時再送は後勝ちで、
+ * 上書きで失効し、新トークンの期限は7日。二重押し・同時再送は後勝ちで、
  * 生き残るのは最後に発行した1つだけ。旧リンクの受諾は410で再発行を案内する。
  * 自動再送はしない(要件 -30 §9-2)。管理者が対象を確かめて押す運用にする。
  */
@@ -727,7 +726,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   }
 
   /*
-   * N-433: 本人が自分のメールを変えるときは、その場では切り替えない。
+   * 本人が自分のメールを変えるときは、その場では切り替えない。
    * 新しい宛先へ確認リンクを送り、開かれてはじめて確定する。旧アドレスへも
    * 知らせを送り、覚えのない変更に気づけるようにする（セッションを盗まれた
    * ときの静かな乗っ取りを防ぐ）。確認待ちの間、email 列は変えない。
@@ -773,7 +772,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   }
 
   /*
-   * R498: 同じ要求キーの送り直しは、受け付けた結果をそのまま返す。
+   * 同じ要求キーの送り直しは、受け付けた結果をそのまま返す。
    * 応答を見失った画面の再試行が、版を重ねたり保存後の新しいセッションを
    * 切ったりしないようにする。対象の権限確認（上）は済ませているが、
    * 新しい副作用は起こさないので直前再認証は求めない（初回で済ませている）。
@@ -804,7 +803,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   }
 
   // 権限・利用状態・連携・見せる範囲の変更は乗っ取り悪用されやすい高危険操作。
-  // 判定は書き込みより前に行い、step-up無しならDBへ何も書かない（N-427）。
+  // 判定は書き込みより前に行い、step-up無しならDBへ何も書かない。
   const authenticationPolicyChanged =
     body.role !== undefined ||
     body.isActive !== undefined ||
@@ -819,11 +818,11 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
     return c.json({ success: false, error: '権限の変更には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
   }
 
-  // N-424: 役割bundleは「初期値のプリセット」。保存されるのは role_bundle と
+  // 役割bundleは「初期値のプリセット」。保存されるのは role_bundle と
   // 展開済みの edit/view キーで、実際の認可は保存済みキーが決める。
   // bundle と項目・メールを同時に指定したときはプリセットから外れた=カスタムとして保存する。
   //
-  // R497: 表・窓に載っていない既存キー（`/automations` など）はどの入口からも
+  // 表・窓に載っていない既存キー（`/automations` など）はどの入口からも
   // 落とさない。置き換えるのは各入口が管理する集合だけにし、外側は温存する。
   const previousEditKeys = safeJson<string[]>(target.permission_keys, []);
   const previousViewKeys = safeJson<string[]>(target.view_permission_keys, []);
@@ -880,7 +879,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   }
 
   /*
-   * R501: この保存で対象が「操作できる管理者」から外れるか。外れるときは
+   * この保存で対象が「操作できる管理者」から外れるか。外れるときは
    * 書き込みと同じ条件で「ほかに有効な管理者が残る」ことを求める。
    * 直前の guardLastAdmin は単独の最終管理者を止めるが、同時の互いの停止は
    * 両方が通過してしまうため、書き込み時の条件で0人を防ぐ。
@@ -918,9 +917,9 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
     }]
     : []));
   /*
-   * R499: 読んだ版と違うまま保存しようとしたら競合で止める。
+   * 読んだ版と違うまま保存しようとしたら競合で止める。
    * 最新の制限を古い画面が上書きしない。行自体が無いときは404のまま。
-   * R501: 同時に互いを止めた2つ目は、ほかに管理者が残らないので競合で止める。
+   * 同時に互いを止めた2つ目は、ほかに管理者が残らないので競合で止める。
    */
   if (!updated && (expectedPolicyVersion !== undefined || removesAdminFromTarget)) {
     const latest = await getStaffById(c.env.DB, id);
@@ -944,7 +943,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   if (updated && authenticationPolicyChanged) {
     await revokeStaffAuthentication(c.env.DB, id);
   }
-  // R498: 受け付けた結果を要求キーに残す。送り直しはここへ来ず台帳から返す。
+  // 受け付けた結果を要求キーに残す。送り直しはここへ来ず台帳から返す。
   const storeReceipt = async (payload: { success: boolean; data: unknown }) => {
     if (idempotencyKey === undefined || !updated) return;
     await saveStaffPermissionReceipt(c.env.DB, {
@@ -987,7 +986,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
 staff.patch('/api/staff/:id', inputJsonBoundary({"name":["string"],"email":["null","string"],"role":["string"],"isActive":["boolean"],"lineLinked":["boolean"],"permissionKeys":["array"],"notificationPreferences":["object"],"assignedLineAccountId":["null","string"],"canAccessDescendantAccounts":["boolean"],"accountScope":["string"],"scopedLineAccountIds":["array"],"managementContext":["string"],"roleBundle":["string"],"permissionScope":["object"],"permissionViewKeys":["array"],"emailMask":["string"],"idempotencyKey":["string"],"expectedPolicyVersion":["number"]}), async c => updateStaffPolicy(c, c.req.param('id'), await c.req.json<StaffPolicyInput>()));
 
 /*
- * N-433: メール変更の確定。メール内リンクは fragment にトークンを乗せて
+ * メール変更の確定。メール内リンクは fragment にトークンを乗せて
  * 管理画面の確認ページ(/staff/email-change)を直接開き、確定はその画面からの
  * POST だけが行う。GET だけでは確定しないので、メールの先読みで勝手に
  * 変わることはない。
@@ -1145,7 +1144,7 @@ staff.delete('/api/staff/:id/two-factor', async (c) => {
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ解除できます' }, 403);
-  // 二段階認証の解除は本人・他人どちらでも高危険。解除後は対象の全セッションも切る（N-427）。
+  // 二段階認証の解除は本人・他人どちらでも高危険。解除後は対象の全セッションも切る。
   if (!await consumeStaffStepUp(c, 'staff.two_factor.remove')) {
     return c.json({ success: false, error: '二段階認証の解除には再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
   }
@@ -1166,11 +1165,11 @@ staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
   if (!target || !isInCurrentTenant(c, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   const guard = await guardLastAdmin(c.env.DB, target, currentTenantId(c), { isActive: false, self: false });
   if (guard) return c.json({ success: false, error: guard }, 400);
-  // 利用停止は権限変更と同じ高危険操作として再認証を要求する（N-427）。
+  // 利用停止は権限変更と同じ高危険操作として再認証を要求する。
   if (!await consumeStaffStepUp(c, 'staff.permissions.change')) {
     return c.json({ success: false, error: 'スタッフの利用停止には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
   }
-  // R501: 削除も「ほかに有効な管理者が残る」を同じ書き込みの条件にする。
+  // 削除も「ほかに有効な管理者が残る」を同じ書き込みの条件にする。
   const removesAdmin = canAdminister(target);
   const updated = await updateStaffMember(c.env.DB, id, { is_active: 0 },
     ...(removesAdmin ? [{ requireRemainingAdmin: { tenantId: currentTenantId(c) } }] : []));

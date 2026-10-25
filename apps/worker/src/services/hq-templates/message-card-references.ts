@@ -18,7 +18,7 @@ export async function listMessageReferences(db: D1Database, authority: HqTemplat
   return [...forms.map(row => ({ ...row, kind: 'form' as const })), ...scenarios.map(row => ({ ...row, kind: 'scenario' as const })), ...menus.map(row => ({ ...row, kind: 'booking' as const })), ...cards.map(row => ({ ...row, kind: 'visit_stamp' as const }))];
 }
 
-/** Only existing destination resources are reused. Every row and ownership list joins the preflight token and atomic guards. */
+/** 配布先の既存リソースだけを再利用し、行と所有権一覧を事前確認票および原子的検査へ含める。 */
 export async function messageCardReferences(db: D1Database, authority: HqTemplateAuthority, accountId: string, card?: HqMessageCard) {
   const targets: Record<string, string> = {}, snapshot: unknown[] = [], statements: HqTemplateStatement[] = [];
   const seen = new Set<string>();
@@ -42,7 +42,7 @@ export async function messageCardReferences(db: D1Database, authority: HqTemplat
     const target = matches[0];
     snapshot.push([key, source, inventory]);
     statements.push(exact(table, source!), exact(table, target));
-    // Guard the complete inventory as well, so a concurrent same-name addition cannot change the match.
+    // 同名の同時追加で選択先が変わらないよう、一覧全体も照合する。
     const inventoryJson = JSON.stringify(inventory);
     statements.push(guard(`(SELECT json_group_array(json(row)) FROM (SELECT json_object(${Object.keys(target).flatMap(column => [`'${column}'`, column]).join(',')}) AS row FROM ${table} WHERE ${button.action === 'form' ? 'EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=forms.id AND fa.line_account_id=?)' : 'line_account_id=?'} ORDER BY id)) IS json(?)`, [accountId, inventoryJson]));
     if (button.action === 'form') {

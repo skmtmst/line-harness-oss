@@ -68,10 +68,10 @@ export const post__api_liff_friend_add_intent_2 = async (c: Context<Env, "/api/l
       identity.lineUserId,
       identity.lineAccountId,
     );
-    // N-244: 停止した流入経路への直送は候補を残さない。内部状態を漏らさない
+    // 停止した流入経路への直送は候補を残さない。内部状態を漏らさない
     // 汎用文で 410 にする。不存在 ref は共有 namespace の正規フローのため
     // 従来どおり 200 で記録する。
-    // N-244差戻(台帳): 停止試行は抑止台帳へ引き継ぐ。友だち行が無い新規利用者
+    // 停止試行は抑止台帳へ引き継ぐ。友だち行が無い新規利用者
     // でも記録し、後の別followが自然流入扱いにならないようにする。応答は変えない。
     const stoppedIntentRef = await isStoppedEntryRouteRef(c.env.DB, refCode);
     if (stoppedIntentRef) {
@@ -129,7 +129,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
       return inputError(c, { success: false, error: 'idToken is required' }, 400, ["idToken"]);
     }
 
-    // Try verifying with default Login channel, then DB accounts
+    // 既定のログインチャネル、DB のアカウントの順で検証する。
     const loginChannelIds = [c.env.LINE_LOGIN_CHANNEL_ID];
     const dbAccounts = await getLineAccounts(c.env.DB);
     for (const acct of dbAccounts) {
@@ -172,7 +172,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
     const friend = await getFriendByLineUserIdForAccount(
       db, lineUserId, matchedAccount?.id ?? null,
     );
-    // N-244差戻(再審査): 本番LIFFはfriend作成前にlinkのみ呼ぶ。404で返す前に
+    // 本番LIFFはfriend作成前にlinkのみ呼ぶ。404で返す前に
     // 停止判定・抑止記録を済ませ、後のfollowが自然流入扱いにならないようにする。
     // 応答は変えない (行なしは従来どおり 404)。
     if (body.ref) {
@@ -214,14 +214,12 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
       linkedUserId = crossAccount.userId;
     }
 
-    // IG cross-link: runs regardless of already-linked vs new-link branch so
-    // existing friends still get ig_igsid wired when they hit this endpoint
-    // from a reward DM.
+    // 既存の友だちも報酬 DM からのアクセスで IG を結べるよう、新規・連携済みの両方で処理する。
     const igLinkOk = await linkIgIgsid(c, friend.id, body.ig || '');
     if (igLinkOk) await saveIgAccountMeta(db, friend.id, body.iga || '', body.igan || '');
 
     if (linkedUserId) {
-      // N-244: 停止した流入経路への LIFF 直送は、連携済みでも raw ref 保存・
+      // 停止した流入経路への LIFF 直送は、連携済みでも raw ref 保存・
       // 候補・tracking・帰属をすべて止める。apply 側も二重に止める。不存在
       // ref は共有 namespace の正規フローのため従来どおり進める。
       const stoppedLinkRef = await isStoppedEntryRouteRef(db, body.ref);
@@ -233,7 +231,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
           source: 'liff',
         });
       } else {
-        // N-244差戻(台帳): 停止試行を抑止台帳へ引き継ぐ。連携自体は通す。
+        // 停止試行を抑止台帳へ引き継ぐ。連携自体は通す。
         await recordStopSuppressionSafe(db, {
           lineAccountId: matchedAccount?.id ?? null,
           lineUserId,
@@ -242,16 +240,12 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
           source: 'liff',
         });
       }
-      // Still save ref even if already linked (but never persist xh: tokens as ref_code)
+      // 連携済みでも ref は保存するが、秘密の xh: トークンは ref_code に残さない。
       if (body.ref && !body.ref.startsWith('xh:') && !stoppedLinkRef) {
         await db.prepare('UPDATE friends SET ref_code = ? WHERE id = ? AND ref_code IS NULL')
           .bind(body.ref, friend.id).run();
       }
-      // Apply ref attribution (tag + scenario push) for already-linked friends.
-      // /auth/callback only fires for new OAuth flows, so existing friends
-      // would otherwise miss tracked-link campaigns triggered by /api/liff/link.
-      // Mirror the new-link branch's recordRefTracking call so analytics
-      // (/api/analytics/ref-summary) include LIFF hits from existing friends.
+      // 既存友だちは OAuth コールバックを通らない場合があるため、LIFF の経路でもタグ・シナリオと流入計測を適用する。
       if (body.ref && !body.ref.startsWith('xh:') && !stoppedLinkRef) {
         try {
           const route = await getEntryRouteByRefCode(db, body.ref);
@@ -268,7 +262,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
           accountChannelId: matchedAccount?.channel_id ?? null,
         });
       }
-      // X Harness token resolution for already-linked friends
+      // 連携済みの友だちも X Harness のトークンを解決する。
       if (body.ref && body.ref.startsWith('xh:')) {
         try {
           const xhToken = body.ref.slice(3);
@@ -309,7 +303,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
 
     await linkFriendToUser(db, friend.id, userId);
 
-    // N-244: 新規連携でも停止 ref の保存・計測・帰属は止める。
+    // 新規連携でも停止 ref の保存・計測・帰属は止める。
     const stoppedNewLinkRef = await isStoppedEntryRouteRef(db, body.ref);
     if (!stoppedNewLinkRef) {
       await saveFriendAddCandidate(db, {
@@ -319,7 +313,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
         source: 'liff',
       });
     } else {
-      // N-244差戻(台帳): 停止試行を抑止台帳へ引き継ぐ。連携自体は通す。
+      // 停止試行を抑止台帳へ引き継ぐ。連携自体は通す。
       await recordStopSuppressionSafe(db, {
         lineAccountId: matchedAccount?.id ?? null,
         lineUserId,
@@ -329,13 +323,12 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
       });
     }
 
-    // Save ref_code from LIFF (first touch wins)
-    // xh: refs are X Harness one-time tokens — never persist as ref_code
+    // 初回の ref_code を保ち、秘密の xh: トークンは保存しない。
     if (body.ref && !body.ref.startsWith('xh:') && !stoppedNewLinkRef) {
       await db.prepare('UPDATE friends SET ref_code = ? WHERE id = ? AND ref_code IS NULL')
         .bind(body.ref, friend.id).run();
 
-      // Record ref tracking
+
       try {
         const route = await getEntryRouteByRefCode(db, body.ref);
         await recordRefTracking(db, {
@@ -346,13 +339,13 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
         });
       } catch { /* silent */ }
 
-      // Apply ref attribution (tag + scenario push) for newly-linked friends
+
       await applyRefAttribution(c, body.ref, friend, lineUserId, {
         accountChannelId: matchedAccount?.channel_id ?? null,
       });
     }
 
-    // X Harness token resolution: ref starting with "xh:" links X account to LINE friend
+    // xh: のトークンから X と LINE の結び付けを解決する。
     if (body.ref && body.ref.startsWith('xh:')) {
       try {
         const xhToken = body.ref.slice(3);
@@ -392,7 +385,7 @@ export const get__api_analytics_ref_summary_4 = async (c: Context<Env, "/api/ana
     // 名前は entry_routes と LEFT JOIN して引く (未登録なら NULL → クライアン
     // ト側で「(未登録)」と表示)。
     //
-    // IDEA-18: 購入・返金も同じ経路へ連結する。注文は「その経路で最初に来た
+    // 購入・返金も同じ経路へ連結する。注文は「その経路で最初に来た
     // 友だち(first-touch)」が起こした ec_orders だけを数える。友だちの絞り込み
     // と同じ条件(相関副問合せの f2 に同じアカウント範囲)で数えるので、経路別の
     // 購入件数と /api/analytics/ref/:refCode/orders の明細は同じ母集団になる。
@@ -454,7 +447,7 @@ export const get__api_analytics_ref_summary_4 = async (c: Context<Env, "/api/ana
     const friendsWithRefRes = await refStmt.first<{ count: number }>();
 
     /*
-      IDEA-18: 未計測を「0件」と混ぜないための注文の内訳。
+      未計測を「0件」と混ぜないための注文の内訳。
       - attributed: 友だちに結びつき、その友だちに流入経路(ref)がある注文
       - noRoute:    友だちには結びついたが流入経路が分からない注文
       - unlinked:   LINEの友だちに結びついていない注文(会員のつき合わせ対象)
@@ -524,11 +517,7 @@ export const get__api_analytics_ref_refCode_5 = async (c: Context<Env, "/api/ana
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
 
-    // Look up the registered entry_route to surface the operator-facing name,
-    // but do NOT 404 when missing. /inflow-links surfaces refs that exist in
-    // the friends table but have never been registered (X Harness UUIDs,
-    // external campaign IDs, etc.) and we still want their friend list to
-    // expand — name just falls back to the raw ref_code in that case.
+    // 未登録の外部流入 ID でも友だち一覧を開けるよう、経路名が見つからなくても404にしない。表示名だけを ref_code へ戻す。
     const routeRow = await db
       .prepare(`SELECT ref_code, name FROM entry_routes WHERE ref_code = ?`)
       .bind(refCode)
@@ -563,7 +552,7 @@ export const get__api_analytics_ref_refCode_5 = async (c: Context<Env, "/api/ana
       data: {
         refCode: routeRow?.ref_code ?? refCode,
         name: routeRow?.name ?? null,
-        // #514-8: 画面が読む欄のうち口が返せるのはいまの状態だけ
+        // -8: 画面が読む欄のうち口が返せるのはいまの状態だけ
         // (is_following を運用文言に寄せる)。はじめて見たページ・成果・
         // マイルの集計口は無いので返さず、画面は「—」にする。
         friends: (friends.results ?? []).map((f) => ({

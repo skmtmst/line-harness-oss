@@ -75,7 +75,7 @@ export async function getAnalyticsReportSchedules(db: D1Database, lineAccountId:
 }
 
 /**
- * 直近にしまった1回送信の一覧（R454）。
+ * 直近にしまった1回送信の一覧。
  *
  * 1回送信は送信後に archived になるため通常の一覧に出ない。
  * 失敗に気づけるよう、直近分だけ依頼と最新履歴を返す。
@@ -108,7 +108,7 @@ export async function getAnalyticsReportSchedule(db: D1Database, id: string, lin
 }
 
 /**
- * しまった依頼も含めて1件引く（R454）。
+ * しまった依頼も含めて1件引く。
  *
  * 1回送信の依頼は送信後に archived になる。一覧・詳細から消えるが、
  * 失敗理由と宛先別結果を確認・再試行できるよう履歴の入口にする。
@@ -124,7 +124,7 @@ export async function getAnalyticsReportScheduleIncludingArchived(
 }
 
 /**
- * 失敗した1回送信をもう一度送れる状態へ戻す（R454）。
+ * 失敗した1回送信をもう一度送れる状態へ戻す。
  *
  * 一部でも届いたものは送り直さない（重複を防ぐ）。呼び出し側で
  * 最新履歴の宛先別結果を確かめてから使う。
@@ -196,7 +196,7 @@ export async function createAnalyticsReportSchedule(db: D1Database, input: {
   alertRules: AnalyticsReportAlertRule[]; nextRunAt: string; createdBy: string; now: string;
   isOneTime?: boolean;
   /**
-   * R526: 呼び出し側が振った要求キー（UUID）。応答消失後の再送で同じ
+   * 呼び出し側が振った要求キー（UUID）。応答消失後の再送で同じ
    * 予約へ戻すため、行の主キーとして使う。省略時は従来どおり採番する。
    */
   id?: string;
@@ -267,7 +267,7 @@ function serializeRun(row: RunRow): AnalyticsReportRun {
 }
 
 /**
- * 同じ予定時刻の実行記録を1件引く（R450）。
+ * 同じ予定時刻の実行記録を1件引く。
  *
  * 次回予定の更新だけ失敗すると、完了済みのrunが残ったまま予定が
  * 古い時刻に止まる。begin は UNIQUE で null を返し続けるので、
@@ -283,7 +283,7 @@ export async function getAnalyticsReportRun(db: D1Database, input: {
 }
 
 /**
- * 1件の定期レポートの実行履歴を新しい順に返す（R454）。
+ * 1件の定期レポートの実行履歴を新しい順に返す。
  *
  * 1回送信の失敗は一覧から消える（archived のため）。依頼IDから
  * 結果へ到達できるよう、履歴は保存失敗時も残す。
@@ -300,7 +300,7 @@ export async function getAnalyticsReportRuns(db: D1Database, input: {
 }
 
 /**
- * 取り残された実行中（running）の記録を回収する（R450）。
+ * 取り残された実行中（running）の記録を回収する。
  *
  * Worker が送信の途中で止まると running 行が残り、同じ予定時刻の
  * begin がずっと null になる。開始から一定時間を過ぎたものだけを

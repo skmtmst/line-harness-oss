@@ -29,41 +29,21 @@ import { messageToLogPayload } from '../services/step-delivery.js';
 import type { Env } from '../worker-env.js';
 
 /**
- * LINE Messaging API 互換プロキシ。
- *
- * 外部エージェント (Codex / Claude Code / スクリプト等) が LINE API を直接叩くと
- * messages_log に残らず admin UI のチャット履歴から欠落する。このプロキシは
- * ベースURLを `https://api.line.me` → `https://<worker>/line-api` に差し替える
- * だけで送信を messages_log に記録する drop-in 経路を提供する。
- * 通常は source='external'、人間が個別返信する push は
- * X-Line-Harness-Source: manual を付けると source='manual' で記録する。
- *
- * 認証は2系統:
- * 1. チャネルアクセストークン (drop-in 移行用) — line_accounts /
- *    env.LINE_CHANNEL_ACCESS_TOKEN と照合。未登録トークンは 401 (オープンリレー防止)。
- * 2. harness API キー (staff key / env API_KEY) — worker が保持するチャネル
- *    トークンで上流を呼ぶ。エージェントにチャネルトークンを配らずに済むので、
- *    トークンローテーション後はこちらが正規経路。複数アカウント構成では
- *    X-Line-Account-Id ヘッダー (line_accounts.id または channel_id) で送信元を指定。
- *
- * - /line-api/v2/bot/** → api.line.me へ透過転送 (メッセージ以外も可)。
- * - /line-api-data/v2/bot/** → api-data.line.me へ透過転送 (コンテンツ取得等)。
- * - 記録対象: push / multicast / broadcast。reply は replyToken から友だちを
- *   特定できないため転送のみ (reply token は webhook 受信者=worker しか持たない
- *   ので実運用では到達しない)。narrowcast は宛先が確定しないため転送のみ。
+ * LINE API の直接送信が管理画面のチャット履歴から欠落しないよう、push / multicast / broadcast を messages_log に記録して転送する。
+ * チャネルトークンは登録済みの値と照合し、未登録ならオープンリレーを防ぐため401で拒む。
+ * API キー認証では Worker がチャネルトークンを保持し、呼び出し元へ配らない。複数アカウントの送信元は X-Line-Account-Id で指定する。
+ * 担当者の個別返信だけ X-Line-Harness-Source: manual を付け、source='manual' とする。通常は source='external'。
+ * reply は replyToken から宛先を解決できず、narrowcast は宛先が未確定なので、記録せず転送する。
  */
 const lineProxy = new Hono<Env>();
 
-// LINE message payloads are small (multicast: 500 recipients + 5 messages).
-// 1 MiB matches the webhook body cap and bounds memory before upstream fetch.
+// multicast の500宛先・5メッセージを収めつつ、上流送信前のメモリを制限するため、本文は Webhook と同じ1MiBまでとする。
 const MAX_PROXY_BODY_SIZE = 1024 * 1024;
 
-// Non-message bodies can be binary (rich menu image upload — LINE caps it at
-// 1 MB). Buffered as ArrayBuffer to preserve bytes; 3 MiB leaves headroom.
+// 画像などのバイナリを壊さないよう ArrayBuffer で読み、LINE の1MB上限に余裕を持つ3MiBで制限する。
 const MAX_BINARY_BODY_SIZE = 3 * 1024 * 1024;
 
-// POST endpoints inspected for logging. reply/narrowcast are included so the
-// body is parsed as JSON (never binary) and the not-logged warning fires.
+// reply/narrowcast も JSON として解析し、履歴へ残らないことを案内する。
 const MESSAGE_SEND_PATHS = new Set([
   '/v2/bot/message/push',
   '/v2/bot/message/multicast',
@@ -72,7 +52,7 @@ const MESSAGE_SEND_PATHS = new Set([
   '/v2/bot/message/narrowcast',
 ]);
 
-// broadcast_dispatch の緊急停止 (#960) で止める送信パス。
+// broadcast_dispatch の緊急停止  で止める送信パス。
 // 例外は2系統: reply (replyToken 前提の1:1返信) と、push に
 // X-Line-Harness-Source: manual を付けた担当者の個別返信。自動 push
 // (manual 指定なし) は一斉送信と同じく停止対象。
@@ -82,14 +62,10 @@ const BULK_DISPATCH_PATHS = new Set([
   '/v2/bot/message/narrowcast',
 ]);
 
-// Unknown recipients cost a getProfile subrequest plus ~4 D1 queries each; cap
-// them so a multicast full of strangers cannot exhaust the Workers subrequest
-// budget. Overflow is skipped WITH a console.warn — never silently.
+// 未知の宛先はプロフィール取得と複数の D1 問い合わせを消費するため件数を制限する。超過分は黙って落とさず警告を残す。
 const MAX_FRIEND_CREATIONS = 20;
 
-// D1 caps bound parameters at ~100 per statement. 8 params per row → 12 rows
-// per INSERT keeps each statement legal while packing ~300 rows per db.batch
-// subrequest (25 statements), so even large broadcasts stay in budget.
+// D1 の約100バインド上限に収めるため、8引数の行を12行ずつ INSERT し、25文を batch にまとめて問い合わせ予算を守る。
 const ROWS_PER_INSERT = 12;
 const STATEMENTS_PER_BATCH = 25;
 
@@ -115,13 +91,15 @@ type LogRow = {
 };
 
 type ResolvedCaller = {
-  /** Channel access token used against api.line.me / api-data.line.me. */
+  /** 上流の LINE API で使うチャネルアクセストークン。 */
   upstreamToken: string;
-  /** line_accounts.id when the channel is DB-registered, else null (env default). */
+  /** DB 登録済みならアカウント ID、環境の既定なら null を使う。 */
   lineAccountId: string | null;
-  /** Total number of registered accounts — used to scope broadcast logging. */
+  /**
+ * 配信ログの範囲を確定するため、登録アカウントの総数を持つ。
+ */
   accountCount: number;
-  /** Present only when the caller authenticated with a Harness staff key. */
+  /** Harness のスタッフキーで認証した場合だけ保持する。 */
   staff?: Awaited<ReturnType<typeof authenticateApiToken>>;
 };
 
@@ -135,22 +113,13 @@ function asMessages(value: unknown): Message[] {
   return value.filter((m): m is Message => !!m && typeof m === 'object' && 'type' in m);
 }
 
-/**
- * Resolve the caller to a channel. Channel tokens are matched against
- * line_accounts / env (drop-in mode); harness API keys (staff key / env
- * API_KEY) map to a channel via X-Line-Account-Id, the single active account,
- * or the env default token. Returns a Response on auth/validation failure.
- */
+/** チャネルトークンは DB・環境へ照合し、Harness の API キーは指定アカウント・単一の稼働アカウント・既定トークンへ解決する。認証や検証に失敗したら応答を返す。 */
 async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCaller | Response> {
   const accounts = await listLineAccountsWithTenantStatus(c.env.DB);
-  // This is the last server-side gate before api.line.me. Keeping stopped
-  // accounts out of token resolution protects every proxy-based dispatcher,
-  // even if a future job forgets its claim-time filter.
+  // LINE API の直前の共通境界として、停止中アカウントをトークン解決から外す。個別処理が取得時の検査を忘れても送信させない。
   const active = accounts.filter((a) => a.is_active && a.tenant_status === 'active');
 
-  // A DB-registered channel token always keeps its tenant boundary. Without
-  // this check, a stopped tenant whose token also happens to be configured as
-  // the environment default could fall through to the legacy env-token path.
+  // DB にあるトークンは統括境界を保つ。同じ値が環境にもあっても、停止中の統括が代替経路へ抜けないようにする。
   const registeredByToken = accounts.find((a) => a.channel_access_token === token);
   if (registeredByToken && registeredByToken.tenant_status !== 'active') {
     return c.json({ code: 'TENANT_SUSPENDED', message: '契約先の利用が停止されています' }, 403);
@@ -208,8 +177,7 @@ async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCa
     };
   }
   if (c.env.LINE_CHANNEL_ACCESS_TOKEN) {
-    // Registered channels retain their lifecycle even when no active account
-    // remains. Only an unregistered legacy default may use the null scope.
+    // 稼働アカウントが0でも登録済みアカウントの停止を守る。未登録の互換用既定値だけを所属なしで扱う。
     const registeredDefault = accounts.some(
       (a) => a.channel_access_token === c.env.LINE_CHANNEL_ACCESS_TOKEN,
     );
@@ -240,12 +208,7 @@ function requiredProxyPermission(method: string, path: string): string | null {
   return null;
 }
 
-/**
- * Create a friend row for a recipient we have never seen. Mirrors
- * ensureFriendFromWebhookUser (webhook.ts) except that line_account_id is only
- * set on newly created rows — an outgoing push must not rebind an existing
- * friend's account attribution.
- */
+/** 未知の宛先は友だちを作るが、送信を理由に既存友だちの所属を変えないよう、line_account_id は新規作成時だけに設定する。 */
 async function createFriendForRecipient(
   db: D1Database,
   lineClient: LineClient,
@@ -284,7 +247,7 @@ async function createFriendForRecipient(
 }
 
 /**
- * R381: 同じ送信キー（X-Line-Retry-Key）への再送で履歴を二重に書かないため、
+ * 同じ送信キー（X-Line-Retry-Key）への再送で履歴を二重に書かないため、
  * キーがある送信は内容から決まるIDを使う。初回の200で履歴を書けなかった
  * 場合も、LINEが「受理済み」を返す409の再送で同じIDへ同じ行を補完できる。
  */
@@ -297,7 +260,7 @@ export async function deterministicLogId(seed: string): Promise<string> {
   return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`;
 }
 
-/** Multi-row INSERT keeps large broadcasts within the D1 subrequest budget. */
+/** 多数配信でも D1 の問い合わせ予算を守るよう、履歴を複数行 INSERT にする。 */
 async function insertLogRows(
   db: D1Database,
   rows: LogRow[],
@@ -347,11 +310,7 @@ async function touchChat(db: D1Database, friendId: string, manualReply: boolean)
   await updateChat(db, chat.id, { status: 'in_progress', lastMessageAt: jstNow(), manualReply });
 }
 
-/**
- * Record a successfully forwarded send into messages_log. Never throws: the
- * upstream send already happened, so a logging failure must not turn the
- * caller's 200 into an error (it would trigger client retries = double sends).
- */
+/** 上流では送信済みなので、履歴保存の失敗で200をエラーへ変えて再送を誘発しない。記録処理は例外を外へ投げない。 */
 async function logProxySend(
   db: D1Database,
   caller: ResolvedCaller,
@@ -421,13 +380,10 @@ async function logProxySend(
     }
 
     if (path === '/v2/bot/message/broadcast') {
-      // A LINE broadcast reaches the followers of ONE channel. Scope the log
-      // to that channel's friends; with a single registered account the whole
-      // friends table belongs to it (legacy rows may carry NULL account_id).
+      // broadcast は1チャネルにしか届かないため、その所属の友だちだけを記録する。単一登録では所属 NULL の互換データも含める。
       let friendIds: string[] = [];
       if (caller.accountCount <= 1 && lineAccountId) {
-        // Single active account: legacy rows may carry NULL account_id, but
-        // rows pinned to a deactivated account are not this channel's followers.
+        // 単一稼働でも、停止した別アカウントに固定された行は対象に含めない。
         const result = await db
           .prepare(
             'SELECT id FROM friends WHERE is_following = 1 AND (line_account_id = ? OR line_account_id IS NULL)',
@@ -447,9 +403,7 @@ async function logProxySend(
           .all<{ id: string }>();
         friendIds = (result.results ?? []).map((r) => r.id);
       } else {
-        // Multi-account install + unregistered env token: the recipient set is
-        // unknowable, and logging every friend would fabricate sends on other
-        // accounts' timelines. Register the account to get broadcast logging.
+        // 複数アカウントで未登録トークンの宛先は特定できないため、全友だちへ送った履歴を作らない。全体配信の記録にはアカウント登録が必要。
         logger.warn("line_proxy_broadcast_not_logged_env_token_is_not_registered_in_line_accounts_and_multiple_accou");
         return;
       }
@@ -471,8 +425,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
   return async (c: Context<Env>): Promise<Response> => {
     const url = new URL(c.req.url);
     const encodedPath = url.pathname.slice(prefix.length);
-    // Percent-encoded paths (/%70ush) must not dodge the message-send check —
-    // LINE decodes them upstream, so match against the decoded form.
+    // 上流が復号する /%70ush などで検査を回避しないよう、復号したパスで送信を判定する。
     let path: string;
     try {
       path = decodeURIComponent(encodedPath);
@@ -486,8 +439,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     const token = bearerToken(c.req.header('Authorization'));
     if (!token) return c.json(AUTH_FAILED, 401);
 
-    // Resolve the token to a known channel or harness key. Unknown tokens are
-    // rejected so the worker cannot be used as an open relay.
+    // オープンリレーを防ぐため、既知のチャネルまたは Harness キー以外のトークンは拒む。
     const caller = await resolveCaller(c, token);
     if (caller instanceof Response) return caller;
 
@@ -501,8 +453,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     }
     const isMessageSend = logSends && method === 'POST' && MESSAGE_SEND_PATHS.has(path);
 
-    // The compatibility endpoint must respect the same account feature switch
-    // and subscription as the management API, for either accepted credential.
+    // 互換入口も、認証方式によらず管理 API と同じ機能スイッチ・契約を守る。
     const featureId = method === 'POST' && BULK_DISPATCH_PATHS.has(path)
       ? 'broadcasts'
       : /^\/v2\/bot\/(?:richmenu(?:\/|$)|user\/[^/]+\/richmenu(?:\/|$))/.test(path) ? 'rich_menus' : null;
@@ -544,9 +495,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       logSource = 'manual';
     }
 
-    // Message sends are buffered as text (needed for log parsing). Everything
-    // else is buffered as raw bytes — e.g. rich menu image upload is binary
-    // and text-decoding it would corrupt the payload.
+    // 履歴の解析に必要なメッセージはテキストで読み、画像などはバイト列のまま読み、文字コード変換で壊さない。
     let rawBody: string | undefined;
     let binaryBody: ArrayBuffer | undefined;
     if (method !== 'GET' && method !== 'HEAD') {
@@ -579,13 +528,13 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     if (retryKey) headers['X-Line-Retry-Key'] = retryKey;
 
     /*
-     * 緊急停止の判定は副作用 (上流fetch) の直前に置く (#960 / #1050)。
+     * 緊急停止の判定は副作用 (上流fetch) の直前に置く。
      * broadcast/multicast/narrowcast と manual 指定なしの自動 push は、
      * 該当 capability が止まっている間は上流へ一切出さない。
      * 例外は reply と X-Line-Harness-Source: manual の push —— 人間が
      * 相手を見て送る1:1返信は一斉送信の停止対象ではない。
      *
-     * #1050: X-Line-Harness-Capability で送信経路の停止対象を名乗れる。
+     * X-Line-Harness-Capability で送信経路の停止対象を名乗れる。
      * 値が無い・知らない値の自動送信は従来どおり broadcast_dispatch
      * (一斉送信 = 安全側) として止める。
      * アカウント単位の停止とグローバル (*) の停止の両方が効く。
@@ -644,7 +593,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     }
 
     /*
-     * R381: LINE が同じ送信キーを受理済みとして返す409（応答消失後の再送
+     * LINE が同じ送信キーを受理済みとして返す409（応答消失後の再送
      * など）でも履歴を書く。本文は一度だけ届いているが、初回の200で履歴の
      * 保存が落ちたとき、再送の409へ追従して同じ決まったIDの行を補完する。
      * insertLogRows は送信キーから決まるIDの INSERT OR IGNORE なので、
@@ -654,9 +603,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       retryKey && upstream.status === 409 && upstream.headers.get('x-line-accepted-request-id'),
     );
     if (isMessageSend && rawBody && (upstream.ok || dedupeAccepted)) {
-      // Log in the background where possible: a multicast to hundreds of
-      // friends must not delay the client response (timeout → client retry →
-      // double send). Falls back to inline await outside a Workers runtime.
+      // 多数宛先の記録で応答が遅れ再送されないよう、可能ならバックグラウンドへ分ける。Workers 以外ではその場で待つ。
       const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource, retryKey, knownPushRecipient);
       try {
         c.executionCtx.waitUntil(logging);
@@ -676,8 +623,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       if (value) responseHeaders.set(name, value);
     }
 
-    // Stream the body through — api-data downloads (images, video) can be
-    // large binary; buffering them as text would corrupt and bloat memory.
+    // 大きな画像・動画でメモリを膨らませたり内容を壊したりしないよう、応答は stream のまま返す。
     return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
   };
 }

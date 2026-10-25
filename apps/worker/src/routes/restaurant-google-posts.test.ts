@@ -528,8 +528,7 @@ describe('取り込み（sync）', () => {
 });
 
 /**
- * Instagram 同時投稿（611・★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。
- * 本物のInstagramへはつながず、graph.instagram.com への呼び出しはすべてモックで受ける。
+ * 本物の Instagram へ送らず、graph.instagram.com への呼出を差し替えて同時投稿を確かめる。設計図 ★V8-B U1X7T2・HEEN9 と照合する。
  */
 describe('Instagram 同時投稿', () => {
   const instagramBody = { ...standardBody, mediaId: 'media-ig', instagram: { enabled: true, caption: null } };

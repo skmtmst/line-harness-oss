@@ -79,7 +79,7 @@ export interface CommonActionVersion {
   versionNumber: number;
   status: 'draft' | 'published';
   actions: ActionDefinition[];
-  /* 監査 R473・R477: 保存ごとに進む改訂番号。古い読み取りからの保存・公開を止める。 */
+  /* 監査 ・: 保存ごとに進む改訂番号。古い読み取りからの保存・公開を止める。 */
   draftRevision: number;
   createdBy: string | null;
   createdAt: string;
@@ -97,7 +97,7 @@ export interface CommonActionBinding {
   hasNewerVersion: boolean;
   runningCount: number | null;
   waitingCount: number | null;
-  /* 監査 R471: 切替後に旧版のまま進んでいる実行。現在版の件数とは分ける。 */
+  /* 監査 : 切替後に旧版のまま進んでいる実行。現在版の件数とは分ける。 */
   olderRunningCount: number | null;
   olderWaitingCount: number | null;
   updatedAt: string;
@@ -148,7 +148,7 @@ export function requiredString(value: unknown, field: string, label: string): st
 }
 
 /*
- * 監査 R473・R477: 読み取り時の改訂番号。保存・公開のたびに照合し、
+ * 監査 ・: 読み取り時の改訂番号。保存・公開のたびに照合し、
  * 古い画面からの上書きを止める。利用者に入力させる項目ではない。
  */
 export function requiredDraftRevision(value: unknown): number {
@@ -224,7 +224,7 @@ export async function requireResource(
   input: { table: string; id: unknown; lineAccountId: string; field: string; label: string },
 ): Promise<string> {
   const id = requiredString(input.id, input.field, input.label);
-  // 再審査対応(#645): テンプレートは同一アカウントに加え、公開版があること。
+  // テンプレートは同一アカウントに加え、公開版があること。
   const publishedClause = input.table === 'templates' ? ' AND published_version > 0' : '';
   const row = await db.prepare(
     `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ?${publishedClause} LIMIT 1`,
@@ -396,7 +396,7 @@ export async function resolveLatestPublishedReference(
 }
 
 /*
- * 監査 R479: 確認後に参照先が更新されていたら、別の内容を再確認なしで
+ * 監査 : 確認後に参照先が更新されていたら、別の内容を再確認なしで
  * 公開しない。保存時に固定した版と現在の公開版を突き合わせる。
  */
 export async function collectReferenceDrifts(

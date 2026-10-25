@@ -54,8 +54,7 @@ async function patchStatus(id: string, status: unknown, staff = operator()) {
 beforeEach(() => {
   testDb = createTestD1();
 
-  // D1 batch is atomic. The shared SQLite adapter predates batch users and
-  // executes sequentially, so make its test behavior match D1's contract.
+  // D1 batch と同じ原子性を試すため、逐次実行の SQLite アダプターをこの試験ではトランザクションにする。
   testDb.db.batch = async <T = unknown>(statements: D1PreparedStatement[]) => {
     testDb.raw.exec('BEGIN');
     try {

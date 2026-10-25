@@ -1,6 +1,6 @@
 import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
 /*
- * R425: 合言葉を更新して同じ通知を再署名しても、受信処理と後続通知は重ねない。
+ * 合言葉を更新して同じ通知を再署名しても、受信処理と後続通知は重ねない。
  *
  * 落ち方（直前）: OLD署名の再送は重複扱いだが、NEWへ更新後の同一本文の
  *   NEW署名は新しい受領IDとなり、受領・未照合・後続通知が2件になる。

@@ -5,7 +5,7 @@ import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
  *
  * 流れ（6時間ごとの重いレーンで1tick）:
  *   1. 利益計算用スプレッドシートが無ければ雛形から自動作成する
- *      （Googleの認可は #838 の google_sheets_integrations を使い回す）。
+ *      （Googleの認可は  の google_sheets_integrations を使い回す）。
  *   2. EC-CUBE の読み取り専用エンドポイント `/line-harness/tiktok-order-export`
  *      から TikTok 注文明細を取り込み、D1 (tiktok_pnl_order_lines) へ upsert。
  *   3. 未反映（sheet_dirty=1）の行だけを「注文明細（自動）」タブへ upsert。
@@ -40,11 +40,11 @@ const SHEET_BATCH_SIZE = 200;
 export const TIKTOK_PNL_SPREADSHEET_TITLE = 'TikTok利益計算（自動集計）';
 
 /**
- * 利益計算が使える連携の状態（#838 の google_sheets_integrations.status）。
+ * 利益計算が使える連携の状態（ の google_sheets_integrations.status）。
  *
- * `pending_target` は「Googleの認可は済んでいるが、#838 の書き出し先スプレッドシートを
+ * `pending_target` は「Googleの認可は済んでいるが、 の書き出し先スプレッドシートを
  * まだ選んでいない」状態で、更新用トークンは保存されている。利益計算は自分で
- * スプレッドシートを作るので #838 の書き出し先を必要とせず、この状態でも動かせる。
+ * スプレッドシートを作るので  の書き出し先を必要とせず、この状態でも動かせる。
  * 除外するのは認可が切れた `expired` と、行自体が無い未接続だけ。
  */
 export const TIKTOK_PNL_USABLE_INTEGRATION_STATUSES = ['connected', 'pending_target'] as const;
@@ -874,7 +874,7 @@ export async function syncTiktokPnlForAccount(
 }
 
 /**
- * 6時間ごとの定期実行。Google Sheets 連携済み（#838）かつ利益計算シートを
+ * 6時間ごとの定期実行。Google Sheets 連携済みかつ利益計算シートを
  * 有効化したアカウントを対象に、機能ゲート（external_integrations）を
  * 通ったものだけ同期する。
  */
@@ -885,7 +885,7 @@ export async function processTiktokPnlTick(
   const db = env.DB;
   const gate = createFeatureJobGate();
   // enabled = 1 のアカウントだけを対象にする。Google Sheets 連携は
-  // 他の機能（#838）でも使うので、連携済みを条件にすると利益計算を
+  // 他の機能でも使うので、連携済みを条件にすると利益計算を
   // 頼んでいないアカウントにも勝手にスプレッドシートを作ってしまう。
   // 管理画面の手動同期が押された時に enabled が 1 になる。
   const integrations = await db.prepare(

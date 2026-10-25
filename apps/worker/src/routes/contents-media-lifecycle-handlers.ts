@@ -109,7 +109,7 @@ export const patch__api_media_id_2 = async (c: Context<Env, "/api/media/:id">) =
     }
   }
   /*
-    既知の利用期限・同意情報の記録（IDEA-15）。
+    既知の利用期限・同意情報の記録。
     日付は実在する YYYY-MM-DD だけを受け付け、null/空で消す。
     推測で値を作らないので、形式が合わない入力は書き込まず拒否する。
   */
@@ -489,7 +489,7 @@ export const delete__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) 
     const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, id, accountId, checkedAt);
     if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
     // R34: 読み残しがあるときは使われていないと断定できない。確かめられ
-    // ないものは消させない（ fail-closed ）。読み直しを促す409で返す。
+    // ないものは消させない（ fail-closed）。読み直しを促す409で返す。
     const verified = (scan.skippedTables ?? []).length === 0;
     const impact = verified ? snapshot.impact : {
       ...snapshot.impact,

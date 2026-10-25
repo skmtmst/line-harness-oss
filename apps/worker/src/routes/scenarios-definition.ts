@@ -39,7 +39,7 @@ export async function requireScenarioAccountScope(c: Context<Env>, lineAccountId
 }
 
 export /**
- * シナリオ変更の共通境界(N-051)。
+ * シナリオ変更の共通境界。
  *
  * owner/adminは従来どおり通す。一般staffはシナリオ行のaccountをDB解決し、
  * 共通土台へ渡す。表示権限だけのstaff・readOnly・範囲外は止める。
@@ -85,7 +85,7 @@ export async function requireVisibleScenario(c: Context<Env>, next: () => Promis
   await next();
 }
 
-export /** Convert D1 snake_case Scenario row to shared camelCase shape */
+export
 function serializeScenario(row: DbScenario) {
   return {
     id: row.id,
@@ -93,9 +93,7 @@ function serializeScenario(row: DbScenario) {
     description: row.description,
     triggerType: row.trigger_type,
     triggerTagId: row.trigger_tag_id,
-    // null = global scenario (fires for every account); UUID = bound to that line_account_id.
-    // Surfacing this lets the dashboard distinguish "全アカ共通" from orphan scenarios whose
-    // owner account was deleted.
+    // null は全アカウント共通、UUID は特定アカウント所属を表す。管理画面で、共通のシナリオと所属先を失ったシナリオを区別できるよう返す。
     lineAccountId: (row as { line_account_id?: string | null }).line_account_id ?? null,
     isActive: Boolean(row.is_active),
     stoppedReason: row.stopped_reason ?? null,
@@ -126,7 +124,7 @@ function parseJson(raw: string | null | undefined): unknown {
   }
 }
 
-export /** Convert D1 snake_case ScenarioStep row to shared camelCase shape */
+export
 function serializeStep(row: DbScenarioStep) {
   return {
     id: row.id,
@@ -174,7 +172,7 @@ function validateQuestionForStorage(
       return { ok: false, error: `選択肢${i + 1}の文字が空です。` };
     }
     /*
-     * R214: 行き先（URL・電話・メール）の形を見る。not-a-url のような
+     * 行き先（URL・電話・メール）の形を見る。not-a-url のような
      * 値でも保存できると、設定済みに見えて実際は開けない通になる。
      * 下書きでも通さず、公開・送信前の共通検査としてここで止める。
      */
@@ -202,11 +200,7 @@ function validateQuestionForStorage(
 export const VALID_DELIVERY_MODES: readonly DeliveryMode[] = ['relative', 'elapsed', 'absolute_time'];
 export const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-export /**
- * Validate scenario step condition_type / condition_value pair.
- * Rejects unknown condition_type values up-front (write-time) so users get an
- * actionable error instead of the silent over-delivery seen in OSS issue #120.
- */
+export /** 未知の条件を保存時に拒み、配信時に常時通過として過剰配信しないよう、condition_type/value の組を検証する。 */
 function validateStepCondition(
   conditionType: unknown,
   conditionValue: unknown,
@@ -221,7 +215,7 @@ function validateStepCondition(
   // conditionType が「あり」のとき conditionValue は必ず非空文字列。
   // body の TS 型は実行時には強制されないので、明示的に runtime check しないと
   // 数値・オブジェクトが SQL バインドに乗って 0件マッチ → tag_not_exists が全友だちに当たる、
-  // のような OSS issue #120 と同じ over-delivery を再現してしまう。
+  // のような OSS issue  と同じ over-delivery を再現してしまう。
   if (typeof conditionValue !== 'string' || conditionValue === '') {
     return { ok: false, error: 'conditionValue must be a non-empty string when conditionType is set' };
   }
@@ -290,7 +284,7 @@ function validateStepSchedule(
   return { ok: true };
 }
 
-export /** Convert D1 snake_case FriendScenario row to shared camelCase shape */
+export /** 購読行を共有の応答形式へ変換する。 */
 function serializeFriendScenario(row: DbFriendScenario) {
   return {
     id: row.id,
@@ -482,7 +476,7 @@ async function runTestSend(
       friendId,
       scenario.line_account_id,
       c.env.WORKER_URL || new URL(c.req.url).origin,
-      // N-057: 送信先×対象（全通 or 1通）で短い間隔の重複実送信を止める。
+      // 送信先×対象（全通 or 1通）で短い間隔の重複実送信を止める。
       { dedupeKey: `${scenarioId}:${stepId ?? 'all'}` },
     );
     if (!result.ok) {

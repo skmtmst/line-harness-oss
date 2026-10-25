@@ -4,12 +4,7 @@ import { getMileageAdminHistory, getMileageFriendsV6 } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /*
- * V6R-CX-e: マイルの友だち詳細は、名前ではなく友だちIDで1人を取る（実SQLite）。
- *
- * 以前は表示名で探して100件まで取り、その中から友だちIDで拾っていた。
- * 同じ名前の友だちが100人を超えると、本人の行と履歴がこぼれて出なかった。
- * また履歴は「代表の友だちID」と一致するものしか残さなかったため、
- * 名寄せした人を副アカウントから開くと履歴が空になっていた。
+ * 同名の友だちの人数によらず本人と履歴を取得できるよう、名前検索でなく友だち ID で照合する。名寄せした友だちは副アカウントからも履歴を取得する。
  */
 let fixture: SqliteD1;
 

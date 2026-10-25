@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Route-level test for the LIFF offer surface:
-//   GET  /api/liff/affiliate/offers            (active offers + enrolled state)
-//   POST /api/liff/affiliate/offers/:id/enroll (idempotent, inactive → 404)
-// Auth is a LINE access token verified against a fetch mock; the db layer is
-// mocked with an in-memory offer + link store so we can exercise idempotency and
-// the inactive-offer 404 without a real D1 binding.
+// LINE トークン検証は外部応答だけを差し替え、案件・リンクはメモリ保存で参加の冪等性と無効案件の404を試す。
 const dbMocks = {
   listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000', tenant_status: 'active', is_active: 1, archived_at: null },
@@ -153,7 +148,7 @@ beforeEach(() => {
     },
   );
   dbMocks.getAffiliateLinkStats.mockResolvedValue(new Map());
-  // Only the active offer is returned by activeOnly listing.
+  // 稼働中の案件だけが一覧に出る。
   dbMocks.listAffiliateOffers.mockResolvedValue([ACTIVE_OFFER]);
   // 既定は版なし・上限なし(従来の表示のまま)。
   dbMocks.getCurrentOfferVersion.mockResolvedValue(null);
@@ -242,7 +237,7 @@ describe('POST /api/liff/affiliate/offers/:id/enroll', () => {
     });
     const b2 = (await second.json()) as { link: { refCode: string } };
     expect(b2.link.refCode).toBe('off0');
-    // Only one link ever created for this affiliate×offer.
+    // 同じ参加者・案件の組合せでリンクを二重に作らない。
     expect(links.filter((l) => l.offer_id === 'off-active')).toHaveLength(1);
   });
 
@@ -333,7 +328,7 @@ describe('POST /api/liff/affiliate/offers/:id/enroll', () => {
 
 describe('POST /api/liff/affiliate/links — offer-scoped issuance', () => {
   it('issues an offer-scoped link once enrolled, carrying offerId + offerName', async () => {
-    // Enroll first so the caller has a link for the offer.
+
     await call('/api/liff/affiliate/offers/off-active/enroll', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -352,7 +347,7 @@ describe('POST /api/liff/affiliate/links — offer-scoped issuance', () => {
     expect(body.link.label).toBe('X用');
     expect(body.link.offerId).toBe('off-active');
     expect(body.link.offerName).toBe('案件A');
-    // The new link was created with the offer scope, not a generic link.
+    // 汎用リンクでなく案件に属するリンクが作られることを確かめる。
     expect(links.some((l) => l.offer_id === 'off-active' && l.label === 'X用')).toBe(true);
   });
 
@@ -367,7 +362,7 @@ describe('POST /api/liff/affiliate/links — offer-scoped issuance', () => {
   });
 
   it('400s when the caller has not yet enrolled in the offer', async () => {
-    // No enroll → no existing link for off-active → issuance is refused.
+    // 未参加で既存リンクもない案件へ、勝手にリンクを発行できないことを確かめる。
     const res = await call('/api/liff/affiliate/links', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

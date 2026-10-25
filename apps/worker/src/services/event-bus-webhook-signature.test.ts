@@ -1,16 +1,4 @@
-/**
- * #650 再審査 + #940(N-371/N-372): 自動配信(event-bus)の外向きWebhookに
- * 署名が必ず付き、本文が共通封筒であること。
- *
- * 退行の中身: secret を暗号文だけで保存するようにしたのに、この経路は行を
- * そのまま deliverWebhook へ渡していた。平文列が NULL なので
- * X-Webhook-Signature が付かないまま送られ、しかも成功として記録されていた。
- * #940 では署名の名前と入力も統一する（X-Harness-Event-Id / Timestamp /
- * Signature、署名入力は「時刻.イベントID.本文」）。
- *
- * ここでは差し替えなしの deliverWebhook と実際の復号を通し、送信ヘッダを
- * 直接見て署名を固定する。鍵は Worker の bindings 経由で読ませる。
- */
+/** 自動配信 Webhook も復号済みの鍵で署名することを、実復号と実 deliverWebhook の送信ヘッダから確かめる。署名入力は時刻・イベント ID・本文とし、共通の封筒を使う。 */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 const KEY = 'DRQbIikwNz5FTFNaYWhvdn2Ei5KZoKeutbzDytHY3-Y';

@@ -262,7 +262,7 @@ export function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
   if (r.label !== undefined && r.label !== null && typeof r.label !== 'string') {
     return { field: 'pages', ok: false, error: 'area.label must be string' };
   }
-  // #827 (N-155): ボタン名は端末の読み上げ(アクセシビリティ)にも使うため
+  //  ボタン名は端末の読み上げ(アクセシビリティ)にも使うため
   // 20 字まで。公開時の必須・上限検査と同じ上限を保存口でも掛けて、
   // 21 字以上の値を DB へ残さない。
   if (typeof r.label === 'string' && [...r.label].length > 20) {
@@ -373,7 +373,7 @@ export function parsePages(raw: unknown): Parsed<RichMenuPageInput[]> {
     if (!parsed.ok) return parsed;
     pages.push(parsed.value);
   }
-  // order_index は 0..N-1 で重複なしを必須化。
+  // order_index は 0.. で重複なしを必須化。
   const orders = pages.map((p) => p.orderIndex).sort((a, b) => a - b);
   for (let i = 0; i < orders.length; i++) {
     if (orders[i] !== i) return { field: 'pages', ok: false, error: 'page.orderIndex must be 0..N-1 with no duplicates' };
@@ -392,7 +392,7 @@ export function parsePages(raw: unknown): Parsed<RichMenuPageInput[]> {
   return { ok: true, value: pages };
 }
 
-export // N-161: 新規作成でもページ切替を決められるようにする。
+export // 新規作成でもページ切替を決められるようにする。
 // 作成前は page.id が決まっていないため、切替ボタンの行き先は
 // `actionData.targetPageIndex`（行き先ページの orderIndex）で受け、
 // createRichMenuGroup が採番した実IDへ解決する。実IDを直接送る形
@@ -425,11 +425,11 @@ export function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> 
   if (typeof r.size !== 'string' || !VALID_SIZES.has(r.size)) return { field: 'size', ok: false, error: 'size must be large or compact' };
   const pages = parsePages(r.pages);
   if (!pages.ok) return pages;
-  // #502中: 作成直後のフォルダ付けupdate握りつぶしをなくすため、作成口で直接受け付ける。
+  // 中: 作成直後のフォルダ付けupdate握りつぶしをなくすため、作成口で直接受け付ける。
   if (r.folderId !== undefined && r.folderId !== null && typeof r.folderId !== 'string') {
     return { field: 'folderId', ok: false, error: 'folderId must be a string or null' };
   }
-  // N-161: 既定ページ・配信対象・全員既定を作成時に決められるようにする。
+  // 既定ページ・配信対象・全員既定を作成時に決められるようにする。
   let defaultPageIndex: number | null = null;
   if (r.defaultPageIndex !== undefined && r.defaultPageIndex !== null) {
     if (
@@ -567,7 +567,7 @@ export function parsePatchBody(raw: unknown): Parsed<{ meta: UpdateRichMenuGroup
   return { ok: true, value: { meta, pages } };
 }
 
-export /** 条件の複雑さの上限 (#502中)。重い条件の連打でDB負荷になるため入り口で断る。 */
+export /** 条件の複雑さの上限 (中)。重い条件の連打でDB負荷になるため入り口で断る。 */
 const PREVIEW_MAX_RULES = 50;
 
 export const PREVIEW_MAX_DEPTH = 5;

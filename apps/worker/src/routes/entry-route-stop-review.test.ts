@@ -1,7 +1,7 @@
 import { signedLiffState, mockLineIdToken } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// N-244 独立レビュー差し戻し: 同じPRで直す4点の直接テスト。
+// 停止した流入経路の公開 URL・LIFF・Webhook・引継の境界を、実際の入口から確かめる。
 // 1. /auth/oauth と PC版 /auth/line の開始時にも停止判定し、停止前ページから
 //    停止後に押した場合を拒否する (410)。active・不存在は従来どおり通す。
 // 2. 停止ref由来では OAuth callback のアカウント共通シナリオを含め

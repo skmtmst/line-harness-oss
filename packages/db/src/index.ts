@@ -1,7 +1,7 @@
 /*
  * `MAX_LIST_LIMIT` は一覧ヘルパの天井。**本番のコードからは読まない**
  * （読むと `@line-crm/db` を差し替えている試験が全部この名前を要求される）。
- * 口が名乗る数と天井が離れていないことを試験から確かめるために公開する（#722）。
+ * 口が名乗る数と天井が離れていないことを試験から確かめるために公開する。
  */
 export { jstNow, toJstString, isTimeBefore, jstDateString, nextDateString, nextVersionToken, MAX_LIST_LIMIT } from './utils';
 export { DEFAULT_TENANT_ID } from '@line-crm/shared';

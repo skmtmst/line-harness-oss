@@ -43,7 +43,7 @@ export const get__api_friend_add_rules_conflicts_1 = async (c: Context<Env, "/ap
       });
     };
     // 定義の読み解きは1行1回だけにする。二重ループの中で毎回読むと
-    // 設定が増えるほど競合確認が遅くなる (#501-軽)。
+    // 設定が増えるほど競合確認が遅くなる (-軽)。
     const parsed = rows.map((row) => ({ row, definition: parseSnapshot(row.definition_snapshot) }));
     for (let left = 0; left < parsed.length; left += 1) {
       for (let right = left + 1; right < parsed.length; right += 1) {
@@ -334,7 +334,7 @@ export const post__api_friend_add_rules_id_test_send_8 = async (c: Context<Env, 
     }
     const account = await getLineAccountById(c.env.DB, accountId);
     if (!account) return inputError(c, { success: false, error: 'LINEアカウントが見つかりません' }, 400, []);
-    // 共通情報の差し込みは厳格に解く（N-189）。解けなければ送らない。
+    // 共通情報の差し込みは厳格に解く。解けなければ送らない。
     let resolvedBody: string;
     try {
       resolvedBody = await expandSendCommonVars(
@@ -401,8 +401,7 @@ export const post__api_friend_add_rules_id_publish_9 = async (c: Context<Env, "/
       return c.json({ success: false, error: '公開前にテストを成功させてください' }, 409);
     }
     /*
-     * M008: 存在しない設定の公開は 500 にしない。消した直後などの競合では
-     * 対象の有無を見直し、無いときは 404、あるとき（下書きが無い）は 409。
+     * 削除との競合を500にしないよう、公開対象の有無を再確認する。対象がなければ404、対象があり下書きがなければ409で返す。
      */
     if (error instanceof Error && (
       error.message === 'FRIEND_ADD_RULE_NOT_FOUND'
@@ -492,7 +491,7 @@ export const delete__api_friend_add_rules_id_13 = async (c: Context<Env, "/api/f
   if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
   /*
-   * M007: 存在しない設定と共通あいさつ（受け皿）を分ける。無いときは 404。
+   * 存在しない設定と共通あいさつ（受け皿）を分ける。無いときは 404。
    */
   const current = await getFriendAddRule(c.env.DB, { lineAccountId: accountId, ruleId: c.req.param('id') });
   if (!current) {

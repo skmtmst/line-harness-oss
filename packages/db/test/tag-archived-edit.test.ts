@@ -15,9 +15,9 @@ import {
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * Issue #710: 保管済み(archived)タグの編集を止める。
+ * 保管済み(archived)タグの編集を止める。
  *
- * 司令塔裁定: タグには archived を active へ戻す口が無い（git grep で確認
+ * タグには archived を active へ戻す口が無い（git grep で確認
  * 済み）。戻せないので、表示名の訂正（name / description）だけは許し、
  * 挙動を決める設定（フォルダ・スター・手動付与可否・再付与方針・連動の
  * 有効無効・マイル・連動アクション）は変えられないようにする。

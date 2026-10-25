@@ -107,7 +107,7 @@ export async function reconcileRestaurantInventory(env:Env['Bindings'],storeId:s
    continue;
   }
   const members=await restaurantResponsibleMembers(db,storeId,tzDateStr(store.timezone,new Date(slot.starts_at)));
-  // Attribute only reservation changes in this stable reconciliation. Rule/table/closure edits have no reservation origin.
+  // 安定した照合では予約変更だけを予約の起点にし、ルール・席・休業の編集を混ぜない。
   const sources=queue?.cause.startsWith('rt_reservations:')?(await db.prepare(`SELECT DISTINCT e.reservation_id AS reservationId,e.source,e.event
     FROM rt_inventory_rule_source_events e JOIN rt_reservations r ON r.id=e.reservation_id AND r.store_id=e.store_id
     JOIN rt_inventory_slots i ON i.id=e.slot_id WHERE e.store_id=? AND e.slot_id=? AND e.id<=?

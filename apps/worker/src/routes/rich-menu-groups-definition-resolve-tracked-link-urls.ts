@@ -173,7 +173,7 @@ export function createLineClient(channelAccessToken: string): LineRichMenuClient
         throw new Error(`LINE linkRichMenuBulk failed: ${res.status} ${await res.text()}`);
       }
     },
-    // ----- N-152: 本人LINEへのテスト適用で使う個人宛て操作 -----
+    // ----- : 本人LINEへのテスト適用で使う個人宛て操作 -----
     async linkRichMenuToUser(userId, richMenuId) {
       const res = await fetch(
         `https://api.line.me/v2/bot/user/${encodeURIComponent(userId)}/richmenu/${encodeURIComponent(richMenuId)}`,
@@ -241,7 +241,7 @@ async function buildPublishGroupInput(
   );
 }
 
-export /** K-1「公開の進み」の段の名前。設計 K-1 の4段。 */
+export /** 「公開の進み」の段の名前。設計 K-1 の4段。 */
 const PUBLISH_PROGRESS_STEPS = [
   { key: 'image', label: '画像をLINEに上げる' },
   { key: 'menu', label: 'メニューを作る' },
@@ -318,7 +318,7 @@ async function handleManualPublish(
   const publishFence = { owner: publishOwner, generation: publishGeneration };
   const executionToken = crypto.randomUUID();
 
-  // K: 台帳の行。try の外で持つ（catch から失敗を残すため）。
+  // 台帳の行。try の外で持つ（catch から失敗を残すため）。
   let publishRunId: string | null = null;
   let publishVersionId: string | null = null;
   let publishRunPageIds: string[] = [];
@@ -350,7 +350,7 @@ async function handleManualPublish(
       await releasePublishLease(c.env.DB, groupId, publishFence);
       return c.json({ success: false, error: '公開対象が更新されました。画面を更新してからもう一度お試しください。' }, 409);
     }
-    // K: 公開する版を凍結し、実行行とページ行を確保する。
+    // 公開する版を凍結し、実行行とページ行を確保する。
     // 同じ下書き・同じ鍵なら使い回す（再試行は同じ「進み」に寄せる）。
     const staffId = c.get('staff').id;
     const version = await ensureRichMenuVersion(c.env.DB, {
@@ -401,7 +401,7 @@ async function handleManualPublish(
       ...groupInput,
       pages: resolveSwitcherActions(groupInput.pages, groupInput.id),
     });
-    // O: 実機で見た確認が今の下書きに無ければ公開しない。
+    // 実機で見た確認が今の下書きに無ければ公開しない。
     // 自前検査の後ろに置く（不備は 400 のまま返す）。下書きが変わると
     // fingerprint が変わり、確認は無効になる。
     const deviceConfirmation = await findRichMenuDeviceConfirmation(c.env.DB, groupId, fingerprint);
@@ -417,7 +417,7 @@ async function handleManualPublish(
         error: 'まだ実機で見た確認がありません。スマートフォンのLINEでメニューを見て「実機で見た」を押してから、もう一度公開してください。',
       }, 409);
     }
-    // O: 自前検査のあと、公開する形のまま LINE の検査 API に通す。
+    // 自前検査のあと、公開する形のまま LINE の検査 API に通す。
     await validateRichMenuPagesWithLine(groupInput, line);
     const heartbeat = async () => {
       const alive = await renewPublishLease(c.env.DB, groupId, publishFence, new Date().toISOString());
@@ -463,7 +463,7 @@ async function handleManualPublish(
     if (shells.length !== latestGroup.pages.length || shells.some((shell) => !latestGroup.pages.some((page) => page.id === shell.page_id))) {
       throw new Error('manual publish shell journal does not match the requested version');
     }
-    // K: 段1・2（画像を上げる・メニューを作る）が済んだページを残す。
+    // 段1・2（画像を上げる・メニューを作る）が済んだページを残す。
     if (publishRunId) {
       for (const shell of shells) {
         await markRichMenuPublishRunPageStep(c.env.DB, publishRunId, shell.page_id, 'create_status', 'succeeded', {
@@ -486,7 +486,7 @@ async function handleManualPublish(
         throw new PublishLeaseLostError();
       }
     }
-    // K: 段3（友だちに割り当てる＝aliasの付け替え）が済んだページを残す。
+    // 段3（友だちに割り当てる＝aliasの付け替え）が済んだページを残す。
     if (publishRunId) {
       for (const shell of shells) {
         await markRichMenuPublishRunPageStep(c.env.DB, publishRunId, shell.page_id, 'alias_status', 'succeeded', {
@@ -499,7 +499,7 @@ async function handleManualPublish(
     // 最初の版で控えた旧IDだけを消す。再開時に現在page行の新IDを旧IDと誤認しない。
     publishPhase = 'cleanup';
     await deleteRichMenuShells(line, shells.flatMap((shell) => shell.old_richmenu_id ? [shell.old_richmenu_id] : []));
-    // K: 段4（前のメニューを片付ける）。旧メニューが無かったページは「しない」。
+    // 段4（前のメニューを片付ける）。旧メニューが無かったページは「しない」。
     if (publishRunId) {
       for (const shell of shells) {
         await markRichMenuPublishRunPageStep(
@@ -524,7 +524,7 @@ async function handleManualPublish(
     })) {
       throw new PublishLeaseLostError();
     }
-    // K: 台帳の実行を成功にし、凍結した版を公開版にする。
+    // 台帳の実行を成功にし、凍結した版を公開版にする。
     if (publishRunId) {
       await markRichMenuPublishRun(c.env.DB, publishRunId, { status: 'succeeded' });
     }
@@ -541,7 +541,7 @@ async function handleManualPublish(
       generation: publishFence.generation,
       nowIso: new Date().toISOString(),
     });
-    // K: 台帳の実行を失敗にし、止まった段のページを「失敗」に残す。
+    // 台帳の実行を失敗にし、止まった段のページを「失敗」に残す。
     // まだ手を付けていない段は pending のまま（画面は「しない」と出す）。
     if (publishRunId) {
       const errorCode = e instanceof RichMenuValidationError
@@ -572,7 +572,7 @@ async function handleManualPublish(
   }
 }
 
-export // ----- N-152: 本人LINEへのテスト適用 -----
+export // ----- : 本人LINEへのテスト適用 -----
 
 function serializeTestApply(row: {
   id: string; status: string; previous_richmenu_id: string | null;

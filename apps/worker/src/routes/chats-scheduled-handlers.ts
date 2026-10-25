@@ -38,7 +38,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
     }
     const image = body.image ?? null;
     const text = typeof body.text === 'string' ? body.text : null;
-    // G-4: テンプレートパック。`texts` は `text` と並べて受け、
+    // テンプレートパック。`texts` は `text` と並べて受け、
     // 挿入順のまま1回のpushにまとめる。LINEのpush上限は1回5通。
     const extraTexts = Array.isArray(body.texts)
       ? body.texts.filter((t): t is string => typeof t === 'string' && t.length > 0)
@@ -101,7 +101,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
     }
     const textParts: string[] = [];
     for (const rawText of texts) {
-      // N-026: 差し込みは単体送信口と同じ解決器・同じ拒否。片方だけ
+      // 差し込みは単体送信口と同じ解決器・同じ拒否。片方だけ
       // 素通しだと、画像つき送信が `{{name}}` をそのまま相手へ出す。
       const renderedText = await renderChatMessageContent(
         c.env.DB, friend, 'text', rawText, liffId,
@@ -405,7 +405,7 @@ export const post__api_chats_id_schedule_2 = async (c: Context<Env, "/api/chats/
     if (messageType === 'text' && content.length > 5000) {
       return inputError(c, { success: false, error: 'メッセージは5000文字以内で入力してください' }, 400, ["messageType","content"]);
     }
-    // N-026: 送信時に解決される差し込み(name/field/var/date等)は予約へ通すが、
+    // 送信時に解決される差し込み(name/field/var/date等)は予約へ通すが、
     // カタログに無い名前は将来も解決できないのでここで拒否する(予約行も作らない)。
     const unsupported = findUnsupportedInterpolations(content);
     if (unsupported.length > 0) {
@@ -538,7 +538,7 @@ export const patch__api_chats_id_scheduled_scheduleId_4 = async (c: Context<Env,
       if (existing.message_type === 'text' && body.content.length > 5000) {
         return inputError(c, { success: false, error: 'メッセージは5000文字以内で入力してください' }, 400, ["content"]);
       }
-      // N-026: 予約作成と同じく、カタログに無い差し込み名はここで拒否する。
+      // 予約作成と同じく、カタログに無い差し込み名はここで拒否する。
       const unsupported = findUnsupportedInterpolations(body.content);
       if (unsupported.length > 0) {
         return inputError(c, { success: false, ...unresolvedVariablesPayload(unsupported) }, 400, ["content"]);

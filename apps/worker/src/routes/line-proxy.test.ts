@@ -46,8 +46,7 @@ vi.mock('@line-crm/line-sdk', async () => {
   };
 });
 
-// Keep the real shape of messageToLogPayload without dragging in the whole
-// step-delivery dependency graph.
+// 配信全体の依存を読まずに検証できるよう、messageToLogPayload と同じ入出力だけを保つ。
 vi.mock('../services/step-delivery.js', () => ({
   messageToLogPayload: (message: { type: string; text?: string }) =>
     message.type === 'text'
@@ -76,10 +75,7 @@ type Exec = { sql: string; params: unknown[] };
 
 const U = (n: number) => `U${n.toString(16).padStart(32, '0')}`;
 
-/**
- * Minimal D1 stub. `friendsByUserId` feeds the IN (...) lookup used by
- * multicast; `broadcastFriendIds` feeds the is_following SELECTs.
- */
+/** multicast の IN 照会は friendsByUserId、全体送信のフォロー状態は broadcastFriendIds で試す。 */
 function fakeDb(opts: {
   friendsByUserId?: Record<string, { id: string; line_user_id: string }>;
   broadcastFriendIds?: string[];
@@ -128,7 +124,7 @@ function fakeDb(opts: {
   return { db: db as unknown as D1Database, executed };
 }
 
-/** Flatten multi-row messages_log INSERTs into logical rows (8 params each). */
+/** 複数行の送信履歴 INSERT を、1行8引数の論理行へ展開して検証する。 */
 function loggedRows(executed: Exec[]) {
   const rows: { friendId: unknown; messageType: unknown; content: unknown; deliveryType: unknown; source: unknown; lineAccountId: unknown }[] = [];
   for (const e of executed) {
@@ -629,7 +625,7 @@ describe('push', () => {
   });
 
   /*
-   * R381: 同じ送信キー（X-Line-Retry-Key）の再送は履歴を二重に書かない。
+   * 同じ送信キー（X-Line-Retry-Key）の再送は履歴を二重に書かない。
    * 初回の200で履歴の保存が落ちても、LINEが「受理済み」を返す409の再送で
    * 同じ決まったIDの行へ補完する。
    */
@@ -860,7 +856,7 @@ describe('multicast', () => {
     );
 
     expect(res.status).toBe(200);
-    // 1 known + 20 created (cap) = 21 logged; 5 skipped with a warning
+    // 既知1人と上限内の新規20人だけを記録し、超過5人は警告とともに除く。
     expect(loggedRows(executed)).toHaveLength(21);
     expect(upsertFriend).toHaveBeenCalledTimes(20);
   });
@@ -1051,7 +1047,7 @@ describe('reply and passthrough', () => {
 });
 
 /*
- * #960 — broadcast_dispatch 緊急停止はプロキシ送信経路にも効く。
+ *  — broadcast_dispatch 緊急停止はプロキシ送信経路にも効く。
  * 停止中の一斉送信系 (broadcast/multicast/narrowcast/自動push) は上流へ
  * fetch しない。例外は reply と manual 明示の 1:1 push。
  */
@@ -1146,7 +1142,7 @@ describe('emergency stop (broadcast_dispatch)', () => {
   });
 
   /*
-   * #1050 — X-Line-Harness-Capability で送信経路ごとの停止対象を名乗る。
+   *  — X-Line-Harness-Capability で送信経路ごとの停止対象を名乗る。
    * 停止中は上流へ一切出さず 409 を返す。値が無い・知らない値の自動送信は
    * 従来どおり broadcast_dispatch (安全側) で止める。
    */

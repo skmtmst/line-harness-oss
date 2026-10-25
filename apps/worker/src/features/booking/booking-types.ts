@@ -1,5 +1,4 @@
-// Booking feature shared types & constants.
-// IDs are TEXT (UUID/nanoid) to follow line-harness schema.sql conventions.
+// DB と同じ保存形式を使うため、ID は UUID/nanoid の TEXT とする。
 
 export type BookingStatus =
   | 'requested'
@@ -58,7 +57,7 @@ export interface StaffMenuRow {
 export interface ShiftRow {
   id: string;
   staff_id: string;
-  work_date: string;  // YYYY-MM-DD JST
+  work_date: string;  // 日本時間の YYYY-MM-DD。
   start_time: string; // HH:MM JST
   end_time: string;   // HH:MM JST
 }
@@ -69,7 +68,7 @@ export interface BookingRow {
   friend_id: string;
   staff_id: string;
   menu_id: string;
-  starts_at: string;       // UTC ISO8601 (Z)
+  starts_at: string;       // UTC の ISO8601（Z）。
   ends_at: string;
   block_ends_at: string;
   status: BookingStatus;
@@ -118,8 +117,8 @@ export const SLOT_GRANULARITY_MINUTES = 30;
 export const SLOT_GRANULARITY_CHOICES = [5, 10, 15, 30, 60] as const;
 export const REQUEST_TTL_HOURS = 24;
 export const IDEMPOTENCY_TTL_MINUTES = 5;
-/** R535: メニュー作成の応答再送の窓。作成画面を開き直すまでの再試行に備えて24時間。 */
+/** メニュー作成の応答再送の窓。作成画面を開き直すまでの再試行に備えて24時間。 */
 export const MENU_IDEMPOTENCY_TTL_MINUTES = 60 * 24;
-/** R559: 電話客の台帳作成の応答再送の窓。予約の確定操作中の再送に備えて24時間。 */
+/** 電話客の台帳作成の応答再送の窓。予約の確定操作中の再送に備えて24時間。 */
 export const BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES = 60 * 24;
 export const REMINDER_MAX_RETRY = 3;

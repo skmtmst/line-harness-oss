@@ -1,7 +1,6 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 
-// Mock the DB package — /t/:linkId route reads the link via getTrackedLinkById
-// and records clicks via recordLinkClick (fire-and-forget in waitUntil).
+// リンク取得とクリック記録を DB ヘルパで差し替え、/t/:linkId の入口を試す。
 const dbMocks = {
   getTrackedLinks: vi.fn(),
   getTrackedLinkById: vi.fn(),
@@ -44,7 +43,7 @@ interface ScenarioRow {
   line_account_id: string | null;
 }
 
-/** Minimal D1 mock covering the raw queries in resolveLinkAccount. */
+/** resolveLinkAccount の直接 SQL だけに対応する最小の D1 試験実装。 */
 function makeDb(state: { accounts?: AccountRow[]; scenarios?: ScenarioRow[] }): D1Database {
   return {
     prepare(sql: string) {
@@ -258,7 +257,7 @@ describe('GET /t/:linkId — short codes', () => {
     expect(res.headers.get('location')).toBe('https://example.com/lp');
     expect(dbMocks.getTrackedLinkByIdOrShortCode).toHaveBeenCalledWith(env.DB, 'Ab3xY9k');
     await Promise.allSettled(waits);
-    // Click must be recorded against the UUID, not the short code
+    // クリックは短縮コードでなく、リンクの UUID へ記録する。
     expect(jobs.record).toHaveBeenCalledWith(env.DB,expect.objectContaining({linkId:'uuid-link-1',friendId:null}));
   });
 

@@ -9,7 +9,7 @@ const statusSql=`CASE WHEN r.status='cancelled' THEN 'cancelled' WHEN r.status='
  WHEN EXISTS(SELECT 1 FROM hq_broadcast_targets t JOIN broadcasts b ON b.id=t.broadcast_id WHERE t.run_id=r.id AND t.excluded=0 AND b.status='scheduled') THEN 'scheduled'
  WHEN EXISTS(SELECT 1 FROM hq_broadcast_targets t JOIN broadcasts b ON b.id=t.broadcast_id WHERE t.run_id=r.id AND t.excluded=0 AND (b.status='draft' OR EXISTS(SELECT 1 FROM broadcast_send_claims s WHERE s.broadcast_id=b.id AND s.state IN ('failed','unknown')))) THEN 'failed'
  WHEN EXISTS(SELECT 1 FROM hq_broadcast_targets t JOIN broadcasts b ON b.id=t.broadcast_id WHERE t.run_id=r.id AND t.excluded=0 AND b.status='sent') THEN 'sent' ELSE 'scheduled' END`;
-/** Keep the array response compatible while returning page/count metadata for the HQ list. */
+/** 配列応答の互換性を保ち、統括一覧にページと件数の情報を返す。 */
 export async function listHqBroadcasts(db:D1Database,tenantId:string,input:Record<string,string|undefined>) {
   let period;
   try {period=parseExecutionDateRange({from:input.from,to:input.to});}catch{throw new StampError('配信日の指定を確認してください',400);}
@@ -19,7 +19,7 @@ export async function listHqBroadcasts(db:D1Database,tenantId:string,input:Recor
   const allowed=['draft','pending_approval','scheduled','sending','sent','failed','stopped','cancelled'];
   if(input.status&&!allowed.includes(input.status))throw new StampError('状態を選び直してください',400);
   const conditions=['r.tenant_id=?'],bindings:(string|number)[]=[tenantId];
-  // sent_at/scheduled_at carry their zone; HQ's fallback created_at is UTC.
+  // 送信・予約日時は時差を持ち、統括の代替 created_at は UTC として解釈する。
   const at="julianday(COALESCE((SELECT MAX(b.sent_at) FROM hq_broadcast_targets t JOIN broadcasts b ON b.id=t.broadcast_id WHERE t.run_id=r.id AND t.excluded=0),r.scheduled_at,r.created_at))";
   if(period.from){conditions.push(`${at}>=julianday(?)`);bindings.push(period.from);}
   if(period.until){conditions.push(`${at}<julianday(?)`);bindings.push(period.until);}
@@ -35,7 +35,7 @@ export async function listHqBroadcasts(db:D1Database,tenantId:string,input:Recor
   return {data,pagination:{total,limit,cursor:offset,nextCursor:offset+rows.length<total?String(offset+rows.length):null},statusCounts};
 }
 
-/** Cached LINE quotas remain per account; stale or missing accounts make the total unknown. */
+/** LINE の送信枠はアカウント別のキャッシュを使い、古い・欠けた値があれば合計を不明とする。 */
 export async function hqBroadcastQuota(db:D1Database,tenantId:string) {
   const accounts=(await db.prepare(`SELECT a.id,a.name,(SELECT h.value_json FROM operation_health_results h JOIN operation_health_runs r ON r.id=h.run_id
     WHERE r.line_account_id=a.id AND r.status='completed' AND h.check_key='message_quota' ORDER BY julianday(h.observed_at) DESC,h.id DESC LIMIT 1) value_json,

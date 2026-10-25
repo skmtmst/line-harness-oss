@@ -93,7 +93,7 @@ export const get__api_conversions_export_2 = async (c: Context<Env, "/api/conver
       item.usageCount,
       item.updatedAt,
     ]);
-    // N-267: 件数で切ったCSVが全件に見えないよう、先頭行で打ち切りを明記する。
+    // 件数で切ったCSVが全件に見えないよう、先頭行で打ち切りを明記する。
     const headerNote = truncated
       ? '# 成果地点の書出し…先頭10000件まで。続きは期間や絞り込みを分けて出してください。'
       : '# 成果地点の書出し…最大10000件まで';
@@ -143,7 +143,7 @@ export const post__api_conversions_points_4 = async (c: Context<Env, "/api/conve
     if (!body.name || !body.eventType) {
       return inputError(c, { success: false, error: 'name and eventType are required' }, 400, ["name","eventType"]);
     }
-    // 定義作成と同じ120文字上限。一覧表示が崩れないため(#513 L14)。
+    // 定義作成と同じ120文字上限。一覧表示が崩れないため。
     if (String(body.name).trim().length > 120) {
       return inputError(c, { success: false, error: 'name must be 120 characters or less' }, 400, ["name"]);
     }
@@ -175,7 +175,7 @@ export const put__api_conversions_points_id_5 = async (c: Context<Env, "/api/con
     const body = await c.req.json<ConversionPointBody>();
     /*
      * 版は本文が正本。代理やプロキシで本文が落ちたときだけクエリを見る
-     * (#513 L11)。定義系の stop / replace / delete と同じ約束にする。
+     * 。定義系の stop / replace / delete と同じ約束にする。
      */
     const expectedVersion = positiveVersion(body.expectedVersion)
       ?? positiveVersion(c.req.query('expectedVersion'));
@@ -363,7 +363,7 @@ export const post__api_conversions_track_7 = async (c: Context<Env, "/api/conver
 
 export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conversions/events">) => {
   try {
-    // 日付は他口と同じ厳密な暦日で見る。不正値は辞書順比較にせず400にする(#513 L12)。
+    // 日付は他口と同じ厳密な暦日で見る。不正値は辞書順比較にせず400にする。
     const rawStart = c.req.query('startDate') ?? undefined;
     const rawEnd = c.req.query('endDate') ?? undefined;
     if ((rawStart !== undefined && !parseDate(rawStart)) || (rawEnd !== undefined && !parseDate(rawEnd))) {
@@ -384,7 +384,7 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
       offset: paging.offset,
     });
 
-    // #819: 取消は追記の台帳。最新の追記が 'reverse' のものだけを
+    // 取消は追記の台帳。最新の追記が 'reverse' のものだけを
     // 「取り消し中」として返す。
     const reversedIds = await getReversedEventIds(c.env.DB, events.map((e) => e.id));
 
@@ -508,13 +508,8 @@ export const get__api_conversions_report_11 = async (c: Context<Env, "/api/conve
   try {
     if (c.req.query('startDate') !== undefined || c.req.query('endDate') !== undefined) {
       /*
-       * N-269: 旧応答形(startDate/endDate→地点別行)もの集計
-       * (getConversionDefinitionReport)から作る。暦日の解釈・
-       * スナップショット固定・取消控除を新レポートと一致させ、
-       * 2系統の集計で数値がずれる状態を解消する。
-       *
-       * 旧形の totalCount/totalValue は取消を含む総数だったので、
-       * 純数へ取消分を戻して同じ意味に写す。
+       * 応答形式が異なっても集計値がずれないよう、getConversionDefinitionReport を共通で使う。
+       * 暦日・スナップショット・取消控除を一致させ、旧形式の totalCount/totalValue は取消を含む総数へ戻す。
        */
       const startDate = c.req.query('startDate');
       const endDate = c.req.query('endDate');

@@ -24,13 +24,7 @@ import {
   getVisibleLineAccountScope,
 } from '../services/account-access.js';
 
-/**
- * Admin-side affiliate offer (案件) CRUD. Mounted under `/api/affiliate-offers`,
- * so it inherits admin auth from authMiddleware (only `/api/liff/*` is skipped).
- *
- * snake_case DB rows → camelCase responses via serializeOffer, mirroring
- * routes/affiliates.ts's serializeAffiliate.
- */
+/** /api/affiliate-offers は管理認証を継承し、DB の snake_case は serializeOffer で camelCase へ変換して応答形式をそろえる。 */
 const affiliateOffers = new Hono<Env>();
 
 async function requireVisibleAffiliateOffer(c: Context<Env>, next: () => Promise<void>) {
@@ -62,17 +56,17 @@ function serializeOffer(row: AffiliateOffer) {
   };
 }
 
-/** reward_amount must be a non-negative integer when supplied. */
+/** 報酬が指定された場合は、非負の整数だけを許可する。 */
 function isValidReward(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0;
 }
 
 /**
  * 案件に結ぶタグ・シナリオが、案件と同じLINEアカウントの有効なものか確かめる
- * （#554 点検#505中3）。他アカウントのものを結ぶと成果時の誤動作・
+ * （ 点検中3）。他アカウントのものを結ぶと成果時の誤動作・
  * 情報の混ざりになる。存在しない・見えないは区別せず400にする。
  * 保管済みタグ・停止中シナリオは承認時点で実行できないので、
- * ここで具体的な理由を添えて止める（監査 R193）。
+ * ここで具体的な理由を添えて止める。
  */
 async function offerReferenceError(
   db: D1Database,
@@ -177,7 +171,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inp
     if (!name) {
       return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
     }
-    // 安定した操作UUID（#686）。commit後に応答だけ失われて再送されても、
+    // 安定した操作UUID。commit後に応答だけ失われて再送されても、
     // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
     const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
     if (operationId && (operationId.length < 8 || operationId.length > 200)) {
@@ -200,7 +194,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inp
       ?? (scope.allowedAccountIds.length === 1 ? scope.allowedAccountIds[0] : null);
     if (!lineAccountId) {
       // そのまま画面へ出す文言にする。複数アカウントのとき空欄で押すと
-      // ここに来る（#505 重大1）。画面側でも押す前に選ばせている。
+      // ここに来る（ 重大1）。画面側でも押す前に選ばせている。
       return inputError(c, { success: false, error: 'LINEアカウントを選んでください' }, 400, ["lineAccountId"]);
     }
     if (!scope.allowedAccountIds.includes(lineAccountId)) {
@@ -225,12 +219,12 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inp
       isActive: body.isActive,
       operationId: operationId || undefined,
     });
-    // 作った案件の決まりを初版として残す(#823)。版が無いと期間30日・上限なしの
+    // 作った案件の決まりを初版として残す。版が無いと期間30日・上限なしの
     // 扱いになるため、値は今の案件と同じものを写す。
     // 版がある再送（応答喪失・報酬編集後の古いPOST）では何も足さない。
     // この確認で、修正前に作られた鍵なし初版を持つ案件の再送も守る。
     // 版が無いときだけ初版を作る（版の保存だけ落ちた後の再送の回収）。
-    // 確認キーは案件ごとに固定し、同時再送の交差は1件に束ねる(F-23)。
+    // 確認キーは案件ごとに固定し、同時再送の交差は1件に束ねる。
     if (!(await getCurrentOfferVersion(c.env.DB, offer.id))) {
       await createOfferVersion(c.env.DB, {
         offerId: offer.id,
@@ -321,7 +315,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
 
     await readFolderAssignment(c.env.DB,'affiliate_offer',effectiveAccountId,body.folderId===undefined?existing.folder_id:body.folderId);
 
-    // 報酬・期間・上限・受付の変更は、決まりの新しい版として残す(#823)。
+    // 報酬・期間・上限・受付の変更は、決まりの新しい版として残す。
     // 版を先に作り、失敗したら案件の値も変えない。版が無い昔の案件は、
     // この保存で初版が生まれる。
     if (body.rewardAmount !== undefined || body.rewardMiles !== undefined

@@ -82,7 +82,7 @@ export type GroupInput = {
   isDefaultForAll: boolean;
   /**
    * V8「トークを開いたとき メニューを開いておく」。LINE の rich menu payload
-   * の `selected` にそのまま出る。未指定（古い呼び出し・既存行）は false、
+   * `selected` にそのまま出る。未指定（古い呼び出し・既存行）は false、
    * つまり従来どおり「閉じておく」。
    */
   defaultOpen?: boolean;
@@ -143,7 +143,7 @@ export interface LineRichMenuClient {
   // bulk link: 指定 richMenuId を userIds (最大 500 件 / リクエスト) に link。
   // 500 超は呼出側で chunk して順次呼ぶ。
   linkRichMenuBulk(richMenuId: string, userIds: string[]): Promise<void>;
-  // ----- N-152: 本人LINEへのテスト適用で使う個人宛て操作（必要な経路だけが使う任意口） -----
+  // ----- : 本人LINEへのテスト適用で使う個人宛て操作（必要な経路だけが使う任意口） -----
   linkRichMenuToUser?(userId: string, richMenuId: string): Promise<void>;
   unlinkRichMenuFromUser?(userId: string): Promise<void>;
   /** その人に今出ている richMenuId。未設定なら null。 */
@@ -385,7 +385,7 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
       if (!limited(uri, 1000)) {
         throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
       }
-      // R203: 計測リンクはこちらが生成したURLなので飛ばす。手入力の飛び先は
+      // 計測リンクはこちらが生成したURLなので飛ばす。手入力の飛び先は
       // URIの形と許可schemeを確かめ、LINEへ届いて初めて失敗する事故を防ぐ。
       if (!area.trackedLinkUrl) {
         const uriError = richMenuUriError(uri);
@@ -471,7 +471,7 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
       `ページは${RICH_MENU_MAX_PAGES}までです（今は${group.pages.length}ページあります）。まとめられるページを1つにしてください`,
     );
   }
-  // #827 (N-159): 「ページを切り替える」だけのボタンは、押しても別ページが
+  //  「ページを切り替える」だけのボタンは、押しても別ページが
   // 出るだけで、押すと何か起きる行き先にはならない。到達可能な行き先として数えない。
   let destinationCount = 0;
   for (const page of group.pages) {
@@ -482,7 +482,7 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
         ? `ページ「${page.name}」の「${label}」`
         : `ページ「${page.name}」のタップ領域${i + 1}`;
 
-      // #827 (N-155): ボタン名は端末の読み上げ(アクセシビリティ)にも使うため
+      //  ボタン名は端末の読み上げ(アクセシビリティ)にも使うため
       // 必須・20字以内。既存行や DB 直接更新を通った値もここで止める。
       if (!label) {
         throw new RichMenuValidationError(`${prefix}: ボタン名（読み上げラベル）を入力してください`);
@@ -510,7 +510,7 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
         if ([...uri].length > 1000) {
           throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
         }
-        // R203: intent なしの古いボタンにも同じ検査を掛ける。
+        // intent なしの古いボタンにも同じ検査を掛ける。
         const uriError = richMenuUriError(String(uri));
         if (uriError) {
           throw new RichMenuValidationError(`${prefix}: ${uriError}`);
@@ -728,7 +728,7 @@ async function readR2Object(r2: R2Like, key: string): Promise<Uint8Array> {
 }
 
 // =============================================================================
-// 段階公開(E-08 #621 司令塔裁定・案A)。publish を create/upload → DB journal確定 →
+// 部分的な公開を防ぐため、create/upload → DB journal 確定 →
 // alias/default切替 → 旧メニュー削除へ分ける。journal確定前の失敗は、まだliveで
 // ない新メニューを消すだけで既存alias/defaultを変えない。切替途中の失敗は、
 // 保存した切替前LINE状態へ補償で戻す。予約実行が journal を挟むために使う。
@@ -1090,7 +1090,7 @@ export type UnpublishResult = {
  *   3. 現 default が own group の richmenu なら default unlink
  *
  * 削除は 404 を許容することで複数回呼ばれても安全 (idempotent)。
- * M953: alias / richmenu の削除が1件でも失敗 (5xx 等) したら、処理を
+ * alias / richmenu の削除が1件でも失敗 (5xx 等) したら、処理を
  * 続けたうえで最後に throw する。失敗を warnings に退避して成功扱いに
  * すると、DB は draft 確定なのに LINE 上にメニューが残り、画面は
  * 「取り下げ済み」に見えてしまう。route 側は throw を受けて 500・run 失敗・

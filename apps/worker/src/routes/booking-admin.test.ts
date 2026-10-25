@@ -18,7 +18,7 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
 const availabilityMocks = {
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
   // 候補の instant 契約に合わせる。route は壁時刻ではなく startUtc の
-  // 完全一致で確定する（#651）ので、置き換えでも instant を付ける。
+  // 完全一致で確定するので、置き換えでも instant を付ける。
   // この試験の店舗は Asia/Tokyo。
   getAvailability: vi.fn(async (_db: unknown, params: { from: string; staffId?: string }) => ({
     by_staff: [{
@@ -299,9 +299,7 @@ const execCtx = {
 } as unknown as ExecutionContext;
 
 describe('POST /api/booking/admin/bookings', () => {
-  // Always 7 days in the future at 02:00Z (= JST 11:00, inside the mocked
-  // 10:00-19:00 shift). A fixed date here becomes a time bomb: the route
-  // rejects past slots with 422 once the calendar catches up.
+  // 実行日によって過去枠として422にならないよう、7日後の02:00Z（JST11時、シフト内）を使う。
   const futureStartsAt = (() => {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() + 7);
@@ -506,7 +504,7 @@ describe('POST /api/booking/admin/bookings', () => {
 
   test('404 when staff belongs to another account', async () => {
     availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
-    // friend exists, but the staff-in-account assertion returns no row.
+    // 友だちは存在するが、アカウント所属のスタッフ検証が見つからない状態を作る。
     const db = scriptedDb([
       ['FROM friends', { first: { id: 'f1', is_following: 1 } }],
       ['FROM staff WHERE', { first: null }],
@@ -531,12 +529,10 @@ describe('POST /api/booking/admin/bookings', () => {
     availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
     const db = happyDb();
     const { app, env } = makeApp(db);
-    // September exercises the old `.replace('-09', ...)` mangling bug, but the
-    // year must stay in the future (past slots are rejected with 422 before the
-    // window query runs) — pick this year's Sep 10 or next year's once passed.
+    // 日付文字列の月置換による破損を検出するため9月を使う。過去枠の拒否より先へ進むよう、未来の9月10日を選ぶ。
     const now = new Date();
     const sepYear =
-      now.getTime() < Date.UTC(now.getUTCFullYear(), 8, 1) // before Sep 1
+      now.getTime() < Date.UTC(now.getUTCFullYear(), 8, 1) // 9月1日より前を指定する。
         ? now.getUTCFullYear()
         : now.getUTCFullYear() + 1;
     const res = await app.request(

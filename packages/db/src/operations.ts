@@ -283,7 +283,7 @@ export async function stopOperationCapabilities(
   }
 
   /*
-   * N-451: 止める瞬間の「止まった定義」の指紋を取る。
+   * 止める瞬間の「止まった定義」の指紋を取る。
    * 復旧のとき、ここで記録した版・期限と現在の定義を比べて、
    * 停止中の 編集・削除・追加・期限切れ を検査する。
    * 制御状態を裏返す前に取るので、snapshotは必ず停止前の定義を指す。
@@ -376,7 +376,7 @@ export async function stopOperationCapabilities(
   };
 }
 
-/** N-451: 復旧試行の検査結果。incident の restore_report_json と応答の両方に載せる。 */
+/** 復旧試行の検査結果。incident の restore_report_json と応答の両方に載せる。 */
 export interface OperationRestoreReport {
   evaluatedAt: string;
   drift: OperationRestoreDrift;
@@ -396,7 +396,7 @@ export type RestoreOperationIncidentResult =
   | { status: 'not_found' };
 
 /*
- * N-451: 停止前snapshotを無条件には戻さない。
+ * 停止前snapshotを無条件には戻さない。
  *
  * 停止時に保存した定義の指紋と現在を比べ、
  * - 変更・追加があった能力 → 再開せず理由つきで止めたままにする

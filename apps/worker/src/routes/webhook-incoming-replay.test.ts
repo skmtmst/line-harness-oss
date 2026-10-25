@@ -1,22 +1,8 @@
 import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
 /*
- * N-365 (#746): 受信Webhookの同じ署名の使い回しを弾く。
- *
- * 直した欠陥（棚卸し #264 の実測）:
- *   同じ本文・同じ署名をそのまま3回送ると [200,200,200] で通り、
- *   受信記録が3行積まれ、fireEvent が3回走っていた。
- *   本文を変えると 401 になるので完全性は守られていて、欠けていたのは新鮮さだけ。
- *
- * ここで止めたい崩れ方:
- *   1. 2回目が通ってしまう（= 盗った署名を何度でも再生できる）
- *   2. 弾きすぎて、別の本文（別の署名）の正規の受信まで落ちる
- *   3. 形の壊れた本文で予約を使い切り、送り直しが 400 ではなく「重複」になる
- *   4. 署名が違うものを通してしまう（既存の守りを壊す）
- *   5. 鍵に webhook_id が入っておらず、別の受信口の受信が混ざって弾かれる
- *
- * source 文字列ではなく、実アプリ(`app`・全 middleware 込み)と実 SQLite を叩く。
- * `?accountId=` を付けているのは、この口が feature 分類のため付けないと
- * 署名検証へ到達しないから（#746 で別途報告済み。この票では直していない）。
+ * 同じ署名の使い回しを拒み、別本文・別受信口の正規要求まで拒まないことを実アプリ・実 SQLite で確かめる。
+ * 壊れた本文は予約を消費せず、修正後の再送を許す。署名違いは拒む。
+ * feature 分類を通って署名検証へ到達させるため、要求には ?accountId= を付ける。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -31,7 +17,7 @@ vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => {
     ...actual,
     deliverWebhook: delivery,
     /*
-      d23b R419: event bus の初回配送と sweep はどちらも1回固定経路
+      d23b : event bus の初回配送と sweep はどちらも1回固定経路
       (deliverOnce)を呼ぶ。event bus 側(送信手段を渡さない)は記録用の
       モックへ、sweep 側(fetchImpl を渡す)は実物の配送へ流して、
       同じ冪等キーで実際に署名して送る姿を確かめられるようにする。
@@ -315,7 +301,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
   it.each([
     ['INSERT OR IGNORE INTO incoming_webhook_receipts', null],
     ["SET status='processing',lease_owner=", 'accepted'],
-    // R425: 本文照合を予約より先に行うため、この文の障害では行が残らない。
+    // 本文照合を予約より先に行うため、この文の障害では行が残らない。
     // 受信自体は失わず、正規再送で回復する（下の 200・completed で確かめる）。
     ['SELECT source_event_id,status,received_at', null],
   ])('受付途中のDB障害でも受信を失わない: %s', async (fragment, expectedStatus) => {
@@ -485,7 +471,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     const actual = await vi.importActual<typeof import('../services/event-bus.js')>('../services/event-bus.js');
     fireEvent.mockImplementation((...args) => actual.fireEvent(...args as Parameters<typeof actual.fireEvent>));
     // out-2 には再送予算を付ける（max_retries=2）。失敗した配送は
-    // 台帳へ retry_wait で残り、sweep が同じ冪等キーで送り直す(#938)。
+    // 台帳へ retry_wait で残り、sweep が同じ冪等キーで送り直す。
     db.raw.prepare(`INSERT INTO outgoing_webhooks (id,name,url,event_types,secret,line_account_id,max_retries)
       VALUES ('out-1','out-1','https://out-1.example.test','["incoming_webhook.custom"]',?,'account-1',0)`).run(SECRET);
     db.raw.prepare(`INSERT INTO outgoing_webhooks (id,name,url,event_types,secret,line_account_id,max_retries)

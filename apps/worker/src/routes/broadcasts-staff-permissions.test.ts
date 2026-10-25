@@ -1,5 +1,5 @@
 /*
- * P0-8 一斉配信の staff 個別権限キー（-06 §6 の6キー）を効かせる。
+ * 一斉配信の staff 個別権限キー（-06 §6 の6キー）を効かせる。
  *
  * 要件の表：下書き作成・編集=definition.edit／テスト送信=test.send／
  * 予約・即時送信=definition.publish／緊急停止=job.stop／失敗再送=job.retry／

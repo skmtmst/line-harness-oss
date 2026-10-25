@@ -249,7 +249,7 @@ it('組5: 記念日の7日前の行は停止で作られ、承認済みの固定
  expect(row).toMatchObject({offset_minutes:-10080,enabled:0});
  t.raw.prepare("INSERT INTO friend_field_values(friend_id,field_id,value) VALUES('f','fixed-anniversary','2000-10-18')").run();
  t.raw.exec("UPDATE rt_store_followup_step_bindings SET enabled=1 WHERE trigger='anniversary_before'");
- // At 18:00 JST the 10:00 send is due, still inside the existing 24-hour retry window.
+ // 18時 JSTには10時の送信予定が到達済みで、既存の24時間の再試行期間内になる。
  expect(await processScenarioSourceJobs(env,sender)).toBe(0);
  await activate();expect(await processScenarioSourceJobs(env,sender)).toBe(1);
  expect(sender.mock.calls[0][2]).toMatchObject([{type:'text',text:'もうすぐ記念日ですね。ご来店をお待ちしています。'}]);

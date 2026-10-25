@@ -33,7 +33,7 @@ test('B2-18/19-DEFAULT: 初期オフ、オンには版と模擬を要求、閲�
  expect((await gapCall(app(),base.replace('account_id=a','account_id=b'))).status).toBe(404);
  expect((await gapCall(app(),base,'PUT',{remainingOne:true,expiry14Days:true,expectedVersion:1})).status).toBe(400);
  await enable();expect((await gapCall(app(),base,'PUT',{remainingOne:false,expiry14Days:false,expectedVersion:1,testMode:true})).status).toBe(409);
- // Enabling does not retroactively fabricate a remaining-one event.
+ // 有効化より前に起きた残り1回のイベントを、さかのぼって作らない。
  expect(notices()).toEqual([]);
 });
 test('B2-18: 申込では知らせ0、確定の減算と同時に1件、取消/再利用でも二重にしない',async()=>{
@@ -56,7 +56,7 @@ test('B2-18-ATOMIC: 通知の記録に失敗したら確定・残り・消費履
 test('B2-19: 14日前の朝8時に1回だけ、13日前/15日前では予定を作らない',async()=>{
  await enable(false,true);
  for(const at of ['2026-10-15T23:00:00Z','2026-10-16T23:00:00Z'])await processPassNotices(d.db,new Date(at),'a');
- // Only October 16 in the store timezone is fourteen days before October 30.
+ // 店舗の時間帯で10月30日の14日前になる10月16日だけを対象にする。
  expect(notices()).toHaveLength(1);expect(notices()).toMatchObject([{kind:'expiry_14_days',status:'simulated',scheduled_at:'2026-10-15T23:00:00.000Z'}]);
  await processPassNotices(d.db,now,'a');expect(notices()).toHaveLength(1);
 });

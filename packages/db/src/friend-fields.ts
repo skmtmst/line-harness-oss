@@ -285,7 +285,7 @@ export class FriendFieldCreateError extends Error {
 }
 
 /**
- * R515: 同じ要求キーの再送で二重に作らないための指紋。
+ * 同じ要求キーの再送で二重に作らないための指紋。
  *
  * 名前・差し込み名・種類・所属・選択肢・既定値・各種の印が
  * 1つでも違えば別の要求とみなし、作らず止める。
@@ -314,7 +314,7 @@ export interface FriendFieldCreateResult {
 }
 
 /**
- * R515: 要求キー付きで友だち情報欄を作る。
+ * 要求キー付きで友だち情報欄を作る。
  *
  * 応答だけ失った再試行は、同じキー・同じ内容なら保存済みの項目を
  * 返す（作り直さない）。同じキーに異なる内容が来たら作らず止める。
@@ -419,7 +419,7 @@ export async function createFriendFieldForScope(
       .bind(id, scope.tenantId, scope.lineAccountId, now),
   ];
   if (idempotency) {
-    // R515: 要求キーの行も同じバッチで確定する。本体より後に積むため、
+    // 要求キーの行も同じバッチで確定する。本体より後に積むため、
     // 外部キーのある環境でも制約に当たらない。同じキーの同時実行は
     // UNIQUE 制約で負けた側だけ巻き戻り、二重に残らない。
     statements.push(db.prepare(
@@ -678,7 +678,7 @@ export async function getFriendFieldUsageForScope(
 
 /**
  * 画面から届いた「動かせる行だけの新しい順」を、届いていない行の位置を
- * 保ったまま全体の並びへ戻して、1回のバッチで書く（#1014 ATTR-03/04）。
+ * 保ったまま全体の並びへ戻して、1回のバッチで書く。
  *
  * 行ごとの PATCH だと途中失敗で一部だけ新しい順位が残る。ここでは
  * 依頼されたIDを動かせる行に限って位置だけ入れ替える。
@@ -797,7 +797,7 @@ function isExistingCalendarDate(value: string): boolean {
  *
  * 項目の種類は作成時に FRIEND_FIELD_TYPES からしか選べないが、古い行や
  * 直接書き込みで想定外の種類が残っている可能性がある。未知の種類を
- * 無条件で通すと、不正値の波及という N-042 の問題が残る。
+ * 無条件で通すと、不正値が波及する。
  */
 const VALUE_CHECKABLE_TYPES = new Set<string>(FRIEND_FIELD_TYPES);
 
@@ -892,7 +892,7 @@ export function validateFriendFieldValue(
       return { ok: false, error: '日時形式で入力してください' };
     }
     /*
-     * R181: Date.parse は存在しない日（2026-02-31）を翌月へ読み替えて
+     * Date.parse は存在しない日（2026-02-31）を翌月へ読み替えて
      * 通してしまう。先頭が YYYY-MM-DD のときは暦に存在するかも見る。
      * 日付型と同じ判定にし、既定値・個別値で同じ結果にする。
      */
@@ -913,7 +913,7 @@ export function validateFriendFieldValue(
     if (typeof raw !== 'string') return { ok: false, error: '電話番号は数字10〜15桁で入力してください' };
     const text = raw.trim();
     /*
-     * R181: 記号だけ（--------）が旧い検査を通っていた。移行プレビュー・
+     * 記号だけ（--------）が旧い検査を通っていた。移行プレビュー・
      * 本人特定と同じく数字の桁数で見る。入力の見た目（ハイフン等）は
      * 残し、保存する形は変えない。
      */
@@ -994,7 +994,7 @@ export async function setFriendFieldValue(
 }
 
 /**
- * N-046(#812): 一括値を1回のD1 batchで書く。
+ * 一括値を1回のD1 batchで書く。
  *
  * 値は呼び出し側で validate済みの正規化ずみを渡すこと。batchは原子的で、
  * 途中の1文が失敗したら永続変更は0件になる。空配列は呼ばないこと。

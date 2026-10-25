@@ -1,5 +1,5 @@
 /*
- * 状態の写像が JS と SQL で一致すること(#731)。
+ * 状態の写像が JS と SQL で一致すること。
  *
  * 契約の状態は、いま2か所で判定している。
  *   - JS: `subscriptionState`   … 1件を整形するとき
@@ -12,7 +12,7 @@
  *
  * 基準は「**いまの JS 関数と同じ結果になること**」。EC 側が実際に何を返すかは
  * 手元では分からないので、実データに合わせるのではなく、**振る舞いを変えない**
- * ことを固定する(#731 の裁定)。
+ * ことを固定する( の裁定)。
  */
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, test } from 'vitest';

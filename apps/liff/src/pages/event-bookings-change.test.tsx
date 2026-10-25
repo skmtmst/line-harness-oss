@@ -6,7 +6,7 @@ import EventBookings from './event-bookings.js';
 import type { EventBookingMine, EventSlot } from '../lib/api.js';
 
 /**
- * U-3: 自分の申込の開催回変更。
+ * 自分の申込の開催回変更。
  * - 「時間を変える」から時間を選んで変える
  * - 新しい席が取れたときだけ今の予約を取り消す (API の約束。画面は結果で分岐しない)
  * - 満席のときは人の言葉で出す

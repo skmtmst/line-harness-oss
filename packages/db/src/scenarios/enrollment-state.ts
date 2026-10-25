@@ -112,7 +112,7 @@ export async function resumeExistingFriendScenario(
 }
 
 /**
- * 画面からの手動停止（#949 N-054）。
+ * 画面からの手動停止。
  *
  * 進行中（active）の購読だけを止める。送信中（delivering）はここでは
  * 触らない。直前に claim した配信が走っている最中に書き換えると、
@@ -140,7 +140,7 @@ export async function pauseFriendScenarioManual(
 }
 
 /**
- * 止まっている購読1件を ID 指定で再開する（#949 N-054）。
+ * 止まっている購読1件を ID 指定で再開する。
  *
  * 画面は友だちではなく購読行を指して操作するため、friend_id + scenario_id
  * で「いちばん新しい行」を探す resumeFriendScenario とは別の入口が要る。
@@ -156,7 +156,7 @@ export async function resumeFriendScenarioById(
 }
 
 /**
- * 配信失敗で止まった購読を、失敗した通からすぐ送り直す（#949 N-054）。
+ * 配信失敗で止まった購読を、失敗した通からすぐ送り直す。
  *
  * pause_reason='delivery_failed' の paused 行だけを受け付ける。
  * 再開と違い、版の予定を計算し直さず next_delivery_at を「いま」に

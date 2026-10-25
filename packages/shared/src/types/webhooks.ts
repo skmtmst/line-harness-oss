@@ -61,7 +61,7 @@ export type WebhookInteractionStatus = 'pending' | 'succeeded' | 'failed' | 'ret
 
 /**
  * 失敗理由の内部記号。'unknown' は「相手先へ届いたか分からない」失敗で、
- * 無条件の再送をせず、相手先で確かめてから復旧する対象(IDEA-26)。
+ * 無条件の再送をせず、相手先で確かめてから復旧する対象。
  */
 export type WebhookInteractionFailureReason =
   | 'connection_failed'
@@ -92,7 +92,7 @@ export interface WebhookInteraction {
   failureReasonCode: WebhookInteractionFailureReason | null;
   canRetry: boolean;
   /**
-   * 送り直せない理由(d23b R414)。canRetry=false のとき、なぜ直せないかを
+   * 送り直せない理由。canRetry=false のとき、なぜ直せないかを
    * 画面へ出せるように返す。
    *   webhook_deleted       送り先が削除された
    *   webhook_inactive      送り先が止められている
@@ -118,11 +118,11 @@ export interface WebhookInteractionSummary {
   incoming: number;
   succeeded: number;
   failed: number;
-  /** 失敗のうち「届いたか分からない」件数。まとめて再送の対象外(IDEA-26)。 */
+  /** 失敗のうち「届いたか分からない」件数。まとめて再送の対象外。 */
   resultUnknown: number;
-  /** 送信の失敗の総数(d23b R408)。受信の失敗と混ぜない。 */
+  /** 送信の失敗の総数。受信の失敗と混ぜない。 */
   outgoingFailed: number;
-  /** 送信の失敗のうち、今ここからまとめて送り直せる件数(d23b R408)。 */
+  /** 送信の失敗のうち、今ここからまとめて送り直せる件数。 */
   retryable: number;
   averageDurationMs: number | null;
 }

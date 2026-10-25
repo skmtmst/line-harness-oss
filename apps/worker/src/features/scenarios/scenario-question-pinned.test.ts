@@ -15,17 +15,8 @@ import { buildQuestionMessages, parseQuestionPostback } from './scenario-questio
 import { handleQuestionAnswer } from './scenario-question-answer'
 
 /**
- * 質問の押下を版へ結びつける（#644 再審査 1・2・3）。
- *
- * ここで確かめるのは3つ。
- *   1. 押し口が版所有の通ID（`<版ID>:<通番>`）でも解析でき、下書きの通を
- *      消したあとも無反応にならない。
- *   2. 回答処理・アクション・選択肢の挙動を、live ではなく購読が固定して
- *      いる版の写しから実行する。
- *   3. タグ・遷移先が別の LINE 公式アカウントなら server 側で実行しない。
- *
- * 配信の入口（step-delivery / routes）は #1470 と重複しているので触らない。
- * ここは質問の押下だけを、本物の SQLite（bootstrap 適用）で確かめる。
+ * 下書き通の削除後も質問へ回答できるよう、版所有の通 ID を解析し、購読が固定した版の返信・アクション・選択肢を実行する。
+ * 別の LINE 公式アカウントのタグ・遷移先はサーバーで拒む。実 SQLite で質問押下の経路を検証する。
  */
 describe('質問の押下を版へ結びつける（実D1）', () => {
   let testDb: SqliteD1

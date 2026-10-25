@@ -1,12 +1,6 @@
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
-/**
- * Cross-account duplicate friend detection via LINE profile picture URL tokens.
- *
- * LINE profile image URLs contain a user-specific token in the middle (pos 10-90 of path)
- * that is consistent across channels, while the prefix and suffix differ per channel.
- * We extract this token and match friends across accounts to auto-tag duplicates.
- */
+/** LINE 画像 URL の中央の本人固有部分はチャネルをまたいで一致するため、抽出して別アカウントの同じ本人を探し、重複タグを付ける。 */
 
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
 import {
@@ -16,19 +10,13 @@ import {
 } from '@line-crm/db';
 
 interface DuplicateTagConfig {
-  /** Map of line_account_id → duplicate tag ID. */
+  /** アカウントごとに付ける重複タグの ID。 */
   tagIds: Record<string, string>;
-  /** tagId → { name, color } used by ensureTags. */
+  /** タグの作成確認で使う名前と色。 */
   tagNames: Record<string, { name: string; color: string }>;
 }
 
-/**
- * Load both account_settings rows in a single SELECT so a concurrent operator
- * updating mapping + names cannot leave a cron tick with a mixed snapshot
- * (e.g. new mapping, old names) — which would trip the friend_tags → tags FK.
- *
- * Read on every cron tick so DB-side updates take effect without redeploy.
- */
+/** 対応表とタグ名を同じ SELECT で読み、同時更新で異なる版を混ぜて外部キーを壊さない。再配備なしで反映できるよう毎回読み直す。 */
 async function getDuplicateTagConfig(db: D1Database): Promise<DuplicateTagConfig> {
   const result = await db.prepare(
     `SELECT key, value FROM account_settings
@@ -71,32 +59,26 @@ async function ensureTags(
   }
 }
 
-/**
- * Detect duplicate friends across all accounts and auto-tag them.
- * Runs incrementally — only processes friends updated since last run.
- */
+/** 前回から更新された友だちだけを増分で調べ、全アカウントの重複を判定する。 */
 export async function processDuplicateDetection(db: D1Database): Promise<void> {
-  // Load tag mapping + names atomically (single SELECT) so they cannot drift
-  // mid-update.
+  // 対応表と名前が食い違わないよう、一度の SELECT で同時に読む。
   const { tagIds, tagNames } = await getDuplicateTagConfig(db);
   if (Object.keys(tagIds).length === 0) {
-    // No mapping configured — skip duplicate detection.
-    // Surfacing this in logs so the operator notices when the feature is
-    // expected to be active but the configuration row has gone missing.
+    // 対応表がなければ検出を省くが、設定の欠落に気付けるようログへ残す。
     logger.warn("duplicate_detect_account_settings_duplicate_tag_mapping_is_empty_feature_disabled");
     return;
   }
 
-  // Ensure duplicate tags exist
+
   await ensureTags(db, tagNames);
 
-  // Get last run timestamp from account_settings
+
   const lastRunRow = await db.prepare(
     `SELECT value FROM account_settings WHERE line_account_id = 'system' AND key = 'duplicate_detect_last_run'`
   ).first<{ value: string }>();
   const lastRun = lastRunRow?.value ?? '2020-01-01T00:00:00';
 
-  // Find friends with picture_url that were created or updated since last run
+
   const candidates = await db.prepare(`
     SELECT id, line_account_id, (${URL_TOKEN_SQL}) as url_token
     FROM friends
@@ -107,7 +89,7 @@ export async function processDuplicateDetection(db: D1Database): Promise<void> {
   `).bind(lastRun, lastRun).all<{ id: string; line_account_id: string; url_token: string | null }>();
 
   if (!candidates.results || candidates.results.length === 0) {
-    return; // Nothing new to process
+    return;
   }
 
   const newFriends = candidates.results.filter(f => f.url_token);
@@ -115,12 +97,12 @@ export async function processDuplicateDetection(db: D1Database): Promise<void> {
 
   logger.log("services_duplicate_detect_log");
 
-  // For each new friend, find matches in other accounts
+
   let taggedCount = 0;
   for (const friend of newFriends) {
     if (!friend.url_token || !friend.line_account_id) continue;
 
-    // Find matching friends in OTHER accounts
+    // 別アカウントの友だちだけを照合する。
     const matches = await db.prepare(`
       SELECT id, line_account_id
       FROM friends
@@ -153,7 +135,7 @@ export async function processDuplicateDetection(db: D1Database): Promise<void> {
     }
   }
 
-  // Update last run timestamp
+
   const now = japanCalendar().toISOString().replace('Z', '+09:00');
   await db.prepare(
     `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)

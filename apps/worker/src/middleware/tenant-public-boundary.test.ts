@@ -163,7 +163,7 @@ describe('F03 public selector input is bounded before parsing or tenant lookup',
   });
 });
 
-// Content-Type cannot bypass the selector's existing tenant suspension check.
+// Content-Type を変えても、選択した統括の停止検査を迂回できないことを確かめる。
 it.each(['text/plain', 'application/octet-stream', 'multipart/form-data; boundary=fixture'])('mislabeled JSON retains the tenant wall: %s', async contentType => {
   const target = app('suspended');
   const response = await target.hono.request('/api/liff/booking/requests', {

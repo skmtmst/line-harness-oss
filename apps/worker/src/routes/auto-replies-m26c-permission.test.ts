@@ -6,15 +6,7 @@ import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { autoReplies } from './auto-replies.js';
 
-/*
- * m26c: 自動応答の公開・権限・競合（R562/R563/R569/R570 のサーバ側）。
- * 実 Hono ルート＋実 SQLite（bootstrap.sql）で、監査の隔離再現を最新枝で
- * やり直す。期待する姿（いずれも現状は赤、ただし owner の正規操作は緑）:
- * - R562: 限定担当 admin は NULL 所属（全アカウント共通）の作成・共通化が 403。
- * - R563: 別 tenant の既知 templateId を送っても本文が返らず保存されない。
- * - R569: 公開中ルールの一覧編集は稼働定義を変えず下書きへ。版保存失敗で食い違わない。
- * - R570: 版保存に失敗した作成は行・版とも残らない。
- */
+/** 限定範囲での共通ルール作成や別統括の参照を拒み、公開中の編集は下書きに限定する。版保存の失敗では設定も残さないことを実 route と SQLite で確かめる。 */
 
 const owner: AuthenticatedStaff = {
   id: 'owner-a',

@@ -118,9 +118,9 @@ describe(': 対応状況とマーク変更を別々に集計する', () => {
       sql.raw.prepare('INSERT INTO friends(id,line_user_id,line_account_id,is_hidden) VALUES(?,?,?,?)').run(id,id,account,hidden);
       sql.raw.prepare("INSERT INTO chats(id,friend_id,line_account_id,status,created_at,updated_at) VALUES(?,?,?,?,datetime('now'),datetime('now'))").run(`chat-${id}`,id,account,status);
     }
-    // Free-form mark names do not determine the fixed inbox states.
+    // 自由入力のマーク名を、受信箱の固定状態の根拠にしない。
     sql.raw.exec("INSERT INTO support_marks(id,name,color) VALUES('custom-mark','未対応','#00AA00'); UPDATE friends SET support_mark_id='custom-mark' WHERE id IN ('a-1','a-2','b-1')");
-    // A damaged cross-account chat is excluded, rather than attributed to either shop.
+    // 壊れた所属のチャットは、どちらの店舗にも帰属させず除外する。
     sql.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('mismatch','mismatch','a'); INSERT INTO chats(id,friend_id,line_account_id,status,created_at,updated_at) VALUES('cross','mismatch','b','in_progress',datetime('now'),datetime('now'))");
   }
   it('全有効店の重複しない人数と直近168時間の記録を返し、0と割合未定義を分ける', async () => {

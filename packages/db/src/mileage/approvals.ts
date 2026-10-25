@@ -64,8 +64,8 @@ async function getScopedLedgerEntry(
 /**
  * 確定待ちの行を利用可能へ進める。確定済みへの再送はそのまま返す。
  *
- * m25d R359の続き: 確定は UPDATE のため INSERT 時の trigger が発火せず、
- * 財布の利用可能分も付与内訳も動かないままだった（残高だけ増える）。
+ * 確定は UPDATE のため INSERT 時の trigger が発火しない。何もしないと
+ * 財布の利用可能分も付与内訳も動かない（残高だけ増える）。
  * 台帳の確定・財布の移動・内訳の作成を同じ batch で書き、再送や同時操作の
  * 負け分は今回書いた確定印に合うときだけ動かす。
  */
@@ -99,7 +99,7 @@ export async function confirmPendingMileageEntry(
   // 財布・内訳の書き込みはその合言葉に合うときだけ通る（原子性は batch が守る）。
   // 同じ担当・同じ時刻の同時確定でも合言葉が違うため、負け分の batch は
   // 台帳の更新（0件）と財布・内訳の書き込み（合言葉不一致）を両方落とす。
-  // R359: 同じ印（担当・時刻）だけでは勝者と負け分を見分けられず、
+  // 同じ印（担当・時刻）だけでは勝者と負け分を見分けられず、
   // 負け分も財布を動かして残高と内訳がずれていた。
   const attemptId = crypto.randomUUID();
   const confirmMarkerSql = `EXISTS (
@@ -233,7 +233,7 @@ export async function confirmPendingMileageEntry(
  * - void: 再送とみなして既存の逆向き行を返す。
  */
 /**
- * m25d R359: 取り消した付与の未使用分を交換対象から外す。
+ * 取り消した付与の未使用分を交換対象から外す。
  * 交換の内訳はロットから選ぶため、台帳の取消だけでは取消済みロットが
  * 使われてしまう。使い切った分は交換側の予約が残り、未使用分だけを
  * 無効化する（紹介成果の却下と同じ考え方）。条件付きなので冪等。
@@ -274,7 +274,7 @@ export async function voidMileageLedgerEntry(
     .bind(idempotencyKey)
     .first<{ id: string }>();
   if (existingReversal) {
-    // m25d R359: 再送時も内訳を無効化し直す（冪等で二重の影響なし）。
+    // 再送時も内訳を無効化し直す（冪等で二重の影響なし）。
     // 初回が落ちた後に残った使用可能ロットをここで閉じる。
     await voidGrantLotForEntry(db, entry.id);
     return { entry, reversalEntryId: existingReversal.id, replayed: true };
@@ -422,7 +422,7 @@ export async function voidMileageLedgerEntry(
         409,
       );
     }
-    // m25d R359: 台帳の取消と同時に内訳も使用不可にする（同じ処理で整合）。
+    // 台帳の取消と同時に内訳も使用不可にする（同じ処理で整合）。
     await voidGrantLotForEntry(db, entry.id);
     return { entry, reversalEntryId: reversalId, replayed: false };
   }
@@ -497,7 +497,7 @@ export async function createMileageAdjustmentApprovalRequest(
     throw new MileageV6Error('approval_request_failed', '承認の依頼に失敗しました', 500);
   }
   /*
-   * R378: 同じ Idempotency-Key で別の内容が来た場合は、古い依頼をそのまま
+   * 同じ Idempotency-Key で別の内容が来た場合は、古い依頼をそのまま
    * 返さず 409 にする。再送は内容が一致したときだけ同じ依頼を返す。
    */
   if (write.meta.changes === 0) {

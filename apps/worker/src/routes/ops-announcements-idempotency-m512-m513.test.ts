@@ -9,7 +9,7 @@ vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.send }));
 const { opsAnnouncements } = await import('./ops-announcements.js');
 
 /*
- * M512（お知らせ作成の二重押し）・M513（お知らせ更新の同時保存）を
+ * （お知らせ作成の二重押し）・（お知らせ更新の同時保存）を
  * 実SQLiteで見る。
  *
  * 作成は Idempotency-Key を行IDに使い、二重押しでも1件だけにする。

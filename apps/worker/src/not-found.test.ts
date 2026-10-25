@@ -1,14 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 
-// The notFound handler imports DB query helpers transitively (via the
-// /r/:ref routes file isn't reached here, but `buildOgForLiffPath` reads
-// from `@line-crm/db`-shaped tables through `c.env.DB.prepare`). The bot UA
-// path is not exercised by these tests; everything else stays inside the
-// handler so no DB calls happen.
+// 通常の未検出応答では DB を使わないため、ここでは bot 向けの画像メタ情報経路を通さず、ハンドラ内の応答を確かめる。
 vi.mock('@line-crm/db', () => ({
-  // index.ts pulls these eagerly at module load; provide no-op stubs so the
-  // import graph resolves under Vitest.
+  // index.ts の依存解決に必要な公開名を、何もしない試験用関数で用意する。
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getTrafficPoolBySlug: vi.fn(),
   getTrafficPoolById: vi.fn(),

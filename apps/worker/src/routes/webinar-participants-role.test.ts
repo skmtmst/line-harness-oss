@@ -1,17 +1,4 @@
-/*
- * N-118: ウェビナーの個人視聴履歴を owner/admin へ限定する。
- *
- * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の webinars
- * ルートを当て、認証も実物（Bearer APIキー → staff_members → 役割・
- * permission_keys・account境界）で通す。外部送信は走らない。
- *
- * 直す前: GET /api/webinars/:id/participants に requireRole が無く、
- * GET /api/webinars/:id/analytics も個人履歴入りの participants を
- * staff へ返していた。CSV だけが owner/admin で守られていた。
- *
- * 判断: analytics は個人以外がすべて集計値なので、staff には集計を残して
- * participants 配列だけ外す（個人を外す選択肢。Issue #820 に記録）。
- */
+/** 個人の視聴履歴は owner/admin に限り、staff の分析には集計だけを残す。CSV 以外の入口も同じ境界を守ることを実 route・認証・SQLite で確かめる。 */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';

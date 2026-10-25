@@ -2,7 +2,7 @@ import { getWorkflowStep } from '@line-crm/db';
 import { acquireWorkflow, WorkflowDeferred } from '../../services/workflow-execution.js';
 
 type Stats = { attempted: number; succeeded: number; failed: number };
-/** Each SQL mutation and its result commit together; a partial block can resume without repeating successful writes. */
+/** 成功した書込を再実行しないよう、各 SQL 更新と結果を一緒に確定し、未完了の部分から再開する。 */
 export async function writeFormDestinationsOnce(input: {
   db: D1Database; friendId: string; sourceKey?: string; blockId: string;
   stats: Stats; write: (db: D1Database, stats: Stats) => Promise<void>;

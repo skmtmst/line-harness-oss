@@ -1,5 +1,5 @@
 /**
- * ログインユーザーの権限モデル正本（N-424 / -30 §6-7）。
+ * ログインユーザーの権限モデル正本（docs/v6-requirements/v6-30-login-users-requirements-draft.md §6-7）。
  *
  * 画面の「項目ごとに決める」3択（変えられる=edit / 見えるだけ=view /
  * 出さない=none）と、役割bundleの初期値をここに置く。
@@ -118,7 +118,7 @@ export const DELIVERY_API_PERMISSIONS: Array<[string, string]> = Object.values(D
   .flatMap((policy) => policy.api.map((prefix): [string, string] => [prefix, policy.key]));
 
 /**
- * 予約の細かい権限（N-411 / -30 §7-2「予約管理editでも予約設定は別permission」）。
+ * 予約の細かい権限（同じ要件の §7-2「予約管理editでも予約設定は別permission」）。
  * - `/booking/menus`: メニューと担当割当の編集・閲覧
  * - `booking.settings`: 予約設定（受付枠・資源・例外・予約スタッフ登録）の変更
  * - `booking.staff.own`: 本人に紐づく予約スタッフの勤務（シフト・休憩・連携）
@@ -155,7 +155,7 @@ export const SCOPE_ITEMS: readonly ScopeItem[] = [
     kind: 'email_mask',
     keys: [],
     /*
-     * LAY-09: この注記は現在の状態の説明ではなく「伏せて見せる」を選んだときの
+     * この注記は現在の状態の説明ではなく「伏せて見せる」を選んだときの
      * 一般説明。「そのまま見せる」の選択と併存しても矛盾しないよう、
      * 選択肢への条件付きの文にする（現在の見せ方の説明は画面右欄が出す）。
      */

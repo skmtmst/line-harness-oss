@@ -1,4 +1,4 @@
-/** Store seats are shared across staff; salon bookings consume one seat each. */
+/** 店舗の席は担当者間で共有し、サロン予約は1件につき1席を消費する。 */
 export interface StoreCapacityWindow {
   start: string;
   end: string;
@@ -17,8 +17,7 @@ export function storeSeatsForSlot(
     const start = Math.max(startMs, Date.parse(window.start));
     const end = Math.min(endMs, Date.parse(window.end));
     if (start >= end) continue;
-    // Occupancy only increases at a booking start. Count the peak, not all
-    // bookings that touch a long candidate but never overlap each other.
+    // 長い候補時間に触れる予約すべてを足さず、予約開始時点ごとの同時利用数の最大値を数える。
     const points = [start, ...bookings.filter(b => start < b.startMs && b.startMs < end).map(b => b.startMs)];
     const used = Math.max(...points.map(point => bookings.filter(b => b.startMs <= point && point < b.endMs).length));
     capacity = Math.min(capacity, window.capacity);
@@ -27,10 +26,7 @@ export function storeSeatsForSlot(
   return { capacity, remaining: Math.max(0, remaining) };
 }
 
-/** Append to INSERT ... SELECT's WHERE. Bind: clipped windows JSON, account, account.
- * The occupied-seat reads and INSERT must remain ONE statement. The windows
- * contain UTC instants, including timezone/day boundaries and the buffer.
- */
+/** 同時予約で定員を超えないよう、席数の読取と INSERT を1文にする。引数は切り詰めた時間区間 JSON とアカウント2つ。区間は時差・日付境界・余白を含む UTC の瞬間で渡す。 */
 export const STORE_CAPACITY_GUARD_SQL = `AND NOT EXISTS (
   SELECT 1 FROM json_each(?) AS store_window
    WHERE EXISTS (

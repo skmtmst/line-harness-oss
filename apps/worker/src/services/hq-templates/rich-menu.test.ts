@@ -150,7 +150,7 @@ describe('rich-menu HQ store atomic adapter', () => {
     expect(payloads[0].areas[2].action.data).toContain(pages[0].areas[2].id);
     expect(payloads[1].areas[0].action).toMatchObject({ type: 'richmenuswitch', richMenuAliasId: `lhx-${row.id.slice(0, 8)}-0` });
     expect(JSON.stringify(payloads)).not.toMatch(/source-(form|template|tag|scenario)/);
-    // Publishing was simulated, so the distribution still has no actual LINE ID.
+    // 公開は模擬しただけなので、実際の LINE ID はまだない。
     expect(f.raw.prepare('SELECT line_richmenu_id FROM rich_menu_pages').all()).toEqual([{ line_richmenu_id: null }, { line_richmenu_id: null }]);
   });
   it.each(['あ'.repeat(30), 'x'.repeat(262), '😀'.repeat(22)])('rejects encoded text postbacks over 300 characters before R2 access: %s', messageText => {

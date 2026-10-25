@@ -8,7 +8,7 @@ import {
 import { resolveTrackedLinkBaseUrl } from '../../lib/link-base-url.js';
 import type { AreaInput, GroupInput } from '../../lib/rich-menu-publisher.js';
 
-/** The fixed camelCase content already persisted by schedule/manual snapshots. */
+/** 保存済みの予約・手動スナップショットと同じ camelCase の内容を保つ。 */
 export type RichMenuSnapshotArea = Omit<AreaInput, 'bounds' | 'trackedLinkUrl'> & {
   boundsX: number;
   boundsY: number;
@@ -36,13 +36,13 @@ export type RichMenuGroupSnapshot = {
 
 export type RichMenuGroupInputOptions = {
   fallbackGroupId: string;
-  /** Worker URL, or the Worker request origin for a manual publish request. */
+  /** 手動公開では Worker URL がなければ要求元を使う。 */
   workerBaseUrl?: string | null;
-  /** Compatibility fallback when the account has no individual LIFF ID. */
+  /** アカウント個別の LIFF ID がない場合の互換用代替値。 */
   liffUrl?: string | null;
 };
 
-/** Normalize live DB content for the same assembler used by a fixed snapshot. */
+/** 固定スナップショットと同じ組立を使えるよう、DB の現在値を正規化する。 */
 export function richMenuLiveToSnapshot(group: RichMenuGroupWithPages): RichMenuGroupSnapshot {
   return {
     id: group.id,
@@ -77,11 +77,7 @@ export function richMenuLiveToSnapshot(group: RichMenuGroupWithPages): RichMenuG
   };
 }
 
-/**
- * Manual, scheduled and restore publishes share this input boundary. The given
- * snapshot supplies all page/area content; the live draft is never reread here.
- * LIFF is only the form base. Selected tracked links use the Worker/branded base.
- */
+/** 手動・予約・復元の公開で入力境界を共有し、渡されたスナップショットだけを使って下書きを読み直さない。LIFF はフォームの基底に限定し、選択した計測リンクは Worker または独自ドメインを使う。 */
 export async function assembleRichMenuGroupInput(
   db: D1Database,
   snapshot: RichMenuGroupSnapshot,
@@ -97,8 +93,7 @@ export async function assembleRichMenuGroupInput(
   const trackedUrls = new Map<string, string>();
   if (ids.size > 0) {
     const base = await resolveTrackedLinkBaseUrl(db, options.workerBaseUrl?.trim() ?? '');
-    // Cron has no request origin. Fail before creating LINE menus rather than
-    // silently baking a relative /t/code or a LIFF /t/code into their actions.
+    // cron には要求元がないため、不正な相対 URL を LINE メニューへ埋め込む前に拒む。
     let parsed: URL;
     try {
       parsed = new URL(base);
@@ -111,8 +106,7 @@ export async function assembleRichMenuGroupInput(
     const normalizedBase = base.replace(/\/+$/, '');
     for (const id of ids) {
       const link = await getTrackedLinkById(db, id);
-      // Preserve existing behavior when a selected link has disappeared: the
-      // publisher can use actionData.uri; do not alter snapshot definitions.
+      // 選択したリンクが消えていてもスナップショットを変更せず、公開処理が actionData.uri を使える形を保つ。
       if (link) trackedUrls.set(id, `${normalizedBase}/t/${link.short_code ?? link.id}`);
     }
   }

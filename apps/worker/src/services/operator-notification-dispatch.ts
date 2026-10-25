@@ -4,7 +4,7 @@ export type { OperatorRuleConditions } from './operator-rule-types.js';
 import type { OperatorRuleConditions } from './operator-rule-types.js';
 import {deliverOperatorPush} from './operator-push.js';
 import { ensureOperatorInstance } from './operator-notification-instance.js';
-// N-327 (#663): 公開済み運用者通知ルールの自動実行と回復。
+//  公開済み運用者通知ルールの自動実行と回復。
 //
 // 業務イベント → dispatchOperatorEvent → 公開ルールだけ発火 → 台帳へ先に積む
 // (durable) → 送る。Worker中断・cron再実行・再送は冪等キーで重複を作らない。

@@ -1,20 +1,4 @@
-/*
- * R348/R349/R350: 通知ルールの所属が変わった後の、middleware の担当判定。
- *
- * 実 middleware＋実DB（better-sqlite3 + bootstrap.sql）で確かめる。
- * handler は素通しの stub（行の絞り込みは route 側の責務）。
- *
- * ここで止めたい崩れ方:
- *   1. R349: 親が B でも A の行を持つ口へ、Bだけの担当者が通れない…
- *      ではなく逆に、旧実装は親=Bだけ見て通し、route が行を絞らず A を漏らした。
- *      middleware は「行のどれかを担当していれば通す」までが責務。
- *   2. R348: Aだけの担当者が旧行の口へ届けない（親=B で 403）。
- *      行に A があれば通す。
- *   3. R348: query に旧所属・body に新所属を書いて検査をすり抜ける。
- *      両方が食い違う入力は断る。
- *   4. R350: /api/friend-reminders/:id の所属確認が存在しない列を読み 500。
- *      友だちの所属で判定し、許可者は通す。
- */
+/** 通知ルールの所属変更後も、登録行が属するアカウントの担当者が操作できることを実 middleware と SQLite で検証する。query/body の食い違いは拒み、本文の絞込は route で守る。 */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';

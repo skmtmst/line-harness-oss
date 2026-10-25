@@ -118,7 +118,7 @@ export function parseTagDefinition(v: unknown): TagDefinition {
     ...(parsedActions === undefined ? {} : { actions: parsedActions }),
   }, folders: ordered };
 }
-// This same projection is checked inside the write batch, closing the read/write race.
+// 確認後の競合を防ぐため、書込 batch 内でも同じ状態を照合する。
 const SNAPSHOT_SQL = `SELECT json_object(
  'tags',json((SELECT json_group_array(json_object('id',t.id,'name',t.name,'normalized_name',t.normalized_name,'color',t.color,'description',t.description,'folder_id',t.folder_id,'updated_at',t.updated_at,'version',t.version,'status',t.status,'action_id',(SELECT ca.id FROM common_action_bindings b JOIN common_actions ca ON ca.id=b.common_action_id AND ca.line_account_id=b.line_account_id WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added' ORDER BY ca.updated_at DESC,ca.id DESC LIMIT 1),'draft_id',(SELECT ca.current_draft_version_id FROM common_action_bindings b JOIN common_actions ca ON ca.id=b.common_action_id AND ca.line_account_id=b.line_account_id WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added' ORDER BY ca.updated_at DESC,ca.id DESC LIMIT 1),'binding_version_id',(SELECT b.common_action_version_id FROM common_action_bindings b JOIN common_actions ca ON ca.id=b.common_action_id AND ca.line_account_id=b.line_account_id WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added' ORDER BY ca.updated_at DESC,ca.id DESC LIMIT 1),'action_count',(SELECT COUNT(*) FROM common_action_bindings b WHERE b.line_account_id=? AND b.consumer_type='tag' AND b.consumer_id=t.id AND b.consumer_path='tag.added'))) FROM (SELECT * FROM tags WHERE line_account_id=? ORDER BY id) t)),
  'folders',json((SELECT json_group_array(json_object('id',id,'name',name,'parent_id',parent_id,'color',color,'updated_at',updated_at)) FROM (SELECT * FROM folders WHERE kind='tag' AND account_id=? ORDER BY id)))
@@ -198,7 +198,7 @@ export function planTags(input: { accountId: string; actorId: string; definition
 }
 export const tagHqTemplateAdapter = unsupportedHqTemplateAdapter('tag');
 
-/** A fresh adapter per store; no tenant, definition or snapshot is kept globally. */
+/** 店舗ごとに新しいアダプターを作り、統括・定義・写しをグローバルへ残さない。 */
 export function createTagHqTemplateAdapter(db: D1Database, authority: HqTemplateAuthority): HqTemplateAdapter {
   let definition: TagDefinition | null = null, snapshot: string | null = null;
   let plan: ReturnType<typeof planTags> | null = null;

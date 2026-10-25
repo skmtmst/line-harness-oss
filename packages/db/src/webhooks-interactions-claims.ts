@@ -4,7 +4,7 @@ import { type WebhookInteractionRow } from './webhooks-types.js';
 
 
 /**
- * d23b R409: 元の失敗記録を「やり直し済み」に畳むのと、やり直し用の記録を
+ * 元の失敗記録を「やり直し済み」に畳むのと、やり直し用の記録を
  * 作るのを1つのDBバッチで行う。どちらかだけ残る中途半端な形（元は
  * retried なのにやり直し行が無い等）を作らない。
  *
@@ -67,7 +67,7 @@ export async function claimWebhookInteractionRetryAndInsert(
 }
 
 /**
- * 送る前に止まったやり直しの記録を消す（d23b R413）。
+ * 送る前に止まったやり直しの記録を消す。
  * まだ外部へ一度も出ていない pending の行だけを消す。確定済みの行は
  * 履歴なので消さない。
  */
@@ -83,7 +83,7 @@ export async function deletePendingWebhookInteraction(
 }
 
 /**
- * d23b R409: 「処理中」のまま放置された記録を「届いたか分からない失敗」へ
+ * 「処理中」のまま放置された記録を「届いたか分からない失敗」へ
  * 直す。始まった時刻から一定時間(既定15分)が過ぎた pending は、結果を書く
  * 途中で止まったものとみなす。一覧から永久に消えない・処理中のままに
  * しないための回収。
@@ -103,7 +103,7 @@ export async function markStalePendingWebhookInteractions(
 }
 
 /**
- * d23b R412: 同じ通知（同じ送り先＋同じ冪等キー）の失敗記録をまとめて
+ * 同じ通知（同じ送り先＋同じ冪等キー）の失敗記録をまとめて
  * 「やり直し済み」へ畳む。手動・自動のどちらかで届いたとき、残っている
  * 失敗記録をそのまま「やり直せる」状態で残さない。
  */
@@ -121,7 +121,7 @@ export async function markFailedInteractionsRetried(
 }
 
 /**
- * 同じ通知がすでに届いた記録があるか(d23b R412)。
+ * 同じ通知がすでに届いた記録があるか。
  * 自動配送の回収が送る前に確かめ、手動のやり直しで届いた分を
  * 二重に送らない。
  */

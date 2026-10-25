@@ -3,7 +3,7 @@
  * 汎用のHMAC計算・比較を保ち、x-nenの5系統の検証もここへ集約する。
  */
 
-/** Constant-time hex-string compare to avoid timing oracles. */
+/** 時間差から秘密を推測されないよう、16進文字列を定時間で比較する。 */
 export function safeEqualHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;

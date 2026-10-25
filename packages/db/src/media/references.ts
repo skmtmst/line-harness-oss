@@ -192,7 +192,7 @@ export async function getMediaUsageReferenceStates(
       if (!row) return { mode: 'unavailable' as const, versionNo: null };
       return detectUsageReferenceState(input.media.id, input.versions, row.columns);
     } catch (err) {
-      // 表そのものが無い読み口は「未確認」に倒し、全体を503にしない（R34）。
+      // 表そのものが無い読み口は「未確認」に倒し、全体を503にしない。
       if (!isMissingTableError(err)) throw err;
       return { mode: 'unavailable' as const, versionNo: null };
     }

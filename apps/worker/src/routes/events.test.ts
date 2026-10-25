@@ -1,8 +1,7 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 
-// Mock availability so LIFF /slots route tests don't need to re-implement
-// the COUNT subquery — those are covered in event-availability.test.ts.
+// 空き枠の SQL は専用試験で守り、ここでは /slots の接続を試すため空き判定を差し替える。
 const availabilityMocks = {
   getSlotsWithRemaining: vi.fn(),
   getActiveBookingCountsBySlot: vi.fn(),
@@ -138,7 +137,7 @@ function makeEventDb(state: {
   tags?: Array<{ id: string; name: string }>;
   /** キャンセル待ちの行。INSERT がここへ積まれる */
   waitlist?: Array<Record<string, unknown>>;
-  /** 予約ごとの通知予定 (event_booking_reminders)。IDEA-07 の一覧添付用。 */
+  /** 予約ごとの通知予定 (event_booking_reminders)。 の一覧添付用。 */
   reminders?: Array<Record<string, unknown>>;
 }): D1Database {
   state.slots ??= [];
@@ -164,7 +163,7 @@ function makeEventDb(state: {
   };
   const filterAdminEvents = (sql: string, bound: unknown[]): EventRow[] => {
     const account = bound[0] as string;
-    // #625: 名前検索は LIKE ではなく instr(lower(e.name), lower(?)) > 0。
+    // 名前検索は LIKE ではなく instr(lower(e.name), lower(?)) > 0。
     // 束縛は `%q%` ではなく検索語そのものが来る。
     const query = sql.includes('instr(lower(e.name)') ? String(bound[2] ?? '') : '';
     return state.events.filter((event) => {
@@ -215,9 +214,7 @@ function makeEventDb(state: {
             const acc = (state.accounts ?? []).find((a) => a.id === id);
             return (acc ? { channel_access_token: acc.channel_access_token ?? '' } : null) as T | null;
           }
-          // immediate booking notification: SELECT la.channel_access_token,
-          //   la.channel_access_token_encrypted, e.confirmation_message_extra
-          //   FROM line_accounts la JOIN events e ON e.id = ? WHERE la.id = ?
+          // 即時通知で使うアカウントと追加文面の取得を扱う。
           if (
             sql.startsWith('SELECT la.channel_access_token,') &&
             sql.includes('la.channel_access_token_encrypted') &&
@@ -233,9 +230,7 @@ function makeEventDb(state: {
               confirmation_message_extra: (ev as Record<string, unknown>).confirmation_message_extra ?? null,
             } as T;
           }
-          // SELECT 1 FROM friend_tags WHERE friend_id = ? AND tag_id = ?
-          // FROM friends より前に置く。詳細画面側の JOIN 版も "FROM friends" を
-          // 含むので、後ろに置くと友だちの検索として拾われてしまう。
+          // 詳細の JOIN も FROM friends を含むため、タグの判定を先に置き、友だち検索と誤認しないようにする。
           if (sql.includes('friend_tags')) {
             if (sql.includes('JOIN friends')) {
               const [lineUserId, account, tagId] = bound as [string, string, string];
@@ -271,7 +266,7 @@ function makeEventDb(state: {
             }
             return { id: f.id } as T;
           }
-          // LIFF event row for booking creation: SELECT id, name, ... FROM events WHERE ...
+
           if (sql.includes('SELECT id, name, image_url, description, venue_name')) {
             const [id, account] = bound as [string, string];
             const e = state.events.find(
@@ -305,7 +300,7 @@ function makeEventDb(state: {
             );
             return (s ?? null) as T | null;
           }
-          // notification JOIN: SELECT e.name AS event_name, e.venue_name, ... line_accounts la
+          // 通知文面が使うイベント名・会場・アカウントの JOIN を扱う。
           if (sql.includes('FROM event_bookings b') && sql.includes('channel_access_token')) {
             const [bookingId] = bound as [string];
             const b = (state.bookings ?? []).find((x) => x.id === bookingId);
@@ -326,8 +321,7 @@ function makeEventDb(state: {
               line_user_id: f.line_user_id,
             } as T;
           }
-          // booking action loader: SELECT id, line_account_id, event_id, slot_id, friend_id, status, decided_at FROM event_bookings WHERE id = ? AND event_id = ?
-          // (multi-account 対応で line_account_id 制約を削除)
+          // 操作対象の予約を ID とイベント ID で解決する。複数アカウントの予約を、代表アカウント1つだけで絞らない。
           if (sql.includes('FROM event_bookings\n        WHERE id = ? AND event_id = ?')) {
             const [id, event_id] = bound as [string, string];
             const b = (state.bookings ?? []).find(
@@ -367,7 +361,7 @@ function makeEventDb(state: {
               reminder_hours_before: e.reminder_hours_before,
             } : null) as T | null;
           }
-          // notifications/pending count: SELECT COUNT(*) AS c FROM event_bookings WHERE line_account_id = ? AND status = 'requested'
+          // 通知待ちの件数はアカウントと requested 状態で数える。
           if (sql.includes('COUNT(*) AS c') && sql.includes('FROM event_bookings') && sql.includes("status = 'requested'")) {
             const [account_id] = bound as [string];
             const c = (state.bookings ?? []).filter(
@@ -397,7 +391,7 @@ function makeEventDb(state: {
               total: matches.length,
             } as T;
           }
-          // POST post-insert verify: COUNT(*) AS c FROM event_bookings WHERE event_id = ? AND identity_key = ?
+          // INSERT 後にも、イベントと本人識別で上限を数え直す。
           if (sql.includes('FROM event_bookings') && sql.includes('COUNT(*) AS c') && sql.includes('identity_key')) {
             const [event_id, idKey] = bound as [string, string];
             const c = (state.bookings ?? []).filter(
@@ -408,10 +402,7 @@ function makeEventDb(state: {
             ).length;
             return { c } as T;
           }
-          // self-cancel JOIN: SELECT b.id, b.status, e.cancel_deadline_hours_before, s.starts_at
-          // LIFF GET event の my_existing_booking 検出:
-          // SELECT b.id, b.status, b.line_account_id, s.starts_at FROM event_bookings b
-          //   JOIN event_slots s WHERE b.event_id = ? AND b.identity_key = ?
+          // 自己取消と予約済み判定は、予約と枠を JOIN して状態・開始時刻・所属を取得する。
           if (sql.includes('FROM event_bookings b') && sql.includes('identity_key')) {
             const [event_id, idKey] = bound as [string, string];
             const b = (state.bookings ?? []).find(
@@ -429,8 +420,7 @@ function makeEventDb(state: {
               slot_starts_at: s?.starts_at ?? null,
             } as T;
           }
-          // booking detail: SELECT b.id, ... e.description AS event_description, CASE WHEN ... END AS confirmation_message_extra
-          //   FROM event_bookings b JOIN events e JOIN event_slots s WHERE b.id = ? AND b.friend_id = ? AND b.line_account_id = ?
+          // 詳細は予約・イベント・枠を JOIN し、予約 ID・本人・アカウントで絞る。
           if (sql.includes('FROM event_bookings b') && sql.includes('event_description') && sql.includes('cancel_deadline_hours_before')) {
             const [bookingId, friend_id, account_id] = bound as [string, string, string];
             const b = (state.bookings ?? []).find(
@@ -459,7 +449,7 @@ function makeEventDb(state: {
               slot_ends_at: s.ends_at,
             } as T;
           }
-          // self-cancel JOIN: SELECT b.id, b.status, e.cancel_deadline_hours_before, s.starts_at
+          // 自己取消の締切を、予約状態とイベント設定・枠時刻から解決する。
           if (sql.includes('FROM event_bookings b') && sql.includes('cancel_deadline_hours_before')) {
             const [bookingId, friend_id, account_id] = bound as [string, string, string];
             const b = (state.bookings ?? []).find(
@@ -562,7 +552,7 @@ function makeEventDb(state: {
               total_capacity: slots.reduce((sum, slot) => sum + (slot.capacity ?? 0), 0),
             } as T;
           }
-          // 申込一覧の総数(点検#520の中8)。使用席数の枝より前に置く。
+          // 申込一覧の総数(点検の中8)。使用席数の枝より前に置く。
           // 絞りがあるときは bound が [event_id, status?, slot_id?] の順に積まれる。
           if (sql.startsWith('SELECT COUNT(*) AS c FROM event_bookings b')) {
             const [event_id, second, third] = bound as [string, string?, string?];
@@ -589,10 +579,7 @@ function makeEventDb(state: {
               .reduce((sum, booking) => sum + Number((booking as Record<string, unknown>).party_size ?? 1), 0);
             return { c } as T;
           }
-          // Multi-account 対応の events lookup helper:
-          // single モード → line_account_id 一致、multi-account-dedup モード
-          // → account_ids JSON 配列に含まれる、のどちらか。
-          // LIFF SELECT id FROM events ... AND is_published = 1
+          // 単一アカウントは line_account_id、複数アカウントは account_ids に含まれるかでイベントの所属を判定する。
           if (sql.includes('SELECT id FROM events') && sql.includes('is_published')) {
             const [id, account, account2] = bound as [string, string, string?];
             const acct = account2 ?? account;
@@ -601,7 +588,7 @@ function makeEventDb(state: {
             );
             return (e ? { id: e.id } : null) as T | null;
           }
-          // admin SELECT id FROM events
+
           if (sql.includes('SELECT id FROM events')) {
             const [id, account, account2] = bound as [string, string, string?];
             const acct = account2 ?? account;
@@ -610,7 +597,7 @@ function makeEventDb(state: {
             );
             return (e ? { id: e.id } : null) as T | null;
           }
-          // LIFF SELECT * FROM events ... AND is_published = 1
+
           if (sql.includes('SELECT * FROM events') && sql.includes('is_published')) {
             const [id, account, account2] = bound as [string, string, string?];
             const acct = account2 ?? account;
@@ -634,7 +621,7 @@ function makeEventDb(state: {
             const e = state.events.find((x) => x.id === id);
             return (e ?? null) as T | null;
           }
-          // イベント一覧の総数(点検#520の中8)。
+          // イベント一覧の総数(点検の中8)。
           if (sql.startsWith('SELECT COUNT(*) AS c FROM events e')) {
             const c = filterAdminEvents(sql, bound).length;
             return { c } as T;
@@ -685,8 +672,7 @@ function makeEventDb(state: {
             }
             return { results: rows as unknown as T[] };
           }
-          // admin events list (must come before event_slots branch since
-          // its sub-queries also reference event_slots s)
+          // 副問い合わせも event_slots を参照するため、管理一覧の判定を枠の分岐より先に置く。
           if (sql.startsWith('SELECT\n         e.*') || (sql.includes('FROM events e') && (sql.includes('e.line_account_id') || sql.includes('e.target_type')))) {
             const items = filterAdminEvents(sql, bound)
               .map((e) => {
@@ -702,7 +688,7 @@ function makeEventDb(state: {
                         .map((s) => s.starts_at)
                         .sort()[0]
                     : null;
-                // 本番と同じ決め方(点検#520の中6): 定員なしの枠が混ざれば合計なし。
+                // 本番と同じ決め方(点検の中6): 定員なしの枠が混ざれば合計なし。
                 const cap = slots.some((s) => s.capacity == null)
                   ? null
                   : slots.length > 0
@@ -730,12 +716,12 @@ function makeEventDb(state: {
               .sort((a, b) => sql.includes('e.name COLLATE NOCASE')
                 ? a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
                 : (a.next_slot_starts_at == null ? 1 : b.next_slot_starts_at == null ? -1 : a.next_slot_starts_at.localeCompare(b.next_slot_starts_at)) || a.id.localeCompare(b.id));
-            // 本番は LIMIT/OFFSET を付ける(点検#520の中8)。bound の末尾2つ。
+            // 本番は LIMIT/OFFSET を付ける(点検の中8)。bound の末尾2つ。
             const limit = typeof bound[bound.length - 2] === 'number' ? (bound[bound.length - 2] as number) : items.length;
             const offset = typeof bound[bound.length - 1] === 'number' ? (bound[bound.length - 1] as number) : 0;
             return { results: items.slice(offset, offset + limit) as unknown as T[] };
           }
-          // IDEA-07: 一覧に添える通知予定。booking_id IN (...) の行だけ返す。
+          // 一覧に添える通知予定。booking_id IN (...) の行だけ返す。
           if (sql.includes('FROM event_booking_reminders')) {
             const ids = new Set(sql.includes('json_each(?)')
               ? JSON.parse(bound[0] as string) as string[]
@@ -745,7 +731,7 @@ function makeEventDb(state: {
               .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
             return { results: rows as unknown as T[] };
           }
-          // admin bookings list: SELECT b.*, s.starts_at, ..., friends.display_name FROM event_bookings b JOIN event_slots s ...
+
           if (sql.includes('FROM event_bookings b') && sql.includes('friend_display_name')) {
             const event_id = bound[0] as string;
             const filterStatus = sql.includes('b.status = ?') ? (bound[1] as string) : null;
@@ -767,12 +753,12 @@ function makeEventDb(state: {
                   friend_line_user_id: f?.line_user_id ?? null,
                 };
               });
-            // 本番は LIMIT/OFFSET を付ける(点検#520の中8)。bound の末尾2つ。
+            // 本番は LIMIT/OFFSET を付ける(点検の中8)。bound の末尾2つ。
             const limit = typeof bound[bound.length - 2] === 'number' ? (bound[bound.length - 2] as number) : items.length;
             const offset = typeof bound[bound.length - 1] === 'number' ? (bound[bound.length - 1] as number) : 0;
             return { results: items.slice(offset, offset + limit) as unknown as T[] };
           }
-          // LIFF history JOIN: FROM event_bookings b JOIN events e JOIN event_slots s
+
           if (sql.includes('FROM event_bookings b') && sql.includes('event_name')) {
             const [friend_id, account_id, nowIso] = bound as [string, string, string];
             const isUpcoming = sql.includes("status IN ('requested','confirmed')")
@@ -816,7 +802,7 @@ function makeEventDb(state: {
               );
             return { results: items as unknown as T[] };
           }
-          // admin slots list: SELECT s.*, COUNT(...) AS active_count FROM event_slots s
+
           if (sql.includes('SELECT id, event_id, starts_at, ends_at, capacity, is_active, sort_order')
             && sql.includes('FROM event_slots WHERE event_id = ?')) {
             const [event_id] = bound as [string];
@@ -848,7 +834,7 @@ function makeEventDb(state: {
               results: (state.slots ?? []).filter((slot) => ids.has(slot.id)) as unknown as T[],
             };
           }
-          // #1000: SELECT * FROM event_slots WHERE event_id = ? AND deleted_at IS NULL AND client_key IN (...)
+          // SELECT * FROM event_slots WHERE event_id = ? AND deleted_at IS NULL AND client_key IN (...)
           if (sql.startsWith('SELECT * FROM event_slots') && sql.includes('client_key IN (')) {
             const [event_id, ...keys] = bound as [string, ...string[]];
             const keySet = new Set(keys);
@@ -897,7 +883,7 @@ function makeEventDb(state: {
             return { success: true, meta: { changes: 1 } };
           }
           if (sql.startsWith('UPDATE event_bookings') && sql.includes('internal_note = COALESCE')) {
-            // reject reason append
+
             const [appended, _updated_at, id] = bound as [string, string, string];
             const b = (state.bookings ?? []).find((x) => x.id === id);
             if (!b) return { success: true, meta: { changes: 0 } };
@@ -906,7 +892,7 @@ function makeEventDb(state: {
             return { success: true, meta: { changes: 1 } };
           }
           if (sql.startsWith('UPDATE event_bookings') && sql.includes('decided_at = ?, decided_by_staff_id')) {
-            // decide
+
             const [next, decided_at, decided_by, _updated_at, id] = bound as [string, string, string | null, string, string];
             const b = (state.bookings ?? []).find((x) => x.id === id);
             if (!b) return { success: true, meta: { changes: 0 } };
@@ -916,7 +902,7 @@ function makeEventDb(state: {
             return { success: true, meta: { changes: 1 } };
           }
           if (sql.startsWith('UPDATE event_bookings') && sql.includes("status = 'cancelled'")) {
-            // admin or friend cancel
+
             const isFriend = sql.includes("cancelled_by = 'friend'");
             const [cancelled_at, _updated_at, id] = bound as [string, string, string];
             const b = (state.bookings ?? []).find((x) => x.id === id);
@@ -927,8 +913,7 @@ function makeEventDb(state: {
             return { success: true, meta: { changes: 1 } };
           }
           if (sql.startsWith('UPDATE event_bookings SET ')) {
-            // generic PUT — conditional on (id, expected status)
-            // bound = [...setValues, id, expectedStatus]
+            // 状態を同時に変更されても上書きしないよう、id と元の状態を更新条件へ含める。
             const expectedStatus = bound[bound.length - 1] as string;
             const id = bound[bound.length - 2] as string;
             const b = (state.bookings ?? []).find((x) => x.id === id);
@@ -1087,7 +1072,7 @@ function makeEventDb(state: {
             return { success: true, meta: { changes: 1 } };
           }
           if (sql.startsWith('UPDATE events SET ')) {
-            // Generic field update — parse SET ... WHERE id = ?
+
             const conditionalVersion = sql.includes('AND version = ?');
             const conditionalToken = sql.includes('AND version_write_token = ?');
             const id = bound[bound.length - (conditionalToken ? 3 : conditionalVersion ? 2 : 1)] as string;
@@ -1096,7 +1081,7 @@ function makeEventDb(state: {
             if (conditionalVersion && e.version !== bound[bound.length - 1]) {
               return { success: true, meta: { changes: 0 } };
             }
-            // Extract column list from SET clause
+
             const setPart = sql.substring('UPDATE events SET '.length, sql.indexOf(' WHERE'));
             const cols = setPart.split(',').map((s) => s.trim());
             let valIdx = 0;
@@ -1410,7 +1395,7 @@ describe('POST /api/events/admin/events', () => {
     const body = (await res.json()) as EventRow;
     expect(body.target_type).toBe('multi-account-dedup');
     expect(typeof body.account_ids === 'string' ? JSON.parse(body.account_ids) : body.account_ids).toEqual(['la1', 'la2']);
-    // sentinel: line_account_id = account_ids[0]
+    // 複数アカウントの代表値は account_ids[0] と一致させる。
     expect(body.line_account_id).toBe('la1');
   });
 
@@ -1910,7 +1895,7 @@ describe('event_slots admin', () => {
     expect(body.items.map((item) => item.starts_at)).toEqual(slots.map((slot) => slot.starts_at));
   });
 
-  // #1000 DETAIL-11: client_key で再送を吸収する。400+1の分割送信が
+  //  client_key で再送を吸収する。400+1の分割送信が
   // 後半だけ失敗しても、同じキーでの再送は成功済みの枠を増やさない。
   test('POST re-sends with the same client_key do not duplicate slots', async () => {
     const state = {
@@ -2730,7 +2715,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
   });
 
   test('409 cancel_deadline_passed when too late', async () => {
-    const soonMs = Date.now() + 60_000; // 1 minute from now
+    const soonMs = Date.now() + 60_000; // 現在から1分後にする。
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1', is_published: 1, cancel_deadline_hours_before: 24 })],
       slots: [{ id: 's1', event_id: 'e1', starts_at: new Date(soonMs).toISOString(), ends_at: new Date(soonMs + 7200_000).toISOString(), capacity: null, is_active: 1, sort_order: 0, deleted_at: null }],
@@ -2762,7 +2747,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
       method: 'POST',
       headers: { 'Authorization': 'Bearer t' },
     });
-    // N-065: 取消が投げた直後の再送は、業務が済みでも だけ直して 200 を返す。
+    // 取消が投げた直後の再送は、業務が済みでも だけ直して 200 を返す。
     expect(res.status).toBe(200);
   });
 
@@ -2962,7 +2947,7 @@ describe('admin bookings management', () => {
       cancelled: 1,
       waitlist: 2,
       totalCapacity: 5,
-      // IDEA-29: 席(人数)の内訳。待機中は席を消費せず、
+      // 席(人数)の内訳。待機中は席を消費せず、
       // 案内中・受諾済みだけを残席の計算へ入れる。
       requestedSeats: 2,
       confirmedSeats: 1,
@@ -3282,7 +3267,7 @@ describe('occurrence applicants / waitlist promotion routes', () => {
     );
     expect(missingVersion.status).toBe(422);
 
-    // U: 手動の繰り上げは理由が必須。版より先に見る。
+    // 手動の繰り上げは理由が必須。版より先に見る。
     const noReason = await app.request(
       '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
       {

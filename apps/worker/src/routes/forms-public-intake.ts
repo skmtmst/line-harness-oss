@@ -54,20 +54,8 @@ export const post__api_forms_id_opened_1 = async (c: Context<Env, "/api/forms/:i
       return c.json({ success: true, isTest: true });
     }
     /*
-     * 受け付けていないフォームの「開いた記録」を増やさない。**塞ぐのは2つ。**
-     *
-     *   保管した（status='archived'） … `getFormById` が見つけない → 404
-     *   受付を止めた（is_active=0）   … 下で弾く → 記録せず 200
-     *
-     * #722 の前は保管の側しか塞いでおらず、注記も保管のことしか書いて
-     * いなかった。読むと全部塞がったように見えるのに、**受付を止めた
-     * フォームは開かれるたびに `form_opens` が増え続けていた。**削除影響の
-     * 画面に出る「開かれた回数」が水増しされ、止めたはずのフォームが
-     * 使われ続けているように見えた。
-     *
-     * 止めた側を 404 にしないのは、この口が計測用で、呼び出し元（LIFF）の
-     * 表示を邪魔しないため。**すぐ下の「関係のない公式アカウント」も同じ形**
-     * ——記録せずに 200 を返す。
+     * 保管済み・受付停止中・関係のないアカウントでは、フォームの開封記録を増やさない。
+     * 保管済みは404とし、停止中や無関係なアカウントは LIFF の表示を妨げないよう、記録せず200を返す。
      */
     const openedForm = await getFormById(c.env.DB, formId, { published: true });
     if (!openedForm) {
@@ -76,9 +64,7 @@ export const post__api_forms_id_opened_1 = async (c: Context<Env, "/api/forms/:i
     if (!openedForm.is_active) {
       return c.json({ success: true });
     }
-    // Open analytics may remain anonymous, but a caller can only attribute an
-    // open to the LINE identity proven by its ID token. Body-supplied customer
-    // IDs are intentionally ignored.
+    // 開封は匿名でもよいが、本人への帰属は ID トークンで証明した LINE 利用者だけに限り、本文の顧客 ID は使わない。
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (identity && (!identity.lineAccountId
       || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId))) {
@@ -107,7 +93,7 @@ export const post__api_forms_id_opened_1 = async (c: Context<Env, "/api/forms/:i
     return c.json({ success: true });
   } catch (err) {
     logger.error("forms.forms_id_opened_post_failed");
-    return c.json({ success: true }); // non-blocking, always succeed
+    return c.json({ success: true }); // 開封計測の失敗で利用者の操作を止めない。
   }
 };
 
@@ -139,7 +125,7 @@ export const post__api_forms_id_partial_2 = async (c: Context<Env, "/api/forms/:
     return fail(c, 404, 'FORM_NOT_FOUND');
   }
   /*
-   * 受付を止めたフォームへ下書きを書かない（#722）。ここは友だちの
+   * 受付を止めたフォームへ下書きを書かない。ここは友だちの
    * `friends.metadata` を直に書き換えるので、止めたあとも書けると
    * **受け付けていないはずの答えが業務データへ入り続ける。**
    * 断り方は `/submit`（:1024）・`/files`（:891）と同じ 400 に揃える。
@@ -157,8 +143,7 @@ export const post__api_forms_id_partial_2 = async (c: Context<Env, "/api/forms/:
     if (allowedNames.has(key)) filtered[key] = value;
   }
 
-  // Save survey data to friend metadata (merge with existing).
-  // 壊れた既存値は空として扱う。ここで例外を投げると500になる。
+  // 回答は既存の metadata へ結合し、壊れた保存値は空として扱って500を防ぐ。
   let existingMeta: Record<string, unknown> = {};
   try {
     const parsed: unknown = friend.metadata ? JSON.parse(friend.metadata) : {};

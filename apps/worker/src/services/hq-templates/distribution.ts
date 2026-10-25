@@ -53,7 +53,7 @@ export async function templateDetail(db: D1Database, authority: HqTemplateAuthor
   if (!version) throw new HqTemplateError('VERSION_UNAVAILABLE', 409);
   return { template, definition: JSON.parse(version.definition_json) as unknown };
 }
-/** Client creation keys are tenant-scoped; the receipt namespace never overlaps health operations. */
+/** 作成キーは統括に限定し、運用状態確認の受領票とは名前空間を分ける。 */
 export function templateCreationRequestId(value: unknown): string {
   if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{8,128}$/.test(value)) throw new HqTemplateError('INVALID_REQUEST_ID');
   return value;
@@ -69,7 +69,7 @@ async function replayTemplateCreation(db: D1Database, authority: HqTemplateAutho
   if (receipt.resource_id !== templateId) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
   const initial = await db.prepare(`SELECT COALESCE(t.catalog_type,t.delivery_type,t.friend_attribute_type,t.extended_type,t.template_type) AS template_type,t.created_at AS template_created_at,v.id,v.created_at,v.created_by,v.definition_json FROM hq_templates t JOIN hq_template_versions v ON v.tenant_id=t.tenant_id AND v.template_id=t.id AND v.version=1 WHERE t.id=? AND t.tenant_id=?`).bind(templateId, authority.tenantId).first<{ template_type:HqTemplateType; template_created_at:string; id:string; created_at:string; created_by:string|null; definition_json:string }>();
   if (!initial) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
-  // Return the original creation response, even if the live record was later edited/archived.
+  // 現在の行が編集・保管済みでも、同じ作成には最初の応答を返す。
   return { template: { id: templateId, tenant_id: authority.tenantId, template_type: initial.template_type, name, description, current_version_id: initial.id, revision: 2, created_by: initial.created_by, created_at: initial.template_created_at, updated_at: initial.created_at, archived_at: null, folder_id: folderId }, definition: JSON.parse(initial.definition_json) as unknown };
 }
 export async function saveTemplate(db: D1Database, authority: HqTemplateAuthority, body: Record<string, unknown>, id?: string) {
@@ -110,7 +110,7 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
     if (requestId) {
       const replay = await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description, body.folderId as string | null ?? null);
       if (replay) return replay;
-      // Even an operator-deleted receipt cannot make the same key create a second resource.
+      // 受領票が手動削除されても、同じキーで別のリソースを作らない。
       if (await getHqTemplate(db, authority.tenantId, templateId)) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
       throw new HqTemplateError('CREATE_UNAVAILABLE', 500);
     }
@@ -319,8 +319,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
   const definition = JSON.parse(version.definition_json);
   const storeSnapshot = isCatalogType(template.template_type) ? (db:D1Database,accountId:string)=>catalogSnapshot(db,accountId,template.template_type as import('@line-crm/shared').HqCatalogTemplateType) : isDeliveryType(template.template_type) ? (db:D1Database,accountId:string)=>deliverySnapshot(db,accountId,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType) : template.template_type === 'scenario' ? scenarioSnapshot : tagSnapshot;
   await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: preflights[0].template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });
-  // Claim the complete decision set before any store mutation. This also binds
-  // concurrent requests and interrupted runs whose first store has not completed.
+  // 店舗への書込前に選択全体を確保し、同時要求や最初の店舗で中断した実行も同じ判断に固定する。
   const requestHash = await digest(JSON.stringify([...selections].sort((a,b) => JSON.stringify([a.accountId,a.sourceId]).localeCompare(JSON.stringify([b.accountId,b.sourceId]))).map(s => [s.accountId,s.sourceId,s.mode])));
   const sourceId = JSON.stringify([authority.tenantId, runId]);
   await db.prepare(`INSERT OR IGNORE INTO audit_events(id,source_kind,source_id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,'hq_template_distribution_request',?,?,'business',?,?,'hq_template.distribution_started','hq_template',?,'success',?)`).bind(crypto.randomUUID(), sourceId, authority.tenantId, authority.actorId, authority.role, templateId, JSON.stringify({ runId, requestHash })).run();
@@ -364,7 +363,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     const persist = (finalStatus: string, commit: HqTemplateStatement[], resolutions: readonly HqTemplateResolution[]) => {
       const statements = [guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND tenant_id=? AND status='ready') AND NOT EXISTS(SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?)`, [p.id, authority.tenantId, runId, authority.tenantId, p.target_account_id])];
       if (finalStatus === 'succeeded') statements.push(guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, [p.id]));
-      // Tenant ownership is also checked inside each atomic store transaction.
+      // 各店舗の原子的トランザクション内でも統括の所有権を確認する。
       statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [p.target_account_id, authority.tenantId]));
       for (const r of resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=COALESCE(?,target_id),alias_name=?,expected_revision=COALESCE(?,expected_revision) WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.mode === 'alias' ? r.aliasName ?? 'pending' : null, r.expectedRevision ?? null, p.id, authority.tenantId, r.sourceId] });
       statements.push({ sql: `INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status,finished_at) VALUES (?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [runId, authority.tenantId, templateId, p.template_version_id, p.target_account_id, p.id, runId, p.snapshot_token, finalStatus] }, ...commit, audit(authority, 'distributed', templateId, p.target_account_id, finalStatus === 'succeeded' ? 'success' : 'failed', runId));

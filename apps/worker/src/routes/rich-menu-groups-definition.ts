@@ -1,4 +1,4 @@
-/** Public exports remain stable; implementation lives with its related helpers. */
+/** 既存の公開名を保ち、関連する補助関数と実装を近くに置く。 */
 export { serializeGroupWithPages } from './rich-menu-groups-definition-serialize-group-with-pages.js';
 export { manualPublishFingerprint } from './rich-menu-groups-definition-serialize-group-with-pages.js';
 export { fingerprintFromSnapshot } from './rich-menu-groups-definition-serialize-group-with-pages.js';

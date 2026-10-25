@@ -19,7 +19,7 @@ describe('computeRemindersForBooking', () => {
     });
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe('day_before');
-    // 前日 18:00 JST = 09:00 UTC of 2099-05-31
+    // 2099-05-31 の18時 JST は09時 UTCになる。
     expect(out[0].scheduled_at).toBe('2099-05-31T09:00:00.000Z');
   });
 
@@ -78,7 +78,7 @@ describe('computeRemindersForBooking', () => {
 
   test('日跨ぎ JST 23:00 → UTC 14:00 の前日計算が正しい', () => {
     // 2099-06-01 23:00 JST = 2099-06-01 14:00 UTC
-    // day_before should be 2099-05-31 18:00 JST = 2099-05-31 09:00 UTC
+    // 前日通知は2099-05-31の18時 JST、09時 UTCを予定する。
     const out = computeRemindersForBooking({
       starts_at_utc: '2099-06-01T14:00:00Z',
       reminder_day_before_enabled: true,

@@ -98,7 +98,7 @@ export async function processEcEvent(
     await setEcActionExecutionStatus(db,{eventId:row.id,lineAccountId,status:'skipped',errorCode:connector.status==='paused'?'connector_paused':'event_not_subscribed',now});
     return 'skipped';
   }
-  // Explicit links are scoped by source, shop and account; an event's customer id alone is never global.
+  // 顧客 ID を全体で一意と扱わず、接続元・店舗・アカウントで絞って結び付ける。
   if(event.customer_id!=null) {
     const linked = await db.prepare(`SELECT f.line_user_id FROM ec_identity_links l JOIN friends f ON f.id=l.friend_id AND f.line_account_id=l.line_account_id
       JOIN ec_connectors c ON c.line_account_id=l.line_account_id AND c.shop_domain=l.shop_key
@@ -112,7 +112,7 @@ export async function processEcEvent(
   ).bind(now, row.id).run();
   if (!claim.meta.changes) return 'duplicate';
 
-  // W11-B adds checkpoints after A's existing event/version claim. It never reclaims event ownership.
+  // 元イベントの実行権は取り直さず、その確定後に工程のチェックポイントを追加する。
   const execution=await acquireWorkflow(db,{scopeId:`line:${lineAccountId}`,processKind:input.identityRecovery?'ec_identity_recovery':'ec_event',subjectId:row.id},{maxAttempts:50});
   if(!execution) {
     const done=await getWorkflowStep(db,{scopeId:`line:${lineAccountId}`,processKind:input.identityRecovery?'ec_identity_recovery':'ec_event',subjectId:row.id,stepKey:'__run'});
@@ -132,8 +132,7 @@ export async function processEcEvent(
     return 'duplicate';
   }
   try {
-    // Receipt replay and cron recovery share this checkpoint. Display data must
-    // exist before the event can report success, even if the first receipt failed.
+    // 初回受領が失敗しても同じ地点から回復できるよう、再送と cron がチェックポイントを共有する。イベント成功を返す前に表示用データを確定する。
     if(event.customer_id!=null) await (await import('./ec-identity-recovery.js')).detectEcIdentityCandidates(db,row.id,event,lineAccountId);
     await execution.step('read_models', async () => {
       const source = await execution.db.prepare('SELECT source FROM ec_events WHERE id=?').bind(row.id).first<{source:string}>();
@@ -171,7 +170,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
   }
 
   {
-    // N-330 (#943): 顧客通知定義があるイベントは定義だけが正本。published の
+    //  顧客通知定義があるイベントは定義だけが正本。published の
     // ときだけ送り、文面は確定済み版の config から取る。定義が無いイベント
     // だけ従来の ec_notification_settings を見る(未移行の互換)。
     const notificationSource = await getCustomerNotificationSource(
@@ -196,7 +195,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
         now,
         row.id,
       ).run();
-      // N-328 (#943): 送れなかった結果も共通送信台帳へ残す。プロフィール同期は
+      //  送れなかった結果も共通送信台帳へ残す。プロフィール同期は
       // 顧客通知を出さないので台帳へは書かない。
       if (event.event_type !== 'ec.customer.profile_updated') {
         await recordCustomerEcDelivery(db, {
@@ -234,7 +233,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
     await execution.step('member_snapshot',()=>syncMemberSnapshot(execution.mutationDb('member_snapshot'),friend.id,event,now));
     await execution.step('member_tags',()=>syncNenEcTags(execution.mutationDb('member_tags'),friend.id,new Date(now),input.identityRecovery?`ec-history:${lineAccountId}:${event.event_id}`:undefined));
 
-    // 注文の確定を成果計測へ接続する(#648)。「注文が確定した」を起点に選んだ
+    // 注文の確定を成果計測へ接続する。「注文が確定した」を起点に選んだ
     // 地点は、ここを通らないと 0 件のままになる。
     //
     // この位置は、この後のどの出口(通知停止で skipped / 通常の processed)を
@@ -331,11 +330,10 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
       await execution.step('shipping_followups',()=>enqueuePostShippingFollowUps(execution.mutationDb('shipping_followups'),event,friend.id,account.id));
     }
 
-    // Transactional delivery can be paused independently while automation
-    // events continue to fire for segmentation and step campaigns.
+    // 分析とシナリオ向けのイベントは保ち、取引通知の送信だけを独立して停止できるようにする。
     if (setting?.is_enabled === 0) {
 
-      // N-328 (#943): 通知停止(定義の draft/stopped、旧設定のOFF)も共通台帳へ
+      //  通知停止(定義の draft/stopped、旧設定のOFF)も共通台帳へ
       // 「対象外」として残す。この処理では送っていないので試行は増やさない。
       await recordCustomerEcDelivery(db, {
         ...ledgerBase,
@@ -388,7 +386,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
     // - pending(送達不明: 送信後に台帳書込が落ちた) → 同じ固定keyで送り直す。
     //   LINE側がキーで重複を抑える(X-Line-Retry-Key、受理済みは409)ため安全。
     const lineClient = new LineClient(accessToken);
-    // N-328 (#943): 共通台帳の冪等キーはLINEへ渡す固定retry keyと同じ値。
+    //  共通台帳の冪等キーはLINEへ渡す固定retry keyと同じ値。
     // イベント再送や再試行で新しい送達行を作らず同じ行を確定する。
     const retryKey = await ecNotificationRetryKey(lineAccountId, event.event_id);
     if (await getEcDispatchStatus(db, row.id, 'notification') !== 'sent') {
@@ -400,8 +398,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
       let providerRequestId: string | null = null;
       let attemptedSend=false;
       try {
-        // Retain the existing checkpoint/key when bringing this older sender
-        // through the same started/unknown/retry-budget rules as other LINE sends.
+        // LINE の送信開始・送達不明・再試行予算を共通で守り、既存のチェックポイントとキーを保持する。
         const pushed = await workflowLineClient(lineClient,execution,{
           stepKey:'customer_notification',retryKeyValidityMs:23*3600_000,onAttempt:()=>{attemptedSend=true;},
         })
@@ -420,7 +417,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
         } catch (markError) {
           logger.error("services_ec_event_processing_failed");
         }
-        // N-328: 送れなかった結果も共通送信台帳へ残す。秘密値を含まない
+        // 送れなかった結果も共通送信台帳へ残す。秘密値を含まない
         // 安全な分類だけ書く。
         await recordCustomerEcDelivery(db, {
           ...ledgerBase,
@@ -431,7 +428,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
         });
         throw pushError;
       }
-      // N-328: 共通台帳を先に確定してから購読台帳を sent にする。台帳の
+      // 共通台帳を先に確定してから購読台帳を sent にする。台帳の
       // 書込が落ちた場合はイベントごと失敗へ回り、再処理で同じ冪等キーの
       // 行を復旧する(既に受理済みなら送達状態は戻らない)。
       await recordCustomerEcDelivery(db, {

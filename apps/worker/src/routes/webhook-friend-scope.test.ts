@@ -8,7 +8,7 @@ const lineClientMocks = vi.hoisted(() => ({
   pushMessage: vi.fn(),
 }));
 
-// Issue #961: 受信アカウントに該当する friend 行が無く、同一 line_user_id の
+// 受信アカウントに該当する friend 行が無く、同一 line_user_id の
 // 行が別アカウントに属するとき、webhook は相手の行を移動せず・混線した履歴を
 // 作らず・イベントを静かに諦めることを証明する。
 vi.mock('@line-crm/db', () => ({

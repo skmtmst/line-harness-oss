@@ -1,4 +1,4 @@
-/** Public exports remain stable; implementation lives with its related helpers. */
+/** 既存の公開名を保ち、関連する補助関数と実装を近くに置く。 */
 export { FRIEND_ADD_ROUTING_KEY } from './friend-add-routing-pick-string.js';
 export type { FriendAddSubject } from './friend-add-routing-pick-string.js';
 export type { FriendKind } from './friend-add-routing-pick-string.js';

@@ -38,7 +38,7 @@ async function requireAccount(c: Context<Env>): Promise<string | Response> {
 }
 
 function validationResponse(c: Context<Env>, error: CommonActionValidationError): Response {
-  // 監査 R473・R477・R467・R479: 改訂・利用版・参照先の競合は409で再確認へ導く。
+  // 監査 ・・・: 改訂・利用版・参照先の競合は409で再確認へ導く。
   const conflict = new Set(['version_conflict', 'draft_exists', 'draft_revision_conflict', 'reference_updated']);
   const notFound = new Set([
     'not_found', 'draft_not_found', 'base_version_not_found', 'version_not_found', 'binding_not_found',
@@ -122,7 +122,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
         ...(format === 'csv' ? {} : { limit, offset }),
       }),
       // 札・KPI用の集計。絞り込みに依らずアカウント全体で数える。
-      // 画面が全件取得を2回投げないための口（#554 点検#519中2）。
+      // 画面が全件取得を2回投げないための口（ 点検中2）。
       format === 'csv' ? null : getCommonActionsSummary(c.env.DB, id),
     ]);
     if (format === 'csv') {
@@ -167,7 +167,7 @@ commonActions.post('/api/common-actions', requireRole('owner', 'admin'), inputJs
     description: body.description,
     actions: body.actions,
     createdBy: c.get('staff')?.id,
-    // 監査 R475: 応答消失からの再試行で二重作成にしない鍵。
+    // 監査 : 応答消失からの再試行で二重作成にしない鍵。
     clientRequestKey: body.clientRequestKey,
   }), 201);
 });
@@ -199,7 +199,7 @@ commonActions.get('/api/common-actions/:id', requireRole('owner', 'admin', 'staf
   }));
 });
 
-// 監査 R480: 未使用の共通アクションを保管する。利用中は422で利用先を示す。
+// 監査 : 未使用の共通アクションを保管する。利用中は422で利用先を示す。
 commonActions.post('/api/common-actions/:id/archive', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = await requireAccount(c);
   if (typeof id !== 'string') return id;
@@ -286,7 +286,7 @@ commonActions.post(
   inputJsonBoundary(), async (c) => {
     const id = await requireAccount(c);
     if (typeof id !== 'string') return id;
-    // 監査 R477: 公開確認に使った下書きの改訂番号を照合する。
+    // 監査 : 公開確認に使った下書きの改訂番号を照合する。
     const body = await c.req.json<{ expectedDraftRevision?: unknown }>()
       .catch(() => ({} as { expectedDraftRevision?: unknown }));
     return endpoint(c, () => publishCommonActionDraft(c.env.DB, {

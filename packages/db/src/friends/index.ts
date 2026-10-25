@@ -155,7 +155,7 @@ export async function setFriendFirstTrackedLinkIfNull(
 
 export interface UpsertFriendInput {
   lineUserId: string;
-  /** 検索対象のLINE公式アカウント。C-2bまでは未割当行へのフォールバックを残す。 */
+  /** 検索対象のLINE公式アカウント。複合 UNIQUE へ移るまでは未割当行へのフォールバックを残す。 */
   lineAccountId?: string | null;
   displayName?: string | null;
   pictureUrl?: string | null;
@@ -170,9 +170,9 @@ function isMissingFollowLifecycleColumn(error: unknown): boolean {
 }
 
 /**
- * friends.line_user_id のグローバル UNIQUE 違反。C-2b の
+ * friends.line_user_id のグローバル UNIQUE 違反。
  * UNIQUE(line_account_id, line_user_id) 移行前は、別アカウント所有の行が
- * あるとこのスコープ用の行を INSERT できない (Issue #961)。呼出側は
+ * あるとこのスコープ用の行を INSERT できない。呼出側は
  * 「このアカウントでは友だち行を作れない」として扱う。相手アカウントの行を
  * 更新したり返したりして履歴を混線させてはいけない。
  */

@@ -174,11 +174,11 @@ interface AutomationExecutionRun {
   automationId: string;
   automationName: string;
   automationVersionId: string;
-  /** 実行時に固定された版番号（#942 N-354）。 */
+  /** 実行時に固定された版番号。 */
   versionNumber: number;
-  /** 1人テストの実行か（#942 N-354：テスト実行の印）。 */
+  /** 1人テストの実行か（ ：テスト実行の印）。 */
   isTest: boolean;
-  /** 取りやめられるのは、まだ終わっていない実行だけ（#942 N-353）。 */
+  /** 取りやめられるのは、まだ終わっていない実行だけ。 */
   canCancel: boolean;
   friendId: string | null;
   friendName: string | null;
@@ -192,10 +192,10 @@ interface AutomationExecutionRun {
   failureReason: string | null;
   /**
    * まだ終わっていない実行が、運用停止・機能無効で動けないときの理由
-   * （#1043：停止・権限を「待っています」と区別する）。
+   * （：停止・権限を「待っています」と区別する）。
    */
   holdReason: string | null;
-  /** 実行した版がいまの公開版と同じか（#1043：現在の版と実行版の区別）。 */
+  /** 実行した版がいまの公開版と同じか（：現在の版と実行版の区別）。 */
   isCurrentVersion: boolean;
   currentVersionNumber: number | null;
 }
@@ -223,7 +223,7 @@ const COMMON_STATUS_TO_DOMAIN: Record<ExecutionRunStatus, AutomationRunDomainSta
   // （待機stepの retry_at の有無）で表示側を分けるため、retry_wait の
   // 絞り込みは待機中全体を返す意図的な近似。
   retry_wait: ['waiting'],
-  // 一部だけ成功は失敗とは別の状態として区別する（#1043）。
+  // 一部だけ成功は失敗とは別の状態として区別する。
   partial: ['partial'],
   permanent_failed: ['failed'],
   cancelled: ['cancelled'],
@@ -255,7 +255,7 @@ function safeFailureReason(code: string | null, failedAction: string | null): st
 
 /**
  * まだ終わっていない実行が「運用停止」「機能無効」で claim できないとき、
- * その理由をアカウントごとに人の言葉で返す（#1043）。
+ * その理由をアカウントごとに人の言葉で返す。
  *
  * 実行エンジンは停止中の実行を消さず queued のまま残し、再開後に動かす
  * 設計のため、理由は書き込みではなく読み取り時に付け足す。
@@ -320,7 +320,7 @@ function mapExecutionRun(row: {
   const failedAction = row.failed_action ? automationActionLabel(row.failed_action) : null;
   const failureReason = safeFailureReason(row.failure_code, failedAction);
   // domainの `waiting` は待機(wait)と失敗の再試行待ちを兼ねる。
-  // 待機中stepに retry_at があるときだけ再試行待ちとする（#1043）。
+  // 待機中stepに retry_at があるときだけ再試行待ちとする。
   const statusLabel: ExecutionRunStatus = row.status === 'waiting' && Number(row.has_retry_wait ?? 0) > 0
     ? 'retry_wait'
     : DOMAIN_STATUS_TO_COMMON[row.status];
@@ -403,7 +403,7 @@ function csvCell(value: string | number | null | undefined): string {
 }
 
 /**
- * 台帳の絞り込み結果をCSVにする（#942 N-353）。
+ * 台帳の絞り込み結果をCSVにする。
  *
  * 画面の検索・状態・期間の絞り込みと同じ行を出す。先頭の BOM は
  * Excelで開いたときに日本語が化けないための目印。
@@ -434,7 +434,7 @@ function executionRunsCsv(items: AutomationExecutionRun[]): string {
 
 async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<void>) {
   const id = c.req.param('id')!;
-  // #942: 一覧が返すidは の automation_definitions。旧 automations 表の
+  // 一覧が返すidは の automation_definitions。旧 automations 表の
   // 行だけを見ると、の定義への操作が全部 404 になる。先にを見る。
   const definition = await c.env.DB.prepare(
     `SELECT line_account_id FROM automation_definitions WHERE id = ?`,
@@ -471,7 +471,7 @@ automations.get(
   },
 );
 
-// #942 N-351: 下書きの作成・保存は「オートメーションを触れる人」= 権限キー
+//  下書きの作成・保存は「オートメーションを触れる人」= 権限キー
 // `/automations` を持つスタッフも通す。入口の絞り込みは
 // requireAutomationPermission が既に担うので、role で二度絞らない。
 automations.get(
@@ -493,7 +493,7 @@ automations.post(
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
     /*
-     * DETAIL-13: 新規作成の操作ごとの冪等鍵。画面は1回の作成操作に1つだけ
+     * 新規作成の操作ごとの冪等鍵。画面は1回の作成操作に1つだけ
      * 鍵を振り、同じ操作の再試行（ダブルクリック・通信やり直し）だけが
      * 同じ鍵を使う。鍵が無い呼び出しは「別の操作」と見分けられず、
      * 前の下書きへ戻って上書きする道が残るので、service 側で断る。
@@ -668,7 +668,7 @@ automations.post(
       credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
       operatorMailEnv: c.env,
       operationKey: body.operationKey,
-      // R487: 確認時に見せた共通アクションの版の一式。食い違えば409で送らない。
+      // 確認時に見せた共通アクションの版の一式。食い違えば409で送らない。
       expectedCommonActions: body.expectedCommonActions,
     }));
   },
@@ -728,7 +728,7 @@ automations.get(
       offset,
     });
 
-    // 運用停止・機能無効で動けない実行に、その理由を付ける（#1043）。
+    // 運用停止・機能無効で動けない実行に、その理由を付ける。
     const holdReasons = await holdReasonByAccount(c.env.DB, result.rows);
     const items: AutomationExecutionRun[] = result.rows.map(
       (row) => mapExecutionRun(row, holdReasons.get(row.line_account_id) ?? null),
@@ -736,7 +736,7 @@ automations.get(
     if (wantsCsv) {
       c.set('outputAudit', { count: items.length, accountIds: allowedAccountIds, accountCounts: Object.fromEntries(allowedAccountIds.map(id => [id, items.filter(item => item.lineAccountId === id).length])) });
       /*
-       * R495: 上限5,000件で切れたことを黙らせない。総件数と出力件数を
+       * 上限5,000件で切れたことを黙らせない。総件数と出力件数を
        * 応答の頭に載せ、切れたかどうかを使い手へ知らせる（画面が読む）。
        */
       return new Response(executionRunsCsv(items), {
@@ -779,7 +779,7 @@ automations.post(
         runId: c.req.param('id'),
         allowedAccountIds: scope.allowedAccountIds,
       });
-      // #736: 実行完了を待たず受け付けだけ返す。実行は既存5分cronの
+      // 実行完了を待たず受け付けだけ返す。実行は既存5分cronの
       // processDueAutomationRuns が拾う(retry は resume_at=now を入れる)。
       // 新規 queue・migration・waitUntil は作らない。
       return c.json({
@@ -800,7 +800,7 @@ automations.post(
 );
 
 /**
- * #942 N-354: 1件の実行記録の詳細。
+ *  1件の実行記録の詳細。
  *
  * 版番号・テスト実行の印・処理ごとの結果（状態と試行数）を返す。
  * step の input/output は友だちの情報を含みうるため出さない。
@@ -847,7 +847,7 @@ automations.get(
 );
 
 /**
- * #942 N-353: 実行の取りやめ。
+ *  実行の取りやめ。
  *
  * 待機中・実行中・再試行待ちの実行を cancelled で閉じる。
  * 終わった実行は 409、無い・範囲外は 404、取消済みはそのまま成功。
@@ -890,7 +890,7 @@ async function definitionAccountId(c: Context<Env>): Promise<string | Response> 
   return row.line_account_id;
 }
 
-/** #942 N-352: 一覧の「編集」。公開済みの定義に改訂用の下書きをぶら下げる。 */
+/**  一覧の「編集」。公開済みの定義に改訂用の下書きをぶら下げる。 */
 automations.post(
   '/api/automations/:id/draft',
   requireAutomationPermission,
@@ -906,7 +906,7 @@ automations.post(
   },
 );
 
-/** #942 N-352: 一覧の「複製」。いま見えている版を写した新しい下書きを作る。 */
+/**  一覧の「複製」。いま見えている版を写した新しい下書きを作る。 */
 automations.post(
   '/api/automations/:id/duplicate',
   requireAutomationPermission,
@@ -923,7 +923,7 @@ automations.post(
 );
 
 /**
- * #942 N-352: 一覧の稼働切替と「保管」。
+ *  一覧の稼働切替と「保管」。
  *
  * body は `{ status: 'active' | 'stopped' | 'archived' }`。
  * 保管から戻せる。戻すだけでは動かさず、実行記録は残る。
@@ -1003,12 +1003,12 @@ automations.get(
   }
 });
 
-// 旧CRUDの作成口は削除済み（#554 点検#519中6）。
+// 旧CRUDの作成口は削除済み（ 点検中6）。
 // 旧 `automations` 表へ検証なしで直書きし、一覧・実行基盤が読む
 // `automation_definitions` 系と不整合を起こすうえ、唯一の呼び元だった
 // 画面内蔵フォームは到達不能だった。作成は下書き→公開の流れを使う。
 // 稼働切替・削除で使う PUT・DELETE は残す。
-// #736: 旧 PUT の受理は isActive boolean だけに絞る。唯一の呼び元は
+// 旧 PUT の受理は isActive boolean だけに絞る。唯一の呼び元は
 // 稼働切替の { isActive } で、eventType/actions を送る画面経路はない。
 // 未知キー・空 body・型違いは黙って無視せず 400 で拒否する。
 function parseAutomationToggle(body: unknown): { ok: true; isActive: boolean } | { ok: false; error: string } {

@@ -80,7 +80,7 @@ export const DEFAULT_NEN_RANKS: ReadonlyArray<{ key: string; name: string; thres
   { key: 'platinum', name: 'プラチナ', thresholdYen: 120_000, ratePercent: 3, tagId: 'nen-tag-member-rank-platinum' },
 ];
 
-/** 初期の節目。特典は未設定（Masato の決定 2026-09-16：まず貯まる仕組みだけ）。 */
+/** 初期の節目。特典は未設定（まず貯まる仕組みだけを用意する）。 */
 export const DEFAULT_NEN_MILESTONES: ReadonlyArray<{ thresholdYen: number; title: string }> = [
   { thresholdYen: 300_000, title: 'NEN FAMILY' },
   { thresholdYen: 600_000, title: 'NEN FAMILY＋' },
@@ -207,7 +207,7 @@ export async function saveNenRankSettings(
   const existing = await getNenRankSettings(db, lineAccountId);
   const byId = new Map(existing.map((row) => [row.id, row]));
   /*
-   * 画面が編集した対象と保存先が一致しているかの最終確認（DEEP-21）。
+   * 画面が編集した対象と保存先が一致しているかの最終確認。
    * このアカウントに存在しないidは新規へ黙って変換せず、1件も書き込む前に拒否する。
    * 別アカウントのidや、同時編集ですでに消えた行のidが送られてきたときに、
    * 既存のランクを巻き込んで置き換えないための防御。
@@ -262,7 +262,7 @@ export async function saveNenLifetimeMilestones(
   validateNenMilestoneInputs(inputs);
   const existing = await getNenLifetimeMilestones(db, lineAccountId);
   const byId = new Map(existing.map((row) => [row.id, row]));
-  // ランクと同じく、存在しないidは新規へ黙って変換せず書き込み前に拒否する（DEEP-21）。
+  // ランクと同じく、存在しないidは新規へ黙って変換せず書き込み前に拒否する。
   for (const input of inputs) {
     if (input.id && !byId.has(input.id)) {
       throw new NenRankValidationError('保存する対象が見つかりません。画面を読み直してから保存してください');

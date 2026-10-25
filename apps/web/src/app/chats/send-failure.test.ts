@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { describeSendFailure } from './send-failure'
+import { describeSendFailure } from '@/v8/inbox-chat/send-failure'
 
 const NOW = new Date('2026-09-17T00:00:00.000Z')
 

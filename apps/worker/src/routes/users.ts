@@ -130,11 +130,7 @@ users.put('/api/users/:id', requireRole('owner', 'admin'), inputJsonBoundary({"e
   }
 });
 
-// DELETE /api/users/:id - archive (never physically delete)
-//
-// 結びついた友だち・名寄せがある利用者を消すと、履歴・監査・支払の記録が
-// 誰のものか分からなくなる。関連があるときは 409 で止め、通常は行を残した
-// まま退避（archive）にする。退避済みは一覧・詳細に出さない。
+// 結び付いた友だちや本人統合があると記録の所有者を失うため409で止める。通常も物理削除せず保管し、一覧と詳細からだけ外す。
 users.delete('/api/users/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -167,7 +163,7 @@ users.delete('/api/users/:id', requireRole('owner'), async (c) => {
   }
 });
 
-// POST /api/users/:id/link - link friend to user UUID
+
 users.post('/api/users/:id/link', requireRole('owner', 'admin'), inputJsonBoundary({"friendId":["string"]}), async (c) => {
   try {
     const userId = c.req.param('id');
@@ -190,7 +186,7 @@ users.post('/api/users/:id/link', requireRole('owner', 'admin'), inputJsonBounda
     }
 
     /*
-     * R394: 同時に別の人が動かしたときは上書きせず409にする（変更0）。
+     * 同時に別の人が動かしたときは上書きせず409にする（変更0）。
      * 最新の結び付きを読み直してからやり直す。
      */
     const linked = await linkFriendToUser(

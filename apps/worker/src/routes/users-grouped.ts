@@ -23,7 +23,7 @@ usersGrouped.get('/api/users-grouped', requireRole('owner', 'admin', 'staff'), a
       q: q || undefined,
       onlyDups,
       account,
-      // FRIEND-09: 表示中ページへの後絞りをやめ、全件へかける条件として受ける。
+      // 表示中ページへの後絞りをやめ、全件へかける条件として受ける。
       uid: uidRaw === 'linked' || uidRaw === 'unlinked' ? uidRaw : undefined,
       page: pageStr ? parseOffsetPaging({ page: pageStr }, { pagePolicy: { format: 'integer-prefix' } }).page : undefined,
       pageSize: pageSizeStr ? parseOffsetPaging({ limit: pageSizeStr }, { defaultLimit: Number.NaN, limitPolicy: { format: 'integer-prefix' } }).limit : undefined,

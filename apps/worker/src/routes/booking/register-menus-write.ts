@@ -24,7 +24,7 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), i
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return inputError(c, { error: 'missing_account_id' }, 400, ["account_id"]);
   /*
-   * R535: 応答消失後の再送で同じメニューを2件作らない。呼び出し側が
+   * 応答消失後の再送で同じメニューを2件作らない。呼び出し側が
    * 作成試行ごとに付ける一意キーで作成済み応答を返す。検証で落ちた
    * 要求は保存しないので、入力を直して同じキーで送り直せる。キーの無い
    * 従来の呼び出しは従来どおり毎回作成する。migration 無しで済ませるため、LIFF用の
@@ -104,7 +104,7 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), i
       ...ruleColumns.map((col) => extraRules[col]),
     )
     .run();
-  // R535: 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
+  // 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
   if (idemKey) {
     await saveIdempotencyResponse(c.env.DB, {
       ...idemScope,
@@ -365,8 +365,7 @@ booking.delete('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_K
 
 // ---- Staff CRUD ----
 
-// Admin mirror of the LIFF menu-staff lookup — used by the iOS app's
-// proxy-booking flow (operator books on behalf of a friend from chat).
+// チャットからの代理予約でも LIFF と同じメニュー・担当者の照合を使う。
 booking.get('/api/booking/admin/menus/:id/staff', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);

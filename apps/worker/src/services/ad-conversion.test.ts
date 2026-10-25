@@ -382,7 +382,7 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
     // value(小数文字列)/number_itemsのみで、通貨相当はWebピクセル側の
     // price_currencyに分離されている。余計な項目を送らないよう鍵集合を固定する。
     // (docs.x.com/x-ads-api/measurement/web-conversions.md の例と
-    //  stape-io/twitter-tag の対応表で確認。2026-09-09)
+    // stape-io/twitter-tag の対応表に従う。
     expect(Object.keys(xBody.conversions[0]).sort()).toEqual(
       ['conversion_id', 'conversion_time', 'event_id', 'identifiers', 'number_items', 'value'],
     );

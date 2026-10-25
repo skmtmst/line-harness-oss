@@ -378,7 +378,7 @@ describe('photo review operations API', () => {
   });
 
   /*
-   * #931 N-307: EC会員とつながっていない採用はポイント手続きを始めない。
+   *  EC会員とつながっていない採用はポイント手続きを始めない。
    * 届ける文面にも「5ポイント」を書かない。一括でも単票と同じ規則。
    */
   it('EC未連携の採用通知はポイント文言を添えない(#931 N-307)', async () => {
@@ -442,9 +442,7 @@ describe('photo review operations API', () => {
     };
     expect(body.data.items.map((item) => item.notificationStatus)).toEqual(['sent', 'failed', 'failed']);
     /*
-     * 失敗の理由は他の送信失敗と同じ安全な言い方にそろえる（2026-10-02）。
-     * 以前は生のエラー本文をそのまま返していて、画面に LINE 側の応答本文や
-     * 社内の呼び名が出ていた。
+     * LINE の応答本文や内部情報を画面へ漏らさないよう、送信失敗は共通の安全な理由だけを表示する。
      */
     expect(body.data.notificationFailures).toEqual([
       { photoId: 'photo-2', error: '送信に失敗しました。設定とLINE連携を確認してください。' },
@@ -468,9 +466,7 @@ describe('photo review operations API', () => {
   });
 
   /*
-   * 審査結果の通知が失敗したとき、LINE 側の応答本文と社内の呼び名が
-   * そのまま管理画面の失敗一覧に出ていた（2026-10-02）。
-   * 運用者に見せるのは次の行動が選べる言い方だけにする。
+   * 審査結果の通知失敗では、応答本文や内部情報を出さず、運用者が次の行動を選べる理由だけを表示する。
    */
   it('LINE側の応答本文や社内の呼び名を画面へ返さない', async () => {
     mocks.bulk.mockResolvedValue({

@@ -98,9 +98,7 @@ const mocks = {
   createCommonVarSchedule: vi.fn(),
   deleteCommonVarSchedule: vi.fn(),
   COMMON_VAR_TYPES: ['text', 'url', 'image', 'number', 'long_text', 'date', 'datetime', 'boolean'],
-  // Route is tested through the production Hono handler. Keep this mock's public
-  // contract identical to the DB normalizer, including calendar round-trips:
-  // a shape-only regex would let 2/30 or 24:00 through this boundary test.
+  // 形だけの正規表現では2月30日や24時を通すため、DB と同じ暦日の往復検査を試験用の正規化にも含め、実 Hono 入口を通す。
   normalizeCommonVarValue: (type: string, value: string) => {
     if (type === 'long_text') return value.length <= 10_000 ? value : null;
     if (type === 'boolean') return value === 'true' || value === 'false' ? value : null;
@@ -1245,7 +1243,7 @@ describe('#637 指摘2 管理画面の表示は認証付きのcontent口だけ',
 });
 
 /*
- * IDEA-15 登録メディア。
+ *  登録メディア。
  * 既知の利用期限・同意情報を詳細へ出す記録口と、版ごとの実体を
  * 取り戻すダウンロード口。記録されていない値は推測で埋めない。
  */
@@ -1763,7 +1761,7 @@ describe('共通情報', () => {
   });
 
   it('値だけの変更は確認値つきで通る', async () => {
-    // N-185: 保存には影響確認の確認値が要る。確認口で発行した値を添える。
+    // 保存には影響確認の確認値が要る。確認口で発行した値を添える。
     const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
       accountId: 'account-1', nextValue: '11-20',
     });
@@ -1883,8 +1881,7 @@ describe('共通情報', () => {
       error: '画像には https:// からはじまるURLを入力してください',
     });
 
-    // PATCH uses the persisted type, so an invalid calendar value must not get as
-    // far as the impact scan or update even if the client forged a proof.
+    // 保存済みの型で検証し、偽造した確認票があっても不正な暦日を影響確認や更新まで進めない。
     mocks.getCommonVarById.mockResolvedValueOnce({ ...VAR, type: 'date' });
     const invalidPatch = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', {
       value: '2026-02-30', impactProof: 'forged', expectedVersion: 3,
@@ -1925,8 +1922,7 @@ describe('共通情報', () => {
     expect(urlBadSchedule.status).toBe(400);
     expect(mocks.createCommonVarSchedule).not.toHaveBeenCalled();
 
-    // Account access and stale versions are rejected before a write. This remains
-    // true for a newly added type, not only for the legacy text fixture.
+    // 項目の種類によらず、書込前にアカウント権限と古い版を拒むことを確かめる。
     accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
     const otherAccount = await req('/api/common-vars/cv-1?accountId=other-account', 'PATCH', {
       value: 'true', impactProof: 'forged', expectedVersion: 3,
@@ -1938,8 +1934,7 @@ describe('共通情報', () => {
     });
     expect(stale.status).toBe(409);
 
-    // The version can change after preview. The production PATCH route must turn
-    // the DB's optimistic-lock error into a conflict rather than overwriting it.
+    // プレビュー後の版更新は DB の楽観ロックを競合応答へ変換し、上書きしない。
     mocks.getCommonVarById
       .mockResolvedValueOnce({ ...VAR, type: 'boolean', value: 'false' })
       .mockResolvedValueOnce({ ...VAR, type: 'boolean', value: 'false' });
@@ -1972,7 +1967,7 @@ describe('共通情報', () => {
       accountId: 'account-1', name: 'x', varKey: 'ok_key', folderId: 'other-folder',
     })).status).toBe(400);
     mocks.updateCommonVar.mockRejectedValueOnce(new MockCommonVarFolderError());
-    // N-185: フォルダ検査まで進めるため確認値を添える。
+    // フォルダ検査まで進めるため確認値を添える。
     const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
       accountId: 'account-1', nextValue: '10-19',
     });
@@ -2246,7 +2241,7 @@ describe('共通情報', () => {
   });
 
   /*
-    IDEA-14: 送信開始時の値で固定済みの配信は、保存してもその配信の
+    送信開始時の値で固定済みの配信は、保存してもその配信の
     文は変わらない。「変わる場所」に入れると説明と処理がずれるので、
     状態名・changesOnSave・件数のすべてで分ける。
   */

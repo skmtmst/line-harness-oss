@@ -4,9 +4,7 @@ import { renderBroadcastMessageContent } from './render-message.js';
 import { buildMessage } from './line-message.js';
 
 /*
- * 2026-10-07 点検：名前や友だち情報に " \ 改行 $& が入っていても、
- * カード（Flex・カルーセル）が壊れず、文のメッセージは見たままの値になる。
- * 壊れると buildMessage が文字のメッセージへ逃げ、中身の JSON がそのままお客さまに届く。
+ * 名前や友だち情報に引用符・バックスラッシュ・改行・$& が含まれても、カードの JSON を壊さず、通常の文面は入力値のまま保つ。JSON がテキストとして顧客へ届かないことを確かめる。
  */
 const tricky = '山田 "やまちゃん" \\ 太郎\n$& $1';
 const friend = { id: 'f1', display_name: tricky, user_id: 'U1' };

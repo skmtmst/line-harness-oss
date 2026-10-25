@@ -3,7 +3,7 @@ import type { CodexSlackRelayConfig } from './codex-slack-relay.js';
 import { securityRule } from './security-monitor-rules.js';
 import type { SecurityAlertRow } from './security-monitor-store.js';
 
-/** Outbox state lives on the alert version. A lease prevents concurrent cron sends. */
+/** 送信待ち状態は警告の版へ保存し、実行権で同時 cron の重複送信を防ぐ。 */
 export async function flushSecurityAlerts(db: D1Database, config: CodexSlackRelayConfig, now: Date, fetcher: typeof fetch = fetch) {
   const rows = await db.prepare(`SELECT * FROM security_alerts WHERE slack_sent_version < version
     AND (slack_lease_until IS NULL OR slack_lease_until <= ?) ORDER BY first_detected_at LIMIT 30`)
@@ -23,7 +23,7 @@ export async function flushSecurityAlerts(db: D1Database, config: CodexSlackRela
       if (!config.SLACK_BOT_TOKEN || !config.SLACK_ERROR_CHANNEL_ID) {
         error = 'unconfigured';
       } else {
-        // Only fixed labels, server-generated UUID, integers and normalized UTC time leave the DB.
+        // DB 外へ出すのは固定名・サーバー生成 UUID・整数・正規化済み UTC 時刻だけ。
         const id = /^[a-f0-9-]{36}$/.test(row.id) ? row.id : 'unavailable';
         const count = Number.isSafeInteger(row.observed_count) ? row.observed_count : 0;
         const response = await fetcher('https://slack.com/api/chat.postMessage', {

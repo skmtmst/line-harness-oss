@@ -1,5 +1,5 @@
 import { jstDate as japanDate } from '@line-crm/shared';
-/** Daily snapshots are rebuilt atomically; a failed rebuild leaves yesterday's values intact. */
+/** 日別の写しは原子的に作り直し、失敗時は前日の値を保持する。 */
 export async function refreshCustomerSegments(db:D1Database,a:string,now=new Date()){
  const at=now.toISOString(),from=new Date(now.getTime()-365*86400000).toISOString();
  const source=`WITH activities AS (
@@ -17,7 +17,7 @@ export async function refreshCustomerSegments(db:D1Database,a:string,now=new Dat
 }
 export function segmentName(r:number,f:number){return r===1&&f===5?'常連':r===1&&f===1?'新しい人':r>=4&&f>=4?'離れかけの常連':r===5&&f<=2?'眠っている':`最後の日 ${r}・回数 ${f}`;}
 export async function processCustomerSegments(db:D1Database,now=new Date()){
- // One account per invocation, using a durable oldest-snapshot cursor instead of scanning all customers at request time.
+ // 要求時に全顧客を走査せず、古い写しの永続カーソルを使い、1回で1アカウントだけを更新する。
  const a=await db.prepare(`SELECT a.id FROM line_accounts a WHERE a.is_active=1 AND a.archived_at IS NULL AND NOT EXISTS(SELECT 1 FROM customer_activity_runs c WHERE c.account_id=a.id AND c.status='ready' AND substr(datetime(c.computed_at,'+9 hours'),1,10)=?) AND NOT EXISTS(SELECT 1 FROM customer_activity_runs c WHERE c.account_id=a.id AND c.status='failed' AND julianday(c.last_attempt_at)>julianday(?,'-1 hour')) ORDER BY a.id LIMIT 1`).bind(japanDate(now),now.toISOString()).first<{id:string}>();
  if(a){try{await refreshCustomerSegments(db,a.id,now);const {evaluateRanks}=await import('./member-ranks.js');await evaluateRanks(db,a.id,false,now);}catch(e){await db.prepare("INSERT INTO customer_activity_runs(account_id,last_attempt_at,status) VALUES(?,?,'failed') ON CONFLICT(account_id) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,status='failed'").bind(a.id,now.toISOString()).run();throw e;}}
 }

@@ -11,15 +11,7 @@ type ResolvedFriend = {
   line_account_id: string | null;
 };
 
-/**
- * Verify a LINE access token and resolve the backing friend row.
- *
- * Returns a discriminated result so callers can pick the right HTTP status in
- * a single pass:
- *   - 'invalid_token' → 401 (token could not be verified against LINE)
- *   - 'no_friend'     → 404 (token verified, but no friend row exists)
- *   - 'ok'            → proceed with the resolved friend
- */
+/** LINE トークンの不正は401、確認済みでも友だちなしは404、成功は本人の友だちを返し、呼出元が1回の解決で状態を選べるようにする。 */
 export async function resolveFriendFromLineToken(
   env: Env['Bindings'],
   accessToken: string,
@@ -36,12 +28,7 @@ export async function resolveFriendFromLineToken(
   );
   if (!v.ok) return { status: 'invalid_token' };
 
-  // The verify response carries the LINE Login channel (`client_id`) that
-  // minted this token. Reject any token issued by a channel this deployment
-  // does not own — otherwise a token from an unrelated LINE Login app whose
-  // user happens to share a lineUserId could impersonate an affiliate.
-  // Allowed channels = env default + every DB account's login channel, mirroring
-  // the multi-account verification pattern in liff.ts.
+  // 別アプリのなりすましを防ぐため、verify の client_id が環境の既定または DB のログインチャネルに属する場合だけ受け付ける。
   const verifyBody = await v
     .json<{ client_id?: string }>()
     .catch((): { client_id?: string } => ({}));
@@ -82,7 +69,7 @@ export async function resolveFriendFromLineToken(
   };
 }
 
-/** Map a non-ok resolution to its JSON error response. */
+/** 解決失敗を対応する JSON のエラー応答へ変換する。 */
 export function unresolvedResponse(
   c: Context<Env>,
   result:

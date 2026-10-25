@@ -29,7 +29,7 @@ function measuredDb(db: D1Database) {
       if (name === 'bind') return (...params: unknown[]) => wrap(target.bind(...params));
       if (name === 'first' || name === 'all') return async (...args: unknown[]) => {
         reads++;
-        // Same simulated D1 round trip for cached and uncached runs.
+        // キャッシュあり・なしに同じ D1 往復の遅延を与えて比較する。
         await new Promise(resolve => setTimeout(resolve, 2));
         return Reflect.apply(target[name], target, args);
       };

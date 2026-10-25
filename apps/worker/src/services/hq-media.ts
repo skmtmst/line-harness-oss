@@ -22,7 +22,7 @@ function publicOrigin(value: string) {
   return url.origin;
 }
 
-/** Existing nullable account sessions + immutable tenant prefix; never a synthetic store. */
+/** 既存の任意アカウントのセッションと不変の統括接頭辞を使い、架空の店舗を作らない。 */
 export async function createHqMediaSession(env: Env['Bindings'], db: D1Database, authority: HqTemplateAuthority, input: Record<string, unknown>): Promise<HqMediaUploadSession> {
   const prefix = scope(authority);
   const { filename, mimeType, sizeBytes } = input;
@@ -66,7 +66,7 @@ export async function completeHqMediaSession(env: Env['Bindings'], db: D1Databas
     ({ durationMs } = await readHqMp4Metadata(bucket, row.r2_key, object!.etag, row.expected_size, kind));
     contentHash = await hashHqMedia(bucket, row.r2_key, object!.etag, row.expected_size);
   } catch { fail('INVALID_MEDIA'); }
-  // One immutable key per session. The signed pending key is never made public.
+  // セッションごとに不変のキーを使い、署名付きの未完了キーは公開しない。
   const key = `hq-templates/${authority.tenantId}/uploads/${id}.${kind === 'audio' ? 'm4a' : 'mp4'}`;
   const media: MessageTemplateMediaDefinition = { id, kind, filename: row.filename, mimeType: row.mime_type, sizeBytes: row.expected_size, width: null, height: null, durationMs: durationMs!, contentHash: contentHash!, r2Key: key, publicUrl: `${base}/images/${key}`, versionId: id, versionNo: 1 };
   const existing = await bucket.head(key);
@@ -77,7 +77,7 @@ export async function completeHqMediaSession(env: Env['Bindings'], db: D1Databas
     catch { /* Recover a lost PUT response by checking the exact immutable receipt. */ }
     if (!isRegisteredHqMedia(await bucket.head(key), media, authority.tenantId)) fail('UPLOAD_UNCONFIRMED', 409);
   }
-  // Same safety gate as store rich video. Replays must not bypass a failed scan.
+  // 店舗の動画と同じ安全検査を適用し、再送でも失敗した検査を迂回させない。
   await ensureFileScanForUpload({ db, lineAccountId: null, subjectKind: 'broadcast_asset', subjectId: key, mediaId: null, filename: media.filename, mimeType: media.mimeType, sizeBytes: media.sizeBytes });
   await db.prepare('UPDATE broadcast_media_upload_sessions SET public_key=?,completed_at=? WHERE id=? AND created_by=? AND completed_at IS NULL')
     .bind(key, new Date().toISOString(), id, authority.actorId).run();
@@ -86,7 +86,7 @@ export async function completeHqMediaSession(env: Env['Bindings'], db: D1Databas
 export async function cancelHqMediaSession(bucket: R2Bucket, db: D1Database, authority: HqTemplateAuthority, id: string) {
   const row = await session(db, authority, id);
   if (row.completed_at) fail('MEDIA_IN_USE', 409);
-  // Revocation first; an outstanding signed PUT can recreate only an unusable pending key.
+  // 失効を先に確定し、残った署名付き PUT では使えない未完了キーしか作れないようにする。
   await db.prepare('UPDATE broadcast_media_upload_sessions SET expires_at=? WHERE id=? AND created_by=? AND completed_at IS NULL').bind(new Date(0).toISOString(), id, authority.actorId).run();
   await bucket.delete(row.r2_key);
   return { deleted: true };
@@ -97,7 +97,7 @@ export async function hqMediaGate(db: D1Database, bucket: Pick<R2Bucket, 'get'>,
 }
 
 export interface HqMediaRuntime { bucket: R2Bucket; publicBaseUrl: string; copy?: boolean }
-/** Standalone HQ audio is materialized per store only on send/test-send, never during preflight. */
+/** 統括の音声は送信・テスト時だけ店舗側へ作り、事前確認では複製しない。 */
 export async function resolveHqAudio(db: D1Database, tenantId: string, accountId: string, audio: Record<string, unknown>, runtime?: HqMediaRuntime) {
   let key = audio.hqMediaKey;
   if (key === undefined && typeof audio.originalContentUrl === 'string') {
@@ -135,7 +135,7 @@ export async function resolveHqAudio(db: D1Database, tenantId: string, accountId
   return { originalContentUrl: url, duration: media.durationMs! / 1000 };
 }
 
-/** Registered tenant-owned HQ uploads. Pending and unrelated account media are never candidates. */
+/** 統括所有の登録済みアップロードだけを対象にし、未完了・無関係なメディアは候補にしない。 */
 export async function listHqRegisteredMedia(db:D1Database,bucket:R2Bucket,authority:HqTemplateAuthority,input:{kind?:string;cursor?:string;limit?:string}) {
   const prefix=`${scope(authority)}uploads/`;
   if(input.kind!==undefined&&!['video','audio','image'].includes(input.kind))fail('INVALID_MEDIA');

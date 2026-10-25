@@ -43,7 +43,7 @@ export interface TemplateRow {
   draft_question_json: string | null;
   draft_question_status: 'draft' | 'published' | null;
   /**
-   * 347(差し戻し対応): 下書きの版。保存のたびに +1 し、公開で 0 に戻す。
+   * 下書きの版。保存のたびに +1 し、公開で 0 に戻す。
    * 公開口はこの番号も確認し、検査後に書き換わった下書きを出さない。
    */
   draft_revision: number;

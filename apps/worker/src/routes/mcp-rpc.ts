@@ -29,7 +29,7 @@ mcpRpc.post('/mcp',async c=>{
  const id=b.id??null,params=b.params as {name?:string;arguments?:Record<string,unknown>}|undefined;
  const finish=async(result:unknown)=>{await c.env.DB.prepare('UPDATE mcp_connections SET last_used_at=? WHERE id=?').bind(now,row.id).run();return c.json({jsonrpc:'2.0',id,result});};
  const log=async(result:string,tool='protocol',account:string|null=null)=>{await c.env.DB.prepare("INSERT INTO mcp_call_logs(id,connection_id,tool,account_id,kind,result,summary,at) VALUES(?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),row.id,tools.some(t=>t.name===tool)?tool:'unknown',account,tool==='request_broadcast_send'?'send_request':tool.endsWith('_draft')?'draft':'read',result,result==='ok'?'集計を読んだ':result==='rate_limited'?'回数の上限':'許可されていない操作',now).run();};
- // The count and insert share one transaction, including refused calls.
+ // 拒否された呼出も含め、計数と INSERT を同じトランザクションへ入れる。
  const attempt=crypto.randomUUID();const claimed=await c.env.DB.batch([
  c.env.DB.prepare("INSERT INTO mcp_call_logs(id,connection_id,tool,kind,result,summary,at) SELECT ?,?,'protocol','read','ok','接続の呼び出し',? WHERE (SELECT count(*) FROM mcp_call_logs WHERE connection_id=? AND tool='protocol' AND julianday(at)>julianday(?,'-1 minute'))<60").bind(attempt,row.id,now,row.id,now)]);
  if(!claimed[0].meta.changes){await log('rate_limited');return c.json({error:'rate_limited'},429);}

@@ -18,11 +18,7 @@ import { buildMetadata } from '../lib/build-metadata.js';
 import { fail } from '../lib/fail.js';
 const health = new Hono<Env>();
 
-// ========== Liveness ==========
-// Public (no auth, see middleware/auth.ts skip list): probed by
-// `create-line-harness update` and by the self-update verify phase
-// (capabilities advertises `/api/health`). Deliberately dependency-free —
-// it exists only to prove the Worker booted and is routing requests.
+// Worker の起動と経路だけを確かめるため、公開の liveness は外部依存なしで200を返す。capabilities で示した /api/health を CLI の配備後確認に使う。
 
 health.get('/health', (c) => {
   c.header('Cache-Control', 'no-store');
@@ -127,7 +123,7 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary
     const db = c.env.DB;
 
     /*
-     * M020：存在しない移行元で 201 の幽霊行を作っていた。
+     * 存在しない移行元で 201 の幽霊行を作っていた。
      * 移行前に可視範囲で有無を見て、無いときは 404 にして作らない。
      * 範囲外も 404 に倒す（詳細口と同じ fail-closed）。
      */
@@ -142,7 +138,7 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary
       return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
 
-    // Never include another account's friends in this migration's count.
+    // この移行件数に、別アカウントの友だちを含めない。
     const countResult = await db
       .prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?`)
       .bind(fromAccountId)

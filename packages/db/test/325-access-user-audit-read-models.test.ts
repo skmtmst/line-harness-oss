@@ -139,9 +139,9 @@ describe('common audit read model', () => {
   });
 
   /*
-   * STAFF-02: 集計は一覧と同じ from/to の期間で数える。
-   * 以前は常に直近30日で数えていたため、画面で90日・全期間を選んでも
-   * 集計だけが30日のままだった。
+   * 集計は一覧と同じ from/to の期間で数える。
+   * 常に直近30日で数えると、画面で90日・全期間を選んでも
+   * 集計だけが30日のままになる。
    */
   it('aggregates the summary over the requested period, not a fixed 30 days', async () => {
     addStaff({ id: 'owner-a', role: 'owner', accountId: 'account-a' });

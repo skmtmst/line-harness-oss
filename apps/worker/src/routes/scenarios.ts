@@ -27,7 +27,7 @@ scenarios.patch('/api/scenarios/reorder', requireDeliveryAccess('scenarios'), in
 // GET /api/scenarios - list all
 scenarios.get('/api/scenarios', scenarioPermission('view'), get__api_scenarios_4);
 
-// GET /api/scenarios/:id - get with steps
+
 scenarios.use('/api/scenarios/:id', requireVisibleScenario);
 
 scenarios.use('/api/scenarios/:id/*', requireVisibleScenario);
@@ -37,21 +37,17 @@ scenarios.get('/api/scenarios/:id', scenarioPermission('view'), get__api_scenari
 // POST /api/scenarios - create
 scenarios.post('/api/scenarios', requireDeliveryAccess('scenarios'), inputJsonBoundary({"name":["string"],"description":["null","string"],"triggerType":["string"],"triggerTagId":["null","string"],"isActive":["boolean"],"lineAccountId":["null","string"],"deliveryMode":["string"],"allowConcurrent":["boolean"],"folderId":["null","string"]}), post__api_scenarios_6);
 
-// PUT /api/scenarios/:id - update (accepts camelCase fields from clients)
+// 入力はクライアントの camelCase を受け付ける。
 scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, inputJsonBoundary({"name":["string"],"description":["null","string"],"triggerType":["string"],"triggerTagId":["null","string"],"isActive":["boolean"],"reason":["string"],"deliveryMode":["string"],"allowConcurrent":["boolean"],"folderId":["null","string"],"onCompleteMode":["string"],"onCompleteScenarioId":["null","string"]}), put__api_scenarios_id_7);
 
 // GET /api/scenarios/:id/move-referrers - 終了後の移動先にしているシナリオの一覧
 //
-// R250: 消す前に「どのシナリオの終了後の処理が変わるか」を確認窓で見せる
+// 消す前に「どのシナリオの終了後の処理が変わるか」を確認窓で見せる
 // ための読み取り。消したあとは参照元の終了後の処理が「一時停止」へ戻る
 // （deleteScenario が原子で直す）ので、この一覧は消す前の案内専用。
 scenarios.get('/api/scenarios/:id/move-referrers', scenarioPermission('view'), get__api_scenarios_id_move_referrers_8);
 
-// DELETE /api/scenarios/:id - delete
-//
-// R250: 終了後の移動先にされていた場合、参照元の終了後の処理は
-// 「一時停止」へ戻る（deleteScenario が同じ batch で直す）。
-// 「移動先のない移動」は残らない。
+// 移動先のない遷移を残さないよう、参照されていたシナリオの終了後処理は削除と同じ batch で一時停止へ戻す。
 scenarios.delete('/api/scenarios/:id', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, delete__api_scenarios_id_9);
 
 // POST /api/scenarios/:id/steps - add step
@@ -60,7 +56,7 @@ scenarios.post('/api/scenarios/:id/steps', requireDeliveryAccess('scenarios'), r
 // PUT /api/scenarios/:id/steps/:stepId - update step (accepts camelCase)
 scenarios.put('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({"stepOrder":["number"],"delayMinutes":["number"],"offsetDays":["number"],"offsetMinutes":["number"],"deliveryTime":["string"],"messageType":["string"],"messageContent":["string"],"conditionType":["null","string"],"conditionValue":["null","string"],"nextStepOnFalse":["null","number"],"templateId":["null","string"],"onReachTagId":["null","string"],"afterSend":["string"],"isDraft":["boolean"]}), put__api_scenarios_id_steps_stepId_1);
 
-// DELETE /api/scenarios/:id/steps/:stepId - delete step
+
 scenarios.delete('/api/scenarios/:id/steps/:stepId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, delete__api_scenarios_id_steps_stepId_2);
 
 // POST /api/scenarios/:id/steps/reorder - bulk update step_order
@@ -79,7 +75,7 @@ scenarios.get('/api/scenarios/:id/runs', scenarioPermission('view'), get__api_sc
 
 /*
  * GET /api/scenarios/:id/friends/:friendId/plan — 選んだ友だちへの配信予定を
- * 副作用なしで試算する（IDEA-05 / B段階導入）。
+ * 副作用なしで試算する。
  *
  * 「シナリオ確認」の中から検証用の友だちを選んで、配信予定・待機・分岐理由を
  * 見る口。送信・購読登録・タグ更新は一切行わない（応答の sideEffects:false）。
@@ -96,7 +92,7 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireDeliveryAccess('sce
 // POST /api/scenarios/:id/publish — いまの下書きを公開版として固定する。
 //
 // 下書きの編集は公開するまで配信へ混入しない。購読は開始時の版へ固定され、
-// 開始後の編集は次に公開した版の購読から使う（N-050 / #644）。
+// 開始後の編集は次に公開した版の購読から使う。
 // アカウント境界は /api/scenarios/:id 系の共通ミドルウェアで 404 にする。
 scenarios.post('/api/scenarios/:id/publish', requireDeliveryAccess('scenarios', 'publish'), requireScenarioEditBoundary, inputJsonBoundary(), post__api_scenarios_id_publish_1);
 
@@ -109,7 +105,7 @@ scenarios.post('/api/scenarios/:id/actions', requireDeliveryAccess('scenarios'),
 // PUT /api/scenarios/:id/actions/:actionId — 中身と並び順を変える
 scenarios.put('/api/scenarios/:id/actions/:actionId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, inputJsonBoundary({"hook":["string"],"stepId":["null","string"],"choiceIndex":["null","number"],"actionType":["string"],"repeatOnRefire":["boolean"],"sortOrder":["number"]}), put__api_scenarios_id_actions_actionId_4);
 
-// DELETE /api/scenarios/:id/actions/:actionId
+
 scenarios.delete('/api/scenarios/:id/actions/:actionId', requireDeliveryAccess('scenarios'), requireScenarioEditBoundary, delete__api_scenarios_id_actions_actionId_5);
 
 scenarios.post('/api/scenarios/:id/test-send', requireDeliveryAccess('scenarios', 'test'), requireScenarioEditBoundary, inputJsonBoundary(), post__api_scenarios_id_test_send_6,

@@ -240,7 +240,7 @@ async function collectChecks(
         { warningRatio: 0.8, dangerRatio: 0.95 });
     }),
     isolate('external_integrations', observedAt, async () => {
-      // Webhook・Google Sheets（#838 第2段）・デリバリー連携（出前館QA#3）を
+      // Webhook・Google Sheets（ 第2段）・デリバリー連携（出前館QA#3）を
       // 1つの確認へ畳んで数える。板の9行は増やさない。
       const totals = await externalIntegrationsSummary(db, account.id, observedAt);
       const status: OperationHealthStatus =
@@ -494,7 +494,7 @@ export async function runOperationHealthChecks(
       return { duplicate: true, run: started.run };
     }
     /*
-     * R571: failed の枠は塞がず、同じ5分枠の押し直しで確認からやり直す。
+     * failed の枠は塞がず、同じ5分枠の押し直しで確認からやり直す。
      * 結果保存の失敗で failed になった行を重複として返すだけだと、
      * 運用者が押しても新しい確認結果が得られない。running に戻せたときだけ
      * 下の通常経路へ進み、戻せなかったとき（並列で誰かが先に開け直した等）は

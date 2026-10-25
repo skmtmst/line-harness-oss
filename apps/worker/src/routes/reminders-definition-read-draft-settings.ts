@@ -16,7 +16,7 @@ export function readDraftSettings(
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
   if (!name) return { ok: false, error: 'リマインダ名を入力してください' };
-  // N-078: 画面の maxLength と同じ上限をサーバーでも守る。画面だけだと
+  // 画面の maxLength と同じ上限をサーバーでも守る。画面だけだと
   // API を直接叩かれたときに上限を越えた名前が入る。
   if (name.length > REMINDER_NAME_MAX_LENGTH) {
     return { ok: false, error: REMINDER_NAME_TOO_LONG_MESSAGE, status: 422 };
@@ -208,7 +208,7 @@ export function versionResponse(row: ReminderVersionRow, fallbackLeapYearPolicy?
     lastTestStatus: row.last_test_status,
     lastTestedAt: row.last_tested_at,
     publishedAt: row.published_at,
-    // R148 監査：保存のたびに変わる版時刻。画面は開いたときの値を保存時に
+    //  監査：保存のたびに変わる版時刻。画面は開いたときの値を保存時に
     // 送り返し、ずれていれば別の画面の先勝ちとして 409 で止める。
     updatedAt: row.updated_at,
   };
@@ -253,7 +253,7 @@ export function mutationResponse(
 }
 
 export /**
- * R341: 再開では取消の記録を外して未来の予定を作り直す。
+ * 再開では取消の記録を外して未来の予定を作り直す。
  * 未来の予定時刻に対応する cancelled 行だけ queued へ戻し、行が無い通は
  * 新しく作る。送信ずみ・過去時刻の通には触らない。再開できないときは
  * 成功と返さない (409/500)。

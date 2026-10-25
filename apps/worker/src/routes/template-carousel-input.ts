@@ -1,4 +1,4 @@
-/** 162: カルーセルの選択肢まわりの設定を読む。 */
+/** カルーセルの選択肢まわりの設定を読む。 */
 export function readCarouselOptions(body: Record<string, unknown>):
   | { ok: true; value: Record<string, unknown> }
   | { ok: false; error: string } {

@@ -55,7 +55,7 @@ function mileageSourceLabel(source: string): string {
 }
 
 /**
- * 貯まったマイル (★V8 ：深い緑の箱。オーナー「黒がいや」のため黒ではなく深い緑)。
+ * 貯まったマイル (深い緑の箱)。
  * 使えるマイルを大きく、その下に「これまでに得た」「使った」の2つの箱。
  * 確定待ちは紹介の箱の中へ移した (ReferralCard)。合算の注記はそのまま。
  */
@@ -537,7 +537,7 @@ function OfferCard({
       onEnrolled(link);
     } catch (e) {
       logFailure('affiliate-enroll', e);
-      // 上限で止まった受付だけ、サーバーの文言をそのまま出す(PR823)。
+      // 上限で止まった受付だけ、サーバーの文言をそのまま出す。
       // それ以外の失敗は定型文にする(技術的な文言を出さない)。
       const message = e instanceof Error ? e.message : ''
       setError(message.includes('上限に達したため終了') ? message : SUBMIT_FAILED_MESSAGE);

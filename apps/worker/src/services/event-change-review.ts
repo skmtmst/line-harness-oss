@@ -1,5 +1,5 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
-// U: イベントの状態・変更確認・開催回変更の土台。
+// イベントの状態・変更確認・開催回変更の土台。
 //
 // -29 §10（開催変更・中止）・§11-2（イベント状態）と確定文書 U の決めごと。
 // 状態を変える操作は「誰が・いつ・何を・理由」を event_change_logs に残す。
@@ -247,8 +247,7 @@ export async function previewEventChange(
     .first<{ id: string }>();
   if (!event) return { kind: 'not_found' };
 
-  // Read slots and all impact counts in one statement, scoped to the already
-  // authorized event. JSON IDs keep the existing D1 binding budget unchanged.
+  // 認可済みイベントの枠と影響数を1文で取得し、JSON の ID を使って D1 のバインド予算を増やさない。
   const slots = new Map<string, SlotPreviewRow>();
   if (params.slotChanges.length) {
     const ids = sqlIdSet(params.slotChanges.map(change => change.slot_id));
@@ -616,7 +615,7 @@ export async function applyEventChange(
   try {await db.batch([...writes,log.statement]);}
   catch(error){if(error instanceof Error&&/event_change_conflict|malformed JSON/.test(error.message))return {kind:'conflict'};throw error;}
   for(const moved of movedSlots){
-    // The committed transition is recoverable even if a reminder fence is busy or this process stops.
+    // 通知の実行権が使用中でも、また途中で止まっても、確定した遷移は回復できる形で残す。
     try{affectedReminders+=await rebuildSlotReminders(db,moved.slotId,moved.newStartsAt);}catch{}
   }
   for(const target of notifyTargets){

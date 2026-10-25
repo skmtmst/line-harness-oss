@@ -15,12 +15,12 @@ vi.mock('../services/line-proxy-send.js', () => ({ pushViaHarnessProxy: line.pus
 const { nenMembers } = await import('./nen-members.js');
 
 /*
- * M508（写真審査の保存失敗が競合に化ける）・M509（見守りフラグの同時更新）
+ * （写真審査の保存失敗が競合に化ける）・（見守りフラグの同時更新）
  * を実SQLiteで見る。
  *
- * M508: 保存のbatchが落ちたら、版の不一致でない限り500で返す。
+ * 保存のbatchが落ちたら、版の不一致でない限り500で返す。
  * 「ほかの担当者により更新されました」に化けない。
- * M509: 見守りフラグの更新に版（expectedUpdatedAt）を持たせ、古い画面から
+ * 見守りフラグの更新に版（expectedUpdatedAt）を持たせ、古い画面から
  * の保存は409で止め、最新の状態を data.latest で返す。
  */
 

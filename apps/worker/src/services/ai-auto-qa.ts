@@ -13,7 +13,7 @@ export async function simulateIncomingQa(db:D1Database,input:{account:string;fri
  if(chat)await simulateQa(db,{...input,chatId:chat.id});
 }
 
-/** Conservative local matching: unknown paraphrases go to a person; no generated answer. */
+/** 確実に一致する候補だけをローカルで選び、不明な言い換えは生成回答で補わず人へ渡す。 */
 export async function evaluateQa(db:D1Database,account:string,question:string,kind='text'):Promise<QaDecision>{
  const handoff=(reason:string):QaDecision=>({action:'handed_off',handoffReason:reason,qa:null});
  if(/人と話|人に代|担当者.*(話|代)|オペレーター|human|agent/i.test(question))return {action:'customer_asked_human',handoffReason:'customer_requested',qa:null};
@@ -25,12 +25,12 @@ export async function evaluateQa(db:D1Database,account:string,question:string,ki
  const rows=(await db.prepare("SELECT id,questions_json,answer_messages_json,version FROM qa_entries WHERE account_id=? AND status='published' AND EXISTS(SELECT 1 FROM json_each(questions_json) WHERE trim(value)=?) ORDER BY id LIMIT 2").bind(account,question.trim()).all<{id:string;questions_json:string;answer_messages_json:string;version:number}>()).results;
  if(rows.length!==1)return handoff('low_confidence');
  const q=rows[0],messages:unknown=JSON.parse(q.answer_messages_json);
- // Only validated text snapshots are currently eligible. Other formats need their delivery adapter.
+ // 検証済みのテキストだけを対象にし、ほかの形式は専用の送信実装ができるまで扱わない。
  if(!Array.isArray(messages)||!messages.length||messages.length>5||messages.some(m=>!m||typeof m!=='object'||(m as {type?:unknown}).type!=='text'||typeof (m as {text?:unknown}).text!=='string'||!(m as {text:string}).text.trim()))return handoff('low_confidence');
  return {action:'answered',handoffReason:null,qa:{id:q.id,title:JSON.parse(q.questions_json)[0],version:q.version,messages,confidence:1}};
 }
 
-/** No sender or provider is accepted here. Every persisted row is explicitly a simulation. */
+/** 送信元や外部事業者を受け付けず、すべての保存行を明示的なシミュレーションにする。 */
 export async function simulateQa(db:D1Database,input:{account:string;chatId:string;eventId:string;question:string;kind?:string;keywordMatched?:boolean;now?:Date}){
  const now=input.now??new Date(),at=now.toISOString();
  const chat=await db.prepare('SELECT c.friend_id,f.display_name FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.id=? AND f.line_account_id=?').bind(input.chatId,input.account).first<{friend_id:string;display_name:string}>();
@@ -40,7 +40,7 @@ export async function simulateQa(db:D1Database,input:{account:string;chatId:stri
  if(!settings||!['auto_qa','suspended'].includes(settings.mode))return {sent:false,testMode:true,skipped:'disabled'};
  const fingerprint=async(value:string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),v=>v.toString(16).padStart(2,'0')).join('');
  const id=simulatedQaPrefix+await fingerprint(JSON.stringify([input.account,input.eventId]));
- // Keep only a salted fingerprint, never the unmasked question, for conflict detection.
+ // 質問の生の本文は保存せず、競合検出には salt 付き指紋だけを保持する。
  const signature=await fingerprint(JSON.stringify([input.account,input.eventId,input.chatId,input.question,input.kind??'text']));
  const existing=await db.prepare('SELECT * FROM ai_answer_logs WHERE id=? AND account_id=?').bind(id,input.account).first<Record<string,unknown>>();
  const replay=(r:Record<string,unknown>,replayed:boolean)=>{
@@ -56,7 +56,7 @@ export async function simulateQa(db:D1Database,input:{account:string;chatId:stri
   if(reason)decision={action:'handed_off',handoffReason:reason,qa:null};
  }
  const monthStart=new Date(`${japanCalendar(now).toISOString().slice(0,7)}-01T00:00:00+09:00`).toISOString();
- // The event row, monthly cap and per-person cap share one transaction. No check-then-insert race.
+ // イベント行と月次・本人別の上限を同じトランザクションにし、確認後 INSERT の競合を防ぐ。
  const countSql="SELECT count(*) FROM ai_answer_logs WHERE account_id=? AND action='answered' AND id LIKE 'ai-sim:%' AND julianday(created_at)>=julianday(?)";
  const guard=decision.action==='answered'?` AND (${countSql})<(SELECT monthly_limit_answers FROM ai_settings WHERE account_id=?) AND (SELECT count(*) FROM ai_answer_logs WHERE account_id=? AND friend_id=? AND action='answered' AND id LIKE 'ai-sim:%' AND julianday(created_at)>julianday(?,'-30 minutes'))<3 AND EXISTS(SELECT 1 FROM qa_entries WHERE id=? AND account_id=? AND status='published' AND version=?) AND EXISTS(SELECT 1 FROM ai_settings WHERE account_id=? AND mode='auto_qa' AND confidence_threshold<=1) AND NOT EXISTS(SELECT 1 FROM ai_answer_logs WHERE account_id=? AND friend_id=? AND action='customer_asked_human' AND julianday(created_at)>julianday(?,'-24 hours')) AND NOT EXISTS(SELECT 1 FROM inbox_reply_leases WHERE channel='line' AND conversation_id=? AND julianday(expires_at)>julianday(?))`:'';
  const priorHandoff=await db.prepare("SELECT 1 FROM ai_answer_logs WHERE account_id=? AND chat_id=? AND action!='answered' AND id LIKE 'ai-sim:%' AND julianday(created_at)>julianday(?,'-24 hours') LIMIT 1").bind(input.account,input.chatId,at).first();
@@ -65,7 +65,7 @@ export async function simulateQa(db:D1Database,input:{account:string;chatId:stri
  const extra=decision.action==='answered'?[input.account,monthStart,input.account,input.account,chat.friend_id,at,decision.qa!.id,input.account,decision.qa!.version,input.account,input.account,chat.friend_id,at,input.chatId,at]:[];
  const savedBatch=await db.batch([
   insert(decision.action,decision.handoffReason,decision.qa?.messages??[],guard,extra),
-  // A concurrent event can exhaust the allowance or stop the QA. Record a handoff, never an answer.
+  // 同時イベントで上限や停止が変わった場合、回答を作らず人への引継を記録する。
   insert('handed_off','rate_or_qa_changed',[],'',[]),
   db.prepare(`UPDATE ai_answer_logs SET handoff_reason=CASE
    WHEN NOT EXISTS(SELECT 1 FROM ai_settings WHERE account_id=? AND mode='auto_qa') THEN 'suspended'

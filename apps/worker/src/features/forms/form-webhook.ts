@@ -16,7 +16,7 @@ export async function callFormWebhook(
   try {
     const url = formWebhookTarget(form.on_submit_webhook_url, submissionData);
 
-    // Parse headers
+
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     // 安定 event id。同じ送信の呼び直しは同じ値になるので、受け側は
     // この値で重複を除ける(durable outbox の片割れ)。
@@ -27,7 +27,7 @@ export async function callFormWebhook(
       } catch { /* ignore invalid headers */ }
     }
 
-    // Saved headers must not replace the durable event identity.
+    // 保存済みのヘッダで永続的なイベントの識別を上書きさせない。
     if (eventId) {
       for (const name of Object.keys(headers)) {
         if (name.toLowerCase() === 'x-form-event-id') delete headers[name];
@@ -35,7 +35,7 @@ export async function callFormWebhook(
       headers['X-Form-Event-Id'] = eventId;
     }
 
-    // Determine method: GET if URL has {placeholders} replaced, POST otherwise
+    // 置換済みのプレースホルダ URL は GET、それ以外は POST として扱う。
     const isGet = form.on_submit_webhook_url.includes('{');
     const res = await publicHttpsRequest(url, {
       method: isGet ? 'GET' : 'POST',
@@ -56,9 +56,9 @@ export async function callFormWebhook(
     if (!bytes) return { passed: false, data: { error: 'Webhook response too large' } };
     const data = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
 
-    // Check for eligibility — support both { eligible: bool } and { success: bool, data: { eligible: bool } }
+    // 応答形式の違いで参加資格の判定が変わらないよう、eligible 直下と success/data 内の両形式を受け付ける。
     const eligible = data.eligible ?? (data.data as Record<string, unknown> | undefined)?.eligible ?? data.success;
-    // Only eligibility and the existing join link belong in the public answer.
+    // 公開回答には参加資格と既存の参加 URL だけを含め、内部情報を返さない。
     return { passed: Boolean(eligible), data: publicFormWebhookData(data) };
   } catch {
     // fetch例外には宛先や保存済みの認証情報が入る可能性がある。
@@ -68,7 +68,7 @@ export async function callFormWebhook(
   }
 }
 
-/** Public projection also applies to outcomes persisted before this boundary existed. */
+/** 保存済みの応答にも同じ公開項目の制限を適用する。 */
 export function publicFormWebhookData(value: unknown): Record<string, unknown> | null {
   if (value == null) return null;
   if (typeof value !== 'object') return { eligible: false };

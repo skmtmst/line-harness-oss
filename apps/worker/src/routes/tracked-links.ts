@@ -50,7 +50,7 @@ const requireVisibleTrackedLink: MiddlewareHandler<Env> = async (c, next) => {
 };
 
 function serializeTrackedLink(row: TrackedLink, baseUrl: string) {
-  // Prefer the short code (baseUrl may be a branded short domain).
+  // 独自ドメインを使う場合もあるため、短縮コードを優先する。
   const trackingUrl = `${baseUrl}/t/${row.short_code ?? row.id}`;
   return {
     id: row.id,
@@ -78,16 +78,12 @@ function getBaseUrl(c: { req: { url: string } }): string {
   return `${url.protocol}//${url.host}`;
 }
 
-/** Base for admin-facing trackingUrl: branded short domain or the request origin. */
+/** 管理用 trackingUrl は、独自ドメインがあればそれを、なければ要求元を基底にする。 */
 async function resolveApiLinkBase(c: { env: { DB: D1Database }; req: { url: string } }): Promise<string> {
   return resolveTrackedLinkBaseUrl(c.env.DB, getBaseUrl(c));
 }
 
-/**
- * Resolve the LINE account that owns a tracked link.
- * Priority: tracked_links.line_account_id → scenario_id → scenarios.line_account_id.
- * Returns null for legacy/unowned links (callers fall back to env defaults).
- */
+/** 計測リンクの所属は自身の line_account_id、次にシナリオの所属で解決する。所有者のない保存済みリンクは null とし、呼出元が環境の既定へ戻す。 */
 async function resolveLinkAccount(
   db: D1Database,
   link: TrackedLink,
@@ -125,7 +121,7 @@ trackedLinks.get('/api/tracked-links', async (c) => {
   }
 });
 
-// GET /api/tracked-links/:id — get single with click details
+
 trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) => {
   try {
     const id = c.req.param('id');
@@ -195,7 +191,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), inputJson
   }
 });
 
-// PATCH /api/tracked-links/:id — update mutable fields
+
 trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, inputJsonBoundary({"name":["string"],"tagId":["null","string"],"scenarioId":["null","string"],"introTemplateId":["null","string"],"rewardTemplateId":["null","string"],"lineAccountId":["null","string"],"isActive":["boolean"],"ogTitle":["null","string"],"ogDescription":["null","string"],"ogImageUrl":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
@@ -228,7 +224,7 @@ trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requ
   }
 });
 
-// DELETE /api/tracked-links/:id
+
 trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, async (c) => {
   try {
     const id = c.req.param('id');
@@ -243,7 +239,7 @@ trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), req
   }
 });
 
-// Domains where Universal Links should be used (JS redirect instead of 302)
+// Universal Link を起動するため、これらのドメインは302でなく JavaScript の移動を使う。
 const APP_LINK_DOMAINS = new Set([
   'x.com',
   'twitter.com',
@@ -264,7 +260,7 @@ function isAppLinkDomain(url: string): boolean {
   }
 }
 
-// Android app package names for intent:// deep links
+// Android の intent 起動に使うアプリのパッケージ名。
 const ANDROID_PACKAGES: Record<string, string> = {
   'x.com': 'com.twitter.android',
   'twitter.com': 'com.twitter.android',
@@ -348,14 +344,14 @@ trackedLinks.post('/api/liff/tracked-link-identity', inputJsonBoundary({ linkId:
 });
 
 // GET /t/:linkId — click tracking redirect (no auth, fast redirect)
-// :linkId accepts both the legacy UUID and the 7-char short code.
+// 保存済み UUID と7文字の短縮コードの両方を受け付ける。
 trackedLinks.get('/t/:linkId', async (c) => {
   const linkId = c.req.param('linkId');
   let friendId: string | null = null;
   c.header('Referrer-Policy', 'no-referrer');
   c.header('Cache-Control', 'no-store');
 
-  // Look up the link first
+
   const link = await getTrackedLinkByIdOrShortCode(c.env.DB, linkId);
 
   if (!link || !link.is_active) {
@@ -378,11 +374,7 @@ trackedLinks.get('/t/:linkId', async (c) => {
   const identityToken = c.req.query('identity');
   if (identityToken) friendId = await verifyTrackedLinkIdentity(c.env.DB, link, identityToken);
 
-  // If no user ID yet, check if this is LINE's in-app browser → redirect to LIFF for identification
-  // Skip LIFF redirect for app-link domains (they'll come from Safari via externalBrowser)
-  //
-  // LIFF はリンクを所有するアカウントのものを使う。グローバル env.LIFF_URL 固定だと
-  // 他アカウントの友だちに①の同意画面が出る（未同意チャネルの LIFF に飛ぶため）。
+  // LINE 内では本人を確認するため、リンク所有アカウントの LIFF へ案内する。別アカウントの同意画面を出さないよう既定 LIFF に固定しない。外部ブラウザを使うアプリリンクはこの移動を省く。
   const isLineApp = /\bLine\b/i.test(ua);
   if (!useAppRedirect && !friendId && identityToken === undefined && !c.req.query('lu') && !c.req.query('f') && isLineApp) {
     let liffBase: string | null = null;
@@ -397,7 +389,7 @@ trackedLinks.get('/t/:linkId', async (c) => {
     }
   }
 
-  // Record the click and its fixed work plan before returning the redirect. Cron owns continuation.
+  // 移動の応答前にクリックと不変の実行計画を保存し、継続は cron が担当する。
   const accountId=(await resolveLinkAccountId(c.env.DB,link)) ?? null;
   const points=friendId ? await getUrlReachConversionPoints(c.env.DB,link.original_url,accountId) : [];
   const click=await recordTrackedClick(c.env.DB,{linkId:link.id,friendId,accountId,tagId:link.tag_id,scenarioId:link.scenario_id,
@@ -406,7 +398,7 @@ trackedLinks.get('/t/:linkId', async (c) => {
     logger.error("tracked_links.process_click_failed");
   }));
 
-  // App-link domains: return HTML with JS redirect for Universal Link support
+  // Universal Link を使うドメインには、JavaScript の移動を含む HTML を返す。
   if (useAppRedirect) {
     return c.html(buildAppRedirectHtml(link.original_url));
   }

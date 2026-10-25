@@ -5,7 +5,7 @@ export class NotificationDeliveryIncomplete extends Error {
  constructor(public readonly deliveryStatus:'failed'|'unknown'){super(`notification_delivery_${deliveryStatus}`)}
 }
 
-/** One delivery record per recipient. Uncertain acceptance requires operator review. */
+/** 受信者ごとに配送を記録し、受理が不明なら運用者へ照合を求める。 */
 export async function sendRecordedNotification(db:D1Database,input:{
  sourceId:string;channel:OutboundChannel;recipient:string;payload:string;lineAccountId?:string|null;
  send:(retryKey:string)=>Promise<unknown>;

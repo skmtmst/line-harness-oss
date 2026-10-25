@@ -174,7 +174,7 @@ async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
     return canAccessAllLineAccounts(c.env.DB, getStaff(c), accountIds);
   }
   /*
-   * R391: 結び付き0件の保管状態は、アカウントの壁では測れない。統括全体を
+   * 結び付き0件の保管状態は、アカウントの壁では測れない。統括全体を
    * 見られる担当だけに開き、履歴の残っている本人に限る。担当店だけの
    * スタッフには開示しない。
    */

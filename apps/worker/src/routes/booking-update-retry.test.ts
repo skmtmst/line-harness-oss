@@ -1,7 +1,7 @@
-// PATCH /api/booking/admin/bookings/:id（予約変更 N-389）と
-// POST .../sync/retry（Google 再試行 N-392）、
-// POST .../notifications/:runId/retry（LINE 通知再試行 N-393）、
-// GET .../audit-logs（変更履歴 N-394）の route 試験。
+// PATCH /api/booking/admin/bookings/:id（予約変更）と
+// POST .../sync/retry（Google 再試行）、
+// POST .../notifications/:runId/retry（LINE 通知再試行）、
+// GET .../audit-logs（変更履歴）の route 試験。
 //
 // 実SQLite (bootstrap.sql) で動かし、ガードSQL・監査・台帳の実挙動を見る。
 
@@ -697,7 +697,7 @@ describe('POST /api/booking/admin/bookings/:id/sync/retry (N-392)', () => {
     const { app, env } = makeApp(db);
     const res = await retry(app, env, 'B1');
     expect(res.status).toBe(200);
-    // 消す対象があるのに接続が無い場合は成功にしない (R328)。
+    // 消す対象があるのに接続が無い場合は成功にしない。
     // retry_wait のまま残して、再接続後の再送・cron で削除を再試行できる。
     await expect(res.json()).resolves.toEqual({ status: 'retry_wait' });
     expect(sqlite.prepare(`SELECT status, error_code FROM booking_operation_runs WHERE id = 'op-d'`).get())

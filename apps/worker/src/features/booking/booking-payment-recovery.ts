@@ -104,7 +104,7 @@ export function paidBookingPaymentStatements(
   return statements;
 }
 
-/** Recover finite, runnable work. Manual-review terminal rows must not occupy every batch. */
+/** 人の確認待ちでバッチが埋まらないよう、実行可能な回復処理だけを有限件取得する。 */
 export async function recoverPaidBookingPayments(db: D1Database, now: Date, credentials: GoogleServiceAccountCredentials = {}): Promise<void> {
   const rows = await db.prepare(`SELECT p.id FROM booking_payments p
     JOIN bookings b ON b.id = p.booking_id AND b.line_account_id = p.line_account_id

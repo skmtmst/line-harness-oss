@@ -6,12 +6,12 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { autoReplies } from './auto-replies.js';
 
 /*
- * m26c R556/R570: 作成・複製の再送を1件化する（migration 543）。
+ * m26c /: 作成・複製の再送を1件化する（migration 543）。
  * 実 Hono ルート＋実 SQLite（bootstrap.sql）で確かめる。
  *
  * 期待する姿（いずれも現状は赤）:
- * - R556: 下書き付き作成の再送は同じ下書きへ復帰し、2件にならない。
- * - R570: 直接作成の再送は同じ行を返し、2行にならない。
+ * - : 下書き付き作成の再送は同じ下書きへ復帰し、2件にならない。
+ * - : 直接作成の再送は同じ行を返し、2行にならない。
  * - 同じキーに異なる内容が来たら作らず止める（409）。
  * - 同時実行でも1行に収まる。
  */

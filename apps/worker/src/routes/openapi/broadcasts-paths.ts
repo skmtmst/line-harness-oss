@@ -1,4 +1,4 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const broadcastsPaths = {
   // ── Broadcasts ───────────────────────────────────────────────────────────
   '/api/broadcast-message-assets/counts': {
@@ -42,7 +42,7 @@ export const broadcastsPaths = {
     },
   },
   /*
-   * 送り始めた配信を止める・続きを送る・失敗した相手だけ送り直す（#662）。
+   * 送り始めた配信を止める・続きを送る・失敗した相手だけ送り直す。
    * どれも `expectedVersion`（画面が読み込んだ版）が要る。版が食い違えば
    * 409 で断り、二重の適用を止める。
    */

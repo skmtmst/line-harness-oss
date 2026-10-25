@@ -1,18 +1,11 @@
 import type { MessageTemplate } from '@line-crm/db';
 
-/**
- * LINE Messaging API message shape we send via push.
- * Subset to keep this module decoupled from the SDK.
- */
+/** SDK 全体と結合しないよう、push に必要な LINE メッセージの部分型だけを定義する。 */
 export type IntroMessage =
   | { type: 'text'; text: string }
   | { type: 'flex'; altText: string; contents: unknown };
 
-/**
- * Default Flex sent when no intro template is configured.
- * Mirrors the previous hardcoded Flex in liff.ts so existing campaigns
- * keep working unchanged.
- */
+/** テンプレート未設定でもフォームを開けるよう、既定の Flex を使う。 */
 export function DEFAULT_FORM_LINK_FLEX(formUrl: string): IntroMessage {
   return {
     type: 'flex',
@@ -70,25 +63,14 @@ export function DEFAULT_FORM_LINK_FLEX(formUrl: string): IntroMessage {
   };
 }
 
-/**
- * Build the push message sent to a friend right after they join via a
- * tracked-link campaign. If a template is provided, substitute {formUrl}
- * placeholders with the actual LIFF form URL. Otherwise fall back to the
- * hardcoded default Flex.
- *
- * Substitution is a plain string replace performed BEFORE JSON.parse, so
- * placeholders work in any text/uri/string field of a Flex template
- * without needing tree traversal.
- */
+/** キャンペーンの案内文は {formUrl} を実際の LIFF URL へ置換する。JSON 解析前なので任意の文字列項目で使え、未設定なら既定 Flex に戻す。 */
 export function buildIntroMessage(
   template: MessageTemplate | null,
   formUrl: string,
 ): IntroMessage {
   if (!template) return DEFAULT_FORM_LINK_FLEX(formUrl);
 
-  // Defensive fallback: if the template never references {formUrl}, sending it
-  // would leave the user with no way to open the form. Fall back to the default
-  // Flex (which always carries a working form button) instead of dead-ending.
+  // formUrl を含まないテンプレートで行き止まりにしないよう、開けるボタンがある既定 Flex へ戻す。
   if (!template.message_content.includes('{formUrl}')) {
     return DEFAULT_FORM_LINK_FLEX(formUrl);
   }
@@ -99,10 +81,7 @@ export function buildIntroMessage(
     return { type: 'text', text: replaced };
   }
 
-  // flex — message_templates API only validates that content is JSON, not that
-  // it conforms to LINE's Flex schema. If parsing fails (malformed save), fall
-  // back to the default Flex so the user still sees a working form button
-  // instead of pushMessage failing silently and leaving them with nothing.
+  // 保存済み JSON が壊れていても無言で送信失敗しないよう、フォームを開ける既定 Flex へ戻す。
   try {
     return {
       type: 'flex',

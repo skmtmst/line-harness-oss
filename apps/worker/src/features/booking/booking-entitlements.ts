@@ -75,7 +75,7 @@ export async function operateEntitlement(db:D1Database,account:string,id:string,
     ...(monthly && b.action==='adjust' ? [db.prepare(`INSERT INTO booking_entitlement_month_limits(entitlement_id,period_start,period_end,allowance)
       SELECT ?,?,?,? WHERE changes()=1 ON CONFLICT(entitlement_id,period_start) DO UPDATE SET allowance=excluded.allowance`)
       .bind(id,monthly.periodStart,monthly.periodEnd,b.remaining+monthly.monthUsed)] : []),
-    // changes prevents a losing version update from writing an audit event.
+    // 競合した更新の監査を書かないよう、実際の変更件数を確認する。
     db.prepare(`INSERT INTO booking_entitlement_events SELECT ?,?,? ,?,?,'staff',?,?,?,?,json_object('id',id,'line_account_id',line_account_id,'friend_id',friend_id,'menu_id',menu_id,'kind',kind,'name',name,'remaining',remaining,'monthly_limit',monthly_limit,'valid_from',valid_from,'expires_at',expires_at,'status',status,'version',version,'created_at',created_at,'updated_at',updated_at),updated_at FROM booking_entitlements WHERE id=? AND line_account_id=? AND changes()=1`)
       .bind(crypto.randomUUID(),id,account,b.action,b.reason.trim(),actor,key,request,JSON.stringify(row),id,account),
   ]);

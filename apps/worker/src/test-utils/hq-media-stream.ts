@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-/** Native Worker streaming primitives, emulated only for the Node test runner. */
+/** Worker の stream を Node 試験でだけ再現する。 */
 export function installHqStreamPrimitives() {
   const original = Object.getOwnPropertyDescriptor(crypto, 'DigestStream');
   const fixed = Object.getOwnPropertyDescriptor(globalThis, 'FixedLengthStream');

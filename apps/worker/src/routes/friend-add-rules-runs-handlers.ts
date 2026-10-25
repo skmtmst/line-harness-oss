@@ -44,7 +44,7 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
     const total = await c.env.DB.prepare(
       `SELECT COUNT(*) AS count FROM friend_add_events e WHERE ${clauses.join(' AND ')}`,
     ).bind(...bindings).first<{ count: number }>();
-    // 上部の集計も同じ絞り込みの中だけを数える（R264）。絞り込み中に
+    // 上部の集計も同じ絞り込みの中だけを数える。絞り込み中に
     // アカウント全体の数が出ると、対象範囲が読み手に伝わらない。
     const listClauses = [...clauses];
     const listBindings = [...bindings];
@@ -91,9 +91,9 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
       /*
        * 「直近28日の追加」は人数（同じ人の再追加は1人）と回数（記録数）を
        * 分けて数える。期間の境界はJSTで計算し、オフセットなしで保存した
-       * 古い行とも比較できるよう空白区切りを T に揃えてから比べる（R264）。
+       * 古い行とも比較できるよう空白区切りを T に揃えてから比べる。
        * last_delivery_at は実際に送った記録だけの最新日時で、一覧の先頭行の
-       * 処理時刻（届いていない記録を含む）とは別物（R266）。
+       * 処理時刻（届いていない記録を含む）とは別物。
        */
       c.env.DB.prepare(
         `SELECT COUNT(DISTINCT CASE WHEN e.attribution_status = 'captured' THEN e.friend_id END) AS captured_friends,

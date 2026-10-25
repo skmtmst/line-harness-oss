@@ -1,13 +1,6 @@
 /**
- * QR の升目を PNG / SVG / JPEG の画像へ起こす。
- *
- * 外部の画像生成サービスへは何も送らない。以前は data をそのまま
- * api.qrserver.com へ渡していたので、流入 ref や LIFF URL が第三者へ
- * 渡っていた。ここは Worker の中だけで完結する。
- *
- * 依存を増やさないために、PNG は 1 ビット灰色、JPEG は白黒 1 成分の
- * ベースライン形式を自前で組み立てる。QR は白黒 2 色しかないので、
- * この 2 つで足りる。
+ * 流入 ref と LIFF URL を第三者へ送らないよう、QR 画像を Worker 内だけで生成する。
+ * 依存を増やさず白黒2色を表せるため、PNG は1ビット灰色、JPEG は白黒1成分のベースライン形式で組み立てる。
  */
 
 import { QrInputError, type QrSymbol } from './qr-matrix.js';

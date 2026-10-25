@@ -122,7 +122,7 @@ const DEFAULT_RULES: ActionScoreRule[] = [
     operation: 'set', value: 0, frequency: { kind: 'unlimited', limit: 1 },
     sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: true,
   },
-  // N-239: 友だち追加はLINE webhookから実際に届く出来事。新規作成時の
+  // 友だち追加はLINE webhookから実際に届く出来事。新規作成時の
   // 初期ルールにも入れておく（再フォロー時にも同じだけ加点される）。
   {
     id: 'friend-joined', name: '友だちになった', eventType: 'friend_add', source: 'line_webhook',
@@ -361,7 +361,7 @@ export async function saveActionScoreRuleDraft(
   }
 
   if (owner.current_draft_version_id) {
-    // R131: 同じ版IDのまま中身だけ書き換えると、古い版を持つ人の保存が
+    // 同じ版IDのまま中身だけ書き換えると、古い版を持つ人の保存が
     // 成功して先の変更を消してしまう。保存ごとに新しい版を作り、版IDが
     // 進むことで古い版での保存を競合にできる（migrationなし）。
     const expected = owner.current_draft_version_id;

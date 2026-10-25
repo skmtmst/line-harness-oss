@@ -1,15 +1,4 @@
-/*
- * N-115: ウェビナー動画の指定を R2 prefix 自由入力からメディア選択へ変える。
- *
- * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の webinars
- * ルートを当て、認証も実物（Bearer APIキー → staff_members → 役割・
- * account境界）で通す。R2 へは触れない（参照はキー文字列だけ）。
- *
- * 直す前: PUT/POST は videoPrefix の文字列をそのまま保存し、実在しない
- * prefix や別アカウントの領域も通った。直す後: videoMediaId で
- * メディアを選ぶと同じアカウントの kind='video' だけが受理され、
- * 保存値 video_prefix はそのメディアの r2_key から生成される。
- */
+/** 動画指定は自由な R2 prefix を受け付けず、同じアカウントの kind=video の登録メディアからキーを解決する。実 route・認証・SQLite で検証し、R2 自体へは触れない。 */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';

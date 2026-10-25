@@ -38,35 +38,31 @@ restaurantTest.use('*',use___3);
 
 restaurantTest.use('/api/restaurant-test/*', use__api_restaurant_test__4);
 
-/** HQ store list. Session store scope is deliberately ignored here. */
+/** 統括全体の店舗一覧なので、セッションの店舗絞込を適用しない。 */
 restaurantTest.get('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_assignment_settings_5);
 
 restaurantTest.put('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), put__api_restaurant_test_assignment_settings_6);
 
 restaurantTest.get('/api/restaurant-test/stores', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_stores_7);
 
-/** Read-only context for the fixed store banner. */
+/** 固定の店舗表示は読み取り専用のコンテキストを使う。 */
 restaurantTest.get('/api/restaurant-test/store-context', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_store_context_8);
 
-/** Return the latest agreement for the organization; credential values are unrelated and never selected. */
+/** 組織の最新同意だけを取得し、関係しない資格情報を選択しない。 */
 restaurantTest.get('/api/restaurant-test/terms-agreement', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_terms_agreement_9);
 
-/** Record one idempotent organization/version agreement without IP or other personal data. */
+/** 同じ組織・版の同意を冪等に記録し、IP などの個人情報を残さない。 */
 restaurantTest.post('/api/restaurant-test/terms-agreement', requireRole('owner', 'admin'), inputJsonBoundary(), post__api_restaurant_test_terms_agreement_10);
 
-/** Save a same-organization store in the existing opaque admin session. */
+/** 同じ組織の店舗だけを、既存の不透明な管理セッションへ保存する。 */
 restaurantTest.post('/api/restaurant-test/stores/:id/select', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), post__api_restaurant_test_stores_id_select_11);
 
-/** Clear store scope and return to the organization-wide HQ view. */
+/** 店舗の絞込を解除し、組織全体の統括画面へ戻す。 */
 restaurantTest.post('/api/restaurant-test/stores/selection/clear', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), post__api_restaurant_test_stores_selection_clear_12);
 
 restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_snapshot_13);
 
-/**
- * Complete the four-step store wizard in one server operation. Draft values
- * stay in the browser until this request; a failed connection leaves neither
- * a store nor a LINE account behind.
- */
+/** 店舗作成の4段階をサーバーで一括確定し、接続失敗時に店舗や LINE アカウントだけを残さない。送信前の入力はブラウザに保持する。 */
 restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 'admin'), inputJsonBoundary(), post__api_restaurant_test_stores_connect_14);
 
 /** LINE公式アカウントを必ず1つ割り当てて店舗を作成する。 */
@@ -94,7 +90,7 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
 restaurantTest.post('/api/restaurant-test/reservations/walk-in', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), post__api_restaurant_test_reservations_walk_in_4);
 
 /**
- * R107: 登録後の予約を変更・取消・再配席する。日時・人数・卓の変更は
+ * 登録後の予約を変更・取消・再配席する。日時・人数・卓の変更は
  * 重なり検査と在庫連動を通し、取消は在庫を戻す（物理削除はしない）。
  */
 restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), patch__api_restaurant_test_reservations_id_5);

@@ -1,4 +1,4 @@
-/** Older bookings without a saved menu keep the current name as a fallback. */
+/** メニューの控えがない保存済み予約でも表示できるよう、現在名へ戻す。 */
 export function bookingHistoryItem<T extends { menu_name: string; menu_snapshot_json?: string | null }>(row: T): Omit<T, 'menu_snapshot_json'> {
   const { menu_snapshot_json, ...item } = row;
   if (menu_snapshot_json) {

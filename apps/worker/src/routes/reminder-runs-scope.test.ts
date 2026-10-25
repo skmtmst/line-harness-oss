@@ -86,7 +86,7 @@ describe('リマインダ実行記録のアカウント範囲', () => {
 
     const response = await createApp().request('/api/reminders/reminder-1/runs')
 
-    // R349: 行の送信元アカウントで絞ってから、見える行がなく親も見えなければ 404。
+    // 行の送信元アカウントで絞ってから、見える行がなく親も見えなければ 404。
     // 絞り込み自体が DB 照会のため listRuns は呼ばれる。
     expect(response.status).toBe(404)
     expect(mocks.listRuns).toHaveBeenCalled()

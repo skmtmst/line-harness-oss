@@ -1,12 +1,10 @@
 import type { FeatureJobMetadata } from './feature-job-types.js';
 
-// Retention keeps running when a product feature is disabled. Each service
-// still applies its own store policy, hold and data-protection checks.
+// 機能が無効でも保存期限の処理は続ける。各サービスの店舗方針・保持・データ保護は維持する。
 export const PERSONAL_DATA_RETENTION_JOB = {
   name: 'personal data retention',
   classification: { kind: 'core', reason: '店が承認した保存期限に従う個人情報の削除' },
-  // Product feature switches do not suspend retention, but the store's
-  // explicit approval and hold checks must remain enforced and audited.
+  // 機能スイッチで期限処理は止めないが、店舗の明示承認と保持条件は検査して監査する。
   enforcement: {
     mode: 'gated',
     sources: ['apps/worker/src/services/personal-data-retention.ts'],

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 
-// N-060: タグ一斉配信のプレビュー人数は、実送信 (getFriendsByTag with
+// タグ一斉配信のプレビュー人数は、実送信 (getFriendsByTag with
 // line_account_id) と同じアカウント境界で数える。外部送信なし。
 
 type FriendRow = {

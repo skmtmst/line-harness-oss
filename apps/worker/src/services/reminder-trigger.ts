@@ -33,7 +33,7 @@ export interface ReminderTriggerRow {
   trigger_offset_minutes: number | null;
   send_at_time: string | null;
   target_tag_id: string | null;
-  /** 418: イベント起点を特定イベントへ絞る列。NULL は全イベント対象。 */
+  /** イベント起点を特定イベントへ絞る列。NULL は全イベント対象。 */
   trigger_event_id: string | null;
   current_published_version_id: string | null;
 }
@@ -139,7 +139,7 @@ export async function enrollByTrigger(
     /** 追跡用の発生元区分。未指定なら triggerType (個別相談は 'meet' を渡す)。 */
     sourceKind?: string | null;
     /**
-     * 418: 起こったイベント定義のid (triggerType==='event' のとき)。
+     * 起こったイベント定義のid (triggerType==='event' のとき)。
      * trigger_event_id を持つルールは、このidと一致するときだけ登録する。
      * 未指定ならイベント限定ルールはどれにも登録しない（取り違え防止）。
      */
@@ -176,7 +176,7 @@ export async function enrollByTrigger(
 
   let enrolled = 0;
   for (const rule of rules.results) {
-    // 418: イベント限定ルールは、起こったイベントと一致するときだけ動く。
+    // イベント限定ルールは、起こったイベントと一致するときだけ動く。
     if (rule.trigger_event_id && rule.trigger_event_id !== (input.eventId ?? null)) continue;
     if (rule.target_tag_id) {
       const tagged = await db
@@ -287,7 +287,7 @@ export interface CancelByTriggerInput {
  * 取消を へ連動する。未送信だけを止め、送信済み履歴は残す。
  *
  * 同じ取消通知の再送は active が無いため 0 件で返す。
- * 失敗は呼び出し側へ投げる。黙って握ると取消漏れ (N-065 そのもの) になる。
+ * 失敗は呼び出し側へ投げる。黙って握ると取消漏れ ( そのもの) になる。
  */
 export async function cancelByTrigger(
   db: D1Database,
@@ -328,7 +328,7 @@ export interface RescheduleByTriggerInput {
  *
  * 同じ変更通知の再送は from の起点が既に無いため 0 件で返す。
  *
- * R334: 既存登録の移動条件は、新規登録の条件と分ける。ルールの公開版が
+ * 既存登録の移動条件は、新規登録の条件と分ける。ルールの公開版が
  * 変わったり停止中でも、予約に紐づく既存登録は現在の予約日時へ追随させる。
  * タグ・対象条件の絞り込みは新規登録のためのもので、既にある登録の
  * 移動には使わない。旧起点の計算は、登録が固定する公開版の設定からも
@@ -426,7 +426,7 @@ export async function rescheduleByTrigger(
     if (!fromCurrent || !to || fromCurrent === to) continue;
     addMove(rule.id, fromCurrent, to);
   }
-  // R334: 版ずれの source 行は、登録が固定する公開版の起点で探す。
+  // 版ずれの source 行は、登録が固定する公開版の起点で探す。
   // 現行起点では一致しないため、上の移動だけでは残る。
   for (const row of rows) {
     const rule = ruleById.get(row.reminderId);

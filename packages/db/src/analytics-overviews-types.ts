@@ -32,7 +32,7 @@ export interface ReactionCampaign {
   sentAt: string;
   targetPeople: AnalyticsMetric<number>;
   delivered: AnalyticsMetric<number>;
-  // 監査 R225: シナリオは「届いた人数」が取れず、手元にあるのは
+  // シナリオは「届いた人数」が取れず、手元にあるのは
   // 送信ログの通数だけ。人数と通数を同じ列で出すと読み違えるので、
   // 通数はこの欄に分けて持つ（一斉配信は人数で数えるため null）。
   sentMessages: AnalyticsMetric<number>;
@@ -94,7 +94,7 @@ export interface UsageReferenceHealthRow {
 export type UsageReferenceHealth = Record<string, AnalyticsMetric<number>>;
 
 /**
- * 機能ごとの「使われ方」の正本（N-448）。
+ * 機能ごとの「使われ方」の正本。
  *
  * featureId は共有カタログ(@line-crm/shared の FEATURE_CATALOG)の正本IDで、
  * 画面側はこのIDで機械照合する。IDを推測で作らない。

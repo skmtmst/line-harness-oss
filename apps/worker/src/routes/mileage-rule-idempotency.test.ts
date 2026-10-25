@@ -1,13 +1,4 @@
-/*
- * N-240 (#813): マイレージ決めごと作成の二重作成を防ぐ。
- *
- * 実SQLite（better-sqlite3 + bootstrap.sql）に実物の scoring ルートを
- * 当て、認証も実物（Bearer APIキー→staff→権限・account境界）で通す。
- * 外部送信はしない（作成口は外部を呼ばない）。
- *
- * 対照（キーなし）: 同じ作成を2回送ると201＋201で mileage_rules が2行に
- * なる。これが直す前の振る舞い。キーなし互換として残す。
- */
+/** 作成は実 SQLite・実認証で通し、要求キーによる二重作成を防ぐ。キーなし互換の要求は同じ内容でも別作成になることを対照として確かめる。外部送信はしない。 */
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import Database from 'better-sqlite3';
@@ -132,7 +123,7 @@ beforeEach(async () => {
   sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
   sqlite.pragma('foreign_keys = OFF');
   seed(sqlite);
-  // Explicit Off fixture for resource authorization and idempotency.
+  // 権限と冪等性の試験を MFA で先に止めないよう、明示的に無効の fixture を使う。
   sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
 
   db = asD1(sqlite);

@@ -1,6 +1,6 @@
-// GET /api/booking/admin/bookings.csv（台帳CSV #933 N-397）と
-// GET /api/booking/admin/requests の担当者・種別絞り込み（#933 N-398）、
-// /o の view=history 通過（#933 N-396）の route 試験。
+// GET /api/booking/admin/bookings.csv（台帳CSV）と
+// GET /api/booking/admin/requests の担当者・種別絞り込み、
+// /o の view=history 通過の route 試験。
 //
 // 実SQLite (bootstrap.sql) で動かし、絞り込み・CSV・権限の実挙動を見る。
 

@@ -30,8 +30,7 @@ export async function inboxSavedViewAccess(c: Context<Env>): Promise<InboxSavedV
 }
 
 export async function requireVisibleChat(c: Context<Env>, next: () => Promise<void>) {
-  // Let the route return its stable 400 response without touching D1. No send or
-  // record mutation is possible until a valid idempotency key is present.
+  // 冪等キーが有効になるまで D1 と送信・記録の更新を行わず、安定した400を返す。
   if (c.req.path.endsWith('/send')
     && !isValidIdempotencyKey(c.req.header('Idempotency-Key')?.trim())) {
     await next();

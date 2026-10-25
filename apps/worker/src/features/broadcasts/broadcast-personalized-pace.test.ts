@@ -1,16 +1,6 @@
 /*
- * 1人ずつ送る配信が、**1回のcronで何人進むか**。
- *
- * 差し込み（{{name}} など）のある配信は multicast が使えないので、1人ずつ
- * push する。ここには2つの制約がある。
- *
- *   - Workers の subrequest（1回の実行で出せる問い合わせの数）は 1,000
- *   - 途中で切れても、次のcronが続きから再開できること
- *
- * 以前は10人ごとに `return` していた。安全ではあるが、cron が5分刻みなので
- * **1時間に120人**しか進まない。友だち5,000人なら41時間かかる。
- * その間ずっと「送信中」で、**エラーは出ない**。止まっているのか進んで
- * いるのか、画面からは分からない。
+ * 差し込み配信は multicast が使えず、1人ずつ push する。
+ * Workers の subrequest 上限1,000を守りながら、途中で切れても次の cron が保存済みの位置から再開できることを確かめる。
  */
 import { describe, expect, it } from 'vitest';
 import { createTestD1, insertFriend } from '../../test-utils/d1-sqlite.js';

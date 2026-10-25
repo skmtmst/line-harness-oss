@@ -42,7 +42,7 @@ customerDownloads.get('/api/liff/files/:id/download', async c => {
   }
 });
 
-// Public compatibility gateways disclose no filenames, owners, or file bytes.
+// 公開の互換入口ではファイル名・所有者・内容のバイトを返さない。
 customerDownloads.get('/liff/:kind/:id', async c => {
   const kind = c.req.param('kind');
   const id = c.req.param('id');

@@ -31,9 +31,7 @@ import { buildQuestionMessages, parseQuestion } from '../features/scenarios/scen
 
 export interface ImmediatePushContext {
   defaultAccessToken: string;
-  /** Base URL for {{...}} / {{auth_url:...}} link expansion. Pass the env
-   *  WORKER_URL whenever it is in scope; undefined leaves those variables
-   *  unexpanded (matching expandVariables' own fallback). */
+  /** 変数の URL 展開には利用可能なら WORKER_URL を渡す。未指定では expandVariables と同じく未展開を保つ。 */
   workerUrl?: string;
   accountChannelId?: string | null;
 }
@@ -46,41 +44,15 @@ export interface EnrollmentRef {
 }
 
 export interface ImmediatePushOptions {
-  /**
-   * - 'once' (default): exactly-once with the cron via the claim protocol.
-   *   The enrollment must already exist (caller-supplied or looked up) and
-   *   still be at a step before step 1.
-   * - 'every-click': click-campaign semantics (tracked link / entry route).
-   *   Pushes on EVERY hit — re-clicks included — enrolling the friend itself
-   *   (INSERT OR IGNORE). When the enrollment still owes step 1 it is
-   *   CLAIMED like 'once' (fencing the cron and any concurrent follow-path
-   *   sender); a failed claim means someone else is delivering right now, so
-   *   the click is skipped instead of double-sending. Re-clicks on an
-   *   already-advanced enrollment push without touching the row.
-   */
+  /** once は既存の初回未送信購読を cron と共通の実行権で送る。every-click は再訪も送るが、初回の未送信分は実行権で競合を防ぎ、取得できなければ送らない。進行済みの再訪は購読の通番を変えない。 */
   mode?: 'once' | 'every-click';
-  /** Pre-created enrollment ('once' mode) — skips the lookup query. */
+  /** once で作成済みの購読を渡し、余分な再取得を省く。 */
   enrollment?: EnrollmentRef | null;
-  /**
-   * Push target override. LIFF/OAuth callers know the LINE user id from the
-   * id_token before the friend row is fully wired; without this the push
-   * requires friend.line_user_id.
-   */
+  /** follow 前でも送れるよう、LIFF/OAuth の検証済み ID トークンから分かる宛先で代替できる。 */
   targetLineUserId?: string;
-  /**
-   * Send through the follow event's reply token (free, no push quota)
-   * instead of resolving an access token and pushing. On failure the claim
-   * is released so the cron delivers by push on schedule. messages_log
-   * rows are stamped delivery_type='reply' automatically.
-   */
+  /** follow の無料 replyToken で送る。失敗時は実行権を返して cron の予定へ委ね、履歴の delivery_type は reply として記録する。 */
   reply?: { client: Pick<LineClient, 'replyMessage'>; replyToken: string };
-  /**
-   * Skip the 60s messages_log duplicate probe. The follow-webhook friend_add
-   * path sets this to preserve its historical semantics: a re-follow within
-   * 60s of the previous welcome (possible once the prior enrollment
-   * completed) must still be answered — the fresh INSERT + claim already
-   * fence every same-flow race there.
-   */
+  /** 新しい follow には60秒以内でも返信するため、履歴の間隔確認を省けるようにする。新規登録と実行権で同じフローの競合は防ぐ。 */
   skipCooldown?: boolean;
   /**
    * 送信の結末を呼ぶ側へ伝える。戻り値の false は「送っていない」と
@@ -128,42 +100,7 @@ function classifySendFailure(error: unknown): 'failed' | 'unknown' {
   return 'unknown';
 }
 
-/**
- * Push a scenario's delay-0 first step to a friend RIGHT NOW — no cron wait —
- * then advance the enrollment so the delivery worker never re-sends step 1.
- *
- * Single implementation behind every instant-first-message entry point:
- * tag-triggered enrollment (friend-tag-attach), the click-campaign block in
- * applyRefAttribution (liff.ts), the follow-webhook friend_add /
- * referral-route enrollments, and the OAuth /auth/callback friend_add
- * auto-enroll loop (liff.ts).
- *
- * Exactly-once with the cron: the enrollment is CLAIMED
- * (claimFriendScenarioForDelivery, status active→delivering) before any
- * network call, using the same optimistic lock the cron delivery worker
- * uses — whichever side claims first owns step 1, the other backs off.
- * advance/complete after the push releases the claim (status back to
- * active / completed).
- *
- * Other guards:
- * - paused scenarios (is_active = 0) never send — same gate as the cron and
- *   the friend_add / tag_added trigger loops
- * - non-immediate first steps (delay > 0 / clock-time modes) return before
- *   claiming/enrolling — cron owns those untouched
- * - a 60s messages_log cooldown catches a racing sender the claim can't see
- *   (a different enrollment row, or a send logged before this row existed);
- *   in 'once' mode a cooldown hit advances WITHOUT pushing (and still
- *   attaches the reach tag — the racer delivered the step) so the fresh row
- *   is never re-delivered by the cron, in 'every-click' mode it simply skips
- * - unresolvable push target releases the claim so the cron can retry on
- *   schedule
- * - an unexpected throw after a successful send still advances the
- *   enrollment (best effort) so the cron cannot re-send; a throw before the
- *   send releases the claim instead of stranding the row in 'delivering'
- *   until the stuck-delivery sweep
- *
- * Returns true when a message was actually sent.
- */
+/** 即時初回文は全入口で同じ処理を使い、ネットワーク前に cron と共通の実行権を取る。成功後は購読を進めて二重送信を防ぐ。停止中と即時でない通は送らない。60秒の履歴確認で別経路の競合も抑え、once の間隔内は送らず通番だけ進める。送信前の失敗は実行権を返し、送信後の記録失敗でも可能な限り通番を進める。実際に送った場合だけ true を返す。 */
 export async function pushImmediateFirstStep(
   db: D1Database,
   friendId: string,
@@ -172,20 +109,17 @@ export async function pushImmediateFirstStep(
   options?: ImmediatePushOptions,
 ): Promise<boolean> {
   const mode = options?.mode ?? 'once';
-  // Function-scope so the outer catch can settle a half-finished delivery.
+  // 外側の例外処理でも途中の配送を確定できるよう、関数スコープで保持する。
   let claimedEnrollmentId: string | null = null;
   let sent = false;
   let settleAfterSend: (() => Promise<void>) | null = null;
   try {
     const scenarioRow = await getScenarioById(db, scenarioId);
     if (!scenarioRow) return false;
-    // Paused scenarios never send. The cron's due-for-delivery query and the
-    // friend_add / tag_added trigger loops all gate on is_active; without
-    // this an entry route pointing at a deactivated campaign would still
-    // instant-push its first step.
+    // 停止中のシナリオを経路の即時配信から動かさないよう、cron や友だち・タグ起点と同じ有効状態を確認する。
     if (!scenarioRow.is_active) return false;
 
-    // 緊急停止 (#1050): scenario_dispatch が止まっているアカウントの
+    // 緊急停止 : scenario_dispatch が止まっているアカウントの
     // シナリオは1通目の即時送信もしない。登録行・claim には触れず、
     // cron 側 (processStepDeliveries も同じ停止を見る) が復旧後に届ける。
     const { isOperationCapabilityStopped } = await import('@line-crm/db');
@@ -217,11 +151,7 @@ export async function pushImmediateFirstStep(
       return row?.published_version_id ?? null;
     };
 
-    // Cooldown probe: a racing sender the claim protocol can't see may have
-    // just pushed this exact step (click campaign vs follow webhook, double
-    // LIFF load, …). Identity is the version-owned step id — deleting and
-    // re-creating the draft step must not lose the dedup. The live-step leg
-    // covers sends logged before versions existed.
+    // 異なる購読や LIFF の重複表示の競合も防ぐため、同じ固定版の通 ID で送信履歴の間隔を確認する。版を持たない保存済み履歴は live の通 ID でも照合する。
     const isRecentDuplicate = async (firstStep: PinnedScenarioStep): Promise<boolean> => {
       const cutoff = toJstString(new Date(Date.now() - 60_000));
       const recent = await db
@@ -258,10 +188,7 @@ export async function pushImmediateFirstStep(
           nextStep,
           { enrolledAt: enrolledAtJst, previousDeliveredAt: enrolledAtJst, now: enrolledAtJst },
         );
-        // `next` is already in the shifted-JST frame (its inputs were
-        // Date.now+9h), so serialize by relabeling — NOT toJstString,
-        // which would add the offset a second time and schedule step 2
-        // nine hours late. Matches enrollFriendInScenario / the cron.
+        // next は既に日本時間へずらした計算値なので、toJstString で9時間を重ねず、ラベルだけを変更して保存する。
         await advanceFriendScenario(
           db,
           enrollmentId,
@@ -282,10 +209,7 @@ export async function pushImmediateFirstStep(
       }
     };
 
-    // Immediate only: delay-0 relative steps schedule at-or-before "now".
-    // elapsed/absolute_time modes have offset/clock-time semantics — cron
-    // owns those. Checked BEFORE claiming/enrolling so non-immediate
-    // enrollments are left untouched.
+    // 時刻指定や経過時間の通は cron に任せ、登録・実行権取得より前に即時の相対遅延0だけを選ぶ。
     const enrolledAtJst = japanCalendar();
     const isImmediate = (source: ScenarioDeliverySource, firstStep: PinnedScenarioStep) => {
       const firstScheduledAt = computeNextDeliveryAt(
@@ -296,8 +220,7 @@ export async function pushImmediateFirstStep(
       return firstScheduledAt.getTime() <= enrolledAtJst.getTime();
     };
 
-    // Which row to advance after a successful send (null = pure re-click
-    // re-delivery: the row is already past step 1, leave it alone).
+    // 進行済みの純粋な再訪では、送信後に通番を変更しない。
     let advanceTargetId: string | null = null;
     let pinned: { source: ScenarioDeliverySource; firstStep: PinnedScenarioStep } | null = null;
 
@@ -309,9 +232,7 @@ export async function pushImmediateFirstStep(
       if (enrollmentRow.current_step_order >= pinned.firstStep.step_order) return false;
       if (!isImmediate(pinned.source, pinned.firstStep)) return false;
 
-      // Optimistic lock shared with the cron worker: whoever claims first
-      // delivers step 1; the loser backs off. Closes the double-send window
-      // between the enrollment INSERT and the post-push advance.
+      // 登録後から送信後の通番更新までを cron と同じ実行権で守り、先に取得した側だけが初回文を送る。
       const claimed = await claimFriendScenarioForDelivery(
         db,
         enrollmentRow.id,
@@ -321,50 +242,34 @@ export async function pushImmediateFirstStep(
       claimedEnrollmentId = enrollmentRow.id;
       advanceTargetId = enrollmentRow.id;
 
-      // Advance without pushing on a cooldown hit so the row is neither
-      // stranded at step -1 nor re-delivered by the cron. The racer
-      // delivered step 1, so the reach tag still applies.
+      // 別経路が送った間隔内でも初回待ちを残さないよう、once は送らず通番を進め、到達タグも適用する。
       if (!options?.skipCooldown && (await isRecentDuplicate(pinned.firstStep))) {
         await advancePastFirstStep(enrollmentRow.id, pinned.source, pinned.firstStep);
-        claimedEnrollmentId = null; // the advance released the claim
+        claimedEnrollmentId = null; // 通番の更新で実行権も解放済み。
         await attachReachTag(pinned.firstStep);
         return false;
       }
     } else {
-      // every-click: cooldown FIRST, before enrolling. The LIFF entry points
-      // fire on every page load (refresh, back-nav), not only on a fresh
-      // tracked-link click. Enrolling before the cooldown check would leave
-      // a fresh active step-0 row behind for the cron worker to pick up
-      // (the partial UNIQUE on friend_scenarios is keyed
-      // `WHERE status != 'completed'`, so completed runs don't block a new
-      // INSERT). The probe identity comes from the current published version
-      // (read-only — no side effects yet).
+      // LIFF の再読込だけで新規購読を残さないよう、every-click は登録より先に間隔を確認する。完了済みは部分 UNIQUE に掛からないため、この順序を守る。
       const currentVersion = await getScenarioPublishedVersion(db, scenarioId);
       const pre = currentVersion ? await loadPinnedFirstStep(currentVersion.id) : null;
       if (!pre || !isImmediate(pre.source, pre.firstStep)) return false;
       if (await isRecentDuplicate(pre.firstStep)) return false;
 
-      // INSERT OR IGNORE — null on re-clicks (already enrolled), still push.
+      // 再訪で INSERT OR IGNORE が行を作らなくても、クリック配信は続ける。
       const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
       const row = enrollment ?? (await lookupEnrollment());
-      // Authoritative read: the enrollment's own pinned version (a concurrent
-      // publish may have moved the pointer between the probe and the enroll).
+      // 確認と登録の間に公開版が変わる場合があるため、登録後は購読自身の固定版を正本として読む。
       pinned = row ? await loadPinnedFirstStep(await resolveEnrollmentVersionId(row)) : null;
       if (!pinned) return false;
       if (row && row.current_step_order < pinned.firstStep.step_order) {
-        // This click owes step 1 to the enrollment — join the claim protocol
-        // so the cron (the fresh row's next_delivery_at is already due) and
-        // the follow-webhook path can't send it concurrently. A failed claim
-        // means another sender is mid-delivery (or the row is paused): skip
-        // rather than double-send.
+        // 初回をまだ配信する購読は、cron と follow の二重送信を防ぐため共通の実行権を取る。取得できなければ送らない。
         const claimed = await claimFriendScenarioForDelivery(db, row.id, row.current_step_order);
         if (!claimed) return false;
         claimedEnrollmentId = row.id;
         advanceTargetId = row.id;
       } else {
-        // Pure re-click re-delivery. Re-probe the cooldown: the first probe
-        // ran before the enroll round-trip, and a racing sender may have
-        // logged its send in between.
+        // 最初の確認から登録の往復中に別の送信が起こり得るため、純粋な再訪でも間隔を再確認する。
         if (await isRecentDuplicate(pinned.firstStep)) return false;
       }
     }
@@ -376,22 +281,14 @@ export async function pushImmediateFirstStep(
       claimedEnrollmentId = null;
     };
 
-    // Re-read the friend after caller writes (linkFriendToUser / ref_code
-    // UPDATE / line_account_id wiring) so {{uid}}, {{ref}}, and merged
-    // metadata expand against the latest state.
+    // 結び付け・ref・所属の更新後の値を差し込むため、送信前に友だちを読み直す。
     const friend = await getFriendById(db, friendId);
     if (!friend) {
       await releaseClaim();
       return false;
     }
 
-    // Independent D1 reads — resolve concurrently; this sits in front of the
-    // reply-token send where latency eats into the token validity window.
-    // ctxAccount is the caller-resolved channel (LIFF/OAuth flows), used for
-    // both the push token and the tracked-link owner below.
-    //
-    // 文面・質問は固定版の写しをそのまま使う。配信時に templates 表を
-    // 読み直さない（公開後の template 編集を混入させない）。
+    // replyToken の有効時間を使い過ぎないよう、独立した D1 読取は並行に解決する。送信元とリンク所有者は解決済みアカウントを使い、文面・質問は固定版の写しを使って公開後の編集を混ぜない。
     const resolved = {
       messageType: firstStep.message_type,
       messageContent: firstStep.message_content,
@@ -417,12 +314,7 @@ export async function pushImmediateFirstStep(
       resolved.messageType,
       extra,
     );
-    // Same decoration pipeline as the cron (processStepDeliveries) via the
-    // shared helper. Link owner: the friend's own account, else the
-    // caller-resolved channel — LIFF/OAuth entry points run BEFORE the follow
-    // webhook wires friend.line_account_id, and an owner-less link would send
-    // that account's friends through the global LIFF consent screen.
-    // live 側の通IDは履歴づけの控え。消されたあとは版所有の通IDに倒す。
+    // cron と同じ文面加工を使う。所属未保存の LIFF/OAuth でも別の同意画面へ送らないよう、リンクは友だちの所属または解決済みチャネルを使う。live の通 ID が消えていれば版所有の通 ID へ戻す。
     const liveStepId = (await scenarioStepExists(db, firstStep.live_step_id ?? null))
       ? firstStep.live_step_id!
       : null;
@@ -439,7 +331,7 @@ export async function pushImmediateFirstStep(
         },
         // 押し口は必ず版所有の通ID。live の通IDを載せると、公開後に直した
         // 返信・タグ・遷移が旧版の購読へ混入し、下書きの通を消した瞬間に
-        // ボタンが無反応になる（#644 再審査 1）。
+        // ボタンが無反応になる。
         { kind: 'version', stepId: firstStep.id },
       );
     } else {
@@ -471,7 +363,7 @@ export async function pushImmediateFirstStep(
       } else {
         const pushTarget = options?.targetLineUserId ?? friend.line_user_id;
         if (!pushTarget) {
-          // Can't push from here — hand the claim back so the cron retries.
+          // 送信できなければ実行権を返し、cron で再試行できるようにする。
           await releaseClaim();
           return false;
         }
@@ -513,18 +405,12 @@ export async function pushImmediateFirstStep(
     settleAfterSend = async () => {
       if (advanceTargetId) {
         await advancePastFirstStep(advanceTargetId, source, firstStep);
-        claimedEnrollmentId = null; // the advance released the claim
+        claimedEnrollmentId = null; // 通番の更新で実行権も解放済み。
         await attachReachTag(firstStep);
       }
     };
 
-    // Log what was actually delivered (post buildMessage normalization) so
-    // the cooldown above sees it on subsequent calls and the dashboard chat
-    // view mirrors LINE 1:1. delivery_type mirrors the send channel.
-    //
-    // 二重送信防止の正体は scenario_version_step_id（版所有の通ID）。
-    // scenario_step_id には live が残っているときだけ入れ、消されたあとは
-    // NULL（外部キーを壊さない）。
+    // 履歴と画面を実送信へ一致させるため、buildMessage 後の内容と実際の送信方式を記録する。重複照合は scenario_version_step_id を使い、削除済みの live 通 ID は NULL にして外部キーを壊さない。
     for (const sentMessage of messages) {
       const logPayload = messageToLogPayload(sentMessage);
       await db
@@ -553,12 +439,10 @@ export async function pushImmediateFirstStep(
     logger.error("immediate_first_step.push_first_step_failed");
     try {
       if (sent && settleAfterSend) {
-        // The message went out but logging/advancing threw — advance anyway
-        // (best effort) so the cron cannot re-deliver step 1.
+        // 送信後の記録・通番更新の失敗でも、cron の再送を防ぐため可能な限り購読を進める。
         await settleAfterSend();
       } else if (claimedEnrollmentId) {
-        // Nothing was sent — hand the claim back now instead of leaving the
-        // row in 'delivering' until the stuck-delivery sweep frees it.
+        // 未送信なら実行権をすぐ返し、delivering のまま回復待ちにしない。
         await releaseClaimById(db, claimedEnrollmentId);
       }
     } catch (settleErr) {

@@ -1,6 +1,6 @@
 import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
 /*
- * R403: 受信のタグ付与でマイル・成果の記録だけ失敗しても成功扱いにしない。
+ * 受信のタグ付与でマイル・成果の記録だけ失敗しても成功扱いにしない。
  *
  * 落ち方（直前）: タグは付くが queue/成果が欠けても受領は completed。
  *   同じ受信の再送は重複扱いで何もせず、欠けは戻らない。

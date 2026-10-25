@@ -250,7 +250,7 @@ export async function saveMileageEarningRuleDraft(
 }
 
 /**
- * N-243: 「たまる決めごと」の並び順を全件まとめて保存する。
+ * 「たまる決めごと」の並び順を全件まとめて保存する。
  *
  * 並び順は下書きJSONの sortOrder に入っている。1件ずつ下書きPATCHを
  * 並列に投げると途中失敗で一部だけ反映され得るため、アカウントの
@@ -340,7 +340,7 @@ export async function getMileageEarningRulesV6(
         draft: JSON.parse(String(row.draft_json)) as MileageEarningRuleDraft,
         draftVersion: Number(row.version),
         draftUpdatedAt: row.draft_updated_at,
-        // N-231 案1: いま公開中の版。null は未公開。
+        // いま公開中の版。null は未公開。
         publishedVersion: row.published_version_number === null || row.published_version_number === undefined
           ? null
           : Number(row.published_version_number),
@@ -375,12 +375,12 @@ export async function getMileageFriendsV6(
   /*
    * 残高・失効・今月の増減は名寄せした本人（beneficiary_key）単位で集計する。
    * 明細APIの財布スコープ（FRIEND_WALLET_SCOPE_SQL）と同じ意味に揃え、
-   * 同じ本人に複数プロフィールがあっても合計を二度足さない（R385・R386）。
-   * 理由・実行者など記録ごとの中身はここには出さず、明細側が権限で伏せる
-   * （R387）。一覧の数字は共通残高として一貫させる。
+   * 同じ本人に複数プロフィールがあっても合計を二度足さない。
+   * 理由・実行者など記録ごとの中身はここには出さず、明細側が権限で伏せる。
+   * 一覧の数字は共通残高として一貫させる。
    */
   /*
-   * R384: SQLite の datetime('now','start of month') は UTC の月初を返し、
+   * SQLite の datetime('now','start of month') は UTC の月初を返し、
    * 日本時間の月初 0〜9 時に前月の記録を今月へ混ぜていた。JST の月初を
    * こちらで計算し、JST 表記の occurred_at と同じ形の文字列で渡す。
    */
@@ -453,8 +453,8 @@ export async function getMileageFriendsV6(
   ).bind(...binds, JSON.stringify(input.visibleAccountIds), JSON.stringify(input.visibleAccountIds), input.search, input.search, input.friendId ?? '', input.friendId ?? '', input.limit, input.offset).all<Record<string, unknown>>();
   /*
    * 合計は beneficiary_key（本人）単位で足す。同じ本人へ複数プロフィールが
-   * 結ばれていても、ledger/expiring はキーごとに1行なので二重計上しない
-   * （R386）。友だちの人数だけは行（プロフィール）数で数える。
+   * 結ばれていても、ledger/expiring はキーごとに1行なので二重計上しない。
+   * 友だちの人数だけは行（プロフィール）数で数える。
    */
   const summary = await db.prepare(
     `${ctes}
@@ -491,7 +491,7 @@ export async function getMileageFriendsV6(
       pending: Number(summary?.pending ?? 0),
       monthChange: Number(summary?.month_change ?? 0),
       rankCounts,
-      // R383: 有効な期限つきロットが1つでもあれば null ではなく数値を返す。
+      // 有効な期限つきロットが1つでもあれば null ではなく数値を返す。
       // 30日内は0でも先に失効があるなら 0 と次の失効日で伝え、「なし（null）」と区別する。
       expiringMiles30d: Number(summary?.expiring_lot_count ?? 0) > 0
         ? Number(summary?.expiring_amount ?? 0) : null,
@@ -514,7 +514,7 @@ export async function getMileageFriendsV6(
       monthChange: Number(row.month_change ?? 0),
       available: Number(row.available ?? 0),
       pending: Number(row.pending ?? 0),
-      // R383: summary と同じく「期限つきロットが存在するか」で null/0 を分け、
+      // summary と同じく「期限つきロットが存在するか」で null/0 を分け、
       // 30日より先にしか失効がない人も「0 + 直近の失効日」で表せるようにする。
       expiringMiles30d: Number(row.lot_count ?? 0) > 0 ? Number(row.expiring_amount ?? 0) : null,
       nextExpiringAt: row.next_expires_at == null ? null : String(row.next_expires_at),
@@ -674,7 +674,7 @@ export async function markMileageAdjustmentNotification(
 ) {
   const now = new Date().toISOString();
   /*
-   * R379: 同じ通知へ並行して届いた遅い失敗で、確定済みの sent・受理IDを
+   * 同じ通知へ並行して届いた遅い失敗で、確定済みの sent・受理IDを
    * 戻さない。一度 sent になった行は failed へ更新しない（受理IDと送信日時を保持）。
    * failed → sent の回復は引き続き許す。
    */
@@ -698,7 +698,7 @@ export async function markMileageAdjustmentNotification(
 }
 
 /**
- * R380/R381: 通知の再送に必要な保存済みの中身（本文・送信キー・宛先）を返す。
+ * 通知の再送に必要な保存済みの中身（本文・送信キー・宛先）を返す。
  * 一覧表示用の mapNotification とは別に、生の記録を返す。
  */
 export async function getMileageAdjustmentNotificationRecord(
@@ -784,7 +784,7 @@ export interface MileageEarningRulePublishResult {
 }
 
 /**
- * N-231 公開(案1)。下書きを不変の公開版として固定し、実行項目へ写す。
+ * 公開。下書きを不変の公開版として固定し、実行項目へ写す。
  *
  * 1回の batch で次をまとめて行う。増えるのは公開版の行だけで、
  * 既存の台帳・残高には触らない。
@@ -853,7 +853,7 @@ export async function publishMileageEarningRule(
       validFrom: draft.validFrom,
       validUntil: draft.validUntil,
       /*
-       * R52: 下書きの対象条件を公開版へ載せる。載せないと公開版だけ
+       * 下書きの対象条件を公開版へ載せる。載せないと公開版だけ
        * 条件が消え、対象外へ付与される。保存時に型を絞ってあるので
        * 絞り込み部品の形と一致する。
        */

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { app } from '../index.js';
 
 /*
- * R393: 統合ユーザー一覧APIが友だち詳細のルートに先取りされ404になる。
+ * 統合ユーザー一覧APIが友だち詳細のルートに先取りされ404になる。
  *
  * GET /api/friends/people は mergedPeople（duplicates 経由）の固定パスだが、
  * friends の GET /api/friends/:id より後に載ると people を友だちIDと読んで

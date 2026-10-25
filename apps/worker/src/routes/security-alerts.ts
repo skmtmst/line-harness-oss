@@ -76,7 +76,7 @@ securityAlerts.post('/api/ops/security-alerts/:id/acknowledge', requirePlatformA
 securityAlerts.post('/api/ops/security-alerts/:id/resolve', requirePlatformAdminWrite(), c => review(c, true, 'resolved'));
 
 
-// Staging has no cron. This runs only monitoring, never the delivery scheduler.
+// 検証環境には cron がないため監視だけを実行し、配信の定期処理は呼ばない。
 securityAlerts.post('/api/ops/security-alerts/run-once', requirePlatformAdminWrite(), async c => {
   if (c.env.DEPLOY_ENV !== 'staging') return c.notFound();
   if (c.get('impersonation')) return c.json({ success: false, error: '代理ログイン中は実行できません' }, 403);

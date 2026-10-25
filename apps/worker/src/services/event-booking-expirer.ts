@@ -1,7 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-// Cron handler: expire 24h-old `requested` event bookings + purge
-// idempotency rows. Mirrors booking-expirer.ts but without a friend
-// notification — spec §7.1 lists no expired-kind notification for events.
+// 24時間経過した申込と冪等行を失効させる。要件にイベントの期限切れ通知がないため、サロンと異なり通知はしない。
 
 import { purgeExpiredEventIdempotency } from './event-booking-idempotency.js';
 import { featureJobCanRun } from './feature-enforcement.js';
@@ -50,7 +48,7 @@ export async function runEventBookingExpirer(
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'events', job: 'event booking expirer' })) {
       continue;
     }
-    // Conditional UPDATE to avoid racing with concurrent admin decide.
+    // 同時の担当者判断を上書きしないよう、元の状態を更新条件へ含める。
     const upd = await db
       .prepare(
         `UPDATE event_bookings
@@ -68,7 +66,7 @@ export async function runEventBookingExpirer(
       )
       .bind(row.id)
       .run();
-    // N-065: 期限切れも取消と同じく の未送信予定だけを止める。送信済み履歴は残す。
+    // 期限切れも取消と同じく の未送信予定だけを止める。送信済み履歴は残す。
     // 1件の失敗で残りを止めないよう行単位で握る。失敗行は末尾の修復走査で拾い直す。
     try {
       await cancelByTrigger(db, {

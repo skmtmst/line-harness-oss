@@ -79,7 +79,7 @@ test('実入口でも他店owner・閲覧のみ・期限切れセッション・
     const headers = { Cookie: `lh_admin_session=${token}; lh_csrf=qa-csrf`, 'Content-Type': 'application/json' };
     expect((await app.request(`${url}/runs`, { method: 'POST', headers, body: '{}' }, env)).status).toBe(403);
     expect((await app.request(`${url}/runs`, { method: 'POST', headers: { ...headers, 'X-CSRF-Token': 'wrong' }, body: '{}' }, env)).status).toBe(403);
-    // Matching CSRF reaches the normal payload validation; it does not create a run.
+    // CSRF 一致後は通常の入力検証へ進むが、実行は作成しない。
     expect((await app.request(`${url}/runs`, { method: 'POST', headers: { ...headers, 'X-CSRF-Token': 'qa-csrf' }, body: '{}' }, env)).status).toBe(400);
     expect((await app.request(`${url}/safety`, { headers }, env)).status).toBe(200);
     fixture.raw.prepare('UPDATE admin_sessions SET expires_at=? WHERE token_hash=?').run('2020-01-01T00:00:00Z', await sha256Hex(token));

@@ -16,7 +16,7 @@ export type WorkerBindings = {
     ASSETS: Fetcher;
     AI?: Ai;
     /**
-     * バナー生成の用途寸法への整形（Cloudflare Images・R120）。
+     * バナー生成の用途寸法への整形（Cloudflare Images）。
      * R2 の `IMAGES` とは別物なので `CF_IMAGES` という名前にしている。
      * 未設定の環境（手元・試験）では変換を飛ばして元の画像を保存する。
      */
@@ -30,12 +30,12 @@ export type WorkerBindings = {
     RESTAURANT_TEST_ENABLED?: string;
     GOOGLE_BUSINESS_ENABLED?: string;
     DEPLOY_ENV?: string;
-    /** Q-75: staging only, with a mandatory outbound stop and resource identity checks. */
+    /** 検証環境専用とし、外部送信の停止と対象の識別を必須にする。 */
     STAGING_QA_ENABLED?: string;
     STAGING_QA_OUTBOUND_DISABLED?: string;
-    /** Positive integer overrides by fixed security rule key (JSON). Invalid values use safe defaults. */
+    /** 固定の安全ルールごとに正整数で上書きし、不正値は安全な既定へ戻す。 */
     SECURITY_MONITOR_THRESHOLDS?: string;
-    /** Dedicated AES-GCM key held as a Worker secret, never a normal var. */
+    /** AES-GCM の専用鍵は通常変数でなく Worker の秘密設定に置く。 */
     GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY?: string;
     /**
      * デリバリー受注（Uber Eats・出前館・ロケットナウ）の接続設定。
@@ -93,7 +93,7 @@ export type WorkerBindings = {
     BOOKING_STRIPE_CONNECT_REDIRECT_URI?: string;
     /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
     OPENAI_API_KEY?: string;
-    /** operations-only deployment flag; production is always closed. */
+    /** 運用専用の配備フラグとし、本番は常に閉じる。 */
     G2_OPENAI_ENABLED?: string;
     /** 画像生成モデル名。未設定時は gpt-image-1。 */
     OPENAI_IMAGE_MODEL?: string;
@@ -117,8 +117,7 @@ export type WorkerBindings = {
     TOTP_ENCRYPTION_KEY?: string;
     /** 署名済みの配備イベント受信用。管理画面へは公開しない。 */
     OPERATIONS_DEPLOYMENT_SIGNING_SECRET?: string;
-    // AES-GCM key for credentials stored in line_accounts. Optional so a
-    // missing secret does not stop unrelated Worker routes from starting.
+    // アカウント資格情報の AES-GCM 鍵。未設定で無関係な route の起動まで止めないよう、型では任意にする。
     LINE_CREDENTIAL_ENCRYPTION_KEY?: string;
     /** 飲食店向けGoogleビジネス：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
     GOOGLE_BUSINESS_OAUTH_CLIENT_ID?: string;
@@ -129,7 +128,7 @@ export type WorkerBindings = {
     GOOGLE_BUSINESS_AI_MODEL?: string;
     /** 口コミ返信の下書きに使う OpenAI のモデル。未設定なら既定値。OPENAI_API_KEY が無い環境では Workers AI を使う。 */
     GOOGLE_BUSINESS_TEXT_MODEL?: string;
-    /** Google Sheets連携(#838)：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
+    /** Google Sheets連携：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
     GOOGLE_SHEETS_OAUTH_CLIENT_ID?: string;
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
@@ -140,32 +139,26 @@ export type WorkerBindings = {
     NEN_EC_MEMBER_RANK_SYNC_ENABLED?: string;
     NEN_RICH_MENU_STORE_URL?: string;
     WORKER_URL: string;
-    // Admin auth topology (see middleware/admin-auth-config.ts):
-    ADMIN_ORIGIN?: string;          // Comma-separated admin web origin allowlist for credentialed CORS
-    ADMIN_COOKIE_SAMESITE?: string; // Optional override: 'Strict' | 'Lax' | 'None'
+    // 管理認証のサイト構成は middleware/admin-auth-config.ts に従う。
+    ADMIN_ORIGIN?: string;          // 資格情報付き CORS を許可する管理画面の origin をカンマ区切りで指定する。
+    ADMIN_COOKIE_SAMESITE?: string; // 必要なら Strict/Lax/None を明示的に上書きできる。
     ADMIN_ALLOW_CROSS_SITE?: string; // 'true' opts into SameSite=None cross-site cookies
-    X_HARNESS_URL?: string;  // Optional: X Harness API URL for account linking
+    X_HARNESS_URL?: string;  // 本人連携に使う X Harness API の URL。
     META_APP_ID?: string;
     META_APP_SECRET?: string;
-    // Instagram API with Instagram Login (no Facebook Page). Separate credentials
-    // from META_APP_*: App Dashboard > Instagram > API setup with Instagram login.
+    // Instagram Login の認証は Facebook ページを使う META_APP 設定とは分離する。
     INSTAGRAM_APP_ID?: string;
     INSTAGRAM_APP_SECRET?: string;
     META_REDIRECT_URI?: string;
     META_GRAPH_API_VERSION?: string;
     META_TOKEN_ENCRYPTION_KEY?: string;
     META_WEBHOOK_VERIFY_TOKEN?: string;
-    IG_HARNESS_URL?: string;  // Optional: IG Harness API URL for cross-platform linking
-    IG_HARNESS_LINK_SECRET?: string;  // Shared secret for IG Harness link-line webhook
-    // Phase 5 self-update — consumed by /admin/update/*. Defaults live in
-    // wrangler.toml [vars]; secrets (CF_API_TOKEN, ADMIN_API_KEY) come from
-    // `wrangler secret put`. All are optional at the type level so the rest
-    // of the worker still type-checks in test environments that don't set
-    // them; the /admin/update/* route guards on their presence at runtime.
+    IG_HARNESS_URL?: string;  // IG と LINE の連携に使う IG Harness API の URL。
+    IG_HARNESS_LINK_SECRET?: string;  // IG Harness の link-line 通知と共有する秘密値。更新用の資格情報は通常変数でなく Worker の秘密設定へ置き、HTTP 自己更新を再開する根拠にはしない。
     ADMIN_API_KEY?: string;
     CF_API_TOKEN?: string;
     CF_ACCOUNT_ID?: string;
-    /** R2 S3 API credentials are Worker secrets. Bucket name is a non-secret deployment var. */
+    /** R2 S3 の資格情報は Worker の秘密設定、バケット名は通常の配備変数に分ける。 */
     MEDIA_R2_ACCESS_KEY_ID?: string;
     MEDIA_R2_SECRET_ACCESS_KEY?: string;
     MEDIA_R2_BUCKET_NAME?: string;
@@ -175,22 +168,16 @@ export type WorkerBindings = {
     D1_DATABASE_ID?: string;
     MANIFEST_URL?: string;
     WORKER_PUBLIC_URL?: string;
-    /**
-     * Comma-separated extra origins that reach this same Worker (for example
-     * its workers.dev address). A LINE webhook registered on one of them is
-     * treated as pointing at this environment.
-     */
+    /** 同じ Worker へ到達する別名 origin をカンマ区切りで指定する。その別名に登録された LINE Webhook も、この環境宛てとして扱う。 */
     WORKER_ALIAS_URLS?: string;
     ADMIN_PUBLIC_URL?: string;
     LIFF_PUBLIC_URL?: string;
-    // Google Calendar booking sync. Store the private key as a Worker secret.
-    // Calendar owners only enter/share their Google Calendar ID in admin UI.
+    // Google カレンダー同期の秘密鍵は Worker の秘密設定へ置き、利用者はカレンダーの共有と ID 指定だけを行う。
     GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
     GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
-    // Read-only Google Search Console performance dashboard.
+    // Google Search Console の分析は読み取り専用にする。
     SEARCH_CONSOLE_SITE_URL?: string;
-    // Codex lifecycle events -> Slack relay. Tokens/secrets are Worker secrets;
-    // channel ids and range mapping are non-secret deployment variables.
+    // Codex の実行を Slack へ中継する。トークン・秘密値は Worker の秘密設定、チャネル ID と範囲対応は通常の配備変数に分ける。
     CODEX_SLACK_RELAY_SECRET?: string;
     CODEX_SLACK_RELAY_SECRET_KENTA?: string;
     CODEX_SLACK_RELAY_SECRET_MASATO?: string;
@@ -209,9 +196,7 @@ export type WorkerBindings = {
     SLACK_AI_LOOP_CHANNEL_ID?: string;
     SLACK_SIGNING_SECRET?: string;
     SLACK_USER_TOKEN?: string;
-    // Slack mention -> official Codex receipt -> user-authored Slack relay.
-    // User ids and grace time are non-secret vars. Tokens and signing secret
-    // must be stored with `wrangler secret put`.
+    // Slack の依頼と公式 Codex 受領を結び、利用者本文を中継する。利用者 ID・猶予時間は通常変数、トークンと署名鍵は秘密設定に保存する。
     CODEX_SLACK_USER_ID?: string;
     CODEX_SLACK_MONITOR_SIGNING_SECRET?: string;
     CODEX_ALLOWED_TEAM_IDS?: string;

@@ -1,10 +1,4 @@
-/*
- * #643 再差戻し(4回目)の実行試験。
- *
- * 1. manifest の booking calendar delete retry が機能オフ中に claim も
- *    Google Calendar 削除もせず、skipped 監査だけ残すこと。
- * 2. 再オンでそのまま拾い直せること(状態が壊れていないこと)。
- */
+/** 機能オフ中はカレンダー削除の実行権も外部送信も行わず、省略の監査だけを残す。再有効化後はそのまま回復できることを確かめる。 */
 import { describe, expect, it, vi } from 'vitest';
 import { FEATURE_IDS } from '@line-crm/shared';
 import { saveVersionedAccountSetting } from '@line-crm/db';
