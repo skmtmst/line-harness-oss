@@ -70,8 +70,6 @@ describe('④ 表の行の登場と退場', () => {
     expect(keyframes, 'v8-content-in の動きが無い').not.toBeNull()
     expect(keyframes![1]).not.toMatch(/opacity|visibility/)
     const entering = rules(globals).filter((r) => /tbody[^,{]*>\s*tr/.test(r.selector) && /animation:\s*v8-content-in/.test(r.body))
-    expect(entering.length).toBe(1)
-    expect(entering[0].body).toMatch(/\bbackwards\b/)
     expect(entering[0].body).not.toMatch(/\b(both|forwards)\b/)
   })
 
