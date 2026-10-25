@@ -174,7 +174,7 @@ export default function SavedViewDialog({
             <div>
               <div className="flex items-baseline justify-between">
                 <label htmlFor="saved-view-name" className="text-ink-secondary text-xs font-medium">
-                  検索名 <span className="text-ink-faint font-normal">（必須）</span>
+                  検索名 <span className="text-ink-faint font-medium">（必須）</span>
                 </label>
                 {/* 残りではなく「11 / 40文字」。上限が何文字かが分かる。 */}
                 <span className="text-ink-faint text-micro tabular-nums">{name.length} / {NAME_LIMIT}文字</span>

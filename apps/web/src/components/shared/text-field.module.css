@@ -14,7 +14,7 @@
    * 同じ大きさにそろえる（以前は `$size-label` の13pxで小さかった）。
    */
   font-size: var(--text-body);
-  font-weight: 400; /* fontWeight: normal */
+  font-weight: var(--font-weight-ui); /* fontWeight: normal */
   font-family: inherit;
 }
 

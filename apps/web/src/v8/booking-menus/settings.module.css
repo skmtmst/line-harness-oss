@@ -869,7 +869,7 @@
 
 .calMark {
   font-size: var(--tpl-bm-12);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-bm-13);
 }
 
@@ -932,7 +932,7 @@
 
 .fieldLabelOptional {
   color: var(--color-ink-faint);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .toggleRow {
@@ -1676,7 +1676,7 @@
 .phoneDayState {
   color: var(--v8-liff-primary);
   font-size: var(--tpl-bm-9);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-bm-13);
 }
 

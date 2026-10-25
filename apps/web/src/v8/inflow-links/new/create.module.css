@@ -145,7 +145,7 @@
   padding-left: 0;
   box-shadow: var(--shadow-row-line);
   color: var(--color-ink);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   text-align: left;
   vertical-align: top;
 }

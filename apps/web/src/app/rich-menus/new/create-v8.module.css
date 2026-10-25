@@ -137,7 +137,7 @@
 
 /* 板 「トークを開いたとき」：前の短い字は太字にしない。 */
 .segLabelPlain {
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .segHint {
@@ -247,7 +247,7 @@
 
 .pageChipDefault {
   font-size: 12px;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   opacity: 0.85;
 }
 

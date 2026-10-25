@@ -294,7 +294,7 @@
   margin-left: var(--polish-space-auto);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   white-space: nowrap;
 }
 

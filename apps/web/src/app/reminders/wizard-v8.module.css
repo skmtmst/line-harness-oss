@@ -146,7 +146,7 @@
   color: var(--color-ink-faint);
   font-size: 12px;
   line-height: var(--tpl-text-sm-lh);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 .fieldNote {
   color: var(--color-ink-faint);
@@ -343,7 +343,7 @@
 .countValueUnit {
   margin-left: 2px;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 .countActions {
   margin-left: auto;

@@ -39,7 +39,7 @@
   padding: 0 12px;
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
@@ -73,7 +73,7 @@
   overflow: hidden;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -83,7 +83,7 @@
 .reason {
   color: var(--color-ink-faint);
   font-size: var(--text-nano);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.4;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -141,7 +141,7 @@
   padding: 6px 10px 2px;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;

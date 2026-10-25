@@ -2527,7 +2527,9 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
    * 戻せる。かな・漢字・英字には効かない。
    */
   body {
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: var(--font-numeric);
+    /* 14px 以下の UI 文字は 500（2026-10-25 オーナー）。15px 以上の読み物だけ --font-weight-reading を指定する。 */
+    font-weight: var(--font-weight-ui);
   }
 
   /*

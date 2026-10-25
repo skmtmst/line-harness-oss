@@ -330,7 +330,7 @@
   margin-left: var(--tpl-compact-gap);
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 

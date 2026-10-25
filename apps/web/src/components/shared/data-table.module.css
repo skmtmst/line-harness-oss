@@ -63,14 +63,14 @@
 }
 
 .sub { /* gap: 2 */ /* fill: $ink-faint */ /* fontSize: $size-label */
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .memo {
   margin-top: 2px;
   color: var(--color-ink-faint);
   font-size: var(--text-micro); /* fontSize: $size-micro */
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 /* 並び替えハンドルの列。行の先頭に置く。幅40px・中央。 */

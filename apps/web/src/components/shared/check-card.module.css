@@ -115,7 +115,7 @@
 :root .box:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
 :root .body { display: flex; flex: 1; flex-direction: column; gap: 2px; }
 :root .title { line-height: 20px; }
-:root .note { line-height: 18px; font-weight: 400; }
+:root .note { line-height: 18px; font-weight: var(--font-weight-ui); }
 :root .disabled, :root .disabled .box { outline-color: var(--color-ink-disabled); }
 
 :root .body { align-items: flex-start; }

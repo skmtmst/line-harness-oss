@@ -11,7 +11,7 @@
   flex: none;
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-13);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .side {

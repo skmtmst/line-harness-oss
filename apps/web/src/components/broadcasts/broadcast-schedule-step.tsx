@@ -92,7 +92,7 @@ export function BroadcastScheduleStep({ ab, approvalConfig, audienceCount, concu
           <div className="border-hairline mt-4 border-t pt-4">
       <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-medium">
         時間を分散して送る
-        <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-micro font-normal">
+        <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-micro font-medium">
           推奨
         </span>
       </label>

@@ -87,7 +87,7 @@
 .field { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); min-width: 0; }
 .label { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 600; color: var(--color-ink); }
 .smallLabel { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 600; color: var(--color-ink); }
-.optional { margin-left: var(--tpl-htn-chip-gap); font-size: var(--tpl-htn-text-12); font-weight: 400; color: var(--color-ink-faint); }
+.optional { margin-left: var(--tpl-htn-chip-gap); font-size: var(--tpl-htn-text-12); font-weight: var(--font-weight-ui); color: var(--color-ink-faint); }
 .labelRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); }
 .textButton { min-height: 0; height: auto; padding: 0; border: 0; background: none; cursor: pointer; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-action); }
 .input, .textarea {

@@ -91,7 +91,7 @@
   color: var(--color-ink);
   font-family: inherit;
   font-size: var(--select-menu-item-size);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: var(--select-menu-item-line);
   text-align: left;
   white-space: nowrap;
@@ -190,7 +190,7 @@
   overflow: hidden;
   color: var(--color-ink-secondary);
   font-size: var(--select-menu-desc-size);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: var(--select-menu-desc-line);
   text-overflow: ellipsis;
   white-space: nowrap;

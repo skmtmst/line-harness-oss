@@ -122,7 +122,7 @@ button.step:focus-visible {
   text-overflow: ellipsis;
   color: var(--color-ink-secondary);
   font-size: var(--tpl-steps-text-size);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-steps-text-lh);
   white-space: nowrap;
 }

@@ -75,9 +75,9 @@ export default function MetricValue({
       ) : (
         <>
           {/* 前置きの後ろは実スペース。コピーや読み上げでも「平均 約1ヶ月」と取れるように。 */}
-          {prefix ? <span className="text-xs font-normal text-ink-faint">{prefix} </span> : null}
+          {prefix ? <span className="text-xs font-medium text-ink-faint">{prefix} </span> : null}
           {shown}
-          {unit ? <span className="ml-0.5 text-xs font-normal text-ink-faint">{unit}</span> : null}
+          {unit ? <span className="ml-0.5 text-xs font-medium text-ink-faint">{unit}</span> : null}
         </>
       )}
     </span>

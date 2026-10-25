@@ -24,7 +24,7 @@
 :root .row[data-active] { border-radius: var(--polish-radius-control); background: var(--color-shell); }
 :root .row[data-active] .select { background: var(--color-shell); color: var(--color-ink); font-weight: 600; }
 :root .folderIcon { display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-folder-dot-indent); flex-shrink: 0; }
-:root .count { font-family: var(--font-inter), Inter, sans-serif; font-size: 12px; font-weight: 400; line-height: normal; }
+:root .count { font-family: var(--font-inter), Inter, sans-serif; font-size: 12px; font-weight: var(--font-weight-ui); line-height: normal; }
 :root .footer { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border: 0; padding: 0; margin-top: 12px; }
 /* 追加はボタンではなく、フォルダの行と同じ形の「行」にする（地の塗りなし・同じ余白と高さ）。 */
 :root .add {

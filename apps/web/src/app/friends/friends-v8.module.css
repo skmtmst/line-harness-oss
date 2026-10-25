@@ -973,7 +973,7 @@ legend.fieldLabel {
   border-radius: var(--radius-control);
   padding: 8px 10px;
   font: inherit;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .errorBandNoticePlacement { margin: 0; }

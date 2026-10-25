@@ -80,7 +80,7 @@
   flex: 0 0 auto;
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .root[open] .hint {

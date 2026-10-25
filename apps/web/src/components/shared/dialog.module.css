@@ -323,7 +323,7 @@
   font-weight: 700;
 }
 
-:root .description { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--color-ink-secondary); }
+:root .description { font-size: 13px; line-height: 20px; font-weight: var(--font-weight-ui); color: var(--color-ink-secondary); }
 /* 注意帯の説明は 1 行で本文いっぱいに使う。字体が変わって文が少し広く出ても折り返さないよう、横の内側を 8px に締める（上下はそのまま）。 */
 :root .panel[data-description-band='danger'] > .headerRow { padding-bottom: 0; }
 :root .descriptionBand {

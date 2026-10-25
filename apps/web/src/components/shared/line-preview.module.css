@@ -211,7 +211,7 @@
 }
 
 /* cfVyj の実測。既存の 管理画面 パネルには適用しない。 */
-:root .phoneRoot { font-family: var(--font-sans); }
+:root .phoneRoot { font-family: var(--font-sans); font-weight: var(--font-weight-reading); } /* LINE の見え方は LINE と同じ太さ。管理画面の UI 文字の 500 は当てない */
 :root .statusBar { align-items: flex-start; }
 :root .statusIcons { flex-shrink: 0; }
 :root .talkHead svg { flex-shrink: 0; }

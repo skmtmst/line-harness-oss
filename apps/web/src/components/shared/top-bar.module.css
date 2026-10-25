@@ -568,7 +568,7 @@
 :root .root[data-v8-chrome='shell'] { padding-right: var(--tpl-hq2-topbar-pad-end); }
 :root .root[data-v8-chrome='shell'] .actions { gap: 10px; }
 :root .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
-:root .root[data-v8-chrome='shell'] .crumbHome { gap: 6px; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--color-ink-faint); }
+:root .root[data-v8-chrome='shell'] .crumbHome { gap: 6px; font-size: 13px; font-weight: var(--font-weight-ui); line-height: 20px; color: var(--color-ink-faint); }
 :root .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 14px; height: 14px; }
 :root .root[data-v8-chrome='shell'] .crumbCurrent { font-size: 13px; font-weight: 500; line-height: 20px; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: var(--polish-radius-control); background: transparent; }
@@ -579,14 +579,14 @@
 :root .accountPill { height: 36px; min-height: 36px; padding: 0 10px 0 6px; gap: 8px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
 :root .accountMark { width: 24px; height: 24px; border-radius: 7px; font-size: 12px; font-weight: 700; line-height: 17px; }
 :root .pillText { gap: 0; }
-:root .pillRole { font-size: 10px; font-weight: 400; line-height: 12px; }
+:root .pillRole { font-size: 10px; font-weight: var(--font-weight-ui); line-height: 12px; }
 :root .accountName { font-size: 13px; font-weight: 600; line-height: 17px; }
 :root .root[data-v8-chrome='shell'] .bellBadge { background: var(--color-status-danger); width: 18px; height: 18px; min-width: 18px; left: 22px; right: auto; top: -4px; padding: 0; outline: 2px solid var(--color-shell); outline-offset: -1px; font-size: 10px; font-weight: 700; line-height: 10px; }
 :root .root[data-v8-chrome='shell'] .identity { height: 36px; padding: 0 10px 0 4px; gap: 8px; }
 :root .root[data-v8-chrome='shell'] .avatar { width: 28px; height: 28px; border-radius: var(--polish-radius-pill); background: var(--color-status-info-soft); color: var(--color-action); font-size: 12px; font-weight: 600; line-height: 17px; }
 :root .root[data-v8-chrome='shell'] .user { font-size: 13px; font-weight: 600; line-height: 17px; }
 :root .root[data-v8-chrome='shell'] .role,
-:root .root[data-v8-chrome='shell'] .roleButton { font-size: 12px; font-weight: 400; line-height: 13px; }
+:root .root[data-v8-chrome='shell'] .roleButton { font-size: 12px; font-weight: var(--font-weight-ui); line-height: 13px; }
 /* 押せる役割（統括へ戻る）は文字の高さのまま。ボタンの最低の高さで名前が上へ押し出されていた（名前と役割の2行）。指で触る端末は今までどおり。 */
 @media (pointer: fine) { :root .root[data-v8-chrome='shell'] .identityText .roleButton { min-height: 0; } }
 :root .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }

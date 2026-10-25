@@ -45,7 +45,7 @@
 .sample { width: 12px; height: 12px; flex-shrink: 0; border-radius: var(--radius-mini); }
 .name, .time, .detail { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .name { font-weight: 600; }
-.time { font-variant-numeric: tabular-nums; font-weight: 400; font-size: var(--text-micro); }
+.time { font-variant-numeric: tabular-nums; font-weight: var(--font-weight-ui); font-size: var(--text-micro); }
 .detail { font-size: var(--text-micro); }
 .summary { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; max-width: 100%; overflow: hidden; }
 [data-placement='timeline'] > .summary { flex-direction: column; align-items: flex-start; gap: 0; }

@@ -76,7 +76,7 @@
   overflow: hidden;
   color: var(--color-ink-faint);
   font-size: 12px;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;

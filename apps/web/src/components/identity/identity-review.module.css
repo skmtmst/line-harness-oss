@@ -99,7 +99,7 @@
 /* 取得元が繋がっていない値。実値の 0 と同じ濃さで出さない。 */
 .rowValuePending {
   color: var(--color-ink-faint);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .evidenceItem {

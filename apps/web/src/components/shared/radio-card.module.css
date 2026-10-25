@@ -104,7 +104,7 @@
 .reason {
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.5;
 }
 
@@ -286,7 +286,7 @@
 .row.disabled { background: transparent; }
 .row.invalid { border-color: transparent; }
 .row .topIcon { display: none; }
-.row .title { font-size: 13px; font-weight: 400; line-height: 20px; }
+.row .title { font-size: 13px; font-weight: var(--font-weight-ui); line-height: 20px; }
 :root .row .body { gap: 2px; }
 :root .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
 :root .row:active { filter: none; }

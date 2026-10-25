@@ -161,7 +161,7 @@
   border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px;
   border-radius: var(--polish-radius-card); box-shadow: var(--v8-parts-toast-shadow);
   font-family: var(--font-sans);
-  font-size: 13px; line-height: 20px; font-weight: 400;
+  font-size: 13px; line-height: 20px; font-weight: var(--font-weight-ui);
 }
 :root .icon { width: 16px; height: 16px; }
 :root .undo { padding: 0; min-height: 0; font-weight: 600; text-decoration: none; line-height: 20px; }

@@ -52,7 +52,7 @@
   max-width: 220px;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.4;
 }
 

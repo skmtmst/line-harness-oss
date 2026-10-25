@@ -95,7 +95,7 @@ button.item:disabled {
   margin-right: auto;
   color: var(--color-ink-secondary);
   font-size: 13px;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.5;
 }
 

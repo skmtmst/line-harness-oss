@@ -166,7 +166,7 @@ export function AffiliateArchiveDialog({
                 aria-label={`確認のため「${target?.name ?? ''}」と打ってください`}
                 value={confirmationName}
                 onChange={(event) => setConfirmationName(event.target.value)}
-                className="border-hairline rounded-control mt-2 w-full border px-3 py-2 font-normal"
+                className="border-hairline rounded-control mt-2 w-full border px-3 py-2 font-medium"
                 autoComplete="off"
               /></SaveErrorField></Field>
         </div>

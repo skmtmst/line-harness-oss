@@ -202,12 +202,12 @@
 }
 :root .unit {
   display: inline; margin: 0; font-family: var(--font-sans);
-  color: var(--color-ink-secondary); font-size: 12px; font-weight: 400;
+  color: var(--color-ink-secondary); font-size: 12px; font-weight: var(--font-weight-ui);
   line-height: var(--tpl-band-unit-lh); letter-spacing: 0;
 }
 :root .detail {
   display: flex; align-items: center; width: 100%; min-height: 0; gap: 0;
-  color: var(--color-ink-faint); font-size: 12px; font-weight: 400; line-height: 18px;
+  color: var(--color-ink-faint); font-size: 12px; font-weight: var(--font-weight-ui); line-height: 18px;
 }
 :root .detailText { min-width: 0; flex: 1; }
 :root .link { min-height: 0; font-size: 12px; font-weight: 500; line-height: 18px; border: 0; padding: 0; background: none; cursor: pointer; }
@@ -290,9 +290,9 @@
 :root .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
 /* 箱の中の小さな数も、数字と単位の文字の役割を分ける。 */
 :root .card[data-kpi-presentation='inline'] .head { min-height: 0; }
-:root .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 12px; font-weight: 400; line-height: 16px; }
+:root .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 12px; font-weight: var(--font-weight-ui); line-height: 16px; }
 :root .card[data-kpi-presentation='inline'] .number { font-size: 18px; font-weight: 600; line-height: 26px; }
-:root .card[data-kpi-presentation='inline'] .unit { font-size: var(--text-caption); font-weight: 400; }
+:root .card[data-kpi-presentation='inline'] .unit { font-size: var(--text-caption); font-weight: var(--font-weight-ui); }
 :root .card[data-kpi-presentation='inline'] .value { gap: 4px; }
 :root .card[data-kpi-presentation='inline'] .detail { display: none; }
 :root .valueDanger { color: var(--color-danger); }
