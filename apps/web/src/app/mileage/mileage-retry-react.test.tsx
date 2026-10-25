@@ -263,6 +263,10 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     expect(text).toContain('結果待ちの交換')
     expect(text).toContain('確認中')
     expect(text).toContain('届いていない')
+    // 確認中の意味は「？」で開ける。届いていない行には付けない。
+    const holdRow = section()?.querySelector('tr[data-row-id="r-hold"]')
+    expect(holdRow?.querySelector('button[aria-label="確認中の説明"]')).not.toBeNull()
+    expect(section()?.querySelector('tr[data-row-id="redemption-1"] button[aria-label="確認中の説明"]')).toBeNull()
   })
 
   it('1件も無いときは欄ごと出さない', async () => {
