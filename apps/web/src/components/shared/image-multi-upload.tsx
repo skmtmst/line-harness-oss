@@ -15,7 +15,7 @@ export default function ImageMultiUpload({ presentation, disabled, busy, onUploa
   const reference = presentation === 'reference'
   return <FileDropzone
     variant="upload"
-    icon={<FileUp aria-hidden="true" size={24} style={{ width: 24, height: 24 }} className={reference ? 'text-ink-secondary' : undefined} />}
+    icon={<FileUp aria-hidden="true" size={20} style={{ width: 24, height: 24 }} className={reference ? 'text-ink-secondary' : undefined} />}
     title={reference ? '参照画像を追加' : '手元の画像を追加'}
     hint={reference ? <>ドラッグ＆ドロップ<br />またはクリックしてファイルをアップロード<br />（1ファイル10メガバイト以内・PNG・JPEG・WebP）</> : <>ドラッグ＆ドロップ<br />またはクリック<br />10MB 以内・PNG・JPEG・WebP</>}
     accept="image/png,image/jpeg,image/webp"

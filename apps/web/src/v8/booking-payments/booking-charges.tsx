@@ -134,12 +134,12 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
     <section className={styles.section} aria-label="お支払い">
       <div className={styles.headRow}><h3 className={styles.title}>キャンセル料</h3><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></div>
       {load.testMode ? <TestModeNote>本当の請求は起きません</TestModeNote> : null}
-      {cardFailure ? <ListState kind="error" title="カード情報を読み込めませんでした" error={cardFailure} onRetry={() => void reloadCard()} /> : <p className={styles.line}><CreditCard size={14} aria-hidden="true" />{cardLoading ? 'カード情報を確かめています' : card ? <>{cardLabel}（登録済み{card.registeredAt ? <ListDateTime value={card.registeredAt} /> : null}）</> : 'カード：未登録'}</p>}
+      {cardFailure ? <ListState kind="error" title="カード情報を読み込めませんでした" error={cardFailure} onRetry={() => void reloadCard()} /> : <p className={styles.line}><CreditCard size={16} aria-hidden="true" />{cardLoading ? 'カード情報を確かめています' : card ? <>{cardLabel}（登録済み{card.registeredAt ? <ListDateTime value={card.registeredAt} /> : null}）</> : 'カード：未登録'}</p>}
       <p className={styles.amount}>{`${yen(charge.amount)}（料金の ${percent ?? '—'}%）`}</p>
       {charge.reason ? <p className={styles.minor}>{`理由：${charge.reason}`}</p> : null}
       <p className={styles.minor}>{`予約のときの決まりで計算（${load.quote.text}）`}</p>
       <div className={styles.actions}>
-        {canCharge && charge.status === 'pending' ? <><Button onClick={() => open('waive')}>請求しない（理由を書く）</Button><Button variant="primary" disabled={cardLoading || Boolean(cardFailure)} onClick={() => open('charge')}><CreditCard size={15} aria-hidden="true" />キャンセル料を請求する</Button></> : null}
+        {canCharge && charge.status === 'pending' ? <><Button onClick={() => open('waive')}>請求しない（理由を書く）</Button><Button variant="primary" disabled={cardLoading || Boolean(cardFailure)} onClick={() => open('charge')}><CreditCard size={16} aria-hidden="true" />キャンセル料を請求する</Button></> : null}
         {canRefund && charge.status === 'succeeded' ? <Button onClick={() => open('refund')}>返金する</Button> : null}
       </div>
 
@@ -148,7 +148,7 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
       {/* 請求の確かめ（Ae1W1）：金額・カード・わけ。額は決まりの額だけ（上げられない）。 */}
       <Dialog open={dialog === 'charge'} title="キャンセル料を請求しますか？" titleNote={`${customerName} さま ・ ${bookingLabel}`} size="medium" contentLayout="form"
         busy={busy} error={error ?? undefined} cancelLabel="戻る" onCancel={close}
-        confirmLabel={`${yen(charge.amount)} を請求する`} confirmIcon={<CreditCard size={15} aria-hidden="true" />}
+        confirmLabel={`${yen(charge.amount)} を請求する`} confirmIcon={<CreditCard size={16} aria-hidden="true" />}
         onConfirm={() => void run(() => bookingCancellationApi.charge(accountId, bookingId, { kind: charge.kind, amount: charge.amount, expectedVersion: charge.version }, key.current), `${yen(charge.amount)} の請求を模擬で記録しました。実際の請求・LINE送信はしていません`)}>
         <dl className={styles.facts}>
           <div><dt>金額</dt><dd className={styles.big}>{yen(charge.amount)}</dd></div>
@@ -156,7 +156,7 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
           <div><dt>わけ</dt><dd>{reasonLine}</dd></div>
         </dl>
         {load.testMode ? <TestModeNote>本当の請求は起きません</TestModeNote> : null}
-        <Notice tone="info" icon={<MessageCircle size={15} aria-hidden="true" />}>
+        <Notice tone="info" icon={<MessageCircle size={16} aria-hidden="true" />}>
           試験の請求を記録します。実際のカード請求・LINE送信はしていません。金額は決まりの額より上げられません。
         </Notice>
       </Dialog>
@@ -181,14 +181,14 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
       </Dialog>
       <Dialog open={dialog === 'refund' && refundStep === 2} title="返金すると戻せません" titleNote={`手順 2 / 2 ・ ${customerName} さまへキャンセル料を全額返金`} size="medium" contentLayout="form" tone="destructive"
         busy={busy} error={error ?? undefined} cancelLabel="戻る" onCancel={() => { if (!busy) setRefundStep(1) }}
-        confirmLabel={`${yen(charge.amount)} を返金する`} confirmIcon={<RotateCcw size={15} aria-hidden="true" />}
+        confirmLabel={`${yen(charge.amount)} を返金する`} confirmIcon={<RotateCcw size={16} aria-hidden="true" />}
         onConfirm={() => void run(() => bookingCancellationApi.refund(accountId, charge.id, { reason: reason.trim(), expectedVersion: charge.version, confirmed: true, confirmedIrreversible: true }, key.current), `${yen(charge.amount)} の返金を模擬で記録しました。実際の返金・LINE送信はしていません`)}>
         <dl className={styles.facts}>
           <div><dt>金額</dt><dd className={styles.big}>{yen(charge.amount)}</dd></div>
           <div><dt>カード</dt><dd>{cardLabel}</dd></div>
           <div><dt>わけ</dt><dd>{`${reason.trim()}（理由は記録に残ります）`}</dd></div>
         </dl>
-        <Notice tone="warn" icon={<AlertTriangle size={15} aria-hidden="true" />}>
+        <Notice tone="warn" icon={<AlertTriangle size={16} aria-hidden="true" />}>
           試験の返金を記録すると元に戻せません。実際のカードへの返金はしません。操作できるのはオーナー・管理者だけです。
         </Notice>
       </Dialog>

@@ -27,7 +27,7 @@ export default function DistributionResultDialog({ open, title, summary, rows, t
   const failures = rows.filter((row) => failedStatus(row.store.status))
   return <Dialog open={open} designNode="dEvJM" designWidth={720} designTop={220} title={title} designHeaderPadding="24px 24px 0"
     busy={busy} cancelLabel="閉じる" onCancel={onClose}
-    {...(failures.length ? { confirmLabel: `失敗した ${failures.length} 件をやり直す`, confirmIcon: <RotateCw size={15} />,
+    {...(failures.length ? { confirmLabel: `失敗した ${failures.length} 件をやり直す`, confirmIcon: <RotateCw size={16} />,
       onConfirm: onRetry } : {})}>
     {tag ? <TagPill {...tag} /> : null}
     <p className={styles.resultSummary}>{summary}</p>

@@ -103,8 +103,8 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.badge} data-design="PrepayBadge">
       <svg className={styles.icon} aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none">
-        <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
-        <line x1="2" y1="8" x2="18" y2="8" stroke="currentColor" strokeWidth="1.5" />
+        <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.75" />
+        <line x1="2" y1="8" x2="18" y2="8" stroke="currentColor" strokeWidth="1.75" />
       </svg>
       <div className={styles.body}>
         <p className={styles.title}>

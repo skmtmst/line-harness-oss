@@ -407,7 +407,7 @@ export default function ScenarioCreateV8() {
                 busy={saving !== null}
                 busyLabel="作成中…"
               >
-                <Check size={15} aria-hidden="true" />この方式で保存する
+                <Check size={16} aria-hidden="true" />この方式で保存する
               </Button>
             </>
           ) : null}

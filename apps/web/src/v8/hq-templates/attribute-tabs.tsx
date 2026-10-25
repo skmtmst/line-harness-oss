@@ -89,7 +89,7 @@ export function OtherTabPanel({ tab, title, description, onSelect }: {
       help={description}
       tabs={<AttributeTabs tab={tab} onSelect={onSelect} />}
     >
-      <ListState kind="empty" title={OTHER_TAB_LINE[tab]}   action={<><Button href={hqOpenHref('tags')}><LogIn size={15} aria-hidden="true" />アカウントを選んで開く</Button></>} />
+      <ListState kind="empty" title={OTHER_TAB_LINE[tab]}   action={<><Button href={hqOpenHref('tags')}><LogIn size={16} aria-hidden="true" />アカウントを選んで開く</Button></>} />
     </ListPage>
   )
 }

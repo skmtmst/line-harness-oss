@@ -71,7 +71,7 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
   }, [permission, webinar.id])
 
   const csvButton = permission === 'ready' && analyticsState === 'ready'
-    ? <Button onClick={download} disabled={busy} busy={busy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+    ? <Button onClick={download} disabled={busy} busy={busy} busyLabel="書き出しています…"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
     : null
 
   const summary = analytics?.summary ?? null
@@ -88,7 +88,7 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
       <div className={styles.stats} data-template-region="stats">
         <KpiBand>
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} help={kpi.help} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={kpi.detail} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} help={kpi.help} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       </div>

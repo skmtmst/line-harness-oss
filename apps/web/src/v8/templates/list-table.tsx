@@ -87,7 +87,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
       ))}
     </div>
   ) : !selectedAccountId ? (
-    <AccountRequiredState hasAccounts={accounts.length > 0}   icon={<FileText size={18} aria-hidden="true" />} />
+    <AccountRequiredState hasAccounts={accounts.length > 0}   icon={<FileText size={20} aria-hidden="true" />} />
   ) : view === 'forbidden' || view === 'error' ? (
     <ListState kind="error" title={view === 'forbidden' ? (failure?.title ?? '見る権限がありません') : 'テンプレートを読み込めませんでした'} description={view === 'forbidden'
           ? (failure?.description ?? '')
@@ -243,7 +243,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
             disabled={moving}
             onClick={() => openMove([...selectedIds])}
           >
-            <FolderIcon size={13} aria-hidden="true" />
+            <FolderIcon size={16} aria-hidden="true" />
             フォルダへ移す
           </Button><Button
             type="button"
@@ -259,7 +259,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
               setPendingBulkDelete(removableSelected)
             }}
           >
-            <Trash2 size={13} aria-hidden="true" />
+            <Trash2 size={16} aria-hidden="true" />
             まとめて削除
           </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
             選択を外す

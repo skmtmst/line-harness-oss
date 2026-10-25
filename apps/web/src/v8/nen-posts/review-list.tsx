@@ -192,7 +192,7 @@ export function ReviewListV8(props: ReviewListV8Props) {
               busy={props.bulkReviewing}
               busyLabel="処理中..."
             >
-              <Check size={15} aria-hidden="true" />まとめて採用
+              <Check size={16} aria-hidden="true" />まとめて採用
             </Button>
             <IconButton aria-label="選ぶのをやめる" title="選ぶのをやめる" onClick={props.onClearSelection}><X size={16} aria-hidden="true" /></IconButton>
         </BulkBar>
@@ -254,8 +254,8 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
       {status === 'pending' ? (
         props.canEdit ? (
           <div className={styles.cardActions}>
-            <Button variant="secondary" disabled={busy} aria-label={`${name}の写真を見送る`} onClick={() => props.onReject(photoId)}><X size={15} aria-hidden="true" />見送る</Button>
-            <Button variant="secondary" disabled={busy} aria-label={`${name}の写真を採用する`} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中..."><Check size={15} aria-hidden="true" />採用する</Button>
+            <Button variant="secondary" disabled={busy} aria-label={`${name}の写真を見送る`} onClick={() => props.onReject(photoId)}><X size={16} aria-hidden="true" />見送る</Button>
+            <Button variant="secondary" disabled={busy} aria-label={`${name}の写真を採用する`} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中..."><Check size={16} aria-hidden="true" />採用する</Button>
           </div>
         ) : (
           /* 閲覧のみには押せないボタンを置かない。場所だけ空けて、並びをそろえる。 */
@@ -265,20 +265,20 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
       {adopted && props.canEdit && (consented || notificationFailed) ? (
         <div className={styles.cardActionSingle}>
           {consented ? (
-            <Button variant="secondary" disabled={busy} onClick={() => props.onPublish(photoId)}><Globe size={15} aria-hidden="true" />公式サイトに出す</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => props.onPublish(photoId)}><Globe size={16} aria-hidden="true" />公式サイトに出す</Button>
           ) : (
-            <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={15} aria-hidden="true" />LINE通知を再送</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={16} aria-hidden="true" />LINE通知を再送</Button>
           )}
         </div>
       ) : null}
       {adopted && props.canEdit && consented && notificationFailed ? (
         <div className={styles.cardActionSingle}>
-          <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={15} aria-hidden="true" />LINE通知を再送</Button>
+          <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={16} aria-hidden="true" />LINE通知を再送</Button>
         </div>
       ) : null}
       {status !== 'adopted' && props.canEdit && notificationFailed ? (
         <div className={styles.cardActionSingle}>
-          <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={15} aria-hidden="true" />LINE通知を再送</Button>
+          <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={16} aria-hidden="true" />LINE通知を再送</Button>
         </div>
       ) : null}
     </article></li>

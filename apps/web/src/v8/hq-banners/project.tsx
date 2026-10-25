@@ -564,7 +564,7 @@ function ProjectInner() {
   const actions = canManage ? (
     <div className={styles.headActions}>
       {images.length > 0 && !archived ? <RowMenu label={`プロジェクト「${project.name}」の操作`} triggerProps={{ disabled: busy }} items={[
-        { id: 'distribute-project', label: 'このプロジェクトの画像を配る', icon: <Send size={15} aria-hidden="true" />, emphasis: true,
+        { id: 'distribute-project', label: 'このプロジェクトの画像を配る', icon: <Send size={16} aria-hidden="true" />, emphasis: true,
           onSelect: () => { setSelectedImages(images.map((image) => image.id)); openDistribution() } },
       ]} /> : null}
       <MediaSlot title="画像を取り込む" accept={BANNER_UPLOAD_ACCEPT.join(',')} fileInputRef={fileRef} busy={uploading} disabled={busy || archived}

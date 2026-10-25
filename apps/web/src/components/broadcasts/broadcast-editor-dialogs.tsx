@@ -218,7 +218,7 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
       cancelLabel="キャンセル"
       busy={testSending}
       designNode="h0kahp"
-      titleIcon={<Send size={22} />}
+      titleIcon={<Send size={20} />}
       confirmIcon={<Send size={16} />}
       onCancel={() => { if (!testSending) setTestDialogOpen(false) }}
       onConfirm={testRecipientState === 'ready' && testRecipients.length > 0 ? () => void handleTestSend() : undefined}

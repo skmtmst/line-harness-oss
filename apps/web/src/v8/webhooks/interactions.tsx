@@ -292,22 +292,22 @@ export default function WebhooksInteractionsV8() {
   const bandCells: BandCell[] = [
     {
       // 数の帯の題はタブをまたいで「直近30日 送った」にそろえる。期間を変えたらその日数で出す。
-      key: 'sent', title: `直近${periodDays}日 送った`, icon: <History size={13} aria-hidden="true" />,
+      key: 'sent', title: `直近${periodDays}日 送った`, icon: <History size={16} aria-hidden="true" />,
       value: known ? known.outgoing : null, unit: '回',
       detail: known ? `成功 ${formatNumber(Math.max(0, known.outgoing - known.outgoingFailed))}` : '集計を読み込めませんでした',
     },
     {
-      key: 'received', title: '受け取った', icon: <Inbox size={13} aria-hidden="true" />,
+      key: 'received', title: '受け取った', icon: <Inbox size={16} aria-hidden="true" />,
       value: known ? known.incoming : null, unit: '回',
       detail: known ? `成功 ${formatNumber(Math.max(0, known.incoming - (known.failed - known.outgoingFailed)))}` : '集計を読み込めませんでした',
     },
     {
-      key: 'failed', title: '失敗', icon: <TriangleAlert size={13} aria-hidden="true" />,
+      key: 'failed', title: '失敗', icon: <TriangleAlert size={16} aria-hidden="true" />,
       value: known ? known.failed : null, unit: '件',
       detail: known ? <span title={failureDetail(data.items, summary)}>{`やり直せるもの ${formatNumber(known.retryable)}`}</span> : '集計を読み込めませんでした',
     },
     {
-      key: 'all', title: 'すべて', icon: <LayoutList size={13} aria-hidden="true" />,
+      key: 'all', title: 'すべて', icon: <LayoutList size={16} aria-hidden="true" />,
       value: known ? known.total : null, unit: '回',
       detail: known ? <span title={`この${periodDays}日で ${formatNumber(known.total > 0 ? Math.round(known.succeeded / known.total * 1000) / 10 : 0)}%成功。平均 ${seconds(known.averageDurationMs)}。${durationDetail(data.items, known.averageDurationMs, periodDays)}`}>{`この${periodDays}日`}</span> : '集計を読み込めませんでした',
     },
@@ -345,7 +345,7 @@ export default function WebhooksInteractionsV8() {
           busy={bulkRetrying}
           busyLabel="失敗したものを確認中"
         >
-          <RefreshCw size={15} aria-hidden="true" />失敗したものをまとめてやり直す
+          <RefreshCw size={16} aria-hidden="true" />失敗したものをまとめてやり直す
         </Button>
       ) : null}
     </>
@@ -540,13 +540,13 @@ function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, bu
       footer={
         <div className={styles.dialogFoot}>
           <Button onClick={() => setTechOpen(!techOpen)}>
-            <FileCode size={15} aria-hidden="true" />{techOpen ? '技術的な記録を閉じる' : '技術的な記録を開く'}
+            <FileCode size={16} aria-hidden="true" />{techOpen ? '技術的な記録を閉じる' : '技術的な記録を開く'}
           </Button>
           <span className={styles.dialogFootSpacer} aria-hidden="true" />
           <Button onClick={onClose} disabled={busy}>閉じる</Button>
           {retryable ? (
             <Button variant="primary" onClick={onRetry} busy={retrying} busyLabel="やり直し中">
-              <RotateCw size={15} aria-hidden="true" />届いたか確かめてから送り直す
+              <RotateCw size={16} aria-hidden="true" />届いたか確かめてから送り直す
             </Button>
           ) : null}
         </div>

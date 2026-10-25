@@ -36,7 +36,7 @@ import { SIDEBAR_AUTO_COLLAPSE_BELOW } from './sidebar-collapse'
 function NavIcon({ d, className }: { d: string; className?: string }) {
   return (
     <svg className={className ?? "h-[18px] w-[18px]"} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={d} />
     </svg>
   )
 }
@@ -785,7 +785,7 @@ export default function Sidebar({
                     stroke="currentColor"
                     aria-hidden="true"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M6 9l6 6 6-6" />
                   </svg>
                 </button>
               )
@@ -950,8 +950,8 @@ export default function Sidebar({
         >
           <svg className="w-6 h-6 text-ink-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isOpen
-              ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M6 18L18 6M6 6l12 12" />
+              : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 12h16M4 18h16" />
             }
           </svg>
         </button>
@@ -993,7 +993,7 @@ export default function Sidebar({
         <div className="absolute right-3 top-2.5 z-10">
           <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-control hover:bg-shell" aria-label="閉じる">
             <svg className="w-5 h-5 text-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>

@@ -114,7 +114,7 @@ export default function CsvMigrationsV8() {
             {/* 変えられない人には押せないボタンを置かない（理由は上の1行）。 */}
             {m.manageLocked ? null : (
               <Button variant="primary" disabled={m.busy} busy={m.busy && !m.summary && !m.downloadId} onClick={() => void m.createExport()} title="件数が多いときは、できあがったらお知らせします。ダウンロードできる期間は7日です。">
-                <Download size={14} aria-hidden="true" />
+                <Download size={16} aria-hidden="true" />
                 書き出しを作る
               </Button>
             )}
@@ -140,7 +140,7 @@ export default function CsvMigrationsV8() {
           <div className={styles.cardFoot}>
             {m.manageLocked ? null : (
               <Button variant="primary" disabled={m.busy || !m.file} onClick={() => void m.previewImport()}>
-                <FileSearch size={14} aria-hidden="true" />
+                <FileSearch size={16} aria-hidden="true" />
                 まず確認だけする
               </Button>
             )}
@@ -167,7 +167,7 @@ export default function CsvMigrationsV8() {
               <KpiCard
                 key={key}
                 presentation="band"
-                icon={<Inbox size={14} />}
+                icon={<Inbox size={16} />}
                 title={title}
                 value={value}
                 unit={value == null ? '' : unit}
@@ -251,7 +251,7 @@ export default function CsvMigrationsV8() {
         description="友だち情報をCSVで書き出し、確かめてから取り込みます"
         action={(
           <Button type="button" variant="secondary" onClick={exportHistory} disabled={m.jobs.length === 0} title="下の「書き出し・取り込みの履歴」をCSVにします">
-            <Download size={14} aria-hidden="true" />
+            <Download size={16} aria-hidden="true" />
             表示中をCSVで書き出す
           </Button>
         )}

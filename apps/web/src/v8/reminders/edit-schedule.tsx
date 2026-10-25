@@ -95,7 +95,7 @@ export function ScheduleStageV8({
           onDraft={onSaveDraft}
           draftBusy={busy}
           nextLabel="次へ：確認"
-          nextIcon={<ArrowRight size={15} aria-hidden="true" />}
+          nextIcon={<ArrowRight size={16} aria-hidden="true" />}
           onNext={onNext}
           nextDisabled={busy || settings.steps.length === 0}
         />

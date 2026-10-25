@@ -460,7 +460,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               下書きを保存
             </Button>
             <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
-              {host ? null : <Send size={15} aria-hidden="true" />}
+              {host ? null : <Send size={16} aria-hidden="true" />}
               {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>
@@ -598,7 +598,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                       {...questionOrder.handle(question.key)}
                       {...questionOrder.handleProps(question.key)}
                     >
-                      <GripVertical size={14} aria-hidden="true" />
+                      <GripVertical size={16} aria-hidden="true" />
                     </ReorderHandle>
                     <span className={styles.questionNo}>問 {index + 1}</span>
                     <span className={styles.spacer} />
@@ -612,7 +612,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                       aria-label={`問 ${index + 1} を消す`}
                       onClick={() => setQuestions((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))}
                     >
-                      <Trash2 size={15} aria-hidden="true" />
+                      <Trash2 size={16} aria-hidden="true" />
                       削除する
                     </button>
                   </div>
@@ -642,14 +642,14 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                               aria-label={`問 ${index + 1} の選択肢 ${choiceIndex + 1} を消す`}
                               onClick={() => { setPickedChoice((current) => ({ ...current, [question.key]: -1 })); updateQuestion(index, { choices: question.choices.filter((_, i) => i !== choiceIndex), choiceTapExtras: question.choiceTapExtras?.filter((_, i) => i !== choiceIndex) }) }}
                             >
-                              <X size={12} aria-hidden="true" />
+                              <X size={16} aria-hidden="true" />
                             </button>
                           ) : null}
                         </div>
                       ))}
                       {question.choices.length < MAX_CHOICES ? (
                         <button type="button" className={styles.insertChip} onClick={() => updateQuestion(index, { choices: [...question.choices, ''] })}>
-                          <Plus size={15} aria-hidden="true" />
+                          <Plus size={16} aria-hidden="true" />
                           選択肢を足す
                         </button>
                       ) : (
@@ -678,7 +678,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                   title={questions.length >= MAX_QUESTIONS ? `質問は${MAX_QUESTIONS}問までです` : `あと${MAX_QUESTIONS - questions.length}問足せます`}
                   onClick={() => setQuestions((prev) => (prev.length >= MAX_QUESTIONS ? prev : [...prev, newQuestion()]))}
                 >
-                  <Plus size={15} aria-hidden="true" />
+                  <Plus size={16} aria-hidden="true" />
                   質問を足す
                 </button>
               </div>

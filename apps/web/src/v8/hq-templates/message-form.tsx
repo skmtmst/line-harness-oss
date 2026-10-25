@@ -215,7 +215,7 @@ export default function MessageForm({
                 </div>
               ))}
               <span className={styles.addButtonRow}>
-                <Button disabled={disabled || card.buttons.length >= 3} onClick={() => updateCard({ ...card, buttons: [...card.buttons, { id: crypto.randomUUID(), label: '', action: 'url', value: '' }] })}><Plus size={15} aria-hidden="true" />ボタンを足す</Button>
+                <Button disabled={disabled || card.buttons.length >= 3} onClick={() => updateCard({ ...card, buttons: [...card.buttons, { id: crypto.randomUUID(), label: '', action: 'url', value: '' }] })}><Plus size={16} aria-hidden="true" />ボタンを足す</Button>
               </span>
               <p className={styles.note}>押したときは URLを開く・テキストを送る・回答フォーム・シナリオを始める から選べます</p>
               <p className={styles.noteStrong}>タグ・回答フォームがあるかは、アカウントへ配る前の確認で調べます（ない所は配る前に知らせます）。</p>

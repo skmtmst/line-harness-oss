@@ -824,7 +824,7 @@ export default function RichMenusListV8() {
       className={narrow ? undefined : styles.createWide}
       onClick={goCreate}
     >
-      <Plus size={15} aria-hidden="true" />
+      <Plus size={16} aria-hidden="true" />
       メニューを作る
     </Button>
   ) : null
@@ -1175,7 +1175,7 @@ export default function RichMenusListV8() {
         <Button type="button" variant="secondary" onClick={closeDelete} disabled={deleteBusy}>閉じる</Button>
         {managedDelete.status === 'published' && canEdit ? (
           <Button type="button" variant="secondary" onClick={() => void confirmDelete()} disabled={deleteBusy} busy={Boolean(deleteBusy)} busyLabel="処理中…">
-            <CloudOff size={15} aria-hidden="true" />
+            <CloudOff size={16} aria-hidden="true" />
             LINEから取り下げる
           </Button>
         ) : null}
@@ -1272,7 +1272,7 @@ export default function RichMenusListV8() {
           onClick={() => setShowExternal(true)}
           title="LINEの画面で直接作ったメニューを見て、取り込めます"
         >
-          <CloudDownload size={15} aria-hidden="true" />
+          <CloudDownload size={16} aria-hidden="true" />
           LINE上にあるメニュー
         </Button>
       }
@@ -1285,7 +1285,7 @@ export default function RichMenusListV8() {
           <KpiCard
             presentation="band"
             title="公開中"
-            icon={<CircleCheck size={13} aria-hidden="true" />}
+            icon={<CircleCheck size={16} aria-hidden="true" />}
             value={groupKpiReady ? groupFacets?.published ?? null : null}
             unit={groupKpiReady && groupFacets?.published != null ? '件' : ''}
             detail={groupKpiReady
@@ -1297,7 +1297,7 @@ export default function RichMenusListV8() {
           <KpiCard
             presentation="band"
             title="今月押された"
-            icon={<Hand size={13} aria-hidden="true" />}
+            icon={<Hand size={16} aria-hidden="true" />}
             value={tapKpiReady ? tapStats?.total ?? null : null}
             unit={tapKpiReady && tapStats?.total != null ? '回' : ''}
             detail={tapKpiReady ? 'ボタンが押された回数' : tapKpiUnavailableText}
@@ -1305,7 +1305,7 @@ export default function RichMenusListV8() {
           <KpiCard
             presentation="band"
             title="いちばん押された"
-            icon={<Trophy size={13} aria-hidden="true" />}
+            icon={<Trophy size={16} aria-hidden="true" />}
             value={null}
             unit=""
             valueText={topArea ? topArea.label || '名前のないボタン' : emptyValue('unknown')}
@@ -1320,7 +1320,7 @@ export default function RichMenusListV8() {
           <KpiCard
             presentation="band"
             title="出し分け"
-            icon={<Split size={13} aria-hidden="true" />}
+            icon={<Split size={16} aria-hidden="true" />}
             value={groupKpiReady ? groupFacets?.targeting ?? null : null}
             unit={groupKpiReady && groupFacets?.targeting != null ? '件' : ''}
             detail={groupKpiReady

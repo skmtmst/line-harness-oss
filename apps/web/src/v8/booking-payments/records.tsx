@@ -101,10 +101,10 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
 
   function menuFor(record: PaymentRecord): ActionMenuItem[] {
     return [
-      ...(record.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={15} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(record.bookingId)}` }] : []),
-      ...(canEdit && record.status === 'pending' ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={15} aria-hidden="true" />, onSelect: () => void previewLink(record) }] : []),
-      ...(record.receiptUrl ? [{ id: 'receipt', label: '領収書を見る', icon: <FileText size={15} aria-hidden="true" />, href: record.receiptUrl, external: true }] : []),
-      ...(canEdit && (record.status === 'paid' || record.status === 'partially_refunded') ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={15} aria-hidden="true" />, onSelect: () => { setRefundError(null); setRefundTarget(record) } }] : []),
+      ...(record.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={16} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(record.bookingId)}` }] : []),
+      ...(canEdit && record.status === 'pending' ? [{ id: 'link', label: '支払いのリンクを送る', icon: <Send size={16} aria-hidden="true" />, onSelect: () => void previewLink(record) }] : []),
+      ...(record.receiptUrl ? [{ id: 'receipt', label: '領収書を見る', icon: <FileText size={16} aria-hidden="true" />, href: record.receiptUrl, external: true }] : []),
+      ...(canEdit && (record.status === 'paid' || record.status === 'partially_refunded') ? [{ id: 'refund', label: '返金する', tone: 'danger' as const, icon: <RotateCcw size={16} aria-hidden="true" />, onSelect: () => { setRefundError(null); setRefundTarget(record) } }] : []),
     ]
   }
 
@@ -163,7 +163,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
     <div className={styles.records} data-design="PaymentRecords">
       <div className={styles.recordsHead}>
         <h2 className={styles.recordsTitle}>お支払いの記録<HelpTip label="お支払いの記録の数え方">入金は今月に支払いが済んだ合計、返金は今月に返金した合計です。期限切れの枠は、お支払いを待つ時間を過ぎて取り消した仮の予約です。</HelpTip>{testMode ? <TestModeNote size="compact">{null}</TestModeNote> : null}</h2>
-        {load.state === 'ready' ? <Button busy={exporting} onClick={() => void exportCsv()}><Download size={15} aria-hidden="true" />CSVで書き出す</Button> : null}
+        {load.state === 'ready' ? <Button busy={exporting} onClick={() => void exportCsv()}><Download size={16} aria-hidden="true" />CSVで書き出す</Button> : null}
       </div>
 
       {load.state === 'not-ready' ? (
@@ -209,7 +209,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
                     })}</tbody>
                   </DataTable></Card>
                 )}
-          <p className={styles.footNote}><Info size={14} aria-hidden="true" />返金は確かめの窓のあとに 2 回目の確かめ（金額を入れる）で行います。数え方は「？」の中。</p>
+          <p className={styles.footNote}><Info size={16} aria-hidden="true" />返金は確かめの窓のあとに 2 回目の確かめ（金額を入れる）で行います。数え方は「？」の中。</p>
         </>
       )}
 

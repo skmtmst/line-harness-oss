@@ -1206,14 +1206,14 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       actions={<>
 {stage === 'accounts' ? <>
             <Button disabled={busy} onClick={toList}>キャンセル</Button>
-            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
+            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}><Check size={16} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
           </> : stage === 'duplicates' && preflight ? <>
-            <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
+            <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={16} aria-hidden="true" />戻る</Button>
             {expired ? <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button> : null}
-            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={15} aria-hidden="true" /> < TruncatedText value ={folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${folderBatch.runs.length}）` : folderBatch ? `${folderBatch.runs.length} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}/></Button>
+            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={16} aria-hidden="true" /> < TruncatedText value ={folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${folderBatch.runs.length}）` : folderBatch ? `${folderBatch.runs.length} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}/></Button>
           </> : <>
             <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
-            {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
+            {!done ? <Button variant="primary" disabled><Plus size={16} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
             {done || !result ? <Button disabled={busy} onClick={refreshResult } busyLabel = "処理中…">結果を再確認</Button> : null}
             {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
           </>}

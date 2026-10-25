@@ -274,8 +274,8 @@ function FriendAddRunDetailInner() {
     ]} />
     {talkHref || settingsHref ? (
       <div className={styles.sideActions}>
-        {talkHref ? <Button href={talkHref}><MessageCircle size={14} aria-hidden="true" />トークを開く</Button> : null}
-        {settingsHref ? <Button href={settingsHref}><Settings2 size={14} aria-hidden="true" />設定を開く</Button> : null}
+        {talkHref ? <Button href={talkHref}><MessageCircle size={16} aria-hidden="true" />トークを開く</Button> : null}
+        {settingsHref ? <Button href={settingsHref}><Settings2 size={16} aria-hidden="true" />設定を開く</Button> : null}
       </div>
     ) : null}
   </>
@@ -295,7 +295,7 @@ function FriendAddRunDetailInner() {
               busyLabel="再試行中…"
               onClick={() => (failedActions.length > 0 ? void retry() : setResendConfirmOpen(true))}
             >
-              <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
+              <RotateCcw size={16} aria-hidden="true" />失敗した処理をもう一度
             </Button>
           ) : null} </>} >{bandNote}</Notice>
       ) : null}
@@ -309,7 +309,7 @@ function FriendAddRunDetailInner() {
         <ol className={styles.steps}>
           {messageSent ? (
             <li data-state="ok"><Card layout="horizontal" padding="compact" gap="var(--tpl-rule-row-gap)" className={styles.step} data-state="ok">
-              <CheckCircle2 size={18} className={styles.stepIcon} aria-hidden="true" />
+              <CheckCircle2 size={20} className={styles.stepIcon} aria-hidden="true" />
               <span className={styles.stepIndex}>1</span>
               <span className={styles.stepText}>
                 <span className={styles.stepTitle}>{`案内（${messageLabel}）を送った`}</span>
@@ -323,9 +323,9 @@ function FriendAddRunDetailInner() {
             const time = jstClock(action.completedAt ?? action.startedAt)
             return (
               <li key={action.id} data-state={state}><Card layout="horizontal" padding="compact" gap="var(--tpl-rule-row-gap)" className={styles.step} data-state={state} surface={state === 'ng' ? 'danger' : 'standard'}>
-                {state === 'ok' ? <CheckCircle2 size={18} className={styles.stepIcon} aria-hidden="true" />
-                  : state === 'ng' ? <XCircle size={18} className={`${styles.stepIcon} ${styles.failedIcon}`} aria-hidden="true" />
-                    : <Clock size={18} className={`${styles.stepIcon} ${styles.waitIcon}`} aria-hidden="true" />}
+                {state === 'ok' ? <CheckCircle2 size={20} className={styles.stepIcon} aria-hidden="true" />
+                  : state === 'ng' ? <XCircle size={20} className={`${styles.stepIcon} ${styles.failedIcon}`} aria-hidden="true" />
+                    : <Clock size={20} className={`${styles.stepIcon} ${styles.waitIcon}`} aria-hidden="true" />}
                 <span className={styles.stepIndex}>{index + (messageSent ? 2 : 1)}</span>
                 <span className={styles.stepText}>
                   <span className={styles.stepTitle}>{actionTitle(action, detail.configuredActions)}</span>

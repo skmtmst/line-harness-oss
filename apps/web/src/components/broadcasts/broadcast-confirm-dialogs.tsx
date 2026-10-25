@@ -132,7 +132,7 @@ export function renderBroadcastConfirmDialogs({ approvalCandidates, approvalCand
       confirmLabel="対象を見直す"
       cancelLabel="キャンセル"
       designNode="vW4Es"
-      titleIcon={quotaInsufficient ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}
+      titleIcon={quotaInsufficient ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
       onCancel={() => setPreflightDialogOpen(false)}
       onConfirm={() => {
         setPreflightDialogOpen(false)

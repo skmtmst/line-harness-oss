@@ -553,7 +553,7 @@ export default function TagsTab({
 
   /* フォルダの列。数は一覧と同じものを数える。 */
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)', icon: <Inbox size={14} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)', icon: <Inbox size={16} aria-hidden="true" /> },
     ...groups.map((group, index) => ({
       kind: 'folder' as const,
       id: group.id,
@@ -566,7 +566,7 @@ export default function TagsTab({
       onDelete: canEdit ? () => { setManageFoldersOpen(false); setDeletingGroup(group) } : undefined,
       deleteNote: '削除しても、中のタグは未分類に残ります。',
     })),
-    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={14} aria-hidden="true" /> },
+    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={16} aria-hidden="true" /> },
   ]
 
   const folderSelectOptions = [
@@ -587,7 +587,7 @@ export default function TagsTab({
 
   // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = (wide: boolean) => status === 'forbidden' || !canEdit ? null : (
-    <Button href="/tags/new" variant="primary" className={wide ? styles.createWide : undefined}><Plus size={15} aria-hidden="true" />タグを作る</Button>
+    <Button href="/tags/new" variant="primary" className={wide ? styles.createWide : undefined}><Plus size={16} aria-hidden="true" />タグを作る</Button>
   )
 
   const search = (
@@ -632,7 +632,7 @@ export default function TagsTab({
     ...QUICK_FILTERS.filter(([value]) => value !== 'starred').map(([value, label]) => ({
       id: `quick-${value}`,
       label,
-      icon: quick.includes(value) ? <Check size={14} aria-hidden="true" /> : <span className={styles.checkSpace} aria-hidden="true" />,
+      icon: quick.includes(value) ? <Check size={16} aria-hidden="true" /> : <span className={styles.checkSpace} aria-hidden="true" />,
       onSelect: () => setQuick((current) => current.includes(value) ? current.filter((key) => key !== value) : [...current, value]),
     })),
     ...(quick.length ? [{ id: 'quick-clear', label: 'すべて外す', dividerBefore: true, onSelect: () => setQuick([]) }] : []),
@@ -650,7 +650,7 @@ export default function TagsTab({
         className={styles.quickButton}
         onClick={() => setQuickOpen((open) => !open)}
       >
-        <Bookmark size={15} aria-hidden="true" />
+        <Bookmark size={16} aria-hidden="true" />
         {narrow ? null : <span>よく使う絞り込み</span>}
       </Button>
       <ActionMenu open={quickOpen} onClose={() => setQuickOpen(false)} ariaLabel="よく使う絞り込み" items={quickItems} />
@@ -799,7 +799,7 @@ export default function TagsTab({
             key={kpi.title}
             presentation="band"
             title={kpi.title}
-            icon={<kpi.icon size={13} aria-hidden="true" />}
+            icon={<kpi.icon size={16} aria-hidden="true" />}
             value={kpi.value}
             unitSpacing="tight"
             unit={kpi.value == null ? '' : kpi.unit}

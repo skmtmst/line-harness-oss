@@ -30,7 +30,7 @@ export default function ActivityItem({
     <div className={styles.row}>
       <div className={styles.rail} aria-hidden="true">
         <span className={styles.marker}>
-          <Icon size={12} />
+          <Icon size={16} />
         </span>
         {!last && <span className={styles.line} />}
       </div>
@@ -46,7 +46,7 @@ export default function ActivityItem({
 /** V8 x4FeKG. Also usable without a timeline row. */
 
 export function ActivityMarker({ icon: Icon }: { icon: LucideIcon }) {
-  return <span className={styles.marker} aria-hidden="true"><Icon size={12} /></span>
+  return <span className={styles.marker} aria-hidden="true"><Icon size={16} /></span>
 }
 
 /** 履歴の小さな時刻。カードの中でも同じ文字と行の値を使う。 */

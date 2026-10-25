@@ -524,7 +524,7 @@ function FieldMigrate() {
         ) : null}
         {!confirmed ? (
           <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">
-            <ArrowRight size={15} aria-hidden="true" />
+            <ArrowRight size={16} aria-hidden="true" />
             {targetMode === 'new' && !createdTarget ? '項目を作って事前確認' : '事前確認する'}
           </Button>
         ) : null}

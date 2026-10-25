@@ -71,7 +71,7 @@ export default function DuplicatesV8() {
 
       <FriendsManageNavV8 current="重複検出" />
 
-      <Notice tone="info" icon={<Info size={14} aria-hidden="true" />}>
+      <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>
         <span>
           自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、
           プロフィール画像や名前だけの一致は候補として出します。確認後も元のLINE友だちデータは残ります。

@@ -76,7 +76,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
     <SaveErrorField names={["status"]}><Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></SaveErrorField>
     <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
     <ListToolbarEnd>
-    <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+    <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
     </ListToolbarEnd>
   </ListToolbarRow></ListToolbarFrame>
 
@@ -92,10 +92,10 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="押された回数" icon={<MousePointerClick size={13} aria-hidden="true" />} value={clicks} unit="回" detail={`この${days}日`} />
-      <KpiCard presentation="band" title="押した人（URLごとの合計）" icon={<Users size={13} aria-hidden="true" />} value={people} unit="人" detail="同じ人の何度押しは1人" />
-      <KpiCard presentation="band" title="計測中のURL" icon={<Link2 size={13} aria-hidden="true" />} value={active} unit="件" detail={`止めている ${stopped}`} />
-      <KpiCard presentation="band" title="押されていないURL" icon={<Unlink size={13} aria-hidden="true" />} value={zeroLinks} unit="件" detail="実測できたURLのうち" />
+      <KpiCard presentation="band" title="押された回数" icon={<MousePointerClick size={16} aria-hidden="true" />} value={clicks} unit="回" detail={`この${days}日`} />
+      <KpiCard presentation="band" title="押した人（URLごとの合計）" icon={<Users size={16} aria-hidden="true" />} value={people} unit="人" detail="同じ人の何度押しは1人" />
+      <KpiCard presentation="band" title="計測中のURL" icon={<Link2 size={16} aria-hidden="true" />} value={active} unit="件" detail={`止めている ${stopped}`} />
+      <KpiCard presentation="band" title="押されていないURL" icon={<Unlink size={16} aria-hidden="true" />} value={zeroLinks} unit="件" detail="実測できたURLのうち" />
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       {toolbar}

@@ -67,3 +67,20 @@ test('動きの曲線を手書きすると落ち、共通の --motion-ease-* と
     assert.ok((await kinds()).includes('motion-literal'))
   } finally { await browser.close() }
 })
+
+test('印が 16・20 以外の大きさや 1.75 以外の線だと落ち、左メニューの 18・空の表示の 40・丸の中のしるしは通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    const icon = (size, stroke = 1.75, cls = 'lucide') => `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}"><path d="M4 12h16"/></svg>`
+    await page.setContent(`<main><button>${icon(16)}保存</button><h2>${icon(20)}見出し</h2><div data-list-state="empty">${icon(40)}</div><span style="display:inline-flex;width:16px;height:16px;border-radius:50%;background:#087a3e">${icon(10)}</span></main><aside><a class="sidebar_item__x" href="#">${icon(18)}友だち</a></aside>`)
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(`<main><button>${icon(14)}保存</button></main>`)
+    assert.ok((await kinds()).includes('icon-size'))
+    await page.setContent(`<main><button>${icon(18)}保存</button></main>`)
+    assert.ok((await kinds()).includes('icon-size'))
+    await page.setContent(`<main><button>${icon(16, 2)}保存</button></main>`)
+    assert.ok((await kinds()).includes('icon-stroke'))
+  } finally { await browser.close() }
+})

@@ -101,12 +101,12 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
 
 /* 状態の札（並び）。件数は口の stateCounts。 */
 const CHIPS: Array<{ value: ConversionDefinitionFilter; label: string; icon: ReactNode }> = [
-  { value: 'active', label: '有効', icon: <Play size={13} aria-hidden="true" /> },
-  { value: 'stopped', label: '停止中', icon: <Pause size={13} aria-hidden="true" /> },
-  { value: 'draft', label: '下書き', icon: <FilePen size={13} aria-hidden="true" /> },
-  { value: 'invalid', label: '入力不良', icon: <TriangleAlert size={13} aria-hidden="true" /> },
-  { value: 'sourceStopped', label: '起点停止', icon: <CirclePause size={13} aria-hidden="true" /> },
-  { value: 'unused', label: 'どこからも使われていない', icon: <CircleOff size={13} aria-hidden="true" /> },
+  { value: 'active', label: '有効', icon: <Play size={16} aria-hidden="true" /> },
+  { value: 'stopped', label: '停止中', icon: <Pause size={16} aria-hidden="true" /> },
+  { value: 'draft', label: '下書き', icon: <FilePen size={16} aria-hidden="true" /> },
+  { value: 'invalid', label: '入力不良', icon: <TriangleAlert size={16} aria-hidden="true" /> },
+  { value: 'sourceStopped', label: '起点停止', icon: <CirclePause size={16} aria-hidden="true" /> },
+  { value: 'unused', label: 'どこからも使われていない', icon: <CircleOff size={16} aria-hidden="true" /> },
 ]
 
 function toEditForm(item: ConversionDefinitionListItem): EditForm {
@@ -815,7 +815,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
     /></SaveErrorField>
   )
   /* 閲覧のみには作るボタンを置かない（場所だけ空ける）。 */
-  const createLink = <Button variant="primary" href="/conversions/new"><Plus size={15} aria-hidden="true" />成果地点を作る</Button>
+  const createLink = <Button variant="primary" href="/conversions/new"><Plus size={16} aria-hidden="true" />成果地点を作る</Button>
   const createButton = canEdit ? createLink : <span className={styles.createSpace} aria-hidden="true" />
   const createInRow = canEdit ? createLink : <span className={styles.createSpaceRow} aria-hidden="true" />
 
@@ -846,7 +846,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   )
   const savedBox = (
     <div className={styles.savedBox}>
-      <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
+      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["status","sort"]}><Select
         aria-label="よく使う絞り込み"
         value={status === 'all' ? '' : status}
@@ -935,7 +935,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       {ingestError ? <Notice tone="danger" >{ingestError}</Notice> : null}
       <div className={styles.panelButtons}>
         {canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
-          <Button onClick={() => issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={15} aria-hidden="true" />鍵を発行する</Button>
+          <Button onClick={() => issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={16} aria-hidden="true" />鍵を発行する</Button>
         ) : null}
         {canEdit && panelPoint.status !== 'stopped' ? <Button onClick={() => openEdit(panelPoint)}>編集する</Button> : null}
         {canEdit && panelPoint.state === 'draft' ? (
@@ -944,7 +944,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       </div>
       {canEdit && panelPoint.status !== 'stopped' && panelPoint.state !== 'draft' ? (
         <div className={styles.panelButtons}>
-          <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={15} aria-hidden="true" />止める</Button>
+          <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={16} aria-hidden="true" />止める</Button>
         </div>
       ) : null}
     </DetailPanel>
@@ -1182,7 +1182,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       title="コンバージョン"
       actions={
         <Button onClick={() => exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSV で書き出す
+          <Download size={16} aria-hidden="true" />CSV で書き出す
         </Button>
       }
       stats={<>
@@ -1202,7 +1202,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           <KpiCard
             presentation="band"
             title="成果地点"
-            icon={<Target size={13} aria-hidden="true" />}
+            icon={<Target size={16} aria-hidden="true" />}
             help="登録している成果地点の数です。"
             value={listUnavailable ? null : total}
             unit="件"
@@ -1211,7 +1211,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           <KpiCard
             presentation="band"
             title="この30日の成果"
-            icon={<Trophy size={13} aria-hidden="true" />}
+            icon={<Trophy size={16} aria-hidden="true" />}
             help="この30日に数えた成果の件数です（取り消しを引いた数）。"
             value={reportUnavailable ? null : kpi.currentCount}
             unit="件"
@@ -1220,7 +1220,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           <KpiCard
             presentation="band"
             title="この30日の金額"
-            icon={<Banknote size={13} aria-hidden="true" />}
+            icon={<Banknote size={16} aria-hidden="true" />}
             help="この30日に数えた成果の金額の合計です。"
             value={reportUnavailable ? null : kpi.currentValue}
             valueText={reportUnavailable ? undefined : `${formatYen(kpi.currentValue)}`}
@@ -1230,7 +1230,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           <KpiCard
             presentation="band"
             title={narrow ? '使われていない' : 'どこからも使われていない'}
-            icon={<Unplug size={13} aria-hidden="true" />}
+            icon={<Unplug size={16} aria-hidden="true" />}
             help="配信・流入リンク・アフィリエイトのどこからも使われていない成果地点です。"
             value={listUnavailable ? null : kpi.unusedCount}
             unit="件"

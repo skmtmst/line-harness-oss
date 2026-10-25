@@ -145,19 +145,19 @@ export default function FileDropzone({
     >
       {busy ? (
         <>
-          <LoaderCircle aria-hidden="true" size={24} className={styles.spin} />
+          <LoaderCircle aria-hidden="true" size={20} className={styles.spin} />
           <p className={styles.zoneTitle}>{busyTitle}</p>
           {busyNote ? <p className={styles.zoneHint}>{busyNote}</p> : null}
         </>
       ) : shown === 'reject' ? (
         <>
-          <Ban aria-hidden="true" size={24} className={styles.rejectIcon} />
+          <Ban aria-hidden="true" size={20} className={styles.rejectIcon} />
           <p className={styles.rejectTitle}>{rejectTitle}</p>
           {rejectHint ? <p className={styles.zoneHint}>{rejectHint}</p> : null}
         </>
       ) : (
         <>
-          {icon ?? <Upload aria-hidden="true" size={24} className={shown === 'active' ? styles.activeIcon : styles.idleIcon} />}
+          {icon ?? <Upload aria-hidden="true" size={20} className={shown === 'active' ? styles.activeIcon : styles.idleIcon} />}
           <p className={shown === 'active' ? styles.activeTitle : styles.zoneTitle}>
             {shown === 'active' ? '離すと追加します' : title}
           </p>
@@ -174,7 +174,7 @@ export default function FileDropzone({
                 openPicker()
               }}
             >
-              {variant === 'video' ? <Upload size={14} aria-hidden="true" /> : null}
+              {variant === 'video' ? <Upload size={16} aria-hidden="true" /> : null}
               {chooseLabel}
             </Button>
           )}
@@ -272,7 +272,7 @@ export function AttachmentRow({
       className={[styles.row, className].filter(Boolean).join(' ')}
     >
       <span aria-hidden="true" className={styles.thumb} data-tone={tone}>
-        {thumbnail ?? <FileText size={18} className={styles.thumbIcon} />}
+        {thumbnail ?? <FileText size={20} className={styles.thumbIcon} />}
       </span>
       <span className={styles.rowBody}>
         <span className={styles.rowName} title={name}>{name}</span>

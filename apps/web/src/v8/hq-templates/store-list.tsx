@@ -160,7 +160,7 @@ export default function HqStoreList(props: HqStoreListProps) {
 
   const createButton = (full: boolean) => !canEdit ? null : (
     <Button type="button" variant="primary" className={full ? 'v8-folder-create w-full' : undefined} disabled={!ready || busy} onClick={onCreate}>
-      <Plus size={15} aria-hidden="true" />{words.create}
+      <Plus size={16} aria-hidden="true" />{words.create}
     </Button>
   )
 
@@ -168,12 +168,12 @@ export default function HqStoreList(props: HqStoreListProps) {
     const contents = folderContents === undefined ? rows : folderContents
     const count = contents?.filter((row) => id === 'none' ? !row.folder_id : row.folder_id === id).length ?? 0
     return canEdit && ready && !busy && type !== 'scenario' && onDistributeFolder && count > 0 ? [{
-      id: `${id}-distribute`, label: 'このフォルダを配る', icon: <Send size={14} aria-hidden="true" />, emphasis: true,
+      id: `${id}-distribute`, label: 'このフォルダを配る', icon: <Send size={16} aria-hidden="true" />, emphasis: true,
       onSelect: () => onDistributeFolder(id, name),
     }] : undefined
   }
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? rows.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? rows.length : null, icon: <Inbox size={16} aria-hidden="true" /> },
     ...folders.map((folder) => ({
       kind: 'folder' as const,
       id: folder.id,
@@ -260,10 +260,10 @@ export default function HqStoreList(props: HqStoreListProps) {
   }
 
   const rowMenu = (row: HqTemplate): ActionMenuItem[] => [
-    { id: 'distribute', label: '配る', icon: <Send size={14} aria-hidden="true" />, disabled: busy, onSelect: () => onDistribute(row) },
-    { id: 'edit', label: '編集する', icon: <Pencil size={14} aria-hidden="true" />, onSelect: () => onEdit(row) },
-    { id: 'duplicate', label: '複製する', icon: <Copy size={14} aria-hidden="true" />, onSelect: () => onDuplicate(row) },
-    { id: 'remove', label: '削除する', icon: <Trash2 size={14} aria-hidden="true" />, tone: 'danger', dividerBefore: true, onSelect: () => onRemove(row) },
+    { id: 'distribute', label: '配る', icon: <Send size={16} aria-hidden="true" />, disabled: busy, onSelect: () => onDistribute(row) },
+    { id: 'edit', label: '編集する', icon: <Pencil size={16} aria-hidden="true" />, onSelect: () => onEdit(row) },
+    { id: 'duplicate', label: '複製する', icon: <Copy size={16} aria-hidden="true" />, onSelect: () => onDuplicate(row) },
+    { id: 'remove', label: '削除する', icon: <Trash2 size={16} aria-hidden="true" />, tone: 'danger', dividerBefore: true, onSelect: () => onRemove(row) },
   ]
 
   /* タグの名前の札。フォルダの色は札の中の丸。 */
@@ -290,18 +290,18 @@ export default function HqStoreList(props: HqStoreListProps) {
           <div role="group" aria-label="配ったかで絞り込む" className={storeStyles.chipGroup}>
             {type === 'template' ? (
               <>
-                <FilterChip selected={tplCount === 'single'} onChange={() => { setTplCount((value) => (value === 'single' ? null : 'single')); setPage(1) }} title="1通だけのテンプレート" icon={<MessageSquare size={13} aria-hidden="true" />}>
+                <FilterChip selected={tplCount === 'single'} onChange={() => { setTplCount((value) => (value === 'single' ? null : 'single')); setPage(1) }} title="1通だけのテンプレート" icon={<MessageSquare size={16} aria-hidden="true" />}>
                   1通のみ
                 </FilterChip>
-                <FilterChip selected={tplCount === 'multiple'} onChange={() => { setTplCount((value) => (value === 'multiple' ? null : 'multiple')); setPage(1) }} title="複数通に分かれるテンプレート" icon={<Layers size={13} aria-hidden="true" />}>
+                <FilterChip selected={tplCount === 'multiple'} onChange={() => { setTplCount((value) => (value === 'multiple' ? null : 'multiple')); setPage(1) }} title="複数通に分かれるテンプレート" icon={<Layers size={16} aria-hidden="true" />}>
                   複数通
                 </FilterChip>
-                <FilterChip selected={tplVars} onChange={() => { setTplVars((value) => !value); setPage(1) }} title="名前や情報を差し込むテンプレート" icon={<Braces size={13} aria-hidden="true" />}>
+                <FilterChip selected={tplVars} onChange={() => { setTplVars((value) => !value); setPage(1) }} title="名前や情報を差し込むテンプレート" icon={<Braces size={16} aria-hidden="true" />}>
                   差し込みあり
                 </FilterChip>
               </>
             ) : null}
-            <FilterChip selected={undistributedOnly} onChange={() => { setUndistributedOnly((value) => !value); setPage(1) }} title="まだどのアカウントへも配っていないひな形" icon={<Unlink size={13} aria-hidden="true" />}>
+            <FilterChip selected={undistributedOnly} onChange={() => { setUndistributedOnly((value) => !value); setPage(1) }} title="まだどのアカウントへも配っていないひな形" icon={<Unlink size={16} aria-hidden="true" />}>
               未配布
             </FilterChip>
           </div>
@@ -321,14 +321,14 @@ export default function HqStoreList(props: HqStoreListProps) {
                 filterActive={tagQuick.length > 0}
                 onClick={() => setTagQuickOpen((open) => !open)}
               >
-                <Bookmark size={15} aria-hidden="true" />
+                <Bookmark size={16} aria-hidden="true" />
                 {narrow ? null : <span>よく使う絞り込み</span>}
               </Button>
               <ActionMenu open={tagQuickOpen} onClose={() => setTagQuickOpen(false)} ariaLabel="よく使う絞り込み" items={[
                 ...TAG_QUICK_FILTERS.map(([value, label]) => ({
                   id: `quick-${value}`,
                   label,
-                  icon: tagQuick.includes(value) ? <Check size={14} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />,
+                  icon: tagQuick.includes(value) ? <Check size={16} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />,
                   onSelect: () => { setTagQuick((current) => current.includes(value) ? current.filter((key) => key !== value) : [...current, value]); setPage(1) },
                 })),
                 ...(tagQuick.length ? [{ id: 'quick-clear', label: 'すべて外す', dividerBefore: true, onSelect: () => { setTagQuick([]); setPage(1) } }] : []),
@@ -346,13 +346,13 @@ export default function HqStoreList(props: HqStoreListProps) {
                 title="よく使う絞り込み"
                 onClick={() => setTagQuickOpen((open) => !open)}
               >
-                <Bookmark size={15} aria-hidden="true" />
+                <Bookmark size={16} aria-hidden="true" />
                 {narrow ? null : <span>よく使う絞り込み</span>}
               </Button>
               <ActionMenu open={tagQuickOpen} onClose={() => setTagQuickOpen(false)} ariaLabel="よく使う絞り込み" items={[
-                { id: 'quick-undistributed', label: 'まだ配っていない', icon: undistributedOnly ? <Check size={14} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setUndistributedOnly((value) => !value); setPage(1) } },
-                { id: 'quick-vars', label: '差し込みがある', icon: tplVars ? <Check size={14} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setTplVars((value) => !value); setPage(1) } },
-                { id: 'quick-multiple', label: '複数通に分かれている', icon: tplCount === 'multiple' ? <Check size={14} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setTplCount((value) => (value === 'multiple' ? null : 'multiple')); setPage(1) } },
+                { id: 'quick-undistributed', label: 'まだ配っていない', icon: undistributedOnly ? <Check size={16} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setUndistributedOnly((value) => !value); setPage(1) } },
+                { id: 'quick-vars', label: '差し込みがある', icon: tplVars ? <Check size={16} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setTplVars((value) => !value); setPage(1) } },
+                { id: 'quick-multiple', label: '複数通に分かれている', icon: tplCount === 'multiple' ? <Check size={16} aria-hidden="true" /> : <span className={hqStyles.checkSpace} aria-hidden="true" />, onSelect: () => { setTplCount((value) => (value === 'multiple' ? null : 'multiple')); setPage(1) } },
                 ...(undistributedOnly || tplVars || tplCount ? [{ id: 'quick-clear', label: 'すべて外す', dividerBefore: true, onSelect: () => { setUndistributedOnly(false); setTplVars(false); setTplCount(null); setPage(1) } }] : []),
               ]} />
             </span>
@@ -523,7 +523,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       stats={(
         <KpiBand data-design="KPIs">
           {bandKpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       )}

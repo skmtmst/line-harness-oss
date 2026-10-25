@@ -35,7 +35,7 @@ export default function FolderDistributionDialog({ name, templates, templateFold
     footer={<div className={styles.footer}>
       <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
       <Button variant="primary" disabled={busy || !picked.length || !selected.length} onClick={() => onConfirm(templates.filter((row) => picked.includes(row.id)), selected)}>
-        <Send size={15} aria-hidden="true" />{`${picked.length} 件を ${selected.length} アカウントへ配る`}
+        <Send size={16} aria-hidden="true" />{`${picked.length} 件を ${selected.length} アカウントへ配る`}
       </Button>
     </div>}
   >

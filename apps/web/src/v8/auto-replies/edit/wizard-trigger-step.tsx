@@ -85,7 +85,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                                 })
                               }
                             >
-                              <X size={12} aria-hidden="true" />
+                              <X size={16} aria-hidden="true" />
                             </button>
                           </span>
                         ))}
@@ -220,7 +220,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                             })
                           }
                         >
-                          {(() => { const Icon = KIND_ICONS[kind.label]; return Icon ? <Icon size={12} aria-hidden="true" /> : null })()}
+                          {(() => { const Icon = KIND_ICONS[kind.label]; return Icon ? <Icon size={16} aria-hidden="true" /> : null })()}
                           {kind.label}
                         </button>
                       )

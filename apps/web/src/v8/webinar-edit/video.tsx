@@ -285,7 +285,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         <h2 className={form.previewTitle}>公開ページでの見え方</h2>
         <div className={styles.pageCard}>
           <p className={styles.pageTitle} title={webinar.title}>{webinar.title}</p>
-          {hasVideo ? <span className={styles.player} aria-hidden="true"><Play size={32} /></span> : null}
+          {hasVideo ? <span className={styles.player} aria-hidden="true"><Play size={40} /></span> : null}
           <p className={styles.pageNote}>
             {!hasVideo ? '動画を設定すると、友だちの画面での見え方がここに出ます。' : scheduled && firstOnce?.at
               ? `${shortJst(firstOnce.at)} から・${fmtJaDuration(webinar.durationSeconds)}`
@@ -294,8 +294,8 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         </div>
         {ctx.canOpenPublicPage && ctx.publicUrl ? (
           <div className={form.previewActions}>
-            <Button external href={ctx.publicUrl}  ><Monitor size={15} aria-hidden="true" />PC で見る</Button>
-            <Button external href={ctx.publicUrl}  ><Smartphone size={15} aria-hidden="true" />スマホで見る</Button>
+            <Button external href={ctx.publicUrl}  ><Monitor size={16} aria-hidden="true" />PC で見る</Button>
+            <Button external href={ctx.publicUrl}  ><Smartphone size={16} aria-hidden="true" />スマホで見る</Button>
           </div>
         ) : ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
       </>}
@@ -303,11 +303,11 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       <Card variant="form" gap="normal" aria-labelledby="webinar-video-title" data-wc-pane="video">
         <div className={form.cardHead}><h2 id="webinar-video-title" className={form.cardTitle}>動画</h2></div>
         <div className={styles.videoRow}>
-          <span className={styles.thumb} aria-hidden="true"><Play size={18} /></span>
+          <span className={styles.thumb} aria-hidden="true"><Play size={20} /></span>
           <span className={styles.videoText}>
             <VideoMetadata webinar={webinar} />
           </span>
-          {readOnly ? null : <Button onClick={() => setReplaceOpen(true)}><Upload size={15} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</Button>}
+          {readOnly ? null : <Button onClick={() => setReplaceOpen(true)}><Upload size={16} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</Button>}
         </div>
         {showStages && asset ? <>
           <ol className={styles.stages} aria-label="動画の準備の段">
@@ -376,8 +376,8 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
           {webinar.schedule.length === 0 ? <p className={form.cardNote}>まだ枠がありません。下の「枠を足す」から足してください。</p> : null}
           {readOnly ? null : (
             <div className={form.buttons}>
-              <Button disabled={busy} onClick={() => setAdding('one')}><Plus size={15} aria-hidden="true" />枠を足す（毎日・毎週・単発）</Button>
-              <Button disabled={busy} onClick={() => setAdding('bulk')}><CalendarPlus size={15} aria-hidden="true" />まとめて作る</Button>
+              <Button disabled={busy} onClick={() => setAdding('one')}><Plus size={16} aria-hidden="true" />枠を足す（毎日・毎週・単発）</Button>
+              <Button disabled={busy} onClick={() => setAdding('bulk')}><CalendarPlus size={16} aria-hidden="true" />まとめて作る</Button>
             </div>
           )}
           {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -468,7 +468,7 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
         {editing ? (
           <span className={styles.capEdit}>
             <SaveErrorField names={["input"]}><NumberInput numericText id={capId} aria-label={`${when}の定員（人）`} inputMode="numeric" value={input} disabled={saving} placeholder="無制限" invalid={Boolean(capError)} aria-describedby={capError ? `${capId}-error` : undefined} onChange={(event) => { setInput(event.target.value); setCapError('') }} /></SaveErrorField>
-            <IconButton aria-label="定員を保存" title="定員を保存" disabled={saving} onClick={() => void save()}><Check size={15} aria-hidden="true" /></IconButton>
+            <IconButton aria-label="定員を保存" title="定員を保存" disabled={saving} onClick={() => void save()}><Check size={16} aria-hidden="true" /></IconButton>
           </span>
         ) : <span className={styles.cell}>{session === undefined ? emptyValue('unknown') : session?.capacity == null ? '無制限' : `${formatNumber(session.capacity)} 人`}</span>}
       </span>

@@ -833,7 +833,7 @@ export default function FormsListV8() {
       busy={creating}
       busyLabel="下書きを作成中"
     >
-      <Plus size={15} aria-hidden="true" />フォームを作る
+      <Plus size={16} aria-hidden="true" />フォームを作る
     </Button>
   ) : null
 
@@ -976,7 +976,7 @@ export default function FormsListV8() {
     listBody = skeleton
   } else if (!selectedAccountId) {
     listBody = stateCard(
-      <ClipboardList size={18} aria-hidden="true" />,
+      <ClipboardList size={20} aria-hidden="true" />,
       'LINE公式アカウントを選んでください',
       '上のアカウント切替から、回答フォームを使う公式アカウントを選びます。',
     )
@@ -984,7 +984,7 @@ export default function FormsListV8() {
     // 403は再試行せず、429は待ち秒数を添える。
     const failure = loadFailureCopy(loadFailure, '回答フォーム')
     listBody = stateCard(
-      <TriangleAlert size={18} aria-hidden="true" />,
+      <TriangleAlert size={20} aria-hidden="true" />,
       failure.title,
       failure.description,
       failure.retryable ? (
@@ -994,13 +994,13 @@ export default function FormsListV8() {
     )
   } else if (reviewMode && reviewForbidden) {
     listBody = stateCard(
-      <ClipboardList size={18} aria-hidden="true" />,
+      <ClipboardList size={20} aria-hidden="true" />,
       '確認できる未割り当てフォームはありません',
       '管理者確認は既定テナントの管理者のみ利用できます。',
     )
   } else if (reviewMode && forms.length === 0) {
     listBody = stateCard(
-      <ClipboardList size={18} aria-hidden="true" />,
+      <ClipboardList size={20} aria-hidden="true" />,
       '担当未割り当てのフォームはありません',
       '担当の決まっていない旧フォームはここに出ます。',
     )
@@ -1014,7 +1014,7 @@ export default function FormsListV8() {
         canCreate={canEditForms}
         action={
           <Button type="button" variant="primary" onClick={createDraft} disabled={creating} busy={creating} busyLabel="下書きを作成中">
-            <Plus size={15} aria-hidden="true" />最初のフォームを作る
+            <Plus size={16} aria-hidden="true" />最初のフォームを作る
           </Button>
         }
         filtered={filterActive}
@@ -1084,7 +1084,7 @@ export default function FormsListV8() {
                     <span className={styles.answerSub} title={answerSub}>{answerSub}</span>
                   </Td>
                   <Td>
-                    <CopyTextButton value={answerUrl ?? ''} label="URL" icon={<Link2 size={14} aria-hidden="true" />} aria-label={`${name}のURLをコピー`} disabled={!answerUrl} />
+                    <CopyTextButton value={answerUrl ?? ''} label="URL" icon={<Link2 size={16} aria-hidden="true" />} aria-label={`${name}のURLをコピー`} disabled={!answerUrl} />
                   </Td>
                   {!reviewMode ? (
                     /* 管理者確認は読み取り専用。編集・削除・回答の口は担当アカウント経由しか受けない。 */
@@ -1185,7 +1185,7 @@ export default function FormsListV8() {
                 key={kpi.key}
                 presentation="band"
                 title={kpi.title}
-                icon={<kpi.icon size={13} aria-hidden="true" />}
+                icon={<kpi.icon size={16} aria-hidden="true" />}
                 value={kpi.value}
                 unit={kpi.value == null ? '' : kpi.unit}
                 detail={kpi.detail}

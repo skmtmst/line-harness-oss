@@ -263,14 +263,14 @@ function LogDetailBody({ log }: { log: AiAnswerLogDetail }) {
             <p className={styles.qaTitle}>{log.qa.title}</p>
             <p className={styles.qaMeta}>{`${QA_STATUS_LABEL[log.qa.status]} ・ 使われた ${formatNumber(log.qa.useCount)} 回 ・ 最後に直した ${formatDate(log.qa.updatedAt, { style: 'list-day', fallback: '—' })}`}</p>
             {differs ? <p className={styles.differs}>今の答えと違います（送った時の答えを出しています）</p> : null}
-            <Link className={styles.link} href="/auto-replies?tab=qa">Q&A を開く <ArrowRight size={13} aria-hidden="true" /></Link>
+            <Link className={styles.link} href="/auto-replies?tab=qa">Q&A を開く <ArrowRight size={16} aria-hidden="true" /></Link>
           </div>
         ) : <p className={styles.after}>—</p>}
       </section>
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>そのあとの会話</h3>
         {log.afterNote ? <p className={styles.after}>{log.afterNote}</p> : null}
-        <Link className={styles.link} href={`/chats?friend=${encodeURIComponent(log.friendId)}`}>受信箱で会話を開く <ArrowRight size={13} aria-hidden="true" /></Link>
+        <Link className={styles.link} href={`/chats?friend=${encodeURIComponent(log.friendId)}`}>受信箱で会話を開く <ArrowRight size={16} aria-hidden="true" /></Link>
       </section>
     </div>
   )

@@ -153,8 +153,8 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
             {canEdit ? (
               <>
                 <RadioCardGroup legend="会議の URL の出し方" columns={2}>
-                  <RadioCard name={`staff-meeting-${person?.id}`} value="manual" icon={<Link2 size={18} />} title="手で入れる" note="決まった URL を毎回使う" checked onChange={() => undefined} />
-                  <RadioCard name={`staff-meeting-${person?.id}`} value="auto" icon={<Wand2 size={18} />} title="自動で発行" note="予約が決まったら会議を作る" checked={false} onChange={() => preparing.open('会議の自動発行')} />
+                  <RadioCard name={`staff-meeting-${person?.id}`} value="manual" icon={<Link2 size={20} />} title="手で入れる" note="決まった URL を毎回使う" checked onChange={() => undefined} />
+                  <RadioCard name={`staff-meeting-${person?.id}`} value="auto" icon={<Wand2 size={20} />} title="自動で発行" note="予約が決まったら会議を作る" checked={false} onChange={() => preparing.open('会議の自動発行')} />
                 </RadioCardGroup>
                 <RadioGroup label="自動で発行するときの会議">
                   {['Google Meet', 'Zoom', 'Microsoft Teams'].map((provider) => (
@@ -178,7 +178,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
           </section>
 
           {!connected ? (
-              <Notice tone="danger" role="status" icon={<Unplug size={18} aria-hidden="true" />} action={<>
+              <Notice tone="danger" role="status" icon={<Unplug size={20} aria-hidden="true" />} action={<>
                 {canEdit ? <Button size="compact" onClick={() => preparing.open('カレンダーのつなぎ直し')}>つなぎ直す</Button> : null}
               </>}>
                 <span><strong>この人の空きは閉じています</strong><span className={styles.minor}>Google の接続が切れました。つなぎ直すまで、この人の枠は予約できません。</span></span>

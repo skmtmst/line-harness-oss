@@ -532,14 +532,14 @@ const EmergencyControlV8 = (
 
       {/* 数の帯。取れていない数字は「—」（0 とは言わない）。 */}
       <KpiBand aria-label="緊急停止の集計">
-        <KpiCard title="緊急停止状態" icon={<ShieldCheck size={14} />} value={null} unit=""
+        <KpiCard title="緊急停止状態" icon={<ShieldCheck size={16} />} value={null} unit=""
           valueText={previewSettled && control ? (isStopped ? '停止中' : '有効') : emptyValue('unknown')}
           valueTone={isStopped ? 'danger' : 'default'}
           detail={impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'} />
-        <KpiCard title="止めた回数" icon={<OctagonPause size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
-        <KpiCard title="最長の停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
+        <KpiCard title="止めた回数" icon={<OctagonPause size={16} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
+        <KpiCard title="最長の停止" icon={<Timer size={16} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
           detail={longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'} />
-        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} unit="" valueText={runningVersion.detail?.version ?? emptyValue('unknown')}
+        <KpiCard title="いまの版" icon={<GitBranch size={16} />} value={null} unit="" valueText={runningVersion.detail?.version ?? emptyValue('unknown')}
           detail={runningVersion.statusText} />
       </KpiBand>
 

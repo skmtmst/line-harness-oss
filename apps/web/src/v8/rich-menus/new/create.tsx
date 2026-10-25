@@ -1201,7 +1201,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     下書きを保存
                   </Button>
                   <Button type="button" variant="primary" disabled={busy || !host.canOperate} title="保存したあとに、配る前の確認へ進みます" busy={saving || host.busy} busyLabel="保存しています…" onClick={() => void hostSave(true)}>
-                    <Upload size={14} aria-hidden="true" />
+                    <Upload size={16} aria-hidden="true" />
                     {host.selectedCount > 0 ? `${formatNumber(host.selectedCount)} アカウントへ配る` : 'アカウントへ配る'}
                   </Button>
                 </>
@@ -1211,7 +1211,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     下書きを保存
                   </Button>
                   <Button type="button" variant="primary" disabled={busy} busy={saving} busyLabel="保存中…" onClick={() => void goNext()}>
-                    <ArrowRight size={14} aria-hidden="true" />
+                    <ArrowRight size={16} aria-hidden="true" />
                     {nextLabel(step as Exclude<StepKey, 'publish'>)}
                   </Button>
                 </>
@@ -1237,11 +1237,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                       (checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk)
                     }
                     title={!canOperate ? '公開する権限がありません' : busy ? '処理が終わるまでお待ちください' : checks !== null && publishPlan.mode === 'now' && !checksAllOk ? '公開前の確認で未完了の項目があります。確認結果を直してください' : checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk ? '予約公開の確認に通っていません。確認結果を直してください' : undefined}
-                    busy={publishing || saving} icon={publishPlan.mode === 'now' ? <Send size={14} aria-hidden="true" /> : <CalendarClock size={14} aria-hidden="true" />}
+                    busy={publishing || saving} icon={publishPlan.mode === 'now' ? <Send size={16} aria-hidden="true" /> : <CalendarClock size={16} aria-hidden="true" />}
                     busyLabel={publishPlan.mode === 'now' ? '公開しています…' : '予約しています…'}
                     onClick={() => void handlePublishSubmit()}
                   >
-                    {publishPlan.mode === 'now' ? <Send size={14} aria-hidden="true" /> : <CalendarClock size={14} aria-hidden="true" />}
+                    {publishPlan.mode === 'now' ? <Send size={16} aria-hidden="true" /> : <CalendarClock size={16} aria-hidden="true" />}
                     {publishPlan.mode === 'now' ? '公開する' : '予約する'}
                   </Button>
                 </>
@@ -1253,14 +1253,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 </Button>
                 <Button
                   type="button"
-                  variant="primary" icon={step === 'audience' ? <ArrowRight size={14} aria-hidden="true" /> : undefined}
+                  variant="primary" icon={step === 'audience' ? <ArrowRight size={16} aria-hidden="true" /> : undefined}
                   disabled={busy}
                   busy={saving}
                   busyLabel="保存中…"
                   onClick={() => void goNext()}
                 >
                   {/* 板 `JeINq`：絵は印→文字の順（印が左・文字は絵x894）。 */}
-                  <ArrowRight size={14} aria-hidden="true" />
+                  <ArrowRight size={16} aria-hidden="true" />
                   {NEXT_LABEL[step as Exclude<StepKey, 'publish'>]}
                 </Button>
               </>

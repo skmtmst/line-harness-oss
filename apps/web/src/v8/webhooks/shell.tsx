@@ -163,7 +163,7 @@ export function overviewBandCells(args: {
     {
       key: 'destinations',
       title: '送り先',
-      icon: <ListChecks size={13} aria-hidden="true" />,
+      icon: <ListChecks size={16} aria-hidden="true" />,
       value: outgoing === null ? null : outgoing.length,
       unit: '件',
       detail: outgoing === null || active === null ? '読み込めませんでした' : `有効 ${active}・停止中 ${outgoing.length - active}`,
@@ -171,7 +171,7 @@ export function overviewBandCells(args: {
     {
       key: 'sent',
       title: '直近30日 送った',
-      icon: <Send size={13} aria-hidden="true" />,
+      icon: <Send size={16} aria-hidden="true" />,
       value: summary ? summary.outgoing : null,
       unit: '回',
       detail: summary ? `成功 ${formatNumber(Math.max(0, summary.outgoing - summary.outgoingFailed))} 回` : '集計を読み込めませんでした',
@@ -179,7 +179,7 @@ export function overviewBandCells(args: {
     {
       key: 'failed',
       title: '失敗',
-      icon: <TriangleAlert size={13} aria-hidden="true" />,
+      icon: <TriangleAlert size={16} aria-hidden="true" />,
       value: summary ? summary.failed : null,
       unit: '件',
       detail: summary ? '「やり取りの記録」からやり直せます' : '集計を読み込めませんでした',
@@ -187,7 +187,7 @@ export function overviewBandCells(args: {
     {
       key: 'incoming',
       title: '受け取り',
-      icon: <Inbox size={13} aria-hidden="true" />,
+      icon: <Inbox size={16} aria-hidden="true" />,
       value: incomingCount,
       unit: '件',
       detail: summary ? `直近30日 ${formatNumber(summary.incoming)} 回` : '集計を読み込めませんでした',

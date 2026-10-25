@@ -65,7 +65,7 @@ function Chevron({ open }: { open: boolean }) {
   return (
     <svg
       width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
       className={open ? 'rotate-180' : undefined}
     >
       <path d="m6 9 6 6 6-6" />
@@ -76,7 +76,7 @@ function Chevron({ open }: { open: boolean }) {
 function Check() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20 6 9 17l-5-5" />
     </svg>
   )

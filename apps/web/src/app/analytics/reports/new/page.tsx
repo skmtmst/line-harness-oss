@@ -1044,8 +1044,8 @@ function AnalyticsReportFormPage() {
         notice={updateConflict ? <Notice tone="warn" role="alert"
           heading={conflictLatest ? <>ほかの人が <time dateTime={conflictLatest.updatedAt} title={formatDateTime(conflictLatest.updatedAt)}>{formatTime(conflictLatest.updatedAt)}</time> にこのレポートを保存しました</> : 'ほかの人がこのレポートを先に保存しました'}
           action={<>
-            {conflictLatest && <Button variant="secondary" disabled={saving || latestBusy || compareBusy} onClick={() => { setCompareError(''); setCompareOpen(true) }}><GitCompareArrows size={15} aria-hidden="true" />違いを比べる</Button>}
-            <Button variant="secondary" disabled={saving || latestBusy || compareBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
+            {conflictLatest && <Button variant="secondary" disabled={saving || latestBusy || compareBusy} onClick={() => { setCompareError(''); setCompareOpen(true) }}><GitCompareArrows size={16} aria-hidden="true" />違いを比べる</Button>}
+            <Button variant="secondary" disabled={saving || latestBusy || compareBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}><RefreshCw size={16} aria-hidden="true" />最新を読み込んで続ける</Button>
           </>}>
           このまま保存すると、相手の変更が消えます。入力は残っています。
         </Notice> : null}
@@ -1064,7 +1064,7 @@ function AnalyticsReportFormPage() {
         <Button href="/analytics">キャンセル</Button>
         {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
         {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; setSendOnceOpen(true) }}>今すぐ1回だけ送る</Button>}
-        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
+        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={16} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
       </>}
       >
       {!canManage && <Notice tone="info" message="運用担当は内容を確認できます。作成は統括または管理者が行います。" />}
@@ -1112,7 +1112,7 @@ function AnalyticsReportFormPage() {
             <div className="report-v8-linkRow">
               {canManage && <button type="button" className="report-v8-addLink" aria-expanded={recipientsOpen} onClick={() => setRecipientsOpen((open) => !open)}>＋ 宛先を足す</button>}
               {/* 絵に無い「通知方法」は、宛先の行の右に小さく置く（開くと下に選ぶ欄）。 */}
-              <button type="button" className="report-v8-sideLink" aria-expanded={channelsOpen} onClick={() => setChannelsOpen((open) => !open)}>通知方法：{[dashboardEnabled ? '管理画面' : '', emailEnabled ? 'メール' : '', lineEnabled ? 'LINE' : ''].filter(Boolean).join('・') || '未選択'}<ChevronDown size={14} aria-hidden="true" /></button>
+              <button type="button" className="report-v8-sideLink" aria-expanded={channelsOpen} onClick={() => setChannelsOpen((open) => !open)}>通知方法：{[dashboardEnabled ? '管理画面' : '', emailEnabled ? 'メール' : '', lineEnabled ? 'LINE' : ''].filter(Boolean).join('・') || '未選択'}<ChevronDown size={16} aria-hidden="true" /></button>
             </div>
             <div className="report-v8-panel" hidden={!recipientsOpen && !hasInvalidEmail}>
               <ul className="report-v8-recipients divide-y" aria-label="レポートを受け取る人">

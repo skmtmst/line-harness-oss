@@ -164,7 +164,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                 ['unmatched', '一致しない', active.counts.unmatched, '新しく作るか除く'],
                 ['conflict', '競合', active.counts.conflict, '同じ先に2人'],
               ] as const).map(([key, title, value, detail]) => (
-                <KpiCard key={key} presentation="band" icon={<Inbox size={14} />} title={title} value={value} unit="人" detail={detail} />
+                <KpiCard key={key} presentation="band" icon={<Inbox size={16} />} title={title} value={value} unit="人" detail={detail} />
               ))}
             </KpiBand>
 
@@ -265,7 +265,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
 
         {active && !reviewing ? (
           <>
-            <Notice tone={active.status === "completed" ? "success" : "info"} role="note" icon={<CircleCheck size={18} aria-hidden="true" />} heading={<>{active.status === 'completed' ? '本移行と照合が終わりました' : statusView?.badgeLabel}</>}>
+            <Notice tone={active.status === "completed" ? "success" : "info"} role="note" icon={<CircleCheck size={20} aria-hidden="true" />} heading={<>{active.status === 'completed' ? '本移行と照合が終わりました' : statusView?.badgeLabel}</>}>
               <span className={styles.bandText}>
                 {active.status === 'completed'
                   ? `${formatNumber(active.counts.applied)} 人を引き継ぎました。必要ならこの履歴から切り戻せます。`
@@ -355,7 +355,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
         description="友だち情報と配信停止の状態を、新しいLINEアカウントへ引き継ぎます"
         action={(
           <Button type="button" variant="secondary" onClick={exportItems} disabled={!active?.items?.length} title="表示中の対応表をCSVにします">
-            <Download size={14} aria-hidden="true" />
+            <Download size={16} aria-hidden="true" />
             表示中をCSVで書き出す
           </Button>
         )}

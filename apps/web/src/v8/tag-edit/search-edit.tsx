@@ -463,7 +463,7 @@ function ConditionRow({
       <span className={label === '最初' ? styles.opFirst : label === 'かつ' ? styles.opAnd : styles.opOr}>{label}</span>
       <ConditionControls condition={condition} tags={tags} marks={marks} scenarios={scenarios} fields={fields} forms={forms} operators={operators} referenceErrors={referenceErrors} onChange={onChange} />
       <IconButton size="small" aria-label="この条件を削除する" title="この条件を削除する" onClick={onDelete}>
-        <X size={14} aria-hidden="true" />
+        <X size={16} aria-hidden="true" />
       </IconButton>
     </div>
     </Field>
@@ -860,8 +860,8 @@ export default function SavedSearchEditV8() {
         </Notice>
       ) : <p className={styles.countNote}>{countNote}</p>}
       <div className={styles.sideButtons}>
-        <Button type="button" onClick={() => recount()} busyLabel="処理中…"><RefreshCw size={14} aria-hidden="true" />数え直す</Button>
-        <Button href={`/friends?savedSearch=${encodeURIComponent(id)}`}><Users size={14} aria-hidden="true" />当てはまる人を見る</Button>
+        <Button type="button" onClick={() => recount()} busyLabel="処理中…"><RefreshCw size={16} aria-hidden="true" />数え直す</Button>
+        <Button href={`/friends?savedSearch=${encodeURIComponent(id)}`}><Users size={16} aria-hidden="true" />当てはまる人を見る</Button>
       </div>
       <div className={styles.sideHead}>
         <h2 className={styles.sideTitle}>使っている所</h2>
@@ -903,8 +903,8 @@ export default function SavedSearchEditV8() {
         footerActions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
-            <Button type="button" disabled={saving} onClick={() => void duplicate()} busy={Boolean(saving)} busyLabel="処理中…"><Copy size={14} aria-hidden="true" />複製して保存する</Button>
-            <Button type="button" variant="primary" disabled={saving || !dirty} title={!dirty ? '変更した内容はありません' : undefined} onClick={() => void save()} busy={saving}><Check size={14} aria-hidden="true" />保存する</Button>
+            <Button type="button" disabled={saving} onClick={() => void duplicate()} busy={Boolean(saving)} busyLabel="処理中…"><Copy size={16} aria-hidden="true" />複製して保存する</Button>
+            <Button type="button" variant="primary" disabled={saving || !dirty} title={!dirty ? '変更した内容はありません' : undefined} onClick={() => void save()} busy={saving}><Check size={16} aria-hidden="true" />保存する</Button>
           </>
         )} dirty={false}
       >
@@ -962,8 +962,8 @@ export default function SavedSearchEditV8() {
             />
           ))}
           <div className={styles.addButtons}>
-            <Button type="button" variant="text" onClick={() => patchConditions({ ...conditions, all: [...allConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />かつの条件を足す</Button>
-            <Button type="button" variant="text" onClick={() => patchConditions({ ...conditions, any: [...anyConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />またはの条件を足す</Button>
+            <Button type="button" variant="text" onClick={() => patchConditions({ ...conditions, all: [...allConditions, defaultCondition(tags)] })}><Plus size={16} aria-hidden="true" />かつの条件を足す</Button>
+            <Button type="button" variant="text" onClick={() => patchConditions({ ...conditions, any: [...anyConditions, defaultCondition(tags)] })}><Plus size={16} aria-hidden="true" />またはの条件を足す</Button>
           </div>
         </Card></div>
 

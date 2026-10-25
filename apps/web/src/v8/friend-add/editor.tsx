@@ -605,12 +605,12 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
               busyLabel="有効化中…"
               onClick={() => void enableRule()}
             >
-              <Power size={14} aria-hidden="true" />有効にする
+              <Power size={16} aria-hidden="true" />有効にする
             </Button>
           ) : (
             <Button type="button" variant="primary" disabled={saving || enabling} onClick={() => moveToStep(nextStep.key)} busy={Boolean(saving)} busyLabel="処理中…">
               次へ：{nextStep.label}
-              <ArrowRight size={15} aria-hidden="true" />
+              <ArrowRight size={16} aria-hidden="true" />
             </Button>
           )}
         </>

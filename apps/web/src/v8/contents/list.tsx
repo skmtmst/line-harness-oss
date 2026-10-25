@@ -822,7 +822,7 @@ export default function MediaLibraryListV8() {
   /* 登録と取得は担当者も使える（今と同じ）。消す・移す・名前を変えるは管理者だけ。 */
   const uploadButton = canRegisterMedia ? (
     <Button type="button" variant="primary" className="v8-folder-create w-full" onClick={() => setUploadOpen(true)}>
-      <Plus size={15} aria-hidden="true" />メディアを登録する
+      <Plus size={16} aria-hidden="true" />メディアを登録する
     </Button>
   ) : null
   const selectFolder = (id: string) => {
@@ -868,7 +868,7 @@ export default function MediaLibraryListV8() {
               key={card.key}
               presentation="band"
               title={card.title}
-              icon={<card.icon size={13} aria-hidden="true" />}
+              icon={<card.icon size={16} aria-hidden="true" />}
               value={card.value}
               valueText={card.valueText}
               valueTextWithUnit={card.valueTextWithUnit}
@@ -941,7 +941,7 @@ export default function MediaLibraryListV8() {
             filters={(
               <div role="group" aria-label="種類と使い方で絞り込む" className={styles.chipGroup}>
                 <FilterChip
-                  icon={<Images size={13} aria-hidden="true" />}
+                  icon={<Images size={16} aria-hidden="true" />}
                   selected={kinds.size === 1 && kinds.has('image') && !showArchivedOnly}
                   onChange={(selectedValue) => {
                     if (selectedValue) {
@@ -957,7 +957,7 @@ export default function MediaLibraryListV8() {
                   {`画像${kpis.kindTotals.image == null ? '' : ` ${formatNumber(kpis.kindTotals.image as number)}`}`}
                 </FilterChip>
                 <FilterChip
-                  icon={<EyeOff size={13} aria-hidden="true" />}
+                  icon={<EyeOff size={16} aria-hidden="true" />}
                   selected={showUnusedOnly}
                   onChange={(selectedValue) => {
                     setShowUnusedOnly(selectedValue)

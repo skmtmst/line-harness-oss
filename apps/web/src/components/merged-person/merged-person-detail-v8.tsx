@@ -190,7 +190,7 @@ export default function MergedPersonDetailViewV8({
                           title={!canManage ? '解除できるのはオーナーか管理者です' : undefined}
                           onClick={() => m.setUnlinkTarget(friend)}
                         >
-                          <Unlink size={12} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> 解除する
+                          <Unlink size={16} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> 解除する
                         </button>
                       </td>
                     </tr>
@@ -229,7 +229,7 @@ export default function MergedPersonDetailViewV8({
             onClick={m.openProfileEditor}
             data-qa-open="Hn9eE-profile"
           >
-            <PencilLine size={13} aria-hidden="true" /> 使う値を直す
+            <PencilLine size={16} aria-hidden="true" /> 使う値を直す
           </Button>
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>使っている値</h3>

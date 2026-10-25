@@ -281,7 +281,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       preview={<>
         <h2 className={form.previewTitle}>カードの見え方</h2>
         <div className={styles.previewCard}>
-          <span className={styles.player} aria-hidden="true"><Play size={32} /></span>
+          <span className={styles.player} aria-hidden="true"><Play size={40} /></span>
           <div className={styles.ctaCard}>
             <p className={styles.ctaTitle}>{current?.title || '（見出しなし）'}</p>
             {current?.body ? <p className={styles.ctaBody}>{current.body}</p> : null}
@@ -319,7 +319,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
           ))}
           {ctas.length === 0 ? <p className={form.cardNote}>まだカードがありません。</p> : null}
           {readOnly ? null : (
-            <div><Button disabled={busy} onClick={() => { setCtas((prev) => [...(prev ?? []), EMPTY_CARD(0)]); setTimes((prev) => [...prev, '0:00']); setSelected(ctas.length) }}><Plus size={15} aria-hidden="true" />CTA カードを足す</Button></div>
+            <div><Button disabled={busy} onClick={() => { setCtas((prev) => [...(prev ?? []), EMPTY_CARD(0)]); setTimes((prev) => [...prev, '0:00']); setSelected(ctas.length) }}><Plus size={16} aria-hidden="true" />CTA カードを足す</Button></div>
           )}
           {current ? (
             <fieldset className={styles.editor} disabled={busy}>

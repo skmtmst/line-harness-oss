@@ -29,7 +29,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
                 </Card>
               </> : <>
                 <div className={styles.doneHero}>
-                  <CircleCheck size={28} className={styles.doneIcon} aria-hidden="true" />
+                  <CircleCheck size={40} className={styles.doneIcon} aria-hidden="true" />
                   <p className={styles.doneTitle}>準備ができました</p>
                 </div>
                 <Card className={styles.accountBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
@@ -52,9 +52,9 @@ export default function Step5Completion({ connection, accountName, createdId, im
                 <div className={styles.buttonRow}>
                   <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
                   {restaurant ? <Button href="/restaurant-test/stores/new">飲食店の店舗を追加する</Button> : null}
-                  <Button href="/friends"><Users size={15} aria-hidden="true" />友だち一覧</Button>
-                  <Button href="/friend-add-settings"><QrCode size={15} aria-hidden="true" />友だち追加URL・QR</Button>
-                  <Button href="/emergency"><Activity size={15} aria-hidden="true" />運用状態の接続監視</Button>
+                  <Button href="/friends"><Users size={16} aria-hidden="true" />友だち一覧</Button>
+                  <Button href="/friend-add-settings"><QrCode size={16} aria-hidden="true" />友だち追加URL・QR</Button>
+                  <Button href="/emergency"><Activity size={16} aria-hidden="true" />運用状態の接続監視</Button>
                 </div>
               </>}
             </Card>

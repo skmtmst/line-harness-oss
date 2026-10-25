@@ -82,7 +82,7 @@ export function MessageStep({ definition, setDefinition, friendKind, scenarios, 
                 data-selected={selected || undefined}
                 onClick={() => { if (tab.key !== 'none') setDefinition((current) => ({ ...current, messageType: tab.key as FriendAddRuleDefinition['messageType'] })) }}
               >
-                <tab.icon size={13} aria-hidden="true" />
+                <tab.icon size={16} aria-hidden="true" />
                 {tab.label}
               </button>
             )
@@ -185,7 +185,7 @@ export function MessageStep({ definition, setDefinition, friendKind, scenarios, 
             ))}
             {canEdit ? (
               <Button type="button" variant="text" onClick={() => setDefinition((current) => ({ ...current, timeWindows: addTimeWindow(current.timeWindows) }))}>
-                <Plus size={15} aria-hidden="true" />時間帯を足す
+                <Plus size={16} aria-hidden="true" />時間帯を足す
               </Button>
             ) : null}
           </div>

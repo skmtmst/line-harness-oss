@@ -300,7 +300,7 @@ function EventsCreateV8Inner() {
         <>
           <Button href="/events">キャンセル</Button>
           <Button disabled={saving || !selectedAccountId} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
-          <Button variant="primary" disabled={saving || !selectedAccountId} busy={saving} onClick={() => { if (validateInput()) setPublishOpen(true) }}><Globe size={15} aria-hidden="true" />公開する</Button>
+          <Button variant="primary" disabled={saving || !selectedAccountId} busy={saving} onClick={() => { if (validateInput()) setPublishOpen(true) }}><Globe size={16} aria-hidden="true" />公開する</Button>
         </>
       )} dirty={false}
     >
@@ -479,7 +479,7 @@ function EventsCreateV8Inner() {
                   aria-label={`質問「${question.label}」を外す`}
                   onClick={() => setQuestions((current) => current.filter((_, at) => at !== index))}
                 >
-                  <X size={14} aria-hidden="true" />
+                  <X size={16} aria-hidden="true" />
                 </Button>
               </li>
             ))}

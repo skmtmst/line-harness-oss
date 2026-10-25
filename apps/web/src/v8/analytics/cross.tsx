@@ -353,11 +353,11 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   const unit = resultAxes?.unit ?? (measureKind === 'events' ? '回' : '人')
   const kpis = <KpiBand className={styles.band}>
     {/* 表の合計は延べ人数。集計対象は口が数えた実際の人数（重複なし）。 */}
-    <KpiCard presentation="band" title="集計対象" icon={<Users size={13} aria-hidden="true" />} value={crossResult ? crossResult.totalFriends : null} unit="人" detail={crossResult ? `表の延べ ${formatNumber(grandTotal)} ${unit}` : '結果が出ると数えます'} loading={loading} />
-    <KpiCard presentation="band" title="いちばん多い組み合わせ" icon={<Grid2x2 size={13} aria-hidden="true" />} value={summary?.top.value ?? null} unit={unit} detail={summary ? `${summary.top.rowLabel} × ${summary.top.columnLabel}` : emptyValue('unknown')} loading={loading} />
-    <KpiCard presentation="band" title="空のマス" icon={<Square size={13} aria-hidden="true" />} value={summary?.empty ?? null} unit="マス" detail={summary ? (summary.emptyLabels.slice(0, 2).join('・') || '該当者なし') : '該当者なし'} loading={loading} />
+    <KpiCard presentation="band" title="集計対象" icon={<Users size={16} aria-hidden="true" />} value={crossResult ? crossResult.totalFriends : null} unit="人" detail={crossResult ? `表の延べ ${formatNumber(grandTotal)} ${unit}` : '結果が出ると数えます'} loading={loading} />
+    <KpiCard presentation="band" title="いちばん多い組み合わせ" icon={<Grid2x2 size={16} aria-hidden="true" />} value={summary?.top.value ?? null} unit={unit} detail={summary ? `${summary.top.rowLabel} × ${summary.top.columnLabel}` : emptyValue('unknown')} loading={loading} />
+    <KpiCard presentation="band" title="空のマス" icon={<Square size={16} aria-hidden="true" />} value={summary?.empty ?? null} unit="マス" detail={summary ? (summary.emptyLabels.slice(0, 2).join('・') || '該当者なし') : '該当者なし'} loading={loading} />
     {/* その項目に値が入っていない人は集計が数えていない。 */}
-    <KpiCard presentation="band" title="未入力" icon={<HelpCircle size={13} aria-hidden="true" />} value={null} unit="人" detail="値がまだ無い人（表に出ない）" />
+    <KpiCard presentation="band" title="未入力" icon={<HelpCircle size={16} aria-hidden="true" />} value={null} unit="人" detail="値がまだ無い人（表に出ない）" />
   </KpiBand>
 
   if (fieldsLoading) return <SaveErrorScope errors={saveErrors}><>{kpis}<div className={styles.body} data-gap="tab"><ListState kind="loading" title="友だち情報欄を読み込んでいます" /></div></></SaveErrorScope>
@@ -433,8 +433,8 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
           <aside className={styles.funnelSide} data-w="cross" aria-labelledby="cross-picked-title">
             <h2 id="cross-picked-title" className={styles.hoursTitle}>{picked ? `${picked.rowLabel} × ${picked.columnLabel}（${formatNumber(picked.value)}${unit}${unit === '回' ? `・${formatNumber(picked.uniqueFriends)} 人` : ''}）` : 'マスを選んでください'}</h2>
             {picked && canManage ? <>
-              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('friends')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={15} aria-hidden="true" />対象者を開く</Button></span>
-              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('broadcast')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={15} aria-hidden="true" />この対象者へ配信を作成</Button></span>
+              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('friends')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={16} aria-hidden="true" />対象者を開く</Button></span>
+              <span><Button variant="secondary" disabled={audienceBusy} onClick={() => void openAudience('broadcast')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={16} aria-hidden="true" />この対象者へ配信を作成</Button></span>
             </> : picked ? <p className={styles.caption}>結果の保存と対象者づくりは、統括・管理者だけが行えます。</p> : null}
             {readings.length > 0 ? <>
               <h3 className={styles.compareTitle}>この表から読めること</h3>

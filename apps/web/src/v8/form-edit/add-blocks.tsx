@@ -17,7 +17,7 @@ export default function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number)
               const Icon = formKindIcon(card.key)
               return <button key={card.key} type="button" className={styles.addCard} data-fresh={card.fresh || undefined} onClick={() => onAdd(card.make)}>
                 <span className={styles.addCardTop}>
-                  <Icon size={15} aria-hidden="true" />
+                  <Icon size={16} aria-hidden="true" />
                   <span className={styles.addCardLabel}>{card.label}</span>
                   {card.fresh ? <span className={styles.newBadge}>新</span> : null}
                 </span>

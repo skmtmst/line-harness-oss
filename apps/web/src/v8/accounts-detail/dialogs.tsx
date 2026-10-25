@@ -456,7 +456,7 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
         actions={<>
           <Button type="button" onClick={close} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => void save()} disabled={busy} busy={busy} busyLabel="保存中…">
-            <ShieldCheck size={14} aria-hidden="true" />本人確認して保存
+            <ShieldCheck size={16} aria-hidden="true" />本人確認して保存
           </Button>
         </>}
       >
@@ -594,7 +594,7 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         actions={<>
           <Button type="button" onClick={close} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => void save()} disabled={busy} busy={busy} busyLabel="保存中…">
-            <Check size={14} aria-hidden="true" />保存する
+            <Check size={16} aria-hidden="true" />保存する
           </Button>
         </>}
       >

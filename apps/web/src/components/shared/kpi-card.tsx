@@ -294,9 +294,9 @@ export default function KpiCard({
         ) : null}
         {action ? (
           action.href !== undefined ? <Link href={action.href} prefetch={false} className={styles.link}>
-            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={12} aria-hidden="true" />
+            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={16} aria-hidden="true" />
           </Link> : <button type="button" className={styles.link} onClick={action.onClick}>
-            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={12} aria-hidden="true" />
+            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={16} aria-hidden="true" />
           </button>
         ) : null}
       </p>

@@ -111,10 +111,10 @@ export default function PetsV8({
         <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。ペットの情報や主食を変える操作は管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       <KpiBand data-design="KPIs" aria-label="ペットの数の帯">
-        <KpiCard presentation="band" title="登録ペット" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.total} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `犬 ${kpis.dogs}・猫 ${kpis.cats}・その他 ${Math.max(0, kpis.total - kpis.dogs - kpis.cats)}`} />
-        <KpiCard presentation="band" title="今月の新規" icon={<PlusCircle size={13} aria-hidden="true" />} value={pending ? null : kpis.newThisMonth} unit="匹" loading={pending && !kpisFailed} detail="1日から今日まで" />
-        <KpiCard presentation="band" title="目安を出せる" icon={<MinusCircle size={13} aria-hidden="true" />} value={pending ? null : kpis.computable} unit="匹" loading={pending && !kpisFailed} detail="犬・猫で体重と主食がそろっている" detailLayout="single" />
-        <KpiCard presentation="band" title="体重が古い" icon={<Undo2 size={13} aria-hidden="true" />} value={pending ? null : kpis.staleWeight} unit="匹" loading={pending && !kpisFailed} detail="90日 更新なし" />
+        <KpiCard presentation="band" title="登録ペット" icon={<History size={16} aria-hidden="true" />} value={pending ? null : kpis.total} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `犬 ${kpis.dogs}・猫 ${kpis.cats}・その他 ${Math.max(0, kpis.total - kpis.dogs - kpis.cats)}`} />
+        <KpiCard presentation="band" title="今月の新規" icon={<PlusCircle size={16} aria-hidden="true" />} value={pending ? null : kpis.newThisMonth} unit="匹" loading={pending && !kpisFailed} detail="1日から今日まで" />
+        <KpiCard presentation="band" title="目安を出せる" icon={<MinusCircle size={16} aria-hidden="true" />} value={pending ? null : kpis.computable} unit="匹" loading={pending && !kpisFailed} detail="犬・猫で体重と主食がそろっている" detailLayout="single" />
+        <KpiCard presentation="band" title="体重が古い" icon={<Undo2 size={16} aria-hidden="true" />} value={pending ? null : kpis.staleWeight} unit="匹" loading={pending && !kpisFailed} detail="90日 更新なし" />
       </KpiBand>
     </>
   ) : undefined
@@ -129,7 +129,7 @@ export default function PetsV8({
       explanation="体重が90日更新されていないペットは、マイページで更新をお願いできます（行の「…」→マイページで更新を促す）。"
       actions={accountId ? (
         <Button type="button" onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSVで書き出す
+          <Download size={16} aria-hidden="true" />CSVで書き出す
         </Button>
       ) : null}
       tabs={tabs}

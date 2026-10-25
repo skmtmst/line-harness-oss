@@ -277,7 +277,7 @@ export default function AffiliateOfferCreateV8() {
                 保存して続けて作る
               </Button>
               <Button variant="primary" disabled={saving} busy={saving} busyLabel="保存中..." onClick={() => runSave(true)}>
-                <Check size={15} aria-hidden="true" />保存して公開
+                <Check size={16} aria-hidden="true" />保存して公開
               </Button>
             </>
           ) : null}

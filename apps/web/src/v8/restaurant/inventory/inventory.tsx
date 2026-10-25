@@ -115,7 +115,7 @@ export default function InventoryPage() {
           {ctx && ctx.data.stores.length > 1 ? storePicker : null}
           {ctx?.store && canWriteRole(role) ? (
             <Button variant="primary" onClick={() => setDialog({ mode: 'add', day: todayIn(ctx.store?.timezone) })}>
-              <Plus size={15} aria-hidden="true" />臨時休業・貸切を足す
+              <Plus size={16} aria-hidden="true" />臨時休業・貸切を足す
             </Button>
           ) : null}
         </>

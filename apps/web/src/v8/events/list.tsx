@@ -344,7 +344,7 @@ export default function EventsListV8() {
   /* 作る場所と余白は共通フォルダ列へ。閲覧のみでは出さない。 */
   const createButton = canEdit ? (
     <Button variant="primary" href="/events/new" className="v8-folder-create w-full">
-      <Plus size={15} aria-hidden="true" />イベントを作る
+      <Plus size={16} aria-hidden="true" />イベントを作る
     </Button>
   ) : null
 
@@ -474,7 +474,7 @@ export default function EventsListV8() {
 
   let listBody: ReactNode
   if (!selectedAccountId) {
-    listBody = stateCard(<CalendarX size={18} aria-hidden="true" />, 'LINE公式アカウントを選んでください', '上のアカウント切替から、イベントを受け付ける公式アカウントを選びます。')
+    listBody = stateCard(<CalendarX size={20} aria-hidden="true" />, 'LINE公式アカウントを選んでください', '上のアカウント切替から、イベントを受け付ける公式アカウントを選びます。')
   } else if (loadStatus === 'loading') {
     listBody = (
       <div className={styles.tableBox} aria-busy="true">
@@ -502,10 +502,10 @@ export default function EventsListV8() {
       </div>
     )
   } else if (loadStatus === 'forbidden') {
-    listBody = stateCard(<TriangleAlert size={18} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()} busyLabel="読み込み中…">もう一度読み込む</Button>, true)
+    listBody = stateCard(<TriangleAlert size={20} aria-hidden="true" />, 'イベントを見る権限がありません', '選んでいるアカウントでは見られません。管理者に権限を確かめてください。', <Button onClick={() => refresh()} busyLabel="読み込み中…">もう一度読み込む</Button>, true)
   } else if (loadStatus === 'error') {
     listBody = stateCard(
-      <TriangleAlert size={18} aria-hidden="true" />,
+      <TriangleAlert size={20} aria-hidden="true" />,
       'イベントを読み込めませんでした',
       '登録したイベントは消えていません。もう一度読み込んでも直らない場合はエラー報告へ。',
       <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button>,
@@ -684,7 +684,7 @@ export default function EventsListV8() {
               key={item.key}
               presentation="band"
               title={item.title}
-              icon={<item.icon size={13} aria-hidden="true" />}
+              icon={<item.icon size={16} aria-hidden="true" />}
               value={item.value}
               unit={item.value == null ? '' : item.unit}
               detail={item.detail}

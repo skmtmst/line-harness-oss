@@ -521,7 +521,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       help={<PhotoReviewHelp pending={`まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? emptyValue('unknown')}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? emptyValue('unknown') : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`}
         adopted={hasMorePhotos ? '読み込んだ写真の集計です。続きの写真は含みません' : '今月 採用した写真の枚数です'}
         rejected={hasMorePhotos ? '読み込んだ写真の集計です。理由の内訳も続きの写真は含みません' : '今月 見送った写真の枚数です'} />}
-      actions={<Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}><History size={15} aria-hidden="true" />版の履歴を見る</Button>}
+      actions={<Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}><History size={16} aria-hidden="true" />版の履歴を見る</Button>}
       tabs={
         <div className={styles.tabs} data-design-node="photo-tabs-v8">
           <Tabs
@@ -544,16 +544,16 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           ) : null}
           <div className={styles.stats}>
             <KpiBand data-design="KPIs" aria-label="投稿の数の帯">
-              <KpiCard presentation="band" title="審査待ち" icon={<History size={13} aria-hidden="true" />}
+              <KpiCard presentation="band" title="審査待ち" icon={<History size={16} aria-hidden="true" />}
                 value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚"
                 detail={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
-              <KpiCard presentation="band" title="今月 採用" icon={<HelpCircle size={13} aria-hidden="true" />}
+              <KpiCard presentation="band" title="今月 採用" icon={<HelpCircle size={16} aria-hidden="true" />}
                 value={countsReady ? adoptedThisMonth : null} unit={hasMorePhotos ? '枚以上' : '枚'}
                 detail={policyPoints == null ? '1 枚ごとに —' : `1 枚ごとに ${formatNumber(policyPoints)} マイル`} />
-              <KpiCard presentation="band" title="今月 見送り" icon={<HelpCircle size={13} aria-hidden="true" />}
+              <KpiCard presentation="band" title="今月 見送り" icon={<HelpCircle size={16} aria-hidden="true" />}
                 value={countsReady ? rejectedThisMonth.length : null} unit={hasMorePhotos ? '枚以上' : '枚'}
                 detail={`理由：${topReason}`} />
-              <KpiCard presentation="band" title="公式サイト掲載" icon={<Undo2 size={13} aria-hidden="true" />}
+              <KpiCard presentation="band" title="公式サイト掲載" icon={<Undo2 size={16} aria-hidden="true" />}
                 value={publishedCount} unit={publishedCount == null ? '' : '枚'} detail="いま載っている写真" />
             </KpiBand>
           </div>

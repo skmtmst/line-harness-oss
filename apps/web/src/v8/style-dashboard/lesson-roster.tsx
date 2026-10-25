@@ -61,7 +61,7 @@ export function LessonRoster({ roster, canWrite, onClose, onPay, onAttend, onAbs
           </div>
         ))}
       </div>
-      {hidden > 0 ? <button type="button" className={styles.sideMoreButton} onClick={() => setAll(true)}>ほか {hidden}人を表示する<ArrowRight size={14} aria-hidden="true" /></button> : null}
+      {hidden > 0 ? <button type="button" className={styles.sideMoreButton} onClick={() => setAll(true)}>ほか {hidden}人を表示する<ArrowRight size={16} aria-hidden="true" /></button> : null}
       {canWrite ? (
         <div className={styles.rosterFoot}>
           <Button onClick={onPay}><CreditCard size={16} aria-hidden="true" />支払いのリンクを送る（{roster.payLinkCount}人）</Button>

@@ -297,7 +297,7 @@
 :root .form:has(> .radio:focus-visible) { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .inlineIcon { display: inline-flex; color: var(--color-ink-secondary); }
 :root .form.checked .inlineIcon { color: var(--color-accent-deep); }
-.inlineIcon svg { width: 14px; height: 14px; }
+.inlineIcon svg { width: 16px; height: 16px; }
 /* 横並びの小さい箱。指定した箱だけ、内容に合わせた高さで描く。 */
 :root .small {
   min-height: 0;

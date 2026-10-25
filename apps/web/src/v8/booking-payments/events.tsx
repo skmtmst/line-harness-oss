@@ -71,8 +71,8 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
 
   function menuFor(event: PaymentEvent): ActionMenuItem[] {
     return [
-      ...(event.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={15} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(event.bookingId)}` }] : []),
-      ...(canEdit && event.result === 'failed' ? [{ id: 'replay', label: 'もう一度読む', icon: <RefreshCw size={15} aria-hidden="true" />, onSelect: () => void replay(event) }] : []),
+      ...(event.bookingId ? [{ id: 'open', label: '予約を開く', icon: <CalendarDays size={16} aria-hidden="true" />, href: `/booking/bookings?booking=${encodeURIComponent(event.bookingId)}` }] : []),
+      ...(canEdit && event.result === 'failed' ? [{ id: 'replay', label: 'もう一度読む', icon: <RefreshCw size={16} aria-hidden="true" />, onSelect: () => void replay(event) }] : []),
     ]
   }
 
@@ -106,7 +106,7 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
                       <Td grow><span className={styles.eventKind}><span className={styles.cellStack}><TruncatedText value={`${EVENT_KIND[event.kind]}${event.repeat ? '（2回目）' : ''}`} />{sub ? <span className={styles.cellSub}>{sub}</span> : null}</span>
                         {/* 結び付け・返金APIは支払いIDが必要。この通知の契約に支払いIDが無い間は推測して実行しない。 */}
                         {canEdit && event.result === 'failed' && !event.bookingId && event.kind === 'paid' ? <span className={styles.eventFix}>
-                          <Button size="compact" onClick={() => preparing.open('予約に結び付ける')}><Link2 size={14} aria-hidden="true" />予約に結び付ける</Button>
+                          <Button size="compact" onClick={() => preparing.open('予約に結び付ける')}><Link2 size={16} aria-hidden="true" />予約に結び付ける</Button>
                           <Button size="compact" onClick={() => preparing.open('予約の無い支払いの返金')}>返金する</Button>
                         </span> : null}</span></Td>
                       <Td>{event.bookingId ? <RowNameLink href={`/booking/bookings?booking=${encodeURIComponent(event.bookingId)}`} title={event.bookingLabel ?? ''}>{event.bookingLabel ?? emptyValue('unknown')}</RowNameLink> : emptyValue('unknown')}</Td>
@@ -118,7 +118,7 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
               </DataTable></Card>
             )}
       {preparing.dialog}
-      <p className={styles.footNote}><Info size={14} aria-hidden="true" />失敗の行は「…」から［もう一度読む］。払ったのに予約が見つからない行は［予約に結び付ける］か［返金する］で手当てします。同じ知らせが二度届いても、二重には数えません。</p>
+      <p className={styles.footNote}><Info size={16} aria-hidden="true" />失敗の行は「…」から［もう一度読む］。払ったのに予約が見つからない行は［予約に結び付ける］か［返金する］で手当てします。同じ知らせが二度届いても、二重には数えません。</p>
     </div>
   )
 }

@@ -102,7 +102,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
     <Card variant="form" aria-labelledby="acd-senders">
       <CardHeader size="stacked" headingLevel={3} titleId="acd-senders" title="送り手"
         meta="メッセージの送り主として、名前とアイコンを切り替えられます（LINE の決まり：名前は 20 文字まで・公式アカウントの名前と並んで出ます）"
-        action={canAdd ? <Button onClick={() => { setError(''); setAdding(true) }}><Plus size={15} aria-hidden="true" />送り手を追加</Button> : undefined} />
+        action={canAdd ? <Button onClick={() => { setError(''); setAdding(true) }}><Plus size={16} aria-hidden="true" />送り手を追加</Button> : undefined} />
       {failed ? (
         <ListState kind="error" title="送り手を読み込めませんでした" onRetry={() => void load()} />
       ) : senders === null ? (
@@ -146,7 +146,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
             {icon?.url
               // eslint-disable-next-line @next/next/no-img-element -- 登録メディアの画像
               ? <img src={icon.url} alt="" className={styles.iconTileImage} />
-              : <><ImagePlus size={22} aria-hidden="true" /><span>画像を選ぶ</span></>}
+              : <><ImagePlus size={20} aria-hidden="true" /><span>画像を選ぶ</span></>}
           </button>
           <div className={styles.iconText}>
             <strong>アイコン<OptionalBadge /></strong>

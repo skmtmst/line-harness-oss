@@ -122,7 +122,7 @@ export function BasicsStageV8({
           onDraft={() => onSaveDraft(value)}
           draftBusy={busy}
           nextLabel="次へ：対象者と止める条件"
-          nextIcon={<ArrowRight size={15} aria-hidden="true" />}
+          nextIcon={<ArrowRight size={16} aria-hidden="true" />}
           onNext={() => onSave(value)}
           nextDisabled={candidatesPending || busy || !value.name.trim()}
         />

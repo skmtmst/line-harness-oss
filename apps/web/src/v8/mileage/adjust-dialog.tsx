@@ -287,7 +287,7 @@ export default function MileageAdjustDialog({
       busy={busy || policyLoading}
       error={error}
       confirmLabel={step === 'input' ? confirmLabel : undefined}
-      confirmIcon={step === 'input' && valid && !highValue ? (delta < 0 ? <Minus size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />) : undefined}
+      confirmIcon={step === 'input' && valid && !highValue ? (delta < 0 ? <Minus size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />) : undefined}
       cancelLabel={step === 'input' ? 'キャンセル' : undefined}
       onConfirm={() => { if (step === 'input') void submit() }}
       onCancel={() => { if (!busy) onCancel() }}

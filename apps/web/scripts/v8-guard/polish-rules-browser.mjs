@@ -76,5 +76,24 @@ export default function scanPolishRules() {
       if (/(?<![\w-])(ease|ease-in|ease-out|ease-in-out|cubic-bezier)(?![\w-])/.test(plain)) add('motion-curve', null, { prop, value: value.trim() }, rule.selectorText)
     }
   }
+  // 1. 印の大きさと線（§6.5 の 5）：ふつう 16・大事な所 20。左メニューの項目は 18、空の表示と画像の置き場の真ん中は 40。線は全部 1.75。
+  // 携帯の見本・グラフ・QR・選ぶ欄の中のしるし（チェック・丸）は印ではないので数えない。
+  const NOT_ICON = '[data-line-preview-part], [class*="line-preview_"], [class*="liff-phone-frame_"], [class*="phone_"], [class*="chart"], [class*="Chart"], [data-qr-code], [class*="qr"], [class*="checkbox_"], [class*="check-card_box"], [class*="radio_"], [class*="radio-card_radio"], [role="img"], [data-chart]'
+  for (const svg of document.querySelectorAll('svg')) {
+    const icon = svg.classList.contains('lucide') || (/currentcolor/i.test(svg.getAttribute('stroke') ?? '') && svg.getAttribute('viewBox') === '0 0 24 24')
+    if (!icon || svg.closest(NOT_ICON) || !visible(svg)) continue
+    // 印の地を svg 自身の余白で描く形（知らせの丸など）は、余白を除いた字面の大きさで見る。
+    const sc = css(svg), r = svg.getBoundingClientRect()
+    const size = Math.round(Math.max(r.width - parseFloat(sc.paddingLeft) - parseFloat(sc.paddingRight), r.height - parseFloat(sc.paddingTop) - parseFloat(sc.paddingBottom)) * 2) / 2
+    // 小さな色の丸の中のしるし（済みのチェック・状態の点）は丸の部品の一部なので、大きさは数えない。
+    const holder = svg.parentElement, hc = holder && css(holder), hr = holder?.getBoundingClientRect()
+    const mark = hc && hr.width <= 24 && hr.height <= 24 && !/rgba\(0, 0, 0, 0\)|transparent/.test(hc.backgroundColor) && parseFloat(hc.borderTopLeftRadius) >= hr.width / 2 - 1
+    const allowed = [16, 20]
+    if (svg.closest('[class*="sidebar_item"], [class*="sidebar_link"]')) allowed.push(18)
+    if (svg.closest('[data-list-state="empty"], [data-media-slot], [data-empty-mark]')) allowed.push(40)
+    if (!mark && !allowed.includes(size)) add('icon-size', svg, { size, allowed }, svg.closest('button, a, [role="button"]')?.getAttribute('aria-label') ?? '')
+    const stroke = parseFloat(sc.strokeWidth)
+    if (Math.abs(stroke - 1.75) > 0.01) add('icon-stroke', svg, { stroke }, '')
+  }
   return findings
 }

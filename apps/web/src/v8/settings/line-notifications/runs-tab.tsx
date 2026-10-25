@@ -175,10 +175,10 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           * 数えているので、全件より少ないときは「このページの n件から」と書く。
           * WEB202：送れなかった一覧にはメールで届いたもの（受付済み）は出ないので、ここでは数えない。
           */}
-        <KpiCard presentation="band" icon={<CircleX size={14} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('記録の合計')} loading={visibleState === 'loading'} />
+        <KpiCard presentation="band" icon={<CircleX size={16} aria-hidden="true" />} title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={kpiNote('記録の合計')} loading={visibleState === 'loading'} />
         <KpiCard presentation="band" icon={<UserX size={16} aria-hidden="true" />} title="ブロック" value={kpiValue(breakdown.blocked)} unit="件" detail={kpiNote(pageScoped ? `このページの${items.length}件から・対応不要` : '対応不要')} loading={visibleState === 'loading'} />
-        <KpiCard presentation="band" icon={<Mail size={14} aria-hidden="true" />} title="メールで送った" value={null} unit="件" detail={kpiNote('お知らせの記録で見られます')} loading={visibleState === 'loading'} />
-        <KpiCard presentation="band" icon={<RotateCcw size={14} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length}件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
+        <KpiCard presentation="band" icon={<Mail size={16} aria-hidden="true" />} title="メールで送った" value={null} unit="件" detail={kpiNote('お知らせの記録で見られます')} loading={visibleState === 'loading'} />
+        <KpiCard presentation="band" icon={<RotateCcw size={16} aria-hidden="true" />} title="再試行の予定" value={kpiValue(breakdown.retry)} unit="件" detail={kpiNote(`${pageScoped ? `このページの${items.length}件から・` : ''}${breakdown.nextRetryAt ? shortJst(breakdown.nextRetryAt) : '予定なし'}`)} loading={visibleState === 'loading'} />
       </KpiBand>
     ) : null}
 
@@ -200,7 +200,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
       </div>
       {mode === 'history' ? <FilterChip selected={filter === 'clicked'} onChange={() => setFilter(filter === 'clicked' ? 'all' : 'clicked')}>クリック記録あり</FilterChip> : null}
       <span className={styles.runSpacer} />
-      <Button onClick={() => load()} busyLabel="処理中…"><RotateCw size={15} aria-hidden="true" />記録を再読み込み</Button>
+      <Button onClick={() => load()} busyLabel="処理中…"><RotateCw size={16} aria-hidden="true" />記録を再読み込み</Button>
     </div>
 
     <section className={styles.table} data-design-node={mode === 'failures' ? 'DrwMm-table' : 'PZBVb-table'} data-list-state={listState} aria-label={title}>

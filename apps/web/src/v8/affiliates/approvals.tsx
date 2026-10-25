@@ -330,7 +330,7 @@ export default function ApprovalsTab() {
       <KpiCard
         presentation="band"
         title="承認待ち"
-        icon={<CircleHelp size={14} aria-hidden="true" />}
+        icon={<CircleHelp size={16} aria-hidden="true" />}
         value={ready ? counts.pending : null}
         unit="件"
         detail={ready ? (oldestPendingDays == null ? 'いまはありません' : `いちばん古いもの ${formatNumber(oldestPendingDays)}日前`) : loadState === 'loading' ? loadingWord : errorWord}
@@ -338,7 +338,7 @@ export default function ApprovalsTab() {
       <KpiCard
         presentation="band"
         title="今月 認めた"
-        icon={<Check size={14} aria-hidden="true" />}
+        icon={<Check size={16} aria-hidden="true" />}
         value={ready ? approvedThisMonth.length : null}
         unit="件"
         detail={ready ? formatYen(approvedMonthYen) : loadState === 'loading' ? loadingWord : errorWord}
@@ -346,7 +346,7 @@ export default function ApprovalsTab() {
       <KpiCard
         presentation="band"
         title="今月 認めなかった"
-        icon={<X size={14} aria-hidden="true" />}
+        icon={<X size={16} aria-hidden="true" />}
         value={ready ? rejectedThisMonth.length : null}
         unit="件"
         detail={ready ? 'テスト注文・取り消し' : loadState === 'loading' ? loadingWord : errorWord}
@@ -354,7 +354,7 @@ export default function ApprovalsTab() {
       <KpiCard
         presentation="band"
         title="保留期間"
-        icon={<Hourglass size={14} aria-hidden="true" />}
+        icon={<Hourglass size={16} aria-hidden="true" />}
         value={holdDays}
         unit="日"
         detail={holdDays == null ? 'アフィリエイターごとに決めます' : '過ぎた成果が次の締めに入る'}
@@ -573,7 +573,7 @@ export default function ApprovalsTab() {
         </div>
       ) : null}
       <BulkBar count={canSelect ? selected.size : 0} total={shownItems.filter(item => item.approvalStatus === 'pending' && approvalReviewReasons(item).length === 0).length} onSelectAll={() => setSelected(new Set(shownItems.filter(item => item.approvalStatus === 'pending' && approvalReviewReasons(item).length === 0).map(item => item.eventId)))} hint="対象を確認してから操作を選んでください">
-        <Button type="button" onClick={openBulkWizard}><ListChecks size={15} aria-hidden="true" /> 操作を選ぶ</Button>
+        <Button type="button" onClick={openBulkWizard}><ListChecks size={16} aria-hidden="true" /> 操作を選ぶ</Button>
       </BulkBar>
     </>
   )
@@ -590,7 +590,7 @@ export default function ApprovalsTab() {
       listHelp={readonly
           ? '行の「…」から 詳細と成果の付け方を見る。'
           : '行の「…」から 認める・認めない・詳細を見る。左のチェックで選ぶと、画面の下から一括バーが出ます。「操作を選ぶ」→ 認める／認めない → 確かめる → 結果 の順。却下の理由はまだ記録できません。'}
-      actions={<Button onClick={exportCsv} disabled={shownItems.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
+      actions={<Button onClick={exportCsv} disabled={shownItems.length === 0}><Download size={16} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
       toolbar={toolbar}
       pagination={pager}

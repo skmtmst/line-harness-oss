@@ -382,7 +382,7 @@ function FriendAddPublish() {
             busyLabel="有効化中…"
             onClick={() => void publish()}
           >
-            <Power size={15} aria-hidden="true" />有効にする
+            <Power size={16} aria-hidden="true" />有効にする
           </Button>
         </>
       ) : (
@@ -414,7 +414,7 @@ function FriendAddPublish() {
           <p className={styles.cardDesc}>送り先：{me ?? 'あなた'}（自分）</p>
           {canEdit ? (
             <Button type="button" disabled={testing} busy={testing} busyLabel="判定中…" onClick={() => void runTest()}>
-              <Send size={15} aria-hidden="true" />テストする（送らずに判定）
+              <Send size={16} aria-hidden="true" />テストする（送らずに判定）
             </Button>
           ) : null}
         </div>
@@ -431,7 +431,7 @@ function FriendAddPublish() {
           {checks.map((check) => (
             <li key={check.title} className={styles.checkRow}>
               <span className={styles.checkMark} data-ok={check.ok || undefined} aria-hidden="true">
-                {check.ok ? <CircleCheck size={18} /> : <CircleAlert size={18} />}
+                {check.ok ? <CircleCheck size={20} /> : <CircleAlert size={20} />}
               </span>
               <span className={styles.checkText}>
                 <strong>{check.title}</strong>

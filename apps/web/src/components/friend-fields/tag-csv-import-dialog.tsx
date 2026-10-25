@@ -197,7 +197,7 @@ export default function TagCsvImportDialog({
       >
         {/* 閉じ方は右上の×に一本化（UI-25）。 */}
         <button type="button" className="absolute right-3 top-3 z-10 inline-flex items-center justify-center rounded-mini p-1.5 text-ink-secondary hover:bg-canvas-sunken hover:text-ink" onClick={close} disabled={busy} aria-label="閉じる">
-          <X aria-hidden="true" size={18} />
+          <X aria-hidden="true" size={20} />
         </button>
         {phase === 'select' ? <>
           <header className={styles.header}>
@@ -239,7 +239,7 @@ export default function TagCsvImportDialog({
                 )}
               </div>
             ) : null}
-            <Notice tone="info" icon={<Info aria-hidden="true" size={18} />}>
+            <Notice tone="info" icon={<Info aria-hidden="true" size={20} />}>
               <span>フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。</span>
             </Notice>
           </div>
@@ -319,7 +319,7 @@ export default function TagCsvImportDialog({
               とくに「同じ名前のタグは上書きしない」は、CSVでフォルダを
               直そうとして見送られたときに、どこへ行けばよいか分からなくなる。
             */}
-              <Notice tone="warn" icon={<TriangleAlert aria-hidden="true" size={18} />} heading={<>{preview.summary.invalid > 0
+              <Notice tone="warn" icon={<TriangleAlert aria-hidden="true" size={20} />} heading={<>{preview.summary.invalid > 0
                 ? `エラーの${preview.summary.invalid}行は登録されません`
                 : '登録できる行だけを登録します'}</>}>
                 <p className={styles.warnBody}>

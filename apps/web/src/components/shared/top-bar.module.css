@@ -569,7 +569,7 @@
 :root .root[data-v8-chrome='shell'] .actions { gap: 10px; }
 :root .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
 :root .root[data-v8-chrome='shell'] .crumbHome { gap: 6px; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--color-ink-faint); }
-:root .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 14px; height: 14px; }
+:root .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 16px; height: 16px; }
 :root .root[data-v8-chrome='shell'] .crumbCurrent { font-size: 13px; font-weight: 500; line-height: 20px; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: var(--polish-radius-control); background: transparent; }
 /* 切替の札は箱の中に小さい字＋名前の2行（絵の指示）。外の見出しは畳む。 */
@@ -590,7 +590,7 @@
 /* 押せる役割（統括へ戻る）は文字の高さのまま。ボタンの最低の高さで名前が上へ押し出されていた（名前と役割の2行）。指で触る端末は今までどおり。 */
 @media (pointer: fine) { :root .root[data-v8-chrome='shell'] .identityText .roleButton { min-height: 0; } }
 :root .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
-:root .root[data-v8-chrome='shell'] .logout svg { width: 15px; height: 15px; }
+:root .root[data-v8-chrome='shell'] .logout svg { width: 16px; height: 16px; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton:not(:focus-visible) { outline-color: transparent; }
 /* 展開時は名前を最大260px・自分の名前を104px、畳んだ外側は内容に合わせた幅。 */
 :root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: auto; max-width: 260px; height: 20px; line-height: 17px; }

@@ -301,7 +301,7 @@ export default function ClosureDialog({
                       <Button href={`/chats?friend=${encodeURIComponent(row.friendId)}`}>LINE で連絡する</Button>
                     ) : (
                       <Button variant="text" href={`/restaurant-test/reservations?date=${dayOfIso(row.startsAt, timezone)}`}>
-                        <Phone size={15} aria-hidden="true" />{row.phone ? `電話で連絡（${row.phone}）` : '電話で連絡（番号は予約台帳）'}
+                        <Phone size={16} aria-hidden="true" />{row.phone ? `電話で連絡（${row.phone}）` : '電話で連絡（番号は予約台帳）'}
                       </Button>
                     )}
                   </div>

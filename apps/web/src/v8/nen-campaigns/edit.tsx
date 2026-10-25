@@ -413,7 +413,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           />
           <span className={styles.fullButton}>
             <Button type="button" disabled={testing || !testTarget} busy={testing} busyLabel="送っています…" title={testTarget ? undefined : '先に相手を名前で探してください'}  onClick={() => void sendTest()}>
-              <Send size={15} aria-hidden="true" />{testCandidates.length === 1 ? `${testCandidates[0].displayName ?? '名前なし'}へテストを送る` : 'テストを送る'}
+              <Send size={16} aria-hidden="true" />{testCandidates.length === 1 ? `${testCandidates[0].displayName ?? '名前なし'}へテストを送る` : 'テストを送る'}
             </Button>
           </span>
           {/* 相手が2人以上いるときだけ、送る相手を選ぶ欄を出す（ボタンの下：上の並びを動かさない）。 */}
@@ -438,7 +438,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       footerActions={canEdit ? (
         <>
           <Button href="/nen-campaigns">キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
+          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving} busyLabel="保存しています…"><Save size={16} aria-hidden="true" />配信内容を保存する</Button>
         </>
       ) : <></>} dirty={false}
     >
@@ -450,11 +450,11 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       <Card variant="form" gap="normal" aria-labelledby="nen-edit-flow">
         <CardHeader size="stacked" titleId="nen-edit-flow" title="配信フロー" meta={formAction && mileageAction ? '回答フォームへの送信をきっかけにマイルを付けます' : 'きっかけから届くまでの流れです'} />
         <ol className={styles.flow} aria-label="配信フロー">
-          <li className={styles.flowStep}><Package size={13} aria-hidden="true" />{trigger}</li>
-          <li className={styles.flowStep}><CalendarClock size={13} aria-hidden="true" />{isBirthday ? '3日前 10:00' : `${merged.delayDays}日後 ${time}`}</li>
-          <li className={styles.flowStep} data-current=""><Send size={13} aria-hidden="true" />{setting.label}</li>
-          {formAction ? <li className={styles.flowStep}><ClipboardList size={13} aria-hidden="true" />フォームに答えた</li> : null}
-          {mileageAction?.kind === 'award_mileage' ? <li className={styles.flowStep}><Coins size={13} aria-hidden="true" />{`${formatNumber(mileageAction.amount)} マイル`}</li> : null}
+          <li className={styles.flowStep}><Package size={16} aria-hidden="true" />{trigger}</li>
+          <li className={styles.flowStep}><CalendarClock size={16} aria-hidden="true" />{isBirthday ? '3日前 10:00' : `${merged.delayDays}日後 ${time}`}</li>
+          <li className={styles.flowStep} data-current=""><Send size={16} aria-hidden="true" />{setting.label}</li>
+          {formAction ? <li className={styles.flowStep}><ClipboardList size={16} aria-hidden="true" />フォームに答えた</li> : null}
+          {mileageAction?.kind === 'award_mileage' ? <li className={styles.flowStep}><Coins size={16} aria-hidden="true" />{`${formatNumber(mileageAction.amount)} マイル`}</li> : null}
         </ol>
       </Card>
 

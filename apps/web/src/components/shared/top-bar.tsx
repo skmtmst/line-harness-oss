@@ -209,7 +209,7 @@ export default function TopBar({
             <Link prefetch={false} href={homeHref} className={styles.crumbHome}>
               <HomeGridIcon /><span>ホーム</span>
             </Link>
-            <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
+            <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={16} /> : '›'}</span>
             {/*
               手前の段。ページが crumbs を渡したらそれを出す
               （一覧からの詳細で「一斉配信 › 配信名」）。渡さない画面は
@@ -236,7 +236,7 @@ export default function TopBar({
                 ) : (
                   <span className={styles.crumbFrom}>{crumb.label}</span>
                 )}
-                <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
+                <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={16} /> : '›'}</span>
               </span>
             ))}
             {title ? <h1 className={styles.crumbCurrent} title={title}>{titleHref ? <Link prefetch={false} href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</h1>
@@ -298,7 +298,7 @@ export default function TopBar({
             ) : (
               <span className={styles.accountName} data-part="account-name" title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
             )}
-            {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
+            {chromeVariant === 'shell' ? <ChevronsUpDown size={16} /> : <ChevronIcon />}
 
             {/*
               開くと統括に戻る操作と店の一覧を出す。
@@ -395,7 +395,7 @@ export default function TopBar({
 /* Pencil のアイコンは lucide。同じ形を手で写す（外の読み込みを増やさない）。 */
 function BookIcon() {
   return (
-    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
       <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
     </svg>
@@ -404,7 +404,7 @@ function BookIcon() {
 
 function LogOutIcon() {
   return (
-    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <path d="m16 17 5-5-5-5" />
       <path d="M21 12H9" />
@@ -414,7 +414,7 @@ function LogOutIcon() {
 
 function ChevronIcon() {
   return (
-    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="m6 9 6 6 6-6" />
     </svg>
   )
@@ -423,7 +423,7 @@ function ChevronIcon() {
 /* ★V8 殻合わせ：ホームの格子印（lucide `layout-grid`） */
 function HomeGridIcon() {
   return (
-    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect width="7" height="7" x="3" y="3" rx="1" />
       <rect width="7" height="7" x="14" y="3" rx="1" />
       <rect width="7" height="7" x="14" y="14" rx="1" />
@@ -435,7 +435,7 @@ function HomeGridIcon() {
 /* ★V8: メニューの畳み（lucide `panel-left`） */
 function PanelLeftIcon() {
   return (
-    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect width="18" height="18" x="3" y="3" rx="2" />
       <path d="M9 3v18" />
     </svg>
@@ -455,7 +455,7 @@ function BellBadge({ count }: { count: number }) {
 /* ★V8: 通知（lucide `bell`） */
 function BellIcon() {
   return (
-    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M10.268 21a2 2 0 0 0 3.464 0" />
       <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
     </svg>

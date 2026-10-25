@@ -177,10 +177,10 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
 
   return <>
     <KpiBand presentation="band" data-design="KPIs">
-      <KpiCard presentation="band" icon={<Bell size={14} aria-hidden="true" />} title="出しているお知らせ" value={ready ? summary?.published ?? null : null} unit="件" detail={ready ? `止めている ${summary?.stopped ?? '—'}` : '—'} loading={state === 'loading'} />
-      <KpiCard presentation="band" icon={<Send size={14} aria-hidden="true" />} title="今日届いた数" value={ready ? summary?.acceptedToday ?? null : null} unit="件" detail="お店の人へ" loading={state === 'loading'} />
-      <KpiCard presentation="band" icon={<Users size={14} aria-hidden="true" />} title="受け取る人" value={ready ? summary?.recipients ?? null : null} unit="人" detail="LINEログイン済み" loading={state === 'loading'} />
-      <KpiCard presentation="band" icon={<CircleX size={14} aria-hidden="true" />} title="届かなかった" value={ready ? summary?.excludedToday ?? null : null} unit="件" detail="LINE未ログインの人" loading={state === 'loading'} />
+      <KpiCard presentation="band" icon={<Bell size={16} aria-hidden="true" />} title="出しているお知らせ" value={ready ? summary?.published ?? null : null} unit="件" detail={ready ? `止めている ${summary?.stopped ?? '—'}` : '—'} loading={state === 'loading'} />
+      <KpiCard presentation="band" icon={<Send size={16} aria-hidden="true" />} title="今日届いた数" value={ready ? summary?.acceptedToday ?? null : null} unit="件" detail="お店の人へ" loading={state === 'loading'} />
+      <KpiCard presentation="band" icon={<Users size={16} aria-hidden="true" />} title="受け取る人" value={ready ? summary?.recipients ?? null : null} unit="人" detail="LINEログイン済み" loading={state === 'loading'} />
+      <KpiCard presentation="band" icon={<CircleX size={16} aria-hidden="true" />} title="届かなかった" value={ready ? summary?.excludedToday ?? null : null} unit="件" detail="LINE未ログインの人" loading={state === 'loading'} />
     </KpiBand>
 
 

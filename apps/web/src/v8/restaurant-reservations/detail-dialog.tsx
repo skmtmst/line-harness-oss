@@ -110,7 +110,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
     <ReservationDining dense entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)}/>
     <ReservationFacts items={[{label:'来店',value:<span title={historyText(history)}>{history.state==='ready'?`${history.count}回`:'—'}</span>}]}/>
     {/* 絵（xzR4g）：下は 変更する・卓を変える・取り消す の3つ。来店の記録の「…」は題の右（閉じるの左）。卓を変えるは変更の窓（卓の欄）へ。 */}
-    <ReservationDetailsActions>{canWrite?<><Button presentation="restaurant" variant="primary" onClick={()=>onEdit(reservation.id)}><Pencil size={15} aria-hidden="true"/>変更する</Button>{inactive?null:<Button presentation="restaurant" onClick={()=>onEdit(reservation.id)}>卓を変える</Button>}<Button presentation="restaurant" onClick={()=>inactive?onRestore(reservation.id):onCancel(reservation.id)}>{inactive?'予約を有効に戻す':'取り消す'}</Button></>:null}</ReservationDetailsActions>
+    <ReservationDetailsActions>{canWrite?<><Button presentation="restaurant" variant="primary" onClick={()=>onEdit(reservation.id)}><Pencil size={16} aria-hidden="true"/>変更する</Button>{inactive?null:<Button presentation="restaurant" onClick={()=>onEdit(reservation.id)}>卓を変える</Button>}<Button presentation="restaurant" onClick={()=>inactive?onRestore(reservation.id):onCancel(reservation.id)}>{inactive?'予約を有効に戻す':'取り消す'}</Button></>:null}</ReservationDetailsActions>
   </Card>
   return (
     <RsDialog
@@ -132,7 +132,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
               <>
                 <Button type="button" disabled={busy} onClick={() => onCancel(reservation.id)}>取り消す</Button>
                 <Button type="button" variant="primary" disabled={busy} onClick={() => onEdit(reservation.id)}>
-                  <Pencil size={15} aria-hidden="true" />変更する
+                  <Pencil size={16} aria-hidden="true" />変更する
                 </Button>
               </>
             )

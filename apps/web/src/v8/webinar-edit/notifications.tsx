@@ -357,7 +357,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         </ul>
       ) : null}
       {readOnly ? null : (
-        <div><Button onClick={() => setTestOpen(true)} disabled={testRefreshError || testing || saving || testDone} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : undefined}  busy={testing} busyLabel="送信中…"><Send size={15} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
+        <div><Button onClick={() => setTestOpen(true)} disabled={testRefreshError || testing || saving || testDone} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : undefined}  busy={testing} busyLabel="送信中…"><Send size={16} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
       )}
     </>
   }

@@ -790,8 +790,8 @@ export default function HqBroadcastCreate() {
               ...(step === 'message' ? [['配信後のアクション', '—']] : []),
             ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
             <div className={formStyles.previewActions}>
-              <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={14} aria-hidden /> テストを送る</Button>
-              <Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button>
+              <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={16} aria-hidden /> テストを送る</Button>
+              <Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={16} aria-hidden /> 配信イメージを見る</Button>
             </div>
             <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
 </>
@@ -805,7 +805,7 @@ export default function HqBroadcastCreate() {
             <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
             {step !== 'confirm' ? (
               <Button variant="primary" disabled={composerBusy || (step === 'audience' && chosen.length > 0 && tagStatus !== 'ready')} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
-                {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={15} aria-hidden /></> : nextLabel}
+                {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={16} aria-hidden /></> : nextLabel}
               </Button>
             ) : (
               <Button variant="primary" busy={checking || sending} disabled={sending || gate === 'pending'} onClick={() => void askSend()}>
@@ -876,7 +876,7 @@ export default function HqBroadcastCreate() {
                     const people = runPeople(item)
                     return (
                       <div key={item.id} className={formStyles.recentRow}>
-                        <Send size={14} aria-hidden /><span className={formStyles.recentName} title={item.title}>{item.title}</span>
+                        <Send size={16} aria-hidden /><span className={formStyles.recentName} title={item.title}>{item.title}</span>
                         <span className="text-ink-faint">{jpDateTime(item.scheduledAt)} 送信 ・ {formatNumber(people)} 人</span>
                         <Button size="compact" onClick={() => duplicate(item)}>複製する</Button>
                       </div>
@@ -978,7 +978,7 @@ export default function HqBroadcastCreate() {
                   <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
                   <small>最近送った人を除く機能は、まだ使えません</small>
                 </div>
-                <div className={formStyles.audienceCount} aria-live="polite"><span><Send size={14} aria-hidden /> この条件で送る人数</span><strong>{peopleLabel}</strong></div>
+                <div className={formStyles.audienceCount} aria-live="polite"><span><Send size={16} aria-hidden /> この条件で送る人数</span><strong>{peopleLabel}</strong></div>
                 {audience !== 'all' && !totals ? <p className="text-xs text-ink-faint">絞った人数は、最終確認でアカウントごとに数えます</p> : null}
                 <Notice tone="info"><strong>対象の確認ポイント</strong><br />人数は送る直前にもう一度数え直します。ブロック中の人には送りません</Notice>
               </section>
@@ -1041,7 +1041,7 @@ export default function HqBroadcastCreate() {
                     { key: 'schedule', label: '送信設定', value: sendWhenLabel, done: when === 'now' || Boolean(scheduledAt), move: '送信設定へ戻る' },
                   ] as const).map((row) => (
                     <div className={formStyles.checkRow} key={row.key}>
-                      {row.done ? <CheckCircle2 size={18} className="text-success" aria-hidden /> : <AlertTriangle size={18} className="text-warning" aria-hidden />}
+                      {row.done ? <CheckCircle2 size={20} className="text-success" aria-hidden /> : <AlertTriangle size={20} className="text-warning" aria-hidden />}
                       <div><strong>{row.label}</strong><p>{row.value}</p></div>
                       <Button variant="secondary" className={formStyles.textButton} size="compact" onClick={() => changeStep(row.key)}>{row.move}</Button>
                     </div>

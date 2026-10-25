@@ -542,7 +542,7 @@ export default function AccountHandoverV8() {
       {canManage && (editCount > 0 || decisionError) ? (
         <Notice role={decisionError ? "alert" : "note"} tone={decisionError ? "danger" : "warn"} action={<>
           <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>
-            <RotateCcw size={14} aria-hidden="true" />事前確認をやり直す
+            <RotateCcw size={16} aria-hidden="true" />事前確認をやり直す
           </Button>
           <Button type="button" variant="primary" disabled={savingDecisions} busy={savingDecisions} onClick={() => void saveDecisions()}>判断を保存する</Button>
         </>}>
@@ -586,7 +586,7 @@ export default function AccountHandoverV8() {
         ) : null}
         {canManage && handover.status !== 'completed' ? (
           <Button type="button" variant="primary" disabled={executeDisabled} title={executeDisabled ? unresolved > 0 ? '全員の判断を決めてください' : executing ? '実行しています' : '事前確認と判断の状態を確かめてください' : undefined} busy={executing} busyLabel="実行中…" onClick={() => { setExecuteError(''); setConfirmOpen(true) }}>
-            <Play size={14} aria-hidden="true" />本実行する{unresolved > 0 ? `（あと ${unresolved} 人）` : ''}
+            <Play size={16} aria-hidden="true" />本実行する{unresolved > 0 ? `（あと ${unresolved} 人）` : ''}
           </Button>
         ) : null}
       </>} />

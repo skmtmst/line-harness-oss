@@ -304,7 +304,7 @@ export default function ColorWell({
           {value ? value.toUpperCase() : '指定なし'}
         </span>
         <span className={styles.divider} aria-hidden="true" />
-        <ChevronDown size={14} aria-hidden="true" className={styles.caret} />
+        <ChevronDown size={16} aria-hidden="true" className={styles.caret} />
       </button>
       {open ? (
         <div
@@ -489,7 +489,7 @@ export default function ColorWell({
                 title={!hasDropper ? 'このブラウザはスポイトに対応していません' : undefined}
                 onClick={() => void pickWithDropper()}
               >
-                <Pipette size={15} aria-hidden="true" />
+                <Pipette size={16} aria-hidden="true" />
               </button>
             )}
           </div>

@@ -453,7 +453,7 @@ function VisitStampsScreen() {
       <PageHeading
         headingSize="regular"
         title="来店スタンプ"
-        actions={stampable&&selectedAccountId&&card?.accountIds.includes(selectedAccountId)?<Button variant="primary" onClick={()=>setQrOpen(true)}><QrCode size={15} aria-hidden="true"/>QR を出す</Button>:undefined}
+        actions={stampable&&selectedAccountId&&card?.accountIds.includes(selectedAccountId)?<Button variant="primary" onClick={()=>setQrOpen(true)}><QrCode size={16} aria-hidden="true"/>QR を出す</Button>:undefined}
         help="お店に来たお客さまへ押すスタンプカードです。マイル（オンラインでの動きにたまるもの）とは別に数えます。決まった数がたまると特典を使えます。特典はお客さまの LINE の画面を店員に見せ、店員が暗証番号を打つと使用済みになります。"
       />
       <div className={tpl.tabs} data-template-region="tabs">
@@ -545,7 +545,7 @@ function VisitStampsScreen() {
                 </div>
                 {fieldError('rewards')}
                 {ro || settings.rewards.length >= 20 ? null : (
-                  <span className={styles.addLine}><Button variant="text" onClick={() => setRewardEdit('new')}><Plus size={15} aria-hidden="true" />特典を足す</Button></span>
+                  <span className={styles.addLine}><Button variant="text" onClick={() => setRewardEdit('new')}><Plus size={16} aria-hidden="true" />特典を足す</Button></span>
                 )}
                 <Field label="使い方の説明（お客さまに見える）"><SaveErrorField names={["instructions","settings.instructions"]}><TextArea {...fieldProps('instructions')} compact aria-label="使い方の説明" rows={2} readOnly={ro} value={settings.instructions ?? ''} onChange={e => { if([...e.target.value].length <= 500) set({ instructions: e.target.value }) }} /></SaveErrorField>
 {fieldError('instructions')}
@@ -634,7 +634,7 @@ function VisitStampsScreen() {
                     <span className={styles.name}>カードを受け取った時のボーナス</span>
                     <span className={styles.sub}>友だちがカードを受け取った時に押す数（0〜50）</span>
                   </span>
-                  <Plus size={14} aria-hidden="true" />
+                  <Plus size={16} aria-hidden="true" />
                   <SaveErrorField names={["receiptBonus","settings.receiptBonus","receipt_bonus","settings.receipt_bonus"]}><NumberInput unit="個" note={false} {...fieldProps('receiptBonus')} aria-label="カードを受け取った時のボーナス" type="number" min={0} max={50} readOnly={ro} value={settings.receiptBonus ?? 0} onChange={e => set({ receiptBonus: Number(e.target.value) })} /></SaveErrorField>
                 </div>
                 {fieldError('receiptBonus')}
@@ -652,7 +652,7 @@ function VisitStampsScreen() {
                   </div>
                 </div>
                 {ro || settings.multipliers.length >= 20 ? null : (
-                  <span className={styles.addLine}><Button variant="text" onClick={() => setMultEdit('new')}><Plus size={15} aria-hidden="true" />倍率を足す</Button></span>
+                  <span className={styles.addLine}><Button variant="text" onClick={() => setMultEdit('new')}><Plus size={16} aria-hidden="true" />倍率を足す</Button></span>
                 )}
                   {card&&selectedAccountId&&card.accountIds.includes(selectedAccountId)?<StorefrontQr key={card.id+":"+card.version+":"+selectedAccountId} card={card} accountId={selectedAccountId} shop={accounts.find(a=>a.id===selectedAccountId)?.displayName??card.name} canManage={canManage}/>:null}
               </section>
@@ -704,7 +704,7 @@ function VisitStampsScreen() {
                                     {row.status === 'pending' && canStamp ? (
                                       <>
                                         <Button size="compact" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
-                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />承認</Button>
+                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
                                       </>
                                     ) : null}
                                     <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
@@ -772,7 +772,7 @@ function VisitStampsScreen() {
                       </div>
                       <Field label="メモ"><SaveErrorField names={["memo"]}><TextField value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={200} placeholder="例：レシートを確認済み" /></SaveErrorField></Field>
                       <span className={styles.addLine}>
-                        <Button disabled={!friendId || busy === 'grant'} onClick={() => void grant()} title={friendId ? undefined : '先に友だちを選んでください'} busy={Boolean(busy === 'grant')} busyLabel="処理中…"><Stamp size={15} aria-hidden="true" />押印を足す</Button>
+                        <Button disabled={!friendId || busy === 'grant'} onClick={() => void grant()} title={friendId ? undefined : '先に友だちを選んでください'} busy={Boolean(busy === 'grant')} busyLabel="処理中…"><Stamp size={16} aria-hidden="true" />押印を足す</Button>
                       </span>
                     </>
               ) : null}
@@ -789,7 +789,7 @@ function VisitStampsScreen() {
             actions={(
               <>
                 <Button disabled={!dirty || saving || imageBusy} disabledReason={saving ? '保存しています' : imageBusy ? '画像を登録しています' : !dirty ? '変更していません' : undefined} onClick={() => resetDraft(card)}>キャンセル</Button>
-                <Button variant="primary" disabled={!dirty || saving || imageBusy} disabledReason={imageBusy ? '画像を登録しています' : !dirty ? '変更していません' : undefined} onClick={() => void save()} busy={Boolean(saving)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />保存する</Button>
+                <Button variant="primary" disabled={!dirty || saving || imageBusy} disabledReason={imageBusy ? '画像を登録しています' : !dirty ? '変更していません' : undefined} onClick={() => void save()} busy={Boolean(saving)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />保存する</Button>
               </>
             )}
           />

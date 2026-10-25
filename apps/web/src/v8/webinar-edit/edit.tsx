@@ -391,7 +391,7 @@ function EditInner() {
       {readOnly ? null : draft}
       {primary ?? (label ? (
         <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handleNext(key)} busy={savingForNav === 'next'}>
-          <ArrowRight size={15} aria-hidden="true" />{label}
+          <ArrowRight size={16} aria-hidden="true" />{label}
         </Button>
       ) : null)}
     </>

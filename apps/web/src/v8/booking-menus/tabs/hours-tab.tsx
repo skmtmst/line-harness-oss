@@ -258,7 +258,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       aria-label={`${label}の${index + 1}区間目を削除`}
                       onClick={() => updateDay(weekday, (list) => list.filter((_, i) => i !== index))}
                     >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" strokeLinecap="round" /></svg>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" strokeLinecap="round" /></svg>
                     </button>
                   </div>
                   ))}
@@ -268,7 +268,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       className={styles.addLine}
                       onClick={() => updateDay(weekday, (list) => [...list, { start: '09:00', end: '18:00', capacity: 1 }])}
                     >
-                      <Plus size={15} aria-hidden="true" />時間帯を足す
+                      <Plus size={16} aria-hidden="true" />時間帯を足す
                     </button>
                   ) : null}
                 </div>
@@ -668,7 +668,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
       </div>
       <div className={styles.checkAction}>
         {/* 絵 yRPxl：虫めがね付きの白いボタン */}
-        <Button variant="secondary" onClick={() => void run()} disabled={!canRun} title={!menuId ? '確かめるメニューを選んでください' : !date ? '確かめる日付を入力してください' : !time ? '開始時刻を入力してください' : undefined} busy={checking}><Search size={15} aria-hidden="true" />確かめる</Button>
+        <Button variant="secondary" onClick={() => void run()} disabled={!canRun} title={!menuId ? '確かめるメニューを選んでください' : !date ? '確かめる日付を入力してください' : !time ? '開始時刻を入力してください' : undefined} busy={checking}><Search size={16} aria-hidden="true" />確かめる</Button>
         {result ? (
           <div className={`${styles.checkResult} ${result.bookable ? styles.checkOk : styles.checkNg}`} role="status">
             {result.bookable ? (

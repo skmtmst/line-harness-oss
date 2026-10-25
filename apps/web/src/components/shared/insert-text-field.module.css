@@ -79,7 +79,7 @@
   user-select: all;
   cursor: default;
 }
-.chipIcon { width: 11px; height: 11px; flex-shrink: 0; }
+.chipIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); flex-shrink: 0; }
 .chipLabel { white-space: nowrap; }
 
 /*
@@ -103,7 +103,7 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.insertButton svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--color-ink-secondary); }
+.insertButton svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--color-ink-secondary); }
 .insertButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
 .insertButton:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 .insertButton:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }

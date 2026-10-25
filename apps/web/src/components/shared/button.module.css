@@ -369,7 +369,7 @@ html:root .button.secondary[data-presentation='row-action']:focus-visible {
 :root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action']) > svg {
   width: 16px;
   height: 16px;
-  stroke-width: 2;
+  stroke-width: var(--polish-icon-stroke);
   flex: none;
 }
 /* ［LINE でログイン］：色は LINE の決まりのまま、文字を大きく太くして読みやすくする。高さは主ボタンと同じ。 */

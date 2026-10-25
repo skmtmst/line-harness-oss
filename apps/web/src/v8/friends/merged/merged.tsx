@@ -117,12 +117,12 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             busyLabel="再計算中…"
             title="最新の状態を取得して一覧を更新"
           >
-            <RotateCw size={14} aria-hidden="true" />
+            <RotateCw size={16} aria-hidden="true" />
             再計算
           </Button>
           {canManage ? (
             <Button type="button" variant="secondary" onClick={() => void u.exportCsv()} disabled={u.exporting} busy={u.exporting} busyLabel="書き出し中…">
-              <Download size={14} aria-hidden="true" />
+              <Download size={16} aria-hidden="true" />
               CSVで書き出す
             </Button>
           ) : null}
@@ -139,7 +139,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             <KpiCard
               key={kpi.key}
               presentation="band"
-              icon={<Inbox size={14} />}
+              icon={<Inbox size={16} />}
               title={kpi.title}
               value={kpi.value}
               valueText={kpi.value == null ? emptyValue('unknown') : `${formatNumber(kpi.value)} 人`}
@@ -314,7 +314,7 @@ function AccountsRow({ row, onClose }: { row: UserRowData; onClose: () => void }
             {row.xUsername ? <p>{`X：@${row.xUsername}`}</p> : null}
           </div>
           <button type="button" className={styles.closeLink} onClick={onClose}>
-            閉じる <ChevronUp size={14} aria-hidden="true" />
+            閉じる <ChevronUp size={16} aria-hidden="true" />
           </button>
         </div>
       </td>

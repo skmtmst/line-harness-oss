@@ -191,7 +191,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
         type="button"
         variant="secondary"
         onClick={() => void start()}
-        disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={15} aria-hidden="true" />CSVで書き出す
+        disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={16} aria-hidden="true" />CSVで書き出す
       </Button>
       {error || active || jobs.length > 1 ? (
       <div className={styles.exportPop}>

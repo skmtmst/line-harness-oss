@@ -295,7 +295,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
           <>
             <Button onClick={onBack} disabled={busy}>キャンセル</Button>
             <Button variant="primary" disabled={busy || !storeId || !dayReady} onClick={() => formRef.current?.requestSubmit()}>
-              {kind === 'hold' ? <Lock size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}{kind === 'hold' ? '枠を押さえる' : '台帳に入れる'}
+              {kind === 'hold' ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}{kind === 'hold' ? '枠を押さえる' : '台帳に入れる'}
             </Button>
           </>
         )} dirty={false}

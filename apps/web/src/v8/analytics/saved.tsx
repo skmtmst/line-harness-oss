@@ -248,10 +248,10 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
 
   return <SaveErrorScope errors={saveErrors}><>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="保存した分析" icon={<Bookmark size={13} aria-hidden="true" />} value={error ? null : items.length} unit="件" detail={failed ?? `クロス分析 ${crossCount}・ファネル ${items.length - crossCount}`} loading={loading} />
-      <KpiCard presentation="band" title="保存結果数" icon={<History size={13} aria-hidden="true" />} value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={failed ?? '時点ごとに固定した結果'} loading={loading} />
-      <KpiCard presentation="band" title="定期レポート" icon={<Mail size={13} aria-hidden="true" />} value={error || schedulesError ? null : schedules.length} unit="件" detail={error || schedulesError ? '読み込めませんでした' : `動いている ${schedules.filter((item) => item.status === 'active').length}・止めている ${schedules.filter((item) => item.status === 'paused').length}`} loading={loading || schedulesLoading} />
-      <KpiCard presentation="band" title="定義が古いもの" icon={<AlertTriangle size={13} aria-hidden="true" />} value={error ? null : staleCount} unit="件" detail={failed ?? '更新後まだ集計していない'} loading={loading} />
+      <KpiCard presentation="band" title="保存した分析" icon={<Bookmark size={16} aria-hidden="true" />} value={error ? null : items.length} unit="件" detail={failed ?? `クロス分析 ${crossCount}・ファネル ${items.length - crossCount}`} loading={loading} />
+      <KpiCard presentation="band" title="保存結果数" icon={<History size={16} aria-hidden="true" />} value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={failed ?? '時点ごとに固定した結果'} loading={loading} />
+      <KpiCard presentation="band" title="定期レポート" icon={<Mail size={16} aria-hidden="true" />} value={error || schedulesError ? null : schedules.length} unit="件" detail={error || schedulesError ? '読み込めませんでした' : `動いている ${schedules.filter((item) => item.status === 'active').length}・止めている ${schedules.filter((item) => item.status === 'paused').length}`} loading={loading || schedulesLoading} />
+      <KpiCard presentation="band" title="定義が古いもの" icon={<AlertTriangle size={16} aria-hidden="true" />} value={error ? null : staleCount} unit="件" detail={failed ?? '更新後まだ集計していない'} loading={loading} />
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>
@@ -285,8 +285,8 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                 </Tr>)}</tbody>
               </DataTable>}
             {selected ? <div data-card-footer className={styles.rowActions} data-gap="wide">
-              <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
-              {canManage ? <Button variant="secondary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={15} aria-hidden="true" />内容を変える</Button> : null}
+              <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
+              {canManage ? <Button variant="secondary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={16} aria-hidden="true" />内容を変える</Button> : null}
             </div> : null}
             <p data-card-footer className={styles.caption}>保存時点の固定結果です。いま集計し直しても変わりません。</p>
           </Card>
@@ -308,7 +308,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
         <span className={styles.caption}>決まった曜日や日に、集計結果をメールやLINEへ届けられます。</span>
         <span className={styles.spacer} />
         {schedulesLoading ? <span className={styles.caption}>確認中</span> : null}
-        {canManage ? <Button href="/analytics/reports/new" variant="secondary"><Plus size={15} aria-hidden="true" />定期レポートを作る</Button> : null}
+        {canManage ? <Button href="/analytics/reports/new" variant="secondary"><Plus size={16} aria-hidden="true" />定期レポートを作る</Button> : null}
       </div>
       {schedulesError ? <Notice tone="danger" ><span>{schedulesError}</span>{/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}<Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></Notice> : null}
       {schedulesLoading ? null : schedules.length === 0 ? (schedulesError ? null : <ListState kind="empty" title="定期レポートはまだありません" description="決まった曜日や日に、集計結果をメールやLINEへ届けられます。" />)

@@ -184,11 +184,11 @@ export default function SnsSettingsPage() {
                 ]}
               />
               <div className={styles.links}>
-                <Link className={styles.link} href="/restaurant-test/google?tab=reviews">口コミへ<ArrowRight size={14} aria-hidden /></Link>
-                <Link className={styles.link} href="/restaurant-test/google?tab=posts">投稿へ<ArrowRight size={14} aria-hidden /></Link>
-                <Link className={styles.link} href="/restaurant-test/google?tab=profile">プロフィールへ<ArrowRight size={14} aria-hidden /></Link>
+                <Link className={styles.link} href="/restaurant-test/google?tab=reviews">口コミへ<ArrowRight size={16} aria-hidden /></Link>
+                <Link className={styles.link} href="/restaurant-test/google?tab=posts">投稿へ<ArrowRight size={16} aria-hidden /></Link>
+                <Link className={styles.link} href="/restaurant-test/google?tab=profile">プロフィールへ<ArrowRight size={16} aria-hidden /></Link>
                 {/* Google の接続・解除は Google ビジネスの［設定］タブ 1 か所で行う（B-360 E）。 */}
-                <Link className={styles.link} href="/restaurant-test/google?tab=settings">接続の設定へ<ArrowRight size={14} aria-hidden /></Link>
+                <Link className={styles.link} href="/restaurant-test/google?tab=settings">接続の設定へ<ArrowRight size={16} aria-hidden /></Link>
               </div>
             </>
           )}
@@ -221,7 +221,7 @@ export default function SnsSettingsPage() {
               ) : null}
               <p className={styles.listTitle}>{igState === 'connected' ? 'できること' : 'つなぐとできること'}</p>
               <ul className={styles.checks}>
-                {IG_CAPABILITIES.map((text) => <li key={text}><Check size={14} aria-hidden />{text}</li>)}
+                {IG_CAPABILITIES.map((text) => <li key={text}><Check size={16} aria-hidden />{text}</li>)}
               </ul>
               {igState === 'unconfigured' ? (
                 <p className={styles.note}>この環境には Instagram 接続の設定がありません。</p>

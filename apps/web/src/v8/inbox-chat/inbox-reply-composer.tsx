@@ -72,7 +72,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           size={'compact'}
           type="button"
           onClick={() => setShowTemplatePicker(true)}>
-          <FileText aria-hidden="true" size={14} />
+          <FileText aria-hidden="true" size={16} />
           テンプレートを選択
         </InboxToolButton>
         <InboxToolButton
@@ -82,7 +82,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           aria-expanded={showComposerOptions}
           type="button"
           onClick={() => setShowComposerOptions((v) => !v)}>
-          {(<Settings2 aria-hidden="true" size={14} />)}
+          {(<Settings2 aria-hidden="true" size={16} />)}
           {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
         </InboxToolButton>
 
@@ -99,7 +99,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           data-inbox-v6="internal-memo-toggle"
           onClick={() => setShowMemoEditor((current) => !current)}
           aria-expanded={showMemoEditor}>
-          <NotebookPen aria-hidden="true" size={14} />
+          <NotebookPen aria-hidden="true" size={16} />
           内部メモ
         </InboxToolButton>
         {/* ★V8 B-6：［添付］の道具はやめ、入力欄の左下のクリップから選ぶ（M0393「7. 添付」）。v7 は今までの［画像］。 */}
@@ -211,7 +211,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           aria-label="引用を解除"
           className="shrink-0 text-ink-faint hover:text-danger"
         >
-          <X aria-hidden="true" size={14} />
+          <X aria-hidden="true" size={16} />
         </button>
       </div>
     )}
@@ -350,14 +350,14 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
             onClick={() => setShowSchedulePanel((v) => !v)}
             aria-expanded={showSchedulePanel}
             aria-haspopup={'dialog'}>
-            {(<Clock3 aria-hidden="true" size={15} />)}
+            {(<Clock3 aria-hidden="true" size={16} />)}
             予約{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
           </InboxToolButton>
           <Button variant="primary"
             size="standard"
             onClick={handleSendMessage}
             disabled={sending || messageOverLimit || ((pendingAttachment !== null) && pendingAttachment.status !== 'ready') || (!messageContent.trim() && !pendingImage && !(pendingAttachment?.status === 'ready'))}>
-            {(!sending) ? <Send aria-hidden="true" size={15} /> : null}
+            {(!sending) ? <Send aria-hidden="true" size={16} /> : null}
             {sending ? '送っています…' : '送信する'}
           </Button>
         </InboxComposerActions>

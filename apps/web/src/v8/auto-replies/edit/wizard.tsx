@@ -725,7 +725,7 @@ function AutoReplyWizardV8Inner() {
           title="ルールを作る"
           help={`ルール名：${published!.name}`}
           identity={<Link href="/auto-replies" className={styles.backLink}>
-            <ArrowLeft size={14} aria-hidden="true" />
+            <ArrowLeft size={16} aria-hidden="true" />
             自動応答へ
           </Link>}
           steps={<Steps label="自動応答を作る進み方" steps={doneSteps} />}
@@ -733,7 +733,7 @@ function AutoReplyWizardV8Inner() {
         <div className={styles.doneBody}>
           <section className={styles.done} aria-labelledby="auto-reply-done-title">
             <span className={styles.doneIcon} aria-hidden="true">
-              <Check size={24} />
+              <Check size={20} />
             </span>
             <CardHeader size="content" title={`「${published!.name}」を有効にしました`} titleId="auto-reply-done-title" meta={<>
               これから届くメッセージで動き始めます。止めているあいだに届いた分には、さかのぼって返しません。止めたいときは、一覧の「…」から止められます。
@@ -750,13 +750,13 @@ function AutoReplyWizardV8Inner() {
               </div>
             </dl>
             <div className={styles.doneActions}>
-              <Button href="/auto-replies"><List size={14} aria-hidden="true" />一覧へ戻る</Button>
+              <Button href="/auto-replies"><List size={16} aria-hidden="true" />一覧へ戻る</Button>
               <Button href={`/auto-replies/runs?id=${encodeURIComponent(autoReplyId ?? '')}`}>
-                <Activity size={14} aria-hidden="true" />
+                <Activity size={16} aria-hidden="true" />
                 実行結果を見る
               </Button>
               <Button href="/auto-replies/edit" variant="primary">
-                <Plus size={14} aria-hidden="true" />
+                <Plus size={16} aria-hidden="true" />
                 もう1つ作る
               </Button>
             </div>
@@ -794,7 +794,7 @@ function AutoReplyWizardV8Inner() {
             `ルール名：${thisRuleName}・${statusBadge}として作っています`
           )}
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
-          <ArrowLeft size={14} aria-hidden="true" />
+          <ArrowLeft size={16} aria-hidden="true" />
           自動応答へ
         </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} summaries={{ basic: form.ruleName, trigger: form.respondToAll ? 'すべてのメッセージ' : `${form.keywordRules.length}件のキーワード`, response: form.mode === 'inline-text' ? form.responseContent : ({ silent: '返信しない', template: 'テンプレートから返信', 'inline-flex': 'カードで返信', 'inline-image': '画像で返信' })[form.mode], priority: `優先順位 ${form.priority}` }} />} previewLabel={step === 'basic' || step === 'trigger' ? '設定内容を見る' : undefined} previewTitle={step === 'basic' || step === 'trigger' ? '設定内容' : undefined} preview={renderPreview(true)} footerActions={
           <>
@@ -844,7 +844,7 @@ function AutoReplyWizardV8Inner() {
                 busyLabel="有効にしています…"
                 done={saveDone}
               >
-                <Power size={14} aria-hidden="true" />
+                <Power size={16} aria-hidden="true" />
                 {wasPublished || isActive ? 'この内容で更新する' : '有効にする'}
               </Button>
             )}

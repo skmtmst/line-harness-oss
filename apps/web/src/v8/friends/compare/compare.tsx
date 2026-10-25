@@ -330,18 +330,18 @@ function CompareInner() {
         <PageFooter
           destructive={(
             <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('different')}>
-              <UserX size={14} aria-hidden="true" />
+              <UserX size={16} aria-hidden="true" />
               別の人だった
             </Button>
           )}
           actions={(
             <>
               <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('deferred')}>
-                <Clock size={14} aria-hidden="true" />
+                <Clock size={16} aria-hidden="true" />
                 あとで決める（保留）
               </Button>
               <Button type="button" variant="primary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('linked')}>
-                <LinkIcon size={14} aria-hidden="true" />
+                <LinkIcon size={16} aria-hidden="true" />
                 同じ人として結び付ける
               </Button>
             </>

@@ -317,7 +317,7 @@ export function ReminderBasicsFormV8({
             value="booking"
             checked={value.triggerType === 'booking'}
             onChange={() => patch({ triggerType: 'booking' })}
-            icon={<CalendarDays size={18} />}
+            icon={<CalendarDays size={20} />}
             title="予約日時"
             note="予約・Google Meet の日時"
           /></SaveErrorField>
@@ -326,7 +326,7 @@ export function ReminderBasicsFormV8({
             value="friend_field"
             checked={value.triggerType === 'friend_field'}
             onChange={() => patch({ triggerType: 'friend_field' })}
-            icon={<IdCard size={18} />}
+            icon={<IdCard size={20} />}
             title="友だち情報欄の日付"
             note="誕生日・契約終了日など"
           /></SaveErrorField>
@@ -335,7 +335,7 @@ export function ReminderBasicsFormV8({
             value="event"
             checked={value.triggerType === 'event'}
             onChange={() => patch({ triggerType: 'event' })}
-            icon={<Ticket size={18} />}
+            icon={<Ticket size={20} />}
             title="イベントの予約日時"
             note="イベントの開始日時"
           /></SaveErrorField>

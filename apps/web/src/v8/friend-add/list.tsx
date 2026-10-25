@@ -519,21 +519,21 @@ function FriendAddList() {
   const locked = (item: ActionMenuItem): ActionMenuItem[] => (canEdit ? [item] : [])
 
   const rowMenuItems = (rule: FriendAddRule): ActionMenuItem[] => rule.status === 'archived' ? [
-    ...locked({ id: 'restore', label: '保管から戻す', icon: <Archive size={15} />, disabled: restoringId !== null, onSelect: () => void restore(rule) }),
-    { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} />, onSelect: () => router.push(runsHref(rule.id)) },
+    ...locked({ id: 'restore', label: '保管から戻す', icon: <Archive size={16} />, disabled: restoringId !== null, onSelect: () => void restore(rule) }),
+    { id: 'runs', label: '実行結果を見る', icon: <Activity size={16} />, onSelect: () => router.push(runsHref(rule.id)) },
   ] : [
-    ...locked({ id: 'duplicate', label: '複製する', icon: <Copy size={15} />, disabled: duplicatingId !== null, onSelect: () => void duplicate(rule) }),
-    ...locked({ id: 'edit', label: '編集する', icon: <Pencil size={15} />, onSelect: () => router.push(editHref(rule.id)) }),
-    { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} />, onSelect: () => router.push(runsHref(rule.id)) },
-    ...locked({ id: 'test', label: 'テストを送る', icon: <Send size={15} />, onSelect: () => router.push(testHref(rule.id)) }),
+    ...locked({ id: 'duplicate', label: '複製する', icon: <Copy size={16} />, disabled: duplicatingId !== null, onSelect: () => void duplicate(rule) }),
+    ...locked({ id: 'edit', label: '編集する', icon: <Pencil size={16} />, onSelect: () => router.push(editHref(rule.id)) }),
+    { id: 'runs', label: '実行結果を見る', icon: <Activity size={16} />, onSelect: () => router.push(runsHref(rule.id)) },
+    ...locked({ id: 'test', label: 'テストを送る', icon: <Send size={16} />, onSelect: () => router.push(testHref(rule.id)) }),
     ...(rule.isFallback
-      ? locked({ id: 'stop-fallback', label: '止められない理由を見る', icon: <Pause size={15} />, onSelect: () => setFallbackStop(true) })
+      ? locked({ id: 'stop-fallback', label: '止められない理由を見る', icon: <Pause size={16} />, onSelect: () => setFallbackStop(true) })
       : [
           ...(rule.status === 'published'
             ? locked({
                 id: 'stop',
                 label: '止める',
-                icon: <Pause size={15} />,
+                icon: <Pause size={16} />,
                 onSelect: () => {
                   setStopError('')
                   setStopTarget(rule)
@@ -543,14 +543,14 @@ function FriendAddList() {
               ? locked({
                   id: 'publish',
                   label: '最終確認・有効化へ進む',
-                  icon: <CircleCheck size={15} />,
+                  icon: <CircleCheck size={16} />,
                   onSelect: () => router.push(`/friend-add-settings/publish?id=${encodeURIComponent(rule.id)}`),
                 })
               : []),
           ...locked({
             id: 'delete',
             label: '保管する',
-            icon: <Archive size={15} />,
+            icon: <Archive size={16} />,
             tone: 'danger' as const,
             dividerBefore: true,
             onSelect: () => {
@@ -596,7 +596,7 @@ function FriendAddList() {
   ]
   const createButton = canEdit ? (
     <Button variant="primary" href="/friend-add-settings?view=new" className={styles.createButton}>
-      <Plus size={15} aria-hidden="true" />初回案内を作る
+      <Plus size={16} aria-hidden="true" />初回案内を作る
     </Button>
   ) : null
   const searchBox = (
@@ -773,7 +773,7 @@ function FriendAddList() {
                 <Tr key={sinkRule.id} className={`${styles.row} ${styles.sinkRow}`} data-table-layout="columns" data-row-id={sinkRule.id} href={editHref(sinkRule.id)}>
                   <Td className={styles.colOrder}>
                     <span className={styles.orderBox} title="いちばん最後に動く・動かせない">
-                      <Lock size={14} aria-hidden="true" className={styles.lock} />
+                      <Lock size={16} aria-hidden="true" className={styles.lock} />
                     </span>
                   </Td>
                   <Td className={styles.colName}>
@@ -811,7 +811,7 @@ function FriendAddList() {
 
       actions={
         <Button href="/friend-add-settings/runs">
-          <Activity size={15} aria-hidden="true" />実行結果を見る
+          <Activity size={16} aria-hidden="true" />実行結果を見る
         </Button>
       }
       tabs={<>
@@ -841,7 +841,7 @@ function FriendAddList() {
               key={kpi.key}
               presentation="band"
               title={kpi.title}
-              icon={<kpi.icon size={13} aria-hidden="true" />}
+              icon={<kpi.icon size={16} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value === null ? '' : kpi.unit}
               detail={kpi.detail}

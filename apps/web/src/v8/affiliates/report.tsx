@@ -193,7 +193,7 @@ export default function ReportTab() {
       <KpiCard
         presentation="band"
         title="成果"
-        icon={<Trophy size={14} aria-hidden="true" />}
+        icon={<Trophy size={16} aria-hidden="true" />}
         value={ready ? inPeriod.length : null}
         unit="件"
         detail={ready ? (false ? '期間内に認めた成果' : conversionsDelta === 0 ? '前の期間と同じ' : `前の期間より ${conversionsDelta > 0 ? '+' : '−'}${formatNumber(Math.abs(conversionsDelta))}`) : state === 'loading' ? loadingWord : errorWord}
@@ -201,7 +201,7 @@ export default function ReportTab() {
       <KpiCard
         presentation="band"
         title="売上"
-        icon={<ShoppingBag size={14} aria-hidden="true" />}
+        icon={<ShoppingBag size={16} aria-hidden="true" />}
         value={null}
         valueText={ready ? formatYen(totalRevenue) : emptyValue('unknown')}
         unit=""
@@ -210,7 +210,7 @@ export default function ReportTab() {
       <KpiCard
         presentation="band"
         title="報酬"
-        icon={<Banknote size={14} aria-hidden="true" />}
+        icon={<Banknote size={16} aria-hidden="true" />}
         value={null}
         valueText={ready && !hasMissingReward ? formatYen(totalReward) : emptyValue('unknown')}
         unit=""
@@ -219,7 +219,7 @@ export default function ReportTab() {
       <KpiCard
         presentation="band"
         title="1件あたりの報酬"
-        icon={<Calculator size={14} aria-hidden="true" />}
+        icon={<Calculator size={16} aria-hidden="true" />}
         value={null}
         valueText={ready && !hasMissingReward ? formatYen(perItem) : emptyValue('unknown')}
         unit=""
@@ -347,7 +347,7 @@ export default function ReportTab() {
       help={view === 'affiliate'
           ? '行を押すと、その人の成果の明細（いつ・どの案件・いくら）を開きます。CSV は今の期間・今の並びで書き出します。'
           : '案件ごとの成果・売上・報酬です。CSV は今の期間・今の並びで書き出します。'}
-      actions={<Button onClick={exportCsv} disabled={!ready || shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
+      actions={<Button onClick={exportCsv} disabled={!ready || shown.length === 0}><Download size={16} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
       toolbar={toolbar}
       overlays={<>

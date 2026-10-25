@@ -284,13 +284,13 @@ export default function QuickSendV8({
       footer={(
         <div className={styles.footer}>
           <Link href="/broadcasts/new" className={styles.detailLink}>
-            <ListOrdered size={15} aria-hidden="true" />
+            <ListOrdered size={16} aria-hidden="true" />
             詳しく作るへ
           </Link>
           <span className={styles.spacer} aria-hidden="true" />
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => void handleSend()} disabled={!canSend} title={!canSend ? sendDisabledReason : undefined} busy={busy} busyLabel="送っています…">
-            <Send size={15} aria-hidden="true" />{sendLabel}
+            <Send size={16} aria-hidden="true" />{sendLabel}
           </Button>
           <span className={styles.spacer} aria-hidden="true" />
           {/* 左の「詳しく作るへ」と釣り合いを取り、キャンセル・送るを窓の真ん中に置く。 */}

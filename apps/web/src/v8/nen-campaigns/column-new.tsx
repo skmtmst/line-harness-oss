@@ -186,7 +186,7 @@ export default function ColumnNew() {
         <>
           <Button href="/nen-campaigns?tab=columns">キャンセル</Button>
           <Button type="button" variant="primary" disabled={busy} busy={busy} busyLabel="保存しています…" onClick={() => void save()}>
-            <Save size={15} aria-hidden="true" />下書きを保存
+            <Save size={16} aria-hidden="true" />下書きを保存
           </Button>
         </>
       )} dirty={false}

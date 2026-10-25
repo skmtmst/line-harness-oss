@@ -407,11 +407,11 @@ export default function ScenarioResultsV8() {
       actions={(
         <span className={styles.headActions}>
           <Button href={`/scenarios/detail?id=${encodeURIComponent(id)}`}>
-            <PencilLine size={15} aria-hidden="true" />シナリオの編集へ
+            <PencilLine size={16} aria-hidden="true" />シナリオの編集へ
           </Button>
           {/* 書き出しは主ボタンにしない。この画面の本筋は結果を見ること（横断レビュー §7）。 */}
           <Button onClick={exportCsv} disabled={!scenario || !stats}>
-            <Download size={15} aria-hidden="true" />CSVで書き出す
+            <Download size={16} aria-hidden="true" />CSVで書き出す
           </Button>
         </span>
       )}
@@ -506,7 +506,7 @@ export default function ScenarioResultsV8() {
                   setPlanOpen(true)
                 }}
               >
-                <CalendarSearch size={15} aria-hidden="true" />友だちを選んで配信予定を見る
+                <CalendarSearch size={16} aria-hidden="true" />友だちを選んで配信予定を見る
               </Button>
             </div>
             {runsState === 'idle' ? (
@@ -587,7 +587,7 @@ export default function ScenarioResultsV8() {
                               setPlanOpen(true)
                             }}
                           >
-                            <Calendar size={15} aria-hidden="true" />予定を見る
+                            <Calendar size={16} aria-hidden="true" />予定を見る
                           </Button>
                         </GridCell>
                         <GridCell data-list-action-cell>

@@ -251,10 +251,10 @@ export default function CommonActionsV8() {
   /* ===== 数の帯 ===== */
   const ready = summary !== null && !loadFailed
   const cells: BandCell[] = [
-    { key: 'total', title: '共通アクション', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? summary.total : null, unit: '件', detail: ready ? `公開中 ${summary.published}・下書き ${summary.draft}` : emptyValue('unknown') },
-    { key: 'bindings', title: '使われている所', icon: <Link2 size={13} aria-hidden="true" />, value: ready ? summary.bindings : null, unit: 'か所', detail: ready && summary.outdated > 0 ? `古い版のまま ${summary.outdated}か所` : 'ルール・シナリオなど5機能から' },
-    { key: 'executions', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: ready ? summary.executions : null, unit: '回', detail: '今月（日本時間）の実行回数' },
-    { key: 'failures', title: '失敗', icon: <TriangleAlert size={13} aria-hidden="true" />, value: ready ? summary.failures : null, unit: '件', detail: '「動いた記録」からやり直せます' },
+    { key: 'total', title: '共通アクション', icon: <ListChecks size={16} aria-hidden="true" />, value: ready ? summary.total : null, unit: '件', detail: ready ? `公開中 ${summary.published}・下書き ${summary.draft}` : emptyValue('unknown') },
+    { key: 'bindings', title: '使われている所', icon: <Link2 size={16} aria-hidden="true" />, value: ready ? summary.bindings : null, unit: 'か所', detail: ready && summary.outdated > 0 ? `古い版のまま ${summary.outdated}か所` : 'ルール・シナリオなど5機能から' },
+    { key: 'executions', title: '今月動いた', icon: <Activity size={16} aria-hidden="true" />, value: ready ? summary.executions : null, unit: '回', detail: '今月（日本時間）の実行回数' },
+    { key: 'failures', title: '失敗', icon: <TriangleAlert size={16} aria-hidden="true" />, value: ready ? summary.failures : null, unit: '件', detail: '「動いた記録」からやり直せます' },
   ]
 
   /* ===== フォルダ ===== */
@@ -265,7 +265,7 @@ export default function CommonActionsV8() {
   ]
   /* 閲覧のみには押せない「共通アクションを作る」を置かない（場所だけ空ける）。 */
   const createButton = canEdit
-    ? <Button variant="primary" href="/common-actions/new" className="v8-folder-create w-full"><Plus size={15} aria-hidden="true" />共通アクションを作る</Button>
+    ? <Button variant="primary" href="/common-actions/new" className="v8-folder-create w-full"><Plus size={16} aria-hidden="true" />共通アクションを作る</Button>
     : <span className={styles.createSpace} aria-hidden="true" />
 
   /* ===== 道具の段 ===== */
@@ -275,16 +275,16 @@ export default function CommonActionsV8() {
   )
   const filterChips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      {chip('published', '公開中', <Radio size={13} aria-hidden="true" />, summary?.published)}
-      {chip('draft', '下書き', <FilePen size={13} aria-hidden="true" />, summary?.draft)}
-      {chip('old_version', '古い版あり', <GitBranch size={13} aria-hidden="true" />, summary?.oldVersion)}
-      {chip('unused', '呼ばれていない', <PhoneOff size={13} aria-hidden="true" />, summary?.unused)}
-      {chip('archived', '保管', <Archive size={13} aria-hidden="true" />, summary?.archived)}
+      {chip('published', '公開中', <Radio size={16} aria-hidden="true" />, summary?.published)}
+      {chip('draft', '下書き', <FilePen size={16} aria-hidden="true" />, summary?.draft)}
+      {chip('old_version', '古い版あり', <GitBranch size={16} aria-hidden="true" />, summary?.oldVersion)}
+      {chip('unused', '呼ばれていない', <PhoneOff size={16} aria-hidden="true" />, summary?.unused)}
+      {chip('archived', '保管', <Archive size={16} aria-hidden="true" />, summary?.archived)}
     </div>
   )
   const savedBox = (
     <div className={styles.savedBox}>
-      <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
+      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["filter","status"]}><Select
         aria-label="よく使う絞り込み"
         value={filter === 'old_version' || filter === 'unused' ? filter : ''}
@@ -327,7 +327,7 @@ export default function CommonActionsV8() {
   } else if (items.length === 0) {
     listBody = query || filter !== 'all' || folderFilter
       ? <ListState kind="empty" title="条件に合う共通アクションはありません" description="検索や絞り込みの札を外すと、すべて出ます。" action={<Button variant="secondary" onClick={() => { setQuery(''); setFilter('all'); setFolderFilter('') }}>条件を外す</Button>} />
-      : <ListState kind="empty" title="まだ、共通アクションはありません" description="よく使う処理をまとめると、設定の重複を減らせます。" action={canEdit ? <Button variant="primary" href="/common-actions/new"><Plus size={15} aria-hidden="true" />共通アクションを作る</Button> : undefined} />
+      : <ListState kind="empty" title="まだ、共通アクションはありません" description="よく使う処理をまとめると、設定の重複を減らせます。" action={canEdit ? <Button variant="primary" href="/common-actions/new"><Plus size={16} aria-hidden="true" />共通アクションを作る</Button> : undefined} />
   } else {
     listBody = (
       <>
@@ -404,13 +404,13 @@ export default function CommonActionsV8() {
 
       actions={canExportCsv && selectedAccountId
         ? csvEmpty
-          ? <Button disabled title="条件に合う共通アクションがないため書き出せません"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+          ? <Button disabled title="条件に合う共通アクションがないため書き出せません"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
           : (
             <Button
               href={api.commonActions.csvUrl({ accountId: selectedAccountId, status: filter === 'all' ? undefined : filter, query: deferredQuery.trim() || undefined })}
               title={csvScoped ? `この条件の${total} 件を書き出します` : `全${total} 件を書き出します`}
             >
-              <Download size={15} aria-hidden="true" />CSVで書き出す
+              <Download size={16} aria-hidden="true" />CSVで書き出す
             </Button>
           )
         : undefined}

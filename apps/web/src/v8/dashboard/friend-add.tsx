@@ -100,7 +100,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
         </span>
         <span className={styles.spacer} />
         {canManage ? (
-          <Button href="/inflow-links"><GitBranch size={15} aria-hidden="true" />経路を分けて発行</Button>
+          <Button href="/inflow-links"><GitBranch size={16} aria-hidden="true" />経路を分けて発行</Button>
         ) : null}
       </div>
       <div className={styles.linkRow}>
@@ -113,7 +113,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
         /></SaveErrorField>
         <CopyTextButton value={link} label="コピーする" icon={<Copy size={16} aria-hidden="true" />} variant="secondary" aria-label="友だち追加URLをコピー" />
         <Button type="button" onClick={() => writeQr(routeId || 'base')}>
-          <QrCode size={15} aria-hidden="true" />QRを表示
+          <QrCode size={16} aria-hidden="true" />QRを表示
         </Button>
       </div>
       {copyState === 'failed' ? (

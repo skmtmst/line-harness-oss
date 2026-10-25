@@ -436,7 +436,7 @@ export default function CreateAffiliateV8() {
           {partialSave ? '追加情報の保存を再開する' : '保存して続けて作る'}
         </Button> : null}
         <Button variant="primary" disabled={saving || !!conflict.conflict} busy={saving} busyLabel="登録しています" onClick={() => void runSave('finish')}>
-          <Check size={15} aria-hidden="true" /> 登録して紹介リンクを発行する
+          <Check size={16} aria-hidden="true" /> 登録して紹介リンクを発行する
         </Button>
       </> : null}</>} dirty={false}
     >
@@ -464,7 +464,7 @@ export default function CreateAffiliateV8() {
         <Field label="連絡先メール" htmlFor="af-email"><SaveErrorField names={["email"]}><TextField readOnly={!canEdit} id="af-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="contact@example.com" maxLength={200} /></SaveErrorField></Field>
         {canEdit ? <div className={styles.friendRow}>
           <Button type="button" aria-expanded={friendPickerOpen} onClick={() => setFriendPickerOpen((open) => !open)}>
-            <LinkIcon size={15} aria-hidden="true" /> LINE の友だちと結びつける
+            <LinkIcon size={16} aria-hidden="true" /> LINE の友だちと結びつける
           </Button>
           <span className={styles.inlineNote}>
             {selectedFriend ? `結びつける友だち：${selectedFriend.displayName}` : '結びつけると、本人が LINE で成果を見られます'}

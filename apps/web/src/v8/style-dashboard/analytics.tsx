@@ -70,7 +70,7 @@ export function StyleAnalyticsView({ data, error, onTab, onRetry, onRowOpen }: {
           </div>}
         </Card> : <ListEmptyMessage>日別の支払いグラフは、この画面ではまだ取得していません。</ListEmptyMessage>)}
         {!data.availability && (table ? <Card className={styles.chartCard} contentPadding="var(--polish-space-card)" gap="var(--polish-space-field)" aria-label={table.title}>
-          <h3 className={styles.sectionTitle}>{table.title}<HelpTip label={`${table.title}の説明`}>{table.help}</HelpTip><span className={styles.grow} />{table.link ? <Link className={styles.sideLink} href={table.link.href}>{table.link.label}<ArrowRight size={14} aria-hidden="true" /></Link> : null}</h3>
+          <h3 className={styles.sectionTitle}>{table.title}<HelpTip label={`${table.title}の説明`}>{table.help}</HelpTip><span className={styles.grow} />{table.link ? <Link className={styles.sideLink} href={table.link.href}>{table.link.label}<ArrowRight size={16} aria-hidden="true" /></Link> : null}</h3>
           <GridTable label={table.title} presentation="metrics" framed={false} design={{
             columns: `minmax(0, 1fr) repeat(${table.columns.length - 1}, auto) auto`,
             gap: 'var(--polish-space-field)', rowPadding: 'var(--polish-space-card)',

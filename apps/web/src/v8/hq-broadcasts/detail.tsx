@@ -91,7 +91,7 @@ export function ResultCard({ run, canManage, onRetry, onRetryAll }: {
           <p className={styles.cardSub}>{`${jpDateTime(run.scheduledAt)} ・ ${n(sentTo.length)}店に送信 ・ 成功 ${n(success)} 人 ・ 失敗 ${n(failed)} 人`}</p>
         </div>
         {canManage && retryable.length > 0 ? (
-          <Button onClick={onRetryAll}><RotateCcw size={15} aria-hidden="true" />失敗した店にやり直す</Button>
+          <Button onClick={onRetryAll}><RotateCcw size={16} aria-hidden="true" />失敗した店にやり直す</Button>
         ) : null}
       </div>
       <DataTable className={styles.table} data-design="hq-broadcast-result">
@@ -334,7 +334,7 @@ function HqDeliveryRail({ run, approvalPending }: { run: HqBroadcastRun; approva
           <li key={step.key} className={detailStyles.railItem} data-state={state} data-kind="delivery">
             {index > 0 ? <span className={detailStyles.railLine} data-done={index <= currentIndex || undefined} aria-hidden="true" /> : null}
             <span className={detailStyles.railStep}>
-              <span className={detailStyles.railMark} aria-hidden="true">{state === 'done' ? <Check size={11} strokeWidth={3} /> : null}</span>
+              <span className={detailStyles.railMark} aria-hidden="true">{state === 'done' ? <Check size={16} strokeWidth={3} /> : null}</span>
               <span className={detailStyles.railLabel} aria-current={state === 'current' ? 'step' : undefined}>{step.label}</span>
             </span>
           </li>
@@ -508,31 +508,31 @@ export default function HqBroadcastDetail() {
         actions={<>{run ? (
             <div className={detailStyles.actions}>
               {/* CSV は見るだけの操作。閲覧のみにも出す。 */}
-              <Button size="field" onClick={() => void exportCsv()} busy={exporting} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+              <Button size="field" onClick={() => void exportCsv()} busy={exporting} busyLabel="書き出しています…"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
               {canManage && run.status !== 'prepared' ? (
-                <Button size="field" variant="primary" href={`/hq/broadcasts/new?copy=${encodeURIComponent(run.id)}`}><Copy size={15} aria-hidden="true" />複製して作る</Button>
+                <Button size="field" variant="primary" href={`/hq/broadcasts/new?copy=${encodeURIComponent(run.id)}`}><Copy size={16} aria-hidden="true" />複製して作る</Button>
               ) : null}
             </div>
           ) : null}{canManage && run ? (
             <div className={detailStyles.actions}>
               {run.status === 'prepared' || (live && run.status !== 'stopped') ? (
-                <Button size="field" variant="danger" onClick={() => setAsk({ kind: 'cancel' })}><Ban size={15} aria-hidden="true" />取り消す</Button>
+                <Button size="field" variant="danger" onClick={() => setAsk({ kind: 'cancel' })}><Ban size={16} aria-hidden="true" />取り消す</Button>
               ) : null}
               {live && run.status !== 'stopped' ? (
-                <Button size="field" onClick={() => setAsk({ kind: 'stop' })}><CirclePause size={15} aria-hidden="true" />止める</Button>
+                <Button size="field" onClick={() => setAsk({ kind: 'stop' })}><CirclePause size={16} aria-hidden="true" />止める</Button>
               ) : null}
               {run.status === 'prepared' ? (
-                <Button size="field" href={`/hq/broadcasts/new?id=${encodeURIComponent(run.id)}`}><PencilLine size={15} aria-hidden="true" />下書きを直す</Button>
+                <Button size="field" href={`/hq/broadcasts/new?id=${encodeURIComponent(run.id)}`}><PencilLine size={16} aria-hidden="true" />下書きを直す</Button>
               ) : null}
               {run.status === 'prepared' ? (
-                <Button size="field" onClick={() => setTestOpen(true)}><Send size={15} aria-hidden="true" />テストを送る</Button>
+                <Button size="field" onClick={() => setTestOpen(true)}><Send size={16} aria-hidden="true" />テストを送る</Button>
               ) : null}
               {run.status === 'prepared' ? (
                 gate === 'needsRequest' ? (
                   <Button size="field" variant="primary" onClick={() => setRequestOpen(true)}>承認を依頼する</Button>
                 ) : (
                   <Button size="field" variant="primary" onClick={() => { setConfirmCount(''); setAsk({ kind: 'send' }) }} disabled={(totals?.sendStores ?? 0) === 0 || gate === 'pending'} title={(totals?.sendStores ?? 0) === 0 ? '送れる店がありません' : gate === 'pending' ? '承認を待っています' : undefined} >
-                    <Send size={15} aria-hidden="true" />{`${n(totals?.sendStores ?? 0)}店に送る`}
+                    <Send size={16} aria-hidden="true" />{`${n(totals?.sendStores ?? 0)}店に送る`}
                   </Button>
                 )
               ) : null}

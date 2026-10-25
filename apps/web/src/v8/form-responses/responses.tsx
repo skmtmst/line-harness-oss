@@ -429,19 +429,19 @@ function Responses() {
           <div className={styles.railButtons}>
             {canRetry && incompleteOf(selected) === true ? (
               <Button variant="primary" onClick={() => void retryPostActions(selected)} disabled={retrying} busy={retrying} busyLabel="再実行しています">
-                <RotateCw size={15} aria-hidden="true" />後処理をやり直す
+                <RotateCw size={16} aria-hidden="true" />後処理をやり直す
               </Button>
             ) : null}
             {selected.friendId ? (
-              <Button href={`/chats?friend=${encodeURIComponent(selected.friendId)}`}><User size={15} aria-hidden="true" />友だちを開く</Button>
+              <Button href={`/chats?friend=${encodeURIComponent(selected.friendId)}`}><User size={16} aria-hidden="true" />友だちを開く</Button>
             ) : null}
           </div>
         </Card>
       ) : null}
       <div className={styles.railButtonsWide}>
-        {canEditForm ? <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}><Pencil size={15} aria-hidden="true" />フォームを編集</Button> : null}
+        {canEditForm ? <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}><Pencil size={16} aria-hidden="true" />フォームを編集</Button> : null}
         <Button onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={exportProgress || 'CSVを準備しています'} widthReserve="idle">
-          <Download size={15} aria-hidden="true" />CSVで書き出す
+          <Download size={16} aria-hidden="true" />CSVで書き出す
         </Button>
       </div>
       {exportError ? <p className={styles.error}>{exportError}</p> : null}
@@ -487,7 +487,7 @@ function Responses() {
                 <Notice tone="danger" role="status"
                   heading={`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}
                   message={`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}
-                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}><Filter size={15} aria-hidden="true" />{`その${incompleteItems.length} 件を見る`}</Button>} />
+                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}><Filter size={16} aria-hidden="true" />{`その${incompleteItems.length} 件を見る`}</Button>} />
               ) : null}
               {summaries.map((fieldSummary) => {
                 const block = blockByKey(fieldSummary.key)
@@ -533,7 +533,7 @@ function Responses() {
                       })}
                     </tbody></DataTable>
                     {/* 絵 v0SbYR：「1件ずつ見る」は一覧の下の右端。 */}
-                    <div className={styles.cardFootEnd}><Button variant="text" onClick={() => setView('rows')}><ArrowRight size={14} aria-hidden="true" />1件ずつ見る</Button></div>
+                    <div className={styles.cardFootEnd}><Button variant="text" onClick={() => setView('rows')}><ArrowRight size={16} aria-hidden="true" />1件ずつ見る</Button></div>
                   </Card>
                 )
               })() : null}

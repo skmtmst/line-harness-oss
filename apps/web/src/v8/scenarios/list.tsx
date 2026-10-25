@@ -656,7 +656,7 @@ export default function ScenariosListV8() {
       className={full ? 'v8-folder-create w-full' : undefined}
       onClick={handleCreate}
     >
-      <Plus size={15} aria-hidden="true" />
+      <Plus size={16} aria-hidden="true" />
       シナリオを作る
     </Button>
   )
@@ -996,7 +996,7 @@ export default function ScenariosListV8() {
               title={stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
               onClick={() => setPendingStop(stoppableIds)}
             >
-              <Square size={13} aria-hidden="true" />
+              <Square size={16} aria-hidden="true" />
               止める
             </Button><Button
               type="button"
@@ -1005,14 +1005,14 @@ export default function ScenariosListV8() {
               title={resumableIds.length === 0 ? '停止中のシナリオが選ばれていません' : undefined}
               onClick={() => runBulkToggle(true, resumableIds)}
             >
-              <Play size={13} aria-hidden="true" />
+              <Play size={16} aria-hidden="true" />
               再開
             </Button><Button
               type="button"
               variant="secondary"
               onClick={() => openMove([...selectedIds])}
             >
-              <FolderIcon size={13} aria-hidden="true" />
+              <FolderIcon size={16} aria-hidden="true" />
               フォルダへ移す
             </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
               選択を外す
@@ -1040,7 +1040,7 @@ export default function ScenariosListV8() {
           if (next && savedFilter === 'active') setSavedFilter('')
         }}
         title="止めてあるシナリオだけ"
-        icon={<Pause size={14} aria-hidden="true" />}
+        icon={<Pause size={16} aria-hidden="true" />}
       >
         停止中のみ
       </FilterChip>
@@ -1048,7 +1048,7 @@ export default function ScenariosListV8() {
         selected={createdThisMonthOnly}
         onChange={(next) => setCreatedThisMonthOnly(next)}
         title="今月（日本時間）作ったシナリオだけ"
-        icon={<CalendarPlus size={14} aria-hidden="true" />}
+        icon={<CalendarPlus size={16} aria-hidden="true" />}
       >
         今月作った
       </FilterChip>
@@ -1149,7 +1149,7 @@ export default function ScenariosListV8() {
               key={kpi.title}
               presentation="band"
               title={kpi.title}
-              icon={<kpi.icon size={14} aria-hidden="true" />}
+              icon={<kpi.icon size={16} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}

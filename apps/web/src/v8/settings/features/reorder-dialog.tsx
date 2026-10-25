@@ -33,10 +33,10 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply }: {
       footerAlign="start"
       footerDivider={false}
       footerLeadFlexible={false}
-      confirmIcon={<Check size={14} aria-hidden="true" />}
+      confirmIcon={<Check size={16} aria-hidden="true" />}
       title="左のメニューの並びを変える"
       confirmLabel="この並びにする"
-      footerLead={<Button variant="text" onClick={() => setDraft(initialOrder)}><RotateCcw size={14} aria-hidden="true" />元の並びに</Button>}
+      footerLead={<Button variant="text" onClick={() => setDraft(initialOrder)}><RotateCcw size={16} aria-hidden="true" />元の並びに</Button>}
       onCancel={onCancel}
       onConfirm={() => onApply(draft)}
     >

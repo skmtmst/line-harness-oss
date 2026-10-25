@@ -216,7 +216,7 @@ export default function QuickCreateV8({
       footer={(
         <div className={styles.footer}>
           <Link href="/auto-replies/edit" className={styles.detailLink}>
-            <ListOrdered size={15} aria-hidden="true" />
+            <ListOrdered size={16} aria-hidden="true" />
             詳しく作るへ
           </Link>
           <span className={styles.footerSpacer} aria-hidden="true" />
@@ -231,7 +231,7 @@ export default function QuickCreateV8({
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}
             onClick={() => save()}
           >
-            <Send size={15} aria-hidden="true" />
+            <Send size={16} aria-hidden="true" />
             有効にして保存
           </Button>
           <span className={styles.footerSpacer} aria-hidden="true" />
@@ -253,7 +253,7 @@ export default function QuickCreateV8({
                   aria-label={`「${keyword}」を外す`}
                   onClick={() => removeKeyword(keyword)}
                 >
-                  <X size={12} aria-hidden="true" />
+                  <X size={16} aria-hidden="true" />
                 </button>
               </span>
             ))}

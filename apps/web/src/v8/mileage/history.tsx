@@ -311,12 +311,12 @@ export default function HistoryTab() {
       explanation="明細はあとから消せません。間違えて付けたときは「減らす」で取り消しの明細を足します。"
       actions={<div className={styles.headActions}>
         <Button onClick={exportCsv} disabled={!canExport}>
-          <Download size={15} aria-hidden="true" /> CSVで書き出す
+          <Download size={16} aria-hidden="true" /> CSVで書き出す
         </Button>
         {/* 閲覧のみの人には出さない。 */}
         {!readonly ? (
           <Button href="/mileage?tab=balances" title="友だちを選んで増減します">
-            <Plus size={15} aria-hidden="true" /> 増やす・減らす
+            <Plus size={16} aria-hidden="true" /> 増やす・減らす
           </Button>
         ) : null}
       </div>}

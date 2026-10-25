@@ -451,13 +451,13 @@ export default function ScoreTab() {
   )
   const stats = (
     <KpiBand>
-      {bandCard('high', summary?.high, 'よく動く', <Star size={14} aria-hidden="true" />)}
-      {bandCard('normal', summary?.normal, 'ふつう', <Activity size={14} aria-hidden="true" />)}
-      {bandCard('low', summary?.low, 'しばらく動いていない', <TrendingDown size={14} aria-hidden="true" />)}
+      {bandCard('high', summary?.high, 'よく動く', <Star size={16} aria-hidden="true" />)}
+      {bandCard('normal', summary?.normal, 'ふつう', <Activity size={16} aria-hidden="true" />)}
+      {bandCard('low', summary?.low, 'しばらく動いていない', <TrendingDown size={16} aria-hidden="true" />)}
       <KpiCard
         presentation="band"
         title="公開中のルール"
-        icon={<Settings2 size={14} aria-hidden="true" />}
+        icon={<Settings2 size={16} aria-hidden="true" />}
         value={rulesLoading || rulesError ? null : 0}
         valueText={rulesLoading || rulesError ? undefined : publishedVersionNo === null ? emptyValue('none') : `版 ${formatMileageNumber(publishedVersionNo)}`}
         unit=""
@@ -505,15 +505,15 @@ export default function ScoreTab() {
       chips={chips}
       trailing={<>
         <Button onClick={() => void openPreview()} disabled={!editable} busy={Boolean(previewBusy)} busyLabel="処理中…">
-          <Bookmark size={15} aria-hidden="true" /> この分けかただと何人入るか
+          <Bookmark size={16} aria-hidden="true" /> この分けかただと何人入るか
         </Button>
         <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
         <Button href={broadcastHref} title={rangeQuery ? '点数がついている人のみ' : undefined}>
-          <Send size={15} aria-hidden="true" /> この帯の人に送る
+          <Send size={16} aria-hidden="true" /> この帯の人に送る
         </Button>
         {!readonly ? (
           <Button href="/mileage/score-rules">
-            <Settings2 size={15} aria-hidden="true" /> スコアのルールを作る
+            <Settings2 size={16} aria-hidden="true" /> スコアのルールを作る
           </Button>
         ) : null}
       </>}
@@ -712,7 +712,7 @@ export default function ScoreTab() {
         )}
         {!readonly ? (
           <div>
-            <Button href="/mileage/score-rules"><Plus size={15} aria-hidden="true" /> できごとを足す</Button>
+            <Button href="/mileage/score-rules"><Plus size={16} aria-hidden="true" /> できごとを足す</Button>
           </div>
         ) : null}
       </div> : null}
@@ -727,7 +727,7 @@ export default function ScoreTab() {
         </span>
         <span className={styles.chipGroup}>
           <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
-            <Download size={15} aria-hidden="true" /> この頁の行動スコアをCSVで書き出す
+            <Download size={16} aria-hidden="true" /> この頁の行動スコアをCSVで書き出す
           </Button>
           {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
         </span>
@@ -745,16 +745,16 @@ export default function ScoreTab() {
       </>}
       actions={readonly ? undefined : <div className={styles.headActions}>
         <Button href="/mileage/score-rules" title="決めごとの編集画面で1人分を試します">
-          <UserRound size={15} aria-hidden="true" /> 1人で試す
+          <UserRound size={16} aria-hidden="true" /> 1人で試す
         </Button>
         <Button href="/mileage/score-rules" title="決めごとの編集画面で保存します">下書きを保存</Button>
         {draftVersionId ? (
           <Button variant="primary" onClick={() => setPublishConfirm(true)}>
-            <Upload size={15} aria-hidden="true" /> スコアのルールを公開
+            <Upload size={16} aria-hidden="true" /> スコアのルールを公開
           </Button>
         ) : (
           <Button variant="primary" href="/mileage/score-rules" title="決めごとの編集画面で公開します">
-            <Upload size={15} aria-hidden="true" /> スコアのルールを公開
+            <Upload size={16} aria-hidden="true" /> スコアのルールを公開
           </Button>
         )}
       </div>}
@@ -937,7 +937,7 @@ export function ScoreAdjustDialog({
       title="点数を手で直す"
       description="記録に残ります。お客様には見えない運用メモとして、あとから理由をたどれるようにしてください。"
       confirmLabel={confirmLabel}
-      confirmIcon={validAmount ? (direction === 'decrease' ? <Minus size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />) : undefined}
+      confirmIcon={validAmount ? (direction === 'decrease' ? <Minus size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />) : undefined}
       cancelLabel="キャンセル"
       busy={busy}
       error={error || undefined}

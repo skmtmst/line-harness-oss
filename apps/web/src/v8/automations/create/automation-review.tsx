@@ -124,7 +124,7 @@ export function AutomationReview({
               busy={preparingTest}
               busyLabel="確認中..."
             >
-              <UserRound size={15} aria-hidden="true" />1人で試す
+              <UserRound size={16} aria-hidden="true" />1人で試す
             </Button>
           </div>
         ) : null}

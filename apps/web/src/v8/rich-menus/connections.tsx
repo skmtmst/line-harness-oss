@@ -172,7 +172,7 @@ function Connections() {
   const aside = (
     <div className={styles.aside}>
       <div className={styles.asideActions}>
-        <Button href={editHref} className={styles.asideButton}><Pencil size={15} aria-hidden="true" />{canEdit ? '編集する' : '詳しく見る'}</Button>
+        <Button href={editHref} className={styles.asideButton}><Pencil size={16} aria-hidden="true" />{canEdit ? '編集する' : '詳しく見る'}</Button>
         <span className={styles.menuAnchor}>
           <RowMenu label="そのほかの操作" items={menuItems} />
         </span>
@@ -227,7 +227,7 @@ function Connections() {
         </div>
         <div className={styles.addRow}>
           {canEdit && pages.length < MAX_PAGES ? (
-            <Button variant="text" href={buttonsHref}><Plus size={15} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES} 枚）`}</Button>
+            <Button variant="text" href={buttonsHref}><Plus size={16} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES} 枚）`}</Button>
           ) : pages.length >= MAX_PAGES ? <span className={styles.cardNote}>{`切替先は最大${MAX_PAGES} 枚です`}</span> : null}
           <span className={styles.count}>{`${pages.length} 枚`}</span>
         </div>

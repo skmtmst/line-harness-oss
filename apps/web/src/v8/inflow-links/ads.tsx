@@ -358,7 +358,7 @@ export default function AdsV8() {
   return (
     <SaveErrorScope errors={saveErrors}><DetailPage boardId="qSTVR" title="広告連携" help="広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。"
       contentPadding="0 var(--tpl-head-pad-side)"
-      actions={manage ? <Button onClick={openManualEntry}><Plus size={15} aria-hidden="true" />費用を手で入れる</Button> : null}>
+      actions={manage ? <Button onClick={openManualEntry}><Plus size={16} aria-hidden="true" />費用を手で入れる</Button> : null}>
       <div className={styles.body}>
         {readonly ? (
           <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
@@ -375,16 +375,16 @@ export default function AdsV8() {
         ) : <>
           {/* 数の帯は共通部品（KpiBand）。絵は離れた4枚だが、帯の決まり（数の帯は共通部品）を優先する。 */}
           <KpiBand aria-label="広告連携の概要">
-              <KpiCard icon={<Wallet size={13} aria-hidden="true" />} title="この30日の広告費"
+              <KpiCard icon={<Wallet size={16} aria-hidden="true" />} title="この30日の広告費"
                 value={null} unit=""
                 valueText={jpyTotal != null ? `¥${formatNumber(jpyTotal)}` : otherTotal ? formatMinor(otherTotal[1], otherTotal[0]) : emptyValue('unknown')}
                 detail="選んだ LINE アカウントの分だけ" />
-              <KpiCard icon={<Plug size={13} aria-hidden="true" />} title="つないだ広告" value={connected.length} unit="件"
+              <KpiCard icon={<Plug size={16} aria-hidden="true" />} title="つないだ広告" value={connected.length} unit="件"
                 detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
-              <KpiCard icon={<UserPlus size={13} aria-hidden="true" />} title="友だち1人あたり"
+              <KpiCard icon={<UserPlus size={16} aria-hidden="true" />} title="友だち1人あたり"
                 value={null} unit="" valueText={avgCostPerFriend != null ? `¥${formatNumber(avgCostPerFriend)}` : emptyValue('unknown')}
                 detail={`友だち追加 ${formatNumber(linkedFriendAdds)} 人`} />
-              <KpiCard icon={<Target size={13} aria-hidden="true" />} title="成果1件あたり"
+              <KpiCard icon={<Target size={16} aria-hidden="true" />} title="成果1件あたり"
                 value={null} unit=""
                 valueText={conversionCost?.costPerConversionMinor != null && conversionCost.currency ? formatMinor(conversionCost.costPerConversionMinor, conversionCost.currency) : emptyValue('unknown')}
                 detail={conversionCost ? `成果 ${formatNumber(conversionCost.confirmedConversionCount)} 件` : '成果の件数を読み込めませんでした'} />
@@ -419,11 +419,11 @@ export default function AdsV8() {
                           busyLabel="取り込んでいます…"
                           onClick={() => void runImportNow(platform.id)}
                         >
-                          <RefreshCw size={15} aria-hidden="true" />広告の状態を再読み込み
+                          <RefreshCw size={16} aria-hidden="true" />広告の状態を再読み込み
                         </Button>
                       ) : (
                         <Button onClick={() => setConnectionTarget({ key: provider.key, label: provider.label })}>
-                          <Plug size={15} aria-hidden="true" />つなぐ
+                          <Plug size={16} aria-hidden="true" />つなぐ
                         </Button>
                       )}
                     </span>
@@ -510,7 +510,7 @@ export default function AdsV8() {
                           label={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
                           open={selectedEntryId === entry.id}
                           onOpenChange={(open) => setSelectedEntryId(open ? entry.id : null)}
-                          items={[{ id: 'cancel', label: '取り消す', icon: <XCircle size={15} aria-hidden />, onSelect: () => openCancel(entry) }]}
+                          items={[{ id: 'cancel', label: '取り消す', icon: <XCircle size={16} aria-hidden />, onSelect: () => openCancel(entry) }]}
                         />
                       ) : null}
                     </span>
@@ -530,7 +530,7 @@ export default function AdsV8() {
         designWidth={520}
         designTop={225}
         confirmLabel="記録する"
-        confirmIcon={<Check size={15} aria-hidden="true" />}
+        confirmIcon={<Check size={16} aria-hidden="true" />}
         busy={manualBusy}
         error={manualError || undefined}
         onConfirm={() => submitManualEntry()}

@@ -177,7 +177,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
             {state === 'ready' && conflict ? <Notice tone="danger">その間に埋まった回があります。表を確かめ直してください。</Notice> : null}
             {state === 'ready' && blocked.length === 0 && !unreadable ? <p className={styles.allOk}>{list.length} 回すべて取れます</p> : null}
             {state === 'ready' && blocked.length > 0 ? <>
-              <span className={styles.badge}><CalendarX2 aria-hidden="true" size={14} />取れない回 {blocked.length} 件</span>
+              <span className={styles.badge}><CalendarX2 aria-hidden="true" size={16} />取れない回 {blocked.length} 件</span>
               <DataTable>
                 <thead><Tr><Th>日</Th><Th>理由</Th><Th>どうするか</Th></Tr></thead>
                 <tbody>

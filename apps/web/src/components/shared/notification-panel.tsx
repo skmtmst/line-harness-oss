@@ -97,7 +97,7 @@ export default function NotificationPanel({
       )}
       <footer className={`${styles.footer} ${styles.notificationFooter}`}>
         <button type="button" className={styles.linkButton} onClick={onViewAll}>すべての通知を見る →</button>
-        <button type="button" className={`${styles.linkButton} ${styles.settings}`} onClick={onOpenSettings}><Settings aria-hidden="true" size={14} />通知設定</button>
+        <button type="button" className={`${styles.linkButton} ${styles.settings}`} onClick={onOpenSettings}><Settings aria-hidden="true" size={16} />通知設定</button>
       </footer>
     </section>
   )

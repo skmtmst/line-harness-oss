@@ -62,12 +62,12 @@ function Kv({ label, children }: { label: string; children: React.ReactNode }) {
 
 /** 最近の履歴の印。種類ごとに決まった形。 */
 function recentIcon(type: string) {
-  if (type === 'message_received' || type === 'message_sent') return <MessageCircle size={12} aria-hidden />
-  if (type === 'tag_change') return <TagIcon size={12} aria-hidden />
-  if (type === 'ec_order') return <ShoppingBag size={12} aria-hidden />
-  if (type.includes('booking')) return <CalendarDays size={12} aria-hidden />
-  if (type.startsWith('scenario')) return <Workflow size={12} aria-hidden />
-  return <MailOpen size={12} aria-hidden />
+  if (type === 'message_received' || type === 'message_sent') return <MessageCircle size={16} aria-hidden />
+  if (type === 'tag_change') return <TagIcon size={16} aria-hidden />
+  if (type === 'ec_order') return <ShoppingBag size={16} aria-hidden />
+  if (type.includes('booking')) return <CalendarDays size={16} aria-hidden />
+  if (type.startsWith('scenario')) return <Workflow size={16} aria-hidden />
+  return <MailOpen size={16} aria-hidden />
 }
 
 /** 最後のやりとり。履歴の中のいちばん新しいメッセージの時刻（無ければ —）。 */
@@ -236,7 +236,7 @@ export default function OverviewTab({
             presentation="band"
             density="compact"
             title="配信を開いた率"
-            icon={<MailOpen size={13} aria-hidden />}
+            icon={<MailOpen size={16} aria-hidden />}
             value={null}
             unit="%"
             detail=""
@@ -246,7 +246,7 @@ export default function OverviewTab({
             presentation="band"
             density="compact"
             title="この90日の購入"
-            icon={<ShoppingBag size={13} aria-hidden />}
+            icon={<ShoppingBag size={16} aria-hidden />}
             value={null}
             unit="回"
             detail=""
@@ -256,7 +256,7 @@ export default function OverviewTab({
             presentation="band"
             density="compact"
             title="次の予約"
-            icon={<CalendarDays size={13} aria-hidden />}
+            icon={<CalendarDays size={16} aria-hidden />}
             value={null}
             unit=""
             loading={upcomingStatus === 'loading' || upcomingStatus === 'idle'}
@@ -270,7 +270,7 @@ export default function OverviewTab({
         <section className={styles.section} aria-labelledby="fdt-running">
           <div className={styles.secHead}>
             <h2 id="fdt-running" className={styles.secTitle}>進行中の配信・自動処理</h2>
-            <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=scenario`}>すべてを見る<ArrowRight size={12} aria-hidden /></Link>
+            <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=scenario`}>すべてを見る<ArrowRight size={16} aria-hidden /></Link>
           </div>
           {upcomingStatus === 'loading' || upcomingStatus === 'idle' ? (
             <DetailLoading />
@@ -282,7 +282,7 @@ export default function OverviewTab({
               className={styles.row}
               href={nextDelivery.kind === 'scenario' ? `/scenarios/detail?id=${encodeURIComponent(nextDelivery.id)}` : `/reminders/detail?id=${encodeURIComponent(nextDelivery.id)}`}
             >
-              <span className={styles.rowIcon}>{nextDelivery.kind === 'scenario' ? <Workflow size={17} aria-hidden /> : <Bell size={17} aria-hidden />}</span>
+              <span className={styles.rowIcon}>{nextDelivery.kind === 'scenario' ? <Workflow size={16} aria-hidden /> : <Bell size={16} aria-hidden />}</span>
               <span className={styles.rowBody}>
                 <span className={styles.rowTop}>
                   <span className={styles.rowTitle} ><TruncatedText value={String(nextDelivery.name ?? '')} /></span>
@@ -298,7 +298,7 @@ export default function OverviewTab({
           {upcomingStatus === 'ready' && !deliveryFailed ? (
             // 今の口は「いちばん近い1件」だけを返す。ほかがあるかは分からないことを、行の形で正直に出す。
             <div className={`${styles.row} ${styles.rowMuted}`}>
-              <span className={styles.rowIcon}><List size={17} aria-hidden /></span>
+              <span className={styles.rowIcon}><List size={16} aria-hidden /></span>
               <span className={styles.rowBody}>
                 <span className={styles.rowTop}>
                   <span className={styles.rowTitle}>ほかの進行中の配信・リマインダ</span>
@@ -311,7 +311,7 @@ export default function OverviewTab({
         </section>
 
         <div className={styles.same}>
-          <span className={styles.rowIcon}><Link2 size={17} aria-hidden /></span>
+          <span className={styles.rowIcon}><Link2 size={16} aria-hidden /></span>
           <div className={styles.sameBody}>
             <p className={styles.sameTitle}>同じ人としてつながる情報</p>
             {/* NEXT-10: 名寄せの実績（マイル口の応答の統合情報）から出す。 */}
@@ -331,7 +331,7 @@ export default function OverviewTab({
         <section className={`${styles.section} ${styles.recent}`} aria-labelledby="fdt-recent">
           <div className={styles.secHead}>
             <h2 id="fdt-recent" className={styles.secTitle}>最近の履歴</h2>
-            <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=history`}>すべて見る<ArrowRight size={12} aria-hidden /></Link>
+            <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=history`}>すべて見る<ArrowRight size={16} aria-hidden /></Link>
           </div>
           {data.historyStatus === 'loading' || data.historyStatus === 'idle' ? (
             <DetailLoading />
@@ -362,7 +362,7 @@ export default function OverviewTab({
               })}
               {history.length === 0 ? (
                 <div className={styles.recentItem}>
-                  <span className={styles.recentLine}><span className={styles.dot}><MailOpen size={12} aria-hidden /></span></span>
+                  <span className={styles.recentLine}><span className={styles.dot}><MailOpen size={16} aria-hidden /></span></span>
                   <span className={styles.recentText}>
                     <span className={styles.recentTitle}>友だちに追加されました</span>
                     <span className={styles.recentSub}>{friend.firstTrackedLinkName ?? 'システム'}・ほかの活動履歴はまだありません</span>

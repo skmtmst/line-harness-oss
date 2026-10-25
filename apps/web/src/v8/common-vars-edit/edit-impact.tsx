@@ -61,19 +61,19 @@ export function ImpactRows({
       <div className={styles.impactFoot}>
         {rest > 0 ? (
           <Button variant="text" type="button" onClick={() => setExpanded(true)}>
-            <ChevronDown size={14} aria-hidden="true" />
+            <ChevronDown size={16} aria-hidden="true" />
             {`ほか ${formatNumber(rest)} か所を見る`}
           </Button>
         ) : rows.length > 3 ? (
           <Button variant="text" type="button" onClick={() => setExpanded(false)}>
-            <ChevronUp size={14} aria-hidden="true" />
+            <ChevronUp size={16} aria-hidden="true" />
             畳む
           </Button>
         ) : null}
         <span className={styles.impactSpacer} aria-hidden="true" />
         {changeable ? (
           <Button variant="text" type="button" onClick={onExportCsv} disabled={csvRows.length === 0}>
-            <Download size={14} aria-hidden="true" />
+            <Download size={16} aria-hidden="true" />
             この一覧をCSVで
           </Button>
         ) : null}
@@ -86,7 +86,7 @@ export function ImpactRows({
             </ul>
           ) : (
             <p className={styles.validNote} role="status">
-              <CircleCheck size={14} aria-hidden="true" />
+              <CircleCheck size={16} aria-hidden="true" />
               <span>文字数の上限をこえる文はありません。保存を止める問題は見つかりませんでした。</span>
             </p>
           )}

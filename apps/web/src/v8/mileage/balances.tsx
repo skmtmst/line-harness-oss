@@ -302,7 +302,7 @@ export default function BalancesTab() {
       <KpiCard
         presentation="band"
         title="友だち"
-        icon={<Users size={14} aria-hidden="true" />}
+        icon={<Users size={16} aria-hidden="true" />}
         value={ready ? summary.totalMembers : null}
         unit="人"
         detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人` : emptyValue('unknown')}
@@ -310,7 +310,7 @@ export default function BalancesTab() {
       <KpiCard
         presentation="band"
         title="残高の合計"
-        icon={<Wallet size={14} aria-hidden="true" />}
+        icon={<Wallet size={16} aria-hidden="true" />}
         value={ready ? summary.available : null}
         unit=""
         detail={ready
@@ -320,7 +320,7 @@ export default function BalancesTab() {
       <KpiCard
         presentation="band"
         title="直近30日 増えた"
-        icon={<TrendingUp size={14} aria-hidden="true" />}
+        icon={<TrendingUp size={16} aria-hidden="true" />}
         value={!loading && !loadError ? grantedMiles ?? 0 : null}
         unit=""
         detail="この30日に付いた分"
@@ -328,7 +328,7 @@ export default function BalancesTab() {
       <KpiCard
         presentation="band"
         title="直近30日 減った"
-        icon={<TrendingDown size={14} aria-hidden="true" />}
+        icon={<TrendingDown size={16} aria-hidden="true" />}
         value={!loading && !loadError ? decreasedMiles ?? 0 : null}
         unit=""
         detail="交換・取り消し"
@@ -358,14 +358,14 @@ export default function BalancesTab() {
                 disabled={approvalBusyId !== null}
                 onClick={() => { setRejectTarget(request); setRejectReason(''); setApprovalError('') }}
               >
-                <Undo2 size={15} aria-hidden="true" /> 差し戻す
+                <Undo2 size={16} aria-hidden="true" /> 差し戻す
               </Button>
               <Button
                 variant="primary"
                 disabled={approvalBusyId !== null}
                 onClick={() => void decideApproval(request.id, 'approve')}
               >
-                <Check size={15} aria-hidden="true" /> 承認する
+                <Check size={16} aria-hidden="true" /> 承認する
               </Button>
             </>
           ) : (
@@ -389,14 +389,14 @@ export default function BalancesTab() {
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
       <FilterChip
         selected={withBalanceOnly}
-        icon={<CircleDot size={13} aria-hidden="true" />}
+        icon={<CircleDot size={16} aria-hidden="true" />}
         onChange={(selected) => { setOffset(0); setWithBalanceOnly(selected) }}
       >
         {`残高あり ${summary === null ? emptyValue('unknown') : formatMileageNumber(summary.withBalanceCount)}`}
       </FilterChip>
       <FilterChip
         selected={pendingOnly}
-        icon={<Clock3 size={13} aria-hidden="true" />}
+        icon={<Clock3 size={16} aria-hidden="true" />}
         onChange={(selected) => { setOffset(0); setPendingOnly(selected) }}
       >
         {/* 件数は全件を読み切ったときだけ確か（読んだ頁の中だけの数と混ぜない）。 */}
@@ -529,10 +529,10 @@ export default function BalancesTab() {
       explanation="残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。"
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>
-          <RefreshCw size={15} aria-hidden="true" /> 残高を再読み込み
+          <RefreshCw size={16} aria-hidden="true" /> 残高を再読み込み
         </Button>
         <Button onClick={exportCsv} disabled={members.length === 0}>
-          <Download size={15} aria-hidden="true" /> この頁の残高を CSV
+          <Download size={16} aria-hidden="true" /> この頁の残高を CSV
         </Button>
       </div>}
       stats={stats}

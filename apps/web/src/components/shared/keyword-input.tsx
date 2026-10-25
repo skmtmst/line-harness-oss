@@ -25,7 +25,7 @@ export default function KeywordInput({ id, label, placeholder = '言葉を入れ
   }
   return <span className={styles.entry} data-keyword-input>
     <AffixedTextField id={id} aria-label={label} placeholder={placeholder} maxLength={maxLength}
-      startAdornment={<Search size={14} aria-hidden="true" />}
+      startAdornment={<Search size={16} aria-hidden="true" />}
       invalid={Boolean(error)} aria-describedby={error ? errorId : undefined}
       value={value} onChange={event => setValue(event.target.value)} onInput={onInput}
       onCompositionStart={() => { composing.current = true }}

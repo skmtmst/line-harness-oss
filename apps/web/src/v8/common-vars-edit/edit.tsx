@@ -599,7 +599,7 @@ function EditCommonVarV8Inner() {
       <>
         <div className={styles.narrowPhoneOpen}>
           <Button type="button" onClick={() => setPreviewOpen(true)}>
-            <Smartphone size={14} aria-hidden="true" />
+            <Smartphone size={16} aria-hidden="true" />
             LINEでの見え方を見る
           </Button>
         </div>
@@ -666,14 +666,14 @@ function EditCommonVarV8Inner() {
           {/* 閲覧のみには押せない操作を置かない（隠す）。 */}
           {canWrite && item && !stopped && !isDraft ? (
             <Button type="button" onClick={() => openStatusDialog('stop')} disabled={saving}>
-              <Pause size={14} aria-hidden="true" />
+              <Pause size={16} aria-hidden="true" />
               止める
             </Button>
           ) : null}
           {/* 状態で変わる操作は下の帯だけに置く（右の列に同じ操作を並べない）。止めている→再開する、下書き→公開する。 */}
           {canWrite && item && stopped ? (
             <Button type="button" onClick={() => openStatusDialog('resume')} disabled={saving}>
-              <Play size={14} aria-hidden="true" />
+              <Play size={16} aria-hidden="true" />
               再開する
             </Button>
           ) : null}
@@ -730,7 +730,7 @@ function EditCommonVarV8Inner() {
                   aria-readonly="true"
                   className={styles.fieldInput}
                 /></SaveErrorField></Field></div>
-              <span className={styles.valueArrow} aria-hidden="true"><ArrowRight size={18} /></span>
+              <span className={styles.valueArrow} aria-hidden="true"><ArrowRight size={20} /></span>
               <div className={styles.field}><Field label="新しい中身" htmlFor="cv-value">{!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
                   // 閲覧のみ：選ぶ部品は置かず、中身を文字で見せる。
                   <ReadOnlyValue id="cv-value" label="新しい中身" value={item.type === 'boolean' ? value : readOnlyDate(value)} />

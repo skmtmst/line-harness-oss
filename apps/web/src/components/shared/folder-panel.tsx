@@ -100,23 +100,23 @@ function folderMenuItems(
   const items: ActionMenuItem[] = []
   if (row.onEdit) {
     items.push(
-      { id: `${row.id}-rename`, label: label.rename, icon: icon(<Pencil size={14} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) },
+      { id: `${row.id}-rename`, label: label.rename, icon: icon(<Pencil size={16} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) },
     )
     if (row.colorEditable !== false) {
-      items.push({ id: `${row.id}-color`, label: label.color, icon: icon(<Palette size={14} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) })
+      items.push({ id: `${row.id}-color`, label: label.color, icon: icon(<Palette size={16} aria-hidden="true" />), onSelect: () => runAction(row.onEdit) })
     }
   }
   if (row.onMoveUp) {
-    items.push({ id: `${row.id}-up`, label: label.up, icon: icon(<ArrowUp size={14} aria-hidden="true" />), onSelect: () => runAction(row.onMoveUp) })
+    items.push({ id: `${row.id}-up`, label: label.up, icon: icon(<ArrowUp size={16} aria-hidden="true" />), onSelect: () => runAction(row.onMoveUp) })
   }
   if (row.onMoveDown) {
-    items.push({ id: `${row.id}-down`, label: label.down, icon: icon(<ArrowDown size={14} aria-hidden="true" />), onSelect: () => runAction(row.onMoveDown) })
+    items.push({ id: `${row.id}-down`, label: label.down, icon: icon(<ArrowDown size={16} aria-hidden="true" />), onSelect: () => runAction(row.onMoveDown) })
   }
   if (row.onDelete) {
     items.push({
       id: `${row.id}-delete`,
       label: label.remove,
-      icon: icon(<Trash2 size={14} aria-hidden="true" />),
+      icon: icon(<Trash2 size={16} aria-hidden="true" />),
       tone: 'danger',
       dividerBefore: items.length > 0,
       onSelect: () => runAction(row.onDelete),
@@ -227,7 +227,7 @@ export default function FolderPanel({
           const isActive = activeId === row.id
           const kind = row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')
           const menuRow = kind === 'all' && onAddFolder && !addFolderDisabled ? { ...row, leadingActions: [
-            ...(row.leadingActions ?? []), { id: 'add-folder', label: addFolderLabel, icon: <FolderPlus size={14} aria-hidden="true" />, onSelect: onAddFolder },
+            ...(row.leadingActions ?? []), { id: 'add-folder', label: addFolderLabel, icon: <FolderPlus size={16} aria-hidden="true" />, onSelect: onAddFolder },
           ] } : row
           const hasActions = !readOnly && Boolean(menuRow.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
 
@@ -261,7 +261,7 @@ export default function FolderPanel({
               >
                 {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
                     色が面で乗って名前より目立ってしまう。 */}
-                <span className={styles.folderIcon} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'frequent' ? <Star size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <Folder size={15} fill="currentColor" style={{ color: folderDisplayColor({ name: row.label, color: row.color }) }} />}</span>
+                <span className={styles.folderIcon} aria-hidden="true">{kind === 'all' ? <Inbox size={16} style={{ color: 'var(--color-ink)' }} /> : kind === 'frequent' ? <Star size={16} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={16} style={{ color: 'var(--color-ink-secondary)' }} /> : <Folder size={16} fill="currentColor" style={{ color: folderDisplayColor({ name: row.label, color: row.color }) }} />}</span>
                 <span className={`${styles.label} min-w-0 flex-1 truncate`}>{row.label}</span>
                 {row.count === null ? null : <span className={`${styles.count} text-ink-faint shrink-0`}>{row.count}</span>}
               </button>
@@ -287,7 +287,7 @@ export default function FolderPanel({
                     // 出さないとスマホから名前変更・削除に届かない。
                     className={`${styles.menuButton} text-ink-faint hover:text-action min-h-8 min-w-8 text-lg leading-none transition-opacity`}
                   >
-                    <Ellipsis size={14} aria-hidden="true" />
+                    <Ellipsis size={16} aria-hidden="true" />
                   </button>
                   {/*
                     ★V7（m13g）：フォルダの操作も共通 ActionMenu にそろえる。
@@ -319,7 +319,7 @@ export default function FolderPanel({
             title={addFolderTitle}
             className={styles.add}
           >
-            <span className={styles.addIcon} aria-hidden="true"><FolderPlus size={15} /></span>
+            <span className={styles.addIcon} aria-hidden="true"><FolderPlus size={16} /></span>
             <span className={styles.addLabel}>{addFolderLabel}</span>
           </button>
         )}

@@ -53,7 +53,7 @@ export function MenuContent({
             width: `${(a.w / dims.width) * 100}%`,
             height: `${(a.h / dims.height) * 100}%`,
           }}
-        >{a.label ? <><AreaIcon intent={a.intent} size={14} presentation="preview" /><span className={styles.previewMenuAreaName}>{a.label}</span></> : null}</span>
+        >{a.label ? <><AreaIcon intent={a.intent} size={16} presentation="preview" /><span className={styles.previewMenuAreaName}>{a.label}</span></> : null}</span>
       ))}
     </div>
   ) : null

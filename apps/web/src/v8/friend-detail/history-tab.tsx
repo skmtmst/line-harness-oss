@@ -31,14 +31,14 @@ const FILTERS: Array<{ value: TimelineFilter; label: string }> = [
 ]
 
 function typeIcon(type: string) {
-  if (type === 'message_received') return <MessageCircle size={12} aria-hidden />
-  if (type === 'message_sent') return <Send size={12} aria-hidden />
-  if (type === 'form_submitted') return <ClipboardList size={12} aria-hidden />
-  if (type.startsWith('scenario')) return <Workflow size={12} aria-hidden />
-  if (type === 'tag_change') return <TagIcon size={12} aria-hidden />
-  if (type === 'ec_order') return <ShoppingBag size={12} aria-hidden />
-  if (type.includes('booking')) return <CalendarDays size={12} aria-hidden />
-  return <MailOpen size={12} aria-hidden />
+  if (type === 'message_received') return <MessageCircle size={16} aria-hidden />
+  if (type === 'message_sent') return <Send size={16} aria-hidden />
+  if (type === 'form_submitted') return <ClipboardList size={16} aria-hidden />
+  if (type.startsWith('scenario')) return <Workflow size={16} aria-hidden />
+  if (type === 'tag_change') return <TagIcon size={16} aria-hidden />
+  if (type === 'ec_order') return <ShoppingBag size={16} aria-hidden />
+  if (type.includes('booking')) return <CalendarDays size={16} aria-hidden />
+  return <MailOpen size={16} aria-hidden />
 }
 
 export default function HistoryTab({ friend, friendId, data }: { friend: FriendDetail; friendId: string; data: FriendDetailState }) {

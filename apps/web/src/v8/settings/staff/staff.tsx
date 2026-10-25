@@ -1163,7 +1163,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 ) : null}
                 <span className={styles.spacer} />
                 {administrator ? (
-                  <Button href="/staff/new" variant="primary"><UserPlus size={15} aria-hidden="true" />人を招待する</Button>
+                  <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />人を招待する</Button>
                 ) : (
                   /* 閲覧のみには押せないボタンを置かない。場所だけ空ける（下の物を詰めない）。 */
                   <span className={styles.inviteSpace} aria-hidden="true" />

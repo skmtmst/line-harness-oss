@@ -443,7 +443,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => onSaveDraft()} disabled={busy || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => onPublish()} disabled={busy || loadFailed} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={15} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" variant="primary" onClick={() => onPublish()} disabled={busy || loadFailed} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >
@@ -498,7 +498,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   </button>
                 ))}
                 <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} onClick={() => { setPanels((prev) => [...prev, emptyPanel()]); setSelected(panels.length) }}>
-                  <Plus size={15} aria-hidden="true" />カードを足す
+                  <Plus size={16} aria-hidden="true" />カードを足す
                 </Button>
                 <span className={own.count}>{`${panels.length} / ${MAX_COLUMNS} 枚`}</span>
               </div>
@@ -550,10 +550,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   sources={tapSources} actionOptions={actionOptions} kindOptions={current => choiceKindOptions({ host: hqHost, current })} extraKinds={hqHost ? [] : ACTION_EXTRA_KIND}
                   onChange={actions => update(selectedIndex, { actions })} />
                 <div className={own.toolRow}>
-                  <Button type="button" variant="text" disabled={panel.actions.length >= MAX_ACTIONS} title={panel.actions.length >= MAX_ACTIONS ? `ボタンは${MAX_ACTIONS}つまでです。` : undefined} onClick={() => update(selectedIndex, { actions: [...panel.actions, emptyChoice()] })}><Plus size={15} aria-hidden="true" />ボタンを足す</Button>
+                  <Button type="button" variant="text" disabled={panel.actions.length >= MAX_ACTIONS} title={panel.actions.length >= MAX_ACTIONS ? `ボタンは${MAX_ACTIONS}つまでです。` : undefined} onClick={() => update(selectedIndex, { actions: [...panel.actions, emptyChoice()] })}><Plus size={16} aria-hidden="true" />ボタンを足す</Button>
                   <span className={own.spacer} />
-                  <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} title={panels.length >= MAX_COLUMNS ? `カードは${MAX_COLUMNS} 枚までです` : undefined} onClick={() => duplicatePanel(selectedIndex)}><Copy size={15} aria-hidden="true" />このカードを複製</Button>
-                  <Button type="button" variant="text" disabled={busy || panels.length <= 1} title={panels.length <= 1 ? 'カードは1枚必要です' : undefined} onClick={() => removePanel(selectedIndex)}><Trash2 size={15} aria-hidden="true" />このカードを消す</Button>
+                  <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} title={panels.length >= MAX_COLUMNS ? `カードは${MAX_COLUMNS} 枚までです` : undefined} onClick={() => duplicatePanel(selectedIndex)}><Copy size={16} aria-hidden="true" />このカードを複製</Button>
+                  <Button type="button" variant="text" disabled={busy || panels.length <= 1} title={panels.length <= 1 ? 'カードは1枚必要です' : undefined} onClick={() => removePanel(selectedIndex)}><Trash2 size={16} aria-hidden="true" />このカードを消す</Button>
                 </div>
                 <Notice tone="warn" title="画像は横1024 × 縦678pxを推奨。本文はタイトルか画像があると60文字、両方なければ120文字までです。" icon={<TriangleAlert aria-hidden="true" />}>
                   画像は全部のカードに入れるか、全部入れないかにします。1枚だけ違うと、高さがそろわず崩れます。

@@ -331,7 +331,7 @@ export default function HqHomeV8() {
   }
 
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: ALL, label: 'すべて', count: accounts.length, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: ALL, label: 'すべて', count: accounts.length, icon: <Inbox size={16} aria-hidden="true" /> },
     ...folders.map((f, index) => ({
       kind: 'folder' as const,
       id: f.id,

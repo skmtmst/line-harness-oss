@@ -434,7 +434,7 @@ export default function NewCommonVarV8() {
                 busy={saving}
                 busyLabel="保存中…"
               >
-                <Upload size={14} aria-hidden="true" />
+                <Upload size={16} aria-hidden="true" />
                 保存して公開
               </Button>
             </>
@@ -532,7 +532,7 @@ export default function NewCommonVarV8() {
                 checked={checked}
                 title={entry.label}
                 note={entry.desc}
-                icon={<Icon size={14} aria-hidden="true" />}
+                icon={<Icon size={16} aria-hidden="true" />}
                 onChange={() => {
                   setType(entry.key)
                   setValue('')

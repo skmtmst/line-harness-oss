@@ -257,13 +257,13 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       {mediaError?<ListState kind="error" title="予約媒体を読み込めませんでした" onRetry={()=>setMediaRetry(n=>n+1)}/>:null}
       {first && firstItem ? (
         <div className={styles.bandRow}>
-          <Notice tone="warn" role="status" data-closure-band="" icon={<Bell size={18} aria-hidden="true" />} action={<>
+          <Notice tone="warn" role="status" data-closure-band="" icon={<Bell size={20} aria-hidden="true" />} action={<>
             {firstMedium?.loginUrl ? (
               <Button external href={firstMedium.loginUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
             ) : null}
             {canWrite ? (
               <Button onClick={() => void closeOne(firstItem)} disabled={busy === firstItem.id} aria-label={`${nameOf(firstItem.channel)}の枠を閉じた`} busy={Boolean(busy === firstItem.id)} busyLabel="処理中…">
-                <Check size={15} aria-hidden="true" />閉じた
+                <Check size={16} aria-hidden="true" />閉じた
               </Button>
             ) : null}
             <>

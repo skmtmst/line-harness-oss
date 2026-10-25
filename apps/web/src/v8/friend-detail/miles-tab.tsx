@@ -34,7 +34,7 @@ export default function MilesTab({ friendId }: { friendId: string }) {
   return (
     <>
       <EmptyTab
-        icon={<Star size={17} />}
+        icon={<Star size={16} />}
         title="この友だちのマイルはマイル画面で見られます"
         text="マイル残高と履歴は、マイル画面で確認できます。"
         actions={[{ label: 'マイルを確認 ↗', href: `/mileage/friends/detail?id=${encodeURIComponent(friendId)}` }]}

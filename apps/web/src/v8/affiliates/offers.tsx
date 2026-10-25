@@ -378,7 +378,7 @@ export default function OffersTab() {
       <KpiCard
         presentation="band"
         title="案件"
-        icon={<Briefcase size={14} aria-hidden="true" />}
+        icon={<Briefcase size={16} aria-hidden="true" />}
         value={ready ? offers.length : null}
         unit="件"
         detail={ready ? `公開中 ${formatNumber(openCount)}・下書き ${formatNumber(draftCount)}` : loadState === 'loading' ? loadingWord : errorWord}
@@ -386,7 +386,7 @@ export default function OffersTab() {
       <KpiCard
         presentation="band"
         title="今月の成果"
-        icon={<Trophy size={14} aria-hidden="true" />}
+        icon={<Trophy size={16} aria-hidden="true" />}
         value={monthlyState === 'ready' && monthly ? monthly.count : null}
         unit="件"
         detail={monthlyState === 'ready' && monthly ? deltaText(monthly.delta) : monthlyState === 'loading' ? loadingWord : errorWord}
@@ -394,7 +394,7 @@ export default function OffersTab() {
       <KpiCard
         presentation="band"
         title="平均報酬"
-        icon={<Banknote size={14} aria-hidden="true" />}
+        icon={<Banknote size={16} aria-hidden="true" />}
         value={null}
         valueText={approvalState === 'ready' && !approvalsTruncated && averageReward != null ? formatYen(averageReward) : emptyValue('unknown')}
         unit=""
@@ -405,7 +405,7 @@ export default function OffersTab() {
       <KpiCard
         presentation="band"
         title="マイルあり"
-        icon={<Coins size={14} aria-hidden="true" />}
+        icon={<Coins size={16} aria-hidden="true" />}
         value={ready ? milesCount : null}
         unit="件"
         detail={ready ? '成果でマイルも付く' : loadState === 'loading' ? loadingWord : errorWord}
@@ -415,7 +415,7 @@ export default function OffersTab() {
 
   const createButton = (full: boolean) => (
     <CreateButton onClick={openCreate} readonly={readonly} full={full}>
-      <Plus size={15} aria-hidden="true" /> 案件を作る
+      <Plus size={16} aria-hidden="true" /> 案件を作る
     </CreateButton>
   )
 
@@ -436,10 +436,10 @@ export default function OffersTab() {
 
   const chips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={filters.includes('open')} icon={<CircleDot size={13} aria-hidden="true" />} onChange={(on) => toggleFilter('open', on)}>
+      <FilterChip selected={filters.includes('open')} icon={<CircleDot size={16} aria-hidden="true" />} onChange={(on) => toggleFilter('open', on)}>
         {ready ? `公開中 ${formatNumber(openCount)}` : '公開中'}
       </FilterChip>
-      <FilterChip selected={filters.includes('draft')} icon={<FilePen size={13} aria-hidden="true" />} onChange={(on) => toggleFilter('draft', on)}>
+      <FilterChip selected={filters.includes('draft')} icon={<FilePen size={16} aria-hidden="true" />} onChange={(on) => toggleFilter('draft', on)}>
         {ready ? `下書き ${formatNumber(draftCount)}` : '下書き'}
       </FilterChip>
     </div>
@@ -582,7 +582,7 @@ export default function OffersTab() {
     <SaveErrorScope errors={saveErrors}><AffiliateFrame
       explanation="アフィリエイターは「紹介する人」、案件は「何を紹介すると、いくら払うか」の決まりです。1人のアフィリエイターが、いくつもの案件を紹介できます。"
       help={readonly ? '行の「…」から 決まり（受付期間・上限・数える期間）を見る。' : '行の「…」から 編集・決まり・公開を止める・複製。'}
-      actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={15} aria-hidden="true" /> CSVで書き出す</Button>}
+      actions={<Button onClick={exportCsv} disabled={shown.length === 0}><Download size={16} aria-hidden="true" /> CSVで書き出す</Button>}
       stats={stats}
       folderNav={{ rows: managedFolderNavRows('affiliate_offer', folders), activeId: folderId, onSelect: chooseFolder, createAction: readonly ? undefined : createButton(false) }}
       folders={folderPanel}
