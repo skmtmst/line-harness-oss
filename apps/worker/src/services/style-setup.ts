@@ -141,7 +141,7 @@ export async function saveProfile(
   const bookingSettingsChanges = Object.entries(changedAnswers).map(
     ([key, answer]) => ({ key, answer }),
   );
-  const { set, inserted } = await insertStyleStarterItems(
+  const { set, inserted, skipped } = await insertStyleStarterItems(
     db,
     account,
     tenant,
@@ -186,6 +186,7 @@ export async function saveProfile(
     bookingSettingsChanges,
     version,
     inserted,
+    skipped,
     starterSet: { id: set.id, version: set.version },
   };
 }
