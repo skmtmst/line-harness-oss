@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import type { ApplyMileageRulesInput } from '@line-crm/db';
 
-/** Mileage is a best-effort projection: the user's primary action must succeed even if it is unavailable. */
+/** マイルの反映が使えなくても、利用者の主操作は成功させる。 */
 export async function awardActivityMileage(
   db: D1Database,
   input: ApplyMileageRulesInput,

@@ -2,10 +2,10 @@ import { buildSegmentWhere, matchesCondition } from './segment-conditions.js';
 import { type SegmentCondition, type SegmentRule } from '@line-crm/shared';
 
 /**
- * 成果地点の「数えない条件」(R40)。
+ * 成果地点の「数えない条件」。
  *
- * 以前は自由文の `excludedCondition` 文字列だけを保存し、記録・試算の
- * どちらにも効いていなかった。いまは分ける。
+ * 自由文の `excludedCondition` 文字列だけでは記録・試算の
+ * どちらにも効かないので、分けて持つ。
  * - `exclusion`: 実効する除外条件。友だち絞り込みの共通部品
  *   (ConditionBuilder / SegmentCondition)と同じ形。条件に当てはまる
  *   友だちの成果は記録しないし、試算の過去集計からも除く。

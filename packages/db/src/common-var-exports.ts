@@ -1,7 +1,7 @@
 import type { CommonVar } from './common-vars/record-types/index.js';
 
 /**
- * 共通情報の監査付きCSV出力（N-192）。
+ * 共通情報の監査付きCSV出力。
  *
  * 画面に読み込めた最大200件を端末でCSV化する方式だと、200件を超える
  * 共通情報は届かず、誰が何を出力したかも残らない。ここでは出力を

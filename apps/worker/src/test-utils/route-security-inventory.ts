@@ -8,14 +8,14 @@ export type SecurityRoute = {
   calls: string[]; evidence: string[]; position: number; guarded: boolean;
 };
 
-/** Include feature directories; splitting a router must never remove it from the security scan. */
+/** route 分割で安全検査から消えないよう、features の実装も対象に含める。 */
 export function routeSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory()
     ? routeSourceFiles(join(directory, entry.name))
     : entry.name.endsWith('.ts') && !entry.name.includes('.test.') ? [join(directory, entry.name)] : []);
 }
 
-/** Evidence of a call is a review aid, never proof that its result is enforced. */
+/** 呼出の存在はレビューの手掛かりであり、結果を強制している証明とはしない。 */
 function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
   const ast = typeof source === 'string' ? ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true) : source;
   const imports = importedRouters(ast);
@@ -132,8 +132,7 @@ function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, 
     prior.push(registration);
     middleware.set(registration.router, prior);
   }
-  // The same middleware argument can guard hundreds of routes. Its complete
-  // call graph is stable within this source scan, including recursive helpers.
+  // 共通 middleware が多数の route を守るため、再帰ヘルパを含む呼出グラフを走査内で共有する。
   const argumentCalls = new Map<ts.Node, Set<string>>();
   const callsOnce = (argument: ts.Node): Set<string> => {
     const cached = argumentCalls.get(argument);
@@ -160,7 +159,7 @@ function inspectScopedRouteSource(file: string, source: string | ts.SourceFile, 
 }
 
 
-/** Keep the reported router name stable while matching registrations by their lexical scope. */
+/** 表示する router 名は保ち、登録の照合は字句スコープで区別する。 */
 export function inspectRouteSource(file: string, source: string | ts.SourceFile, importedConstant?: (module: string, name: string) => string[]): SecurityRoute[] {
   return inspectScopedRouteSource(file, source, importedConstant)
     .filter(route => route.method !== 'USE')
@@ -173,9 +172,7 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
     sources.set(resolve(file), readFileSync(file, 'utf8'));
   }
   sources.set(resolve(srcDir, 'index.ts'), readFileSync(join(srcDir, 'index.ts'), 'utf8'));
-  // Parse only sources reached through mounted routers/factories. Handler-only
-  // modules remain in the source set, so moving a registration cannot hide it.
-  // Keep both caches within this scan: edits must be visible on the next call.
+  // 登録された router/factory から到達したソースだけを解析する。ハンドラ側も残して移動で隠せないようにし、キャッシュは今回の走査内だけで使う。
   function parseMetadata(file: string, source: string) {
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
     return {
@@ -249,9 +246,7 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
     const own = registered.filter(route => route.method !== 'USE')
       .map(route => ({ ...route, file: route.file.replace(resolve(srcDir), 'apps/worker/src'),
         path: prefix + (prefix && route.path === '*' ? '/*' : route.path) }));
-    // A factory can register routes on a router argument without creating a Hono.
-    // Follow only top-level invocations on this mounted router; unused factories
-    // and similarly named parameters in other functions never become routes.
+    // Hono を新規作成しない factory もあるため、登録済み router に対する最上位の呼出だけを追う。未使用や他関数の同名引数を route と推測しない。
     const factoryName = router.includes(':') ? router.slice(0, router.indexOf(':')) : undefined;
     const receiver = router.split(':').pop()!;
     const body = factoryName ? meta.factories.get(factoryName)?.body : undefined;

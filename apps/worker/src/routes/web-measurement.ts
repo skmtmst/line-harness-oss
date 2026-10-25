@@ -24,7 +24,7 @@ import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 import { auditLog } from '../lib/audit-log.js';
 import { fail } from '../lib/fail.js';
 /**
- * Web計測の公開口と計測サイトの管理 (#819)。
+ * Web計測の公開口と計測サイトの管理。
  *
  * 計測タグはサイトIDだけを載せる。秘密の鍵はタグに含めない代わりに、
  * 受け付けるドメインをサイトごとに決めておき、許可にない所から来た分は
@@ -70,7 +70,7 @@ webMeasurement.post('/api/public/web-conversions', inputJsonBoundary(), async (c
     const site = await getMeasurementSite(c.env.DB, siteId);
     if (!site) return c.body(null, 204, corsHeaders());
 
-    // R275: 停止中のサイトは成果を受け付けない。許可外ドメインとも別扱いで、
+    // 停止中のサイトは成果を受け付けない。許可外ドメインとも別扱いで、
     // 拒否の集計にも入れない(届いた事実自体を残さない)。
     if (site.stopped_at !== null) return c.body(null, 204, corsHeaders());
 
@@ -106,7 +106,7 @@ webMeasurement.post('/api/public/web-conversions', inputJsonBoundary(), async (c
 
     await recordMeasurementSiteReceipt(c.env.DB, site.id, site.line_account_id);
 
-    // R282: パラメータ（?以降）とページ内位置（#以降）は判定に使わない。
+    // パラメータ（?以降）とページ内位置（#以降）は判定に使わない。
     // 照合自体も getUrlReachConversionPoints 側で同じ形へ直して比べる。
     const path = typeof body.path === 'string' && body.path.startsWith('/')
       ? body.path.split('?')[0].split('#')[0] || '/'
@@ -280,7 +280,7 @@ webMeasurement.patch('/api/measurement-sites/:id', requireRole('owner', 'admin')
 });
 
 /**
- * R275: サイトの計測を止める・再開する。
+ * サイトの計測を止める・再開する。
  *
  * 停止は「閉鎖・誤登録」の運用整理。行は消さず、いつ・なぜ止めたかを残す。
  * 止めたサイトへの成果は公開口が受け付けず、既に数えた記録は変わらない。

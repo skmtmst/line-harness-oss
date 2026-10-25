@@ -1,8 +1,4 @@
-/**
- * Produce a stable RFC 4122 UUID-shaped retry key from the logical delivery.
- * LINE accepts a retry of the same push/multicast without delivering it twice
- * when the same X-Line-Retry-Key is reused.
- */
+/** 同じ push/multicast を二重に届けないよう、論理的な配送から安定した RFC 4122 UUID 形式のキーを作り、X-Line-Retry-Key を再試行でも使う。 */
 export async function createBroadcastRetryKey(...parts: string[]): Promise<string> {
   const input = new TextEncoder().encode(`line-harness:broadcast:${parts.join('\u001f')}`);
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', input));

@@ -53,11 +53,7 @@ export interface FollowerImportStepOptions {
   maxProfiles?: number;
 }
 
-/**
- * Process as much as the given time/subrequest budget allows. State and cursors
- * live in D1, so closing the browser continues in the scheduled lane; requests
- * may also resume it under the same lock.
- */
+/** 時間・問い合わせ予算の範囲で進め、状態とカーソルを D1 に残す。ブラウザを閉じても定期処理が継続し、要求も同じロックで再開する。 */
 export async function processFollowerImportStep(
   db: D1Database,
   client: FollowerImportClient,
@@ -140,7 +136,7 @@ export async function processFollowerImportStep(
   let profilesFetched = 0;
   try {
     // 1 ページ終わるたびに予算を見て、残っていれば続けて次のページへ進む。
-    // 以前は 1 回の実行で 1 ページだけ進めていたので、人数が多いと
+    // 多数の友だちでも1回の実行を有効に使えるよう、時間の範囲内で複数ページを進める。
     // 刻みの回数だけ待つことになっていた。
     while (state.phase === 'importing_ids' || state.phase === 'hydrating_profiles') {
       if (state.phase === 'importing_ids') {

@@ -14,7 +14,7 @@ export async function syncAffiliateConversionMileage(
   eventId: string,
   status: 'approved' | 'rejected',
 ): Promise<void> {
-  // 付けた時点の版があれば、その版の決まりを優先する(#823)。
+  // 付けた時点の版があれば、その版の決まりを優先する。
   // 版の表が無い古いスキーマでは、従来どおり今の案件の値を使う。
   const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
     && (await dbTableExists(db, 'affiliate_attribution_decisions'));
@@ -78,7 +78,7 @@ export async function syncAffiliateConversionMileage(
     occurredAt,
   });
 
-  // N-238: 承認された紹介成果は「たまる決めごと」のきっかけとしても選べるよう、
+  // 承認された紹介成果は「たまる決めごと」のきっかけとしても選べるよう、
   // 共通イベントキューへも乗せる。行動した側（受益者=紹介者）へルールが効く。
   // sourceEventId に決定版を含めるのは、却下→再承認を別の出来事として
   // 再度ルールに通すため（初回承認のイベントへ冪等吸収されないようにする）。
@@ -102,7 +102,7 @@ export async function syncAffiliateConversionMileage(
   }
 
   if (status === 'approved') {
-    // m22u R356: 承認時に凍結したマイル数があれば、変更後の案件設定ではなく
+    // 承認時に凍結したマイル数があれば、変更後の案件設定ではなく
     // 凍結値を使う。0 の凍結も有効（0 のまま完了し、後日の再送で増えない）。
     const rewardMiles = context.frozen_miles ?? context.reward_miles ?? 0;
     if (rewardMiles <= 0) return;
@@ -158,7 +158,7 @@ export async function syncAffiliateConversionMileage(
       metadata: { originalEntryId: grant.id },
       occurredAt,
     });
-    // m22u R359: 取り消した付与の未使用分を交換対象から外す。交換の内訳は
+    // 取り消した付与の未使用分を交換対象から外す。交換の内訳は
     // ロットから選ぶため、台帳の取消だけでは取消済みロットが使われてしまう。
     // 使い切った分は交換側の予約が残り、未使用分だけを無効化する。
     // 再送では取消済みのため grants に載らず、ここも再実行されない。

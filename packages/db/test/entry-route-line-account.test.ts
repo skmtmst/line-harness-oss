@@ -24,7 +24,7 @@ function asD1(sqlite: Database.Database): D1Database {
   } as unknown as D1Database;
 }
 
-// R39: 作成時に選んだLINEアカウントが line_account_id 列へ残る。
+// 作成時に選んだLINEアカウントが line_account_id 列へ残る。
 describe('entry route line account', () => {
   let sqlite: Database.Database;
   let db: D1Database;

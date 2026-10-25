@@ -17,16 +17,16 @@ const conversions = new Hono<Env>();
 
 // ── Conversion Points ───────────────────────────────────────────────────────
 
-// GET /api/conversions/definitions - list, filters, state counts and metrics
+
 conversions.get('/api/conversions/definitions', conversionPermission('view'), get__api_conversions_definitions_1);
 
-// POST /api/conversions/definitions - save the complete definition and its initial usages
+
 conversions.post('/api/conversions/definitions', conversionPermission('edit'), inputJsonBoundary(), post__api_conversions_definitions_2);
 
-// POST /api/conversions/definitions/preview - calculate from the submitted draft without saving it
+// 保存せず、送られた下書きの内容だけで試算する。
 conversions.post('/api/conversions/definitions/preview', conversionPermission('edit'), inputJsonBoundary(), post__api_conversions_definitions_preview_3);
 
-// GET /api/conversions/definitions/:id - definition, current version and usages
+
 conversions.get('/api/conversions/definitions/:id', conversionPermission('view'), get__api_conversions_definitions_id_4);
 
 conversions.get('/api/conversions/definitions/:id/delete-impact', conversionPermission('view'), get__api_conversions_definitions_id_delete_impact_5);
@@ -34,7 +34,7 @@ conversions.get('/api/conversions/definitions/:id/delete-impact', conversionPerm
 conversions.post('/api/conversions/definitions/:id/stop', conversionPermission('edit'), inputJsonBoundary(), post__api_conversions_definitions_id_stop_6);
 
 /*
- * POST /api/conversions/definitions/:id/revise — 履歴を保ったまま編集して次の版にする（N-252）。
+ * POST /api/conversions/definitions/:id/revise — 履歴を保ったまま編集して次の版にする。
  *
  * 停止・差し替えと同じく、版は本文で受けて CAS に使う。負けたら 409 で、
  * DBには何も残さない。過去の成果は書き換えない（集計は計測時の控えを見ている）。
@@ -46,14 +46,14 @@ conversions.post('/api/conversions/definitions/:id/replace', conversionPermissio
 conversions.delete('/api/conversions/definitions/:id', conversionPermission('edit'), delete__api_conversions_definitions_id_9);
 
 /*
- * POST /api/conversions/definitions/:id/publish — 下書きを計測中へ(N-268)。
+ * POST /api/conversions/definitions/:id/publish — 下書きを計測中へ。
  *
  * 下書きは保存だけの状態で、どの計測経路にも乗らない。公開すると
  * status='active' になり、内部起点・外部受信の両方で数え始める。
  */
 conversions.post('/api/conversions/definitions/:id/publish', conversionPermission('edit'), inputJsonBoundary(), post__api_conversions_definitions_id_publish_10);
 
-// ── 外部受信 (N-270) ─────────────────────────────────────────────────────────
+// ── 外部受信  ─────────────────────────────────────────────────────────
 //
 // 地点ごとの受信鍵で HMAC-SHA256 を照合する。受信の成否は
 // conversion_ingestion_events に残す(秘密値・署名・本文は残さない)。
@@ -74,7 +74,7 @@ conversions.post('/api/conversions/definitions/:id/ingest-enable', conversionPer
 conversions.get('/api/conversions/definitions/:id/ingest-events', conversionPermission('view'), get__api_conversions_definitions_id_ingest_events_14);
 
 /**
- * GET /api/conversions/definitions/:id/events — 成果1件ずつの一覧(IDEA-19)。
+ * GET /api/conversions/definitions/:id/events — 成果1件ずつの一覧。
  *
  * 「購入」「相談完了」など成果名の下に、1件ごとの状態(確定・確認待ち・
  * 却下・取消)を新しい順で返す。承認状態と取消台帳からの導出は
@@ -84,7 +84,7 @@ conversions.get('/api/conversions/definitions/:id/ingest-events', conversionPerm
 conversions.get('/api/conversions/definitions/:id/events', conversionPermission('view'), get__api_conversions_definitions_id_events_15);
 
 /**
- * POST /api/conversions/ingest/:id — 外部システムからの成果受信(N-270)。
+ * POST /api/conversions/ingest/:id — 外部システムからの成果受信。
  *
  * 管理認証を通さない公開口(isPublicApiBoundary で公開境界に登録済み)。
  * 地点ごとの受信鍵で HMAC-SHA256 を照合する。友だちは friendId または
@@ -97,14 +97,14 @@ conversions.post('/api/conversions/ingest/:id', inputJsonBoundary(), post__api_c
 
 conversions.post('/api/conversions/definitions/:id/usages', conversionPermission('edit'), inputJsonBoundary(), post__api_conversions_definitions_id_usages_1);
 
-// GET /api/conversions/export - same filters as the list, bounded to 10,000 rows
+// 一覧と同じ絞込を使い、出力を1万行以内に制限する。
 conversions.get('/api/conversions/export', conversionPermission('export'), get__api_conversions_export_2);
 
 // GET /api/conversions/points - list all
 //
 // 旧口だが成果・承認待ち(友だち名含む)を返すので、定義系と同じ
-// `conversionPermission('view')` で縛る(#513 M1)。アカウント境界の
-// 可視範囲はDB問い合わせのWHEREへ渡し、全件をメモリへ載せない(#513 L13)。
+// `conversionPermission('view')` で縛る。アカウント境界の
+// 可視範囲はDB問い合わせのWHEREへ渡し、全件をメモリへ載せない。
 conversions.get('/api/conversions/points', conversionPermission('view'), get__api_conversions_points_3);
 
 // POST /api/conversions/points - create
@@ -113,14 +113,11 @@ conversions.post('/api/conversions/points', requireRole('owner', 'admin'), input
 // PUT /api/conversions/points/:id - update
 // 送られた項目だけを触る。画面が「計測方法だけ変える」ような部分更新をするため。
 // ただし旧口のまま版・利用先確認を通さず上書きすると、稼働中の数え方が
-// 後から変わる(N-254)。定義系と同じく版の一致を求め、稼働中または
+// 後から変わる。定義系と同じく版の一致を求め、稼働中または
 // 成果・利用先のある地点の数え方は新版作成か停止後の手順へ案内する。
 conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, inputJsonBoundary(), put__api_conversions_points_id_5);
 
-// DELETE /api/conversions/points/:id - stop tracking and preserve history
-//
-// 停止も版を進める操作のため、旧PUTと同じく版の一致を必須にする(N-254)。
-// 版は本文が正本。代理やプロキシで本文が落ちたときだけクエリを見る(#513 L11)。
+// 停止も版を更新するため一致を必須とする。本文を正本とし、本文が欠けた場合だけクエリの版を使う。履歴は残す。
 conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, delete__api_conversions_points_id_6);
 
 // ── Conversion Tracking ─────────────────────────────────────────────────────
@@ -128,10 +125,10 @@ conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'),
 // POST /api/conversions/track - record conversion
 conversions.post('/api/conversions/track', requireRole('owner', 'admin'), inputJsonBoundary({"conversionPointId":["string"],"friendId":["string"],"userId":["null","string"],"affiliateCode":["null","string"],"metadata":["null","object"],"idempotencyKey":["null","string"]}), post__api_conversions_track_7);
 
-// GET /api/conversions/events - list events with filters
+
 //
 // 旧口だが友だち単位の成果記録を返すので、`conversionPermission('view')`
-// で縛る(#513 M1)。アカウント境界の絞り込みはそのまま残す。
+// で縛る。アカウント境界の絞り込みはそのまま残す。
 conversions.get('/api/conversions/events', conversionPermission('view'), get__api_conversions_events_8);
 
 // GET /api/conversions/events/:id/reversals — 取消の履歴（新しい順）
@@ -148,25 +145,20 @@ conversions.post(
   inputJsonBoundary(), post__api_conversions_events_id_reversals_10,
 );
 
-// GET /api/conversions/report - report; keep the old date-query response for the current screen
+// 現在の画面が使う日付指定の応答形式との互換性を保つ。
 conversions.get('/api/conversions/report', conversionPermission('view'), get__api_conversions_report_11);
 
-// GET /api/conversions/approvals?status=pending|approved|rejected
-// Affiliate-attributed CVs awaiting/holding an approval decision. duplicateFlag
-// reuses the Phase 1 identity_key heuristic scoped per affiliate.
-// 承認待ち(友だち名・案件名含む)を返すので、定義系と同じ
-// `conversionPermission('view')` で縛る(#513 M1)。利用者は
-// /conversions 画面のタブだけなので、affiliates 側の導線は変えない。
+// 友だち名・案件名を含む承認一覧は conversionPermission('view') で守る。本人識別による重複判定は参加者の範囲内に限る。
 conversions.get('/api/conversions/approvals/counts', conversionPermission('view'), get__api_conversions_approvals_counts_12);
 
 conversions.get('/api/conversions/approvals', conversionPermission('view'), get__api_conversions_approvals_13);
 
-// GET /api/conversions/events/:id/attribution - どの紹介に成果を付けたかの記録(#823)
+// GET /api/conversions/events/:id/attribution - どの紹介に成果を付けたかの記録
 // 候補になった紹介を並べ、付けた先と付けなかった理由を1件ずつ返す。
 // 記録が無い昔の成果は 404。
 conversions.get('/api/conversions/events/:id/attribution', conversionPermission('view'), requireVisibleConversionEvent, get__api_conversions_events_id_attribution_1);
 
-// PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
+
 conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermission, requireVisibleConversionEvent, inputJsonBoundary(), patch__api_conversions_events_id_approval_2);
 
 conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, inputJsonBoundary(), post__api_conversions_approvals_bulk_3);

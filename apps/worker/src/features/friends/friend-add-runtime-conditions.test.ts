@@ -1,5 +1,5 @@
 /*
- * N-101: 友だち追加時配信の曜日・時間・条件・再送制限を実行時評価する契約テスト。
+ * 友だち追加時配信の曜日・時間・条件・再送制限を実行時評価する契約テスト。
  *
  * 外部LINE・顧客・Calendarへ送らない。DBはテスト用D1（better-sqlite3）だけを使う。
  * 時刻は routingContext.now で差し込む（JSTで評価する）。
@@ -484,7 +484,7 @@ describe('本番の振り分け: 曜日・時間帯・条件・再送制限', ()
       `INSERT OR IGNORE INTO entry_routes (id, name, ref_code, is_active, tenant_id)
        VALUES ('route-1', '紹介QR', 'REF001', 1, 'tenant-1')`,
     ).run();
-    // 参加には明示公開が要る（351 / #644）。稼働中の状態にしてから試す。
+    // 参加には明示公開が要る。稼働中の状態にしてから試す。
     await publishScenarioVersion(db, scenarioId, {
       staffId: null,
       idempotencyKey: `runtime-conditions-${scenarioId}`,

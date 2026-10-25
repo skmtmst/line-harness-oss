@@ -25,22 +25,7 @@ export interface DedupPreviewResult {
   perAccount: DedupPreviewPerAccount[];
 }
 
-/**
- * Send a multi-account-dedup broadcast.
- *
- * Called by processBroadcastSend (in broadcast.ts) when
- * broadcast.target_type === 'multi-account-dedup'. Re-runs
- * computeDedupBroadcastPreview at send time (live data, drift from preview by
- * design) to obtain the per-account recipient list, then for each account:
- *   - skip if account is missing or inactive (not a failure)
- *   - send recipients in 500-friend batches with stagger delays
- *   - log per-friend INSERTs into messages_log
- *   - on multicast exception, log the account in failedAccountIds and continue
- *
- * Persists failedAccountIds to broadcasts.failed_account_ids when non-empty.
- * Status determination ('sent' vs 'failed' vs 'sent + partial') is left to
- * the caller (processBroadcastSend) — see broadcast.ts §7.3.
- */
+/** 送信時に実データで重複除外を再計算し、アカウント別に500人単位で送る。停止・不存在は飛ばし、送信失敗はアカウントを記録して残りを続ける。最終状態の判定は呼出元へ委ねる。 */
 /**
  * dedup broadcast の resume 用進捗。broadcasts.dedup_progress JSON カラムに保存。
  *

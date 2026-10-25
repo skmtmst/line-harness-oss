@@ -148,7 +148,7 @@ export async function listBroadcastMessageAssets(
 }
 
 /**
- * 件数だけを種類ごとに返す（PERF-04）。
+ * 件数だけを種類ごとに返す。
  *
  * 件数タブは各行の payload を必要としないので、本文を読まない集計で足りる。
  * scopeWhere/scopeBindings には呼び出し側がアカウント可視範囲の条件を渡す

@@ -55,7 +55,7 @@ async function notificationContext(db:D1Database,bookingId:string,row:BookingNot
     startsAt:formatStartsAtForStore(row.starts_at,timezone),...notificationTiming(row.starts_at,timezone,new Date(now))};
 }
 
-/** Read-only preview of the same renderer/context used by the actual send. */
+/** 実送信と異なるプレビューを出さないよう、同じ組立とコンテキストを読み取り専用で使う。 */
 export async function previewBookingConfirmation(db:D1Database,bookingId:string,accountId:string,now=new Date()):Promise<string|null> {
   try {
     const row=await loadNotificationRow(db,bookingId,accountId);

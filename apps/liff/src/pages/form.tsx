@@ -1275,7 +1275,7 @@ function BlockView({
           />
         )}
 
-        {/* F-11：住所は郵便番号から自動補完。手入力も残す。 */}
+        {/* 住所は郵便番号から自動補完。手入力も残す。 */}
         {block.type === 'address' && (
           <AddressFields
             name={block.name}

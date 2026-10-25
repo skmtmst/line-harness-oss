@@ -1,7 +1,7 @@
 import { EVENT_NAME_MAX, EVENT_DESCRIPTION_MAX, EVENT_APPROVAL_DEADLINE_HOURS } from '../services/event-booking-types.js';
 
 // ----------------------------------------------------------------
-// 申込時のカスタム質問 (#841)
+// 申込時のカスタム質問
 // events.questions_json に定義、event_bookings.answer_snapshot_json に
 // {質問id: 回答} として保存する。id が変わると過去の回答と紐付かなくなるので、
 // 画面が送ってきた id はそのまま採用し、無い分だけ連番で補う。
@@ -73,7 +73,7 @@ export function validateEventInput(
   const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
   if (isCreate || has('name')) {
     const name = body.name;
-    // 空白だけの名前は通さない(点検#520軽14)。画面はtrim検査済みだがAPIは未検査だった。
+    // 画面を経由しない要求でも空白だけの名前を保存しないよう、API 側でも検証する。
     if (typeof name !== 'string' || name.trim().length === 0 || name.length > EVENT_NAME_MAX) {
       return { ok: false, code: 'invalid_name' };
     }
@@ -118,7 +118,7 @@ export function validateEventInput(
       }
     }
   }
-  // waitlist_enabled は画面が `=== 1` で読むので2等を保存させない(点検#520軽14)。
+  // waitlist_enabled は画面が `=== 1` で読むので2等を保存させない(点検軽14)。
   for (const key of ['description_centered', 'requires_approval', 'reminder_day_before_enabled', 'is_published', 'waitlist_enabled'] as const) {
     if (has(key) && body[key] != null) {
       const v = body[key];

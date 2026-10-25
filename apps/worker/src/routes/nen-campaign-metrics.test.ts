@@ -108,7 +108,7 @@ describe('NEN campaign metric routes', () => {
     expect(invalid.status).toBe(400);
   });
 
-  // #727: 「これから」チップの pending,processing を複数状態のまま service へ渡す。
+  // 「これから」チップの pending,processing を複数状態のまま service へ渡す。
   it('複数状態の絞り込みをそのままserviceへ渡す', async () => {
     const response = await app('staff').request(
       '/api/nen-campaigns/deliveries?lineAccountId=account-a&status=pending,processing',

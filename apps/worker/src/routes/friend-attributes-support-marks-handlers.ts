@@ -60,7 +60,7 @@ export const post__api_support_marks_3 = async (c: Context<Env, "/api/support-ma
     const scope = await supportMarkAccess(c);
     if (scope instanceof Response) return scope;
     /*
-     * R512: 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
+     * 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
      * 同じキー・同じ内容の再送は保存済みのマークを返し、同じキーに
      * 異なる内容が来たら作らず409で止める（保管の口と同じ約束）。
      */
@@ -183,7 +183,7 @@ export const patch__api_support_marks_id_5 = async (c: Context<Env, "/api/suppor
       displayOrder = order;
     }
     /*
-     * R513: 読んだときの版を送り、変わっていたら409で止める。
+     * 読んだときの版を送り、変わっていたら409で止める。
      * 版が無い古い呼び出しは従来どおり上書きする（後方互換）。
      */
     let displayLocations;
@@ -269,7 +269,7 @@ export const post__api_support_marks_id_automation_rules_7 = async (c: Context<E
       /*
        * D034: 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
        * 同じキー・同じ内容の再送は保存済みのルールを返し、同じキーに
-       * 異なる内容が来たら作らず409で止める（マーク作成のR512と同じ約束）。
+       * 異なる内容が来たら作らず409で止める（マーク作成のと同じ約束）。
        */
       const idempotencyKey = c.req.header('Idempotency-Key')?.trim() ?? '';
       if (!idempotencyKey || idempotencyKey.length > 128) {
@@ -397,7 +397,7 @@ export const post__api_support_marks_id_archive_11 = async (c: Context<Env, "/ap
         ? body.replacementMarkId.trim()
         : '';
       /*
-       * R180: 使っている友だちが0人のときは置換先なしで保管できる。
+       * 使っている友だちが0人のときは置換先なしで保管できる。
        * 空の置換先はここでは null へ倒し、0人かどうかの判定は
        * `archiveSupportMarkWithReplacement` が最新の実値で行う。
        */

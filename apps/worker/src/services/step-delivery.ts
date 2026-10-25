@@ -49,8 +49,8 @@ import { featureJobCanRun } from './feature-enforcement.js';
 import { parseQuestion, buildQuestionMessages } from '../features/scenarios/scenario-question/index.js';
 import { expandDateVariables } from './interpolation-date.js';
 
-const MAX_SENDS_PER_CRON = 40; // CF Free plan: 50 subrequests limit (margin for other jobs)
-const MAX_ATTEMPTS_PER_CRON = 40; // condition skips/errors also consume CPU and D1 work
+const MAX_SENDS_PER_CRON = 40; // Cloudflare 無料枠の50問い合わせに対し、ほかの処理の余裕を残す。
+const MAX_ATTEMPTS_PER_CRON = 40; // 条件による省略や失敗も CPU と D1 を使うため、処理予算に含める。
 
 export function getLineApiErrorStatus(err: unknown): number | null {
   if (!(err instanceof Error)) return null;
@@ -78,11 +78,7 @@ export async function processStepDeliveries(
   const activeByAccount = new Map(
     accountsWithStatus.map((account) => [account.id, Boolean(account.is_active)]),
   );
-  // Crash recovery: a claim (active→delivering) that never got released means
-  // the worker died mid-delivery — without this, the enrollment is stranded
-  // forever because the due query only picks up 'active' rows. Reclaim after
-  // 5 minutes. The durable send reservation reuses the same LINE retry key;
-  // an uncertain attempt older than 24 hours is held for operator review.
+  // 中断した delivering は active だけの取得で取り残されるため、5分後に実行権を回復する。送信予約は同じ LINE キーを使い、24時間超の結果不明は人の確認へ残す。
   const recovered = await recoverStuckDeliveries(db);
   if (recovered > 0) {
     logger.warn("services_step_delivery_warn");
@@ -134,8 +130,7 @@ export async function processStepDeliveries(
         continue;
       }
       if (ownerRow?.line_account_id && isStoppedTenantStatus(tenantStatusByAccount.get(ownerRow.line_account_id))) {
-        // A stop is a point-in-time cancellation for due deliveries. Pausing
-        // prevents an overdue message from being pushed automatically after restore.
+        // 停止中の期限到達は一時停止し、復旧後に古い通知を自動送信しない。
         await db.prepare(
           `UPDATE friend_scenarios
               SET status = 'paused', pause_reason = 'tenant_suspended',
@@ -147,13 +142,13 @@ export async function processStepDeliveries(
       if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'scenarios', job: 'scenario deliveries' })) {
         continue;
       }
-      // 緊急停止 (#1050): scenario_dispatch が止まっている統括は claim せず
+      // 緊急停止 : scenario_dispatch が止まっている統括は claim せず
       // active のまま残す。復旧すれば next_delivery_at を過ぎた分から順に届く。
       // アカウント未割当の旧行はグローバル停止 (*) だけに従う。
       if (await isOperationCapabilityStopped(db, ownerRow?.line_account_id ?? null, 'scenario_dispatch')) {
         continue;
       }
-      // Stealth: add small random delay between deliveries to avoid burst patterns
+      // 短時間の集中を避けるため、配信間に小さいランダム遅延を入れる。
       if (i > 0) {
         await sleep(addJitter(50, 200));
       }
@@ -161,9 +156,7 @@ export async function processStepDeliveries(
       if (sent) sendCount++;
     } catch (err) {
       logger.error("step_delivery.deliver_step_failed");
-      // A permanent LINE 4xx (invalid/unreachable recipient, invalid payload,
-      // unauthorized channel, etc.) must not be recovered and retried forever.
-      // 408/409/429 are transient and retain the existing 5-minute recovery.
+      // 不正宛先・本文・チャネルなどの恒久4xxは無限に回復しない。408/409/429は一時失敗として既存の5分回復を保つ。
       if (isPermanentLineDeliveryError(err)) {
         await pauseFriendScenarioDelivery(db, fs.id);
         logger.warn("step_delivery.deliver_permanent_failed");
@@ -173,19 +166,7 @@ export async function processStepDeliveries(
   }
 }
 
-/**
- * Resolve the account-specific friend that an account-bound scenario may
- * safely message.
- *
- * - Same-account enrollment: use it directly.
- * - UUID-linked cross-account enrollment: use the friend row belonging to the
- *   scenario account.
- * - OAuth-before-webhook legacy row (line_account_id NULL): the row's LINE user
- *   id was issued in the scenario account context, so allow one attempt with
- *   the scenario token. A permanent 4xx pauses it.
- * - A friend explicitly belonging to another account is never sent through a
- *   fallback/default token when no linked destination exists.
- */
+/** 同じアカウントの購読はその友だちを使い、UUID 連携ならシナリオ所属側の友だちへ解決する。follow 前の所属なしはその文脈のトークンで1回試し、恒久4xxなら停止する。明示的な別所属に連携先がなければ既定トークンで送らない。 */
 export async function resolveScenarioDeliveryFriend(
   db: D1Database,
   enrolledFriend: Friend,
@@ -237,7 +218,7 @@ async function processSingleDelivery(
   const permission = await getSendPermissionForAccount(db, scenarioAccount?.line_account_id ?? null, sendPermissions);
   if (!permission.allowed) return false;
 
-  // Optimistic lock: claim this delivery (prevents duplicate sends from parallel workers)
+  // 並行 Worker の二重送信を防ぐため、楽観ロックで実行権を取る。
   const claimed = await claimFriendScenarioForDelivery(db, fs.id, fs.current_step_order);
   if (!claimed) return false;
 
@@ -247,8 +228,7 @@ async function processSingleDelivery(
     return false;
   }
 
-  // Fetch scenario account together with delivery_mode. Account-bound
-  // scenarios must use that account's friend identity and token.
+  // アカウント固定のシナリオは、その所属の本人とトークンを使うため delivery_mode と一緒に取得する。
   const scenarioRow = await db
     .prepare(
       `SELECT delivery_mode, line_account_id, audience_condition_json,
@@ -287,15 +267,7 @@ async function processSingleDelivery(
     return false;
   }
 
-  // Get all steps for this scenario.
-  //
-  // 購読に固定した公開版だけを読む（351）。開始後の下書き編集は既存配信へ
-  // 混入しない。版が無い・欠損しているときは送らずに止める。live の表へ
-  // 戻ると編集中身が混入するので、安全停止が契約。
-  //
-  // 下書き (is_draft) はここで落とす。落としておけば「次の通」を探す処理が
-  // そのまま次の公開ぶんを選ぶ。あとから条件で弾く作りにすると、下書きに
-  // 到達した時点で止まって見える。
+  // 開始後の編集を混ぜないよう、購読に固定した公開版だけを読む。版がなければ live へ戻らず停止する。下書きの通は先に除き、次の公開通をそのまま探せるようにする。
   const source = await getStepsForDelivery(db, fs.scenario_id, fs.published_version_id ?? null);
   if (!source) {
     await pauseFriendScenarioDelivery(db, fs.id);
@@ -344,8 +316,7 @@ async function processSingleDelivery(
     on_complete_scenario_id: source.onCompleteScenarioId,
   };
 
-  // Steps are sorted by step_order but may not be contiguous (e.g., 1, 3, 5 after deletions).
-  // Find the next step whose step_order > current_step_order.
+  // 通番は削除で飛ぶ場合があるため、現在の値より大きい最初の通を選ぶ。
   const currentStep = steps.find((s) => s.step_order > fs.current_step_order);
 
   if (!currentStep) {
@@ -353,7 +324,7 @@ async function processSingleDelivery(
     return false;
   }
 
-  // Check step condition before sending
+
   if (currentStep.condition_type) {
     const conditionMet = await evaluateCondition(db, fs.friend_id, currentStep);
     if (!conditionMet) {
@@ -361,10 +332,7 @@ async function processSingleDelivery(
         const jumpStep = steps.find((s) => s.step_order === currentStep.next_step_on_false);
         if (jumpStep) {
           const jitteredDate = jitterDeliveryTime(nextDeliveryFor(jumpStep));
-          // Advance to just before the jump target so the next tick's
-          // `find(step_order > current_step_order)` selects jumpStep itself.
-          // Passing currentStep.step_order here (pre-fix) delivered the
-          // sequentially-next step and silently ignored next_step_on_false.
+          // 次の取得で指定した遷移先を選ぶため、その直前の通番まで進める。現在通のままでは順番の次へ送ってしまう。
           await advanceFriendScenario(db, fs.id, jumpStep.step_order - 1, jitteredDate.toISOString().slice(0, -1) + '+09:00');
           return false;
         }
@@ -421,7 +389,7 @@ async function processSingleDelivery(
   // 通の文面・質問は公開時に確定した写しを使う（351）。配信時に templates 表を
   // 読み直さないので、公開後の template 編集は固定済みの購読へ混入しない。
   //
-  // テンプレートの公開版をシナリオの持ち主アカウントだけで解決する(#645)のは、
+  // テンプレートの公開版をシナリオの持ち主アカウントだけで解決するのは、
   // 公開時の写し作り（packages/db/src/scenarios.ts の版snapshot）へ移した。
   // 配信時にはもう templates 表を読まないので、ここでは解決しない。
   const resolved = {
@@ -431,7 +399,7 @@ async function processSingleDelivery(
     questionJson: currentStep.question_json ?? null,
   };
 
-  // Expand template variables ({{name}}, {{uid}}, {{auth_url:CHANNEL_ID}}, {{metadata.KEY}}, etc.)
+
   const resolvedMeta = await resolveMetadata(db, friend);
   const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
   // 質問の前文・選択肢文にも expandVariables が効くので、共通情報の
@@ -455,9 +423,7 @@ async function processSingleDelivery(
     resolved.messageType,
     { ...extra, deliveredAt: new Date() },
   );
-  // Auto-wrap URLs with tracking links + bake f=<friendId> into /t links —
-  // shared pipeline with the instant first-step push (immediate-first-step.ts).
-  // リンクの所有アカウントは実際に配信するアカウント (= friend の account) に合わせる
+  // 即時初回文と同じ計測リンク・署名付き本人情報の加工を使い、リンク所有者を実際の送信アカウントへ合わせる。
   const { decorateForFriendPush } = await import('./auto-track.js');
   const tracked = await decorateForFriendPush(db, resolved.messageType, expandedContent, workerUrl, {
     lineAccountId: deliveryAccountId ?? null,
@@ -493,7 +459,7 @@ async function processSingleDelivery(
         // 入るので、旧形として送ると受信側の `parseQuestionPostback` が
         // 「旧形にコロンは入らない」で弾き、押しても無反応になる。
         // 下書き削除後も配信が続くのはこの票で新しく作った振る舞いなので、
-        // その経路の押し口もここで揃える（#644 独立審査）。
+        // その経路の押し口もここで揃える。
         liveStepId
           ? { kind: 'live' as const, stepId: liveStepId }
           : { kind: 'version' as const, stepId: currentStep.id },
@@ -505,7 +471,7 @@ async function processSingleDelivery(
       const personalized = JSON.parse(await appendFriendToTrackedLinks(db, JSON.stringify(decorated), workerUrl || '', friend.id));
     messages.splice(0, messages.length, ...(personalized as Message[]));
   }
-  // Resolve the correct LINE client for this friend's account
+  // 別アカウントの送信を防ぐため、友だちの所属に合う LINE クライアントを使う。
   let deliveryClient = lineClient;
   if (deliveryAccountId) {
     const { getLineAccountById } = await import('@line-crm/db');
@@ -560,7 +526,7 @@ async function processSingleDelivery(
     ]);
   }
 
-  // Determine next step (find the step after currentStep in the sorted list)
+
   const currentIndex = steps.indexOf(currentStep);
   const nextStep = currentIndex + 1 < steps.length ? steps[currentIndex + 1] : null;
 
@@ -579,7 +545,7 @@ async function processSingleDelivery(
     const jitteredDate = jitterDeliveryTime(nextDeliveryFor(nextStep));
     await advanceFriendScenario(db, fs.id, currentStep.step_order, jitteredDate.toISOString().slice(0, -1) + '+09:00');
   } else {
-    // This was the last step
+
     await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, onComplete, {executorDependencies:{credentialEncryptionKey:credentialKey}});
   }
 
@@ -661,7 +627,7 @@ export async function finishScenario(
   });
 }
 
-/** Supported scenario step condition_type values evaluated at delivery time. */
+/** 配信時に評価できる、シナリオの条件種別。 */
 export const SUPPORTED_CONDITION_TYPES = [
   'tag_exists',
   'tag_not_exists',
@@ -674,24 +640,13 @@ export function isSupportedConditionType(value: unknown): value is ConditionType
   return typeof value === 'string' && (SUPPORTED_CONDITION_TYPES as readonly string[]).includes(value);
 }
 
-/**
- * Evaluate a scenario step's condition_type/condition_value at delivery time.
- *
- * Semantics:
- *  - condition_type null/empty (no condition configured) → `true` (deliver normally).
- *  - condition_type set but condition_value missing/empty → `false` (skip + log).
- *    This is the same OSS issue #120 over-delivery pattern: a configured condition with
- *    no value would otherwise match every friend, e.g. tag_not_exists with empty value
- *    binds '' into the SQL and returns 0 rows → "tag absent" for everyone.
- *  - unknown condition_type or malformed condition_value JSON → `false` (skip + log).
- *  - condition_type + condition_value valid → actually evaluate.
- */
+/** 条件なしは通常配信、条件ありで値なし・未知の種類・不正 JSON は省略して記録する。空の条件値を全員一致と解釈して過剰配信しないよう、有効な組だけを評価する。 */
 export async function evaluateCondition(
   db: D1Database,
   friendId: string,
   step: { condition_type: string | null; condition_value: string | null },
 ): Promise<boolean> {
-  // No condition configured at all → deliver as usual.
+  // 条件自体が設定されていなければ通常どおり配信する。
   if (!step.condition_type) return true;
 
   if (!isSupportedConditionType(step.condition_type)) {
@@ -759,7 +714,7 @@ export async function evaluateCondition(
       ) {
         // 既存行や直接 INSERT された行で {"key":"x"} のように value が欠落しているケースは
         // friend.metadata[x] === undefined と比較されて「key 不在の全友だち」に一致する
-        // (= 同じ OSS issue #120 の over-delivery を再現する) ので明示的にスキップする。
+        // (= 同じ OSS issue  の over-delivery を再現する) ので明示的にスキップする。
         logger.error("step_delivery.validate_metadata_condition_failed");
         return false;
       }

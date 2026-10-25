@@ -86,7 +86,7 @@ richMenuGroups.post('/api/rich-menu-groups', requireDeliveryAccess('richMenus'),
 richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireDeliveryAccess('richMenus'), inputJsonBoundary(), patch__api_rich_menu_groups_groupId_9);
 
 /**
- * 優先順と自分で決めた並び順の一括更新 (#502中)。
+ * 優先順と自分で決めた並び順の一括更新 (中)。
  * 全件ぶん PATCH を並列に投げると台数比例で増え、途中失敗で順番が
  * 中途半端に残る。id 配列を1回で受け、1 batch で 0,1,2…へそろえる。
  * 全部入りでなければ 400 (隠れているメニューの優先関係を壊さない)。
@@ -108,10 +108,10 @@ richMenuGroups.get('/api/rich-menu-images/:key{.+}', get__api_rich_menu_images_k
 
 richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireDeliveryAccess('richMenus', 'publish'), inputJsonBoundary(), post__api_rich_menu_groups_groupId_publish_3);
 
-// ----- K-1・O-1: 公開の進み・公開前の確認 -----
+// ----- ・公開の進み・公開前の確認 -----
 
 /**
- * O-1 公開前の確認。下書きを変えない検査だけを集める。
+ * 公開前の確認。下書きを変えない検査だけを集める。
  * LINE の検査は別の口（POST validate）で、作らずに見る。
  */
 richMenuGroups.get(
@@ -121,7 +121,7 @@ richMenuGroups.get(
 );
 
 /**
- * O-1 LINE の検査。自前の検査を通った下書きを、公開する形のまま
+ * LINE の検査。自前の検査を通った下書きを、公開する形のまま
  * Validate rich menu object API に通す。下書きもLINEも変えない。
  */
 richMenuGroups.post(
@@ -131,7 +131,7 @@ richMenuGroups.post(
 );
 
 /**
- * O-1 実機で見た記録。今の下書きの fingerprint にひもづく。
+ * 実機で見た記録。今の下書きの fingerprint にひもづく。
  * 下書きが変わると無効になり、公開門番が止める。
  */
 richMenuGroups.post(
@@ -141,7 +141,7 @@ richMenuGroups.post(
 );
 
 /**
- * K-1 公開の進み。最新の公開実行の4段（画像・メニュー・割り当て・片付け）を
+ * 公開の進み。最新の公開実行の4段（画像・メニュー・割り当て・片付け）を
  * ページ行から集めて返す。まだ公開していなければ空で返す。
  */
 richMenuGroups.get(
@@ -150,7 +150,7 @@ richMenuGroups.get(
   get__api_rich_menu_groups_groupId_publish_progress_7,
 );
 
-// ----- N-151: 公開履歴・失敗だけの再試行・LINEとの照合修復 -----
+// ----- : 公開履歴・失敗だけの再試行・LINEとの照合修復 -----
 
 /**
  * 公開履歴の一覧。各runの版（スナップショットの要約）・状態・試行に使った
@@ -219,7 +219,7 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireDeliveryA
 // 前提: group が published かつ default_page に line_richmenu_id がセット済み。
 richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireDeliveryAccess('richMenus', 'publish'), inputJsonBoundary(), post__api_rich_menu_groups_groupId_apply_to_tag_1);
 
-// ----- N-154: 下書き複製 -----
+// ----- : 下書き複製 -----
 
 /**
  * メニュー全体（ページ・ボタン・画像参照・出し分け条件）を別IDの下書きとして
@@ -232,7 +232,7 @@ richMenuGroups.post(
   inputJsonBoundary(), post__api_rich_menu_groups_groupId_duplicate_2,
 );
 
-// ----- N-156: staffへは合計だけ見せる影響人数 -----
+// ----- : staffへは合計だけ見せる影響人数 -----
 
 /**
  * 「実際にこのメニューが出る人」の集計だけを返す読み取り口。

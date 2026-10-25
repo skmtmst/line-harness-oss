@@ -17,7 +17,7 @@ export function serializeMileageRule(rule: MileageRuleRow) {
     amount: rule.amount,
     initialStatus: rule.initial_status,
     conditions,
-    // 334(#521): 帰属アカウント。null は変更不可の既存全店ルール。
+    // 帰属アカウント。null は変更不可の既存全店ルール。
     lineAccountId: rule.line_account_id ?? null,
     isActive: Boolean(rule.is_active),
     validFrom: rule.valid_from,
@@ -29,7 +29,7 @@ export function serializeMileageRule(rule: MileageRuleRow) {
 
 
 /**
- * N-240(#813): 決めごと作成の冪等。reminders の N-067 と同じ約束:
+ * 決めごと作成の冪等。reminders の  と同じ約束:
  * - keyは `mileage-rule:<account>:<requestKey>` でaccountごとに名前空間を分ける
  * - 同一key＋同一内容→同じrule ID・同じ応答（行は1件）
  * - 同一key＋別内容→409（上書きしない）

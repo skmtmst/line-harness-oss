@@ -19,7 +19,7 @@ export interface BookingStaffSaveInput {
   sort_order?: number;
   is_designation_optional?: 0 | 1;
   is_active?: 0 | 1;
-  /** N-411: 本人勤務の対象となるログインユーザー(staff_members.id)。null で解除。 */
+  /** 本人勤務の対象となるログインユーザー(staff_members.id)。null で解除。 */
   staff_member_id?: string | null;
 }
 

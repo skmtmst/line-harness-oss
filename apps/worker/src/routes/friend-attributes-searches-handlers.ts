@@ -510,22 +510,22 @@ export const get__api_folders_10 = async (c: Context<Env, "/api/folders">) => {
 
     // kind を指定しない呼び出しは全種別をまとめて返す口で、往復回数も
     // 数えるべき母集団も定まらないため件数を数えない。呼び出し元は
-    // すべて kind を指定している（2026-09-11時点で apps/web 側21箇所すべて、
-    // apps/web/src/lib/api.ts の folders.list 経由）。増えたら見直すこと。
+    // kind ごとの母集団で数えるため、種類の指定が必要になる。
+    // 一覧は folders.list 経由で種類を指定する。
     if (!kind) {
       return c.json({ success: true, data: items.map((row) => serializeFolder(row)) });
     }
 
     const itemCounts = await getFolderItemCounts(c.env.DB, kind, {
       allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
-      // #730: account_id 指定（一覧画面が選んだ1件）は、その1件に閉じた母集団で
+      // account_id 指定（一覧画面が選んだ1件）は、その1件に閉じた母集団で
       // 数える。未割当の NULL 行は単一アカウントの一覧に一切出ないため含めない。
       canSeeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
     });
     return c.json({
       success: true,
       data: items.map((row) => {
-        // `itemCounts` が undefined の kind（#730、対応表に無い種別）は
+        // `itemCounts` が undefined の kind（対応表に無い種別）は
         // 「数えていない」。中身が0件のフォルダは GROUP BY の結果に
         // 現れず `byFolderId[row.id]` も undefined になるため、
         // ここで初めて `0` へ読み替える。「数えていない」と
@@ -533,7 +533,7 @@ export const get__api_folders_10 = async (c: Context<Env, "/api/folders">) => {
         const itemCount = itemCounts === undefined ? undefined : (itemCounts.byFolderId[row.id] ?? 0);
         return serializeFolder(row, undefined, itemCount);
       }),
-      // 一覧の「未分類」タブと同じ母集団。itemCounts が無い kind（#730）は
+      // 一覧の「未分類」タブと同じ母集団。itemCounts が無い kindは
       // 未分類件数も数えていないので、キーごと省く。
       ...(itemCounts === undefined ? {} : { unfiledCount: itemCounts.unfiled }),
     });

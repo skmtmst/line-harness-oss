@@ -146,7 +146,7 @@ describe('runEventBookingExpirer', () => {
   });
 });
 
-// N-065: 期限切れも通常取消と同じく の未送信予定だけを止める。
+// 期限切れも通常取消と同じく の未送信予定だけを止める。
 // 本物の SQLite に当て、別予約・別アカウントへ触れないことと再実行の冪等を見る。
 describe('runEventBookingExpirer の 連動', () => {
   const ACCOUNT_1 = 'v6ev-account-1';

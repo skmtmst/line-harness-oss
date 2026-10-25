@@ -83,7 +83,7 @@ vi.mock('./outgoing-webhook-delivery.js', async () => {
   return {
     ...actual,
     deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 }),
-    // d23b R419: イベント発火の初回配送は1回固定経路(deliverOnce)を呼ぶ。
+    // d23b : イベント発火の初回配送は1回固定経路(deliverOnce)を呼ぶ。
     deliverOnce: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 }),
     recordDeliveryOutcome: vi.fn().mockResolvedValue(undefined),
   };
@@ -144,7 +144,7 @@ describe('fireEvent — send_message action logging', () => {
     expect(captured).toHaveLength(1);
     const insert = captured[0];
     expect(insert.sql).toContain('INSERT INTO messages_log');
-    // bind order: id, friendId, messageType, content, deliveryType, source, lineAccountId, createdAt
+    // バインド順: id、friendId、messageType、content、deliveryType、source、lineAccountId、createdAt。
     expect(insert.binds[1]).toBe('friend-1');
     expect(insert.binds[2]).toBe('flex');
     expect(insert.binds[4]).toBe('reply');
@@ -352,7 +352,7 @@ describe('fireEvent — 行動スコア', () => {
   });
 
   /*
-   * IDEA-17: ルール未設定で旧ルールへ落ちるときも、発生元の不変IDを
+   * ルール未設定で旧ルールへ落ちるときも、発生元の不変IDを
    * 渡して決定的な履歴IDで受け付ける。実行台帳(execution)が無い呼び出し
    * でも payload.sourceEventId があれば、同じイベントの走り直しで
    * スコアと履歴は二重に増えない。
@@ -716,7 +716,7 @@ describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', 
 
     const sent = seen.find((entry) => entry.url === 'https://hooks.example.com/ping');
     expect(sent).toBeDefined();
-    // N-371/N-372: 旧式経路でも共通封筒と X-Harness-* のヘッダを使う。
+    // 旧式経路でも共通封筒と X-Harness-* のヘッダを使う。
     const headers = (sent?.init?.headers ?? {}) as Record<string, string>;
     expect(headers['X-Harness-Event-Id']).toBeDefined();
     expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);

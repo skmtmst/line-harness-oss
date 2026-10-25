@@ -99,7 +99,7 @@ describe('緊急停止の保存API', () => {
     const noStepUp = await app().request('/api/operations/incidents', request, bindings());
     expect(noStepUp.status).toBe(401);
     /*
-     * #1058: 再認証のやり直しは画面が自分で案内する通常の状態。
+     * 再認証のやり直しは画面が自分で案内する通常の状態。
      * 管理画面がセッション喪失モーダルと区別できるよう機械コードを付ける。
      */
     await expect(noStepUp.json()).resolves.toMatchObject({
@@ -582,7 +582,7 @@ describe('N-451 復旧前検査と安全な復旧', () => {
       bindings(),
     );
     expect(replay.status).toBe(200);
-    // N-451: 再実行でも最初の検査結果（report）を返す。落とすと画面が成功と誤認する。
+    // 再実行でも最初の検査結果（report）を返す。落とすと画面が成功と誤認する。
     expect(await replay.json()).toMatchObject({
       duplicate: true,
       data: {

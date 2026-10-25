@@ -6,7 +6,7 @@ import { waitlistStartsAt } from './waitlist-sheet.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
 
 /**
- * 監査 L10：空き枠の開始の瞬間（startUtc）と店のタイムゾーンを、選んだ時から
+ * 空き枠の開始の瞬間（startUtc）と店のタイムゾーンを、選んだ時から
  * 確認・API まで運ぶ。日本時間以外の店（例：バンコク 13:00 = 06:00Z）で
  * 日本時間として読み直す（04:00Z）とずれる。正しい枠かはサーバーが確かめ直す。
  */

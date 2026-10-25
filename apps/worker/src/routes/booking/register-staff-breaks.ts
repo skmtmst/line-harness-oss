@@ -144,7 +144,7 @@ booking.put('/api/booking/admin/staff/:id/breaks', requireOwnBookingStaffOrAdmin
   return c.json({ ok: true, count: freshRows.length, version: breaksFingerprint(freshRows), breaks: freshRows });
 });
 
-// ---- staff break dates (N-405 #655; 日付指定の休憩) ----
+// ---- staff break dates ( ; 日付指定の休憩) ----
 
 booking.get('/api/booking/admin/staff/:id/break-dates', requireOwnBookingStaffOrAdmin(), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);

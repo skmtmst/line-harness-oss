@@ -248,16 +248,12 @@ export const ADMIN_REQUEST_HEADERS = [
   'x-step-up-token',
 ] as const;
 
-// CORS — credentialed cookie auth cannot use a wildcard origin. Reflect only
-// same-origin requests and origins on the ADMIN_ORIGIN allowlist; everything
-// else gets no Access-Control-Allow-Origin header (browser blocks it). Bearer
-// SDK/MCP callers send no Origin header and are unaffected.
-// 検索に出さない：本物の robots.txt と、全部の応答に X-Robots-Tag（リリース前点検 2026-10-07）。
+// Cookie 認証の CORS で任意の origin を許可しないよう、同一 origin と ADMIN_ORIGIN の許可先だけを反映する。ほかはヘッダを返さず、Origin のない SDK/MCP の Bearer 認証には影響させない。robots.txt と X-Robots-Tag で検索対象から外す。
 setHolidayCoverageWarningHandler(() => logger.warn('src_japanese_holidays_warn'));
 app.use('*', timingStart());
 app.use('*', apiContractMiddleware);
 app.use('*', noindexHeaderMiddleware);
-// Establish an invocation-local outbound boundary before any auth or error reporting.
+// 認証や障害報告より先に、実行単位の外部送信境界を確立する。
 app.use('*', async (c, next) => {
   if ((c.req.path === '/api/ops/staging-qa' || c.req.path.startsWith('/api/ops/staging-qa/')) && !qaEnabled(c.env)) {
     return c.json({ success: false, error: 'Not found' }, 404);
@@ -278,22 +274,20 @@ app.use('*', timingMiddleware('cors', cors({
   maxAge: 600,
 })));
 
-// Rate limiting — runs before auth to block abuse early
+// 認証処理へ負荷を掛ける前に、不正な大量要求をレート制限で止める。
 app.use('*', htmlSecurityMiddleware);
 app.use('*', timingMiddleware('rate', rateLimitMiddleware));
 
-// LIFF/public routes skip staff auth. Apply their tenant wall before auth and
-// before any route handler can persist a form/booking/member write.
+// LIFF・公開経路は staff 認証を通らないため、フォーム・予約・会員の書込より前に統括の境界を適用する。
 app.use('/api/liff/*', timingMiddleware('tenant', tenantPublicBoundaryMiddleware));
 app.use('/api/events/liff/*', timingMiddleware('tenant', tenantPublicBoundaryMiddleware));
 
-// Auth middleware — skips /webhook and /docs automatically
+// /webhook と /docs はスタッフ認証の対象外とする。
 app.use('*', authMiddleware);
 app.use('*', timingMiddleware('rate', authenticatedRateLimitMiddleware));
 app.use('/api/*', timingMiddleware('audit', outputAuditMiddleware));
 
-// Tenant boundary — authenticated admin APIs may only select LINE accounts
-// that belong to the signed-in staff member's tenant.
+// 別の統括を選択できないよう、管理 API の LINE アカウントをログイン中のスタッフの統括へ限定する。
 app.use('*', timingMiddleware('tenant', tenantScopeMiddleware));
 // 代理ログイン中の個人情報の伏せ字。認証の後ろ、各ルートの前。
 app.use('/api/*', timingMiddleware('pii', piiMaskMiddleware));
@@ -309,7 +303,7 @@ app.use('/api/*', timingMiddleware('sensitive', sensitiveOperationMiddleware));
 
 app.use('*', timingHandler());
 
-// Mount route groups — MVP & Round 2
+
 app.route('/', webhook);
 app.route('/', stagingQa);
 app.route('/', gettingStarted);
@@ -323,7 +317,7 @@ app.route('/', errorMessages);
 app.route('/', accountHandovers);
 app.route('/', friendBulkRuns);
 app.route('/', friendMigrations);
-// NOTE: R393 — /api/friends/people 等の固定名は :id より先に載せる。
+// NOTE:  — /api/friends/people 等の固定名は :id より先に載せる。
 // duplicates（本人候補・統合ユーザー）は friends の GET /:id より先でないと
 // people を友だちIDと読んで404になる。broadcastApprovals と同じ考え方。
 app.route('/', duplicates);
@@ -359,7 +353,7 @@ app.route('/', affiliatePayouts);
 
 app.use('*', timingHandler());
 
-// Mount route groups — Round 3
+
 app.route('/', webhooks);
 app.route('/', publicApi);
 app.route('/', calendar);
@@ -388,8 +382,8 @@ app.route('/', chats);
 app.route('/', chatMessages);
 app.route('/', conversations);
 app.route('/', notificationCenter);
-// 運用者通知ルール(/api/notifications/rules)。2026-08-29 の下書き画面がこの経路を呼ぶが、
-// 2026-05 に外したまま mount されていなかった。
+// 通知ルールの画面が呼ぶ /api/notifications/rules を登録する。
+
 app.route('/', notifications);
 app.route('/', lineNotifications);
 app.route('/', stripe);
@@ -405,7 +399,7 @@ app.route('/', forms);
 app.route('/', postalCode);
 app.route('/', adPlatforms);
 app.route('/', adCosts);
-// Web計測の公開口と計測サイトの管理(#819)。
+// Web計測の公開口と計測サイトの管理。
 app.route('/', webMeasurement);
 app.route('/', staff);
 app.route('/', access);
@@ -498,18 +492,13 @@ app.route('/', lineWebhookEvents);
 app.route('/', operations);
 app.route('/', securityAlerts);
 
-// Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
-// /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
-// before login to render the upgrade banner, and the returned hashes are
-// derivable from the deployed bundle. /admin/update/* (Task 18) layers
-// ADMIN_API_KEY middleware on subpaths.
+// ログイン前の更新案内でも使うため、配備済み bundle から導ける版情報は未認証で返す。更新操作の認証とは分ける。
 app.route('/admin', adminVersion);
-// Phase 5 Task 18 — self-update endpoints guarded by x-admin-api-key.
-// HTTP self-update is retired; the router returns 404 for every request.
+// HTTP 経由の自己更新は受け付けず、すべて404を返す。
 app.route('/admin/update', adminUpdate);
 
 // QR は Worker の中だけで作る。流入 ref や LIFF URL は計測の識別子で、
-// 第三者の生成サービスへ渡す理由がない。以前は data をそのまま
+// 流入識別子や LIFF URL を第三者へ漏らさないため、QR は Worker 内で生成する。
 // api.qrserver.com へ送っていたので、説明と実装が食い違っていた。
 export const qrHandler: (c: Context<Env>) => Promise<Response> = async (c) => {
   const data = c.req.query('data');
@@ -540,39 +529,23 @@ export const qrHandler: (c: Context<Env>) => Promise<Response> = async (c) => {
 
 app.get('/api/qr', qrHandler);
 
-// N-244: 停止した流入経路の公開URLは、active・停止・不存在の区別や
+// 停止した流入経路の公開URLは、active・停止・不存在の区別や
 // 転送先を漏らさない同一の終了応答で止める。ref の echo もしない。
 const ENTRY_ROUTE_STOPPED_HTML =
   '<!doctype html><html lang="ja"><meta charset="utf-8"><title>このページは利用できません</title><body><main><h1>このページは利用できません</h1><p>公開が終わっているか、アドレスが正しくありません。運用者へ、新しいリンクをご確認ください。</p></main></body></html>';
 
-// Short link: /r/:ref → universal landing page with LINE open button
-// Supports query params: ?form=FORM_ID (auto-push form after friend add)
-// Mobile: single CTA → LIFF URL (Universal Link). No UA detection.
-// Desktop: QR code encodes LIFF URL.
-// Stuck users opt into /r/:ref/help for Safari escape instructions.
+// 短縮 URL は端末共通の LIFF リンクへ案内する。PC では QR を出し、起動できない場合だけ /help で外部ブラウザへの手順を案内する。form は友だち追加後の案内へ引き継ぐ。
 app.get('/r/:ref', async (c) => {
   const ref = c.req.param('ref');
   const formId = c.req.query('form') || '';
 
-  // Resolve LIFF URL — priority:
-  //   1. entry_route.pool_id (if ref maps to a referral link)
-  //   2. URL query ?pool=
-  //   3. 'main' fallback
+  // 送信先は経路の pool_id、クエリの pool、main の順で選ぶ。
   let liffUrl = c.env.LIFF_URL;
   let pool: Awaited<ReturnType<typeof getTrafficPoolBySlug>> | null = null;
 
-  // 1. entry_route lookup. getTrafficPoolById (unlike getTrafficPoolBySlug)
-  // does not filter on is_active, so we ignore disabled pools explicitly to
-  // honor the operator's pause action.
-  //
-  // NOTE: we intentionally do NOT record a ref_tracking row here. The
-  // /auth/callback + /api/liff/link path already writes a tracking row when
-  // OAuth/LIFF completes, and writing a second landing-page row would
-  // double-count every successful click in getEntryRouteFunnel. Landing-page
-  // drop-off (clicks that never reach OAuth) is therefore not visible in the
-  // funnel; that limitation is intentional pending a dedicated click table.
+  // ID 取得は有効状態で絞らないため、停止中のプールを明示的に除く。流入記録は OAuth/LIFF 完了時に作るため、ここでは二重計上しない。ログイン前の離脱はこの集計に含まれない。
   const route = await getEntryRouteByRefCode(c.env.DB, ref);
-  // N-244: 停止した経路は active と同じ受付をしない。転送先があっても
+  // 停止した経路は active と同じ受付をしない。転送先があっても
   // 送らず、紹介リンクやプールの後段にも落とさず、同一の終了応答で止める。
   // ref が entry_routes の名前空間に属さないときだけ従来の後段へ進む。
   if (!route) {
@@ -588,7 +561,7 @@ app.get('/r/:ref', async (c) => {
     if (!account?.liff_id || !/^\d+-[A-Za-z0-9]+$/.test(account.liff_id)) return c.html('<!doctype html><html lang="ja"><meta charset="utf-8"><title>このリンクは現在利用できません</title><p>お店へお問い合わせください。</p></html>', 503);
     liffUrl = `https://liff.line.me/${account.liff_id}`;
   }
-  // 転送先が設定された経路はそちらへ送る（#514 重大4）。保存はするのに
+  // 転送先が設定された経路はそちらへ送る（ 重大4）。保存はするのに
   // 読まないままだった。危険な形式は safe-redirect が弾き、そのときは
   // 従来どおり友だち追加の着地画面へ進む。
   if (!couponRoute && route?.redirect_url) {
@@ -600,14 +573,7 @@ app.get('/r/:ref', async (c) => {
     if (candidate?.is_active) pool = candidate;
   }
 
-  // 1b. affiliate_links fallback (ASP). Only when the ref is NOT a known
-  // entry_route: entry_routes owns the ref namespace, so an existing route
-  // (even one whose pool is paused) keeps its behavior unchanged. An affiliate
-  // ref resolves its LINE account directly (no pool) and lands on that
-  // account's LIFF. Stopped links do not redirect or count a new click.
-  // The click is counted here (the landing page hit), and `ref` still rides
-  // through to LIFF state below so the existing ref_tracking flow attributes
-  // the eventual friend-add via /auth/callback + /api/liff/link.
+  // 経路とアフィリエイトで ref が重なれば経路を優先する。アフィリエイトは所属アカウントの LIFF へ直接案内し、停止中なら移動もクリック計上もしない。ref はその後の友だち追加の帰属へ引き継ぐ。
   let affiliateResolved = false;
   if (!route) {
     const affiliateLink = await getAffiliateLinkByRefCode(c.env.DB, ref);
@@ -630,9 +596,7 @@ app.get('/r/:ref', async (c) => {
     }
   }
 
-  // 2 / 3. fallback to URL query or 'main'. Skipped for affiliate refs, whose
-  // account is already resolved above; falling through to the 'main' pool would
-  // override the affiliate's chosen account.
+  // アフィリエイトの送信先を main プールで上書きしないよう、その場合は pool の代替解決を省く。
   if (!pool && !affiliateResolved && !couponRoute) {
     const poolSlug = c.req.query('pool') || 'main';
     pool = await getTrafficPoolBySlug(c.env.DB, poolSlug);
@@ -650,7 +614,7 @@ app.get('/r/:ref', async (c) => {
     }
   }
 
-  // Build LIFF URL with params (direct link for Universal Link)
+
   const liffIdMatch = liffUrl.match(/liff\.line\.me\/([0-9]+-[A-Za-z0-9]+)/);
   const liffParams = new URLSearchParams();
   if (liffIdMatch) liffParams.set('liffId', liffIdMatch[1]);
@@ -667,12 +631,7 @@ app.get('/r/:ref', async (c) => {
   if (iga) liffParams.set('iga', iga);
   const igan = c.req.query('igan');
   if (igan) liffParams.set('igan', igan);
-  // LIFF in-app navigation passthrough — OpenChat strips raw liff.line.me
-  // URLs, so we accept `page` / `id` here and forward them to the resolved
-  // LIFF target. Limited to pages whose client initializer enforces the
-  // friend-add gate (initSalonBooking, initEventBooking); page=book/form
-  // would bypass that gate and bypass ref-based attribution, so they are
-  // intentionally excluded until those initializers are unified.
+  // OpenChat 内でも友だち追加と流入計測を保つため、page/id の転送は友だち追加判定を持つ salon-booking と event-booking に限る。判定を通らない book/form は許可しない。
   const PAGE_PASSTHROUGH_ALLOWED = new Set(['salon-book', 'event', 'event-me', 'webinar', 'research', 'visit-stamps']);
   const page = c.req.query('page');
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
@@ -691,21 +650,14 @@ app.get('/r/:ref', async (c) => {
     if (card && /^[A-Za-z0-9_-]{1,128}$/.test(card)) liffParams.set('card', card);
   }
 
-  // Ad click IDs + UTM passthrough. /auth/line forwards its full query string
-  // to /r/:ref, but rebuilding liffParams here without these keys silently
-  // drops ad attribution for the primary mobile path. Keep this list in sync
-  // with the params /auth/line reads.
+  // モバイル経路でも広告の帰属を落とさないよう、auth/line が扱うクリック ID と UTM を LIFF のクエリへ引き継ぐ。
   for (const key of ['gclid', 'fbclid', 'twclid', 'ttclid', 'utm_source', 'utm_medium', 'utm_campaign']) {
     const value = c.req.query(key);
     if (value) liffParams.set(key, value);
   }
   const liffTarget = liffParams.toString() ? `${liffUrl}?${liffParams.toString()}` : liffUrl;
 
-  // Help link carries the *resolved* liff target as `t=` so the help page
-  // displays the exact URL the user should paste into a real browser. Without
-  // this, pooled refs would re-roll the random pool account on each /r/:ref
-  // visit and the help-page paste URL could end up at a different LINE
-  // account than the one originally chosen for this user.
+  // 再試行のたびにプールのアカウントを再抽選しないよう、解決済み LIFF URL を t で help へ渡す。
   const helpUrl = `/r/${encodeURIComponent(ref)}/help?t=${encodeURIComponent(liffTarget)}`;
 
   const ua = (c.req.header('user-agent') || '').toLowerCase();
@@ -714,27 +666,14 @@ app.get('/r/:ref', async (c) => {
   const isAndroid = /android/.test(ua);
 
   if (isMobile) {
-    // OS-aware mobile UI. Per-browser detection (X / IG / FB) intentionally avoided —
-    // we only branch on iOS vs Android because the recovery primitives differ:
-    //   iOS: long-press the link → iOS context menu shows "LINEで開く" even inside
-    //        WKWebView in-app browsers that block tap-driven Universal Links.
-    //   Android: intent:// URL launches LINE directly via Android's intent system,
-    //        which works even when in-app browsers swallow https links.
-    // The same liff.line.me URL still drives Universal Link on the iOS button —
-    // long-press is a recovery hint, not a replacement.
+    // アプリ内ブラウザで通常のリンクが開けない場合に備え、iOS はシステムの長押しメニュー、Android は intent を案内する。ブラウザごとの判別は行わない。
 
-    // Build Android intent URL — strips the https:// prefix and appends the intent
-    // metadata so Chrome / in-app browsers hand off to the LINE app package.
-    // L-Step uses the same shape: jp.naver.line.android with browsable category.
-    // S.browser_fallback_url makes Chrome fall back to plain HTTPS when LINE
-    // isn't installed or the WebView refuses the intent, so Android users
-    // never hit a dead end (they at least land on liff.line.me web).
+    // Android では intent で LINE を開き、未インストールや WebView の拒否時にも行き止まりにしないよう、HTTPS の代替 URL を設定する。
     const liffPath = liffTarget.replace(/^https:\/\//, '');
     const intentFallback = encodeURIComponent(liffTarget);
     const androidIntent = `intent://${liffPath}#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=jp.naver.line.android;S.browser_fallback_url=${intentFallback};end`;
     const buttonHref = isAndroid ? androidIntent : liffTarget;
-    // iOS shows long-press hint; Android relies on intent URL alone (long-press
-    // on Android opens "Open with…" which is noisier than the intent route).
+    // Android の長押しは選択肢が増えるため、長押し案内は iOS にだけ出し、Android は intent を使う。
     const longPressHint = isIOS
       ? '<p class="hint">※開かない場合はボタンを<strong>長押し</strong>して「LINEで開く」を選択</p>'
       : '';
@@ -810,16 +749,10 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 </html>`);
 });
 
-// /r/:ref/help — opt-in recovery page when "LINEで開く" didn't launch the app.
-// Method 1 (long-press) is iOS's escape hatch — works inside X / IG / FB
-// in-app browsers because iOS's context menu is system-level UI floating
-// above the WKWebView, so it surfaces "LINEで開く" even when tap-driven
-// Universal Links are blocked. This is the L-Step approach.
-// Method 2 (URL copy → external browser) is the universal fallback.
-// No LINE-Login-web fallback exposed — friction kills conversion.
+// LINE が開かないときだけ、iOS の長押しまたは URL コピーと外部ブラウザを案内する。システムのメニューはアプリ内ブラウザのリンク制限を受けにくい。
 app.get('/r/:ref/help', async (c) => {
   const ref = c.req.param('ref');
-  // N-244: 停止した経路の回復ページも同じ終了応答で止める。直接開かれても
+  // 停止した経路の回復ページも同じ終了応答で止める。直接開かれても
   // 受付へ戻さない。属さない ref は従来どおり回復ページを出す。
   const helpRoute = await getEntryRouteByRefCode(c.env.DB, ref);
   if (!helpRoute) {
@@ -829,24 +762,19 @@ app.get('/r/:ref/help', async (c) => {
     }
   }
   const reqUrl = new URL(c.req.url);
-  // Prefer the resolved liff target passed by /r/:ref via ?t= so pooled refs
-  // do not re-roll on retry. Fall back to the short /r/:ref URL only when
-  // ?t= is missing (e.g. direct navigation to /help without coming from /r/).
-  // Reject anything that is not an https://liff.line.me/* URL — never trust
-  // user-supplied open redirects.
+  // プールの再抽選を防ぐため解決済みの t を優先する。任意サイトへの転送を防ぐため https://liff.line.me/ 配下だけを受け付け、t がない場合だけ短縮 URL に戻す。
   const tParam = c.req.query('t') || '';
   let displayUrl: string;
   if (tParam && /^https:\/\/liff\.line\.me\//.test(tParam)) {
     displayUrl = tParam;
   } else {
-    // Strip ?t= if it sneaks in unvalidated, but keep other query params
-    // (form, gate, xh, ig, pool) for the /r/:ref re-entry.
+    // 未検証の t は除き、再入場に必要な form/gate/xh/ig/pool などは保つ。
     const safeParams = new URLSearchParams(reqUrl.search);
     safeParams.delete('t');
     const qs = safeParams.toString();
     displayUrl = `${reqUrl.origin}/r/${encodeURIComponent(ref)}${qs ? '?' + qs : ''}`;
   }
-  // Escape URL for safe embedding in HTML attributes and a visible <code>-style block.
+  // HTML 属性や表示文へ URL を埋める前にエスケープする。
   const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const urlForHtml = escapeHtml(displayUrl);
 
@@ -855,8 +783,7 @@ app.get('/r/:ref/help', async (c) => {
   const isAndroid = /android/.test(ua);
   const browserName = isIOS ? 'Safari' : isAndroid ? 'Chrome' : 'ブラウザ（iPhoneは Safari／Androidは Chrome）';
 
-  // Long-press recovery is iOS-only. On Android the intent:// URL on the
-  // main page already handles the equivalent recovery without help-page UI.
+  // Android は元の intent で回復できるため、長押しの手順は iOS にだけ表示する。
   const longPressBlock = isIOS ? `<div class="method">
 <div class="method-num">1</div>
 <div class="method-body">
@@ -1007,7 +934,7 @@ app.get('/o', async (c) => {
     const card = c.req.query('card');
     if (card && /^[A-Za-z0-9_-]{1,128}$/.test(card)) liffParams.set('card', card);
   }
-  // N-396: 管理画面が発行する「予約履歴URL」は salon-book の view=history を
+  // 管理画面が発行する「予約履歴URL」は salon-book の view=history を
   // 指す。任意の view を通すと未定義画面へ誘導できてしまうので、履歴だけを通す。
   const view = c.req.query('view');
   if (page === 'salon-book' && view === 'history') liffParams.set('view', view);
@@ -1091,10 +1018,10 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 </html>`);
 });
 
-// Convenience redirect for /book path
+
 app.get('/book', (c) => c.redirect('/?page=book'));
 
-// 404 fallback — API paths return JSON 404, everything else serves from static assets (LIFF/admin)
+// API の未検出は JSON の404、ほかは管理画面・LIFF の静的ファイルへ渡す。
 export async function notFoundHandler(
   c: import('hono').Context<Env>,
 ): Promise<Response> {
@@ -1111,11 +1038,7 @@ export async function notFoundHandler(
     return c.html(html);
   }
 
-  // Serve static assets (admin dashboard, LIFF pages).
-  // ASSETS binding is missing when wrangler runs without a built `dist/client`
-  // (fresh clone, vitest, or a deploy where the assets directive was stripped).
-  // Without this guard every GET / surfaces as
-  // "TypeError: Cannot read properties of undefined (reading 'fetch')".
+  // 静的ファイルの binding がない開発・試験環境でも、未定義の fetch を呼んで GET 全体を失敗させないよう、先に存在を確認する。
   if (!c.env.ASSETS || typeof c.env.ASSETS.fetch !== 'function') {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
@@ -1192,4 +1115,3 @@ export default {
     await withInvocation('email', () => routeInboundEmail(message, env));
   },
 };
-// redeploy trigger

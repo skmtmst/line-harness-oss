@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 
 /*
- * #935 N-304: 過去の予約日時を「予約」として受け付けない。
+ *  過去の予約日時を「予約」として受け付けない。
  * 通すと次のtickで即送され、「予約した」のに「今届いた」になる。
  * 新規作成口(POST /columns)と一覧の予約口(POST /columns/:id/deliver)の両方で、
  * DBを触る前に400で断ることを確かめる。
@@ -141,7 +141,7 @@ describe('コラムの新規作成（POST /columns）', () => {
   });
 
   /*
-   * NEN-06: 下書き保存は配信日時があっても配信待ち行列を作らない。
+   * 下書き保存は配信日時があっても配信待ち行列を作らない。
    * 日時は下書きの「配信したい日時」として delivery_at に残るだけで、
    * 予約は一覧の「この内容で予約する」（POST /columns/:id/deliver）の
    * 明示操作だけが行う。

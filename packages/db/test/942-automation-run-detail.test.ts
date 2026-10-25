@@ -34,7 +34,7 @@ function asD1(sqlite: Database.Database): D1Database {
 }
 
 /*
- * #942 N-354: 実行の詳細で出す項目をDBヘルパーへ固定する。
+ * 実行の詳細で出す項目をDBヘルパーへ固定する。
  * - 実行時に固定された版番号（version_number）とテスト実行の印（is_test）
  * - 処理ごとの結果・試行数・共通アクション版の固定
  * - 入力・出力の生JSONは API へ出さない（SELECT 列に入れない）
@@ -111,7 +111,7 @@ describe('実行記録の詳細（#942 N-354）', () => {
       failed_action: 'send_message',
       failure_code: 'line_api_error',
       duration_ms: 2000,
-      // #1043: いまの公開版と、待機中stepの再試行の有無を一緒に返す。
+      // いまの公開版と、待機中stepの再試行の有無を一緒に返す。
       current_published_version_id: 'ver-3',
       current_version_number: 3,
       has_retry_wait: 0,

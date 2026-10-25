@@ -11,7 +11,7 @@ import { awardActivityMileage } from '../services/activity-mileage.js';
 import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
-export // OAuth state base64 helpers. btoa only accepts Latin-1, so a single
+export // btoa は Latin-1 だけを受け付けるため、OAuth state は文字コードを変換してから符号化する。
 // multibyte query param (e.g. utm_campaign=夏キャンペーン) used to throw
 // InvalidCharacterError and turn the whole /auth/line request into a 500.
 // Encode via UTF-8 bytes instead. decodeState is byte-compatible with
@@ -41,7 +41,7 @@ export async function stoppedLineAccountResponse(
 
 export /**
  * 呼び出し側の見えるアカウントに絞る WHERE 断片を作る。
- * IDEA-18: 友だち(f)だけでなく注文(o)や相関副問合せの友だち(f2)にも
+ * 友だち(f)だけでなく注文(o)や相関副問合せの友だち(f2)にも
  * 同じ条件を使うため、別名ごとの断片を `for(alias)` で作れるようにした。
  * 既定の where/binds は従来どおり友だち別名 `f` のものを返す。
  */
@@ -75,7 +75,7 @@ export async function saveFriendAddCandidate(
 ): Promise<void> {
   const refCode = input.refCode?.trim();
   if (!input.lineAccountId || !refCode || refCode.startsWith('xh:')) return;
-  // N-244: 停止した流入経路の ref は候補も残さない。入口表示後に停止して
+  // 停止した流入経路の ref は候補も残さない。入口表示後に停止して
   // LIFF/OAuth直送で届いた場合も、共有 namespace の tracked/affiliate へ
   // 落とさず止める。不存在 ref (Any が null) は従来どおり記録する。
   if (await isStoppedEntryRouteRef(db, refCode)) return;
@@ -94,14 +94,7 @@ export async function saveFriendAddCandidate(
   }
 }
 
-export // Persist ig_igsid on the LINE friend and notify IG Harness.
-// Used anywhere a LIFF/OAuth flow resolves with a known IGSID so existing
-// friends (who bypass /auth/callback) also get the cross-link written.
-// Returns whether the friend is linked to THIS IGSID after the call (true
-// when written or already identical; false on conflict/error). Callers use
-// the verdict to gate IG-account metadata writes so metadata can't claim an
-// account that contradicts the stored ig_igsid. An empty igParam returns
-// true: no IGSID means no conflict evidence.
+export // 連携済みでも LIFF の各入口から ig_igsid を保存する。保存後に同じ IGSID と結び付いている場合だけ true を返し、metadata が実際の結び付けと矛盾しないようにする。IGSID 未指定は競合の根拠がないため true とする。
 async function linkIgIgsid(
   c: Context<Env>,
   friendId: string,
@@ -109,11 +102,7 @@ async function linkIgIgsid(
 ): Promise<boolean> {
   if (!igParam) return true;
 
-  // Only notify IG Harness if this friend is actually linked to this IGSID
-  // locally. Writing LINE→IG first then gating the IG→LINE notify prevents
-  // the two DBs from diverging when the same LINE friend is hit with a
-  // different ?ig= on a later visit (the UPDATE is a no-op, and blindly
-  // notifying would then point IG Harness at the wrong LINE UUID).
+  // LINE 側が指定 IGSID に結び付いていることを先に確認し、その場合だけ IG 側へ通知する。別の IG 指定で再訪したとき、2つの DB が別の相手を指すのを防ぐ。
   let linked = false;
   try {
     const result = await c.env.DB
@@ -139,8 +128,7 @@ async function linkIgIgsid(
     return false;
   }
 
-  // A successful IG -> LINE return is itself an engagement milestone. The
-  // stable identity/subject keys make repeated LIFF visits harmless.
+  // IG から LINE へ戻った操作を記録する。同じ識別子を使い、繰り返し訪問しても重複しないようにする。
   await awardActivityMileage(c.env.DB, {
     eventType: 'instagram_line_returned',
     source: 'instagram',
@@ -172,13 +160,7 @@ async function linkIgIgsid(
   return true;
 }
 
-export /**
- * Persist which IG Harness business account funneled this friend in.
- * First touch wins — a friend arriving via multiple IG accounts keeps the
- * original attribution, mirroring friends.ref_code semantics. Values land in
- * friends.metadata (ig_account_id / ig_account_username) so no migration is
- * needed and the admin friend detail can render an attribution badge.
- */
+export /** 複数 IG アカウントから流入しても初回の帰属を保つ。ig_account_id/ig_account_username は metadata に保存し、管理画面の流入表示に使う。 */
 async function saveIgAccountMeta(
   db: D1Database,
   friendId: string,
@@ -196,26 +178,7 @@ async function saveIgAccountMeta(
   }
 }
 
-export // Apply tag + scenario from a ref code. Looks up entry_routes (legacy) first,
-// then tracked_links (modern). Both expose (tag_id, scenario_id) so the call
-// sites are uniform.
-//
-// Click-campaign semantics: when scenario step 1 is delay-0, push it on
-// EVERY click — not just first enrollment. enrollFriendInScenario is
-// INSERT OR IGNORE so re-clicks return null, but the push fires anyway
-// so the same Flex / message is re-delivered each time the user re-enters
-// the funnel (matches user expectation of "tracked link push"). Only
-// advance the enrollment row when the enrollment row is freshly created;
-// otherwise the cron worker keeps managing the existing enrollment.
-//
-// Used from BOTH /auth/callback (new friends, OAuth path) and
-// /api/liff/link (existing friends, LIFF SDK path) so click-driven push
-// works for already-friend users too.
-//
-// `accountChannelId` lets callers (e.g. /auth/callback) supply the resolved
-// LINE account context when `friend.line_account_id` may not yet be wired
-// up by the follow webhook. Without it the helper would fall back to the
-// default env token and push to the wrong bot for non-default accounts.
+export // ref は経路、計測リンクの順で解決し、タグとシナリオへ適用する。遅延0のクリック配信は再訪でも送り、購読の通番は新規登録時だけ進める。新規 OAuth と既存 LIFF の両方で使う。follow 前でも誤った Bot から送らないよう、解決済み accountChannelId を優先する。
 async function applyRefAttribution(
   c: Context<Env>,
   ref: string,
@@ -226,7 +189,7 @@ async function applyRefAttribution(
   if (!ref || ref.startsWith('xh:')) return;
   const db = c.env.DB;
 
-  // N-244: 停止した流入経路の ref は、入口表示後の LIFF/OAuth 直送でも
+  // 停止した流入経路の ref は、入口表示後の LIFF/OAuth 直送でも
   // tracked/affiliate fallback・タグ/シナリオ開始をすべて止める。
   // 不存在 ref は共有 namespace の正規フローのため従来どおり進める。
   if (await isStoppedEntryRouteRef(db, ref)) return;
@@ -238,20 +201,12 @@ async function applyRefAttribution(
     if (tl?.is_active) trackedLink = tl;
   }
 
-  // ASP Phase 2: when the ref is neither an entry_route nor a tracked_link,
-  // it may be an affiliate offer link. An affiliate_link carrying a non-NULL
-  // offer_id inherits the offer's tag + scenario, applied through the same
-  // path as entry_routes / tracked_links so the flow is identical. Generic
-  // affiliate links (offer_id NULL) resolve to no tag/scenario — unchanged.
+  // 経路・計測リンクに当たらない ref は案件付きアフィリエイトリンクを調べ、同じタグ・シナリオ処理へつなぐ。案件なしの汎用リンクは自動付与しない。
   let offer: Awaited<ReturnType<typeof getAffiliateOfferById>> = null;
   if (!route && !trackedLink) {
     const affiliateLink = await getAffiliateLinkByRefCode(db, ref);
     if (affiliateLink) {
-      // ASP friend-add notification: only for a brand-new friend arriving via an
-      // affiliate link (existing-friend re-touches would spam the affiliate).
-      // Self-clicks (the affiliate adding their own bot) are suppressed. Runs
-      // even for a 汎用リンク (offer_id NULL) — offerName is then null.
-      // Wrapped so a notify failure can never break attribution.
+      // 通知過多を防ぐため、アフィリエイト経由の新規友だちだけを通知し、再訪と自己クリックは除く。汎用リンクも対象とし、通知失敗で帰属処理は止めない。
       if (options?.isNewFriend) {
         try {
           const affiliate = await getAffiliateById(db, affiliateLink.affiliate_id);
@@ -270,10 +225,7 @@ async function applyRefAttribution(
 
       if (affiliateLink.offer_id) {
         const fetchedOffer = await getAffiliateOfferById(db, affiliateLink.offer_id);
-        // Inactive offers (is_active = 0) are treated as null: stop the automatic
-        // flow (tag / scenario) so a paused campaign does not enroll new friends.
-        // Attribution recording (ref_tracking / ref_code on the friend row) is
-        // unaffected — it runs before this function and always persists the click.
+        // 停止中の案件はタグ・シナリオを始めない。これより前のクリックと初回流入の記録は保つ。
         if (fetchedOffer?.is_active) {
           offer = fetchedOffer;
         }
@@ -286,12 +238,7 @@ async function applyRefAttribution(
     route?.scenario_id ?? trackedLink?.scenario_id ?? offer?.scenario_id ?? null;
 
   if (effectiveTagId) {
-    // Guarded attach: fires tag_added scenario enrollment (and tag_change
-    // events) ONLY when the tag is newly applied. Re-clicks and clicks from
-    // other links carrying the same tag are no-ops, so a tag_added-triggered
-    // campaign (e.g. a seminar optin sequence) sends exactly once per friend
-    // no matter how many article links they enter through. Routes that want
-    // push-on-every-click keep using an explicit scenario_id below.
+    // 同じタグを持つリンクへ何度入ってもタグ起点のシナリオが重複しないよう、新規付与時だけ副作用を動かす。毎クリック配信は明示的な scenario_id の処理へ分ける。
     await attachTagAndFireSideEffects(db, friend.id, effectiveTagId, {
       defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
       workerUrl: c.env.WORKER_URL,
@@ -309,10 +256,7 @@ async function applyRefAttribution(
           workerUrl: c.env.WORKER_URL,
           accountChannelId: options?.accountChannelId ?? null,
         },
-        // every-click: cooldown before enrolling, push even on re-clicks,
-        // advance only fresh / behind enrollment rows (see the service).
-        // lineUserId comes from the verified id_token / OAuth exchange, so
-        // the push works even before friend.line_user_id is fully wired.
+        // 毎クリック配信はクールダウンを確認し、再訪でも送る。通番は新規・遅れた購読だけ進め、宛先は検証済みトークンの lineUserId を使う。
         { mode: 'every-click', targetLineUserId: lineUserId },
       );
     } catch (err) {
@@ -327,11 +271,11 @@ function authLandingPage(liffUrl: string, oauthUrl: string): string {
   // Extract LIFF ID from URL like https://liff.line.me/{LIFF_ID}?ref=test
   const liffIdMatch = liffUrl.match(/liff\.line\.me\/([^?]+)/);
   const liffId = liffIdMatch ? liffIdMatch[1] : '';
-  // Query string part (e.g., ?ref=test)
+
   const qsIndex = liffUrl.indexOf('?');
   const liffQs = qsIndex >= 0 ? liffUrl.slice(qsIndex) : '';
 
-  // line:// scheme to force open LINE app with LIFF
+  // LIFF を LINE アプリで開くため、line: の形式へ変換する。
   const lineSchemeUrl = `https://line.me/R/app/${liffId}${liffQs}`;
 
   return `<!DOCTYPE html>
@@ -463,16 +407,13 @@ export function escapeHtml(str: string): string {
 
 export // ─── X Harness Token Resolution ─────────────────────────────────
 
-/**
- * Apply X Harness gate actions (tag + scenario) to a LINE friend.
- * Non-blocking — failures are logged but don't interrupt the flow.
- */
+/** タグ・シナリオの失敗は記録し、利用者の連携フロー全体は止めない。 */
 async function applyXHarnessActions(
   db: D1Database,
   friendId: string,
   result: XHarnessTokenResult,
 ): Promise<void> {
-  // Add tag if specified
+
   if (result.tag) {
     try {
       const tagRow = await findOrCreateGlobalTag(db, { name: result.tag });
@@ -486,7 +427,7 @@ async function applyXHarnessActions(
     }
   }
 
-  // Start scenario if specified
+
   if (result.scenarioId) {
     try {
       const { enrollFriendInScenario } = await import('@line-crm/db');
@@ -504,10 +445,7 @@ export interface XHarnessTokenResult {
   scenarioId: string | null;
 }
 
-export /**
- * Resolve an X Harness token to get the linked X username + gate config (tag, scenario).
- * The token IS the secret — no Bearer auth needed on the resolve endpoint.
- */
+export /** X の利用者名と条件設定はトークンで解決する。トークン自体が秘密のため、この入口では別の Bearer を要求しない。 */
 async function resolveXHarnessToken(
   token: string,
   env: { X_HARNESS_URL?: string },
@@ -515,7 +453,7 @@ async function resolveXHarnessToken(
   if (!env.X_HARNESS_URL) return null;
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout — must not block login flow
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // ログインを止め続けないよう、5秒で打ち切る。
     try {
       const res = await fetch(`${env.X_HARNESS_URL}/api/tokens/${token}/resolve`, {
         headers: { 'Content-Type': 'application/json' },

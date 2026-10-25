@@ -2,7 +2,7 @@
 
 
 /*
- * R428: 申告なし・申告不足の本文も上限を超えて読み続けない。
+ * 申告なし・申告不足の本文も上限を超えて読み続けない。
  * 上限を超えたら null を返し、呼び出し側は413にする。
  */
 export async function readCappedBodyText(raw: Request, maxBytes: number): Promise<string | null> {
@@ -34,7 +34,7 @@ export async function readCappedBodyText(raw: Request, maxBytes: number): Promis
 }
 
 
-/** R430: X-Webhook-Timestamp の検査状態。送らない受信は checked:false。 */
+/** X-Webhook-Timestamp の検査状態。送らない受信は checked:false。 */
 export function receiveTimestampState(raw: string | null | undefined):
   | { checked: false }
   | { checked: true; timeMs: number | null } {

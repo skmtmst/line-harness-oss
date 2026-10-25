@@ -6,9 +6,7 @@ import type { WorkflowExecution } from './workflow-execution.js';
 import { WorkflowDeferred } from './workflow-execution.js';
 import { EXTERNAL_DELIVERY_MAX_ATTEMPTS, externalDeliveryRetryAt, externalDeliveryNotBefore, EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES } from './external-delivery-retry.js';
 
-/** Older failures did not record whether the wire request had started. Never
- * reinterpret those rows as proof of rejection or allocate a fresh operation.
- */
+/** 送信開始が記録されていない失敗は拒否の証明にせず、新しい操作を割り当てて再送しない。 */
 export async function holdUncertainLineStep(db:D1Database,ref:WorkflowStepRef,previous:WorkflowStepRow,code:'delivery_unknown'|'reply_unknown'='delivery_unknown'):Promise<boolean>{
   if(previous.status==='unknown')return true;
   const now=Date.now();
@@ -21,7 +19,7 @@ export async function holdUncertainLineStep(db:D1Database,ref:WorkflowStepRef,pr
   return true;
 }
 
-/** Automatic sends retain their original wire inputs; reply tokens never enter the ledger. */
+/** 自動送信は最初の不変の送信入力を保ち、replyToken は台帳へ保存しない。 */
 export function workflowLineClient(client: LineClient, execution: WorkflowExecution, options: {
   stepKey?: string;
   onAttempt?: () => void;
@@ -44,12 +42,11 @@ export function workflowLineClient(client: LineClient, execution: WorkflowExecut
         maxAttempts: EXTERNAL_DELIVERY_MAX_ATTEMPTS, retryKey: reply ? undefined : retryKey,
       });
       if (previous.status === 'succeeded') return JSON.parse(previous.result_json ?? 'null');
-      // A lease expiration is not proof that a provider did not accept a send.
-      // Include old running rows which predate the explicit started marker.
+      // 貸出期限切れだけでは外部の未受理を証明できないため、開始印のない過去の running も結果不明として扱う。
       if(await holdUncertainLineStep(execution.db,ref,previous,reply?'reply_unknown':'delivery_unknown')
         || reply && previous.first_attempt_at!==null)throw new WorkflowDeferred(reply?'reply_unknown':'delivery_unknown');
       if(previous.status==='running')throw new WorkflowDeferred('busy');
-      // Existing rows may carry the former five-attempt budget. Never raise a stricter one.
+      // 保存済みの5回予算があっても、より厳しい現在の予算を引き上げない。
       await execution.db.prepare(`UPDATE workflow_steps SET max_attempts=MIN(max_attempts,?) WHERE ${WORKFLOW_WHERE}`)
         .bind(EXTERNAL_DELIVERY_MAX_ATTEMPTS, ...workflowBindings(ref)).run();
       const row = await claimWorkflowStep(execution.db, ref);

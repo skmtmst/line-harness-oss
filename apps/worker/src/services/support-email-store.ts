@@ -81,9 +81,7 @@ async function findThreadId(
     if (byReply?.thread_id) return byReply.thread_id;
   }
 
-  // One customer email address represents one support account. Keep every
-  // inquiry and reply in the same timeline even when the subject changes or
-  // an earlier conversation was marked resolved.
+  // 件名や解決状態が変わっても、同じ顧客メールの問い合わせと返信を同じ時系列へまとめる。
   const byCustomer = await db.prepare(
     `SELECT id FROM support_email_threads
      WHERE customer_email = ?
@@ -112,7 +110,7 @@ export async function storeSupportEmail(
     || (input.bodyHtml ? stripHtml(input.bodyHtml) : '')
     || '(本文なし)').slice(0, MAX_BODY_CHARS);
 
-  // Source time (never retry time) makes the fingerprint stable on redelivery.
+  // 再配信でも同じ指紋になるよう、再試行時刻でなく元の発生時刻を使う。
   if(!messageId)messageId=`fallback:${await hashOutboundPayload(JSON.stringify([
     customerEmail,subject,input.sentAt?.trim()||'',input.bodyText??'',input.bodyHtml??'',
   ]))}`;

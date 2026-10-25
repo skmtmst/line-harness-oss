@@ -21,7 +21,7 @@ export function publicSecurityAlert(row: SecurityAlertRow): SecurityAlert {
 
 export async function observeSecurityAlert(db: D1Database, count: SecurityCount, threshold: number, now: string) {
   const scope = JSON.stringify([count.tenant_id, count.line_account_id]);
-  // A quiet window does not erase an unresolved security incident. Human review closes it.
+  // 静かな時間帯でも未解決の警告は消さず、人の確認で閉じる。
   await db.prepare(`INSERT INTO security_alerts
     (id, tenant_id, line_account_id, scope_key, rule_key, observed_count, threshold_count, first_detected_at, last_detected_at, notification_id, latest_event_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

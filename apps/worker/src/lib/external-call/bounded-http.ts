@@ -1,7 +1,5 @@
 import { tracedFetch as fetch, traceRequestInit } from '@line-crm/shared/server';
-/** One physical HTTP request, with its entire response body inside the same budget.
- * This transport has no retry loop or journal: its caller owns the durable operation.
- */
+/** 応答本文の読取まで同じ予算に含め、物理的な HTTP 要求を1回だけ行う。再試行と台帳は呼出元が管理する。 */
 export async function boundedHttpRequest(
   url: string, init: RequestInit,
   options: { timeoutMs: number; maxResponseBytes: number; fetch?: typeof fetch },

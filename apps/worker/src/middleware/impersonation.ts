@@ -67,15 +67,15 @@ export async function resolveImpersonation(
 // 個人情報の伏せ字（要件 §3 37-5 / §6-6）
 // ---------------------------------------------------------------------------
 
-/** Classify fields independently of URL; new admin routes inherit protection. */
+/** 新しい管理経路も保護されるよう、URL でなく項目の種類から分類する。 */
 const NAME_KEYS = new Set(['ownername', 'personname', 'displayname', 'systemdisplayname', 'realname', 'friendname', 'fullname', 'customername', 'staffname', 'recipientname', 'firstname', 'lastname', 'bankaccountholder', 'furigana', 'kana']);
 const CONTACT_KEYS = new Set(['pictureurl', 'phone', 'phonenumber', 'email', 'emailaddress', 'address', 'postalcode', 'zipcode', 'birthdate', 'birthday', 'dateofbirth', 'lineuserid', 'allergies', 'allergy', 'accountnumber', 'bankaccountnumber', 'filename', 'r2key', 'downloadurl', 'contenturl', 'originalurl', 'attachmenturl', 'customeremail', 'customerphone', 'recipientemail', 'recipientphone', 'contactemail', 'contactphone', 'phonee164', 'addressline1', 'addressline2', 'city', 'prefecture', 'bankcode', 'branchcode', 'accountlast4', 'url', 'uri', 'imageurl', 'avatarurl', 'thumbnailurl', 'originalcontenturl', 'previewimageurl']);
 const TEXT_KEYS = new Set(['alttext', 'subject', 'caption', 'snippet', 'usercomment', 'friendcomment', 'notificationtext', 'reason', 'text', 'content', 'message', 'body', 'lastmessage', 'preview', 'customernote', 'internalnote', 'note', 'memo', 'description']);
-// Arbitrary answers/metadata cannot be safely classified by their nested keys.
+// 任意の回答や metadata は、入れ子のキーだけでは安全に分類できない。
 const OPAQUE_KEYS = new Set(['metadata', 'metadatajson', 'answers', 'answer', 'fieldvalues', 'customfields', 'formdata', 'profile', 'payload']);
 function fieldKey(key: string): string { return key.replace(/[_-]/g, '').toLowerCase(); }
 
-/** Conversation summaries carry the same private text as the full message. */
+/** 会話の要約も本文と同じ個人情報を含むため、同じ保護を適用する。 */
 function isPrivateTextField(key: string): boolean {
   return TEXT_KEYS.has(key) || /(?:preview|snippet|(?:message|incoming|outgoing)(?:content|text))$/.test(key);
 }
@@ -87,7 +87,7 @@ export function shouldMaskPii(path: string): boolean {
 function maskOpaque(value: unknown): unknown {
   if (value === null || value === undefined) return value;
   if (Array.isArray(value)) return [];
-  if (typeof value === 'object') return {}; // arbitrary keys can also contain PII
+  if (typeof value === 'object') return {}; // 任意のキーにも個人情報が入り得る。
   return typeof value === 'number' ? 0 : typeof value === 'boolean' ? false : '（代理ログイン中は伏せています）';
 }
 
@@ -106,7 +106,7 @@ export function maskedFriendLabel(id: unknown): string {
  */
 export function maskPiiDeep(value: unknown, depth = 0): unknown {
   if (value === null || typeof value !== 'object') return value;
-  if (depth > 64) return null; // Never return an unexamined subtree.
+  if (depth > 64) return null; // 検査していない入れ子の値は返さない。
   if (Array.isArray(value)) return value.map((item) => maskPiiDeep(item, depth + 1));
   const source = value as Record<string, unknown>;
   const out: Record<string, unknown> = {};
@@ -145,9 +145,7 @@ async function auditPiiOutput(c: Context<Env>, result: 'success' | 'denied', kin
 
 export const piiMaskMiddleware: MiddlewareHandler<Env> = async (c, next) => {
   let impersonation = c.get('impersonation');
-  // Ops keeps the operator's original authority, but is still an output while
-  // that session impersonates someone. Mask its broad console data regardless
-  // of a reveal granted only for the target organization's customer APIs.
+  // 代理操作中の ops 応答も個人情報を伏せる。元の運営権限があっても、対象統括向け API の開示許可を広い運営データへ拡張しない。
   if (!impersonation && c.req.path.startsWith('/api/ops/') && c.get('staff')) {
     const tokenHash = await adminSessionTokenHashFromRequest(c);
     const active = tokenHash ? await getActiveImpersonation(c.env.DB, c.get('staff').id, tokenHash) : null;

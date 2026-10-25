@@ -97,9 +97,7 @@ export interface BannerPromptInput {
   references?: BannerReference[] | null;
   textLines: string[];
   /**
-   * 行ごとの「強調」（Pencil ★修正案 `g64HOD`・2026-10-06 承認の決まり5）。
-   * `textLines` と同じ順・同じ長さ。true の行だけを強調カラーで目立たせる。
-   * 強調を知らない古い生成は空配列・未指定で、そのときは今までどおりになる。
+   * 行と強調の対応がずれないよう、textLines と同じ順・長さにする。true の行だけを強調し、未指定や空配列は強調しない。設計図 g64HOD と照合する。
    */
   emphasisLines?: boolean[] | null;
   /** 色の4つの役割（★BG-B `KkTNS`）。指定なしは null。 */

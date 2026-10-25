@@ -72,7 +72,7 @@ export async function createAutoReply(
   const isActive = input.isActive === true;
 
   /*
-   * m26c R570: 行・版・参照表を1回の batch で書く。版の書込が落ちたら
+   * 行・版・参照表を1回の batch で書く。版の書込が落ちたら
    * 行も残らない。不完全な行が残る部分成功を起こさない。
    */
   const created: AutoReply = {
@@ -123,14 +123,14 @@ export async function createAutoReply(
    * メモの plan は公開版の作成文だけを返す。
    */
   const memoPlanned = await planAutoReplyInternalMemoStatements(db, created, input.internalMemo ?? null,input.normalizeKeywords);
-  // 467: 保存で参照表を書き換える。どの版を使っているかの正本。
+  // 保存で参照表を書き換える。どの版を使っているかの正本。
   const refStatements = await planSyncTemplateReferenceStatements(
     db,
     'auto_reply',
     id,
     created.template_id ? [created.template_id] : [],
   );
-  // R512 と同じく、要求キーの行も同じ batch で確定する。本体より後に積むため、
+  // 要求キーの行も同じ batch で確定する。本体より後に積むため、
   // 外部キーのある環境でも制約に当たらない。同じキーの同時実行は
   // UNIQUE 制約で負けた側だけ巻き戻り、二重に残らない。
   const claimStatements = idempotency && memoPlanned.versionId
@@ -274,7 +274,7 @@ export async function updateAutoReply(
   }
 
   /*
-   * m26c R569: 行・版・参照表を1回の batch で書く。版の書込が落ちたら
+   * 行・版・参照表を1回の batch で書く。版の書込が落ちたら
    * 行も変えず、行と公開版が食い違わない。
    */
   const merged: AutoReply = {
@@ -325,7 +325,7 @@ export async function updateAutoReply(
   const memoPlanned = 'internalMemo' in input || 'normalizeKeywords' in input
     ? await planAutoReplyInternalMemoStatements(db, merged, 'internalMemo' in input ? input.internalMemo ?? null : undefined,input.normalizeKeywords)
     : { statements: [], draftUpdated: false };
-  // 467: 保存で参照表を書き換える。外した参照はここで消える。
+  // 保存で参照表を書き換える。外した参照はここで消える。
   const refStatements = await planSyncTemplateReferenceStatements(
     db,
     'auto_reply',
@@ -397,7 +397,7 @@ export async function updateAutoReply(
 }
 
 /**
- * 専用の停止口（機能08 点検 E-01）。
+ * 専用の停止口。
  *
  * isActive の素のトグルと違い、いつ・誰が・なぜ止めたかを残す。
  * stopped_* は「最後に停止した記録」なので、再び動かしても消さない。
@@ -441,7 +441,7 @@ export async function stopAutoReply(
 }
 
 /**
- * 削除は履歴を残す方式（機能08 点検 N-085）。
+ * 削除は履歴を残す方式。
  *
  * 物理削除すると、設定と「誰が消したか」が跡形もなく消える。行を残して
  * deleted_at で隠し、一覧・評価・集計は deleted_at IS NULL の行だけを見る。

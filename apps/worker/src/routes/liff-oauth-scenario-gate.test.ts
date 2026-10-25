@@ -2,23 +2,7 @@ import { d1BindingIdentity } from '../lib/d1-timing.js';
 import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// friend_add auto-enroll gating on GET /auth/callback (LIFF/OAuth path).
-//
-// The friend_scenarios partial UNIQUE only blocks non-completed enrollments
-// (WHERE status != 'completed'), so an existing friend with a completed
-// enrollment would get re-enrolled — and the welcome sequence re-sent — every
-// time they re-run OAuth login (e.g. via a form link). Re-sends on actual
-// re-adds (unblock → follow) are the follow webhook's job, so the OAuth path
-// must only enroll friends with no enrollment history for the scenario. It
-// must NOT gate on "friend row is new": friends whose row was created without
-// a follow event (message-first via ensureFriendFromWebhookUser, migrated
-// bases, webhook partial failure) still rely on this path as their only
-// friend_add entry.
-//
-// Cases:
-//   - new friend → enrolls in active friend_add scenarios
-//   - existing friend with a prior (completed) enrollment → does NOT enroll
-//   - existing friend with NO enrollment history → enrolls (catch-up)
+// 完了済み購読は部分 UNIQUE だけでは防げないため、OAuth 再ログインで歓迎文を再送しないことを確かめる。follow なしで作られた友だちも、登録履歴がなければこの入口から登録できることを守る。
 
 const dbMocks = {
   /*
@@ -36,7 +20,7 @@ const dbMocks = {
       .filter((s) => s.trigger_type === 'friend_add' && s.is_active)
       .map((s) => s.id);
   }),
-  // eager module-load deps
+
   getLineAccounts: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000' },
   ]),
@@ -76,9 +60,7 @@ vi.mock('@line-crm/db', () => dbMocks);
 
 const worker = (await import('../index.js')).default;
 
-// Prepared-statement stub. Raw statements are no-ops except the
-// friend_scenarios existence probe, which answers from `priorEnrollment` so
-// tests can simulate a friend with/without enrollment history.
+// friend_scenarios の履歴確認だけを priorEnrollment に対応させ、ほかの SQL は空の結果にして登録履歴の有無を試す。
 let priorEnrollment: { id: string } | null = null;
 const DB = {
   prepare: (sql: string) => ({
@@ -124,7 +106,7 @@ function installFetchMock() {
           status: 200,
         });
       }
-      // bot/info, push, etc → 404 so the handler falls through
+      // bot/info などは404を返し、完了ページへの代替経路を試す。
       return new Response('not found', { status: 404 });
     }),
   );
@@ -169,7 +151,7 @@ beforeEach(() => {
 
 describe('GET /auth/callback — friend_add scenario auto-enroll gating', () => {
   it('enrolls a brand-new friend in active friend_add scenarios', async () => {
-    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null); // brand-new friend
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
 
     await callback();
 
@@ -195,9 +177,7 @@ describe('GET /auth/callback — friend_add scenario auto-enroll gating', () => 
   });
 
   it('does NOT enroll an existing friend with a prior enrollment on OAuth re-login', async () => {
-    // A completed enrollment doesn't block the partial UNIQUE, so without the
-    // existence guard this re-login would re-create the enrollment and
-    // re-send the whole welcome sequence.
+    // 完了済みの行は部分 UNIQUE に掛からないため、明示的な履歴確認で歓迎文の再登録を防ぐ。
     dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'F-1',
       line_user_id: 'U-login',
@@ -212,9 +192,7 @@ describe('GET /auth/callback — friend_add scenario auto-enroll gating', () => 
   });
 
   it('enrolls an existing friend with NO enrollment history (catch-up)', async () => {
-    // Friend row was created without a follow event (message-first friend,
-    // migrated base, or a follow webhook that died before enrolling). The
-    // OAuth path is their only friend_add entry — it must still enroll them.
+    // follow を通らない友だちにも追加の機会を残すため、既存行でも登録履歴がなければ OAuth から登録する。
     dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'F-1',
       line_user_id: 'U-login',

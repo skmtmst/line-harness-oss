@@ -40,8 +40,7 @@ dedupPreview.post(
       targetTagId,
     );
 
-    // Strip recipients[] before returning — it's needed only by the send executor,
-    // not the UI. Keeps the response payload small for large broadcasts.
+    // 多数配信でも応答を大きくしないよう、送信実行だけで使う recipients を返さない。
     return c.json({
       success: true,
       data: {

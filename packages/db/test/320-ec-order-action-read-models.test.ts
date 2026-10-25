@@ -174,7 +174,7 @@ describe('migration 320 EC order and action read models', () => {
   });
 
   it('未知の計量キーは売上集計に入れず、既知のキーは共有の一覧どおりに数える', async () => {
-    // #517 軽4: キー名がずれても画面は黙って「—」になる。共有の一覧を本物で
+    // キー名がずれても画面は黙って「—」になる。共有の一覧を本物で
     // import し、未知キーの除外と既知キーの集計を両方見張る。共有からキーを
     // 抜く・ずらす逆変異は、ここで赤になる。
     expect(ORDER_IMPACT_KEYS).toContain('orders');

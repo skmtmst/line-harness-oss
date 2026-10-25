@@ -316,7 +316,7 @@ export async function runFrequentHeavyJobs(
       },
     },
     {
-      // #838 第2段: Google Sheets への日次同期。その日(JST)の scheduled
+      //  第2段: Google Sheets への日次同期。その日(JST)の scheduled
       // 実行が済んでいる連携は飛ばし、未実行分だけ6時間tickのどれか1回が回す。
       name: 'google sheets sync',
       run: async () => {
@@ -345,8 +345,8 @@ export async function runFrequentHeavyJobs(
       },
     },
     {
-      // K(#822): リッチメニューの毎日の照合。公開中の group を1日1回だけ見る。
-      // 見つけたずれは直さず台帳に残す。直すのは運用者が K-2 画面で行う。
+      // リッチメニューの毎日の照合。公開中の group を1日1回だけ見る。
+      // 見つけたずれは直さず台帳に残す。直すのは運用者が 照合・修復画面で行う。
       name: 'rich menu daily reconcile',
       run: async () => {
         const { processDailyRichMenuReconcile } = await import('../features/rich-menus/rich-menu-daily-reconcile/index.js');
@@ -417,7 +417,7 @@ export async function runFrequentHeavyJobs(
     });
   }
 
-  // 通知cronから外した重い処理側で、各時11分に無反応スコアを再評価する。
+  // 通知処理を重くしないよう、無反応スコアの再評価は各時11分の重い処理側で行う。
   if (jstMinutes === 11) {
     jobs.push({
       name: 'action score inactivity',

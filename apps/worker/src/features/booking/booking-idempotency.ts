@@ -1,5 +1,4 @@
-// Idempotency-Key store for booking request POSTs.
-// Returns same response for repeated submissions within the TTL window.
+// 二重予約を防ぐため、TTL 内の同じ Idempotency-Key には同じ応答を返す。
 
 export interface SaveIdempotencyParams {
   key: string;

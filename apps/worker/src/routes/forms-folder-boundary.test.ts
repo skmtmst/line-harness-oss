@@ -1,4 +1,4 @@
-/* N-175 直接試験: 実route＋実SQLite。folderId条件をサーバーで絞ること。 */
+/*  直接試験: 実route＋実SQLite。folderId条件をサーバーで絞ること。 */
 import { Hono } from 'hono';
 import { expect, test } from 'vitest';
 

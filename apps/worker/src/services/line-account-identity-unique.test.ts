@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 /**
- * R550: 同時登録で同じLINE LoginチャネルID・LIFF IDを複数アカウントへ保存できる。
+ * 同時登録で同じLINE LoginチャネルID・LIFF IDを複数アカウントへ保存できる。
  * migration 542 の一意制約が、重複SELECT→INSERTの窓をDB側で塞ぐ。
  */
 describe('R550: Login/LIFF識別子の一意制約', () => {

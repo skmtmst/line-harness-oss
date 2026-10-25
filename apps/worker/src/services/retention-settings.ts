@@ -2,7 +2,7 @@ import { auditEventStatement, getAccountSetting } from '@line-crm/db';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { parseRetentionPolicy, RETENTION_POLICY_KEY, type RetentionPolicy } from './retention-policy.js';
 
-/** Read policy and version from the same row snapshot. Invalid policies still throw. */
+/** 同じ行の状態から方針と版を読み、不正な方針は例外にする。 */
 export async function readRetentionSetting(db: D1Database, accountId: string) {
   const raw = await getAccountSetting(db, accountId, RETENTION_POLICY_KEY);
   const policy = parseRetentionPolicy(raw);
@@ -13,7 +13,7 @@ export async function readRetentionSetting(db: D1Database, accountId: string) {
   return { version, policy };
 }
 
-/** Caller checks scope and step-up first. The policy and its audit commit together. */
+/** 範囲と本人確認後に呼び、方針と監査を一緒に確定する。 */
 export async function saveRetentionSetting(
   db: D1Database,
   input: { accountId: string; expectedVersion: number; policy: RetentionPolicy; actor: Pick<AuthenticatedStaff, 'id' | 'tenantId'> },

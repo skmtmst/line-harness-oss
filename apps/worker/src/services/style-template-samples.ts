@@ -178,7 +178,7 @@ const labels: Record<string, string> = {
   membership_url: '入会のご案内URL',
 };
 
-/** Catalog reads and template creation never schedule a delivery. */
+/** 一覧読取やテンプレート作成だけでは配信を予約しない。 */
 export function templateSamples(style: AccountStyle): StyleTemplateSample[] {
   const specific = industry[style as IndustryStyle] ?? [];
   const catalog = style === 'ec' ? [...common, ...ecSamples] : common;

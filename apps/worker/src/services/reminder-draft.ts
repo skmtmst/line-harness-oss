@@ -194,7 +194,7 @@ export async function validateReminderDraft(
       : !fieldValid
         ? '基準日に使う友だち情報欄を選んでください'
         : '基準日にするイベントを選んでください'));
-  // N-068: 毎年くり返す友だち情報欄起点では、2月29日の平年の扱いが
+  // 毎年くり返す友だち情報欄起点では、2月29日の平年の扱いが
   // 保存済みであることを公開前に確かめる。
   const leapValid = !(settings.repeatYearly && settings.triggerType === 'friend_field')
     || ['feb28', 'mar1', 'skip'].includes(settings.leapYearPolicy ?? '');

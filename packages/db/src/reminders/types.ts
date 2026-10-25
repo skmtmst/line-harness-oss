@@ -64,7 +64,7 @@ export interface FriendReminderRow {
   updated_at: string;
   reminder_version_id: string | null;
   /**
-   * R346: 登録時に使っていたテンプレートの公開版。
+   * 登録時に使っていたテンプレートの公開版。
    * {"テンプレートID": 公開版番号} の JSON。NULL は今までどおり最新の版を読む。
    */
   template_version_snapshot: string | null;
@@ -91,7 +91,7 @@ export type ReminderRegistrantMutation =
   | { state: 'conflict' | 'not_found' };
 
 /**
- * R348/R349: 行ごとの送信元アカウントで絞るための担当範囲。
+ * 行ごとの送信元アカウントで絞るための担当範囲。
  * getVisibleLineAccountScope と同じ形。未指定なら従来の条件のまま
  * （親ルールと友だちの所属一致）。経路側は必ず渡す。
  */
@@ -193,7 +193,7 @@ export interface ReminderDeliveryRunRow {
   line_request_id: string | null;
   message_log_id: string | null;
   /**
-   * R345: 初回に送った本文（差し込み済み）と使った版。
+   * 初回に送った本文（差し込み済み）と使った版。
    * 同じ再試行キーの再送はここから送り、履歴もここから残す。
    * NULL は「まだ送っていない」→今までどおり最新の内容で作る。
    */
@@ -233,7 +233,7 @@ export interface ResumeExpectedRun {
 }
 
 // =============================================================================
-// N-065: 予約・イベント・Meet の取消/日程変更を リマインダへ同期
+// 予約・イベント・Meet の取消/日程変更を リマインダへ同期
 // =============================================================================
 //
 // 予約時には enrollByTrigger が friend_reminders を作るが、取消・日程変更は

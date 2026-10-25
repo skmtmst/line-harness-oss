@@ -22,7 +22,7 @@ export async function postMileageAdjustment(
     .first<MileageLedgerEntry>();
   if (existing) {
     const result = adjustmentResult(existing, fingerprint, true);
-    // R359: 初回の取り直し batch が落ちた再送は、ここで残りを取り直す。
+    // 初回の取り直し batch が落ちた再送は、ここで残りを取り直す。
     // 台帳・残高には触らない。印と残高超過の上限で二重消費しない。
     if (input.amount < 0) {
       await repairAdjustmentLotShortfall(db, existing, -input.amount);
@@ -46,12 +46,12 @@ export async function postMileageAdjustment(
     executedByStaffId: input.executedByStaffId,
     executedByStaffName: input.executedByStaffName,
     expiresAt: input.expiresAt ?? null,
-    // R380: 通知記録の作成自体が落ちたとき、あとから「通知だけ」を再送
+    // 通知記録の作成自体が落ちたとき、あとから「通知だけ」を再送
     // できるよう、依頼されたかどうかを台帳へ残す。
     notifyFriend: input.notifyFriend === true,
   });
 
-  // m25d R359: 減算は台帳だけでなく付与内訳も同じ処理で減らす。
+  // 減算は台帳だけでなく付与内訳も同じ処理で減らす。
   // 増額は 275 の trigger がロットを作るが、減額は台帳だけでは
   // ロットが残り「残高100・使用可能ロット200」の不整合になる。
   // 期限切れは使えない分なので消費対象から外す（交換の予約と同じ）。
@@ -136,14 +136,14 @@ export async function postMileageAdjustment(
   }>;
   const ledgerChanges = Number(batchResults[0]?.meta?.changes ?? 0);
 
-  // R359: 同時減算で古い内訳を読んだ側は、条件付きのロット更新が
+  // 同時減算で古い内訳を読んだ側は、条件付きのロット更新が
   // 効かず（changes 0）残高だけが減る。足りなかった分を取り直して
   // 消費し直す。取り直しも条件付きで、無ければある分だけにする
   // （期限切れ・過去の不整合の不足受容は従来どおり）。
-  // 台帳を書かなかった再送（ledgerChanges 0）は直した本人が直している
+  // 台帳を書かなかった再送（ledgerChanges 0）は、台帳を書いた側が取り直しを済ませている
   // ため、ここでは何もしない（二重消費防止）。
   if (input.amount < 0 && ledgerChanges > 0 && lotSpends.length > 0) {
-    // R359: 確定した消費の印。再送の請求はこの印の残りだけにする。
+    // 確定した消費の印。再送の請求はこの印の残りだけにする。
     const consumed: AdjustmentLotConsumption[] = [];
     let shortfall = 0;
     for (let index = 0; index < lotSpends.length; index += 1) {
@@ -201,7 +201,7 @@ export async function postMileageAdjustment(
       if (progressed === 0) break;
       shortfall -= progressed;
     }
-    // R359: 確定分を台帳へ刻む。再送はこの印の残りだけを請求するため、
+    // 確定分を台帳へ刻む。再送はこの印の残りだけを請求するため、
     // 印が無くても残高超過の上限で二重消費しない。
     await recordLotConsumed(db, id, programId, input.idempotencyKey, consumed);
   }

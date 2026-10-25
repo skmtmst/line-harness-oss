@@ -16,7 +16,7 @@ export const resourceTables: Record<
   automation: { table: 'automation_definitions', account: 'line_account_id' },
   booking_menu: { table: 'menus', account: 'line_account_id' },
 };
-/** SQL snapshot covers both editable content and publication state, including child rows. */
+/** SQL の照合には、子行を含む編集内容と公開状態の両方を含める。 */
 export function snapshotSql(kind: string) {
   const jsonRows = (table: string, where: string) =>
     `(SELECT json_group_array(json_object(${table === 'rich_menu_pages' ? "'id',id,'name',name,'image',image_r2_key,'order',order_index" : table === 'rich_menu_areas' ? "'id',id,'x',bounds_x,'y',bounds_y,'w',bounds_width,'h',bounds_height,'action',action_type,'data',action_data,'label',label,'template',template_id,'form',form_id" : "'id',id,'status',status,'trigger',trigger_type,'config',trigger_config,'conditions',condition_config,'actions',action_config"})) FROM ${table} WHERE ${where})`;

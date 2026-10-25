@@ -228,7 +228,7 @@ describe('NEN campaign metrics', () => {
     })).rejects.toMatchObject({ code: 'version_conflict', status: 409 });
   });
 
-  // #733: skipped の直せる2理由は、前提が直っていれば attempts を問わず再送できる。
+  // skipped の直せる2理由は、前提が直っていれば attempts を問わず再送できる。
   it('直せる2理由のskippedは前提の回復を確認して再送待ちへ戻す', async () => {
     insertJob(testDb.raw, {
       id: 'skip-token', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
@@ -256,7 +256,7 @@ describe('NEN campaign metrics', () => {
     });
   });
 
-  // #733: 前提が直っていなければ送らず、何を直すかを409で返す。
+  // 前提が直っていなければ送らず、何を直すかを409で返す。
   it('前提が直っていないskippedの再送は409で直す場所を返す', async () => {
     testDb.raw.prepare(`UPDATE line_accounts SET channel_access_token = '' WHERE id = 'account-b'`).run();
     insertJob(testDb.raw, {
@@ -291,7 +291,7 @@ describe('NEN campaign metrics', () => {
     ).all()).toEqual([{ status: 'skipped' }, { status: 'skipped' }]);
   });
 
-  // #733: 直せない4理由は理由ごとに409で止め、文言を理由別に返す。
+  // 直せない4理由は理由ごとに409で止め、文言を理由別に返す。
   it('直せない4理由のskippedは理由別の文言で409にする', async () => {
     const cases = [
       { reason: 'friend_unavailable', message: '友だちが配信対象ではないため、この記録は再送できません' },
@@ -312,7 +312,7 @@ describe('NEN campaign metrics', () => {
     }
   });
 
-  // #733: 既知の6理由以外は理由コードを出さず、生文の秘密値を漏らさない。
+  // 既知の6理由以外は理由コードを出さず、生文の秘密値を漏らさない。
   it('未知の理由コードは出さず秘密値を漏らさない', async () => {
     insertJob(testDb.raw, {
       id: 'skip-unknown', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
@@ -330,7 +330,7 @@ describe('NEN campaign metrics', () => {
     expect(JSON.stringify(detail)).not.toContain('token-xyz');
   });
 
-  // #733: 二人同時押し・古い版・確認後の状態変化は送らず409にする。
+  // 二人同時押し・古い版・確認後の状態変化は送らず409にする。
   it('同時押しと確認後の状態変化は送らず409にする', async () => {
     insertJob(testDb.raw, {
       id: 'skip-race', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',
@@ -371,7 +371,7 @@ describe('NEN campaign metrics', () => {
     await expect(getNenFlowMetrics(broken, 'account-a', RANGE)).rejects.toThrow('db unavailable');
   });
 
-  // #727: チップに出ている数を押したら、その数だけ並ぶ。
+  // チップに出ている数を押したら、その数だけ並ぶ。
   it('複数状態の絞り込みを受け付け、単一状態の誤りはそのまま400にする', () => {
     expect(normalizeDeliveryStatus(undefined)).toBeUndefined();
     expect(normalizeDeliveryStatus('failed')).toBe('failed');
@@ -386,7 +386,7 @@ describe('NEN campaign metrics', () => {
     }
   });
 
-  // #727: failed と skipped は別チップで単一状態ずつ絞る。
+  // failed と skipped は別チップで単一状態ずつ絞る。
   // 「これから」は pending,processing の複数状態で絞る。
   it('failed・skipped・pending+processingの絞り込みがチップの数と一致する', async () => {
     insertJob(testDb.raw, {
@@ -427,9 +427,9 @@ describe('NEN campaign metrics', () => {
     expect(upcoming.pagination.total).toBe(2);
   });
 
-  // #727: skipped の内訳は理由コードそのまま。運用で直せる2理由が
+  // skipped の内訳は理由コードそのまま。運用で直せる2理由が
   // 「その他」に落ちないこと。failed 側の文字列一致分類は触らない。
-  // #733: 6つ目の campaign_form_already_submitted も既知理由として数え、説明を出す。
+  // 6つ目の campaign_form_already_submitted も既知理由として数え、説明を出す。
   it('skippedの内訳を6理由で出し、直せる2理由がその他に落ちない', async () => {
     insertJob(testDb.raw, {
       id: 'skip-fixable-a', accountId: 'account-a', friendId: 'friend-a', status: 'skipped',

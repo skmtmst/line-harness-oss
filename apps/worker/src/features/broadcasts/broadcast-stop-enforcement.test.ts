@@ -1,15 +1,7 @@
 /*
- * #662 / N-059 — 送り始めた一斉配信を止め、失敗した相手だけ送り直す。
- *
- * ここで見張るのは「止まったか」ではなく、**止めたあと・再開したあと・
- * 送り直したあとに、同じ人へ2通目が出ないこと**。
- *
- * この現場の既定は at-most-once。外へ出たかもしれない相手（送達不明）は
- * 再送しない。二重に届くと相手のトークに残って取り消せないが、1回分
- * 欠けたほうは台帳に残るのでこちら側で気づけるため。
- *
- * 遅延（stealth）は本物を使うと束の間で5秒眠る。ここで測りたいのは
- * 止まる位置と送った相手なので、待ちだけ外す。
+ * 停止・再開・失敗先への再送で、同じ人へ二重に届かないことを守る。
+ * 外へ出た可能性がある送信は at-most-once で再送せず、欠けた分は台帳で確認する。
+ * 試験では停止位置と送信先を検証するため、stealth の束間待機だけを省く。
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -266,7 +258,7 @@ describe('一斉配信の停止（#662）', () => {
       seedSendingSegmentBroadcast(raw);
 
       // 2束目（100人）が LINE に断られる。要求は届いていて、誰にも配られていない。
-      // #816: 送り直すのは一時的な失敗だけなので、429（速度制限）で断る。
+      // 送り直すのは一時的な失敗だけなので、429（速度制限）で断る。
       // 400 だと恒常的な失敗になり、送り直しの対象に入らない。
       const first = makeLineClient({
         onMulticast: (_ids, index) => {
@@ -542,7 +534,7 @@ describe('一斉配信の停止（#662）', () => {
       });
       await processBroadcastSend(db, client, 'b1');
 
-      // 以前はここで console.error だけが残り、誰が落ちたかは消えていた。
+      // 失敗した宛先を保存し、再送の対象を特定できることを確かめる。
       expect(await countBroadcastLedger(db, 'b1')).toEqual({
         sent: 500, failed: 100, unknown: 0, claimed: 0,
       });

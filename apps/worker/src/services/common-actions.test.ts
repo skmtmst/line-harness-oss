@@ -90,7 +90,7 @@ describe('共通アクション', () => {
   });
 
   it('別アカウントの参照先は保存の時点で拒否する（監査 R479）', async () => {
-    // 監査 R479: 参照先の固定は保存時に行う。別アカウントの選択肢は
+    // 監査 : 参照先の固定は保存時に行う。別アカウントの選択肢は
     // 下書きに残さず、保存の時点で止める（公開時の検査は維持する）。
     await expect(createCommonAction(testDb.db, {
       lineAccountId: 'account-1',
@@ -237,7 +237,7 @@ describe('共通アクション', () => {
   });
 
   it('空の友だち情報項目名を保存せず、待機時間を実行形式へ揃える（監査 R479）', async () => {
-    // 監査 R479: 参照先と入力の検査は保存時に行う。不正な内容は下書きに残さない。
+    // 監査 : 参照先と入力の検査は保存時に行う。不正な内容は下書きに残さない。
     await expect(createCommonAction(testDb.db, {
       lineAccountId: 'account-1',
       name: '入力不足',
@@ -351,7 +351,7 @@ describe('共通アクション', () => {
     const draftA2 = await createCommonActionDraft(testDb.db, {
       id: first.id, lineAccountId: 'account-1',
     });
-    // 監査 R479: 循環は保存の時点で止まる（公開時の検査は維持する）。
+    // 監査 : 循環は保存の時点で止まる（公開時の検査は維持する）。
     // Bは公開済みでAを呼び、Aの下書きがBを呼ぶと循環になる。
     await expect(updateCommonActionDraft(testDb.db, {
       id: first.id,
@@ -439,7 +439,7 @@ describe('共通アクション', () => {
       id: created.id, lineAccountId: 'account-1',
     });
     const byId = new Map(detail.bindings.map((binding) => [binding.id, binding]));
-    // R472: 動かしていない箇所は0件。同じ実行を重ねて数えない。
+    // 動かしていない箇所は0件。同じ実行を重ねて数えない。
     expect(byId.get('b-root')).toMatchObject({ runningCount: 1, waitingCount: 1 });
     expect(byId.get('b-never')).toMatchObject({ runningCount: 0, waitingCount: 0 });
     expect(byId.get('b-root')).toMatchObject({ consumerPath: 'root' });
@@ -472,7 +472,7 @@ describe('共通アクション', () => {
       id: created.id, lineAccountId: 'account-1',
     });
     const migrated = detail.bindings.find((binding) => binding.id === 'b-root');
-    // R471: 新版の件数は0だが、旧版で進行中の2件を見失わない。
+    // 新版の件数は0だが、旧版で進行中の2件を見失わない。
     expect(migrated).toMatchObject({
       versionNumber: 2,
       runningCount: 0,
@@ -498,7 +498,7 @@ describe('共通アクション', () => {
       name: '競合する下書き',
       actions: [...wait60],
     });
-    // R473: 開いたままだった古い画面の保存（名前だけでも）は409で止まる。
+    // 開いたままだった古い画面の保存（名前だけでも）は409で止まる。
     await expect(updateCommonActionDraft(testDb.db, {
       id: created.id,
       lineAccountId: 'account-1',
@@ -514,7 +514,7 @@ describe('共通アクション', () => {
     expect(detail.versions[0].actions[0].params).toEqual({ durationMinutes: 60 });
     expect(detail.versions[0].draftRevision).toBe(2);
     /*
-     * 監査 R473: 409では古い画面の名前も残らない。親行と版行の
+     * 監査 : 409では古い画面の名前も残らない。親行と版行の
      * どちらも先行保存のまま（名前・版ポインタ・改訂番号が不変）。
      */
     expect(detail.name).toBe('競合する下書き');
@@ -530,7 +530,7 @@ describe('共通アクション', () => {
       draft_revision: 2,
     });
 
-    // R477: 公開の読取後に保存が入った古い読取の公開も409で止まる。
+    // 公開の読取後に保存が入った古い読取の公開も409で止まる。
     await expect(publishCommonActionDraft(testDb.db, {
       id: created.id,
       lineAccountId: 'account-1',
@@ -538,7 +538,7 @@ describe('共通アクション', () => {
       expectedDraftRevision: 1,
     })).rejects.toMatchObject({ code: 'draft_revision_conflict' });
     /*
-     * 監査 R477: 409では親行の版ポインタも版行の状態も変わらない。
+     * 監査 : 409では親行の版ポインタも版行の状態も変わらない。
      * 下書きのまま（公開ポインタなし・版は下書きのまま）。
      */
     expect(testDb.raw.prepare(
@@ -688,7 +688,7 @@ describe('共通アクション', () => {
       params: { commonActionId: leaf.id }, onFailure: 'stop',
     }));
     /*
-     * 監査 R478: 実行時は利用側の呼び出し1件が先に数えられる。
+     * 監査 : 実行時は利用側の呼び出し1件が先に数えられる。
      * 呼び出し10回で900+10=910に89処理を足した999へ利用側1件で
      * 1000処理は公開できる（境界）。
      */
@@ -893,10 +893,7 @@ describe('共通アクション', () => {
   });
 
   /*
-   * 監査 R123: 「呼ばれていない」の札の件数は、一覧の絞り込みと同じ
-   * 「呼び出し元なし」で数える。以前は集計が公開中に限られ、下書きの
-   * 未使用があると件数と一覧がずれた。保管の未使用は「保管」で数える
-   * （監査 R480）。
+   * 未使用件数の札と一覧がずれないよう、下書きも含め呼出元なしで数える。保管済みは保管の件数へ分ける。
    */
   it('「呼ばれていない」の件数は一覧の絞り込みと同じ対象を数える', async () => {
     const published = await createCommonAction(testDb.db, {
@@ -921,7 +918,7 @@ describe('共通アクション', () => {
       await getCommonActionsSummary(testDb.db, 'account-1'),
       await listCommonActions(testDb.db, { lineAccountId: 'account-1', status: 'unused' }),
     ];
-    // 監査 R480: 保管済みは「保管」で見る。「呼ばれていない」には出さない。
+    // 監査 : 保管済みは「保管」で見る。「呼ばれていない」には出さない。
     expect(unusedList.total).toBe(2);
     expect(summary.unused).toBe(unusedList.total);
     const all = await listCommonActions(testDb.db, { lineAccountId: 'account-1' });
@@ -977,7 +974,7 @@ describe('共通アクション', () => {
   });
 
   /*
-   * 監査 R124: 一覧の検索欄は「アクション名・中の処理で探す」と案内する。
+   * 監査 : 一覧の検索欄は「アクション名・中の処理で探す」と案内する。
    * 名前・説明だけでなく各版の処理内容（手順の本文など）も対象にする。
    */
   it('「中の処理で探す」は版の処理内容の文字にも届く', async () => {

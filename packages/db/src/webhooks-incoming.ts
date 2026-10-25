@@ -104,7 +104,7 @@ export async function createIncomingWebhook(
 }
 
 /**
- * R424: 秘密値の等価判定（定数時間）。同じ値の再保存を重複操作として扱い、
+ * 秘密値の等価判定（定数時間）。同じ値の再保存を重複操作として扱い、
  * 旧合言葉の猶予を保つために使う。判定自体に秘密値は出さない。
  */
 export function sameSecretValue(current: string, next: string): boolean {
@@ -132,12 +132,12 @@ export async function updateIncomingWebhook(
   if (updates.secret !== undefined) {
     // 入れ直しは暗号化して保存し、旧平文を消す。鍵がなければ例外にする。
     /*
-     * S (#939 機能26): 入れ替え前の合言葉は secret_previous_encrypted へ移し、
+     * 入れ替え前の合言葉は secret_previous_encrypted へ移し、
      * 入れ替え時刻と一緒に残す。受信側は入れ替えから24時間だけ前の
      * 合言葉の署名も受け付ける(相手側の切り替えに猶予を持たせる)。
      * 前の値が暗号文ならそのまま移す。旧平文だけ残る行は暗号化して移す。
      *
-     * R424: 同じ新値の再保存（応答消失の再試行）は重複操作として扱い、
+     * 同じ新値の再保存（応答消失の再試行）は重複操作として扱い、
      * 既存 previous と失効時刻を保つ。別値への変更だけが猶予を作り直す。
      */
     const before = await db
@@ -177,7 +177,7 @@ export async function updateIncomingWebhook(
 }
 
 /**
- * N-368 (#939): 削除は行を消さず印を付ける。届いた・送った記録と
+ * 削除は行を消さず印を付ける。届いた・送った記録と
  * 「いつ誰が止めたか」の履歴を残すため。返り値は印を付けられたか。
  * 既に印のある行や別アカウントの行は false。
  */

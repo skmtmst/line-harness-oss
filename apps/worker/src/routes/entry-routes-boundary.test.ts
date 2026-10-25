@@ -5,7 +5,7 @@ import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-// N-011: 流入経路一覧が選択中LINEアカウントと無関係に統括全体を返す。
+// 流入経路一覧が選択中LINEアカウントと無関係に統括全体を返す。
 // 実 route＋実SQLiteで確かめる。選択accountをAPIへ渡し、DBの行と共通境界で照合する。
 
 const { entryRoutes } = await import('./entry-routes.js');

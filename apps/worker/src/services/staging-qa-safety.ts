@@ -7,7 +7,7 @@ export const QA_STAGING_DATABASE = '00bd7aca-950b-4d67-b865-fd7427b9c43f';
 type OutboundContext = { env: WorkerBindings; stopped: boolean };
 const outbound = new AsyncLocalStorage<OutboundContext>();
 
-/** Multiple independent identity checks: changing a feature flag in production cannot open QA. */
+/** 本番でフラグだけ変えても QA が開かないよう、独立した複数の環境識別を検査する。 */
 export function qaEnvironment(env: WorkerBindings | undefined): boolean {
   return env?.DEPLOY_ENV === 'staging'
     && env.WORKER_NAME === 'nen-line-stg'
@@ -21,7 +21,7 @@ export function qaEnabled(env: WorkerBindings | undefined): boolean {
 }
 
 export function qaOutboundStopped(env: WorkerBindings | undefined): boolean {
-  // Enabling QA also forces the stop, even if its other flag was misconfigured.
+  // ほかの停止フラグが不正でも、QA を有効にしたら送信は強制停止する。
   return env?.DEPLOY_ENV === 'staging'
     && (env.STAGING_QA_OUTBOUND_DISABLED === 'true' || env.STAGING_QA_ENABLED === 'true');
 }
@@ -30,7 +30,7 @@ export function assertQaOutboundAllowed(): void {
   if (outbound.getStore()?.stopped) throw new Error('STAGING_QA_OUTBOUND_BLOCKED');
 }
 
-/** Only synthetic connections registered by this API can simulate a LINE send. */
+/** この API が登録した合成接続だけに、LINE 送信の模擬を許す。 */
 async function simulateLineSend(request: Request, env: WorkerBindings): Promise<Response | null> {
   const url = new URL(request.url);
   if (!qaEnabled(env) || url.origin !== 'https://api.line.me' || request.method !== 'POST'
@@ -68,7 +68,7 @@ let installedFetch: typeof fetch | undefined;
 function installFetchBoundary(): void {
   if (globalThis.fetch === installedFetch) return;
   const original = globalThis.fetch;
-  // Install once per runtime; the policy lives in async context, never a process-wide boolean.
+  // 方針をプロセス全体の真偽値にせず非同期コンテキストへ置き、実行環境ごとに一度だけ接続する。
   installedFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const context = outbound.getStore();
     if (!context?.stopped) return original(input, init);
@@ -87,7 +87,7 @@ export function withQaOutboundBoundary<T>(env: WorkerBindings | undefined, work:
   return outbound.run({ env, stopped }, work);
 }
 
-/** Service bindings bypass global fetch. Refuse their external side effects as well. */
+/** service binding は global fetch を通らないため、その外部副作用も拒む。 */
 export function qaSafeBindings(env: WorkerBindings): WorkerBindings;
 export function qaSafeBindings(env: undefined): undefined;
 export function qaSafeBindings(env: WorkerBindings | undefined): WorkerBindings | undefined {

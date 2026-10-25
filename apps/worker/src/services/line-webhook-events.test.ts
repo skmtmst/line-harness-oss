@@ -44,8 +44,7 @@ describe('LINE durable event receipts',()=>{
  });
 });
 
-// Event IDs are globally unique in the legacy receipt table. A foreign owner
-// must never change that receipt, even when its own workflow checkpoint exists.
+// イベント ID が全体で一意でも、別の所有者は受領票を変更できない。自身のチェックポイントがあっても許可しない。
 test('foreign event IDs never run handlers or overwrite another customer receipt', async () => {
   item.raw.prepare("INSERT INTO line_webhook_events(webhook_event_id,line_account_id,event_type,status) VALUES('shared','account-a','message','failed')").run();
   const handle=vi.fn();

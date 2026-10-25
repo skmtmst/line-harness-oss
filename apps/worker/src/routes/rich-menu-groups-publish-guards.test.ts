@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { authMiddleware } from '../middleware/auth.js';
 
 /**
- * #827 (N-155/N-158/N-159) の受け入れ試験。
+ *   の受け入れ試験。
  *
  * - 実SQLite: packages/db/bootstrap.sql からそのまま作る。手書きの写しにすると
  *   列ズレで route が別理由で落ち、ガードの有無と区別がつかなくなる。
@@ -30,7 +30,7 @@ const SCOPED_ADMIN_KEY = 'test-scoped-admin-key';
 function setupSqlite() {
   const sqlite = new Database(':memory:');
   sqlite.exec(BOOTSTRAP_SQL);
-  // Explicit Off fixture: these tests exercise resource authorization, not login MFA.
+  // 対象の権限検査まで到達させるため、MFA は明示的に無効の fixture とする。
   sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
   sqlite.prepare(
     `INSERT INTO line_accounts (id, name, channel_id, channel_access_token, channel_secret)
@@ -207,7 +207,7 @@ const VALID_AREA = {
 };
 
 // ---------------------------------------------------------------------------
-// N-158: 公開中定義の直接上書きを更新口で拒否する
+// 公開中定義の直接上書きを更新口で拒否する
 // ---------------------------------------------------------------------------
 
 describe('N-158: 公開中グループへの定義上書き拒否 (PATCH)', () => {
@@ -325,7 +325,7 @@ describe('N-158: 公開中グループへの画像差し替え拒否', () => {
 });
 
 // ---------------------------------------------------------------------------
-// N-159: 到達可能な行き先が1つも無い定義の公開を拒否する
+// 到達可能な行き先が1つも無い定義の公開を拒否する
 // ---------------------------------------------------------------------------
 
 describe('N-159: 有効な行き先ゼロの公開拒否', () => {
@@ -402,7 +402,7 @@ describe('N-159: 有効な行き先ゼロの公開拒否', () => {
     });
     insertArea('p2', 'a2', { label: 'サイトを開く' });
 
-    // O: 実機で見た確認が無いと公開できない門番。先に押してから公開する。
+    // 実機で見た確認が無いと公開できない門番。先に押してから公開する。
     const app = setupApp(db, r2);
     const confirm = authed('/api/rich-menu-groups/g1/device-confirm', { method: 'POST' });
     const confirmRes = await app.request(confirm.path, confirm.init);
@@ -421,7 +421,7 @@ describe('N-159: 有効な行き先ゼロの公開拒否', () => {
 });
 
 // ---------------------------------------------------------------------------
-// N-155: 読み上げラベル必須・20文字以下をサーバー側で保証する
+// 読み上げラベル必須・20文字以下をサーバー側で保証する
 // ---------------------------------------------------------------------------
 
 describe('N-155: 読み上げラベルの必須化と20字上限', () => {
@@ -482,7 +482,7 @@ describe('N-155: 読み上げラベルの必須化と20字上限', () => {
     insertPage('g1', 'p1', 0, true);
     insertArea('p1', 'a1', { label: 'あ'.repeat(20) });
 
-    // O: 実機で見た確認を先に済ませる。
+    // 実機で見た確認を先に済ませる。
     const app = setupApp(db, r2);
     const confirm = authed('/api/rich-menu-groups/g1/device-confirm', { method: 'POST' });
     expect((await app.request(confirm.path, confirm.init)).status).toBe(200);

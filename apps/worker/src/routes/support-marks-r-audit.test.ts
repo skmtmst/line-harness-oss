@@ -7,11 +7,11 @@ import { authMiddleware } from '../middleware/auth.js';
 import { friendAttributes } from './friend-attributes.js';
 
 /*
- * R540〜R544（対応マーク・自動変更ルール）の最新枝での照合。
+ * 〜（対応マーク・自動変更ルール）の最新枝での照合。
  *
- * 監査は古いSHA（918b8cdb）で行われた。D028〜D035・#1032 で直ったものは
+ * 監査は古いSHA（918b8cdb）で行われた。D028〜D035・ で直ったものは
  * コードを変えず「最新では再現しない」ことをここで証拠立てる。
- * R540（画面の切替中の古い一覧）は画面側の試験で見る。
+ * （画面の切替中の古い一覧）は画面側の試験で見る。
  *
  * 実ルート＋実認証＋メモリSQLite＋失敗注入で確かめる。
  */
@@ -27,7 +27,7 @@ const OWNER_KEY = 'r540-owner';
 function setupSqlite() {
   const sqlite = new Database(':memory:');
   sqlite.exec(BOOTSTRAP_SQL);
-  // Explicit Off fixture: these tests exercise resource authorization, not login MFA.
+  // 対象の権限検査まで到達させるため、MFA は明示的に無効の fixture とする。
   sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
   sqlite.prepare(
     `INSERT INTO line_accounts (id, name, channel_id, channel_access_token, channel_secret)
@@ -151,7 +151,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
 });
 
-// R541: 停止した対応マーク自動変更ルールが並行編集で再び有効になる。
+// 停止した対応マーク自動変更ルールが並行編集で再び有効になる。
 // 版照合と保管後の読み直しで直し済み。最新では古い版の編集は止まるため再現しない。
 describe('R541 停止後の古い版の編集は有効に戻さない', () => {
   it('停止（保管）後の古い版の編集は404で、停止のまま残る', async () => {
@@ -189,7 +189,7 @@ describe('R541 停止後の古い版の編集は有効に戻さない', () => {
   });
 });
 
-// R542: 既定マーク変更の途中失敗で既定が0件になる。
+// 既定マーク変更の途中失敗で既定が0件になる。
 // D031 で順序を変え済み（新しい既定を先に確定し、古い既定は後に外す）。
 // 最新では既定が0件にならないため再現しない。
 describe('R542 既定の付け替え失敗でも既定は0件にならない', () => {
@@ -213,7 +213,7 @@ describe('R542 既定の付け替え失敗でも既定は0件にならない', (
   });
 });
 
-// R543: 自動変更ルールを同一入力で再送すると二つ登録される。
+// 自動変更ルールを同一入力で再送すると二つ登録される。
 // D034 で要求キーが必須になり、同じキー・同じ内容は保存済みを返す。
 // 最新では二重に残らないため再現しない。
 describe('R543 同一入力の再送でルールは二重に残らない', () => {
@@ -240,7 +240,7 @@ describe('R543 同一入力の再送でルールは二重に残らない', () =>
   });
 });
 
-// R544: 対応マーク編集APIが空名と範囲外の並び順を保存する。
+// 対応マーク編集APIが空名と範囲外の並び順を保存する。
 // D032 で作成と同じ検査を編集にも入れ済み。最新では400で止めるため再現しない。
 describe('R544 編集の空名・範囲外の順序は400で止める', () => {
   it('空名・-1・10001は400、境界の0と10000は通す', async () => {

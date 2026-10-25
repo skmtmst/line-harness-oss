@@ -86,7 +86,7 @@ export interface InboxSavedViewConditions {
   assignees: string[];
   unread: 'all' | 'mine';
   /**
-   * 一覧上部の「すべて／要返信／期限超過」。N-020 で追加。
+   * 一覧上部の「すべて／要返信／期限超過」。
    * 持たない古い行は due から復元する（overdue → 'overdue'）。
    */
   quickFilter: (typeof INBOX_SAVED_VIEW_QUICK_FILTERS)[number];
@@ -153,10 +153,10 @@ export function validateSearchConditions(
       }
       /*
         実行側（saved-search-filter のSQL変換）が解釈できない op を
-        ここで断る。以前は「op が空でない」だけを見ていたため、
+        ここで断る。「op が空でない」だけを見ると、
         `field` + `gte` のような保存は通るが検索で拒否される条件が
-        作れた。保存した本人はもう画面を離れているので、形の検査で
-        実行可否まで一致させる（ATTR-13）。
+        作れてしまう。保存した本人はもう画面を離れているので、形の検査で
+        実行可否まで一致させる。
       */
       if (!isSavedSearchOpAllowed(String(c.kind), c.op)) {
         return {
@@ -165,7 +165,7 @@ export function validateSearchConditions(
         };
       }
       /*
-       * R183: 開始日より後の終了日（逆転期間）は0人になる設定ミス。
+       * 開始日より後の終了日（逆転期間）は0人になる設定ミス。
        * 0人のまま保存・再利用されると「本当に該当者なし」と区別が
        * 付かないため、保存の時点で断る。片側だけの期間は許容する。
        * 日付は YYYY-MM-DD のため文字列比較で前後が分かる。
@@ -192,7 +192,7 @@ export function validateSearchConditions(
 
   /*
    * 「表示中のみ」「非表示のみ」はそれだけで意味のある絞り込みなので、
-   * all/any が空でも受け取る（#1010 FRIEND-01）。'all' は絞り込み無しと
+   * all/any が空でも受け取る。'all' は絞り込み無しと
    * 同じなので、それだけの条件はこれまで通り弾く。
    */
   if ((out.all?.length ?? 0) === 0 && (out.any?.length ?? 0) === 0
@@ -346,7 +346,7 @@ export function validateInboxSavedViewConditions(
     return { ok: false, error: '期限条件が正しくありません' };
   }
   /*
-    quickFilter は N-020 で追加した軸。持たない古い行は due から復元する。
+    quickFilter を持たない古い行は due から復元する。
     'overdue' は due='overdue' と同じ条件なので、保存時は両方を揃えて書く。
   */
   const quickFilter = input.quickFilter === undefined
@@ -422,7 +422,7 @@ export async function getSavedSearchById(
 
 /**
  * 画面から届いた「動かせる検索だけの新しい順」を、届いていない行の位置を
- * 保ったまま全体の並びへ戻して、1回のバッチで書く（#1014 ATTR-03）。
+ * 保ったまま全体の並びへ戻して、1回のバッチで書く。
  *
  * 動かせる範囲は PATCH と同じ：選択中アカウントの検索で、本人が作った
  * もの（owner/admin は全部）。行ごとの PATCH だと、他人が作った検索への
@@ -763,7 +763,7 @@ export async function deleteSavedSearch(
   access: SavedSearchAccess,
 ): Promise<boolean> {
   /*
-   * R189: 一覧での呼び出し履歴（saved_search_usage_events）は閲覧の記録で、
+   * 一覧での呼び出し履歴（saved_search_usage_events）は閲覧の記録で、
    * 生きている使用先ではない。RESTRICT の外部キーが残っていると、一度でも
    * 一覧で開いた検索が「使用中」として消せなくなる。書き込むのは一覧表示
    * だけなので（recordSavedSearchUsage の呼び出しは friends 一覧のみ）、

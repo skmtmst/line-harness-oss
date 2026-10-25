@@ -2,7 +2,7 @@ import type { IndustryStyle, StyleBooking } from '@line-crm/shared';
 import { eligible, instant, civilDate } from './style-analytics-core.js';
 import { personMetrics } from './style-person-metrics.js';
 
-/** Uses only account-scoped rows already filtered by staff/store/menu permissions. */
+/** スタッフ・店舗・メニューの権限で絞り済みの、アカウント内の行だけを使う。 */
 export async function styleDashboardSidebar(
   db: D1Database,
   account: string,
@@ -67,7 +67,7 @@ export async function styleDashboardSidebar(
         });
     }
   }
-  // Waitlist has no assigned staff: omit it under a staff filter instead of leaking other staff's work.
+  // 待機者は担当未定なので、担当者で絞る場合は除き、他の担当の情報を漏らさない。
   const waitlist =
     style === 'restaurant' && !staffId
       ? (

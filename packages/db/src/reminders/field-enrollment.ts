@@ -176,7 +176,7 @@ export async function enrollFriendsInReminderOnce(
   const versionSteps = await getReminderVersionSteps(db, versionId);
   let enrolled = 0;
   const now = jstNow();
-  // R346: まとめ登録も1件ずつと同じ版で送る。この束が使うテンプレートの
+  // まとめ登録も1件ずつと同じ版で送る。この束が使うテンプレートの
   // 公開版を1度だけ写し、新しい行に付ける（ある行は触らない）。
   const bulkTemplateSnapshot = await snapshotReminderTemplateVersions(
     db,

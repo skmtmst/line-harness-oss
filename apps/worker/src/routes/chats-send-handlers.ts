@@ -79,7 +79,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
       catch(e) { if(e instanceof GapError) return c.json({success:false,error:e.code},e.status); throw e; }
     }
 
-    // N-026: 差し込みは一斉配信と同じ解決器で置き換える。解決しきれない
+    // 差し込みは一斉配信と同じ解決器で置き換える。解決しきれない
     // `{{…}}` が残るなら、LINE呼出し0・履歴書込み0のまま構造化して拒否する。
     // lease・冪等予約より前に置くので、拒否時はDBへ何も書かない。
     const rendered = await renderChatMessageContent(

@@ -45,7 +45,7 @@ import {
   type DefaultRestoreOutcome,
 } from '../../lib/rich-menu-publisher.js';
 
-// E-08 (#621): 保存済み公開予約を時刻到来時に実行する。
+// 保存済み公開予約を時刻到来時に実行する。
 // 読むcronが無かったため時刻を過ぎても公開されなかった問題を直す。
 // 二重実行は claim の UPDATE 条件 (status + account_id) で防ぐ。
 // staleになったpublishing/restoringは所有runのlease期限で回収し永久停止させない。

@@ -16,7 +16,7 @@ export async function reportLedgerAvailability(db: D1Database): Promise<ReportLe
 }
 
 /**
- * R284/R285: 取消の正本は「成果単位」の判定にする。
+ * 取消の正本は「成果単位」の判定にする。
  * 報酬の取消調整が付いた成果、または取消台帳の最新が 'reverse' の成果を
  * 取消扱いにする(再計上 = 最新が 'restore' は数え直しに戻る)。
  * 判定はイベント一覧と同じ定義で、期間の区切りは成果の発生日(ce.created_at)、
@@ -68,7 +68,7 @@ export async function reportRows(
 }
 
 /**
- * N-269: 旧来の地点別集計(startDate/endDate→地点別行)の薄い互換口。
+ * 旧来の地点別集計(startDate/endDate→地点別行)の薄い互換口。
  *
  * 集計は新レポートと同じ `reportRows` を使うため、暦日の解釈
  * (先頭10文字のJST暦日)とスナップショット固定は新レポートと一致する。
@@ -130,9 +130,9 @@ export async function getConversionDefinitionReport(
   };
   const previousById = new Map(previous.map((row) => [row.conversion_point_id, row]));
   const account = accountWhere('cp.', input.scope, input.lineAccountId);
-  // N-265: 経路別の母数。ref_tracking に残る「その経路を踏んだ友だち数」を
+  // 経路別の母数。ref_tracking に残る「その経路を踏んだ友だち数」を
   // 分母にする。created_at は JST ISO(+09:00)と datetime 書式が混在するため、
-  // 保存された暦日の先頭10文字で日単位に比較する(N-269 と同じ扱い)。
+  // 保存された暦日の先頭10文字で日単位に比較する。
   const friendAccount = accountWhere('f.', input.scope, input.lineAccountId);
   const [dailyRows, routeRows, audienceRows] = await Promise.all([
     db.prepare(`SELECT substr(ce.created_at, 1, 10) AS day, cp.id AS conversion_point_id,
@@ -218,7 +218,7 @@ export async function getConversionDefinitionReport(
     range: input.range,
     previousRange: input.previousRange,
     kpis: {
-      // R284: recorded は取消前の総数。純数(net)とは別に持つ。
+      // recorded は取消前の総数。純数(net)とは別に持つ。
       recordedCount: totals.count,
       recordedValue: totals.value,
       reversedCount: totals.cancelledCount || null,
@@ -275,7 +275,7 @@ export async function listConversionDefinitionsForExport(
 ): Promise<{ items: ConversionDefinitionListItem[]; truncated: boolean }> {
   const where = definitionWhere(input);
   const cte = metricsCte(input.range, where);
-  // N-267: 上限そのもの(10000)ではなく +1 件まで読み、切れたことを確実に
+  // 上限そのもの(10000)ではなく +1 件まで読み、切れたことを確実に
   // 検出して呼び出し側へ返す。黙って切るとCSVが未完の一覧に見える。
   const rows = await db.prepare(`${cte.sql}
     ${selectDefinitionsSql()}

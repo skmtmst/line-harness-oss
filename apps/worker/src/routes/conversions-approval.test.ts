@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Route-level test for the approval queue endpoints:
-//   GET   /api/conversions/approvals?status=…
-//   PATCH /api/conversions/events/:id/approval
-// The db layer is mocked (real SQL is covered in packages/db/test). Here we
-// assert status validation, the injected IDENTITY_KEY_SQL wiring, duplicateFlag
-// pass-through, and the 404 for missing / non-attributed events.
+// 実 SQL は DB 側で検証し、ここでは承認状態の検証、IDENTITY_KEY_SQL の接続、重複フラグ、不存在・帰属なしの404を確かめる。
 const dbMocks = {
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
@@ -18,7 +13,7 @@ const dbMocks = {
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // conversions route deps
+
   getConversionPoints: vi.fn(),
   getConversionPointById: vi.fn(),
   createConversionPoint: vi.fn(),
@@ -33,7 +28,7 @@ const dbMocks = {
   markApprovalNotified: vi.fn(),
   releaseApprovalNotification: vi.fn(),
   getConversionApprovalNotifyInfo: vi.fn(),
-  // N-212 の案件動作はここでは対象外 — 案件なしとして通す。
+  //  の案件動作はここでは対象外 — 案件なしとして通す。
   getConversionOfferActionPlan: vi.fn().mockResolvedValue(null),
   syncAffiliateConversionMileage: vi.fn().mockResolvedValue(undefined),
   listConversionDefinitions: vi.fn(),
@@ -46,8 +41,7 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-// Mock the affiliate notifier so the approval route's push is observable
-// without touching LINE / the DB resolution chain.
+// LINE や DB の解決経路を呼ばず通知を観測するため、参加者向け通知だけを差し替える。
 const notifyAffiliateApproval = vi.fn().mockResolvedValue(undefined);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateApproval }));
 
@@ -92,7 +86,7 @@ beforeEach(() => {
     { id: 'account-1', tenant_id: '00000000-0000-4000-8000-000000000001' },
   ]);
   dbMocks.syncAffiliateConversionMileage.mockResolvedValue(undefined);
-  // R354: 承認世代の通知は未送信として扱い、初回承認の通知を通す。
+  // 承認世代の通知は未送信として扱い、初回承認の通知を通す。
   dbMocks.getApprovalNotificationState.mockResolvedValue({
     send: true,
     approvedAt: '2026-09-01T00:00:00.000+09:00',
@@ -126,7 +120,7 @@ describe('GET /api/conversions/approvals', () => {
 
     const callArgs = dbMocks.getConversionApprovalQueue.mock.calls[0][1];
     expect(callArgs.status).toBe('pending');
-    // The route injects the identity-key SQL fragment (referencing friends.*).
+    // friends を参照する本人識別の SQL が渡されることを確かめる。
     expect(String(callArgs.identityKeySql)).toContain('friends');
   });
 
@@ -291,7 +285,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
 
   it('returns 200 without calling notifyAffiliate when status is already_set (double-click guard)', async () => {
     dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'already_set', currentStatus: 'approved' });
-    // R354: 同じ承認世代の通知は送り済みなので送らない。
+    // 同じ承認世代の通知は送り済みなので送らない。
     dbMocks.getApprovalNotificationState.mockResolvedValue({
       send: false,
       approvedAt: '2026-09-01T00:00:00.000+09:00',
@@ -308,7 +302,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       'ev-dup',
       'approved',
     );
-    // Critical: notify must NOT be called for an idempotent no-op
+    // 同じ状態への再クリックでは通知しない。
     expect(notifyAffiliateApproval).not.toHaveBeenCalled();
     expect(dbMocks.getConversionApprovalNotifyInfo).not.toHaveBeenCalled();
   });

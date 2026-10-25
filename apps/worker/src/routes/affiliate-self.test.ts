@@ -1,19 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock @line-crm/db. index.ts pulls several helpers eagerly at module load, so
-// every referenced export must exist as a stub. This suite drives the
-// self-serve affiliate endpoints, so the affiliate CRUD helpers are backed by a
-// tiny in-memory store to exercise idempotency / isolation / the 20-link cap
-// without a real D1 binding.
+// 実 D1 なしで冪等性・分離・20件上限を試すため、アフィリエイトの保存だけを小さなメモリストアへ差し替える。入口が即時 import する公開名も用意する。
 const dbMocks = {
-  // eager module-load deps (mirror affiliate-links-redirect.test.ts)
+
   listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000', tenant_status: 'active', is_active: 1, archived_at: null },
   ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // self-serve affiliate helpers
+
   getFriendByLineUserIdForAccount: vi.fn(),
   getAffiliateByFriendId: vi.fn(),
   createAffiliate: vi.fn(),
@@ -21,7 +17,7 @@ const dbMocks = {
   listAffiliateLinks: vi.fn(),
   countAffiliateLinks: vi.fn(),
   getAffiliateLinkStats: vi.fn(),
-  // offer-name enrichment on link responses (loadOfferNames)
+  // リンク応答へ案件名を付ける処理も差し替える。
   listAffiliateOffers: vi.fn().mockResolvedValue([]),
   enrollAffiliateInOffer: vi.fn(),
   getMileageSummaryForFriend: vi.fn(),
@@ -40,7 +36,7 @@ const dbMocks = {
     constructor(public code: string, message: string, public status = 400) { super(message); }
   },
   generateRefSlug: vi.fn(() => 'slug00'),
-  // account-settings helpers (used by resolveLinkBaseUrl via @line-crm/db)
+  // URL 解決が使うアカウント設定の読込を差し替える。
   getLinkBaseUrl: vi.fn().mockResolvedValue(null),
 };
 vi.mock('@line-crm/db', () => dbMocks);
@@ -48,14 +44,12 @@ vi.mock('@line-crm/db', () => dbMocks);
 const deliveryMocks = { deliverMileageReward: vi.fn() };
 vi.mock('../features/mileage/mileage-reward-delivery.js', () => deliveryMocks);
 
-// Import after the mock so index.ts binds the mocked helpers.
+// 差替済みのヘルパを入口へ接続するため、モック登録後に読み込む。
 const worker = (await import('../index.js')).default;
 
 const DB = {} as D1Database;
 
-// The deployment's LINE Login channel. resolveFriendFromLineToken now requires
-// the verify response's client_id to be in the allowed set (env default + DB
-// account login channels), so tokens minted by any other channel are rejected.
+// 別アプリのトークンでなりすまさないよう、verify の client_id が環境の既定または DB のログインチャネルに属することを検証する。
 const LOGIN_CHANNEL_ID = '2000000000';
 
 const imagesGet = vi.fn();
@@ -86,10 +80,7 @@ function call(path: string, init?: RequestInit) {
   );
 }
 
-// ── LINE API fetch mock ───────────────────────────────────────────────────────
-// A valid access token maps to a LINE userId. The verify endpoint 200s for any
-// known token; the profile endpoint returns the mapped userId. Unknown tokens
-// 401 at the verify step so resolveFriendFromLineToken returns null.
+// 既知のトークンは LINE 利用者 ID へ対応させ、未知のトークンは verify で401とする。トークン検証とプロフィール解決の境界を試す。
 const TOKEN_TO_USER: Record<string, string> = {
   'tok-alice': 'U-alice',
   'tok-bob': 'U-bob',
@@ -126,7 +117,7 @@ function installLineFetchMock(clientId: string = LOGIN_CHANNEL_ID) {
   );
 }
 
-// ── in-memory affiliate store backing the db mocks ────────────────────────────
+
 type AffRow = { id: string; name: string; code: string; commission_rate: number; is_active: number; created_at: string; friend_id: string };
 type LinkRow = { id: string; affiliate_id: string; ref_code: string; label: string | null; line_account_id: string | null; is_active: number; created_at: string; click_count: number };
 
@@ -146,8 +137,7 @@ function installStore() {
   statsByAffiliate = new Map();
   slugCounter = 0;
 
-  // Per-link stats: empty by default (fresh links → 0). Tests seed real values
-  // via statsByAffiliate to assert they flow through serializeLink.
+  // 新規リンクの集計は既定0とし、値を設定した試験では serializeLink が実値を返すことを確かめる。
   dbMocks.getAffiliateLinkStats.mockImplementation(async (_db: unknown, affiliateId: string) => {
     return statsByAffiliate.get(affiliateId) ?? new Map();
   });
@@ -215,7 +205,7 @@ beforeEach(() => {
   dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
     { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID, tenant_status: 'active', is_active: 1, archived_at: null },
   ]);
-  // No offers by default → serializeLink emits offerId/offerName = null.
+  // 案件がなければ offerId/offerName は null とする。
   dbMocks.listAffiliateOffers.mockResolvedValue([]);
   dbMocks.getMileageSummaryForFriend.mockResolvedValue({
     programId: 'default',
@@ -292,10 +282,10 @@ describe('POST /api/liff/affiliate/register — idempotency', () => {
       'U-alice',
       'account-main',
     );
-    // Registration auto-issues exactly one link.
+    // 登録時の初期リンクは1本だけ発行する。
     expect(body1.links).toHaveLength(1);
 
-    // Second call must NOT create a second affiliate — same id returned.
+    // 再送で別の参加者を作らず、同じ ID を返す。
     const res2 = await call('/api/liff/affiliate/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -304,7 +294,7 @@ describe('POST /api/liff/affiliate/register — idempotency', () => {
     expect(res2.status).toBe(200);
     const body2 = (await res2.json()) as { affiliate: { id: string } };
     expect(body2.affiliate.id).toBe(body1.affiliate.id);
-    // createAffiliate called exactly once across both registrations.
+    // 2回の登録でも createAffiliate は1回だけ呼ぶ。
     expect(dbMocks.createAffiliate).toHaveBeenCalledTimes(1);
   });
 });
@@ -430,7 +420,7 @@ describe('LIFF mileage rewards — verified account and real limits', () => {
 
 describe('GET /api/liff/affiliate/me — cross-affiliate isolation', () => {
   it('(b) a token only ever surfaces its own affiliate data', async () => {
-    // Register alice + bob.
+
     await call('/api/liff/affiliate/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -450,7 +440,7 @@ describe('GET /api/liff/affiliate/me — cross-affiliate isolation', () => {
     const bob = (await resBob.json()) as { affiliate: { name: string } };
     expect(bob.affiliate.name).toBe('Bob');
 
-    // Alice's payload must never leak Bob's affiliate id (no shared identity).
+    // 本人の応答に別の参加者の ID を混ぜない。
     expect(JSON.stringify(alice)).not.toContain('friend-bob');
     expect(JSON.stringify(bob)).not.toContain('friend-alice');
   });
@@ -468,8 +458,7 @@ describe('GET /api/liff/affiliate/me — cross-affiliate isolation', () => {
     const affId = regBody.affiliate.id;
     const refCode = regBody.links[0].refCode;
 
-    // Seed real per-link stats for this affiliate's link; getAffiliateLinkStats
-    // (mocked) surfaces them, and serializeLink must emit the real values.
+    // 保存したリンク別集計が、応答まで正しい値で届くことを確かめる。
     statsByAffiliate.set(affId, new Map([[refCode, { friendAdds: 3, conversions: 2, conversionsPending: 1, conversionsApproved: 1 }]]));
 
     const res = await call('/api/liff/affiliate/me?lineAccessToken=tok-alice');
@@ -481,7 +470,7 @@ describe('GET /api/liff/affiliate/me — cross-affiliate isolation', () => {
     expect(typeof link.refCode).toBe('string');
     expect(link.url).toBe(`https://worker.example.com/r/${link.refCode}`);
     expect(link.clickCount).toBe(0);
-    // Real per-link aggregates now flow through (no longer placeholders).
+    // リンクの集計は仮値でなく取得した値を返す。
     expect(link.friendAdds).toBe(3);
     expect(link.conversions).toBe(2);
     expect(link.conversionsPending).toBe(1);
@@ -494,7 +483,7 @@ describe('GET /api/liff/affiliate/me — cross-affiliate isolation', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
     });
-    // No statsByAffiliate seeding → getAffiliateLinkStats returns empty map.
+    // 集計を設定しないリンクでは、取得結果は空の対応表になる。
     const res = await call('/api/liff/affiliate/me?lineAccessToken=tok-alice');
     const body = (await res.json()) as {
       links: Array<{ friendAdds: number; conversions: number }>;
@@ -511,7 +500,7 @@ describe('POST /api/liff/affiliate/links — 20-link cap', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
     });
-    // Registration already issued 1 link → 19 more brings us to 20 exactly.
+    // 初期の1本と追加19本で、上限20本ちょうどになる。
     for (let i = 0; i < 19; i++) {
       const r = await call('/api/liff/affiliate/links', {
         method: 'POST',
@@ -520,7 +509,7 @@ describe('POST /api/liff/affiliate/links — 20-link cap', () => {
       });
       expect(r.status).toBe(200);
     }
-    // 20 links now exist. The 21st must be refused.
+    // 20本まで作り、21本目が拒まれることを確かめる。
     const over = await call('/api/liff/affiliate/links', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -549,8 +538,7 @@ describe('LINE token verification', () => {
     });
     expect(links.status).toBe(401);
 
-    // A friend that never added the bot (verified but no friend row) → 404,
-    // and crucially never creates an affiliate.
+    // トークンが有効でも友だち行がなければ404とし、参加者も作らない。
     dbMocks.getFriendByLineUserIdForAccount.mockImplementationOnce(async () => null);
     const ghost = await call('/api/liff/affiliate/register', {
       method: 'POST',
@@ -561,9 +549,7 @@ describe('LINE token verification', () => {
   });
 
   it('(d2) a token minted by a foreign LINE Login channel is rejected with 401', async () => {
-    // verify 200s (token is real) but reports a client_id this deployment does
-    // not own. Without the client_id gate, its lineUserId would resolve to a
-    // local friend and let an unrelated app impersonate an affiliate.
+    // トークンが実在しても、別のログインチャネルならなりすましを防ぐため拒む。
     installLineFetchMock('9999999999');
 
     const reg = await call('/api/liff/affiliate/register', {
@@ -572,7 +558,7 @@ describe('LINE token verification', () => {
       body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
     });
     expect(reg.status).toBe(401);
-    // Crucially, no affiliate is ever created from a foreign-channel token.
+    // 別チャネルのトークンでは参加者を作らない。
     expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
 
     const me = await call('/api/liff/affiliate/me?lineAccessToken=tok-alice');
@@ -580,8 +566,7 @@ describe('LINE token verification', () => {
   });
 
   it('(d3) accepts a token whose client_id matches a DB account login channel', async () => {
-    // Env default channel does NOT match; a DB line_account's login_channel_id
-    // does. Mirrors liff.ts allowing multi-account login channels.
+    // 環境の既定と違っても、所属アカウントに保存したログインチャネルは許可する。
     installLineFetchMock('3000000000');
     dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
       {
@@ -623,10 +608,7 @@ describe('LINE token verification', () => {
 
 describe('POST /api/liff/affiliate/register — concurrent double-register', () => {
   it('(e) a UNIQUE(friend_id) violation on INSERT recovers the existing affiliate', async () => {
-    // Simulate the race: getAffiliateByFriendId returns null on the pre-check
-    // (first call), createAffiliate throws the UNIQUE violation the losing
-    // request would hit, and the post-catch getAffiliateByFriendId returns the
-    // row the winning request already committed. Register must stay idempotent.
+    // 事前確認後に INSERT が一意制約で競合する形を再現し、負けた要求も勝者の保存行を返して冪等になることを確かめる。
     const winner: AffRow = {
       id: 'aff-winner',
       name: 'Alice',
@@ -638,13 +620,13 @@ describe('POST /api/liff/affiliate/register — concurrent double-register', () 
     };
     linksByAffiliate.set(winner.id, []);
 
-    // Pre-check: not found yet (this request thinks it's first).
+    // 事前確認では未登録に見える状態を作る。
     dbMocks.getAffiliateByFriendId.mockResolvedValueOnce(null);
-    // INSERT races and loses.
+    // 同時 INSERT に負けた状態を作る。
     dbMocks.createAffiliate.mockRejectedValueOnce(
       new Error('D1_ERROR: UNIQUE constraint failed: affiliates.friend_id'),
     );
-    // Post-catch recovery: the winner's committed row is now visible.
+    // 例外後の再取得では、勝者が確定した行を返す。
     dbMocks.getAffiliateByFriendId.mockResolvedValueOnce(winner);
 
     const res = await call('/api/liff/affiliate/register', {
@@ -655,7 +637,7 @@ describe('POST /api/liff/affiliate/register — concurrent double-register', () 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { affiliate: { id: string } };
     expect(body.affiliate.id).toBe('aff-winner');
-    // The loser must NOT auto-issue a second first-link.
+    // 競合に負けた要求は初期リンクを二重発行しない。
     expect(dbMocks.createAffiliateLink).not.toHaveBeenCalled();
   });
 });

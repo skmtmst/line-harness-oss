@@ -4,12 +4,7 @@ import { getTemplateById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-/**
- * 公開の原子性と同時実行(#645・独立審査P1/P2)。
- * 版の更新と確認キーの記録は1つの原子操作なので、D1の途中障害でも
- * 「版だけ進む」ことはない。同時publishは1つだけ通り、負けは409。
- * 同じ確認キーの同時再試行は、版を進めず両方200で返す。
- */
+/** 版と確認キーを同じ原子操作で保存し、途中障害でも版だけを進めない。同時公開は1件だけ通し、同じキーの再試行は版を増やさず同じ成功を返す。 */
 
 const accountAccess = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),

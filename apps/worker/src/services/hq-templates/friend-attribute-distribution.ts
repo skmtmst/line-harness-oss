@@ -12,8 +12,7 @@ type Selection={accountId:string;sourceId:string;mode:HqFriendAttributeMode};
 type Item={sourceId:string;itemKind:string;name:string;targetId:string|null;expectedRevision:string|null;duplicate:boolean;allowedModes:HqFriendAttributeMode[];reason?:string|null;code?:string|null};
 type ScopedRow={field_key?:string;type?:string;options_json?:string|null;default_value?:string|null;source?:string;ec_field_path?:string|null;ec_is_master?:number;is_personal?:number;is_starred?:number;display_order?:number;folder_id?:string|null;parent_id?:string|null;status?:string;version?:number;updated_at:string;archived_at?:string|null} & {id:string;name:string;line_account_id:string|null};
 type State={fields:ScopedRow[];marks:ScopedRow[];folders:ScopedRow[];keys:{field_key:string}[]};
-// Include complete definitions and global key occupancy, never customer values.
-// The identical projection is fenced inside the atomic write batch.
+// 顧客の値は含めず、定義全体と共通キーの使用状況だけを照合する。書込 batch 内でも同じ状態を検査する。
 const SNAPSHOT_SQL=`SELECT json_object(
  'fields',json((SELECT json_group_array(json_object('row',json(j))) FROM (
   SELECT json_object('id',f.id,'name',f.name,'field_key',f.field_key,'type',COALESCE(f.type_v8,f.type_v6,f.type),'options_json',f.options_json,'default_value',f.default_value,'source',f.source,'ec_field_path',f.ec_field_path,'ec_is_master',f.ec_is_master,'is_personal',f.is_personal,'is_starred',f.is_starred,'display_order',f.display_order,'folder_id',f.folder_id,'status',f.status,'version',f.version,'updated_at',f.updated_at,'line_account_id',s.line_account_id) j
@@ -106,7 +105,7 @@ function plan(type:HqFriendAttributeType,definition:HqFriendFieldDefinition|HqMa
    statements.push(stmt('UPDATE support_marks SET display_locations_json=? WHERE id=?',[JSON.stringify(m.displayLocations??['inbox','friends','friend_detail']),id]));
   }else{
    const field=def.field,folderId=field.folderId?ids.get(`folder:${field.folderId}`)??null:null;
-   // Stable IDs of existing options survive relabeling and removal (archived).
+   // 表示名変更や保管でも、既存選択肢の ID を保つ。
    const existing=mode==='overwrite'?s.fields.find(r=>r.id===id):undefined;
    const oldOptions:HqFriendFieldOption[]=((existing?.options_json?JSON.parse(existing.options_json):[]) as (string|HqFriendFieldOption)[]).map((v,i:number)=>typeof v==='string'?{id:`legacy_${i+1}`,label:v,color:null,status:'active' as const,displayOrder:i}:v);
    const options=(field.options??[]).map((v,i)=>typeof v==='string'?{id:`option_${i+1}`,label:v}:v);
@@ -160,7 +159,7 @@ export async function distributeFriendAttribute(db:D1Database,auth:HqTemplateAut
   const r=stored.find(r=>r.target_account_id===s.accountId&&r.source_id===s.sourceId),p=preflights.find(p=>p.target_account_id===s.accountId);
   if(!r||!p||!['create','overwrite','alias','skip'].includes(s.mode))throw new HqTemplateError('SELECTION_REQUIRED',409);
   if(p.status==='consumed'){if(r.mode!==s.mode)throw new HqTemplateError('SELECTION_CHANGED',409);continue;}
-  // Validate against the original duplicate identity even when snapshot is stale.
+  // 写しが古い場合も、最初の重複対象の識別と照合する。
   if(s.mode==='skip'&&(!r.target_id||r.item_kind!==type))throw new HqTemplateError('SELECTION_REQUIRED',409);
   if(!r.target_id&&r.mode==='alias'&&s.mode!=='alias')throw new HqTemplateError('SELECTION_REQUIRED',409);
   if(r.target_id&&s.mode==='create')throw new HqTemplateError('SELECTION_REQUIRED',409);
@@ -187,7 +186,7 @@ export async function distributeFriendAttribute(db:D1Database,auth:HqTemplateAut
    if(apply)statements.push(stmt("SELECT json(CASE WHEN EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')) THEN '{}' ELSE 'VERSION_CONFLICT' END)",[p.id]));
    for(const s of selected){
     const r=stored.find(r=>r.preflight_id===p.id&&r.source_id===s.sourceId)!,resolved=commit?.resolved.find(r=>r.item.sourceId===s.sourceId);
-    // A failed alias still needs a non-null ledger name under the legacy CHECK.
+    // 既存の CHECK 制約を守るため、別名の失敗時も台帳名は NULL にしない。
     statements.push(stmt('UPDATE hq_template_preflight_resolutions SET resolution_mode=?,friend_attribute_mode=?,target_id=COALESCE(?,target_id),alias_name=? WHERE preflight_id=? AND tenant_id=? AND source_id=?',[s.mode==='skip'?'overwrite':s.mode,s.mode==='skip'?'skip':null,apply?resolved?.targetId??null:r.target_id,s.mode==='alias'?resolved?.aliasName??'pending':null,p.id,auth.tenantId,s.sourceId]));
    }
    statements.push(stmt("INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status,error_code,finished_at) VALUES(?,?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[runId,auth.tenantId,id,p.template_version_id,p.target_account_id,p.id,runId,p.snapshot_token,finalStatus,finalError]));
@@ -202,7 +201,7 @@ export async function distributeFriendAttribute(db:D1Database,auth:HqTemplateAut
   try{await persist(status,errorCode,status==='succeeded')}
   catch{
    if(await existing())continue;
-   // Recheck ownership before writing a failure ledger for this store.
+   // 失敗台帳を残す前にも、その店舗の所有権を再確認する。
    await requireTargetAccounts(db,auth,[p.target_account_id]);
    const conflict=!p.expires_at||p.expires_at<=new Date().toISOString()||(await snapshot(db,auth,p.target_account_id))!==value;
    try{await persist(conflict?'version_conflict':'failed',conflict?'VERSION_CONFLICT':'COMMIT_FAILED',false)}catch{if(!(await existing()))throw new HqTemplateError('RESULT_UNAVAILABLE',500)}

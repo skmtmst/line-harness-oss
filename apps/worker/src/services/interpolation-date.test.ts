@@ -1,9 +1,5 @@
 /*
- * 日付の差し込み。
- *
- * ここがずれると、**相手に届いた文面が間違う**。しかも配信は自動なので、
- * 気づくのは受け取った人からの指摘になる。日付をまたぐ時刻と、
- * 実行環境の時計に引きずられないことを重点的に見る。
+ * 自動配信で誤った日付が届かないよう、日付をまたぐ時刻と実行環境の時差に影響されないことを重点的に確かめる。
  */
 import { describe, it, expect } from 'vitest'
 import { formatDate, daysUntil, expandDateVariables, DATE_FORMATS } from './interpolation-date.js'

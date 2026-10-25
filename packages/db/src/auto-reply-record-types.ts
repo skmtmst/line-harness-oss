@@ -109,7 +109,7 @@ export interface CreateAutoReplyInput {
   internalMemo?: string | null;
   /**
    * 新規作成時の有効/停止。**省略や false は止まったまま作る。**
-   * 「オフで作ったのに動いていた」は送り事故なので、有効化は
+   * 「オフで作ったのに動いていた」は誤送信になるので、有効化は
    * 明示的な true（または公開・再開の操作）だけに限る。
    */
   isActive?: boolean;

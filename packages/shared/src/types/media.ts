@@ -14,7 +14,7 @@ export interface MediaItem {
   url: string;
   uploadedBy: string | null;
   /**
-   * 入れた人の表示名（R35）。uploadedBy は内部ID（UUID）のまま残し、
+   * 入れた人の表示名。uploadedBy は内部ID（UUID）のまま残し、
    * 画面にはこちらを出す。退職・削除済みで引けないときは null。
    */
   uploadedByName?: string | null;
@@ -78,7 +78,7 @@ export interface MediaDeleteImpact {
   checkedAt: string;
   lastScannedAt: string | null;
   /**
-   * すべての使用先を読み切れたか（R34）。表が無い環境などで一部を読めな
+   * すべての使用先を読み切れたか。表が無い環境などで一部を読めな
    * かったときは false。false のとき usageCount 0 は「どこでも使って
    * いない」ではなく「確かめられなかった」で、canDelete も false
    * （確かめられないものは消させない）。

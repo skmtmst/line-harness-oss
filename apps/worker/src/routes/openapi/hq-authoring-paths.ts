@@ -1,7 +1,7 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const hqAuthoringPaths = {
 
-  // V8 API integration: authenticated endpoints, with account scope and revision checks.
+  // 認証済み入口にもアカウント範囲と版の照合を適用する。
   '/api/hq/templates/saved-views': {
   get: {tags:['HQ Templates'],summary:'統括テンプレートの保存した絞り込みを取得',responses:{200:{description:'個人と統括で共有された条件'},403:{description:'統括の閲覧権限が必要'}}},
   post: {tags:['HQ Templates'],summary:'テンプレートの絞り込みを保存',requestBody:{required:true,content:{'application/json':{schema:{type:'object',required:['name','filters'],properties:{name:{type:'string',maxLength:100},scope:{type:'string',enum:['personal','tenant'],default:'personal'},filters:{type:'object',description:'kind・messageCount・hasInterpolations・undistributed・search・folderIdだけを許可'}}}}}},responses:{201:{description:'保存済みの条件とrevision'},403:{description:'統括の編集権限が必要'},422:{description:'条件または分類が不正'}}},

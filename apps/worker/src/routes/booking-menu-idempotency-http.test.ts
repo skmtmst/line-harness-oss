@@ -1,15 +1,15 @@
 /**
- * R535 / R538: 予約メニュー作成の応答再送と担当割当の権限。
+ *  予約メニュー作成の応答再送と担当割当の権限。
  *
  * 実 Worker + 実 D1（better-sqlite3 に bootstrap.sql を流したもの）で検証する。
  * Miniflare はこの環境で listen できないため、affiliate-offers 系と同じ
  * better-sqlite3 方式を使う。
  *
- * - R535: 同じ Idempotency-Key での作成POST再送は作り直さず、
+ * - 同じ Idempotency-Key での作成POST再送は作り直さず、
  *   作成済みIDを返す（応答消失後の再操作で2件にならない）。
- * - R535: キーが無ければ従来どおり毎回作成する（後方互換）。
- * - R535: キーが違えば別メニューとして作成する。
- * - R538: 閲覧のみ（viewキー）の staff では担当割当の一括PUTが403。
+ * - キーが無ければ従来どおり毎回作成する（後方互換）。
+ * - キーが違えば別メニューとして作成する。
+ * - 閲覧のみ（viewキー）の staff では担当割当の一括PUTが403。
  *   編集キーでは通る。Worker 側の認可が画面の出し分けの裏付け。
  */
 import { readFileSync } from 'node:fs';

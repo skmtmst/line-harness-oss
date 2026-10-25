@@ -3,8 +3,7 @@ import { recoverEventTransitions } from './event-transition-recovery.js';
 import type { AccountStyle } from '@line-crm/shared';
 import { recoverEventBookingNotifications } from './event-notification-recovery.js';
 import { deliverBookingLine, BookingLineDeliveryIncomplete } from '../features/booking/booking-line-delivery/index.js';
-// Event booking reminders: schedule + cron processor.
-// Phase 1 mirrors booking-reminders.ts pattern but on event_booking_reminders.
+
 
 import {
   REMINDER_MAX_RETRY,
@@ -75,9 +74,7 @@ export async function processDueEventReminders(
              AND ${stoppedTenantLineAccountSql('stopped_booking.line_account_id')}
         )`,
   ).bind(params.now.toISOString()).run();
-  // status: 'pending' or 'failed' (retryable). 'sent' / 'failed_permanent'
-  // / 'cancelled' are excluded. Booking must still be confirmed and slot
-  // start in the future at processing time.
+  // pending と再試行可能な failed だけを拾い、成功・恒久失敗・取消を除く。処理時点でも予約が確定済みで開始前であることを求める。
   const due = await db
     .prepare(
       `SELECT r.id, r.booking_id, r.kind, r.retry_count,r.booking_version,
@@ -117,7 +114,7 @@ export async function processDueEventReminders(
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'events', job: 'event reminders' })) {
       continue;
     }
-    // 緊急停止 (#1050): reminder_dispatch が止まっている統括は claim せず
+    // 緊急停止 : reminder_dispatch が止まっている統括は claim せず
     // pending のまま残す。復旧すれば次の cron が拾う。
     if (await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')) {
       continue;
@@ -134,7 +131,7 @@ export async function processDueEventReminders(
           hoursBefore: row.reminder_hours_before ?? 0, reminderExtra: row.reminder_message_extra },
       },
     });
-    // A provider acknowledgement followed by a failed domain write is reconciled without sending again.
+    // 外部の受理後に業務保存だけが失敗した場合は、再送せず照合する。
     if (snapshot.status === 'succeeded') {
       await db.prepare(`UPDATE event_booking_reminders SET status='sent', sent_at=?
         WHERE id=? AND status IN ('pending','failed')`).bind(params.now.toISOString(),row.id).run();
@@ -153,7 +150,7 @@ export async function processDueEventReminders(
         await releaseWorkflowStep(db,ref,owner,now);
         continue;
       }
-      // LINE remembers retry UUIDs for 24 hours. An uncertain old dispatch needs human reconciliation.
+      // LINE の再試行 UUID の保持は24時間なので、古い送達不明は人へ照合を求める。
       if (lease.attempt_count > 1 && now - lease.first_attempt_at! >= 23 * 3600_000) {
         await failWorkflowStep(db,ref,owner,{now,unknown:true,code:'delivery_unknown'});
         continue;
@@ -196,7 +193,7 @@ export async function processDueEventReminders(
         continue;
       }
       await failWorkflowStep(db,ref,owner,{now,unknown: error instanceof BookingLineDeliveryIncomplete && error.kind === 'unknown',delayMs:60_000,code:error instanceof BookingLineDeliveryIncomplete ? 'delivery_unknown' : 'notification_preflight_failed'});
-      // Only this owner's failure may change the reminder. Cancellation and accepted sends stay intact.
+      // 自分の実行権の失敗だけを反映し、取消や受理済みの通知を上書きしない。
       await db.prepare(`UPDATE event_booking_reminders SET status=?,retry_count=?,last_error='delivery_unknown'
         WHERE id=? AND status IN ('pending','failed') AND EXISTS (SELECT 1 FROM workflow_steps
           WHERE scope_id=? AND process_kind='event_reminder' AND subject_id=? AND step_key='send'

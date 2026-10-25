@@ -106,7 +106,7 @@ export const post__api_scenarios_id_actions_3 = async (c: Context<Env, "/api/sce
     const conditionCheck = validateConditionForStorage(body.condition, 'アクションの実行');
     if (!conditionCheck.ok) return inputError(c, { success: false, error: conditionCheck.error }, 400, ["condition"]);
 
-    // N-053: 参照先の存在と所属を保存前に確かめる。幽霊・他アカウントは
+    // 参照先の存在と所属を保存前に確かめる。幽霊・他アカウントは
     // 1行も書かず 400 で返す。実行時の読み飛ばしに頼らない。
     const scenarioRow = await c.env.DB.prepare(
       `SELECT line_account_id FROM scenarios WHERE id = ?`,
@@ -184,7 +184,7 @@ export const put__api_scenarios_id_actions_actionId_4 = async (c: Context<Env, "
     if (body.config !== undefined) {
       const check = validateActionConfig(existing.action_type, body.config);
       if (!check.ok) return inputError(c, { success: false, error: check.error }, 400, ["config"]);
-      // N-053: 新しく保存する設定だけ確かめる。並び順だけの変更や既存の
+      // 新しく保存する設定だけ確かめる。並び順だけの変更や既存の
       // 幽霊参照には触らない（既存データの読み・実行を壊さない）。
       const scenarioRow = await c.env.DB.prepare(
         `SELECT line_account_id FROM scenarios WHERE id = ?`,
@@ -287,7 +287,7 @@ export const post__api_scenarios_id_triggers_9 = async (c: Context<Env, "/api/sc
         .first<{ id: string; line_account_id: string | null }>();
       if (!tag) return inputError(c, { success: false, error: 'タグが見つかりません。' }, 400, ["tagId"]);
       // 別組織のタグを開始条件に付けると、そのタグ操作で別組織の購読が
-      // 作られてしまう（R435）。共通タグと自組織のタグだけ受け付ける。
+      // 作られてしまう。共通タグと自組織のタグだけ受け付ける。
       // 全体共通のシナリオはどの組織のタグでもよい（どの友だちにも流れる設計）。
       if (tag.line_account_id !== null
         && scenario.line_account_id !== null

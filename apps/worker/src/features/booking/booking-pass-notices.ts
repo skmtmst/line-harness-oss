@@ -11,7 +11,7 @@ export async function processPassNotices(db:D1Database,now=new Date(),account?:s
   const zone=await getAccountTimeZone(db,a.id),today=tzDateStr(zone,now);
   const targetDay=new Date(Date.parse(today+'T00:00:00Z')+14*86400000).toISOString().slice(0,10),endDay=new Date(Date.parse(targetDay+'T00:00:00Z')+86400000).toISOString().slice(0,10);
   const expiryFrom=restaurantCivilTime(targetDay,0,zone),expiryTo=restaurantCivilTime(endDay,0,zone);
-  // Read only candidates near expiry; the unique key keeps overlapping cron runs safe.
+  // 期限に近い候補だけを読み、cron が重なっても一意キーで通知の重複を防ぐ。
   const expiring=(await db.prepare(`SELECT e.id,e.friend_id,e.plan_id,e.name,e.expires_at FROM booking_entitlements e
  JOIN booking_pass_plans p ON p.id=e.plan_id AND p.line_account_id=e.line_account_id
  WHERE e.line_account_id=? AND e.status='active' AND e.friend_id IS NOT NULL AND p.notify_expiry_14_days=1

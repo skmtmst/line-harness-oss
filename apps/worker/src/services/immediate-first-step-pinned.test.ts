@@ -52,7 +52,7 @@ async function seedScenario(db: D1Database) {
 }
 
 /**
- * 即時1通目の版固定（#644）の実D1テスト。
+ * 即時1通目の版固定の実D1テスト。
  *
  * 友だち追加・タグ・LIFF はすべて pushImmediateFirstStep に集約されるので、
  * ここで「参加時に固定した公開版だけを読む」ことを実DBで確かめる。
@@ -90,7 +90,7 @@ describe('pushImmediateFirstStep の版固定（実D1）', () => {
   it('公開後の template 編集は固定版へ混入しない', async () => {
     const scenario = await createScenario(testDb.db, { name: '案内', triggerType: 'manual' });
     // template の解決は「公開版があり、持ち主が両方はっきりしていて一致する」
-    // ときだけ通る（#645）。その条件を満たす形で置く。
+    // ときだけ通る。その条件を満たす形で置く。
     testDb.raw
       .prepare(
         `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)

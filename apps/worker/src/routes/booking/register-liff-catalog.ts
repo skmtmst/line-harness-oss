@@ -13,9 +13,7 @@ import { googleCredentials } from './availability.js';
 import { bookingPhoto } from '../../features/booking/booking-photos/index.js';
 
 export function registerLiffCatalog(booking: Hono<Env>): void {
-// ================================================================
-// LIFF endpoints (/api/liff/booking/*)
-// ================================================================
+
 
 booking.get('/api/liff/booking/style-readiness', async c => {
   const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return liffBookingJson(c, {error:caller.error},caller.status);

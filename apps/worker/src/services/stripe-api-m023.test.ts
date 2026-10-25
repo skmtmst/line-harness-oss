@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { StripeApiError, stripeRequest } from './stripe-api.js';
 
 /**
- * M023：Stripe への輸送失敗（到達不能）が汎用 500 の内部文になる。
+ * Stripe への輸送失敗（到達不能）が汎用 500 の内部文になる。
  * fetch 自体の throw を StripeApiError（502）で包み、
  * 口側の 502 日本語案内へ載せる。
  */

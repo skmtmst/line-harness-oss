@@ -174,7 +174,7 @@ export function calendarDeleteIdempotencyKey(bookingId: string): string {
 }
 
 /**
- * の fence 成功後に台帳行を残す。
+ * fence 成功後に台帳行を残す。
  *
  * 実行側 (runCalendarDeleteOperation) の作成・検索が初期 DB 失敗すると
  * retry_wait を返すだけで行が残らず、cron が回収できない。行さえあれば
@@ -297,7 +297,7 @@ export async function processPendingCalendarDeleteOperations(
   ).toISOString();
   const limit = input.limit ?? 20;
   /*
-   * 予約機能がオフのアカウントは claim もしない (#643)。
+   * 予約機能がオフのアカウントは claim もしない。
    *
    * claim してから判定すると opened_at を書き換えてしまい、オフ中でも
    * 状態が動く。候補を読むだけの SELECT を先に置き、機能が動いている
@@ -519,7 +519,7 @@ export async function runBookingGoogleSync(
         });
         if (deleted === 'connection_missing') {
           // 実際には消せていない。成功にせず予定IDを保持したまま回復待ちに
-          // 残し、再接続後の再試行・cron で消せる状態にする (R328)。
+          // 残し、再接続後の再試行・cron で消せる状態にする。
           await finishBookingOperation(db, {
             id: operationId, status: 'retry_wait', completedAt: now,
             errorCode: 'calendar_connection_missing',
@@ -564,7 +564,7 @@ export async function runBookingGoogleSync(
       });
       if (deleted === 'connection_missing') {
         // 旧予定を消せる接続が無いまま作り直すと、旧予定を追う術を失ったまま
-        // 新しい予定が増える。旧IDを保持して回復待ちに残す (R328)。
+        // 新しい予定が増える。旧IDを保持して回復待ちに残す。
         await finishBookingOperation(db, {
           id: operationId, status: 'retry_wait', completedAt: now,
           errorCode: 'calendar_connection_missing',
@@ -609,7 +609,7 @@ export async function runBookingGoogleSync(
 }
 
 /**
- * 台帳駆動の Calendar 削除で呼ぶ「外部予定を消す」処理 (R328)。
+ * 台帳駆動の Calendar 削除で呼ぶ「外部予定を消す」処理。
  *
  * 接続の探索は「イベントを作ったカレンダー」基準にする (担当変更で
  * bookings.staff_id が変わっても旧カレンダーの接続を見つけられる)。

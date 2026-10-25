@@ -1,5 +1,5 @@
 /*
- * P0-1 統合ユーザーの物理削除ガード。実 SQLite + bootstrap.sql に本物の
+ * 統合ユーザーの物理削除ガード。実 SQLite + bootstrap.sql に本物の
  * ルータを通す。DB は本物なので、関連が残る・消えるの両方を見張れる。
  */
 import { readFileSync } from 'node:fs';

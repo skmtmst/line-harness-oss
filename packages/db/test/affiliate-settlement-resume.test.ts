@@ -16,8 +16,8 @@ import { ensureConversionRewardSnapshot } from '../src/affiliate-settlements.js'
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * R287の回帰試験: 締めのあと画面を開き直しても、締め済み台帳を引き直して
- * 明細発行・CSV準備を再開できる(#938の再開口 getClosedAccountSettlement)。
+ * 締めのあと画面を開き直しても、締め済み台帳を引き直して
+ * 明細発行・CSV準備を再開できる(再開口 getClosedAccountSettlement)。
  * 監査はこの口が入る前の版で「再開できない」とした。口が無くなったり
  * 壊れたりしたらここが赤になる。
  */

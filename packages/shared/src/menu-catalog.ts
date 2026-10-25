@@ -3,8 +3,8 @@ import type { FeatureId } from './feature-catalog.js';
 /**
  * サイドメニューの区分と項目の正本。
  *
- * 並び順の保存はサーバーがこの表と完全に同じ顔ぶれだけを受け付ける
- * （N-441）。画面側の `apps/web/src/lib/menu.ts` は表示用の情報
+ * 並び順の保存はサーバーがこの表と完全に同じ顔ぶれだけを受け付ける。
+ * 画面側の `apps/web/src/lib/menu.ts` は表示用の情報
  * （アイコン・説明・URL）をここへ足した形で持ち、両者が一致することは
  * `apps/web/src/lib/menu-catalog-parity.test.ts` が固定する。
  *
@@ -74,7 +74,7 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
       { id: 'booking-bookings', featureKey: 'booking' },
       { id: 'booking-menus', featureKey: 'booking' },
       { id: 'events', featureKey: 'events' },
-      // 提案 E-7（2026-10-07）：来店スタンプ。飲食店もサロンも使う。鍵は予約と同じ（専用の鍵は無い）。
+      // 来店スタンプ。飲食店もサロンも使う。鍵は予約と同じ（専用の鍵は無い）。
       { id: 'visit-stamps', featureKey: 'visit_stamps' },
       { id: 'booking-own-shifts', featureKey: 'booking' },
     ],
@@ -106,7 +106,7 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     title: '専用機能',
     items: [
       { id: 'nen-members', featureKey: 'ec_commerce' },
-      // ★37-3／37-4（2026-09-16 採用）。「投稿」と同じ photo_review の受け口。
+      // ペットの写真。「投稿」と同じ photo_review の受け口。
       { id: 'nen-pets', featureKey: 'photo_review' },
       { id: 'nen-health', featureKey: 'photo_review' },
       { id: 'photo-review', featureKey: 'photo_review' },

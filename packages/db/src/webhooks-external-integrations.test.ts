@@ -1,9 +1,9 @@
 /*
- * 外部連携の補強 (#939) のDB層テスト。
+ * 外部連携の補強のDB層テスト。
  *
- * N-368: 削除は行を消さず deleted_at を立て、一覧・詳細・送り先解決からは見えなくなる。
- * N-367: 人が見つからなかった届物を箱へ置き、確認済みにできる。
- * N-380: 外部APIの鍵はハッシュだけを持ち、無効化・入れ替えで即座に使えなくなる。
+ * 削除は行を消さず deleted_at を立て、一覧・詳細・送り先解決からは見えなくなる。
+ * 人が見つからなかった届物を箱へ置き、確認済みにできる。
+ * 外部APIの鍵はハッシュだけを持ち、無効化・入れ替えで即座に使えなくなる。
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -328,7 +328,7 @@ describe('外部APIの鍵 (N-380)', () => {
     });
 
     const rotated = await rotateIntegrationApiToken(db, first.row.id, 'account-a', 'staff-2');
-    // R431: 同時再発行の当たり外れを区別するため、成否ではなく状態で返す。
+    // 同時再発行の当たり外れを区別するため、成否ではなく状態で返す。
     // 逐次の再発行が通ること・古い鍵だけ止まることの意図は変えない。
     if (rotated.status !== 'ok') throw new Error('rotate should succeed');
     expect(await resolveIntegrationApiToken(db, first.token)).toBeNull();

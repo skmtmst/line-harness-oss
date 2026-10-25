@@ -102,7 +102,7 @@ export async function readDraftSettings(db: D1Database, raw: unknown, checkRefer
     return { ok: false, error: `返信する内容は${AUTO_REPLY_RESPONSE_MAX.toLocaleString('ja-JP')}文字までです` , field: "responseContent" };
   }
   /*
-   * R201: カードはJSONとして読めるだけでは足りない。`{}` のような構造のない
+   * カードはJSONとして読めるだけでは足りない。`{}` のような構造のない
    * 内容は送信時に落ちるだけなので、保存の側で止める。テンプレートから
    * 写した中身はテンプレート側の検査に任せ、直接入力だけここで見る。
    */
@@ -386,7 +386,7 @@ export function validIdempotencyKey(value: string | undefined): value is string 
 }
 
 export /*
- * m26c R556/R570: 作成・複製の確認キー。ヘッダで受け、形が正しいときだけ
+ * m26c /: 作成・複製の確認キー。ヘッダで受け、形が正しいときだけ
  * 重複防止に使う。無い・壊れているときは従来どおり作る（後方互換）。
  */
 function readIdempotencyKey(c: Context<Env>): string | undefined {
@@ -532,7 +532,7 @@ export async function buildAutomationKeywordIndex(db: D1Database): Promise<Map<s
     .all<{ line_account_id: string | null; conditions: string; actions: string }>();
   const idx = new Map<string, Set<string>>();
   for (const r of res.results ?? []) {
-    if (!r.line_account_id) continue;  // global rules — skip; UI assumes per-account
+    if (!r.line_account_id) continue;  // 画面はアカウント単位を前提とするため、全体ルールは除く。
     let keyword: string | null = null;
     try {
       const c = JSON.parse(r.conditions) as { keyword?: string; keyword_exact?: string };

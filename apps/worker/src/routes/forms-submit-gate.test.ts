@@ -57,7 +57,7 @@ vi.mock('@line-crm/db', () => ({
   listLineAccountsWithTenantStatus: vi.fn(async () => [
     { id: 'account-a', tenant_status: 'active' },
   ]),
-  // #648: 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
+  // 成果計測は packages/db へ移した。この差し替えに書き出しが無いと、
   // 呼び出し口が 500 になる。数えること自体は実DBの試験で見ている。
   recordConversionSourceEvent: vi.fn(async () => ({ matched: 0, recorded: 0, failed: 0, skipped: null })),
   getForms: vi.fn(),

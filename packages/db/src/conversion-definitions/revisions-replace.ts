@@ -7,7 +7,7 @@ import { requireExpectedDefinition, configOf, currentDefinitionForMutation } fro
 
 
 /**
- * 成果地点を、履歴を保ったまま編集して次の版にする（N-252）。
+ * 成果地点を、履歴を保ったまま編集して次の版にする。
  *
  * **過去の成果は書き換えない。** 集計は `conversion_events.value_snapshot` を
  * 見ており、計測時の版は `point_version_snapshot` に残る。だから編集しても
@@ -34,7 +34,7 @@ export async function reviseConversionDefinition(
     FROM conversion_points cp WHERE cp.id = ? AND ${account.sql}`)
     .bind(input.id, ...account.values)
     .first<RevisionRow>();
-  // N-268: 下書きも編集できる。版を進めても status は draft のまま。
+  // 下書きも編集できる。版を進めても status は draft のまま。
   requireExpectedDefinition(current, input.expectedVersion, { allowDraft: true });
   const row = current!;
   const folderId = await conversionFolder(db, row.line_account_id, input.folderId);
@@ -148,7 +148,7 @@ export async function replaceConversionDefinitionUsages(
     throw new ConversionDefinitionError('account_mismatch', '同じLINEアカウントの成果地点を選んでください', 409);
   }
   /*
-   * N-261: 種類の違う成果地点へは差し替えられない。
+   * 種類の違う成果地点へは差し替えられない。
    * 起点の種類・計測方法・対象URLが一致する地点だけを置き換え先にする。
    * 違う種類へ利用先を移すと、「注文が確定した成果」を見ていた分析が
    * いきなり「ページを見た成果」を数え始めるような取り違えになる。

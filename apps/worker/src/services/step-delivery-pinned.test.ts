@@ -51,7 +51,7 @@ function pushHarness() {
 }
 
 /**
- * cron 配信の版固定（#644）の実D1テスト。
+ * cron 配信の版固定の実D1テスト。
  *
  * 既存購読・同時公開・部分失敗・通削除・欠損参照・template 編集を、
  * 本物の SQLite（bootstrap 適用）で確かめる。
@@ -151,7 +151,7 @@ describe('processStepDeliveries の版固定（実D1）', () => {
   it('公開後の template 編集は固定版へ混入しない', async () => {
     const scenario = await createScenario(testDb.db, { name: '案内', triggerType: 'manual' });
     // template の解決は「公開版があり、持ち主が両方はっきりしていて一致する」
-    // ときだけ通る（#645）。その条件を満たす形で置く。
+    // ときだけ通る。その条件を満たす形で置く。
     //
     // シナリオ側の持ち主は friends 経由で決まる（scenarios.line_account_id を
     // 直に入れると、cron が実アカウントの資格情報で送りにいってしまい、
@@ -239,11 +239,7 @@ describe('processStepDeliveries の版固定（実D1）', () => {
   }
 
   /*
-   * 下書きを消したあとも、押し口は「押して反応する」形で届く（#644 独立審査）。
-   *
-   * 下書き削除後も固定版から配信を続けるのは、この票で新しく作った振る舞い。
-   * そこで初めて「版所有の通ID（コロンを含む）を押し口へ載せる」経路が生まれる。
-   * 旧形として載せると受信側が弾き、友だちが押しても無反応になる。
+   * 下書き削除後も質問押下が反応するよう、固定版の通 ID を押し口へ載せ、コロンを含む ID を受信側が受け付けることを確かめる。
    */
   it('下書きの通を消しても、送る質問の押し口は受信側が読める形になっている', async () => {
     const { step1, enrollment } = await seedPublishedQuestion();

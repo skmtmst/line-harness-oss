@@ -33,7 +33,7 @@ export async function ensureBuiltInProgram(db: D1Database, programId: string): P
 }
 
 /**
- * N-231 公開版(案1)。受付時点で固定する適用版の集合 {rule_id: version_number}。
+ * 公開版。受付時点で固定する適用版の集合 {rule_id: version_number}。
  * 0 は未公開(旧口で作ったまま)で、処理時は live を読む。単一IDへ潰さない。
  */
 export async function getAccountRuleVersionMap(

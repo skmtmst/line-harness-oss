@@ -78,7 +78,7 @@ actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'a
   const accountId = await requireAccount(c, body.accountId);
   if (typeof accountId !== 'string') return accountId;
   /*
-   * M505: 応答消失後の再送の要求キー。版ずれの再送が自分の保存済みと
+   * 応答消失後の再送の要求キー。版ずれの再送が自分の保存済みと
    * 同じ内容なら、競合（409）ではなく保存済みの結果を返す。
    */
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
@@ -177,7 +177,7 @@ actionScoreRules.post('/api/action-scores/rules/stop', requireRole('owner', 'adm
 });
 
 /**
- * N-235: 担当者が理由つきで1人分の点数を手で直す口。
+ * 担当者が理由つきで1人分の点数を手で直す口。
  * 不可逆操作なので確認ヘッダと冪等キーを必須にし、履歴は追記だけで残す。
  */
 actionScoreRules.post(
@@ -233,7 +233,7 @@ actionScoreRules.post(
 );
 
 /**
- * N-235: 編集中の帯の分けかたで、今いる友だちが各帯に何人入るかだけ数える
+ * 編集中の帯の分けかたで、今いる友だちが各帯に何人入るかだけ数える
  * 読み取り専用プレビュー。公開版・友だちの点数は動かさない。
  */
 actionScoreRules.post(

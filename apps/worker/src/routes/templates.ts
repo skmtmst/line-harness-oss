@@ -47,7 +47,7 @@ async function readFolderId(
   if (folder.kind !== 'template') {
     return { ok: false, error: 'テンプレートのフォルダではありません' };
   }
-  // フォルダはアカウント単位（N-147）。別アカウントのフォルダへ入れさせない。
+  // フォルダはアカウント単位。別アカウントのフォルダへ入れさせない。
   // 未所属のものは一覧・更新と同じく「見えない」扱い——見えない置き場へ
   // 入れると、そのテンプレートはどの絞り込みにも出なくなる。
   if (folder.account_id !== accountId && (folder.account_id !== null || !canSeeUnassigned)) {
@@ -102,14 +102,7 @@ function questionValue(raw: string | null): ScenarioQuestion | null {
   return parseQuestion(raw);
 }
 
-/**
- * 347: 画面に見せる「編集中の内容」。下書きがあれば下書き、なければ公開版。
- * 送信側はこの口を通らず live 列を直接読むので、ここが下書きを返しても
- * 実送信文は公開版のまま。
- *
- * 差し戻し対応(要件2): 消せる項目(質問・カルーセル・制限超過文)は行単位で見る。
- * 下書きがある行の draft 列 NULL は「削除した」であり、公開版へ落とさない。
- */
+/** 編集画面は下書きがあればそれを、なければ公開版を読む。送信側は公開値を使う。下書きの削除可能な項目の NULL は明示削除なので、公開値へ戻さない。 */
 function draftMessageTypeOf(t: TemplateRow): string {
   return t.draft_message_type ?? t.message_type;
 }
@@ -270,7 +263,7 @@ templates.get('/api/templates', async (c) => {
       logger.error("templates.list_failed");
     }
     /*
-     * 差し戻し対応(要件1): 一覧の主 messageType/messageContent は公開版だけを返す。
+     * 一覧の主 messageType/messageContent は公開版だけを返す。
      * 編集中の下書きがあってもここには出さず、実送信の候補選びが
      * 未公開の下書きを掴まないようにする。編集中の内容は編集画面が
      * 詳細口で読む。未公開(版0・公開日時なし)は候補から外す目印付きで返す。
@@ -284,7 +277,7 @@ templates.get('/api/templates', async (c) => {
       messageContent: t.message_content,
       messageBubbles: t.message_bubbles_json ? JSON.parse(t.message_bubbles_json) : null,
       /*
-       * R194: 管理一覧の抜粋・検索が読む最新の下書き。公開版しか無ければ null。
+       * 管理一覧の抜粋・検索が読む最新の下書き。公開版しか無ければ null。
        * 送信の候補選びは `messageContent`（公開版）だけを見る決まりは変えない。
        */
       draftMessageContent: t.draft_message_content ?? null,
@@ -292,7 +285,7 @@ templates.get('/api/templates', async (c) => {
       questionStatus: t.question_status,
       folderId: t.folder_id ?? null,
       usageCount: t.usage_count,
-      /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
+      /** 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
       tapCount: taps.get(t.id) ?? 0,
       monthlySendCount: sends.get(t.id)?.thisMonth ?? null,
       totalSendCount: sends.get(t.id)?.total ?? null,
@@ -378,9 +371,9 @@ templates.get('/api/templates/:id', async (c) => {
       return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
     const usedBy = await usageWithVersions(c.env.DB, id, item.line_account_id);
-    // 467: 一斉配信の参照は参照表から足す（送った時の版のまま）。
+    // 一斉配信の参照は参照表から足す（送った時の版のまま）。
     const broadcasts = await listBroadcastReferences(c.env.DB, id);
-    // R347: 旧公開版に固定された送信待ち・取消ずみの登録も使用先に出す。
+    // 旧公開版に固定された送信待ち・取消ずみの登録も使用先に出す。
     const reminderEnrollments = await getPinnedReminderDeleteBlockers(
       c.env.DB, id, item.line_account_id,
     );
@@ -417,7 +410,7 @@ function templateUsageCount(usage: Awaited<ReturnType<typeof getTemplateUsage>>)
 }
 
 /**
- * 467: 利用先の行に「使っている版」を載せる。参照表にない古い参照は
+ * 利用先の行に「使っている版」を載せる。参照表にない古い参照は
  * 空のままにし、無い版番号をでっち上げない（画面では「—」）。
  */
 async function usageWithVersions(
@@ -454,10 +447,10 @@ templates.get('/api/templates/:id/usages', async (c) => {
       return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
 
-    // 467: 一斉配信の参照は参照表から足す（送った時の版のまま）。
+    // 一斉配信の参照は参照表から足す（送った時の版のまま）。
     const usage = await usageWithVersions(c.env.DB, templateId, tpl.line_account_id);
     const broadcasts = await listBroadcastReferences(c.env.DB, templateId);
-    // R347: 旧公開版に固定された送信待ち・取消ずみの登録も使用先に出す。
+    // 旧公開版に固定された送信待ち・取消ずみの登録も使用先に出す。
     const reminderEnrollments = await getPinnedReminderDeleteBlockers(
       c.env.DB, templateId, tpl.line_account_id,
     );
@@ -468,7 +461,7 @@ templates.get('/api/templates/:id/usages', async (c) => {
 });
 
 /**
- * N-146: 空でない文字列か。口を直接叩かれても、空白だけの名前や本文は
+ * 空でない文字列か。口を直接叩かれても、空白だけの名前や本文は
  * 通さない。空欄のまま保存されると一覧に名前の無い行が残り、中身の無い
  * テンプレートが配信の候補に並ぶ。
  */
@@ -494,7 +487,7 @@ templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBo
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
-    // N-146: 空白だけの値も「無い」と同じに扱う。
+    // 空白だけの値も「無い」と同じに扱う。
     if (isBlankText(body.name) || isBlankText(body.messageType) || isBlankText(body.messageContent)) {
       return inputError(c, { success: false, error: 'name, messageType, messageContent are required' }, 400, ["name","messageType","messageContent"]);
     }
@@ -516,7 +509,7 @@ templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBo
     const question = readQuestionPayload(body as unknown as Record<string, unknown>);
     if (!question.ok) return inputError(c, { success: false, error: question.error }, 422, ["messageContent"]);
     /*
-     * R249: カード型はバブルかカルーセルのJSONでないと保存しない。
+     * カード型はバブルかカルーセルのJSONでないと保存しない。
      * 通常文・壊れたJSON・型なしJSONのまま保存できると「作れた」と
      * 誤認し、送信時に落ちる。質問付きは質問文をテキストとして
      * 保存するので、カードの中身は見ない。
@@ -546,8 +539,8 @@ templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBo
         ? { messageType: 'text', messageContent: question.question.intro?.trim() || question.question.text }
         : {}),
     });
-    // 作成の返しも更新と同じ形にする。将来使うときにハマらないため（#497 軽11）。
-    // 差し戻し対応(要件4): 作った直後は未公開(版0・公開日時なし・下書きあり)。
+    // 作成の返しも更新と同じ形にする。将来使うときにハマらないため。
+    // 作った直後は未公開(版0・公開日時なし・下書きあり)。
     return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, messageContent: item.message_content, question: questionValue(item.question_json), questionStatus: item.question_status, folderId: item.folder_id ?? null, hasDraft: true, publishedVersion: 0, publishedAt: null, draftRevision: 1, createdAt: item.created_at, updatedAt: item.updated_at } }, 201);
   } catch (err) {
     if (err instanceof MediaReferenceAccountError) {
@@ -579,7 +572,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
     }
     if(existing.message_bubbles_json || existing.draft_message_bubbles_json) return c.json({success:false,code:'MULTIPLE_MESSAGES_REQUIRE_EDITOR',error:'複数通のテンプレートは統括の編集から保存してください'},409);
     /*
-     * N-146: 部分更新なので「来なかった項目」はいまのまま残すが、
+     * 部分更新なので「来なかった項目」はいまのまま残すが、
      * 来た項目が空・空白だけなら断る。画面側は保存前に止めているが、
      * 口を直接叩かれたときに空の名前・空の本文へ書き換わるのを防ぐ。
      */
@@ -593,7 +586,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
       return inputError(c, { success: false, error: '本文を入力してください' }, 400, ["messageContent"]);
     }
     /*
-     * 347: 保存は2系統。名前・置き場の整理は live 列へ即時反映し、
+     * 保存は2系統。名前・置き場の整理は live 列へ即時反映し、
      * 送信文(種別・本文・カルーセル・質問)は下書きへだけ書く。
      * 公開版は POST /:id/publish を通らないと変わらない。
      */
@@ -632,7 +625,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
     if (!options.ok) return inputError(c, { success: false, error: options.error }, 400, ["carouselActions","carouselTapLimitMode","carouselTapLimitText"]);
     const question = readQuestionPayload(body as unknown as Record<string, unknown>);
     if (!question.ok) return inputError(c, { success: false, error: question.error }, 422, ["messageContent"]);
-    // R249: 作成口と同じく、質問で上書きしないカード型だけ中身を見る。
+    // 作成口と同じく、質問で上書きしないカード型だけ中身を見る。
     if (changesMessage && !question.question) {
       const flexError = validateFlexContent(baseMessageType, baseMessageContent);
       if (flexError) return inputError(c, { success: false, error: flexError }, 422, ["messageContent"]);
@@ -728,7 +721,7 @@ function validPublishKey(value: string | null | undefined): value is string {
 }
 
 /**
- * 347: 下書きを公開版へ写す。送信側が読む live 列はここでしか変わらない。
+ * 下書きを公開版へ写す。送信側が読む live 列はここでしか変わらない。
  * 同じ確認キーでの再試行は成功済みの結果をそのまま返し(下書きなしの成功も記録)、
  * 別の下書きを公開しない。公開版・下書き版の両方を確認できる(自動応答の
  * POST /api/auto-replies/:id/publish より厳しい約束)。
@@ -746,7 +739,7 @@ templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'),
     )) {
       return fail(c, 404, 'TEMPLATE_NOT_FOUND');
     }
-    // 独立審査P2: 版の確認は任意にしない。確認なしの公開は受け付けない。
+    // 版の確認は任意にしない。確認なしの公開は受け付けない。
     // 詳細口が返す publishedVersion・draftRevision をそのまま送る。
     const body: { expectedVersion?: unknown; expectedDraftRevision?: unknown; effectiveFrom?: unknown } =
       await c.req.json().catch(() => ({}));
@@ -762,7 +755,7 @@ templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'),
     if (expectedDraftRevision === undefined || !Number.isInteger(expectedDraftRevision)) {
       return inputError(c, { success: false, error: '下書きの版を確認してください' }, 400, ["expectedDraftRevision"]);
     }
-    // 466: 使い始めの日時は持てるだけ（予約の札で見せる）。来たら日付か確かめる。
+    // 使い始めの日時は持てるだけ（予約の札で見せる）。来たら日付か確かめる。
     let effectiveFrom: string | undefined;
     if (body.effectiveFrom !== undefined && body.effectiveFrom !== null) {
       if (typeof body.effectiveFrom !== 'string' || !Number.isFinite(Date.parse(body.effectiveFrom))) {
@@ -784,7 +777,7 @@ templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'),
       if (!carousel.ok) return inputError(c, { success: false, error: carousel.error }, 422, ["messageContent"]);
       const image = checkImageTemplate(draftType, draftContent);
       if (!image.ok) return inputError(c, { success: false, error: image.error }, 422, ["messageContent"]);
-      // R249: 検査基準が変わる前に残った壊れたカードの下書きを出さない。
+      // 検査基準が変わる前に残った壊れたカードの下書きを出さない。
       const flexError = validateFlexContent(draftType, draftContent);
       if (flexError) return inputError(c, { success: false, error: flexError }, 422, ["messageContent"]);
       const structured = checkStructuredSize(draftType, draftContent);
@@ -867,7 +860,7 @@ templates.get('/api/templates/:id/versions', async (c) => {
 });
 
 /**
- * 466: この版に戻す。過去の版は変えず、その中身で新しい版を作る
+ * この版に戻す。過去の版は変えず、その中身で新しい版を作る
  * （下書きへ写して公開する）。公開口と同じ確認キーと版確認を使う。
  */
 templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), inputJsonBoundary(), async (c) => {
@@ -945,11 +938,11 @@ templates.delete('/api/templates/:id', requireDeliveryAccess('templates'), async
     // 切ることはしない。すべての利用先を先に差し替えてもらう。
     const usage = await usageWithVersions(c.env.DB, id, existing.line_account_id);
     const usageCount = templateUsageCount(usage);
-    // 467: 予約済み・送信中の配信で使っているものは消せない。
+    // 予約済み・送信中の配信で使っているものは消せない。
     // 送った配信は送った時の版のまま残り、下書きは本文の写しで作り直せる。
     const blockers = await getBroadcastDeleteBlockers(c.env.DB, id);
     const broadcasts = await listBroadcastReferences(c.env.DB, id);
-    // R347: 旧公開版に固定された送信待ち・取消ずみ（再開できる）の登録が
+    // 旧公開版に固定された送信待ち・取消ずみ（再開できる）の登録が
     // 使っているものも消せない。消すと固定した版の本文が控えに変わる。
     const reminderBlockers = await getPinnedReminderDeleteBlockers(
       c.env.DB, id, existing.line_account_id,

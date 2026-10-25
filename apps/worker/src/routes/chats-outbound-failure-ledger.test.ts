@@ -1,5 +1,5 @@
 /*
- * N-023: 個別送信の失敗台帳と安全な再試行。
+ * 個別送信の失敗台帳と安全な再試行。
  * 実Hono route + 実SQLite(bootstrap.sql)へ当て、LINE clientだけを止める。
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';

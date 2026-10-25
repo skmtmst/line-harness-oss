@@ -136,7 +136,7 @@ describe('mileage rewards', () => {
     ).run(published.currentPublishedVersionId)).toThrow(/immutable/);
   });
 
-  // N-236: 止めた使い道は、止める前と同じ公開版のまままた出せる
+  // 止めた使い道は、止める前と同じ公開版のまままた出せる
   // （削除して作り直すのではなく、状態だけを戻す）。
   it('restores a stopped reward to published with the same published version', async () => {
     const draft = await createMileageRewardDraft(db, {
@@ -500,7 +500,7 @@ describe('mileage rewards', () => {
      * 証言を消したら**貸出も返っている**。持ち主と期限を残すと、行は
      * 「送っていないのに誰かが送信中」に見え、次の走者は貸出が切れるまで
      * `'busy'` しか受け取れない。失敗した直後の管理画面のやり直しが
-     * 貸出の残り時間ぶん空振りする(#641 司令塔独立審査で実測)。
+     * 貸出の残り時間ぶん空振りする。
      */
     expect(sqlite.prepare(
       `SELECT owner, lease_expires_at AS leaseExpiresAt, needs_reconcile AS needsReconcile
@@ -619,7 +619,7 @@ describe('mileage rewards', () => {
   });
 
   /*
-   * R299: 画面は「0 と書くと品切れ」と案内するのに、保存側の検証が 0 を
+   * 画面は「0 と書くと品切れ」と案内するのに、保存側の検証が 0 を
    * 拒否していた。空欄=無制限・0=品切れ・正の整数=上限で画面・保存・
    * 交換判定を揃える。
    */

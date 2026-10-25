@@ -127,7 +127,7 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), inputJson
       // validateEventInput で形は検証済み。id未指定の分だけここで連番を補う。
       body.questions == null ? null : JSON.stringify((normalizeEventQuestions(body.questions) as { questions: EventQuestion[] }).questions),
       publishedVersionId,
-      // m26g R576: 作成時も公開フラグと保存する状態を両書きする。
+      // m26g : 作成時も公開フラグと保存する状態を両書きする。
       // 公開で作った行が下書きのままでは、顧客 GET の可視性と
       // 管理表示がずれる（lifecycle_status が正本・移行 492 の決め）。
       isPublished ? 'published' : 'draft',
@@ -187,7 +187,7 @@ events.get('/api/events/admin/events', async (c) => {
   else if (folderId) { conditions.push('e.folder_id = ?'); params.push(folderId); }
   if (q) {
     /*
-     * #625: LIKE ではなく instr で部分一致する。
+     * LIKE ではなく instr で部分一致する。
      * D1 の LIKE/GLOB パターンは最大50バイト。`%<検索語>%` を束縛すると
      * 48バイト超の検索語で SQLite エラー(500)になっていた。
      */
@@ -480,7 +480,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), inputJ
   }
   const nextVersion = (expectedVersion as number) + 1;
   const nextPublished = (body.is_published ?? exists.is_published) === 1;
-  // m26g R576: 公開フラグと保存する状態の両書き。lifecycle 口では
+  // m26g : 公開フラグと保存する状態の両書き。lifecycle 口では
   // is_published へ両書きしているが、通常 PUT は lifecycle_status を
   // 触らず、is_published=1・lifecycle=draft の不整合行を作っていた。
   // その行は管理表示が「下書き」なのに顧客 GET が 200 になる。
@@ -568,8 +568,7 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), inputJ
         ).bind(id, nextVersion, writeToken),
       ]);
   if ((results[0]?.meta?.changes ?? 0) === 0) return bad(c, 'version_conflict', 409);
-  // If reminder settings changed, rebuild pending reminders for confirmed
-  // bookings on this event so they reflect the new schedule.
+  // 通知設定が変わった場合、確定予約の未送信通知を作り直し、新しい予定へ合わせる。
   if (
     Object.prototype.hasOwnProperty.call(body, 'reminder_day_before_enabled') ||
     Object.prototype.hasOwnProperty.call(body, 'reminder_hours_before')

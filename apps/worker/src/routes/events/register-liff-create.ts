@@ -45,8 +45,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     .first<{ id: string; user_id: string | null; picture_url: string | null }>();
   if (!friend) return liffBookingResponse(c, bad(c, 'friend_not_found', 404));
 
-  // Reserve idempotency key BEFORE the booking work to dedupe concurrent
-  // double-taps (the key is held for the full TTL window).
+  // 同時の二重押下を防ぐため、予約処理より先に冪等キーを確保し、TTL の間保持する。
   const reservation = await reserveEventIdempotency(c.env.DB, {
     key: idemKey,
     lineAccountId: account_id,
@@ -65,8 +64,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     return liffBookingResponse(c, bad(c, 'idempotent_in_progress', 429));
   }
 
-  // Helper that finalizes the reservation row before returning. Wraps every
-  // exit path so retries after this point hit the cached branch above.
+  // すべての終了経路で冪等行を確定し、以後の再送が保存済み応答へ戻るようにする。
   const finalize = async (status: number, body: unknown): Promise<Response> => {
     await finalizeEventIdempotencyResponse(c.env.DB, {
       key: idemKey,
@@ -77,8 +75,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     });
     return liffBookingJson(c, body as Record<string, unknown>, status as 200 | 201 | 400 | 409 | 410 | 422);
   };
-  // try/catch wrapper so an unexpected DB error does not strand the
-  // idempotency reservation in the in_progress state for the full TTL.
+  // 想定外の DB エラーでも、in_progress の予約を TTL 全期間残さないよう例外を処理する。
   try {
     return await runBookingFlow();
   } catch (e) {
@@ -89,9 +86,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   }
 
   async function runBookingFlow(): Promise<Response> {
-  // Hoisted function declarations lose narrowing of outer-scope `const`
-  // captures; re-assert here to keep `friend` / `callerLineUserId` non-null.
-  // The outer scope already returned on null, so these throws are unreachable.
+  // 関数宣言では外側の絞込が引き継がれないため、friend と callerLineUserId を再確認する。外側では null を返却済みなので、この例外へは到達しない。
   if (friend == null) throw new Error('runBookingFlow: friend missing');
   if (callerLineUserId == null) throw new Error('runBookingFlow: callerLineUserId missing');
   if (account_id == null) throw new Error('runBookingFlow: line account missing');
@@ -192,18 +187,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   const identityKey = computeIdentityKey(friend);
 
   /*
-   * 満席のときキャンセル待ちへ入れる。**申込前の空き確認と、INSERT 後の
-   * 再検査で負けたときの両方から呼ぶ** (#747 / N-416)。
-   *
-   * 以前はここが申込前の分岐の中だけにあったので、**同時申込で負けた側は
-   * 待ちが有効でも `slot_full` で終わっていた**。空き確認を通った時点では
-   * 席があったのに、後から来た再検査で弾かれるという、利用者からは
-   * 区別のつかない負け方をする。待ちが有効なら、どちらの負け方でも
-   * 同じ行き先にする。
-   *
-   * キャンセル待ちは event_bookings に入れない。定員を数えている箇所が
-   * 多く、そこへ「待ちは数えない」条件を足して回ると必ずどこかで漏れる。
-   * 同じ(枠, 同一人物)の重複は部分UNIQUE索引が弾くので INSERT OR IGNORE。
+   * 満席確認の時点によらず同じキャンセル待ちへ進めるため、申込前の確認と INSERT 後の再検査の両方から呼ぶ。
+   * 予約定員へ待機者が混ざらないよう event_bookings とは分け、同じ枠・同じ人物の重複は部分 UNIQUE 索引と INSERT OR IGNORE で防ぐ。
    */
   // 巻き上げられる function 宣言にすると、外側の const に効いている絞り込みが
   // 消える (このファイルの runBookingFlow と同じ理由)。const の arrow にする。
@@ -286,10 +271,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     return finalize(200, { waitlisted: true, slot_id: slot.id });
   };
 
-  // Pre-flight friend-limit check は identity_key ベースに統合済 (後段の
-  // sameIdentityActive ブロック参照)。friend_id ベースの単一アカウント
-  // 内カウントは cross-account 同一人物を捉えられないので使わない。
-  // Pre-flight capacity check (also a cheap rejection).
+  // 同一人物が別アカウントにいても上限を守るため、friend_id の単一アカウント集計でなく identity_key を使う。定員も事前に確認して早く拒む。
   const slotRow = await c.env.DB
     .prepare(`SELECT capacity FROM event_slots WHERE id = ?`)
     .bind(slot.id)
@@ -341,10 +323,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     }
   }
 
-  // Insert-then-verify pattern: Cloudflare D1 doesn't expose multi-statement
-  // transactions, so we INSERT first, then re-COUNT. If concurrent inserts
-  // pushed us over the limit we DELETE this row and return 409. Determinism
-  // is enforced by the INSERT timestamp (newest row loses).
+  // D1 は複文のトランザクションを公開しないため、INSERT 後に再集計する。上限超過なら新しい requested_at と ID の行を負けとし、自分の行だけを戻して409を返す。
   const status = event.requires_approval === 1 ? 'requested' : 'confirmed';
   const id = crypto.randomUUID();
   const nowIso = firstParticipationCheckedAt;
@@ -410,9 +389,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     return finalize(409, { error: event.max_bookings_per_friend === 1 ? 'duplicate_friend_booking' : 'over_friend_limit' });
   }
 
-  // Verify capacity again. If there is a race winner ahead of us — i.e. an
-  // earlier (smaller requested_at, then smaller id) row — we are the loser
-  // and roll back our row.
+  // 定員を再確認し、先に確定した requested_at・ID の小さい予約があれば、自分の行だけを戻す。
   if (slotRow?.capacity != null) {
     const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, slot.id);
     if (usedSeats > slotRow.capacity) {
@@ -531,7 +508,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     );
   }
 
-  // best-effort notification: do not fail the booking if push fails.
+  // 通知失敗だけでは予約を失敗させない。
   try {
     const acc = await c.env.DB
       .prepare(
@@ -573,6 +550,6 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   }
 
   return finalize(201, { id, status });
-  } // close runBookingFlow
+  }
 });
 }

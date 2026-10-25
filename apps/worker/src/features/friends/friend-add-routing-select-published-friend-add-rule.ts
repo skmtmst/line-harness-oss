@@ -91,8 +91,7 @@ export async function applyFriendAddRouting(
     sendRight?: boolean;
     claimError?: boolean;
     /**
-     * 奪い直した予約に、前の持ち主の「送り始めた」印が残っていた。
-     * 送ったかもしれないので送らず、理由を送達不明として残す。
+     * 再取得した予約に前の実行者の送信開始印があれば、二重送信を防ぐため送達不明として記録し、送らない。
      */
     dispatchUnknown?: boolean;
     /**
@@ -304,19 +303,8 @@ export async function applyFriendAddRouting(
   }
 
   /*
-   * 「前回読んだところから」は、**②に当たる人すべて**で意味がある。
-   *
-   * 以前は「別のシナリオを選んだとき」だけに絞っていたが、
-   * 「はじめての人と同じものを配信する」を選んでいるアカウントで、
-   * **ブロックを解除した人に何も届かない**という壊れ方をしていた。
-   *
-   * ブロック中に購読が止まっている（status='paused'）と、
-   * `enrollFriendInScenario` は部分UNIQUE索引（status != 'completed'）に
-   * 弾かれて null を返す。resume も呼ばれないので、止まったまま何も起きない。
-   * 解除した本人にも、設定した人にも、何が起きていないのか分からない。
-   *
-   * ①（はじめての人）では効かせない。履歴が無いので resume は必ず空振りし、
-   * 呼ぶだけ1クエリ増える。
+   * ブロック解除後も続きから配信できるよう、対象者すべての paused 購読を再開する。
+   * 既存購読は部分 UNIQUE 索引（status != 'completed'）により新規登録できないため、登録だけでは再開できない。
    */
   const wantResume = classifiedKind === 'returning' && routing.returning.startPosition === 'resume';
 

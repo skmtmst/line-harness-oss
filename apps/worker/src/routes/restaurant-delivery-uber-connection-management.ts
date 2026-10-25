@@ -48,7 +48,7 @@ function failure(c: Context<Env>, result: Extract<ConnectionMutationResult, { ok
   });
 }
 
-/** Register the explicit provider check and one-shot disconnect management endpoints. */
+/** 事業者への明示確認と、一度限りの接続解除の入口を登録する。 */
 export function registerUberConnectionManagementRoutes(
   app: Hono<Env>,
   deps: UberConnectionManagementDeps,

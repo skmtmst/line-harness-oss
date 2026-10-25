@@ -90,21 +90,21 @@ export interface CreateAffiliateInput {
   /** Optional LINE friend UUID to bind for self-serve (LIFF) affiliates. */
   friendId?: string | null;
   /**
-   * Stable per-attempt UUID from the client (#686). When the create commits
+   * Stable per-attempt UUID from the client. When the create commits
    * but the response is lost, the client retries with the SAME operationId;
    * this lets the retry recover the original row instead of creating a
    * duplicate affiliate.
    */
   operationId?: string | null;
   /**
-   * R525: 作った直後の稼働状態。「すぐに計測を始める」をオフで登録したら
+   * 作った直後の稼働状態。「すぐに計測を始める」をオフで登録したら
    * 最初のINSERTから停止(0)で作る。オンのまま2段階目が失敗しても稼働で
    * 残る——という取り違えを、作り口で断つ。省略時は稼働(1)のまま。
    */
   isActive?: boolean;
 }
 
-/** Look up a prior create by its client-supplied operation UUID (idempotent replay, #686). */
+/** Look up a prior create by its client-supplied operation UUID (idempotent replay). */
 async function findAffiliateByOperationId(
   db: D1Database,
   tenantId: string,
@@ -151,7 +151,7 @@ export async function createAffiliate(
         input.name,
         input.code,
         input.commissionRate ?? 0,
-        // R525: 計測オフの登録は最初から停止で作る（省略時は稼働）。
+        // 計測オフの登録は最初から停止で作る（省略時は稼働）。
         input.isActive === false ? 0 : 1,
         now,
         input.friendId ?? null,
@@ -181,9 +181,9 @@ export interface CreateAffiliateWithRandomCodeInput {
   rewardMode?: 'none' | 'fixed' | 'rate';
   /** Optional LINE friend UUID to bind (enforced 1:1 by the partial UNIQUE index). */
   friendId?: string | null;
-  /** See CreateAffiliateInput.operationId (#686). */
+  /** See CreateAffiliateInput.operationId. */
   operationId?: string | null;
-  /** See CreateAffiliateInput.isActive (R525). */
+  /** See CreateAffiliateInput.isActive. */
   isActive?: boolean;
 }
 
@@ -234,7 +234,7 @@ export async function createAffiliateWithRandomCode(
           input.name,
           code,
           input.commissionRate ?? 0,
-          // R525: 計測オフの登録は最初から停止で作る（省略時は稼働）。
+          // 計測オフの登録は最初から停止で作る（省略時は稼働）。
           input.isActive === false ? 0 : 1,
           now,
           input.friendId ?? null,

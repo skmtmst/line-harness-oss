@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { evaluateQuota, shortfallMessage } from './broadcast-quota-guard';
 
 /**
- * 予約配信の送信直前に、残りの送信枠を確かめる（台帳 Issue #120）。
+ * 予約配信の送信直前に、残りの送信枠を確かめる（台帳 Issue）。
  *
  * 設計 `Bw0zt` は「予約時刻の直前に対象人数と送信枠を再確認します。」と
  * 約束している。**予約したあとに枠を使い切ると、予約は実行されるが途中で

@@ -119,7 +119,7 @@ export interface FormCapacitySlot {
 export const FORM_TOTAL_LIMIT_SLOT_KEY = '__total__';
 
 /**
- * この回答が原子的に確保すべき枠を列挙する(N-167 / #751)。
+ * この回答が原子的に確保すべき枠を列挙する。
  *
  * `checkFormGates` の全体上限・選択肢定員の判定は「数えてから比べる」
  * だけで、同時に来た別の回答との間に隙間がある。ここで列挙した枠を
@@ -337,7 +337,7 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
 }
 
 /**
- * layout の後処理が進める内側の工程 id の一覧(N-168)。
+ * layout の後処理が進める内側の工程 id の一覧。
  *
  * `applyFormLayoutEffects` は工程ごとに `layout:<id>` という記録を残す。
  * 回答とレイアウトから「あるべき工程」をここで組み立て、予約(claim)の
@@ -478,7 +478,7 @@ async function writeDestinations(
     const target = await getFriendFieldById(db, fieldId);
     if (!target || target.ec_is_master === 1) continue;
     await trackDestinationWrite(stats, 1, async () => {
-      // N-042: 生の回答を項目の型で検証し、正規化した値を保存する。
+      // 生の回答を項目の型で検証し、正規化した値を保存する。
       // toText で先に文字列化すると、multi_select の正しい選択まで
       // 1つの文字列として弾かれるので、配列のまま検証する。
       const rawForCheck = Array.isArray(value) && target.type === 'multi_select' ? value : text;
@@ -615,7 +615,7 @@ async function applyChoiceFriendField(
   await trackDestinationWrite(stats, 1, async () => {
     // 値を書いていない選択肢は、ラベルをそのまま入れる
     const value = choice.value && choice.value !== '' ? choice.value : choice.label;
-    // N-042: 選択肢の値も項目の型で検証する。合わなければ保存せず
+    // 選択肢の値も項目の型で検証する。合わなければ保存せず
     // 失敗に数える(設定側の直しが必要なため、黙って通さない)。
     const checked = validateFriendFieldValue(target, value);
     if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
@@ -699,7 +699,7 @@ export async function runFormAction(
       if (!template) return;
       // テキストは従来どおり本文をそのまま送る。Flex などそれ以外は
       // 配信側と同じ組み立て(buildMessage)を通して実際に送る。
-      // N-177: 以前は非テキストを warn して素通りしていたため、選んだ
+      // 選んだ非テキストのテンプレートも配信対象なので、組み立てて送信する。
       // テンプレートが顧客にも運用にも見えず届かなかった。
       // {{var.*}} の共通情報は消えていれば fail-closed で止め、
       // 解決できるものは送信時点の値へ置き換える。
@@ -750,7 +750,7 @@ export async function runFormAction(
       const target = await getFriendFieldById(db, action.fieldId);
       if (!target || target.ec_is_master === 1) return;
       const write = async () => {
-        // N-042: 動作の値も項目の型で検証する。合わなければ保存しない。
+        // 動作の値も項目の型で検証する。合わなければ保存しない。
         const checked = validateFriendFieldValue(target, action.value ?? '');
         if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`);
         await setFriendFieldValue(db, {

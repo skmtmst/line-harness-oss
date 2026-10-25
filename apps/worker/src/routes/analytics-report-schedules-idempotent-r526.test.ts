@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';
 
 /**
- * R526: 定期レポート作成の応答消失後に再試行しても、有効な予約は1件。
+ * 定期レポート作成の応答消失後に再試行しても、有効な予約は1件。
  *
  * 作成に要求キー（`Idempotency-Key`）を付け、同じキー＋同じ内容なら
  * 既にある予約を返す。実 Worker（`apps/worker/src/routes/analytics.ts` を

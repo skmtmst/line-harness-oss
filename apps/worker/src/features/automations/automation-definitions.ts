@@ -245,7 +245,7 @@ async function requireCurrentVersion(
 
 /**
  * 確認画面で見せた共通アクションの版の一式を、実行前のいま解決される版と
- * 照合する（監査 R487）。
+ * 照合する。
  *
  * - 下書きに共通アクションが無いときは `null`（照合なし）。
  * - 共通アクションがあるのに照合用の一式が来ていない・形が違うときは、
@@ -417,17 +417,17 @@ export async function runAutomationTest(
     friendId: unknown;
     lineAccountId: string;
     credentialEncryptionKey?: string;
-    /** F-14: 担当者通知の送達に使う環境（メール経路用）。 */
+    /** 担当者通知の送達に使う環境（メール経路用）。 */
     operatorMailEnv?: import('../../worker-env.js').Env['Bindings'];
     /**
-     * 同じ確認画面の操作を識別する鍵（R484）。確認を開くたびに画面が振る。
+     * 同じ確認画面の操作を識別する鍵。確認を開くたびに画面が振る。
      * 応答が失われたあとの再試行は同じ鍵で来るので、2件目の実行を作らず
      * 初回の実行を返す。鍵が無い・形が違う呼び出しは古い画面と見て、
      * 従来どおり新しい実行を作る。
      */
     operationKey?: unknown;
     /**
-     * 監査 R487: 確認画面で出した「この共通アクションはこの版を使う」の一式。
+     * 監査 : 確認画面で出した「この共通アクションはこの版を使う」の一式。
      * 下書きの版と指紋は束の切り替えを検知できないため、確認後に別担当が
      * 利用版を切り替えると、確認していない新版が送られてしまう。
      * 下書きに共通アクションを含むときは必須とし、1件でも解決版と
@@ -461,7 +461,7 @@ export async function runAutomationTest(
    */
   const version = await requireCurrentVersion(db, input, { requireFingerprint: true });
   /*
-   * R487: 確認時に見せた共通アクションの版が、いま解決される版と同じか。
+   * 確認時に見せた共通アクションの版が、いま解決される版と同じか。
    * 束の切り替えは下書きの版・指紋を変えないので、ここで別に照合する。
    * 「確認した版と違う」「照合用の一式が来ていない」ときは送らない。
    */
@@ -486,7 +486,7 @@ export async function runAutomationTest(
       WHERE f.id = ? AND f.line_account_id = ? AND (${where.sql}) LIMIT 1`,
   ).bind(friendId, input.lineAccountId, ...where.bindings).first<{ ok: number }>();
   /*
-   * R484: 同じ確認の再試行は同じ鍵で来る。先に初回の実行を探し、
+   * 同じ確認の再試行は同じ鍵で来る。先に初回の実行を探し、
    * あれば作らずにそれを返す（副作用は1件のまま）。
    * 応答が届く前に止まった再試行（まだ queued/waiting）もここで拾うので、
    * 作り直して二重に送ることはない。
@@ -551,7 +551,7 @@ export async function runAutomationTest(
 }
 
 /**
- * 定義の稼働状態を切り替える（#942 N-352：一覧の「保管」と稼働切替）。
+ * 定義の稼働状態を切り替える（ ：一覧の「保管」と稼働切替）。
  *
  * - `active`：公開済みの版がある定義だけ動かせる。下書きだけの定義は
  *   先に `publishAutomationDraft` で公開する。

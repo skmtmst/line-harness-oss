@@ -225,7 +225,7 @@ describe('取り込みの競合検出と実行', () => {
 });
 
 /**
- * Issue #1012 FRIEND-34/35/36: 一部失敗の切り戻し・移行後変更の照合・
+ * 一部失敗の切り戻し・移行後変更の照合・
  * 二重実行の抑止。実Honoルートに模擬DBを当てる。
  */
 const APPLIED_ITEM = {
@@ -274,7 +274,7 @@ describe('切り戻しの可否と照合（FRIEND-34/35/36）', () => {
       { id: 'f-old', user_id: 'user-merged' },
       { id: 'f-new', user_id: 'user-merged' },
     ] });
-    // R396: ペア2件の書き戻しは1文で2件一致する。
+    // ペア2件の書き戻しは1文で2件一致する。
     run.mockResolvedValue({ meta: { changes: 2 } });
     vi.mocked(env.DB.batch).mockResolvedValue([{ meta: { changes: 2 } }, { meta: { changes: 1 } }, { meta: { changes: 1 } }] as never);
     const response = await appFor().fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
@@ -283,7 +283,7 @@ describe('切り戻しの可否と照合（FRIEND-34/35/36）', () => {
     expect(body.data.status).toBe('rolled_back');
     expect(body.data.rolledBack).toBe(1);
     expect(body.data.rollbackable).toBe(false);
-    // FRIEND-35/R396: 現在値をWHERE条件に含む書き戻し（照合と書込みの二重防御）。
+    // 現在値をWHERE条件に含む書き戻し（照合と書込みの二重防御）。
     // ペア2件は1文（CASE）で同時に戻し、部分復旧を出さない。
     const sqls = prepare.mock.calls.map(([sql]) => String(sql));
     expect(sqls.some((sql) => /UPDATE friends\s+SET user_id = CASE/i.test(sql))).toBe(true);

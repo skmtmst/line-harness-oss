@@ -67,7 +67,7 @@ export const use__api_restaurant_test__4 = async (c: Context<Env, "/api/restaura
     return c.json({ success: false, error: 'この統括を操作する権限がありません' }, 403);
   }
 
-  // The existing account_id visibility check intentionally remains unchanged.
+  // 既存の account_id の可視範囲検査を維持する。
   const selectedAccount = accountId(c);
   if (!selectedAccount) return next();
   const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
@@ -247,7 +247,7 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
   await applyDueRestaurantMenuPrices(dbFor(c.env), organization.id, organization.scopedStoreId ?? undefined);
   const orgId = organization.id;
   const scopedStoreId = organization.scopedStoreId;
-  // R103: 予約台帳の絞り込み（期間・状態）とページ切替。既定は従来どおり先頭300件。
+  // 予約台帳の絞り込み（期間・状態）とページ切替。既定は従来どおり先頭300件。
   const reservationFilter = parseReservationFilter(c, orgId, scopedStoreId);
   if (!reservationFilter.ok) return c.json({ success: false, error: reservationFilter.error }, 400);
   const [stores, memberships, approvals, reservationTotal, reservations, tables, inventory, menuItems, connectors, reviews, posts, lineFlows] = await Promise.all([

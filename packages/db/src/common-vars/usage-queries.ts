@@ -30,7 +30,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'broadcast',
-    // IDEA-14: 送信を始めた配信は、使う共通情報の値を送信開始時点の
+    // 送信を始めた配信は、使う共通情報の値を送信開始時点の
     // スナップショットで固定する（common-var-snapshot.ts）。固定済みのものは
     // 共通情報を直してももう変わらないので、予約中とは別の状態名で返す。
     // snapshot がまだ無い sending（開始直後の短い隙間・失敗からの再開待ち）は

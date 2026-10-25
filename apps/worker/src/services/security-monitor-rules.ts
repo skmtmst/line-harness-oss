@@ -13,7 +13,7 @@ export type SecurityRuleKey = keyof typeof SECURITY_RULES;
 export type SecurityThresholds = Record<SecurityRuleKey, number>;
 export const SECURITY_WINDOW_MINUTES = 15;
 
-/** Invalid settings cannot silently turn off monitoring. No dynamic SQL comes from settings. */
+/** 不正設定で監視を黙って無効にせず、設定から動的 SQL を作らない。 */
 export function securityThresholds(raw?: string): { values: SecurityThresholds; invalid: boolean } {
   const values = Object.fromEntries(Object.entries(SECURITY_RULES).map(([key, rule]) => [key, rule.threshold])) as SecurityThresholds;
   if (!raw) return { values, invalid: false };

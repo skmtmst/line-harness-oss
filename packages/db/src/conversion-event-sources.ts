@@ -6,15 +6,15 @@ import { trackConversion } from './conversions/index.js';
 /**
  * コンバージョン起点 → 実イベントの接続口。
  *
- * 画面で選べる6起点のうち、url_reach 以外の5つは自動計測されていなかった
- * (#648)。各業務イベントの発生点からこの関数を呼ぶと、一致する計測中の
+ * 画面で選べる6起点のうち、url_reach 以外の5つを自動計測する。
+ * 各業務イベントの発生点からこの関数を呼ぶと、一致する計測中の
  * 成果地点を探して trackConversion へ渡す。記録の重複排除・一人一回判定・
  * 同時到着の競合は trackConversion 側(冪等キー+一意索引)が受け持つ。
  *
  * 失敗しても呼び出し元の業務処理は巻き添えにしない。呼び出し側は
  * executionCtx.waitUntil(it) で best-effort 実行すること。
  *
- * **なぜ apps/worker ではなく packages/db に置くか(#648 の差し戻し)。**
+ * **なぜ apps/worker ではなく packages/db に置くか。**
  * 「タグが付いた」を数える口を worker のサービスに置いたところ、
  * `attachTagAndFireSideEffects` を通る経路でしか数えられず、友だち詳細画面の
  * 手動タグ付けやオートメーションのタグ付けアクション(いずれも db の
@@ -53,7 +53,7 @@ export interface ConversionSourceEvent {
   /** conversion_events.metadata に残す追加情報。 */
   metadata?: Record<string, unknown> | null;
   /**
-   * 起点が持つ1件あたりの金額(R42。例: EC注文の合計)。
+   * 起点が持つ1件あたりの金額(例: EC注文の合計)。
    * `value_mode='source'` の地点だけに効き、無い・不正なときは
    * 金額なし(NULL)で記録する。0 へ倒さない。
    */
@@ -64,7 +64,7 @@ export interface ConversionSourceResult {
   matched: number;
   recorded: number;
   failed: number;
-  /** 「数えない条件」に当てはまり数えなかった地点の数(R40)。 */
+  /** 「数えない条件」に当てはまり数えなかった地点の数。 */
   excluded: number;
   /** 何も数えなかった理由。数えたときは null。 */
   skipped: 'unknown_source' | 'invalid_input' | 'friend_not_found' | 'account_mismatch' | null;
@@ -99,7 +99,7 @@ export async function recordConversionSourceEvent(
   const empty: ConversionSourceResult = { matched: 0, recorded: 0, failed: 0, excluded: 0, skipped: null };
 
   if (!isConversionSourceType(event.sourceType)) {
-    // 未対応イベントは捨てず、運用者が後で辿れる形で残す(#648 完了条件)。
+    // 未対応イベントは捨てず、運用者が後で辿れる形で残す。
     logger.log("conversion_source_unmatched");
     return { ...empty, skipped: 'unknown_source' };
   }
@@ -108,7 +108,7 @@ export async function recordConversionSourceEvent(
   }
 
   /*
-   * 友だちの所属と、数えられる地点を **1回の往復で** 引く(#648 の差し戻し)。
+   * 友だちの所属と、数えられる地点を **1回の往復で** 引く。
    *
    * この関数はタグが1本新しく付くたびに走る。友だちを引いてから地点を引く
    * 2回の形だと、一括タグ付けで N 件付けたときに 2N 回の往復になる。
@@ -164,13 +164,13 @@ export async function recordConversionSourceEvent(
         friendId: event.friendId,
         metadata,
         idempotencyKey: key,
-        // R42: 起点の金額を source 方式の地点へ渡す。無いときは
+        // 起点の金額を source 方式の地点へ渡す。無いときは
         // trackConversion 側で金額なし(NULL)になる。
         value: event.value ?? null,
       });
       recorded += 1;
     } catch (error) {
-      // R40: 除外は失敗ではない。除いたことが分かるよう数だけ残す。
+      // 除外は失敗ではない。除いたことが分かるよう数だけ残す。
       if (error instanceof Error && error.message === 'conversion_excluded') {
         excluded += 1;
         continue;

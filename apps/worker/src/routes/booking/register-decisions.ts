@@ -108,7 +108,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
 
   if (next === 'confirmed') {
     await runConfirmedBookingSideEffects(c.env.DB, id, { credentials: googleCredentials(c.env) });
-    // R150: 「予約が入ったとき」の送信Webhook購読者へも届ける。
+    // 「予約が入ったとき」の送信Webhook購読者へも届ける。
     c.executionCtx.waitUntil(
       fireOutgoingWebhooks(c.env.DB, 'booking_created', {
         friendId: row.friend_id ?? undefined,
@@ -125,7 +125,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       }, accountId).catch((err) => logger.error("booking.admin_requests_by_id_update_failed")),
     );
   } else if (next === 'rejected') {
-    // N-065: 却下でも の未送信予定は止める (通知だけでは送り続ける)。
+    // 却下でも の未送信予定は止める (通知だけでは送り続ける)。
     // 送信権の貸出中は 409 で再試行させる (取消確定後の送信を起こさない)。
     try {
       await cancelByTrigger(c.env.DB, {
@@ -155,7 +155,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       }
       throw error;
     }
-    // R324: 却下が確定したら古い確定案内などの未成功行を止める。
+    // 却下が確定したら古い確定案内などの未成功行を止める。
     // これから送る rejected 通知の行はまだ無いため巻き込まない。
     await cancelObsoleteConfirmationRuns(c.env.DB, id, accountId);
     c.executionCtx.waitUntil(
@@ -164,7 +164,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       ),
     );
   } else if (next === 'cancelled' || next === 'expired') {
-    // N-065: の未送信予定だけを止める。送信済み履歴は残す。
+    // の未送信予定だけを止める。送信済み履歴は残す。
     // 旧表の取消は fence 成功の後に回す: fence の 409 では旧表も
     // 含めて完全 rollback する (先に止めると巻き戻せない)。
     // 送信権の貸出中は状態更新を巻き戻して 409 にする
@@ -196,7 +196,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       throw error;
     }
     await cancelLegacyBookingReminders(c.env.DB, id);
-    // R324: 取消・期限切れが確定したら古い確定案内などの未成功行を止める。
+    // 取消・期限切れが確定したら古い確定案内などの未成功行を止める。
     await cancelObsoleteConfirmationRuns(c.env.DB, id, accountId);
     // Calendar 削除は台帳駆動 (安定キーで1行)。の fence 成功後に登録する:
     // 送信権の貸出中で巻き戻した 409 の後に queued 行が残ると、cron が確定
@@ -225,10 +225,10 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     }
   }
 
-  // R329: 成功履歴は取消ガードと状態確定の後に残す。送信中の 409 で
+  // 成功履歴は取消ガードと状態確定の後に残す。送信中の 409 で
   // 巻き戻したときはここへ来ないため、成立していない取消・拒否の
   // 履歴は残らない。
-  // N-394: 状態遷移も監査へ残す。誰が・いつ・何へ変えたかを後から追えるようにする。
+  // 状態遷移も監査へ残す。誰が・いつ・何へ変えたかを後から追えるようにする。
   await recordBookingAudit(c.env.DB, {
     bookingId: id,
     lineAccountId: accountId,
@@ -243,7 +243,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   return c.json({ status: next });
 });
 
-// Pending count for sidebar badge.
+
 booking.get('/api/booking/admin/pending-count', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);

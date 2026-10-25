@@ -6,9 +6,7 @@ import { friendAttributes } from './friend-attributes.js';
 import type { Env } from '../worker-env.js';
 
 /*
- * V6R-S2-c: 隣り合う2つのフォルダの並びを1回で入れ替える。
- * 以前は画面が PATCH を2回送り、1回目だけ成功すると同じ番号が2つ残った。
- * 番号が同じ2つは交換しても並びが変わらなかった。
+ * 片側だけ成功して同じ順序番号が残らないよう、隣り合うフォルダの並びを1回の操作で交換することを確かめる。
  */
 
 let fixture: SqliteD1;

@@ -43,9 +43,9 @@ export async function resourceExists(db: D1Database, table: string, id: string):
 }
 
 /**
- * N-053: アクション保存前の参照検証。存在しない参照・別アカウント参照を弾く。
+ * アクション保存前の参照検証。存在しない参照・別アカウント参照を弾く。
  *
- * #644 の既存契約に合わせる。シナリオ側が共通（NULL）なら確かめない。
+ * 既存の参照の決まりに合わせる。シナリオ側が共通（NULL）なら確かめない。
  * 資源側の共通（NULL）は tag/template/scenario の3種だけ通し、それ以外へは
  * 推測で広げない。通すのは「ある」だけでなく「そのシナリオで使える」行だけ。
  * 書き込みはしない。呼び側が保存の前に呼ぶ。
@@ -90,7 +90,7 @@ export async function validateScenarioActionReferences(
   };
 
   /**
-   * N-053 R2: 範囲表つき資源（対応マーク・友だち情報欄）の所有境界。
+   * 範囲表つき資源（対応マーク・友だち情報欄）の所有境界。
    * 可視条件は各機能の取得口と同一にする（support-marks.ts・friend-fields.ts）。
    * 範囲表が無い昔の行は既定統括の共通扱い（196・198 と同じ扱い）。
    */

@@ -199,10 +199,7 @@ accountSettings.put('/api/account-settings/test-recipients', requireRole('owner'
 
 // ── link_base_url (global setting, stored under sentinel '__global__') ─────────
 
-/**
- * GET /api/account-settings/link-base-url
- * Returns the configured short-link base URL (or null if not set).
- */
+
 accountSettings.get('/api/account-settings/link-base-url', async (c) => {
   const value = await getLinkBaseUrl(c.env.DB, '__global__');
   return c.json({ success: true, data: value });
@@ -230,9 +227,7 @@ accountSettings.put('/api/account-settings/link-base-url', requireRole('owner'),
   }
 });
 
-// ── tracked_link_base_url (global setting) ────────────────────────────────────
-// Base domain for message tracked links (/t/<code>). The domain must route
-// /t/* to the Worker (Redirect Rule or Custom Domain). Unset → WORKER_URL.
+// 計測リンクの独自ドメインは /t/* を Worker へ向ける必要がある。未設定なら WORKER_URL を使う。
 
 accountSettings.get('/api/account-settings/tracked-link-base-url', async (c) => {
   const value = await getTrackedLinkBaseUrl(c.env.DB, '__global__');

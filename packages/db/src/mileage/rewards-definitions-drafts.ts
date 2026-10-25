@@ -54,8 +54,8 @@ export async function updateMileageRewardDraft(
 ): Promise<MileageRewardSummary> {
   const draft = validateMileageRewardDraft(input.draft);
   await requirePublishedActionVersion(db, input.lineAccountId, draft.commonActionVersionId);
-  // R375: 書く前に所属と版IDを照合する。版のUPDATEだけ所属を見ない形にしない。
-  // R374: 読み込んだ更新番号と一致する保存だけ通す。
+  // 書く前に所属と版IDを照合する。版のUPDATEだけ所属を見ない形にしない。
+  // 読み込んだ更新番号と一致する保存だけ通す。
   const current = await db.prepare(
     `SELECT r.current_draft_version_id AS draft_version_id, v.revision AS revision
        FROM mileage_rewards r
@@ -148,7 +148,7 @@ export async function createMileageRewardDraftFromPublished(
       ).bind(versionId, now, input.id, input.lineAccountId),
     ]);
   } catch (error) {
-    // R377: 同時に作った片方は版番号の一意制約に当たる。共同編集の正常な
+    // 同時に作った片方は版番号の一意制約に当たる。共同編集の正常な
     // 競合なので、一般的なサーバーエラーにせず読み直しを案内する。
     if (error instanceof Error && /unique|UNIQUE/i.test(error.message)) {
       throw new MileageRewardError('draft_exists', 'ほかの担当者が下書きを作成済みです。読み直してください', 409);
@@ -179,7 +179,7 @@ export async function publishMileageReward(
   if (!reward || !draft || !reward.currentDraftVersionId) {
     throw new MileageRewardError('draft_missing', '公開する下書きがありません', 409);
   }
-  // R376: 公開者が確認した版と更新番号を要求に含め、検証から確定まで
+  // 公開者が確認した版と更新番号を要求に含め、検証から確定まで
   // 同じ内容を保証する。途中で保存されたら公開を止めて確認し直す。
   if (input.expectedVersionId != null && input.expectedVersionId !== draft.id) {
     throw new MileageRewardError('version_conflict', '公開前に内容が変わりました。読み直してください', 409);

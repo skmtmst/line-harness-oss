@@ -6,7 +6,7 @@ import { listAccessUsers, listAuditEvents, recordAuditEvent } from '../src/acces
 import { asD1 } from './d1-test-helper.js';
 
 /*
- * Issue #620: ログインユーザー検索が不存在語で0件にならない。
+ * ログインユーザー検索が不存在語で0件にならない。
  *
  * 画面の検索欄は「人の名前・メールで検索」。照合は表示中の
  * 名前・職位・（権限のあるとき）メールだけに限る。
@@ -163,7 +163,7 @@ describe('入った記録検索の照合 (#620)', () => {
   });
 
   it('検索語の % や _ をワイルドカードとして扱わない', async () => {
-    // 以前は `%語%` の LIKE だったため、「%」1文字で全件に一致していた。
+    // `%語%` の LIKE のままだと、「%」1文字で全件に一致してしまう。
     for (const term of ['%', '_']) {
       const result = await listAuditEvents(db, {
         tenantId: TENANT, allowedLineAccountIds: ['account-a'], query: term,

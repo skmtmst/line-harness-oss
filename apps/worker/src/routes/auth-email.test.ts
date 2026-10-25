@@ -326,9 +326,7 @@ describe('メール＋パスワードのログイン', () => {
   });
 
   /*
-   * 誰も自己登録しないまま他人を招待すると、以前は互換判定まで閉じてしまい
-   * 運営マスターが 0 人のまま誰も入れなくなっていた（招待メールが失効すると
-   * 再送も運営権限を要求するため画面から復旧できない）。
+   * 未登録の招待行で互換判定を閉じると有効な運営マスターが0人になり、招待失効後の再送もできなくなるため、招待中は入口を維持する。
    */
   it('他人の招待が保留中でも、既定の統括のオーナーは互換判定で入れる', async () => {
     await seedOwner();
@@ -384,7 +382,7 @@ describe('パスワード再設定（36-6）', () => {
   });
 
   it('同じメールに複数の権限者がいてどれも パスワード無しなら送らない（誰宛か決められない）', async () => {
-    // M958: 同じ統括での重複は一意制約で作れない。統括を分けた重複（運用上あり得る）で曖昧さを確かめる。
+    // 同じ統括での重複は一意制約で作れない。統括を分けた重複（運用上あり得る）で曖昧さを確かめる。
     testDb.raw.prepare(`INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('a', 'A', 'dup@example.com', 'admin', 'k1', 'tenant-a'), ('b', 'B', 'dup@example.com', 'admin', 'k2', 'tenant-b')`).run();
     await call('POST', '/api/auth/password/forgot', { email: 'dup@example.com', turnstileToken: 'tok' });
     expect(mail.sendPlainMail).not.toHaveBeenCalled();

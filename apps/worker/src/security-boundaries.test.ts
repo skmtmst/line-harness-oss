@@ -24,7 +24,7 @@ describe('tenant and public boundaries', () => {
     expect(await linkFriendToUser(f.db, 'fb', user.id)).toBe(false);
     f.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a2','ch-a2','A2','','','tenant-a'); INSERT INTO friends(id,line_user_id,line_account_id,metadata) VALUES('fa2','Ua2','a2','{\"vip\":\"yes\"}')");
     expect(await linkFriendToUser(f.db, 'fa2', user.id)).toBe(true);
-    // Also isolate already contaminated legacy records rather than trusting a shared UUID.
+    // 共通 UUID を信用せず、所属が混ざった保存済み行も隔離する。
     f.raw.prepare('UPDATE friends SET user_id=? WHERE id=?').run(user.id, 'fb');
     expect(await getMergedMetadataByUserId(f.db, user.id, 'a')).toEqual({ phone: 'A', vip: 'yes' });
     expect(await getMergedMetadataByUserId(f.db, user.id, 'b')).toEqual({ phone: 'B' });

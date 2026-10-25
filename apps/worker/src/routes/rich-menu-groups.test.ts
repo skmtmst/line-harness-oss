@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 
-// Mock @line-crm/db so we can drive the route purely from this test file.
+// route の動作に集中できるよう、DB だけを差し替える。
 const dbMocks = {
   getRichMenuGroups: vi.fn(),
   getRichMenuGroupById: vi.fn(),
@@ -44,7 +44,7 @@ const dbMocks = {
   restartRichMenuManualPublishRequest: vi.fn(),
   markRichMenuGroupUnpublished: vi.fn(),
   getTrackedLinkById: vi.fn(),
-  // N-163: 検索語の正規化は route 側でも使うので実装をそのまま置く。
+  // 検索語の正規化は route 側でも使うので実装をそのまま置く。
   normalizeRichMenuSearchText: (value: string) => value.toLowerCase().replace(/[\s　]+/g, ''),
   listRichMenuGroupIdsByAreaLabel: vi.fn(async () => new Set<string>()),
   duplicateRichMenuGroupAtomic: vi.fn(),
@@ -98,7 +98,7 @@ const accountAccessMocks = {
 };
 vi.mock('../services/account-access.js', () => accountAccessMocks);
 
-// Re-import after mock so the module picks up mocked deps.
+// モック登録後に再読込し、差し替えた依存を使う。
 const { richMenuGroups } = await import('./rich-menu-groups.js');
 
 type TestEnv = {
@@ -126,9 +126,7 @@ function makeR2Stub(): R2Bucket {
   } as any;
 }
 
-// Minimal D1 stub for routes that issue ad-hoc SQL outside the @line-crm/db
-// helpers (例: GET /api/rich-menu-groups の thumbnail JOIN クエリ)。
-// 空 results / null を返すことで route の「サムネなし」分岐を通す。
+// DB ヘルパ以外の SQL は空の results/null を返し、サムネイルなしの route 分岐を試す。
 function makeMinimalDbStub(): D1Database {
   const empty = { results: [] };
   return {
@@ -852,7 +850,7 @@ describe('PATCH /api/rich-menu-groups/:groupId', () => {
       body: JSON.stringify({ expectedVersion: 1, name: 'new', isDefaultForAll: true }),
     });
     expect(res.status).toBe(200);
-    // M950/M951: meta も pages も saveRichMenuGroupDraft の1件で確定する。
+    // /meta も pages も saveRichMenuGroupDraft の1件で確定する。
     expect(dbMocks.saveRichMenuGroupDraft).toHaveBeenCalledWith(expect.anything(), 'g1', {
       meta: { name: 'new', isDefaultForAll: true },
       pages: undefined,
@@ -1431,7 +1429,7 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
   });
 });
 
-// ----- #502中 (PR #552): 優先順一括・冪等キー・作成時フォルダ・条件上限・外部応答の固定文言 -----
+// ----- 中 : 優先順一括・冪等キー・作成時フォルダ・条件上限・外部応答の固定文言 -----
 
 describe('POST /api/rich-menu-groups/reorder-priorities (#502中)', () => {
   test('id配列を1回でそろえ直す', async () => {

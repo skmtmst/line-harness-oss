@@ -437,7 +437,7 @@ describe('リマインダ配信の実行記録', () => {
     expect(pushes).toEqual(['U-friend-1'])
     // claim 拒否は握っていないため skipped に数えない。送らず止める約束は同じ。
     expect(result).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0, held: 0 })
-    // R339: 取消ずみの登録には実行行自体を作らない (取消時の回収が済みのため)。
+    // 取消ずみの登録には実行行自体を作らない (取消時の回収が済みのため)。
     expect(raw.prepare(
       `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-2'`,
     ).get()).toBeUndefined()

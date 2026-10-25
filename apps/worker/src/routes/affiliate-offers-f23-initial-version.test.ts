@@ -6,14 +6,8 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';
 
 /**
- * F-23 追補（2026-10-03 オーナー指示 O担当）。
- *
- * 公開案件の報酬を変えたら、変えたあとの成果は新額、変える前の成果と
- * 旧支払は当時額で凍結する。初回 POST の応答喪失・古い POST の再送でも
- * 報酬の版を壊さないことを、実 Worker + 実 D1（bootstrap.sql）で確かめる。
- *
- * apps/worker/src/routes/affiliate-offers.ts は本物のまま mount し、
- * @line-crm/db はモックしない。
+ * 公開案件の報酬変更後の成果は新額、変更前の成果と支払は当時額を保つ。
+ * 初回 POST の応答喪失や再送でも報酬の版を壊さないことを、実 Worker と bootstrap.sql を適用した実 SQLite で確かめる。route と DB 関数は差し替えない。
  */
 
 function asD1(sqlite: Database.Database): D1Database {

@@ -103,7 +103,7 @@ describe('HQ form atomic plans', () => {
     });
     const modes = ['create', 'overwrite', 'alias'] as const;
     test.each(modes.flatMap(selectionMode => modes.map(contextMode => ({ selectionMode, contextMode }))))('plan mode $contextMode must match selected operation $selectionMode', async ({ selectionMode, contextMode }) => {
-        // Make the selected operation valid independently of the envelope mode.
+        // 包装形式とは独立に、選んだ操作自体を有効にして試す。
         const existingId = selectionMode === 'create' ? null : await commit(await plan((await preflight('a1')).context));
         const { context } = await preflight('a1', selectionMode);
         const before = rows();

@@ -8,7 +8,7 @@ import type { Context } from 'hono';
 
 export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
   const ref = c.req.query('ref') || '';
-  // N-244差戻: 開始時にも停止判定する。停止前のページから停止後に押した
+  // 開始時にも停止判定する。停止前のページから停止後に押した
   // 場合を拒否する。不存在 ref は共有 namespace の正規フローのため通す。
   // DB 読取失敗は fail-closed (止める側) に倒す。
   if (await isStoppedEntryRouteRef(c.env.DB, ref)) {
@@ -24,28 +24,20 @@ export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
   const utmMedium = c.req.query('utm_medium') || '';
   const utmCampaign = c.req.query('utm_campaign') || '';
   let accountParam = c.req.query('account') || '';
-  const uidParam = c.req.query('uid') || ''; // existing user UUID for cross-account linking
-  const igParam = c.req.query('ig') || ''; // IG Harness IGSID for cross-platform linking
-  const igaParam = c.req.query('iga') || ''; // IG Harness business account id
-  const iganParam = c.req.query('igan') || ''; // IG Harness business account @username
-  let poolAccount = ''; // pool's channel_id — passed via state only, not accountParam
+  const uidParam = c.req.query('uid') || ''; // アカウント間の連携に使う既存の本人 UUID。
+  const igParam = c.req.query('ig') || ''; // IG と LINE を結び付ける IGSID。
+  const igaParam = c.req.query('iga') || ''; // 流入元の IG ビジネスアカウント ID。
+  const iganParam = c.req.query('igan') || ''; // 流入元の IG ビジネスアカウント名。
+  let poolAccount = ''; // プールの channel_id は state でだけ引き継ぎ、accountParam に混ぜない。
   const baseUrl = new URL(c.req.url).origin;
 
   const ua = c.req.header('user-agent') || '';
 
-  // Multi-account: resolve LINE Login channel + LIFF
-  // Priority:
-  //   1. entry_route.pool_id (when ref resolves to a referral link)
-  //   2. ?account= explicit single-account override
-  //   3. ?pool= explicit override
-  //   4. 'main' traffic pool fallback
-  //   5. env default
+  // ログインチャネルと LIFF は、経路のプール、明示アカウント、明示プール、main、環境の既定の順で解決する。
   let channelId = c.env.LINE_LOGIN_CHANNEL_ID;
   let liffUrl = c.env.LIFF_URL;
 
-  // 1. entry_route → pool_id. getTrafficPoolById skips the is_active check
-  // that getTrafficPoolBySlug does for us, so we filter disabled pools here
-  // to honor an operator pause.
+  // ID によるプール取得は停止状態を絞らないため、運用者の停止を守るよう明示的に除外する。
   let resolvedPool: Awaited<ReturnType<typeof getTrafficPoolBySlug>> | null = null;
   if (ref) {
     const route = await getEntryRouteByRefCode(c.env.DB, ref);
@@ -81,12 +73,12 @@ export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
       } else {
         const allAccounts = await getPoolAccounts(c.env.DB, resolvedPool.id);
         if (allAccounts.length === 0) {
-          // No pool_accounts yet — fallback to active_account_id (migration period)
+          // プール内のアカウント行がまだなければ、保存済みの active_account_id へ戻す。
           if (resolvedPool.login_channel_id) channelId = resolvedPool.login_channel_id;
           if (resolvedPool.liff_id) liffUrl = `https://liff.line.me/${resolvedPool.liff_id}`;
           if (resolvedPool.channel_id) poolAccount = resolvedPool.channel_id;
         } else {
-          // All pool_accounts disabled — fail closed, don't leak to default account
+          // 全アカウントが停止中なら、既定アカウントへ漏らさず拒む。
           return c.text('このリンクは現在利用できません。しばらくしてからお試しください。', 503);
         }
       }
@@ -94,13 +86,10 @@ export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
   }
   const callbackUrl = `${baseUrl}/auth/callback`;
 
-  // xh: refs are X Harness one-time tokens — never forward to third-party URLs (liff.line.me / QR)
-  // The token must reach /auth/callback, so it IS included in the OAuth state (handled by this worker).
-  // It must NOT appear in LIFF URLs or QR codes that escape to external domains.
+  // xh: の秘密トークンは Worker のコールバックで解決する state にだけ含め、LIFF や QR の第三者 URL へ渡さない。
   const externalRef = ref.startsWith('xh:') ? '' : ref;
 
-  // Build LIFF URL with ref + ad params (for mobile → LINE app)
-  // Extract LIFF ID from URL and pass as query param so the app can init correctly
+  // モバイルで正しい LIFF を初期化できるよう、解決した LIFF ID と広告情報を引き継ぐ。
   const liffIdMatch = liffUrl.match(/liff\.line\.me\/([0-9]+-[A-Za-z0-9]+)/);
   const liffParams = new URLSearchParams();
   if (liffIdMatch) liffParams.set('liffId', liffIdMatch[1]);
@@ -123,14 +112,7 @@ export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
     ? `${liffUrl}?${liffParams.toString()}`
     : liffUrl;
 
-  // Build OAuth URL (for desktop fallback)
-  // Pack all tracking params into state so they survive the OAuth redirect.
-  // The full ref (including xh: tokens) is stored in state — it is opaque to access.line.me
-  // and only decoded by this worker's /auth/callback handler.
-  // gate / xh: campaign metadata that must reach the form push so the form
-  // can verify against the correct gate via the correct X Harness instance.
-  // Without these, the form falls back to the gateId baked into the form's
-  // onSubmitWebhookUrl (which is stale when a form is reused across campaigns).
+  // OAuth の移動で流入と条件を失わないよう state に保存する。xh: は Worker が復号する state 内だけに保ち、フォームの再利用でも正しい gate を引き継ぐ。
   const state = JSON.stringify({ ref, redirect, redirectProof: c.req.query('redirectProof') || '', form: formId, gate: gateParam, xh: xhParam2, gclid, fbclid, twclid, ttclid, utmSource, utmMedium, utmCampaign, account: accountParam || poolAccount, uid: uidParam, ig: igParam, iga: igaParam, igan: iganParam });
   const oauthNonce = crypto.randomUUID();
   const payload = encodeState(JSON.stringify({ data: state, nonce: oauthNonce, expires: Date.now() + 10 * 60_000 }));
@@ -144,11 +126,7 @@ export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
   loginUrl.searchParams.set('bot_prompt', 'aggressive');
   loginUrl.searchParams.set('state', encodedState);
 
-  // Build LIFF URL with params (opens LINE app directly on mobile + QR on PC)
-  // externalRef used — xh: tokens must not appear in QR codes or LIFF URLs
-  // gate/xh: campaign metadata that the LIFF page must see so it can verify
-  // against the correct gate (otherwise the form falls back to the stale gate
-  // baked into the form's webhook URL when forms are reused across campaigns).
+  // QR と LIFF URL には秘密トークンを除いた ref だけを載せる。フォームごとに固定された古い条件へ戻らないよう、gate/xh のキャンペーン情報は引き継ぐ。
   const qrParams = new URLSearchParams();
   if (liffIdMatch) qrParams.set('liffId', liffIdMatch[1]);
   if (externalRef) qrParams.set('ref', externalRef);
@@ -160,8 +138,7 @@ export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
   if (igParam) qrParams.set('ig', igParam);
   if (igaParam) qrParams.set('iga', igaParam);
   if (iganParam) qrParams.set('igan', iganParam);
-  // Ad click IDs + UTM — without these the PC/QR path loses ad attribution
-  // (same params /auth/line already reads for the OAuth state).
+  // PC・QR 経由でも帰属を失わないよう、広告クリック ID と UTM を引き継ぐ。
   if (gclid) qrParams.set('gclid', gclid);
   if (fbclid) qrParams.set('fbclid', fbclid);
   if (twclid) qrParams.set('twclid', twclid);
@@ -171,25 +148,14 @@ export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
   if (utmCampaign) qrParams.set('utm_campaign', utmCampaign);
   const qrUrl = qrParams.toString() ? `${liffUrl}?${qrParams.toString()}` : liffUrl;
 
-  // Mobile: route through /r/:ref so users get the OS-aware landing page
-  // (long-press hint on iOS, intent:// URL on Android) instead of being
-  // dropped onto liff.line.me directly. Direct liff.line.me redirects
-  // surface LINE Login web for UL-未学習 devices, which kills conversion.
-  // Exceptions:
-  //   - cross-account links (accountParam) → OAuth directly so the callback
-  //     can push from the correct account
-  //   - xh: refs (X Harness one-time tokens) → liff.line.me direct, since
-  //     these tokens must NEVER appear in third-party URLs and the
-  //     externalRef has already been zeroed for that case
-  //   - empty ref → liff.line.me direct (no /r/:ref to route to)
+  // 通常のモバイルは OS 別の起動回復がある /r/:ref へ案内する。明示アカウントは正しい送信元のため OAuth、秘密の xh: と空 ref は外部へ秘密を出さない LIFF の経路へ分ける。
   const isMobile = /iphone|ipad|android|mobile/.test(ua.toLowerCase());
   if (isMobile) {
     if (accountParam) {
       return c.redirect(loginUrl.toString());
     }
     if (externalRef) {
-      // Forward all relevant query params (form, gate, xh, ig, pool, redirect, ad ids).
-      // ref is already in the path; strip it from the query.
+      // form/gate/xh/ig/pool/redirect/広告 ID を引き継ぎ、パスに含まれる ref はクエリから除く。
       const reqUrl = new URL(c.req.url);
       const passthrough = new URLSearchParams();
       for (const [key, value] of reqUrl.searchParams) {
@@ -239,7 +205,7 @@ export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
 
 export const get__auth_oauth_2 = async (c: Context<Env, "/auth/oauth">) => {
   const ref = c.req.query('ref') || '';
-  // N-244差戻: /auth/line と同じく開始時に停止判定する。停止前のページから
+  // /auth/line と同じく開始時に停止判定する。停止前のページから
   // 停止後に押した場合を拒否する。不存在 ref は正規フローのため通す。
   if (await isStoppedEntryRouteRef(c.env.DB, ref)) {
     return c.html(ENTRY_ROUTE_STOPPED_HTML, 410);
@@ -291,7 +257,7 @@ export const get__auth_oauth_2 = async (c: Context<Env, "/auth/oauth">) => {
     }
   }
 
-  // Build OAuth URL with full state
+
   const callbackUrl = `${baseUrl}/auth/callback`;
   const state = JSON.stringify({
     ref, redirect, redirectProof: c.req.query('redirectProof') || '', form: formId, gate: gateParam, xh: xhParam,

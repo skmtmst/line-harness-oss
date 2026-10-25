@@ -23,10 +23,7 @@ export function serializeLineAccount(row: DbLineAccount) {
     timezone: row.timezone ?? 'Asia/Tokyo',
     revision: row.revision ?? 1,
     displayOrder: row.display_order,
-    // login_channel_id and liff_id are non-secret identifiers (visible in
-    // LINE Developers console, embedded in public LIFF URLs). Safe to expose
-    // in list responses so the admin UI can show "Login/LIFF configured?"
-    // without a separate fetch.
+    // 公開 URL や開発者設定にも出る login_channel_id/liff_id は秘密でないため、別の取得なしで設定有無を示せるよう一覧にも返す。
     loginChannelId: row.login_channel_id,
     liffId: row.liff_id,
     ogSiteName: row.og_site_name,
@@ -57,8 +54,6 @@ export function serializeLineAccount(row: DbLineAccount) {
 }
 
 export function serializeLineAccountFull(row: DbLineAccount) {
-  // Credential values are deliberately never returned after persistence.
-  // Owners rotate them by submitting a new value; the UI only sees whether
-  // each credential is configured.
+  // 保存済み資格情報は返さず、設定有無だけを表示する。変更時は新しい値を送って交換する。
   return serializeLineAccount(row);
 }

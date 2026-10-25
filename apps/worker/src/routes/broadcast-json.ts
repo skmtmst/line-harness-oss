@@ -1,13 +1,7 @@
 
 
 
-/**
- * Parse a D1 JSON-array column. Returns:
- *   - null if the column is null/undefined/empty string or parse fails
- *   - the value as-is if already an array (some D1 drivers auto-parse JSON columns)
- *   - the parsed array if the JSON is a valid string-array
- *   - null if parsed JSON is not an array (e.g., object, scalar)
- */
+/** D1 が配列を復号済みでも受け付ける。空・解析失敗・配列以外は null とし、応答側が配列と誤認しないようにする。 */
 export function parseJsonArray(s: unknown): string[] | null {
   if (!s) return null;
   if (Array.isArray(s)) return s as string[];

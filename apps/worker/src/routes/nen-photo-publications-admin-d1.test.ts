@@ -5,7 +5,7 @@ import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqli
 import { nenMembers } from './nen-members.js';
 
 /*
- * Issue #1040（IDEA-22 写真審査）の実DB契約。
+ * （ 写真審査）の実DB契約。
  * 「撤回後に残る公開先・対応状況を追え」「採用1回に対し付与1回」を、
  * 実SQLに当てて確認する。fakeの準備関数では SQL そのものを検証できないため、
  * ここでは better-sqlite3 上の bootstrap スキーマへ投げる。

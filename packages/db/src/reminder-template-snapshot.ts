@@ -2,7 +2,7 @@ import { sqlIdSet } from './id-queries.js';
 
 
 /**
- * R346: 登録時に使っていたテンプレートの公開版を写す。
+ * 登録時に使っていたテンプレートの公開版を写す。
  * {"テンプレートID": 公開版番号} の JSON。本文は作らない。
  * まだ公開されていない・消えたテンプレートは載せず、送るときに今の版を読む。
  */
@@ -25,7 +25,7 @@ export async function snapshotReminderTemplateVersions(
 
 
 /**
- * R346: 登録に残した版指定を読む。壊れた記録は「指定なし」と同じにする。
+ * 登録に残した版指定を読む。壊れた記録は「指定なし」と同じにする。
  */
 export function parseTemplateVersionSnapshot(
   value: string | null | undefined,

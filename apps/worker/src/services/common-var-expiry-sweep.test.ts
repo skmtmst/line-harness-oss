@@ -3,7 +3,7 @@ import { createCommonVar, deleteCommonVar, setCommonVarStatus } from '@line-crm/
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /*
- * Q: 期限の14日前・3日前の知らせは「同じ知らせを二度出さない」ことが肝。
+ * 期限の14日前・3日前の知らせは「同じ知らせを二度出さない」ことが肝。
  * 通知の送出はモックにして、sweep側の選択と記録だけを確かめる。
  */
 const dispatch = vi.hoisted(() => ({

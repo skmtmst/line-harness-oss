@@ -87,7 +87,7 @@ export function adConversionForEvent(
   }
   if (eventType === 'ec.order.confirmed' || eventType === 'ec.order.payment_received') {
     // 金額の読みどころを統一: 正規形 orderTotal → 互換 order.total → 旧 total。
-    // (EC側の通貨・単位の正規化は#1472の結合時に渡す。今は値だけ通す)
+    // (EC側の通貨・単位の正規化はの結合時に渡す。今は値だけ通す)
     const eventData = payload.eventData ?? {};
     const order = eventData.order as Record<string, unknown> | undefined;
     return {
@@ -98,15 +98,7 @@ export function adConversionForEvent(
   return null;
 }
 
-/**
- * Fire an event and run all registered handlers.
- *
- * Execution is split into two sequential phases so that score_threshold
- * conditions in automation rules see the score already updated by this event:
- *
- *   Phase 1 (concurrent): outgoing webhooks + scoring
- *   Phase 2 (concurrent): automations + notifications, with currentScore injected
- */
+/** 自動化のスコア条件が最新値を読めるよう、Webhook・スコア・広告通知を先に並行実行し、その後で更新済みスコアを自動化・通知へ渡す。 */
 export async function fireEvent(
   db: D1Database,
   eventType: string,
@@ -131,7 +123,7 @@ export async function fireEvent(
     outgoingWebhookLineAccountId = friend?.line_account_id;
   }
 
-  // Phase 1: fire webhooks, apply scoring rules, and ad conversion postback concurrently.
+  // Webhook・スコア更新・広告への成果通知は、互いに独立なので並行に進める。
   const phase1: Promise<unknown>[] = [
     ...(options?.internalOnly ? [] : [fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId, execution)]),
     replayStep(execution, 'event:scoring', () => processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken, execution)),
@@ -160,7 +152,7 @@ export async function fireEvent(
     throw new Error('incoming_event_phase_failed');
   }
 
-  // Build an enriched payload with the freshly-updated score.
+  // 自動化が古いスコアを読まないよう、更新後の値を入力へ含める。
   const enrichedPayload: EventPayload = payload.friendId
     ? {
         ...payload,
@@ -195,7 +187,7 @@ export async function fireEvent(
     }
   }
 
-  // Phase 2: evaluate automations.
+
   await replayStep(execution, 'event:legacy-automations', () => processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId, execution));
 
   // は発生元の不変IDとアカウントが分かるイベントだけを受け付ける。
@@ -212,7 +204,7 @@ export async function fireEvent(
     }, { emitEvent: fireEvent }));
   }
 
-  // Phase 3: リッチメニューの出し分けを見直す。
+  // リッチメニューの出し分けを見直す。
   //
   // オートメーションの後に置くのは、オートメーションでタグを付ける構成が
   // 多いため。先に見直すと、いま付いたばかりのタグが条件に反映されない。
@@ -236,7 +228,7 @@ async function reevaluateRichMenuTargeting(
   if (!isTargetingTrigger(eventType)) return;
   if (!payload.friendId || !lineAccessToken || !lineAccountId) return;
   try {
-    // 緊急停止 (#1050): メッセージ送信ではないが、イベントに連動して顧客側の
+    // 緊急停止 : メッセージ送信ではないが、イベントに連動して顧客側の
     // 表示を変える LINE 呼び出しなので automation_actions の停止に連動する。
     if (await isOperationCapabilityStopped(db, lineAccountId, 'automation_actions')) return;
     await applyRichMenuTargeting(db, payload.friendId, lineAccountId, lineAccessToken);
@@ -269,7 +261,7 @@ export async function fireOutgoingWebhooks(
         const idempotencyKey = payload.sourceEventId
           ? `outgoing_webhook:${wh.id}:${payload.sourceKind ?? eventType}:${payload.sourceEventId}`
           : crypto.randomUUID();
-        // N-371/N-372: 本文は共通封筒（要件26 §6-2）で組み立てる。
+        // 本文は共通封筒（要件26 §6-2）で組み立てる。
         // 冪等キー＝封筒の id＝X-Harness-Event-Id で、再送しても同じ出来事と
         // 判定できる。replyToken・変換測定用の値など内部情報は data に入れない。
         const deliveryAccountId = wh.line_account_id ?? lineAccountId;
@@ -281,11 +273,11 @@ export async function fireOutgoingWebhooks(
           data: { friendId: payload.friendId ?? null, ...payload.eventData },
           attempt: 1,
         });
-        // N-370: 配送は台帳(outgoing_webhook_deliveries)へ先に積んでから送る。
+        // 配送は台帳(outgoing_webhook_deliveries)へ先に積んでから送る。
         // 同じ出来事の再発火は (webhook_id, idempotency_key) の UNIQUE で
         // 積み増さず、Worker中断・cron再実行の送り残しは sweep が回収する。
         if (!deliveryAccountId) {
-          // 緊急停止 (#1050): アカウント不明でもグローバル (*) の
+          // 緊急停止 : アカウント不明でもグローバル (*) の
           // webhook_outgoing 停止には従う。この経路は台帳へ積めないので、
           // 停止中の通知は送らず手放す（送達の約束が作れないため）。
           if (await isOperationCapabilityStopped(db, null, 'webhook_outgoing')) return;
@@ -309,16 +301,16 @@ export async function fireOutgoingWebhooks(
           maxAttempts: outgoingDeliveryMaxAttempts(wh.max_retries),
         });
         if (!queued) return; // 台帳済み。以後の回収は sweep の仕事。
-        // 緊急停止 (#1050): webhook_outgoing が止まっている統括は台帳へ
+        // 緊急停止 : webhook_outgoing が止まっている統括は台帳へ
         // 積んだまま初回配送を送らない。pending の行は復旧後に sweep の
         // cron が届けるので、出来事自体は失われない。
         if (await isOperationCapabilityStopped(db, deliveryAccountId, 'webhook_outgoing')) return;
-        // N-369: 再送は Worker 内で sleep せず台帳の next_retry_at へ積む。
+        // 再送は Worker 内で sleep せず台帳の next_retry_at へ積む。
         // ここでは1回だけ送る。失敗しても行は retry_wait で残り、delivery
         // レーンの cron が決められた時刻に送り直す。
         const lease = await claimOutgoingDelivery(db, queued);
         if (!lease) return; // 別の実行が取り掛かった
-        // d23b R413: 取り掛かり〜送信のあいだに緊急停止へ切り替わった分は、
+        // d23b : 取り掛かり〜送信のあいだに緊急停止へ切り替わった分は、
         // lease を外して送る前の状態へ戻す。sweep側と同じ再確認。
         if (await isOperationCapabilityStopped(db, deliveryAccountId, 'webhook_outgoing')) {
           await releaseOutgoingDelivery(db, queued, lease);
@@ -426,7 +418,7 @@ export async function processScoring(
     /*
      * 旧ルールにも発生元の不変IDを渡す。実行台帳(execution)が無い経路でも
      * payload.sourceEventId が分かれば決定的な履歴IDで受け付けるので、
-     * 同じイベントを走り直してもスコアと履歴は二重に増えない (IDEA-17)。
+     * 同じイベントを走り直してもスコアと履歴は二重に増えない。
      */
     const scoreSourceEventId = execution?.sourceEventId ?? payload.sourceEventId;
     if (scoreSourceEventId) await applyScoring(db, payload.friendId, eventType, scoreSourceEventId);
@@ -448,7 +440,7 @@ async function processAutomations(
 ): Promise<void> {
   try {
     const allAutomations = await getActiveAutomationsByEvent(db, eventType);
-    // Filter by account: match this account's automations + unassigned (backward compat)
+    // 指定アカウントと互換用の所属なし自動化だけを対象にする。
     const automations = allAutomations.filter(
       (a) => Boolean(a.line_account_id && lineAccountId && a.line_account_id === lineAccountId),
     );
@@ -463,7 +455,7 @@ async function processAutomations(
       const results: Array<{ action: string; success: boolean; error?: string }> = [];
 
       for (const [index, action] of actions.entries()) {
-        // 緊急停止 (#1050): automation_actions が止まっている統括のアクション
+        // 緊急停止 : automation_actions が止まっている統括のアクション
         // (LINE送信・Webhook起動・メニュー切替) は実行しない。イベント駆動の
         // 動作はキューへ積めないので、止まった分は手放す。
         if (await isOperationCapabilityStopped(
@@ -672,7 +664,7 @@ async function executeAction(
     case 'send_webhook': {
       const url = action.params.url;
       if (url) {
-        // N-371/N-372: 旧式の直書きURL経路でも共通封筒と X-Harness-* の
+        // 旧式の直書きURL経路でも共通封筒と X-Harness-* の
         // ヘッダを使う。secret を持たない経路なので署名は付かないが、
         // イベントIDと時刻は他経路と同じ名前で渡す。
         const eventId = idempotencyKey ?? crypto.randomUUID();

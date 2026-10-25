@@ -13,7 +13,7 @@ vi.mock('../services/staff-invite.js', () => mail)
 const { staff } = await import('./staff.js')
 
 /*
- * R497b: 一部だけ許可（例：分析の1キーのみ）の保存・再読込・実判定。
+ * 一部だけ許可（例：分析の1キーのみ）の保存・再読込・実判定。
  *
  * - 保存済みに /analytics だけがある状態をそのまま保つ
  * - 行単位の保存は触っていない分析の一部を落とさない

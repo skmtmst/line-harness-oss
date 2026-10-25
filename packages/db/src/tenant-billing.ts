@@ -27,7 +27,7 @@ export async function getTenantBilling(db: D1Database, tenantId: string): Promis
 }
 
 /**
- * LINEアカウントの所属統括の課金行を1往復で読む(#633)。
+ * LINEアカウントの所属統括の課金行を1往復で読む。
  *
  * 「アカウントの tenant_id を読んでから tenants を読む」と2往復になるため、
  * 機能可否判定のように両方を連続で使う呼び出しではこの結合読取を使う。

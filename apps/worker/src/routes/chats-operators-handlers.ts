@@ -93,7 +93,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
 
     // 「1時間以上待ち」の基準時刻。一覧の quickFilter=overdue と同じ定義:
     // 対応状況が未対応で、表示される最後のメッセージ（受信・送信どちらでも）
-    // から1時間以上。対応期限の記録はまだ無い（INBOX-10）。
+    // から1時間以上。対応期限の記録はまだ無い。
     const overdueThreshold = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
     let line = { all: 0, reply: 0, overdue: 0 };
@@ -150,7 +150,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
         conditionBindings.push(lineAccountId);
       }
       if (query) {
-        // #625: LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+        // LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         conditions.push(`(
           instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
             SELECT 1 FROM messages_log mq
@@ -226,7 +226,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
-        // #625: LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+        // LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         searchSql = `AND (
           instr(lower(t.customer_email), lower(?)) > 0
           OR instr(lower(t.customer_name), lower(?)) > 0

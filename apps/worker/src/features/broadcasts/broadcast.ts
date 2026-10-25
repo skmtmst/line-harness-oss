@@ -72,22 +72,9 @@ const MULTICAST_BATCH_SIZE = 500;
 const PERSONALIZED_PUSH_BATCH_SIZE = 10;
 
 /**
- * 1人ずつ送る配信で、**1回のcronで何人まで送るか**。
- *
- * 差し込みのある配信は multicast が使えないので、1人ずつ push する。
- * 以前はここに上限が無く、10人送るたびに `return` していた。cron は5分刻み
- * なので、**1時間に120人**しか送れない計算になる。友だち5,000人なら41時間。
- * 途中で止まっているように見えるが、**エラーは出ない**。「送信中」のまま
- * 何日も残る。
- *
- * 上限を置く理由は Workers の subrequest（1回の実行で出せる問い合わせの数、
- * 1,000）。1人あたり最大4つ使う。
- *
- *   照合1（送信済みか） + 友だち情報1 + LINEへの送信1 + 記録1 = 4
- *
- * 150人で600。10人ごとに `batch_offset` を書いているので、上限に当たって
- * 実行が切れても**次のcronで続きから再開する**。送信済みの照合があるので
- * 二重送信にもならない。
+ * 差し込み配信は multicast が使えないため、1人ずつ push する。
+ * Workers の subrequest 上限1,000に対し、1人あたり照合・友だち取得・送信・記録で最大4回使う。150人なら600回となる。
+ * 10人ごとに batch_offset を保存し、実行が切れても次の cron で再開する。送信済み照合により二重送信を防ぐ。
  */
 const PERSONALIZED_PUSH_PER_TICK = 150;
 
@@ -98,7 +85,7 @@ export async function processBroadcastSend(
   workerUrl?: string,
 ): Promise<Broadcast> {
   if(await processBroadcastSimulation(db,broadcastId))return (await getBroadcastById(db,broadcastId))!;
-  // Mark as sending
+
   await updateBroadcastStatus(db, broadcastId, 'sending');
 
   const broadcast = await getBroadcastById(db, broadcastId);
@@ -126,8 +113,7 @@ export async function processBroadcastSend(
     );
   }
 
-  // LINE broadcast cannot omit specific followers. Keep the saved target 'all'
-  // and switch to the existing resumable recipient ledger when consent requires it.
+  // LINE broadcast は一部の友だちを除外できないため、同意条件がある場合は all 設定を保ったまま、再開可能な宛先台帳の経路へ切り替える。
   if (broadcast.target_type === 'all' && !hasRecipientVariablesInParts(storedParts)
     && await hasSuppressedDeliveryRecipients(db, broadcast.line_account_id ?? null)) {
     const conditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'is_following', value: true }] });
@@ -136,9 +122,7 @@ export async function processBroadcastSend(
     return (await getBroadcastById(db, broadcastId))!;
   }
 
-  // A recipient variable cannot be delivered through LINE broadcast or
-  // multicast because those endpoints accept one shared Message object.
-  // Convert scheduled/direct sends into the resumable queue path.
+  // broadcast/multicast は全員で同じメッセージを使うため、宛先ごとの変数があれば再開可能なキューへ切り替える。
   if (hasRecipientVariablesInParts(storedParts)
     && broadcast.target_type !== 'multi-account-dedup') {
     const raw = broadcast as unknown as Record<string, unknown>;
@@ -297,8 +281,7 @@ export async function processBroadcastSend(
     return (await getBroadcastById(db, broadcastId))!;
   }
 
-  // Auto-wrap URLs with tracking links (text with URLs → Flex with button)
-  // track_links=0 の broadcast は明示的に短縮 OFF (URL をそのまま送る)。
+  // URL の計測リンク化は track_links で制御し、0 の場合は短縮せず元の URL を送る。
   const broadcastAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
   let finalParts = await autoTrackMessageParts(
     db,
@@ -332,12 +315,12 @@ export async function processBroadcastSend(
 
   try {
     if (broadcast.target_type === 'all') {
-      // 緊急停止 (#1050): 送る直前に broadcast_dispatch を確かめる。
+      // 緊急停止 : 送る直前に broadcast_dispatch を確かめる。
       // 停止中は status='sending' のまま戻り、完了とは書かない。
       if (await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) {
         return (await getBroadcastById(db, broadcastId))!;
       }
-      // Use LINE broadcast API (sends to all followers)
+
       const retryKey = await createBroadcastRetryKey(
         broadcast.id,
         'broadcast',
@@ -367,7 +350,7 @@ export async function processBroadcastSend(
           logger.error("services_broadcast_failed");
         }
       }
-      // We don't have exact count for broadcast API, set as 0 (unknown)
+      // broadcast API から正確な件数が得られないため、0 はここでは不明を表す。
       totalCount = 0;
       successCount = 0;
     } else if (broadcast.target_type === 'tag') {
@@ -407,13 +390,13 @@ export async function processBroadcastSend(
         ]);
       }
 
-      // Send in batches with stealth delays to mimic human patterns
+      // 自然な送信間隔を保つため、バッチ間に遅延を入れる。
       const now = jstNow();
       const totalBatches = Math.ceil(followingFriends.length / MULTICAST_BATCH_SIZE);
       // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
       const unit = aggregationUnitFor(broadcast);
       /*
-       * 送達台帳（#662）。予約した tag 配信はこの関数の中で最後まで送るので、
+       * 送達台帳。予約した tag 配信はこの関数の中で最後まで送るので、
        * 束と束のあいだが唯一の止めどころになる。台帳がないと、失敗した束の
        * 相手が誰だったのかが残らず——今までは `console.error` だけで消えていた
        * ——「失敗した相手だけ送り直す」ができない。
@@ -423,7 +406,7 @@ export async function processBroadcastSend(
       for (let i = 0; i < followingFriends.length; i += MULTICAST_BATCH_SIZE) {
         // 次の束へ進む前に停止を読み直す。送り終えた束は取り消せないので、
         // **新しい束を始めないことで止める**。
-        // 緊急停止 (#1050) の broadcast_dispatch も同じ止めどころで読む。
+        // 緊急停止  の broadcast_dispatch も同じ止めどころで読む。
         if (await isBroadcastStopped(db, broadcastId) ||
             await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) break;
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
@@ -435,13 +418,13 @@ export async function processBroadcastSend(
         const sendableIds = sendable.map((f) => f.id);
         const lineUserIds = sendable.map((f) => f.line_user_id);
 
-        // Stealth: add staggered delay between batches
+
         if (batchIndex > 0) {
           const delay = calculateStaggerDelay(followingFriends.length, batchIndex, MULTICAST_BATCH_SIZE);
           await sleep(delay);
         }
 
-        // Stealth: add slight variation to text messages
+
         const batchMessages = varyTextMessages(messages, batchIndex, totalBatches);
 
         await markBroadcastRecipientsDispatched(db, {
@@ -461,9 +444,7 @@ export async function processBroadcastSend(
           const { requestId } = await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey);
           successCount += sendable.length;
 
-          // Log only successfully sent messages (batch insert for performance)
-          // line_account_id は broadcast 設定時のアカウントを記録 (送信時点の固定値)。
-          // friends.line_account_id は webhook で書き換わる mutable なので使わない。
+          // 成功分だけをまとめて記録する。送信元は配信設定時のアカウントに固定し、Webhook で変わり得る friends.line_account_id を使わない。
           const broadcastAccount = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
           const logStmts = sendable.flatMap(friend => finalParts.map(part =>
             db.prepare(
@@ -484,8 +465,7 @@ export async function processBroadcastSend(
           for (const id of sendableIds) blocked.add(id);
         } catch (err) {
           logger.error("services_broadcast_failed");
-          // Continue with next batch; failed batch is not logged.
-          // 誰が落ちたかは台帳に残す。断定できた失敗だけが再送の対象になる。
+          // 失敗したバッチは送信成功として記録せず、失敗先を台帳へ残す。再送できるのは未送信と断定できた宛先だけ。
           const outcome = classifyDeliveryFailure(err);
           await settleBroadcastRecipients(db, {
             broadcastId,
@@ -500,9 +480,9 @@ export async function processBroadcastSend(
     }
     // multi-account-dedup はこの関数の冒頭で queue に委譲済み (ここには到達しない)。
 
-    // 停止で束の途中を抜けた配信を「送信済み」にしない（#662）。送り残した
+    // 停止で束の途中を抜けた配信を「送信済み」にしない。送り残した
     // 相手がいるのに完了と書くと、再開も失敗分の再送もできなくなる。
-    // 緊急停止 (#1050) の broadcast_dispatch も同じく完了にしない。
+    // 緊急停止  の broadcast_dispatch も同じく完了にしない。
     if (await isBroadcastStopped(db, broadcastId) ||
         await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) {
       return (await getBroadcastById(db, broadcastId))!;
@@ -510,7 +490,7 @@ export async function processBroadcastSend(
     await createBroadcastInsight(db, broadcast.id);
     await updateBroadcastStatus(db, broadcastId, 'sent', { totalCount, successCount });
   } catch (err) {
-    // On failure, reset to draft so it can be retried
+    // 再試行できるよう、失敗時は下書きへ戻す。
     await updateBroadcastStatus(db, broadcastId, 'draft');
     throw err;
   }
@@ -519,7 +499,7 @@ export async function processBroadcastSend(
 }
 
 /**
- * 予約配信を送る直前に、残りの送信枠を確かめる（設計 `Bw0zt`、台帳 #120）。
+ * 予約配信を送る直前に、残りの送信枠を確かめる（設計 `Bw0zt`、台帳）。
  *
  * **止めるのは「足りないと分かったとき」だけ。** 枠が読めないときは通す
  * ——LINE の口が落ちているだけで予約を潰すと、送れるはずの配信が届かない。
@@ -527,7 +507,7 @@ export async function processBroadcastSend(
  * 止めたときは通知センターへ理由を残す。**運用者が結果画面で読める**
  * ようにするため（何通足りないか、次に何をすればよいか）。
  */
-// N-062: 即時送信の直前再確認でも使うため公開する。中身と通知は予約経路と同じ。
+// 即時送信の直前再確認でも使うため公開する。中身と通知は予約経路と同じ。
 // REJECT対応: reserveBroadcastId を渡すと、枠内と分かった時点でその分を予約台帳に
 // 積む。別配信と残枠を同時に読んでも、台帳の合計で残枠を超えない。
 export async function guardScheduledBroadcastQuota(
@@ -642,7 +622,7 @@ export async function processScheduledBroadcasts(
   });
 
   /*
-   * 二者承認（m12a）。予約時刻を過ぎても承認されなかった依頼は、
+   * 二者承認。予約時刻を過ぎても承認されなかった依頼は、
    * 先に期限切れにして送らない（依頼主に知らせる）。
    */
   try {
@@ -657,8 +637,7 @@ export async function processScheduledBroadcasts(
     try {
       const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
       if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
-        // Keep the content but remove the expired automatic schedule. Restoring
-        // the tenant must never send a message whose due time passed while stopped.
+        // 統括の復旧時に停止中の期限切れ配信が届かないよう、内容は残して自動予約だけを解除する。
         await db.prepare(
           `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'scheduled'`,
         ).bind(broadcast.id).run();
@@ -689,14 +668,14 @@ export async function processScheduledBroadcasts(
       if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
         continue;
       }
-      // 緊急停止 (#1050): broadcast_dispatch が止まっている統括は claim せず
+      // 緊急停止 : broadcast_dispatch が止まっている統括は claim せず
       // 予約のまま残す。停止中に時刻を過ぎた分は、復旧の検査
       // (holdExpiredBroadcasts) が下書きへ戻し、まとめて追い送りしない。
       if (await isOperationCapabilityStopped(db, ownerAccountId, 'broadcast_dispatch')) {
         continue;
       }
       /*
-       * 二者承認（m12a）。承認が要る人数なのに承認済みでなければ送らない。
+       * 二者承認。承認が要る人数なのに承認済みでなければ送らない。
        * 期限切れの走査は上で済ませてある。数えられないときは送らず残す。
        */
       try {
@@ -707,13 +686,13 @@ export async function processScheduledBroadcasts(
         logger.error("services_broadcast_failed");
         continue;
       }
-      // Optimistic lock: claim this broadcast (scheduled → sending)
+      // 重複実行を防ぐため、scheduled から sending への変更で実行権を取る。
       const lockResult = await db
         .prepare(`UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'scheduled' ${BROADCAST_DEFINITION_GUARD_SQL}`)
         .bind(broadcast.id, ...broadcastDefinitionGuardArgs(broadcast))
         .run();
       if (!lockResult.meta.changes || lockResult.meta.changes === 0) continue;
-      // 予約の自動送信も記録に残す（#816）。誰の操作でもないので担当者は空＝「自動」。
+      // 予約の自動送信も記録に残す。誰の操作でもないので担当者は空＝「自動」。
       try {
         await recordBroadcastLifecycleEvent(db, {
           broadcastId: broadcast.id,
@@ -725,7 +704,7 @@ export async function processScheduledBroadcasts(
         logger.error("services_broadcast_failed");
       }
 
-      // Resolve correct lineClient for this broadcast's account
+      // 別アカウントから送らないよう、配信の送信元に対応する LINE クライアントを解決する。
       let deliveryClient = lineClient;
       const accountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
       if (accountId) {
@@ -742,7 +721,7 @@ export async function processScheduledBroadcasts(
       }
 
       /*
-        **送る直前に、残りの送信枠を確かめる**（設計 `Bw0zt`、台帳 #120）。
+        **送る直前に、残りの送信枠を確かめる**（設計 `Bw0zt`、台帳）。
         予約したあとに枠を使い切ると、**予約は実行されるが途中で失敗する**。
         送った人と送れなかった人が混ざり、運用者は結果を見るまで気づけない。
 
@@ -785,7 +764,7 @@ export async function processScheduledBroadcasts(
         continue;
       }
       logger.error("services_broadcast_failed");
-      // Reset to scheduled so it can be retried next cron
+      // 次の cron で再試行できるよう、scheduled へ戻す。
       try {
         await db.prepare(`UPDATE broadcasts SET status = 'scheduled' WHERE id = ? AND status = 'sending'`)
           .bind(broadcast.id).run();
@@ -857,7 +836,7 @@ export async function processQueuedBroadcasts(
     if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
       continue;
     }
-    // 緊急停止 (#1050): broadcast_dispatch 停止中はロックを取らず、
+    // 緊急停止 : broadcast_dispatch 停止中はロックを取らず、
     // 送信中の続きも送らない。行は残るため復旧後に続きから送れる。
     if (await isOperationCapabilityStopped(db, ownerAccountId, 'broadcast_dispatch')) {
       continue;
@@ -942,7 +921,7 @@ async function processQueuedBroadcastBatches(
   // と比較すると即座に「stale」扱いされて lock 取得直後に解除される。created_at
   // 列の DEFAULT と同じ式を使って naive JST に揃える。
   //
-  // `stopped_at IS NULL` は #662 の停止。**運用者が停止を押した後は、
+  // `stopped_at IS NULL` は  の停止。**運用者が停止を押した後は、
   // 新しい送信権をここで取らせない。**停止を受け付ける UPDATE と、この
   // ロック取得の UPDATE は同じ行の条件付き更新なので、どちらが先でも
   // 「停止が勝てばロックは取れず、ロックが勝てば停止はループ内の確認で効く」
@@ -993,11 +972,7 @@ async function processQueuedBroadcastBatches(
   }
   const messages = buildMessages(finalParts);
 
-  // multi-account-dedup: delegate to processMultiAccountDedupBroadcast.
-  // dedup ループは内部で per-account に {{liff_id}} 置換 + buildMessage する。
-  // auto-track で計算された finalType / finalContent を反映した broadcast を
-  // 渡す (broadcast 引数の message_content をそのまま使うと auto-track 結果が
-  // 落ちる)。
+  // 複数アカウントの重複除外は専用処理へ委ねる。内部でアカウント別に LIFF ID と本文を組み立てるため、計測リンク化済みの message_type/message_content を渡して変換結果を失わないようにする。
   if (broadcast.target_type === 'multi-account-dedup') {
     const { processMultiAccountDedupBroadcast } = await import('../../services/dedup-broadcast.js');
     const broadcastForDedup = {
@@ -1094,7 +1069,7 @@ async function processQueuedBroadcastBatches(
   // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
   const unit = aggregationUnitFor(broadcast);
   /*
-   * 送達台帳（#662）。
+   * 送達台帳。
    *
    * `blocked` は**もう送ってはいけない相手**——送達済み（sent）と
    * 送達不明（unknown）。この tick の始めに1回だけ引く。相手の id を
@@ -1136,7 +1111,7 @@ async function processQueuedBroadcastBatches(
   // 1回のCron実行で、上限まで処理する（タイムアウトしない範囲で）
   while (currentOffset < stopAt) {
     /*
-     * 停止（#662）はここで効く。**次の一束へ進む前に必ず読み直す。**
+     * 停止はここで効く。**次の一束へ進む前に必ず読み直す。**
      *
      * ロックを取ったあとに運用者が停止を押した場合、この tick は自分が
      * 掴んだ束を送り終えている。送り終えた分を取り消すことはできない
@@ -1157,7 +1132,7 @@ async function processQueuedBroadcastBatches(
 
     if (personalized) {
       for (const friend of batch) {
-        // 台帳が「送達済み」「送達不明」と覚えている相手は飛ばす（#662）。
+        // 台帳が「送達済み」「送達不明」と覚えている相手は飛ばす。
         // 送達不明を飛ばすのは at-most-once のため——外へ出たかもしれない
         // 相手を送り直すと、相手のトークに2通残って取り消せない。
         if (blocked.has(friend.id)||suppressed.has(friend.id)) {
@@ -1279,7 +1254,7 @@ async function processQueuedBroadcastBatches(
     }
 
     /*
-     * 台帳が覚えている相手を束から抜く（#662）。
+     * 台帳が覚えている相手を束から抜く。
      *
      *   送達済み（sent）   … もう届いている
      *   送達不明（unknown）… 外へ出たかもしれない。送り直さない
@@ -1381,7 +1356,7 @@ async function processQueuedBroadcastBatches(
     }
 
     currentOffset += batch.length;
-    // Update success_count but keep batch_offset=-1 (locked) during processing
+    // 処理中に別実行が取得しないよう、成功数を更新しても batch_offset=-1 のロックは保つ。
     await db.prepare(
       `UPDATE broadcasts SET success_count = success_count + ? WHERE id = ?`,
     ).bind(sendable.length, broadcast.id).run();

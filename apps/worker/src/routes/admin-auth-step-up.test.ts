@@ -78,7 +78,7 @@ describe('POST /api/auth/step-up の試行回数制限', () => {
 
     const fifth = await requestStepUp(invalid, 'affiliate.payout.export');
     expect(fifth.status).toBe(429);
-    // R503: 上限時は待ち秒数を本文と Retry-After の両方で返す。
+    // 上限時は待ち秒数を本文と Retry-After の両方で返す。
     await expect(fifth.json()).resolves.toEqual({
       success: false, error: LIMIT_ERROR, data: { retryAfterSeconds: expect.any(Number) },
     });
@@ -230,7 +230,7 @@ describe('POST /api/auth/step-up の優先順位（V）', () => {
 
 describe('POST /api/auth/step-up のstaff文脈ガード', () => {
   /*
-   * #1058: 再認証フローの401は管理画面の共通「セッション喪失」合図と
+   * 再認証フローの401は管理画面の共通「セッション喪失」合図と
    * 区別できるよう、機械コードを本文へ付ける。
    * （本番では認証middlewareが先に401を返すため、ここは保険の経路）
    */

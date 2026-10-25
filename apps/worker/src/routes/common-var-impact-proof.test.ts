@@ -1,4 +1,4 @@
-/* N-185/N-186 直接試験: 実route＋実SQLite。確認値の契約と公開版の走査を守る。 */
+/* / 直接試験: 実route＋実SQLite。確認値の契約と公開版の走査を守る。 */
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { test, expect } from 'vitest';

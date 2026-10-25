@@ -4,9 +4,7 @@ import { getBookingCustomerContext } from '../../features/booking/booking-admin-
 import { resolveAccountIdAdmin } from './identity.js';
 
 export function registerCustomerContext(booking: Hono<Env>): void {
-// Admin mirror of the LIFF availability lookup. minLeadTimeMinutes is 0:
-// the operator is on the phone with the customer and may book a slot
-// starting within the lead-time window that customers themselves cannot.
+// 電話対応中の担当者は顧客向けの締切内でも代理予約できるよう、空き照会の minLeadTimeMinutes を0にする。
 booking.get('/api/booking/admin/customer-context', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);

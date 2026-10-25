@@ -70,7 +70,7 @@ export interface CreateEntryRouteInput {
   isActive?: boolean;
   tenantId?: string;
   /**
-   * R39: 作成時に所属させるLINEアカウント。migration 308 の
+   * 作成時に所属させるLINEアカウント。migration 308 の
    * line_account_id 列へ保存する。未指定は未割当のまま残す。
    */
   lineAccountId?: string | null;
@@ -112,7 +112,7 @@ export async function getEntryRouteByRefCode(
 }
 
 /**
- * N-244: ref 名前空間の所有確認用。is_active を問わず行を返す。
+ * ref 名前空間の所有確認用。is_active を問わず行を返す。
  * 停止した経路を「存在しない」と区別し、公開URL受付を止めるために使う。
  * 返す行の redirect_url / pool_id / tag_id 等を公開応答に含めてはならない。
  */

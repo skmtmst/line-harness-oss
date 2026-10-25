@@ -31,7 +31,7 @@ export async function listTemplateViews(db:D1Database,auth:HqTemplateAuthority){
 }
 export async function saveTemplateView(db:D1Database,auth:HqTemplateAuthority,input:Record<string,unknown>,id?:string){
   const name=boundedText(input.name,100,'name'),filters=parseTemplateViewFilters(input.filters);
-  // Shared searches are editable by HQ administrators; private searches only by their owner.
+  // 共有検索は統括管理者、非公開検索は所有者だけに編集を許可する。
   const current=id?await db.prepare(`SELECT * FROM hq_template_saved_views WHERE id=? AND ${visible}`).bind(id,auth.tenantId,auth.actorId).first<Row>():null;
   if(id&&!current)throw new HqTemplateError('NOT_FOUND',404);
   const scope=input.scope??current?.scope??'personal';
@@ -61,7 +61,7 @@ export async function archiveTemplateView(db:D1Database,auth:HqTemplateAuthority
   return {id,archived:true};
 }
 
-/** Search only message content fields, never filenames/media URLs. Values remain server-side. */
+/** ファイル名・メディア URL を検索せず、メッセージ内容だけを対象とする。値はサーバー内に保つ。 */
 export async function messageTemplateSearchIds(db:D1Database,auth:HqTemplateAuthority,search:string,status:HqTemplateArchiveStatus='active'){
  if(search.length>200)throw new HqTemplateError('INVALID_LIST_FILTER',422);
  const result=await db.prepare(`SELECT t.id FROM hq_templates t JOIN hq_template_versions v

@@ -1,4 +1,4 @@
-// Unit route suites use stub databases. Durable leases and recovery are exercised separately against SQLite.
+// 入口の単体試験は偽 DB を使い、永続的な実行権と回復は実 SQLite の別試験で守る。
 import type {WorkflowExecution} from '../services/workflow-execution.js';
 export function unitWorkflow(db:D1Database,ref:{scopeId:string;processKind:string;subjectId:string}):WorkflowExecution{
  return {db,ref:{...ref,stepKey:'__run'},owner:'unit-owner',sourceEventId:ref.subjectId,occurredAt:'2026-01-01T00:00:00Z',

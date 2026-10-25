@@ -146,7 +146,7 @@ export interface UndoIdentityCandidateRequest {
 }
 
 /**
- * 計量キーの正本(#517 軽4)。
+ * 計量キーの正本。
  *
  * 保存済みの `impact_json` を読む2か所(集計 `potentialRevenue` と画面表示)で
  * 共有する。キー名がずれると画面が黙って「—(未取得)」になり、型でも守れない

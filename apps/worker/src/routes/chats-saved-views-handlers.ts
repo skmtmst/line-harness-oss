@@ -137,7 +137,7 @@ export const post__api_chats_5 = async (c: Context<Env, "/api/chats">) => {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const item = await createChat(c.env.DB, body);
-    // Save line_account_id if provided
+
     if (body.lineAccountId) {
       await c.env.DB.prepare(`UPDATE chats SET line_account_id = ? WHERE id = ?`)
         .bind(body.lineAccountId, item.id).run();

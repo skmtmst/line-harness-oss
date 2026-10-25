@@ -1,7 +1,7 @@
 import { getTenantBilling } from '@line-crm/db';
 import { reportPeriod } from '@line-crm/shared';
 
-/** A tenant has one subscription. Account counts are not individual contracts. */
+/** 統括ごとの契約を数え、LINE アカウント数を別契約の数と扱わない。 */
 export async function hqBillingMetrics(db:D1Database,tenantId:string) {
   const billing=await getTenantBilling(db,tenantId);
   if(!billing)return null;

@@ -6,7 +6,7 @@ import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqli
 import { nenMembers } from './nen-members.js';
 
 /*
- * PHOTO-06 (#1079): 止まったポイント手続きの復旧口（point-retry /
+ * 止まったポイント手続きの復旧口（point-retry /
  * point-reconcile）と、詳細応答の派生状態を実DBで確かめる。
  */
 

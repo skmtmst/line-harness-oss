@@ -27,7 +27,7 @@ function sourceKey(key: string, tenant: string): string {
   return key;
 }
 type Bucket = Pick<R2Bucket, 'head' | 'get' | 'put' | 'delete'>;
-export interface R2RuntimeBinding { db: D1Database; bucket: Bucket; authority: HqTemplateAuthority; templateId: string; templateVersionId: string; textOverride?: string | null; /** Trusted server public origin, never request-body input. */ publicBaseUrl?: string }
+export interface R2RuntimeBinding { db: D1Database; bucket: Bucket; authority: HqTemplateAuthority; templateId: string; templateVersionId: string; textOverride?: string | null; /** 公開 origin は信頼済みサーバー設定だけを使い、要求本文から取らない。 */ publicBaseUrl?: string }
 async function sourceVersion(b: R2RuntimeBinding) {
   if (requireHqTemplateAuthority(b.authority).kind !== 'AUTHORIZED') fail('FORBIDDEN');
   const v = await b.db.prepare(`SELECT v.definition_json,v.content_hash,t.template_type FROM hq_template_versions v JOIN hq_templates t ON t.id=v.template_id AND t.tenant_id=v.tenant_id WHERE v.id=? AND v.template_id=? AND v.tenant_id=? AND t.archived_at IS NULL AND t.template_type IN ('template','rich_menu') AND t.extended_type IS NULL`).bind(b.templateVersionId,b.templateId,b.authority.tenantId).first<{definition_json:string;content_hash:string;template_type:'template'|'rich_menu'}>();
@@ -97,7 +97,7 @@ async function plannedTargetId(b:R2RuntimeBinding,account:string,ref:RichReferen
   return (await digest(JSON.stringify([b.authority.tenantId,b.templateVersionId,account,ref.kind,ref.sourceId]))).slice(0,32);
 }
 
-/** Reuse an exact destination match or plan one private/local clone in the parent atomic batch. */
+/** 配布先の完全一致を再利用するか、親 batch に含む非公開のローカル複製を1件計画する。 */
 async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:string,execution=false):Promise<RichReferenceMatch> {
   if (!['tag','form','scenario','template','friend_field','mark','reminder','notification_rule','event','folder'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
   await targetAccount(b,account);
@@ -292,7 +292,7 @@ async function templateReferencePlan(b:R2RuntimeBinding,definition:import('@line
   return planResourceReferences(b,templateResourceReferences(definition),account,execution);
 }
 
-/** The execution resolver accepts only the exact preflight-selected graph and revision. */
+/** 実行時は、事前確認で選んだ参照グラフと版だけを受け付ける。 */
 function richResolver(plan:RichReferencePlan,sourceGuards:HqTemplateStatement[],context?:HqTemplateAdapterContext) {
   const byKey=new Map(plan.matches.map(match=>[richReferenceKey(match),match]));let bound=false;
   return async (ref:RichReference,account:string) => {
@@ -311,7 +311,7 @@ function richResolver(plan:RichReferencePlan,sourceGuards:HqTemplateStatement[],
     return {targetId:match.targetId,operation:match.operation,expectedRevision:match.expectedRevision};
   };
 }
-/** Prevent the rich-menu adapter's arrayBuffer call from consuming an unbounded stream. */
+/** arrayBuffer で無制限の stream を読まないよう、先に上限を適用する。 */
 function boundedRichBucket(b:R2RuntimeBinding):Bucket {
   return {
     head:(key)=>b.bucket.head(sourceKey(key,b.authority.tenantId)),
@@ -337,7 +337,7 @@ async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContex
   const hqAuthored=definition.template.id===HQ_AUTHORED_MESSAGE_ID;
   const source=hqAuthored?null:await b.db.prepare(`SELECT t.line_account_id FROM templates t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(definition.template.id,b.authority.tenantId).first<{line_account_id:string}>();
   if(!hqAuthored&&!source)fail('SOURCE_ACCOUNT_UNAVAILABLE');
-  // HQ provenance is the tenant/version DB record checked by sourceVersion, not a client account id.
+  // 統括の出自はクライアントの account_id でなく、sourceVersion が検証した統括・版の DB 記録から確定する。
   const sourceAccountId=hqAuthored?`hq:${b.authority.tenantId}`:source!.line_account_id;
   if(!hqAuthored)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM templates t JOIN line_accounts a ON a.id=t.line_account_id WHERE t.id=? AND t.line_account_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`,[definition.template.id,sourceAccountId,b.authority.tenantId]));
   const bindings:MessageTemplateSourceMediaBinding[]=[];
@@ -388,7 +388,7 @@ export async function inspectR2RuntimeStore(b:R2RuntimeBinding,targetAccountId:s
   const v=await sourceVersion(b),input={templateVersionId:b.templateVersionId,definitionJson:v.definition_json};await targetAccount(b,targetAccountId);
   if(v.template_type==='template') {
     const snapshot=await messageSnapshot(b,targetAccountId);
-    // Validate real DB media provenance and source objects even during preflight.
+    // 事前確認でも実際の DB の出自と R2 の元オブジェクトを検証する。
     await messageAdapter(b,{tenantId:b.authority.tenantId,targetAccountId,preflightId:'inspect',idempotencyFingerprint:'inspect',mode:'create',snapshotToken:snapshot.snapshotToken,resolutions:[]},input,[]);
     const definition=parseMessageTemplateDefinition(JSON.parse(v.definition_json));
     const plan=await templateReferencePlan(b,definition,targetAccountId);
@@ -432,8 +432,7 @@ async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,i
   const refs=ok(await adapter.extractReferences(input)),verified=ok(await adapter.verifyReferences(context,refs));
   const duplicates=ok(await adapter.detectDuplicates(context,verified)),ids=ok(await adapter.buildIdMap(context,verified,duplicates));
   const plan=ok(await adapter.buildCommitPlan(context,input,ids));
-  // The adapter's first statement verifies the exact preflight snapshot. Run it
-  // before reference clones, then create dependencies before rich-menu rows.
+  // 参照の複製より前にスナップショットを検証し、依存を作ってからリッチメニュー行を作る。
   return type==='rich_menu'
     ? {...plan,resolutions:richContext!.resolutions.map(r => r.itemKind === 'rich_menu'
       ? {...r, targetId: r.mode === 'overwrite' ? r.targetId : ids[r.sourceId]} : r),
@@ -455,7 +454,7 @@ export type R2StoreOutcome = { status: HqTemplateDistributionResult['status']; r
 const MAX_IO_ATTEMPTS = 3;
 const CLAIM_LEASE_MS = 5 * 60_000;
 
-/** R2-backed store with bounded I/O retry. Active R2 claims are never stolen by time alone. */
+/** I/O の再試行を制限し、使用中の R2 の実行権を時刻だけで奪わない。 */
 export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2StoreOutcome> {
   const { db, authority, templateId, runId } = options;
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || options.context.tenantId !== authority.tenantId) fail('FORBIDDEN');
@@ -509,7 +508,7 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
   }
   const run = await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });
   if (run.run.status !== 'running' || run.run.created_by !== authority.actorId) fail('INVALID_RUN');
-  // Write receipt before the first claim, so even a crash in pending binds the decision.
+  // pending 中の中断でも判断が変わらないよう、最初の実行権取得前に受領票を保存する。
   await db.prepare(`INSERT OR IGNORE INTO audit_events(id,source_kind,source_id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,'hq_template_r2_store_request',?,?,'business',?,?,'hq_template.store_requested','hq_template',?,'success',?)`).bind(crypto.randomUUID(), sourceId, authority.tenantId, authority.actorId, authority.role, templateId, JSON.stringify({ requestHash })).run();
   await checkReceipt();
   const begun = await beginHqTemplateStoreResult(db, { runId, tenantId: authority.tenantId, templateId, templateVersionId: p!.template_version_id, targetAccountId: context.targetAccountId, preflightId: p!.id, idempotencyFingerprint: runId, snapshotToken: p!.snapshot_token });
@@ -587,7 +586,7 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
     }
     return fail('STORE_COMMIT_FAILED');
   } catch (error) {
-    // A successful batch may lose its response. Never replay the business writes.
+    // batch が成功して応答だけ失われても、業務の書込を再実行しない。
     const row = await read().catch(() => null);
     if (!row) return {status:'staged',reused:false,cleanupPending:!!plan?.stage.length};
     if (row!.status !== 'staged' || row!.attempt_count !== attempt) {
@@ -602,7 +601,7 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
   }
 }
 
-/** Retry cleanup from the durable ownership ledger without trusting request input. */
+/** 要求入力を信用せず、永続的な所有台帳から後片付けを再試行する。 */
 export async function reconcileFailedOwnedImages(b:R2RuntimeBinding,runId:string,account:string):Promise<boolean> {
   const result=await b.db.prepare(`SELECT status FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?`).bind(runId,b.authority.tenantId,account).first<{status:string}>().catch(()=>null);
   if(!result||result.status==='pending'||result.status==='staged')return false;
@@ -622,7 +621,7 @@ export async function reconcileFailedOwnedImages(b:R2RuntimeBinding,runId:string
 }
 
 
-/** Clean only the unreferenced keys owned by one fenced attempt. */
+/** 照合済みの1回の実行が所有する、未参照キーだけを回収する。 */
 async function cleanupOwnedPlan(b:R2RuntimeBinding,runId:string,account:string,plan:HqTemplateStoreAtomicCommitPlan):Promise<boolean> {
   let clean=true;
   for(const object of plan.stage)try {

@@ -78,7 +78,7 @@ duplicates.route('/', mergedPeople);
 
 duplicates.get('/api/duplicates/stats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    // 全アカウント分の計数をそのまま返すと、見せてよい範囲を超える (#496-14)。
+    // 全アカウント分の計数をそのまま返すと、見せてよい範囲を超える (-14)。
     // 可視アカウントだけを集計する。見られる先が無い人は 0 件の集計になる。
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const forceRefresh = c.req.query('refresh') === '1';

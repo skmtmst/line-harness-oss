@@ -3,7 +3,7 @@ import { templateDetail, HqTemplateError } from './distribution.js';
 import { parseFormTemplateDefinition } from './form.js';
 import type { HqTemplateAuthority } from './contract.js';
 
-/** Exercise the saved HQ definition with the same validator as the store, without sending or writing answers. */
+/** 店舗と同じ検証で保存済み定義を試し、送信や回答保存は行わない。 */
 export async function testHqForm(db: D1Database, authority: HqTemplateAuthority, id: string, input: Record<string,unknown>) {
   const {template,definition}=await templateDetail(db,authority,id);
   if(template.template_type!=='form')throw new HqTemplateError('INVALID_TYPE');
@@ -22,7 +22,7 @@ async function tokenHash(token:string) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token)))].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-/** Issue a capability for one immutable version. The conditional insert enforces the cap atomically. */
+/** 不変の1版だけの権限票を発行し、条件付き INSERT で上限も原子的に守る。 */
 export async function issueHqFormTestToken(db:D1Database,authority:HqTemplateAuthority,id:string,input:Record<string,unknown>,origin:string) {
   if(!Number.isSafeInteger(input.expectedRevision))throw new HqTemplateError('INVALID_REVISION');
   const checked=await testHqForm(db,authority,id,input),token=`${crypto.randomUUID()}-${crypto.randomUUID()}`;
@@ -44,7 +44,7 @@ export async function revokeHqFormTestToken(db:D1Database,authority:HqTemplateAu
   return {id:tokenId,revoked:true};
 }
 
-/** Bearer capability only; no staff session or LINE identity and no answer/event writes. */
+/** Bearer の権限票だけで扱い、スタッフ・LINE 本人を取得せず、回答やイベントを書かない。 */
 export async function readHqFormTest(db:D1Database,id:string,token:string|null,answers?:unknown) {
   if(!token||token.length>200)throw new HqTemplateError('NOT_FOUND',404);
   const row=await db.prepare(`SELECT v.definition_json,v.id version_id FROM hq_form_test_tokens x

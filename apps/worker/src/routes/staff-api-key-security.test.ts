@@ -54,7 +54,7 @@ it('S04 returns a replacement key once, revokes old keys and sessions, and audit
   expect(audits).toHaveLength(1);
   expect(JSON.stringify(audits)).not.toContain(body.data.apiKey);
   expect(JSON.stringify(audits)).not.toContain('lh_synthetic_key');
-  // GET metadata does not repeat the secret; a new authenticated session is required in production.
+  // GET の設定情報では秘密を再表示しない。本番は新しい認証済みセッションを必要とする。
   const metadata=await request('GET');
   expect(await metadata.text()).not.toContain(body.data.apiKey);
 });

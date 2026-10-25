@@ -103,7 +103,7 @@ export async function finishBookingOperation(
 }
 
 /**
- * R323: 手動再送の二重実行を防ぐ取得 (lease)。
+ * 手動再送の二重実行を防ぐ取得 (lease)。
  *
  * opened_at を原子的に更新し、取れたときだけ true を返す。Google 側の
  * 削除回収 (processPendingCalendarDeleteOperations) と同じ形で、status は

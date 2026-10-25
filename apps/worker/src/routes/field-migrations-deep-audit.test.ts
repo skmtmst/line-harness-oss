@@ -7,10 +7,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { friendFields } from './friend-fields.js';
 
 /*
- * D036〜D038（友だち情報欄の移行）の深い再調査の回帰試験。
- *
- * 実ルート＋実認証＋メモリSQLite＋失敗注入で確かめる。
- * c.executionCtx が無い試験環境では、実行はその場で同期的に走る。
+ * 友だち情報欄の移行を、実 route・実認証・メモリ SQLite と失敗注入で検証する。executionCtx がない環境では実行をその場で完了させる。
  */
 
 const BOOTSTRAP_SQL = readFileSync(
@@ -27,7 +24,7 @@ const SCOPED_KEY = 'mig-scoped';
 function setupSqlite() {
   const sqlite = new Database(':memory:');
   sqlite.exec(BOOTSTRAP_SQL);
-  // Explicit Off fixture: these tests exercise resource authorization, not login MFA.
+  // 対象の権限検査まで到達させるため、MFA は明示的に無効の fixture とする。
   sqlite.exec("INSERT OR REPLACE INTO platform_settings(key,value) SELECT 'auth.mfa.required:'||id,'false' FROM tenants");
   sqlite.prepare(
     `INSERT INTO line_accounts (id, name, channel_id, channel_access_token, channel_secret)

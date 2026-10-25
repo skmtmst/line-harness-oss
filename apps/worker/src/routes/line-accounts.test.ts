@@ -4,10 +4,7 @@ import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono, type ErrorHandler } from 'hono';
 import type { Env } from '../worker-env.js';
 
-// Mock @line-crm/db so we can assert on the values the route forwards to the
-// DB layer without needing a real D1Database. The route's responsibility is
-// "normalize body → call DB function with correct args", so capturing those
-// args is the meaningful assertion.
+// route の責務である入力正規化と引数の接続を確かめるため、実 D1 でなく DB 関数へ渡る値を観測する。
 const dbMocks = {
   getLineAccounts: vi.fn(),
   getLineAccountScopeEntries: vi.fn(),
@@ -42,7 +39,7 @@ const dbMocks = {
   LineAccountLifecycleError: class LineAccountLifecycleError extends Error {
     constructor(public readonly code: string) { super(code); this.name = 'LineAccountLifecycleError'; }
   },
-  // V: 接続・鍵・停止の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
+  // 接続・鍵・停止の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
   consumeStepUpGrant: vi.fn(async () => true),
   getAdminSessionByTokenHash: vi.fn(async () => null),
   jstNow: vi.fn(() => '2026-08-10T12:00:00.000+09:00'),
@@ -60,7 +57,7 @@ vi.mock('@line-crm/line-sdk', () => ({
   LineClient: vi.fn().mockImplementation(function () { return lineClientMocks; }),
 }));
 
-// Re-import after mock so the module picks up mocked deps.
+// 差替済みの依存を使うよう、モック登録後に再読込する。
 const { lineAccounts } = await import('./line-accounts.js');
 const { unhandledWorkerError } = await import('../lib/unhandled-error.js');
 const receiptErrorReport = vi.hoisted(() => vi.fn(async () => false));
@@ -71,9 +68,7 @@ type TestEnv = {
   Bindings: { DB: D1Database };
 };
 
-// Minimal D1 stub: every prepare/bind/first chain resolves to `null` (no row).
-// Used for the uniqueness check in checkUniqueLoginAndLiff — tests that need
-// to assert duplicate-rejection override `firstResult` per request.
+// 一意性の検証は既定で未検出とし、重複を試す場合だけ firstResult を変える。
 function makeDbStub(firstResult: unknown = null): D1Database {
   return {
     prepare: vi.fn(() => ({
@@ -93,7 +88,7 @@ function setupApp(
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'test-staff', name: 'Test', role, readOnly: false, ...staffOverride });
     c.env = { DB: dbStub };
-    // V: 大事な操作の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
+    // 大事な操作の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
     c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     await next();
   });
@@ -903,7 +898,7 @@ describe('POST /api/line-accounts', () => {
     expect(body.success).toBe(true);
     expect(body.data.loginChannelId).toBe('2009624792');
     expect(body.data.liffId).toBe('2009624792-XXXX');
-    // Saved credentials are never echoed to the browser after persistence.
+    // 保存した資格情報をブラウザへ返さないことを確かめる。
     expect(body.data.loginChannelSecret).toBeUndefined();
     expect(body.data.loginChannelSecretConfigured).toBe(true);
   });
@@ -1020,8 +1015,7 @@ describe('POST /api/line-accounts', () => {
   test('LIFF IDが空なら登録しない', async () => {
     dbMocks.createLineAccount.mockResolvedValue(fakeAccount);
 
-    // Use a complete login pair (both id+secret present) to focus on the
-    // trim/empty-string normalization behavior. liffId is independent.
+    // 空白・空文字の正規化だけを試すため、ログイン ID と秘密値は両方そろえる。LIFF ID は独立に扱う。
     const app = setupApp('owner');
     const res = await app.request('/api/line-accounts', {
       method: 'POST',
@@ -1642,7 +1636,7 @@ describe('Login pair / uniqueness validation', () => {
   });
 
   test('POST: rejects duplicate liffId', async () => {
-    // makeDbStub returns "another row already has this liff_id"
+    // 同じ liff_id を持つ別の行を返し、重複を検証する。
     const app = setupApp('owner', makeDbStub({ id: 'other-acc' }));
 
     const res = await app.request('/api/line-accounts', {
@@ -1691,9 +1685,7 @@ describe('Login pair / uniqueness validation', () => {
   });
 
   test('PATCH: LIFF-only edit succeeds against half-configured Login (id-only) account', async () => {
-    // Setup CLI persists login_channel_id without secret as a best-effort.
-    // Adding a LIFF ID later via the dashboard must NOT trip the pair check
-    // because the request doesn't touch the Login fields at all.
+    // CLI が ID だけを保存した既存アカウントでも、ログイン項目に触れない LIFF 更新まで組合せ検査で拒まない。
     dbMocks.getLineAccountById.mockResolvedValue({
       ...fakeAccount,
       login_channel_id: 'setup-cli-id',
@@ -1764,8 +1756,7 @@ describe('Login pair / uniqueness validation', () => {
   });
 
   test('PATCH: keeps existing secret when only changing the loginChannelId', async () => {
-    // Current row already has both id+secret. Caller changes only the id —
-    // pair check should pass because the unchanged secret keeps the pair complete.
+    // ID だけの変更でも、保存済みの秘密値と組になれば許可する。
     dbMocks.getLineAccountById.mockResolvedValue({
       ...fakeAccount,
       login_channel_id: 'old-id',
@@ -1828,7 +1819,7 @@ describe('PUT /api/line-accounts/:id', () => {
       login_channel_id: '2009624792',
       liff_id: '2009624792-XXXX',
     });
-    // country/role uses the fields helper (separate code path)
+    // country/role は専用の項目更新関数へ渡る。
     expect(dbMocks.updateLineAccountFields.mock.calls[0][2]).toMatchObject({
       country: '日本',
       role: '本店',

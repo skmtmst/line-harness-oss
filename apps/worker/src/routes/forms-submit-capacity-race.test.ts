@@ -8,20 +8,8 @@ import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
 /**
- * 全体上限・選択肢定員が同時回答で超えないことの実DBテスト(N-167 / #751)。
- *
- * 棚卸し(#264, 2026-09-12)で、`checkFormGates` の「数えてから比べる」判定
- * だけでは、実SQLiteファイル1本への2接続 + `Promise.all` で確実に(または
- * ほぼ確実に)超えることを確認済み。ここでは修正後、同じ形の並行でも
- * 超えないことを見る。
- *
- * forms-submit-reality.test.ts の「実DBの2接続」パターンを流用する
- * (D1 の並行に近い形。better-sqlite3 は同期実行だが、await のたびに
- * 制御が譲られるため、この形で実際の競合を再現できる)。
- *
- * 時刻の同一性には依存しない(#743 の教訓)。別々の友だち・別々の
- * Idempotency-Key を使い、判定は「最終的に何件保存されたか」「エラーの
- * 文言が利用者に分かる形か」だけを見る。
+ * 同時回答で全体上限・選択肢定員を超えないよう、同じ SQLite ファイルへの2接続と Promise.all で競合を作る。
+ * await の間に割り込める実処理を通し、別々の友だち・冪等キーで最終保存件数と利用者向けエラーを確かめる。時刻の一致には依存しない。
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -125,7 +113,7 @@ function twoConnections(seedSql: string) {
   const dir = mkdtempSync(join(tmpdir(), 'form-capacity-race-'));
   const file = join(dir, 'test.sqlite');
   const primary = new Database(file);
-  // #743: 起動SQL(約1000文)の素の再生は、文ごとに確定・fsyncする。
+  // 起動SQL(約1000文)の素の再生は、文ごとに確定・fsyncする。
   // では全480ファイル並行の確定待ちで行列し、準備だけで15秒を
   // 超えた(実装の行き詰まりではない。確保は条件付きINSERT1本で待機なし、
   // 別キー・別友だちで共有状態を持たないため)。1つの確定にまとめ、
@@ -157,8 +145,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// GitHub Actions runs this real-file, two-connection race test alongside the
-// full Worker suite. Keep the assertions strict while allowing CI I/O load.
+// CI の全試験と並行する実ファイル2接続の検証なので、I/O 待ちの時間は確保し、結果の期待値は緩めない。
 const CONCURRENCY_TEST_TIMEOUT_MS = 15_000;
 
 describe('N-167: 全体上限は同時回答でも超えない(実DB・2接続)', () => {

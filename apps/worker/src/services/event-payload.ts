@@ -14,10 +14,10 @@ export interface EventPayload {
   /** 金額が補助単位(セント等)のとき true。通貨不明のときは換算しない。 */
   conversionAmountInMinorUnit?: boolean;
   replyToken?: string;
-  /** Recovery must never turn a missing reply token into a billable push. */
+  /** 回復時に replyToken がなくても、有料 push へ勝手に切り替えない。 */
   recoveryWithoutReply?: boolean;
   onRecoveryReview?: (code: 'reply_input_unavailable' | 'delivery_unknown') => void;
 }
 
-/** Event dispatch supplied by the composition root, including nested tag changes. */
+/** 入れ子のタグ変更も含め、業務イベントの配信を組立元から注入する。 */
 export type EventDispatcher = (db: D1Database, eventType: string, payload: EventPayload, lineAccessToken?: string, lineAccountId?: string | null) => Promise<void>;

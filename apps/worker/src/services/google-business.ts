@@ -276,7 +276,7 @@ export async function revokeToken(input: { token: string; fetch: FetchLike }): P
   }
 }
 
-// ---------- authorized requests with retry ----------
+
 
 const RETRY_DELAYS_MS = [500, 1500, 4000];
 

@@ -1,17 +1,5 @@
 import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
-/*
- * 公開受信口の防衛（R423 e2e / R427 / R428 / R430）。
- *
- * R423 e2e: コピーURL（accountなし）・正しい署名・account未含有JSONで正常受領。
- * R427: 停止・保管が完了した契約先への新規受信からは外部POSTを起こさない。
- *   署名の後に止め、受領も残さず理由つき403にする。
- * R428: 申告が上限超えなら本文を読まず413。申告なしの超過も上限で止める。
- * R430: 受付期間外・未来の署名時刻は受領・後続処理なしで拒否する。
- *   時刻を送らない古い送信元は受理する。
- *
- * 実アプリ（app・全 middleware 込み）と実 SQLite を叩く。
- * event-bus は発行の有無だけ見るため代役にする（POST抑止の証明）。
- */
+/** 公開受信口のコピー URL と正しい署名で受領し、停止・保管・本文上限・時刻の境界で後続の外部送信を止める。実アプリと SQLite を使い、イベント発行だけを差し替えて抑止を観測する。 */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';

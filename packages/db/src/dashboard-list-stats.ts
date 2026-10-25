@@ -73,7 +73,7 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         )
         .bind(...markScope.binds, ...friendScope.binds)
         .first<{ total: number; in_use: number }>();
-      // #1014 ATTR-21: 「未対応◯%」の母数は受信箱全体（unread＋対応中＋
+      // 「未対応◯%」の母数は受信箱全体（unread＋対応中＋
       // 保留＋対応済み）。数え方は受信箱の正本（getInboxStatusCounts）の
       // LINE 側を使う。MAIL のスレッドは友だち属性の母数に混ぜない。
       const inbox = (await getInboxStatusCounts(db, scope)).line;

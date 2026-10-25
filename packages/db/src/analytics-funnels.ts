@@ -538,8 +538,8 @@ export async function getCurrentFunnelVersion(
 /**
  * ファネル一覧と各ファネルの現在版を、件数に関係なく2問い合わせで返す。
  *
- * 以前は一覧取得後に getCurrentFunnelVersion を1件ずつ呼んでいたため、
- * ファネル数に比例してD1への往復が増えていた。現在版の決定はDB内のJOINで行う。
+ * 一覧取得後に getCurrentFunnelVersion を1件ずつ呼ぶと、
+ * ファネル数に比例してD1への往復が増える。現在版の決定はDB内のJOINで行う。
  */
 export async function getFunnelsWithCurrentVersions(
   db: D1Database,
@@ -867,7 +867,7 @@ export async function assertFunnelReferences(
         valid = await referenceExists(db, `SELECT id FROM friend_fields WHERE id = ?`, [step.match.fieldId]);
         break;
       case 'form':
-        // N-282 (#802): 参照フォームのaccount所属をDBで確かめる。別account・
+        // 参照フォームのaccount所属をDBで確かめる。別account・
         // 存在なし・未割当legacy行はfail-closedにする(存在扱いにしない)。
         valid = await referenceExists(
           db,

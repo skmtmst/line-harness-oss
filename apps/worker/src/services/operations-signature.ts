@@ -18,7 +18,7 @@ async function key(secret: string): Promise<CryptoKey> {
 /**
  * HMAC-SHA256 を hex で返す唯一の署名プリミティブ。
  * 受信検証（operations webhook）と送信署名（外部連携Webhook）の両方が
- * これを使い、署名アルゴリズムが経路ごとに分かれないようにする（N-372）。
+ * これを使い、署名アルゴリズムが経路ごとに分かれないようにする。
  */
 export async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
   const digest = await crypto.subtle.sign(

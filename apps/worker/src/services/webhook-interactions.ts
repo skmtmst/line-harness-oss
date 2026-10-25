@@ -36,7 +36,7 @@ export function webhookFailureLabel(reason: WebhookInteractionFailureReason | nu
     case 'response_5xx': return 'つなぎ先で処理できませんでした';
     case 'processing_failed': return '受け取った内容を処理できませんでした';
     case 'unknown': return '結果を確認できませんでした';
-    // d23b R415: こちら側の署名の準備ができず、相手へ一度も送れていない。
+    // d23b : こちら側の署名の準備ができず、相手へ一度も送れていない。
     // 「相手から返事がない」と混ぜない。設定を直してからやり直せる。
     case 'secret_unavailable': return '署名の合言葉を確認できないため、まだ送っていません';
     case null: return null;
@@ -47,7 +47,7 @@ export function webhookResponseLabel(row: WebhookInteractionRow): string {
   if (row.status === 'failed') return webhookFailureLabel(row.failure_reason) ?? '処理できませんでした';
   if (row.status === 'pending') return '処理中です';
   /*
-   * d23d R407: 受け取りの「試し」は照合も実行もしていない。
+   * d23d : 受け取りの「試し」は照合も実行もしていない。
    * 実処理と同じ「結びつきました」を出すと、照合相手がいない試しまで
    * 成功に見えてしまう。記録時に idempotency_key へ残した試算結果を読む。
    */
@@ -58,7 +58,7 @@ export function webhookResponseLabel(row: WebhookInteractionRow): string {
 }
 
 /**
- * 受け取りの試しの結果の種類(d23d R407)。
+ * 受け取りの試しの結果の種類(d23d )。
  * 'invalid' は照合の成否に関わらず、行動の組み立て確認で不備があった試し。
  */
 export type IncomingTestOutcome = 'matched' | 'ambiguous' | 'not_found' | 'invalid';
@@ -95,7 +95,7 @@ function incomingTestResultLabel(idempotencyKey: string): string {
  * 二重処理を防げる。URL・secret・送信本文はAPIへ返さない。
  *
  * 同じ通知の自動配送台帳(outgoing_webhook_deliveries)との兼ね合い
- * (d23b R412):
+ * (d23b ):
  *   - 台帳に「届いた」印がある … 手動のやり直しは重ねない(already_delivered)
  *   - 自動の送り直しが動いている … lease を取ってこの要求で続きを送る。
  *     取れないときは自動側が動いている(auto_retry_scheduled)ので断る
@@ -138,12 +138,12 @@ export async function retryWebhookInteraction(
   };
 
   try {
-    // 緊急停止 (#1050): webhook_outgoing 停止中は手動再送も受け付けない。
+    // 緊急停止 : webhook_outgoing 停止中は手動再送も受け付けない。
     if (await isOperationCapabilityStopped(db, original.line_account_id, 'webhook_outgoing')) {
       throw new Error('emergency_stopped');
     }
     // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
-    // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり送る。
+    // (鍵不足・復号失敗)ときだけ送らずに止める。未設定の旧行は従来どおり送る。
     if (webhook.secret_encrypted || webhook.secret) {
       let sendSecret: string | null = null;
       try {
@@ -158,7 +158,7 @@ export async function retryWebhookInteraction(
     throw error;
   }
 
-  // d23b R409: 元の記録を「やり直し済み」に畳むのと、やり直し用の記録を
+  // d23b : 元の記録を「やり直し済み」に畳むのと、やり直し用の記録を
   // 作るのを1つのDBバッチで行う。途中で止まっても「元は畳まれたが再送
   // 記録が無い」形は残らない。
   const { claimed, retryId } = await claimWebhookInteractionRetryAndInsert(db, original, {
@@ -174,7 +174,7 @@ export async function retryWebhookInteraction(
     throw new Error('already_retried');
   }
 
-  // d23b R413: 畳み込み〜送信のあいだに止まった・消えた分を、送る前に
+  // d23b : 畳み込み〜送信のあいだに止まった・消えた分を、送る前に
   // もう一度確かめる。まだ送っていないので、この段階の中止は元の状態へ
   // そのまま戻せる。
   let sendTarget = webhook;
@@ -196,7 +196,7 @@ export async function retryWebhookInteraction(
   const started = Date.now();
   try {
     // 署名用の復号は deliverWebhook が行う。ここでの復号は、送り直しを
-    // 始める前に止めるための事前確認(#650 再審査)。
+    // 始める前に止めるための事前確認。
     const result = await deliverOnce(sendTarget, original.request_body_json, {
       idempotencyKey: original.idempotency_key,
       credentialKeys: keys,
@@ -208,14 +208,14 @@ export async function retryWebhookInteraction(
       durationMs: Date.now() - started,
       failureReason: result.ok ? null : failureReasonForDelivery(result),
     });
-    // R412: 手動で取り掛かった自動配送は、この結果で台帳も確定する。
+    // 手動で取り掛かった自動配送は、この結果で台帳も確定する。
     // 失敗なら retry_wait へ戻り、残りの自動の送り直しが続く。
     if (delivery && deliveryLease) {
       await finishOutgoingDelivery(db, delivery, deliveryLease, outgoingAttemptOf(result));
       deliveryLease = null;
     }
     await recordDeliveryOutcome(db, webhookId, result.ok);
-    // R412: 届いた通知と同じ失敗記録は「やり直し済み」に畳む。
+    // 届いた通知と同じ失敗記録は「やり直し済み」に畳む。
     if (result.ok) {
       await markFailedInteractionsRetried(
         db, original.line_account_id, webhookId, original.idempotency_key,
@@ -224,7 +224,7 @@ export async function retryWebhookInteraction(
     return (await getWebhookInteractionById(db, retryId, original.line_account_id))!;
   } catch (error) {
     /*
-      d23b R409: 結果の確定を書けなかったとき、無条件には元へ戻さない。
+      d23b : 結果の確定を書けなかったとき、無条件には元へ戻さない。
       再送記録が残っていれば（外部への送信が行われたかもしれないので）
       「届いたか分からない」失敗として閉じる試みだけをして返す。
       それも駄目なら pending のまま残し、一覧の滞留回収に任せる。

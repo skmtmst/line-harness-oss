@@ -7,7 +7,7 @@ import {
 } from './nen-engagement.js';
 
 /*
- * IDEA-21: 購入後の案内は注文の現在状態に合わせる。
+ * 購入後の案内は注文の現在状態に合わせる。
  * - 発送後に予約された案内は、注文が取り消し・返金になったら送らない
  *   （送信直前の再検証 + イベント受信時の前倒し停止の二段構え）。
  * - 注文が有効なまま、またはEC台帳に行が無い（取り消しを確認できない）
@@ -30,7 +30,7 @@ function seed(raw: SqliteD1['raw']) {
        is_enabled, title, body_text, created_at, updated_at)
       VALUES (?, ?, 'follow_up', 'ec.order.shipped', ?, '10:00', 1, ?, '本文', '2026-09-01', '2026-09-01')`)
       .run(key, label, delay, label);
-    // NEN-07: 既定の review_request は「回答者を除く」ONだがフォーム未選択の
+    // 既定の review_request は「回答者を除く」ONだがフォーム未選択の
     // ため設定不足=jobを積まない。注文状態の検証とは無関係なので、アカウント別
     // 設定で除外を外した通常状態にしておく。
     raw.prepare(`INSERT INTO account_settings
@@ -152,7 +152,7 @@ describe('IDEA-21 注文の取り消し・返金と発送後の案内', () => {
       VALUES ('acc-2', 'ch-2', '支店', 'tok2', 'sec2')`).run();
     raw.prepare(`INSERT INTO friends (id, line_user_id, line_account_id, is_following)
       VALUES ('friend-2', 'U2', 'acc-2', 1)`).run();
-    // NEN-07: acc-2 の既定 review_request も除外ON・フォーム未選択=設定不足に
+    // acc-2 の既定 review_request も除外ON・フォーム未選択=設定不足に
     // なるので、別アカウントを触らないことの検証対象は除外を外した通常状態にする。
     raw.prepare(`INSERT INTO account_settings
       (id, line_account_id, key, value, created_at, updated_at)

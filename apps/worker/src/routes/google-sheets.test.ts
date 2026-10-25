@@ -108,7 +108,7 @@ describe('connect/start', () => {
     expect(insert).toBeTruthy();
     // code_verifier は暗号化して持つ（平文でDBへ置かない）
     expect(String(insert!.args[4])).toMatch(/^v1\./);
-    // R448: 新しい接続操作の開始時に、このアカウントの古いstateは消す
+    // 新しい接続操作の開始時に、このアカウントの古いstateは消す
     // （開始済みの古いcallbackが後から連携を上書きしないように）。
     const clearOld = statements.find(
       (s) => s.sql.includes('DELETE FROM google_sheets_oauth_states') && s.args[0] === 'acc-1',
@@ -277,7 +277,7 @@ describe('oauth/callback', () => {
   });
 
   it('保存直前にstateが消えていたら連携を作り直さずerror:state_cancelledで戻す', async () => {
-    // R448: 解除・新しい接続開始でstate行が消えたあとに遅れて届いたcallback。
+    // 解除・新しい接続開始でstate行が消えたあとに遅れて届いたcallback。
     // 連携行を作り直してはいけない。
     const verifierEnc = await encryptCredential('verifier-1', ENCRYPTION_KEY);
     firstQueue.push({
@@ -285,7 +285,7 @@ describe('oauth/callback', () => {
       code_verifier_enc: verifierEnc, expires_at: '2999-01-01T00:00:00Z', used_at: null,
     });
     firstQueue.push({ id: 'acc-1' });
-    firstQueue.push(null); // integrationFor
+    firstQueue.push(null);
     firstQueue.push(null); // 保存直前のstate生存確認 → 消えている
     googleBusiness.exchangeAuthorizationCode.mockResolvedValue({
       accessToken: 'at-1', refreshToken: 'rt-1', expiresAtMs: Date.now() + 3600_000,
@@ -301,7 +301,7 @@ describe('oauth/callback', () => {
   });
 
   it('同じstateを二度消費しようとしても片方だけ通る', async () => {
-    // R448: 消費UPDATEの changes が0 → もう片方が先に使った → invalid_state。
+    // 消費UPDATEの changes が0 → もう片方が先に使った → invalid_state。
     const verifierEnc = await encryptCredential('verifier-1', ENCRYPTION_KEY);
     firstQueue.push({
       state: 's1', line_account_id: 'acc-1', staff_id: 'owner-1', mode: 'connect',
@@ -341,7 +341,7 @@ describe('disconnect', () => {
     expect(body.data.revoked).toBe(true);
     expect(googleBusiness.revokeToken).toHaveBeenCalledWith({ token: 'rt-1', fetch: expect.anything() });
     expect(statements.some((s) => s.sql.includes('DELETE FROM google_sheets_integrations'))).toBe(true);
-    // R448: 解除時にこのアカウントの接続操作（state）も全部消す。
+    // 解除時にこのアカウントの接続操作（state）も全部消す。
     // 解除より前に始まっていた遅いcallbackが連携を復活させないように。
     expect(
       statements.some((s) => s.sql.includes('DELETE FROM google_sheets_oauth_states') && s.args[0] === 'acc-1'),

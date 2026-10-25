@@ -184,14 +184,9 @@ export async function bookingConflictAlternatives(
   };
 }
 
-// ----------------------------------------------------------------
-// Helpers
 
-// UTC [start, end) bounds covering a JST calendar day (YYYY-MM-DD in JST).
-// The JST day runs [date 00:00 JST, date+1 00:00 JST) = [date-1 15:00Z, date 15:00Z).
-// Used to fetch a staff member's existing bookings for slot computation.
-// (Replaces a broken `${date}T-09:00:00.000Z`.replace('-09','00') that corrupted
-//  any date string containing '-09'/'-11'/'-12' and dropped JST 00:00-09:00.)
+
+// JST の暦日全体を UTC の半開区間へ変換する。00:00 JST は前日15:00Zなので、当日の00〜09時を落とさず既存予約との重複を検証する。
 export function jstDayWindowUtc(jstDate: string): { startUtc: string; endUtc: string } {
   return {
     startUtc: new Date(`${jstDate}T00:00:00+09:00`).toISOString(),

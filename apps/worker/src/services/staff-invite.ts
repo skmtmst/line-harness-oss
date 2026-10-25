@@ -12,7 +12,7 @@ export async function sendStaffLineLinkEmail(env: Env['Bindings'], input: Invite
 }
 
 /*
- * N-433: 本人が自分のメールアドレスを変えるときの確認便り。
+ * 本人が自分のメールアドレスを変えるときの確認便り。
  *
  * 新しい宛先へ確認リンクを送り、開かれてはじめて変更が確定する。
  * 旧アドレスへは申し込みと完了の知らせを送り、覚えのない変更に

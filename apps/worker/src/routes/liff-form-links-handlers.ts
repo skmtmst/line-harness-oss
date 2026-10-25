@@ -158,16 +158,12 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
     if (!lineUserId || !formId) {
       return inputError(c, { success: false, error: 'lineUserId and formId required' }, 400, ["lineUserId","formId"]);
     }
-    // idToken is required: this endpoint pins friend.first_tracked_link_id and
-    // pushes a campaign-specific message, so we must verify the caller IS the
-    // claimed LINE user before trusting lineUserId. Without this, an attacker
-    // who knows another user's lineUserId could lock that user into an
-    // attacker-chosen tracked_link_id (and thus an attacker-chosen reward).
+    // 流入先の固定と報酬メッセージを本人以外が操作できないよう、lineUserId を信用する前に idToken を必須検証する。
     if (!idToken) {
       return c.json({ success: false, error: 'idToken required' }, 401);
     }
 
-    // Verify idToken — ensures caller is the actual user
+    // 本人を証明する ID トークンを検証する。
     let verifiedLineAccountId: string | null = null;
     {
       const loginChannelIds = [c.env.LINE_LOGIN_CHANNEL_ID];
@@ -214,19 +210,11 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
 
     const friendAccountId = verifiedLineAccountId ?? friend.line_account_id ?? null;
 
-    // IG cross-link for LIFF flows that hit this endpoint (existing friends
-    // tapping a reward DM URL).
+    // 報酬 DM から再訪した友だちも、IG との結び付けを更新する。
     const igLinkOk = await linkIgIgsid(c, friend.id, ig || '');
     if (igLinkOk) await saveIgAccountMeta(db, friend.id, iga || '', igan || '');
 
-    // Build form LIFF URL using the friend's account liff_id (multi-account aware)
-    // Append gate/xh so the form can verify against the correct campaign gate
-    // (form definitions can be reused across campaigns, so the form's webhook
-    // URL is unreliable as a source of gate id).
-    // xh: refs are X Harness one-time secret tokens — never put them on
-    // liff.line.me URLs (third-party host).
-    // N-244差戻: 停止 ref は再送しない (下流の form 受付で帰属が復活するのを
-    // 止める)。tracked 解決も後段で止める。不存在 ref は従来どおり載せる。
+    // 友だちの所属 LIFF を使い、再利用されるフォーム自身の URL でなく gate/xh の条件を引き継ぐ。秘密の xh: トークンと停止 ref は第三者の LIFF URL に載せず、下流で停止した帰属が復活しないようにする。
     const stoppedFormRef = await isStoppedEntryRouteRef(db, ref);
     const refLink = ref && !stoppedFormRef ? await getTrackedLinkById(db, ref) : null;
     const trackedLink = refLink && await trackedLinkReferralMatchesAccount(db, refLink, friendAccountId)
@@ -256,17 +244,14 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
       context: 'liff.form-send',
     });
     if (formLiffUrl.startsWith(`${new URL(c.req.url).origin}`)) {
-      // Fallback: use env LIFF_URL if no account-specific liff_id
+      // 個別 LIFF ID がなければ環境の LIFF_URL を使う。
       const liffUrl = c.env.LIFF_URL || '';
       const liffIdMatch = liffUrl.match(/liff\.line\.me\/([0-9]+-[A-Za-z0-9]+)/);
       if (liffIdMatch) {
         formLiffUrl = `https://liff.line.me/${liffIdMatch[1]}?${formQuery.toString()}`;
       }
     }
-    // Resolve intro template via tracked link (if ref provided).
-    // Also pin the friend's first_tracked_link_id (idempotent — never overwrites).
-    // N-244差戻: 停止 entry route と同名の tracked link があっても fallback
-    // しない (帰属の復活を止める)。不存在 ref は従来どおり解決する。
+    // 計測リンクから案内文と初回流入を解決し、既存の初回値は上書きしない。停止経路と同名のリンクへ代替して帰属を復活させない。
     let introTemplate = null;
     if (trackedLink) {
       try {

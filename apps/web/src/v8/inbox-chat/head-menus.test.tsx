@@ -9,7 +9,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import ConversationHead from './conversation-head'
-import { HeadStatusMenu } from './head-menus'
+import { HeadStatusMenu } from '@/components/shared/inbox-head-menus'
 
 beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true) })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.unstubAllGlobals() })

@@ -28,7 +28,7 @@ export async function partyInput(db:D1Database,a:string,f:string,value:unknown):
  }
  return out;
 }
-/** Candidate matching reserves a separate staff/time interval for each person before publishing a slot. */
+/** 同じ枠を重複割当しないよう、公開前に各人の担当者と時間区間を確保する。 */
 export async function previewParty(db:D1Database,a:string,members:PreparedMember[],startMode:unknown,from:string,to:string,env:Record<string,unknown>){
  if(!['parallel','sequential'].includes(String(startMode))||![from,to].every(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&Number.isFinite(Date.parse(x)))||from>to||Date.parse(to)-Date.parse(from)>31*86400000)throw new GapError('invalid_party_range');
  const tz=await getAccountTimeZone(db,a),availability=await Promise.all(members.map(m=>getAvailability(db,{lineAccountId:a,menuId:m.menuId,staffId:m.staffId??undefined,from,to,minLeadTimeMinutes:60,now:new Date(),applyStoreRules:true,additionalDurationMinutes:m.addons.reduce((n,r)=>n+r.duration_minutes,0),forceCalendarRefresh:true,googleCredentials:{email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL as string,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY as string}})));
@@ -92,7 +92,7 @@ export async function createBulkBooking(c:Context<Env>,a:string,f:string,b:Recor
  }
  }
  if(!planned.length)throw new GapError('no_occurrences');
- // Online settlement and companion cancellation charges require provider adapters; never silently skip collection.
+ // 決済や同伴者の取消料を黙って省略しないよう、対応する事業者アダプターがない処理は進めない。
  for(const [i,p]of planned.entries()){
  if(routingToken!==undefined){const claim=await verifyRoutingToken(db,a,f,routingToken,p.member.menuId,p.staffId);if(claim.target.meetingMode&&claim.target.meetingMode!==p.member.meetingMode)throw new GapError('routing_token_invalid');}
  const deposit=await depositEstimate(db,a,p.member.menuId,p.member.price,p.startsAt,party?members.length:1,tz);

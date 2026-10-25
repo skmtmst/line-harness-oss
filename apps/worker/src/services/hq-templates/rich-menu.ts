@@ -12,7 +12,7 @@ import { buildTapPostbackData } from '../../lib/rich-menu-tap.js';
 import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, createHqTemplateSnapshotToken, type HqTemplateAdapter, type HqTemplateAdapterInput, type HqTemplateAdapterContext, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateMatchedReference, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { type HqTemplateStatement } from '@line-crm/db';
 
-/** Registry remains fail-closed until the store coordinator binds DB, R2 and reference adapters. */
+/** 店舗の組立元が DB・R2・参照を接続するまで、安全側で拒む。 */
 export const richMenuHqTemplateAdapter = unsupportedHqTemplateAdapter('rich_menu');
 
 type RefKind = 'tag' | 'form' | 'scenario' | 'template';
@@ -31,8 +31,7 @@ async function digest(value: string | Uint8Array): Promise<string> {
 }
 const referenceKey = (r: HqTemplateReference) => `${r.kind}:${r.sourceId}`;
 function validateTextPostback(area: Area, targetAreaId: string): void {
-  // Tag actions wrap the text in a URL-encoded postback. Its final data, not
-  // just the visible text, must fit LINE's 300-character limit.
+  // タグ操作は URL 符号化した postback になるため、表示文だけでなく最終 data が LINE の300文字以内か検査する。
   if (area.intent === 'text' && area.tagIds?.length
     && buildTapPostbackData(targetAreaId, area.actionData.text).length > 300) fail('INVALID_ACTION');
 }
@@ -47,7 +46,7 @@ function assertPublicUri(value: unknown): void {
         current = next;
       } catch { fail('INVALID_ACTION'); }
     }
-    // Encoded account references must not survive the bounded inspection.
+    // 制限付きの検査でも、符号化したアカウント参照を残さない。
     if (/%[0-9a-f]{2}/i.test(current)) fail('OPAQUE_REFERENCE_UNSUPPORTED');
     return current;
   };
@@ -102,7 +101,7 @@ export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, t
         const expected = RICH_MENU_DB_ACTION_TYPE_BY_INTENT[a.intent as keyof typeof RICH_MENU_DB_ACTION_TYPE_BY_INTENT];
         if (a.actionType !== expected) fail('INVALID_ACTION');
       }
-      // Opaque postback payloads may hide source account IDs. Only structured references are accepted.
+      // 不透明な postback に元アカウント ID が隠れるため、構造化した参照だけを受け付ける。
       const allowed = a.intent === 'tel' ? ['uri'] : a.intent === 'datetime' ? ['mode','initial','min','max'] : a.intent === 'clipboard' ? ['text'] : a.intent === 'postback' ? ['data','displayText'] : a.intent === 'booking' ? ['menuId'] : a.intent === 'visit_stamp' ? ['cardId'] : isLiffActionKind(a.intent) ? [] : a.actionType === 'richmenuswitch' ? ['targetPageId'] : a.actionType === 'uri' ? ['uri'] : a.actionType === 'message' ? ['text'] : [];
       keys(a.actionData, allowed);
       if(a.dataBindings!==undefined) {
@@ -127,19 +126,18 @@ export function parseRichMenuTemplateDefinition(input: HqTemplateAdapterInput, t
       if (a.formId !== undefined && a.intent !== 'form' || a.templateId !== undefined && a.intent !== 'template') fail('INVALID_REFERENCE');
       if (a.tagIds !== undefined && (!Array.isArray(a.tagIds) || a.tagIds.length > 30)) fail('INVALID_REFERENCE');
       for (const tag of (a.tagIds ?? []) as unknown[]) ident(tag);
-      // Only these intents emit an area postback consumed by handleRichMenuTap.
+      // handleRichMenuTap が受ける領域 postback は、これらの操作だけが作る。
       if ((a.tagIds as unknown[] | undefined)?.length && !['text', 'template','postback','datetime'].includes(String(a.intent)) && !a.useTrackedLink) fail('UNSUPPORTED_TAG_ACTION');
       if (a.scenarioId !== undefined && !['text', 'template'].includes(String(a.intent))) fail('UNSUPPORTED_SCENARIO_ACTION');
     }
   }
   const definition = d as unknown as RichMenuHqDefinition;
-  // buildIdMap generates 32-character IDs. Recheck the actual mapping at commit.
+  // 生成 ID は32文字とし、確定時にも実際の対応関係を再確認する。
   for (const p of definition.richMenu.pages) for (const a of p.areas) validateTextPostback(a, '0'.repeat(32));
   const pageIds = new Set(definition.richMenu.pages.map(p => p.id));
   if (!pageIds.has(definition.richMenu.defaultPageId)) fail('INVALID_DEFAULT_PAGE');
   for (const p of definition.richMenu.pages) for (const a of p.areas) if (a.actionType === 'richmenuswitch' && !pageIds.has(a.actionData.targetPageId)) fail('INVALID_SWITCH_TARGET');
-  // Reuse the same action validator as publication (no LINE/R2 calls). The target
-  // account's actual LIFF URL remains a prerequisite of the later publish flow.
+  // LINE/R2 を呼ばず公開と同じ操作検証を使う。実際の公開では対象アカウントの LIFF URL を別途必須とする。
   const pages = definition.richMenu.pages.map((p, orderIndex) => ({ ...p, orderIndex, imageContentType: null, lineRichMenuId: null, areas: p.areas as AreaInput[] }));
   try {
     validateRichMenuGroupForPublish({ id: definition.richMenu.id, size: definition.richMenu.size, chatBarText: definition.richMenu.chatBarText, isDefaultForAll: false, formBaseUrl: 'https://liff.line.me/fixture-hq', pages: resolveSwitcherActions(pages, definition.richMenu.id) });
@@ -160,7 +158,7 @@ const GROUP_COLUMNS = ['id', 'name', 'chat_bar_text', 'size', 'default_page_id',
 const PAGE_COLUMNS = ['id', 'group_id', 'order_index', 'name', 'image_r2_key', 'line_richmenu_id', 'updated_at', 'alias_id', 'image_content_type', 'created_at'];
 const AREA_COLUMNS = ['id', 'page_id', 'action_type', 'action_data', 'intent', 'tag_ids', 'form_id', 'template_id', 'tracked_link_id', 'bounds_x', 'bounds_y', 'bounds_width', 'bounds_height', 'updated_at', 'label', 'score_change', 'created_at'];
 
-/** Bound adapter. snapshot is persisted by the preflight coordinator, not recomputed on apply. */
+/** スナップショットは事前確認側が保存し、適用時に再計算しない。 */
 export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions): HqTemplateAdapter & {
   snapshot(targetAccountId: string): Promise<HqTemplateSnapshotToken>;
 } {
@@ -170,8 +168,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED') fail('FORBIDDEN');
   ident(authority.tenantId); ident(input.templateVersionId);
   const d = parseRichMenuTemplateDefinition(input, authority.tenantId); const g = d.richMenu; const refs = richMenuReferences(d);
-  // D1 allows 100 bound parameters per statement. The atomic snapshot guard
-  // needs the seven root bindings, reference bindings, and one expected snapshot.
+  // D1 の100バインド内に、ルート7項目・参照・期待スナップショットの検証を収める。
   if (8 + (g.displayAudience === 'tag' ? 1 : 0) + refs.reduce((count, ref) => count + (ref.kind === 'form' ? 3 : 2), 0) > 100) fail('UNSUPPORTED_REFERENCE_LIMIT');
   const assertContext = (c: Pick<HqTemplateAdapterContext, 'tenantId' | 'targetAccountId'>) => {
     if (c.tenantId !== authority.tenantId) fail('FORBIDDEN'); ident(c.targetAccountId);
@@ -298,7 +295,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
       const dbCommit: HqTemplateStatement[] = [{ sql: `SELECT json(CASE WHEN (${s.sql}) = ? THEN '{}' ELSE 'VERSION_CONFLICT' END)`, bindings: [...s.bindings, s.raw] }, ...s.liff.statements];
       const add = (sql: string, ...bindings: (string | number | null)[]) => dbCommit.push({ sql, bindings });
       if (c.mode === 'overwrite') {
-        // Explicit child deletion also works with the application's current FK-off test fixture.
+        // 外部キーが無効の既存試験環境でも動くよう、子行を明示的に削除する。
         add('DELETE FROM rich_menu_areas WHERE page_id IN (SELECT id FROM rich_menu_pages WHERE group_id=?)', groupId);
         add('DELETE FROM rich_menu_pages WHERE group_id=?', groupId);
         add("UPDATE rich_menu_groups SET name=?, chat_bar_text=?, size=?, default_page_id=?, status='draft', is_default_for_all=0, targeting_enabled=0, targeting_condition=NULL, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND account_id=?", name, g.chatBarText, g.size, resolve(g.defaultPageId), groupId, c.targetAccountId);
@@ -340,10 +337,7 @@ export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions)
   };
 }
 
-/** Caller must hold the store lease through stage/commit/reconciliation, including retries.
- * commit runs the plan AND the coordinator's preflight claim/result/audit in one D1 batch.
- * uncertain outcomes never delete an image that a committed menu could reference.
- */
+/** 準備・確定・照合と再試行まで店舗の実行権を保持する。計画と事前確認の受領票・結果・監査は1つの D1 batch で確定する。結果不明では確定済みメニューの画像を削除しない。 */
 export async function executeRichMenuHqPlan(
   plan: HqTemplateStoreAtomicCommitPlan,
   dependencies: {
@@ -373,7 +367,7 @@ export async function executeRichMenuHqPlan(
     await commit(plan.dbCommit);
     return 'committed';
   } catch (error) {
-    // A retry may encounter images written before a successful but unacknowledged commit.
+    // 応答を失った成功処理の画像が、再試行時に既に存在する場合がある。
     const outcome = await reconcile().catch(() => 'unknown' as const);
     if (outcome === 'committed') return 'committed';
     if (outcome === 'unknown') return 'cleanup_pending';
@@ -385,7 +379,7 @@ export async function executeRichMenuHqPlan(
       } catch { cleanupFailed = true; }
     }
     if (cleanupFailed) return 'cleanup_pending';
-    // Do not expose DB/R2 messages, which may contain internal keys or SQL bindings.
+    // DB/R2 の本文にはキーや SQL 引数が含まれ得るため、応答へ出さない。
     fail(commitStarted ? 'STORE_COMMIT_FAILED' : 'IMAGE_STAGE_FAILED');
   }
 }

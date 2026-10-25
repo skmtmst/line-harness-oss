@@ -76,9 +76,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
 
   const nowIso = new Date().toISOString();
   const staff = c.get('staff');
-  // Conditional UPDATE so two concurrent admins can't both transition the
-  // same `requested` row. The losing request gets changes=0 and treats the
-  // booking as already decided.
+  // 同時に承認されないよう requested を条件に更新する。changes=0 の要求は既に判断済みとして扱う。
   const plans=action==='confirm'?await prepareConfirmedEventBooking(c.env.DB,booking.id,new Date(nowIso)):[];
   const decision = await c.env.DB.batch([c.env.DB
     .prepare(
@@ -152,7 +150,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         reminder_hours_before: evRow.reminder_hours_before,
       });
       await insertRemindersForBooking(c.env.DB, booking.id, reminders);
-      // N-065: 承認で確定した予約も へ登録する (source 連動つき)。
+      // 承認で確定した予約も へ登録する (source 連動つき)。
       // 登録失敗で承認自体を壊さない。二重登録は enroll 側で吸収する。
       await enrollByTrigger(c.env.DB, {
         triggerType: 'event',
@@ -179,7 +177,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
     );
   }
   if (action === 'reject') {
-    // N-065: 落選した予約の 未送信予定だけを止める。
+    // 落選した予約の 未送信予定だけを止める。
     // 送信権の貸出中は状態更新を巻き戻して 409 にする。貸出中の送信は
     // 確定ずみの予約への送信になるため正当で、再試行は巻き戻し後の状態から
     // 再開する (再送の修復受付も残す)。
@@ -263,8 +261,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
   if (!canTransition(booking.status as never, 'cancel')) return bad(c, 'invalid_state', 409);
 
   const nowIso = new Date().toISOString();
-  // Conditional UPDATE: another concurrent action (mark_attended /
-  // mark_no_show / friend cancel) may have already changed status.
+  // 出席・欠席・本人取消が先に確定した場合を上書きしないよう、状態を条件に更新する。
   const upd = await c.env.DB
     .prepare(
       `UPDATE event_bookings
@@ -278,7 +275,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
     .bind(booking.slot_id)
     .first<{ starts_at: string }>();
-  // N-065: の未送信予定だけを止める。送信済み履歴は残す。
+  // の未送信予定だけを止める。送信済み履歴は残す。
   // 旧表の取消は fence 成功の後に回す (409 の完全 rollback のため)。
   // 送信権の貸出中は状態更新を巻き戻して 409 にする (取消確定後の送信を起こさない)。
   try {
@@ -331,7 +328,7 @@ events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owne
   const setValues: unknown[] = [];
 
   if ('internal_note' in body) {
-    // 顧客メモと同等の上限(点検#520軽14)。無制限だと一覧が重くなる。
+    // 顧客メモと同等の上限(点検軽14)。無制限だと一覧が重くなる。
     if (typeof body.internal_note === 'string' && body.internal_note.length > 5000) {
       return bad(c, 'invalid_internal_note', 422, ["internal_note"]);
     }
@@ -352,8 +349,7 @@ events.put('/api/events/admin/events/:id/bookings/:bookingId', requireRole('owne
   }
   setClauses.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
   setValues.push(booking.id, booking.status);
-  // Conditional UPDATE on (id, status) — same race protection as the
-  // decide / cancel handlers.
+  // 承認・取消と同じく、id と状態を更新条件に含めて競合を防ぐ。
   const upd = await c.env.DB
     .prepare(`UPDATE event_bookings SET ${setClauses.join(', ')} WHERE id = ? AND status = ?`)
     .bind(...setValues)

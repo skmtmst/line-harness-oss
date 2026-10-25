@@ -88,7 +88,7 @@ export const get__webinar_assets_token_slug__2 = async (c: Context<Env, "/webina
 
   // ?at=<秒> 付きプレイリストは #EXT-X-START を注入し、途中参加位置からの
   // 再生を「配信側で」宣言する。iOS native HLS (LINE in-app) はクライアント側
-  // の currentTime シークが 0 に巻き戻ることがあるため、開始位置はプレイリスト
+  // currentTime シークが 0 に巻き戻ることがあるため、開始位置はプレイリスト
   // で示すのが確実。master 内の variant URI にも ?at= を伝播する。
   const atRaw = c.req.query('at');
   if (ext === 'm3u8' && atRaw !== undefined) {
@@ -141,8 +141,7 @@ export const get__api_webinars_4 = async (c: Context<Env, "/api/webinars">) => {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   /*
-    共通一覧契約の offset 方式。以前は件数制限が無く全件転送だった。
-    絞り(検索・フォルダ・状態・並び順)はサーバーで行い、頁を切る。
+  * 大きな一覧を一度に転送しないよう、検索・フォルダ・状態・並びをサーバーで適用し、共通の offset 契約でページを区切る。
   */
   const paging = parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') });
   const rawSort = c.req.query('sort');

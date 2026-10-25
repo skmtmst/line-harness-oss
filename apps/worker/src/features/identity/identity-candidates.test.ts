@@ -320,7 +320,7 @@ describe('identity candidate contract', () => {
   });
 
   /*
-   * FRIEND-11: 画面の「すべて」は本当に全状態を返す。集計は状態の絞り込みを
+   * 画面の「すべて」は本当に全状態を返す。集計は状態の絞り込みを
    * 含まない全件で数え、弱い根拠（confidence < 50）の件数も出す。
    */
   it('lists every status with status=all and returns aggregate counts', async () => {
@@ -355,7 +355,7 @@ describe('identity candidate contract', () => {
   });
 
   /*
-   * FRIEND-11: 検索はサーバー側で全件へかける。取得済みの1ページだけを
+   * 検索はサーバー側で全件へかける。取得済みの1ページだけを
    * 画面で絞ると、後ろのページにしか無い候補へ辿れない。
    */
   it('applies q across the whole candidate set before slicing the page', async () => {

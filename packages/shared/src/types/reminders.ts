@@ -127,7 +127,7 @@ export interface ReminderDraftVersion {
   lastTestedAt: string | null;
   publishedAt: string | null;
   /**
-   * 版の更新時刻（R148 監査）。保存のたびに変わるため、開いたときの値と
+   * 版の更新時刻。保存のたびに変わるため、開いたときの値と
    * ずれていれば別の画面が先に保存したと分かる。保存時に送り返す。
    */
   updatedAt: string;
@@ -172,7 +172,7 @@ export interface ReminderPublishResult {
 }
 
 /**
- * テスト送信前に画面へ出す送信先の状態（N-070）。
+ * テスト送信前に画面へ出す送信先の状態。
  * unset=未設定 / unavailable=設定済みだがこのアカウントで届けられない /
  * ready=送信できる。送信本体と同じ判定を使うので表示と実送信がずれない。
  *
@@ -234,7 +234,7 @@ export interface ReminderDeliveryRunsResponse {
     /** 公開版スナップショットの停止条件。公開版が無いときは null（未取得と区別する）。 */
     stopConditions: ReminderStopConditions | null;
     /**
-     * 公開版があるか（R146 監査）。無い下書きは「停止中」ではなく
+     * 公開版があるか。無い下書きは「停止中」ではなく
      * 「下書き」と出し、再開はさせない。
      */
     hasPublishedVersion: boolean;

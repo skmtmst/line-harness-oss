@@ -6,7 +6,7 @@ import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /**
- * M506: コラムの「同じ形で書く」を二重に押しても複製は1本。
+ * コラムの「同じ形で書く」を二重に押しても複製は1本。
  *
  * 複製に要求キー（`Idempotency-Key`）を付け、同じキーなら同じ複製へ戻す。
  * 実ルート（nen-campaigns.ts）＋実DB（createTestD1）で確かめる。

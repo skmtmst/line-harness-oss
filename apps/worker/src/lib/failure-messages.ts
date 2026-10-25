@@ -1,5 +1,4 @@
-/** Fixed operator messages for legacy route reasons. Never interpolate request data or external errors.
- * The English keys preserve existing handler identities; only the public failure is localized. */
+/** 要求や外部エラーを文面へ差し込まず、固定の運用者向けメッセージだけを使う。内部の英語キーは既存のまま保つ。 */
 export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, message: string]>> = {
   "AI loop Slack report not configured": ["AI_LOOP_SLACK_REPORT_NOT_CONFIGURED", "AIのSlack報告が未設定です。連携の設定を確認してください。"],
   "Account already in this pool": ["ACCOUNT_ALREADY_IN_THIS_POOL", "このアカウントは、すでにこの流入プールに登録されています。"],
@@ -474,12 +473,12 @@ export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, m
   "windowDays must be an integer between 1 and 365": ["WINDOW_DAYS_MUST_BE_AN_INTEGER_BETWEEN_1_AND_365", "集計日数は1〜365の整数で指定してください。"],
 };
 
-/** Reviewed Japanese text for a legacy reason. Unknown reasons use a safe generic guide. */
+/** 未知の理由で内部情報を漏らさないよう、確認済みの日本語がなければ安全な共通案内を使う。 */
 export function failureMessage(reason: string, fallback = '処理を完了できませんでした。時間をおいて、もう一度お試しください。'): string {
   return Object.hasOwn(FAILURE_MESSAGES, reason) ? FAILURE_MESSAGES[reason]![1] : fallback;
 }
 
-/** Canonical codes can be used by new handlers without an English legacy reason. */
+/** 新しいハンドラは既存の英語理由へ依存せず、正規コードを使える。 */
 export const FAILURE_CODE_MESSAGES: Readonly<Record<string, string>> = Object.fromEntries(
   Object.values(FAILURE_MESSAGES).map(([code, message]) => [code, message]),
 );

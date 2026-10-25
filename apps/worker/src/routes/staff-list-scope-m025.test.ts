@@ -5,12 +5,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-/**
- * M025: 範囲限定の担当者には権限者の一覧APIを画面と同じ基準で拒否する（403）。
- *
- * 役割ごとの試験で固定する。画面（/hq/members）は範囲限定に理由つきの面を
- * 出すが、口は200で一覧を返していた。
- */
+/** 氏名・役割・範囲を漏らさないよう、範囲限定の担当者には権限者一覧を403で拒むことを役割ごとに確かめる。 */
 
 const { staff } = await import('./staff.js');
 

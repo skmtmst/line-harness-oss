@@ -61,7 +61,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
       if (stored?.message_bubbles_json) return c.json({success:false,code:'MULTIPLE_MESSAGES_REQUIRE_EDITOR',error:'複数の吹き出しは来店フォローの編集で保存してください'},409);
     }
 
-    // conditionType / conditionValue の partial-update 検証（OSS issue #120 回帰防止）。
+    // conditionType / conditionValue の partial-update 検証（OSS issue  回帰防止）。
     // どちらかが touched なときだけ走らせる。effective 値は、body に来た値を優先しつつ
     // 既存行で穴埋めして組み立て、validateStepCondition で pair を検証する。
     // これにより「type だけ flipping、value は既存」のような partial 更新を壊さずに、
@@ -274,9 +274,9 @@ export const post__api_scenarios_id_steps_reorder_3 = async (c: Context<Env, "/a
       .bind(scenarioId)
       .all<{ id: string; step_order: number }>();
     const oldOrderById = new Map(existing.results.map((r) => [r.id, r.step_order]));
-    // moved set: stepId → newOrder
+
     const newOrderById = new Map(body.orders.map((o) => [o.stepId, o.stepOrder]));
-    // old → new step_order map (only for moved steps)
+    // 移動した通だけの、新旧の通番対応を作る。
     const oldToNew = new Map<number, number>();
     for (const [stepId, newOrder] of newOrderById) {
       const oldOrder = oldOrderById.get(stepId);
@@ -327,7 +327,7 @@ export const post__api_scenarios_id_steps_reorder_3 = async (c: Context<Env, "/a
 export const get__api_scenarios_id_preview_4 = async (c: Context<Env, "/api/scenarios/:id/preview">) => {
   try {
     // simulate と同じく開始日の正しさを見る。無いと NaN 時刻の予定が
-    // 返るか 500 になる（#495 軽15）。
+    // 返るか 500 になる。
     const startParam = c.req.query('startAt');
     if (startParam && !Number.isFinite(new Date(startParam).getTime())) {
       return c.json({
@@ -413,11 +413,11 @@ export const get__api_scenarios_id_preview_4 = async (c: Context<Env, "/api/scen
         messageType: resolved.messageType,
         messageContent: resolved.messageContent,
         question: parseQuestion(resolved.questionJson),
-        // R212: 下書きの通も並ぶが、実際は送られない。送られる通と
+        // 下書きの通も並ぶが、実際は送られない。送られる通と
         // 見分けられるよう別を付ける（友だち別の予定は下書きを除く）。
         isDraft: Number(step.is_draft ?? 0) !== 0,
         /*
-         * R237: 公開版・通の控えのどれを表示しているかを出す。
+         * 公開版・通の控えのどれを表示しているかを出す。
          * template 参照があるのに控えのときは、未反映の理由も付ける
          * （保存と公開を取り違えると、確認すべき場所を誤る）。
          */
@@ -564,7 +564,7 @@ export const post__api_scenarios_id_enroll_friendId_10 = async (c: Context<Env, 
     const friendId = c.req.param('friendId');
     const db = c.env.DB;
 
-    // Verify both exist
+
     const [scenario, friend] = await Promise.all([
       getScenarioById(db, scenarioId),
       getFriendById(db, friendId),
@@ -579,7 +579,7 @@ export const post__api_scenarios_id_enroll_friendId_10 = async (c: Context<Env, 
 
     /*
      * 手動登録は本物の購読を作る。IDを直接渡されても、見えない友だちや
-     * 別アカウントの友だちを混ぜない（点検 #495 中12）。
+     * 別アカウントの友だちを混ぜない（点検  中12）。
      * テスト送信と同じく、友だち側のアカウント一致を見る。
      */
     const friendAccountId = (friend as { line_account_id?: string | null }).line_account_id ?? null;
@@ -595,7 +595,7 @@ export const post__api_scenarios_id_enroll_friendId_10 = async (c: Context<Env, 
     /*
      * 未公開・停止中の契約はここで正直に返す。enrollFriendInScenario は
      * webhook 経路の副作用でも使うので null に倒すだけだが、手動登録では
-     * 理由を 422 で返す（N-050 / #644）。
+     * 理由を 422 で返す。
      */
     if (!scenario.is_active) {
       return inputError(c, { success: false, error: '停止中のシナリオには登録できません。' }, 422, ["scenario"]);

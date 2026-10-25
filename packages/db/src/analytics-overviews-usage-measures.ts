@@ -63,7 +63,7 @@ export const FEATURE_USAGE_DEFINITIONS: Record<FeatureId, FeatureUsageDefinition
 export const FEATURE_USAGE_WINDOW_DAYS = 90;
 
 /**
- * 機能ごとの利用回数を、機能の意味に合わせて数える（N-448）。
+ * 機能ごとの利用回数を、機能の意味に合わせて数える。
  *
  * 計測できる機能は直近90日の回数と最終利用（期間を区切らない最後の記録）を返す。
  * 機能ごとに1問ずつ投げず、領域ごとの固定文で集計する（N+1回避）。

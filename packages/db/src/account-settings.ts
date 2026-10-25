@@ -34,7 +34,7 @@ export async function getAccountSetting(
  * Retrieve several raw setting values for an account in one round trip.
  *
  * 管理APIが機能設定の束を読むとき、キーごとに getAccountSetting を投げると
- * 往復が本数分だけかかる(#633)。まとめて取って欠けたキーは「未設定」と
+ * 往復が本数分だけかかる。まとめて取って欠けたキーは「未設定」と
  * 同じ扱いにする（返値へキーが出ない）。
  */
 export async function getAccountSettings(

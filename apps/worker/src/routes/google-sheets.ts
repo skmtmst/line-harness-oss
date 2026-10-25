@@ -3,12 +3,12 @@ import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
 import { inputJsonBoundary } from '../lib/input-errors.js';
 /**
- * #838 第2段: Google Sheets への直接書き出し（OAuth + Sheets API）。
+ *  第2段: Google Sheets への直接書き出し（OAuth + Sheets API）。
  *
  * - 認可・トークン保管・権限の形は restaurant-google.ts と揃える。
  *   state はDB管理・1回使い切り・10分失効。PKCEの verifier も暗号化して持つ。
  * - 変えられるのは統括（owner または全アカウント担当の admin）だけ。
- * - 接続の解除は Google 側の revoke ＋連携行の削除（要件 #838 §2）。
+ * - 接続の解除は Google 側の revoke ＋連携行の削除（要件  §2）。
  * - トークン・秘密値を応答・ログに出さない。
  */
 import { Hono } from 'hono';
@@ -269,7 +269,7 @@ googleSheets.post('/api/integrations/google-sheets/connect/start', requireIntegr
   }
   /*
    * 新しい接続操作を始めたら、このアカウント向けの古い接続操作は全部
-   * 無効にする（R448）。開始済みで使い切り済みのstateも消すので、
+   * 無効にする。開始済みで使い切り済みのstateも消すので、
    * いま進行中の古い callback が後から連携行を復活・上書きしない。
    */
   await dbFor(c.env)
@@ -333,7 +333,7 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
   }
   /*
    * 同じstateが同時に二度来ても片方だけが通るよう、使用済みへの更新は
-   * 「まだ使われていない」条件付きで行う（R448）。
+   * 「まだ使われていない」条件付きで行う。
    */
   const consumed = await dbFor(c.env)
     .prepare('UPDATE google_sheets_oauth_states SET used_at = ? WHERE state = ? AND used_at IS NULL')
@@ -376,7 +376,7 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
       return c.redirect(adminReturnUrl(c, lineAccountId, 'error:no_refresh_token'));
     }
     /*
-     * 保存の直前にもう一度stateの存否を確かめる（R448）。
+     * 保存の直前にもう一度stateの存否を確かめる。
      * 接続の解除や新しい接続開始はこのアカウントのstateを消すので、
      * 途中で解除・再接続された古い操作の結果をここで止める。
      * これがないと、解除のあとに遅れて届いた callback が連携行を
@@ -437,12 +437,12 @@ googleSheets.post('/api/integrations/google-sheets/disconnect', requireIntegrati
   } catch {
     revoked = false;
   }
-  // 要件 #838 §2: 切断は行ごと消す。同期履歴も CASCADE で消える。
+  // 要件  §2: 切断は行ごと消す。同期履歴も CASCADE で消える。
   await dbFor(c.env).prepare('DELETE FROM google_sheets_integrations WHERE id = ?').bind(integration.id).run();
   /*
    * このアカウント宛ての接続操作（使い切り済みのものを含む）も消す。
    * 解除より前に始まっていた遅い callback が、あとから連携行を
-   * 復活させないようにする（R448）。
+   * 復活させないようにする。
    */
   await dbFor(c.env)
     .prepare('DELETE FROM google_sheets_oauth_states WHERE line_account_id = ?')

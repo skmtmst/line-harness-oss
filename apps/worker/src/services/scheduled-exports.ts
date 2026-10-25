@@ -1,7 +1,7 @@
 import { jstDate as japanDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 /**
- * #838 第1段: 定期CSV書き出しの実行役。
+ *  第1段: 定期CSV書き出しの実行役。
  *
  * sixHourly のスケジューラから呼ばれ、その日(JST)分がまだ無い
  * アカウントへ友だちCSVの書き出し履歴を1件作る。実体は既存の

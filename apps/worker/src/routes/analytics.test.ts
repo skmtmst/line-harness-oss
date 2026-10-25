@@ -96,7 +96,7 @@ staffApp.use('*', async (c, next) => {
 });
 staffApp.route('/', analytics);
 staffApp.onError(unhandledWorkerError);
-// 実行間隔ガード(点検#508の中4)が読む最小の入れ物。テストごとに中身を変える。
+// 実行間隔ガード(点検の中4)が読む最小の入れ物。テストごとに中身を変える。
 const guardRows: { crossBusy: { id: string } | null; lastFunnelRunAt: string | null } = {
   crossBusy: null,
   lastFunnelRunAt: null,
@@ -483,7 +483,7 @@ describe('クロス分析API', () => {
     expect(mocks.createAnalyticsCrossRun).not.toHaveBeenCalled();
   });
 
-  // #951 N-276: 「数えるもの」は人数固定ではなく、イベントの回数も選べる。
+  //  「数えるもの」は人数固定ではなく、イベントの回数も選べる。
   // ルートは種類をこねず検証層へそのまま渡す。検証と集計は packages/db の
   // 実SQLite試験(analytics-cross.test.ts)が担う。
   it('イベントの回数を数えるmeasureも検証層へそのまま渡す', async () => {
@@ -1000,7 +1000,7 @@ describe('定期レポートAPI', () => {
   });
 
   it('R228: 正しい宛先と形の合わない宛先が混ざっていても止める', async () => {
-    // 以前は不正な宛先を黙って外して作成していた（送ったつもりが届かない）。
+    // 送ったつもりで欠落しないよう、不正な宛先を含む作成は拒む。
     const mixed = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', {
       ...body,
       recipients: [

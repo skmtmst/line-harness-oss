@@ -312,7 +312,7 @@ export const post__api_rich_menu_groups_8 = async (c: Context<Env, "/api/rich-me
     return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
   }
   const created = await createRichMenuGroup(c.env.DB, parsed.value);
-  // N-164: 登録メディアを選んで作った場合、既定ページの画像としてここで登録する。
+  // 登録メディアを選んで作った場合、既定ページの画像としてここで登録する。
   // 作成と別口の「画像アップロード」を要しないため、作成画面へ戻った選択が
   // そのまま下書きへ反映される。失敗しても下書き自体は残し、編集画面で
   // やり直せることを応答で伝える。
@@ -355,7 +355,7 @@ export const post__api_rich_menu_groups_8 = async (c: Context<Env, "/api/rich-me
       try {
         await setRichMenuPageImage(c.env.DB, defaultPage.id, key, contentType);
       } catch (dbError) {
-        // M954 と同じく、DB への記録に失敗したら上げた画像を片付ける。
+        // と同じく、DB への記録に失敗したら上げた画像を片付ける。
         try {
           await c.env.IMAGES.delete(key);
         } catch {
@@ -392,7 +392,7 @@ export const patch__api_rich_menu_groups_groupId_9 = async (c: Context<Env, "/ap
   const parsed = parsePatchBody(body);
   if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 400, ["name","size","chatBarText"]);
 
-  // M951: 保存に版を付ける (タグ編集の expectedVersion と同じ約束)。
+  // 保存に版を付ける (タグ編集の expectedVersion と同じ約束)。
   // 無し・不正は 400、古い版は 409。先に読んだ側の変更が黙って消えないようにする。
   const rawVersion = isJsonRecord(body) ? body.expectedVersion : undefined;
   if (rawVersion === undefined) {
@@ -409,7 +409,7 @@ export const patch__api_rich_menu_groups_groupId_9 = async (c: Context<Env, "/ap
       }, 400, ["expectedVersion"]);
   }
 
-  // M952: 作成口と同じ検査を保存口にも入れる。「条件で出し分ける」のに
+  // 作成口と同じ検査を保存口にも入れる。「条件で出し分ける」のに
   // 条件が無いメニューは誰にも出ない。片方だけの変更でも、残りと合わせた
   // 形で見る。
   const effectiveTargetingEnabled = parsed.value.meta.targetingEnabled
@@ -424,7 +424,7 @@ export const patch__api_rich_menu_groups_groupId_9 = async (c: Context<Env, "/ap
       }, 400, ["targetingCondition"]);
   }
 
-  // #827 (N-158): 公開中の定義(LINEに出ている形)は直接上書きしない。ページ構成・
+  //  公開中の定義(LINEに出ている形)は直接上書きしない。ページ構成・
   // トークバー文言・全員既定の指定を変えるには、いったん取り下げて下書きへ戻すか、
   // 取り込み/新規作成で別IDの下書きを作る。名前・出し分け条件・フォルダ・並び順は
   // 公開中でも運用変更として従来どおり許す。
@@ -444,7 +444,7 @@ export const patch__api_rich_menu_groups_groupId_9 = async (c: Context<Env, "/ap
     );
   }
 
-  // M950: meta と pages を同じ取引で確定する。pages が失敗したら meta も
+  // meta と pages を同じ取引で確定する。pages が失敗したら meta も
   // 戻る (saveRichMenuGroupDraft が 1 batch で流す)。古い版は書かず 409。
   const saved = await saveRichMenuGroupDraft(c.env.DB, groupId, {
     meta: parsed.value.meta,

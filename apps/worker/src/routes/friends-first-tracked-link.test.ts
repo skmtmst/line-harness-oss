@@ -8,7 +8,7 @@ import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqli
 import { friends } from './friends.js';
 
 /*
- * N-036: GET /api/friends/:id が一覧と同じ「first_tracked_link_id →
+ * GET /api/friends/:id が一覧と同じ「first_tracked_link_id →
  * tracked_links.name」基準で firstTrackedLinkName を返すかを確かめる。
  *
  * 一覧（?includeChatStatus=true）は LEFT JOIN で流入元名を出しているが、

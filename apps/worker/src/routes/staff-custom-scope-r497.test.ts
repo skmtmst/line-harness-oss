@@ -13,7 +13,7 @@ vi.mock('../services/staff-invite.js', () => mail)
 const { staff } = await import('./staff.js')
 
 /*
- * R497: 個別設定（custom）の表示・保存・再読込・実際の権限判定の一致。
+ * 個別設定（custom）の表示・保存・再読込・実際の権限判定の一致。
  *
  * - 保存済みキーを3択へ写した表示どおりに保存できる
  * - 行単位の保存は触っていない行の部分設定を落とさない

@@ -1,10 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import {toMin,fromMin,overlaps,intInRange,isHhmm} from './availability-time-values.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
-// Booking availability calculation.
-// `computeSlots` is a pure function over Interval[]; `getAvailability`
-// is the high-level entry point that fetches working hours, busy intervals,
-// and applies lead-time / virtual-staff rules.
+// computeSlots は区間だけを受ける純粋関数とし、勤務・埋まりの取得や締切・仮担当者の条件は getAvailability で接続する。
 
 import type { AvailabilityByStaff } from '../features/booking/booking-types/index.js';
 import { SLOT_GRANULARITY_CHOICES, SLOT_GRANULARITY_MINUTES } from '../features/booking/booking-types/index.js';
@@ -62,7 +59,7 @@ function mergeIntervals(intervals: Interval[]): Interval[] {
   return merged.map((m) => ({ start: fromMin(m.s), end: fromMin(m.e) }));
 }
 
-/** 稼働区間から休憩などの除外区間を差し引く（R164）。 */
+/** 稼働区間から休憩などの除外区間を差し引く。 */
 function subtractIntervals(working: Interval[], excluded: Interval[]): Interval[] {
   let out = mergeIntervals(working);
   const cuts = mergeIntervals(excluded);
@@ -99,12 +96,8 @@ function intersectIntervals(a: Interval[], b: Interval[]): Interval[] {
 }
 
 /**
- * 勤務時間から、予約を入れられる開始時刻を並べる。
- *
- * 候補の枠を1つずつ見て、埋まっている時間帯と重なるかを判定する。
- * 以前は「勤務時間から埋まりを引き算する」形だったが、同時受付数を
- * 数えるには「何件重なっているか」が要るので、枠ごとの判定に変えた。
- * 定員1・全て別メニュー扱い、という従来の条件では結果は変わらない。
+ * 同時受付数を判定するため、候補の開始時刻ごとに重なる予約件数を数える。
+ * 勤務時間から埋まりを引くだけでは重複件数が分からないため、枠ごとの判定を使う。
  */
 export function computeSlots(input: ComputeSlotsInput): Interval[] {
   const occupy = input.menu.duration_minutes + input.menu.buffer_after_minutes;
@@ -145,8 +138,7 @@ export function computeSlots(input: ComputeSlotsInput): Interval[] {
   return out;
 }
 
-// ----------------------------------------------------------------
-// DB layer
+
 
 const FALLBACK_TIME_ZONE = 'Asia/Tokyo';
 
@@ -260,7 +252,7 @@ export interface GetAvailabilityParams {
   lineAccountId: string;
   menuId: string;
   staffId?: string;
-  from: string; // YYYY-MM-DD JST
+  from: string; // 日本時間の YYYY-MM-DD。
   to: string;
   now: Date;
   minLeadTimeMinutes: number;
@@ -291,7 +283,7 @@ export interface CalendarSyncState {
 }
 
 /**
- * 予約できない理由の分類（IDEA-28 予約設定の「この日時はなぜ取れないか」）。
+ * 予約できない理由の分類（ 予約設定の「この日時はなぜ取れないか」）。
  * 画面はこのコードを運用者向けの文へ翻訳する。顧客名・外部予定の内容など
  * 詳細は返さず、「どの条件で塞がっているか」だけを表す。
  */
@@ -423,7 +415,7 @@ interface LoadedAvailability {
   minLeadAt: Date;
   windowLastDate: string | null;
   /**
-   * R314: 予約枠の間隔（分）。店舗設定の保存値を使う。行が無い・壊れた
+   * 予約枠の間隔（分）。店舗設定の保存値を使う。行が無い・壊れた
    * 値のときだけ従来の既定（30）に寄せる。
    */
   slotGranularity: number;
@@ -474,12 +466,7 @@ export interface StoreCapacitySnapshot {
   settingsVersion: number;
 }
 
-/**
- * Capacity applies only to business-hour intervals touched by this occupancy.
- * Settings and hours are read by one LEFT JOIN so the returned version describes
- * exactly the rows used to build the capacity windows, including a configured
- * all-closed week that has no child rows.
- */
+/** 対象の営業区間だけへ定員を適用する。設定と営業時間を1つの LEFT JOIN で読み、子行のない全休週も含め、返す版と計算に使う状態を一致させる。 */
 export async function getStoreCapacitySnapshot(
   db: D1Database,
   accountId: string,
@@ -665,7 +652,7 @@ async function loadAvailabilityData(
   ]);
   // 店舗のタイムゾーンで日付・時刻を読む。未設定・壊れた値は Asia/Tokyo。
   const timeZone = normalizeTimeZone(settingsRow?.timezone ?? FALLBACK_TIME_ZONE);
-  // R314: 枠生成・可否説明で使う刻み幅は店舗設定の保存値。候補外・欠損は既定へ。
+  // 枠生成・可否説明で使う刻み幅は店舗設定の保存値。候補外・欠損は既定へ。
   const storedGranularity = Number(settingsRow?.slot_granularity_minutes);
   const slotGranularity = (SLOT_GRANULARITY_CHOICES as readonly number[]).includes(storedGranularity)
     ? storedGranularity
@@ -710,7 +697,7 @@ async function loadAvailabilityData(
     .bind(...(staffIds.length ? sqlIdSet(staffIds).binds : []))
     .all<{ staff_id: string; weekday: number; start_time: string; end_time: string }>();
 
-  // R164: 曜日指定・日付指定の休憩。勤務区間から差し引くため、
+  // 曜日指定・日付指定の休憩。勤務区間から差し引くため、
   // 空きの列挙と確定前判定の両方で同じく読む。
   const [weeklyBreaks, datedBreaks] = await Promise.all([
     db.prepare(
@@ -821,8 +808,7 @@ async function loadAvailabilityData(
       googleBusyByStaff.set(staff.id, busy);
       calendarSync.push({ staff_id: staff.id, configured: busy !== null, ok: true });
     } catch (error) {
-      // Configured calendar must fail closed. Showing slots while Google is
-      // unreachable can create double bookings.
+      // Google の予定が取れないと二重予約になるため、接続設定済みで取得不能なら空き枠を見せず安全側に止める。
       logger.error("booking_availability.load_failed");
       googleBusyByStaff.set(staff.id, []);
       calendarSync.push({ staff_id: staff.id, configured: true, ok: false, error: 'unavailable' });
@@ -976,7 +962,7 @@ function computeDayWorking(
       ? [{ start: base.start_time, end: base.end_time }]
       : [];
   /*
-   * 店舗の営業時間（週次）で、通常の勤務を切り詰める（#748 / N-403）。
+   * 店舗の営業時間（週次）で、通常の勤務を切り詰める。
    *
    * これまで `booking_business_hours` は定員の計算にしか使われておらず、
    * 枠の開閉には効いていなかった。営業 10:00-17:00・勤務 09:00-18:00 の
@@ -1017,7 +1003,7 @@ function computeDayWorking(
     workingList = intersectIntervals(workingList, mergeIntervals(hours));
     if (workingList.length === 0) break;
   }
-  // R164: 休憩を勤務区間から差し引く。その日だけの休憩と、その曜日の
+  // 休憩を勤務区間から差し引く。その日だけの休憩と、その曜日の
   // いつもの休憩の両方を見る。壊れた行は保存口で弾くため、ここでは
   // 時刻の形が正しいものだけを差し引く。
   if (workingList.length > 0) {
@@ -1287,7 +1273,7 @@ export async function getAvailability(
     };
   }
   const d = loaded.data;
-  // Staff/menu concurrency is distinct from the store-wide seat budget.
+  // 担当者・メニューの同時受付と、店舗全体の席数を別々に検査する。
   const staffCapacity = Math.max(1, d.concurrentCapacity);
   const by_staff: AvailabilityByStaff[] = [];
   // LIFF カレンダーの「休」の印用。担当ごとに閉まっている日を集め、
@@ -1348,7 +1334,7 @@ export async function getAvailability(
 }
 
 // ----------------------------------------------------------------
-// IDEA-28 予約設定: 「この日時はなぜ予約できないか」の説明
+//  予約設定: 「この日時はなぜ予約できないか」の説明
 // ----------------------------------------------------------------
 
 export interface ExplainSlotParams {
@@ -1388,7 +1374,7 @@ export interface SlotCheckResult {
   reasons: SlotBlockReason[];
   per_staff: SlotCheckStaff[];
   /**
-   * R314: 判定に実際に使った枠間隔（分）。理由文が適用値を表示するために使う。
+   * 判定に実際に使った枠間隔（分）。理由文が適用値を表示するために使う。
    * 追加の項目なので、読まない呼び出し側の動きは変わらない。
    */
   slotGranularityMinutes?: number;
@@ -1423,7 +1409,7 @@ export async function explainBookingSlot(
     bookable: false,
     reasons: [],
     per_staff: [],
-    // R314: 刻み幅が要る理由文のため、読めたときは適用値を添える。
+    // 刻み幅が要る理由文のため、読めたときは適用値を添える。
     ...(d0 ? { slotGranularityMinutes: d0.slotGranularity } : null),
     ...partial,
   });

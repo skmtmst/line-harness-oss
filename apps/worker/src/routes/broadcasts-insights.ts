@@ -276,7 +276,7 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
   const accountId = raw.line_account_id as string | null;
   if (!accountId) return inputError(c, { success: false, error: 'Broadcast has no line_account_id' }, 400, ["accountId"]);
 
-  // Get test recipients
+
   const setting = await c.env.DB.prepare(
     `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`
   ).bind(accountId).first<{ value: string }>();
@@ -455,7 +455,7 @@ export const get__api_broadcasts_id_progress_4 = async (c: Context<Env, "/api/br
     }));
   }
   /*
-   * 送達台帳の内訳（#662）。画面はこの4つを別々に出す。
+   * 送達台帳の内訳。画面はこの4つを別々に出す。
    *
    *   sent          … 届いた
    *   failed        … 届かなかった。**再送の対象**
@@ -523,14 +523,7 @@ export const post__api_segments_count_5 = async (c: Context<Env, "/api/segments/
     }
 
     /*
-     * 件数は、組み立てた SQL を丸ごと副問い合わせに包んで数える。
-     *
-     * 以前は /^SELECT .+ FROM/ を置き換えていたが、`.+` が貪欲なので
-     * **条件の中に FROM があると、そこまで食べてしまう**。タグの条件は
-     * `EXISTS (SELECT 1 FROM friend_tags ...)` を含むので、
-     *   SELECT COUNT(*) as count FROM friend_tags ft WHERE ...)
-     * という壊れた SQL になり、タグで絞ると常に 400 になっていた。
-     * 他の呼び出し口（broadcast.ts など）は最初から包む形で書かれている。
+     * 集計 SQL は副問い合わせに包んで数える。SELECT から FROM までを正規表現で置換すると、タグ条件の入れ子の FROM まで消して SQL を壊すため。
      */
     const countSql = `SELECT COUNT(*) AS count FROM (${accountSql}) q`;
     const result = await c.env.DB.prepare(countSql).bind(...accountBindings).first<{ count: number }>();

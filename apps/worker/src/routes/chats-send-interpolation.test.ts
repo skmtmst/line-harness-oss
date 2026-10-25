@@ -1,5 +1,5 @@
 /*
- * 1対1トークの差し込み解決(N-026)のルート対照。
+ * 1対1トークの差し込み解決のルート対照。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の chats ルートを当て、
  * LINE clientだけを止める。

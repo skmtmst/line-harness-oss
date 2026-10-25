@@ -6,12 +6,12 @@ import {
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 /**
- * 権限・tenant・LINEアカウント境界の共通土台(board #800)。
+ * 権限・tenant・LINEアカウント境界の共通土台。
  *
  * 各機能routeが手書きしていた「指定アカウントを見てよいか」の判定を1か所へ集める。
  * 中身の判定は既存 getVisibleLineAccountScope の再利用だけにする。
  * tenantの壁・個別アカウント範囲・機能範囲の順序は変えない。
- * 今回は各機能routeへ配線しない。後続のN/E-ID票がこの関数を呼ぶ。
+ * 呼出元が入口で接続し、ここでは境界の判定だけを担当する。
  */
 export type BoundaryDenialReason = 'unauthenticated' | 'outside-scope' | 'forbidden';
 

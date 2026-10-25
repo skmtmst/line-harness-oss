@@ -8,7 +8,7 @@ import type { Env } from '../../worker-env.js';
  * 台帳一覧とCSV書出しで共用する絞り込み条件の組み立て。
  * 画面の「よく使う」タブ・担当者・種別・期間・検索語が、そのまま WHERE 句に
  * なる。一覧とCSVで条件がずれると「画面と違うCSVが出た」になるので、
- * 条件はこの1か所だけで作る (#933 N-398)。
+ * 条件はこの1か所だけで作る。
  */
 export const BOOKING_REQUEST_SOURCES = new Set(['liff', 'phone', 'counter', 'operator', 'import']);
 
@@ -46,7 +46,7 @@ export function bookingLedgerFilter(c: Context<Env>, accountId: string): { where
 
 // CSV の行上限。台帳は日々増えるので、上限を越える分は次の期間へ分けて
 // 出してもらう。先頭の注記行にこの上限と絞り込み条件を書き、範囲が一目で
-// 分かるようにする (#933 N-397)。
+// 分かるようにする。
 export const BOOKING_CSV_EXPORT_LIMIT = 5000;
 
 export const BOOKING_CSV_STATUS_LABEL: Record<string, string> = {
@@ -70,7 +70,7 @@ export const BOOKING_CSV_SOURCE_LABEL: Record<string, string> = {
 export function csvCell(value: unknown): string {
   let text = value === null || value === undefined ? '' : String(value);
   // CSVを開いた表計算ソフトで式として実行させない。先頭のタブ・空白も
-  // 一部のソフトでは式と解釈されるため危険接頭辞に含める (#959)。
+  // 一部のソフトでは式と解釈されるため危険接頭辞に含める。
   if (/^[\s=+\-@]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
@@ -78,7 +78,7 @@ export function csvCell(value: unknown): string {
 /**
  * 注記行へ埋め込む値の改行・制御文字を落とす。注記行はクォートなしの
  * 生テキストなので、クエリ値に %0D%0A=… を仕込まれるとそのまま別の
- * CSV行として混入し、式注入防御を迂回する (#959)。
+ * CSV行として混入し、式注入防御を迂回する。
  */
 export function csvNoteValue(value: string): string {
   return value.replace(/[\x00-\x1F\x7F]/g, '');
@@ -111,7 +111,7 @@ export async function cancelLegacyBookingReminders(db: D1Database, bookingId: st
 }
 
 /**
- * R324: 終端状態への遷移が確定したら、意味を失った確認通知の未成功行を
+ * 終端状態への遷移が確定したら、意味を失った確認通知の未成功行を
  * 止める。詳細画面の再送ボタンに反映され、古い確定案内の再送を防ぐ。
  * 送信中 (queued) の初回送信は触らない (送り始めているため)。
  */

@@ -28,8 +28,7 @@ export function parseTextLines(value: string): string[] {
 }
 
 /**
- * 行ごとの「強調」（★修正案 `Svmg0`・2026-10-06 承認）。列が無い古い生成は
- * null なので空配列になり、「同じ条件で作る」で戻したときは全部オフになる。
+ * 強調は保存した行順で扱い、列のない生成は全行オフとする。同じ条件で作る場合もこの意味を保つ。設計図 Svmg0 と照合する。
  */
 export function parseEmphasisLines(value: string | null | undefined): boolean[] {
   if (!value) return [];

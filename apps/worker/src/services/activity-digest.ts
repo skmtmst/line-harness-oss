@@ -11,9 +11,9 @@ const MAX_HOURS = 24 * 7;
 const CATEGORY_LIMIT = 500;
 
 export interface ActivityDigestOptions {
-  /** Restrict output to accounts visible to the authenticated caller. */
+  /** 出力は認証済みの利用者から見えるアカウントへ限る。 */
   allowedAccountIds: readonly string[];
-  /** Include legacy rows whose account assignment is missing. */
+  /** 所属アカウントのない保存済み行を含めるかを明示する。 */
   canSeeUnassigned: boolean;
   hours?: number;
   now?: Date;

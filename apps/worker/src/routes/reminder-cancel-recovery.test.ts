@@ -1,5 +1,5 @@
 /**
- * N-065追補 (#654) の回帰テスト。3点の部分失敗を本物に近い形で固定する。
+ * 追補  の回帰テスト。3点の部分失敗を本物に近い形で固定する。
  *
  * - 取消と送信claimの原子化: live確認後に別接続で実claim・最終verifyが
  *   割り込んでも、取消を成功させず送信権を守る。
@@ -780,7 +780,7 @@ function seedLiffCancelTarget(raw: Database.Database) {
 }
 
 function confirmLegacyEventReminder(raw: Database.Database) {
-  // Approval schedules its reminders against the resulting booking generation.
+  // 承認で確定した予約の世代に対して通知予定を作る。
   raw.exec(`UPDATE event_bookings SET status='confirmed' WHERE id='eb-l1';
     UPDATE event_booking_reminders SET booking_version=(SELECT lock_version FROM event_bookings WHERE id='eb-l1')
       WHERE id='LEG-l1' AND status='pending';`);
@@ -965,7 +965,7 @@ describe('LIFF本人取消の両分岐strict fence (再審査-2)', () => {
 });
 
 // =============================================================================
-// 自主検証 (再審査の指摘): 取消後の実配信・部分失敗の再実行・送達不明の扱い
+// 取消後の配信抑止、部分失敗の再試行、送達不明時の再送禁止を確かめる。
 //
 // ここは「緑の試験を信用しない」ための独立検証。db 関数の直接呼び出しでは
 // なく、実 route と実配信ループ (processReminderDeliveries) を通し、LINE へ
@@ -1760,7 +1760,7 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
 });
 
 // =============================================================================
-// 恒久失敗の打ち切り (再審査-退行)
+// 恒久失敗の打ち切り
 //
 // 旧表 cron の due SELECT は LIMIT 100 で ORDER BY が無い。直らない行を
 // failed のまま溜めると、正常なリマインダが押し出されて送られなくなる。

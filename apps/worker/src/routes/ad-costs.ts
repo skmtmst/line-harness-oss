@@ -20,7 +20,7 @@ import { importAdCostNow } from '../services/ad-cost-import.js';
 import { auditLog } from '../lib/audit-log.js';
 import { fail } from '../lib/fail.js';
 /**
- * 流入の広告費の台帳 (#818)。
+ * 流入の広告費の台帳。
  *
  * 費用は外部連携の暗号化された秘密で媒体から毎日取り込む分と、
  * 管理画面から手入力する分を同じ口で見せる。取り込めなかった日は
@@ -68,7 +68,7 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
     const [rows, platforms, manualEntries, confirmedConversionCount] = await Promise.all([
       getAdCostSummary(c.env.DB, { lineAccountId: accountId, from, to }),
       getAdPlatforms(c.env.DB),
-      // R275: 手入力の記録は取消できるよう1行ずつ返す(取消済みも履歴として返す)。
+      // 手入力の記録は取消できるよう1行ずつ返す(取消済みも履歴として返す)。
       listManualAdCostEntries(c.env.DB, { lineAccountId: accountId, from, to }),
       getConfirmedConversionCount(c.env.DB, { lineAccountId: accountId, from, to }),
     ]);
@@ -199,7 +199,7 @@ adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), inputJsonBoundary()
 });
 
 /**
- * POST /api/ad-costs/:id/cancel — 手入力の費用を取消する (R275)。
+ * POST /api/ad-costs/:id/cancel — 手入力の費用を取消する。
  *
  * 日付・名前・金額を間違えて入れた記録を集計から外す。行は消さず、
  * 取消した日時と理由を残す。取込分は媒体側の記録なので対象外。

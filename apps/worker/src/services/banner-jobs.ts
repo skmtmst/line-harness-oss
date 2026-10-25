@@ -18,7 +18,7 @@ import { stableWebhookStepId } from './incoming-webhook-receipts.js';
 
 export class BannerJobFailure extends Error { constructor(message:string,public status:number){super(message)} }
 
-/** One durable image per pass; the existing frequent cron keeps taking the next unfinished image. */
+/** 1回に画像1枚を永続的に処理し、定期処理が未完了の続きへ進む。 */
 export async function processBannerGeneration(env:Env['Bindings'],generationId:string,tenantId:string):Promise<string|null>{
   const db=env.DB;
   const ref:WorkflowStepRef={scopeId:`tenant:${tenantId}`,processKind:'banner_generation',subjectId:generationId,stepKey:'__run'};
@@ -58,7 +58,7 @@ export async function processBannerGeneration(env:Env['Bindings'],generationId:s
 }
 async function processNextImage(env:Env['Bindings'],g:BannerGeneration,root:WorkflowStepRef,owner:string):Promise<string|null>{
   const db=env.DB;
-  // Old generations already have saved images: count those sequences as done without generating them again.
+  // 保存済み画像があれば、その順番は完了として扱い再生成しない。
   for(let sequence=1;sequence<=g.requested_count;sequence++){
     const slot={...root,stepKey:`image:${sequence}`};
     const saved=await db.prepare('SELECT id FROM banner_images WHERE generation_id=? AND sequence=? ORDER BY created_at LIMIT 1')
@@ -80,7 +80,7 @@ async function processNextImage(env:Env['Bindings'],g:BannerGeneration,root:Work
       if(!source){
         const render={...root,stepKey:`render:${sequence}`};
         const prior=await ensureWorkflowStep(db,render,{maxAttempts:1});
-        // No provider replay after a crash or lost response. A saved R2 object is the recovery proof.
+        // 実行中断や応答喪失で外部生成を再実行しない。保存済み R2 オブジェクトだけを回復の根拠にする。
         if(prior.first_attempt_at!==null){
           const message='画像を作れませんでした。生成結果が不明な画像は作り直していません';
           await finishWorkflowStep(db,slot,slotOwner,{result:{failed:true,unknown:true},statements:[workflowFence(db,root,owner),
@@ -127,7 +127,7 @@ async function processNextImage(env:Env['Bindings'],g:BannerGeneration,root:Work
           source=await env.IMAGES.get(rawKey);
         }catch(error){
           await failWorkflowStep(db,render,renderClaim.lease_owner!,{unknown:true,code:'render_failed'});
-          // Once the provider may have been called, do not create that image again.
+          // 外部呼出をした可能性があれば、同じ画像をもう一度生成しない。
           if(await env.IMAGES.get(rawKey))throw error;
           const message=error instanceof OpenAIImageError?error.userMessage
             :error instanceof Error && error.message==='banner_reference_missing'?'参照画像が見つかりません。ライブラリから選び直してください'
@@ -144,7 +144,7 @@ async function processNextImage(env:Env['Bindings'],g:BannerGeneration,root:Work
       }
       if(!source)throw new Error('banner_source_missing');
       const render={...root,stepKey:`render:${sequence}`};
-      // The R2 object proves rendering succeeded even when the checkpoint write was interrupted.
+      // チェックポイント保存が失敗しても、保存済み R2 が生成成功の根拠になる。
       await db.batch([workflowFence(db,root,owner),db.prepare(`UPDATE workflow_steps SET status='succeeded',lease_owner=NULL,lease_expires_at=NULL,
         result_json=?,updated_at=? WHERE scope_id=? AND process_kind=? AND subject_id=? AND step_key=?`)
         .bind(JSON.stringify({r2Key:rawKey,mimeType:source.httpMetadata?.contentType ?? JSON.parse((await getWorkflowStep(db,render))?.result_json ?? '{}').mimeType ?? 'image/png'}),Date.now(),render.scopeId,render.processKind,render.subjectId,render.stepKey)]);

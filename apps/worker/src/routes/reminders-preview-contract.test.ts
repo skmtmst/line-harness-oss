@@ -4,11 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /*
- * 機能7（リマインダ）の配信予定プレビューの再発防止。
- *
- * 公開フローの画面は目標日を持たずに POST /api/reminders/:id/preview を呼ぶ。
- * 口が目標日なしを 400 で返すと、STEP4 の確認が permanent に壊れる。
- * 目標日が無いときは仮の基準日で予定を返し、仮の日付は結果の targetDate に入れる。
+ * 公開フローは目標日なしでプレビューを呼ぶため、未指定なら仮の基準日で予定を返し、targetDate にその日付を明示する。
  */
 
 const here = dirname(fileURLToPath(import.meta.url));

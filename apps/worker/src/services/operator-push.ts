@@ -58,7 +58,7 @@ export async function sweepOperatorPush(db:D1Database,env:Partial<Env['Bindings'
  }
 }
 
-/** Retry only explicit 429/5xx responses; unknown delivery outcomes are never replayed. */
+/** 明示的な429/5xx応答だけを再試行し、送達不明は送り直さない。 */
 export async function retryOperatorPush(db:D1Database,env:Partial<Env['Bindings']>,now=new Date(),send?:PushSender){
  const due=(await db.prepare(`SELECT d.*,s.endpoint,s.p256dh,s.auth,s.staff_id FROM operator_push_deliveries d JOIN operator_push_subscriptions s ON s.id=d.subscription_id WHERE s.revoked_at IS NULL AND d.status='failed' AND d.attempts<4 AND d.next_attempt_at IS NOT NULL AND julianday(d.next_attempt_at)<=julianday(?) LIMIT 100`).bind(now.toISOString()).all<{id:string;subscription_id:string;kind:string;ref_id:string;line_account_id:string|null;staff_id:string;endpoint:string;p256dh:string;auth:string;attempts:number}>()).results;
  for(const row of due){

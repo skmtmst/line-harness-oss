@@ -1,13 +1,5 @@
 /*
- * 一斉配信も、シナリオと同じ種別を組み立てられるか。
- *
- * 別実装を2つ持っていたときは、シナリオだけスタンプ・カルーセル・位置情報・
- * 音声に対応していて、一斉配信は text / image / flex の3つだけだった。
- * それ以外を渡すと「テキストに JSON を入れたもの」に落ちるので、
- * **中身の JSON がそのまま相手のトークに届く**。しかも送るまで分からない。
- *
- * ここでは「2つの入口が同じ結果を返す」ことを固定する。片方だけ直したら
- * 落ちるようにしておかないと、また同じずれ方をする。
+ * JSON がそのままトークへ届かないよう、一斉配信とシナリオが各メッセージ種別を同じ結果へ組み立てることを確かめる。
  */
 import { describe, it, expect } from 'vitest';
 import { buildMessage as broadcastBuild } from './broadcast.js';
@@ -57,7 +49,7 @@ describe('一斉配信の種別', () => {
   }
 
   it('シナリオとまったく同じ結果になる', () => {
-    // 片方だけ直したときに落ちるようにしておく。
+    // 両方の入口で組み立て結果が一致することを確かめる。
     for (const c of CASES) {
       expect(broadcastBuild(c.kind, c.content)).toEqual(scenarioBuild(c.kind, c.content));
     }

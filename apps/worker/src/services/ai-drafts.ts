@@ -30,8 +30,7 @@ export async function makeAiDraft(db:D1Database,input:{account:string;friend:str
   const qa=input.kind==='draft'?(await db.prepare("SELECT id,questions_json,answer_messages_json FROM qa_entries WHERE account_id=? AND status='published' ORDER BY updated_at DESC,id LIMIT 20").bind(input.account).all<{id:string;questions_json:string;answer_messages_json:string}>()).results:[];
   const sources:AiSource[]=qa.slice(0,3).map(q=>({type:'qa',id:q.id,title:maskAiText((JSON.parse(q.questions_json) as string[])[0],names)}));
   const past=conversation.filter(r=>r.role==='担当').slice(-3);sources.push(...past.map(r=>({type:'past_reply' as const,id:r.id,title:'過去の返事'})));
-  // Bound reference text separately from conversation content. Output tokens
-  // retain their own provider budget; character counts are not token counts.
+  // 参照文と会話本文を別に制限する。文字数と token 数は異なるため、出力は外部事業者の予算も守る。
   let qaBudget=4000;
   const qaText=qa.slice(0,3).flatMap(q=>{
    if(qaBudget<=0)return [];

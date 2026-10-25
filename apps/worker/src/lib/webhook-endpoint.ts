@@ -2,7 +2,7 @@ import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * LINE に登録されている Webhook の宛先を読み、こちらの受け口と突き合わせる。
  *
- * `LineAccount.webhook` は型だけあって、**誰も値を入れていなかった**（台帳 #134）。
+ * `LineAccount.webhook` は型だけあって、**誰も値を入れていなかった**（台帳）。
  * 入れないままだと、はじめの設定の段1（「Webhookが合っていて」）が
  * いつまでも終わらない。
  *

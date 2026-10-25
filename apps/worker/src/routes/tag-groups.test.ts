@@ -182,7 +182,7 @@ describe('タグの所属', () => {
   });
 
   it('タグの作成時に分類を指定できる', async () => {
-    // N-048(#803): 作り先所属の分類だけ受け付ける。
+    // 作り先所属の分類だけ受け付ける。
     mocks.getFolderById.mockResolvedValue({ ...GROUP, kind: 'tag', account_id: 'account-1' });
     mocks.createTag.mockResolvedValue(TAG);
     const res = await req('/api/tags', 'POST', { name: '腰痛', groupId: 'g-1' });

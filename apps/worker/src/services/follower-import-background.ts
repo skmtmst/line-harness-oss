@@ -15,7 +15,7 @@ const LANE_BUDGET_MS = 10 * 60_000;
 // 先頭の 1 件がレーンを占め続けないようにするための区切り。
 const PER_ACCOUNT_BUDGET_MS = 150_000;
 
-/** Bounded cron lane; settings are the durable queue, not the browser. */
+/** 継続の正本はブラウザでなく保存済み設定とし、cron が有限の範囲で進める。 */
 export async function processPendingFollowerImports(db: D1Database, options: {
   credentialKey?: string;
   client?: (accountId: string, token: string) => FollowerImportClient;

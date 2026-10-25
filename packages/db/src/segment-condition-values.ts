@@ -26,7 +26,7 @@ export function asRecord(value: unknown, ruleType: string): Record<string, unkno
 
 /**
  * 期間の条件。from / to はどちらも省略できるが、両方省略は受け付けない。
- * 「期間を指定したつもりで全員に一致する」事故を防ぐため。
+ * 「期間を指定したつもりで全員に一致する」ことを防ぐため。
  */
 export function buildDateRange(column: string, value: unknown, ruleType: string): { sql: string; bindings: unknown[] } {
   const v = asRecord(value, ruleType)

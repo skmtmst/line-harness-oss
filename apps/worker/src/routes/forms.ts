@@ -16,17 +16,17 @@ import { post__api_forms_id_submit_1 } from './forms-public-submit.js';
 
 const forms = new Hono<Env>();
 
-// GET /api/forms — list all forms (with submission stats + delivering accounts)
+
 forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), get__api_forms_1);
 
 /**
- * GET /api/forms/unassigned — 管理者確認専用。担当の決まっていない旧フォームだけを返す(#724)。
+ * GET /api/forms/unassigned — 管理者確認専用。担当の決まっていない旧フォームだけを返す。
  *
  * 通常の `account_id` 指定一覧へは混ぜない。この口を選んだときだけ未割当を返す。
  * 見られるのは既定テナントの owner / admin と環境 owner だけ。一般 staff、
  * アカウント制限付き・機能スコープ付き・別テナントは不可。現行 canSeeUnassigned は
  * 一般 staff も含むため、その値だけでは許可せず role も requireRole で絞る。
- * 割当操作は置かない(#771)。
+ * 割当操作は置かない。
  *
  * `account_id` は必須（通常一覧と同じ）。結果には使わず、立ち位置の確認にだけ使う。
  * 無いと機能 enforcement が一覧用の絞り込みを staff へ書き込み、canSeeUnassigned が
@@ -54,7 +54,7 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
 forms.post('/api/forms/drafts', inputJsonBoundary({"name":["string"],"accountId":["string"]}), post__api_forms_drafts_7);
 
 /*
- * POST /api/forms/:id/duplicate — フォーム全体を別IDの下書きとして複製する(R230)。
+ * POST /api/forms/:id/duplicate — フォーム全体を別IDの下書きとして複製する。
  *
  * 引き継ぐのは中身だけ（名前・説明・質問・レイアウト・分岐・回答後の設定・
  * デザイン・所属フォルダ・利用アカウント）。引き継がないのは集まった回答・
@@ -80,7 +80,7 @@ forms.post('/api/forms/:id/unarchive', requireArchiveManage, inputJsonBoundary({
 // DELETE /api/forms/:id — 影響0件・非公開・同じ版のときだけ物理削除する。
 forms.delete('/api/forms/:id', requireDeliveryAccess('forms', 'archive'), delete__api_forms_id_3);
 
-// one answer and its private attachments; never the whole form.
+// フォーム全体でなく、回答1件とその非公開添付だけを対象にする。
 forms.delete('/api/forms/:id/submissions/:submissionId', requireRole('owner', 'admin'), denyReadOnly(), requireIrreversibleConfirmation('delete-form-response'), delete__api_forms_id_submissions_submissionId_4);
 
 // CSV は回答閲覧と分離し、明示的な書き出し権限で確認する。

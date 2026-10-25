@@ -32,7 +32,7 @@ booking.get('/api/booking/admin/requests', async (c) => {
 });
 
 /**
- * 予約台帳のCSV書出し (#933 N-397)。
+ * 予約台帳のCSV書出し。
  *
  * 一覧と同じ絞り込み（状態・検索語・メニュー・担当者・種別・期間）を
  * bookingLedgerFilter で組み立てるので、画面に見えている分だけが出る。

@@ -44,7 +44,7 @@ function app(firstResult: FirstResult = null) {
             first: vi.fn(async () => firstResult),
             all: vi.fn(async () => ({ results: [] })),
             // D1 の run は { meta: { changes } } を返す。形が無いと
-            // 更新の成否を見分けられない（M509 の版照合）。
+            // 更新の成否を見分けられない（の版照合）。
             run: vi.fn(async () => ({ success: true, meta: { changes: 1 } })),
           };
           return statement;
@@ -102,8 +102,8 @@ describe('A-7 tenant scope', () => {
     const harness = app();
     expect((await harness.instance.request('/api/nen-members/photos?accountId=own-account')).status).toBe(200);
     expect(harness.sql[0].query).toContain('ps.line_account_id = ? AND f.line_account_id = ?');
-    // 先頭はポイント手続き「手続き中」の回収閾値（PHOTO-06）。絞り込みの2値の
-    // あとは、続きを取るための枚数と開始位置（#666）。
+    // 先頭はポイント手続き「手続き中」の回収閾値。絞り込みの2値の
+    // あとは、続きを取るための枚数と開始位置。
     expect(harness.sql[0].bindings).toEqual([expect.any(String), 'own-account', 'own-account', 200, 0]);
   });
 

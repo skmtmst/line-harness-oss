@@ -19,12 +19,12 @@ export async function depositEstimate(db:D1Database,a:string,menu:string,price:n
  return {amount:applicable?(r.kind==='percent'?yenPercent(price,Number(r.value)):Math.min(price,Number(r.value))):0,rule:r,testMode:true,paymentCollectionAvailable:false};
 }
 
-/** A stored option must affect the actual request, not just its settings page. */
+/** 保存した設定を画面だけの値にせず、実際の要求へ反映する。 */
 export async function cancellationCardRequired(db:D1Database,a:string,f:string){
  const option=await db.prepare('SELECT card_required_for FROM booking_cancellation_options WHERE account_id=?').bind(a).first<{card_required_for:string}>();
  if(option?.card_required_for==='no_show_flagged'){
   const {decidePrepayOnly}=await import('@line-crm/db');return (await decidePrepayOnly(db,a,f)).prepayOnly;
  }
- // Custom conditions have no public condition editor in this tranche. Fail closed.
+ // 独自条件を安全に編集する入口がないため、未対応の条件は拒む。
  return true;
 }

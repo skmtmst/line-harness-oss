@@ -546,7 +546,7 @@ export const post__api_restaurant_test_inbound_reservations_13 = async (c: Conte
     VALUES (?, ?, ?, ?, ?, 'received') ON CONFLICT(store_id, provider, external_event_id) DO NOTHING`).bind(
       eventDbId, body.storeId, body.provider, body.eventId.trim(), JSON.stringify(body.reservation),
     ).run();
-  // R101: 処理済みだけを重複終了にする。失敗・受信中の再送は取り込み直す。
+  // 処理済みだけを重複終了にする。失敗・受信中の再送は取り込み直す。
   let syncEventId = eventDbId;
   if (!inserted.meta.changes) {
     const existing = await dbFor(c.env, body.storeId).prepare(
@@ -571,7 +571,7 @@ export const post__api_restaurant_test_inbound_reservations_13 = async (c: Conte
        WHERE store_id = ? AND source = ? AND external_id = ? LIMIT 1`,
     ).bind(body.storeId, body.provider, value.externalId)
       .first<{ id: string; starts_at: string; guest_count: number; status: string; table_id: string | null; course_id: string | null; source_updated_at: string | null }>();
-    // R102: 媒体側の更新時刻が古い通知は記録だけ残して反映しない。
+    // 媒体側の更新時刻が古い通知は記録だけ残して反映しない。
     if (current?.source_updated_at && value.sourceUpdatedAt
       && value.sourceUpdatedAt <= current.source_updated_at) {
       await dbFor(c.env, body.storeId).prepare(
@@ -597,7 +597,7 @@ export const post__api_restaurant_test_inbound_reservations_13 = async (c: Conte
         return inputError(c, { success: false, error: '停止中のコースは選べません' }, 400, ["reservation","storeId"]);
       }
     }
-    // R100: 同じ卓に重なる有効予約があれば取り込まない（自分自身の更新は除く）。
+    // 同じ卓に重なる有効予約があれば取り込まない（自分自身の更新は除く）。
     if (value.tableId && await overlappingReservationExists(
       dbFor(c.env, body.storeId), body.storeId, value.tableId, value.startsAt, value.endsAt, current?.id ?? null, c.env,
     )) {
@@ -618,7 +618,7 @@ export const post__api_restaurant_test_inbound_reservations_13 = async (c: Conte
           value.customerName, value.customerPhone, value.lineUid, value.guestCount, value.startsAt, value.endsAt,
           value.tableId, value.courseId, value.status, value.allergyNote, value.note, value.sourceUpdatedAt,
         ).run();
-    // R100: 時間帯在庫の予約済数を人数分だけ動かす（更新時は差分・枠移動を調整）。
+    // 時間帯在庫の予約済数を人数分だけ動かす（更新時は差分・枠移動を調整）。
     await applyReservationInventoryChange(
       dbFor(c.env, body.storeId), body.storeId,
       current ? { starts_at: current.starts_at, guest_count: current.guest_count, status: current.status } : null,

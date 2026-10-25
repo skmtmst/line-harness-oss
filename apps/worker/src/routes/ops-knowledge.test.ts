@@ -30,8 +30,7 @@ beforeEach(async () => {
   requestId = ticket.id;
   const first = await addSupportReply(store.db, { requestId, authorStaffId: 'master', authorName: '架空担当者', body: action, aiAssisted: false, deliveredVia: [], nextStage: 'waiting' });
   const last = await addSupportTenantMessage(store.db, { requestId, staffId: 'tenant-owner', staffName: '架空担当者', body: result, attachmentKeys: [] });
-  // Separate real conversation events explicitly; wall-clock speed and random
-  // UUID ordering must not decide whether this fixture has a confirmed result.
+  // 端末の実行速度や UUID の順で結果が変わらないよう、会話イベントを明示的に区別する。
   store.raw.prepare('UPDATE hq_support_messages SET created_at = ? WHERE id = ?').run('2026-09-19T10:00:00.000+09:00', first.id);
   store.raw.prepare('UPDATE hq_support_messages SET created_at = ? WHERE id = ?').run('2026-09-19T10:01:00.000+09:00', last.id);
   await updateSupportTicket(store.db, requestId, { stage: 'resolved' });
@@ -164,7 +163,7 @@ describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
   it('CronなしのHTTP実行でも対象だけを下書きにし、別の予約には触らない', async () => {
     const other = await createHqSupportRequest(store.db, { tenantId: 'tenant', staffId: 'tenant-owner', staffName: '架空担当者', staffEmail: null, kind: 'usage', subject: '別件', body: '別の問い合わせです', lineAccountId: null, attachmentKeys: [] });
     await updateSupportTicket(store.db, other.id, { stage: 'resolved' });
-    // The unrelated job is deliberately older than the requested job.
+    // 無関係のジョブを意図的に古くし、誤って選ばれないことを確かめる。
     store.raw.prepare("UPDATE platform_knowledge_jobs SET created_at = '2020-01-01' WHERE request_id = ?").run(other.id);
     const res = await request(`/api/ops/knowledge/tickets/${requestId}/process`, {});
     expect(res.status).toBe(200);

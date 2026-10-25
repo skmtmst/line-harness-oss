@@ -13,7 +13,7 @@ const { createFileScan } = await import('../services/file-scan.js');
 const { post__api_rich_menu_groups_8: createRichMenu } = await import('./rich-menu-groups-configuration.js');
 const { get__media_id_content_1: liveContent } = await import('./contents-media-lifecycle-handlers.js');
 
-// Include dimensions and IEND, with a distinct hostile trailing-data variant.
+// 寸法と IEND を持つ画像を使い、不正な末尾データを加えた対照も用意する。
 const clean = Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0,0,0,0,0,73,69,78,68,174,66,96,130]);
 const hostile = new Uint8Array([...clean, 60, 115, 99, 114, 105, 112, 116, 62]);
 type Stored = { bytes: Uint8Array; etag: string; httpMetadata: { contentType: string }; customMetadata: Record<string, string> };
@@ -204,7 +204,7 @@ describe('upload bytes and published media share one immutable result', () => {
     expect((await complete('replacement', 'next')).status).toBe(200);
     expect((await publishReplacement('replacement', old.result_media_id)).status).toBe(201);
     const version = db.raw.prepare('SELECT id FROM media_versions WHERE media_id=? AND version_no=1').get(old.result_media_id) as {id: string};
-    // R2's copied object keeps the same content ETag; align the test's artificial ETag.
+    // R2 の複製は内容の ETag を保つため、試験の ETag も同じ性質へ合わせる。
     db.raw.prepare('UPDATE media_versions SET etag=? WHERE id=?').run(bucket.objects.get(old.r2_key)!.etag, version.id);
     await createFileScan(db.db, { lineAccountId: 'account', subjectKind: 'media_version', subjectId: version.id, mediaId: old.result_media_id, filename: 'photo.png', mimeType: 'image/png', sizeBytes: clean.length });
     db.raw.prepare("UPDATE media_file_scans SET next_retry_at='2000-01-01T00:00:00Z' WHERE subject_id=?").run(version.id);

@@ -1,4 +1,4 @@
-/** Append to reservation INSERT so parallel requests cannot pass the limit together. */
+/** 並行要求が同時に上限を通らないよう、予約 INSERT の条件へ組み込む。 */
 const PERSON_BOOKINGS_SQL = `(SELECT COUNT(*) FROM bookings b
   WHERE b.line_account_id = ? AND b.status IN ('requested','confirmed')
     AND julianday(b.ends_at) > julianday('now')

@@ -131,13 +131,13 @@ export interface CreateRichMenuGroupInput {
   chatBarText: string;
   size: 'large' | 'compact';
   pages: RichMenuPageInput[];
-  /** 作成直後のフォルダ。#502中: 作成後の付け直し2口目をなくし1口で決める。 */
+  /** 作成直後のフォルダ。作成後に付け直す2口目を使わず、1口で決める。 */
   folderId?: string | null;
-  /** N-161: 最初に見せるページの orderIndex。未指定なら先頭ページ。 */
+  /** 最初に見せるページの orderIndex。未指定なら先頭ページ。 */
   defaultPageIndex?: number | null;
-  /** N-161: 「すべての友だちの既定にする」か。 */
+  /** 「すべての友だちの既定にする」か。 */
   isDefaultForAll?: boolean;
-  /** N-161: 出し分け設定。有効にするなら targetingCondition が必須。 */
+  /** 出し分け設定。有効にするなら targetingCondition が必須。 */
   targetingEnabled?: boolean;
   targetingCondition?: string | null;
   targetingPriority?: number;
@@ -361,7 +361,7 @@ export interface RichMenuTargetingCandidate {
 }
 
 // =============================================================================
-// N-154: 下書き複製（同じ鍵のやり直しを1回に数える台帳つき）
+// 下書き複製（同じ鍵のやり直しを1回に数える台帳つき）
 // =============================================================================
 
 export interface RichMenuDuplicateRequest {

@@ -213,7 +213,7 @@ export function validateNenColumnCreateBody(body: Record<string, unknown>): Vali
     return { ok: false, error: 'scheduled_at_invalid' };
   }
   /*
-   * #935 N-304: 過去の予約日時は断る。通すと次のtickで即送され、
+   *  過去の予約日時は断る。通すと次のtickで即送され、
    * 「予約した」のに「今届いた」と画面の約束が崩れる（予約画面と同じ決めごと）。
    */
   if (scheduledAt && Date.parse(scheduledAt) <= Date.now()) {

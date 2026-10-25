@@ -1,7 +1,5 @@
 /**
- * 予約の通知・Google同期の二重実行と失敗時の食い違い (m22l)。
- * R323・R324・R325・R326・R329・R335・R336 の回帰試験。
- * booking-update-retry.test.ts と同じ隔離 harness (better-sqlite3 + 実 bootstrap)。
+ * 通知・Google 同期の同時実行と再試行で二重処理を防ぐ。booking-update-retry.test.ts と同じ実 bootstrap の隔離環境で検証する。
  */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi, afterEach } from 'vitest';
@@ -234,7 +232,7 @@ describe('通知の再試行 (R323・R324)', () => {
     });
     expect(retry.status).toBe(200);
     expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
-    // R323: 同じ行の再送は安定キーで行う。
+    // 同じ行の再送は安定キーで行う。
     expect(notifierMocks.calls[0]).toMatchObject({ retryKey: 'OP1' });
   });
 
@@ -432,7 +430,7 @@ describe('予約の変更と通知予定 (R325・R326・R335・R336)', () => {
     const moved = futureStartsAt(8);
     const res = await patchBody('B1', { lock_version: 0, starts_at: moved });
     expect(res.status).toBe(200);
-    // R336: 同期結果を応答で返す (失敗は failed になり監査にも残る)。
+    // 同期結果を応答で返す (失敗は failed になり監査にも残る)。
     await expect(res.clone().json()).resolves.toMatchObject({ v6_sync: 'synced' });
     const enrollment = sqlite.prepare(`SELECT status, target_date FROM friend_reminders WHERE id = 'E1'`).get() as {
       status: string;

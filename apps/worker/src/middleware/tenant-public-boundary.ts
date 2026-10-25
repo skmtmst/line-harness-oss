@@ -10,7 +10,7 @@ const UNAVAILABLE = {
   error: '現在ご利用いただけません',
 } as const;
 
-/** Query selects the account first; routes retain their own identity and ownership checks. */
+/** アカウント選択はクエリを優先し、route 側の本人・所有権検査も維持する。 */
 async function publicAccountSelector(c: Context<Env>): Promise<{ liffId: string; accountId: string }> {
   let { liffId, accountId } = publicLiffQuerySelector(c.req.url);
   if (!liffId && !accountId && !['GET', 'HEAD'].includes(c.req.method.toUpperCase())) {
@@ -27,12 +27,7 @@ async function publicAccountSelector(c: Context<Env>): Promise<{ liffId: string;
   return { liffId, accountId };
 }
 
-/**
- * Public LIFF routes bypass authMiddleware, so they need an independent
- * server-side tenant wall. Most public booking/event/webinar entry points
- * already carry liffId; resolve it and tenant status in one D1 read before
- * any route can write.
- */
+/** 公開 LIFF は staff 認証を通らないため、独立した統括境界が必要になる。書込前に liffId と停止状態を1回の D1 読込で解決する。 */
 export const tenantPublicBoundaryMiddleware: MiddlewareHandler<Env> = async (c, next) => {
   if (!isPublicLiffOperation(c.req.method, new URL(c.req.url).pathname)) return next();
   const rejected = await boundPublicLiffInput(c);

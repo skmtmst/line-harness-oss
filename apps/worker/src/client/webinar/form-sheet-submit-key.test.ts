@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 /*
- * #646 P1-1: webinar の申込フォームが Idempotency-Key を必ず送ることを見張る。
+ *  webinar の申込フォームが Idempotency-Key を必ず送ることを見張る。
  *
  * サーバはキー無しの送信を 400 で断る。つまりこのヘッダが落ちると、webinar
  * からの申込は全部通らなくなる。それでいてこの経路は fetch へヘッダの器を

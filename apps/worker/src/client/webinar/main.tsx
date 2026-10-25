@@ -10,14 +10,7 @@ import {
 } from '@line-crm/shared';
 
 
-// main.tsx — Auto-webinar (疑似ライブ) LIFF entry. Loaded via dynamic import
-// from apps/worker/src/client/main.ts (?page=webinar&slug=<slug>).
-// Worker の入口と apps/liff の入口が共用する、申込・視聴・回答の本体。
-//
-// 時刻の権威はサーバー:
-//   期待位置 = offsetSeconds + (performance.now - t0) / 1000
-// 動画側がバッファ等で 5 秒以上ズレたら期待位置へ強制シーク。
-// シークバー・一時停止 UI は出さない (controls なし)。
+// Worker と LIFF が共用する申込・視聴・回答の本体。サーバー時刻を基準に offsetSeconds と経過時間から再生位置を決め、バッファ等で5秒以上ずれたら補正する。疑似ライブのためシークと一時停止は表示しない。
 
 import { StrictMode, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -53,7 +46,7 @@ export interface WebinarContext {
 }
 
 const DRIFT_TOLERANCE = 5;
-// J #821: 再生中だけ15秒ごとに送る。
+// J : 再生中だけ15秒ごとに送る。
 const HEARTBEAT_MS = 15_000;
 
 type HeartbeatPlayerState = 'playing' | 'paused' | 'hidden' | 'buffering' | 'seeking';
@@ -518,7 +511,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [expectedPosition, ended]);
 
-  // ハートビート (配信終了後は送らない。J #821: 再生中だけ15秒ごと)。
+  // ハートビート (配信終了後は送らない。J : 再生中だけ15秒ごと)。
   // 状態を区別する: 再生・一時停止・隠れた・読み込み待ち・位置の移動・速度。
   // 一時停止や隠れている時間はサーバー側で視聴に数えない。
   useEffect(() => {
@@ -1114,7 +1107,7 @@ export function FormSheet({
       idemKeyRef.current = { defId: def.id, key: newFormIdempotencyKey() };
     }
     const idemKey = idemKeyRef.current.key;
-    // #729: ヘッダ組立は共有部品へ寄せる。認証の取得(ctx)・URL・再送はここに残す。
+    // ヘッダ組立は共有部品へ寄せる。認証の取得(ctx)・URL・再送はここに残す。
     const postOnce = async (key: FormIdempotencyKey) => {
       const r = await fetch(new URL(`/api/forms/${encodeURIComponent(def.id)}/submit`, ctx.apiBase || window.location.origin).toString(), {
         method: 'POST',

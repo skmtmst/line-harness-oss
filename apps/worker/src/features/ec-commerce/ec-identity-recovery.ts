@@ -2,7 +2,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { EcEvent } from './member-snapshot.js';
 import { upsertIdentityCandidate } from '../identity/identity-candidates/index.js';
 
-/** Only produce suggestions; verified contact values never automatically merge identities. */
+/** 確認済みの連絡先も本人統合の根拠として自動採用せず、候補提示だけを行う。 */
 export async function detectEcIdentityCandidates(db: D1Database, eventId: string, event: EcEvent, accountId: string): Promise<number> {
   if (event.customer_id == null) return 0;
   const connector = await db.prepare('SELECT shop_domain,identity_rules_json FROM ec_connectors WHERE line_account_id=?').bind(accountId).first<{shop_domain:string;identity_rules_json:string}>();
@@ -35,7 +35,7 @@ export async function detectEcIdentityCandidates(db: D1Database, eventId: string
   return count;
 }
 
-/** Resume only explicitly approved history ranges, or an event whose LINE identity became resolvable. */
+/** 明示承認された履歴期間か、LINE の本人を解決できたイベントだけを再開する。 */
 export async function recoverEcIdentityPending(db: D1Database, now: string): Promise<number> {
   const rows=await db.prepare(`SELECT e.id,e.source,e.line_account_id,e.customer_id,e.line_user_id,e.payload,
     l.friend_id,c.reprocess_scope_json
@@ -58,7 +58,7 @@ export async function recoverEcIdentityPending(db: D1Database, now: string): Pro
     const friend= row.friend_id ? await db.prepare('SELECT id,line_user_id FROM friends WHERE id=? AND line_account_id=?').bind(row.friend_id,row.line_account_id).first<{id:string;line_user_id:string}>()
       : await db.prepare('SELECT id,line_user_id FROM friends WHERE line_user_id=? AND line_account_id=?').bind(row.line_user_id,row.line_account_id).first<{id:string;line_user_id:string}>();
     if(!friend || (row.friend_id && scope.mode==='future_only') || (scope.from && Date.parse(event.occurred_at)<Date.parse(scope.from)) || (scope.to && Date.parse(event.occurred_at)>Date.parse(scope.to))) continue;
-    // Separate workflow namespace: a prior identity_pending completion must not suppress this run.
+    // 本人未確定の処理済み記録で今回の実行まで抑止しないよう、処理の名前空間を分ける。
     const payload={...event,line_user_id:friend.line_user_id};
     const mode=scope.mode==='analytics_snapshot'?'analytics_snapshot':'non_delivery_actions';
     await db.batch([

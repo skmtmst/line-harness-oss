@@ -220,7 +220,7 @@ export async function getEventOccurrenceApplicants(
       .bind(params.lineAccountId, params.occurrenceId)
       .all<WaitlistApplicantRow>(),
     getEventOccurrenceUsedSeats(db, params.occurrenceId),
-    // IDEA-29: 当日受付。参加済・無断欠席は申込者一覧から外れるため、
+    // 当日受付。参加済・無断欠席は申込者一覧から外れるため、
     // 受付の結果が見えなくならないよう別ブロックで返す。
     db
       .prepare(
@@ -241,7 +241,7 @@ export async function getEventOccurrenceApplicants(
         display_name: string | null;
       }>(),
     /*
-     * IDEA-29: 繰上げ履歴。converted の予約IDは受諾時に
+     * 繰上げ履歴。converted の予約IDは受諾時に
      * `event-waitlist:<待ちID>` で作る決まりなので、存在確認だけして返す。
      * 稼働中(waiting/offered/accepted)は applicants 側に出るため含めない。
      */
@@ -836,7 +836,7 @@ export async function promoteEventWaitlist(
   const modeRemaining=await eventModeRemaining(db,occurrence.id,waiting.participation_mode??'classroom');
   if(modeRemaining!==null&&waiting.party_size>modeRemaining)return {kind:'noop',reason:'party_too_large',occurrenceVersion,promoted:null};
 
-  // 緊急停止 (#1050): reminder_dispatch 停止中は席の確保 (offered 化) と
+  // 緊急停止 : reminder_dispatch 停止中は席の確保 (offered 化) と
   // 案内通知をしない。待機者は waiting のまま残り、復旧後に次の促進が届く。
   if (await isOperationCapabilityStopped(db, params.lineAccountId, 'reminder_dispatch')) {
     return { kind: 'noop', reason: 'emergency_stopped', occurrenceVersion, promoted: null };
@@ -1046,7 +1046,7 @@ export async function processEventWaitlistPromotionJobs(
     if (job.line_account_id && !await featureJobCanRun(db, { accountId: job.line_account_id, featureId: 'events', job: 'event waitlist promotions' })) {
       continue;
     }
-    // 緊急停止 (#1050): reminder_dispatch 停止中は claim せず pending の
+    // 緊急停止 : reminder_dispatch 停止中は claim せず pending の
     // まま残す。繰り上げ案内は復旧後の tick が届ける。
     if (await isOperationCapabilityStopped(db, job.line_account_id, 'reminder_dispatch')) {
       continue;
@@ -1070,7 +1070,7 @@ export async function processEventWaitlistPromotionJobs(
       });
       if (result.kind === 'promoted') promoted++;
       if (result.kind === 'noop' && result.reason === 'emergency_stopped') {
-        // 緊急停止と競合した分は完了にせず pending へ戻す (#1050)。
+        // 緊急停止と競合した分は完了にせず pending へ戻す。
         // 復旧後の tick が席の確保と案内をやり直す。
         await db
           .prepare(
@@ -1114,7 +1114,7 @@ function formatJst(utcIso: string): string {
 }
 
 // ----------------------------------------------------------------
-// U: 待ちの手動操作（順番の変更・飛ばし）。どちらも理由が必須で、
+// 待ちの手動操作（順番の変更・飛ばし）。どちらも理由が必須で、
 // 適用口（route 側）が event_change_logs へ残す。
 // 順番は sort_order 列で持ち、案内の取り出しも表示も
 // (sort_order, created_at) の順に読む。既存行は 0 のままなので、

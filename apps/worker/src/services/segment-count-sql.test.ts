@@ -1,13 +1,6 @@
 /*
- * 絞り込みの件数SQL。
- *
- * 組み立てた SQL を「包んで数える」形にしていること、そして
- * **条件の中に FROM が入っていても壊れないこと**を確かめる。
- *
- * 以前は /^SELECT .+ FROM/ を置き換えて件数SQLを作っていた。`.+` が
- * 貪欲なので、タグの条件（EXISTS (SELECT 1 FROM friend_tags ...)）を
- * 入れると `FROM friend_tags` まで食べてしまい、タグで絞ると常に
- * 400 が返っていた。同じ形に戻らないように、実際に SQLite で数える。
+ * タグ条件の入れ子の FROM を正規表現で誤って除去しないよう、集計 SQL を副問い合わせに包んで数える。
+ * 実 SQLite に条件を通し、正しい件数を得られることを確かめる。
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Database from 'better-sqlite3'

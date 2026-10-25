@@ -1,5 +1,5 @@
 /**
- * 飲食店の席の予約 (E-11・★V8 glL3g→km8EG→sAnyy) の計算だけを集めた所。
+ * 飲食店の席の予約 (★V8 glL3g→km8EG→sAnyy) の計算だけを集めた所。
  * 画面から切り離して試験する。時刻は店の時間帯 (link の timezone) で見せる。
  */
 import type {

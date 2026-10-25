@@ -4,8 +4,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 /**
  * アカウントスコープの friend 解決。同一プロバイダー配下の複数アカウントでは
  * line_user_id が同一になるため、無指定の先頭一致だと別アカウントの friend 行に
- * 吸われて「friend=別アカウント・送信元=受信アカウント」の履歴が作られる
- * (Issue #961)。
+ * 吸われて「friend=別アカウント・送信元=受信アカウント」の履歴が作られる。
  *
  * - lineAccountId 指定時: そのアカウントの行か、まだどのアカウントにも
  *   紐づいていない未割当 (NULL) の行だけを返す（未割当は既定統括の店のみ）。**別アカウント所有の行は
@@ -22,7 +21,7 @@ export async function getFriendByLineUserIdForAccount(
   lineAccountId: string | null,
 ): Promise<Friend | null> {
   if (lineAccountId) {
-    // C-2b で UNIQUE(line_account_id, line_user_id) へ移行すると同一スコープと
+    // UNIQUE(line_account_id, line_user_id) へ移行すると同一スコープと
     // 未割当の行が並存し得るため、厳密一致の行を優先して返す。
     return db
       .prepare(

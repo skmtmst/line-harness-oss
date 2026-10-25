@@ -73,7 +73,7 @@ nenMembers.put('/api/nen-members/photos/publications/order', requireRole('owner'
 
 nenMembers.post('/api/nen-members/photos/:id/publish', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), inputJsonBoundary(), post__api_nen_members_photos_id_publish_6);
 
-// 公開の撤回・掲載先の変更は、審査とは別の上位権限だけでできるようにする（#931 N-311）。
+// 公開の撤回・掲載先の変更は、審査とは別の上位権限だけでできるようにする。
 // 「審査できる人なら公開範囲も変えられる」状態を止め、掲載管理の権限を明示的に分ける。
 nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), inputJsonBoundary({"accountId":["string"],"expectedVersion":["number"]}), put__api_nen_members_photos_publications_id_withdraw_7);
 
@@ -98,7 +98,7 @@ nenMembers.post(
 );
 
 /*
- * 詳細画面で直した写真の向きを版つきで保存する（#931 N-309）。
+ * 詳細画面で直した写真の向きを版つきで保存する。
  * 「回す」が見た目だけだと、向きを直して通したつもりが元の向きで残る。
  * 版（expectedVersion）を要求するのは、審査と同じく並行する直しと
  * 通しの順序ずれを「別の担当者が更新しました」として気づけるようにするため。

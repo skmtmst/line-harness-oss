@@ -5,7 +5,7 @@ import { sha256Hex } from '../middleware/auth.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 /*
- * N-433(#957)。本人のメール変更は確認メールを経て確定する契約試験。
+ *。本人のメール変更は確認メールを経て確定する契約試験。
  * 実D1で通し、即時切り替えをしないこと・使い切り・期限・旧宛先への
  * 知らせを確かめる。
  */

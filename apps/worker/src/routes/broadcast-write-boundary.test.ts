@@ -1,5 +1,5 @@
 /*
- * 配信の作成・更新・送信の共通境界(N-061)。
+ * 配信の作成・更新・送信の共通境界。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の broadcasts ルートを当てる。
  * 作成時は要求account、更新・送信時はDB行のaccountを共通土台へ渡す。
@@ -228,7 +228,7 @@ describe('配信の共通境界(N-061)', () => {
     const badUrl = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({ value: 'not-a-url' })] } });
     expect(badUrl.status).toBe(400);
     await expect(badUrl.json()).resolves.toMatchObject({ error: 'ボタン1のURLは https:// から始めてください' });
-    // 直したら通る。
+
     const fixed = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({})] } });
     expect(fixed.status).toBe(201);
   });

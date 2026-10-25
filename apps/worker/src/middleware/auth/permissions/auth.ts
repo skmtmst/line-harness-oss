@@ -1,6 +1,6 @@
 import { DELIVERY_API_PERMISSIONS } from '@line-crm/shared';
 
-// Route delegation only. Handlers still enforce ownership and operation-specific permissions.
+// 経路の委譲だけを担当し、所有権と操作別の権限はハンドラでも検証する。
 const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/auth/two-factor/policy', 'auth.mfa.policy'],
   ...DELIVERY_API_PERMISSIONS,
@@ -13,12 +13,12 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   // 流入計測の入口経路と文面は /inflow-links 画面が呼ぶ。
   ['/api/entry-routes', '/inflow-links'], ['/api/entry-route-genres', '/inflow-links'],
   ['/api/message-templates', '/inflow-links'],
-  // 広告費の台帳(#818)も流入画面の一部。書き込みは route 側で owner/admin に絞る。
+  // 広告費の台帳も流入画面の一部。書き込みは route 側で owner/admin に絞る。
   ['/api/ad-costs', '/inflow-links'],
   ['/api/funnels', '/analytics'],
   // ダッシュボード(ホーム)の数字と表示設定。'/' 鍵はメニューの href と同じ。
   // /api/list-stats は複数画面の集計で帰属を決められないため登録しない
-  // (fail-closed。N-423 の残課題として司令塔へ報告する)。
+  // 未対応の経路も、安全側で拒否する。
   ['/api/dashboard', '/'],
   ['/api/getting-started', '/getting-started'],
   ['/api/conversions', '/conversions'], ['/api/measurement-sites', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
@@ -32,14 +32,14 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/webhooks', '/webhooks'], ['/api/instagram', '/webhooks'],
   ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
   // 個別相談の変更・取消は予約と同じ `/booking/bookings` 権限で守る
-  // (N-065 #623 司令塔裁定。`/api/meet-callback` は公開コールバックのため対象外)。
+  // 公開コールバックの /api/meet-callback は対象外とする。
   ['/api/meet-consultations', '/booking/bookings'],
   ['/api/ec-commerce', '/ec-commerce'],
   // 然の会員（★37-1）。メニューの href は /nen/members。
   ['/api/nen/rank-settings', '/nen/members'], ['/api/nen/lifetime-milestones', '/nen/members'], ['/api/nen/members', '/nen/members'],
   // 然のマイペット・健康日記（★37-3／37-4）。主食のカロリー表はマイペット画面へ移した。
   ['/api/nen/feeding-products', '/nen/pets'], ['/api/nen/pets', '/nen/pets'], ['/api/nen/health', '/nen/health'],
-  // ログインユーザー一覧・権限のかたまり・監査の閲覧は「設定」の点キーで守る（N-424）。
+  // ログインユーザー一覧・権限のかたまり・監査の閲覧は「設定」の点キーで守る。
   // route 側の requirePermission が最終判定を握る。
   ['/api/access', 'access.user.view'],
   ['/api/audit', 'access.audit.view'],
@@ -56,14 +56,10 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/restaurant-test/assignment-settings', 'booking.settings'],
 ];
 
-/**
- * A few APIs live under /api/friends for URL compatibility but expose another
- * feature. Resolve them before the broad /api/friends prefix so a staff member
- * cannot inherit chat or friend-attribute access from the friends permission.
- */
+/** URL 互換性で /api/friends 配下にある別機能を先に解決し、friends 権限だけでチャットや属性へアクセスできないようにする。 */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/dashboard\/style\/template-samples$/, '/templates'],
-  // 予約の細かい権限（N-411）。広い '/api/booking' → '/booking/bookings' より先に評価する。
+  // 予約の細かい権限。広い '/api/booking' → '/booking/bookings' より先に評価する。
   // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
   [/^\/api\/booking\/admin\/staff\/me(?:\/|$)/, 'booking.staff.own'],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar|calendar-sync|meeting-url)(?:\/|$)/, 'booking.staff.own'],
@@ -73,16 +69,16 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/booking\/admin\/menus(?:\/|$)/, '/booking/menus'],
   // 予約設定（受付枠・資源・例外）の GET は予約の閲覧に含め、
   // 変更は route 側で 'booking.settings' を要求する（後方互換のため）。
-  // 運用状態の健全性サマリは '/health' 権限で守る（N-424）。
+  // 運用状態の健全性サマリは '/health' 権限で守る。
   // /api/accounts 全体ではなくこの配下だけを対象にする。
   [/^\/api\/accounts\/health-summary(?:\/|$)/, '/health'],
   [/^\/api\/accounts\/[^/]+\/health(?:\/|$)/, '/health'],
   [/^\/api\/nen-members\/photos\/decisions\/bulk(?:\/|$)/, 'photo.submission.bulk_review'],
   [/^\/api\/nen-members\/photos\/(?:original-download\/[^/]+|[^/]+\/original-download)(?:\/|$)/, 'photo.original.download'],
   [/^\/api\/nen-members\/photos\/[^/]+\/(?:assessments\/re-evaluate|assets\/process|review|notification\/retry)(?:\/|$)/, 'photo.submission.review'],
-  // ポイント付与の復旧（再試行・照合）は審査権限とは別の専用鍵（PHOTO-06）。
+  // ポイント付与の復旧（再試行・照合）は審査権限とは別の専用鍵。
   [/^\/api\/nen-members\/photos\/[^/]+\/(?:point-retry|point-reconcile)(?:\/|$)/, 'photo.reward.reconcile'],
-  // 公開の撤回・掲載先の変更は審査権限ではなく掲載管理の上位権限（#931 N-311）。
+  // 公開の撤回・掲載先の変更は審査権限ではなく掲載管理の上位権限。
   // 一覧の表示（GET publications）は審査と同じ閲覧権限のままにする。
   [/^\/api\/nen-members\/photos\/publications\/[^/]+\/(?:withdraw|placements)(?:\/|$)/, 'photo.publication.manage'],
   [/^\/api\/nen-members\/photos\/(?:publications\/order|[^/]+\/publish)(?:\/|$)/, 'photo.publication.manage'],
@@ -91,7 +87,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
   [/^\/api\/friends\/[^/]+\/support-mark(?:\/|$)/, '/tags'],
   [/^\/api\/friends\/support-mark\/bulk(?:\/|$)/, '/tags'],
-  // 友だち単位の購読操作（#949 N-054 / 機能05 §7）は操作ごとの個別鍵で
+  // 友だち単位の購読操作（機能05 §7）は操作ごとの個別鍵で
   // 委譲する。失敗の再送だけを任された staff（scenario.step_run.retry）が
   // 購読の操作権限なしで retry へ届くよう、第一関門も操作単位の鍵を見る。
   // route 側の requirePermission が最終判定を握る。
@@ -99,7 +95,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
-/** POST operations that read/preview instead of changing business data. */
+/** POST でも業務データを更新しない読取・プレビュー操作。 */
 export function gap2ReadOperation(method: string, path: string): boolean {
   return method === 'POST' && (
     /^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)
@@ -143,13 +139,13 @@ export function permissionForApiPath(path: string): string | null {
  * 新しい口は fail-closed (staff 403) に倒す。
  */
 const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
-  // Self-service handlers require a real session and derive the only target from it.
+  // 本人向け操作は実セッションを必須とし、その本人だけを対象にする。
   ['GET', '/api/auth/api-key'],
   ['POST', '/api/auth/api-key'],
   ['DELETE', '/api/auth/api-key'],
   ['GET', '/api/auth/session'],
   ['PUT', '/api/me/presence'],
-  // These routes derive the target exclusively from the authenticated principal.
+  // 外部入力で対象を選ばせず、認証済みの本人だけから解決する。
   ['GET', '/api/auth/two-factor/self'],
   ['POST', '/api/auth/two-factor/recovery'],
   ['POST', '/api/auth/step-up'],
@@ -230,11 +226,8 @@ export function isStaffSelfEndpoint(method: string, path: string, staffId?: stri
 }
 
 /**
- * route が staff へ明示許可している既存の口の写し。
- *
- * 旧一覧の GET /api/staff は handler が他人のメールを伏せる意図的な
- * 仕様として維持する(司令塔裁定 #670)。飲食店テストは点検対象外の
- * ため route の明示許可を写すだけで、闇雲に広げない。
+ * route が staff へ明示許可する経路だけを対応させる。
+ * GET /api/staff は他人のメールを伏せる仕様を保つ。飲食店テストも既存の明示許可を写し、範囲を広げない。
  */
 const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/staff'],

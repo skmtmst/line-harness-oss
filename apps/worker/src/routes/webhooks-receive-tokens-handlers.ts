@@ -26,13 +26,13 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
     if (!wh || !wh.is_active) {
       return fail(c, 404, 'WEBHOOK_NOT_FOUND_OR_INACTIVE');
     }
-    // N-384: 巨大な本文を署名計算の前に止める。申告サイズが超えていれば
+    // 巨大な本文を署名計算の前に止める。申告サイズが超えていれば
     // 読まずに413、申告が無くても実バイト数で止める。
     const declaredLength = Number(c.req.header('content-length') ?? '');
     if (Number.isFinite(declaredLength) && declaredLength > MAX_INCOMING_BODY_BYTES) {
       return c.json({ success: false, error: 'Payload too large' }, 413);
     }
-    // 照合の直前に復号する。鍵不足・復号失敗は fail-closed(#650)。
+    // 照合の直前に復号する。鍵不足・復号失敗は fail-closed。
     let verifySecret: string | null;
     try {
       verifySecret = await resolveWebhookSecret(wh, webhookKeysOf(c));
@@ -40,7 +40,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
       verifySecret = null;
     }
     if (!verifySecret || verifySecret.length < MIN_SECRET_LENGTH) {
-      // Should never happen post-migration, but fail closed.
+      // 不整合な保存済み状態も、安全側で拒む。
       return c.json({ success: false, error: 'Webhook is not configured for secure delivery' }, 503);
     }
 
@@ -54,13 +54,13 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
       return c.json({ success: false, error: 'X-Webhook-Signature header is required' }, 401);
     }
 
-    // R428: 申告が無くても実バイト数で止める。上限超えは読まずに413。
+    // 申告が無くても実バイト数で止める。上限超えは読まずに413。
     const rawBody = await readCappedBodyText(c.req.raw, MAX_INCOMING_BODY_BYTES);
     if (rawBody === null) {
       return c.json({ success: false, error: 'Payload too large' }, 413);
     }
     /*
-     * S (#939 機能26): 合言葉を入れ替えてから24時間は前の合言葉でも
+     * S ( 機能26): 合言葉を入れ替えてから24時間は前の合言葉でも
      * 署名が通る。相手のサービス側の切り替えに猶予を持たせるため。
      * 前の合言葉で通した届物はログに残して追えるようにする。
      */
@@ -79,7 +79,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
     }
 
     /*
-     * R427: 署名が通った後、受領の前に契約先の状態を見る。停止・保管が
+     * 署名が通った後、受領の前に契約先の状態を見る。停止・保管が
      * 完了した契約先への新規受信からは外部POSTを1件も起こさない
      * （即時送信と定期再送で同じ停止方針）。署名の前に弾くと停止の有無が
      * 外部へ漏れるため、この順序にする。
@@ -106,7 +106,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
     }
 
     /*
-     * N-365 (#746): 同じ署名の使い回しを弾く。
+     *  同じ署名の使い回しを弾く。
      *
      * 時刻・出来事ID・本文を署名し、同じ出来事は受領台帳で1件にまとめる。
      * 期限付き所有権を得た1件だけが下流へ進む。
@@ -122,7 +122,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
     // 合言葉の入れ替え後や時刻を更新した再署名も、同じ出来事IDの受領へ結び付ける。
     // 既存列body_hashには出来事IDのハッシュを保存する（顧客情報は保存しない）。
     const bodyHash = await sha256Hex(signedEventId);
-    // N-384: 受領の予約に窓内件数の上限を載せて1文で判定する。
+    // 受領の予約に窓内件数の上限を載せて1文で判定する。
     // 上限超えの新規受信は受領記録を消費せず 429 で返し、
     // 窓が明けたあとの正規再送を残す。
     const reserved = await reserveIncomingWebhook(c.env.DB, wh.id, signatureHash, {
@@ -157,7 +157,7 @@ export const post__api_webhooks_incoming_id_receive_1 = async (c: Context<Env, "
     await c.env.DB.prepare(`INSERT OR IGNORE INTO incoming_webhook_queue
       (source_event_id,webhook_id,signature_hash,body_hash,payload_encrypted,next_attempt_at,created_at,updated_at)
       VALUES (?,?,?,?,?,?,?,?)`).bind(execution.sourceEventId,wh.id,signatureHash,bodyHash,encrypted,queuedAt,queuedAt,queuedAt).run();
-    if(execution.defer) await execution.defer(); else await execution.fail(); // consumer owns the first attempt
+    if(execution.defer) await execution.defer(); else await execution.fail(); // 初回の試行もキューの実行側が担当する。
     return c.json({success:true,data:{received:true,queued:true,source:wh.source_type}},202);
 
   } catch (err) {
@@ -296,7 +296,7 @@ export const post__api_webhooks_api_tokens_id_rotate_6 = async (c: Context<Env, 
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     if (rotated.status === 'conflict') {
-      // 同時再発行に負けた・古い読み取りのまま来た側（R431）。
+      // 同時再発行に負けた・古い読み取りのまま来た側。
       // 新トークンは作っていない。一覧を読み直して今の状態から進める。
       const current = await listIntegrationApiTokens(c.env.DB, lineAccountId);
       return c.json({

@@ -94,7 +94,7 @@ function harness(options: {
               last_idempotency_key: null,
             };
           }
-          // 詳細口の掲載・報酬の単発取得（Issue #1040 IDEA-22）。
+          // 詳細口の掲載・報酬の単発取得。
           if (query.includes('FROM nen_photo_publications pub') && query.includes('pub.photo_id = ?')) {
             return options.detailPublication ?? null;
           }
@@ -104,7 +104,7 @@ function harness(options: {
           if (query.includes('SELECT e.notification_status')) {
             return options.settledState ?? null;
           }
-          // 再送口の写真メタ（再実行キー照合。 #931 N-313）。
+          // 再送口の写真メタ（再実行キー照合。）。
           if (query.includes('notification_retry_key')) {
             if (entry.bindings[1] !== photoAccount) return null;
             return {
@@ -113,7 +113,7 @@ function harness(options: {
               notification_retry_key: options.notificationRetryKey ?? null,
             };
           }
-          // 単票審査の再実行キー照合（#931 N-313）。同じキーの判断があれば返す。
+          // 単票審査の再実行キー照合。同じキーの判断があれば返す。
           if (query.includes('idempotency_key = ?') && query.includes('nen_photo_review_events')) {
             return options.previousDecision ?? null;
           }
@@ -129,7 +129,7 @@ function harness(options: {
               customer_id: null,
             };
           }
-          // 向き保存口の写真（#931 N-309）。
+          // 向き保存口の写真。
           if (query.includes('display_rotation') && query.includes('rotation_idempotency_key')) {
             if (entry.bindings[1] !== photoAccount) return null;
             return {
@@ -165,7 +165,7 @@ function harness(options: {
           if (query.includes('FROM nen_photo_risk_assessments')) {
             return { results: [{ flag: 'face', confidence: 0.78 }] };
           }
-          // 詳細口の審査履歴（Issue #1040 IDEA-22）。
+          // 詳細口の審査履歴。
           if (query.includes('FROM nen_photo_review_events')) {
             return { results: options.reviewHistory ?? [] };
           }
@@ -251,8 +251,8 @@ describe('NEN photo review', () => {
     expect((await app.request('/api/nen-members/photos?accountId=account-a')).status).toBe(200);
     const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
     expect(list?.query).toContain('ps.line_account_id = ? AND f.line_account_id = ?');
-    // 絞り込みの2値のあとは、続きを取るための枚数と開始位置（#666）。
-    // 先頭の1値はポイント手続きの「要対応」判定に使う24時間前の区切り（PHOTO-06）。
+    // 絞り込みの2値のあとは、続きを取るための枚数と開始位置。
+    // 先頭の1値はポイント手続きの「要対応」判定に使う24時間前の区切り。
     expect(list?.bindings).toEqual([expect.any(String), 'account-a', 'account-a', 200, 0]);
   });
 
@@ -364,7 +364,7 @@ describe('NEN photo review', () => {
   });
 
   it('withdraws every placement with account scope, version and idempotency', async () => {
-    // 公開の撤回は審査権限ではなく掲載管理の上位権限が要る（#931 N-311）。
+    // 公開の撤回は審査権限ではなく掲載管理の上位権限が要る。
     const { app, batches } = harness({ permissionKeys: ['photo.publication.manage'] });
     const response = await app.request('/api/nen-members/photos/publications/publication-1/withdraw', {
       method: 'PUT',
@@ -415,7 +415,7 @@ describe('NEN photo review', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { notificationStatus: 'sent' } });
     const decision = batches[0].find((entry) => entry.query.includes('INSERT INTO nen_photo_review_events'));
-    // 再実行キーと「再投稿の案内を添えるか」も判断へ残す（#931 N-312/N-313）。
+    // 再実行キーと「再投稿の案内を添えるか」も判断へ残す。
     expect(decision?.bindings).toEqual([
       expect.any(String), 'photo-1', 'account-a', 'rejected', 'privacy',
       '顔が写っていない写真をお願いします。', 0, 'staff-a', '担当者',
@@ -475,9 +475,7 @@ describe('NEN photo review', () => {
   });
 
   /*
-   * 失敗の理由は、ほかの送信失敗と同じ安全な文言にそろえる（2026-10-02）。
-   * ここだけ生のエラー本文を記録していたため、管理画面の失敗一覧に LINE 側の
-   * 応答本文がそのまま出ていた。原因を追うための生の本文はログにだけ残す。
+   * 失敗一覧へ LINE の応答本文を漏らさないよう、他の送信失敗と同じ安全な理由を使う。原因調査用の生の本文はログだけで扱う。
    */
   it('keeps the review saved and records a failed LINE notification', async () => {
     mocks.push.mockRejectedValueOnce(new Error('LINE unavailable'));
@@ -537,7 +535,7 @@ describe('NEN photo review', () => {
     );
     expect(submissionUpdate?.bindings).toContain('adopted');
     const outbox = batches[0].find((entry) => entry.query.includes('INSERT INTO nen_photo_reward_outbox'));
-    // 版の鍵は SQL の文字から束縛へ移った (#817)。値は同じ legacy-5・5pt。
+    // 版の鍵は SQL の文字から束縛へ移った。値は同じ legacy-5・5pt。
     expect(outbox?.bindings).toEqual([
       expect.any(String), 'photo-1', 'account-a', 'friend-1', 'customer-1',
       'nen-photo:photo-1', 'legacy-5', 5,
@@ -609,7 +607,7 @@ describe('NEN photo review', () => {
     }));
     const { app } = harness();
     const body = JSON.stringify({ accountId: 'account-a' });
-    // 連打・再試行は同じ再実行キーで届く想定（#931 N-313）。
+    // 連打・再試行は同じ再実行キーで届く想定。
     const headers = { 'content-type': 'application/json', 'Idempotency-Key': 'retry-race-1' };
     const first = app.request('/api/nen-members/photos/photo-1/notification/retry', { method: 'POST', headers, body });
     const second = app.request('/api/nen-members/photos/photo-1/notification/retry', { method: 'POST', headers, body });
@@ -668,7 +666,7 @@ describe('NEN photo review', () => {
   });
 
   /*
-   * #931 N-313: 単体審査と通知再送は再実行キー必須。連打・応答ロストの
+   *  単体審査と通知再送は再実行キー必須。連打・応答ロストの
    * やり直しが「別の担当者が更新しました」に化けないようにする。
    */
   it('requires an idempotency key for the individual review', async () => {
@@ -788,7 +786,7 @@ describe('NEN photo review', () => {
   });
 
   /*
-   * #931 N-309: 詳細で直した向きを版つきで保存する。見た目だけの「回す」
+   *  詳細で直した向きを版つきで保存する。見た目だけの「回す」
    * は、通したあと元の向きへ戻ってしまうため。
    */
   it('saves the corrected rotation with version and idempotency', async () => {
@@ -836,7 +834,7 @@ describe('NEN photo review', () => {
   });
 
   /*
-   * #931 N-308: 一覧は名前・ペット名・コメントの部分一致で絞れる。
+   *  一覧は名前・ペット名・コメントの部分一致で絞れる。
    * LIKE の記号（% _ \）は逃がして、検索語そのものにだけ当てる。
    */
   it('filters the photo list by owner, pet name and caption with escaped LIKE', async () => {

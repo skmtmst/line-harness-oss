@@ -1,4 +1,4 @@
-/** Count observed unfollows among successful recipients; never infer causality or fill coverage gaps with zero. */
+/** 成功した受信者の解除だけを観測し、配信が原因とは断定しない。観測漏れを0で補わない。 */
 export async function hqBroadcastBlocks(db:D1Database,tenantId:string,runId:string) {
   const rows=(await db.prepare(`SELECT t.line_account_id account_id,b.sent_at,c.state coverage_state,c.available_from,
     (SELECT COUNT(*) FROM broadcast_send_claims s WHERE s.broadcast_id=b.id AND s.line_account_id=t.line_account_id AND s.state='sent') sent,

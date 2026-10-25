@@ -221,7 +221,7 @@ export interface RequestOptions {
   /** 呼ぶ先。トークンを取った側と必ず同じ側にする。 */
   hosts: UberHosts;
   sleep?: (ms: number) => Promise<void>;
-  /** Interactive store selection owns the operation; never add SDK retries. */
+  /** 対話的な店舗選択が操作を管理するため、SDK 内で再試行を追加しない。 */
   singleAttempt?: boolean;
 }
 

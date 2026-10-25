@@ -1,7 +1,7 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
-// N-244 競合順序: OAuth/LIFFで候補保存→経路停止→follow webhook到着の順でも、
+//  競合順序: OAuth/LIFFで候補保存→経路停止→follow webhook到着の順でも、
 // 停止refを friends.ref_code・計測・友だち追加ルールへ使わない。
 // webhook側で候補ref/既存refを使う直前に inactive entry route を判定し、
 // 停止済みなら破棄する。active・不存在の既存フローは維持する。
@@ -189,7 +189,7 @@ describe('停止refの競合順序: 候補保存→停止→follow (N-244)', () 
     await sendFollow('U-1', 'webhook-follow-stopped');
 
     // 友だち追加ルール (unknown-route fallback を含む) へは一切流さない。
-    // N-244差戻: 停止ref由来ではタグ・シナリオを一切開始しない。
+    // 停止ref由来ではタグ・シナリオを一切開始しない。
     expect(applyFriendAddRouting).not.toHaveBeenCalled();
     // 停止refで紹介経路を引かない。
     expect(getEntryRouteByRefCode).not.toHaveBeenCalledWith(
@@ -223,7 +223,7 @@ describe('停止refの競合順序: 候補保存→停止→follow (N-244)', () 
 
     expect(applyFriendAddRouting).toHaveBeenCalledWith(
       baseEnv.DB, 'account-main', expect.anything(), expect.anything(),
-      // N-101(#622) で送信権の関門などが同じ引数へ加わった。ここで見たいのは
+      //  で送信権の関門などが同じ引数へ加わった。ここで見たいのは
       // 「停止していない経路のIDがそのまま渡ること」なので、経路IDだけを見る。
       expect.objectContaining({ entryRouteId: 'route-active' }),
     );
@@ -235,7 +235,7 @@ describe('停止refの競合順序: 候補保存→停止→follow (N-244)', () 
 
   test('停止ref由来では非空のアカウント共通シナリオも開始しない', async () => {
     // 実行可能な fallback (unknown-route ルール) と非空の友だち追加
-    // シナリオがあっても、停止ref由来では何も始まらない (N-244差戻)。
+    // シナリオがあっても、停止ref由来では何も始まらない 。
     vi.mocked(captureFriendAddEventAttribution).mockResolvedValue({
       refCode: 'stopped1', entryRouteId: 'route-stopped',
     });
@@ -268,7 +268,7 @@ describe('停止refの競合順序: 候補保存→停止→follow (N-244)', () 
 
   test('停止候補B由来では過去active経路Aへfallbackしない', async () => {
     // B停止由来の follow で、friends.ref_code の過去active経路Aの
-    // 紹介メッセージ/専用scenarioが動かないこと (N-244差戻・再審査)。
+    // 紹介メッセージ/専用scenarioが動かないこと 。
     // Aは実行可能 (紹介文・専用scenario付き) にして抑止を直接見る。
     const STOPPED_B = {
       id: 'route-stopped', ref_code: 'stoppedB', is_active: 0,

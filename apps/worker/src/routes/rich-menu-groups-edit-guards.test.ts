@@ -5,14 +5,14 @@ import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 /**
- * M950〜M954 の受け入れ試験（`/rich-menus/edit` 深い再監査の直し）。
+ * 〜の受け入れ試験（`/rich-menus/edit` 深い再監査の直し）。
  *
  * - 実SQLite (createTestD1: bootstrap.sql そのまま・batch は取引で包むので
- *   M950 の原子性を本物の意味で確かめられる)＋実 route＋実 auth。
+ *   の原子性を本物の意味で確かめられる)＋実 route＋実 auth。
  * - 差し替えるのは LINE への fetch と R2 だけ（外部副作用）。
- * - 逆変異の担保：直しを戻すと対応する試験が赤になる（M950 は meta だけ残る、
- *   M951 は版なし・古い版が 200、M952 は条件なし出し分けが 200、
- *   M953 は LINE 全滅でも 200・draft 確定、M954 は R2 に孤児が残る）。
+ * - 逆変異の担保：直しを戻すと対応する試験が赤になる（は meta だけ残る、
+ *   は版なし・古い版が 200、は条件なし出し分けが 200、
+ *   は LINE 全滅でも 200・draft 確定、は R2 に孤児が残る）。
  */
 const { richMenuGroups } = await import('./rich-menu-groups.js');
 
@@ -134,7 +134,7 @@ function pageNames(groupId: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// M950: 保存は meta と pages を同じ取引で確定する
+// 保存は meta と pages を同じ取引で確定する
 // ---------------------------------------------------------------------------
 
 describe('M950: 保存の部分書き込みを残さない', () => {
@@ -165,7 +165,7 @@ describe('M950: 保存の部分書き込みを残さない', () => {
     }
 
     expect(res.status).toBe(500);
-    // 直し前はここで name='新しい名前' だけ残る（部分書き込み）。
+    // 失敗時に名前だけを部分保存しないことを確かめる。
     expect(groupRow('g1').name).toBe('メニュー');
     expect(pageNames('g1')).toEqual(['ページ1']);
     // 版の検査と書込が別取引だと、版上げだけが残る。版も戻る（進まない）。
@@ -197,7 +197,7 @@ describe('M950: 保存の部分書き込みを残さない', () => {
 });
 
 // ---------------------------------------------------------------------------
-// M951: 保存に版を付けて同時編集の上書きを止める
+// 保存に版を付けて同時編集の上書きを止める
 // ---------------------------------------------------------------------------
 
 describe('M951: 保存の版照合', () => {
@@ -242,7 +242,7 @@ describe('M951: 保存の版照合', () => {
     expect((await app.request(first.path, first.init)).status).toBe(200);
 
     // 古い画面のままのBさんが保存 → 409。Aさんの内容は残る。
-    // 直し前はここが 200 で Aさんの名前が黙って消える。
+    // 同時更新で別の担当者の名前を黙って上書きしないことを確かめる。
     const second = authed('/api/rich-menu-groups/g1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -274,7 +274,7 @@ describe('M951: 保存の版照合', () => {
 });
 
 // ---------------------------------------------------------------------------
-// M952: 「条件で出し分け・条件なし」を保存口でも断る（作成口と同じ検査）
+// 「条件で出し分け・条件なし」を保存口でも断る（作成口と同じ検査）
 // ---------------------------------------------------------------------------
 
 describe('M952: 出し分け条件なしの保存拒否', () => {
@@ -290,7 +290,7 @@ describe('M952: 出し分け条件なしの保存拒否', () => {
     });
     const res = await setupApp(db, r2).request(path, init);
 
-    // 直し前はここが 200 で誰にも出ないメニューが作れる。
+    // 表示対象がないメニューを作成しないことを確かめる。
     expect(res.status).toBe(400);
     const row = raw.prepare(`SELECT targeting_enabled AS e FROM rich_menu_groups WHERE id = 'g1'`).get() as { e: number };
     expect(row.e).toBe(0);
@@ -350,7 +350,7 @@ describe('M952: 出し分け条件なしの保存拒否', () => {
 });
 
 // ---------------------------------------------------------------------------
-// M953: 取り下げで LINE 削除が失敗したら成功にしない
+// 取り下げで LINE 削除が失敗したら成功にしない
 // ---------------------------------------------------------------------------
 
 function stubLineFetch(mode: 'ok' | 'fail-all' | 'fail-richmenu-only') {
@@ -396,7 +396,7 @@ describe('M953: 取り下げの LINE 削除失敗', () => {
     const { path, init } = authed('/api/rich-menu-groups/g1/unpublish', { method: 'POST' });
     const res = await setupApp(db, r2).request(path, init);
 
-    // 直し前はここが 200・draft 確定で、LINE 上にメニューが残る。
+    // 下書きへの変更だけ確定し、LINE 側に公開メニューが残る状態を防ぐ。
     expect(res.status).toBe(500);
     expect(groupRow('g1').status).toBe('published');
     expect(publishRunStatus('g1')).toBe('failed');
@@ -428,7 +428,7 @@ describe('M953: 取り下げの LINE 削除失敗', () => {
 });
 
 // ---------------------------------------------------------------------------
-// M954: 画像アップロードで DB 失敗時は R2 を片付ける
+// 画像アップロードで DB 失敗時は R2 を片付ける
 // ---------------------------------------------------------------------------
 
 describe('M954: 画像アップロードの R2 孤児', () => {
@@ -464,7 +464,7 @@ describe('M954: 画像アップロードの R2 孤児', () => {
     const res = await uploadImage(failingImageDb());
 
     expect(res.status).toBe(500);
-    // 直し前はここで R2 に1件残る。
+    // 失敗時に R2 側の部分書込を残さないことを確かめる。
     expect(r2.store.size).toBe(0);
     expect(r2.deleted).toHaveLength(1);
     const row = raw.prepare(`SELECT image_r2_key AS k FROM rich_menu_pages WHERE id = 'p1'`).get() as {
@@ -489,7 +489,7 @@ describe('M954: 画像アップロードの R2 孤児', () => {
 });
 
 // ---------------------------------------------------------------------------
-// M950/M951 追加照合：版の検査と書込は同じ取引で行う
+// /追加照合：版の検査と書込は同じ取引で行う
 // ---------------------------------------------------------------------------
 
 describe('M950/M951: 保存の交錯で古い書込が勝たない', () => {
@@ -554,7 +554,7 @@ describe('M950/M951: 保存の交錯で古い書込が勝たない', () => {
     releaseBatch();
     const resA = await resAPromise;
 
-    // 直し前は A が 200 で Aさんの名前・Aページが残る（B が消える）。
+    // 同時編集で片方の名前・ページを黙って上書きしないことを確かめる。
     expect(resA.status).toBe(409);
     expect(groupRow('g1').name).toBe('Bさんの名前');
     expect(pageNames('g1')).toEqual(['Bページ']);

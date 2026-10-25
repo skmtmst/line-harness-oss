@@ -193,7 +193,7 @@ export interface EventDetail {
   cancel_deadline_hours_before: number | null;
   /** 満席のあとキャンセル待ちを受けるか (GET /api/liff/events/:id が行ごと返す)。 */
   waitlist_enabled?: number | null;
-  /** 申込時のカスタム質問 (#841)。定義が無いイベントは空配列。 */
+  /** 申込時のカスタム質問。定義が無いイベントは空配列。 */
   questions?: EventQuestion[];
 }
 
@@ -292,7 +292,7 @@ export interface PublicForm {
 }
 
 
-/** F-11：郵便番号検索の結果。status が matched/multiple のとき候補から選ぶ。 */
+/** 郵便番号検索の結果。status が matched/multiple のとき候補から選ぶ。 */
 export interface PostalCodeCandidate {
   postalCode: string;
   prefecture: string;

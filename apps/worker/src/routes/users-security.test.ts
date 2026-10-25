@@ -160,7 +160,7 @@ describe('/api/users authorization boundaries', () => {
       createdBy: 'staff-own',
     }));
     expect((await instance.request('/api/users/user-own', request('PUT', { displayName: 'Changed' }))).status).toBe(200);
-    // R394: 結び直しは担当者を添えて呼び、成功すれば200。
+    // 結び直しは担当者を添えて呼び、成功すれば200。
     db.linkFriendToUser.mockResolvedValue(true);
     expect((await instance.request('/api/users/user-own/link', request('POST', { friendId: 'friend-own' }))).status).toBe(200);
     expect((await instance.request('/api/users/user-own/accounts')).status).toBe(200);

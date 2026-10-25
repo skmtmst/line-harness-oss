@@ -1,16 +1,6 @@
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
-/**
- * Token auto-refresh — proactively renew LINE channel access tokens before expiry.
- *
- * LINE's stateless token API uses client_credentials grant:
- * POST channel_id + channel_secret → new access_token (30 days).
- * No refresh_token needed.
- *
- * Runs every cron cycle (5 min). Only refreshes when:
- * - token_expires_at is within 7 days, OR
- * - token_expires_at is NULL (legacy, unknown expiry — refresh once to start tracking)
- */
+/** LINE の client_credentials で有効期限30日のトークンを発行する。5分の cron ごとに、期限まで7日以内か期限不明のアカウントだけを更新し、失効前に交換する。 */
 
 import { getLineAccounts, updateLineAccount, updateLineAccountFields } from '@line-crm/db';
 import type { LineAccount } from '@line-crm/db';
@@ -24,7 +14,7 @@ function jstNow(): string {
 }
 
 function shouldRefresh(account: LineAccount): boolean {
-  if (!account.token_expires_at) return true; // unknown expiry
+  if (!account.token_expires_at) return true; // 期限が分からない場合も、一度更新して以後の期限を追えるようにする。
   const expiresAt = new Date(account.token_expires_at).getTime();
   return expiresAt - Date.now() < REFRESH_THRESHOLD_MS;
 }
@@ -37,7 +27,7 @@ function shouldSyncProfile(account: LineAccount): boolean {
 
 export interface TokenResponse {
   access_token: string;
-  expires_in: number; // seconds
+  expires_in: number; // 単位は秒。
   token_type: string;
 }
 
@@ -58,11 +48,7 @@ export class LineTokenIssueError extends Error {
   }
 }
 
-/**
- * Issue a channel access token through the existing LINE OAuth endpoint.
- * Response bodies are intentionally never copied into exceptions because they
- * may contain operational details that must not reach logs or browser errors.
- */
+/** LINE の既存 OAuth でトークンを発行する。応答本文に運用上の情報が含まれ得るため、例外へ写してログや画面へ出さない。 */
 export async function issueLineAccessToken(
   channelId: string,
   channelSecret: string,

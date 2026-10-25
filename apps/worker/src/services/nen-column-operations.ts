@@ -31,7 +31,7 @@ export async function duplicateNenColumn(
     id: string;
     lineAccountId: string;
     /**
-     * M506: 呼び出し側が振った要求キー。応答消失後の再送・二重押しで
+     * 呼び出し側が振った要求キー。応答消失後の再送・二重押しで
      * 同じ複製へ戻すため、複製行の主キーとして使う。省略時は採番する。
      */
     newId?: string;

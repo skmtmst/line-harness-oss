@@ -28,7 +28,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
   const stateParam = c.req.query('state') || '';
   const error = c.req.query('error');
 
-  // Parse state (contains ref, redirect, and ad click IDs)
+
   let ref = '';
   let redirect = '';
   let redirectProof = '';
@@ -84,7 +84,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     const baseUrl = new URL(c.req.url).origin;
     const callbackUrl = `${baseUrl}/auth/callback`;
 
-    // Multi-account: resolve LINE Login credentials from DB
+    // 複数アカウントで送信元を誤らないよう、DB からログイン資格情報を解決する。
     let loginChannelId = c.env.LINE_LOGIN_CHANNEL_ID;
     let loginChannelSecret = c.env.LINE_LOGIN_CHANNEL_SECRET;
     let loginLineAccountId: string | null = null;
@@ -104,7 +104,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       )?.id ?? null;
     }
 
-    // Exchange code for tokens
+
     const tokenRes = await fetch('https://api.line.me/oauth2/v2.1/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -129,7 +129,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       token_type: string;
     }>();
 
-    // Verify ID token to get sub (use resolved login channel ID, not env default)
+    // 環境の既定でなく、解決済みのログインチャネル ID で ID トークンを検証する。
     const verifyRes = await fetch('https://api.line.me/oauth2/v2.1/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -150,7 +150,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       picture?: string;
     }>();
 
-    // Get profile via access token
+
     const profileRes = await fetch('https://api.line.me/v2/profile', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
@@ -170,9 +170,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     const db = c.env.DB;
     const lineUserId = verified.sub;
 
-    // Detect a brand-new friend BEFORE upsertFriend creates the row, so the ASP
-    // affiliate friend-add notification fires once per genuinely-new add (a
-    // re-touch of an existing friend must not re-notify the affiliate).
+    // 再訪で通知しないよう、upsert より前に本当の新規友だちかを判定する。
     const preExistingFriend = await getFriendByLineUserIdForAccount(
       db,
       lineUserId,
@@ -180,7 +178,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     );
     const isNewFriend = !preExistingFriend;
 
-    // Upsert friend (may not exist yet if webhook hasn't fired)
+    // follow Webhook より先に到着した場合も、友だち行を作成・更新できるようにする。
     const friend = await upsertFriend(db, {
       lineUserId,
       lineAccountId: loginLineAccountId,
@@ -190,7 +188,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     });
 
     // OAuth型の追加導線は /api/liff/link を通らないため、ここでも今回リンクを記録する。
-    // N-244: 停止 ref の候補は save 側でも止めるが、ここで求めた判定を使い回す。
+    // 停止 ref の候補は save 側でも止めるが、ここで求めた判定を使い回す。
     const stoppedCallbackRef =
       ref && !ref.startsWith('xh:') ? await isStoppedEntryRouteRef(db, ref) : false;
     if (!stoppedCallbackRef) {
@@ -201,7 +199,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         source: 'line_login',
       });
     } else {
-      // N-244差戻(台帳): 停止試行を抑止台帳へ引き継ぎ、後の別followが
+      // 停止試行を抑止台帳へ引き継ぎ、後の別followが
       // 自然流入扱いにならないようにする。保存・計測は抑止のまま。
       // 記録の恒久失敗は握り潰さない (fail-closed)。外側catchは200を返すため
       // ここで500にして、記録なしの完了扱いにしない。
@@ -219,9 +217,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       }
     }
 
-    // IG cross-platform UUID linkage (OAuth path — new friends & returning users
-    // going through /auth/callback). Existing friends who bypass OAuth hit the
-    // same helper from /api/liff/link and /api/liff/send-form-link.
+    // OAuth を通る新規・再訪と、LIFF だけの既存友だちが、同じ IG 連携を使う。
     const igLinkOk = await linkIgIgsid(c, friend.id, igParam);
     if (igLinkOk) await saveIgAccountMeta(db, friend.id, igaParam, iganParam);
 
@@ -229,24 +225,24 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     if (!identityAccount) return c.html(errorPage(failureMessage('Authorization failed')), 400);
     const identityTenant = identityAccount.tenant_id ?? DEFAULT_TENANT_ID;
     const identityAccounts = (await getLineAccounts(db)).filter(a => (a.tenant_id ?? DEFAULT_TENANT_ID) === identityTenant).map(a => a.id);
-    // Create or find user → link
+
     let userId: string | null = null;
 
-    // Check if already linked
+
     const existingUserId = (friend as unknown as Record<string, unknown>).user_id as string | null;
     if (existingUserId) {
       userId = existingUserId;
     } else {
-      // Cross-account linking: if uid is provided, use that existing UUID
+      // 別アカウントへの結び付けは、指定された既存 UUID を使う。
 
 
-      // Try to find by email
+
       if (!userId && verified.email) {
         const existingUser = await getUserByEmailForAccess(db, verified.email, { tenantId: identityTenant, allowedAccountIds: identityAccounts, includeUnlinked: true });
         if (existingUser) userId = existingUser.id;
       }
 
-      // Create new user only if no existing UUID found
+      // 既存の UUID が見つからない場合だけ本人を新規作成する。
       if (!userId) {
         const newUser = await createUser(db, {
           email: verified.email || null,
@@ -256,27 +252,22 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         userId = newUser.id;
       }
 
-      // Link friend to user
+
       await linkFriendToUser(db, friend.id, userId);
     }
 
-    // Attribution tracking
-    // xh: refs are X Harness one-time tokens (the token IS the secret) — never persist as ref_code
-    // N-244: 停止した流入経路の ref は、停止前に入口表示→停止後に連携完了の
-    // 場合も friends.ref_code 保存・tracking・帰属をすべて止める。apply 側も
-    // 二重に止めるが、ここで保存自体を止めないと数字が増える。不存在 ref は
-    // 共有 namespace の正規フローのため従来どおり進める。
+    // xh: は一度限りの秘密なので ref_code に保存しない。入口表示後に停止された ref も、保存・計測・帰属をすべて止める。下流の抑止だけでは件数が増えるため、ここでも保存を拒む。未登録 ref は通常の共有名前空間として扱う。
     if (ref && !ref.startsWith('xh:') && !stoppedCallbackRef) {
-      // Save ref_code on the friend record (first touch wins — only set if not already set)
+      // 初回の流入元を後から変えられないよう、ref_code は未設定のときだけ保存する。
       await db
         .prepare(`UPDATE friends SET ref_code = ? WHERE id = ? AND ref_code IS NULL`)
         .bind(ref, friend.id)
         .run();
 
-      // Look up entry route config
+
       const route = await getEntryRouteByRefCode(db, ref);
 
-      // Persist tracking event with ad click IDs
+      // 広告へ帰属できるよう、クリック ID を流入記録に残す。
       await recordRefTracking(db, {
         refCode: ref,
         friendId: friend.id,
@@ -299,7 +290,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       });
     }
 
-    // Save ad click IDs + UTM to friend metadata (for future ad API postback)
+    // 広告 API の通知に使えるよう、クリック ID と UTM を友だちの metadata へ保存する。
     const adMeta: Record<string, string> = {};
     if (gclid) adMeta.gclid = gclid;
     if (fbclid) adMeta.fbclid = fbclid;
@@ -309,12 +300,12 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     if (utmMedium) adMeta.utm_medium = utmMedium;
     if (utmCampaign) adMeta.utm_campaign = utmCampaign;
 
-    // N-244差戻: 停止由来では広告ID・UTMを friends metadata へ新規保存しない。
+    // 停止由来では広告ID・UTMを friends metadata へ新規保存しない。
     if (!stoppedCallbackRef && Object.keys(adMeta).length > 0) {
       await patchFriendMetadata(db, friend.id, adMeta);
     }
 
-    // X Harness token resolution: ref starting with "xh:" links X account to LINE friend
+    // xh: のトークンから X と LINE の結び付けを解決する。
     if (ref && ref.startsWith('xh:')) {
       try {
         const xhToken = ref.slice(3);
@@ -323,7 +314,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
           await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
           logger.log("routes_liff_log");
         }
-        // Apply gate actions (tag + scenario) from X Harness
+
         if (xhResult) {
           await applyXHarnessActions(db, friend.id, xhResult);
         }
@@ -332,12 +323,10 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       }
     }
 
-    // Auto-enroll in friend_add scenarios + immediate delivery.
-    // Skip entirely when the referral link explicitly overrides account-level
-    // friend_add scenarios (entry_routes.run_account_friend_add_scenarios = 0).
+    // 経路がアカウントの友だち追加シナリオを明示的に除外した場合は、自動登録と即時配信を行わない。
     const referralRouteForOverride =
       ref && !ref.startsWith('xh:') ? await getEntryRouteByRefCode(db, ref) : null;
-    // N-244差戻: 停止ref由来では unknown-route/アカウント共通の友だち追加
+    // 停止ref由来では unknown-route/アカウント共通の友だち追加
     // シナリオを含めタグ・シナリオを一切開始しない。停止refを消した後は
     // referralRouteForOverride が null になるため、従来の条件だけでは
     // アカウント共通シナリオへ流れてしまう。ref 無しの自然流入は通す。
@@ -346,7 +335,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       (!referralRouteForOverride || referralRouteForOverride.run_account_friend_add_scenarios !== 0);
 
     try {
-      // Resolve which account this friend belongs to
+      // 送信元を誤らないよう、友だちの所属を解決する。
       const matchedAccountId = accountParam
         ? (await getLineAccountByChannelId(db, accountParam))?.id ?? null
         : null;
@@ -360,17 +349,9 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         if (!liffFriendAddIds.has(scenario.id) || !scenarioAccountMatch) {
           continue;
         }
-        // Per-scenario isolation (matching the follow webhook's loop): one
-        // failing enroll/push must not skip the remaining scenarios.
+        // 1つの登録・送信の失敗で残りを欠落させないよう、シナリオごとに例外を分ける。
         try {
-          // Never re-enroll via the OAuth path. The friend_scenarios partial
-          // UNIQUE only blocks non-completed rows (WHERE status != 'completed'),
-          // so an existing friend re-running OAuth login (e.g. via a form link)
-          // would get a completed enrollment re-created and the welcome
-          // sequence re-sent. Re-sends on genuine re-adds (unblock → follow)
-          // are the follow webhook's job. Friends with no enrollment history
-          // (OAuth beat the webhook, message-first friends, migrated bases)
-          // still enroll here — this is their only friend_add entry.
+          // OAuth の再ログインで完了済み購読を作り直さないよう、登録履歴のない友だちだけを追加する。実際の再追加は follow Webhook が扱う。follow 前・移行済みなどの友だちには、この経路が必要なので新規行だけに限定しない。
           const priorEnrollment = await db
             .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
             .bind(friend.id, scenario.id)
@@ -378,10 +359,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
           if (priorEnrollment) continue;
           const enrollment = await enrollFriendInScenario(db, friend.id, scenario.id);
           if (enrollment) {
-            // Instant welcome via the unified service ('once' mode): claims
-            // the fresh row, then advances it so the cron never re-sends
-            // step 1. lineUserId comes from the verified id_token, so the
-            // push works even before friend.line_user_id is fully wired.
+            // once の共通サービスで実行権取得と通番更新を行い、cron が初回文を再送しないようにする。宛先は検証済み id_token を使う。
             await pushImmediateFirstStep(
               db,
               friend.id,
@@ -402,28 +380,17 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       logger.error("liff.auth_callback_get_failed");
     }
 
-    // Redirect or show completion. Guard against open-redirect abuse: only
-    // http(s) destinations and root-relative paths are honored (external
-    // marketing/LP redirects are an intentional feature; javascript:/data:/
-    // protocol-relative targets are not).
+    // javascript:/data:/別ホスト形式の相対 URL による不正移動を防ぎ、許可する移動先だけへ案内する。
     const safeRedirect = safeRedirectTarget(redirect, new URL(c.req.url).origin)
       || (await verifyNavigationProof(c.env.LINE_CHANNEL_SECRET, `redirect:${identityAccount.liff_id ?? ''}`, redirect, redirectProof) ? storedRedirectTarget(redirect) : null);
     if (safeRedirect) {
       return c.redirect(safeRedirect);
     }
 
-    // Send form link as LINE message if form param was passed
+
     if (formId && friend?.line_user_id) {
       try {
-        // Build form LIFF URL using the friend's account liff_id (multi-account aware)
-        // Append gate/xh so the form can verify against the correct campaign gate
-        // (form definitions can be reused across campaigns, so the form's webhook
-        // URL is unreliable as a source of gate id).
-        // xh: refs are X Harness one-time secret tokens — never put them on
-        // liff.line.me URLs (third-party host). The same filter is applied
-        // elsewhere in this file for QR codes / external LIFF URLs.
-        // N-244: 停止 ref は案内文の URL にも載せない。下流の form 受付で
-        // 帰属が復活するのを止める。不存在 ref は従来どおり載せる。
+        // フォームの使い回しでも正しい条件を使うよう、所属 LIFF と gate/xh を引き継ぐ。秘密の xh: トークンと停止 ref を外部 URL や QR に載せず、停止した帰属を復活させない。
         const formAccountId = loginLineAccountId ?? friend.line_account_id ?? null;
         const refLink = ref && !stoppedCallbackRef ? await getTrackedLinkById(db, ref) : null;
         const trackedLink = refLink && await trackedLinkReferralMatchesAccount(db, refLink, formAccountId)
@@ -460,14 +427,9 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
             formLiffUrl = `https://liff.line.me/${envLiffIdMatch[1]}?${formQuery.toString()}`;
           }
         }
-        // Resolve intro template via tracked link (if ref points to one).
-        // Also pin the friend to this tracked_link via setFriendFirstTrackedLinkIfNull,
-        // so the form-submit handler can authoritatively look up the reward
-        // template without trusting client-provided ref. The "if null" guard
-        // means existing friends cannot tamper with their attribution by
-        // re-running this flow with a different ref.
+        // クライアントの ref だけで報酬を変えられないよう、計測リンクの初回値を未設定時だけ固定し、回答処理はそれを正本にする。
         let introTemplate = null;
-        // N-244: 停止 entry route の ref は tracked fallback へ落とさない。
+        // 停止 entry route の ref は tracked fallback へ落とさない。
         if (trackedLink) {
           try {
             const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
@@ -501,21 +463,20 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       }
     }
 
-    // Redirect to the correct bot's chat after auth
-    // Find the LINE account by: account param, friend's account, or login channel ID
+    // 正しい Bot のトークへ戻すため、指定アカウント・友だちの所属・認証に使ったログインチャネルの順で解決する。
     let redirectAccount: Record<string, string> | null = null;
     if (accountParam) {
       redirectAccount = await getLineAccountByChannelId(db, accountParam) as Record<string, string> | null;
     }
     if (!redirectAccount) {
-      // Find account by login_channel_id used in this OAuth flow
+      // 今回の OAuth のログインチャネルからアカウントを探す。
       redirectAccount = await db
         .prepare('SELECT * FROM line_accounts WHERE login_channel_id = ?')
         .bind(loginChannelId)
         .first<Record<string, string>>();
     }
     if (!redirectAccount) {
-      // Fallback: first active account
+      // 見つからなければ稼働中の先頭アカウントを使う。
       redirectAccount = await db
         .prepare('SELECT * FROM line_accounts WHERE is_active = 1 LIMIT 1')
         .first<Record<string, string>>();
@@ -569,7 +530,7 @@ export const get__api_liff_config_3 = async (c: Context<Env, "/api/liff/config">
     const stopped = await stoppedLineAccountResponse(c, account?.id);
     if (stopped) return stopped;
 
-    // Fallback to default env account if liff_id not found in DB
+    // DB に LIFF ID がなければ、環境の既定アカウントを使う。
     const accessToken = account
       ? await resolveLineCredential(
           account.channel_access_token_encrypted,
@@ -580,7 +541,7 @@ export const get__api_liff_config_3 = async (c: Context<Env, "/api/liff/config">
     const accountName = account?.name || 'Default';
     const accountId = account?.id || 'default';
 
-    // Fetch bot basic ID from LINE API
+
     let botBasicId = '';
     try {
       const botRes = await fetch('https://api.line.me/v2/bot/info', {

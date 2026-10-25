@@ -139,9 +139,7 @@ describe('mileage reward delivery', () => {
   });
 
   /*
-   * 貸出が取れないときは**送っていない**。送ったとは言わず、交換も押す前の
-   * 状態へ戻す。戻さないと `delivering` のまま「届かなかった交換」の一覧から
-   * 消え、次に押しても409で閉じ込められる(#641 司令塔独立審査)。
+   * 貸出を取れなければ外部へ送っていない。送信済みとは返さず交換を元の状態へ戻し、失敗一覧と再試行から取り残さない。
    */
   it('waits without sending and puts the redemption back when the step lease is held', async () => {
     const statements: Array<{ sql: string; binds: unknown[] }> = [];
@@ -298,9 +296,7 @@ describe('mileage reward delivery', () => {
   });
 
   /*
-   * R361: 2手順目で失敗しても、渡し終えた1手順目がある交換は
-   * 全額返却しない。成功済み手順を繰り返さず、未完了だけやり直せる。
-   * （直す前は refund が呼ばれ全額戻っていた＝赤）
+   * 成功済みの手順を繰り返さないよう、部分配送済みの交換は全額返却せず、未完了だけを再試行する。
    */
   it('does not refund the full cost when an earlier step already succeeded', async () => {
     dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
@@ -329,9 +325,7 @@ describe('mileage reward delivery', () => {
   });
 
   /*
-   * R362: 返却より先に再試行が成功していたら、遅い返却で
-   * 成功済みの交換を書き換えない。成功として返す。
-   * （直す前は already_delivered が投げっぱなし＝赤）
+   * 再試行が先に成功していれば、遅れた返却処理で成功済みの交換を書き換えず、成功として返す。
    */
   it('returns success when a late refund finds the redemption already delivered', async () => {
     dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({ failurePolicy: 'refund' }));
@@ -346,9 +340,7 @@ describe('mileage reward delivery', () => {
   });
 
   /*
-   * R344: 最初の送信から24時間を過ぎた手順は、同じキーで送り直さない。
-   * 自動返却もしない。人が確かめる照合待ちに残す。
-   * （直す前は claim に期限がなく送り直していた＝赤）
+   * 最初の送信から24時間を過ぎた手順は同じキーで再送せず、自動返却もしない。重複を避けるため照合待ちに残す。
    */
   it('holds without resending or refunding when the retry key is expired', async () => {
     dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
@@ -372,9 +364,7 @@ describe('mileage reward delivery', () => {
   });
 
   /*
-   * R364: 照合待ちの手順は、送り直しても安全な種類だけ期限内に
-   * 回復を試みる。回復できれば二重に送らず成功へ進む。
-   * （直す前は回復を試みず確認中のまま＝赤）
+   * 照合待ちは、再送しても安全な種類だけを期限内に回復する。回復できれば二重送信せず成功へ進む。
    */
   it('recovers a reconcilable step without resending the benefit twice', async () => {
     dbMocks.getMileageRewardDeliveryPlan.mockResolvedValueOnce(plan({
@@ -395,7 +385,7 @@ describe('mileage reward delivery', () => {
   });
 
   /*
-   * R364: Webhookの照合待ちは、受け先で二重に処理されるため
+   * Webhookの照合待ちは、受け先で二重に処理されるため
    * 自動では回復しない。送らず照合待ちのまま残す。
    */
   it('does not auto-recover a webhook step left unconfirmed', async () => {

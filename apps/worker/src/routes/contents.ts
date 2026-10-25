@@ -69,7 +69,7 @@ contents.get('/api/media/:id/download', requireRole('owner', 'admin', 'staff'), 
 contents.get('/api/media/:id/content', requireRole('owner', 'admin', 'staff'), get__api_media_id_content_10);
 
 /**
- * 版ごとのダウンロード（IDEA-15）。
+ * 版ごとのダウンロード。
  *
  * 版を追加すると media.r2_key は新しい版へ進むが、旧版の実体は
  * media_versions に残る。第1版＝登録時の元ファイルを含め、指定した版を
@@ -118,7 +118,7 @@ contents.post('/api/common-vars', requireDeliveryAccess('commonVars'), inputJson
 
 contents.patch('/api/common-vars/:id', requireDeliveryAccess('commonVars'), inputJsonBoundary(), patch__api_common_vars_id_2);
 
-// Q: 状態の切替。下書き→使用中（公開）、使用中→止めた、止めた→使用中（再開）。
+// 状態の切替。下書き→使用中（公開）、使用中→止めた、止めた→使用中（再開）。
 // 値の変更ではないので影響確認は求めないが、状態を変える操作なので理由は必須。
 contents.post('/api/common-vars/:id/status', requireDeliveryAccess('commonVars'), inputJsonBoundary(), post__api_common_vars_id_status_3);
 

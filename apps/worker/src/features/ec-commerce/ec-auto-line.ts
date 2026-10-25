@@ -12,7 +12,7 @@ export async function ingestBehavior(db:D1Database,a:string,b:Record<string,unkn
  if(!b||typeof b!=='object'||Array.isArray(b))throw new GapError('invalid_event');
  const customer=typeof b.customerId==='string'?b.customerId:null;
  const f=customer?await db.prepare('SELECT friend_id FROM ec_identity_links WHERE line_account_id=? AND external_customer_id=? AND unlinked_at IS NULL').bind(a,customer).first<{friend_id:string}>():null;
- // Tracking consent is supplied by the authenticated first-party EC connector; never accept a public visitor's friend ID.
+ // 公開訪問者の友だち ID を信用しないよう、計測同意は認証済みの自社 EC 接続から受け取る。
  if(['product_view','cart_add','cart_remove'].includes(String(b.type))&&b.trackingConsent!==true)return {accepted:false,reason:'tracking_consent_required'};
  const id=crypto.randomUUID(),insert=await db.prepare(`INSERT INTO ec_behavior_events(id,account_id,friend_id,ec_customer_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT count(*) FROM ec_behavior_events WHERE account_id=? AND julianday(received_at)>=julianday(?,'-1 minute'))<600 ON CONFLICT(account_id,dedupe_key) DO NOTHING`).bind(id,a,f?.friend_id??null,customer,b.type,b.productId,JSON.stringify({stock:Number.isSafeInteger(b.stock)?b.stock:null}),b.occurredAt,now.toISOString(),b.eventId,a,now.toISOString()).run();
  const saved=await db.prepare('SELECT id,type,product_id,ec_customer_id,occurred_at FROM ec_behavior_events WHERE account_id=? AND dedupe_key=?').bind(a,b.eventId).first<{id:string;type:string;product_id:string;ec_customer_id:string|null;occurred_at:string}>();if(!saved)throw new GapError('rate_limited',429);if(saved.type!==b.type||saved.product_id!==b.productId||saved.ec_customer_id!==customer||saved.occurred_at!==b.occurredAt)throw new GapError('idempotency_conflict',409);
@@ -42,7 +42,7 @@ export async function processAutoLineMock(db:D1Database,now=new Date(),account?:
  }
  if(s.rule_kind==='browse'&&await db.prepare("SELECT id FROM ec_behavior_events WHERE account_id=? AND friend_id=? AND product_id=? AND type='cart_add' AND julianday(occurred_at)>=julianday(?)").bind(a,f,s.product_id,s.occurred_at).first())status='skipped_cart';
  if(s.rule_kind==='restock'){const stock=await db.prepare("SELECT json_extract(product_snapshot_json,'$.stock') stock FROM ec_behavior_events WHERE account_id=? AND product_id=? AND type='restock' ORDER BY occurred_at DESC LIMIT 1").bind(a,s.product_id).first<{stock:number}>();if(!stock||!Number.isFinite(stock.stock)||stock.stock<=0)status='skipped_stock';}
- // No provider order-lookup adapter yet: always allow a 10-minute event delay before making the final purchase check.
+ // 注文照会アダプターがないため、イベントの到着遅延を10分待ってから購入を最終確認する。
  if(status==='simulated'&&Date.parse(String(s.original_due_at))+10*60000>now.getTime())continue;
  if(status==='simulated'&&(hour<'08:00'||hour>='21:00')){
  const nextDay=hour<'08:00'?day:new Date(Date.parse(day)+86400000).toISOString().slice(0,10),next=restaurantCivilTime(nextDay,480,tz);
@@ -50,7 +50,7 @@ export async function processAutoLineMock(db:D1Database,now=new Date(),account?:
  }
  if(status==='simulated'&&((s.rule_kind==='cart'&&now.getTime()-Date.parse(String(s.original_due_at))>12*3600000)||now.getTime()-Date.parse(String(s.scheduled_at))>3*3600000))status='skipped_late';
  const midnight=restaurantCivilTime(day,0,tz);
- // Single conditional UPDATE both claims the message and checks all three caps. Concurrent runs cannot exceed the caps.
+ // 並行実行でも上限を超えないよう、送信権と3つの上限を1つの条件付き UPDATE で確認する。
  const result=await db.prepare(`UPDATE ec_auto_line_sends SET status=?,sent_at=CASE WHEN ?='simulated' THEN ? ELSE NULL END,claim_token=? WHERE id=? AND status='scheduled'
  AND (?!='simulated' OR (
  EXISTS(SELECT 1 FROM friends WHERE id=? AND line_account_id=? AND is_following=1)

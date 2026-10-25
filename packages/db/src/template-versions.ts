@@ -5,7 +5,7 @@ export type { TemplateVersionRow } from './template-version-types.js';
 import { jstNow } from './utils.js';
 import { getTemplateById, publishTemplate, saveTemplateDraft } from './templates.js';
 
-// テンプレートの版履歴と参照表 (#820)。
+// テンプレートの版履歴と参照表。
 //
 // 版 (template_versions) は公開のたびに1行足す。前の版は変えない。
 // 「この版に戻す」は過去の行を書き換えず、その中身で新しい版を作る。
@@ -164,7 +164,7 @@ async function pinnedVersionNumber(
  * 利用先の参照を書き換える（全消し→全入れ）。保存のたびに呼ぶ。
  * 存在しないテンプレートは書かない。本文の写しは残るので送りは壊れない。
  *
- * m26c R569/R570: 参照の書込文だけを組み立てて返す。呼び出し側が
+ * 参照の書込文だけを組み立てて返す。呼び出し側が
  * ルール行・版と1回の batch に束ね、途中失敗で食い違わないようにする。
  */
 export async function planSyncTemplateReferenceStatements(
@@ -331,7 +331,7 @@ export interface PinnedReminderTemplateReference {
 }
 
 /**
- * R347: 旧公開版に固定された登録から、テンプレートを使うものを返す。
+ * 旧公開版に固定された登録から、テンプレートを使うものを返す。
  * 現行の reminder_steps だけ見ると、版を切り替えた途端に使用先が0件に
  * 見える。登録は reminder_version_id で版に固定され、その版の手順が持つ
  * template_id で送るため、こちらの参照が消えたことにならない。
@@ -339,7 +339,7 @@ export interface PinnedReminderTemplateReference {
  * （一覧の数と使用先の件数をずらさない）。
  *
  * templateAccountId を渡すと、getTemplateUsage と同じく「同じアカウント
- * or 未設定」の使用先だけに絞る（#891）。
+ * or 未設定」の使用先だけに絞る。
  */
 export async function listPinnedReminderTemplateReferences(
   db: D1Database,
@@ -379,7 +379,7 @@ export async function listPinnedReminderTemplateReferences(
 }
 
 /**
- * R347: 削除を止める登録。送信待ち（active）と取消ずみ（cancelled）だけ。
+ * 削除を止める登録。送信待ち（active）と取消ずみ（cancelled）だけ。
  * 取消ずみは再開すると固定した版で送り直すため、止める側に入れる。
  * 送り終わった（completed）登録はもう送らないので止めない。
  */

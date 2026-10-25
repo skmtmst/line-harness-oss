@@ -1,5 +1,5 @@
 /*
- * シナリオ変更の共通境界(N-051)。
+ * シナリオ変更の共通境界。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物の scenarios ルートを当てる。
  * 改名・通常編集(PUT)・きっかけ(triggers)・公開(publish)を同じ権限契約へ揃える。

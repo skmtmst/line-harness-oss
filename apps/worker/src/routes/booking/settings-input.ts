@@ -125,7 +125,7 @@ export function readBookingAdminSettings(input: Record<string, unknown>):
   const businessHours = Object.hasOwn(input, 'businessHours')
     ? readBookingBusinessHours(input.businessHours)
     : null;
-  // N-395: リマインダの送信時刻。null / 未指定は従来の既定
+  // リマインダの送信時刻。null / 未指定は従来の既定
   // (前日=24時間前、当日=2時間前)。明示するなら正しい形だけを受ける。
   const reminderDayBeforeTime = input.reminderDayBeforeTime === undefined || input.reminderDayBeforeTime === null
     ? null

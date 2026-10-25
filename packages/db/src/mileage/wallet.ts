@@ -22,7 +22,7 @@ export const FRIEND_WALLET_SCOPE_SQL = `(
  * ledger rows; an unlinked friend still has a safe friend-scoped wallet.
  */
 /**
- * m22u R360：交換の内訳選びと同じ「使える」基準。
+ * 交換の内訳選びと同じ「使える」基準。
  * 期限切れロットの残数は、台帳に残っていても使えない。残高からも外す。
  * 比較は交換予約と同じ now で行い、基準のずれを作らない。
  */
@@ -162,7 +162,7 @@ export async function getMileageHistoryForFriend(
       occurredAt: row.occurred_at,
       lineAccountId,
       restricted,
-      // R380: 通知の失敗は履歴の行から再送できるように、状態だけを返す。
+      // 通知の失敗は履歴の行から再送できるように、状態だけを返す。
       // 権限外アカウントの行では通知の有無も伏せる。
       notificationStatus: restricted ? null : row.notification_status,
       notificationErrorCode: restricted ? null : row.notification_error_code,

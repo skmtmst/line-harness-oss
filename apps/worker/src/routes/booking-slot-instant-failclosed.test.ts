@@ -101,8 +101,7 @@ function slotWithStartUtc(startUtc: unknown) {
 }
 
 /**
- * 司令塔が挙げた「欠落・不正値」の並び。
- * 3 つめは Idempotency-Key に使う札。ヘッダーは ASCII しか通らない。
+ * 欠落・不正値を並べ、入口で拒めることを確かめる。3つめは Idempotency-Key 用なので、HTTP ヘッダで使える ASCII を使う。
  */
 const BROKEN_START_UTC: Array<[string, unknown, string]> = [
   ['欠落（キーが無い）', undefined, 'missing'],

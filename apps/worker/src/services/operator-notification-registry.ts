@@ -1,4 +1,4 @@
-// N-327 (#663): 運用者通知ルールが自動発火できる業務イベントの登録簿。
+//  運用者通知ルールが自動発火できる業務イベントの登録簿。
 //
 // 公開済みルールは、ここに載っているきっかけ(event type)にだけ反応する。
 // 載っていないきっかけは発火しない(400 unknown_event_type)。
@@ -15,7 +15,9 @@ export interface OperatorEventTypeEntry {
   eventType: string;
   /** 運用者に見せる名前 */
   label: string;
-  /** 業務イベントを出す側。connected=false の間は触らない(司令塔の承認待ち) */
+  /**
+ * 未接続のイベントを送信元と誤認しないよう、connected=false は接続済みとして扱わない。
+ */
   producer: OperatorEventProducer;
   /** 実producerから自動発火するよう接続済みか */
   connected: boolean;
@@ -79,7 +81,7 @@ export const OPERATOR_NOTIFICATION_EVENT_TYPES: OperatorEventTypeEntry[] = [
     connected: true,
   },
   {
-    // Q: 期限の14日前と3日前に知らせる。
+    // 期限の14日前と3日前に知らせる。
     eventType: 'common_var_expiry',
     label: '共通情報の期限が近い',
     producer: {

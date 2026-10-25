@@ -96,8 +96,7 @@ it('S15 a token-only offer cannot access a suspended tenant', async () => {
   db.raw.prepare(`INSERT INTO event_waitlist(id,line_account_id,event_id,slot_id,friend_id,identity_key,status,offer_token_hash,created_at,updated_at)
     VALUES ('w','a','e','s','f','fixture','offered',?,'2026-10-16','2026-10-16')`).run(await sha256Hex(token));
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ sub: 'Ufixture' })));
-  // A complete offer must exist, otherwise a broken tenant gate could still
-  // return 404 simply because a required join row was missing from the fixture.
+  // 欠けた JOIN 行の404で統括境界の不備を隠さないよう、成立する案件をすべて用意する。
   const { getEventWaitlistOffer } = await import('../services/event-waitlist.js');
   expect(await getEventWaitlistOffer(db.db, { token, callerLineUserId: 'Ufixture' })).not.toBeNull();
   const app = new Hono<Env>(); app.route('/', events);

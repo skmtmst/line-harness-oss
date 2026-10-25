@@ -60,7 +60,7 @@ function accountVisible(
 }
 
 /**
- * 紹介者の成績・動線の参照に付ける権限検査（#554 点検#505中9）。
+ * 紹介者の成績・動線の参照に付ける権限検査（ 点検中9）。
  *
  * 成果地点側の `conversionPermission('view')` と同じ考えで、見るだけの人にも
  * 鍵（`affiliate.report.view`、精算口と共通）で開ける。owner・admin は素通し。
@@ -76,7 +76,7 @@ function affiliateReportPermission(): MiddlewareHandler<Env> {
 }
 
 /**
- * 報酬率の範囲検査（#554 点検#505中2）。
+ * 報酬率の範囲検査（ 点検中2）。
  *
  * 100超をそのまま保存すると報酬計算（revenue*rate/100）が膨らむ。
  * 省略時はDB既定（0）を使うので undefined は通す。
@@ -346,17 +346,7 @@ affiliates.get('/api/affiliates/:id', async (c) => {
   }
 });
 
-// POST /api/affiliates - create (admin-side)
-//
-// Three call shapes, all backward compatible:
-//   1. Random-code create:  { name?, commissionRate?, friendId?, issueInitialLink? }
-//        - `code` is auto-generated (unguessable base62 slug). No manual entry.
-//        - `friendId` binds the affiliate 1:1 to a LINE friend (migration 046
-//          partial UNIQUE index enforces one affiliate per friend).
-//        - When friendId is given, `name` defaults to the friend's display_name
-//          and an initial link is issued by default (issueInitialLink=true).
-//   2. Legacy explicit create: { name, code, commissionRate? }
-//        - OSS back-compat. `code` must be >= 4 chars, alphanumeric only.
+// 友だち指定の作成は推測しにくいコードを生成し、DB の部分 UNIQUE で1対1を守る。名前は友だちの表示名、初期リンク発行は既定 true とする。OSS の互換用の明示コードは4文字以上の英数字を受け付ける。
 const CODE_RE = /^[A-Za-z0-9]{4,}$/;
 
 affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBoundary({"folderId":["string","null"],"name":["string"],"code":["string"],"rewardMode":["string"],"friendId":["string"],"issueInitialLink":["boolean"],"lineAccountId":["string"],"operationId":["string"],"isActive":["boolean"]}), async (c) => {
@@ -372,7 +362,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
       issueInitialLink?: boolean;
       lineAccountId?: string;
       operationId?: string;
-      // R525: 「すぐに計測を始める」オフで登録したら最初の行から停止で作る。
+      // 「すぐに計測を始める」オフで登録したら最初の行から停止で作る。
       isActive?: boolean;
     }>();
 
@@ -382,7 +372,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
     const requestedLineAccountId = typeof body.lineAccountId === 'string'
       ? body.lineAccountId.trim()
       : '';
-    // 安定した操作UUID（#686）。commit後に応答だけ失われて再送されても、
+    // 安定した操作UUID。commit後に応答だけ失われて再送されても、
     // packages/db 側が同じIDで既存行を回収するため二重登録にならない。
     const operationId = typeof body.operationId === 'string' ? body.operationId.trim() : '';
     if (operationId && (operationId.length < 8 || operationId.length > 200)) {
@@ -390,13 +380,12 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
     }
     const { visible, scope } = await getAffiliateScope(c);
 
-    // Require at least one of name / code / friendId to identify the affiliate.
+    // 参加者を識別できるよう、name/code/friendId のいずれかを必須にする。
     if (!name && !code && !friendId) {
       return inputError(c, { success: false, error: 'name, code, or friendId is required' }, 400, ["name","code","friendId"]);
     }
 
-    // Resolve the friend (if binding) up front: 404 on unknown friend, and use
-    // its display_name when the caller did not supply a name.
+    // 先に友だちを解決し、不存在なら404、名前の指定がなければ表示名を使う。
     let resolvedName = name;
     let lineAccountId = requestedLineAccountId;
     if (friendId) {
@@ -429,8 +418,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
       return inputError(c, { success: false, error: rateError }, 400, ["commissionRate"]);
     }
 
-    // ── Legacy explicit-code path (OSS back-compat) ─────────────────────────
-    // Only taken when a code was supplied AND no friend binding is requested.
+    // OSS 互換の明示コードは、友だちとの結び付けを要求しない場合だけに適用する。
     if (code && !friendId) {
       if (!CODE_RE.test(code)) {
         return inputError(c, {
@@ -451,7 +439,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
           commissionRate: body.commissionRate,
         rewardMode: body.rewardMode,
           operationId: operationId || undefined,
-          // R525: 追加情報の保存が失敗しても稼働で残さない。
+          // 追加情報の保存が失敗しても稼働で残さない。
           isActive: body.isActive,
         });
         return c.json({ success: true, data: serializeAffiliate(item) }, 201);
@@ -483,12 +471,11 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
         rewardMode: body.rewardMode,
         friendId: friendId || null,
         operationId: operationId || undefined,
-        // R525: 追加情報の保存が失敗しても稼働で残さない。
+        // 追加情報の保存が失敗しても稼働で残さない。
         isActive: body.isActive,
       });
     } catch (err) {
-      // The friend_id partial UNIQUE index throws when the friend already has an
-      // affiliate. Confirm and return 409 with a friendly message.
+      // 友だちの部分 UNIQUE による既存登録との競合を確認し、運用者向けの理由で409を返す。
       const msg = err instanceof Error ? err.message : String(err);
       if (friendId && /UNIQUE constraint failed/i.test(msg)) {
         const existing = await getAffiliateByFriendId(c.env.DB, friendId, lineAccountId);
@@ -502,14 +489,14 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
       throw err;
     }
 
-    // Issue an initial link. Defaults to true when a friend is bound.
+    // 友だちに結び付ける場合は、初期リンクの発行を既定とする。
     const shouldIssueLink =
       body.issueInitialLink !== undefined
         ? body.issueInitialLink
         : Boolean(friendId);
 
     // 応答だけ失われた再送は、上の operationId で同じ `item` を回収する。
-    // リンク発行も同じ操作UUIDを渡し、DB側の部分UNIQUEで1本に収める（#686）。
+    // リンク発行も同じ操作UUIDを渡し、DB側の部分UNIQUEで1本に収める。
     // ここを「一覧を読んで無ければ作る」で書くと、同時2実行で両方が
     // 「まだ無い」と読んでそれぞれ発行し、リンクが2本できる。
     let link: { refCode: string; url: string } | undefined;
@@ -621,9 +608,7 @@ affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), async (c
   );
 });
 
-// GET /api/affiliates/:id/report - affiliate performance report (v2)
-// Extends the legacy report with ref_tracking-based clicks, add-time friendAdds,
-// conversionsByPoint, estimatedCommission and identity-key duplicateFlags.
+
 affiliates.get('/api/affiliates/:id/report', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
@@ -647,8 +632,7 @@ affiliates.get('/api/affiliates/:id/report', affiliateReportPermission(), async 
   }
 });
 
-// GET /api/affiliates/:id/journeys - attributed-friend journey summaries
-// Cursor-paginated on (addedAt, friendId), same scheme as GET /api/chats.
+// 追加日時と友だち ID の組をカーソルにし、同日時の行も取り落とさない。
 affiliates.get('/api/affiliates/:id/journeys', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
@@ -669,7 +653,7 @@ affiliates.get('/api/affiliates/:id/journeys', affiliateReportPermission(), asyn
   }
 });
 
-// GET /api/affiliates/:id/links - list all ref_code links for an affiliate
+
 affiliates.get('/api/affiliates/:id/links', affiliateReportPermission(), async (c) => {
   try {
     const { scope } = await getAffiliateScope(c);
@@ -698,7 +682,7 @@ affiliates.get('/api/affiliates/:id/links', affiliateReportPermission(), async (
   }
 });
 
-// GET /api/friends/:id/journey - time-ordered event journey for one friend
+
 affiliates.get('/api/friends/:id/journey', async (c) => {
   try {
     const { visible } = await getAffiliateScope(c);

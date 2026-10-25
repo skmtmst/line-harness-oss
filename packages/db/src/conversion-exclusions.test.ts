@@ -11,7 +11,7 @@ import { recordConversionSourceEvent } from './conversion-event-sources.js';
 import { trackConversion } from './conversions/index.js';
 
 /*
- * R40「数えない条件」・R42「注文金額と金額なし」の回帰試験。
+ * 「数えない条件」・「注文金額と金額なし」の試験。
  *
  * 実SQLite(bootstrap.sql)で、記録と試算の両方を見る。件数だけを見ると
  * 絞り込みを外しても緑のままになる箇所があるため、値・理由文・除外数

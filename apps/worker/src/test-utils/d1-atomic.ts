@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 
-// apps/worker/src/services/unanswered-inbox.ts records the production incident:
+// D1 の100バインド上限も試験で守り、SQLite だけで通る条件を作らない。
 // D1 rejects statements over 100 binds, while better-sqlite3 would let tests pass.
 export const D1_TEST_BIND_LIMIT = 100;
 

@@ -5,7 +5,7 @@ import { collectInputs, layoutToFields, normalizeLayout, validateFormDefinition,
 import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { type HqTemplateStatement } from '@line-crm/db';
 import { bindScenarioGraphRevision, loadScenarioReferenceGraph, scenarioGraphSnapshotToken, ScenarioGraphError } from './scenario-graph.js';
-/** Unbound callers remain closed until the common executor provides dependencies. */
+/** 共通実行側が依存を接続するまで、未接続の呼出は安全側で拒む。 */
 export const formHqTemplateAdapter = unsupportedHqTemplateAdapter('form');
 export class FormTemplateError extends Error {
     constructor(public readonly code: 'INVALID_DEFINITION' | 'FORBIDDEN' | 'REFERENCE_UNAVAILABLE' | 'UNSUPPORTED_REFERENCE' | 'VERSION_CONFLICT' | 'SELECTION_REQUIRED' | 'SHARED_FORM' | 'INVALID_PHASE' | 'LIFF_UNAVAILABLE') { super(code); }
@@ -28,9 +28,9 @@ export type FormReference = HqTemplateReference & {
 export type FormReferenceResolution = {
     targetId: string;
     aliasName?: string;
-    /** The target is created or updated by an earlier statement in this same atomic plan. */
+    /** 対象は同じ原子的計画の先行文で作成・更新される。 */
     planned?: boolean;
-    /** A trusted reference adapter's plan; it must not write before this batch. */
+    /** 信頼済み参照アダプターも、この batch より前には書き込まない。 */
     dbCommit?: readonly HqTemplateStatement[];
 };
 export type FormTemplateDependencies = {
@@ -50,7 +50,7 @@ function text(value: unknown, max = 200): string {
 }
 function optionalText(value: unknown, max = 2000): string | null { return value == null || value === '' ? null : text(value, max); }
 const referenceKey = (kind: string, id: string) => `${kind}:${id}`;
-/** Match the form editor's absolute HTTP(S) contract; account links need an explicit resolver. */
+/** 編集画面と同じ絶対 HTTP(S) を求め、アカウント依存のリンクは明示的に解決する。 */
 function validatePortableUrl(value: unknown): void {
     if (value == null || value === '') return;
     if (typeof value !== 'string' || value.length > 2048 || /[\u0000-\u001f\u007f\\]/.test(value))
@@ -65,7 +65,7 @@ function validatePortableUrl(value: unknown): void {
             if (next === current) return current;
             current = next;
         }
-        // Do not silently accept indefinitely encoded account references.
+        // 多重符号化したアカウント参照も、黙って通さない。
         if (/%[0-9a-f]{2}/i.test(current)) throw new FormTemplateError('UNSUPPORTED_REFERENCE');
         return current;
     };
@@ -91,7 +91,7 @@ function validatePortableUrl(value: unknown): void {
         || [path, query, hash].some(part => referencePath.test(part) || referenceFragment.test(part) || liff.test(part)))
         throw new FormTemplateError('UNSUPPORTED_REFERENCE');
 }
-/** The visitor remaps supported references and rejects unknown cross-account dependencies. */
+/** 実行契約が分かる参照だけを変換し、未知のアカウント間依存は拒む。 */
 function visitLayout(value: unknown, resolve: (kind: 'tag' | 'scenario', id: string) => string): unknown {
     if (Array.isArray(value))
         return value.map(v => visitLayout(v, resolve));
@@ -129,7 +129,7 @@ export function parseFormTemplateDefinition(input: HqTemplateAdapterInput): Form
     if (root.schemaVersion !== 1)
         throw new FormTemplateError('INVALID_DEFINITION');
     const form = object(root.form);
-    // Webhook credentials, source URLs, publication flags and answer data are not portable configuration.
+    // Webhook 資格情報・元 URL・公開フラグ・回答は、配布可能な設定へ含めない。
     const allowed = new Set(['name', 'description', 'fields', 'layout', 'on_submit_tag_id', 'on_submit_scenario_id', 'save_to_metadata']);
     if (Object.keys(form).some(k => !allowed.has(k)))
         throw new FormTemplateError('INVALID_DEFINITION');
@@ -185,8 +185,7 @@ function references(def: FormTemplateDefinition): FormReference[] {
     visitLayout(def.form.layout, add);
     return [...refs.values()].sort((a, b) => referenceKey(a.kind, a.sourceId).localeCompare(referenceKey(b.kind, b.sourceId)));
 }
-// Answer counts, submissions and deletion-impact revision intentionally do not enter
-// content comparison: a new answer must not masquerade as an editor conflict.
+// 回答が増えただけで編集競合にしないよう、回答数・回答・削除影響の版を内容比較へ混ぜない。
 const SNAPSHOT_SQL = `SELECT json_object(
  'account',json((SELECT json_object('id',id,'tenant',tenant_id,'active',is_active,'archived',archived_at,'liff',liff_id) FROM line_accounts WHERE id=?)),
  'forms',json((SELECT json_group_array(json_object('id',id,'name',name,'description',description,'fields',fields,'layout',layout,'tag',on_submit_tag_id,'scenario',on_submit_scenario_id,'active',is_active,'status',status,'content_revision',content_revision,'owners',json((SELECT json_group_array(line_account_id) FROM (SELECT line_account_id FROM form_accounts WHERE form_id=f.id ORDER BY line_account_id))))) FROM (SELECT f.* FROM forms f WHERE EXISTS(SELECT 1 FROM form_accounts WHERE form_id=f.id AND line_account_id=?) ORDER BY f.id) f)),
@@ -252,7 +251,7 @@ export async function inspectFormTemplate(db: D1Database, authority: HqTemplateA
     const allowedModes = !found ? ['create'] as const : found.status === 'archived' || found.owners.length !== 1 ? ['alias'] as const : ['overwrite', 'alias'] as const;
     return { snapshot, snapshotToken: await formTemplateSnapshotToken(snapshot), sourceId: 'form', itemKind: 'form', name: def.form.name, targetId: found?.id ?? null, expectedRevision: found ? String(found.content_revision) : null, duplicate: Boolean(found), allowedModes, references: references(def) };
 }
-/** Preflight rows make every form reference an explicit, immutable operator decision. */
+/** フォーム参照ごとの選択は、事前確認行へ明示的かつ不変の判断として保存する。 */
 export async function inspectFormTemplateReferences(db: D1Database, authority: HqTemplateAuthority, accountId: string, input: HqTemplateAdapterInput, inspectedSnapshot?: string) {
     const def = parseFormTemplateDefinition(input), snapshot = inspectedSnapshot ?? await formTemplateSnapshot(db, accountId), state = JSON.parse(snapshot) as FormSnapshot;
     authorize(authority, { tenantId: authority.tenantId, targetAccountId: accountId }, state);
@@ -313,7 +312,7 @@ export async function inspectFormTemplateReferences(db: D1Database, authority: H
     }
     return referenceItems;
 }
-/** The URL is derived from the destination LIFF and stable form ID, never copied. */
+/** 元 URL を複製せず、配布先の LIFF と固定フォーム ID から組み立てる。 */
 export async function formTemplatePublicUrl(db: D1Database, authority: HqTemplateAuthority, accountId: string, formId: string): Promise<string | null> {
     if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED')
         throw new FormTemplateError('FORBIDDEN');
@@ -322,7 +321,7 @@ export async function formTemplatePublicUrl(db: D1Database, authority: HqTemplat
     }>();
     return row?.liff_id ? `https://liff.line.me/${encodeURIComponent(row.liff_id)}/forms/${encodeURIComponent(formId)}` : null;
 }
-/** Produces an atomic plan only. The shared executor owns result claims and audits. */
+/** ここは原子的な計画だけを作り、結果の実行権と監査は共通実行側が管理する。 */
 export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqTemplateAdapter {
     let def: FormTemplateDefinition | null = null, inputBinding: string | null = null, contextBinding: string | null = null, snapshot: string | null = null;
     let resolved = new Map<string, FormReferenceResolution>(), planned: HqTemplateStoreAtomicCommitPlan | null = null;

@@ -110,7 +110,7 @@ conversations.get('/api/conversations', async (c) => {
       .bind(...bindings)
       .all();
 
-    // total count
+
     const countSql = `
       WITH last_incoming AS (
         SELECT friend_id, MAX(created_at) AS at FROM messages_log
@@ -142,7 +142,7 @@ conversations.get('/api/conversations', async (c) => {
       .bind(...countBindings)
       .first<{ total: number }>();
 
-    // tags lookup (friend_id -> tag names)
+
     const friendIds = results.map((r) => (r as { friend_id: string }).friend_id);
     const tagMap: Record<string, string[]> = {};
     if (friendIds.length > 0) {
@@ -189,7 +189,7 @@ conversations.get('/api/conversations', async (c) => {
   }
 });
 
-// GET /api/conversations/:friendId?limit=&before=
+
 conversations.get('/api/conversations/:friendId', async (c) => {
   try {
     const friendId = c.req.param('friendId');
@@ -229,10 +229,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       .all<{ name: string }>();
     const tags = tagRows.results.map((r) => r.name);
 
-    // Normalize the `before` cursor via julianday so sub-second precision
-    // is preserved and cursors in any ISO 8601 timezone form (Z, +09:00) sort
-    // correctly against stored `+09:00` timestamps. strftime('%s', ...) would
-    // truncate to whole seconds and drop messages that share a second.
+    // 同秒のメッセージを落とさないよう、before は julianday で正規化して小数秒を保つ。Z と +09:00 も保存済み日時と正しく比較し、秒へ切り詰めない。
     const msgSql = before
       ? `SELECT id, direction, message_type, content, delivery_type, source, broadcast_id, scenario_step_id, created_at
          FROM messages_log WHERE friend_id = ? AND julianday(created_at) < julianday(?)
@@ -261,11 +258,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       messageType: m.message_type,
       content: m.content,
       deliveryType: m.delivery_type,
-      // Infer source from associated foreign keys / delivery_type when missing.
-      // Historically some writers (incl. orphan deploys before migration 028)
-      // left source NULL on scenario/broadcast/auto_reply outgoings. Mirrors
-      // the backfill rules in migrations/028_messages_log_source.sql so the
-      // dashboard does not misclassify automated messages as operator replies.
+      // source が空の保存済み行は、関連する外部キーと delivery_type から推定する。自動送信を担当者の返信と誤表示しないよう、migration 028 の補完規則と一致させる。
       source: m.source ?? (
         m.direction === 'incoming' ? 'user'
           : m.scenario_step_id ? 'scenario'

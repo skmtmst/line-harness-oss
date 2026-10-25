@@ -23,11 +23,11 @@ export interface Form {
   status: 'active' | 'archived';
   archived_at: string | null;
   revision: number;
-  /** 編集の版(#723 / migration 379)。updateForm だけが増やす。 */
+  /** 編集の版(migration 379)。updateForm だけが増やす。 */
   content_revision: number;
   /** お客さまへ出している不変版。NULL は一度も公開していない下書き。 */
   current_published_version_id: string | null;
-  /** フォルダ所属(N-175 / migration 395)。NULL は未分類。 */
+  /** フォルダ所属(migration 395)。NULL は未分類。 */
   folder_id: string | null;
   /** 管理画面の取得時だけ入る、現在公開版の元になった編集版。 */
   published_content_revision?: number | null;
@@ -78,9 +78,9 @@ export interface FormAccountScope {
   status?: 'active' | 'archived';
   lineAccountIds?: string[];
   includeUnassigned?: boolean;
-  /** N-175 (#805): 指定フォルダだけに絞る。 */
+  /** 指定フォルダだけに絞る。 */
   folderId?: string;
-  /** N-175 (#805): 未分類(f.folder_id IS NULL)だけに絞る。 */
+  /** 未分類(f.folder_id IS NULL)だけに絞る。 */
   unfiledOnly?: boolean;
 }
 
@@ -98,7 +98,7 @@ export type PublishFormVersionResult =
   | { kind: 'conflict'; form: Form };
 
 /**
- * バージョン1行の中身(N-168)。
+ * バージョン1行の中身。
  *
  * 失敗した後処理の再実行は、回答が作られた当時の版の定義
  * (fields/layout/後処理の指定)をそのまま使う。回答が持つ
@@ -141,7 +141,7 @@ export type FormDeleteImpact = {
   referenceCount: number;
   answerUrl: string | null;
   revision: number;
-  /** 編集の版(#723)。受付停止など updateForm を通る操作がこれを送る。 */
+  /** 編集の版。受付停止など updateForm を通る操作がこれを送る。 */
   contentRevision: number;
   checkedAt: string;
   canDelete: boolean;
@@ -213,12 +213,12 @@ export type UpdateFormResult =
   | { kind: 'conflict'; form: Form };
 
 /**
- * フォームの編集保存(#723)。
+ * フォームの編集保存。
  *
  * **確認した編集の版(`expectedContentRevision`)と一致するときだけ書く。**
- * 一致しなければ1行も更新せず `conflict` を返す。以前はここが
- * `WHERE id = ?` だけで、2人が同時に編集すると後から保存した人の内容で
- * 黙って上書きされ、先の人の変更は何の断りもなく消えていた。
+ * 一致しなければ1行も更新せず `conflict` を返す。
+ * `WHERE id = ?` だけでは、2人が同時に編集すると後から保存した人の内容で
+ * 黙って上書きされ、先の人の変更は何の断りもなく消える。
  *
  * 守るのは `content_revision` で、`revision` ではない。`revision` は
  * migration 259 のトリガが来訪や回答で増やす「削除影響の確認版」なので、

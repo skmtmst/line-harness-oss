@@ -6,7 +6,7 @@ import type { FormLayout } from '@line-crm/shared';
 import Form from './form.js';
 
 /**
- * 監査 L12：回答フォームの欄名・説明・直しの文を入力と結ぶ。
+ * 回答フォームの欄名・説明・直しの文を入力と結ぶ。
  * 1つの入力で答える欄は label の htmlFor、選択肢・★は群れにして欄名で呼ぶ。
  */
 vi.mock('../lib/api.js', () => ({

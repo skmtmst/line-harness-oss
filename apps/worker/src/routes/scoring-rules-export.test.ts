@@ -5,7 +5,7 @@ import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-// N-237: 決めごとのCSVがブラウザ生成で権限・監査を通らない。
+// 決めごとのCSVがブラウザ生成で権限・監査を通らない。
 // 実 route＋実SQLiteで確かめる。許可scope内の決めごとだけをサーバー側でCSV化し、
 // 既存の監査契約へ記録する。
 
