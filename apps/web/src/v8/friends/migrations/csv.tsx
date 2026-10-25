@@ -122,7 +122,7 @@ export default function CsvMigrationsV8() {
         </Card>,
 
         <Card key="import" layout="vertical" padding="default" gap="var(--polish-space-card)" aria-labelledby="csv-import-title">
-          <CardHeader title="CSVを取り込む" titleId="csv-import-title" headingLevel={3} size="content" />
+          <CardHeader title="CSVから取り込む" titleId="csv-import-title" headingLevel={3} size="content" />
           <FileDropzone
             className={styles.drop}
             variant="upload"
