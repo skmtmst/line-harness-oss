@@ -4,104 +4,124 @@ import { useRunningVersion } from '@/lib/use-running-version'
 /*
  * ★V8 運用状態 更新履歴（板 ）。
  *
- * 並び：数のマス3つ（いまの版・この30日の更新・失敗した更新）→ 版の表（開始・版・どうやって・かかった時間・結果）→
+ * 並び：数のマス3つ（いまの版・この30日の更新・失敗した更新）→ 1回の更新＝1枚の並び（新しい順）→
  * 下の行に「自前でデプロイしている環境では…」と「手動アップデートガイドを開く」。
- * 止めた・戻した記録は緊急コントロールの表で見る。
- * 版は更新履歴ファイル（release-log の要約）、どうやって・結果は配備の記録（運用の履歴の deployment）から引く。
- * 記録が無い値は「—」（0 や成功とは言わない）。
+ * 1枚には、日付・版・配備の結果・種類の数・3行のまとめ・［すべて見る］。区切りと3行の決め方は
+ * history-updates.ts。止めた・戻した記録は緊急コントロールの表で見る。
+ * 版と行は更新履歴ファイル（release-log の要約）、結果は配備の記録（運用の履歴の deployment）から引く。
+ * 記録が無い値は出さない（0 や成功とは言わない）。
  */
 import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, CircleX, GitBranch, RefreshCw } from 'lucide-react'
 import Button from '@/components/shared/button'
-import { RowNameButton } from '@/components/shared/table'
-import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-entry-details'
 import Card from '@/components/shared/card'
-import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
+import Disclosure from '@/components/shared/disclosure'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import SectionHeader from '@/components/shared/section-header'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { MANUAL_UPDATE_GUIDE_URL } from '@/components/update/use-update-status'
 import releaseLog from '@/generated/release-log-summary.json'
 import { api, type OperationHistoryEntry } from '@/lib/api'
+import { formatCount, formatDate } from '@/lib/format'
 import styles from './history.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
-import { emptyValue } from '@/components/shared/empty-value'
+import { buildUpdateCards, latestDeploymentPhases, missingLineCount, toTime, type Deployment, type ReleaseSummary, type UpdateCard, type UpdateKind } from './history-updates'
 
-type Release = { version: string; released: string | null; entries: Array<{ text: string }> }
-type Deployment = NonNullable<OperationHistoryEntry['deployment']>
+export { latestDeploymentPhases } from './history-updates'
 
 const HISTORY_FETCH_LIMIT = 200
 const DAY = 24 * 60 * 60 * 1000
-
-/** 「10/1 23:58」。release-log の「2026-08-19 15:00」（日本時間・オフセット無し）もそのまま読む。 */
-function shortWhen(value: string | null | undefined): string {
-  return polishFormatDate(value, { style: 'list', fallback: '—' })
-}
-
-function toTime(value: string | null | undefined): number {
-  if (!value) return NaN
-  return Date.parse(/[zZ]|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value.replace(' ', 'T')}+09:00`)
-}
+/** 一度に出す枚数。続きは［もっと見る］で足す。 */
+const CARD_PAGE = 10
 
 /** 配備した人が仕組み（自動の配備）かどうか。 */
 function isAutomatic(deployment: Deployment): boolean {
   return /github|actions|bot|auto|system/i.test(deployment.actor)
 }
 
-const RESULT: Record<Deployment['phase'], { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' }> = {
-  succeeded: { label: '成功', tone: 'good' },
+const RESULT: Record<Deployment['phase'], { label: string; tone: StatusBadgeTone }> = {
+  succeeded: { label: '成功', tone: 'success' },
   failed: { label: '失敗', tone: 'danger' },
-  rolled_back: { label: '戻した', tone: 'warn' },
-  queued: { label: '待っている', tone: 'muted' },
-  deploying: { label: '入れている', tone: 'muted' },
-  verifying: { label: '確かめている', tone: 'muted' },
+  rolled_back: { label: '戻した', tone: 'warning' },
+  queued: { label: '待っている', tone: 'neutral' },
+  deploying: { label: '入れている', tone: 'neutral' },
+  verifying: { label: '確かめている', tone: 'neutral' },
 }
 
-/**
- * WEB195：配備の記録は1回の配備につき段階（待っている→入れている→確かめている→成功）ごとに1行ある。
- * 段階を別々の「更新」と数えない。配備ID ごとに、いちばん新しい段階（記録は新しい順）だけを残す。
- */
-export function latestDeploymentPhases(deployments: Deployment[]): Deployment[] {
-  const seen = new Set<string>()
-  const latest: Deployment[] = []
-  for (const deployment of deployments) {
-    const key = deployment.deploymentId || `${deployment.version ?? ''}|${deployment.occurredAt}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    latest.push(deployment)
-  }
-  return latest
-}
+const ENVIRONMENT: Record<string, string> = { staging: '検証', production: '本番' }
 
-/** 配備の口を正にし、版の文書に無い配備も落とさない。文書だけの版も残す。 */
-export function historyRows(releases: Release[], deployments: Deployment[]) {
-  const latest = latestDeploymentPhases(deployments)
-  const used = new Set<string>()
-  const rows = latest.map((deployment) => {
-    const version = deployment.version?.replace(/^v/, '') ?? emptyValue('unknown')
-    used.add(version)
-    const release = releases.find((item) => item.version.replace(/^v/, '') === version)
-      ?? { version, released: deployment.occurredAt, entries: [] }
-    return { release, deployment: deployment as Deployment | null }
-  })
-  rows.push(...releases.filter((item) => !used.has(item.version.replace(/^v/, ''))).map((release) => ({ release, deployment: null })))
-  return rows.sort((a, b) => (toTime(b.deployment?.occurredAt ?? b.release.released) || 0) - (toTime(a.deployment?.occurredAt ?? a.release.released) || 0)).slice(0, 10)
-}
+const KIND_LABEL: Record<UpdateKind, string> = { added: '追加', changed: '変更', fixed: '修正' }
+const KIND_ORDER: UpdateKind[] = ['added', 'changed', 'fixed']
 
-/** WEB194：表の「結果」。配備の記録が無い・読めないときに「反映済み（成功）」と言わない。 */
-export function releaseResult(deployment: Deployment | null, historyState: 'loading' | 'ready' | 'error'): { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' } {
+/** WEB194：配備の記録が無い・読めないときに「反映済み（成功）」と言わない。 */
+export function releaseResult(deployment: Deployment | null, historyState: 'loading' | 'ready' | 'error'): { label: string; tone: StatusBadgeTone } | null {
   if (deployment) return RESULT[deployment.phase]
-  if (historyState === 'error') return { label: '確認できません', tone: 'muted' }
-  if (historyState === 'loading') return { label: '—', tone: 'muted' }
-  return { label: '配備の記録なし', tone: 'muted' }
+  if (historyState === 'error') return { label: '確認できません', tone: 'neutral' }
+  return null
 }
 
-export default function UpdateHistoryV8({ canCopy }: { canCopy: boolean }) {
-  const [entry, setEntry] = useState<LogEntryFacts | null>(null)
+function CardDate({ at }: { at: string | null }) {
+  if (!at) return <>日時の記録なし</>
+  return <time dateTime={at}>{formatDate(at, { style: 'detail' })}</time>
+}
+
+function UpdateCardView({ card, historyState }: { card: UpdateCard; historyState: 'loading' | 'ready' | 'error' }) {
+  const result = card.source === 'deployment' ? releaseResult(card.deployment, historyState) : null
+  const environment = card.deployment ? ENVIRONMENT[card.deployment.environment] ?? card.deployment.environment : null
+  const counts = KIND_ORDER.filter((kind) => card.counts[kind] > 0)
+  const title = card.source === 'pending' ? 'これから入る変更' : <CardDate at={card.at} />
+  const note = card.source === 'pending'
+    ? formatCount(card.entryCount, '行')
+    : [card.version ? `v${card.version}` : null, environment ? `${environment}へ${card.deployment && isAutomatic(card.deployment) ? '自動' : '手動'}で配備` : null].filter(Boolean).join('・') || undefined
+  const badges = <>
+    {card.latest ? <StatusBadge tone="info" dot={false}>最新</StatusBadge> : null}
+    {card.source === 'archive' ? <StatusBadge tone="neutral" dot={false}>{`保管用の版（${formatCount(card.entryCount, '行')}）`}</StatusBadge> : null}
+    {result ? <StatusBadge tone={result.tone}>{result.label}</StatusBadge> : null}
+  </>
+  const hasMore = card.entries.length > card.highlights.length
+  return (
+    <Card as="article" padding="default" gap="tight" aria-label={card.source === 'pending' ? 'これから入る変更' : `${card.at ? formatDate(card.at, { style: 'detail' }) : '日時の記録なし'}の更新`} data-update-card={card.source} data-update-latest={card.latest ? '' : undefined}>
+      <SectionHeader title={title} note={note} actions={badges} />
+      {counts.length > 0 ? (
+        <ul className={styles.counts} aria-label="種類ごとの数">
+          {counts.map((kind) => <li key={kind}><StatusBadge tone="neutral" dot={false}>{`${KIND_LABEL[kind]} ${formatCount(card.counts[kind], '').trim()}`}</StatusBadge></li>)}
+        </ul>
+      ) : null}
+      {card.source === 'pending' ? (
+        <p className={styles.note}>次の版に入る予定の変更です。版に入ると、ここから日付の1枚へ移ります。</p>
+      ) : card.source === 'archive' ? (
+        <p className={styles.note}>この版の行は保管用の記録にまとめてあり、この画面には出していません。</p>
+      ) : card.highlights.length > 0 ? (
+        <ul className={styles.lines} aria-label={card.highlightSource === 'written' ? 'この回のまとめ' : 'この回のおもな変更'}>
+          {card.highlights.map((line, index) => <li key={`${index}|${line}`} className={styles.line}>{line}</li>)}
+        </ul>
+      ) : (
+        <p className={styles.note}>この回の変更の行は記録にありません。</p>
+      )}
+      {hasMore ? (
+        <Disclosure size="compact" appearance="inset" title={`すべて見る（${formatCount(card.entryCount, '行')}）`}>
+          <ul className={styles.lines} aria-label="この回のすべての変更">
+            {card.entries.map((entry, index) => (
+              <li key={`${index}|${entry.text}`} className={styles.line}>
+                <span className={styles.kind}>{KIND_LABEL[entry.kind as UpdateKind] ?? '変更'}</span>{entry.text}
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+      ) : null}
+    </Card>
+  )
+}
+
+export default function UpdateHistoryV8() {
+  usePageTitle('更新履歴')
+  usePageCrumbs([{ label: '運用状態', href: '/emergency' }])
   const runningVersion = useRunningVersion()
   const [history, setHistory] = useState<OperationHistoryEntry[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [shown, setShown] = useState(CARD_PAGE)
 
   useEffect(() => {
     let cancelled = false
@@ -114,7 +134,8 @@ export default function UpdateHistoryV8({ canCopy }: { canCopy: boolean }) {
     return () => { cancelled = true }
   }, [])
 
-  const releases = useMemo(() => ((releaseLog as { releases?: Release[] }).releases ?? []).filter((item) => item.released), [])
+  const summary = releaseLog as ReleaseSummary
+  const releases = useMemo(() => (summary.releases ?? []).filter((item) => item.released), [summary])
   const deployments = useMemo(() => latestDeploymentPhases(history.flatMap((item) => (item.historyKind === 'deployment' && item.deployment ? [item.deployment] : []))), [history])
 
   const now = Date.now()
@@ -126,50 +147,34 @@ export default function UpdateHistoryV8({ canCopy }: { canCopy: boolean }) {
   const failed = recent.filter((d) => d.phase === 'failed' || d.phase === 'rolled_back').length
   const ready = state === 'ready'
 
-  const rows = historyRows(releases, deployments)
+  const cards = useMemo(() => buildUpdateCards({ summary, deployments, runningVersion: current }), [summary, deployments, current])
+  const missing = missingLineCount(summary)
 
   return (
     <div className={styles.board}>
-      <LogEntryDetails canCopy={canCopy} entry={entry} onClose={() => setEntry(null)} />
       <KpiBand aria-label="更新の集計">
-        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} valueText={current ? `v${current}` : '—'} unit="" detail={currentAt ? `${shortWhen(currentAt)} に更新` : runningVersion.statusText} />
+        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} valueText={current ? `v${current}` : '—'} unit="" detail={currentAt ? `${formatDate(currentAt, { style: 'list' })} に更新` : runningVersion.statusText} />
         <KpiCard title="この30日の更新" icon={<RefreshCw size={14} />} value={ready ? Math.max(recent.length, recentReleases.length) : null} unit="回" detail={ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'} />
         <KpiCard title="失敗した更新" icon={<CircleX size={16} aria-hidden="true" />} value={ready ? failed : null} unit="回" valueTone={failed > 0 ? 'danger' : 'default'} detail="この30日" />
       </KpiBand>
 
       {state === 'error' ? (
-        <ListState kind="error" title="更新の記録を読み込めませんでした" description="版の一覧は出しています。どうやって・結果は読み直すと出ます。" />
+        <ListState kind="error" title="更新の記録を読み込めませんでした" description="版の一覧は出しています。配備の結果は読み直すと出ます。" />
       ) : null}
 
-      {rows.length === 0 ? (
+      {cards.length === 0 ? (
         <ListState kind="empty" title="更新の記録はまだありません" />
       ) : (
-        <Card padding="rows" overflow="hidden"><GridTable label="管理画面の更新" design={{ columns: 'var(--sett-history-columns)', gap: 'var(--tpl-rest3-uh-gap)', rowPadding: 'var(--tpl-rest3-uh-row-pad)', rowHeight: 'var(--tpl-rest3-uh-row-h)', headHeight: 'var(--tpl-rest3-uh-head-h)', fontSize: 'var(--tpl-rest3-em-body)', lineHeight: 'var(--tpl-rest3-em-td-lh)', headFontSize: 'var(--tpl-rest3-em-th)', headLineHeight: 'var(--tpl-rest3-em-th-lh)', headColor: 'var(--color-ink-faint)', headBackground: 'var(--color-surface-pearl)' }} className={styles.table}>
-          <div role="rowgroup">
-            <GridHeadRow>
-              <GridCell role="columnheader">開始</GridCell>
-              <GridCell role="columnheader">版</GridCell>
-              <GridCell role="columnheader">どうやって</GridCell>
-              <GridCell role="columnheader" className={styles.num}>かかった時間</GridCell>
-              <GridCell role="columnheader">結果</GridCell>
-            </GridHeadRow>
-          </div>
-          <div role="rowgroup">
-            {rows.map(({ release, deployment }) => {
-              const result = releaseResult(deployment, state)
-              const title = `v${release.version} ${release.entries[0]?.text ?? ''}`.trim()
-              return (
-                <GridRow key={deployment?.deploymentId || `${release.version}|${deployment?.occurredAt ?? release.released}`}>
-                  <GridCell role="cell" className={styles.cell}>{shortWhen(deployment?.occurredAt ?? release.released)}</GridCell>
-                  <GridCell role="cell" className={`${styles.cell} ${styles.strong}`} title={title}><RowNameButton onClick={() => setEntry({ occurredAt: deployment?.occurredAt ?? release.released ?? '', target: deployment?.environment ?? '管理画面', status: result.label, reason: deployment?.phase === 'failed' ? '更新に失敗しました。配備の記録で原因を確認してください。' : deployment?.phase === 'rolled_back' ? '前の版へ戻しました。' : deployment ? result.label : '配備の記録がありません。' })}>{title}</RowNameButton></GridCell>
-                  <GridCell role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : emptyValue('unknown')}</GridCell>
-                  <GridCell role="cell" className={`${styles.cell} ${styles.num}`}>—</GridCell>
-                  <GridCell role="cell" className={styles.judge}><StatusBadge tone={({ good: 'success', warn: 'warning', danger: 'danger', muted: 'neutral' } as Record<string, StatusBadgeTone>)[result.tone]}>{result.label}</StatusBadge></GridCell>
-                </GridRow>
-              )
-            })}
-          </div>
-        </GridTable></Card>
+        <section className={styles.cards} aria-label="管理画面の更新">
+          {cards.slice(0, shown).map((card) => <UpdateCardView key={card.key} card={card} historyState={state} />)}
+          {cards.length > shown ? (
+            <div className={styles.more}>
+              <Button variant="secondary" onClick={() => setShown((value) => value + CARD_PAGE)}>{`もっと見る（残り ${formatCount(cards.length - shown, '回')}）`}</Button>
+            </div>
+          ) : missing > 0 ? (
+            <p className={styles.footText}>{`これより前の ${formatCount(missing, '行')}は、この画面には出していません。`}</p>
+          ) : null}
+        </section>
       )}
 
       <div className={styles.foot}>
