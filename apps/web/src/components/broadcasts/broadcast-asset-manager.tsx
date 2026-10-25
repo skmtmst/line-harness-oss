@@ -197,7 +197,7 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
       onChanged?.()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
- { if (!fieldFailure) setError('保存できませんでした') } } finally { setSaving(false) }
+ { if (!fieldFailure) setError('保存できませんでした。時間をおいて、もう一度お試しください。') } } finally { setSaving(false) }
   }
 
   const meta = LABELS[kind]

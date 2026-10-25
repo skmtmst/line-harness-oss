@@ -209,7 +209,7 @@ export default function OpsSupportV8() {
         ? await opsCall(api.ops.knowledge.process(id))
         : await opsCall(api.ops.support.ticket(id).then((r) => (r.success ? { ...r, data: r.data.knowledge } : r)))
       if (!active) return
-      if (!res.success) { setError(res.error || 'ナレッジの確認を再開できませんでした'); return }
+      if (!res.success) { setError(res.error || 'ナレッジの確認を再開できませんでした。時間をおいて、もう一度お試しください。'); return }
       const knowledge = res.data
       setDetail((current) => (current?.ticket.id === id ? { ...current, knowledge } : current))
       if (knowledge?.job?.source_current === 1 && ['queued', 'running'].includes(knowledge.job.status)) {
@@ -237,7 +237,7 @@ export default function OpsSupportV8() {
     setError('')
     const res = await opsCall(api.ops.support.update(detail.ticket.id, { stage: next }))
     setBusy(false)
-    if (!res.success) { setError(res.error || '変更できませんでした'); return }
+    if (!res.success) { setError(res.error || '変更できませんでした。時間をおいて、もう一度お試しください。'); return }
     setNotice(`${res.data.ticketLabel} を「${res.data.stageLabel}」にしました`)
     deepLink.current = res.data.id
     setStage(next)
@@ -247,7 +247,7 @@ export default function OpsSupportV8() {
   const changePriority = async (next: OpsSupportPriority) => {
     if (!detail) return
     const res = await opsCall(api.ops.support.update(detail.ticket.id, { priority: next }))
-    if (!res.success) { setError(res.error || '変更できませんでした'); return }
+    if (!res.success) { setError(res.error || '変更できませんでした。時間をおいて、もう一度お試しください。'); return }
     await Promise.all([loadSummary(), loadList()])
     if (selectedId) await loadDetail(selectedId, { keepReply: true })
   }
@@ -258,7 +258,7 @@ export default function OpsSupportV8() {
     setError('')
     const res = await opsCall(api.ops.support.saveDraft(detail.ticket.id, reply))
     setDraftSaving(false)
-    if (!res.success) { setError(res.error || '下書きを保存できませんでした'); return }
+    if (!res.success) { setError(res.error || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。'); return }
     setReplyFromAi(null)
     setReferences([])
     notifySaved(res.data ? '下書きを保存しました' : '下書きを消しました')
@@ -312,7 +312,7 @@ export default function OpsSupportV8() {
     // WEB217：送信時に選んだ状態へ進める。既定は開いたときの状態。
     const res = await opsCall(api.ops.support.reply(detail.ticket.id, { body: reply, nextStage: replyStage, aiAssisted: replyFromAi !== null }))
     setBusy(false)
-    if (!res.success) { setError(res.error || '返信できませんでした'); return }
+    if (!res.success) { setError(res.error || '返信できませんでした。時間をおいて、もう一度お試しください。'); return }
     setReply('')
     setReplyFromAi(null)
     setConfirmReply(false)

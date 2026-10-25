@@ -465,7 +465,7 @@ export default function TemplatesListV8() {
     setFolderError('')
     try {
       const res = await api.folders.delete(deletingFolder.id, selectedAccountId ?? undefined)
-      if (!res.success) throw new Error(res.error ?? '削除できませんでした')
+      if (!res.success) throw new Error(res.error ?? '削除できませんでした。時間をおいて、もう一度お試しください。')
       setDeletingFolder(null)
       if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
       await loadFolders()
@@ -473,7 +473,7 @@ export default function TemplatesListV8() {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
-      setFolderError('フォルダを削除できませんでした。') }
+      setFolderError('フォルダを削除できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }

@@ -131,7 +131,7 @@ export default function MediaUploadDialog({
         }))),
       })
       if (!prepared.success || prepared.data.sessions.length !== pending.length) {
-        throw new Error('送信の準備結果を確認できませんでした')
+        throw new Error('送信の準備結果を確認できませんでした。時間をおいて、もう一度お試しください。')
       }
       for (let position = 0; position < pending.length; position += 1) {
         const selected = pending[position]
@@ -153,7 +153,7 @@ export default function MediaUploadDialog({
             entryIndex === index ? { ...item, state: 'verifying', message: '中身を確認しています', progress: 100 } : item
           )))
           const response = await api.media.completeUpload(session.id, { accountId, etag })
-          if (!response.success || response.data.status !== 'completed') throw new Error('登録を完了できませんでした')
+          if (!response.success || response.data.status !== 'completed') throw new Error('登録を完了できませんでした。時間をおいて、もう一度お試しください。')
           completed += 1
           const mediaId = response.data.mediaId ?? null
           setEntries((current) => current.map((item, entryIndex) => (

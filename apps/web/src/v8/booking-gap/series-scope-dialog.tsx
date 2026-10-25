@@ -70,7 +70,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
         const from = res.data.bookings.find((b) => b.id === target.bookingId)?.series_index ?? target.index
         const candidates = res.data.bookings.filter((b) => (b.series_index ?? 0) >= from && !['cancelled', 'rejected', 'expired'].includes(b.status)).sort((a, b) => (a.series_index ?? 0) - (b.series_index ?? 0))
         const selected = scope === 'this' ? candidates.slice(0, 1) : candidates
-        if (selected.some((b) => !preview.data.items.some((item) => item.bookingId === b.id))) throw new Error('見込みの一部を確認できませんでした')
+        if (selected.some((b) => !preview.data.items.some((item) => item.bookingId === b.id))) throw new Error('見込みの一部を確認できませんでした。時間をおいて、もう一度お試しください。')
         setVersion(res.data.series.version)
         setImpact(Object.fromEntries(preview.data.items.map((item) => [item.bookingId, item])))
         setAll(candidates)

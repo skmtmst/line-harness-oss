@@ -202,7 +202,7 @@ describe('R319: 再試行の失敗理由は読み直しで消さない', () => {
 
     // 読み直し（getBooking）が走っても、今回の失敗理由が残る。
     expect(m.get.mock.calls.length).toBeGreaterThan(1)
-    expect(screen.getByText('お知らせを再送できませんでした')).toBeTruthy()
+    expect(screen.getByText('お知らせを再送できませんでした。時間をおいて、もう一度お試しください。')).toBeTruthy()
   })
 
   it('カレンダー再試行の失敗理由も読み直しで消さない', async () => {

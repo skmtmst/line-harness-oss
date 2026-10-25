@@ -78,7 +78,7 @@ export default function OpsMembersV8() {
     setError('')
     const res = await opsCall(api.ops.addMember({ email: email.trim() }))
     setBusy(false)
-    if (!res.success) { setError(res.error || '招待できませんでした'); return }
+    if (!res.success) { setError(res.error || '招待できませんでした。時間をおいて、もう一度お試しください。'); return }
     setNotice(res.data.activationState === 'active'
       ? '最初の運営メンバーとして登録しました'
       : `${email.trim()} に招待メールを送りました。相手が2要素認証の登録を終えると運営メンバーになります`)
@@ -102,7 +102,7 @@ export default function OpsMembersV8() {
     setError('')
     const res = await opsCall(api.ops.setMemberActive(pending.member.staffId, pending.kind === 'resume'))
     setBusy(false)
-    if (!res.success) { setError(res.error || '変更できませんでした'); return }
+    if (!res.success) { setError(res.error || '変更できませんでした。時間をおいて、もう一度お試しください。'); return }
     setPending(null)
     void load()
   }

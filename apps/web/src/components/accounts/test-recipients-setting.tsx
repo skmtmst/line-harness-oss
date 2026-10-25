@@ -117,7 +117,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
       // 保存だけ失敗したのに一覧へ出続けると「入っている」と誤認させる。
       // 失敗を表示し、サーバの真値へ戻す。
       { if (!fieldFailure)
-      setSaveError('テスト送信先を保存できませんでした。') }
+      setSaveError('テスト送信先を保存できませんでした。時間をおいて、もう一度お試しください。') }
       void load()
     } finally { setSaving(false) }
   }
@@ -134,7 +134,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
-      setSaveError('テスト送信先を保存できませんでした。') }
+      setSaveError('テスト送信先を保存できませんでした。時間をおいて、もう一度お試しください。') }
       void load()
     } finally { setSaving(false) }
   }

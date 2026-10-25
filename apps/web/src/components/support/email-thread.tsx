@@ -526,7 +526,7 @@ export default function EmailThread({
       )
       if (isStale()) return
       if (!res.success) {
-        setMemoError(res.error || '内部メモを保存できませんでした')
+        setMemoError(res.error || '内部メモを保存できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       setDetail((current) => current && current.thread.id === myThread ? {
@@ -546,7 +546,7 @@ export default function EmailThread({
         // 書いた下書きは残す。消すと入れ直しになる。
         setMemoError('他の担当者が先に更新しています。会話を読み直してから保存し直してください。')
       } else {
-        setMemoError('内部メモを保存できませんでした')
+        setMemoError('内部メモを保存できませんでした。時間をおいて、もう一度お試しください。')
       }
     } finally {
       // 閉じた・切り替わったあとも「保存中」の印は必ず下ろす。

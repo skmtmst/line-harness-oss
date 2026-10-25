@@ -255,7 +255,7 @@ export default function RemindersListV8() {
         fetchApi<ApiResponse<FriendDetail>>(`/api/friends/${encodeURIComponent(friendId)}?submissions=0`, { signal }),
         fetchApi<ApiResponse<Array<{ reminderId: string }>>>(`/api/friends/${encodeURIComponent(friendId)}/reminders`, { signal }),
       ])
-      if (!person.success || !enrollments.success) throw new Error('この友だちのリマインダを確認できませんでした')
+      if (!person.success || !enrollments.success) throw new Error('この友だちのリマインダを確認できませんでした。時間をおいて、もう一度お試しください。')
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
       setFilterFriend({ id: friendId, value: person.data })
       return friendReminderPage(enrollments.data.map(row => row.reminderId), request, load)

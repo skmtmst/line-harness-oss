@@ -245,7 +245,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         for (const person of targets) {
           if (!alive()) return
           const updated = await bookingApi.updateStaff(accountId, person.id, { is_designation_optional: noAssign ? 1 : 0 })
-          if (!updated.ok) throw new Error('担当の設定を保存できませんでした')
+          if (!updated.ok) throw new Error('担当の設定を保存できませんでした。時間をおいて、もう一度お試しください。')
           if (!alive()) return
           savedStaff.current.set(person.id, noAssign)
           completedSteps.push(person.display_name)

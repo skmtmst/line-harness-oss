@@ -520,7 +520,7 @@ export default function NewProxyBookingPage() {
         setSlots([])
         // 読み込み自体は終わったので「指定時刻は取れない」として捨てる側に回す。
         setSlotsReady(true)
-        setError('空き時間を確認できませんでした')
+        setError('空き時間を確認できませんでした。時間をおいて、もう一度お試しください。')
       }
     } finally {
       if (requestId === slotRequest.current) setLoading(false)
@@ -548,7 +548,7 @@ export default function NewProxyBookingPage() {
           }
         })
         .catch(() => {
-          if (active) setError('友だちを検索できませんでした')
+          if (active) setError('友だちを検索できませんでした。時間をおいて、もう一度お試しください。')
         })
     }, 250)
     return () => {

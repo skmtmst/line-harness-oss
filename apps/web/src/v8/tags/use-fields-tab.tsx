@@ -199,7 +199,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
       await api.friendFields.delete(field.id, accountId)
       leave(field.id, () => load())
     } catch (reason) {
-      setActionError(reason instanceof ApiError ? reason.message : '削除できませんでした')
+      setActionError(reason instanceof ApiError ? reason.message : '削除できませんでした。時間をおいて、もう一度お試しください。')
     }
   }
 
@@ -234,7 +234,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
       /* フォルダを消した項目は未分類に戻るので一覧も読み直す。 */
       await load()
     } catch {
-      setFolderError('フォルダを削除できませんでした。')
+      setFolderError('フォルダを削除できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       setFolderBusy(false)
     }

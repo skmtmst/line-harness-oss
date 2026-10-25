@@ -41,7 +41,7 @@ export default function PasswordForgotPage() {
     setError('')
     const res = await authRequest<{ sent: boolean }>('/api/auth/password/forgot', { email: email.trim(), turnstileToken })
     if (!res.ok) {
-      setError(res.error || '送信できませんでした')
+      setError(res.error || '送信できませんでした。時間をおいて、もう一度お試しください。')
       turnstileRef.current?.reset()
       setBusy(false)
       return

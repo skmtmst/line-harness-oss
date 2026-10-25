@@ -627,7 +627,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       loadChats()
     } catch (reason) {
       saveErrors.capture(reason)
-      setError('担当の更新に失敗しました。')
+      setError('担当の更新に失敗しました。時間をおいて、もう一度お試しください。')
     }
   }
 
@@ -648,7 +648,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         notes,
         revision: savingRevision,
       })
-      if (!response.success) throw new Error(response.error || '内部メモを保存できませんでした')
+      if (!response.success) throw new Error(response.error || '内部メモを保存できませんでした。時間をおいて、もう一度お試しください。')
       // 返ってきた版を採用する。古い版のまま次の保存を送ると409になる。
       setChatDetail((current) => current && current.id === savingChatId
         ? { ...current, notes: response.data?.notes ?? notes, revision: response.data.revision }
@@ -664,7 +664,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     } catch (memoSaveError) {
       if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
         saveErrors.capture(memoSaveError)
-        setMemoError(japaneseDetailOf(memoSaveError) || '内部メモを保存できませんでした')
+        setMemoError(japaneseDetailOf(memoSaveError) || '内部メモを保存できませんでした。時間をおいて、もう一度お試しください。')
       }
     } finally {
       setMemoSaving(false)

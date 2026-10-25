@@ -366,11 +366,11 @@ export default function MediaDetailDialog({
         }],
       })
       const session = prepared.success ? prepared.data.sessions[0] : null
-      if (!session) throw new Error('送信の準備結果を確認できませんでした')
+      if (!session) throw new Error('送信の準備結果を確認できませんでした。時間をおいて、もう一度お試しください。')
       const etag = await putMediaFile(session, versionFile, setVersionProgress)
       const completed = await api.media.completeUpload(session.id, { accountId, etag })
       if (!completed.success || completed.data.status !== 'verified') {
-        throw new Error('差し替え用ファイルを確認できませんでした')
+        throw new Error('差し替え用ファイルを確認できませんでした。時間をおいて、もう一度お試しください。')
       }
       const previewed = await api.media.previewVersion(item.id, {
         accountId,

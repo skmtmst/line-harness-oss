@@ -393,7 +393,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
 
-      setError('テストを実行できませんでした。') }
+      setError('テストを実行できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (loadRequestRef.current === request) setSaving(false)
     }

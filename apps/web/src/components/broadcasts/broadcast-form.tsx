@@ -1117,7 +1117,7 @@ export default function BroadcastForm({
             assetId = saved.data.id; payload = saved.data.payload
           } catch (saveFailure) {
             const fieldFailure = saveErrors.capture(saveFailure);
- if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。'); } return false }
+ if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。時間をおいて、もう一度お試しください。'); } return false }
           finally { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(false) }
         }
         bubble = { id: inlineBubble.id, type: 'rich_message', content: { ...payload, assetId, assetName: content.name, inline: true } }

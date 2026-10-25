@@ -56,7 +56,7 @@ function PublishedWebinarContent() {
 
   const load = useCallback(async () => {
     if (!id) {
-      setError('公開したウェビナーを特定できませんでした。')
+      setError('公開したウェビナーを特定できませんでした。時間をおいて、もう一度お試しください。')
       setLoading(false)
       return
     }

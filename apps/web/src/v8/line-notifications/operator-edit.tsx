@@ -404,7 +404,7 @@ function OperatorEditInner() {
     setError('')
     try {
       const result = await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
-      if (!result.success) throw new Error('公開できませんでした')
+      if (!result.success) throw new Error('公開できませんでした。時間をおいて、もう一度お試しください。')
       setRuleVersion(result.data.version ?? null)
       setBaseline(signature)
       setConfirmOpen(false)

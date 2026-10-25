@@ -84,7 +84,7 @@ export function useInboxActions({ chatDetail, selectedChatId, loadChatDetail, lo
       if (error instanceof ApiError && error.status === 409) {
         setError('ほかの変更が先に保存されました。最新の状態で確認してもう一度お試しください。')
       } else {
-        setError('注目の変更に失敗しました。')
+        setError('注目の変更に失敗しました。時間をおいて、もう一度お試しください。')
       }
     } finally {
       setAttentionSaving(false)

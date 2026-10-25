@@ -17,7 +17,7 @@ export async function saveInitialSlot({ api, accountId, eventId, input, cached, 
     if (!slot) throw new Error('作成済みの予約枠を確認できませんでした。入力は残っています。')
   }
   if (!slot) slot = (await api.createSlots(accountId, eventId, [input])).items[0]
-  if (!slot?.id) throw new Error('予約枠の保存結果を確認できませんでした。')
+  if (!slot?.id) throw new Error('予約枠の保存結果を確認できませんでした。時間をおいて、もう一度お試しください。')
   capture({ slot, needsRefresh: false })
   if (Date.parse(slot.starts_at) !== Date.parse(input.starts_at) || Date.parse(slot.ends_at) !== Date.parse(input.ends_at) || slot.capacity !== input.capacity) {
     if (!Number.isInteger(slot.version) || (slot.version ?? 0) < 1) {

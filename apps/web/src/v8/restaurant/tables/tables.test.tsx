@@ -205,9 +205,9 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
     fireEvent.click(screen.getByRole('button', { name: '予約を移して止める' }))
-    await screen.findByText('予約の移動・卓の停止に失敗しました。')
+    await screen.findByText('予約の移動・卓の停止に失敗しました。時間をおいて、もう一度お試しください。')
     expect(fixture.updateTable).not.toHaveBeenCalled()
-    expect(within(screen.getByRole('dialog')).getByRole('alert').textContent).toContain('予約の移動・卓の停止に失敗しました。')
+    expect(within(screen.getByRole('dialog')).getByRole('alert').textContent).toContain('予約の移動・卓の停止に失敗しました。時間をおいて、もう一度お試しください。')
     expect(document.querySelector('[data-design-node="eY9F3"]')).not.toBeNull()
   })
 

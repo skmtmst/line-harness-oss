@@ -56,7 +56,7 @@ export default function RichMenuTestApply({ groupId }: { groupId: string }) {
     } catch (e) {
       if (request !== generation.current) return
       setLoadError(e instanceof ApiError && e.status === 403
-        ? 'テスト適用の状態を見る権限がありません。' : 'テスト適用の状態を確認できませんでした。')
+        ? 'テスト適用の状態を見る権限がありません。' : 'テスト適用の状態を確認できませんでした。時間をおいて、もう一度お試しください。')
     }
   }, [groupId])
 

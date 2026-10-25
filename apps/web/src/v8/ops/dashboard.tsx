@@ -93,7 +93,7 @@ export default function OpsDashboardV8() {
     setBillingSyncError('')
     const res = await opsCall(api.ops.billingSync())
     if (!res.success) {
-      setBillingSyncError(res.error || 'Stripe と同期できませんでした')
+      setBillingSyncError(res.error || 'Stripe と同期できませんでした。時間をおいて、もう一度お試しください。')
       setSyncingBilling(false)
       return
     }

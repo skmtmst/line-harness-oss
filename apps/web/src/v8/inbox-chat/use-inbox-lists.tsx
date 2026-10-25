@@ -194,12 +194,12 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
         }
       } else {
         // 口が success:false を返したときも、0件と区別できるよう失敗を出す。
-        setEmailError('メールの読み込みに失敗しました。')
+        setEmailError('メールの読み込みに失敗しました。時間をおいて、もう一度お試しください。')
       }
     } catch {
       if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
       // メールが出ないだけ。LINEのトークは使えるが、0件と区別できるよう失敗を出す。
-      setEmailError('メールの読み込みに失敗しました。')
+      setEmailError('メールの読み込みに失敗しました。時間をおいて、もう一度お試しください。')
     } finally {
       if (append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
         emailMoreLockRef.current = false
@@ -281,7 +281,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
       }
     } catch {
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
-      setError('チャットの追加読み込みに失敗しました。')
+      setError('チャットの追加読み込みに失敗しました。時間をおいて、もう一度お試しください。')
     } finally {
       if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoadingMore(false)
     }

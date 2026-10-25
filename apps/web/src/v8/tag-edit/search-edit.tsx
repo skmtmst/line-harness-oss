@@ -790,7 +790,7 @@ export default function SavedSearchEditV8() {
 
       { if (!fieldFailure)
 
-      setError(deleteError instanceof ApiError ? deleteError.message : '削除できませんでした') }
+      setError(deleteError instanceof ApiError ? deleteError.message : '削除できませんでした。時間をおいて、もう一度お試しください。') }
     }
   }
 

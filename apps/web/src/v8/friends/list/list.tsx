@@ -557,7 +557,7 @@ export default function FriendsListV8() {
         { method: 'PUT', body: JSON.stringify({ __attention: current ? null : '1' }) },
       )
       if (loadContextRef.current.identity !== savingIdentity) return
-      if (!saved.success || !saved.data?.updatedAt) throw new Error('保存後の状態を確認できませんでした')
+      if (!saved.success || !saved.data?.updatedAt) throw new Error('保存後の状態を確認できませんでした。時間をおいて、もう一度お試しください。')
       // 保存前に始まった一覧の応答で、新しい版を上書きしない。
       loadRequestRef.current += 1
       setRefreshing(false)

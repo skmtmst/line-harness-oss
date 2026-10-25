@@ -409,12 +409,12 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
       const prepared = await api.media.prepareUploads({ accountId, files: [{ filename: file.name, mimeType: file.type, sizeBytes: file.size, metadata }] })
       if (!prepared.success) throw new ApiError(500, prepared.error)
       const session = prepared.data.sessions[0]
-      if (!session) throw new Error('送信の準備結果を確認できませんでした')
+      if (!session) throw new Error('送信の準備結果を確認できませんでした。時間をおいて、もう一度お試しください。')
       const etag = await mediaUpload.put(session, file, (progress) => setUpload((current) => ({ ...current, progress })))
       const completion = await api.media.completeUpload(session.id, { accountId, etag })
       if (!completion.success) throw new ApiError(500, completion.error)
       const mediaId = completion.data.mediaId
-      if (!mediaId) throw new Error('登録を完了できませんでした')
+      if (!mediaId) throw new Error('登録を完了できませんでした。時間をおいて、もう一度お試しください。')
       const detail = await api.media.detail(mediaId, accountId)
       if (!detail.success) throw new ApiError(500, detail.error)
       setForm((current) => ({ ...current, mediaId: detail.data.item.id, mediaFilename: detail.data.item.filename, mediaSourceUrl: detail.data.item.url }))

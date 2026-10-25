@@ -303,7 +303,7 @@ function FieldMigrate() {
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
 
-      setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした') }
+      setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setChecking(false)
     }

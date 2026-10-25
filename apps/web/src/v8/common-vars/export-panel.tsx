@@ -142,7 +142,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
       })
       if (generationRef.current !== generation) return
       if (!res.success) {
-        setError(res.error || '書き出しを依頼できませんでした')
+        setError(res.error || '書き出しを依頼できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       setActive(res.data)

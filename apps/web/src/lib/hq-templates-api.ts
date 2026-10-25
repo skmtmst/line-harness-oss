@@ -151,7 +151,7 @@ export const hqTemplatesApi = {
   deleteImage: async (r2Key: string): Promise<{ deleted: boolean }> => {
     // R568: 保存されなかった画像の後片付け。所有確認はサーバが行う。
     const result = await fetchApi<{ success: boolean; data?: { deleted: boolean } }>(`/api/hq/templates/media?r2Key=${encodeURIComponent(r2Key)}`, { method: 'DELETE' })
-    if (!result.success || !result.data) throw new Error('画像の後片付けができませんでした。')
+    if (!result.success || !result.data) throw new Error('画像の後片付けができませんでした。時間をおいて、もう一度お試しください。')
     return result.data
   },
   context: async (): Promise<{ tenantId: string; actorId: string }> => {

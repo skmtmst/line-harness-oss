@@ -17,13 +17,13 @@ export async function uploadCarouselImage(file: File, accountId: string): Promis
     filename: file.name, mimeType: file.type, sizeBytes: file.size,
     folderId: null, metadata: await extractMediaMetadata(file),
   }] })
-  if (!prepared.success) throw new Error(prepared.error || '画像を送る準備ができませんでした。')
-  if (prepared.data.sessions.length !== 1) throw new Error('画像を送る準備ができませんでした。')
+  if (!prepared.success) throw new Error(prepared.error || '画像を送る準備ができませんでした。時間をおいて、もう一度お試しください。')
+  if (prepared.data.sessions.length !== 1) throw new Error('画像を送る準備ができませんでした。時間をおいて、もう一度お試しください。')
   const session = prepared.data.sessions[0]
   const etag = await putMediaFile(session, file, () => {})
   const completed = await api.media.completeUpload(session.id, { accountId, etag })
-  if (!completed.success) throw new Error(completed.error || '画像の登録を完了できませんでした。')
-  if (completed.data.status !== 'completed' || !completed.data.mediaId) throw new Error('画像の登録を完了できませんでした。')
+  if (!completed.success) throw new Error(completed.error || '画像の登録を完了できませんでした。時間をおいて、もう一度お試しください。')
+  if (completed.data.status !== 'completed' || !completed.data.mediaId) throw new Error('画像の登録を完了できませんでした。時間をおいて、もう一度お試しください。')
   const media = await api.media.detail(completed.data.mediaId, accountId)
   if (!media.success) throw new Error(media.error || '登録した画像を確認できませんでした。登録メディアから選び直してください。')
   if (media.data.item.kind !== 'image' || !media.data.item.url) throw new Error('登録した画像を確認できませんでした。登録メディアから選び直してください。')

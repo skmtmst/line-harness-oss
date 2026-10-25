@@ -92,7 +92,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
     if (fields.submit().length > 0) { setError(''); return }
     setBusy(true); setError('')
     const saved = await opsCall(api.ops.knowledge.update(article.id, article.version, value))
-    if (!saved.success) { setError(saved.error || '保存できませんでした'); setBusy(false); return }
+    if (!saved.success) { setError(saved.error || '保存できませんでした。時間をおいて、もう一度お試しください。'); setBusy(false); return }
     setArticle({ ...saved.data, sourceSubject: article.sourceSubject })
     if (approve) {
       const reviewed = await opsCall(api.ops.knowledge.review(article.id, { version: saved.data.version, action: 'approve', confirmed: true }))
@@ -108,7 +108,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
     setBusy(true); setError('')
     const res = await opsCall(api.ops.knowledge.review(article.id, { version: article.version, action }))
     setBusy(false)
-    if (!res.success) { setError(res.error || (action === 'dismiss' ? '見送りにできませんでした' : '無効にできませんでした')); return }
+    if (!res.success) { setError(res.error || (action === 'dismiss' ? '見送りにできませんでした。時間をおいて、もう一度お試しください。' : '無効にできませんでした。時間をおいて、もう一度お試しください。')); return }
     onSaved(); onClose()
   }
 

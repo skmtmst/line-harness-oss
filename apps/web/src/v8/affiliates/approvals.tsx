@@ -214,7 +214,7 @@ export default function ApprovalsTab() {
         if (leftovers === 0) setSelected(new Set())
         else setSelected((current) => new Set([...current].filter((eventId) => !data.succeeded.includes(eventId))))
       } else {
-        setActionError(res.error ?? 'まとめて処理できませんでした')
+        setActionError(res.error ?? 'まとめて処理できませんでした。時間をおいて、もう一度お試しください。')
       }
     } catch (e) {
       await loadItems({ fresh: true })

@@ -228,7 +228,7 @@ export default function OpsAnnouncementsV8() {
       const res = editingId
         ? await api.ops.announcements.update(editingId, input(mode), editingUpdatedAt ?? undefined)
         : await api.ops.announcements.create(input(mode), createKey)
-      if (!res.success) { setFormError('保存できませんでした'); return }
+      if (!res.success) { setFormError('保存できませんでした。時間をおいて、もう一度お試しください。'); return }
       setConfirmSend(false)
       notifySaved(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
       collision.clear()
@@ -262,7 +262,7 @@ export default function OpsAnnouncementsV8() {
         return
       }
       { if (!fieldFailure)
-      setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした') }
+      setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setBusy(false)
     }

@@ -112,7 +112,7 @@ describe('テスト送信先の設定欄 (N-070)', () => {
     // ログインユーザー候補からの追加で保存を試みる。
     fireEvent.click(screen.getByRole('button', { name: /候補 花子/ }))
     await flush()
-    expect(screen.getByText('テスト送信先を保存できませんでした。')).toBeTruthy()
+    expect(screen.getByText('テスト送信先を保存できませんでした。時間をおいて、もう一度お試しください。')).toBeTruthy()
     // 保存失敗後は真値（空）へ戻り、追加した人が送信先として残らない。
     expect(screen.queryByTitle('候補 花子を削除する')).toBeNull()
   })

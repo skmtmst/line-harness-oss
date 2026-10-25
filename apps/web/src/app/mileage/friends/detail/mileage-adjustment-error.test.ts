@@ -31,6 +31,6 @@ describe('手動マイル調整の失敗案内', () => {
       .toBe('マイルを変更できませんでした。時間をおいてもう一度お試しください。')
     expect(mileageAdjustmentErrorMessage(new Error('Failed to fetch')))
       .toBe('通信に失敗しました。接続を確認してもう一度お試しください。')
-    expect(mileageAdjustmentErrorMessage(null)).toBe('通信に失敗しました。')
+    expect(mileageAdjustmentErrorMessage(null)).toBe('通信に失敗しました。接続を確認してもう一度お試しください。')
   })
 })

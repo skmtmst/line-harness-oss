@@ -74,7 +74,7 @@ export default function ImpersonationBar({
       ? await opsCall(api.ops.impersonation.write(reason))
       : await opsCall(api.ops.impersonation.revealPii(reason))
     setBusy(false)
-    if (!res.success) { setError(res.error || '切り替えできませんでした'); return }
+    if (!res.success) { setError(res.error || '切り替えできませんでした。時間をおいて、もう一度お試しください。'); return }
     update({ ...state, ...res.data, tenantName: state.tenantName })
     setDialog(null)
     router.refresh()

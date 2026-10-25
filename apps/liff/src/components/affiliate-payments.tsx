@@ -66,7 +66,7 @@ export default function AffiliatePayments({ editable }: { editable: boolean }) {
       if (e instanceof SelfApiError && Object.keys(e.fields).length) {
         setFields(e.fields); setTimeout(() => document.getElementById(`bank-${Object.keys(e.fields)[0]}`)?.focus(), 0);
       } else {
-        setError(e instanceof Error ? e.message : '保存できませんでした');
+        setError(e instanceof Error ? e.message : '保存できませんでした。時間をおいて、もう一度お試しください。');
         if (e instanceof SelfApiError && e.status === 409) setConflict(true);
       }
     } finally { setConfirming(false); busyRef.current = false; setBusy(false); }

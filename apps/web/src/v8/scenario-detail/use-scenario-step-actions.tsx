@@ -362,7 +362,7 @@ export function useScenarioStepActions({
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
-      setStepError('この通を複製できませんでした') }
+      setStepError('この通を複製できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setDuplicatingStepId(null)
     }

@@ -406,7 +406,7 @@ export default function ScenariosListV8() {
       void loadOverallTotal()
       void loadStats()
     } catch {
-      throw new Error('シナリオを削除できませんでした')
+      throw new Error('シナリオを削除できませんでした。時間をおいて、もう一度お試しください。')
     }
   }
 

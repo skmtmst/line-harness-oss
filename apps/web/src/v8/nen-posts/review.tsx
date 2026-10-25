@@ -858,7 +858,7 @@ function PublicationsV8({
 
       if (token === generation.current) { if (!fieldFailure) setNotice(error instanceof ApiError && error.status === 409
         ? '掲載の集合か版が変わりました。キャンセルして最新の全件を読み直してください。'
-        : '掲載順を保存できませんでした。') }
+        : '掲載順を保存できませんでした。時間をおいて、もう一度お試しください。') }
     } finally { if (busyId === 'order' || token === generation.current) setBusyId('') }
   }
 

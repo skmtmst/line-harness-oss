@@ -258,7 +258,7 @@ export default function AdsV8() {
         currency: 'JPY',
       })
       if (!res.success) {
-        setManualError(res.error ?? '記録できませんでした')
+        setManualError(res.error ?? '記録できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       setManualOpen(false)

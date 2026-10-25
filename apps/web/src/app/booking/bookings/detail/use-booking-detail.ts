@@ -406,7 +406,7 @@ export function useBookingDetail() {
       .catch(() => {
         if (requestId !== slotRequest.current) return
         setEditSlots([])
-        setError('空き時間を確認できませんでした')
+        setError('空き時間を確認できませんでした。時間をおいて、もう一度お試しください。')
       })
       .finally(() => {
         if (requestId === slotRequest.current) setEditSlotsLoading(false)
@@ -543,7 +543,7 @@ export function useBookingDetail() {
       if (!isCurrentTarget(retryTarget)) return
       setError(cause instanceof ApiError && cause.code === 'no_retryable_operation'
         ? '再試行できる失敗はありません'
-        : '再試行できませんでした')
+        : '再試行できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       if (isCurrentTarget(retryTarget)) setRetrying(null)
     }
@@ -573,7 +573,7 @@ export function useBookingDetail() {
         ? 'このお知らせは今の予約の状態に合わないため送れません'
         : code === 'retry_in_progress'
           ? 'ほかの担当者が再送中のため送れません。しばらくしてからお試しください'
-          : 'お知らせを再送できませんでした')
+          : 'お知らせを再送できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       if (isCurrentTarget(retryTarget)) setRetrying(null)
     }

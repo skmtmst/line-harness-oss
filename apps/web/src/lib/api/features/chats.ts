@@ -39,7 +39,7 @@ export const chatsMethods = {
         const response = await fetch(prepared.data.uploadUrl, {
           method: 'PUT', headers: prepared.data.requiredHeaders, body: file, credentials: 'omit',
         });
-        if (!response.ok) throw new Error('動画をアップロードできませんでした');
+        if (!response.ok) throw new Error('動画をアップロードできませんでした。時間をおいて、もう一度お試しください。');
         const etag = response.headers.get('etag');
         if (!etag) throw new Error('アップロード結果を確認できませんでした。R2のCORS設定を確認してください');
         return fetchApi<ApiResponse<ChatAttachment>>(`${path}/upload-sessions/${encodeURIComponent(prepared.data.id)}/complete`, {

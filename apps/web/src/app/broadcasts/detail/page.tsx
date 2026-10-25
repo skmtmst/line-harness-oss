@@ -397,7 +397,7 @@ function BroadcastDetailInner() {
       const res = await action()
       if (moved()) return
       if (!res.success) {
-        setApprovalMessage(res.error ?? '操作できませんでした。')
+        setApprovalMessage(res.error ?? '操作できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       await reloadApproval(target)

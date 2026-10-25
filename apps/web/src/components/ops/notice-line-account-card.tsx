@@ -32,7 +32,7 @@ export default function NoticeLineAccountCard() {
     setError('')
     const res = await opsCall(api.ops.setNoticeLineAccount(selected || null))
     setBusy(false)
-    if (!res.success) { setError(res.error || '保存できませんでした'); return }
+    if (!res.success) { setError(res.error || '保存できませんでした。時間をおいて、もう一度お試しください。'); return }
     setNotice(selected ? '契約者専用LINEのアカウントを指定しました' : '指定を外しました')
     await load()
   }

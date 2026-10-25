@@ -203,7 +203,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         const fieldFailure = saveErrors.capture(error)
 
         { if (!fieldFailure)
-        setStopError(japaneseDetailOf(error) || '予約の移動・卓の停止に失敗しました。') }
+        setStopError(japaneseDetailOf(error) || '予約の移動・卓の停止に失敗しました。時間をおいて、もう一度お試しください。') }
         throw new QuietError()
       }
     }, reservations.length === 0

@@ -518,7 +518,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         if (!host.uploadCarouselImage) throw new Error('統括の画像の受け取り口を利用できません。')
                         const media = await host.uploadCarouselImage(file)
                         setUploadedMedia((current) => [...current.filter((item) => item.id !== media.id), media])
-                        if (!media.publicUrl) throw new Error('登録した画像のURLを確認できませんでした。')
+                        if (!media.publicUrl) throw new Error('登録した画像のURLを確認できませんでした。時間をおいて、もう一度お試しください。')
                         return media.publicUrl
                       }
                       if (!folderAccountId) throw new Error('上のバーでLINE公式アカウントを選んでください。')
