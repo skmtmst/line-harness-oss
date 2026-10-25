@@ -19,6 +19,7 @@ import Disclosure from '@/components/shared/disclosure'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
 import SectionHeader from '@/components/shared/section-header'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -121,7 +122,7 @@ export default function UpdateHistoryV8() {
   const runningVersion = useRunningVersion()
   const [history, setHistory] = useState<OperationHistoryEntry[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [shown, setShown] = useState(CARD_PAGE)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     let cancelled = false
@@ -149,6 +150,10 @@ export default function UpdateHistoryV8() {
 
   const cards = useMemo(() => buildUpdateCards({ summary, deployments, runningVersion: current }), [summary, deployments, current])
   const missing = missingLineCount(summary)
+  const pageCount = Math.max(1, Math.ceil(cards.length / CARD_PAGE))
+  const shownPage = Math.min(page, pageCount)
+  const first = (shownPage - 1) * CARD_PAGE + 1
+  const last = Math.min(cards.length, shownPage * CARD_PAGE)
 
   return (
     <div className={styles.board}>
@@ -166,12 +171,13 @@ export default function UpdateHistoryV8() {
         <ListState kind="empty" title="更新の記録はまだありません" />
       ) : (
         <section className={styles.cards} aria-label="管理画面の更新">
-          {cards.slice(0, shown).map((card) => <UpdateCardView key={card.key} card={card} historyState={state} />)}
-          {cards.length > shown ? (
+          {cards.slice(first - 1, last).map((card) => <UpdateCardView key={card.key} card={card} historyState={state} />)}
+          {pageCount > 1 ? (
             <div className={styles.more}>
-              <Button variant="secondary" onClick={() => setShown((value) => value + CARD_PAGE)}>{`もっと見る（残り ${formatCount(cards.length - shown, '回')}）`}</Button>
+              <Pagination page={shownPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="更新履歴のページ送り" range={{ total: cards.length, first, last, unit: '回' }} />
             </div>
-          ) : missing > 0 ? (
+          ) : null}
+          {shownPage === pageCount && missing > 0 ? (
             <p className={styles.footText}>{`これより前の ${formatCount(missing, '行')}は、この画面には出していません。`}</p>
           ) : null}
         </section>
