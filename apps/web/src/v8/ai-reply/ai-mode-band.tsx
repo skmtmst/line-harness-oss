@@ -208,13 +208,9 @@ export function AutoAnswerConfirmDialog({ open, accountId, accountName, publishe
           </div>
         ))}
       </dl>
-      <div className={styles.warn} role="note">
-        <TriangleAlert size={16} aria-hidden="true" />
-        <div>
-          <p className={styles.warnTitle}>自動で送った答えは取り消せません。</p>
-          <p className={styles.warnText}>答えられないときは人へ回し、受信箱に「人へ回した」で残します。</p>
-        </div>
-      </div>
+      <Notice tone="warn" role="note" icon={<TriangleAlert size={16} aria-hidden="true" />} heading={<>自動で送った答えは取り消せません。</>}>
+        <p className={styles.warnText}>答えられないときは人へ回し、受信箱に「人へ回した」で残します。</p>
+      </Notice>
       <div className={styles.test}>
         <TextField aria-label="テストの質問" placeholder="例：駐車場はありますか" value={question} onChange={(event) => { setQuestion(event.target.value); setResult(null) }} />
         <Button onClick={() => void runTest()} busy={testing} disabled={!question.trim()}>テストの質問で試す</Button>

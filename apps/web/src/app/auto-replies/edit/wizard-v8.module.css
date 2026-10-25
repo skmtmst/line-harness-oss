@@ -277,7 +277,6 @@
   color: var(--color-ink-secondary);
 }
 
-
 /* 手順4「動く順番」の行。 */
 .orderList {
   display: flex;
@@ -350,10 +349,6 @@
   border-radius: var(--radius-control, 8px);
   background: var(--color-canvas-sunken);
   font-size: 13px;
-}
-.testResultWin {
-  border: 1px solid var(--color-success);
-  background: var(--color-success-bg);
 }
 .testResultLose {
   border: 1px solid var(--color-warning);
@@ -660,7 +655,6 @@
 }
 
 /* 編集の競合の帯（）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
-
 
 /* 右の列の箱（絵 「右の箱 設定内容」）：余白16・題13太字・行の間4・行は上下9＋下線。 */
 

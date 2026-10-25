@@ -14,7 +14,7 @@ import styles from './quick-create.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 自動応答 かんたんに作る（板 、小窓 560）。
@@ -297,10 +297,9 @@ export default function QuickCreateV8({
           /></SaveErrorField>
 {replyError ? <p className={styles.fieldError} role="alert">{replyError}</p> : null}</Field></div>
         {overlaps.length > 0 ? (
-          <p className={styles.overlapBand} role="status">
-            <HelpCircle size={16} aria-hidden="true" className={styles.overlapIcon} />
-            <span>{`「${overlapNames(overlaps)}」と重なります。こちらが先に動きます（並びは詳しく作るで変えられる）`}</span>
-          </p>
+            <Notice tone="warn" role="status" icon={<HelpCircle size={16} aria-hidden="true" />}>
+              <span>{`「${overlapNames(overlaps)}」と重なります。こちらが先に動きます（並びは詳しく作るで変えられる）`}</span>
+            </Notice>
         ) : null}
       </div>
     </Dialog>
