@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeHmacSha256Hex } from '../lib/hmac.js';
 import type { Env } from '../worker-env.js';
 
-// N-270: 公開受信口 /api/conversions/ingest/:id の回帰テスト。
+// 公開受信口 /api/conversions/ingest/:id の回帰テスト。
 // 管理認証を通さず、地点ごとの受信鍵で HMAC-SHA256 を照合し、
 // 成否を conversion_ingestion_events(recordConversionIngestionEvent)へ残す。
 

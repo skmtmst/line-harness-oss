@@ -153,10 +153,7 @@ function parseOptions(raw: unknown, existingRaw?: string | null): { ok: true; va
 }
 
 /*
- * R181: 既定値の検査は個別値（validateFriendFieldValue）と同じ物差しで
- * 行う。以前はここに独自の甘い検査があり、存在しない日付・記号だけの
- * 電話番号が既定値として保存できていた。選択肢はID付きの形で渡し、
- * 個別値側の突き合わせ（ID・表示名の両対応）を使う。
+ * 存在しない日付や不正な電話番号を既定値だけで受け付けないよう、validateFriendFieldValue と同じ検証を使う。選択肢は ID と表示名の両方で照合する。
  */
 function validateDefaultValue(
   raw: unknown,
@@ -177,7 +174,7 @@ async function sha256(value: string): Promise<string> {
 }
 
 /**
- * N-046(#812): 一括更新のIdempotency-Key検査。サーバ状態を持たず、
+ * 一括更新のIdempotency-Key検査。サーバ状態を持たず、
  * key自体へ内容を束縛する。作り方は `ffbulk_<sha256hex>`、正準形は
  * `v1\n<lineAccountId>\n<fieldId>\n<friendIds昇順,区切り>\n<JSON.stringify(value)>`。
  *
@@ -260,9 +257,7 @@ function convertMigrationValue(value: string, targetType: FriendFieldType): Omit
   if (!trimmed) return { convertedValue: null, status: 'invalid', reason: '空欄です' };
   if (targetType === 'number') {
     /*
-     * R549: 保存側（validateFriendFieldValue）と同じ物差しで判定する。
-     * 以前は Number で見ていたため 0x10・1e5 などを「移せる」と数え、
-     * 保存では拒否されて件数が合わなかった。カンマ区切りは両側で外す。
+     * 移行可能件数と保存結果がずれないよう、validateFriendFieldValue と同じ基準で判定する。0x10 や1e5も数値変換だけで許さず、カンマ区切りの処理を一致させる。
      */
     const normalized = trimmed.replace(/,/g, '');
     return /^[-+]?(\d+(\.\d+)?|\.\d+)$/.test(normalized) && Number.isFinite(Number(normalized))
@@ -537,7 +532,7 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), inputJson
     const scope = await friendFieldAccess(c);
     if (scope instanceof Response) return scope;
     /*
-     * R515: 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
+     * 応答だけ失った再試行で二重に作らないため、要求キーを必須にする。
      * 同じキー・同じ内容の再送は保存済みの項目を返し、同じキーに
      * 異なる内容が来たら作らず409で止める（対応マークと同じ約束）。
      */
@@ -609,13 +604,9 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), inputJson
   }
 });
 
-// PATCH /api/friend-fields/:id
-//
-// 種類と差し込み名はここでは変えられない。種類を変えると既に入っている値の
-// 意味が変わり（「犬」が数値項目になる等）、差し込み名を変えると
-// テンプレートの差し込みが黙って空になる。どちらも作り直してもらう。
+// 種類変更は保存値の意味を変え、差し込み名の変更はテンプレートを空にするため、ここでは変更させず作り直す。
 /**
- * PATCH /api/friend-fields/reorder — 並び順をまとめて書く（#1014 ATTR-02/03/04）。
+ * PATCH /api/friend-fields/reorder — 並び順をまとめて書く。
  *
  * /api/friend-fields/:id より前に置く。:id に "reorder" として
  * 食われないようにするため（/api/tags/reorder と同じ並び）。
@@ -726,7 +717,7 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), inpu
     const field = await updateFriendField(c.env.DB, id, patch);
     if (!field) {
       /*
-       * R517: 版が合わない再試行は、最新の内容を付けて409で返す。
+       * 版が合わない再試行は、最新の内容を付けて409で返す。
        * 画面は送った内容と比べ、保存済みか他人の変更かを案内する
        * （対応マークの SUPPORT_MARK_VERSION_CONFLICT と同じ約束）。
        */
@@ -745,10 +736,7 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), inpu
   }
 });
 
-// DELETE /api/friend-fields/:id
-//
-// 値が入っていれば人数を返して止める。項目を消すと入っていた値も消えるので、
-// 何人ぶん消えるのかを見てから決めてもらう。
+// 値がある項目は削除件数を示して止め、データ損失を確認してから判断できるようにする。
 friendFields.delete('/api/friend-fields/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const scope = await friendFieldAccess(c);
@@ -782,7 +770,7 @@ friendFields.delete('/api/friend-fields/:id', requireRole('owner', 'admin'), asy
 // GET /api/friends/:id/fields
 //
 // 個人情報の項目は attribute.personal_info.view（またはedit）の個別権限で
-// 絞る（N-045。owner/adminは常に通る）。閲覧できる人が開いたときは記録を残す。
+// 絞る（。owner/adminは常に通る）。閲覧できる人が開いたときは記録を残す。
 friendFields.get(
   '/api/friends/:id/fields',
   requireRole('owner', 'admin', 'staff'),
@@ -848,7 +836,7 @@ friendFields.get(
 // まとめて更新する。EC を正としている項目は書き換えず、理由を warnings で返す。
 // 黙って無視すると「保存したのに戻る」という形で表に出る。
 //
-// N-045: 個人情報の項目だけ attribute.personal_info.edit を持つ staff に
+// 個人情報の項目だけ attribute.personal_info.edit を持つ staff に
 // 開ける。それ以外の項目は owner/admin のみ。staff が個人情報以外の項目を
 // 送ってきた分は保存せず warnings で返す。
 friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, inputJsonBoundary({"values":["object"]}), async (c) => {
@@ -874,7 +862,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
     const pending: Array<{ fieldId: string; value: string | null; field: FriendField }> = [];
     const errors: Array<{ fieldId: string; name: string; message: string }> = [];
 
-    // N-042: 型に合わない値は1件も保存しない。先に全部を検証し、
+    // 型に合わない値は1件も保存しない。先に全部を検証し、
     // 1つでも通らなければ422で返して書き込まない（部分保存なし）。
     for (const [fieldId, raw] of Object.entries(values)) {
       const field = byId.get(fieldId);
@@ -903,7 +891,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
     }
 
     /*
-     * M046: 複数項目の保存は同じ取引（1回のbatch）で確定する。
+     * 複数項目の保存は同じ取引（1回のbatch）で確定する。
      * 1件ずつ書くと、途中失敗で500なのに先に書けた分が残る部分保存になる。
      * batchは原子的で、1文でも失敗したら永続変更は0件になる。
      * 値は上で validate済みの正規化ずみが pending に入っている。
@@ -926,7 +914,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
 // POST /api/friend-fields/bulk
 //
 // 選んだ友だち全員に同じ値を入れる。人数が多いので、上限を置く。
-// N-045: staff も個人情報の項目だけ、attribute.personal_info.edit を
+// staff も個人情報の項目だけ、attribute.personal_info.edit を
 // 持っていれば実行できる。個人情報以外の項目は従来どおり owner/admin のみ。
 friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), async (c) => {
   try {
@@ -968,7 +956,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
       );
     }
 
-    // N-042: 型に合わない値は誰にも保存しない。所属検査の前に検証し、
+    // 型に合わない値は誰にも保存しない。所属検査の前に検証し、
     // 通らなければ422で返して書き込まない（部分保存なし）。
     const checked = validateFriendFieldValue(field, body.value);
     if (!checked.ok) {
@@ -980,7 +968,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
         }, 422, ["value"]);
     }
 
-    // N-043: 書込み前に全friendIdsの所属が要求lineAccountIdと完全一致するか検査する。
+    // 書込み前に全friendIdsの所属が要求lineAccountIdと完全一致するか検査する。
     // owner/adminが複数アカウントへアクセスできても、指定外の混在は部分更新せず404で拒否する。
     // 存在の有無・値が分からない汎用404を返す。
     for (const friendId of friendIds) {
@@ -990,7 +978,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
       }
     }
 
-    // N-046(#812): 冪等keyは内容に束縛する。同じkey＋同じ内容は収束再実行、
+    // 冪等keyは内容に束縛する。同じkey＋同じ内容は収束再実行、
     // 同じkey＋別内容は409、account違いの流用も409。keyなしは従来どおり。
     // keyの正準形はクライアントが送った値そのままで作る（正規化前で一致する）。
     const rawValue = typeof body.value === 'string' ? body.value : null;
@@ -1002,7 +990,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
     });
     if (idempotencyError) return idempotencyError;
 
-    // N-046(#812): 書き込みは1回のbatchで原子化する。途中で1文でも失敗したら
+    // 書き込みは1回のbatchで原子化する。途中で1文でも失敗したら
     // 永続変更は0件になる。値は事前validateずみの正規化ずみを使う。
     await setFriendFieldValuesBulk(c.env.DB, {
       fieldId: field.id,

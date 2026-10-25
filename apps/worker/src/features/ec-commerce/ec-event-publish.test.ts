@@ -76,7 +76,7 @@ describe('buildEcV6Event', () => {
   it('keeps the order subset readable for the ad-conversion mapping (#1460 compatible)', () => {
     const built = buildEcV6Event(sourceEvent('ec.order.confirmed'), 'friend-1');
     const eventData = (built.payload.eventData ?? {}) as Record<string, unknown>;
-    // #1460 adConversionForEvent と同じ読み方: order.total、なければeventData直下。
+    //  adConversionForEvent と同じ読み方: order.total、なければeventData直下。
     const order = (eventData.order as Record<string, unknown> | undefined) ?? eventData;
     expect(order.total).toBe(2860);
   });

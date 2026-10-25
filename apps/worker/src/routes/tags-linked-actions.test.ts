@@ -247,7 +247,7 @@ describe('タグ定義と共通アクション連動', () => {
   });
 
   /*
-   * #708: すでに整理済みのタグへ、画面が影響を読み直してからもう一度 archive を
+   * すでに整理済みのタグへ、画面が影響を読み直してからもう一度 archive を
    * 投げても、版も監査記録も増やさない。ここで止めたい崩れ方は2つ。
    *
    *   1. 何度でも 200 で成功し、tags.version が 2→3→4 と増える。
@@ -256,7 +256,7 @@ describe('タグ定義と共通アクション連動', () => {
    *
    * 409 は version_conflict / impact_changed と同じ番号だが、code を分けて
    * already_archived で返す。画面はこれを見て「失敗」ではなく「もう着いている」
-   * として見せる（#708 の裁定）。
+   * として見せる（ の裁定）。
    */
   it('整理済みのタグへの再 archive は 409 already_archived で止め、版も監査記録も増やさない', async () => {
     const created = await app(testDb.db).request('/api/tags', json('POST', {
@@ -293,7 +293,9 @@ describe('タグ定義と共通アクション連動', () => {
     expect(testDb.raw.prepare('SELECT status, version FROM tags WHERE id = ?').get(tagId))
       .toEqual({ status: 'archived', version: 2 });
 
-    /* 影響を読み直してから、もう一度投げる。前はここが 200 で通り、版が 3 になった。 */
+    /*
+ * 影響を読み直して再試行し、古い版のまま更新できないことを確かめる。
+ */
     const second = await archive();
     expect(second.status).toBe(409);
     await expect(second.json()).resolves.toMatchObject({

@@ -59,7 +59,7 @@ function storedStringList(value: unknown, allowed: ReadonlySet<string>): string[
 export type SubscriptionState = 'active' | 'paused' | 'at_risk' | 'cancelled';
 
 /**
- * 定期便の状態をどう読むかの表(#731)。**上から順に見て、先に当たったものが勝つ。**
+ * 定期便の状態をどう読むかの表。**上から順に見て、先に当たったものが勝つ。**
  *
  * 同じ判定を JS(`subscriptionState`)と SQL(`subscriptionStateSql`)の両方で
  * 使うので、**表はここ1か所だけに置く。**値が増えたときに片方だけ増える事故を
@@ -232,12 +232,8 @@ ecCommerce.get(
       GROUP BY event_type ORDER BY count DESC`,
   ).bind(...accountBindings, todayStart, tomorrowStart).all<{ event_type: string; count: number }>();
   /*
-   * 定期便の契約数(#731)。タブの数字はここから取る。
-   *
-   * 以前はタブが `/subscriptions?limit=1` を叩いていたが、あの口は行を取って
-   * から JS で数える作りだったので、**`limit=1` でも 500 行ぶん働いていた。**
-   * 件数は行を返さずに数えられる。`json_type` の守りは一覧側と同じで、
-   * 形の違うスナップショットで `json_each` がクエリごと落ちるのを防ぐ。
+   * タブの契約数だけを得るために行一覧を読み込まない。
+   * 一覧と同じ json_type の検証で、形式の異なるスナップショットが json_each 全体を失敗させるのを防ぐ。
    */
   const friendAccountWhere = lineAccountId
     ? 'f.line_account_id = ?'
@@ -273,7 +269,7 @@ ecCommerce.get(
         label: ecEventLabel(row.event_type, row.event_type),
         count: row.count,
       })),
-      /** 定期便の契約数。タブの数字用(#731)。 */
+      /** 定期便の契約数。タブの数字用。 */
       subscriptions: Number(subscriptionCount?.count ?? 0),
     },
   });
@@ -438,7 +434,7 @@ ecCommerce.get(
             customerName: row.customer_name == null ? null : String(row.customer_name),
             friendId: row.friend_id == null ? null : String(row.friend_id),
             retryAvailable: row.status === 'retryable_failed' && Number(row.attempt_count) < Number(row.max_attempts),
-            /* IDEA-23: 「未連携／権限不足／通信失敗」を一覧でも分けるための分類。 */
+            /* 「未連携／権限不足／通信失敗」を一覧でも分けるための分類。 */
             failureKind: classifyEcErrorCode(row.error_code == null ? null : String(row.error_code)),
             order: orderId == null ? null : {
               id: orderId,
@@ -516,9 +512,9 @@ ecCommerce.get(
 });
 
 /**
- * ページ送りを指定せずに呼ばれたときに返す件数(#731)。
+ * ページ送りを指定せずに呼ばれたときに返す件数。
  *
- * #722 と同じ考え方で、古い呼び出し側を壊さずに上限を置き、`Warning` で
+ *  と同じ考え方で、古い呼び出し側を壊さずに上限を置き、`Warning` で
  * ページ送りへ誘導する。ページ送りを指定した呼び出しにはこの上限はかからない。
  */
 const SUBSCRIPTIONS_NON_PAGINATED_MAX = 100;
@@ -576,7 +572,7 @@ ecCommerce.get(
 
   /*
    * 契約は1行の JSON 配列に入っているので、`json_each` で行へ展開してから
-   * 数える(#731)。行(=定期便を持つ友だち)を 500 で切って JS で数えていた
+   * 数える。行(=定期便を持つ友だち)を 500 で切って JS で数えていた
    * ころは、501人目以降の契約が一覧にも集計にも入らず、切ったことを知らせる
    * 手がかりも無かった。
    *
@@ -607,9 +603,7 @@ ecCommerce.get(
     )`;
 
   /*
-   * 並び順は、直しても変えないこと。次の発送日が早い順で、日付を持たない
-   * ものは末尾。同じ日付のときは、元の JS が安定ソートだったので
-   * 「同期の新しい行から、行の中の並び順」を保つ。
+   * 同じ結果を安定して返すため、次回発送日の昇順、日付なしは末尾とし、同日の場合は同期の新しい行と行内の順序を保つ。
    */
   const orderBy = 'ORDER BY (next_shipping_at IS NULL), next_shipping_at ASC, synced_at DESC, friend_id ASC, contract_index ASC';
   const stateWhere = filter === 'all' ? '' : 'WHERE state = ?';
@@ -654,7 +648,7 @@ ecCommerce.get(
         WHERE cancellation_reason IS NOT NULL AND cancellation_reason != ''
         GROUP BY cancellation_reason ORDER BY count DESC, reason ASC LIMIT 1`,
     ).bind(lineAccountId).first<{ reason: string; count: number }>(),
-    // 弾いた行。**黙って数から落とさない**ための数(#731)。
+    // 弾いた行。**黙って数から落とさない**ための数。
     c.env.DB.prepare(
       `SELECT COUNT(*) AS count
          FROM nen_ec_member_snapshots s JOIN friends f ON f.id = s.friend_id
@@ -689,7 +683,7 @@ ecCommerce.get(
       riskReason: row.state === 'at_risk' ? '定期便のお支払いを確認できませんでした' : null,
       nextShippingAt: row.next_shipping_at,
       /*
-       * IDEA-21: 定期便の変更先。ECが契約ごとに渡すマイページURLをそのまま出す。
+       * 定期便の変更先。ECが契約ごとに渡すマイページURLをそのまま出す。
        * https 以外や形の違う値は出さない（クリック先を偽装しない）。
        */
       manageUrl: [contract.manage_url, contract.mypage_subscription_url]
@@ -712,7 +706,7 @@ ecCommerce.get(
   const withAmount = Number(amountRow?.with_amount ?? 0);
 
   if (!hasPagination) {
-    // Header 値は ASCII のみ。日本語の案内は PR と票に残す(#722 と同じ)。
+    // Header 値は ASCII のみ。日本語の案内は PR と票に残す( と同じ)。
     c.header(
       'Warning',
       `299 - "non-paginated subscriptions are limited to ${SUBSCRIPTIONS_NON_PAGINATED_MAX} rows; use limit/offset"`,
@@ -764,8 +758,7 @@ ecCommerce.get(
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }
   /*
-   * healthの「今日」「この30日」もJSTの暦日で切る。`date('now')` はUTCで、
-   * JSTの朝9時前は「昨日」になり、月末も9時間ずれる。
+   * health の今日・この30日は JST の暦日で切る。UTC の date('now') では日本時間の朝9時前や月末の境界がずれる。
    */
   const healthTodayStart = jstDateString(0);
   const healthWindowStart = jstDateString(-29);
@@ -787,7 +780,7 @@ ecCommerce.get(
        FROM ec_events WHERE line_account_id = ?`,
     ).bind(healthTodayStart, healthWindowEnd, healthWindowStart, healthWindowEnd, lineAccountId).first<Record<string, unknown>>(),
     /*
-     * #948 N-320: 「止めると影響する数」は EC の出来事を起点にする設定だけを
+     *  「止めると影響する数」は EC の出来事を起点にする設定だけを
      * 数える。コラム・誕生日など EC と無関係なNEN配信、手動のマイル・項目を
      * 全体件数として混ぜると、止めても変わらないものまで影響に見える。
      * conversion_events と analytics_saved_analyses は EC 起点かを判定する

@@ -116,7 +116,7 @@ export function conversionRange(c: Context<Env>):
 }
 
 export const DEFINITION_STATUSES = new Set<ConversionDefinitionStatus>(['active', 'stopped', 'draft']);
-export // N-268: 導出状態での絞り込み。status 列そのものよりこちらが正確。
+export // 導出状態での絞り込み。status 列そのものよりこちらが正確。
 const DEFINITION_STATES = new Set<ConversionDefinitionFilter>([
   'active', 'draft', 'stopped', 'invalid', 'sourceStopped', 'unused',
 ]);
@@ -137,7 +137,7 @@ export function positiveVersion(value: unknown): number | null {
 }
 
 export /**
- * 操作理由の取り出し。台帳行を膨らませないよう200文字まで(#513 L14)。
+ * 操作理由の取り出し。台帳行を膨らませないよう200文字まで。
  *
  * 画面は決まった短い文言しか送らないが、口を直接叩く巨大文字から
  * 監査・履歴の行を守る。超えたら切り捨てず400で返す。
@@ -160,11 +160,7 @@ export function plainObject(value: unknown): Record<string, unknown> | null {
 }
 
 export /**
- * 成果地点の入力を1か所で検証する。
- *
- * 編集（新版化）は既にある地点を書き換えるので、店の指定は本文から取らない
- * （地点に紐づく店が正本）。同じ検証を2つ書くと片方だけ直したときに食い違うので、
- * 必須かどうかだけを切り替える。
+ * 同じ入力が経路ごとに異なる結果にならないよう、成果地点の検証を共有し、必須かどうかだけを切り替える。編集時の店は本文でなく既存地点から確定する。
  */
 function readDefinitionInput(body: Record<string, unknown>, options: { requireAccount?: boolean } = {}) {
   const requireAccount = options.requireAccount !== false;
@@ -260,7 +256,7 @@ export interface ConversionPointBody {
 
 export /**
  * 数え方を変える項目。稼働中または成果・利用先のある地点では
- * 旧PUTで触らせず、新版作成か停止後の手順へ案内する(N-254)。
+ * 旧PUTで触らせず、新版作成か停止後の手順へ案内する。
  * 名前だけは表示用で数え方に影響しないため対象外。
  */
 const CONVERSION_MEASURE_PATCH_KEYS = new Set([
@@ -302,7 +298,7 @@ function readMeasureOptions(
     } else if (typeof raw !== 'string' || !/^https?:\/\//.test(raw)) {
       return { ok: false, error: 'targetUrl must start with http:// or https://' };
     } else if (raw.trim().length > 2000) {
-      // 巨大なURLで計測行・台帳行を膨らませない(#513 L14)。
+      // 巨大なURLで計測行・台帳行を膨らませない。
       return { ok: false, error: 'targetUrl must be 2000 characters or less' };
     } else {
       targetUrl = raw.trim();
@@ -346,7 +342,7 @@ export // ── Approval Queue (ASP Phase 2) ───────────�
 const APPROVAL_STATUSES = new Set(['pending', 'approved', 'rejected']);
 
 export /**
- * 成果承認の門番(N-209)。
+ * 成果承認の門番。
  *
  * owner/adminは通す。一般staffは「/conversions の利用権」と
  * 「conversion.approval.edit の承認権」の両方を持つときだけ通す。
@@ -376,7 +372,7 @@ export function readApprovalDecision(body: { status?: unknown; expectedStatus?: 
     return { ok: false, error: 'status must be approved or rejected' };
   }
   // 版の代わりに「いま見えている状態」を必ず送る。送らない・壊れている
-  // 要求は保存せず400にする(N-208)。
+  // 要求は保存せず400にする。
   if (body.expectedStatus !== 'pending' && body.expectedStatus !== 'approved' && body.expectedStatus !== 'rejected') {
     return { ok: false, error: 'expectedStatus must be pending, approved, or rejected' };
   }
@@ -384,7 +380,7 @@ export function readApprovalDecision(body: { status?: unknown; expectedStatus?: 
 }
 
 export /**
- * 承認確定で案件の動作を実行した結果、未完に残ったもの(N-212)。
+ * 承認確定で案件の動作を実行した結果、未完に残ったもの。
  *
  * `retryable` は「同じ承認をもう一度送れば走り直すか」。無効な参照は
  * 再送しても直らない（案件の設定を直す必要がある）ので false。
@@ -452,7 +448,7 @@ async function notifyOfferActionFailure(
 
 export /**
  * 承認確定時に、成果の帰属先案件に設定されたタグ付与・シナリオ開始を
- * 実行する(N-212)。
+ * 実行する。
  *
  * - 冪等: タグは attachTagAndFireSideEffects（friend_tags の INSERT OR IGNORE +
  *   friend_tag_side_effect_runs 台帳）、シナリオは enrollFriendInScenario の
@@ -594,7 +590,7 @@ function offerActionFailureMessage(failures: OfferActionFailure[]): string {
 }
 
 export /**
- * POST /api/conversions/approvals/bulk — まとめて承認・却下する(N-213)。
+ * POST /api/conversions/approvals/bulk — まとめて承認・却下する。
  *
  * 単体と同じ契約を各対象へ適用する。結果は成功ID・競合ID・権限拒否ID・
  * その他失敗IDに分けて返し、途中失敗を全成功と表示させない。
@@ -618,7 +614,7 @@ export async function isEventVisibleToStaff(db: D1Database, staff: Authenticated
   return canAccessAllLineAccounts(db, staff, [row.line_account_id]);
 }
 
-export /** m22u R355: 一括の対象ごとの所属。行が無い・所属不明は null。 */
+export /** m22u : 一括の対象ごとの所属。行が無い・所属不明は null。 */
 async function bulkItemAccountId(db: D1Database, eventId: string): Promise<string | null> {
   const row = await db.prepare(
     `SELECT cp.line_account_id AS line_account_id FROM conversion_events ce
@@ -629,7 +625,7 @@ async function bulkItemAccountId(db: D1Database, eventId: string): Promise<strin
 }
 
 export /**
- * m22u R354: 承認通知を「欠けた分だけ1回」送る。
+ * m22u : 承認通知を「欠けた分だけ1回」送る。
  *
  * 承認状態（updated/already_set）と通知の送信状態を分け、同じ承認世代の
  * 通知は1回だけ送る。再試行の修復（already_set で版・マイルを補った場合）

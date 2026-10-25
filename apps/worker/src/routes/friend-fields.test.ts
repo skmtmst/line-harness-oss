@@ -37,7 +37,7 @@ const mocks = {
   getFriendById: vi.fn(),
   setFriendFieldValue: vi.fn(),
   setFriendFieldValuesBulk: vi.fn(),
-  // M046: 単票 PUT は1件ずつ書かず、1人の複数項目を1回の batch で書く。
+  // 単票 PUT は1件ずつ書かず、1人の複数項目を1回の batch で書く。
   setFriendFieldValuesForFriend: vi.fn(),
   jstNow: () => '2026-09-14T00:00:00.000+09:00',
   recordLoginAudit: vi.fn(),
@@ -115,7 +115,7 @@ function req(
   );
 }
 
-/** 項目作成の口を叩く。R515で要求キーが必須になったため、鍵を付けて送る。 */
+/** 項目作成の口を叩く。で要求キーが必須になったため、鍵を付けて送る。 */
 function createReq(app: ReturnType<typeof makeApp>, body: unknown, key = 'field-key-1') {
   return req(app, '/api/friend-fields?lineAccountId=account-1', 'POST', body, {
     'Idempotency-Key': key,
@@ -739,7 +739,7 @@ describe('一括変更', () => {
       value: 'ポチ',
     });
     expect(res.status).toBe(200);
-    // N-046(#812): 書き込みは1回のbatchにまとめる。
+    // 書き込みは1回のbatchにまとめる。
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
     expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(1);
     expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledWith(expect.anything(), {
@@ -959,7 +959,7 @@ describe('値の型検証（N-042 単票）', () => {
       values: { 'ff-num': '1,000', 'ff-sel': '柴犬' },
     });
     expect(res.status).toBe(200);
-    // M046: 1件ずつ書かず、正規化ずみを1回の batch にまとめる。
+    // 1件ずつ書かず、正規化ずみを1回の batch にまとめる。
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
     expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledTimes(1);
     expect(mocks.setFriendFieldValuesForFriend).toHaveBeenCalledWith(expect.anything(), {
@@ -1059,7 +1059,7 @@ describe('値の型検証（N-042 一括）', () => {
     mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...NUMBER_FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
     const res = await req(makeApp(), '/api/friend-fields/bulk', 'POST', bulk('ff-num', '1,000'));
     expect(res.status).toBe(200);
-    // N-046(#812): 正規化ずみを1回のbatchにまとめる。
+    // 正規化ずみを1回のbatchにまとめる。
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
     expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(1);
     expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledWith(expect.anything(), {

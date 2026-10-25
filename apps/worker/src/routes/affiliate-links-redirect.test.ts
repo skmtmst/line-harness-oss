@@ -1,18 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock @line-crm/db. index.ts pulls several helpers eagerly at module load, so
-// every referenced export must exist as a stub. The /r/:ref handler is the only
-// thing exercised here; unrelated helpers stay as bare vi.fn.
+// /r/:ref だけを試すため、DB の公開名を差し替え、ほかの機能は空の関数として依存解決する。
 const dbMocks = {
-  // eager module-load deps (mirror not-found.test.ts)
+
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
   // /r/:ref resolution helpers
   getEntryRouteByRefCode: vi.fn(),
-  // N-244: stopped-route check. Default null keeps every existing case on
-  // the legacy path (active hit / neither-table miss).
+  // 既定では停止経路を返さず、通常の命中と未検出を試す。
   getEntryRouteByRefCodeAny: vi.fn().mockResolvedValue(null),
   getTrafficPoolBySlug: vi.fn(),
   getTrafficPoolById: vi.fn(),
@@ -24,11 +21,10 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-// Import after the mock so index.ts binds the mocked helpers.
+// 差替済みのヘルパを入口へ接続するため、モック登録後に読み込む。
 const worker = (await import('../index.js')).default;
 
-// A stub DB is enough: every query goes through the mocked @line-crm/db
-// helpers, so the binding itself is never touched by the /r/:ref handler.
+// 全問い合わせが差替済みヘルパを通るため、D1 本体には触れない。
 const DB = {} as D1Database;
 
 const MOBILE_UA =
@@ -77,18 +73,16 @@ describe('/r/:ref — affiliate_links fallback', () => {
     expect(res.status).toBe(200);
     const html = await res.text();
 
-    // Click counted exactly once, keyed by the ref_code.
+    // 同じ ref_code でクリックを1回だけ数える。
     expect(dbMocks.incrementAffiliateLinkClick).toHaveBeenCalledTimes(1);
     expect(dbMocks.incrementAffiliateLinkClick).toHaveBeenCalledWith(DB, 'aff123');
 
-    // Landing page targets the affiliate link's account LIFF, with the ref
-    // carried into LIFF state so downstream ref_tracking still attributes.
+    // アフィリエイトの所属 LIFF を選び、友だち追加の帰属へ ref を引き継ぐ。
     expect(html).toContain('liff.line.me/2000000000-BbCcDd');
     expect(html).toContain('ref=aff123');
     expect(html).toContain('liffId=2000000000-BbCcDd');
 
-    // The pooled 'main' fallback must NOT run for an affiliate ref — its account
-    // is already resolved.
+    // 解決済みアカウントを上書きしないよう、アフィリエイトでは main プールへ戻らない。
     expect(dbMocks.getTrafficPoolBySlug).not.toHaveBeenCalled();
   });
 
@@ -133,15 +127,14 @@ describe('/r/:ref — affiliate_links fallback', () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(dbMocks.incrementAffiliateLinkClick).toHaveBeenCalledWith(DB, 'nulldef');
-    // No account lookup when line_account_id is null; default LIFF is used.
+    // アカウントなしでは参照を試さず、既定の LIFF を使う。
     expect(dbMocks.getLineAccountById).not.toHaveBeenCalled();
     expect(html).toContain('liff.line.me/1000000000-DefaultAA');
     expect(html).toContain('ref=nulldef');
   });
 
   it('(b) entry_routes ref → legacy behavior unchanged (affiliate path not consulted)', async () => {
-    // entry_route hit with an active pool → pooled account chosen, exactly as
-    // before this task. Affiliate helpers must never be touched.
+    // 有効なプールの経路があればそれを選び、アフィリエイト側は参照しない。
     dbMocks.getEntryRouteByRefCode.mockResolvedValue({
       ref_code: 'route1',
       pool_id: 'pool-1',
@@ -162,12 +155,12 @@ describe('/r/:ref — affiliate_links fallback', () => {
     expect(html).toContain('liff.line.me/3000000000-PoolAcct');
     expect(html).toContain('ref=route1');
 
-    // Affiliate fallback must be entirely bypassed for a known entry_route.
+    // 既知の流入経路はアフィリエイトの代替解決へ流さない。
     expect(dbMocks.getAffiliateLinkByRefCode).not.toHaveBeenCalled();
     expect(dbMocks.incrementAffiliateLinkClick).not.toHaveBeenCalled();
   });
 
-  // #514 重大4: 転送先が設定された経路はそちらへ 302 で送る。
+  //  重大4: 転送先が設定された経路はそちらへ 302 で送る。
   // 保存はするのに読まないままだった。
   it('(d) route with redirect_url → 302 to that URL', async () => {
     dbMocks.getEntryRouteByRefCode.mockResolvedValue({
@@ -199,8 +192,8 @@ describe('/r/:ref — affiliate_links fallback', () => {
   });
 
   it('(c) ref in neither table → legacy default behavior unchanged', async () => {
-    // entry_routes miss AND affiliate_links miss → falls through to the pooled
-    // 'main' resolution, same as before this task.
+    // 経路とアフィリエイトの両方になければ、
+    // main プールの解決へ戻す。
     dbMocks.getEntryRouteByRefCode.mockResolvedValue(null);
     dbMocks.getAffiliateLinkByRefCode.mockResolvedValue(null);
     dbMocks.getTrafficPoolBySlug.mockResolvedValue(null); // no 'main' pool
@@ -209,11 +202,11 @@ describe('/r/:ref — affiliate_links fallback', () => {
     expect(res.status).toBe(200);
     const html = await res.text();
 
-    // No click recorded for an unknown ref.
+    // 未知の ref はクリックとして記録しない。
     expect(dbMocks.incrementAffiliateLinkClick).not.toHaveBeenCalled();
-    // The 'main' pool fallback ran, proving legacy resolution still fires.
+    // main プールの代替解決も保たれることを確かめる。
     expect(dbMocks.getTrafficPoolBySlug).toHaveBeenCalledWith(DB, 'main');
-    // Default LIFF used; ref still carried through.
+    // 既定の LIFF でも ref は引き継ぐ。
     expect(html).toContain('liff.line.me/1000000000-DefaultAA');
     expect(html).toContain('ref=unknown');
   });

@@ -1,6 +1,6 @@
 import { processDueEcRetries } from '../features/ec-commerce/ec-retry.js';
 /*
- * N-328 / N-330 (#943): ECイベントからの顧客通知送信を、実D1で共通送信台帳
+ *  ECイベントからの顧客通知送信を、実D1で共通送信台帳
  * (notification_instances / notification_deliveries /
  *  notification_delivery_attempts) へつなぐことを固定する。
  *

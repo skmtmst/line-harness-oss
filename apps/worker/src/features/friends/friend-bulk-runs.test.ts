@@ -361,7 +361,7 @@ describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結す�
     testDb = createTestD1();
     addAccount(testDb.raw, 'account-1');
     insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', is_following: 1 });
-    // N-263: 実装は地点作成時にアカウントの統括を tenant_id へ写す。
+    // 実装は地点作成時にアカウントの統括を tenant_id へ写す。
     // 試験データも同じ形にする(account-1 は統括 'default')。
     testDb.raw.prepare(
       `INSERT INTO conversion_points (id, name, event_type, value, line_account_id, version, tenant_id)
@@ -396,7 +396,7 @@ describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結す�
       value_snapshot: 5000,
       point_version_snapshot: 3,
       affiliate_id: null,
-      // N-263: 記録した成果にも計測時の統括を写す。
+      // 記録した成果にも計測時の統括を写す。
       tenant_id: 'default',
     });
 

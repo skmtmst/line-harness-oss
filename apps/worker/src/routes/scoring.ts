@@ -75,7 +75,7 @@ scoring.post(
 
 // 交換履歴の一覧。残高を減らしたのに特典が届かなかった交換を、管理画面で
 // 見つけるための口。既定は要対応（失敗中＋送ったか分からない配送中）。
-// 照合待ちを既定の一覧から消さない（R364）。秘密の処理IDは落として返す。
+// 照合待ちを既定の一覧から消さない。秘密の処理IDは落として返す。
 scoring.get(
   '/api/mileage/redemptions',
   requireRole('owner', 'admin', 'staff'),
@@ -100,7 +100,7 @@ scoring.get('/api/mileage/earning-rules', requireRole('owner', 'admin', 'staff')
 
 /*
  * PUT /api/mileage/earning-rules-order — 「たまる決めごと」の並び順を
- * 全件まとめて保存する(N-243)。1件ずつ下書きPATCHを並列に投げる従来方式は
+ * 全件まとめて保存する。1件ずつ下書きPATCHを並列に投げる従来方式は
  * 途中失敗で一部だけ反映され得るため、rewards-order と同じ一括口の構造で
  * アカウントの一覧と一致する全順序だけを受け付ける。
  */
@@ -110,7 +110,7 @@ scoring.patch('/api/mileage/earning-rules/:id/draft', requireRole('owner', 'admi
 
 // POST /api/mileage/earning-rules/:id/publish — 下書きを公開版として固定し、実行へ反映する。
 //
-// N-231 案1。公開後に受け付けたイベントだけ新版で、公開前にキューへ入った
+//  案1。公開後に受け付けたイベントだけ新版で、公開前にキューへ入った
 // 未処理イベントは旧版のまま。既存の台帳・残高は変えない。
 scoring.post(
   '/api/mileage/earning-rules/:id/publish',
@@ -135,7 +135,7 @@ scoring.post(
 );
 
 /*
- * R: 高額調整の承認依頼の一覧・承認・差し戻し・取り下げ。
+ * 高額調整の承認依頼の一覧・承認・差し戻し・取り下げ。
  * 承認は「依頼した人とは別のオーナー」だけが行える（二者承認）。
  */
 scoring.get('/api/mileage/adjustment-approvals', requireRole('owner', 'admin'), get__api_mileage_adjustment_approvals_7);
@@ -159,7 +159,7 @@ scoring.post(
 );
 
 /*
- * R: 確定待ちの確定・取消。どちらも理由が必須。確定は pending→available、
+ * 確定待ちの確定・取消。どちらも理由が必須。確定は pending→available、
  * 取消は逆向きの記録を足す（台帳の行は消さない）。
  */
 scoring.post(
@@ -176,7 +176,7 @@ scoring.post(
 );
 
 /*
- * R380/R381: 手動調整の友だち通知だけをあとから再送する。
+ * 手動調整の友だち通知だけをあとから再送する。
  * 残高は動かさない。通知記録があれば保存済みの本文・送信キーで再送し、
  * 記録自体が作れなかった調整では台帳の依頼印（notifyFriend）を見て
  * 本文を組み直して送る。sent 済みの再送は sendMileageNotification 側で
@@ -198,8 +198,7 @@ scoring.get('/api/mileage/rules', requireRole('owner', 'admin', 'staff'), get__a
 
 scoring.get('/api/mileage/rules/export', requireMileageExport('mileage.ledger.export'), get__api_mileage_rules_export_4);
 
-// Generic authenticated ingestion point for future Harness products/SNS.
-// The request only records an event + queue row; mileage is calculated by cron.
+// 認証済みの共通入口ではイベントとキューだけを記録し、マイル計算は cron へ分ける。
 scoring.post('/api/mileage/events', requireRole('owner', 'admin'), inputJsonBoundary(), post__api_mileage_events_5);
 
 scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"eventType":["string"],"source":["null","string"],"amount":["number"],"initialStatus":["string"],"conditions":["null","object"],"validFrom":["null","string"],"validUntil":["null","string"],"lineAccountId":["string"],"isActive":["boolean"]}), post__api_mileage_rules_6);

@@ -27,11 +27,8 @@ friendAttributes.post('/api/support-marks/:id/restore', requireRole('owner', 'ad
 friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), inputJsonBoundary(), post__api_support_marks_3);
 
 /**
- * PATCH /api/support-marks/reorder — 並び順をまとめて書く（#1014 ATTR-02/03/04）。
- *
- * /api/support-marks/:id より前に置く。共有マークは `updateSupportMark` で
- * 複製＋付け替えが走るため、行ごとの PATCH に混ぜると「並び替えただけで
- * 共有マークが複製される」事故になる。ここでは動かせる行だけを入れ替える。
+ * 並び替えで共有マークを複製しないよう、個別 PATCH と分けて順序だけを更新する。
+ * /api/support-marks/:id に取り込まれないよう reorder の入口を先に登録する。
  */
 friendAttributes.patch('/api/support-marks/reorder', requireRole('owner', 'admin'), inputJsonBoundary(), patch__api_support_marks_reorder_4);
 
@@ -106,7 +103,7 @@ friendAttributes.post(
 friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), post__api_saved_searches_5);
 
 /**
- * PATCH /api/saved-searches/reorder — 並び順をまとめて書く（#1014 ATTR-02/03）。
+ * PATCH /api/saved-searches/reorder — 並び順をまとめて書く。
  *
  * /api/saved-searches/:id より前に置く。他人が作った検索へ行ごとの
  * PATCH は404で途中までしか反映されなかった。ここでは「動かせる行だけの
@@ -148,11 +145,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), inputJsonBo
 friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), inputJsonBoundary(), patch__api_folders_id_2);
 
 /*
- * V6R-S2-c: 隣り合う2つのフォルダの並びを、1回で入れ替える。
- *
- * 以前は画面が PATCH を2回送っていた。1回目だけ成功すると同じ番号のフォルダが
- * 2つ残り、番号が同じ2つは入れ替えても並びが変わらなかった。
- * 同じ種類・同じアカウント・同じ親のフォルダ同士だけを受け付ける。
+ * 片側だけの保存による順序の重複を防ぐため、隣接フォルダの並びを1回で交換する。同じ種類・同じアカウント・同じ親だけを受け付ける。
  */
 friendAttributes.post('/api/folders/:id/swap-order', requireRole('owner', 'admin'), inputJsonBoundary(), post__api_folders_id_swap_order_3);
 

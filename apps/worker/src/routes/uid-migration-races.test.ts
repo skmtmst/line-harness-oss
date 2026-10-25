@@ -9,10 +9,7 @@ import { friendMigrations } from './friend-migrations.js';
 import { mergedPeople } from './merged-people.js';
 
 /*
- * 監査 R391・R395・R396（UID移行の競合・保管履歴）の回帰試験。
- * モックではなく本物の SQLite に実ルートを載せ、監査の再現手順をなぞる。
- * 同時実行の割り込みは、確認読みと書込みの間に別担当の操作を差し込む。
- * 直しを戻すと赤くなることを確認済み。
+ * UID 移行の確認読取と書込の間に別担当の操作を差し込み、競合時の境界と保管履歴を実 route・実 SQLite で確かめる。
  */
 
 const executor: AuthenticatedStaff = {
@@ -236,7 +233,7 @@ describe('R391 保管状態の本人は詳細と履歴を開ける', () => {
     insertFriend(raw, 'friend-b', {
       line_account_id: 'account-b', display_name: '田中 はなこ', user_id: 'user-a',
     });
-    // R391の被害形: 本人は統括を持たない行（移行・判定で作られる形）。
+    // の被害形: 本人は統括を持たない行（移行・判定で作られる形）。
     raw.prepare(`
       INSERT INTO users (
         id, tenant_id, status, display_name, primary_display_name, revision,
@@ -317,11 +314,8 @@ describe('R391 保管状態の本人は詳細と履歴を開ける', () => {
 });
 
 /*
- * F-3 UID移行の新規作成（create）。
- * オーナー承認 2026-10-02：対応表の移行先UIDで友だちを作り、移行元の名前を
- * 引き継ぐ。切り戻しでは作った友だちを残し、結び付けだけ戻す。同じUIDが
- * 対象アカウントにあれば作らず採用し、並行作成・再送は一人に収束させる。
- * 対象外アカウントのUIDは越境させない。実SQLiteに実ルートを載せる。
+ * 移行先 UID で友だちを作り、名前は移行元から引き継ぐ。同じ UID が対象アカウントにあれば既存行へ収束させ、別アカウントへは越境させない。
+ * 切り戻しは作った友だちを残し、結び付けだけを戻す。実 route・実 SQLite で確かめる。
  */
 const creator: AuthenticatedStaff = {
   id: 'owner-1', name: '作成者', role: 'owner', readOnly: false, tenantId: DEFAULT_TENANT_ID,

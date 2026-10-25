@@ -25,7 +25,7 @@ export async function adminAccountScope(c: Context<Env>, alias = '') {
 }
 
 /**
- * 利用者入力を LIKE パターンに埋める前の逃がし (#496-18)。
+ * 利用者入力を LIKE パターンに埋める前の逃がし (-18)。
  *
  * `%` / `_` をそのまま渡すとワイルドカードとして効いて過剰一致する
  * （注入ではなく人数・ページ送りのぶれ）。`\` も逃がしたうえで、
@@ -53,13 +53,7 @@ export const requireIdempotencyKey: MiddlewareHandler<Env> = async (c, next) => 
   await next();
 };
 
-export /**
- * Friend serializer for the list endpoint. Adds firstTrackedLinkName +
- * chatStatus from the JOINed query, present only when the caller opted into
- * the chat-status path (?includeChatStatus=true). When absent, the fields
- * default to nullish so the response shape stays consistent for clients that
- * don't request them.
- */
+export /** JOIN で取得した流入名・チャット状態は、要求した場合だけ値を入れる。省略時も null 相当を保ち、応答形式を変えない。 */
 function serializeFriendListRow(
   row: DbFriend & {
     first_tracked_link_name?: string | null;
@@ -76,12 +70,10 @@ function serializeFriendListRow(
   if (!includeChatStatus) return base;
   return {
     ...base,
-    // L-step style "ASP_LP名" — the campaign/landing-page name the friend
-    // entered through, attributed once at friend-add time and never
-    // overwritten (see migration 022). LEFT JOINed in the list query.
+    // 友だち追加時の流入名は初回の帰属として固定し、後から上書きしない。migration 022 と同じ意味で扱う。
     firstTrackedLinkName: row.first_tracked_link_name ?? null,
-    // chats.status defaulted to 'resolved' for friends without a chats row
-    // (matches /api/chats listing). Friend-list and chats-list now agree on
+    // チャット行がない友だちも resolved とし、
+    // チャット一覧と友だち一覧で同じ扱いにする。
     // 未対応/対応中/対応済み state.
     chatStatus: (row.chat_status ?? 'resolved') as 'unread' | 'in_progress' | 'resolved',
     operatorId: row.operator_id ?? null,
@@ -92,7 +84,7 @@ function serializeFriendListRow(
   };
 }
 
-export /** Convert a D1 snake_case Tag row to the shared camelCase shape */
+export
 function serializeTag(row: DbTag) {
   return {
     id: row.id,

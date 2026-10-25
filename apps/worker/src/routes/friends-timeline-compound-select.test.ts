@@ -1,9 +1,9 @@
 /*
  * 友だちタイムライン `GET /api/friends/:id/timeline` の問い合わせ試験。
  *
- * 元は票 #717 の「8項 compound SELECT を D1 の
+ * 元は票  の「8項 compound SELECT を D1 の
  * SQLITE_MAX_COMPOUND_SELECT(既定5) 以下に収めるため 4+4 の CTE へ割る」
- * 直しの試験。IDEA-03 で専用ソースが 10 項（group_a 4 + group_b 4 +
+ * 直しの試験。 で専用ソースが 10 項（group_a 4 + group_b 4 +
  * group_c 2、外側 3 項）へ増えたので、ここでは今の問い合わせの
  * 契約を固定する。
  *
@@ -352,7 +352,7 @@ describe('GET /api/friends/:id/timeline（10ソースを3CTEへ割った問い�
   });
 
   /*
-   * IDEA-03「重複なし」。受信メッセージは messages_log と
+   * 「重複なし」。受信メッセージは messages_log と
    * analytics_events の両方へ記録される（webhook.ts）。
    * analytics 側の同じ出来事は履歴から外す。
    */

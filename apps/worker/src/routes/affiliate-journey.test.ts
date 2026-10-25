@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// The heavy set-based aggregation SQL is covered against real SQLite in
-// packages/db/test/affiliate-report.test.ts. Here we mock @line-crm/db and only
-// assert that the routes wire params/cursors through and shape the response.
+// 集計 SQL は DB パッケージの実 SQLite 試験で検証し、ここでは DB を差し替えて引数・カーソルの接続と応答形式を確かめる。
 const dbMocks = {
-  // eager module-load deps (mirror other route tests)
+
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
   getAccountSetting: vi.fn().mockResolvedValue(null),
@@ -16,7 +14,7 @@ const dbMocks = {
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // affiliate route deps
+
   getAffiliateById: vi.fn(),
   getAffiliateReportV2: vi.fn(),
   getFriendById: vi.fn(),
@@ -34,8 +32,7 @@ const env = {
   API_KEY,
 } as unknown as import('../index.js').Env['Bindings'];
 
-// These routes sit behind authMiddleware. getStaffByApiKey is mocked to return
-// undefined, so the env API_KEY owner fallback authenticates the Bearer token.
+// 個別キーの利用者が見つからない場合は、環境の API_KEY を owner とする既存の認証経路を試す。
 function call(path: string, init?: RequestInit) {
   const separator = path.includes('?') ? '&' : '?';
   const scopedPath = `${path}${separator}accountId=account-1`;

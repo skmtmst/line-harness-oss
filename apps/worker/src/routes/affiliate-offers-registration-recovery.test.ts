@@ -5,13 +5,7 @@ import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { Env } from '../worker-env.js';
 
-/**
- * Issue #686 差し戻し対応の実 Worker + 実 D1（better-sqlite3 に bootstrap.sql
- * を流したもの）による検証（案件 = affiliate_offers 側）。
- *
- * apps/worker/src/routes/affiliate-offers.ts は本物のまま mount し、
- * @line-crm/db はモックしない。
- */
+/** 案件登録の再送と回復を実 Worker と実 SQLite で検証する。DB 関数と route は実物を通す。 */
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({
@@ -70,7 +64,7 @@ function seed(sqlite: Database.Database) {
   ).run(ACCOUNT_A);
 
   // account-b だけを見られるスタッフ。操作UUIDの回収が account を跨がない
-  // ことを確かめる側（#686 審査3）。
+  // ことを確かめる側（ 審査3）。
   sqlite.prepare(
     `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)
      VALUES ('scoped-staff-b', '担当者B', 'admin', 'key-scoped-staff-b', ?, 'accounts')`,
@@ -182,7 +176,7 @@ describe('POST /api/affiliate-offers — cross-account への作成を拒む (#6
   });
 
   /*
-   * 案件側も、操作UUIDの回収を LINEアカウントの内側だけで効かせる（#686 審査3）。
+   * 案件側も、操作UUIDの回収を LINEアカウントの内側だけで効かせる（ 審査3）。
    * 回収SELECTから line_account_id を落とすと、別アカウントのスタッフが
    * 他店の operationId を送っただけで他店の案件（名前・報酬額）が返る。
    */
@@ -338,7 +332,7 @@ describe('PUT /api/affiliate-offers/:id — 途中保存後の再開は全項目
     }, env);
     const { data: created } = await create.json() as { data: { id: string } };
 
-    // 旧実装（PR #1508 差し戻し版）の再開PUTは isActive しか送らない。
+    // isActive だけを送る部分 PUT では、入力済みの他項目を引き継げない。
     const narrow = await app.request(`/api/affiliate-offers/${created.id}`, {
       method: 'PUT',
       body: JSON.stringify({ isActive: false }),
@@ -347,7 +341,7 @@ describe('PUT /api/affiliate-offers/:id — 途中保存後の再開は全項目
 
     const row = sqlite.prepare(`SELECT name, reward_amount FROM affiliate_offers WHERE id = ?`)
       .get(created.id) as { name: string; reward_amount: number };
-    // 直したはずの値が失われている＝narrow PUTでは画面上の編集が消えることの証明。
+    // 一部項目だけの PUT では画面で編集した値が失われることを対照として確かめる。
     expect(row.name).toBe('編集前の案件名2');
     expect(row.reward_amount).toBe(100);
   });

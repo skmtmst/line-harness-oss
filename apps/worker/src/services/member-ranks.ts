@@ -37,7 +37,7 @@ export async function rankEvaluationStatements(db:D1Database,a:string,p:Awaited<
  db.prepare('DELETE FROM friend_tags WHERE friend_id=? AND tag_id IN(SELECT tag_id FROM member_rank_tiers WHERE account_id=?)').bind(d.id,a),
  db.prepare('INSERT OR IGNORE INTO friend_tags(friend_id,tag_id) VALUES(?,?)').bind(d.id,d.tier.tagId));
  }
- // Notice ledger remains simulation-only and is committed with the rank decision.
+ // 通知台帳はシミュレーションだけとし、ランク判定と一緒に確定する。
  return ops;
 }
 export async function evaluateRanks(db:D1Database,a:string,initial:boolean,now=new Date()){

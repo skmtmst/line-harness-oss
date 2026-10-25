@@ -1,9 +1,6 @@
 /*
- * #699: タグ付与後の副作用が1度落ちると二度と走らない欠陥の回帰試験。
- *
- * 実DB相当 (better-sqlite3 + bootstrap.sql) で、本物の
- * enqueueMileageEvent / enrollFriendInScenario / fireEvent を走らせる。
- * 障害は module のモックではなく、DB 側の TRIGGER か D1 の殻の層で起こす。
+ * タグ付与後に副作用が失敗しても回復できることを、実 SQLite と実 enqueueMileageEvent / enrollFriendInScenario / fireEvent で確かめる。
+ * 障害はモジュール全体の差替でなく、DB の TRIGGER または D1 の境界へ注入する。
  */
 import { afterEach, beforeEach, describe, expect, test, vi, type MockInstance } from 'vitest';
 import type Database from 'better-sqlite3';
@@ -58,7 +55,7 @@ async function setup() {
        VALUES ('rule-1', 'タグ変化', 'tag_change', 5)`,
     )
     .run();
-  // 参加には明示公開が要る（351 / #644）。稼働中の状態にしてから試す。
+  // 参加には明示公開が要る。稼働中の状態にしてから試す。
   await publishScenarioVersion(db, 'scenario-1', {
     staffId: null,
     idempotencyKey: 'tag-attach-ledger-seed',

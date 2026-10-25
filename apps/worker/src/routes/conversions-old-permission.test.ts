@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
-// #513 M1・M7 の契約。
+// 承認の権限と成功時の監査記録の契約を検証する。
 //
 // M1: 旧口3つ(GET points/events/approvals)は定義系と同じ
 //     `conversionPermission('view')` で縛る。`/conversions` 権限の無い
@@ -20,9 +20,9 @@ const dbMocks = {
   decideConversionApproval: vi.fn(),
   syncAffiliateConversionMileage: vi.fn().mockResolvedValue(undefined),
   getConversionApprovalNotifyInfo: vi.fn().mockResolvedValue(null),
-  // N-212 の案件動作はここでは対象外 — 案件なしとして通す。
+  //  の案件動作はここでは対象外 — 案件なしとして通す。
   getConversionOfferActionPlan: vi.fn().mockResolvedValue(null),
-  // #819: 取消台帳。権限試験では「取り消し無し」にする。
+  // 取消台帳。権限試験では「取り消し無し」にする。
   getReversedEventIds: vi.fn().mockResolvedValue(new Set<string>()),
   listConversionReversals: vi.fn().mockResolvedValue([]),
   appendConversionReversal: vi.fn(),

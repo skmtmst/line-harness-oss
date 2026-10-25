@@ -107,14 +107,8 @@ const STALE_DELIVERY_LEASE_MS = 5 * 60 * 1000;
 const CONFIRM_RETRIES = 3;
 
 /**
- * **送っていないことが確かなまま譲る合図。**
- *
- * 別の走者が手順の貸出を握っているだけで、こちらは外部へ1バイトも
- * 送っていない。`MileageRedemptionConfirmError` と混ぜると
- * 「特典の送信は終わっています」と事実に反する返事をし、しかも交換が
- * `delivering` に残って「届かなかった交換」の一覧から消える。
- * 押した人からは何が起きたか分からなくなるので、別の合図にして
- * 交換を押す前の状態へ戻す(#641 司令塔独立審査の差し戻し)。
+ * 別の実行者が貸出を保持していて外部へ送っていない場合は、送信完了と区別する。
+ * MileageRedemptionConfirmError と混ぜると事実と異なる応答を返し、delivering のまま失敗一覧から取り残すため、専用の合図で交換を元へ戻す。
  */
 class RedemptionStepBusyError extends Error {
   constructor() {
@@ -124,7 +118,7 @@ class RedemptionStepBusyError extends Error {
 }
 
 /**
- * R344: 最初の送信から24時間を過ぎた手順の合図。
+ * 最初の送信から24時間を過ぎた手順の合図。
  * 同じキーで送り直すと LINE 側が新規受付して二重に届くので、
  * 送らず・確定もせず、人が確かめる照合待ちに残す。
  * 確定失敗と同じ扱い（失敗に落とさない・返却しない）。
@@ -139,7 +133,7 @@ class RedemptionRetryKeyExpiredError extends Error {
   }
 }
 
-/** R344 の合図かどうか。code・名前でも見る。 */
+/**  の合図かどうか。code・名前でも見る。 */
 function isRetryKeyExpiredError(error: unknown): error is RedemptionRetryKeyExpiredError {
   if (error instanceof RedemptionRetryKeyExpiredError) return true;
   return error instanceof Error
@@ -148,7 +142,7 @@ function isRetryKeyExpiredError(error: unknown): error is RedemptionRetryKeyExpi
 }
 
 /**
- * R364: 照合待ちの手順のうち、送り直しても安全な種類。
+ * 照合待ちの手順のうち、送り直しても安全な種類。
  * Webhook は受け先で二重に処理されるため、自動では回復しない。
  * タグ・属性・シナリオ・リッチメニューは何度実行しても同じ結果、
  * メッセージは同じキーで LINE 側が重複を防ぐ（期限内のみ）。
@@ -236,7 +230,7 @@ export async function deliverMileageReward(
   }
   if (plan.redemption.status === 'refunded') {
     /*
-     * R362: 返却確定後に台帳・ロットの書き込みが中断した行は、
+     * 返却確定後に台帳・ロットの書き込みが中断した行は、
      * ここで欠けた分を足してから案内する。残高・台帳・状態が
      * 一致するまで復旧する。直せなくても案内は変えない
      * （cron・再試行の回復に任せる）。
@@ -292,7 +286,7 @@ export async function deliverMileageReward(
         fetch: options.fetch,
         now: options.now,
       });
-      // R344: 最初の送信から24時間を過ぎた手順は同じキーで送らない。
+      // 最初の送信から24時間を過ぎた手順は同じキーで送らない。
       const retryKeyExpiresAt = new Date(
         new Date(now).getTime() - MILEAGE_REWARD_RETRY_KEY_VALIDITY_MS,
       ).toISOString();
@@ -336,7 +330,7 @@ export async function deliverMileageReward(
             }
             if (recovery) {
               /*
-               * R364: 回復のやり直しで失敗したら、送ったか分からないので
+               * 回復のやり直しで失敗したら、送ったか分からないので
                * 照合待ちのまま残す。証言は消さない（消すことは
                * 「送っていないことの確定」であり、回復時は言えない）。
                * 失敗にも落とさない（返却の素にしない）。
@@ -422,7 +416,7 @@ export async function deliverMileageReward(
       };
     }
     if (isRetryKeyExpiredError(error)) {
-      // R344: 期限切れは自動で送らない。理由だけ残し、人が確かめる。
+      // 期限切れは自動で送らない。理由だけ残し、人が確かめる。
       await db.prepare(
         `UPDATE mileage_redemptions
             SET failure_code = 'retry_key_expired',
@@ -465,7 +459,7 @@ export async function deliverMileageReward(
     });
     if (plan.failurePolicy === 'refund') {
       /*
-       * R361: 一部の手順を渡し終えていたら、全額は返さない。
+       * 一部の手順を渡し終えていたら、全額は返さない。
        * 渡し終えた分は返さず、未完了の手順だけやり直せるよう
        * 失敗のまま残す。返却の判断は提供済み内容と一緒に人が行う。
        */
@@ -493,7 +487,7 @@ export async function deliverMileageReward(
           reason: '特典を渡せなかったためマイルを自動で戻す',
         });
       } catch (refundError) {
-        // R362: 返却より先に再試行が成功していたら、成功を返す。
+        // 返却より先に再試行が成功していたら、成功を返す。
         // 遅れた返却で成功済みの交換を書き換えない。
         if (refundError instanceof MileageRewardError && refundError.code === 'already_delivered') {
           return {
@@ -590,7 +584,7 @@ export async function processDueMileageRewardDeliveries(
     else failed += 1;
   }
   /*
-   * R362: 返却確定後に書き込みが中断した交換（台帳なしの refunded）。
+   * 返却確定後に書き込みが中断した交換（台帳なしの refunded）。
    * 期限待ちの一覧にも要対応にも出ない取り残しなので、cron が
    * 見つけて残高・台帳・状態が一致するまで再開する。
    * 機能オフ中は触らず残す。再オンで再開する。

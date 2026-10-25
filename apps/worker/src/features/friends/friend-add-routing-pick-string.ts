@@ -39,12 +39,7 @@ export function normalizeActions(value: unknown): FriendAddAction[] {
     const kind = (item as { kind?: unknown }).kind;
     if (kind === 'tag') {
       /*
-       * 古い形。**読むときに新しい形へ直す。**
-       *
-       * 以前は「タグを1つ付ける」しかできなかった。外すこともフォルダを
-       * 指定することもできない。シナリオ側には同じことをする仕組みが
-       * あるので、そちらへ寄せた。既に保存されている設定を読めなくすると
-       * 「設定が消えた」ことになるので、ここで直す。
+       * 保存済みの単一タグ設定も失わないよう、読込時にタグ・フォルダ操作を表せる共通形式へ変換する。
        */
       const tagId = (item as { tagId?: unknown }).tagId;
       if (typeof tagId === 'string' && tagId) {
@@ -181,7 +176,7 @@ export function classifyFriend(
 }
 
 // ── 実行時条件（曜日・時間帯・友だち条件・再送制限） ─────────────────────────
-// N-101: 公開版に保存できる曜日・時間帯・友だち条件・再送制限を、
+// 公開版に保存できる曜日・時間帯・友だち条件・再送制限を、
 // 本番の振り分けでも実際に効かせる。競合確認（routes/friend-add-rules.ts）
 // と同じ関数・同じ意味で判定する。
 

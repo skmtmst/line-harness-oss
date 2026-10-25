@@ -105,7 +105,7 @@ export type EcEvent = {
     }>;
   };
   /**
-   * 公式サイトの掲載写真の閲覧数（F-20）。
+   * 公式サイトの掲載写真の閲覧数。
    * ECが数えた累計を写真ID単位で送る。musuboは大きい方だけ残す。
    */
   publication_views?: PublicationViewSample[] | null;

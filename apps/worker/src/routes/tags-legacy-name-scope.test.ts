@@ -13,8 +13,7 @@ beforeEach(() => {
   sql = fixture.raw;
   db = fixture.db;
   beforeBulkInsert = undefined;
-  // D1 run returns rows for INSERT RETURNING; the generic fixture only models
-  // run changes. Use real SQLite RETURNING here, never simulate uniqueness.
+  // 一意性を偽の返答で保証しないよう、実 SQLite の INSERT RETURNING を使い、D1 の結果と合わせる。
   const prepare = db.prepare.bind(db);
   db.prepare = ((query: string) => {
     if (!/^INSERT OR IGNORE INTO tags/.test(query)) return prepare(query);
@@ -43,7 +42,7 @@ async function request(path: string, method: string, body: unknown) {
 
 describe('legacy tags after migration 382: real SQLite and HTTP', () => {
   test('same-name POST returns 409, including pre-existing NULL normalized_name', async () => {
-    // N-048(#803): 旧作成の作り先は単一割当へ自動確定する。NULL行は作らない。
+    // 旧作成の作り先は単一割当へ自動確定する。NULL行は作らない。
     sql.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES ('a1','A','fixture-a1','x','x')").run();
     sql.exec("INSERT INTO tags(id,name) VALUES ('old','ＶＩＰ　会員')");
     expect((await request('/api/tags', 'POST', { name: 'vip 会員' })).status).toBe(409);
@@ -56,7 +55,7 @@ describe('legacy tags after migration 382: real SQLite and HTTP', () => {
   });
 
   test('concurrent CSV imports that both passed preflight create one row and report a skip', async () => {
-    // N-048(#803): 一括作成の作り先は単一割当へ自動確定する。NULL行は作らない。
+    // 一括作成の作り先は単一割当へ自動確定する。NULL行は作らない。
     sql.prepare("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES ('a1','A','fixture-a1','x','x')").run();
     let arrived = 0, release!: () => void;
     const bothReady = new Promise<void>(resolve => { release = resolve; });

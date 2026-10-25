@@ -116,7 +116,7 @@ export const MILEAGE_ADJUSTMENT_REASON_CATEGORIES = new Set([
   'other',
 ]);
 
-export // N-237: 決めごとのCSVはサーバー側で作る。許可scope内の決めごとだけを出し、
+export // 決めごとのCSVはサーバー側で作る。許可scope内の決めごとだけを出し、
 // 既存の監査契約へ残す。ブラウザだけで権限判定を完結させない。
 // 表示側(apps/web/src/app/mileage/page.tsx)の列・文言とそろえる。
 const MILEAGE_RULE_EVENT_LABELS: Record<string, string> = {

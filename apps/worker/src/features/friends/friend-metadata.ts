@@ -1,7 +1,7 @@
 import { jstNow } from '@line-crm/db';
 
 type Options = { lineAccountId?: string; expectedUpdatedAt?: string; deleteNull?: boolean; maxBytes?: number; firstTouchKeys?: string[] };
-/** Merge top-level fields inside the UPDATE so concurrent writers never reuse a stale JSON document. */
+/** 古い JSON による同時更新の上書きを防ぐため、UPDATE 内で最上位の項目を結合する。 */
 export function friendMetadataPatchStatement(db: D1Database, friendId: string, patch: Record<string, unknown>, options: Options = {}): D1PreparedStatement {
   const data = JSON.stringify(patch);
   const merged = `(SELECT json_group_object(key, json(encoded)) FROM (

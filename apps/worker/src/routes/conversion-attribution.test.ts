@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Route-level test for the attribution explanation endpoint (#823):
-//   GET /api/conversions/events/:id/attribution
-// The db layer is mocked — real decision behaviour is covered against SQLite
-// in packages/db/test/472_473_affiliate_rules.test.ts. Here we assert the
-// visible-scope guard, serialization, and the 404 for a conversion without
-// a recorded decision.
+// 帰属の決定処理は DB の実 SQLite 試験で検証し、ここでは可視範囲・応答形式・決定記録のない成果の404を確かめる。
 const dbMocks = {
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
@@ -18,7 +13,7 @@ const dbMocks = {
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
-  // conversions route deps
+
   getConversionPoints: vi.fn(),
   getConversionPointById: vi.fn(),
   createConversionPoint: vi.fn(),

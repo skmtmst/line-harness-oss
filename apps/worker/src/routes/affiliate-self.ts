@@ -18,21 +18,10 @@ import { sha256Hex } from '../middleware/auth.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { deliverMileageReward } from '../features/mileage/mileage-reward-delivery/index.js';
 
-/**
- * Self-serve affiliate API for LIFF clients.
- *
- * Auth boundary: these endpoints are authenticated ONLY by a LINE access token
- * that the LIFF SDK obtains client-side. The token is verified against LINE's
- * OAuth2 + profile endpoints server-side; the resulting LINE userId is resolved
- * to a friend row, and the affiliate is resolved from THAT friend. Clients never
- * pass an affiliate_id — it is always derived server-side from the verified
- * token, so one affiliate can never read or mutate another's data.
- *
- * authMiddleware skips `/api/liff/*` (staff auth), so verification lives here.
- */
+/** LIFF の LINE アクセストークンをサーバーで OAuth2/profile 検証し、その userId の友だちから参加者を解決する。別の人のデータへ触れないよう、クライアントから affiliate_id を受け取らない。/api/liff はスタッフ認証を通らないため、ここで本人確認する。 */
 const affiliateSelfRoutes = new Hono<Env>();
 
-// URL credentials must never enter access logs, caches, or referrers.
+// URL の資格情報をログ・キャッシュ・参照元へ漏らさない。
 const privateSelfAccess: MiddlewareHandler<Env> = async (c, next) => {
   c.header('Cache-Control', 'private, no-store');
   c.header('Referrer-Policy', 'no-referrer');
@@ -46,14 +35,10 @@ const privateSelfAccess: MiddlewareHandler<Env> = async (c, next) => {
 affiliateSelfRoutes.use('/api/liff/mileage/*', privateSelfAccess);
 affiliateSelfRoutes.use('/api/liff/affiliate/*', privateSelfAccess);
 
-/** Max self-issued links per affiliate. The 21st issuance is a 400. */
+/** 自分で発行できるリンクは20本に制限し、21本目は400で拒む。 */
 const MAX_SELF_LINKS = 20;
 
-/**
- * Shape each affiliate link into the client-facing row. `stats` maps ref_code →
- * per-link counters (getAffiliateLinkStats). A link absent from the map (e.g. a
- * freshly issued link with no activity yet) defaults to zeros.
- */
+/** リンク別集計は ref_code で対応させる。新規で操作記録がないリンクは0として返す。 */
 function serializeLink(
   link: AffiliateLink,
   baseUrl: string,
@@ -67,7 +52,7 @@ function serializeLink(
     url: `${baseUrl}/${link.ref_code}`,
     clickCount: link.click_count,
     friendAdds: s?.friendAdds ?? 0,
-    // conversions = non-rejected total (approved + pending), kept for compat.
+    // 互換性のため、否認されていない承認済み・保留中の合計を conversions とする。
     conversions: s?.conversions ?? 0,
     conversionsPending: s?.conversionsPending ?? 0,
     conversionsApproved: s?.conversionsApproved ?? 0,
@@ -76,11 +61,7 @@ function serializeLink(
   };
 }
 
-/**
- * Build an offerId → name lookup once per request so serializeLink can label
- * offer-scoped links without an N+1 fetch. Includes inactive offers so an
- * already-issued link's name still resolves after its offer is deactivated.
- */
+/** N+1 を避けて案件名を1回で解決する。発行済みリンクの名前が消えないよう、停止中の案件も含める。 */
 async function loadOfferNames(
   db: D1Database,
   lineAccountId: string,
@@ -103,12 +84,7 @@ function serializeAffiliate(aff: Affiliate) {
   };
 }
 
-/**
- * GET /api/liff/mileage/me — wallet for any verified LINE friend.
- *
- * This intentionally does not require affiliate registration. The same wallet
- * will later receive webinar, CTA, Instagram and other engagement mileage.
- */
+/** マイルはアフィリエイト以外の利用でも貯まるため、確認済みの LINE 友だちなら参加者登録なしで残高を読める。 */
 affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
   try {
     const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
@@ -149,7 +125,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
   }
 });
 
-/** Published mileage uses for the verified friend. Unknown numbers stay null. */
+/** 確認済みの友だちに公開済みの利用先を返す。未知の数字は null のまま保つ。 */
 affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
   try {
     const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
@@ -253,11 +229,7 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', inputJsonBounda
   }
 });
 
-/**
- * POST /api/liff/affiliate/register — idempotent self-registration.
- * Body: { lineAccessToken }. If already registered, returns the existing
- * affiliate + links. On first registration, auto-issues one link.
- */
+/** 登録の再送は既存の参加者とリンクを返す。初回だけリンクを1本作り、二重登録を防ぐ。 */
 affiliateSelfRoutes.post('/api/liff/affiliate/register', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req
@@ -302,11 +274,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', inputJsonBoundary(), as
         lineAccountId: resolved.lineAccountId,
       });
     } catch (createErr) {
-      // Concurrent double-register: two requests both passed the getAffiliateBy-
-      // FriendId check, then raced the INSERT. The UNIQUE(friend_id) index makes
-      // the loser throw — recover by returning the winner's row so register stays
-      // idempotent even under a race. Re-throw anything that isn't the expected
-      // uniqueness collision.
+      // 同時登録で UNIQUE(friend_id) に負けても、勝者の行を取得して同じ登録として返す。想定した一意制約以外の例外は握り潰さない。
       const raced = await getAffiliateByFriendId(db, friend.id, resolved.lineAccountId);
       if (!raced) throw createErr;
       const links = await listAffiliateLinks(db, raced.id, {
@@ -320,7 +288,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', inputJsonBoundary(), as
         links: links.map((l) => serializeLink(l, baseUrl, stats, offerNames)),
       });
     }
-    // Auto-issue the first link on registration.
+
     const firstLink = await createAffiliateLink(db, {
       affiliateId: affiliate.id,
       lineAccountId: resolved.lineAccountId,
@@ -335,10 +303,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', inputJsonBoundary(), as
   }
 });
 
-/**
- * GET /api/liff/affiliate/me — return the caller's affiliate
- * profile + links. 404 if the caller is a friend but not yet registered.
- */
+/** LINE の友だちでも未登録なら404とし、本人の参加者情報とリンクだけを返す。 */
 affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
   try {
     const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
@@ -483,7 +448,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
   try {
     c.header('Cache-Control', 'private, no-store');
     c.header('Referrer-Policy', 'no-referrer');
-    // Old emailed/LINE links guide to LIFF, without copying token/query values.
+    // 保存済みのメール・LINE のリンクは LIFF へ案内し、トークンやクエリを複製しない。
     if (!c.req.header('Authorization') && !c.req.query('signature') && !c.req.query('expires') && c.req.query('issue') !== '1') {
       return c.redirect(customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', c.req.param('id')), 303);
     }
@@ -528,20 +493,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
   }
 });
 
-/**
- * POST /api/liff/affiliate/links — issue a new self-serve link.
- * Body: { lineAccessToken, label?, offerId? }. Enforces the 20-link cap
- * (21st → 400).
- *
- * When `offerId` is supplied the new link is scoped to that offer, which powers
- * the "この案件用のリンクを追加" action on each offer card. The offer must be
- * active (404 otherwise) and the caller must already be enrolled in it — i.e.
- * have at least one existing link for that offer (400 「先に案件に参加してください」
- * otherwise). Offer-scoped links carry the offer's line_account_id so their
- * attribution matches the enroll-issued link.
- *
- * Omitting `offerId` keeps the existing generic-link behaviour untouched.
- */
+/** 自己発行は20本までとする。offerId があれば稼働中かつ参加済みの案件だけに発行し、案件の line_account_id を継承して帰属をそろえる。未指定は汎用リンクとして扱う。 */
 affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req
@@ -572,9 +524,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async
       return inputError(c, { success: false, error: `Link limit reached (max ${MAX_SELF_LINKS})` }, 400, ["lineAccessToken"]);
     }
 
-    // offerId is optional. When present, gate issuance on an active offer the
-    // caller has already joined so an offer-scoped link can never be minted for
-    // an offer the affiliate isn't participating in (or one that's been hidden).
+    // 非表示・未参加の案件へリンクを作らせないよう、offerId 指定時は有効状態と参加を検証する。
     const offerId = typeof body.offerId === 'string' && body.offerId ? body.offerId : null;
     let offerLineAccountId: string | null = null;
     if (offerId) {
@@ -613,14 +563,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async
   }
 });
 
-/**
- * GET /api/liff/affiliate/offers — list active offers with the
- * caller's participation state. For enrolled offers, the caller's offer-scoped
- * refCode + url are returned so the LIFF page can show "あなたの◯◯案件用リンク".
- *
- * The caller must be a registered affiliate (404 otherwise) — offers are only
- * meaningful once you have an affiliate identity to attach links to.
- */
+/** 案件のリンクを本人へ結び付ける必要があるため、登録済み参加者だけに稼働中の案件と参加状態を返す。 */
 affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
   try {
     const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
@@ -652,16 +595,14 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
     });
     const baseUrl = await resolveLinkBaseUrl(db, c.env);
 
-    // Map offerId → the earliest link for this affiliate scoped to that offer.
-    // listAffiliateLinks orders newest-first, so iterate in reverse to keep the
-    // oldest (matching enroll's earliest-wins idempotency).
+    // 再参加でも同じリンクを返すため、新しい順の一覧を逆から読み、案件ごとに最初の発行を採用する。
     const linkByOffer = new Map<string, AffiliateLink>();
     for (let i = links.length - 1; i >= 0; i--) {
       const l = links[i];
       if (l.offer_id) linkByOffer.set(l.offer_id, l);
     }
 
-    // 案件の決まり(今の版)と上限の残りを添える(#823)。上限に達した受付の
+    // 案件の決まり(今の版)と上限の残りを添える。上限に達した受付の
     // 自動停止は、紹介した人の画面にも出す。
     const data = [];
     for (const o of offers) {
@@ -692,12 +633,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
   }
 });
 
-/**
- * POST /api/liff/affiliate/offers/:id/enroll — join an offer, issuing an
- * offer-scoped link. Idempotent per affiliate×offer (re-enroll returns the
- * existing link). Inactive/unknown offers → 404.
- * Body: { lineAccessToken }.
- */
+/** 再参加でもリンクを増やさず同じ参加者・案件の最初のリンクを返す。無効・未知の案件は404とする。 */
 affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req
@@ -723,9 +659,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', inputJsonBound
       return c.json({ success: false, error: 'Not registered as an affiliate' }, 404);
     }
 
-    // Guard on active offers only. Enrolling in a hidden/inactive offer must not
-    // be possible from the self-serve LIFF surface. (enrollAffiliateInOffer
-    // itself throws on a truly-missing offer; the activeOnly list is the gate.)
+    // 非表示・停止中の案件へ参加できないよう、有効な案件一覧で絞る。
     const activeOffers = await listAffiliateOffers(db, {
       activeOnly: true,
       lineAccountIds: [resolved.lineAccountId],
@@ -735,7 +669,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', inputJsonBound
       return fail(c, 404, 'OFFER_NOT_FOUND');
     }
 
-    // 上限に達した案件の受付は自動で止める(#823)。参加済みの人の紹介リンクは
+    // 上限に達した案件の受付は自動で止める。参加済みの人の紹介リンクは
     // 残るが、新しい参加と成果の付与は止まる。
     const capStatus = await getOfferCapStatus(db, offer.id, { affiliateId: affiliate.id });
     if (capStatus.capped) {

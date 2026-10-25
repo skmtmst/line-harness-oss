@@ -1,5 +1,5 @@
 /*
- * 6起点が「実際に1件数えられる」ことを実DBで見る (#648 / N-253)。
+ * 6起点が「実際に1件数えられる」ことを実DBで見る。
  *
  * この票の芯は「画面で6種類の起点を選べるのに、実質1種類しか自動計測
  * されない」。したがって **繋いだことを見ても足りない**。本物の
@@ -173,7 +173,7 @@ function env(): Env['Bindings'] {
 /** 起点ごとに計測中の成果地点を1つ置く。 */
 function addPoint(eventType: string, options: { targetUrl?: string } = {}): string {
   const id = `point-${eventType}`;
-  // N-263: 実装は作成時にアカウントの統括を tenant_id へ写す。
+  // 実装は作成時にアカウントの統括を tenant_id へ写す。
   // 試験データも同じ形にする(account-a は tenant-1)。
   sqlite
     .prepare(
@@ -293,17 +293,10 @@ describe('起点2: タグが付いた (tag_added)', () => {
   });
 });
 
-// ---- 起点2の別の入口(#648 差し戻し) ---------------------------------------
+// ---- 起点2の別の入口( 差し戻し) ---------------------------------------
 
 /*
- * 「タグが付いた」は、`attachTagAndFireSideEffects` を通る経路でしか数えて
- * いなかった。友だち詳細画面の手動タグ付けも、オートメーションの
- * 「タグを付ける」アクションも、db の `addTagToFriend` を直に呼ぶため
- * 0 件のままだった(独立審査 2026-09-12)。
- *
- * 画面の起点一覧は「タグが付いた」としか書いておらず、誰が付けたかで
- * 数えたり数えなかったりする境界は運用者に説明できない。ここでは
- * **本物の口を叩いて**、実際に1件数えられることを見る。
+ * タグ付与の起点は付けた経路によらず数える必要があるため、手動タグ付けと自動化の実際の入口を通し、成果が1件記録されることを確かめる。
  */
 describe('起点2の別の入口: 手動タグ付け・オートメーションのタグ付け', () => {
   beforeEach(() => {
@@ -691,13 +684,7 @@ describe('境界: 起点・アカウント・友だちが合わないものは�
 // ---- 絞り込みの SQL そのものを見る -----------------------------------------
 
 /*
- * ここは `conversion_events` の件数ではなく、返ってきた `matched`
- * (= 地点を引く SQL が何件拾ったか) を見る。
- *
- * 件数だけを見ていると、**絞り込みを外しても緑のまま**になる。外した分は
- * trackConversion 側の停止判定・アカウント判定が投げて弾くため、記録は
- * 増えないからである(2026-09-11 の逆変異 M8/M9 で実際にそうなった)。
- * それでは「この関数の絞り込み」は誰も見張っていない。
+ * 絞込を外しても後段のアカウント・停止判定で記録が増えない場合があるため、conversion_events の件数だけでなく SQL が拾った matched を検証する。
  */
 describe('地点の絞り込み(実DB・SQLを直接見る)', () => {
   function point(
@@ -705,7 +692,7 @@ describe('地点の絞り込み(実DB・SQLを直接見る)', () => {
     over: { eventType?: string; status?: string; accountId?: string | null; tenantId?: string | null } = {},
   ) {
     const accountId = over.accountId === undefined ? 'account-a' : over.accountId;
-    // N-263: 実装と同じく、アカウントを絞る地点はそのアカウントの統括、
+    // 実装と同じく、アカウントを絞る地点はそのアカウントの統括、
     // 絞らない地点は既定の統括に属する形で置く。
     const tenantId = over.tenantId !== undefined
       ? over.tenantId
@@ -734,7 +721,7 @@ describe('地点の絞り込み(実DB・SQLを直接見る)', () => {
     // 同じ統括の全アカウント対象の地点は拾う。
     point('p-common', { accountId: null, tenantId: 'tenant-1' });
     point('p-other', { accountId: 'account-b' });
-    // N-263: 既定の統括に属する共通地点は、tenant-1 の友だちを数えない。
+    // 既定の統括に属する共通地点は、tenant-1 の友だちを数えない。
     point('p-default', { accountId: null });
     sqlite.exec(`
       INSERT INTO line_accounts
