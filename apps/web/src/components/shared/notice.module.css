@@ -16,7 +16,6 @@
   font-size: var(--text-label);
   font-weight: 400;
   line-height: var(--tpl-ro-band-lh);
-  -webkit-font-smoothing: antialiased;
 }
 .notice[hidden] { display: none; }
 .icon {

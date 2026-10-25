@@ -188,12 +188,11 @@
 :root .tip {
   display: flex; align-items: flex-start; gap: 0; padding: 6px 10px;
   border: 0; border-radius: var(--polish-radius-small); box-shadow: none;
-  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: 12px; line-height: 18px; font-weight: 400;
 }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .tip { -webkit-font-smoothing: antialiased; }
 
 @layer components {
 :root .mark {
@@ -204,7 +203,7 @@
   border-radius: var(--polish-radius-pill);
   background: transparent;
   color: var(--color-ink-faint);
-  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: var(--text-micro);
   line-height: 11px;
 }

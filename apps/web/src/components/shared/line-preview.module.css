@@ -211,7 +211,7 @@
 }
 
 /* cfVyj の実測。既存の 管理画面 パネルには適用しない。 */
-:root .phoneRoot { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; }
+:root .phoneRoot { font-family: var(--font-sans); }
 :root .statusBar { align-items: flex-start; }
 :root .statusIcons { flex-shrink: 0; }
 :root .talkHead svg { flex-shrink: 0; }

@@ -212,7 +212,7 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+:root .button { border: 0; line-height: 20px; font-family: var(--font-sans); }
 :root .primary { border: 0; outline: 1px solid var(--color-primary-border); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
 :root .line { border: 0; outline: 1px solid var(--color-accent); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
 :root .secondary { outline: 1px solid var(--color-control-border); outline-offset: -1px; }

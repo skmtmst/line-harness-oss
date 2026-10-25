@@ -1,7 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const HERE = dirname(fileURLToPath(import.meta.url))
 
 /*
  * #976 デザイン統一の契約。
@@ -28,6 +31,11 @@ describe('#976 デザイン統一', () => {
     expect(globals).not.toMatch(/--font-sans:\s*var\(--font-noto-sans-jp\)/)
     expect(layout).toContain('font-sans')
     expect(layout).not.toContain('fontFamily')
+    // 文字のなめらか処理は既定のまま。body にも共通部品にも antialiased を付けない（2026-10-25）。
+    expect(layout).not.toMatch(/className="[^"]*\bantialiased\b/)
+    const sharedCss = readdirSync(HERE).filter((name) => name.endsWith('.css')).map((name) => read(`./${name}`)).join('\n')
+    expect(sharedCss).not.toMatch(/-webkit-font-smoothing:\s*antialiased/)
+    expect(sharedCss).not.toMatch(/font-family:\s*var\(--font-noto-sans-jp\)/)
     expect(layout).toContain("from 'next/font/google'")
   })
 
