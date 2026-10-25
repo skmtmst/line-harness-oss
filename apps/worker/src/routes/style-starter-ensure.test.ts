@@ -50,6 +50,10 @@ const version = () =>
   (sql.raw.prepare("SELECT version FROM account_styles WHERE line_account_id='a'").get() as { version: number }).version;
 const starterRows = () =>
   sql.raw.prepare("SELECT item_key,kind,target_id FROM style_starter_items WHERE line_account_id='a' ORDER BY item_key").all() as Array<{ item_key: string; kind: string; target_id: string }>;
+const friendAddDrafts = (rule: string) =>
+  (sql.raw.prepare("SELECT COUNT(*) n FROM friend_add_rule_versions WHERE rule_id=? AND status='draft'").get(rule) as { n: number }).n;
+/** 受け皿の下書きが残っている時、入れ直しで入る物（友だち追加の決まりは既にあるので入らない）。 */
+const withoutFriendAdd = (items: Array<{ key: string; kind: string }>) => items.filter((i) => i.kind !== 'friend_add_rule');
 const allAnswers = {
   booking: { mode: 'configured', value: true },
   reminders: { mode: 'configured', value: true },
@@ -67,6 +71,14 @@ function expectEverythingStopped() {
       expect(sql.raw.prepare('SELECT is_active FROM menus WHERE id=?').get(row.target_id)).toEqual({ is_active: 0 });
     if (row.kind === 'rich_menu')
       expect(sql.raw.prepare('SELECT status FROM rich_menu_groups WHERE id=?').get(row.target_id)).toEqual({ status: 'draft' });
+    if (row.kind === 'friend_add_rule') {
+      // ごあいさつは下書きの版にだけ入り、今送っている版は何も送らない形のまま。
+      const current = sql.raw
+        .prepare('SELECT v.definition_snapshot FROM friend_add_rules r JOIN friend_add_rule_versions v ON v.id=r.current_version_id WHERE r.id=?')
+        .get(row.target_id) as { definition_snapshot: string };
+      expect(JSON.parse(current.definition_snapshot).messageText ?? '').toBe('');
+      expect(friendAddDrafts(row.target_id)).toBe(1);
+    }
   }
 }
 
@@ -98,7 +110,8 @@ describe('新しいアカウントの初期セット', () => {
     expect(inserted).toEqual(set.definition.items.map((i) => i.key).sort());
     expect(r.body.data.skipped).toEqual([]);
     expect(starterRows().map((row) => row.item_key)).toEqual(inserted);
-    expect(new Set(starterRows().map((row) => row.kind))).toEqual(new Set(['template', 'rich_menu', 'booking_menu', 'reminder', 'dashboard']));
+    expect(new Set(starterRows().map((row) => row.kind))).toEqual(new Set(set.definition.items.map((i) => i.kind)));
+    expect(starterRows().some((row) => row.kind === 'friend_add_rule')).toBe(true);
     expectEverythingStopped();
     // 同じスタイルでもう一度保存しても増えない。
     expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 1, style: 'salon', answers: allAnswers })).status).toBe(200);
@@ -126,8 +139,11 @@ describe('入れ直しの口', () => {
     const first = await request(ensurePath, 'POST', { expectedVersion: v });
     expect(first.status).toBe(200);
     const set = await starter(sql.db, 't', 'salon');
-    expect(first.body.data).toMatchObject({ existing: 0, skipped: [], starterSet: { id: 'musubo:salon', version: 1 } });
-    expect(first.body.data.inserted.map((i: any) => i.key).sort()).toEqual(set.definition.items.map((i) => i.key).sort());
+    expect(first.body.data).toMatchObject({ existing: 0, starterSet: { id: 'musubo:salon', version: 1 } });
+    // 最初の保存で足した受け皿の下書きは残っているので、上書きせず理由つきで飛ばす。2つ目の下書きも作らない。
+    expect(first.body.data.skipped).toEqual([{ key: 'friend-add-welcome', reason: 'already_exists' }]);
+    expect(friendAddDrafts('friend-add-rule-first_time-a')).toBe(1);
+    expect(first.body.data.inserted.map((i: any) => i.key).sort()).toEqual(withoutFriendAdd(set.definition.items).map((i) => i.key).sort());
     expect(Object.keys(first.body.data.inserted[0]).sort()).toEqual(['key', 'kind']);
     expectEverythingStopped();
     const rows = starterRows();
@@ -261,7 +277,10 @@ describe('入れ直しの口', () => {
 });
 
 describe('はじめにやることの読む口', () => {
-  const snapshot = () => ['style_starter_items', 'templates', 'account_styles', 'style_change_logs'].map((t) => count(t));
+  const snapshot = () => [
+    ...['style_starter_items', 'templates', 'account_styles', 'style_change_logs'].map((t) => count(t)),
+    count('friend_add_rule_versions', '1=1'),
+  ];
 
   test('8. スタイルはあるが見本が0件なら applied=false。読むだけで行が増えない', async () => {
     await initializeAccountStyle(sql.db, 'a', 't', 'owner');
@@ -273,11 +292,11 @@ describe('はじめにやることの読む口', () => {
     const before = snapshot();
     r = await request('/api/getting-started?account_id=a&version=v8');
     expect(r.status).toBe(200);
-    expect(r.body.data.starter).toEqual({ applied: false, count: 0, missing: set.definition.items.length });
+    expect(r.body.data.starter).toEqual({ applied: false, count: 0, missing: withoutFriendAdd(set.definition.items).length });
     expect(snapshot()).toEqual(before);
     // 入れ直しで入る数と、読む口の「足りない数」が一致する。
     const ensured = await request(ensurePath, 'POST', { expectedVersion: version() });
-    expect(ensured.body.data.inserted).toHaveLength(set.definition.items.length);
+    expect(ensured.body.data.inserted).toHaveLength(withoutFriendAdd(set.definition.items).length);
     r = await request('/api/getting-started?account_id=a&version=v8');
     expect(r.body.data.starter).toMatchObject({ applied: true, missing: 0 });
   });

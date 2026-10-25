@@ -362,7 +362,11 @@ export async function insertStyleStarterItems(
       );
     } else if (item.kind === 'friend_add_rule') {
       const prepared = await friendAddStarterStatements(db, account, item, now);
-      if (!prepared) continue;
+      // 受け皿に店の設定か下書きが既にある。上書きせず、黙って落とさずに理由を返す。
+      if (!prepared) {
+        skip(item.key,'already_exists');
+        continue;
+      }
       id = prepared.id;
       statements.push(...prepared.statements);
     } else if (item.kind === 'dashboard')
