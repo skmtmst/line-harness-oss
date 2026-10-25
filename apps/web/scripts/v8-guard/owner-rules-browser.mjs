@@ -44,5 +44,15 @@ export default function scanOwnerRules() {
       }
     }
   }
+  // 14px 未満の UI 文字を太さ 400 で描かない。
+  // お客さまのスマホの見え方（LINE の見本）は LINE と同じ太さなので数えない。
+  // V8 の画面（<html data-theme="v8">）だけを見る。アプリの CSS の無い素の見本はブラウザ既定の太さなので数えない。
+  for (const el of document.documentElement.dataset.theme === 'v8' ? surfaces.filter(visible) : []) {
+    if (el.closest('svg,[data-line-preview-part],[class*="line-preview_phoneRoot__"],[class*="liff-phone-frame_"]')) continue
+    const text = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim()
+    if (!text) continue
+    const c = css(el), size = parseFloat(c.fontSize), weight = Number(c.fontWeight)
+    if (size < 14 && weight < 500) add('thintext', el, { size, weight }, text)
+  }
   return findings
 }

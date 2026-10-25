@@ -37,7 +37,7 @@
   display: inline-flex;
   flex-shrink: 0;
   margin-left: 6px;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   white-space: nowrap;
 }
 
@@ -58,7 +58,7 @@
   margin-top: 4px;
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
   line-height: 1.6;
   text-align: right;
 }
@@ -95,7 +95,7 @@
 :root .field { display: flex; flex-direction: column; gap: 6px; }
 :root .field > :is(.required, .optional) { align-self: flex-start; }
 :root .labelRow { margin-bottom: 0; gap: 6px; }
-:root .label { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+:root .label { line-height: 20px; font-family: var(--font-sans); }
 :root .field[data-field-size='compact'] .label { font-size: var(--text-caption); font-weight: 600; line-height: normal; }
 :root .field[data-field-fill] { flex: 1 1 0; }
 

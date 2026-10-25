@@ -150,7 +150,7 @@
 
 .step[data-done] .label {
   color: var(--color-ink-secondary);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .link {

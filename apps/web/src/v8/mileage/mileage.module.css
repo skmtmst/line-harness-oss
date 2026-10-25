@@ -266,7 +266,7 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.6;
   resize: vertical;
 }

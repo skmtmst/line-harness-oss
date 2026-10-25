@@ -162,7 +162,7 @@
 }
 
 .useFill {
-  fill: var(--tpl-rs-line-green);
+  fill: var(--color-accent-deep); /* 使っている量の棒は画面の緑（LINE の緑ではない） */
 }
 
 .useFillBusy {

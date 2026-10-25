@@ -244,7 +244,7 @@
   color: var(--color-ink);
   font: inherit;
   font-size: var(--text-body);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
   cursor: pointer;
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
@@ -337,7 +337,7 @@
 /* 日付の欄も線ではなく影で浮かせる。 */
 :root .field {
   border: 0;
-  background: var(--color-canvas);
+  background: var(--gradient-raised-control) var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
 }
 

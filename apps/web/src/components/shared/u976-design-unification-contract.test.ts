@@ -1,7 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const HERE = dirname(fileURLToPath(import.meta.url))
 
 /*
  * #976 デザイン統一の契約。
@@ -22,11 +25,15 @@ describe('#976 デザイン統一', () => {
   const layout = read('../../app/layout.tsx')
 
   it('U080: 書体の正本は --font-sans で、body は inline style ではなく font-sans を読む', () => {
-    // ★管理画面「見た目の物差し」§3: 「Inter, Noto Sans JP」の順。英字と数字は
-    // Inter（next/font が --font-inter を出す）、かなと漢字は Noto Sans JP。
-    expect(globals).toMatch(/--font-sans:\s*var\(--font-noto-sans-jp\),\s*"Noto Sans JP",\s*var\(--font-inter\),\s*Inter,\s*sans-serif;/)
+    // 英字と数字は Inter（先）、かなと漢字は Noto Sans JP。Noto を先に戻さない。
+    expect(globals).not.toMatch(/--font-sans:\s*var\(--font-noto-sans-jp\)/)
     expect(layout).toContain('font-sans')
     expect(layout).not.toContain('fontFamily')
+    // 文字のなめらか処理は既定のまま。body にも共通部品にも antialiased を付けない。
+    expect(layout).not.toMatch(/className="[^"]*\bantialiased\b/)
+    const sharedCss = readdirSync(HERE).filter((name) => name.endsWith('.css')).map((name) => read(`./${name}`)).join('\n')
+    expect(sharedCss).not.toMatch(/-webkit-font-smoothing:\s*antialiased/)
+    expect(sharedCss).not.toMatch(/font-family:\s*var\(--font-noto-sans-jp\)/)
     expect(layout).toContain("from 'next/font/google'")
   })
 

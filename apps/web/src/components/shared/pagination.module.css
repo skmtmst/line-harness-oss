@@ -86,7 +86,7 @@ button.item:disabled {
 :root .pagination {
   gap: 6px;
   padding: 10px 20px;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
 }
 
 :root .summary {
@@ -95,7 +95,7 @@ button.item:disabled {
   margin-right: auto;
   color: var(--color-ink-secondary);
   font-size: 13px;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.5;
 }
 
@@ -182,7 +182,7 @@ html:root .current {
  */
 html:root nav[data-pagination] .current {
   border-color: transparent !important;
-  background: var(--color-ink) !important;
+  background: var(--gradient-selected-chip) var(--color-ink) !important; /* 選んだ黒い札と同じ奥行き */
   color: var(--color-canvas) !important;
-  box-shadow: none !important;
+  box-shadow: var(--shadow-selected-chip) !important;
 }

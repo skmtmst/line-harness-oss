@@ -5,6 +5,7 @@ import './polish.css'
 import AppShell from '@/components/app-shell'
 import ClientErrorReporter from '@/components/client-error-reporter'
 import ToastHost from '@/components/shared/toast'
+import NameTipHost from '@/components/shared/name-tip'
 
 /**
  * 書き出しの時点で決まる題。
@@ -22,6 +23,7 @@ const DEFAULT_TITLE = 'musubo LINE管理システム'
  */
 /*
  * 管理画面の書体。英字と数字は Inter、かなと漢字は Noto Sans JP に見える
+ * （文字のなめらか処理は既定のままにし、antialiased を付けない）
  * （--font-sans の並びが正本。Inter に日本語グリフが無いので、かなと漢字は
  * 自動で Noto Sans JP に落ちる）。
  *
@@ -65,13 +67,15 @@ export default function RootLayout({
   return (
     <html lang="ja" data-theme="v8" className={`${inter.variable} ${notoSansJp.variable}`}>
       {/* 書体は globals.css の --font-sans が正本（#976 U080）。inline style はやめる。 */}
-      <body className="bg-canvas-sunken text-ink antialiased font-sans">
+      <body className="bg-canvas-sunken text-ink font-sans">
         <ClientErrorReporter />
         <AppShell>
           {children}
         </AppShell>
         {/* 保存の知らせ（Toast）の置き場所。全画面で1つ。画面側は置かない。 */}
         <ToastHost />
+        {/* アイコンだけのボタンの名前の吹き出し。全画面で1つ。画面側は置かない。 */}
+        <NameTipHost />
       </body>
     </html>
   )

@@ -732,7 +732,7 @@ export default function AdvancedSearchDialog({
                 options={[{ value: '', label: 'このアカウントをブロックしていない' }]}
                 disabled
               />
-              <span className="text-nano font-normal text-ink-faint">相手側のブロック状態を絞る口の接続後に選べます</span>
+              <span className="text-nano font-medium text-ink-faint">相手側のブロック状態を絞る口の接続後に選べます</span>
             </label>
           </section>
 

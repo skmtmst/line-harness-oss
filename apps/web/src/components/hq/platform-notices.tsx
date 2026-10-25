@@ -42,7 +42,7 @@ export default function PlatformNotices() {
       {notices.map((n) => (
         <Notice key={n.id} tone="info" icon={<Megaphone aria-hidden="true" />} heading={<>
               {n.subject}
-              <span className="ml-2 text-micro font-normal text-ink-faint">musubo 運営{n.sentAt ? `・${shortDateTime(n.sentAt)}` : ''}</span>
+              <span className="ml-2 text-micro font-medium text-ink-faint">musubo 運営{n.sentAt ? `・${shortDateTime(n.sentAt)}` : ''}</span>
             </>} action={<Button size="field" onClick={() => void markRead(n.id)} disabled={busyId === n.id}>読みました</Button>}>
             <p className="mt-1 whitespace-pre-wrap text-caption text-ink">{n.body}</p>
         </Notice>

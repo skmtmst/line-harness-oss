@@ -148,7 +148,7 @@
 
 .skipped {
   gap: var(--polish-space-row);
-  border: 1px solid var(--card-edge);
+  border: 1px solid var(--surface-edge);
   background: var(--color-surface-pearl);
   box-shadow: none;
 }

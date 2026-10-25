@@ -251,7 +251,7 @@
 .diffHead {
   margin: 0 0 var(--tpl-mb-field-gap);
   color: var(--color-ink-secondary);
-  font-size: var(--tpl-mb-text-11);
+  font-size: var(--tpl-mb-text-12);
   font-weight: 600;
 }
 .diffList {
@@ -282,7 +282,7 @@
 }
 .lifetimeTotalLabel {
   color: var(--color-ink-secondary);
-  font-size: var(--tpl-mb-text-11);
+  font-size: var(--tpl-mb-text-12);
   line-height: var(--tpl-mb-lh-16);
 }
 .lifetimeTotalValue {
@@ -312,7 +312,7 @@
   box-shadow: var(--shadow-row-line);
   background: var(--color-surface-pearl);
   color: var(--color-ink-secondary);
-  font-size: var(--tpl-mb-text-11);
+  font-size: var(--tpl-mb-text-12);
   font-weight: 600;
   line-height: var(--tpl-mb-lh-16);
 }
@@ -379,7 +379,7 @@
 }
 .lifeTitleSub {
   color: var(--color-ink-faint);
-  font-size: var(--tpl-mb-text-11);
+  font-size: var(--tpl-mb-text-12);
   line-height: var(--tpl-mb-lh-16);
 }
 .lifeAdd {
@@ -437,7 +437,7 @@
 .listHint {
   margin: var(--tpl-mb-gap) 0 0;
   color: var(--color-ink-faint);
-  font-size: var(--tpl-mb-text-11);
+  font-size: var(--tpl-mb-text-12);
   line-height: var(--tpl-mb-lh-16);
 }
 .memberCell {
@@ -479,7 +479,7 @@
 .memberSub {
   overflow: hidden;
   color: var(--color-ink-faint);
-  font-size: var(--tpl-mb-text-11);
+  font-size: var(--tpl-mb-text-12);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -63,14 +63,14 @@
 }
 
 .sub { /* gap: 2 */ /* fill: $ink-faint */ /* fontSize: $size-label */
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .memo {
   margin-top: 2px;
   color: var(--color-ink-faint);
   font-size: var(--text-micro); /* fontSize: $size-micro */
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 /* 並び替えハンドルの列。行の先頭に置く。幅40px・中央。 */
@@ -439,7 +439,7 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
 :root .frame .row .bodyCell { padding-block: 0; font-size: var(--polish-text-body); }
 :root .frame .row:hover:not(.rowSelected) { background: var(--polish-table-hover); }
 :root .frame .row { transition: background-color var(--motion-fast) var(--motion-ease-out); }
-:root .frame :is(th, td)[data-align='right'] { text-align: right; font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+:root .frame :is(th, td)[data-align='right'] { text-align: right; font-family: var(--font-sans); font-variant-numeric: var(--font-numeric); }
 :root .frame :is(th, td)[data-align='right'] + :is(th, td) { padding-inline-start: var(--polish-table-number-gap); }
 :root .frame thead tr { height: var(--polish-table-head); min-height: var(--polish-table-head); background: var(--polish-table-head-bg); }
 :root .frame thead th { height: var(--polish-table-head); padding-block: 0; color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
@@ -579,7 +579,7 @@ html:root .frame:is([data-column-sizing='content'], [data-column-sizing='control
 :root .frame[data-grid-table]:is([data-column-sizing='content'], [data-column-sizing='controls']) .table tr { grid-template-columns: var(--table-content-columns, var(--table-columns)); }
 
 /* すべての共通表で文字階層と数字の桁をそろえる。 */
-:root .table tbody { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); font-variant-numeric: tabular-nums; }
+:root .table tbody { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); font-variant-numeric: var(--font-numeric); }
 html:root .frame .table tbody td { font-size: var(--polish-text-body); }
 :root .table thead tr { background: var(--color-canvas); border-top: 0; }
 html:root .name { font-weight: var(--polish-value-weight); }

@@ -26,6 +26,7 @@ function RowIconButton({
       type="button"
       aria-label={label}
       title={label}
+      data-hit-area={grip ? '' : undefined}
       className={[styles.action, tone === 'danger' && styles.danger, grip && styles.grip, className]
         .filter(Boolean)
         .join(' ')}

@@ -1,5 +1,6 @@
 'use client'
 
+import Checkbox from './checkbox'
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
@@ -437,27 +438,26 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
               { key: 'system', label: 'システム表示名' },
             ].map((t) => {
               return (
-                <label key={t.key} className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={nameTargets.includes(t.key)}
-                    onChange={(e) => {
-                      // 最後の1つは外さない。外したまま保存されると
-                      // 判定側が全欄へ広げてしまう（R258）。
-                      if (!e.target.checked && nameTargets.length === 1 && nameTargets.includes(t.key)) {
-                        setNameTargetsNotice(true)
-                        return
-                      }
-                      changeName({
-                        ...v,
-                        targets: e.target.checked
-                          ? [...nameTargets, t.key]
-                          : nameTargets.filter((x) => x !== t.key),
-                      })
-                    }}
-                  />
+                <Checkbox
+                  key={t.key}
+                  checked={nameTargets.includes(t.key)}
+                  onCheckedChange={(checked) => {
+                    // 最後の1つは外さない。外したまま保存されると
+                    // 判定側が全欄へ広げてしまう（R258）。
+                    if (!checked && nameTargets.length === 1 && nameTargets.includes(t.key)) {
+                      setNameTargetsNotice(true)
+                      return
+                    }
+                    changeName({
+                      ...v,
+                      targets: checked
+                        ? [...nameTargets, t.key]
+                        : nameTargets.filter((x) => x !== t.key),
+                    })
+                  }}
+                >
                   {t.label}
-                </label>
+                </Checkbox>
               )
             })}
             <span className="text-ink-faint text-xs">から検索</span>

@@ -803,7 +803,7 @@ export default function Sidebar({
                   prefetch={false}
                   onClick={(event) => allowFeatureNavigation(event, item.href, item.label, preparing) && setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={collapsed && !drawer ? undefined : visibleLabel}
-                  // 件数の札がある時は「名前、33件」と区切って読ませる（札の数字は読ませない）。
+                  // 件数の札がある時は「名前、N件」と区切って読ませる（札の数字は読ませない）。
                   aria-label={badgeCount(item) > 0 ? `${visibleLabel}、${badgeCount(item)}件` : collapsed && !drawer ? visibleLabel : undefined}
                   data-rail-label={visibleLabel}
                   data-rail-count={badgeCount(item) > 0 ? (badgeCount(item) > 99 ? '99+' : String(badgeCount(item))) : undefined}

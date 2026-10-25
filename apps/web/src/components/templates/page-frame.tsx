@@ -62,15 +62,15 @@ export interface PageHeadingProps {
   tabs?: ReactNode
 }
 
-/** 型の外に残るページの題も同じ文字の決まりを使う。窓・カードには使わない。 */
-export function PageTitle({ children, as: Tag = 'h2', className }: {
+/** 型の外に残るページの題も同じ文字の決まりを使う。窓・カードには使わない。画面の題なので h1（パンくずは見出しにしない）。 */
+export function PageTitle({ children, as: Tag = 'h1', className }: {
   children: string; as?: 'h1' | 'h2'; className?: string
 }) {
   return <Tag className={[styles.pageTitle, className].filter(Boolean).join(' ')} title={children} data-page-title>{children}</Tag>
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   /*
    * 絵の値を渡された分だけ、この頭の中だけに効く変数で下へ流す。`.heading`・`.title` は

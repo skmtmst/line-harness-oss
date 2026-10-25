@@ -44,8 +44,8 @@
 .t5 { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
 
 /* 28 / 34 / 52 are the V8 small / medium / large face sizes. */
-:root .avatar { gap: 0; border-radius: var(--polish-radius-pill); font-family: var(--font-noto-sans-jp), system-ui, sans-serif; }
-:root .s28, :root .s24 { width: 28px; height: 28px; font-size: 11px; line-height: 17px; }
+:root .avatar { gap: 0; border-radius: var(--polish-radius-pill); font-family: var(--font-sans); }
+:root .s28, :root .s24 { width: 28px; height: 28px; font-size: 12px; line-height: 17px; }
 :root .s34, :root .s32 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }
 :root .s36 { width: 36px; height: 36px; font-size: 15px; line-height: 22px; }
 :root .s40 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }

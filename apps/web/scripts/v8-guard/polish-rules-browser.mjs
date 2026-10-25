@@ -39,7 +39,7 @@ export default function scanPolishRules() {
   }
   for (const sheet of document.styleSheets) { try { walk(sheet.cssRules, false) } catch { /* 読めない外部の CSS は測らない */ } }
 
-  // 3. 押せない時：灰色に塗り直さず、元の見た目のまま薄くする（影なし・cursor: not-allowed）。
+  // 押せない時（§6.5 の 7）：灰色に塗り直さず、元の見た目のまま薄くする（影なし・cursor: not-allowed）。
   const positive = (sel) => sel.replace(/:not\((?:[^()]|\([^()]*\))*\)/g, '')
   const DISABLED = /:disabled|\[disabled\]|\[aria-disabled="?true|\[data-disabled|\.disabled\b|_disabled__/
   for (const { rule } of rules) {
@@ -60,7 +60,7 @@ export default function scanPolishRules() {
     const cursor = c.pointerEvents !== 'none' && c.cursor !== 'not-allowed'
     if (opacity < 0.4 || opacity > 0.55 || shadow || cursor) add('disabled-look', el, { opacity: Math.round(opacity * 100) / 100, shadow, cursor: c.cursor }, el.getAttribute('aria-label') || el.textContent)
   }
-  // 4・17. 動きの時間と曲線：transition・animation は共通の --motion-* を読む。
+  // 動きの時間と曲線（§6.11）：transition・animation は共通の --motion-* を読む。
   // 動きを減らす設定の 0.01ms は止めるための値、回り続ける印の linear・steps() は一定の速さのための値なので数えない。
   const withoutVars = (value) => { let out = value; while (/var\([^()]*\)/.test(out)) out = out.replace(/var\([^()]*\)/g, ' '); return out }
   const MOTION = ['transition', 'animation', 'transition-duration', 'animation-duration', 'transition-delay', 'animation-delay', 'transition-timing-function', 'animation-timing-function']
@@ -76,7 +76,7 @@ export default function scanPolishRules() {
       if (/(?<![\w-])(ease|ease-in|ease-out|ease-in-out|cubic-bezier)(?![\w-])/.test(plain)) add('motion-curve', null, { prop, value: value.trim() }, rule.selectorText)
     }
   }
-  // 1. 印の大きさと線（§6.5 の 5）：ふつう 16・大事な所 20。左メニューの項目は 18、空の表示と画像の置き場の真ん中は 40。線は全部 1.75。
+  // 印の大きさと線（§6.5 の 5）：ふつう 16・大事な所 20。左メニューの項目は 18、空の表示と画像の置き場の真ん中は 40。線は全部 1.75。
   // 携帯の見本・グラフ・QR・選ぶ欄の中のしるし（チェック・丸）は印ではないので数えない。
   const NOT_ICON = '[data-line-preview-part], [class*="line-preview_"], [class*="liff-phone-frame_"], [class*="phone_"], [class*="chart"], [class*="Chart"], [data-qr-code], [class*="qr"], [class*="checkbox_"], [class*="check-card_box"], [class*="radio_"], [class*="radio-card_radio"], [role="img"], [data-chart]'
   for (const svg of document.querySelectorAll('svg')) {
@@ -95,7 +95,7 @@ export default function scanPolishRules() {
     const stroke = parseFloat(sc.strokeWidth)
     if (Math.abs(stroke - 1.75) > 0.01) add('icon-stroke', svg, { stroke }, '')
   }
-  // 5. 共通のボタン・→つきのリンク・パンくずの家の中の、印と文字の間は 8（§6.5 の 5）。
+  // 共通のボタン・→つきのリンク・パンくずの家の中の、印と文字の間は 8（§6.5 の 5）。
   const textBox = (el) => {
     const rects = []
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
@@ -115,7 +115,7 @@ export default function scanPolishRules() {
     const gap = r.right <= text.left + 0.5 ? text.left - r.right : r.left >= text.right - 0.5 ? r.left - text.right : null
     if (gap !== null && Math.abs(gap - 8) > 0.5) add('button-icon-gap', el, { gap: Math.round(gap * 10) / 10 }, el.textContent)
   }
-  // 9. 最後の仕上げ：文字を選んだ時の地（ブランドの深い緑の薄い色）・端末のタップの光なし・画像の幅と高さ・動きを減らす設定の遅れなし。
+  // 仕上げ（§6.5 の 7）：文字を選んだ時の地（ブランドの深い緑の薄い色）・端末のタップの光なし・画像の幅と高さ・動きを減らす設定の遅れなし。
   const selection = getComputedStyle(document.body, '::selection').backgroundColor
   if (/^rgba\(0, 0, 0, 0\)$|^transparent$/.test(selection)) add('selection-color', document.body, { selection })
   const tap = css(document.documentElement).webkitTapHighlightColor
@@ -133,14 +133,14 @@ export default function scanPolishRules() {
       if (delayed) { add('reduced-motion-delay', el, { animation: c.animationDelay, transition: c.transitionDelay }); break }
     }
   }
-  // 16. 左メニューの件数の札：読み上げの名前は「名前、33件」と区切り、札の数字は読ませない。
+  // 左メニューの件数の札：読み上げは「名前、N件」と区切り、札の数字は読ませない。
   for (const link of document.querySelectorAll('nav a[href], aside a[href]')) {
     const badge = [...link.querySelectorAll('span')].find((span) => !span.children.length && /^\d+\+?$/.test(span.textContent.trim()) && visible(span))
     if (!badge) continue
     const label = link.getAttribute('aria-label') ?? ''
     if (!/、\d+件$/.test(label) || !badge.closest('[aria-hidden="true"]')) add('nav-count-name', link, { label, badgeHidden: Boolean(badge.closest('[aria-hidden="true"]')) }, link.textContent)
   }
-  // 18. 「？」：押せる範囲は 28×28、見た目の丸は 16、隣の見出し・ラベル・札との間は 8。
+  // 「？」（§6.5 の 7）：押せる範囲は 28×28、見た目の丸は 16、隣の見出し・ラベル・札との間は 8。
   for (const button of document.querySelectorAll('[class*="help-tip_button"]:not([data-help-trigger="text"])')) {
     if (!visible(button)) continue
     const mark = button.querySelector('svg, [class*="help-tip_mark"]')

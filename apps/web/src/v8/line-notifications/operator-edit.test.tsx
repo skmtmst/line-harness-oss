@@ -91,7 +91,7 @@ describe('運用者へのお知らせを なおす（hiBO8）', () => {
   test('保存ずみの名前で題を出し、選んでいない人も並べて数を数える', async () => {
     await render()
     expect(host?.querySelector('[data-design-node="hiBO8"]')).not.toBeNull()
-    expect(host?.querySelector('[data-template-region="heading"] h2')?.textContent).toBe('「新しい予約が入りました」を編集する')
+    expect(host?.querySelector('[data-template-region="heading"] h1')?.textContent).toBe('「新しい予約が入りました」を編集する')
     fireEvent.click(screen.getByRole('button', { name: '受け取るスタッフ' }))
     const rows = screen.getAllByRole('checkbox').filter((node) => node.closest('[role="dialog"]')).filter((node) => ['高田 誠', '山本 健', '佐藤 杏'].includes(node.getAttribute('aria-label') ?? '')).map((node) => node.closest('label')?.textContent ?? '')
     expect(rows.length).toBe(3)
@@ -108,7 +108,7 @@ describe('運用者へのお知らせを なおす（hiBO8）', () => {
     search.value = ''
     await render()
     expect(host?.querySelector('[data-design-node="gjUz3"]')).not.toBeNull()
-    expect(host?.querySelector('[data-template-region="heading"] h2')?.textContent).toBe('運用者へのお知らせを作る')
+    expect(host?.querySelector('[data-template-region="heading"] h1')?.textContent).toBe('運用者へのお知らせを作る')
     expect(host?.textContent).toContain('選択 3 人／LINEで受け取れる 2 人')
   })
 })

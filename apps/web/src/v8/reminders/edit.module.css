@@ -64,7 +64,7 @@
   color: var(--color-ink-faint);
   font-size: var(--tpl-rm-small-size);
   line-height: var(--tpl-text-sm-lh);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 .fieldNote { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-text-sm-lh); }
 .testRow { display: flex; align-items: center; gap: var(--tpl-rm-row-gap); }

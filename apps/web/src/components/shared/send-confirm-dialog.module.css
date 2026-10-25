@@ -20,7 +20,7 @@
 .accounts { margin: 0; padding: 0; list-style: none; width: 100%; display: flex; flex-direction: column; font-size: var(--text-caption); }
 .accounts li { display: grid; grid-template-columns: minmax(0, 1fr) 88px 72px; gap: 12px; padding: 6px 10px; border-top: 1px solid var(--color-hairline); }
 .accounts li:first-child { border-top: 0; }
-.accountsNum { text-align: right; font-variant-numeric: tabular-nums; }
+.accountsNum { text-align: right; font-variant-numeric: var(--font-numeric); }
 .sender { display: inline-flex; align-items: center; gap: 8px; }
 .senderIcon { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--radius-pill); background: var(--color-surface-pearl); color: var(--color-ink-secondary); font-size: 12px; font-weight: 700; object-fit: cover; }
 .footLead { color: var(--color-ink-secondary); font-size: var(--text-caption); }

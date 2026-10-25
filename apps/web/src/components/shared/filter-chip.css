@@ -49,7 +49,7 @@
 .v6-filter-chip__count {
   font-size: var(--text-micro);
   font-weight: 500;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
   color: var(--color-ink-faint);
 }
 
@@ -89,7 +89,7 @@
 }
 
 /* V8 正本 O2fCAt / XGJDa。 */
-:root .v6-filter-chip { height: 36px; border: 0; outline: 1px solid var(--color-control-border); box-shadow: var(--control-shadow); outline-offset: -1px; color: var(--color-ink); line-height: 18px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+:root .v6-filter-chip { height: 36px; border: 0; outline: 1px solid var(--color-control-border); box-shadow: var(--control-shadow); outline-offset: -1px; color: var(--color-ink); line-height: 18px; font-family: var(--font-sans); }
 :root .v6-filter-chip[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); outline-color: var(--color-selection-border); box-shadow: none; }
 :root .v6-filter-chip__icon { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 :root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-selection-border); }
@@ -108,7 +108,7 @@
 :root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-ink-secondary); }
 :root .v6-filter-chip__icon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 
-:root .v6-filter-chip { padding-block-start: var(--polish-text-center-inset); }
+:root .v6-filter-chip { padding-block: 0; }
 
 :root .v6-filter-chip[aria-pressed]:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
@@ -117,3 +117,12 @@
 :root .v6-filter-chip[aria-haspopup] { background: var(--color-canvas); color: var(--color-ink); outline-color: var(--color-control-border); }
 :root .v6-filter-chip__chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); flex: none; color: var(--color-ink-faint); order: 1; }
 :root .v6-filter-chip[aria-haspopup]:hover:not(:disabled) { background: var(--color-canvas-sunken); }
+
+/*
+ * 奥行き（くっきり版）。選んでいない札は白い副ボタンと同じ薄いグラデと外周 1px の影、
+ * 選んだ黒い札は上が少し明るい黒と内側の光。値は globals.css の共通の値。
+ */
+:root .v6-filter-chip:not([aria-pressed='true']):not(:hover) { outline-color: transparent; background: var(--gradient-raised-control) var(--color-canvas); box-shadow: var(--shadow-raised-control); }
+:root .v6-filter-chip:not([aria-pressed='true']):hover:not(:disabled) { outline-color: transparent; box-shadow: var(--shadow-raised-control); }
+:root .v6-filter-chip[aria-pressed='true'] { background: var(--gradient-selected-chip) var(--color-ink); box-shadow: var(--shadow-selected-chip); }
+:root .v6-filter-chip:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

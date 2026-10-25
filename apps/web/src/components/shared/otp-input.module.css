@@ -133,7 +133,7 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .slot { height: 52px; border: 0; outline-color: transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 24px; font-weight: 600; line-height: normal; caret-color: var(--color-ink); }
+:root .slot { height: 52px; border: 0; outline-color: transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control); font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 24px; font-weight: 600; line-height: normal; caret-color: var(--color-ink); }
 :root .slot:focus,
 :root .slot:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 :root .group[data-state='success'] .slot { outline-color: transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control), inset 0 0 0 1.5px var(--color-success); }
@@ -141,7 +141,7 @@
 
 .field { display: contents; }
 :root .field:has(.label) { display: inline-flex; flex-direction: column; gap: 6px; }
-:root .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: antialiased; color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 20px; }
+:root .label { font-family: var(--font-sans); color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 20px; }
 :root .field:has(.label) { align-items: flex-start; }
 :root .slot { gap: 0; }
 

@@ -104,7 +104,7 @@
 .reason {
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.5;
 }
 
@@ -165,7 +165,7 @@
   outline: 1px solid var(--color-hairline);
   outline-offset: -1px;
   background: var(--color-canvas);
-  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 :root .topIcon { display: flex; height: var(--polish-icon-control); width: 100%; color: inherit; }
 :root .topIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex-shrink: 0; }
@@ -230,7 +230,7 @@
   border-radius: var(--radius-segment);
 }
 :root .compact .body { gap: 3px; }
-:root .compact .title { font-size: 11px; line-height: 16px; font-weight: 600; }
+:root .compact .title { font-size: 12px; line-height: 16px; font-weight: 600; }
 :root .compact .note { font-size: 10px; line-height: 14px; }
 :root .compact.checked .title { color: var(--color-accent-deep); }
 :root .compact[data-compact-typography='banner'] .body { gap: var(--tpl-hq-nav-gap); }
@@ -257,7 +257,6 @@
 }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .card { -webkit-font-smoothing: antialiased; }
 
 /*
  * 変わり形：行（ の素のラジオ行）。箱・選んだ面・上段の印なし。
@@ -281,18 +280,17 @@
 .row.disabled { background: transparent; }
 .row.invalid { border-color: transparent; }
 .row .topIcon { display: none; }
-.row .title { font-size: 13px; font-weight: 400; line-height: 20px; }
+.row .title { font-size: 13px; font-weight: var(--font-weight-ui); line-height: 20px; }
 :root .row .body { gap: 2px; }
 :root .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
 :root .row:active { filter: none; }
-:root .row { -webkit-font-smoothing: antialiased; }
 
 /* フォームの小さい選択肢（・）。装飾の丸を出さず、印と題を同じ行に置く。 */
 :root .form { min-height: 0; padding: 12px 10px; gap: 4px; border-radius: var(--radius-control); }
 :root .form:has(.inlineIcon) { padding-inline: 14px; }
 :root .form .body { gap: 4px; }
 :root .form .title { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 19px; }
-:root .form .note { font-size: 11px; line-height: 16px; }
+:root .form .note { font-size: 12px; line-height: 16px; }
 :root .form > .radio { top: 0; right: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 :root .form:has(> .radio:focus-visible) { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .inlineIcon { display: inline-flex; color: var(--color-ink-secondary); }

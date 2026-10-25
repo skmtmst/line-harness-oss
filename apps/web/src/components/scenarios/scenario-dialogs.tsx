@@ -214,7 +214,7 @@ export function ConditionDialog({
               <li key={`rule-${i}`} className="flex items-center justify-between gap-3">
                 <p className="text-ink text-sm font-bold">
                   条件 {i + 1}
-                  <span className="text-ink-secondary ml-2 text-xs font-normal">
+                  <span className="text-ink-secondary ml-2 text-xs font-medium">
                     {describeRule(rule)}
                   </span>
                 </p>
@@ -238,7 +238,7 @@ export function ConditionDialog({
               <li key={`group-${gi}`} className="flex items-center justify-between gap-3">
                 <p className="text-ink text-sm font-bold">
                   or条件のかたまり {gi + 1}
-                  <span className="text-ink-secondary ml-2 text-xs font-normal">
+                  <span className="text-ink-secondary ml-2 text-xs font-medium">
                     {group.rules.length}件
                   </span>
                 </p>

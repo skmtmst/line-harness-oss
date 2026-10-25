@@ -56,7 +56,7 @@ export function SideCard({
             <h2 className="text-ink min-w-0 text-base leading-normal font-bold">{title}</h2>
             {helpTip ? <HelpTip label={`${title}の説明`}>{helpTip}</HelpTip> : null}
             {/* 期間は常に1行にする（DASH-23）。折り返すとカード間で見出しの高さがずれる。 */}
-            {period ? <span className="text-ink-faint shrink-0 text-micro font-normal whitespace-nowrap">{period}</span> : null}
+            {period ? <span className="text-ink-faint shrink-0 text-micro font-medium whitespace-nowrap">{period}</span> : null}
           </div>
           {/*
             行き先リンクは CardHeader の action（actionTone="info"）と
@@ -79,7 +79,7 @@ function Figure({ label, value, unit }: { label: string; value: number | null; u
       <p className="text-ink-faint text-xs">{label}</p>
       <p className="text-ink mt-0.5 text-lg font-bold tabular-nums">
         {value === null ? '—' : formatNumber(value)}
-        <span className="text-ink-secondary ml-1 text-xs font-normal">{unit}</span>
+        <span className="text-ink-secondary ml-1 text-xs font-medium">{unit}</span>
       </p>
     </div>
   )

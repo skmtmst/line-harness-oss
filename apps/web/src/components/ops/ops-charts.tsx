@@ -46,7 +46,7 @@ export function RevenueBars({ rows, width = 920, height = 220 }: { rows: Array<{
         return (
           <g key={i}>
             <line x1={left} x2={width - 16} y1={y} y2={y} stroke="var(--color-hairline)" strokeWidth={1} />
-            <text x={left - 8} y={y + 4} textAnchor="end" fontSize={11} fill="var(--color-ink-faint)">{formatYenShort(t)}</text>
+            <text x={left - 8} y={y + 4} textAnchor="end" fontSize={12} fill="var(--color-ink-faint)">{formatYenShort(t)}</text>
           </g>
         )
       })}

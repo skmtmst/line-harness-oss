@@ -280,6 +280,7 @@ export default function OverviewTab({
           ) : nextDelivery ? (
             <Link
               className={styles.row}
+              data-pressable-card=""
               href={nextDelivery.kind === 'scenario' ? `/scenarios/detail?id=${encodeURIComponent(nextDelivery.id)}` : `/reminders/detail?id=${encodeURIComponent(nextDelivery.id)}`}
             >
               <span className={styles.rowIcon}>{nextDelivery.kind === 'scenario' ? <Workflow size={16} aria-hidden /> : <Bell size={16} aria-hidden />}</span>
