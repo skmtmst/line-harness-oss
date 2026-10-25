@@ -743,7 +743,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     }
 
     default:
-      return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません（{rule.type}）</span>
+      return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません。条件を作った画面で直してください。</span>
   }
 }
 

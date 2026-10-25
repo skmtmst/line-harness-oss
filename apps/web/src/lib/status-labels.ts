@@ -19,6 +19,22 @@ export function statusLabel(status: string): string {
 
 type StatusTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
 
+/** 予約のリマインダの送り状態（API の値 → 画面の言葉）。知らない値は英語のまま出さず「状態不明」。 */
+const REMINDER_DELIVERY_STATUS: Record<string, string> = {
+  pending: '送信待ち', sent: '送信済み', failed: '送信失敗（やり直します）', failed_permanent: '送信失敗', cancelled: '取り消し',
+}
+export function reminderDeliveryStatusLabel(status: string): string {
+  return Object.hasOwn(REMINDER_DELIVERY_STATUS, status) ? REMINDER_DELIVERY_STATUS[status] : '状態不明'
+}
+
+/** 管理画面の更新の実行状態（API の値 → 画面の言葉）。 */
+const UPDATE_RUN_STATUS: Record<string, string> = {
+  success: '成功', failed: '失敗', rolled_back: '元に戻した', running: '実行中', pending: '待機中',
+}
+export function updateRunStatusLabel(status: string): string {
+  return Object.hasOwn(UPDATE_RUN_STATUS, status) ? UPDATE_RUN_STATUS[status] : '状態不明'
+}
+
 /** Google と Instagram の接続状態。同じ接続を設定と SNS で別の言葉にしない。 */
 export const GOOGLE_CONNECTION_STATUS = {
   connected: { label: '接続済み', tone: 'success' },
