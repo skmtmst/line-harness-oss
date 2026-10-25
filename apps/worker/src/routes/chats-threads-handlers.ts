@@ -21,6 +21,12 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     if (quickFilter && quickFilter !== 'reply' && quickFilter !== 'overdue') {
       return c.json({ success: false, error: 'invalid_quick_filter' }, 400);
     }
+    // 並び: 既定は「未読が先 → 新しい順」。latest は未読を先にせず新しい順だけで並べる。
+    const sortParam = c.req.query('sort');
+    if (sortParam && sortParam !== 'unread_first' && sortParam !== 'latest') {
+      return c.json({ success: false, error: 'invalid_sort' }, 400);
+    }
+    const unreadFirst = sortParam !== 'latest';
     const lineAccountId = c.req.query('lineAccountId') ?? undefined;
     const query = (c.req.query('q') ?? '').trim().slice(0, 200);
     const visibleScope = await getVisibleLineAccountScope(c.env.DB, staff);
@@ -125,10 +131,11 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     // 新着で行が押し下げられた分が欠落する」構造問題があるため採用しない。
     // friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
     // beforeUnread が無い古い渡し方は、時刻だけの従来条件に倒す。
+    // sort=latest のカーソルは (last_message_at, friend_id) だけで、beforeUnread は見ない。
     const beforeAt = c.req.query('beforeAt') || undefined;
     const beforeId = c.req.query('beforeId') || undefined;
     const beforeUnreadRaw = c.req.query('beforeUnread');
-    const beforeUnread = beforeUnreadRaw === '1' || beforeUnreadRaw === 'true'
+    const beforeUnread = !unreadFirst ? null : beforeUnreadRaw === '1' || beforeUnreadRaw === 'true'
       ? 1
       : beforeUnreadRaw === '0' || beforeUnreadRaw === 'false' ? 0 : null;
     const useCursor = Boolean(beforeAt && beforeId);
@@ -247,7 +254,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
             ? 'AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))'
             : `AND (${unreadExpr} < ? OR (${unreadExpr} = ? AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))))`
           : ''}
-        ORDER BY is_unread DESC, d.last_message_at DESC, d.friend_id DESC
+        ORDER BY ${unreadFirst ? 'is_unread DESC, ' : ''}d.last_message_at DESC, d.friend_id DESC
         LIMIT ?
       ),
       any_agg AS (
@@ -324,7 +331,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         ON sr.channel = 'line'
        AND sr.conversation_id = f.id
        AND sr.staff_id = ?
-      ORDER BY is_unread_for_staff DESC, d.last_message_at DESC, d.friend_id DESC
+      ORDER BY ${unreadFirst ? 'is_unread_for_staff DESC, ' : ''}d.last_message_at DESC, d.friend_id DESC
     `;
 
     // placeholder 順 = SQL 出現順: last_any(account) → deduped 内 chats(account) →
