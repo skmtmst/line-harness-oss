@@ -33,8 +33,7 @@ describe('リッチメニュー作る③の出す順番（OxEMM）', () => {
   })
 
   it('「トークを開いたとき」の前の短い字は太字にしない', () => {
-    // 太字（600）にしない。14px 以下の UI 文字の太さ（500）を読む（2026-10-25）。
-    expect(block('.segLabelPlain {')).toContain('font-weight: var(--font-weight-ui)')
+    expect(block('.segLabelPlain {')).not.toMatch(/font-weight:\s*(?:600|700|bold)/)
     expect(TSX).toContain('segLabelPlain')
   })
 })

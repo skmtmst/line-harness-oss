@@ -7,7 +7,7 @@ import IconButton from './icon-button'
 beforeEach(() => { vi.useFakeTimers() })
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
-describe('アイコンだけのボタンの名前の吹き出し（2026-10-25）', () => {
+describe('アイコンだけのボタンの名前の吹き出し', () => {
   it('印だけのボタンに乗せると、aria-label と同じ文の吹き出しが 0.4 秒後に出て、離すと消える', () => {
     render(<><NameTipHost /><IconButton aria-label="もっと見る"><svg aria-hidden="true" /></IconButton></>)
     const button = screen.getByRole('button', { name: 'もっと見る' })

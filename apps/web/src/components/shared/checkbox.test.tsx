@@ -87,7 +87,7 @@ describe('固定の設定の理由と通常の切り替え', () => {
   })
 })
 
-describe('チェックボックスは1種類（2026-10-25）', () => {
+describe('チェックボックスは1種類', () => {
   const SRC = join(dirname(fileURLToPath(import.meta.url)), '../..')
   const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
     const path = join(dir, name)

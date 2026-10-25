@@ -93,7 +93,7 @@ describe('文字と角丸の共通値を役割ごとに維持する', () => {
 
   it('補助の段もV8の写しに合わせる', () => {
     // 補助文字・大きな数の役割も、写しの値を守る。
-    expect(token('text-micro')).toBe('12px') // 11px は使わない（2026-10-25）
+    expect(token('text-micro')).toBe('12px') // 11px は使わない
     expect(token('text-label')).toBe('12px')
     expect(token('text-heading')).toBe('15px')
     expect(token('text-metric')).toBe('28px')
@@ -175,7 +175,7 @@ describe('共通の値を使うクラスの描画を保つ', () => {
 })
 
 /*
- * 11px の文字は使わない（2026-10-25 オーナー）。補足も 12px の段を読む。
+ * 11px の文字は使わない。補足も 12px の段を読む。
  * 左メニュー（sidebar.module.css）は左メニューの直しの持ち物なので、その直しが入るまで数に入れない。
  */
 describe('11px の文字を使わない', () => {

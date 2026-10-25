@@ -6,7 +6,7 @@
  *   カード：高さ 68・余白 14・間隔 12・角丸 card・枠 1px
  *     オフ＝canvas 地＋hairline 枠、オン＝accent-soft 地＋accent-deep 枠
  *   箱：共通の CheckboxControl（checkbox.tsx）。大きさ・角丸・線・選んだ時の動きは
- *     チェックボックスと同じ1種類（2026-10-25）
+ *     チェックボックスと同じ1種類
  *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない
  */
 

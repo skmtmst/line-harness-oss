@@ -22,7 +22,7 @@ const DEFAULT_TITLE = 'musubo LINE管理システム'
  */
 /*
  * 管理画面の書体。英字と数字は Inter、かなと漢字は Noto Sans JP に見える
- * （2026-10-25 オーナー決定。文字のなめらか処理は既定のままにし、antialiased を付けない）
+ * （文字のなめらか処理は既定のままにし、antialiased を付けない）
  * （--font-sans の並びが正本。Inter に日本語グリフが無いので、かなと漢字は
  * 自動で Noto Sans JP に落ちる）。
  *

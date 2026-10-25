@@ -68,7 +68,7 @@ describe('画像の上で面を選ぶ（共通部品 TapAreaEditor・採用案 W
     expect(screen.getByText('画像の上をドラッグすると、面を足せます。')).toBeTruthy()
   })
 
-  it('見た目：画像は幅 320、記号は薄い地＋灰色の字、選んだ行の記号は濃い緑・白い字、要約と未設定は 12px（11px は使わない）', () => {
+  it('見た目：画像は幅 320、記号は薄い地＋灰色の字、選んだ行の記号は濃い緑・白い字', () => {
     expect(block('.canvas {')).toContain('width: 320px')
     expect(block('.letter {')).toContain('var(--color-surface-pearl)')
     expect(block('.letter {')).toContain('var(--color-ink-secondary)')
@@ -77,9 +77,7 @@ describe('画像の上で面を選ぶ（共通部品 TapAreaEditor・採用案 W
     expect(on).toContain('var(--color-on-accent)')
     expect(block('.row[data-selected], .row[data-selected]:hover {')).toContain('var(--color-accent-soft)')
     expect(block('.area[data-selected] {')).toContain('var(--color-accent-deep)')
-    expect(block('.summary {')).toContain('font-size: 12px')
     const unset = block('.unset {')
-    expect(unset).toContain('font-size: 12px')
     expect(unset).not.toContain('font-weight')
   })
 })

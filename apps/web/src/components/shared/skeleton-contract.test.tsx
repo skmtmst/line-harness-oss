@@ -126,10 +126,8 @@ describe("RefreshCover", () => {
 })
 
 describe('globals.css の現役の動き規定', () => {
-  it('骨組みは CSS だけの薄い光りが流れ、動きを減らす設定では止まる。旧い明滅は残さない', () => {
+  it('骨組みの光りを後ろの規則・部品の CSS が消さない。旧い明滅は残さない', () => {
     expect(GLOBALS_CODE).not.toContain('@keyframes v7-skeleton-pulse')
-    expect(GLOBALS_CODE).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*:root \[data-skeleton\] \{[^}]*animation:\s*v8-skeleton-shimmer var\(--motion-pulse\)/)
-    expect(GLOBALS_CODE).toMatch(/@keyframes v8-skeleton-shimmer/)
     // 後ろの規則・部品の CSS が光りを消さない（background の一括指定や animation: none を書かない）。
     expect(GLOBALS_CODE).not.toMatch(/\[data-skeleton\] \{[^}]*(?:background-image:\s*none|animation:\s*none|background:\s)/)
     const skeletonCss = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'skeleton.module.css'), 'utf8')

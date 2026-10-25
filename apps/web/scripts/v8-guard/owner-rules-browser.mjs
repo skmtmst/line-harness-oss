@@ -44,7 +44,7 @@ export default function scanOwnerRules() {
       }
     }
   }
-  // 14px 未満の UI 文字を太さ 400 で描かない（2026-10-25 オーナー：小さい文字は 500）。
+  // 14px 未満の UI 文字を太さ 400 で描かない。
   // お客さまのスマホの見え方（LINE の見本）は LINE と同じ太さなので数えない。
   for (const el of surfaces.filter(visible)) {
     if (el.closest('svg,[data-line-preview-part],[class*="line-preview_phoneRoot__"],[class*="liff-phone-frame_"]')) continue

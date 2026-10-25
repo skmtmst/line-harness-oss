@@ -149,7 +149,7 @@
 }
 
 /*
- * 名前と @ID の2行（2026-10-25 オーナー）。行の背景は1枚の面（.glow）が、指や焦点を置いた行へ
+ * 名前と @ID の2行。行の背景は1枚の面（.glow）が、指や焦点を置いた行へ
  * 上下になめらかに動く（180ms・CSS だけ）。最初は選んでいる行にいる。動きを減らす設定では一瞬で移る。
  */
 :root .row { position: relative; z-index: 1; height: auto; min-height: var(--tpl-hq2-switch-row-h); padding-block: var(--space-6); background: transparent; }

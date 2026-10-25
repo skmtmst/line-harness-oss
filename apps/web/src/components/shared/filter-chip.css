@@ -119,7 +119,7 @@
 :root .v6-filter-chip[aria-haspopup]:hover:not(:disabled) { background: var(--color-canvas-sunken); }
 
 /*
- * 奥行き（2026-10-25 オーナー決定・くっきり版）。選んでいない札は白い副ボタンと同じ薄いグラデと外周 1px の影、
+ * 奥行き（くっきり版）。選んでいない札は白い副ボタンと同じ薄いグラデと外周 1px の影、
  * 選んだ黒い札は上が少し明るい黒と内側の光。値は globals.css の共通の値。
  */
 :root .v6-filter-chip:not([aria-pressed='true']):not(:hover) { outline-color: transparent; background: var(--gradient-raised-control); box-shadow: var(--shadow-raised-control); }

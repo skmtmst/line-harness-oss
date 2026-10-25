@@ -45,7 +45,7 @@ describe('設計の実測値に合わせる', () => {
   it('文字の段は設計の10段と一致する', () => {
     // Pencil: $size-nano..$size-display
     expect(token('text-nano')).toBe('10px')
-    expect(token('text-micro')).toBe('12px') // 11px は使わない（2026-10-25）
+    expect(token('text-micro')).toBe('12px') // 11px は使わない
     expect(token('text-caption')).toBe('12px')
     expect(token('text-label')).toBe('12px')
     expect(token('text-body')).toBe('13px')
@@ -126,7 +126,7 @@ describe('設計の実測値に合わせる', () => {
     expect(token('color-on-accent')).toBe('#ffffff')
     expect(BUTTON).toMatch(/\.primary\s*\{[^}]*background:\s*var\(--color-accent-deep\)/s)
     expect(BUTTON).toMatch(/\.primary\s*\{[^}]*color:\s*var\(--color-on-accent\)/s)
-    // 画面の緑は深い緑 1 色。LINE の緑は LINE の決まりの所だけ（2026-10-25）。
+    // 画面の緑は深い緑 1 色。LINE の緑は LINE の決まりの所だけ。
     expect(token('color-accent')).toBe('#087a3e')
     expect(token('color-line-green')).toBe('#06c755')
   })

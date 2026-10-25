@@ -15,7 +15,7 @@ export function isIconOnlyAction(el: Element): el is HTMLElement {
 }
 
 /**
- * アイコンだけのボタンに、aria-label と同じ文の吹き出しを出す（2026-10-25 オーナー）。
+ * アイコンだけのボタンに、aria-label と同じ文の吹き出しを出す。
  * 画面ごとに吹き出しを書かず、全画面で1つだけ置く（ToastHost と同じ置き方）。
  * 指を乗せて 0.4 秒、またはキーボードで移った時に出し、離す・押す・Esc・送ると消す。
  */

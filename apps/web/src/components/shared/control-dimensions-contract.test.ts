@@ -18,9 +18,6 @@ describe('V8 の入力・選択・押し口規定', () => {
      * （`@media (pointer: coarse)` の 44px は design-unification の試験が見る）
      */
     expect(button).toMatch(/:root \.standard,\s*:root \.field\s*{[^}]*height:\s*var\(--tpl-button-h\)/s)
-    // ふつうのボタンは共通の値 --control-h（36px）を読む（2026-10-25 ボタンの高さを少数に）。
-    expect(read('../../app/globals.css')).toMatch(/--tpl-button-h:\s*var\(--control-h\)/)
-    expect(read('../../app/globals.css')).toMatch(/--control-h:\s*36px/)
     expect(textField).toMatch(/\.field\s*{[^}]*background:\s*var\(--color-canvas\)/s)
     expect(select).toMatch(/\.trigger\s*{[^}]*height:\s*36px/s)
     expect(select).toMatch(/background:\s*var\(--color-canvas\)/)

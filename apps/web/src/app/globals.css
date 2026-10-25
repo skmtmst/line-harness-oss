@@ -31,7 +31,7 @@
    * スタイル属性は検査から見えにくく、「どれが正本か」が分かりにくかった。
    * 正本をここへ移し、body は `font-sans` で読む。
    *
-   * 並びは「Inter, Noto Sans JP」（2026-10-25 オーナー決定）。英字と数字は
+   * 並びは「Inter, Noto Sans JP」。英字と数字は
    * Inter、かなと漢字は Noto Sans JP に見える（Inter に日本語グリフが
    * 無いので、かな・漢字は自動で次の書体に落ちる）。2つの変数は
    * layout.tsx で next/font が html へ出す `--font-inter` /
@@ -39,16 +39,8 @@
    */
   --font-sans: var(--font-inter), Inter, var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
 
-  /* --- 色 ---------------------------------------------------------------
-   * 画面で使う緑は深い緑 1 色（主ボタンと同じ #087a3e・2026-10-25 オーナー）。
-   * 明るい LINE の緑（#06c755）は［LINE でログイン］など LINE の決まりの所だけが
-   * --color-line-green を読む。数を知らせる丸は赤（緑にしない）。
-   * 状態色（成功・注意・危険）とは役割が別で、アクセントを状態表示に使わない。
-   */
-  --color-line-green: #06c755;
-  --color-line-green-hover: #05b34c;
-  --color-accent: var(--color-accent-deep);
-  --color-accent-hover: #066a35;
+  /* --- 色：画面の緑は深い緑1色。明るい LINE の緑は［LINE でログイン］など LINE の決まりの所だけ。数を知らせる丸は赤。アクセントを状態表示に使わない。 */
+  --color-line-green: #06c755; --color-line-green-hover: #05b34c; --color-accent: var(--color-accent-deep); --color-accent-hover: #066a35;
   --color-accent-soft: #e8f8ee;
   /*
    * 主ボタンの背景。**白文字が載る前提の緑。**
@@ -577,9 +569,9 @@
   --polish-text-section: 15px;
   --polish-text-body: 13px;
   --polish-text-support: 12px;
-  --polish-text-note: 12px; /* 11px は使わない（2026-10-25）。補足も 12px */
+  --polish-text-note: 12px; /* 11px は使わない。補足も 12px */
   --polish-weight-title: 700;
-  --polish-weight-body: 500; /* 14px 以下の UI 文字は 500（2026-10-25）。15px 以上の読み物は --font-weight-reading */
+  --polish-weight-body: 500; /* 14px 以下の UI 文字は 500。15px 以上の読み物は --font-weight-reading */
   --polish-weight-label: 500;
 }
 :root {
@@ -625,8 +617,7 @@
    * 既定のカードはこの2つを読む。一覧の平らなカードは Card.frame="flat" で影を外す。
    * 選ぶカード（ラジオ・チェック）・入力欄・ボタン・浮く面（メニュー・窓）は別の値のまま。
    */
-  --card-edge: transparent; /* カードの縁は影の外周 1px が描く。線と重ねて太く見せない（2026-10-25） */
-  --surface-edge: rgba(29, 29, 31, 0.08); /* 影を持たない面（浮く窓・帯）の薄い縁 */
+  --card-edge: transparent; --surface-edge: rgba(29, 29, 31, 0.08); /* カードの縁は影の外周 1px が描く。影を持たない面（浮く窓・帯）は surface-edge の薄い縁 */
   --card-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 2px 3px -1px rgba(0, 0, 0, 0.07), 0 6px 8px -4px rgba(0, 0, 0, 0.07);
   /* --- 動き（管理画面）------------------------------------------------------------
    * Pencil ★管理画面「基礎 動き」（管理画面 文書 `bi8Au`）の物差し。部品の CSS は ms を
@@ -788,7 +779,7 @@
   --tpl-msg-composer-media-h: 96px;
   --tpl-msg-composer-audio-h: 36px;
   --tpl-msg-composer-audio-icon-w: 32px;
-  --tpl-msg-composer-small-button-h: var(--control-h-compact); /* 小さいボタンは 32（2026-10-25 ボタンの高さを少数に） */
+  --tpl-msg-composer-small-button-h: var(--control-h-compact); /* 小さいボタンは 32 */
   --tpl-msg-composer-drawer-actions-gap: 28px;
   --tpl-msg-composer-preview-card-w: 128px;
   --tpl-msg-composer-preview-image-h: 62px;
@@ -2531,9 +2522,7 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
    * 戻せる。かな・漢字・英字には効かない。
    */
   body {
-    font-variant-numeric: var(--font-numeric);
-    /* 14px 以下の UI 文字は 500（2026-10-25 オーナー）。15px 以上の読み物だけ --font-weight-reading を指定する。 */
-    font-weight: var(--font-weight-ui);
+    font-variant-numeric: var(--font-numeric); font-weight: var(--font-weight-ui); /* 14px 以下の UI 文字は 500。15px 以上の読み物だけ --font-weight-reading */
   }
 
   /*
@@ -2955,8 +2944,7 @@ html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'],
 }
 html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-disabled-opacity); }
 
-/* 骨組みの地と角丸。光りの動き（v8-skeleton-shimmer）は上の「動きを減らさない設定」の規則が付け、ここでは消さない（2026-10-25 オーナー）。 */
-:root [data-skeleton] { background-color: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
+/* 骨組みの地と角丸。光りの動きは上の規則が付け、ここでは消さない。 */ :root [data-skeleton] { background-color: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
 
 /* ・仕上げ9。旧テーマの角丸は維持する。 */
 :root {
@@ -3146,8 +3134,7 @@ html:root input:is([type='radio'], [type='checkbox']) { appearance: none; width:
 html:root input[type='radio'] { border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
 html:root input[type='radio']:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
 
-/* 共通の Checkbox を通らない素のチェックも、同じ1種類の形（16px・角丸4・線1px・選ぶと濃い緑に白い印）。 */
-html:root input[type='checkbox'] { margin: 0; border: 0; border-radius: var(--choice-checkbox-radius); outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); background: var(--color-canvas); }
+/* 素のチェックも共通の Checkbox と同じ形 */ html:root input[type='checkbox'] { margin: 0; border: 0; border-radius: var(--choice-checkbox-radius); outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); background: var(--color-canvas); }
 html:root input[type='checkbox']:checked { outline-color: var(--color-accent-deep); background: var(--color-accent-deep) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M4 12l5 5L20 6'/%3E%3C/svg%3E") center/var(--polish-icon-control) no-repeat; }
 html:root input:is([type='radio'], [type='checkbox']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
@@ -3200,70 +3187,8 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 /* 複合部品や画面が渡す線幅も、同じlucideの値へそろえる。 */
 :root svg.lucide { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
 
-/* 数の帯・表の数・件数・時刻は桁をそろえる（共通の値 --font-numeric）。 */
-html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][data-align='right'], [data-count], [data-part='count']) { font-variant-numeric: var(--font-numeric); }
+/* 数の帯・表の数・件数・時刻は桁をそろえる */ html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][data-align='right'], [data-count], [data-part='count']) { font-variant-numeric: var(--font-numeric); }
 
-/*
- * 共通の値（直し③-0・2026-10-25 オーナー決定）。部品と画面はここの値を読むだけにし、
- * 画面ごとに影・ボタンの高さ・文字の太さを書かない。
- *
- *   余白の段      --space-2〜32（上の :root）。
- *   角丸の役割    部品 --radius-control・主ボタン --radius-primary-action・カード --radius-card・窓 --radius-panel。
- *   文字の大きさ  題 32/600・本文 13・ラベル 12・補足 12（11px は使わない）・数の帯 34/500。
- *   文字の太さ    14px 以下の UI 文字は 500、15px 以上の読み物は 400、見出し・ボタン・状態は 600。
- *   影            くっきり版（ぼかしは最大 8px）。カード・白い部品・緑の主ボタン・選んだ黒い札。
- *   ボタンの高さ  ふつう 36・小さい 32（道具の列・表の中）・アイコンだけ 32 角（押せる所は 28 以上）。
- *   動き          押した時 0.98 倍（主ボタンは 0.5px 沈む）・カードに乗せた時 2px 浮く（150ms）。
- */
-:root {
-  --font-weight-ui: 500;
-  --font-weight-reading: 400;
-  --font-numeric: tabular-nums;
-  --text-optical-shift: 0.5px; /* 札の中の和文を字面の真ん中へ寄せる量（Inter が先の時） */
-
-  --control-h: 36px;
-  --control-h-compact: 32px;
-  --control-icon-size: 32px;
-  --control-icon-min: 28px;
-
-  --card-shadow-hover: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 3px 4px -1px rgba(0, 0, 0, 0.08), 0 8px 10px -5px rgba(0, 0, 0, 0.09);
-  --card-hover-lift: translateY(-2px);
-  --motion-card-lift: 150ms;
-  --motion-switch-glide: 180ms; /* 切り替えの一覧で行の背景が動く・⌄ が回る */
-
-  /*
-   * 緑の主ボタンの地。上端は今までの #087a3e のまま、下へ少し濃くする。
-   * 白い文字との比はどこでも 5.44:1 以上（上端 5.44・下端 6.73）。
-   */
-  --gradient-primary-action: linear-gradient(180deg, #087a3e, #066a35);
-  --shadow-primary-action-hover: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 4px rgba(8, 122, 62, 0.35), 0 3px 5px -2px rgba(8, 122, 62, 0.3);
-  --press-primary-shift: translateY(0.5px);
-
-  --gradient-raised-control: linear-gradient(180deg, #fff, #fafafc);
-  --gradient-selected-chip: linear-gradient(180deg, #34343a, #1d1d1f);
-  --shadow-selected-chip: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.25);
-
-  --bar-scrolled-bg: rgba(255, 255, 255, 0.72);
-  --bar-scrolled-filter: saturate(180%) blur(18px);
-  --bar-scrolled-line: inset 0 -1px 0 rgba(29, 29, 31, 0.06); /* 下端の 1px の線。帯の高さを変えないよう内側の影で描く */
-}
-
-/*
- * アイコンだけの小さい押し口（並び替えのつまみ・札の ×・行の小さい印）は、見た目の大きさを変えずに
- * 押せる所を 28px 以上へ広げる（2026-10-25 オーナー）。部品が data-hit-area を付ける。
- */
-:where([data-hit-area]) { position: relative; } /* 部品が自分で位置を決めていればそちらが勝つ */
-:root [data-hit-area]::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, var(--control-icon-min)); height: max(100%, var(--control-icon-min)); transform: translate(-50%, -50%); }
-
-/*
- * 押せるカード（カード全体が1つのリンク・ボタン）だけ、指を乗せると 2px 浮いて影が少し深くなる（150ms・2026-10-25 オーナー）。
- * 押せないカードは浮かせない。部品・画面は data-pressable-card を付けるだけで、影や動きを書かない。
- */
-:root [data-pressable-card] { transition: transform var(--motion-card-lift) var(--motion-ease-out), box-shadow var(--motion-card-lift) var(--motion-ease-out); }
-:root [data-pressable-card]:hover { box-shadow: var(--card-shadow-hover); }
-@media (prefers-reduced-motion: no-preference) {
-  :root [data-pressable-card]:hover { transform: var(--card-hover-lift); }
-}
-@media (prefers-reduced-motion: reduce) {
-  :root [data-pressable-card] { transition: none; }
-}
+/* 共通の値。部品と画面はここを読むだけで、影・ボタンの高さ・文字の太さを画面ごとに書かない。余白 --space-*・角丸 部品 --radius-control／主ボタン --radius-primary-action／カード --radius-card・文字 題32/600 本文13 ラベル12 補足12 数34/500・太さ 14px以下のUI文字500 読み物400 見出しとボタン600・影 くっきり版（ぼかし最大8px）・ボタン ふつう36 小さい32 アイコン32角（押せる所28以上）・動き 押すと0.98倍（主ボタンは0.5px沈む）押せるカードは乗せると2px浮く。 主ボタンの地は上端が深い緑のまま下へ少し濃く（白い文字との比はどこでも 5.44:1 以上）。白い部品と選んだ黒い札の地。帯は下へ流した時だけ白72%＋すりガラス＋下端1px（内側の影で描き高さを変えない）。 小さいアイコンの押し口は見た目を変えずに押せる所を 28px 以上へ（部品が data-hit-area を付ける。位置を自分で決めた部品はそちらが勝つ）。 カード全体が1つのリンク・ボタンの時だけ data-pressable-card を付け、乗せると浮いて影が深くなる。押せないカードは浮かせない。 */
+:root { --font-weight-ui: 500; --font-weight-reading: 400; --font-numeric: tabular-nums; --text-optical-shift: 0.5px; --control-h: 36px; --control-h-compact: 32px; --control-icon-size: 32px; --control-icon-min: 28px; --card-hover-lift: translateY(-2px); --motion-card-lift: 150ms; --motion-switch-glide: 180ms; --press-primary-shift: translateY(0.5px); --card-shadow-hover: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 3px 4px -1px rgba(0, 0, 0, 0.08), 0 8px 10px -5px rgba(0, 0, 0, 0.09); --shadow-primary-action-hover: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 4px rgba(8, 122, 62, 0.35), 0 3px 5px -2px rgba(8, 122, 62, 0.3); --gradient-primary-action: linear-gradient(180deg, #087a3e, #066a35); --gradient-raised-control: linear-gradient(180deg, #fff, #fafafc); --gradient-selected-chip: linear-gradient(180deg, #34343a, #1d1d1f); --shadow-selected-chip: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.25); --bar-scrolled-bg: rgba(255, 255, 255, 0.72); --bar-scrolled-filter: saturate(180%) blur(18px); --bar-scrolled-line: inset 0 -1px 0 rgba(29, 29, 31, 0.06); }
+:where([data-hit-area]) { position: relative; } :root [data-hit-area]::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, var(--control-icon-min)); height: max(100%, var(--control-icon-min)); transform: translate(-50%, -50%); } :root [data-pressable-card] { transition: transform var(--motion-card-lift) var(--motion-ease-out), box-shadow var(--motion-card-lift) var(--motion-ease-out); } :root [data-pressable-card]:hover { box-shadow: var(--card-shadow-hover); } @media (prefers-reduced-motion: no-preference) { :root [data-pressable-card]:hover { transform: var(--card-hover-lift); } } @media (prefers-reduced-motion: reduce) { :root [data-pressable-card] { transition: none; } }

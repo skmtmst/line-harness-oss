@@ -97,7 +97,7 @@ function CheckboxMark() {
 
 /**
  * 文字や札を自分で持つ部品（選ぶカードなど）が使う、チェックの四角だけ。
- * 大きさ・角丸・線・選んだ時の動きは Checkbox と同じ1種類（2026-10-25 チェックボックスを1種類に）。
+ * 大きさ・角丸・線・選んだ時の動きは Checkbox と同じ1種類。
  */
 export function CheckboxControl({
   checked,

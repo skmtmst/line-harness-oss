@@ -1,10 +1,7 @@
 // @vitest-environment happy-dom
-/* 本文（main）を下へ流した時だけ、上の帯をすりガラスにする（2026-10-25 オーナー）。一番上では今のまま。 */
+/* 本文（main）を下へ流した時だけ、上の帯をすりガラスにする。一番上では今のまま。 */
 import React from 'react'
 import { act, cleanup, render } from '@testing-library/react'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
@@ -25,14 +22,5 @@ describe('上の帯のすりガラス', () => {
     act(() => { main.scrollTop = 0; main.dispatchEvent(new Event('scroll')) })
     expect(header.hasAttribute('data-scrolled')).toBe(false)
     main.remove()
-  })
-
-  it('すりガラスの値は共通の値（白72%・saturate 180%・blur 18px・下端 1px）', () => {
-    const here = dirname(fileURLToPath(import.meta.url))
-    const globals = readFileSync(join(here, '../../app/globals.css'), 'utf8')
-    const bar = readFileSync(join(here, '../shared/top-bar.module.css'), 'utf8')
-    expect(globals).toContain('--bar-scrolled-bg: rgba(255, 255, 255, 0.72);')
-    expect(globals).toContain('--bar-scrolled-filter: saturate(180%) blur(18px);')
-    expect(bar).toMatch(/\.root\[data-scrolled\] \{[^}]*background: var\(--bar-scrolled-bg\);[^}]*backdrop-filter: var\(--bar-scrolled-filter\);[^}]*box-shadow: var\(--bar-scrolled-line\)/)
   })
 })

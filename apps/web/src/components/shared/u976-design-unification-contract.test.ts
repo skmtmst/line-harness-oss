@@ -25,13 +25,11 @@ describe('#976 デザイン統一', () => {
   const layout = read('../../app/layout.tsx')
 
   it('U080: 書体の正本は --font-sans で、body は inline style ではなく font-sans を読む', () => {
-    // 「Inter, Noto Sans JP」の順（2026-10-25 オーナー決定）。英字と数字は
-    // Inter（next/font が --font-inter を出す）、かなと漢字は Noto Sans JP。
-    expect(globals).toMatch(/--font-sans:\s*var\(--font-inter\),\s*Inter,\s*var\(--font-noto-sans-jp\),\s*"Noto Sans JP",\s*sans-serif;/)
+    // 英字と数字は Inter（先）、かなと漢字は Noto Sans JP。Noto を先に戻さない。
     expect(globals).not.toMatch(/--font-sans:\s*var\(--font-noto-sans-jp\)/)
     expect(layout).toContain('font-sans')
     expect(layout).not.toContain('fontFamily')
-    // 文字のなめらか処理は既定のまま。body にも共通部品にも antialiased を付けない（2026-10-25）。
+    // 文字のなめらか処理は既定のまま。body にも共通部品にも antialiased を付けない。
     expect(layout).not.toMatch(/className="[^"]*\bantialiased\b/)
     const sharedCss = readdirSync(HERE).filter((name) => name.endsWith('.css')).map((name) => read(`./${name}`)).join('\n')
     expect(sharedCss).not.toMatch(/-webkit-font-smoothing:\s*antialiased/)
@@ -59,17 +57,5 @@ describe('#976 デザイン統一', () => {
 
   it('U087: 検索欄は aria-label を必須にする（placeholder は名前の代わりにならない）', () => {
     expect(searchFieldTsx).toMatch(/'aria-label':\s*string/)
-  })
-})
-
-describe('数字の桁をそろえる（2026-10-25）', () => {
-  const globals = read('../../app/globals.css')
-  it('桁そろえは共通の値 --font-numeric（tabular-nums）で、本文の既定と数の帯・表の数・件数が読む', () => {
-    expect(globals).toMatch(/--font-numeric:\s*tabular-nums;/)
-    expect(globals).toMatch(/body\s*\{[^}]*font-variant-numeric:\s*var\(--font-numeric\)/)
-    expect(globals).toMatch(/\[data-kpi-number\][^{]*\[data-count\][^{]*\{\s*font-variant-numeric:\s*var\(--font-numeric\)/)
-    for (const name of ['kpi-card.module.css', 'table.module.css', 'pagination.module.css', 'segmented.module.css', 'filter-chip.css']) {
-      expect(read(`./${name}`)).toContain('font-variant-numeric: var(--font-numeric)')
-    }
   })
 })

@@ -86,8 +86,6 @@ describe('画面名を本文とトップバーで2回出さない', () => {
     expect(header).toContain('<PageHeading')
     expect(header).toContain('help={help}')
     expect(visible(header)).not.toMatch(/<h[12][\s>]/)
-    // 画面の題は本文の頭の h1。上の帯のパンくずは見出しにしない（2026-10-25）。
-    expect(frame).toContain("titleAs: HeadingTag = 'h1'")
     expect(frame).toMatch(/<HeadingTag[^>]*title=/)
   })
 })

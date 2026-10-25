@@ -74,7 +74,7 @@ export function cssShapeCandidates(css, tokens) {
     if (!/^(?:12px\s*){1,4}$/.test(radius)) continue
     const frame = [d.border, d['border-color'], d.outline, d['outline-color'], d['box-shadow']].filter(Boolean).join(' ')
     const resolvedFrame = compact(resolveValue(frame, local))
-    // カードの縁は影の外周が描くので --card-edge は透明（2026-10-25）。影を持たない面の縁は --surface-edge。
+    // カードの縁は影の外周が描くので --card-edge は透明。影を持たない面の縁は --surface-edge。
     // 透明の値は「縁がある」印にしない（outline-color: transparent を縁と取り違えない）。
     const framed = /hairline|card-edge|surface-edge|var\(--tpl-[\w-]*ring/.test(frame) ||
       ['--color-hairline', '--card-edge', '--surface-edge'].some(token => {

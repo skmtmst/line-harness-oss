@@ -374,7 +374,7 @@ html:root .button.secondary[data-presentation='row-action']:focus-visible {
 }
 
 /*
- * 奥行き（2026-10-25 オーナー決定・くっきり版）。値は globals.css の共通の値だけを読む。
+ * 奥行き（くっきり版）。値は globals.css の共通の値だけを読む。
  * 緑の主ボタン：薄いグラデと上端の光、乗せると影が少し深く、押すと 0.5px 沈む。
  * 白い副ボタン：白から #fafafc への薄いグラデと、外周 1px の影。
  */
