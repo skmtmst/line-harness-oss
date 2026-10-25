@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 
 
 /**
- * 送り先の `event_types` を読む(#506 中)。
+ * 送り先の `event_types` を読む( 中)。
  *
  * 1行でも壊れていると一覧全体が例外→500になっていた。壊れた行は空に
  * 落とし、IDを構造化ログに残して一覧は返す。配列でないJSON(文字列など)

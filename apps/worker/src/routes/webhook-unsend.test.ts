@@ -231,7 +231,7 @@ describe('N-024 LINE送信取消', () => {
     };
     await postText(db,'a','sql-only','sql-only-msg','人工の本文',1_800_000_000_000);
     const response=await retry(db,'sql-only');
-    // The inbox insert is known; the reply policy was not reached, so only mileage is safe.
+    // 受信箱への保存は確定し、返信方針には未到達なので、マイルだけが安全に実行できる。
     expect(await response.json()).toMatchObject({status:'needs_review',reasonCode:'reply_input_unavailable'});
     expect(mileage).toHaveBeenCalledOnce();
     expect(db.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({n:1});

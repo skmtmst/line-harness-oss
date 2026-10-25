@@ -8,8 +8,7 @@ const lineClientMocks = vi.hoisted(() => ({
   pushMessage: vi.fn(),
 }));
 
-// Stub the DB graph — these tests focus on webhook guard behavior and the
-// first-contact friend registration path without touching real D1/LINE.
+// Webhook の境界と初回友だち作成を試すため、DB と LINE の外部依存を差し替える。
 vi.mock('@line-crm/db', () => ({
   isOperationCapabilityStopped: vi.fn(async () => false),
   upsertFriend: vi.fn(),
@@ -303,7 +302,7 @@ describe('POST /webhook — DoS defenses (#104)', () => {
       baseExecutionCtx,
     );
     expect(res.status).toBe(413);
-    // Signature verification must not even be attempted on an oversized body.
+    // 上限超過の本文では、署名検証まで実行しない。
     expect(verifySignature).not.toHaveBeenCalled();
   });
 
@@ -331,11 +330,7 @@ describe('POST /webhook — DoS defenses (#104)', () => {
     vi.mocked(verifySignature).mockResolvedValue(false);
 
     const app = setupApp();
-    // 44-char signature (valid HMAC-SHA256 base64 length) so it clears the
-    // length pre-check and reaches verifySignature. Malformed JSON body: if
-    // signature were verified *after* parse (old behavior), we'd hit the
-    // parser-failure branch first. With signature-first, we get the invalid-
-    // signature branch and never attempt to parse.
+    // 長さは正しい署名と壊れた JSON を使い、JSON 解析より先に署名が拒まれることを確かめる。
     const validShapedSignature = 'A'.repeat(43) + '=';
     const res = await app.request(
       '/webhook',
@@ -351,7 +346,7 @@ describe('POST /webhook — DoS defenses (#104)', () => {
       baseExecutionCtx,
     );
     expect(res.status).toBe(200);
-    // verifySignature must run; rejection happens before any parse attempt.
+    // 署名の拒否は JSON 解析より先に起きる。
     expect(verifySignature).toHaveBeenCalled();
     expect(verifySignature).toHaveBeenCalledWith('env-default-secret', '{not valid json', validShapedSignature);
   });
@@ -372,7 +367,7 @@ describe('POST /webhook — DoS defenses (#104)', () => {
       baseExecutionCtx,
     );
     expect(res.status).toBe(200);
-    // Fast-rejected before any crypto / DB work.
+    // 不正形は暗号処理・DB より前に拒む。
     expect(verifySignature).not.toHaveBeenCalled();
   });
 
@@ -532,8 +527,7 @@ describe('POST /webhook — postback events', () => {
     const processing = vi.mocked(executionCtx.waitUntil).mock.calls[0]?.[0] as Promise<unknown>;
     await processing;
 
-    // No auto-reply matched — the reply token must be handed to the event bus
-    // so automations can still use it for free reply delivery.
+    // 自動返信が使わなかった replyToken をイベントへ渡し、自動化の無料返信に使えるようにする。
     expect(fireEvent).toHaveBeenCalledWith(
       db,
       'postback_received',
@@ -630,8 +624,7 @@ describe('POST /webhook — postback events', () => {
     const processing = vi.mocked(executionCtx.waitUntil).mock.calls[0]?.[0] as Promise<unknown>;
     await processing;
 
-    // Silent rule: no reply sent, but matched=true and the unconsumed reply
-    // token still reaches the event bus (rich menu tap → silent + add_tag flow).
+    // 無言ルールでも未消費の replyToken はイベントへ渡し、タグ付与などの後続操作で利用できるようにする。
     expect(lineClientMocks.replyMessage).not.toHaveBeenCalled();
     expect(fireEvent).toHaveBeenCalledWith(
       db,
@@ -768,7 +761,7 @@ describe('POST /webhook — first-contact existing friends', () => {
     expect(getScenarios).not.toHaveBeenCalled();
     expect(enrollFriendInScenario).not.toHaveBeenCalled();
 
-    // Keep the unrelated DB stubs quiet but type-checked as mocked imports.
+    // 関係しない DB の差替も、import した型の検査は維持する。
     expect(updateFriendFollowStatus).not.toHaveBeenCalled();
     expect(getScenarioSteps).not.toHaveBeenCalled();
     expect(advanceFriendScenario).not.toHaveBeenCalled();

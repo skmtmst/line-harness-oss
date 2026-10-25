@@ -8,17 +8,14 @@ import { upsertFriend, updateFriendFollowStatus, getFriendByLineUserIdForAccount
 import type { Friend } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
-export // LINE webhook bodies are small (events array). Cap defends against unauthenticated
-// large-payload DoS before signature verification (#104). 1 MiB leaves room for
-// bursty batched deliveries (~100 events × ~5 KB) while still well below the
-// 128 MB Cloudflare Workers memory ceiling.
+export // 署名確認前の巨大本文による負荷を防ぐため、1MiBに制限する。大量イベントをまとめても余裕を保ち、Worker の128MBメモリを圧迫しない。
 const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024;
 
 export /**
  * friends.line_user_id はグローバル UNIQUE のため (C-2b までは1ユーザー1行)、
  * 別アカウント所有の行があるとこのアカウント用の行は INSERT できない。
  * その場合は相手の行に触れず「このアカウントでは友だちを解決できない」
- * として扱う (Issue #961)。
+ * として扱う。
  */
 function isFriendScopeConflict(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -39,9 +36,7 @@ export async function ensureFriendFromWebhookUser(
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
-      // A signed webhook already proves this user interacted with the bot.
-      // If profile lookup is temporarily unavailable, keep the event processable
-      // by creating the friend with the LINE userId and filling profile later.
+      // 署名済み受信は利用者の接触を証明するため、プロフィール取得が一時的に失敗しても LINE userId で友だちを作り、後から情報を補う。
       logWebhookStepFailure('unknown_user_profile', err, lineAccountId);
     }
 
@@ -67,7 +62,7 @@ export async function ensureFriendFromWebhookUser(
   if (lineAccountId && friend.line_account_id !== lineAccountId) {
     // lookup は同一アカウントか未割当 (NULL) の行しか返さないので、ここで
     // line_account_id が違うのは未割当行だけ。それを受信アカウントへ引き当てる。
-    // 別アカウントの行を「移動」する経路は Issue #961 で廃止した。
+    // 別アカウントの行を「移動」する経路は Issue  で廃止した。
     const now = jstNow();
     await db
       .prepare('UPDATE friends SET line_account_id = ?, updated_at = ? WHERE id = ?')
@@ -79,12 +74,7 @@ export async function ensureFriendFromWebhookUser(
   return friend;
 }
 
-export /**
- * Stopped tenants still own their inbound data, but no webhook-triggered
- * external effect may run. Keep this deliberately separate from handleEvent:
- * adding a new auto-reply/action path there cannot accidentally re-enable
- * delivery for a suspended tenant.
- */
+export /** 停止中の統括も受信データは保持するが、外部の副作用は起こさない。新しい返信経路で送信が復活しないよう、handleEvent と分離して守る。 */
 async function handleStoppedTenantEvent(
   db: D1Database,
   lineClient: LineClient,

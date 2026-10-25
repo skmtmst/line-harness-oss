@@ -124,7 +124,7 @@ export const post__api_webhooks_outgoing_2 = async (c: Context<Env, "/api/webhoo
           folderId: item.folder_id ?? null,
           url: item.url,
           eventTypes: outgoingEventTypes(item.event_types, item.id),
-          // Returned exactly once on create. The row itself holds only ciphertext.
+          // 作成時にだけ秘密値を返し、行には暗号文だけを保存する。
           secret: body.secret,
           isActive: Boolean(item.is_active),
           maxRetries: item.max_retries ?? 0,
@@ -214,12 +214,7 @@ export const put__api_webhooks_outgoing_id_3 = async (c: Context<Env, "/api/webh
         return inputError(c, { success: false, error: secretError }, 400, ["secret"]);
       }
     }
-    // Activation gate: a PUT that re-enables an outgoing webhook must leave
-    // the row with both a valid secret AND an https url even after the
-    // partial update. Without this, migration 034 can be bypassed by
-    // sending {isActive:true} on a legacy http:// or secret-less row.
-    // Encrypted rows are decrypted for the length check; undecryptable rows
-    // stay stopped until the secret is re-entered (#650).
+    // 部分更新後の秘密値と HTTPS URL を検査し、isActive だけで不正な保存値を再有効化させない。復号不能なら再入力まで停止する。
     if (body.isActive === true) {
       let effectiveSecret = body.secret;
       if (effectiveSecret === undefined) {
@@ -249,7 +244,7 @@ export const put__api_webhooks_outgoing_id_3 = async (c: Context<Env, "/api/webh
     const updated = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     if (saved === false) return conflict(updated);
-    // N-379 (#939): 動かす/止める・合言葉の入れ直し・その他の変更を分けて記録する。
+    //  動かす/止める・合言葉の入れ直し・その他の変更を分けて記録する。
     if (body.isActive !== undefined) {
       auditLog(c, body.isActive ? 'webhook.outgoing.activate' : 'webhook.outgoing.deactivate',
         { kind: 'outgoing_webhook', id }, { lineAccountId });
@@ -300,12 +295,12 @@ export const post__api_webhooks_outgoing_id_test_4 = async (c: Context<Env, "/ap
     const webhook = await getOutgoingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
     if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
     if (!webhook.is_active) return c.json({ success: false, error: '止めている送り先は試せません' }, 409);
-    // 緊急停止 (#1050): webhook_outgoing 停止中は試し送信も受け付けない。
+    // 緊急停止 : webhook_outgoing 停止中は試し送信も受け付けない。
     if (await isOperationCapabilityStopped(c.env.DB, lineAccountId, 'webhook_outgoing')) {
       return c.json({ success: false, error: '緊急停止中のため試し送信できません' }, 409);
     }
     // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
-    // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり試す。
+    // (鍵不足・復号失敗)ときだけ送らずに止める。未設定の旧行は従来どおり試す。
     let sendSecret: string | null = null;
     if (webhook.secret_encrypted || webhook.secret) {
       try {
@@ -317,7 +312,7 @@ export const post__api_webhooks_outgoing_id_test_4 = async (c: Context<Env, "/ap
         return c.json({ success: false, error: 'secret を確認できないため試し送信を止めました' }, 503);
       }
     }
-    // N-371: 試し送信も共通封筒で送る。イベントIDと冪等キーは同じ値にし、
+    // 試し送信も共通封筒で送る。イベントIDと冪等キーは同じ値にし、
     // 記録のやり直しでも同じ出来事として届く。
     const eventId = crypto.randomUUID();
     const body = buildOutgoingWebhookBody({
@@ -334,10 +329,10 @@ export const post__api_webhooks_outgoing_id_test_4 = async (c: Context<Env, "/ap
       idempotencyKey: eventId,
     });
     const started = Date.now();
-    // d23b R419: 試し送信は1回だけ。画面の案内（届いたかを試す1回）と
+    // d23b : 試し送信は1回だけ。画面の案内（届いたかを試す1回）と
     // 自動の送り直しを混ぜないため、送り直しを0回に固定して送る。
     // 署名用の復号は配送側が行う。ここは早い段階で 503 を返すための
-    // 事前確認だけに使い、鍵はそのまま渡す(#650 再審査)。
+    // 事前確認だけに使い、鍵はそのまま渡す。
     const result = await deliverOnce(webhook, body, {
       idempotencyKey: eventId,
       credentialKeys: webhookKeysOf(c),
@@ -347,7 +342,7 @@ export const post__api_webhooks_outgoing_id_test_4 = async (c: Context<Env, "/ap
       responseStatus: result.lastStatus ?? null,
       attemptCount: result.attempts,
       durationMs: Date.now() - started,
-      // d23b R410/R415: 他経路と同じ理由を残す。届いたか分からない
+      // d23b /: 他経路と同じ理由を残す。届いたか分からない
       // 失敗を「処理できなかった」と記録しない。
       failureReason: result.ok ? null : failureReasonForDelivery(result),
     });
@@ -448,7 +443,7 @@ export const get__api_webhooks_interactions_id_payload_9 = async (c: Context<Env
     if ('error' in access) return access.error;
     const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
     if (!original) return c.json({ success: false, error: 'Not found' }, 404);
-    // 本文は伏せて返す（F-18）。元やDBは変えない。
+    // 本文は伏せて返す。元やDBは変えない。
     const masked = maskInteractionPayload(original.request_body_json);
     return c.json({
       success: true,
@@ -466,7 +461,7 @@ export const post__api_webhooks_interactions_id_retry_10 = async (c: Context<Env
     const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
     if (!original) return c.json({ success: false, error: 'Not found' }, 404);
     /*
-      IDEA-26: 「届いたか分からない」失敗を無条件で再送しない。
+      「届いたか分からない」失敗を無条件で再送しない。
       相手先で同じ処理が記録されていないか確かめた、という運用者の確認
       (confirmed=true)が無い要求は 409 で止める。確認後の再送は同じ
       冪等キーで行うので、届いていても相手先で二重処理されない。
@@ -493,7 +488,7 @@ export const post__api_webhooks_interactions_id_retry_10 = async (c: Context<Env
       return c.json({ success: false, error: code }, 409);
     }
     /*
-      d23b R412: 同じ通知が自動で届き済み・自動の送り直しが動いている
+      d23b : 同じ通知が自動で届き済み・自動の送り直しが動いている
       場合は手動のやり直しを重ねず、理由を画面へ返す。
     */
     if (code === 'already_delivered') {
@@ -522,19 +517,19 @@ export const post__api_webhooks_interactions_retry_failed_11 = async (c: Context
     const access = await requireInteractionAccount(c);
     if ('error' in access) return access.error;
     // 1件につき最大6回の外部通信になる。1リクエストの外部通信上限を越えないよう5件まで。
-    // 結果不明(届いたか分からない)の記録はここには含まれない(IDEA-26)。
+    // 結果不明(届いたか分からない)の記録はここには含まれない。
     //
-    // d23b R405: 選ぶ段階で、送り先が消えた・止まった・内容が残っていない
+    // d23b : 選ぶ段階で、送り先が消えた・止まった・内容が残っていない
     // 記録と、自動の送り直しが動いている記録は外す。先頭に固まった対象外の
     // 記録で、後ろの送れる記録へ届かなくなることはなくなった。
     const failed = await listFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId, 5);
-    // N-387: 対象外に残る件数を先に数えて返す。まとめて操作で黙って残さない。
+    // 対象外に残る件数を先に数えて返す。まとめて操作で黙って残さない。
     const totalFailed = await countFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId);
     const remaining = Math.max(0, totalFailed - failed.length);
-    // IDEA-26: 結果不明の失敗は無条件に再送しない代わりに、件数を返して
+    // 結果不明の失敗は無条件に再送しない代わりに、件数を返して
     // 「相手先で確かめてから1件ずつやり直す」ことを画面へ伝える。
     const needsReview = await countUnverifiedWebhookInteractions(c.env.DB, access.lineAccountId);
-    // d23b R408: 対象外に残った件数（消えた・止まった送り先、内容が無い
+    // d23b : 対象外に残った件数（消えた・止まった送り先、内容が無い
     // 記録、自動の送り直しが動いている記録）も返す。画面が「何件が今回の
     // 対象外だったか」を説明できるようにする。
     const excluded = await countExcludedFailedWebhookInteractions(c.env.DB, access.lineAccountId);

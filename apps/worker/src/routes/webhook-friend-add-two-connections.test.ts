@@ -1,5 +1,5 @@
 /*
- * N-101(#622): 友だち追加の webhook を「独立した2つのD1接続」で取り合わせる。
+ * 友だち追加の webhook を「独立した2つのD1接続」で取り合わせる。
  *
  * 1つの接続で await を挟むだけの並行では、SQL が競合を捌けているかまでは
  * 分からない。ここでは同じDBファイルへ**別々の接続**を開き、2つの実行主体が
@@ -129,7 +129,7 @@ beforeAll(async () => {
   templateFile = join(templateDir, 'template.sqlite');
   const setup = createTestD1({ file: templateFile });
   seedBase(setup.raw);
-  // 参加には明示公開が要る（351 / #644）。写し元の時点で稼働中にしておく。
+  // 参加には明示公開が要る。写し元の時点で稼働中にしておく。
   await publishScenarioVersion(setup.db, 'scenario-1', {
     staffId: null,
     idempotencyKey: 'two-connections-seed',

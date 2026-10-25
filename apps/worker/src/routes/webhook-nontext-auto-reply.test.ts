@@ -1,7 +1,7 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
-// N-082 (Issue #619): 非テキスト受信を自動応答の種別条件へ接続する契約テスト。
+//  非テキスト受信を自動応答の種別条件へ接続する契約テスト。
 // Webhook の非テキスト分岐が matchAndReply へ正しい種別で渡すこと、
 // 対象なし・停止中・別アカウント・重複は送信しないこと、
 // LINE の通常保存・受信箱・メディア処理を壊さないことを確かめる。

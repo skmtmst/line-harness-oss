@@ -31,14 +31,11 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), inputJsonBounda
 webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), delete__api_webhooks_incoming_id_6);
 
 /**
- * POST /api/webhooks/incoming/:id/restore — 削除の取り消し（B 元に戻す）。
- *
- * 消した受信Webhookだけを戻す。戻した直後は止めたまま。消していない
- * 行・無い行・権限の無いアカウントは 404/403。
+ * 受信 Webhook の削除を取り消しても、突然受信処理を再開しないよう停止状態を保つ。未削除・不存在・範囲外は404/403で拒む。
  */
 webhooks.post('/api/webhooks/incoming/:id/restore', requireRole('owner'), inputJsonBoundary(), post__api_webhooks_incoming_id_restore_7);
 
-// ========== 人が見つからなかった届物（#939 N-367） ==========
+// ========== 人が見つからなかった届物 ==========
 
 /**
  * 未照合の箱の中身。届物1件ごとに「照合に使った値」と
@@ -47,7 +44,7 @@ webhooks.post('/api/webhooks/incoming/:id/restore', requireRole('owner'), inputJ
 webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin', 'staff'), get__api_webhooks_incoming_id_unmatched_8);
 
 /**
- * S (#939 機能26): 受け取りの試し。見本のJSONを照合と行動の組み立てまで
+ * S ( 機能26): 受け取りの試し。見本のJSONを照合と行動の組み立てまで
  * 試して結果を返す。届物の受領・行動の実行・箱への記録は一切行わない。
  * 結果だけはやり取り台帳へ「試し」として分けて残す(-26 §9)。
  */
@@ -64,7 +61,7 @@ webhooks.post('/api/webhooks/unmatched/:id/resolve', requireRole('owner', 'admin
 
 webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), get__api_webhooks_outgoing_11);
 
-// N-363 (#939): 編集画面が現在値を読むための詳細口。secret は出さない。
+//  編集画面が現在値を読むための詳細口。secret は出さない。
 webhooks.get('/api/webhooks/outgoing/:id', requireRole('owner', 'admin', 'staff'), get__api_webhooks_outgoing_id_1);
 
 webhooks.post('/api/webhooks/outgoing', requireRole('owner'), inputJsonBoundary({"name":["string"],"url":["string"],"eventTypes":["array"],"secret":["string"],"isActive":["boolean"],"lineAccountId":["string"]}), post__api_webhooks_outgoing_2);
@@ -76,10 +73,7 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
 webhooks.delete('/api/webhooks/outgoing/:id', requireRole('owner'), delete__api_webhooks_outgoing_id_5);
 
 /**
- * POST /api/webhooks/outgoing/:id/restore — 削除の取り消し（B 元に戻す）。
- *
- * 消した送信Webhookだけを戻す。戻した直後は止めたまま。消していない
- * 行・無い行・権限の無いアカウントは 404/403。
+ * 送信 Webhook の削除を取り消しても、突然送信を再開しないよう停止状態を保つ。未削除・不存在・範囲外は404/403で拒む。
  */
 webhooks.post('/api/webhooks/outgoing/:id/restore', requireRole('owner'), inputJsonBoundary(), post__api_webhooks_outgoing_id_restore_6);
 
@@ -98,7 +92,7 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
 // ========== secret の移行(所有者専用) ==========
 
 /**
- * 既存の平文・旧鍵暗号文を現行鍵へ寄せる(#650 再審査)。
+ * 既存の平文・旧鍵暗号文を現行鍵へ寄せる。
  *
  * - dryRun=true(既定)は件数だけ数えて書かない。先にこれで見積もりを取る。
  * - dryRun=false は batchSize 件ずつ移す。べき等なので中断したら呼び直す。

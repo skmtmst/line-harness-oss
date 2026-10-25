@@ -91,8 +91,7 @@ export async function handleEvent(
     return;
   }
 
-  // Postback events — triggered by Flex buttons with action.type: "postback"
-  // Uses the same auto_replies matching but without displaying text in chat
+  // Flex ボタンの postback も自動返信条件へ通すが、入力の文をチャットに表示しない。
   if (event.type === 'postback') {
     const userId = event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
@@ -284,7 +283,7 @@ export async function handleEvent(
   }
 
   // 非テキストの受信メッセージ（スタンプ/画像/音声/動画/ファイル/位置情報等）もログに残す。
-  // N-082: ログ・受信箱・メディア保存はそのままに、自動応答の種別条件へ渡す。
+  // ログ・受信箱・メディア保存はそのままに、自動応答の種別条件へ渡す。
   // 本文は捏造せず空文字で評価するため、キーワード条件のルールは当たらない。
   // 種別 + 時間帯等の条件で絞ったルール（例: 画像に定型文を返す）のみが動く。
   if (event.type === 'message' && event.message.type !== 'text') {
@@ -452,12 +451,12 @@ export async function handleEvent(
       occurredAt: now,
     }));
 
-    // Cross-account trigger: send message from another account via UUID
+    // 同じ本人の UUID から別アカウントへ送る操作を扱う。
     if (incomingText === '体験を完了する' && lineAccountId) {
       try {
         const friendRecord = await db.prepare('SELECT user_id FROM friends WHERE id = ?').bind(friend.id).first<{ user_id: string | null }>();
         if (friendRecord?.user_id) {
-          // Find the same user on other accounts
+
           const otherFriends = await webhookDemoTargets(db, friendRecord.user_id, lineAccountId);
 
           for (const other of otherFriends) {
@@ -489,7 +488,7 @@ export async function handleEvent(
             }))]);
           }
 
-          // Reply on Account ② confirming
+
           await lineClient.replyMessage(event.replyToken, [buildMessage('flex', JSON.stringify({
             type: 'bubble',
             body: { type: 'box', layout: 'vertical', paddingAll: '20px',
@@ -538,15 +537,13 @@ export async function handleEvent(
       });
     }
 
-    // G2 is simulation-only in this tranche. It cannot consume a reply token or
-    // suppress unread/operator notifications. Keyword rules always take priority.
+    // シミュレーションだけなので replyToken を消費せず、未読・担当者通知も抑止しない。キーワードルールを優先する。
     if (!matched && lineAccountId) await replay('ai_qa_simulation', async()=>{
       const {simulateIncomingQa}=await import('../services/ai-auto-qa.js');
       await simulateIncomingQa(db,{account:lineAccountId,friendId:friend.id,eventId:event.webhookEventId??logId,question:incomingText,kind:event.message?.type??'text'});
     });
 
-    // イベントバス発火: message_received
-    // Pass replyToken only when auto_reply didn't actually consume it
+    // 自動返信が消費していない replyToken だけを message_received のイベントへ渡す。
     await replay('fireEvent:0',()=>fireEvent(db, 'message_received', {
       sourceEventId: event.webhookEventId,
       sourceKind: 'line_webhook',

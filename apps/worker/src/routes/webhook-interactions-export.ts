@@ -4,7 +4,7 @@ import { listWebhookInteractions } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { webhookResponseLabel } from '../services/webhook-interactions.js';
 
-/** Export only safe fields after the route checks account access. */
+/** route でアカウント権限を確認した後、安全な項目だけを出力する。 */
 export async function exportWebhookInteractions(c: Context<Env>, lineAccountId: string) {
   const direction = c.req.query('direction');
   const status = c.req.query('status');
@@ -24,7 +24,7 @@ export async function exportWebhookInteractions(c: Context<Env>, lineAccountId: 
     if (/^[\s]*[=+@\-]|^[\t\r\n]/u.test(text)) text = "'" + text;
     return '"' + text.replace(/"/g, '""') + '"';
   };
-  // Do not export payloads, headers, matching values, or URLs with credentials/queries.
+  // 本文・ヘッダ・一致値・資格情報やクエリ付き URL は出力しない。
   const lines = [
     ['日時', '向き', 'つなぎ先', '出来事', '状態', '返事', '試行回数', 'かかった時間（ms）'],
     ...result.items.map(row => [

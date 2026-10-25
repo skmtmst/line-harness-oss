@@ -1,6 +1,6 @@
 import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
 /*
- * R402: 受信の再試行中に設定を変えても、元の受信は元の計画で動く。
+ * 受信の再試行中に設定を変えても、元の受信は元の計画で動く。
  *
  * 落ち方（直前）: 再試行がその時点の設定を読み直す。T2を外すと旧T2の
  *   進捗が processing のまま受領全体が completed になる。T3を足すと

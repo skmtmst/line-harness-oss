@@ -17,7 +17,7 @@ export async function ensureOperatorInstance(
   },
 ): Promise<string> {
   const now = new Date().toISOString();
-  // Group membership survives completion and the grouping window: a replay is never a new occurrence.
+  // 完了や集約期間後も所属を保ち、再送を新しい発生と扱わない。
   const occurrence = await db.prepare(`SELECT instance_id FROM operator_notification_occurrences
     WHERE rule_id=? AND line_account_id=? AND source_event_id=?`).bind(
       input.ruleId, input.lineAccountId, input.sourceEventId,

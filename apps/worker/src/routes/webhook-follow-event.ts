@@ -27,7 +27,7 @@ import { issueFriendAddCoupon } from '../features/friends/friend-add-coupon/inde
 
 import { isFriendScopeConflict, type FollowSendOutcome, stableRetryKey, classifyFollowSendFailure } from './webhook-definition-is-friend-scope-conflict.js';
 
-/** Follow-specific ledger, routing and notification steps; called once in event order. */
+/** イベント順に1回だけ呼び、follow の台帳・振分・通知を進める。 */
 export async function handleFollowEvent(
   db: D1Database,
   lineClient: LineClient,
@@ -71,7 +71,7 @@ export async function handleFollowEvent(
     } catch (err) {
       if (!isFriendScopeConflict(err)) throw err;
       // 同一 line_user_id が別アカウント所有。friend 行なしではフォロー処理を
-      // 進められないので、相手の行に触れずこのイベントを諦める (Issue #961)。
+      // 進められないので、相手の行に触れずこのイベントを諦める。
       logger.warn("line_webhook_friend_scope_conflict");
       return;
     }
@@ -109,7 +109,7 @@ export async function handleFollowEvent(
 
     // line_account_id の紐づけは upsertFriend 内で行う（新規行は受信アカウント
     // で作り、未割当行だけを引き当てる）。ここで別アカウントの行を
-    // 「移動」する経路は Issue #961 で廃止した。
+    // 「移動」する経路は Issue  で廃止した。
 
     // 新規・再フォローのどちらでも、最初の友だち登録マイルを同じキーで非同期投入する。
     // first_followed_at を使うため再フォローやWebhook再送では二重加算されない。
@@ -124,12 +124,7 @@ export async function handleFollowEvent(
       occurredAt: firstFollowedAt,
     }));
 
-    // Resolve referral link (entry_route) for this friend.
-    // /auth/callback (OAuth path) writes friends.ref_code in parallel with
-    // this follow webhook, so the field can briefly be NULL when LINE
-    // delivers the event. Retry a few times (~1s total) before giving up,
-    // otherwise override mode and intro pushes silently fall back to the
-    // account default whenever the webhook wins the race.
+    // OAuth の帰属保存と follow が並行するため、ref_code が一時的に空なら合計約1秒まで再取得する。競合の早着で経路の上書きや案内配信を既定へ落とさないため。
     const { getFriendById } = await import('@line-crm/db');
     let currentAttribution: { refCode: string; entryRouteId: string | null } | null = null;
     if (friendAddEventId && lineAccountId) {
@@ -148,11 +143,11 @@ export async function handleFollowEvent(
       }
     }
 
-    // N-244競合: 候補保存→経路停止→follow到着の順でも、停止refを
+    // 競合: 候補保存→経路停止→follow到着の順でも、停止refを
     // friends.ref_code・計測・友だち追加ルールへ使わない。capture は停止
     // ref を friend_add_events へ確定させてしまうため、台帳も unavailable
     // へ戻して計測に残さない。
-    // N-244差戻: 停止ref由来では unknown-route/アカウント共通の友だち追加
+    // 停止ref由来では unknown-route/アカウント共通の友だち追加
     // シナリオを含めタグ・シナリオを一切開始しないため、破棄したことを覚える。
     let stoppedRefDiscarded = false;
     if (currentAttribution?.refCode && (await isStoppedEntryRouteRef(db, currentAttribution.refCode))) {
@@ -181,7 +176,7 @@ export async function handleFollowEvent(
         }
       }
     }
-    // N-244競合: 停止前に LIFF/OAuth が保存した既存 ref も停止済みなら
+    // 競合: 停止前に LIFF/OAuth が保存した既存 ref も停止済みなら
     // 使わない。friends.ref_code の停止値は消し、計測・帰属に残さない。
     if (friendRefCode && (await isStoppedEntryRouteRef(db, friendRefCode))) {
       try {
@@ -194,14 +189,14 @@ export async function handleFollowEvent(
       friendRefCode = null;
       stoppedRefDiscarded = true;
     }
-    // N-244差戻(再審査): 候補Bが停止済みで破棄した場合、friends.ref_code の
+    // 候補Bが停止済みで破棄した場合、friends.ref_code の
     // 過去active経路Aへ fallback しない。B由来の follow でAの紹介メッセージ/
     // 専用scenarioが動くのを止める。A の DB 値は正規の履歴のため残すが、
     // 今回の follow では使わない。既存ref由来の破棄では既に null のため no-op。
     if (stoppedRefDiscarded) {
       friendRefCode = null;
     }
-    // N-244差戻(台帳): 候補・既存refが無く自然流入に見えても、同一利用者の
+    // 候補・既存refが無く自然流入に見えても、同一利用者の
     // 直近の停止試行が抑止台帳にあれば停止由来として抑止する。これで
     // LIFF/callbackと別followが前後・同時に来ても停止由来が共有される。
     // 明示の帰属(候補・既存ref)がある場合はそちらが勝ち、ここでは見ない。
@@ -214,7 +209,7 @@ export async function handleFollowEvent(
     const referralRoute: EntryRoute | null = friendRefCode
       ? await getEntryRouteByRefCode(db, friendRefCode)
       : null;
-    // N-244差戻: 停止refを消した後は referralRoute が null になるため、
+    // 停止refを消した後は referralRoute が null になるため、
     // 従来の条件だけでは unknown-route/アカウント共通の友だち追加ルールへ
     // 流れてタグ・シナリオが始まる。破棄した場合は振り分けもアカウント共通
     // シナリオもすべて止める。ref が無い自然流入は従来どおり進める。
@@ -242,7 +237,7 @@ export async function handleFollowEvent(
     let claimGeneration = 0;
     let claimError = false;
     let fencedOut = false;
-    /** 奪い直した予約に、前の持ち主の「送り始めた」印が残っていた。 */
+    /** 再取得した予約に送信開始印が残る場合は、二重送信を防ぐため送らず照合する。 */
     let previousDispatchUnknown = false;
     /*
      * 送信の結末。**「送っていない」と「送ったか分からない」を分ける。**
@@ -457,9 +452,7 @@ export async function handleFollowEvent(
       }
     }
 
-    // friend_add シナリオに登録（このアカウントのシナリオのみ）
-    // Skip entirely when a referral link explicitly overrides (run_account_friend_add_scenarios=0).
-    // 振り分け設定があるアカウントはここを通らない（上で1本に絞ってある）。
+    // 経路がアカウントの友だち追加シナリオを除外した場合は登録しない。振分設定があれば上で選んだ1本だけを使う。
     const scenarios = runAccountScenarios && !routing?.routed ? await getScenarios(db) : [];
     /*
      * 「友だち追加で始まる」は scenario_triggers から引く（128）。
@@ -469,16 +462,16 @@ export async function handleFollowEvent(
     const friendAddIds = scenarios.length > 0 ? new Set(await getFriendAddScenarioIds(db)) : new Set<string>();
     // 送信権を取れなかった実行は送らずに引く（予約を取った側が送る）。
     for (const scenario of (sendRight ? scenarios : [])) {
-      // Only trigger scenarios belonging to this account (or unassigned for backward compat)
+      // 対象アカウントまたは互換用の共通シナリオだけを起動する。
       const scenarioAccountMatch = !scenario.line_account_id || !lineAccountId || scenario.line_account_id === lineAccountId;
       if (friendAddIds.has(scenario.id) && scenarioAccountMatch) {
         try {
           // 回収されていたら古い持ち主として登録も送信もしない。
           // この経路は登録の直後に送るので、送信の印もここで立てる。
           if (!(await holdSendRight({ external: true }))) break;
-          // INSERT OR IGNORE handles dedup via UNIQUE(friend_id, scenario_id)
+          // 同じ友だち・シナリオの重複登録は UNIQUE と INSERT OR IGNORE で防ぐ。
           const friendScenario = await enrollFriendInScenario(db, friend.id, scenario.id);
-          if (!friendScenario) continue; // already enrolled
+          if (!friendScenario) continue;
           scenarioEnrollmentId ??= friendScenario.id;
 
           // Immediate delivery: step1 が「now 以前」にスケジュールされる場合のみ
@@ -526,11 +519,11 @@ export async function handleFollowEvent(
      *
      * 台帳の確定はここではなく、外部効果を全部終えたあとで行う（下）。
      * 送った結末が出そろってからでないと、送達不明を取りこぼす。
-     * N-244 の「停止ref由来で止めた」も、その確定へ持っていく。
+     *  の「停止ref由来で止めた」も、その確定へ持っていく。
      */
-    // Referral link side-effects (intro push + dedicated scenario)
+
     if (referralRoute) {
-      // Intro push from referral link
+
       if (referralRoute.intro_template_id && await holdSendRight({ external: true })) {
         try {
           const template = await getMessageTemplateById(db, referralRoute.intro_template_id);
@@ -559,12 +552,7 @@ export async function handleFollowEvent(
         }
       }
 
-      // Dedicated scenario enrollment from referral link. A delay-0 first
-      // step is pushed immediately (same instant-welcome semantics as
-      // friend_add / tag_added enrollments — previously this path always
-      // waited for the next cron tick). pushMessage, not reply: the reply
-      // token may already be consumed by an account friend_add scenario
-      // above, and the intro push on this path uses pushMessage too.
+      // 経路の専用シナリオも遅延0なら初回文を即送する。replyToken は先の処理で消費済みの可能性があるため、案内文と同じ push を使う。
       if (referralRoute.scenario_id && await holdSendRight()) {
         try {
           const enrollment = await enrollFriendInScenario(db, friend.id, referralRoute.scenario_id);
@@ -694,7 +682,7 @@ export async function handleFollowEvent(
         ledgerFinalized = await markFriendAddEventRouting(db, {
           eventId: friendAddEventId,
           lineAccountId,
-          // N-244: 停止ref由来で振り分けを止めた場合も suppressed に倒す。
+          // 停止ref由来で振り分けを止めた場合も suppressed に倒す。
           status: actionFailed
             ? 'partial_failed'
             : deliveryStatus,

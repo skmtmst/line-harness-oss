@@ -131,7 +131,7 @@ describe('Webhookの安全な送り直し', () => {
 
     const result = await retryWebhookInteraction(db, original);
 
-    // d23b R409: 畳み込みと新記録は1つのDBバッチで行う。
+    // d23b : 畳み込みと新記録は1つのDBバッチで行う。
     expect(claimWebhookInteractionRetryAndInsert).toHaveBeenCalledWith(db, original, expect.objectContaining({
       webhookId: 'wh-1', idempotencyKey: 'delivery-1', requestBodyJson: original.request_body_json,
     }));
@@ -144,7 +144,7 @@ describe('Webhookの安全な送り直し', () => {
       status: 'succeeded', responseStatus: 200,
     }));
     expect(recordDeliveryOutcome).toHaveBeenCalledWith(db, 'wh-1', true);
-    // d23b R412: 届いた通知と同じ失敗記録は「やり直し済み」へ畳む。
+    // d23b : 届いた通知と同じ失敗記録は「やり直し済み」へ畳む。
     expect(markFailedInteractionsRetried).toHaveBeenCalledWith(db, 'account-a', 'wh-1', 'delivery-1');
     expect(result.status).toBe('succeeded');
   });
@@ -202,7 +202,7 @@ describe('Webhookの安全な送り直し', () => {
     expect(claimWebhookInteractionRetryAndInsert).not.toHaveBeenCalled();
   });
 
-  // ---- d23b R412: 手動のやり直しと自動配送台帳の照合 ----
+  // ---- d23b : 手動のやり直しと自動配送台帳の照合 ----
 
   it('同じ通知が自動で届き済みなら手動では重ねない', async () => {
     vi.mocked(findOutgoingDeliveryByKey).mockResolvedValue(deliveryRow({ status: 'delivered' }));
@@ -249,7 +249,7 @@ describe('Webhookの安全な送り直し', () => {
     );
   });
 
-  // ---- d23b R413: 畳み込み後の緊急停止の再確認 ----
+  // ---- d23b : 畳み込み後の緊急停止の再確認 ----
 
   it('畳み込み後に緊急停止へ切り替わったら送る前の状態へ戻す', async () => {
     vi.mocked(isOperationCapabilityStopped)
@@ -273,12 +273,12 @@ describe('画面へ出す安全な言葉', () => {
   it('内部の失敗コードを日本語へ置き換える', () => {
     expect(webhookFailureLabel('response_429')).toBe('つなぎ先が混み合っていました');
     expect(webhookFailureLabel('processing_failed')).toBe('受け取った内容を処理できませんでした');
-    // d23b R415: こちら側で一度も送っていない失敗は言葉を分ける。
+    // d23b : こちら側で一度も送っていない失敗は言葉を分ける。
     expect(webhookFailureLabel('secret_unavailable')).toBe('署名の合言葉を確認できないため、まだ送っていません');
     expect(webhookResponseLabel(original)).toBe('つなぎ先で処理できませんでした');
   });
 
-  // d23d R407: 試しは照合も実行もしていないので、実処理の
+  // d23d : 試しは照合も実行もしていないので、実処理の
   // 「結びつきました」ではなく試算の結果をそのまま出す。
   const incomingTestRow = (idempotencyKey: string): WebhookInteractionRow => ({
     ...original,

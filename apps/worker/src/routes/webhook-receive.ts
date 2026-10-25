@@ -11,7 +11,7 @@ import { MAX_WEBHOOK_BODY_SIZE, handleStoppedTenantEvent, handleNoticeLinkCode, 
 import type { Context } from 'hono';
 
 export const post__webhook_1 = async (c: Context<Env>) => {
-  // Pre-read size guard: reject before reading the body if Content-Length is oversized.
+  // 大きすぎる Content-Length は、本文の読込前に拒む。
   const contentLengthHeader = c.req.header('Content-Length');
   if (contentLengthHeader) {
     const declared = Number.parseInt(contentLengthHeader, 10);
@@ -22,9 +22,7 @@ export const post__webhook_1 = async (c: Context<Env>) => {
 
   const rawBody = await c.req.text();
 
-  // Post-read size guard for the case where Content-Length was absent or untrustworthy.
-  // Use UTF-8 byte count: `rawBody.length` counts UTF-16 code units, so multibyte
-  // payloads (Japanese/emoji) would otherwise bypass the cap.
+  // 長さが未指定・不正でも上限を守るため、読込後も UTF-8 バイト数を検査する。文字数では日本語や絵文字で迂回できる。
   const rawBodyByteLength = new TextEncoder().encode(rawBody).byteLength;
   if (rawBodyByteLength > MAX_WEBHOOK_BODY_SIZE) {
     return c.json({ status: 'too_large' }, 413);
@@ -33,17 +31,14 @@ export const post__webhook_1 = async (c: Context<Env>) => {
   const signature = c.req.header('X-Line-Signature') ?? '';
   const db = c.env.DB;
 
-  // Cheap pre-reject for unsigned / malformed-signature requests. LINE signatures
-  // are HMAC-SHA256 + base64 = 44 chars. This avoids D1 lookups and HMAC compute
-  // for junk traffic on a public endpoint.
+  // LINE の HMAC-SHA256 の base64 は44文字なので、未署名・不正形は DB や暗号処理より先に拒む。
   const LINE_SIGNATURE_LENGTH = 44;
   if (signature.length !== LINE_SIGNATURE_LENGTH) {
     logger.error("line_webhook.verify_signature_failed");
     return c.json({ status: 'ok' }, 200);
   }
 
-  // A URL selects a candidate, never authorizes it. Legacy URLs must have
-  // exactly one signature match; never pick the first of ambiguous credentials.
+  // URL は候補の選択にしか使わず、署名一致で認可する。曖昧な場合に先頭を採用せず、署名が一意に一致することを要求する。
   const channelId = c.req.param('channelId');
   if (channelId !== undefined && !/^\d+$/.test(channelId)) return c.json({ status: 'ok' }, 200);
   const accounts = await listLineAccountsWithTenantStatus(db, undefined, channelId);
@@ -86,8 +81,7 @@ export const post__webhook_1 = async (c: Context<Env>) => {
   }
 
   const lineClient = new LineClient(channelAccessToken);
-  // The sender knows its own secret and can sign arbitrary destination values.
-  // Persistence must therefore use the authenticated DB identity, not payload data.
+  // 送り手は自身の鍵で任意の destination を署名できるため、保存先は本文でなく認証済み DB の識別で決める。
   const lineMessageAccountKey = `account:${matchedAccountId}`;
   const legacyLineMessageAccountKey = `destination:${body.destination}`;
 
