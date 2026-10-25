@@ -338,7 +338,7 @@
 /* 日付の欄も線ではなく影で浮かせる。 */
 :root .field {
   border: 0;
-  background: var(--gradient-raised-control);
+  background: var(--gradient-raised-control) var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
 }
 
