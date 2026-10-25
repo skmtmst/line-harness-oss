@@ -1,5 +1,5 @@
 /*
- * N-306 #639: 一括審査の通知を実D1（bootstrap.sql を流した SQLite）と
+ *  一括審査の通知を実D1（bootstrap.sql を流した SQLite）と
  * LINE送信 mock で固定する。手書きのDBモックだと「通知が本当に呼ばれたか」
  * 「送達台帳に何が残ったか」「その残り方で再送できるか」が確かめられない。
  *
@@ -200,7 +200,7 @@ describe('一括審査の本人通知（実D1・LINE mock）', () => {
 
   it('本文が単票審査とまったく同じ（承認・見送りとも）', async () => {
     const app = harness(db);
-    // 単票（承認）。単票審査も再実行キーが必須（#931 N-313）。
+    // 単票（承認）。単票審査も再実行キーが必須。
     await app.fetch(new Request('https://worker.test/api/nen-members/photos/photo-a/review', {
       method: 'PUT', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'single-approve-1' },
       body: JSON.stringify({ accountId: ACCOUNT, status: 'adopted', expectedVersion: 1 }),

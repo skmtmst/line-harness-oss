@@ -357,7 +357,7 @@ export async function getUberApplicationToken(input: {
   encryptionKey: string | undefined;
   fetcher: FetchLike;
   nowMs?: number;
-  /** Store reconciliation needs eats.store; order ingestion remains the default cache/scope. */
+  /** 店舗の照合には eats.store が必要なので、注文受信の既定キャッシュ・スコープと分ける。 */
   purpose?: ApplicationTokenPurpose;
 }): Promise<UberTokenSet> {
   const nowMs = input.nowMs ?? Date.now();

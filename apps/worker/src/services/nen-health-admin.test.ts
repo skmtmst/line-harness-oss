@@ -34,7 +34,7 @@ describe('summarizePetHealth', () => {
   it('「正常」以外の便が 3 回続くと印。2 回では付かない（監査 R61: 利用者側のケア共有と同じ基準）', () => {
     expect(summarizePetHealth([log(0, null, 'diarrhea'), log(1, null, 'bloody'), log(2, null, 'diarrhea')], today).changes.map((c) => c.key)).toEqual(['stool_abnormal']);
     expect(summarizePetHealth([log(0, null, 'diarrhea'), log(1, null, 'diarrhea'), log(2, null, 'normal')], today).changes).toEqual([]);
-    // やわらかい便だけでも3回続けば印が立つ（以前は管理側だけ下痢・血便に限っていた）。
+    // 利用者側と同じく、やわらかい便も3回続けば気になる変化として扱う。
     expect(summarizePetHealth([log(0, null, 'soft'), log(1, null, 'soft'), log(2, null, 'soft')], today).changes.map((c) => c.key)).toEqual(['stool_abnormal']);
     expect(summarizePetHealth([log(0, null, 'soft'), log(1, null, 'soft')], today).changes).toEqual([]);
   });

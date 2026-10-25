@@ -33,11 +33,7 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-/**
- * Mint a short-lived OAuth token from an instance-level Google service account.
- * The private key never enters D1 or the admin browser. Calendar owners only
- * need to share their calendar with the service-account email and save its ID.
- */
+/** 共有の Google サービスアカウントから短期トークンを発行する。秘密鍵は D1・ブラウザへ渡さず、利用者はカレンダーをサービスアカウントへ共有して ID だけを保存する。 */
 export async function getGoogleServiceAccountToken(
   credentials: GoogleServiceAccountCredentials,
   scopes: string | string[] = CALENDAR_SCOPE,

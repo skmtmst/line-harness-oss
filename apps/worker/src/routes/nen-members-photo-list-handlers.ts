@@ -21,13 +21,13 @@ export const put__api_nen_members_care_flags_id_1 = async (c: Context<Env, "/api
     .bind(c.req.param('id')).first<{ friend_id: string; status: string; advice_ready: number; updated_at: string; line_account_id: string | null }>();
   if (!flag || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [flag.line_account_id])) return c.json({ success: false, error: 'Not found' }, 404);
   /*
-   * M509: 見守りフラグの同時解決＋再開は後勝ちで先の変更が黙って消えていた。
+   * 見守りフラグの同時解決＋再開は後勝ちで先の変更が黙って消えていた。
    * 版（expectedUpdatedAt）が送られてきたときだけ updated_at の一致も
    * 条件に入れる。古い画面からの保存は409で止め、最新の状態を
    * data.latest で返す。送られてこない従来の呼び出しはそのまま通す。
    */
   const flagExpectedUpdatedAt = typeof body.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null;
-  // M509: 版つきの保存は版を必ず単調に進める（同じミリ秒の連打でも見分けられる）。
+  // 版つきの保存は版を必ず単調に進める（同じミリ秒の連打でも見分けられる）。
   const flagNewUpdatedAt = flagExpectedUpdatedAt === null ? jstNow() : nextVersionToken(flag.updated_at);
   const written = await c.env.DB.prepare(`UPDATE nen_care_flags SET status=?, advice_ready=?, resolved_at=CASE WHEN ?='resolved' THEN ? ELSE NULL END, updated_at=? WHERE (? IS NULL OR updated_at=?) AND id=?`)
     .bind(body.status, body.adviceReady === false ? 0 : 1, body.status, jstNow(), flagNewUpdatedAt, flagExpectedUpdatedAt, flagExpectedUpdatedAt, c.req.param('id')).run();
@@ -52,13 +52,11 @@ export const get__api_nen_members_photos_2 = async (c: Context<Env, "/api/nen-me
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }
   /*
-   * 続きを取れるようにする。前は 200 枚で打ち切りだったので、審査待ちが
-   * 201 枚以上あるとダッシュボードの件数に届かなかった（#666）。
-   * 1ページの上限は 200 のまま。offset で次の 200 枚を取る。
+   * 審査待ち写真を取り落とさないよう、1ページ200枚の上限を保ち、offset で続きへ到達できるようにする。
    */
   const { limit, offset } = parseOffsetPaging({ limit: c.req.query('limit'), offset: c.req.query('offset') }, { defaultLimit: 200, limitPolicy: { fallback: 'finite', truncate: true, minimum: 1, maximum: 200 }, offsetPolicy: { fallback: 'finite', truncate: true, minimum: 0 } });
   /*
-   * 名前・ペット名・コメントの部分一致で絞る（#931 N-308）。
+   * 名前・ペット名・コメントの部分一致で絞る。
    * 200 枚ずつの区切りでしか見られない一覧だと、目的の1枚を探すのに
    * 全部を読み進めるしかなかった。%・_・\ は LIKE の記号なので逃がす。
    */
@@ -130,7 +128,7 @@ export const get__api_nen_members_photos_publications_3 = async (c: Context<Env,
         ORDER BY pub.sort_order, pub.published_at DESC, pub.id LIMIT 200`,
     ).bind(staleCutoff, accountId).all<Record<string, unknown>>();
     /*
-     * 公開中ではない掲載も同じ画面で追う（Issue #1040 IDEA-22）。
+     * 公開中ではない掲載も同じ画面で追う。
      * ご本人がLIFFで同意を撤回すると写真側の publication_withdrawn_at が
      * 立つが、掲載先の登録（placements.active=1）は残る。上の一覧の条件から
      * 外れるだけでは「撤回後に残る公開先」を追えないため、掲載管理の対象を
@@ -160,9 +158,7 @@ export const get__api_nen_members_photos_publications_3 = async (c: Context<Env,
         ORDER BY pub.updated_at DESC LIMIT 200`,
     ).bind(staleCutoff, accountId).all<Record<string, unknown>>();
     /*
-     * 掲載先は1発で取る。写真ごとに1件ずつ取りに行くと、掲載数が増えるほど
-     * 遅くなる（N+1）。公開先ごとの掲載状態を追えるよう、外した先
-     * （active=0）も外した日時つきで返す（Issue #1040 IDEA-22）。
+     * 写真ごとの N+1 問い合わせを避けるため、掲載先をまとめて取得する。撤回後の状態も追えるよう、active=0 の掲載先と解除日時も返す。
      */
     const allPublications = [...rows.results, ...inactiveRows.results];
     const publicationIds = allPublications.map((row) => String(row.id));
@@ -197,7 +193,7 @@ export const get__api_nen_members_photos_publications_3 = async (c: Context<Env,
     const items = rows.results.map(withPlacements);
     const inactive = inactiveRows.results.map(withPlacements);
     // ご本人が同意を撤回したのに掲載先の整理が残っているものと、
-    // 掲載先から外し終えたものを分ける（Issue #1040 IDEA-22）。
+    // 掲載先から外し終えたものを分ける。
     const pendingWithdrawals = inactive.filter((row) => String(row.status) !== 'withdrawn');
     const withdrawnItems = inactive.filter((row) => String(row.status) === 'withdrawn');
     const measured = items.filter((item) => item.view_count !== null && item.view_count !== undefined);
@@ -408,7 +404,7 @@ export const get__api_nen_members_photos_id_9 = async (c: Context<Env, "/api/nen
   if(scan?.status!=='clean') return c.json({success:false,code:'PHOTO_SCAN_PENDING',error:'写真の安全性を確認中です'},409);
 
   /*
-   * 採用履歴・報酬・公開先を一緒に返す（Issue #1040 IDEA-22）。
+   * 採用履歴・報酬・公開先を一緒に返す。
    * 「通した1回につきポイントの手続きが1回」か、撤回後にどの掲載先が
    * 残っているかを、詳細を開いたときにその場で確認できるようにする。
    */
@@ -446,7 +442,7 @@ export const get__api_nen_members_photos_id_9 = async (c: Context<Env, "/api/nen
   ).bind(publication.id, accountId).all<Record<string, unknown>>()).results : [];
   /*
    * 報酬は生のstatusではなく運用向けの派生状態（state）で返す
-   * （PHOTO-06）。「手続き中」のまま24時間以上止まったものは stale、
+   * 。「手続き中」のまま24時間以上止まったものは stale、
    * 再試行しても直らない失敗は failed_permanent として、
    * 一覧（point_sync_status の CASE）と同じ顔ぶれで出す。
    */
@@ -462,7 +458,7 @@ export const get__api_nen_members_photos_id_9 = async (c: Context<Env, "/api/nen
     }
     : null;
   /*
-   * 重複の判定 (#817)。完全に同じ中身の写真で、すでに採用されて
+   * 重複の判定。完全に同じ中身の写真で、すでに採用されて
    * 報酬が付いたものがあれば、前の投稿と並べて見せる。
    * 似ている写真は自動で却下せず、注意の札だけに留める。
    */

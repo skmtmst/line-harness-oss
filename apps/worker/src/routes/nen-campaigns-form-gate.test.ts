@@ -1,5 +1,5 @@
 /*
- * NEN-07 (#1078): 「回答フォームを開く」配信はつなぐフォームが使えることが前提。
+ * 「回答フォームを開く」配信はつなぐフォームが使えることが前提。
  * 使えない(削除済み・非公開・別アカウント専用)設定は保存・稼働開始を止め、
  * 一覧へ「設定不足」の判定を返す。実DBで確かめる。
  */
@@ -204,7 +204,7 @@ describe('GET /api/nen-campaigns/settings の設定不足判定', () => {
 
   test('「回答者を除く」だけがONでフォームがない既定状態は form_unselected を返す', async () => {
     // アカウント別設定が無い review_request は既定で除外ON・フォーム無し。
-    // 監査で指摘された「未選択のまま稼働できる状態」そのもの。
+    // フォーム未選択のまま稼働できないことを確かめる。
     const res = await app().request('/api/nen-campaigns/settings?lineAccountId=account-1');
     expect(res.status).toBe(200);
     const body = await res.json() as { data: Array<{ campaignKey: string; formIssue: string | null }> };

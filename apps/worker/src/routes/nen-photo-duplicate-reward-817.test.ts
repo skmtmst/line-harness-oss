@@ -9,7 +9,7 @@ import {
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /*
- * #817: 写真の重複と報酬の決まりの版。実DBで確かめる。
+ * 写真の重複と報酬の決まりの版。実DBで確かめる。
  *
  * - 完全に同じ写真は中身の hash で「重複」とする。似ている写真は
  *   自動で却下しない（注意の札だけ）。

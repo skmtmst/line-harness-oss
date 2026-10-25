@@ -11,8 +11,8 @@ vi.mock('../services/account-access.js', async (importOriginal) => ({
 const { nenCampaigns } = await import('./nen-campaigns.js');
 
 /*
- * M507（配信設定・紹介文の同時保存）・M510（ペット登録の二重押し）・
- * M511（ペット更新の同時保存）を実SQLiteで見る。
+ * （配信設定・紹介文の同時保存）・（ペット登録の二重押し）・
+ * （ペット更新の同時保存）を実SQLiteで見る。
  *
  * 版（expectedUpdatedAt）を送った保存だけが対象。送らない古い呼び出しは
  * 従来どおり通す（後方互換）。新しい呼び出しは、古い画面からの保存を

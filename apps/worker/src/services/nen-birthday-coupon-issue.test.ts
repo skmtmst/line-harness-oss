@@ -3,7 +3,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { enqueueBirthdayCoupons, type NenCouponIssueFailure } from './nen-engagement.js';
 
 /**
- * #934 N-298: 誕生日クーポンのEC作成失敗が他の子や通常配信を止めないこと。
+ *  誕生日クーポンのEC作成失敗が他の子や通常配信を止めないこと。
  *  - 1匹のEC失敗で残りの子は発行・予約される（部分成功を全体失敗にしない）
  *  - 失敗した子の発行行は残らず、次の日次走査で同じコードへ収束する（孤児を残さない）
  *  - ECの重複（409）は成功と同じ意味で受け取る

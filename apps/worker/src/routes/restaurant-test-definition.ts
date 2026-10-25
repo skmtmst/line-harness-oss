@@ -49,11 +49,7 @@ export function authenticatedTenantId(c: Context<Env>): string {
   return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
 }
 
-export /**
- * One authenticated operator belongs to one restaurant organization in phase
- * A. Multi-organization membership is intentionally deferred until its access
- * model is defined.
- */
+export /** 1人の認証済み担当者は1つの飲食店組織に所属する。複数所属は権限モデルが定義されるまで扱わない。 */
 async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext | null> {
   const requestedTenant = tenantId(c);
   if (requestedTenant) {
@@ -83,12 +79,7 @@ async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext
     : null;
 }
 
-export /**
- * Create only the real organization required by a write operation. The
- * tenant-scoped unique index and the legacy account_id unique index make this
- * safe when two requests arrive together; the SELECT after INSERT returns the
- * winning row in either case.
- */
+export /** 必要な書込時だけ実組織を作る。同時要求は統括と account_id の一意制約へ収束させ、INSERT 後の SELECT で勝者を取得する。 */
 async function ensureOrganizationForAuthenticatedTenant(
   c: Context<Env>,
 ): Promise<OrganizationContext | null> {
@@ -222,7 +213,7 @@ export function reservationSlotActive(status: string | null | undefined): boolea
 }
 
 export /**
- * 同じ卓に時間が重なる有効予約があるかを調べる（R100）。
+ * 同じ卓に時間が重なる有効予約があるかを調べる。
  * 終了ちょうどの入替（ends_at = starts_at）は重なりとみなさない。
  */
 async function overlappingReservationExists(
@@ -251,7 +242,7 @@ async function overlappingReservationExists(
 
 export type ReservationSlotState = { starts_at: string; guest_count: number; status: string };
 
-export /** 予約の新旧状態に合わせて時間帯在庫の予約済数を動かす（R100・R107）。 */
+export /** 予約の新旧状態に合わせて時間帯在庫の予約済数を動かす。 */
 async function applyReservationInventoryChange(
   db: D1Database,
   storeId: string,
@@ -279,7 +270,7 @@ async function applyReservationInventoryChange(
   }
 }
 
-export /** 時間帯在庫の予約済数を人数分だけ動かす（R100）。枠が無ければ何もしない。 */
+export /** 時間帯在庫の予約済数を人数分だけ動かす。枠が無ければ何もしない。 */
 async function adjustInventoryReservedCount(
   db: D1Database,
   storeId: string,

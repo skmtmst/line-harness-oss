@@ -11,7 +11,7 @@ export function petWriteBody(body: Record<string, unknown> | null):
   } {
   if (!body || typeof body.name !== 'string' || !body.name.trim()) return { error: 'name is required' };
   // ペットの名前はNEN配信の本文へ差し込まれる（{{pet_name}}）。無制限だと
-  // 差し込み展開後の本文が際限なく膨らみ、保存時の上限判定の前提（#659）が
+  // 差し込み展開後の本文が際限なく膨らみ、保存時の上限判定の前提が
   // 崩れるため、ここで有限の上限を持たせる。
   if (countNenCampaignBodyLength(body.name.trim()) > NEN_PET_NAME_MAX_LENGTH) {
     return { error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください` };

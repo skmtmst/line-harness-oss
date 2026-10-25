@@ -415,7 +415,7 @@ export async function getNenPetMetrics(
 
 const DELIVERY_STATUSES = new Set(['pending', 'processing', 'sent', 'skipped', 'failed', 'cancelled']);
 
-// #727: 絞り込みは複数状態を受け付ける(カンマ区切り)。
+// 絞り込みは複数状態を受け付ける(カンマ区切り)。
 // failed と skipped は単一状態の別チップで絞り、「これから」チップだけが
 // pending,processing の複数状態で絞る。processing は配信処理中のごく短い
 // 一時状態で、そこだけを見たい場面がないため、ほぼ常に 0 のチップを
@@ -453,19 +453,19 @@ export const NEN_SKIPPED_REASONS = [
 
 export type NenSkippedReason = (typeof NEN_SKIPPED_REASONS)[number];
 
-// #727: skipped のうち運用で直せるもの。line_account_unavailable は
+// skipped のうち運用で直せるもの。line_account_unavailable は
 // LINE公式アカウントの接続設定のやり直し、campaign_disabled は配信を
 // オンに戻すことで解消する。残り4つは友だち側の事情かデータ不整合か
 // 回答済みで運用操作では直せない。line_account_mismatch は要調査のため含めない。
-// #733: 直せる2理由だけ手動再送できる。前提の再確認は retryNenDelivery が行う。
+// 直せる2理由だけ手動再送できる。前提の再確認は retryNenDelivery が行う。
 export const NEN_SKIPPED_FIXABLE_REASONS: ReadonlySet<string> = new Set([
   'line_account_unavailable',
   'campaign_disabled',
-  // NEN-07: つなぐ回答フォームを選び直せば再送できる。
+  // つなぐ回答フォームを選び直せば再送できる。
   'campaign_form_unavailable',
 ]);
 
-// #733: 画面の出し分け用に理由コードを返す。last_error は送信失敗時に
+// 画面の出し分け用に理由コードを返す。last_error は送信失敗時に
 // 上流の生文(秘密値を含むことがある)が入るため、既知の6理由のどれかに
 // 一致する時だけそのまま返し、それ以外は出さない。
 function safeReasonCode(status: string, error: string | null): string | null {
@@ -542,7 +542,7 @@ export async function listNenDeliveries(
       GROUP BY j.status`,
   ).bind(input.lineAccountId, input.range.fromSql, input.range.toSql)
     .all<{ status: string; total: number }>();
-  // #727: failed 側の分類は触らない(文字列一致のまま)。skipped は
+  // failed 側の分類は触らない(文字列一致のまま)。skipped は
   // 5つの理由コードのどれも block/unfollow 等の語を含まないため、
   // 従来はすべて other に落ちていた。skipped は対象外にして、
   // 内訳は下の理由コード集計(skippedReasons)で出す。
@@ -559,8 +559,8 @@ export async function listNenDeliveries(
       GROUP BY reason`,
   ).bind(input.lineAccountId, input.range.fromSql, input.range.toSql)
     .all<{ reason: 'blocked' | 'unfollowed' | 'other'; total: number }>();
-  // #727: skipped の内訳は理由コードそのままで数える。文字列一致は使わない。
-  // #733: 理由は NEN_SKIPPED_REASONS と同じ集合。last_error に上流の生文
+  // skipped の内訳は理由コードそのままで数える。文字列一致は使わない。
+  // 理由は NEN_SKIPPED_REASONS と同じ集合。last_error に上流の生文
   // (秘密値を含むことがある)が入るため、既知の理由以外は unknown にまとめ、
   // 生文をキーとして出さない。
   const skippedRows = await db.prepare(
@@ -624,7 +624,7 @@ export async function listNenDeliveries(
       status: row.status,
       attempts: Number(row.attempts ?? 0),
       unmetReason: safeFailureReason(row.status, row.last_error, Number(row.attempts ?? 0)),
-      // #733: 画面が直せる理由か判断できるよう、既知の理由コードだけ返す。
+      // 画面が直せる理由か判断できるよう、既知の理由コードだけ返す。
       unmetReasonCode: safeReasonCode(row.status, row.last_error),
       reaction: unavailable('この配信記録に対応する個人の反応は取得できません'),
       version: Number(row.version),
@@ -695,7 +695,7 @@ export async function getNenDeliveryDetail(
     status: row.status,
     attempts: Number(row.attempts ?? 0),
     unmetReason: safeFailureReason(row.status, row.last_error, Number(row.attempts ?? 0)),
-    // #733: 詳細画面の再送ボタン出し分け用。既知の理由コードだけ返す。
+    // 詳細画面の再送ボタン出し分け用。既知の理由コードだけ返す。
     unmetReasonCode: safeReasonCode(row.status, row.last_error),
     trigger: triggerLabel(row.campaign_key),
     content: snapshot ? {
@@ -733,7 +733,7 @@ function triggerLabel(campaignKey: string): string {
   return labels[campaignKey] ?? '配信の決めごと';
 }
 
-// #733: 再送できない記録へ、何を直す必要があるかを返す。failed 側の
+// 再送できない記録へ、何を直す必要があるかを返す。failed 側の
 // 従来文言は変えない。skipped の直せない4理由は理由ごとに止める。
 function skippedRetryBlockedMessage(status: string, lastError: string | null): string {
   if (status === 'skipped') {
@@ -753,7 +753,7 @@ function skippedRetryBlockedMessage(status: string, lastError: string | null): s
   return '最大回数まで失敗した配信だけ、手動で再送できます';
 }
 
-// #733: 送信時と同じ見方で前提を再確認する。送信側は
+// 送信時と同じ見方で前提を再確認する。送信側は
 // getLineAccountById の channel_access_token を使うため、同じ getter で見る。
 async function hasUsableLineAccountToken(
   db: D1Database,
@@ -764,7 +764,7 @@ async function hasUsableLineAccountToken(
   return Boolean(account?.channel_access_token);
 }
 
-// #733: 送信時と同じ見方で決めごとの有効を確認する。送信側は
+// 送信時と同じ見方で決めごとの有効を確認する。送信側は
 // getNenCampaign(db, key, accountId) の is_enabled を使うため、同じ呼び方で見る。
 async function isNenCampaignEnabled(
   db: D1Database,
@@ -775,7 +775,7 @@ async function isNenCampaignEnabled(
   return campaign?.is_enabled === 1;
 }
 
-// NEN-07: 「つなぐ回答フォームが使えない」で止まった記録は、編集画面で
+// 「つなぐ回答フォームが使えない」で止まった記録は、編集画面で
 // フォームを選び直してから再送できる。判定は job 生成時と同じ見方で確かめる。
 async function isNenCampaignFormUsable(
   db: D1Database,
@@ -823,7 +823,7 @@ export async function retryNenDelivery(
       409,
     );
   }
-  // #733: skipped の再送は運用で直した前提が今も直っているか確かめ直す。
+  // skipped の再送は運用で直した前提が今も直っているか確かめ直す。
   // 判定は送信時と同じ getter・同じ見方で行う(getter本体は触らない)。
   if (skippedFixable) {
     const recovered = current.last_error === 'line_account_unavailable'
@@ -844,7 +844,7 @@ export async function retryNenDelivery(
     }
   }
   const now = jstNow();
-  // #733: skipped は attempts を問わず、直せる2理由のままの行だけ戻す。
+  // skipped は attempts を問わず、直せる2理由のままの行だけ戻す。
   // 確認後に状態・理由・版のどれかが変わった行は1件も更新されず409になる。
   const result = await db.prepare(
     `UPDATE nen_delivery_jobs

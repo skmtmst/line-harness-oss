@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
 /*
- * 419: NEN誕生日クーポンの2月29日生まれの扱い（3択）を
+ * NEN誕生日クーポンの2月29日生まれの扱い（3択）を
  * GET/PUT で往復させ、壊れた値・省略時の既存値保護を確かめる。
  */
 

@@ -4,7 +4,7 @@ export interface StoredConsultation {
   id: string; friend_id: string; starts_at: string; ends_at: string; meet_url: string;
   status: string; booking_id: string | null; booking_version: number | null; schedule_revision: number;
 }
-/** The parent CAS and all future notification plans commit together. Sent/unknown rows are never reset. */
+/** 親の CAS と将来の通知計画を一緒に確定し、送信済み・不明の行は戻さない。 */
 export async function persistMeetGeneration(db: D1Database, input: RegisterMeetConsultationInput,
   friend: { line_account_id: string; line_user_id: string }, existing: StoredConsultation | null,
   schedules: MeetReminderSchedule[], now: string) {
@@ -26,7 +26,7 @@ export async function persistMeetGeneration(db: D1Database, input: RegisterMeetC
       AND (excluded.booking_version IS NULL OR meet_consultations.booking_version IS NULL OR excluded.booking_version>=meet_consultations.booking_version)`)
     .bind(id,input.externalEventId,input.friendId,input.title,input.startsAt,input.endsAt,input.meetUrl,
       bookingId,bookingVersion,revision,now,now,existing?.schedule_revision ?? 0)];
-  // A stale writer must not change any child's schedule. Fail the complete batch on a lost parent CAS.
+  // 古い更新者が通知予定を変えないよう、親 CAS に負けたら batch 全体を失敗させる。
   writes.push(db.prepare(`SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'meet_generation_conflict' END)`));
   writes.push(db.prepare(`UPDATE meet_consultation_notification_runs SET status='cancelled',updated_at=?
     WHERE consultation_id=? AND schedule_revision<>? AND (status='pending' OR status='failed' AND last_error='notification_preflight_failed') AND ${guard}`)

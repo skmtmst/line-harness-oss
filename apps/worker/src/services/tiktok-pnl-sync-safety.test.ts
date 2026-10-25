@@ -454,7 +454,7 @@ describe('TikTok利益計算：同期の安全性', () => {
 
   it('定期実行は #838 の書き出し先が未選択（pending_target）でも対象にする', async () => {
     // Googleの認可は済んでいて更新用トークンもある状態。利益計算は自分で
-    // スプレッドシートを作るので #838 の書き出し先には依存しない。
+    // スプレッドシートを作るので  の書き出し先には依存しない。
     // ここで除外すると、認可したのに毎回手動同期を押す羽目になる。
     seedSettings(testDb, 'acc-1', {
       enabled: 1, spreadsheet_id: null, spreadsheet_url: null,

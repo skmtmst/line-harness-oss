@@ -186,8 +186,8 @@ export function specialFromGoogle(periods: GoogleSpecialHourPeriod[] | undefined
 }
 
 /**
- * 送信用：変更する日付だけ画面の値から作り、それ以外の日は Google の原文（rawSpecialHours）をそのまま返す。
- * specialHours は全置換なので、変換の往復で他の日が変わる事故（0:00 終了が翌日へ延びた 2026-09-26 の事故）を構造的に防ぐ。
+ * specialHours は全置換なので、変更する日だけを画面値から作り、他の日は Google の rawSpecialHours を保持する。
+ * 往復変換で0時終了が翌日へ延びるなど、編集していない日を変更しないため。
  */
 export function mergeSpecialHours(raw: GoogleSpecialHourPeriod[], changed: SpecialDay[], removeDates: string[] = []): { untouched: GoogleSpecialHourPeriod[]; changed: SpecialDay[] } {
   const targets = new Set([...changed.map((d) => d.date), ...removeDates]);

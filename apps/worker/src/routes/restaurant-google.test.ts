@@ -215,7 +215,7 @@ beforeEach(() => {
  * Google Business Profileプロジェクトを間接的に使える経路を残さない。
  *
  * Google Business Profile APIのポリシー
- * （https://developers.google.com/my-business/content/policies 、2026-08-28更新）は
+ * （https://developers.google.com/my-business/content/policies、2026-08-28更新）は
  *   「End users of your Business Profile APIs need to manually sign in to use it.」
  *   「They're not allowed automatic access to make manual or programmatic changes to their accounts.」
  *   「You cannot provide indirect access to your Business Profile project.」

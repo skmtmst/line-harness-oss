@@ -1,8 +1,8 @@
 /*
- * #931 N-310: 投稿経路のメタデータ除去と寸法検査をルートで直接固定する。
- * ・EXIF 等は審査用派生（nen-photo-review/*）から外れ、原本はそのまま残る
- * ・寸法が読めない・20,000px 超の画像は 400 で止まり、R2 へも DB へも残らない
- * ・申告 MIME と実体が違うものは弾く
+ *  投稿経路のメタデータ除去と寸法検査をルートで直接固定する。
+ * EXIF 等は審査用派生（nen-photo-review/*）から外れ、原本はそのまま残る
+ * 寸法が読めない・20,000px 超の画像は 400 で止まり、R2 へも DB へも残らない
+ * 申告 MIME と実体が違うものは弾く
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';

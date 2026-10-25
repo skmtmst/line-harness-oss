@@ -1,19 +1,4 @@
-/**
- * 飲食店向け（テスト）「デリバリー受注」のルートのテスト。
- * 設計正本：デリバリー受注_v02.pen の D-1 `kDQHr` / D-2 `hjdqV` / D-3 `dgeTy`
- *           / D-4 `OzHLO` / D-5 `h7OeT` / D-6 `XCVGd`（2026-10-09 承認）。
- *
- * ここで確かめるのは受入条件の2・3・4。
- * 2. 各サービスへの送信は送信台帳 rt_delivery_dispatches に記録し、成功時だけD1の
- *    状態を進める（失敗は分類済み符号のみ保存）
- * 3. 受信口は HMAC-SHA256 署名・5分の時刻ずれ制限・受信台帳の一意制約で守られ、
- *    重複通知を二重処理しない
- * 4. 取り消せない操作（注文キャンセル・受付一括停止）は確認手順(428)と
- *    owner/admin 権限で守られる
- *
- * SQL そのものが仕様（版での絞り込み・UNIQUE による重複吸収）なので、モックではなく
- * 本物の SQLite（createTestD1）に当てる。外部サービスへの通信だけを fetch で受ける。
- */
+/** 飲食店の送信は台帳へ先に記録し、成功時だけ状態を進める。署名・5分の時刻制限・一意制約で受信を守り、取消などの不可逆操作は確認票と owner/admin を必須にする。実 SQLite で版と重複を検証し、外部通信だけを差し替える。設計図 kDQHr・hjdqV・dgeTy・OzHLO・h7OeT・XCVGd と照合する。 */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { currentInvocation, withInvocation } from '@line-crm/shared/server';

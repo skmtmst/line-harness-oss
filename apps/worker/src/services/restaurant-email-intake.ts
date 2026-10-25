@@ -180,10 +180,7 @@ async function storeRawEmail(
   objectKey: string,
   customMetadata?: Record<string, string>,
 ): Promise<void> {
-  // Cloudflare Email Routing rejects messages over 25 MiB before this handler runs.
-  // Workers share a 128 MB isolate limit, so never turn the raw MIME stream into an
-  // ArrayBuffer/string here. EmailMessage.raw does not carry a content length that
-  // R2 can rely on, so preserve streaming while attaching the authoritative rawSize.
+  // Email Routing は25MiB超を先に拒むが、Worker の128MB内で複製を増やさないよう MIME を文字列や ArrayBuffer にしない。stream を保ち、R2 へ正規の rawSize を渡す。
   const fixedLength = new FixedLengthStream(message.rawSize);
   const pipeAbort = new AbortController();
   const pipePromise = message.raw.pipeTo(fixedLength.writable, { signal: pipeAbort.signal });
@@ -195,8 +192,7 @@ async function storeRawEmail(
     });
     await pipePromise;
   } catch (error) {
-    // If R2 rejects before consuming the body, release the single-use source stream
-    // instead of leaving the pipe blocked on backpressure.
+    // R2 が本文を読む前に拒んだ場合、背圧で止まらないよう一度限りの元 stream を解放する。
     pipeAbort.abort(error);
     await fixedLength.readable.cancel(error).catch(() => undefined);
     await pipePromise.catch(() => undefined);

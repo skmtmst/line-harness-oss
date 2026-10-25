@@ -107,7 +107,7 @@ nenPhotoOperations.get(
 );
 
 /*
- * 報酬の決まりの版 (#817)。保存するたびに版を1つ足し、前の版は変えない。
+ * 報酬の決まりの版。保存するたびに版を1つ足し、前の版は変えない。
  * 「この版に戻す」は、その版の中身で新しい版を作る。
  * 決まりは全体で1つ（アカウントの切り分けなし）。見るだけなら
  * 写真審査の表示権限で足り、変えるのは owner・admin だけ。
@@ -381,7 +381,7 @@ nenPhotoOperations.post(
         || (reasonCode === 'other' && !reasonNote)) {
         return inputError(c, { success: false, error: '写真、判断、理由、版を確認してください' }, 400, ["decisions"]);
       }
-      // 単体審査と同じく補足は素で保存する（#500 軽）。
+      // 単体審査と同じく補足は素で保存する（ 軽）。
       // 一括だけ `[差し戻し]` を付けると「見送った理由」の表示が単体とずれる。
       decisions.push({
         photoId: raw.photoId.trim(), decision: decision as BulkPhotoDecision['decision'],
@@ -431,7 +431,7 @@ nenPhotoOperations.post(
           receiptId, lineAccountId, idempotencyKey: key, decisions, result: result.result,
         });
         /*
-         * 採用した分のポイント手続きをその場で一度届ける（PHOTO-06）。
+         * 採用した分のポイント手続きをその場で一度届ける。
          * 単体採用と同じく、失敗しても審査結果は確定済みで、行は
          * 日次回収・手動の再試行・照合で後から進められる。
          */
