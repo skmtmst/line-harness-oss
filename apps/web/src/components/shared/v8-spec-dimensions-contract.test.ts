@@ -32,7 +32,9 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     const css = read('./button.module.css')
     expect(css).toMatch(/:root \.standard,\s*:root \.field \{\s*height:\s*var\(--tpl-button-h\)/s)
     // 行内 32・アイコン 36 も見本どおり。
-    expect(css).toMatch(/\.compact\s*\{[^}]*height:\s*32px/s)
+    // 小さい（道具の列・表の中）は共通の値 --control-h-compact（32px）を読む。
+    expect(css).toMatch(/\.compact\s*\{[^}]*height:\s*var\(--control-h-compact\)/s)
+    expect(readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')).toMatch(/--control-h-compact:\s*32px/)
     expect(read('./icon-button.module.css')).toMatch(/:root \.button \{[^}]*height:\s*36px/s)
   })
 

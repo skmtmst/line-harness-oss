@@ -382,7 +382,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel[data-design-layout='stacked'] .actions { padding: 0; border: 0; }
 :root .panel[data-confirm-first] .actions > button:last-child { order: -1; }
 
-:root .panel[data-design-layout='stacked'] .close { width: 28px; height: 28px; min-height: 0; padding: 0; }
+:root .panel[data-design-layout='stacked'] .close { width: var(--control-icon-size); height: var(--control-icon-size); min-height: 0; padding: 0; }
 
 :root .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
 :root .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }
