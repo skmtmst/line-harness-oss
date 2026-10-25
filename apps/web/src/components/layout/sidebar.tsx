@@ -55,8 +55,11 @@ const HQ_SETTINGS_PATHS = ['/hq/settings', '/hq/members', '/hq/billing', '/hq/su
 
 /** 組の開閉を覚えるキー（ブラウザごと）。 */
 const SIDEBAR_GROUPS_KEY = 'lh-sidebar-groups'
-/** 保存が無いとき、この幅より狭ければ左メニューを畳んで開く。1152 の絵は開いたまま。 */
-export const SIDEBAR_AUTO_COLLAPSE_BELOW = 1152
+/**
+ * 保存が無いとき、この幅より狭ければ左メニューを畳んで開く。iPad 横（1024px）だけ
+ * アイコンの列にし、1025px からは名前つきのまま（2026-10-25 オーナー）。1023px 以下は引き出し。
+ */
+export const SIDEBAR_AUTO_COLLAPSE_BELOW = 1025
 
 /*
  * PERF-08: バッジ件数をアカウント単位で共有する直近値。
@@ -148,7 +151,7 @@ export default function Sidebar({
    * ★V8 外側：左メニューの畳み（幅 64・アイコンだけ）。
    * 上の帯のボタンと ⌘\ が SIDEBAR_TOGGLE_EVENT を投げ、ここで受ける。
    * 状態はブラウザに覚える（lh-sidebar-collapsed）。保存がなければ
-   * 1152px 未満では畳んだ形で開く。保存済みの状態があればそちらを優先する。
+   * 1024px 以下では畳んだ形で開く。保存済みの状態があればそちらを優先する。
    */
   const [collapsed, setCollapsed] = useState(false)
   /* 畳んだ時、アイコンに乗せた・フォーカスした項目の名前を右の吹き出しに出す。メニューは縦に送れるので中に描くと切れる。画面に固定して出す。 */

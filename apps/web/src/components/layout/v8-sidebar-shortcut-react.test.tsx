@@ -189,3 +189,44 @@ describe('V8-1085-KEYBOARD-01: ⌘\\ は1回だけ畳む', () => {
     expect(isCollapsed()).toBe(false)
   })
 })
+
+describe('保存が無い時の左メニュー：iPad 横（1024px）だけ畳む', () => {
+  const realWidth = window.innerWidth
+  beforeEach(() => {
+    clearFeatureVisibilityCache()
+    fixture.visibility.mockReset()
+    fixture.get.mockReset()
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: {} } })
+    fixture.get.mockResolvedValue({
+      success: true,
+      data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, specializedFeatureKeys: [] },
+    })
+    document.documentElement.dataset.theme = 'v8'
+    window.localStorage.clear()
+    window.localStorage.setItem('lh_staff_role', 'owner')
+  })
+
+  afterEach(() => {
+    cleanup()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: realWidth })
+    delete document.documentElement.dataset.theme
+  })
+
+  it.each([
+    [1024, true],
+    [1025, false],
+    [1100, false],
+    [1152, false],
+  ])('幅 %ipx で畳むか：%s', (width, collapsed) => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+    renderShell()
+    expect(isCollapsed()).toBe(collapsed)
+  })
+
+  it('保存した開き方が幅より優先される', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
+    window.localStorage.setItem(COLLAPSED_KEY, '0')
+    renderShell()
+    expect(isCollapsed()).toBe(false)
+  })
+})
