@@ -17,6 +17,4 @@
 .providerRow label { white-space: nowrap; }
 .urlLine { display: flex; align-items: center; gap: var(--tpl-bm-8); }
 .urlLine > :first-child { flex: 1 1 auto; min-width: 0; }
-.broken { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--tpl-bm-12); padding: var(--tpl-bm-12) var(--tpl-bm-16); border-radius: var(--radius-card); background: var(--color-danger-bg); color: var(--color-danger); }
-.broken strong { display: block; color: var(--color-ink); font-size: var(--tpl-bm-13); }
 .footer { display: flex; justify-content: center; width: 100%; }

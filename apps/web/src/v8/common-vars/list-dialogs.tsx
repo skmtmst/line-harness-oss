@@ -2,7 +2,6 @@
 
 import type { CommonVarDeleteImpactItem } from '@line-crm/shared'
 
-
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel from '@/components/shared/detail-panel'
@@ -132,12 +131,11 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
         {statusTarget ? (
           <div className={styles.dialogBody}>
             {statusAction === 'stop' && statusTarget.nextSchedule ? (
-              <p className={styles.dialogWarn} role="note">
-                <TriangleAlert size={14} aria-hidden="true" />
+              <Notice tone="warn" role="note" icon={<TriangleAlert size={14} aria-hidden="true" />}>
                 <span>
                   決めた日時に変わる予約（{formatStamp(statusTarget.nextSchedule.effectiveFrom)}に「{statusTarget.nextSchedule.value || '（空）'}」へ）があります。止める前に予定も見直してください。
                 </span>
-              </p>
+              </Notice>
             ) : null}
             <Field label={<><span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}

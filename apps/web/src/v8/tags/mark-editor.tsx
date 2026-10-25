@@ -319,7 +319,6 @@ function MarkEditorBody({ markId }: { markId?: string }) {
     } catch (reason) {
       const fieldFailure = saveErrors.capture(reason);
 
-
       const status = (reason as { status?: number } | null)?.status
       const code = (reason as { code?: string } | null)?.code
       if (status === 403) {
@@ -444,10 +443,10 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         ))}
       </dl>
       {editing ? (
-        <p className={styles.infoNote}>
-          <Pause className={styles.wayIcon} aria-hidden="true" />
+        <Notice tone="info" icon={<Pause aria-hidden="true" />}>
           保管すると、新しく付けられなくなります。いま付いている人は、確認画面で選ぶマークへ置き換わり、履歴に残ります。
-        </p>
+
+        </Notice>
       ) : null}
       <div ><Field>
         <SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} disabled={selected?.isDefault} onCheckedChange={setIsDefault}>新しい友だちに最初から付ける</Checkbox></SaveErrorField>

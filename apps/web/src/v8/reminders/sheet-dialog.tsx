@@ -42,6 +42,8 @@ export default function SheetDialog({
   return <Dialog open={open} title={title} description={description} onCancel={onClose} busy={busy} error={error} designNode={designNode}
     role={destructive ? 'alertdialog' : undefined} confirmation designLayout="stacked" designWidth={designWidth} designTop={designTop}
     footer={<DialogActions>{destructive}{actions}</DialogActions>} footerAlign={destructive ? 'start' : 'center'}>
-    {band ? bandTone === 'danger' ? <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />}>{band}</Notice> : <div className={styles.band} data-tone={bandTone}><TriangleAlert size={16} aria-hidden="true" className={styles.bandIcon} /><div className={styles.bandText}>{band}</div></div> : null}
+    {band ? bandTone === 'danger' ? <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />}>{band}</Notice> : <Notice tone="warn" data-tone={bandTone} icon={<TriangleAlert size={16} aria-hidden="true" />}>
+      <div className={styles.bandText}>{band}</div>
+    </Notice> : null}
   </Dialog>
 }

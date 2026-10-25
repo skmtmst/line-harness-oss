@@ -20,17 +20,7 @@
 }
 
 /* 検証環境の帯（CHz31「検証環境の帯」）：薄い金色の地＋緑の札＋右の注意。間12。 */
-.boundary {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rt-band-gap);
-  padding: var(--tpl-rt-band-pad);
-  border-radius: var(--tpl-rt-band-radius);
-  outline: 1px solid var(--tpl-rt-band-line);
-  outline-offset: -1px;
-  background: var(--tpl-rt-band-bg);
-  min-width: 0;
-}
+
 
 .boundaryBadge {
   flex: 0 0 auto;
@@ -44,52 +34,11 @@
   white-space: nowrap;
 }
 
-.boundaryText {
-  margin: 0;
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: normal;
-  white-space: nowrap;
-}
-
-.boundarySpacer {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.boundaryDot {
-  flex: 0 0 auto;
-  width: var(--tpl-rt-band-dot);
-  height: var(--tpl-rt-band-dot);
-  border-radius: var(--radius-pill);
-  background: var(--tpl-rt-band-dot-color);
-}
-
-.boundaryNote {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--color-accent-deep);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: normal;
-  white-space: nowrap;
-}
-
 .notice {
   padding: var(--tpl-rt-notice-pad);
   border-radius: var(--tpl-rt-band-radius);
   font-size: var(--text-label);
   font-weight: 600;
-}
-
-.noticeSuccess {
-  background: var(--color-success-bg);
-  color: var(--color-success);
 }
 
 .noticeError {

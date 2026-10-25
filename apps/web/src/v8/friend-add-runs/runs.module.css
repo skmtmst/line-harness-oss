@@ -16,14 +16,6 @@
 .viewerBand { margin: 0; }
 
 /* 失敗の帯：うすい赤の地・角12・余白12/16・間12。 */
-.failBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rule-row-gap);
-  padding: var(--tpl-ar-ed-band-pad);
-  border-radius: var(--radius-card);
-  background: var(--color-danger-bg);
-}
 .failIcon { flex-shrink: 0; color: var(--color-danger); }
 .failText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
 .failTitle { margin: 0; color: var(--color-danger); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-ar-run-fail-title-lh); }

@@ -72,26 +72,9 @@
 
 /* --- 気をつけること --------------------------------------------------- */
 
-.careCard {
-  gap: 10px; /* gap: 10 */
-  border-color: var(--color-status-warn); /* stroke: $status-warn */
-  background: var(--color-status-warn-soft); /* fill: $status-warn-soft */
-}
-
-.careTitle {
-  color: var(--color-status-warn-deep); /* fill: $status-warn-deep */
-}
-
 .careRow {
   display: flex;
   gap: 8px; /* gap: 8 */
-}
-
-.careIcon {
-  width: 15px; /* width: 15 */
-  height: 15px;
-  flex: none;
-  color: var(--color-status-warn-deep);
 }
 
 .careText {

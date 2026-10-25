@@ -151,18 +151,6 @@
   font-size: var(--text-caption);
 }
 
-.overlapBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ms-key-info-gap);
-  margin: 0;
-  padding: var(--tpl-ms-key-box-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-warning-bg);
-  color: var(--color-ink);
-  font-size: var(--tpl-ms-key-token-size);
-}
-
 .overlapIcon {
   flex: none;
   color: var(--color-warning);

@@ -144,27 +144,6 @@
   flex-shrink: 0;
 }
 
-.note {
-  display: flex;
-  gap: 9px;
-  border: 1px solid var(--color-status-info-soft);
-  border-radius: var(--radius-card);
-  background: var(--color-status-info-soft);
-  padding: 12px 14px;
-  color: var(--color-action);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.error {
-  border: 1px solid var(--color-status-danger-soft);
-  border-radius: var(--radius-control);
-  background: var(--color-status-danger-soft);
-  padding: 10px 12px;
-  color: var(--color-danger);
-  font-size: 13px;
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -226,16 +205,6 @@
 }
 
 /* 設計 `sfTEW` の注意帯。押す前に、押したらどうなるかを書く。 */
-.warnBar {
-  display: flex;
-  gap: 9px;
-  border: 1px solid var(--color-status-warn-soft);
-  border-radius: var(--radius-card);
-  background: var(--color-status-warn-soft);
-  padding: 12px 14px;
-  color: var(--color-status-warn-deep);
-  flex-shrink: 0;
-}
 
 .warnTitle {
   margin: 0;
@@ -336,21 +305,6 @@
 .footerRow .muted {
   min-width: 0;
   flex: 1;
-}
-
-.resultBanner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-radius: var(--radius-control);
-  background: var(--color-accent-soft);
-  padding: 14px 16px;
-  color: var(--color-accent-deep);
-}
-
-.warningBanner {
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
 }
 
 .resultTitle {

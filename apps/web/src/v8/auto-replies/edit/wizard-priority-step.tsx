@@ -193,34 +193,28 @@ export function WizardPriorityStep({ autoReplyId, conflicts, dryRun, effectiveKe
                   </Button>
                 </div>
                 {dryRun && (
-                  <div
-                    className={`${styles.testResult} ${dryRun.draftWon ? styles.testResultWin : styles.testResultLose}`}
-                    role="status"
-                  >
-                    <p className={styles.testResultTitle}>
-                      {dryRun.draftWon
-                        ? `当たったルール：このルール「${thisRuleName}」`
-                        : dryRun.winner
-                          ? `当たったルール：「${dryRun.winner.name}」`
-                          : 'どのルールにも当たりませんでした'}
-                    </p>
-                    <p className={styles.testResultNote}>
-                      {dryRun.draftWon
-                        ? 'このルールが返します。'
-                        : dryRun.winner
-                          ? `このルールは見送りです：${dryRun.winner.name}が先に動きます。動かすには、順番をそれより前にします。`
-                          : '届いたメッセージや相手の条件が、どのルールにも合いませんでした。'}
-                    </p>
-                    {dryRun.candidates.find((c) => c.autoReplyId === autoReplyId)?.reasonCodes.length ? (
-                      <p className={styles.testResultNote}>
-                        見送った理由：
-                        {dryRun.candidates
-                          .find((c) => c.autoReplyId === autoReplyId)!
-                          .reasonCodes.map((code) => REASON_WORDS[code] ?? code)
-                          .join('・')}
-                      </p>
-                    ) : null}
-                  </div>
+        <Notice tone={dryRun.draftWon ? "success" : "warn"} role="status" heading={<>{dryRun.draftWon
+          ? `当たったルール：このルール「${thisRuleName}」`
+          : dryRun.winner
+            ? `当たったルール：「${dryRun.winner.name}」`
+            : 'どのルールにも当たりませんでした'}</>}>
+          <p className={styles.testResultNote}>
+            {dryRun.draftWon
+              ? 'このルールが返します。'
+              : dryRun.winner
+                ? `このルールは見送りです：${dryRun.winner.name}が先に動きます。動かすには、順番をそれより前にします。`
+                : '届いたメッセージや相手の条件が、どのルールにも合いませんでした。'}
+          </p>
+          {dryRun.candidates.find((c) => c.autoReplyId === autoReplyId)?.reasonCodes.length ? (
+            <p className={styles.testResultNote}>
+              見送った理由：
+              {dryRun.candidates
+                .find((c) => c.autoReplyId === autoReplyId)!
+                .reasonCodes.map((code) => REASON_WORDS[code] ?? code)
+                .join('・')}
+            </p>
+          ) : null}
+        </Notice>
                 )}
               </Card>
             </>)

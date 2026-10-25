@@ -58,16 +58,6 @@
   font-size: var(--text-micro);
 }
 
-.warn {
-  display: flex;
-  gap: var(--space-12);
-  margin-top: var(--space-16);
-  padding: var(--space-12) var(--space-16);
-  border-radius: var(--radius-control);
-  background: var(--color-notice-warning-bg);
-  color: var(--color-ink);
-}
-
 .warnTitle {
   margin: 0;
   font-size: var(--text-caption);

@@ -1,15 +1,9 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import Dialog from './dialog'
 import ConfirmDialog from './confirm-dialog'
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-const css = readFileSync(join(HERE, 'dialog.module.css'), 'utf8')
 
 /**
  * 解除窓の説明文の桃箱（ Google Sheets の接続を解除）。
@@ -87,15 +81,14 @@ describe('ダイアログの桃箱', () => {
     expect(html.indexOf('書き出しが止まります。')).toBeGreaterThan(html.indexOf('data-qa-dialog-callout'))
   })
 
-  it("桃箱は v8 だけで桃色（既存の見た目は変えない）", () => {
-    expect(css).toMatch(/:root \.calloutDanger\s*\{[^}]*background:\s*var\(--color-danger-bg\)/s)
-    expect(css).toMatch(/:root \.calloutDanger \.description\s*\{[^}]*color:\s*var\(--color-danger\)/s)
-  })
-
-  it('桃箱は板どおり角丸 8・内側 10/12・文 11px/17px（YZ57z）', () => {
-    expect(css).toMatch(/:root \.calloutDanger\s*\{[^}]*border-radius:\s*var\(--radius-segment\)/s)
-    expect(css).toMatch(/:root \.calloutDanger\s*\{[^}]*padding:\s*10px 12px/s)
-    expect(css).toMatch(/:root \.calloutDanger \.description\s*\{[^}]*font-size:\s*11px/s)
-    expect(css).toMatch(/:root \.calloutDanger \.description\s*\{[^}]*line-height:\s*17px/s)
+  it('説明の知らせは共通部品で、タイトルと読み上げの参照を保つ', () => {
+    const html = renderToStaticMarkup(<Dialog open modal={false} title="接続を解除しますか？"
+      description="書き出しが止まります。" descriptionBand="danger" onCancel={vi.fn()} />)
+    const container = document.createElement('div')
+    container.innerHTML = html
+    const notice = container.querySelector('[data-design-part="notice"]')!
+    expect(notice.textContent).toBe('書き出しが止まります。')
+    expect(notice.contains(container.querySelector('h2'))).toBe(false)
+    expect(notice.querySelector('p')?.id).toBe(container.querySelector('[role="dialog"]')?.getAttribute('aria-describedby'))
   })
 })

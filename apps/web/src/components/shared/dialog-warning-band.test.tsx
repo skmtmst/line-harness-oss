@@ -1,13 +1,8 @@
+// @vitest-environment happy-dom
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import Dialog from './dialog'
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-const css = readFileSync(join(HERE, 'dialog.module.css'), 'utf8')
 
 /**
  * 確認窓の説明文の琥珀帯（ 送受信を止める）。
@@ -45,15 +40,15 @@ describe('ダイアログの琥珀帯', () => {
     expect(html).not.toContain('data-qa-dialog-callout')
   })
 
-  it("琥珀帯は v8 だけで琥珀色（既存の見た目は変えない）", () => {
-    expect(css).toMatch(/:root \.calloutWarning\s*\{[^}]*background:\s*var\(--color-status-warn-soft\)/s)
-    expect(css).toMatch(/:root \.calloutWarning \.description \{[^}]*color:\s*var\(--color-warning\)/s)
-  })
-
-  it('琥珀帯は板どおり角丸 8・内側 10/12・文 11px/17px（CFAyf・YZ57z）', () => {
-    expect(css).toMatch(/:root \.calloutWarning\s*\{[^}]*border-radius:\s*var\(--radius-segment\)/s)
-    expect(css).toMatch(/:root \.calloutWarning\s*\{[^}]*padding:\s*10px 12px/s)
-    expect(css).toMatch(/:root \.calloutWarning \.description\s*\{[^}]*font-size:\s*11px/s)
-    expect(css).toMatch(/:root \.calloutWarning \.description\s*\{[^}]*line-height:\s*17px/s)
+  it('注意の説明も共通の知らせで、題と説明の読み上げを保つ', () => {
+    const html = renderToStaticMarkup(<Dialog open modal={false} title="送受信を止めますか？"
+      description="配信も受信もしません。" descriptionBand="warning" onCancel={vi.fn()} />)
+    const host = document.createElement('div')
+    host.innerHTML = html
+    const notice = host.querySelector('[data-qa-dialog-callout]')!
+    const dialog = host.querySelector('[role="dialog"]')!
+    expect(notice.getAttribute('data-design-part')).toBe('notice')
+    expect(notice.textContent).toContain('送受信を止めますか？')
+    expect(notice.querySelector('p')?.id).toBe(dialog.getAttribute('aria-describedby'))
   })
 })

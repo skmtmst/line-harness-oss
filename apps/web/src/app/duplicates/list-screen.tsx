@@ -17,6 +17,7 @@ import { formatDateTime } from '@/lib/format'
 import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 
 /*
@@ -70,13 +71,12 @@ export default function DuplicatesV8() {
 
       <FriendsManageNavV8 current="重複検出" />
 
-      <p className={styles.infoBand}>
-        <Info size={14} aria-hidden="true" style={{ flex: '0 0 auto' }} />
+      <Notice tone="info" icon={<Info size={14} aria-hidden="true" />}>
         <span>
           自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、
           プロフィール画像や名前だけの一致は候補として出します。確認後も元のLINE友だちデータは残ります。
         </span>
-      </p>
+      </Notice>
 
       {/* 数の帯：4つのマス。取れない数は「—」と短い理由（SXCb3）。1152 は `G9C4Uw`。 */}
       <KpiBand data-design-node="G9C4Uw">
@@ -98,12 +98,9 @@ export default function DuplicatesV8() {
       {!d.data || isForbidden(d.statsFailure) ? (
         <DuplicatesStatsNotice failure={d.statsFailure} onRetry={() => void d.load()} />
       ) : d.error ? (
-        <p className={styles.infoBand} role="status">
+        <Notice tone="warn" role="status" action={<Button type="button" onClick={() => void d.load()}>もう一度</Button>}>
           再計算できませんでした。表示中の数字は前回の集計です。
-          <button type="button" className={styles.infoBandRetry} onClick={() => void d.load()}>
-            もう一度
-          </button>
-        </p>
+        </Notice>
       ) : null}
 
       {/* 道具の段：検索・状態・右に件数と再検出の補足。 */}

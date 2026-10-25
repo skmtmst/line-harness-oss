@@ -160,11 +160,6 @@
   flex-shrink: 0;
 }
 
-.info > .icon {
-  margin-top: var(--tpl-tag-sub-gap);
-  color: var(--color-action);
-}
-
 .toolRow {
   display: flex;
   align-items: center;
@@ -173,19 +168,6 @@
 
 .spacer {
   flex: 1 1 0;
-}
-
-.info {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tpl-tg2-swatch-gap);
-  margin: 0;
-  padding: var(--tpl-tg2-info-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: var(--tpl-tg2-info-band-lh);
 }
 
 /* 右の列の行（行どうしの間は線だけ）。 */

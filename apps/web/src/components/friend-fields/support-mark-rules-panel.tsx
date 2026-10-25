@@ -28,6 +28,7 @@ import {
 } from './support-mark-rules-view'
 import styles from './support-mark-rules-panel.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 type Draft = {
   name: string
@@ -111,7 +112,6 @@ export default function SupportMarkRulesPanel({
       setRules(inExecutionOrder(res.data))
       setState('ready')
     } catch (err) {
-
 
       if (!stillHere()) return
       const fieldFailure = saveErrors.capture(err)
@@ -251,16 +251,13 @@ export default function SupportMarkRulesPanel({
       </header>
 
       {failure ? (
-        <div
-          className={failure.kind === 'forbidden' ? styles.notice : styles.warn}
-          role="alert"
-          data-failure-kind={failure.kind}
-        >
-          <p>{failure.message}</p>
+        <Notice tone={failure.kind === "forbidden" ? "danger" : "warn"} role="alert" data-failure-kind={failure.kind} action={<>
           {failure.canReload ? (
             <Button onClick={() => void load()}>最新の内容を読み直す</Button>
           ) : null}
-        </div>
+        </>}>
+          <p>{failure.message}</p>
+        </Notice>
       ) : null}
 
       {state === 'loading' ? (

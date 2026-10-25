@@ -1,4 +1,5 @@
 'use client'
+import Notice from '@/components/shared/notice'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import { unreadLookup } from '@/components/chats/assignee-unread';
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
@@ -407,16 +408,16 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   ふだん（成功時）は何も出ないので、一覧の見た目は変わらない。
                 */}
         {channel !== 'line' && emailError && (
-          <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
-            <p className="text-sm text-danger">{emailError}</p>
-            <button
+          <Notice tone="danger" action={<> <button
               type="button"
               onClick={() => { void loadEmails() }}
               className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
             >
               メールを読み込み直す
-            </button>
-          </div>
+            </button> </>} role="alert">
+            <p className="text-sm">{emailError}</p>
+
+          </Notice>
         )}
         {/*
                   LINE一覧の失敗行。メールだけ見ているときは出さない。
@@ -425,16 +426,16 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   同じ条件の再取得へ戻れるようにする。
                 */}
         {channel !== 'email' && chatListFailed && (
-          <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
-            <p className="text-sm text-danger">チャットの読み込みに失敗しました。</p>
-            <button
+          <Notice tone="danger" action={<> <button
               type="button"
               onClick={() => { void loadChats() }}
               className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
             >
               会話を読み込み直す
-            </button>
-          </div>
+            </button> </>} role="alert">
+            <p className="text-sm">チャットの読み込みに失敗しました。</p>
+
+          </Notice>
         )}
         {/*
                   メールの問い合わせを同じ一覧の先頭に混ぜる。

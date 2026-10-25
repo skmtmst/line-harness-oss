@@ -3,24 +3,7 @@
  * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
  */
 
-.infoBand,
-.dangerBand,
-.doneBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sb-band-gap);
-  margin: 0;
-  padding: var(--tpl-sb-band-pad);
-  border-radius: var(--tpl-sb-band-radius);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sb-band-text);
-  line-height: var(--tpl-sb-band-lh);
-}
 
-.infoBand { background: var(--color-status-info-soft); }
-.infoBand .bandIcon { color: var(--color-action); }
-.dangerBand { background: var(--color-status-danger-soft); color: var(--color-danger); }
-.doneBand { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 
 .bandIcon {
   flex-shrink: 0;

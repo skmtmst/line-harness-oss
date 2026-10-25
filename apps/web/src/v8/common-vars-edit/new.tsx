@@ -370,7 +370,6 @@ export default function NewCommonVarV8() {
       if (e instanceof ApiError && e.status === 409) {
         { if (!fieldFailure)
 
-
         setError('その差し込み名は既に使われています') }
         focusField('cv-key')
       } else {
@@ -633,20 +632,7 @@ export default function NewCommonVarV8() {
         /></SaveErrorField></Field></div>
 
       {secretWarningFields && (
-        <div
-          ref={secretWarningRef}
-          role="alertdialog"
-          aria-labelledby="cv-secret-warning-title"
-          aria-describedby="cv-secret-warning-description"
-          className={styles.secretConfirm}
-        >
-          <h2 id="cv-secret-warning-title" className={styles.secretConfirmTitle}>
-            秘密値の可能性がある内容を確認してください
-          </h2>
-          <p id="cv-secret-warning-description" className={styles.secretConfirmText}>
-            {secretWarningFields.join('・')}に、パスワードやトークンなどの秘密値らしい内容があります。
-            共通情報には保存せず、安全な保管場所へ移してください。
-          </p>
+        <Notice tone="danger" ref={secretWarningRef} role="alertdialog" aria-labelledby="cv-secret-warning-title" aria-describedby="cv-secret-warning-description" action={<>
           <div className={styles.secretConfirmActions}>
             <Button
               type="button"
@@ -654,7 +640,7 @@ export default function NewCommonVarV8() {
               onClick={() => {
                 const firstField = secretWarningFields[0]
                 setSecretWarningFields(null)
-                if (firstField === '社内メモ') focusField('cv-memo')
+                if(firstField === '社内メモ') focusField('cv-memo')
                 else valueRef.current?.focus()
               }}
             >
@@ -664,7 +650,15 @@ export default function NewCommonVarV8() {
               内容を確認して登録する
             </Button>
           </div>
-        </div>
+        </>}>
+          <h2 id="cv-secret-warning-title" className={styles.secretConfirmTitle}>
+            秘密値の可能性がある内容を確認してください
+          </h2>
+          <p id="cv-secret-warning-description" className={styles.secretConfirmText}>
+            {secretWarningFields.join('・')}に、パスワードやトークンなどの秘密値らしい内容があります。
+            共通情報には保存せず、安全な保管場所へ移してください。
+          </p>
+        </Notice>
       )}
 
       {error && <Notice tone="danger" className={styles.formErrorNoticePlacement} >{error}</Notice>}

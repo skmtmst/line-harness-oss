@@ -8,10 +8,10 @@ import { Plus, Trash2, Check, ChevronDown, ChevronUp, Copy, GitCompare, Triangle
 import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation';
-import type { Tag, TagGroup } from '@line-crm/shared';
-import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api';
+
+import { api, type TagRetroactivePreview } from '@/lib/api';
 import { formatDay } from '@/lib/format';
 import { StickyBarAction } from '@/components/shared/sticky-bar';
 import { CreatePage } from '@/components/templates';
@@ -35,7 +35,6 @@ import { emptyValue } from '@/components/shared/empty-value';
 import NumberInput from '@/components/shared/number-field';
 import { SaveErrorField, useSaveErrorReveal } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice';
-
 
 export function TagEditForm({
   tag,
@@ -196,10 +195,9 @@ export function TagEditForm({
           </dd>
         </div>
       </dl>
-      <p className={styles.infoBand}>
-        <TriangleAlert size={16} aria-hidden="true" className={styles.infoIcon} />
+      <Notice tone="info" icon={<TriangleAlert size={16} aria-hidden="true" />}>
         <span>このタグを消すと、上の配信やフォームの条件から外れます。消す前に確認が出ます。</span>
-      </p>
+      </Notice>
     </div>
   )
 

@@ -128,17 +128,20 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend }: { broadc
           )}
           {result.status === 'decided' || result.status === 'finished' ? (
             winner ? (
-              <p className={styles.doneBand}><Check aria-hidden="true" className={styles.infoIcon} />{`${result.fallback ? '決められなかったため A 案を送りました' : `${winner.key} 案が勝ちました（${METRIC_WORD[result.metric]}${result.metric === 'click' ? `率 ${pct(winner.clickRate)}` : ''}）`}。残りの ${formatNumber(result.remainder.count)} 人へ ${result.remainder.sentAt ? `${hm(new Date(result.remainder.sentAt))} に送りました` : `${result.remainder.scheduledAt ? hm(new Date(result.remainder.scheduledAt)) : '—'} に送ります`}。`}</p>
+                <Notice tone="success" icon={<Check aria-hidden="true" />}>
+                  {`${result.fallback ? '決められなかったため A 案を送りました' : `${winner.key} 案が勝ちました（${METRIC_WORD[result.metric]}${result.metric === 'click' ? `率 ${pct(winner.clickRate)}` : ''}）`}。残りの ${formatNumber(result.remainder.count)} 人へ ${result.remainder.sentAt ? `${hm(new Date(result.remainder.sentAt))} に送りました` : `${result.remainder.scheduledAt ? hm(new Date(result.remainder.scheduledAt)) : '—'} に送ります`}。`}
+                </Notice>
             ) : <p className={styles.note}>送らずに終えました。</p>
           ) : result.status === 'undecided' ? (
-            <div className={styles.chooseBand}>
-              <span className={styles.chooseText}>{`残りの ${formatNumber(result.remainder.count)} 人へ送る案を選んでください。${mdwhm(result.chooseUntil)} までに選ばなければ、送らずに終えます。`}</span>
-              {canSend ? <>
-                <Button onClick={() => open('A')}>A を送る</Button>
-                <Button onClick={() => open('B')}>B を送る</Button>
-                <Button variant="text" onClick={() => open('none')}>送らずに終える</Button>
-              </> : null}
-            </div>
+                <Notice tone="warn" action={<>
+                  {canSend ? <>
+                    <Button onClick={() => open('A')}>A を送る</Button>
+                    <Button onClick={() => open('B')}>B を送る</Button>
+                    <Button variant="text" onClick={() => open('none')}>送らずに終える</Button>
+                  </> : null}
+                </>}>
+                  <span className={styles.chooseText}>{`残りの ${formatNumber(result.remainder.count)} 人へ送る案を選んでください。${mdwhm(result.chooseUntil)} までに選ばなければ、送らずに終えます。`}</span>
+                </Notice>
           ) : result.status === 'expired' ? (
             <p className={styles.note}>期限までに選ばれなかったため、送らずに終えました。</p>
           ) : result.status === 'testing' ? (

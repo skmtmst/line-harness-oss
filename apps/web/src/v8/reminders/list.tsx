@@ -3,16 +3,13 @@ import { RefreshCover } from '@/components/shared/refresh-cover'
 import FolderSelect from '@/components/shared/folder-select'
 
 import ListDateTime from '@/components/shared/list-date-time'
-import { useDeferredDelete } from '@/lib/use-deferred-delete';
+
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { RowMenu } from '@/components/shared/row-actions';
 
 import { RowNameLink } from '@/components/shared/table';
-
-
-
 
 import { permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { formatListTimestamp, formatNumber } from '@/lib/format';
@@ -25,10 +22,10 @@ import SearchField from '@/components/shared/search-field'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useListScrollMemory, useListUrlParam, useListUrlValue } from '@/components/shared/list-url-state';
-import { Activity, AlertCircle, ArrowRight, Bell, Calendar, CalendarClock, Copy, Folder as FolderIcon, FolderInput, Pause, Pencil, Play, Plus, Send, Square, Trash2, TriangleAlert, Users } from 'lucide-react';
+import { Activity, AlertCircle, ArrowRight, Bell, CalendarClock, Copy, Folder as FolderIcon, FolderInput, Pause, Pencil, Play, Send, Square, Trash2, TriangleAlert, Users } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Eye, MoreHorizontal } from 'lucide-react';
+
 import type { ApiResponse, ReminderTriggerType } from '@line-crm/shared';
 import { api, fetchApi, type ListStats } from '@/lib/api';
 import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-list';
@@ -53,7 +50,7 @@ import Pagination from '@/components/shared/pagination'
 import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton';
 import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table';
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
+import { type FolderDotFolder } from '@/components/shared/folder-dot';
 import { runUndoable, runOptimistic } from '@/lib/undoable';
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { completeReorder } from '@/lib/complete-reorder';
@@ -204,7 +201,6 @@ export default function RemindersListV8() {
   const [duplicating, setDuplicating] = useState(false)
   const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   const [moveNotice, setMoveNotice] = useState('')
-
 
   const loadStats = useCallback(async () => {
     setStatsFailed(false)
@@ -1122,7 +1118,6 @@ export default function RemindersListV8() {
         ))}
       </KpiBand> : null}
 
-
       <ConfirmDialog
         open={bulkPauseIds !== null}
         title={`${bulkPauseIds?.length ?? 0}件のリマインダーを停止しますか？`}
@@ -1147,12 +1142,11 @@ export default function RemindersListV8() {
               }}
       >
         {pauseTarget && (
-          <p className={styles.warnNote}>
-            <TriangleAlert size={14} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }} />
+          <Notice tone="warn" icon={<TriangleAlert size={14} aria-hidden="true" />}>
             {pauseTarget.plannedDeliveries != null && pauseTarget.plannedDeliveries > 0
               ? `これから送る予定の ${formatNumber(pauseTarget.plannedDeliveries)}通 が送られなくなります。`
               : 'これから送る予定の通知があれば、送られなくなります。'}
-          </p>
+          </Notice>
         )}
       </ConfirmDialog>
 
@@ -1251,14 +1245,16 @@ export default function RemindersListV8() {
             placeholder="例：予約"
           >
             {foldersError && (reminders.length > 0 || !reminderList.error) ? (
-              <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
-                <button
-                  type="button"
-                  onClick={() => void loadFolders()}
-                  className="text-action ml-2 font-semibold hover:underline"
-                >
-                  もう一度
-                </button></Notice>
+            <Notice tone="danger" className={styles.folderNoteNoticePlacement} action={<>
+              <button
+                type="button"
+                onClick={() => void loadFolders()}
+                className="text-action ml-2 font-semibold hover:underline"
+              >
+                もう一度
+              </button>
+            </>}>フォルダを読み込めませんでした。
+            </Notice>
             ) : null}
           </ManagedFolderPanel>
         </>}
@@ -1294,9 +1290,11 @@ export default function RemindersListV8() {
           )}
 
           {actionError && (
-            <Notice tone="danger" className={styles.errorBandNoticePlacement} >
-              {actionError}
-              <button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
+          <Notice tone="danger" className={styles.errorBandNoticePlacement} action={<>
+            <button type="button" onClick={() => setActionError('')}>閉じる</button>
+          </>}>
+            {actionError}
+          </Notice>
           )}
 
           <RefreshCover refreshing={reminderList.refreshing}>{table}</RefreshCover>

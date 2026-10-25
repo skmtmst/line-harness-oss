@@ -13,10 +13,6 @@
 .aside { display: flex; flex-direction: column; flex-shrink: 0; gap: var(--tpl-eds-aside-gap); width: var(--tpl-eds-aside-w); padding: var(--tpl-eds-aside-pad); border-left: 1px solid var(--color-hairline); }
 
 /* 終わった帯（薄い緑）・止まった帯（琥珀）。 */
-.doneBand,
-.failBand { display: flex; align-items: center; gap: var(--tpl-eds-band-gap); padding: var(--tpl-eds-band-pad); border-radius: var(--radius-card); }
-.doneBand { background: var(--color-success-bg); }
-.failBand { background: var(--color-status-warn-soft); }
 .doneIcon { flex-shrink: 0; color: var(--color-accent-deep); }
 .failIcon { flex-shrink: 0; color: var(--color-warning); }
 .bandText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }

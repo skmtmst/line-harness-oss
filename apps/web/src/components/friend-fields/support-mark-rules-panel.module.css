@@ -5,12 +5,11 @@
 .title { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; }
 .note { color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: 1.6; }
 
-.warn, .notice {
+.notice {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
   border-radius: var(--radius-mini); padding: 10px 12px;
   font-size: var(--text-micro); font-weight: 600; line-height: 1.5;
 }
-.warn { background: var(--color-danger-bg); color: var(--color-danger); }
 .notice { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
 
 .list { display: flex; flex-direction: column; gap: 8px; }

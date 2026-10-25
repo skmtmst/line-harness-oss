@@ -123,7 +123,6 @@ export default function AccountHandoverV8() {
     }
   }, [saveErrors]);
 
-
   const retryAccounts = useCallback(async () => {
     if (accountsRetrying)
 
@@ -541,15 +540,16 @@ export default function AccountHandoverV8() {
       </DataTable></Card>
 
       {canManage && (editCount > 0 || decisionError) ? (
-        <div className={styles.pendingBand}>
-          {decisionError
-            ? <Notice tone="danger" className={styles.pendingTextNoticePlacement} >{decisionError}</Notice>
-            : <p className={styles.pendingText}>{editCount} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
+        <Notice role={decisionError ? "alert" : "note"} tone={decisionError ? "danger" : "warn"} action={<>
           <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>
             <RotateCcw size={14} aria-hidden="true" />事前確認をやり直す
           </Button>
           <Button type="button" variant="primary" disabled={savingDecisions} busy={savingDecisions} onClick={() => void saveDecisions()}>判断を保存する</Button>
-        </div>
+        </>}>
+          {decisionError
+            ? decisionError
+            : <p className={styles.pendingText}>{editCount} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
+        </Notice>
       ) : null}
 
       <div className={styles.duo}>

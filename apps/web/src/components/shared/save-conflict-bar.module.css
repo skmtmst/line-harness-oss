@@ -25,41 +25,6 @@
   pointer-events: none;
 }
 
-.inner {
-  display: flex;
-  width: 100%;
-  max-width: 720px;
-  align-items: center;
-  gap: 12px;
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-v6-card, 0 8px 24px rgb(0 0 0 / 18%));
-  padding: 8px;
-  pointer-events: auto;
-}
-
-.notice {
-  min-width: 0;
-  flex: 1;
-}
-
-.action {
-  flex: 0 0 auto;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  padding: 8px 12px;
-  font-size: var(--text-label);
-  font-weight: 600;
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-}
-
-.action:hover {
-  background: var(--color-canvas-sunken);
-}
-
-.action:focus-visible {
-  outline: revert;
-}
+/* 固定位置だけを持ち、面と操作の並びはNoticeへ渡す。 */
+.inner { width: 100%; max-width: 720px; pointer-events: auto; }
 }

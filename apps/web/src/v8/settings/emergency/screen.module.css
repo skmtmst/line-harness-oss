@@ -35,24 +35,6 @@
   outline: var(--tpl-sb-focus-ring);
 }
 
-.warnBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-sb-ctl-gap);
-  padding: var(--tpl-sb-band-pad);
-  border-radius: var(--tpl-sb-band-radius);
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-  font-size: var(--tpl-sb-chip-text);
-  font-weight: 600;
-}
-
-.warnBand p {
-  margin: 0;
-}
-
 .inlineLink {
   padding: 0;
   border: 0;
@@ -69,30 +51,7 @@
   font-size: var(--tpl-sb-row-sub);
 }
 
-.notice {
-  margin: 0;
-  padding: var(--tpl-sb-band-pad);
-  border-radius: var(--tpl-sb-band-radius);
-  font-size: var(--tpl-sb-chip-text);
-}
-
-.notice[data-tone='success'] { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.notice[data-tone='warning'] { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.notice[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-danger); }
-
 /* 全体の状態（角丸 12・余白 14/18・印 20＋間 12・題 15/700・本文 12）。 */
-.banner {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sb-group-gap);
-  padding: var(--tpl-sb-hc-banner-pad);
-  border-radius: var(--tpl-sb-card-radius);
-  background: var(--color-status-info-soft);
-}
-
-.banner[data-tone='warn'] { background: var(--color-status-warn-soft); }
-.banner[data-tone='danger'] { background: var(--color-status-danger-soft); }
-.banner[data-tone='good'] { background: var(--color-accent-soft); }
 
 .bannerIcon {
   flex-shrink: 0;
@@ -100,10 +59,6 @@
   height: var(--tpl-sb-hc-banner-icon);
   color: var(--color-action);
 }
-
-.banner[data-tone='warn'] .bannerIcon { color: var(--color-status-warn-deep); }
-.banner[data-tone='danger'] .bannerIcon { color: var(--color-danger); }
-.banner[data-tone='good'] .bannerIcon { color: var(--color-accent-deep); }
 
 .bannerText {
   display: flex;
@@ -300,7 +255,6 @@
 .status[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-danger); }
 .status[data-tone='muted'] { background: var(--color-shell); color: var(--color-ink-secondary); }
 .status[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-action); }
-
 
 .srOnly {
   position: absolute;

@@ -1,3 +1,6 @@
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,7 +9,6 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const EDITOR = readFileSync(join(HERE, '../../v8/friend-add/editor.tsx'), 'utf8')
 const CONFLICT = readFileSync(join(HERE, '../../components/shared/save-conflict.tsx'), 'utf8')
-const CONFLICT_CSS = readFileSync(join(HERE, '../../components/shared/save-conflict.module.css'), 'utf8')
 
 /*
  * V8 友だち追加時の配信の細かい板（・）。
@@ -29,10 +31,13 @@ describe('友だち追加時の配信の細かい板', () => {
     expect(CONFLICT).toContain('最新を読み込んで続ける')
   })
 
-  it('競合の帯の見た目は直接の色・丸み・影を書かない', () => {
-    expect(CONFLICT_CSS).toContain('var(--color-status-warn-soft)')
-    expect(CONFLICT_CSS).toContain('var(--radius-control)')
-    expect(CONFLICT_CSS).toContain('var(--save-conflict-ring)')
-    expect(CONFLICT_CSS).not.toMatch(/#[0-9a-fA-F]{3,8}/)
+  it('共通の競合の知らせで、比較のリンクと読み直す操作を保つ', () => {
+    const html = renderToStaticMarkup(React.createElement(SaveConflictBand, {
+      title: 'ほかの人が先に保存しました', compareHref: '/friend-add-settings?compare=latest', onReload: () => {},
+    }))
+    expect(html).toContain('role="alert"')
+    expect(html).toContain('href="/friend-add-settings?compare=latest"')
+    expect(html).toContain('違いを比べる')
+    expect(html).toContain('最新を読み込んで続ける')
   })
 })

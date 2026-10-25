@@ -125,21 +125,6 @@
 }
 
 /* LIFF が無い店で LIFF の要る動きを選んだとき。 */
-.liffNote {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: var(--tap-action-gap);
-  width: 100%;
-  min-width: 0;
-  min-height: var(--tap-action-row-h);
-  margin: 0;
-  padding: var(--tap-action-note-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-  font-size: var(--text-caption);
-}
 
 .liffText {
   min-width: 0;

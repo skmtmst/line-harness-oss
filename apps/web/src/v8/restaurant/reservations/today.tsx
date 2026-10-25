@@ -19,19 +19,17 @@ import Link from '@/components/shared/list-navigation'
 import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
-import { BookingBlock, BookingSlot } from '@/components/shared/booking-controls'
+
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 import { StatRow } from '@/v8/restaurant/booking-kit/public/shell/index'
-import {
-  INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, floorOrder, hm, isHold, mdWeek, minutesOf,
-  addDays, sameDay, shortCourse, slotLabel, sourceKind, sourceName, dayRange, toYmd,
-} from './format'
+import { INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, floorOrder, hm, isHold, mdWeek, minutesOf, addDays, sameDay, shortCourse, slotLabel, sourceName, dayRange, toYmd } from './format'
 import styles from './reservations.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 export type PhonePreset = { date?: Date; time?: string; tableId?: string; hold?: boolean }
 
@@ -127,8 +125,6 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
         <IconButton aria-label="次の日" onClick={() => onDay(addDays(day, 1))}><ChevronRight size={16} aria-hidden="true" /></IconButton>
         <Button presentation="restaurant" onClick={() => onDay(new Date())} disabled={isToday} title={isToday ? '今日の予約を表示しています' : undefined}>今日</Button>
 
-
-
       </>} trailingToolbar={<span className={styles.sourcePicker}>
           <SaveErrorField names={["source"]}><Select
             aria-label="予約元"
@@ -137,7 +133,9 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
             onChange={onSource}
             options={[{ value: 'all', label: '予約元：すべて' }, ...Object.entries(SOURCE_LABEL).map(([value, label]) => ({ value, label: `予約元：${label}` }))]}
           /></SaveErrorField>
-        </span>} notice={hidden.length > 0 ? <span className={styles.dateNote}>{`${hidden.map((table) => table.code).join('・')} は停止中のため出していません`}</span> : null} floor={floor} dates={[toYmd(day)]}
+            </span>} notice={hidden.length > 0 ? <Notice tone="warn">
+              {`${hidden.map((table) => table.code).join('・')} は停止中のため出していません`}
+            </Notice> : null} floor={floor} dates={[toYmd(day)]}
           onSlot={(tableId,startsAt)=>onAdd({date:day,time:hm(startsAt),tableId})} entries={shown.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))}
           resources={columns.map(t=>({id:t.id,label:`${t.code} ${t.max_capacity}名`,capacity:t.max_capacity,active:!!t.is_active}))}
           canWrite={canWrite} busy={busy} onOpen={onDetail}

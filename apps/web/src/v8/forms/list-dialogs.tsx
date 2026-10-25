@@ -2,7 +2,6 @@
 
 import type { AccountWithStats } from '@/contexts/account-context';
 
-
 import Button from '@/components/shared/button';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
 import CopyTextButton from '@/components/shared/copy-text-button';
@@ -297,10 +296,9 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
             </div>
           </div>
             {deleteImpact.references.length > 0 ? (
-              <p className={styles.impactWarn} title={deleteImpact.answerUrl ? `開けなくなる公開URL：${deleteImpact.answerUrl}` : undefined}>
-                <TriangleAlert size={16} aria-hidden="true" />
-                <span>{`${deleteImpact.references.map(referenceLabel).join('と')}がこのフォームを開きます。`}</span>
-              </p>
+                  <Notice tone="warn" title={deleteImpact.answerUrl ? `開けなくなる公開URL：${deleteImpact.answerUrl}` : undefined} icon={<TriangleAlert size={16} aria-hidden="true" />}>
+                    <span>{`${deleteImpact.references.map(referenceLabel).join('と')}がこのフォームを開きます。`}</span>
+                  </Notice>
             ) : null}
             {/* 利用先の注意があるときは、その札の title に URL を入れる（絵の窓に URL の行は無い）。 */}
             {deleteImpact.answerUrl && deleteImpact.references.length === 0 ? (

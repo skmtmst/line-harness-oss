@@ -30,10 +30,7 @@ describe('V8共通情報の現役の型と数値', () => {
     expect(tokens).toContain('--tpl-cv-pager-pad: 10px 20px')
     expect(css).toMatch(/\.pagerCount \{[^}]*font-size: var\(--text-label\)/s)
   })
-  it('警告の余白10/14・間10、探す欄の幅200を使う', () => {
-    expect(css).toContain('padding: var(--tpl-cv-alert-pad)')
-    expect(css).toContain('gap: var(--tpl-cv-alert-gap)')
-    expect(tokens).toContain('--tpl-cv-alert-gap: 10px; --tpl-cv-alert-pad: 10px 14px')
+  it('探す欄の幅200を使う', () => {
     expect(css).toContain('--list-search-width: var(--tpl-cv-search-w)')
     expect(tokens).toContain('--tpl-cv-search-w: 200px')
   })

@@ -32,6 +32,7 @@ import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 UID移行（Pencil  要確認の判断・ 本移行の完了・
@@ -155,9 +156,9 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
 
       {/* FRIEND-15: 「まだ変更していません」は本移行前の履歴だけに出す。 */}
       {(!active || PRE_EXECUTE_STATUSES.includes(active.status)) && (
-        <div className={styles.infoBand} role="note">
+        <Notice tone="info" role="note">
           <p>本移行まで、既存ユーザー・配信・シナリオには影響しません。</p>
-        </div>
+        </Notice>
       )}
 
       {/* 移行の登録（いつでも新しいテスト移行を始められる）。 */}
@@ -539,13 +540,13 @@ function MigrationResultBoard({
   const isCompleted = active.status === 'completed'
   return (
     <>
-      <div className={isCompleted ? styles.infoBand : styles.errorBand} role={isCompleted ? 'note' : 'alert'}>
+      <Notice tone={isCompleted ? "info" : "danger"} role={isCompleted ? 'note' : 'alert'}>
         <p>
           {isCompleted
             ? `本移行と照合が終わりました。${formatNumber(active.counts.applied)} 人を引き継ぎました。必要ならこの履歴から切り戻せます。`
             : statusView.description}
         </p>
-      </div>
+      </Notice>
       <KpiBand role="group" aria-label="照合の結果">
         <KpiCard presentation="band" icon={null} title="引き継いだ" value={active.counts.applied} unit="人" detail="" />
         <KpiCard presentation="band" icon={null} title="一致先なし" value={active.counts.unmatched} unit="人" detail="" />

@@ -376,7 +376,9 @@ export default function OpsAnnouncementsV8() {
               <FieldError id="ann-channels-error">{fields.error('channels')}</FieldError>
             </fieldset>
             {loaded && !lineConfigured ? (
-              <p className={styles.warn}>契約者専用LINE のアカウントが未設定です。メンバー管理の「運営の情報」で指定すると LINE で送れます。</p>
+              <Notice tone="warn">
+                契約者専用LINE のアカウントが未設定です。メンバー管理の「運営の情報」で指定すると LINE で送れます。
+              </Notice>
             ) : null}
             <div className={styles.field}>
               <span className={styles.label}>

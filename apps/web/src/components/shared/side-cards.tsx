@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import styles from './side-cards.module.css'
+import Notice from './notice'
 
 export interface FeatureLink {
   /** 相手の機能名。サイドメニューに出ている名前と同じにする。 */
@@ -56,18 +57,16 @@ export interface CareItem {
  */
 export function CareCard({ items, className }: { items: CareItem[]; className?: string }) {
   return (
-    <section className={[styles.card, styles.careCard, className].filter(Boolean).join(' ')}>
-      <h2 className={[styles.title, styles.careTitle].join(' ')}>気をつけること</h2>
+    <Notice tone="warn" heading={<h2 className={styles.title}>気をつけること</h2>} className={className}>
       {items.map((item) => (
         <div key={item.head} className={styles.careRow}>
-          <AlertIcon />
           <div className={styles.careText}>
             <p className={styles.careHead}>{item.head}</p>
             {item.note ? <p className={styles.careNote}>{item.note}</p> : null}
           </div>
         </div>
       ))}
-    </section>
+    </Notice>
   )
 }
 
@@ -75,15 +74,6 @@ function ArrowRight() {
   return (
     <svg className={styles.linkIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
       <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function AlertIcon() {
-  return (
-    <svg className={styles.careIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <path d="M12 4l9 16H3l9-16z" strokeLinejoin="round" />
-      <path d="M12 10v4M12 17h.01" strokeLinecap="round" />
     </svg>
   )
 }

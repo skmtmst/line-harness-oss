@@ -133,7 +133,7 @@ export function BroadcastScheduleStep({ ab, approvalConfig, audienceCount, concu
                   return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-semibold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
                 })}
               </div>
-              {concurrentBroadcasts.length > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
+              {concurrentBroadcasts.length > 0 && <Notice tone="warn">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</Notice>}
             </section>
           )}
           <BroadcastAbSettings ab={ab} total={audienceCount} targetAll={targetMode === 'all'} start={new Date(scheduledAtIso() ?? Date.now())} approvalThreshold={approvalConfig?.threshold ?? null} ecConnected canEdit onNarrow={() => goToStep('audience')} />

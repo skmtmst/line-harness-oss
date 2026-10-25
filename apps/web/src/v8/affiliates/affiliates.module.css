@@ -354,21 +354,7 @@
   font-size: var(--text-micro);
   font-weight: 400;
 }
-.closeWarn {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-af2-close-warn-gap);
-  margin: 0;
-  padding: var(--tpl-af2-close-warn-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-af2-close-warn-lh);
-}
 /* 文の途中で言葉のまとまりごとに早く折れないように（絵は字の途中で折る）。 */
-.closeWarn > span { word-break: normal; }
-.closeWarn > svg { flex-shrink: 0; color: var(--color-status-warn-deep); }
 .closeExcluded {
   padding: var(--tpl-af-bulk-target-pad);
   border: 1px solid var(--color-hairline);

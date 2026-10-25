@@ -46,7 +46,7 @@ import styles from './screen.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /** 出来事ごとの取り込みを表示し、再実行時も版と対象アカウントを保持する。 */
 
@@ -59,7 +59,6 @@ const TABS: ReadonlyArray<{ key: EcTabKey; label: string; href: string }> = [
   { key: 'auto-line', label: '自動の LINE', href: '/ec-commerce?tab=auto-line' },
   { key: 'connector', label: 'つなぎ先', href: '/ec-commerce?tab=connector' },
 ]
-
 
 /* 「したこと」列。worker が実際に行う処理を運用の言葉で書く（今の画面と同じ）。 */
 const ACTION_LABEL: Record<string, string> = {
@@ -341,7 +340,9 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
           {overviewState === 'error' ? <Button variant="text" onClick={() => loadOverview(false)} busyLabel="処理中…">集計をもう一度読む</Button> : null}
         </p>
       ) : null}
-      {notice ? <p className={notice.tone === 'success' ? styles.noticeGood : styles.noticeBad} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</p> : null}
+      {notice ? <Notice tone={notice.tone === "success" ? "success" : "danger"} role={notice.tone === 'success' ? 'status' : 'alert'}>
+        {notice.text}
+      </Notice> : null}
 
       <div className={styles.toolbar}>
         <SearchField

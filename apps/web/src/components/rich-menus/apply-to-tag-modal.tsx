@@ -1,5 +1,6 @@
 'use client'
 
+import Notice from '@/components/shared/notice'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
@@ -247,13 +248,13 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
           {phase === 'done' && result && (
             <>
-              <div className="bg-accent-soft border border-accent-border text-success text-sm p-4 rounded-control mb-4">
+              <Notice tone="success">
                 <div className="font-medium mb-1">✓ 完了しました</div>
                 <div className="text-xs">
                   {result.message ??
                     `${result.total} 名の友だちに適用しました (${result.chunks} chunk)`}
                 </div>
-              </div>
+              </Notice>
               <div className="flex justify-end">
                 <button
                   onClick={onClose}
@@ -268,9 +269,9 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
           {phase === 'error' && (
             <>
-              <div className="bg-danger-bg border border-status-danger-border text-danger text-sm p-4 rounded-control mb-4">
+              <Notice tone="danger">
                 {error}
-              </div>
+              </Notice>
               <div className="flex justify-end gap-2">
                 <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl h-auto whitespace-normal" onClick={onClose}>
                   閉じる

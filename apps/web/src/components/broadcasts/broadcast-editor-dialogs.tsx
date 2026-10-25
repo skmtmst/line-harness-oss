@@ -262,29 +262,14 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
           </>
         )}
         {testResult && (
-          <p className={
-            testResult.kind === 'success'
-              ? 'rounded-control bg-success-bg p-3 text-sm text-success'
-              : testResult.kind === 'partial'
-                ? 'rounded-control bg-warning-bg p-3 text-sm text-warning'
-                : 'rounded-control bg-danger-bg p-3 text-sm text-danger'
-          }>{testResult.message}</p>
+          <Notice tone={testResult.kind === 'success' ? 'success' : testResult.kind === 'partial' ? 'warn' : 'danger'}>{testResult.message}</Notice>
         )}
         {testHistory.length > 1 && (
           <section>
             <h4 className="text-xs font-bold text-ink-faint">これ以前の実行履歴</h4>
             <ul className="mt-1 space-y-1">
               {testHistory.slice(1).map((entry, index) => (
-                <li
-                  key={index}
-                  className={
-                    entry.kind === 'success'
-                      ? 'rounded-control bg-success-bg p-2 text-xs text-success'
-                      : entry.kind === 'partial'
-                        ? 'rounded-control bg-warning-bg p-2 text-xs text-warning'
-                        : 'rounded-control bg-danger-bg p-2 text-xs text-danger'
-                  }
-                >{entry.message}</li>
+                <li key={index}><Notice tone={entry.kind === 'success' ? 'success' : entry.kind === 'partial' ? 'warn' : 'danger'}>{entry.message}</Notice></li>
               ))}
             </ul>
           </section>

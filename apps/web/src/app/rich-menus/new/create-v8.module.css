@@ -397,27 +397,10 @@
 
 /* 青い案内帯（既定が入れ替わる注意など）。 */
 /* 板  の注意の帯：絵の青い地・13px・印は青。段の中に置く。 */
-.infoBand {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px 14px;
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-status-info-soft, #e9f1ff);
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
 
 .infoBandIcon {
   flex: none;
   display: inline-flex;
-  margin-top: 2px;
-  color: var(--color-action);
-}
-
-.infoBand svg {
-  flex: none;
   margin-top: 2px;
   color: var(--color-action);
 }
@@ -551,7 +534,6 @@
 
 .pageHead { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: var(--tpl-rm-head-pad); border-bottom: 1px solid var(--color-hairline); }
 .previewColumn { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 24px; border-left: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
-
 
 @container (max-width: 560px) { .fieldGrid { grid-template-columns: minmax(0, 1fr); } }
 

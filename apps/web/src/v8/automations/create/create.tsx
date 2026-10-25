@@ -744,15 +744,14 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
   const isDraft = chrome === 'draft'
   const backHref = isDraft ? '/automations?tab=templates' : '/automations'
   const sourceBand = isDraft && resumeStatus === 'ready' ? (
-    <span className={styles.sourceBand} role="note">
-      <FilePen size={16} aria-hidden="true" className={styles.sourceIcon} />
+    <Notice tone="info" role="note" icon={<FilePen size={16} aria-hidden="true" />}>
       <span>{`見本「${sourceName.trim() || '見本'}」から作った下書きです。${usedTagNames.length > 0 || usedScenarioNames.length > 0
         ? `${[
           ...usedTagNames.map((tagName) => `タグ「${tagName}」`),
           ...usedScenarioNames.map((scenarioName) => `シナリオ「${scenarioName}」`),
         ].join('と')}を、このアカウントのものに選び直してください。`
         : 'タグやシナリオを、このアカウントのものに選び直してください。'}`}</span>
-    </span>
+    </Notice>
   ) : null
 
   return (
@@ -821,10 +820,11 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
         </div>
       ) : null}
       {storedDraftHint && !savedDraft && resumeTarget === null ? (
-        <div className={styles.infoBand} role="note">
-          <span>前にこのアカウントで保存した下書きがあります。このまま入力すると、別の新しいルールになります。</span>
+        <Notice tone="info" role="note" action={<>
           <Button onClick={openStoredDraft}>保存した下書きを開く</Button>
-        </div>
+        </>}>
+          <span>前にこのアカウントで保存した下書きがあります。このまま入力すると、別の新しいルールになります。</span>
+        </Notice>
       ) : null}
 <AutomationFields
         isDraft={isDraft}

@@ -11,10 +11,6 @@
 .facts dt { color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); }
 .facts dd { margin: var(--tpl-layout-zero); color: var(--color-ink); }
 .big { font-size: var(--tpl-bm-20); font-weight: 700; }
-.info, .warn { display: flex; align-items: flex-start; gap: var(--tpl-bm-8); margin: var(--tpl-layout-zero); padding: var(--tpl-bm-12) var(--tpl-bm-16); border-radius: var(--tpl-bm-8); font-size: var(--tpl-bm-13); line-height: var(--tpl-bm-20); color: var(--color-ink); }
-.info { background: var(--color-info-bg); }
-.warn { background: var(--color-warning-bg, var(--color-table-head)); }
-.info svg, .warn svg { flex: none; margin-top: var(--tpl-bm-2); }
 .groupTable { display: flex; flex-direction: column; border-radius: var(--tpl-bm-8); overflow: hidden; }
 .groupRow { display: grid; grid-template-columns: var(--tpl-bm-40) minmax(0, 1fr) var(--tpl-bm-48) var(--tpl-bm-84); align-items: center; gap: var(--tpl-bm-6); min-height: var(--tpl-bm-48); padding: var(--tpl-bm-6) var(--tpl-bm-8); box-shadow: var(--shadow-row-line); font-size: var(--tpl-bm-13); color: var(--color-ink); }
 .groupRow > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

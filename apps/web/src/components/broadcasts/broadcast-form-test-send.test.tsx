@@ -140,8 +140,8 @@ async function confirmTestSend() {
 }
 
 function resultBanner(): HTMLElement {
-  const el = [...dialog().querySelectorAll('p')].find((p) =>
-    p.className.includes('bg-success-bg') || p.className.includes('bg-warning-bg') || p.className.includes('bg-danger-bg'),
+  const el = [...dialog().querySelectorAll('[data-design-part="notice"]')].find((p) =>
+    /テスト送信(?:できませんでした|済み|に失敗)|一部を送信できませんでした/.test(p.textContent ?? ''),
   )
   expect(el, '結果の表示がない').toBeDefined()
   return el as HTMLElement
@@ -190,14 +190,13 @@ describe('一斉配信のテスト送信（#986）', () => {
     expect(el.querySelectorAll('.bg-accent-soft, .border-accent')).toHaveLength(0)
   })
 
-  it('0成功2失敗はエラーとして赤で出し、成功扱いにしない', async () => {
+  it('0成功2失敗はエラーとして知らせ、成功扱いにしない', async () => {
     sendApi.mockResolvedValue({ success: true, sent: 0, failed: 2 })
     await openTestDialog()
     await confirmTestSend()
     expect(sendApi).toHaveBeenCalledWith('fake-draft')
     const banner = resultBanner()
-    expect(banner.className).toContain('bg-danger-bg')
-    expect(banner.className).not.toContain('bg-success-bg')
+    expect(banner.getAttribute('role')).toBe('alert')
     expect(banner.textContent).toContain('2名')
     expect(dialog().textContent).not.toContain('テスト送信しました（0件）')
     expect(dialog().textContent).not.toContain('成功')
@@ -208,17 +207,18 @@ describe('一斉配信のテスト送信（#986）', () => {
     await openTestDialog()
     await confirmTestSend()
     const banner = resultBanner()
-    expect(banner.className).toContain('bg-warning-bg')
+    expect(banner.textContent).toContain('一部を送信できませんでした')
     expect(banner.textContent).toContain('1名成功')
     expect(banner.textContent).toContain('1名失敗')
   })
 
-  it('2成功0失敗だけ成功として緑で出す', async () => {
+  it('2成功0失敗だけ成功として知らせる', async () => {
     sendApi.mockResolvedValue({ success: true, sent: 2, failed: 0 })
     await openTestDialog()
     await confirmTestSend()
     const banner = resultBanner()
-    expect(banner.className).toContain('bg-success-bg')
+    expect(banner.textContent).toContain('テスト送信済み')
+    expect(banner.textContent).not.toContain('失敗')
     expect(banner.textContent).toContain('2名成功')
   })
 

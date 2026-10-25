@@ -133,27 +133,8 @@
   padding-top: 2px;
 }
 
-.callout .titleIcon {
-  color: var(--color-status-danger);
-}
-
 .description {
   margin: 0;
-}
-
-.callout {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px solid var(--color-status-danger-soft);
-  border-radius: var(--radius-card);
-  background: var(--color-notice-danger-bg);
-  padding: 16px;
-}
-
-.callout .title,
-.callout .description {
-  color: var(--color-status-danger);
 }
 
 /*
@@ -162,22 +143,6 @@
  * とほぼ同じ。--color-warning-bg #faf0dc は濃すぎるため使わない）。
  * 板どおり角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
  */
-:root .calloutWarning {
-  border-color: var(--color-status-warn-soft);
-  border-radius: var(--radius-segment);
-  background: var(--color-status-warn-soft);
-  padding: 10px 12px;
-}
-
-:root .calloutWarning .title,
-:root .calloutWarning .description {
-  color: var(--color-warning);
-}
-
-:root .calloutWarning .description {
-  font-size: 11px;
-  line-height: 17px;
-}
 
 /*
  * 桃の呼びかけ（ 解除：説明文だけを桃箱で囲む。題は箱の外）。
@@ -185,31 +150,12 @@
  * （#b3261e）・角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
  * 互換経路は変えない。 式（箱なし）の既定の破壊的トーンはそのまま。
  */
-:root .calloutDanger {
-  border-color: var(--color-danger-bg);
-  border-radius: var(--radius-segment);
-  background: var(--color-danger-bg);
-  padding: 10px 12px;
-}
-
-.callout .title {
-  font-size: var(--text-body);
-}
 
 .content {
   min-width: 0;
   /* R283: 長い中身はこの中で送る。見出し・閉じる・操作は外に残る。 */
   min-height: 0;
   overflow-y: auto;
-}
-
-.error {
-  border-radius: var(--radius-control);
-  background: var(--color-status-danger-soft);
-  padding: 10px 12px;
-  color: var(--color-status-danger);
-  font-size: var(--text-caption);
-  line-height: 1.5;
 }
 
 .actions {
@@ -378,20 +324,13 @@
 }
 
 :root .description { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--color-ink-secondary); }
-:root .calloutDanger .description {
-  color: var(--color-danger);
-  font-size: 11px;
-  line-height: 17px;
-}
 /* 注意帯の説明は 1 行で本文いっぱいに使う。字体が変わって文が少し広く出ても折り返さないよう、横の内側を 8px に締める（上下はそのまま）。 */
-:root .callout.calloutDanger { padding-inline: 8px; }
 :root .panel[data-description-band='danger'] > .headerRow { padding-bottom: 0; }
 :root .descriptionBand {
   flex: none;
   padding: 0 var(--polish-space-section);
   margin: var(--polish-space-field) 0 var(--polish-space-card);
 }
-:root .descriptionBand > .callout { width: 100%; }
 :root .panel[data-design-layout='stacked'] > .descriptionBand { padding: 0; margin: 0; }
 :root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 :root .close svg { width: 16px; height: 16px; }
@@ -421,7 +360,6 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 .stepDone { background: var(--color-accent-deep); color: var(--color-canvas); }
 .stepCurrent { background: var(--color-ink); color: var(--color-canvas); }
 .stepLine { width: 28px; height: 1.5px; background: var(--color-accent-deep); }
-:root .error { margin: 0 24px 12px; }
 :root .panel[style*='--dialog-design-footer-padding'] .actions { padding: var(--dialog-design-footer-padding); }
 :root .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
 :root .panel[data-footer-divider='none'] .actions { border-top: 0; }

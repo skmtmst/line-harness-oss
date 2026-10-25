@@ -17,17 +17,6 @@
 .backLink:hover { text-decoration: underline; }
 
 /* 競合の帯：頭の線の下・板の幅いっぱい。型の帯の段（上 0・左右 24・下 8）に入れる。 */
-.conflictBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rm-band-gap);
-  padding: var(--tpl-rm-band-pad);
-  border-radius: var(--tpl-rm-band-radius);
-  outline: 1px solid var(--color-warning);
-  outline-offset: -1px;
-  background: var(--color-status-warn-soft);
-  color: var(--color-ink);
-}
 .conflictIcon { flex: none; color: var(--color-warning); }
 .conflictText { display: flex; flex: 1; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
 .conflictTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-rm-label-size); font-weight: 600; line-height: var(--tpl-rm-band-lh); }
@@ -275,19 +264,6 @@
 .colStep { flex: none; width: var(--tpl-rm-col-step); }
 .colState { flex: none; width: var(--tpl-rm-col-state); white-space: nowrap; }
 .colState[data-tone='warn'] { color: var(--color-warning); }
-.infoBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rm-row-gap);
-  margin: 0;
-  padding: var(--tpl-rm-info-pad);
-  border-radius: var(--tpl-rm-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-rm-label-size);
-  line-height: var(--tpl-rm-band-lh);
-}
-.infoBand > svg { flex: none; color: var(--color-action); }
 
 /* ---- 手順5：確認 ---- */
 .confirmRows { display: flex; flex-direction: column; gap: var(--tpl-section-gap); }

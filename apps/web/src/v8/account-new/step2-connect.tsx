@@ -11,6 +11,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
 import { LOGIN_ACKS, WEBHOOK_ACKS, developerChannelUrl, musuboWebhookUrl } from './logic'
 import styles from './register.module.css'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★LINE新規追加_v07.pen（2026-10-18承認）②アカウント接続 Fqy29 の描画だけ。
@@ -162,10 +163,9 @@ export default function Step2Connect({
               <CopyTextButton value={WEBHOOK_URL} label="コピー" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="Webhook URL をコピー" disabled={!WEBHOOK_URL} />
             </div>
           </Card>
-          <div className={`${styles.precheckNote} ${styles.precheckNoteWarn}`}>
-            <p className={styles.precheckNoteTitle}>すでにほかのツールのURLが入っているとき</p>
+          <Notice tone="warn" heading={<>すでにほかのツールのURLが入っているとき</>}>
             <p>Webhook URL の欄に別の配信ツールのURLが入っている場合、あとの「接続チェック」で musubo のURLに書きかわり、そのツールの受信は止まります。使い続けたいときは、ここで「途中保存して閉じる」を押して、既存のWebhook URLを別途保存してから進めてください。</p>
-          </div>
+          </Notice>
           <div className={styles.field}>
             <p className={styles.groupLabel}>設定手順の確認</p>
             <p className={styles.help}>URLを貼り付けて更新すると、下の3つのスイッチが出てきます。ONにしたら、それぞれチェックを入れてください。</p>

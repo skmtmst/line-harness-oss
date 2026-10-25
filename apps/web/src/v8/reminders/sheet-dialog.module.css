@@ -38,20 +38,7 @@
   font-size: var(--text-label);
   line-height: var(--tpl-rm-rule-lh);
 }
-.band {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rm-row-gap);
-  padding: var(--tpl-rm-info-pad);
-  border-radius: var(--tpl-rm-band-radius);
-  background: var(--color-status-warn-soft);
-  color: var(--color-ink);
-  font-size: var(--tpl-rm-note-size);
-  line-height: var(--tpl-rm-note-lh);
-}
-.band[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-danger); }
 .bandIcon { flex: none; color: var(--color-warning); }
-.band[data-tone='danger'] .bandIcon { color: var(--color-danger); }
 .bandText { flex: 1; min-width: 0; }
 .error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); font-weight: 600; }
 .footer { display: flex; align-items: center; justify-content: center; gap: var(--tpl-toolbar-gap); }

@@ -96,10 +96,8 @@ export default function MergedPersonDetailViewV8({
 
       {/* 版競合や保存失敗は面の上に残す（窓を閉じても消えない）。 */}
       {m.saveError ? (
-        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{m.saveError}{' '}
-          <button type="button" className={styles.infoBandRetry} onClick={m.reload}>
-            読み直す
-          </button></Notice>
+        <Notice tone="danger" className={styles.errorBandNoticePlacement}
+          action={<Button type="button" onClick={m.reload}>読み直す</Button>}>{m.saveError}{' '}</Notice>
       ) : null}
 
       <div className={styles.detailGrid}>

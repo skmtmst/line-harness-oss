@@ -6,7 +6,6 @@
   display: contents;
 }
 
-
 .duo {
   display: flex;
   align-items: stretch;
@@ -100,14 +99,6 @@
 }
 
 /* 保存していない書き換えの帯。 */
-.pendingBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-acd-row-gap);
-  padding: var(--tpl-acd-ho-band-pad);
-  border-radius: var(--tpl-acd-dlg-band-radius);
-  background: var(--tpl-acd-warn-bg);
-}
 .pendingText {
   flex: 1;
   margin: 0;
@@ -140,7 +131,6 @@
   line-height: var(--tpl-acd-note-lh);
   white-space: pre-line;
 }
-
 
 /* 下の行：未判断の数・引き継ぎをやめる・本実行する。 */
 .bottomNote {

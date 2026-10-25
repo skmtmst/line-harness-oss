@@ -764,6 +764,7 @@
 - [決まりの説明書の整理](release-log/unreleased/1822-kenta-docs-current-rules.md)
 - [使われていない部品の片づけ](release-log/unreleased/1823-kenta-remove-unused-files.md)
 - [共通の仕組みの説明の書き方をそろえる](release-log/unreleased/1824-kenta-package-comments.md)
+- [お知らせを白いカードにそろえる](release-log/unreleased/1825-kenta-notice-card.md)
 - [LIFF の自動点検の書き換え](release-log/unreleased/1820-kenta-liff-behavior-tests.md)
 - [仕組みの説明の書き方をそろえる](release-log/unreleased/1821-kenta-worker-comments.md)
 - [古い見た目の切り替えの片づけ](release-log/unreleased/1818-kenta-remove-v7-leftovers.md)

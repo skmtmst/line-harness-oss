@@ -4,17 +4,6 @@
  */
 
 /* 運営だけの帯：薄い琥珀・角丸 12・余白 12/16・印 16＋間 10・文字 12。 */
-.note {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sb-band-gap);
-  margin: 0;
-  padding: var(--tpl-sb-note-pad);
-  border-radius: var(--tpl-sb-card-radius);
-  background: var(--color-status-warn-soft);
-  color: var(--color-ink);
-  font-size: var(--tpl-sb-note-text);
-}
 
 .noteIcon {
   flex-shrink: 0;
@@ -79,14 +68,6 @@
   width: var(--tpl-sb-icon-m);
   height: var(--tpl-sb-icon-m);
   flex-shrink: 0;
-}
-
-.danger {
-  padding: var(--tpl-sb-band-pad);
-  border-radius: var(--tpl-sb-band-radius);
-  background: var(--color-status-danger-soft);
-  color: var(--color-danger);
-  font-size: var(--tpl-sb-band-text);
 }
 
 /* 表：枠 1・角丸 12・余白 4/12。行は 6 列（70・150・残り・130・90・76、間 12）。 */
@@ -180,4 +161,4 @@
   .search { width: var(--tpl-sb-search-w); }
 }
 
-.danger, .dangerNoticePlacement { margin: 0; }
+.dangerNoticePlacement { margin: 0; }

@@ -120,17 +120,6 @@
   padding: var(--tpl-sd-conflict-wrap-pad);
 }
 
-.conflictBar {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sd-conflict-gap);
-  padding: var(--tpl-sd-conflict-pad);
-  border-radius: var(--tpl-sd-oc-radius);
-  outline: 1px solid var(--color-warning);
-  outline-offset: -1px;
-  background: var(--tpl-sd-conflict-bg);
-}
-
 .conflictIcon {
   flex-shrink: 0;
   width: var(--tpl-sd-conflict-icon);
@@ -249,18 +238,6 @@
 
 .startedLink:hover {
   text-decoration: underline;
-}
-
-.remainderBand {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-sd-remainder-gap);
-  padding: var(--tpl-sd-remainder-pad);
-  border-radius: var(--tpl-sd-card-radius);
-  outline: 1px solid var(--color-warning);
-  outline-offset: -1px;
-  background: var(--color-warning-bg);
-  font-size: var(--tpl-sd-band-size);
 }
 
 .remainderDetail {
@@ -500,7 +477,6 @@ button.stepTitle:hover {
   color: var(--color-action);
 }
 
-
 .stepOps {
   display: flex;
   flex-shrink: 0;
@@ -736,26 +712,6 @@ button.stepTitle:hover {
   color: var(--color-ink-secondary);
   font-size: var(--tpl-sd-dup-size);
   line-height: var(--tpl-sd-dup-lh);
-}
-
-.dupNote {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-sd-band-gap);
-  margin: 0;
-  padding: var(--tpl-sd-dup-note-pad);
-  border-radius: var(--tpl-sd-dup-box-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-sd-band-size);
-  line-height: var(--tpl-sd-dup-note-lh);
-}
-
-.dupNote > svg {
-  flex-shrink: 0;
-  width: var(--tpl-sd-band-icon);
-  height: var(--tpl-sd-band-icon);
-  color: var(--color-action);
 }
 
 /* 止める確認：説明・数の行・ボタンを間 12 で縦に並べる。 */

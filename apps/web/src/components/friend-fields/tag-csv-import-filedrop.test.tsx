@@ -8,6 +8,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import TagCsvImportDialog from './tag-csv-import-dialog'
+import { api } from '@/lib/api'
 
 vi.mock('@/lib/api', () => ({
   api: { tags: { importPreview: vi.fn(), importCsv: vi.fn() } },
@@ -49,4 +50,21 @@ describe('タグCSV取り込みのファイル選択（★管理画面 NQMnx）'
     expect(screen.getAllByText('CSVは1MB以下にしてください')).toHaveLength(1)
     expect(screen.getByRole('button', { name: '「大きすぎる.csv」を外す' })).not.toBeNull()
   })
+})
+
+it('CSVの確認前に、既存タグを上書きしないこととエラー行の直し方を知らせる', async () => {
+  vi.mocked(api.tags.importPreview).mockResolvedValueOnce({ success: true, data: {
+    summary: { total: 2, ready: 1, skipped: 0, invalid: 1 },
+    rows: [
+      { rowNumber: 1, name: 'VIP', folderName: '会員', status: 'ready' },
+      { rowNumber: 2, name: '', folderName: '', status: 'invalid', error: 'タグ名を入力してください' },
+    ],
+  } } as Awaited<ReturnType<typeof api.tags.importPreview>>)
+  openDialog()
+  chooseFile('タグ.csv', 'タグ名,フォルダ\nVIP,会員\n,\n')
+  await screen.findByText('タグ.csv')
+  fireEvent.click(screen.getByRole('button', { name: '取り込む内容を確認' }))
+  expect(await screen.findByText('エラーの1行は登録されません')).toBeTruthy()
+  expect(screen.getByText(/同じ名前のタグは上書きしません/)).toBeTruthy()
+  expect(screen.getByText(/エラーの行はCSVを直してから/)).toBeTruthy()
 })

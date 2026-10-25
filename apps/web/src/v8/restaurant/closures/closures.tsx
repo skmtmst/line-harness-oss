@@ -24,7 +24,7 @@ import styles from './closures.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 。採用 2026-10-07）。
@@ -190,7 +190,6 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
 
-
       if (!fieldFailure) {
       notifyToast(withPermissionFailure(caught, describeSaveFailure(caught), 'store'), { tone: 'error' }) }
     } finally {
@@ -258,14 +257,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       {mediaError?<ListState kind="error" title="予約媒体を読み込めませんでした" onRetry={()=>setMediaRetry(n=>n+1)}/>:null}
       {first && firstItem ? (
         <div className={styles.bandRow}>
-          <div className={styles.band} role="status" data-closure-band="">
-            <Bell size={18} aria-hidden="true" className={styles.bandIcon} />
-            <div className={styles.bandText}>
-              <p className={styles.bandTitle}>{`${dayTitle(first.closure.startDate)}の${KIND_LABEL[first.closure.kind]}：他の予約サイトの枠を閉じてください（未対応 ${first.t.open.length} 件）`}</p>
-              <p className={styles.bandDetail}>
-                {`LINE の受付は止めました → ${first.t.open.map((t) => nameOf(t.channel)).join('・')}の ${first.closure.startDate === first.closure.endDate ? dayShort(first.closure.startDate) : rangeTitle(first.closure)} を${first.closure.allDay ? '終日' : ` ${timeText(first.closure)} `}閉じてください`}
-              </p>
-            </div>
+          <Notice tone="warn" role="status" data-closure-band="" icon={<Bell size={18} aria-hidden="true" />} action={<>
             {firstMedium?.loginUrl ? (
               <Button external href={firstMedium.loginUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
             ) : null}
@@ -274,8 +266,15 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                 <Check size={15} aria-hidden="true" />閉じた
               </Button>
             ) : null}
-            <TextLink href="/restaurant-test/close-tasks">すべて見る</TextLink>
-          </div>
+            <>
+              <TextLink href="/restaurant-test/close-tasks">すべて見る</TextLink>
+            </>
+          </>} heading={<>{`${dayTitle(first.closure.startDate)}の${KIND_LABEL[first.closure.kind]}：他の予約サイトの枠を閉じてください（未対応 ${first.t.open.length} 件）`}</>}>
+            <p className={styles.bandDetail}>
+              {`LINE の受付は止めました → ${first.t.open.map((t) => nameOf(t.channel)).join('・')}の ${first.closure.startDate === first.closure.endDate ? dayShort(first.closure.startDate) : rangeTitle(first.closure)} を${first.closure.allDay ? '終日' : ` ${timeText(first.closure)} `}閉じてください`}
+            </p>
+
+          </Notice>
         </div>
       ) : null}
 

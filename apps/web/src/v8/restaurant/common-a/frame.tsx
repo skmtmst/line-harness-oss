@@ -19,6 +19,7 @@ import styles from './frame.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 飲食店向け（テスト）の器（担当 a：ダッシュボード・承認・組織・LINE来店フォロー・Googleビジネス）。
@@ -49,13 +50,10 @@ export const STORE_PICKER_WIDTH = 210
 /** 検証環境の帯（CHz31「検証環境の帯」）。右の注意は板ごとに替えられる。 */
 export function BoundaryBanner({ note = '予約媒体は受信専用・外部更新なし' }: { note?: string }) {
   return (
-    <div className={styles.boundary}>
-      <span className={styles.boundaryBadge}>検証環境専用</span>
-      <p className={styles.boundaryText}><TruncatedText value="既存の然-NEN運用とは分離された飲食店向けテスト領域です。" /></p>
-      <span className={styles.boundarySpacer} aria-hidden="true" />
-      <span className={styles.boundaryDot} aria-hidden="true" />
-      <span className={styles.boundaryNote}><TruncatedText value={note} /></span>
-    </div>
+    <Notice tone="warn" marker="dot" heading={<span className={styles.boundaryBadge}>検証環境専用</span>}>
+      <TruncatedText value="既存の然-NEN運用とは分離された飲食店向けテスト領域です。" />
+      <TruncatedText value={note} />
+    </Notice>
   )
 }
 
@@ -218,7 +216,6 @@ export default function RestaurantFrame({
   ) : (
     <SaveErrorField names={["selectedStoreId","selected_store_id"]}><StoreFilterTabs
 
-
       value={selectedStoreId}
       onChange={setSelectedStoreId}
       options={[
@@ -244,9 +241,9 @@ export default function RestaurantFrame({
     >
       {banner ? <BoundaryBanner note={bannerNote} /> : null}
       {notice ? (
-        <div role="status" className={`${styles.notice} ${notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError}`}>
+        <Notice tone={notice.tone === "success" ? "success" : "danger"} role="status">
           {notice.text}
-        </div>
+        </Notice>
       ) : null}
       {loading ? (
         <div className={styles.stateBox}><ListState kind="loading" /></div>
