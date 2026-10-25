@@ -733,8 +733,15 @@ export default function TemplatesListV8() {
     const folder = folders.find((f) => f.id === t.folderId)
     return folder ? { name: folder.name, color: folder.color } : null
   }
+  /*
+   * 「すべて」は全部の数＝各フォルダと未分類のサーバーの数の合計。フォルダと未分類と
+   * 同じ数え方にする（今のタブの行数だと「すべて 0」なのに「未分類 1」と食い違った）。
+   */
+  const allCount = ready && unfiledCount !== null && folders.every((folder) => typeof folder.itemCount === 'number')
+    ? folders.reduce((sum, folder) => sum + (folder.itemCount ?? 0), unfiledCount)
+    : null
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? tabItems.length : null },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: allCount },
     ...folders.map((folder, index) => ({
       kind: 'folder' as const,
       id: folder.id,

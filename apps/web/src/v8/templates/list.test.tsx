@@ -9,6 +9,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listTemplates = vi.hoisted(() => vi.fn())
+const folderList = vi.hoisted(() => ({ value: { success: true, data: [] as unknown[], unfiledCount: 2 } }))
 const usages = vi.hoisted(() => vi.fn())
 const removeTemplate = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
@@ -45,7 +46,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     templates: { list: listTemplates, usages, delete: removeTemplate },
     broadcastMessageAssets: { counts: () => Promise.resolve({ success: true, data: { card_message: 4 } }) },
-    folders: { list: () => Promise.resolve({ success: true, data: [], unfiledCount: 2 }) },
+    folders: { list: () => Promise.resolve(folderList.value) },
   },
 }))
 
@@ -100,6 +101,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  folderList.value = { success: true, data: [], unfiledCount: 2 }
   clearToastsForTest()
   vi.useRealTimers()
   vi.clearAllMocks()
@@ -112,6 +114,15 @@ describe('V8 テンプレートの一覧', () => {
     expect(screen.getByText('未公開の変更')).toBeTruthy()
     expect(screen.getByText('下書きだけ')).toBeTruthy()
     expect(screen.getByText('11か所')).toBeTruthy()
+  })
+
+  it('「すべて」はフォルダと未分類と同じサーバーの数の合計で、食い違わない', async () => {
+    // 今のタブの行数で数えると、全種類を数えるサーバーの「未分類」と食い違う。
+    folderList.value = { success: true, data: [{ id: 'f1', name: '予約', color: null, displayOrder: 0, itemCount: 5 }], unfiledCount: 9 }
+    listTemplates.mockResolvedValue({ success: true, data: [{ ...used, folderId: 'f1' }, unused, { ...unused, id: 't-question', name: '質問', question: { type: 'single' } }] })
+    await renderList()
+    const counts = Object.fromEntries([...document.querySelectorAll('[data-part="folder-row"]')].map((row) => [row.getAttribute('title'), row.lastElementChild?.textContent]))
+    expect(counts).toEqual({ すべて: '14', 予約: '5', 未分類: '9' })
   })
 
   it('画像は中身の JSON を出さず「画像 1枚」、一度も公開していないものの送信数は「—」', async () => {

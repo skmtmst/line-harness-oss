@@ -29,9 +29,10 @@
 .digitColumn {
   display: flex;
   flex-direction: column;
-  /* 撮影などでanimationだけを無効にしても最終の数字を出す。 */
+  /* 撮影などでanimationだけを無効にしても最終の数字を出す。
+     始めの段も本当の数字なので、動きが進まない時も正しい値に見える。 */
   transform: translateY(calc(-200% / 3));
-  animation: kpi-digit-roll var(--motion-kpi-roll) var(--motion-ease-out) both;
+  animation: kpi-digit-roll var(--motion-kpi-roll) var(--motion-ease-out) backwards;
 }
 .digitColumn > span { height: 1lh; }
 @keyframes kpi-digit-roll {
