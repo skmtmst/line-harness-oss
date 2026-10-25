@@ -53,12 +53,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pillDot {
-  width: var(--tpl-badge-dot);
-  height: var(--tpl-badge-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
 
 .footNote {
   margin: 0;
@@ -109,23 +103,17 @@
   align-self: stretch;
   margin-block: var(--tpl-wb-ix-body-pull);
 }
-/* 状態の札は題の右（題の文字は固定なので、窓の左上から絵の位置へ置く）。 */
+/* 状態の札は題の右（題の文字は固定なので、窓の左上から絵の位置へ置く）。札そのものは共通の StatusBadge。 */
 .dialogState {
   position: absolute;
   top: var(--tpl-wb-ix-state-top);
   left: var(--tpl-wb-ix-state-left);
   display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-wb-pill-gap);
-  padding: var(--tpl-wb-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--tpl-wb-pill-lh);
 }
-.dialogState[data-tone='active'] { background: var(--color-success-bg); color: var(--color-success); }
-.dialogState[data-tone='danger'] { background: var(--color-danger-bg); color: var(--color-danger); }
-.dialogState[data-tone='neutral'] { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
+/* 技術的な記録の下に、伏せた後の記録の JSON を開く。 */
+.dialogJson {
+  min-width: 0;
+}
 .dialogList {
   margin: 0;
   padding: 0;

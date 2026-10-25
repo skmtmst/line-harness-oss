@@ -743,6 +743,8 @@
 - [1781-kenta-cleanup-d02](release-log/unreleased/1781-kenta-cleanup-d02.md)
 - [v8-change-map](v8-change-map.md)
 - [見つからないページのコード案内](../apps/web/src/v8/not-found/README.md)
+- [記録の JSON を開いて写す部品のコード案内](../apps/web/src/v8/log-record/README.md)
+- [送信記録の見やすさ](release-log/unreleased/0000-kenta-sendlog.md)
 - [デリバリー注文連携の提供状況](release-log/unreleased/1781-kenta-cleanup-u01l.md)
 - [Uber Eatsの注文受信と重複操作の防止](release-log/unreleased/1800-masato-uber-orders.md)
 - [Uber Eatsの接続確認・解除・再ログイン](release-log/unreleased/1806-masato-uber-connection-management.md)

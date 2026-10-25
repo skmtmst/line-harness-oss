@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useResponseGate } from '@/lib/use-response-gate'
 import { api, type BroadcastRecipientRow, type BroadcastRecipientsSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Chip, { type ChipTone } from '@/components/shared/chip'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -21,9 +21,10 @@ const RESULT_OPTIONS = [
   { value: 'inflight', label: '送信中・送る前' },
 ] as const
 
-const GROUP_TONE: Record<BroadcastRecipientRow['group'], ChipTone> = {
-  delivered: 'ok',
-  failed_temporary: 'warn',
+/* 宛先の結果の色は共通の状態の札だけで分ける（画面で色を書かない）。 */
+const GROUP_TONE: Record<BroadcastRecipientRow['group'], StatusBadgeTone> = {
+  delivered: 'success',
+  failed_temporary: 'warning',
   failed_permanent: 'danger',
   unknown: 'neutral',
   inflight: 'info',
@@ -213,9 +214,9 @@ export default function BroadcastRecipients({
   return (
     <section aria-label="宛先" className="bg-canvas rounded-card content-card space-y-4 border p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <Chip tone="ok">届いた {formatNumber(summary.sent)}</Chip>
-        <Chip tone="danger">失敗 {formatNumber((summary.failedTemporary + summary.failedPermanent))}</Chip>
-        <Chip tone="neutral">送る前 {formatNumber((pending ?? 0))}</Chip>
+        <StatusBadge tone="success">{`届いた ${formatNumber(summary.sent)}`}</StatusBadge>
+        <StatusBadge tone="danger">{`失敗 ${formatNumber(summary.failedTemporary + summary.failedPermanent)}`}</StatusBadge>
+        <StatusBadge tone="neutral">{`送る前 ${formatNumber(pending ?? 0)}`}</StatusBadge>
         <HelpTip label="宛先の数の説明">
           届いた・失敗・送る前は宛先の台帳の数です。送る前はまだ送っていない人数で、名前の一覧はありません。
         </HelpTip>
@@ -257,10 +258,10 @@ export default function BroadcastRecipients({
                     {row.displayName}
                   </p>
                   <span className="flex shrink-0 items-center gap-2">
-                    <span className="text-ink-faint text-xs tabular-nums">
-                      {row.settledAt ? formatTime(row.settledAt) : '—'}
-                    </span>
-                    <Chip tone={GROUP_TONE[row.group]}>{row.label}</Chip>
+                    {row.settledAt
+                      ? <time dateTime={row.settledAt} className="text-ink-faint text-xs tabular-nums">{formatTime(row.settledAt)}</time>
+                      : <span className="text-ink-faint text-xs">—</span>}
+                    <StatusBadge tone={GROUP_TONE[row.group]}>{row.label}</StatusBadge>
                   </span>
                 </li>
               ))}
