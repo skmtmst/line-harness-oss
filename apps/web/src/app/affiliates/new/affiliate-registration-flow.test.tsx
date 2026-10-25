@@ -306,7 +306,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
 
     expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: true })
     expect(hasText('基本情報は保存済みです')).toBe(true)
-    expect(hasText('基本情報の登録で計測は既に始まっています')).toBe(true)
+    expect(hasText('計測は始まっています')).toBe(true)
     expect(hasText('追加情報を保存すると計測も始まります')).toBe(false)
 
     // やり直しの前にオフへ変えても、保存済みの真実は変わらない。
@@ -317,7 +317,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await act(async () => { fireEvent.click(within(tracking as HTMLElement).getByRole('button', { name: /操作/ })) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '削除する' })) })
     await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '削除する' })) })
-    expect(hasText('計測は既に始まっています')).toBe(true)
+    expect(hasText('計測は始まっています')).toBe(true)
     expect(hasText('計測はまだ始まっていません')).toBe(false)
     expect(hasText('オフに切り替えて保存')).toBe(true)
 
@@ -349,7 +349,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     expect(affiliatesCreate.mock.calls[0][0]).toMatchObject({ isActive: false })
     expect(hasText('基本情報は保存済みです')).toBe(true)
     expect(hasText('計測はまだ始まっていません')).toBe(true)
-    expect(hasText('計測は既に始まっています')).toBe(false)
+    expect(hasText('計測は始まっています')).toBe(false)
 
     // やり直しの前にオンへ変えても、保存済みの真実は変わらない。
     // 知らせは「まだ始まっていません」のまま、再開の送り先だけを言う。
@@ -357,7 +357,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: 'すぐに計測を始める' })) })
     expect(hasText('計測はまだ始まっていません')).toBe(true)
-    expect(hasText('計測は既に始まっています')).toBe(false)
+    expect(hasText('計測は始まっています')).toBe(false)
     expect(hasText('オンに切り替えて保存')).toBe(true)
 
     await click(buttonByText('追加情報の保存を再開する'))

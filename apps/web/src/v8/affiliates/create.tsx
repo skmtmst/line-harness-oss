@@ -402,6 +402,13 @@ export default function CreateAffiliateV8() {
     </div>
   )
 
+  const savedStates = [
+    { state: 'done' as const, label: `基本情報は保存済み（${(savedIsActive ?? startTracking) ? '計測は始まっています' : '計測はまだ始まっていません'}）${savedIsActive !== null && savedIsActive !== startTracking ? `・再開するときは計測を${startTracking ? 'オン' : 'オフ'}に切り替えて保存します。` : ''}` },
+    { state: 'pending' as const, label: '追加情報は未保存' },
+  ]
+  const discardAction = partialSave && createdId ? <Button variant="text" textTone="danger"
+    href={`${LIST_PATH}?affiliate=${encodeURIComponent(createdId)}&highlight=${encodeURIComponent(createdId)}`}>追加情報を破棄して一覧へ戻る</Button> : null
+
   if (!canEdit) return <CreatePage boardId="RaMf3" title="アフィリエイターを作る" readOnly footerActions={<Button href="/affiliates?tab=affiliates">一覧へ戻る</Button>}>{null}</CreatePage>
 
   return (
@@ -411,7 +418,15 @@ export default function CreateAffiliateV8() {
       boardId="RaMf3"
       title="アフィリエイターを作る"
       help="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
-      notice={conflict.conflict ? <SaveConflictBand title="ほかの人が先にこのアフィリエイターを保存しました" compareBusy={conflict.compareBusy} onCompare={conflict.compare} onReload={conflict.reloadLatest} /> : null}
+      notice={conflict.conflict ? <SaveConflictBand
+        title="ほかの人が先にこのアフィリエイターを保存しました"
+        description="あなたの追加情報はまだ保存していません。違いを確かめてから続けてください。"
+        compareBusy={conflict.compareBusy} onCompare={conflict.compare} onReload={conflict.reloadLatest}
+        states={partialSave ? savedStates : undefined} footer={discardAction}
+      /> : partialSave && createdId ? <Notice tone="warn" marker="dot" heading="基本情報は保存済みです"
+        states={savedStates} footer={discardAction}
+        action={<Button variant="primary" busy={saving} busyLabel="保存しています" disabled={saving} onClick={() => void runSave('continue')}>追加情報の保存を再開する</Button>}
+      /> : null}
       previewLabel="紹介リンクを見る"
       previewTitle="紹介リンク"
       preview={preview}
@@ -435,21 +450,7 @@ export default function CreateAffiliateV8() {
           payoutCycle: payoutCycle.trim() || null, notifyOnConversion, isActive: startTracking,
         }, conflict.latest) : null}
         onReload={conflict.reloadLatest} onCancel={conflict.closeCompare} />
-      {partialSave && createdId ? (
-        <Notice tone="warn" action={<a href={`${LIST_PATH}?affiliate=${encodeURIComponent(createdId)}&highlight=${encodeURIComponent(createdId)}`}>未保存の追加情報を破棄して一覧へ戻る</a>}>
-          <p className={styles.noticeTitle}>基本情報は保存済みです</p>
-          <p className={styles.noticeNote}>下の「追加情報の保存を再開する」で続けるか、未保存の追加情報を破棄して一覧へ戻れます。</p>
-          <p className={styles.noticeNote}>
-            {savedIsActive === true
-              ? `基本情報の登録で計測は既に始まっています。${startTracking ? 'このまま追加情報だけを保存します。' : '再開するときは計測をオフに切り替えて保存します。'}`
-              : savedIsActive === false
-                ? `基本情報の登録は計測オフで済んでいるので、計測はまだ始まっていません。${startTracking ? '再開するときは計測をオンに切り替えて保存します。' : 'このまま追加情報だけを保存します。'}`
-                : startTracking
-                  ? '「すぐに計測を始める」がオンなので、基本情報の登録で計測は既に始まっています。'
-                  : '「すぐに計測を始める」がオフなので、計測は始まらないまま追加情報だけを保存します。'}
-          </p>
-        </Notice>
-      ) : null}
+
 
       <Card variant="form" aria-label="だれを登録するか">
         <CardHeader size="stacked" title="だれを登録するか" meta="会社でも個人でも登録できます" />

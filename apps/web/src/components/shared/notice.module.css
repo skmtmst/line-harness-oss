@@ -1,298 +1,70 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-/*
- * 帯（Notice）。★管理画面 共通部品その2 §1。
- *
- * 黄・青・赤・緑を画面ごとに手書きしていた帯を1本にまとめたもの。
- * 種類は4つ（案内・うまくいった・注意・危険）。左に線のアイコン、
- * 本文は1〜2文、右に操作1つまで。`note-bar.tsx` はこの部品への
- * 互換品（props をそのまま渡すだけ。中身はここが持つ）。
- *
- * 使い分け: 読まなくても操作できる説明は帯にせず HelpTip へ（§2-1b）。
- * 読み込めなかったときは帯でなく ListState error。1画面2つまで。
- */
-
-/* 帯の土台。幅は持たない（呼び出し側が className で渡す。§5-2）。 */
+/* 知らせの面・印・操作は、画面や窓によらずここが持つ。 */
 .notice {
   display: flex;
-  align-items: center;
-  font-weight: 400;
-}
-
-.notice[hidden] {
-  display: none;
-}
-
-.icon {
-  width: 16px;
-  height: 16px;
-  flex: none;
-}
-
-/* 本文。1〜2文。長い定義の補足は HelpTip（?）へ入れ、箱を高くしない。 */
-.message {
-  min-width: 0;
-  flex: 1;
-}
-
-/* 帯の右に置く操作（1つまで）。 */
-.action {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-toolbar-gap);
   flex-wrap: wrap;
-  flex: none;
-}
-
-/* 案内（青）。地は info-bg、文字は ink-secondary（★管理画面 画面の決まり）。 */
-.info {
-  color: var(--color-ink-secondary);
-}
-
-/*
- * うまくいった（緑）。カードの地は白にし、種類の色は左の丸い印だけに残す。
- * 文字は success（status-badge と同じ）。
- */
-.success {
-  background: var(--color-notice-success-bg);
-  color: var(--color-success);
-}
-
-/* 注意（黄）。文字は必ず warn-deep（地に warn は読めないため）。 */
-.warn {
-  color: var(--color-status-warn-deep);
-}
-
-/* 危険（赤）。止まっている・失敗していることだけに使う。 */
-.danger {
-  color: var(--color-status-danger);
-}
-
-/* 閉じる印。帯の右端。 */
-.close {
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  flex: none;
   align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: currentcolor;
-  cursor: pointer;
-}
-
-.close:hover {
-  background: color-mix(in srgb, currentcolor 9%, transparent);
-}
-
-.close:focus-visible {
-  outline: revert;
-}
-
-/*
- * 操作の中のリンク（「くわしく」など）。押せるものとして輪郭を出す。
- * HelpTip 側が持つ見た目は変えない。ここでは存在だけ示す。
- */
-.notice a:focus-visible {
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 1px;
-}
-}
-
-/* 正本 ThDed。案内の印だけ青、本文は副文字色。 */
-:root .notice {
-  gap: 10px; padding: 10px 14px; border-radius: var(--polish-radius-control);
-  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
-  line-height: 20px;
-}
-:root .info { background: var(--color-status-info-soft); }
-:root .info .icon { color: var(--color-status-info); }
-
-/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .notice { -webkit-font-smoothing: antialiased; }
-
-:root .notice[data-density="compact"] { gap: var(--tpl-rt-chip-row-gap); padding: var(--tpl-rt-notice-pad); border-radius: var(--tpl-rt-inner-radius); color: var(--color-ink); font-size: var(--text-label); line-height: normal; }
-/* ：題と説明を2行にし、右側に競合の操作を並べる。 */
-:root .twoLine { gap: 12px; padding: 12px 16px; border: 0; }
-:root .twoLine .message { display: flex; flex-direction: column; gap: 2px; }
-:root .twoLine .headingRow { display: flex; align-items: center; gap: 6px; }
-:root .twoLine .heading { color: var(--color-ink); font-size: 13px; font-weight: 700; line-height: 19px; }
-:root .twoLine .description { color: var(--color-ink-secondary); font-size: 12px; line-height: 17px; }
-:root .twoLine .action { display: flex; gap: 12px; }
-:root .twoLine.warn .icon { color: var(--color-warning); }
-/* 失敗を2行で示すときも、見出しと印はdangerの色を保つ。 */
-:root .twoLine.danger .heading,
-:root .twoLine.danger .icon { color: var(--color-status-danger); }
-/*
- * 小さく出す帯（density="compact"）に題を付けたときの題の太さ。
- * 上の  の2行帯は 13px で 700 を使っているが、globals.css の
- * 「太さは 600 / 500 / 400 の3段だけ、700 は text-hero（28px）だけ」に
- * 合わない。既定の帯の見え方は変えず、小さく出す帯だけ 600 に直す。
- * 絵 hjdqV の「急ぎ対応のおすすめ」は 13/600。
- */
-:root .notice[data-density='compact'] .heading { font-weight: 600; }
-/* 小さなカードに入れる1行の注意。既存の帯は変えない。 */
-:root .notice[data-compact] {
-  min-width: 0;
-  padding: 6px 10px;
-  gap: 6px;
-  border: 0;
-  border-radius: var(--radius-mini);
-  font-size: var(--text-micro);
-  line-height: 20px;
-}
-:root .notice[data-compact] .message {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-:root .notice[data-appearance='soft'] { border-color: transparent; }
-:root .notice[data-presentation='account-note'] {
-  width: 100%; margin: 0; padding: var(--tpl-acd-dlg-band-pad); border: 0;
-  border-radius: var(--tpl-acd-dlg-band-radius); font-size: var(--tpl-acd-dlg-band-size); line-height: var(--tpl-acd-dlg-band-lh);
-}
-:root .info[data-presentation='account-note'] { background: var(--color-surface-pearl); }
-:root .warn[data-presentation='account-note'] { background: var(--tpl-acd-warn-bg); color: var(--tpl-acd-warn-ink); }
-
-:root .notice { padding: var(--tpl-notice-pad); font-size: var(--text-body); }
-
-/* 運営の共通注意帯。橙の状態札とは役目を分ける。 */
-:root .notice[data-presentation='ops'] {
-  gap: var(--tpl-op-caution-gap);
-  padding: var(--tpl-op-caution-pad);
-  border: 0;
-  border-radius: var(--tpl-op-caution-radius);
-  background: var(--tpl-op-caution-bg);
-  color: var(--tpl-op-caution-ink);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  line-height: var(--tpl-op-caution-lh);
-}
-:root .notice[data-presentation='ops'] .icon {
-  width: var(--tpl-op-caution-icon);
-  height: var(--tpl-op-caution-icon);
-}
-:root .notice[data-presentation='ops'] .icon > svg { width: 100%; height: 100%; }
-
-/* 長い本文の横で操作が幅を占めないよう、指定された帯だけ狭幅で段を分ける。 */
-@media (max-width: 639px) {
-  :root .notice[data-action-layout='stack-on-narrow'] {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-  }
-  :root .notice[data-action-layout='stack-on-narrow'] .message {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  :root .notice[data-action-layout='stack-on-narrow'] .action {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: start;
-    margin-left: 0;
-  }
-  :root .notice[data-action-layout='stack-on-narrow'] .message:first-child,
-  :root .notice[data-action-layout='stack-on-narrow'] .message:first-child + .action {
-    grid-column: 1 / 3;
-  }
-  :root .notice[data-action-layout='stack-on-narrow'] .close {
-    grid-column: 3;
-    grid-row: 1;
-  }
-}
-
-/* 窓内の注意・結果は丸い淡色の印と文字。意味と読み上げの役割を保つ。 */
-html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) .notice {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  gap: var(--polish-space-row);
-}
-html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) .notice .icon {
-  box-sizing: content-box;
-  width: var(--polish-icon-control);
-  height: var(--polish-icon-control);
-  padding: var(--space-6);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, currentColor 9%, transparent);
-}
-
-:root .action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-action); font-weight: 600; }
-
-/*
- * お知らせは、線ではなく影で浮かせた白いカード。左に32pxの丸い印を置き、
- * 種類の色（情報＝青・成功＝緑・注意＝琥珀・危険＝赤）はその丸だけに使う。
- * 文は題（14px/600・濃い文字）と説明（13px・灰）の2段。題が無いときは
- * 今の文をそのまま説明として1段で縦の中央にそろえる。
- */
-:root .notice:not([data-presentation]):not([data-compact]) {
-  gap: 12px;
-  padding: 14px 16px;
+  gap: var(--polish-space-field);
+  margin: 0;
+  padding: var(--space-14) var(--polish-space-card);
   border: 0;
   border-radius: var(--radius-raised-card);
   background: var(--color-canvas);
   box-shadow: var(--shadow-raised-card);
   color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--text-label);
+  font-weight: 400;
+  line-height: var(--tpl-af-cr-label-lh);
+  -webkit-font-smoothing: antialiased;
 }
-
-:root .notice:not([data-presentation]):not([data-compact]) .icon {
+.notice[hidden] { display: none; }
+.info { --notice-color: var(--color-status-info); }
+.success { --notice-color: var(--color-success); }
+.warn { --notice-color: var(--color-status-warn); }
+.danger { --notice-color: var(--color-status-danger); }
+.icon {
   box-sizing: border-box;
-  width: 32px;
-  height: 32px;
-  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--space-32);
+  height: var(--space-32);
+  padding: var(--polish-space-row);
   border-radius: var(--radius-pill);
+  background: var(--notice-color);
   color: var(--color-on-accent);
 }
-
-:root .notice:not([data-presentation]):not([data-compact]) .icon > svg {
-  width: 16px;
-  height: 16px;
+.icon > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+.notice[data-marker='dot'] .icon { background: color-mix(in srgb, var(--notice-color) 12%, var(--color-canvas)); }
+.notice[data-marker='dot'] .icon::after {
+  content: '';
+  width: var(--polish-space-row);
+  height: var(--polish-space-row);
+  border-radius: var(--radius-pill);
+  background: var(--notice-color);
 }
-
-:root .notice:not([data-presentation]):not([data-compact]).info .icon { background: var(--color-status-info); color: var(--color-on-accent); }
-:root .notice:not([data-presentation]):not([data-compact]).success .icon { background: var(--color-success); color: var(--color-on-accent); }
-:root .notice:not([data-presentation]):not([data-compact]).warn .icon { background: var(--color-status-warn); color: var(--color-on-accent); }
-:root .notice:not([data-presentation]):not([data-compact]).danger .icon { background: var(--color-status-danger); color: var(--color-on-accent); }
-
-/* 2段の題と説明。題は濃い文字、説明は灰。 */
-:root .notice:not([data-presentation]) .heading {
-  color: var(--color-ink);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
-}
-
-:root .notice:not([data-presentation]) .description {
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-:root .notice:not([data-presentation]).twoLine {
-  padding: 14px 16px;
-}
-
-:root .notice:not([data-presentation]).twoLine .message {
-  gap: 0;
-}
-
-/* カードの中の小さな帯も、線ではなく影で浮かせる（大きさは今のまま）。 */
-:root .notice[data-compact] {
-  border: 0;
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-raised-card);
-}
-
-/* アカウントの短い説明・運営の注意帯・窓の中は、それぞれの今の形を保つ。 */
-:root .notice[data-presentation] {
-  box-shadow: none;
-}
-
-html:root :is(:global([data-design-part='dialog']), :global([data-design-part='drawer'])) .notice {
-  box-shadow: none;
+.message { min-width: 0; flex: 1 1 24em; overflow-wrap: anywhere; }
+.headingRow { display: flex; align-items: center; gap: var(--space-6); }
+.heading { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; }
+.description { display: block; color: var(--color-ink-secondary); }
+.action { display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); margin-left: auto; max-width: 100%; }
+.action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-action); font-weight: 600; }
+.close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--space-32); height: var(--space-32); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); cursor: pointer; }
+.close:hover { background: var(--color-surface-pearl); }
+.close:focus-visible, .notice a:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+.twoLine { align-items: flex-start; }
+.states { display: flex; flex-wrap: wrap; gap: var(--polish-space-row) var(--polish-space-card); padding: 0; margin: var(--polish-space-field) 0 0; list-style: none; font-size: var(--text-micro); }
+.state { display: inline-flex; align-items: center; gap: var(--space-6); }
+.stateMark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--polish-icon-small); height: var(--polish-icon-small); border-radius: var(--radius-pill); }
+.stateMark[data-state='done'] { background: var(--color-success); color: var(--color-on-accent); }
+.stateMark[data-state='pending'] { box-shadow: inset 0 0 0 var(--choice-ring) var(--color-status-warn); }
+.stateMark > svg { width: var(--space-10); height: var(--space-10); }
+.footer { margin-top: var(--polish-space-field); padding-top: var(--polish-space-row); border-top: 1px solid var(--color-hairline); }
+/* 小さな欄の知らせも同じ面を使い、文を省略したときは全文のtitleを保つ。 */
+.notice[data-compact] { padding: var(--space-6) var(--space-10); gap: var(--space-6); font-size: var(--text-micro); }
+.notice[data-compact] .message { flex-basis: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.notice[data-compact] .icon { width: var(--space-24); height: var(--space-24); padding: var(--space-4); }
+.notice[data-action-layout='stack-on-narrow'] .message { flex-basis: 24em; }
 }
