@@ -1,5 +1,6 @@
 import {prepareStarterInsert} from './style-starter-insert-context.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
+import { friendAddStarterStatements } from './style-starter-friend-add.js';
 import {
   recordSnapshot,
   resourceSnapshot,
@@ -342,6 +343,11 @@ export async function insertStyleStarterItems(
           .prepare('UPDATE rich_menu_groups SET default_page_id=? WHERE id=?')
           .bind(page, id),
       );
+    } else if (item.kind === 'friend_add_rule') {
+      const prepared = await friendAddStarterStatements(db, account, item, now);
+      if (!prepared) continue;
+      id = prepared.id;
+      statements.push(...prepared.statements);
     } else if (item.kind === 'dashboard')
       statements.push(
         db
@@ -386,6 +392,7 @@ export async function insertStyleStarterItems(
       requiresActivation:
         item.kind === 'automation' ||
         item.kind === 'reminder' ||
+        item.kind === 'friend_add_rule' ||
         item.kind === 'booking_menu' ||
         item.kind === 'rich_menu',
     });

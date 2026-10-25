@@ -16,8 +16,11 @@ export type StarterItem = {
     | 'automation'
     | 'reminder'
     | 'booking_menu'
-    | 'dashboard';
+    | 'dashboard'
+    | 'friend_add_rule';
   name: string;
+  /** friend_add_rule が送るごあいさつ。同じ組の template の key を指す。 */
+  templateKey?: string;
   feature?: string;
   text?: string;
   durationMinutes?: number;
@@ -44,30 +47,33 @@ export function standardStarter(style: AccountStyle): StarterDefinition {
     consult: 'ご相談',
     lesson: 'レッスン',
   };
+  const welcome = style === 'ec' ? '友だち追加ありがとうございます。商品やご利用ガイドは、下のメニューからご覧いただけます。' : style === 'standard' ? '友だち追加ありがとうございます。お知らせ・お申し込み・お問い合わせは、下のメニューからご確認いただけます。' : style === 'consult' ? '友だち追加ありがとうございます。面談のご予約・資料は、下のメニューからご確認いただけます。' : `こんにちは。${names[style]}へのお問い合わせありがとうございます。ご希望をお知らせください。`;
   return {
     items: [
       {
         key: 'welcome',
         kind: 'template',
         name: `${names[style]}のごあいさつ`,
-        text: style === 'ec' ? '友だち追加ありがとうございます。商品やご利用ガイドは、下のメニューからご覧いただけます。' : style === 'standard' ? '友だち追加ありがとうございます。お知らせ・お申し込み・お問い合わせは、下のメニューからご確認いただけます。' : style === 'consult' ? '友だち追加ありがとうございます。面談のご予約・資料は、下のメニューからご確認いただけます。' : `こんにちは。${names[style]}へのお問い合わせありがとうございます。ご希望をお知らせください。`,
+        text: welcome,
+      },
+      {
+        // 受け皿（経路が分からなかった人）の下書き。公開は友だち追加の画面の確認窓からだけ。
+        key: 'friend-add-welcome',
+        kind: 'friend_add_rule',
+        name: '友だち追加のごあいさつ',
+        templateKey: 'welcome',
+        text: welcome,
       },
       {
         key: 'menu',
         kind: 'rich_menu',
         name: `${names[style]}のメニュー`,
         buttons: style === 'restaurant' ? [
-          ...(!['standard', 'ec'].includes(style)
-            ? [
-                {
-                  label: '予約する',
-                  feature: 'booking',
-                },
-              ]
-            : []),
-          ...(['restaurant', 'salon', 'lesson'].includes(style)
-            ? [{ label: 'ポイントカード', feature: 'stamps' }]
-            : []),
+          { label: '予約する', feature: 'booking' },
+          { label: '予約の確認', feature: 'booking', actionData: 'history' },
+          { label: 'クーポン', feature: 'coupons' },
+          { label: 'メニュー', feature: 'content' },
+          { label: 'スタンプ', feature: 'stamps' },
           { label: 'お問い合わせ', feature: 'contact' },
         ] : style === 'ec' ? [
           { label: '商品を見る', feature: 'content' },
@@ -181,6 +187,7 @@ export function readDefinition(
         'reminder',
         'booking_menu',
         'dashboard',
+        'friend_add_rule',
       ].includes(item.kind) ||
       typeof item.name !== 'string' ||
       !item.name.trim() ||
@@ -226,8 +233,23 @@ export function readDefinition(
     )
       throw new StyleError('invalid_buttons');
     if (item.cards) readCards(item.cards, style);
+    if (
+      item.kind === 'friend_add_rule' &&
+      (typeof item.text !== 'string' ||
+        !item.text.trim() ||
+        item.feature !== undefined ||
+        item.buttons !== undefined ||
+        (item.templateKey !== undefined &&
+          !input.items.some(
+            (other) => other.key === item.templateKey && other.kind === 'template',
+          )))
+    )
+      throw new StyleError('invalid_starter_set');
     seen.add(item.key);
   }
+  // 受け皿は 1 アカウントに 1 つだけなので、ごあいさつの決まりも 1 つまで。
+  if (input.items.filter((i) => i.kind === 'friend_add_rule').length > 1)
+    throw new StyleError('invalid_starter_set');
   if (
     input.items.some(
       (i) =>
