@@ -274,14 +274,25 @@ describe('Googleビジネス：APIキーによる間接利用の遮断（受入�
     expect(response.status).toBe(200);
   });
 
-  it('Googleのルートを持つ4ファイルすべてが同じゲートを通している', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { fileURLToPath } = await import('node:url');
-    const here = fileURLToPath(new URL('.', import.meta.url));
-    for (const file of ['restaurant-google.ts', 'restaurant-google-profile.ts', 'restaurant-google-posts.ts', 'restaurant-google-performance.ts']) {
-      const source = readFileSync(`${here}${file}`, 'utf8');
-      expect(source, `${file} は googleAccessGuard を通していない`).toContain("use('/api/restaurant-test/google/*', googleAccessGuard)");
-    }
+  /*
+   * 4つを1つのアプリに載せると、先に載せたファイルのゲートが残りの道にも掛かり、
+   * 1ファイルがゲートを外しても見えない。ファイルごとに単独で載せて叩く。
+   */
+  it.each([
+    ['restaurant-google.ts', () => restaurantGoogle, '/api/restaurant-test/google/connection?account_id=account-2'],
+    ['restaurant-google-profile.ts', () => restaurantGoogleProfile, '/api/restaurant-test/google/profile?account_id=account-2'],
+    ['restaurant-google-posts.ts', () => restaurantGooglePosts, '/api/restaurant-test/google/posts?account_id=account-2'],
+    ['restaurant-google-performance.ts', () => restaurantGooglePerformance, '/api/restaurant-test/google/performance?account_id=account-2&days=7'],
+  ] as const)('%s だけを載せても、APIキーは403で止まる', async (_file, routes, path) => {
+    seedStore();
+    await seedConnection();
+    const single = new Hono<Env>();
+    single.use('*', authMiddleware);
+    single.route('/', routes());
+    const response = await single.request(path, { headers: { Authorization: 'Bearer owner-key' } }, env);
+    expect(response.status).toBe(403);
+    expect((await response.json() as { error: string }).error).toContain('ログイン');
+    expect(googleCalls).toHaveLength(0);
   });
 });
 
@@ -432,6 +443,41 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(new URL(response.headers.get('location')!).searchParams.get('google')).toBe('error:invalid_state');
     expect(googleCalls).toHaveLength(0);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_connections').get()).toEqual({ n: 0 });
+  });
+
+  /*
+   * 同意画面では権限ごとにチェックを外せる。business.manage を外したまま接続できると
+   * 「連携済みなのに全部403」になるので、接続時と更新時の両方で止める。
+   */
+  it('コールバック：business.manage を外した同意では接続を保存しない', async () => {
+    seedStore();
+    googleHandler = (url) => {
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return jsonResponse({ access_token: 'access-1', refresh_token: 'refresh-1', expires_in: 3600, scope: 'openid email' });
+      }
+      // 許可の確かめが無ければ接続まで進めてしまう応答をそろえておく。
+      if (url.startsWith('https://openidconnect.googleapis.com/v1/userinfo')) return jsonResponse({ email: 'owner@example.test' });
+      if (url.startsWith('https://mybusinessaccountmanagement.googleapis.com/v1/accounts')) return jsonResponse({ accounts: [{ name: 'accounts/111' }] });
+      if (url.includes('/v1/accounts/111/locations')) return jsonResponse({ locations: [{ name: 'locations/222', title: 'こもれび食堂 渋谷店', metadata: { mapsUri: 'https://maps.google.com/?cid=1' } }] });
+      return jsonResponse({}, 404);
+    };
+    const response = await startAndCallback((state) => `state=${state}&code=auth-code`);
+    expect(response.status).toBe(302);
+    expect(new URL(response.headers.get('location')!).searchParams.get('google')).toBe('error:no_permission');
+    expect(googleCalls.map((entry) => entry.url)).toEqual(['https://oauth2.googleapis.com/token']);
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM rt_google_connections WHERE status = 'connected'").get()).toEqual({ n: 0 });
+  });
+
+  it('更新：連携後に business.manage だけ取り消されたら、同期で使わずに止める', async () => {
+    seedStore();
+    await seedConnection({ expires: '2000-01-01T00:00:00.000Z' });
+    googleHandler = (url) => (url === 'https://oauth2.googleapis.com/token'
+      ? jsonResponse({ access_token: 'access-2', expires_in: 3600, scope: 'openid email' })
+      : jsonResponse({ reviews: [] }));
+    const response = await call('/api/restaurant-test/google/reviews/sync?account_id=account-2', { body: {} });
+    expect(response.status).not.toBe(200);
+    expect(await response.json()).toMatchObject({ code: 'no_permission' });
+    expect(googleCalls.filter((entry) => entry.url !== 'https://oauth2.googleapis.com/token')).toHaveLength(0);
   });
 
   it('コールバック：店舗が複数なら候補を保存して選択待ちにし、選択で接続済みになる', async () => {
