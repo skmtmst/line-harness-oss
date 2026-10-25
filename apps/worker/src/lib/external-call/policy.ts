@@ -29,7 +29,7 @@ export function scopeKey(scope: CallIdentity['scope']): string {
   if (parts.some(p => typeof p !== 'string' || !p.trim())) throw new TypeError('Missing external call scope');
   return JSON.stringify(parts);
 }
-/** Persist this once with the existing job/outbox. Do not recreate it for retries. */
+/** 再試行で予算を復活させないよう、既存ジョブや outbox に一度だけ保存する。 */
 export function createCallState(identity: CallIdentity, policy: CallPolicy, now: number): CallState {
   scopeKey(identity.scope);
   if (![identity.operationId, identity.idempotencyKey, identity.snapshotId].every(v => typeof v === 'string' && !!v.trim())
@@ -56,7 +56,7 @@ export function retryTime(policy: CallPolicy, attempts: number, now: number, ran
   if (!Number.isFinite(draw) || draw < 0 || draw > 1) throw new TypeError('Invalid backoff random source');
   return now + Math.ceil(cap * (1 + wait.jitterRatio * (draw * 2 - 1)));
 }
-/** Absolute time, so storage/adapter work can never shorten Retry-After. */
+/** 保存やアダプター処理で Retry-After が短くならないよう、絶対時刻で持つ。 */
 export function parseRetryAfter(value: string | null, now: number): number | undefined {
   if (!value?.trim()) return undefined;
   const raw = value.trim();

@@ -58,7 +58,7 @@ describe('resolveAdminAuthConfig — topology guard', () => {
   test('cross-site without opt-in is flagged as misconfigured (the #57/#59 blocker)', () => {
     const cfg = resolveAdminAuthConfig({ ADMIN_ORIGIN: PAGES, WORKER_URL: WORKERS });
     expect(cfg.crossSite).toBe(true);
-    expect(cfg.sameSite).toBe('Lax'); // would be silently dropped cross-site
+    expect(cfg.sameSite).toBe('Lax'); // 別サイトではブラウザが Cookie を黙って破棄する場合を検証する。
     expect(cfg.misconfigured).toMatch(/cross-site/i);
   });
 
@@ -109,8 +109,7 @@ describe('resolveAdminAuthConfig — topology guard', () => {
   });
 
   test('with WORKER_URL unset, the request origin is used for cross-site detection', () => {
-    // Production installer never sets WORKER_URL; the request origin is the
-    // Worker's own origin and must still flag the cross-site blocker.
+    // WORKER_URL がない本番設定でも、API の要求元から別サイト構成を検出する。
     const cfg = resolveAdminAuthConfig(
       { ADMIN_ORIGIN: PAGES },
       { requestOrigin: WORKERS },
@@ -180,8 +179,7 @@ describe('isAllowedAdminOrigin — Cloudflare Pages previews', () => {
 
 describe('resolveCorsOrigin — local development', () => {
   test('allows a loopback admin origin when the Worker runs on loopback', () => {
-    // `pnpm dev:web` (localhost:3001) → `wrangler dev` (localhost:8787),
-    // with no ADMIN_ORIGIN configured.
+    // ADMIN_ORIGIN 未設定で、localhost:3001 から localhost:8787 へ接続する開発構成。
     expect(
       resolveCorsOrigin({}, 'http://localhost:3001', 'http://localhost:8787/api/friends'),
     ).toBe('http://localhost:3001');

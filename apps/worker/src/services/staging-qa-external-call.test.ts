@@ -31,7 +31,7 @@ test('共通の外部実行器でもQAの送信止めを通り、不明の書込
   expect(await withQaOutboundBoundary(staging, run)).toMatchObject({ kind: 'unknown', state: { phase: 'unknown', attempts: 1 } });
   expect(await withQaOutboundBoundary(staging, run)).toMatchObject({ kind: 'unknown', state: { attempts: 1 } });
   expect(network).not.toHaveBeenCalled();
-  // The same adapter has a working transport when QA is inactive; no real network is used.
+  // QA が無効なら同じアダプターを通常通信へつなげることを、実通信なしで確かめる。
   expect(await withQaOutboundBoundary({ ...staging, DEPLOY_ENV: 'production' }, () => execute(new AbortController().signal, state.identity)))
     .toMatchObject({ kind: 'success', value: { id: 'real-acceptance' } });
   expect(network).toHaveBeenCalledOnce();
@@ -44,7 +44,7 @@ test('共通LINE transportを注入したSDKもQA中はネットワーク送信0
     const client = new LineClient('non-qa-connection', { transport: lineTransport(new AbortController().signal) });
     return client.pushMessage('U' + 'a'.repeat(32), [{ type: 'text', text: 'Synthetic QA' }]);
   };
-  // The SDK intentionally hides transport errors; assert its public error and zero requests.
+  // SDK は通信の例外を隠すため、公開エラーと要求0件を検証する。
   await expect(withQaOutboundBoundary(staging, send)).rejects.toThrow('LINE API network error');
   expect(network).not.toHaveBeenCalled();
   await withQaOutboundBoundary({ ...staging, DEPLOY_ENV: 'production' }, send);

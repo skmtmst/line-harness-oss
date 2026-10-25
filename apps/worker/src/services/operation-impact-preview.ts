@@ -43,7 +43,7 @@ function count(value: number | null | undefined): number {
  * 数えるが、対象者数(friendCount)は先頭 N 件の合計(下限値)にとどめ、
  * `friendCountIsPartial` で「概算」であることを示す。
  * 停止対象が数千件に増えても、直前確認1回あたりのクエリ本数を
- * 一定に保つための上限（Issue #737）。
+ * 一定に保つための上限。
  */
 const BROADCAST_AUDIENCE_SAMPLE_LIMIT = 50;
 

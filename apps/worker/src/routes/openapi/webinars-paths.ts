@@ -1,6 +1,6 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const webinarsPaths = {
-  // ── Webinars（動画素材の準備・開催回の定員。J-1・N #821） ──────────────
+  // ── Webinars（動画素材の準備・開催回の定員。J-1・N） ──────────────
   '/api/webinars/{id}/video-asset': {
     get: {
       tags: ['Webinars'], summary: '動画素材の準備段階を取得',

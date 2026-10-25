@@ -13,7 +13,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { checkAllManualLinks, isSafePublicHttpsUrl } from '../services/manual-link-check.js';
 
 /**
- * マニュアルの正本表。設計 ★34-4（`f9oUm`）。台帳 #134。
+ * マニュアルの正本表。設計 ★34-4（`f9oUm`）。台帳。
  *
  * **直せるのは運営（owner）だけ。** お客さまの組織ごとには変えない
  * （要件 -34 §8-2）。

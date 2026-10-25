@@ -6,7 +6,7 @@ export * from './policy.js';
 export { MemoryCircuitStore } from './circuit.js';
 export { createHttpAttempt } from './http.js';
 
-/** One invocation = at most one physical attempt. Long waits go back to the job/cron. */
+/** 1回の呼出で物理試行は最大1回とし、長い待機はジョブや cron へ返す。 */
 export function createExternalCall(options: { circuits: CircuitStore; now?: () => number; random?: () => number }) {
   const now = options.now ?? Date.now;
   const random = options.random ?? Math.random;
@@ -14,7 +14,7 @@ export function createExternalCall(options: { circuits: CircuitStore; now?: () =
     return resumeInvocation(request.state.requestId, () => execute(request));
   };
   async function execute<T>(request: CallRequest<T>): Promise<CallResult<T>> {
-    // Isolate the immutable identity/budget from caller changes across awaits.
+    // await をまたぐ呼出元の変更で識別や予算が変わらないよう、不変の値として保持する。
     const state = structuredClone(request.state);
     validateState(state);
     if (state.phase !== 'ready') {
@@ -38,8 +38,7 @@ export function createExternalCall(options: { circuits: CircuitStore; now?: () =
     if (!admission.allowed) return { kind: 'deferred', reason: 'circuit', nextAt: admission.nextAt, state };
     const lease = admission.lease;
     const settle = async (result: 'success' | 'failure' | 'neutral', retryAt?: number) => {
-      // A storage failure must not overwrite a successfully journaled operation.
-      // Failed release is fail-closed (probe remains occupied).
+      // 保存失敗で確定済みの結果を上書きしない。解除失敗時は回復確認の実行権を保持して安全側に止める。
       try { await options.circuits.settle(lease, result, now(), retryAt); } catch { /* keep stopped */ }
     };
     let allowed = false;
@@ -79,7 +78,7 @@ export function createExternalCall(options: { circuits: CircuitStore; now?: () =
       clearTimeout(timer);
       request.signal?.removeEventListener('abort', cancel);
     }
-    // No adapter may turn authentication/permission/input failures into retries.
+    // 認証・権限・入力の失敗を再試行可能へ言い換えない。
     if (outcome.kind !== 'success' && outcome.status !== undefined && outcome.status >= 400 && outcome.status < 500
       && outcome.status !== 408 && outcome.status !== 429) outcome = { ...outcome, kind: 'permanent' };
     let next: CallState = { ...started, revision: started.revision + 1 };
@@ -104,7 +103,7 @@ export function createExternalCall(options: { circuits: CircuitStore; now?: () =
       : outcome.kind === 'transient' || outcome.kind === 'unknown' && outcome.reason !== 'cancelled' ? 'failure' : 'neutral',
     outcome.kind === 'success' ? undefined : outcome.retryAt);
     const saved = await persist(started, next);
-    // External success followed by failed save is UNKNOWN, not an ordinary retry.
+    // 外部で成功して保存だけ失敗した場合、通常の再試行へ戻さず送達不明として扱う。
     if (saved !== 'ok') return { kind: 'unknown', state: { ...started, phase: 'unknown', reason: 'storage' } };
     if (outcome.kind === 'success') return { kind: 'success', state: next, value: outcome.value };
     if (next.phase === 'ready') return { kind: 'deferred', reason: 'schedule', state: next, nextAt: next.nextAt };

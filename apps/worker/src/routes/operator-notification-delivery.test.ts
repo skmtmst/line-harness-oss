@@ -108,10 +108,7 @@ describe('運用者へのお知らせの送信と実行記録', () => {
   });
 
   /*
-   * 審査(2026-09-12)が見つけた形。画面が保存していた message_received は
-   * 公開が 200 で通り is_active=1 になるのに、dispatch は unknown_event_type
-   * で断るので通知は0件だった。**公開できて届かない**のが一番悪い。
-   * 公開の時点で断ることで、静かな失敗を見える失敗にする。
+   * 公開できても dispatch が処理できない通知を作らないよう、未対応のイベント種別は公開時点で拒む。
    */
   it('登録簿に無いきっかけは公開できず、停止のまま残る', async () => {
     const response = await app(testDb.db).request(
@@ -418,7 +415,7 @@ describe('N-342 (#943): 正本名 /api/line-notifications 配下の運用者通�
       json({ lineAccountId: 'account-1' }),
     );
     expect(rulePreview.status).toBe(200);
-    // m26e R565: 版なしの下書き保存は受け付けない（顧客通知の下書きとそろえる）。
+    // m26e : 版なしの下書き保存は受け付けない（顧客通知の下書きとそろえる）。
     const noVersion = await instance.request(
       `/api/line-notifications/operator-rules/${ruleId}/draft`,
       patch({ lineAccountId: 'account-1', name: '版なし保存' }),

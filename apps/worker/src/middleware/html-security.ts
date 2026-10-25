@@ -1,11 +1,11 @@
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../worker-env.js';
 
-/** Worker-generated LIFF/OGP HTML also needs protection; _headers covers static assets only. */
+/** _headers は静的ファイルにしか効かないため、Worker が生成する LIFF/OGP の HTML も保護する。 */
 export const htmlSecurityMiddleware: MiddlewareHandler<Env> = async (c, next) => {
   await next();
   if (!c.res.headers.get('content-type')?.includes('text/html')) return;
-  // ASSETS/fetch responses can have immutable headers. Rewrap without changing the body.
+  // ASSETS の応答ヘッダは変更不能な場合があるため、本文を保ったまま応答を包み直す。
   c.res = new Response(c.res.body, { status: c.res.status, statusText: c.res.statusText, headers: new Headers(c.res.headers) });
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('Referrer-Policy', 'no-referrer');

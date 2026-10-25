@@ -1,6 +1,6 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const templatesPhotoPolicyPaths = {
-  // ── Templates (#645 公開版固定) ─────────────────────────────────────────
+  // ── Templates ( 公開版固定) ─────────────────────────────────────────
   '/api/templates/{id}/versions': {
     get: {
       tags: ['Templates'],
@@ -40,7 +40,7 @@ export const templatesPhotoPolicyPaths = {
       },
     },
   },
-  // ── Photo reward policy (#817 報酬の決まりの版) ─────────────────────────
+  // ── Photo reward policy ( 報酬の決まりの版) ─────────────────────────
   '/api/nen-members/photo-reward-policy/versions': {
     get: {
       tags: ['NenMembers'],

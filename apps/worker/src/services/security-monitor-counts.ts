@@ -2,7 +2,7 @@ import type { SecurityRuleKey } from './security-monitor-rules.js';
 
 export type SecurityCount = { tenant_id: string; line_account_id: string | null; rule_key: SecurityRuleKey; count: number; latest_event_at?: number };
 
-// 691 maintains this indexed UTC value for legacy JST and ISO/offset timestamps.
+// JST と時差付き ISO の保存値は、移行済みの索引付き UTC 値で比較する。
 const BASE = `SELECT tenant_id, line_account_id, category, action, result, after_json,
   security_created_at_jd AS utc_at FROM audit_events INDEXED BY idx_audit_events_security_utc
   WHERE security_created_at_jd > julianday(?) AND security_created_at_jd <= julianday(?)`;
@@ -40,7 +40,7 @@ export async function collectSecurityCounts(db: D1Database, now: Date): Promise<
     FROM recent WHERE action = 'data.export' AND result = 'success'
     GROUP BY tenant_id, line_account_id`).bind(since, until).all<Omit<SecurityCount, 'rule_key'>>();
   counts.push(...exports.results.map(row => ({ ...row, rule_key: 'export_records' as const })));
-  // Platform records include hidden read-only impersonation; never expose them through store APIs.
+  // 運営の記録は非表示の閲覧専用代理操作も含むため、店舗 API へ公開しない。
   const platform = await db.prepare(`SELECT COALESCE(tenant_id, '') AS tenant_id, NULL AS line_account_id, COUNT(*) AS count, MAX(security_created_at_jd) AS latest_event_at
     FROM platform_audit_logs INDEXED BY idx_platform_audit_logs_security_utc
     WHERE security_created_at_jd > julianday(?) AND security_created_at_jd <= julianday(?)

@@ -60,7 +60,7 @@ export const get__api_settings_features_2 = async (c: Context<Env, "/api/setting
       }, 403);
     }
     const restaurantEnabled = await restaurantEffectivelyEnabledForTenant(c);
-    // 親子モード・専用カタログは設定束と独立して読めるため並列で投げる(#633)。
+    // 親子モード・専用カタログは設定束と独立して読めるため並列で投げる。
     const [state, parentChildRaw, specializedRaw] = await Promise.all([
       loadFeatureSettings(
         c.env.DB,
@@ -204,7 +204,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
     let catalog: ToggleableFeature[] | undefined;
     if (body.catalog !== undefined) {
       const staff = c.get('staff');
-      // #558: 運営ロール未導入の現行契約では、既定統括の owner だけが変更できる。
+      // 運営ロール未導入の現行契約では、既定統括の owner だけが変更できる。
       if (staff?.role !== 'owner' || staff.readOnly
         || (staff.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) {
         return c.json({ success: false, error: 'この操作には運営権限が必要です' }, 403);
@@ -252,7 +252,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
        * 正解の顔ぶれはアカウントごとの専用カタログで変わる。
        * 同じ要求でカタログも変わるなら保存後の姿（新しいカタログ）を
        * 正解にする。画面が現在の表示から組み立てた完全な並びと
-       * 一致するものだけを受け付ける（N-441）。
+       * 一致するものだけを受け付ける。
        */
       const specializedKeys = catalog !== undefined
         ? new Set<string>(catalog)
@@ -273,7 +273,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
       || body.sidebarItemOrder !== undefined;
 
     /*
-     * 変更理由の必須化（N-444）。あとから「なぜ変えたか」を追えるよう、
+     * 変更理由の必須化。あとから「なぜ変えたか」を追えるよう、
      * 保存する要求は全部、空白ではない理由を持つこと。
      */
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
@@ -285,7 +285,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
       }, 400, ["features","sidebarOrder","sidebarItemOrder","reason"]);
     }
     /*
-     * 機能・順序の保存は版なしでは受け付けない(#643)。版なし逐次保存は
+     * 機能・順序の保存は版なしでは受け付けない。版なし逐次保存は
      * 途中失敗で部分反映になり、版付きGETとの不整合を起こすため。
      *
      * ただし断るだけでは呼び出し側が次に何を送ればよいか分からない。
@@ -320,7 +320,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
     }
 
     /**
-     * オフ前の影響確認(#643)。有効→無効に変わる機能に止まる仕事が
+     * オフ前の影響確認。有効→無効に変わる機能に止まる仕事が
      * あるのに、有効な確認トークンが無ければ保存しない。直接PUTでの
      * 迂回もここで止める。影響が無ければ通常保存する。
      */
@@ -374,7 +374,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
     let auditSaved = false;
 
     /**
-     * 一括保存(#643)。一括設定・専用カタログ・確認トークン消費を
+     * 一括保存。一括設定・専用カタログ・確認トークン消費を
      * 単一batch(本番D1では1トランザクション)で書き、途中失敗の
      * 部分反映を起こさない。失敗時は例外か409で、版も実効値も
      * 変わらない。
@@ -416,7 +416,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
         FEATURE_SETTINGS_BUNDLE_KEY,
       ) !== null;
       /*
-       * 同時保存の敗者は1行も書かない(#643)。
+       * 同時保存の敗者は1行も書かない。
        *
        * 一括設定のCASだけを条件にすると、負けた側でも専用カタログの
        * 上書きと確認トークンの削除だけが残り、409を返しながら別の
@@ -458,7 +458,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
         ).bind(accountId, OFF_CONFIRM_KEY, ...guardParams));
       }
       /*
-       * 保存の監査（N-444）も同じbatch・同じ判定式で書く。
+       * 保存の監査も同じbatch・同じ判定式で書く。
        * CASに負けたときは監査行も0行になり、「保存されていない成功」や
        * 「前後versionが混ざった監査」は残らない。
        */
@@ -549,7 +549,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
       /*
        * 専用カタログだけの変更は単独1行の保存で部分反映は起きないが、
        * 監査も同じbatchに入れて「保存だけ残る」「監査だけ残る」の
-       * どちらも起こさない（N-444）。
+       * どちらも起こさない。
        */
       const staff = c.get('staff');
       const now = japanCalendar()

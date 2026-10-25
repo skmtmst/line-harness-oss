@@ -15,8 +15,7 @@ export function normalizedHarnessErrorPath(value: string | undefined): string {
   } catch {
     return '/other';
   }
-  // Copy only a fixed product area. IDs, hostnames, queries, hashes and arbitrary
-  // path segments can contain customer data even when they resemble ordinary slugs.
+  // ID・ホスト・クエリ・ハッシュ・任意のパスには顧客情報が入り得るため、固定の製品領域だけを取り出す。
   const parts = pathname.split('/').filter(Boolean);
   const api = parts[0] === 'api';
   const area = parts[api ? 1 : 0];

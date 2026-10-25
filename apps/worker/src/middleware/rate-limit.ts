@@ -1,20 +1,10 @@
-/**
- * General burst budgets use isolate memory. Sensitive actions additionally
- * reserve shared D1 budgets in sensitive-rate-limit.ts, before doing work.
- *
- * Cloudflare Workers have per-isolate memory that persists across
- * requests to the same instance. Counters are lost on cold start,
- * which is acceptable — this guards against burst abuse, not
- * long-term quota enforcement.
- */
+/** 短時間の集中要求は isolate 内のカウンタで抑える。再起動で失われるため長期の割当には使わず、機密操作は処理前に sensitive-rate-limit.ts の共有 D1 予算も確保する。 */
 
 import type { Context, Next } from 'hono';
 import type { Env } from '../worker-env.js';
 import { authenticatedSensitiveLimit, preAuthSensitiveLimit } from './sensitive-rate-limit.js';
 
-// ---------------------------------------------------------------------------
-// Core rate-limit logic
-// ---------------------------------------------------------------------------
+
 
 interface RateLimitEntry {
   timestamps: number[];
@@ -60,9 +50,7 @@ function check(key: string, max: number, windowMs: number): { ok: boolean; remai
   return { ok: true, remaining: max - entry.timestamps.length, retryAfter: 0 };
 }
 
-// ---------------------------------------------------------------------------
-// Paths that are unauthenticated (lower limit, keyed by IP)
-// ---------------------------------------------------------------------------
+// 未認証の経路は、IP ごとの低い上限を使う。
 
 const UNAUTHENTICATED_PATTERNS: Array<string | RegExp> = [
   '/webhook',
@@ -70,13 +58,12 @@ const UNAUTHENTICATED_PATTERNS: Array<string | RegExp> = [
   /^\/api\/forms\/[^/]+\/submit$/,
   // サイトスクリプトの受け口。認証が無く、外のサイトから直接叩かれる。
   '/api/site/collect',
-  // R429: 公開受信口。署名で守る公開口で、管理画面の認証は通さない。
+  // 公開受信口。署名で守る公開口で、管理画面の認証は通さない。
   // 未検証の Bearer/Cookie で認証済み枠（1000/分）へ切り替わると
   // 公開受信の負荷抑制が緩むため、Authorization の有無によらず IP 枠で抑える。
   /^\/api\/webhooks\/incoming\/[^/]+\/receive$/,
   '/api/qr',
-  // Public referral URLs do database work too. Share one IP budget across
-  // changing refs/help/query values and ignore unverified credentials.
+  // 公開の流入 URL も DB を使うため、ref・help・クエリを変えても同じ IP の予算を使う。未検証の資格情報で分散させない。
   /^\/r\//,
   /^\/liff\/(?:files|statements)\//,
   /^\/api\/liff\/files\//,
@@ -99,9 +86,7 @@ function getClientIp(c: Context): string {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Hono middleware
-// ---------------------------------------------------------------------------
+
 
 const AUTHENTICATED_MAX = 1000;
 const AUTHENTICATED_WINDOW = 60_000; // 1 min
@@ -112,7 +97,7 @@ const UNAUTHENTICATED_WINDOW = 60_000; // 1 min
 export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
   const path = new URL(c.req.url).pathname;
 
-  // Public documentation does not perform referral lookups.
+  // 公開文書は流入情報の DB 読込を行わない。
   if (path === '/docs' || path === '/openapi.json') {
     return next();
   }
@@ -124,7 +109,7 @@ export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<
   let windowMs: number;
 
   if (isUnauthenticatedPath(path)) {
-    // Key by IP for unauthenticated endpoints
+    // 未認証の要求は IP ごとに制限する。
     key = `ip:${getClientIp(c)}`;
     max = path === '/api/qr' ? 30 : UNAUTHENTICATED_MAX;
     windowMs = UNAUTHENTICATED_WINDOW;
@@ -144,7 +129,7 @@ export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<
     );
   }
 
-  // Proceed and attach rate-limit headers to the response
+
   await next();
 
   c.header('X-RateLimit-Remaining', String(result.remaining));

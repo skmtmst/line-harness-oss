@@ -18,10 +18,7 @@ import { mailFromName, MUSUBO_FROM_NAME, NEN_FROM_NAME } from './mail-from-name.
 import { sendPlainMail } from './plain-mail.js';
 
 /**
- * 差出人の表示名（2026-09-30）。
- *
- * musubo の会員登録メールが「然-NEN- お客様窓口」から届いていたので、件名の呼び名から
- * 表示名を決めるようにした。ここが崩れると、ペットフードとSaaSの名前が入れ替わる。
+ * 共有のメール送信経路でも SaaS とペットフードの差出人名が混ざらないよう、件名に対応した表示名を確かめる。
  */
 describe('mailFromName', () => {
   it('件名が【musubo】で始まるメールは musubo から送る', () => {

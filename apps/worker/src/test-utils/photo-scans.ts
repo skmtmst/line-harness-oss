@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-/** Existing review/paging fixtures represent files whose safety scan already completed. */
+/** 審査・ページ送りの既存 fixture は、安全検査が完了したファイルとして用意する。 */
 export function seedCleanPhotoScans(raw: Database.Database): void {
  raw.prepare(`INSERT OR IGNORE INTO media_file_scans
   (id,line_account_id,subject_kind,subject_id,filename,mime_type,size_bytes,status,created_at,updated_at)

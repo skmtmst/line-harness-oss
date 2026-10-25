@@ -142,7 +142,7 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
   try {
     const kind = c.req.query('kind') as IdentityCandidateKind | undefined;
     /*
-      FRIEND-11: 'all' は状態で絞らない。画面の「すべて」が従来は
+      'all' は状態で絞らない。画面の「すべて」が従来は
       status 未指定 = pending だけを見せていたため、「すべて」と
       表示しながら確認済み・保留・別人の候補が隠れていた。
     */
@@ -167,7 +167,7 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
       allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       limit: parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 20, limitPolicy: { fallback: 'nonnegative-integer', minimum: 1, maximum: 100 } }).limit,
       offset: parseOffsetPaging({ offset: c.req.query('offset') }, { offsetPolicy: { fallback: 'nonnegative-integer', maximum: 100_000 } }).offset,
-      // FRIEND-11: 名前・根拠の検索は全件へかける。
+      // 名前・根拠の検索は全件へかける。
       q: c.req.query('q') ?? undefined,
     });
     return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: data.limit, offset: data.offset }, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });

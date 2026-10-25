@@ -1,43 +1,23 @@
 import type { Env } from '../worker-env.js';
 
-// ---------------------------------------------------------------------------
-// Admin auth configuration & topology resolution
-//
-// The admin SPA (Cloudflare Pages) and the Worker API (workers.dev / custom
-// domain) may live on different sites. Cookie auth only works if the cookie's
-// SameSite attribute matches the topology:
-//
-//   * same-site (shared registrable domain) → SameSite=Lax is fine.
-//   * cross-site (e.g. *.pages.dev ↔ *.workers.dev) → the cookie is only sent
-//     with SameSite=None; Secure, and the operator must opt in because
-//     browsers increasingly block third-party cookies.
-//
-// This module derives the safe attributes from the environment and refuses
-// (loudly) to issue a cookie the browser would silently drop — that silent
-// drop is exactly the merge/deploy blocker found in review of #57/#59.
-// ---------------------------------------------------------------------------
+// 管理画面と API が別サイトにある場合、Cookie は SameSite=None; Secure が必要になる。同一サイトは Lax とし、別サイトの Cookie はブラウザの制限を受けるため明示的な許可を求める。送れない構成で Cookie を発行して成功に見せず、設定エラーとして拒む。
 
 export type AdminSameSite = 'Strict' | 'Lax' | 'None';
 
 export interface AdminAuthConfig {
-  /** Origins permitted to make credentialed cross-origin requests. */
+  /** 資格情報付きの別 origin 要求を許可する送信元。 */
   allowedOrigins: string[];
-  /** SameSite attribute applied to the session + CSRF cookies. */
+  /** セッションと CSRF の Cookie に適用する SameSite。 */
   sameSite: AdminSameSite;
-  /** Cookies are always Secure (HTTPS only) in this app. */
+  /** Cookie は常に Secure として HTTPS に限る。 */
   secure: boolean;
-  /** True when an admin origin is cross-site relative to the Worker API. */
+  /** 管理画面が API と別サイトかを示す。 */
   crossSite: boolean;
-  /**
-   * Non-null when the configured topology cannot deliver the session cookie.
-   * Login refuses with this message instead of silently issuing a cookie the
-   * browser will never send back.
-   */
+  /** ブラウザが返せない Cookie を発行して成功に見せないよう、配送不能な構成はログイン時にこの理由で拒む。 */
   misconfigured: string | null;
 }
 
-// Bindings this module reads. Declared here (rather than only on Env) so the
-// helpers stay testable with a plain object.
+// 通常のオブジェクトでも検証できるよう、Env 本体と分けて必要な設定を宣言する。
 export type AdminAuthEnv = {
   WORKER_URL?: string;
   ADMIN_ORIGIN?: string;
@@ -45,12 +25,7 @@ export type AdminAuthEnv = {
   ADMIN_ALLOW_CROSS_SITE?: string;
 };
 
-/**
- * Public-suffix-style multi-tenant hosts where every subdomain is its own
- * registrable site. `your-admin.pages.dev` and `x.workers.dev` are
- * therefore cross-site to each other. Not a full PSL — just the suffixes this
- * deployment topology actually uses.
- */
+/** pages.dev や workers.dev は各ホストが別サイトになる。完全な公開サフィックス一覧でなく、この配備構成で使う接尾辞だけを扱う。 */
 const MULTI_TENANT_SUFFIXES = [
   'pages.dev',
   'workers.dev',
@@ -63,7 +38,7 @@ export function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
-/** True for localhost / 127.0.0.1 / ::1 origins (local development). */
+/** ローカル開発の localhost / 127.0.0.1 / ::1 かを判定する。 */
 export function isLoopbackOrigin(value: string | undefined | null): boolean {
   if (!value) return false;
   try {
@@ -74,7 +49,7 @@ export function isLoopbackOrigin(value: string | undefined | null): boolean {
   }
 }
 
-/** Returns the canonical `scheme://host[:port]` origin, or null if unparizable. */
+/** scheme://host[:port] に正規化し、解析できない値は null とする。 */
 export function normalizeOrigin(value: string | undefined | null): string | null {
   if (!value) return null;
   try {
@@ -84,11 +59,7 @@ export function normalizeOrigin(value: string | undefined | null): string | null
   }
 }
 
-/**
- * Best-effort registrable domain. Honours the multi-tenant suffix list so each
- * `*.pages.dev` / `*.workers.dev` host is treated as its own site; otherwise
- * falls back to the last two labels.
- */
+/** 別プロジェクトを同一サイトとしないよう、pages.dev と workers.dev はホストごとに区別する。ほかは末尾2ラベルで登録可能ドメインを求める。 */
 export function registrableDomain(host: string): string {
   const labels = host.toLowerCase().split('.').filter(Boolean);
   if (labels.length <= 2) return labels.join('.');
@@ -101,14 +72,14 @@ export function registrableDomain(host: string): string {
   return labels.slice(-2).join('.');
 }
 
-/** True when the two origins do not share a registrable domain. */
+/** 登録可能ドメインが異なるかを判定する。 */
 export function isCrossSite(originA: string, originB: string): boolean {
   try {
     const a = new URL(originA);
     const b = new URL(originB);
     return registrableDomain(a.hostname) !== registrableDomain(b.hostname);
   } catch {
-    // Unknown → fail safe by assuming cross-site.
+    // 不明な場合は別サイトとみなし、安全側で扱う。
     return true;
   }
 }
@@ -127,7 +98,7 @@ function parseSameSite(value: string | undefined): AdminSameSite | null {
   }
 }
 
-/** Parse the comma-separated ADMIN_ORIGIN allowlist into normalized origins. */
+/** ADMIN_ORIGIN のカンマ区切りの値を origin へ正規化する。 */
 export function parseAllowedOrigins(env: AdminAuthEnv): string[] {
   if (!env.ADMIN_ORIGIN) return [];
   return env.ADMIN_ORIGIN.split(',')
@@ -139,13 +110,7 @@ function isCloudflarePagesOrigin(value: URL): boolean {
   return value.hostname.toLowerCase().endsWith('.pages.dev');
 }
 
-/**
- * Cloudflare Pages exposes both the production project origin
- * (`https://project.pages.dev`) and deployment/branch preview origins such as
- * `https://hash.project.pages.dev`. Operators often click the preview URL that
- * Wrangler prints immediately after deploy, so treat origins inside the same
- * Pages project as equivalent for the admin allowlist.
- */
+/** 配備直後に開くプレビューでも認証できるよう、同じ Pages プロジェクト内の本番・プレビュー origin を許可先として対応させる。 */
 export function isAllowedAdminOrigin(origin: string, allowedOrigin: string): boolean {
   const normalizedOrigin = normalizeOrigin(origin);
   const normalizedAllowed = normalizeOrigin(allowedOrigin);
@@ -172,10 +137,7 @@ export function resolveAdminAuthConfig(
   opts: { requestOrigin?: string } = {},
 ): AdminAuthConfig {
   const allowedOrigins = parseAllowedOrigins(env);
-  // WORKER_URL is the source of truth, but the installer doesn't always set it.
-  // Fall back to the request origin (which IS the Worker's own origin when an
-  // API route is handling the request) so cross-site detection stays correct
-  // even when WORKER_URL is unset in production.
+  // WORKER_URL を優先し、未設定なら API 要求の origin を使う。本番でも別サイト判定を省略しない。
   const workerOrigin = normalizeOrigin(env.WORKER_URL) ?? normalizeOrigin(opts.requestOrigin);
 
   const crossSite =
@@ -186,8 +148,7 @@ export function resolveAdminAuthConfig(
   const explicit = parseSameSite(env.ADMIN_COOKIE_SAMESITE);
   const allowCrossSite = env.ADMIN_ALLOW_CROSS_SITE === 'true';
 
-  // Opting into cross-site cookies means SameSite=None (the only value a
-  // browser sends cross-site). An explicit override always wins.
+  // 別サイトの Cookie は SameSite=None とする。明示指定の上書きがあればそちらを優先する。
   const sameSite: AdminSameSite =
     explicit ?? (allowCrossSite ? 'None' : 'Lax');
 
@@ -207,12 +168,7 @@ export function resolveAdminAuthConfig(
   return { allowedOrigins, sameSite, secure: true, crossSite, misconfigured };
 }
 
-/**
- * CORS origin resolver for credentialed admin requests. Returns the origin to
- * echo back, or '' when the origin is not allowed (so no ACAO header is set).
- * Same-origin requests (and non-browser callers with no Origin header) are
- * always permitted; this keeps SDK/MCP Bearer callers working.
- */
+/** 資格情報付き CORS は許可された origin だけを返し、不許可ならヘッダを付けない。同一 origin と Origin のない SDK/MCP の Bearer 要求は許可する。 */
 export function resolveCorsOrigin(
   env: AdminAuthEnv,
   origin: string | null | undefined,
@@ -226,11 +182,7 @@ export function resolveCorsOrigin(
   }
   if (!origin) return requestOrigin;
 
-  // Local development: when the Worker itself runs on loopback (e.g.
-  // `wrangler dev` on localhost:8787), allow loopback admin origins (e.g.
-  // `pnpm dev:web` on localhost:3001) so dev login works without configuring
-  // ADMIN_ORIGIN. Never enabled in production, where requestOrigin is the
-  // deployed (non-loopback) Worker origin.
+  // Worker 自身がループバックで動く開発環境だけ、別ポートのローカル管理画面を許可する。本番の要求元では有効にしない。
   if (isLoopbackOrigin(requestOrigin) && isLoopbackOrigin(origin)) {
     return origin;
   }

@@ -10,7 +10,7 @@ export type HarnessProxyDispatch = (request: Request) => Promise<Response>;
  * プロキシ側が送信履歴の記録も担当するため、呼び出し元で messages_log を
  * 二重に書かないこと。
  *
- * #1050: capability を渡すと X-Line-Harness-Capability として名乗り、
+ * capability を渡すと X-Line-Harness-Capability として名乗り、
  * プロキシの緊急停止判定がその停止対象を見る。省略時はプロキシ側で
  * broadcast_dispatch (安全側) として扱われる。
  */

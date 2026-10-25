@@ -44,7 +44,7 @@ import { runIsolatedScheduledJobs, scheduledLane } from '../services/scheduled-j
 import { runFrequentHeavyJobs } from './frequent.js';
 import { runSixHourlyHeavyJobs } from './six-hourly.js';
 
-// Scheduled handler for cron triggers — runs for all active LINE accounts
+// 稼働中の全 LINE アカウントを対象にする。
 export async function scheduled(
   event: ScheduledEvent,
   env: Env['Bindings'],
@@ -116,7 +116,7 @@ export async function scheduled(
     logger.error("src_index_failed");
   }
 
-  // N-327 (#663): 公開済み運用者通知ルールの送り残しを回収する。
+  //  公開済み運用者通知ルールの送り残しを回収する。
   //
   // 初回の送信は業務イベントの側で同期に行う。ここが拾うのは、そこで
   // 落ちて retry_wait に入った行と、Worker が途中で止まって pending の
@@ -138,7 +138,7 @@ export async function scheduled(
     logger.error("src_index_failed");
   }
 
-  // N-369/N-370 (#938): 送信Webhookの送り残しを回収する。
+  // 送信Webhookの送り残しを回収する。
   //
   // 初回の送信はイベント発火の側で同期に行う。ここが拾うのは、そこで
   // 落ちて retry_wait に入った行と、Worker が途中で止まって
@@ -170,11 +170,11 @@ export async function scheduled(
     observeOperationDispatcher(env.DB, jobName, run, dispatchObservedAt);
 
   // 配信系は1回だけ実行（内部でfriendのline_account_idから正しいlineClientを動的解決）
-  // 以前はアカウントごとにループしていたが、アカウントフィルタなしのDBクエリで
-  // 全アカウントの配信が各ループで重複実行されていたバグを修正
+  // アカウントフィルタなしの DB クエリで取得するため、全体を1回だけ処理する。
+  // アカウントごとの再実行で同じ配信を重ねない。
   ctx.waitUntil(import('../routes/webhooks.js').then(({processIncomingWebhookQueue})=>processIncomingWebhookQueue(env)).catch(()=>logger.error("incoming_queue_failed")));
 
-  // Phase 1: 復旧処理 (batch_offset=-1 → 0 にする軽量な UPDATE のみ) を queue 処理より
+  // 復旧処理 (batch_offset=-1 → 0 にする軽量な UPDATE のみ) を queue 処理より
   // 先に await 完了させる。これで stalled/stuck から復旧した配信が同じ cron tick の
   // processQueuedBroadcasts に拾われ、復旧レイテンシが 1 tick 縮む。recover は inline 送信を
   // 含まない高速処理なので、先に await しても他ジョブを starve させない。
@@ -185,12 +185,12 @@ export async function scheduled(
   ]);
 
   // Booking / event-booking リマインドは時刻厳守 + 軽量 (数件/tick、上限100件) なので、
-  // 重い配信・insight ジョブより先に実行する。以前は最後に置かれていたため、
+  // 開始前の通知期限を守るため、重い配信・insight ジョブより先に実行する。
   // 手前のジョブが invocation を止めると数時間分のリマインドが未送信のまま
-  // starts_at を過ぎ、「開始後は送らない」ガードで永久 pending になる事故が
-  // 発生した (2026-06-01 / 2026-06-15、計 10 件送り漏れ)。
+  // starts_at を過ぎると送信ガードにより送れなくなるため、後続ジョブで遅延させない。
+
   // token refresh はリマインドより先に済ませる (失効直後トークンでの 401 送信を防ぐ。
-  // 旧順序では refresh が先だった invariant の維持)。
+  // 送信前に有効なトークンを準備する)。
   try {
     await refreshLineAccessTokens(env.DB);
   } catch (e) {
@@ -271,7 +271,7 @@ export async function scheduled(
   }
 
   // 来店スタンプの期限通知。配信の見張り（observeDispatch）の対応表には未登録なので、
-  // event-waitlist と同じく直接呼ぶ（対応表への追加は Codex の担当で別に行う）。
+  // event-waitlist と同じく、定期処理から直接呼ぶ。
   try {
     await processVisitStampReminders(dbFor(env), {
       now: new Date(event.scheduledTime), proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
@@ -374,7 +374,7 @@ export async function scheduled(
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
       /*
-       * PHOTO-06: 採用写真のポイント付与outboxの日次回収。
+       * 採用写真のポイント付与outboxの日次回収。
        * 採用直後・手動の再試行で届かなかった分を、期限の来た順に届け直す。
        * EC接続が未設定の環境では何もしない（行は「要対応」として一覧に残る）。
        */
@@ -414,7 +414,7 @@ export async function scheduled(
     logger.error("src_index_failed");
   }
 
-  // E-08 (#621): 保存済みリッチメニュー公開予約を時刻到来時に実行する。
+  // 保存済みリッチメニュー公開予約を時刻到来時に実行する。
   // 予約時のスナップショットを公開し、期間モードは終了時に元メニューへ戻す。
   // 失敗しても他の処理は続ける。実LINE送信はここで行うが、DB配備は別工程。
   try {
@@ -670,7 +670,7 @@ export async function scheduled(
         })), heartbeat);
       },
       compensateSwitchToPrevious: async ({ schedule, groupId, prev, newIds }) => {
-        // 切替失敗の補償: journalを消した後に呼ばれ、旧へ戻す。決して投げない。
+        // 切替失敗時は journal 削除後に元の状態へ補償する。補償の失敗を呼び出し元へ投げない。
         const account = await getLineAccountById(env.DB, schedule.account_id);
         if (!account?.channel_access_token) {
           // 補償手段がない。何も消さないよう全滅扱いで返す
@@ -774,7 +774,7 @@ export async function scheduled(
     logger.error("src_index_failed");
   }
 
-  // Phase 2: 配信系と定期ジョブを並列実行する。processScheduledBroadcasts は tag/all の
+  // 配信系と定期ジョブを並列実行する。processScheduledBroadcasts は tag/all の
   // inline 送信を含み時間がかかり得るため、queue 処理と並列にして互いを block しない
   // (barrier 化すると長い scheduled 送信が queue 処理を待たせる)。scheduled dedup は
   // status='sending', batch_offset=0 に enqueue され、同 tick もしくは次 tick (最大5分、

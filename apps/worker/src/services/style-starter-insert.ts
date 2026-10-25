@@ -39,7 +39,7 @@ export async function insertStyleStarterItems(
     ) {
       if (!choice?.[item.key] || choice[item.key].mode === 'sample') {
         const old = existing.find((e) => e.item_key === item.key)!;
-        // Reuse the same untouched resource across styles, while refreshing its industry contents.
+        // スタイルをまたいでも未編集の同じリソースを使い、業種内容だけを更新する。
         if (
           oldProfile?.style !== style &&
           old.kind === item.kind &&
@@ -151,7 +151,7 @@ export async function insertStyleStarterItems(
       id = source.id;
       sample = false;
     } else if (item.sourceId) {
-      // Cross-account cloning belongs to the existing HQ distribution mechanism. Never copy live IDs.
+      // アカウント間の複製は統括の既存配布へ委ね、生きた ID をそのままコピーしない。
       throw new StyleError('use_hq_distribution_for_source', 422);
     } else if (item.kind === 'template')
       statements.push(

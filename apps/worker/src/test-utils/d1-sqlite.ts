@@ -40,7 +40,7 @@ function rewriteNumbered(sql: string, args: unknown[]): { sql: string; args: unk
   return { sql: rewritten, args: order.map((n) => args[n - 1]) }
 }
 
-/** Public methods stay promises; batch executes native statements without yielding between SQL writes. */
+/** 公開メソッドは Promise の契約を保ち、batch 内の SQL 書込間では制御を譲らない。 */
 function promiseMethod<T>(sync:()=>T):(()=>Promise<T>) & {sync:()=>T} {
   return Object.assign(async()=>sync(),{sync});
 }
@@ -89,7 +89,7 @@ export function createTestD1(
     /*
      * 実DBと同じ見え方のまま、テストのディスク待ちだけ削る。
      *
-     * **schema を流す前に立てること(#720)。** bootstrap.sql には BEGIN/COMMIT が
+     * **schema を流す前に立てること。** bootstrap.sql には BEGIN/COMMIT が
      * 無く、900本を超える DDL が1文ずつ暗黙トランザクションで走る。既定の
      * ロールバックジャーナルのままだと、その1文ごとにジャーナルファイルを
      * 作って書いて消す。手元の実測で中央値 1,117ms かかり、journal_mode を
@@ -113,9 +113,7 @@ export function createTestD1(
   // ただし外部キーに関わる不整合 (誤った通 ID の保存など) は OFF では隠れる。
   // その種の回帰テストは { foreignKeys: true } で作り、実 D1 と同じ制約で確かめる。
   raw.pragma(`foreign_keys = ${options?.foreignKeys ? 'ON' : 'OFF'}`)
-  // Legacy route-authorization tests explicitly choose the supported Off mode.
-  // Default fixtures retain the product's default-On policy. This changes real
-  // settings rows, never the authentication implementation or its allow rules.
+  // 権限専用の既存試験は明示的な MFA 無効設定を選ぶ。通常の fixture は既定有効を保ち、認証実装や許可条件は変えず実設定行だけを使う。
   if (options?.loginPolicy === 'off') {
     raw.exec(`INSERT OR REPLACE INTO platform_settings(key,value)
       SELECT 'auth.mfa.required:'||id,'false' FROM tenants;

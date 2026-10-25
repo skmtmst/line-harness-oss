@@ -1,5 +1,5 @@
 /**
- * N-065 回帰テスト: 版管理リマインダの実行記録は、外部キー制約の下でも壊れない。
+ *  回帰テスト: 版管理リマインダの実行記録は、外部キー制約の下でも壊れない。
  *
  * friend_reminder_deliveries.reminder_step_id は旧 reminder_steps への FK。
  * 通 ID に版固有の ID (reminder_version_steps.id) を保存すると実 D1 で

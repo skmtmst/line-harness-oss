@@ -63,7 +63,7 @@ export async function acquireWorkflow(db: D1Database,
         const outer=execution.activeStep;execution.activeStep=key;
         let result:T;
         try{result=await work()}finally{execution.activeStep=outer}
-        // Best-effort helpers may swallow a database error. Their unfinished receipts must keep this parent retryable.
+        // 継続可能なヘルパが DB エラーを握り潰しても、未完了の受領票があれば親を再試行可能に保つ。
         const prefixes=[`${key}:`,`line:${key}:`];
         const unfinished=await db.prepare(`SELECT 1 FROM workflow_steps WHERE scope_id=? AND process_kind=? AND subject_id=?
           AND status NOT IN ('succeeded','canceled')

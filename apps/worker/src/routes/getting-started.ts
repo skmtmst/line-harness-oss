@@ -9,7 +9,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { expectedWebhookUrl, fetchWebhookEndpoint } from '../lib/webhook-endpoint.js';
 
 /**
- * はじめの設定の順路。設計 ★34-1（`RAW35`）。台帳 #134。
+ * はじめの設定の順路。設計 ★34-1（`RAW35`）。台帳。
  *
  * **画面を開いたかではなく、実際に作られたもので判定する。**
  * 訪問の記録は持たない。毎回いまの中身を数え、キャッシュもしない

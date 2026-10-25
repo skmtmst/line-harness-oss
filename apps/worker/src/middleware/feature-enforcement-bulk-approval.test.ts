@@ -7,11 +7,11 @@ import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /*
- * R352/R355: 一括承認の所属解決と対象ごとの機能確認。
+ * 一括承認の所属解決と対象ごとの機能確認。
  *
- * - R352: 固定アカウントのない管理者でも、画面と同じ items だけの一括承認
+ * - 固定アカウントのない管理者でも、画面と同じ items だけの一括承認
  *   要求が LINE_ACCOUNT_REQUIRED で止まらない（対象の成果から解決する）。
- * - R355: 別アカウントを指定した一括承認でも、各成果のアカウントで機能オフを
+ * - 別アカウントを指定した一括承認でも、各成果のアカウントで機能オフを
  *   確認する（A指定でB対象を通さない。Bオフは対象ごとに失敗として返す）。
  */
 

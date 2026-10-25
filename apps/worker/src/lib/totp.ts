@@ -132,7 +132,7 @@ async function decryptTotpPayload(payload: string, masterKey: string): Promise<s
   return new TextDecoder().decode(decrypted);
 }
 
-/** Backward compatible with the original encrypted base32 secret. */
+/** 保存済みの暗号化 base32 秘密値も読める形式を保つ。 */
 export async function decryptTotpEnrollment(payload: string, masterKey: string): Promise<{ secret: string; recoveryHashes: string[] }> {
   const plain = await decryptTotpPayload(payload, masterKey);
   if (!plain.startsWith('{')) return { secret: plain, recoveryHashes: [] };
@@ -146,7 +146,7 @@ export async function decryptTotpSecret(payload: string, masterKey: string): Pro
   return (await decryptTotpEnrollment(payload, masterKey)).secret;
 }
 
-/** Eight 40-bit codes (8 base32 characters). Online attempts are account-throttled. Only hashes persist. */
+/** 40ビットのコードを8つ作り、オンライン試行はアカウントごとに制限する。保存するのはハッシュだけ。 */
 export async function createTotpEnrollment(secret: string, masterKey: string) {
   const uniqueCodes = new Set<string>();
   while (uniqueCodes.size < 8) {

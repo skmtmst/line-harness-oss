@@ -1,17 +1,4 @@
-/*
- * R423/R426: 公開受信口は受信口IDから所属を確定する。
- *
- * 落ち方（直前）:
- *   R423 … 画面のコピーURL（queryなし）は feature middleware で
- *     400 LINE_ACCOUNT_REQUIRED になり、正しい署名でも受け付けない。
- *   R426 … query/本文の account を変えるだけで所有先の機能停止を
- *     すり抜けられる（B指定・不存在指定でも200）。
- * 通り方（直後）:
- *   受信口IDの所有先で機能判定する。外部指定の account は使わない。
- *   所有先の停止中は指定の有無・内容にかかわらず止まる。
- *   有効な所有先の受信を無関係な指定で拒否しない。
- *   未知の受信口は従来どおり（route が 404 を返す）。
- */
+/** 公開受信口は受信口 ID の所有先で機能を判定し、query や本文の account を信用しない。コピー URL の正規受信は通し、停止中の所有先は指定方法によらず拒む。実 middleware と DB で確かめる。 */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';

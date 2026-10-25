@@ -588,7 +588,7 @@ describe('style setup', () => {
         .prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'")
         .get(),
     ).not.toEqual(before);
-    // Omitted preferences are retained when editing the contents later.
+    // 後から内容を編集しても、省略した希望設定を消さない。
     const { autoInsert, ...withoutPreference } = payload;
     expect(
       (

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { detectImageMeta, validateRichMenuImage } from './image-validator.js';
 
-// PNG (2500x1686) header — first 33 bytes are enough to read IHDR.
+// PNG の寸法は IHDR を含む先頭33バイトで検証できる。
 const PNG_2500x1686_HEADER = new Uint8Array([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG signature
   0x00, 0x00, 0x00, 0x0d, // IHDR length = 13
@@ -20,7 +20,7 @@ const PNG_2500x843_HEADER = new Uint8Array([
   0x08, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ]);
 
-// Minimal JPEG with SOF0 marker carrying width=2500, height=1686.
+// 幅2500・高さ1686を持つ SOF0 だけを含む最小の JPEG を使う。
 function buildJpeg2500x1686(): Uint8Array {
   return new Uint8Array([
     0xff, 0xd8, // SOI

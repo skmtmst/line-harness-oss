@@ -233,7 +233,7 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
     const scope = await resolveCalendarScope(c);
     const conn = await getCalendarConnectionById(c.env.DB, body.connectionId, scope);
     if (!conn) return fail(c, 404, 'CALENDAR_CONNECTION_NOT_FOUND');
-    // Resolve before writing a booking; bad keys/legacy plaintext must not create partial work.
+    // 不正な鍵や平文で予約だけが保存されないよう、書込前に資格情報を解決する。
     const accessToken = conn.access_token
       ? await decryptCredential(conn.access_token, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY) : null;
 

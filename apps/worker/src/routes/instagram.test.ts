@@ -114,8 +114,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 /**
- * 接続は一段。Instagram にログインして戻ってきた折り返しだけで保存が終わり、
- * ページを選ばせる画面は出さずに設定 › SNS連携へ帰る（2026-10-07 利用者承認）。
+ * 接続を途中で終わらせないよう、Instagram の認可から戻るだけで保存を完了し、ページ選択を挟まず設定の SNS 連携へ戻す。
  */
 async function connect() {
   const start = await read(await req('/api/instagram/oauth/start', {}));

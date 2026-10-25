@@ -4,7 +4,7 @@ import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 
 /**
- * エラー文面の対応表。設計 ★34（要件 -34 §9）。台帳 #134。
+ * エラー文面の対応表。設計 ★34（要件 -34 §9）。台帳。
  *
  * **画面は起動時に一度取って版ごとキャッシュする**（§12）。
  * 表に無いコードは画面側で汎用文面と追跡番号に落とす——

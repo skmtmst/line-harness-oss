@@ -1,4 +1,4 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const eventsPaths = {
   // ── Event applicant operations ─────────────────────────────────────────
   '/api/events/admin/events/{id}/occurrence-selector': {
@@ -69,7 +69,7 @@ export const eventsPaths = {
       },
     },
   },
-  // ── Event lifecycle and change review ─────────────────────────────────
+
   '/api/events/admin/events/{id}/lifecycle': {
     post: {
       tags: ['Events'],

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// N-244: 停止した流入経路の公開URL受付と計測を止める回帰テスト。
+// 停止した流入経路の公開URL受付と計測を止める回帰テスト。
 // active だけが通常受付し、停止は転送先・内部状態を漏らさない同一の
 // 終了応答(410)で止まる。存在しない ref は従来の汎用受付のまま
 // (affiliate 契約テスト (c) の鎖を保つ)で、経路に結びつく計測を増やさない。
 const dbMocks = {
-  // eager module-load deps (mirror affiliate-links-redirect.test.ts)
+
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
@@ -23,11 +23,10 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-// Import after the mock so index.ts binds the mocked helpers.
+// 差替済みのヘルパを入口へ接続するため、モック登録後に読み込む。
 const worker = (await import('../index.js')).default;
 
-// A stub DB is enough: every query goes through the mocked @line-crm/db
-// helpers, so the binding itself is never touched by the /r/:ref handler.
+// 問い合わせは差替済みの DB ヘルパを通るため、D1 本体は使わない。
 const DB = {} as D1Database;
 
 const MOBILE_UA =

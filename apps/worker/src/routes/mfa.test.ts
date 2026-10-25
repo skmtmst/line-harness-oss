@@ -11,7 +11,7 @@ import { staff } from './staff.js';
 import { createStepUpGrant } from '@line-crm/db';
 import { mfaPolicyKey } from '../services/login-mfa.js';
 
-// Keep real token/config validation; simulate only Cloudflare's network response.
+// トークンと設定の検証は実物を使い、Cloudflare の外部応答だけを差し替える。
 vi.mock('../services/turnstile.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../services/turnstile.js')>();
   const verify: typeof actual.verifyTurnstile = (environment, token, ip) => actual.verifyTurnstile(environment, token, ip, async (url, init) => {

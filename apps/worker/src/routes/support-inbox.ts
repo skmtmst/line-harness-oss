@@ -87,12 +87,7 @@ supportInbox.post('/webhooks/xserver/support-email', inputJsonBoundary(), async 
   const formCustomer = recipients.find(
     (recipient) => recipient.address && recipient.address.toLowerCase() !== contactEmail,
   );
-  // EC-CUBE sends the customer receipt to the form submitter and BCCs the
-  // private support mailbox. In that copy Reply-To is the support mailbox,
-  // while To is the actual customer who must own the support thread.
-  // The support mailbox receives the customer receipt as BCC. Its visible To
-  // address is therefore the form submitter, while ordinary inbound mail has
-  // the private contact mailbox in To.
+  // EC-CUBE の控えは問い合わせ窓口へ BCC で届き、Reply-To が窓口でも To は実際の顧客になる。通常の受信と区別し、問い合わせの所有者は提出者へ結び付ける。
   const isContactFormReceipt = Boolean(formCustomer);
   const formData = isContactFormReceipt ? extractContactFormReceipt(parsed.text) : {};
   const sender = isContactFormReceipt
@@ -182,7 +177,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     if (quickFilter && quickFilter !== 'reply' && quickFilter !== 'overdue') {
       return c.json({ success: false, error: 'invalid_quick_filter' }, 400);
     }
-    // These filters belong to the email list; LINE uses /api/chats.
+    // これらの絞込はメール一覧に限り、LINE は /api/chats で扱う。
     if ((assignee || unreadOnly || quickFilter) && channel !== 'email') {
       return c.json({ success: false, error: 'email_channel_required' }, 400);
     }
@@ -197,10 +192,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     let emailUnread = 0;
     let lineTotal = 0;
 
-    // Email threads have no account key in the legacy schema. Until a thread
-    // is explicitly attributed, only the default tenant may view them.
-    // メール問い合わせは LINE アカウントに所属しないため、選択中の
-    // LINE アカウントがあっても対象から外さない（件数の数え方と同じ）。
+    // 所属列のないメール履歴は、明示帰属するまで既定統括だけへ許可する。LINE アカウントには属さないため、選択中のアカウントでは除かず、件数と一致させる。
     if (channel !== 'line' && scope.canSeeUnassigned) {
       const statusSql = status === 'all'
         ? '1=1'
@@ -214,7 +206,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
-        // #625: LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+        // LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         searchSql = `AND (
           instr(lower(t.customer_email), lower(?)) > 0
           OR instr(lower(t.customer_name), lower(?)) > 0
@@ -528,7 +520,7 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
   }
   // 担当は「まだ誰も付いていないとき」だけ、操作した人を入れる。
   //
-  // 以前は毎回 staff.id で上書きしていた。担当を選べるようにすると、
+  // 選択した担当者を保存し、操作した staff.id で上書きしない。
   // 対応を変えるたびに担当が勝手に別の人へ移ってしまう。
   const nextRevision = expectedRevision + 1;
   const correlationId = crypto.randomUUID();

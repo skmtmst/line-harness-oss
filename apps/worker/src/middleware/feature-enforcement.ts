@@ -129,7 +129,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/booking', 'booking'),
   feature('/api/meet-consultations', 'booking'),
   feature('/api/conversions', 'affiliates'),
-  // #819: 計測サイトの管理は成果計測(affiliates)の一部。公開口は /api/public で公開分類済み。
+  // 計測サイトの管理は成果計測(affiliates)の一部。公開口は /api/public で公開分類済み。
   feature('/api/measurement-sites', 'affiliates'),
   feature('/api/affiliates', 'affiliates'),
   feature('/api/affiliate-', 'affiliates'),
@@ -271,7 +271,7 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'public', reason: '登録前・ログイン前にTurnstileと回数制限で守る認証経路' },
   },
   {
-    // 二段階認証の確認と初回設定。セッションはまだ無く、合言葉だけで守る公開経路（N-426）。
+    // 二段階認証の確認と初回設定。セッションはまだ無く、合言葉だけで守る公開経路。
     pattern: /^\/api\/auth\/two-factor\/(verify|setup(?:\/confirm)?)$/,
     methods: ['POST'],
     accountResolver: 'none',
@@ -333,7 +333,7 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'feature', featureId: 'affiliates' },
   },
   {
-    // 管理者確認専用口(#724)。公開の :id 表示と紛らわしいため、固有経路を先に置く。
+    // 管理者確認専用口。公開の :id 表示と紛らわしいため、固有経路を先に置く。
     // requireRole('owner', 'admin') で認証必須。公開口にしない。
     pattern: /^\/api\/forms\/unassigned$/,
     methods: ['GET'],
@@ -398,7 +398,7 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/broadcasts\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcasts WHERE id = ?' },
   { pattern: /^\/api\/broadcast-message-assets\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcast_message_assets WHERE id = ?' },
   { pattern: /^\/api\/reminders\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminders WHERE id = ?' },
-  // R348: friend_reminders 表に所属列は無い。友だちの所属で判定する。
+  // friend_reminders 表に所属列は無い。友だちの所属で判定する。
   { pattern: /^\/api\/friend-reminders\/([^/]+)/, sql: 'SELECT f.line_account_id AS account_id FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.id = ?' },
   { pattern: /^\/api\/reminder-runs\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminder_delivery_runs WHERE id = ?' },
   { pattern: /^\/api\/auto-replies\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM auto_replies WHERE id = ?' },
@@ -408,7 +408,7 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/media\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM media WHERE id = ?' },
   { pattern: /^\/api\/common-vars\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_vars WHERE id = ?' },
   { pattern: /^\/api\/common-actions\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_actions WHERE id = ?' },
-  // #942: 一覧が返すidは の automation_definitions。旧 automations 表だけを
+  // 一覧が返すidは の automation_definitions。旧 automations 表だけを
   // 見ると ルールの稼働切替・改訂下書きが全部 LINE_ACCOUNT_REQUIRED で止まる。
   { pattern: /^\/api\/automations\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM automation_definitions WHERE id = ?', fallbackSql: 'SELECT line_account_id AS account_id FROM automations WHERE id = ?' },
   { pattern: /^\/api\/tracked-links\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM tracked_links WHERE id = ?' },
@@ -416,16 +416,16 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/ad-platforms\/(?!mappings(?:\/|$))([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM ad_platforms WHERE id = ?' },
   { pattern: /^\/api\/friend-add-rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM friend_add_rules WHERE id = ?' },
   { pattern: /^\/api\/conversions\/(?:definitions|points)\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_points WHERE id = ?' },
-  // R351: 成果の所属は地点表が持つ。イベント表に列は無いので結合して引く。
+  // 成果の所属は地点表が持つ。イベント表に列は無いので結合して引く。
   { pattern: /^\/api\/conversions\/events\/([^/]+)/, sql: 'SELECT cp.line_account_id AS account_id FROM conversion_events ce JOIN conversion_points cp ON cp.id = ce.conversion_point_id WHERE ce.id = ?' },
   { pattern: /^\/api\/events\/admin\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM events WHERE id = ?' },
-  // #1075: たまる決めごとの停止・再開・削除は payload に account を載せない。
+  // たまる決めごとの停止・再開・削除は payload に account を載せない。
   // 照合が無いと PUT/DELETE /api/mileage/rules/:id が全部 LINE_ACCOUNT_REQUIRED で止まる。
   { pattern: /^\/api\/mileage\/rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM mileage_rules WHERE id = ?' },
 ];
 
 /**
- * R348/R349: 親ではなく行の送信元アカウントで担当を判定する口。
+ * 親ではなく行の送信元アカウントで担当を判定する口。
  * 履歴・登録の一覧と、登録1件の操作（日時変更・取消・再開）が対象。
  * 行の絞り込み自体は route 側で行い、ここでは「通してよいか」だけ決める。
  */
@@ -514,9 +514,7 @@ async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
 }
 
 async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; accountMismatch: boolean }> {
-  // Customer booking changes use a compatibility URL outside /api/liff. Keep
-  // the normal event feature gate, but resolve its owner from the stored LIFF
-  // mapping rather than an untrusted account parameter or an admin session.
+  // /api/liff 外の互換予約 URL もイベントの機能判定を通す。所有者は未検証のパラメータや管理セッションでなく、保存済み LIFF 対応から解決する。
   if (c.req.method === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(c.req.path)) {
     const liffId = c.req.query('liffId');
     const account = liffId ? await dbFor(c.env).prepare(
@@ -525,7 +523,7 @@ async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; acco
     return { ids: account ? [account.id] : [], accountMismatch: false };
   }
   /*
-   * R423/R426/R428: 公開受信口は受信口IDから所属を確定する。
+   * 公開受信口は受信口IDから所属を確定する。
    * 画面のコピーURL（queryなし）でも通り、外部指定の account は使わない。
    * 別 account・不存在の指定で所有先の機能停止をすり抜けられない。
    * 有効な所有先の受信を無関係な指定で拒否しない。
@@ -548,7 +546,7 @@ async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; acco
     }
     // 未知の受信口は従来の解決へ（route が 404 を返す）。
   }
-  // R348: query と body の両方に所属があるときは両方を見る。query だけを
+  // query と body の両方に所属があるときは両方を見る。query だけを
   // 見ると、query に旧所属・body に新所属を書いて検査をすり抜けられる。
   // 両方が食い違う入力はどちらを信じるか決められないため断る。
   let queryAccount: string | null = null;
@@ -603,7 +601,7 @@ async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; acco
     if (row?.line_account_id) return { ids: [row.line_account_id], accountMismatch: false };
   }
   // /api/scenario-subscriptions/:id/... は本体に account を載せない。
-  // 購読の友だちが属するアカウントで機能設定を見る（#949 N-054）。
+  // 購読の友だちが属するアカウントで機能設定を見る。
   const subscription = /^\/api\/scenario-subscriptions\/([^/]+)/.exec(c.req.path);
   if (subscription) {
     const row = await dbFor(c.env).prepare(
@@ -629,7 +627,7 @@ const BULK_APPROVAL_PATH = '/api/conversions/approvals/bulk';
 const BULK_APPROVAL_MAX_ITEMS = 100;
 
 /**
- * m22u R352・R355：一括承認の対象IDから所属アカウントを引く。
+ * m22u ・：一括承認の対象IDから所属アカウントを引く。
  *
  * 一括の body は items（成果IDの列）だけで、アカウントを載せない。
  * URL にも対象IDが無いため従来の解決では空になり、固定アカウントのない
@@ -694,7 +692,7 @@ async function resolveBulkApprovalScope(
   const staff = c.get('staff');
   if (explicit.length > 0) {
     /*
-     * R355: 指定したアカウントと対象の所属が違うときは全体を拒否する。
+     * 指定したアカウントと対象の所属が違うときは全体を拒否する。
      * A の名前で B の成果を通す抜け道にしない。
      */
     if (union.some((account) => !explicit.includes(account))) {
@@ -798,7 +796,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
   }
   if (classification.kind !== 'feature') return next();
 
-  // m22u R352・R355: 一括承認は items の成果IDから所属を引いて判定する。
+  // m22u ・: 一括承認は items の成果IDから所属を引いて判定する。
   // URL に資源が無いため従来の解決では空になり、固定アカウントの無い管理者が
   // LINE_ACCOUNT_REQUIRED で止まる。items の成果IDから所属を引いて判定する。
   if (c.req.method === 'POST' && c.req.path === BULK_APPROVAL_PATH) {
@@ -813,7 +811,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
   }
   const staff = c.get('staff');
   const db = dbFor(c.env);
-  // R348/R349: 履歴・登録の口は親の所属だけで閉じない。行の送信元
+  // 履歴・登録の口は親の所属だけで閉じない。行の送信元
   // アカウントのどれかを担当していれば通し、行の絞り込みは route 側で行う。
   const rowScopedReminderId = matchRowScopedReminderId(c.req.path);
   if (rowScopedReminderId) {
@@ -832,7 +830,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
 };
 
 /**
- * 機能設定の強制（本文）。行単位の口（R348/R349）と通常の口で共有する。
+ * 機能設定の強制（本文）。行単位の口と通常の口で共有する。
  * accountIds は「この要求で機能判定する所属」の確定ずみ一覧。
  */
 async function enforceAccounts(

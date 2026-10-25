@@ -44,7 +44,7 @@ function routeApp(current: AuthenticatedStaff | undefined) {
   instance.post('/api/automations/:id/draft', (c) => c.json({ success: true }));
   instance.put('/api/mileage/rules/:id', (c) => c.json({ success: true }));
   instance.delete('/api/mileage/rules/:id', (c) => c.json({ success: true }));
-  // R351: 成果の個別操作（取消履歴・取消・承認/却下）。判定までが対象なので stub で足りる。
+  // 成果の個別操作（取消履歴・取消・承認/却下）。判定までが対象なので stub で足りる。
   instance.get('/api/conversions/events/:id/reversals', (c) => c.json({ success: true }));
   instance.post('/api/conversions/events/:id/reversals', (c) => c.json({ success: true }));
   instance.patch('/api/conversions/events/:id/approval', (c) => c.json({ success: true }));
@@ -97,7 +97,7 @@ function seedResources(testDb: SqliteD1): void {
       (id, name, event_type, line_account_id, created_at)
     VALUES ('cv-1', '成果地点1', 'purchase', 'account-1', ?)
   `).run(now);
-  // R351: account-1 の地点にぶら下がる成果1件。所属は地点表だけが持つ。
+  // account-1 の地点にぶら下がる成果1件。所属は地点表だけが持つ。
   testDb.raw.prepare(`
     INSERT INTO conversion_events
       (id, conversion_point_id, friend_id, created_at)
@@ -308,7 +308,7 @@ describe('WRITE-01: 対象IDからの所属account解決', () => {
   });
 
   it('オートメーション定義の稼働切替も対象の所属accountで通る', async () => {
-    // #1063: automation_definitions の行は旧 automations 表に無い。
+    // automation_definitions の行は旧 automations 表に無い。
     // 旧表だけを見る所有解決だと ルールへの操作が全部 LINE_ACCOUNT_REQUIRED で止まる。
     setFeature(testDb, 'account-1', 'automations', true);
     const app = routeApp(staff('env-owner'));
@@ -357,7 +357,7 @@ describe('WRITE-01: 対象IDからの所属account解決', () => {
   });
 
   it('たまる決めごとの停止（isActiveのみのPUT）も対象の所属accountで通る', async () => {
-    // #1075: PUT /api/mileage/rules/:id は {isActive} だけを送り、
+    // PUT /api/mileage/rules/:id は {isActive} だけを送り、
     // account を載せない。所有照合が無いと LINE_ACCOUNT_REQUIRED で止まる。
     setFeature(testDb, 'account-1', 'mileage', true);
     const app = routeApp(staff('env-owner'));

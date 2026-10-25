@@ -143,7 +143,7 @@ entryRoutes.get('/api/entry-routes', async (c) => {
   try {
     const staff = c.get('staff');
     const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
-    // N-011: 選択accountをAPIへ渡し、DBの行と共通境界で照合する。
+    // 選択accountをAPIへ渡し、DBの行と共通境界で照合する。
     // 範囲外の指定は「ない」ものとして404にする。
     const requested = (c.req.query('account_id') ?? '').trim();
     const decision = await resolveRequestBoundary(c.env.DB, staff, requested || undefined);
@@ -225,7 +225,7 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), inputJsonBo
         code: 'LINE_ACCOUNT_REQUIRED',
       }, 400, ["lineAccountId","line_account_id","accountId","account_id"]);
     }
-    // N-011 と同じ境界で照合する。範囲外の指定は「ない」ものとして404にする。
+    //  と同じ境界で照合する。範囲外の指定は「ない」ものとして404にする。
     const decision = await resolveRequestBoundary(c.env.DB, staff, lineAccountId);
     if (!decision.allowed) return c.json({ success: false, error: 'Not found' }, 404);
     const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
@@ -242,7 +242,7 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), inputJsonBo
   }
 });
 
-// PATCH /api/entry-routes/:id — update
+
 entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), inputJsonBoundary({"refCode":["string"],"genre":["null","string"],"name":["string"],"tagId":["null","string"],"scenarioId":["null","string"],"redirectUrl":["null","string"],"poolId":["null","string"],"introTemplateId":["null","string"],"runAccountFriendAddScenarios":["boolean"],"isActive":["boolean"],"stoppedReason":["null","string"]}), async (c) => {
   try {
     const id = c.req.param('id');
@@ -312,7 +312,7 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), inputJ
   }
 });
 
-// DELETE /api/entry-routes/:id
+
 entryRoutes.delete('/api/entry-routes/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');

@@ -8,7 +8,7 @@ deliveryPurposePreview.use('/api/delivery-purposes*',requirePermission('/broadca
 deliveryPurposePreview.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'purpose_preview_unavailable'},e instanceof GapError?e.status:503));
 const purposes=[{id:'transaction',label:'予約・支払いなどの取引の連絡',sendAvailable:false,simulationAvailable:true},{id:'notice',label:'お知らせ',sendAvailable:false,simulationAvailable:true},{id:'marketing',label:'宣伝',sendAvailable:true}]as const;
 deliveryPurposePreview.get('/api/delivery-purposes',async c=>{await gapAccount(c);return c.json({success:true,data:purposes});});
-/** This endpoint never saves or sends. Existing broadcast delivery remains marketing. */
+/** 保存や送信は行わない。既存の一斉配信はマーケティング用途の判定を維持する。 */
 deliveryPurposePreview.post('/api/delivery-purposes/preview',async c=>{
  const a=await gapAccount(c),b=await gapBody(c);if(!purposes.some(p=>p.id===b.purpose))throw new GapError('invalid_purpose');
  const aliases=purposeAliases[b.purpose as BroadcastPurpose];

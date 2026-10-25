@@ -6,7 +6,7 @@ export type Registration = {
 };
 const GUARDS = new Set(['requireRole', 'requirePermission', 'requireDeliveryAccess', 'requirePlatformAdminWrite', 'authMiddleware']);
 
-/** Import names alone never protect a route: only middleware arguments count. */
+/** import 名だけで保護済みとはせず、middleware の引数として登録したものだけを数える。 */
 export function registrations(source: string | ts.SourceFile): Registration[] {
   const file = typeof source === 'string' ? ts.createSourceFile('routes.ts', source, ts.ScriptTarget.Latest, true) : source;
   const aliases = new Map<string, ts.Expression | string>();

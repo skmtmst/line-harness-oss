@@ -89,7 +89,7 @@ export async function deliveryIntegrationFailures(
 /**
  * 外部連携の確認に出す件数を、3つの台帳から1つに畳んで返す。
  * - `outgoing_webhooks`: 送信先ごとの連続失敗。
- * - `google_sheets_integrations`（#838 第2段）: 連続失敗と要再接続。
+ * - `google_sheets_integrations`（ 第2段）: 連続失敗と要再接続。
  * - `rt_delivery_*`（出前館QA#3）: デリバリー連携の送信・受信の失敗と連携切れ。
  */
 export async function externalIntegrationsSummary(

@@ -110,11 +110,7 @@ export function hasConfiguredRelayChannelGate(
     configuredRelayValues(configuredPrefixes).length > 0;
 }
 
-/**
- * Exact channel IDs are accepted without a network request. Range channels
- * may instead be admitted by a fail-closed range-name check against Slack's
- * authoritative conversations.info response.
- */
+/** 完全一致のチャネル ID は通信なしで許可し、範囲チャネルは Slack の正規応答の名前を検証できた場合だけ許可する。 */
 export async function isAllowedRelayChannel(
   config: Pick<Env['Bindings'],
     'SLACK_BOT_TOKEN' | 'CODEX_ALLOWED_CHANNEL_IDS' | 'CODEX_ALLOWED_CHANNEL_NAME_PREFIXES'>,
@@ -172,7 +168,7 @@ export function createCodexQueueFailureLog(input: {
   };
 }
 
-/** Never persist or log exception bodies; reduce them to an operational class. */
+/** 例外本文は保存・記録せず、運用上の固定分類へ落とす。 */
 export function classifyCodexMonitorError(error: unknown): CodexMonitorErrorClassification {
   const candidate = error as {
     name?: unknown;
@@ -300,8 +296,7 @@ export async function observeOfficialCodexReply(
   `).bind(channelId, threadTs).first<{ slack_event_id: string; status: CodexMonitorStatus }>();
   if (!row) return { tracked: false, duplicateRisk: false, taskUrl: classification.taskUrl };
 
-  // fallback_running means that the user-authored relay was posted and the
-  // official Codex receipt is the expected next event, not a duplicate run.
+  // fallback_running は利用者本文の中継済みを表し、次に期待する公式 Codex の受領を重複実行と扱わない。
   const duplicateRisk = false;
   const nextStatus: CodexMonitorStatus = classification.state === 'failed'
     ? 'official_failed'
@@ -489,9 +484,7 @@ async function processOfficialInspection(
     return;
   }
   if (row.status === 'fallback_running') {
-    // If the producer response was lost after the user relay succeeded, the
-    // original message may be retried. Recreate only the idempotent receipt
-    // inspection; never post the user relay a second time.
+    // 中継成功後の応答喪失でも利用者本文を二重投稿せず、冪等な受領確認だけを再作成する。
     await env.CODEX_MENTION_QUEUE?.send(traceQueueMessage({
       kind: 'inspect_relay',
       slackEventId: message.slackEventId,

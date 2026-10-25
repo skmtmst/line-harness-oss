@@ -1,4 +1,4 @@
-/** Stamp attribution without changing downloaded bytes or exposing the actor's name. */
+/** ダウンロードのバイトと担当者の匿名性を保ったまま、出力の帰属を付ける。 */
 export function exportedResponseHeaders(staffId: string, disposition: string | null, at = new Date().toISOString()): Record<string, string> {
   const actor = staffId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 100);
   const headers: Record<string, string> = { 'X-Exported-By': actor, 'X-Exported-At': at };

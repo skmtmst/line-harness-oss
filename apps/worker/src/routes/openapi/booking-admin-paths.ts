@@ -1,6 +1,6 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const bookingAdminPaths = {
-  // ── Booking detail edit / retry / audit (N-389〜N-394 #932) ─────────────
+  // ── Booking detail edit / retry / audit  ─────────────
   '/api/booking/admin/bookings.csv': {
     get: {
       tags: ['Booking'], summary: '予約台帳をCSVで書き出す',
@@ -153,7 +153,7 @@ export const bookingAdminPaths = {
       },
     },
   },
-  // ── Booking staff breaks (N-405 #655) ────────────────────────────────────
+  // ── Booking staff breaks  ────────────────────────────────────
   '/api/booking/admin/staff/{id}/breaks': {
     get: {
       tags: ['Booking'],
@@ -196,7 +196,7 @@ export const bookingAdminPaths = {
       responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid date, DST gap, overlap, outside hours, or time range' } },
     },
   },
-  // ── Booking staff self link (N-411 #866) ─────────────────────────────
+  // ── Booking staff self link  ─────────────────────────────
   '/api/booking/admin/staff/me': {
     get: {
       tags: ['Booking'],
@@ -211,7 +211,7 @@ export const bookingAdminPaths = {
       },
     },
   },
-  // ── Booking staff×menu matrix bulk save (N-410 #819) ──────────────────
+  // ── Booking staff×menu matrix bulk save  ──────────────────
   '/api/booking/admin/staff-menus': {
     get: {
       tags: ['Booking'],

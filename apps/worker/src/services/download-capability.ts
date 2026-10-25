@@ -1,4 +1,4 @@
-/** Short lived, purpose-bound capability. Never sign a caller-provided origin. */
+/** 有効期限と用途を限定した権限票とし、呼出元が指定した origin には署名しない。 */
 export const DOWNLOAD_TTL_SECONDS = 15 * 60;
 
 async function key(secret: string): Promise<CryptoKey> {
@@ -31,7 +31,7 @@ export async function validDownload(
   const now = Math.floor(Date.now() / 1000);
   if (!secret || !/^\d{10}$/.test(expires) || !/^[a-f0-9]{64}$/.test(signature)
     || Number(expires) <= now || Number(expires) > now + DOWNLOAD_TTL_SECONDS) return false;
-  // The format check above fixes the signature at exactly 32 bytes.
+  // 先の形式検証で、署名は32バイトに固定されている。
   const bytes = Uint8Array.from({ length: 32 }, (_, i) => parseInt(signature.slice(i * 2, i * 2 + 2), 16));
   return crypto.subtle.verify('HMAC', await key(secret), bytes, message(purpose, resource, owner, expires));
 }

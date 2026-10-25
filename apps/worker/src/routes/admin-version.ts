@@ -17,10 +17,7 @@ type Env = {
   };
 };
 
-// Unauthenticated by design — returns build-time public metadata used by the
-// dashboard's upgrade banner before the user logs in. The manifest proxy exists
-// because GitHub release assets do not reliably send browser CORS headers.
-// The retired /admin/update/* router does not affect this public metadata.
+// ログイン前の更新案内でも使うため、ビルド時の公開情報は未認証で返す。GitHub の公開成果物は CORS が安定しないため manifest を中継する。更新操作の停止とは独立に扱う。
 const app = new Hono<Env>();
 
 /*

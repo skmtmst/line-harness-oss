@@ -1,7 +1,7 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const chatsPaths = {
   /*
-   * 画像と本文を1回の送信単位にする（N-022）。2回に分けると画像だけが
+   * 画像と本文を1回の送信単位にする。2回に分けると画像だけが
    * 先に届く部分送信になる。片方だけの送信もこの口で受け付ける。
    */
   '/api/chats/{id}/send-combined': {
@@ -45,7 +45,7 @@ export const chatsPaths = {
     },
   },
   /*
-   * N-026: 送信内容の差し込み解決プレビュー。/send と同じ解決器を通し、
+   * 送信内容の差し込み解決プレビュー。/send と同じ解決器を通し、
    * 未解決のまま残る差し込み名を返す(送信はそれらを400で拒否する)。
    * 読み取りのみ。LINE呼出し・履歴書込みは行わない。
    */
@@ -76,7 +76,7 @@ export const chatsPaths = {
     },
   },
   /*
-   * N-025: 返信の送信予約。作成は Idempotency-Key 必須で、時刻は未来のみ。
+   * 返信の送信予約。作成は Idempotency-Key 必須で、時刻は未来のみ。
    * 予約の実行はcronのscheduledジョブがlease付きで行う。
    */
   '/api/chats/{id}/schedule': {

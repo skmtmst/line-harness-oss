@@ -7,7 +7,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { defaultActionScoreRuleBundle } from '@line-crm/db';
 
 /**
- * M505: 下書き保存の応答喪失後、再送が「ほかの人が先に保存しています」の
+ * 下書き保存の応答喪失後、再送が「ほかの人が先に保存しています」の
  * 輪にならない。要求キー付きの再送は、同じ内容なら保存済みの結果を返す。
  *
  * 実ルート（action-score-rules.ts）＋実DB（createTestD1）で確かめる。

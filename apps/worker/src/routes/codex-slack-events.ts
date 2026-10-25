@@ -256,8 +256,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     return c.json({ success: true, observed: observed.tracked });
   }
 
-  // The relay itself contains a real Codex mention. Ignore the explicit marker
-  // before mention detection so the Worker cannot recursively relay its own post.
+  // 中継メッセージの Codex メンションで再起動しないよう、メンション検出より先に中継印を除外する。
   if (isAutomaticCodexRelay(event.text)) {
     return c.json({ success: true, ignored: true });
   }

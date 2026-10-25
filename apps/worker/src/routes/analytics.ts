@@ -134,7 +134,7 @@ function nextReportRun(input: {
   cadence: 'weekly' | 'monthly'; weekday: number | null; monthDay: number | null;
   sendTime: string; timeZone: string; now: Date;
 }): string {
-  // R458: 0時のUTC換算＋時分の加算は夏時間の切替日に1時間ずれる。
+  // 0時のUTC換算＋時分の加算は夏時間の切替日に1時間ずれる。
   // その日のその時刻を壁時計として解き直す（services/zoned-time.ts）。
   const currentDate = dateInZone(input.now, input.timeZone);
   const candidateDate = new Date(`${currentDate}T00:00:00.000Z`);
@@ -201,7 +201,7 @@ function parseReportBody(raw: unknown): { ok: true; value: {
     : [];
   if (!channels.length) return { ok: false, error: '通知方法を選んでください' , field: "channels" };
   const recipients: AnalyticsReportRecipient[] = [];
-  // R228: 形が合わない宛先を黙って外さない。正しい宛先と混ざっていても、
+  // 形が合わない宛先を黙って外さない。正しい宛先と混ざっていても、
   // 不備のある行を示して止める（送ったつもりが届いていないを防ぐ）。
   for (const item of Array.isArray(body.recipients) ? body.recipients : []) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
@@ -566,7 +566,7 @@ analytics.get('/api/analytics/report-schedules', async (c) => {
       getAnalyticsReportSchedules(c.env.DB, account.accountId),
       getSavedAnalytics(c.env.DB, account.accountId),
       reportRecipientOptions(c, account.accountId),
-      // R454: しまった1回送信の直近分も返す。一覧から消えても
+      // しまった1回送信の直近分も返す。一覧から消えても
       // 失敗に気づき、依頼IDの結果へ進めるようにする。
       getRecentOneTimeAnalyticsReportRuns(c.env.DB, account.accountId),
     ]);
@@ -627,7 +627,7 @@ const REPORT_SCHEDULE_CONFLICT =
   'この定期レポートは別の画面で先に更新されました。最新の内容を読み込み直してください';
 
 /*
- * R526: 同じ要求キーで同じ内容なら、既にある予約を返す。
+ * 同じ要求キーで同じ内容なら、既にある予約を返す。
  *
  * 作成の直後に応答だけ失われると、画面は失敗表示のまま「つくって動かす」を
  * もう一度押せる。要求キーなしでは2件目の有効な予約ができ、同じ内容が重複
@@ -684,7 +684,7 @@ analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'),
     }
     const validationError = await validateReportPayload(c, account.accountId, parsed.value);
     if (validationError) return inputError(c, { success: false, error: validationError }, 422, [validationError.includes('保存済み分析') ? 'savedAnalysisIds' : 'recipients']);
-    // R526: 要求キー（UUID）を付けた作成は、応答消失後の再送でも
+    // 要求キー（UUID）を付けた作成は、応答消失後の再送でも
     // 同じ予約へ戻す。キーが無い従来の呼び出しはそのまま通す。
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim() || null;
     if (idempotencyKey && !isValidIdempotencyKey(idempotencyKey)) {
@@ -832,7 +832,7 @@ analytics.put('/api/analytics/report-schedules/:id/status', requireRole('owner',
   }
 });
 
-// R454: 1回送信の依頼は送信後に一覧から消える（archived のため）。
+// 1回送信の依頼は送信後に一覧から消える（archived のため）。
 // 依頼IDから失敗理由・宛先別結果へ到達できるよう、履歴を返す。
 // しまったものも含めて引くが、別アカウントのIDは Not found にする。
 analytics.get('/api/analytics/report-schedules/:id/runs', async (c) => {
@@ -852,7 +852,7 @@ analytics.get('/api/analytics/report-schedules/:id/runs', async (c) => {
   }
 });
 
-// R454: 確定失敗の1回送信だけ送り直せる入口。一部でも届いたものは
+// 確定失敗の1回送信だけ送り直せる入口。一部でも届いたものは
 // 送り直さない（重複を防ぐ）。届いていないことの確認は最新履歴の
 // 宛先別結果で行い、送り直しは新しい実行記録として残す。
 analytics.post('/api/analytics/report-schedules/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
@@ -905,7 +905,7 @@ analytics.get('/api/funnels', async (c) => {
 
 // 作成時点の段・期間・比較条件を第1版として固定する。
 /**
- * N-256/N-258: 段に「成果」が入ったファネルを保存したら、成果地点側の
+ * 段に「成果」が入ったファネルを保存したら、成果地点側の
  * 「使う場所」台帳へこのファネルを実IDで記す。
  *
  * 段の中の conversionPointId は作る側で確かめ済み(同じアカウントの
@@ -915,7 +915,7 @@ analytics.get('/api/funnels', async (c) => {
  * 作成の成功は変えない。
  */
 /*
- * CONVERSION-05: 段に置かれた成果地点への利用関係を必ず記す。
+ * 段に置かれた成果地点への利用関係を必ず記す。
  * 下書き・停止中の地点は手追加の口では弾くが、ファネルの段は実際に
  * 参照している事実なので allowInactive で記す。登録に失敗した地点名を
  * 返し、呼び出し側は応答へ載せる——作成は成功したのに利用先一覧へ

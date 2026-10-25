@@ -75,11 +75,7 @@ reminders.put('/api/reminders/:id', requireDeliveryAccess('reminders'), inputJso
 reminders.delete('/api/reminders/:id', requireDeliveryAccess('reminders'), delete__api_reminders_id_4);
 
 /**
- * POST /api/reminders/:id/restore — 削除の取り消し（B 元に戻す）。
- *
- * 定義の deleted_at だけを戻す。戻した直後は止めたまま。
- * 削除時に取り消した登録・配信予定は戻さない（日時が過ぎた相手へ
- * いきなり送らないため）。消していない行・無い行は 404。
+ * 削除の取消後に過去の通知を突然送らないよう、定義の deleted_at だけを戻し、停止と登録・配信予定の取消は維持する。存在しない行や未削除の行は404とする。
  */
 reminders.post('/api/reminders/:id/restore', requireDeliveryAccess('reminders'), inputJsonBoundary(), post__api_reminders_id_restore_5);
 
@@ -93,7 +89,7 @@ reminders.delete('/api/reminders/:id/steps/:stepId', requireDeliveryAccess('remi
 
 reminders.post('/api/reminders/:id/enroll/:friendId', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"targetDate":["string"]}), post__api_reminders_id_enroll_friendId_8);
 
-/** N-064: リマインダ別の登録者を、直接URLから安全に確認できる一覧。 */
+/** リマインダ別の登録者を、直接URLから安全に確認できる一覧。 */
 reminders.get('/api/reminders/:id/registrants', requireRole('owner', 'admin', 'staff'), get__api_reminders_id_registrants_9);
 
 /** 基準日を変える。旧日程の未送信だけを止め、送信済み履歴は残す。 */

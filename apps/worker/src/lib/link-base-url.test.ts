@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── DB mock ───────────────────────────────────────────────────────────────────
-// We mock only the getLinkBaseUrl helper from @line-crm/db so the test
-// exercises resolveLinkBaseUrl without a real D1 binding.
+// 実 D1 なしで URL 解決を検証するため、getLinkBaseUrl だけを差し替える。
 
 const dbMocks = {
   getLinkBaseUrl: vi.fn<() => Promise<string | null>>(),
@@ -10,7 +8,7 @@ const dbMocks = {
 
 vi.mock('@line-crm/db', () => dbMocks);
 
-// Import after mock registration.
+// 差替を確実に反映するため、モック登録後に読み込む。
 const { resolveLinkBaseUrl } = await import('./link-base-url.js');
 
 const DB = {} as D1Database;
@@ -70,7 +68,7 @@ describe('resolveLinkBaseUrl', () => {
     });
 
     it('uses the stored domain even when WORKER_URL is missing', async () => {
-      // If a custom domain is set, WORKER_URL is irrelevant and must not throw.
+      // 独自ドメインがあれば WORKER_URL は不要なので、未設定でも失敗させない。
       const base = await resolveLinkBaseUrl(DB, {});
       expect(base).toBe('https://go.example.com');
     });

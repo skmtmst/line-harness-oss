@@ -28,7 +28,7 @@ export function requireRole(...allowed: StaffRole[]): MiddlewareHandler<Env> {
 }
 
 /**
- * 項目別permissionによる門番（N-411）。
+ * 項目別permissionによる門番。
  *
  * owner/admin は常に通す。staff は保存済みの権限キーで判定する:
  *   - permissionKeys … すべてのメソッドで有効（edit）

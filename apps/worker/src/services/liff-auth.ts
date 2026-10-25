@@ -2,8 +2,7 @@ import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { getLineAccountLoginChannels } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
-// The unverified audience selects a single verification endpoint candidate only.
-// Identity is trusted only after LINE verifies the token for that client_id.
+// 未検証の aud は検証先の候補選択だけに使い、その client_id について LINE がトークンを検証してから本人を信用する。
 function tokenAudience(token: string): string | null {
   try {
     const parts = token.split('.');

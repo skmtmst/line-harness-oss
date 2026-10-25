@@ -1,6 +1,6 @@
 import { api9Schemas } from '../api9-openapi.js';
 
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const schemas = {
   ...api9Schemas,
   ApiErrorDetail: {

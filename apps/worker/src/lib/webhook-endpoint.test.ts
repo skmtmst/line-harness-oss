@@ -2,7 +2,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { compareWebhookUrl, expectedWebhookUrl, fetchWebhookEndpoint } from './webhook-endpoint.js';
 
 /**
- * Webhook の照合。台帳 #134（はじめの設定の段1が要る）。
+ * Webhook の照合。台帳 （はじめの設定の段1が要る）。
  *
  * 守りたいのは 1 点——**「確かめていない」を「登録されていない」と言わない**こと。
  * 通信が失敗しただけで「未登録」と出すと、運用者は直っているものを直しに行く。

@@ -79,7 +79,7 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
         clauses.push(accountParts.length > 0 ? `(${accountParts.join(' OR ')})` : '1 = 0');
       }
       if (q) {
-        // N-077: 「名前・内容で検索」と画面が言う以上、通知本文も対象にする。
+        // 「名前・内容で検索」と画面が言う以上、通知本文も対象にする。
         // JOIN だと通の数だけ行が増えて total がずれるので EXISTS で検査する。
         // 本文は公開済みが reminder_steps、まだ公開していない下書きが
         // current_draft_version_id のぶら下がる reminder_version_steps にある。
@@ -107,7 +107,7 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
       else if (status === 'stopped') clauses.push(`(r.lifecycle_status = 'stopped' OR r.is_active = 0)`);
       else if (status) return c.json({ success: false, error: 'status is invalid' }, 400);
 
-      // N-072: 並び順は画面の選択をそのままSQLへ流さず、白名簿で列へ写す。
+      // 並び順は画面の選択をそのままSQLへ流さず、白名簿で列へ写す。
       const sortKey = c.req.query('sort') ?? 'order';
       const sortSpec = REMINDER_LIST_SORTS[sortKey];
       if (!sortSpec) return c.json({ success: false, error: 'sort is invalid' }, 400);
@@ -320,7 +320,7 @@ export const put__api_reminders_id_draft_6 = async (c: Context<Env, "/api/remind
     if (folderError) return inputError(c, { success: false, error: folderError }, 422, ["folderId"]);
     const referenceError = await validateReminderDraftReferences(c.env.DB, parsed.value);
     if (referenceError) return inputError(c, { success: false, error: referenceError }, 422, ["steps"]);
-    // N-080: 画面を開いたときの下書き版を送ってもらい、先に別の保存・公開が
+    // 画面を開いたときの下書き版を送ってもらい、先に別の保存・公開が
     // 走っていたら 409 で止める。古い画面からの上書き保存を防ぐ。
     if (parsed.value.leapYearPolicy === undefined) {
       const currentDraft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
@@ -340,7 +340,7 @@ export const put__api_reminders_id_draft_6 = async (c: Context<Env, "/api/remind
       && typeof (rawBody as Record<string, unknown>).expectedVersionId === 'string'
       ? (rawBody as Record<string, unknown>).expectedVersionId as string
       : undefined;
-    // R148 監査：対象設定の保存も通知ステップと同じ条件にする。版IDに加え、
+    //  監査：対象設定の保存も通知ステップと同じ条件にする。版IDに加え、
     // 保存のたびに変わる版時刻も照合し、ずれていれば 409 で止める。
     const expectedUpdatedAt = rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
       && typeof (rawBody as Record<string, unknown>).expectedUpdatedAt === 'string'

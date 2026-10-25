@@ -247,7 +247,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
   }
 });
 
-/** Explicit owner-only tenant overview for operational monitoring. */
+/** 統括全体の運用情報は、明示的にオーナーだけへ許可する。 */
 dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), async (c) => {
   try {
     const period = readPeriod(c.req.query('period'));
@@ -446,7 +446,7 @@ function jstDayStart(now: Date): string {
 }
 
 /**
- * L (#824 数字の出どころ): 失敗の数を通知の送達台帳から出どころ別に数える。
+ * L ( 数字の出どころ): 失敗の数を通知の送達台帳から出どころ別に数える。
  *
  * 同じ失敗は通知1件として数え、送り直しは数えない。件数は台帳の件数と
  * 一致する。カードの「i」はこの応答の出どころと時点を見せる。

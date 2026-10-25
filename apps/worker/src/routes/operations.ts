@@ -134,7 +134,7 @@ function parseRestoreReport(raw: string | null): unknown {
 }
 
 /*
- * R573: 停止の状態確定後に receipt の保存だけ失敗したときの再送を補う。
+ * 停止の状態確定後に receipt の保存だけ失敗したときの再送を補う。
  *
  * receipt が無い再送は停止処理へ進み、版が進んでいるため版競合になる。
  * 置き去りの部分実行か、他人の確定済み要求との競合かは、動いている停止記録と
@@ -206,7 +206,7 @@ async function repairOrphanedStop(
 }
 
 /*
- * R573: 復旧の状態確定後に receipt の保存だけ失敗したときの再送を補う。
+ * 復旧の状態確定後に receipt の保存だけ失敗したときの再送を補う。
  *
  * 復旧済みの再送は対象外(OPERATION_NOT_STOPPED)に、版だけ進んだ部分復旧の
  * 再送は版競合になる。どちらも「自分が確定させた対象に誰の receipt も無い」
@@ -463,11 +463,7 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
       auto_reply_dispatch: impact.auto_reply_dispatch.itemCount,
     };
     /*
-     * N-456: 読み取りGETでは監査記録を書かない。
-     *
-     * 以前はプレビューを表示するたびに 'previewed' が operation_audit へ
-     * 増え、停止・復旧の操作記録が見るだけの記録に埋もれていた。
-     * 記録するのは操作・判断を伴う更新(停止・復旧・受領・再送)だけにする。
+     * 停止・復旧などの判断の記録が閲覧で埋もれないよう、読み取り GET では監査を書かず、更新操作だけを記録する。
      */
     const calculatedAt = new Date().toISOString();
     const canControl = canControlEmergency(c);
@@ -477,7 +473,7 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
         control,
         counts,
         impact,
-        // N-453: 停止できない理由を画面が運用者向け文言へ変えるための機械コード。
+        // 停止できない理由を画面が運用者向け文言へ変えるための機械コード。
         // 権限があるときは null。文言そのものは画面側が持つ。
         permissions: {
           canControl,
@@ -492,7 +488,7 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
 });
 
 /*
- * 送信経路の台帳 (#1050)。
+ * 送信経路の台帳。
  *
  * 「停止ボタンが見える」だけでは各経路が止まるか分からないため、実装が
  * 名乗った経路一覧と、いまの停止対象ごとの状態をそのまま返す。
@@ -657,7 +653,7 @@ operations.post(
       /*
        * 再認証grantの未所持・期限切れは、画面が6桁コードの入力からやり直せる
        * 通常の状態。管理画面の共通401処理（セッション喪失モーダル）に
-       * 取られないよう、機械コードを付けて区別する（#1058）。
+       * 取られないよう、機械コードを付けて区別する。
        * HTTPステータスは呼び出し側の既存分岐を壊さないよう401のまま。
        */
       return c.json({ success: false, error: '重要操作の再認証が必要です', code: 'STEP_UP_REQUIRED' }, 401);
@@ -705,7 +701,7 @@ operations.post(
 );
 
 /*
- * N-451: 復旧の前に、停止時snapshotと現在の定義のずれ（drift）を見せる口。
+ * 復旧の前に、停止時snapshotと現在の定義のずれ（drift）を見せる口。
  * 読み取り専用なので typed 確認・step-up・冪等キーは要らないが、
  * 範囲の権限は復旧と同じだけ要求する。
  */
@@ -786,7 +782,7 @@ operations.post(
           payload: { lineAccountId: replayed.lineAccountId, actorId },
         });
         /*
-         * N-451: 同じキーでの再実行にも最初の検査結果を返す。
+         * 同じキーでの再実行にも最初の検査結果を返す。
          * 画面は report を見て「一部だけ復旧」を出し分けるので、
          * ここで落とすと成功表示へ誤認する。
          */
@@ -807,7 +803,7 @@ operations.post(
       }
       if (!await consumeOperationStepUp(c)) {
         // 停止側と同じく、再認証のやり直しは画面が自分で案内する通常の状態。
-        // セッション喪失モーダルと区別するため機械コードを付ける（#1058）。
+        // セッション喪失モーダルと区別するため機械コードを付ける。
         return c.json({ success: false, error: '重要操作の再認証が必要です', code: 'STEP_UP_REQUIRED' }, 401);
       }
       const result = await restoreOperationIncident(c.env.DB, {
@@ -843,7 +839,7 @@ operations.post(
         }, 409);
       }
       /*
-       * N-451: 停止中の編集・追加・権限喪失がある能力は再開しない。
+       * 停止中の編集・追加・権限喪失がある能力は再開しない。
        * 1つも再開できなかったときは制御状態を変えず 409 で理由を返す。
        * 冪等キーの receipt は実際に再開したときだけ保存するので、
        * ずれを直したあと同じキーで試し直せる。

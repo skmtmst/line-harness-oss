@@ -108,8 +108,7 @@ export function stepUpRequiredResponse(c: Context<Env>, detail: string): Respons
   return c.json({ success: false, error: detail, code: 'STEP_UP_REQUIRED' }, 401);
 }
 
-// Shared and route guards share one in-flight verification for this request and purpose.
-// Separate requests must still compete for the one-use grant in D1.
+// 同じ要求・目的では実行中の確認を共有する。別要求は D1 上の一度限りの確認票を取り合う。
 const verifiedInRequest = new WeakMap<Context<Env>, Map<StepUpPurpose, Promise<boolean>>>();
 export async function sensitiveStepUpSatisfied(c: Context<Env>, purpose: StepUpPurpose): Promise<boolean> {
   const purposes = verifiedInRequest.get(c) ?? new Map<StepUpPurpose, Promise<boolean>>();
@@ -123,7 +122,7 @@ export async function sensitiveStepUpSatisfied(c: Context<Env>, purpose: StepUpP
     verified = await verification;
     return verified;
   } finally {
-    // A failed check never authorizes a later guard, even within the same request.
+    // 同じ要求内でも失敗した確認を後続の許可に使わない。
     if (!verified) purposes.delete(purpose);
   }
 }

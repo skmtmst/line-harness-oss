@@ -1,7 +1,7 @@
 import type { ReminderDraftSettings } from '@line-crm/db';
 import type { StarterItem } from './style-starter-definition.js';
 import { StyleError } from './style-setup-core.js';
-/** Always create a new draft so a shop's published schedule and its history remain intact. */
+/** 店舗の公開予定と履歴を保つため、必ず新しい下書きを作る。 */
 export async function reminderReplacement(
   db: D1Database,
   account: string,

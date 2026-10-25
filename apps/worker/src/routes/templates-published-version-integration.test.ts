@@ -4,11 +4,7 @@ import { getTemplateById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-/**
- * 実DBで通す一気通貫(#645・差し戻し6要件)。
- * 保存→下書きにだけ書かれ、送信側が読む live 列は公開操作まで不変。
- * モック単体の契約は templates-published-version.test.ts にある。
- */
+/** 下書き保存から公開まで実 DB で検証し、公開操作まで送信側の live 列が変わらないことを確かめる。 */
 
 const accountAccess = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
@@ -29,8 +25,7 @@ function app() {
 }
 
 async function json(method: string, path: string, body: unknown, key?: string, db = store.db) {
-  // These integration cases exercise saving from a freshly loaded editor.
-  // Explicit versions in the body still take precedence for stale-edit cases.
+  // 読みたての編集画面から保存する経路を試す。古い版を試す場合は、本文に明示した版を優先する。
   if (method === 'PUT' && path.startsWith('/api/templates/')) {
     const row = store.raw.prepare('SELECT published_version, draft_revision FROM templates WHERE id=?').get(path.split('/').at(-1)) as {published_version:number;draft_revision:number} | undefined;
     if (row) body = { expectedVersion: row.published_version, expectedDraftRevision: row.draft_revision, ...body as Record<string, unknown> };

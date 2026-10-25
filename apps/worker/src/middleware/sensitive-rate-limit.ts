@@ -20,7 +20,7 @@ export function isUploadRequest(c: Context<Env>): boolean {
     || /^\/api\/(?:images$|media\/(?:upload-sessions|[^/]+\/versions)|forms\/[^/]+\/files$|liff\/nen\/(?:pets(?:\/[^/]+\/photo)?|photos)$|hq\/banners\/projects\/[^/]+\/uploads$|broadcasts\/[^/]+\/(?:media|upload)|rich-menu(?:s|groups)\/.*(?:image|upload))/.test(c.req.path);
 }
 
-/** All windows fit within one day. Retain two days so active budgets are never reset. */
+/** すべての窓は1日以内なので、有効な予算を失わないよう2日間保持する。 */
 export async function pruneSensitiveRateLimits(db: D1Database, now = new Date()): Promise<void> {
   await db.prepare("DELETE FROM auth_throttles WHERE key LIKE 'sensitive:%' AND updated_at < ?")
     .bind(toJstString(new Date(now.getTime() - 2 * 24 * 60 * MINUTE))).run();
@@ -32,13 +32,13 @@ async function reserve(c: Context<Env>, feature: string, principal: string, max:
     if (count > max) return c.json({ success: false, code: 'rate_limited', error: 'しばらく待ってからもう一度お試しください' },
       { status: 429, headers: { 'Retry-After': String(Math.ceil(windowMs / 1000)) } });
   } catch {
-    // A missing table or unavailable shared store must never fall back to isolate memory.
+    // 共有ストアや表が使えなくても、isolate メモリへ戻して制限を緩めない。
     return c.json({ success: false, code: 'rate_limit_unavailable', error: '現在処理を受け付けられません' },
       { status: 503, headers: { 'Retry-After': '60' } });
   }
 }
 
-/** Cloudflare supplies the connection IP. Unverified forwarding headers cannot create buckets. */
+/** IP は Cloudflare の接続情報を使い、未検証の転送ヘッダで別枠を作らせない。 */
 export async function preAuthSensitiveLimit(c: Context<Env>, authenticated = false): Promise<Response | undefined> {
   const ip = c.req.header('cf-connecting-ip') ?? 'unknown';
   if (authAttempt(c) && (authenticated || isPublicApiBoundary(c.req.method, c.req.path))) {
@@ -59,7 +59,7 @@ export async function preAuthSensitiveLimit(c: Context<Env>, authenticated = fal
   }
 }
 
-/** Authenticated export and upload budgets follow the verified tenant and staff, across IPs. */
+/** 認証済みの出力・アップロードは、IP を変えても確認済み統括とスタッフの予算を共有する。 */
 export async function authenticatedSensitiveLimit(c: Context<Env>): Promise<Response | undefined> {
   const staff = c.get('staff');
   if (!staff) return;

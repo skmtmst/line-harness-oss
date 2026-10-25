@@ -80,7 +80,7 @@ import { commonVarsPaths } from './common-vars-paths.js';
 import { automationsPaths } from './automations-paths.js';
 import { webinarsPaths } from './webinars-paths.js';
 
-// Keep spread precedence and insertion order: later feature definitions may override earlier ones.
+// 後の定義が先の定義を上書きする場合があるため、展開の優先順と挿入順を保つ。
 export const paths = {
   ...trackedLinkIdentityPaths,
   ...bookingPhotosPaths,

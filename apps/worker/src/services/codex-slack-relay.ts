@@ -130,10 +130,7 @@ export function shouldTrackCodexTask(event: CodexSlackEvent, category: CodexSlac
 }
 
 export function isCodexTaskCompletion(event: CodexSlackEvent): boolean {
-  // GitHub emits turn_completed only after the PR is closed or merged. Its
-  // structured state is authoritative; PR titles can legitimately contain
-  // words such as "失敗", which must not turn a completed PR back into an
-  // open Slack task.
+  // 完了判定は GitHub の構造化状態を正本にし、題名の失敗などの語で完了済み PR を未完了へ戻さない。
   if (event.eventSource === 'github' && event.prNumber && event.eventType === 'turn_completed') {
     return true;
   }
@@ -426,10 +423,7 @@ async function ensureSlackChannelMembers(
   fetcher: typeof fetch,
 ): Promise<void> {
   if (desiredMembers.length === 0) return;
-  // Slack can reject conversations.members with invalid_arguments even when
-  // the same bot can create, invite to, and post in the channel. Inviting one
-  // member at a time is idempotent once the two benign responses below are
-  // accepted, and avoids one bad/duplicate user aborting every invitation.
+  // メンバー一覧が取れなくても、個別招待の安全な既登録応答を成功として扱う。1人の不正・重複で全員の招待を止めない。
   for (const member of desiredMembers) {
     try {
       await slackApi(token, 'conversations.invite', {
@@ -439,10 +433,7 @@ async function ensureSlackChannelMembers(
     } catch (error) {
       const message = String(error);
       if (message.includes(':already_in_channel') || message.includes(':cant_invite_self')) continue;
-      // A stale or temporarily unavailable member must not prevent the
-      // channel from being used or block invitations for the remaining
-      // operators. Keep the failure visible in Worker logs and retry it on
-      // the next PR event.
+      // 一時的に利用できない1人のためにチャネル利用と残りの招待を止めず、失敗は記録して次の PR イベントで再試行する。
       logger.warn("slack_pr_channel_member_invite_failed");
     }
   }
@@ -468,8 +459,7 @@ async function ensurePublicSlackChannel(
     await ensureSlackChannelMembers(token, created.channel.id, desiredMembers, fetcher);
     return created.channel.id;
   } catch (error) {
-    // Two GitHub events can cross the threshold together. If the other event
-    // won the create race, resolve the channel that now exists.
+    // 同時の作成で他のイベントが先に確定した場合は、既にできたチャネルを解決する。
     if (String(error).includes('name_taken')) {
       const raced = await findPublicSlackChannel(token, name, fetcher);
       if (raced?.id) {
@@ -491,8 +481,7 @@ export async function resolveCodexSlackChannelWithProvisioning(
   if (category !== 'fix' || !prNumber || !config.SLACK_BOT_TOKEN) return configured;
   const mapped = parsePrChannels(config.SLACK_PR_CHANNELS_JSON)[prRangeKey(prNumber)];
   if (mapped) return mapped;
-  // Existing ranges predate automatic provisioning and keep their configured
-  // fallback. New ranges from PR #301 onward are resolved by channel name.
+  // 自動作成前の保存済み範囲は代替先を保ち、それ以降はチャネル名で解決する。
   if (prNumber <= 300) return configured;
   return ensurePublicSlackChannel(
     config.SLACK_BOT_TOKEN,
@@ -525,9 +514,7 @@ async function ensureUpcomingPrRangeChannelWithoutBlocking(
   try {
     await ensureUpcomingPrRangeChannel(config, prNumber, fetcher);
   } catch (error) {
-    // Preparing the next 100-PR channel is preventive maintenance. A missing
-    // Slack scope or a temporary API failure must never suppress the current
-    // PR report. Every event from #x90 through #x00 retries the preparation.
+    // 次の100件用チャネルの準備に失敗しても現在の PR 報告を止めず、範囲の末尾11件のイベントで再試行する。
     logger.warn("slack_upcoming_pr_range_prepare_failed");
   }
 }
@@ -538,9 +525,7 @@ async function readThreadParent(
   threadTs: string,
   fetcher: typeof fetch,
 ): Promise<SlackMessage | null> {
-  // Bot tokens can read channel history, but conversations.replies on public
-  // and private channel threads requires a user token. Read the exact parent
-  // timestamp from history instead so the relay keeps using the bot token.
+  // スレッド取得には利用者トークンが必要なため、Bot で読める履歴から親の正確な時刻を探す。
   const replies = await slackApi(token, 'conversations.history', {
     channel,
     oldest: threadTs,
@@ -1217,8 +1202,7 @@ export async function reportHarnessErrorToSlack(
   fetcher: typeof fetch = fetch,
 ): Promise<boolean> {
   if (!config.SLACK_BOT_TOKEN || !config.SLACK_ERROR_CHANNEL_ID) return false;
-  // Error input is untrusted. Regex redaction cannot recognize arbitrary names or
-  // secrets: only fixed codes/areas go to Slack, including its task metadata.
+  // 正規表現だけでは任意の個人名や秘密値を伏せ切れないため、タスク metadata も含め固定コードと領域だけを Slack へ渡す。
   const message = harnessErrorCode(report);
   const path = normalizedHarnessErrorPath(report.path);
   const fingerprint = taskIdForKey(harnessErrorIncidentKey(report)).slice(5);
@@ -1270,9 +1254,7 @@ export async function relayCodexSlackEvent(
     fetcher,
   );
   if (!channelId) throw new Error(`SLACK_CHANNEL_NOT_CONFIGURED:${category}`);
-  // Next-range preparation is independent from the current PR report. It is
-  // retried for every PR in the last 11 numbers of the current range, but a
-  // provisioning failure is logged and never aborts the main Slack update.
+  // 次範囲の作成は現在の報告と独立にし、末尾11件で再試行する。失敗は記録するが主の更新は継続する。
   if (event.prNumber) {
     await ensureUpcomingPrRangeChannelWithoutBlocking(config, event.prNumber, fetcher);
   }
@@ -1282,8 +1264,7 @@ export async function relayCodexSlackEvent(
   let linkedTask: SlackMessage | null = null;
 
   const requestedTaskId = event.eventSource === 'github' ? null : taskIdFromContent(event.content);
-  // GitHub may open or finish a task whose original key belongs to a Codex session or
-  // dedicated branch. Use its saved relationship, never a TASK-ID in the title.
+  // タスクの元キーが Codex セッションや専用枝でも、題名中の TASK-ID でなく保存済みの対応関係を使う。
   const relatedBranchKey = event.eventSource === 'github' && event.repository
     ? workKey({ ...event, prNumber: undefined }) : '';
   if (
@@ -1319,9 +1300,7 @@ export async function relayCodexSlackEvent(
   threadTs ||= await findThreadTs(token, channelId, key, fetcher);
   const completed = isCodexTaskCompletion(event);
 
-  // GitHub's periodic reconciliation repairs missing notifications without
-  // adding a reply on every run. The parent status is the durable completion
-  // ledger; the task card is only the list of currently open work.
+  // 定期照合は不足した通知だけを補い、毎回返信を増やさない。親の状態を完了台帳、タスクカードを未完了一覧として扱う。
   if (event.syncMode === 'reconcile' && threadTs) {
     if (completed) {
       const parent = await readThreadParent(token, channelId, threadTs, fetcher);

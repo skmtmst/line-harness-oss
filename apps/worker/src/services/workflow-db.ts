@@ -11,7 +11,7 @@ export function normalizeWorkflowResult<T>(db:D1Database,value:T):T{
   const aliases=aliasesForDb.get(db);
   return JSON.parse(JSON.stringify(value ?? null,(_key,item)=>typeof item==='string'?(aliases?.get(item) ?? item):item)) as T;
 }
-/** Domain reads freeze the branch plan; every write and its SQL receipt commit atomically. */
+/** 読取で処理計画を固定し、各書込と SQL の受領票を原子的に確定する。 */
 export function workflowMutationDb(db:D1Database,root:WorkflowStepRef,owner:string,prefix:string):D1Database {
   let writes=0,reads=0;
   const aliases=new Map<string,string>();
@@ -24,7 +24,7 @@ export function workflowMutationDb(db:D1Database,root:WorkflowStepRef,owner:stri
     const previous=await ensureWorkflowStep(db,ref,{maxAttempts:50,input:items});
     const plan=JSON.parse(previous.input_json!) as Array<{sql:string;args:unknown[]}>;
     if(plan.length!==items.length || plan.some((item,i)=>item.sql!==items[i]!.sql))throw new Error('workflow_plan_changed');
-    // Helpers mint UUIDs before INSERT and then use them in later queries. Replay maps those transient IDs back to the saved IDs.
+    // INSERT 前に作る一時 UUID を再試行でも同じ保存 ID に対応させ、後続の照会先を変えない。
     for(let i=0;i<items.length;i++)for(let j=0;j<items[i]!.args.length;j++){
       const current=items[i]!.args[j],original=plan[i]!.args[j];
       if(typeof current==='string' && typeof original==='string' && current!==original
@@ -51,7 +51,7 @@ export function workflowMutationDb(db:D1Database,root:WorkflowStepRef,owner:stri
   };
   const read=async(sql:string,args:unknown[],method:'first'|'all',column?:string)=>{
     const statement=db.prepare(sql).bind(...mapped(args));
-    // Credentials stay live and outside snapshots. Never cache account/secret-bearing queries.
+    // 資格情報は常に現在値を使い、アカウントや秘密値を含む問い合わせを写しやキャッシュへ残さない。
     if(/\b(line_accounts|.*credentials.*|.*secrets.*|.*tokens.*|staff_sessions)\b/i.test(sql))return column===undefined?statement[method]():statement.first(column);
     const ref={...root,stepKey:`${prefix}:read:${reads++}`};
     const previous=await ensureWorkflowStep(db,ref,{maxAttempts:50});

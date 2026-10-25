@@ -7,7 +7,7 @@ import { webMeasurement } from './web-measurement.js';
 import { conversions } from './conversions.js';
 
 /*
- * #819: Web計測の公開口。
+ * Web計測の公開口。
  * - 許可ドメイン以外からの成果は数えない(件数と最後の来た先だけ残す)
  * - 同意が無い送信は数えない
  * - 友だちと結び付かない成果は地点の「匿名を数える」設定のときだけ日別集計

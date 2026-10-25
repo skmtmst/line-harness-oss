@@ -158,7 +158,7 @@ export async function buildReminderStepMessage(
   // 下書き試験から呼ぶときは 'test_send' を渡す。台帳の送信種別が
   // 本番配信とテスト送信で分かれる。
   sourceKind: 'reminder' | 'test_send' = 'reminder',
-  // R346: 登録時のテンプレート版の写し {"テンプレートID": 公開版番号}。
+  // 登録時のテンプレート版の写し {"テンプレートID": 公開版番号}。
   // 無いときは今までどおり最新の版を読む（下書き試験・古い登録）。
   options?: { pinnedTemplateVersions?: Record<string, number> | null; previewOnly?: boolean },
 ): Promise<{
@@ -172,7 +172,7 @@ export async function buildReminderStepMessage(
   let messageContent = step.message_content;
   let templateVersion: number | null = null;
   if (step.template_id) {
-    // R346: 登録時の版があるときはその版で送る。新しい版にするのは
+    // 登録時の版があるときはその版で送る。新しい版にするのは
     // 登録し直した時だけ。版履歴に無いときは今の版へ落ちる。
     const pinned = options?.pinnedTemplateVersions?.[step.template_id];
     if (pinned != null) {
@@ -224,7 +224,7 @@ export async function buildReminderStepMessage(
 }
 
 /**
- * R345: 1通の送信内容を決める。初回は作って実行行へ残し、
+ * 1通の送信内容を決める。初回は作って実行行へ残し、
  * 同じ再試行キーの再送は残した本文をそのまま使う。
  * 受理ずみ（409）の再試行も初回と同じ要求になるため、履歴は初回の内容を表す。
  * まだ送っていない通は今までどおり最新の差し込みで作る。
@@ -304,7 +304,7 @@ export async function processReminderDeliveries(
   const nowIso = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString();
 
-  // R344: 再試行キーの期限を過ぎた結果不明は自動で送らない。
+  // 再試行キーの期限を過ぎた結果不明は自動で送らない。
   // 要確認として残し、人が確かめて手動で送る。
   await holdExpiredLineRetryRuns(db, { now: nowIso });
 
@@ -345,8 +345,7 @@ export async function processReminderDeliveries(
       : null;
     const accountId = enrollment.line_account_id ?? friendAccountId;
     if (accountId && isStoppedTenantStatus(tenantStatusByAccount.get(accountId))) {
-      // Materialize terminal skipped runs for steps that are already due. This
-      // keeps them unsent and prevents restore from becoming an overdue blast.
+      // 停止中に期限を過ぎた分は終端の skipped として残し、復旧後に期限切れ通知をまとめて送らない。
       for (const step of enrollment.steps) {
         const sendAt = resolveReminderSendAt(
           new Date(enrollment.target_date),
@@ -423,7 +422,7 @@ export async function processReminderDeliveries(
       result.skipped += enrollment.steps.length;
       continue;
     }
-    // 緊急停止 (#1050): reminder_dispatch が止まっている統括は claim せず
+    // 緊急停止 : reminder_dispatch が止まっている統括は claim せず
     // active のまま残す。実行行を積まないので復旧でそのまま届く。
     // アカウント未割当の行はグローバル停止 (*) だけに従う。
     if (await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch')) {
@@ -446,7 +445,7 @@ export async function processReminderDeliveries(
         result.held += 1;
         continue enrollmentLoop;
       }
-      // R339: 候補読込後の日時変更を見落とさない。実行行を作る前に
+      // 候補読込後の日時変更を見落とさない。実行行を作る前に
       // 登録の現在値を読み直し、ずれた起点では古い予定を作らない。
       // 次の tick で読み直すためここでは何も積まない。
       const gate = await getFriendReminderSendGate(db, enrollment.id);
@@ -473,7 +472,7 @@ export async function processReminderDeliveries(
       });
       // 別cronが送信中、再試行時刻前、または既に終端状態なら何もしない。
       if (!run) continue;
-      // R340: この貸出で付けた期限だけを以後の書込に使う。期限切れで
+      // この貸出で付けた期限だけを以後の書込に使う。期限切れで
       // 別処理へ移った後の書込は 0 件になり、上書きしない。
       const claimLease = run.lease_expires_at;
       const ownedLeases = (claimLease ? [claimLease] : []).concat([leaseExpiresAt]);
@@ -556,7 +555,7 @@ export async function processReminderDeliveries(
         const deliveryClient = await (options.resolveClient
           ? options.resolveClient(accountId, lineClient)
           : defaultResolveClient(db, accountId, lineClient));
-        // R346: この登録が使うテンプレート版。無い登録は今までどおり最新の版。
+        // この登録が使うテンプレート版。無い登録は今までどおり最新の版。
         const pinnedTemplateVersions = parseTemplateVersionSnapshot(
           enrollment.template_version_snapshot,
         );
@@ -611,7 +610,7 @@ export async function processReminderDeliveries(
           result.skipped++;
           continue enrollmentLoop;
         }
-        // 外部送信の直前にも緊急停止を確かめる (#1050)。claim 後に停止へ
+        // 外部送信の直前にも緊急停止を確かめる。claim 後に停止へ
         // 切り替わった分は claim をキューへ戻し、失敗・skipped にはしない
         // (停止を理由に消さない。復旧後に届く)。
         if (await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch')) {
@@ -703,8 +702,7 @@ export async function processReminderDeliveries(
         const rejected=!accepted&&status>=400&&status<500&&status!==408;
         const unknown=sendStarted&&!rejected;
         const safe = unknown?{code:'delivery_unknown',message:'送信結果を確認できません。LINEの送信履歴を照合するまで再送しません。',retryable:false}:classifyReminderDeliveryError(error);
-        // The relative provider wait starts when its response arrives, rather
-        // than at the beginning of a potentially long cron sweep.
+        // 外部の相対待機は長い cron の開始でなく、応答到着から数える。
         const failureNow = options.now ?? new Date();
         const retryAt = externalDeliveryRetryAt(
           error,
@@ -717,7 +715,7 @@ export async function processReminderDeliveries(
         const notBeforeAt=Number.isFinite(providerDate.getTime())?providerDate.toISOString():null;
         const overWait=notBefore!==undefined&&notBefore-failureNow.getTime()>EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES*60_000;
         const exhausted = safe.retryable && !retryAt;
-        // R340: 持ち主が移っているときは書けず false になる。
+        // 持ち主が移っているときは書けず false になる。
         // 新しい持ち主が結果を記録するため、ここでは数えない。
         const recorded = await failReminderDeliveryRun(db, {
           id: run.id,

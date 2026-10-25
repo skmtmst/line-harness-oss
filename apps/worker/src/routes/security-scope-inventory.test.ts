@@ -52,8 +52,7 @@ describe('S07 unqualified resource IDs and aggregate requests stay in the staff 
     expect(body.data.rows[0].accounts.map((a: any) => a.accountId)).toEqual(['a']);
     expect(JSON.stringify(body)).not.toContain('other@example.invalid');
     expect(JSON.stringify(body)).not.toContain('Other fixture');
-    // Same binding and same isolate cache, different tenant. A cache warmed by
-    // the first caller must never supply their records to the second caller.
+    // 同じ binding・isolate のキャッシュでも、別統括へ最初の利用者のデータを返さないことを確かめる。
     const other = await server(db, usersGrouped, 'tb', role).request('/api/users-grouped');
     const second = await other.json() as any;
     expect(second.data.rows[0].accounts.map((a: any) => a.accountId)).toEqual(['b']);
@@ -142,8 +141,7 @@ it.each([
       expect((await server(db, handler, 'ta', role).request(path, { method })).status).toBe(403);
     }
   }
-  // Legacy default tenant keeps access, but an account-restricted member of
-  // that same tenant cannot claim the unassigned data either.
+  // 所属なしのデータは既定統括でもアカウント制限付きの利用者には許可しない。
   db.raw.prepare('UPDATE staff_members SET tenant_id=? WHERE id=?').run(DEFAULT_TENANT_ID, 'sb');
   expect((await server(db, handler, DEFAULT_TENANT_ID).request(path)).status).toBe(204);
   db.raw.prepare("UPDATE staff_members SET account_scope='accounts' WHERE id='sb'").run();

@@ -3,7 +3,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * TikTok利益計算の自動化: 状態確認と手動同期のAPI。
  *
- * - 認可は既存の google_sheets_integrations（#838）を使い回すため、
+ * - 認可は既存の google_sheets_integrationsを使い回すため、
  *   ここに新しいOAuthは無い。Googleの認可が生きているアカウントだけ動く。
  * - 変更系（手動同期）は owner / admin に限定する。
  */
@@ -25,9 +25,9 @@ export const tiktokPnl = new Hono<Env>();
 /**
  * 利益計算に使えるGoogle連携を1件返す。
  *
- * #838 の書き出し先スプレッドシート未選択（`pending_target`）でも、
+ *  の書き出し先スプレッドシート未選択（`pending_target`）でも、
  * Googleの認可と更新用トークンは保存されているので利益計算は動く。
- * 利益計算は自分でスプレッドシートを作るため #838 の書き出し先に依存しない。
+ * 利益計算は自分でスプレッドシートを作るため  の書き出し先に依存しない。
  * 認可切れ（`expired`）と未接続（行なし）だけを未接続として扱う。
  */
 async function connectedIntegration(

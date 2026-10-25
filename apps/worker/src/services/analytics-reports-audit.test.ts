@@ -9,7 +9,7 @@ import {
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /*
- * 定期レポートの監査 R449〜R452・R457〜R460。
+ * 定期レポートの監査 〜・〜。
  *
  * 実SQLite（bootstrap.sql済み）＋実DB関数で processDueAnalyticsReports を
  * 通し、送信の口だけ差し替える。実メール・実LINEは送らない。

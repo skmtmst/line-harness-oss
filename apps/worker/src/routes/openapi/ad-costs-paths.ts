@@ -1,6 +1,6 @@
-// Definitions only. Runtime handlers remain in their feature routes.
+// 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const adCostsPaths = {
-  // ── 広告費 (#818) ────────────────────────────────────────────────────
+  // ── 広告費  ────────────────────────────────────────────────────
   '/api/ad-costs': {
     get: {
       tags: ['Ads'], summary: '流入元ごとの広告費と取込状況（期間指定は日付。手入力分は source=manual）',

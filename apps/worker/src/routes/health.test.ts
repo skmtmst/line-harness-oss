@@ -50,10 +50,7 @@ function app() {
   return a;
 }
 
-// The liveness endpoints are what `create-line-harness update` and the
-// self-update verify phase probe after a deploy — they must answer 200
-// with no credentials, or every update ends in a bogus health warning
-// (CLI) or rollback (self-update).
+// 配備後の CLI が認証なしで到達を確認できるよう、liveness は資格情報なしで200を返す。
 describe('liveness endpoints are public', () => {
   test.each(['/health', '/api/health'])('%s returns deployed SHA through auth middleware without secrets', async (path) => {
     const bindings = { ...env(), BUILD_GIT_COMMIT: 'a'.repeat(40), BUILD_VERSION: '0.24.0', BUILD_RELEASED_AT: '2026-10-09T00:00:00Z' };

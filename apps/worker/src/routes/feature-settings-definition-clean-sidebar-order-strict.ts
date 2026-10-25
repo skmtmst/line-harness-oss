@@ -11,7 +11,7 @@ export /**
  * 読み出し側は部分・未知を許容して残すが、書き込みはカタログの
  * 区分見出しをちょうど1回ずつ並べた完全な順序だけを受け付ける。
  * 未知の区分や過不足を通すと、読み出し側の「知らない値は捨てる」
- * 処理で並びが黙って欠ける（N-441）。
+ * 処理で並びが黙って欠ける。
  */
 function cleanSidebarOrderStrict(raw: unknown): string[] | null {
   const values = cleanStringArray(raw);
@@ -56,7 +56,7 @@ export async function loadLegacyFeatureSettings(
   accountId: string,
   restaurantEnabled: boolean,
 ): Promise<FeatureSettingsData> {
-  // 一括設定が無い旧保存だけの読み分け。キーごとの往復(30本超)を1往復に束ねる(#633)。
+  // 一括設定が無い旧保存だけの読み分け。キーごとの往復(30本超)を1往復に束ねる。
   const stored = await getAccountSettings(db, accountId, [
     ...TOGGLEABLE_FEATURES.map((key) => `${SETTING_PREFIX}${key}`),
     SIDEBAR_ORDER_KEY,
@@ -123,7 +123,7 @@ export async function loadFeatureVisibility(
   accountId: string,
   restaurantEnabled: boolean,
 ): Promise<FeatureVisibilityData> {
-  // 専用カタログは設定束と独立して読めるため先に並列で投げる(#633)。
+  // 専用カタログは設定束と独立して読めるため先に並列で投げる。
   const [state, specializedRaw] = await Promise.all([
     loadFeatureSettings(db, accountId, restaurantEnabled),
     getAccountSetting(db, accountId, SPECIALIZED_CATALOG_KEY),

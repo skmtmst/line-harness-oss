@@ -37,7 +37,7 @@ function normalized(r: Row): StyleBooking {
     participationMode: (r.participationMode ?? null) as string | null,
   };
 }
-/** Every join stays within the selected account. Meet rows linked to bookings are not counted twice. */
+/** JOIN は選択アカウント内に保ち、予約に結び付いた Meet を二重計上しない。 */
 async function industryRows(
   db: D1Database,
   account: string,
@@ -91,7 +91,7 @@ async function industryRows(
   );
 }
 
-/** All reservation systems survive a style change. Kind is part of the identity. */
+/** スタイル変更で予約を失わないよう、予約種別も識別子に含める。 */
 export async function styleRows(
   db: D1Database,
   account: string,

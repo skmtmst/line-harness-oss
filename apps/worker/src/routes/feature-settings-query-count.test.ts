@@ -27,9 +27,7 @@ function app() {
 }
 
 /**
- * D1 往復回数の観測用ラッパー(#633)。
- * 全画面共通の機能設定APIは、改善前は旧保存の読取だけで30往復超だった。
- * 構造的な削減を「prepareの発行回数」で固定する（体感msではなくクエリ数）。
+ * 体感時間だけでなく D1 の往復数の増加を検出できるよう、prepare の発行回数を観測する。
  */
 function countingDb(db: D1Database): { db: D1Database; count: () => number } {
   let calls = 0;
@@ -95,7 +93,7 @@ describe('機能設定APIのD1往復回数(#633)', () => {
       expect(response.status).toBe(200);
       const body = await response.json() as { data: { features: Record<string, boolean> } };
       expect(body.data.features.scenarios).toBe(false);
-      // 改善前は旧キー30本超を個別に読んでいた。束読み後は片手で足りる。
+      // 保存済み設定の読込をまとめ、個別キーごとの問い合わせへ戻らないことを確かめる。
       expect(counting.count()).toBeLessThanOrEqual(8);
     } finally {
       testDb.raw.close();
