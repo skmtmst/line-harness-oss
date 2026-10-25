@@ -5,6 +5,7 @@ import { profile } from './style-profile.js';
 import type { AccountStyle, SetupAnswer } from '@line-crm/shared';
 import type { StarterItem } from './style-starter-definition.js';
 import { StyleError } from './style-setup-core.js';
+import { friendAddWelcomeDefinition } from './style-starter-friend-add.js';
 
 export const resourceTables: Record<
   string,
@@ -15,6 +16,7 @@ export const resourceTables: Record<
   reminder: { table: 'reminders', account: 'line_account_id' },
   automation: { table: 'automation_definitions', account: 'line_account_id' },
   booking_menu: { table: 'menus', account: 'line_account_id' },
+  friend_add_rule: { table: 'friend_add_rules', account: 'line_account_id' },
 };
 /** SQL の照合には、子行を含む編集内容と公開状態の両方を含める。 */
 export function snapshotSql(kind: string) {
@@ -26,6 +28,8 @@ export function snapshotSql(kind: string) {
   if (!r) throw new StyleError('invalid_resource');
   if (kind === 'reminder')
     return `(SELECT json_object('name',name,'active',is_active,'status',lifecycle_status,'draft',current_draft_version_id,'published',current_published_version_id,'updated',updated_at,'versions',(SELECT json_group_array(json_object('id',v.id,'settings',v.settings_snapshot,'status',v.status,'steps',(SELECT json_group_array(json_object('id',s.id,'offset',s.offset_minutes,'content',s.message_content)) FROM reminder_version_steps s WHERE s.reminder_version_id=v.id))) FROM reminder_versions v WHERE v.reminder_id=r.id)) FROM reminders r WHERE id=? AND line_account_id=?)`;
+  if (kind === 'friend_add_rule')
+    return `(SELECT json_object('status',status,'lock',lock_version,'current',current_version_id,'archived',archived_at,'versions',(SELECT json_group_array(json_object('id',v.id,'status',v.status,'definition',v.definition_snapshot)) FROM friend_add_rule_versions v WHERE v.rule_id=r.id)) FROM friend_add_rules r WHERE id=? AND line_account_id=?)`;
   const fields =
     kind === 'template'
       ? "'id',id,'name',name,'content',message_content,'type',message_type,'draft',draft_message_content,'bubbles',message_bubbles_json,'draftBubbles',draft_message_bubbles_json,'updated',updated_at,'published',published_version,'draftRevision',draft_revision,'folder',folder_id,'question',question_json,'draftQuestion',draft_question_json,'carousel',carousel_actions_json,'draftCarousel',draft_carousel_actions_json"
@@ -221,5 +225,14 @@ export async function overwriteResource(
       );
     return statements;
   }
+  if (item.kind === 'friend_add_rule')
+    // 下書きの文だけを差し替える。公開済みの版・受け皿の状態は触らない。
+    return [
+      db
+        .prepare(
+          `UPDATE friend_add_rule_versions SET definition_snapshot=?,last_test_status=NULL,last_tested_at=NULL,last_tested_by_staff_id=NULL,updated_at=? WHERE rule_id=? AND status='draft' AND rule_id IN(SELECT id FROM friend_add_rules WHERE id=? AND line_account_id=?)`,
+        )
+        .bind(JSON.stringify(friendAddWelcomeDefinition(item)), now, id, id, account),
+    ];
   throw new StyleError('invalid_resource');
 }

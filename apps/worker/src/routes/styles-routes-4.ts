@@ -185,6 +185,16 @@ styles.get(base + '/starter-items', async (c) => {
             .bind(item.target_id, a)
             .first<{ status: string }>()
         )?.status ?? 'missing';
+    else if (item.kind === 'friend_add_rule')
+      // 受け皿に下書きがある間は「下書き」。公開は友だち追加の画面の確認窓からだけ。
+      status =
+        (
+          await c.env.DB.prepare(
+            "SELECT CASE WHEN EXISTS(SELECT 1 FROM friend_add_rule_versions v WHERE v.rule_id=r.id AND v.status='draft') THEN 'draft' ELSE r.status END status FROM friend_add_rules r WHERE r.id=? AND r.line_account_id=?",
+          )
+            .bind(item.target_id, a)
+            .first<{ status: string }>()
+        )?.status ?? 'missing';
     const definition =
       item.kind === 'rich_menu'
         ? {
@@ -227,11 +237,12 @@ styles.get(base + '/starter-items', async (c) => {
         ? JSON.parse(String(item.pending_update))
         : null,
       requiresActivation:
-        ['automation', 'reminder', 'booking_menu', 'rich_menu'].includes(
+        ['automation', 'reminder', 'booking_menu', 'rich_menu', 'friend_add_rule'].includes(
           String(item.kind),
         ) && !blockedConfirmation,
-      activationAllowed: !blockedConfirmation,
-      href: item.kind === 'reminder' ? '/reminders' : undefined,
+      // ごあいさつの公開は［まとめて動かす］に混ぜない。
+      activationAllowed: !blockedConfirmation && item.kind !== 'friend_add_rule',
+      href: item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : undefined,
       currentSnapshot: await resourceSnapshot(
         c.env.DB,
         a,
