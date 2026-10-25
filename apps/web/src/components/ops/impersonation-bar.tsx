@@ -2,7 +2,7 @@
 
 import { Eye, PencilLine } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { api, type OpsImpersonation } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -10,7 +10,8 @@ import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { forgetSessionSnapshot } from '@/lib/session-snapshot'
-import v8 from './impersonation-bar-v8.module.css'
+import Notice from '@/components/shared/notice'
+import Button from '@/components/shared/button'
 
 /** 帯の「10/1 15:20」（日本時間）。 */
 function startedLabel(iso: string): string {
@@ -85,52 +86,22 @@ export default function ImpersonationBar({
   const writing = state.mode === 'write'
   const name = state.tenantName ?? '契約先'
 
-
-  /*
-   * V8-B 「代理ログイン中（閲覧のみ）」。閲覧のみの帯だけ V8 の形にし、
-   * 書き込み中・理由の窓・止め方は今のまま。押す先・API は変えない。
-   */
-  const v8ReadBanner = !writing ? (
-    <div data-design-node="VtJQ6" role="status" className={v8.banner}>
-      <Eye aria-hidden="true" className={v8.icon} />
-      <span className={v8.title}>
-        {`代理ログイン中：${name}（閲覧のみ）${state.piiRevealed ? '・個人情報を表示中' : ''}`}
-      </span>
-      {/* 絵は「理由：…・運営 〇〇・10/1 15:20〜」。理由と運営の名前はまだ受け口が返さないので、始めた時刻だけ。 */}
-      <span className={v8.sub}>{`${startedLabel(state.startedAt)}〜`}</span>
-      <span className={v8.spacer} />
-      {!state.piiRevealed ? (
-        <button type="button" className={v8.outline} onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</button>
-      ) : null}
-      <button type="button" className={v8.outline} onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</button>
-      <button type="button" className={v8.solid} onClick={() => void end()} disabled={busy}>代理ログインを終える</button>
-    </div>
-  ) : null
-
   return (
     <>
-      {v8ReadBanner ?? (
-      <div
-        data-design-node="WXp5T"
-        role="status"
-        className="flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent"
-      >
-        <span className="flex min-w-0 items-center gap-2.5 text-label font-medium">
-          <PencilLine aria-hidden="true" className="h-4.5 w-4.5" />
-          <span className="truncate">
-            {name} として書き込み中
-            {state.piiRevealed ? '・個人情報を表示中' : ''}
-          </span>
-        </span>
-        <span className="flex shrink-0 items-center gap-2">
-          {!state.piiRevealed ? (
-            <BarButton onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</BarButton>
-          ) : null}
-          <BarButton onClick={() => void toRead()} disabled={busy}>閲覧のみに戻す</BarButton>
-          <BarButton onClick={() => void end()} disabled={busy} solid>代理ログインを終える</BarButton>
-        </span>
-      </div>
-      )}
+      <Notice tone={writing ? 'danger' : 'warn'} role="status"
+        data-design-node={writing ? 'WXp5T' : 'VtJQ6'}
+        icon={writing ? <PencilLine aria-hidden="true" /> : <Eye aria-hidden="true" />}
+        heading={writing
+          ? <>{name} として書き込み中{state.piiRevealed ? '・個人情報を表示中' : ''}</>
+          : `代理ログイン中：${name}（閲覧のみ）${state.piiRevealed ? '・個人情報を表示中' : ''}`}
+        action={<>
+          {!state.piiRevealed ? <Button type="button" onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</Button> : null}
+          {writing
+            ? <Button type="button" onClick={() => void toRead()} disabled={busy}>閲覧のみに戻す</Button>
+            : <Button type="button" onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</Button>}
+          <Button type="button" variant="primary" onClick={() => void end()} disabled={busy}>代理ログインを終える</Button>
+        </>}
+      >{!writing ? `${startedLabel(state.startedAt)}〜` : null}</Notice>
       {dialog ? (
         <ReasonDialog
           kind={dialog}
@@ -141,25 +112,6 @@ export default function ImpersonationBar({
         />
       ) : null}
     </>
-  )
-}
-
-/**
- * 帯の上に置く小さなボタン。帯の色（赤）の上に乗るので、共通 `Button` の
- * 白地・緑地ではなく、帯と同じ色系で描く。
- */
-function BarButton({ onClick, disabled, solid, children }: { onClick: () => void; disabled?: boolean; solid?: boolean; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={solid
-        ? 'h-8 rounded-control bg-canvas px-3.5 text-caption font-medium text-danger disabled:opacity-60'
-        : 'h-8 rounded-control border border-on-accent/60 bg-on-accent/15 px-3.5 text-caption font-medium text-on-accent hover:bg-on-accent/25 disabled:opacity-60'}
-    >
-      {children}
-    </button>
   )
 }
 
