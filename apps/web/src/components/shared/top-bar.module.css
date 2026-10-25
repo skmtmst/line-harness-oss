@@ -627,3 +627,10 @@
 :root .accountPill > [data-avatar] { flex: 0 0 auto; }
 :root .accountPill { transition: background-color var(--motion-fast) var(--motion-ease-out), box-shadow var(--motion-fast) var(--motion-ease-out); }
 :root .iconButton[data-topbar-bell] { transition: background-color var(--motion-fast) var(--motion-ease-out); }
+
+/* 切り替えを開いた時に ⌄ が半回転する（180ms・CSS だけ。動きを減らす設定では回さずに向きだけ変える）。 */
+.switchChevron { display: inline-flex; flex: none; align-items: center; justify-content: center; }
+.switchChevron[data-open] { rotate: 180deg; }
+@media (prefers-reduced-motion: no-preference) {
+  .switchChevron { transition: rotate var(--motion-switch-glide) var(--motion-ease-out); }
+}

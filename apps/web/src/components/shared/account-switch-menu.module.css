@@ -83,6 +83,7 @@
 }
 
 .list {
+  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -103,10 +104,8 @@
   cursor: pointer;
 }
 
-.rowSelected,
-.rowSelected:hover {
-  background: var(--color-accent-soft);
-  font-weight: 700;
+.rowSelected {
+  font-weight: 600;
 }
 
 .mark {
@@ -123,11 +122,22 @@
   font-weight: 700;
 }
 
-.name {
-  overflow: hidden;
+.names {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.name {
+  line-height: var(--tpl-hq2-switch-title-lh);
+}
+
+.handle {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-hq2-switch-sub-lh);
 }
 
 .check {
@@ -136,4 +146,15 @@
   height: var(--tpl-hq2-switch-icon);
   color: var(--color-ink);
 }
+}
+
+/*
+ * 名前と @ID の2行（2026-10-25 オーナー）。行の背景は1枚の面（.glow）が、指や焦点を置いた行へ
+ * 上下になめらかに動く（180ms・CSS だけ）。最初は選んでいる行にいる。動きを減らす設定では一瞬で移る。
+ */
+:root .row { position: relative; z-index: 1; height: auto; min-height: var(--tpl-hq2-switch-row-h); padding-block: var(--space-6); background: transparent; }
+:root .row:hover { background: transparent; }
+.glow { position: absolute; top: 0; left: 0; right: 0; z-index: 0; border-radius: var(--radius-control); background: var(--color-accent-soft); pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .glow { transition: transform var(--motion-switch-glide) var(--motion-ease-out), height var(--motion-switch-glide) var(--motion-ease-out); }
 }

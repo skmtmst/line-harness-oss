@@ -18,6 +18,8 @@ export interface TopBarAccount {
   iconUrl?: string | null
   /** 頭の1文字。アイコンの代わりに出す。無ければ名前の1文字目。 */
   mark?: string
+  /** LINE の ID（@ なし）。切り替えの一覧で名前の下に出す。 */
+  basicId?: string | null
 }
 
 export interface TopBarNotificationsPopover {
@@ -299,7 +301,7 @@ export default function TopBar({
             ) : (
               <span className={styles.accountName} data-part="account-name" title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
             )}
-            {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
+            <span className={styles.switchChevron} data-open={switchOpen || undefined} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}</span>
 
             {/*
               開くと統括に戻る操作と店の一覧を出す。
