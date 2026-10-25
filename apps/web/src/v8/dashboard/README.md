@@ -1,4 +1,4 @@
-> 文書：dashboard のコード案内｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+> 文書：dashboard のコード案内｜区分：今の説明｜最終確認：2026-10-26（日本時間）
 
 # ダッシュボードの動き：コードの入口
 
@@ -10,7 +10,7 @@
 
 呼び出し側：[v8/style-dashboard/home.tsx](../style-dashboard/home.tsx)
 
-本体：[dashboard-editor.tsx](dashboard-editor.tsx)、[dashboard.tsx](dashboard.tsx)、[ec-period.tsx](ec-period.tsx)、[ec-summary.tsx](ec-summary.tsx)、[first-steps.tsx](first-steps.tsx)、[friend-add.tsx](friend-add.tsx)、[head.tsx](head.tsx)、[inbox.tsx](inbox.tsx)、[sections.tsx](sections.tsx)、[trend.tsx](trend.tsx)
+本体：[comparisons.ts](comparisons.ts)、[dashboard-editor.tsx](dashboard-editor.tsx)、[dashboard.tsx](dashboard.tsx)、[ec-period.tsx](ec-period.tsx)、[ec-summary.tsx](ec-summary.tsx)、[first-steps.tsx](first-steps.tsx)、[friend-add.tsx](friend-add.tsx)、[head.tsx](head.tsx)、[inbox.tsx](inbox.tsx)、[kpi-delta.tsx](kpi-delta.tsx)、[sections.tsx](sections.tsx)、[trend.tsx](trend.tsx)
 
 ## 外に見せる名前（index.ts）
 
@@ -27,7 +27,9 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 ## 動きと試験
 
 - [BEHAVIOR.md](BEHAVIOR.md)
+- [comparisons.test.tsx](comparisons.test.tsx)
 - [dashboard-align.test.tsx](dashboard-align.test.tsx)
+- [dashboard-compare-band.test.tsx](dashboard-compare-band.test.tsx)
 - [dashboard-editor.test.tsx](dashboard-editor.test.tsx)
 - [dashboard.test.tsx](dashboard.test.tsx)
 - [ec-summary.test.tsx](ec-summary.test.tsx)
@@ -35,5 +37,6 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [first-steps.test.ts](first-steps.test.ts)
 - [friend-add-read-failure.test.tsx](friend-add-read-failure.test.tsx)
 - [friend-add.test.tsx](friend-add.test.tsx)
+- [kpi-delta.test.tsx](kpi-delta.test.tsx)
 
 実行：`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web test -- src/v8/dashboard`。関連する入口の試験も実行してください。保存・入力保持・権限・別店舗・失敗からの回復を守り、文書の整合だけを動作の合格に数えません。
