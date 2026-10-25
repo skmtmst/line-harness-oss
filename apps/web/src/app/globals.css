@@ -3254,3 +3254,16 @@ html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][dat
  */
 :where([data-hit-area]) { position: relative; } /* 部品が自分で位置を決めていればそちらが勝つ */
 :root [data-hit-area]::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, var(--control-icon-min)); height: max(100%, var(--control-icon-min)); transform: translate(-50%, -50%); }
+
+/*
+ * 押せるカード（カード全体が1つのリンク・ボタン）だけ、指を乗せると 2px 浮いて影が少し深くなる（150ms・2026-10-25 オーナー）。
+ * 押せないカードは浮かせない。部品・画面は data-pressable-card を付けるだけで、影や動きを書かない。
+ */
+:root [data-pressable-card] { transition: transform var(--motion-card-lift) var(--motion-ease-out), box-shadow var(--motion-card-lift) var(--motion-ease-out); }
+:root [data-pressable-card]:hover { box-shadow: var(--card-shadow-hover); }
+@media (prefers-reduced-motion: no-preference) {
+  :root [data-pressable-card]:hover { transform: var(--card-hover-lift); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root [data-pressable-card] { transition: none; }
+}
