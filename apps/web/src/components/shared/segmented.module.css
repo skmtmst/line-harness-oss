@@ -202,7 +202,7 @@ html:root .root[data-appearance="track"] .thumb { background: var(--color-canvas
 html:root .root[data-appearance="track"] .selected { color: var(--color-ink); background: transparent; outline-color: transparent; box-shadow: none; }
 html:root .root[data-appearance="track"] .item:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 
-:root .root[data-size='booking'] .item { padding-block-start: var(--polish-text-center-inset); }
+:root .root[data-size='booking'] .item { padding-block: 0; } /* 予約の切り替えは行の高さだけで真ん中（Inter のあとは補正が要らない） */
 
 /* 切り替えの項目は、指を乗せても地を塗らない（文字の色だけ変える）。つまみの白を濁らせない。 */
 html:root .root .item.item:hover:not(:disabled) {

@@ -3215,6 +3215,7 @@ html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][dat
   --font-weight-ui: 500;
   --font-weight-reading: 400;
   --font-numeric: tabular-nums;
+  --text-optical-shift: 0.5px; /* 札の中の和文を字面の真ん中へ寄せる量（Inter が先の時） */
 
   --control-h: 36px;
   --control-h-compact: 32px;

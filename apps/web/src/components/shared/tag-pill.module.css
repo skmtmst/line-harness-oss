@@ -104,3 +104,6 @@
   --tag-pill-gap: 8px;
   line-height: 20px;
 }
+
+/* 文字の上下の真ん中（2026-10-25）：英数字が Inter になり和文の字面が約 0.5px 上に寄るので、名前の文字だけを共通の値で下げる（札の大きさは変えない）。 */
+:root .pill .name { translate: 0 var(--text-optical-shift); }
