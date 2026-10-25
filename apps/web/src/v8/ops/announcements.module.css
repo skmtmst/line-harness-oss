@@ -90,16 +90,6 @@
   overflow-y: auto;
 }
 
-.warn {
-  margin: 0;
-  border-radius: var(--tpl-op-caution-radius);
-  background: var(--color-status-warn-soft);
-  padding: var(--tpl-op-ann-warn-pad);
-  color: var(--color-status-warn-deep);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-op-caution-lh);
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;

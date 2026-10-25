@@ -59,8 +59,6 @@ import styles from './project.module.css'
 import ReferenceFrame from './reference-frame'
 import { bannerFailureMessage,tileLabel } from './words'
 
-
-
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound' | 'missing'
 type Filter = 'all' | 'favorite' | 'delivered'
 
@@ -638,10 +636,9 @@ function ProjectInner() {
               * 同じ操作のボタンを2か所に出すと、どちらを押したか分からなくなる。
               */}
             {running ? (
-              <div className={styles.runningBand} role="status" aria-live="polite">
-                <Hourglass aria-hidden="true" className={styles.icon} />
+              <Notice tone="info" role="status" aria-live="polite" icon={<Hourglass aria-hidden="true" />}>
                 <span className={styles.runningText}>{`${Math.min(doneSoFar + 1, running.requestedCount)} / ${running.requestedCount} 枚目を作っています。閉じても作り続けます`}</span>
-              </div>
+              </Notice>
             ) : null}
             {generationError ? <Notice tone="danger" message={generationError} onClose={() => setGenerationError('')} /> : null}
             {sizeNotice ? <Notice tone="info" message="大きさの調整は検証環境で確認してください。この画像は生成時の大きさのまま保存されています。" onClose={() => setSizeNotice(false)} /> : null}

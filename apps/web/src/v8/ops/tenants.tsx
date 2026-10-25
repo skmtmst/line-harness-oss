@@ -26,6 +26,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営の契約先アカウント V8（絵の作る窓 ）。
@@ -209,7 +210,9 @@ export default function OpsTenantsV8() {
               <SaveErrorField names={["newRestaurant","new_restaurant"]}><Select aria-label="飲食店機能" value={newRestaurant ? 'use' : 'skip'} onChange={(value) => setNewRestaurant(value === 'use')} size="full" options={[{ value: 'skip', label: '使わない' }, { value: 'use', label: '使う' }]} /></SaveErrorField>
             </div>
           </div>
-          <p className={parts.dialogNote}>作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。</p>
+          <Notice tone="info">
+            作ると、統括の最初の権限者へ招待を送れるようになります。プランは契約先の詳細で決めます。
+          </Notice>
         </div>
       </Dialog>
     </OpsListPage>

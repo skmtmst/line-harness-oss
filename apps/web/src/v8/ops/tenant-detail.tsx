@@ -362,13 +362,13 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       onCancel={onClose}
     >
       <div className={parts.dialogBody}>
-        <p className={needsName ? styles.dangerNote : parts.dialogNote}>
+        <Notice tone={needsName ? "danger" : "info"}>
           {target === 'suspended'
             ? '停止すると、この契約先の権限者はログインできなくなります。配信も止まります。'
             : target === 'archived'
               ? 'アーカイブすると一覧から外れます。データは消えません。'
               : '再開すると、権限者がまたログインできるようになります。'}
-        </p>
+        </Notice>
         {needsName ? (
           <Field label="確認のため、契約先の名前をそのまま入力" requirement={nameRequirement}><SaveErrorField names={["confirmName","confirm_name"]}><TextField value={confirmName} onChange={(event) => setConfirmName(event.target.value)} placeholder={tenantName} /></SaveErrorField></Field>
         ) : null}

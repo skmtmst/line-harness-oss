@@ -161,11 +161,11 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
               <Link href={`/ops/support?id=${encodeURIComponent(article.sourceRequestId)}`} className={parts.textLink}>元のやり取りを開く →</Link>
             </section>
           )}
-          <p className={parts.dialogNote}>
+          <Notice tone="info">
             {article.articleKind === 'verified'
               ? '未確認の原因や途中の提案は記事に含めません。お客様が「直った」と返したやり取りだけを根拠にします。'
               : '回答例はお客様の成功確認を示すものではありません。質問と運営の回答内容を元のやり取りで確認してください。'}
-          </p>
+          </Notice>
           <div className={styles.sideActions}>
             {editing ? (
               <>

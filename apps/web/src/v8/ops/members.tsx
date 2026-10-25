@@ -225,13 +225,13 @@ export default function OpsMembersV8() {
         onCancel={() => { if (!busy) setPending(null) }}
       >
         <div className={parts.dialogBody}>
-        <p className={parts.dialogNote}>
-          {pending?.kind === 'resume'
-            ? '再開すると、この人はまた運営コンソールに入れるようになります。'
-            : pending?.kind === 'cancel'
-              ? '取り消すと、届いた招待メールのリンクから入れなくなります。あとで再開できます。'
-              : '停止すると、この人は運営コンソールに入れなくなります。あとで再開できます。'}
-        </p>
+          <Notice tone="info">
+            {pending?.kind === 'resume'
+              ? '再開すると、この人はまた運営コンソールに入れるようになります。'
+              : pending?.kind === 'cancel'
+                ? '取り消すと、届いた招待メールのリンクから入れなくなります。あとで再開できます。'
+                : '停止すると、この人は運営コンソールに入れなくなります。あとで再開できます。'}
+          </Notice>
         </div>
       </Dialog>
     </PageFrame>

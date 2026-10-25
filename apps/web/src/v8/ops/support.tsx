@@ -541,7 +541,9 @@ export default function OpsSupportV8() {
 <FieldError id="sup-subject-error">{createFields.error('subject')}</FieldError></Field></div>
           <div className={styles.field}><Field label="内容" htmlFor="sup-body" requirement={createFields.requirement('body')}><SaveErrorField names={["body","form.body"]}><TextArea {...createFields.bind('body')} id="sup-body" invalid={createFields.invalid('body')} aria-describedby={createFields.invalid('body') ? 'sup-body-error' : undefined} className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" /></SaveErrorField>
 <FieldError id="sup-body-error">{createFields.error('body')}</FieldError></Field></div>
-          <p className={parts.dialogNote}>電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</p>
+          <Notice tone="info">
+            電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。
+          </Notice>
         </div>
       </Dialog>
 
@@ -570,7 +572,9 @@ export default function OpsSupportV8() {
               <div className={styles.fact}><dt>優先度</dt><dd>{ticket.priorityLabel}</dd></div>
             </dl>
             {replyFromAi && references.length > 0 ? (
-              <p className={parts.dialogNote}>{`AI の下書きの根拠：${references.map((ref) => `ナレッジ「${ref.title}」`).join('・')}をもとに作成`}</p>
+              <Notice tone="info">
+                {`AI の下書きの根拠：${references.map((ref) => `ナレッジ「${ref.title}」`).join('・')}をもとに作成`}
+              </Notice>
             ) : null}
             <p className={styles.confirmBody}>{reply}</p>
           </div>
