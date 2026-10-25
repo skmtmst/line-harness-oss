@@ -69,15 +69,18 @@ beforeEach(() => {
   document.body.appendChild(host)
   root = createRoot(host)
   stopCalls = []
+  requestOrder = []
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     if (url.includes('/api/auth/step-up')) {
+      requestOrder.push('step-up')
       return response({ success: true, data: { token: 'step-up-test-token' } })
     }
     if (url.includes('/restore-preview')) return response({ success: false, error: '閲覧のみです' }, 403)
     if (url.includes('/api/operations/incidents')) {
+      requestOrder.push('incidents')
       const raw = (init as { body?: string } | undefined)?.body
-      stopCalls.push({ url, body: (raw ? JSON.parse(raw) : {}) as Record<string, unknown> })
+      stopCalls.push({ url, body: (raw ? JSON.parse(raw) : {}) as Record<string, unknown>, headers: new Headers(init?.headers) })
       return response({ success: true, data: { status: 'changed', control: controlBase, incident: null } })
     }
     if (url.includes('/api/operations/control/preview')) {
@@ -184,7 +187,8 @@ test('PKG107: 閲覧のみには停止操作を隠し、状態と記録を残す
  * 確認の言葉・認証番号が1枚にそろい、1つでも欠けたら進めない。
  * 中身は口（preview）の実データを出す。絵の数は書かない。
  */
-let stopCalls: Array<{ url: string; body: Record<string, unknown> }> = []
+let stopCalls: Array<{ url: string; body: Record<string, unknown>; headers?: Headers }> = []
+let requestOrder: string[] = []
 
 async function openStopDialog() {
   await renderControl()
@@ -299,6 +303,58 @@ test('EA8rM: 全部そろうと本人確認の上で止める', async () => {
   expect(stop?.body['reason']).toBe('宛先の絞り込みを間違えた')
   expect(stop?.body['confirmation']).toBe('停止')
   expect(host?.textContent).toContain('サーバー共通の停止状態を更新しました')
+})
+
+test('EA8rM: 窓に止める対象・止まらないもの・取り消せないこと・本人確認の方法を出す', async () => {
+  await openStopDialog()
+  const dialog = document.body.querySelector('[data-design-node="EA8rM"]')
+  expect(dialog?.textContent).toContain('止める対象：すべてのアカウント')
+  expect(dialog?.textContent).toContain('停止前にすでに LINE へ渡したものは取り消せません。')
+  expect(dialog?.textContent).toMatch(/止まらないもの：.*受信箱からの手の返信/)
+  expect(dialog?.textContent).toContain('本人確認（認証アプリの6桁）')
+})
+
+test('EA8rM: 止める要求は本人確認のあとに、一回限りの証明と再実行キーを付けて送る', async () => {
+  await openStopDialog()
+  await typeInto(dialogInput('止める理由'), '宛先の絞り込みを間違えた')
+  await typeInto(dialogInput('確認の言葉'), '停止')
+  await typeCode('481516')
+  await act(async () => {
+    executeButton().click()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  })
+  expect(requestOrder).toEqual(['step-up', 'incidents'])
+  const headers = stopCalls[0]?.headers
+  expect(headers?.get('X-Step-Up-Token')).toBe('step-up-test-token')
+  expect(headers?.get('X-Confirm-Irreversible')).toBe('operation-stop')
+  expect(headers?.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/)
+
+})
+
+test('自動処理を選んで止めると、オートメーションと自動応答の両方を止める', async () => {
+  await renderControl()
+  const automations = Array.from(host?.querySelectorAll('label') ?? [])
+    .find((label) => label.textContent?.includes('自動処理'))?.querySelector('input[type="checkbox"]') as HTMLInputElement | undefined
+  expect(automations, '自動処理の選択がある').toBeDefined()
+  await act(async () => {
+    automations?.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+  const stopButton = Array.from(host?.querySelectorAll('button') ?? [])
+    .find((button) => button.textContent === '選んだものを止める')
+  await act(async () => {
+    ;(stopButton as HTMLButtonElement | undefined)?.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+  expect(document.body.querySelector('[data-design-node="EA8rM"]')?.textContent).toContain('自動応答')
+  await typeInto(dialogInput('止める理由'), '自動応答の文面を間違えた')
+  await typeInto(dialogInput('確認の言葉'), '停止')
+  await typeCode('481516')
+  await act(async () => {
+    executeButton().click()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  })
+  expect(stopCalls[0]?.body['capabilities']).toEqual(expect.arrayContaining(['automation_actions', 'auto_reply_dispatch']))
 })
 
 /* 監査 WEB313：補足（任意）に書いた文を、止める要求に乗せる。 */
