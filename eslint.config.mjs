@@ -22,8 +22,10 @@ export default [
     // Keep next.rootDir unset while braces has no patched release. The Next
     // plugin then uses context.cwd directly instead of parsing a glob pattern.
     // 画像の alt は必須（意味のある画像は中身、飾りは alt=""）。警告どまりだと CI が通すので落とす。
+    // HTML の文字列をそのまま差し込まない（中身が内部の定数でも、要素として描く）。
     rules: {
       'jsx-a11y/alt-text': 'error',
+      'react/no-danger': 'error',
     },
   },
 ];
