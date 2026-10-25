@@ -42,7 +42,7 @@ function deferred<T>(): Deferred<T> {
 const bench = vi.hoisted(() => {
   const previewCalls: Array<{ accountId: string | null; deferred: Deferred<unknown> }> = []
   const stopCalls: Array<{ lineAccountId: string | null; expectedVersion: number }> = []
-  const restoreCalls: Array<{ incidentId: string }> = []
+  const restoreCalls: Array<{ incidentId: string; stepUpToken?: string; idempotencyKey?: string }> = []
   const stepUpCalls: string[] = []
   return {
     previewCalls,
@@ -113,8 +113,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
           bench.stopCalls.push({ lineAccountId: input.lineAccountId, expectedVersion: input.expectedVersion })
           return (bench.stopResult?.() ?? Promise.reject(new Error('stop は用意されていません'))) as Promise<never>
         },
-        restore: (incidentId: string) => {
-          bench.restoreCalls.push({ incidentId })
+        restore: (incidentId: string, _input: unknown, stepUpToken: string, idempotencyKey: string) => {
+          bench.restoreCalls.push({ incidentId, stepUpToken, idempotencyKey })
           return (bench.restoreResult?.() ?? Promise.reject(new Error('restore は用意されていません'))) as Promise<never>
         },
       },
@@ -289,6 +289,14 @@ describe('EmergencyControlV8 を現役の画面から操作する', () => {
     expect(screen.queryByRole('button', { name: '本人確認して実行' })).toBeNull()
     expect(screen.queryByRole('button', { name: '復旧する' })).toBeNull()
     expect(bench.restoreCalls).toHaveLength(1); expect(bench.stepUpCalls).toHaveLength(1)
+  })
+
+  it('復旧は本人確認の証明と、窓を開いたときの再実行キーを付けて送る', async () => {
+    await mountControl(); await answerPreview(0, previewPayload({ mark: 701, activeIncidentId: 'incident-9' }))
+    const { ApiError } = await import('@/lib/api')
+    bench.restoreResult = () => Promise.reject(new ApiError(403, 'forbidden', 'EMERGENCY_SCOPE_FORBIDDEN'))
+    await runRestoreFlow()
+    expect(bench.restoreCalls).toEqual([{ incidentId: 'incident-9', stepUpToken: 'step-up-token', idempotencyKey: expect.stringMatching(/^[0-9a-f-]{36}$/) }])
   })
 
   it('409はモーダルを閉じ、古い確認内容を捨て、すべての変更操作を止める', async () => {

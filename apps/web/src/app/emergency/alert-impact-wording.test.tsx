@@ -118,12 +118,10 @@ afterEach(() => {
 
 describe('A32-01: 根拠のない影響を断定しない', () => {
   it('外部通知の不達・友だちの減少・配信の停滞を断定する文が残っていない', () => {
+    // 可能性として出すことは、下の3つの試験が異常を描いて見る。
     expect(PAGE).not.toContain('外部システムへの通知が届いていません。')
     expect(PAGE).not.toContain('友だちが急に減っています')
     expect(PAGE).not.toContain('予約した配信が時刻どおりに出ていません。')
-    expect(PAGE).toContain('外部システムへの通知が届いていない可能性があります')
-    expect(PAGE).toContain('友だちが急に減っている可能性があります')
-    expect(PAGE).toContain('予約した配信が時刻どおりに出ていない可能性があります')
   })
 
   it('実測された注意の異常では影響を可能性として案内する', () => {
@@ -149,6 +147,18 @@ describe('A32-01: 根拠のない影響を断定しない', () => {
 
     expect(screen.getByTitle(/友だちが急に減っている可能性があります/)).toBeTruthy()
     expect(screen.queryByText(/友だちが急に減っています/)).toBeNull()
+  })
+
+  it('配信の異常でも出ていないと断定せず可能性として案内する', () => {
+    render(<OperationAlertsPanel canManage
+      alerts={[alert({ checkKey: 'dispatch_jobs', summary: '予約配信が遅れています' })]}
+      failed={false}
+      busyId={null}
+      onAcknowledge={vi.fn()}
+      onRetry={vi.fn()}
+    />)
+
+    expect(screen.getByTitle(/予約した配信が時刻どおりに出ていない可能性があります。/)).toBeTruthy()
   })
 
   it('確認できていない(unknown)異常では影響の有無も未確認と出す', () => {
@@ -187,6 +197,24 @@ describe('A32-01: 期限切れ(stale)の健全性を現在の判定と混ぜな�
     expect(screen.getByText(/前回の確認結果が期限切れです/)).toBeTruthy()
     expect(screen.getByText(/自動確認が止まっている可能性があります/)).toBeTruthy()
     expect(screen.queryByText(/次は.*に自動で確かめます/)).toBeNull()
+  })
+
+  it('期限切れの実行は、全体の判定も古い「正常」ではなく未確認として知らせる', async () => {
+    // 9項目すべてが古い「正常」。期限切れを見なければ全体が正常に見えてしまう形。
+    const allNormal = staleSnapshot()
+    const keys = ['line_connection', 'message_quota', 'external_integrations', 'webhook', 'dispatch_jobs', 'friend_change', 'monitoring_heartbeat', 'infra_canary', 'credential_expiry'] as const
+    allNormal.data.latestRun.results = keys.map((checkKey, index) => ({
+      ...allNormal.data.latestRun.results[0], id: `result-${index}`, checkKey, observedAt: new Date().toISOString(),
+    }))
+    healthResponse.handler = () => Promise.resolve(allNormal)
+    const onSeverity = vi.fn()
+    render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={onSeverity} />)
+    // 読み込み中も期限切れも判定は未確認のまま。古い結果の「正常」を知らせない。
+    await waitFor(() => {
+      expect([...document.querySelectorAll('span')].filter((el) => el.textContent === '古い確認').length).toBeGreaterThan(0)
+    })
+    await act(async () => { await Promise.resolve() })
+    expect(onSeverity).not.toHaveBeenCalledWith('normal')
   })
 
   it('期限内の実行はこれまでどおり実測の判定を出す', async () => {
