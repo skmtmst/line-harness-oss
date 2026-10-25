@@ -93,7 +93,7 @@ describe('文字と角丸の共通値を役割ごとに維持する', () => {
 
   it('補助の段もV8の写しに合わせる', () => {
     // 補助文字・大きな数の役割も、写しの値を守る。
-    expect(token('text-micro')).toBe('11px')
+    expect(token('text-micro')).toBe('12px') // 11px は使わない（2026-10-25）
     expect(token('text-label')).toBe('12px')
     expect(token('text-heading')).toBe('15px')
     expect(token('text-metric')).toBe('28px')

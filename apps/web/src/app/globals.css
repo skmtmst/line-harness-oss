@@ -31,13 +31,13 @@
    * スタイル属性は検査から見えにくく、「どれが正本か」が分かりにくかった。
    * 正本をここへ移し、body は `font-sans` で読む。
    *
-   * ★管理画面「見た目の物差し」§3: 並びは「Inter, Noto Sans JP」。英字と数字は
+   * 並びは「Inter, Noto Sans JP」（2026-10-25 オーナー決定）。英字と数字は
    * Inter、かなと漢字は Noto Sans JP に見える（Inter に日本語グリフが
    * 無いので、かな・漢字は自動で次の書体に落ちる）。2つの変数は
    * layout.tsx で next/font が html へ出す `--font-inter` /
    * `--font-noto-sans-jp` で、ビルド時に同梱される。
    */
-  --font-sans: var(--font-noto-sans-jp), "Noto Sans JP", var(--font-inter), Inter, sans-serif;
+  --font-sans: var(--font-inter), Inter, var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
 
   /* --- 色 ---------------------------------------------------------------
    * アクセントはLINEブランドの緑1色。状態色（成功・注意・危険）とは
@@ -451,7 +451,7 @@
    * 2枚の影）。照りは緑の上に薄い白の内側線で、ボタンが平らに
    * なりすぎないようにする。
    */
-  --shadow-primary-action: 0 1px 2px rgba(29, 29, 31, 0.1); /* 主ボタンは薄い1枚の影（カードの二重の影は重く見える） */
+  --shadow-primary-action: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(8, 122, 62, 0.35), 0 2px 3px -1px rgba(8, 122, 62, 0.22); /* 上端の光と緑の影。ぼかしは 3px まで */
   /* トグル・オフの地（Pencil V8 トグル/オフ LxHpj の #c9ced6）。 */
   --color-toggle-off: #c9ced6;
   /* 注目の星・オン（Pencil V8 w0R1PQ）：塗りは黄、縁は濃い黄。 */
@@ -573,9 +573,9 @@
   --polish-text-section: 15px;
   --polish-text-body: 13px;
   --polish-text-support: 12px;
-  --polish-text-note: 11px;
+  --polish-text-note: 12px; /* 11px は使わない（2026-10-25）。補足も 12px */
   --polish-weight-title: 700;
-  --polish-weight-body: 400;
+  --polish-weight-body: 500; /* 14px 以下の UI 文字は 500（2026-10-25）。15px 以上の読み物は --font-weight-reading */
   --polish-weight-label: 500;
 }
 :root {
@@ -622,7 +622,8 @@
    * 選ぶカード（ラジオ・チェック）・入力欄・ボタン・浮く面（メニュー・窓）は別の値のまま。
    */
   --card-edge: rgba(29, 29, 31, 0.08);
-  --card-shadow: 0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08);
+  --surface-edge: rgba(29, 29, 31, 0.08); /* 影を持たない面（浮く窓・帯）の薄い縁 */
+  --card-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 2px 3px -1px rgba(0, 0, 0, 0.07), 0 6px 8px -4px rgba(0, 0, 0, 0.07);
   /* --- 動き（管理画面）------------------------------------------------------------
    * Pencil ★管理画面「基礎 動き」（管理画面 文書 `bi8Au`）の物差し。部品の CSS は ms を
    * 直接書かず、この4段と2本の曲線だけを使う。
@@ -797,7 +798,7 @@
   /* controls レーン：書き出しHTMLの線・成功・浮く色選びの値。 */
   --color-controls-swatch-line: #1d1d1f1f;
   --shadow-controls-primary: var(--shadow-primary-action);
-  --shadow-primary-action: 0 1px 2px rgba(29, 29, 31, 0.1); /* 主ボタンは薄い1枚の影（カードの二重の影は重く見える） */
+  --shadow-primary-action: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(8, 122, 62, 0.35), 0 2px 3px -1px rgba(8, 122, 62, 0.22); /* 上端の光と緑の影。ぼかしは 3px まで */
   --color-primary-border: var(--color-accent-deep); /* 地と同じ色。濃い縁が下の影と重なって太い枠に見えた */
   --radius-primary-action: 8px;
   --tpl-folder-create-space-col-h: 45px;
@@ -806,7 +807,7 @@
   --shadow-controls-selected: 0 0 0 #087a3e33;
   --text-lh: 1.5;
   --color-control-border: #1d1d1f1f;
-  --control-shadow: 0 0 #0000; /* 線ではなく影で浮かせる面（選ぶ欄・日付・白い副ボタン・お知らせ） */ --shadow-raised-control: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 1px 2px rgba(0, 0, 0, 0.1), 0 1px 1px rgba(0, 0, 0, 0.04); --shadow-raised-card: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.06); --radius-raised-card: 14px; --color-scroll-thumb: rgba(29, 29, 31, 0.22); --color-scroll-thumb-hover: rgba(29, 29, 31, 0.4);
+  --control-shadow: 0 0 #0000; /* 線ではなく影で浮かせる面（選ぶ欄・日付・白い副ボタン・お知らせ） */ --shadow-raised-control: 0 0 0 1px rgba(25, 28, 33, 0.08), 0 1px 0 rgba(25, 28, 33, 0.02), 0 2px 3px -1px rgba(0, 0, 0, 0.1); --shadow-raised-card: var(--card-shadow); --radius-raised-card: 14px; --color-scroll-thumb: rgba(29, 29, 31, 0.22); --color-scroll-thumb-hover: rgba(29, 29, 31, 0.4);
   --color-toggle-locked: #dadde2;
   --color-status-warn-soft: #f973161a;
   --color-track: #1d1d1f0a;
@@ -2825,7 +2826,7 @@ select:not([multiple]):not(.appearance-none) {
 :root { --shadow-frozen-column: 6px 0 12px #1d1d1f14; --color-scroll-thumb: #1d1d1f40; --gradient-scroll-edge: linear-gradient(-90deg, #1d1d1f00 0%, #1d1d1f14 100%); }
 
 :root {
-  --font-sans: var(--font-noto-sans-jp), "Noto Sans JP", var(--font-inter), Inter, sans-serif;
+  --font-sans: var(--font-inter), Inter, var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
   --color-avatar-purple-bg: #f3ecfb;
   --color-avatar-purple-ink: #6b3fa0;
   --color-avatar-blue-bg: #e9f1ff;
@@ -3192,3 +3193,46 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 :root svg.lucide { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
 
 html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][data-align='right']) { font-variant-numeric: tabular-nums; }
+
+/*
+ * 共通の値（直し③-0・2026-10-25 オーナー決定）。部品と画面はここの値を読むだけにし、
+ * 画面ごとに影・ボタンの高さ・文字の太さを書かない。
+ *
+ *   余白の段      --space-2〜32（上の :root）。
+ *   角丸の役割    部品 --radius-control・主ボタン --radius-primary-action・カード --radius-card・窓 --radius-panel。
+ *   文字の大きさ  題 32/600・本文 13・ラベル 12・補足 12（11px は使わない）・数の帯 34/500。
+ *   文字の太さ    14px 以下の UI 文字は 500、15px 以上の読み物は 400、見出し・ボタン・状態は 600。
+ *   影            くっきり版（ぼかしは最大 8px）。カード・白い部品・緑の主ボタン・選んだ黒い札。
+ *   ボタンの高さ  ふつう 36・小さい 32（道具の列・表の中）・アイコンだけ 32 角（押せる所は 28 以上）。
+ *   動き          押した時 0.98 倍（主ボタンは 0.5px 沈む）・カードに乗せた時 2px 浮く（150ms）。
+ */
+:root {
+  --font-weight-ui: 500;
+  --font-weight-reading: 400;
+  --font-numeric: tabular-nums;
+
+  --control-h: 36px;
+  --control-h-compact: 32px;
+  --control-icon-size: 32px;
+  --control-icon-min: 28px;
+
+  --card-shadow-hover: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 3px 4px -1px rgba(0, 0, 0, 0.08), 0 8px 10px -5px rgba(0, 0, 0, 0.09);
+  --card-hover-lift: translateY(-2px);
+  --motion-card-lift: 150ms;
+
+  /*
+   * 緑の主ボタンの地。上端は今までの #087a3e のまま、下へ少し濃くする。
+   * 白い文字との比はどこでも 5.44:1 以上（上端 5.44・下端 6.73）。
+   */
+  --gradient-primary-action: linear-gradient(180deg, #087a3e, #066a35);
+  --shadow-primary-action-hover: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 4px rgba(8, 122, 62, 0.35), 0 3px 5px -2px rgba(8, 122, 62, 0.3);
+  --press-primary-shift: translateY(0.5px);
+
+  --gradient-raised-control: linear-gradient(180deg, #fff, #fafafc);
+  --gradient-selected-chip: linear-gradient(180deg, #34343a, #1d1d1f);
+  --shadow-selected-chip: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.25);
+
+  --bar-scrolled-bg: rgba(255, 255, 255, 0.72);
+  --bar-scrolled-filter: saturate(180%) blur(18px);
+  --bar-scrolled-line: 1px solid rgba(29, 29, 31, 0.06);
+}

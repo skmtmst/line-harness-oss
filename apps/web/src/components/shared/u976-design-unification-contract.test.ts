@@ -22,9 +22,10 @@ describe('#976 デザイン統一', () => {
   const layout = read('../../app/layout.tsx')
 
   it('U080: 書体の正本は --font-sans で、body は inline style ではなく font-sans を読む', () => {
-    // ★管理画面「見た目の物差し」§3: 「Inter, Noto Sans JP」の順。英字と数字は
+    // 「Inter, Noto Sans JP」の順（2026-10-25 オーナー決定）。英字と数字は
     // Inter（next/font が --font-inter を出す）、かなと漢字は Noto Sans JP。
-    expect(globals).toMatch(/--font-sans:\s*var\(--font-noto-sans-jp\),\s*"Noto Sans JP",\s*var\(--font-inter\),\s*Inter,\s*sans-serif;/)
+    expect(globals).toMatch(/--font-sans:\s*var\(--font-inter\),\s*Inter,\s*var\(--font-noto-sans-jp\),\s*"Noto Sans JP",\s*sans-serif;/)
+    expect(globals).not.toMatch(/--font-sans:\s*var\(--font-noto-sans-jp\)/)
     expect(layout).toContain('font-sans')
     expect(layout).not.toContain('fontFamily')
     expect(layout).toContain("from 'next/font/google'")

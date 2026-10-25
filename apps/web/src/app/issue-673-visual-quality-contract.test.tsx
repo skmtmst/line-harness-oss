@@ -23,9 +23,9 @@ const GLOBALS = readFileSync(join(HERE, 'globals.css'), 'utf8')
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('#673 A. カード・パネルの立体感', () => {
-  it('カードは案Aのくっきりした2層の影と黒8%の線を使う', () => {
+  it('カードはくっきり版の4層の影（ぼかし最大8px）と黒8%の線を使う', () => {
     const card = GLOBALS_CODE.match(/--card-shadow:\s*([^;]+);/)?.[1] ?? ''
-    expect(card).toBe('0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)')
+    expect(card).toBe('0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 2px 3px -1px rgba(0, 0, 0, 0.07), 0 6px 8px -4px rgba(0, 0, 0, 0.07)')
     expect(GLOBALS_CODE).toMatch(/--card-edge:\s*rgba\(29, 29, 31, 0\.08\);/)
     expect(GLOBALS_CODE).toMatch(/--shadow-card-surface:\s*var\(--card-shadow\);/)
   })

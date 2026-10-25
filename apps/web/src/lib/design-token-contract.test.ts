@@ -45,7 +45,7 @@ describe('設計の実測値に合わせる', () => {
   it('文字の段は設計の10段と一致する', () => {
     // Pencil: $size-nano..$size-display
     expect(token('text-nano')).toBe('10px')
-    expect(token('text-micro')).toBe('11px')
+    expect(token('text-micro')).toBe('12px') // 11px は使わない（2026-10-25）
     expect(token('text-caption')).toBe('12px')
     expect(token('text-label')).toBe('12px')
     expect(token('text-body')).toBe('13px')
