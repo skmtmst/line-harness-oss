@@ -1,3 +1,4 @@
+import { liffBookingJson, liffBookingResponse } from '../liff-booking-response.js';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -17,14 +18,14 @@ export function registerLiffHistory(events: Hono<Env>): void {
 
 events.get('/api/liff/events/me', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
-  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
+  if (!account_id) return liffBookingResponse(c, bad(c, 'liff_account_resolution_failed', 400));
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
-  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  if (!callerLineUserId) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const friend = await c.env.DB
     .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
     .bind(callerLineUserId, account_id)
     .first<{ id: string }>();
-  if (!friend) return c.json({ items: [] });
+  if (!friend) return liffBookingJson(c, { items: [] });
 
   const tab = c.req.query('tab') === 'past' ? 'past' : 'upcoming';
   const nowIso = new Date().toISOString();
@@ -79,43 +80,43 @@ events.get('/api/liff/events/me', async (c) => {
   items.sort((a, b) => tab === 'upcoming'
     ? a.slot_starts_at.localeCompare(b.slot_starts_at)
     : b.slot_starts_at.localeCompare(a.slot_starts_at));
-  return c.json({ items });
+  return liffBookingJson(c, { items });
 });
 
 events.get('/api/liff/events/me/waitlist', async (c) => {
   const caller = await eventWaitlistCaller(c);
-  if (caller instanceof Response) return caller;
+  if (caller instanceof Response) return liffBookingResponse(c, caller);
   const items = await getMyEventWaitlist(c.env.DB, caller);
-  return c.json({ items });
+  return liffBookingJson(c, { items });
 });
 
 events.get('/api/liff/events/me/waitlist/:waitlistId', async (c) => {
   const caller = await eventWaitlistCaller(c);
-  if (caller instanceof Response) return caller;
+  if (caller instanceof Response) return liffBookingResponse(c, caller);
   const items = await getMyEventWaitlist(c.env.DB, { ...caller, waitlistId: c.req.param('waitlistId') });
-  if (!items[0]) return bad(c, 'not_found', 404);
-  return c.json(items[0]);
+  if (!items[0]) return liffBookingResponse(c, bad(c, 'not_found', 404));
+  return liffBookingJson(c, items[0]);
 });
 
 events.post('/api/liff/events/me/waitlist/:waitlistId/cancel', inputJsonBoundary(), async (c) => {
   const caller = await eventWaitlistCaller(c);
-  if (caller instanceof Response) return caller;
+  if (caller instanceof Response) return liffBookingResponse(c, caller);
   const result = await cancelMyEventWaitlist(c.env.DB, { ...caller, waitlistId: c.req.param('waitlistId') });
-  if (result === 'not_found') return bad(c, 'not_found', 404);
-  if (result === 'conflict') return bad(c, 'waitlist_not_cancellable', 409);
-  return c.json({ ok: true });
+  if (result === 'not_found') return liffBookingResponse(c, bad(c, 'not_found', 404));
+  if (result === 'conflict') return liffBookingResponse(c, bad(c, 'waitlist_not_cancellable', 409));
+  return liffBookingJson(c, { ok: true });
 });
 
 events.get('/api/liff/events/me/:bookingId', async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
-  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400);
+  if (!account_id) return liffBookingResponse(c, bad(c, 'liff_account_resolution_failed', 400));
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
-  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  if (!callerLineUserId) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const friend = await c.env.DB
     .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
     .bind(callerLineUserId, account_id)
     .first<{ id: string }>();
-  if (!friend) return bad(c, 'not_found', 404);
+  if (!friend) return liffBookingResponse(c, bad(c, 'not_found', 404));
 
   const row = await c.env.DB
     .prepare(
@@ -139,20 +140,20 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
     )
     .bind(c.req.param('bookingId'), friend.id, account_id)
     .first();
-  if (!row) return bad(c, 'not_found', 404);
-  return c.json(row);
+  if (!row) return liffBookingResponse(c, bad(c, 'not_found', 404));
+  return liffBookingJson(c, row);
 });
 
 events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async (c) => {
   const account_id = await resolveAccountIdFromLiff(c);
-  if (!account_id) return bad(c, 'liff_account_resolution_failed', 400, []);
+  if (!account_id) return liffBookingResponse(c, bad(c, 'liff_account_resolution_failed', 400, []));
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
-  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  if (!callerLineUserId) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const friend = await c.env.DB
     .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
     .bind(callerLineUserId, account_id)
     .first<{ id: string }>();
-  if (!friend) return bad(c, 'friend_not_found', 404);
+  if (!friend) return liffBookingResponse(c, bad(c, 'friend_not_found', 404));
 
   const row = await c.env.DB
     .prepare(
@@ -175,7 +176,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
       cancel_deadline_hours_before: number | null;
       slot_starts_at: string;
     }>();
-  if (!row) return bad(c, 'not_found', 404);
+  if (!row) return liffBookingResponse(c, bad(c, 'not_found', 404));
   const nowIso = new Date().toISOString();
   const waitlistParams = {
     lineAccountId: row.line_account_id,
@@ -200,7 +201,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
       });
     } catch (error) {
       if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
-        return bad(c, 'send_in_flight_retry', 409);
+        return liffBookingResponse(c, bad(c, 'send_in_flight_retry', 409));
       }
       throw error;
     }
@@ -208,13 +209,13 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
     // 再送でそろえる (fence 成功後なので 409 で巻き戻す物は無い)。
     await cancelPendingRemindersFor(c.env.DB, row.id);
     await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
-    return c.json({ ok: true });
+    return liffBookingJson(c, { ok: true });
   }
-  if (row.status !== 'requested' && row.status !== 'confirmed') return bad(c, 'invalid_state', 409);
-  if (row.cancel_deadline_hours_before == null) return bad(c, 'cancel_not_allowed', 403);
+  if (row.status !== 'requested' && row.status !== 'confirmed') return liffBookingResponse(c, bad(c, 'invalid_state', 409));
+  if (row.cancel_deadline_hours_before == null) return liffBookingResponse(c, bad(c, 'cancel_not_allowed', 403));
   const deadlineMs =
     new Date(row.slot_starts_at).getTime() - row.cancel_deadline_hours_before * 3600_000;
-  if (deadlineMs <= Date.now()) return bad(c, 'cancel_deadline_passed', 409);
+  if (deadlineMs <= Date.now()) return liffBookingResponse(c, bad(c, 'cancel_deadline_passed', 409));
 
   // 条件付き状態更新: 同時取消の race を防ぐ。0 件なら相手に任せて再試行させる。
   const priorStatus = row.status;
@@ -226,7 +227,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
     )
     .bind(nowIso, nowIso, row.id,row.lock_version)
     .run();
-  if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
+  if ((upd.meta?.changes ?? 0) === 0) return liffBookingResponse(c, bad(c, 'invalid_state', 409));
   // N-065: の未送信予定だけを止める。送信済み履歴は残す。
   // 旧表の取消は fence 成功の後に回す (409 では旧表も含めて完全 rollback)。
   // 送信権の貸出中は状態更新を巻き戻して 409 にする
@@ -252,13 +253,13 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
         )
         .bind(priorStatus, nowIso, row.id,row.lock_version+1)
         .run();
-      return bad(c, 'send_in_flight_retry', 409);
+      return liffBookingResponse(c, bad(c, 'send_in_flight_retry', 409));
     }
     throw error;
   }
   // 旧表の取消は fence 成功の後 (409 では旧表も含めて完全 rollback)。
   await cancelPendingRemindersFor(c.env.DB, row.id);
   await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
-  return c.json({ ok: true });
+  return liffBookingJson(c, { ok: true });
 });
 }

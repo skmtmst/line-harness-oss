@@ -54,13 +54,13 @@ test('待ち一覧と個別取得は本人の行だけを返し、案内中の�
   expect(await res.json()).toMatchObject({ items: [{ id: 'w', queue_position: null, source: 'waitlist' }] });
   expect((await request('me/waitlist/w')).status).toBe(200);
   auth.verifyCallerLineUserId.mockResolvedValue('Uother');
-  expect(await (await request('me/waitlist')).json()).toEqual({ items: [] });
+  expect(await (await request('me/waitlist')).json()).toEqual({ success: true, items: [] });
   expect((await request('me/waitlist/w')).status).toBe(404);
   expect((await request('me/waitlist/w/cancel', 'POST')).status).toBe(404);
 });
 test('取り下げは再送しても成功し、一度だけ次候補のjobを残す', async () => {
-  expect(await (await request('me/waitlist/w/cancel', 'POST')).json()).toEqual({ ok: true });
-  expect(await (await request('me/waitlist/w/cancel', 'POST')).json()).toEqual({ ok: true });
+  expect(await (await request('me/waitlist/w/cancel', 'POST')).json()).toEqual({ success: true, ok: true });
+  expect(await (await request('me/waitlist/w/cancel', 'POST')).json()).toEqual({ success: true, ok: true });
   expect(fixture.raw.prepare(`SELECT status FROM event_waitlist WHERE id = 'w'`).get()).toEqual({ status: 'cancelled' });
   expect(fixture.raw.prepare(`SELECT COUNT(*) AS count FROM event_waitlist_promotion_jobs`).get()).toEqual({ count: 1 });
 });
@@ -94,7 +94,7 @@ test('自分のイベントに予約の旧形式と順番つきの待ちを日�
 });
 test('終了・取消の待ちは過去に出し、予約化済みは二重表示しない', async () => {
   fixture.raw.exec(`UPDATE event_waitlist SET status = 'cancelled' WHERE id = 'w'`);
-  expect(await (await request('me?tab=upcoming')).json()).toEqual({ items: [] });
+  expect(await (await request('me?tab=upcoming')).json()).toEqual({ success: true, items: [] });
   expect(await (await request('me?tab=past')).json()).toMatchObject({ items: [{ id: 'w', status: 'cancelled', queue_position: null }] });
   fixture.raw.exec(`UPDATE event_waitlist SET status = 'expired' WHERE id = 'w'`);
   expect(await (await request('me?tab=past')).json()).toMatchObject({ items: [{ id: 'w', status: 'expired' }] });
@@ -102,7 +102,7 @@ test('終了・取消の待ちは過去に出し、予約化済みは二重表�
     UPDATE event_slots SET starts_at = '2020-06-01T00:00:00.000Z' WHERE id = 's'`);
   expect(await (await request('me?tab=past')).json()).toMatchObject({ items: [{ id: 'w' }] });
   fixture.raw.exec(`UPDATE event_waitlist SET status = 'converted' WHERE id = 'w'`);
-  expect(await (await request('me?tab=past')).json()).toEqual({ items: [] });
+  expect(await (await request('me?tab=past')).json()).toEqual({ success: true, items: [] });
 });
 test('イベント編集後も待ち一覧の日時と名称は申込時のsnapshotに従う', async () => {
   fixture.raw.prepare(`UPDATE event_waitlist SET status = 'waiting', event_snapshot_json = ?`).run(JSON.stringify({

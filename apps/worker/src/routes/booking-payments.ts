@@ -1,3 +1,4 @@
+import { liffBookingJson, liffBookingInputError } from './liff-booking-response.js';
 import { logger } from '@line-crm/shared/server';
 import { runBookingPaymentStart } from '../features/booking/booking-payment-start/index.js';
 import { safeReceiptUrl } from '../features/booking/booking-payment-history/index.js';
@@ -277,24 +278,24 @@ bookingPayments.post(
 // POST /api/liff/booking/payments/start — 支払いを始める（お客さま用）
 bookingPayments.post('/api/liff/booking/payments/start', inputJsonBoundary(), async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
-  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  if (!accountId) return liffBookingJson(c, { error: 'unknown_liff' }, 404);
   const callerLineUserId = await verifyCallerLineUserId(c);
-  if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
+  if (!callerLineUserId) return liffBookingJson(c, { error: 'unauthorized' }, 401);
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
-  if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
+  if (!friendId) return liffBookingJson(c, { error: 'friend_not_found' }, 404);
   const body = await c.req.json<{ bookingId?: unknown }>().catch(() => null);
   const bookingId = String(body?.bookingId ?? '');
-  if (!bookingId) return inputError(c, { error: 'bookingId が必要です' }, 400, ["bookingId"]);
+  if (!bookingId) return liffBookingInputError(c, { error: 'bookingId が必要です' }, 400, ["bookingId"]);
   const booking = await c.env.DB.prepare(
     `SELECT id, line_account_id, price_at_booking, status FROM bookings WHERE id = ? AND friend_id = ?`,
   ).bind(bookingId, friendId).first<StartBookingRow>();
   if (!booking || booking.line_account_id !== accountId) {
-    return c.json({ error: '対象が見つかりません' }, 404);
+    return liffBookingJson(c, { error: '対象が見つかりません' }, 404);
   }
   const result = await startBookingPayment(c.env.DB, c.env, booking, `booking:${bookingId}`);
-  if (!result.ok) return inputError(c, { error: result.error }, result.status, []);
+  if (!result.ok) return liffBookingInputError(c, { error: result.error }, result.status, []);
   const current = await getBookingPaymentByBooking(c.env.DB, accountId, bookingId);
-  return c.json(
+  return liffBookingJson(c,
     { payment: customerPaymentRecord(current), checkoutUrl: result.checkoutUrl },
     result.created ? 201 : 200,
   );
@@ -303,18 +304,18 @@ bookingPayments.post('/api/liff/booking/payments/start', inputJsonBoundary(), as
 // GET /api/liff/booking/payments/by-booking — 支払いの状態（お客さま用）
 bookingPayments.get('/api/liff/booking/payments/by-booking', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
-  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  if (!accountId) return liffBookingJson(c, { error: 'unknown_liff' }, 404);
   const callerLineUserId = await verifyCallerLineUserId(c);
-  if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
+  if (!callerLineUserId) return liffBookingJson(c, { error: 'unauthorized' }, 401);
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
-  if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
+  if (!friendId) return liffBookingJson(c, { error: 'friend_not_found' }, 404);
   const bookingId = c.req.query('bookingId')?.trim();
-  if (!bookingId) return c.json({ error: 'bookingId が必要です' }, 400);
+  if (!bookingId) return liffBookingJson(c, { error: 'bookingId が必要です' }, 400);
   const booking = await c.env.DB.prepare(
     `SELECT id FROM bookings WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
   ).bind(bookingId, friendId, accountId).first<{ id: string }>();
-  if (!booking) return c.json({ error: '対象が見つかりません' }, 404);
-  return c.json(await bookingPaymentStatusPayload(c.env.DB, accountId, bookingId));
+  if (!booking) return liffBookingJson(c, { error: '対象が見つかりません' }, 404);
+  return liffBookingJson(c, await bookingPaymentStatusPayload(c.env.DB, accountId, bookingId));
 });
 
 // GET /api/booking/payments/by-booking — 支払いの状態（仮押さえの期限切れもここで落とす）
@@ -345,12 +346,12 @@ async function accessiblePayment(c: import('hono').Context<Env>) {
   return record && await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[record.line_account_id]) ? record : null;
 }
 bookingPayments.onError((error,c) => {
-  if (error instanceof PaymentActionError) return c.json({success:false,error:error.code,code:error.code},error.status);
+  if (error instanceof PaymentActionError) return (c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:error.code,code:error.code}, error.status) : c.json({success:false,error:error.code,code:error.code},error.status));
   const missing = /no such (table|column).*?(booking_payment_refunds|booking_payment_booking_links|refunded_amount|actor_label)/.test(String(error));
   if (!missing) throw error;
   const code = 'payment_refund_storage_not_ready';
   logger.error(code);
-  return c.json({success:false,error:code,code}, /\/(refund|refunds|booking)$/.test(c.req.path) ? 503 : 500);
+  return (c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:code,code}, /\/(refund|refunds|booking)$/.test(c.req.path) ? 503 : 500) : c.json({success:false,error:code,code}, /\/(refund|refunds|booking)$/.test(c.req.path) ? 503 : 500));
 });
 bookingPayments.post('/api/booking/payments/:id/refund',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary(),async c => {
   c.header('Cache-Control','no-store');

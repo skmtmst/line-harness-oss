@@ -1,3 +1,4 @@
+import { liffBookingJson } from '../liff-booking-response.js';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bookingAddons } from '../../features/booking/booking-addons/index.js';
@@ -17,23 +18,23 @@ export function registerLiffCatalog(booking: Hono<Env>): void {
 // ================================================================
 
 booking.get('/api/liff/booking/style-readiness', async c => {
-  const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
-  try{return c.json({success:true,data:await featureReadiness(c.env.DB,caller.accountId,c.req.query('feature')??'')});}catch(e){if(e instanceof StyleError)return c.json({error:e.code},e.status);throw e;}
+  const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return liffBookingJson(c, {error:caller.error},caller.status);
+  try{return liffBookingJson(c, {success:true,data:await featureReadiness(c.env.DB,caller.accountId,c.req.query('feature')??'')});}catch(e){if(e instanceof StyleError)return liffBookingJson(c, {error:e.code},e.status);throw e;}
 });
 
 booking.post('/api/liff/booking/page-views', inputJsonBoundary(), async c => {
   const caller=await resolveSelfBookingCaller(c);
-  if(!caller.ok)return c.json({error:caller.error},caller.status);
+  if(!caller.ok)return liffBookingJson(c, {error:caller.error},caller.status);
   const body=await c.req.json<{menuId?:unknown;entryPoint?:unknown}>().catch(()=>null);
-  if(!body||(body.menuId!==undefined&&typeof body.menuId!=='string')||(body.entryPoint!==undefined&&(typeof body.entryPoint!=='string'||body.entryPoint.length>100)))return c.json({error:'invalid_page_view'},400);
-  if(body.menuId&&!await c.env.DB.prepare('SELECT id FROM menus WHERE id=? AND line_account_id=? AND is_active=1').bind(body.menuId,caller.accountId).first())return c.json({error:'menu_not_found'},404);
+  if(!body||(body.menuId!==undefined&&typeof body.menuId!=='string')||(body.entryPoint!==undefined&&(typeof body.entryPoint!=='string'||body.entryPoint.length>100)))return liffBookingJson(c, {error:'invalid_page_view'},400);
+  if(body.menuId&&!await c.env.DB.prepare('SELECT id FROM menus WHERE id=? AND line_account_id=? AND is_active=1').bind(body.menuId,caller.accountId).first())return liffBookingJson(c, {error:'menu_not_found'},404);
   await c.env.DB.prepare('INSERT INTO booking_page_views(id,line_account_id,menu_id,friend_id,entry_point,viewed_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),caller.accountId,body.menuId??null,caller.friendId,body.entryPoint??null,new Date().toISOString()).run();
-  return c.json({success:true},201);
+  return liffBookingJson(c, {success:true},201);
 });
 
 booking.get('/api/liff/booking/menus', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
-  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  if (!accountId) return liffBookingJson(c, { error: 'unknown_liff' }, 404);
   const rows = await c.env.DB
     .prepare(
       `SELECT id, name, category_label, description,
@@ -52,23 +53,23 @@ booking.get('/api/liff/booking/menus', async (c) => {
   const friend=user?await resolveFriendId(c,user,accountId):null;
   const visible=[];
   for(const row of rows.results as Array<{id:string;addon_only:number}>)if(!row.addon_only&&(await menuAudience(c.env.DB,accountId,row.id,friend)).visible)visible.push(row);
-  return c.json({ menus: visible.map(row => ({ ...row,
+  return liffBookingJson(c, { menus: visible.map(row => ({ ...row,
     photo_url: bookingPhoto(c.env.WORKER_URL || new URL(c.req.url).origin, (row as { photo_media_id?: string }).photo_media_id)?.url ?? null,
   })) });
 });
 
 booking.get('/api/liff/booking/menus/:id/addons',async(c)=>{
- const a=await resolveAccountIdFromLiff(c);if(!a)return c.json({error:'unknown_liff'},404);
+ const a=await resolveAccountIdFromLiff(c);if(!a)return liffBookingJson(c, {error:'unknown_liff'},404);
  const user=await verifyCallerLineUserId(c),f=user?await resolveFriendId(c,user,a):null;
- if(!(await menuAudience(c.env.DB,a,c.req.param('id'),f)).visible)return c.json({error:'menu_not_available'},403);
+ if(!(await menuAudience(c.env.DB,a,c.req.param('id'),f)).visible)return liffBookingJson(c, {error:'menu_not_available'},403);
  const row=await c.env.DB.prepare('SELECT addon_menu_ids_json FROM menus WHERE id=? AND line_account_id=?').bind(c.req.param('id'),a).first<{addon_menu_ids_json:string}>();
  const ids=JSON.parse(row?.addon_menu_ids_json??'[]') as string[],out=[];for(const id of ids){try{out.push(...await bookingAddons(c.env.DB,a,c.req.param('id'),[id],f));}catch{/* 停止した追加メニューは候補に出さない。 */}}
- return c.json({success:true,data:out});
+ return liffBookingJson(c, {success:true,data:out});
 });
 
 booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
-  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  if (!accountId) return liffBookingJson(c, { error: 'unknown_liff' }, 404);
   const menuId = c.req.param('id');
   const rows = await c.env.DB
     .prepare(
@@ -85,27 +86,27 @@ booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
     )
     .bind(accountId, menuId)
     .all();
-  return c.json({ staff: rows.results.map(row => ({ ...(row as Record<string, unknown>),
+  return liffBookingJson(c, { staff: rows.results.map(row => ({ ...(row as Record<string, unknown>),
     photo_url: bookingPhoto(c.env.WORKER_URL || new URL(c.req.url).origin, (row as { photo_media_id?: string }).photo_media_id)?.url ?? null,
   })) });
 });
 
 booking.get('/api/liff/booking/availability', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
-  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  if (!accountId) return liffBookingJson(c, { error: 'unknown_liff' }, 404);
   const menuId = c.req.query('menu_id');
   const staffId = c.req.query('staff_id') || undefined;
   const from = c.req.query('from');
   const to = c.req.query('to');
   if (!menuId || !from || !to) {
-    return c.json({ error: 'missing_params' }, 400);
+    return liffBookingJson(c, { error: 'missing_params' }, 400);
   }
   const fromD = new Date(`${from}T00:00:00Z`);
   const toD = new Date(`${to}T00:00:00Z`);
   if ((toD.getTime() - fromD.getTime()) / 86400_000 > 28) {
-    return c.json({ error: 'range_too_wide' }, 400);
+    return liffBookingJson(c, { error: 'range_too_wide' }, 400);
   }
-  let addonIds:unknown;try{addonIds=c.req.query('addon_ids')?JSON.parse(c.req.query('addon_ids')!):undefined;}catch{return c.json({error:'invalid_addons'},400);}
+  let addonIds:unknown;try{addonIds=c.req.query('addon_ids')?JSON.parse(c.req.query('addon_ids')!):undefined;}catch{return liffBookingJson(c, {error:'invalid_addons'},400);}
   const user=addonIds?await verifyCallerLineUserId(c):null,friend=user?await resolveFriendId(c,user,accountId):null;
   const addons=await bookingAddons(c.env.DB,accountId,menuId,addonIds,friend);
   // R92: お客さまの画面の空き確認では、店舗共通の受付締切・受付期間を
@@ -122,7 +123,7 @@ booking.get('/api/liff/booking/availability', async (c) => {
     applyStoreRules: true,
     googleCredentials: googleCredentials(c.env),
   });
-  return c.json(result);
+  return liffBookingJson(c, result);
 });
 
 // LIFF 予約「日時を選ぶ」段の最初の形と受付期間を返す読み口。
@@ -131,7 +132,7 @@ booking.get('/api/liff/booking/availability', async (c) => {
 // 他店舗の設定は読めない。migration 前の行は既定値（list・60日）を返す。
 booking.get('/api/liff/booking/settings', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
-  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  if (!accountId) return liffBookingJson(c, { error: 'unknown_liff' }, 404);
   // SELECT * で読む。liff_date_view 列が無い migration 前の DB でも
   // 既定値を返せるよう、列名の指定はしない。
   const row = await c.env.DB
@@ -139,7 +140,7 @@ booking.get('/api/liff/booking/settings', async (c) => {
     .bind(accountId)
     .first<Record<string, unknown>>();
   const windowDays = Number(row?.booking_window_days);
-  return c.json({
+  return liffBookingJson(c, {
     liff_date_view: normalizeLiffDateView(row?.liff_date_view),
     booking_window_days:
       Number.isInteger(windowDays) && windowDays >= 1 && windowDays <= 365 ? windowDays : 60,
