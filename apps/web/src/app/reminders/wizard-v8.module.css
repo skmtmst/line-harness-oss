@@ -995,15 +995,7 @@
 }
 
 /* 詳細のタブの上の小見出し・バナー（ / ）。 */
-.bannerWarn {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
-  border-radius: var(--radius-card);
-  background: var(--color-danger-bg);
-}
+
 .bannerWarnText {
   display: flex;
   flex-direction: column;
@@ -1019,16 +1011,6 @@
   margin: 0;
   color: var(--color-ink-secondary);
   font-size: 12px;
-}
-.bannerInfo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border-radius: var(--radius-card);
-  background: var(--color-info-bg);
-  color: var(--color-info);
-  font-size: 13px;
 }
 
 /* 詳細の右欄の操作ボタン（一時停止・編集・その他）。 */

@@ -131,25 +131,7 @@
 }
 
 /* 案内の帯（青。自動では結び付けません、など）。 */
-.infoBand {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--color-accent-border, var(--color-hairline));
-  border-radius: var(--radius-control);
-  background: var(--color-accent-soft);
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
-}
 
-.infoBand svg {
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: var(--color-action);
-}
 
 /* 操作の失敗の帯。 */
 
@@ -679,18 +661,7 @@
   color: var(--color-warning);
 }
 
-.infoBandRetry {
-  background: none;
-  border: 0;
-  padding: 0;
-  margin-left: 8px;
-  color: var(--color-accent-deep);
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
+
 
 .stateIconError {
   background: var(--color-status-danger-soft);

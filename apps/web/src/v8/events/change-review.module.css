@@ -188,15 +188,6 @@
   font-size: var(--text-caption);
   line-height: var(--tpl-wh-care-lh);
 }
-.band {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-wh-ops-gap);
-  padding: var(--tpl-ev-band-pad);
-  border-radius: var(--radius-segment);
-  background: var(--tpl-ev-band-bg);
-  color: var(--tpl-ev-band-ink);
-}
 .bandTitle {
   margin: 0;
   font-size: var(--text-caption);

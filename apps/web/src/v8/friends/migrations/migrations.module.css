@@ -1,7 +1,5 @@
 /* ★V8 CSVで書き出す・取り込む・UID移行（・）。値は globals.css の --tpl-fr-*。 */
 .body { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); padding: var(--tpl-fr-area-pad); min-width: 0; }
-.bandDone { padding-block: var(--tpl-fr-uid-band-pad); background: var(--color-accent-soft); color: var(--color-ink-secondary); }
-.bandDone > svg { color: var(--color-accent-deep); }
 .bandTitle { display: block; color: var(--color-ink); font-weight: 700; line-height: var(--tpl-fr-back-lh); }
 .bandText { display: block; font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
 

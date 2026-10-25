@@ -256,11 +256,6 @@
   color: var(--color-danger);
 }
 
-.feedbackSuccess {
-  background: var(--color-accent-soft);
-  color: var(--color-ink);
-}
-
 /* 確認の窓の中身。 */
 
 .confirmTargetRow {
