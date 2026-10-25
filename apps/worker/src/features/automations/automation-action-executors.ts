@@ -3,7 +3,7 @@ import { createAutomationActionExecutors as createHandlers } from './automation-
 import type { AutomationActionExecutorDependencies } from './automation-action-handlers.js';
 export type { AutomationActionExecutorDependencies } from './automation-action-handlers.js';
 
-/** Bind business event dispatch at the public entry, outside the handlers. */
+/** ハンドラ同士を結合しないよう、業務イベントの配信は公開入口で接続する。 */
 export function createAutomationActionExecutors(dependencies: AutomationActionExecutorDependencies = {}) {
   return createHandlers({ ...dependencies, emitEvent: dependencies.emitEvent ?? fireEvent });
 }

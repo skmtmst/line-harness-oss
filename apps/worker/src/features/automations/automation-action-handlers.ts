@@ -47,7 +47,7 @@ interface AutomationLineClient {
 export interface AutomationActionExecutorDependencies {
   emitEvent?: EventDispatcher;
   credentialEncryptionKey?: string;
-  /** Immediate callers own their delivery ledger and require the external acknowledgement. */
+  /** 呼出元が配送台帳を管理する即時処理では、外部の受理確認まで待つ。 */
   webhookDeliveryMode?: 'queued' | 'immediate';
   resolveLineAccessToken?: (db: D1Database, lineAccountId: string) => Promise<string | null>;
   createLineClient?: (accessToken: string) => AutomationLineClient;
@@ -55,7 +55,7 @@ export interface AutomationActionExecutorDependencies {
   lookupHost?: WebhookDnsLookup;
   now?: () => string;
   /**
-   * F-14: 担当者通知の送達に使う環境（メール経路用）。渡さない呼び出しでは
+   * 担当者通知の送達に使う環境（メール経路用）。渡さない呼び出しでは
    * メール経路のあるルールは送らずに止める（LINE・画面内通知は送れる）。
    */
   operatorMailEnv?: Env['Bindings'];
@@ -113,7 +113,7 @@ async function requireScopedResource(
   context: AutomationActionContext,
   input: { table: 'tags' | 'templates' | 'outgoing_webhooks'; id: string; code: string; label: string },
 ): Promise<void> {
-  // #939 N-368: 送信Webhookの削除は履歴を残す印なので、印のある行は
+  //  送信Webhookの削除は履歴を残す印なので、印のある行は
   // 「見つからない」として扱う。他の表に deleted_at は無い。
   const notDeleted = input.table === 'outgoing_webhooks' ? ' AND deleted_at IS NULL' : '';
   const row = await context.db.prepare(
@@ -237,7 +237,7 @@ async function tagExecutor(context: AutomationActionContext, operation: 'add' | 
   await requireScopedResource(context, { table: 'tags', id: tagId, code: 'tag_not_found', label: 'タグ' });
   if (operation === 'add') {
     /*
-     * R403: 受信Webhookの起点では連動処理（マイル・成果）の失敗を握りつぶさない。
+     * 受信Webhookの起点では連動処理（マイル・成果）の失敗を握りつぶさない。
      * 受領は失敗状態で残り、同じ受信の再送で欠けた記録だけを復旧する
      * （安定キーで二重計上しない）。自動化など他の起点は従来どおり。
      */
@@ -401,7 +401,7 @@ async function sendMessageExecutor(
   }
   const token = await resolveAccessToken(context, dependencies);
   const client = (dependencies.createLineClient ?? ((value) => new LineClient(value)))(token);
-  // R363: 送信呼び出しと送信後の記録は分けて失敗を見る。
+  // 送信呼び出しと送信後の記録は分けて失敗を見る。
   // 呼び出し前の失敗（resolve・検証・予約）は未送信の失敗、
   // 呼び出し後の失敗（受理不明・記録失敗）は照合待ちにする。
   // まとめて分類すると、受理済みの送信を未送信として返却・再送する。
@@ -531,7 +531,7 @@ async function webhookExecutor(
   if (!webhook) throw invalid('webhook_not_active', '動作中の送信Webhookが見つかりません');
   // 送り先の安全確認はpostWebhookSafelyが送信直前と転送先の各段で行う。
   // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
-  // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり送る。
+  // (鍵不足・復号失敗)ときだけ送らずに止める。未設定の旧行は従来どおり送る。
   let sendSecret: string | null = null;
   if (webhook.secret_encrypted || webhook.secret) {
     try {
@@ -542,7 +542,7 @@ async function webhookExecutor(
     if (!sendSecret) throw invalid('webhook_secret_unavailable', '送信Webhookのsecretを確認できませんでした');
   }
 
-  // N-371/N-372: 本文は共通封筒（要件26 §6-2）、ヘッダは X-Harness-* の
+  // 本文は共通封筒（要件26 §6-2）、ヘッダは X-Harness-* の
   // 共通契約に揃える。イベントIDは冪等キー（step.id）と同じ値なので、
   // 自動化の再試行で同じ出来事を指し続ける。
   const body = buildOutgoingWebhookBody({
@@ -565,7 +565,7 @@ async function webhookExecutor(
     if (!delivery) throw new Error('webhook_delivery_not_recorded');
     if (delivery.status === 'delivered') return { output: { webhookId, deliveryId: delivery.id, delivered: true } };
     if (delivery.status === 'failed') throw invalid('webhook_delivery_failed', '送信Webhookを届けられませんでした');
-    // Acceptance into the outbox is not completion: dependent actions must wait for acknowledgement.
+    // 後続アクションが先に進まないよう、outbox への登録だけでは完了とせず受理確認を待つ。
     throw new AutomationActionDeferred();
   }
   const headers = await buildOutgoingWebhookHeaders({ eventId: context.idempotencyKey, body, secret: sendSecret });
@@ -617,7 +617,7 @@ async function webhookExecutor(
 }
 
 /**
- * F-14 すること「担当へ知らせる」。担当者通知のルールを、自動通知として
+ * すること「担当へ知らせる」。担当者通知のルールを、自動通知として
  * 動かす（`X-Line-Harness-Source: manual` は付けない。自動の扱い）。
  * 送り先・経路はルール側に従い、文面だけこの処理のひと言で上書きする。
  */

@@ -5,8 +5,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import { buildStepMessages, testSendSteps } from './scenario-test-send.js';
 
 /**
- * 実DBで確かめるテスト送信の解決(独立審査指摘5)。
- * 送る側のアカウントを必ず渡し、未公開・別アカウントは step の控えに落とす。
+ * 送信元アカウントを必須とし、未公開・別アカウントの参照は step の控えへ戻すことを実 DB で確かめる。
  */
 describe('実DB: テスト送信は送る側のアカウントで解決する', () => {
   let store: SqliteD1;
@@ -85,7 +84,7 @@ describe('実DB: テスト送信は送る側のアカウントで解決する', 
 });
 
 /**
- * 送信先単位のデバウンス（#949 N-057）。
+ * 送信先単位のデバウンス。
  *
  * 画面の送信中フラグだけでは、連打・別タブ・同時リクエストの重複実送信を
  * 止められない。送る前にサーバー側で claim を取り、窓の内側では実送信も

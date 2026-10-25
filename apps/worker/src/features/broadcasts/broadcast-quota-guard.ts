@@ -98,7 +98,7 @@ export async function fetchQuota(channelAccessToken: string): Promise<QuotaFetch
 }
 
 /*
- * N-062 REJECT対応: アカウント単位の送信枠の予約台帳。
+ *  REJECT対応: アカウント単位の送信枠の予約台帳。
  * 配信単位の claim は行を排他するが、アカウント残枠を別配信間で排他しない。
  * 残枠1を読んだ2配信が同時に進む TOCTOU を止めるため、送る前に枠を予約する。
  * 置き場所は既存の `account_settings` の1行（migration なし）。

@@ -1,5 +1,5 @@
 /*
- * 友だち単位の購読操作（#949 N-054 / 機能05）。
+ * 友だち単位の購読操作（機能05）。
  *
  * 実DB（better-sqlite3 + bootstrap.sql）に実物のルートを当てる。
  *   - 止める・再開・失敗を再送・別のシナリオへ移す
@@ -273,7 +273,7 @@ describe('友だち単位の購読操作（#949 N-054）', () => {
     const first = await post('sub-move', 'move', owner, { targetScenarioId: 'sc-move' }, shared);
     expect(first.status).toBe(200);
     // 同じ購読・同じ操作・同じキーでも、本体（移し先）が違えば使い回し。
-    // 直す前は台帳が購読+操作だけを照合していたため、保存済みの 200 が返った。
+    // 状態変更後の操作を、過去の receipt で成功扱いしないことを確かめる。
     const different = await post('sub-move', 'move', owner, { targetScenarioId: 'sc-2' }, shared);
     expect(different.status).toBe(409);
     // 同じ本体の再送は従来どおり保存済みの結果を返す
@@ -292,7 +292,7 @@ describe('友だち単位の購読操作（#949 N-054）', () => {
     ).get(shared) as { n: number };
     expect(ledger.n).toBe(0);
     // 配信が済んで active へ戻ったあと、同じキーでやり直せる
-    // （直す前は 409 が pin され、Web がキーを回さないため永遠に止められなかった）
+    // 競合応答を固定して、同じキーの停止操作を永久に妨げない。
     sqlite.raw.prepare(
       `UPDATE friend_scenarios SET status = 'active' WHERE id = 'sub-delivering'`,
     ).run();

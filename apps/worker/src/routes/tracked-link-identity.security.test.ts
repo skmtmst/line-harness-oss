@@ -84,7 +84,7 @@ describe('tracked click caller identity and current ownership', () => {
       { ...original, exp: now + 31 * 86400 }, { ...original, exp: `${now + 1}` },
     ]) {
       const altered = btoa(JSON.stringify(data)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-      // Even correctly signed expired or malformed claims must be refused.
+      // 署名が正しくても、期限切れや不正な内容の確認票は拒む。
       const signature = await navigationProof('secret-a', 'tracked-click-identity:v1', altered);
       const candidate = data.friend === 'fa2' ? `${altered}.${signed.split('.')[1]}` : `${altered}.${signature}`;
       await click(`?identity=${candidate}`);

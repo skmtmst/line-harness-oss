@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', async (importOriginal) => ({
-  // 台帳・記録・状態の純粋な部品と集計は本物を使う（#816）。
+  // 台帳・記録・状態の純粋な部品と集計は本物を使う。
   // 境界の判定対象（取得・作成・更新・削除）だけ差し替える。
   ...(await importOriginal<typeof import('@line-crm/db')>()),
   getBroadcasts: mocks.getBroadcasts,
@@ -47,7 +47,7 @@ vi.mock('../features/broadcasts/broadcast.js', () => ({
   processBroadcastSend: mocks.processBroadcastSend,
   processQueuedBroadcasts: mocks.processQueuedBroadcasts,
   buildMessage: vi.fn(),
-  // N-062: 即時送信の直前再確認はこの試験の対象外のため通す。枠の拒否は専用試験で見る。
+  // 即時送信の直前再確認はこの試験の対象外のため通す。枠の拒否は専用試験で見る。
   guardScheduledBroadcastQuota: async () => ({ blocked: false }),
 }));
 vi.mock('../services/operator-notification-dispatch.js', () => ({

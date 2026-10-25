@@ -6,7 +6,7 @@ import { jstDayStart, processDailyRichMenuReconcile } from './rich-menu-daily-re
 import type { LineRichMenuClient } from '../../lib/rich-menu-publisher.js';
 
 /**
- * K(#822): 毎日の自動照合。実SQLite＋偽LINE client。
+ * 毎日の自動照合。実SQLite＋偽LINE client。
  * 見つけたずれは直さず台帳に残す。同じ日は2回見ない。
  */
 
@@ -103,7 +103,7 @@ describe('毎日の自動照合', () => {
     expect(runs[0].m).toBe('scheduled_reconcile');
     expect(runs[0].s).toBe('succeeded');
     expect(JSON.parse(runs[0].d)).toContain('stale_page_richmenu_id');
-    // 直していない（記録は外したまま）
+    // 記録は除外した状態を保つ。
     const page = sqlite.prepare(`SELECT line_richmenu_id AS v FROM rich_menu_pages WHERE id = 'p1'`).get() as { v: string | null };
     expect(page.v).toBe('rm-gone');
   });

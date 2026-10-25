@@ -155,7 +155,7 @@ export const post__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">)
   const requestedAccountIds = targetType === 'multi-account-dedup'
     ? (Array.isArray(body.accountIds) ? body.accountIds : [null])
     : [body.lineAccountId ?? null];
-  // N-061: 要求accountを共通境界へ渡す。/broadcasts持ちstaffだけが作れる。
+  // 要求accountを共通境界へ渡す。/broadcasts持ちstaffだけが作れる。
   const createBoundary = await broadcastWriteBoundary(c, requestedAccountIds, { operationKey: BROADCAST_DEFINITION_EDIT_KEY });
   if (!createBoundary.allowed) {
     return createBoundary.reason === 'forbidden'
@@ -246,7 +246,7 @@ export const post__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">)
     if (!Array.isArray(body.dedupPriority)) {
       return inputError(c, { success: false, error: 'dedupPriority (array, may be empty) required for multi-account-dedup' }, 400, ["dedupPriority"]);
     }
-    // Defense in depth: drop priority entries not in accountIds before persisting.
+    // 不正なアカウントを優先先として保存しないよう、accountIds にない項目を除く。
     body.dedupPriority = body.dedupPriority.filter((id: unknown) =>
       typeof id === 'string' && body.accountIds!.includes(id));
   }
@@ -302,8 +302,7 @@ export const post__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">)
       saveAsDraft,
     });
   } catch (createError) {
-    // Concurrent retries may both pass the SELECT above. The primary key makes
-    // only one INSERT win; the loser is returned as an idempotent replay.
+    // 同時再送は主キーで1件だけ確定し、負けた要求も保存済みの同じ結果を返す。
     const existing = idempotencyKey
       ? await getBroadcastById(c.env.DB, idempotencyKey)
       : null;

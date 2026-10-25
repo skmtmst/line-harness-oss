@@ -1,3 +1,3 @@
-// Compatibility entry for existing consumers; implementation lives with its feature.
+// 既存の公開入口を維持し、実装は機能側に置く。
 export { AutoReplyActionRetryError, compareAutoReplyCandidates, evaluateAutoReplyCandidates, keywordMatches, keywordRuleMatches, matchAndReply, matchedKeywordLabel, matchesMessageKind, parseAutoReplyActions, parseAutoReplyActionSnapshot, previewAutoReplyContent, readAutoReplyOnFailure, resolveAutoReplyContent, resolveKeywordRules, retryAutoReplyActionRuns } from '../features/auto-replies/auto-reply.js';
 export type { AutoReplyActionRetryOutcome, AutoReplyActionRow, AutoReplyCandidateEvaluation, AutoReplyCandidateReasonCode, KeywordRule, MatchAndReplyResult } from '../features/auto-replies/auto-reply.js';

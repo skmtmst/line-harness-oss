@@ -260,7 +260,7 @@ describe('自動応答の一覧・競合・下書き保存口', () => {
     expect(saved.status).toBe(200);
     await expect(saved.json()).resolves.toMatchObject({
       data: {
-        // m26c R551: 保存ごとに版が進む。同じ版の後続保存は競合になる。
+        // m26c : 保存ごとに版が進む。同じ版の後続保存は競合になる。
         versionNumber: 3,
         settings: {
           receiveSources: ['line', 'email'],

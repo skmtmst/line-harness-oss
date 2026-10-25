@@ -55,7 +55,7 @@ autoReplies.post('/api/auto-replies/:id/publish', requireDeliveryAccess('autoRep
 // いずれも owner/admin 専用で、本文の長さ上限は下書きと同じ基準を見る。
 //
 // isActive は省略・false ともに「止まった状態」で作る（AUTOREPLY-08）。
-// 前は入力を無視して常に有効で作っていたため、オフで保存したルールが
+// オフで保存したルールが意図せず動かないよう、入力の有効・無効を保存する。
 // 届いたメッセージへ応答していた。動かすのは isActive: true の明示指定か、
 // 保存後の再開・公開操作だけにする。
 // F7: isActive: true の指定があっても、作る前に既存の有効ルールと当てる。
@@ -67,7 +67,7 @@ autoReplies.post('/api/auto-replies', requireDeliveryAccess('autoReplies'), inpu
 autoReplies.put('/api/auto-replies/:id', requireDeliveryAccess('autoReplies'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"isActive":["boolean"]}), put__api_auto_replies_id_2);
 
 /**
- * POST /api/auto-replies/:id/stop — 専用の停止口（機能08 点検 E-01）。
+ * POST /api/auto-replies/:id/stop — 専用の停止口（機能08 点検）。
  *
  * isActive の素のトグルでは「いつ・誰が・なぜ止めたか」が残らない。
  * 停止は運用の判断なので、理由（任意）・担当者・日時を記録する。
@@ -75,9 +75,7 @@ autoReplies.put('/api/auto-replies/:id', requireDeliveryAccess('autoReplies'), i
  */
 autoReplies.post('/api/auto-replies/:id/stop', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), post__api_auto_replies_id_stop_3);
 
-// DELETE /api/auto-replies/:id
-// 物理削除ではなく履歴を残す方式（機能08 点検 N-085）。設定と担当者を残し、
-// 一覧・評価・集計からは外れる。過去の一致記録と実行台帳はそのまま残る。
+// 物理削除せず設定・担当者・過去の一致・実行台帳を保持し、一覧・評価・集計からだけ外す。
 autoReplies.delete('/api/auto-replies/:id', requireDeliveryAccess('autoReplies'), delete__api_auto_replies_id_4);
 
 /**

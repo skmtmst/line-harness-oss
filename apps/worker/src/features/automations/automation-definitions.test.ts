@@ -182,11 +182,7 @@ describe('オートメーションの一覧・対象見込み・1人テスト', 
   });
 
   /*
-   * ここから3件は「確認した中身しか送らない」ことを見る（#679・司令塔 09-09 03:46）。
-   *
-   * `runAutomationTest` は `startAutomationRun` の中でもう一度 `action_config` を
-   * 読み、`execution_plan_json` に焼き付けてから送る。**画面側の突き合わせだけでは、
-   * その読み取りの直前に割り込まれた中身を止められない。**
+   * 確認した中身だけを送るため、runAutomationTest の入口の照合に加え、startAutomationRun が action_config を読み execution_plan_json へ固定する直前の割り込みも検出する。
    */
 
   it('確認した中身が別接続で書き換わっていたら、送らずに409で返し実行行も残さない', async () => {
@@ -286,10 +282,7 @@ describe('オートメーションの一覧・対象見込み・1人テスト', 
     const confirmed = await revisionOf(testDb.raw, versionId);
 
     /*
-     * アプリを通さずDBを直接書き換える場面（司令塔の C1 の道具立てと同じ）。
-     * 入口の突き合わせが済んだあと、`startAutomationRun` が中身を読む直前に
-     * 同じ行を書き換えるので、**版の行のidは現在の下書きのまま**である。
-     * 入口の指紋も、実行側の `v.id IN (...)` も当たらない。最後の見張りだけが頼り。
+     * 入口の照合後、startAutomationRun の読込直前に DB の同じ行を書き換える。版 ID が同じでも中身が変わるため、実行側の最終照合が必要になる。
      */
     let interrupted = false;
     const racingDb = new Proxy(testDb.db, {
@@ -359,7 +352,7 @@ describe('オートメーションの一覧・対象見込み・1人テスト', 
   });
 
   /*
-   * 監査 R487: 下書きが呼ぶ共通アクションは `common_action_bindings` で
+   * 監査 : 下書きが呼ぶ共通アクションは `common_action_bindings` で
    * 版を固定する。**束の切り替えは下書きの版・指紋を変えない**ので、
    * 確認画面が持つ版の一式（expectedCommonActions）と照合しないと、
    * 確認後に別担当が切り替えた新版をそのまま送ってしまう。
@@ -548,7 +541,7 @@ describe('オートメーションの一覧・対象見込み・1人テスト', 
 });
 
 /*
- * #942 N-352: 一覧の稼働切替と「保管」。
+ *  一覧の稼働切替と「保管」。
  * 状態切替から保管を直接再開できない。の専用入口で
  * 停止中または下書きへ戻す。実行記録は消えない。
  */

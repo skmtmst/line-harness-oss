@@ -12,16 +12,13 @@ import type { LineClient } from '@line-crm/line-sdk';
 import type { Friend } from '@line-crm/db';
 
 /**
- * Regression coverage for OSS issue #120 — scenario step
- * conditionType/conditionValue must be evaluated at delivery time, and
- * unknown / malformed conditions must fail safe (skip step) rather than
- * silently treat them as "always pass" (which would over-deliver).
+ * 通の conditionType/conditionValue は配信時に評価する。不明・不正な条件を常時通過と解釈して過剰配信しないよう、安全側でその通を飛ばす。
  */
 
 interface FakeTables {
   friendTags?: Set<string>; // "friendId|tagId" entries
-  friendMetadata?: Record<string, Record<string, unknown>>; // friendId → metadata
-  friendUserIds?: Record<string, string | null>; // friendId → shared UUID
+  friendMetadata?: Record<string, Record<string, unknown>>; // 友だち ID から metadata を引く。
+  friendUserIds?: Record<string, string | null>; // 友だち ID から共有 UUID を引く。
 }
 
 function mockDb(tables: FakeTables): D1Database {
@@ -101,8 +98,7 @@ describe('evaluateCondition', () => {
   });
 
   it('returns false (skip) when condition_type is set but condition_value is empty', async () => {
-    // Fail-safe for malformed stored rows: a configured condition without a value
-    // would otherwise bind '' into SQL and produce over-delivery (OSS #120 pattern).
+    // 値が欠けた条件を空文字の SQL として通して過剰配信しないよう、保存済み不整合も安全側で拒む。
     const db = mockDb({});
     expect(await evaluateCondition(db, 'f1', { condition_type: 'tag_exists', condition_value: '' })).toBe(false);
     expect(errorSpy).toHaveBeenCalled();
@@ -199,9 +195,7 @@ describe('evaluateCondition', () => {
 
   describe('fail-safe semantics (OSS #120 regression)', () => {
     it('unknown condition_type → false (skip), NOT true (deliver)', async () => {
-      // OSS issue #120: user passed condition_type='tag_not_has' (typo for tag_not_exists);
-      // pre-fix behaviour was to fall through to default and return true → over-deliver to every
-      // friend regardless of the configured filter. Lock in fail-safe = skip.
+      // 未知の tag_not_has などを常時通過にせず、その通を飛ばす。
       const db = mockDb({ friendTags: new Set(['f1|tag-A']) });
       const result = await evaluateCondition(db, 'f1', {
         condition_type: 'tag_not_has',
@@ -232,9 +226,7 @@ describe('evaluateCondition', () => {
     });
 
     it('condition_value missing "value" key → false (skip; would otherwise match undefined keys)', async () => {
-      // Pre-existing rows could have {"key":"tier"} (no "value"). Without the explicit
-      // 'value' in parsed check, metadata_equals compares actual === undefined and would
-      // pass for every friend who lacks the key — recreating the OSS #120 over-delivery.
+      // metadata の value が欠けると未設定同士が一致してしまうため、値の存在を明示的に検査する。
       const db = mockDb({ friendMetadata: { f1: {} } });
       const result = await evaluateCondition(db, 'f1', {
         condition_type: 'metadata_equals',
@@ -256,7 +248,7 @@ describe('evaluateCondition', () => {
         condition_type: 'metadata_equals',
         condition_value: JSON.stringify({ key: 'tier', value: 'gold' }),
       });
-      // metadata defaults to {} → key is absent → not equal → returns false
+      // metadata が空ならキーはなく、不一致として false を返す。
       expect(result).toBe(false);
     });
   });
@@ -334,14 +326,8 @@ describe('isPermanentLineDeliveryError', () => {
 });
 
 /**
- * Regression coverage for the condition-false jump path.
- *
- * Pre-fix, a failed condition with next_step_on_false set advanced
- * current_step_order to currentStep.step_order — so the next tick's
- * `find(step_order > current)` delivered the sequentially-next step and the
- * configured jump target was silently ignored (only its timing was used).
- * The bug is invisible when the jump target happens to BE the next step,
- * which is why it survived since the initial release.
+ * 条件不成立の遷移先が次の通と異なっていても、指定した通へ飛ぶことを確かめる。
+ * 時刻だけを遷移先から使い、通番を元の位置のまま進めない。
  */
 describe('condition-false jump (next_step_on_false)', () => {
   interface AdvanceCall {
@@ -350,11 +336,7 @@ describe('condition-false jump (next_step_on_false)', () => {
     id: string;
   }
 
-  /**
-   * Fake D1 driving processStepDeliveries through the condition-false path:
-   * one due friend_scenario at current_step_order=1, whose next step (order 2)
-   * has a tag_exists condition the friend does NOT satisfy.
-   */
+  /** 通番1から、タグ条件を満たさない次の通へ進む期限到達の購読を作り、条件不成立の経路を試す。 */
   function deliveryMockDb(opts: { nextStepOnFalse: number | null; steps?: number[] }): {
     db: D1Database;
     advances: AdvanceCall[];
@@ -414,7 +396,7 @@ describe('condition-false jump (next_step_on_false)', () => {
         const stmt = (args: unknown[]) => ({
           first: async () => {
             if (sql.includes('FROM friend_tags')) {
-              return null; // friend does NOT have tag-X → condition fails
+              return null; // tag-X を持たないため条件は不成立になる。
             }
             if (sql.includes('FROM scenario_versions')) {
               return versionRow;
@@ -459,7 +441,7 @@ describe('condition-false jump (next_step_on_false)', () => {
           },
           run: async () => {
             if (sql.includes("SET status = 'delivering'")) {
-              return { meta: { changes: 1 } }; // claim succeeds
+              return { meta: { changes: 1 } }; // 実行権の取得は成功させる。
             }
             if (sql.includes('SET current_step_order')) {
               advances.push({
@@ -497,11 +479,10 @@ describe('condition-false jump (next_step_on_false)', () => {
 
     await processStepDeliveries(db, client);
 
-    expect(push).not.toHaveBeenCalled(); // condition failed → nothing pushed
+    expect(push).not.toHaveBeenCalled(); // 条件不成立では push しない。
     expect(advances).toHaveLength(1);
     expect(advances[0].id).toBe('fs1');
-    // find(step_order > current) must select step 4 next → current must be 3.
-    // Pre-fix this was 2 (currentStep.step_order) → step 3 was wrongly delivered.
+    // 次に通番4を選ぶため、現在値は3へ進める。元の通番2のままでは通番3へ誤って送る。
     expect(advances[0].nextStepOrder).toBe(3);
   });
 
@@ -512,7 +493,7 @@ describe('condition-false jump (next_step_on_false)', () => {
     await processStepDeliveries(db, client);
 
     expect(advances).toHaveLength(1);
-    // current=8 → first step_order > 8 is 9 (the jump target); 5 is skipped.
+    // 現在値8の次は9を選び、途中の5は飛ばす。
     expect(advances[0].nextStepOrder).toBe(8);
   });
 
@@ -523,7 +504,7 @@ describe('condition-false jump (next_step_on_false)', () => {
     await processStepDeliveries(db, client);
 
     expect(advances).toHaveLength(1);
-    // Unchanged behaviour: advance to currentStep.step_order (2) → next is 3.
+    // 遷移先がなければ現在の通番2へ進め、次は3を選ぶ。
     expect(advances[0].nextStepOrder).toBe(2);
   });
 
@@ -534,17 +515,12 @@ describe('condition-false jump (next_step_on_false)', () => {
     await processStepDeliveries(db, client);
 
     expect(advances).toHaveLength(1);
-    expect(advances[0].nextStepOrder).toBe(2); // no step 99 → sequential path
+    expect(advances[0].nextStepOrder).toBe(2); // 遷移先99がなければ、順番の経路へ戻る。
   });
 });
 
 /**
- * Regression coverage for the comma-cleanup scope bug.
- *
- * The ",," / "[," / ",]" cleanup in expandVariables exists to repair Flex
- * JSON broken by conditional-block removal ({{#if_ref}} / {{#if_metadata.KEY}}
- * inside arrays). Pre-fix it ran on EVERY message type, silently rewriting
- * plain-text bodies that legitimately contain those sequences.
+ * 条件ブロックの削除で崩れたカンマを補正するのは Flex JSON だけとし、通常の本文にある連続カンマや角括弧を勝手に変更しない。
  */
 describe('expandVariables comma cleanup scope', () => {
   const friend = { id: 'f1', display_name: 'Test', user_id: null };
@@ -573,8 +549,7 @@ describe('expandVariables comma cleanup scope', () => {
 
   describe('flex messages keep the JSON repair (existing behaviour)', () => {
     it('repairs "[," left by a removed {{#if_ref}} block so the JSON parses', () => {
-      // Simulates a Flex contents array whose first element was a conditional
-      // block removed for a friend without ref_code: [{{#if_ref}}{...}{{/if_ref}},{...}]
+      // ref_code なしで先頭の条件付き要素が消える Flex 配列を再現する。
       const template = '{"contents":[{{#if_ref}}{"type":"text","text":"ref: {{ref}}"}{{/if_ref}},{"type":"text","text":"hello"}]}';
       const out = expandVariables(template, { ...friend, ref_code: null }, undefined, 'flex');
       expect(out).toBe('{"contents":[{"type":"text","text":"hello"}]}');
@@ -591,11 +566,7 @@ describe('expandVariables comma cleanup scope', () => {
 });
 
 /**
- * Crash recovery wiring — a claim (active→delivering) whose worker died
- * mid-delivery must be reset back to 'active' at the start of every cron
- * run, BEFORE the due query (which only sees 'active' rows). Regression:
- * recoverStuckDeliveries existed but was never called, stranding
- * enrollments in 'delivering' forever.
+ * 途中で停止した delivering の購読を取り残さないよう、active だけを対象とする期限取得より前に、各 cron が停止中の実行権を回復する。
  */
 describe('processStepDeliveries crash recovery', () => {
   it("resets stuck 'delivering' enrollments before querying due rows", async () => {
@@ -626,8 +597,8 @@ describe('processStepDeliveries crash recovery', () => {
       (sql) => sql.includes("SET status = 'active'") && sql.includes("status = 'delivering'"),
     );
     const dueQueryIdx = executed.findIndex((sql) => sql.includes('FROM friend_scenarios'));
-    expect(recoveryIdx).toBeGreaterThanOrEqual(0); // recovery ran
+    expect(recoveryIdx).toBeGreaterThanOrEqual(0); // 回復処理が実行されたことを確かめる。
     expect(dueQueryIdx).toBeGreaterThanOrEqual(0);
-    expect(recoveryIdx).toBeLessThan(dueQueryIdx); // and ran first
+    expect(recoveryIdx).toBeLessThan(dueQueryIdx); // 回復が対象取得より先に実行されたことを確かめる。
   });
 });

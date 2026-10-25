@@ -61,7 +61,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
-  // N-061: 行のaccountを共通境界へ渡す。/broadcasts持ちstaffだけが送れる。
+  // 行のaccountを共通境界へ渡す。/broadcasts持ちstaffだけが送れる。
   const sendBoundary = await broadcastWriteBoundary(c, broadcastAccountIds(existing), { operationKey: BROADCAST_DEFINITION_PUBLISH_KEY });
   if (!sendBoundary.allowed) {
     return sendBoundary.reason === 'forbidden'
@@ -232,9 +232,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     }, 202);
   }
 
-  // LINE's multicast/broadcast endpoints accept one shared Message object;
-  // recipient-name variables therefore require per-friend push delivery.
-  // Queue these even for a small audience so they run within Worker limits.
+  // broadcast/multicast は本文を共有するため、受信者別の変数があれば少人数でも個別 push のキューへ進め、Worker の制限内で送る。
   if (hasRecipientVariables(existing.message_content)
     && existing.target_type !== 'multi-account-dedup') {
     const rawExisting = existing as unknown as Record<string, unknown>;
@@ -305,13 +303,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
 
   // multi-account-dedup は常にキュー方式 — Worker の30秒制限を超えるため
   if (existing.target_type === 'multi-account-dedup') {
-    // Always queue — never run inline. The executor walks per-account multicast
-    // loops which can exceed the Worker's 30 s wall-clock if invoked synchronously.
-    // Use status='sending' + batch_offset=0 to signal queued; processed by cron
-    // via processQueuedBroadcasts (schema CHECK allows only draft/scheduled/sending/sent).
-    //
-    // total_count を同期計算して書く: progress polling が 0/0 のまま固まらないように。
-    // computeDedupBroadcastPreview は単一SQL (ROW_NUMBER OVER) なので軽量。
+    // アカウントごとの送信ループが実行時間を超えないよう、同期送信せず sending と batch_offset=0 で必ずキューへ載せる。表示が0/0のままにならないよう、軽い単一 SQL で対象数だけは同期確定する。
     const rawExisting = existing as unknown as Record<string, unknown>;
     const accountIds = parseJsonArray(rawExisting.account_ids) ?? [];
     const dedupPriority = parseJsonArray(rawExisting.dedup_priority) ?? [];
@@ -422,10 +414,10 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   });
   const lineClient = new LineClient(accessToken);
 
-  // N-062: 即時送信も LINE 送信の直前に枠と後続アクション版を見直す。
+  // 即時送信も LINE 送信の直前に枠と後続アクション版を見直す。
   // ここで止めれば status は draft のまま。確認後の競合は claim と台帳境界が防ぐ。
   const sendAccountId = (broadcastAccountId as string | null) ?? null;
-  // 緊急停止 (#1050): broadcast_dispatch が止まっている統括の今すぐ送信は
+  // 緊急停止 : broadcast_dispatch が止まっている統括の今すぐ送信は
   // 受け付けない。claim 前に止めるので draft/scheduled のまま残る。
   if (await isOperationCapabilityStopped(c.env.DB, sendAccountId, 'broadcast_dispatch')) {
     return c.json({ success: false, error: '緊急停止中のため送信できません' }, 409);
@@ -524,7 +516,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
 
   const segmentAudienceChanged = existing.target_type !== 'segment' || !sameJsonMeaning(existing.segment_conditions, body.conditions);
   /*
-   * 二者承認のゲート（m12a）。絞り込み送信も人数で判定する。
+   * 二者承認のゲート。絞り込み送信も人数で判定する。
    * 送る条件は行に無いので、今回の条件を重ねた行で数える。
    */
   try {

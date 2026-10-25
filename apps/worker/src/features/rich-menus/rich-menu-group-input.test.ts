@@ -90,8 +90,7 @@ describe('W17 rich menu group input (real SQL and actual LINE payload builder)',
         if (branded) await setTrackedLinkBaseUrl(testDb.db, '__global__', 'https://go.example.test/');
         const { group } = await source();
         const live = richMenuLiveToSnapshot(group);
-        // Scheduled content is a serialized fixed snapshot; manual / restore use
-        // explicitly fetched live content, normalized by the same boundary.
+        // 予約公開は固定スナップショット、手動公開と復元は明示取得した内容を使い、同じ境界で正規化する。
         const snapshot = path === 'scheduled-snapshot'
           ? JSON.parse(JSON.stringify(live)) as RichMenuGroupSnapshot
           : live;

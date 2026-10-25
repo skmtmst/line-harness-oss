@@ -117,7 +117,7 @@ export const get__api_scenarios_4 = async (c: Context<Env, "/api/scenarios">) =>
     const query = c.req.query('query')?.trim();
     if (query) {
       /*
-       * #625: LIKE ではなく instr で部分一致する。
+       * LIKE ではなく instr で部分一致する。
        * D1 は LIKE/GLOB パターンを最大50バイトに制限するため、
        * `%<検索語>%` を束縛すると48バイト超の検索語で500になっていた。
        * 記号はワイルドカードとして効かず文字どおり探す点は ESCAPE 版と同じ。
@@ -277,14 +277,14 @@ export const post__api_scenarios_6 = async (c: Context<Env, "/api/scenarios">) =
       allowConcurrent: body.allowConcurrent !== false,
     });
 
-    // Save line_account_id if provided
+
     if (body.lineAccountId) {
       await c.env.DB.prepare(`UPDATE scenarios SET line_account_id = ? WHERE id = ?`)
         .bind(body.lineAccountId, scenario.id).run();
     }
 
     // フォルダは create の中身に入っていないので、指定があればここで付ける
-    // （#949 N-055: 新規作成画面が名前・フォルダ・方式をまとめて送る）。
+    // （ : 新規作成画面が名前・フォルダ・方式をまとめて送る）。
     if (body.folderId !== undefined) {
       const updated = await updateScenario(c.env.DB, scenario.id, { folder_id: body.folderId });
       if (updated) scenario = updated;

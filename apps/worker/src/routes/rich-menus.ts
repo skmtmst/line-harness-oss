@@ -11,7 +11,7 @@ const richMenus = new Hono<Env>();
 
 class LineAccountRequiredError extends Error {}
 
-/** Resolve LINE access token only after confirming the requested/default account is visible. */
+/** 要求または既定のアカウントが見えることを確認してから、LINE のトークンを解決する。 */
 async function resolveLineClient(c: Context<Env>): Promise<LineClient> {
   const accountId = c.req.query('accountId');
   if (accountId) {
@@ -34,7 +34,7 @@ function richMenuError(c: Context<Env>, prefix: string, err: unknown) {
   throw err;
 }
 
-// GET /api/rich-menus — list all rich menus from LINE API
+
 richMenus.get('/api/rich-menus', async (c) => {
   try {
     const lineClient = await resolveLineClient(c);
@@ -57,7 +57,7 @@ richMenus.post('/api/rich-menus', requireDeliveryAccess('richMenus'), inputJsonB
   }
 });
 
-// DELETE /api/rich-menus/:id — delete a rich menu
+
 richMenus.delete('/api/rich-menus/:id', requireDeliveryAccess('richMenus'), async (c) => {
   try {
     const richMenuId = c.req.param('id');
@@ -69,7 +69,7 @@ richMenus.delete('/api/rich-menus/:id', requireDeliveryAccess('richMenus'), asyn
   }
 });
 
-// POST /api/rich-menus/:id/default — set rich menu as default for all users
+
 richMenus.post('/api/rich-menus/:id/default', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   try {
     const richMenuId = c.req.param('id');
@@ -81,7 +81,7 @@ richMenus.post('/api/rich-menus/:id/default', requireDeliveryAccess('richMenus')
   }
 });
 
-// POST /api/friends/:friendId/rich-menu — link rich menu to a specific friend
+
 richMenus.post('/api/friends/:friendId/rich-menu', requireDeliveryAccess('richMenus'), inputJsonBoundary({"richMenuId":["string"]}), async (c) => {
   try {
     const friendId = c.req.param('friendId');
@@ -127,7 +127,7 @@ richMenus.post('/api/friends/:friendId/rich-menu', requireDeliveryAccess('richMe
   }
 });
 
-// DELETE /api/friends/:friendId/rich-menu — unlink rich menu from a specific friend
+
 richMenus.delete('/api/friends/:friendId/rich-menu', requireDeliveryAccess('richMenus'), async (c) => {
   try {
     const friendId = c.req.param('friendId');
@@ -169,7 +169,7 @@ richMenus.delete('/api/friends/:friendId/rich-menu', requireDeliveryAccess('rich
 });
 
 /**
- * 友だちのリッチメニュー取得の短時間キャッシュ (#496-13)。
+ * 友だちのリッチメニュー取得の短時間キャッシュ (-13)。
  *
  * 取得のたびに LINE API を最大3本（個別→既定→一覧）叩くと、列挙で
  * 制限・課金を消費される。認可の検査は毎回行い、通った後だけここを見る。
@@ -185,7 +185,7 @@ export function _resetFriendRichMenuCacheForTest(): void {
   friendRichMenuCache.clear();
 }
 
-// GET /api/friends/:friendId/rich-menu — get rich menu currently linked to a friend
+
 richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
   try {
     const friendId = c.req.param('friendId');
@@ -194,7 +194,7 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
     const friend = await getFriendById(db, friendId);
     const friendAccId = (friend as unknown as Record<string, string | null> | null)?.line_account_id ?? null;
     // 認可: 隣の GET /api/friends/:id と同じく、見られる友だちだけ。
-    // 存在の有無は 404 に倒して、ID列挙の手がかりを漏らさない (#496-13)。
+    // 存在の有無は 404 に倒して、ID列挙の手がかりを漏らさない (-13)。
     if (!friend || !await canAccessAllLineAccounts(db, c.get('staff'), [friendAccId])) {
       return fail(c, 404, 'FRIEND_NOT_FOUND');
     }
@@ -275,13 +275,13 @@ richMenus.post('/api/rich-menus/:id/image', requireDeliveryAccess('richMenus'), 
     let imageContentType: 'image/png' | 'image/jpeg' = 'image/png';
 
     if (contentType.includes('application/json')) {
-      // Accept base64 encoded image in JSON body
+
       const body = await c.req.json<{ image?: string; imageData?: string; contentType?: string }>();
       const imageBase64 = body.image ?? body.imageData;
       if (!imageBase64) {
         return inputError(c, { success: false, error: 'image (base64) is required' }, 400, ["image","imageData"]);
       }
-      // Strip data URI prefix if present
+
       const base64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
       const binaryString = atob(base64);
       const bytes = new Uint8Array(binaryString.length);
@@ -291,7 +291,7 @@ richMenus.post('/api/rich-menus/:id/image', requireDeliveryAccess('richMenus'), 
       imageData = bytes.buffer;
       if (body.contentType === 'image/jpeg') imageContentType = 'image/jpeg';
     } else if (contentType.includes('image/')) {
-      // Accept raw binary upload
+
       imageData = await c.req.arrayBuffer();
       imageContentType = contentType.includes('jpeg') || contentType.includes('jpg') ? 'image/jpeg' : 'image/png';
     } else {

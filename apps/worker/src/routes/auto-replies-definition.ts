@@ -1,4 +1,4 @@
-/** Public exports remain stable; implementation lives with its related helpers. */
+/** 既存の公開名を保ち、関連する補助関数と実装を近くに置く。 */
 export { COOLDOWN_RANGE_ERROR } from './auto-replies-definition-validate-auto-reply-folder.js';
 export { validateAutoReplyFolder } from './auto-replies-definition-validate-auto-reply-folder.js';
 export { requireCommonRuleOwner } from './auto-replies-definition-validate-auto-reply-folder.js';

@@ -19,7 +19,7 @@ const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
 const MAX_ATTEMPTS = RETRY_DELAYS_MINUTES.length + 1;
 
 /*
- * 監査 R478: 共通アクション参照の展開上限。公開前の検査
+ * 監査 : 共通アクション参照の展開上限。公開前の検査
  * （common-actions.ts の assertPublishableExpansion）と実行時の計画
  * （buildExecutionPlan）で同じ値を使う。片方だけ変えない。
  */
@@ -85,7 +85,7 @@ export interface AutomationEngineOptions {
   executors?: Record<string, AutomationActionExecutor>;
   now?: string;
   leaseMinutes?: number;
-  /** Cron supplies one shared snapshot so status enforcement never becomes N+1. */
+  /** 状態の強制判定が N+1 にならないよう、cron が同じスナップショットを共有する。 */
   tenantStatusByAccount?: ReadonlyMap<string, 'active' | 'suspended' | 'archived'>;
 }
 
@@ -100,7 +100,7 @@ export class AutomationActionError extends Error {
   }
 }
 
-/** The delivery outbox owns retries; polling must not spend this action's retry budget. */
+/** 再試行は配送 outbox が管理するため、ポーリングでアクションの再試行予算を使わない。 */
 export class AutomationActionDeferred extends Error {}
 
 export class AutomationRunRetryError extends Error {
@@ -690,7 +690,7 @@ export async function processAutomationRun(
   if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'automations', job: 'automation runs' })) {
     return 'busy';
   }
-  // 緊急停止 (#1050): automation_actions が止まっている統括は claim せず
+  // 緊急停止 : automation_actions が止まっている統括は claim せず
   // queued のまま残す。停止中の実行は外部へ何も出さない。
   if (await isOperationCapabilityStopped(db, ownerRow?.line_account_id ?? null, 'automation_actions')) {
     return 'busy';
@@ -729,7 +729,7 @@ export async function processAutomationRun(
     if (!latest) return 'not_found';
     if (latest.status === 'cancelled') return 'cancelled';
     /*
-     * 緊急停止 (#1050) も step の境目で効かせる。claim 後に止まった分は
+     * 緊急停止  も step の境目で効かせる。claim 後に止まった分は
      * run を queued へ戻し、現在の step から再開できるようにする。
      * 停止を理由に failed / skipped にはしない。
      */
@@ -979,7 +979,7 @@ export async function retryAutomationRun(
 }
 
 /**
- * 実行の取りやめ（#942 N-353）。
+ * 実行の取りやめ。
  *
  * **実行記録は消せない**（`trg_automation_runs_no_delete`）。だから取りやめは
  * `cancelled` への状態遷移にする。

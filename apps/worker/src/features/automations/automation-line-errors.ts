@@ -1,7 +1,7 @@
 import { AutomationActionError } from './automation-engine.js';
 
 /**
- * R363: メッセージ送信時の失敗分類。受理した可能性がある失敗は
+ * メッセージ送信時の失敗分類。受理した可能性がある失敗は
  * `delivery_unconfirmed`（照合待ち）にして自動返却・再送を止める。
  *
  * - 4xx拒否 … 未受理が確定。返却してよい失敗。

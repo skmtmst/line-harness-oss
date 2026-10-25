@@ -145,13 +145,10 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { success: boolean; data: { items: { id: string; lineAccountId: string | null }[]; total: number; limit: number } };
     expect(body.success).toBe(true);
-    // webhook.ts:211 / liff.ts:878 trigger scenarios where line_account_id is
-    // NULL (global) OR matches the active account. The list endpoint must
-    // mirror that so the UI does not hide records the engine will fire.
+    // 実行側と画面の対象を一致させるため、アカウント共通とそのアカウント所属のシナリオを両方返す。
     const ids = body.data.items.map((d) => d.id).sort();
     expect(ids).toEqual(['s-acc1', 's-global']);
-    // Serializer surfaces the binding so the UI can distinguish 全アカ共通 from
-    // an account-specific scenario.
+    // 全アカウント共通と特定所属を画面で区別できるよう、所属値を返す。
     const globalRow = body.data.items.find((d) => d.id === 's-global');
     expect(globalRow?.lineAccountId).toBeNull();
     // 一覧を引くクエリは1本だけ。人数の集計は別に1本走るので、
@@ -242,7 +239,7 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     );
     expect(res.status).toBe(200);
     const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
-    // #625: D1 の LIKE パターン50バイト制限を避けるため instr で部分一致する。
+    // D1 の LIKE パターン50バイト制限を避けるため instr で部分一致する。
     // 束縛は `%夏%` ではなく検索語そのもの。
     expect(listCall?.sql).toMatch(/instr\(lower\(s\.name\), lower\(\?\)\) > 0/);
     expect(listCall?.sql).toMatch(/s\.is_active = 0/);

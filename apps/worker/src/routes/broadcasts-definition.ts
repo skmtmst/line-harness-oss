@@ -46,7 +46,7 @@ export async function canAccessBroadcast(
 }
 
 export /**
- * 配信の作成・更新・送信の共通境界(N-061＋-06 §6)。
+ * 配信の作成・更新・送信の共通境界(＋-06 §6)。
  *
  * owner/adminは従来の範囲確認だけ通す(動作・状態を変えない)。一般staffは
  * /broadcasts に加え、操作ごとの個別キー（下書き・送信など）も要る。
@@ -130,7 +130,7 @@ export function validateMessageOptions(value: unknown): string | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'ボタンの設定を読み込めませんでした';
   const options = value as { buttons?: unknown; resources?: unknown };
   if (options.buttons !== undefined) {
-    // 監査 R206: 番号と不足項目を日本語で返す。画面の検査と文言をそろえる。
+    // 監査 : 番号と不足項目を日本語で返す。画面の検査と文言をそろえる。
     if (!Array.isArray(options.buttons) || options.buttons.length > 4) return 'ボタンは4つまでです';
     for (const [index, button] of options.buttons.entries()) {
       const number = index + 1;
@@ -194,7 +194,7 @@ export function parseStoredSegmentConditions(stored: unknown): SegmentCondition 
 }
 
 export /*
- * N-062: 即時送信の直前再確認。作成・更新時と違い、取消・欠損・他アカウントを
+ * 即時送信の直前再確認。作成・更新時と違い、取消・欠損・他アカウントを
  * 言い分けて運用者が判断できる文にする。送らない理由だけを見て、行は変えない。
  */
 async function checkSendableAfterActionVersion(
@@ -304,7 +304,7 @@ export function serializeBroadcast(row: DbBroadcast) {
     afterActionVersionId: (r.after_action_version_id as string | null | undefined) ?? null,
     version: Number(r.lock_version ?? 1),
     /*
-     * 停止の状態（#662 / N-059）。
+     * 停止の状態。
      *
      * status は動かしていない。停止は送信の段階（下書き→予約→送信中→
      * 送信済み）とは別の軸——「送信中だが、新しい送信権をもう取らない」
@@ -315,7 +315,7 @@ export function serializeBroadcast(row: DbBroadcast) {
     stoppedAt: (r.stopped_at as string | null | undefined) ?? null,
     sendAttemptNo: Number(r.send_attempt_no ?? 1),
     /*
-     * 二者承認の今の状態（m12a）。送信の段階（status）とは別の軸。
+     * 二者承認の今の状態。送信の段階（status）とは別の軸。
      * 未マイグレーション環境では undefined → 画面は承認なしとして扱う。
      */
     approvalStatus: (r.approval_status as string | null | undefined) ?? 'none',
@@ -331,7 +331,7 @@ export function serializeBroadcast(row: DbBroadcast) {
 }
 
 /**
- * 一斉配信の10の状態（#816）。
+ * 一斉配信の10の状態。
  *
  * `status` の CHECK は変えられないので、status・承認・停止・台帳の集計から
  * 組み立てる。二者承認（#A）の軸（承認待ち・期限切れ）と整合させる。
@@ -447,7 +447,7 @@ async function ledgerCountsForBroadcasts(
 }
 
 export /**
- * 操作の記録（#816 / migration 459）。書けなくても本処理は止めない。
+ * 操作の記録（migration 459）。書けなくても本処理は止めない。
  * 止めると「止めたのに記録が無い」より「記録が無いのに止まった」になる——
  * どちらも困るが、送信の安全を優先し、失敗は console に残す。
  */
@@ -470,7 +470,7 @@ async function recordLifecycle(
   }
 }
 
-export // GET /api/broadcasts/:id/recipients — 宛先台帳（#816）
+export // GET /api/broadcasts/:id/recipients — 宛先台帳
 //
 // 宛先ごとに結果（届いた・失敗の理由・送る前）・時刻・LINEの要求IDを返す。
 // 失敗の理由は人の言葉に直して返す（classifyBroadcastRecipient）。
@@ -518,7 +518,7 @@ function kickQueueProcessing(c: Context<Env>, label: string): void {
 export /*
  * ───────── 送信中の一斉配信を止める／再開する／失敗した相手だけ送り直す ─────────
  *
- * #662 / N-059。これまで `sending` に入った配信を止める正式な経路が無かった。
+ *  /。これまで `sending` に入った配信を止める正式な経路が無かった。
  *
  * 3つの口はどれも**版付きの条件付き UPDATE 1本**で決める。読んでから書くと、
  * 2人が同時に押したときに両方が「自分が勝った」と読む。変わった行数を見て、
@@ -598,12 +598,12 @@ async function broadcastLedgerSummary(db: D1Database, id: string) {
     failedPermanent: breakdown.permanent,
     unknown: counts.unknown,
     inFlight: counts.claimed,
-    // 再送できるのは一時的な失敗だけ（#816）。
+    // 再送できるのは一時的な失敗だけ。
     retryableCount: breakdown.temporary,
   };
 }
 
-export // DELETE /api/broadcasts/:id - delete
+export
 //
 // D026: 下書き・予約だけ消す。送信中は 409（止めるには停止を使う）、
 // 送信済みは 409（配信の記録は残す）。画面は draft/scheduled にしか

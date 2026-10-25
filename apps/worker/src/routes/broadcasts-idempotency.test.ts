@@ -236,7 +236,7 @@ describe('PUT /api/broadcasts/:id', () => {
         targetType: 'segment',
         segmentConditions: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
         stealthSpreadMinutes: 45,
-        // #772: 版を付けて更新する（版なしは400になる）。
+        // 版を付けて更新する（版なしは400になる）。
         expectedVersion: 3,
       }),
     });
@@ -255,7 +255,7 @@ describe('PUT /api/broadcasts/:id', () => {
     );
   });
 
-  // #772: 版なしPUTは400で止め、更新関数を呼ばない。
+  // 版なしPUTは400で止め、更新関数を呼ばない。
   test('版なしの更新は400で止める', async () => {
     dbMocks.getBroadcastById.mockResolvedValueOnce({ ...row, status: 'draft', scheduled_at: null });
     const response = await setupApp().request(`/api/broadcasts/${KEY}`, {
@@ -279,7 +279,7 @@ describe('PUT /api/broadcasts/:id', () => {
       body: JSON.stringify({
         targetType: 'segment',
         segmentConditions: { operator: 'AND', rules: [{ type: 'unknown_rule', value: true }] },
-        // #772: 版を付けて絞り込み検証まで進める（版なしだと手前で400になる）。
+        // 版を付けて絞り込み検証まで進める（版なしだと手前で400になる）。
         expectedVersion: 3,
       }),
     });

@@ -271,11 +271,7 @@ export interface RunPinnedActionsInput extends RunActionRowsOptions {
 }
 
 /**
- * 版に固定されたアクションを実行する。
- *
- * 旧版に固定された購読でも、**live の scenario_actions は読まない**。
- * 読むと、公開後にアクションを足した・消した・付け替えたぶんが旧版の
- * 購読へそのまま混入する（#644 再審査 2）。
+ * 購読が固定している版のアクションだけを実行する。live の scenario_actions を読むと、公開後の追加・削除・変更が別の版の購読へ混入する。
  */
 export async function runPinnedScenarioActions(
   db: D1Database,
@@ -544,7 +540,7 @@ async function resolveTagIds(
  * 1人ぶんの値が壊れているだけで以降の配信が全部止まる(呼び出し側が
  * 失敗数に数え、残りのアクションと配信は続ける)。
  *
- * N-042: 書き込む値は項目の型で検証し、合わなければ保存せず例外にする。
+ * 書き込む値は項目の型で検証し、合わなければ保存せず例外にする。
  * 設定値が型に合わないまま配信されると、不正値が情報欄へ残るため。
  */
 async function applyFriendField(
