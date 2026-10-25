@@ -141,6 +141,12 @@ export function motionMs(name: string, fallback: number): number {
   return raw.endsWith('ms') ? value : raw.endsWith('s') ? value * 1000 : value
 }
 
+/** 動きの曲線（--motion-ease-*）を読む。JS の動きも CSS と同じ曲線にそろえる（曲線を直書きしない）。 */
+export function motionEasing(name: '--motion-ease-out' | '--motion-ease-in-out' | '--motion-spring' | '--motion-glide' = '--motion-ease-out'): string {
+  if (typeof window === 'undefined' || typeof getComputedStyle !== 'function') return 'ease-out'
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || 'ease-out'
+}
+
 /** 閉じる動きの長さ（--motion-exit）。読めなければ 150ms。 */
 function exitMs(): number {
   return motionMs('--motion-exit', 150)

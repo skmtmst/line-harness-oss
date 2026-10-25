@@ -17,7 +17,7 @@
   min-height: 68px;
   background: var(--color-canvas);
   cursor: pointer;
-  transition: background-color var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
+  transition: background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .card:hover {
@@ -44,7 +44,7 @@
   height: 18px;
   background: var(--color-canvas);
   cursor: pointer;
-  transition: background-color var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
+  transition: background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .box:checked {
@@ -72,7 +72,7 @@
 
 .box:checked ~ .mark path {
   stroke-dashoffset: 0;
-  transition: stroke-dashoffset var(--motion-fast) ease-out;
+  transition: stroke-dashoffset var(--motion-fast) var(--motion-ease-out);
 }
 
 .disabled {

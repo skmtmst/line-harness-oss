@@ -49,3 +49,21 @@ test('動きの時間を手書きすると落ち、共通の --motion-* と動�
     assert.ok((await kinds()).includes('motion-literal'))
   } finally { await browser.close() }
 })
+
+test('動きの曲線を手書きすると落ち、共通の --motion-ease-* と回る印の linear は通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind)
+    await page.setContent('<style>:root{--motion-fast:120ms;--motion-ease-out:cubic-bezier(.22,1,.36,1);--motion-spin:1s}.a{transition:color var(--motion-fast) var(--motion-ease-out)}.s{animation:r var(--motion-spin) linear infinite}@keyframes r{to{rotate:1turn}}</style><main><a class="a" href="#">リンク</a><i class="s"></i></main>')
+    assert.deepEqual(await kinds(), [])
+    await page.addStyleTag({ content: '.b{animation:none;transition:none}' })
+    assert.deepEqual(await kinds(), [])
+    await page.addStyleTag({ content: '.a{transition:color var(--motion-fast) ease-out}' })
+    assert.ok((await kinds()).includes('motion-curve'))
+    await page.setContent('<style>.a{transition-timing-function:cubic-bezier(.2,0,0,1)}</style><main><a class="a" href="#">リンク</a></main>')
+    assert.ok((await kinds()).includes('motion-curve'))
+    await page.setContent('<style>:root{--motion-ease-out:ease}.a{transition:color .15s var(--motion-ease-out)}</style><main><a class="a" href="#">リンク</a></main>')
+    assert.ok((await kinds()).includes('motion-literal'))
+  } finally { await browser.close() }
+})

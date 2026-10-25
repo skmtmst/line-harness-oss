@@ -402,7 +402,7 @@
    * :root の --motion-* より先に書いてあっても効く）。
    */
   --default-transition-duration: var(--motion-fast);
-  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-timing-function: var(--motion-ease-out);
   --animate-spin: spin var(--motion-spin) linear infinite; /* Tailwind の animate-spin も回る印の 1 周を読む。 */
 
   /* --- ★V8 で増える語彙 -------------------------------------------------
@@ -2575,11 +2575,11 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {
     transition:
-      background-color var(--motion-fast) ease-out,
-      border-color var(--motion-fast) ease-out,
-      color var(--motion-fast) ease-out,
-      box-shadow var(--motion-fast) ease-out,
-      opacity var(--motion-fast) ease-out;
+      background-color var(--motion-fast) var(--motion-ease-out),
+      border-color var(--motion-fast) var(--motion-ease-out),
+      color var(--motion-fast) var(--motion-ease-out),
+      box-shadow var(--motion-fast) var(--motion-ease-out),
+      opacity var(--motion-fast) var(--motion-ease-out);
   }
 
   /*
@@ -2592,7 +2592,7 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
    */
   @media (hover: hover) and (pointer: fine) {
     tbody tr {
-      transition: background-color var(--motion-fast) ease-out;
+      transition: background-color var(--motion-fast) var(--motion-ease-out);
     }
     tbody tr:hover {
       background-color: var(--color-canvas-sunken);
@@ -2655,8 +2655,8 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
    */
   a {
     transition:
-      color var(--motion-fast) ease-out,
-      background-color var(--motion-fast) ease-out;
+      color var(--motion-fast) var(--motion-ease-out),
+      background-color var(--motion-fast) var(--motion-ease-out);
   }
 
   /*

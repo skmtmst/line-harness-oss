@@ -485,7 +485,7 @@
   white-space: nowrap;
   pointer-events: none;
   transform: translateY(-50%);
-  animation: rail-tip-in var(--motion-fast) cubic-bezier(0.2, 0, 0, 1);
+  animation: rail-tip-in var(--motion-fast) var(--motion-ease-out);
 }
 :root .railTipCount {
   min-width: 18px;

@@ -60,16 +60,20 @@ export default function scanPolishRules() {
     const cursor = c.pointerEvents !== 'none' && c.cursor !== 'not-allowed'
     if (opacity < 0.4 || opacity > 0.55 || shadow || cursor) add('disabled-look', el, { opacity: Math.round(opacity * 100) / 100, shadow, cursor: c.cursor }, el.getAttribute('aria-label') || el.textContent)
   }
-  // 4. 動きの時間：transition・animation は共通の --motion-* を読む（動きを減らす設定の 0.01ms は止めるための値）。
+  // 4・17. 動きの時間と曲線：transition・animation は共通の --motion-* を読む。
+  // 動きを減らす設定の 0.01ms は止めるための値、回り続ける印の linear・steps() は一定の速さのための値なので数えない。
   const withoutVars = (value) => { let out = value; while (/var\([^()]*\)/.test(out)) out = out.replace(/var\([^()]*\)/g, ' '); return out }
+  const MOTION = ['transition', 'animation', 'transition-duration', 'animation-duration', 'transition-delay', 'animation-delay', 'transition-timing-function', 'animation-timing-function']
   for (const { rule, reduced } of rules) {
     if (reduced) continue
-    for (let i = 0; i < rule.style.length; i++) {
-      const prop = rule.style[i]
-      const motionProp = /^(transition|animation)(-duration|-delay)?$/.test(prop) || (/^--[\w-]*(-spin|-enter|transition-duration)$/.test(prop) && !prop.startsWith('--motion-'))
-      if (!motionProp) continue
-      const value = rule.style.getPropertyValue(prop)
-      if (/(?<![\w.-])(?!0m?s\b)\d*\.?\d+m?s\b/.test(withoutVars(value))) add('motion-literal', null, { prop, value: value.trim() }, rule.selectorText)
+    // animation: none・transition: none は初期値（ease・0s）で書き出されるので、止める指定として数えない。
+    const off = { animation: rule.style.getPropertyValue('animation-name').trim() === 'none', transition: rule.style.getPropertyValue('transition-property').trim() === 'none' }
+    const props = new Set(MOTION.filter((prop) => rule.style.getPropertyValue(prop) && !off[prop.split('-')[0]]))
+    for (let i = 0; i < rule.style.length; i++) if (/^--[\w-]*(-spin|-enter|transition-duration|transition-timing-function)$/.test(rule.style[i]) && !rule.style[i].startsWith('--motion-')) props.add(rule.style[i])
+    for (const prop of props) {
+      const value = rule.style.getPropertyValue(prop), plain = withoutVars(value)
+      if (/(?<![\w.-])(?!0m?s\b)\d*\.?\d+m?s\b/.test(plain)) add('motion-literal', null, { prop, value: value.trim() }, rule.selectorText)
+      if (/(?<![\w-])(ease|ease-in|ease-out|ease-in-out|cubic-bezier)(?![\w-])/.test(plain)) add('motion-curve', null, { prop, value: value.trim() }, rule.selectorText)
     }
   }
   return findings

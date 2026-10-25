@@ -1,7 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useRef } from 'react'
-import { motionMs, shouldAnimateLeave } from './overlay-utils'
+import { motionEasing, motionMs, shouldAnimateLeave } from './overlay-utils'
 
 /** 選択位置の共通FLIP。幅は一度だけ更新し、途中の見かけの位置から次へ進む。 */
 export function SlidingIndicator({ left, top = 0, width, selection, className }: {
@@ -31,7 +31,7 @@ export function SlidingIndicator({ left, top = 0, width, selection, className }:
       // 下線はbottom:0を基準にし、折り返したタブの段にも追従する。
       const y = box.top - parent.top - element.offsetTop + (element.parentElement?.scrollTop ?? 0)
       const start = Number.isFinite(y) && y !== 0 ? `translate(${x}px, ${y}px)` : `translateX(${x}px)`
-      const easing = getComputedStyle(document.documentElement).getPropertyValue('--motion-ease-out').trim() || 'ease-out'
+      const easing = motionEasing()
       animation.current = element.animate([
         { transform: `${start} scaleX(${box.width / width})` },
         { transform: `${target} scaleX(1)` },
