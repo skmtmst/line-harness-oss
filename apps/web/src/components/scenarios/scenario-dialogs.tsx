@@ -458,7 +458,6 @@ export function OnCompleteDialog({
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure);
 
-
       if (!isStale()) { if (!fieldFailure) setCandidatesState('error') }
     }
   }, [scenarioId, selectedAccountId, targetScenarioId, saveErrors])
@@ -1086,13 +1085,9 @@ export function TestSendDialog({
       </div>
       </>
       {result && (
-        <p
-          className={`rounded-panel mt-3 px-4 py-3 text-sm ${
-            result.ok ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'
-          }`}
-        >
+        <Notice tone={result.ok ? 'success' : 'danger'}>
           {result.message}
-        </p>
+        </Notice>
       )}
     </Shell>
   )
@@ -1370,7 +1365,6 @@ const FRIEND_PLAN_OUTCOME: Record<ScenarioFriendPlanStep['outcome'], string> = {
   pause: 'この通のあと停止',
   undetermined: '未確定',
 }
-
 
 /** 予定1行。時刻が無い・動的条件で変わるものは「未確定」を添える。 */
 function FriendPlanStepRow({ step }: { step: ScenarioFriendPlanStep }) {
