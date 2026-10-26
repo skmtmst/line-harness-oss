@@ -1,7 +1,7 @@
 'use client'
 
 import Card from '@/components/shared/card'
-import StatusBadge from '@/components/shared/status-badge'
+import Chip from '@/components/shared/chip'
 import styles from './broadcast-form-v8.module.css'
 
 /**
@@ -15,7 +15,7 @@ export function BroadcastBlockedExclusion() {
         <strong>ブロック中の人</strong>
         <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
       </div>
-      <StatusBadge tone="neutral" dot={false}>いつも除きます</StatusBadge>
+      <Chip>いつも除きます</Chip>
     </Card>
   )
 }

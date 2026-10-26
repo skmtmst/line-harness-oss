@@ -64,7 +64,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
   const people = (value: number | null | undefined) => (value === null || value === undefined ? '—' : `${formatNumber(value)} 人`)
   return (<aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label={reach ? '届く人' : 'LINEの見え方'}>
         {reach ? <>
-          <div className={styles.previewHead}><h3>届く人</h3>{closeButton}</div>
+          <div className={styles.previewHead}><h3 className="sr-only">届く人</h3>{closeButton}</div>
           <Card layout="vertical" padding="compact" gap="tight" className={styles.reachCard}>
             <div aria-live="polite"><KpiCard presentation="inline" title="届く人" value={audienceDisplayCount} unit="人" detail={null} icon={null} loading={audienceDisplayCount === null && preflightStatus === 'loading'} /></div>
             <dl className={styles.reachRows}>{[
