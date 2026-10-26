@@ -448,4 +448,53 @@ describe('受信箱の保存検索URL復元(N-021)', () => {
     expect(row('件数がまだ無い検索')?.textContent).not.toContain('0件')
     expect(document.body.textContent).toContain('「—件」は0件ではありません。')
   })
+
+  it('「未読だけ」と「要返信」で保存した検索を選ぶと、その2つも一覧の取得へ戻す', async () => {
+    net.handler = baseHandler({
+      savedViews: () => Promise.resolve({ success: true, data: [savedView('sv-mine', '自分の未読の要返信', {
+        version: 1, query: '', channels: ['line'], statuses: ['unread'], assignees: [], unread: 'mine',
+        quickFilter: 'reply', messageTypes: [], receivedFrom: null, receivedTo: null, sort: 'newest', due: 'all',
+      })] }),
+    })
+    await render()
+    await flush()
+    await openSavedViews()
+    await clickSavedView('自分の未読の要返信')
+    await applyNavigation()
+    await flush()
+
+    const last = chatsListQueries().at(-1)!
+    expect(last.get('unreadOnly')).toBe('1')
+    expect(last.get('quickFilter')).toBe('reply')
+  })
+
+  it('保存した検索の削除は行末の「…」の中にあり、選ぶと消す口を呼んで一覧を読み直す', async () => {
+    let views = [overdueLineView('sv-1')]
+    net.handler = (path: string, init?: RequestInit) => {
+      if (path.startsWith('/api/inbox/saved-views/sv-1') && init?.method === 'DELETE') {
+        views = []
+        return Promise.resolve({ success: true, data: null })
+      }
+      return baseHandler({ savedViews: () => Promise.resolve({ success: true, data: views }) })(path)
+    }
+    await render()
+    await flush()
+    await openSavedViews()
+    // 名前の隣に削除ボタンを常設しない。
+    expect([...document.body.querySelectorAll('button')].some((button) => button.textContent?.trim() === '保存した検索を削除')).toBe(false)
+
+    const menu = [...document.body.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === '未対応・期限超過の操作')
+    expect(menu).toBeTruthy()
+    await act(async () => { menu!.click() })
+    await flush()
+    const remove = [...document.body.querySelectorAll<HTMLElement>('[role="menuitem"], button')].find((item) => item.textContent?.trim() === '保存した検索を削除')
+    expect(remove).toBeTruthy()
+    const before = net.calls.filter((call) => call.startsWith('GET /api/inbox/saved-views')).length
+    await act(async () => { remove!.click() })
+    await flush()
+    await flush()
+
+    expect(net.calls.some((call) => call.startsWith('DELETE /api/inbox/saved-views/sv-1'))).toBe(true)
+    expect(net.calls.filter((call) => call.startsWith('GET /api/inbox/saved-views')).length).toBeGreaterThan(before)
+  })
 })
