@@ -17,6 +17,7 @@
 .dot[data-tone='warning'] { background: var(--color-support-progress-dot); }
 .dot[data-tone='success'] { background: var(--color-support-resolved-dot); }
 .dot[data-tone='danger'] { background: var(--color-support-unread-dot); }
+.dot[data-tone='caution'] { background: var(--polish-status-caution-dot); }
 .dot[data-tone='neutral'] { background: var(--color-support-hold-dot); }
 .pill[data-tone='info'], :root .pill.control[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-status-info); }
 .pill[data-tone='warning'], :root .pill.control[data-tone='warning'] { background: var(--color-support-progress-bg); color: var(--color-support-progress); }
@@ -45,18 +46,19 @@
   --status-bg: var(--polish-status-neutral-bg);
   --status-ink: var(--polish-status-neutral-ink);
   gap: var(--polish-status-gap); padding: var(--polish-status-pad);
-  border: 0; border-radius: var(--radius-pill);
+  border: 0; border-radius: var(--polish-status-radius);
   background: var(--status-bg); color: var(--status-ink);
   font-size: var(--polish-text-support); font-weight: var(--polish-status-weight); line-height: 1.5;
   max-width: 100%; min-width: 0;
 }
 :root .pill[data-tone='success'] { --status-dot: var(--polish-status-success-dot); --status-bg: var(--polish-status-success-bg); --status-ink: var(--polish-status-success-ink); }
 :root .pill[data-tone='warning'] { --status-dot: var(--polish-status-warning-dot); --status-bg: var(--polish-status-warning-bg); --status-ink: var(--polish-status-warning-ink); }
+:root .pill[data-tone='caution'] { --status-dot: var(--polish-status-caution-dot); --status-bg: var(--polish-status-caution-bg); --status-ink: var(--polish-status-caution-ink); }
 :root .pill[data-tone='danger'] { --status-dot: var(--polish-status-danger-dot); --status-bg: var(--polish-status-danger-bg); --status-ink: var(--polish-status-danger-ink); }
 :root .pill[data-tone='info'] { --status-dot: var(--polish-status-info-dot); --status-bg: var(--polish-status-info-bg); --status-ink: var(--polish-status-info-ink); }
 :root .pill[data-tone='neutral'] { --status-dot: var(--polish-status-neutral-dot); --status-bg: var(--polish-status-neutral-bg); --status-ink: var(--polish-status-neutral-ink); }
 :root .pill .dot { width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); background: var(--status-dot); }
-:root .pill.control[data-tone] { background: var(--status-bg); color: var(--status-ink); }
+:root .pill.control[data-tone] { border-radius: var(--radius-pill); background: var(--status-bg); color: var(--status-ink); }
 
 /* ：4文字の状態を数文字に切らない。列の中で縮めない。 */
 html:root .pill { flex-shrink: 0; min-width: max-content; }
