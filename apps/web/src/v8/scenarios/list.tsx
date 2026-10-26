@@ -959,7 +959,7 @@ export default function ScenariosListV8() {
                     />
                     <Td
                       className={styles.countCell}
-                      title={`読み終えた ${formatNumber(s.completedCount ?? 0)} 人 ／ 購読中 ${subscribers} 人`}
+                      title={`購読中 ${subscribers} 人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}
                     >
                       {/* 読み終えた ÷ 購読中 を細い棒と 1 行の数で。0 人の行は棒も数も薄くする。 */}
                       <div className={styles.countRow} data-empty={!s.subscriberCount || undefined}>
