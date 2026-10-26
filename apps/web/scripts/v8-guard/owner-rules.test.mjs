@@ -216,3 +216,18 @@ test('押して開ける行に指の形と乗せた時の地の変化が無い�
     assert.deepEqual(await kinds(), ['row-open'])
   } finally { await browser.close() }
 })
+
+test('押せる所が 24 未満で上下の隣と近いと落ち、透明な当たりで広げるか間が空いていれば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind === 'hit-size')
+    const links = extra => `<style>a{display:inline-flex;height:18px;font-size:13px;line-height:18px}${extra}</style><main><nav style="display:flex;flex-direction:column;gap:2px;align-items:flex-start"><a href="#">ホーム</a><a href="#">友だち</a></nav></main>`
+    await page.setContent(links(''))
+    assert.ok((await kinds()).length > 0)
+    await page.setContent(links("a{position:relative}a::before{content:'';position:absolute;inset-inline:0;inset-block:min(0px,calc((100% - 24px) / 2))}"))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent('<main><p>説明の文の中の <a href="#">リンク</a> は数えない。</p><a href="#" style="display:inline-block;margin:40px">離れた小さなリンク</a></main>')
+    assert.deepEqual(await kinds(), [])
+  } finally { await browser.close() }
+})

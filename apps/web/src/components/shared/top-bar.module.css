@@ -640,3 +640,9 @@
  * 一番上にいる時は今のまま（透明）。値は globals.css の共通の値。
  */
 html:root .root[data-scrolled] { background: var(--bar-scrolled-bg); -webkit-backdrop-filter: var(--bar-scrolled-filter); backdrop-filter: var(--bar-scrolled-filter); box-shadow: var(--bar-scrolled-line); }
+
+/* パンくずのリンクと左メニューを畳むボタンの押せる範囲（§6.5 の 7）。見た目は変えず、透明な当たりで広げる（パンくずは高さ 24、畳むボタンは 36 角）。 */
+.crumbHome, .crumbFromLink { position: relative; }
+.crumbHome::before, .crumbFromLink::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - 24px) / 2)); }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton { position: relative; }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton::before { content: ''; position: absolute; inset: -2px; }

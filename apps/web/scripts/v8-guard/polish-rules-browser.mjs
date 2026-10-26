@@ -201,5 +201,26 @@ export default function scanPolishRules() {
     const hover = hoverRules.some(({ rule }) => rule.selectorText.split(',').some((part) => { try { return part.includes(':hover') && row.matches(part.replace(/:hover/g, '').replace(/:not\(\[aria-selected='true'\]\)|:not\(\.[\w-]*rowSelected[\w-]*\)/g, '')) } catch { return false } }))
     if (!pointer || !hover) { add('row-open', row, { cursor: css(row).cursor, hover }); break }
   }
+  // 押せる大きさ（§6.5 の 7）：押せる所は高さ・幅 24 以上。透明な ::before で広げた当たりも数える。
+  // 文の中のリンクと、周りに 24 角の空きがある小さな的（WCAG 2.5.8 の間隔の例外）は数えない。
+  const targets = [...document.querySelectorAll('a[href], button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [role="switch"], summary, select, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])')].filter(visible)
+  const hit = (el) => {
+    const r = el.getBoundingClientRect(), before = getComputedStyle(el, '::before')
+    if (before.content === 'none' || before.position !== 'absolute') return r
+    const top = parseFloat(before.top), left = parseFloat(before.left), right = parseFloat(before.right), bottom = parseFloat(before.bottom)
+    return { left: r.left + Math.min(0, left || 0), right: r.right - Math.min(0, right || 0), top: r.top + Math.min(0, top || 0), bottom: r.bottom - Math.min(0, bottom || 0) }
+  }
+  const boxes = targets.map((el) => ({ el, box: hit(el) }))
+  for (const { el, box } of boxes) {
+    const w = box.right - box.left, h = box.bottom - box.top
+    if (w >= 23.5 && h >= 23.5) continue
+    const c = css(el)
+    const inText = el.tagName === 'A' && c.display === 'inline' && [...(el.parentElement?.childNodes ?? [])].some((n) => n.nodeType === 3 && n.textContent.trim())
+    if (inText) continue
+    const cx = (box.left + box.right) / 2, cy = (box.top + box.bottom) / 2
+    const zone = { left: cx - 12, right: cx + 12, top: cy - 12, bottom: cy + 12 }
+    const crowded = boxes.some((o) => o.el !== el && !o.el.contains(el) && !el.contains(o.el) && o.box.left < zone.right && o.box.right > zone.left && o.box.top < zone.bottom && o.box.bottom > zone.top)
+    if (crowded) add('hit-size', el, { width: Math.round(w), height: Math.round(h) }, el.getAttribute('aria-label') || el.textContent)
+  }
   return findings
 }

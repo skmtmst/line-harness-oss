@@ -54,3 +54,7 @@
 @layer components { .root[data-tone='action']{color:var(--color-accent-deep);} }
 
 .root[data-icon-tone='link'] svg { flex: none; color: var(--color-link); }
+
+/* 押せる範囲は高さ 24 以上（§6.5 の 7）。文字の大きさと並びは変えず、透明な当たりで上下に広げる。 */
+.root { position: relative; }
+.root::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - 24px) / 2)); }

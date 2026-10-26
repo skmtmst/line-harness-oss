@@ -107,3 +107,6 @@
 
 /* 文字の上下の真ん中：英数字が Inter になり和文の字面が約 0.5px 上に寄るので、名前の文字だけを共通の値で下げる（札の大きさは変えない）。 */
 :root .pill:not([data-size='md']) .name { translate: 0 var(--text-optical-shift); } /* md は行の高さ 20px で既に真ん中 */
+
+/* 外す「×」の押せる範囲は 24 角（§6.5 の 7）。印の大きさは変えない。 */
+.remove::before { content: ''; position: absolute; inset: calc((24px - var(--tag-pill-font)) / -2); }
