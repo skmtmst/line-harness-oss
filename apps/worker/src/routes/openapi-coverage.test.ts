@@ -212,6 +212,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   "POST /api/broadcasts/{id}/simulate-send",
   "POST /api/chats/{id}/ai/typing",
   "POST /api/dashboard/style/starter-items/{key}/accept-update",
+  "POST /api/dashboard/style/starter-items/ensure",
   "POST /api/delivery-purposes/preview",
   "POST /api/ec/auto-line/attribution/simulate",
   "POST /api/ec/auto-line/rules/{kind}/enable",

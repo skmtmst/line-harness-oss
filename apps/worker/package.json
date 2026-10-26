@@ -13,7 +13,8 @@
     "deploy": "vite build && wrangler deploy",
     "pretypecheck": "pnpm --filter @line-harness/sdk --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-crm/db build",
     "typecheck": "tsc --noEmit",
-    "inject-version": "tsx scripts/inject-version.ts"
+    "inject-version": "tsx scripts/inject-version.ts",
+    "scale:benchmark": "vitest run --config vitest.scale.config.ts"
   },
   "dependencies": {
     "@line-crm/db": "workspace:*",

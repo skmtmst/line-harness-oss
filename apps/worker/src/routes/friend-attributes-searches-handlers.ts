@@ -7,6 +7,7 @@ import type { Env } from '../worker-env.js';
 
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { getTemplateSectionFolderCounts, isTemplateSection } from '../services/template-section.js';
 import { getSavedSearchMatchInsights, getSavedSearchMatchPreview, type SavedSearchMatchInsight } from '../services/saved-search-insights.js';
 import { supportMarkAccess, requestedConditionFormat, positiveInteger, nonNegativeInteger, savedSearchAccess, savedSearchReferenceMap, serializeSearch, canReadSavedSearch, savedSearchMatchForRow, savedSearchDetail, validateConditionsForFormat, maskIp, serializeFolder } from './friend-attributes-definition.js';
 import type { Context } from 'hono';
@@ -479,6 +480,11 @@ export const get__api_folders_10 = async (c: Context<Env, "/api/folders">) => {
       return c.json({ success: false, error: '知らないフォルダの種類です' }, 400);
     }
     const kind = raw && isFolderKind(raw) ? raw : undefined;
+    // テンプレートのフォルダは、一覧の今のタブの種類だけで数えられる。無ければ全種類。
+    const section = c.req.query('section');
+    if (section !== undefined && (kind !== 'template' || !isTemplateSection(section))) {
+      return c.json({ success: false, error: 'invalid_section' }, 400);
+    }
 
     if (kind === 'webinar') {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -516,12 +522,15 @@ export const get__api_folders_10 = async (c: Context<Env, "/api/folders">) => {
       return c.json({ success: true, data: items.map((row) => serializeFolder(row)) });
     }
 
-    const itemCounts = await getFolderItemCounts(c.env.DB, kind, {
+    const countScope = {
       allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       // account_id 指定（一覧画面が選んだ1件）は、その1件に閉じた母集団で
       // 数える。未割当の NULL 行は単一アカウントの一覧に一切出ないため含めない。
       canSeeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
-    });
+    };
+    const itemCounts = section !== undefined && isTemplateSection(section)
+      ? await getTemplateSectionFolderCounts(c.env.DB, section, { accountIds: countScope.allowedAccountIds, includeUnassigned: countScope.canSeeUnassigned })
+      : await getFolderItemCounts(c.env.DB, kind, countScope);
     return c.json({
       success: true,
       data: items.map((row) => {

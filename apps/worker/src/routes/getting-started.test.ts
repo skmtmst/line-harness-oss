@@ -6,6 +6,8 @@ const db = {
   hasSavedFeatureConfiguration: vi.fn(async () => false),
   resolveLineCredential: vi.fn(async () => 'token'),
   hasFirstDeliveredMessage: vi.fn(async () => true),
+  firstDeliveredMessageAt: vi.fn(async () => null),
+  toJstString: (date: Date) => date.toISOString(),
 };
 vi.mock('@line-crm/db', () => db);
 

@@ -20,10 +20,10 @@ test('CMP-01/03/04/09/10/12/17: 店の範囲・期間・平均との差、未取
  expect((await gapCall(gapApp(d,[storeComparison]),'/api/hq/store-comparison/b?from=2026-10-15&to=2026-10-15')).status).toBe(404);
  expect((await gapCall(gapApp(d,[storeComparison],{...gapOwner,id:'s',role:'staff'}),url)).status).toBe(403);expect(fetch).not.toHaveBeenCalled();
 });
-test('CMP-11/13/16/17: 閲覧だけも読め、失敗や欠測の日を含む期間は未取得',async()=>{
+test('CMP-11/13/16/17: 閲覧だけも読め、欠測の日はそろった日の分で数え、失敗だけの期間は未取得',async()=>{
  snapshot('a',0);expect((await read(url,{...gapOwner,readOnly:true})).rows[0].metrics.bookings.value).toBe(0);
- const numbers=await storeNumbers(d.db,'a',comparisonPeriod('2026-10-14','2026-10-15'));expect(numbers.values.bookings).toBeNull();
- d.raw.exec("UPDATE hq_store_daily_metrics SET state='failed' WHERE account_id='a'");expect((await read()).rows.find((r:any)=>r.accountId==='a').metrics.bookings.value).toBeNull();
+ const numbers=await storeNumbers(d.db,'a',comparisonPeriod('2026-10-14','2026-10-15'));expect(numbers).toMatchObject({coveredDays:1,periodDays:2,values:{bookings:0}});
+ d.raw.exec("UPDATE hq_store_daily_metrics SET state='failed' WHERE account_id='a'");const failed=(await read()).rows.find((r:any)=>r.accountId==='a');expect(failed.metrics.bookings.value).toBeNull();expect(failed).toMatchObject({coveredDays:0,periodDays:1,computedAt:null});
  expect((await gapCall(gapApp(d,[storeComparison]),url.replace('2026-10-15','2026-02-30'))).status).toBe(400);
 });
 test('CMP-04/16: 日別の控えは日本時間・来店/取消、単一店舗の失敗でも次の店舗へ',async()=>{
@@ -113,4 +113,46 @@ test('CMP-08: 対応件数と同じ範囲のstatusと予約定義IDを行き先�
  expect(detail.attention.targets.unhandledChats).toEqual([{href:'/chats?status=in_progress',count:1},{href:'/chats?status=on_hold',count:1}]);
  expect(detail.attention.targets.pendingBookings).toEqual([{href:'/events/bookings?id=definition%20a%26b',count:1}]);expect(JSON.stringify(detail.attention)).not.toContain('booking-private-id');
  const original=await readAccountAttention(d.db,'a');expect(original.details.pendingBookings).toEqual([{id:'booking-private-id',href:'/events/bookings'}]);
+});
+
+test('CMP-17: 開いて日が浅い店は、そろった日だけで数を出し何日分かを返す（0日・一部・全部）',async()=>{
+ // 期間は 10/13〜10/15 の 3 日。a と a2 は 3 日そろう、a3 は 10/15 の 1 日だけ、b は見えない店。
+ const period='/api/hq/store-comparison?from=2026-10-13&to=2026-10-15&compare=average';
+ for(const day of ['2026-10-13','2026-10-14','2026-10-15']){snapshot('a',2,day);snapshot('a2',4,day);}
+ snapshot('a3',9,'2026-10-15');
+ d.raw.exec("UPDATE hq_store_daily_metrics SET broadcast_recipients=10,broadcast_clicks=CASE account_id WHEN 'a3' THEN 5 ELSE 1 END");
+ let data=await read(period);
+ const row=(id:string)=>data.rows.find((r:any)=>r.accountId===id);
+ expect(row('a')).toMatchObject({coveredDays:3,periodDays:3});expect(row('a3')).toMatchObject({coveredDays:1,periodDays:3});
+ expect(row('a3').computedAt).toBe('2026-10-16T00:00:00Z');
+ // 件数：一部の店も数は出す（1日分の 9 件）。日数の違う店と比べないので、差と平均は全部の日がそろった店だけ。
+ expect(row('a3').metrics.bookings).toMatchObject({value:9,diff:null,available:true});
+ expect(data.average.bookings).toBeNull();
+ // 割合：そろった日の分で、全店の平均との差を出す（(10+10+50)/3）。
+ expect(row('a3').metrics.clickRate.value).toBe(50);expect(data.average.clickRate).toBeCloseTo(70/3,6);expect(row('a3').metrics.clickRate.diff).toBeCloseTo(50-70/3,6);
+ // 3 店とも全部の日がそろえば件数の平均と差も出る。
+ for(const day of ['2026-10-13','2026-10-14'])snapshot('a3',0,day);
+ data=await read(period);expect(row('a3')).toMatchObject({coveredDays:3,periodDays:3});expect(data.average.bookings).toBe((6+12+9)/3);expect(row('a3').metrics.bookings.diff).toBe(0);
+ // 0 日の店は今のまま「—」（null）で、何日分かは 0。
+ d.raw.exec("DELETE FROM hq_store_daily_metrics WHERE account_id='a3'");
+ data=await read(period);expect(row('a3')).toMatchObject({coveredDays:0,periodDays:3,computedAt:null});expect(Object.values(row('a3').metrics).every((m:any)=>m.value===null&&m.diff===null)).toBe(true);
+ // 詳細の口も同じ日数を返す。
+ expect(await read('/api/hq/store-comparison/a3?from=2026-10-13&to=2026-10-15')).toMatchObject({coveredDays:0,periodDays:3});
+ expect(await read('/api/hq/store-comparison/a?from=2026-10-12&to=2026-10-15')).toMatchObject({coveredDays:3,periodDays:4,values:{bookings:6}});
+});
+test('CMP-17: 前の期間との差は、両方の期間の全部の日がそろった時だけ件数を比べる',async()=>{
+ for(const day of ['2026-10-14','2026-10-15'])snapshot('a',3,day);snapshot('a',1,'2026-10-13');
+ const now=await read('/api/hq/store-comparison?from=2026-10-14&to=2026-10-15');
+ const a=now.rows.find((r:any)=>r.accountId==='a');expect(a.metrics.bookings).toMatchObject({value:6,diff:null});
+ snapshot('a',2,'2026-10-12');
+ const full=(await read('/api/hq/store-comparison?from=2026-10-14&to=2026-10-15')).rows.find((r:any)=>r.accountId==='a');expect(full.metrics.bookings).toMatchObject({value:6,diff:3});
+ // 今の期間が一部だけなら、前の期間がそろっていても件数は比べない（割合は比べる）。
+ d.raw.exec("DELETE FROM hq_store_daily_metrics WHERE account_id='a' AND date='2026-10-14'");
+ const partial=(await read('/api/hq/store-comparison?from=2026-10-14&to=2026-10-15')).rows.find((r:any)=>r.accountId==='a');expect(partial).toMatchObject({coveredDays:1,periodDays:2});expect(partial.metrics.bookings).toMatchObject({value:3,diff:null});expect(partial.metrics.blockRate).toMatchObject({value:1,diff:-1});
+});
+test('CMP-01/17: 返事の速さは、そろった日の返事だけで真ん中の値を出す',async()=>{
+ d.raw.exec(`INSERT INTO hq_store_response_samples(account_id,chat_id,pending_since,responded_at,minutes) VALUES('a','c1','2026-10-13T00:00:00Z','2026-10-13T01:00:00Z',100),('a','c2','2026-10-14T00:00:00Z','2026-10-14T01:00:00Z',4),('a','c3','2026-10-14T23:00:00Z','2026-10-14T23:30:00Z',6)`);
+ snapshot('a',0,'2026-10-14');snapshot('a',0,'2026-10-15');d.raw.exec("INSERT INTO hq_store_daily_metrics(account_id,date,state,computed_at) VALUES('a','2026-10-13','failed','2026-10-16T00:00:00Z')");
+ // 10/13 は失敗の日なので 100 分は入れない。10/14 23:30Z は日本時間 10/15 の返事。
+ const n=await storeNumbers(d.db,'a',comparisonPeriod('2026-10-13','2026-10-15'));expect(n).toMatchObject({coveredDays:2,periodDays:3});expect(n.values.responseMinutes).toBe(5);
 });

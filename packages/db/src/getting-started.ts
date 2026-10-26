@@ -42,6 +42,10 @@ export interface StepFacts {
  * 「QRを読んで自分を友だちに追加するか、テスト受信者へ送ります」と
  * 2 経路を認めているため。
  */
+const FIRST_DELIVERED_MESSAGE_WHERE = `line_account_id = ?
+          AND direction = 'outgoing'
+          AND (source = 'friend_add_routing' OR scenario_step_id IS NOT NULL)`;
+
 export async function hasFirstDeliveredMessage(
   db: D1Database,
   accountId: string,
@@ -50,14 +54,28 @@ export async function hasFirstDeliveredMessage(
     .prepare(
       `SELECT 1 AS hit
          FROM messages_log
-        WHERE line_account_id = ?
-          AND direction = 'outgoing'
-          AND (source = 'friend_add_routing' OR scenario_step_id IS NOT NULL)
+        WHERE ${FIRST_DELIVERED_MESSAGE_WHERE}
         LIMIT 1`,
     )
     .bind(accountId)
     .first<{ hit: number }>();
   return row !== null;
+}
+
+/** 最初の1通の時刻。`hasFirstDeliveredMessage` と同じ条件の一番早い送信。無ければ null。 */
+export async function firstDeliveredMessageAt(
+  db: D1Database,
+  accountId: string,
+): Promise<string | null> {
+  const row = await db
+    .prepare(
+      `SELECT MIN(created_at) AS at
+         FROM messages_log
+        WHERE ${FIRST_DELIVERED_MESSAGE_WHERE}`,
+    )
+    .bind(accountId)
+    .first<{ at: string | null }>();
+  return row?.at ?? null;
 }
 
 /** 段1。3つとも揃って初めて数える。**`unknown` の Webhook を「合っている」と読まない。** */

@@ -56,6 +56,34 @@ describe('テンプレートフォルダのアカウント境界（N-147）', ()
     expect(all.data.map((row) => row.id)).toEqual(['folder-a']);
   });
 
+  it('フォルダの数は今のタブの種類だけを数え、種類が無ければ今と同じ全種類', async () => {
+    const insert = fixture.raw.prepare(`INSERT INTO templates(id,name,message_type,message_content,draft_message_content,question_json,folder_id,line_account_id,deleted_at,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,'a',?,'2026-01-01','2026-01-01')`);
+    const question = JSON.stringify({ text: '来ますか', choices: [{ label: 'はい', behavior: 'none' }] });
+    const video = JSON.stringify({ baseUrl: 'https://example.invalid/i', altText: '動画', baseSize: { width: 1040, height: 585 }, video: { originalContentUrl: 'https://example.invalid/v.mp4' }, actions: [] });
+    insert.run('q-folder', '質問', 'text', '本文', null, question, 'folder-a', null);
+    insert.run('q-unfiled', '質問2', 'text', '本文', null, question, null, null);
+    insert.run('v-folder', '動画', 'imagemap', '{}', video, null, 'folder-a', null);
+    insert.run('m-folder', '本文', 'text', '本文', null, null, 'folder-a', null);
+    insert.run('m-deleted', '消した', 'text', '本文', null, null, 'folder-a', '2026-01-02');
+    insert.run('v-question', '動画の質問', 'imagemap', '{}', video, question, null, null);
+    insert.run('broken-question', '壊れた質問', 'text', '本文', null, '{"text":""}', 'folder-a', null);
+    const counts = async (query: string) => {
+      const body = await (await req(`/api/folders?kind=template&account_id=a${query}`)).json() as { data: { id: string; itemCount?: number }[]; unfiledCount?: number };
+      return { folder: body.data.find((row) => row.id === 'folder-a')?.itemCount, unfiled: body.unfiledCount };
+    };
+    // メッセージ：本文と壊れた質問（一覧でも質問にならない）。削除済みは数えない。未分類は beforeEach の tpl-a。
+    expect(await counts('&section=message')).toEqual({ folder: 2, unfiled: 1 });
+    // 動画で質問のもの（未分類）は、画面と同じく質問とリッチビデオの両方のタブで数える。
+    expect(await counts('&section=question')).toEqual({ folder: 1, unfiled: 2 });
+    expect(await counts('&section=rich_video')).toEqual({ folder: 1, unfiled: 1 });
+    // 種類が無い時は全種類（1件は1回）。削除済みは一覧と同じく数えない。
+    expect(await counts('')).toEqual({ folder: 4, unfiled: 3 });
+    // 知らない種類・テンプレート以外のフォルダへの種類は断る。
+    expect((await req('/api/folders?kind=template&account_id=a&section=card_message')).status).toBe(400);
+    expect((await req('/api/folders?kind=tag&section=message')).status).toBe(400);
+  });
+
   it('選択可能範囲外のアカウントIDは404として扱う', async () => {
     expect((await req('/api/folders?kind=template&account_id=b')).status).toBe(404);
   });

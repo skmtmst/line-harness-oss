@@ -77,3 +77,13 @@ export function diffTitle(key: StoreComparisonKey, diff: number | null, compare:
   const amount = key === 'blockRate' || key === 'clickRate' || key === 'noShowRate' ? `${one.format(abs)} pt` : key === 'friendChange' ? `${nf.format(Math.round(abs))} 人` : key === 'responseMinutes' ? `${nf.format(Math.round(abs))} 分` : `${nf.format(Math.round(abs))} 件`
   return `${base}より ${amount} ${diff > 0 ? '多い' : '少ない'}`
 }
+
+/** 足し上げる数（件数・人数）。そろった日数が違う店どうしでは比べられない。 */
+const COUNT_KEYS: ReadonlySet<StoreComparisonKey> = new Set(['friendChange', 'bookings', 'visits'])
+
+/** 期間の途中から集計した店の件数に添える「12 日分」。全部の日がそろった・0 日の店は null。 */
+export function coverageLabel(key: StoreComparisonKey, row: Pick<StoreComparisonRow, 'coveredDays' | 'periodDays'>): string | null {
+  if (!COUNT_KEYS.has(key)) return null
+  if (!(row.coveredDays > 0) || row.coveredDays >= row.periodDays) return null
+  return `${nf.format(row.coveredDays)} 日分`
+}

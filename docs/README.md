@@ -789,5 +789,9 @@
 - [ベルと通知の画面のタブを「すべて・未読・システム」にし、未読は古いものまで漏れず](release-log/unreleased/1835-kenta-bell-inbox.md)
 - [一斉配信を作る画面に「2/5 配信対象」のように今の段を出し、配信名・送る相手・](release-log/unreleased/1835-kenta-broadcast-steps.md)
 - [運用状態の更新履歴を、検証へ入れた1回ごとに1枚のカードで見られるようにした。日](release-log/unreleased/1835-kenta-release-history.md)
+- [店の比較で、開いて日が浅い店もそろった日の分で数を出すようにし、テンプレートのフ](release-log/unreleased/1832-kenta-count-rules.md)
+- [友だちやトークがとても多いお店でも画面が遅くならないかを、毎週自動で確かめるよう](release-log/unreleased/1832-kenta-scale-guard.md)
+- [お店の形を選んだ時に入る最初のセットに、友だち追加のあいさつの下書きと、飲食店の](release-log/unreleased/1832-kenta-starter-content.md)
+- [新しいアカウントの初期セットが足りない時に、足りない物だけを止めた状態で入れ直せ](release-log/unreleased/1832-kenta-starter-ensure.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
