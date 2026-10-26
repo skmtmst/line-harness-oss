@@ -44,6 +44,12 @@ function Fixture(){
   <CheckCard title="カード" checked={value} onChange={setValue}/>
   <div data-center-row><Radio name="channel" checked={value} onChange={()=>setValue(!value)}>ラジオ</Radio></div>
   <div data-center-row><Toggle label="切り替え" checked={value} onChange={setValue}/></div></section>
+  <section id="notices" style={{maxWidth:720}}>
+   <Notice tone="info" heading="回復コードが残っていません" message="認証アプリが使えない時に入れなくなる前に、作り直してください。" action={<Button>作り直す</Button>} onClose={()=>{}}/>
+   <Notice tone="warn" heading="いつもと違う端末・場所からのログインです。心当たりがなければ、ほかの端末のログインを終えてパスワードを変えてください" message="大事な操作の前に毎回、本人確認をします。" action={<Button>ログイン中の端末を見る</Button>} onClose={()=>{}}/>
+   <Notice tone="warn" heading="ほかの人がこの内容を保存しました" message="読み直すと、ほかの人の変更を見てから続けられます。" states={[{label:'済み',state:'done'},{label:'未保存',state:'pending'}]} footer={<button type="button">入力を破棄する</button>} action={<><Button>読み直す</Button><Button variant="primary">上書きする</Button></>} onClose={()=>{}}/>
+   <Notice tone="info" action={<Button>開く</Button>} onClose={()=>{}}>題のない1行の知らせです。</Notice>
+  </section>
   <section id="windows">{['通常','確認','危険','警告','手順','選択','長文','引き出し'].map(name=><Button key={name} onClick={()=>setWindow(name)}>{name}</Button>)}</section>
   {window==='引き出し'?<Drawer open title="設定を編集する" headerIcon={props.headerIcon} description={props.description} onClose={()=>setWindow('')} footer={<Button onClick={()=>setWindow('')}>保存する</Button>}><input aria-label="名前" defaultValue="保持する名前"/></Drawer>:
    ['確認','危険','警告'].includes(window)?<ConfirmDialog {...props} title="内容を確認しますか？" destructive={window==='危険'} warning={window==='警告'}/>:
@@ -192,6 +198,31 @@ for (const width of [1152,1440,1920]) {
         await panel.getByRole('button',{name:'閉じる',exact:true}).click()
         await panel.waitFor({state:'detached'})
       }
+    }finally{await browser.close()}
+  })
+}
+
+for (const width of [1152,1440]) {
+  test(`知らせの［×］を操作のボタンと縦の真ん中でそろえる（題が1行でも2行でも） ${width}`,async()=>{
+    const browser=await connectGuardBrowser()
+    try{
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      const measure=()=>page.locator('#notices').evaluate(root=>[...root.querySelectorAll('[data-design-part="notice"]')].map(notice=>{
+        const close=notice.querySelector('button[aria-label="通知を閉じる"]')
+        const actions=[...notice.querySelectorAll('[class*="action"] [data-shared-button]')]
+        const center=el=>{const r=el.getBoundingClientRect();return r.top+r.height/2}
+        const heading=notice.querySelector('[class*="heading"]')
+        return {lines:heading?Math.round(heading.getBoundingClientRect().height/parseFloat(getComputedStyle(heading).lineHeight)):0,
+          offsets:actions.map(button=>center(close)-center(button))}
+      }))
+      const rows=await measure()
+      assert.equal(rows.length,4)
+      assert.ok(rows.some(row=>row.lines>=2),JSON.stringify(rows))
+      assert.ok(rows.every(row=>row.offsets.length>0&&row.offsets.every(offset=>Math.abs(offset)<=0.5)),JSON.stringify(rows))
+      // ［×］を2pxずらすと、この計測が見逃さないことを確かめる。
+      await page.locator('#notices button[aria-label="通知を閉じる"]').first().evaluate(el=>{el.style.position='relative';el.style.top='-2px'})
+      assert.ok((await measure()).some(row=>row.offsets.some(offset=>Math.abs(offset)>0.5)))
     }finally{await browser.close()}
   })
 }
