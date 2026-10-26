@@ -1,27 +1,24 @@
 'use client'
 import ChatThreadWindow from '@/components/chats/chat-thread-window';
 import { type ChatStatus } from '@/components/chats/inbox-dropdown';
-import FlexPreviewComponent from '@/components/flex-preview';
 import Button from '@/components/shared/button';
 import Dialog from '@/components/shared/dialog';
-import { InboxFlexContent, InboxMedia } from '@/components/shared/inbox-content';
+import { InboxMedia } from '@/components/shared/inbox-content';
 import { InboxHistoryButton } from '@/components/shared/inbox-list';
-import { InboxMessage, InboxMessageDay, InboxQuotedMessage, InboxThreadLoading } from '@/components/shared/inbox-thread';
+import { InboxThreadLoading } from '@/components/shared/inbox-thread';
 import ListState from '@/components/shared/list-state';
 import EmailThread from '@/components/support/email-thread';
 import { InboxConversationPane, InboxMessages } from '@/components/templates/inbox-page';
-import { formatDateTime, formatListRecent, formatTime } from '@/lib/format';
+import { formatListRecent } from '@/lib/format';
 import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary } from '@/v8/ai-reply/public/inbox-ai/index'
-import AttachmentMessage from '@/v8/inbox-chat/attachment-message';
 import ConversationHead from '@/v8/inbox-chat/conversation-head';
 import { ChatSearchBar } from '@/v8/inbox-search/public/chat-search-bar/index'
-import { Link2 } from 'lucide-react';
-import { AUTO_SOURCE_LABEL, CORRECTION_TEMPLATE, Chat, formatByteSize, formatDayJa, formatInboxDatetime, formatYmdSlash, sameYmd } from './inbox-model';
-import { ChatImageMessage, StickerMessageImage } from "./screen-gap-parts";
+import { CORRECTION_TEMPLATE, Chat, formatByteSize, formatInboxDatetime } from './inbox-model';
 
 import { useMemo } from 'react';
 import type { Props } from './inbox-conversation-view-types';
 import InboxReplyComposer from './inbox-reply-composer';
+import { InboxMessageRow } from './message-row';
 
 export default function InboxConversation({ operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo, loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages }: Props) {
   const messages = useMemo(() => pendingMessages?.length ? [...(chatDetail?.messages ?? []), ...pendingMessages] : (chatDetail?.messages ?? []), [chatDetail?.messages, pendingMessages])
@@ -130,88 +127,15 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
                 scrollToId={chatSearchTarget?.id ?? null}
                 scrollSeq={chatSearchTarget?.seq ?? 0}
                 rowGap={'var(--tpl-inbox-thread-gap)'}
-                renderMessage={(msg, idx, list) => {
-                  const prevMsg = idx > 0 ? list[idx - 1] : null
-                  const isLast = idx === list.length - 1
-                  const showDateSep = !prevMsg || !sameYmd(prevMsg.createdAt, msg.createdAt)
-                  const isOutgoing = msg.direction === 'outgoing'
-                  const isSending = pendingMessages?.some((pending) => pending.id === msg.id) === true
-                  const searchHit = chatSearch.hitKind(msg)
-
-                  // メッセージ表示の分岐
-                  let bubbleContent: React.ReactNode
-                  if (msg.isUnsent) {
-                    bubbleContent = <span className="text-ink-faint">送信を取り消しました</span>
-                  } else if (msg.messageType === 'flex') {
-                    bubbleContent = (
-                      <InboxFlexContent>
-                        <FlexPreviewComponent content={msg.content} maxWidth={280} />
-                      </InboxFlexContent>
-                    )
-                  } else if (msg.messageType === 'image') {
-                    // INBOX-30: 404・期限切れ・回線断は空白にせず、
-                    // 理由の出る代替表示と読み込み直しに倒す。
-                    bubbleContent = <ChatImageMessage content={msg.content} />
-                  } else if (msg.messageType === 'sticker') {
-                    bubbleContent = <StickerMessageImage content={msg.content} />
-                  } else if ((msg.messageType === 'video' || msg.messageType === 'file') && msg.direction === 'outgoing') {
-                    // ：送った動画・ファイルは JSON のまま出さず、再生できる枠・名前と期限の札にする。
-                    bubbleContent = <AttachmentMessage messageType={msg.messageType} content={msg.content} />
-                  } else {
-                    bubbleContent = <span>{msg.content}</span>
-                  }
-
-                  if (msg.source === 'scenario') {
-                    const startedAt = formatDateTime(msg.createdAt)
-                    return (
-                      <>
-                        {showDateSep && (
-                          <div className="mb-3 flex justify-center" style={{ marginTop: idx === 0 ? 12 : 4 }}>
-                            <span className="bg-ink/20 text-on-accent/85 rounded-pill px-2.5 py-0.5 text-micro">
-                              {formatYmdSlash(msg.createdAt)}
-                            </span>
-                          </div>
-                        )}
-                        {/* 上下の 8px は窓分けの行が持つ（外の余白は測った高さに入らない）。 */}
-                        <div className="flex items-center justify-center gap-1.5" style={{ marginTop: !showDateSep && idx === 0 ? 8 : 0, marginBottom: isLast ? 8 : 0 }}>
-                          <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-micro font-semibold text-action shadow-card">
-                            <Link2 aria-hidden="true" size={13} />
-                            シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
-                          </span>
-                          <time className="text-micro text-ink-faint">{startedAt}</time>
-                        </div>
-                      </>
-                    )
-                  }
-
-                  {
-                    /*
-                     * ★V8 やりとり（XqSvX「やりとり」）：日付は真ん中の小さな字、相手の吹き出しは白・薄い枠で
-                     * 顔を置かない、時刻は吹き出しの横（相手は右・こちらは左）、こちらの吹き出しは薄い緑で
-                     * 下に「K Kenta が送信」／「自動：…」。引用・探すの印・取り消しの扱いは 管理画面 と同じ。
-                     */
-                    const quotedNode = msg.quoted ? (
-                      <InboxQuotedMessage>
-                        {msg.quoted.isUnsent
-                          ? '取り消されたメッセージ'
-                          : msg.quoted.messageType === 'text'
-                            ? msg.quoted.content
-                            : `[${msg.quoted.messageType}]`}
-                      </InboxQuotedMessage>
-                    ) : null
-                    const autoLabel = AUTO_SOURCE_LABEL[msg.source ?? ''] ?? null
-                    return <>
-                      {showDateSep ? <InboxMessageDay first={idx === 0}>{formatDayJa(msg.createdAt)}</InboxMessageDay> : null}
-                      <InboxMessage sendStatus={isOutgoing ? (isSending ? 'sending' : 'sent') : undefined} outgoing={isOutgoing} last={isLast} time={formatTime(msg.createdAt)} searchHit={searchHit} senderName={msg.sentByStaffName} autoLabel={autoLabel}
-                        onQuote={msg.isUnsent || isSending ? undefined : () => { setQuotedMessage(msg); textareaRef.current?.focus() }}
-                        onCorrect={staffRole !== 'viewer' && !isSending && isOutgoing && msg.messageType === 'text' && !msg.isUnsent && msg.source !== 'scenario'
-                          ? () => { setQuotedMessage(msg); setCorrectingId(msg.id); setMessageContent((prev) => prev.trim() ? prev : CORRECTION_TEMPLATE); textareaRef.current?.focus() }
-                          : undefined}>
-                        {quotedNode}{bubbleContent}
-                      </InboxMessage>
-                    </>
-                  }
-                }}
+                renderMessage={(msg, idx, list) => (
+                  <InboxMessageRow msg={msg} idx={idx} list={list}
+                    sending={pendingMessages?.some((pending) => pending.id === msg.id) === true}
+                    searchHit={chatSearch.hitKind(msg)}
+                    onQuote={(target) => { setQuotedMessage(target); textareaRef.current?.focus() }}
+                    onCorrect={staffRole !== 'viewer'
+                      ? (target) => { setQuotedMessage(target); setCorrectingId(target.id); setMessageContent((prev) => prev.trim() ? prev : CORRECTION_TEMPLATE); textareaRef.current?.focus() }
+                      : undefined} />
+                )}
               />
             )}
           </InboxMessages>
