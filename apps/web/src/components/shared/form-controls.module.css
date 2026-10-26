@@ -47,7 +47,8 @@
  * （互換経路は本番で動いているので変えない）。v8 では正本と同じ物になる。
  */
 
-/* 「？」の中の「くわしく」。キーボードで来たときに輪郭を出す。 */
+/* 「？」の中の「くわしく」。本文の中のリンクの色。キーボードで来たときに輪郭を出す。 */
+.helpLink { color: var(--color-link); }
 .helpLink:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;

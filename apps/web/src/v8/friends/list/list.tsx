@@ -83,7 +83,7 @@ import { lastContactOf,messageWord,monthDay,monthDayTime,statusOf } from './word
  *
  * 管理画面 の一覧（app/friends/page.tsx の FriendsPageInner）とは別の部品として持つ。
  * 呼ぶ API・送る形・保存先（sessionStorage・localStorage）は今と同じ。
- * 違いは見せ方だけ：頭（題・CSV・取り込む）→ 閲覧のみの帯 → タブ → 数の帯 →
+ * 違いは見せ方だけ：頭（題・CSVで書き出す・CSVから取り込む）→ 閲覧のみの帯 → タブ → 数の帯 →
  * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
  * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
  */
@@ -557,7 +557,7 @@ export default function FriendsListV8() {
         { method: 'PUT', body: JSON.stringify({ __attention: current ? null : '1' }) },
       )
       if (loadContextRef.current.identity !== savingIdentity) return
-      if (!saved.success || !saved.data?.updatedAt) throw new Error('保存後の状態を確認できませんでした')
+      if (!saved.success || !saved.data?.updatedAt) throw new Error('保存後の状態を確認できませんでした。時間をおいて、もう一度お試しください。')
       // 保存前に始まった一覧の応答で、新しい版を上書きしない。
       loadRequestRef.current += 1
       setRefreshing(false)
@@ -665,7 +665,7 @@ export default function FriendsListV8() {
       {canImport ? (
         <Button variant="primary" href="/friends/migrations">
           <Upload size={14} aria-hidden="true" />
-          友だちを取り込む
+          CSVから取り込む
         </Button>
       ) : null}
     </>
@@ -735,7 +735,7 @@ export default function FriendsListV8() {
         {broadcastHandoffHref ? (
           <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
             <Megaphone size={14} aria-hidden="true" />
-            この条件で配信を作成
+            この条件で配信を作る
           </Link>
         ) : null}
         </ListToolbarOptional>

@@ -28,6 +28,7 @@ import styles from './closures.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { formatNumber } from '@/lib/format'
 
 
 /*
@@ -288,7 +289,7 @@ export default function ClosureDialog({
               <div className={styles.affected} data-affected="">
                 <p className={styles.affectedTitle}>
                   <AlertTriangle size={16} aria-hidden="true" />
-                  {`${days}の予約が ${rows.length} 件あります（保存しても取り消しません${editing && preview.contacted > 0 ? `・連絡済み ${preview.contacted} 件` : ''}）`}
+                  {`${days}の予約が ${formatNumber(rows.length)} 件あります（保存しても取り消しません${editing && preview.contacted > 0 ? `・連絡済み ${preview.contacted} 件` : ''}）`}
                 </p>
                 {rows.map((row) => (
                   <div key={row.id} className={styles.affectedRow}>

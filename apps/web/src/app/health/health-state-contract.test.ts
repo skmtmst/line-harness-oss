@@ -59,7 +59,7 @@ describe('監視の状態と個別の読み直し', () => {
     let resolve!: (value: unknown) => void
     calls.health.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
     fireEvent.click(screen.getByRole('button', { name: '再試行' }))
-    expect((screen.getByRole('button', { name: '再取得中...' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '再取得中…' }) as HTMLButtonElement).disabled).toBe(true)
     expect(within(accountButton('b')).getByText('警告')).toBeTruthy()
     await act(async () => resolve({ success: true, data: { riskLevel: 'normal' } }))
     await waitFor(() => expect(within(accountButton()).getByText('正常')).toBeTruthy())

@@ -89,7 +89,7 @@ export function PlanDonut({ rows, total, size = 190 }: { rows: Array<{ key: stri
   const circumference = 2 * Math.PI * r
   let offset = 0
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label={`契約先 ${total} 件の内訳`}>
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label={`契約先 ${formatNumber(total)} 件の内訳`}>
       <circle cx={c} cy={c} r={r} fill="none" stroke="var(--color-surface-pearl)" strokeWidth={24} />
       {total > 0
         ? rows.filter((row) => row.count > 0).map((row) => {

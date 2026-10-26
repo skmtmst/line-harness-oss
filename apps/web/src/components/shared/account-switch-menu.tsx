@@ -104,7 +104,7 @@ export default function AccountSwitchMenu({
               <Building2 aria-hidden="true" className={styles.hqIcon} />
               <span className={styles.hqText}>
                 <span className={styles.hqTitle}>統括に戻る</span>
-                <span className={styles.hqSub} title={hq.companyName}>{`${hq.companyName} ・ アカウント ${hq.accountCount}`}</span>
+                <span className={styles.hqSub} title={hq.companyName}>{`${hq.companyName}・アカウント ${hq.accountCount}`}</span>
               </span>
               <ArrowRight aria-hidden="true" className={styles.hqArrow} />
             </button>

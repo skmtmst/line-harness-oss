@@ -555,7 +555,7 @@ export default function ScenarioFirstStepV8() {
     {
       value: 'advanced',
       title: '詳細条件で絞る',
-      note: conditionCount > 0 ? `${conditionCount} 個の条件` : '条件を組み合わせて選ぶ（未設定）',
+      note: conditionCount > 0 ? `${formatNumber(conditionCount)} 個の条件` : '条件を組み合わせて選ぶ（未設定）',
       icon: <Filter size={16} />,
     },
   ]

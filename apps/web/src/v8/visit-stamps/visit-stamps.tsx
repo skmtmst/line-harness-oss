@@ -379,7 +379,7 @@ function VisitStampsScreen() {
         requestId: grantRequest.current, source: reason === 'paper' ? 'paper' : 'manual',
       })
       grantRequest.current = newRequestId()
-      notifyToast(`${count} 個 押しました。`)
+      notifyToast(`${polishFormatNumber(count)} 個 押しました。`)
       setCount(1); setMemo('')
       await loadLog()
     } catch (caught) {
@@ -607,7 +607,7 @@ function VisitStampsScreen() {
                     <SaveErrorField names={[`multipliers.${i}.active`,"active","m.active"]}><Checkbox checked={m.active !== false} aria-label={`${multiplierName(m)}を使う`} disabled={ro} onCheckedChange={ro ? () => {} : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} /></SaveErrorField>
                     <span className={styles.texts}>
                       <span className={styles.name}>{multiplierName(m)}</span>
-                      <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています ・ ${multiplierDetail(m)}` : multiplierDetail(m)}</span>
+                      <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています・${multiplierDetail(m)}` : multiplierDetail(m)}</span>
                     </span>
                     {ro ? null : <RowActions subjectName={multiplierName(m)} menuItems={[{ id: 'edit', label: '倍率を変える', onSelect: () => setMultEdit(i) }]}
                       destructiveItem={{ id: 'delete', label: '倍率を消す', onSelect: () => set({ multipliers: settings.multipliers.filter((_, k) => k !== i) }) }} />}
@@ -762,7 +762,7 @@ function VisitStampsScreen() {
                         <span className={styles.label}>押印数</span>
                         <span className={styles.stepper}>
                           <IconButton aria-label="1個へらす" disabled={count <= 1} onClick={() => setCount((c) => Math.max(1, c - 1))}><Minus size={16} aria-hidden="true" /></IconButton>
-                          <span className={styles.stepValue} aria-live="polite">{`＋${count} 個`}</span>
+                          <span className={styles.stepValue} aria-live="polite">{`＋${polishFormatNumber(count)} 個`}</span>
                           <IconButton aria-label="1個ふやす" disabled={count >= 100} onClick={() => setCount((c) => Math.min(100, c + 1))}><Plus size={16} aria-hidden="true" /></IconButton>
                         </span>
                       </div>

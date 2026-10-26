@@ -126,7 +126,7 @@ describe('公開履歴の読み込み（応答の形ずれ）', () => {
     await renderDetail()
     expect(screen.getByTitle(/いま対象に出ている版: 「公開した版」.*2ページ.*編集中の下書きは公開中の版と同じです/)).toBeTruthy()
     expect(screen.queryByText(/この下書きで上書きされます/)).toBeNull()
-    expect(screen.getByTitle('「公開した版」 ・ 2ページ ・ LINE ID 1件')).toBeTruthy()
+    expect(screen.getByTitle('「公開した版」・2ページ・LINE ID 1件')).toBeTruthy()
   })
 
   it('公開版と違う下書きは上書きされると警告する', async () => {
@@ -144,7 +144,7 @@ describe('公開履歴の読み込み（応答の形ずれ）', () => {
   it('失敗した保存版と対象を確認してから、その版だけを再試行する', async () => {
     net.publishRunsResult = { success: true, data: { runs: [run('failed')], published: null, draftDiffersFromPublished: null } }
     await renderDetail()
-    expect(screen.getByTitle('「公開した版」 ・ 2ページ ・ LINE ID 1件 ・ 失敗理由: line_unavailable')).toBeTruthy()
+    expect(screen.getByTitle('「公開した版」・2ページ・LINE ID 1件・失敗理由: line_unavailable')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '失敗だけやり直す' }))
     const dialog = screen.getByRole('dialog', { name: '失敗した公開をやり直しますか？' })
     expect(within(dialog).getByText(/対象: 条件に当てはまる友だち/)).toBeTruthy()

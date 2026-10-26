@@ -38,6 +38,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 /* ★V8-B 緊急コントロール（板 ）。停止・復旧・本人確認・冪等キーと
  * 競合後の読み直しは、この現役の部品だけで守る。 */
@@ -740,7 +741,7 @@ const EmergencyControlV8 = (
           </div>
         )}
         <Notice tone="info">
-          {historyState === 'ready' ? `種類の件数は、取得した直近${operations.length}件の記録から数えています。` : ''}
+          {historyState === 'ready' ? `種類の件数は、取得した直近${formatNumber(operations.length)}件の記録から数えています。` : ''}
           だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。緊急停止はオーナーと許可された人だけが実行できます。
 
         </Notice>

@@ -6,6 +6,7 @@ import type { CommonVar,CommonVarDeleteImpact } from '@line-crm/shared'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { MAX_BATCH_DELETE_COUNT } from './list-model'
 import { reasonRequirement } from './model'
+import { formatNumber } from '@/lib/format'
 
 type OpenCommonVarDeleteContext = {
   deleteRequestRef: RefObject<{ accountId: string | null; itemId: string | null; generation: number; }>
@@ -133,7 +134,7 @@ export async function prepareCommonVarRemoval({ batchRequestRef, items, saveErro
       const blocked = impacts.filter(({ impact }) => !impact.canDelete)
       if (blocked.length > 0) {
         const references = blocked.reduce((sum, { impact }) => sum + impact.total, 0)
-        setError(`${blocked.length} 件は、合計${references}か所で使用中のため削除できません。`)
+        setError(`${formatNumber(blocked.length)} 件は、合計${references}か所で使用中のため削除できません。`)
         return
       }
     } catch (saveFailure) {
@@ -217,7 +218,7 @@ export async function removeCommonVars({ batchReason, batchRequestRef, deleteTar
         setDeleteBatchError(
           failed.length === targets.length
             ? '選択した共通情報を削除できませんでした。状態を読み直してから、もう一度お試しください。'
-            : `${failed.length} 件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
+            : `${formatNumber(failed.length)} 件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
         )
         await load()
         return

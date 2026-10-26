@@ -183,7 +183,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   if (state === 'denied') {
     body = <ListState kind="forbidden" title="個人の参加履歴はオーナーと管理者だけが確認できます" description="友だちごとの視聴・申込の記録を出す権限がないため、表は出せません。集計は上の数と「分析」で確認できます。" />
   } else if (state === 'loading') {
-    body = <p className={styles.state} role="status">読み込み中...</p>
+    body = <p className={styles.state} role="status">読み込み中…</p>
   } else if (state === 'error') {
     body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" onRetry={() => setAttempt((count) => count + 1)} />
   } else if (pageItems.length === 0) {

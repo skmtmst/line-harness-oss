@@ -107,12 +107,12 @@ export function multiplierDetail(m: VisitStampMultiplier): string {
   if (m.startMinute !== undefined && m.endMinute !== undefined) when.push(`${minuteLabel(m.startMinute)}〜${minuteLabel(m.endMinute)}`)
   const parts = when.length ? [when.join(' ')] : []
   if (m.from || m.to) parts.push(`${m.from ? monthDay(m.from) : ''}〜${m.to ? monthDay(m.to, true) : ''}`)
-  return parts.join(' ・ ') || 'いつでも'
+  return parts.join('・') || 'いつでも'
 }
 
 export function rankDetail(settings: VisitStampSettings): string {
   return settings.rankMultipliers.length
-    ? settings.rankMultipliers.map((r) => `${r.name?.trim() || r.tagName} ${trimNumber(r.multiplier)}倍${r.active === false ? '（止めています）' : ''}`).join(' ・ ')
+    ? settings.rankMultipliers.map((r) => `${r.name?.trim() || r.tagName} ${trimNumber(r.multiplier)}倍${r.active === false ? '（止めています）' : ''}`).join('・')
     : 'タグごとに倍率を決めます'
 }
 

@@ -14,7 +14,7 @@
     "release-log": "node scripts/build-release-log.mjs",
     "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "test": "vitest run --config vitest.config.ts",
-    "verify:design": "node scripts/verify-b244.mjs",
+    "verify:design": "node scripts/verify-b244.mjs && node scripts/verify-copy-rules.mjs",
     "design:debt:check": "node scripts/design-debt.mjs",
     "design:impact": "node scripts/design-impact.mjs"
   },

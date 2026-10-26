@@ -137,7 +137,7 @@ describe('DEEP-18: 詳細と操作対象の固定', () => {
     // 取得が終わっていない間は A の内容も承認ボタンも出さない。
     expect(screen.queryByText('Aメニュー')).toBeNull()
     expect(screen.queryByRole('button', { name: /承認する/ })).toBeNull()
-    expect(screen.getByText('読み込み中...')).toBeTruthy()
+    expect(screen.getByText('読み込み中…')).toBeTruthy()
   })
 })
 

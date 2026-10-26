@@ -6,7 +6,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from '@/app/rich-menus/new/create-v8.module.css'
 
 type TestApplyState = {
@@ -56,7 +56,7 @@ export default function RichMenuTestApply({ groupId }: { groupId: string }) {
     } catch (e) {
       if (request !== generation.current) return
       setLoadError(e instanceof ApiError && e.status === 403
-        ? 'テスト適用の状態を見る権限がありません。' : 'テスト適用の状態を確認できませんでした。')
+        ? 'テスト適用の状態を見る権限がありません。' : 'テスト適用の状態を確認できませんでした。時間をおいて、もう一度お試しください。')
     }
   }, [groupId])
 
@@ -130,7 +130,7 @@ export default function RichMenuTestApply({ groupId }: { groupId: string }) {
           {canRevert
             ? <Button type="button" onClick={() => openConfirm('revert')} disabled={busy}>元のメニューに戻す</Button>
             : <Button type="button" variant="primary" onClick={() => openConfirm('apply')} disabled={busy || Boolean(active && active.status !== 'reverted' && active.status !== 'failed')}>自分のLINEに適用して試す</Button>}
-          {state.recent.length > 0 ? <p className={styles.cardNote}>最近の適用: {state.recent.length}件（直近 {formatDateTime(state.recent[0].createdAt)}）</p> : null}
+          {state.recent.length > 0 ? <p className={styles.cardNote}>最近の適用: {formatNumber(state.recent.length)}件（直近 {formatDateTime(state.recent[0].createdAt)}）</p> : null}
         </> : null}
       </div>
     </Dialog>

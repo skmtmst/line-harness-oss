@@ -226,7 +226,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
         })}
       </DistributionTable>
       {distributionResult && view==='result' && <DistributionProgress finished={distributionResult.stores.filter(store=>store.status==='succeeded').length} total={distributionResult.stores.length}>
-        <p>{distributionResult.stores.map(store=>`${store.accountName ?? accounts.find(account=>account.id===store.accountId)?.name ?? 'アカウント'}：${store.status==='succeeded' ? '完了' : store.reason ?? '確認中'}`).join(' ・ ')}</p>
+        <p>{distributionResult.stores.map(store=>`${store.accountName ?? accounts.find(account=>account.id===store.accountId)?.name ?? 'アカウント'}：${store.status==='succeeded' ? '完了' : store.reason ?? '確認中'}`).join('・')}</p>
       </DistributionProgress>}
     </div>
   </DistributionPage></SaveErrorScope>

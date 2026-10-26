@@ -74,7 +74,7 @@ export function broadcastPreflightSummary({ preflight, targetMode, tags, tagId, 
       })()
     : preflight?.warnings?.find((w) => w.message.includes('除いて'))?.message ?? null
   const exclusionNote = excludeTagId
-    ? `タグ「${tags.find((tag) => tag.id === excludeTagId)?.name ?? '選択したタグ'}」を除く ・ ${countedExclusionNote === '除外なし' ? 'その他の除外なし' : countedExclusionNote ?? '除外人数は未取得'}`
+    ? `タグ「${tags.find((tag) => tag.id === excludeTagId)?.name ?? '選択したタグ'}」を除く・${countedExclusionNote === '除外なし' ? 'その他の除外なし' : countedExclusionNote ?? '除外人数は未取得'}`
     : countedExclusionNote
   const quota = preflight?.quota ?? null
   const quotaInsufficient = quota?.state === 'insufficient'

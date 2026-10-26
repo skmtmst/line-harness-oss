@@ -145,7 +145,7 @@ function actionScoreAdjustmentErrorMessage(error: unknown): string {
     if (error.status === 428) return '確認手順が完了していません。画面を閉じずに、もう一度内容を確認してください。'
     return '点数を変更できませんでした。時間をおいてもう一度お試しください。'
   }
-  return error instanceof Error ? '通信に失敗しました。接続を確認してもう一度お試しください。' : '通信に失敗しました。'
+  return error instanceof Error ? '通信に失敗しました。接続を確認してもう一度お試しください。' : '通信に失敗しました。接続を確認してもう一度お試しください。'
 }
 
 export default function ScoreTab() {

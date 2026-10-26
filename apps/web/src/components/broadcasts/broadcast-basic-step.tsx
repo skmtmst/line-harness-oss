@@ -47,7 +47,7 @@ export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMeth
           <h3>配信方法</h3>
               <SaveErrorField names={["broadcast-delivery-method","value","deliveryMethod"]}><RadioCardGroup legend="配信方法" className={styles.methodCards}>
                 {([
-                  ['new', '新しいメッセージを作成', 'テキスト・画像・ボタンを組み合わせて一から作ります。'],
+                  ['new', '新しいメッセージを作る', 'テキスト・画像・ボタンを組み合わせて一から作ります。'],
                   ['template', 'テンプレートを選択', '保存済みテンプレートを呼び出して手直しします。'],
                   ['duplicate', '過去の配信を複製', '送信済みの配信をそのまま写して作り直します。'],
                 ] as const).map(([value, label, description]) => (
@@ -91,7 +91,7 @@ export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMeth
               : recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
               <div key={broadcast.id} className={styles.recentRow}>
                 <Send size={14} aria-hidden /><span className={styles.recentName} title={broadcast.title}>{broadcast.title}</span>
-                <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'} ・ {broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>
+                <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'}・{broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>
                 <Button size="compact" onClick={() => duplicateRecent(broadcast)}>複製する</Button>
               </div>
             )) : <p className="text-xs text-ink-faint">最近の配信はまだありません。</p>}

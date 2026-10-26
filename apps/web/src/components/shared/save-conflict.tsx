@@ -230,7 +230,7 @@ export function SaveConflictCompareDialog({
         <div className={styles.changes} data-save-conflict-changes="">
           {lines.map((line, index) => (
             <p key={index} className={styles.changeLine} data-kind={line.kind ?? 'change'}>
-              {line.kind === 'remove' ? '－ ' : line.kind === 'add' ? '＋ ' : '・ '}
+              {line.kind === 'remove' ? '－ ' : line.kind === 'add' ? '＋ ' : '・'}
               {line.text}
             </p>
           ))}

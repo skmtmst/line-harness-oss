@@ -43,6 +43,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors';
 import { ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 タグ「対応マーク」タブ（Pencil ）。
@@ -445,7 +446,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
                   </ContextMenu>
                   {mark.archivedAt ? <StatusBadge size="annotation" dot={false}>保管</StatusBadge> : null}
                 </Td>
-                <Td className={styles.markColCount}><span className={styles.cellText}>{mark.friendCount == null ? emptyValue('unknown') : `${mark.friendCount}人`}</span></Td>
+                <Td className={styles.markColCount}><span className={styles.cellText}>{mark.friendCount == null ? emptyValue('unknown') : `${formatNumber(mark.friendCount)}人`}</span></Td>
                 <Td className={styles.markColDefault}><span className={styles.cellText}>{mark.isDefault ? '新規の初期値' : emptyValue('unknown')}</span></Td>
                 <Td className={styles.markColAuto}><span className={styles.cellText} title={host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}>{host ? (mark.autoOnInbound ? '受信時' : emptyValue('unknown')) : autoRuleLabel(mark)}</span></Td>
                 <Td className={styles.markColPlace}><span className={styles.cellText} title={host ? undefined : usageLabel(mark)}>{host ? emptyValue('unknown') : usageLabel(mark)}</span></Td>
@@ -550,7 +551,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       <DetailPanel
         open={!host && activeMark !== null}
         title={activeMark?.name ?? ''}
-        description={activeMark ? `${activeMark.friendCount} 人・${autoRuleLabel(activeMark)}` : undefined}
+        description={activeMark ? `${formatNumber(activeMark.friendCount)} 人・${autoRuleLabel(activeMark)}` : undefined}
         onClose={() => setActiveMarkId(null)}
         hasPrev={activeMarkIndex > 0}
         hasNext={activeMarkIndex >= 0 && activeMarkIndex < pageItems.length - 1}
@@ -586,7 +587,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
                 ) : activeMark.name}
               </dd>
             </div>
-            <div><dt>付いている人</dt><dd>{`${activeMark.friendCount}人`}</dd></div>
+            <div><dt>付いている人</dt><dd>{`${formatNumber(activeMark.friendCount)}人`}</dd></div>
             <div><dt>はじめの値</dt><dd>{activeMark.isDefault ? '新規の初期値' : emptyValue('unknown')}</dd></div>
             <div><dt>自動で変わる</dt><dd>{autoRuleLabel(activeMark)}</dd></div>
             <div><dt>出す場所</dt><dd>{usageLabel(activeMark)}</dd></div>

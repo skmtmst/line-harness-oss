@@ -545,7 +545,7 @@ export default function SeatReserve() {
       {view === 'confirm' && (
         <BottomBar appearance="restaurant">
           <Button variant="restaurant-primary" aria-label={target ? 'この内容に変える' : '予約を確定する'} disabled={busy || expired} onClick={() => void finish()}>
-            {busy ? '送信中...' : target ? 'この内容に変える' : '予約する'}
+            {busy ? '送信中…' : target ? 'この内容に変える' : '予約する'}
           </Button>
         </BottomBar>
       )}

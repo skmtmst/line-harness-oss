@@ -65,10 +65,10 @@ export function useOverview<T>(load: () => Promise<OverviewResult<T>>, key: stri
       .then((result) => {
         if (!active) return
         if (result.success) setData(result.data)
-        else setError(result.error || '分析を表示できませんでした')
+        else setError(result.error || '分析を表示できませんでした。時間をおいて、もう一度お試しください。')
       })
       .catch(() => {
-        if (active) setError('分析を表示できませんでした')
+        if (active) setError('分析を表示できませんでした。時間をおいて、もう一度お試しください。')
       })
       .finally(() => {
         if (active) setLoading(false)

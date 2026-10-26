@@ -95,7 +95,7 @@ export default function LoginPage() {
     })
     turnstileRef.current?.reset()
     if (!res.ok || !res.data) {
-      setError(res.error || 'ログインできませんでした')
+      setError(res.error || 'ログインできませんでした。時間をおいて、もう一度お試しください。')
       setBusy(null)
       return
     }

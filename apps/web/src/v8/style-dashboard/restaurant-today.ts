@@ -1,4 +1,4 @@
-import { formatDate } from '@/lib/format'
+import { formatDate, formatNumber } from '@/lib/format'
 import type { StyleAlert, StyleKpi, StyleRow, StyleToday } from './model'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 import { isWalkIn } from '@/v8/restaurant/front-desk/public/walk-in/index'
@@ -43,7 +43,7 @@ export function restaurantAlert(d: Pick<StoreToday, 'closeTasks' | 'media'>): St
   const medium = item ? d.media?.find((m) => m.code === item.channel) : undefined
   return {
     id: 'close-tasks',
-    title: `他の予約サイトの枠を閉じてください（未対応 ${pending.length}件）`,
+    title: `他の予約サイトの枠を閉じてください（未対応 ${formatNumber(pending.length)}件）`,
     detail: `${slotTitle(first.startsAt)} の枠が${reasonText(first)} → ${openItems(first).map((i) => i.name).join('・')}の枠を閉じてください`,
     actions: [
       ...(medium?.adminUrl ? [{ id: 'open-admin', label: '媒体の管理画面を開く', icon: 'external' as const, href: medium.adminUrl }] : []),
@@ -72,7 +72,7 @@ export function restaurantToday(d: StoreToday, tables: RestaurantTable[], now: n
     kpis,
     alert: restaurantAlert(d),
     rows,
-    rowsNote: `${rows.length}件中 1〜${rows.length}件`,
+    rowsNote: `${formatNumber(rows.length)}件中 1〜${formatNumber(rows.length)}件`,
     side: [],
   }
 }

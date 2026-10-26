@@ -31,6 +31,7 @@ import { readSessionSnapshot } from '@/lib/session-snapshot'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { coverageLabel, diffTitle, formatDiff, formatMetric, METRICS, diffTone, worseCount, type MetricDef } from './metrics'
 import styles from './list.module.css'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`）。行＝店、列＝7つの数。
@@ -213,7 +214,7 @@ export default function StoreComparisonList() {
         </tbody>
       </DataTable>
       <div className={styles.averageBand}>
-        <span className={styles.averageTitle}>{`${total} 店の平均`}</span>
+        <span className={styles.averageTitle}>{`${formatNumber(total)} 店の平均`}</span>
         <TruncatedText className={styles.averageText} value={METRICS.map((def) => `${def.label} ${formatMetric(def.key, data.average[def.key] ?? null)}`).join('・')} />
         <span className={styles.averageNote}>{`札は${compare === 'average' ? '全店の平均' : '前の期間'}との差（赤＝悪い・緑＝良い）`}</span>
       </div>
@@ -230,7 +231,7 @@ export default function StoreComparisonList() {
         toolbar={toolbar}
         pagination={status === 'ready' && total > 0 ? (
           <ListPagePagination>
-            <span className={styles.pagerCount}>{`${total} 店中 ${first}〜${last} ・ 期間 ${rangeLabel(period.from, period.to)}`}</span>
+            <span className={styles.pagerCount}>{`${formatNumber(total)} 店中 ${first}〜${last}・期間 ${rangeLabel(period.from, period.to)}`}</span>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </ListPagePagination>
         ) : undefined}
@@ -377,7 +378,7 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
             {current.status === 'error' || (current.status === 'ready' && attention?.status !== 'ready') ? <p className={styles.mute}>対応が要るものを読み込めませんでした。</p> : null}
             {current.status === 'ready' && attention?.status === 'ready' ? ATTENTION.map(item => <div key={item.key}>
               <p>{item.label} {attention.counts[item.key]}件</p>
-              {(attention.targets?.[item.key] ?? []).map(target => <Button key={target.href} variant="text" onClick={() => { setSelectedAccountId(row.accountId); router.push(target.href) }}>{attentionTargetLabel(target.href)} {target.count}件</Button>)}
+              {(attention.targets?.[item.key] ?? []).map(target => <Button key={target.href} variant="text" onClick={() => { setSelectedAccountId(row.accountId); router.push(target.href) }}>{attentionTargetLabel(target.href)} {formatNumber(target.count)}件</Button>)}
             </div>) : null}
           </Card>
         </div>

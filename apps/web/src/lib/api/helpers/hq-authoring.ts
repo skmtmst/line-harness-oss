@@ -12,7 +12,7 @@ export interface HqRichMenuPreview {
 }
 export async function previewHqRichMenu(input: {name:string;accountIds:string[];definition?:HqRichMenuDraft}): Promise<HqRichMenuPreview> {
   const result=await fetchApi<{success:boolean;data:HqRichMenuPreview}>('/api/hq/templates/rich-menu-preview',{method:'POST',body:JSON.stringify(input)})
-  if(!result.success)throw new Error('配る前の確認ができませんでした。')
+  if(!result.success)throw new Error('配る前の確認ができませんでした。時間をおいて、もう一度お試しください。')
   return result.data
 }
 /** The upload receipt already returns the server-verified number of bytes. */
@@ -22,7 +22,7 @@ export function hqImageSizeKb(receipt: {sizeBytes:number}): number {
 export async function saveHqRichMenu(input: {name:string;definition:HqRichMenuDraft;description?:string;folderId?:string|null} & ({id?:undefined;requestId:string;expectedRevision?:undefined}|{id:string;expectedRevision:number;requestId?:string})) {
   const {id,...body}=input
   const result=await fetchApi<{success:boolean;data:{template:{id:string;revision:number};definition:HqRichMenuDraft}}>(`/api/hq/templates${id?`/${encodeURIComponent(id)}`:''}`,{method:id?'PATCH':'POST',body:JSON.stringify({type:'rich_menu',...body})})
-  if(!result.success)throw new Error('リッチメニューを保存できませんでした。')
+  if(!result.success)throw new Error('リッチメニューを保存できませんでした。時間をおいて、もう一度お試しください。')
   return result.data
 }
 

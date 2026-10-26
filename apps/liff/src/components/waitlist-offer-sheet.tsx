@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CustomerBookingWaitlist, CustomerSeatWaitlist } from '@line-crm/shared';
 import { api } from '../lib/api.js';
+import { formatDateTimeLong } from '../lib/datetime.js';
 import Button from './ui/button/index.js';
 import BookingPayment from './booking-payment.js';
 /** 案内のリンクを開いた本人が、既存の予約口で期限内に確定する。 */
@@ -26,7 +27,7 @@ if (!entry || !active || busy.current) return; busy.current = true; setWorking(t
     <Button variant="overlay" aria-label="閉じる" onClick={onClose} />
     <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-(--liff-radius-lg) bg-canvas p-4 pb-8">
       <h2 className="text-[15px] font-bold text-ink">{decline ? '今回は見送る' : '空きが出ました'}</h2>
-      {entry && <p className="mt-1 text-[13px] text-liff-sub">{new Date(entry.starts_at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{'guest_count' in entry ? `${entry.store_name} ${entry.guest_count}名` : `${entry.menu_name}・${entry.staff_name}`}</p>}
+      {entry && <p className="mt-1 text-[13px] text-liff-sub">{formatDateTimeLong(entry.starts_at)}・{'guest_count' in entry ? `${entry.store_name} ${entry.guest_count}名` : `${entry.menu_name}・${entry.staff_name}`}</p>}
       {paymentBooking ? <BookingPayment bookingId={paymentBooking} menuName={('menu_name' in entry! ? entry!.menu_name : '') || 'ご予約'} initialAmount={0} slot={{ date: new Date(entry!.starts_at).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }), start: new Date(entry!.starts_at).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }) }} durationMinutes={('ends_at' in entry! && entry!.ends_at) ? (Date.parse(entry!.ends_at) - Date.parse(entry!.starts_at)) / 60000 : 60} /> : message ? <p className="mt-3" role="status">{message}</p> : entry ? <p className="mt-3 text-[13px]">{active ? `仮押さえは${new Date(entry.hold_expires_at!).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}までです。${decline ? '見送ると次の方へ案内します。' : '期限内に予約を確定してください。'}` : entry.status === 'waiting' ? 'まだ空きの案内を待っています。' : entry.status === 'converted' ? 'この案内は予約になりました。' : 'この待ちは終わりました。仮押さえはありません。'}</p> : !error ? <p className="mt-3">読み込んでいます。</p> : null}
       {active && !message && !paymentBooking && <p className="mt-3 text-[13px] text-ink" role="timer">残り{Math.floor(remaining / 60)}分{String(remaining % 60).padStart(2, '0')}秒</p>}
       {error && !entry && <Button variant="secondary" onClick={() => setReadAttempt(n => n + 1)}>もう一度</Button>}

@@ -42,7 +42,7 @@ it('一人の追加メニューにも担当者料金と指名料を含め、日�
   const summary = document.querySelector('[data-party-summary]')!;
   expect(summary.textContent).toContain('指名料（担当者）');
   expect(summary.textContent).toContain('¥1,000');
-  expect(summary.textContent).toContain('1 人 ・ 同時に 90 分 ・ ¥10,300');
+  expect(summary.textContent).toContain('1 人・同時に 90 分・¥10,300');
   fireEvent.click(await screen.findByRole('button', { name: '日時を選ぶ' }));
   expect(datetime()).toEqual({ selected: null, addonIds: ['addon'], additionalDurationMinutes: 30 });
 });

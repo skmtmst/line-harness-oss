@@ -68,7 +68,7 @@ export default function ImageUploader({
     (file: File) => {
       if (!file.type.startsWith('image/')) return '画像ファイルのみアップロードできます'
       if (lineImage && !['image/jpeg', 'image/png'].includes(file.type)) return 'LINE 送信用は JPEG または PNG のみ対応'
-      if (lineImage && file.size > 1024 * 1024) return 'LINE 送信用は 1MB 以下にしてください (preview サイズ制限)'
+      if (lineImage && file.size > 1024 * 1024) return 'LINE 送信用は 1MB 以下にしてください（preview サイズ制限）'
       if (file.size > maxMB * 1024 * 1024) return `${maxMB}MB 以下にしてください`
       return ''
     },
@@ -108,7 +108,7 @@ export default function ImageUploader({
               const next = event.target.value
               onChangeRef.current(next ? toValue(next) : null)
             }}
-            placeholder="https://... (外部 CDN / R2 URL)"
+            placeholder="https://…（外部 CDN / R2 URL）"
           />
         ) : null}
       </MediaSlot>

@@ -121,7 +121,7 @@ export default function LineFollowupV8() {
       description="予約前・来店後・口コミ依頼・会員証を、来店・退店のきっかけで送るひな形として作ります。"
       pickerAs="select"
       banner={false}
-      subtitle={(store) => `${store ? `${store.name} ・ ` : ''}本送信は停止中（プレビューのみ）`}
+      subtitle={(store) => `${store ? `${store.name}・` : ''}本送信は停止中（プレビューのみ）`}
       actions={(ctx) => readOnly ? null : (
         <Button variant="primary" disabled={!ctx || ctx.busy || flowsOf(ctx).length === 0} busy={ctx?.busy} onClick={() => { if (ctx) save(ctx) }}>
           <Check size={16} aria-hidden />下書きを保存する

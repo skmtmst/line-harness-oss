@@ -344,7 +344,7 @@ function HistoryRow({
         <button type="button" className={styles.linkAction} onClick={onSelect} aria-current={isActive ? 'true' : undefined}>
           {accountName(run.fromAccountId)} → {accountName(run.toAccountId)}
         </button>
-        <span className={styles.pairCellSub}>{run.purpose} ・ {formatNumber(run.counts.total)}件</span>
+        <span className={styles.pairCellSub}>{run.purpose}・{formatNumber(run.counts.total)}件</span>
       </td>
       <td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></td>
       <td>

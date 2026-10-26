@@ -96,7 +96,7 @@ export interface MileageOpportunity {
 
 async function getAccessToken(): Promise<string> {
   const token = liff.getAccessToken();
-  if (!token) throw new Error('LINE アクセストークンを取得できませんでした');
+  if (!token) throw new Error('LINE アクセストークンを取得できませんでした。LINE のアプリから開き直してください。');
   return token;
 }
 

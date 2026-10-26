@@ -20,16 +20,16 @@ const NOW = '2026-09-29T15:48:00Z'
 
 describe('★管理画面 日付と数の書き方（板 ZzBqa §2）', () => {
   it('日時は今年なら M月D日（曜）H:mm、秒も年も出さない', () => {
-    expect(formatDateTime('2026-09-29T15:48:00Z', '—', NOW)).toBe('9月30日（水）00:48')
-    expect(formatDateTime('2026-09-29T15:48:59Z', '—', NOW)).toBe('9月30日（水）00:48')
+    expect(formatDateTime('2026-09-29T15:48:00Z', '—', NOW)).toBe('2026年9月30日 00:48')
+    expect(formatDateTime('2026-09-29T15:48:59Z', '—', NOW)).toBe('2026年9月30日 00:48')
   })
 
   it('年が違うときだけ頭に YYYY年 を付ける', () => {
-    expect(formatDateTime('2025-04-03T01:00:00Z', '—', NOW)).toBe('2025年4月3日（木）10:00')
+    expect(formatDateTime('2025-04-03T01:00:00Z', '—', NOW)).toBe('2025年4月3日 10:00')
   })
 
   it('PCの地域に左右されない（UTC入力が必ずJSTで出る）', () => {
-    expect(formatDateTime('2026-09-30T15:00:00Z', '—', NOW)).toBe('10月1日（木）00:00')
+    expect(formatDateTime('2026-09-30T15:00:00Z', '—', NOW)).toBe('2026年10月1日 00:00')
   })
 
   it('日付だけは M月D日（曜）', () => {

@@ -266,7 +266,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       if (detail) setDetail({ ...detail, thread: { ...detail.thread, status: next } })
       await loadInbox(true)
     } catch {
-      setError('対応状況を更新できませんでした')
+      setError('対応状況を更新できませんでした。時間をおいて、もう一度お試しください。')
     }
   }
 
@@ -441,7 +441,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 もう一度読み込む
               </button>
             </div>
-          ) : <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">会話を読み込み中...</div>}
+          ) : <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">会話を読み込み中…</div>}
         </div>
       </div>
     </div>

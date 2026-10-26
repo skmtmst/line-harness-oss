@@ -7,7 +7,7 @@ import { PAYMENT_METHOD_ONSITE } from '@/components/shared/payment-status'
 import TextLink from '@/components/shared/text-link'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
-import { formatYen } from '@/lib/format'
+import { formatYen, formatNumber } from '@/lib/format'
 import { bookingApi, type BookingMenu } from '@/lib/api'
 import { bookingPaymentAdminApi, type BookingPaymentMode, type MenuPaymentOverride, type PaymentSummary } from '@/lib/api/helpers/booking-payment-admin'
 import { MODE_SHORT, MODE_TONE } from './labels'
@@ -70,7 +70,7 @@ export default function PaymentsSide({ accountId, menus, connected = true }: { a
       <dl className={styles.sideList}>
         <div className={styles.sideRow}><dt className={styles.sideName}>入金</dt><dd className={styles.sideValue}>{summary && summary !== 'not-ready' ? formatYen(summary.paidAmount) : emptyValue('unknown')}</dd></div>
         <div className={styles.sideRow}><dt className={styles.sideName}>返金</dt><dd className={styles.sideValue}>{summary && summary !== 'not-ready' ? formatYen(summary.refundedAmount) : emptyValue('unknown')}</dd></div>
-        <div className={styles.sideRow}><dt className={styles.sideName}>期限切れの枠</dt><dd className={styles.sideValue}>{summary && summary !== 'not-ready' ? `${summary.expiredCount} 件` : emptyValue('unknown')}</dd></div>
+        <div className={styles.sideRow}><dt className={styles.sideName}>期限切れの枠</dt><dd className={styles.sideValue}>{summary && summary !== 'not-ready' ? `${formatNumber(summary.expiredCount)} 件` : emptyValue('unknown')}</dd></div>
       </dl>
       <TextLink href="/booking/menus?tab=payments&view=records">お支払いの記録を見る</TextLink>
       <TextLink href="/booking/menus?tab=payments&view=events">Stripe から届いた知らせを見る</TextLink>

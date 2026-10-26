@@ -93,15 +93,15 @@
    */
 
   /* 文字。Pencil V5を共通基盤とし、管理画面でも同じ変数を使う。
-   * ink が本文、ink-secondary が補足、ink-faint がラベル。 */
+   * ink が本文、ink-secondary が補足・説明・ラベルの灰色（1色）。 */
   --color-ink: #1d1d1f;
   --color-ink-secondary: #4a5565;
   /*
-   * ink-faint は 2026-09-24 に #6e7781 → #626a73。灰色の面（#ebedf1・#f5f5f7・
-   * #e8f8ee）の上で 3.9〜4.4:1 しかなく、AA の 4.5:1 に届かなかった。色あいは
-   * そのままで明るさだけ下げた（どの面でも 4.68:1 以上）。
+   * ink-faint は補足と同じ灰色を指す。#626a73 と #4a5565 の2つの灰色が同じ役目の
+   * 補足に混ざり、画面ごとに濃さが違って見えた。補足は1色にそろえ、どの灰色の面
+   * （#ebedf1・#f5f5f7・#e8f8ee）の上でも 6.4:1 以上で読めるようにする。
    */
-  --color-ink-faint: #626a73;
+  --color-ink-faint: var(--color-ink-secondary);
 
   /* 面。canvas がカードの地、canvas-sunken が一段沈んだ面。 */
   --color-canvas: #ffffff;
@@ -475,7 +475,7 @@
   --color-notice-warning-bg: #fff7e6;
   --color-notice-danger-bg: #fef0f0;
   --color-menu-danger: #e5484d;
-  --color-link: var(--color-ink);
+  --color-link: var(--color-accent-deep); /* 本文・説明の中のリンク。ボタン・左メニュー・パンくずには使わない。 */
   --color-checkbox-line: #dadde2;
   --radius-checkbox-mark: 3px;
   --text-callout: 14px;
@@ -578,7 +578,7 @@
   --polish-space-row: 8px;
   --polish-control-bg: #f0f0f2; --polish-control-hover: #e8e8eb; --polish-control-text: 13px; --polish-control-weight: 500; --polish-value-weight: 600;
   --polish-selection-bg: #f0f0f2; --polish-selection-ink: var(--color-ink); --polish-selection-shadow: var(--shadow-nav-active); --polish-selection-outline: 1px solid var(--color-control-border); --polish-band-radius: 16px;
-  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06); --polish-nav-tracking: 0.06em; --polish-icon-small: 14px; --polish-icon-large: 18px; --polish-text-center-inset: 1px; --tpl-tabs-center-inset: 3px; --tpl-funnel-window-min-width: 208px; --tpl-cv-period-preview-width: 320px; --tpl-cv-period-content-width: 288px;
+  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06); --polish-nav-tracking: 0.06em; --polish-heading-tracking: 0.02em; --polish-icon-small: 14px; --polish-icon-large: 18px; --polish-text-center-inset: 1px; --tpl-tabs-center-inset: 3px; --tpl-funnel-window-min-width: 208px; --tpl-cv-period-preview-width: 320px; --tpl-cv-period-content-width: 288px;
   --polish-space-field: 12px;
   --polish-space-card: 16px;
   --polish-space-section: 24px;
@@ -2541,11 +2541,9 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
     word-break: auto-phrase;
   }
 
-  h1,
-  h2,
-  h3 {
-    text-wrap: balance;
-  }
+  h1, h2, h3 { text-wrap: balance; }
+  /* 和文の題・見出しは字の間を少し空ける（0.02em）。型と共通部品の見出しは h1〜h4 なのでここ1か所で効き、部品が決めた字間はそちらが勝つ。 */
+  h1, h2, h3, h4 { letter-spacing: var(--polish-heading-tracking); }
 
   /*
    * ★V8 複数行の入力欄の決まり（2026-10-08 共通部品の1本化）：縦にだけ手で広げられ、

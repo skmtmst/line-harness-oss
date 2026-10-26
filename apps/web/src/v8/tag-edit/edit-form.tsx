@@ -24,6 +24,7 @@ import Notice from '@/components/shared/notice';
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
 import { tagNameProblem } from '@/v8/tags/public/tag-name/index'
+import { formatNumber } from '@/lib/format'
 import Select from '@/components/shared/select';
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select';
 import { SettingCheckbox } from '@/components/shared/checkbox';
@@ -179,8 +180,8 @@ export function TagEditForm({
             <dt>{row.label}</dt>
             <dd>
               {row.count > 0 && row.href
-                ? <Link href={row.href} className={styles.useLink}>{`${row.count} 件 →`}</Link>
-                : <span className={row.count > 0 ? styles.useCount : styles.useNone}>{row.count > 0 ? `${row.count} 件` : row.known ? emptyValue('none') : emptyValue('unknown')}</span>}
+                ? <Link href={row.href} className={styles.useLink}>{`${formatNumber(row.count)} 件 →`}</Link>
+                : <span className={row.count > 0 ? styles.useCount : styles.useNone}>{row.count > 0 ? `${formatNumber(row.count)} 件` : row.known ? emptyValue('none') : emptyValue('unknown')}</span>}
             </dd>
           </div>
         ))}
@@ -346,7 +347,7 @@ export function TagEditForm({
                   {grantAttachers.length > 0 ? (
                     <div className={styles.attachBox}>
                       <p className={styles.subTitle}>{`このタグが付く物（${grantAttachers.reduce((sum, row) => sum + row.count, 0)}）`}</p>
-                      {grantAttachers.map((row) => <p key={row.label} className={styles.hint}>{`${row.label} ${row.count} 件`}</p>)}
+                      {grantAttachers.map((row) => <p key={row.label} className={styles.hint}>{`${row.label} ${formatNumber(row.count)} 件`}</p>)}
                     </div>
                   ) : null}
                 </>

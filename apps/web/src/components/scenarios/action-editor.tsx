@@ -485,7 +485,7 @@ export default function ActionEditor({
           })
           if (!response.success) throw new Error(response.error)
         }
-        if (!await saveDraftSnapshot(latest)) throw new Error(errorRef.current || '下書きを保存できませんでした')
+        if (!await saveDraftSnapshot(latest)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
         onChanged?.()
       } : null
     }).finally(() => {
@@ -610,7 +610,7 @@ export default function ActionEditor({
       }
       const fresh = await refresh()
       setExpandedId(res.data.id)
-      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
       onChanged?.()
     })
   }
@@ -633,7 +633,7 @@ export default function ActionEditor({
       if (!res.success) {
         throw new Error(res.error)
       }
-      if (!await saveDraftSnapshot(next)) throw new Error(errorRef.current || '下書きを保存できませんでした')
+      if (!await saveDraftSnapshot(next)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
       onChanged?.()
     }, true)
   }
@@ -650,7 +650,7 @@ export default function ActionEditor({
         return
       }
       const fresh = await refresh()
-      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
       onChanged?.()
     })
   }
@@ -688,7 +688,7 @@ export default function ActionEditor({
           return
         }
         const fresh = await refresh()
-        if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
+        if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
         onChanged?.()
         setConditionFor(null)
       } finally {
@@ -744,7 +744,7 @@ export default function ActionEditor({
           }
         }
         const fresh = await refresh()
-        if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
+        if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
         onChanged?.()
         onClose()
       } catch (restoreError) {
@@ -780,7 +780,7 @@ export default function ActionEditor({
         if (!res.success) throw new Error(res.error)
       }
       const fresh = await refresh()
-      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
       onChanged?.()
     })
   } })
@@ -1065,10 +1065,10 @@ export function ActionConfigEditor({
             value={String(c.op ?? 'set')}
             onChange={(value) => onChange({ ...c, op: value })}
             options={[
-              { value: 'set', label: '← (代入)' },
-              { value: 'add', label: '＋ (加算)' },
-              { value: 'sub', label: '－ (減算)' },
-              { value: 'clear', label: 'X (消去)' },
+              { value: 'set', label: '←（代入）' },
+              { value: 'add', label: '＋（加算）' },
+              { value: 'sub', label: '－（減算）' },
+              { value: 'clear', label: 'X（消去）' },
             ]}
           /></SaveErrorField>
           <span className="text-ink-secondary text-sm">する</span>
@@ -1119,8 +1119,8 @@ export function ActionConfigEditor({
               <RadioCardGroup legend="シナリオを購読する場合">
                 {(
                   [
-                    { value: 'from_start', label: '(新規)最初から／(再開)最初から' },
-                    { value: 'from_read', label: '(再開)友だちが読んだところから' },
+                    { value: 'from_start', label: '（新規）最初から／（再開）最初から' },
+                    { value: 'from_read', label: '（再開）友だちが読んだところから' },
                   ] as const
                 ).map((opt) => (
                   <RadioCard
@@ -1168,8 +1168,8 @@ export function ActionConfigEditor({
             value={String(c.op ?? 'add')}
             onChange={(value) => onChange({ ...c, op: value })}
             options={[
-              { value: 'add', label: '＋ (加算)' },
-              { value: 'sub', label: '－ (減算)' },
+              { value: 'add', label: '＋（加算）' },
+              { value: 'sub', label: '－（減算）' },
             ]}
           /></SaveErrorField>
           <span className="text-ink-secondary text-sm">する</span>

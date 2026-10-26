@@ -22,7 +22,7 @@ import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -179,8 +179,8 @@ export default function SnsSettingsPage() {
                 rows={[
                   { label: '店舗', value: googleLocation ?? '—' },
                   { label: '最終同期', value: formatDate(google.connection.lastSyncedAt, { style: 'detail', fallback: '—' }) },
-                  { label: '口コミ', value: google.summary.storedCount > 0 ? `${google.summary.storedCount}件・未返信 ${google.summary.unrepliedCount}件` : '—' },
-                  { label: '投稿', value: google.summary.postsAttentionCount > 0 ? `要対応 ${google.summary.postsAttentionCount}件` : '—' },
+                  { label: '口コミ', value: google.summary.storedCount > 0 ? `${formatNumber(google.summary.storedCount)}件・未返信 ${formatNumber(google.summary.unrepliedCount)}件` : '—' },
+                  { label: '投稿', value: google.summary.postsAttentionCount > 0 ? `要対応 ${formatNumber(google.summary.postsAttentionCount)}件` : '—' },
                 ]}
               />
               <div className={styles.links}>

@@ -26,8 +26,8 @@ describe('配信の事前確認を表示する値', () => {
 
   it('除外タグと実測の除外内訳を両方示し、内訳のない応答でも人数を捏造しない', () => {
     const excluded = { ...input, excludeTagId: 'exclude', tags: [{ id: 'exclude', name: '配信不要' }] }
-    expect(broadcastPreflightSummary(excluded).exclusionNote).toBe('タグ「配信不要」を除く ・ 除外人数は未取得')
-    expect(broadcastPreflightSummary({ ...excluded, preflight: result({ exclusions: { ...exclusions, blocked: 2, duplicate: 3, total: 5 } }) }).exclusionNote).toBe('タグ「配信不要」を除く ・ ブロック 2人・重複 3人を除外')
+    expect(broadcastPreflightSummary(excluded).exclusionNote).toBe('タグ「配信不要」を除く・除外人数は未取得')
+    expect(broadcastPreflightSummary({ ...excluded, preflight: result({ exclusions: { ...exclusions, blocked: 2, duplicate: 3, total: 5 } }) }).exclusionNote).toBe('タグ「配信不要」を除く・ブロック 2人・重複 3人を除外')
     expect(broadcastPreflightSummary({ ...input, preflight: result({ warnings: [{ level: 'info', message: 'ブロック中の友だちを除いています' }] }) }).exclusionNote).toBe('ブロック中の友だちを除いています')
   })
 

@@ -264,7 +264,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
         : items.length === 0 ? <ListState kind="empty" title="保存した分析はまだありません" description="クロス分析かファネルを集計し、その結果を保存してください。" />
         : <DetailColumns presentation="analysis" variant="analysis-history" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={
           <Card variant="records" aria-labelledby="saved-history-title">
-            <CardHeader size="content" titleId="saved-history-title" meta={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined} title={<TruncatedText value={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} />} />
+            <CardHeader size="content" titleId="saved-history-title" meta={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${formatNumber(schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length)}件`}` : undefined} title={<TruncatedText value={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} />} />
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
             {snapshotError ? <Notice tone="danger" className={styles.captionNoticePlacement} >結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></Notice> : null}
             {snapshotLoading ? <p data-card-footer className={styles.caption}>結果を読み込んでいます</p>
@@ -295,7 +295,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <thead><TableHeadRow><Th grow truncate>分析名</Th><Th truncate>種類</Th><Th truncate>作った人</Th><Th truncate>更新日時</Th><Th truncate>集計状態</Th></TableHeadRow></thead>
             <tbody>
               {visibleItems.length === 0 ? <Tr><Td colSpan={5}>条件に合う保存済み分析はありません。<Button onClick={() => setQuery('')}>キャンセル</Button></Td></Tr> : visibleItems.map(item => <Tr key={item.id} data-table-layout="columns" selected={selectedId === item.id} onOpen={() => setSelectedId(item.id)}>
-                <Td grow><RowNameButton onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${item.snapshotCount}件）`}><TruncatedText value={item.name} /></RowNameButton></Td>
+                <Td grow><RowNameButton onClick={() => setSelectedId(item.id)} title={`${item.name}（第${item.currentVersionNumber}版・保存結果 ${formatNumber(item.snapshotCount)}件）`}><TruncatedText value={item.name} /></RowNameButton></Td>
                 <Td><TruncatedText value={kindLabel(item.kind)} /></Td><Td><TruncatedText value={item.createdByName} /></Td><Td><TruncatedText value={shortDateTime(item.updatedAt)} /></Td>
                 <Td title={item.latestSnapshot ? `${formatAnalyticsDate(item.latestSnapshot.periodFrom)}〜${formatAnalyticsDate(item.latestSnapshot.periodTo)}・${SAVED_STATE_LABELS[item.latestSnapshot.state]}` : undefined}>{latestPill(item)}</Td>
               </Tr>)}
@@ -331,7 +331,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
 
       {/* 1回だけ送った直近の結果。一覧からは消えるため、ここから失敗理由・宛先別結果へ進める。 */}
       {recentOneTime.length > 0 ? <section className={styles.table} aria-label="1回だけ送った結果">
-        <div className={styles.thead}><span className={styles.colMain}>{`1回だけ送った結果（${recentOneTime.length} 件）`}</span></div>
+        <div className={styles.thead}><span className={styles.colMain}>{`1回だけ送った結果（${formatNumber(recentOneTime.length)} 件）`}</span></div>
         {recentOneTime.map((item) => <div key={item.schedule.id} className={styles.trow} data-h="button">
           <span className={styles.colMain}><strong className={styles.cellStrong} ><TruncatedText value={String(item.schedule.name ?? '')} /></strong><span className={styles.cellSub}>{item.lastRun ? `${RUN_STATE_LABELS[item.lastRun.state] ?? item.lastRun.state}${runErrorLabel(item.lastRun.errorCode, item.lastRun.state) ? `：${runErrorLabel(item.lastRun.errorCode, item.lastRun.state)}` : ''}` : 'まだ送信されていません'}</span></span>
           <span className={styles.colOps}><Button href={`/analytics/reports/new?id=${item.schedule.id}`} variant="secondary">結果を見る</Button></span>

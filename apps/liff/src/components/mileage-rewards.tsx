@@ -34,7 +34,7 @@ export default function MileageRewards({ onChanged }: { onChanged: () => Promise
       // 交換成立後の残高取得の失敗を、交換失敗として再実行させない。
       try { await onChanged(); } catch { setError('残高を読み直せませんでした。画面を開き直してください。'); }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '交換できませんでした');
+      setError(e instanceof Error ? e.message : '交換できませんでした。時間をおいて、もう一度お試しください。');
     } finally { busyRef.current = false; setBusy(false); }
   }
   return <section aria-label="マイルを使う" className="space-y-3">

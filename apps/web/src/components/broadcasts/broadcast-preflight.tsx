@@ -43,6 +43,6 @@ export async function runBroadcastPreflight({ preflightRequestBody, preflightSeq
       if (!silent) { if (!fieldFailure)
 
 
- setError('確認できませんでした') }
+ setError('確認できませんでした。時間をおいて、もう一度お試しください。') }
     }
   }

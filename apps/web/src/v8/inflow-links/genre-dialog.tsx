@@ -46,7 +46,7 @@ export default function GenreDialog({
         : await api.entryRouteGenres.create(normalized)
       if (!response.success) {
         setSubmitting(false)
-        setError(response.error || 'フォルダを保存できませんでした。')
+        setError(response.error || 'フォルダを保存できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       onSaved(response.data, genre?.name ?? null)
@@ -57,7 +57,7 @@ export default function GenreDialog({
         { if (!fieldFailure)
         setNameError('同じ名前のフォルダが既にあります。') }
         focusField(inputId)
-      } else { if (!fieldFailure) setError('フォルダを保存できませんでした。')
+      } else { if (!fieldFailure) setError('フォルダを保存できませんでした。時間をおいて、もう一度お試しください。')
     }
   }
   }

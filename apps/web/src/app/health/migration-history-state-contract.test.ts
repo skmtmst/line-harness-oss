@@ -28,7 +28,7 @@ describe('監視画面の移行履歴の読込状態', () => {
     let resolve!: (value: unknown) => void
     calls.migrations.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
     render(createElement(HealthPage))
-    expect(await screen.findByText('移行履歴を読み込んでいます...')).toBeTruthy()
+    expect(await screen.findByText('移行履歴を読み込んでいます…')).toBeTruthy()
     expect(screen.queryByText('移行履歴はありません')).toBeNull()
     await act(async () => resolve({ success: true, data: [] }))
     expect(await screen.findByText('移行履歴はありません')).toBeTruthy()

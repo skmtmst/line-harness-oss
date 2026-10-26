@@ -170,7 +170,7 @@ function FriendAddRunDetailInner() {
       const response = await api.friendAddRules.runDetail(selectedAccountId, runId)
       if (requestId !== requestSequence.current) return
       if (!response.success) {
-        setError('実行詳細を表示できませんでした。')
+        setError('実行詳細を表示できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       setDetail(response.data)

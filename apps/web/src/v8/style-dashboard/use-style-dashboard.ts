@@ -9,7 +9,7 @@ import { useAccount } from '@/contexts/account-context'
 import { bookingApi,eventsApi } from '@/lib/api'
 import { reservationBoardApi } from '@/lib/api/helpers/reservation-board'
 import { styleApi } from '@/lib/api/helpers/styles'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatNumber } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { useStaffRole } from '@/lib/staff-role'
 import type { RestaurantClosureKind,RestaurantFloor,StyleCard,StyleSnapshot } from '@line-crm/shared'
@@ -315,7 +315,7 @@ export function useStyleDashboard(style: IndustryStyle) {
     }
     setBusy('')
     const word = status === 'attended' ? '出席' : '欠席'
-    notifyToast(failedCount ? `${failedCount}人を${word}にできませんでした。` : `${word}にしました。`, failedCount ? { tone: 'error' } : undefined)
+    notifyToast(failedCount ? `${formatNumber(failedCount)}人を${word}にできませんでした。` : `${word}にしました。`, failedCount ? { tone: 'error' } : undefined)
     setRosterId(r.rowId)
     setRosterRevision(value => value + 1)
     void load()
@@ -327,7 +327,7 @@ export function useStyleDashboard(style: IndustryStyle) {
     try {
       if (style === 'restaurant' && store.store) {
         const res = await restaurantTestApi.createClosure(accountId, { storeId: store.store.id, startDate: input.date, endDate: input.date, allDay: input.allDay, startTime: input.from ?? null, endTime: input.to ?? null, kind: KIND[input.reason] ?? 'other', memo: input.reason, tableIds: input.target === 'seat' ? input.ids : [] })
-        notifyToast(res.data.reservations.length ? `休みを入れました。重なる予約が ${res.data.reservations.length}件あります（取り消していません）。` : '休みを入れました。')
+        notifyToast(res.data.reservations.length ? `休みを入れました。重なる予約が ${formatNumber(res.data.reservations.length)}件あります（取り消していません）。` : '休みを入れました。')
       } else {
         // 人の口は担当 1 人ずつ。途中で失敗した人をまとめて成功にしない。
         const ids = input.target === 'staff' ? input.ids : [null]

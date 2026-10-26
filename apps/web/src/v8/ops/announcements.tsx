@@ -30,7 +30,7 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError, Field } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
@@ -228,9 +228,9 @@ export default function OpsAnnouncementsV8() {
       const res = editingId
         ? await api.ops.announcements.update(editingId, input(mode), editingUpdatedAt ?? undefined)
         : await api.ops.announcements.create(input(mode), createKey)
-      if (!res.success) { setFormError('保存できませんでした'); return }
+      if (!res.success) { setFormError('保存できませんでした。時間をおいて、もう一度お試しください。'); return }
       setConfirmSend(false)
-      notifySaved(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${res.data.recipientsTotal}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
+      notifySaved(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${formatNumber(res.data.recipientsTotal)}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
       collision.clear()
       if (editingId) {
         setBaseline(form)
@@ -262,7 +262,7 @@ export default function OpsAnnouncementsV8() {
         return
       }
       { if (!fieldFailure)
-      setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした') }
+      setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
@@ -402,7 +402,7 @@ export default function OpsAnnouncementsV8() {
         <section aria-label="配信済みの表" className={styles.list}>
           <div className={styles.listHead}>
             <h3 className={parts.panelTitle}>配信済み・予約・下書き</h3>
-            <HelpTip label="契約者専用LINEの登録状況">{linked ? `契約者専用LINEの登録 ${linked.linked} 人 / ${linked.total} 人` : '登録状況を読み込んでいます'}</HelpTip>
+            <HelpTip label="契約者専用LINEの登録状況">{linked ? `契約者専用LINEの登録 ${linked.linked} 人 / ${formatNumber(linked.total)} 人` : '登録状況を読み込んでいます'}</HelpTip>
           </div>
           {!loaded ? (
             <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />

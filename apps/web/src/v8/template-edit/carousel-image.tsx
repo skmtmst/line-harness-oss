@@ -47,7 +47,7 @@ export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUpl
       if (latestScope.current !== requestedScope) { setError('編集中のカードかアカウントが変わったため、画像を反映しませんでした。選び直してください。'); return }
       onUploaded(nextUrl); setFile(null)
     } catch (caught) {
-      if (alive.current) setError(uploadReasonOf(caught) || '画像を登録できませんでした。')
+      if (alive.current) setError(uploadReasonOf(caught) || '画像を登録できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       locked.current = false
       if (alive.current) { setBusy(false); busyChange.current(false) }

@@ -146,7 +146,7 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
       {preparing.dialog}
 
       {/* 請求の確かめ（Ae1W1）：金額・カード・わけ。額は決まりの額だけ（上げられない）。 */}
-      <Dialog open={dialog === 'charge'} title="キャンセル料を請求しますか？" titleNote={`${customerName} さま ・ ${bookingLabel}`} size="medium" contentLayout="form"
+      <Dialog open={dialog === 'charge'} title="キャンセル料を請求しますか？" titleNote={`${customerName} さま・${bookingLabel}`} size="medium" contentLayout="form"
         busy={busy} error={error ?? undefined} cancelLabel="戻る" onCancel={close}
         confirmLabel={`${yen(charge.amount)} を請求する`} confirmIcon={<CreditCard size={15} aria-hidden="true" />}
         onConfirm={() => void run(() => bookingCancellationApi.charge(accountId, bookingId, { kind: charge.kind, amount: charge.amount, expectedVersion: charge.version }, key.current), `${yen(charge.amount)} の請求を模擬で記録しました。実際の請求・LINE送信はしていません`)}>
@@ -162,7 +162,7 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
       </Dialog>
 
       {/* 請求しない：理由は必須。 */}
-      <Dialog open={dialog === 'waive'} title="キャンセル料を請求しませんか？" titleNote={`${customerName} さま ・ ${bookingLabel}`} size="small" contentLayout="form"
+      <Dialog open={dialog === 'waive'} title="キャンセル料を請求しませんか？" titleNote={`${customerName} さま・${bookingLabel}`} size="small" contentLayout="form"
         busy={busy} error={error ?? undefined} cancelLabel="戻る" onCancel={close} confirmLabel="請求しない" confirmDisabled={!reason.trim()} confirmDisabledReason="理由を入れてください"
         onConfirm={() => void run(() => bookingCancellationApi.waive(accountId, charge.id, reason.trim(), charge.version), '請求しないにしました')}>
         <Field label="請求しない理由" required><TextField aria-label="請求しない理由" value={reason} maxLength={500} placeholder="例：初めての取り消しなので今回は請求しない" onChange={(event) => setReason(event.target.value)} /></Field>
@@ -170,7 +170,7 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
       </Dialog>
 
       {/* 返金（2 段・fom2A は 2 段目）：全額だけ。 */}
-      <Dialog open={dialog === 'refund' && refundStep === 1} title="返金する" titleNote={`手順 1 / 2 ・ ${customerName} さまへキャンセル料を全額返金`} size="medium" contentLayout="form"
+      <Dialog open={dialog === 'refund' && refundStep === 1} title="返金する" titleNote={`手順 1 / 2・${customerName} さまへキャンセル料を全額返金`} size="medium" contentLayout="form"
         cancelLabel="キャンセル" onCancel={close} confirmLabel="次へ" confirmDisabled={!reason.trim()} confirmDisabledReason="理由を入れてください" onConfirm={() => setRefundStep(2)}>
         <dl className={styles.facts}>
           <div><dt>金額</dt><dd className={styles.big}>{yen(charge.amount)}</dd></div>
@@ -179,7 +179,7 @@ function BookingChargesInner({ accountId, bookingId, customerName, bookingLabel,
         <Field label="返金の理由" required><TextField aria-label="返金の理由" value={reason} maxLength={500} placeholder="例：お店の都合で取り消しにした" onChange={(event) => setReason(event.target.value)} /></Field>
         <p className={styles.minor}>試験の全額返金だけを記録します。実際のカードへの返金・LINE送信はしません。</p>
       </Dialog>
-      <Dialog open={dialog === 'refund' && refundStep === 2} title="返金すると戻せません" titleNote={`手順 2 / 2 ・ ${customerName} さまへキャンセル料を全額返金`} size="medium" contentLayout="form" tone="destructive"
+      <Dialog open={dialog === 'refund' && refundStep === 2} title="返金すると戻せません" titleNote={`手順 2 / 2・${customerName} さまへキャンセル料を全額返金`} size="medium" contentLayout="form" tone="destructive"
         busy={busy} error={error ?? undefined} cancelLabel="戻る" onCancel={() => { if (!busy) setRefundStep(1) }}
         confirmLabel={`${yen(charge.amount)} を返金する`} confirmIcon={<RotateCcw size={15} aria-hidden="true" />}
         onConfirm={() => void run(() => bookingCancellationApi.refund(accountId, charge.id, { reason: reason.trim(), expectedVersion: charge.version, confirmed: true, confirmedIrreversible: true }, key.current), `${yen(charge.amount)} の返金を模擬で記録しました。実際の返金・LINE送信はしていません`)}>

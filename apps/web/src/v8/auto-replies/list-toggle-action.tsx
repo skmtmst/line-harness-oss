@@ -6,6 +6,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { api,ApiError } from '@/lib/api'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { AutoReply,PendingToggle } from './list-model'
+import { formatNumber } from '@/lib/format'
 
 type ToggleAutoReplyContext = {
   listContextKey: string
@@ -54,8 +55,8 @@ export function toggleAutoReply({ listContextKey, load, pendingToggle, rules, sa
           ? '自動応答を再開しました'
           : '自動応答を停止しました'
         : targetKind === 'resume'
-          ? `${ids.length} 件の自動応答を再開しました`
-          : `${ids.length} 件の自動応答を停止しました`
+          ? `${formatNumber(ids.length)} 件の自動応答を再開しました`
+          : `${formatNumber(ids.length)} 件の自動応答を停止しました`
     const failedMessage = (targetKind: 'stop' | 'resume', forbidden: boolean) =>
       forbidden
         ? permissionDeniedMessage('store')

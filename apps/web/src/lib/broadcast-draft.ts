@@ -45,7 +45,7 @@ export async function persistBroadcastDraft<T extends { id: string; version?: nu
       throw new Error('下書きの版が分からないため、読み直してください')
     }
     const updated = await client.update(session.draftId, payload, session.version)
-    if (!updated.success) throw new Error(updated.error ?? '下書きを保存できませんでした')
+    if (!updated.success) throw new Error(updated.error ?? '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
     return {
       session: { ...session, version: updated.data.version ?? session.version },
       broadcast: updated.data,
@@ -53,7 +53,7 @@ export async function persistBroadcastDraft<T extends { id: string; version?: nu
   }
 
   const created = await client.create(payload, { idempotencyKey: session.createKey })
-  if (!created.success) throw new Error(created.error ?? '下書きを保存できませんでした')
+  if (!created.success) throw new Error(created.error ?? '下書きを保存できませんでした。時間をおいて、もう一度お試しください。')
   return {
     session: { ...session, draftId: created.data.id, version: created.data.version ?? null },
     broadcast: created.data,

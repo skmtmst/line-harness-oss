@@ -66,7 +66,7 @@ describe('テスト送信先の設定欄 (N-070)', () => {
     await flush()
     expect(screen.getByText(/読み込めませんでした/)).toBeTruthy()
     // 失敗を空一覧で取り繕わない（検索欄を出さない）。
-    expect(screen.queryByPlaceholderText('友だちを検索して追加...')).toBeNull()
+    expect(screen.queryByPlaceholderText('友だちを検索して追加…')).toBeNull()
 
     apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '田中 太郎', pictureUrl: null }]))
     fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
@@ -112,7 +112,7 @@ describe('テスト送信先の設定欄 (N-070)', () => {
     // ログインユーザー候補からの追加で保存を試みる。
     fireEvent.click(screen.getByRole('button', { name: /候補 花子/ }))
     await flush()
-    expect(screen.getByText('テスト送信先を保存できませんでした。')).toBeTruthy()
+    expect(screen.getByText('テスト送信先を保存できませんでした。時間をおいて、もう一度お試しください。')).toBeTruthy()
     // 保存失敗後は真値（空）へ戻り、追加した人が送信先として残らない。
     expect(screen.queryByTitle('候補 花子を削除する')).toBeNull()
   })

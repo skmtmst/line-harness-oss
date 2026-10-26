@@ -40,6 +40,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 予約サイト・グルメ媒体（提案 E-4 `aSmph`。設定の中の1画面）。
@@ -106,7 +107,7 @@ export function recipientText(settings: Pick<NoticeSettings, 'recipientMode' | '
   if (settings.recipientMode === 'manager') return '店長'
   if (settings.recipientMode === 'selected') {
     const names = settings.membershipIds.map((id) => members.find((m) => m.id === id)?.staff_name).filter((name): name is string => !!name)
-    return names.length > 0 ? `${names.join('・')}（${names.length} 人）` : `選んだスタッフ（${settings.membershipIds.length} 人）`
+    return names.length > 0 ? `${names.join('・')}（${formatNumber(names.length)} 人）` : `選んだスタッフ（${formatNumber(settings.membershipIds.length)} 人）`
   }
   return '当日の責任者（いなければ店長）'
 }
@@ -585,7 +586,7 @@ export default function BookingMediaPage() {
                   </Button>
                 </>
               )}
-              status={changes > 0 ? <span aria-live="polite">{dirty.length > 0 ? `変えた媒体 ${dirty.length} 件${noticeDirty ? '・知らせの設定' : ''}（まだ保存していません）` : '知らせの設定を変えました（まだ保存していません）'}</span> : undefined}
+              status={changes > 0 ? <span aria-live="polite">{dirty.length > 0 ? `変えた媒体 ${formatNumber(dirty.length)} 件${noticeDirty ? '・知らせの設定' : ''}（まだ保存していません）` : '知らせの設定を変えました（まだ保存していません）'}</span> : undefined}
           />
         ) : null}
       </PageFrame>

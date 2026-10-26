@@ -49,7 +49,7 @@ test('開ける：本人確認のあとで名前と大きさを出し、ボタ�
   routes.push(() => json(issued()));
   mount();
   expect(await screen.findByText('見積書.pdf')).toBeTruthy();
-  expect(screen.getByText(/書類 ・ 2.0 KB/)).toBeTruthy();
+  expect(screen.getByText(/書類・2.0 KB/)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'ファイルを開く' })).toBeTruthy();
   expect(calls).toHaveLength(1);
   expect(calls[0]).toEqual({ path: `/api/liff/files/${ID}/download`, auth: 'Bearer token-of-A' });

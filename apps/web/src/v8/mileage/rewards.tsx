@@ -868,7 +868,7 @@ export default function RewardsTab() {
 
   const pager = ready && visible.length > 0 && pageCount > 1 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>{`${shown.length} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}</span>
+      <span className={styles.pagerCount}>{`${formatNumber(shown.length)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}</span>
       <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
   ) : undefined

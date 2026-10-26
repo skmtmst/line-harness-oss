@@ -19,7 +19,7 @@ const BROADCAST_STEPS = new Set<BroadcastStepKey>(['basic', 'audience', 'message
 
 /**
  * `?condition=<JSON>` から渡される絞り込み条件（IDEA-03）。
- * 友だち一覧の「この条件で配信を作成」が付ける。
+ * 友だち一覧の「この条件で配信を作る」が付ける。
  * 形が壊れているものは採用しない —— 壊れた条件を黙って全員扱いにすると
  * 誤配信になる。'invalid' を返して画面に理由を出す。
  */
@@ -215,7 +215,7 @@ function NewBroadcastPageContent() {
       {!canManage ? (
         <ListState kind="forbidden" title="一斉配信を作る権限がありません" description="一斉配信を作成する権限が必要です。管理者に依頼してください" action={<Link href="/broadcasts" className="text-action text-sm">一斉配信一覧へ戻る</Link>} />
       ) : loading || audiencePending || (effectiveAudienceId && accountLoading) ? (
-        <ListState kind="loading" title="読み込み中..." />
+        <ListState kind="loading" title="読み込み中…" />
       ) : audienceNoAccount ? (
         <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
           <p className="text-ink text-sm font-semibold">
@@ -288,7 +288,7 @@ function NewBroadcastPageContent() {
 
 export default function NewBroadcastPage() {
   return (
-    <Suspense fallback={<ListState kind="loading" title="読み込み中..." />}>
+    <Suspense fallback={<ListState kind="loading" title="読み込み中…" />}>
       <NewBroadcastPageContent />
     </Suspense>
   )

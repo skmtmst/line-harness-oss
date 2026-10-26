@@ -67,10 +67,10 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       const res = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders(handoffToken) })
       if (!res.ok) {
         if (res.status === 401) { router.replace('/ops/login'); return }
-        throw new Error('運営コンソールのログイン状態を確認できませんでした')
+        throw new Error('運営コンソールのログイン状態を確認できませんでした。時間をおいて、もう一度お試しください。')
       }
       const body = await res.json() as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null; recoveryCodesRemaining?: number | null }; csrfToken?: string }
-      if (!body.success || !body.data) throw new Error('運営コンソールのログイン状態を確認できませんでした')
+      if (!body.success || !body.data) throw new Error('運営コンソールのログイン状態を確認できませんでした。時間をおいて、もう一度お試しください。')
       if (body.csrfToken) {
         try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Bearer session remains usable */ }
       }

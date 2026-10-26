@@ -48,6 +48,7 @@ import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { ListToolbarRow, ListToolbarSort } from '@/components/shared/list-toolbar'
+import { formatNumber } from '@/lib/format'
 /*
  * ★V8 統括のバナー生成（Pencil  プロジェクト一覧・ 画像ライブラリ）。
  * 窓： プロジェクトを作る・ 画像を取り込む・画像の詳細（ と同じ窓）。
@@ -411,8 +412,8 @@ function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFav
 }) {
   const running = project.runningCount > 0
   const meta = running && project.imageCount === 0
-    ? '— ・ いま作成中'
-    : `${project.imageCount} 枚 ・ ${monthDay(project.updatedAt)} 更新`
+    ? '—・いま作成中'
+    : `${formatNumber(project.imageCount)} 枚・${monthDay(project.updatedAt)} 更新`
   return (
     <Card frame="flat" padding="rows" layout="media" overflow="hidden" aria-label={project.name}>
       <button type="button" className={styles.mosaic} onClick={onOpen} aria-label={`${project.name} を開く`}>
@@ -624,7 +625,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       <div className={styles.pager}>
         <span className={styles.range} ref={pageSizeAnchor} role="button" tabIndex={0} aria-label="画像の取得件数" aria-haspopup="menu" aria-expanded={pageSizeOpen}
           onClick={() => setPageSizeOpen((open) => !open)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setPageSizeOpen((open) => !open) } }}>
-          {total === null ? `${first}–${last} 件` : `${first}–${last} 件 / ${total} 件`}
+          {total === null ? `${first}–${last} 件` : `${first}–${last} 件 / ${formatNumber(total)} 件`}
         </span>
         <ActionMenu open={pageSizeOpen} onClose={() => setPageSizeOpen(false)} anchorRef={pageSizeAnchor} ariaLabel="画像の取得件数"
           note="一度に読み込む画像の枚数です。変えると最初のページへ戻ります。"

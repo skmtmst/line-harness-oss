@@ -16,6 +16,7 @@ import FolderAddDialog from './folder-add-dialog'
 import { describeFolderFailure } from './folder-failure'
 import { notifyToast } from './toast'
 import type { FolderPanelRow } from './folder-panel'
+import { formatNumber } from '@/lib/format'
 
 export interface FolderRowActionsOptions {
   /** `folders.kind`（'rich_menu'・'scenario' など）。 */
@@ -36,7 +37,7 @@ export interface FolderRowActionsOptions {
 }
 
 export function deleteFolderDescription(itemLabel: string, count: number | null | undefined) {
-  const inside = typeof count === 'number' ? `中の${itemLabel} ${count} 件` : `中の${itemLabel}`
+  const inside = typeof count === 'number' ? `中の${itemLabel} ${formatNumber(count)} 件` : `中の${itemLabel}`
   return `${inside}は消えずに「未分類」へ移ります。消したフォルダは元に戻せません。`
 }
 

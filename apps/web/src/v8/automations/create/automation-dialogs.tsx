@@ -120,7 +120,7 @@ export function AutomationDialogs({
                 <p className={styles.sideNote}>保存されている内容</p>
                 <p className={styles.subTitle}>{conflict.serverName || '（名前なし）'}</p>
                 <p className={styles.sideNote}>{conflict.serverEventLabel}</p>
-                <p className={styles.sideNote}>処理 {conflict.serverActionCount} 件</p>
+                <p className={styles.sideNote}>処理 {formatNumber(conflict.serverActionCount)} 件</p>
               </section>
             </div>
             <p className={styles.sideNote}>

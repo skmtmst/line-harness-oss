@@ -14,7 +14,7 @@ export function UpdateBanner() {
   if (status.kind === 'latest') {
     return (
       <div className="text-xs text-ink-faint px-4 py-2 border-b bg-surface-pearl">
-        v{status.version} (最新)
+        v{status.version}（最新）
       </div>
     )
   }

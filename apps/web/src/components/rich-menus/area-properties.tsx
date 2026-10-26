@@ -474,7 +474,7 @@ export function AreaProperties({
             aria-label="切り替え先のページ"
             invalid={Boolean(error)}
             options={[
-              { value: '', label: '選択...' },
+              { value: '', label: '選択…' },
               ...pages.map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: p.name })),
             ]}
             size="full"

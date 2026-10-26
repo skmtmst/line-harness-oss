@@ -83,15 +83,15 @@ describe('UVnvR 休業日・貸切', () => {
     })
     const board = document.querySelector('[data-design-node="UVnvR"]')!
     fireEvent.click(screen.getByRole('button', { name: '予約枠・在庫の説明' }))
-    expect(screen.getByText('渋谷店 ・ 1つの時間帯の総数 20席（有効の卓 5）')).toBeTruthy()
+    expect(screen.getByText('渋谷店・1つの時間帯の総数 20席（有効の卓 5）')).toBeTruthy()
     expect(board.textContent).not.toContain('検証環境専用')
     expect(screen.getByRole('tab', { name: '休業日・貸切' }).getAttribute('aria-selected')).toBe('true')
     expect(card.textContent).toContain('終日・全卓')
     expect(card.textContent).toContain('他サイト 未対応 2')
     /* 連絡済みは contact-status の数（休業を作った後に担当者が LINE で送った予約）。 */
-    await waitFor(() => expect(card.textContent).toContain('予約 2 件 ・ 連絡済み 1 件 ・ 他サイト 未対応 2'))
+    await waitFor(() => expect(card.textContent).toContain('予約 2 件・連絡済み 1 件・他サイト 未対応 2'))
     expect(fixture.closureContactStatus).toHaveBeenCalledWith('account-1', 'cl-1')
-    expect(document.querySelector('[data-closure-card="cl-2"]')!.textContent).toContain('18:00〜22:00 ・ 個室A・T1')
+    expect(document.querySelector('[data-closure-card="cl-2"]')!.textContent).toContain('18:00〜22:00・個室A・T1')
     expect(screen.getAllByText('定休').length).toBeGreaterThan(1)
     const band = document.querySelector('[data-closure-band]') as HTMLElement
     expect(band.textContent).toContain('他の予約サイトの枠を閉じてください（未対応 2 件）')
@@ -212,10 +212,10 @@ describe('休業日・貸切の数え方', () => {
 
   it('他サイトの状態：未対応があれば未対応、全部閉じたら n/m。件数が分からなければ予約は書かない', () => {
     const t = (status: string) => ({ reason: 'closure', closureId: 'x', status }) as never
-    expect(statusLine(2, tasksFor({ id: 'x' }, [t('close'), t('done')]))).toBe('予約 2 件 ・ 他サイト 未対応 1')
-    expect(statusLine(0, tasksFor({ id: 'x' }, [t('done'), t('done')]))).toBe('予約 0 件 ・ 他サイト 閉じた 2/2')
+    expect(statusLine(2, tasksFor({ id: 'x' }, [t('close'), t('done')]))).toBe('予約 2 件・他サイト 未対応 1')
+    expect(statusLine(0, tasksFor({ id: 'x' }, [t('done'), t('done')]))).toBe('予約 0 件・他サイト 閉じた 2/2')
     expect(statusLine(null, tasksFor({ id: 'x' }, []))).toBe('')
-    expect(statusLine(2, tasksFor({ id: 'x' }, []), 1)).toBe('予約 2 件 ・ 連絡済み 1 件')
+    expect(statusLine(2, tasksFor({ id: 'x' }, []), 1)).toBe('予約 2 件・連絡済み 1 件')
     expect(statusLine(0, tasksFor({ id: 'x' }, []), 0)).toBe('予約 0 件')
   })
 
