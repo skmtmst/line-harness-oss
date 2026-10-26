@@ -108,6 +108,7 @@
   --color-canvas-sunken: #f7f7f5;
   --color-surface-pearl: #f7f8fa;
   --color-shell: #f5f5f7;
+  --color-ground: #f2f3f5; --color-board-tint: #fafafb; /* 外の地（左メニュー・板の外）と板の地。板の中のまとまりは白（canvas）のカード */
   --color-hairline: #1d1d1f12;
 
   /* 状態。アクセントと混ぜない。 */
@@ -129,7 +130,7 @@
   --color-status-info-soft: #2563eb1a;
   --color-status-warn: #f5c56b;
   --color-status-warn-soft: #f973161a;
-  --color-status-warn-deep: #c2410c;
+  --color-status-warn-deep: #ad3a0b;
   --color-status-danger: #b91c1c;
   --color-status-danger-soft: #ef44441a;
   --color-step-idle: #eef0f3;
@@ -613,13 +614,11 @@
 
 :root {
   /*
-   * カード（線で囲んだ箱）の線と影（2026-10-09 案A：ブラーを抑え、境目をくっきりさせる）。
-   * 影は 0 1px 1px / 黒16% ＋ 0 2px 4px / 黒8%、線は黒8%。
-   * 既定のカードはこの2つを読む。一覧の平らなカードは Card.frame="flat" で影を外す。
+   * カードの縁は線なし・やわらかい影だけ。既定のカード・一覧の表の塊・数の帯・知らせがこの影を読む。
    * 選ぶカード（ラジオ・チェック）・入力欄・ボタン・浮く面（メニュー・窓）は別の値のまま。
    */
-  --card-edge: transparent; --surface-edge: rgba(29, 29, 31, 0.08); /* カードの縁は影の外周 1px が描く。影を持たない面（浮く窓・帯）は surface-edge の薄い縁 */
-  --card-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 2px 3px -1px rgba(0, 0, 0, 0.07), 0 6px 8px -4px rgba(0, 0, 0, 0.07);
+  --card-edge: transparent; --surface-edge: rgba(29, 29, 31, 0.08); /* カードは線なし。影を持たない面（浮く窓・入れ子の面）は surface-edge の薄い縁 */
+  --card-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 8px -2px rgba(16, 24, 40, 0.08); /* 線はやめ、やわらかい影だけで浮かせる（ぼかしは 8px まで） */
   /* --- 動き（管理画面）------------------------------------------------------------
    * Pencil ★管理画面「基礎 動き」（管理画面 文書 `bi8Au`）の物差し。部品の CSS は ms を
    * 直接書かず、この4段と2本の曲線だけを使う。
@@ -2124,9 +2123,9 @@
  * CSS Module が `:root` で定義する。
  */
 
-/* v8 の地は全体が shell の灰。板の白が浮くのはこの差で作る。 */
+/* v8 の外の地は ground の灰。板（board-tint）が浮くのはこの差で作る。 */
 :root body {
-  background-color: var(--color-shell);
+  background-color: var(--color-ground);
 }
 
 /*
@@ -2814,7 +2813,7 @@ select:not([multiple]):not(.appearance-none) {
   :root #main-content { margin-left: 0; border: 0; outline: 1px solid var(--color-board-line); outline-offset: -1px; }
 }
 
-:root { --color-status-warn-deep: #c2410c; }
+:root { --color-status-warn-deep: #ad3a0b; }
 :root aside[aria-label="フォルダ"] { box-shadow: none; }
 
 :root { --shadow-frozen-column: 6px 0 12px #1d1d1f14; --color-scroll-thumb: #1d1d1f40; --gradient-scroll-edge: linear-gradient(-90deg, #1d1d1f00 0%, #1d1d1f14 100%); }
@@ -3192,5 +3191,5 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 /* 数の帯・表の数・件数・時刻は桁をそろえる */ html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][data-align='right'], [data-count], [data-part='count']) { font-variant-numeric: var(--font-numeric); }
 
 /* 共通の値。部品と画面はここを読むだけで、影・ボタンの高さ・文字の太さを画面ごとに書かない。余白 --space-*・角丸 部品 --radius-control／主ボタン --radius-primary-action／カード --radius-card・文字 題32/600 本文13 ラベル12 補足12 数34/500・太さ 14px以下のUI文字500 読み物400 見出しとボタン600・影 くっきり版（ぼかし最大8px）・ボタン ふつう36 小さい32 アイコン32角（押せる所28以上）・動き 押すと0.98倍（主ボタンは0.5px沈む）押せるカードは乗せると2px浮く。 主ボタンの地は上端が深い緑のまま下へ少し濃く（白い文字との比はどこでも 5.44:1 以上）。白い部品と選んだ黒い札の地。帯は下へ流した時だけ白72%＋すりガラス＋下端1px（内側の影で描き高さを変えない）。 小さいアイコンの押し口は見た目を変えずに押せる所を 28px 以上へ（部品が data-hit-area を付ける。位置を自分で決めた部品はそちらが勝つ）。 カード全体が1つのリンク・ボタンの時だけ data-pressable-card を付け、乗せると浮いて影が深くなる。押せないカードは浮かせない。 */
-:root { --font-weight-ui: 500; --font-weight-reading: 400; --font-numeric: tabular-nums; --text-optical-shift: 0.5px; --control-h: 36px; --control-h-compact: 32px; --control-icon-size: 32px; --control-icon-min: 28px; --card-hover-lift: translateY(-2px); --motion-card-lift: 150ms; --motion-switch-glide: 180ms; --press-primary-shift: translateY(0.5px); --card-shadow-hover: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 3px 4px -1px rgba(0, 0, 0, 0.08), 0 8px 10px -5px rgba(0, 0, 0, 0.09); --shadow-primary-action-hover: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 4px rgba(8, 122, 62, 0.35), 0 3px 5px -2px rgba(8, 122, 62, 0.3); --gradient-primary-action: linear-gradient(180deg, #087a3e, #066a35); --gradient-raised-control: linear-gradient(180deg, #fff, #fafafc); --gradient-selected-chip: linear-gradient(180deg, #34343a, #1d1d1f); --shadow-selected-chip: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.25); --bar-scrolled-bg: rgba(255, 255, 255, 0.72); --bar-scrolled-filter: saturate(180%) blur(18px); --bar-scrolled-line: inset 0 -1px 0 rgba(29, 29, 31, 0.06); }
+:root { --font-weight-ui: 500; --font-weight-reading: 400; --font-numeric: tabular-nums; --text-optical-shift: 0.5px; --control-h: 36px; --control-h-compact: 32px; --control-icon-size: 32px; --control-icon-min: 28px; --card-hover-lift: translateY(-2px); --motion-card-lift: 150ms; --motion-switch-glide: 180ms; --press-primary-shift: translateY(0.5px); --card-shadow-hover: 0 1px 2px rgba(16, 24, 40, 0.07), 0 6px 8px -2px rgba(16, 24, 40, 0.1); --shadow-primary-action-hover: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 4px rgba(8, 122, 62, 0.35), 0 3px 5px -2px rgba(8, 122, 62, 0.3); --gradient-primary-action: linear-gradient(180deg, #087a3e, #066a35); --gradient-raised-control: linear-gradient(180deg, #fff, #fafafc); --gradient-selected-chip: linear-gradient(180deg, #34343a, #1d1d1f); --shadow-selected-chip: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.25); --bar-scrolled-bg: rgba(255, 255, 255, 0.72); --bar-scrolled-filter: saturate(180%) blur(18px); --bar-scrolled-line: inset 0 -1px 0 rgba(29, 29, 31, 0.06); }
 :where([data-hit-area]) { position: relative; } :root [data-hit-area]::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, var(--control-icon-min)); height: max(100%, var(--control-icon-min)); transform: translate(-50%, -50%); } :root [data-pressable-card] { transition: transform var(--motion-card-lift) var(--motion-ease-out), box-shadow var(--motion-card-lift) var(--motion-ease-out); } :root [data-pressable-card]:hover { box-shadow: var(--card-shadow-hover); } @media (prefers-reduced-motion: no-preference) { :root [data-pressable-card]:hover { transform: var(--card-hover-lift); } } @media (prefers-reduced-motion: reduce) { :root [data-pressable-card] { transition: none; } }

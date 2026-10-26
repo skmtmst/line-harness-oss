@@ -218,11 +218,9 @@ html:root .headerContent .meta { display: flex; flex-direction: column; align-it
 :root .headerRestaurant .meta{font-size:14px;line-height:21px;}
 
 /* ・208：枠から中身は最低16。段の間は spacing・gap・variant の指定を使う。 */
-/* 固定HTMLの枠は内側のoutline。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
+/* 縁は .card の影（--card-shadow）だけ。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
 html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']):where(:not([data-card-frame='ring'])) {
   border: 0;
-  outline: 1px solid var(--surface-edge);
-  outline-offset: -1px;
 }
 html:root .paddingCompact { padding: var(--space-16); }
 html:root .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
@@ -238,7 +236,7 @@ html:root .card[data-card-surface='danger'] { border: 0; outline-color: transpar
 /* 回答など、頭・表・ページ送りの段がそれぞれ端の余白を持つ記録の箱。 */
 html:root .records {
   display: flex; flex-direction: column; gap: var(--polish-space-field);
-  padding-block: var(--polish-space-section); border: 0; outline: 1px solid var(--surface-edge); outline-offset: -1px;
+  padding-block: var(--polish-space-section); border: 0;
 }
 html:root .records > .header { padding-inline: var(--polish-space-section); }
 html:root .records > [data-card-footer] { padding-inline: var(--polish-space-section); }
@@ -254,14 +252,6 @@ html:root .card[data-card-selected] { --card-edge: var(--color-control-border); 
 /* 内側の線だけの面。外枠・影で本文の寸法を増やさず、既存のカードは変えない。 */
 html:root .card[data-card-frame='ring'] {
   border: 0; box-shadow: var(--tpl-sa-ring);
-}
-
-/* 一覧の平らな面。内側の線なので、既存の本文幅・高さは変えない。 */
-html:root .card[data-card-frame='flat'] {
-  border: 0;
-  outline: 1px solid var(--surface-edge);
-  outline-offset: -1px;
-  box-shadow: none;
 }
 
 /* 情報内と操作前の間は親のgapを1回だけ使う。高さ合わせで増えた分だけ操作の上へ回す。 */
