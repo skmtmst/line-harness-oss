@@ -226,6 +226,9 @@
 :global(:root) .dashboardRow[data-grouping='cards'][data-row='trend'] .dashboardAsideSection:last-child { padding-bottom: var(--polish-space-card); }
 :global(:root) .dashboardColumns[data-grouping='cards'] { column-gap: var(--polish-space-field); }
 :global(:root) .dashboardRow[data-grouping='cards'] .dashboardCell + .dashboardCell { border-left: 0; }
+/* 受信の表のカードは中身の高さで止め、右の列の高さに引っぱらない（下に大きな空白を作らない）。 */
+:global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] { min-height: 0; align-items: flex-start; }
+:global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] > .dashboardCell { align-self: flex-start; }
 
 /* 入力側と各段は中身の高さを保つ。 */
 :global(:root) [data-page-template='create'] > .heading .headingText { flex: 1 1 auto; }

@@ -166,3 +166,7 @@ a.planTitle:hover { text-decoration: underline; }
 /* 数のマスの下の補足は1行（狭い幅で2行に割らない）。全文は内訳で読める。 */
 .todayBand > * > p:last-child > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pendingMeta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); }
+
+/* 受信の内容が絵文字だけの時の添え書き。 */
+.inboxEmoji { display: inline-flex; align-items: baseline; gap: var(--space-4); min-width: 0; white-space: nowrap; }
+.inboxEmojiNote { color: var(--color-ink-faint); font-size: var(--text-caption); }
