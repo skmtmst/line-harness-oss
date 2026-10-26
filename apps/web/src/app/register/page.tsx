@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import TextLink from '@/components/shared/text-link'
 import { PRODUCT_SCOPE } from '@/lib/product-scope'
 import { useRouter } from 'next/navigation'
 import { useCallback, useRef, useState, type FormEvent } from 'react'
@@ -101,9 +101,9 @@ export default function RegisterPage() {
           {!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy ? (
             <p className="text-micro text-ink-faint">
               文書のページはまだ公開されていません。公開までの間、内容は{' '}
-              <a href={CONTACT_URL} target="_blank" rel="noreferrer" className="text-action underline underline-offset-2">
+              <TextLink inline external href={CONTACT_URL}>
                 お問い合わせ
-              </a> からご確認いただけます。
+              </TextLink> からご確認いただけます。
             </p>
           ) : null}
           {agreeMessage ? (
@@ -119,9 +119,9 @@ export default function RegisterPage() {
 
       <p className="text-caption text-ink-faint">
         すでにアカウントをお持ちの方は{' '}
-        <Link href="/login" className="font-semibold text-action hover:underline">
+        <TextLink inline href="/login">
           ログイン
-        </Link>
+        </TextLink>
       </p>
     </AuthCard>
   )
@@ -130,8 +130,8 @@ export default function RegisterPage() {
 function LegalWord({ href, children }: { href: string | null; children: string }) {
   if (!href) return <span className="font-semibold">{children}</span>
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="font-semibold text-action hover:underline">
+    <TextLink inline external href={href}>
       {children}
-    </a>
+    </TextLink>
   )
 }

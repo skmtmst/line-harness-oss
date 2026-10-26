@@ -19,6 +19,7 @@ import { Send } from 'lucide-react'
 import Link from 'next/link'
 import type { Dispatch,SetStateAction } from 'react'
 import styles from './broadcast-form-v8.module.css'
+import TextLink from '@/components/shared/text-link'
 
 type BroadcastAudienceStepContext = {
   audienceDisplayCount: number | null
@@ -148,7 +149,7 @@ export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, co
             {tagsStatus === 'ready' && tags.length === 0 && (
               <p className="mt-1 text-xs text-ink-faint">
                 タグはまだありません。先に
-                <Link href="/tags" className="font-semibold text-action hover:underline">タグ</Link>
+                <TextLink inline href="/tags">タグ</TextLink>
                 で作成してください。
               </p>
             )}

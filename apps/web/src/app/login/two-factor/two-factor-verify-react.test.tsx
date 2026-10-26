@@ -18,7 +18,7 @@ const fixture = vi.hoisted(() => ({
   verify: null as null | { status: number; body: Record<string, unknown> } | { reject: unknown },
 }))
 
-vi.mock('next/link', () => ({ default: () => null }))
+vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/login/two-factor',

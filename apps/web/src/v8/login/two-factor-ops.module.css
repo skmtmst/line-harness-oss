@@ -73,6 +73,13 @@
   gap: var(--space-8);
 }
 
+.footRow,
+.helpChoices {
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-ms-otp-label-lh);
+}
+
 .footRow {
   display: flex;
   align-items: center;
@@ -81,8 +88,7 @@
 }
 
 .helpToggle,
-.helpLink,
-.switchAccount {
+.helpLink {
   margin: 0;
   border: 0;
   padding: 0;
@@ -97,20 +103,13 @@
   cursor: pointer;
 }
 
-.switchAccount {
-  color: var(--color-ink-secondary);
-  text-decoration: none;
-}
-
 .helpToggle:hover,
-.helpLink:hover,
-.switchAccount:hover {
+.helpLink:hover {
   text-decoration: underline;
 }
 
 .helpToggle:focus-visible,
-.helpLink:focus-visible,
-.switchAccount:focus-visible {
+.helpLink:focus-visible {
   outline: var(--polish-focus-width) solid var(--color-focus-ring);
   outline-offset: var(--polish-focus-offset);
   border-radius: var(--radius-control);

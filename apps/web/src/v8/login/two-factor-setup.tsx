@@ -1,7 +1,7 @@
 'use client'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
-import Link from 'next/link'
+import TextLink from '@/components/shared/text-link'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession, takeTwoFactorNextPath } from '@/lib/admin-session'
@@ -13,7 +13,7 @@ import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '@/v8/login/two-factor/two-factor-error'
 
 import { useBrand } from '@/lib/use-brand'
-import { AuthPage, AuthForm } from '@/components/templates/auth-page'
+import { AuthPage, AuthForm, AuthHelp } from '@/components/templates/auth-page'
 import TotpQr from '@/components/shared/totp-qr'
 import RecoveryCodes from './recovery-codes'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -161,10 +161,10 @@ export default function TwoFactorSetupPage() {
         <TotpQr qr={qr} manualKey={setup.manualKey} />
           <SaveErrorField names={["code", "typedCode"]}><OtpInput id="totp-setup-code" value={typedCode} onChange={setCode} onComplete={entered => void submit(undefined, entered)} visualLabel="認証アプリの6桁の数字" label="認証アプリの6桁の数字" invalid={Boolean(error)} busy={busy} /></SaveErrorField>
         <Button type="submit" variant="primary" fullWidth disabled={busy} busy={busy} busyLabel="確認しています…">登録してログイン</Button>
-        <Link href="/login" onClick={clearTwoFactorChallenge}>ログインへ戻る</Link>
+        <AuthHelp><TextLink inline href="/login" onClick={clearTwoFactorChallenge}>ログインへ戻る</TextLink></AuthHelp>
       </AuthForm>
     ) : expired || !challenge ? (
-      <Link href="/login" onClick={clearTwoFactorChallenge}>ログインへ戻る</Link>
+      <AuthHelp><TextLink inline href="/login" onClick={clearTwoFactorChallenge}>ログインへ戻る</TextLink></AuthHelp>
     ) : <ListState kind="error" error={setupError ?? undefined} onRetry={() => void loadSetup(challenge, true)} retrying={retrying} />}
   </AuthPage></SaveErrorScope>
 }
