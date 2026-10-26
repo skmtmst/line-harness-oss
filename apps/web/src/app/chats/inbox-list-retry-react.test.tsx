@@ -45,7 +45,7 @@ function base(url: URL) {
 }
 const list = () => host.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"]')!
 const retryButton = () => [...host.querySelectorAll('button')]
-  .find((item) => item.textContent?.trim() === '会話を読み込み直す')
+  .find((item) => item.textContent?.trim() === 'もう一度読み込む')
 async function settle() {
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
 }

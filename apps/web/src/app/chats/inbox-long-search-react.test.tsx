@@ -159,7 +159,7 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
   // 再読み込みで同じ条件（長い検索語のまま）を取り直せる。
   fail = false
   const retry = [...list().querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === '会話を読み込み直す')
+    .find((item) => item.textContent?.trim() === 'もう一度読み込む')
   expect(retry).toBeTruthy()
   await act(async () => { retry!.click() })
   await eventually(() => {

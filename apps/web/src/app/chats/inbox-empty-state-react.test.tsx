@@ -241,7 +241,7 @@ test('条件解除の描画から再取得開始まで旧0件を通常0件とし
 
   const next = hold()
   handler = (url) => isFilteredRequest(url) ? base(url) : next.promise.then((value) => value.clone())
-  const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === '絞り込みを解除')!
+  const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === '絞り込みを外す')!
   act(() => {
     flushSync(() => button.click())
     expect(state('loading')).toBeTruthy()
@@ -281,7 +281,7 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
   await eventually(() => expect(state('filtered-empty')).toBeTruthy())
   expect(list().textContent).toContain('条件に一致する会話がありません')
   expect(list().contains(state('filtered-empty'))).toBe(true)
-  await click('絞り込みを解除')
+  await click('絞り込みを外す')
   await eventually(() => expect(list().textContent).toContain('戻った会話'))
 
   const line = calls.filter((url) => url.pathname === '/api/chats').at(-1)!

@@ -62,8 +62,8 @@ describe('#548-9 メール取得の失敗は専用の行で知らせる', () => 
     expect(loader).toContain("setEmailError('')")
   })
 
-  it('LINE側の失敗表示とは別に、読み込み直しのボタンを出す', () => {
-    expect(PAGE).toContain('メールを読み込み直す')
-    expect(PAGE).toContain('channel !== \'line\' && emailError')
+  it('LINE側の失敗と同じ知らせにまとめても、押せばメールも読み直す', () => {
+    expect(PAGE).toContain('<InboxListFailure')
+    expect(PAGE).toContain("if (channel !== 'line' && emailError) void loadEmails()")
   })
 })
