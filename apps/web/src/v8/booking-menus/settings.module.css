@@ -741,9 +741,8 @@
   background: var(--color-canvas-sunken);
 }
 
-.addLine:disabled {
-  cursor: not-allowed;
-}
+/* 印と文字の上下の真ん中（差 0.5 以内。§6.5 の 2）：字の箱が上に寄るので印を共通の補正値で上げる。押せない時の形は共通の規則が持つ。 */
+.addLine > svg { translate: 0 calc(var(--text-optical-shift) * -1); }
 
 /* ===== 休業日（月の暦） ===== */
 
@@ -1825,6 +1824,3 @@
     display: none;
   }
 }
-
-/* 印と文字の上下の真ん中をそろえる（差 0.5 以内。§6.5 の 2）。文字は字の箱が上に寄るので、共通の補正値で印を上げる。 */
-.addLine > svg { translate: 0 calc(var(--text-optical-shift) * -1); }
