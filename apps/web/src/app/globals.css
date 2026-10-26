@@ -1715,7 +1715,7 @@
    * ・印（いなずま等）のある札：左8・印12・間3〜4・字。狭いほうの3に寄せる。
    * 使うのは共通の札の `size="delivery"`（status-badge.module.css）だけ。
    */
-  --tpl-rt-dlv-badge-pad: 2px 8px; --tpl-rt-dlv-badge-gap: 5px; --tpl-rt-dlv-badge-mark-gap: 3px;
+  --tpl-rt-dlv-badge-pad: 2px 8px; --tpl-rt-dlv-badge-gap: var(--polish-status-gap); --tpl-rt-dlv-badge-mark-gap: var(--polish-status-gap);
   /*
    * 絵の行の高さ＝上下の余白12＋中身＋下の線1。中身の高さは行ごとに違い、絵（kDQHr）の
    * 実測の行の間は 53・53・53・53・50・47 で全部同じではない。だから決め打ちの高さは置かず、
@@ -1779,7 +1779,7 @@
   --tpl-rt-dlv-head-pad: 14px; --tpl-rt-dlv-head-icon: 16px; --tpl-rt-dlv-refresh-icon: 16px; --tpl-rt-dlv-note-weight: 500;
   /*
    * 絵（kDQHr `foYm6`）のサービス札は横1行・高さ74・左右の余白16。印は36角、札の間6、数と説明の間4。
-   * 「札の間6」は札を並べる間で、札の中の点と字の間（上の `--tpl-rt-dlv-badge-gap`＝5）とは別物。
+   * 「札の間6」は札を並べる間で、札の中の点と字の間（上の `--tpl-rt-dlv-badge-gap`＝8）とは別物。
    * 同じ名前で上書きすると、後から書いたほうが共通の札（`size="delivery"`）にも効いてしまう。
    */
   --tpl-rt-dlv-service-h: 74px; --tpl-rt-dlv-service-pad: 0 16px; --tpl-rt-dlv-mark: 36px; --tpl-rt-dlv-service-badges-gap: 6px; --tpl-rt-dlv-stat-gap: 4px;

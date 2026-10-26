@@ -158,3 +158,16 @@ test('「？」の押せる範囲が 28 未満・見出しとの間が 8 でな�
     assert.deepEqual(await kinds(), ['help-tip'])
   } finally { await browser.close() }
 })
+
+test('状態の札の点と文字の間が 8 でないと落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind === 'status-dot-gap')
+    const badge = gap => `<style>.status-badge_badge__x{display:inline-flex;align-items:center;gap:${gap}px;padding:2px 8px}.status-badge_badge__x::before{content:'';width:6px;height:6px;border-radius:50%;background:#16a34a}</style><main><span class="status-badge_badge__x">配信中</span></main>`
+    await page.setContent(badge(8))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(badge(5))
+    assert.deepEqual(await kinds(), ['status-dot-gap'])
+  } finally { await browser.close() }
+})

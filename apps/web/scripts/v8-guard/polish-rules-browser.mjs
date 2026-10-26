@@ -159,5 +159,19 @@ export default function scanPolishRules() {
     const bad = br.width < 28 || br.height < 28 || (mr && Math.abs(Math.max(mr.width, mr.height) - 16) > 0.5) || (gap !== null && gap < 30 && Math.abs(gap - 8) > 0.5)
     if (bad) add('help-tip', button, { hit: `${Math.round(br.width)}x${Math.round(br.height)}`, mark: mr ? Math.round(mr.width) : null, gap: gap === null ? null : Math.round(gap * 10) / 10 }, button.getAttribute('aria-label'))
   }
+  // 状態の札（§6.5 の 4）：左の点・印と文字の間は 8。
+  for (const badge of document.querySelectorAll('[class*="status-badge_badge"], [class*="status-pill_pill"]')) {
+    if (!visible(badge)) continue
+    const text = textBox(badge)
+    if (!text) continue
+    const before = getComputedStyle(badge, '::before'), bc = css(badge), br = badge.getBoundingClientRect()
+    let markRight = null
+    if (before.content !== 'none' && parseFloat(before.width) > 0) markRight = br.left + parseFloat(bc.borderLeftWidth) + parseFloat(bc.paddingLeft) + parseFloat(before.width)
+    const mark = [...badge.children].find((child) => child.matches('svg') || (!child.textContent.trim() && child.getBoundingClientRect().width > 0 && child.getBoundingClientRect().width <= 16))
+    if (mark && visible(mark)) markRight = mark.getBoundingClientRect().right
+    if (markRight === null) continue
+    const gap = text.left - markRight
+    if (Math.abs(gap - 8) > 0.5) add('status-dot-gap', badge, { gap: Math.round(gap * 10) / 10 }, badge.textContent)
+  }
   return findings
 }
