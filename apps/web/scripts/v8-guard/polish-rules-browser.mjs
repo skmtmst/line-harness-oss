@@ -238,5 +238,31 @@ export default function scanPolishRules() {
       break
     }
   }
+  // 同じ種類のカード（同じ親・同じ部品）の右上の操作・札は、どのカードでも同じ位置（右と上からの距離の差 0.5 以内）。
+  // 題の文字のすぐ後ろに付く「？」は文字の長さで動くので、右上の操作に数えない。
+  const cornerOf = (card) => {
+    const r = card.getBoundingClientRect()
+    const items = [...card.querySelectorAll('button, a[href], [role="button"], [class*="status-badge_badge"], [class*="status-pill_pill"]')].filter((el) => visible(el) && !el.parentElement.closest('[class*="status-badge_badge"]') && !el.matches('[class*="help-tip_button"]'))
+      .map((el) => ({ el, x: el.getBoundingClientRect() })).filter(({ x }) => x.top - r.top < 48 && r.right - x.right < 64 && x.width <= 120)
+    if (!items.length) return null
+    const { x } = items.sort((p, q) => (r.right - p.x.right + p.x.top - r.top) - (r.right - q.x.right + q.x.top - r.top))[0]
+    return { right: r.right - x.right, top: x.top - r.top }
+  }
+  const groups = new Map()
+  for (const card of document.querySelectorAll('article, [class*="card_card"]')) {
+    if (!visible(card) || !card.parentElement) continue
+    const r = card.getBoundingClientRect()
+    if (r.width < 160 || r.height < 80) continue
+    const key = card.parentElement
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(card)
+  }
+  for (const cards of groups.values()) {
+    const sameKind = cards.filter((card) => card.className === cards[0].className)
+    const corners = sameKind.map(cornerOf).filter(Boolean)
+    if (corners.length < 2) continue
+    const spread = (k) => Math.max(...corners.map((c) => c[k])) - Math.min(...corners.map((c) => c[k]))
+    if (spread('right') > 0.5 || spread('top') > 0.5) add('card-corner', sameKind[0], { right: Math.round(spread('right') * 10) / 10, top: Math.round(spread('top') * 10) / 10 })
+  }
   return findings
 }

@@ -244,3 +244,16 @@ test('色の地の箱の中の印が真ん中から 0.5 より離れると落ち
     assert.deepEqual(await kinds(), ['box-icon-center'])
   } finally { await browser.close() }
 })
+
+test('同じ種類のカードの右上の操作の位置がそろっていないと落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind === 'card-corner')
+    const card = top => `<article class="c" style="position:relative;width:240px;height:120px"><button style="position:absolute;right:16px;top:${top}px;width:28px;height:28px">…</button></article>`
+    await page.setContent(`<main><div style="display:flex;gap:16px">${card(16)}${card(16)}</div></main>`)
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(`<main><div style="display:flex;gap:16px">${card(16)}${card(20)}</div></main>`)
+    assert.deepEqual(await kinds(), ['card-corner'])
+  } finally { await browser.close() }
+})
