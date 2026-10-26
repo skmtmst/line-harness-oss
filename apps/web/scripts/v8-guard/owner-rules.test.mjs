@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
 import scan from './owner-rules-browser.mjs'
 import scanPolish from './polish-rules-browser.mjs'
+import scanRowCentering from './row-centering-browser.mjs'
 
 test('a framed box clipped by its parent fails; scrollable and restored boxes remain usable', async () => {
   const browser = await connectGuardBrowser()
@@ -325,5 +326,32 @@ test('手書きの動きを同じ選び先の後ろの規則で共通の値に�
     assert.deepEqual(await kinds(), [])
     await page.setContent('<style>:root{--m:120ms;--e:ease}.c{transition:color var(--m) var(--e)}.c{transition:color 120ms ease-out}</style><main><a class="c" href="#">リンク</a></main>')
     assert.ok((await kinds()).length > 0)
+  } finally { await browser.close() }
+})
+
+test('印＋文字の行で、印・文字・右のボタンの上下の真ん中が 1px を超えてずれると落ち、そろえば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const svg = '<svg width="16" height="16"><rect width="16" height="16"/></svg>'
+    await page.setContent(`<main>
+      <div id="hand" style="display:flex;align-items:center;gap:12px;height:56px"><span style="width:32px;height:32px;display:inline-flex">${svg}</span><span id="text" style="display:flex;flex-direction:column"><span>ほかの進行中の配信</span><span>一覧はまだ見られません</span></span><button style="height:36px">開く</button></div>
+      <div id="shared" data-center-row style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;min-height:50px"><span data-center-row-part="icon" style="width:24px;height:24px;display:inline-flex">${svg}</span><span data-center-row-part="text">題<br>補足</span><span data-center-row-part="end">9月15日</span></div>
+    </main>`)
+    assert.deepEqual(await page.evaluate(scanRowCentering), [])
+    // 手書きの行：文字の下に空の段を足して文字を上へ寄せる（友だちの詳細で起きた形）。
+    await page.locator('#text').evaluate(el => { el.insertAdjacentHTML('beforeend', '<span style="display:block;height:12px"></span>') })
+    let broken = await page.evaluate(scanRowCentering)
+    assert.equal(broken.length, 1)
+    assert.equal(broken[0].kind, 'row-offcenter')
+    assert.ok(broken[0].measure.offset > 1)
+    await page.locator('#text > span:last-child').evaluate(el => el.remove())
+    // 共通の行：上そろえに戻すと落ちる。
+    await page.locator('#shared').evaluate(el => { el.style.alignItems = 'start' })
+    broken = await page.evaluate(scanRowCentering)
+    assert.equal(broken.length, 1)
+    assert.match(broken[0].target, /div/)
+    await page.locator('#shared').evaluate(el => { el.style.alignItems = 'center' })
+    assert.deepEqual(await page.evaluate(scanRowCentering), [])
   } finally { await browser.close() }
 })
