@@ -15,6 +15,9 @@ import styles from './style-choice-step.module.css'
  * 見るのと選ぶのを分けるのは、見本を見ている途中に選んだつもりのないスタイルで保存しないため。
  */
 
+/** 開いた直後に焦点を寄せる［このスタイルにする］。選んだスタイルを見ている時は無い。 */
+export const STYLE_CHOICE_PICK_ID = 'style-choice-pick'
+
 export const STYLE_CHOICE_ORDER: readonly AccountStyle[] = STYLE_EXPERIENCE_SCRIPT.order
 
 /** 最初に見せるスタイル。保存済みならそれ、まだなら飲食店。 */
@@ -60,7 +63,7 @@ export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, dis
       <div className={styles.choose}>
         {chosen === viewing
           ? <StatusBadge tone="success" dot>選んでいます</StatusBadge>
-          : <Button onClick={() => onChoose(viewing)} disabled={disabled}>このスタイルにする</Button>}
+          : <Button id={STYLE_CHOICE_PICK_ID} onClick={() => onChoose(viewing)} disabled={disabled}>このスタイルにする</Button>}
       </div>
     </div>
   )

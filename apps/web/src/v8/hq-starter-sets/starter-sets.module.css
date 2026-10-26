@@ -196,6 +196,7 @@
 /* 中身を見る（読むだけ）：種類の中の物を 1 つずつ。 */
 .viewRows {
   display: flex;
+  width: 100%;
   flex-direction: column;
   gap: var(--polish-space-field);
   margin: 0;
