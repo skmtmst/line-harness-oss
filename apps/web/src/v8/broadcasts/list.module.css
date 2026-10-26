@@ -177,7 +177,6 @@
   font-variant-numeric: tabular-nums;
 }
 .cellMain[data-upcoming] { font-weight: 600; }
-.faintValue { color: var(--color-ink-faint); }
 
 .audience {
   display: block;

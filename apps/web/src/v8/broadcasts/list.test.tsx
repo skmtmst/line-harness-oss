@@ -161,13 +161,13 @@ describe('V8 一斉配信一覧の結果の列', () => {
   const sentRow = { ...base, id: 'bc-3', title: '新商品発売のお知らせ', status: 'sent', displayStatus: 'sent', displayStatusLabel: '送信済み', scheduledAt: null, sentAt: '2026-08-20T03:00:00.000Z', successCount: 624, insightSummary: { delivered: 624, uniqueImpression: 444, uniqueClick: 96, openRate: 0.712, clickRate: 0.154 } }
   const renderRows = async () => {
     listBroadcasts.mockImplementation(async () => ({
-      success: true, data: [base, sentRow], kpis: { scheduled: 1, thisMonth: 1, delivered: 624, openRate: 71.2, drafts: 0 },
-      statusCounts: { all: 2, scheduled: 1, sent: 1 }, pagination: { total: 2, limit: 20, cursor: 0, nextCursor: null },
+      success: true, data: [base, sentRow, rowB], kpis: { scheduled: 1, thisMonth: 1, delivered: 624, openRate: 71.2, drafts: 1 },
+      statusCounts: { all: 3, scheduled: 1, sent: 1, draft: 1 }, pagination: { total: 3, limit: 20, cursor: 0, nextCursor: null },
     }))
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     const rowOf = (title: string) => [...host.querySelectorAll('tbody tr')].find((tr) => tr.textContent?.includes(title)) as HTMLTableRowElement
-    return { sent: rowOf('新商品発売のお知らせ'), unsent: rowOf('8月キャンペーンのお知らせ'), heads: [...host.querySelectorAll('thead th')].map((th) => th.textContent?.trim()) }
+    return { sent: rowOf('新商品発売のお知らせ'), unsent: rowOf('8月キャンペーンのお知らせ'), draft: rowOf('未購入者フォロー'), heads: [...host.querySelectorAll('thead th')].map((th) => th.textContent?.trim()) }
   }
 
   it('広い幅は届いた・開封・クリックの3列に右そろえで、送っていない行は — で数を作らない', async () => {
@@ -179,6 +179,15 @@ describe('V8 一斉配信一覧の結果の列', () => {
     const unsentRight = [...unsent.querySelectorAll('td[data-align="right"]')].map((td) => td.textContent?.trim())
     expect(unsentRight).toHaveLength(3)
     for (const text of unsentRight) expect(text).not.toMatch(/\d/)
+  })
+
+  it('配信日時は日本時間で、日時の無い下書きは薄い「—」1つ', async () => {
+    narrow.value = false
+    const { sent, unsent, draft } = await renderRows()
+    expect(unsent.querySelector('[data-upcoming]')?.textContent).toContain('10:00')
+    expect(sent.textContent).toContain('12:00')
+    expect(draft.textContent).not.toContain('未設定')
+    expect(draft.querySelector('[data-empty-value]')?.textContent).toBe('—')
   })
 
   it('配信日時は日時だけの1行で「予約」を重ねず、予約中の日時だけ少し濃くする', async () => {

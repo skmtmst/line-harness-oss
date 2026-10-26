@@ -57,7 +57,7 @@ import { runOptimistic } from '@/lib/undoable';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
-import { emptyValue } from '@/components/shared/empty-value';
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RefreshCover } from '@/components/shared/refresh-cover'
@@ -1056,7 +1056,7 @@ export default function BroadcastListV8() {
                 {/* 日時だけの1行。予約中（まだ先）の日時だけ少し濃くする。「予約」は状態の札にあるので重ねない。 */}
                 {(() => {
                   const at = broadcast.status === 'sent' ? broadcast.sentAt : broadcast.scheduledAt
-                  if (!at) return <span className={`${styles.cellMain} ${styles.faintValue}`}>{emptyValue('unknown')}</span>
+                  if (!at) return <EmptyCell />
                   return <span className={styles.cellMain} data-upcoming={broadcast.status === 'scheduled' || undefined}><ListDateTime value={at} /></span>
                 })()}
               </Td>
