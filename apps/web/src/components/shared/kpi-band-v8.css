@@ -136,9 +136,12 @@ html:root [data-list-skeleton] [data-kpi-detail-layout='qualifier'] [data-kpi-de
 /* 業種ダッシュボード（XBkC2・NqAvL ほか）：補足と行き先を同じ行に置く（補足は左・1行＋省略、行き先は右）。layout="link-row" の帯だけ。 */
 html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] { flex-direction: row; align-items: center; gap: var(--polish-space-row); }
 html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { flex: 1 1 auto; width: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* 狭い板（白い板が 1100 未満）では数と前との比べの札を折り返し、札を切らない。 */
+/* 狭い板（白い板が 1100 未満）では数と前との比べの札を折り返し、札を切らない。補足は1行を全部使い、行き先はその下の行の右へ下ろす。 */
 @container v8-page (max-width: 1099px) {
   html:root [data-kpi-strip][data-kpi-layout='link-row'] [data-unit-spacing] { flex-wrap: wrap; row-gap: var(--space-2); }
+  html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] { flex-wrap: wrap; row-gap: var(--space-4); }
+  html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { flex-basis: 100%; }
+  html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] > :is(a, button) { margin-inline-start: auto; }
 }
 
 /* Wrapped metric selections keep one shared separator between existing bands. */
@@ -186,6 +189,88 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
 }
 
 html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { padding-block: var(--space-16); gap: var(--tpl-band-cell-gap); }
-/* 大きな金額は文字を縮めず2列にし、単位まで読み取れる幅を確保する。 */
-html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-wide-values] { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-wide-values] > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* 大きな金額・範囲がある帯も2列に逃がさず横一列のまま。入りきらない数だけ下の決まりで字を小さくする。 */
+
+/*
+ * 帯の1マスは数が長くても隣と重ならない。マスの幅を物差しにして、入りきらない時だけ字を小さくする
+ * （省略しない）。字数と単位の幅は KpiCard が data-kpi-fit の行に渡す。0.62 は数字1字の幅（em）の上限。
+ * マスは名前つきの容器（kpi-card）にし、数のカードの形の細いマスの切り替えもこれで測る。
+ */
+html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { container: kpi-card / inline-size; }
+html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
+  font-size: min(var(--tpl-band-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
+  font-size: min(var(--tpl-band-compact-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
+}
+
+/*
+ * 数のカードの形（案A・KpiBand appearance="cards"）。マスを線で区切らず、1マスずつ共通のカードの面
+ * （白・--card-shadow・--card-edge・--radius-card）にして間を 12 空ける。帯の枠・影・区切り線は持たない。
+ */
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'][data-kpi-frame='card'],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards']:has(> [data-design-version]:only-child) {
+  gap: var(--polish-space-field); border: 0; border-radius: 0; background: transparent; box-shadow: none;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] > [data-design-version],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] > [data-design-version]:not(:last-child) {
+  position: relative; border: 0; border-radius: var(--radius-card); background: var(--color-canvas);
+  outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow);
+  padding: var(--polish-space-card) var(--space-20); gap: var(--space-8);
+}
+/* 題の左の印は色なしで、灰の小さな四角の中。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-icon] {
+  display: inline-flex; width: var(--tpl-kpi-card-icon-box); height: var(--tpl-kpi-card-icon-box);
+  border-radius: var(--radius-control); background: var(--color-canvas-sunken); color: var(--color-ink-secondary);
+}
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-icon] svg { width: var(--space-16); height: var(--space-16); }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-label] { color: var(--color-ink); }
+/* 数字は大きく詰める（大きさ・太さは帯の決まりのまま、字間だけ詰める）。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-number] { letter-spacing: var(--tpl-kpi-card-number-tracking); }
+
+/*
+ * 状態の札（差の札）は右上。題の行と同じ段に置き、題は札の手前で省略する（重ねない）。
+ * 数の行（data-unit-spacing）は箱を作らず中身を段に並べ、差の札だけ右上の欄へ移す。
+ */
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] > [data-design-version] {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-auto-rows: auto; align-content: start; column-gap: var(--space-8);
+}
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > *,
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > [data-unit-spacing] > * { grid-column: 1 / -1; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > :first-child { grid-column: 1; grid-row: 1; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > [data-unit-spacing] { display: contents; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > [data-unit-spacing] > [data-kpi-delta-slot] { grid-column: 2; grid-row: 1; align-self: center; }
+/* 説明は1行、行き先は右下。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] { flex-direction: row; align-items: flex-end; gap: var(--polish-space-row); margin-top: auto; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > span:first-child { flex: 1 1 auto; width: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 流れの数の細いグラフは右下。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-sparkline] {
+  display: block; position: absolute; right: var(--space-20); bottom: var(--polish-space-card);
+  width: 30%; height: var(--space-24);
+}
+/* 画面が 1152 より狭い時は 2×2。 */
+@media (max-width: 1151px) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/*
+ * 細いカード（4 列で中身の幅が 200 未満＝1152 の 4 列）は、題を 1 行で全部見せる。右上の札は数字の行の右へ移し、
+ * 行き先は補足の下の行へ下ろす（題・補足を札や行き先で省略させない）。
+ */
+@container kpi-card (width < 200px) {
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child { display: contents; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child > * { grid-column: 2; grid-row: 1; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child > [data-kpi-label] { grid-column: 1 / -1; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version]:has(> :first-child > :not([data-kpi-label], [data-kpi-badge])) > :first-child > [data-kpi-label] { grid-column: 1; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child > [data-kpi-badge],
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > [data-unit-spacing] > [data-kpi-delta-slot] { grid-column: 2; grid-row: 2; align-self: center; justify-self: end; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > [data-unit-spacing] > p:first-child { grid-column: 1; grid-row: 2; min-width: 0; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] { flex-wrap: wrap; row-gap: var(--space-4); }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > span:first-child { flex-basis: 100%; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > a,
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > button { margin-inline-start: auto; }
+}
+
+/* どの数の帯でも、値が 0 の時は数字と単位を薄い灰にする（帯の形・数字の太さは変えない）。 */
+html:root [data-kpi-strip] [data-kpi-zero] [data-kpi-value],
+html:root [data-kpi-strip] [data-kpi-zero] [data-kpi-unit] { color: var(--color-kpi-zero); }

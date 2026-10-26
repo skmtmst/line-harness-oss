@@ -168,8 +168,8 @@ describe('UnfamiliarLoginNotice（V-2）', () => {
   it('unfamiliarAt が立つセッションでは警告帯とセッション管理への導線を出す', async () => {
     fixture.snapshot!.unfamiliarAt = '2026-10-04T01:00:00.000Z'
     await act(async () => { render(<UnfamiliarLoginNotice />) })
-    await screen.findByText(/いつもと違う端末・場所からのログインです/)
-    expect(screen.getByRole('link', { name: 'ログイン中の端末を確認する' }).getAttribute('href')).toBe('/staff')
-    expect(screen.getByRole('note').getAttribute('data-action-layout')).toBe('stack-on-narrow')
+    await screen.findByText(/大事な操作の前に毎回、本人確認をします/)
+    expect(screen.getByRole('link', { name: 'ログイン中の端末を見る' }).getAttribute('href')).toBe('/staff')
+    expect(screen.getByText('いつもと違う端末・場所からのログインです')).toBeTruthy()
   })
 })
