@@ -17,7 +17,7 @@ import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from 
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
 import { DetailPage } from '@/components/templates'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
@@ -165,7 +165,7 @@ export default function AdConnectionsV8() {
     }
     return item && manage
       ? <button type="button" className={styles.cellFaint} aria-label={`${item.pointName} ${item.provider}の対応を編集`} onClick={() => setEditing(item)}>{emptyValue('unknown')}</button>
-      : <span className={styles.cellFaint}>{emptyValue('unknown')}</span>
+      : <EmptyCell />
   }
 
   if (!accountId) {

@@ -408,7 +408,7 @@ function RuleRow({ rule, webinarId, menu }: { rule: WebinarScheduleRule; webinar
   const { session, failed } = useSession(webinarId ?? '', startAt)
   return (
     <div className={form.listRow} data-kind={rule.type}>
-      <span className={form.pill} data-tone={view.tone}><span className={form.pillDot} aria-hidden="true" />{view.kind}</span>
+      <StatusBadge tone={view.tone === 'warn' ? 'warning' : view.tone}>{view.kind}</StatusBadge>
       <span className={`${form.rowMain} ${form.ellipsis}`} title={view.detail}>{view.detail}</span>
       {startAt !== null ? <span className={styles.side}>{sessionText(session, failed)}</span> : null}
       {menu}

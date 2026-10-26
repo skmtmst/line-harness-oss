@@ -36,7 +36,7 @@ import styles from './screen.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
-import { emptyValue } from '@/components/shared/empty-value'
+import { EmptyCell } from '@/components/shared/empty-value'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -138,7 +138,7 @@ export function withSavedVersion(list: MediaRow[], code: string, version: number
 }
 
 function UrlCell({ url }: { url: string | null }) {
-  if (!url) return <span className={styles.none}>{emptyValue('unknown')}</span>
+  if (!url) return <EmptyCell />
   return (
     <TextLink external className={styles.url} href={url}   title={url}>
       {`${shortUrl(url)}`}

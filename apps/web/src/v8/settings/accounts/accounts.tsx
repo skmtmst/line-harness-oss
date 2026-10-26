@@ -44,7 +44,7 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
@@ -275,7 +275,7 @@ export default function AccountsV8() {
                     <TruncatedText className={styles.sub} value={account.channelId ? `チャネル ${account.channelId}` : `チャネル ${emptyValue("unconfigured")}`} />
                   </Td>
                   <Td className={styles.colHook}>
-                    {archived ? <span className={styles.faint}>{emptyValue('unknown')}</span> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
+                    {archived ? <EmptyCell /> : <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>}
                   </Td>
                   <Td className={`${styles.colFriends} ${friends === '—' ? styles.faint : ''}`}>{friends}</Td>
                   <Td className={`${styles.colDefault} ${account.isDefault ? '' : styles.faint}`}>

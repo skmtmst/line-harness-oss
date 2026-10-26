@@ -82,9 +82,9 @@ describe('読めなかった項目は日本語の名前', () => {
 })
 
 describe('右の列：現在の対応状況と接続状態', () => {
-  it('対応状況の4行は状態の色の丸を前に置く（未対応 赤・対応中 橙・保留 灰・対応済み 緑）', () => {
+  it('対応状況の4行は状態の札（色の点つき）で出す（未対応 赤・対応中 橙・保留 灰・対応済み 緑）', () => {
     const { container } = render(<SupportStatus inbox={{ unanswered: 5, inProgress: 0, onHold: 0, resolved: 38 } as never} autoOnInbound />)
-    const dots = [...container.querySelectorAll('a span[aria-hidden="true"]')].map((dot) => (dot as HTMLElement).dataset.tone)
+    const dots = [...container.querySelectorAll('a [data-design-node="xRvDB"]')].map((badge) => (badge as HTMLElement).dataset.tone)
     expect(dots).toHaveLength(4)
     expect(dots[0]).toBe('danger')
     expect(dots[1]).toBe('warning')
