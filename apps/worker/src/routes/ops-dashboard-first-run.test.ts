@@ -114,13 +114,15 @@ describe('最初の10分のまとめ', () => {
     expect(body).toMatchObject({
       periodLabel: '今月',
       accounts: 3,
+      // その段まで来た数は前の地点が全部そろったお店だけ。la-2 は初期セットが無いので、1 通が出ていても 3 段目で止まる。
       stages: [
-        { key: 'started', count: 3, percent: 100 },
-        { key: 'style', count: 2, percent: 66.7 },
-        { key: 'starter', count: 1, percent: 33.3 },
-        { key: 'follow', count: 1, percent: 33.3 },
-        { key: 'firstMessage', count: 2, percent: 66.7 },
+        { key: 'started', count: 3, percent: 100, fromPrevious: null, minutesFromPrevious: null },
+        { key: 'style', count: 2, percent: 66.7, fromPrevious: 66.7, minutesFromPrevious: 1 },
+        { key: 'starter', count: 1, percent: 33.3, fromPrevious: 50, minutesFromPrevious: 0 },
+        { key: 'follow', count: 1, percent: 33.3, fromPrevious: 100, minutesFromPrevious: 2 },
+        { key: 'firstMessage', count: 1, percent: 33.3, fromPrevious: 100, minutesFromPrevious: 1 },
       ],
+      biggestDrop: { key: 'starter', fromPrevious: 50, lost: 1 },
       minutesToFirstMessage: { median: 4, p75: 30, reached: 2 },
       withinTenMinutesPercent: 33.3,
       allStepsDone: { count: 1, percent: 33.3 },
@@ -159,7 +161,7 @@ describe('最初の10分のまとめ', () => {
 
   it('期間に店が無い時は 0 と空の分を返す', async () => {
     const { body } = await read(master, '?period=prev_month');
-    expect(body).toMatchObject({ periodLabel: '先月', accounts: 0, minutesToFirstMessage: { median: null, p75: null, reached: 0 }, withinTenMinutesPercent: 0 });
+    expect(body).toMatchObject({ periodLabel: '先月', accounts: 0, biggestDrop: null, minutesToFirstMessage: { median: null, p75: null, reached: 0 }, withinTenMinutesPercent: 0 });
   });
 
   it('アカウント 1,000 の作り物でも 3 秒以内に数える', async () => {
@@ -180,9 +182,10 @@ describe('最初の10分のまとめ', () => {
     const { body } = await read();
     const elapsed = performance.now() - started;
     expect(body?.accounts).toBe(1000);
-    expect(body?.stages.find((stage) => stage.key === 'firstMessage')?.count).toBe(1000);
+    expect(body?.minutesToFirstMessage.reached).toBe(1000);
     expect(elapsed).toBeLessThan(3000);
-  });
+    // 作り物を入れる時間は測らない。3 秒は数える部分だけで見る。
+  }, 30_000);
 });
 
 describe('見られる人', () => {

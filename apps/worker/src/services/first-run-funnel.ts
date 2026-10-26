@@ -28,7 +28,19 @@ export type FirstRunFunnelStage = (typeof FIRST_RUN_FUNNEL_STAGES)[number];
 export interface FirstRunFunnel {
   /** 期間にできたアカウントの数（じょうごの 1 段目）。 */
   accounts: number;
-  stages: Array<{ key: FirstRunFunnelStage; count: number; percent: number }>;
+  /**
+   * 5 地点の順に区切ったじょうご。その段まで来た数は、その地点と前の地点が全部そろったアカウントだけを数える。
+   * fromPrevious は前の段からの割合、minutesFromPrevious は前の地点からかかった分の中央値（1 段目は null）。
+   */
+  stages: Array<{
+    key: FirstRunFunnelStage;
+    count: number;
+    percent: number;
+    fromPrevious: number | null;
+    minutesFromPrevious: number | null;
+  }>;
+  /** 前の段からの割合がいちばん低い段（同じなら先の段）。アカウントが無ければ null。 */
+  biggestDrop: { key: FirstRunFunnelStage; fromPrevious: number; lost: number } | null;
   /** 開始から最初の 1 通までの分。届いたアカウントだけで数える。 */
   minutesToFirstMessage: { median: number | null; p75: number | null; reached: number };
   /** 期間にできたアカウントのうち、10 分以内に最初の 1 通まで届いた割合。 */
@@ -156,30 +168,56 @@ export async function firstRunFunnel(
   return summarize(times.results ?? [], done);
 }
 
+/** 2 つの時刻の差を分（切り上げ・0 未満は 0）。読めなければ null。 */
+function spanMinutes(from: string | null, to: string | null): number | null {
+  if (!from || !to) return null;
+  const span = instant(to) - instant(from);
+  return Number.isFinite(span) ? Math.max(0, Math.ceil(span / 60000)) : null;
+}
+
 function summarize(rows: AccountTimes[], done: Set<string>): FirstRunFunnel {
   const total = rows.length;
-  const reachedBy: Record<FirstRunFunnelStage, (row: AccountTimes) => boolean> = {
-    started: () => true,
-    style: (row) => Boolean(row.style_at),
-    starter: (row) => Boolean(row.starter_at),
-    follow: (row) => Boolean(row.follow_at),
-    firstMessage: (row) => Boolean(row.first_message_at),
+  const pointOf: Record<FirstRunFunnelStage, (row: AccountTimes) => string | null> = {
+    started: (row) => row.created_at,
+    style: (row) => row.style_at,
+    starter: (row) => row.starter_at,
+    follow: (row) => row.follow_at,
+    firstMessage: (row) => row.first_message_at,
   };
+  const stages: FirstRunFunnel['stages'] = [];
+  let reached = rows;
+  FIRST_RUN_FUNNEL_STAGES.forEach((key, index) => {
+    const previous = index > 0 ? FIRST_RUN_FUNNEL_STAGES[index - 1] : null;
+    const before = reached.length;
+    if (previous) reached = reached.filter((row) => Boolean(pointOf[key](row)));
+    const spans = previous
+      ? reached.map((row) => spanMinutes(pointOf[previous](row), pointOf[key](row)))
+        .filter((value): value is number => value !== null)
+        .sort((a, b) => a - b)
+      : [];
+    stages.push({
+      key,
+      count: reached.length,
+      percent: ratio(reached.length, total),
+      fromPrevious: previous ? ratio(reached.length, before) : null,
+      minutesFromPrevious: previous ? rankPoint(spans, 0.5) : null,
+    });
+  });
+  let biggestDrop: FirstRunFunnel['biggestDrop'] = null;
+  stages.forEach((stage, index) => {
+    if (total === 0 || stage.fromPrevious === null) return;
+    if (biggestDrop && stage.fromPrevious >= biggestDrop.fromPrevious) return;
+    biggestDrop = { key: stage.key, fromPrevious: stage.fromPrevious, lost: stages[index - 1].count - stage.count };
+  });
   const minutes = rows
-    .map((row) => {
-      if (!row.created_at || !row.first_message_at) return null;
-      const span = instant(row.first_message_at) - instant(row.created_at);
-      return Number.isFinite(span) ? Math.max(0, Math.ceil(span / 60000)) : null;
-    })
+    .map((row) => spanMinutes(row.created_at, row.first_message_at))
     .filter((value): value is number => value !== null)
     .sort((a, b) => a - b);
   const withinTen = minutes.filter((value) => value <= 10).length;
   return {
     accounts: total,
-    stages: FIRST_RUN_FUNNEL_STAGES.map((key) => {
-      const count = rows.filter(reachedBy[key]).length;
-      return { key, count, percent: ratio(count, total) };
-    }),
+    stages,
+    biggestDrop,
     minutesToFirstMessage: { median: rankPoint(minutes, 0.5), p75: rankPoint(minutes, 0.75), reached: minutes.length },
     withinTenMinutesPercent: ratio(withinTen, total),
     allStepsDone: { count: done.size, percent: ratio(done.size, total) },
