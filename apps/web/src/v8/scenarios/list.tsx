@@ -35,6 +35,7 @@ import { describeApiFailure, isForbidden, permissionDeniedMessage } from '@/comp
 import { NoPermissionBoard } from '@/v8/no-permission/index'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';
+import { ProgressBar } from '@/components/shared/progress';
 import { runUndoable, runOptimistic } from '@/lib/undoable';
 import { useLiveReorder } from '@/lib/use-live-reorder';
 import { ListPage, ListPagePagination } from '@/components/templates';
@@ -796,7 +797,7 @@ export default function ScenariosListV8() {
     <>
       <Th aria-label="並び替え" />
       <Th className={styles.headCell}>シナリオ</Th>
-      <Th className={styles.headCell}>購読中 / 読み終えた</Th>
+      <Th className={styles.headCell}>読み終えた / 購読中</Th>
       <Th className={styles.headCell}>状態</Th>
       <Th aria-label="操作" />
     </>
@@ -958,10 +959,13 @@ export default function ScenariosListV8() {
                     />
                     <Td
                       className={styles.countCell}
-                      title={`購読中 ${subscribers} 人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}
+                      title={`読み終えた ${formatNumber(s.completedCount ?? 0)} 人 ／ 購読中 ${subscribers} 人`}
                     >
-                      <div className={styles.countMain}>{`${subscribers} 人`}</div>
-                      <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}</div>
+                      {/* 読み終えた ÷ 購読中 を細い棒と 1 行の数で。0 人の行は棒も数も薄くする。 */}
+                      <div className={styles.countRow} data-empty={!s.subscriberCount || undefined}>
+                        <ProgressBar value={s.completedCount ?? 0} max={s.subscriberCount ?? 0} label={`${s.name ?? 'シナリオ'}の読み終えた割合`} className={styles.countBar} />
+                        <span className={styles.countMain}>{`${formatNumber(s.completedCount ?? 0)} / ${subscribers} 人`}</span>
+                      </div>
                     </Td>
                     <Td>
                       <SharedStatusPill tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? '有効' : '停止中'}</SharedStatusPill>
