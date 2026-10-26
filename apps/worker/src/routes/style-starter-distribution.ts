@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
-import { base, hq, json, account, edit } from './styles-common.js';
-import { checkStyle, StyleError } from '../services/style-setup.js';
+import { base, hq, json, account, edit, version } from './styles-common.js';
+import { checkStyle, readDefinition, StyleError } from '../services/style-setup.js';
+import { musuboStarter } from '../services/style-starter-set.js';
+import { requireRole } from '../middleware/role-guard.js';
 import {
   starterDistributionPlan,
   distributeStarter,
@@ -32,6 +34,53 @@ styleStarterDistribution.post(path + '/preflight', async (c) => {
         items: a.items.map(({ binding, snapshot, ...i }) => i),
       })),
     },
+  });
+});
+/** musubo の標準の中身。統括が自分の組を作る・戻す前に見る。 */
+styleStarterDistribution.get(path + '/default', async (c) => {
+  await hq(c);
+  const style = checkStyle(c.req.param('style'));
+  const standard = await musuboStarter(c.env.DB, style);
+  return c.json({
+    success: true,
+    data: { style, id: standard.id, version: standard.version, definition: standard.definition },
+  });
+});
+/**
+ * 統括の組を musubo の標準に戻す。戻す前の版は止めた写しで残し、自動で入れるかの設定と組の ID は変えない。
+ * 店にはまだ配らない（配るのは今までどおり確認と配るの口から）。
+ */
+styleStarterDistribution.post(path + '/reset', requireRole('owner', 'admin'), async (c) => {
+  const tenant = await hq(c),
+    style = checkStyle(c.req.param('style')),
+    b = await json(c);
+  if (b.confirmed !== true) throw new StyleError('confirmation_required');
+  const current = await c.env.DB.prepare(
+    'SELECT id,version,auto_insert FROM style_starter_sets WHERE tenant_id=? AND style=? AND archived_at IS NULL',
+  )
+    .bind(tenant, style)
+    .first<{ id: string; version: number; auto_insert: number }>();
+  version(b.expectedVersion, current?.version ?? 0);
+  // 自分の組が無い統括は、もう標準を使っている。戻す物が無い。
+  if (!current) return c.json({ success: true, data: { id: null, version: 0, reset: false, previousId: null } });
+  const definition = readDefinition((await musuboStarter(c.env.DB, style)).definition, style);
+  const now = new Date().toISOString(),
+    previousId = crypto.randomUUID();
+  const [, updated] = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO style_starter_sets(id,tenant_id,style,name,definition_json,version,archived_at,updated_at,updated_by,auto_insert)
+       SELECT ?,tenant_id,style,name,definition_json,version,?,updated_at,updated_by,auto_insert FROM style_starter_sets
+        WHERE id=? AND tenant_id=? AND version=? AND archived_at IS NULL`,
+    ).bind(previousId, now, current.id, tenant, current.version),
+    c.env.DB.prepare(
+      'UPDATE style_starter_sets SET definition_json=?,version=version+1,updated_at=?,updated_by=? WHERE id=? AND tenant_id=? AND version=? AND archived_at IS NULL',
+    ).bind(JSON.stringify(definition), now, c.get('staff').id, current.id, tenant, current.version),
+  ]);
+  // 読んだ後にほかの人が保存していたら、写しも作られていない。上書きせずに知らせる。
+  if (!updated?.meta.changes) throw new StyleError('version_conflict', 409);
+  return c.json({
+    success: true,
+    data: { id: current.id, version: current.version + 1, reset: true, previousId, autoInsert: !!current.auto_insert },
   });
 });
 styleStarterDistribution.post(path + '/distribute', async (c) =>

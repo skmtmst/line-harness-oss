@@ -27,6 +27,8 @@ const definitions: Array<[string,string,string]> = [
   ["put", "/api/hq/style-starter-sets/{style}", "統括の見本セット"],
   ["post", "/api/hq/style-starter-sets/{style}/preflight", "初期セットを配る前の確認"],
   ["post", "/api/hq/style-starter-sets/{style}/distribute", "初期セットを配る"],
+  ["get", "/api/hq/style-starter-sets/{style}/default", "musubo の標準の初期セット"],
+  ["post", "/api/hq/style-starter-sets/{style}/reset", "初期セットを標準に戻す"],
   ["post", "/api/dashboard/style/starter-items/{key}/accept-update", "本部の新しい版を取り込む"],
   ["get", "/api/hq/style-attention", "統括の要確認一覧"],
   ["post", "/api/dashboard/style/closures", "休業・貸切"],
