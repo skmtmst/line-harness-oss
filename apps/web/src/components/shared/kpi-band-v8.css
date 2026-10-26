@@ -235,6 +235,28 @@ html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-sparkline] {
   display: block; position: absolute; right: var(--space-20); bottom: var(--polish-space-card);
   width: 30%; height: var(--space-24);
 }
+/* 画面が 1152 より狭い時は 2×2。 */
+@media (max-width: 1151px) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/*
+ * 細いカード（4 列で中身の幅が 200 未満＝1152 の 4 列）は、題を 1 行で全部見せる。右上の札は数字の行の右へ移し、
+ * 行き先は補足の下の行へ下ろす（題・補足を札や行き先で省略させない）。
+ */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] { container: kpi-card / inline-size; }
+@container kpi-card (width < 200px) {
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child { display: contents; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child > * { grid-column: 2; grid-row: 1; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child > [data-kpi-label] { grid-column: 1 / -1; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version]:has(> :first-child > :not([data-kpi-label], [data-kpi-badge])) > :first-child > [data-kpi-label] { grid-column: 1; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > :first-child > [data-kpi-badge],
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > [data-unit-spacing] > [data-kpi-delta-slot] { grid-column: 2; grid-row: 2; align-self: center; justify-self: end; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-design-version] > [data-unit-spacing] > p:first-child { grid-column: 1; grid-row: 2; min-width: 0; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] { flex-wrap: wrap; row-gap: var(--space-4); }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > span:first-child { flex-basis: 100%; }
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > a,
+  html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > button { margin-inline-start: auto; }
+}
 
 /* どの数の帯でも、値が 0 の時は数字と単位を薄い灰にする（帯の形・数字の太さは変えない）。 */
 html:root [data-kpi-strip] [data-kpi-zero] [data-kpi-value],
