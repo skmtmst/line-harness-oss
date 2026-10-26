@@ -324,7 +324,7 @@ for (const [style, heading] of [['standard', 'ダッシュボード'], ['ec', '�
     await dialog.getByRole('button', { name: '閉じる', exact: true }).click()
     await expect(dialog).toHaveCount(0)
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('heading', { name: heading, exact: true, level: 2 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: heading, exact: true, level: 1 })).toBeVisible()
   }
 })
 
@@ -453,7 +453,7 @@ for (const style of ['salon', 'ec']) test(`discarding unsaved ${style} setup nev
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page).toHaveURL(/\/$/)
     await page.reload()
-    await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true, level: 2 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true, level: 1 })).toBeVisible()
     await page.goto('/?setup=0')
     const reopened = page.getByRole('dialog', { name: 'はじめに、使い方を教えてください' })
     await expect(reopened.locator('input[name="setup-style"][value="standard"]')).toBeChecked()

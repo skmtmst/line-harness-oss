@@ -1,5 +1,6 @@
 import {prepareStarterInsert} from './style-starter-insert-context.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
+import { friendAddStarterStatements } from './style-starter-friend-add.js';
 import {
   recordSnapshot,
   resourceSnapshot,
@@ -11,6 +12,9 @@ import { type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 import { profile } from './style-profile.js';
 import type { starter } from './style-starter-set.js';
 import { StyleError, readCards, defaultCards } from './style-setup-core.js';
+/** 入れなかった理由。画面がそのまま札に使うので、決まった値だけを返す。 */
+export type StarterSkipReason = 'answer_later' | 'not_for_style' | 'auto_insert_off' | 'already_exists';
+export type StarterSkip = { key: string; reason: StarterSkipReason };
 export async function insertStyleStarterItems(
   db: D1Database,
   account: string,
@@ -29,10 +33,19 @@ export async function insertStyleStarterItems(
 ) {
   const {set,existing,oldProfile,choice}=await prepareStarterInsert(db,account,tenant,style,input,options);
   const inserted:unknown[]=[];
+  const skipped:StarterSkip[]=[];
+  const skip=(key:string,reason:StarterSkipReason)=>{skipped.push({key,reason});};
+  // スタイルを選んでいない（あとで・手動）時は何も入れない。黙って飛ばさず理由を返す。
+  if (!selected) for (const item of set.definition.items) skip(item.key,'answer_later');
   for (const item of selected ? set.definition.items : []) {
-    if (item.kind === 'booking_menu' && !['salon', 'consult'].includes(style))
+    if (item.kind === 'booking_menu' && !['salon', 'consult'].includes(style)) {
+      skip(item.key,'not_for_style');
       continue;
-    if (!set.autoInsert && !choice?.[item.key]) continue;
+    }
+    if (!set.autoInsert && !choice?.[item.key]) {
+      skip(item.key,'auto_insert_off');
+      continue;
+    }
     if (
       options.skipExisting !== false &&
       existing.some((e) => e.item_key === item.key)
@@ -88,6 +101,7 @@ export async function insertStyleStarterItems(
             );
           }
         }
+        skip(item.key,'already_exists');
         continue;
       }
       statements.push(
@@ -102,8 +116,10 @@ export async function insertStyleStarterItems(
       ['template', 'rich_menu'].includes(item.kind) &&
       answers.content &&
       (answers.content.mode !== 'configured' || answers.content.value === false)
-    )
+    ) {
+      skip(item.key,'answer_later');
       continue;
+    }
     const intrinsicFeature =
       item.kind === 'booking_menu'
         ? 'booking'
@@ -119,8 +135,10 @@ export async function insertStyleStarterItems(
           answers[feature]?.mode !== 'configured' ||
           answers[feature]?.value === false,
       )
-    )
+    ) {
+      skip(item.key,'answer_later');
       continue;
+    }
     const chosen = choice?.[item.key];
     if (chosen && !['sample', 'existing', 'configured'].includes(chosen.mode))
       throw new StyleError('invalid_choices');
@@ -342,6 +360,15 @@ export async function insertStyleStarterItems(
           .prepare('UPDATE rich_menu_groups SET default_page_id=? WHERE id=?')
           .bind(page, id),
       );
+    } else if (item.kind === 'friend_add_rule') {
+      const prepared = await friendAddStarterStatements(db, account, item, now);
+      // 受け皿に店の設定か下書きが既にある。上書きせず、黙って落とさずに理由を返す。
+      if (!prepared) {
+        skip(item.key,'already_exists');
+        continue;
+      }
+      id = prepared.id;
+      statements.push(...prepared.statements);
     } else if (item.kind === 'dashboard')
       statements.push(
         db
@@ -386,9 +413,10 @@ export async function insertStyleStarterItems(
       requiresActivation:
         item.kind === 'automation' ||
         item.kind === 'reminder' ||
+        item.kind === 'friend_add_rule' ||
         item.kind === 'booking_menu' ||
         item.kind === 'rich_menu',
     });
   }
-  return { set, inserted };
+  return { set, inserted, skipped, existing };
 }

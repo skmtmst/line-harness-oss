@@ -1877,18 +1877,17 @@ describe('selected registration style', () => {
     }
     expect(external).not.toHaveBeenCalled();expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
-  test('returns the created account for style retry without deleting it or creating a second account',async()=>{
-    installAutoConnectFetch();
-    let followerSetting:string|null=null;
+  test.each([
+    ['/api/line-accounts/connect',{...autoConnectBody,style:'consult'}],
+    ['/api/line-accounts',{channelId:'123456789',name:'メイン',channelAccessToken:'token',channelSecret:'secret',loginChannelId:'2009624792',loginChannelSecret:'login-secret',liffId:'2009624792-XXXX',style:'consult'}],
+  ])('returns the created account for style retry without deleting it or creating a second account: %s',async(path,body)=>{
+    installAutoConnectFetch();let followerSetting:string|null=null;
     dbMocks.getAccountSetting.mockImplementation(async()=>followerSetting);dbMocks.setAccountSetting.mockImplementation(async(_db,_id,_key,value)=>{followerSetting=value;});
-    dbMocks.createLineAccount.mockResolvedValue({...fakeAccount,id:'created-account',channel_access_token:'issued-token'});
-    dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
-    lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});
-    styleMocks.initializeAccountStyle.mockRejectedValueOnce(new Error('db failure'));
+    dbMocks.createLineAccount.mockResolvedValue({...fakeAccount,id:'created-account',channel_access_token:'issued-token',login_channel_id:'2009624792',login_channel_secret:'login-secret',liff_id:'2009624792-XXXX'});
+    dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});styleMocks.initializeAccountStyle.mockRejectedValueOnce(new Error('db failure'));
     const app=new Hono<TestEnv>();app.use('*',apiContractMiddleware);app.route('/',setupApp('owner'));
-    const res=await app.request('/api/line-accounts/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...autoConnectBody,style:'consult'})});
-    expect(res.status).toBe(502);
-    expect(await res.json()).toMatchObject({success:false,error:{code:'style_save_failed',requestId:res.headers.get('X-Request-ID'),fieldErrors:[]},data:{accountId:'created-account',style:'consult',styleSaved:false,retryAt:'/api/dashboard/style?account_id=created-account'}});
+    const res=await app.request(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({success:false,error:{code:'style_save_failed',requestId:res.headers.get('X-Request-ID'),fieldErrors:[]},data:{accountId:'created-account',style:'consult',styleSaved:false,retryAt:'/api/dashboard/style?account_id=created-account',starterRetryAt:'/api/dashboard/style/starter-items/ensure?account_id=created-account'}});
     expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();expect(dbMocks.deleteUncommittedLineAccount).not.toHaveBeenCalled();
   });
 });

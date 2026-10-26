@@ -272,7 +272,7 @@ function ViewerComments({ webinarId }: { webinarId: string }) {
     return () => { active = false }
   }, [webinarId, attempt])
   return (
-    <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${comments.length}件` : emptyValue('unknown')}>
+    <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${formatNumber(comments.length)}件` : emptyValue('unknown')}>
       {error ? <Notice tone="danger" action={<> <Button size="compact" onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button> </>} >{error}</Notice>
         : comments === null ? <p role="status" className={styles.cardText}>コメントを読み込んでいます…</p>
           : comments.length === 0 ? <p className={styles.cardText}>まだコメントはありません。</p>

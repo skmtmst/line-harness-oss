@@ -62,7 +62,7 @@ function ResetInner() {
     const res = await authRequest<{ email: string }>('/api/auth/password/reset', { token, password })
     if (!res.ok || !res.data) {
       if (res.errors) setMessages((current) => ({ ...current, ...res.errors }))
-      setError(res.error || '設定できませんでした')
+      setError(res.error || '設定できませんでした。時間をおいて、もう一度お試しください。')
       setBusy(false)
       return
     }

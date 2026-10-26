@@ -508,7 +508,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
     setReversalError('')
     try {
       const res = await api.conversions.appendReversal(reversalTarget.id, { kind: reversalKind, reason: reversalReason.trim() })
-      if (!res.success) throw new Error(res.error || '記録できませんでした')
+      if (!res.success) throw new Error(res.error || '記録できませんでした。時間をおいて、もう一度お試しください。')
       const targetId = detailTarget.id
       setReversalTarget(null)
       setReversalReason('')

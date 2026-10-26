@@ -131,7 +131,7 @@ export default function MediaUploadDialog({
         }))),
       })
       if (!prepared.success || prepared.data.sessions.length !== pending.length) {
-        throw new Error('送信の準備結果を確認できませんでした')
+        throw new Error('送信の準備結果を確認できませんでした。時間をおいて、もう一度お試しください。')
       }
       for (let position = 0; position < pending.length; position += 1) {
         const selected = pending[position]
@@ -153,7 +153,7 @@ export default function MediaUploadDialog({
             entryIndex === index ? { ...item, state: 'verifying', message: '中身を確認しています', progress: 100 } : item
           )))
           const response = await api.media.completeUpload(session.id, { accountId, etag })
-          if (!response.success || response.data.status !== 'completed') throw new Error('登録を完了できませんでした')
+          if (!response.success || response.data.status !== 'completed') throw new Error('登録を完了できませんでした。時間をおいて、もう一度お試しください。')
           completed += 1
           const mediaId = response.data.mediaId ?? null
           setEntries((current) => current.map((item, entryIndex) => (
@@ -196,11 +196,11 @@ export default function MediaUploadDialog({
   return <Dialog open={open} title="ファイルを入れる" onCancel={onClose} busy={busy} error={error || undefined} designNode="eXAJP" designWidth={720} footer={(
         <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
           <p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
-            {errorCount > 0 ? `${errorCount}件は登録できません` : `${entries.length}件を選択中`}
+            {errorCount > 0 ? `${formatNumber(errorCount)}件は登録できません` : `${entries.length}件を選択中`}
           </p>
           <div className="flex items-center gap-2">
             <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
-              {`${readyCount}件を登録する`}
+              {`${formatNumber(readyCount)}件を登録する`}
             </Button>
           </div>
         </div>
@@ -227,7 +227,7 @@ export default function MediaUploadDialog({
             <div className="mb-2 flex items-center justify-between">
               <p className="text-ink text-sm font-bold">入れているもの</p>
               {busy || attempted ? null : (
-                <p className="text-ink-faint text-xs">{entries.length} 件中 {doneCount} 件 完了</p>
+                <p className="text-ink-faint text-xs">{formatNumber(entries.length)} 件中 {formatNumber(doneCount)} 件 完了</p>
               )}
             </div>
             {/*

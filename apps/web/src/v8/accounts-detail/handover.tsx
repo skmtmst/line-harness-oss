@@ -471,10 +471,10 @@ export default function AccountHandoverV8() {
             <span className={styles.boxLabel}>事前確認の結果</span>
             {canManage ? (
               <Button type="button" variant="text" presentation="account-inline" aria-expanded={declaredOpen} onClick={() => setDeclaredOpen((open) => !open)}>
-                {handover.declaredFriendTotal != null ? `申告 ${handover.declaredFriendTotal} 人` : '申告の数を入れる'}
+                {handover.declaredFriendTotal != null ? `申告 ${formatNumber(handover.declaredFriendTotal)} 人` : '申告の数を入れる'}
               </Button>
             ) : handover.declaredFriendTotal != null ? (
-              <span className={styles.boxLabel}>申告 {handover.declaredFriendTotal} 人</span>
+              <span className={styles.boxLabel}>申告 {formatNumber(handover.declaredFriendTotal)} 人</span>
             ) : null}
           </p>
           <p className={styles.boxValue}>{countsAreComplete && handover.counts ? countsLine(handover.counts) : '事前確認の合計が元の友だちの数と合わないので、数を出していません'}</p>
@@ -485,7 +485,7 @@ export default function AccountHandoverV8() {
               </div></Field></div>
           ) : null}
           {declaredMismatch ? (
-            <p className={styles.boxWarn}>申告の数（{handover.declaredFriendTotal}人）と事前確認の合計（{handover.counts?.sourceTotal ?? emptyValue('unknown')}人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
+            <p className={styles.boxWarn}>申告の数（{formatNumber(handover.declaredFriendTotal)}人）と事前確認の合計（{handover.counts?.sourceTotal ?? emptyValue('unknown')}人）が違います。差の理由を確かめてから、数を直すか事前確認をやり直してください。</p>
           ) : null}
         </Card>
       </div>
@@ -548,7 +548,7 @@ export default function AccountHandoverV8() {
         </>}>
           {decisionError
             ? decisionError
-            : <p className={styles.pendingText}>{editCount} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
+            : <p className={styles.pendingText}>{formatNumber(editCount)} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
         </Notice>
       ) : null}
 
@@ -577,7 +577,7 @@ export default function AccountHandoverV8() {
 
       <StickyBar presentation="account-handover" status={<p className={styles.bottomNote}>
           {unresolved > 0
-            ? `未判断が ${unresolved} 人残っています${reviewTotal !== null && decided !== null ? `（要確認 ${reviewTotal} 人のうち ${decided} 人を決めた）` : ''}。全員を決めると本実行できます`
+            ? `未判断が ${unresolved} 人残っています${reviewTotal !== null && decided !== null ? `（要確認 ${formatNumber(reviewTotal)} 人のうち ${decided} 人を決めた）` : ''}。全員を決めると本実行できます`
             : ''}
         </p>} actions={<>
         {/* 取り消しは進行中だけ。変更なので見るだけの人には出さない。 */}

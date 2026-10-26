@@ -39,8 +39,8 @@ describe('統括の旧メッセージ編集（保存結果の再確認にも使�
     const media = { id: 'media-old', kind: 'image' as const, filename, mimeType: 'image/png', sizeBytes: 1, width: 1040, height: 1040, durationMs: null, r2Key: 'k', publicUrl: null, versionId: 'v-1', versionNo: 1, contentHash: 'h' }
     const card = { format: 'flex' as const, title: 'ご案内', body: '本文', imageMediaId: 'media-old', buttons: [] }
     render(<Harness initial={{ ...base, media: [media], card, template: { ...base.template, messageType: 'flex' } }} save={vi.fn()} />)
-    const name = await screen.findByText(`${filename} ・ 1040×1040`)
-    expect(name.getAttribute('title')).toBe(`${filename} ・ 1040×1040`)
+    const name = await screen.findByText(`${filename}・1040×1040`)
+    expect(name.getAttribute('title')).toBe(`${filename}・1040×1040`)
   })
 
   it('既存の画像は切り替えを出さず、URLを直しても画像のまま保存できる', async () => {

@@ -67,7 +67,7 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
   it('編集画面でもテスト送信の結果を操作の直後に表示する', () => {
     expect(PAGE).toContain("notice: { tone: 'success' | 'error'; text: string } | null")
     expect(PAGE).toContain('notice={notice}')
-    expect(PAGE).toContain('テスト受信者 ${result.data.sent}名へ送信しました。')
+    // 送った後の文は、描いた編集画面で line-notifications-n678-contract.test.tsx が見る。
   })
 
   it('EC通知の既定設定も選択中のLINEアカウントに限定して読み書きする', () => {

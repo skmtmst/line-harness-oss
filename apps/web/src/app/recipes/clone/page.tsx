@@ -28,6 +28,7 @@ import {
   prefixedName,
 } from '../recipe-catalog'
 import styles from './clone.module.css'
+import { formatNumber } from '@/lib/format'
 
 /** 設計 ★管理画面 34-3「レシピを複製する」（`D5UaX`）。 */
 function RecipeClone() {
@@ -223,7 +224,7 @@ function RecipeClone() {
 
               <section className={styles.block}>
                 <h2 className={styles.blockTitle}>
-                  作られるもの{recipe.itemCount != null ? ` ${recipe.itemCount}件` : ''}
+                  作られるもの{recipe.itemCount != null ? ` ${formatNumber(recipe.itemCount)}件` : ''}
                 </h2>
                 <p className={styles.hint}>
                   すべて下書きで作られます。動きはじめるのは、ひとつずつ公開してからです。

@@ -7,7 +7,7 @@ import { withRequestTimeout } from '@/lib/request-timeout';
 import { clampSearchQuery } from '@/lib/search-query';
 import type { Dispatch,SetStateAction } from 'react';
 import { useCallback,useEffect,useRef,useState } from 'react';
-import { Chat,EmailInboxItem,ListCursor,StatusFilter,toListCursor } from './inbox-model';
+import { Chat,EmailInboxItem,InboxSort,ListCursor,StatusFilter,toListCursor } from './inbox-model';
 import { buildSupportEmailInboxQuery } from './support-email-query';
 
 type Options = {
@@ -19,10 +19,12 @@ type Options = {
   assigneeFilter: string
   unreadOnly: boolean
   quickFilter: "all" | "reply" | "overdue"
+  /** 並び。期限を使う店は期限が近い順で並べるので、口へは送らない。 */
+  sort?: InboxSort
   setError: Dispatch<SetStateAction<string>>
 }
 
-export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, statusFilter, assigneeFilter, unreadOnly, quickFilter, setError }: Options) {
+export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, statusFilter, assigneeFilter, unreadOnly, quickFilter, sort = 'unread_first', setError }: Options) {
 
   /*
    * メール一覧だけの失敗表示。LINE側の `error` とは別にする。
@@ -91,8 +93,10 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     const params: {
       status?: string; accountId?: string; q?: string;
       operatorId?: string; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue';
+      sort?: 'latest';
       limit?: number; beforeUnread?: 0 | 1; beforeAt?: string; beforeId?: string;
     } = {}
+    const latest = sort === 'latest' && !slaEnabled
     if (statusFilter !== 'all') params.status = statusFilter
     if (selectedAccountId) params.accountId = selectedAccountId
     if (debouncedNameQuery) params.q = debouncedNameQuery
@@ -101,17 +105,19 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     if (quickFilter !== 'all') params.quickFilter = quickFilter
     /* 返事の期限を使う店：「期限超過」は旧い「1時間以上待ち」の絞りを使わない。期限の絞り・並びは読んだ行の slaState・slaDueAt で行う。 */
     if (slaEnabled && quickFilter === 'overdue') delete params.quickFilter
+    // 新しい順は既定の並びと違うときだけ送る（既定の呼び方は変えない）。続きの位置に未読は使わない。
+    if (latest) params.sort = 'latest'
     params.limit = CHAT_PAGE_SIZE
     if (cursor) {
-      params.beforeUnread = cursor.unread
+      if (!latest) params.beforeUnread = cursor.unread
       params.beforeAt = cursor.at
       params.beforeId = cursor.id
     }
     return params
-  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, CHAT_PAGE_SIZE])
+  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, CHAT_PAGE_SIZE])
 
   // Compare at render time too: an old request can finish before the next effect runs.
-  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled])
+  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort])
 
   const { value: chats, setValue: setChats } = useListSnapshot<Chat[]>(listFilterKey, [])
   const { value: emailItems, setValue: setEmailItems } = useListSnapshot<EmailInboxItem[]>(listFilterKey, [])
@@ -194,12 +200,12 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
         }
       } else {
         // 口が success:false を返したときも、0件と区別できるよう失敗を出す。
-        setEmailError('メールの読み込みに失敗しました。')
+        setEmailError('メールの読み込みに失敗しました。時間をおいて、もう一度お試しください。')
       }
     } catch {
       if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
       // メールが出ないだけ。LINEのトークは使えるが、0件と区別できるよう失敗を出す。
-      setEmailError('メールの読み込みに失敗しました。')
+      setEmailError('メールの読み込みに失敗しました。時間をおいて、もう一度お試しください。')
     } finally {
       if (append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
         emailMoreLockRef.current = false
@@ -281,7 +287,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
       }
     } catch {
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
-      setError('チャットの追加読み込みに失敗しました。')
+      setError('チャットの追加読み込みに失敗しました。時間をおいて、もう一度お試しください。')
     } finally {
       if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoadingMore(false)
     }

@@ -21,6 +21,7 @@ import Dialog from './dialog'
 import TagPill from './tag-pill'
 import { TextField } from './text-field'
 import useNarrow from './use-picker-narrow'
+import { formatNumber } from '@/lib/format'
 
 /** フォルダの列の「すべて」「未分類」の値。 */
 export const PICKER_ALL = ''
@@ -123,7 +124,7 @@ function SingleEntityPickerDialog({
             </span>{item.categoryLabel ? <StatusBadge tone={item.tone} dot={false} size="compact">{item.categoryLabel}</StatusBadge> : null}</label>) : <p className={styles.tpNote}>当てはまる候補がありません。</p>)}
         </div>
         {createAction && !readOnly && query.trim() && !items.some((item) => item.name === query.trim()) ? <Button disabled={busy || listState} onClick={() => createAction.onCreate(query.trim())}>{createAction.label(query.trim())}</Button> : null}
-        {!listState ? <div className={shell.more}><span>{`${rows.length}件中 ${rows.length ? 1 : 0}〜${Math.min(visibleLimit, rows.length)}件`}</span>{rows.length > visibleLimit ? <Button size="compact" onClick={() => setLimit((value) => value + 20)}>続きを読み込む</Button> : null}</div> : null}
+        {!listState ? <div className={shell.more}><span>{`${formatNumber(rows.length)}件中 ${rows.length ? 1 : 0}〜${Math.min(visibleLimit, rows.length)}件`}</span>{rows.length > visibleLimit ? <Button size="compact" onClick={() => setLimit((value) => value + 20)}>続きを読み込む</Button> : null}</div> : null}
       {listFooter}
         {preview !== undefined && picked ? <div className={styles.itemPreview} aria-label="選んだ候補の見え方">{previewNode}</div> : null}
     </section></div></EntityPickerDialog>
@@ -227,7 +228,7 @@ export function EntityMultiPickerDialog({ title, description, items, folders, fo
     } catch { setCreateError('作れませんでした。もう一度お試しください。') }
     finally { setCreateBusy(false) }
   }
-  const countText = `${selected.length}件`
+  const countText = `${formatNumber(selected.length)}件`
   const pickedNames = selected.map((value) => allItems.find((item) => item.id === value)?.name ?? '見つからないもの').join('・')
   const footNote = note ?? (maxSelected !== undefined ? `${maxSelected}${unit === '件' ? '件' : ` ${unit}`}まで選べます` : 'いくつでも選べます')
   // S2Vgi（正の形）：頭に「＋〇〇を作る」、一覧の下に「選んだもの」の帯、下の段は案内と［キャンセル］［選ぶ（N件）］。
@@ -236,7 +237,7 @@ export function EntityMultiPickerDialog({ title, description, items, folders, fo
     band={selected.length ? <div className={styles.pickedBand} aria-live="polite">
       <strong className={styles.pickedLabel}>選んだもの：</strong>
       <span className={styles.pickedNames} title={pickedNames}>{pickedNames}</span>
-      <strong className={styles.pickedCount}>{`${selected.length} 件`}</strong>
+      <strong className={styles.pickedCount}>{`${formatNumber(selected.length)} 件`}</strong>
     </div> : undefined}
     footer={<>
       <div className={styles.tpFootLead}>

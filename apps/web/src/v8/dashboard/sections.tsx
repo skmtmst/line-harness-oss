@@ -24,6 +24,8 @@ import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import type { DashboardComparison } from '@line-crm/shared'
+import KpiDelta from './kpi-delta'
 
 type Section = NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
 
@@ -163,13 +165,13 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
 }) {
   const currentHealthIssue = risk === 'warning' || risk === 'danger'
   const count = referenceCount ?? (risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0)
-  const twoFactorText = `・組織全体の二段階認証：${twoFactor === null ? emptyValue('unknown') : `${twoFactor.enabled} / ${twoFactor.total}人`}`
+  const twoFactorText = `・組織全体の二段階認証：${twoFactor === null ? emptyValue('unknown') : `${twoFactor.enabled} / ${formatNumber(twoFactor.total)}人`}`
   return (
     <DashboardAsideSection>
       <SectionHeader title="運用アラート" href="/emergency" linkLabel="運用状態を見る" />
       <p className={styles.alertHead}>
         <span className={failed || count === null ? styles.faintStrong : styles.strong}>
-          {failed ? '未取得' : count === null ? emptyValue('unknown') : `接続・自動処理 ${count}件`}
+          {failed ? '未取得' : count === null ? emptyValue('unknown') : `接続・自動処理 ${formatNumber(count)}件`}
         </span>
         {!failed && count !== null ? <Tag tone={count > 0 ? 'warning' : 'success'}>{count > 0 ? '要確認' : '正常'}</Tag> : null}
       </p>
@@ -230,7 +232,24 @@ export function webhookState(account: Pick<AccountWithStats, 'connection' | 'web
   return { label: '未確認', reason: null }
 }
 
-export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFriends, healthFailed }: {
+/**
+ * 友だちの上限のメーター。上限は LINE の決まりではなく、アカウントに店が入れた目安だけを使う。
+ * 上限か友だちの数が無いアカウントには出さない（作り物の上限を出さない）。
+ */
+export function friendCapacityMeter(account: Pick<AccountWithStats, 'friendCapacity' | 'capacityWarnAt' | 'stats'> | null | undefined): { count: number; capacity: number; rate: number; warn: boolean } | null {
+  const capacity = account?.friendCapacity
+  const count = account?.stats?.friendCount
+  if (typeof capacity !== 'number' || !Number.isFinite(capacity) || capacity <= 0 || typeof count !== 'number' || !Number.isFinite(count)) return null
+  const warnAt = account?.capacityWarnAt
+  return {
+    count,
+    capacity,
+    rate: Math.max(0, Math.min(100, count / capacity * 100)),
+    warn: count >= capacity || (typeof warnAt === 'number' && Number.isFinite(warnAt) && count >= warnAt),
+  }
+}
+
+export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFriends, activeFriendsCompare, healthFailed }: {
   account: AccountWithStats | null | undefined
   /** 確かめるを押せる（オーナー・管理者）。 */
   canCheck: boolean
@@ -238,6 +257,8 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
   onChecked: () => Promise<void> | void
   risk: HealthRisk
   activeFriends: number | null
+  /** 有効友だちの先週の同じ曜日との比べ。記録が無い時は null（札を出さない）。 */
+  activeFriendsCompare?: DashboardComparison | null
   healthFailed?: boolean
 }) {
   const [checking, setChecking] = useState(false)
@@ -268,6 +289,7 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
     }
   }
   const showCheck = canRun && (state.label !== '正常' || checking)
+  const capacity = friendCapacityMeter(account)
   return (
     <DashboardAsideSection>
       <SectionHeader title="接続状態" />
@@ -282,7 +304,14 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
       {state.label === '要確認' && state.reason && !checking ? <p className={`${styles.stale} ${styles.connectionReason}`} title={state.reason.title}>{state.reason.text}</p> : null}
       {checkError ? <p className={styles.alert} role="alert">{checkError}</p> : null}
       <KeyValue label="自動処理" value={autoLabel} dot={dotOf(autoLabel)} tone={autoLabel === '要確認' ? 'danger' : 'default'} />
-      <KeyValue label="有効友だち" value={activeFriends === null ? emptyValue('unknown') : `${formatNumber(activeFriends)} 人`} />
+      <KeyValue label="有効友だち" value={activeFriends === null ? emptyValue('unknown') : <span className={styles.kvDelta}>
+        {activeFriendsCompare ? <KpiDelta current={activeFriendsCompare.current} previous={activeFriendsCompare.previous} better={activeFriendsCompare.better} unit="人" /> : null}
+        <span>{`${formatNumber(activeFriends)} 人`}</span>
+      </span>} />
+      {capacity ? <>
+        <KeyValue label="友だちの上限" value={`${formatNumber(capacity.count)} / ${formatNumber(capacity.capacity)} 人`} tone={capacity.warn ? 'danger' : 'default'} />
+        <ProgressBar appearance="quota" tone={capacity.warn ? 'danger' : undefined} value={capacity.rate} label={`友だちの上限の使用率 ${Math.round(capacity.rate)}%`} />
+      </> : null}
     </DashboardAsideSection>
   )
 }
@@ -386,7 +415,12 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
 }
 
 /* ── 段D：今日の配信の失敗 ───────────────────────── */
-export function DeliveryFailures({ accountId, startLoad }: { accountId: string | null; startLoad: boolean }) {
+export function DeliveryFailures({ accountId, startLoad, compare }: {
+  accountId: string | null
+  startLoad: boolean
+  /** 先週の同じ曜日の同じ時刻までとの比べ。記録が無い時は null（札を出さない）。 */
+  compare?: DashboardComparison | null
+}) {
   const [origins, setOrigins] = useState<DeliveryFailureOrigins | null>(null)
   const [failed, setFailed] = useState(false)
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
@@ -418,7 +452,7 @@ export function DeliveryFailures({ accountId, startLoad }: { accountId: string |
         helpLabel="今日の配信の失敗の説明"
       />
       {origins ? (
-        <p className={styles.figure}><span className={styles.bigNum}>{formatNumber(origins.total)}</span><span className={styles.unit}>件</span></p>
+        <p className={styles.figure}><span className={styles.bigNum}>{formatNumber(origins.total)}</span><span className={styles.unit}>件</span>{compare && compare.current === origins.total ? <KpiDelta current={compare.current} previous={compare.previous} better={compare.better} unit="件" /> : null}</p>
       ) : failed ? (
         <p className={styles.figure}><span className={styles.bigNum}>{emptyValue('unknown')}</span></p>
       ) : <Loading label="今日の配信の失敗" />}

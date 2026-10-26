@@ -285,7 +285,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         <div className={styles.innerHeadRow}>
           <p className={styles.sectionDesc}>設備ごとに、同じ時間に使える数を決めます。</p>
           {canEdit ? (
-            <Button onClick={() => setAddingResource(true)}>設備を追加する</Button>
+            <Button onClick={() => setAddingResource(true)}>設備を作る</Button>
           ) : null}
         </div>
         {resourcesStatus === 'loading' ? <SkeletonRows rows={2} /> : null}
@@ -551,7 +551,7 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
   return (
     <SaveErrorScope errors={saveErrors}><Dialog
       open={open}
-      title={resource ? `「${resource.name}」を編集` : '設備を追加する'}
+      title={resource ? `「${resource.name}」を編集` : '設備を作る'}
       onCancel={() => { if (!saving) onClose() }}
       busy={saving}
       footer={<div className="flex justify-end gap-2">

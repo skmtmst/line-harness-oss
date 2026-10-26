@@ -31,7 +31,7 @@ import HelpTip from '@/components/shared/help-tip'
 import { Field, RequiredBadge } from '@/components/shared/form-controls'
 import PeriodPicker from '@/components/shared/period-picker'
 import { Check, ChevronDown, GitCompareArrows, RefreshCw } from 'lucide-react'
-import { formatDateTime, formatTime } from '@/lib/format'
+import { formatDateTime, formatTime, formatNumber } from '@/lib/format'
 import {
   api,
   ApiError,
@@ -1057,7 +1057,7 @@ function AnalyticsReportFormPage() {
             <CardHeader size="stacked" title={`${nextLabel} に、こう届きます`} meta="見本" />
             <Card surface="muted" corner="control" padding="compact" layout="vertical" gap="tight"><p className="report-v8-previewTitle">{name.trim() || '（名前なし）'}（前の{periodDays}日）</p>{sections.filter((id) => id !== 'usage').map((id) => <p className="report-v8-previewRow" key={id}>{PREVIEW_LABEL[id] ?? sectionTitleOf(id)} <strong>送信時に集計</strong></p>)}<p className="report-v8-previewMore">くわしくは musubo の分析で</p></Card>
           </Card>
-          <Card variant="aside"><CardHeader size="stacked" title="レポートが見ているもの" /><p className="report-v8-kvRow">LINE アカウント <strong>{selectedAccount?.name ?? '選択中のアカウント'}</strong></p><p className="report-v8-kvRow">保存した分析 <strong>{savedAnalysisIds.length} 件</strong></p></Card>
+          <Card variant="aside"><CardHeader size="stacked" title="レポートが見ているもの" /><p className="report-v8-kvRow">LINE アカウント <strong>{selectedAccount?.name ?? '選択中のアカウント'}</strong></p><p className="report-v8-kvRow">保存した分析 <strong>{formatNumber(savedAnalysisIds.length)} 件</strong></p></Card>
           <Card variant="aside"><CardHeader size="stacked" title="気をつけること" /><ul className="report-v8-notes"><li>数は送る時刻の時点で集めます</li><li>宛先がブロックしていると、LINE では届きません</li></ul></Card>
         </>}
         footerActions={<>
@@ -1177,7 +1177,7 @@ function AnalyticsReportFormPage() {
 export default function AnalyticsReportNewPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中…</div>}>
       <AnalyticsReportFormPage />
     </Suspense>
   )

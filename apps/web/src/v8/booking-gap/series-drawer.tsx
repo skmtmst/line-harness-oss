@@ -27,6 +27,7 @@ import { bookingSeriesApi } from '@/lib/api/helpers/gap2'
 import type { RecurrenceFrequency as SeriesFreq, SeriesOccurrence } from '@line-crm/shared'
 import { reasonText, createdCount, dayOf, dayWithWeekday, FREQ_OPTIONS, hm, initialPick, ruleLabel, weekdayOf, type Pick } from './series-model'
 import styles from './series-drawer.module.css'
+import { formatNumber } from '@/lib/format'
 
 export type SeriesDrawerSummary = {
   customerName: string
@@ -120,7 +121,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
           return { index: o.index, action: pick === 'skip' ? 'skip' as const : 'keep' as const }
         }),
       }, key.current)
-      notifySaved(`${res.data.bookings.length} 件の予約を入れました`)
+      notifySaved(`${formatNumber(res.data.bookings.length)} 件の予約を入れました`)
       onCreated({ seriesId: res.data.series.id, created: res.data.bookings.length })
     } catch (e) {
       saveErrors.capture(e)
@@ -138,7 +139,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
     <Drawer
       open={open}
       title="予約を入れる"
-      description={`${summary.customerName} さん ・ ${summary.menuName} ${summary.durationMin} 分`}
+      description={`${summary.customerName} さん・${summary.menuName} ${summary.durationMin} 分`}
       closeAppearance="box"
       width="editor"
       heightMode="viewport"
@@ -170,14 +171,14 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
               </Field>
             </div>
             {!countOk ? <Notice tone="danger">回数は {MIN} 回から {MAX} 回までです。</Notice> : null}
-            {countOk && state !== 'idle' ? <p className={styles.range}>{dayOf(summary.startsAt, summary.timeZone)} から {state === 'ready' ? dayOf(last, summary.timeZone) : '…'} まで、{ruleLabel(freq, summary.startsAt, summary.timeZone)}（{count} 回）</p> : null}
+            {countOk && state !== 'idle' ? <p className={styles.range}>{dayOf(summary.startsAt, summary.timeZone)} から {state === 'ready' ? dayOf(last, summary.timeZone) : '…'} まで、{ruleLabel(freq, summary.startsAt, summary.timeZone)}（{formatNumber(count)} 回）</p> : null}
             {state === 'loading' ? <Skeleton height={48} /> : null}
             {state === 'error' ? <Notice tone="danger">空きを確かめられませんでした。<Button variant="text" onClick={() => setRetry((n) => n + 1)}>もう一度</Button></Notice> : null}
             {state === 'ready' && unreadable ? <p className={styles.range}>空きを確かめられない回があります。その回は作りません。</p> : null}
             {state === 'ready' && conflict ? <Notice tone="danger">その間に埋まった回があります。表を確かめ直してください。</Notice> : null}
-            {state === 'ready' && blocked.length === 0 && !unreadable ? <p className={styles.allOk}>{list.length} 回すべて取れます</p> : null}
+            {state === 'ready' && blocked.length === 0 && !unreadable ? <p className={styles.allOk}>{formatNumber(list.length)} 回すべて取れます</p> : null}
             {state === 'ready' && blocked.length > 0 ? <>
-              <span className={styles.badge}><CalendarX2 aria-hidden="true" size={16} />取れない回 {blocked.length} 件</span>
+              <span className={styles.badge}><CalendarX2 aria-hidden="true" size={16} />取れない回 {formatNumber(blocked.length)} 件</span>
               <DataTable>
                 <thead><Tr><Th>日</Th><Th>理由</Th><Th>どうするか</Th></Tr></thead>
                 <tbody>
@@ -201,7 +202,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
             </> : null}
           </> : null}
         </section>
-        {on && state === 'ready' ? <p className={styles.note}>{list.length} 回のうち {made} 件を入れます{skipped.length ? `（${skipped.map((o) => dayOf(o.startsAt, summary.timeZone)).join('・')} は飛ばす）` : ''}。保存の直前に空きを確かめ直します。</p> : null}
+        {on && state === 'ready' ? <p className={styles.note}>{formatNumber(list.length)} 回のうち {made} 件を入れます{skipped.length ? `（${skipped.map((o) => dayOf(o.startsAt, summary.timeZone)).join('・')} は飛ばす）` : ''}。保存の直前に空きを確かめ直します。</p> : null}
       </div>
     </Drawer>
     </>

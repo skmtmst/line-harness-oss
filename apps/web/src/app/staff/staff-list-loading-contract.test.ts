@@ -16,6 +16,6 @@ describe("管理画面 30 一覧の読み方", () => {
 
   it('200件打ち切りは黙って切らず注記する', () => {
     expect(staffSource).toContain('setUsersTotal(usersResult.data.pagination?.total')
-    expect(staffSource).toContain('全${usersTotal} 人中${accessUsers.length} 人まで読み込み')
+    // 注記の文は、描いた画面で src/v8/settings/staff/staff-more-users.test.tsx が見る。
   })
 })

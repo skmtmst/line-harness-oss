@@ -110,7 +110,7 @@ export default function MergedPersonDetailViewV8({
             <div className={styles.tableWrap} style={{ border: 0 }}>
               <table className={styles.table}>
                 <thead>
-                  <tr>
+                  <tr className={styles.headRow}>
                     <th>アカウント</th>
                     <th>表示名</th>
                     <th>状態</th>
@@ -168,7 +168,7 @@ export default function MergedPersonDetailViewV8({
             <div className={styles.tableWrap} style={{ border: 0 }}>
               <table className={styles.table}>
                 <thead>
-                  <tr>
+                  <tr className={styles.headRow}>
                     <th>アカウント</th>
                     <th>表示名</th>
                     <th>結び付けた日</th>

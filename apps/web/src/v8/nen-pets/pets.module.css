@@ -87,7 +87,7 @@
 :global(:root) .table .headRow[data-table-layout='columns'] > th {
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
-  font-weight: var(--polish-control-weight);
+  font-weight: 600;
   white-space: nowrap;
 }
 :global(:root) .table .headRow[data-table-layout='columns'] > th.colProduct,

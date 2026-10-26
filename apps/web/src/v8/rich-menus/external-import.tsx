@@ -10,6 +10,7 @@ import Notice from '@/components/shared/notice'
 import { RowMenu } from '@/components/shared/row-actions'
 import styles from './external-import.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { formatNumber } from '@/lib/format'
 
 export type LineMenu = {
   richMenuId: string
@@ -88,7 +89,7 @@ export function ExternalImportWorkspace({
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-ink text-sm font-bold">LINE側にあって、この管理画面に無いメニュー</h2>
-                <span className="text-ink-faint text-xs">{unmanaged.length} 件</span>
+                <span className="text-ink-faint text-xs">{formatNumber(unmanaged.length)} 件</span>
               </div>
               <div className="space-y-2">
                 {unmanaged.map((menu) => {

@@ -149,16 +149,16 @@ export function putMediaFile(
       if (!event.lengthComputable || event.total <= 0) return
       onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)))
     }
-    request.onerror = () => reject(new Error('ファイルを送信できませんでした'))
+    request.onerror = () => reject(new Error('ファイルを送信できませんでした。時間をおいて、もう一度お試しください。'))
     request.onabort = () => reject(new Error('ファイルの送信を取り消しました'))
     request.onload = () => {
       if (request.status < 200 || request.status >= 300) {
-        reject(new Error('ファイルを送信できませんでした'))
+        reject(new Error('ファイルを送信できませんでした。時間をおいて、もう一度お試しください。'))
         return
       }
       const etag = request.getResponseHeader('ETag')?.trim()
       if (!etag) {
-        reject(new Error('送信したファイルを確認できませんでした'))
+        reject(new Error('送信したファイルを確認できませんでした。時間をおいて、もう一度お試しください。'))
         return
       }
       onProgress(100)

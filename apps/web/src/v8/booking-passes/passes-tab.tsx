@@ -209,7 +209,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
       <tbody>
         {plans.map((plan) => {
           const names = plan.menuIds.map((id) => menuNames[id]).filter(Boolean)
-          const usable = plan.menuIds.length === 0 ? 'すべての予約' : names.length === 0 ? `${plan.menuIds.length} 件` : names.length > 2 ? `${names.slice(0, 2).join('・')} ほか ${names.length - 2}` : names.join('・')
+          const usable = plan.menuIds.length === 0 ? 'すべての予約' : names.length === 0 ? `${formatNumber(plan.menuIds.length)} 件` : names.length > 2 ? `${names.slice(0, 2).join('・')} ほか ${names.length - 2}` : names.join('・')
           const holders = holdersCount[plan.id]
           return (
             <Tr key={plan.id} data-row-id={plan.id}>
@@ -256,7 +256,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
       {body}
       {status === 'ready' && total > 0 ? (
         <div className={styles.pager}>
-          <span className={styles.pagerCount}>{`${total} 件中 ${first}〜${last} 件`}</span>
+          <span className={styles.pagerCount}>{`${formatNumber(total)} 件中 ${first}〜${last} 件`}</span>
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       ) : null}

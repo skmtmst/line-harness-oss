@@ -109,9 +109,9 @@
     "--color-ink-faint": {
       "pencil": "$ink-faint",
       "source": "#6e7781",
-      "resolved": "#626a73",
+      "resolved": "#4a5565",
       "status": "active",
-      "note": "変更。旧 #8b938d。白地のコントラストが 3.16 → 4.55 でAAを満たす",
+      "note": "変更。旧 #8b938d → #626a73 → 補足の灰色を1色にするため ink-secondary と同じ値（白地 7.56）",
       "lastCheckedAt": "2026-08-24"
     },
     "--color-hairline": {
@@ -690,7 +690,7 @@
           "class": "labelV6",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
           "pencil": "V6 KPI label fontSize: $size-caption",
@@ -725,7 +725,7 @@
           "class": "labelBroadcast",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
           "pencil": "mNUQ3 label fontSize: $size-label",
@@ -1152,7 +1152,7 @@
           "class": "removedBar",
           "prop": "background",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
           "pencil": "目盛り数字 11px・$ink-faint",
@@ -1405,7 +1405,7 @@
           "class": "sectionHeading",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
           "pencil": "J33xq section fontSize: $size-caption",
@@ -1467,7 +1467,7 @@
           "class": "root",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
           "pencil": "R098Z fontSize: $size-caption",
@@ -1502,7 +1502,7 @@
           "class": "separator",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         }
       ]
     },
@@ -2284,7 +2284,7 @@
           "class": "searchIcon",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
           "pencil": "phlR1 text fill: $ink",
@@ -2443,7 +2443,7 @@
           "class": "chevron",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
           "pencil": "Gfsb4 stroke: $accent",
@@ -2671,7 +2671,7 @@
           "class": "button",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         }
       ]
     },

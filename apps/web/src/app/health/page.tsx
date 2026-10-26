@@ -262,7 +262,7 @@ export default function HealthPage() {
       {/* Loading */}
       {loading ? (
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
-          読み込み中...
+          読み込み中…
         </div>
       ) : accountsError !== null ? (
         /*
@@ -339,7 +339,7 @@ export default function HealthPage() {
                             disabled={retryingHealthIds.has(account.id)}
                             className="text-action mt-2 text-sm font-medium underline underline-offset-2 disabled:cursor-not-allowed"
                           >
-                            {retryingHealthIds.has(account.id) ? '再取得中...' : '再試行'}
+                            {retryingHealthIds.has(account.id) ? '再取得中…' : '再試行'}
                           </button>
                         </div>
                       )}
@@ -434,7 +434,7 @@ export default function HealthPage() {
                   />
                 </div>
                 <div className="flex items-center gap-3">
-                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId} busy={migrating} busyLabel="移行中...">移行を開始
+                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId} busy={migrating} busyLabel="移行中…">移行を開始
                   </Button>
                   <Button
                     type="button"
@@ -455,7 +455,7 @@ export default function HealthPage() {
             <h2 className="text-lg font-bold text-ink mb-4">移行履歴</h2>
             {migrationLoadState === 'loading' ? (
               <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-8 text-center">
-                移行履歴を読み込んでいます...
+                移行履歴を読み込んでいます…
               </div>
             ) : migrationLoadState === 'error' ? (
               <Notice

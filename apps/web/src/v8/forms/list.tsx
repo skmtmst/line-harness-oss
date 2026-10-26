@@ -636,7 +636,7 @@ export default function FormsListV8() {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
-      setFolderError('フォルダを削除できませんでした。') }
+      setFolderError('フォルダを削除できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }

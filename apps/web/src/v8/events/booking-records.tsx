@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { eventsApi, type EventBookingItem, type EventBookingSummary } from '@/lib/api'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, formatNumber } from '@/lib/format'
 import { parseEventQuestions } from '@/components/events/event-questions-editor'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
@@ -135,7 +135,7 @@ function Records({ accountId, eventId, occurrenceId, questionsJson, revision, re
             </EventRosterRow>
           })}
         </EventRosterTable>
-        <p>{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件 / 全{total}件</p>
+        <p>{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件 / 全{formatNumber(total)}件</p>
         <Pagination page={page} pageCount={Math.ceil(total / PAGE_SIZE)} onPageChange={setPage} ariaLabel="申込記録のページ送り" />
       </>}
   </>

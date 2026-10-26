@@ -19,6 +19,7 @@ import styles from './comments.module.css'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CommentViewerStats from './comment-stats'
+import { formatNumber } from '@/lib/format'
 
 
 /*
@@ -108,7 +109,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
     setMessage(null)
     if (importJson.trim()) { setMessage({ text: '貼り付けたJSONを読み込んでから保存してください。', error: true }); return false }
     if (comments.length > WEBINAR_SAKURA_COMMENTS_MAX) {
-      setMessage({ text: `コメントは${WEBINAR_SAKURA_COMMENTS_MAX} 件までです（いま${comments.length} 件）。減らしてから保存してください。`, error: true })
+      setMessage({ text: `コメントは${WEBINAR_SAKURA_COMMENTS_MAX} 件までです（いま${formatNumber(comments.length)} 件）。減らしてから保存してください。`, error: true })
       return false
     }
     const cleaned: WebinarSakuraComment[] = []
@@ -126,7 +127,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
       if (request !== generation.current) return false
       setComments(sorted)
       setBaseline(JSON.stringify(sorted))
-      notifySaved(`${response.data.count}件保存しました`)
+      notifySaved(`${formatNumber(response.data.count)}件保存しました`)
       return true
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause);
@@ -159,7 +160,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
       setComments(rows)
       setImportJson('')
       setShowImport(false)
-      setMessage({ text: `${rows.length} 件読み込みました（保存ボタンで確定）`, error: false })
+      setMessage({ text: `${formatNumber(rows.length)} 件読み込みました（保存ボタンで確定）`, error: false })
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
 
@@ -196,7 +197,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
           <div className={styles.cardHead}>
             <div className={styles.cardHeadText}>
               <h3 id="webinar-comments-title" className={styles.cardTitle}>流すコメント（演出）</h3>
-              <p className={styles.cardDesc}>{`動画の決まった秒に、用意したコメントを流します。マイナスの秒は開始前（待機ルーム）。最大 ${WEBINAR_SAKURA_COMMENTS_MAX} 件・いま ${comments.length} 件`}</p>
+              <p className={styles.cardDesc}>{`動画の決まった秒に、用意したコメントを流します。マイナスの秒は開始前（待機ルーム）。最大 ${WEBINAR_SAKURA_COMMENTS_MAX} 件・いま ${formatNumber(comments.length)} 件`}</p>
             </div>
             {readOnly ? null : (
               <Button variant="primary" disabled={state !== 'ready' || saving} busy={saving} busyLabel="保存しています…" onClick={() => void save()}>

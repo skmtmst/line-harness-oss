@@ -20,6 +20,7 @@ import { useEffect,useState } from 'react'
 import type { StyleClosureInput,StyleLayout,StyleLayoutItem,StyleKpi,IndustryStyle } from './model'
 import styles from './style-dashboard.module.css'
 import { metricOptions } from './metric-selection'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ［表示を変える］の引き出し（wFmQa・ 追記 7・8・ の 7）：
@@ -158,7 +159,7 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
   useEffect(() => { if (open) setIds(choices[0] ? [choices[0].id] : []) }, [open, target]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Dialog open={open} designWidth={step === 2 ? 540 : 480} titleHelp={<HelpTip label="休みを入れるの説明">臨時休業・貸切・急な休みを入れます。入れた時間は予約を受け付けません。</HelpTip>} busy={busy || checking} error={error} confirmLabel={step === 2 ? `休みを入れて LINE を送る` : '休みを入れる'} confirmIcon={step === 2 ? <Send size={16} aria-hidden="true" /> : <CalendarX2 size={16} aria-hidden="true" />} busyLabel="入れています" onCancel={() => (step === 2 ? setStep(1) : onClose())} cancelLabel={step === 2 ? '戻る' : 'キャンセル'} footerAlign="center"
-      title={step === 2 ? `重なる予約が ${overlap.length}件あります` : '休みを入れる'} description={step === 2 ? `${day} を休みにします` : undefined}
+      title={step === 2 ? `重なる予約が ${formatNumber(overlap.length)}件あります` : '休みを入れる'} description={step === 2 ? `${day} を休みにします` : undefined}
       confirmDisabled={target !== 'store' && ids.length === 0} confirmDisabledReason="対象を選んでください" dirty={false}
       onConfirm={() => void confirmClosure()}
       steps={overlap.length ? <Steps label="休みを入れる手順" currentKey={String(step)} steps={[{ key: '1', label: '日と時間', state: step > 1 ? 'done' : 'todo' }, { key: '2', label: '重なる予約', state: 'todo' }]} /> : undefined} stepKey={step}

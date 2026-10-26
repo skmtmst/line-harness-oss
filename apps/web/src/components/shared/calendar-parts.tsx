@@ -11,6 +11,7 @@ import { groupCalendarIntervals } from './calendar-overlap'
 import { calendarInterval, calendarMinutes } from './calendar-time-range'
 export { calendarTimeRange } from './calendar-time-range'
 import styles from './calendar-parts.module.css'
+import { formatNumber } from '@/lib/format'
 export { useCalendarTimeScale } from './use-calendar-time-scale'
 
 /** 時間盤の空き枠。媒体の取込欄とは別の予約操作。 */
@@ -69,7 +70,7 @@ export function CalendarTimeEntries({ days, entries, free, canWrite, position, o
               </div>
             })}
             {group.peak >= 3 ? <div className={styles.calendarPosition} style={position(all[0].start, all.reduce((last, entry) => minutes(entry.end) > minutes(last) ? entry.end : last, all[0].end), dayIndex, days.length)}>
-              <BookingBlock placement="calendar" tone="confirmed" aria-description="同じ時間帯の予約一覧" style={laneStyle(bookingLanes, lanes)} aria-haspopup="dialog" title={`この時間帯の予約${all.length}件をすべて見る`} aria-label={`ほか${all.length - 2}件・この時間帯の予約${all.length}件をすべて見る`} onClick={() => setExpanded(all)}>
+              <BookingBlock placement="calendar" tone="confirmed" aria-description="同じ時間帯の予約一覧" style={laneStyle(bookingLanes, lanes)} aria-haspopup="dialog" title={`この時間帯の予約${formatNumber(all.length)}件をすべて見る`} aria-label={`ほか${all.length - 2}件・この時間帯の予約${formatNumber(all.length)}件をすべて見る`} onClick={() => setExpanded(all)}>
                 <TruncatedText value={`+${all.length - 2}件`} />
               </BookingBlock>
             </div> : null}
@@ -78,10 +79,10 @@ export function CalendarTimeEntries({ days, entries, free, canWrite, position, o
         {freeGroups.map(group => {
           const slots = group.entries.map(entry => entry.value), slot = slots[0]
           const end = slots.reduce((last, item) => minutes(item.end) > minutes(last) ? item.end : last, slot.end)
-          const label = slots.length === 1 ? `${slot.bookingDay ?? day} ${slot.bookingStart ?? slot.start}に予約を入れる` : `${day} ${slot.start}からの空き${slots.length}件を選ぶ`
+          const label = slots.length === 1 ? `${slot.bookingDay ?? day} ${slot.bookingStart ?? slot.start}に予約を入れる` : `${day} ${slot.start}からの空き${formatNumber(slots.length)}件を選ぶ`
           return <div key={`${slot.start}-${end}`} className={styles.calendarPosition} style={position(slot.start, end, dayIndex, days.length)}>
             <CalendarSlotButton placement="calendar" style={laneStyle(bookingLanes + overflowLane, lanes)} title={label} aria-label={label} aria-haspopup={slots.length > 1 ? 'dialog' : undefined} onClick={() => slots.length === 1 ? onSlot(slot.bookingDay ?? day, slot.bookingStart ?? slot.start) : setExpandedFree(slots)}>
-              <Plus size={16} aria-hidden="true" /><TruncatedText value={slots.length === 1 ? '予約を入れる' : `空き${slots.length}件`} />
+              <Plus size={16} aria-hidden="true" /><TruncatedText value={slots.length === 1 ? '予約を入れる' : `空き${formatNumber(slots.length)}件`} />
             </CalendarSlotButton>
           </div>
         })}
@@ -90,12 +91,12 @@ export function CalendarTimeEntries({ days, entries, free, canWrite, position, o
   </>
   return <>
     {hourCount ? <div className={styles.timeGrid} style={{ '--calendar-hour-count': hourCount } as CSSProperties}>{grid}</div> : grid}
-    {expanded ? <Dialog open title={`この時間帯の予約（${expanded.length}件）`} onCancel={() => setExpanded(null)}>
+    {expanded ? <Dialog open title={`この時間帯の予約（${formatNumber(expanded.length)}件）`} onCancel={() => setExpanded(null)}>
       <div className={styles.calendarList}>{expanded.map(entry => <RowNameButton key={entry.id} title={`${entry.start}〜${entry.end} ${entry.title} ${entry.name}`} onClick={() => { setExpanded(null); onOpen(entry.id) }}>
         <TruncatedText value={`${entry.start}〜${entry.end} ${entry.title} ${entry.name}`} />
       </RowNameButton>)}</div>
     </Dialog> : null}
-    {canWrite && expandedFree ? <Dialog open title={`予約を入れる時刻（${expandedFree.length}件）`} onCancel={() => setExpandedFree(null)}>
+    {canWrite && expandedFree ? <Dialog open title={`予約を入れる時刻（${formatNumber(expandedFree.length)}件）`} onCancel={() => setExpandedFree(null)}>
       <div className={styles.calendarList}>{expandedFree.map((slot, index) => <RowNameButton key={`${slot.day}-${slot.start}-${index}`} onClick={() => { setExpandedFree(null); onSlot(slot.bookingDay ?? slot.day, slot.bookingStart ?? slot.start) }}>
         <TruncatedText value={slot.bookingDay ? `${slot.bookingDay} ${slot.bookingStart}からの空きに予約を入れる` : `${slot.day} ${slot.start}〜${slot.end}に予約を入れる`} />
       </RowNameButton>)}</div>

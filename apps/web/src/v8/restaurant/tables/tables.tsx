@@ -9,7 +9,7 @@ import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 /*
  * ★V8 座席・卓管理（板 `BERxg`・卓を止める ・卓を追加・変更 ）。
  *
- * 数4（卓数・総席数・結合可能・個室）→ 右上に「卓を追加する」→
+ * 数4（卓数・総席数・結合可能・個室）→ 右上に「卓を作る」→
  * 左にフロアマップ（結合グループは緑の地と札・停止中は薄く）、右に卓の詳細
  * （有効／停止中の札・変更・停止／再開）→ 自動配席ルール。
  * 止めるときは、この卓に入っている先の予約を見せ、別の卓へ移すか未配席に戻してから止める。
@@ -45,7 +45,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 /*
  * ★V8 座席・卓管理（板 `BERxg`・卓を止める ・卓を追加・変更 ）。
  *
- * 数4（卓数・総席数・結合可能・個室）→ 右上に「卓を追加する」→
+ * 数4（卓数・総席数・結合可能・個室）→ 右上に「卓を作る」→
  * 左にフロアマップ（結合グループは緑の地と札・停止中は薄く）、右に卓の詳細
  * （有効／停止中の札・変更・停止／再開）→ 自動配席ルール。
  * 止めるときは、この卓に入っている先の予約を見せ、別の卓へ移すか未配席に戻してから止める。
@@ -203,7 +203,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         const fieldFailure = saveErrors.capture(error)
 
         { if (!fieldFailure)
-        setStopError(japaneseDetailOf(error) || '予約の移動・卓の停止に失敗しました。') }
+        setStopError(japaneseDetailOf(error) || '予約の移動・卓の停止に失敗しました。時間をおいて、もう一度お試しください。') }
         throw new QuietError()
       }
     }, reservations.length === 0
@@ -379,7 +379,7 @@ export default function TablesPage() {
     <RestaurantShell templateHeading boundary={false} storeTab="tables" boardId="jmVYJ" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}<Button presentation="restaurant" href="/restaurant-test/tables"><MapIcon size={16} aria-hidden="true"/>座席表を直す</Button></>} renderPage={(ctx, heading, notice) => <TablesAssignBoard ctx={ctx} canEdit={canEdit} heading={heading} notice={notice} />} />
   )
   return (
-    <RestaurantShell templateHeading boundary={false} storeTab="tables" boardId="BERxg" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}<Button presentation="restaurant" href="/restaurant-test/tables?view=assign"><Scale size={16} aria-hidden="true"/>卓の割り当て方</Button>{canEdit?<Button presentation="restaurant" variant="primary" onClick={()=>setAddRequest(n=>n+1)}><Plus size={16}/>卓を追加する</Button>:null}</>}>
+    <RestaurantShell templateHeading boundary={false} storeTab="tables" boardId="BERxg" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}<Button presentation="restaurant" href="/restaurant-test/tables?view=assign"><Scale size={16} aria-hidden="true"/>卓の割り当て方</Button>{canEdit?<Button presentation="restaurant" variant="primary" onClick={()=>setAddRequest(n=>n+1)}><Plus size={16}/>卓を作る</Button>:null}</>}>
       {(ctx) => <TablesBoard ctx={ctx} addRequest={addRequest} />}
     </RestaurantShell>
   )

@@ -359,7 +359,7 @@ async function sendCustomerTestNotification(args: {
     if (!result.success) throw new Error(result.error)
     // 別アカウントへ切り替わった後の応答は、いまの画面へ出さない。
     if (isStale(guard)) return { kind: 'stale' }
-    return { kind: 'applied', tone: 'success', message: `テスト受信者 ${result.data.sent}名へ送信しました。` }
+    return { kind: 'applied', tone: 'success', message: `テスト受信者 ${formatNumber(result.data.sent)}名へ送信しました。` }
   } catch {
     if (isStale(guard)) return { kind: 'stale' }
     return { kind: 'applied', tone: 'error', message: 'テスト送信できませんでした。テスト受信者の設定をご確認ください。' }
@@ -897,7 +897,7 @@ function LineNotificationsPage() {
       setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
       if (restoredEvents.length > 0) {
         setDirtyEvents(restoredEvents)
-        notifySaved(`未保存の編集を${restoredEvents.length}件復元しました。確認して保存してください。`)
+        notifySaved(`未保存の編集を${formatNumber(restoredEvents.length)}件復元しました。確認して保存してください。`)
       }
       setLoadState('ready')
       setCustomerLoadError(null)
@@ -1257,7 +1257,7 @@ function LineNotificationsPage() {
         open={testSendDraft !== null}
         title="テスト受信者に送信しますか？"
         description="編集中の文面を、テスト受信者として登録されている人へ送ります。お客さま全員への一斉配信ではありません。"
-        confirmLabel={testRecipients.items.length > 0 ? `テスト受信者 ${testRecipients.items.length}名へ送信` : 'テスト受信者に送信'}
+        confirmLabel={testRecipients.items.length > 0 ? `テスト受信者 ${formatNumber(testRecipients.items.length)}名へ送信` : 'テスト受信者に送信'}
         onConfirm={testRecipients.state === 'ready' && testRecipients.items.length > 0 ? confirmTestSend : undefined}
         onCancel={closeTestSendConfirm}
       >
@@ -1277,7 +1277,7 @@ function LineNotificationsPage() {
                 : testRecipients.state === 'error' ? 'テスト受信者を読み込めませんでした。時間をおいて、もう一度お試しください。'
                 : testRecipients.items.length === 0
                   ? <>テスト受信者が登録されていません。<Link href={`/accounts/detail?id=${encodeURIComponent(selectedAccountId ?? '')}`} className="text-action hover:underline">アカウント設定</Link>で登録してください。</>
-                  : `${testRecipients.items.map((item) => item.displayName).join('・')}（${testRecipients.items.length}名）`}
+                  : `${testRecipients.items.map((item) => item.displayName).join('・')}（${formatNumber(testRecipients.items.length)}名）`}
             </dd>
           </div>
         </dl>

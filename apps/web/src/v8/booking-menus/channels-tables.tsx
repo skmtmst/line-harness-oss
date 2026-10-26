@@ -8,7 +8,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import { RowMenu } from '@/components/shared/row-actions'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { emptyValue } from '@/components/shared/empty-value'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatNumber } from '@/lib/format'
 import type { BookingChannel, BookingChannelStaff, BookingChannelsData } from './lib/booking-channels'
 import ch from './channels.module.css'
 
@@ -80,7 +80,7 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
           return <Tr key={channel.key} data-table-layout="columns">
             <Td grow title={`受け取り方：${label.how || emptyValue('unknown')}`}><span className={ch.nameCell}><OneLine text={label.name} tone="name" />{label.sub ? <OneLine text={label.sub} tone="sub" /> : null}</span></Td>
             <Td collapseAt="narrow"><TruncatedText value={label.how || emptyValue('unknown')} /></Td>
-            <Td><ChannelStatusChip channel={channel} /></Td><Td align="right"><TruncatedText value={channel.todayCount == null ? emptyValue('unknown') : `${channel.todayCount}件`} /></Td>
+            <Td><ChannelStatusChip channel={channel} /></Td><Td align="right"><TruncatedText value={channel.todayCount == null ? emptyValue('unknown') : `${formatNumber(channel.todayCount)}件`} /></Td>
             <Td collapseAt="narrow">{emptyValue('unknown')}</Td>
             <ActionCell>{channel.status === 'active' && ['line', 'manual'].includes(channel.key) ? <Button href="/booking/bookings">予約管理へ</Button> : null}{OUTSIDE_CHANNELS.has(channel.key) ? <RowMenu appearance="box" label={`${label.name}の操作`} items={outsideChannelMenu(channel.key)} /> : null}</ActionCell>
           </Tr>

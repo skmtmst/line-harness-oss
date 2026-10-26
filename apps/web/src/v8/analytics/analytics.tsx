@@ -143,5 +143,5 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
 
 export default function AnalyticsV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
-  return <Suspense fallback={<div className={styles.waiting}>読み込み中...</div>}><AnalyticsInnerV8 slots={slots} /></Suspense>
+  return <Suspense fallback={<div className={styles.waiting}>読み込み中…</div>}><AnalyticsInnerV8 slots={slots} /></Suspense>
 }

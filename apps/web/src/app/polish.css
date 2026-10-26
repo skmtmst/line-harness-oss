@@ -26,3 +26,9 @@ html {
     transition-delay: 0s !important;
   }
 }
+
+/*
+ * 表の見出しの文字は 500（§6.5 の 3）。画面ごとに太くした見出しも、ここで共通の値にそろえる
+ * （画面の規則は詳しさが高いので、この 1 つの値だけは必ず勝たせる）。
+ */
+html:root :is(th, [role=columnheader]) { font-weight: var(--polish-control-weight) !important; }

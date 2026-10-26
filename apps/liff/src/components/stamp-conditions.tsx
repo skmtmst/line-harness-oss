@@ -1,8 +1,9 @@
 import { formatYen } from '@line-crm/shared';
 import type { VisitStampSettings } from '@line-crm/shared';
+import { formatDateTimeLong } from '../lib/datetime.js';
 
 const hm = (minute: number) => `${Math.floor(minute / 60).toString().padStart(2, '0')}:${(minute % 60).toString().padStart(2, '0')}`;
-const day = (value: string, timeZone: string) => new Date(/(?:Z|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`).toLocaleString('ja-JP', { timeZone });
+const day = (value: string, timeZone: string) => formatDateTimeLong(/(?:Z|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`, timeZone);
 export default function StampConditions({ settings: s }: { settings: VisitStampSettings }) {
   const rules: string[] = [s.mode === 'visit' ? '1回の来店で1個' : `お会計${formatYen(s.amountUnit).replace(/^¥/, '')}円ごとに1個`];
   if (s.receiptBonus) rules.push(`カードを受け取ると${s.receiptBonus}個`);

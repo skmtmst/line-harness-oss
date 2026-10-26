@@ -14,6 +14,7 @@ import DistributionAccountPicker from './distribution-account-picker'
 import { ALL_ACCOUNTS, type useDistributionFolders } from './distribution-accounts'
 import styles from './folder-distribution-dialog.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { formatNumber } from '@/lib/format'
 
 export function distributionKind(row: HqTemplate) {
   if (row.template_type === 'template' && (row.kind ?? 'message') === 'message' && row.content_summary) return row.content_summary.replace(/\s+\d+$/u, '')
@@ -28,21 +29,21 @@ export default function FolderDistributionDialog({ name, templates, templateFold
   const [selected, setSelected] = useState<string[]>([])
   const [accountFilter, setAccountFilter] = useState(ALL_ACCOUNTS)
   const [accountSearch, setAccountSearch] = useState('')
-  return <Dialog open designNode="JSirC" designWidth={720} title={`フォルダ「${name}」の ${templates.length} 件を配る`}
+  return <Dialog open designNode="JSirC" designWidth={720} title={`フォルダ「${name}」の ${formatNumber(templates.length)} 件を配る`}
     description="フォルダの中のひな形をまとめて、選んだアカウントへ配ります。"
     busy={busy} error={error} onCancel={onCancel}
     designHeaderPadding="24px 24px 8px" designContentPadding="8px 24px 20px"
     footer={<div className={styles.footer}>
       <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
       <Button variant="primary" disabled={busy || !picked.length || !selected.length} onClick={() => onConfirm(templates.filter((row) => picked.includes(row.id)), selected)}>
-        <Send size={16} aria-hidden="true" />{`${picked.length} 件を ${selected.length} アカウントへ配る`}
+        <Send size={16} aria-hidden="true" />{`${formatNumber(picked.length)} 件を ${selected.length} アカウントへ配る`}
       </Button>
     </div>}
   >
     <div className={styles.sections}>
       {/* 絵 W2GYgL：配るテンプレートはチェックの一覧（種類の札つき）、配る先はフォルダの列＋アカウントのチェックの一覧。 */}
       <section className={styles.section} aria-label="配るテンプレート">
-        <div className={styles.heading}><strong>配るテンプレート</strong><span>{`${picked.length} / ${templates.length} 件を選択`}</span></div>
+        <div className={styles.heading}><strong>配るテンプレート</strong><span>{`${picked.length} / ${formatNumber(templates.length)} 件を選択`}</span></div>
         <div className={styles.list}>
           {templates.map((row) => <div key={row.id} className={styles.row}>
             <SaveErrorField names={["picked"]}><Checkbox checked={picked.includes(row.id)} disabled={busy}

@@ -105,7 +105,7 @@ export function actionText(item: RunItem): string {
   }
   if (item.scenario?.started) return `案内＋シナリオ「${item.scenario.name ?? '名前は未取得'}」を開始`
   if (item.status === 'pending' && item.actions.total > 0) return `案内＋${item.actions.total}つの処理（テスト待ち）`
-  if (item.deliveryCount > 0) return `案内を${item.deliveryCount} 通送信`
+  if (item.deliveryCount > 0) return `案内を${formatNumber(item.deliveryCount)} 通送信`
   if (item.actions.total > 0) return `案内＋${item.actions.total}つの処理`
   return routingAction(item.status, item.errorCode)
 }
@@ -328,7 +328,7 @@ function FriendAddRunsInner() {
     setRetrying(null)
     const failed = failedItems.length - retried
     setMessage(failed > 0
-      ? `${retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : ''}${failed} 件をもう一度実行できませんでした。時間を置いてお試しください。`
+      ? `${retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : ''}${formatNumber(failed)} 件をもう一度実行できませんでした。時間を置いてお試しください。`
       : `失敗した処理を${retried} 件もう一度実行しました。`)
     await load()
   }

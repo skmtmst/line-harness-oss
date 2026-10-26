@@ -40,7 +40,7 @@ export function UpdateButton({ targetVersion }: { targetVersion: string }) {
         disabled={loading}
         className="text-sm px-3 py-1 rounded-mini bg-action text-on-accent hover:bg-action-hover"
       >
-        {loading ? '開始中...' : `v${targetVersion} にアップデート`}
+        {loading ? '開始中…' : `v${targetVersion} にアップデート`}
       </button>
       {error && (
         <p role="alert" className="text-danger mt-2 text-xs">{error}</p>

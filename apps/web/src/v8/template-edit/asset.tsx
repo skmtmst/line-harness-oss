@@ -287,7 +287,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         payload: { ...built.payload, folder },
       })
       if (!result.success) {
-        setError(result.error || '保存できませんでした。')
+        setError(result.error || '保存できませんでした。時間をおいて、もう一度お試しください。')
         return false
       }
       setSaved(true)

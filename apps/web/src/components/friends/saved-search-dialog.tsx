@@ -126,7 +126,7 @@ function SavedSearchItem({
           aria-expanded={false}
           className="mt-1 text-xs font-semibold text-action hover:underline"
         >
-          ほか{hiddenCount}件の条件を表示
+          ほか{formatNumber(hiddenCount)}件の条件を表示
         </button>
       ) : null}
       {expanded && summary.length > SUMMARY_PREVIEW_LINES ? (

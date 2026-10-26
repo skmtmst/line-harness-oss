@@ -115,7 +115,7 @@ export function jstMonthDay(value: string | null | undefined): string {
 
 /** 「9/20 10:00」。読めなければ「—」。 */
 export function jstDateTime(value: string | null | undefined): string {
-  return polishFormatDate(value, { style: 'detail', fallback: '—' })
+  return polishFormatDate(value, { style: 'list-time', fallback: '—' })
 }
 
 /* 予約日時の決めごとはコラムを書く画面と同じもの（column-form.ts）を使う。 */

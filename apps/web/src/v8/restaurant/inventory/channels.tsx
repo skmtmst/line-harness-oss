@@ -248,7 +248,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
             <ListState kind="empty" title="いま残っているものはありません" description="読めなかった予約メールは、ここに残ります。" />
           ) : emails.map((mail) => (
             <div key={mail.id} className={styles.unreadRow}>
-              <p className={styles.unreadMain}><TruncatedText value={[formatAt(mail.receivedAt, timezone), mail.mediaName ?? mail.mediaCode ?? '媒体不明', mail.reason ?? '読めなかった理由は分かりません'].join(' ・ ')} /></p>
+              <p className={styles.unreadMain}><TruncatedText value={[formatAt(mail.receivedAt, timezone), mail.mediaName ?? mail.mediaCode ?? '媒体不明', mail.reason ?? '読めなかった理由は分かりません'].join('・')} /></p>
               <Button onClick={() => setDetail(mail)}>詳しく見る</Button>
               <Button variant="primary" onClick={() => { setDraft({ customerName: '', guestCount: '2', startsAt: '' }); setFieldErrors({}); setImportError(''); setImporting(mail) }}>手で直して取り込む</Button>
             </div>

@@ -1,0 +1,48 @@
+import { ArrowRight, TrendingDown, TrendingUp } from 'lucide-react'
+import { kpiChangeTone, type KpiBetterDirection } from '@line-crm/shared'
+import DeltaChip from '@/components/shared/delta-chip'
+import StatusBadge from '@/components/shared/status-badge'
+import { formatNumber } from '@/lib/format'
+
+/** 比べる基準の言葉。札の短い言葉と、読み上げの「〇〇より」。 */
+export type KpiDeltaBasis = { short: string; reading: string }
+
+export const SAME_WEEKDAY_LAST_WEEK: KpiDeltaBasis = { short: '先週比', reading: '先週の同じ曜日' }
+
+/** 札の見える文字と読み上げの文。色だけに頼らず、矢印と言葉でも増減が分かる。 */
+export function kpiDeltaText(diff: number, unit: string, basis: KpiDeltaBasis): { visible: string; reading: string } {
+  const amount = `${formatNumber(Math.abs(diff))} ${unit}`
+  if (diff === 0) return { visible: `0 ${unit} ${basis.short}`, reading: `${basis.reading}と同じ` }
+  return { visible: `${amount} ${basis.short}`, reading: `${basis.reading}より ${amount}${diff > 0 ? '多い' : '少ない'}` }
+}
+
+/**
+ * 数の帯の差の札（KpiCard の delta に入れる）。
+ *
+ * 色は良し悪しの向き（better）で決める：良い＝緑・悪い＝赤・どちらでもない／差 0＝灰色。
+ * 矢印は数の増減の向き（差 0 は →）。比べる値が無い数には、この札を置かない（0 として比べない）。
+ */
+export default function KpiDelta({ current, previous, better, unit, basis = SAME_WEEKDAY_LAST_WEEK }: {
+  current: number
+  previous: number
+  better: KpiBetterDirection
+  unit: string
+  basis?: KpiDeltaBasis
+}) {
+  const diff = current - previous
+  const tone = kpiChangeTone(better, diff)
+  const text = kpiDeltaText(diff, unit, basis)
+  const body = <>
+    <span aria-hidden="true">{text.visible}</span>
+    <span className="sr-only">{text.reading}</span>
+  </>
+  if (tone === 'good' || tone === 'bad') {
+    return <span data-kpi-delta={tone} title={text.reading}>
+      <DeltaChip tone={tone === 'good' ? 'up' : 'down'} direction={diff > 0 ? 'up' : 'down'}>{body}</DeltaChip>
+    </span>
+  }
+  const Icon = tone === 'flat' ? ArrowRight : diff > 0 ? TrendingUp : TrendingDown
+  return <span data-kpi-delta={tone} title={text.reading}>
+    <StatusBadge tone="neutral" size="compact" dot={false}><Icon size={16} aria-hidden="true" />{body}</StatusBadge>
+  </span>
+}

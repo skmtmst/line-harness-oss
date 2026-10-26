@@ -2,6 +2,7 @@
  * イベント一覧と申込者で使う、目を向ける回と残席の決め方。
  */
 import type { EventLifecycleStatus, EventListItem } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -131,7 +132,7 @@ export function isLowApplication(
 export function describeBookingCapacity(applied: number, capacity: number | null): string {
   if (capacity === null || capacity <= 0) return '定員なし'
   const remaining = Math.max(0, capacity - applied)
-  if (remaining === 0) return `定員 ${capacity} ・ 満席です`
-  if (remaining <= 3) return `あと${remaining}人で満席です。声をかけると埋まります`
-  return `定員 ${capacity} ・ 残り${remaining}`
+  if (remaining === 0) return `定員 ${capacity}・満席です`
+  if (remaining <= 3) return `あと${formatNumber(remaining)}人で満席です。声をかけると埋まります`
+  return `定員 ${capacity}・残り${remaining}`
 }

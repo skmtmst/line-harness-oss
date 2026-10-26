@@ -35,14 +35,14 @@ type History = { state: 'loading' } | { state: 'none' } | { state: 'error' } | {
 /** 「10/2（金）19:00〜21:00 ・ T4（4人卓）」。卓が無ければ「未配席」。 */
 export function detailWhen(item: RestaurantReservation, table: RestaurantTable | null): string {
   const seat = table ? `${table.code}（${table.max_capacity} 人卓）` : item.table_label || '未配席'
-  return `${mdWeek(new Date(item.starts_at))}${hm(item.starts_at)}〜${hm(item.ends_at)} ・ ${seat}`
+  return `${mdWeek(new Date(item.starts_at))}${hm(item.starts_at)}〜${hm(item.ends_at)}・${seat}`
 }
 
 /** 「秋の鹿肉コース 8,800円 ・ Hot Pepper から」。コースが無ければ「席のみ」。 */
 export function detailCourse(item: RestaurantReservation, course: RestaurantMenuItem | null): string {
   const name = item.course_name || course?.name || ''
   const price = course?.price ? ` ${polishFormatYen(course.price)}` : ''
-  return `${name ? `${name}${price}` : '席のみ'} ・ ${sourceName(item.source)} から`
+  return `${name ? `${name}${price}` : '席のみ'}・${sourceName(item.source)} から`
 }
 
 function historyText(history: History): string {
@@ -104,11 +104,11 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const dining=<ReservationDining entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
   if(inline)return <Card surface="inset" contentPadding="16px" layout="vertical" gap="10px">
     <SectionHeader title="予約の詳細" actions={<>{attendance}<Button size="inline" variant="text" aria-label="予約の詳細を閉じる" onClick={onClose}><X size={16} aria-hidden="true"/></Button></>}/>
-    <p className={styles.fact}>{`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)} ・ ${table?.code??'未配席'}`}</p>
+    <p className={styles.fact}>{`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}・${table?.code??'未配席'}`}</p>
     <SectionHeader size="customer" title={`${reservation.customer_name} さま`} note={<ReservationSource value={reservation.source} note={reservation.note}/>}/>
     <ReservationFacts items={[{label:'人数・コース',value:`${reservation.guest_count}名・${reservation.course_name??'席のみ'}${course?.price?` ${polishFormatYen(course.price)}`:''}`},{label:'電話',value:maskPhone(reservation.customer_phone)||'電話未登録'}]}/>
     <ReservationDining dense entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)}/>
-    <ReservationFacts items={[{label:'来店',value:<span title={historyText(history)}>{history.state==='ready'?`${history.count}回`:'—'}</span>}]}/>
+    <ReservationFacts items={[{label:'来店',value:<span title={historyText(history)}>{history.state==='ready'?`${polishFormatNumber(history.count)}回`:'—'}</span>}]}/>
     {/* 絵（xzR4g）：下は 変更する・卓を変える・取り消す の3つ。来店の記録の「…」は題の右（閉じるの左）。卓を変えるは変更の窓（卓の欄）へ。 */}
     <ReservationDetailsActions>{canWrite?<><Button presentation="restaurant" variant="primary" onClick={()=>onEdit(reservation.id)}><Pencil size={16} aria-hidden="true"/>変更する</Button>{inactive?null:<Button presentation="restaurant" onClick={()=>onEdit(reservation.id)}>卓を変える</Button>}<Button presentation="restaurant" onClick={()=>inactive?onRestore(reservation.id):onCancel(reservation.id)}>{inactive?'予約を有効に戻す':'取り消す'}</Button></>:null}</ReservationDetailsActions>
   </Card>

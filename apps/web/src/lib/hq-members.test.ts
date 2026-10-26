@@ -43,9 +43,9 @@ describe('メンバー管理の計算', () => {
 
   it('★V8 の最終ログインは「9/30 10:12」。今年でなければ年を付ける', () => {
     const now = new Date('2026-10-07T03:00:00Z')
-    expect(lastLoginShort('2026-09-30T10:12:00+09:00', now)).toBe('9/30 10:12')
-    expect(lastLoginShort('2026-09-28T09:02:00.000', now)).toBe('9/28 09:02')
-    expect(lastLoginShort('2025-08-31T12:00:00+09:00', now)).toBe('2025/8/31 12:00')
+    expect(lastLoginShort('2026-09-30T10:12:00+09:00', now)).toBe('09/30 10:12')
+    expect(lastLoginShort('2026-09-28T09:02:00.000', now)).toBe('09/28 09:02')
+    expect(lastLoginShort('2025-08-31T12:00:00+09:00', now)).toBe('2025/08/31 12:00')
     expect(lastLoginShort(undefined, now)).toBe('—')
     expect(lastLoginShort('壊れた値', now)).toBe('—')
   })

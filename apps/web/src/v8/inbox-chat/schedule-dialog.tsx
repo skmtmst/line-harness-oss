@@ -128,7 +128,7 @@ export default function ScheduleSendDialog({
                 <span className={styles.schRowAt}>{row.label}</span>
                 <span className={styles.schRowText} title={row.content}>{row.content}</span>
                 <DateTimeField
-                  aria-label="予約時刻を変更(日本時間)"
+                  aria-label="予約時刻を変更（日本時間）"
                   defaultValue={row.defaultValue}
                   disabled={!row.editable || row.tooLate}
                   onChange={(next) => { if (next) onReschedule(row.id, next) }}

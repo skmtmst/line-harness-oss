@@ -14,10 +14,11 @@ import { api,type ChatDetailMessage } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useStaffRole } from '@/lib/staff-role';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { useRouter,useSearchParams } from 'next/navigation';
 import { Suspense,useEffect,useRef,useState } from 'react';
-import { jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,statusFilters,statusFiltersV8 } from './inbox-model';
+import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,inboxSortFromParam,statusFilters,statusFiltersV8 } from './inbox-model';
 
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
@@ -71,6 +72,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (params.get('unanswered') === '1' || params.get('unanswered') === 'true') return 'unread'
     return 'all'
   })
+
+  /* 並び（未読が先／新しい順）は URL の `?sort=` が正本。戻る・共有で同じ並びに戻る。 */
+  const samePageUrl = useSamePageUrl()
+  const sortOrder = inboxSortFromParam(params.get('sort'))
+  const setSortOrder = (next: InboxSort) => {
+    const query = new URLSearchParams(params.toString())
+    if (next === 'latest') query.set('sort', 'latest')
+    else query.delete('sort')
+    const text = query.toString()
+    samePageUrl.replace(`${window.location.pathname}${text ? `?${text}` : ''}`)
+  }
 
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
 
@@ -239,6 +251,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     assigneeFilter,
     unreadOnly,
     quickFilter,
+    sort: sortOrder,
     setError,
   })
 
@@ -627,7 +640,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       loadChats()
     } catch (reason) {
       saveErrors.capture(reason)
-      setError('担当の更新に失敗しました。')
+      setError('担当の更新に失敗しました。時間をおいて、もう一度お試しください。')
     }
   }
 
@@ -648,7 +661,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         notes,
         revision: savingRevision,
       })
-      if (!response.success) throw new Error(response.error || '内部メモを保存できませんでした')
+      if (!response.success) throw new Error(response.error || '内部メモを保存できませんでした。時間をおいて、もう一度お試しください。')
       // 返ってきた版を採用する。古い版のまま次の保存を送ると409になる。
       setChatDetail((current) => current && current.id === savingChatId
         ? { ...current, notes: response.data?.notes ?? notes, revision: response.data.revision }
@@ -664,7 +677,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     } catch (memoSaveError) {
       if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
         saveErrors.capture(memoSaveError)
-        setMemoError(japaneseDetailOf(memoSaveError) || '内部メモを保存できませんでした')
+        setMemoError(japaneseDetailOf(memoSaveError) || '内部メモを保存できませんでした。時間をおいて、もう一度お試しください。')
       }
     } finally {
       setMemoSaving(false)
@@ -756,7 +769,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef,
           setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats,
           handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
-          clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails,
+          clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,
         }} />
 
         {/* Right Panel: Chat Detail */}
@@ -867,7 +880,7 @@ function ChatsPageHost() {
 export default function ChatsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中…</div>}>
       <ChatsPageHost />
     </Suspense>
   )

@@ -191,7 +191,7 @@ export function formatMileageMonthDay(value: string | null): string {
 }
 
 export function formatMileageShortDateTime(value: string | null): string {
-  return polishFormatDate(value, { style: 'detail', fallback: '—' })
+  return polishFormatDate(value, { style: 'list-time', fallback: '—' })
 }
 
 function finiteNonNegativeNumber(value: unknown): number | null {

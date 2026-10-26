@@ -20,6 +20,7 @@ import { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 分析「URLクリック」（Pencil ）。
@@ -129,7 +130,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
           })}
       </div>
       {links.length > 10 ? <div className={styles.pager}>
-        <span>{`${links.length} 件中 ${links.length ? currentPage * pageSize + 1 : 0}〜${Math.min((currentPage + 1) * pageSize, links.length)} 件（取得した範囲）`}</span>
+        <span>{`${formatNumber(links.length)} 件中 ${links.length ? currentPage * pageSize + 1 : 0}〜${Math.min((currentPage + 1) * pageSize, links.length)} 件（取得した範囲）`}</span>
         <span className={styles.spacer} />
         <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value} 件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} /></SaveErrorField>
         <Button variant="secondary" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>前へ</Button>

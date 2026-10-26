@@ -262,7 +262,7 @@ export function ScenarioStepForm({
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
-                  placeholder="メッセージ内容を入力..."
+                  placeholder="メッセージ内容を入力…"
                   value={stepForm.messageContent}
                   onValueChange={(next) => setStepForm({ ...stepForm, messageContent: next })}
                   aria-invalid={stepFields.invalid('content') || undefined}

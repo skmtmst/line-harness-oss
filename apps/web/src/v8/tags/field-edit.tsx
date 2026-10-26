@@ -187,7 +187,7 @@ export default function FieldEdit() {
         await handleVersionConflict(sent)
       } else {
         { if (!fieldFailure)
-        setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした') }
+        setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした。時間をおいて、もう一度お試しください。') }
       }
     } finally {
       setSaving(false)

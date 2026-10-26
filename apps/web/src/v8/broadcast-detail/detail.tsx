@@ -266,7 +266,7 @@ export default function BroadcastDetail({
 
   const total = broadcast.totalCount
   const bubbleCount = broadcast.messageBubbles?.length ?? (broadcast.messageContent ? 1 : 0)
-  const messageText = `${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通`
+  const messageText = `${messageTypeLabel(broadcast.messageType)} ${formatNumber(bubbleCount)} 通`
   const scheduledLabel = broadcast.scheduledAt ? formatBroadcastDateTime(broadcast.scheduledAt) : null
   const approvalStatus = approval.state?.approval.status ?? null
 

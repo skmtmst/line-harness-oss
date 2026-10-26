@@ -21,7 +21,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { ActionCell, DataTable, RowNameLink, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { emptyValue } from '@/components/shared/empty-value'
-import { formatListTimestamp, formatYen } from '@/lib/format'
+import { formatListTimestamp, formatYen, formatNumber } from '@/lib/format'
 import { ApiError } from '@/lib/api'
 import { bookingPaymentAdminApi, isNotReadyError, type PaymentRecord, type PaymentRecordsPage } from '@/lib/api/helpers/booking-payment-admin'
 import { PAYMENT_STATUS, paymentBadge } from '@/components/shared/payment-status'
@@ -171,8 +171,8 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
       ) : (
         <>
           <KpiBand>
-            <KpiCard icon={null} title="今月の入金" value={summary?.paidAmount} unit="円" detail={summary ? `${summary.paidCount} 件` : undefined} loading={load.state === 'loading'} />
-            <KpiCard icon={null} title="返金" value={summary?.refundedAmount} unit="円" detail={summary ? `${summary.refundedCount} 件` : undefined} loading={load.state === 'loading'} />
+            <KpiCard icon={null} title="今月の入金" value={summary?.paidAmount} unit="円" detail={summary ? `${formatNumber(summary.paidCount)} 件` : undefined} loading={load.state === 'loading'} />
+            <KpiCard icon={null} title="返金" value={summary?.refundedAmount} unit="円" detail={summary ? `${formatNumber(summary.refundedCount)} 件` : undefined} loading={load.state === 'loading'} />
             <KpiCard icon={null} title={PAYMENT_STATUS.unpaid.label} value={summary?.pendingCount} unit="件" detail="支払いを待って枠を取り置き中" loading={load.state === 'loading'} />
             <KpiCard icon={null} title="期限切れの枠" value={summary?.expiredCount} unit="件" detail={summary ? `${summary.holdMinutes} 分を過ぎた` : undefined} loading={load.state === 'loading'} />
           </KpiBand>

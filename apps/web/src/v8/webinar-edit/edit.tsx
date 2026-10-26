@@ -271,7 +271,7 @@ function EditInner() {
     </>
   }
   if (loading) {
-    return <><p className="text-ink-faint p-6 text-sm" role="status">読み込み中...</p>{leaveDialog}</>
+    return <><p className="text-ink-faint p-6 text-sm" role="status">読み込み中…</p>{leaveDialog}</>
   }
   if (missingNow || (!loadError && (!webinar || !editor))) {
     return <>
@@ -443,7 +443,7 @@ function EditInner() {
 
 export default function WebinarEditV8() {
   return (
-    <Suspense fallback={<p className="text-ink-faint p-6 text-sm" role="status">読み込み中...</p>}>
+    <Suspense fallback={<p className="text-ink-faint p-6 text-sm" role="status">読み込み中…</p>}>
       <EditInner />
     </Suspense>
   )

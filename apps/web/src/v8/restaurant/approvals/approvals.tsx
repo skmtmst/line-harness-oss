@@ -130,7 +130,7 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
         ) : null}
       </div>
       <CardHeader size="stacked" headingLevel={3} title={item.title} />
-      <p className={styles.requested}>{`申請：${item.requested_by || emptyValue('unknown')} ・ ${formatStamp(item.created_at)}`}</p>
+      <p className={styles.requested}>{`申請：${item.requested_by || emptyValue('unknown')}・${formatStamp(item.created_at)}`}</p>
       <Card surface="muted" layout="vertical" padding="compact" gap="var(--polish-space-row)">
         <p className={styles.payloadLabel}>変更内容</p>
         <ApprovalContent item={item} data={data} />

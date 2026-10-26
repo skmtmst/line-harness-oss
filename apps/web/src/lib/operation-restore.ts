@@ -3,6 +3,7 @@ import type {
   OperationRestoreDrift,
   OperationRestoreReport,
 } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /*
  * N-451: 復旧前検査（drift）を運用者向けの文言へ変える。
@@ -38,7 +39,7 @@ export function describeCapabilityDrift(capability: OperationCapability, entries
   const parts = (['changed', 'added', 'expired', 'deleted', 'inactive'] as const)
     .map((kind) => ({ kind, count: countByKind(entries, kind) }))
     .filter(({ count }) => count > 0)
-    .map(({ kind, count }) => `${DRIFT_KIND_LABEL[kind]}${count}件`)
+    .map(({ kind, count }) => `${DRIFT_KIND_LABEL[kind]}${formatNumber(count)}件`)
   return `${CAPABILITY_LABEL[capability]}: ${parts.join('・')}`
 }
 
@@ -76,7 +77,7 @@ export function describeRestoreBlockers(drift: OperationRestoreDrift): string[] 
 /** 復旧の結果メッセージ。一部だけ戻った・期限切れを下書きへ戻した場合も伝える。 */
 export function describeRestoreResult(report: OperationRestoreReport): { tone: 'success' | 'warning'; text: string } {
   const heldCount = report.heldExpired.length
-  const heldText = heldCount > 0 ? `期限を過ぎた予約${heldCount}件は下書きへ戻しました。` : ''
+  const heldText = heldCount > 0 ? `期限を過ぎた予約${formatNumber(heldCount)}件は下書きへ戻しました。` : ''
   if (report.remaining.length === 0) {
     return {
       tone: 'success',

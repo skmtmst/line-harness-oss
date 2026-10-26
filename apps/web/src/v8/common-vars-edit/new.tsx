@@ -648,7 +648,7 @@ export default function NewCommonVarV8() {
               入力に戻って修正する
             </Button>
             <Button type="button" disabled={saving} onClick={() => save(true)} busy={Boolean(saving)} busyLabel="処理中…">
-              内容を確認して登録する
+              内容を確認して作る
             </Button>
           </div>
         </>}>

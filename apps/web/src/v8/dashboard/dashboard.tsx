@@ -37,6 +37,8 @@ import { ConnectionStatus,DeliveryFailures,FriendStatus,Loading,Metric,MonthlyDe
 import { FriendTrend,trendRangeNote } from './trend'
 import { PERIODS,jstDay,useDashboard } from './use-dashboard'
 import { dashboardCardForStyle } from './style-cards'
+import { asOfLine,comparisonOf,useDashboardComparisons } from './comparisons'
+import KpiDelta from './kpi-delta'
 export { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 
 
@@ -56,6 +58,10 @@ const ASIDE_OF: Partial<Record<DashboardCardId, DashboardCardId[]>> = {
   'pending-inbox': ['support-mark-status', 'connection-status'],
   'friend-add': ['friend-status'],
 }
+/* 比べられない数の「？」。前の値を記録していない数を 0 や「—」で比べて見せない。 */
+const NOT_COMPARED_HELP = 'この数は前の値を記録していないので、先週とは比べられません。'
+const BOOKING_COMPARE_HELP = '先週比は、今日の予約（来店済みを含み、取消・お断り・期限切れを除く）を先週の同じ曜日の件数と比べています。先週の記録が無い時と、この数と数え方がずれた時は比べません。'
+
 const ROW_VARIANT: Partial<Record<DashboardCardId, 'trend' | 'inbox' | 'link'>> = {
   'friend-trend': 'trend',
   'pending-inbox': 'inbox',
@@ -111,6 +117,11 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   const [openDetail, setOpenDetail] = useState<DashboardCardId | null>(null)
   const data = d.data
   const reference = d.reference
+  /* 比べる値は概要が読めてから読む（最初の表示を遅くしない）。 */
+  const comparisons = useDashboardComparisons(d.selectedAccountId, Boolean(data))
+  const bookingCompare = comparisonOf(comparisons, 'todayBookings')
+  /* 帯の数と比べる値の今の数が違う時（数えた時刻・数え方のずれ）は、矛盾して見えるので札を出さない。 */
+  const bookingDeltaShown = (value: number | null) => value !== null && bookingCompare !== null && bookingCompare.current === value
 
   /* ── 数の帯（今日やること） ─────────────────────── */
   const todayCell = (id: DashboardCardId): { node: ReactNode; detail: ReactNode } | null => {
@@ -126,6 +137,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           valueAction={valueAction('対応が必要な受信')}
           value={total}
           unit="件"
+          help={NOT_COMPARED_HELP}
           loading={d.pendingDetailState === 'loading'}
           detail={d.pendingDetailState === 'ready'
             ? <span className={styles.pendingMeta}>
@@ -158,6 +170,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           valueAction={valueAction('写真審査')}
           value={forbidden ? null : value}
           unit="件"
+          help={NOT_COMPARED_HELP}
           loading={state === 'loading'}
           delta={state === 'ready' ? <Tag>ポイント付与あり</Tag> : forbidden ? <Tag tone="danger">権限なし</Tag> : null}
           detail={forbidden ? permissionDeniedMessage('store') : state === 'error' ? STATE_TEXT.error : value === null ? STATE_TEXT.loading : `確認待ち ${value}件`}
@@ -185,6 +198,8 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           valueAction={valueAction('今日の予約')}
           value={value}
           unit="件"
+          help={BOOKING_COMPARE_HELP}
+          delta={bookingDeltaShown(value) && bookingCompare ? <KpiDelta current={bookingCompare.current} previous={bookingCompare.previous} better={bookingCompare.better} unit="件" /> : null}
           loading={value === null && !d.bookingsFailed}
           detail={nextText}
           action={{ label: '予約を見る', href: '/booking/bookings?view=day' }}
@@ -206,6 +221,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           valueAction={valueAction('出荷予定')}
           value={state === 'ready' ? (s?.soon ?? null) : null}
           unit="件"
+          help={NOT_COMPARED_HELP}
           loading={state === 'loading'}
           detail={state === 'error' ? STATE_TEXT.error : state === 'ready' ? ((s?.soon ?? 0) > 0 ? `今日 ${s?.today ?? 0} 件・明日 ${(s?.soon ?? 0) - (s?.today ?? 0)} 件` : '未処理はありません') : STATE_TEXT.loading}
           action={{ label: 'ECを見る', href: '/ec-commerce' }}
@@ -219,6 +235,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   }
   const todayCells = d.visibleToday.map((item) => ({ id: item.id, cell: todayCell(item.id) })).filter((entry) => entry.cell !== null)
   const openCell = todayCells.find((entry) => entry.id === openDetail)
+  const todayAsOf = asOfLine(data, todayCells.some((entry) => entry.id === 'today-bookings') && bookingDeltaShown(d.todayActiveBookings ?? (d.displayedBookings === null ? null : d.todayBookings.length)))
 
   const overviewFailed = !data && !d.loading && d.error !== ''
   /* ── 右の列・段D のカード ──────────────────────── */
@@ -228,12 +245,12 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
     if (id === 'send-quota') return <SendQuota overviewFailed={overviewFailed} delivery={d.sectionAvailable('quota') ? data?.delivery ?? null : null} metric={data?.metrics?.monthlyQuota} section={data?.sections?.quota} onRetry={() => void d.load()} />
     if (id === 'operational-alerts') return <OperationalAlerts risk={d.displayedHealthRisk} healthIssues={d.healthIssueCount} oldestWaitMinutes={d.pendingOldest} twoFactor={d.displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={d.healthFailed} updatedAt={d.supplementLoadedAt} />
     if (id === 'support-mark-status') return <SupportStatus inbox={d.sectionAvailable('inbox') ? (data && reference?.supportInbox ? { ...data.inbox, ...reference.supportInbox } : data?.inbox ?? null) : null} autoOnInbound={d.supportMarkAutoOnInbound} />
-    if (id === 'connection-status') return <ConnectionStatus account={d.selectedAccount} canCheck={role !== null && canManageRole(role)} onChecked={refreshAccounts} risk={d.displayedHealthRisk} activeFriends={d.activeFriends} healthFailed={d.healthFailed} />
+    if (id === 'connection-status') return <ConnectionStatus account={d.selectedAccount} canCheck={role !== null && canManageRole(role)} onChecked={refreshAccounts} risk={d.displayedHealthRisk} activeFriends={d.activeFriends} activeFriendsCompare={d.activeFriends !== null ? comparisonOf(comparisons, 'activeFriends') : null} healthFailed={d.healthFailed} />
     if (id === 'friend-status') return unavailable('friends')
       ? <><SectionHeader title="友だちの状態" /><Unavailable section={data?.sections?.friends} onRetry={() => void d.load()} /></>
       : data ? <FriendStatus friends={data.friends} /> : <><SectionHeader title="友だちの状態" /><Loading label="友だちの状態" /></>
     if (id === 'upcoming') return <Upcoming accountId={d.selectedAccountId} bookings={d.displayedBookings} loading={d.supplementLoading} today={d.today} jstDay={jstDay} startLoad={d.supplementGate} />
-    if (id === 'delivery-failures') return <DeliveryFailures accountId={d.selectedAccountId} startLoad={d.supplementGate} />
+    if (id === 'delivery-failures') return <DeliveryFailures accountId={d.selectedAccountId} startLoad={d.supplementGate} compare={comparisonOf(comparisons, 'deliveryFailures')} />
     if (id === 'monthly-delivery') return unavailable('delivery')
       ? <><SectionHeader title="今月の配信" /><Unavailable section={data?.sections?.delivery} onRetry={() => void d.load()} /></>
       : data ? <MonthlyDelivery delivery={data.delivery} section={data.sections?.delivery} /> : <><SectionHeader title="今月の配信" /><Loading label="今月の配信" /></>
@@ -398,6 +415,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
         onReset={d.resetPreferences}
       /> : null}
     >
+      {todayCells.length > 0 && todayAsOf ? <p className={styles.asOf} title={todayAsOf}>{todayAsOf}</p> : null}
       {todayCells.length > 0 ? (
         <KpiBand className={styles.todayBand} frame="card" data-design="TodayTasks">
           {todayCells.map((entry) => entry.cell?.node)}

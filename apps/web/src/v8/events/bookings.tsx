@@ -515,7 +515,7 @@ function Bookings({ eventId }: { eventId: string }) {
   const historyRows = history.filter((entry) => entry.status !== 'cancelled')
   const cancelRows = history.filter((entry) => entry.status === 'cancelled')
   const title = event?.name ? `${event.name}の申込者` : 'イベントの申込者'
-  const subLine = [event?.venue_name ?? null, capacity !== null ? `定員 ${capacity} 人` : null].filter(Boolean).join(' ・ ')
+  const subLine = [event?.venue_name ?? null, capacity !== null ? `定員 ${capacity} 人` : null].filter(Boolean).join('・')
   const ready = applicantsStatus === 'ready'
 
   return (

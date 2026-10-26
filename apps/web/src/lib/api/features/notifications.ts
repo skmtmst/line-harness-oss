@@ -159,9 +159,11 @@ export const notificationsMethods = {
         fetchApiBlob(`/api/notifications/operator-deliveries.csv?${new URLSearchParams({ lineAccountId, reason })}`),
     },
     center: {
-      list: (lineAccountId: string, params?: { category?: 'all' | 'error' | 'update'; limit?: number; offset?: number }) => {
+      list: (lineAccountId: string, params?: { category?: 'all' | 'error' | 'update'; unread?: boolean; limit?: number; offset?: number }) => {
         const query = new URLSearchParams({ lineAccountId });
         if (params?.category) query.set('category', params.category);
+        // 未読だけ。担当者ごとの既読で口が絞る（種類との組み合わせは口が受けない）。
+        if (params?.unread) query.set('unread', '1');
         if (params?.limit !== undefined) query.set('limit', String(params.limit));
         if (params?.offset !== undefined) query.set('offset', String(params.offset));
         return fetchApi<ApiResponse<NotificationCenterData>>(`/api/notifications/center?${query}`);

@@ -10,6 +10,7 @@ import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Avatar from './avatar'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import styles from './top-bar.module.css'
+import { formatNumber } from '@/lib/format'
 
 export interface TopBarAccount {
   id: string
@@ -350,7 +351,7 @@ export default function TopBar({
                 type="button"
                 className={`${styles.iconButton}`}
                 data-topbar-bell=""
-                aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
+                aria-label={notificationUnreadCount > 0 ? `通知（未読 ${formatNumber(notificationUnreadCount)} 件）` : '通知'}
                 aria-haspopup="dialog"
                 aria-expanded={bellOpen}
                 aria-controls={bellOpen ? bellPopoverId : undefined}
@@ -366,7 +367,7 @@ export default function TopBar({
               prefetch={false}
               href="/notifications"
               className={`${styles.iconButton}`}
-              aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
+              aria-label={notificationUnreadCount > 0 ? `通知（未読 ${formatNumber(notificationUnreadCount)} 件）` : '通知'}
             >
               <BellIcon />
               <BellBadge count={notificationUnreadCount} />

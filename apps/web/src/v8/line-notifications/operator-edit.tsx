@@ -39,6 +39,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect from '@/components/shared/entity-select'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 運用者へのお知らせを作る・なおす（板  作る・ なおす、公開前の確認 ）。
@@ -330,7 +331,7 @@ function OperatorEditInner() {
           recipientType: teamId ? 'team' : 'staff',
           ...(teamId ? { teamId } : {}),
           recipientIds,
-          recipientLabel: `${recipientIds.length} 人`,
+          recipientLabel: `${formatNumber(recipientIds.length)} 人`,
           message: null,
           schedule,
           scheduleLabel,
@@ -404,7 +405,7 @@ function OperatorEditInner() {
     setError('')
     try {
       const result = await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
-      if (!result.success) throw new Error('公開できませんでした')
+      if (!result.success) throw new Error('公開できませんでした。時間をおいて、もう一度お試しください。')
       setRuleVersion(result.data.version ?? null)
       setBaseline(signature)
       setConfirmOpen(false)
@@ -457,7 +458,7 @@ function OperatorEditInner() {
   const description = editId
     ? '宛先はお店のスタッフ（運用者）です。どんなときに知らせるか・だれが受け取るか・いつ送るかを決めます。閉じるときに保存していなければ確認が出ます。'
     : '宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは「顧客へのお知らせ」で作ります。'
-  const teamOptions = [{ value: '', label: 'スタッフを選ぶ' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length} 人）` }))]
+  const teamOptions = [{ value: '', label: 'スタッフを選ぶ' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${formatNumber(team.staffIds.length)} 人）` }))]
 
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId={editId ? 'hiBO8' : 'gjUz3'}>
@@ -599,7 +600,7 @@ function OperatorEditInner() {
                   {items.length > 0 ? (
                     <>
                       <p className={styles.staffSummary}>
-                        {`選択 ${recipientIds.length} 人／LINEで受け取れる ${lineReachable.length} 人／管理画面で受け取れる ${recipientIds.length} 人`}
+                        {`選択 ${formatNumber(recipientIds.length)} 人／LINEで受け取れる ${formatNumber(lineReachable.length)} 人／管理画面で受け取れる ${formatNumber(recipientIds.length)} 人`}
                       </p>
                       <p className={styles.staffNote}>0人のときは「受け取る人を1人以上選んでください」と出て、公開できません。</p>
                     </>
@@ -686,14 +687,14 @@ function OperatorEditInner() {
               <span className={styles.confirmLabel}>宛先</span>
               <span className={styles.confirmValue}>
                 {selectedTeam
-                  ? `チーム「${selectedTeam.name}」${selectedRecipients.length} 人`
-                  : `選んだスタッフ ${selectedRecipients.length} 人`}
+                  ? `チーム「${selectedTeam.name}」${formatNumber(selectedRecipients.length)} 人`
+                  : `選んだスタッフ ${formatNumber(selectedRecipients.length)} 人`}
               </span>
             </p>
             <p className={styles.confirmLine}>
               <span className={styles.confirmLabel}>LINE が届く人</span>
               <span className={styles.confirmValue}>
-                {`${lineReachable.length} 人${lineUnregistered > 0 ? `（${lineUnregistered} 人は LINE 未登録）` : ''}`}
+                {`${formatNumber(lineReachable.length)} 人${lineUnregistered > 0 ? `（${lineUnregistered} 人は LINE 未登録）` : ''}`}
               </span>
             </p>
           </div>
@@ -712,7 +713,7 @@ function OperatorEditInner() {
               busy={publishing}
               busyLabel="公開中…"
             >
-              <Send size={16} aria-hidden="true" />{`公開して ${lineReachable.length} 人に LINE で送る`}
+              <Send size={16} aria-hidden="true" />{`公開して ${formatNumber(lineReachable.length)} 人に LINE で送る`}
             </Button>
           </div>
         </div>

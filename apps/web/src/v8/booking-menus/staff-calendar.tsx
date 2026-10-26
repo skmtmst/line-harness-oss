@@ -120,7 +120,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
     <SaveErrorScope errors={saveErrors}>
     <FormLeaveGuard dirty={person !== null && urlDirty} busy={busy} />
     {/* 共通の引き出し（幅は決まりの 540・後ろに暗い幕）。幅は画面で上書きしない。 */}
-    <Drawer open={person !== null} title={person?.name ?? ''} description={person ? `${person.role ? `${person.role} ・ ` : ''}担当メニュー ${menuCount} つ` : undefined}
+    <Drawer open={person !== null} title={person?.name ?? ''} description={person ? `${person.role ? `${person.role}・` : ''}担当メニュー ${menuCount} つ` : undefined}
       width="editor" heightMode="viewport" contentSpacing="sections" onClose={onClose} busy={busy} dirty={urlDirty} footer={<div className={styles.footer}><Button onClick={onClose}>閉じる</Button></div>}>
       {load.state === 'loading' ? <p className={styles.minor}>読み込んでいます…</p> : null}
       {load.state === 'error' ? <div className={styles.card}><p className={styles.minor}>カレンダーの設定を読み込めませんでした。</p><Button size="compact" onClick={() => void reload()}>もう一度読み込む</Button></div> : null}
@@ -129,7 +129,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
           {error ? <Notice tone="danger">{error}</Notice> : null}
           <section className={styles.card} aria-labelledby="staff-calendar-heading">
             <h3 id="staff-calendar-heading" className={styles.title}>カレンダー</h3>
-            {ready.store ? <p className={styles.minor}>{`店全体の同期：読み込み ${onOff(ready.store.readEnabled)} ・ 書き込み ${onOff(ready.store.writeEnabled)}（予約設定 › 担当スタッフの上で変えます）`}</p> : null}
+            {ready.store ? <p className={styles.minor}>{`店全体の同期：読み込み ${onOff(ready.store.readEnabled)}・書き込み ${onOff(ready.store.writeEnabled)}（予約設定 › 担当スタッフの上で変えます）`}</p> : null}
             <DataTable aria-label="つなぐカレンダー">
               <thead><TableHeadRow><Th>カレンダー</Th><Th>状態</Th><Th>読み込み</Th><Th>書き込み</Th></TableHeadRow></thead><tbody>
               <Tr>
@@ -186,7 +186,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
           ) : null}
 
           {/* 書き込みをオフにする確かめ（GcYWx）：書いた予定を残すか、これから先の予定を消すか。 */}
-          <Dialog open={writeOff !== null} title="書き込みをオフにしますか？" titleNote={`${person?.name ?? ''} ・ Google カレンダー`} size="medium" contentLayout="form"
+          <Dialog open={writeOff !== null} title="書き込みをオフにしますか？" titleNote={`${person?.name ?? ''}・Google カレンダー`} size="medium" contentLayout="form"
             busy={busy} error={error ?? undefined} cancelLabel="やめる" onCancel={() => { if (!busy) setWriteOff(null) }}
             confirmLabel="書き込みをオフにする" onConfirm={() => void saveSwitch({ readEnabled: mine.readEnabled, writeEnabled: false }, { removeFutureEvents: writeOff === 'remove' })}>
             <p className={styles.body}>{`これからの予約は、${person?.name ?? ''}さんのカレンダーに書きません。予約はそのまま残ります。`}</p>

@@ -1,6 +1,6 @@
 import type { StaffMember } from '@line-crm/shared'
 import { parseJstDateTime } from './hq-banners'
-import { formatRelative } from '@/lib/format'
+import { formatListTimestamp, formatRelative } from '@/lib/format'
 
 /**
  * 統括のメンバー管理（★管理画面 36-5）の小さな計算。通信は持たない。
@@ -89,13 +89,7 @@ export function lastLoginShort(iso: string | undefined, now = new Date()): strin
   if (!iso) return '—'
   const date = parseJstDateTime(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  const fmt = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  })
-  const pick = (d: Date) => Object.fromEntries(fmt.formatToParts(d).map((part) => [part.type, part.value]))
-  const at = pick(date)
-  const year = at.year === pick(now).year ? '' : `${at.year}/`
-  return `${year}${Number(at.month)}/${Number(at.day)} ${at.hour}:${at.minute}`
+  return formatListTimestamp(date, { now })
 }
 
 const ROLE_ORDER: Record<StaffMember['role'], number> = { owner: 0, admin: 1, staff: 2, viewer: 3 }

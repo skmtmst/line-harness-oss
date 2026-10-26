@@ -220,7 +220,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
 
       { if (!fieldFailure)
 
-      setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした') }
+      setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした。時間をおいて、もう一度お試しください。') }
     }
   }
 

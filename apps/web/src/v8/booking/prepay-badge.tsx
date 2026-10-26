@@ -1,5 +1,5 @@
 'use client'
-import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { formatDateTime, formatListDay, formatNumber } from '@/lib/format'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -10,18 +10,11 @@ import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/
 import Notice from '@/components/shared/notice'
 
 function jstMonthDay(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  const jst = japanCalendar(date)
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`
+  return formatListDay(iso, '')
 }
 
 function jstDateTime(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  const jst = japanCalendar(date)
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${pad(jst.getUTCHours())}:${pad(jst.getUTCMinutes())}`
+  return formatDateTime(iso, '')
 }
 
 /**
@@ -108,7 +101,7 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
       </svg>
       <div className={styles.body}>
         <p className={styles.title}>
-          前払いのみ（来なかった{decision.noshowCount}回・直近{decision.windowMonths}か月）
+          前払いのみ（来なかった{formatNumber(decision.noshowCount)}回・直近{decision.windowMonths}か月）
         </p>
         {dates.length > 0 ? (
           <p className={styles.dates}>{dates.join('・')}に来なかった</p>

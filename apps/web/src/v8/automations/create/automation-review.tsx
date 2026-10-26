@@ -122,7 +122,7 @@ export function AutomationReview({
               disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()}
               title={!savedDraft ? '下書きを保存すると試せます' : !testFriendId.trim() ? '試す友だちを入れてください' : undefined}
               busy={preparingTest}
-              busyLabel="確認中..."
+              busyLabel="確認中…"
             >
               <UserRound size={16} aria-hidden="true" />1人で試す
             </Button>
@@ -151,7 +151,7 @@ export function AutomationReview({
               >
                 キャンセル
               </Button>
-              <Button variant="primary" disabled={testing} onClick={() => void runOnePersonTest()} busy={testing} busyLabel="送信中...">
+              <Button variant="primary" disabled={testing} onClick={() => void runOnePersonTest()} busy={testing} busyLabel="送信中…">
                 この内容で送る
               </Button>
             </div>

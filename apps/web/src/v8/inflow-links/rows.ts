@@ -129,7 +129,7 @@ export function buildRows(
       entryRouteId: null,
       refCode: s.refCode,
       genre: null,
-      name: s.name ?? '(未登録)',
+      name: s.name ?? '（未登録）',
       poolId: null,
       tagId: null,
       scenarioId: null,

@@ -31,6 +31,7 @@ import { MESSAGE_TYPE_LABEL } from '@/v8/friend-add/public/flow/index'
 import { DELIVERY_UNKNOWN_CODE, jstClock, jstShortDateTime, jstTitleDate, routingAction } from './status'
 import styles from './detail.module.css'
 import { LogEntryCopy } from '@/components/shared/log-entry-details'
+import { LogRecordJson } from '@/v8/log-record'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import Notice from '@/components/shared/notice'
@@ -85,6 +86,27 @@ export function actionTitle(action: ActionRun, configured: unknown[] | undefined
   const { type, label } = config as { type?: unknown; label?: unknown }
   if (typeof label !== 'string' || !label || typeof type !== 'string' || CONFIGURED_KIND[type] !== action.type) return fallback
   return action.status === 'completed' ? pastTense(label) : label
+}
+
+/**
+ * JSON で見せる実行の記録。友だちの名前・ID と設定の中身（送る文面）は入れず、
+ * 画面に出している状態・日時・経路・処理の結果だけにする。
+ */
+export function runRecord(detail: FriendAddRunDetail, actionRuns: ActionRun[]) {
+  return {
+    id: detail.id,
+    status: detail.status,
+    errorCode: detail.errorCode,
+    friendKind: detail.friendKind,
+    receivedAt: detail.receivedAt,
+    processedAt: detail.processedAt,
+    attribution: { status: detail.attribution.status, routeName: detail.attribution.routeName },
+    rule: detail.rule ? { id: detail.rule.id, name: detail.rule.name, versionNumber: detail.rule.versionNumber } : null,
+    actionRuns: actionRuns.map((action) => ({
+      id: action.id, type: action.type, status: action.status, attemptCount: action.attemptCount,
+      errorCode: action.errorCode, startedAt: action.startedAt, completedAt: action.completedAt, nextRetryAt: action.nextRetryAt,
+    })),
+  }
 }
 
 /** 記録ID は長いので頭と末尾だけ（全文は title）。 */
@@ -148,7 +170,7 @@ function FriendAddRunDetailInner() {
       const response = await api.friendAddRules.runDetail(selectedAccountId, runId)
       if (requestId !== requestSequence.current) return
       if (!response.success) {
-        setError('実行詳細を表示できませんでした。')
+        setError('実行詳細を表示できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       setDetail(response.data)
@@ -340,6 +362,7 @@ function FriendAddRunDetailInner() {
         {detail.status === 'suppressed' && !deliveryUnknown ? <p className={styles.cardSub}>配信なし</p> : null}
         {actionRuns.length === 0 ? <p className={styles.cardSub}>追加の処理はありません。</p> : null}
       </Card>
+      <LogRecordJson value={runRecord(detail, actionRuns)} label="この実行" canCopy={canManage} />
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
       <ConfirmDialog
         open={resendConfirmOpen}

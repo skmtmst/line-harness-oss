@@ -78,7 +78,7 @@ export default function OpsTwoFactorV8() {
       if (cancelledRef.current)
  return
       if (!setup || !setup.success) {
-        setError(!setup || typeof setup.error !== 'string' || !setup.error ? 'QRコードを用意できませんでした' : setup.error)
+        setError(!setup || typeof setup.error !== 'string' || !setup.error ? 'QRコードを用意できませんでした。時間をおいて、もう一度お試しください。' : setup.error)
         setState('ready')
         return
       }

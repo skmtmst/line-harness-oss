@@ -357,7 +357,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
     <div data-customer-section="richMenu" style={sectionStyle('richMenu')} className={`p-4`}>
       <h4 className="text-micro font-semibold text-ink-faint mb-1.5">リッチメニュー</h4>
       {richMenu.kind === 'loading' ? (
-        <p className="text-micro text-ink-faint italic">読み込み中...</p>
+        <p className="text-micro text-ink-faint italic">読み込み中…</p>
       ) : richMenu.kind === 'error' ? (
         /* INBOX-08: 失敗と未設定を分け、その場で再試行できる。 */
         <div className="space-y-1.5">
@@ -374,7 +374,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
         <p className="text-micro text-ink-faint italic">未設定</p>
       ) : (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-ink-secondary">{richMenu.name ?? '(名前なし)'}</span>
+          <span className="text-xs text-ink-secondary">{richMenu.name ?? '（名前なし）'}</span>
           {richMenu.isDefault && (
             <span className="px-1.5 py-0 rounded-mini text-nano font-medium bg-shell text-ink-faint">
               デフォルト

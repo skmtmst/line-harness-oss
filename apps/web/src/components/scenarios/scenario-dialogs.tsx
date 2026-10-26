@@ -18,6 +18,7 @@ import { formatDateTime } from '@/lib/format';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import type { ScenarioFriendPlanStep } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 /*
  * シナリオ詳細で使う小さな窓。
  *
@@ -137,7 +138,7 @@ export function ConditionDialog({
           <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" className="px-5 font-medium border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
+          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
                * 欄の下で知らせて止める。保存済みの条件は維持する。
@@ -239,7 +240,7 @@ export function ConditionDialog({
                 <p className="text-ink text-sm font-bold">
                   or条件のかたまり {gi + 1}
                   <span className="text-ink-secondary ml-2 text-xs font-medium">
-                    {group.rules.length}件
+                    {formatNumber(group.rules.length)}件
                   </span>
                 </p>
                 <button
@@ -345,7 +346,7 @@ export function MoveReferrersNotice({ scenarioId }: { scenarioId: string }) {
   return (
     <div>
       <p className="text-warning text-sm font-medium">
-        このシナリオは{items.length}件のシナリオの終了後の移動先になっています。
+        このシナリオは{formatNumber(items.length)}件のシナリオの終了後の移動先になっています。
       </p>
       <p className="text-ink-secondary mt-1 text-xs">
         {shown.map((s) => s.name).join('、')}
@@ -474,7 +475,7 @@ export function OnCompleteDialog({
           <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" className="px-5 font-medium border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
+          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
                * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
@@ -551,7 +552,7 @@ export function OnCompleteDialog({
           配り終えた人に対して、タグ・友だち情報・対応マークなどを動かします。
         </p>
         <Button variant="secondary" className="text-ink-secondary px-4 whitespace-normal" type="button" onClick={onOpenActions}>
-          アクション設定{actionCount > 0 ? `（${actionCount} 件）` : ''}
+          アクション設定{actionCount > 0 ? `（${formatNumber(actionCount)} 件）` : ''}
         </Button>
       </div>
 
@@ -902,9 +903,9 @@ export function TestSendDialog({
             ? {
                 ok: false,
                 partial: true,
-                message: `${res.data.sent} 件のメッセージだけ届きました。残りは送れていない可能性があります。`,
+                message: `${formatNumber(res.data.sent)} 件のメッセージだけ届きました。残りは送れていない可能性があります。`,
               }
-            : { ok: true, message: `${res.data.sent} 件のメッセージを送りました。` },
+            : { ok: true, message: `${formatNumber(res.data.sent)} 件のメッセージを送りました。` },
         )
         if (!partial) await loadTestHistory()
       } else {
@@ -995,7 +996,7 @@ export function TestSendDialog({
         <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
           キャンセル
         </Button>
-        <Button variant="primary" className="px-5 font-medium border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
+        <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
           内容を確認
         </Button>
         </>
@@ -1016,7 +1017,7 @@ export function TestSendDialog({
 
       {lastTest ? (
         <Notice tone="info" className="mb-4">
-          前回のテスト送信：{formatDateTime(lastTest.sentAt)}・{lastTest.messageCount}通
+          前回のテスト送信：{formatDateTime(lastTest.sentAt)}・{formatNumber(lastTest.messageCount)}通
         </Notice>
       ) : null}
 

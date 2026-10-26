@@ -173,11 +173,11 @@ export default function HqHomeV8() {
     try {
       await Promise.all([load(), refreshAccounts()])
       setConnectionResult(failed === 0
-        ? `${succeeded} 件のLINE IDと接続状態を更新しました。`
-        : `${succeeded} 件を更新し、${failed} 件は更新できませんでした。`)
+        ? `${formatNumber(succeeded)} 件のLINE IDと接続状態を更新しました。`
+        : `${formatNumber(succeeded)} 件を更新し、${formatNumber(failed)} 件は更新できませんでした。`)
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
-      if (!fieldFailure) setConnectionResult(`${succeeded} 件を確認しましたが、一覧を再読み込みできませんでした。`)
+      if (!fieldFailure) setConnectionResult(`${formatNumber(succeeded)} 件を確認しましたが、一覧を再読み込みできませんでした。`)
     } finally {
       setConnectionProgress('')
       setCheckingConnections(false)

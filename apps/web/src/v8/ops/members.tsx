@@ -22,7 +22,7 @@ import { OpsHead } from './shell'
 import { PageFrame } from '@/components/templates/page-frame'
 import parts from './parts.module.css'
 import styles from './members.module.css'
-import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format'
+import { formatDate as polishFormatDate, formatDateTime, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
@@ -78,7 +78,7 @@ export default function OpsMembersV8() {
     setError('')
     const res = await opsCall(api.ops.addMember({ email: email.trim() }))
     setBusy(false)
-    if (!res.success) { setError(res.error || '招待できませんでした'); return }
+    if (!res.success) { setError(res.error || '招待できませんでした。時間をおいて、もう一度お試しください。'); return }
     setNotice(res.data.activationState === 'active'
       ? '最初の運営メンバーとして登録しました'
       : `${email.trim()} に招待メールを送りました。相手が2要素認証の登録を終えると運営メンバーになります`)
@@ -102,7 +102,7 @@ export default function OpsMembersV8() {
     setError('')
     const res = await opsCall(api.ops.setMemberActive(pending.member.staffId, pending.kind === 'resume'))
     setBusy(false)
-    if (!res.success) { setError(res.error || '変更できませんでした'); return }
+    if (!res.success) { setError(res.error || '変更できませんでした。時間をおいて、もう一度お試しください。'); return }
     setPending(null)
     void load()
   }
@@ -130,7 +130,7 @@ export default function OpsMembersV8() {
         {tab === 'members' ? (
           <>
             <KpiBand gridClassName="grid grid-cols-3">
-              <KpiCard presentation="cell" icon={<Users size={16} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? <span title={`2要素認証 設定済み ${summary.totpEnabled}人 / ${summary.members}人・未設定 ${Math.max(0, summary.members - summary.totpEnabled)}人`}>{`有効 ${active}・招待中 ${summary.invited}`}</span> : emptyValue('unknown')} loading={!loaded} />
+              <KpiCard presentation="cell" icon={<Users size={16} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? <span title={`2要素認証 設定済み ${summary.totpEnabled}人 / ${formatNumber(summary.members)}人・未設定 ${Math.max(0, summary.members - summary.totpEnabled)}人`}>{`有効 ${active}・招待中 ${summary.invited}`}</span> : emptyValue('unknown')} loading={!loaded} />
               <KpiCard presentation="cell" icon={<LogIn size={16} aria-hidden="true" />} title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
               <KpiCard presentation="cell" icon={<Eye size={16} aria-hidden="true" />} title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
             </KpiBand>

@@ -54,6 +54,7 @@ import styles from './google.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 Googleビジネス 投稿（一覧 ・投稿を作る ）と公開前の確認。
@@ -231,7 +232,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
       {loadError ? <div className={styles.stateBox}><ListState kind="error" title="投稿を表示できませんでした" description={loadError} onRetry={() => void load()} /></div> : null}
       {data ? (
         <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
-          <SectionHeader size="small" title={<>{`投稿 ${data.total} 件`}</>} />
+          <SectionHeader size="small" title={<>{`投稿 ${formatNumber(data.total)} 件`}</>} />
           {data.total === 0 && !loading ? (
             <ListState kind="empty" title={filter === 'all' ? 'まだ投稿がありません' : 'その状態の投稿はありません'} description="「投稿を作る」から最新情報・イベント・特典を作れます。" emptyPreset="readonly" />
           ) : (
@@ -257,7 +258,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
             </div>
           )}
           {data.total > 0 && pageCount > 1 ? (
-            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${data.total} 件・時刻はすべて日本時間（Asia/Tokyo）`} />
+            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${formatNumber(data.total)} 件・時刻はすべて日本時間（Asia/Tokyo）`} />
           ) : null}
         </Card>
       ) : null}
@@ -409,12 +410,12 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
       const prepared = await api.media.prepareUploads({ accountId, files: [{ filename: file.name, mimeType: file.type, sizeBytes: file.size, metadata }] })
       if (!prepared.success) throw new ApiError(500, prepared.error)
       const session = prepared.data.sessions[0]
-      if (!session) throw new Error('送信の準備結果を確認できませんでした')
+      if (!session) throw new Error('送信の準備結果を確認できませんでした。時間をおいて、もう一度お試しください。')
       const etag = await mediaUpload.put(session, file, (progress) => setUpload((current) => ({ ...current, progress })))
       const completion = await api.media.completeUpload(session.id, { accountId, etag })
       if (!completion.success) throw new ApiError(500, completion.error)
       const mediaId = completion.data.mediaId
-      if (!mediaId) throw new Error('登録を完了できませんでした')
+      if (!mediaId) throw new Error('登録を完了できませんでした。時間をおいて、もう一度お試しください。')
       const detail = await api.media.detail(mediaId, accountId)
       if (!detail.success) throw new ApiError(500, detail.error)
       setForm((current) => ({ ...current, mediaId: detail.data.item.id, mediaFilename: detail.data.item.filename, mediaSourceUrl: detail.data.item.url }))

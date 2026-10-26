@@ -10,6 +10,7 @@ import Notice from '@/components/shared/notice'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatDateTime } from '@/lib/format'
+import { updateRunStatusLabel } from '@/lib/status-labels'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 // self-update を構成した環境でのみ設定される。
@@ -111,7 +112,7 @@ export default function UpdatesPage() {
                   </Td>
                   <Td>
                     <StatusBadge tone={statusTone(r.status)} size="compact">
-                      {r.status}
+                      {updateRunStatusLabel(r.status)}
                     </StatusBadge>
                   </Td>
                   <Td>

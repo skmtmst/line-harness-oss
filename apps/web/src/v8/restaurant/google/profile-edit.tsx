@@ -21,6 +21,7 @@ import { errorMessage } from './format'
 import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { formatNumber } from '@/lib/format'
 
 
 type ProfileForm = { title: string; postalCode: string; administrativeArea: string; locality: string; addressLines: string; phone: string; websiteUri: string; description: string }
@@ -113,7 +114,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
       go({ tab: 'profile', view: 'confirm', id: ids.join(',') })
     } catch (err) {
       saveErrors.capture(err)
-      setActionError(`${errorMessage(err, '変更案を作れませんでした。')}${ids.length ? `（${ids.length}件は作成済みです。変更履歴から確認できます）` : ''}`)
+      setActionError(`${errorMessage(err, '変更案を作れませんでした。')}${ids.length ? `（${formatNumber(ids.length)}件は作成済みです。変更履歴から確認できます）` : ''}`)
     } finally {
       submitLock.current = false
       setBusy(false)
@@ -153,7 +154,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
         </Field>
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="写真">
-        <SectionHeader size="small" title={`写真（${photos === null ? '—' : `${photoTotal}枚`}）`} actions={canEdit ? <Button onClick={() => void openPicker()} disabled={picker.loading || !editable}>登録メディアから追加する</Button> : null} />
+        <SectionHeader size="small" title={`写真（${photos === null ? '—' : `${formatNumber(photoTotal)}枚`}）`} actions={canEdit ? <Button onClick={() => void openPicker()} disabled={picker.loading || !editable}>登録メディアから追加する</Button> : null} />
         {photosError ? <Notice tone="warn">{photosError}</Notice> : null}
         <div className={styles.pickerGrid}>
           {visiblePhotos.map((p, index) => <div key={p.name} className={styles.imageSlot} role="group" aria-label={`既存の写真${index + 1}`}>
@@ -166,7 +167,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
             <Button variant="text" onClick={() => setAdds((values) => values.filter((x) => x.id !== m.id))} disabled={!editable} aria-label={`${m.filename} の追加をやめる`}>追加をやめる</Button>
           </div>)}
         </div>
-        {deletes.length ? <Notice tone="warn" action={<Button variant="text" onClick={() => setDeletes([])} disabled={busy}>削除をやめる</Button>}>{deletes.length}枚を削除します。</Notice> : null}
+        {deletes.length ? <Notice tone="warn" action={<Button variant="text" onClick={() => setDeletes([])} disabled={busy}>削除をやめる</Button>}>{formatNumber(deletes.length)}枚を削除します。</Notice> : null}
         {picker.open ? <Card appearance="outlined" padding="compact" layout="vertical" gap="normal" role="group" aria-label="登録メディアから写真を選ぶ">
           <SectionHeader size="small" title="登録メディアの画像" actions={<Button onClick={closePicker}>閉じる</Button>} />
           {picker.loading ? <ListState kind="loading" title="登録メディアを読み込んでいます" /> : null}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import StatusBadge from './status-badge'
-import { STATUS_LABELS, statusLabel } from '@/lib/status-labels'
+import { STATUS_LABELS, reminderDeliveryStatusLabel, statusLabel, updateRunStatusLabel } from '@/lib/status-labels'
 
 describe('決まり1 状態の言葉', () => {
   it('用途の札は自動処理の状態へ読み替えず、別の意味なら両方を残す', () => {
@@ -29,5 +29,14 @@ describe('決まり1 状態の言葉', () => {
     expect(renderToStaticMarkup(<StatusBadge status="scheduled" />)).toContain('予約中')
     expect(renderToStaticMarkup(<StatusBadge>稼働中</StatusBadge>)).toContain('有効')
     expect(statusLabel('審査中')).toBe('審査中')
+  })
+})
+
+describe('内部の状態の値を英語のまま出さない', () => {
+  it('リマインダの送り状態と更新の実行状態は日本語にし、知らない値は「状態不明」にする', () => {
+    expect(['pending', 'sent', 'failed', 'failed_permanent', 'cancelled'].map(reminderDeliveryStatusLabel)).toEqual(['送信待ち', '送信済み', '送信失敗（やり直します）', '送信失敗', '取り消し'])
+    expect(['success', 'failed', 'rolled_back', 'running', 'pending'].map(updateRunStatusLabel)).toEqual(['成功', '失敗', '元に戻した', '実行中', '待機中'])
+    expect(reminderDeliveryStatusLabel('editing')).toBe('状態不明')
+    expect(updateRunStatusLabel('constructor')).toBe('状態不明')
   })
 })

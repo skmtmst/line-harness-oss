@@ -22,14 +22,14 @@
   },
   {
     "filename": "src/app/booking/bookings/detail/use-booking-detail.ts",
-    "fingerprint": "412d5b4d0670d471",
+    "fingerprint": "d064b6e64efaf9ff",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
     "filename": "src/app/booking/bookings/new/page.tsx",
-    "fingerprint": "c975a839aab746b7",
+    "fingerprint": "aba671b74c2d8dc9",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"

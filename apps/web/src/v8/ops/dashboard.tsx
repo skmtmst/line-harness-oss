@@ -6,7 +6,7 @@ import Link from '@/components/shared/list-navigation'
 import { Banknote, Hourglass, Sparkles, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsDashboard, type OpsDashboardPeriod, type OpsLineUnregistered } from '@/lib/api'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, formatNumber } from '@/lib/format'
 import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { formatYen, formatBytes } from '@/components/ops/ops-charts'
@@ -93,11 +93,11 @@ export default function OpsDashboardV8() {
     setBillingSyncError('')
     const res = await opsCall(api.ops.billingSync())
     if (!res.success) {
-      setBillingSyncError(res.error || 'Stripe と同期できませんでした')
+      setBillingSyncError(res.error || 'Stripe と同期できませんでした。時間をおいて、もう一度お試しください。')
       setSyncingBilling(false)
       return
     }
-    setBillingSyncNotice(`Stripe から ${res.data.imported} 件取り込みました（失敗 ${res.data.failed} 件）`)
+    setBillingSyncNotice(`Stripe から ${res.data.imported} 件取り込みました（失敗 ${formatNumber(res.data.failed)} 件）`)
     await load()
     setSyncingBilling(false)
   }
@@ -199,8 +199,8 @@ export default function OpsDashboardV8() {
               {data ? (
                 <>
                   <KpiBand density="compact">
-                    <KpiCard title="未対応" valueText={`${data.tickets.newCount} 件`} icon={null} presentation="band" value={null} unit="" detail={null} />
-                    <KpiCard title="対応中" valueText={`${data.tickets.inProgressCount} 件`} icon={null} presentation="band" value={null} unit="" detail={null} />
+                    <KpiCard title="未対応" valueText={`${formatNumber(data.tickets.newCount)} 件`} icon={null} presentation="band" value={null} unit="" detail={null} />
+                    <KpiCard title="対応中" valueText={`${formatNumber(data.tickets.inProgressCount)} 件`} icon={null} presentation="band" value={null} unit="" detail={null} />
                     <KpiCard title="平均の初回返信" valueText={hoursLabel(data.tickets.avgFirstReplyMinutes)} icon={null} presentation="band" value={null} unit="" detail={null} />
                   </KpiBand>
                   <Link href="/ops/support" className={parts.textLink}>すべて見る →</Link>
@@ -218,10 +218,10 @@ export default function OpsDashboardV8() {
               <SectionHeader title="契約者専用LINEに未登録の権限者" />
               {data ? (
                 <div className={styles.lineRow}>
-                  <p className={parts.line} title={`契約者専用LINEの登録 ${data.lineRegistration.registered}人 / ${data.lineRegistration.total}人`}>{lineUnregisteredLine(data.lineRegistration.unregisteredCount, unregistered)}</p>
+                  <p className={parts.line} title={`契約者専用LINEの登録 ${data.lineRegistration.registered}人 / ${formatNumber(data.lineRegistration.total)}人`}>{lineUnregisteredLine(data.lineRegistration.unregisteredCount, unregistered)}</p>
                   {data.lineRegistration.unregisteredCount > 0 ? (
                     <button type="button" className={parts.textLink} onClick={() => void openUnregistered()}>
-                      {`未登録の${data.lineRegistration.unregisteredCount} 人を見る`}
+                      {`未登録の${formatNumber(data.lineRegistration.unregisteredCount)} 人を見る`}
                     </button>
                   ) : null}
                 </div>
@@ -307,11 +307,11 @@ function planShareLine(rows: Array<{ key: string; label: string; count: number }
 
 /** 未登録の権限者の1行（メール未登録 M 人・LINE 未登録 N 人（店 1・店 1））。 */
 function lineUnregisteredLine(unregisteredCount: number, unregistered: OpsLineUnregistered | null): string {
-  if (!unregistered) return `LINE 未登録 ${unregisteredCount} 人`
+  if (!unregistered) return `LINE 未登録 ${formatNumber(unregisteredCount)} 人`
   const noEmail = unregistered.people.filter((p) => !p.hasEmail).length
   const byTenant = new Map<string, number>()
   for (const p of unregistered.people) byTenant.set(p.tenantName, (byTenant.get(p.tenantName) ?? 0) + 1)
   const top = [...byTenant].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([name, n]) => `${name} ${n}`)
   const tail = top.length > 0 ? `（${top.join('・')}）` : ''
-  return `メール未登録 ${noEmail} 人・LINE 未登録 ${unregisteredCount} 人${tail}`
+  return `メール未登録 ${noEmail} 人・LINE 未登録 ${formatNumber(unregisteredCount)} 人${tail}`
 }

@@ -62,6 +62,7 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense,useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css'
+import { formatNumber } from '@/lib/format'
 
 function readStep(raw: string | null): WizardStep {
   return raw === 'trigger' || raw === 'response' || raw === 'priority' || raw === 'confirm' ? raw : 'basic'
@@ -796,7 +797,7 @@ function AutoReplyWizardV8Inner() {
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={16} aria-hidden="true" />
           自動応答へ
-        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} summaries={{ basic: form.ruleName, trigger: form.respondToAll ? 'すべてのメッセージ' : `${form.keywordRules.length}件のキーワード`, response: form.mode === 'inline-text' ? form.responseContent : ({ silent: '返信しない', template: 'テンプレートから返信', 'inline-flex': 'カードで返信', 'inline-image': '画像で返信' })[form.mode], priority: `優先順位 ${form.priority}` }} />} previewLabel={step === 'basic' || step === 'trigger' ? '設定内容を見る' : undefined} previewTitle={step === 'basic' || step === 'trigger' ? '設定内容' : undefined} preview={renderPreview(true)} footerActions={
+        </Link>} steps={<Steps label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} summaries={{ basic: form.ruleName, trigger: form.respondToAll ? 'すべてのメッセージ' : `${formatNumber(form.keywordRules.length)}件のキーワード`, response: form.mode === 'inline-text' ? form.responseContent : ({ silent: '返信しない', template: 'テンプレートから返信', 'inline-flex': 'カードで返信', 'inline-image': '画像で返信' })[form.mode], priority: `優先順位 ${form.priority}` }} />} previewLabel={step === 'basic' || step === 'trigger' ? '設定内容を見る' : undefined} previewTitle={step === 'basic' || step === 'trigger' ? '設定内容' : undefined} preview={renderPreview(true)} footerActions={
           <>
             <Button
               type="button"

@@ -15,7 +15,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { readSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { forgetAuthCheck } from '@/lib/auth-check-marker'
 import { logoutAndGoToLogin } from '@/lib/logout'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatNumber } from '@/lib/format'
 
 type Self = { staffId: string; enabledAt: string | null; remaining: number | null; canEdit: boolean; notice: string | null }
 export default function SelfMfa({ loginPath = '/login' }: { loginPath?: '/login' | '/ops/login' }) {
@@ -70,7 +70,7 @@ export default function SelfMfa({ loginPath = '/login' }: { loginPath?: '/login'
     finally { setBusy(false) }
   }
   return <>
-    {self?.remaining !== null && self?.remaining !== undefined && self.remaining <= 2 ? <Notice tone="info" message={`回復コードの残りが${self.remaining}個です。認証アプリが使えない時に入れなくなる前に、作り直してください。`} /> : null}
+    {self?.remaining !== null && self?.remaining !== undefined && self.remaining <= 2 ? <Notice tone="info" message={`回復コードの残りが${formatNumber(self.remaining)}個です。認証アプリが使えない時に入れなくなる前に、作り直してください。`} /> : null}
     <FormSection id="self-mfa-title" title="自分の二段階認証" description="このアカウントでログインする時の確かめ">
       {error ? <Notice tone="danger" message={error} /> : null}
       {self?.notice ? <Notice tone="warn" message={self.notice} /> : null}

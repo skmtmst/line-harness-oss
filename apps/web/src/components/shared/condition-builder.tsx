@@ -56,10 +56,10 @@ const FIELD_OPS: { value: FieldOperator; label: string }[] = [
   { value: 'not_exists', label: '登録なし' },
   { value: 'not_equals', label: '完全一致除外' },
   { value: 'not_contains', label: '部分一致除外' },
-  { value: 'gte', label: '以上(≧)' },
-  { value: 'gt', label: 'より大きい(＞)' },
-  { value: 'lte', label: '以下(≦)' },
-  { value: 'lt', label: 'より小さい(＜)' },
+  { value: 'gte', label: '以上（≧）' },
+  { value: 'gt', label: 'より大きい（＞）' },
+  { value: 'lte', label: '以下（≦）' },
+  { value: 'lt', label: 'より小さい（＜）' },
 ]
 
 const REACTION_STATES: { value: string; label: string }[] = [
@@ -743,7 +743,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     }
 
     default:
-      return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません（{rule.type}）</span>
+      return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません。条件を作った画面で直してください。</span>
   }
 }
 

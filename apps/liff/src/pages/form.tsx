@@ -595,7 +595,7 @@ export default function Form() {
                   onClick={() => void retryBookings()}
                   disabled={bookingRetrying}
                 >
-                  {bookingRetrying ? '確保中...' : '予約を取り直す'}
+                  {bookingRetrying ? '確保中…' : '予約を取り直す'}
                 </Button>
                 <Button variant="secondary" className="flex-1"
                   type="button"
@@ -739,7 +739,7 @@ export default function Form() {
           disabled={sending || Object.values(uploading).some(Boolean) || (routedPage && routedNeedsPick)}
           style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
         >
-          {sending ? '送信中...' : routedPage && routedEmpty ? `${words.contact}に問い合わせる` : routedPage && routedNeedsPick ? '日時を選んでください' : routedPage && routedPicked && routedConfirm ? 'この内容で送る' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(japanDate(new Date(routedPicked)))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+          {sending ? '送信中…' : routedPage && routedEmpty ? `${words.contact}に問い合わせる` : routedPage && routedNeedsPick ? '日時を選んでください' : routedPage && routedPicked && routedConfirm ? 'この内容で送る' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(japanDate(new Date(routedPicked)))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
         </Button>
 
       </BottomBar>
@@ -919,7 +919,7 @@ function PeopleBookingSlotPicker({
 
   const emptyRouted = Boolean(target) && !loading && !failed && !Object.values(byDate).some((l) => l.some((t) => t.open));
   useEffect(() => { onRoutedEmpty?.(emptyRouted); }, [emptyRouted]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (routed?.status === 'loading') return <p className="text-sm text-ink-faint">ご案内を準備しています...</p>;
+  if (routed?.status === 'loading') return <p className="text-sm text-ink-faint">ご案内を準備しています…</p>;
   if (routed?.status === 'error') {
     return (
       <LoadErrorView compact message="ご案内を準備できませんでした。回答は保存されています。" onRetry={routed.retry} />
@@ -929,7 +929,7 @@ function PeopleBookingSlotPicker({
     return <p className="text-sm text-ink-secondary">{`予約のメニューが決まっていません。${words.contact}に確認してください。`}</p>;
   }
   if (loading && Object.keys(byDate).length === 0) {
-    return <p className="text-sm text-ink-faint">空き枠を読み込んでいます...</p>;
+    return <p className="text-sm text-ink-faint">空き枠を読み込んでいます…</p>;
   }
   if (failed && Object.keys(byDate).length === 0) {
     return <p className="text-sm text-ink-secondary">空き枠を読めませんでした。時間をおいて開き直してください。</p>;

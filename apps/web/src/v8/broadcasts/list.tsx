@@ -320,7 +320,7 @@ export default function BroadcastListV8() {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
-      setFolderError('フォルダを削除できませんでした。') }
+      setFolderError('フォルダを削除できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }
@@ -497,7 +497,7 @@ export default function BroadcastListV8() {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
-      setSavedViewError('この検索条件を保存できませんでした。') }
+      setSavedViewError('この検索条件を保存できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setSavedViewBusy(false)
     }

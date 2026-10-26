@@ -526,7 +526,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
         state: runs.testSends.length > 0 ? ('ok' as const) : ('warn' as const),
         detail:
           runs.testSends.length > 0
-            ? `最新のテスト送信は${runs.testSends[0].messageCount} 通です`
+            ? `最新のテスト送信は${formatNumber(runs.testSends[0].messageCount)} 通です`
             : 'テスト送信の記録がありません',
       }
     }

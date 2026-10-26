@@ -104,7 +104,7 @@ export default function AccountSwitchMenu({
               <Building2 aria-hidden="true" className={styles.hqIcon} />
               <span className={styles.hqText}>
                 <span className={styles.hqTitle}>統括に戻る</span>
-                <span className={styles.hqSub} title={hq.companyName}>{`${hq.companyName} ・ アカウント ${hq.accountCount}`}</span>
+                <span className={styles.hqSub} title={hq.companyName}>{`${hq.companyName}・アカウント ${hq.accountCount}`}</span>
               </span>
               <ArrowRight aria-hidden="true" className={styles.hqArrow} />
             </button>
@@ -120,15 +120,19 @@ export default function AccountSwitchMenu({
           onPointerLeave={() => moveGlow(listRef.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? null)}
         >
           {glow ? <span aria-hidden="true" className={styles.glow} style={{ transform: `translateY(${glow.top}px)`, height: glow.height }} /> : null}
-          {accounts.map((account) => {
+          {accounts.map((account, index) => {
             const selected = account.id === selectedAccountId
             const handle = account.basicId ? `@${account.basicId.replace(/^@/, '')}` : null
+            const handleId = `${listId}-handle-${index}`
             return (
               <button
                 key={account.id}
                 type="button"
                 role="menuitemradio"
                 aria-checked={selected}
+                // 読み上げるのはアカウント名だけ。@ID は説明として読む。
+                aria-label={account.label}
+                aria-describedby={handle ? handleId : undefined}
                 className={selected ? `${styles.row} ${styles.rowSelected}` : styles.row}
                 onClick={() => { onClose(); if (!selected) onSelect(account.id) }}
                 onPointerEnter={(event) => moveGlow(event.currentTarget)}
@@ -139,7 +143,7 @@ export default function AccountSwitchMenu({
                 {/* 名前と @ID の2行。長い時は1行で省略し、全文は共通の吹き出しで見られる。 */}
                 <span className={styles.names}>
                   <TruncatedText value={account.label} className={styles.name} />
-                  {handle ? <TruncatedText value={handle} className={styles.handle} /> : null}
+                  {handle ? <TruncatedText id={handleId} value={handle} className={styles.handle} /> : null}
                 </span>
                 {selected ? <Check aria-hidden="true" className={styles.check} /> : null}
               </button>

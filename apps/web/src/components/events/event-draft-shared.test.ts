@@ -166,7 +166,7 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
   })
 
   it('編集画面の日時表示は端末の時間帯に依存しない(EVENT-05)', () => {
-    expect(formatJpDateTime('2026-10-16T16:30:00Z')).toMatch(/10月17日（土）01:30$/)
+    expect(formatJpDateTime('2026-10-16T16:30:00Z')).toMatch(/2026年10月17日 01:30$/)
     // 一覧と編集の実際の表示結果を、日本時間の日またぎでそろえる。
     expect(LIST_PAGE).toContain("import { jstDay, jstTime } from './shared'")
     expect(jstDay('2026-10-16T16:30:00Z')).toBe('10/17（土）')
@@ -196,5 +196,5 @@ it.each([
 ])('一覧と編集の日本時間は同じ暦日と時刻になる: %s', (at, time) => {
   expect(jstDay(at)).toBe('10/1（木）')
   expect(jstTime(at)).toBe(time)
-  expect(formatJpDateTime(at)).toMatch(new RegExp(`10月1日（木）${time}$`))
+  expect(formatJpDateTime(at)).toMatch(new RegExp(`2026年10月1日 ${time}$`))
 })

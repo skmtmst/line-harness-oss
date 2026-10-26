@@ -109,7 +109,7 @@ function DetailContent() {
     setBusy(true)
     const res = await opsCall(api.ops.setTenantFeaturePacks(detail.tenant.id, featurePacks))
     setBusy(false)
-    if (!res.success) { setError(res.error || '機能パックを変更できませんでした'); return }
+    if (!res.success) { setError(res.error || '機能パックを変更できませんでした。時間をおいて、もう一度お試しください。'); return }
     setError('')
     await load()
   }
@@ -342,7 +342,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
     setError('')
     const res = await opsCall(api.ops.changeTenantStatus(tenantId, { status: target, reason: reason.trim(), confirmName: needsName ? confirmName : undefined }))
     setBusy(false)
-    if (!res.success) { setError(res.error || '変更できませんでした'); return }
+    if (!res.success) { setError(res.error || '変更できませんでした。時間をおいて、もう一度お試しください。'); return }
     onDone()
   }
 

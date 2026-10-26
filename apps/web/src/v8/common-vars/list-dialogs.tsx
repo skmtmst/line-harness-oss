@@ -409,7 +409,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
         title={deleteTargets.length === 1
           ? `「${deleteTargets[0]?.name ?? ''}」を削除しますか？`
           : `「${deleteTargets[0]?.name ?? ''}」ほか${deleteTargets.length - 1} 件を削除しますか？`}
-        description={`選択した${deleteTargets.length} 件の共通情報と、登録値・次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。この操作は元に戻せません。`}
+        description={`選択した${formatNumber(deleteTargets.length)} 件の共通情報と、登録値・次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。この操作は元に戻せません。`}
         confirmLabel="削除する"
         destructive
         busy={deleting}

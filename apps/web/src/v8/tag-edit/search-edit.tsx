@@ -790,7 +790,7 @@ export default function SavedSearchEditV8() {
 
       { if (!fieldFailure)
 
-      setError(deleteError instanceof ApiError ? deleteError.message : '削除できませんでした') }
+      setError(deleteError instanceof ApiError ? deleteError.message : '削除できませんでした。時間をおいて、もう一度お試しください。') }
     }
   }
 
@@ -843,7 +843,7 @@ export default function SavedSearchEditV8() {
     : preview?.calculatedAt
       ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? emptyValue('unknown')}人・MAIL ${preview.byChannel.mail ?? emptyValue('unknown')}人）。数え直している間は古い数を出しません`
       : '保存した条件でまだ数えていません。数え直すと出ます'
-  const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length} 件）` : '削除できるか確かめられません'
+  const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${polishFormatNumber(original.usedIn.length)} 件）` : '削除できるか確かめられません'
 
   const side = (
     <div className={styles.side}>
@@ -918,7 +918,7 @@ export default function SavedSearchEditV8() {
             <span className={styles.labelRow}>
               <span className={styles.label}>共有</span>
               {/* 設計 XBkiQ：共有を選ぶ場所で、上限と共有すると何が起きるかを先に言う。 */}
-              <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount} 件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
+              <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${polishFormatNumber(savedCount)} 件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
             </span>
             <SegmentedControl fit="content" aria-label="共有" value={isShared ? 'all' : 'self'} options={[{ value: 'all', label: '全員' }, { value: 'self', label: '自分だけ' }]} onChange={(value) => setIsShared(value === 'all')} />
           </div>

@@ -285,7 +285,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       if (dirty && !(await saveRef.current())) return
       setTestOpen(false)
       const res = await webinarApi.testNotifications(webinarId)
-      setTestResult(`テスト送信しました。成功 ${res.data.sent} 件・失敗 ${res.data.failed} 件`)
+      setTestResult(`テスト送信しました。成功 ${formatNumber(res.data.sent)} 件・失敗 ${formatNumber(res.data.failed)} 件`)
       await refreshTestResult()
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)

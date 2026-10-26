@@ -8,6 +8,7 @@ import Dialog from '@/components/shared/dialog'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { TextField } from '@/components/shared/text-field'
+import { formatNumber } from '@/lib/format'
 
 /** 1ページに並べる候補数。検索と併用するので多すぎない数に抑える。 */
 export const MEDIA_PICKER_PAGE_SIZE = 20
@@ -213,7 +214,7 @@ export default function MediaPickerDialog({
             </ul>
             <div className="flex items-center justify-between text-xs">
               <span className="text-ink-faint">
-                {total}件{query ? `（「${query}」で絞り込み中）` : ''}
+                {formatNumber(total)}件{query ? `（「${query}」で絞り込み中）` : ''}
               </span>
               <Pagination
                 page={page}

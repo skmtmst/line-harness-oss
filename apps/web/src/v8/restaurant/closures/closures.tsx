@@ -25,6 +25,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 。採用 2026-10-07）。
@@ -269,7 +270,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
             <>
               <TextLink href="/restaurant-test/close-tasks">すべて見る</TextLink>
             </>
-          </>} heading={<>{`${dayTitle(first.closure.startDate)}の${KIND_LABEL[first.closure.kind]}：他の予約サイトの枠を閉じてください（未対応 ${first.t.open.length} 件）`}</>}>
+          </>} heading={<>{`${dayTitle(first.closure.startDate)}の${KIND_LABEL[first.closure.kind]}：他の予約サイトの枠を閉じてください（未対応 ${formatNumber(first.t.open.length)} 件）`}</>}>
             <p className={styles.bandDetail}>
               {`LINE の受付は止めました → ${first.t.open.map((t) => nameOf(t.channel)).join('・')}の ${first.closure.startDate === first.closure.endDate ? dayShort(first.closure.startDate) : rangeTitle(first.closure)} を${first.closure.allDay ? '終日' : ` ${timeText(first.closure)} `}閉じてください`}
             </p>
@@ -316,7 +317,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                         <>
                           <span className={`${styles.mark} ${tone === 'closed' ? styles.markClosed : ''}`}>{KIND_LABEL[hit.kind]}</span>
                           <span className={styles.cellNote}>{hit.allDay ? `終日・${tablesText(hit.tableIds, tables)}` : timeText(hit)}</span>
-                          <span className={styles.cellNote}>{hit.allDay ? (count === null ? '' : `予約 ${count} 件`) : tablesText(hit.tableIds, tables)}</span>
+                          <span className={styles.cellNote}>{hit.allDay ? (count === null ? '' : `予約 ${formatNumber(count)} 件`) : tablesText(hit.tableIds, tables)}</span>
                           {hits.length > 1 ? <span className={styles.cellNote}>{`ほか ${hits.length - 1} 件`}</span> : null}
                         </>
                       ) : holiday ? (

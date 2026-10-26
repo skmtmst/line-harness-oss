@@ -108,6 +108,23 @@ describe('宛先のタブ', () => {
     expect(screen.getByRole('button', { name: /1件を再送/ })).toBeTruthy()
   })
 
+  it('宛先の結果は共通の状態の札で色を分け、時刻は time で桁をそろえる', async () => {
+    fixture.recipients.mockResolvedValue({
+      success: true,
+      data: {
+        rows: [row('山田花子', 'delivered', '届いた'), row('佐藤次郎', 'failed_permanent', '届けられなかった'), row('鈴木一郎', 'failed_temporary', '一時的な失敗')],
+        summary: SUMMARY, aggregateOnly: false, aggregateReason: null, legacySuccessCount: null,
+      },
+    })
+    render(<BroadcastRecipients broadcastId="b1" total={3} version={1} />)
+    await waitFor(() => expect(screen.getByText('山田花子')).toBeTruthy())
+    const tone = (name: string) => screen.getByText(name).closest('li')?.querySelector('[data-design-node="xRvDB"]')?.getAttribute('data-tone')
+    expect(tone('山田花子')).toBe('success')
+    expect(tone('佐藤次郎')).toBe('danger')
+    expect(tone('鈴木一郎')).toBe('warning')
+    expect(screen.getByText('山田花子').closest('li')?.querySelector('time')?.getAttribute('dateTime')).toBe('2026-10-01T10:00:00+09:00')
+  })
+
   it('旧配信は集約だけと書く（行を作らない）', async () => {
     fixture.recipients.mockResolvedValue({
       success: true,

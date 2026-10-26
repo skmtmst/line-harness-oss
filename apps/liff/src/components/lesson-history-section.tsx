@@ -40,8 +40,8 @@ export default function LessonHistorySection({ onPicking, onLater, onBookingChan
           <li key={b.id}>
             <Card className="space-y-2.5 p-3.5">
               <h3 className="text-[15px] font-bold text-ink">{mdHm(b.slot_starts_at)}</h3>
-              <p className="text-[13px] text-ink">{[b.event_name, b.venue_name].filter(Boolean).join('・ ')}</p>
-              <p className="text-xs text-liff-sub">{[b.makeup?.plan_label, b.makeup?.cutoff_at ? `欠席の連絡は ${utcToJstHm(b.makeup.cutoff_at)} まで` : null].filter(Boolean).join(' ・ ')}</p>
+              <p className="text-[13px] text-ink">{[b.event_name, b.venue_name].filter(Boolean).join('・')}</p>
+              <p className="text-xs text-liff-sub">{[b.makeup?.plan_label, b.makeup?.cutoff_at ? `欠席の連絡は ${utcToJstHm(b.makeup.cutoff_at)} まで` : null].filter(Boolean).join('・')}</p>
               <Button variant="secondary" onClick={() => { setError(null); setTarget(b); }}>欠席する</Button>
             </Card>
           </li>

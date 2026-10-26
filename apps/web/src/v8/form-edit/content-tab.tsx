@@ -351,9 +351,9 @@ function AllergyOptionsSave({accountId, block, set}: {accountId: string; block: 
       setBusy(true); setMessage('')
       try {
         const result = await api.accountSettings.saveAllergyOptions(accountId, (block.choices ?? []).filter(choice => !choice.isOther).map(choice => choice.label), version)
-        if (!result.success || !result.data) throw new Error(result.error ?? '保存できませんでした')
+        if (!result.success || !result.data) throw new Error(result.error ?? '保存できませんでした。時間をおいて、もう一度お試しください。')
         setVersion(result.data.version); setMessage('店の選択肢を保存しました')
-      } catch (error) { if(!saveErrors.capture(error)) setMessage(japaneseDetailOf(error) || '保存できませんでした') }
+      } catch (error) { if(!saveErrors.capture(error)) setMessage(japaneseDetailOf(error) || '保存できませんでした。時間をおいて、もう一度お試しください。') }
       finally { setBusy(false) }
     }}>店の選択肢を保存する</Button> : null}
     {message ? <p role="status" className={styles.cardNote}>{message}</p> : null}</SaveErrorScope>

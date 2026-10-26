@@ -6,7 +6,7 @@
 .colItem { width: var(--tpl-distribution-col-item); }
 .colVersion { width: var(--tpl-distribution-col-version); }
 .colMode { width: var(--tpl-distribution-col-mode); }
-.table thead th { height: var(--tpl-roster-history-head-h); padding: 0 var(--tpl-toolbar-gap); background: var(--color-surface-pearl); box-shadow: none; border: 0; text-align: left; font-size: var(--text-micro); line-height: var(--tpl-row-sub-lh); font-weight: var(--polish-control-weight); color: var(--color-ink-secondary); white-space: nowrap; }
+.table thead th { height: var(--tpl-roster-history-head-h); padding: 0 var(--tpl-toolbar-gap); background: var(--color-surface-pearl); box-shadow: none; border: 0; text-align: left; font-size: var(--text-micro); line-height: var(--tpl-row-sub-lh); font-weight: 600; color: var(--color-ink-secondary); white-space: nowrap; }
 .table tbody td { height: var(--tpl-ev-ls-row-h); padding: 0 var(--tpl-toolbar-gap); vertical-align: middle; box-shadow: var(--tpl-htn-line-top); font-size: var(--text-caption); line-height: var(--tpl-wh-cell-lh); }
 .table th:first-child, .table td:first-child { padding-left: var(--tpl-htn-edge); }
 .table th:last-child, .table td:last-child { padding-right: var(--tpl-htn-edge); }

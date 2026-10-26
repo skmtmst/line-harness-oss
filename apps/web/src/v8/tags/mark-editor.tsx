@@ -31,6 +31,7 @@ import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fiel
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list';
 import MarkBasicFields from './mark-basic-fields'
 import styles from './create.module.css'
+import { formatNumber } from '@/lib/format'
 import { permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 
@@ -430,14 +431,14 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   const back = null
   const description = editing && selected
-    ? `${selected.friendCount} 人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
+    ? `${formatNumber(selected.friendCount)} 人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
     : '対応の状態を、色つきの印で管理します。'
 
   const aside = hideForm ? null : (
     <div className={styles.aside}>
       <h2 className={styles.asideTitle}>出す場所と数</h2>
       <dl className={styles.placeList}>
-        <div className={styles.placeRow}><dt>付いている人</dt><dd>{selected ? `${selected.friendCount} 人` : '0 人'}</dd></div>
+        <div className={styles.placeRow}><dt>付いている人</dt><dd>{selected ? `${formatNumber(selected.friendCount)} 人` : '0 人'}</dd></div>
         {PLACE_ROWS.map(([key, label]) => (
           <div key={key} className={styles.placeRow}><dt>{label}</dt><dd>{shownTargets.includes(key) ? '出す' : '出さない'}</dd></div>
         ))}

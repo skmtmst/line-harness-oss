@@ -485,9 +485,9 @@ function Responses() {
             <>
               {incompleteItems.length > 0 ? (
                 <Notice tone="danger" role="status"
-                  heading={`後処理が終わっていない回答が ${incompleteItems.length} 件あります`}
+                  heading={`後処理が終わっていない回答が ${formatNumber(incompleteItems.length)} 件あります`}
                   message={`答えは保存されています。${failedSteps.join('・') || '後処理'}が終わっていません${(total ?? 0) > items.length ? '（表示中のページから数えています）' : ''}。`}
-                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}><Filter size={16} aria-hidden="true" />{`その${incompleteItems.length} 件を見る`}</Button>} />
+                  action={<Button onClick={() => { selectAnswer(incompleteItems[0]?.id ?? null); setView('rows') }}><Filter size={16} aria-hidden="true" />{`その${formatNumber(incompleteItems.length)} 件を見る`}</Button>} />
               ) : null}
               {summaries.map((fieldSummary) => {
                 const block = blockByKey(fieldSummary.key)

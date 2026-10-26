@@ -42,7 +42,7 @@ export function MemberCardView({ card }: { card: MemberCardData }) {
       <p className="text-[28px] leading-9 font-bold">{card.name}</p>
       {card.next && typeof card.next.progress === 'number' ? <ProgressBar value={card.next.progress} label={`${card.next.name}まで`} className="text-liff-member-bar" /> : null}
       <p className="text-sm font-bold">{goal}</p>
-      {card.benefits && card.benefits.length > 0 ? <p className="text-xs text-liff-deep-sub">{`特典：${card.benefits.join(' ・ ')}`}</p> : null}
+      {card.benefits && card.benefits.length > 0 ? <p className="text-xs text-liff-deep-sub">{`特典：${card.benefits.join('・')}`}</p> : null}
     </div>
     {card.downgradeDueAt ? <Card className="space-y-1 p-4">
       <p className="text-xs text-ink-secondary">ランクが下がる前のお知らせ</p>

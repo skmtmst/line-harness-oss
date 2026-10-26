@@ -237,7 +237,7 @@ function EditWebhookPageInner() {
 
 export default function EditWebhookPage() {
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中…</div>}>
       <EditWebhookPageInner />
     </Suspense>
   )

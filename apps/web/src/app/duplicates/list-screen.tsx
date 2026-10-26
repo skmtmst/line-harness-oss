@@ -144,7 +144,7 @@ export default function DuplicatesV8() {
       <div className={styles.tableWrap} aria-busy={d.candidatesLoading}>
         <table className={styles.table}>
           <thead>
-            <tr>
+            <tr className={styles.headRow}>
               <th>候補</th>
               <th>確からしさ</th>
               <th>一致した根拠</th>
@@ -284,7 +284,7 @@ export default function DuplicatesV8() {
             ) : (
               <table className={styles.table} style={{ minWidth: 0 }}>
                 <thead>
-                  <tr>
+                  <tr className={styles.headRow}>
                     <th>アカウント</th>
                     <th className="num">友だち</th>
                     <th className="num">うち重複</th>
@@ -318,9 +318,9 @@ export default function DuplicatesV8() {
               <table className={styles.table} style={{ minWidth: 0 }}>
                 <thead>
                   <tr>
-                    <th>行 ＼ 列</th>
+                    <th className={styles.headCell}>行 ＼ 列</th>
                     {d.data.perAccount.map((col) => (
-                      <th key={col.accountId} className="num" title={col.accountName}>
+                      <th key={col.accountId} className={`${styles.headCell} num`} title={col.accountName}>
                         {col.accountName}
                       </th>
                     ))}

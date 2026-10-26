@@ -180,7 +180,7 @@ export function StaffEditModal({
           >
             キャンセル
           </button>
-          <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" onClick={submit} disabled={saving} busy={busySave ?? saving} busyLabel="保存中…" widthReserve="idle">
+          <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={submit} disabled={saving} busy={busySave ?? saving} busyLabel="保存中…" widthReserve="idle">
             {'保存する'}
           </Button>
         </div>

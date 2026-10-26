@@ -193,10 +193,10 @@ export default function SiteScriptV8() {
       const domains = parseDomains(siteDialog.domainsText)
       if (siteDialog.mode === 'create') {
         const res = await api.measurementSites.create({ accountId: selectedAccountId ?? undefined, label: siteDialog.label, domains })
-        if (!res.success) throw new Error(res.error || '作成できませんでした')
+        if (!res.success) throw new Error(res.error || '作成できませんでした。時間をおいて、もう一度お試しください。')
       } else {
         const res = await api.measurementSites.update(siteDialog.site.id, { label: siteDialog.label, domains })
-        if (!res.success) throw new Error(res.error || '更新できませんでした')
+        if (!res.success) throw new Error(res.error || '更新できませんでした。時間をおいて、もう一度お試しください。')
       }
       if (moved()) return
       setSiteDialog(null)
@@ -235,7 +235,7 @@ export default function SiteScriptV8() {
     setSiteBusy(true)
     try {
       const res = await api.measurementSites.stop(stopDialog.site.id, reason)
-      if (!res.success) throw new Error(res.error || '停止できませんでした')
+      if (!res.success) throw new Error(res.error || '停止できませんでした。時間をおいて、もう一度お試しください。')
       if (moved()) return
       setStopDialog(null)
       setSiteActionError('')
@@ -256,7 +256,7 @@ export default function SiteScriptV8() {
     setSiteBusy(true)
     try {
       const res = await api.measurementSites.resume(resumeTarget.id)
-      if (!res.success) throw new Error(res.error || '再開できませんでした')
+      if (!res.success) throw new Error(res.error || '再開できませんでした。時間をおいて、もう一度お試しください。')
       if (moved()) return
       setResumeTarget(null)
       setSiteActionError('')

@@ -157,7 +157,7 @@ function TagFolderDialog({
       { if (!fieldFailure)
 
 
-      setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした') }
+      setError(group ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setSaving(false)
     }

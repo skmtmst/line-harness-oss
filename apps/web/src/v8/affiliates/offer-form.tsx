@@ -247,7 +247,7 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
   return (
     <SaveErrorScope errors={saveErrors}><Dialog
       open
-      title={isEdit ? '案件を編集' : '案件を新規作成'}
+      title={isEdit ? '案件を編集' : '案件を作る'}
       busy={submitting}
       error={formError ?? undefined}
       confirmLabel={isEdit ? '更新' : '作成'}

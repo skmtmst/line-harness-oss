@@ -14,7 +14,7 @@ import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/g
 import ListToolbar from '@/components/shared/list-toolbar'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowActions } from '@/components/shared/row-actions'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
 import Notice from '@/components/shared/notice'
@@ -131,7 +131,7 @@ export default function ManualLinksScreen() {
           ) : undefined}
         />
       ) : (
-        <GridTable className={styles.table} label={`画面とマニュアルの対応 ${total} 件`} design={{ columns: 'var(--sett-manual-columns)', gap: 'var(--tpl-sb-tbl-gap)', padding: 'var(--tpl-sb-tbl-pad)', rowPadding: 'var(--tpl-sb-tbl-row-pad)', fontSize: 'var(--tpl-sb-tbl-head)', color: 'var(--color-ink)' }}>
+        <GridTable className={styles.table} label={`画面とマニュアルの対応 ${formatNumber(total)} 件`} design={{ columns: 'var(--sett-manual-columns)', gap: 'var(--tpl-sb-tbl-gap)', padding: 'var(--tpl-sb-tbl-pad)', rowPadding: 'var(--tpl-sb-tbl-row-pad)', fontSize: 'var(--tpl-sb-tbl-head)', color: 'var(--color-ink)' }}>
           <div role="rowgroup">
             <GridHeadRow>
               <GridCell role="columnheader">画面ID</GridCell>

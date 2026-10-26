@@ -1,4 +1,5 @@
 import type { AccountHandover } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 乗り換え（V8）の言葉。今の画面（app/accounts/handover/handover-view.ts）の決まりを写した。
@@ -46,7 +47,7 @@ export function countsLine(counts: MatchCounts & { sourceTotal: number }): strin
   const parts = MATCH_BUCKETS
     .filter((bucket) => bucket.key === 'review' || counts[bucket.key] > 0)
     .map((bucket) => `${bucket.label} ${counts[bucket.key]}`)
-  return `元の友だち ${counts.sourceTotal} 人：${parts.join('・')}`
+  return `元の友だち ${formatNumber(counts.sourceTotal)} 人：${parts.join('・')}`
 }
 
 /** 判断の言葉。 */

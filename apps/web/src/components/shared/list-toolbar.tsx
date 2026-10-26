@@ -10,6 +10,7 @@ import FilterChip from './filter-chip'
 import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
 import { toolbarContentFit, fitToolbarWrap, measureToolbarOptionalWidth, fitToolbarOptionalWidth, fitToolbarOverflowPanel, observeToolbarContent } from './list-toolbar-fit.mjs'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 札の組は組の中で縦に積まない。
@@ -441,7 +442,7 @@ export function ResponsiveFilterChips({ children, label = '状態', preserveChip
   return <span ref={ref} className={styles.filterChoices} data-filter-collapsed={!preserveChips && collapsed || undefined}>
     <span className={styles.filterWide} data-filter-chips>{children}</span>
     {!preserveChips ? <span className={styles.filterNarrow}><Select size="content" label={label} aria-label={label} value={current}
-      options={[...(allIndex >= 0 ? [] : [{ value: 'all', label: 'すべて', disabled: selected.length > 1 }]), ...(selected.length > 1 ? [{ value: 'multiple', label: `${selected.length}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
+      options={[...(allIndex >= 0 ? [] : [{ value: 'all', label: 'すべて', disabled: selected.length > 1 }]), ...(selected.length > 1 ? [{ value: 'multiple', label: `${formatNumber(selected.length)}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
       onChange={next => { if (next === 'all') { if (selected.length === 1) chips[selected[0]].props.onChange(false) } else { const chip = chips[Number(next)]; chip?.props.onChange(!chip.props.selected) } }} /></span> : null}
   </span>
 }

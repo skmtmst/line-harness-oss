@@ -31,6 +31,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import Notice from '@/components/shared/notice'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 統括のお問い合わせ（Pencil 。運営の LINE を登録する窓を開いた状態が ）。
@@ -347,7 +348,7 @@ export default function HqSupportV8() {
                   <GridCell className={styles.subjectCell}>
                     <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`}><TruncatedText value={item.subject} /></Link>
                     {!tenantUnavailable && item.replies && item.replies.length > 0 ? (
-                      <span className={styles.replyNote}>運営からの返信 {item.replies.length} 件・開いて続きを送れます</span>
+                      <span className={styles.replyNote}>運営からの返信 {formatNumber(item.replies.length)} 件・開いて続きを送れます</span>
                     ) : null}
                   </GridCell>
                   <GridCell>{supportKindWord(item.kind, item.kindLabel)}</GridCell>

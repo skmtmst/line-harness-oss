@@ -22,6 +22,7 @@ import {
   type BannerReference,
   type BannerReferenceMode,
 } from '@/lib/hq-banners'
+import { formatNumber } from '@/lib/format'
 
 type Scope = 'all' | 'favorite' | 'project'
 
@@ -227,7 +228,7 @@ export default function ReferencePickerDialog({
             onClick={() => onPick(picks, pickedImages.map(({ image }) => image))}
           >
             <Check aria-hidden="true" className="h-4 w-4" />
-            {picks.length === 0 ? 'この画像を使う' : `この ${picks.length} 枚を使う`}
+            {picks.length === 0 ? 'この画像を使う' : `この ${formatNumber(picks.length)} 枚を使う`}
           </Button>
         </div>
       }

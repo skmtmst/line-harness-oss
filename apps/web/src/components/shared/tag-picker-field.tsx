@@ -12,6 +12,7 @@ import { FolderDot } from './folder-dot'
 import TagPill from './tag-pill'
 import FolderPickerShell from './folder-picker-shell'
 import styles from './tag-picker-field.module.css'
+import { formatNumber } from '@/lib/format'
 
 export type TagPickerOption = { id: string; name: string; groupId?: string | null; isStarred?: boolean; lineAccountId?: string | null }
 /** 案A：欄全体が押せる。窓を開いても、選ぶまで保存値は変えない。 */
@@ -102,7 +103,7 @@ function TagPickerDialog({ multiple, items, folders, folderFailed, status, initi
   return <FolderPickerShell busy={busy} title="タグを選ぶ" onClose={() => { if (!busy) onCancel() }} rows={rows} activeId={folder} onFolder={setFolder}
     search={<div className={styles.searchRow}><SearchField ref={inputRef} aria-label="タグ名で探す" placeholder="タグ名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />{!creating && status === 'ready' ? <Button variant="text" onClick={() => setCreating(true)}><Plus size={16} />その場でタグを作る</Button> : null}</div>}
     sideNote={folderFailed ? <p className={styles.error}>フォルダを読み込めませんでした</p> : null}
-    footer={<><span className={styles.count} aria-live="polite">{selected.length}件選んでいます</span><Button disabled={busy} onClick={onCancel}>キャンセル</Button><Button variant="primary" disabled={busy || status !== 'ready'} onClick={() => onConfirm(selected)}>選ぶ（{selected.length}件）</Button></>}
+    footer={<><span className={styles.count} aria-live="polite">{formatNumber(selected.length)}件選んでいます</span><Button disabled={busy} onClick={onCancel}>キャンセル</Button><Button variant="primary" disabled={busy || status !== 'ready'} onClick={() => onConfirm(selected)}>選ぶ（{formatNumber(selected.length)}件）</Button></>}
   >
     {status === 'loading' ? <p>タグを読み込んでいます。</p> : status === 'error' ? <><p role="alert" className={styles.error}>タグを読み込めませんでした。</p><Button onClick={onRetry}>もう一度読み込む</Button></> : <>
       {creating ? <div className={styles.create}><TextField aria-label="新しいタグの名前" placeholder="タグの名前" value={name} onChange={event => setName(event.target.value)} invalid={Boolean(error)} /><Button busy={busy} disabled={busy || !name.trim()} onClick={() => void create()}>作る</Button><Button disabled={busy} onClick={() => setCreating(false)}>やめる</Button></div> : null}

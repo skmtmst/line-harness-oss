@@ -291,7 +291,7 @@ describe('NEXT-11 遅い補助パネルが顧客名の表示を止めない', ()
 
     // マイルの応答を待たずに本体が出る
     await eventually(() => expect(document.body.textContent).toContain('テスト太郎'))
-    expect(document.body.textContent).not.toContain('読み込み中...')
+    expect(document.body.textContent).not.toContain('読み込み中…')
     // 戻る導線（友だち一覧へのリンク）が使える
     const back = Array.from(document.querySelectorAll('a')).find((a) => a.getAttribute('href') === '/chats?friend=friend-1')
     expect(back).toBeTruthy()

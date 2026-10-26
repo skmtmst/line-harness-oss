@@ -16,7 +16,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { ActionCell, DataTable, RowNameLink, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { emptyValue } from '@/components/shared/empty-value'
-import { formatListTimestamp, formatYen } from '@/lib/format'
+import { formatListTimestamp, formatYen, formatNumber } from '@/lib/format'
 import { bookingPaymentAdminApi, isNotReadyError, type PaymentEvent } from '@/lib/api/helpers/booking-payment-admin'
 import { EVENT_KIND, EVENT_RESULT } from './labels'
 import styles from './payments.module.css'
@@ -31,7 +31,7 @@ const RESULT_FILTER = [
   { value: 'failed', label: '結果：失敗' },
 ]
 const PERIOD_FILTER = [
-  { value: '7d', label: '期間：この７日' },
+  { value: '7d', label: '期間：この7日' },
   { value: '30d', label: '期間：過去30日' },
   { value: '90d', label: '期間：過去90日' },
 ]
@@ -88,7 +88,7 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
           <Select aria-label="結果" value={result} onChange={setResult} options={RESULT_FILTER} />
           <Select aria-label="期間" value={period} onChange={setPeriod} options={PERIOD_FILTER} />
         </>}
-        trailing={<span className={styles.count}>{load.state === 'ready' ? `${load.total}件表示` : ''}</span>}
+        trailing={<span className={styles.count}>{load.state === 'ready' ? `${formatNumber(load.total)}件表示` : ''}</span>}
       /></div>
       {load.state === 'loading' ? <ListState kind="loading" title="届いた知らせを読み込んでいます" />
         : load.state === 'error' ? <ListState kind="error" title="届いた知らせを表示できませんでした" onRetry={() => void reload()} />

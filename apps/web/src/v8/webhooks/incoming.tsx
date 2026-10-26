@@ -43,6 +43,7 @@ import styles from './incoming.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import IncomingActions from './incoming-actions'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 外部連携「こちらで受け取る」タブ（Pencil 、作る窓 ）。
@@ -745,7 +746,7 @@ export default function WebhooksIncomingV8() {
             <div className={styles.cardHead}>
               <h3 className={styles.cardTitle} id="wh-in-unmatched">人が見つからなかった届物</h3>
               <p className={styles.cardNote}>
-                {(detail.pendingUnmatched ?? 0) > 0 ? `${detail.pendingUnmatched} 件。` : ''}結び付けると、届いたらすることが動きます
+                {(detail.pendingUnmatched ?? 0) > 0 ? `${formatNumber(detail.pendingUnmatched)} 件。` : ''}結び付けると、届いたらすることが動きます
               </p>
             </div>
             {unmatchedStatus === 'loading' ? (
@@ -782,7 +783,7 @@ export default function WebhooksIncomingV8() {
                       <TruncatedText value={item.kind === 'candidate'
                         ? '1人の友だちに一致'
                         : item.kind === 'ambiguous'
-                          ? item.candidates.length > 0 ? `${item.candidates.length} 人の友だちに一致` : '2人以上に一致'
+                          ? item.candidates.length > 0 ? `${formatNumber(item.candidates.length)} 人の友だちに一致` : '2人以上に一致'
                           : '一致する友だちがいません'} />
                       {item.kind === 'ambiguous' && canResolveUnmatched ? item.candidates.map((candidate) => (
                         <div key={candidate.friendId}>
@@ -949,7 +950,7 @@ export default function WebhooksIncomingV8() {
                 {testResult.match.status === 'matched'
                   ? '1人の友だちに一致しました'
                   : testResult.match.status === 'ambiguous'
-                    ? `同じ値の友だちが${testResult.match.friendIds.length} 人います。実際に届くと保留になり、人が選びます。`
+                    ? `同じ値の友だちが${formatNumber(testResult.match.friendIds.length)} 人います。実際に届くと保留になり、人が選びます。`
                     : '一致する友だちがいません'}
               </p>
               <span className={styles.fieldLabel}>動く予定の処理</span>

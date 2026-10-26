@@ -7,6 +7,7 @@
  */
 
 import { formatDateTime, formatRelative } from './format'
+import { formatNumber } from '@/lib/format'
 
 export type BannerPresetGroup = 'line' | 'sns'
 
@@ -522,7 +523,7 @@ export function generationConditionRows(
     const usages = references.map((reference) => BANNER_REFERENCE_MODE_LABEL[reference.mode] ?? reference.mode)
     rows.push({
       label: '参照画像',
-      value: references.length === 1 ? usages[0] : `${references.length}枚（${usages.join('・')}）`,
+      value: references.length === 1 ? usages[0] : `${formatNumber(references.length)}枚（${usages.join('・')}）`,
     })
   }
   rows.push({ label: '作成', value: shortDateTime(image.createdAt) })

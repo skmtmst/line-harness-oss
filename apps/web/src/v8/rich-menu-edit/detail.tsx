@@ -181,7 +181,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const latestSucceeded = useMemo(() => (runs ?? []).find((run) => run.status === 'succeeded') ?? null, [runs])
   const currentPublished = publishedRun === undefined ? latestSucceeded : publishedRun
   const publishedInfo = currentPublished
-    ? `いま対象に出ている版: 「${currentPublished.version.name ?? '（名前なし）'}」${currentPublished.version.pageCount !== null ? ` ・ ${currentPublished.version.pageCount}ページ` : ''} ・ ${runAudienceText(currentPublished)} ・ ${runStamp(currentPublished.updatedAt)} に公開${draftDiffers === false ? '。編集中の下書きは公開中の版と同じです。' : ''}`
+    ? `いま対象に出ている版: 「${currentPublished.version.name ?? '（名前なし）'}」${currentPublished.version.pageCount !== null ? `・${currentPublished.version.pageCount}ページ` : ''}・${runAudienceText(currentPublished)}・${runStamp(currentPublished.updatedAt)} に公開${draftDiffers === false ? '。編集中の下書きは公開中の版と同じです。' : ''}`
     : 'いま対象に出ている版はありません（まだ公開に成功していません）。'
 
   const reloadAll = useCallback(async () => {
@@ -243,7 +243,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       if (!res.success) throw new Error(res.error)
       setFixOpen(false)
       const unapplied = res.data.unapplied ?? []
-      setNotice(`ずれを ${res.data.applied ?? 0} 件修復しました。${unapplied.length > 0 ? `取り込みが必要なずれが ${unapplied.length} 件あります。「LINEにだけあるメニュー」は「外部メニューの取り込み」画面で取り込んでください。` : ''}`)
+      setNotice(`ずれを ${res.data.applied ?? 0} 件修復しました。${unapplied.length > 0 ? `取り込みが必要なずれが ${polishFormatNumber(unapplied.length)} 件あります。「LINEにだけあるメニュー」は「外部メニューの取り込み」画面で取り込んでください。` : ''}`)
       await check()
       await loadRuns()
     } catch (saveFailure) {
@@ -397,7 +397,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                       : diffs.length === 0 ? <span>{`管理画面の記録とLINE上の状態にずれはありませんでした${checkedAt ? `（${runStamp(checkedAt.toISOString(), true)}）` : ''}`}</span>
                         : (
                           <>
-                            <span className={styles.diffTitle}>{`${diffs.length} 件のずれがあります`}</span>
+                            <span className={styles.diffTitle}>{`${polishFormatNumber(diffs.length)} 件のずれがあります`}</span>
                             <ul className={styles.diffList}>
                               {diffs.map((diff, index) => <li key={`${diff.kind}-${index}`}>{diff.detail}{diff.fix ? `（${diff.fix.label}）` : ''}</li>)}
                             </ul>
@@ -415,7 +415,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                 <div className={styles.runList}>
                   {runs.map((run) => (
                     <div key={run.id} className={styles.runRow}>
-                      <span className={styles.runText} title={`${run.version.name ? `「${run.version.name}」 ・ ` : ''}${run.version.pageCount !== null ? `${run.version.pageCount}ページ ・ ` : ''}LINE ID ${run.pages?.length ?? 0}件${run.status === 'failed' && run.lastErrorCode ? ` ・ 失敗理由: ${run.lastErrorCode.slice(0, 80)}` : ''}`}>{`${runStamp(run.createdAt)} ${runAudienceText(run)}`}</span>
+                      <span className={styles.runText} title={`${run.version.name ? `「${run.version.name}」・` : ''}${run.version.pageCount !== null ? `${run.version.pageCount}ページ・` : ''}LINE ID ${run.pages?.length ?? 0}件${run.status === 'failed' && run.lastErrorCode ? `・失敗理由: ${run.lastErrorCode.slice(0, 80)}` : ''}`}>{`${runStamp(run.createdAt)} ${runAudienceText(run)}`}</span>
                       <span className={styles.runSpacer} />
                       {run.status === 'failed' && canOperate && run.id === latestRun?.id ? (
                         <button type="button" className={styles.linkButton} onClick={() => { setDialogError(''); setRetryTarget(run) }}>失敗だけやり直す</button>

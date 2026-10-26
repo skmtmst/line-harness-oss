@@ -157,7 +157,7 @@ export default function WebhooksApiTokensV8() {
                 <CopyTextButton value={issued!.token} aria-label="発行した鍵をコピー"  />
               </div>
               <p className={styles.issuedMeta} title={issued.name}>
-                {`接続の名前：${issued.name}${issued.scopes.length ? ` ・ できること：${issued.scopes.map(scopeLabel).join('・')}` : ''}`}
+                {`接続の名前：${issued.name}${issued.scopes.length ? `・できること：${issued.scopes.map(scopeLabel).join('・')}` : ''}`}
               </p>
             </div>
           ) : null}

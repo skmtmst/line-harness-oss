@@ -427,6 +427,26 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
   display: block; padding: 0; box-shadow: none; font-size: var(--text-caption); line-height: var(--tpl-sa-member-name-lh); min-width: 0;
 }
 :root .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) tbody tr { box-shadow: var(--tpl-sa-line-top); }
+
+/* 版の履歴（窓の中の表）。欄の間12（左右6ずつ）・端14、本文 13/17・見出し 12/16。上下は行の高さで決める。 */
+html:root .table.table[data-table-presentation='version-history'] > :is(thead, tbody) > tr > :is(th, td):nth-child(n) {
+  height: auto;
+  padding: var(--tpl-nm-hist-cell-pad);
+  padding-block: 0;
+  font-size: var(--tpl-nm-row-size);
+  line-height: var(--tpl-nm-row-lh);
+  vertical-align: middle;
+}
+html:root .table.table[data-table-presentation='version-history'] > :is(thead, tbody) > tr > th:nth-child(n) {
+  height: var(--tpl-nm-hist-head-h);
+  padding-block: 0;
+  font-size: var(--tpl-nm-small-size);
+  line-height: var(--tpl-nm-small-lh);
+  font-weight: var(--font-weight-ui);
+}
+html:root .table.table[data-table-presentation='version-history'] > :is(thead, tbody) > tr > :is(th, td):first-child:nth-child(n) { padding-left: var(--tpl-nm-hist-edge); }
+html:root .table.table[data-table-presentation='version-history'] > :is(thead, tbody) > tr > :is(th, td):last-child:nth-child(n) { padding-right: var(--tpl-nm-hist-edge); text-align: right; white-space: nowrap; }
+html:root .table.table[data-table-presentation='version-history'] > :is(thead, tbody) > tr > td:first-child:nth-child(n) { font-weight: 600; }
 :root .table[data-table-presentation='account-list'] tbody tr:hover { background: var(--color-canvas-sunken); }
 :root .table[data-table-presentation='connection-check'] { border-collapse: collapse; }
 :root .table[data-table-presentation='connection-check'] tr { height: var(--tpl-htn-result-row-h); box-shadow: var(--tpl-htn-line-bottom); }

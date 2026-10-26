@@ -121,7 +121,7 @@ export function formatScheduleLabel(mode: DeliveryMode | undefined, step: Scenar
     const mins = step.offsetMinutes ?? 0
     const h = Math.floor(mins / 60)
     const r = mins % 60
-    if (days === 0 && mins === 0) return '即時 (購読開始)'
+    if (days === 0 && mins === 0) return '即時（購読開始）'
     const parts: string[] = []
     if (days > 0) parts.push(`${days}日`)
     if (h > 0) parts.push(`${h}時間`)

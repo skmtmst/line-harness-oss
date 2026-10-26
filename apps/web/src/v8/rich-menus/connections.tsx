@@ -236,9 +236,9 @@ function Connections() {
         <Notice key={page.id} tone="warn" message={`「${page.name}」に${entry ? `${entry.name}へ` : ''}戻るタブがありません。押した人が元のメニューに帰れません。`}
           action={canEdit ? <Button href={buttonsHref}>{`${page.name}を開いて直す`}</Button> : undefined} />
       ))} rows={[
-        ...(analysis.missingTargetEdges.length > 0 ? [{ label: '切替先が見つからないタブ', value: <StatusBadge tone="danger">{`${analysis.missingTargetEdges.length} 件`}</StatusBadge> }] : []),
+        ...(analysis.missingTargetEdges.length > 0 ? [{ label: '切替先が見つからないタブ', value: <StatusBadge tone="danger">{`${formatNumber(analysis.missingTargetEdges.length)} 件`}</StatusBadge> }] : []),
         ...(analysis.unreachablePageIds.size > 0 ? [{ label: 'どこからも来られないメニュー', value: <StatusBadge tone="danger">{`${analysis.unreachablePageIds.size} 件`}</StatusBadge> }] : []),
-        { label: '切替先が下書きのまま', value: draftTargets.length ? <StatusBadge tone="warning">{`${draftTargets.length}件`}</StatusBadge> : emptyValue('none') },
+        { label: '切替先が下書きのまま', value: draftTargets.length ? <StatusBadge tone="warning">{`${formatNumber(draftTargets.length)}件`}</StatusBadge> : emptyValue('none') },
         // 対象条件は束ごとに保存するため、切替先だけ別の条件にはならない。
         { label: '切替先だけ「誰に出すか」が違う', value: 'なし' },
       ]} />

@@ -197,7 +197,7 @@ export default function QuickSendV8({
       if (attempt) {
         // 応答だけを失った場合は実物を読み、既に始まった送信・承認依頼を繰り返さない。
         const current = await api.broadcasts.get(attempt.id)
-        if (!current.success) throw new Error(current.error ?? '配信の状態を確認できませんでした')
+        if (!current.success) throw new Error(current.error ?? '配信の状態を確認できませんでした。時間をおいて、もう一度お試しください。')
         if (current.data.status === 'sent' || current.data.status === 'sending'
           || (attempt.needsApproval && current.data.approvalStatus === 'pending')) {
           notifyToast(current.data.approvalStatus === 'pending' ? '配信の承認を頼みました' : current.data.status === 'sent' ? '配信を送りました' : '配信の送信を受け付けました')
@@ -215,7 +215,7 @@ export default function QuickSendV8({
           messageContent: text,
           messageCount: 1,
         })
-        if (!current.success) throw new Error(current.error || '現在の人数を確認できませんでした')
+        if (!current.success) throw new Error(current.error || '現在の人数を確認できませんでした。時間をおいて、もう一度お試しください。')
         if (current.data.audienceCount !== Number(countInput)) {
           setEstimate({ count: current.data.audienceCount, blocked: current.data.hiddenExcluded, remaining: current.data.quota?.remaining ?? null })
           setCountInput('')

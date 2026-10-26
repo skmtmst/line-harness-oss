@@ -406,7 +406,7 @@ export default function ScenariosListV8() {
       void loadOverallTotal()
       void loadStats()
     } catch {
-      throw new Error('シナリオを削除できませんでした')
+      throw new Error('シナリオを削除できませんでした。時間をおいて、もう一度お試しください。')
     }
   }
 
@@ -470,7 +470,7 @@ export default function ScenariosListV8() {
         );
 
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed} 件の保存に失敗しました`)
+        if (failed > 0) throw new Error(`${formatNumber(failed)} 件の保存に失敗しました`)
       },
       revert: () => { toggleBusyRef.current = false; setOptimisticRows(null); void loadScenarios() },
       failureMessage: next ? '配信を始められませんでした。' : '停止できませんでした。',
@@ -514,7 +514,7 @@ export default function ScenariosListV8() {
         );
 
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed} 件のフォルダ移動に失敗しました`)
+        if (failed > 0) throw new Error(`${formatNumber(failed)} 件のフォルダ移動に失敗しました`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: 'フォルダを移動できませんでした。',
@@ -680,7 +680,7 @@ export default function ScenariosListV8() {
     >
       {sharedScenarioCount > 0 ? (
         <p className={styles.folderNote}>
-          全アカウントに共通で適用されるシナリオが{sharedScenarioCount} 件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
+          全アカウントに共通で適用されるシナリオが{formatNumber(sharedScenarioCount)} 件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
         </p>
       ) : null}
     </ManagedFolderPanel>

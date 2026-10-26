@@ -139,7 +139,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
       }
       const res=await api.broadcastMessageAssets.upload(file,selectedAccountId!)
       if(current!==generation.current)return
-      if(!res.success)throw new Error(res.error||'アップロードできませんでした')
+      if(!res.success)throw new Error(res.error||'アップロードできませんでした。時間をおいて、もう一度お試しください。')
       if(image){patch({previewImageUrl:res.data.url});setNeedsImage(false);return}
       patch({originalContentUrl:res.data.url,previewImageUrl:''});setNeedsImage(false);setFileName(file.name)
       try {
@@ -210,7 +210,7 @@ setError('この吹き出しに入れられませんでした。もう一度お�
       const data = {category:'general',name:draft.name.trim(),folderId:draft.folderId||null,messageType:'imagemap',messageContent:JSON.stringify(richVideoContent(draft))}
       const res = savedId ? await api.templates.update(savedId,{...data,...editVersion.current}) : await api.templates.create({...data,accountId:selectedAccountId!})
       if(current !== generation.current)return
-      if(!res.success)throw new Error(res.error||'保存できませんでした')
+      if(!res.success)throw new Error(res.error||'保存できませんでした。時間をおいて、もう一度お試しください。')
       editVersion.current = { expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision }
       setSavedId(res.data.id)
       if (host?.composer) {

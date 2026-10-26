@@ -138,7 +138,7 @@ export default function QuickCreateV8({
       if (res.error?.includes('競合') || res.error?.includes('確認')) {
         throw new Error('重なりの確認が足りていません。詳しく作るで確かめてください。')
       }
-      throw new Error(res.error || '自動応答を有効にできませんでした。')
+      throw new Error(res.error || '自動応答を有効にできませんでした。時間をおいて、もう一度お試しください。')
     }
   }
 
@@ -168,16 +168,16 @@ export default function QuickCreateV8({
         draftVersionRef.current = created.data.versionNumber
         savedInputRef.current = snapshot
       } else if (changed) {
-        if (draftVersionRef.current === null) throw new Error('下書きの更新番号を確認できませんでした')
+        if (draftVersionRef.current === null) throw new Error('下書きの更新番号を確認できませんでした。時間をおいて、もう一度お試しください。')
         const updated = await api.autoReplies.saveDraft(id, { ...input, expectedVersion: draftVersionRef.current })
-        if (!updated.success) throw new Error(updated.error || '下書きを更新できませんでした')
+        if (!updated.success) throw new Error(updated.error || '下書きを更新できませんでした。時間をおいて、もう一度お試しください。')
         draftVersionRef.current = updated.data.versionNumber
         savedInputRef.current = snapshot
         publishKeyRef.current = crypto.randomUUID()
       }
       // 通信失敗を「重なりなし」と扱わず、公開の直前にも最新の重なりを確認する。
       const found = await api.autoReplies.conflicts(id)
-      if (!found.success) throw new Error(found.error || '重なりを確認できませんでした')
+      if (!found.success) throw new Error(found.error || '重なりを確認できませんでした。時間をおいて、もう一度お試しください。')
       const list = found.data.conflicts
       const acknowledged = list.map(conflict => conflict.autoReplyId)
       const newConflicts = acknowledged.some(conflictId => !acknowledgedRef.current.includes(conflictId))

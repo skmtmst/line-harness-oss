@@ -791,7 +791,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
                   variant="primary"
                   disabled={saving || Boolean(blockedReason)}
                   busy={saving}
-                  busyLabel="作成中..."
+                  busyLabel="作成中…"
                   onClick={() => {
                     const invalid = validate()
                     if (invalid) {

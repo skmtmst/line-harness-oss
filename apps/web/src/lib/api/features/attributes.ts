@@ -486,9 +486,10 @@ export const attributesMethods = {
      * `kind` を渡さない、または件数の母集団が確立できていない種別
      * （#730）では省かれる（`undefined`）。**`0` と紛れないよう、
      * 呼び出し側は存在チェックしてから使うこと。**
+     * `section` はテンプレートのフォルダだけ。一覧の今のタブの種類だけを数える。
      */
-    list: (kind?: string, accountId?: string) =>
-      fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}${kind && accountId ? `&account_id=${encodeURIComponent(accountId)}` : ''}`),
+    list: (kind?: string, accountId?: string, section?: 'message' | 'question' | 'rich_video') =>
+      fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}${kind && accountId ? `&account_id=${encodeURIComponent(accountId)}` : ''}${kind === 'template' && section ? `&section=${section}` : ''}`),
     /** 色（#RRGGBB）はフォルダに付く。中身の印にこの色が出る。 */
     create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null; accountId?: string | null }) =>
       fetchApi<ApiResponse<Folder>>('/api/folders', {

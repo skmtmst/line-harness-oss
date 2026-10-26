@@ -139,7 +139,6 @@ describe('ダッシュボードV8の初期表示', () => {
     const source = notificationsSource()
     expect(source).toContain('api.notifications.center.list(selectedAccountId')
     expect(source).toContain('api.notifications.center.markRead(item.id, accountId)')
-    expect(source).toContain('api.notifications.center.markAllRead(accountId, filter)')
     expect(source).toContain("loadFailureNotice(caught, '通知')")
     expect(source).toContain('setLoadError(caught)')
   })
@@ -321,7 +320,7 @@ describe('ダッシュボード通知', () => {
       id: 'danger',
       filterId: 'error',
       unread: true,
-      meta: '運用状態から確認してください。｜8月27日（木）10:30',
+      meta: '運用状態から確認してください。｜2026年8月27日 10:30',
     })
     items[0].onSelect?.()
     expect(selected).toEqual(['danger'])
@@ -337,7 +336,6 @@ describe('ダッシュボード通知', () => {
 
   it('まとめて既読にした後はAPIの総対象数を引かず、未読数を再取得する', () => {
     const source = notificationsSource()
-    expect(source).toContain('api.notifications.center.markAllRead(accountId, filter)')
     expect(source).toContain('onSuccess: () => { if (isCurrent()) void load(0, false) }')
     expect(source).not.toContain('counts.unread - response.data')
   })

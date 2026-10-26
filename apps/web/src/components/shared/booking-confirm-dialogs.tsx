@@ -11,6 +11,7 @@ import StatusBadge, { type StatusBadgeTone } from './status-badge'
 import TestModeNote from './test-mode-note'
 import styles from './booking-confirm-dialogs.module.css'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 予約・お金・連絡が絡む、戻せない操作の確かめの窓（・2026-10-16）。どの画面も同じ部品で出す。
@@ -173,7 +174,7 @@ export function CancelClassDialog({ open, subtitle, facts, counts, testMode, bus
   const input = { refundPaid, restoreTickets, stopPaymentLinks, reason }
   return (
     <Dialog contentLayout="form" open={open} title="この回を休講にしますか？" description={subtitle} designWidth={480} tone="destructive" confirmation busy={busy} error={error}
-      confirmLabel="休講にする" cancelLabel="やめる" footerLead={<span className={styles.lead}>{counts.members}人に LINE を送ります</span>}
+      confirmLabel="休講にする" cancelLabel="やめる" footerLead={<span className={styles.lead}>{formatNumber(counts.members)}人に LINE を送ります</span>}
       confirmDisabled={!reason.trim()} confirmDisabledReason="休講の理由を入れてください" onCancel={onClose} onConfirm={() => onConfirm(input)}>
       <div className={styles.body}>
         <Facts facts={facts} testMode={testMode} testText="本当の返金は起きません" />
@@ -185,7 +186,7 @@ export function CancelClassDialog({ open, subtitle, facts, counts, testMode, bus
           </div>
         </Field> : null}
         <Field label="休講の理由（お客さまに出ます）" required><TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="講師の体調不良のため" /></Field>
-        <Field label={`${counts.members}人に送る LINE`} optional={false}><Message text={messageFor(input)} /></Field>
+        <Field label={`${formatNumber(counts.members)}人に送る LINE`} optional={false}><Message text={messageFor(input)} /></Field>
       </div>
     </Dialog>
   )
@@ -220,7 +221,7 @@ export function ClosureOverlapStep({ rows, message, mediaNote, mode, onMode, onM
           <Radio name="overlap-mode" checked={mode === 'cancel'} onChange={() => onMode('cancel')}>予約を取り消して返金する（次で確かめる）</Radio>
         </div>
       </Field>
-      <Field label={`${rows.length}人に送る LINE`} optional={false}><TextArea value={message} onChange={(e) => onMessage(e.target.value)} rows={3} /></Field>
+      <Field label={`${formatNumber(rows.length)}人に送る LINE`} optional={false}><TextArea value={message} onChange={(e) => onMessage(e.target.value)} rows={3} /></Field>
       {mediaNote ? <Notice tone="info">
         {mediaNote}
       </Notice> : null}

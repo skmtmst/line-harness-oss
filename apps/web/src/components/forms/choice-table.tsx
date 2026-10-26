@@ -21,6 +21,7 @@ import Checkbox from '@/components/shared/checkbox'
 
 import { cellInput, miniButton, type FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
+import { formatNumber } from '@/lib/format'
 
 const MODES: { value: NonNullable<FormInputBlock['choiceMode']>; label: string }[] = [
   { value: 'tag', label: 'タグ追加' },
@@ -163,7 +164,7 @@ export default function ChoiceTable({
                       setOpenChoiceId(openChoiceId === choice.id ? null : choice.id)
                     }>
                     {choice.actions?.length
-                      ? `${choice.actions.length}件の動作`
+                      ? `${formatNumber(choice.actions.length)}件の動作`
                       : '動作を決める'}
                   </Button>
                 )}

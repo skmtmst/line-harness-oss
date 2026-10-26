@@ -34,7 +34,7 @@ function versionSummary(version: OfferVersion): string {
     `1件 ${polishFormatYen(version.rewardAmount)}`,
     version.rewardMiles > 0 ? `＋${formatNumber(version.rewardMiles)}マイル` : null,
     `期間${version.windowDays}日`,
-    version.capTotal != null ? `全体${version.capTotal} 件` : null,
+    version.capTotal != null ? `全体${formatNumber(version.capTotal)} 件` : null,
     version.capMonthlyPerAffiliate != null ? `月${version.capMonthlyPerAffiliate} 件` : null,
   ].filter((part): part is string => part !== null)
   return parts.join('・')
@@ -233,7 +233,7 @@ export default function OfferTermsDialog({
               <dd className="text-ink">
                 {status.capTotal != null || status.capMonthlyPerAffiliate != null ? (
                   <>
-                    {status.capTotal != null ? `この案件で${status.capTotal} 件` : null}
+                    {status.capTotal != null ? `この案件で${formatNumber(status.capTotal)} 件` : null}
                     {status.capTotal != null && status.capMonthlyPerAffiliate != null ? '／' : null}
                     {status.capMonthlyPerAffiliate != null ? `1人月${status.capMonthlyPerAffiliate} 件` : null}
                   </>
@@ -251,7 +251,7 @@ export default function OfferTermsDialog({
             <Progress
               state="active"
               title={status.totalRemaining != null && status.totalRemaining > 0
-                ? `上限まであと${status.totalRemaining} 件`
+                ? `上限まであと${formatNumber(status.totalRemaining)} 件`
                 : '上限に達しました'}
               percent={Math.min(100, Math.round((status.totalUsed / status.capTotal) * 100))}
               countText={`${formatNumber(status.totalUsed)} / ${formatNumber(status.capTotal)} 件`}

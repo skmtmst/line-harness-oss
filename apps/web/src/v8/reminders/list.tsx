@@ -255,7 +255,7 @@ export default function RemindersListV8() {
         fetchApi<ApiResponse<FriendDetail>>(`/api/friends/${encodeURIComponent(friendId)}?submissions=0`, { signal }),
         fetchApi<ApiResponse<Array<{ reminderId: string }>>>(`/api/friends/${encodeURIComponent(friendId)}/reminders`, { signal }),
       ])
-      if (!person.success || !enrollments.success) throw new Error('この友だちのリマインダを確認できませんでした')
+      if (!person.success || !enrollments.success) throw new Error('この友だちのリマインダを確認できませんでした。時間をおいて、もう一度お試しください。')
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
       setFilterFriend({ id: friendId, value: person.data })
       return friendReminderPage(enrollments.data.map(row => row.reminderId), request, load)
@@ -436,7 +436,7 @@ export default function RemindersListV8() {
         );
 
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件のフォルダを移動できませんでした`)
+        if (failed > 0) throw new Error(`${formatNumber(failed)}件のフォルダを移動できませんでした`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: 'フォルダを移動できませんでした。',
@@ -514,7 +514,7 @@ export default function RemindersListV8() {
         );
 
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
+        if (failed > 0) throw new Error(`${formatNumber(failed)}件の保存に失敗しました`)
       },
       revert: () => setOptimisticRows(null),
       failureMessage: next ? '再開できませんでした。' : '一時停止できませんでした。',

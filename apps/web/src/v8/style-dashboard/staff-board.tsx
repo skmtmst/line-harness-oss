@@ -11,6 +11,7 @@ import { BookingCategory, BookingNowLine, BookingName, BookingSummary, BookingLe
 import StatusBadge from '@/components/shared/status-badge'
 import type { StyleBoard, StyleBoardEntry } from './model'
 import styles from './style-dashboard.module.css'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 1枚目のタブの「盤（時間×担当）」（サロンの台帳 mOAX5）。
@@ -54,7 +55,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
           <div key={c.id} className={styles.boardColumnHead}>
             <span className={styles.face} data-tone={c.tone} aria-hidden="true">{c.initial}</span>
             <span className={styles.faceText}>
-              <span className={styles.faceName}><BookingCategory name={c.name} color={({green:'var(--color-accent-deep)',purple:'var(--color-avatar-purple-ink)',blue:'var(--color-avatar-blue-ink)',amber:'var(--color-status-warn-deep)'})[c.tone]}/><span className={styles.grow} /><span className={styles.cellMuted}>{c.count}件</span></span>
+              <span className={styles.faceName}><BookingCategory name={c.name} color={({green:'var(--color-accent-deep)',purple:'var(--color-avatar-purple-ink)',blue:'var(--color-avatar-blue-ink)',amber:'var(--color-status-warn-deep)'})[c.tone]}/><span className={styles.grow} /><span className={styles.cellMuted}>{formatNumber(c.count)}件</span></span>
               <span className={styles.faceNext} data-off={c.off || undefined}>{c.next}</span>
             </span>
           </div>

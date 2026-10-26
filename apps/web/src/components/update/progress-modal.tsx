@@ -150,7 +150,7 @@ export function ProgressModal({
         </div>
         <ul className="space-y-1 font-mono text-sm">
           {events.length === 0 && (
-            <li className="text-ink-faint">接続中...</li>
+            <li className="text-ink-faint">接続中…</li>
           )}
           {events.map((e, i) => (
             <li key={i} className="flex items-center gap-2">

@@ -339,7 +339,7 @@ export default function BalancesTab() {
   /* 承認待ちの板（黄の地）。案内の帯のすぐ下・道具の段の上。 */
   const approval = approvalRequests && approvalRequests.length > 0 ? (
     <section className={styles.approval} aria-label="承認待ちのマイル変更">
-      <p className={styles.approvalTitle}>{`承認待ちのマイル変更 ${approvalRequests.length} 件`}</p>
+      <p className={styles.approvalTitle}>{`承認待ちのマイル変更 ${formatNumber(approvalRequests.length)} 件`}</p>
       {approvalError ? <Notice tone="danger" message={approvalError} /> : null}
       {approvalRequests.map((request) => (
         <div key={request.id} className={styles.approvalRow}>

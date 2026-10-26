@@ -71,7 +71,7 @@
 .th {
   background: var(--color-table-head);
   color: var(--color-ink);
-  font-weight: var(--polish-control-weight);
+  font-weight: 700;
 }
 
 .td {

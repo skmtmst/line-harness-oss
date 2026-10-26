@@ -16,7 +16,7 @@ describe('初回の読み込みの骨組み', () => {
 
   it.each([
     ['v8/friend-add/list.tsx', '友だち追加時の配信を読み込んでいます'],
-    ['app/chats/page.tsx', '会話を読み込んでいます...'],
+    ['app/chats/page.tsx', '会話を読み込んでいます…'],
   ])('%s は DelayedSkeleton で行の形を出し、読み上げの文は残す', (file, text) => {
     const source = read(file)
     const at = source.indexOf(text)

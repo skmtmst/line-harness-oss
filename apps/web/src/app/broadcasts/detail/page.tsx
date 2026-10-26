@@ -397,7 +397,7 @@ function BroadcastDetailInner() {
       const res = await action()
       if (moved()) return
       if (!res.success) {
-        setApprovalMessage(res.error ?? '操作できませんでした。')
+        setApprovalMessage(res.error ?? '操作できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       await reloadApproval(target)
@@ -489,7 +489,7 @@ function BroadcastDetailInner() {
     ? (approvalCandidates.find((item) => item.id === approvalState.approval.approverStaffId)?.name ?? null)
     : null
   const approvalMessageSummary = broadcast?.messageBubbles && broadcast.messageBubbles.length > 0
-    ? `${broadcast.messageBubbles.length}通`
+    ? `${formatNumber(broadcast.messageBubbles.length)}通`
     : null
   // 差し戻し・期限切れ・取り消しのあと、頼み直せる条件。
   const canReRequest = broadcast
@@ -564,7 +564,7 @@ function BroadcastDetailInner() {
 export default function BroadcastDetailPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中…</div>}>
       <BroadcastDetailInner />
     </Suspense>
   )

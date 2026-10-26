@@ -203,7 +203,7 @@
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
   font-size: var(--tpl-rest3-em-th);
-  font-weight: var(--polish-control-weight);
+  font-weight: 600;
   line-height: var(--tpl-rest3-em-th-lh);
   text-align: left;
   white-space: nowrap;

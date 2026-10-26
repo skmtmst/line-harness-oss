@@ -352,7 +352,7 @@ export default function InflowListV8({
     try {
       const res = await api.entryRoutes.update(entryRouteId, { isActive: nextActive })
       if (!isCurrent()) return false
-      if (!res.success) throw new Error(res.error || '更新できませんでした')
+      if (!res.success) throw new Error(res.error || '更新できませんでした。時間をおいて、もう一度お試しください。')
       notifyToast(nextActive ? `「${name}」の受付を再開しました` : `「${name}」の受付を停止しました`)
       void load()
       return true

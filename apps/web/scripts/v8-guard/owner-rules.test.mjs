@@ -286,3 +286,28 @@ test('余白の段にない padding・margin・gap・余白の変数を書くと
     assert.deepEqual(await kinds(), ['space-scale'])
   } finally { await browser.close() }
 })
+
+test('Tailwind の disabled: の書き足しは、共通の規則が上書きして見た目どおりなら数えない', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind.startsWith('disabled'))
+    const css = '@layer utilities{.disabled\\:opacity-50:disabled{opacity:.5}}:root{--o:.48}html:root button:disabled{opacity:var(--o);box-shadow:none;cursor:not-allowed}'
+    await page.setContent(`<style>${css}</style><main><button class="disabled:opacity-50" disabled>保存</button></main>`)
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(`<style>${css.replace('@layer utilities{', '{').replace('{.disabled', '.disabled').replace('.5}}', '.5}')}</style><main><button class="disabled:opacity-50" disabled>保存</button></main>`)
+    assert.ok((await kinds()).includes('disabled-opacity'))
+  } finally { await browser.close() }
+})
+
+test('手書きの動きを同じ選び先の後ろの規則で共通の値に書き直していれば数えない', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind.startsWith('motion'))
+    await page.setContent('<style>:root{--m:120ms;--e:ease}.c{transition:color 120ms ease-out}.c{transition:color var(--m) var(--e)}</style><main><a class="c" href="#">リンク</a></main>')
+    assert.deepEqual(await kinds(), [])
+    await page.setContent('<style>:root{--m:120ms;--e:ease}.c{transition:color var(--m) var(--e)}.c{transition:color 120ms ease-out}</style><main><a class="c" href="#">リンク</a></main>')
+    assert.ok((await kinds()).length > 0)
+  } finally { await browser.close() }
+})

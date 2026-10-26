@@ -26,14 +26,14 @@ export default function scanPolishRules() {
 
   // 読み込まれた CSS の規則を全部たどる（層・@media の中も）。動きを減らす設定の中は別の決まりなので外す。
   const rules = []
-  const walk = (list, reduced) => {
+  const walk = (list, reduced, layer = '') => {
     for (const rule of list) {
       if (rule.cssRules && rule.constructor.name !== 'CSSStyleRule') {
         const isReduced = reduced || (rule.conditionText ?? rule.media?.mediaText ?? '').includes('prefers-reduced-motion: reduce')
-        walk(rule.cssRules, isReduced)
+        walk(rule.cssRules, isReduced, rule.constructor.name === 'CSSLayerBlockRule' ? rule.name : layer)
       } else if (rule.selectorText) {
-        rules.push({ rule, reduced })
-        if (rule.cssRules?.length) walk(rule.cssRules, reduced)
+        rules.push({ rule, reduced, layer })
+        if (rule.cssRules?.length) walk(rule.cssRules, reduced, layer)
       }
     }
   }
@@ -42,8 +42,10 @@ export default function scanPolishRules() {
   // 押せない時（§6.5 の 7）：灰色に塗り直さず、元の見た目のまま薄くする（影なし・cursor: not-allowed）。
   const positive = (sel) => sel.replace(/:not\((?:[^()]|\([^()]*\))*\)/g, '')
   const DISABLED = /:disabled|\[disabled\]|\[aria-disabled="?true|\[data-disabled|\.disabled\b|_disabled__/
-  for (const { rule } of rules) {
+  for (const { rule, layer } of rules) {
     if (!DISABLED.test(positive(rule.selectorText))) continue
+    // Tailwind の disabled: の書き足し（utilities の層）は、層の外の共通の規則が必ず上書きする。実際の見た目は下の disabled-look が測る。
+    if (layer === 'utilities' && /disabled\\:/.test(rule.selectorText)) continue
     for (const prop of ['background-color', 'background-image', 'color', 'border-color', 'border-top-color', 'outline-color', '-webkit-text-fill-color']) {
       const v = rule.style.getPropertyValue(prop).trim()
       if (v && !/^(inherit|transparent|none|currentcolor|initial|unset)$/i.test(v) && !(prop === 'background-image' && /^linear-gradient\(color-mix/.test(v))) add('disabled-repaint', null, { prop, value: v }, rule.selectorText)
@@ -70,7 +72,10 @@ export default function scanPolishRules() {
     const off = { animation: rule.style.getPropertyValue('animation-name').trim() === 'none', transition: rule.style.getPropertyValue('transition-property').trim() === 'none' }
     const props = new Set(MOTION.filter((prop) => rule.style.getPropertyValue(prop) && !off[prop.split('-')[0]]))
     for (let i = 0; i < rule.style.length; i++) if (/^--[\w-]*(-spin|-enter|transition-duration|transition-timing-function)$/.test(rule.style[i]) && !rule.style[i].startsWith('--motion-')) props.add(rule.style[i])
+    // 同じ選び先の後ろの規則が同じ値を書き直していれば、重なりの順で後ろが勝つので数えない。
+    const later = rules.slice(rules.findIndex((r) => r.rule === rule) + 1).filter((r) => r.rule.selectorText === rule.selectorText && !r.reduced)
     for (const prop of props) {
+      if (later.some((r) => r.rule.style.getPropertyValue(prop) || r.rule.style.getPropertyValue(prop.split('-')[0]))) continue
       const value = rule.style.getPropertyValue(prop), plain = withoutVars(value)
       if (/(?<![\w.-])(?!0m?s\b)\d*\.?\d+m?s\b/.test(plain)) add('motion-literal', null, { prop, value: value.trim() }, rule.selectorText)
       if (/(?<![\w-])(ease|ease-in|ease-out|ease-in-out|cubic-bezier)(?![\w-])/.test(plain)) add('motion-curve', null, { prop, value: value.trim() }, rule.selectorText)

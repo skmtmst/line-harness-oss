@@ -98,5 +98,5 @@ export function describeSendFailure(error: unknown, now: Date = new Date()): str
     return '送信の準備に失敗しました。時間をおいてもう一度送信してください。'
   }
 
-  return 'メッセージの送信に失敗しました。'
+  return 'メッセージの送信に失敗しました。時間をおいてもう一度送信してください。'
 }

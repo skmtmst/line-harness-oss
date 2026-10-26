@@ -3,7 +3,7 @@
  *
  * 行き先は今の画面と同じ URL（v8/friends/friends-tabs.ts と同じ名前・同じ順）。
  * 絵のタブは4つ。「CSVで書き出す・取り込む」（/friends/migrations）はタブに置かず、
- * 友だち一覧の「友だちを取り込む」から行く（画面の頭の説明の文だけ残す）。
+ * 友だち一覧の「CSVから取り込む」から行く（画面の頭の説明の文だけ残す）。
  */
 export type FriendsTabKey = 'list' | 'duplicates' | 'merged' | 'uid-migration' | 'csv'
 

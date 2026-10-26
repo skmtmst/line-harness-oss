@@ -288,7 +288,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
       } else if (!silent) {
         { if (!fieldFailure)
 
-        setError('保存できませんでした。') }
+        setError('保存できませんでした。時間をおいて、もう一度お試しください。') }
       }
       return false
     } finally {
@@ -348,7 +348,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
 
       { if (!fieldFailure)
 
-      setError('リマインダを有効化できませんでした。') }
+      setError('リマインダを有効化できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setBusy(false)
     }
@@ -790,7 +790,7 @@ export function TargetStageV8({
       <Dialog
         open={facesOpen}
         title="対象者を確認"
-        description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${faces.sample.length} 人です。` : undefined}
+        description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${formatNumber(faces.sample.length)} 人です。` : undefined}
         onCancel={() => setFacesOpen(false)}
       >
         {!faces || faces.loading

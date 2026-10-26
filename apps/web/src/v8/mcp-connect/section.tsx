@@ -309,7 +309,7 @@ export function McpIssuedDialog({ issued, onClose }: { issued: McpIssued | null;
       >
         {issued ? (
           <div className={styles.issued}>
-            <p className={styles.issuedMeta}>{`${issued.connection.name} ・ ${LEVEL_LABEL[issued.connection.level]} ・ ${issued.connection.accounts.map((account) => account.name).join('・')} ・ ${day(issued.connection.expiresAt)} まで`}</p>
+            <p className={styles.issuedMeta}>{`${issued.connection.name}・${LEVEL_LABEL[issued.connection.level]}・${issued.connection.accounts.map((account) => account.name).join('・')}・${day(issued.connection.expiresAt)} まで`}</p>
             <div className={styles.issuedRow}>
               <span className={styles.issuedLabel}>URL</span>
               <code className={styles.code}>{issued.url}</code>

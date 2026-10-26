@@ -1,8 +1,9 @@
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * （2026-10-09）：管理画面の日付と数は、この共通書式を使う。
- * 一覧は MM/DD HH:mm、過去の別年は YYYY/MM/DD。
- * 詳細は M月D日（曜）HH:mm。店舗の時間帯は指定して保つ。
+ * 日時は2つの書き方だけにする。一覧は MM/DD HH:mm（今年は年を省く。過去の別年は YYYY/MM/DD）。
+ * 詳細は YYYY年M月D日 HH:mm（いつの記録か読み違えないよう年を省かない）。店舗の時間帯は指定して保つ。
+ * 時刻を持たない日付（予約日・期限）は M月D日（曜）。
  * 件数は3桁区切りと単位の前の半角空き、金額は ¥29,800、割合は12.4%。
  * 保存値・CSV・日付入力の機械向け書式は表示の書式と分ける。
  */
@@ -108,11 +109,11 @@ export function formatDate(
     if (style === 'list-day-weekday') return `${day}${weekday(p.w)}`
     return style === 'list-day' ? day : `${day} ${clock}`
   }
-  const day = `${sameYear ? '' : `${p.y}年`}${p.m}月${p.d}日${weekday(p.w)}`
-  return style === 'day' ? day : `${day}${clock}`
+  if (style === 'detail') return `${p.y}年${p.m}月${p.d}日 ${clock}`
+  return `${sameYear ? '' : `${p.y}年`}${p.m}月${p.d}日${weekday(p.w)}`
 }
 
-/** 詳細・説明文の日付。 */
+/** 詳細・説明文の日時。YYYY年M月D日 HH:mm。 */
 export function formatDateTime(value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo'): string {
   return formatDate(value, { style: 'detail', fallback, now, timeZone })
 }
@@ -169,6 +170,37 @@ export function formatRelative(value: DateInput, now?: DateInput, fallback = '�
   if (dayDiff === 1) return `昨日 ${p.h}:${pad2(p.min)}`
   if (dayDiff < 7) return `${dayDiff}日前`
   return formatDay(value, fallback)
+}
+
+/**
+ * 一覧の行の右上に収める短い時刻（受信箱のトーク一覧など）。暦は日本時間で数える。
+ * 今日は 17:51 / 昨日 / 6日前までは 月曜日 / 7日より古い物は MM/DD / 別の年は YYYY/MM/DD。
+ * 時計のずれで未来の時刻になったときは、相対の言葉にせず日付で出す。
+ */
+export function formatListRecent(value: DateInput, options: { fallback?: string; now?: DateInput } = {}): string {
+  const { fallback = '—', now } = options
+  const p = toJst(value)
+  if (!p) return fallback
+  const n = nowJst(now)
+  const dayIndex = (e: number) => Math.floor((e + JST_OFFSET_MS) / 86_400_000)
+  const dayDiff = dayIndex(n.epoch) - dayIndex(p.epoch)
+  if (p.epoch <= n.epoch) {
+    if (dayDiff === 0) return `${pad2(p.h)}:${pad2(p.min)}`
+    if (dayDiff === 1) return '昨日'
+    if (dayDiff < 7) return `${WEEKDAYS[p.w]}曜日`
+  }
+  const day = `${pad2(p.m)}/${pad2(p.d)}`
+  return p.y === n.y ? day : `${p.y}/${day}`
+}
+
+/** 短い時刻の全文（指を乗せたときの title）。「2026年10月25日 17:51（3分前）」。 */
+export function formatListRecentTitle(value: DateInput, options: { fallback?: string; now?: DateInput } = {}): string {
+  const { fallback = '', now } = options
+  const p = toJst(value)
+  if (!p) return fallback
+  const full = `${p.y}年${p.m}月${p.d}日 ${pad2(p.h)}:${pad2(p.min)}`
+  const relative = formatRelative(value, now, '')
+  return relative.endsWith('前') ? `${full}（${relative}）` : full
 }
 
 /** M月D日〜M月D日。両側とも月日を書く（9月1日〜9月30日）。年が違う側だけ `YYYY年` を付ける。 */

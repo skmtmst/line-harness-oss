@@ -107,7 +107,7 @@ export default function McpLogV8() {
       heightMode="content"
       title="AI の操作の記録"
       help="AI との接続が読んだ・下書きを作った・送る依頼を出した・断ったことを、全部ここに残します。送る依頼は、人が承認するまで送りません。"
-      subtitle={connection ? `${connection.name} ・ ${LEVEL_LABEL[connection.level]}` : undefined}
+      subtitle={connection ? `${connection.name}・${LEVEL_LABEL[connection.level]}` : undefined}
       actions={connection && connection.status === 'active' && permissions.stop
         ? <Button variant="danger" onClick={() => { setError(''); setStopOpen(true) }}>この接続を止める</Button>
         : undefined}

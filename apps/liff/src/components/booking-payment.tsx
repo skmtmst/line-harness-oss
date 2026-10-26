@@ -216,7 +216,7 @@ export default function BookingPayment({
         <div className="pb-40" aria-hidden="true" />
         <BottomBar>
           <Button variant="primary" onClick={refreshStatus} disabled={checking}>
-            {checking ? '確認中...' : '支払いの状態を確認する'}
+            {checking ? '確認中…' : '支払いの状態を確認する'}
           </Button>
         </BottomBar>
       </div>
@@ -244,7 +244,7 @@ export default function BookingPayment({
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         <Button variant="primary" onClick={handleStart} disabled={starting || !ready}>
-          {starting ? '準備中...' : `${formatYen(amount)}の試験へ進む`}
+          {starting ? '準備中…' : `${formatYen(amount)}の試験へ進む`}
         </Button>
       </BottomBar>
     </div>
