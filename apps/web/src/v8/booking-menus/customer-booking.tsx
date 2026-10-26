@@ -23,7 +23,7 @@ import styles from './menu-form.module.css'
  * お客さまの繰り返し予約、一度に予約できる人数、追加メニュー、追加専用のメニューを持つ。
  * 保存はメニューの保存と同じ口（recurring・maxPartySize・addonMenuIds・addonOnly）。
  * 口はオーナー・管理者にしか開いていないので、変えられない人の保存には載せない。
- * 繰り返しの今の設定は一覧の口が返さないことがある。読めないときは上書きせず、入れ直したときだけ送る。
+ * 繰り返しの今の設定は一覧の口が返さないことがある。読めないときは上書きせず、入れ直すと送る。
  */
 
 export type RecurringFreq = 'weekly' | 'biweekly' | 'monthly_nth'
