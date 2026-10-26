@@ -11,6 +11,7 @@ import { Plus } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
+import { emptyValue } from '@/components/shared/empty-value'
 import { notifyToast } from '@/components/shared/toast'
 
 import Pagination from '@/components/shared/pagination'
@@ -31,7 +32,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /* ① メニュー（settings-v8.tsx から分割。見た目・動きは変えない） */
 
-export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: MenusTabProps) {
+export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload, onOpenStaff }: MenusTabProps) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [query, setQuery] = useListUrlValue('q', '')
@@ -339,7 +340,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                 </span>
                 <span className={styles.colStaff}>
                   {staffNames.length === 0 ? (
-                    <span className={styles.cellWarn}>担当なし</span>
+                    <span className={styles.cellEmpty}>{emptyValue('unknown')}</span>
                   ) : (
                     <span className={styles.cellText}>{staffNames.join('・')}</span>
                   )}
@@ -348,7 +349,14 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                   <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0} 件</span>
                 </span>
                 <span className={styles.colStatus}>
-                  <SharedStatusPill tone={(visOverride[menu.id] ?? menu.is_active) ? 'success' : 'neutral'}>{(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '停止中'}</SharedStatusPill>
+                  {/* 公開していても担当が 0 人だと予約を受けられない。理由を札で言い、押すと担当スタッフのタブへ。 */}
+                  {(visOverride[menu.id] ?? menu.is_active) && staffNames.length === 0 ? (
+                    <button type="button" className={styles.statusLink} onClick={onOpenStaff} title="担当スタッフのタブで担当を決める">
+                      <SharedStatusPill tone="caution">担当がいないため停止中</SharedStatusPill>
+                    </button>
+                  ) : (
+                    <SharedStatusPill tone={(visOverride[menu.id] ?? menu.is_active) ? 'success' : 'neutral'}>{(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '停止中'}</SharedStatusPill>
+                  )}
                 </span>
                 <span className={styles.colMenu}>
                   <RowMenu

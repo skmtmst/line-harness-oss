@@ -444,7 +444,7 @@
 .colStatus {
   display: flex;
   align-items: center;
-  width: var(--tpl-bm-96);
+  width: var(--tpl-bm-160);
   flex-shrink: 0;
 }
 
@@ -476,6 +476,12 @@
   color: var(--color-warning);
   font-size: var(--tpl-bm-12);
 }
+
+.cellEmpty { color: var(--color-ink-faint); font-size: var(--tpl-bm-12); }
+
+/* 状態の札を押せる形にする（見た目は札のまま、焦点の輪だけ足す）。 */
+.statusLink { display: inline-flex; min-width: 0; max-width: 100%; padding: 0; border: 0; border-radius: var(--tpl-bm-6); background: none; cursor: pointer; }
+.statusLink:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 /* 状態の札（公開中/止めている/受付中）。 */
 .statePill {

@@ -106,14 +106,14 @@ const menus = () => ([
     duration_minutes: 60, buffer_after_minutes: 0, base_price: 8000, price_mode: 'fixed',
     sort_order: 0, is_active: true, auto_tag_id: null, concurrent_capacity: 1,
     booking_window_days: null, cutoff_hours_before: null, cancel_deadline_hours_before: null,
-    intake_question: null, assigned_staff: [], version: 1,
+    intake_question: null, assigned_staff: [{ id: 'staff-a', display_name: '担当A' }], version: 1,
   },
   {
     id: 'menu-2', name: 'カラー', category_label: null, description: null,
     duration_minutes: 90, buffer_after_minutes: 0, base_price: 12000, price_mode: 'fixed',
     sort_order: 1, is_active: true, auto_tag_id: null, concurrent_capacity: 1,
     booking_window_days: null, cutoff_hours_before: null, cancel_deadline_hours_before: null,
-    intake_question: null, assigned_staff: [], version: 1,
+    intake_question: null, assigned_staff: [{ id: 'staff-a', display_name: '担当A' }], version: 1,
   },
 ])
 
