@@ -181,8 +181,8 @@ describe('V8-B プールを作る（D0AOyx）', () => {
     expect(routerPush, '落ちた分があるときは進まない').not.toHaveBeenCalled()
   })
 
-  it('V8 の決まり（板ID・準備中なし）を守る', () => {
-    expect(v8tsx).toContain('boardId="D0AOyx"')
+  /* 板の印は「番号つきの節とプレビューが出る」で描画して確かめる。 */
+  it('V8 の決まり（準備中なし）を守る', () => {
     expect(v8tsx).not.toContain('準備中')
   })
 })

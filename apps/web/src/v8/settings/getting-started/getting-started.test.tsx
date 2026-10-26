@@ -35,3 +35,8 @@ it('完了済みでも閲覧のみ・送信権限のない人には送信への�
   render(<GettingStarted />)
   expect(screen.queryByRole('link', { name: 'シナリオを選んでテスト送信する' })).toBeNull()
 })
+it('板の印を付け、順路は名前の付いた表で読める', () => {
+  const { container } = render(<GettingStarted />)
+  expect(container.querySelector('[data-design-node="xuJ7D"]')).not.toBeNull()
+  expect(screen.getByRole('table', { name: 'はじめの設定の順路' })).toBeTruthy()
+})

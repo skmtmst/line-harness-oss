@@ -25,6 +25,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
 import { OptionalBadge, RequiredBadge } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
@@ -173,7 +174,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
       folderNav={{rows:folderRows,activeId:folderFilter,onSelect:setFolderFilter,createAction:canEdit ? <Button variant="primary" onClick={create}>ひな形を作る</Button> : undefined}}
       toolbar={<SearchField aria-label="ひな形を検索" placeholder="ひな形を探す" value={query} onChange={setQuery} />}>
       {notices}
-      {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<RowMenu label={`「${row.name}」の操作`} items={[{id:'distribute',label:'アカウントへ配る',icon:<Send size={14} aria-hidden="true" />,emphasis:true,disabled:busy || accountsFailed,onSelect:()=>{void (async()=>{if (await edit(row)) setView('accounts')})()}}]} />}))} /> : <p>ひな形がありません。検索・フォルダを確認するか、新しく作ってください。</p>}
+      {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<RowMenu label={`「${row.name}」の操作`} items={[{id:'distribute',label:'アカウントへ配る',icon:<Send size={14} aria-hidden="true" />,emphasis:true,disabled:busy || accountsFailed,onSelect:()=>{void (async()=>{if (await edit(row)) setView('accounts')})()}}]} />}))} /> : <EmptyList icon={<Send aria-hidden="true" />} title={`まだ${titleOf(type)}のひな形がありません`} description="ひな形を保存すると、各アカウントへ下書きとして配れます。" create={{ label: 'ひな形を作る', onClick: create }} canCreate={canEdit} filtered={rows.length > 0} onClearFilters={() => { setQuery(''); setFolderFilter('all') }} />}
     </ListPage></SaveErrorScope>
   }
   /* 自動応答は店と同じ手順の段で作る。ほかの種類は今の1枚の画面。 */

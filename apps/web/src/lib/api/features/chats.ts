@@ -49,7 +49,7 @@ export const chatsMethods = {
     },
     searchMessages: (friendId:string,q:string,offset=0,limit=30) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationSearchResult>>(`/api/chats/${encodeURIComponent(friendId)}/messages/search?${new URLSearchParams({q,offset:String(offset),limit:String(limit)})}`),
     messagesAt: (friendId:string,params:{cursorAt?:string;cursorId?:string;direction?:'before'|'after'|'around';limit?:number}={}) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationMessagePage>>(`/api/chats/${encodeURIComponent(friendId)}/messages?${new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]))}`),
-    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
+    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; sort?: 'unread_first' | 'latest'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status
       if (params?.operatorId) query.operatorId = params.operatorId
@@ -58,6 +58,8 @@ export const chatsMethods = {
       if (params?.unansweredOnly) query.unansweredOnly = '1'
       if (params?.unreadOnly) query.unreadOnly = '1'
       if (params?.quickFilter) query.quickFilter = params.quickFilter
+      // 並び: 既定は未読が先。latest は新しい順だけで、カーソルの beforeUnread は見ない
+      if (params?.sort) query.sort = params.sort
       if (params?.limit !== undefined) query.limit = String(params.limit)
       // カーソルページング: (未読, lastMessageAt, friendId) の複合カーソルより後の行を返す
       if (params?.beforeUnread !== undefined) query.beforeUnread = String(params.beforeUnread)

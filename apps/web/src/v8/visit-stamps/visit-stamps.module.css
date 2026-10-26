@@ -77,7 +77,7 @@
 .optional {
   margin-left: var(--tpl-e78-title-gap);
   font-size: var(--tpl-e78-sub-size);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   color: var(--color-ink-faint);
 }
 
@@ -378,7 +378,7 @@
 }
 
 .countReversed {
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   color: var(--color-ink-secondary);
 }
 

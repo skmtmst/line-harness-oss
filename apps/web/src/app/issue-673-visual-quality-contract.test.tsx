@@ -23,10 +23,11 @@ const GLOBALS = readFileSync(join(HERE, 'globals.css'), 'utf8')
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('#673 A. カード・パネルの立体感', () => {
-  it('カードは案Aのくっきりした2層の影と黒8%の線を使う', () => {
+  it('カードの影は共通の値で、ぼかしは 8px まで', () => {
     const card = GLOBALS_CODE.match(/--card-shadow:\s*([^;]+);/)?.[1] ?? ''
-    expect(card).toBe('0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)')
-    expect(GLOBALS_CODE).toMatch(/--card-edge:\s*rgba\(29, 29, 31, 0\.08\);/)
+    // ぼかしの大きい層（12px・24px）を足さない。縁を線と影の外周で二重にしない。
+    expect(card).not.toMatch(/\s(?:9|[1-9]\d+)px\s/)
+    expect(GLOBALS_CODE).not.toMatch(/--card-edge:\s*rgba/)
     expect(GLOBALS_CODE).toMatch(/--shadow-card-surface:\s*var\(--card-shadow\);/)
   })
 

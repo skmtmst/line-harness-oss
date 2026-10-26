@@ -78,8 +78,8 @@
 
 .optional {
   color: var(--color-ink-faint);
-  font-size: var(--tpl-bm-11);
-  font-weight: 400;
+  font-size: var(--tpl-bm-12);
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-bm-17);
 }
 

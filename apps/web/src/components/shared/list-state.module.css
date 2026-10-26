@@ -52,7 +52,7 @@
   max-width: 220px;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: 1.4;
 }
 
@@ -97,7 +97,7 @@
 :root .root[data-list-state='empty'] {
   justify-content: flex-start; min-height: 0; padding: 28px 24px;
   /* 枠は付けない：空の表示は表・カードの中に出るので、箱の中に箱を重ねない（2026-10-08 オーナー「ここに枠があるのは違和感」。Pencil hNXm7 の線も外した）。 */
-  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 :root [data-list-state='empty'] .iconWrap {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -116,7 +116,6 @@
 :root [data-list-state='empty'] .action { --shadow-primary-action: var(--v8-parts-primary-shadow); }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .root { -webkit-font-smoothing: antialiased; }
 
 /* ・仕上げ2 */
 :root .title { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }

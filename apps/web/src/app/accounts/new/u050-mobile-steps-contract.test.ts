@@ -6,11 +6,14 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(__dirname, '../../../v8/account-new/register.tsx'), 'utf8')
 const CSS = readFileSync(join(__dirname, '../../../components/templates/steps.module.css'), 'utf8')
 
 afterEach(cleanup)
 
+/*
+ * 登録画面が5段を「登録の進捗」で出し、済んだ段へ戻れて登録後は戻れないことは
+ * register-v8-react.test.tsx が描いて押して確かめる。ここは共通の段の部品の描き方と、狭い幅で折り返さない決まり。
+ */
 describe('アカウント登録のV8の手順表示（#975 U050）', () => {
   it('現在の段と全段の名前を描画し、省略される名前も全文を読める', () => {
     const labels = ['基本情報', 'LINE設定', '接続確認', '動作確認', '完了']
@@ -28,12 +31,7 @@ describe('アカウント登録のV8の手順表示（#975 U050）', () => {
     }
     expect(nav.querySelectorAll('[data-step-dot]')).toHaveLength(5)
   })
-  it('進み具合を5段の同じ手順で示し、済んだ段へ入力を残して戻れる', () => {
-    expect(PAGE).toContain('label="登録の進捗"')
-    // v07では③で登録するので、登録済みでも段の表示は先に進めない（完了へ飛ばさない）。
-    // 描かれた側の確認は register-v8.react.test.tsx「段の表示は今いる段を指し、登録しても先へ飛ばさない」。
-    expect(PAGE).toContain('steps={V8_STEPS.map')
-    expect(PAGE).toContain('onSelect: !createdId && currentStep > step.number')
+  it('狭い幅でも段を折り返さない', () => {
     expect(CSS).toContain('flex-wrap: nowrap')
   })
 })

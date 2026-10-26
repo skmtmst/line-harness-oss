@@ -44,7 +44,7 @@ export default function TagPill({ name, color, folderName, size = 'md', compactA
         </Link>
       ) : <TagName name={name} color={color} folderName={folderName} />}
       {onRemove ? (
-        <button type="button" className={styles.remove} aria-label={`${name}を外す`} onClick={(event) => { event.stopPropagation(); onRemove() }}>
+        <button type="button" className={styles.remove} data-hit-area="" aria-label={`${name}を外す`} onClick={(event) => { event.stopPropagation(); onRemove() }}>
           <X aria-hidden="true" />
         </button>
       ) : null}

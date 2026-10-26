@@ -16,7 +16,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-canvas);
   color: var(--color-ink);
-  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: var(--polish-text-support);
   font-weight: var(--polish-status-weight);
   line-height: calc(var(--polish-text-support) * var(--text-lh));

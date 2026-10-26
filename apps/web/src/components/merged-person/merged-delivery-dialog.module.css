@@ -21,7 +21,7 @@
 .priorityRank {
   min-width: var(--priority-rank-min-width);
   color: var(--color-ink-faint);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
   font-weight: 500;
 }
 

@@ -531,7 +531,7 @@
   padding-block: 0;
   font-size: var(--tpl-nm-small-size);
   line-height: var(--tpl-nm-small-lh);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 :global(:root) .historyTable :is(th, td):first-child:nth-child(n) {
   padding-left: var(--tpl-nm-hist-edge);

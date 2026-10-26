@@ -68,7 +68,7 @@
 .optional {
   color: var(--color-ink-faint);
   font-size: var(--tpl-tg2-safety-body-size);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-cn-main-lh);
 }
 

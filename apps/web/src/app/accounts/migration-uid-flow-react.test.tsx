@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountMigration from './migration'
 import UidMigrationV8 from '@/v8/friends/migrations/uid'
 import { SESSION_LOST_EVENT } from '@/lib/session-events'
+import { MIGRATION_STEPS } from './use-uid-migration'
 
 /**
  * Issue #1012 FRIEND-14/15/16/33/36 の回帰試験。
@@ -619,5 +620,111 @@ describe('UID移行の閲覧のみ', () => {
     const labels = [...host.querySelectorAll('button')].map(button => button.textContent?.trim())
     for (const label of ['テスト移行を実行', '新しい移行を作る', '本移行へ進む', '切り戻す']) expect(labels).not.toContain(label)
     expect(net.calls.filter(call => call.method !== 'GET')).toHaveLength(0)
+  })
+})
+
+describe('UID移行の対応表の読み方', () => {
+  const detailGetPaths = () => net.calls.filter((call) => call.method === 'GET' && /^\/api\/friends\/migrations\/run-1\?/.test(call.path)).map((call) => call.path)
+
+  it('対応表は20件ずつ読み、次のページで続きを読む', async () => {
+    net.detailResponders.set('run-1', async () => json({ ...detailFixture(runFixture()), itemTotal: 25 }))
+    await render()
+    await flush()
+    expect(detailGetPaths().at(-1)).toContain('limit=20&offset=0')
+    fireEvent.click(document.body.querySelector<HTMLButtonElement>('button[aria-label="次のページ"]')!)
+    await flush()
+    expect(detailGetPaths().at(-1)).toContain('limit=20&offset=20')
+  })
+
+  it('分類の絞り込みと「未判断のみ」を持ち、未判断のみは口へ伝える', async () => {
+    await render()
+    await flush()
+    expect(document.body.querySelector('[aria-label="分類で絞り込む"]')).toBeTruthy()
+    const pending = within(document.body).getByRole('checkbox', { name: '未判断のみ' })
+    fireEvent.click(pending)
+    await flush()
+    expect(detailGetPaths().at(-1)).toContain('pendingOnly=1')
+  })
+
+  it('一致先なしの行には「結び付ける」「新しく作る」を出さない', async () => {
+    net.detailResponders.set('run-1', async () => json({
+      ...detailFixture(runFixture()),
+      items: [{ ...ITEM, id: 'item-u', oldUid: 'U-NOMATCH', newUid: null, candidateName: null, classification: 'unmatched' }],
+    }))
+    await render()
+    await flush()
+    fireEvent.click(document.body.querySelector<HTMLButtonElement>('button[aria-label="U-NOMATCH の引き継ぎ方"]')!)
+    await flush()
+    const options = [...document.body.querySelectorAll('[role="option"]')].map((option) => option.textContent?.trim())
+    expect(options).toContain('除く')
+    expect(options).not.toContain('新しく作る')
+    expect(options).not.toContain('結び付ける')
+  })
+})
+
+describe('UID移行の現在地と入力欄', () => {
+  it('Z0jHp の枠に、データ管理の現在地「UID移行」を出す', async () => {
+    await render()
+    await flush()
+    expect(host.querySelector('[data-design-node="Z0jHp"]')).toBeTruthy()
+    const crumbs = within(host).getByRole('navigation', { name: 'データ管理の中の現在地' })
+    expect(crumbs.querySelector('[aria-current="page"]')?.textContent).toBe('UID移行')
+  })
+
+  it('移行元・移行先は選び欄で選び、利用目的は入力欄で書く', async () => {
+    net.runs = []
+    await render()
+    await flush()
+    expect(host.querySelector('[aria-label="移行元アカウント"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="移行先アカウント"]')).toBeTruthy()
+    const label = [...host.querySelectorAll('span')].find((node) => node.textContent === '利用目的')
+    const input = label?.parentElement?.querySelector('input') as HTMLInputElement
+    expect(input).toBeTruthy()
+    fireEvent.input(input, { target: { value: '店舗統合' } })
+    expect(input.value).toBe('店舗統合')
+  })
+})
+
+describe('UID移行の5段階の表示', () => {
+  const stepNav = () => within(host).getByRole('navigation', { name: '移行の手順' })
+  const states = () => [...stepNav().querySelectorAll('[data-step-state]')].map((item) => item.getAttribute('data-step-state'))
+
+  it('手順は5段を共通の帯で出す', async () => {
+    await render()
+    await flush()
+    const names = [...stepNav().querySelectorAll('ol > li [data-step-name]')]
+    expect(names.map((name) => name.textContent?.trim())).toEqual([...MIGRATION_STEPS])
+  })
+
+  it('本移行を待つ移行は「本移行と照合」の段を今の段にする', async () => {
+    await render()
+    await flush()
+    expect(stepNav().querySelector('[aria-current="step"]')?.textContent).toContain('本移行と照合')
+    expect(states().slice(0, 4).every((state) => state === 'done')).toBe(true)
+  })
+
+  it('判断が残っている移行は「要確認の判断」を今の段にする', async () => {
+    net.runs = [runFixture({ status: 'review' })]
+    net.detailResponders.set('run-1', async () => json({ ...detailFixture(runFixture({ status: 'review' })), unresolved: 1 }))
+    await render()
+    await flush()
+    expect(stepNav().querySelector('[aria-current="step"]')?.textContent).toContain('要確認の判断')
+    expect(states().at(-1)).not.toBe('done')
+  })
+
+  it('完了・切り戻し済みは全段を済みにし、今の段を指さない', async () => {
+    net.runs = [runFixture({ status: 'completed', rollbackable: true })]
+    await render()
+    await flush()
+    expect(stepNav().querySelector('[aria-current="step"]')).toBeNull()
+    expect(states()).toEqual(MIGRATION_STEPS.map(() => 'done'))
+    expect(host.textContent).toContain('一致先なし')
+  })
+
+  it('失敗した移行は全段を済みにしない', async () => {
+    net.runs = [runFixture({ status: 'failed', rollbackable: true, failureReason: '一部失敗', counts: { total: 2, auto: 0, review: 0, unmatched: 0, conflict: 0, applied: 1, failed: 1 } })]
+    await render()
+    await flush()
+    expect(states().at(-1)).not.toBe('done')
   })
 })

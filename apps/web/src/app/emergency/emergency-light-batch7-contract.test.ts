@@ -4,20 +4,15 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = ['page.tsx', '../../v8/emergency/control.tsx', '../../v8/settings/emergency/history-details.tsx', '../../v8/settings/emergency/screen.tsx'].map((file) => readFileSync(join(import.meta.dirname, file), 'utf8')).join('\n')
 
-describe('点検・軽 第7便運用状態(#585)', () => {
-  it('最終確認は低い画面でも閉じ込めない(#518 8)', () => {
-    const dialogCss = readFileSync(join(import.meta.dirname, '../../components/shared/dialog.module.css'), 'utf8')
-    expect(dialogCss).toMatch(/max-height:[^;]*(?:100dvh|100vh)/)
-  })
-
-  it('アカウント一覧の取得失敗は黙らせず読み直せる(#518 9)', () => {
-    expect(PAGE).toContain('アカウント一覧を読み込めませんでした')
-    expect(PAGE).toContain('もう一度読み込む')
+/*
+ * 運用状態の点検で直した3つ。動きは描いて見る：
+ * - 最終確認の窓を低い画面でも閉じ込めない＝共通 Dialog の dialog-tall-panel-contract.test.tsx。
+ * - アカウント一覧の取得失敗は黙らせず読み直せる＝v8/settings/emergency/screen.test.tsx。
+ * - 日付が読めない記録は数えて断る＝operation-history-summary.test.tsx。
+ * ここには失敗を黙らせる旧形へ戻らない見張りだけを残す。
+ */
+describe('運用状態の取得失敗を黙らせない', () => {
+  it('取得の失敗を握りつぶす旧形へ戻らない', () => {
     expect(PAGE).not.toContain('.catch(() => undefined)')
-  })
-
-  it('日付が読めない記録は数えて断る(#518 10)', () => {
-    expect(PAGE).toContain('const unreadableEntries = operations.filter((item) => Number.isNaN(Date.parse(item.createdAt)))')
-    expect(PAGE).toContain('期間の絞り込みから外しています')
   })
 })

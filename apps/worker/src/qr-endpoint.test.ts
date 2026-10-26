@@ -252,28 +252,13 @@ describe('/api/qr を呼ぶ側が渡せる大きさ', () => {
     expect(builders.sort()).toEqual(QR_CALL_SITES.map((site) => site.file).sort());
   }, 30_000);
 
-  it('受け取ったクエリをそのまま載せる呼び出し元は、240x240のPNGしか頼まない', () => {
-    // ここは data を 2KiB まで伸ばせるので、絵の大きさと形式が固定であることが
-    // 1 要求あたりの重さの歯止めになっている。
-    for (const site of QR_CALL_SITES.filter((entry) => entry.kind === 'passthrough')) {
-      const source = read(site.file);
-      const urls = source.match(/\/api\/qr\?[^"'`]*/g) ?? [];
-      expect(urls.length).toBeGreaterThan(0);
-      for (const url of urls) {
-        expect(url).toContain(`size=${site.fixedSize}`);
-        expect(url).not.toContain('format=');
-      }
-    }
-  });
+  // 受け取ったクエリをそのまま載せる呼び出し元が 240x240 の PNG しか頼まないことは、
+  // 実際に返す画面の HTML で見る（qr-endpoint-callers.test.ts）。
 
   it('画素数や形式を選べる呼び出し元が渡すdataは200バイト未満', () => {
     // 選べる側が渡すのは「土台のURL + /r/ + 流入経路の合言葉」だけ。
-    // 合言葉の長さは経路を作るときの検査で決まる。
-    const entryRoutes = read('apps/worker/src/routes/entry-routes.ts');
-    const refCodeRule = /\/\^\[A-Za-z0-9_-\]\{1,(\d+)\}\$\//.exec(entryRoutes);
-    expect(refCodeRule).not.toBeNull();
-    const refCodeMax = Number((refCodeRule as RegExpExecArray)[1]);
-    expect(refCodeMax).toBe(64);
+    // 合言葉は経路を作るときに 64 文字までに断る（qr-endpoint-callers.test.ts が口を叩いて確かめる）。
+    const refCodeMax = 64;
 
     // 土台のURLは配備の設定で決まるので、実際に配っている値のうち長い方を使う。
     const bases = ['apps/worker/wrangler.toml', 'apps/worker/wrangler.staging.toml'].map((file) => {

@@ -87,7 +87,7 @@ async function openSurfaces(page, width) {
 function surfaceDistances() {
   const distance = (from, to) => Math.round((to.getBoundingClientRect().top - from.getBoundingClientRect().bottom) * 100) / 100
   const firstTool = id => document.querySelector(`#${id} [data-template-region="toolbar"]`).firstElementChild
-  const title = id => document.querySelector(`#${id} [data-template-region="heading"] h2`)
+  const title = id => document.querySelector(`#${id} [data-template-region="heading"] h1`)
   const step = id => document.querySelector(`#${id} [data-template-region="steps"]`)
   const content = id => document.querySelector(`#${id} [data-template-region="content"] [data-design-part="card"]`)
   const folders = document.querySelector('#common-vars [data-template-region="folders"]')
@@ -110,7 +110,7 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
     console.log(JSON.stringify({ width, distances }))
     assert.deepEqual(distances, { hq: 8, contents: 14, banners: 14, 'common-vars': width === 1440 ? 8 : null, 'reminder-detail': 6, 'auto-reply': 8, reminder: 8, 'hq-broadcast': 2, scenario: 8, 'rich-menu': 8 })
     for (const id of ['contents', 'banners']) {
-      const gap = await page.locator('#' + id).evaluate(el => el.querySelector('[data-template-region="toolbar"]').firstElementChild.getBoundingClientRect().top - el.querySelector('h2').getBoundingClientRect().bottom)
+      const gap = await page.locator('#' + id).evaluate(el => el.querySelector('[data-template-region="toolbar"]').firstElementChild.getBoundingClientRect().top - el.querySelector('h1').getBoundingClientRect().bottom)
       assert.equal(gap, 8)
     }
     const sectionGaps = await page.evaluate(() => {
@@ -118,7 +118,7 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
       const text = document.querySelector('#section-with-tools [data-template-region="content"] p')
       const noTools = document.querySelector('#section-without-tools')
       return [text.getBoundingClientRect().top - tools.firstElementChild.getBoundingClientRect().bottom,
-        noTools.querySelector('p').getBoundingClientRect().top - noTools.querySelector('h2').getBoundingClientRect().bottom,
+        noTools.querySelector('p').getBoundingClientRect().top - noTools.querySelector('h1, h2').getBoundingClientRect().bottom,
         document.querySelector('#section-with-tools [data-page-template]').getBoundingClientRect().bottom - text.getBoundingClientRect().bottom]
     })
     assert.deepEqual(sectionGaps, [14, 8, 24])
@@ -135,9 +135,10 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
       assert.equal(await page.locator('#' + id).evaluate(el => getComputedStyle(el).boxShadow), 'none', id)
     }
     const fonts = await page.locator('#surfaces [data-part="create-summary"] dd').evaluateAll(nodes => nodes.map(el => getComputedStyle(el).fontWeight))
-    assert.deepEqual(fonts, ['400', '400'])
+    // 要約の値は 14px 以下の UI 文字なので 500（太字の 600 にはしない）。
+    assert.deepEqual(fonts, ['500', '500'])
     for (const th of await page.locator('thead th').all()) assert.equal(await th.evaluate(el => getComputedStyle(el).fontWeight), '500')
-    const heading = await page.locator('#hq h2').evaluate(el => {
+    const heading = await page.locator('#hq h1').evaluate(el => {
       const style = getComputedStyle(el)
       return { size: style.fontSize, weight: style.fontWeight }
     })

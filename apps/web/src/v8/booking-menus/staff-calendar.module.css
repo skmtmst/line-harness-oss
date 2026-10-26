@@ -2,7 +2,7 @@
 .card { display: flex; flex-direction: column; gap: var(--tpl-bm-12); padding: var(--tpl-bm-16); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: calc(var(--tpl-bm-1) * -1); box-shadow: var(--card-shadow); background: var(--color-canvas); }
 .headRow { display: flex; align-items: center; gap: var(--tpl-bm-6); }
 .title { margin: var(--tpl-layout-zero); color: var(--color-ink); font-size: var(--tpl-bm-15); font-weight: 700; }
-.minor { display: block; margin: var(--tpl-layout-zero); color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); line-height: var(--tpl-bm-18); font-weight: 400; }
+.minor { display: block; margin: var(--tpl-layout-zero); color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); line-height: var(--tpl-bm-18); font-weight: var(--font-weight-ui); }
 .body { margin: var(--tpl-layout-zero); color: var(--color-ink); font-size: var(--tpl-bm-13); line-height: var(--tpl-bm-20); }
 .readValue { margin: var(--tpl-layout-zero); color: var(--color-ink); font-size: var(--tpl-bm-13); font-weight: 700; }
 .error { margin: var(--tpl-layout-zero); color: var(--color-danger); font-size: var(--tpl-bm-13); }

@@ -302,7 +302,7 @@ export default function TriggerEditor({
                   }`}
                 >
                   <span className="block">{kind.label}</span>
-                  <span className="text-ink-faint mt-0.5 block text-xs font-normal">
+                  <span className="text-ink-faint mt-0.5 block text-xs font-medium">
                     {kind.ready ? (configured ? '設定済み' : '足せます') : 'まだ使えません'}
                   </span>
                 </span>
@@ -443,9 +443,9 @@ export default function TriggerEditor({
                 {match.kind === 'ready' ? (
                   `${formatNumber(match.matched)}人`
                 ) : match.kind === 'loading' ? (
-                  <span className="text-ink-faint text-sm font-normal">読み込んでいます</span>
+                  <span className="text-ink-faint text-sm font-medium">読み込んでいます</span>
                 ) : match.kind === 'error' ? (
-                  <span className="text-danger text-sm font-normal">読み込めませんでした</span>
+                  <span className="text-danger text-sm font-medium">読み込めませんでした</span>
                 ) : (
                   <span className="text-ink-faint">—</span>
                 )}

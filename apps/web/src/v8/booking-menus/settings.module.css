@@ -412,7 +412,7 @@
   margin: 0;
   overflow: hidden;
   color: var(--color-ink-faint);
-  font-size: var(--tpl-bm-11);
+  font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-16);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -669,7 +669,7 @@
 
 .sameTimeLabel {
   color: var(--color-ink-faint);
-  font-size: var(--tpl-bm-11);
+  font-size: var(--tpl-bm-12);
   white-space: nowrap;
 }
 
@@ -813,7 +813,7 @@
 .calWeekday {
   padding: 0;
   color: var(--color-ink-faint);
-  font-size: var(--tpl-bm-11);
+  font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-16);
   text-align: center;
 }
@@ -868,8 +868,8 @@
 }
 
 .calMark {
-  font-size: var(--tpl-bm-11);
-  font-weight: 400;
+  font-size: var(--tpl-bm-12);
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-bm-13);
 }
 
@@ -932,7 +932,7 @@
 
 .fieldLabelOptional {
   color: var(--color-ink-faint);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .toggleRow {
@@ -1060,7 +1060,7 @@
   color: var(--color-ink-faint);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--tpl-bm-11);
+  font-size: var(--tpl-bm-12);
 }
 
 .staffColMenus {
@@ -1143,7 +1143,7 @@
   display: block;
   margin-top: var(--tpl-bm-2);
   color: var(--color-ink-faint);
-  font-size: var(--tpl-bm-11);
+  font-size: var(--tpl-bm-12);
 }
 
 /* 見本：「つながっている」は薄緑の札＋緑の点。つないでいないは灰。 */
@@ -1676,7 +1676,7 @@
 .phoneDayState {
   color: var(--v8-liff-primary);
   font-size: var(--tpl-bm-9);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-bm-13);
 }
 

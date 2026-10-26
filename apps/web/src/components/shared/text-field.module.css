@@ -14,7 +14,7 @@
    * 同じ大きさにそろえる（以前は `$size-label` の13pxで小さかった）。
    */
   font-size: var(--text-body);
-  font-weight: 400; /* fontWeight: normal */
+  font-weight: var(--font-weight-ui); /* fontWeight: normal */
   font-family: inherit;
 }
 
@@ -88,7 +88,7 @@
 }
 
 /* V8の1行欄。高さ・左右の余白・行間は共通値。 */
-:root .single { height: var(--tpl-field-h); border: 0; padding: 0 var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); line-height: var(--tpl-field-lh); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+:root .single { height: var(--tpl-field-h); border: 0; padding: 0 var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); line-height: var(--tpl-field-lh); font-family: var(--font-sans); }
 :root .single[aria-invalid='true'] { outline-color: var(--color-danger); }
 :root .single:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 /* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */

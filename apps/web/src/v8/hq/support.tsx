@@ -3,7 +3,8 @@
 import { PageContent } from '@/components/templates/page-frame'
 import { Field as SharedField } from '@/components/shared/form-controls'
 import StatusBadge from '@/components/shared/status-badge'
-import { CheckCircle2, Plus, X } from 'lucide-react'
+import { CheckCircle2, MessageCircleQuestion, Plus, X } from 'lucide-react'
+import EmptyList from '@/components/shared/empty-list'
 import Link from '@/components/shared/list-navigation'
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ListPage } from '@/components/templates'
@@ -331,7 +332,7 @@ export default function HqSupportV8() {
               <button type="button" onClick={() => void loadHistory()} className={styles.linkButton}>もう一度読み込む</button>
             </p>
           ) : history.length === 0 ? (
-            <p className={styles.empty}>まだ問い合わせはありません。</p>
+            <EmptyList icon={<MessageCircleQuestion aria-hidden="true" />} title="まだ問い合わせはありません" description="上の欄から送った問い合わせと、運営からの返事がここに並びます。" canCreate={false} />
           ) : (
             <GridTable label="これまでの問い合わせ" design={{ columns: 'var(--tpl-hq-col-ticket) minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-ticket)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
               <GridHeadRow>

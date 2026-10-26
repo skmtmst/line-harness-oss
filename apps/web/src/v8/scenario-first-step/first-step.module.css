@@ -151,7 +151,7 @@
   padding: var(--tpl-cfl-insert-pad);
   border-radius: var(--radius-mini);
   font-size: var(--text-caption);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-wb-pill-lh);
 }
 .counter {

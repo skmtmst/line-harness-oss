@@ -385,6 +385,9 @@ describe('S4-OR 編集の数えない条件は空のかたまりを黙って落�
     await openEditDialog()
     await click(orAddButton())
     await pickKind(kindPickers()[1], '行動スコア')
+    /* 編集の窓は数えない条件の人数を出さないので、条件を入れても数え上げの口は呼ばない。 */
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 500)) })
+    expect(net.calls.filter((call) => call.path.includes('/segments'))).toHaveLength(0)
     await click(byText('この内容にする'))
 
     const revise = net.calls.find((call) => call.path.includes('/revise'))
