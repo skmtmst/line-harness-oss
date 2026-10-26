@@ -1,18 +1,14 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
  * 「＋ シナリオを作る」で空の行を作らない（#949 N-055）。
  *
- * 以前は押した時点で POST /api/scenarios を打ち、配信方式や1通目の設定を
- * 放り出されると、名前も通も無い空の行が一覧に残った。一覧のボタンは
- * 方式選択画面へ送るだけで、行を作るのは方式を確定したとき。
+ * 押すと方式選びへ送るだけで作らない動きは v8/scenarios/list-counts-and-actions.test.tsx が
+ * 描いて押して守る。ここは作成中の状態を持つ書き方へ戻さない禁止の見張りだけを残す。
  */
-const HERE = dirname(fileURLToPath(import.meta.url))
 /* 完全切り替え：管理画面 の page.tsx は捨て、V8 の一覧（src/v8/scenarios/list.tsx・page.tsx が描く本体）を見る。 */
-const PAGE = readFileSync(join(HERE, '../../v8/scenarios/list.tsx'), 'utf8')
+const PAGE = readFileSync(new URL('../../v8/scenarios/list.tsx', import.meta.url), 'utf8')
 
 describe('シナリオ作成ボタンは行を作らない（#949 N-055）', () => {
   it('作成ボタンは方式選択へ送るだけで、POSTを打たない', () => {
@@ -21,7 +17,6 @@ describe('シナリオ作成ボタンは行を作らない（#949 N-055）', () 
       PAGE.indexOf('const handleReorder'),
     )
     expect(handleCreate).not.toContain('api.scenarios.create')
-    expect(handleCreate).toContain("router.push('/scenarios/mode')")
     // id なしで送る。行が無いことを方式選択画面が区別できるように。
     expect(handleCreate).not.toContain('?id=')
   })
