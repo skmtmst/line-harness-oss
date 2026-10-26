@@ -1,4 +1,5 @@
 import { Activity, CircleCheck, QrCode, Users } from 'lucide-react'
+import { ProgressBar } from '@/components/shared/progress'
 import { type LineAccountConnectData } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -21,9 +22,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
                     <strong>{`${polishFormatNumber(handover.imported)} 人`}</strong>
                     <strong>{handover.total !== null ? `${polishFormatNumber(handover.total)} 人` : '確認中'}</strong>
                   </div>
-                  <div className={styles.progressTrack} role="progressbar" aria-valuenow={handover.rate} aria-valuemin={0} aria-valuemax={100} aria-label="友だちの引き継ぎ">
-                    <span className={styles.progressFill} style={{ width: `${handover.rate}%` }} />
-                  </div>
+                  <ProgressBar appearance="quota" value={handover.rate} label="友だちの引き継ぎ" />
                   <p className={styles.progressNote}>{remainText}</p>
                   <p className={styles.progressWarn}>引き継ぎは画面を閉じても続きます。もう一度開くと進み具合を確認できます。</p>
                 </Card>

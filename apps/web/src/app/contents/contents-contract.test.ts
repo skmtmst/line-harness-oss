@@ -66,7 +66,7 @@ describe('V8 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('nearLimitOnly: showNearLimitOnly')
     // 棒と残量とstate別の案内は案内側に寄せている。
     expect(GUIDANCE).toContain('quota.remainingBytes')
-    expect(GUIDANCE).toContain('style={{ width')
+    expect(GUIDANCE).toContain('<ProgressBar')
     expect(GUIDANCE).toContain('80%以上')
     expect(GUIDANCE).toContain('上限に達しました')
   })
