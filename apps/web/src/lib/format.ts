@@ -1,8 +1,9 @@
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * （2026-10-09）：管理画面の日付と数は、この共通書式を使う。
- * 日時は2つの書き方だけにする。一覧は MM/DD HH:mm（今年は年を省く。過去の別年は YYYY/MM/DD）。
- * 詳細は YYYY年M月D日 HH:mm（いつの記録か読み違えないよう年を省かない）。店舗の時間帯は指定して保つ。
+ * 日時は2つの書き方だけにする。表の狭い列は MM/DD HH:mm（今年は年を省く。過去の別年は YYYY/MM/DD）。
+ * それ以外は M月D日 HH:mm（今年は年を省き、去年より前だけ YYYY年 を付ける）。店舗の時間帯は指定して保つ。
+ * 24時間以内の出来事は formatRelative で「2時間前」。グラフの軸だけ M/D。
  * 時刻を持たない日付（予約日・期限）は M月D日（曜）。
  * 件数は3桁区切りと単位の前の半角空き、金額は ¥29,800、割合は12.4%。
  * 保存値・CSV・日付入力の機械向け書式は表示の書式と分ける。
@@ -109,11 +110,11 @@ export function formatDate(
     if (style === 'list-day-weekday') return `${day}${weekday(p.w)}`
     return style === 'list-day' ? day : `${day} ${clock}`
   }
-  if (style === 'detail') return `${p.y}年${p.m}月${p.d}日 ${clock}`
+  if (style === 'detail') return `${sameYear ? '' : `${p.y}年`}${p.m}月${p.d}日 ${clock}`
   return `${sameYear ? '' : `${p.y}年`}${p.m}月${p.d}日${weekday(p.w)}`
 }
 
-/** 詳細・説明文の日時。YYYY年M月D日 HH:mm。 */
+/** 詳細・説明文の日時。今年は M月D日 HH:mm、別の年は YYYY年M月D日 HH:mm。 */
 export function formatDateTime(value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo'): string {
   return formatDate(value, { style: 'detail', fallback, now, timeZone })
 }
@@ -151,8 +152,8 @@ export function formatTime(value: DateInput, fallback = '—', timeZone = 'Asia/
 }
 
 /**
- * 一覧の「最新やりとり」向けの近い時刻。
- * 1分未満→たった今 / ◯分前 / ◯時間前 / 昨日 H:mm / ◯日前 / 7日より前は日付。
+ * 出来事の時刻（最近の動きなど）。24時間以内は 1分未満→たった今 / ◯分前 / ◯時間前、
+ * それより前は formatDateTime と同じ M月D日 HH:mm。
  */
 export function formatRelative(value: DateInput, now?: DateInput, fallback = '—'): string {
   const p = toJst(value)
@@ -163,13 +164,7 @@ export function formatRelative(value: DateInput, now?: DateInput, fallback = '�
   if (diffMin < 1) return 'たった今'
   if (diffMin < 60) return `${diffMin}分前`
   if (diffMin < 60 * 24) return `${Math.floor(diffMin / 60)}時間前`
-  // 暦日差で「昨日」を判定し、7日より前は日付へ
-  const dayIndex = (e: number) => Math.floor((e + JST_OFFSET_MS) / 86_400_000)
-  const dayDiff = dayIndex(n.epoch) - dayIndex(p.epoch)
-  if (dayDiff === 0) return `${Math.floor(diffMin / 60)}時間前`
-  if (dayDiff === 1) return `昨日 ${p.h}:${pad2(p.min)}`
-  if (dayDiff < 7) return `${dayDiff}日前`
-  return formatDay(value, fallback)
+  return formatDateTime(value, fallback, now)
 }
 
 /**
