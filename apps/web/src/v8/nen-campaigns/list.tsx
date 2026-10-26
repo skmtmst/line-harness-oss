@@ -614,7 +614,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const categories = useMemo(() => {
     const counts = new Map<string, number>()
     for (const column of columns) {
-      const key = column.category?.trim() || '分類なし'
+      const key = column.category?.trim() || '未分類'
       counts.set(key, (counts.get(key) ?? 0) + 1)
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1])
@@ -629,7 +629,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
     return columns.filter((column) => {
       if (filter === 'published' && column.publishedAt == null) return false
       if (filter === 'draft' && column.publishedAt != null) return false
-      const cat = column.category?.trim() || '分類なし'
+      const cat = column.category?.trim() || '未分類'
       if (filter === 'category' && topCategory && cat !== topCategory[0]) return false
       if (category && cat !== category) return false
       if (q && !`${column.title} ${column.excerpt} ${column.category ?? ''}`.toLocaleLowerCase().includes(q)) return false
@@ -730,7 +730,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
 
                       </span>
                     </Td>
-                    <Td className={styles.colCategory}><span className={styles.cell}>{column.category?.trim() || '分類なし'}</span></Td>
+                    <Td className={styles.colCategory}><span className={styles.cell}>{column.category?.trim() || '未分類'}</span></Td>
                     <Td className={styles.colDate}><span className={styles.cell}>{column.publishedAt ? jstMonthDay(column.publishedAt) : column.deliveryAt ? `${jstMonthDay(column.deliveryAt)} 予定` : emptyValue('unknown')}</span></Td>
                     <Td className={styles.colLine}>{columnBadge(column, metric?.sent ?? null)}</Td>
                     <Td className={styles.colViews}><span className={styles.num}>{views == null ? emptyValue('unknown') : formatNumber(views)}</span></Td>

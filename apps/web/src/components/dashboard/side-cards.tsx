@@ -237,14 +237,14 @@ function formatUpcomingDate(iso: string): string {
 
 const upcomingKindLabel: Record<string, string> = {
   broadcast: '配信',
-  reminder: 'リマインダー',
+  reminder: 'リマインダ',
   booking: '予約',
 }
 
 /**
  * 今後の予定（M）。
  *
- * 予約配信・リマインダー・予約の7日分を時刻順に並べる。種類ごとの
+ * 予約配信・リマインダ・予約の7日分を時刻順に並べる。種類ごとの
  * 一覧へつなぐ。ここから変えることはできない（読むだけ）。
  * 旧Worker（upcoming 未返却）では予約だけの表示へ戻る。
  */
@@ -300,7 +300,7 @@ export function UpcomingCard({
     return (
       <SideCard
         title="今後の予定"
-        helpTip="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
+        helpTip="7日分の予約配信・リマインダ・予約です。見るだけで、ここからは変えられません。"
         freshness={upcomingAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {formatTime(upcomingAt)}</span> : undefined}
       >
         {merged.items.length === 0 ? (
@@ -337,7 +337,7 @@ export function UpcomingCard({
     */
     <SideCard
       title="今後の予定"
-      helpTip="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
+      helpTip="7日分の予約配信・リマインダ・予約です。見るだけで、ここからは変えられません。"
       action={{ label: 'すべて見る →', href: '/booking/bookings?view=list' }}
       freshness={updatedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {formatTime(updatedAt)}</span> : undefined}
     >

@@ -513,7 +513,7 @@ export default function AutomationRunsV8() {
                 const done = run.successfulActions ?? []
                 const reason = resultReason(run)
                 const whenLine = [shortDateTime(run.occurredAt), run.accountLabel].filter(Boolean).join('・')
-                const versionLine = `v${run.versionNumber}${run.isTest ? '・テスト' : ''}`
+                const versionLine = `第${run.versionNumber}版${run.isTest ? '・テスト' : ''}`
                 const subjectName = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」`
                 return (
                   <Tr key={run.id} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(selectedRun?.id === run.id ? null : run)}>
@@ -615,9 +615,9 @@ export default function AutomationRunsV8() {
             <div className={styles.panel}>
               <LogEntryCopy canCopy={permissions?.canExport === true} entry={{ occurredAt: run.occurredAt, target: run.subject ?? '友だち名なし', status: STATUS_LABEL[run.status], reason: resultReason(run) ?? STATUS_LABEL[run.status] }} />
               <p className={styles.panelText}>
-                {`版 v${(runDetail ?? run).versionNumber}`}
+                {`第${(runDetail ?? run).versionNumber}版`}
                 {(runDetail ?? run).isTest ? '・テスト実行' : ''}
-                {runDetail ? (runDetail.isCurrentVersion ? '・いまの公開版です' : runDetail.currentVersionNumber !== null ? `・いまの公開版は v${runDetail.currentVersionNumber} です` : '') : ''}
+                {runDetail ? (runDetail.isCurrentVersion ? '・いまの公開版です' : runDetail.currentVersionNumber !== null ? `・いまの公開版は 第${runDetail.currentVersionNumber}版 です` : '') : ''}
               </p>
               <dl className={styles.panelGrid}>
                 <dt>きっかけ</dt><dd>{run.triggerLabel}</dd>

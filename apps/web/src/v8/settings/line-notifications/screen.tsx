@@ -588,7 +588,7 @@ function CustomerNotificationEditor({
       <div>
         <p className="text-xs font-semibold text-ink-faint"><Button variant="text" size="inline" onClick={onClose} disabled={busy}>LINE通知</Button>　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
-        <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : emptyValue('none')} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
+        <p className="mt-1 text-xs text-ink-faint">{definition ? `公開中 ${definition.currentVersionNumber ? `第${definition.currentVersionNumber}版` : emptyValue('none')} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
         {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
       </div>
       <DialogActions padding="none"><Button onClick={onTestSend} disabled={busy}>テスト受信者に送る</Button>{definition ? <Button variant={hasUnsaved ? "secondary" : "primary"} onClick={() => validateEditor(onPublish)} disabled={busy}>顧客へのお知らせを公開</Button> : null}</DialogActions>

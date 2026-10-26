@@ -357,7 +357,7 @@ export default function CommonActionsV8() {
                     <Td collapseAt="narrow" className={styles.colSteps}><span className={styles.main}>{`${formatNumber(item.actionCount)} 個の処理`}</span></Td>
                     <Td className={styles.colUsed}><span className={styles.main}>{`${formatNumber(item.bindingCount)} か所`}</span></Td>
                     <Td className={styles.colVersion}>
-                      <span className={styles.main}>{item.publishedVersion ? `v${item.publishedVersion}` : emptyValue('unknown')}</span>
+                      <span className={styles.main}>{item.publishedVersion ? `第${item.publishedVersion}版` : emptyValue('unknown')}</span>
                       {versionSub ? <span className={item.oldVersionBindingCount > 0 ? styles.subWarn : styles.sub}>{versionSub}</span> : null}
                     </Td>
                     <ActionCell className={styles.colOps}>
