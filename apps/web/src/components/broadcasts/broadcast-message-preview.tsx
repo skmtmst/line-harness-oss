@@ -53,7 +53,7 @@ export default function BroadcastMessagePreview({
           ) : item.type === 'flex' ? <LinePreviewFlex content={item.text} /> : item.location ? (
             <div className="rounded-card bg-canvas p-3 text-sm shadow-card">
               <p className="flex items-center gap-1 font-bold text-ink">
-                <MapPin size={14} aria-hidden />
+                <MapPin size={16} aria-hidden />
                 {item.location.title}
               </p>
               {item.location.address && (

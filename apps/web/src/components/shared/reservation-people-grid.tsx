@@ -86,7 +86,7 @@ export default function ReservationPeopleGrid({ entries, resources, date, slots 
               <BookingTime>{formatTime(row.startsAt)}〜{formatTime(row.endsAt)}</BookingTime>
               <BookingDetail>{row.courseName ?? '予約'}・<ReservationSource value={row.source} note={row.note}/></BookingDetail>
               <BookingDetail>{over ? '要対応・受付数超過' : ({ confirmed: '確定', requested: '承認待ち', pending: '承認待ち', seated: '来店中', visited: '来店中', cancelled: 'キャンセル', rejected: '拒否', expired: '期限切れ', completed: '完了', no_show: '来店なし' } as Record<string, string>)[row.status] ?? row.status}</BookingDetail>
-            </BookingBlock>{over ? <span className={styles.over} role="alert"><TriangleAlert size={13} aria-hidden />受付数を超えています（{overlapping} / {resource.capacity}）</span> : null}</Fragment>
+            </BookingBlock>{over ? <span className={styles.over} role="alert"><TriangleAlert size={16} aria-hidden />受付数を超えています（{overlapping} / {resource.capacity}）</span> : null}</Fragment>
           })}
           {canWrite && !busy ? available.map(slot => <span key={slot.startsAt} className={styles.slot}>{slot.href ? <Button variant="text" href={slot.href} aria-label={`${resource.label} ${formatTime(slot.startsAt)}に予約を入れる`}>＋ 予約を入れる</Button> : onSlot ? <BookingSlot onClick={() => onSlot(resource.id, slot.startsAt)} aria-label={`${resource.label} ${formatTime(slot.startsAt)}に予約を入れる`}>＋ 予約を入れる</BookingSlot> : null}</span>) : null}
         </div>

@@ -57,7 +57,7 @@ export default function WebhooksSamplesV8() {
       headingSize="regular"
       title="外部連携"
 
-      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
+      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="notify" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!canManage ? <ViewerBand /> : null}

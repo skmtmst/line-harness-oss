@@ -776,7 +776,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const preview = (
     <div className={styles.rail} data-fe-rail>
       <Button className={styles.previewOpen} onClick={() => setPreviewOpen(true)}>
-        <Smartphone size={15} aria-hidden="true" />
+        <Smartphone size={16} aria-hidden="true" />
         LINEでの見え方を見る
       </Button>
       {host ? (
@@ -793,13 +793,13 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             <div className={styles.urlRow}>
               {/* 見せるのは短い形（絵どおり）。全文は title とコピーで渡す。 */}
               <span className={styles.urlValue} title={answerUrl}>{`https://liff.line.me/…/forms/${id}`}</span>
-              <CopyTextButton variant="secondary" icon={<Copy size={15} aria-hidden="true" />} value={answerUrl} label="コピーする" aria-label="回答用URLをコピー" />
+              <CopyTextButton variant="secondary" icon={<Copy size={16} aria-hidden="true" />} value={answerUrl} label="コピーする" aria-label="回答用URLをコピー" />
             </div>
             <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
             {canEdit ? (
               <div className={styles.urlTest}>
                 <Button onClick={() => void startTest()} disabled={testBusy} busy={testBusy} busyLabel="用意しています…" title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません">
-                  <FlaskConical size={15} aria-hidden="true" />
+                  <FlaskConical size={16} aria-hidden="true" />
                   <span className={styles.testWide}>公開前に試す（試しのURLを作る）</span>
                   <span className={styles.testNarrow}>公開前に試す</span>
                 </Button>
@@ -848,7 +848,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             </Button>
           ) : (
             <Button variant="primary" onClick={() => setShowPublish(true)} disabled={saving}>
-              <Upload size={15} aria-hidden="true" />
+              <Upload size={16} aria-hidden="true" />
               この版を公開
             </Button>
           )}
@@ -1006,7 +1006,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
                 })()
               }}
             >
-              <Upload size={15} aria-hidden="true" />
+              <Upload size={16} aria-hidden="true" />
               この版を公開
             </Button>
           </div>

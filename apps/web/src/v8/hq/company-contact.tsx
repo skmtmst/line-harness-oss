@@ -162,7 +162,7 @@ export default function CompanyContactCard({ canEdit, draftRef, onDirtyChange, l
     {!draftRef ? <FormLeaveGuard dirty={canEdit && dirty} busy={saving || locked} /> : null}
     {field('legalCompanyName')}
     {field('postalCode', canEdit ? <Button type="button" size="field" onClick={() => void findAddress()}
-      disabled={loading || saving || locked || finding || revision === null} busy={finding} busyLabel="検索中…"><Search aria-hidden size={14} />住所を探す</Button> : null)}
+      disabled={loading || saving || locked || finding || revision === null} busy={finding} busyLabel="検索中…"><Search aria-hidden size={16} />住所を探す</Button> : null)}
     {postalNote ? <p role="status" className={styles.hint}>{postalNote}</p> : null}
     {canEdit && candidates.length ? <SettingsFormRow>{candidates.map((candidate, index) => {
       const address = `${candidate.prefecture}${candidate.city}${candidate.town}`

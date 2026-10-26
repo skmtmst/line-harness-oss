@@ -197,7 +197,7 @@ export function CancellationSection({ state, connected, testMode, canEdit }: { s
               </Tr>
             </tbody></DataTable>
             <p className={styles.minor}>物差しは「予約の開始の何時間前か」1 つだけです。段の間に空き・重なりがあると保存できません。100% を超える値は入れられません。</p>
-            {canEdit && tiers.length < 3 ? <Button variant="text" textTone="ink" onClick={() => setEditing('new')}><Plus size={15} aria-hidden="true" />段を足す</Button> : null}
+            {canEdit && tiers.length < 3 ? <Button variant="text" textTone="ink" onClick={() => setEditing('new')}><Plus size={16} aria-hidden="true" />段を足す</Button> : null}
           </>
         )}
       <h3 className={styles.subTitle}>カードを登録してもらう条件</h3>
@@ -315,7 +315,7 @@ export function ConnectionCard({ connected, testMode, checkedAt, accountIdTail, 
           <span className={styles.minor}>{connected ? `${testMode ? '試験モードで' : ''}つながっています${checkedAt ? `・${checkedAt} につないだ` : ''}` : 'まだつないでいません。つなぐと、キャンセル料とデポジットを使えます'}</span>
         </span>
         {connected ? <StatusBadge tone="success">つながっている</StatusBadge>
-          : canEdit ? <Button variant="primary" busy={busy} onClick={onConnect}><Plug size={15} aria-hidden="true" />決済をつなぐ</Button> : null}
+          : canEdit ? <Button variant="primary" busy={busy} onClick={onConnect}><Plug size={16} aria-hidden="true" />決済をつなぐ</Button> : null}
       </div>
       {connected ? <div className={styles.links}>
         <Button href={dashboardUrl ?? (testMode ? 'https://dashboard.stripe.com/test/payments' : 'https://dashboard.stripe.com/payments')} external>Stripe の管理画面を開く</Button>

@@ -457,7 +457,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
                 </div>
                 <span className={styles.checkAction}>
                   <Button type="button" onClick={() => void recordSeen()} disabled={recording} busy={recording} busyLabel="記録中…">
-                    <Smartphone size={15} aria-hidden /> スマホで見た
+                    <Smartphone size={16} aria-hidden /> スマホで見た
                   </Button>
                 </span>
               </li>

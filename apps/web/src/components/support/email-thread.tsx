@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import EntitySelect from '@/components/shared/entity-select'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -88,7 +89,7 @@ export function EmailThreadBackButton({ onBack }: { onBack: () => void }) {
       aria-label="戻る"
     >
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 19l-7-7 7-7" />
       </svg>
     </button>
   )
@@ -262,7 +263,7 @@ export default function EmailThread({
           })
           setLoadError('')
           if (!quiet) {
-            window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+            window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: scrollMotion() }), 50)
           }
           return true
         }

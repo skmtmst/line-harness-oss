@@ -75,7 +75,7 @@
   display: flex;
   flex-shrink: 0;
   height: 44px;
-  padding: 14px 26px 0 30px;
+  padding: 14px 24px 0 32px;
   background: var(--v8-line-chrome);
 }
 
@@ -99,7 +99,7 @@
 .statusIcons {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   margin-left: auto;
   color: var(--v8-line-ink);
 }
@@ -218,20 +218,20 @@
 :root .dateChip > span { display: flex; align-items: flex-start; }
 :root .messageRow { display: flex; align-items: flex-start; gap: 6px; flex-shrink: 0; width: 100%; }
 :root .senderAvatar { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 999px; background: var(--color-accent-deep); color: var(--color-canvas); font-size: 13px; font-weight: 700; line-height: 20px; }
-:root .senderBody { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex-shrink: 0; }
+:root .senderBody { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex-shrink: 0; }
 :root .senderName { color: var(--v8-line-sender); font-size: 10px; font-weight: 400; line-height: 15px; }
 :root .bubbleRow { display: flex; align-items: flex-end; gap: 4px; }
 :root .bubble { position: relative; width: 176px; min-height: 94px; flex-shrink: 0; }
 :root .tail { position: absolute; left: -5px; top: 2px; width: 10px; height: 8px; color: var(--color-canvas); overflow: visible; }
-:root .bubbleBody { position: relative; z-index: 1; display: flex; align-items: flex-start; min-height: 94px; width: 176px; padding: 8px 11px; border-radius: 16px; background: var(--color-canvas); color: var(--color-ink); font-size: 11.5px; font-weight: 400; line-height: 18px; }
+:root .bubbleBody { position: relative; z-index: 1; display: flex; align-items: flex-start; min-height: 94px; width: 176px; padding: 8px 10px; border-radius: 16px; background: var(--color-canvas); color: var(--color-ink); font-size: 11.5px; font-weight: 400; line-height: 18px; }
 :root .messageTime { font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 9px; font-weight: 400; line-height: 14px; color: var(--v8-line-time); white-space: nowrap; }
 :root .cardRow { display: flex; flex-shrink: 0; align-items: flex-end; gap: 4px; width: 100%; padding-left: 40px; }
 :root .productCard { display: flex; flex-direction: column; flex-shrink: 0; width: 186px; border-radius: 16px; background: var(--color-canvas); overflow: hidden; }
 :root .productImage { width: 100%; height: 104px; flex-shrink: 0; background-position: center; background-size: cover; }
-:root .productCopy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9px 11px 8px; }
+:root .productCopy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px 8px; }
 :root .productTitle { color: var(--color-ink); font-size: 12.5px; font-weight: 700; line-height: 19px; white-space: nowrap; }
 :root .productDescription { color: var(--v8-line-muted); font-size: 10.5px; font-weight: 400; line-height: 16px; white-space: nowrap; }
-:root .priceRow { display: flex; align-items: flex-end; gap: 4px; padding-top: 3px; }
+:root .priceRow { display: flex; align-items: flex-end; gap: 4px; padding-top: 2px; }
 :root .price { font-family: var(--font-inter), Inter, system-ui, sans-serif; color: var(--color-ink); font-size: 14px; font-weight: 700; line-height: 21px; }
 :root .tax { color: var(--v8-line-muted); font-size: 9.5px; font-weight: 400; line-height: 14px; }
 :root .productAction { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 100%; height: 34px; padding: 0; border: 0; border-top: 1px solid var(--v8-line-hairline); background: transparent; color: var(--color-accent); font-family: inherit; font-size: 12px; font-weight: 700; line-height: 18px; cursor: pointer; }

@@ -669,19 +669,19 @@ export default function RemindersListV8() {
   const rowMenuItems = (row: ReminderRow): ActionMenuItem[] => {
     const status = statusKeyOf(row)
     const items: ActionMenuItem[] = [
-      { id: 'detail', label: "リマインダの詳細を見る", icon: <ArrowRight size={15} aria-hidden="true" />, onSelect: () => goDetail(detailHref(row.id)) },
+      { id: 'detail', label: "リマインダの詳細を見る", icon: <ArrowRight size={16} aria-hidden="true" />, onSelect: () => goDetail(detailHref(row.id)) },
       /*
        * 詳細のタブは ?tab=（registrants・schedule・runs）で開く（src/v8/reminders/BEHAVIOR.md）。
        * 前は tab を付けず・status=planned だけで、どれを押しても概要が開いていた（監査 WEB-013）。
        * status=planned は 管理画面 の詳細（実行結果の画面）が読む名前なので残す。
        */
-      { id: 'registrants', label: '登録者を管理', icon: <Users size={15} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&tab=registrants`) },
-      { id: 'planned', label: '配信予定を見る', icon: <CalendarClock size={15} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&tab=schedule&status=planned`) },
-      { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&tab=runs`) },
+      { id: 'registrants', label: '登録者を管理', icon: <Users size={16} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&tab=registrants`) },
+      { id: 'planned', label: '配信予定を見る', icon: <CalendarClock size={16} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&tab=schedule&status=planned`) },
+      { id: 'runs', label: '実行結果を見る', icon: <Activity size={16} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&tab=runs`) },
       {
         id: 'edit',
         label: '編集する',
-        icon: <Pencil size={15} aria-hidden="true" />,
+        icon: <Pencil size={16} aria-hidden="true" />,
         dividerBefore: true,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => goDetail(`/reminders/edit?id=${encodeURIComponent(row.id)}`),
@@ -689,7 +689,7 @@ export default function RemindersListV8() {
       {
         id: 'duplicate',
         label: '複製する',
-        icon: <Copy size={15} aria-hidden="true" />,
+        icon: <Copy size={16} aria-hidden="true" />,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => {
           setDuplicateError('')
@@ -700,7 +700,7 @@ export default function RemindersListV8() {
         ? {
             id: 'pause',
             label: '一時停止する',
-            icon: <Pause size={15} aria-hidden="true" />,
+            icon: <Pause size={16} aria-hidden="true" />,
             disabledReason: canEdit ? undefined : readonlyReason,
             onSelect: () => {
                         setPauseTarget(row)
@@ -710,14 +710,14 @@ export default function RemindersListV8() {
           ? {
               id: 'resume',
               label: '再開する',
-              icon: <Play size={15} aria-hidden="true" />,
+              icon: <Play size={16} aria-hidden="true" />,
                 disabledReason: canEdit ? undefined : readonlyReason,
               onSelect: () => void runResume(row),
             }
           : {
               id: 'pause-none',
               label: '一時停止する',
-              icon: <Pause size={15} aria-hidden="true" />,
+              icon: <Pause size={16} aria-hidden="true" />,
               disabled: true,
               disabledReason: '下書きはまだ送っていないため、止める予定がありません',
               onSelect: () => {},
@@ -725,7 +725,7 @@ export default function RemindersListV8() {
       {
         id: 'move',
         label: 'フォルダへ移す',
-        icon: <FolderInput size={15} aria-hidden="true" />,
+        icon: <FolderInput size={16} aria-hidden="true" />,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => openMove([row.id]),
       },
@@ -734,7 +734,7 @@ export default function RemindersListV8() {
       {
         id: 'delete',
         label: '削除する',
-        icon: <Trash2 size={15} aria-hidden="true" />,
+        icon: <Trash2 size={16} aria-hidden="true" />,
         tone: 'danger',
         dividerBefore: true,
         disabledReason: canEdit ? undefined : readonlyReason,
@@ -1046,7 +1046,7 @@ export default function RemindersListV8() {
               title={stoppableIds.length === 0 ? '有効なリマインダが選ばれていません' : undefined}
               onClick={() => setBulkPauseIds(stoppableIds)}
             >
-              <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
+              <Square size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               止める
             </Button>
             <Button
@@ -1056,7 +1056,7 @@ export default function RemindersListV8() {
               title={resumableIds.length === 0 ? '停止中のリマインダが選ばれていません' : undefined}
               onClick={() => runBulkToggle(true, resumableIds)}
             >
-              <Play size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
+              <Play size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               再開
             </Button>
             <Button
@@ -1064,7 +1064,7 @@ export default function RemindersListV8() {
               variant="secondary"
               onClick={() => openMove([...selectedIds])}
             >
-              <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
+              <FolderIcon size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               フォルダへ移す
             </Button>
           </BulkBar>
@@ -1114,7 +1114,7 @@ export default function RemindersListV8() {
       {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
       {!friendId ? <KpiBand border="dividers" data-design="KPIs">
         {kpis.map((kpi) => (
-          <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} action={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? { label: '失敗を見る', onClick: kpi.link } : undefined} />
+          <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} action={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? { label: '失敗を見る', onClick: kpi.link } : undefined} />
         ))}
       </KpiBand> : null}
 
@@ -1142,7 +1142,7 @@ export default function RemindersListV8() {
               }}
       >
         {pauseTarget && (
-          <Notice tone="warn" icon={<TriangleAlert size={14} aria-hidden="true" />}>
+          <Notice tone="warn" icon={<TriangleAlert size={16} aria-hidden="true" />}>
             {pauseTarget.plannedDeliveries != null && pauseTarget.plannedDeliveries > 0
               ? `これから送る予定の ${formatNumber(pauseTarget.plannedDeliveries)}通 が送られなくなります。`
               : 'これから送る予定の通知があれば、送られなくなります。'}
@@ -1189,7 +1189,7 @@ export default function RemindersListV8() {
                 }}
                 disabled={deleting}
               >
-                <Pause size={15} aria-hidden="true" />代わりに一時停止
+                <Pause size={16} aria-hidden="true" />代わりに一時停止
               </Button>
             ) : null}
           </>

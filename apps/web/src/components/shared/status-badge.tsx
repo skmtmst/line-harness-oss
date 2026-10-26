@@ -26,8 +26,8 @@ export default function StatusBadge({
   tone?: StatusBadgeTone
   /**
    * ★V8 `'delivery'` はデリバリー受注の承認 v02（kDQHr・hjdqV・OzHLO・h7OeT）の札。
-   * 見た目は `'compact'` と同じで、点と字の間だけ絵のとおり 5（既定8）にする。印を持つ札
-   * （急ぎ）は絵が 3〜4 なので 3 にする。画面CSSから共通の札を削る書き方（★V8 §24で禁止）
+   * 見た目は `'compact'` と同じで、余白だけ絵に合わせる。点・印と字の間はほかの札と同じ 8
+   * （§6.5 の 4）。画面CSSから共通の札を削る書き方（★V8 §24で禁止）
    * の代わりに、渡したときだけ効くこの大きさを部品側に置く。
    */
   size?: 'default' | 'compact' | 'micro' | 'annotation' | 'dining' | 'delivery'

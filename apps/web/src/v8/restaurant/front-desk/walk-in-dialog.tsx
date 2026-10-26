@@ -108,7 +108,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
       busy={busy}
       error={error || undefined}
       confirmLabel="入店にする"
-      confirmIcon={<LogIn size={15} aria-hidden="true" />}
+      confirmIcon={<LogIn size={16} aria-hidden="true" />}
       onConfirm={tableId ? () => save() : undefined}
       onCancel={onClose}
     >

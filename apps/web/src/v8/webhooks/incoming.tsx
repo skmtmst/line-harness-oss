@@ -588,7 +588,7 @@ export default function WebhooksIncomingV8() {
     >
       {/* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */}
       {canManage
-        ? <Button variant="primary" className={styles.createButton} onClick={openCreate}><Plus size={15} aria-hidden="true" />受け取り口を作る</Button>
+        ? <Button variant="primary" className={styles.createButton} onClick={openCreate}><Plus size={16} aria-hidden="true" />受け取り口を作る</Button>
         : <span className={styles.createSpace} aria-hidden="true" />}
       <p className={styles.inletListLabel}>受け取り口</p>
       {incomingStatus === 'loading' && selectedAccountId ? (
@@ -683,7 +683,7 @@ export default function WebhooksIncomingV8() {
               <span className={styles.fieldLabel}>受け取る URL（相手のサービスに貼る）</span>
               <span className={styles.valueBox} ><TruncatedText value={String(endpointUrl(selected.id) ?? '')} url /></span>
             </div>
-            <CopyTextButton value={endpointUrl(selected!.id)} label="コピーする" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="受け取るURLをコピー" />
+            <CopyTextButton value={endpointUrl(selected!.id)} label="コピーする" variant="secondary" icon={<Copy size={16} aria-hidden="true" />} aria-label="受け取るURLをコピー" />
           </div>
           <div className={styles.fieldRow}>
             <div className={styles.field}>
@@ -692,7 +692,7 @@ export default function WebhooksIncomingV8() {
             </div>
             {canManage ? (
               <Button onClick={() => { setRotateError(''); setRotateSecret(''); setRotateTarget({ id: selected.id, name: selected.name }) }}>
-                <RefreshCw size={15} aria-hidden="true" />合言葉を更新する
+                <RefreshCw size={16} aria-hidden="true" />合言葉を更新する
               </Button>
             ) : null}
           </div>
@@ -837,7 +837,7 @@ export default function WebhooksIncomingV8() {
                 setTestOpen(true)
               }}
             >
-              <FlaskConical size={15} aria-hidden="true" />試す
+              <FlaskConical size={16} aria-hidden="true" />試す
             </Button>
           </div>
         </Card>
@@ -845,7 +845,7 @@ export default function WebhooksIncomingV8() {
         {canManage ? (
           <div className={styles.dangerRow}>
             <Button variant="text" onClick={() => { setDeleteError(''); setDeleteTarget({ id: selected.id, name: selected.name }) }}>
-              <Trash2 size={15} aria-hidden="true" />この受け取り口を削除する
+              <Trash2 size={16} aria-hidden="true" />この受け取り口を削除する
             </Button>
           </div>
         ) : null}
@@ -859,7 +859,7 @@ export default function WebhooksIncomingV8() {
       headingSize="regular"
       title="外部連携"
       help={WEBHOOKS_DESCRIPTION}
-      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
+      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="incoming" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!canManage ? <ViewerBand /> : null}
@@ -883,7 +883,7 @@ export default function WebhooksIncomingV8() {
           onCancel={() => { if (!creating) setShowCreate(false) }}
           onConfirm={() => runCreate()}
           confirmLabel="作る"
-          confirmIcon={<Plus size={15} aria-hidden="true" />}
+          confirmIcon={<Plus size={16} aria-hidden="true" />}
         >
           <div className={`${styles.form} ${styles.formTight}`}>
             <Field label="名前" htmlFor="wh-incoming-name" error={createFieldError.name} requirement={FIELD_REQUIREMENTS.createName}>
@@ -926,7 +926,7 @@ export default function WebhooksIncomingV8() {
                 /></SaveErrorField>
               </Field>
           </div>
-              <Button type="button" onClick={() => setCreateSecret(generateSecret())}><RefreshCw size={15} aria-hidden="true" />自動生成</Button>
+              <Button type="button" onClick={() => setCreateSecret(generateSecret())}><RefreshCw size={16} aria-hidden="true" />自動生成</Button>
             </div>
             <p className={styles.noteBox}>作るときに本人確認が出ます。</p>
           </div>

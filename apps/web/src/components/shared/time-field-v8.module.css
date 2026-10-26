@@ -67,8 +67,7 @@
 }
 
 .field[data-disabled] {
-  background: var(--color-canvas-sunken);
-  opacity: 0.6;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .input {
@@ -157,8 +156,8 @@
   }
 
   .open :global(svg) {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
   }
 }
 
@@ -325,4 +324,4 @@
 }
 }
 
-:root .now { padding-block: 2.5px 1.5px; }
+:root .now { padding-block: 2px 1px; }

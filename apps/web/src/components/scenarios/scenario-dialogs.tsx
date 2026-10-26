@@ -1,5 +1,6 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useId, useState } from 'react';
 import { api, type ScenarioFriendPlan } from '@/lib/api';
@@ -56,14 +57,7 @@ function Shell({
             <h2 id={titleId} className="text-ink text-lg font-bold">{title}</h2>
             {description && <p className="text-ink-secondary mt-0.5 text-sm">{description}</p>}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ink-secondary shrink-0 px-2 text-2xl leading-none"
-            aria-label="閉じる"
-          >
-            ×
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
         <div className={`min-h-0 flex-1 overflow-y-auto px-6 ${wide ? 'pb-5 pt-0' : 'py-5'}`}>{children}</div>
         {footer && <div className={`border-hairline flex shrink-0 justify-end gap-2 border-t px-6 ${wide ? 'py-3' : 'py-4'}`}>{footer}</div>}

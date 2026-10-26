@@ -36,7 +36,7 @@ import { SIDEBAR_AUTO_COLLAPSE_BELOW } from './sidebar-collapse'
 function NavIcon({ d, className }: { d: string; className?: string }) {
   return (
     <svg className={className ?? "h-[18px] w-[18px]"} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={d} />
     </svg>
   )
 }
@@ -686,7 +686,7 @@ export default function Sidebar({
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-hairline px-4 pr-16">
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
-            <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
+            <img width={36} height={36} src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
           ) : (
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
@@ -709,8 +709,8 @@ export default function Sidebar({
           <div><SidebarIdentity /></div>
         </>
       ) : preview ? (
-        <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
-          <p className="mb-[11px] text-caption font-normal text-ink-faint">現在のLINEアカウント</p>
+        <div className={`px-[12px] pb-[8px] pt-[16px] ${styles.collapseHide}`}>
+          <p className="mb-[10px] text-caption font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-card border border-hairline bg-canvas px-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-body font-semibold text-accent-deep">サ</div>
             <div className="ml-3 min-w-0 flex-1">
@@ -785,7 +785,7 @@ export default function Sidebar({
                     stroke="currentColor"
                     aria-hidden="true"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M6 9l6 6 6-6" />
                   </svg>
                 </button>
               )
@@ -803,7 +803,8 @@ export default function Sidebar({
                   prefetch={false}
                   onClick={(event) => allowFeatureNavigation(event, item.href, item.label, preparing) && setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={collapsed && !drawer ? undefined : visibleLabel}
-                  aria-label={collapsed && !drawer ? visibleLabel : undefined}
+                  // 件数の札がある時は「名前、N件」と区切って読ませる（札の数字は読ませない）。
+                  aria-label={badgeCount(item) > 0 ? `${visibleLabel}、${badgeCount(item)}件` : collapsed && !drawer ? visibleLabel : undefined}
                   data-rail-label={visibleLabel}
                   data-rail-count={badgeCount(item) > 0 ? (badgeCount(item) > 99 ? '99+' : String(badgeCount(item))) : undefined}
                   aria-current={active ? 'page' : undefined}
@@ -834,11 +835,9 @@ export default function Sidebar({
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
                       {/* 地が薄い緑になったので、選ばれていても札の色は変えない。
                           緑ベタの上に置いていたころは白抜きにする必要があった。 */}
-                      <span className={styles.badge}>
+                      <span className={styles.badge} aria-hidden="true">
                         {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
                       </span>
-                      {/* 読み上げは「33件」と続け、数字と単位の間に空白を入れない（§2-6）。 */}
-                      <span className="sr-only">{badgeCount(item)}件</span>
                     </>
                   )}
                 </Link>
@@ -950,8 +949,8 @@ export default function Sidebar({
         >
           <svg className="w-6 h-6 text-ink-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isOpen
-              ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M6 18L18 6M6 6l12 12" />
+              : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 12h16M4 18h16" />
             }
           </svg>
         </button>
@@ -965,7 +964,7 @@ export default function Sidebar({
         <div className={styles.mobileBrand}>
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
-            <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
+            <img width={28} height={28} src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
           ) : (
             <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
@@ -993,7 +992,7 @@ export default function Sidebar({
         <div className="absolute right-3 top-2.5 z-10">
           <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-control hover:bg-shell" aria-label="閉じる">
             <svg className="w-5 h-5 text-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>

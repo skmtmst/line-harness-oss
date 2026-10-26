@@ -797,6 +797,7 @@
 - [新しいアカウントの初期セットが足りない時に、足りない物だけを止めた状態で入れ直せ](release-log/unreleased/1832-kenta-starter-ensure.md)
 - [直し③⑤（部品と言葉づかい）](release-log/unreleased/1836-kenta-train-m2c-1026.md)
 - [分け方のタグ・シナリオの見本と、本部の初期セットを標準に戻す口](release-log/unreleased/1838-kenta-starter-samples.md)
+- [直し④（部品の手入れ）](release-log/unreleased/1839-kenta-train-m2e-1026.md)
 - [スマートフォン専用の画面（トークと対応）](release-log/unreleased/0000-kenta-phone-shell-talk.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

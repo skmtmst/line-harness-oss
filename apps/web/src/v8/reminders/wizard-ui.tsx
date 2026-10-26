@@ -114,7 +114,7 @@ export function WizardHeadV8({
   return (
     <>
       <Link href="/reminders" className={styles.backLink}>
-        <ChevronLeft size={14} aria-hidden="true" />
+        <ChevronLeft size={16} aria-hidden="true" />
         リマインダへ
       </Link>
       <div className={styles.headText}>

@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 const create = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', () => ({ api: { adPlatforms: { create, connect: async () => ({ success: true }) } } }))
 import AdConnection from './ad-connection-dialog'
+import { scrollMotion } from '@/components/shared/overlay-utils'
 afterEach(cleanup)
 it('不足する接続欄を赤くして最初の欄へ移り、保存を呼ばない', () => {
   create.mockClear()
@@ -15,7 +16,7 @@ it('不足する接続欄を赤くして最初の欄へ移り、保存を呼ば�
   fireEvent.click(screen.getByRole('button', { name: '接続を確認してつなぐ' }))
   expect(first.getAttribute('aria-invalid')).toBe('true')
   expect(document.activeElement).toBe(first)
-  expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
+  expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: scrollMotion() })
   expect(screen.getAllByRole('alert')).toHaveLength(3)
   expect(screen.queryByText('接続に必要な項目を入力してください')).toBeNull()
   expect(create).not.toHaveBeenCalled()

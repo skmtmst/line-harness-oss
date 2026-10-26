@@ -7,7 +7,7 @@ import EmptyTab from './empty-tab'
 export default function RichMenuTab() {
   return (
     <EmptyTab
-      icon={<LayoutGrid size={17} />}
+      icon={<LayoutGrid size={16} />}
       title="この友だちのリッチメニュー変更履歴はまだ記録されていません"
       text="現在の割り当ては概要タブの「リッチメニュー」欄で確認できます。"
       actions={[{ label: 'リッチメニュー一覧を見る ↗', href: '/rich-menus' }]}

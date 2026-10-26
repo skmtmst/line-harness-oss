@@ -409,7 +409,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         <div className={rich.phoneImage}>
           {imageSet ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl.trim()} alt="" />
+            <img width={1040} height={1040} src={imageUrl.trim()} alt="" />
           ) : null}
           {shapeDef.rows.map((row, rowIndex) => (
             <div key={rowIndex} className={rich.phoneRow}>
@@ -463,7 +463,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
               下書きを保存
             </Button>
             <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
-              {host ? null : <Send size={15} aria-hidden="true" />}
+              {host ? null : <Send size={16} aria-hidden="true" />}
               {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>

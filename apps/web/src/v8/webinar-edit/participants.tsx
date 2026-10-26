@@ -231,7 +231,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   }
 
   const csvButton = canExport && state === 'ready'
-    ? <Button onClick={downloadCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+    ? <Button onClick={downloadCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
     : null
 
   return (
@@ -248,7 +248,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
           ) : null}
           <KpiBand>
             {kpis.map((kpi) => (
-              <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={<span title={kpi.help}>{kpi.detail}</span>} />
+              <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={<span title={kpi.help}>{kpi.detail}</span>} />
             ))}
           </KpiBand><Notice tone="info" icon={null} appearance="soft">「見ていない」は申込だけで入場の記録がない人です。「入場のみ」は入場したが再生を確かめられなかった人です。</Notice>
         </>}
@@ -268,7 +268,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
               />
             )}
             trailing={<>
-              <Select size="content" icon={<Bookmark size={15} aria-hidden="true" />} aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} />
+              <Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} />
               <PageSizeSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1) }} options={[10, 20, 50]} label={null} />
             </>}
           />

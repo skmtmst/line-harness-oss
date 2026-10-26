@@ -123,7 +123,7 @@ export function WizardConfirmStep({ actionOptions, autoReplyId, confirmState, ef
                           className={`${styles.checkIcon} ${gate.state === 'ok' ? styles.checkIconOk : gate.state === 'blocked' ? styles.checkIconWarn : ''}`}
                           aria-hidden="true"
                         >
-                          {gate.state === 'ok' ? <Check size={14} /> : gate.state === 'blocked' ? <CircleAlert size={14} /> : emptyValue('unknown')}
+                          {gate.state === 'ok' ? <Check size={16} /> : gate.state === 'blocked' ? <CircleAlert size={16} /> : emptyValue('unknown')}
                         </span>
                         <div className={styles.checkBody}>
                           <p className={styles.checkTitle}>{gate.label}</p>

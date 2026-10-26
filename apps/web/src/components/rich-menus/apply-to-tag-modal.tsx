@@ -229,7 +229,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 <button
                   onClick={apply}
                   disabled={mode.kind === 'tag' && !mode.tagId}
-                  className="px-4 py-2 text-sm font-medium text-on-accent rounded-control disabled:opacity-50 transition-opacity hover:opacity-90"
+                  className="px-4 py-2 text-sm font-medium text-on-accent rounded-control transition-opacity hover:opacity-90"
                   style={{ backgroundColor: 'var(--color-accent)' }}
                 >
                   実行する

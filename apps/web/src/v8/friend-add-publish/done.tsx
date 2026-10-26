@@ -31,7 +31,7 @@ export default function FriendAddDoneV8({ ruleId, ruleName, routeNames, priority
       />
       <div className={styles.doneBody}>
         <section className={styles.doneCard} aria-label="有効化の完了">
-          <span className={styles.doneMark} aria-hidden="true"><Check size={22} /></span>
+          <span className={styles.doneMark} aria-hidden="true"><Check size={20} /></span>
           <h2 className={styles.doneTitle}>「{ruleName}」を有効にしました</h2>
           <p className={styles.doneDesc}>
             {routeNames.length > 0 ? `${routeNames.join('・')}から` : ''}友だち追加した人に、すぐ案内が届きます。止めたいときは、一覧の「…」から止められます。
@@ -47,9 +47,9 @@ export default function FriendAddDoneV8({ ruleId, ruleName, routeNames, priority
             </div>
           </dl>
           <div className={styles.doneActions}>
-            <Button href="/friend-add-settings"><List size={15} aria-hidden="true" />一覧へ戻る</Button>
-            <Button href="/inflow-links"><Link2 size={15} aria-hidden="true" />流入リンクを見る</Button>
-            <Button href="/friend-add-settings/runs" variant="primary"><Activity size={15} aria-hidden="true" />実行結果を見る</Button>
+            <Button href="/friend-add-settings"><List size={16} aria-hidden="true" />一覧へ戻る</Button>
+            <Button href="/inflow-links"><Link2 size={16} aria-hidden="true" />流入リンクを見る</Button>
+            <Button href="/friend-add-settings/runs" variant="primary"><Activity size={16} aria-hidden="true" />実行結果を見る</Button>
           </div>
         </section>
       </div>

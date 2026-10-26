@@ -326,7 +326,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
         <div className={styles.footer}>
           <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
           <Button variant="primary" onClick={() => void save()} busy={saving} busyLabel="保存しています…">
-            {edit ? null : <Plus size={15} aria-hidden="true" />}{edit ? '新版として保存する' : '作る'}
+            {edit ? null : <Plus size={16} aria-hidden="true" />}{edit ? '新版として保存する' : '作る'}
           </Button>
         </div>
       )}
@@ -373,7 +373,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
                     </Field>
                       {steps.length > MIN_STEPS ? (
                         <button type="button" className={styles.removeStep} onClick={() => { setSteps((prev) => prev.filter((_, j) => j !== i)); setFieldErrors({}) }} aria-label={`段${i + 1}を外す`}>
-                          <X size={12} aria-hidden="true" />外す
+                          <X size={16} aria-hidden="true" />外す
                         </button>
                       ) : null}
                   </div>

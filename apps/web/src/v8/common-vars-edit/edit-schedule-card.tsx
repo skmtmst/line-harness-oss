@@ -50,7 +50,7 @@ export function renderScheduleCard({ canWrite, item, loadSchedules, removeSchedu
                   <dd title={schedule.value || '（空）'}>{schedule.value || '（空）'}</dd>
                   {canWrite && schedules.length > 1 ? (
                     <button type="button" className={styles.kvRemove} onClick={() => void removeSchedule(schedule.id)} aria-label={`${scheduleStamp(schedule.effectiveFrom)} からの予定を消す`}>
-                      <X size={14} aria-hidden="true" />
+                      <X size={16} aria-hidden="true" />
                     </button>
                   ) : null}
                 </div>
@@ -68,7 +68,7 @@ export function renderScheduleCard({ canWrite, item, loadSchedules, removeSchedu
                   setDraft({ date: now.date, time: '00:00', value })
                 }}
               >
-                <Plus size={14} aria-hidden="true" />
+                <Plus size={16} aria-hidden="true" />
                 予定を足す
               </Button>
               {/* 予定が1つなら行に×を置かず（絵の行は日時と値だけ）、ここから消す。 */}

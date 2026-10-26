@@ -58,7 +58,7 @@ export function DragHandle({ label = '並び替える', ...rest }: Base & { labe
 export function DeleteAction({ label = '削除する', ...rest }: Base & { label?: string }) {
   return (
     <RowIconButton label={label} tone="danger" {...rest}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
         <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </RowIconButton>

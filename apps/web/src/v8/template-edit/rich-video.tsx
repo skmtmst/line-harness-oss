@@ -1,4 +1,5 @@
 'use client'
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { notifySaved } from '@/components/shared/toast'
@@ -164,7 +165,7 @@ setError(describeApiFailure(cause, '画像の登録')) }}
     const validation = richVideoDraftIssue(draft)
     if(validation){
       setError('');setIssue(validation)
-      requestAnimationFrame(()=>{const element=document.getElementById(`rv-${validation.field}`);element?.focus();element?.scrollIntoView?.({block:'center',behavior:'smooth'})})
+      requestAnimationFrame(()=>{const element=document.getElementById(`rv-${validation.field}`);element?.focus();element?.scrollIntoView?.({block:'center',behavior: scrollMotion()})})
       return
     }
     const current = generation.current

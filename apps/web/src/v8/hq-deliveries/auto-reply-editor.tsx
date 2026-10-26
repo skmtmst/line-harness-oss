@@ -101,7 +101,7 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
       {/* ページ内に戻るは置かない（決まり）。前の段へは上の手順の段から戻る。 */}
       <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
       {canEdit ? <Button disabled={busy || !name.trim()} title={!name.trim() ? '統括での名前を入力してください。' : undefined} onClick={onSave} busy={busy} busyLabel="保存中…">下書きとして保存</Button> : null}
-      {next ? <Button variant="primary" disabled={busy || !done(step)} onClick={() => setStep(next)}><ArrowRight size={15} aria-hidden="true" />{`次へ：${STEP_LABELS[next]}`}</Button> : null}
+      {next ? <Button variant="primary" disabled={busy || !done(step)} onClick={() => setStep(next)}><ArrowRight size={16} aria-hidden="true" />{`次へ：${STEP_LABELS[next]}`}</Button> : null}
     </>}>
     {step === 'basic' ? <Card variant="form" gap="normal">
       <CardHeader size="stacked" title="基本設定" />
@@ -124,7 +124,7 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
       <Card variant="form" gap="normal">
         <CardHeader size="stacked" title="返すもの" />
         {canEdit && !preservedReply ? <SegmentedControl aria-label="返すもの" size="compact" value={silent ? 'silent' : 'text'} onChange={(value) => onSetting('responseType', value)}
-          options={[{ value: 'text', label: <span className={styles.choice}><PenLine size={14} aria-hidden="true" />この画面で書く</span> }, { value: 'silent', label: <span className={styles.choice}><CircleSlash size={14} aria-hidden="true" />返信しない（記録だけ）</span> }]} /> : null}
+          options={[{ value: 'text', label: <span className={styles.choice}><PenLine size={16} aria-hidden="true" />この画面で書く</span> }, { value: 'silent', label: <span className={styles.choice}><CircleSlash size={16} aria-hidden="true" />返信しない（記録だけ）</span> }]} /> : null}
         {preservedReply ? <Notice tone="info">{`${replyLabel}を保存しています。この画面では返信内容を変更できません。ほかの設定を保存しても、その内容は引き継がれます。`}</Notice> : silent ? <p className={styles.note}>返信はしません。キーワードに当たったことだけを店の記録に残します。</p>
           : <SaveErrorField names={['responseContent', 'definition.settings.responseContent']}><HqMessageBody value={text} label="返信内容" onChange={(value) => onSetting('responseContent', value)} readOnly={!canEdit} disabled={busy} /></SaveErrorField>}
       </Card>

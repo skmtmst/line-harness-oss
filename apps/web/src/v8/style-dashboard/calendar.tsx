@@ -96,7 +96,7 @@ export function DayList({ month, href }: { month: StyleMonth; href: string }) {
         ))}
       </div>
       <a className={styles.sideMore} href={href}>{s.moreLabel}</a>
-      <p className={styles.dayHint}><Info size={14} aria-hidden="true" />日を押すと、その日の予約がここに出ます。休みは［休みを入れる］から。</p>
+      <p className={styles.dayHint}><Info size={16} aria-hidden="true" />日を押すと、その日の予約がここに出ます。休みは［休みを入れる］から。</p>
     </div>
   )
 }

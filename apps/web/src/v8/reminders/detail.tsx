@@ -387,7 +387,7 @@ function ReminderDetailV8() {
     {
       id: 'csv',
       label: '実行結果をCSVで書き出す',
-      icon: <Download size={15} aria-hidden="true" />,
+      icon: <Download size={16} aria-hidden="true" />,
       disabled: exporting || loading,
       onSelect: () => void exportCsv(),
     },
@@ -395,14 +395,14 @@ function ReminderDetailV8() {
       {
         id: 'duplicate',
         label: '複製する',
-        icon: <Copy size={15} aria-hidden="true" />,
+        icon: <Copy size={16} aria-hidden="true" />,
         disabled: duplicating,
         onSelect: () => void runDuplicate(),
       },
       {
         id: 'delete',
         label: '削除する',
-        icon: <Trash2 size={15} aria-hidden="true" />,
+        icon: <Trash2 size={16} aria-hidden="true" />,
         tone: 'danger' as const,
         dividerBefore: true,
         onSelect: () => setConfirmDelete(true),
@@ -486,17 +486,17 @@ function ReminderDetailV8() {
             {canManage && !isUnpublishedDraft ? (
               data.reminder.isActive ? (
                 <Button className={styles.sideAction} onClick={() => setConfirmPause(true)}>
-                  <Pause size={15} aria-hidden="true" />一時停止する
+                  <Pause size={16} aria-hidden="true" />一時停止する
                 </Button>
               ) : (
                 <Button className={styles.sideAction} onClick={() => setReminderActive(true)} busyLabel="処理中…">
-                  <Play size={15} aria-hidden="true" />再開する
+                  <Play size={16} aria-hidden="true" />再開する
                 </Button>
               )
             ) : null}
             {canManage ? (
               <Button className={styles.sideAction} onClick={() => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}`)}>
-                <Pencil size={15} aria-hidden="true" />
+                <Pencil size={16} aria-hidden="true" />
                 {isUnpublishedDraft ? '編集を続ける' : '編集する'}
               </Button>
             ) : null}
@@ -584,7 +584,7 @@ function ReminderDetailV8() {
           <>
             <Button onClick={() => setConfirmPause(false)} disabled={pausing}>キャンセル</Button>
             <Button widthReserve="idle" variant="primary" onClick={() => void runPause()} disabled={pausing} busy={pausing} busyLabel="止めています…">
-              <Pause size={15} aria-hidden="true" />一時停止する
+              <Pause size={16} aria-hidden="true" />一時停止する
             </Button>
           </>
         )}
@@ -630,7 +630,7 @@ function OverviewTab({
     <>
       {hasErrors ? (
         <Notice tone="danger" heading={<> 送れなかった通知が {formatNumber(data.summary.errors)}通あります </>} action={<> <Button onClick={onShowErrors}>
-            <ArrowRight size={15} aria-hidden="true" />実行結果を見る
+            <ArrowRight size={16} aria-hidden="true" />実行結果を見る
           </Button> </>} >友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</Notice>
       ) : null}
 
@@ -697,7 +697,7 @@ function OverviewTab({
             </div>
             <div className={styles.moreRow}>
               <Button variant="text" onClick={onShowAllRuns}>
-                <ArrowRight size={15} aria-hidden="true" />すべての実行結果
+                <ArrowRight size={16} aria-hidden="true" />すべての実行結果
               </Button>
             </div>
           </>
@@ -908,7 +908,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
                 <span role="cell" className={styles.colOps}>
                   {item.canRetry && canManage ? (
                     <Button variant="text" disabled={retryingId === item.id} busy={retryingId === item.id} busyLabel="受け付けています" onClick={() => void retry(item.id)}>
-                      <RotateCcw size={15} aria-hidden="true" />再試行する
+                      <RotateCcw size={16} aria-hidden="true" />再試行する
                     </Button>
                   ) : null}
                 </span>
@@ -1115,7 +1115,7 @@ export function RegistrantsTab({ reminderId, canManage }: { reminderId: string; 
                       {/* 行の操作は「…」1つの中（B-253）。基準日を変えたときだけ、その場で保存するボタンを横に出す。閲覧のみの人には置かない。 */}
                       {canManage && item.status === 'active' && dirty ? (
                         <Button variant="primary" disabled={busy} busy={busy} busyLabel="保存しています" onClick={() => void saveDate(item)}>
-                          <Check size={15} aria-hidden="true" />基準日を保存
+                          <Check size={16} aria-hidden="true" />基準日を保存
                         </Button>
                       ) : null}
                       {canManage && (item.status === 'active' || item.status === 'cancelled') ? (

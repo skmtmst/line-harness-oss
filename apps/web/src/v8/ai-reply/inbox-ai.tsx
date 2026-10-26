@@ -123,7 +123,7 @@ export function InboxAiSummary({ inboxAi }: { inboxAi: InboxAi }) {
   if (ai.mode === 'suspended' || (summary.kind === 'error' && summary.busy)) {
     return (
       <div className={styles.unavailable} role="status" data-design-node="OmV7B">
-        <CloudOff size={15} aria-hidden="true" />
+        <CloudOff size={16} aria-hidden="true" />
         <span>AI が使えません（混んでいます）。要約と返信案は止めています。返事はいつもどおり送れます。</span>
       </div>
     )
@@ -134,7 +134,7 @@ export function InboxAiSummary({ inboxAi }: { inboxAi: InboxAi }) {
   return (
     <section className={styles.summary} aria-label="要約" data-design-node="l1i3v">
       <header className={styles.head}>
-        <Sparkles size={15} aria-hidden="true" />
+        <Sparkles size={16} aria-hidden="true" />
         <span className={styles.title}>要約</span>
         {data ? <span className={styles.meta}>{`${time(data.generatedAt)} 時点${data.messageCount ? `・最新 ${formatNumber(data.messageCount)} 件から` : ''}`}</span> : null}
         <span className={styles.spacer} />
@@ -173,7 +173,7 @@ export function InboxAiDraft({ inboxAi, onInsert }: { inboxAi: InboxAi; onInsert
   return (
     <section className={styles.draft} aria-label="返信案" data-design-node="l1i3v">
       <header className={styles.head}>
-        <Sparkles size={15} aria-hidden="true" />
+        <Sparkles size={16} aria-hidden="true" />
         <span className={styles.title}>返信案</span>
         {data?.sources.map((source) => (
           <span key={`${source.type}-${source.id}`} className={styles.source} title={source.title}>{source.type === 'qa' ? `Q&A ${source.title}` : `過去の返事 ${source.title}`}</span>
@@ -182,10 +182,10 @@ export function InboxAiDraft({ inboxAi, onInsert }: { inboxAi: InboxAi; onInsert
       {draft.kind === 'error' ? <p className={styles.error}>{draft.message}</p> : data ? <p className={styles.text}>{data.text}</p> : <p className={styles.meta}>返信案を作っています…</p>}
       <div className={styles.actions}>
         <Button size="compact" disabled={!data || loading} onClick={() => { if (data) { onInsert(data.text); notifyToast('返信案を入力欄に入れました。直してから送ってください') } }}>
-          <CornerDownLeft size={14} aria-hidden="true" />入力欄に入れる
+          <CornerDownLeft size={16} aria-hidden="true" />入力欄に入れる
         </Button>
         <Button size="compact" busy={loading} onClick={() => void inboxAi.reloadDraft()}>
-          <RefreshCw size={14} aria-hidden="true" />作り直す
+          <RefreshCw size={16} aria-hidden="true" />作り直す
         </Button>
         <Button size="compact" onClick={inboxAi.dismiss}>使わない</Button>
         <span className={styles.spacer} />

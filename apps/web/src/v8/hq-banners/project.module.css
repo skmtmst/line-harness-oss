@@ -20,7 +20,7 @@
 .headActions { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
 
 .runningText { flex: 1; min-width: 0; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-hb-small-lh); }
-.spin { animation: hb-spin 1s linear infinite; }
+.spin { animation: hb-spin var(--motion-spin) linear infinite; }
 @keyframes hb-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 

@@ -82,9 +82,9 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
         </div>
       </Card> : <ListState kind="empty" title={ready ? '次の予約はありません' : '予約を読み込んでいます'} />}
     </BookingSidebarSection>
-    <BookingSidebarSection title={`${period} 気をつけること`}><BookingSidebarNotes items={!ready ? [{ icon: <Info size={14} aria-hidden />, title: '読み込んでいます' }] : [
-      summary.requested ? { icon: <CircleAlert size={14} aria-hidden />, title: `未承認の予約が${summary.requested}件`, detail: '承認するか、断るかを決めてください' } : { icon: <Info size={14} aria-hidden />, title: 'いま確認が必要な予約はありません' },
-      ...(summary.phone + summary.other > 0 ? [{ icon: <Info size={14} aria-hidden />, title: 'LINE以外の予約があります', detail: '連絡方法も確認してください' }] : []),
+    <BookingSidebarSection title={`${period} 気をつけること`}><BookingSidebarNotes items={!ready ? [{ icon: <Info size={16} aria-hidden />, title: '読み込んでいます' }] : [
+      summary.requested ? { icon: <CircleAlert size={16} aria-hidden />, title: `未承認の予約が${summary.requested}件`, detail: '承認するか、断るかを決めてください' } : { icon: <Info size={16} aria-hidden />, title: 'いま確認が必要な予約はありません' },
+      ...(summary.phone + summary.other > 0 ? [{ icon: <Info size={16} aria-hidden />, title: 'LINE以外の予約があります', detail: '連絡方法も確認してください' }] : []),
     ]} /></BookingSidebarSection>
     <BookingSidebarSection title={`${day}の内訳`}><ReservationFacts items={[
       { label: '予約', value: ready ? `${summary.active}件` : '—' }, { label: 'うちLINEから', value: ready ? `${summary.line}件` : '—' },

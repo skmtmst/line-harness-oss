@@ -182,6 +182,7 @@ const NEW_BASELINE = JSON.stringify([
 const ROLE_LABEL = { owner: 'オーナー', admin: '管理者', staff: 'スタッフ' } as const
 
 import { isEmail } from './report-email'
+import CloseButton from '@/components/shared/close-button'
 
 /*
  * R454: 1回送信の結果を見る画面。しまうと一覧から消えるため、
@@ -1043,8 +1044,8 @@ function AnalyticsReportFormPage() {
         notice={updateConflict ? <Notice tone="warn" role="alert"
           heading={conflictLatest ? <>ほかの人が <time dateTime={conflictLatest.updatedAt} title={formatDateTime(conflictLatest.updatedAt)}>{formatTime(conflictLatest.updatedAt)}</time> にこのレポートを保存しました</> : 'ほかの人がこのレポートを先に保存しました'}
           action={<>
-            {conflictLatest && <Button variant="secondary" disabled={saving || latestBusy || compareBusy} onClick={() => { setCompareError(''); setCompareOpen(true) }}><GitCompareArrows size={15} aria-hidden="true" />違いを比べる</Button>}
-            <Button variant="secondary" disabled={saving || latestBusy || compareBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
+            {conflictLatest && <Button variant="secondary" disabled={saving || latestBusy || compareBusy} onClick={() => { setCompareError(''); setCompareOpen(true) }}><GitCompareArrows size={16} aria-hidden="true" />違いを比べる</Button>}
+            <Button variant="secondary" disabled={saving || latestBusy || compareBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}><RefreshCw size={16} aria-hidden="true" />最新を読み込んで続ける</Button>
           </>}>
           このまま保存すると、相手の変更が消えます。入力は残っています。
         </Notice> : null}
@@ -1063,7 +1064,7 @@ function AnalyticsReportFormPage() {
         <Button href="/analytics">キャンセル</Button>
         {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
         {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; setSendOnceOpen(true) }}>今すぐ1回だけ送る</Button>}
-        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
+        {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={16} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
       </>}
       >
       {!canManage && <Notice tone="info" message="運用担当は内容を確認できます。作成は統括または管理者が行います。" />}
@@ -1084,7 +1085,7 @@ function AnalyticsReportFormPage() {
           </Card>
           <Card variant="form" gap="normal">
             {/* 絵に無い「使われ方」は、段の頭の右に小さく置く（落とさない）。 */}
-            <CardHeader size="stacked" title={<>何を入れますか <HelpTip label="レポートに入れるもの">チェックしたものが、この順にレポートへ並びます。</HelpTip></>}
+            <CardHeader size="stacked" title="何を入れますか" help={<HelpTip label="レポートに入れるもの">チェックしたものが、この順にレポートへ並びます。</HelpTip>}
               action={<Checkbox checked={sections.includes('usage')} onCheckedChange={() => toggleSection('usage')}>使われ方も入れる</Checkbox>} />
             <div className="report-v8-sectionCards">
               {SECTION_CHOICES.filter((choice) => choice.id !== 'usage').map((choice) => {
@@ -1105,13 +1106,13 @@ function AnalyticsReportFormPage() {
             {editing && editing.recipients.some((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)) && <Notice tone="warn" message={`前に選んでいた${editing.recipients.filter((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)).map((item) => `「${item.label}」`).join('・')}は、いまは受け取れません（利用停止・閲覧範囲外の可能性があります）。このまま保存すると宛先から外れます。`} />}
             <EntitySelect aria-label="レポートを受け取る人" noun="担当者" values={staffIds} onChange={setStaffIds} readOnly={!canManage} options={options.recipients.map((person) => ({ value: person.id, label: person.name, description: `${ROLE_LABEL[person.role]}${person.lineLinked ? ' ／ LINE連携済み' : ''}` }))} />
             <div className="report-v8-chips">
-              {emails.map((email, index) => email.trim() && <span className="report-v8-chip" key={index}><span className="report-v8-chipText" title={email}>{email}（メール）</span>{canManage && <button type="button" className="report-v8-chipRemove" aria-label={`${email}を宛先から外す`} onClick={() => setEmails((current) => current.filter((_, value) => value !== index))}>×</button>}</span>)}
+              {emails.map((email, index) => email.trim() && <span className="report-v8-chip" key={index}><span className="report-v8-chipText" title={email}>{email}（メール）</span>{canManage && <CloseButton className="report-v8-chipRemove" aria-label={`${email}を宛先から外す`} onClick={() => setEmails((current) => current.filter((_, value) => value !== index))} />}</span>)}
               {!hasRecipient && <span className="report-v8-chipEmpty">受け取る人を1人以上選んでください。選ぶまで作れません。</span>}
             </div>
             <div className="report-v8-linkRow">
               {canManage && <button type="button" className="report-v8-addLink" aria-expanded={recipientsOpen} onClick={() => setRecipientsOpen((open) => !open)}>＋ 宛先を足す</button>}
               {/* 絵に無い「通知方法」は、宛先の行の右に小さく置く（開くと下に選ぶ欄）。 */}
-              <button type="button" className="report-v8-sideLink" aria-expanded={channelsOpen} onClick={() => setChannelsOpen((open) => !open)}>通知方法：{[dashboardEnabled ? '管理画面' : '', emailEnabled ? 'メール' : '', lineEnabled ? 'LINE' : ''].filter(Boolean).join('・') || '未選択'}<ChevronDown size={14} aria-hidden="true" /></button>
+              <button type="button" className="report-v8-sideLink" aria-expanded={channelsOpen} onClick={() => setChannelsOpen((open) => !open)}>通知方法：{[dashboardEnabled ? '管理画面' : '', emailEnabled ? 'メール' : '', lineEnabled ? 'LINE' : ''].filter(Boolean).join('・') || '未選択'}<ChevronDown size={16} aria-hidden="true" /></button>
             </div>
             <div className="report-v8-panel" hidden={!recipientsOpen && !hasInvalidEmail}>
               <ul className="report-v8-recipients divide-y" aria-label="レポートを受け取る人">
@@ -1132,7 +1133,7 @@ function AnalyticsReportFormPage() {
             </div>
           </Card>
           <Card variant="form" gap="normal">
-            <CardHeader size="stacked" title={<>いつ送りますか<HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip></>} />
+            <CardHeader size="stacked" title="いつ送りますか" help={<HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip>} />
             <SettingsFormRow layout="columns">
               <Field label="間かく" required><Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></Field>
               {cadence === 'weekly' ? <Field label="送る曜日" required><Select aria-label="送る曜日" value={weekday} onChange={setWeekday} options={WEEKDAY_JA.map((day, value) => ({ value: String(value), label: `${day}曜` }))} size="full" /></Field> : <Field label="送る日" required><Select aria-label="送る日" value={monthDay} onChange={setMonthDay} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></Field>}
@@ -1143,7 +1144,7 @@ function AnalyticsReportFormPage() {
           <Card variant="form" gap="normal">
             {/* 全体の入り切りは段の頭の右に小さく置く（絵は条件ごとのチェックだけ）。 */}
             <CardHeader size="stacked"
-              title={<>知らせの決めごと <HelpTip label="変化の判定">前の期間と比べ、条件に合えばレポートに含めて知らせます。集計待ちや一部だけ取れた期間は比べません。</HelpTip></>}
+              title="知らせの決めごと" help={<HelpTip label="変化の判定">前の期間と比べ、条件に合えばレポートに含めて知らせます。集計待ちや一部だけ取れた期間は比べません。</HelpTip>}
               meta="数が急に動いたときだけ、すぐに知らせます。少ない数でさわがないよう、最低件数も決めます"
               action={<Checkbox id="report-alerts-enabled" invalid={!!fieldMessage('report-alerts-enabled')} aria-describedby={fieldMessage('report-alerts-enabled') ? 'report-alerts-enabled-error' : undefined} checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>} />
             {fieldMessage('report-alerts-enabled') && <p id="report-alerts-enabled-error" className="report-v8-fieldError" role="alert">{fieldMessage('report-alerts-enabled')}</p>}

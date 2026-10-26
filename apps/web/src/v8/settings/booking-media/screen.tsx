@@ -433,7 +433,7 @@ export default function BookingMediaPage() {
                         ...(row.acceptsReservations ? [{
                           id: 'close',
                           label: row.closeOnBooking ? '枠を閉じる知らせの対象から外す' : '枠を閉じる知らせの対象にする',
-                          icon: row.closeOnBooking ? <Check size={14} aria-hidden="true" /> : undefined,
+                          icon: row.closeOnBooking ? <Check size={16} aria-hidden="true" /> : undefined,
                           onSelect: () => setRow(row.code, { closeOnBooking: !row.closeOnBooking }),
                         }] : []),
                         ...(row.pageUrl ? [{ id: 'open-page', label: '店舗ページを開く', external: true, href: row.pageUrl! }] : []),
@@ -468,7 +468,7 @@ export default function BookingMediaPage() {
                   <SaveErrorField names={["storeId","pendingStoreId","store_id","pending_store_id"]}><StoreFilterTabs  value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))} /></SaveErrorField>
                 </span>
               ) : null}
-              {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={15} aria-hidden="true" />媒体を足す</Button> : null}
+              {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={16} aria-hidden="true" />媒体を足す</Button> : null}
             </span>
           )}
         />
@@ -582,7 +582,7 @@ export default function BookingMediaPage() {
                 <>
                   <Button onClick={() => { if (saved) setRows(saved); if (noticeSaved) setNotice(noticeSaved); setSaveError('') }} disabled={saving}>キャンセル</Button>
                   <Button variant="primary" onClick={() => void save()} busy={saving} busyLabel="保存中…" disabled={changes === 0 || saving} title={changes === 0 ? '変えた所がありません' : undefined}>
-                    <Check size={15} aria-hidden="true" />保存する
+                    <Check size={16} aria-hidden="true" />保存する
                   </Button>
                 </>
               )}

@@ -191,7 +191,7 @@ export function AutoAnswerConfirmDialog({ open, accountId, accountName, publishe
       busy={busy}
       error={error || undefined}
       confirmLabel="自動で答えるをオンにする"
-      confirmIcon={<Bot size={15} aria-hidden="true" />}
+      confirmIcon={<Bot size={16} aria-hidden="true" />}
       cancelLabel="戻る"
       footerLead={<span className={styles.footLead}>閉じても送りません</span>}
       onConfirm={onConfirm}

@@ -330,7 +330,7 @@ export default function NewReminderV8() {
       boardId="VE1u5"
       title="リマインダを作る"
       help="いまは下書きとして作ります。最後の「確認」で有効にします。"
-      identity={<Link href="/reminders" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />リマインダへ</Link>}
+      identity={<Link href="/reminders" className={styles.backLink}><ChevronLeft size={16} aria-hidden="true" />リマインダへ</Link>}
       steps={<ReminderV8Stepper current="basics" reminderId={savedId} />}
       status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}
       preview={preview}
@@ -342,7 +342,7 @@ export default function NewReminderV8() {
         onDraft={() => void save().then((id) => { if (id) autosave.markSaved() })}
         draftBusy={saving === 'saving'}
         nextLabel="次へ：対象者と止める条件"
-        nextIcon={<ArrowRight size={15} aria-hidden="true" />}
+        nextIcon={<ArrowRight size={16} aria-hidden="true" />}
         onNext={() => void next()}
         nextDisabled={candidatesPending || saving === 'saving'}
         />

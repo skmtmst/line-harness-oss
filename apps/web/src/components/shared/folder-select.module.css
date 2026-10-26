@@ -107,7 +107,7 @@
 .cancel:disabled,
 .primary:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 }
 

@@ -486,7 +486,7 @@ function OperatorEditInner() {
                 </div>
                 {canWrite ? (
                   <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => testSend()} disabled={saveDisabled} busy={Boolean(saving)} busyLabel="処理中…">
-                    <Send size={15} aria-hidden="true" />自分にテストを送る
+                    <Send size={16} aria-hidden="true" />自分にテストを送る
                   </Button>
                 ) : null}
               </FormSection>
@@ -654,7 +654,7 @@ function OperatorEditInner() {
                   <>
                     <Button onClick={() => saveDraft()} disabled={saveDisabled} busy={saving && !preparingPublish}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
                     <Button onClick={() => openPublishConfirm()} disabled={saveDisabled} busy={preparingPublish} variant="primary">
-                      <Check size={15} aria-hidden="true" />運用者へのお知らせを公開
+                      <Check size={16} aria-hidden="true" />運用者へのお知らせを公開
                     </Button>
                   </>
                 ) : null}
@@ -713,7 +713,7 @@ function OperatorEditInner() {
               busy={publishing}
               busyLabel="公開中…"
             >
-              <Send size={15} aria-hidden="true" />{`公開して ${formatNumber(lineReachable.length)} 人に LINE で送る`}
+              <Send size={16} aria-hidden="true" />{`公開して ${formatNumber(lineReachable.length)} 人に LINE で送る`}
             </Button>
           </div>
         </div>

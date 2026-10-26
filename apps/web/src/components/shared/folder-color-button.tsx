@@ -89,7 +89,7 @@ export default function FolderColorButton({ value, onChange, colors = FOLDER_SEL
         aria-controls={open ? paletteId : undefined} aria-haspopup="true" disabled={disabled}
         onClick={() => setOpen((currentOpen) => !currentOpen)}>
         <span className={styles.dot} style={value ? { backgroundColor: value } : undefined} aria-hidden="true" />
-        <ChevronDown size={14} aria-hidden="true" />
+        <ChevronDown size={16} aria-hidden="true" />
       </button>
       {compact ? (open ? <span className={styles.inlinePalette}>{palette}</span> : null) : (
         <MenuPortal open={open} getAnchor={() => buttonRef.current} onClose={() => setOpen(false)} onEscape={close}>{palette}</MenuPortal>

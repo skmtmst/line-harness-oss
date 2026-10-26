@@ -87,7 +87,7 @@ export default function EntitlementsCard({ accountId, friendId, friendName, canE
 
   return (
     <Card variant="form" gap="normal">
-      <CardHeader size="stacked" title="回数券・月謝" action={canEdit && state === 'ready' ? <Button onClick={() => setDialog({ action: 'give', id: items[0]?.id ?? NEW_TICKET })}><Plus size={15} aria-hidden="true" />手で入れる</Button> : undefined} />
+      <CardHeader size="stacked" title="回数券・月謝" action={canEdit && state === 'ready' ? <Button onClick={() => setDialog({ action: 'give', id: items[0]?.id ?? NEW_TICKET })}><Plus size={16} aria-hidden="true" />手で入れる</Button> : undefined} />
       {state === 'not-ready' ? <Notice tone="info" icon={<Info size={16} aria-hidden="true" />}>回数券・月謝は、データの準備が済むと店が手で入れられます。</Notice>
         : state === 'loading' ? <ListState kind="loading" title="回数券・月謝を読み込んでいます" />
           : state === 'error' ? <ListState kind="error" title="回数券・月謝を表示できませんでした" onRetry={() => void reload()} />
@@ -294,7 +294,7 @@ export function EntitlementDrawer({ item, accountId, friendName, canEdit, onClos
           </KpiBand>
           <div className={styles.historyHead}>
             <h3 className={styles.historyTitle}>履歴</h3>
-            {canEdit ? <Button onClick={() => onAdd(item.id)}><Plus size={15} aria-hidden="true" />手で入れる</Button> : null}
+            {canEdit ? <Button onClick={() => onAdd(item.id)}><Plus size={16} aria-hidden="true" />手で入れる</Button> : null}
           </div>
           {events === null ? <ListState kind="loading" title="履歴を読み込んでいます" />
             : events === 'error' ? <ListState kind="error" title="履歴を表示できませんでした" />
@@ -322,7 +322,7 @@ export function EntitlementDrawer({ item, accountId, friendName, canEdit, onClos
                   </DataTable>
                 </Card>
               )}
-          <p className={styles.footNote}><Info size={14} aria-hidden="true" />予約で使った行は、押すとその予約を開きます。手で入れた行には理由が必ず残ります。</p>
+          <p className={styles.footNote}><Info size={16} aria-hidden="true" />予約で使った行は、押すとその予約を開きます。手で入れた行には理由が必ず残ります。</p>
           {item.kind === 'monthly' ? <StatusBadge tone="info">{`今月 ${item.monthUsed} 回使いました`}</StatusBadge> : null}
         </div>
       ) : null}

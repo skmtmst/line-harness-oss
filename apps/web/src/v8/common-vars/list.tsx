@@ -565,7 +565,7 @@ function CommonVarsListInner() {
       } : {
         id: 'stop',
         label: '止める',
-        icon: <Pause size={14} aria-hidden="true" />,
+        icon: <Pause size={16} aria-hidden="true" />,
         onSelect: () => openStatusDialog(item, 'stop'),
       },
       {
@@ -656,7 +656,7 @@ function CommonVarsListInner() {
   /* 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。 */
   const createButton = (full: boolean) => canWrite ? (
     <Button href="/contents/vars/new" variant="primary" className={full ? 'v8-folder-create w-full' : undefined}>
-      <Plus size={15} aria-hidden="true" />共通情報を作る
+      <Plus size={16} aria-hidden="true" />共通情報を作る
     </Button>
   ) : null
 
@@ -690,20 +690,20 @@ function CommonVarsListInner() {
   const showExpiredChip = chip === 'expired' || stats.expiredCount > 0
   const filterChips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={chip === 'empty'} onChange={() => toggleChip('empty')} title="中身が空のもの" icon={<CircleDashed size={13} aria-hidden="true" />}>
+      <FilterChip selected={chip === 'empty'} onChange={() => toggleChip('empty')} title="中身が空のもの" icon={<CircleDashed size={16} aria-hidden="true" />}>
         空のまま
       </FilterChip>
-      <FilterChip selected={chip === 'scheduled'} onChange={() => toggleChip('scheduled')} title="有効期間か、決めた日の切り替えがあるもの" icon={<CalendarClock size={13} aria-hidden="true" />}>
+      <FilterChip selected={chip === 'scheduled'} onChange={() => toggleChip('scheduled')} title="有効期間か、決めた日の切り替えがあるもの" icon={<CalendarClock size={16} aria-hidden="true" />}>
         期限つき
       </FilterChip>
-      <FilterChip selected={chip === 'unused'} onChange={() => toggleChip('unused')} title="どこにも差し込まれていないもの" icon={<Archive size={13} aria-hidden="true" />}>
+      <FilterChip selected={chip === 'unused'} onChange={() => toggleChip('unused')} title="どこにも差し込まれていないもの" icon={<Archive size={16} aria-hidden="true" />}>
         使われていない
       </FilterChip>
-      <FilterChip selected={chip === 'draftStopped'} onChange={() => toggleChip('draftStopped')} title="下書きと、止めているもの" icon={<Pause size={13} aria-hidden="true" />}>
+      <FilterChip selected={chip === 'draftStopped'} onChange={() => toggleChip('draftStopped')} title="下書きと、止めているもの" icon={<Pause size={16} aria-hidden="true" />}>
         下書き・止めた
       </FilterChip>
       {showExpiredChip ? (
-        <FilterChip selected={chip === 'expired'} onChange={() => toggleChip('expired')} title="期限が切れたもの" icon={<CalendarX size={13} aria-hidden="true" />}>
+        <FilterChip selected={chip === 'expired'} onChange={() => toggleChip('expired')} title="期限が切れたもの" icon={<CalendarX size={16} aria-hidden="true" />}>
           期限切れ
         </FilterChip>
       ) : null}
@@ -843,7 +843,7 @@ function CommonVarsListInner() {
               key={kpi.key}
               presentation="band"
               title={kpi.title}
-              icon={<kpi.icon size={13} aria-hidden="true" />}
+              icon={<kpi.icon size={16} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}

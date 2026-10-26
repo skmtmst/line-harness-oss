@@ -318,7 +318,7 @@ export default function AffiliateDrawer({
                   <span className={styles.listActions}>
                     <Button type="button" disabled={deciding !== null} onClick={() => { void decide(item, 'rejected') }}>断る</Button>
                     <Button type="button" disabled={deciding !== null} onClick={() => { void decide(item, 'approved') }}>
-                      <Check size={14} aria-hidden="true" /> 認める
+                      <Check size={16} aria-hidden="true" /> 認める
                     </Button>
                   </span>
                 )}
@@ -471,7 +471,7 @@ export default function AffiliateDrawer({
         toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => setTab(item.key) }))} />}
         footer={(<div className={styles.footerRow}>{readonly ? <span /> : (
             <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
-              <PauseCircle size={14} aria-hidden="true" />
+              <PauseCircle size={16} aria-hidden="true" />
               紹介を止める
             </button>
           )}
@@ -488,7 +488,7 @@ export default function AffiliateDrawer({
                 title={settlement ? undefined : '今回締められる報酬がありません'}
                 onClick={() => setPaymentOpen(true)}
               >
-                <Check size={15} aria-hidden="true" />
+                <Check size={16} aria-hidden="true" />
                 支払いを確定する
               </Button>
             </>

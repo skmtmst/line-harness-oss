@@ -91,7 +91,7 @@
   cursor: pointer;
 }
 .link:hover { text-decoration: underline; }
-.link:disabled { cursor: not-allowed; opacity: 0.5; }
+.link:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 .import { display: flex; flex-direction: column; gap: var(--tpl-toolbar-gap); }
 
 /* 右：視聴画面での見え方（幅340・内側16・間10）。黒い画面は高さ180・下に寄せた2行。 */

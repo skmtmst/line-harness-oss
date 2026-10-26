@@ -138,14 +138,14 @@ function FlexImage({ node }: { node: FlexNode }) {
     objectFit: (node.aspectMode === 'cover' ? 'cover' : 'contain') as React.CSSProperties['objectFit'],
     ...(node.aspectRatio ? { aspectRatio: node.aspectRatio.replace(':', '/') } : {}),
   }
-  return <img src={url} alt="" style={style} referrerPolicy="no-referrer" loading="lazy" />
+  return <img width={1040} height={676} src={url} alt="" style={style} referrerPolicy="no-referrer" loading="lazy" />
 }
 
 function FlexIcon({ node }: { node: FlexNode }) {
   const url = safeFlexAssetUrl(node.url)
   if (!url) return null
   const s = getSize(node.size) || '16px'
-  return <img src={url} alt="" style={{ width: s, height: s, objectFit: 'contain' }} referrerPolicy="no-referrer" loading="lazy" />
+  return <img width={16} height={16} src={url} alt="" style={{ width: s, height: s, objectFit: 'contain' }} referrerPolicy="no-referrer" loading="lazy" />
 }
 
 function FlexSpacer({ node }: { node: FlexNode }) {

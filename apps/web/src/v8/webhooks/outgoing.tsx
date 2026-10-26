@@ -394,7 +394,7 @@ export default function WebhooksOutgoingV8() {
       items.push({
         id: 'toggle',
         label: item.isActive ? '止める' : '動かす',
-        icon: item.isActive ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />,
+        icon: item.isActive ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />,
         disabled: !item.isActive && !canActivate,
         disabledReason: !item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined,
         onSelect: () => { setMenuId(null); void handleToggle(item, item.isActive) },
@@ -436,7 +436,7 @@ export default function WebhooksOutgoingV8() {
   )
   /* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */
   const createButton = canManage
-    ? <Button variant="primary" href="/webhooks/new"><Plus size={15} aria-hidden="true" />送り先を作る</Button>
+    ? <Button variant="primary" href="/webhooks/new"><Plus size={16} aria-hidden="true" />送り先を作る</Button>
     : <span className={styles.createSpace} aria-hidden="true" />
 
   /* ===== 道具の段 ===== */
@@ -455,7 +455,7 @@ export default function WebhooksOutgoingV8() {
   /* 絵に並びの部品は無い。並びは「よく使う絞り込み」の中で選ぶ（機能は残す）。 */
   const savedBox = (
     <div className={styles.savedBox}>
-      <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
+      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["chip","sortKey","sort_key"]}><Select
         aria-label="よく使う絞り込み"
         value={chip}
@@ -725,7 +725,7 @@ export default function WebhooksOutgoingV8() {
       headingSize="regular"
       title="外部連携"
 
-      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
+      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="outgoing" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!canManage ? <ViewerBand /> : null}

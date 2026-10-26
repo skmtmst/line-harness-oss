@@ -165,7 +165,7 @@ export default function OpsTwoFactorV8() {
               <div className={styles.qr}>
                 {qr ? (
                   // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
-                  <img src={qr} alt="認証アプリ登録用のQRコード" />
+                  <img width={200} height={200} src={qr} alt="認証アプリ登録用のQRコード" />
                 ) : qrFailed ? (
                   <Notice tone="danger" >QRコードを表示できませんでした</Notice>
                 ) : (

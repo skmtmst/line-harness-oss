@@ -46,6 +46,10 @@
   transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
+/* 押して開ける行は、行のどこでも押せると分かるよう指の形にする（§6.11 の 4）。 */
+html:root .row[data-row-open] { cursor: pointer; }
+html:root .row[data-row-open]:not(.rowInteractive):hover:not([aria-selected='true']) { background: var(--polish-table-hover); }
+
 .rowInteractive.rowSelected:hover {
   background: var(--polish-selection-bg);
 }
@@ -115,7 +119,7 @@
 
 /* 店と同じひな形の板 ・ に渡す密度。既定の行は変えない。 */
 :root .rowTemplate { height: 61px; }
-:root .rowTemplate .bodyCell { padding-block: 11px; }
+:root .rowTemplate .bodyCell { padding-block: 10px; }
 
 :root .row + .row .bodyCell {
   border-top: 1px solid var(--color-divider);
@@ -168,7 +172,7 @@
 :root .memo { line-height: 16px; }
 :root .row[data-table-layout='columns'] {
   display: flex; align-items: center; gap: 16px; height: auto;
-  padding: 9px 20px; border-bottom: 1px solid var(--color-divider);
+  padding: 8px 20px; border-bottom: 1px solid var(--color-divider);
 }
 :root .row[data-table-layout='columns'] .bodyCell {
   display: block; padding: 0; border: 0; flex-shrink: 0; color: var(--color-ink);
@@ -181,7 +185,7 @@
 /* ★V8 一覧の行の「名前＋下の説明」（ 行：名前 13/600 高さ19 → 間3 → 説明 11 高さ16、行 62）。説明の中の印で行を押し上げない（司令塔 2026-10-05） */
 :root .name { font-size: var(--tpl-row-name-size); font-weight: 600; line-height: var(--tpl-row-name-lh); }
 :root .sub { display: flex; align-items: center; gap: 6px; margin-top: var(--tpl-row-sub-gap); font-size: var(--tpl-row-sub-size); line-height: var(--tpl-row-sub-lh); min-height: 0; }
-:root .sub svg { flex: none; width: 12px; height: 12px; }
+:root .sub svg { flex: none; width: 16px; height: 16px; }
 :root .sub > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 :root .sub svg { display: inline-block; }
 /* ★V8 表の横の余白（Pencil の行：左右24・欄の間16）。各セルの左右24（欄の間48）を、欄の間16＝左右8・端だけ24 にする（司令塔 2026-10-06） */

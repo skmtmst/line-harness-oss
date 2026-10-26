@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { motionEasing } from '@/components/shared/overlay-utils'
 
 /*
  * 並べ替えの「付いてくる動き」（フルード・インタラクション ②）。
@@ -66,7 +67,7 @@ export function useFlipRows(containerRef: RefObject<HTMLElement | null>, orderKe
       if (!animate || before === undefined || duration <= 0) continue
       const delta = before - top
       if (Math.abs(delta) < 1) continue
-      const animation = row.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }], { duration, easing: 'cubic-bezier(0.2, 0, 0, 1)' })
+      const animation = row.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }], { duration, easing: motionEasing() })
       if (animation) animations.current.push(animation)
     }
     positions.current = next

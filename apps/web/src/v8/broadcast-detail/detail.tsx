@@ -243,7 +243,7 @@ export default function BroadcastDetail({
     {
       id: 'duplicate',
       label: '複製して作る',
-      icon: <Copy size={14} aria-hidden="true" />,
+      icon: <Copy size={16} aria-hidden="true" />,
       external: false,
       href: duplicateHref, onSelect: () => router.push(duplicateHref),
     },
@@ -259,7 +259,7 @@ export default function BroadcastDetail({
     id: 'delete',
     label: '削除する',
     tone: 'danger',
-    icon: <Trash2 size={14} aria-hidden="true" />,
+    icon: <Trash2 size={16} aria-hidden="true" />,
     dividerBefore: true,
     onSelect: () => { setDeleteError(''); setDeleteOpen(true) },
   })
@@ -565,7 +565,7 @@ function DeliveryRail({ broadcast, approvalInvolved: withApproval, abWaiting = f
           <li key={step.key} className={`${styles.railItem} ${styles.railDelivery}`} data-delivery-stage={state} data-finished={finished || undefined} data-kind="delivery">
             {index > 0 ? <span className={styles.railLine} data-done={index <= currentIndex || undefined} aria-hidden="true" /> : null}
             <span className={styles.railStep}>
-              <span className={styles.railMark} aria-hidden="true">{state === 'done' && !finished ? <Check size={11} strokeWidth={3} /> : null}</span>
+              <span className={styles.railMark} aria-hidden="true">{state === 'done' && !finished ? <Check size={16} strokeWidth={3} /> : null}</span>
               <span className={styles.railLabel} aria-current={state === 'current' ? 'step' : undefined}>{step.label}</span>
             </span>
           </li>

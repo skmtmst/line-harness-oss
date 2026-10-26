@@ -545,7 +545,7 @@ export default function RewardsTab() {
       <KpiCard
         presentation="band"
         title="使い道"
-        icon={<Gift size={14} aria-hidden="true" />}
+        icon={<Gift size={16} aria-hidden="true" />}
         value={ready ? rewards.length : null}
         unit="件"
         detail={<span title={neverRedeemedFriendCount == null ? '1回も使っていない人の数は未取得' : `1回も使っていない人 ${formatNumber(neverRedeemedFriendCount)} 人`}>{ready ? `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}` : emptyValue('unknown')}</span>}
@@ -553,7 +553,7 @@ export default function RewardsTab() {
       <KpiCard
         presentation="band"
         title="今月 交換"
-        icon={<ArrowLeftRight size={14} aria-hidden="true" />}
+        icon={<ArrowLeftRight size={16} aria-hidden="true" />}
         value={ready ? exchangedCount ?? 0 : null}
         unit="件"
         detail={ready ? `${formatMileageNumber(redeemedMiles ?? 0)} マイル` : emptyValue('unknown')}
@@ -561,7 +561,7 @@ export default function RewardsTab() {
       <KpiCard
         presentation="band"
         title="いちばん人気"
-        icon={<Star size={14} aria-hidden="true" />}
+        icon={<Star size={16} aria-hidden="true" />}
         /* 大きい数字の場所には今月の交換の件数、名前は下の段（：数の場所に名前を入れない）。 */
         value={ready && popularName && popularCount != null ? popularCount : null}
         unit="件"
@@ -570,7 +570,7 @@ export default function RewardsTab() {
       <KpiCard
         presentation="band"
         title="渡せなかった"
-        icon={<AlertCircle size={14} aria-hidden="true" />}
+        icon={<AlertCircle size={16} aria-hidden="true" />}
         value={redemptionsLoad === 'ready' ? redemptionsTotal : null}
         unit="件"
         detail={failedReason ? '理由を確認してください' : '要対応の交換はありません'}
@@ -581,7 +581,7 @@ export default function RewardsTab() {
 
   const createButton = (full: boolean) => (
     <CreateButton href="/mileage/rewards/edit" readonly={readonly} full={full}>
-      <Plus size={15} aria-hidden="true" /> 使い道を作る
+      <Plus size={16} aria-hidden="true" /> 使い道を作る
     </CreateButton>
   )
 
@@ -880,7 +880,7 @@ export default function RewardsTab() {
       explanation="交換は、お客さまの LINE（マイルの画面）から。渡せなかったときは、決めておいた方法（マイルを戻す など）で処理します"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
-          <Download size={15} aria-hidden="true" /> CSVで書き出す
+          <Download size={16} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}

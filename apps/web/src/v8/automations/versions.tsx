@@ -223,21 +223,21 @@ function VersionsInner() {
       title={`${detail.name}（版と使われている場所）`}
       help="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
       stats={<PageContent layout="stats"><KpiBand aria-label="版と利用先の集計">
-        <KpiCard presentation="band" title="いまの版" icon={<GitBranch size={13} aria-hidden="true" />} value={null} valueText={published ? `v${published.versionNumber}` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
-        <KpiCard presentation="band" title="呼び出し元" icon={<Link2 size={13} aria-hidden="true" />} value={detail.bindings.length} unit="か所" detail={consumerBreakdown(detail.bindings)} />
-        <KpiCard presentation="band" title="古い版のまま" icon={<History size={13} aria-hidden="true" />} value={outdatedCount} unit="か所" detail={outdatedCount > 0 ? '新版あり' : 'すべて最新の版です'} />
-        <KpiCard presentation="band" title="今月 動いた回数" icon={<Zap size={13} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
+        <KpiCard presentation="band" title="いまの版" icon={<GitBranch size={16} aria-hidden="true" />} value={null} valueText={published ? `v${published.versionNumber}` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
+        <KpiCard presentation="band" title="呼び出し元" icon={<Link2 size={16} aria-hidden="true" />} value={detail.bindings.length} unit="か所" detail={consumerBreakdown(detail.bindings)} />
+        <KpiCard presentation="band" title="古い版のまま" icon={<History size={16} aria-hidden="true" />} value={outdatedCount} unit="か所" detail={outdatedCount > 0 ? '新版あり' : 'すべて最新の版です'} />
+        <KpiCard presentation="band" title="今月 動いた回数" icon={<Zap size={16} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
       </KpiBand></PageContent>}
       actions={<>
-        {manualHref ? <Button external href={manualHref}><BookOpen size={15} aria-hidden="true" />マニュアル</Button> : null}
+        {manualHref ? <Button external href={manualHref}><BookOpen size={16} aria-hidden="true" />マニュアル</Button> : null}
         {canEdit && draft ? (
-          <Button href={editHref}><Pencil size={15} aria-hidden="true" />下書きの中身を編集</Button>
+          <Button href={editHref}><Pencil size={16} aria-hidden="true" />下書きの中身を編集</Button>
         ) : canEdit && published ? (
           <Button
             disabled={Boolean(working)}
             onClick={() => void run('draft', () => api.commonActions.createDraft(detail.id, selectedAccountId!, published.id))}
           >
-            <Pencil size={15} aria-hidden="true" />前の版から新版を作る
+            <Pencil size={16} aria-hidden="true" />前の版から新版を作る
           </Button>
         ) : null}
       </>}
@@ -273,7 +273,7 @@ function VersionsInner() {
                         if (result !== true) void (async () => { await load(); setError((current) => current || result) })()
                       })}
                   >
-                    <Upload size={15} aria-hidden="true" />公開する
+                    <Upload size={16} aria-hidden="true" />公開する
                   </Button>
                 ) : (
                   /* 下書きがある間は新しい版を作れない（サーバも draft_exists で断る）。押せない理由を添える。 */

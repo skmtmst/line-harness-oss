@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Avatar from '@/components/shared/avatar'
 import Notice from '@/components/shared/notice'
@@ -190,7 +191,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
       if (isStale()) return true
       if (response.success) {
         setDetail(response.data)
-        if (!quiet) window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+        if (!quiet) window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: scrollMotion() }), 50)
         return true
       }
       return false
@@ -373,7 +374,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
           {!selected ? (
             <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-ink-faint">
               <div>
-                <svg className="text-ink-faint mx-auto mb-3 h-10 w-10" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" aria-hidden="true">
+                <svg className="text-ink-faint mx-auto mb-3 h-10 w-10" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12a8 8 0 0 1-11.4 7.2L3 21l1.8-6.1A8 8 0 1 1 21 12Z" />
                 </svg>
                 対応するお問い合わせを選択してください

@@ -8,7 +8,7 @@
 .withExtras { width: 100%; min-width: 0; }
 .withExtras { container: tap-action / inline-size; }
 .pickRow { text-align: left; cursor: pointer; }
-.pickRow:disabled { cursor: default; }
+.pickRow:disabled { cursor: not-allowed; }
 .pickRow:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .root {
   display: flex;

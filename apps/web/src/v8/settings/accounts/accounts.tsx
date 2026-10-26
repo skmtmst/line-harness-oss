@@ -186,11 +186,11 @@ export default function AccountsV8() {
   const headActions = canManage ? (
     <div className={styles.headActions}>
       <Button variant="secondary" onClick={() => setOrderingOpen(true)}>
-        <ArrowUpDown size={15} aria-hidden="true" />並び順と親子を変える
+        <ArrowUpDown size={16} aria-hidden="true" />並び順と親子を変える
       </Button>
       {canRegister ? (
         <Button variant="primary" href="/accounts/new">
-          <Plus size={15} aria-hidden="true" />LINEアカウントを登録
+          <Plus size={16} aria-hidden="true" />LINEアカウントを登録
         </Button>
       ) : <span className={styles.ownerOnly}>{MANAGER_ONLY_REGISTER}</span>}
     </div>
@@ -204,10 +204,10 @@ export default function AccountsV8() {
         ) : null}
 
         <KpiBand data-design="KPIs">
-          <KpiCard title="つないでいる" icon={<Cable size={13} aria-hidden="true" />} value={kpis?.connected} unit="アカウント" detail={null} />
-          <KpiCard title="有効" icon={<CircleCheck size={13} aria-hidden="true" />} value={kpis?.active} unit="件" detail={null} />
-          <KpiCard title="接続に問題" icon={<TriangleAlert size={13} aria-hidden="true" />} value={kpis?.problem} unit="件" detail={null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
-          <KpiCard title="友だちの合計" icon={<Users size={13} aria-hidden="true" />} value={kpis?.friends} unit="人" detail={null} />
+          <KpiCard title="つないでいる" icon={<Cable size={16} aria-hidden="true" />} value={kpis?.connected} unit="アカウント" detail={null} />
+          <KpiCard title="有効" icon={<CircleCheck size={16} aria-hidden="true" />} value={kpis?.active} unit="件" detail={null} />
+          <KpiCard title="接続に問題" icon={<TriangleAlert size={16} aria-hidden="true" />} value={kpis?.problem} unit="件" detail={null} valueTone={(kpis?.problem ?? 0) > 0 ? 'warning' : 'default'} />
+          <KpiCard title="友だちの合計" icon={<Users size={16} aria-hidden="true" />} value={kpis?.friends} unit="人" detail={null} />
         </KpiBand>
 
         {/* B-335：スタイルを変える入口（今のアカウント）。オーナー・管理者だけ。 */}
@@ -246,7 +246,7 @@ export default function AccountsV8() {
                   : '送受信に使うアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。')
                 : undefined}
               action={accounts.length === 0
-                ? (canRegister ? <Button href="/accounts/new" variant="primary"><Plus size={15} aria-hidden="true" />LINEアカウントを登録</Button> : undefined)
+                ? (canRegister ? <Button href="/accounts/new" variant="primary"><Plus size={16} aria-hidden="true" />LINEアカウントを登録</Button> : undefined)
                 : <Button type="button" onClick={() => { setQuery(''); setFilter('all') }}>条件を外す</Button>}
             />
           </div>

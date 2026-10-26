@@ -678,7 +678,7 @@ export default function TemplatesListV8() {
         {
           id: 'duplicate',
           label: '複製する',
-          icon: <Copy size={14} aria-hidden="true" />,
+          icon: <Copy size={16} aria-hidden="true" />,
           onSelect: () => {
             setDuplicateError('')
             void runDuplicate(t)
@@ -687,7 +687,7 @@ export default function TemplatesListV8() {
         {
           id: 'move',
           label: 'フォルダへ移す',
-          icon: <FolderIcon size={14} aria-hidden="true" />,
+          icon: <FolderIcon size={16} aria-hidden="true" />,
           onSelect: () => openMove([t.id]),
         },
         {
@@ -782,7 +782,7 @@ export default function TemplatesListV8() {
       title={createBlocked ?? undefined}
       onClick={openPicker}
     >
-      <Plus size={15} aria-hidden="true" />テンプレートを作る
+      <Plus size={16} aria-hidden="true" />テンプレートを作る
     </Button>
   )
 
@@ -814,16 +814,16 @@ export default function TemplatesListV8() {
   }
   const filterChips = (
     <div role="group" aria-label="中身で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={chips.single} onChange={() => toggleChip('single')} title="1つのメッセージだけのテンプレート" icon={<MessageSquare size={13} aria-hidden="true" />}>
+      <FilterChip selected={chips.single} onChange={() => toggleChip('single')} title="1つのメッセージだけのテンプレート" icon={<MessageSquare size={16} aria-hidden="true" />}>
         1通のみ
       </FilterChip>
-      <FilterChip selected={chips.multiple} onChange={() => toggleChip('multiple')} title="複数のメッセージに分かれるテンプレート" icon={<Layers size={13} aria-hidden="true" />}>
+      <FilterChip selected={chips.multiple} onChange={() => toggleChip('multiple')} title="複数のメッセージに分かれるテンプレート" icon={<Layers size={16} aria-hidden="true" />}>
         複数通
       </FilterChip>
-      <FilterChip selected={chips.variables} onChange={() => toggleChip('variables')} title="名前や情報を差し込むテンプレート" icon={<Braces size={13} aria-hidden="true" />}>
+      <FilterChip selected={chips.variables} onChange={() => toggleChip('variables')} title="名前や情報を差し込むテンプレート" icon={<Braces size={16} aria-hidden="true" />}>
         差し込みあり
       </FilterChip>
-      <FilterChip selected={chips.unused} onChange={() => toggleChip('unused')} title="どこからも使われていないテンプレート" icon={<Unlink size={13} aria-hidden="true" />}>
+      <FilterChip selected={chips.unused} onChange={() => toggleChip('unused')} title="どこからも使われていないテンプレート" icon={<Unlink size={16} aria-hidden="true" />}>
         使っていない
       </FilterChip>
     </div>
@@ -844,7 +844,7 @@ export default function TemplatesListV8() {
         setSavedMenuOpen((current) => !current)
       }}
     >
-      <Bookmark size={15} aria-hidden="true" />
+      <Bookmark size={16} aria-hidden="true" />
       {iconOnly ? null : (savedLabel ?? 'よく使う絞り込み')}
     </Button>
   )
@@ -983,7 +983,7 @@ export default function TemplatesListV8() {
               key={kpi.key}
               presentation="band"
               title={kpi.title}
-              icon={<kpi.icon size={13} aria-hidden="true" />}
+              icon={<kpi.icon size={16} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}

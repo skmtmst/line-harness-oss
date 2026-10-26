@@ -24,7 +24,6 @@
 
 .field:disabled {
   cursor: not-allowed;
-  background: var(--color-canvas-sunken);
 }
 
 /* 計算で決まる読むだけの欄（年齢など）。絵 ：灰色の地・薄い文字。 */
@@ -147,5 +146,5 @@ html:root .affixed .affixedControl { width: auto; min-width: 0; max-width: 100%;
 html:root .adornment { flex-shrink: 0; color: var(--color-ink-faint); }
 html:root .affixed:focus-within { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 html:root .affixed[aria-invalid='true']:focus-within { box-shadow: var(--polish-error-ring); }
-html:root .affixed[data-disabled] { opacity: var(--polish-disabled-opacity); background: var(--color-canvas-sunken); }
+html:root .affixed[data-disabled] { opacity: var(--polish-disabled-opacity); }
 html:root .affixed .affixedControl:disabled { opacity: 1; }

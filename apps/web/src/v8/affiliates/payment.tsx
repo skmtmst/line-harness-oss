@@ -229,7 +229,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="今回 払う額"
-        icon={<Banknote size={14} aria-hidden="true" />}
+        icon={<Banknote size={16} aria-hidden="true" />}
         value={null}
         valueText={ready && preview ? formatYen(preview.totalAmount) : emptyValue('unknown')}
         unit=""
@@ -238,7 +238,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="次の締め"
-        icon={<Calendar size={14} aria-hidden="true" />}
+        icon={<Calendar size={16} aria-hidden="true" />}
         value={null}
         valueText={ready && preview ? formatMonthDay(preview.periodTo) : emptyValue('unknown')}
         unit=""
@@ -247,7 +247,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="次の支払日"
-        icon={<CalendarCheck size={14} aria-hidden="true" />}
+        icon={<CalendarCheck size={16} aria-hidden="true" />}
         value={null}
         valueText="—"
         unit=""
@@ -257,7 +257,7 @@ export default function PaymentTab() {
       <KpiCard
         presentation="band"
         title="今年 払った合計"
-        icon={<Wallet size={14} aria-hidden="true" />}
+        icon={<Wallet size={16} aria-hidden="true" />}
         value={null}
         valueText="—"
         unit=""
@@ -293,7 +293,7 @@ export default function PaymentTab() {
             disabled={!preview.conversionCount || Boolean(closed)}
             title={closed ? 'この期間は締めました' : !preview.conversionCount ? '締められる成果がありません' : undefined}
           >
-            <Lock size={15} aria-hidden="true" /> 期間を締める…
+            <Lock size={16} aria-hidden="true" /> 期間を締める…
           </Button>
         )}
     </div>
@@ -336,10 +336,10 @@ export default function PaymentTab() {
 
   const chips = (
     <div role="group" aria-label="振込先で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={filter === 'bank_missing'} icon={<TriangleAlert size={13} aria-hidden="true" />} onChange={(on) => { setSaved(''); setAllPicked(false); setFilter(on ? 'bank_missing' : 'all'); setPage(1) }}>
+      <FilterChip selected={filter === 'bank_missing'} icon={<TriangleAlert size={16} aria-hidden="true" />} onChange={(on) => { setSaved(''); setAllPicked(false); setFilter(on ? 'bank_missing' : 'all'); setPage(1) }}>
         {ready ? `振込先が足りない ${formatNumber(missingBanks.length)}` : '振込先が足りない'}
       </FilterChip>
-      <FilterChip selected={filter === 'all' && allPicked} icon={<Users size={13} aria-hidden="true" />} onChange={(on) => { setSaved(''); setFilter('all'); setAllPicked(on); setPage(1) }}>
+      <FilterChip selected={filter === 'all' && allPicked} icon={<Users size={16} aria-hidden="true" />} onChange={(on) => { setSaved(''); setFilter('all'); setAllPicked(on); setPage(1) }}>
         {ready ? `今回払う人 ${formatNumber(rows.length)}` : '今回払う人'}
       </FilterChip>
     </div>
@@ -456,7 +456,7 @@ export default function PaymentTab() {
         disabled={!closed || operationBusy || Boolean(resumed?.batch)}
         title={!closed ? '期間を締めると書き出せます' : resumed?.batch ? '銀行用CSVの準備は作成済みです' : undefined} busy={Boolean(operationBusy)} busyLabel="処理中…"
       >
-        <Landmark size={15} aria-hidden="true" /> 銀行用 CSV…
+        <Landmark size={16} aria-hidden="true" /> 銀行用 CSV…
       </Button>
       <Button
         type="button"
@@ -464,7 +464,7 @@ export default function PaymentTab() {
         disabled={!closed || operationBusy || statementTargets.length === 0}
         title={!closed ? '期間を締めると出せます' : undefined} busy={Boolean(operationBusy)} busyLabel="処理中…"
       >
-        <FileText size={15} aria-hidden="true" /> {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${formatNumber(statementTargets.length)} 人）` : '支払明細をまとめて出す'}
+        <FileText size={16} aria-hidden="true" /> {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${formatNumber(statementTargets.length)} 人）` : '支払明細をまとめて出す'}
       </Button>
     </span>
   )

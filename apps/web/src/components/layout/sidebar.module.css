@@ -383,7 +383,7 @@
 :root .active { color: var(--color-ink); }
 :root .section { gap: 1px; }
 :root .sectionHeading,
-:root .sectionToggle { min-height: 0; box-sizing: border-box; height: 30px; padding: 10px 10px 3px; line-height: 17px; font-size: 11px; }
+:root .sectionToggle { min-height: 0; box-sizing: border-box; height: 30px; padding: 10px 10px 2px; line-height: 17px; font-size: 11px; }
 :root .desktop { padding-top: 16px; }
 :root .desktop[data-collapsed] .item { height: 36px; min-height: 36px; }
 
@@ -416,7 +416,7 @@
   content: ''; display: block; width: 24px; height: 1px; flex-shrink: 0;
   align-self: center; background: var(--color-hairline);
 }
-:root .sectionHeading > svg { width: 14px; height: 14px; }
+:root .sectionHeading > svg { width: 16px; height: 16px; }
 :root .badge {
   display: inline-flex; align-items: center; justify-content: center;
   height: 18px; padding: 0 6px; margin-left: auto;
@@ -485,11 +485,11 @@
   white-space: nowrap;
   pointer-events: none;
   transform: translateY(-50%);
-  animation: rail-tip-in var(--motion-fast) cubic-bezier(0.2, 0, 0, 1);
+  animation: rail-tip-in var(--motion-fast) var(--motion-ease-out);
 }
 :root .railTipCount {
   min-width: 18px;
-  padding: 0 5px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--color-danger);
   color: var(--color-canvas);

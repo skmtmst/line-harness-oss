@@ -39,7 +39,7 @@ export default function Breadcrumb({ items, className, appearance = 'default' }:
 
 function ChevronRight() {
   return (
-    <svg className={styles.separator} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+    <svg className={styles.separator} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
       <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )

@@ -50,7 +50,7 @@
 .actionLabel { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-eds-name-lh); text-overflow: ellipsis; white-space: nowrap; }
 .actionTiming { flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .iconButton { display: inline-flex; flex: 0 0 var(--tpl-eds-icon-btn); align-items: center; justify-content: center; height: var(--tpl-eds-icon-btn); min-height: 0; padding: 0; border: 0; border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; background: var(--color-canvas); color: var(--color-ink-secondary); cursor: pointer; }
-.iconButton:disabled { color: var(--color-ink-faint); cursor: default; }
+.iconButton:disabled { cursor: not-allowed; }
 .ghostButton { display: inline-flex; align-self: flex-start; align-items: center; gap: var(--tpl-eds-ghost-gap); height: var(--tpl-eds-ghost-h); padding: var(--tpl-eds-ghost-pad); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-chip-label-lh); cursor: pointer; }
 .ghostButton:hover { background: var(--color-surface-pearl); }
 

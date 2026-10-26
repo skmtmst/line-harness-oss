@@ -60,7 +60,7 @@
 .frame[data-state='busy'],
 .frame[data-readonly],
 .frame[data-disabled] {
-  cursor: default;
+  cursor: not-allowed;
 }
 
 .frame[data-disabled] {
@@ -218,7 +218,7 @@
 }
 
 .link:disabled {
-  cursor: default;
+  cursor: not-allowed;
   opacity: var(--tpl-slot-disabled-opacity);
 }
 
@@ -269,7 +269,7 @@
 }
 
 .pill:disabled {
-  cursor: default;
+  cursor: not-allowed;
   opacity: var(--tpl-slot-disabled-opacity);
 }
 
@@ -290,7 +290,7 @@
   height: var(--tpl-slot-icon);
   margin-bottom: var(--tpl-slot-icon-gap);
   color: var(--color-ink-faint);
-  animation: media-slot-spin var(--tpl-slot-spin) linear infinite;
+  animation: media-slot-spin var(--motion-spin) linear infinite;
 }
 
 .frame[data-size='compact'] .spin {

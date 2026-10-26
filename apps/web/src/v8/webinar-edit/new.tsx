@@ -155,7 +155,7 @@ function NewInner() {
           <Button href="/webinars">キャンセル</Button>
           {readOnly ? null : <>
             <Button disabled={blocked} title={blockedReason} busy={saving === 'list'} onClick={() => save('list')}>下書きを保存</Button>
-            <Button variant="primary" disabled={blocked} title={blockedReason} busy={saving === 'video'} onClick={() => save('video')}><ArrowRight size={15} aria-hidden="true" />動画の設定へ</Button>
+            <Button variant="primary" disabled={blocked} title={blockedReason} busy={saving === 'video'} onClick={() => save('video')}><ArrowRight size={16} aria-hidden="true" />動画の設定へ</Button>
           </>}
         </>}
         preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />} dirty={false}

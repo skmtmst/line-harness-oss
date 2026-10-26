@@ -201,7 +201,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
             </div>
             {readOnly ? null : (
               <Button variant="primary" disabled={state !== 'ready' || saving} busy={saving} busyLabel="保存しています…" onClick={() => void save()}>
-                <Check size={15} aria-hidden="true" />保存する
+                <Check size={16} aria-hidden="true" />保存する
               </Button>
             )}
           </div>
@@ -227,7 +227,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
                   <SaveErrorField names={[`comments.${index}.body`,"body","comment.body"]}><input className={`${styles.cell} ${styles.cellBody}`} value={comment.body} disabled={locked2} aria-label={`${index + 1} 行目の本文`} onChange={(event) => update(index, { body: event.target.value })} /></SaveErrorField>
                   {readOnly ? null : (
                     <IconButton className={styles.remove} aria-label={`${comment.authorName || '名前未入力'}のコメントを消す`} title="このコメントを消す" disabled={saving} onClick={() => setComments((prev) => prev.filter((_, j) => j !== index))}>
-                      <Trash2 size={15} aria-hidden="true" />
+                      <Trash2 size={16} aria-hidden="true" />
                     </IconButton>
                   )}
                 </div>

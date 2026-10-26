@@ -611,7 +611,7 @@
 .pairCell {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
   font-weight: 600;
   color: var(--color-ink);
@@ -709,12 +709,12 @@
   border-radius: var(--radius-pill);
   background: var(--color-track);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--motion-fast) var(--motion-ease-out);
 }
 
 .switch:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .switchOn {
@@ -727,7 +727,7 @@
   height: 16px;
   border-radius: var(--radius-pill);
   background: var(--color-canvas);
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .switchOn .switchKnob {

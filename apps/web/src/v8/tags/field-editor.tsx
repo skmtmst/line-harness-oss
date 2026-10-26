@@ -386,7 +386,7 @@ export default function FieldEditor({
             busy={saving}
             busyLabel={mode === 'create' ? '作成中…' : '保存中…'}
           >
-            <Check size={15} aria-hidden="true" />
+            <Check size={16} aria-hidden="true" />
             {mode === 'create' ? '項目を作る' : '保存する'}
           </Button>
         </>} dirty={false}

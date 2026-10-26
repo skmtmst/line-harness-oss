@@ -119,7 +119,7 @@ export function ContentTab(props: Props) {
             </button>
           ))}
           {props.readOnly ? null : <Button variant="text" onClick={props.onAddPage}>
-            <Plus size={15} aria-hidden="true" />
+            <Plus size={16} aria-hidden="true" />
             ページを足す
           </Button>}
         </div>
@@ -410,13 +410,13 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
             title={block.fixedField === 'allergy' && choice.isOther ? '自由に書く選択肢は、アレルギーの書き足しに使うため消せません' : choices.length <= 1 ? '選択肢を1つ以上残してください' : undefined}
             onClick={() => set({ choices: choices.filter((_, i) => i !== index) })}
           >
-            <X size={15} aria-hidden="true" />
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
       ))}
       <span>
         <Button variant="text" onClick={() => set({ choices: [...choices, { id: newBlockId('c'), label: `選択肢${choices.length + 1}` }] })}>
-          <Plus size={15} aria-hidden="true" />
+          <Plus size={16} aria-hidden="true" />
           選択肢を足す
         </Button>
       </span>

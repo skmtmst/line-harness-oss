@@ -256,7 +256,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
               ) : null}
             </span>
             {Item === 'a' &&item.external ? (
-              <ArrowUpRight size={14} aria-hidden="true" className={styles.externalIcon} />
+              <ArrowUpRight size={16} aria-hidden="true" className={styles.externalIcon} />
             ) : null}
           </Item>}
         </div>

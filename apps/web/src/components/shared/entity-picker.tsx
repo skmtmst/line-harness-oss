@@ -44,7 +44,7 @@ function matches(item: EntityPickerItem, query: string) {
 
 function CreateLink({ href, label }: { href?: string; label?: string }) {
   if (!href || !label) return null
-  return <Link className={styles.createLink} href={href} target="_blank" rel="noopener">{`作る画面へ：${label}`}<ArrowUpRight size={13} aria-hidden="true" /></Link>
+  return <Link className={styles.createLink} href={href} target="_blank" rel="noopener">{`作る画面へ：${label}`}<ArrowUpRight size={16} aria-hidden="true" /></Link>
 }
 
 export function EntityPickerWindow(props: EntityPickerWindowProps) {
@@ -233,7 +233,7 @@ export function EntityMultiPickerDialog({ title, description, items, folders, fo
   const footNote = note ?? (maxSelected !== undefined ? `${maxSelected}${unit === '件' ? '件' : ` ${unit}`}まで選べます` : 'いくつでも選べます')
   // S2Vgi（正の形）：頭に「＋〇〇を作る」、一覧の下に「選んだもの」の帯、下の段は案内と［キャンセル］［選ぶ（N件）］。
   return <EntityPickerDialog title={title} description={description} designNode="dJZ7Q" busy={busy} error={error} onCancel={onCancel}
-    headerAction={!readOnly && createAction ? <Button size="compact" disabled={busy || creating} onClick={() => { setCreating(true); setCreateError('') }}><Plus size={14} aria-hidden="true" />{createAction.label}</Button> : undefined}
+    headerAction={!readOnly && createAction ? <Button size="compact" disabled={busy || creating} onClick={() => { setCreating(true); setCreateError('') }}><Plus size={16} aria-hidden="true" />{createAction.label}</Button> : undefined}
     band={selected.length ? <div className={styles.pickedBand} aria-live="polite">
       <strong className={styles.pickedLabel}>選んだもの：</strong>
       <span className={styles.pickedNames} title={pickedNames}>{pickedNames}</span>

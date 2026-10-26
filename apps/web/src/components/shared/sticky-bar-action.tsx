@@ -13,7 +13,7 @@ export default function StickyBarAction({ label, icon: Icon, disabledReason, dis
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'style'>) {
   return <div className={styles.leadAction}>
     <Button {...props} type="button" variant={destructive ? 'danger-outline' : 'secondary'} disabled={disabled || Boolean(disabledReason)} aria-description={disabledReason ?? undefined}>
-      <Icon size={15} aria-hidden="true" />{label}
+      <Icon size={16} aria-hidden="true" />{label}
     </Button>
     {disabledReason ? <span className={styles.leadReason} role="note">{disabledReason}</span> : null}
   </div>

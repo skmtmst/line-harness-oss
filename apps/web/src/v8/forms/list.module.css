@@ -272,7 +272,6 @@ a.answerCount:hover {
 }
 
 .urlButton:disabled {
-  color: var(--color-ink-faint);
   cursor: not-allowed;
 }
 

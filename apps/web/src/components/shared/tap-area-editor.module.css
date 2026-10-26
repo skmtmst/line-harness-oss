@@ -31,7 +31,7 @@
 
 /* 面の一覧：記号は 22px・角丸 6・未選択は薄い地＋灰色の字。選んだ行は薄い緑・記号は濃い緑。 */
 .row {
-  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0;
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0;
   border-radius: var(--radius-control, 8px); background: transparent; text-align: left; font: inherit; cursor: pointer;
 }
 .row:hover { background: var(--color-canvas-sunken); }

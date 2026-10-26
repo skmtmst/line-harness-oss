@@ -343,7 +343,7 @@ export default function RankSettingsV8({
           {readonly ? null : (
             <div className={styles.syncAction}>
               <Button variant="secondary" onClick={() => resync()} disabled={busy || dirty} busy={Boolean(busy)} busyLabel="処理中…">
-                <RefreshCw size={15} aria-hidden="true" />もう一度同期
+                <RefreshCw size={16} aria-hidden="true" />もう一度同期
               </Button>
             </div>
           )}
@@ -416,7 +416,7 @@ export default function RankSettingsV8({
             {readonly ? null : (
               <div className={styles.addRow}>
                 <Button variant="secondary" onClick={add} disabled={drafts.length >= MAX_RANKS}>
-                  <Plus size={15} aria-hidden="true" />ランクを足す
+                  <Plus size={16} aria-hidden="true" />ランクを足す
                 </Button>
               </div>
             )}
@@ -428,7 +428,7 @@ export default function RankSettingsV8({
         <div className={styles.saveRow}>
           <Button variant="secondary" onClick={cancel} disabled={busy || !dirty} title={busy ? '処理しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
           <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty} title={busy ? '処理しています' : !dirty ? '変更がありません' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
-            <Check size={15} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して EC へ同期'}
+            <Check size={16} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して EC へ同期'}
           </Button>
         </div>
       )}

@@ -154,11 +154,11 @@ export default function HqTemplateDetail({
       {canEdit ? (
         <div className={styles.sideActions}>
           <Button variant="secondary" href="/hq/broadcasts/new">
-            <Send size={14} aria-hidden="true" />
+            <Send size={16} aria-hidden="true" />
             一括配信で使う
           </Button>
           <Button variant="secondary" onClick={onDuplicate} disabled={busy}>
-            <Copy size={14} aria-hidden="true" />
+            <Copy size={16} aria-hidden="true" />
             複製する
           </Button>
           {onRemove ? <RowMenu appearance="box" label="そのほかの操作" menuLabel={`ひな形「${detail.template.name}」の操作`} items={[{ id: 'delete', label: '削除する', tone: 'danger' as const, onSelect: onRemove }]} /> : null}
@@ -189,7 +189,7 @@ export default function HqTemplateDetail({
   }
   const shortName = (name: string) => name.replace(/^然\s*-NEN-\s*/, '')
   const enterButton = (accountId: string | null) => accountId
-    ? <Button variant="text" onClick={() => onEnterAccount(accountId)} aria-label="このアカウントへ入る"><LogIn size={14} aria-hidden="true" />入る</Button>
+    ? <Button variant="text" onClick={() => onEnterAccount(accountId)} aria-label="このアカウントへ入る"><LogIn size={16} aria-hidden="true" />入る</Button>
     : <span className={styles.ghostSpacer} aria-hidden="true" />
   const creator = (version: HqTemplateVersionDisplay) => `${version.creator_name ?? emptyValue('unknown')}・${stamp(version.created_at)}`
   const sortedVersions = [...(versions ?? [])].sort((a, b) => b.version - a.version)
@@ -222,16 +222,16 @@ export default function HqTemplateDetail({
         {canEdit ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</ReadOnlyNotice></div>}
         {notices}
         {canEdit ? (
-          <Notice tone="warn" role="status" icon={<CircleAlert size={18} aria-hidden="true" />}
+          <Notice tone="warn" role="status" icon={<CircleAlert size={20} aria-hidden="true" />}
             heading={unsentChanges ? '配っていない変更があります' : distributedCount > 0 ? '直したら、配ると新しい版になります' : 'まだ配っていません'}
             action={<>
               {unsentChanges && inUse && current && inUse.version !== current.version ? (
                 <Button variant="secondary" onClick={() => openCompare(inUse.version, current.version)} aria-pressed={compare?.from === inUse.version && compare.to === current.version}>
-                  <GitCompare size={14} aria-hidden="true" />比べる
+                  <GitCompare size={16} aria-hidden="true" />比べる
                 </Button>
               ) : null}
               <Button variant="primary" onClick={onDistribute} disabled={busy} aria-label={`${detail.template.name}を配る`}>
-                <Upload size={14} aria-hidden="true" />配る
+                <Upload size={16} aria-hidden="true" />配る
               </Button>
             </>}>
             {distributedCount > 0
@@ -242,7 +242,7 @@ export default function HqTemplateDetail({
         {compare && inUse && current && compare.from === inUse.version && compare.to === current.version ? compareBox : null}
 
         <Card layout="vertical" contentPadding="var(--tpl-eds-card-pad)" gap="var(--tpl-eds-card-gap)" aria-label="本文">
-          <CardHeader size="content" title={`${kind === 'message' ? '本文' : '中身'}${current?.is_draft && distributedCount > 0 ? '（下書き）' : ''}`} meta={kind === 'message' ? '{ } は差し込み。受け取る人ごとに変わります。' : summary ?? '中身の要約を読めませんでした'} action={canEdit ? <Button variant="secondary" onClick={onEdit} disabled={busy}><Pencil size={14} aria-hidden="true" />編集する</Button> : undefined} />
+          <CardHeader size="content" title={`${kind === 'message' ? '本文' : '中身'}${current?.is_draft && distributedCount > 0 ? '（下書き）' : ''}`} meta={kind === 'message' ? '{ } は差し込み。受け取る人ごとに変わります。' : summary ?? '中身の要約を読めませんでした'} action={canEdit ? <Button variant="secondary" onClick={onEdit} disabled={busy}><Pencil size={16} aria-hidden="true" />編集する</Button> : undefined} />
           <div className={styles.bodyBox}>{tag ? <TagPill name={tag.name} color={tagColor} /> : kind === 'message' ? content : `［${kindLabel}］${summary ?? ''}`}</div>
         </Card>
 
@@ -277,7 +277,7 @@ export default function HqTemplateDetail({
           ) : <ListEmptyMessage>まだ配っていません</ListEmptyMessage>}
           {canEdit ? (
             <div className={styles.moreRow}>
-              <Button variant="text" onClick={onDistribute} disabled={busy}><ChevronDown size={14} aria-hidden="true" />配る先を変える</Button>
+              <Button variant="text" onClick={onDistribute} disabled={busy}><ChevronDown size={16} aria-hidden="true" />配る先を変える</Button>
             </div>
           ) : null}
         </Card>
@@ -306,14 +306,14 @@ export default function HqTemplateDetail({
                     {version.is_current ? (
                       inUse && inUse.version !== version.version ? (
                         <div className={styles.versionActions}>
-                          <Button variant="secondary" onClick={() => openCompare(inUse.version, version.version)}><GitCompare size={14} aria-hidden="true" />いまの版と比べる</Button>
+                          <Button variant="secondary" onClick={() => openCompare(inUse.version, version.version)}><GitCompare size={16} aria-hidden="true" />いまの版と比べる</Button>
                         </div>
                       ) : null
                     ) : !isInUse ? (
                       <div className={styles.versionActions}>
-                        {current ? <Button variant="secondary" onClick={() => openCompare(version.version, current.version)}><GitCompare size={14} aria-hidden="true" />比べる</Button> : null}
+                        {current ? <Button variant="secondary" onClick={() => openCompare(version.version, current.version)}><GitCompare size={16} aria-hidden="true" />比べる</Button> : null}
                         {canEdit ? (
-                          <Button variant="secondary" disabled={busy} onClick={() => { setRestoreError(''); setRestoreTarget(version.version) }}><RotateCcw size={14} aria-hidden="true" />この版に戻す</Button>
+                          <Button variant="secondary" disabled={busy} onClick={() => { setRestoreError(''); setRestoreTarget(version.version) }}><RotateCcw size={16} aria-hidden="true" />この版に戻す</Button>
                         ) : null}
                       </div>
                     ) : null}

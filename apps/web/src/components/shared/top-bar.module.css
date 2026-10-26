@@ -42,7 +42,7 @@
   height: 36px;
   flex-shrink: 0;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--color-canvas);
@@ -389,7 +389,7 @@
   font-size: var(--text-nano);
   font-weight: 600;
   font-variant-numeric: var(--font-numeric);
-  padding: 0 3px;
+  padding: 0 2px;
 }
 
 /* 自分。名まえの頭1文字を36pxの丸で出す。 */
@@ -568,8 +568,8 @@
 :root .root[data-v8-chrome='shell'] { padding-right: var(--tpl-hq2-topbar-pad-end); }
 :root .root[data-v8-chrome='shell'] .actions { gap: 10px; }
 :root .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
-:root .root[data-v8-chrome='shell'] .crumbHome { gap: 6px; font-size: 13px; font-weight: var(--font-weight-ui); line-height: 20px; color: var(--color-ink-faint); }
-:root .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 14px; height: 14px; }
+:root .root[data-v8-chrome='shell'] .crumbHome { gap: var(--polish-space-row); font-size: 13px; font-weight: var(--font-weight-ui); line-height: 20px; color: var(--color-ink-faint); }
+:root .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 16px; height: 16px; }
 :root .root[data-v8-chrome='shell'] .crumbCurrent { font-size: 13px; font-weight: 500; line-height: 20px; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: var(--polish-radius-control); background: transparent; }
 /* 切替の札は箱の中に小さい字＋名前の2行（絵の指示）。外の見出しは畳む。 */
@@ -590,7 +590,7 @@
 /* 押せる役割（統括へ戻る）は文字の高さのまま。ボタンの最低の高さで名前が上へ押し出されていた（名前と役割の2行）。指で触る端末は今までどおり。 */
 @media (pointer: fine) { :root .root[data-v8-chrome='shell'] .identityText .roleButton { min-height: 0; } }
 :root .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
-:root .root[data-v8-chrome='shell'] .logout svg { width: 15px; height: 15px; }
+:root .root[data-v8-chrome='shell'] .logout svg { width: 16px; height: 16px; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton:not(:focus-visible) { outline-color: transparent; }
 /* 展開時は名前を最大260px・自分の名前を104px、畳んだ外側は内容に合わせた幅。 */
 :root .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: auto; max-width: 260px; height: 20px; line-height: 17px; }
@@ -640,3 +640,9 @@
  * 一番上にいる時は今のまま（透明）。値は globals.css の共通の値。
  */
 html:root .root[data-scrolled] { background: var(--bar-scrolled-bg); -webkit-backdrop-filter: var(--bar-scrolled-filter); backdrop-filter: var(--bar-scrolled-filter); box-shadow: var(--bar-scrolled-line); }
+
+/* パンくずのリンクと左メニューを畳むボタンの押せる範囲（§6.5 の 7）。見た目は変えず、透明な当たりで広げる（パンくずは高さ 24、畳むボタンは 36 角）。 */
+.crumbHome, .crumbFromLink { position: relative; }
+.crumbHome::before, .crumbFromLink::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton { position: relative; }
+:root .root[data-v8-chrome='shell'] .v8Left > .iconButton::before { content: ''; position: absolute; inset: -2px; }

@@ -527,7 +527,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               busy={publishing || Boolean(host?.busy)}
               busyLabel={host ? '保存中…' : '公開中…'}
             >
-              {conflict ? <GitCompare size={15} aria-hidden="true" /> : host ? null : <Send size={15} aria-hidden="true" />}
+              {conflict ? <GitCompare size={16} aria-hidden="true" /> : host ? null : <Send size={16} aria-hidden="true" />}
               {conflict ? '比べてから保存' : host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>
@@ -608,7 +608,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 <>
                   {urls.map((url) => (
                     <div key={url} className={styles.urlRow}>
-                      <Link2 size={14} aria-hidden="true" className={styles.urlIcon} />
+                      <Link2 size={16} aria-hidden="true" className={styles.urlIcon} />
                       <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
                       <span className={styles.urlNote}>短縮して、押された数を数える</span>
                       <SettingCheckbox checked locked label={`${url}を短縮して数える（いつもオン）`} />

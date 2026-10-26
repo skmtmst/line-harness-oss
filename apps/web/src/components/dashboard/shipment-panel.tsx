@@ -123,7 +123,7 @@ export default function ShipmentPanel({
         action={<Link href="/ec-commerce" prefetch={false} className="hover:underline">すべて見る →</Link>}
         actionTone="info"
       />
-      <div className="px-[18px] pb-[18px]">
+      <div className="px-[16px] pb-[16px]">
         {loading ? (
           <p className="py-6 text-center text-sm text-ink-faint">{STATE_TEXT.loading}…</p>
         ) : error ? (

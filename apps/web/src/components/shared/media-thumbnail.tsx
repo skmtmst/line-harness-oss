@@ -12,7 +12,7 @@ export default function MediaThumbnail({ kind, src, alt }: { kind: 'image' | 'vi
     ? <span className={styles.failure}>画像を表示できません</span>
     // 静的書き出しでは認証付きURLをそのまま読む。
     // eslint-disable-next-line @next/next/no-img-element
-    : <img src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} className={styles.image} />
+    : <img width={160} height={120} src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} className={styles.image} />
   const Icon = kind === 'video' ? Play : kind === 'audio' ? FileAudio : FileText
   return <span className={styles.placeholder} data-media-thumbnail="" data-kind={kind} role="img" aria-label={alt}><Icon aria-hidden="true" /></span>
 }

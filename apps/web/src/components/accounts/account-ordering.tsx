@@ -290,7 +290,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
           onDragStart={(event) => startDrag(event, account.id)} onDragEnd={finishDrag}
           onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
           onDrop={(event) => dropOn(event, account.id)}>
-          <GripHorizontal className={compact.grip} size={12} aria-hidden="true" />
+          <GripHorizontal className={compact.grip} size={16} aria-hidden="true" />
           <span className={compact.name} title={account.displayName || account.name}>{account.displayName || account.name}</span>
           <span className={compact.relationship}>{depth === 0 ? '最上位（親）' : `${parent?.displayName || parent?.name || '上位アカウント'}の${depth === 1 ? '子' : '孫'}`}</span>
           {moveMenu(account)}
@@ -303,7 +303,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
         designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 0" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
         footer={<div className={compact.footer}>
           <Button onClick={() => { cancelChanges(); onClose() }} disabled={saving}>キャンセル</Button>
-          <Button variant="primary" onClick={() => save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…"><Save size={14} aria-hidden="true" />構成を保存する</Button>
+          <Button variant="primary" onClick={() => save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…"><Save size={16} aria-hidden="true" />構成を保存する</Button>
         </div>}>
         <div className={compact.body}>
           <p className={compact.description}>カードの「…」から「最上位（親）にする」「○○の子にする」を選ぶか、親にしたいカードの上へドラッグします。親・子・孫の3階層まで設定できます。</p>

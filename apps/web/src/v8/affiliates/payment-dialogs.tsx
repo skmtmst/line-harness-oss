@@ -106,7 +106,7 @@ export function SettlementCloseDialog({
             </div>
           </dl>
           {missing.length > 0 ? (
-            <Notice tone="warn" role="note" icon={<CircleHelp size={14} aria-hidden="true" />}>
+            <Notice tone="warn" role="note" icon={<CircleHelp size={16} aria-hidden="true" />}>
               <span>
                 {`振込先が未登録の人が ${formatNumber(missing.length)} 人います（${missing.slice(0, 3).map((item) => `${item.affiliateName} ${formatYen(item.amount)}`).join('・')}${missing.length > 3 ? ` ほか${formatNumber(missing.length - 3)} 人` : ''}）。締めても、登録されるまで振り込めません。`}
               </span>
@@ -133,7 +133,7 @@ export function SettlementCloseDialog({
               busy={busy}
               busyLabel="締めています"
             >
-              <Lock size={15} aria-hidden="true" />
+              <Lock size={16} aria-hidden="true" />
               締める
             </Button>
           </div>
@@ -246,7 +246,7 @@ export function PayoutStepUpDialog({
           <Button type="button" onClick={onClose} disabled={busy}>やめる</Button>
           {stepUpMethod !== 'none' ? (
             <Button type="button" variant="primary" title={summary} onClick={() => { void exportCsv() }} disabled={busy || !ready} busy={busy} busyLabel="確認しています">
-              <Download size={15} aria-hidden="true" />
+              <Download size={16} aria-hidden="true" />
               確認して書き出す
             </Button>
           ) : null}

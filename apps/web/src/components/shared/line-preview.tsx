@@ -72,17 +72,17 @@ export default function LinePreview({
               <span className={styles.clock}>9:41</span>
               <span className={styles.island} aria-hidden="true" />
               <span className={styles.statusIcons}>
-                <Signal size={15} strokeWidth={1.8} aria-hidden="true" />
-                <Wifi size={15} strokeWidth={1.8} aria-hidden="true" />
+                <Signal size={16} strokeWidth={1.8} aria-hidden="true" />
+                <Wifi size={16} strokeWidth={1.8} aria-hidden="true" />
                 <BatteryFull size={20} strokeWidth={1.8} aria-hidden="true" />
               </span>
             </div>
             <div className={styles.talkHead}>
               <ChevronLeft size={20} aria-hidden="true" />
               <span className={styles.talkName}>{accountName ?? '公式アカウント'}</span>
-              <Search size={17} aria-hidden="true" />
-              <Phone size={17} aria-hidden="true" />
-              <Menu size={17} aria-hidden="true" />
+              <Search size={16} aria-hidden="true" />
+              <Phone size={16} aria-hidden="true" />
+              <Menu size={16} aria-hidden="true" />
             </div>
             <div className={styles.talk} data-line-preview-part="talk">
               {/* リッチメニューの見本（gobhu）はトークが空で、日付の札も無い。届く日時を渡したときだけ出す。 */}
@@ -98,7 +98,7 @@ export default function LinePreview({
             {richMenu ? <div className={styles.richMenu} data-line-preview-part="rich-menu">{richMenu}</div> : null}
             <div className={styles.menuBar} data-line-preview-part="menu-bar">
               <span>{richMenu ? (chatBarText || 'メニュー') : 'メニュー'}</span>
-              <ChevronDown size={12} aria-hidden="true" />
+              <ChevronDown size={16} aria-hidden="true" />
             </div>
             <div className={styles.homeBar}><span className={styles.homeLine} aria-hidden="true" /></div>
           </div>
