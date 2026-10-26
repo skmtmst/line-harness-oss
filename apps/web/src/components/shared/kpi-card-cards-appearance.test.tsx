@@ -19,4 +19,13 @@ describe('数のカードの形（案A）', () => {
     expect(cards.map((card) => card.hasAttribute('data-kpi-zero'))).toEqual([true, false, false])
     expect(cards.map((card) => card.querySelector('[data-kpi-sparkline]') !== null)).toEqual([false, true, false])
   })
+
+  it('一覧の線の帯（カードの形でない帯）でも 0 の数に同じ印を付ける', () => {
+    const { container } = render(<KpiBand>
+      <KpiCard presentation="band" title="友だち" value={0} unit="人" detail="" />
+      <KpiCard presentation="band" title="予約" value={12} unit="件" detail="" />
+    </KpiBand>)
+    expect(container.querySelector('[data-kpi-strip]')?.hasAttribute('data-kpi-appearance')).toBe(false)
+    expect([...container.querySelectorAll('[data-design-version]')].map((card) => card.hasAttribute('data-kpi-zero'))).toEqual([true, false])
+  })
 })

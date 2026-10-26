@@ -212,10 +212,9 @@ html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-icon] {
 }
 html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-icon] svg { width: var(--space-16); height: var(--space-16); }
 html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-label] { color: var(--color-ink); }
-/* 数字は大きく詰める（大きさ・太さは帯の決まりのまま、字間だけ詰める）。0 は薄い灰。 */
+/* 数字は大きく詰める（大きさ・太さは帯の決まりのまま、字間だけ詰める）。 */
 html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-number] { letter-spacing: var(--tpl-kpi-card-number-tracking); }
-html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-zero] [data-kpi-value],
-html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-zero] [data-kpi-unit] { color: var(--color-ink-faint); }
+
 /*
  * 状態の札（差の札）は右上。題の行と同じ段に置き、題は札の手前で省略する（重ねない）。
  * 数の行（data-unit-spacing）は箱を作らず中身を段に並べ、差の札だけ右上の欄へ移す。
@@ -236,3 +235,7 @@ html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-sparkline] {
   display: block; position: absolute; right: var(--space-20); bottom: var(--polish-space-card);
   width: 30%; height: var(--space-24);
 }
+
+/* どの数の帯でも、値が 0 の時は数字と単位を薄い灰にする（帯の形・数字の太さは変えない）。 */
+html:root [data-kpi-strip] [data-kpi-zero] [data-kpi-value],
+html:root [data-kpi-strip] [data-kpi-zero] [data-kpi-unit] { color: var(--color-kpi-zero); }

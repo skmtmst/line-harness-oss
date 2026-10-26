@@ -149,6 +149,8 @@
    */
   --color-accent-border: #a8e9c1;
   --color-ink-disabled: #b8bcc2;
+  /* 数の帯で値が 0 の時の数字と単位（目立たせない）。 */
+  --color-kpi-zero: #a3a8b0;
   --color-divider-soft: #eaebed;
   --color-status-danger-selected: #ffe4e7;
   --color-status-danger-border: #f3b8bb;
