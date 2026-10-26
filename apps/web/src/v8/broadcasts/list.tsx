@@ -826,24 +826,6 @@ export default function BroadcastListV8() {
     </FilterPopover>
   )
 
-  /* 閲覧のみは保存できないので置かない。場所だけ空けて「保存した検索」までの並びを保つ。 */
-  const saveCurrentButton = canEdit ? (
-    <Button
-      type="button"
-      variant="text"
-      textTone="quiet"
-      onClick={() => setSavedViewOpen((open) => !open)}
-    >
-      <Bookmark size={16} aria-hidden="true" />
-      この条件を保存する
-    </Button>
-  ) : (
-    <span className={`${styles.ghostButton} ${styles.viewerSpace}`} aria-hidden="true">
-      <Bookmark size={16} aria-hidden="true" />
-      この条件を保存する
-    </span>
-  )
-
   const savedSearchBox = (
     <div className={styles.savedBox}>
       <Button
@@ -854,7 +836,10 @@ export default function BroadcastListV8() {
       >
         <Bookmark size={16} aria-hidden="true" />
         {savedViews.find((view) => view.id === savedViewId)?.name ?? '保存した検索'}
+        <ChevronDown size={16} aria-hidden="true" />
       </Button>
+      {/* 絞り込み中で、まだ保存した検索として開いていない時だけ、保存できることを小さな点で知らせる。 */}
+      {canEdit && !savedViewId && (filterActive || dateFrom || dateTo) ? <span className={styles.savableDot} data-savable-dot="" title="今の条件を保存できます" aria-hidden="true" /> : null}
       <ActionMenu
         open={savedMenuOpen}
         onClose={() => setSavedMenuOpen(false)}
@@ -870,7 +855,7 @@ export default function BroadcastListV8() {
           // 閲覧のみは保存できないので、押せない項目を置かない
           ...(canEdit ? [{
             id: 'view-save',
-            label: '＋ この条件を保存する',
+            label: '＋ 今の条件を保存する',
             dividerBefore: savedViews.length > 0,
             onSelect: () => { setSavedMenuOpen(false); setSavedViewOpen(true) },
           }] : []),
@@ -926,7 +911,7 @@ export default function BroadcastListV8() {
     <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         {searchBox}
-        <ListToolbarOptional collapse="overflow" label="配信日・検索条件">{dateBox}{saveCurrentButton}<ListToolbarEnd>{savedSearchBox}</ListToolbarEnd></ListToolbarOptional>
+        <ListToolbarOptional collapse="overflow" label="配信日・検索条件">{dateBox}<ListToolbarEnd>{savedSearchBox}</ListToolbarEnd></ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
         {statusChips}
@@ -1068,12 +1053,12 @@ export default function BroadcastListV8() {
                 <Td><span className={styles.audience} title={audience}>{audience}</span></Td>
               )}
               <Td>
-                <span className={styles.cellMain}>
-                  {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? <ListDateTime value={broadcast.sentAt} /> : emptyValue('unknown'))
-                    : (broadcast.scheduledAt ? <ListDateTime value={broadcast.scheduledAt} /> : emptyValue('unconfigured'))}
-                </span>
-                {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
+                {/* 日時だけの1行。予約中（まだ先）の日時だけ少し濃くする。「予約」は状態の札にあるので重ねない。 */}
+                {(() => {
+                  const at = broadcast.status === 'sent' ? broadcast.sentAt : broadcast.scheduledAt
+                  if (!at) return <span className={`${styles.cellMain} ${styles.faintValue}`}>{emptyValue('unknown')}</span>
+                  return <span className={styles.cellMain} data-upcoming={broadcast.status === 'scheduled' || undefined}><ListDateTime value={at} /></span>
+                })()}
               </Td>
               <BroadcastResultCells broadcast={broadcast} insight={insight} narrow={narrow} />
               <Td className={styles.colMenu}>

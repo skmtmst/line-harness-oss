@@ -19,7 +19,7 @@ vi.mock('@/components/broadcasts/broadcast-form', () => {
 })
 const listBroadcasts = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
-const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view' } })))
+const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view', name: '古い配信', filters: {} } })))
 const listViews = vi.hoisted(() => vi.fn())
 const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const updateBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
@@ -181,6 +181,32 @@ describe('V8 一斉配信一覧の結果の列', () => {
     for (const text of unsentRight) expect(text).not.toMatch(/\d/)
   })
 
+  it('配信日時は日時だけの1行で「予約」を重ねず、予約中の日時だけ少し濃くする', async () => {
+    narrow.value = false
+    const { sent, unsent } = await renderRows()
+    const upcoming = unsent.querySelector('[data-upcoming]')
+    expect(upcoming?.textContent).toMatch(/\d/)
+    expect([...unsent.querySelectorAll('td span')].some((el) => el.textContent?.trim() === '予約')).toBe(false)
+    expect(sent.querySelector('[data-upcoming]')).toBeNull()
+  })
+
+  it('［この条件を保存する］は［保存した検索］の中にまとめ、絞り込み中だけ横に小さな点を出す', async () => {
+    narrow.value = false
+    await renderRows()
+    expect(buttonByText('この条件を保存する')).toBeUndefined()
+    expect(host.querySelector('[data-savable-dot]')).toBeNull()
+    act(() => { buttonByText('保存した検索')!.click() })
+    await flush()
+    const items = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent?.trim())
+    expect(items.at(-1)).toBe('＋ 今の条件を保存する')
+    act(() => { (document.querySelector('[role="menuitem"]') as HTMLElement).click() })
+    await flush()
+    const chip = [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith('予約中')) as HTMLButtonElement
+    act(() => { chip.click() })
+    await flush()
+    expect(host.querySelector('[data-savable-dot]')).not.toBeNull()
+  })
+
   it('狭い幅は1列の2段（上に人数・下に開封とクリック）で、送っていない行は — で数を作らない', async () => {
     narrow.value = true
     const { sent, unsent, heads } = await renderRows()
@@ -290,7 +316,10 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     const buttons = [...host.querySelectorAll('button')]
     // 押せない形で出すのではなく、置かない（2026-10-06 オーナー決定）
     expect(buttons.find((b) => b.textContent?.includes('配信を作る')), '閲覧のみに「配信を作る」が出ています').toBeUndefined()
-    expect(buttons.find((b) => b.textContent?.includes('この条件を保存する')), '閲覧のみに「この条件を保存する」が出ています').toBeUndefined()
+    expect(buttons.find((b) => b.textContent?.includes('条件を保存する')), '閲覧のみに「条件を保存する」が出ています').toBeUndefined()
+    act(() => { buttonByText('保存した検索')!.click() })
+    await flush()
+    expect([...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent?.includes('今の条件を保存する')), '閲覧のみのメニューに保存が出ています').toBe(false)
     expect(buttons.find((b) => b.textContent?.includes('フォルダを追加')), '閲覧のみに「フォルダを追加」が出ています').toBeUndefined()
   })
 
@@ -507,7 +536,9 @@ it('検索保存は現在の並び順と表示件数を保存する', async () =
   await flush()
   act(() => { fireEvent.click(host.querySelector('[aria-label="並び"]')!) })
   act(() => { fireEvent.click([...document.querySelectorAll('[role="option"]')].find(el => el.textContent?.includes('古い順'))!.querySelector('button')!) })
-  act(() => { buttonByText('この条件を保存する')!.click() })
+  act(() => { buttonByText('保存した検索')!.click() })
+  await flush()
+  act(() => { ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('今の条件を保存する')) as HTMLElement).click() })
   await flush()
   fireEvent.change(host.querySelector('input[aria-label="保存する検索の名前"]')!, { target: { value: '古い配信' } })
   act(() => { buttonByText('保存する')!.click() })
