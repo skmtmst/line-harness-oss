@@ -107,7 +107,7 @@ describe('数の帯', () => {
 })
 
 describe('行', () => {
-  it('名前は編集へ、ボタンは条件を当てた友だち一覧へ。省略しても全文を名前として持つ', async () => {
+  it('行の名前のリンクは編集へ、ボタンは条件を当てた友だち一覧へ。省略しても全文を持つ', async () => {
     render(<SearchesTab accountId="acc" canEdit />)
     await screen.findByText('VIPかつ未契約')
     const row = rowOf('s1')

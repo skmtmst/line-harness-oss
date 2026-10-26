@@ -213,7 +213,7 @@ describe('事前確認から実行へのつなぎ', () => {
     expect(fixture.migrationExecute).toHaveBeenCalledWith('source-1', 'account-1', 'tok-1', expect.stringMatching(/^[0-9a-f-]{36}$/))
   })
 
-  it('確かめている間に移行先を選び直したら、遅れて届いた確認の結果で実行を出さない', async () => {
+  it('確かめている間に移行先を選びなおすと、遅れて届いた確認の結果で実行を出さない', async () => {
     let finish!: (value: unknown) => void
     fixture.migrationPreview.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
     render(<MigrateFriendFieldPage />)
