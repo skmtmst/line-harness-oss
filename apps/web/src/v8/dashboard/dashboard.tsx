@@ -31,6 +31,7 @@ import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
 import { FirstStepsCard,useFirstSteps } from './first-steps'
 import { FirstRunDoneDialog } from './first-run-done'
+import { StarterRetryNotice, starterRetryVisible, useStarterRetryResult } from './starter-retry'
 import { FriendAddLink } from './friend-add'
 import SectionHeader from './head'
 import { InboxSection } from './inbox'
@@ -84,6 +85,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   const start = useFirstSteps(d.selectedAccountId, role, { qrOpen: qrRequested })
   /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
   const setup = useStyleSetup(d.selectedAccountId, role)
+  const starterResult = useStarterRetryResult(d.selectedAccountId)
   const setupRest = setupSummary(setup.data)
   const closedWizardAccount = useRef<string | null>(null)
   const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
@@ -366,12 +368,19 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   ])
   const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
   const setupBands = setup.data && canManage ? <SetupWarningBands data={setup.data} /> : null
-  const notice = start.error || setup.error || start.summary || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
+  /* 初期セットが入っていない時の［入れ直す］。版は使い方の設定が読めてから渡す（閲覧のみには出さない）。 */
+  const starterRetry = canManage && d.selectedAccountId && starterRetryVisible(start.starter, starterResult.inserted) ? (
+    <StarterRetryNotice key={d.selectedAccountId} accountId={d.selectedAccountId} starter={start.starter} version={setup.data?.state.version ?? null}
+      inserted={starterResult.inserted} onInserted={starterResult.record} onDismiss={starterResult.clear}
+      onChanged={() => { start.reload(); setup.reload() }} />
+  ) : null
+  const notice = start.error || setup.error || start.summary || starterRetry || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <ReadOnlyNotice />
       ) : null}
       {setupBands}
+      {starterRetry}
       {start.error && canManage ? <ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={start.error} onRetry={start.reload} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} onRecheck={start.watchExpired ? start.rewatch : undefined} /> : null}
       {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : null}
       {d.periodNotice ? <Notice tone="info" role="status">{d.periodNotice}</Notice> : null}

@@ -90,7 +90,7 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   }, [accountId])
   return {
     summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: state.reload,
-    steps: state.steps, firstRun: state.firstRun, watchExpired: state.watchExpired, rewatch: state.rewatch,
+    steps: state.steps, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
     arrived: enabled && done.arrived, dismissArrived: done.dismiss,
   }
 }
