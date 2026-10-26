@@ -42,7 +42,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.empty { color: var(--color-ink-faint); font-weight: 400; }
+.empty { color: var(--color-ink-faint); font-weight: var(--font-weight-ui); }
 /* 右の欄の中身：顔・要点・顧客情報の枠を縦に並べる（管理画面 の線の区切りは使わない）。 */
 .body { display: flex; flex-direction: column; padding-bottom: var(--tpl-inbox-summary-pad); }
 /* 顧客情報の枠（XqSvX：角丸12・薄い枠・内側16）。中の節は線で区切る。 */

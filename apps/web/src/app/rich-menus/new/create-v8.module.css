@@ -117,7 +117,7 @@
 .fieldHint {
   margin: 0;
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -137,7 +137,7 @@
 
 /* 板 「トークを開いたとき」：前の短い字は太字にしない。 */
 .segLabelPlain {
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .segHint {
@@ -246,8 +246,8 @@
 }
 
 .pageChipDefault {
-  font-size: 11px;
-  font-weight: 400;
+  font-size: 12px;
+  font-weight: var(--font-weight-ui);
   opacity: 0.85;
 }
 
@@ -487,7 +487,7 @@
 .checkNote {
   margin: 0;
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
   line-height: var(--tpl-eds-hint-lh);
 }
 

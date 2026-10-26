@@ -182,7 +182,7 @@
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
@@ -238,7 +238,7 @@
   border-radius: var(--radius-pill);
   background: var(--color-accent-soft);
   color: var(--color-accent-deep);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -249,7 +249,7 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -280,7 +280,7 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-mini);
   color: var(--color-ink-secondary);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -574,7 +574,7 @@
 
 .importSummary dt {
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .importSummary dd {
@@ -650,7 +650,7 @@
   background: var(--color-canvas-sunken);
   border: 1px solid var(--color-hairline);
   color: var(--color-ink-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -858,7 +858,7 @@ button.personName:hover {
 
 .personSub {
   color: var(--color-ink-secondary);
-  font-size: 11px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -960,7 +960,7 @@ legend.fieldLabel {
   display: block;
   margin-top: 2px;
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* 解除の理由を書く欄 */
@@ -973,7 +973,7 @@ legend.fieldLabel {
   border-radius: var(--radius-control);
   padding: 8px 10px;
   font: inherit;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .errorBandNoticePlacement { margin: 0; }

@@ -30,7 +30,7 @@
  * 同じ高さにそろえる。文字サイズ・余白は共通のまま変えない。
  */
 .compact {
-  height: 32px;
+  height: var(--control-h-compact);
 }
 
 /* タッチ端末は指の当たり判定のため44pxを確保する（#976 U083）。 */
@@ -212,7 +212,7 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+:root .button { border: 0; line-height: 20px; font-family: var(--font-sans); }
 :root .primary { border: 0; outline: 1px solid var(--color-primary-border); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
 :root .line { border: 0; outline: 1px solid var(--color-accent); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
 :root .secondary { outline: 1px solid var(--color-control-border); outline-offset: -1px; }
@@ -372,6 +372,25 @@ html:root .button.secondary[data-presentation='row-action']:focus-visible {
   stroke-width: 2;
   flex: none;
 }
+
+/*
+ * 奥行き（くっきり版）。値は globals.css の共通の値だけを読む。
+ * 緑の主ボタン：薄いグラデと上端の光、乗せると影が少し深く、押すと 0.5px 沈む。
+ * 白い副ボタン：白から #fafafc への薄いグラデと、外周 1px の影。
+ */
+:root .button.primary { background: var(--gradient-primary-action) var(--color-accent-deep); }
+:root .button.primary:hover:not(:disabled) { box-shadow: var(--shadow-primary-action-hover); }
+/* 窓の取消（淡い面）・選んだ札・乗せた時・押した時は、それぞれの規則（詳しさが上）が勝つ。 */
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']) { background: var(--gradient-raised-control) var(--color-canvas); }
+@media (prefers-reduced-motion: no-preference) {
+  :root .button.primary:active:not(:disabled) { transform: var(--press-primary-shift); }
+}
+/* 文字の上下の真ん中：行の高さだけで真ん中に置き、上に足す 1px の補正は使わない（英数字が Inter になったため）。 */
+html:root .button:is(.standard, .field, .compact)[data-text-content]:is(:not([data-presentation]), [data-presentation='row-action']) { padding-block: 0; }
+
+/* ［LINE でログイン］は LINE の決まりの明るい緑。画面の緑（--color-accent＝深い緑）をこのボタンの中だけ LINE の緑に読み替える。 */
+:root .line { --color-accent: var(--color-line-green); --color-accent-hover: var(--color-line-green-hover); }
+
 /* ［LINE でログイン］：色は LINE の決まりのまま、文字を大きく太くして読みやすくする。高さは主ボタンと同じ。 */
 :root .button.line:not([data-presentation]) {
   font-size: 15px;

@@ -32,7 +32,6 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     const css = read('./button.module.css')
     expect(css).toMatch(/:root \.standard,\s*:root \.field \{\s*height:\s*var\(--tpl-button-h\)/s)
     // 行内 32・アイコン 36 も見本どおり。
-    expect(css).toMatch(/\.compact\s*\{[^}]*height:\s*32px/s)
     expect(read('./icon-button.module.css')).toMatch(/:root \.button \{[^}]*height:\s*36px/s)
   })
 

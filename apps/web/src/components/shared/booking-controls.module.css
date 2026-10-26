@@ -36,7 +36,7 @@
 .block[data-placement='board'] { position: static; width: 100%; height: 100%; gap: 0; padding: var(--tpl-sd-entry-pad); }
 .block[data-placement='month'] { position: static; width: 100%; padding: var(--polish-space-row); gap: 0; font-size: var(--text-micro); }
 .block > strong { font-weight: 600; }
-.block > span { font-variant-numeric: tabular-nums; }
+.block > span { font-variant-numeric: var(--font-numeric); }
 .block[data-selected] { outline: var(--polish-focus-width) solid var(--color-ink); outline-offset: -2px; }
 .slotAdd {
   position: absolute;

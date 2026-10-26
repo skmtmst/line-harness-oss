@@ -217,5 +217,5 @@
   background: var(--color-accent-deep); /* fill: $accent-deep */
   color: var(--color-on-accent); /* fill: $on-accent */
   font-size: var(--text-label); /* fontSize: $size-label */
-  font-weight: 400; /* fontWeight: 400 */
+  font-weight: var(--font-weight-ui); /* fontWeight: 400 */
 }

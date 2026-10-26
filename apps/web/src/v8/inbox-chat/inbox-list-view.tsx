@@ -169,7 +169,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                         名前だけだと、`未対応・期限超過` と `河野担当の未対応` の
                         どちらを押せばいいのかが、名前の付け方頼みになる。
                       */}
-                      <span className="text-ink-faint mt-0.5 block truncate text-micro font-normal">
+                      <span className="text-ink-faint mt-0.5 block truncate text-micro font-medium">
                         {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
                       </span>
                     </button>

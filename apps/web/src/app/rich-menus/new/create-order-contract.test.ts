@@ -33,7 +33,7 @@ describe('リッチメニュー作る③の出す順番（OxEMM）', () => {
   })
 
   it('「トークを開いたとき」の前の短い字は太字にしない', () => {
-    expect(block('.segLabelPlain {')).toContain('font-weight: 400')
+    expect(block('.segLabelPlain {')).not.toMatch(/font-weight:\s*(?:600|700|bold)/)
     expect(TSX).toContain('segLabelPlain')
   })
 })

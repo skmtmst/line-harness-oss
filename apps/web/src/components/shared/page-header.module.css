@@ -71,7 +71,7 @@
 :root .description {
   color: var(--color-ink-secondary);
   font-size: var(--tpl-desc-size);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-desc-lh);
 }
 

@@ -27,7 +27,7 @@
 .header :global([data-part='stepper'] ol) { gap: var(--space-14); }
 .header :global([data-part='stepper'] li > span[aria-hidden]) { width: 10px; }
 .header :global([data-part='stepper'] li > :last-child) { gap: var(--space-6); }
-.header :global([data-part='stepper'] li > :last-child > :first-child) { width: 22px; height: 22px; font-size: 11px; }
+.header :global([data-part='stepper'] li > :last-child > :first-child) { width: 22px; height: 22px; font-size: 12px; }
 .header :global([data-part='stepper'] li > :last-child > :last-child span) { font-size: 13px; white-space: nowrap; }
 .header :global([data-part='stepper'] [aria-current='step'] > :first-child) { outline: 0; background: var(--color-ink); color: var(--color-canvas); }
 .input { min-width: 0; padding: var(--space-24); display: flex; flex-direction: column; gap: var(--space-16); }
@@ -58,7 +58,7 @@
 .excludeTag { min-width: 0; }
 .audienceCount { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-14); border-radius: var(--radius-control); background: var(--color-surface-pearl); font-size: 13px; }
 .audienceCount span { display: flex; align-items: center; gap: var(--space-8); }
-.audienceCount strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.audienceCount strong { white-space: nowrap; font-variant-numeric: var(--font-numeric); }
 .details { border-top: 1px solid var(--color-hairline); padding-top: var(--space-12); font-size: 12px; }
 .details summary { cursor: pointer; color: var(--color-ink-secondary); }
 .details[open] > :not(summary) { margin-top: var(--space-10); }
@@ -71,7 +71,7 @@
 .phonePreview :global(section > p:first-child), .pcPreview :global(section > p:first-child) { display: none; }
 .pcPreview { width: 100%; }
 .pcPreview :global(section > div) { width: 100%; height: 440px; border-radius: var(--radius-panel); }
-.previewCaption { font-size: 11px; color: var(--color-ink-faint); text-align: center; }
+.previewCaption { font-size: 12px; color: var(--color-ink-faint); text-align: center; }
 .previewSummary { border-top: 1px solid var(--color-hairline); padding-top: var(--space-14); width: 100%; }
 .previewSummary dl { margin-top: var(--space-8); font-size: 12px; }
 .previewSummary dl > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-4) 0; }
@@ -132,7 +132,7 @@
 .bubbleFrame { border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); }
 .bubbleFrame[open] { border-color: var(--color-accent-deep); }
 .bubbleFrame > summary { display: flex; align-items: center; gap: var(--space-8); cursor: pointer; padding: var(--space-10) var(--space-12); font-size: 13px; font-weight: 500; background: var(--color-surface-pearl); border-radius: var(--radius-control); }
-.bubbleNumber { display: inline-flex; justify-content: center; align-items: center; width: 20px; height: 20px; border-radius: var(--radius-pill); background: var(--color-ink); color: var(--color-canvas); font-size: 11px; }
+.bubbleNumber { display: inline-flex; justify-content: center; align-items: center; width: 20px; height: 20px; border-radius: var(--radius-pill); background: var(--color-ink); color: var(--color-canvas); font-size: 12px; }
 .bubbleFrame > section { border: 0; border-radius: var(--radius-none); margin: 0; padding: var(--space-12); }
 .bubbleFrame > :global([role='tablist']) { margin: 0; padding: var(--space-6) var(--space-10); border-bottom: 1px solid var(--color-hairline); }
 

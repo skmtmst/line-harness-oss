@@ -37,6 +37,7 @@ export default function IconButton({
       aria-label={ariaLabel}
       data-design-node="H0V8EK"
       data-size={size}
+      data-hit-area={size === 'small' ? '' : undefined}
       data-variant={variant}
       aria-pressed={pressed}
       {...props}

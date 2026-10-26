@@ -38,7 +38,7 @@
 .mileUnit { font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-ink-secondary); white-space: nowrap; }
 .value { margin: 0; font-size: var(--tpl-fdt-text-size); line-height: var(--tpl-fdt-text-lh); color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .memo { margin: 0; font-size: var(--tpl-fdt-text-size); line-height: var(--tpl-fdt-text-lh); color: var(--color-ink-secondary); white-space: pre-wrap; overflow-wrap: anywhere; }
-.faint { color: var(--color-ink-faint); font-weight: 400; }
+.faint { color: var(--color-ink-faint); font-weight: var(--font-weight-ui); }
 .retry { padding: 0; margin-left: var(--tpl-fdt-link-gap); border: 0; background: none; color: var(--color-action); font: inherit; cursor: pointer; }
 .full { width: 100%; }
 .more { display: flex; flex-direction: column; gap: var(--tpl-fdt-summary-gap); }
@@ -123,11 +123,11 @@ a.recentTitle:hover { text-decoration: underline; }
 .infoGroup + .infoGroup { padding-top: var(--tpl-fdt-info-gap); border-top: 1px solid var(--color-hairline); }
 .infoGroupTitle { margin: var(--tpl-fdt-info-heading-margin); font-size: var(--tpl-fdt-text-size); font-weight: 600; color: var(--color-ink); display: flex; align-items: baseline; gap: var(--space-8); min-width: 0; }
 .infoGroupHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-12); }
-.infoGroupNote { font-size: var(--tpl-fdt-small-size); font-weight: 400; color: var(--color-ink-faint); white-space: nowrap; }
+.infoGroupNote { font-size: var(--tpl-fdt-small-size); font-weight: var(--font-weight-ui); color: var(--color-ink-faint); white-space: nowrap; }
 .fieldLabelText { flex-shrink: 0; white-space: nowrap; }
 .manageLink { display: inline-flex; align-items: center; gap: var(--space-2); flex-shrink: 0; white-space: nowrap; font-size: var(--tpl-fdt-small-size); font-weight: 500; color: var(--color-action); }
 .manageLink:hover { text-decoration: underline; }
-.fieldSource { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; color: var(--color-ink-faint); }
+.fieldSource { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-weight-ui); color: var(--color-ink-faint); }
 .field { display: flex; flex-direction: column; gap: var(--tpl-fdt-field-gap); min-width: 0; padding-left: 0; }
 .field[data-changed] { border-left: var(--tpl-fdt-changed-line) solid var(--color-accent-deep); padding-left: var(--tpl-fdt-group-gap); }
 .fieldLabel { display: flex; align-items: center; gap: var(--tpl-fdt-row-text-gap); font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); font-weight: 500; color: var(--color-ink-secondary); }
