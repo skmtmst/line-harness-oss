@@ -544,9 +544,7 @@
   --polish-status-gap: 8px;
   --polish-status-pad: 2px 8px;
   /* 状態の札は地の色のある札（点は残し、色だけに頼らない）。字と地の明暗差はどれも 4.5:1 以上。 */
-  --polish-status-radius: var(--polish-radius-small);
-  /* 行の「…」に乗せた時の薄い灰の地（行の乗せた時の地より一段濃い）。 */
-  --polish-row-menu-hover-bg: #eef0f3;
+  --polish-status-radius: var(--polish-radius-small); --polish-row-menu-hover-bg: #eef0f3; /* 行の「…」に乗せた時の地（行の地より一段濃い） */
   --polish-status-success-dot: #16a34a;
   --polish-status-success-bg: #e3f4ea;
   --polish-status-success-ink: #08703a;
