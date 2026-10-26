@@ -51,7 +51,7 @@ import { billingFailureMessage } from './billing-failure'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import styles from './billing.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 type BillingMetrics = Awaited<ReturnType<typeof fetchHqBillingMetrics>>['data']
@@ -411,7 +411,7 @@ function BillingInner() {
                       <Download aria-hidden="true" className={styles.buttonIcon} />領収書
                     </Button>
                   ) : (
-                    <span className={styles.faint}>{emptyValue('unknown')}</span>
+                    <EmptyCell />
                   )}
                 </Td>
               </Tr>

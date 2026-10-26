@@ -35,7 +35,7 @@ import Checkbox from '@/components/shared/checkbox';
 import Chip from '@/components/shared/chip';
 import Dialog from '@/components/shared/dialog';
 import DisplayItemsDialog from '@/components/shared/display-items-dialog';
-import { emptyValue } from '@/components/shared/empty-value';
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
 import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select';
 import FilterChip from '@/components/shared/filter-chip';
 import KpiBand from '@/components/shared/kpi-band';
@@ -865,7 +865,7 @@ export default function FriendsListV8() {
           </Td>
           )
           if (column.key === 'scenario') return (
-          <Td key={column.key} presentation="friend-list" className={styles.fixedContent}>{friend.activeScenario ? <ScenarioState scenario={friend.activeScenario} /> : <span className={styles.faint}>{emptyValue('unknown')}</span>}</Td>
+          <Td key={column.key} presentation="friend-list" className={styles.fixedContent}>{friend.activeScenario ? <ScenarioState scenario={friend.activeScenario} /> : <EmptyCell />}</Td>
           )
           if (column.key === 'latest') return (
           <Td key={column.key} presentation="friend-list">
@@ -874,7 +874,7 @@ export default function FriendsListV8() {
                 <span className={styles.cellText} title={latest.content}>{messageWord(latest)}</span>
                 <span className={styles.sub}>{monthDayTime(latest.createdAt)}</span>
               </div>
-            ) : <span className={styles.faint}>{emptyValue('unknown')}</span>}
+            ) : <EmptyCell />}
           </Td>
           )
           if (column.key === 'tags') return (
@@ -882,18 +882,18 @@ export default function FriendsListV8() {
             <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
               <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}</TagOverflow>
 
-              {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
+              {friend.tags.length === 0 ? <EmptyCell /> : null}
             </div>
           </Td>
           )
           if (column.key === 'source') return (
-          <Td key={column.key} presentation="friend-list" className={styles.fixedContent}>{friend.firstTrackedLinkName ? <span className={styles.cellText} title={friend.firstTrackedLinkName}>{friend.firstTrackedLinkName}</span> : <span className={styles.faint}>{emptyValue('unknown')}</span>}</Td>
+          <Td key={column.key} presentation="friend-list" className={styles.fixedContent}>{friend.firstTrackedLinkName ? <span className={styles.cellText} title={friend.firstTrackedLinkName}>{friend.firstTrackedLinkName}</span> : <EmptyCell />}</Td>
           )
           if (column.key === 'last') return (
           <Td key={column.key} presentation="friend-list" className={styles.fixedContent}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
           )
           const value = friend.fieldValues?.[column.key]
-          return <Td key={column.key}>{value ? <span className={styles.cellText} title={value}>{value}</span> : <span className={styles.faint}>{emptyValue('unknown')}</span>}</Td>
+          return <Td key={column.key}>{value ? <span className={styles.cellText} title={value}>{value}</span> : <EmptyCell />}</Td>
         })}
         <Td columnKind="menu">
           <div className={styles.menuBox}>
