@@ -331,13 +331,13 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
             {canOperate ? (
               <div className={styles.sideActions}>
-                <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}&step=shape`} variant="secondary"><Pencil size={14} aria-hidden="true" />編集する</Button>
-                <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={14} aria-hidden="true" />切替のつながり</Button>
+                <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}&step=shape`} variant="secondary"><Pencil size={16} aria-hidden="true" />編集する</Button>
+                <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={16} aria-hidden="true" />切替のつながり</Button>
                 <RowMenu label="そのほかの操作" menuLabel={`リッチメニュー「${group.name}」の操作`} items={menuItems} />
               </div>
             ) : (
               <div className={styles.sideActions}>
-                <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={14} aria-hidden="true" />切替のつながり</Button>
+                <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={16} aria-hidden="true" />切替のつながり</Button>
               </div>
             )}
             {canOperate || role === null ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・取り下げは管理者の操作です。</ReadOnlyNotice></div>}
@@ -354,9 +354,9 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 </>}>
 <div className={styles.content}>
             {failed ? (
-              <Notice tone="danger" heading={<> 公開が途中で止まりました </>} action={<> {canOperate ? <Button variant="primary" onClick={() => void republish()} busy={republishing} busyLabel="公開しています…"><RefreshCw size={14} aria-hidden="true" />もう一度公開する</Button> : null} </>} >{progress?.message ?? 'それまでの段を元に戻し、前のメニューのままにしました。もう一度公開できます。'}</Notice>
+              <Notice tone="danger" heading={<> 公開が途中で止まりました </>} action={<> {canOperate ? <Button variant="primary" onClick={() => void republish()} busy={republishing} busyLabel="公開しています…"><RefreshCw size={16} aria-hidden="true" />もう一度公開する</Button> : null} </>} >{progress?.message ?? 'それまでの段を元に戻し、前のメニューのままにしました。もう一度公開できます。'}</Notice>
             ) : progress?.completed ? (
-                <Notice tone="success" role="status" icon={<CircleCheck size={18} aria-hidden="true" />} heading={<>{audience === 'all' ? 'LINEへの登録が終わり、すべての友だちの既定のメニューになりました' : audience === 'targeted' ? 'LINEへの登録が終わり、条件に当てはまる友だちに順に出ます' : 'LINEへの登録が終わりました'}</>}>
+                <Notice tone="success" role="status" icon={<CircleCheck size={20} aria-hidden="true" />} heading={<>{audience === 'all' ? 'LINEへの登録が終わり、すべての友だちの既定のメニューになりました' : audience === 'targeted' ? 'LINEへの登録が終わり、条件に当てはまる友だちに順に出ます' : 'LINEへの登録が終わりました'}</>}>
                   <p className={styles.bandNote}>
                     {audience === 'all'
                       ? '条件で出し分けている人には、いままでどおり上の順番のメニューが出ます。'
@@ -374,9 +374,9 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               {progress && !progress.completed && !progress.failed && progress.message ? <p className={styles.cardNote}>{progress.message}</p> : null}
               {progressError ? <p className={styles.cardNote}>公開の進みを読み込めませんでした。</p> : progress === null ? <DetailLoading /> : progress.steps.length === 0 ? <p className={styles.cardNote}>まだ公開の記録はありません。</p> : progress.steps.map((step) => (
                 <div key={step.key} className={styles.stepRow}>
-                  {step.status === 'done' ? <CircleCheck size={18} aria-hidden="true" className={styles.stepOk} />
-                    : step.status === 'failed' ? <CircleX size={18} aria-hidden="true" className={styles.stepNg} />
-                      : <Circle size={18} aria-hidden="true" className={styles.stepQuiet} />}
+                  {step.status === 'done' ? <CircleCheck size={20} aria-hidden="true" className={styles.stepOk} />
+                    : step.status === 'failed' ? <CircleX size={20} aria-hidden="true" className={styles.stepNg} />
+                      : <Circle size={20} aria-hidden="true" className={styles.stepQuiet} />}
                   <span className={styles.stepLabel}>{step.label}</span>
                   <span className={step.status === 'done' ? styles.stateOk : step.status === 'failed' ? styles.stateNg : styles.stateQuiet}>{progressStatusText(step.status)}</span>
                 </div>
@@ -408,7 +408,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                   <Button variant="secondary" onClick={() => { setDialogError(''); setFixOpen(true) }}>ずれを直す</Button>
                 ) : null}
                 <Button variant="text" size="compact" onClick={() => void check()} disabled={checking} busy={checking} busyLabel="照らし合わせています…">
-                  <RefreshCw size={14} aria-hidden="true" />もう一度照らし合わせる
+                  <RefreshCw size={16} aria-hidden="true" />もう一度照らし合わせる
                 </Button>
               </div>
               {runsError ? <p className={styles.cardNote}>{runsError}</p> : runs === null ? null : runs.length === 0 ? <p className={styles.cardNote}>まだ公開の履歴はありません。</p> : (

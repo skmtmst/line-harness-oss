@@ -178,7 +178,7 @@ function MenuEditBody() {
         destructive={canEdit && draftItem ? <Button variant="danger" onClick={() => setDeleting(true)} disabled={busy}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => void save()}><Check size={15} aria-hidden="true" />{editing ? (priceChanged ? '保存して申請する' : '保存する') : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => void save()}><Check size={16} aria-hidden="true" />{editing ? (priceChanged ? '保存して申請する' : '保存する') : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}

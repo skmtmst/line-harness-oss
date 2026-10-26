@@ -534,7 +534,7 @@ function Bookings({ eventId }: { eventId: string }) {
       actions={(
         <div className={styles.headActions}>
           <Button onClick={() => void exportCsv()} disabled={csvBusy || !applicants} busy={csvBusy} busyLabel="書き出しています…">
-            <Download size={15} aria-hidden="true" />CSV を書き出す
+            <Download size={16} aria-hidden="true" />CSV を書き出す
           </Button>
           <div className={styles.occurrencePick}>
             <SaveErrorField names={["selectedOccurrenceId","selected_occurrence_id"]}><EntitySelect
@@ -617,7 +617,7 @@ function Bookings({ eventId }: { eventId: string }) {
                         }}
                         disabled={busy}
                       >キャンセルにする</Button>
-                      <Button onClick={() => void markStatus(row, 'attended')} disabled={marking.has(row.id)}><Check size={15} aria-hidden="true" />参加済</Button>
+                      <Button onClick={() => void markStatus(row, 'attended')} disabled={marking.has(row.id)}><Check size={16} aria-hidden="true" />参加済</Button>
                       <Button onClick={() => void markStatus(row, 'no_show')} disabled={marking.has(row.id)}>無断</Button>
                     </>
                   ) : null}
@@ -659,7 +659,7 @@ function Bookings({ eventId }: { eventId: string }) {
             }}
             disabled={waitlistBusy || waitingRows.length === 0}
           >
-            <Send size={15} aria-hidden="true" />次の方へ案内する
+            <Send size={16} aria-hidden="true" />次の方へ案内する
           </Button>
         )}>
           <EventRosterTable kind="waitlist" label="キャンセル待ち" headings={["友だち", "結果", "並んだ日時", "案内日時", "終了日時"]}>
@@ -710,7 +710,7 @@ function Bookings({ eventId }: { eventId: string }) {
                 placeholder="当日は動きやすい服装でお越しください"
               /></SaveErrorField>
               <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} title={broadcastMessage.trim() === '' ? 'メッセージを入力してください' : undefined} busy={broadcastBusy} busyLabel="確認中…">
-                <Send size={15} aria-hidden="true" />送る
+                <Send size={16} aria-hidden="true" />送る
               </Button>
             </div></Field></div>
           {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}

@@ -120,7 +120,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
             >
               {statusAction === 'stop' ? (
                 <>
-                  <Pause size={14} aria-hidden="true" />
+                  <Pause size={16} aria-hidden="true" />
                   止める
                 </>
               ) : '再開する'}
@@ -131,7 +131,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
         {statusTarget ? (
           <div className={styles.dialogBody}>
             {statusAction === 'stop' && statusTarget.nextSchedule ? (
-              <Notice tone="warn" role="note" icon={<TriangleAlert size={14} aria-hidden="true" />}>
+              <Notice tone="warn" role="note" icon={<TriangleAlert size={16} aria-hidden="true" />}>
                 <span>
                   決めた日時に変わる予約（{formatStamp(statusTarget.nextSchedule.effectiveFrom)}に「{statusTarget.nextSchedule.value || '（空）'}」へ）があります。止める前に予定も見直してください。
                 </span>
@@ -146,7 +146,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                 className={styles.dialogInput}
               /></SaveErrorField></Field>
             {statusAction === 'stop' && statusScheduled.length > 0 ? (
-              <Notice tone="warn" appearance="soft" icon={<TriangleAlert size={14} aria-hidden="true" />}>
+              <Notice tone="warn" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />}>
                   予約中の{statusScheduled[0].kindLabel}「{statusScheduled[0].name}」が送られなくなります。
                   {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)} 件` : ''}
               </Notice>

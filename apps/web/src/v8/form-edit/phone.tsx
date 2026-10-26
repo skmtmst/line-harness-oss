@@ -118,7 +118,7 @@ function PhoneBlock({ block, bookingMenus }: { block: FormBlock; bookingMenus: P
 function PhoneImage({ url, alt }: { url: string; alt?: string }) {
   const [failed, setFailed] = useState(false)
   if (!url || failed) return <span className={styles.phoneImage} role="img" aria-label={url ? '画像（読み込めません）' : '画像（未設定）'} />
-  return <img className={styles.phoneImage} src={url} alt={alt ?? ""} onError={() => setFailed(true)} />
+  return <img width={280} height={70} className={styles.phoneImage} src={url} alt={alt ?? ""} onError={() => setFailed(true)} />
 }
 
 function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; bookingMenus: Props['bookingMenus'] }) {

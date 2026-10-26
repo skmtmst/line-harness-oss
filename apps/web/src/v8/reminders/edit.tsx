@@ -693,7 +693,7 @@ export function TargetStageV8({
           onDraft={onSaveDraft}
           draftBusy={busy}
           nextLabel="次へ：通知の中身"
-          nextIcon={<ArrowRight size={15} aria-hidden="true" />}
+          nextIcon={<ArrowRight size={16} aria-hidden="true" />}
           onNext={onNext}
           nextDisabled={busy}
         />
@@ -711,7 +711,7 @@ export function TargetStageV8({
             value="all"
             checked={mode === 'all'}
             onChange={() => onChange({ ...settings, targetCondition: null })}
-            icon={<Users size={18} />}
+            icon={<Users size={20} />}
             title={allLabel}
             note={allNote}
           /></SaveErrorField>
@@ -720,7 +720,7 @@ export function TargetStageV8({
             value="condition"
             checked={mode === 'condition'}
             onChange={() => onChange({ ...settings, targetCondition: condition ?? { operator: 'AND', rules: [], groups: [] } })}
-            icon={<Filter size={18} />}
+            icon={<Filter size={20} />}
             title="条件に合う人だけ"
             note="タグ・友だち情報などで絞る"
           /></SaveErrorField>
@@ -739,7 +739,7 @@ export function TargetStageV8({
           </div>
           <span className={styles.spacer} aria-hidden="true" />
           <Button type="button" variant="text" onClick={openFaces} disabled={counting}>
-            <Users size={15} aria-hidden="true" />顔ぶれを見る
+            <Users size={16} aria-hidden="true" />顔ぶれを見る
           </Button>
           <Button
             type="button"
@@ -747,7 +747,7 @@ export function TargetStageV8({
             disabled={counting}
             onClick={() => (mode === 'condition' ? setRecountRetryToken((value) => value + 1) : onRetryValidation?.())}
           >
-            <RefreshCw size={15} aria-hidden="true" />数え直す
+            <RefreshCw size={16} aria-hidden="true" />数え直す
           </Button>
           <span className={styles.countNote} title="数え直しにかかる時間：数秒〜1分（1,000人ごとに約10秒）">数秒〜1分</span>
         </div>

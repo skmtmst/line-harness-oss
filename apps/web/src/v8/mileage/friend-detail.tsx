@@ -356,9 +356,9 @@ function FriendDetailInner() {
 
   const chips: Array<{ key: 'all' | Kind; label: string; icon?: React.ReactNode }> = [
     { key: 'all', label: 'すべて' },
-    { key: 'earned', label: 'たまった', icon: <CircleDot size={13} aria-hidden="true" /> },
-    { key: 'spent', label: '使った', icon: <Clock3 size={13} aria-hidden="true" /> },
-    { key: 'voided', label: '取り消し', icon: <Undo2 size={13} aria-hidden="true" /> },
+    { key: 'earned', label: 'たまった', icon: <CircleDot size={16} aria-hidden="true" /> },
+    { key: 'spent', label: '使った', icon: <Clock3 size={16} aria-hidden="true" /> },
+    { key: 'voided', label: '取り消し', icon: <Undo2 size={16} aria-hidden="true" /> },
   ]
 
   return (
@@ -369,16 +369,16 @@ function FriendDetailInner() {
       help={[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null].filter(Boolean).join('・')}
       actions={<div className={styles.headActions}>
         <Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={connectionsText}>
-          <MessageCircle size={15} aria-hidden="true" /> トークを開く
+          <MessageCircle size={16} aria-hidden="true" /> トークを開く
         </Button>
         {/* 増やす・減らすはオーナー・管理者だけ（ほかの人には出さない）。 */}
         {canAdjust ? (
           <>
             <Button onClick={() => { setAdjustMode('decrease'); setAdjustmentOpen(true) }}>
-              <Minus size={15} aria-hidden="true" /> 減らす
+              <Minus size={16} aria-hidden="true" /> 減らす
             </Button>
             <Button variant="primary" onClick={() => { setAdjustMode('increase'); setAdjustmentOpen(true) }}>
-              <Plus size={15} aria-hidden="true" /> 増やす
+              <Plus size={16} aria-hidden="true" /> 増やす
             </Button>
           </>
         ) : null}

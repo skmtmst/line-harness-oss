@@ -65,12 +65,12 @@ export default function BulkOpWizard({
       footerLead={<span className={styles.dialogStep}>手順 1 / 3</span>}
       cancelLabel="閉じる"
       confirmLabel="実行内容を確認"
-      confirmIcon={<ArrowRight size={15} />}
+      confirmIcon={<ArrowRight size={16} />}
       onConfirm={() => onChoose(choice)}
     >
       <div className={styles.bulkBody}>
       <div className={styles.bulkTargets}>
-        <ListChecks size={15} aria-hidden="true" />
+        <ListChecks size={16} aria-hidden="true" />
         <span className={styles.bulkTargetsText}>
           {`選択した成果 ${formatNumber(targets.length)} 件：${shownNames}${restCount > 0 ? `ほか${formatNumber(restCount)} 件` : ''}（報酬 ${formatYen(totalYen)}）`}
         </span>
@@ -83,7 +83,7 @@ export default function BulkOpWizard({
           value="approved"
           checked={choice === 'approved'}
           onChange={() => setChoice('approved')}
-          icon={<Check size={15} aria-hidden="true" />}
+          icon={<Check size={16} aria-hidden="true" />}
           title="認める"
           note="次の締めで報酬に入ります"
         />
@@ -93,7 +93,7 @@ export default function BulkOpWizard({
           value="rejected"
           checked={choice === 'rejected'}
           onChange={() => setChoice('rejected')}
-          icon={<X size={15} aria-hidden="true" />}
+          icon={<X size={16} aria-hidden="true" />}
           title="認めない"
           note="報酬に入りません"
         />

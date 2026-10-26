@@ -402,7 +402,7 @@ function EditInner() {
       <div className={formStyles.stickyBar}>
         <Button variant="secondary" href="/mileage?tab=earning-rules">キャンセル</Button>
         <Button variant="primary" onClick={() => void save()} disabled={saving || !dirty} busy={saving} busyLabel="保存しています">
-          <Check size={14} aria-hidden="true" /> 下書きを保存
+          <Check size={16} aria-hidden="true" /> 下書きを保存
         </Button>
       </div>
 

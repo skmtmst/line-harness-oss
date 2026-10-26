@@ -133,7 +133,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           key={id}
           presentation="band"
           title="対応が必要な受信"
-          icon={<Inbox size={13} aria-hidden="true" />}
+          icon={<Inbox size={16} aria-hidden="true" />}
           valueAction={valueAction('対応が必要な受信')}
           value={total}
           unit="件"
@@ -166,7 +166,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           key={id}
           presentation="band"
           title="写真審査"
-          icon={<ImageIcon size={13} aria-hidden="true" />}
+          icon={<ImageIcon size={16} aria-hidden="true" />}
           valueAction={valueAction('写真審査')}
           value={forbidden ? null : value}
           unit="件"
@@ -194,7 +194,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           key={id}
           presentation="band"
           title="今日の予約"
-          icon={<Calendar size={13} aria-hidden="true" />}
+          icon={<Calendar size={16} aria-hidden="true" />}
           valueAction={valueAction('今日の予約')}
           value={value}
           unit="件"
@@ -217,7 +217,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           key={id}
           presentation="band"
           title="出荷予定（今日・明日）"
-          icon={<Package size={13} aria-hidden="true" />}
+          icon={<Package size={16} aria-hidden="true" />}
           valueAction={valueAction('出荷予定')}
           value={state === 'ready' ? (s?.soon ?? null) : null}
           unit="件"
@@ -397,8 +397,8 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
         <PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 30} supportedDays={[1,7,30]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 30, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last30')} />
-        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={15} aria-hidden="true" />表示を変える</Button> : null}
-        {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={15} aria-hidden="true" />配信を作る</Button> : null}
+        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button> : null}
+        {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={16} aria-hidden="true" />配信を作る</Button> : null}
       </>}
       notice={notice}
       overlays={d.editorOpen && canEditLayout ? <DashboardEditor

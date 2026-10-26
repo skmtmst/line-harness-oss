@@ -343,7 +343,7 @@
 }
 
 .grip {
-  width: var(--tpl-bm-14);
+  width: var(--polish-icon-control);
   min-width: 0;
   height: var(--tpl-bm-18);
   min-height: 0;
@@ -355,14 +355,14 @@
 /* 閲覧のみ：つまみは置かず、同じ大きさの場所だけ空ける。 */
 .gripSlot {
   display: block;
-  width: var(--tpl-bm-14);
+  width: var(--polish-icon-control);
   height: var(--tpl-bm-18);
   flex-shrink: 0;
 }
 
 .grip:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .orderNum {
@@ -694,11 +694,6 @@
   outline: var(--tpl-bm-2) solid var(--color-focus-ring);
   outline-offset: 1px;
 }
-
-.numInput:disabled {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
-}
 /* 保存で落ちた同時受付数。枠を危険の色にする。 */
 .numInput[aria-invalid='true'] { border-color: var(--color-danger); outline-color: var(--color-danger); }
 
@@ -722,7 +717,7 @@
 
 .iconRemove:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
 }
 
 /* 見本：「＋ 時間帯を足す」は文字ボタン（36px・角10・灰の文字）。 */
@@ -746,10 +741,8 @@
   background: var(--color-canvas-sunken);
 }
 
-.addLine:disabled {
-  cursor: not-allowed;
-  color: var(--color-ink-faint);
-}
+/* 印と文字の上下の真ん中（差 0.5 以内。§6.5 の 2）：字の箱が上に寄るので印を共通の補正値で上げる。押せない時の形は共通の規則が持つ。 */
+.addLine > svg { translate: 0 calc(var(--text-optical-shift) * -1); }
 
 /* ===== 休業日（月の暦） ===== */
 

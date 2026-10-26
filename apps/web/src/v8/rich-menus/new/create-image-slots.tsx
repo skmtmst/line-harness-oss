@@ -103,7 +103,7 @@ export function renderSingleImageSlot({ accountId, busy, clearPendingImage, hand
               </>
             ) : null}
             <button type="button" className={styles.guideLink} onClick={() => setImageGuideOpen(true)}>
-              <BookOpen size={15} aria-hidden />画像の作り方（大きさ・押しやすい余白）
+              <BookOpen size={16} aria-hidden />画像の作り方（大きさ・押しやすい余白）
             </button>
           </div>
         </div>

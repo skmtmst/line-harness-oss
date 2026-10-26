@@ -76,17 +76,17 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="配信" icon={<Send size={13} aria-hidden="true" />} value={overview.campaigns.length} unit="件" detail={`一斉配信 ${broadcastShown}・シナリオ ${scenarioShown}`} />
-      <KpiCard presentation="band" title="届いた人" icon={<Users size={13} aria-hidden="true" />} value={delivered} unit="人" detail={delivered === null ? (METRIC_STATE_TEXT[overview.metrics.delivered.state] || '未取得') : `対象 ${formatNumber(targets)} 人のうち`} />
-      <KpiCard presentation="band" title="押された割合" icon={<MousePointerClick size={13} aria-hidden="true" />} value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
-      <KpiCard presentation="band" title="取得できない配信" icon={<CircleHelp size={13} aria-hidden="true" />} value={shownValue(unavailable)} unit="件" detail={shownValue(unavailable) === null ? (METRIC_STATE_TEXT[unavailable.state] || '未取得') : '20人未満で数が出ない'} />
+      <KpiCard presentation="band" title="配信" icon={<Send size={16} aria-hidden="true" />} value={overview.campaigns.length} unit="件" detail={`一斉配信 ${broadcastShown}・シナリオ ${scenarioShown}`} />
+      <KpiCard presentation="band" title="届いた人" icon={<Users size={16} aria-hidden="true" />} value={delivered} unit="人" detail={delivered === null ? (METRIC_STATE_TEXT[overview.metrics.delivered.state] || '未取得') : `対象 ${formatNumber(targets)} 人のうち`} />
+      <KpiCard presentation="band" title="押された割合" icon={<MousePointerClick size={16} aria-hidden="true" />} value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
+      <KpiCard presentation="band" title="取得できない配信" icon={<CircleHelp size={16} aria-hidden="true" />} value={shownValue(unavailable)} unit="件" detail={shownValue(unavailable) === null ? (METRIC_STATE_TEXT[unavailable.state] || '未取得') : '20人未満で数が出ない'} />
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>
         <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
         <span className={styles.caption} title={`データ締切 ${state.data.dataCutoffAt}`}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
-        <Button variant="secondary" onClick={exportCampaigns} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+        <Button variant="secondary" onClick={exportCampaigns} disabled={exportDisabled}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
       </div>
       <p className={styles.caption}>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。{truncationNote ? ` ${truncationNote}までを表示しています。それより古い配信は一覧にも CSV にも入りません。` : ''}</p>
       <div className={styles.table} role="table" aria-label="配信ごとの反応">

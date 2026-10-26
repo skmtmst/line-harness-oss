@@ -35,7 +35,7 @@ export default function SavedDistributionDialog({ accounts, folders, selected, o
       </div>
       <span className={styles.footerActions}>
       <Button disabled={busy} onClick={onLater}>あとで</Button>
-      <Button variant="primary" disabled={busy || !canDistribute || selected.length === 0} busy={busy} onClick={onDistribute}><Send size={15} aria-hidden="true" />{`${selected.length} アカウントへ配る`}</Button>
+      <Button variant="primary" disabled={busy || !canDistribute || selected.length === 0} busy={busy} onClick={onDistribute}><Send size={16} aria-hidden="true" />{`${selected.length} アカウントへ配る`}</Button>
       </span>
     </div>}
   >

@@ -165,7 +165,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
                     <Td>
                       {canManage ? (
                         <button type="button" className={styles.textButton} disabled={m.saving} onClick={() => m.setUnlinkTarget(friend)}>
-                          <Unlink size={14} aria-hidden="true" />
+                          <Unlink size={16} aria-hidden="true" />
                           解除する
                         </button>
                       ) : null}

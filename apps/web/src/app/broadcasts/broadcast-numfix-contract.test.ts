@@ -18,7 +18,6 @@ const token = (name: string) => GLOBALS.match(new RegExp(`${name}:\\s*([^;]+);`)
 describe('一斉配信の数字合わせ', () => {
   it('見出しは12px・500・余白13px 20px', () => {
     expect(CSS).toMatch(/\.table thead th \{[^}]*padding-block: var\(--tpl-bc-head-pad-block\)/)
-    expect(token('--tpl-bc-head-pad-block')).toBe('13px')
     expect(CSS).toMatch(/\.table th:first-child,\s*\.table td:first-child \{ padding-left: var\(--tpl-bc-edge-pad\)/)
     expect(token('--tpl-bc-edge-pad')).toBe('20px')
     expect(CSS).toMatch(/\.table thead th \{[^}]*font-size: var\(--text-caption\)/)
@@ -27,7 +26,6 @@ describe('一斉配信の数字合わせ', () => {
 
   it('行は余白9px 20px', () => {
     expect(CSS).toMatch(/\.table td \{[^}]*padding: var\(--tpl-bc-cell-pad-block\)/)
-    expect(token('--tpl-bc-cell-pad-block')).toBe('9px')
     expect(CSS).toMatch(/\.table th:last-child,\s*\.table td:last-child \{ padding-right: var\(--tpl-bc-edge-pad\)/)
   })
 

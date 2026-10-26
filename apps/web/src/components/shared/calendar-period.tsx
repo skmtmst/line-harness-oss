@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react'
 import styles from './calendar-period.module.css'
+import { motionEasing } from './overlay-utils'
 
 const CalendarMotion = createContext(false)
 
@@ -26,7 +27,7 @@ export default function CalendarPeriod({ period, scope = '', children }: { perio
     const animation = node.animate([
       { transform: `translateX(${period > before.period ? distance : `calc(${distance} * -1)`})` },
       { transform: 'translateX(0)' },
-    ], { duration, easing: tokens.getPropertyValue('--motion-ease-out').trim() || 'ease-out' })
+    ], { duration, easing: motionEasing() })
     const stop = () => { if (preference.matches) animation.cancel() }
     preference.addEventListener('change', stop)
     return () => { animation.cancel(); preference.removeEventListener('change', stop) }

@@ -155,7 +155,7 @@
   /* 板の中の余白は板が持つ。内容の左右は 24px。 */
   :root .content,
   :root .contentFull {
-    padding: 20px 24px 28px;
+    padding: 20px 24px 24px;
   }
 }
 
@@ -235,7 +235,7 @@
 
 @media (min-width: 1024px) {
   :root .settingsBody {
-    padding: 20px 24px 28px; /* .content の v8 の余白と同じ */
+    padding: 20px 24px 24px; /* .content の v8 の余白と同じ */
   }
 }
 

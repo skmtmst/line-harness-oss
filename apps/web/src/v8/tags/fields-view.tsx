@@ -41,7 +41,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
             key={kpi.title}
             presentation="band"
             title={kpi.title}
-            icon={<kpi.icon size={13} aria-hidden="true" />}
+            icon={<kpi.icon size={16} aria-hidden="true" />}
             value={kpi.value}
             unit={kpi.value == null ? '' : kpi.unit}
             detail={kpi.detail}

@@ -392,10 +392,10 @@ function InflowCreate() {
         <>
           <Button href="/inflow-links">キャンセル</Button>
           {conflict ? (
-            <Button variant="primary" onClick={() => setShowCompare(true)} disabled={saving}><ArrowLeftRight size={15} aria-hidden="true" />比べてから保存</Button>
+            <Button variant="primary" onClick={() => setShowCompare(true)} disabled={saving}><ArrowLeftRight size={16} aria-hidden="true" />比べてから保存</Button>
           ) : (
             <Button variant="primary" onClick={() => void doSave()} disabled={saving || candidatesError || candidatesLoading} busy={saving} busyLabel="発行しています…">
-              <Link2 size={15} aria-hidden="true" />発行して URL を受け取る
+              <Link2 size={16} aria-hidden="true" />発行して URL を受け取る
             </Button>
           )}
         </>
@@ -519,7 +519,7 @@ function InflowCreate() {
       <Card variant="form" gap="normal" aria-labelledby="ir-new-url">
         <CardHeader size="stacked" titleId="ir-new-url" title={<>発行される URL</>} meta={<>発行したあと、一覧の「…」から QR コードと URL をコピーできます</>} />
         <div className={styles.urlBox}>
-          <Link2 size={14} aria-hidden="true" className={styles.urlIcon} />
+          <Link2 size={16} aria-hidden="true" className={styles.urlIcon} />
           <span className={styles.urlText} title={previewUrl || undefined}>{previewUrl || `例：${workerBase}/r/summer-ig`}</span>
           <span className={styles.urlNote}>{previewUrl ? '発行するとできます' : 'まだ発行されていません'}</span>
         </div>
@@ -537,7 +537,7 @@ function InflowCreate() {
         designWidth={680}
         designTop={185}
         confirmLabel="最新を取り込んで直す"
-        confirmIcon={<RefreshCw size={15} aria-hidden="true" />}
+        confirmIcon={<RefreshCw size={16} aria-hidden="true" />}
         onConfirm={loadLatestAndContinue}
         onCancel={() => setShowCompare(false)}
       >

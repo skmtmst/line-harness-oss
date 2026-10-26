@@ -24,7 +24,7 @@ export function SideCard({ card, canWrite, onAction, children }: { card: StyleSi
         <h3 className={styles.sideTitle}>{card.title}</h3>
         {card.help ? <HelpTip label={`${card.title}の説明`}>{card.help}</HelpTip> : null}
         <span className={styles.grow} />
-        {card.link ? <Link className={styles.sideLink} href={card.link.href}>{card.link.label}<ArrowRight size={14} aria-hidden="true" /></Link> : null}
+        {card.link ? <Link className={styles.sideLink} href={card.link.href}>{card.link.label}<ArrowRight size={16} aria-hidden="true" /></Link> : null}
       </div>
       {card.rows.map((row) => (
         <div key={row.label} className={styles.sideRow}>

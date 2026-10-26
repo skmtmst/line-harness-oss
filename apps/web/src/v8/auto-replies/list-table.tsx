@@ -360,7 +360,7 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
               setPendingToggle({ ids: stoppableIds, names: [], kind: 'stop', accountId: selectedAccountId })
             }}
           >
-            <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
+            <Square size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             まとめて止める
           </Button><Button
             type="button"
@@ -372,14 +372,14 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
               runToggle({ ids: resumableIds, names: [], kind: 'resume', accountId: selectedAccountId })
             }}
           >
-            <Play size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
+            <Play size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             まとめて再開
           </Button><Button
             type="button"
             variant="secondary"
             onClick={() => openMove([...selectedIds])}
           >
-            <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
+            <FolderIcon size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             フォルダへ移す
           </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
             選択を外す

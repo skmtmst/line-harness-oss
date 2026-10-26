@@ -6,7 +6,7 @@ import Button from '@/components/shared/button'
 import { Check, Circle, CircleCheck, CircleDot } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
 import { useLayoutEffect, useRef, type HTMLAttributes } from 'react'
-import { motionMs, prefersReducedMotion, shouldAnimateLeave } from '@/components/shared/overlay-utils'
+import { motionEasing, motionMs, prefersReducedMotion, shouldAnimateLeave } from '@/components/shared/overlay-utils'
 import styles from './steps.module.css'
 
 export type { StepperStep as StepsStep } from '@/components/shared/stepper'
@@ -72,9 +72,8 @@ export function Steps({
     const line = root.querySelector<HTMLElement>('[data-step-line]')
     const target = done ?? current
     if (!target?.animate) return
-    const rootStyle = window.getComputedStyle?.(document.documentElement)
-    const easing = rootStyle?.getPropertyValue('--motion-ease-out').trim() || 'ease-out'
-    const spring = rootStyle?.getPropertyValue('--motion-spring').trim() || 'cubic-bezier(0.34, 1.36, 0.64, 1)'
+    const easing = motionEasing()
+    const spring = motionEasing('--motion-spring')
     const dotMs = motionMs('--motion-exit', 150)
     const lineMs = motionMs('--motion-base', 200)
     const animations: Animation[] = []
@@ -182,7 +181,7 @@ export function StepContent({ step, children, as: Element = 'div', disabled, ...
     const animation = panel.animate([
       { transform: step > from ? 'translateX(var(--polish-space-card))' : 'translateX(calc(-1 * var(--polish-space-card)))' },
       { transform: 'translateX(0)' },
-    ], { duration: motionMs('--motion-exit', 150), easing: 'ease-out' })
+    ], { duration: motionMs('--motion-exit', 150), easing: motionEasing() })
     // 次の操作や閉じる操作による取消は、保存や画面の失敗ではない。
     void animation.finished?.catch(() => {})
     return () => animation.cancel()

@@ -53,7 +53,7 @@ export function MenuContent({
             width: `${(a.w / dims.width) * 100}%`,
             height: `${(a.h / dims.height) * 100}%`,
           }}
-        >{a.label ? <><AreaIcon intent={a.intent} size={14} presentation="preview" /><span className={styles.previewMenuAreaName}>{a.label}</span></> : null}</span>
+        >{a.label ? <><AreaIcon intent={a.intent} size={16} presentation="preview" /><span className={styles.previewMenuAreaName}>{a.label}</span></> : null}</span>
       ))}
     </div>
   ) : null
@@ -72,7 +72,7 @@ export function MenuContent({
         /* 枠の比は大きさ（大 2500×1686・小 2500×843）で決める。画像が別の比・読み途中でも高さが潰れない。 */
         <div className={styles.previewMenuImage} data-rich-menu-size={size} style={{ aspectRatio: `${dims.width} / ${dims.height}` }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL */}
-          <img src={imageUrl} alt="メニューの画像" />
+          <img width={2500} height={1686} src={imageUrl} alt="メニューの画像" />
           {areaBoxes}
         </div>
       ) : (

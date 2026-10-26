@@ -44,7 +44,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
   return (
     <section ref={timeScale} className={styles.board} aria-label="台帳の盤">
       <div className={styles.boardTools}>
-        {board.next ? <span className={styles.nextChip}><CircleHelp size={14} aria-hidden="true" />次の空き<strong>{board.next}</strong></span> : null}
+        {board.next ? <span className={styles.nextChip}><CircleHelp size={16} aria-hidden="true" />次の空き<strong>{board.next}</strong></span> : null}
         <span className={styles.grow} />
         <div className={styles.search}><ListToolbar search={{ value: search, onChange: onSearch, placeholder: "名前・電話で探す", width: 220 }} /></div>
       </div>
@@ -75,7 +75,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
           return (
             <div key={e.id} className={styles.entryWrap} style={{ ...col(i, count), ...at(e.start, board.from), ...span(e.start, e.end) }}>
               <BookingBlock placement="board" ref={openId === e.id ? anchor : undefined} state={calendarBookingState(e.state)} data-selected={e.selected || openId === e.id || undefined} aria-haspopup={e.state === 'off' ? undefined : 'menu'} aria-expanded={e.state === 'off' ? undefined : openId === e.id} onClick={(ev) => { if (e.state === 'off') return; anchor.current = ev.currentTarget; setOpenId(openId === e.id ? null : e.id) }} aria-label={`${e.start}〜${e.end} ${e.name}さん ${e.menu} ${e.stateLabel}`}>
-                <BookingName>{e.name}{e.nominated ? <Star size={12} className={styles.star} aria-label="指名" /> : null}{e.unpaid ? <StatusBadge tone="danger" dot={false} size="micro">未払い</StatusBadge> : null}</BookingName>
+                <BookingName>{e.name}{e.nominated ? <Star size={16} className={styles.star} aria-label="指名" /> : null}{e.unpaid ? <StatusBadge tone="danger" dot={false} size="micro">未払い</StatusBadge> : null}</BookingName>
                 <BookingSummary time={`${e.start}〜${e.end}`}>{e.menu} {e.stateLabel}</BookingSummary>
               </BookingBlock>
             </div>
@@ -86,7 +86,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
           if (i < 0) return null
           return (
             <div key={`${f.columnId}-${f.start}`} className={styles.entryWrap} style={{ ...col(i, count), ...at(f.start, board.from), blockSize: 'var(--tpl-sd-free-h)' }}>
-              <CalendarSlotButton onClick={() => onSlot(f.columnId, f.start)}><Plus size={14} aria-hidden="true" />入れる<span>{f.start}〜</span></CalendarSlotButton>
+              <CalendarSlotButton onClick={() => onSlot(f.columnId, f.start)}><Plus size={16} aria-hidden="true" />入れる<span>{f.start}〜</span></CalendarSlotButton>
             </div>
           )
         }) : null}
@@ -95,7 +95,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
       {opened ? <ActionMenu open items={entryItems(opened)} anchorRef={anchor} ariaLabel={`${opened.name}の操作`} onClose={() => setOpenId(null)} /> : null}
       <div className={styles.boardLegend}>
         {[['booked', term('S11')], ['active', styleTerm('salon', 'V15')], ['done', styleTerm('salon', 'V16')], ['pending', term('S10')], ['off', '休み']].map(([k, l]) => <CalendarLegendItem key={k} state={k}>{l}</CalendarLegendItem>)}
-        <CalendarLegendItem state="star"><Star size={12} aria-hidden="true" />指名</CalendarLegendItem>
+        <CalendarLegendItem state="star"><Star size={16} aria-hidden="true" />指名</CalendarLegendItem>
         <span className={styles.grow} />
         {canWrite ? <span className={styles.cellMuted}>空いている所を押すと予約を入れられます</span> : null}
       </div>

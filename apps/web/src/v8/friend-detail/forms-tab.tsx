@@ -44,7 +44,7 @@ export default function FormsTab({ data }: { data: FriendDetailState }) {
         return (
           <article key={s.id} className={styles.card}>
             <div className={styles.cardHead}>
-              <span className={styles.formIcon}><ClipboardList size={15} aria-hidden /></span>
+              <span className={styles.formIcon}><ClipboardList size={16} aria-hidden /></span>
               <h3 className={styles.cardTitle} title={s.formName}>{s.formName}</h3>
               <span className={styles.time}>{formatDateTime(s.createdAt)}</span>
             </div>

@@ -92,18 +92,18 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="友だちになった" icon={<UserPlus size={13} aria-hidden="true" />} value={friends} unit="人" detail={clicks === null ? 'クリックは未取得です' : `リンクを押した ${formatNumber(clicks)} 回から`} />
-      <KpiCard presentation="band" title="成果" icon={<Target size={13} aria-hidden="true" />} value={conversions} unit="件" detail={pending === null || rejected === null ? '保留・却下は未取得です' : `保留 ${formatNumber(pending)}・却下 ${formatNumber(rejected)}`} />
-      <KpiCard presentation="band" title="かかった広告費" icon={<Wallet size={13} aria-hidden="true" />} value={adCost} valueText={yen(adCost)} unit="円" detail={`費用を取れない経路 ${noCost}`} />
-      <KpiCard presentation="band" title="差し引き" icon={<TrendingUp size={13} aria-hidden="true" />} value={profit} valueText={yen(profit, true)} unit="円" detail={revenue === null ? '売上は未取得です' : `売上 ${yen(revenue)} − 費用`} />
+      <KpiCard presentation="band" title="友だちになった" icon={<UserPlus size={16} aria-hidden="true" />} value={friends} unit="人" detail={clicks === null ? 'クリックは未取得です' : `リンクを押した ${formatNumber(clicks)} 回から`} />
+      <KpiCard presentation="band" title="成果" icon={<Target size={16} aria-hidden="true" />} value={conversions} unit="件" detail={pending === null || rejected === null ? '保留・却下は未取得です' : `保留 ${formatNumber(pending)}・却下 ${formatNumber(rejected)}`} />
+      <KpiCard presentation="band" title="かかった広告費" icon={<Wallet size={16} aria-hidden="true" />} value={adCost} valueText={yen(adCost)} unit="円" detail={`費用を取れない経路 ${noCost}`} />
+      <KpiCard presentation="band" title="差し引き" icon={<TrendingUp size={16} aria-hidden="true" />} value={profit} valueText={yen(profit, true)} unit="円" detail={revenue === null ? '売上は未取得です' : `売上 ${yen(revenue)} − 費用`} />
     </KpiBand>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>
         <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
         <span className={styles.caption}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
-        <Link href={overview.searchConsoleHref} className={styles.textLink}>Search Console を見る<ArrowRight size={12} aria-hidden="true" /></Link>
-        <Button variant="secondary" onClick={onExport} disabled={disabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+        <Link href={overview.searchConsoleHref} className={styles.textLink}>Search Console を見る<ArrowRight size={16} aria-hidden="true" /></Link>
+        <Button variant="secondary" onClick={onExport} disabled={disabled}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
       </div>
       {children ? children(overview) : <RoutesTable overview={overview} clicks={clicks} />}
     </div>

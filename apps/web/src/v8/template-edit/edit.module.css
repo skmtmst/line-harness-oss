@@ -64,7 +64,7 @@
   white-space: nowrap; cursor: pointer;
 }
 .insertChip:hover:not(:disabled) { background: var(--color-canvas-sunken); }
-.insertChip:disabled { cursor: not-allowed; opacity: 0.5; }
+.insertChip:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 .insertChip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-focus-ring); outline-offset: calc(var(--tpl-te-focus) * -1); }
 .counter { margin-left: auto; color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
 .counter[data-over] { color: var(--color-danger); }
@@ -160,7 +160,7 @@
   box-shadow: var(--card-shadow);
 }
 .grip { display: inline-flex; align-items: center; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); cursor: pointer; }
-.grip:disabled { cursor: default; opacity: 0.5; }
+.grip:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 .grip:focus-visible { outline: var(--tpl-te-focus) solid var(--color-focus-ring); outline-offset: var(--tpl-te-focus); }
 .questionNo { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-text-sm-lh); }
 .formatField { width: var(--tpl-te-format-w); flex-shrink: 0; }

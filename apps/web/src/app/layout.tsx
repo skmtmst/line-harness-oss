@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter, Noto_Sans_JP } from 'next/font/google'
 import './globals.css'
+import './polish.css'
 import AppShell from '@/components/app-shell'
 import ClientErrorReporter from '@/components/client-error-reporter'
 import ToastHost from '@/components/shared/toast'

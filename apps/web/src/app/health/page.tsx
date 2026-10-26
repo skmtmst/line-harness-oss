@@ -337,7 +337,7 @@ export default function HealthPage() {
                             type="button"
                             onClick={() => void retryAccountHealth(account.id)}
                             disabled={retryingHealthIds.has(account.id)}
-                            className="text-action mt-2 text-sm font-medium underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="text-action mt-2 text-sm font-medium underline underline-offset-2 disabled:cursor-not-allowed"
                           >
                             {retryingHealthIds.has(account.id) ? '再取得中…' : '再試行'}
                           </button>

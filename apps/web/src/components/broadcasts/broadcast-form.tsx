@@ -1263,7 +1263,7 @@ export default function BroadcastForm({
       </div>
       {/* ★V8：手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。v7 はこれまでの帯のまま。 */}
       {<div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} summaries={currentStep ? { basic: title.trim(), audience: confirmAudienceLabel, message: `${formatNumber(bubbles.length)}通・${bubbles.map(bubble => String(bubble.content.text ?? typeLabel(bubble.type))).join(' / ')}`, schedule: sendWhenLabel ?? '未設定' } : undefined} /></div>}
-      <Button ref={previewToggleRef} aria-expanded={previewOpen} aria-controls="broadcast-line-preview" className={styles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
+      <Button ref={previewToggleRef} aria-expanded={previewOpen} aria-controls="broadcast-line-preview" className={styles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={16} aria-hidden /> LINEの見え方</Button>
     </header>
     {/*
       R580: 保存を押した段で理由を示す。失敗の帯は1画面に1つまでなので、
@@ -1367,7 +1367,7 @@ export default function BroadcastForm({
           { key: 'message', label: 'メッセージ', value: `${formatNumber(bubbles.length)}件・${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, move: 'メッセージへ戻る' },
           { key: 'schedule', label: '送信設定', value: `${sendWhenLabel ?? '未設定'}・${quotaNote ?? '送信枠は未確認'}`, done: sendMode === 'now' || Boolean(scheduledDate && scheduledTime), move: '送信設定へ戻る' },
         ] as const).map((row) => <div className={styles.checkRow} key={row.key}>
-          {row.done ? <CheckCircle2 size={18} className="text-success" aria-hidden /> : <AlertTriangle size={18} className="text-warning" aria-hidden />}
+          {row.done ? <CheckCircle2 size={20} className="text-success" aria-hidden /> : <AlertTriangle size={20} className="text-warning" aria-hidden />}
           <div><strong>{row.label}</strong><p>{row.value}</p></div><Button variant="secondary" className={styles.textButton} size="compact" onClick={() => goToStep(row.key)}>{row.move}</Button>
         </div>)}
       </div>
@@ -1413,12 +1413,12 @@ export default function BroadcastForm({
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button variant="secondary" type="button" disabled={saving || composerBusy} onClick={() => saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
+          <Button variant="secondary" type="button" disabled={saving || composerBusy} onClick={() => saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={16} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" disabled={composerBusy || nextBlockReason !== null} aria-describedby={nextBlockReason ? 'broadcast-footer-reason' : undefined} onClick={() => { if (nextBlockReason === null) goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)]) }}>
               {currentStep === 'basic' ? '対象設定へ'
                 : currentStep === 'audience' ? 'メッセージ設定へ'
-                  : currentStep === 'message' ? <><span>送信設定へ</span><ArrowRight size={15} aria-hidden /></>
+                  : currentStep === 'message' ? <><span>送信設定へ</span><ArrowRight size={16} aria-hidden /></>
                     : '配信前チェックへ'}
             </Button>
           ) : (

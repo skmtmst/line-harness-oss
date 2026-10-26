@@ -219,7 +219,7 @@ export default function FileScanScreen() {
   }
 
   const menuItems = (item: FileScanItem): ActionMenuItem[] => [
-    { id: 'delete', label: '削除する', tone: 'danger', icon: <Trash2 size={14} aria-hidden="true" />, onSelect: () => openDelete(item) },
+    { id: 'delete', label: '削除する', tone: 'danger', icon: <Trash2 size={16} aria-hidden="true" />, onSelect: () => openDelete(item) },
   ]
   const externalConfigured = Boolean(config?.externalProvider || config?.externalEndpointUrl || config?.externalSecretRef)
   const externalOn = config?.externalEnabled === true

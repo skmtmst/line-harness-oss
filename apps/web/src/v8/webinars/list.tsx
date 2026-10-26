@@ -723,7 +723,7 @@ function WebinarList() {
     return w.folderName ? { name: w.folderName } : null
   }
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: panelGrand, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: panelGrand, icon: <Inbox size={16} aria-hidden="true" /> },
     /*
      * 絵どおり「…」は選んだ行だけに出す。選んでいない行に操作を渡すと、
      * 共通のフォルダの列では「…」の箱が場所を取り、件数が左へずれる。
@@ -760,7 +760,7 @@ function WebinarList() {
   )
   // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = canEdit
-    ? <Button variant="primary" href="/webinars/new"><Plus size={15} aria-hidden="true" />ウェビナーを作る</Button>
+    ? <Button variant="primary" href="/webinars/new"><Plus size={16} aria-hidden="true" />ウェビナーを作る</Button>
     : null
 
   /* ===== 道具の段 ===== */
@@ -787,7 +787,7 @@ function WebinarList() {
   )
   const savedBox = (
     <div className={styles.savedBox}>
-      <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
+      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["savedFilter","status","saved_filter"]}><Select
         aria-label="よく使う絞り込み"
         value={savedFilter}
@@ -956,7 +956,7 @@ function WebinarList() {
           busy={csvBusy}
           busyLabel="書き出しています…"
         >
-          <Download size={15} aria-hidden="true" />CSVで書き出す
+          <Download size={16} aria-hidden="true" />CSVで書き出す
         </Button>
       }
       stats={<>
@@ -976,7 +976,7 @@ function WebinarList() {
               key={kpi.key}
               presentation="band"
               title={kpi.title}
-              icon={<kpi.icon size={13} aria-hidden="true" />}
+              icon={<kpi.icon size={16} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value === null ? '' : kpi.unit}
               detail={kpi.detail}

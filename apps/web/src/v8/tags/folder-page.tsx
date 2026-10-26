@@ -201,13 +201,13 @@ function TagFolderPage() {
           <>
             {editId ? (
               <Button type="button" variant="danger" disabled={saving} onClick={() => setDeleteOpen(true)}>
-                <Trash2 size={15} aria-hidden="true" />削除する
+                <Trash2 size={16} aria-hidden="true" />削除する
               </Button>
             ) : null}
             <span className={styles.dialogFooterEnd}>
               <Button type="button" disabled={saving} onClick={close}>キャンセル</Button>
               <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined}  onClick={() => save()} busy={saving}>
-                {editId ? <FolderCheck size={15} aria-hidden="true" /> : <FolderPlus size={15} aria-hidden="true" />}
+                {editId ? <FolderCheck size={16} aria-hidden="true" /> : <FolderPlus size={16} aria-hidden="true" />}
                 {editId ? 'フォルダを保存する' : 'フォルダを作る'}
               </Button>
             </span>

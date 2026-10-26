@@ -100,10 +100,10 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="増えた" icon={<Users size={13} aria-hidden="true" />} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)} 人` }, state.retry)} />
-      <KpiCard presentation="band" title="減った" icon={<UserMinus size={13} aria-hidden="true" />} value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, { detail: `この${days}日・解除を含む` }, state.retry)} />
-      <KpiCard presentation="band" title="差し引き" icon={<ArrowLeftRight size={13} aria-hidden="true" />} value={netValue} unit="人" signed {...metricCardState(overview.metrics.net, { detail: `友だちは ${metricText(overview.metrics.currentFriends)} 人` }, state.retry)} />
-      <KpiCard presentation="band" title="ブロック率" icon={<CircleHelp size={13} aria-hidden="true" />} value={null} unit="%" detail="ブロックの数は未取得" />
+      <KpiCard presentation="band" title="増えた" icon={<Users size={16} aria-hidden="true" />} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)} 人` }, state.retry)} />
+      <KpiCard presentation="band" title="減った" icon={<UserMinus size={16} aria-hidden="true" />} value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, { detail: `この${days}日・解除を含む` }, state.retry)} />
+      <KpiCard presentation="band" title="差し引き" icon={<ArrowLeftRight size={16} aria-hidden="true" />} value={netValue} unit="人" signed {...metricCardState(overview.metrics.net, { detail: `友だちは ${metricText(overview.metrics.currentFriends)} 人` }, state.retry)} />
+      <KpiCard presentation="band" title="ブロック率" icon={<CircleHelp size={16} aria-hidden="true" />} value={null} unit="%" detail="ブロックの数は未取得" />
     </KpiBand>
     <ListPageSection>
       {reasonShownInBanner ? <Notice tone="warn">{overview.stateReason}</Notice> : null}

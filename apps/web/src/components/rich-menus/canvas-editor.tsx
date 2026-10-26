@@ -369,7 +369,7 @@ export function CanvasEditor({
         >
           {imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <img width={2500} height={1686}
               src={imageUrl}
               alt=""
               className="absolute inset-0 w-full h-full pointer-events-none object-cover"

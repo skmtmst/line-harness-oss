@@ -546,7 +546,7 @@ export default function EarningRulesTab() {
       <KpiCard
         presentation="band"
         title="たまる決めごと"
-        icon={<ListOrdered size={14} aria-hidden="true" />}
+        icon={<ListOrdered size={16} aria-hidden="true" />}
         value={ready ? rules.length : null}
         unit="件"
         detail={dash(`動いている ${formatMileageNumber(activeRules.length)}・止めている ${formatMileageNumber(rules.length - activeRules.length)}`)}
@@ -554,7 +554,7 @@ export default function EarningRulesTab() {
       <KpiCard
         presentation="band"
         title="直近30日 付けたマイル"
-        icon={<Coins size={14} aria-hidden="true" />}
+        icon={<Coins size={16} aria-hidden="true" />}
         value={ready ? grantedMiles ?? 0 : null}
         unit=""
         detail={dash(`${formatMileageNumber(grantedCount ?? 0)} 件`)}
@@ -562,7 +562,7 @@ export default function EarningRulesTab() {
       <KpiCard
         presentation="band"
         title="直近30日 使われたマイル"
-        icon={<Gift size={14} aria-hidden="true" />}
+        icon={<Gift size={16} aria-hidden="true" />}
         value={ready ? Math.abs(spentMiles ?? 0) : null}
         unit=""
         detail={dash(`交換 ${formatMileageNumber(spentCount ?? 0)} 件`)}
@@ -570,7 +570,7 @@ export default function EarningRulesTab() {
       <KpiCard
         presentation="band"
         title="残高の合計"
-        icon={<Wallet size={14} aria-hidden="true" />}
+        icon={<Wallet size={16} aria-hidden="true" />}
         value={ready ? balanceTotal ?? 0 : null}
         unit=""
         detail={<span title={ready && averageDenominator !== null && balanceTotal !== null ? averageDenominator > 0 ? `残高0の人は除き、マイルを持っている${formatMileageNumber(averageDenominator)}人で割った平均：${formatMileageNumber(balanceTotal / averageDenominator)}マイル` : '残高がある人がいないため計算していません' : undefined}>{dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}</span>}
@@ -580,7 +580,7 @@ export default function EarningRulesTab() {
 
   const createButton = (full: boolean) => (
     <CreateButton href="/mileage/earning-rules/new" readonly={readonly} full={full}>
-      <Plus size={15} aria-hidden="true" /> 決めごとを作る
+      <Plus size={16} aria-hidden="true" /> 決めごとを作る
     </CreateButton>
   )
 
@@ -635,7 +635,7 @@ export default function EarningRulesTab() {
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
       <FilterChip
         selected={activeOnly}
-        icon={<CircleDot size={13} aria-hidden="true" />}
+        icon={<CircleDot size={16} aria-hidden="true" />}
         onChange={(selected) => resetPage(() => {
           setActiveOnly(selected)
           if (selected) setStoppedOnly(false)
@@ -645,7 +645,7 @@ export default function EarningRulesTab() {
       </FilterChip>
       <FilterChip
         selected={pendingOnly}
-        icon={<Clock3 size={13} aria-hidden="true" />}
+        icon={<Clock3 size={16} aria-hidden="true" />}
         onChange={(selected) => resetPage(() => setPendingOnly(selected))}
       >
         {`確定待ちあり ${formatMileageNumber(pendingRules.length)}`}
@@ -662,7 +662,7 @@ export default function EarningRulesTab() {
     <ListToolbarOptional compact label="保存した絞り込み"><div className={styles.savedBox}>
 
       <SaveErrorField names={["presetValue","page","preset_value"]}><Select
-        icon={<Bookmark size={15} aria-hidden="true" />}
+        icon={<Bookmark size={16} aria-hidden="true" />}
         aria-label="よく使う絞り込み"
         value={presetValue}
         options={[
@@ -910,7 +910,7 @@ export default function EarningRulesTab() {
       explanation="決めごとを変えると、変えたあとの行動から新しい数で付きます。前に付いたマイルは変わりません。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
-          <Download size={15} aria-hidden="true" /> CSVで書き出す
+          <Download size={16} aria-hidden="true" /> CSVで書き出す
         </Button>
       }
       stats={stats}

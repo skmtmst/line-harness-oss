@@ -134,7 +134,7 @@ export default function Button(props: ButtonProps) {
     return (
       <Link href={href} className={classes} data-shared-button="" data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} data-text-content={hasButtonText(children) || undefined} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {icon}{props.actionWording ? normalizeActionNode(children) : children}
-        {newTab ? <ArrowUpRight size={13} aria-hidden="true" data-external-icon /> : null}
+        {newTab ? <ArrowUpRight size={16} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
   }
@@ -299,8 +299,8 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       aria-label={iconButtonLabel(props)}
       onClick={handleClick}
     >
-      {busyNow ? <LoaderCircle className={styles.spin} size={15} aria-hidden="true" /> : null}
-      {shownDone ? <Check size={15} aria-hidden="true" /> : null}
+      {busyNow ? <LoaderCircle className={styles.spin} size={16} aria-hidden="true" /> : null}
+      {shownDone ? <Check size={16} aria-hidden="true" /> : null}
       {!busyNow && !shownDone ? icon : null}
       {busyNow ? busyLabel : shownDone ? doneLabel : children}
     </button>

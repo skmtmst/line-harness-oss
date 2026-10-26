@@ -77,7 +77,7 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
       hidden={hidden}
       data-design-node="phlR1"
     >
-      <Search className={styles.searchIcon} aria-hidden="true" strokeWidth={2} />
+      <Search className={styles.searchIcon} aria-hidden="true" />
       <input
         ref={setRefs}
         type="search"

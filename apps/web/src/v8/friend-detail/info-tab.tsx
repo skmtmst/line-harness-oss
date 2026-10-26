@@ -180,7 +180,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
           {groups.map(groupKey => <section key={groupKey} className={styles.infoGroup} aria-label={groupAria(groupKey)}>
           <div className={styles.infoGroupHead}>
             <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}<span className={styles.infoGroupNote}>{groupNote(groupKey)}</span></h3>
-            {groupKey === manageGroup ? <Link className={styles.manageLink} href="/tags?tab=fields">情報欄を管理<ArrowUpRight size={13} aria-hidden="true" /></Link> : null}
+            {groupKey === manageGroup ? <Link className={styles.manageLink} href="/tags?tab=fields">情報欄を管理<ArrowUpRight size={16} aria-hidden="true" /></Link> : null}
           </div>
           <div className={styles.fieldGrid}>
             {ordered.filter(field => groupOf(field) === groupKey).map((field) => {
@@ -230,7 +230,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
               </div>
             </div>
           ) : (
-            <p className={styles.saveNote}><Lock size={13} aria-hidden />保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。</p>
+            <p className={styles.saveNote}><Lock size={16} aria-hidden />保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。</p>
           )}
         </>
       )}

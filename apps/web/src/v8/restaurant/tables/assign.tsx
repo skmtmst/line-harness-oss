@@ -75,7 +75,7 @@ export default function TablesAssignBoard({ ctx, canEdit, heading, notice }: { c
       {canEdit ? (
         <PageFooter actions={<>
           <Button onClick={assignment.reset} disabled={assignment.saving}>キャンセル</Button>
-          <Button variant="primary" busy={assignment.saving} onClick={() => { if (!assignment.dirty) { notifyToast('変更はありません。'); return } if (assignment.status === 'not-ready') { preparing.open('卓の割り当て方の保存'); return } void assignment.save(order) }}><Check size={15} aria-hidden="true" />保存する</Button>
+          <Button variant="primary" busy={assignment.saving} onClick={() => { if (!assignment.dirty) { notifyToast('変更はありません。'); return } if (assignment.status === 'not-ready') { preparing.open('卓の割り当て方の保存'); return } void assignment.save(order) }}><Check size={16} aria-hidden="true" />保存する</Button>
         </>} />
       ) : null}
       {preparing.dialog}

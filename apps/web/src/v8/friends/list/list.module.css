@@ -167,8 +167,6 @@
   overflow-clip-margin: var(--tpl-fr-cell-inset);
 }
 
-.row { cursor: default; }
-
 .menuBox { display: flex; justify-content: flex-end; }
 
 .star {

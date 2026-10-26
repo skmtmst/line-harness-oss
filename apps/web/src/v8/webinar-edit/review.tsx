@@ -143,7 +143,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
     ['視聴後の動き', reviewActionSummaryText(validation)],
   ]
   const chrome = chromeFor(readOnly ? null : (
-    <Button variant="primary" disabled={!canPublish} title={canPublish ? undefined : '公開前の確認が全部通ると公開できます'} busy={publishing} busyLabel="公開しています…" onClick={() => void publish()}><Check size={15} aria-hidden="true" />この版を公開</Button>
+    <Button variant="primary" disabled={!canPublish} title={canPublish ? undefined : '公開前の確認が全部通ると公開できます'} busy={publishing} busyLabel="公開しています…" onClick={() => void publish()}><Check size={16} aria-hidden="true" />この版を公開</Button>
   ))
 
   return (
@@ -160,11 +160,11 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         <h2 className={form.previewTitle}>公開ページでの見え方</h2>
         <div className={styles.pageCard}>
           <p className={styles.pageTitle} title={webinar.title}>{webinar.title}</p>
-          <span className={styles.player} aria-hidden="true"><Play size={32} /></span>
+          <span className={styles.player} aria-hidden="true"><Play size={40} /></span>
         </div>
         <div className={form.previewActions}>
           {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
-          {readOnly ? null : <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={15} aria-hidden="true" />テストを送る</Button>}
+          {readOnly ? null : <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={16} aria-hidden="true" />テストを送る</Button>}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
         {ctx.analytics ? <p className={form.previewNote}>{`申込 ${formatNumber(ctx.analytics.summary.reservations)} 人`}</p> : null}
@@ -187,8 +187,8 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         ) : state === 'ready' ? <p className={styles.ok}>必要なものはそろっています。</p> : null}
         {readOnly ? null : (
           <div className={form.buttons}>
-            <Button variant={failed.some((check) => check.key === 'public_page_test') ? 'primary' : 'secondary'} disabled={testing !== false || publishing} busy={testing === 'page'} busyLabel="確かめています…" onClick={() => void testPage()}><Globe size={15} aria-hidden="true" />ページをテスト</Button>
-            <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={15} aria-hidden="true" />通知のテストを送る</Button>
+            <Button variant={failed.some((check) => check.key === 'public_page_test') ? 'primary' : 'secondary'} disabled={testing !== false || publishing} busy={testing === 'page'} busyLabel="確かめています…" onClick={() => void testPage()}><Globe size={16} aria-hidden="true" />ページをテスト</Button>
+            <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={16} aria-hidden="true" />通知のテストを送る</Button>
           </div>
         )}
         {notice ? <p className={form.cardNote} role="status">{notice}</p> : null}

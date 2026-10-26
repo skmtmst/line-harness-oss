@@ -43,6 +43,6 @@ export default function KpiDelta({ current, previous, better, unit, basis = SAME
   }
   const Icon = tone === 'flat' ? ArrowRight : diff > 0 ? TrendingUp : TrendingDown
   return <span data-kpi-delta={tone} title={text.reading}>
-    <StatusBadge tone="neutral" size="compact" dot={false}><Icon size={12} aria-hidden="true" />{body}</StatusBadge>
+    <StatusBadge tone="neutral" size="compact" dot={false}><Icon size={16} aria-hidden="true" />{body}</StatusBadge>
   </span>
 }

@@ -39,7 +39,7 @@
 .plot {
   position: relative;
   height: 180px;
-  padding-left: 28px;
+  padding-left: 24px;
 }
 
 /* 横の薄い線と左の目盛り（11px・ink-faint）。 */

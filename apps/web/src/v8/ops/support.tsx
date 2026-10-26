@@ -508,7 +508,7 @@ export default function OpsSupportV8() {
         title="チケットを作る"
         confirmLabel="作る"
         cancelLabel="キャンセル"
-        confirmIcon={<Plus size={15} aria-hidden="true" />}
+        confirmIcon={<Plus size={16} aria-hidden="true" />}
         busy={busy}
         error={createError || undefined}
         designNode="Izau1"

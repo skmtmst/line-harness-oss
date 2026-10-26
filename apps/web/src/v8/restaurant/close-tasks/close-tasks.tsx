@@ -170,7 +170,7 @@ export default function CloseTasksPage() {
                   <span className={styles.chips} title={group.items.map((item) => `${item.name}${item.status === 'done' ? '（閉じた）' : ''}`).join('・')}>
                     {group.items.map((item) => (
                       <Chip key={item.id}>
-                        {item.name}{item.status === 'done' ? <Check size={12} aria-label="閉じた" /> : null}
+                        {item.name}{item.status === 'done' ? <Check size={16} aria-label="閉じた" /> : null}
                       </Chip>
                     ))}
                   </span>
@@ -185,7 +185,7 @@ export default function CloseTasksPage() {
                     ) : null}
                     {canWrite && target ? (
                       <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`} busy={Boolean(busyId === target.id)} busyLabel="処理中…">
-                        <Check size={15} aria-hidden="true" />閉じた
+                        <Check size={16} aria-hidden="true" />閉じた
                       </Button>
                     ) : null}
                     <RowMenu

@@ -82,7 +82,7 @@ export function CalendarTimeEntries({ days, entries, free, canWrite, position, o
           const label = slots.length === 1 ? `${slot.bookingDay ?? day} ${slot.bookingStart ?? slot.start}に予約を入れる` : `${day} ${slot.start}からの空き${formatNumber(slots.length)}件を選ぶ`
           return <div key={`${slot.start}-${end}`} className={styles.calendarPosition} style={position(slot.start, end, dayIndex, days.length)}>
             <CalendarSlotButton placement="calendar" style={laneStyle(bookingLanes + overflowLane, lanes)} title={label} aria-label={label} aria-haspopup={slots.length > 1 ? 'dialog' : undefined} onClick={() => slots.length === 1 ? onSlot(slot.bookingDay ?? day, slot.bookingStart ?? slot.start) : setExpandedFree(slots)}>
-              <Plus size={12} aria-hidden="true" /><TruncatedText value={slots.length === 1 ? '予約を入れる' : `空き${formatNumber(slots.length)}件`} />
+              <Plus size={16} aria-hidden="true" /><TruncatedText value={slots.length === 1 ? '予約を入れる' : `空き${formatNumber(slots.length)}件`} />
             </CalendarSlotButton>
           </div>
         })}

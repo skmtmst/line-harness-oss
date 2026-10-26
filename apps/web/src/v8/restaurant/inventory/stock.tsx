@@ -368,7 +368,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
             ) : null}
             {selected ? (
               <div className={styles.sideActions}>
-                <Button href={`/restaurant-test/reservations?date=${encodeURIComponent(date)}`}><BookOpen size={15} aria-hidden="true" />{`予約台帳で ${selected.time} を見る`}</Button>
+                <Button href={`/restaurant-test/reservations?date=${encodeURIComponent(date)}`}><BookOpen size={16} aria-hidden="true" />{`予約台帳で ${selected.time} を見る`}</Button>
                 {canCloseNote ? (
                   <Button onClick={() => { setClosedChannels([]); setCloseNoteOpen(true) }}>媒体の受付を閉じる</Button>
                 ) : null}
@@ -532,7 +532,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                           )}
                           {canEdit ? (
                             <IconButton variant="plain" size="row" aria-label={`${name}曜日の${index + 1}つ目の時間帯を外す`} onClick={() => setDay(weekday, day.periods.filter((_, i) => i !== index))}>
-                              <X size={14} aria-hidden="true" />
+                              <X size={16} aria-hidden="true" />
                             </IconButton>
                           ) : null}
                         </div>
@@ -557,9 +557,9 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
             <>
               <Button onClick={resetAll} disabled={busy}>キャンセル</Button>
               {conflict ? (
-                <Button variant="primary" disabled={busy} onClick={() => setDiffOpen(true)}><Check size={15} aria-hidden="true" />比べてから保存</Button>
+                <Button variant="primary" disabled={busy} onClick={() => setDiffOpen(true)}><Check size={16} aria-hidden="true" />比べてから保存</Button>
               ) : (
-                <Button variant="primary" disabled={busy || allocInvalid || (!hoursDraft && rows.length === 0)} onClick={() => saveAll(false)}><Check size={15} aria-hidden="true" />開ける時間と配分を保存</Button>
+                <Button variant="primary" disabled={busy || allocInvalid || (!hoursDraft && rows.length === 0)} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />開ける時間と配分を保存</Button>
               )}
             </>
           )}
@@ -582,7 +582,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               title={closedChannels.length === 0 ? '閉じた媒体にチェックを入れてください' : undefined}
               onClick={() => { if (selected) setClosedSlots((current) => [...current, selected.row.id]); setCloseNoteOpen(false) }}
             >
-              <Check size={15} aria-hidden="true" />閉じたものを記録する
+              <Check size={16} aria-hidden="true" />閉じたものを記録する
             </Button>
           </>
         )}

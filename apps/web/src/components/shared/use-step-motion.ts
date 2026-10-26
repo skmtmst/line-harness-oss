@@ -1,7 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useRef } from 'react'
-import { motionMs, shouldAnimateLeave } from './overlay-utils'
+import { motionEasing, motionMs, shouldAnimateLeave } from './overlay-utils'
 
 /** 本文だけを入れ替える。窓・入力のstate・焦点を作り直さない。 */
 export function useStepMotion(enabled: boolean, stepKey: unknown) {
@@ -24,7 +24,7 @@ export function useStepMotion(enabled: boolean, stepKey: unknown) {
       const from = heightAnimationRef.current ? outer.getBoundingClientRect().height : previous
       heightAnimationRef.current?.cancel()
       if (!shouldAnimateLeave() || typeof outer.animate !== 'function') return
-      heightAnimationRef.current = outer.animate([{ height: `${from}px` }, { height: `${next}px` }], { duration: motionMs('--motion-base', 200), easing: 'cubic-bezier(0.2, 0, 0, 1)' })
+      heightAnimationRef.current = outer.animate([{ height: `${from}px` }, { height: `${next}px` }], { duration: motionMs('--motion-base', 200), easing: motionEasing() })
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -36,7 +36,7 @@ export function useStepMotion(enabled: boolean, stepKey: unknown) {
     stepRef.current = stepKey
     fadeRef.current?.cancel()
     if (!enabled || !shouldAnimateLeave() || !innerRef.current?.animate) return
-    fadeRef.current = innerRef.current.animate([{ opacity: 0 }, { opacity: 1 }], { duration: motionMs('--motion-exit', 150), easing: 'ease-out' })
+    fadeRef.current = innerRef.current.animate([{ opacity: 0 }, { opacity: 1 }], { duration: motionMs('--motion-exit', 150), easing: motionEasing() })
   }, [enabled, stepKey])
   useLayoutEffect(() => () => fadeRef.current?.cancel(), [])
   return { outerRef, innerRef }

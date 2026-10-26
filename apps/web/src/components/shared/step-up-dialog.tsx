@@ -48,7 +48,7 @@ export default function StepUpDialog({ open, action, presentation, method = 'tot
         title="本人確認の方法が未設定です"
         description={`${action}には本人確認が必要です。先に確認方法を設定してください。`}
         busy={false}
-        titleIcon={<KeyRound size={22} />}
+        titleIcon={<KeyRound size={20} />}
         onCancel={onCancel}
         cancelLabel="閉じる"
       >
@@ -72,7 +72,7 @@ export default function StepUpDialog({ open, action, presentation, method = 'tot
       confirmLabel={mfaOff ? 'オフにする' : '本人確認して実行'}
       busy={busy}
       error={error && isTotp ? otpFailureMessage(error) : error}
-      titleIcon={mfaOff ? undefined : <KeyRound size={22} />}
+      titleIcon={mfaOff ? undefined : <KeyRound size={20} />}
       onConfirm={ready ? () => onSubmit(value) : undefined}
       onCancel={onCancel}
     >

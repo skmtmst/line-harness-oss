@@ -39,6 +39,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
 vi.mock('@/lib/pools-availability', () => ({ isPoolsFeatureAvailable: async () => false }))
 
 import InflowCreateV8 from './create'
+import { scrollMotion } from '@/components/shared/overlay-utils'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -141,7 +142,7 @@ describe('V8 流入リンクを作る', () => {
     await flush()
     expect(name.getAttribute('aria-invalid')).toBe('true')
     expect(document.activeElement).toBe(name)
-    expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
+    expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: scrollMotion() })
     expect(screen.getByText('リンク名を入力してください').id).toBe(name.getAttribute('aria-describedby'))
     expect(screen.getAllByRole('alert')).toHaveLength(2)
     expect(posted).toHaveLength(0)

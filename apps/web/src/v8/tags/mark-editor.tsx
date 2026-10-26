@@ -473,7 +473,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         footerActions={hideForm ? <></> : <>
           <Button type="button" onClick={() => guarded(() => router.push('/tags?tab=marks'))}>キャンセル</Button>
           <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined}  onClick={() => void save()} busy={saving}>
-            <Check size={15} aria-hidden="true" />{editing ? '保存する' : '対応マークを作る'}
+            <Check size={16} aria-hidden="true" />{editing ? '保存する' : '対応マークを作る'}
           </Button>
         </>} dirty={false}
       >
@@ -524,7 +524,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                   ))}
                   {rulesState === 'ready' || rulesState === 'loading' ? (
                     <span>
-                      <Button type="button" variant="text" onClick={() => setRulesOpen(true)}><Plus size={15} aria-hidden="true" />きまりを作る</Button>
+                      <Button type="button" variant="text" onClick={() => setRulesOpen(true)}><Plus size={16} aria-hidden="true" />きまりを作る</Button>
                     </span>
                   ) : null}
                 </>
@@ -549,7 +549,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                 </div>
               ) : (
                 <span>
-                  <Button type="button" variant="text" onClick={() => setCreateRule(true)}><Plus size={15} aria-hidden="true" />きまりを作る</Button>
+                  <Button type="button" variant="text" onClick={() => setCreateRule(true)}><Plus size={16} aria-hidden="true" />きまりを作る</Button>
                 </span>
               )}
             </Card>

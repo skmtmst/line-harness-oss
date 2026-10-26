@@ -444,8 +444,8 @@ export default function OpsAnnouncementsV8() {
                           label={`「${a.subject}」の操作`}
                           size="row"
                           items={a.status === 'sending' ? [] : a.status === 'draft' || a.status === 'scheduled'
-                            ? [{ id: 'edit', label: '編集する', icon: <Pencil size={14} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => edit(a) }]
-                            : [{ id: 'edit', label: '編集する', description: '送ったものは変えず、中身を写して新しく作ります', icon: <Pencil size={14} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => copyAsNew(a) }]}
+                            ? [{ id: 'edit', label: '編集する', icon: <Pencil size={16} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => edit(a) }]
+                            : [{ id: 'edit', label: '編集する', description: '送ったものは変えず、中身を写して新しく作ります', icon: <Pencil size={16} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => copyAsNew(a) }]}
                         />}
                   </span>
                 </div>
@@ -463,7 +463,7 @@ export default function OpsAnnouncementsV8() {
         title="このお知らせを送りますか？"
         cancelLabel="戻って直す"
         confirmLabel={scheduled ? `${shortPublishAt(form.publishAt)} に送る` : '今すぐ送る'}
-        confirmIcon={<Send size={15} aria-hidden="true" />}
+        confirmIcon={<Send size={16} aria-hidden="true" />}
         busy={busy}
         error={formError || undefined}
         designNode="TJUUl"

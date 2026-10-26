@@ -29,7 +29,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
-              {previewUrl ? <Button href={previewUrl} fullWidth><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+              {previewUrl ? <Button href={previewUrl} fullWidth><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
             </div>
             <p className={styles.sideTitle}>お客さまの予約画面</p>
             {phone}
@@ -64,7 +64,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
           /* 絵 ：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
           <div className={styles.narrowActions}>
             <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>
-            {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+            {previewUrl ? <Button href={previewUrl}><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
           </div>
         )}
         footerActions={tabEdit && tabEdit.showBar !== false && !tabEdit.saveDisabled ? (
@@ -72,7 +72,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                   <Button onClick={() => tabEdit.onReset()} disabled={tabEdit.saving}>キャンセル</Button>
                   <Button
                     variant="primary"
-                    icon={<Check size={15} aria-hidden="true" />}
+                    icon={<Check size={16} aria-hidden="true" />}
                     onClick={() => {
                       if (!hasChanges) {
                         notifyToast('変更はありません。')

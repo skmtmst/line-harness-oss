@@ -167,7 +167,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
               title={templates.length === 0 ? '文のテンプレートがありません' : undefined}
               onClick={() => setTemplateMenuOpen((value) => !value)}
             >
-              <FileText size={15} aria-hidden="true" />テンプレートを選択
+              <FileText size={16} aria-hidden="true" />テンプレートを選択
             </Button>
             <Button type="button" icon={<ImagePlus aria-hidden="true" />} disabled={busy} onClick={() => setImagePickerOpen(true)}>画像</Button>
             {templateMenuOpen ? <EntityKindDialog kind="template" options={templates} confirmLabel="この文を入れる"

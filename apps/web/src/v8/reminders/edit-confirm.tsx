@@ -170,7 +170,7 @@ export function ConfirmStageV8({
           onDraft={onSaveDraft}
           draftBusy={busy}
           nextLabel="有効にする"
-          nextIcon={<Power size={15} aria-hidden="true" />}
+          nextIcon={<Power size={16} aria-hidden="true" />}
           onNext={onPublish}
           nextDisabled={busy || !publishReady}
           nextBusy={busy}
@@ -203,7 +203,7 @@ export function ConfirmStageV8({
         <div className={styles.testRow}>
           <span className={styles.testDestination} aria-label="送り先" title={placeholderSummary || undefined}>送り先：{destination}</span>
           <Button variant="secondary" onClick={onSend} disabled={sendBusy || recipientView.kind !== 'ready'} busy={sendBusy} busyLabel="送信中…">
-            <Send size={15} aria-hidden="true" />テストを送る
+            <Send size={16} aria-hidden="true" />テストを送る
           </Button>
         </div>
         {testedLabel ? <p className={styles.testResult}>{testedLabel}</p> : null}
@@ -255,7 +255,7 @@ export function CheckRow({ ok, title, note, action }: { ok: boolean; title: stri
   return (
     <div className={styles.checkRow}>
       <span className={styles.checkIcon} data-ok={ok || undefined}>
-        {ok ? <CheckCircle2 size={18} aria-hidden="true" /> : <CircleAlert size={18} aria-hidden="true" />}
+        {ok ? <CheckCircle2 size={20} aria-hidden="true" /> : <CircleAlert size={20} aria-hidden="true" />}
       </span>
       <span className={styles.checkText}>
         <span className={styles.checkTitle}>{title}</span>
@@ -306,12 +306,12 @@ export function DoneStageV8({
             </div>
           </dl>
           <div className={styles.doneActions}>
-            <Button href="/reminders"><List size={15} aria-hidden="true" />一覧へ戻る</Button>
+            <Button href="/reminders"><List size={16} aria-hidden="true" />一覧へ戻る</Button>
             <Button variant="secondary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}&tab=schedule&status=planned`}>
-              <CalendarClock size={15} aria-hidden="true" />配信予定を見る
+              <CalendarClock size={16} aria-hidden="true" />配信予定を見る
             </Button>
             <Button variant="primary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}`}>
-              <ArrowRight size={15} aria-hidden="true" />詳細を見る
+              <ArrowRight size={16} aria-hidden="true" />詳細を見る
             </Button>
           </div>
         </Card>

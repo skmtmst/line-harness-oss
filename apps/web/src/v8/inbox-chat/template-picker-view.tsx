@@ -62,7 +62,7 @@ const PACK_MAX = 5
 export default function TemplatePickerView(props: TemplatePickerViewProps) {
   const { side, packMode, packItems } = props
   const folderRows: FolderPanelRow[] = [
-    { id: 'frequent', kind: 'folder', label: 'よく使う', icon: <FolderOpen size={15} aria-hidden="true" />, count: null },
+    { id: 'frequent', kind: 'folder', label: 'よく使う', icon: <FolderOpen size={16} aria-hidden="true" />, count: null },
     { id: 'all', kind: 'all', label: 'すべて', count: side.allCount },
     ...(side.status === 'error' ? [] : side.folders.map((folder): FolderPanelRow => ({
       id: `folder:${folder.id}`, kind: 'folder', label: folder.name, color: folder.color, count: folder.count,
@@ -90,8 +90,8 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               <Button onClick={props.onClose}>キャンセル</Button>
               <Button variant="primary" onClick={props.onConfirm} disabled={props.confirmDisabled}>
                 {packMode
-                  ? <><Send aria-hidden="true" size={15} />{formatNumber(packItems.length)}通を続けて送る</>
-                  : <><CornerDownLeft aria-hidden="true" size={15} />入力欄に入れる</>}
+                  ? <><Send aria-hidden="true" size={16} />{formatNumber(packItems.length)}通を続けて送る</>
+                  : <><CornerDownLeft aria-hidden="true" size={16} />入力欄に入れる</>}
               </Button>
             </div>
       </>}

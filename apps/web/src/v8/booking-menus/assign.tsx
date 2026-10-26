@@ -350,7 +350,7 @@ export default function AssignMatrixV8() {
                   キャンセル
                 </Button>
                 <Button
-                  variant="primary" icon={<Check size={15} aria-hidden="true" />}
+                  variant="primary" icon={<Check size={16} aria-hidden="true" />}
                   onClick={() => {
                     if (!dirty) {
                       notifyToast('変更はありません。')
@@ -363,7 +363,7 @@ export default function AssignMatrixV8() {
                   busy={saving}
 
                 >
-                  <Check size={15} aria-hidden="true" />保存する
+                  <Check size={16} aria-hidden="true" />保存する
                 </Button>
               </>
             ) : null}
@@ -542,7 +542,7 @@ export default function AssignMatrixV8() {
                   </div>
                   <div className={styles.legendRow}>
                     <span className={styles.legendCheck} aria-hidden="true">
-                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4l2.5 2.5L9 1" /></svg>
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4l2.5 2.5L9 1" /></svg>
                     </span>
                     <span className={styles.legendName}>{staffLabel(selectedStaff)}</span>
                     {selectedOverridden ? (

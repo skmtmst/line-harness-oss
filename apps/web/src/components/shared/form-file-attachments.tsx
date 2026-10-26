@@ -24,14 +24,14 @@ function Attachment({ file }: { file: FormFileAnswer }) {
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [file.fileId, file.state])
   if (file.state === 'expired') return <span>期限で消しました</span>
-  if (file.state === 'restricted') return <span><Lock size={14} aria-hidden />見る権限がありません</span>
+  if (file.state === 'restricted') return <span><Lock size={16} aria-hidden />見る権限がありません</span>
   if (file.state === 'quarantined') return <span>危ないファイルのため開けません</span>
   if (file.state === 'rejected') return <span>安全を確認できませんでした。別のファイルを選んでください</span>
   if (file.state !== 'ready') return <span>検査中です</span>
   const pdf = file.mimeType === 'application/pdf'
   return <>
     <Button size="compact" onClick={() => setOpen(true)} aria-label={`${file.filename || '書類'}を開く`}>
-      {pdf ? <FileText size={16} aria-hidden /> : url ? <img src={url} alt="添付の小さな見本" className={styles.thumbnail} /> : null}
+      {pdf ? <FileText size={16} aria-hidden /> : url ? <img width={32} height={32} src={url} alt="添付の小さな見本" className={styles.thumbnail} /> : null}
       {file.filename || '書類'}
     </Button>
     <Dialog open={open} title={file.filename || '書類'} designWidth={720} onCancel={() => setOpen(false)} cancelLabel="閉じる">

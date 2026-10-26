@@ -28,7 +28,7 @@ export function Thumb({ image }: { image: BannerImage }) {
   return (
     <span className={styles.thumb}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {!failed ? <img src={image.media.url} alt="" loading="lazy" onError={() => setFailed(true)} /> : null}
+      {!failed ? <img width={240} height={126} src={image.media.url} alt="" loading="lazy" onError={() => setFailed(true)} /> : null}
     </span>
   )
 }

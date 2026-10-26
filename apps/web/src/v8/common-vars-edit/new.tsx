@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { createPageReturnHref } from '@/components/shared/create-page';
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -233,7 +234,7 @@ export default function NewCommonVarV8() {
   }, [selectedAccountId])
 
   useEffect(() => {
-    if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: scrollMotion(), block: 'center' })
   }, [secretWarningFields])
 
   const valueErrorMessageRef = useRef('')
@@ -434,7 +435,7 @@ export default function NewCommonVarV8() {
                 busy={saving}
                 busyLabel="保存中…"
               >
-                <Upload size={14} aria-hidden="true" />
+                <Upload size={16} aria-hidden="true" />
                 保存して公開
               </Button>
             </>
@@ -532,7 +533,7 @@ export default function NewCommonVarV8() {
                 checked={checked}
                 title={entry.label}
                 note={entry.desc}
-                icon={<Icon size={14} aria-hidden="true" />}
+                icon={<Icon size={16} aria-hidden="true" />}
                 onChange={() => {
                   setType(entry.key)
                   setValue('')

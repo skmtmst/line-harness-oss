@@ -119,7 +119,7 @@ export default function CopyTextButton({
         aria-label={ariaLabel}
         title={state === 'copied' ? 'コピーしました' : label}
       >
-        {state === 'copied' ? <Check size={14} aria-hidden /> : icon}
+        {state === 'copied' ? <Check size={16} aria-hidden /> : icon}
         {state === 'copied' ? 'コピーしました' : label}
       </Button>
     )
@@ -144,7 +144,7 @@ export default function CopyTextButton({
           : 'text-action hover:underline'
       }`}
     >
-      {state === 'copied' ? <Check size={14} aria-hidden /> : icon}
+      {state === 'copied' ? <Check size={16} aria-hidden /> : icon}
       {state === 'copied' ? 'コピーしました' : label}
     </button>
   )

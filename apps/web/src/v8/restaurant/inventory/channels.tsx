@@ -191,14 +191,14 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
           <Field label="取り込みアドレス" htmlFor="rs-intake-address" optional={false}>
             <div className={styles.addressBox}>
               <TextField id="rs-intake-address" readOnly title={address ?? undefined} value={address ?? (canEdit ? 'まだ発行されていません' : '管理者だけが見られます')} />
-              {address ? <CopyTextButton variant="secondary" icon={<Copy size={15} aria-hidden="true" />} value={address} aria-label="取り込みアドレスをコピー" /> : null}
+              {address ? <CopyTextButton variant="secondary" icon={<Copy size={16} aria-hidden="true" />} value={address} aria-label="取り込みアドレスをコピー" /> : null}
             </div>
           </Field>
           <div className={styles.cardActions}>
-            <Button onClick={() => setHowToOpen(true)}><CircleHelp size={15} aria-hidden="true" />転送の設定のしかた</Button>
-            <Button href="/restaurant-test/reservations"><FlaskConical size={15} aria-hidden="true" />試しに受け取る（予約台帳へ）</Button>
+            <Button onClick={() => setHowToOpen(true)}><CircleHelp size={16} aria-hidden="true" />転送の設定のしかた</Button>
+            <Button href="/restaurant-test/reservations"><FlaskConical size={16} aria-hidden="true" />試しに受け取る（予約台帳へ）</Button>
             {canEdit ? (address
-              ? <Button onClick={() => setReissueOpen(true)} disabled={busy}><RefreshCw size={15} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
+              ? <Button onClick={() => setReissueOpen(true)} disabled={busy}><RefreshCw size={16} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
               : <Button variant="primary" disabled={busy} onClick={issue} busy={Boolean(busy)} busyLabel="処理中…">発行する</Button>) : null}
           </div>
         </Card>

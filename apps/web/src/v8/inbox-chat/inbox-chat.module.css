@@ -69,7 +69,7 @@
 .schWarn { color: var(--color-warning); font-size: var(--text-caption); font-weight: 600; }
 .schError { color: var(--color-danger); font-size: var(--text-caption); }
 .schLink { margin-left: var(--tpl-inbox-chip-gap); border: 0; background: none; color: var(--color-action); font-size: var(--text-caption); font-weight: 600; cursor: pointer; white-space: nowrap; }
-.schLink:disabled { opacity: 0.4; cursor: default; }
+.schLink:disabled { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
 .schRows { display: flex; flex-direction: column; gap: var(--tpl-inbox-head-tools-gap); width: 100%; }
 .schRow {
   display: flex;
@@ -240,7 +240,7 @@
   cursor: pointer;
 }
 .attachChipRemove:hover:not(:disabled) { background: var(--color-canvas); color: var(--color-ink); }
-.attachChipRemove:disabled { opacity: 0.4; cursor: default; }
+.attachChipRemove:disabled { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
 .attachChipRemoveIcon { width: var(--tpl-inbox-icon-md); height: var(--tpl-inbox-icon-md); }
 /* ドラッグで近づけている間は書く欄の枠を緑にする */
 .composer[data-drop-over] .inputBox { outline-color: var(--color-accent-deep); background: var(--color-accent-soft); }

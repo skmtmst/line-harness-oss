@@ -63,9 +63,9 @@ export default function NoPermissionBoard({
           ) : null}
           <div className={styles.actions}>
             {capabilitiesHref ? (
-              <Button href={capabilitiesHref} variant="secondary"><BookOpen size={15} aria-hidden="true" />役割でできることを見る</Button>
+              <Button href={capabilitiesHref} variant="secondary"><BookOpen size={16} aria-hidden="true" />役割でできることを見る</Button>
             ) : null}
-            <Button href={onBack ? undefined : backHref} onClick={onBack} variant="primary"><CircleHelp size={15} aria-hidden="true" />{backLabel}</Button>
+            <Button href={onBack ? undefined : backHref} onClick={onBack} variant="primary"><CircleHelp size={16} aria-hidden="true" />{backLabel}</Button>
           </div>
         </section>
       </div>

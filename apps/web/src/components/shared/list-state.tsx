@@ -161,7 +161,7 @@ export default function ListState({
       data-design-node={designNode}
       role={kind === 'forbidden' ? 'alert' : undefined}
     >
-      <span className={styles.iconWrap} aria-hidden="true">{icon ?? <Icon aria-hidden="true" size={24} className={iconClass} />}</span>
+      <span className={styles.iconWrap} aria-hidden="true">{icon ?? <Icon aria-hidden="true" size={20} className={iconClass} />}</span>
       <p className={styles.title}>{title ?? preset.title}</p>
       <p className={styles.description}>{kind === 'forbidden' ? `${permissionReason ? `${permissionReason} ` : ''}${permissionDeniedMessage(permissionScope)}` : description ?? preset.description}</p>
       {kind === 'forbidden' ? <div className={styles.action}><Button busy={retrying} onClick={onRetry ?? (() => window.location.reload())}>{retrying ? '読み込んでいます' : 'もう一度読み込む'}</Button>{action}</div> : action ? <div className={styles.action}>{action}</div> : null}

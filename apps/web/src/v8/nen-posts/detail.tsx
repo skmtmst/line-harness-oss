@@ -146,7 +146,7 @@ export function PhotoReviewDetail({
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <figure>
           <div className="grid h-48 place-items-center overflow-hidden rounded-card bg-canvas-sunken">
-            {reviewUrl ? <img
+            {reviewUrl ? <img width={800} height={800}
               src={reviewUrl}
               alt="今回の投稿の写真"
               className="h-full w-full object-contain"
@@ -161,7 +161,7 @@ export function PhotoReviewDetail({
         </figure>
         <figure>
           <div className="grid h-48 place-items-center overflow-hidden rounded-card bg-canvas-sunken">
-            {duplicateImageUrl ? <img
+            {duplicateImageUrl ? <img width={800} height={800}
               src={duplicateImageUrl}
               alt="前に採用された同じ写真"
               className="h-full w-full object-contain"
@@ -182,7 +182,7 @@ export function PhotoReviewDetail({
     <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
       <Card className="xl:col-span-3" overflow="hidden">
         <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-160">
-          {reviewUrl ? <img
+          {reviewUrl ? <img width={800} height={800}
             src={reviewUrl}
             alt={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の審査用写真`}
             className="h-full w-full object-contain transition-transform"

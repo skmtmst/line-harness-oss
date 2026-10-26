@@ -203,7 +203,7 @@ export function AppearanceTab(props: Props) {
               onClick={() => patchTheme({ main: FORM_THEME_DEFAULT.main, sub: FORM_THEME_DEFAULT.sub, accent: FORM_THEME_DEFAULT.accent, error: FORM_THEME_DEFAULT.error, text: FORM_THEME_DEFAULT.text })}
               title="5つの色だけを初期の組合せにします。書体・角の丸み・背景画像は変わりません。"
             >
-              <Sparkles size={15} aria-hidden="true" />
+              <Sparkles size={16} aria-hidden="true" />
               おまかせで組む
             </Button>
           </span>
@@ -239,7 +239,7 @@ export function AppearanceTab(props: Props) {
             /></SaveErrorField>
             <button type="button" className={styles.selectLike} onClick={() => setLinkOpen(true)} aria-haspopup="dialog">
               <span>{`リンクの見え方：${linkSummary}`}</span>
-              <Link2 size={14} aria-hidden="true" />
+              <Link2 size={16} aria-hidden="true" />
             </button>
           </div>
         </div>}

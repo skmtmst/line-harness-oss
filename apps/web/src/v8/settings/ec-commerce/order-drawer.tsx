@@ -209,7 +209,7 @@ export default function OrderDrawer({
       </> : undefined}
       onClose={onClose}
       footer={order ? <>
-        <Button href="/ec-commerce/identity-candidates"><LinkIcon size={14} aria-hidden="true" />会員のつき合わせへ</Button>
+        <Button href="/ec-commerce/identity-candidates"><LinkIcon size={16} aria-hidden="true" />会員のつき合わせへ</Button>
         {order.detailUrl ? <Button external href={order.detailUrl}  >ECの管理画面で開く</Button> : null}
       </> : undefined}
     >

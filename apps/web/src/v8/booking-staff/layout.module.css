@@ -147,7 +147,6 @@
 
 .input:focus-visible { outline: var(--tpl-bks-ring) solid var(--color-focus-ring); }
 .input[aria-invalid='true'] { outline-color: var(--color-danger); }
-.input:disabled { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 
 .fieldError {
   color: var(--color-danger);

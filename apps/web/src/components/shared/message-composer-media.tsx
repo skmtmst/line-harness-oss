@@ -30,7 +30,7 @@ function AudioPreview({ url, duration, name, disabled }: { url: string; duration
     else try { await audio.current.play() } catch { setError(true) }
   }
   return <div className={styles.audioAttachment}>
-    <Button size="composer" disabled={disabled} className={styles.audioIcon} aria-label={playing ? '音声を停止する' : '音声を再生する'} onClick={() => void toggle()}>{playing ? <Pause size={14} aria-hidden /> : <Play size={14} aria-hidden />}</Button>
+    <Button size="composer" disabled={disabled} className={styles.audioIcon} aria-label={playing ? '音声を停止する' : '音声を再生する'} onClick={() => void toggle()}>{playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}</Button>
     <div className={styles.audioTrack}><strong title={name}>{name}</strong><progress aria-label="音声の再生位置" value={elapsed} max={seconds || 1} />{error ? <span role="alert">再生できませんでした。音声のURLを確認してください。</span> : null}</div>
     <span>{clock(playing || elapsed ? elapsed : seconds)}</span>
     <audio ref={audio} src={url} hidden onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onTimeUpdate={(event) => setElapsed(event.currentTarget.currentTime)} />

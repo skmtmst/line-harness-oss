@@ -102,10 +102,10 @@ export default function WebhooksSheetsV8() {
                   busy={busy === 'sync'}
                   busyLabel="同期しています…"
                 >
-                  <RefreshCw size={15} aria-hidden="true" />{effectivelyRunning ? '同期中' : '今すぐ同期'}
+                  <RefreshCw size={16} aria-hidden="true" />{effectivelyRunning ? '同期中' : '今すぐ同期'}
                 </Button>
                 <Button disabled={busy !== null} onClick={() => setShowTargetForm((current) => !current)}>
-                  <Sheet size={15} aria-hidden="true" />{showTargetForm ? '閉じる' : connection?.spreadsheetId ? '出力先を変更' : '出力先を設定'}
+                  <Sheet size={16} aria-hidden="true" />{showTargetForm ? '閉じる' : connection?.spreadsheetId ? '出力先を変更' : '出力先を設定'}
                 </Button>
               </>
             )}
@@ -225,7 +225,7 @@ export default function WebhooksSheetsV8() {
       headingSize="regular"
       title="外部連携"
       help={WEBHOOKS_DESCRIPTION}
-      actions={isOwner ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
+      actions={isOwner ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="sheets" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!isOwner ? <ViewerBand /> : null}

@@ -257,7 +257,7 @@ export function RoutesStep({ rule, definition, setDefinition, options, routeUses
         <div className={styles.routeFoot}>
           {canEdit ? (
             <Button href="/inflow-links" variant="text">
-              <Plus size={15} aria-hidden="true" />流入リンクを新しく発行する
+              <Plus size={16} aria-hidden="true" />流入リンクを新しく発行する
             </Button>
           ) : null}
           {narrow ? <Button type="button" variant="text" onClick={() => setConditionsDialogOpen(true)}>対象をしぼる <OptionalBadge /></Button> : null}

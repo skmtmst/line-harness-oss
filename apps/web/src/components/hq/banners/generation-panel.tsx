@@ -161,7 +161,7 @@ export default function GenerationPanel({
                   {/* 統括の画像は Worker から配信されるので next/image の最適化は使わない（image-tile と同じ） */}
                   {image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={image.media.url} alt="" className="h-12 w-12 shrink-0 rounded-mini bg-step-idle object-cover" />
+                    <img width={48} height={48} src={image.media.url} alt="" className="h-12 w-12 shrink-0 rounded-mini bg-step-idle object-cover" />
                   ) : (
                     <span className="h-12 w-12 shrink-0 rounded-mini bg-step-idle" />
                   )}
@@ -312,7 +312,7 @@ export default function GenerationPanel({
                         alignEmphasis(value.textLines, value.emphasisLines).filter((_, j) => j !== i),
                       )
                     }
-                    className={v8Layout ? styles.v8LineRemove : "rounded-mini p-1 text-ink-faint hover:bg-canvas-sunken disabled:opacity-50"}
+                    className={v8Layout ? styles.v8LineRemove : "rounded-mini p-1 text-ink-faint hover:bg-canvas-sunken "}
                   >
                     <X aria-hidden="true" className="h-3.5 w-3.5" />
                   </button>
@@ -326,7 +326,7 @@ export default function GenerationPanel({
                 onClick={() =>
                   setLines([...value.textLines, ''], [...alignEmphasis(value.textLines, value.emphasisLines), false])
                 }
-                className={v8Layout ? styles.v8LineAdd : "inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline disabled:opacity-50"}
+                className={v8Layout ? styles.v8LineAdd : "inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline "}
               >
                 <Plus aria-hidden="true" className="h-3.5 w-3.5" />
                 行を足す

@@ -56,10 +56,6 @@
   outline: var(--tpl-tag-ring) solid var(--color-focus-ring);
 }
 
-.input:disabled {
-  background: var(--color-canvas-sunken);
-}
-
 /* 選ぶ欄（絵 320）。 */
 .selectBox {
   width: var(--tpl-tg2-select-w);

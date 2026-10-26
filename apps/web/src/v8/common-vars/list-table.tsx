@@ -69,7 +69,7 @@ export function renderCommonVarList({ accountLoading, activeId, allOnPageSelecte
         ))}
     </div>
   ) : !selectedAccountId ? (
-    <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。"  icon={<Braces size={18} aria-hidden="true" />} />
+    <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。"  icon={<Braces size={20} aria-hidden="true" />} />
   ) : listFailed ? (
     isForbidden(listFailure) ? (
       <ListState kind="error" title="共通情報を見る権限がありません" description="オーナーか管理者に、共通情報を見られるよう頼んでください。"  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button><Button href="/staff" variant="secondary">できることを確かめる</Button></>} />

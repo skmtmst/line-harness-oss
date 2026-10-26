@@ -225,7 +225,7 @@ export default function BookingStaffPage() {
                     <Td>
                       <div className="flex items-center gap-3">
                         {s.profile_image_url ? (
-                          <img
+                          <img width={36} height={36}
                             src={s.profile_image_url}
                             alt={s.display_name}
                             className="w-9 h-9 rounded-pill object-cover"
