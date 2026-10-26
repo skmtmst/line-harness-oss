@@ -4,7 +4,7 @@ import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
-import { Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
+import { Folder as FolderIcon, Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { ListPage, ListPageCards } from '@/components/templates';
@@ -530,7 +530,7 @@ export default function HqHomeV8() {
                   <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>
                 </div>
                 <TagOverflow label={`${name}の分類`}>
-                  {folderDotOf(account) ? <TagPill name={folderDotOf(account)!.name} color={folderDotOf(account)!.color} aria-label={`フォルダ：${folderDotOf(account)!.name}`} /> : null}
+                  {folderDotOf(account) ? <span className={styles.folderLabel} aria-label={`フォルダ：${folderDotOf(account)!.name}`}><FolderIcon size={14} aria-hidden="true" />{folderDotOf(account)!.name}</span> : null}
                   {(account.tags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
                 </TagOverflow>
                 <dl className={styles.stats}>
