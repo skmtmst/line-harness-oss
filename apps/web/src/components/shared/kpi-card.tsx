@@ -14,6 +14,7 @@ import { formatNumber } from '@/lib/format'
 import { RetryLabel } from './retry-label'
 import { normalizeActionLabel } from './action-words'
 import { KpiRollingValue } from './kpi-value-motion'
+import { ProgressBar } from './progress'
 
 function detailText(node: ReactNode): string {
   return React.Children.toArray(node).map(child => {
@@ -132,6 +133,8 @@ export type KpiCardProps = {
   'aria-label'?: string
   /** faint は「値を出せない」の見せ方。0 を薄くする用途には使わない。 */
   valueTone?: 'default' | 'warning' | 'faint' | 'danger'
+  /** 数と補足のあいだのメーター（送信枠の使った割合など）。value は 0〜100。 */
+  meter?: { value: number; label: string; tone?: 'danger' }
 }
 
 /** 旧名。KpiCard に寄せたので、新しくは KpiCardProps を使う。 */
@@ -179,6 +182,7 @@ export default function KpiCard({
   valueText,
   valueRange,
   valueTextWithUnit = false,
+  meter,
   ...cardProps
 }: KpiCardProps) {
   const valueRef = React.useRef<HTMLButtonElement>(null)
@@ -284,6 +288,7 @@ export default function KpiCard({
       {delta ? <span className={styles.delta}>{delta}</span> : null}
       </div>
 
+      {meter && !loading ? <ProgressBar appearance="quota" tone={meter.tone} value={meter.value} label={meter.label} className={styles.meter} /> : null}
       {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
       <p data-kpi-detail data-kpi-detail-present={Boolean(detailText(detail).trim() || onRetry || action) || undefined} className={styles.detail}>
         <span role="note" className={styles.detailText} title={detailText(detail) || undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
