@@ -65,6 +65,19 @@ test('全員より少ないときは「続きを読み込む」で残りを足�
   await waitFor(() => expect(screen.queryByRole('button', { name: '続きを読み込む' })).toBeNull())
 })
 
+test('読み込んだ人数が全員より少ないときは、黙って切らず人数を注記する', async () => {
+  net.users.mockResolvedValue({ success: true, data: {
+    items: Array.from({ length: 200 }, (_, i) => user(i)),
+    pagination: { total: 1250, limit: 200, offset: 0 },
+    summary: { active: 1250, suspended: 0, mfaEnabled: 0, invited: 0 },
+  } })
+  vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
+  vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
+  render(<StaffV8 />)
+  await screen.findByRole('button', { name: '続きを読み込む' })
+  await waitFor(() => expect(document.body.textContent).toContain('（全1,250 人中200 人まで読み込み）'))
+})
+
 test('役割の区別を共通札へ渡し、名前と権限の読み取りを保つ', async () => {
   const roles = ['administrator', 'operations', 'reception', 'view_only', 'custom']
   net.users.mockResolvedValue({ success: true, data: {

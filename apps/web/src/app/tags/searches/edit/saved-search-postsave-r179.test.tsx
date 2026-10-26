@@ -6,7 +6,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const mockState = vi.hoisted(() => ({
   role: 'owner' as string | null,
@@ -135,4 +135,15 @@ for (const role of [null, 'staff', 'viewer']) test(`権限${role}では条件の
   expect(screen.queryByLabelText('条件名')).toBeNull()
   for (const name of ['保存する', '複製して保存する', '削除する']) expect(screen.queryByRole('button', { name, exact: true })).toBeNull()
   expect(mockState.previewRevisions).toHaveLength(0)
+})
+
+test('共有の「？」は、上限といまの件数と、共有すると何が起きるかを先に言う', async () => {
+  const { default: SavedSearchEditPage } = await import('./page')
+  await act(async () => { render(<SavedSearchEditPage />) })
+  const help = await screen.findByRole('button', { name: '共有の説明' })
+  await act(async () => { fireEvent.click(help) })
+  await waitFor(() => expect(help.getAttribute('aria-describedby')).toBeTruthy())
+  const note = document.getElementById(help.getAttribute('aria-describedby')!)!
+  expect(note.textContent).toContain('保存できるのは50件までです（いま1 件）。')
+  expect(note.textContent).toContain('一斉配信・オートメーションの対象条件からも呼び出せます')
 })

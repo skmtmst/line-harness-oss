@@ -86,7 +86,7 @@ describe('受信箱 保存した検索の完了判定', () => {
   })
 
   it('保存条件ごとの件数が未接続なら0件にせず理由を出す', () => {
-    expect(PAGE).toContain("typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'")
+    // 件数そのものの出し方は、描いた画面で inbox-saved-view-url-react.test.tsx が見る。
     expect(PAGE).toContain('「—件」は0件ではありません。')
   })
 
