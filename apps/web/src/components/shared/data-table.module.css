@@ -46,6 +46,10 @@
   transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
+/* 押して開ける行は、行のどこでも押せると分かるよう指の形にする（§6.11 の 4）。 */
+html:root .row[data-row-open] { cursor: pointer; }
+html:root .row[data-row-open]:not(.rowInteractive):hover:not([aria-selected='true']) { background: var(--polish-table-hover); }
+
 .rowInteractive.rowSelected:hover {
   background: var(--polish-selection-bg);
 }

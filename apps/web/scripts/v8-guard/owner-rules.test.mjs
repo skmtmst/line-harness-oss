@@ -201,3 +201,18 @@ test('表の見出しの行がふつうの行より高い・太い、表の中�
     assert.deepEqual(await kinds(), ['table-tag-pad'])
   } finally { await browser.close() }
 })
+
+test('押して開ける行に指の形と乗せた時の地の変化が無いと落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind === 'row-open')
+    const row = style => `<style>${style}</style><main><table style="width:300px"><tbody><tr data-row-open="true"><td>山田</td></tr></tbody></table></main>`
+    await page.setContent(row('tr[data-row-open]{cursor:pointer}tr[data-row-open]:hover{background:#f5f5f7}'))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(row('tr[data-row-open]:hover{background:#f5f5f7}'))
+    assert.deepEqual(await kinds(), ['row-open'])
+    await page.setContent(row('tr[data-row-open]{cursor:pointer}'))
+    assert.deepEqual(await kinds(), ['row-open'])
+  } finally { await browser.close() }
+})

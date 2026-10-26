@@ -193,5 +193,13 @@ export default function scanPolishRules() {
       if (text && (text.top - pr.top < 3.5 || pr.bottom - text.bottom < 3.5)) { add('table-tag-pad', pill, { top: Math.round((text.top - pr.top) * 10) / 10, bottom: Math.round((pr.bottom - text.bottom) * 10) / 10 }, pill.textContent); break }
     }
   }
+  // 押して開ける行（§6.11 の 4）：指の形と、乗せた時の地の変化（共通の値）がある。
+  const hoverRules = rules.filter(({ rule }) => rule.selectorText.includes(':hover') && (rule.style.backgroundColor || rule.style.background || rule.style.getPropertyValue('--polish-overlay-strength')))
+  for (const row of document.querySelectorAll('tr[data-row-open], [role="row"][data-row-open]')) {
+    if (!visible(row)) continue
+    const pointer = css(row).cursor === 'pointer'
+    const hover = hoverRules.some(({ rule }) => rule.selectorText.split(',').some((part) => { try { return part.includes(':hover') && row.matches(part.replace(/:hover/g, '').replace(/:not\(\[aria-selected='true'\]\)|:not\(\.[\w-]*rowSelected[\w-]*\)/g, '')) } catch { return false } }))
+    if (!pointer || !hover) { add('row-open', row, { cursor: css(row).cursor, hover }); break }
+  }
   return findings
 }
