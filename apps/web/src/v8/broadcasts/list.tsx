@@ -845,6 +845,7 @@ export default function BroadcastListV8() {
         onClose={() => setSavedMenuOpen(false)}
         anchorRef={savedAnchorRef}
         ariaLabel="保存した検索"
+        choiceHeading="保存した検索"
         items={[
           ...savedViews.map((view) => ({
             id: `view-${view.id}`,

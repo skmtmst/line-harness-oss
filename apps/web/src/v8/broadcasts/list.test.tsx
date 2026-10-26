@@ -208,6 +208,8 @@ describe('V8 一斉配信一覧の結果の列', () => {
     await flush()
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent?.trim())
     expect(items.at(-1)).toBe('＋ 今の条件を保存する')
+    // 保存した検索は「1つ選ぶ一覧」。操作メニューの鉛筆などの印を付けない。
+    expect(document.querySelector('[role="menu"] [role="menuitem"] svg')).toBeNull()
     act(() => { (document.querySelector('[role="menuitem"]') as HTMLElement).click() })
     await flush()
     const chip = [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith('予約中')) as HTMLButtonElement
