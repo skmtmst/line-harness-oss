@@ -208,7 +208,7 @@ export function OpenAlerts({
               <div className={styles.alertLine}>
                 <StatusPill severity={alert.severity} />
                 <p className={styles.alertText} title={detail}>{`${checkTitle}：${alert.summary}${formatDetectedSince(alert.firstDetectedAt)}`}</p>
-                {alert.status === 'acknowledged' ? <span className={styles.status} data-tone="info">受領済み</span> : alert.status === 'resolved' ? <span className={styles.status} data-tone="info">解消済み</span> : null}
+                {alert.status === 'acknowledged' ? <StatusBadge tone="info">受領済み</StatusBadge> : alert.status === 'resolved' ? <StatusBadge tone="info">解消済み</StatusBadge> : null}
                 {response ? <Link href={response.href} className={styles.srOnly}>対象画面へ</Link> : null}
                 {canManage && alert.status === 'open' ? (
                   <Button variant="secondary" disabled={busy} busy={busy} onClick={() => {

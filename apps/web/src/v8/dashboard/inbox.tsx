@@ -145,7 +145,7 @@ export function InboxSection({ onSummaryChange }: {
           <tbody>{items.map((item) => (
             <Tr key={item.id} data-table-layout="columns">
               <Td className={styles.colName}>
-                <span className={styles.route}>{item.channel === 'email' ? 'メール' : 'LINE'}</span>
+                <StatusBadge tone="neutral" size="compact" dot={false}>{item.channel === 'email' ? 'メール' : 'LINE'}</StatusBadge>
                 <Link href={inboxItemHref(item)} className={styles.inboxName} title={`${item.customerName}の受信箱を開く`}>
                   {item.customerName}
                 </Link>

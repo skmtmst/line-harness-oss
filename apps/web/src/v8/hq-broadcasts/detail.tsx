@@ -343,7 +343,7 @@ function HqDeliveryRail({ run, approvalPending }: { run: HqBroadcastRun; approva
       {branch ? (
         <li className={detailStyles.railItem}>
           <span className={detailStyles.railLine} aria-hidden="true" />
-          <span className={detailStyles.badge} data-tone={branch.tone === 'danger' ? 'danger' : branch.tone === 'warning' ? 'warning' : 'neutral'}>{branch.label}</span>
+          <StatusBadge tone={branch.tone === 'danger' ? 'danger' : branch.tone === 'warning' ? 'warning' : 'neutral'}>{branch.label}</StatusBadge>
         </li>
       ) : null}
     </ol>
@@ -503,7 +503,7 @@ export default function HqBroadcastDetail() {
         <PageHeading title={run?.title ?? '一括配信'}
         steps={<>{run ? <HqDeliveryRail run={run} approvalPending={approval.state?.approval.status === 'pending'} /> : null}</>}
         /* 店の詳細と同じ形：題の右に状態の札、題の下に1行の要約。 */
-        titleAccessory={badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : undefined}
+        titleAccessory={badge ? <StatusBadge tone={tone}>{badge.label}</StatusBadge> : undefined}
         crumbs={run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : undefined}
         actions={<>{run ? (
             <div className={detailStyles.actions}>

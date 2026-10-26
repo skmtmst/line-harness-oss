@@ -61,6 +61,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import StatusBadge from '@/components/shared/status-badge'
 
 
 /** 送るまでの6段階。承認が絡まない・予約しない配信はその段を省く。 */
@@ -277,10 +278,7 @@ export default function BroadcastDetail({
         steps={<>{isDraft
             ? <DraftStepRail broadcastId={broadcast.id} draftStep={broadcast.draftStep} canEdit={canEdit} />
             : <DeliveryRail broadcast={broadcast} approvalInvolved={approvalInvolved(broadcast, approval.state)} abWaiting={abResult.result?.status === 'undecided' || abResult.result?.status === 'testing'} />}</>}
-        titleAccessory={<><span className={styles.badge} data-tone={badgeTone}>
-              <span className={styles.dot} aria-hidden="true" />
-              {statusLabel}
-            </span></>}
+        titleAccessory={<StatusBadge tone={badgeTone ?? 'neutral'}>{statusLabel}</StatusBadge>}
         actions={<>{canEdit ? (
             <>
               <RowMenu
@@ -574,7 +572,7 @@ function DeliveryRail({ broadcast, approvalInvolved: withApproval, abWaiting = f
       {branchLabel ? (
         <li className={styles.railItem}>
           <span className={styles.railLine} aria-hidden="true" />
-          <span className={styles.badge} data-tone={BADGE_TONE[displayStatus]}>{branchLabel}</span>
+          <StatusBadge tone={BADGE_TONE[displayStatus] ?? 'neutral'}>{branchLabel}</StatusBadge>
         </li>
       ) : null}
     </ol>

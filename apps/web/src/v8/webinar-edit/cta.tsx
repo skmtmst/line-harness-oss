@@ -37,6 +37,7 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import StatusBadge from '@/components/shared/status-badge'
 
 
 /*
@@ -304,7 +305,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
               <button type="button" className={styles.cardPick} aria-current={index === currentIndex || undefined} onClick={() => setSelected(index)}>
                 <span className={styles.cardTime}>{times[index] ?? fmtMinSec(card.atSeconds)}</span>
                 <span className={`${form.rowMain} ${form.ellipsis}`} title={card.title}>{card.title || '（見出しなし）'}</span>
-                <span className={form.pill} data-tone={card.kind === 'form' ? 'success' : undefined}><span className={form.pillDot} aria-hidden="true" />{card.kind === 'form' ? '回答フォーム' : 'URL'}</span>
+                <StatusBadge tone={card.kind === 'form' ? 'success' : 'neutral'}>{card.kind === 'form' ? '回答フォーム' : 'URL'}</StatusBadge>
                 <ErrorCountBadge count={fields.countIn(`card-${index}`)} label={`カード${index + 1}`} />
               </button>
               {readOnly ? null : (

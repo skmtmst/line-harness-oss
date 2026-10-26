@@ -299,7 +299,7 @@ function BillingInner() {
                 <h2 className={styles.planName}>{plan.name}</h2>
                 {plan.recommended ? <span className={styles.badge}>おすすめ</span> : null}
                 {interval === 'year' ? <span className={styles.badge}>約15% OFF</span> : null}
-                {isCurrent ? <span className={`${styles.pill} ${styles.pillOk}`}><span className={styles.dot} aria-hidden="true" />利用中</span> : null}
+                {isCurrent ? <StatusBadge tone="success">利用中</StatusBadge> : null}
               </div>
               <p className={styles.planDesc}>{plan.description}</p>
               <p className={styles.price} data-price-source={price.fromStripe ? 'stripe' : 'fallback'}>
