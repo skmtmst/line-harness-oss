@@ -18,3 +18,6 @@
 .create { display: flex; gap: var(--tap-action-gap); align-items: center; }
 .error { color: var(--color-danger); font-size: var(--text-caption); }
 }
+
+/* 印と文字の上下の真ん中をそろえる（差 0.5 以内。§6.5 の 2）。英数字の書体は字の箱が上に寄るので、共通の補正値で文字を下げる。 */
+:root .field > :is(.selection, .change) { translate: 0 var(--text-optical-shift); }

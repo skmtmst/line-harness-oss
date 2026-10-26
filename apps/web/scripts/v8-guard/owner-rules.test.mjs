@@ -88,7 +88,7 @@ test('印が 16・20 以外の大きさや 1.75 以外の線だと落ち、左�
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => !['selection-color', 'tap-highlight'].includes(kind))
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => ['icon-size', 'icon-stroke'].includes(kind))
     const icon = (size, stroke = 1.75, cls = 'lucide') => `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}"><path d="M4 12h16"/></svg>`
     await page.setContent(`<main><button>${icon(16)}保存</button><h2>${icon(20)}見出し</h2><div data-list-state="empty">${icon(40)}</div><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#087a3e">${icon(10)}</span></main><aside><a class="sidebar_item__x" href="#">${icon(18)}友だち</a></aside>`)
     assert.deepEqual(await kinds(), [])
@@ -255,5 +255,20 @@ test('同じ種類のカードの右上の操作の位置がそろっていな�
     assert.deepEqual(await kinds(), [])
     await page.setContent(`<main><div style="display:flex;gap:16px">${card(16)}${card(20)}</div></main>`)
     assert.deepEqual(await kinds(), ['card-corner'])
+  } finally { await browser.close() }
+})
+
+test('印と 1 行の文字の上下の真ん中が 0.5 より離れる・札が文字にかぶると落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => ['icon-text-center', 'badge-overlap'].includes(kind))
+    const button = shift => `<main><button style="display:inline-flex;align-items:center;gap:8px;height:36px;font:500 13px/20px sans-serif"><svg width="16" height="16" viewBox="0 0 24 24" style="translate:0 ${shift}px"></svg><span>保存する</span></button></main>`
+    await page.setContent(button(0))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(button(3))
+    assert.deepEqual(await kinds(), ['icon-text-center'])
+    await page.setContent('<main><a href="#" style="position:relative;display:block;width:120px"><span>受信箱のお知らせ</span><span class="nav_badge__x" style="position:absolute;left:20px;top:0">33</span></a></main>')
+    assert.deepEqual(await kinds(), ['badge-overlap'])
   } finally { await browser.close() }
 })

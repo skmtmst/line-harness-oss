@@ -264,5 +264,35 @@ export default function scanPolishRules() {
     const spread = (k) => Math.max(...corners.map((c) => c[k])) - Math.min(...corners.map((c) => c[k]))
     if (spread('right') > 0.5 || spread('top') > 0.5) add('card-corner', sameKind[0], { right: Math.round(spread('right') * 10) / 10, top: Math.round(spread('top') * 10) / 10 })
   }
+  // 印と文字の上下の真ん中（§6.5 の 2）：ボタン・リンク・選ぶ欄の中の印と 1 行の文字は、中心の差 0.5 以内。
+  for (const el of document.querySelectorAll('button, a[href], [role="button"], [role="tab"]')) {
+    if (!visible(el) || el.closest('[class*="sidebar_"], [class*="line-preview_"], [class*="liff-phone-frame_"]')) continue
+    const svg = [...el.querySelectorAll(':scope > svg, :scope > span > svg:only-child')].find((x) => visible(x) && x.getBoundingClientRect().width <= 24)
+    const lines = []
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.textContent.trim() || node.parentElement.closest('svg, [aria-hidden="true"]:not(svg), [class*="badge"], [class*="Badge"], [class*="count"]')) continue
+      const range = document.createRange(); range.selectNodeContents(node)
+      lines.push(...[...range.getClientRects()].filter((x) => x.width > 0))
+    }
+    if (!svg || !lines.length || new Set(lines.map((x) => Math.round(x.top))).size > 1) continue
+    const sr = svg.getBoundingClientRect(), text = { top: Math.min(...lines.map((x) => x.top)), bottom: Math.max(...lines.map((x) => x.bottom)) }
+    if (sr.top >= text.bottom || sr.bottom <= text.top) continue
+    const d = Math.abs((sr.top + sr.bottom) / 2 - (text.top + text.bottom) / 2)
+    if (d > 0.5) add('icon-text-center', el, { d: Math.round(d * 100) / 100 }, el.textContent)
+  }
+  // 件数・状態の札が隣の文字にかぶらない（§6.27）。
+  for (const badge of document.querySelectorAll('[class*="badge"], [class*="Badge"]')) {
+    if (!visible(badge) || !badge.textContent.trim() || badge.children.length > 2) continue
+    const br = badge.getBoundingClientRect()
+    const parent = badge.parentElement
+    const walker = document.createTreeWalker(parent, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (badge.contains(node) || !node.textContent.trim() || !visible(node.parentElement)) continue
+      const range = document.createRange(); range.selectNodeContents(node)
+      const overlap = [...range.getClientRects()].some((x) => x.width > 0 && Math.min(x.right, br.right) - Math.max(x.left, br.left) > 0.5 && Math.min(x.bottom, br.bottom) - Math.max(x.top, br.top) > 0.5)
+      if (overlap) { add('badge-overlap', badge, {}, badge.textContent); break }
+    }
+  }
   return findings
 }

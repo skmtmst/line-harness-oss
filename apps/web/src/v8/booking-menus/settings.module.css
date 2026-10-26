@@ -1825,3 +1825,6 @@
     display: none;
   }
 }
+
+/* 印と文字の上下の真ん中をそろえる（差 0.5 以内。§6.5 の 2）。文字は字の箱が上に寄るので、共通の補正値で印を上げる。 */
+.addLine > svg { translate: 0 calc(var(--text-optical-shift) * -1); }
