@@ -204,3 +204,24 @@ describe('R547 止まった実行は続きから再開できる', () => {
     expect(executeButton()).toBeNull()
   })
 })
+
+describe('事前確認から実行へのつなぎ', () => {
+  it('実行は、事前確認の引き換え券と要求キーを付けて移行元の実行の口へ送る', async () => {
+    await confirmReady()
+    fireEvent.click(executeButton()!)
+    await waitFor(() => expect(fixture.migrationExecute).toHaveBeenCalledTimes(1))
+    expect(fixture.migrationExecute).toHaveBeenCalledWith('source-1', 'account-1', 'tok-1', expect.stringMatching(/^[0-9a-f-]{36}$/))
+  })
+
+  it('確かめている間に移行先を選び直したら、遅れて届いた確認の結果で実行を出さない', async () => {
+    let finish!: (value: unknown) => void
+    fixture.migrationPreview.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+    render(<MigrateFriendFieldPage />)
+    await waitFor(() => expect(previewButtons()[0].disabled).toBe(false))
+    fireEvent.click(previewButtons()[0])
+    await waitFor(() => expect(fixture.migrationPreview).toHaveBeenCalledTimes(1))
+    fireEvent.click(await screen.findByRole('button', { name: '別の項目を選び直す' }))
+    await act(async () => { finish({ success: true, data: PREVIEW }) })
+    expect(executeButton()).toBeNull()
+  })
+})
