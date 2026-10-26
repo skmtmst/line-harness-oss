@@ -138,6 +138,11 @@ export const opsSupportPaths = {
   '/api/ops/dashboard/line-unregistered': {
     get: { tags: ['Ops Console'], summary: 'LINE 未登録の権限者（名前と契約先だけ）', responses: { '200': { description: 'Unregistered staff' } } },
   },
+  '/api/ops/dashboard/first-run': {
+    get: { tags: ['Ops Console'], summary: '最初の10分の全アカウントのまとめ（数と割合だけ・閲覧のみと代理ログイン中は403）', parameters: [
+      { name: 'period', in: 'query', required: false, schema: { type: 'string', enum: ['month', 'prev_month', 'year'] } },
+    ], responses: { '200': { description: 'Funnel counts and minutes to the first message' }, '403': { description: 'Forbidden' } } },
+  },
   // ── Ops Console: お問い合わせ（★37-6） ────────────────────────────
   '/api/ops/support/summary': {
     get: { tags: ['Ops Console'], summary: 'お問い合わせの状態別件数と数値カード（未対応・初回返信・解決率・解決時間）', responses: { '200': { description: 'Counts by stage and KPIs' } } },
