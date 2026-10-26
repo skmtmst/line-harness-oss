@@ -19,6 +19,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
 import StatusBadge from '@/components/shared/status-badge'
 import RowMenu from './row-menu'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -458,7 +459,7 @@ export default function HqBroadcastDetail() {
   }
 
   let body
-  if (!id) body = <Notice tone="warn">一括配信が選ばれていません。一括配信の一覧から開いてください。</Notice>
+  if (!id) body = null
   else if (loadError && !run) body = <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => void load()} />
   else if (!run) body = <DetailLoading />
   else body = run.status === 'prepared'
@@ -496,6 +497,16 @@ export default function HqBroadcastDetail() {
   const exampleStore = sentTo[0]?.accountName ?? '店の名前'
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
 
+
+  /* 選ばれていない時は対象なしの1枚だけ。右の設定・スマホ・タブは出さない。 */
+  if (!id) {
+    return (
+      <PageFrame kind="detail" boardId="M2tJM xOXuY">
+        <PageHeading title="一括配信" />
+        <TargetMissing kind="unspecified" title="一括配信が選ばれていません" description="一括配信の一覧から開いてください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
+      </PageFrame>
+    )
+  }
 
   return (
     <>
