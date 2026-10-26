@@ -115,7 +115,7 @@ export function InboxSection({ onSummaryChange }: {
 
   return (
     <>
-      <SectionHeader title="対応が必要な受信（全アカウント）" href="/chats" linkLabel="受信箱をすべて見る" />
+      <SectionHeader title="対応が必要な受信（全アカウント）" href="/chats" linkLabel="受信箱へ" />
       {loadFailure && summary ? (
         <p role="status" className={styles.stale}>
           {`最新の状態に更新できませんでした。${lastSuccessAt ? `最終更新 ${formatTime(lastSuccessAt)} の内容を表示しています。` : ''}`}

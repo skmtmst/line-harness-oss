@@ -63,7 +63,7 @@
   --color-on-accent: #ffffff;
 
   /* 文字の操作は濃い字。主ボタンと成功は専用の緑を使う。 */
-  --color-action: var(--color-ink);
+  --color-action: var(--color-ink); --color-destination-link: #087a3e; /* 行き先の文字リンクは緑（2026-10-26 オーナー指示） */
   --color-action-hover: var(--color-ink);
   --color-action-soft: var(--polish-selection-bg);
   --color-focus-ring: var(--polish-focus);

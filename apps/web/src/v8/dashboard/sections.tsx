@@ -168,7 +168,7 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
   const twoFactorText = `・組織全体の二段階認証：${twoFactor === null ? emptyValue('unknown') : `${twoFactor.enabled} / ${formatNumber(twoFactor.total)}人`}`
   return (
     <DashboardAsideSection>
-      <SectionHeader title="運用アラート" href="/emergency" linkLabel="運用状態を見る" />
+      <SectionHeader title="運用アラート" href="/emergency" linkLabel="運用状態へ" />
       <p className={styles.alertHead}>
         <span className={failed || count === null ? styles.faintStrong : styles.strong}>
           {failed ? '未取得' : count === null ? emptyValue('unknown') : `接続・自動処理 ${formatNumber(count)}件`}
@@ -198,7 +198,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
         help="現在の件数。選択中のアカウントのLINE（友だち単位）と、すべてのMAIL（メール単位）の合計。受信箱の絞り込みと同じ数。"
         helpLabel="現在の対応状況の説明"
         href="/chats"
-        linkLabel="受信箱を見る"
+        linkLabel="受信箱へ"
       />
       {rows.map((row) => (
         <KeyValue
@@ -324,7 +324,7 @@ export function FriendStatus({ friends }: { friends: DashboardOverview['friends'
   const breakdown = `相手から ${formatNumber(friends.blockedByThem)} 人・自分から ${formatNumber(friends.hiddenByUs)} 人・相互に ${formatNumber(friends.blockedBoth)} 人`
   return (
     <>
-      <SectionHeader title="友だちの状態" note="現在" href="/friends" linkLabel="友だちを見る" />
+      <SectionHeader title="友だちの状態" note="現在" href="/friends" linkLabel="友だちへ" />
       <KeyValue label="友だち総数" value={`${formatNumber(friends.total)} 人`} />
       <KeyValue label="有効" value={`${formatNumber(friends.active)} 人`} />
       <KeyValue label="ブロック・非表示" value={`${formatNumber(blocked)} 人（${rate.toFixed(1)}%）`} />
@@ -372,7 +372,7 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
       title="今後の予定"
       help="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
       helpLabel="今後の予定の説明"
-      {...(upcoming ? {} : { href: '/booking/bookings?view=list', linkLabel: 'すべて見る' })}
+      {...(upcoming ? {} : { href: '/booking/bookings?view=list', linkLabel: '予約へ' })}
     />
   )
   if (accountId && !failed && upcoming) {
@@ -483,7 +483,7 @@ export function MonthlyDelivery({ delivery, section }: { delivery: DashboardOver
 export function RecentResults({ conversions, period, section }: { conversions: DashboardOverview['conversions']; period: string; section?: Section }) {
   return (
     <>
-      <SectionHeader title="最近の成果" note={period} href="/conversions" linkLabel="成果を見る" />
+      <SectionHeader title="最近の成果" note={period} href="/conversions" linkLabel="成果へ" />
       {conversions.byPoint.length === 0 ? (
         <p className={styles.noteBody}>この期間の成果はまだありません。成果地点を作ると、ここに件数が出ます。</p>
       ) : (
@@ -536,7 +536,7 @@ export function RecentActivity({ items, failed }: { items: NotificationCenterIte
   const shown = (items ?? []).slice(0, 3)
   return (
     <section className={styles.activity} aria-label="最近の動き">
-      <SectionHeader title="最近の動き" href="/notifications" linkLabel="すべての動きを見る" />
+      <SectionHeader title="最近の動き" href="/notifications" linkLabel="動きの一覧へ" />
       {items === null ? (
         failed ? <p className={styles.note}>最近の動きを読み込めませんでした。</p> : <Loading label="最近の動き" />
       ) : shown.length === 0 ? (
