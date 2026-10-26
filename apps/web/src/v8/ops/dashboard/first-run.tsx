@@ -6,6 +6,7 @@ import Card from '@/components/shared/card'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import SectionHeader from '@/components/shared/section-header'
 import { api, ApiError, type OpsDashboardPeriod, type OpsFirstRunFunnel, type OpsFirstRunStage } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -28,10 +29,17 @@ const STAGE_LABELS: Record<OpsFirstRunStage, string> = {
 
 const HELP = '期間にアカウントを作った新しいお店の数です（運営自身と保管したアカウントは入れません）。'
   + '友だち追加は LINE から届いた友だち追加の記録だけを数え、取り込んだ友だちは入れません。'
+  + 'じょうごの各段は、前の地点が全部そろったお店だけを数えます。'
   + '「6段を全部」の LINE をつなぐ段は、稼働中で LINE のシークレットがあるかだけを見ます（Webhook は問い合わせません）。'
 
 function minutes(value: number | null): string {
   return value === null ? '—' : `${formatNumber(value)} 分`
+}
+
+/** 段の右の 1 行。1 段目は全体の割合、2 段目からは前の段からの割合とかかった分の中央値。 */
+function stageDetail(stage: OpsFirstRunFunnel['stages'][number]): string {
+  if (stage.fromPrevious === null) return `${stage.percent}%`
+  return `前から ${stage.fromPrevious}%・中央値 ${minutes(stage.minutesFromPrevious)}`
 }
 
 export default function OpsFirstRunCard({ period }: { period: OpsDashboardPeriod }) {
@@ -82,10 +90,13 @@ export default function OpsFirstRunCard({ period }: { period: OpsDashboardPeriod
             <KpiCard title="10分以内に届いた" valueText={`${data.withinTenMinutesPercent}%`} icon={null} presentation="band" value={null} unit="" detail={null} />
             <KpiCard title="6段を全部終えた" valueText={`${data.allStepsDone.percent}%`} icon={null} presentation="band" value={null} unit="" detail={null} />
           </KpiBand>
+          {data.biggestDrop ? (
+            <Notice tone="warn">{`いちばん落ちている段：${STAGE_LABELS[data.biggestDrop.key]}（前の段から ${data.biggestDrop.fromPrevious}%・${formatNumber(data.biggestDrop.lost)} 件がここで止まっています）`}</Notice>
+          ) : null}
           <FunnelChart
             label="最初の10分の段ごとの数"
             unit="件"
-            items={data.stages.map((stage) => ({ key: stage.key, label: STAGE_LABELS[stage.key], value: stage.count, detail: <span>{`${stage.percent}%`}</span> }))}
+            items={data.stages.map((stage) => ({ key: stage.key, label: STAGE_LABELS[stage.key], value: stage.count, detail: <span>{stageDetail(stage)}</span> }))}
           />
           <p className={parts.note}>{`${data.periodLabel}に作られたアカウント ${formatNumber(data.accounts)} 件・最初の1通まで届いた ${formatNumber(data.minutesToFirstMessage.reached)} 件で数えています`}</p>
         </>

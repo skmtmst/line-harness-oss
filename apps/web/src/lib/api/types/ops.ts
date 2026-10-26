@@ -236,7 +236,10 @@ export type OpsFirstRunFunnel = {
   period: OpsDashboardPeriod
   periodLabel: string
   accounts: number
-  stages: Array<{ key: OpsFirstRunStage; count: number; percent: number }>
+  /** その段まで来た数（前の地点が全部そろったお店）・前の段からの割合・前の地点からかかった分の中央値（1 段目は null）。 */
+  stages: Array<{ key: OpsFirstRunStage; count: number; percent: number; fromPrevious: number | null; minutesFromPrevious: number | null }>
+  /** 前の段からの割合がいちばん低い段。 */
+  biggestDrop: { key: OpsFirstRunStage; fromPrevious: number; lost: number } | null
   minutesToFirstMessage: { median: number | null; p75: number | null; reached: number }
   withinTenMinutesPercent: number
   allStepsDone: { count: number; percent: number }

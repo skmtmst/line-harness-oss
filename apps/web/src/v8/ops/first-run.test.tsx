@@ -20,12 +20,13 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 const FUNNEL = {
   period: 'month', periodLabel: '今月', accounts: 12,
   stages: [
-    { key: 'started', count: 12, percent: 100 },
-    { key: 'style', count: 10, percent: 83.3 },
-    { key: 'starter', count: 9, percent: 75 },
-    { key: 'follow', count: 6, percent: 50 },
-    { key: 'firstMessage', count: 5, percent: 41.7 },
+    { key: 'started', count: 12, percent: 100, fromPrevious: null, minutesFromPrevious: null },
+    { key: 'style', count: 10, percent: 83.3, fromPrevious: 83.3, minutesFromPrevious: 2 },
+    { key: 'starter', count: 9, percent: 75, fromPrevious: 90, minutesFromPrevious: 0 },
+    { key: 'follow', count: 4, percent: 33.3, fromPrevious: 44.4, minutesFromPrevious: 5 },
+    { key: 'firstMessage', count: 4, percent: 33.3, fromPrevious: 100, minutesFromPrevious: 1 },
   ],
+  biggestDrop: { key: 'follow', fromPrevious: 44.4, lost: 5 },
   minutesToFirstMessage: { median: 8, p75: 14, reached: 5 },
   withinTenMinutesPercent: 25,
   allStepsDone: { count: 2, percent: 16.7 },
@@ -75,10 +76,11 @@ describe('最初の10分（新しいお店）', () => {
     await act(async () => { root.render(<OpsFirstRunCard period="prev_month" />) })
     await settle()
     expect(calls.some((url) => url.endsWith('/api/ops/dashboard/first-run?period=prev_month'))).toBe(true)
-    for (const label of ['最初の1通まで（中央値）', '8 分', '14 分', '25%', '16.7%', 'アカウントを作った', '最初の1通が届いた', '41.7%']) {
+    for (const label of ['最初の1通まで（中央値）', '8 分', '14 分', '25%', '16.7%', 'アカウントを作った', '最初の1通が届いた', '前から 44.4%・中央値 5 分', '前から 83.3%・中央値 2 分']) {
       expect(text()).toContain(label)
     }
     expect(document.querySelectorAll('[data-part="funnel-row"]')).toHaveLength(5)
+    expect(text()).toContain('いちばん落ちている段：最初の友だち追加（前の段から 44.4%・5 件がここで止まっています）')
   })
 
   it('閲覧のみの人には口を呼ばずに出さない', async () => {
