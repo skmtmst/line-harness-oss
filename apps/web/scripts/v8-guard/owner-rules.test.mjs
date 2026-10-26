@@ -184,3 +184,20 @@ test('数の帯の数字と単位が同じ下の線に乗っていないと落�
     assert.deepEqual(await kinds(), ['kpi-unit-baseline'])
   } finally { await browser.close() }
 })
+
+test('表の見出しの行がふつうの行より高い・太い、表の中の札の上下が詰まっていると落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => ['table-head', 'table-tag-pad'].includes(kind))
+    const table = (headH, weight, pillH) => `<main><table style="border-collapse:collapse;width:300px"><thead><tr style="height:${headH}px"><th style="font:${weight} 12px sans-serif">名前</th></tr></thead><tbody><tr style="height:52px"><td><span class="tag-pill_pill__x" style="display:inline-flex;align-items:center;height:${pillH}px;font:500 12px/16px sans-serif">VIP</span></td></tr></tbody></table></main>`
+    await page.setContent(table(40, 500, 24))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(table(60, 500, 24))
+    assert.deepEqual(await kinds(), ['table-head'])
+    await page.setContent(table(40, 600, 24))
+    assert.deepEqual(await kinds(), ['table-head'])
+    await page.setContent(table(40, 500, 18))
+    assert.deepEqual(await kinds(), ['table-tag-pad'])
+  } finally { await browser.close() }
+})

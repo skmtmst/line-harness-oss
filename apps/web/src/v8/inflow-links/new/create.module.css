@@ -153,7 +153,7 @@
   padding: var(--tpl-cn-compare-head-pad);
   padding-left: 0;
   font-size: var(--text-micro);
-  font-weight: 700;
+  font-weight: var(--polish-control-weight);
 }
 .compareTable .compareLabelCol {
   width: var(--tpl-cn-compare-label-w);

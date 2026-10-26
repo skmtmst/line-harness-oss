@@ -52,7 +52,7 @@
 .colMode { width: var(--tpl-htn-col-mode); }
 .tableBox .table thead th {
   height: var(--tpl-htn-head-h); padding: var(--tpl-htn-head-pad); background: var(--tpl-htn-soft-bg); box-shadow: none; border: 0;
-  text-align: left; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); font-weight: 600; color: var(--color-ink-secondary); white-space: nowrap;
+  text-align: left; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); font-weight: var(--polish-control-weight); color: var(--color-ink-secondary); white-space: nowrap;
 }
 .tableBox .table tbody td {
   height: var(--tpl-htn-row-h); padding: var(--tpl-htn-cell-pad); vertical-align: middle;

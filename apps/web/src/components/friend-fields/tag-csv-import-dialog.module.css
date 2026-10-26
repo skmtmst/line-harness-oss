@@ -257,7 +257,7 @@
   z-index: 1;
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
-  font-weight: 600;
+  font-weight: var(--polish-control-weight);
 }
 
 .table th,

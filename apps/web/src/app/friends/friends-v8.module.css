@@ -183,7 +183,7 @@
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--polish-control-weight);
   text-align: left;
   white-space: nowrap;
 }

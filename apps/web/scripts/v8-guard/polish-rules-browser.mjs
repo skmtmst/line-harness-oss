@@ -181,5 +181,17 @@ export default function scanPolishRules() {
     const diff = Math.abs(baseline(number) - baseline(unit))
     if (diff > 0.5) add('kpi-unit-baseline', unit, { diff: Math.round(diff * 10) / 10 }, unit.parentElement.textContent)
   }
+  // 表（§6.5 の 3）：見出しの行はふつうの行より高くせず、文字は 500 より太くしない。表の中の札の文字の上下は 4 以上空ける。
+  for (const table of document.querySelectorAll('table, [role="table"], [role="grid"]')) {
+    if (!visible(table) || table.getBoundingClientRect().width < 40) continue
+    const head = table.querySelector('thead tr, [role="row"]:has(> [role="columnheader"])')
+    const row = table.querySelector('tbody tr, [role="rowgroup"] [role="row"]:not(:has(> [role="columnheader"]))')
+    if (head && row && visible(head) && visible(row) && head.getBoundingClientRect().height > row.getBoundingClientRect().height + 0.5) add('table-head', head, { head: Math.round(head.getBoundingClientRect().height), row: Math.round(row.getBoundingClientRect().height) })
+    for (const cell of table.querySelectorAll('th, [role="columnheader"]')) if (visible(cell) && cell.textContent.trim() && Number(css(cell).fontWeight) > 500) { add('table-head', cell, { weight: css(cell).fontWeight }, cell.textContent); break }
+    for (const pill of table.querySelectorAll('td [class*="tag-pill_pill"], [role="cell"] [class*="tag-pill_pill"], [role="gridcell"] [class*="tag-pill_pill"]')) {
+      const text = visible(pill) && textBox(pill), pr = pill.getBoundingClientRect()
+      if (text && (text.top - pr.top < 3.5 || pr.bottom - text.bottom < 3.5)) { add('table-tag-pad', pill, { top: Math.round((text.top - pr.top) * 10) / 10, bottom: Math.round((pr.bottom - text.bottom) * 10) / 10 }, pill.textContent); break }
+    }
+  }
   return findings
 }
