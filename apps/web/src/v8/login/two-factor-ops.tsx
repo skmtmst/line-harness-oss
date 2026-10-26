@@ -19,8 +19,9 @@ import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import styles from './two-factor-ops.module.css'
 import { Field } from '@/components/shared/form-controls'
 import Card from '@/components/shared/card'
+import TextLink from '@/components/shared/text-link'
 import SectionHeader from '@/components/shared/section-header'
-import { AuthPage, AuthActions, AuthHelp } from '@/components/templates/auth-page'
+import { AuthPage, AuthActions, AuthHelp, AuthSubmit } from '@/components/templates/auth-page'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
@@ -126,13 +127,17 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
     : '認証アプリの 6 桁のコードを入れてください。'
   const backHref = scope === 'ops' ? '/ops/login' : '/login'
   const toggleRecovery = () => { setRecovery(value => !value); setCode(''); setError('') }
-  /* 6 マスの下の 1 行：何が起きたかを言う（違った・確かめ中・通った・入れている時の案内）。 */
+  /* 6 マスの下の 1 行：何が起きたかを言う（違った・通った・入れている時の案内）。確かめ中はボタンが言う。 */
   const status = error
     ? { tone: 'danger', text: error }
     : succeeded ? { tone: 'success', text: '確認できました。開いています…' }
-    : loading ? { tone: 'muted', text: '確かめています…' }
     : isAdmin && !recovery && !missingChallenge ? { tone: 'muted', text: 'コードは約 30 秒ごとに変わります' }
     : null
+
+  /* 押せない間だけ、ボタンの下に理由の灰の 1 行。6 桁は入れ終わると自動で確かめる。 */
+  const incomplete = recovery ? typedCode.length !== 8 : isAdmin && typedCode.length !== 6
+  const submitReason = loading || succeeded || missingChallenge || !incomplete ? null
+    : recovery ? '回復コードを 8 文字入れると押せます' : '6 桁を入れると自動でログインします'
 
   return (
     <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} brandName={isAdmin ? brandName : 'musubo'} brandNote={isAdmin ? undefined : '運営'} boardId={recovery ? undefined : 'tOPeY'} title={title} titleId="ops-two-factor-title" help={isAdmin ? adminHelp : undefined}>
@@ -157,16 +162,17 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
           {status ? <p id={status.tone === 'danger' ? 'ops-two-factor-error' : undefined} role={status.tone === 'danger' ? 'alert' : undefined} className={styles.status} data-tone={status.tone}>{status.text}</p> : null}
         </div>
         {recovery && scope === 'ops' ? <><AuthHelp>控えた8個のうち、まだ使っていない1つを入れます。貼り付けもできます。</AuthHelp><AuthHelp>回復コードも無い時は、オーナー（運営）に連絡して、登録をやり直します。</AuthHelp></> : null}
-        <Button
+        <AuthSubmit reasonId="ops-two-factor-submit-reason" reason={submitReason}><Button
           variant="primary" fullWidth
           className={styles.submit}
           onClick={() => void submit()}
-          disabled={loading || missingChallenge || succeeded || (recovery ? typedCode.length !== 8 : isAdmin && typedCode.length !== 6)}
+          disabled={loading || missingChallenge || succeeded || incomplete}
           busy={loading || succeeded}
-          busyLabel={succeeded ? '開いています' : '確認しています'}
+          busyLabel={succeeded ? '開いています' : '確かめています…'}
+          aria-describedby={submitReason ? 'ops-two-factor-submit-reason' : undefined}
         >
           {scope === 'ops' && !recovery ? <LogIn aria-hidden="true" className={styles.icon} /> : null}{scope === 'ops' && !recovery ? 'ログイン' : '確認してログイン'}
-        </Button>
+        </Button></AuthSubmit>
         {isAdmin ? (
           <div className={styles.helpArea}>
             <div className={styles.footRow}>
@@ -174,12 +180,12 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
                 コードが使えない場合
               </button>
               {/* ログインの 1 段目に戻る（合言葉は捨てる）。 */}
-              <a className={styles.switchAccount} href={backHref} onClick={clearTwoFactorChallenge}>別のアカウントで入る</a>
+              <TextLink inline href={backHref} onClick={clearTwoFactorChallenge}>別のアカウントで入る</TextLink>
             </div>
             {helpOpen ? (
               <div id="two-factor-help-choices" className={styles.helpChoices} role="group" aria-label="コードが使えない場合の選択肢">
                 <button type="button" className={styles.helpLink} disabled={loading || succeeded} onClick={toggleRecovery}>{recovery ? '6桁のコードで入る' : '回復コードを使う'}</button>
-                {!recovery && challenge && method === 'line' ? <a className={styles.helpLink} href={backHref} onClick={clearTwoFactorChallenge}>別のLINEアカウントでログイン</a> : null}
+                {!recovery && challenge && method === 'line' ? <TextLink inline href={backHref} onClick={clearTwoFactorChallenge}>別のLINEアカウントでログイン</TextLink> : null}
               </div>
             ) : null}
           </div>

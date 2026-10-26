@@ -66,38 +66,52 @@ export default function AuthCard({
     {children}
   </section></main>
 
+  const legal = (
+    <footer className="flex flex-wrap items-center justify-center gap-4 text-micro text-ink-faint">
+      <LegalLink href={LEGAL_LINKS.terms}>利用規約</LegalLink>
+      <LegalLink href={LEGAL_LINKS.privacy}>プライバシーポリシー</LegalLink>
+      <LegalLink href={LEGAL_LINKS.commerce}>特定商取引法に基づく表記</LegalLink>
+      {/*
+        ログインしていない人のお問い合わせは、サービスサイトの /contact/ へ。
+        /hq/support はログインが要り、ログイン画面へ戻されてしまう（監査 m18e）。
+      */}
+      <a href={CONTACT_URL} target="_blank" rel="noreferrer" className="hover:underline">
+        お問い合わせ
+      </a>
+    </footer>
+  )
+
+  // ログインの 1 段目：二段階認証（2 段目）と同じ地・同じ幅・同じカード（枠の線なしで影だけ）。
+  if (step) return (
+    <main data-design-node={node} className={authStyles.page} data-auth-layout="admin" data-auth-foot="">
+      <section data-design-node={cardNode} className={authStyles.card} aria-label={title} data-auth-layout="admin">
+        <AuthCardHead brandName={brandName} brandNote={brandNote} step={step} />
+        <PageHeading title={title} titleAs="h1" titleId={titleId} inset="none" subtitle={description} subtitleSize="body" />
+        {children}
+      </section>
+      {legal}
+    </main>
+  )
+
   return (
     <main data-design-node={node} className="flex min-h-svh flex-col items-center justify-center bg-shell px-4 py-8 sm:px-6">
       <section
         data-design-node={cardNode}
         className="flex w-full max-w-130 flex-col items-center gap-5 rounded-large border border-hairline bg-canvas px-6 py-9 shadow-float sm:px-10"
       >
-        {step ? <AuthCardHead brandName={brandName} brandNote={brandNote} step={step} /> : (
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-control bg-accent-deep text-heading font-bold text-on-accent">
-              m
-            </span>
-            <span className="text-display font-bold text-ink">musubo</span>
-          </div>
-        )}
-        <div className={step ? 'flex w-full flex-col items-start gap-2 text-left' : 'flex w-full flex-col items-center gap-2 text-center'}>
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-control bg-accent-deep text-heading font-bold text-on-accent">
+            m
+          </span>
+          <span className="text-display font-bold text-ink">musubo</span>
+        </div>
+        <div className="flex w-full flex-col items-center gap-2 text-center">
           <h1 className="text-heading font-bold text-ink">{title}</h1>
           <p className="text-caption text-balance text-ink-faint">{description}</p>
         </div>
         {children}
       </section>
-      <footer className="mt-6 flex flex-wrap items-center justify-center gap-4 text-micro text-ink-faint">
-        <LegalLink href={LEGAL_LINKS.terms}>利用規約</LegalLink>
-        <LegalLink href={LEGAL_LINKS.privacy}>プライバシーポリシー</LegalLink>
-        <LegalLink href={LEGAL_LINKS.commerce}>特定商取引法に基づく表記</LegalLink>
-        {/*
-          ログインしていない人のお問い合わせは、サービスサイトの /contact/ へ。
-          /hq/support はログインが要り、ログイン画面へ戻されてしまう（監査 m18e）。
-        */}
-        <a href={CONTACT_URL} target="_blank" rel="noreferrer" className="hover:underline">
-          お問い合わせ
-        </a>
-      </footer>
+      <div className="mt-6">{legal}</div>
     </main>
   )
 }
@@ -105,9 +119,10 @@ export default function AuthCard({
 /** カードの頭：会社の印・会社名・musubo、右に「2 / 2」、下に薄い線（統括のアカウントのカードと同じ作り）。 */
 function AuthCardHead({ brandName, brandNote = 'musubo', step }: { brandName?: string; brandNote?: string; step?: { current: number; total: number } }) {
   const name = brandName || 'musubo'
+  // 会社名が無い時は「musubo」を 2 回並べない。
   return <div className={authStyles.head} data-auth-head="">
     <span className={authStyles.headMark} aria-hidden="true" data-auth-brand-mark="">{nameInitial(name)}</span>
-    <div className={authStyles.headName}><strong>{name}</strong><small>{brandNote}</small></div>
+    <div className={authStyles.headName}><strong>{name}</strong>{brandName || brandNote !== 'musubo' ? <small>{brandNote}</small> : null}</div>
     {step ? <span className={authStyles.headStep}><span className="sr-only">ログインの手順 </span>{step.current} / {step.total}</span> : null}
   </div>
 }
@@ -149,7 +164,7 @@ export function AuthField({
         <label htmlFor={htmlFor} className="text-label font-medium text-ink">
           {label}
         </label>
-        {action}
+        {action ? <span className="shrink-0 text-label">{action}</span> : null}
       </div>
       {hint ? <p className="text-micro text-ink-faint">{hint}</p> : null}
       {children}

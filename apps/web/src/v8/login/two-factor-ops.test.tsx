@@ -140,10 +140,10 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
         await Promise.resolve()
       })
       expect(bodies[0]).toMatchObject({ challengeToken: 'challenge-1', code: '482917' })
-      // 確かめ中：6 マスは数字を残したまま、ボタンは緑のまま回る印と「確認しています」。
+      // 確かめ中：6 マスは数字を残したまま、ボタンは緑のまま回る印と「確かめています…」。
       expect(slots().map((input) => input.value).join('')).toBe('482917')
       const button = [...host.querySelectorAll('button')].find((b) => b.getAttribute('aria-busy') === 'true')
-      expect(button?.textContent).toBe('確認しています')
+      expect(button?.textContent).toBe('確かめています…')
       expect(host.textContent).toContain('確かめています…')
       await act(async () => {
         answer(json({ success: true, data: { sessionToken: 'session-1' }, csrfToken: 'csrf-1' }))
@@ -162,6 +162,23 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
     } finally {
       assign.mockRestore()
     }
+  })
+
+  it('入れ終わるまでは主ボタンを押せない形にし、下の1行で6桁目で自動でログインすると伝える', async () => {
+    await openAdmin()
+    const submit = () => [...host.querySelectorAll('button')].find((button) => button.textContent === '確認してログイン') as HTMLButtonElement | undefined
+    const reason = () => host.querySelector('#ops-two-factor-submit-reason')
+    expect(submit()?.disabled).toBe(true)
+    expect(reason()?.textContent).toBe('6 桁を入れると自動でログインします')
+    expect(submit()?.getAttribute('aria-describedby')).toBe('ops-two-factor-submit-reason')
+    verifyAnswer = () => new Promise<Response>(() => {}) as unknown as Response
+    await act(async () => {
+      fireEvent.change(slots()[0], { target: { value: '482917' } })
+      await Promise.resolve()
+    })
+    // 6 桁目で自動で確かめ始めたら、理由の 1 行は消える。
+    expect(bodies[0]).toMatchObject({ code: '482917' })
+    expect(reason()).toBeNull()
   })
 
   it('間違えると赤い理由を出し、四角を空にして1つ目へ戻る', async () => {

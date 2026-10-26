@@ -23,6 +23,9 @@
 
 .help { color: var(--color-ink-secondary); font-size: 13px; line-height: 20px; margin: 0; }
 
+.submit { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
+.submitReason { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: var(--font-weight-ui); line-height: var(--tpl-auth-status-lh); text-align: center; }
+
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); }
 
 
@@ -33,9 +36,13 @@
 
 /*
  * 管理画面・運営とも、統括のアカウントのカードと同じ作りの 1 枚。
- * 左寄せ・頭に会社の印と会社名・右に「2 / 2」・下に薄い線・くっきりした影・角 14・題 20/600。
+ * 左寄せ・頭に会社の印と会社名・右に「2 / 2」・下に薄い線・枠の線なしで影だけ・角 14・題 20/600。
+ * ログインの 1 段目も同じ地・同じ幅・同じカード。
  */
-.card[data-auth-layout] { max-width: var(--tpl-auth-card-w); padding: var(--tpl-auth-card-pad); gap: var(--tpl-auth-card-gap); border-radius: var(--tpl-auth-card-radius); box-shadow: var(--card-shadow); }
+.page[data-auth-layout] { background: var(--tpl-auth-page-bg); }
+/* ログインの 1 段目：カードの下に規約などのリンクを縦に積む。 */
+.page[data-auth-foot] { flex-direction: column; gap: var(--space-24); }
+.card[data-auth-layout] { max-width: var(--tpl-auth-card-w); padding: var(--tpl-auth-card-pad); gap: var(--tpl-auth-card-gap); border-radius: var(--tpl-auth-card-radius); box-shadow: var(--tpl-auth-card-shadow); }
 .card[data-auth-width='wide'] { max-width: var(--tpl-auth-card-w-wide); }
 .card[data-auth-layout] > header { padding: 0; }
 .card[data-auth-layout] h1 { width: 100%; text-align: left; font-size: var(--tpl-auth-title-size); font-weight: var(--font-weight-bold); line-height: var(--tpl-auth-title-lh); }

@@ -19,6 +19,18 @@ export function AuthActions({ children }: { children: ReactNode }) {
   return <div className={styles.actions}>{children}</div>
 }
 
+/**
+ * 主ボタンと、押せない理由の灰の 1 行（「6 桁を入れると自動でログインします」）。
+ * 押せない形は共通の Button の disabled（本物の緑を薄く）。理由は押せる形になったら null で消す。
+ * 権限で押せない灰色＋吹き出しとは別の形。
+ */
+export function AuthSubmit({ reason, reasonId, children }: { reason?: string | null; reasonId?: string; children: ReactNode }) {
+  return <div className={styles.submit}>
+    {children}
+    {reason ? <p id={reasonId} className={styles.submitReason} data-auth-submit-reason="">{reason}</p> : null}
+  </div>
+}
+
 export function AuthHelp({ children }: { children: ReactNode }) {
   return <p className={styles.help}>{children}</p>
 }
