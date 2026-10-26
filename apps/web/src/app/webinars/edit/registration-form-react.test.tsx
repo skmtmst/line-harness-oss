@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * N-113 ウェビナーの申込フォームを選ぶ欄（CTA・フォームの段）を描いて押す。
+ * ウェビナーの申込フォームを選ぶ欄（CTA・フォームの段）を描いて押す。
  * 同じアカウントの公開中フォームだけを候補にし、読込中・0件・取得失敗・権限不足を分ける。
  * 選んだフォームは版付きの editor 口へ registrationFormId として送り、開き直しで戻す。
  * 止まった・別アカウントのフォームで断られたら理由を出して候補を取り直す。CTA のフォームとは混ぜない。
@@ -110,7 +110,7 @@ it('選んだフォームを版付きで registrationFormId として保存し�
   expect(onEditorChange).toHaveBeenCalledWith(expect.objectContaining({ version: 6, registrationFormId: 'form-1' }))
 })
 
-it('開き直したときは保存済みのフォームを選んだ形で出す', async () => {
+it('保存済みのフォームを最初から選んだ形で出す', async () => {
   const { host } = render({ ...EDITOR, registrationFormId: 'form-2' } as WebinarEditor)
   await settle()
   expect(host.querySelector('button[aria-label^="申込に使う回答フォーム"]')?.parentElement?.textContent).toContain('相談フォーム')

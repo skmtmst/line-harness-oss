@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 /*
- * #975 U098：実行詳細を開けないときに「再読み込み」だけを出さない。
+ * 実行詳細を開けないときに「再読み込み」だけを出さない。
  * 対象未指定・アカウント未選択・見つからない・取得の失敗を描き分け、
- * 戻り先は一覧から受け取った絞り込みとページ位置を残す（R268）。
+ * 戻り先は一覧から受け取った絞り込みとページ位置を残す。
  */
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
