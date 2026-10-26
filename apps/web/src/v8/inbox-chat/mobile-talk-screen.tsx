@@ -28,7 +28,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import AttachMenu from './attach-menu'
 import AttachmentChip from './attachment-chip'
 import { ATTACH_NOTE } from './attachments'
-import { CORRECTION_TEMPLATE, MESSAGE_MAX_LENGTH, type StatusFilter } from './inbox-model'
+import { MESSAGE_MAX_LENGTH, type StatusFilter } from './inbox-model'
 import { InboxMessageRow } from './message-row'
 import { useInboxConversation } from './use-inbox-conversation'
 import { useInboxDeepLink } from './use-inbox-deep-link'
@@ -42,7 +42,8 @@ import styles from './mobile-talk.module.css'
  * 電話の画面のトーク（/m/chats → /m/chats?friend=…）。
  * 一覧と会話を 2 枚に分ける。取得・送信・下書き・別のアカウントの取り違え防止は PC の受信箱と同じフックを使う
  * （送信は冪等キー付きで 1 回だけ・失敗したら書いた文を残す・送ったら取り消せない）。
- * 出さない物：振り分けのルール・保存した見方・予約送信・AI の下書きの設定・メール・まとめての既読（PC だけ）。
+ * 出さない物：振り分けのルール・保存した見方・予約送信・AI の下書きの設定・メール・まとめての既読・引用と訂正（PC だけ。
+ * 吹き出しの横の小さな操作は指で押せる大きさにならないため、電話の段②以降で形を決める）。
  */
 
 /* 1 回に読む件数（表示の件数の切り替えではない）。 */
@@ -174,7 +175,7 @@ function MobileTalkThread() {
   })
 
   const draft = useInboxDraft({ selectedAccountId, selectedChatId })
-  const { chatDetail, setChatDetail, detailLoading, messagesHasMore, loadingOlderMessages, loadChatDetail, loadOlderMessages, refreshChatDetailQuietly } = useInboxConversation({
+  const { chatDetail, setChatDetail, messagesHasMore, loadingOlderMessages, loadChatDetail, loadOlderMessages, refreshChatDetailQuietly } = useInboxConversation({
     CHAT_MESSAGE_PAGE_SIZE: MESSAGE_BATCH,
     selectedChatIdRef, detailAccountRef, detailRequestIdRef, setError, deepLinkIdRef, setDeepLinkNotice,
     selectedChatId, selectedAccountId, setChats, chats,
@@ -220,12 +221,6 @@ function MobileTalkThread() {
       ) : null}
       {chatPollStalled ? (
         <Notice tone="warn" message="会話の読み直しを止めています（つながりません）。" action={<Button size="compact" onClick={() => setChatPollRetryKey((key) => key + 1)}>読み直す</Button>} />
-      ) : null}
-      {quotedMessage ? (
-        <div className={styles.quoted}>
-          <span className={styles.quotedText} title={quotedMessage.content}>{correctingId ? '訂正：' : '引用：'}{quotedMessage.messageType === 'text' ? quotedMessage.content : '画像など'}</span>
-          <IconButton size="row" aria-label="引用をやめる" onClick={() => { setQuotedMessage(null); setCorrectingId(null) }}><X aria-hidden="true" /></IconButton>
-        </div>
       ) : null}
       {draft.pendingAttachment ? (
         <AttachmentChip item={draft.pendingAttachment} busy={sending} onRemove={draft.clearPendingAttachment} onRetry={draft.retryAttachment} />
@@ -280,7 +275,7 @@ function MobileTalkThread() {
       ) : error && !chatDetail ? (
         <ListState kind="error" title="会話を読み込めませんでした" description={error} onRetry={() => { if (selectedChatId) void loadChatDetail(selectedChatId) }} />
       ) : !chatDetail ? (
-        <InboxThreadLoading loading={detailLoading || !selectedChatId} />
+        <InboxThreadLoading loading />
       ) : (
         <div className={styles.thread} aria-label={`${name}さんとのメッセージ`}>
           {messagesHasMore && messages.length > 0 ? (
@@ -297,8 +292,6 @@ function MobileTalkThread() {
               idx={idx}
               list={list}
               sending={pendingMessages?.some((item) => item.id === msg.id) === true}
-              onQuote={canReply ? (target) => { setQuotedMessage(target); setCorrectingId(null); textareaRef.current?.focus() } : undefined}
-              onCorrect={canReply ? (target) => { setQuotedMessage(target); setCorrectingId(target.id); draft.setMessageContent((prev) => prev.trim() ? prev : CORRECTION_TEMPLATE); textareaRef.current?.focus() } : undefined}
             />
           ))}
           {chatDetail && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}

@@ -38,8 +38,10 @@
   line-height: var(--phone-body-lh);
 }
 
-/* 入力欄は 16。電話の外枠の中だけの値（PC の欄の文字は変えない）。 */
-.frame :is(input, textarea, select) {
+/*
+ * 入力欄は 16。電話の外枠の中だけの値（PC の欄の文字は変えない）。共通部品の PC の文字の大きさより先にする。
+ */
+html:root .frame :is(input:not([type='checkbox']):not([type='radio']), textarea, select) {
   font-size: var(--phone-input-text);
 }
 
@@ -279,4 +281,23 @@
   flex-direction: column;
   gap: var(--polish-space-row);
   margin-bottom: var(--phone-gap);
+}
+
+/* 一覧の上の探す欄と切り替えも指で押せる 44。共通部品の PC の高さより、電話の外枠の値を先にする。 */
+html:root .tools > :first-child {
+  height: var(--phone-hit);
+}
+
+html:root .tools [role='group'] button {
+  min-height: var(--phone-hit);
+}
+
+/* 外枠の中の押せる所は全部 44 以上（返信欄・添付のクリップなど共通部品の PC の小さい形も含む）。 */
+html:root .frame :is(button, a[href], [role='button']) {
+  min-width: var(--phone-hit);
+  min-height: var(--phone-hit);
+}
+
+html:root .frame textarea {
+  min-height: var(--phone-hit);
 }
