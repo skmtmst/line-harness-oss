@@ -30,6 +30,7 @@ import { Fragment,useEffect,useRef,useState,type ReactNode } from 'react'
 import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
 import { FirstStepsCard,useFirstSteps } from './first-steps'
+import { FirstRunDoneDialog } from './first-run-done'
 import { FriendAddLink } from './friend-add'
 import SectionHeader from './head'
 import { InboxSection } from './inbox'
@@ -76,14 +77,14 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
   const canManage = canManageRole(role)
   const canEditLayout = canEditDashboardLayout(role)
-  /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
-  const start = useFirstSteps(d.selectedAccountId, role)
-  /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
-  const setup = useStyleSetup(d.selectedAccountId, role)
-  const setupRest = setupSummary(setup.data)
   const params = useSearchParams()
   const setupParam = params.get('setup')
   const qrRequested = params.has('qr')
+  /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。QR の窓の間は最初の1通を待って読み直す。 */
+  const start = useFirstSteps(d.selectedAccountId, role, { qrOpen: qrRequested })
+  /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
+  const setup = useStyleSetup(d.selectedAccountId, role)
+  const setupRest = setupSummary(setup.data)
   const closedWizardAccount = useRef<string | null>(null)
   const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
   useEffect(() => {
@@ -371,7 +372,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
         <ReadOnlyNotice />
       ) : null}
       {setupBands}
-      {start.error && canManage ? <ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={start.error} onRetry={start.reload} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
+      {start.error && canManage ? <ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={start.error} onRetry={start.reload} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} onRecheck={start.watchExpired ? start.rewatch : undefined} /> : null}
       {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : null}
       {d.periodNotice ? <Notice tone="info" role="status">{d.periodNotice}</Notice> : null}
       {d.error ? (
@@ -433,6 +434,8 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
         <RecentActivity items={d.notifications} failed={d.notificationFailed} />
       </div>
       {/* はじめの質問の窓（B-313）。`?setup=0〜|summary` かスタイル未選択の最初の訪問で開く。 */}
+      {/* 最初の1通が、この画面で見ている間に届いた時だけ（SPEC-11 ③）。 */}
+      {start.arrived && setup.data && d.selectedAccountId && canManage ? <FirstRunDoneDialog accountId={d.selectedAccountId} style={setup.data.state.style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} onClose={start.dismissArrived} /> : null}
       {wizardStep !== null && setup.data && d.selectedAccountId && canManage ? <StyleSetupWizard accountId={d.selectedAccountId} state={setup.data.state} initialStep={wizardStep} onClose={closeWizard} /> : null}
     </DashboardPage>
     </KpiValueMotionProvider>
