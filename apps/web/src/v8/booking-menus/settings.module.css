@@ -444,7 +444,7 @@
 .colStatus {
   display: flex;
   align-items: center;
-  width: var(--tpl-bm-160);
+  width: calc(var(--tpl-bm-160) + var(--tpl-bm-8));
   flex-shrink: 0;
 }
 
