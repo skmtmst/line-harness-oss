@@ -6,7 +6,7 @@ import type { AccountStyle } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 import StyleSetupWizard from './wizard'
-import type { StyleState } from './model'
+import { styleLabel, type StyleState } from './model'
 
 const calls = vi.hoisted(() => ({ save: vi.fn(), activate: vi.fn(), updated: vi.fn(), closed: vi.fn(), push: vi.fn() }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: {
@@ -33,10 +33,18 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 
+/* 1 問目：上の切り替えで見て、［このスタイルにする］で選ぶ（選んでいる札は名前の後ろに「選んでいます」）。 */
+function pickStyle(style: AccountStyle) {
+  const group = screen.getByRole('group', { name: '見るスタイル' })
+  fireEvent.click(within(group).getByRole('button', { name: new RegExp(`^${styleLabel(style)}`) }))
+  const choose = screen.queryByRole('button', { name: 'このスタイルにする' })
+  if (choose) fireEvent.click(choose)
+}
+function chosenStyle(style: AccountStyle) {
+  return within(screen.getByRole('group', { name: '見るスタイル' })).queryByRole('button', { name: `${styleLabel(style)}（選んでいます）` })
+}
 async function chooseStyle(style: AccountStyle) {
-  const radio = document.querySelector<HTMLInputElement>(`input[name="setup-style"][value="${style}"]`)
-  expect(radio).not.toBeNull()
-  fireEvent.click(radio!)
+  pickStyle(style)
   fireEvent.click(screen.getByRole('button', { name: '次へ' }))
   await screen.findByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
 }
@@ -58,7 +66,7 @@ describe('はじめの質問の保存と破棄', () => {
 
   it('最初のスタイル選択だけ変えた場合も、共通の確認で破棄できる', async () => {
     render(<Subject />)
-    fireEvent.click(document.querySelector<HTMLInputElement>('input[name="setup-style"][value="ec"]')!)
+    pickStyle('ec')
     fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
     fireEvent.click(await screen.findByRole('button', { name: '破棄する' }))
     await screen.findByText('閉じました')
@@ -81,7 +89,7 @@ describe('はじめの質問の保存と破棄', () => {
     expect(state).toEqual(before)
     view.unmount()
     render(<Subject state={state} />)
-    expect(document.querySelector<HTMLInputElement>('input[name="setup-style"][value="standard"]')?.checked).toBe(true)
+    expect(chosenStyle('standard')).not.toBeNull()
   })
 
   it.each(['escape', 'backdrop'] as const)('%sから破棄しても保存はしない', async method => {
@@ -101,7 +109,7 @@ describe('はじめの質問の保存と破棄', () => {
     fireEvent.click(await screen.findByRole('button', { name: '編集を続ける' }))
     expect(screen.getByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '戻る' }))
-    expect(document.querySelector<HTMLInputElement>('input[name="setup-style"][value="ec"]')?.checked).toBe(true)
+    expect(chosenStyle('ec')).not.toBeNull()
     expect(calls.save).not.toHaveBeenCalled()
     expect(calls.closed).not.toHaveBeenCalled()
   })
@@ -128,7 +136,7 @@ describe('はじめの質問の保存と破棄', () => {
     expect(calls.closed).not.toHaveBeenCalled()
     expect(calls.updated).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '戻る' }))
-    expect(document.querySelector<HTMLInputElement>('input[name="setup-style"][value="salon"]')?.checked).toBe(true)
+    expect(chosenStyle('salon')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '次へ' }))
     requestClose('close')
     fireEvent.click(await screen.findByRole('button', { name: '破棄する' }))
@@ -156,10 +164,9 @@ describe('はじめの質問の保存と破棄', () => {
     expect(calls.closed).toHaveBeenCalledExactlyOnceWith(true)
   })
 
-  it.each(['later', 'manual'] as const)('%sを選んで次へは、明示的な設定保存として残す', async mode => {
+  it.each(['later', 'manual'] as const)('%sのボタンは、明示的な設定保存として残す', async mode => {
     render(<Subject />)
-    fireEvent.click(document.querySelector<HTMLInputElement>(`input[name="setup-style"][value="${mode}"]`)!)
-    fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+    fireEvent.click(screen.getByRole('button', { name: mode === 'later' ? 'あとで設定する' : '手動で設定する' }))
     await screen.findByText('閉じました')
     expect(calls.save).toHaveBeenCalledExactlyOnceWith('test-store', { expectedVersion: 7, styleMode: mode })
     expect(calls.activate).not.toHaveBeenCalled()

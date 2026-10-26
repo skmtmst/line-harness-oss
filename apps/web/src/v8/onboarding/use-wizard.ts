@@ -35,7 +35,8 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
 
   /* 今の手順で選んでいる値（まだ答えていなければおすすめ）。 */
   const current = (() => {
-    if (step === 0) return style
+    /* 1 問目は本人が選ぶまで空（保存済みのスタイルがあればそれ）。見ているだけのスタイルは入れない。 */
+    if (step === 0) return styleChosen ? style : ''
     /* 「あとで」「手動」にした質問を開き直したときは、答えに来たのでおすすめを選んでおく。 */
     const picked = (key: string) => (answers[key]?.mode === 'configured' ? selectedValue(answers[key], questions.find((q) => q.key === key)) : null)
     if (step === 1) return picked('image') ?? 'keep'
@@ -153,6 +154,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
     if (step === 0) {
       /* スタイルの「あとで」「手動」は口の styleMode で保存する（別の人・別の端末でも同じ）。 */
       if (choice === 'later' || choice === 'manual') { await saveStyleMode(choice); return }
+      if (!choice) return
       setStyleChosen(true)
       setDirty(true)
       if (choice !== style) setStyle(choice as AccountStyle)
@@ -161,6 +163,12 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
     }
     const selected = await selectedAnswer()
     if (selected) commitAndNext(selected.key, selected.value, selected.nextChoices)
+  }
+
+  /* 1 問目で選ぶ。保存は［次へ］から先の今の流れのまま。選び直しは閉じる時の未保存確認に入れる。 */
+  const chooseStyle = (next: AccountStyle) => {
+    setChoice(next)
+    if (next !== (styleChosen ? style : '')) setDirty(true)
   }
 
   const discard = () => {
@@ -234,7 +242,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
   }
 
 
- return { style, setStyle, answers, setAnswers, choices, setChoices, version, setVersion, step, setStep, dirty, setDirty, busy, setBusy, error, setError, router, summary, setSummary, enabled, setEnabled, resources, setResources, resource, setResource, preparing, steps, questions, total, index, question, current, choice, setChoice, answer, saved, setSaved, confirm, setConfirm, save, confirmThenSave, loadSummary, go, nextOf, commitAndNext, onNext, discard, saveAndClose, saveStyleMode, activate }
+ return { style, setStyle, answers, setAnswers, choices, setChoices, version, setVersion, step, setStep, dirty, setDirty, busy, setBusy, error, setError, router, summary, setSummary, enabled, setEnabled, resources, setResources, resource, setResource, preparing, steps, questions, total, index, question, current, choice, setChoice, answer, saved, setSaved, confirm, setConfirm, save, confirmThenSave, loadSummary, go, nextOf, commitAndNext, onNext, chooseStyle, discard, saveAndClose, saveStyleMode, activate }
 }
 
 import { KIND_WORD } from './wizard-item-kinds'
