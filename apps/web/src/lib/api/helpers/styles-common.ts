@@ -63,8 +63,11 @@ export type StarterSetItem = {
     | 'automation'
     | 'reminder'
     | 'booking_menu'
-    | 'dashboard';
+    | 'dashboard'
+    | 'friend_add_rule';
   name: string;
+  /** friend_add_rule が送るごあいさつ。同じ組の template の key を指す。 */
+  templateKey?: string;
   feature?: string;
   text?: string;
   durationMinutes?: number;
@@ -75,6 +78,17 @@ export type StarterSetItem = {
   offsetDays?: number;
   sendAtTime?: string;
   triggerType?: 'calendar_booked' | 'restaurant.departed';
+};
+
+/** 入れなかった理由。Worker が決まった値だけを返す。 */
+export type StarterSkipReason = 'answer_later' | 'not_for_style' | 'auto_insert_off' | 'already_exists';
+
+/** 初期セットの入れ直しの結果。2 回目からは inserted が空。 */
+export type StarterEnsureResult = {
+  inserted: Array<{ key: string; kind: StarterSetItem['kind'] }>;
+  skipped: Array<{ key: string; reason: StarterSkipReason }>;
+  existing: number;
+  starterSet: { id: string; version: number };
 };
 
 export type StyleBookingDetails = {

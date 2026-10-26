@@ -17,7 +17,7 @@ import styles from './first-run-done.module.css'
  * 「届きました」は LINE が受け取った意味で、読んだかは言わない。閉じても帯の記憶（dismiss）は呼ばない。
  */
 
-const KIND_ROWS: ReadonlyArray<{ kind: string; label: string }> = [
+const KIND_ROWS: ReadonlyArray<{ kind: Exclude<StarterSetItem['kind'], 'dashboard'>; label: string }> = [
   { kind: 'rich_menu', label: 'リッチメニュー' },
   { kind: 'template', label: 'テンプレート' },
   { kind: 'automation', label: 'オートメーション' },

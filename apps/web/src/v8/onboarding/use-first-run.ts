@@ -1,26 +1,28 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, type GettingStartedFirstRun, type GettingStartedStarter } from '@/lib/api'
 import { loadFeatureSettings } from '@/lib/feature-settings-cache'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
 import { ACCOUNT_STYLE_UPDATED } from '@/hooks/use-account-style'
 import { buildStepsFromApi, featureSetEntry, insertFeatureSet, type StepResult } from '@/v8/settings/public/steps/index'
 
-/** 最初の10分の時刻（Worker が日本時間の文字で返す）。古い Worker は返さないので無い時は null。 */
-export type FirstRunTimes = { startedAt: string | null; styleAt: string | null; starterAt: string | null; followAt: string | null; firstMessageAt: string | null; minutes: number | null }
+/** 最初の10分の時刻（Worker が日本時間の文字で返す）。 */
+export type FirstRunTimes = GettingStartedFirstRun
 
 /** 最初の1通を待つ間の読み直しの間隔と、止めるまでの長さ。 */
 export const FIRST_RUN_WATCH_INTERVAL_MS = 10_000
 export const FIRST_RUN_WATCH_LIMIT_MS = 15 * 60_000
 
 /** ダッシュボードと設定の完了条件の正本は同じ V8 API。訪問・招待人数では判定しない。 */
-export async function loadFirstRun(accountId: string | null): Promise<{ steps: StepResult[]; firstRun: FirstRunTimes | null }> {
+type FirstRunLoad = { steps: StepResult[]; firstRun: FirstRunTimes | null; starter: GettingStartedStarter | null }
+
+export async function loadFirstRun(accountId: string | null): Promise<FirstRunLoad> {
   const res = await api.gettingStarted.get(accountId ?? undefined, 'v8')
   if (!res.success) throw new Error(res.error)
-  const firstRun = (res.data as { firstRun?: FirstRunTimes | null }).firstRun ?? null
+  const { firstRun, starter } = res.data
   const steps = buildStepsFromApi(res.data.steps)
-  if (res.data.steps.some((step) => step.key === 'featureSet')) return { steps, firstRun }
+  if (res.data.steps.some((step) => step.key === 'featureSet')) return { steps, firstRun, starter }
   // 更新途中の Worker でも未取得は未確認。保存済みの機能設定だけで補う。
   let entry = null
   if (accountId) {
@@ -28,7 +30,7 @@ export async function loadFirstRun(accountId: string | null): Promise<{ steps: S
     if (!features.success) throw new Error(features.error)
     entry = featureSetEntry({ forbidden: false, version: features.data.version ?? 0 })
   }
-  return { steps: insertFeatureSet(steps, entry), firstRun }
+  return { steps: insertFeatureSet(steps, entry), firstRun, starter }
 }
 
 export async function loadFirstRunSteps(accountId: string | null): Promise<StepResult[]> {
@@ -36,7 +38,7 @@ export async function loadFirstRunSteps(accountId: string | null): Promise<StepR
 }
 
 type Snapshot =
-  | { accountId: string | null; steps: StepResult[]; firstRun: FirstRunTimes | null; status: 'ready'; error: null }
+  | ({ accountId: string | null; status: 'ready'; error: null } & FirstRunLoad)
   | { accountId: string | null; status: 'error'; error: unknown }
 
 /**
@@ -55,16 +57,16 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
   const refresh = useCallback(() => {
     if (!enabled) return
     const at = ++generation.current
-    void loadFirstRun(accountId).then(({ steps, firstRun }) => {
-      if (generation.current === at) setSnapshot({ accountId, steps, firstRun, status: 'ready', error: null })
+    void loadFirstRun(accountId).then((loaded) => {
+      if (generation.current === at) setSnapshot({ accountId, ...loaded, status: 'ready', error: null })
     }).catch(() => { /* 後ろの読み直しの失敗では、読めている表示を消さない。次の読み直しで戻る。 */ })
   }, [accountId, enabled])
   useEffect(() => {
     const at = ++generation.current
     setSnapshot(null)
     if (!enabled) return
-    void loadFirstRun(accountId).then(({ steps, firstRun }) => {
-      if (generation.current === at) setSnapshot({ accountId, steps, firstRun, status: 'ready', error: null })
+    void loadFirstRun(accountId).then((loaded) => {
+      if (generation.current === at) setSnapshot({ accountId, ...loaded, status: 'ready', error: null })
     }).catch((error: unknown) => {
       if (generation.current === at) setSnapshot({ accountId, status: 'error', error })
     })
@@ -105,6 +107,7 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
   return {
     steps: current?.status === 'ready' ? current.steps : [],
     firstRun: current?.status === 'ready' ? current.firstRun : null,
+    starter: current?.status === 'ready' ? current.starter : null,
     status: current?.status ?? 'loading' as const,
     error: current?.error ?? null,
     reload,
