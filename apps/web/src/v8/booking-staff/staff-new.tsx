@@ -21,7 +21,8 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
 import { CreatePage } from '@/components/templates/create-page'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
-import { TextField, TextArea, AffixedTextField } from '@/components/shared/text-field'
+import { TextField, TextArea } from '@/components/shared/text-field'
+import NumberInput from '@/components/shared/number-field'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -401,13 +402,13 @@ export default function StaffNewV8() {
             <Notice tone="info">予約枠の色は現在グリーンで固定です。カレンダーでの見分けに使います。</Notice>
             {canEditFee ? (
               <Field label="指名料" htmlFor="bs-fee" optional note="お客さまが指名したときだけ掛かります。指名なしで自動で割り当てたときは掛かりません。">
-                <SaveErrorField names={["nominationFee", "nomination_fee"]}><AffixedTextField id="bs-fee" layout="field" startAdornment="¥"
+                <SaveErrorField names={["nominationFee", "nomination_fee"]}><NumberInput id="bs-fee" short unit="円" aria-label="指名料"
                   type="number" min={0} step={1} inputMode="numeric" value={nominationFee} placeholder="0"
                   onChange={(e) => setNominationFee(e.target.value)} /></SaveErrorField>
               </Field>
             ) : (
               <Field label="指名料" note="決められるのはオーナー・管理者だけです。登録のあとで頼んでください。">
-                <AffixedTextField layout="field" startAdornment="¥" readOnly aria-label="指名料（円）" value="0" />
+                <NumberInput short unit="円" readOnly aria-label="指名料（円）" value="0" />
               </Field>
             )}
           </Card>

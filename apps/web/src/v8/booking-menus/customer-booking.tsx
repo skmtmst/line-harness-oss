@@ -220,14 +220,16 @@ export function CustomerBookingCard({ state, menus, selfId, readOnly }: {
               ) : null}
             </>
           )}
-          <Field label="一度に予約できる人数" help="2人以上にすると、お連れさまの分も一緒に予約できます">
+          <Field label="一度に予約できる人数" optional={false} help="2人以上にすると、お連れさまの分も一緒に予約できます">
             <Select size="full" aria-label="一度に予約できる人数" value={String(values.maxPartySize)}
               onChange={(value) => state.setMaxPartySize(Number(value))} options={PARTY_OPTIONS} />
           </Field>
-          <EntityPickerField multiple label="追加メニュー" noun="追加メニュー" unit="件"
-            description="固定の料金のメニューから選べます。お客さまは1人3つまで足せます。"
-            items={pickerItems} value={values.addonMenuIds} allowEmpty
-            onChange={state.setAddonMenuIds} />
+          <Field label="追加メニュー" optional={false} help="固定の料金のメニューから選べます。お客さまは1人3つまで足せます">
+            <EntityPickerField multiple label="追加メニュー" noun="追加メニュー" unit="件"
+              description="固定の料金のメニューから選べます。お客さまは1人3つまで足せます。"
+              items={pickerItems} value={values.addonMenuIds} allowEmpty
+              onChange={state.setAddonMenuIds} />
+          </Field>
         </>
       )}
     </Card>
