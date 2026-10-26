@@ -1,12 +1,13 @@
 /**
  * 印＋文字（＋右の文字・ボタン）の行で、印・文字のかたまり・右の物の上下の真ん中が 1px を超えてずれたら落とす
- * （2026-10-27 オーナー指摘：友だちの詳細の行で文字が真ん中からずれていた）。page.evaluate で単独に動く。
+ * page.evaluate で単独に動く。
  *
  * 見る行：
  * - 共通の行（`[data-center-row]`）の印・文字・右（`[data-center-row-part]`）
  * - 手書きの行：横並びの箱（flex の横・grid）で、直下に「印」（中が svg だけ・40px 以下）と
  *   「文字のかたまり」（文字を持つ要素）を持ち、高さが 40〜96px の物。直下のボタンも比べる
- * ボタン・入力欄そのもの（中の印と文字）は対象外。上そろえの複数行の本文（高さ 96px 超）も対象外。
+ * ボタン・入力欄そのもの（中の印と文字）、押せる物を含む欄（表の「…」など）は印として数えない。
+ * 知らせ（notice）は印を 1 行目にそろえる作りなので対象外。上そろえの複数行の本文（高さ 96px 超）も対象外。
  */
 export default function scanRowCentering() {
   const findings = []
@@ -47,7 +48,7 @@ export default function scanRowCentering() {
     return r.top + r.height / 2
   }
   const isIcon = el => {
-    if (el.matches('button,a,input,select,textarea,[role="button"]')) return false
+    if (el.matches('button,a,input,select,textarea,[role="button"]') || el.querySelector('button,a[href],input,select,textarea,[role="button"]')) return false
     const r = el.getBoundingClientRect()
     if (r.width > 40 || r.height > 40) return false
     if (el.tagName.toLowerCase() === 'svg') return true
@@ -74,7 +75,7 @@ export default function scanRowCentering() {
     check(row, parts.find(p => p.dataset.centerRowPart === 'icon'), parts.filter(p => p.dataset.centerRowPart !== 'icon'))
   }
   for (const row of root.querySelectorAll('*')) {
-    if (marked.has(row) || row.closest('[data-center-row]') || row.matches('button,a,label,input,select,textarea,svg,svg *,[role="button"],th,td,[role="cell"],[role="gridcell"],[role="columnheader"]')) continue
+    if (marked.has(row) || row.closest('[data-center-row],[data-design-part="notice"]') || row.matches('button,a,label,input,select,textarea,svg,svg *,[role="button"],th,td,[role="cell"],[role="gridcell"],[role="columnheader"]')) continue
     const c = getComputedStyle(row)
     const across = (c.display.includes('flex') && !c.flexDirection.startsWith('column')) || c.display.includes('grid')
     if (!across) continue

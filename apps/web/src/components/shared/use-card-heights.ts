@@ -58,7 +58,7 @@ export function useCardHeights() {
           for (const row of rows.values()) {
             const heights = row.map(card => card.getBoundingClientRect().height)
             const max = Math.max(...heights)
-            // 同じ幅の列に並ぶカード（カードの格子）は、高さの差に関係なく高い方へそろえる（2026-10-27 オーナー）。
+            // 同じ幅の列に並ぶカード（カードの格子）は、高さの差に関係なく高い方へそろえる。
             // 幅の違う本文と横の欄（main と aside）は別の役目なので、印の無い段ではそろえない。
             if (row.length > 1 && (parent.dataset.cardHeight === 'equal' || sameWidths(row))) for (const card of row) card.style.minHeight = `${max}px`
           }
