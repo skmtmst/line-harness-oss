@@ -32,7 +32,7 @@
 }
 
 .textLink {
-  color: var(--color-link);
+  color: var(--color-action);
   font-size: var(--text-caption);
   font-weight: 600;
   white-space: nowrap;

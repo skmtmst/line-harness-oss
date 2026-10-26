@@ -20,4 +20,15 @@ describe('アカウントの切り替えの一覧', () => {
     expect(onClose).toHaveBeenCalled()
     expect(onSelect).toHaveBeenCalledWith('a2')
   })
+
+  it('読み上げるのはアカウント名だけで、@ID は説明として読む', () => {
+    const anchor = document.createElement('button'); document.body.append(anchor)
+    render(<AccountSwitchMenu open onClose={() => {}} getAnchor={() => anchor} selectedAccountId="a1" onSelect={() => {}}
+      accounts={[{ id: 'a1', label: '然-NEN- 本店', basicId: 'nen-honten' }, { id: 'a3', label: 'ID なし' }]} />)
+    const menu = screen.getByRole('menu', { name: 'LINEアカウントの切り替え' })
+    const row = screen.getByRole('menuitemradio', { name: '然-NEN- 本店' })
+    expect(menu.contains(row)).toBe(true)
+    expect(document.getElementById(row.getAttribute('aria-describedby') ?? '')?.textContent).toBe('@nen-honten')
+    expect(screen.getByRole('menuitemradio', { name: 'ID なし' }).hasAttribute('aria-describedby')).toBe(false)
+  })
 })

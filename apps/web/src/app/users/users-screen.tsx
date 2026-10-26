@@ -187,7 +187,7 @@ export default function UsersV8() {
       <div className={styles.tableWrap} aria-busy={u.loading}>
         <table className={styles.table}>
           <thead>
-            <tr>
+            <tr className={styles.headRow}>
               <th>統合ユーザー</th>
               <th>結び付いた友だち</th>
               <th>状態</th>

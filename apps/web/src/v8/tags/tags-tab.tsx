@@ -81,7 +81,6 @@ const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 import { EXTENDED_PAGE_SIZES as PAGE_SIZES } from '@/components/shared/page-size-options'
-import { formatNumber } from '@/lib/format'
 
 /** 連動の文（絵の「本人+10・1.2倍 他1」）。マイル以外の連動は「他N」。0件は「—」。 */
 /**
@@ -645,7 +644,7 @@ export default function TagsTab({
         variant="secondary"
         aria-haspopup="menu"
         aria-expanded={quickOpen}
-        aria-label={quick.length ? `よく使う絞り込み（${formatNumber(quick.length)} 件選択中）` : 'よく使う絞り込み'}
+        aria-label={quick.length ? `よく使う絞り込み（${quick.length} 件選択中）` : 'よく使う絞り込み'}
         title="よく使う絞り込み"
         data-active={quick.length > 0 || undefined}
         className={styles.quickButton}

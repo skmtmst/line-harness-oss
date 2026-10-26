@@ -45,12 +45,15 @@ const UNITS = { friendChange: '人', blockRate: '%', clickRate: '%', bookings: '
 const mean = (index) => STORES.reduce((n, row) => n + row[index], 0) / STORES.length
 const AVERAGE = { friendChange: mean(2), blockRate: mean(3), clickRate: mean(4), bookings: mean(5), visits: mean(6), noShowRate: mean(7), responseMinutes: mean(8) }
 
+/* 最後の店は期間の途中から集計した店（30 日のうち 12 日分）。件数は日数が違うので差を出さない。 */
+const COUNT_KEYS = new Set(['friendChange', 'bookings', 'visits'])
 function storeRows() {
   return STORES.map((row, i) => {
     const values = { friendChange: row[2], blockRate: row[3], clickRate: row[4], bookings: row[5], visits: row[6], noShowRate: row[7], responseMinutes: row[8] }
+    const coveredDays = i === STORES.length - 1 ? 12 : 30
     return {
-      accountId: `store-${i + 1}`, name: row[0], style: null, computedAt: '2026-10-16T04:30:00.000Z',
-      metrics: Object.fromEntries(KEYS.map((k) => [k, { value: values[k], diff: Math.round((values[k] - AVERAGE[k]) * 10) / 10, unit: UNITS[k], available: true }])),
+      accountId: `store-${i + 1}`, name: row[0], style: null, computedAt: '2026-10-16T04:30:00.000Z', coveredDays, periodDays: 30,
+      metrics: Object.fromEntries(KEYS.map((k) => [k, { value: values[k], diff: coveredDays < 30 && COUNT_KEYS.has(k) ? null : Math.round((values[k] - AVERAGE[k]) * 10) / 10, unit: UNITS[k], available: true }])),
     }
   })
 }
@@ -128,7 +131,7 @@ export function gap3Respond(method, pathname, body = {}, query = new URLSearchPa
   }
   const detail = /^\/api\/hq\/store-comparison\/([^/]+)$/.exec(pathname)
   if (method === 'GET' && detail) {
-    return ok({ accountId: detail[1], values: {}, style: null, computedAt: '2026-10-16T04:30:00.000Z', trend: [], recentBroadcasts: [
+    return ok({ accountId: detail[1], values: {}, style: null, computedAt: '2026-10-16T04:30:00.000Z', coveredDays: 30, periodDays: 30, trend: [], recentBroadcasts: [
       { id: 'b1', title: '秋の新メニュー', status: 'sent', sent_at: '2026-10-14T01:00:00.000Z' },
       { id: 'b2', title: '休業日のお知らせ', status: 'sent', sent_at: '2026-10-07T01:00:00.000Z' },
       { id: 'b3', title: 'クーポン', status: 'sent', sent_at: '2026-09-30T01:00:00.000Z' },

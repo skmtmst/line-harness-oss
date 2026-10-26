@@ -253,7 +253,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr>
+                <tr className={styles.headRow}>
                   <th>日時</th>
                   <th>移行元 → 移行先</th>
                   <th>状態</th>
@@ -430,7 +430,7 @@ function MigrationReviewBoard({
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr>
+                <tr className={styles.headRow}>
                   <th>移行元 uid</th>
                   <th>移行先 uid</th>
                   <th>一致</th>

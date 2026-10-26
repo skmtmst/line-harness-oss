@@ -6,8 +6,25 @@ import type { Env } from '../worker-env.js';
 import { hasStaffPermission } from '../middleware/role-guard.js';
 import { StyleError } from '../services/style-setup.js';
 
+import { ensureStyleStarterItems } from '../services/style-starter-ensure.js';
 import { base, account, json, edit, text } from './styles-common.js';
 export const styles = new Hono<Env>();
+
+/** 初期セットの入れ直し。足りない物だけを止めた状態で入れ、スタイルの版は上げない。 */
+styles.post(base + '/starter-items/ensure', async (c) => {
+  edit(c);
+  const a = await account(c);
+  return c.json({
+    success: true,
+    data: await ensureStyleStarterItems(
+      c.env.DB,
+      a,
+      c.get('staff').tenantId ?? null,
+      c.get('staff').id,
+      await json(c),
+    ),
+  });
+});
 
 styles.get(base + '/menus/:id', async (c) => {
   const a = await account(c);

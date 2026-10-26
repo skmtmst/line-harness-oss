@@ -286,7 +286,8 @@ export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
   reminder: { table: 'reminders', accountColumn: 'line_account_id', listFilter: 'deleted_at IS NULL' },
   scenario: { table: 'scenarios', accountColumn: 'line_account_id' },
   tag: { table: 'tags', accountColumn: 'line_account_id' },
-  template: { table: 'templates', accountColumn: 'line_account_id' },
+  // 一覧は deleted_at IS NULL で絞る(packages/db/src/templates.ts の getTemplatesWithUsageCount)。
+  template: { table: 'templates', accountColumn: 'line_account_id', listFilter: 'deleted_at IS NULL' },
   // 一覧は deleted_at IS NULL で絞る(packages/db/src/auto-replies.ts:76)。
   auto_reply: { table: 'auto_replies', accountColumn: 'line_account_id', listFilter: 'deleted_at IS NULL' },
   broadcast: { table: 'broadcasts', accountColumn: 'line_account_id' },
