@@ -794,5 +794,6 @@
 - [お店の形を選んだ時に入る最初のセットに、友だち追加のあいさつの下書きと、飲食店の](release-log/unreleased/1832-kenta-starter-content.md)
 - [新しいアカウントの初期セットが足りない時に、足りない物だけを止めた状態で入れ直せ](release-log/unreleased/1832-kenta-starter-ensure.md)
 - [スタイルを選ぶ時の見本として、飲食店・サロン・面談・標準・EC ごとに「お客さま](release-log/unreleased/1837-kenta-style-player.md)
+- [スタイルを選ぶ画面・最初の1通の確かめ・初期セットを配る](release-log/unreleased/0000-kenta-first-ten-screens.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

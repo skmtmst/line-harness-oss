@@ -10,7 +10,7 @@
 
 呼び出し側：[v8/style-dashboard/home.tsx](../style-dashboard/home.tsx)
 
-本体：[comparisons.ts](comparisons.ts)、[dashboard-editor.tsx](dashboard-editor.tsx)、[dashboard.tsx](dashboard.tsx)、[ec-period.tsx](ec-period.tsx)、[ec-summary.tsx](ec-summary.tsx)、[first-steps.tsx](first-steps.tsx)、[friend-add.tsx](friend-add.tsx)、[head.tsx](head.tsx)、[inbox.tsx](inbox.tsx)、[kpi-delta.tsx](kpi-delta.tsx)、[sections.tsx](sections.tsx)、[trend.tsx](trend.tsx)
+本体：[comparisons.ts](comparisons.ts)、[dashboard-editor.tsx](dashboard-editor.tsx)、[dashboard.tsx](dashboard.tsx)、[ec-period.tsx](ec-period.tsx)、[ec-summary.tsx](ec-summary.tsx)、[first-run-done.tsx](first-run-done.tsx)、[first-steps.tsx](first-steps.tsx)、[friend-add.tsx](friend-add.tsx)、[head.tsx](head.tsx)、[inbox.tsx](inbox.tsx)、[kpi-delta.tsx](kpi-delta.tsx)、[sections.tsx](sections.tsx)、[trend.tsx](trend.tsx)
 
 ## 外に見せる名前（index.ts）
 
@@ -31,6 +31,7 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [dashboard-align.test.tsx](dashboard-align.test.tsx)
 - [dashboard-compare-band.test.tsx](dashboard-compare-band.test.tsx)
 - [dashboard-editor.test.tsx](dashboard-editor.test.tsx)
+- [first-run-done.test.tsx](first-run-done.test.tsx)
 - [dashboard.test.tsx](dashboard.test.tsx)
 - [ec-summary.test.tsx](ec-summary.test.tsx)
 - [first-steps-fold-react.test.tsx](first-steps-fold-react.test.tsx)

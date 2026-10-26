@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import HelpTip from '@/components/shared/help-tip'
 import Link from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
@@ -19,13 +20,15 @@ import Toggle from '@/components/shared/toggle'
 import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
 import { ArrowRight, Hourglass, Info, Play } from 'lucide-react'
 import { SetupIcon } from './icons'
-import { LOOK_CHOICES, STYLE_CHOICES, choiceLabel, styleLabel } from './model'
+import { LOOK_CHOICES, choiceLabel, styleLabel } from './model'
 import { SampleMenuTiles } from './sample-menu'
 import { useWizard } from './use-wizard'
 import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
 import { useStarterMenu } from './use-starter-menu'
 import SetupLinks from './setup-links'
+import StyleChoiceStep, { STYLE_CHOICE_ORDER, STYLE_CHOICE_PICK_ID, StyleChoiceStatus, initialViewingStyle } from './style-choice-step'
+import { useState } from 'react'
 
 /*
  *  (1)：スタイルを変えると、ダッシュボードが数える予約が変わる（前の予約は消えないが、出なくなる）。
@@ -36,12 +39,15 @@ const BOOKING_PLACE: Record<AccountStyle, string> = {
 }
 
 export default function StyleSetupWizard({ accountId, state, initialStep = 0, onClose }: Props) {
-  const { style, answers, step, setStep, dirty, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, discard, saveAndClose, activate } = useWizard({ accountId, state, initialStep, onClose })
+  const { style, answers, step, setStep, dirty, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, discard, saveAndClose, saveStyleMode, chooseStyle, activate } = useWizard({ accountId, state, initialStep, onClose })
 
   const label = styleLabel(style)
+  /* 1 問目で「見ている」スタイル。選んでいるスタイル（choice）とは別に持つ（共通節 S-3）。 */
+  const [viewing, setViewing] = useState<AccountStyle>(() => initialViewingStyle(state))
+  const chosenStyle = step === 0 && (STYLE_CHOICE_ORDER as readonly string[]).includes(choice) ? choice as AccountStyle : null
   const menu = useStarterMenu(accountId, style)
   const head = step === 0
-    ? { title: 'はじめに、使い方を教えてください', description: '答えに合わせて、メニュー・見本・設定をまとめて入れます。1 分ほどで終わります。' }
+    ? { title: '使い方のスタイルを選ぶ', description: undefined }
     : step === 1
       ? { title: 'リッチメニューなどの見た目をどうしますか', description: `${label}の見本が入っています。画像だけ変えることもできます。` }
       : step === 'summary'
@@ -53,15 +59,19 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
     <DialogActions><div className={styles.footer}>
       {/* B-338：どの問も同じ骨組み。左に［戻る］（1問目は無し）、真ん中に［次へ］。あとで・手動はカードで選ぶ。 */}
       <div className={styles.footerSide}>
-        {step === 0 ? null : <Button onClick={() => setStep(step === 'summary' ? total - 1 : Math.max(0, (step as number) - 1))} disabled={busy}>戻る</Button>}
+        {step === 0 ? <>
+          <Button variant="text" onClick={() => void saveStyleMode('later')} disabled={busy}>あとで設定する</Button>
+          <Button variant="text" onClick={() => void saveStyleMode('manual')} disabled={busy}>手動で設定する</Button>
+        </> : <Button onClick={() => setStep(step === 'summary' ? total - 1 : Math.max(0, (step as number) - 1))} disabled={busy}>戻る</Button>}
       </div>
       <div className={styles.footerCenter}>
         {step === 'summary' ? <Button onClick={() => onClose(true)} disabled={busy}>動かさずにダッシュボードへ</Button> : null}
         {step === 'summary'
           ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${onCount}件）`}</Button>
-          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle"><ArrowRight aria-hidden="true" className={styles.buttonIcon} />次へ</Button>}
+          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}><ArrowRight aria-hidden="true" className={styles.buttonIcon} />次へ</Button>}
       </div>
-      <div className={styles.footerSide}>
+      <div className={step === 0 ? styles.footerEnd : styles.footerSide}>
+        {step === 0 ? <StyleChoiceStatus chosen={chosenStyle} /> : null}
         {step !== 0 && step !== 'summary' ? <Button onClick={() => void saveAndClose()} busy={busy} busyLabel="保存中…">途中保存して閉じる</Button> : null}
       </div>
     </div></DialogActions>
@@ -85,13 +95,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   if (step === 0) {
     body = (
       <>
-        <RadioCardGroup legend="使い方のスタイル" columns={2}>
-          {STYLE_CHOICES.map((item) => (
-            <RadioCard key={item.value} name="setup-style" value={item.value} checked={choice === item.value} onChange={setChoice} title={item.label} note={item.note} icon={<SetupIcon name={item.icon} />} />
-          ))}
-          <RadioCard name="setup-style" value="later" checked={choice === 'later'} onChange={setChoice} title="あとで設定する" note="今は入れません。はじめにやることに残ります" icon={<SetupIcon name="hourglass" />} />
-          <RadioCard name="setup-style" value="manual" checked={choice === 'manual'} onChange={setChoice} title="手動で設定する" note="スタイルを使わず、設定の画面で 1 つずつ決めます" icon={<SetupIcon name="sliders" />} />
-        </RadioCardGroup>
+        <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} />
         {where(`あとから変えられます（設定 › アカウント）。友だち・配信は残ります。前の予約は${BOOKING_PLACE[state.style]}から見られます。`)}
       </>
     )
@@ -206,6 +210,8 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         open
         title={head.title}
         description={head.description}
+        initialFocusId={step === 0 ? STYLE_CHOICE_PICK_ID : undefined}
+        titleHelp={step === 0 ? <HelpTip label="使い方のスタイルの説明">ダッシュボード・はじめの質問・初期セットが、このスタイルに合わせて変わります。</HelpTip> : undefined}
         size="wide"
         designTop={step === 'summary' ? 48 : 60}
         fitViewport

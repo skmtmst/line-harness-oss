@@ -27,9 +27,18 @@ it('スタイルを選ばず別の質問だけ保存しても、標準を選択�
 
 it('本人が標準を選んで次へ進んだら、明示的な途中保存で選択を保存する', async () => {
   const { result } = renderHook(() => useWizard({ accountId: 'new-account', state, onClose: calls.close }))
+  await act(async () => { result.current.chooseStyle('standard') })
   await act(async () => { await result.current.onNext() })
   await act(async () => { await result.current.saveAndClose() })
   expect(calls.save).toHaveBeenCalledWith('new-account', expect.objectContaining({ expectedVersion: 1, style: 'standard' }))
+})
+
+it('スタイルを選んでいない 1 問目では［次へ］で進まず、保存もしない', async () => {
+  const { result } = renderHook(() => useWizard({ accountId: 'new-account', state, onClose: calls.close }))
+  expect(result.current.choice).toBe('')
+  await act(async () => { await result.current.onNext() })
+  expect(result.current.step).toBe(0)
+  expect(calls.save).not.toHaveBeenCalled()
 })
 
 it.each(['later', 'manual'])('本人の%sはスタイルを選んだ扱いにせず保存する', async mode => {

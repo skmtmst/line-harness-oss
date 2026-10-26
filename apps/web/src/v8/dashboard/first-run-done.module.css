@@ -1,0 +1,65 @@
+/* 最初の1通が届いた時の窓。行は種類ごとに 1 行、札は右端。 */
+.body {
+  --frd-row-h: 40px;
+  --frd-body-lh: 20px;
+  --frd-caption-lh: 18px;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--polish-space-section);
+}
+
+.section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--frd-body-lh);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--frd-caption-lh);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  min-height: var(--frd-row-h);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--polish-space-field);
+  box-shadow: var(--shadow-row-line);
+}
+
+.rowLabel {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--frd-body-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link {
+  flex: none;
+  color: var(--color-action);
+  font-size: var(--text-body);
+  white-space: nowrap;
+}

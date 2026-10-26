@@ -30,14 +30,15 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifySaved } from '@/components/shared/toast'
 import { STYLE_CHOICES, styleLabel } from '@/v8/onboarding/public/model/index'
 import styles from './starter-sets.module.css'
+import { DISTRIBUTE_ACCOUNT_LIMIT, useDistribute } from './use-distribute'
 
 /*
  * 統括の「スタイルの初期セット」（★V8 修正案の列 VHp7p `J6647`。決まり ）。
  *
  * スタイルごとに、新しいアカウントで自動で入れる物（リッチメニュー・テンプレート・オートメーション・
  * 予約メニュー・ダッシュボードの型）を束ねて見せる。自動で送る物は「止めた状態で入る」。
- * 読みは組4の `GET /api/hq/style-starter-sets`。作る・直す・配る・標準に戻す・自動で入れるの切り替えは
- * 口が入るまで準備中の窓。
+ * 読みは組4の `GET /api/hq/style-starter-sets`。配るは preflight で数を確かめてから distribute。
+ * 作る（標準の中身を読む口）・中身を直す（編集の画面）・標準に戻す（戻す口）は、口が入るまで準備中の窓。
  */
 
 const KIND_ROWS: ReadonlyArray<{ kind: StarterSetItem['kind']; label: string; how: { text: string; tone: 'neutral' | 'warning' } }> = [
@@ -77,8 +78,7 @@ export default function HqStarterSetsV8() {
   const [samplesError, setSamplesError] = useState(false)
   const [sampleOpen, setSampleOpen] = useState<StyleTemplateSample | null>(null)
   const [samplesTick, setSamplesTick] = useState(0)
-  /* 配る前の確かめ（f7x1BZ）：配る先と、店が直した物の扱い。 */
-  const [distribute, setDistribute] = useState<{ target: 'style' | 'pick'; accounts: string[]; mode: 'alias' | 'overwrite' } | null>(null)
+  const [viewing, setViewing] = useState<StarterSetItem['kind'] | null>(null)
   const { accounts } = useAccount()
 
   const load = useCallback(async () => {
@@ -106,6 +106,11 @@ export default function HqStarterSetsV8() {
   const set = sets?.find((item) => item.style === active) ?? null
   const groups = useMemo(() => KIND_ROWS.map((row) => ({ ...row, items: (set?.definition.items ?? []).filter((item) => item.kind === row.kind) })).filter((row) => row.items.length > 0), [set])
   const label = styleLabel(active)
+  /* 配る前の確かめ（f7x1BZ）：配る先と、店が直した物の扱い。 */
+  const share = useDistribute(active, set?.version ?? null, () => void load())
+  const distribute = share.draft
+  const setDistribute = share.setDraft
+  const viewed = groups.find((group) => group.kind === viewing) ?? null
 
   /* 新しいアカウントで自動で入れるの切り替え（今の中身・名前・版と一緒に保存する）。 */
   const saveErrors = useSaveFormErrors()
@@ -165,7 +170,7 @@ export default function HqStarterSetsV8() {
           <span className={styles.spacer} />
           {canEdit ? <>
             <Button onClick={() => preparing.open('初期セットの中身を直す')}><Pencil aria-hidden="true" className={styles.buttonIcon} />中身を直す</Button>
-            {set ? <Button variant="primary" onClick={() => setDistribute({ target: 'style', accounts: [], mode: 'alias' })}><Send aria-hidden="true" className={styles.buttonIcon} />{`使っている ${set.accountCount} アカウントへ配る`}</Button> : null}
+            {set ? <Button variant="primary" onClick={() => setDistribute({ target: 'style', accounts: [], editedAction: 'notify' })}><Send aria-hidden="true" className={styles.buttonIcon} />{`使っている ${set.accountCount} アカウントへ配る`}</Button> : null}
           </> : null}
         </div>
         <div className={styles.auto}>
@@ -200,13 +205,14 @@ export default function HqStarterSetsV8() {
                   <GridRow key={group.kind} className={styles.row}>
                     <GridCell>{group.label}</GridCell>
                     <GridCell className={styles.name}>
-                      <button type="button" className={styles.nameButton} title={name.main} onClick={() => preparing.open(`${group.label}の中身`)}>{name.main}</button>
+                      <button type="button" className={styles.nameButton} title={name.main} onClick={() => setViewing(group.kind)}>{name.main}</button>
                       {name.sub ? <span className={styles.sub}>{name.sub}</span> : null}
                     </GridCell>
                     <GridCell><StatusBadge tone={group.how.tone} dot>{group.how.text}</StatusBadge></GridCell>
                     {/* 口は初期セット全体の更新日時を返す（種類ごとではない）。直した人は ID なので名前は出さない。 */}
                     <GridCell><span className={styles.date}>{set ? shortDate(set.updatedAt) : '—'}</span></GridCell>
                     <GridCell>{canEdit ? <RowMenu appearance="box" size="row" label={`${group.label}の操作`} items={[
+                      { id: 'view', label: '中身を見る', onSelect: () => setViewing(group.kind) },
                       { id: 'edit', label: '中身を直す', onSelect: () => preparing.open(`${group.label}の中身を直す`) },
                       ...(set ? [{ id: 'remove', label: '初期セットから外す', tone: 'danger' as const, onSelect: () => { setSaveError(''); setRemoving(group.kind) } }] : []),
                     ]} /> : null}</GridCell>
@@ -266,12 +272,14 @@ export default function HqStarterSetsV8() {
           size="small"
           designNode="f7x1BZ"
           onCancel={() => setDistribute(null)}
+          busy={share.busy}
+          error={share.error}
           footerDivider
           footer={(
             <DialogActions leadingAction={<span className={styles.footLead}>配った記録が残ります</span>}>
               <Button onClick={() => setDistribute(null)}>やめる</Button>
-              <Button variant="primary" disabled={distribute.target === 'pick' && distribute.accounts.length === 0} onClick={() => { setDistribute(null); preparing.open('初期セットを配る') }}>
-                <Send aria-hidden="true" className={styles.buttonIcon} />{`${distribute.target === 'style' ? set.accountCount : distribute.accounts.length} アカウントへ配る`}
+              <Button variant="primary" disabled={share.preview === null} disabledReason={share.tooMany ? `一度に配れるのは ${DISTRIBUTE_ACCOUNT_LIMIT} アカウントまでです` : distribute.target === 'pick' && distribute.accounts.length === 0 ? '配るアカウントを選んでください' : '配る先を確かめています'} busy={share.busy} busyLabel="配っています…" onClick={() => void share.run()}>
+                <Send aria-hidden="true" className={styles.buttonIcon} />{`${share.preview?.accountCount ?? (distribute.target === 'style' ? set.accountCount : distribute.accounts.length)} アカウントへ配る`}
               </Button>
             </DialogActions>
           )}
@@ -285,17 +293,31 @@ export default function HqStarterSetsV8() {
               <EntitySelect aria-label="配るアカウント" noun="アカウント" placeholder="アカウントを選ぶ" values={distribute.accounts} onChange={(values) => setDistribute({ ...distribute, accounts: values })} options={accounts.map((account) => ({ value: account.id, label: account.name }))} />
             ) : null}
             <RadioCardGroup legend="店が直した物があるとき" legendVisible>
-              <RadioCard variant="row" name="hss-mode" value="alias" checked={distribute.mode === 'alias'} onChange={() => setDistribute({ ...distribute, mode: 'alias' })} title="上書きせず、新しく作る（おすすめ）" />
-              <RadioCard variant="row" name="hss-mode" value="overwrite" checked={distribute.mode === 'overwrite'} onChange={() => setDistribute({ ...distribute, mode: 'overwrite' })} title="本部の見本で上書きする" />
+              <RadioCard variant="row" name="hss-mode" value="notify" checked={distribute.editedAction === 'notify'} onChange={() => setDistribute({ ...distribute, editedAction: 'notify' })} title="上書きせず、本部の新しい版があると知らせる（おすすめ）" />
+              <RadioCard variant="row" name="hss-mode" value="new_copy" checked={distribute.editedAction === 'new_copy'} onChange={() => setDistribute({ ...distribute, editedAction: 'new_copy' })} title="上書きせず、本部の見本を新しく写して入れる" />
             </RadioCardGroup>
             <dl className={styles.facts}>
               <dt>入る物</dt><dd>{KIND_ROWS.filter((row) => row.kind !== 'dashboard').map((row) => [row.label, set.definition.items.filter((item) => item.kind === row.kind).length] as const).filter(([, n]) => n > 0).map(([name, n]) => `${name} ${n}`).join('・')}</dd>
-              <dt>店が直した物</dt><dd>{distribute.mode === 'alias' ? '配るときに確かめ、新しく作ります' : '配るときに確かめ、本部の見本で上書きします'}</dd>
+              <dt>配る先</dt><dd>{share.preview ? `${share.preview.accountCount} アカウント` : share.tooMany ? `一度に配れるのは ${DISTRIBUTE_ACCOUNT_LIMIT} アカウントまでです` : '確かめています…'}</dd>
+              <dt>店が直した物</dt><dd>{share.preview ? `${share.preview.editedCount} 件。${distribute.editedAction === 'notify' ? '上書きせず、店に新しい版があると知らせます' : '上書きせず、新しく写して入れます'}` : '確かめています…'}</dd>
               <dt>自動で送る物</dt><dd>止めた状態で入ります。店が［動かす］を押すまで送りません</dd>
             </dl>
           </div>
         </Dialog>
       ) : null}
+      <Dialog open={viewed !== null} title={viewed ? `${viewed.label}の中身` : ''} description="新しいアカウントに入る中身です（読むだけ）" size="medium" onCancel={() => setViewing(null)}>
+        {viewed ? (
+          <ul className={styles.viewRows}>
+            {viewed.items.map((item) => (
+              <li key={item.key} className={styles.viewRow}>
+                <span className={styles.viewName}>{item.name}</span>
+                {item.text ? <span className={styles.sampleText}>{item.text}</span> : null}
+                {item.buttons ? <span className={styles.sub}>{item.buttons.map((button) => button.label).join('・')}</span> : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </Dialog>
       {preparing.dialog}
       <ConfirmDialog
         open={removing !== null}
