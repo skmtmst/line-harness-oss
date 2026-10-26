@@ -18,6 +18,7 @@
 
 - [index.ts](index.ts)：`MenuFormV8`・`BookingSettingsV8`・`AssignMatrixV8`・`AccountIcon`・`SkeletonRows`・`StateCard`・`useV8TabEdit`・`bookingChannelsApi`
 - [public/lib-booking-channels/index.ts](public/lib-booking-channels/index.ts)：`bookingChannelsApi`
+- [public/liff-phone/index.ts](public/liff-phone/index.ts)：`LiffPhoneMenuStep`・`LiffPhoneStaffStep`・`LiffPhoneDatetimeStep`（お客さまの予約画面の写し。スタイル体験の見本も作り物のデータで使う）
 - [public/tab-parts/index.ts](public/tab-parts/index.ts)：`AccountIcon`・`SkeletonRows`・`StateCard`・`useV8TabEdit`
 
 機能の内部は宣言元を直接読み、外部は明示された公開入口を使います。Nextのpage・layoutとWorkerのroute登録は直接接続します。決まりは [コードの構成と名前](../../../../../docs/code-structure.md)。

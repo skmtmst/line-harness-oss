@@ -1,8 +1,14 @@
 import { fetchApi } from '../../api'
 import { bookingApi } from '../../api'
 import { restaurantTestApi } from '../../restaurant-test-api';
-import { root, url, write, Result, StyleMember } from './styles-common';
+import { root, url, write, Result, StarterEnsureResult, StyleMember } from './styles-common';
 export const methods2 = {
+  /** 初期セットの入れ直し。足りない物だけを止めた状態で入れ、スタイルの版は上げない（版が違えば 409）。 */
+  ensureStarterItems: (accountId: string, expectedVersion: number) =>
+    fetchApi<Result<StarterEnsureResult>>(
+      url(root + '/starter-items/ensure', accountId),
+      write('POST', { expectedVersion }),
+    ),
 
   saveMenu: (
     accountId: string,

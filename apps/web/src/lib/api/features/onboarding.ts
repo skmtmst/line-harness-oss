@@ -1,6 +1,6 @@
 import { fetchApi } from '../transport/request'
 import type { ApiResponse } from '@line-crm/shared'
-import type { GettingStartedStep, Recipe, ManualLink } from '../types/onboarding'
+import type { GettingStartedFirstRun, GettingStartedStarter, GettingStartedStep, Recipe, ManualLink } from '../types/onboarding'
 
 export const onboardingMethods = {
 /** はじめの設定の順路。台帳 #134。**毎回いまの中身を数える（キャッシュしない）。** */
@@ -8,6 +8,11 @@ export const onboardingMethods = {
     get: (accountId?: string, version?: 'v8') =>
       fetchApi<ApiResponse<{
         steps: GettingStartedStep[]
+        accountId: string | null
+        /** アカウントを選んでいてスタイルを保存済みの時だけ。それ以外は null。 */
+        starter: GettingStartedStarter | null
+        /** アカウントを選んでいる時だけ。それ以外は null。 */
+        firstRun: GettingStartedFirstRun | null
         doneCount: number
         total: number
         allDone: boolean

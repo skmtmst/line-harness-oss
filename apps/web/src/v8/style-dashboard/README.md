@@ -14,6 +14,7 @@
 
 - [index.ts](index.ts)：`HomeDashboard`・`StyleDashboard`
 - [public/style-dashboard/index.ts](public/style-dashboard/index.ts)：`StyleDashboard`
+- [public/sample-parts/index.ts](public/sample-parts/index.ts)：`STYLE_CONFIG`・`TodayList`・`TodayListColumn`・`SideCard`・`StaffBoard`・`styleMetricLabel`・`StyleBoard`・`StyleRow`・`StyleSideCard`（スタイル体験の見本が同じ部品・言葉で縮めた画面を描くため。ホームを読み込まない）
 
 機能の内部は宣言元を直接読み、外部は明示された公開入口を使います。Nextのpage・layoutとWorkerのroute登録は直接接続します。決まりは [コードの構成と名前](../../../../../docs/code-structure.md)。
 

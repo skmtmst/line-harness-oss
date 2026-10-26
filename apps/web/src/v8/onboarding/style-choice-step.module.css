@@ -1,0 +1,80 @@
+/*
+ * スタイルを選ぶ画面（共通節 S）。見本の枠の大きさはプレイヤーが持つ（並べた時は最小版・全部版とも同じ高さ、
+ * 狭い時は縦に積む）。枠で縦横比を決めて切ると、積んだ時に中が欠けるため。
+ */
+.root {
+  --sc-check: 14px;
+  --sc-caption-lh: 18px;
+  --sc-body-lh: 20px;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--polish-space-card);
+}
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+  white-space: nowrap;
+}
+
+.optionCheck,
+.canIcon {
+  width: var(--sc-check);
+  height: var(--sc-check);
+  flex: none;
+  color: var(--color-accent-deep);
+}
+
+.can {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+}
+
+.canTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--sc-body-lh);
+}
+
+.canList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.canItem {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--sc-caption-lh);
+}
+
+.frame {
+  width: 100%;
+  min-width: 0;
+}
+
+.choose {
+  display: flex;
+  justify-content: center;
+}
+
+.status {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--sc-caption-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
