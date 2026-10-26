@@ -6,10 +6,8 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { join as sourceJoin } from 'node:path'
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const runsMock = vi.hoisted(() => vi.fn())
@@ -126,6 +124,11 @@ describe('R530 実行結果の出し分け（役割×操作）', () => {
 
     expect(buttonLabels().some((label) => label.includes('もう一度実行'))).toBe(false)
     expect(buttonLabels().some((label) => label.includes('一時停止'))).toBe(false)
+    // 行の「…」を開いても、失敗の記録に再実行は無い（確認は残る）。
+    const more = container.querySelector<HTMLButtonElement>('button[aria-label$="記録の操作"]')!
+    await act(async () => { more.click() })
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('実行の詳細を見る')
+    expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('もう一度実行')
     expect(container.textContent).toContain(
       '再実行・一時停止はオーナーと管理者だけができます',
     )
@@ -149,24 +152,15 @@ describe('R530 実行結果の出し分け（役割×操作）', () => {
 })
 
 /*
- * 直しを戻すと赤くなる文字契約。実マウントの試験が本命で、
- * こちらは分岐の削除・無条件表示への戻しを見張る。
+ * 変更の可否は共通の出し分け（useStaffRole・canManageRole）で決める。上の描画の試験が
+ * 役割ごとに押して見る。403 の権限の説明は auto-reply-runs-retry.test.tsx が見る。
+ * ここは手元の保存値で決める古い形に戻さない見張りだけ。
  */
-const HERE = __dirname
-const PAGE = readFileSync(sourceJoin(__dirname, '../../../v8/auto-replies/runs.tsx'), 'utf8')
+const PAGE = readFileSync(join(__dirname, '../../../v8/auto-replies/runs.tsx'), 'utf8')
 
 describe('R530 実行結果の出し分け契約', () => {
-  it('変更の可否は共通の出し分けで決め、手元の保存値で決めない', () => {
-    expect(PAGE).toContain("from '@/lib/staff-role'")
-    expect(PAGE).toContain('useStaffRole')
-    expect(PAGE).toContain('canManageRole')
+  it('変更の可否を手元の保存値で決めない', () => {
     expect(PAGE).not.toContain("localStorage.getItem('lh_staff_role')")
-  })
-
-  it('再実行・一時停止が canManage で守られ、403 は権限の説明になる', () => {
-    expect(PAGE).toContain('if (canManage && !isDeliveryUnconfirmed(item) && item.canRetry)')
-    expect(PAGE).toContain("permissionDeniedMessage('store')")
-    expect(PAGE).toContain('再実行・一時停止はオーナーと管理者だけができます')
   })
 })
 
