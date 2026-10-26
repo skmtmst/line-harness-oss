@@ -113,8 +113,10 @@ it('平均は秒に直して出す', async () => {
 it('読み込み中は読込の表示だけを出し、空や失敗と言わない', async () => {
   mocks.runs.mockReturnValue(new Promise(() => {}))
   await renderPage()
-  expect(container.querySelector('[data-list-state="loading"]')).not.toBeNull()
+  // 本体の一覧と、きっかけの内訳の欄の両方が読込の表示になる（空・失敗の表示は1つも出さない）。
+  expect(container.querySelectorAll('[data-list-state="loading"]')).toHaveLength(2)
   expect(container.querySelector('[data-list-state="error"]')).toBeNull()
+  expect(container.querySelector('[data-list-state="empty"]')).toBeNull()
   expect(container.textContent).not.toContain('実行結果はまだありません')
 })
 
