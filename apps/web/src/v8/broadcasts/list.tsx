@@ -121,9 +121,9 @@ function chipText(label: string, count: number | null): string {
 }
 
 /** 状態の札の色。10 の状態を5色に畳む（色は CSS の data-tone）。 */
-const BADGE_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
+const BADGE_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger'> = {
   draft: 'neutral',
-  pending_approval: 'warning',
+  pending_approval: 'caution',
   scheduled: 'info',
   preparing: 'info',
   sending: 'warning',
@@ -132,6 +132,43 @@ const BADGE_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'd
   failed: 'danger',
   stopped: 'neutral',
   expired: 'neutral',
+}
+
+function percent(rate: number | null | undefined): string | null {
+  return rate != null ? `${(rate * 100).toFixed(1)}%` : null
+}
+
+/**
+ * 結果の列。広い幅は「届いた・開封・クリック」の3列で右にそろえ、狭い幅（1280 以下）は
+ * 1列の2段（上に人数・下に開封とクリック）。どちらも省略しない。
+ * まだ送っていない配信は数を作らず — にする（0件・0人は「届かなかった」に読める）。
+ */
+function BroadcastResultCells({ broadcast, insight, narrow }: { broadcast: ApiBroadcast; insight: BroadcastInsight | undefined; narrow: boolean }) {
+  const sent = broadcast.status === 'sent'
+  const delivered = sent ? `${formatNumber(insight?.delivered ?? broadcast.successCount)} 人` : null
+  const open = sent ? percent(insight?.openRate) : null
+  const click = sent ? percent(insight?.clickRate) : null
+  if (!narrow) {
+    return (
+      <>
+        <Td align="right"><span className={styles.resultNumber}>{delivered ?? emptyValue('unknown')}</span></Td>
+        <Td align="right"><span className={styles.resultNumber}>{open ?? emptyValue('unknown')}</span></Td>
+        <Td align="right"><span className={styles.resultNumber}>{click ?? emptyValue('unknown')}</span></Td>
+      </>
+    )
+  }
+  return (
+    <Td>
+      {delivered === null ? <span className={styles.cellMain}>{emptyValue('unknown')}</span> : (
+        <>
+          <span className={styles.resultMain}>{delivered}</span>
+          {open !== null || click !== null ? (
+            <span className={styles.resultSub}>{[open !== null ? `開封 ${open}` : '', click !== null ? `クリック ${click}` : ''].filter(Boolean).join('・')}</span>
+          ) : null}
+        </>
+      )}
+    </Td>
+  )
 }
 
 function StatusBadge({ broadcast }: { broadcast: ApiBroadcast }) {
@@ -929,7 +966,13 @@ export default function BroadcastListV8() {
         <Th className={styles.colStatus}>状態</Th>
         {narrow ? null : <Th className={styles.colAudience}>配信条件</Th>}
         <Th className={styles.colDate}>配信日時</Th>
-        <Th className={narrow ? styles.colResult : styles.colResultWide}>結果</Th>
+        {narrow ? <Th className={styles.colResult}>結果</Th> : (
+          <>
+            <Th align="right" className={styles.colDelivered}>届いた</Th>
+            <Th align="right" className={styles.colRate}>開封</Th>
+            <Th align="right" className={styles.colRate}>クリック</Th>
+          </>
+        )}
         <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
       </TableHeadRow>
     </thead>
@@ -946,7 +989,11 @@ export default function BroadcastListV8() {
             <Td><Skeleton width={72} height={22} className="rounded-pill" /></Td>
             {narrow ? null : <Td><Skeleton width={120} height={12} /></Td>}
             <Td><Skeleton width={96} height={16} /></Td>
-            <Td><Skeleton width={64} height={16} /></Td>
+            {narrow ? <Td><Skeleton width={64} height={16} /></Td> : <>
+              <Td align="right"><Skeleton width={48} height={16} /></Td>
+              <Td align="right"><Skeleton width={40} height={16} /></Td>
+              <Td align="right"><Skeleton width={40} height={16} /></Td>
+            </>}
             <Td />
           </Tr>
         ))}
@@ -1028,23 +1075,7 @@ export default function BroadcastListV8() {
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>
-              <Td>
-                {broadcast.status !== 'sent' ? (
-                  <span className={styles.cellMain}>{emptyValue('unknown')}</span>
-                ) : (
-                  <>
-                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)} 人に届いた</span>
-                    {insight && (insight.openRate != null || insight.clickRate != null) ? (
-                      <span className={styles.cellSub}>
-                        {[
-                          insight.openRate != null ? `開封 ${(insight.openRate * 100).toFixed(1)}%` : '',
-                          insight.clickRate != null ? `クリック ${(insight.clickRate * 100).toFixed(1)}%` : '',
-                        ].filter(Boolean).join('・')}
-                      </span>
-                    ) : null}
-                  </>
-                )}
-              </Td>
+              <BroadcastResultCells broadcast={broadcast} insight={insight} narrow={narrow} />
               <Td className={styles.colMenu}>
                 {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                 {canEdit ? <div className={styles.menuBox}>

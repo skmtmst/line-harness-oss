@@ -5,7 +5,7 @@ import TruncatedText from './truncated-text'
 import styles from './status-badge.module.css'
 
 /**
- * 札の色。warning＝橙（対応中・承認待ちなど進んでいる途中）、caution＝黄（要確認）、
+ * 札の色。warning＝橙（対応中・送信中など進んでいる途中）、caution＝黄（要確認・承認待ち）、
  * danger＝赤（未対応・失敗）、success＝緑（済み・正常・有効）、info＝青、neutral＝灰（保留・種類）。
  */
 export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger'

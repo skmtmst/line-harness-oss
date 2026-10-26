@@ -81,8 +81,8 @@ const BRANCH_LABELS: Record<string, string> = {
   expired: '期限切れ',
 }
 
-const BADGE_TONE: Record<string, 'info' | 'warning' | 'success' | 'danger'> = {
-  pending_approval: 'warning',
+const BADGE_TONE: Record<string, 'info' | 'warning' | 'caution' | 'success' | 'danger'> = {
+  pending_approval: 'caution',
   scheduled: 'info',
   preparing: 'info',
   sending: 'warning',

@@ -17,9 +17,10 @@ describe('V8 一斉配信の結果と日時', () => {
    * 「送ったが誰にも届かなかった」に読める。
    */
   it('送信済みでない行の結果は — で、数や単位を作らない', () => {
-    const stats = SOURCE.slice(SOURCE.indexOf("{broadcast.status !== 'sent' ?"), SOURCE.indexOf("<span className={styles.resultMain}"))
-    expect(stats).toContain("broadcast.status !== 'sent'")
-    expect(stats).toContain("emptyValue('unknown')")
+    const stats = SOURCE.slice(SOURCE.indexOf('function BroadcastResultCells'), SOURCE.indexOf('function StatusBadge'))
+    expect(stats).toContain("const sent = broadcast.status === 'sent'")
+    expect(stats).toContain("sent ? `${formatNumber(")
+    expect(stats.match(/emptyValue\('unknown'\)/g)?.length).toBe(4)
     expect(stats).not.toMatch(/0\s*件/)
     expect(stats).not.toMatch(/0\s*人/)
   })

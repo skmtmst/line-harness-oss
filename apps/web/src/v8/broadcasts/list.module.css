@@ -148,8 +148,19 @@
 .colAudience { width: var(--tpl-bc-col-audience); }
 .colDate { width: var(--tpl-bc-col-date); }
 .colResult { width: var(--tpl-bc-col-result); }
-/* 広い板（・）は名前の前に丸が入った絵で、結果の列が 214（＋間16）。1152は今までどおり。 */
+/* 統括の一括配信の一覧（広い板）の結果の列。 */
 .colResultWide { width: var(--tpl-fx4-bc-col-result-wide); }
+/* 広い幅の結果は「届いた・開封・クリック」の3列。数は右にそろえ、桁をそろえる。 */
+.colDelivered { width: var(--tpl-bc-col-delivered); }
+.colRate { width: var(--tpl-bc-col-rate); }
+.resultNumber {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bc-cell-lh);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 /* 丸の下の2行目は名前の頭にそろえる（絵の「説明の行」の左 16）。 */
 /* 丸＋名前の行は箱（flex）で包む。文字の行の高さを足さない（足すと行が5〜7高くなる）。 */
 .titleLine { display: flex; align-items: center; min-width: 0; }
@@ -282,3 +293,13 @@
 
 /* 行を選ぶ欄（左の四角）。 */
 .selectCell { width: var(--tpl-bc-col-select); text-align: center; }
+
+/* 狭い幅の結果の2段目（開封とクリック）。省略しない。 */
+.resultSub {
+  display: block;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-row-sub-lh);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

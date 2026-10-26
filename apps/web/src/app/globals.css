@@ -545,6 +545,8 @@
   --polish-status-pad: 2px 8px;
   /* 状態の札は地の色のある札（点は残し、色だけに頼らない）。字と地の明暗差はどれも 4.5:1 以上。 */
   --polish-status-radius: var(--polish-radius-small);
+  /* 行の「…」に乗せた時の薄い灰の地（行の乗せた時の地より一段濃い）。 */
+  --polish-row-menu-hover-bg: #eef0f3;
   --polish-status-success-dot: #16a34a;
   --polish-status-success-bg: #e3f4ea;
   --polish-status-success-ink: #08703a;
@@ -943,7 +945,7 @@
   --tpl-bc-note-lh: 17px; --tpl-bc-tools-gap: 10px; --tpl-bc-search-w: 280px; --tpl-bc-narrow-search-w: 180px; --tpl-bc-status-select-w: 152px; --tpl-bc-page-size-w: 96px;
   --tpl-bc-control-gap: 6px; --tpl-bc-date-pad: 0 10px; --tpl-bc-ghost-pad: 0 14px; --tpl-bc-sort-h: 30px; --tpl-bc-popover-w: 260px; --tpl-bc-save-input-w: 240px;
   --tpl-bc-cell-pad-block: 8px; --tpl-bc-head-pad-block: 12px; --tpl-bc-col-gap: 16px; --tpl-bc-edge-pad: 20px; --tpl-bc-cell-lh: 18px; --tpl-bc-result-lh: 19px;
-  --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-menu: 56px; --tpl-bc-col-select: 48px;
+  --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-delivered: 88px; --tpl-bc-col-rate: 72px; --tpl-bc-col-menu: 56px; --tpl-bc-col-select: 48px;
   --tpl-bc-badge-gap: 4px; --tpl-bc-badge-pad: 2px 8px; --tpl-bc-menu-size: 28px; --tpl-bc-pager-lh: 21px; --tpl-bc-state-pad: 24px 24px; --tpl-bc-state-icon: 32px;
   --tpl-title-size: var(--polish-text-page); --tpl-title-weight: 600; --tpl-title-lh: 40px; --tpl-title-tracking: -0.01em;
   /* ウェビナーの編集・参加者・分析・コメント演出（・・・・・・・・・）。 */
