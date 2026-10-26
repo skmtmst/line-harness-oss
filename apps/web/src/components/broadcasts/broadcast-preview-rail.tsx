@@ -8,6 +8,7 @@ import { BubblePreview } from './broadcast-preview-model'
 import { type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import KpiCard from '@/components/shared/kpi-card'
 import Checkbox from '@/components/shared/checkbox'
 import LinePreview from '@/components/shared/line-preview'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -64,7 +65,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
     return (<aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label="届く人">
         <div className={styles.previewHead}><h3>届く人</h3>{closeButton}</div>
         <Card layout="vertical" padding="compact" gap="tight" className={styles.reachCard}>
-          <p className={styles.reachTotal} aria-live="polite"><strong>{audienceDisplayCount !== null ? formatNumber(audienceDisplayCount) : preflightStatus === 'loading' ? '数えています…' : '—'}</strong>{audienceDisplayCount !== null ? <span>人</span> : null}</p>
+          <div aria-live="polite"><KpiCard presentation="inline" title="届く人" value={audienceDisplayCount} unit="人" detail={null} icon={null} loading={audienceDisplayCount === null && preflightStatus === 'loading'} /></div>
           <dl className={styles.reachRows}>{[
             [confirmAudienceLabel, people(matched)],
             ['ブロック中で除く', blocked === undefined ? '—' : blocked === 0 ? '0 人' : `− ${formatNumber(blocked)} 人`],

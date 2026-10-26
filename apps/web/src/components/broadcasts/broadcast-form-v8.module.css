@@ -67,9 +67,6 @@
 .pcPreview :global(section > div) { width: 100%; height: 440px; border-radius: var(--radius-panel); }
 /* 手順 1〜2 の右の欄：届く人数と内訳。箱は共通のカード、中の字だけここで決める。 */
 .reachCard { width: 100%; }
-.reachTotal { display: flex; align-items: baseline; gap: var(--space-4); font-variant-numeric: var(--font-numeric); }
-.reachTotal strong { font-size: var(--text-metric); line-height: var(--text-hero--line-height); font-weight: 600; color: var(--color-ink); }
-.reachTotal span { font-size: var(--text-caption); color: var(--color-ink-secondary); }
 .reachRows { font-size: var(--text-micro); }
 .reachRows > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-4) 0; }
 .reachRows dt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); }

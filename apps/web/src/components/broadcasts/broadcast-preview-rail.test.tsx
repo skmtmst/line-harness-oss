@@ -67,6 +67,6 @@ it('手順 1〜2 は空のスマホではなく、届く人数と内訳（対象
   cleanup()
   const counting = render(<BroadcastPreviewRail {...props} currentStep="audience" preflight={null} audienceDisplayCount={null} preflightStatus="loading" />)
   const rail = counting.getByRole('complementary', { name: '届く人' })
-  expect(rail.textContent).toContain('数えています…')
+  expect(rail.querySelector('[aria-busy="true"]')).not.toBeNull()
   expect(rail.textContent).toContain('ブロック中で除く—')
 })
