@@ -801,5 +801,6 @@
 - [直し④（部品の手入れ）](release-log/unreleased/1839-kenta-train-m2e-1026.md)
 - [使っている部品に重大な弱点が見つかった週は、自動の点検が赤くなって分かるようにし](release-log/unreleased/1840-kenta-audit-weekly-red.md)
 - [統括のアカウントのカードの高さとボタンの位置を、同じ行でそろえた](release-log/unreleased/1841-kenta-hq-card-height.md)
+- [最初の10分の全アカウントのまとめ（運営だけ）](release-log/unreleased/0000-kenta-funnel-summary.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

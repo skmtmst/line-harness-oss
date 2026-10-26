@@ -822,6 +822,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/ops/announcements',
   'GET /api/ops/audit',
   'GET /api/ops/dashboard',
+  'GET /api/ops/dashboard/first-run',
   'GET /api/ops/dashboard/line-unregistered',
   'GET /api/ops/impersonation/current',
   'GET /api/ops/me',

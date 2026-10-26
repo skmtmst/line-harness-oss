@@ -2501,6 +2501,11 @@
             "id": "svg-line",
             "re": "<(polyline|path)\\b[^>]*\\b(points|d)=\\{",
             "why": "SVG で線を手描き"
+          },
+          {
+            "id": "hand-bar",
+            "re": "role=[\\\"']progressbar[\\\"']|style=\\{\\{\\s*width:\\s*`\\$\\{[^`]*\\}%`",
+            "why": "棒を手書き（進み・使用量は ProgressBar）"
           }
         ]
       },
@@ -2888,6 +2893,11 @@
             "id": "raw-check",
             "re": "type=[\"'](checkbox|radio)[\"']",
             "why": "素のチェック・ラジオ"
+          },
+          {
+            "id": "locked-check",
+            "re": "<Checkbox\\s+checked\\s[^>]*\\bdisabled\\b",
+            "why": "外せない決まりをチェックの形で出す（札で言い切る）"
           }
         ]
       },

@@ -65,6 +65,8 @@ async function mount(page, width, hash = '', height = 1100) {
   await page.addScriptTag({ content: compiled.outputFiles[0].text })
   await page.locator('[data-style-experience]').waitFor()
   await page.evaluate(() => document.fonts.ready)
+  // 白い板の幅で並べ方（横・縦）が決まった後の描き直しを待つ。数の帯はマスの幅で字の大きさを決めるので、切り替え前の幅で測らない。
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
 }
 
 /** 崩れの計測：はみ出し・3 つの画面の重なり・器の外へ出た中身・縮めた後の文字の大きさ。 */
@@ -87,6 +89,14 @@ function measure() {
       const r = box(el)
       if (r.width === 0 || el.closest('[data-pane="phone"] [data-line-preview-part="talk"]')) continue
       if (r.right > edge.right + 0.5 || r.left < edge.left - 0.5) { escaped.push(`${pane.dataset.pane}:${(el.getAttribute('aria-label') ?? el.textContent).trim().slice(0, 12)}`); break }
+    }
+  }
+  // 数の帯の1マス：数と単位がマスの右端を越えて隣のマスへ食い込まない（「¥38,5001 件」と読める形）。
+  for (const cell of root.querySelectorAll('[data-kpi-strip] > [data-design-version]')) {
+    const edge = box(cell)
+    for (const el of cell.querySelectorAll('[data-kpi-value], [data-kpi-number], [data-kpi-unit]')) {
+      const r = box(el)
+      if (r.width > 0 && r.right > edge.right + 0.5) { escaped.push(`kpi:${cell.textContent.trim().slice(0, 16)}`); break }
     }
   }
   const scale = Number(getComputedStyle(root).getPropertyValue('--sxp-scale') || 1)
@@ -117,7 +127,7 @@ for (const width of [1024, 1152, 1440, 1920]) {
     const browser = await connectGuardBrowser()
     try {
       const page = await browser.newPage({ reducedMotion: 'reduce' })
-      for (const style of ['restaurant', 'salon', 'consult', 'standard', 'ec']) {
+      for (const style of ['restaurant', 'salon', 'consult', 'lesson', 'standard', 'ec']) {
         await mount(page, width, `style=${style}`)
         const result = await page.evaluate(measure)
         assert.equal(result.pageOverflow <= 0, true, `${style} ${JSON.stringify(result)}`)
