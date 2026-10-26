@@ -47,62 +47,70 @@
   height: var(--tpl-ms-otp-icon);
 }
 
-.foot {
-  color: var(--color-ink-faint);
+/* 6 マスとその下の 1 行（違った・確かめ中・通った・案内）。 */
+.code {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.status {
+  margin: 0;
+  color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  line-height: var(--tpl-ms-otp-foot-lh);
-  text-align: center;
+  font-weight: var(--font-weight-ui);
+  line-height: var(--tpl-auth-status-lh);
 }
 
-/* 題の上の薄い緑の丸と盾。 */
-.hero {
-  display: inline-flex;
-  width: var(--tpl-ms-otp-hero);
-  height: var(--tpl-ms-otp-hero);
-  align-items: center;
-  justify-content: center;
-  align-self: center;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-}
+.status[data-tone='danger'] { color: var(--color-status-danger); }
+.status[data-tone='success'] { color: var(--color-success); }
 
-.heroIcon {
-  width: var(--tpl-ms-otp-hero-icon);
-  height: var(--tpl-ms-otp-hero-icon);
-}
-
-/* コードが使えないときの道は、灰色の箱ではなく小さな青い文字のリンクにする。 */
+/* カードの下：左に「コードが使えない場合」、右に「別のアカウントで入る」。 */
 .helpArea {
   display: flex;
   width: 100%;
   flex-direction: column;
-  align-items: center;
   gap: var(--space-8);
 }
 
+.footRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
 .helpToggle,
-.helpLink {
+.helpLink,
+.switchAccount {
   margin: 0;
   border: 0;
   padding: 0;
   background: none;
   color: var(--color-link);
   font: inherit;
-  font-size: var(--text-body);
-  font-weight: 500;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-ui);
   line-height: var(--tpl-ms-otp-label-lh);
-  text-align: center;
+  text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
 
+.switchAccount {
+  color: var(--color-ink-secondary);
+  text-decoration: none;
+}
+
 .helpToggle:hover,
-.helpLink:hover {
+.helpLink:hover,
+.switchAccount:hover {
   text-decoration: underline;
 }
 
 .helpToggle:focus-visible,
-.helpLink:focus-visible {
+.helpLink:focus-visible,
+.switchAccount:focus-visible {
   outline: var(--polish-focus-width) solid var(--color-focus-ring);
   outline-offset: var(--polish-focus-offset);
   border-radius: var(--radius-control);
@@ -118,6 +126,6 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--space-8) var(--space-16);
 }

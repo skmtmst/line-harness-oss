@@ -1,6 +1,5 @@
 'use client'
 import { AuthPage, AuthStack, AuthActions, AuthHelp } from '@/components/templates/auth-page'
-import { Steps } from '@/components/templates/steps'
 import RecoveryCodeList from '@/components/shared/recovery-code-list'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Button from '@/components/shared/button'
@@ -32,6 +31,6 @@ export function RecoveryCodePanel({ codes, onContinue, continueLabel = '控え�
   </AuthStack>
 }
 
-export default function RecoveryCodes(props: { codes: string[]; onContinue: () => void }) {
-  return <AuthPage title="回復コードを控えてください" help="認証アプリが使えない時に、1つにつき1回だけ使えます。" steps={<Steps label="二段階認証の設定" steps={[{ label: '二段階認証の設定', state: 'done' }, { label: '回復コード', state: 'current' }]} />}><RecoveryCodePanel {...props} /></AuthPage>
+export default function RecoveryCodes({ brandName, ...props }: { brandName?: string; codes: string[]; onContinue: () => void }) {
+  return <AuthPage brandName={brandName} title="回復コードを控えてください" help="認証アプリが使えない時に、1つにつき1回だけ使えます。"><RecoveryCodePanel {...props} /></AuthPage>
 }
