@@ -567,7 +567,7 @@ export type {
   SearchConsolePerformance,
   SearchConsoleSetup,
 } from './types/search-console'
-export type { GettingStartedStep, Recipe, ManualLink } from './types/onboarding'
+export type { GettingStartedFirstRun, GettingStartedStarter, GettingStartedStep, Recipe, ManualLink } from './types/onboarding'
 export type {
   FriendAddRuleKind,
   FriendAddRuleStatus,

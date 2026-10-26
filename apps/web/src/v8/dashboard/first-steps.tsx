@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Button from '@/components/shared/button'
 import Link from '@/components/shared/list-navigation'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { canManageRole } from '@/lib/staff-role'
@@ -44,11 +45,39 @@ export function readFirstStepsFolded(accountId: string | null): boolean {
   } catch { return false }
 }
 
-export function useFirstSteps(accountId: string | null, role: string | null) {
+/** 最初の1通を待っている（友だち追加の時の配信は済み、最初の1通はまだ）。 */
+export function waitingForFirstMessage(steps: ReadonlyArray<StepResult>): boolean {
+  return steps.find((step) => step.key === 'friendAdd')?.state === 'done' && steps.find((step) => step.key === 'firstMessage')?.state === 'todo'
+}
+
+/**
+ * 最初の1通が、この画面で見ている間に「まだ」から「済み」に変わったか。
+ * 開いた時にもう済みだった人・別のアカウントへ移った直後は数えない（後から来た人には出さない）。
+ */
+export function useFirstMessageArrived(accountId: string | null, steps: ReadonlyArray<StepResult>, ready: boolean) {
+  const seen = useRef<{ accountId: string | null; state: StepResult['state'] | null }>({ accountId: null, state: null })
+  const [arrived, setArrived] = useState(false)
+  useEffect(() => {
+    if (!ready) return
+    const state = steps.find((step) => step.key === 'firstMessage')?.state ?? null
+    const before = seen.current
+    seen.current = { accountId, state }
+    if (before.accountId === accountId && before.state === 'todo' && state === 'done') setArrived(true)
+  }, [accountId, steps, ready])
+  useEffect(() => { setArrived(false) }, [accountId])
+  return { arrived, dismiss: useCallback(() => setArrived(false), []) }
+}
+
+export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean } = {}) {
   const enabled = Boolean(accountId) && canManageRole(role)
-  const state = useFirstRun(accountId, enabled)
-  const summary = state.status === 'ready' ? summarizeFirstSteps(state.steps) : null
   const [folded, setFolded] = useState(false)
+  const [waiting, setWaiting] = useState(false)
+  const state = useFirstRun(accountId, enabled, Boolean(options.qrOpen) || waiting)
+  const summary = state.status === 'ready' ? summarizeFirstSteps(state.steps) : null
+  /* 待つ帯（はじめにやること）が開いて見えている間だけ、最初の1通を待って読み直す。 */
+  const visibleWaiting = state.status === 'ready' && !folded && waitingForFirstMessage(state.steps)
+  useEffect(() => { setWaiting(visibleWaiting) }, [visibleWaiting])
+  const done = useFirstMessageArrived(accountId, state.steps, state.status === 'ready')
   useEffect(() => { setFolded(readFirstStepsFolded(accountId)) }, [accountId])
   const toggle = useCallback(() => {
     setFolded((current) => {
@@ -59,10 +88,14 @@ export function useFirstSteps(accountId: string | null, role: string | null) {
       return next
     })
   }, [accountId])
-  return { summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: state.reload }
+  return {
+    summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: state.reload,
+    steps: state.steps, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
+    arrived: enabled && done.arrived, dismissArrived: done.dismiss,
+  }
 }
 
-export function FirstStepsCard({ summary, folded, onToggle }: { summary: FirstStepsSummary; folded: boolean; onToggle: () => void }) {
+export function FirstStepsCard({ summary, folded, onToggle, onRecheck }: { summary: FirstStepsSummary; folded: boolean; onToggle: () => void; onRecheck?: () => void }) {
   return (
     <section className={styles.card} aria-labelledby="first-steps-title" data-design-node="r3X34">
       <div className={styles.head}>
@@ -70,6 +103,7 @@ export function FirstStepsCard({ summary, folded, onToggle }: { summary: FirstSt
         <span className={styles.count}>{`${summary.done} / ${summary.total} 済み`}</span>
         <ProgressBar appearance="onboarding" value={summary.done} max={summary.total} label="はじめにやることの進み" />
         <span className={styles.spacer} />
+        {onRecheck ? <Button size="compact" onClick={onRecheck} title="最初の1通の自動の確かめを止めました">もう一度確かめる</Button> : null}
         <button type="button" className={styles.fold} onClick={onToggle} aria-expanded={!folded} aria-controls="first-steps-list">
           {folded ? '開く' : '畳む'}
           {folded ? <ChevronDown className={styles.foldIcon} aria-hidden="true" /> : <ChevronUp className={styles.foldIcon} aria-hidden="true" />}

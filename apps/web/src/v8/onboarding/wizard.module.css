@@ -296,6 +296,14 @@
   gap: var(--polish-space-row);
 }
 
+.footerEnd {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--polish-space-row);
+}
+
 .footerCenter {
   display: flex;
   align-items: center;

@@ -1,0 +1,295 @@
+/*
+ * スタイル体験の見本。スマホ枠は本物の大きさのまま、ダッシュボードと盤は設計の幅で組んで外の器だけを縮める。
+ * 縮める値は部品が --sxp-scale で渡す。縮めても文字が 10px を下回らない幅（器 1052 以上）だけ横に並べ、
+ * それより狭い時は縦に積む（白い板 1100 未満で積む決まり）。
+ */
+.root {
+  --sxp-phone-w: 330px;
+  --sxp-frame-h: 690px;
+  --sxp-panes-design-w: 800px;
+  --sxp-fact-label-w: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+  min-width: 0;
+}
+
+.frame {
+  display: grid;
+  grid-template-columns: var(--sxp-phone-w) minmax(0, 1fr);
+  gap: var(--polish-space-section);
+  height: var(--sxp-frame-h);
+  min-width: 0;
+}
+
+.root[data-layout='stacked'] .frame {
+  grid-template-columns: minmax(0, 1fr);
+  height: auto;
+}
+
+.phone {
+  display: flex;
+  justify-content: center;
+  animation: sxp-fade var(--motion-panel) var(--motion-ease-out) both;
+}
+
+/* 縮める器。設計の幅で組んだ中身を、器の幅に合わせて縮める（中の部品の値は変えない）。 */
+.panes {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.panesStage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--polish-space-section);
+  width: calc(100% / var(--sxp-scale, 1));
+  height: calc(var(--sxp-frame-h) / var(--sxp-scale, 1));
+  transform: scale(var(--sxp-scale, 1));
+  transform-origin: top left;
+  animation: sxp-fade var(--motion-panel) var(--motion-ease-out) both;
+}
+
+.root[data-variant='minimal'] .panesStage {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+}
+
+.root[data-layout='stacked'] .panes {
+  overflow: visible;
+}
+
+.root[data-layout='stacked'] .panesStage {
+  grid-template-columns: minmax(0, 1fr);
+  width: auto;
+  height: auto;
+  transform: none;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+  min-width: 0;
+}
+
+@keyframes sxp-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone,
+  .panesStage { animation: none; }
+}
+
+.root[data-reduced-motion] .phone,
+.root[data-reduced-motion] .panesStage { animation: none; }
+
+/* ── ダッシュボード ── */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+  min-width: 0;
+}
+
+.dashHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--polish-space-field);
+}
+
+.dashTitle {
+  margin: 0;
+  font-size: var(--text-title);
+  line-height: var(--text-title--line-height);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dashCards {
+  display: grid;
+  gap: var(--polish-space-field);
+}
+
+/* ── できること・場面の 1 行 ── */
+.can {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+}
+
+.can li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.canIcon {
+  flex-shrink: 0;
+  width: var(--space-16);
+  height: var(--space-16);
+  color: var(--color-accent-deep);
+}
+
+.lineRow {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-field);
+  min-width: 0;
+}
+
+.line {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── お客さまの予約画面の写し（席・確認・受け付けました。LIFF の並びと同じ順） ── */
+.liffBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+  padding: var(--polish-space-card);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+}
+
+.liffRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.liffLabel,
+.liffSub {
+  color: var(--v8-liff-sub);
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+}
+
+.liffStepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--polish-space-field);
+}
+
+.liffStepper svg {
+  width: var(--space-16);
+  height: var(--space-16);
+  color: var(--v8-liff-sub);
+}
+
+.liffTimes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.liffTime {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tpl-chip-h);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--v8-liff-slot-line);
+  outline-offset: -1px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.liffTime[data-picked] {
+  background: var(--v8-liff-primary-soft);
+  outline-color: var(--v8-liff-primary);
+  color: var(--v8-liff-primary);
+}
+
+.liffTime[data-full] {
+  background: var(--v8-liff-off);
+  color: var(--v8-liff-idle);
+  font-weight: 400;
+}
+
+.liffDone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  text-align: center;
+}
+
+.liffDoneIcon {
+  width: var(--polish-space-section);
+  height: var(--polish-space-section);
+  color: var(--v8-liff-primary);
+}
+
+.liffFacts {
+  margin: 0;
+  padding-inline: var(--polish-space-field);
+  border-radius: var(--v8-liff-card-radius);
+  outline: 1px solid var(--v8-liff-line);
+  outline-offset: -1px;
+}
+
+.liffFacts div {
+  display: flex;
+  gap: var(--space-8);
+  padding-block: var(--space-8);
+}
+
+.liffFacts dt {
+  flex: 0 0 var(--sxp-fact-label-w);
+  color: var(--v8-liff-sub);
+  font-size: var(--text-caption);
+}
+
+.liffFacts dd {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.liffFoot {
+  padding: var(--polish-space-field) var(--polish-space-card);
+}
+
+.liffCta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tpl-chip-h);
+  border-radius: var(--radius-pill);
+  background: var(--v8-liff-primary);
+  color: var(--color-canvas);
+  font-weight: 700;
+}

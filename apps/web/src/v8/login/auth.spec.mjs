@@ -235,6 +235,15 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and personal rec
 })
 
 
+// The style step shows the six styles as one switch; it only views until 「このスタイルにする」 is pressed.
+const STYLE_CHOICE_ORDER = ['restaurant', 'salon', 'consult', 'lesson', 'standard', 'ec']
+const styleChoiceButtons = dialog => dialog.getByRole('group', { name: '見るスタイル' }).getByRole('button')
+
+async function expectStyleChoices(dialog) {
+  await expect(styleChoiceButtons(dialog)).toHaveCount(STYLE_CHOICE_ORDER.length)
+  for (const name of ['あとで設定する', '手動で設定する']) await expect(dialog.getByRole('button', { name, exact: true })).toBeVisible()
+}
+
 test('new style selection opens once, explicit later and legacy later stay deferred', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.addInitScript(() => {
@@ -255,12 +264,11 @@ test('new style selection opens once, explicit later and legacy later stay defer
     }
     return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
-  const dialog = page.getByRole('dialog', { name: 'はじめに、使い方を教えてください' })
+  const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   await page.goto('/')
   await expect(dialog).toBeVisible()
-  await expect(dialog.locator('input[name="setup-style"]')).toHaveCount(8)
-  await dialog.getByRole('radio', { name: /あとで設定する/ }).check()
-  await dialog.getByRole('button', { name: '次へ', exact: true }).click()
+  await expectStyleChoices(dialog)
+  await dialog.getByRole('button', { name: 'あとで設定する', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   expect(writes).toBe(1)
   await page.reload()
@@ -316,11 +324,11 @@ async function useIndustryFixture(page, style = 'salon', legacyMeet = false) {
 
 for (const [style, heading] of [['standard', 'ダッシュボード'], ['ec', 'ダッシュボード'], ['restaurant', 'お店'], ['salon', 'サロン'], ['consult', '面談'], ['lesson', '教室']]) test(`${style} resumes shared setup and summary, then returns without changing the style`, async ({ page }) => {
   await useIndustryFixture(page, style)
-  for (const [step, title] of [['0', 'はじめに、使い方を教えてください'], ['summary', '準備ができました']]) {
+  for (const [step, title] of [['0', '使い方のスタイルを選ぶ'], ['summary', '準備ができました']]) {
     await page.goto(`/?setup=${step}`)
     const dialog = page.getByRole('dialog', { name: title })
     await expect(dialog).toBeVisible()
-    if (step === '0') await expect(dialog.locator('input[name="setup-style"]')).toHaveCount(8)
+    if (step === '0') await expectStyleChoices(dialog)
     await dialog.getByRole('button', { name: '閉じる', exact: true }).click()
     await expect(dialog).toHaveCount(0)
     await expect(page).toHaveURL(/\/$/)
@@ -429,8 +437,9 @@ for (const style of ['salon', 'ec']) test(`discarding unsaved ${style} setup nev
   for (const [width, close] of [[1152, 'button'], [1440, 'escape'], [1920, 'backdrop']]) {
     await page.setViewportSize({ width, height: 1000 })
     await page.goto('/?setup=0')
-    const selection = page.getByRole('dialog', { name: 'はじめに、使い方を教えてください' })
-    await selection.locator(`input[name="setup-style"][value="${style}"]`).check()
+    const selection = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+    await styleChoiceButtons(selection).nth(STYLE_CHOICE_ORDER.indexOf(style)).click()
+    await selection.getByRole('button', { name: 'このスタイルにする', exact: true }).click()
     await selection.getByRole('button', { name: '次へ', exact: true }).click()
     const question = page.getByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
     await expect(question.getByRole('button', { name: '途中保存して閉じる', exact: true })).toBeEnabled()
@@ -455,8 +464,10 @@ for (const style of ['salon', 'ec']) test(`discarding unsaved ${style} setup nev
     await page.reload()
     await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true, level: 1 })).toBeVisible()
     await page.goto('/?setup=0')
-    const reopened = page.getByRole('dialog', { name: 'はじめに、使い方を教えてください' })
-    await expect(reopened.locator('input[name="setup-style"][value="standard"]')).toBeChecked()
+    const reopened = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+    const saved = styleChoiceButtons(reopened).nth(STYLE_CHOICE_ORDER.indexOf('standard'))
+    await expect(saved).toHaveAttribute('aria-pressed', 'true')
+    await expect(saved).toHaveAccessibleName(/（選んでいます）$/)
     await reopened.getByRole('button', { name: '閉じる', exact: true }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
     expect(writes).toEqual([])

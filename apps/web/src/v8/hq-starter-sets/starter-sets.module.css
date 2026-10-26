@@ -192,3 +192,27 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
 }
+
+/* 中身を見る（読むだけ）：種類の中の物を 1 つずつ。 */
+.viewRows {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--polish-space-field);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.viewRow {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+}
+
+.viewName {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+}

@@ -86,6 +86,17 @@ export type StarterSetItem = {
   steps?: Array<{ delayMinutes: number; text: string }>;
 };
 
+/** 入れなかった理由。Worker が決まった値だけを返す。 */
+export type StarterSkipReason = 'answer_later' | 'not_for_style' | 'auto_insert_off' | 'already_exists';
+
+/** 初期セットの入れ直しの結果。2 回目からは inserted が空。 */
+export type StarterEnsureResult = {
+  inserted: Array<{ key: string; kind: StarterSetItem['kind'] }>;
+  skipped: Array<{ key: string; reason: StarterSkipReason }>;
+  existing: number;
+  starterSet: { id: string; version: number };
+};
+
 /** musubo の標準の初期セット。統括の組とは別に読む。 */
 export type StyleStarterDefault = {
   style: AccountStyle;

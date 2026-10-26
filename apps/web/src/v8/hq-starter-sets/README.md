@@ -1,4 +1,4 @@
-> 文書：hq-starter-sets のコード案内｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+> 文書：hq-starter-sets のコード案内｜区分：今の説明｜最終確認：2026-10-26（日本時間）
 
 # 統括のスタイルの初期セット：コードの入口
 
@@ -8,7 +8,7 @@
 
 - `/hq/templates/starter-sets` → [app/hq/templates/starter-sets/page.tsx](../../app/hq/templates/starter-sets/page.tsx)
 
-本体：[starter-sets.tsx](starter-sets.tsx)
+本体：[starter-sets.tsx](starter-sets.tsx)、[use-distribute.ts](use-distribute.ts)
 
 ## 外に見せる名前（index.ts）
 
@@ -26,6 +26,6 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 ## 動きと試験
 
 - [BEHAVIOR.md](BEHAVIOR.md)
-- このフォルダ内の試験はありません。入口と利用側の試験を確認してください。試験済みの宣言ではありません。
+- [use-distribute.test.tsx](use-distribute.test.tsx)
 
 実行：`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web test -- src/v8/hq-starter-sets`。関連する入口の試験も実行してください。保存・入力保持・権限・別店舗・失敗からの回復を守り、文書の整合だけを動作の合格に数えません。

@@ -12,13 +12,14 @@ const LABELS: Record<(typeof STYLE_METRIC_IDS)[number], string> = {
   onlineOccupancy: 'オンラインの埋まり', unlimitedClasses: '上限なしのクラス', mediaCloseTasks: '媒体の枠を閉じる知らせ', tableUtilization: '卓の稼働率',
 }
 
-function metricLabel(id: string, style: IndustryStyle) {
+/** 指標の画面の名前。スタイル体験の見本も同じ名前を使う。 */
+export function styleMetricLabel(id: string, style: IndustryStyle) {
   return id === 'visits' ? style === 'consult' ? '実施数' : style === 'lesson' ? '出席数' : '来店数' : LABELS[id as keyof typeof LABELS] ?? '表示できない項目'
 }
 
 export function metricOptions(defaults: StyleKpi[], style: IndustryStyle) {
   const titles = new Map(defaults.map(item => [item.metricId ?? item.id, item.title]))
-  return STYLE_METRIC_IDS.map(id => ({ id, label: titles.get(id) ?? metricLabel(id, style) }))
+  return STYLE_METRIC_IDS.map(id => ({ id, label: titles.get(id) ?? styleMetricLabel(id, style) }))
 }
 
 /** A saved ordered selection only reads metrics already supplied by the API. */
@@ -28,7 +29,7 @@ export function selectedKpis(style: IndustryStyle, snapshot: StyleSnapshot, rang
     const existing = defaults.get(id)
     if (existing) return existing
     const metric = snapshot.metrics[id], value = metricValue(metric)
-    const label = metricLabel(id, style)
+    const label = styleMetricLabel(id, style)
     return {
       id, metricId: id, title: label, value: value.value, valueText: value.valueText, unit: value.unit,
       detail: metric ? value.reason : 'まだ取得できていません',
