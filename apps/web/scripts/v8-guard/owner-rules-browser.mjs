@@ -44,6 +44,20 @@ export default function scanOwnerRules() {
       }
     }
   }
+  // 高さをそろえる段（data-card-height="equal"）では、同じ行のカードの高さと下端の操作の位置が1pxもずれない。
+  for (const group of root.querySelectorAll('[data-card-height="equal"]')) {
+    const rows = new Map()
+    for (const card of [...group.children].filter(el => el.matches('[data-design-part="card"]') && visible(el))) {
+      const top = Math.round(card.getBoundingClientRect().top)
+      rows.set(top, [...rows.get(top) ?? [], card])
+    }
+    for (const row of [...rows.values()].filter(row => row.length > 1)) {
+      const heights = row.map(card => card.getBoundingClientRect().height)
+      const bottoms = row.map(card => card.querySelector(':scope > [data-card-actions]')).filter(Boolean).map(el => el.getBoundingClientRect().bottom)
+      const spread = values => values.length > 1 ? Math.max(...values) - Math.min(...values) : 0
+      if (spread(heights) > 1 || spread(bottoms) > 1) add('cardrow', row[0], { height: Math.ceil(spread(heights)), actions: Math.ceil(spread(bottoms)) }, '', row[row.length - 1])
+    }
+  }
   // 14px 未満の UI 文字を太さ 400 で描かない。
   // お客さまのスマホの見え方（LINE の見本）は LINE と同じ太さなので数えない。
   // V8 の画面（<html data-theme="v8">）だけを見る。アプリの CSS の無い素の見本はブラウザ既定の太さなので数えない。
