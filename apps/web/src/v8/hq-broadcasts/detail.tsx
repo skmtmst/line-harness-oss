@@ -11,7 +11,7 @@ import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval
 import { downloadApiFile, ApiError, describeSaveFailure } from '@/lib/api'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import type { HqBroadcastRun } from '@line-crm/shared'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { ListPageSection } from '@/components/templates/list-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -503,7 +503,9 @@ export default function HqBroadcastDetail() {
     return (
       <PageFrame kind="detail" boardId="M2tJM xOXuY">
         <PageHeading title="一括配信" />
-        <TargetMissing kind="unspecified" title="一括配信が選ばれていません" description="一括配信の一覧から開いてください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
+        <PageContent>
+          <TargetMissing kind="unspecified" title="一括配信が選ばれていません" description="一括配信の一覧から開いてください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
+        </PageContent>
       </PageFrame>
     )
   }
