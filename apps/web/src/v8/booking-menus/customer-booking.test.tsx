@@ -168,6 +168,21 @@ describe('お客さまの予約のしかた（直す）', () => {
     expect(second.recurring).toEqual({ enabled: true, freqs: ['weekly'], maxCount: 12 })
   })
 
+  it('人数だけ変えても、ページを離れるときに止める（入力途中の扱い）', async () => {
+    nav.menu = 'm1'
+    net.menus = [menu(), spa]
+    net.matrix = [{ menu_id: 'm1', name: 'カット', is_offered: 1, override_duration_minutes: null, override_price: null }]
+    render(<MenuFormV8 />)
+    await settle()
+    const before = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(before)
+    expect(before.defaultPrevented).toBe(false)
+    await choosePartySize('2人まで')
+    const after = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(after)
+    expect(after.defaultPrevented).toBe(true)
+  })
+
   it('返ってきた繰り返しの設定はそのまま欄に出す', async () => {
     nav.menu = 'm1'
     net.menus = [menu({ customer_recurring_enabled: 1, recurring_freqs_json: '["weekly","monthly_nth"]', recurring_max_count: 6 }), spa]
