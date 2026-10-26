@@ -227,10 +227,11 @@ describe('A32-01: 期限切れ(stale)の健全性を現在の判定と混ぜな�
     healthResponse.handler = () => Promise.resolve(fresh)
     render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
 
+    // 行の名前は読み込み中から出るので、全体の判定が出るまで待つ
     await waitFor(() => {
       expect(screen.getAllByText('LINE のアカウントとつながっているか').length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/正常/).length).toBeGreaterThan(0)
     })
-    expect(screen.getAllByText(/正常/).length).toBeGreaterThan(0)
     expect(screen.queryByText(/古い結果です/)).toBeNull()
     expect([...document.querySelectorAll('span')].filter((el) => el.textContent === '古い確認').length).toBe(0)
   })
