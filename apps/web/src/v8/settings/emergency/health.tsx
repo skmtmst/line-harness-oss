@@ -538,7 +538,7 @@ export function HealthPanelV8({
               {lineReceipts.filter((item) => item.lineAccountId === accountId).map((item) => (
                 <div className={styles.alertRow} key={item.webhookEventId}>
                   <div className={styles.alertLine}>
-                    <StatusBadge tone="warning">{item.recoveryStatus === 'needs_review' ? '要確認' : '未完了'}</StatusBadge>
+                    <StatusBadge tone={item.recoveryStatus === 'needs_review' ? 'caution' : 'warning'}>{item.recoveryStatus === 'needs_review' ? '要確認' : '未完了'}</StatusBadge>
                     <p className={styles.alertText} title={item.webhookEventId}>受信：{formatOperationDate(item.receivedAt)}</p>
                     {item.canRetry === true && item.recoveryStatus !== 'needs_review' ? <Button variant="secondary" disabled={lineRetryId !== null} busy={lineRetryId === item.webhookEventId} onClick={() => void retryLineReceipt(item)}>やり直す</Button> : null}
                   </div>

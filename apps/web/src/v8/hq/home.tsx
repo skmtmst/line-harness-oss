@@ -527,7 +527,7 @@ export default function HqHomeV8() {
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
                   </div>
-                  <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>
+                  <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>
                 </div>
                 <TagOverflow label={`${name}の分類`}>
                   {folderDotOf(account) ? <TagPill name={folderDotOf(account)!.name} color={folderDotOf(account)!.color} aria-label={`フォルダ：${folderDotOf(account)!.name}`} /> : null}
@@ -570,7 +570,7 @@ export default function HqHomeV8() {
               <Tr key={account.id}>
                 <PersonCell avatarName={name} avatarSrc={accountIconUrl(account)} avatarShape="rounded" avatarAlt={name} avatarSize={32} nameTitle={[name, state.label, accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))].filter(Boolean).join(' / ')} name={
                   <span className={styles.cardName}>
-                    <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>}>
+                    <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>}>
                       <TruncatedText className={styles.name} value={String(name ?? '')} />
                     </FolderDotName>
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
