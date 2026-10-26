@@ -79,3 +79,21 @@ describe('今日の記録が無い時', () => {
     expect(screen.queryByText('読み込んでいます')).toBeNull()
   })
 })
+
+describe('数のカードの札', () => {
+  it('次の配信が明日なら黄の札「明日」、予約が無ければ灰の札「なし」', () => {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const item = { kind: 'broadcast' as const, id: 'b1', title: '秋の新メニュー', startsAt: tomorrow, href: '/broadcasts' }
+    render(<>{kpiFillCell('fill-next-broadcast', input(null, { nextBroadcast: { accountId: 'a', item, failed: false } }))}</>)
+    expect(screen.getByText('明日')).toBeTruthy()
+    cleanup()
+    render(<>{kpiFillCell('fill-next-broadcast', input(null, { nextBroadcast: { accountId: 'a', item: null, failed: false } }))}</>)
+    expect(screen.getByText('なし')).toBeTruthy()
+  })
+
+  it('今日の友だちは日ごとの数の細いグラフを持つ', () => {
+    const trend = [{ date: '2026-10-25', added: 1, blocked: 0, active: 8, estimated: false }, { date: '2026-10-26', added: 3, blocked: 1, active: 10, estimated: false }]
+    const { container } = render(<>{kpiFillCell('fill-friends', input(overview({ trend })))}</>)
+    expect(container.querySelector('[data-kpi-sparkline]')).not.toBeNull()
+  })
+})

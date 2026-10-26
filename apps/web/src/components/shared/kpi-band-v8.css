@@ -189,3 +189,50 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]
 /* 大きな金額は文字を縮めず2列にし、単位まで読み取れる幅を確保する。 */
 html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-wide-values] { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-wide-values] > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/*
+ * 数のカードの形（案A・KpiBand appearance="cards"）。マスを線で区切らず、1マスずつ共通のカードの面
+ * （白・--card-shadow・--card-edge・--radius-card）にして間を 12 空ける。帯の枠・影・区切り線は持たない。
+ */
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'][data-kpi-frame='card'],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards']:has(> [data-design-version]:only-child) {
+  gap: var(--polish-space-field); border: 0; border-radius: 0; background: transparent; box-shadow: none;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] > [data-design-version],
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] > [data-design-version]:not(:last-child) {
+  position: relative; border: 0; border-radius: var(--radius-card); background: var(--color-canvas);
+  outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow);
+  padding: var(--polish-space-card) var(--space-20); gap: var(--space-8);
+}
+/* 題の左の印は色なしで、灰の小さな四角の中。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-icon] {
+  display: inline-flex; width: var(--tpl-kpi-card-icon-box); height: var(--tpl-kpi-card-icon-box);
+  border-radius: var(--radius-control); background: var(--color-canvas-sunken); color: var(--color-ink-secondary);
+}
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-icon] svg { width: var(--space-16); height: var(--space-16); }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-label] { color: var(--color-ink); }
+/* 数字は大きく詰める（大きさ・太さは帯の決まりのまま、字間だけ詰める）。0 は薄い灰。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-number] { letter-spacing: var(--tpl-kpi-card-number-tracking); }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-zero] [data-kpi-value],
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-zero] [data-kpi-unit] { color: var(--color-ink-faint); }
+/*
+ * 状態の札（差の札）は右上。題の行と同じ段に置き、題は札の手前で省略する（重ねない）。
+ * 数の行（data-unit-spacing）は箱を作らず中身を段に並べ、差の札だけ右上の欄へ移す。
+ */
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'] > [data-design-version] {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-auto-rows: auto; align-content: start; column-gap: var(--space-8);
+}
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > *,
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > [data-unit-spacing] > * { grid-column: 1 / -1; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > :first-child { grid-column: 1; grid-row: 1; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > [data-unit-spacing] { display: contents; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] > [data-design-version] > [data-unit-spacing] > [data-kpi-delta-slot] { grid-column: 2; grid-row: 1; align-self: center; }
+/* 説明は1行、行き先は右下。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] { flex-direction: row; align-items: flex-end; gap: var(--polish-space-row); margin-top: auto; }
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > span:first-child { flex: 1 1 auto; width: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 流れの数の細いグラフは右下。 */
+html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-sparkline] {
+  display: block; position: absolute; right: var(--space-20); bottom: var(--polish-space-card);
+  width: 30%; height: var(--space-24);
+}

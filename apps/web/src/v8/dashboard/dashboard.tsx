@@ -143,13 +143,12 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           unit="件"
           help={NOT_COMPARED_HELP}
           loading={d.pendingDetailState === 'loading'}
+          badge={d.pendingDetailState !== 'ready' || total === null ? undefined : total > 0 && d.pendingOldest !== null ? `最長 ${formatWaitRough(d.pendingOldest)}` : total === 0 ? 'なし' : undefined}
+          badgeTone={total === 0 ? 'neutral' : 'danger'}
           detail={d.pendingDetailState === 'ready'
-            ? <span className={styles.pendingMeta}>
-                {total !== null && total > 0 && d.pendingOldest !== null ? <Tag>{`最長 ${formatWaitRough(d.pendingOldest)}`}</Tag> : null}
-                <span>{`LINE ${d.lineUnread === null ? '未取得' : d.lineUnread}・メール ${d.mailUnread === null ? '未取得' : d.mailUnread}`}</span>
-              </span>
+            ? `LINE ${d.lineUnread === null ? '未取得' : d.lineUnread}・メール ${d.mailUnread === null ? '未取得' : d.mailUnread}`
             : d.pendingDetailState === 'error' ? STATE_TEXT.error : STATE_TEXT.loading}
-          action={{ label: '受信箱を開く', href: '/chats?status=unread' }}
+          action={{ label: '受信箱へ', href: '/chats?status=unread' }}
         />,
         detail: <>
           <span>{`LINEの未対応：${d.lineUnread === null ? '未取得' : `${formatNumber(d.lineUnread)}件`}`}</span>
@@ -206,7 +205,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           delta={bookingDeltaShown(value) && bookingCompare ? <KpiDelta current={bookingCompare.current} previous={bookingCompare.previous} better={bookingCompare.better} unit="件" /> : null}
           loading={value === null && !d.bookingsFailed}
           detail={nextText}
-          action={{ label: '予約を見る', href: '/booking/bookings?view=day' }}
+          action={{ label: '予約へ', href: '/booking/bookings?view=day' }}
         />,
         detail: d.upcomingBookings.length === 0
           ? <span>{d.bookingsFailed ? STATE_TEXT.error : '直近の予約はありません。数は取消・完了を除く今日の予約です。'}</span>
@@ -442,7 +441,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       /> : null}
     >
       {todayAsOf ? <p className={styles.asOf} title={todayAsOf}>{todayAsOf}</p> : null}
-      <KpiBand className={styles.todayBand} frame="card" data-design="TodayTasks">
+      <KpiBand className={styles.todayBand} appearance="cards" data-design="TodayTasks">
         {bandCells.map((entry) => <Fragment key={entry.id}>{entry.node}</Fragment>)}
       </KpiBand>
       {openCell?.cell ? (

@@ -1414,7 +1414,7 @@
   /* 自動応答の一覧（・・）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: var(--polish-table-row); --tpl-ar-narrow-head-h: 34px; --tpl-badge-dot: 6px;
   --tpl-ro-band-pad: 12px 16px; --tpl-ro-band-gap: 12px; --tpl-ro-band-bg: #e9f1ff; --tpl-ro-band-radius: var(--polish-radius-control); --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
-  --tpl-band-number-size: 34px; --tpl-band-number-lh: 36px; --tpl-band-number-weight: 500; --tpl-band-number-tracking: -0.02em; --tpl-band-unit-lh: 18px;
+  --tpl-band-number-size: 34px; --tpl-band-number-lh: 36px; --tpl-band-number-weight: 500; --tpl-band-number-tracking: -0.02em; --tpl-kpi-card-number-tracking: -0.04em; --tpl-kpi-card-icon-box: 28px; --tpl-band-unit-lh: 18px;
   /* 外部連携（・・・・・・・）。 */
   --tpl-wh-ro-row-pad: 12px 24px; --tpl-wh-notice-after: 6px; --tpl-wh-saved-w: 153px; --tpl-wh-create-w: 135px; --tpl-wh-create-after: 16px; --tpl-wh-add-space: 32px; --tpl-wh-note-lh: 17px;
   --tpl-wh-col-gap: 16px; --tpl-wh-head-h: var(--polish-table-head); --tpl-wh-head-pad: 12px 20px; --tpl-wh-row-h: var(--polish-table-row); --tpl-wh-row-pad: 8px 20px; --tpl-wh-num-pad-end: 8px;

@@ -6,6 +6,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { api, type DashboardOverview, type DashboardUpcomingItem } from '@/lib/api'
 import { formatListTimestamp, formatNumber } from '@/lib/format'
+import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 import KpiDelta, { type KpiDeltaBasis } from './kpi-delta'
 
 /**
@@ -76,7 +77,7 @@ function FriendsToday({ data, overviewFailed, trendAvailable, today, activeFrien
     loading={!data && !overviewFailed}
     delta={point && activeFriendsCompare ? <KpiDelta current={activeFriendsCompare.current} previous={activeFriendsCompare.previous} better={DASHBOARD_COMPARISON_BETTER.activeFriends} unit="人" basis={ACTIVE_FRIENDS_BASIS} /> : null}
     detail={failed ? STATE_TEXT.error : !data ? STATE_TEXT.loading : point ? blocked : '今日の記録はまだありません'}
-    action={{ label: '友だちを見る', href: '/friends' }}
+    sparkline={point ? [...trend].sort((a, b) => a.date.localeCompare(b.date)).map((item) => item.added) : undefined}
   />
 }
 
@@ -102,8 +103,10 @@ function DeliveryThisMonth({ data, overviewFailed }: FillInput) {
     help="LINE公式アカウントで今月送った数です。送信枠は毎月1日にリセットされ、使い切ると翌月1日まで送れません。"
     loading={!data && !overviewFailed}
     meter={!failed && !unlimited && rate !== null ? { value: rate, label: '送信枠の使った割合', tone: rate >= 90 ? 'danger' : undefined } : undefined}
+    badge={rate !== null && rate >= 80 ? '枠が残りわずか' : undefined}
+    badgeTone={rate !== null && rate >= 90 ? 'danger' : 'warning'}
     detail={detail}
-    action={{ label: '配信を見る', href: '/broadcasts' }}
+    action={{ label: '配信へ', href: '/broadcasts' }}
   />
 }
 
@@ -119,7 +122,17 @@ function NextBroadcast({ nextBroadcast }: FillInput) {
     unit=""
     help={`予約した一斉配信のうち、${NEXT_BROADCAST_DAYS}日以内で一番近い1本です。`}
     loading={nextBroadcast === null}
+    badge={item ? soonLabel(item.startsAt) : nextBroadcast && !failed ? 'なし' : undefined}
+    badgeTone={item ? 'warning' : 'neutral'}
     detail={failed ? STATE_TEXT.error : item ? `「${item.title}」` : nextBroadcast === null ? STATE_TEXT.loading : '予約した配信はありません'}
-    action={{ label: '配信の予定を見る', href: '/broadcasts' }}
+    action={{ label: '配信の予定へ', href: '/broadcasts' }}
   />
+}
+
+/** 次の配信が今日・明日なら札で知らせる（確かめが要る）。それより先は札を出さない。 */
+function soonLabel(startsAt: string, now: Date = new Date()): string | undefined {
+  const target = jstDate(new Date(startsAt))
+  if (target === jstDate(now)) return '今日'
+  if (target === jstDateOffset(1, now)) return '明日'
+  return undefined
 }

@@ -24,6 +24,7 @@ export default function KpiBand({
   layout,
   maxColumns,
   frame,
+  appearance,
   ...rest
 }: {
   children: ReactNode
@@ -33,6 +34,11 @@ export default function KpiBand({
   className?: string
   /** 隣に線やカードが無い所では、帯をカードの枠つきで置く。 */
   frame?: 'card'
+  /**
+   * 数のカードの形（案A）。マスを線で区切らず、1マスずつ白いカードにして間を空ける。
+   * 題の左に灰の小箱の印、右上に状態の小さな札、0 は薄い灰の数字、流れの数は右下に細いグラフ。
+   */
+  appearance?: 'cards'
   /** 型が区切りを持つ帯はinset-top、マスの間だけ区切る帯はdividers。 */
   border?: 'inset-top' | 'dividers'
   /** 親の本文が左右の余白を持つ場合、帯の両端では重ねない。 */
@@ -49,7 +55,7 @@ export default function KpiBand({
       const rows: ReactNode[][] = []
       for (let start = 0; start < items.length; start += maxColumns) rows.push(items.slice(start, start + maxColumns))
       return <div data-shared-part="kpi-band-rows" {...rest} style={{ ...rest.style, '--kpi-band-row-columns': maxColumns } as CSSProperties}>
-        {rows.map((row, index) => <KpiBand key={index} gridClassName={gridClassName} className={className} presentation={presentation} border={border} edgeInset={edgeInset} density={density} layout={layout}>{row}</KpiBand>)}
+        {rows.map((row, index) => <KpiBand key={index} gridClassName={gridClassName} className={className} presentation={presentation} border={border} edgeInset={edgeInset} density={density} layout={layout} appearance={appearance}>{row}</KpiBand>)}
       </div>
     }
   }
@@ -66,6 +72,7 @@ export default function KpiBand({
       data-kpi-layout={layout}
       data-kpi-border={border}
       data-kpi-frame={frame}
+      data-kpi-appearance={appearance}
       data-kpi-edge-inset={edgeInset}
       data-kpi-density={density}
       data-shared-part="kpi-band"
