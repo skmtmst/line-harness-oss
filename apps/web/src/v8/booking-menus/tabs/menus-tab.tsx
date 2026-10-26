@@ -26,6 +26,7 @@ import MenuVersionHistory from '../menu-version-history'
 import { AccountIcon, Band, MENU_PAGE_SIZE, StateCard, SkeletonRows, sortedMenus } from './shared'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import styles from '../settings.module.css'
+import menuStyles from './menus-tab.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -340,7 +341,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                 </span>
                 <span className={styles.colStaff}>
                   {staffNames.length === 0 ? (
-                    <span className={styles.cellEmpty}>{emptyValue('unknown')}</span>
+                    <span className={menuStyles.cellEmpty}>{emptyValue('unknown')}</span>
                   ) : (
                     <span className={styles.cellText}>{staffNames.join('・')}</span>
                   )}
@@ -351,7 +352,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                 <span className={styles.colStatus}>
                   {/* 公開していても担当が 0 人だと予約を受けられない。理由を札で言い、押すと担当スタッフのタブへ。 */}
                   {(visOverride[menu.id] ?? menu.is_active) && staffNames.length === 0 ? (
-                    <button type="button" className={styles.statusLink} onClick={onOpenStaff} title="担当スタッフのタブで担当を決める">
+                    <button type="button" className={menuStyles.statusLink} onClick={onOpenStaff} title="担当スタッフのタブで担当を決める">
                       <SharedStatusPill tone="caution">担当がいないため停止中</SharedStatusPill>
                     </button>
                   ) : (

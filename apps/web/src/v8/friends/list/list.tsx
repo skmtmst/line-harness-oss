@@ -115,7 +115,7 @@ function isPageSize(value: number): value is PageSize {
   return (PAGE_SIZE_OPTIONS as readonly number[]).includes(value)
 }
 
-/** シナリオの列：状態は地の色の札（動いている＝緑「有効」・停止中＝灰）、名前は札の右。名前が札と同じ言葉なら重ねて書かない。 */
+/** シナリオの列：状態は地の色の札（動いている＝緑「有効」・停止中＝灰）、シナリオ名は札の右。札と同じ言葉なら重ねて書かない。 */
 function ScenarioState({ scenario }: { scenario: { name: string; status: string } }) {
   const running = scenario.status === 'active' || scenario.status === 'delivering'
   const label = running ? statusLabel('active') : scenario.status === 'paused' ? '停止中' : statusLabel(scenario.status)
