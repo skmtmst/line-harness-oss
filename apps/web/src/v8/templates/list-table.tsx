@@ -79,7 +79,7 @@ type RenderTemplateListContext = {
 const KIND_ICONS = { image: ImageIcon, flex: LayoutTemplate, carousel: GalleryHorizontal, question: HelpCircle, video: Video } as const
 function KindIcon({ kind }: { kind: string }) {
   const Icon = KIND_ICONS[kind as keyof typeof KIND_ICONS] ?? FileText
-  return <Icon size={14} aria-hidden="true" />
+  return <Icon size={14} aria-hidden="true" className={styles.kindIcon} />
 }
 
 export function renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, openPicker, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: RenderTemplateListContext) {

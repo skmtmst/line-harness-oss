@@ -530,7 +530,7 @@ export default function HqHomeV8() {
                   <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>
                 </div>
                 <TagOverflow label={`${name}の分類`}>
-                  {folderDotOf(account) ? <span className={styles.folderLabel} aria-label={`フォルダ：${folderDotOf(account)!.name}`}><FolderIcon size={14} aria-hidden="true" />{folderDotOf(account)!.name}</span> : null}
+                  {folderDotOf(account) ? <span className={styles.folderLabel} aria-label={`フォルダ：${folderDotOf(account)!.name}`}><FolderIcon size={14} aria-hidden="true" className={styles.folderIcon} />{folderDotOf(account)!.name}</span> : null}
                   {(account.tags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
                 </TagOverflow>
                 <dl className={styles.stats}>

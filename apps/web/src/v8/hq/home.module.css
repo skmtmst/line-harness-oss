@@ -225,4 +225,4 @@
 
 /* カードの所属は色なしの印＋文字（色の点は名前の前のフォルダだけ）。 */
 .folderLabel { display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
-.folderLabel > svg { flex: none; color: var(--color-ink-faint); }
+.folderIcon { flex: none; color: var(--color-ink-faint); }
