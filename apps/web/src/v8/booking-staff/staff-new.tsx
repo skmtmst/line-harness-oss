@@ -21,7 +21,8 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
 import { CreatePage } from '@/components/templates/create-page'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
-import { TextField, TextArea } from '@/components/shared/text-field'
+import { TextField, TextArea, AffixedTextField } from '@/components/shared/text-field'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -55,6 +56,9 @@ export default function StaffNewV8() {
   const [bio, setBio] = useState('')
   const [isDesignationOptional, setIsDesignationOptional] = useState(false)
   const [isActive, setIsActive] = useState(true)
+  /* 指名料（B9）。決められるのはオーナー・管理者だけ。ほかの人の登録には載せない（口が断るため）。 */
+  const canEditFee = canManageRole(useStaffRole())
+  const [nominationFee, setNominationFee] = useState('0')
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [offered, setOffered] = useState<Set<string>>(new Set())
   // N-411 本人勤務: 登録と同時にログインユーザーへひも付けられるようにする。
@@ -168,7 +172,7 @@ export default function StaffNewV8() {
   /* 登録途中の離脱確認。どれかに手を付けていたら、キャンセルや左メニューで確認窓を出す。 */
   const dirty = Boolean(
     name || displayName || role || imageUrl || bio || staffMemberId ||
-    isDesignationOptional || !isActive || offered.size > 0,
+    isDesignationOptional || !isActive || offered.size > 0 || (nominationFee.trim() !== '' && nominationFee.trim() !== '0'),
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
@@ -182,6 +186,7 @@ export default function StaffNewV8() {
     is_designation_optional: isDesignationOptional,
     is_active: isActive,
     staff_member_id: staffMemberId || null,
+    ...(canEditFee && Number(nominationFee.trim() || '0') !== 0 ? { nominationFee: Number(nominationFee.trim()) } : {}),
   })
 
   function validate(): string | null {
@@ -297,6 +302,7 @@ export default function StaffNewV8() {
       sort_order: Number.MAX_SAFE_INTEGER,
       is_designation_optional: isDesignationOptional ? 1 : 0,
       is_active: isActive ? 1 : 0,
+      nomination_fee: canEditFee ? Number(nominationFee.trim() || '0') || 0 : 0,
     },
   ]
   // お客さまの画面の「指名なし」は、指名なしの枠に入る担当が1人でもいれば出る。
@@ -393,6 +399,17 @@ export default function StaffNewV8() {
                 description="オフにすると予約画面に出ません。">登録したらすぐ予約を受ける</Checkbox>
             </SaveErrorField>
             <Notice tone="info">予約枠の色は現在グリーンで固定です。カレンダーでの見分けに使います。</Notice>
+            {canEditFee ? (
+              <Field label="指名料" htmlFor="bs-fee" optional note="お客さまが指名したときだけ掛かります。指名なしで自動で割り当てたときは掛かりません。">
+                <SaveErrorField names={["nominationFee", "nomination_fee"]}><AffixedTextField id="bs-fee" layout="field" startAdornment="¥"
+                  type="number" min={0} step={1} inputMode="numeric" value={nominationFee} placeholder="0"
+                  onChange={(e) => setNominationFee(e.target.value)} /></SaveErrorField>
+              </Field>
+            ) : (
+              <Field label="指名料" note="決められるのはオーナー・管理者だけです。登録のあとで頼んでください。">
+                <AffixedTextField layout="field" startAdornment="¥" readOnly aria-label="指名料（円）" value="0" />
+              </Field>
+            )}
           </Card>
 
           <Card variant="form" gap="normal" aria-labelledby="bs-card-member">
