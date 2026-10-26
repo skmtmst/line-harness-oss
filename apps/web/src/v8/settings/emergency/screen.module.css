@@ -231,31 +231,6 @@
   word-break: normal;
 }
 
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-sb-chip-gap);
-  padding: var(--tpl-sb-pill-pad-sm);
-  border-radius: var(--radius-pill);
-  font-size: var(--tpl-sb-chip-text);
-  font-weight: 600;
-  line-height: var(--tpl-sb-chip-lh);
-  white-space: nowrap;
-}
-
-.dot {
-  width: var(--tpl-sb-dot);
-  height: var(--tpl-sb-dot);
-  border-radius: var(--tpl-sb-dot-radius);
-  background: currentColor;
-}
-
-.status[data-tone='good'] { background: var(--color-accent-soft); color: var(--color-success); }
-.status[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.status[data-tone='danger'] { background: var(--color-status-danger-soft); color: var(--color-danger); }
-.status[data-tone='muted'] { background: var(--color-shell); color: var(--color-ink-secondary); }
-.status[data-tone='info'] { background: var(--color-status-info-soft); color: var(--color-action); }
-
 .srOnly {
   position: absolute;
   width: 1px;

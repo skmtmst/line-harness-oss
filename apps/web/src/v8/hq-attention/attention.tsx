@@ -11,6 +11,7 @@ import Notice from '@/components/shared/notice'
 import EntitySelect from '@/components/shared/entity-select'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import StatusAction from '@/components/shared/status-action'
 import { RowMenu } from '@/components/shared/row-actions'
 import { RowNameButton } from '@/components/shared/table'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -163,7 +164,7 @@ export default function HqAttentionV8() {
                 const value = count(item, entry.key)
                 const href = hrefOf(item, entry)
                 if (value === 0) return <GridCell key={entry.key}><span className={styles.none} aria-label="なし">—</span></GridCell>
-                if (entry.key === 'connections') return <GridCell key={entry.key}><button type="button" className={styles.badgeButton} onClick={() => open(item.accountId, href)}><StatusBadge tone="danger" dot>LINE の接続</StatusBadge></button></GridCell>
+                if (entry.key === 'connections') return <GridCell key={entry.key}><StatusAction onClick={() => open(item.accountId, href)}><StatusBadge tone="danger" dot>LINE の接続</StatusBadge></StatusAction></GridCell>
                 return <GridCell key={entry.key}><button type="button" className={styles.count} onClick={() => open(item.accountId, href)} aria-label={`${item.name}の${entry.label} ${value}件を開く`}>{`${value} 件`}</button></GridCell>
               })}
               <GridCell>

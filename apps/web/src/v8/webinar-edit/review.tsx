@@ -17,6 +17,7 @@ import styles from './review.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { summaryRows, reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-summary'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import StatusBadge from '@/components/shared/status-badge'
 
 
 /*
@@ -177,7 +178,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         {state === 'loading' ? <p className={form.cardNote} role="status">公開前の確認を読み込んでいます。</p> : null}
         {checks.map((check) => (
           <div key={check.key} className={styles.check}>
-            <span className={form.pill} data-tone={check.status === 'passed' ? 'success' : check.status === 'warning' ? 'warn' : 'danger'}><span className={form.pillDot} aria-hidden="true" />{check.status === 'passed' ? 'できた' : 'まだ'}</span>
+            <StatusBadge tone={check.status === 'passed' ? 'success' : check.status === 'warning' ? 'caution' : 'danger'}>{check.status === 'passed' ? 'できた' : 'まだ'}</StatusBadge>
             <span className={`${styles.checkLabel} ${form.ellipsis}`} title={check.label}>{check.label}</span>
             {check.detail ? <span className={`${styles.checkDetail} ${form.ellipsis}`} title={check.detail}>{check.detail}</span> : null}
           </div>
