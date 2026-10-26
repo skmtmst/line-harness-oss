@@ -110,7 +110,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
     >
       <div className="mb-4">
         <label className="text-ink-secondary mb-1 block text-xs font-medium">
-          起点 (購読開始日時)
+          起点（購読開始日時）
         </label>
         <SaveErrorField names={["startAt","start_at"]}><DateTimeField
           value={startAt}
@@ -122,7 +122,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
       {error && <p className="text-danger mb-3 text-sm" role="alert">{error}</p>}
 
       {loading ? (
-        <p className="text-ink-faint text-sm">読み込み中...</p>
+        <p className="text-ink-faint text-sm">読み込み中…</p>
       ) : steps && steps.length > 0 ? (
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {steps.map((s) => (

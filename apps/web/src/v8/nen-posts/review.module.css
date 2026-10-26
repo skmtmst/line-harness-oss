@@ -518,32 +518,6 @@
   width: 100%;
   table-layout: fixed;
 }
-/* 絵の行：上下9・欄の間12（左右6ずつ）・端14、文字 12/17。見出しは 11 の高さ34。 */
-:global(:root) .historyTable :is(th, td):nth-child(n) {
-  height: auto;
-  padding: var(--tpl-nm-hist-cell-pad);
-  font-size: var(--tpl-nm-row-size);
-  line-height: var(--tpl-nm-row-lh);
-  vertical-align: middle;
-}
-:global(:root) .historyTable th:nth-child(n) {
-  height: var(--tpl-nm-hist-head-h);
-  padding-block: 0;
-  font-size: var(--tpl-nm-small-size);
-  line-height: var(--tpl-nm-small-lh);
-  font-weight: 400;
-}
-:global(:root) .historyTable :is(th, td):first-child:nth-child(n) {
-  padding-left: var(--tpl-nm-hist-edge);
-}
-:global(:root) .historyTable :is(th, td):last-child:nth-child(n) {
-  padding-right: var(--tpl-nm-hist-edge);
-  text-align: right;
-  white-space: nowrap;
-}
-:global(:root) .historyTable td:first-child:nth-child(n) {
-  font-weight: 600;
-}
 .historyTable th:nth-child(1) { width: var(--tpl-nm-hist-col-v); }
 .historyTable th:nth-child(2) { width: var(--tpl-nm-hist-col-date); }
 .historyTable th:nth-child(3) { width: var(--tpl-nm-hist-col-by); }

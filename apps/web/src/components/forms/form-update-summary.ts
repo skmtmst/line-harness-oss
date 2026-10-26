@@ -17,6 +17,7 @@ import {
   type FormLayout,
 } from '@line-crm/shared'
 import type { FormRefs } from './form-refs'
+import { formatNumber } from '@/lib/format'
 
 /** 情報欄の名前を引く。消えた項目・EC管理（書き込まない）は区別して返す。 */
 function friendFieldLabel(refs: FormRefs, fieldId: string): { name: string; blocked: boolean } {
@@ -80,7 +81,7 @@ export function describeInputUpdates(
         0,
       )
       if (actionCount > 0) {
-        lines.push(`選んだ選択肢に応じて動作を実行（計${actionCount}件、選んだものだけ）`)
+        lines.push(`選んだ選択肢に応じて動作を実行（計${formatNumber(actionCount)}件、選んだものだけ）`)
       }
     }
     if (choiceCount > 0 && (block.choices ?? []).some((choice) => choice.jumpToSectionId)) {

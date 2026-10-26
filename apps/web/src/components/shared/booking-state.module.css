@@ -45,17 +45,17 @@
 .sample { width: 12px; height: 12px; flex-shrink: 0; border-radius: var(--radius-mini); }
 .name, .time, .detail { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .name { font-weight: 600; }
-.time { font-variant-numeric: tabular-nums; font-weight: 400; font-size: var(--text-micro); }
+.time { font-variant-numeric: var(--font-numeric); font-weight: var(--font-weight-ui); font-size: var(--text-micro); }
 .detail { font-size: var(--text-micro); }
 .summary { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; max-width: 100%; overflow: hidden; }
 [data-placement='timeline'] > .summary { flex-direction: column; align-items: flex-start; gap: 0; }
 [data-placement='timeline'] > .summary > .detail { flex: none; width: 100%; }
 .summary > .time { flex-shrink: 0; }
 .summary > .detail { flex: 1; }
-.gap { position: absolute; bottom: var(--polish-space-row); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; pointer-events: none; color: var(--color-ink-secondary); font-size: var(--text-micro); font-variant-numeric: tabular-nums; }
+.gap { position: absolute; bottom: var(--polish-space-row); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; pointer-events: none; color: var(--color-ink-secondary); font-size: var(--text-micro); font-variant-numeric: var(--font-numeric); }
 .category { display: inline-flex; align-items: center; gap: var(--polish-space-row); min-width: 0; max-width: 100%; color: inherit; font-size: inherit; white-space: nowrap; }
 .categoryText { overflow: hidden; text-overflow: ellipsis; }
-.now { position: absolute; z-index: 3; pointer-events: none; color: var(--color-ink-faint); font-variant-numeric: tabular-nums; }
+.now { position: absolute; z-index: 3; pointer-events: none; color: var(--color-ink-faint); font-variant-numeric: var(--font-numeric); }
 .now[data-direction='vertical'] { inset-block: 0; border-inline-start: 1px solid var(--color-ink-faint); }
 .now[data-direction='horizontal'] { inset-inline: 0; border-block-start: 1px solid var(--color-ink-faint); }
 .now > span { position: absolute; padding: 0 var(--polish-space-row); border-radius: var(--radius-mini); background: var(--color-ink-faint); color: var(--color-on-accent); font-size: var(--text-micro); white-space: nowrap; }

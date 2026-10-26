@@ -41,7 +41,7 @@
   color: var(--color-accent-deep); /* fill: $accent-deep（進み具合＝うまくいっている途中） */
   font-size: var(--text-body); /* fontSize: 14 */
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
 }
 
 .meta {
@@ -52,7 +52,7 @@
   margin: 0;
   color: var(--color-ink-secondary); /* fill: $ink-secondary */
   font-size: 13px; /* fontSize: 13 */
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
 }
 
 .note {

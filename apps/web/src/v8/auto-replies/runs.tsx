@@ -88,7 +88,7 @@ export function actionLabel(run: AutoReplyRun): string {
   const parts: string[] = []
   if (run.replyStatus === 'accepted') parts.push('返信')
   if ((summary.executed ?? 0) > 0) parts.push(`後続処理${summary.executed}件`)
-  if ((summary.failed ?? 0) > 0) parts.push(`失敗${summary.failed}件`)
+  if ((summary.failed ?? 0) > 0) parts.push(`失敗${formatNumber(summary.failed)}件`)
   return parts.length > 0 ? parts.join('＋') : statusView(run.status).label
 }
 
@@ -307,7 +307,7 @@ export default function AutoReplyRunsV8() {
     }
     setActionMessage(
       failed > 0
-        ? `${retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : ''}${failed} 件をもう一度実行できませんでした。時間を置いてお試しください。`
+        ? `${retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : ''}${formatNumber(failed)} 件をもう一度実行できませんでした。時間を置いてお試しください。`
         : retried > 0
         ? `失敗した処理を${retried} 件もう一度実行しました。`
         : 'もう一度実行できる処理はありませんでした。',

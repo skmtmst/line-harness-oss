@@ -12,6 +12,7 @@
  */
 
 import type { SegmentCondition } from './segment-condition'
+import { formatNumber } from '@/lib/format'
 
 const TYPE_LABELS: Record<string, string> = {
   text: 'テキスト',
@@ -65,7 +66,7 @@ export function contentExcerpt(messageType: string, messageContent: string, limi
     const head = typeof first?.title === 'string' && first.title
       ? first.title
       : typeof first?.text === 'string' ? first.text : ''
-    return head ? `${head}（${parsed.length}枚）` : `カルーセル ${parsed.length}枚`
+    return head ? `${head}（${formatNumber(parsed.length)}枚）` : `カルーセル ${formatNumber(parsed.length)}枚`
   }
 
   const obj = (parsed && typeof parsed === 'object' ? parsed : {}) as Record<string, unknown>
@@ -166,7 +167,7 @@ export function audienceSummary(
   }
 
   const count = rules.length + groups.reduce((n, g) => n + (g.rules?.length ?? 0), 0)
-  return `詳細条件 ${count} 件`
+  return `詳細条件 ${formatNumber(count)} 件`
 }
 
 /**

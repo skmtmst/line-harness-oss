@@ -15,6 +15,7 @@ import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 export default function MediaReplacementDialog({
   source,
@@ -234,7 +235,7 @@ export default function MediaReplacementDialog({
                   <Pagination page={candidatePage} pageCount={Math.ceil(candidateTotal / 50)} onPageChange={setCandidatePage} />
                 </div>
               ) : candidateQuery ? (
-                <p className="text-ink-faint mt-2 text-xs">「{candidateQuery}」で絞り込み中（{candidateTotal} 件）</p>
+                <p className="text-ink-faint mt-2 text-xs">「{candidateQuery}」で絞り込み中（{formatNumber(candidateTotal)} 件）</p>
               ) : null}
             </>
           )}</Field></div>
@@ -256,7 +257,7 @@ export default function MediaReplacementDialog({
               <p className="text-ink-faint text-xs">
                 差し替えられない使用先：
                 {Object.entries(impact.blockedByKind)
-                  .map(([kind, count]) => `${referenceKindText(kind as Parameters<typeof referenceKindText>[0])}${count} 件`)
+                  .map(([kind, count]) => `${referenceKindText(kind as Parameters<typeof referenceKindText>[0])}${formatNumber(count)} 件`)
                   .join('・')}
               </p>
             ) : null}

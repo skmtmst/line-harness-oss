@@ -112,8 +112,8 @@ export default function CustomerInfoPanel({
         const started = generation.current
         setSaving(true); setSaveError('');
         const values = Object.fromEntries(shownFields.filter(field => FIXED_FRIEND_FIELDS.some(spec => spec.key === field.fixedKey) && draft[field.id] !== (field.value ?? '')).map(field => [field.id, draft[field.id]]))
-        try { const result = await api.friendFields.saveForFriend(friendId, values); if (generation.current !== started) return; if (!result.success) throw new Error(result.error ?? '保存できませんでした'); setSaved(current => ({ ...current, ...values })); setEditing(false); notifyToast('保存しました'); onRetry?.() }
-        catch (error) { if (generation.current === started) setSaveError(japaneseDetailOf(error) || '保存できませんでした') }
+        try { const result = await api.friendFields.saveForFriend(friendId, values); if (generation.current !== started) return; if (!result.success) throw new Error(result.error ?? '保存できませんでした。時間をおいて、もう一度お試しください。'); setSaved(current => ({ ...current, ...values })); setEditing(false); notifyToast('保存しました'); onRetry?.() }
+        catch (error) { if (generation.current === started) setSaveError(japaneseDetailOf(error) || '保存できませんでした。時間をおいて、もう一度お試しください。') }
         finally { if (generation.current === started) setSaving(false) }
       }}>保存する</Button></div>{saveError ? <p className={styles.note} role="alert">{saveError}</p> : null}</> : null}
       {hiddenPersonalCount > 0 ? <p className={styles.note}>個人情報は閲覧権限が必要です。</p> : null}

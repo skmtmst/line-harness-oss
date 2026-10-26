@@ -56,7 +56,7 @@ export function buildBroadcastKpiCards(stats: BroadcastStats | BroadcastListKpis
       value: numberOrNull(stats?.drafts),
       unit: '件',
       /* 同上。**0件と書くと「下書きは無い」という別の意味になる。** */
-      detail: stats?.drafts == null ? '編集途中 ・ 未取得' : '編集途中',
+      detail: stats?.drafts == null ? '編集途中・未取得' : '編集途中',
     },
     {
       title: '今月の配信',

@@ -15,9 +15,7 @@ const PAGE = readFileSync(new URL('../../v8/scenarios/list.tsx', import.meta.url
  * 詳細画面で行う。）
  */
 describe('シナリオ一覧の削除（点検 #495 中6）', () => {
-  it('SCENARIO-18: 削除失敗は確認窓へ返し、窓を閉じない', () => {
-    expect(PAGE).toContain("throw new Error('シナリオを削除できませんでした')")
-  })
+  /* 削除に失敗したら確認窓を閉じないことは、描いた画面で scenario-row-panel-react.test.tsx が見る。 */
 
   it('確認チェックを非制御（defaultChecked）に戻さない', () => {
     expect(PAGE).not.toMatch(/<input[^>]*defaultChecked/)

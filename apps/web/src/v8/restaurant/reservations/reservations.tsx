@@ -362,7 +362,7 @@ export default function ReservationsPage() {
       templateHeading boundary={false}
       boardId={view === 'today' ? 'l9NlC0' : 'Z3FoM'}
       title="予約台帳"
-      description={ctx=>`${ctx?.store?.name??''} ・ ${view==='today'?dayTitle(toYmd(day)):'今後の予約'}`}
+      description={ctx=>`${ctx?.store?.name??''}・${view==='today'?dayTitle(toYmd(day)):'今後の予約'}`}
       query={query}
       layout={view === 'today' ? 'ledgerTight' : 'ledger'}
       storeTab="reservations"

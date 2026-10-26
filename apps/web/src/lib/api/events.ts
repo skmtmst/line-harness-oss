@@ -18,6 +18,7 @@ import type {
 import { fetchApi } from './transport/request'
 import { withAccount } from './booking'
 import { downloadApiFile } from './transport/download'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 枠の一括作成が途中のチャンクで失敗したときのエラー。
@@ -121,7 +122,7 @@ export const eventsApi = {
       } catch (error) {
         const detail = error instanceof Error ? `（${error.message}）` : ''
         throw new EventSlotsPartialError(
-          `${items.length}件まで追加されました。残りを確認してから、もう一度追加してください${detail}`,
+          `${formatNumber(items.length)}件まで追加されました。残りを確認してから、もう一度追加してください${detail}`,
           [...items],
           error,
         )

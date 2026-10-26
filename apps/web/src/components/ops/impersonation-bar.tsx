@@ -10,16 +10,13 @@ import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { forgetSessionSnapshot } from '@/lib/session-snapshot'
+import { formatListTimestamp } from '@/lib/format'
 import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 
 /** 帯の「10/1 15:20」（日本時間）。 */
 function startedLabel(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return formatListTimestamp(iso, { fallback: '' })
 }
 
 /**
@@ -77,7 +74,7 @@ export default function ImpersonationBar({
       ? await opsCall(api.ops.impersonation.write(reason))
       : await opsCall(api.ops.impersonation.revealPii(reason))
     setBusy(false)
-    if (!res.success) { setError(res.error || '切り替えできませんでした'); return }
+    if (!res.success) { setError(res.error || '切り替えできませんでした。時間をおいて、もう一度お試しください。'); return }
     update({ ...state, ...res.data, tenantName: state.tenantName })
     setDialog(null)
     router.refresh()
@@ -149,7 +146,7 @@ function ReasonDialog({
     >
       <div className="flex flex-col gap-3">
         <label className="block">
-          <span className="mb-1.5 block text-caption font-medium text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
+          <span className="mb-1.5 block text-caption font-medium text-ink">理由<RequiredBadge /><span className="font-medium text-ink-faint">（4文字以上）</span></span>
           <TextArea
             value={reason}
             onChange={(event) => setReason(event.target.value)}

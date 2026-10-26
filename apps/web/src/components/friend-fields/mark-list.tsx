@@ -5,6 +5,7 @@ import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { formatNumber } from '@/lib/format'
 
 type MarkRow = SupportMarkListItem
 
@@ -99,7 +100,7 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
       confirmLabel={needsReplacement ? '置き換えて保管する' : '保管する'} busyLabel="保管中…">
       {/* ★V8 fy5dz：説明は題の段ではなく本文の頭。説明・置き換え先・注意を 12 ずつ縦に並べる。 */}
       <div className="flex flex-col gap-3">
-          <p className="text-xs leading-[18px] text-ink-secondary">{needsReplacement ? `いま ${friendCount} 人に付いています。保管すると、この ${friendCount} 人は下で選んだマークへ置き換え、履歴に残します。` : '使っている友だちはいないので、そのまま保管できます。'}</p>
+          <p className="text-xs leading-[18px] text-ink-secondary">{needsReplacement ? `いま ${formatNumber(friendCount)} 人に付いています。保管すると、この ${formatNumber(friendCount)} 人は下で選んだマークへ置き換え、履歴に残します。` : '使っている友だちはいないので、そのまま保管できます。'}</p>
           {loading ? <p className="rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact && needsReplacement ? (
             <SaveErrorField names={["replacementMarkId","replacement_mark_id"]}><EntitySelect
               aria-label="置き換え先"

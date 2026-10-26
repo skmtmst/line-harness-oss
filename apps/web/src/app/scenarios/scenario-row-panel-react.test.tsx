@@ -39,7 +39,12 @@ const row = (id: string, name: string) => ({
   stepCount: 1, subscriberCount: 3, completedCount: 1,
 })
 const puts: Array<{ url: string; body: unknown }> = []
+const deletes: string[] = []
 function handler(url: URL, init?: RequestInit) {
+  if (init?.method === 'DELETE' && url.pathname.startsWith('/api/scenarios/')) {
+    deletes.push(url.pathname)
+    return response({ success: false, error: 'Internal Server Error' }, 500)
+  }
   if (init?.method === 'PUT' && url.pathname.startsWith('/api/scenarios/')) {
     puts.push({ url: url.pathname, body: JSON.parse(String(init.body)) })
     return response({ success: true, data: row('s1', '変えた名前') })
@@ -47,6 +52,7 @@ function handler(url: URL, init?: RequestInit) {
   if (url.pathname === '/api/scenarios') {
     return response({ success: true, data: { items: [row('s1', '一つ目'), row('s2', '二つ目')], total: 2, limit: 50, sort: [] } })
   }
+  if (url.pathname.endsWith('/move-referrers')) return response({ success: true, data: { items: [], total: 0 } })
   if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'owner' } })
   if (url.pathname === '/api/folders') return response({ success: true, data: [], unfiledCount: 0 })
   if (url.pathname === '/api/list-stats') return response({ success: false, error: 'not needed' })
@@ -68,6 +74,7 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/scenarios')
   pushes.length = 0
   puts.length = 0
+  deletes.length = 0
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -143,4 +150,25 @@ test('パネルで名前を変えると保存口へ送る', async () => {
     if (puts.length === 0) throw new Error('not saved')
   })
   expect(puts[0]).toEqual({ url: '/api/scenarios/s1', body: { name: '変えた名前' } })
+})
+
+test('削除に失敗したら確認窓を閉じず、窓の中に失敗を出す', async () => {
+  await openFirstRow()
+  await eventually(() => {
+    if (!document.body.querySelector('[data-design-part="detail-panel"]')) throw new Error('panel not open')
+  })
+  const remove = [...document.body.querySelectorAll('button')].find((b) => b.textContent === '削除する')
+  if (!remove) throw new Error('no delete button')
+  await act(async () => { remove.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  const dialog = () => [...document.body.querySelectorAll('[role="dialog"], [role="alertdialog"]')]
+    .find((node) => node.textContent?.includes('「一つ目」を削除しますか？'))
+  await eventually(() => { if (!dialog()) throw new Error('confirm not open') })
+  const confirm = [...dialog()!.querySelectorAll('button')].find((b) => b.textContent === '削除する')
+  if (!confirm) throw new Error('no confirm button')
+  await act(async () => { confirm.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  await eventually(() => {
+    if (!dialog()?.textContent?.includes('このシナリオを削除できませんでした。')) throw new Error('error not shown')
+  })
+  expect(deletes).toEqual(['/api/scenarios/s1'])
+  expect(dialog()).toBeTruthy()
 })

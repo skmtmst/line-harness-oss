@@ -51,7 +51,7 @@ export default function ComposerMedia({ bubble, accountId, onChange, disabled, o
   const select = (item: MediaItem) => {
     const formats = audio ? ['audio/mp4', 'audio/mpeg'] : video ? ['video/mp4'] : ['image/jpeg', 'image/png']
     if (item.kind !== (audio ? 'audio' : video ? 'video' : 'image') || !formats.includes(item.mimeType) || item.sizeBytes > (audio || video ? 200 : 10) * 1024 * 1024) { setError('このメッセージで使える形式のメディアを選んでください。'); return }
-    if (!item.url) { setError('選んだメディアのURLを確認できませんでした。'); return }
+    if (!item.url) { setError('選んだメディアのURLを確認できませんでした。時間をおいて、もう一度お試しください。'); return }
     if (audio) {
       const durationMs = item.durationMs
       if (!durationMs || durationMs <= 0) { setError('音声の長さを確認できませんでした。登録メディアで確認してください。'); return }
@@ -76,17 +76,17 @@ export default function ComposerMedia({ bubble, accountId, onChange, disabled, o
         const metadata = await extractMediaMetadata(file)
         if (!metadata.durationMs) throw new Error('音声の長さを読み取れませんでした。ファイルを確認してください。')
         const prepared = await api.media.prepareUploads({ accountId, files: [{ filename: file.name, mimeType: file.type, sizeBytes: file.size, metadata }] })
-        if (!prepared.success || prepared.data.sessions.length !== 1) throw new Error('音声を送る準備ができませんでした。')
+        if (!prepared.success || prepared.data.sessions.length !== 1) throw new Error('音声を送る準備ができませんでした。時間をおいて、もう一度お試しください。')
         const session = prepared.data.sessions[0]
         const etag = await putMediaFile(session, file, () => {})
         const completed = await api.media.completeUpload(session.id, { accountId, etag })
-        if (!completed.success || completed.data.status !== 'completed' || !completed.data.mediaId) throw new Error('音声の登録を完了できませんでした。')
+        if (!completed.success || completed.data.status !== 'completed' || !completed.data.mediaId) throw new Error('音声の登録を完了できませんでした。時間をおいて、もう一度お試しください。')
         const result = await api.media.detail(completed.data.mediaId, accountId)
-        if (!result.success || result.data.item.kind !== 'audio') throw new Error('登録した音声を確認できませんでした。')
+        if (!result.success || result.data.item.kind !== 'audio') throw new Error('登録した音声を確認できませんでした。時間をおいて、もう一度お試しください。')
         if (live.current) select(result.data.item)
       } else {
         const result = await api.broadcastMessageAssets.upload(file, accountId)
-        if (!result.success) throw new Error(result.error || 'アップロードできませんでした。')
+        if (!result.success) throw new Error(result.error || 'アップロードできませんでした。時間をおいて、もう一度お試しください。')
         if (live.current) onChange({ ...bubble.content, fileName: file.name, originalContentUrl: result.data.url, previewImageUrl: video ? String(bubble.content.previewImageUrl ?? '') : result.data.url })
       }
     } catch (cause) { if (live.current) setError(japaneseDetailOf(cause) || (describeApiFailure(cause, '画像の登録'))) }

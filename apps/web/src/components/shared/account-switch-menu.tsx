@@ -1,9 +1,10 @@
 'use client'
 
 import { Building2, Check, ArrowRight } from 'lucide-react'
-import { useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
 import Avatar from './avatar'
+import TruncatedText from './truncated-text'
 import styles from './account-switch-menu.module.css'
 
 export interface AccountSwitchMenuAccount {
@@ -11,6 +12,8 @@ export interface AccountSwitchMenuAccount {
   label: string
   iconUrl?: string | null
   mark?: string
+  /** LINE の ID（@ なし）。あれば名前の下に「@ID」を出す。 */
+  basicId?: string | null
 }
 
 export interface AccountSwitchMenuHq {
@@ -45,6 +48,18 @@ export default function AccountSwitchMenu({
 }) {
   const listId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  // 指や焦点を置いた行へ、背景が上下になめらかに動く（CSS の transition だけ。動きを減らす設定では動かない）。
+  const [glow, setGlow] = useState<{ top: number; height: number } | null>(null)
+  const moveGlow = (row: HTMLElement | null) => {
+    if (!row || !listRef.current?.contains(row)) return
+    setGlow({ top: row.offsetTop, height: row.offsetHeight })
+  }
+  useLayoutEffect(() => {
+    if (!open) { setGlow(null); return }
+    const selected = listRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')
+    if (selected) setGlow({ top: selected.offsetTop, height: selected.offsetHeight })
+  }, [open, selectedAccountId, accounts.length])
 
   // 開いたら、選んでいる行（無ければ先頭）へ焦点を移す。
   useEffect(() => {
@@ -89,7 +104,7 @@ export default function AccountSwitchMenu({
               <Building2 aria-hidden="true" className={styles.hqIcon} />
               <span className={styles.hqText}>
                 <span className={styles.hqTitle}>統括に戻る</span>
-                <span className={styles.hqSub} title={hq.companyName}>{`${hq.companyName} ・ アカウント ${hq.accountCount}`}</span>
+                <span className={styles.hqSub} title={hq.companyName}>{`${hq.companyName}・アカウント ${hq.accountCount}`}</span>
               </span>
               <ArrowRight aria-hidden="true" className={styles.hqArrow} />
             </button>
@@ -97,21 +112,39 @@ export default function AccountSwitchMenu({
           </>
         ) : null}
         <p className={styles.heading} id={listId}>LINEアカウント</p>
-        <div role="group" aria-labelledby={listId} className={styles.list}>
-          {accounts.map((account) => {
+        <div
+          ref={listRef}
+          role="group"
+          aria-labelledby={listId}
+          className={styles.list}
+          onPointerLeave={() => moveGlow(listRef.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? null)}
+        >
+          {glow ? <span aria-hidden="true" className={styles.glow} style={{ transform: `translateY(${glow.top}px)`, height: glow.height }} /> : null}
+          {accounts.map((account, index) => {
             const selected = account.id === selectedAccountId
+            const handle = account.basicId ? `@${account.basicId.replace(/^@/, '')}` : null
+            const handleId = `${listId}-handle-${index}`
             return (
               <button
                 key={account.id}
                 type="button"
                 role="menuitemradio"
                 aria-checked={selected}
+                // 読み上げるのはアカウント名だけ。@ID は説明として読む。
+                aria-label={account.label}
+                aria-describedby={handle ? handleId : undefined}
                 className={selected ? `${styles.row} ${styles.rowSelected}` : styles.row}
                 onClick={() => { onClose(); if (!selected) onSelect(account.id) }}
+                onPointerEnter={(event) => moveGlow(event.currentTarget)}
+                onFocus={(event) => moveGlow(event.currentTarget)}
               >
                 {/* 名前は隣の行が読ませるので、印は飾り（alt を渡すと読み上げが二重になる）。 */}
                 <Avatar name={account.label} src={account.iconUrl ?? null} size={24} shape="rounded" />
-                <span className={styles.name} title={account.label}>{account.label}</span>
+                {/* 名前と @ID の2行。長い時は1行で省略し、全文は共通の吹き出しで見られる。 */}
+                <span className={styles.names}>
+                  <TruncatedText value={account.label} className={styles.name} />
+                  {handle ? <TruncatedText id={handleId} value={handle} className={styles.handle} /> : null}
+                </span>
                 {selected ? <Check aria-hidden="true" className={styles.check} /> : null}
               </button>
             )

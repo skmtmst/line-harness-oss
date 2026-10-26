@@ -3,6 +3,7 @@
 import { Children, useState, type ReactElement, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import kpiStyles from '@/components/shared/kpi-card.module.css'
+import { formatNumber } from '@/lib/format'
 
 /**
  * KPIの折りたたみ（UI監査 #975 U060）。
@@ -71,7 +72,7 @@ export default function KpiCollapse({
             aria-expanded={open}
             onClick={() => setOpen((current) => !current)}
           >
-            {open ? '集計を閉じる' : `残り${tail.length}件の集計を見る`}
+            {open ? '集計を閉じる' : `残り${formatNumber(tail.length)}件の集計を見る`}
           </Button>
         </div>
       ) : null}

@@ -197,7 +197,7 @@ export function ApprovalStatusSection({
         </p>
         {requesterName || approval.requestedAt ? (
           <p className="text-ink-secondary mt-1 text-xs leading-5">
-            依頼：{requesterName ?? '—'} ・ {formatApprovalDateTime(approval.requestedAt)}
+            依頼：{requesterName ?? '—'}・{formatApprovalDateTime(approval.requestedAt)}
           </p>
         ) : null}
         <p className="text-ink-secondary mt-1 text-xs leading-5">

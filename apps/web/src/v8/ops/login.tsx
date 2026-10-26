@@ -90,7 +90,7 @@ export default function OpsLoginV8() {
     })
     turnstileRef.current?.reset()
     if (!res.ok || !res.data) {
-      setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? 'ログインできませんでした')
+      setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? 'ログインできませんでした。時間をおいて、もう一度お試しください。')
       setBusy(null)
       return
     }

@@ -4,7 +4,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingAdminDetail, type BookingRequest } from '@/lib/api'
-import { formatDateTime, formatTime } from '@/lib/format'
+import { formatDateTime, formatTime, formatNumber } from '@/lib/format'
 import type { AccountStyle } from '@line-crm/shared'
 import { bookingWords } from '@/v8/booking-bookings/public/words/index'
 import { BookingGapSections } from '@/v8/booking-gap/public/booking-gap-sections/index'
@@ -106,7 +106,7 @@ export default function BookingDetailV8({
         <div>
           <dt className="text-ink-faint text-xs">日時</dt>
           <dd className="text-ink mt-0.5">
-            {safeDateTime(b.starts_at)}〜{safeTime(b.ends_at)} ・ {words.staff} {b.staff_name}
+            {safeDateTime(b.starts_at)}〜{safeTime(b.ends_at)}・{words.staff} {b.staff_name}
           </dd>
         </div>
         <div>
@@ -128,7 +128,7 @@ export default function BookingDetailV8({
               </>
             ) : (
               <DelayedSkeleton loading={historyTotal === null} skeleton={<Skeleton width={48} />}>
-                {historyTotal === null ? null : `${historyTotal}回`}
+                {historyTotal === null ? null : `${formatNumber(historyTotal)}回`}
               </DelayedSkeleton>
             )}
           </dd>

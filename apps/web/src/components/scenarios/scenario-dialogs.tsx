@@ -17,6 +17,7 @@ import { formatDateTime } from '@/lib/format';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import type { ScenarioFriendPlanStep } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 /*
  * シナリオ詳細で使う小さな窓。
  *
@@ -220,7 +221,7 @@ export function ConditionDialog({
               <li key={`rule-${i}`} className="flex items-center justify-between gap-3">
                 <p className="text-ink text-sm font-bold">
                   条件 {i + 1}
-                  <span className="text-ink-secondary ml-2 text-xs font-normal">
+                  <span className="text-ink-secondary ml-2 text-xs font-medium">
                     {describeRule(rule)}
                   </span>
                 </p>
@@ -244,8 +245,8 @@ export function ConditionDialog({
               <li key={`group-${gi}`} className="flex items-center justify-between gap-3">
                 <p className="text-ink text-sm font-bold">
                   or条件のかたまり {gi + 1}
-                  <span className="text-ink-secondary ml-2 text-xs font-normal">
-                    {group.rules.length}件
+                  <span className="text-ink-secondary ml-2 text-xs font-medium">
+                    {formatNumber(group.rules.length)}件
                   </span>
                 </p>
                 <button
@@ -351,7 +352,7 @@ export function MoveReferrersNotice({ scenarioId }: { scenarioId: string }) {
   return (
     <div>
       <p className="text-warning text-sm font-medium">
-        このシナリオは{items.length}件のシナリオの終了後の移動先になっています。
+        このシナリオは{formatNumber(items.length)}件のシナリオの終了後の移動先になっています。
       </p>
       <p className="text-ink-secondary mt-1 text-xs">
         {shown.map((s) => s.name).join('、')}
@@ -557,7 +558,7 @@ export function OnCompleteDialog({
           配り終えた人に対して、タグ・友だち情報・対応マークなどを動かします。
         </p>
         <Button variant="secondary" className="text-ink-secondary px-4 whitespace-normal" type="button" onClick={onOpenActions}>
-          アクション設定{actionCount > 0 ? `（${actionCount} 件）` : ''}
+          アクション設定{actionCount > 0 ? `（${formatNumber(actionCount)} 件）` : ''}
         </Button>
       </div>
 
@@ -908,9 +909,9 @@ export function TestSendDialog({
             ? {
                 ok: false,
                 partial: true,
-                message: `${res.data.sent} 件のメッセージだけ届きました。残りは送れていない可能性があります。`,
+                message: `${formatNumber(res.data.sent)} 件のメッセージだけ届きました。残りは送れていない可能性があります。`,
               }
-            : { ok: true, message: `${res.data.sent} 件のメッセージを送りました。` },
+            : { ok: true, message: `${formatNumber(res.data.sent)} 件のメッセージを送りました。` },
         )
         if (!partial) await loadTestHistory()
       } else {
@@ -1022,7 +1023,7 @@ export function TestSendDialog({
 
       {lastTest ? (
         <Notice tone="info" className="mb-4">
-          前回のテスト送信：{formatDateTime(lastTest.sentAt)}・{lastTest.messageCount}通
+          前回のテスト送信：{formatDateTime(lastTest.sentAt)}・{formatNumber(lastTest.messageCount)}通
         </Notice>
       ) : null}
 

@@ -4,6 +4,7 @@
  */
 import type { Tag } from '@line-crm/shared'
 import type { NenColumnCreateInput } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /**
  * このアカウントのタグだけを候補にする(点検 #512 の中4)。
@@ -56,7 +57,7 @@ export const EMPTY_DRAFT: ColumnDraft = {
 export function titleNotice(title: string): string | null {
   const length = title.trim().length
   if (length === 0) return null
-  const head = `題名 ${length}文字。LINEの通知では${TITLE_NOTICE_LENGTH}文字までしか出ません。`
+  const head = `題名 ${formatNumber(length)}文字。LINEの通知では${TITLE_NOTICE_LENGTH}文字までしか出ません。`
   return length <= TITLE_NOTICE_LENGTH ? `${head}いまなら全部見えます。` : `${head}途中で切れます。`
 }
 

@@ -78,7 +78,7 @@ function CompleteInner() {
     })
     if (!res.ok || !res.data) {
       if (res.errors) setMessages((current) => ({ ...current, ...res.errors }))
-      setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? '登録を完了できませんでした')
+      setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? '登録を完了できませんでした。時間をおいて、もう一度お試しください。')
       setBusy(false)
       return
     }

@@ -46,7 +46,7 @@ export function RevenueBars({ rows, width = 920, height = 220 }: { rows: Array<{
         return (
           <g key={i}>
             <line x1={left} x2={width - 16} y1={y} y2={y} stroke="var(--color-hairline)" strokeWidth={1} />
-            <text x={left - 8} y={y + 4} textAnchor="end" fontSize={11} fill="var(--color-ink-faint)">{formatYenShort(t)}</text>
+            <text x={left - 8} y={y + 4} textAnchor="end" fontSize={12} fill="var(--color-ink-faint)">{formatYenShort(t)}</text>
           </g>
         )
       })}
@@ -89,7 +89,7 @@ export function PlanDonut({ rows, total, size = 190 }: { rows: Array<{ key: stri
   const circumference = 2 * Math.PI * r
   let offset = 0
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label={`契約先 ${total} 件の内訳`}>
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label={`契約先 ${formatNumber(total)} 件の内訳`}>
       <circle cx={c} cy={c} r={r} fill="none" stroke="var(--color-surface-pearl)" strokeWidth={24} />
       {total > 0
         ? rows.filter((row) => row.count > 0).map((row) => {

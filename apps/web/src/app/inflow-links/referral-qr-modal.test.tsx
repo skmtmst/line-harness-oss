@@ -30,8 +30,8 @@ describe('現役の流入QRと停止経路の発行制限', () => {
     expect(screen.getAllByText(/この経路は停止しています/).length).toBeGreaterThan(0)
   })
   it('未登録 ref（有効・無効の概念なし）は従来どおり出す', () => {
-    render(<QrDialog route={{ refCode: 'external-x', name: '(未登録)', genre: null, isActive: null }} onClose={() => {}} />)
-    expect(screen.getByRole('img', { name: '(未登録) の QR コード' }).getAttribute('src')).toContain('/api/qr')
+    render(<QrDialog route={{ refCode: 'external-x', name: '（未登録）', genre: null, isActive: null }} onClose={() => {}} />)
+    expect(screen.getByRole('img', { name: '（未登録） の QR コード' }).getAttribute('src')).toContain('/api/qr')
     expect(screen.getByRole('link', { name: '画像をダウンロード' })).toBeTruthy()
   })
 })

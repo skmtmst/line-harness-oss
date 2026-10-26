@@ -13,6 +13,7 @@
  */
 
 import { pruneCondition, type SegmentCondition } from './segment-condition'
+import { formatNumber } from '@/lib/format'
 
 /** 送る相手の決め方。 */
 export type TargetMode = 'all' | 'scenario' | 'tag' | 'advanced'
@@ -133,5 +134,5 @@ export function describeAudience(
     return '分析で作った対象者'
   }
   const count = usable.rules.length + (usable.groups ?? []).reduce((n, g) => n + g.rules.length, 0)
-  return `詳細条件 ${count} 件`
+  return `詳細条件 ${formatNumber(count)} 件`
 }

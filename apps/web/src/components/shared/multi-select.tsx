@@ -10,6 +10,7 @@ import MenuPortal from './menu-portal'
 import styles from './multi-select.module.css'
 import { isImeComposing } from './ime'
 import { joinDescribedBy, useFieldContext } from './field-context'
+import { formatNumber } from '@/lib/format'
 
 export type MultiSelectOption = ComboboxOption
 
@@ -169,7 +170,7 @@ export default function MultiSelect({
     }
   }
 
-  const statusText = !open ? '' : loading ? '探しています' : `${matches.length}件の候補`
+  const statusText = !open ? '' : loading ? '探しています' : `${formatNumber(matches.length)}件の候補`
 
   return (
     <div
@@ -219,7 +220,7 @@ export default function MultiSelect({
         {overflowCount > 0 ? (
           <button
             type="button"
-            aria-label={`残り${overflowCount}件を表示`}
+            aria-label={`残り${formatNumber(overflowCount)}件を表示`}
             onMouseDown={(event) => event.preventDefault()}
             onClick={(event) => {
               event.stopPropagation()
@@ -274,7 +275,7 @@ export default function MultiSelect({
           style={{ position: 'static', width: '100%' }}
         >
           <div className={styles.summary}>
-            <span>{values.length}件選択中</span>
+            <span>{formatNumber(values.length)}件選択中</span>
             <button
               type="button"
               disabled={disabled || values.length === 0}

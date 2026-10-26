@@ -120,8 +120,8 @@ export default function OpsAuditV8() {
     a.click()
     URL.revokeObjectURL(url)
     setExportNote(truncated
-      ? `いまの条件の ${collected.length} 件を書き出しました（${expected} 件中・上限 ${formatNumber(CSV_MAX)} 件まで。全部を残すには期間で絞ってください）`
-      : `いまの条件の ${collected.length} 件を書き出しました`)
+      ? `いまの条件の ${formatNumber(collected.length)} 件を書き出しました（${expected} 件中・上限 ${formatNumber(CSV_MAX)} 件まで。全部を残すには期間で絞ってください）`
+      : `いまの条件の ${formatNumber(collected.length)} 件を書き出しました`)
     setExporting(false)
   }
 

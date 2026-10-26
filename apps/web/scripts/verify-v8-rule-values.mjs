@@ -15,7 +15,8 @@ export const RULE_VALUES = {
   '--shadow-controls-pop': '0 8px 24px rgba(29, 29, 31, 0.12)',
   '--shadow-float': '0 8px 24px rgba(29, 29, 31, 0.12)',
   '--select-menu-shadow': '0 8px 24px rgba(29, 29, 31, 0.12)',
-  '--card-edge': 'rgba(29, 29, 31, 0.08)',
+  '--card-edge': 'transparent', // カードの縁はくっきり版の影の外周 1px が描く
+  '--surface-edge': 'rgba(29, 29, 31, 0.08)',
   '--shadow-overlay': '0 8px 24px rgba(29, 29, 31, 0.12)',
   '--v8-parts-dialog-shadow': '0 8px 24px rgba(29, 29, 31, 0.12)',
   '--shadow-controls-toggle': '0 1px 2px rgba(29, 29, 31, 0.16)',

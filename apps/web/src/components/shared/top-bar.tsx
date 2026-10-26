@@ -10,6 +10,7 @@ import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Avatar from './avatar'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import styles from './top-bar.module.css'
+import { formatNumber } from '@/lib/format'
 
 export interface TopBarAccount {
   id: string
@@ -18,6 +19,8 @@ export interface TopBarAccount {
   iconUrl?: string | null
   /** 頭の1文字。アイコンの代わりに出す。無ければ名前の1文字目。 */
   mark?: string
+  /** LINE の ID（@ なし）。切り替えの一覧で名前の下に出す。 */
+  basicId?: string | null
 }
 
 export interface TopBarNotificationsPopover {
@@ -163,6 +166,16 @@ export default function TopBar({
   }, [])
   const classes = [styles.root, className].filter(Boolean).join(' ')
   const current = accounts.find((account) => account.id === selectedAccountId)
+  // 本文（main）を下へ流した時だけ、帯をすりガラスにする。一番上にいる時は今のまま。
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const main = document.getElementById('main-content')
+    if (!main) return
+    const update = () => setScrolled(main.scrollTop > 0)
+    update()
+    main.addEventListener('scroll', update, { passive: true })
+    return () => main.removeEventListener('scroll', update)
+  }, [])
 
   /*
    * ★V8 外側の合図。⌘\ で左メニューを畳む。
@@ -183,7 +196,7 @@ export default function TopBar({
   }, [])
 
   return (
-    <header ref={rootRef} className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
+    <header ref={rootRef} className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined} data-scrolled={scrolled || undefined}>
       {/*
         ★V8 外側（Pencil `y3gx8R`）：左に畳むボタンとパンくず
         （アカウント › 画面名）。
@@ -239,14 +252,15 @@ export default function TopBar({
                 <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
               </span>
             ))}
-            {title ? <h1 className={styles.crumbCurrent} title={title}>{titleHref ? <Link prefetch={false} href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</h1>
-              : (() => { const last = (crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').at(-1); return last ? <h1 className={styles.crumbCurrent} title={last.label}>{last.href ? <Link prefetch={false} href={last.href} className={styles.crumbCurrentLink}>{last.label}</Link> : last.label}</h1> : null })()}
+            {/* パンくずの今いる所は見出しにしない。画面の題（h1）は本文の頭（PageHeading）が持つ。 */}
+            {title ? <span className={styles.crumbCurrent} title={title} aria-current="page">{titleHref ? <Link prefetch={false} href={titleHref} className={styles.crumbCurrentLink}>{title}</Link> : title}</span>
+              : (() => { const last = (crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').at(-1); return last ? <span className={styles.crumbCurrent} title={last.label} aria-current="page">{last.href ? <Link prefetch={false} href={last.href} className={styles.crumbCurrentLink}>{last.label}</Link> : last.label}</span> : null })()}
           </nav>
         </div>
       ) : null}
 
       {!v8Chrome ? <div className={styles.titleGroup}>
-        <h1 className={styles.title} title={title}>{title}</h1>
+        <span className={styles.title} title={title}>{title}</span>
         {manualHref
           ? <Link prefetch={false} href={manualHref} className={styles.manual}><BookIcon /><span>マニュアル</span></Link>
           : null}
@@ -298,7 +312,7 @@ export default function TopBar({
             ) : (
               <span className={styles.accountName} data-part="account-name" title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
             )}
-            {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
+            <span className={styles.switchChevron} data-open={switchOpen || undefined} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}</span>
 
             {/*
               開くと統括に戻る操作と店の一覧を出す。
@@ -337,7 +351,7 @@ export default function TopBar({
                 type="button"
                 className={`${styles.iconButton}`}
                 data-topbar-bell=""
-                aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
+                aria-label={notificationUnreadCount > 0 ? `通知（未読 ${formatNumber(notificationUnreadCount)} 件）` : '通知'}
                 aria-haspopup="dialog"
                 aria-expanded={bellOpen}
                 aria-controls={bellOpen ? bellPopoverId : undefined}
@@ -353,7 +367,7 @@ export default function TopBar({
               prefetch={false}
               href="/notifications"
               className={`${styles.iconButton}`}
-              aria-label={notificationUnreadCount > 0 ? `通知（未読 ${notificationUnreadCount} 件）` : '通知'}
+              aria-label={notificationUnreadCount > 0 ? `通知（未読 ${formatNumber(notificationUnreadCount)} 件）` : '通知'}
             >
               <BellIcon />
               <BellBadge count={notificationUnreadCount} />

@@ -126,9 +126,12 @@ describe("RefreshCover", () => {
 })
 
 describe('globals.css の現役の動き規定', () => {
-  it('骨組みは今の静止表示を保ち、旧い明滅を残さない', () => {
+  it('骨組みの光りを後ろの規則・部品の CSS が消さない。旧い明滅は残さない', () => {
     expect(GLOBALS_CODE).not.toContain('@keyframes v7-skeleton-pulse')
-    expect(GLOBALS_CODE).toMatch(/:root \[data-skeleton\] \{[^}]*background-image:\s*none;\s*animation:\s*none/)
+    // 後ろの規則・部品の CSS が光りを消さない（background の一括指定や animation: none を書かない）。
+    expect(GLOBALS_CODE).not.toMatch(/\[data-skeleton\] \{[^}]*(?:background-image:\s*none|animation:\s*none|background:\s)/)
+    const skeletonCss = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'skeleton.module.css'), 'utf8')
+    expect(skeletonCss).not.toMatch(/\[data-skeleton\][^{]*\{[^}]*(?:background:\s|animation:\s*none)/)
   })
 
   it('今の初回表示は下から4px・200ms ease-out・40msずつ、消える行を除く', () => {

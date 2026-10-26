@@ -59,7 +59,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
       if (!found) throw new Error('まだ')
       return found as HTMLElement
     })
-    expect(band.textContent).toContain('貸切（18:00〜22:00 ・ 個室A・T1）です。閉じた時間帯は LINE からの予約を受け付けません。入っている予約は取り消していません。')
+    expect(band.textContent).toContain('貸切（18:00〜22:00・個室A・T1）です。閉じた時間帯は LINE からの予約を受け付けません。入っている予約は取り消していません。')
     expect(within(band).getByRole('link', { name: '休業日・貸切を見る' }).getAttribute('href')).toBe('/restaurant-test/inventory?tab=closures')
     expect(screen.getByText('佐藤 健')).not.toBeNull()
   })

@@ -50,9 +50,9 @@ export function runErrorLabel(errorCode: string | null, state: AnalyticsReportRu
       return '送る直前に内容が変わったため、旧設定では送りませんでした。'
     case null:
     case undefined:
-      return '送信に失敗しました。'
+      return '送信に失敗しました。理由が届いていないので、送信の記録を確認してから送り直してください。'
     default:
-      return `送信に失敗しました（${errorCode}）。`
+      return `送信に失敗しました（${errorCode}）。送信の記録を確認してから送り直してください。`
   }
 }
 

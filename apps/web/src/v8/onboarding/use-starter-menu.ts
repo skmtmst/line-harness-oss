@@ -18,7 +18,7 @@ export function useStarterMenu(accountId: string | null, style: AccountStyle) {
       if (!res.success) throw new Error('見本を読み込めませんでした')
       // T01の追加応答。未提供のWorkerで名前だけを本物のボタンとして描かない。
       const preview = (res.data as typeof res.data & { preview?: ResolvedPreview[] }).preview
-      if (!Array.isArray(preview)) throw new Error('見本の行き先を確認できませんでした')
+      if (!Array.isArray(preview)) throw new Error('見本の行き先を確認できませんでした。時間をおいて、もう一度お試しください。')
       const buttons = preview.flatMap(menu => menu.buttons)
       if (active) setSnapshot({ accountId, style, buttons, error: null })
     }).catch(error => { if (active) setSnapshot({ accountId, style, buttons: null, error }) })

@@ -9,4 +9,4 @@
 .number { display: grid; place-items: center; flex-shrink: 0; width: var(--tpl-eds-label-lh); height: var(--tpl-eds-label-lh); border-radius: var(--radius-pill); background: var(--color-surface-pearl); font-size: var(--text-micro); }
 .warning { display: grid; gap: var(--tpl-hq-card-gap); font-size: var(--text-label); line-height: var(--tpl-eds-name-lh); }
 .preview > :last-child { margin-top: var(--tpl-eds-content-gap); }
-.warning p { margin: 0; font-weight: 400; }
+.warning p { margin: 0; font-weight: var(--font-weight-ui); }

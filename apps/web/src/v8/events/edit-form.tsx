@@ -43,6 +43,7 @@ import { AddSlotDialog, EditSlotDialog } from "./edit-form-gap-parts"
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 
 import { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
+import { formatNumber } from '@/lib/format'
 export { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
 
 type Tab = 'overview' | 'slots' | 'publish'
@@ -325,7 +326,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
             const name = `${acct.country ? acct.country + ' ' : ''}${acct.name}`
             if (!acct.liffId) return <Notice key={account.id} tone="warn" action={canManageRole(role) ? <Button variant="text" size="inline" href={`/accounts/detail?id=${encodeURIComponent(account.id)}`}>アカウント設定へ →</Button> : undefined} message={`${name}: LIFF ID 未設定`} />
             const url = `https://liff.line.me/${acct.liffId}/?page=event&id=${eventId}&liffId=${acct.liffId}`
-            return <Field key={account.id} label={`${name}の固定 URL (QR・LP 直貼り用)`}>
+            return <Field key={account.id} label={`${name}の固定 URL（QR・LP 直貼り用）`}>
               <TextInput readOnly value={url} onFocus={(event) => event.currentTarget.select()} />
               <Button onClick={() => copyValue(url)}>{copiedValue === url ? 'コピー済' : 'コピー'}</Button>
             </Field>
@@ -354,7 +355,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       ? eventId ? undefined : '保存するとイベントが作成され、予約枠タブに進みます'
       : '「公開する」ON で友だちに予約 URL を案内できます'} actions={<>
         {tab === 'overview' && eventId ? <Button onClick={() => save('slots')} disabled={saving}>保存して次へ →</Button> : null}
-        <Button variant="primary" onClick={() => save()} disabled={saving} busy={saving} busyLabel="保存中...">
+        <Button variant="primary" onClick={() => save()} disabled={saving} busy={saving} busyLabel="保存中…">
           {tab === 'overview' && !eventId ? 'イベントを作る' : TABS.find((item) => item.key === tab)?.saveLabel ?? '保存する'}
         </Button>
       </>} /> : null}
@@ -442,7 +443,7 @@ function OverviewTab({
           value={draft.description ?? ''}
           onChange={(e) => update('description', e.target.value || null)}
           rows={8}
-          placeholder="開催趣旨、注意事項、持ち物などを記載..."
+          placeholder="開催趣旨、注意事項、持ち物などを記載…"
         /></SaveErrorField>
       </Field>
         <Checkbox
@@ -501,7 +502,7 @@ function OverviewTab({
         </RadioCardGroup>
 
         {targetType === 'multi-account-dedup' && (
-          <Field label="対象アカウント（重複なし配信）" note={`${accountIds.length} 件選択中`}>
+          <Field label="対象アカウント（重複なし配信）" note={`${formatNumber(accountIds.length)} 件選択中`}>
             {activeAccounts.length === 0 && (
               <Notice tone="info" message="アクティブなアカウントがありません" />
             )}
@@ -678,7 +679,7 @@ function SlotsTab({
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><FormSection id="ev-form-slots" title="予約枠" description={`${slots.length} 件の予約枠`} action={<>
+    <SaveErrorScope errors={saveErrors}><FormSection id="ev-form-slots" title="予約枠" description={`${formatNumber(slots.length)} 件の予約枠`} action={<>
           <Button onClick={() => setShowAdd(true)}>
             ＋ 枠を追加する
           </Button>
@@ -965,7 +966,7 @@ function PublishTab({
     </FormSection>
     <FormSection id="ev-form-messages" title="予約者向けカスタムメッセージ" description="予約者だけに届く LINE 通知の末尾に追加されます（Zoom URL など）。空欄ならデフォルト文言のみ。">
       <Field label="予約確定メッセージへの追記" count={{ value: (draft.confirmation_message_extra ?? '').length, max: 2000 }} note="確定通知（即時 / 後追い承認）の末尾に追加">
-        <SaveErrorField names={["confirmation_message_extra"]}><TextArea value={draft.confirmation_message_extra ?? ''} onChange={(event) => update('confirmation_message_extra', event.target.value || null)} rows={3} maxLength={2000} placeholder="例: 当日の Zoom URL: https://us02web.zoom.us/j/..." /></SaveErrorField>
+        <SaveErrorField names={["confirmation_message_extra"]}><TextArea value={draft.confirmation_message_extra ?? ''} onChange={(event) => update('confirmation_message_extra', event.target.value || null)} rows={3} maxLength={2000} placeholder="例: 当日の Zoom URL: https://us02web.zoom.us/j/…" /></SaveErrorField>
       </Field>
       <Field label="リマインドメッセージへの追記" count={{ value: (draft.reminder_message_extra ?? '').length, max: 2000 }} note="前日 / N 時間前のリマインド末尾に追加">
         <SaveErrorField names={["reminder_message_extra"]}><TextArea value={draft.reminder_message_extra ?? ''} onChange={(event) => update('reminder_message_extra', event.target.value || null)} rows={3} maxLength={2000} placeholder="例: 開始 10 分前に同じ URL からご入室ください" /></SaveErrorField>

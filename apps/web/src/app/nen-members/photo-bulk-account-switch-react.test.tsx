@@ -130,7 +130,7 @@ async function click(label: string, index = 0) {
  */
 function bulkButton(): HTMLButtonElement {
   const found = Array.from(host.querySelectorAll('button')).find(
-    (item) => ['まとめて採用', '処理中...'].includes(item.textContent?.trim() ?? ''),
+    (item) => ['まとめて採用', '処理中…'].includes(item.textContent?.trim() ?? ''),
   )
   if (!found) throw new Error(`一括のボタンが見つかりません: ${host.textContent}`)
   return found as HTMLButtonElement

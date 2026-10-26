@@ -91,6 +91,7 @@ import { STATUS_TABS, SOURCE_FILTER_OPTIONS, SOURCE_FILTER_NAME, sourceFilterTex
 
 import type { BookingLedgerModel } from './use-booking-ledger'
 import { bookingWords } from '@/v8/booking-bookings/public/words/index'
+import { reminderDeliveryStatusLabel } from '@/lib/status-labels'
 
 export default function BookingLedgerScreen({ model }: { model: BookingLedgerModel }) {
   if (model.selectedAccountId && model.styleProfile && !model.styleProfile.data) return <BookingLedgerFrame view={model.view}>
@@ -344,7 +345,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             ]}
             activeId={menuFilter}
             onSelect={setMenuFilter}
-            total={`${summary.total} 件`}
+            total={`${formatNumber(summary.total)} 件`}
           />}
         folderNav={{
           label: words.menu,
@@ -805,7 +806,7 @@ function BookingDetailPanel({
               <p>✓ {formatJpDateTime(b.requested_at)} 予約を受け付けました</p>
               {b.decided_at ? <p>✓ {formatJpDateTime(b.decided_at)} 予約を「{statusLabel[b.status] ?? b.status}」にしました</p> : null}
               {lineOperation ? <p>{lineOperation.status === 'succeeded' ? '✓' : '…'} 予約確認LINE: {lineOperation.status === 'succeeded' ? '送信済み' : lineOperation.status === 'queued' ? '送信中' : lineOperation.status === 'retry_wait' ? '再試行中' : lineOperation.status === 'permanent_failed' ? '失敗' : '送信なし'}</p> : null}
-              {detail?.reminders.map((reminder) => <p key={reminder.id}>{reminder.status === 'sent' ? '✓' : '…'} {formatJpDateTime(reminder.scheduledAt)} リマインダ: {reminder.status}</p>)}
+              {detail?.reminders.map((reminder) => <p key={reminder.id}>{reminder.status === 'sent' ? '✓' : '…'} {formatJpDateTime(reminder.scheduledAt)} リマインダ：{reminderDeliveryStatusLabel(reminder.status)}</p>)}
               {isLinked ? <p className="text-ink-faint">お知らせの開封状況は、受信箱で確認できます。</p> : null}
             </div>
           </section>

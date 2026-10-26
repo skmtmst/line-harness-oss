@@ -58,5 +58,5 @@ function statusOf(account: AccountWithStats): { label: string; tone: 'ok' | 'war
 export { type StatusFilter, type View, UNFILED, ALL, STATUS_FILTERS, SORT_OPTIONS, PAGE_SIZES, isArchived, matchesStatus, statusOf }
 
 export function accountMeta(account: AccountWithStats, parent: string | null) {
-  return [accountHandle(account), parent ? `親：${parent}` : null, `権限者 ${formatNumber(account.stats?.staffCount ?? 0)} 人`].filter(Boolean).join(' ・ ')
+  return [accountHandle(account), parent ? `親：${parent}` : null, `権限者 ${formatNumber(account.stats?.staffCount ?? 0)} 人`].filter(Boolean).join('・')
 }

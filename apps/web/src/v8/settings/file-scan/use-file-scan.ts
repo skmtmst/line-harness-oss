@@ -197,7 +197,7 @@ export function useFileScan() {
         externalSecretRef: secretRef.trim() || null,
       })
       if (!res.success) {
-        setActionError('設定を保存できませんでした。')
+        setActionError('設定を保存できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       setConfigOpen(false)

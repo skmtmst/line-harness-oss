@@ -40,7 +40,7 @@
 :root .row { height: var(--polish-table-row); min-height: var(--polish-table-row); font-size: var(--polish-text-body); padding-block: 0; }
 :root .row[data-head] { min-height: var(--polish-table-head); height: var(--polish-table-head); padding-block: 0; background: var(--polish-table-head-bg); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
 :root .row:not([data-head]):hover { background: var(--polish-table-hover); }
-:root .cell[data-align='right'] { text-align: right; font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+:root .cell[data-align='right'] { text-align: right; font-family: var(--font-sans); font-variant-numeric: var(--font-numeric); }
 :root .cell[data-align='right'] + .cell { padding-inline-start: var(--polish-table-number-gap); }
 
 /* ：格子の表も一覧の型で同じ行高にする。 */

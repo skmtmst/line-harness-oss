@@ -56,7 +56,7 @@
 }
 
 /* 箱の中の「?」。★管理画面 `LYs5d`：11px 太字 `ink-secondary`。 */
-.mark { /* fontSize: 11 */
+.mark { /* fontSize: 12 */
 }
 
 .tip {
@@ -188,12 +188,11 @@
 :root .tip {
   display: flex; align-items: flex-start; gap: 0; padding: 6px 10px;
   border: 0; border-radius: var(--polish-radius-small); box-shadow: none;
-  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
-  font-size: 12px; line-height: 18px; font-weight: 400;
+  font-family: var(--font-sans);
+  font-size: 12px; line-height: 18px; font-weight: var(--font-weight-ui);
 }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .tip { -webkit-font-smoothing: antialiased; }
 
 @layer components {
 :root .mark {
@@ -204,7 +203,7 @@
   border-radius: var(--polish-radius-pill);
   background: transparent;
   color: var(--color-ink-faint);
-  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: var(--text-micro);
   line-height: 11px;
 }
@@ -224,7 +223,7 @@
 
 /* ・・：10-10 に採用した共通の形。 */
 html:root .tip { background: var(--color-canvas); color: var(--color-ink); border: 1px solid var(--color-code-border); box-shadow: var(--shadow-float); padding: var(--space-12); }
-html:root .tip a { color: var(--color-action); }
+html:root .tip a { color: var(--color-link); }
 
 .sourceMark { display: inline-flex; width: var(--choice-size); height: var(--choice-size); color: var(--color-ink-secondary); align-items: center; justify-content: center; }
 .sourceMark svg { width: var(--text-caption); height: var(--text-caption); }

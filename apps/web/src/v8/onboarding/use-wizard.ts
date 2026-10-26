@@ -224,7 +224,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
         await loadSummary()
         return
       }
-      notifySaved(`${items.length}件を動かしました`)
+      notifySaved(`${formatNumber(items.length)}件を動かしました`)
       onClose(true)
     } catch (caught) {
       setError(describeApiFailure(caught, '動かす操作'))
@@ -238,3 +238,4 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
 }
 
 import { KIND_WORD } from './wizard-item-kinds'
+import { formatNumber } from '@/lib/format'

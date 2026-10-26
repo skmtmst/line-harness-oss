@@ -23,7 +23,7 @@ export function PartySummary({ party, first, withFee = false }: { party: PartySt
           {withFee && r.fee > 0 ? <p className="flex justify-between gap-3 pl-[3.2em]"><span>指名料（{r.member.staff?.display_name}）</span><span className="liff-num">{yen(r.fee)}</span></p> : null}
         </div>
       ))}
-      <p className="flex items-baseline gap-2 pt-1"><span className="text-xs text-liff-sub">合計</span><span className="text-[15px] font-bold">{`${party.size} 人 ・ ${sum.sequential ? '続けて' : '同時に'} ${sum.minutes} 分 ・ ${yen(sum.price)}`}</span></p>
+      <p className="flex items-baseline gap-2 pt-1"><span className="text-xs text-liff-sub">合計</span><span className="text-[15px] font-bold">{`${party.size} 人・${sum.sequential ? '続けて' : '同時に'} ${sum.minutes} 分・${yen(sum.price)}`}</span></p>
     </div>
   );
 }
@@ -77,7 +77,7 @@ export default function PartyMenuStep({ menu, party, onParty, onChangeMenu }: {
               <div className="flex items-center justify-between gap-3 rounded-(--liff-radius) bg-liff-soft p-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-ink">{mine.name}</p>
-                  <p className="text-xs text-liff-sub">{`${memberMinutes(mine, member) - addonsOf(mine, member).reduce((n, a) => n + a.duration_minutes, 0)} 分 ・ ${bookingPriceText(mine.base_price, mine.price_mode)}`}</p>
+                  <p className="text-xs text-liff-sub">{`${memberMinutes(mine, member) - addonsOf(mine, member).reduce((n, a) => n + a.duration_minutes, 0)} 分・${bookingPriceText(mine.base_price, mine.price_mode)}`}</p>
                 </div>
                 <Button variant="link" onClick={() => (first ? onChangeMenu() : setPicking(index))}>変える</Button>
               </div>
@@ -85,7 +85,7 @@ export default function PartyMenuStep({ menu, party, onParty, onChangeMenu }: {
               <div className="space-y-2" role="radiogroup" aria-label={`${personLabel(index)}のメニュー`}>
                 <Button variant="plain" role="radio" aria-checked className="items-start gap-2.5" onClick={() => setMember(index, { menu: null, addonIds: [] })}>
                   <span className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 border-liff-primary"><span className="h-2 w-2 rounded-full bg-liff-primary" /></span>
-                  <span className="min-w-0"><span className="block text-[13px] font-bold text-ink">1 人目と同じ</span><span className="block text-xs text-liff-sub">{`${menu.name}${menu.duration_minutes} 分 ・ ${bookingPriceText(menu.base_price, menu.price_mode)}`}</span></span>
+                  <span className="min-w-0"><span className="block text-[13px] font-bold text-ink">1 人目と同じ</span><span className="block text-xs text-liff-sub">{`${menu.name}${menu.duration_minutes} 分・${bookingPriceText(menu.base_price, menu.price_mode)}`}</span></span>
                 </Button>
                 <Button variant="plain" role="radio" aria-checked={false} className="items-center gap-2.5" onClick={() => setPicking(index)}>
                   <span className="h-[18px] w-[18px] shrink-0 rounded-full border-2 border-liff-line-strong" />
@@ -102,7 +102,7 @@ export default function PartyMenuStep({ menu, party, onParty, onChangeMenu }: {
                   return (
                     <label key={a.id} className="flex items-center gap-2.5 text-[13px] text-ink">
                       <ChoiceInput type="checkbox" checked={on} disabled={!on && member.addonIds.length >= MAX_ADDONS} onChange={() => toggleAddon(index, a.id)} />
-                      <span>{`${a.name} +${a.duration_minutes} 分 ・ ${yen(a.price)}`}</span>
+                      <span>{`${a.name} +${a.duration_minutes} 分・${yen(a.price)}`}</span>
                     </label>
                   );
                 })}
@@ -131,7 +131,7 @@ function OtherMenuSheet({ onPick, onClose }: { onPick: (m: MenuItem) => void; on
         {failed ? <LoadErrorView onRetry={() => setKey((n) => n + 1)} /> : !menus ? <LoadingView /> : menus.length === 0 ? <p className="text-[13px] text-liff-sub">ほかに選べるメニューがありません。</p> : (
           <ul className="space-y-2">
             {menus.map((m) => (
-              <li key={m.id}><Button variant="option" onClick={() => onPick(m)}><span className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-bold">{m.name}</span><span className="block text-xs text-liff-sub">{`${m.duration_minutes} 分 ・ ${bookingPriceText(m.base_price, m.price_mode)}`}</span></span></Button></li>
+              <li key={m.id}><Button variant="option" onClick={() => onPick(m)}><span className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-bold">{m.name}</span><span className="block text-xs text-liff-sub">{`${m.duration_minutes} 分・${bookingPriceText(m.base_price, m.price_mode)}`}</span></span></Button></li>
             ))}
           </ul>
         )}
@@ -183,7 +183,7 @@ export function PartyStaffStep({ menu, party, onParty, onLoadState }: {
     <div className="space-y-3.5" data-party-step="staff">
       <div>
         <h2 className="text-xl font-bold text-ink">担当を選んでください</h2>
-        <p className="mt-3.5 text-xs leading-[18px] text-liff-sub">{`${party.size} 人 ・ ${sum.sequential ? '続けて' : '同時に'} ${sum.minutes} 分`}</p>
+        <p className="mt-3.5 text-xs leading-[18px] text-liff-sub">{`${party.size} 人・${sum.sequential ? '続けて' : '同時に'} ${sum.minutes} 分`}</p>
       </div>
       <label className={`flex items-center gap-2.5 rounded-(--liff-radius-lg) p-3.5 text-sm font-bold text-ink outline-2 -outline-offset-1 ${allAny ? 'outline-liff-primary' : 'outline-liff-line'}`}>
         <ChoiceInput type="checkbox" checked={allAny}

@@ -26,5 +26,5 @@ export function greeting(name: string | null, now = new Date()): string {
 export function headline(asOf: string | null | undefined, risk: 'normal' | 'warning' | 'danger' | null): string {
   const time = formatDashboardAsOf(asOf)?.replace(/） /, '）')
   const health = risk === 'normal' ? '正常に動いています' : risk === 'warning' ? '確かめることがあります' : risk === 'danger' ? '止まっているところがあります' : '動きを確かめています'
-  return time ? `更新 ${time} ・ ${health}` : health
+  return time ? `更新 ${time}・${health}` : health
 }

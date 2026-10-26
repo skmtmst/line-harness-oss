@@ -1,6 +1,7 @@
 'use client'
 import Notice from '@/components/shared/notice'
 import { RefreshCover } from '@/components/shared/refresh-cover'
+import { formatNumber } from '@/lib/format'
 import { unreadLookup } from '@/components/chats/assignee-unread';
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
 import { buildOperatorRows } from '@/components/chats/inbox-dropdown';
@@ -169,12 +170,12 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                         名前だけだと、`未対応・期限超過` と `河野担当の未対応` の
                         どちらを押せばいいのかが、名前の付け方頼みになる。
                       */}
-                      <span className="text-ink-faint mt-0.5 block truncate text-micro font-normal">
+                      <span className="text-ink-faint mt-0.5 block truncate text-micro font-medium">
                         {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
                       </span>
                     </button>
                     <span className="text-ink-secondary shrink-0 text-xs tabular-nums">
-                      {typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'}
+                      {typeof view.matchCount === 'number' ? `${formatNumber(view.matchCount)}件` : '—件'}
                     </span>
                     <div className="relative shrink-0">
                       <RowMenu
@@ -626,7 +627,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                               {chat.lastMessageDirection === 'outgoing' && (
                                 <span className="text-ink-faint mr-1">返信：</span>
                               )}
-                              {preview || <span className="text-ink-faint italic">(まだメッセージなし)</span>}
+                              {preview || <span className="text-ink-faint italic">（まだメッセージなし）</span>}
                             </p>
                           </div>
                           <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
@@ -684,7 +685,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                * 読み上げには「読み込んでいます」を残す。
                */
               <div role="status" aria-busy="true" data-inbox-list-state="loading">
-                <span className="sr-only">会話を読み込んでいます...</span>
+                <span className="sr-only">会話を読み込んでいます…</span>
                 <DelayedSkeleton
                   loading
                   skeleton={

@@ -16,6 +16,7 @@ import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value';
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import { formatNumber } from '@/lib/format'
 
 
 /*
@@ -52,7 +53,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
       <div className={styles.tools}>
         <SegmentedControl aria-label="履歴の種類" value={filter} onChange={setFilter} options={FILTERS} />
         {historyStatus === 'ready' ? (
-          <span className={styles.count}>{complete ? `${rows.length} 件` : `${rows.length} 件を表示中`}</span>
+          <span className={styles.count}>{complete ? `${formatNumber(rows.length)} 件` : `${formatNumber(rows.length)} 件を表示中`}</span>
         ) : null}
       </div>
 

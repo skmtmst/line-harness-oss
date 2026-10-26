@@ -10,6 +10,7 @@ import Notice from '@/components/shared/notice'
 import { RowMenu } from '@/components/shared/row-actions'
 import styles from './external-import.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { formatNumber } from '@/lib/format'
 
 export type LineMenu = {
   richMenuId: string
@@ -88,7 +89,7 @@ export function ExternalImportWorkspace({
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-ink text-sm font-bold">LINE側にあって、この管理画面に無いメニュー</h2>
-                <span className="text-ink-faint text-xs">{unmanaged.length} 件</span>
+                <span className="text-ink-faint text-xs">{formatNumber(unmanaged.length)} 件</span>
               </div>
               <div className="space-y-2">
                 {unmanaged.map((menu) => {
@@ -103,7 +104,7 @@ export function ExternalImportWorkspace({
                     >
                       <span className="bg-canvas-sunken text-ink-faint flex h-10 items-center justify-center rounded-control">▧</span>
                       <span className="min-w-0"><strong className="text-ink block truncate text-sm">{menu.name || '名前なし'}</strong><span className="text-ink-faint block truncate text-xs">{`${menu.areasCount}面・${switchText(menu)}・画像あり`}</span></span>
-                      <span className="text-ink hidden text-sm font-semibold sm:block">{emptyValue('unknown')}<small className="text-ink-faint block text-micro font-normal">今月</small></span>
+                      <span className="text-ink hidden text-sm font-semibold sm:block">{emptyValue('unknown')}<small className="text-ink-faint block text-micro font-medium">今月</small></span>
                       <span className="text-ink-secondary hidden text-xs sm:block">作成日不明</span>
                       <span className={styles.importTag}>取り込む</span>
                     </button>

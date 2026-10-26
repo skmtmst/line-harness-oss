@@ -45,8 +45,8 @@ export default function CustomerLookScreen() {
   const invalid=customerLookError(draft);if(invalid){setError(invalid);return false}
   const request=generation.current;setSaving(true);setError('')
   try {const result=await api.accountSettings.saveCustomerLook(selectedAccountId,draft,version);if(request!==generation.current)return false;
-   if(!result.success||!result.data)throw new Error(result.error??'保存できませんでした');setSaved(result.data.look);setDraft(result.data.look);setVersion(result.data.version);guard.disarm();notifyToast('お客さまの画面のデザインを保存しました');return true
-  }catch(failure){if(request===generation.current){if(failure instanceof ApiError&&failure.status===409)markConflict();if(!saveErrors.capture(failure))setError(japaneseDetailOf(failure)||'保存できませんでした')}return false}
+   if(!result.success||!result.data)throw new Error(result.error??'保存できませんでした。時間をおいて、もう一度お試しください。');setSaved(result.data.look);setDraft(result.data.look);setVersion(result.data.version);guard.disarm();notifyToast('お客さまの画面のデザインを保存しました');return true
+  }catch(failure){if(request===generation.current){if(failure instanceof ApiError&&failure.status===409)markConflict();if(!saveErrors.capture(failure))setError(japaneseDetailOf(failure)||'保存できませんでした。時間をおいて、もう一度お試しください。')}return false}
   finally{if(request===generation.current)setSaving(false)}
  }
  const reloadLatest=async()=>{

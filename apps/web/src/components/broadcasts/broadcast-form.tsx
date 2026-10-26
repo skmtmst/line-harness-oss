@@ -1123,7 +1123,7 @@ export default function BroadcastForm({
             assetId = saved.data.id; payload = saved.data.payload
           } catch (saveFailure) {
             const fieldFailure = saveErrors.capture(saveFailure);
- if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。'); } return false }
+ if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。時間をおいて、もう一度お試しください。'); } return false }
           finally { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(false) }
         }
         bubble = { id: inlineBubble.id, type: 'rich_message', content: { ...payload, assetId, assetName: content.name, inline: true } }
@@ -1262,7 +1262,7 @@ export default function BroadcastForm({
         <p>{currentStepIndex >= 0 ? <><span data-step-count>{`${currentStepIndex + 1}/${stepOrder.length} ${steps[currentStepIndex]?.label ?? ''}`}</span>{' ・ '}</> : null}<span aria-live="polite">{draftStatusLabel || '下書き・未保存'}</span></p>
       </div>
       {/* ★V8：手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。v7 はこれまでの帯のまま。 */}
-      {<div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} summaries={currentStep ? { basic: title.trim(), audience: confirmAudienceLabel, message: `${bubbles.length}通・${bubbles.map(bubble => String(bubble.content.text ?? typeLabel(bubble.type))).join(' / ')}`, schedule: sendWhenLabel ?? '未設定' } : undefined} /></div>}
+      {<div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} summaries={currentStep ? { basic: title.trim(), audience: confirmAudienceLabel, message: `${formatNumber(bubbles.length)}通・${bubbles.map(bubble => String(bubble.content.text ?? typeLabel(bubble.type))).join(' / ')}`, schedule: sendWhenLabel ?? '未設定' } : undefined} /></div>}
       <Button ref={previewToggleRef} aria-expanded={previewOpen} aria-controls="broadcast-line-preview" className={styles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
     </header>
     {/*
@@ -1363,16 +1363,16 @@ export default function BroadcastForm({
       <div className={styles.checkList}>
         {([
           { key: 'basic', label: '配信名', value: title.trim() || '配信名を入力してください', done: Boolean(title.trim()) && title.trim().length <= TITLE_MAX, move: '基本設定へ戻る' },
-          { key: 'audience', label: '配信対象', value: `${confirmAudienceLabel} ・ ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`} ・ ${exclusionNote ?? '除外の内訳は未取得'}`, done: canConfirm, move: '対象を一覧で見る' },
-          { key: 'message', label: 'メッセージ', value: `${bubbles.length}件 ・ ${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, move: 'メッセージへ戻る' },
-          { key: 'schedule', label: '送信設定', value: `${sendWhenLabel ?? '未設定'} ・ ${quotaNote ?? '送信枠は未確認'}`, done: sendMode === 'now' || Boolean(scheduledDate && scheduledTime), move: '送信設定へ戻る' },
+          { key: 'audience', label: '配信対象', value: `${confirmAudienceLabel}・${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}・${exclusionNote ?? '除外の内訳は未取得'}`, done: canConfirm, move: '対象を一覧で見る' },
+          { key: 'message', label: 'メッセージ', value: `${formatNumber(bubbles.length)}件・${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, move: 'メッセージへ戻る' },
+          { key: 'schedule', label: '送信設定', value: `${sendWhenLabel ?? '未設定'}・${quotaNote ?? '送信枠は未確認'}`, done: sendMode === 'now' || Boolean(scheduledDate && scheduledTime), move: '送信設定へ戻る' },
         ] as const).map((row) => <div className={styles.checkRow} key={row.key}>
           {row.done ? <CheckCircle2 size={18} className="text-success" aria-hidden /> : <AlertTriangle size={18} className="text-warning" aria-hidden />}
           <div><strong>{row.label}</strong><p>{row.value}</p></div><Button variant="secondary" className={styles.textButton} size="compact" onClick={() => goToStep(row.key)}>{row.move}</Button>
         </div>)}
       </div>
       <Notice tone={unconfirmedCount || !canConfirm ? 'warn' : 'info'} action={<Button variant="secondary" className={styles.textButton} size="compact" onClick={() => setPreflightDialogOpen(true)}>配信前チェックを確認</Button>}>
-        {audienceCount === 0 ? 'この条件に当てはまる友だちがいません。条件を変えてください' : audienceCount === null ? '人数を確認してから送れます' : unconfirmedCount ? `${unconfirmedCount}件の確認が残っています` : '配信する内容を確認してください'}
+        {audienceCount === 0 ? 'この条件に当てはまる友だちがいません。条件を変えてください' : audienceCount === null ? '人数を確認してから送れます' : unconfirmedCount ? `${formatNumber(unconfirmedCount)}件の確認が残っています` : '配信する内容を確認してください'}
       </Notice>
       <details className={styles.details}>
         <summary>最終確認の内訳</summary>
@@ -1380,7 +1380,7 @@ export default function BroadcastForm({
           ['対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
           ['除外', exclusionNote ?? '—'], ['除くタグ', tags.find((tag) => tag.id === excludeTagId)?.name ?? 'なし'],
           ['配信日時', sendWhenLabel ?? '未設定'], ['送信枠', quotaNote ?? '—'], ['計算時刻', evaluatedAtLabel ?? '—'],
-          ['メッセージ', `${bubbles.length}通`], ['開封計測', measureOpens ? '有効' : '無効'],
+          ['メッセージ', `${formatNumber(bubbles.length)}通`], ['開封計測', measureOpens ? '有効' : '無効'],
           ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       </details>

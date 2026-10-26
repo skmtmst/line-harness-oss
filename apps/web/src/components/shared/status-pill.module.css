@@ -62,3 +62,6 @@
 html:root .pill { flex-shrink: 0; min-width: max-content; }
 /* 状態の隣の短い対応マークも、札の幅を確保した分だけ切らない。 */
 html:root .pill + [title^='対応マーク：'] { flex-shrink: 0; }
+
+/* 文字の上下の真ん中：英数字が Inter になり和文の字面が約 0.5px 上に寄るので、名前の文字だけを共通の値で下げる（札の大きさは変えない）。 */
+:root .pill .name { translate: 0 var(--text-optical-shift); }

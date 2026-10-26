@@ -129,8 +129,8 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
       referrer: values.referralRewardMiles,
     }).then((res) => {
       if (res.success) setPreview(res.data)
-      else setPreviewError(res.error || '対象を再計算できませんでした')
-    }).catch(() => setPreviewError('対象を再計算できませんでした'))
+      else setPreviewError(res.error || '対象を再計算できませんでした。時間をおいて、もう一度お試しください。')
+    }).catch(() => setPreviewError('対象を再計算できませんでした。時間をおいて、もう一度お試しください。'))
   }
 
   useEffect(() => {

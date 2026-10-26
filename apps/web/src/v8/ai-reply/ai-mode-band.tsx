@@ -185,7 +185,7 @@ export function AutoAnswerConfirmDialog({ open, accountId, accountName, publishe
     <Dialog
       open={open}
       title="自動で答える前の確かめ"
-      titleNote={`Q&A ・ ${accountName}`}
+      titleNote={`Q&A・${accountName}`}
       designNode="NmTj4"
       designWidth={560}
       busy={busy}

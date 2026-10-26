@@ -30,6 +30,7 @@ import { INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, floorOrder, hm, is
 import styles from './reservations.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 export type PhonePreset = { date?: Date; time?: string; tableId?: string; hold?: boolean }
 
@@ -151,7 +152,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
               <>
                 <div className={styles.nextBox}>
                   <p className={styles.nextName}>{`${next.customer_name}さん・${next.guest_count}名`}</p>
-                  <p className={styles.nextMeta}>{`${nextOtherDay ? `${mdWeek(new Date(next.starts_at))} ` : ''}${hm(next.starts_at)}〜${hm(next.ends_at)} ・ ${next.table_id ? tableById.get(next.table_id)?.code ?? next.table_label : '未配席'} ・ ${shortCourse(next.course_name)}`}</p>
+                  <p className={styles.nextMeta}>{`${nextOtherDay ? `${mdWeek(new Date(next.starts_at))} ` : ''}${hm(next.starts_at)}〜${hm(next.ends_at)}・${next.table_id ? tableById.get(next.table_id)?.code ?? next.table_label : '未配席'}・${shortCourse(next.course_name)}`}</p>
 
                 </div>
                 <div className={styles.nextActions}><ReservationSource value={next.source}/>
@@ -167,11 +168,11 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
             <SectionHeader title={<span id="rs-care-title">{isToday ? '今日 気をつけること' : '気をつけること'}</span>}/>
             <p className={styles.sideText}>
               {pending.length > 0
-                ? `・承認待ちが ${pending.length} 件（${pending.map((item) => `${item.customer_name.split(/\s+/)[0]}さん・${sourceName(item.source)}`).join('、')}）`
+                ? `・承認待ちが ${formatNumber(pending.length)} 件（${pending.map((item) => `${item.customer_name.split(/\s+/)[0]}さん・${sourceName(item.source)}`).join('、')}）`
                 : '・承認待ちはありません'}
             </p>
             {allergies.length > 0 ? (
-              <p className={`${styles.sideText} ${styles.sideAlert}`}>{`・アレルギー ${allergies.length} 件（${allergies.map((item) => (item.allergy_note ?? '').replace(/・/g, '')).join('・')}）`}</p>
+              <p className={`${styles.sideText} ${styles.sideAlert}`}>{`・アレルギー ${formatNumber(allergies.length)} 件（${allergies.map((item) => (item.allergy_note ?? '').replace(/・/g, '')).join('・')}）`}</p>
             ) : null}
             {peak >= 0 ? (
               <p className={styles.sideText}>
@@ -183,7 +184,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
           </Card>
           <Card frame="raised" layout="vertical" padding="roomy" className={styles.sideCard} aria-labelledby="rs-break-title">
             <SectionHeader title={<span id="rs-break-title">{`${dayShort(day)}の内訳`}</span>}/>
-            <p className={styles.sideText}>{`予約 ${bookings.length}件・${guests}名`}{' ／ '}{`LINE ${lineCount}・媒体 ${mediaCount}・電話 ${phoneCount}`}{' ／ '}{`押さえ ${holds.length}枠`}</p>
+            <p className={styles.sideText}>{`予約 ${formatNumber(bookings.length)}件・${guests}名`}{' ／ '}{`LINE ${lineCount}・媒体 ${mediaCount}・電話 ${phoneCount}`}{' ／ '}{`押さえ ${holds.length}枠`}</p>
           </Card>
           <Card frame="raised" layout="vertical" padding="roomy" className={styles.sideCard} aria-labelledby="rs-links-title">
             <SectionHeader title={<span id="rs-links-title">つながる先</span>}/>

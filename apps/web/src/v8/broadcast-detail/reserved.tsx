@@ -116,7 +116,7 @@ export default function Reserved({
     { label: '管理名', value: broadcast.title },
     { label: '配信対象', value: `${audienceLabel}${audienceCount === null ? '' : ` ${formatNumber(audienceCount)} 人`}${estimate && estimate.hiddenExcluded > 0 ? `（除く見込み ${formatNumber(estimate.hiddenExcluded)} 人）` : ''}` },
     { label: '送る日時', value: scheduledLabel },
-    { label: 'メッセージ', value: `${messageTypeLabel(broadcast.messageType)} ${bubbleCount} 通` },
+    { label: 'メッセージ', value: `${messageTypeLabel(broadcast.messageType)} ${formatNumber(bubbleCount)} 通` },
     { label: '状態', value: `予約中${approverLabel}` },
   ].map(row => ({ ...row, value: <TruncatedText value={row.value} /> }))
 

@@ -16,6 +16,9 @@ const SRC = join(__dirname, '..', '..')
 const GLOBALS = readFileSync(join(SRC, 'app', 'globals.css'), 'utf8')
 
 function token(name: string): string {
+  // 別の色を指す変数（補足の灰色など）は、指す先の値まで読む。
+  const alias = GLOBALS.match(new RegExp(`--color-${name}:\\s*var\\(--color-([a-z0-9-]+)\\);`))
+  if (alias) return token(alias[1])
   const match = GLOBALS.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?);`))
   if (!match) throw new Error(`--color-${name} が見つからない`)
   const hex = match[1]

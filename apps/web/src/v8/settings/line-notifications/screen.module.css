@@ -13,7 +13,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--color-action);
+  color: var(--color-link);
   font-size: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -246,7 +246,7 @@
   background: none;
   color: var(--color-ink);
   font: inherit;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;

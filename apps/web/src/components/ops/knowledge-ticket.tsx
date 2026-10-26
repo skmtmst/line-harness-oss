@@ -32,7 +32,7 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
     const res = await opsCall(api.ops.knowledge.retry(detail.ticket.id))
     setBusy(false)
     if (res.success) onRefresh()
-    else setError(res.error || '再試行できませんでした')
+    else setError(res.error || '再試行できませんでした。時間をおいて、もう一度お試しください。')
   }
   return <section className="grid gap-2" aria-label="ナレッジの確認">
     <NoteBar>{current?.sourceCurrent
@@ -73,7 +73,7 @@ export function KnowledgeReferences({ references, requestId, busy, onExclude }: 
     const res = await opsCall(api.ops.knowledge.feedback(id, requestId, value))
     setPending(false)
     if (res.success) setFeedback(state => ({ ...state, [`${id}:${references.find(ref => ref.id === id)?.version}`]: value }))
-    else setError(res.error || '保存できませんでした')
+    else setError(res.error || '保存できませんでした。時間をおいて、もう一度お試しください。')
   }
   const open = async (id: string) => {
     setPending(true); setError('')

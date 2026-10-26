@@ -243,7 +243,7 @@ export default function AdsV8() {
     if ((FIELD_REQUIREMENTS.manualLabel.check(manualLabel) !== null)) errors['ad-cost-name'] = '流入元の名前を入れてください'
     if (!manualDay) errors['ad-cost-day'] = '費用の日付を選んでください'
     if ((FIELD_REQUIREMENTS.manualAmount.check(manualAmount) !== null)) errors['ad-cost-amount'] = '費用を入力してください'
-    else if (!Number.isInteger(amount) || amount < 0) errors['ad-cost-amount'] = '費用は0以上の整数(円)で入れてください'
+    else if (!Number.isInteger(amount) || amount < 0) errors['ad-cost-amount'] = '費用は0以上の整数（円）で入れてください'
     setManualFieldErrors(errors)
     if (Object.keys(errors).length) { focusField(Object.keys(errors)[0]); return }
     setManualBusy(true)
@@ -258,7 +258,7 @@ export default function AdsV8() {
         currency: 'JPY',
       })
       if (!res.success) {
-        setManualError(res.error ?? '記録できませんでした')
+        setManualError(res.error ?? '記録できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       setManualOpen(false)

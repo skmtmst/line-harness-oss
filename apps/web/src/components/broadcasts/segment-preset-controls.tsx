@@ -101,14 +101,14 @@ export default function SegmentPresetControls({
       } else {
         setPresets([])
         setPresetsAccountId(null)
-        setLoadError('保存した条件を表示できませんでした。')
+        setLoadError('保存した条件を表示できませんでした。時間をおいて、もう一度お試しください。')
       }
     } catch (saveFailure) {
       if (currentAccountIdRef.current !== requestAccountId || loadGenerationRef.current !== generation) return
       const fieldFailure = saveErrors.capture(saveFailure)
       setPresets([])
       setPresetsAccountId(null)
-      { if (!fieldFailure) setLoadError('保存した条件を表示できませんでした。') }
+      { if (!fieldFailure) setLoadError('保存した条件を表示できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (currentAccountIdRef.current === requestAccountId && loadGenerationRef.current === generation) {
         setLoading(false)

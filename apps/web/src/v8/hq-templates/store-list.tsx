@@ -316,7 +316,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                 variant="secondary"
                 aria-haspopup="menu"
                 aria-expanded={tagQuickOpen}
-                aria-label={tagQuick.length ? `よく使う絞り込み（${tagQuick.length}件で絞り込み中）` : 'よく使う絞り込み'}
+                aria-label={tagQuick.length ? `よく使う絞り込み（${formatNumber(tagQuick.length)}件で絞り込み中）` : 'よく使う絞り込み'}
                 title="よく使う絞り込み"
                 filterActive={tagQuick.length > 0}
                 onClick={() => setTagQuickOpen((open) => !open)}

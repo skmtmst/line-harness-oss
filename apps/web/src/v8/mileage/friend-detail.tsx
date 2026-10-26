@@ -389,12 +389,12 @@ function FriendDetailInner() {
             detail={<span title={[rankProgress.headline, rankProgress.detail].filter(Boolean).join('・')}>{v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${formatNumber(v6Friend.monthChange)}` : `生涯 ${formatNumber(mileage.summary.lifetimeEarned)}・使用 ${formatNumber(mileage.summary.spent)}`}</span>} />
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="確定待ち" value={pendingMiles} unit="マイル"
             detail={historyPartial
-              ? `最新${formatNumber(displayedHistory.length)} 件のうち ${pendingItems.length} 件が確定待ち`
-              : pendingItems.length > 0 ? `${pendingItems.length} 件が確定待ち`
+              ? `最新${formatNumber(displayedHistory.length)} 件のうち ${formatNumber(pendingItems.length)} 件が確定待ち`
+              : pendingItems.length > 0 ? `${formatNumber(pendingItems.length)} 件が確定待ち`
                 : pendingMiles > 0 ? '確定待ちの残高があります。明細を確認してください' : '確定待ちはありません'} />
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="今月たまった" value={monthComplete ? earnedSum : null} unit="マイル"
             detail={<span title={rewardedActions === null ? '付与記録の回数は未取得' : `${formatNumber(rewardedActions)} 回の付与記録`}>{monthComplete
-              ? `できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)} 回`}`
+              ? `できごと ${formatNumber(earnedThisMonth.length)} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)} 回`}`
               : `最新${formatNumber(displayedHistory.length)} 件だけでは数えられません`}</span>} />
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="期限が近い" value={expiring ?? null} unit="マイル" detail={expiringSub} />
         </KpiBand>
@@ -526,7 +526,7 @@ function FriendDetailInner() {
           ) : earnedReasons.map((reason) => (
             <div key={reason.reason} className={styles.summaryLine}>
               <span className={styles.summaryKey} title={reason.reason}>{reason.reason}</span>
-              <span className={styles.summaryValue}>{`${reason.count} 回・${formatMileageNumber(reason.amount)}`}</span>
+              <span className={styles.summaryValue}>{`${formatNumber(reason.count)} 回・${formatMileageNumber(reason.amount)}`}</span>
             </div>
           ))}
         </Card>
@@ -537,7 +537,7 @@ function FriendDetailInner() {
           ) : spentReasons.map((reason) => (
             <div key={reason.reason} className={styles.summaryLine}>
               <span className={styles.summaryKey} title={reason.reason}>{reason.reason}</span>
-              <span className={styles.summaryValue}>{`${reason.count} 回・${formatMileageChange(reason.amount)}`}</span>
+              <span className={styles.summaryValue}>{`${formatNumber(reason.count)} 回・${formatMileageChange(reason.amount)}`}</span>
             </div>
           ))}
           {lastSpend?.occurredAt ? (

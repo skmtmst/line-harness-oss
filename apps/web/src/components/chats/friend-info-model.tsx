@@ -106,7 +106,7 @@ export function ExpandableText({ value, className = '', empty = '未登録' }: {
    * ★V8：空の「未登録」はほかの値と同じ大きさ（13px）・普通の太さで、薄い色にする。
    * 大きさを付けないと親の 16px を継いで、値より大きく見えていた（オーナー指摘）。
    */
-  if (!value) return <span className="text-ink-faint text-label font-normal">{empty}</span>
+  if (!value) return <span className="text-ink-faint text-label font-medium">{empty}</span>
   return (
     <button
       type="button"

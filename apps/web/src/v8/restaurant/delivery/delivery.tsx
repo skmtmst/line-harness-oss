@@ -52,6 +52,7 @@ import SoldOutBoard, { IntakeStopDialog } from './bulk'
 import { DASH, errorMessage, formatClock, storeToday } from './format'
 import { useUberConnection } from './use-uber-connection'
 import styles from './delivery.module.css'
+import { formatNumber } from '@/lib/format'
 
 /** 板の印（撮影と見張りの試験が読む）。 */
 const VIEW_BOARDS = {
@@ -454,7 +455,7 @@ function DeliveryInner() {
     } else {
       setNotice({
         tone: 'warn',
-        text: `${done}件を受け付けました。${failed}件は受け付けられませんでした。もう一度お試しください。`,
+        text: `${done}件を受け付けました。${formatNumber(failed)}件は受け付けられませんでした。もう一度お試しください。`,
       })
     }
   }, [canManage, selectedAccountId, selected, data, loadOrders])
@@ -503,11 +504,11 @@ function DeliveryInner() {
       setStopOpen(false)
       await loadOrders(true)
       if (result.failed.length === 0) {
-        setNotice({ tone: 'success', text: `${result.stopped.length}件のサービスの受付を停止しました。` })
+        setNotice({ tone: 'success', text: `${formatNumber(result.stopped.length)}件のサービスの受付を停止しました。` })
       } else {
         setNotice({
           tone: 'warn',
-          text: `${result.stopped.length}件を停止しました。${result.failed.length}件は停止できませんでした。もう一度お試しください。`,
+          text: `${formatNumber(result.stopped.length)}件を停止しました。${formatNumber(result.failed.length)}件は停止できませんでした。もう一度お試しください。`,
         })
       }
     } catch (err) {

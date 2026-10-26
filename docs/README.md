@@ -793,5 +793,6 @@
 - [友だちやトークがとても多いお店でも画面が遅くならないかを、毎週自動で確かめるよう](release-log/unreleased/1832-kenta-scale-guard.md)
 - [お店の形を選んだ時に入る最初のセットに、友だち追加のあいさつの下書きと、飲食店の](release-log/unreleased/1832-kenta-starter-content.md)
 - [新しいアカウントの初期セットが足りない時に、足りない物だけを止めた状態で入れ直せ](release-log/unreleased/1832-kenta-starter-ensure.md)
+- [直し③⑤（部品と言葉づかい）](release-log/unreleased/1836-kenta-train-m2c-1026.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

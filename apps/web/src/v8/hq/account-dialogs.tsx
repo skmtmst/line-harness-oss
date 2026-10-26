@@ -37,7 +37,7 @@ const RESTORE_TOP = 220
 
 async function stepUpToken(code: string): Promise<string> {
   const res = await api.auth.stepUp({ method: 'totp', value: code, purpose: 'line_account.archive' })
-  if (!res.success) throw new Error(res.error || '認証コードを確認できませんでした。')
+  if (!res.success) throw new Error(res.error || '認証コードを確認できませんでした。時間をおいて、もう一度お試しください。')
   return res.data.token
 }
 
@@ -250,7 +250,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
       }
       onDone()
     } catch (caught) {
-      setError(caught instanceof Error ? otpFailureMessage(caught.message) : 'アーカイブできませんでした。')
+      setError(caught instanceof Error ? otpFailureMessage(caught.message) : 'アーカイブできませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       setBusy(false)
     }

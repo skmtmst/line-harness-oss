@@ -38,7 +38,7 @@ it('注文1件の口を読み、4つの段を時刻つきの行で出す', async
   expect(screen.getByText('マイル +75')).toBeTruthy()
   // 絵 ：日付だけを短く出し、時刻つきの全文は乗せたときに見せる。
   expect(screen.getByText('10/12 予定')).toBeTruthy()
-  expect(screen.getByTitle('10月12日（月）10:00 予定')).toBeTruthy()
+  expect(screen.getByTitle('2026年10月12日 10:00 予定')).toBeTruthy()
   // 済んだ出来事は1行だけ（理由もやり直しも出さない）
   expect(screen.queryByRole('button', { name: 'もう一度やる' })).toBeNull()
   expect(screen.queryByText(/処理済み/)).toBeNull()

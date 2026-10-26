@@ -383,7 +383,7 @@ export default function QuestionEditor({
                 className="text-ink min-w-0 text-left text-sm font-bold"
               >
                 選択肢{index + 1}
-                <span className="text-ink-secondary ml-2 font-normal">
+                <span className="text-ink-secondary ml-2 font-medium">
                   {choice.label || '（未入力）'}
                 </span>
               </button>
@@ -511,7 +511,7 @@ export default function QuestionEditor({
                         {(
                           [
                             { value: 'from_start', label: '最初から' },
-                            { value: 'from_read', label: '(再開)友だちが読んだところから' },
+                            { value: 'from_read', label: '（再開）友だちが読んだところから' },
                           ] as const
                         ).map((opt) => (
                           <RadioCard

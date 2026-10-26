@@ -46,7 +46,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
   if (mode === 'relative') {
     return (
       <div>
-        <label className="block text-xs font-medium text-ink-secondary mb-1">遅延 (分)</label>
+        <label className="block text-xs font-medium text-ink-secondary mb-1">遅延（分）</label>
         <SaveErrorField names={["delayMinutes","value.delayMinutes","delay_minutes","value.delay_minutes"]}><input
           type="number"
           min={0}

@@ -23,6 +23,6 @@ export default function ComposerStickers({ value, onChange }: { value: { package
   return <div className={styles.root}>
     <SegmentedControl size="sticker" aria-label="スタンプの決め方" options={[{ value: 'pick', label: '一覧から選ぶ' }, { value: 'manual', label: '番号を直接入れる' }]} value={mode} onChange={setMode} />
     {mode === 'pick' ? <><div className={styles.packs}>{PACKS.map((item) => <FilterChip size="compact" showCheck={false} key={item.id} selected={pack.id === item.id} onChange={() => setPackId(item.id)}>{item.label}</FilterChip>)}</div><div className={styles.grid}>{pack.stickers.map((id) => <button key={id} type="button" aria-label={`スタンプ ${id}`} aria-pressed={value.packageId === pack.id && value.stickerId === id} onClick={() => onChange({ packageId: pack.id, stickerId: id })}><Thumb id={id} /></button>)}</div></> : <div className={styles.manual}><label>パッケージID<TextField inputMode="numeric" value={value.packageId} onChange={(event) => onChange({ ...value, packageId: event.target.value })} /></label><label>スタンプID<TextField inputMode="numeric" value={value.stickerId} onChange={(event) => onChange({ ...value, stickerId: event.target.value })} /></label></div>}
-    {value.packageId && value.stickerId ? <p>{`選んだスタンプ：パッケージ ${value.packageId} ・ スタンプ ${value.stickerId}`}</p> : null}
+    {value.packageId && value.stickerId ? <p>{`選んだスタンプ：パッケージ ${value.packageId}・スタンプ ${value.stickerId}`}</p> : null}
   </div>
 }

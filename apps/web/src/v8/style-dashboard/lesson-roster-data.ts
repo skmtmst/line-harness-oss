@@ -11,7 +11,7 @@ export async function loadLessonBookings(accountId: string, eventId: string, slo
     const response = await eventsApi.listBookings(accountId, eventId, { slot_id: slotId, limit: 50, page }, { signal })
     if (signal.aborted) throw new Error('名簿の読み込みを中止しました')
     if (!Number.isSafeInteger(response.total) || response.total < 0 || !Array.isArray(response.items)) {
-      throw new Error('名簿の件数を確認できませんでした')
+      throw new Error('名簿の件数を確認できませんでした。時間をおいて、もう一度お試しください。')
     }
     for (const item of response.items) {
       if (seen.has(item.id)) throw new Error('名簿の続きを読み込めませんでした')

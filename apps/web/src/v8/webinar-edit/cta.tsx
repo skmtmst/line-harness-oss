@@ -32,7 +32,7 @@ import { cardFieldProblems, fmtMinSec, parseMinSec } from './cta-validation'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './cta.module.css'
-import { formatTime as polishFormatTime } from '@/lib/format'
+import { formatTime as polishFormatTime, formatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -292,7 +292,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     >
 
       <Card variant="form" gap="normal" aria-labelledby="webinar-cta-title" data-wc-pane="cta">
-        <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? 'CTA カード' : `CTA カード ${ctas.length} 枚`}</h2></div>
+        <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? 'CTA カード' : `CTA カード ${formatNumber(ctas.length)} 枚`}</h2></div>
         <p className={styles.desc}>動画の途中で出す申し込みボタンです。出す時刻は 分:秒 で入れます。</p>
         {message ? <Notice tone="danger">{message}</Notice> : null}
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />

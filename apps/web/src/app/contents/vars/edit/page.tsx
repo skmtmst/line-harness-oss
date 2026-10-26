@@ -12,7 +12,7 @@ function EditCommonVarPageSwitch() {
 export default function EditCommonVarPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中…</div>}>
       {/* 直URLでも共通情報オフのaccountには画面を出さない。 */}
       <FeatureGate feature="common_vars">
         <EditCommonVarPageSwitch />

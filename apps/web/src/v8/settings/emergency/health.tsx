@@ -18,7 +18,7 @@ import { onlyWhenVisible } from '@/lib/visible-polling'
 import styles from './screen.module.css'
 import Notice from '@/components/shared/notice'
 import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
-import { formatTime as polishFormatTime, formatDate as polishFormatDate } from '@/lib/format'
+import { formatTime as polishFormatTime, formatDate as polishFormatDate, formatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -130,7 +130,7 @@ function formatDetectedSince(iso: string | null | undefined): string {
 
 /** LINE行の補足。実数が取れれば「アカウント N 件」。数は作らない。 */
 function lineSub(accountCount: number | null | undefined): string {
-  return typeof accountCount === 'number' ? `アカウント ${accountCount} 件` : 'アカウント'
+  return typeof accountCount === 'number' ? `アカウント ${formatNumber(accountCount)} 件` : 'アカウント'
 }
 
 function mostSevere(items: HealthCheckItem[]): OperationSeverity {
@@ -179,7 +179,7 @@ export function OpenAlerts({
   if (alerts.length === 0) return <p className={styles.alertsNote}>異常の記録はありません。健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</p>
   return (
     <section className={styles.alerts} aria-label="開いている異常">
-      <h2 className={styles.alertsTitle}>{`開いている異常 ${alerts.length} 件`}</h2>
+      <h2 className={styles.alertsTitle}>{`開いている異常 ${formatNumber(alerts.length)} 件`}</h2>
       <div className={styles.alertRows}>
         {alerts.map((alert) => {
           const busy = busyId === alert.id
@@ -187,12 +187,12 @@ export function OpenAlerts({
           const notification = alert.notification.unconfigured > 0
             ? `${alert.notification.unconfigured} 件の通知先が未設定です。担当者または連絡先を設定して再確認できます。`
             : alert.notification.failed > 0
-              ? `${alert.notification.failed} 件の通知が送れませんでした。再送できます。`
+              ? `${formatNumber(alert.notification.failed)} 件の通知が送れませんでした。再送できます。`
               : alert.notification.total === 0
                 ? '通知の準備を確認しています。'
                 : alert.notification.queued + alert.notification.sending > 0
                   ? '通知を送っています。'
-                  : `${alert.notification.sent} 件の通知を送信しました。`
+                  : `${formatNumber(alert.notification.sent)} 件の通知を送信しました。`
           const response = ALERT_RESPONSE_FIRST[alert.checkKey]
           const checkTitle = CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.sub ?? alert.checkKey
           const detail = [
@@ -457,7 +457,7 @@ export function HealthPanelV8({
     : worst
       ? {
         tone: worst.severity === 'danger' ? 'danger' : 'warn',
-        title: `全体の状態：${worst.severity === 'danger' ? 'エラー' : '注意'} ${(worst.severity === 'danger' ? dangers : warnings).length} 件`,
+        title: `全体の状態：${worst.severity === 'danger' ? 'エラー' : '注意'} ${formatNumber((worst.severity === 'danger' ? dangers : warnings).length)} 件`,
         body: `${ALERT_RESPONSE_FIRST[CHECK_KEY_BY_ID[worst.id]].impact}${checkedText ? `最後の確認 ${checkedText}（5分ごとに自動確認）` : ''}`,
       }
       : allNormal

@@ -19,7 +19,7 @@ import { joinDescribedBy, useFieldContext } from './field-context'
  * 使い方:
  *   <RadioCardGroup legend="配信方法" className="grid gap-3 md:grid-cols-3">
  *     <RadioCard name="delivery-method" value="new" checked={...} onChange={...}
- *                title="新しいメッセージを作成" note="一から作ります。" />
+ *                title="新しいメッセージを作る" note="一から作ります。" />
  *   </RadioCardGroup>
  */
 

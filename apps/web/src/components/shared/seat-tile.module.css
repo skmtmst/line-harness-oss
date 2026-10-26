@@ -28,7 +28,7 @@
 
 .joined {
   background: var(--color-accent-soft);
-  outline-color: var(--tpl-rs-line-green);
+  outline-color: var(--color-accent-deep);
 }
 
 .stopped {

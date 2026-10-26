@@ -65,7 +65,7 @@ describe('友だちのタブと権限', () => {
   })
   afterEach(() => store.clear())
 
-  it('タブは絵どおり4つ（UID移行は V8 の移行画面。CSV は友だちを取り込むから行く）', () => {
+  it('タブは絵どおり4つ（UID移行は V8 の移行画面。CSV はCSVから取り込むから行く）', () => {
     expect(FRIENDS_TABS.map((tab) => [tab.label, tab.href])).toEqual([
       ['友だち一覧', '/friends'],
       ['重複検出', '/friends?tab=duplicates'],

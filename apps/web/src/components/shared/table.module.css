@@ -26,7 +26,7 @@
 
 .dateCell {
   color: var(--color-ink-secondary);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: var(--font-numeric);
   white-space: nowrap;
 }
 

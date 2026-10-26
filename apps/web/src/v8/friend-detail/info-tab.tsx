@@ -21,6 +21,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import AllergyField from '@/components/shared/allergy-field'
 import Notice from '@/components/shared/notice'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 情報欄タブ（ の 4.）。その人について決めた項目を2列に並べ、最後に1回保存する。
@@ -166,7 +167,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
         </p>
       ) : ordered.length === 0 ? (
         <div className={styles.centered}>
-          {hiddenPersonalCount > 0 ? <p className={styles.hiddenNote}>個人情報の項目が {hiddenPersonalCount} 件あります。表示には個人情報の閲覧権限が要ります。</p> : null}
+          {hiddenPersonalCount > 0 ? <p className={styles.hiddenNote}>個人情報の項目が {formatNumber(hiddenPersonalCount)} 件あります。表示には個人情報の閲覧権限が要ります。</p> : null}
           <p className={styles.paneNote}>
             {fields.length === 0 && hiddenPersonalCount === 0
               ? '情報欄の項目がまだありません。'
@@ -213,7 +214,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
             })}
           </div></section>)}
 
-          {hiddenPersonalCount > 0 ? <p className={styles.hiddenNote}>個人情報の項目が {hiddenPersonalCount} 件あります。表示には個人情報の閲覧権限が要ります。</p> : null}
+          {hiddenPersonalCount > 0 ? <p className={styles.hiddenNote}>個人情報の項目が {formatNumber(hiddenPersonalCount)} 件あります。表示には個人情報の閲覧権限が要ります。</p> : null}
               {data.warnings.length > 0 ? <Notice tone="warn">
                 <ul>{data.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
               </Notice> : null}

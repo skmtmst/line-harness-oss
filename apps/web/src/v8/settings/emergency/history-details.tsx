@@ -18,6 +18,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import TruncatedText from '@/components/shared/truncated-text'
+import { formatNumber } from '@/lib/format'
 
 export type HistoryDetail = 'incidents' | 'updates' | null
 const HISTORY_FETCH_LIMIT = 200
@@ -83,10 +84,10 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
     {panel === 'incidents' ? <>
       <Field label="表示期間"><Select aria-label="表示期間" size="full" value={period} onChange={(value) => setPeriod(value as 'year' | '30days')} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: '過去30日' }]} /></Field>
       <KpiBand>
-        <KpiCard title="止めた回数" value={null} valueText={ready ? `${entries.length}回${truncated ? '以上' : ''}` : '—'} unit="" detail={period === '30days' ? '過去30日' : 'この1年'} />
+        <KpiCard title="止めた回数" value={null} valueText={ready ? `${formatNumber(entries.length)}回${truncated ? '以上' : ''}` : '—'} unit="" detail={period === '30days' ? '過去30日' : 'この1年'} />
         <KpiCard title="いちばん長かった停止" value={null} valueText={ready && longestMinutes > 0 ? formatMinutesRough(longestMinutes) : '—'} unit="" detail={truncated ? '直近の記録から' : period === '30days' ? '過去30日' : 'この1年'} />
       </KpiBand>
-      {unreadableEntries.length > 0 ? <Notice tone="warn">日付を読み取れない記録が{unreadableEntries.length}件あります。期間の絞り込みから外しています。</Notice> : null}
+      {unreadableEntries.length > 0 ? <Notice tone="warn">日付を読み取れない記録が{formatNumber(unreadableEntries.length)}件あります。期間の絞り込みから外しています。</Notice> : null}
       {state === 'loading' ? <ListState kind="loading" title="記録を読み込んでいます" /> : ready && entries.length === 0 ? <ListState kind="empty" title="この期間の記録はありません" /> : ready ?
         <GridTable label="止めた・戻した記録の一覧" design={{ columns: 'repeat(5, minmax(0, 1fr))', gap: 'var(--tpl-rest3-uh-gap)', rowPadding: 'var(--tpl-rest3-uh-row-pad)', fontSize: 'var(--tpl-rest3-em-body)' }}>
           <GridHeadRow>{['いつ・だれが', '止めたもの', '対象', '理由', '戻した'].map((label) => <GridCell key={label} role="columnheader">{label}</GridCell>)}</GridHeadRow>
@@ -108,8 +109,8 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
             <GridCell role="cell"><TruncatedText value={`${entry.by ?? '自動'}${entry.pr ? ` #${entry.pr}` : ''}`} /></GridCell>
           </GridRow>)}
         </GridTable>}
-      {hiddenCount > 0 ? <p>続きが{hiddenCount}件あります。</p> : null}
-      {pendingCount > 0 ? <p>まだ画面に入っていない変更が{pendingCount}件あります。</p> : null}
+      {hiddenCount > 0 ? <p>続きが{formatNumber(hiddenCount)}件あります。</p> : null}
+      {pendingCount > 0 ? <p>まだ画面に入っていない変更が{formatNumber(pendingCount)}件あります。</p> : null}
     </>}
   </Dialog>
 }

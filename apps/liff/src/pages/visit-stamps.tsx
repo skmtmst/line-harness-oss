@@ -355,7 +355,7 @@ function ShowReward({ redemption, shopName, onBack, onUse }: {
           <Icon name="gift" className="h-8 w-8 text-liff-primary" />
           <p className="text-[30px] leading-[45px] font-bold text-ink">{redemption.rewardName}</p>
           <p className="text-[13px] leading-5 text-liff-sub">{`来店スタンプ ${redemption.stamps}個の特典`}</p>
-          <p className="text-[13px] leading-5 text-liff-sub">{`${jpDateTime(redemption.shownAt, false)}${shortShop ? ` ・ ${shortShop}` : ''}`}</p>
+          <p className="text-[13px] leading-5 text-liff-sub">{`${jpDateTime(redemption.shownAt, false)}${shortShop ? `・${shortShop}` : ''}`}</p>
         </section>
         <p className="flex items-center gap-2 rounded-(--liff-radius) bg-liff-note px-3 py-2.5 text-[13px] leading-5 text-ink">
           <Icon name="info" className="h-4 w-4 shrink-0 text-liff-sat" />

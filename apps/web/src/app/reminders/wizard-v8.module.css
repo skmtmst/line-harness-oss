@@ -144,9 +144,9 @@
 .labelOptional {
   margin-left: var(--tpl-label-tag-gap);
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: var(--text-micro);
   line-height: var(--tpl-text-sm-lh);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 .fieldNote {
   color: var(--color-ink-faint);
@@ -343,7 +343,7 @@
 .countValueUnit {
   margin-left: 2px;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 .countActions {
   margin-left: auto;
@@ -385,7 +385,7 @@
 }
 .stopNote {
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: var(--text-micro);
 }
 
 /* いつも守る決まり。 */
@@ -945,7 +945,7 @@
   border-radius: var(--radius-pill);
   background: var(--v8-bphone-send);
   color: var(--v8-bphone-chrome);
-  font-size: 11px;
+  font-size: var(--text-micro);
   font-weight: 600;
 }
 .phoneSenderName {

@@ -12,6 +12,7 @@ import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { formatNumber } from '@/lib/format'
 
 type Tag = { id: string; name: string; color: string }
 
@@ -239,7 +240,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
           {phase === 'running' && (
             <div className="text-center py-10 text-sm text-ink-faint">
-              <div className="mb-2">適用中...</div>
+              <div className="mb-2">適用中…</div>
               <div className="text-xs text-ink-faint">
                 LINE Messaging API に送信しています
               </div>
@@ -252,7 +253,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 <div className="font-medium mb-1">✓ 完了しました</div>
                 <div className="text-xs">
                   {result.message ??
-                    `${result.total} 名の友だちに適用しました (${result.chunks} chunk)`}
+                    `${formatNumber(result.total)} 名の友だちに適用しました (${result.chunks} chunk)`}
                 </div>
               </Notice>
               <div className="flex justify-end">

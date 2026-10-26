@@ -32,7 +32,7 @@ import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
 
-import { formatYen as polishFormatYen } from '@/lib/format'
+import { formatYen as polishFormatYen, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -272,7 +272,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         <h3 id="rs-phone-who" className={styles.sideTitle}>この方について</h3>
         {history ? (
           <>
-            <p className={styles.breakRow}><span>これまでの来店</span><strong>{`${history.visitCount} 回`}</strong></p>
+            <p className={styles.breakRow}><span>これまでの来店</span><strong>{`${formatNumber(history.visitCount)} 回`}</strong></p>
             <p className={styles.breakRow}><span>前回</span><strong>{lastVisit ? `${jstCalendar(new Date(lastVisit.starts_at)).getUTCMonth() + 1}/${jstCalendar(new Date(lastVisit.starts_at)).getUTCDate()}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : emptyValue('unknown')}</strong></p>
             <p className={styles.breakRow}><span>アレルギー（前回）</span><strong className={lastAllergy ? styles.alertText : undefined}>{lastAllergy || emptyValue('unknown')}</strong></p>
           </>
@@ -347,7 +347,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                     </div>
                   ) : null}
                   {person ? (
-                    <FriendMatchRow name={person.name} selected avatar={false} onClear={() => { setPerson(null); setSearch('') }} description={<StatusBadge dot={false} size="micro" surface="white" tone="success">{`${person.lineUid ? 'LINE 連携済み' : 'LINE 未連携'}${history ? `・来店 ${history.visitCount} 回` : ''}`}</StatusBadge>} />
+                    <FriendMatchRow name={person.name} selected avatar={false} onClear={() => { setPerson(null); setSearch('') }} description={<StatusBadge dot={false} size="micro" surface="white" tone="success">{`${person.lineUid ? 'LINE 連携済み' : 'LINE 未連携'}${history ? `・来店 ${formatNumber(history.visitCount)} 回` : ''}`}</StatusBadge>} />
                   ) : null}
                 </>
               ) : (

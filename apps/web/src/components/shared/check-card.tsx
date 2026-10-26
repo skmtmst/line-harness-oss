@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { CheckboxControl } from './checkbox'
 import styles from './check-card.module.css'
 
 /**
@@ -6,7 +7,7 @@ import styles from './check-card.module.css'
  *
  * 「いくつか選ぶ」選択肢をカードで出す共通部品。radio-card と同じく
  * 本物の input[type=checkbox] を使い、押せる範囲はカード全体。
- * 選ぶと箱が緑に染まり、白いチェックが左下から右上へ描かれる（120ms）。
+ * 四角は共通の CheckboxControl（Checkbox と同じ1種類）。
  */
 export default function CheckCard({
   checked,
@@ -49,18 +50,13 @@ export default function CheckCard({
       ].filter(Boolean).join(' ')}
     >
       <span className={styles.boxWrap}>
-        <input
-          type="checkbox"
-          className={styles.box}
+        <CheckboxControl
           checked={checked}
           disabled={disabled}
-          aria-invalid={invalid || undefined}
+          invalid={invalid}
           aria-describedby={describedBy}
-          onChange={(event) => onChange(event.target.checked)}
+          onCheckedChange={onChange}
         />
-        <svg viewBox="0 0 12 12" className={styles.mark} aria-hidden="true">
-          <path d="M2.6 6.4 4.9 8.8 9.4 3.2" />
-        </svg>
       </span>
       <span className={styles.body}>
         <span className={styles.title}>{title}</span>

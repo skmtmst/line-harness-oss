@@ -303,7 +303,7 @@ export default function EventConfirm() {
       </div>
       <BottomBar>
         <Button variant="primary" onClick={submit} disabled={submitting}>
-          {submitting ? '送信中...' : '申し込む'}
+          {submitting ? '送信中…' : '申し込む'}
         </Button>
         <Button variant="text"
           type="button"

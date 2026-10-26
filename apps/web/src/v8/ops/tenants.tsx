@@ -129,7 +129,7 @@ export default function OpsTenantsV8() {
     setCreateError('')
     const res = await opsCall(api.ops.createTenant(newName.trim(), newRestaurant ? ['restaurant'] : []))
     setCreateBusy(false)
-    if (!res.success) { setCreateError(res.error || '作成できませんでした'); return }
+    if (!res.success) { setCreateError(res.error || '作成できませんでした。時間をおいて、もう一度お試しください。'); return }
     setNewName('')
     setNewRestaurant(false)
     setCreating(false)

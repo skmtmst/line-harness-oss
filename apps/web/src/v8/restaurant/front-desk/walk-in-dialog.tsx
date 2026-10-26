@@ -104,7 +104,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
       designTop={140}
       footerAlign="center"
       title="ウォークインを入れる"
-      description={`いま ${hm(now)} ・ 空いている卓 ${freeAll}`}
+      description={`いま ${hm(now)}・空いている卓 ${freeAll}`}
       busy={busy}
       error={error || undefined}
       confirmLabel="入店にする"

@@ -137,7 +137,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
     <SaveErrorScope errors={errors}><Drawer
       open={open}
       title="配信の受け取り"
-      description={`${friendName} さん ・ 目的ごとに、届けてよいかを記録します`}
+      description={`${friendName} さん・目的ごとに、届けてよいかを記録します`}
       closeAppearance="box"
       heightMode="viewport"
       onClose={onClose}
