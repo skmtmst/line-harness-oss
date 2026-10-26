@@ -1,6 +1,8 @@
-/* スタイルを選ぶ画面（共通節 S）。見本の枠の縦横比は枠が持ち、中身を差し替えても画面が動かない。 */
+/*
+ * スタイルを選ぶ画面（共通節 S）。見本の枠の大きさはプレイヤーが持つ（並べた時は最小版・全部版とも同じ高さ、
+ * 狭い時は縦に積む）。枠で縦横比を決めて切ると、積んだ時に中が欠けるため。
+ */
 .root {
-  --sc-frame-ratio: 12 / 5;
   --sc-check: 14px;
   --sc-caption-lh: 18px;
   --sc-body-lh: 20px;
@@ -60,8 +62,7 @@
 
 .frame {
   width: 100%;
-  aspect-ratio: var(--sc-frame-ratio);
-  overflow: hidden;
+  min-width: 0;
 }
 
 .choose {

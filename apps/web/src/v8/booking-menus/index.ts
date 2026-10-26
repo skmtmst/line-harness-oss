@@ -4,5 +4,3 @@ export { default as BookingSettingsV8 } from './settings'
 export { default as AssignMatrixV8 } from './assign'
 export { AccountIcon, SkeletonRows, StateCard, useV8TabEdit } from './tabs/shared'
 export { bookingChannelsApi } from './lib/booking-channels'
-// お客さまの予約画面の写し。スタイル体験の見本（onboarding）も同じ写しを作り物のデータで使う。
-export { LiffPhoneMenuStep, LiffPhoneStaffStep, LiffPhoneDatetimeStep } from './liff-phone'

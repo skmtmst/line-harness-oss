@@ -1,9 +1,9 @@
 import type { ComponentProps } from 'react'
 import type { AccountStyle, ReservationBoardEntry, ReservationBoardResource, RestaurantFloor, StyleMetricId } from '@line-crm/shared'
 import type { BookingAvailabilitySlot } from '@/lib/api'
-import type { LiffPhoneDatetimeStep, LiffPhoneMenuStep, LiffPhoneStaffStep } from '@/v8/booking-menus'
-import type { FormPhone } from '@/v8/form-edit'
-import type { StyleBoard, StyleRow, StyleSideCard } from '@/v8/style-dashboard'
+import type { LiffPhoneDatetimeStep, LiffPhoneMenuStep, LiffPhoneStaffStep } from '@/v8/booking-menus/public/liff-phone/index'
+import type { FormPhone } from '@/v8/form-edit/public/phone/index'
+import type { StyleBoard, StyleRow, StyleSideCard } from '@/v8/style-dashboard/public/sample-parts/index'
 import type { StarterButton } from '../use-starter-menu'
 
 /*

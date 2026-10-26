@@ -10,7 +10,7 @@
 
 呼び出し側：[v8/dashboard/dashboard.tsx](../dashboard/dashboard.tsx)、[v8/dashboard/first-steps.tsx](../dashboard/first-steps.tsx)、[v8/hq-attention/attention.tsx](../hq-attention/attention.tsx)、[v8/hq-starter-sets/starter-sets.tsx](../hq-starter-sets/starter-sets.tsx)、[v8/rich-menu-sample/sample.tsx](../rich-menu-sample/sample.tsx)、[v8/settings/accounts/accounts.tsx](../settings/accounts/accounts.tsx)、[v8/settings/getting-started/getting-started.tsx](../settings/getting-started/getting-started.tsx)
 
-本体：[icons.tsx](icons.tsx)、[style-experience-player/player.tsx](style-experience-player/player.tsx)（スタイル体験の見本）、[sample-menu.tsx](sample-menu.tsx)、[setup-card.tsx](setup-card.tsx)、[setup-links.tsx](setup-links.tsx)、[style-entry.tsx](style-entry.tsx)、[style-choice-step.tsx](style-choice-step.tsx)、[style-experience-stand-in.tsx](style-experience-stand-in.tsx)（プレイヤーが入るまでの仮）、[wizard.tsx](wizard.tsx)
+本体：[icons.tsx](icons.tsx)、[style-experience-player/player.tsx](style-experience-player/player.tsx)（スタイル体験の見本）、[sample-menu.tsx](sample-menu.tsx)、[setup-card.tsx](setup-card.tsx)、[setup-links.tsx](setup-links.tsx)、[style-entry.tsx](style-entry.tsx)、[style-choice-step.tsx](style-choice-step.tsx)、[wizard.tsx](wizard.tsx)
 
 ## 外に見せる名前（index.ts）
 

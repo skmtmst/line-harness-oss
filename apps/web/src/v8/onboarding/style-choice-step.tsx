@@ -6,7 +6,7 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
-import { STYLE_EXPERIENCE_SCRIPT, StyleExperiencePlayer } from './style-experience-stand-in'
+import { STYLE_EXPERIENCE_SCRIPT, StyleExperiencePlayer } from './style-experience-player'
 import styles from './style-choice-step.module.css'
 
 /*
@@ -57,7 +57,7 @@ export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, dis
           {viewed.can.map((item) => <li key={item.text} className={styles.canItem}><Check aria-hidden="true" className={styles.canIcon} />{item.text}</li>)}
         </ul>
       </section>
-      <Card surface="muted" layout="block" contentPadding="0" className={styles.frame} aria-label="見本">
+      <Card surface="muted" layout="block" contentPadding="var(--polish-space-card)" className={styles.frame} aria-label="見本">
         <StyleExperiencePlayer script={script} style={viewing} switcher="external" variant={variant} data="sample" />
       </Card>
       <div className={styles.choose}>

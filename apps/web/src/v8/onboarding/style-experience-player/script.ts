@@ -1,5 +1,5 @@
 import type { BookingMenu, BookingStaff } from '@/lib/api'
-import type { StyleBoard, StyleRow, StyleSideCard } from '@/v8/style-dashboard'
+import type { StyleBoard, StyleRow, StyleSideCard } from '@/v8/style-dashboard/public/sample-parts/index'
 import { fieldsToLayout, type RestaurantFloor, type ReservationBoardResource } from '@line-crm/shared'
 import type { DashboardScene, DatetimeSample, SampleKpi, SampleReservation, StyleExperienceScript, TalkMessage } from './script-types'
 

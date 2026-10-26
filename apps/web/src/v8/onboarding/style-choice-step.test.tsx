@@ -6,7 +6,7 @@ import type { AccountStyle } from '@line-crm/shared'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 import StyleSetupWizard from './wizard'
 import StyleChoiceStep, { StyleChoiceStatus } from './style-choice-step'
-import { STYLE_EXPERIENCE_SCRIPT } from './style-experience-stand-in'
+import { STYLE_EXPERIENCE_SCRIPT } from './style-experience-player'
 import { STYLE_CHOICES, styleLabel, type StyleState } from './model'
 
 const calls = vi.hoisted(() => ({ save: vi.fn(), closed: vi.fn() }))
@@ -16,7 +16,8 @@ vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: {
   starterItems: vi.fn(async () => ({ success: true, data: { items: [] } })),
 } }))
 vi.mock('@/hooks/use-account-style', () => ({ accountStyleUpdated: vi.fn() }))
-vi.mock('@/components/shared/list-navigation', () => ({
+vi.mock('@/components/shared/list-navigation', async (original) => ({
+  ...(await original<object>()),
   default: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a>,
   useListNavigationRouter: () => ({ push: vi.fn() }),
 }))
