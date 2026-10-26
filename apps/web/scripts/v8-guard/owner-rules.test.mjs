@@ -355,3 +355,19 @@ test('印＋文字の行で、印・文字・右のボタンの上下の真ん�
     assert.deepEqual(await page.evaluate(scanRowCentering), [])
   } finally { await browser.close() }
 })
+
+test('印の無い段でも、同じ幅に並ぶカードの高さが 1px を超えてずれると落ち、幅の違う本文と横の欄・natural の段は数えない', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const card = (h, w = 200) => `<article data-design-part="card" style="width:${w}px;height:${h}px;box-shadow:0 1px 2px #0003">箱</article>`
+    await page.setContent(`<main><div id="grid" style="display:flex;gap:16px;align-items:flex-start">${card(120)}${card(120)}${card(120)}</div>
+      <div id="split" style="display:flex;gap:16px;align-items:flex-start">${card(600, 800)}${card(120, 320)}</div></main>`)
+    const rows = async () => (await page.evaluate(scan)).filter(f => f.kind === 'cardrow')
+    assert.deepEqual(await rows(), [])
+    await page.locator('#grid > article:nth-child(2)').evaluate(el => { el.style.height = '80px' })
+    assert.equal((await rows()).length, 1)
+    await page.locator('#grid').evaluate(el => { el.dataset.cardHeight = 'natural' })
+    assert.deepEqual(await rows(), [])
+  } finally { await browser.close() }
+})
