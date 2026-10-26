@@ -270,6 +270,7 @@
 - [運営 ログイン 2段目の動き（BEHAVIOR.md）](../apps/web/src/v8/login/BEHAVIOR.md)
 - [マイル（V8）の動き](../apps/web/src/v8/mileage/BEHAVIOR.md)
 - [たまる決めごとを作る（V8・create.tsx・板 ctLwT・競合 BnrQp）](../apps/web/src/v8/mileage/earning-rule-new/BEHAVIOR.md)
+- [電話の画面の対応（BEHAVIOR.md）](../apps/web/src/v8/mobile-todo/BEHAVIOR.md)
 - [NEN配信の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-campaigns/BEHAVIOR.md)
 - [健康日記（専用機能）の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-health/BEHAVIOR.md)
 - [会員（専用機能）の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-members/BEHAVIOR.md)
@@ -703,6 +704,7 @@
 - [login のコード案内](../apps/web/src/v8/login/README.md)
 - [mcp-connect のコード案内](../apps/web/src/v8/mcp-connect/README.md)
 - [mileage のコード案内](../apps/web/src/v8/mileage/README.md)
+- [mobile-todo のコード案内](../apps/web/src/v8/mobile-todo/README.md)
 - [nen-campaigns のコード案内](../apps/web/src/v8/nen-campaigns/README.md)
 - [nen-health のコード案内](../apps/web/src/v8/nen-health/README.md)
 - [nen-members のコード案内](../apps/web/src/v8/nen-members/README.md)
@@ -795,5 +797,6 @@
 - [新しいアカウントの初期セットが足りない時に、足りない物だけを止めた状態で入れ直せ](release-log/unreleased/1832-kenta-starter-ensure.md)
 - [直し③⑤（部品と言葉づかい）](release-log/unreleased/1836-kenta-train-m2c-1026.md)
 - [分け方のタグ・シナリオの見本と、本部の初期セットを標準に戻す口](release-log/unreleased/1838-kenta-starter-samples.md)
+- [スマートフォン専用の画面（トークと対応）](release-log/unreleased/0000-kenta-phone-shell-talk.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
