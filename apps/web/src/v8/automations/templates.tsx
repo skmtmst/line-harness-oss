@@ -223,7 +223,7 @@ export default function AutomationTemplatesV8() {
             {visible.map((item) => {
               const triggerText = templateTriggerText(item.triggerLabel)
               return (
-                <Card frame="flat" key={item.key} role="listitem" layout="vertical" padding="compact" gap="tight">
+                <Card key={item.key} role="listitem" layout="vertical" padding="compact" gap="tight">
                   <h2 className={styles.cardTitle} title={item.name}>{item.name}</h2>
                   <dl className={styles.facts}>
                     <div className={styles.fact}>

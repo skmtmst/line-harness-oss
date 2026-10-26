@@ -15,6 +15,7 @@ import { DataTable, Tr, Th, Td } from '@/components/shared/table'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarX2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import Drawer from '@/components/shared/drawer'
 import HelpTip from '@/components/shared/help-tip'
 import SegmentedControl from '@/components/shared/segmented'
@@ -154,11 +155,13 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
       </div>}
     >
       <div className={styles.body}>
-        <dl className={styles.summary}>
-          <div><dt>日時</dt><dd>{dayWithWeekday(summary.startsAt, summary.timeZone)} {hm(summary.startsAt, summary.timeZone)}〜{hm(summary.endsAt, summary.timeZone)}</dd></div>
-          <div><dt>担当</dt><dd>{summary.staffName}</dd></div>
-        </dl>
-        <section className={styles.card} aria-label="繰り返す">
+        <Card as="section" className={styles.summaryFrame} padding="default" gap="tight" aria-label="予約の概要">
+          <dl className={styles.summary}>
+            <div><dt>日時</dt><dd>{dayWithWeekday(summary.startsAt, summary.timeZone)} {hm(summary.startsAt, summary.timeZone)}〜{hm(summary.endsAt, summary.timeZone)}</dd></div>
+            <div><dt>担当</dt><dd>{summary.staffName}</dd></div>
+          </dl>
+        </Card>
+        <Card as="section" className={styles.card} padding="default" gap="normal" aria-label="繰り返す">
           <div className={styles.cardHead}>
             <h3 className={styles.cardTitle}>繰り返す<HelpTip label="繰り返すの説明">毎週・隔週・毎月の同じ曜日・同じ時間で、まとめて予約を入れます。取れない回は保存の前に表で選びます。</HelpTip></h3>
             <Toggle label="繰り返す" checked={on} onChange={setOn} />
@@ -201,7 +204,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
               </DataTable>
             </> : null}
           </> : null}
-        </section>
+        </Card>
         {on && state === 'ready' ? <p className={styles.note}>{formatNumber(list.length)} 回のうち {made} 件を入れます{skipped.length ? `（${skipped.map((o) => dayOf(o.startsAt, summary.timeZone)).join('・')} は飛ばす）` : ''}。保存の直前に空きを確かめ直します。</p> : null}
       </div>
     </Drawer>

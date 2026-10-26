@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Info, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
@@ -136,7 +136,7 @@ export default function HqAttentionV8() {
     <ListPage
       boardId="Kyf8U"
       title="対応が要るもの"
-      help="アカウントごとに、すぐ対応が要るものの件数を出します。件数を押すと、そのアカウントに切り替えて開きます。"
+      help="アカウントごとに、すぐ対応が要るものの件数を出します。件数を押すと、そのアカウントに切り替えて受信箱・予約・配信の画面を開きます。見る権限の無いアカウントは出しません。"
       actions={<Button onClick={() => void load()} busy={loading} busyLabel="読み直しています…"><RefreshCw aria-hidden="true" className={styles.buttonIcon} />すべて読み直す</Button>}
       stats={stats}
       toolbar={toolbar}
@@ -173,7 +173,6 @@ export default function HqAttentionV8() {
           ))}
         </GridTable></div>
       )}
-      <p className={styles.help}><Info aria-hidden="true" className={styles.helpIcon} />件数を押すと、そのアカウントに切り替えて受信箱・予約・配信の画面を開きます。見る権限の無いアカウントは出しません。</p>
       </div>
     </ListPage>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import KpiBand from '@/components/shared/kpi-band'
+import Card from '@/components/shared/card'
 import KpiCard from '@/components/shared/kpi-card'
 
 import { useCallback, useEffect, useState } from 'react'
@@ -64,7 +65,7 @@ const count = (value: number | null, unit: string) => (value === null ? '—（�
 
 function Variant({ variant, winner, metric }: { variant: AbVariantResult; winner: boolean; metric: AbResult['metric'] }) {
   return (
-    <div className={styles.variant} data-winner={winner || undefined}>
+    <Card as="article" className={styles.variant} padding="default" gap="var(--polish-space-field)">
       <div className={styles.variantHead}>
         <span className={styles.variantTitle} title={variant.label ?? undefined}>{`${variant.key} 案${variant.label ? `：${variant.label}` : ''}`}</span>
         {winner ? <StatusBadge tone="success" dot>勝ち</StatusBadge> : null}
@@ -74,7 +75,7 @@ function Variant({ variant, winner, metric }: { variant: AbVariantResult; winner
         <KpiCard detail="" presentation="band" title="クリック率" valueText={pct(variant.clickRate)} value={null} unit="" />
         <KpiCard detail="" presentation="band" title={metric === 'purchase' ? '購入' : '予約'} valueText={metric === 'purchase' ? count(variant.purchases, '件') : count(variant.bookings, '件')} value={null} unit="" />
       </KpiBand>
-    </div>
+    </Card>
   )
 }
 
@@ -107,7 +108,7 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend }: { broadc
   const metricLine = result ? `勝ちの決め方：${METRIC_WORD[result.metric]}・${result.status === 'undecided' ? `${result.decideAfterMinutes / 60} 時間たっても差が小さく決められない` : `${result.decideAfterMinutes / 60} 時間で決めた`}` : ''
   const winner = result?.winner ? result.variants.find((variant) => variant.key === result.winner) : null
   return (
-    <section className={styles.resultCard} aria-labelledby="ab-result-title" data-design-node={result?.status === 'undecided' ? 'Eoi7q' : 'n4kwM'}>
+    <Card as="section" className={styles.resultCard} contentPadding="var(--ab-pad)" aria-labelledby="ab-result-title" data-design-node={result?.status === 'undecided' ? 'Eoi7q' : 'n4kwM'}>
       <div className={styles.settingsHead}>
         <h3 id="ab-result-title" className={styles.title}>A/B の結果</h3>
         <HelpTip label="A/B の結果の説明">試しの数は送れた人で数えます。購入の数が EC から届いていないときは「取得待ち」と出し、0 とは数えません。勝ちは確からしさ 95% 以上・差が 1 ポイント以上のときだけ決めます。</HelpTip>
@@ -162,6 +163,6 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend }: { broadc
         onCancel={() => { if (!busy) setChoose(null) }}
         onConfirm={() => void run()}
       />
-    </section>
+    </Card>
   )
 }

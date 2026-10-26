@@ -17,6 +17,7 @@ export default function StatusBadge({
   helpLabel,
   helpHref,
   dot = true,
+  fill = true,
   surface = 'tinted',
   distinctFrom,
   ...props
@@ -49,6 +50,8 @@ export default function StatusBadge({
    * （「変わる」は点なしの札）。
    */
   dot?: boolean
+  /** 注意・危険の状態を薄い色面で示す。 */
+  fill?: boolean
 }) {
   const label = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
   if (typeof label === 'string' && distinctFrom !== undefined
@@ -59,7 +62,7 @@ export default function StatusBadge({
   const hasHelp = help !== undefined && help !== null
   const heading = helpLabel ? statusLabel(helpLabel) : (typeof label === 'string' ? label : 'この状態')
   return (
-    <span className={classes} data-size={size} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
+    <span className={classes} data-size={size} data-tone={tone} data-fill={fill || undefined} data-design-node="xRvDB" data-surface={surface} {...props}>
       {typeof label === 'string' ? <TruncatedText value={label} /> : label}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>

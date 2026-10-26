@@ -5,7 +5,6 @@ import { operationFailureText } from './health-error'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
-import { TriangleAlert, CircleCheck, Info, OctagonAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import KpiBand from '@/components/shared/kpi-band'
@@ -465,7 +464,6 @@ export function HealthPanelV8({
         : staleItems.length > 0 || snapshotStale
           ? { tone: 'warn', title: '全体の状態：未確認', body: '前回の確認結果が期限切れです。自動確認が止まっている可能性があります。「いますぐ確かめる」で確かめ直してください。' }
           : { tone: 'info', title: '全体の状態：未確認', body: 'まだ確認できていない項目があります。時間をおいて確かめ直してください。' }
-  const BannerIcon = banner.tone === 'good' ? CircleCheck : banner.tone === 'danger' ? OctagonAlert : banner.tone === 'warn' ? TriangleAlert : Info
 
   const acknowledgeAlert = useCallback(async (alert: OperationAlert, note: string) => {
     if (!accountId) return
@@ -510,7 +508,7 @@ export function HealthPanelV8({
   return (
     <>
       {loginSecurityNotice ? <Notice tone="warn" message={loginSecurityNotice} /> : null}
-      <Notice tone={banner.tone === "good" ? "success" : banner.tone} data-tone={banner.tone} role="status" icon={<BannerIcon aria-hidden="true" />} action={<>
+      <Notice tone={banner.tone === "good" ? "success" : banner.tone} data-tone={banner.tone} role="status" action={<>
         {worst ? <Link href={worst.href} className={styles.bannerLink}>{`${worst.sub.split('・')[0]}を開く →`}</Link> : null}
       </>} heading={<>{banner.title}</>}>
         <p className={styles.bannerBody}>{banner.body}</p>

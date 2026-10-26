@@ -34,8 +34,10 @@
 .success::before { background: var(--polish-status-success-dot); }
 .info::before { background: var(--polish-status-info-dot); }
 .warning { color: var(--polish-status-warning-ink); }
+.badge[data-fill='true'].warning { background: var(--color-warning-bg); }
 .warning::before { background: var(--polish-status-warning-dot); }
 .danger { color: var(--polish-status-danger-ink); }
+.badge[data-fill='true'].danger { background: var(--color-danger-bg); }
 .danger::before { background: var(--polish-status-danger-dot); }
 .neutral::before { background: var(--polish-status-neutral-dot); }
 .compact, .micro { font-size: var(--polish-text-support); }

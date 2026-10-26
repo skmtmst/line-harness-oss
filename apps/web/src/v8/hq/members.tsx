@@ -219,7 +219,7 @@ function MembersInner() {
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="r4ARpV"
       title="メンバー"
-      help="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
+      help="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。役割は、オーナー（請求・メンバーまで全部）、管理者、担当者（担当範囲のアカウントだけ）、閲覧のみ（見るだけ）です。"
       actions={ready && canManage ? (
         <Button variant="primary" onClick={openInvite}>
           <Plus aria-hidden="true" className={styles.buttonIcon} />
@@ -282,7 +282,6 @@ function MembersInner() {
               })}
             </GridTable>
 
-            <p className={styles.legend}>役割：オーナー（請求・メンバーまで全部）／管理者／担当者（担当範囲のアカウントだけ）／閲覧のみ（見るだけ）</p>
           </>
         )}
       </PageContent>

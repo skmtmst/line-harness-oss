@@ -155,7 +155,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
     body = summary ? (
       <>
         <div className={styles.summaryRow}>
-          <section className={styles.card} aria-labelledby="setup-inserted">
+          <Card as="section" className={styles.card} contentPadding="var(--polish-space-card)" aria-labelledby="setup-inserted">
             <div className={styles.cardHead}><h3 id="setup-inserted" className={styles.cardTitle}>入った物</h3><span className={styles.cardMeta}>{`${formatNumber(groupInserted(summary.inserted).length)}件`}</span></div>
             <ul className={styles.rows}>
               {groupInserted(summary.inserted).map((group) => (
@@ -167,8 +167,8 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
                 </li>
               ))}
             </ul>
-          </section>
-          <section className={styles.card} aria-labelledby="setup-activate">
+          </Card>
+          <Card as="section" className={styles.card} contentPadding="var(--polish-space-card)" aria-labelledby="setup-activate">
             <div className={styles.cardHead}><h3 id="setup-activate" className={styles.cardTitle}>動かす前に確かめる物</h3><span className={styles.cardMetaEnd}>止めた状態で入っています</span></div>
             <ul className={styles.rows}>
               {summary.activation.length === 0 ? <li className={styles.row}><span className={styles.rowNote}>動かす前に確かめる物はありません。</span></li> : null}
@@ -181,11 +181,11 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
               ))}
             </ul>
             <p className={styles.cardFoot}>自動で送る物は全部止めて入れています。オンにした物だけ、［まとめて動かす］で動き始めます。</p>
-          </section>
+          </Card>
         </div>
         <SetupLinks style={style} />
         {skipped.length > 0 ? (
-          <section className={styles.skipped} aria-labelledby="setup-skipped">
+          <Card as="section" className={styles.skipped} padding="default" gap="var(--polish-space-field)" aria-labelledby="setup-skipped">
             <div className={styles.cardHead}><h3 id="setup-skipped" className={styles.cardTitle}>入れなかった物（あとで設定する）</h3><span className={styles.cardMetaEnd}>はじめにやることに残ります</span></div>
             <ul className={styles.skippedRows}>
               {skipped.map((q) => (
@@ -199,7 +199,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
                 </li>
               ))}
             </ul>
-          </section>
+          </Card>
         ) : null}
       </>
     ) : <ListState kind="loading" title="入った物を読み込んでいます…" />

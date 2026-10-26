@@ -453,7 +453,7 @@ export default function MediaDetailDialog({
             ) : item.kind === 'audio' ? (
               <audio src={displaySrc} controls />
             ) : (
-              <TextLink external href={displaySrc}   className="text-action text-sm font-semibold">PDFを開く</TextLink>
+              <TextLink external href={displaySrc}   className="text-action text-sm font-semibold">PDFへ</TextLink>
             )}
           </div>
 

@@ -163,7 +163,7 @@ describe('狭い幅でも題を「…」で切らない（1280・1152）', () =>
 
   it('ダッシュボードの段の題は行き先を次の行へ回せる（入るときは1行のまま）', async () => {
     const { default: Head } = await import('./head')
-    const { container } = render(<Head title="現在の対応状況" href="/chats" linkLabel="受信箱を見る" />)
+    const { container } = render(<Head title="現在の対応状況" href="/chats" linkLabel="受信箱へ" />)
     expect(container.querySelector('[data-wrap]')).not.toBeNull()
     expect(headerCss).toMatch(/\.root\[data-wrap\] \{\s*flex-wrap: wrap;/)
   })

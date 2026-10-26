@@ -191,7 +191,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
       {lineWarning ? <Notice tone="warn" role="alert" message={lineWarning} /> : null}
       {dayClosures && dayClosures.closures.length > 0 ? (
         <Notice tone="warn" role="status" data-closure-day={dayClosures.day} action={<>
-          <TextLink href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</TextLink>
+          <TextLink href="/restaurant-test/inventory?tab=closures">休業日・貸切へ</TextLink>
         </>}>
           <p className={styles.closureText}>
             {`${dayTitle(dayClosures.day)}は${dayClosures.closures.map((c) => `${KIND_LABEL[c.kind]}（${scopeText(c, tables)}）`).join('・')}です。閉じた時間帯は LINE からの予約を受け付けません。入っている予約は取り消していません。`}

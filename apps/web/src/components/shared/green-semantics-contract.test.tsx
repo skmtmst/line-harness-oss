@@ -47,9 +47,16 @@ describe('補足と成功通知の色を役割に合わせる', () => {
     expect(screen.getByText('保存しました')).toBeTruthy()
     const style = getComputedStyle(container.firstElementChild!)
     expect(style.color).toBe(roleColor('ink-secondary'))
-    const icon = container.querySelector('svg')!
-    expect(getComputedStyle(icon).backgroundColor).toBe(roleColor('success'))
+    const dot = container.querySelector('[data-notice-dot]')!
+    expect(getComputedStyle(dot).backgroundColor).toBe(roleColor('success'))
+    expect(getComputedStyle(dot).width).toBe('8px')
+    expect(getComputedStyle(dot).height).toBe('8px')
     expect(contrastRatio(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5)
+    for (const [tone, color] of [['info', 'status-info'], ['warn', 'status-warn'], ['danger', 'status-danger']] as const) {
+      const { container: toned, unmount } = render(<Notice tone={tone} message="知らせ" />)
+      expect(getComputedStyle(toned.querySelector('[data-notice-dot]')!).backgroundColor).toBe(roleColor(color))
+      unmount()
+    }
   })
 
   it('成功の札は状態を文字で示し、背景との明暗差を保つ', () => {

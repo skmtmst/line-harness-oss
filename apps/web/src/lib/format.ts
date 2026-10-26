@@ -1,15 +1,15 @@
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { formatElapsedMinutes } from './format-duration'
 /*
  * （2026-10-09）：管理画面の日付と数は、この共通書式を使う。
- * 日時は2つの書き方だけにする。表の狭い列は MM/DD HH:mm（今年は年を省く。過去の別年は YYYY/MM/DD）。
- * それ以外は M月D日 HH:mm（今年は年を省き、去年より前だけ YYYY年 を付ける）。店舗の時間帯は指定して保つ。
+ * 日時は2つの書き方だけにする。表の狭い列は MM/DD HH:mm、それ以外は M月D日 HH:mm。
+ * どちらも去年の日付までは年を省き、去年より前と未来年だけ年を付ける。店舗の時間帯は指定して保つ。
  * 24時間以内の出来事は formatRelative で「2時間前」。グラフの軸だけ M/D。
  * 時刻を持たない日付（予約日・期限）は M月D日（曜）。
  * 件数は3桁区切りと単位の前の半角空き、金額は ¥29,800、割合は12.4%。
  * 保存値・CSV・日付入力の機械向け書式は表示の書式と分ける。
  */
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
 
 type DateInput = string | number | Date | null | undefined
@@ -102,19 +102,19 @@ export function formatDate(
   const clock = `${pad2(p.h)}:${pad2(p.min)}`
   if (style === 'time') return clock
   const currentYear = (toParts(now ?? new Date(), timeZone) ?? nowJst()).y
-  const sameYear = p.y === currentYear
-  if (style === 'list-time') return `${sameYear ? '' : `${p.y}/`}${pad2(p.m)}/${pad2(p.d)} ${clock}`
+  const showYear = p.y < currentYear - 1 || p.y > currentYear
+  if (style === 'list-time') return `${showYear ? `${p.y}/` : ''}${pad2(p.m)}/${pad2(p.d)} ${clock}`
   if (style === 'list' || style === 'list-day' || style === 'list-day-weekday') {
-    const day = `${pad2(p.m)}/${pad2(p.d)}`
-    if (!sameYear) return `${p.y}/${day}${style === 'list-day-weekday' ? weekday(p.w) : style === 'list' && p.y > currentYear ? ` ${clock}` : ''}`
+    const day = `${showYear ? `${p.y}/` : ''}${pad2(p.m)}/${pad2(p.d)}`
     if (style === 'list-day-weekday') return `${day}${weekday(p.w)}`
-    return style === 'list-day' ? day : `${day} ${clock}`
+    if (style === 'list') return `${day} ${clock}`
+    return day
   }
-  if (style === 'detail') return `${sameYear ? '' : `${p.y}年`}${p.m}月${p.d}日 ${clock}`
-  return `${sameYear ? '' : `${p.y}年`}${p.m}月${p.d}日${weekday(p.w)}`
+  if (style === 'detail') return `${showYear ? `${p.y}年` : ''}${p.m}月${p.d}日 ${clock}`
+  return `${showYear ? `${p.y}年` : ''}${p.m}月${p.d}日${weekday(p.w)}`
 }
 
-/** 詳細・説明文の日時。今年は M月D日 HH:mm、別の年は YYYY年M月D日 HH:mm。 */
+/** 詳細・説明文の日時。去年までは M月D日 HH:mm、去年より前と未来年は YYYY年を付ける。 */
 export function formatDateTime(value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo'): string {
   return formatDate(value, { style: 'detail', fallback, now, timeZone })
 }
@@ -161,39 +161,23 @@ export function formatRelative(value: DateInput, now?: DateInput, fallback = '�
   const n = nowJst(now)
   const diffMin = Math.floor((n.epoch - p.epoch) / 60_000)
   if (diffMin < 0) return formatDateTime(value, fallback, now)
-  if (diffMin < 1) return 'たった今'
-  if (diffMin < 60) return `${diffMin}分前`
-  if (diffMin < 60 * 24) return `${Math.floor(diffMin / 60)}時間前`
+  if (diffMin < 60 * 24) return formatElapsedMinutes(diffMin)
   return formatDateTime(value, fallback, now)
 }
 
-/**
- * 一覧の行の右上に収める短い時刻（受信箱のトーク一覧など）。暦は日本時間で数える。
- * 今日は 17:51 / 昨日 / 6日前までは 月曜日 / 7日より古い物は MM/DD / 別の年は YYYY/MM/DD。
- * 時計のずれで未来の時刻になったときは、相対の言葉にせず日付で出す。
- */
+/** 受信箱の一覧時刻。24時間以内は相対表示、それより前は狭い列用の共通書式。 */
 export function formatListRecent(value: DateInput, options: { fallback?: string; now?: DateInput } = {}): string {
   const { fallback = '—', now } = options
-  const p = toJst(value)
-  if (!p) return fallback
-  const n = nowJst(now)
-  const dayIndex = (e: number) => Math.floor((e + JST_OFFSET_MS) / 86_400_000)
-  const dayDiff = dayIndex(n.epoch) - dayIndex(p.epoch)
-  if (p.epoch <= n.epoch) {
-    if (dayDiff === 0) return `${pad2(p.h)}:${pad2(p.min)}`
-    if (dayDiff === 1) return '昨日'
-    if (dayDiff < 7) return `${WEEKDAYS[p.w]}曜日`
-  }
-  const day = `${pad2(p.m)}/${pad2(p.d)}`
-  return p.y === n.y ? day : `${p.y}/${day}`
+  const relative = formatRelative(value, now, '')
+  if (/^(?:たった今|\d+分前|\d+時間前)$/.test(relative)) return relative
+  return formatListDateTime(value, fallback, now)
 }
 
-/** 短い時刻の全文（指を乗せたときの title）。「2026年10月25日 17:51（3分前）」。 */
+/** 短い時刻の全文（指を乗せたときの title）。共通日時と相対書式を使う。 */
 export function formatListRecentTitle(value: DateInput, options: { fallback?: string; now?: DateInput } = {}): string {
   const { fallback = '', now } = options
-  const p = toJst(value)
-  if (!p) return fallback
-  const full = `${p.y}年${p.m}月${p.d}日 ${pad2(p.h)}:${pad2(p.min)}`
+  const full = formatDateTime(value, fallback, now)
+  if (!full) return fallback
   const relative = formatRelative(value, now, '')
   return relative.endsWith('前') ? `${full}（${relative}）` : full
 }
@@ -204,8 +188,8 @@ export function formatRange(from: DateInput, to: DateInput, fallback = '—'): s
   const b = toJst(to)
   if (!a || !b) return fallback
   const y = nowJst().y
-  const left = `${a.y === y ? '' : `${a.y}年`}${a.m}月${a.d}日`
-  const right = `${b.y === y ? '' : `${b.y}年`}${b.m}月${b.d}日`
+  const left = `${a.y < y - 1 || a.y > y ? `${a.y}年` : ''}${a.m}月${a.d}日`
+  const right = `${b.y < y - 1 || b.y > y ? `${b.y}年` : ''}${b.m}月${b.d}日`
   return `${left}〜${right}`
 }
 

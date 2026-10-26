@@ -3,7 +3,7 @@
 /*
  * リンク（→つき。Pencil ★V8 `g5Db8`）。
  *
- *   「〇〇へ →」の1つの形。文字 12px/500 の緑（destination-link）・矢印 16px、間 8（§6.5 の 5）
+ *   「〇〇へ →」の1つの形。文字 12px/500 の緑（color-link）・矢印 16px、間 8（§6.5 の 5）
  *   乗せると矢印が 2px 右へ滑る（120ms）
  *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない
  */
@@ -12,11 +12,11 @@
   display: inline-flex;
   align-items: center;
   gap: var(--polish-space-row);
-  color: var(--color-destination-link);
+  color: var(--color-link);
   text-decoration: none;
 }
 
-.root:hover { color: var(--color-destination-link); }
+.root:hover { color: var(--color-link); }
 
 .label {
   font-size: var(--text-caption);
@@ -61,3 +61,7 @@
 /* 押せる範囲は高さ 24 以上（§6.5 の 7）。文字の大きさと並びは変えず、透明な当たりで上下に広げる。 */
 .root { position: relative; }
 .root::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }
+
+.root[data-inline] { display: inline; color: var(--color-link); white-space: nowrap; }
+.root[data-inline] .label { font-size: inherit; line-height: inherit; }
+.root[data-inline]:hover { text-decoration: underline; }

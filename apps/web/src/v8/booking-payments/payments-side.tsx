@@ -63,7 +63,7 @@ export default function PaymentsSide({ accountId, menus, connected = true }: { a
         })}
       </ul>
       {!connected ? <p className={styles.minor}>先払いにするメニューは、Stripe をつないでから選べます。</p> : null}
-      <TextLink href="/booking/menus?tab=menus">メニューの一覧で変える</TextLink>
+      <TextLink href="/booking/menus?tab=menus">メニュー一覧へ</TextLink>
 
       {connected ? <>
       <h2 className={styles.sideTitle}><span className={styles.headRow}>今月のお支払い{testMode ? <TestModeNote size="compact">{null}</TestModeNote> : null}</span></h2>
@@ -72,8 +72,8 @@ export default function PaymentsSide({ accountId, menus, connected = true }: { a
         <div className={styles.sideRow}><dt className={styles.sideName}>返金</dt><dd className={styles.sideValue}>{summary && summary !== 'not-ready' ? formatYen(summary.refundedAmount) : emptyValue('unknown')}</dd></div>
         <div className={styles.sideRow}><dt className={styles.sideName}>期限切れの枠</dt><dd className={styles.sideValue}>{summary && summary !== 'not-ready' ? `${formatNumber(summary.expiredCount)} 件` : emptyValue('unknown')}</dd></div>
       </dl>
-      <TextLink href="/booking/menus?tab=payments&view=records">お支払いの記録を見る</TextLink>
-      <TextLink href="/booking/menus?tab=payments&view=events">Stripe から届いた知らせを見る</TextLink>
+      <TextLink href="/booking/menus?tab=payments&view=records">お支払いの記録へ</TextLink>
+      <TextLink href="/booking/menus?tab=payments&view=events">Stripe から届いた知らせへ</TextLink>
       </> : null}
     </div>
   )
