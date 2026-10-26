@@ -53,7 +53,7 @@ export default function CouponSettings({ accountId, value, onChange, onOptionsLo
       <Toggle checked={value.couponEnabled} disabled={disabled} label="クーポンを渡す"
         onChange={(couponEnabled) => onChange({ ...value, couponEnabled })} />
       <span className={styles.couponSwitchLabel} aria-hidden="true">クーポンを渡す</span>
-      {value.couponEnabled ? <StatusBadge tone="warning" dot={false} size="compact"><Ticket size={12} aria-hidden="true" />クーポン付き QR</StatusBadge> : null}
+      {value.couponEnabled ? <StatusBadge tone="warning" dot={false} size="compact"><Ticket size={16} aria-hidden="true" />クーポン付き QR</StatusBadge> : null}
     </div>
     {value.couponEnabled ? <>
       <Field label="渡すクーポン" required note={selected ? undefined : '公開中で、利用期間内のクーポンを選んでください。'}>

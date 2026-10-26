@@ -114,12 +114,12 @@ export function WizardPriorityStep({ autoReplyId, conflicts, dryRun, effectiveKe
                           {isSelf && (
                             <span className={styles.orderMove}>
                               <Button type="button" disabled={myIndex <= 0} onClick={moveUp}>
-                                <ArrowUp size={14} aria-hidden="true" />
+                                <ArrowUp size={16} aria-hidden="true" />
                                 上へ
                               </Button>
                               {firstConflictAbove && (
                                 <Button type="button" onClick={moveBeforeFirstConflict}>
-                                  <ArrowUpToLine size={14} aria-hidden="true" />
+                                  <ArrowUpToLine size={16} aria-hidden="true" />
                                   {`「${displayName(firstConflictAbove)}」より前へ`}
                                 </Button>
                               )}
@@ -188,7 +188,7 @@ export function WizardPriorityStep({ autoReplyId, conflicts, dryRun, effectiveKe
                     busy={saving}
                     busyLabel="試しています…"
                   >
-                    <Play size={14} aria-hidden="true" />
+                    <Play size={16} aria-hidden="true" />
                     試す
                   </Button>
                 </div>

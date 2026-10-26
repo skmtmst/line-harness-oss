@@ -434,7 +434,7 @@ export default function BulkRunDialog({
         {phase === 'confirm' && preview ? (
           <div className={styles.body}>
             <div className={styles.notice}>
-              <OperationIcon aria-hidden="true" size={18} />
+              <OperationIcon aria-hidden="true" size={20} />
               <div className="min-w-0"><h3 className={styles.blockTitle}>{selectedOperation?.label ?? '一括操作'}</h3>
               <p className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-ink-secondary">{operationSummary}</p>
               {reversible ? <p className={styles.hint}>あとから「取り消し」で元に戻せます</p> : null}</div>

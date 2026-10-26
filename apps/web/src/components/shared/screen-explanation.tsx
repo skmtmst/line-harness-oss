@@ -26,7 +26,7 @@ export default function ScreenExplanation({ title, children, screenKey, titleCla
     try { if (key) localStorage.setItem(key, next ? 'open' : 'closed') } catch { /* 開閉自体は保つ。 */ }
   }
   return <>
-    <div className={`${styles.titleRow} ${titleClassName ?? ''}`}>{title}{children ? <button data-screen-explanation-toggle type="button" className={styles.toggle} aria-expanded={open} aria-controls={id} onClick={toggle}>この画面の説明{open ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}</button> : null}</div>
+    <div className={`${styles.titleRow} ${titleClassName ?? ''}`}>{title}{children ? <button data-screen-explanation-toggle type="button" className={styles.toggle} aria-expanded={open} aria-controls={id} onClick={toggle}>この画面の説明{open ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}</button> : null}</div>
     {children ? <div id={id} className={`${styles.panel} ${panelClassName ?? ''}`} hidden={!open} data-screen-explanation>{children}</div> : null}
   </>
 }

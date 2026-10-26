@@ -1,4 +1,5 @@
 'use client'
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { notifySaved } from '@/components/shared/toast'
 import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -194,7 +195,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
     if (next.domain || next.secret) {
       const field = next.domain ? domainRef.current : secretRef.current
       field?.focus()
-      field?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+      field?.scrollIntoView?.({ block: 'center', behavior: scrollMotion() })
       return
     }
     const events = form.eventTypes.length === 0

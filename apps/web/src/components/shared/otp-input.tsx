@@ -285,7 +285,7 @@ export default function OtpInput({
         ))
       )}
       {busy ? <span className={styles.spinner} aria-hidden="true" /> : null}
-      {success && !busy ? <Check className={styles.check} size={18} aria-hidden="true" /> : null}
+      {success && !busy ? <Check className={styles.check} size={20} aria-hidden="true" /> : null}
     </div>
     {/* 確かめている・通ったを読み上げにも伝える（見た目の輪・✓ と同じ時に）。 */}
     <span className={styles.srOnly} role="status" aria-live="polite">{busy ? '確かめています' : success ? '確認できました' : ''}</span>

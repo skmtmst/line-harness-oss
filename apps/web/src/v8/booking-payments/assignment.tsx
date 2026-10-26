@@ -161,7 +161,7 @@ export function AssignmentSection({ state, kind, canEdit }: { state: AssignmentS
         </div>
         {!staff ? (
           <>
-            <p className={styles.fixedRule}><Lock size={14} aria-hidden="true" />いつも：人数に合う一番小さい卓から入れます（2名を 6 人卓に入れない）</p>
+            <p className={styles.fixedRule}><Lock size={16} aria-hidden="true" />いつも：人数に合う一番小さい卓から入れます（2名を 6 人卓に入れない）</p>
             <h3 className={styles.subTitle}>同じ大きさの卓の中での選び方</h3>
           </>
         ) : null}

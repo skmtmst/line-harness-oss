@@ -199,8 +199,8 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   const exportCsv = () => downloadCsv(autoSettingsToCsv(autoSettings, sentByKey), csvFileName("NEN配信"))
 
   const actions = tab === 'columns'
-    ? (canEdit ? props.topAction ?? <Button href="/nen-campaigns/columns/new"><PenLine size={15} aria-hidden="true" />コラムを書く</Button> : null)
-    : <><Button type="button" onClick={exportCsv} disabled={autoSettings.length === 0}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>{canEdit ? props.topAction : null}</>
+    ? (canEdit ? props.topAction ?? <Button href="/nen-campaigns/columns/new"><PenLine size={16} aria-hidden="true" />コラムを書く</Button> : null)
+    : <><Button type="button" onClick={exportCsv} disabled={autoSettings.length === 0}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>{canEdit ? props.topAction : null}</>
 
   // 取れていないタブの件数に 0 を出さない。
   const countLabel = (base: string, count: number) => (tabError || (loading && settings.length === 0) ? base : `${base} ${count}`)
@@ -228,10 +228,10 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
         <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       <KpiBand data-design="KPIs">
-        <KpiCard presentation="band" title="自動配信" icon={<History size={13} aria-hidden="true" />} help="注文・発送・誕生日などのきっかけで送る配信の数です。" value={settingsUnknown ? null : autoSettings.length} unit="件" detail={settingsUnknown ? kpiMissing : `動いている ${enabledCount}・止めている ${pausedCount}`} />
-        <KpiCard presentation="band" title="今月送った" icon={<CircleHelp size={13} aria-hidden="true" />} help={`今月（日本時間の月初から）送った通数です。先月 ${num(kpis?.sentLastMonth)}通。配信からの注文 ${num(kpis?.orders)}件・${kpis?.orderAmount == null ? '金額未取得' : polishFormatYen(kpis.orderAmount)}（送信後7日以内）。届かなかった ${num(kpis?.undelivered)}通・友だち解除 ${num(kpis?.unfollowed)}・ブロック ${num(kpis?.blocked)}。`} value={kpis?.sentThisMonth ?? null} unit={kpis?.sentThisMonth == null ? '' : '通'} detail={sentDiff == null ? kpiMissing : `先月より ${sentDiff >= 0 ? '+' : ''}${formatNumber(sentDiff)}`} />
-        <KpiCard presentation="band" detailLayout="single" title={tab === 'history' ? '取得不可' : '開封率'} helpLabel={tab === 'history' ? undefined : '開封（コラムを開いた割合）'} icon={<CircleHelp size={13} aria-hidden="true" />} help={tab === 'history' ? '配信ごとの開封は LINE から取れません。' : 'コラムの記事を開いた割合です。自動配信は LINE から一人ずつの開封を取れません。'} value={tab === 'history' ? null : kpis?.openRate ?? null} unit={tab === 'history' || kpis?.openRate == null ? '' : '%'} detail={kpis ? openDetail : kpiMissing} />
-        <KpiCard presentation="band" title="コラム" icon={<Undo2 size={13} aria-hidden="true" />} help="外部サイトの記事へつなぐコラムの本数です。" value={columnsUnknown ? null : columnTotal} unit="本" detail={columnsUnknown ? kpiMissing : `公開中 ${publishedCount}・下書き ${columns.length - publishedCount}`} />
+        <KpiCard presentation="band" title="自動配信" icon={<History size={16} aria-hidden="true" />} help="注文・発送・誕生日などのきっかけで送る配信の数です。" value={settingsUnknown ? null : autoSettings.length} unit="件" detail={settingsUnknown ? kpiMissing : `動いている ${enabledCount}・止めている ${pausedCount}`} />
+        <KpiCard presentation="band" title="今月送った" icon={<CircleHelp size={16} aria-hidden="true" />} help={`今月（日本時間の月初から）送った通数です。先月 ${num(kpis?.sentLastMonth)}通。配信からの注文 ${num(kpis?.orders)}件・${kpis?.orderAmount == null ? '金額未取得' : polishFormatYen(kpis.orderAmount)}（送信後7日以内）。届かなかった ${num(kpis?.undelivered)}通・友だち解除 ${num(kpis?.unfollowed)}・ブロック ${num(kpis?.blocked)}。`} value={kpis?.sentThisMonth ?? null} unit={kpis?.sentThisMonth == null ? '' : '通'} detail={sentDiff == null ? kpiMissing : `先月より ${sentDiff >= 0 ? '+' : ''}${formatNumber(sentDiff)}`} />
+        <KpiCard presentation="band" detailLayout="single" title={tab === 'history' ? '取得不可' : '開封率'} helpLabel={tab === 'history' ? undefined : '開封（コラムを開いた割合）'} icon={<CircleHelp size={16} aria-hidden="true" />} help={tab === 'history' ? '配信ごとの開封は LINE から取れません。' : 'コラムの記事を開いた割合です。自動配信は LINE から一人ずつの開封を取れません。'} value={tab === 'history' ? null : kpis?.openRate ?? null} unit={tab === 'history' || kpis?.openRate == null ? '' : '%'} detail={kpis ? openDetail : kpiMissing} />
+        <KpiCard presentation="band" title="コラム" icon={<Undo2 size={16} aria-hidden="true" />} help="外部サイトの記事へつなぐコラムの本数です。" value={columnsUnknown ? null : columnTotal} unit="本" detail={columnsUnknown ? kpiMissing : `公開中 ${publishedCount}・下書き ${columns.length - publishedCount}`} />
       </KpiBand>
     </>
   )
@@ -363,7 +363,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
             <>
               <span ref={savedRef} className={styles.savedBox}>
                 <Button type="button" aria-haspopup="menu" aria-expanded={savedOpen} onClick={() => setSavedOpen((current) => !current)}>
-                  <Bookmark size={15} aria-hidden="true" />{saved ? savedOptions.find((option) => option.value === saved)?.label : 'よく使う絞り込み'}
+                  <Bookmark size={16} aria-hidden="true" />{saved ? savedOptions.find((option) => option.value === saved)?.label : 'よく使う絞り込み'}
                 </Button>
                 <ActionMenu
                   open={savedOpen}
@@ -674,7 +674,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
             <>
               <span ref={savedRef} className={styles.savedBox}>
                 <Button type="button" aria-haspopup="menu" aria-expanded={savedOpen} onClick={() => setSavedOpen((current) => !current)}>
-                  <Bookmark size={15} aria-hidden="true" />{category || 'よく使う絞り込み'}
+                  <Bookmark size={16} aria-hidden="true" />{category || 'よく使う絞り込み'}
                 </Button>
                 <ActionMenu
                   open={savedOpen}
@@ -808,7 +808,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
           {canEdit ? (
             <span className={styles.buttonRow}>
               <Button type="button" disabled={introDraft === selected.introText || props.savingColumnId === selected.id || !introDraft.trim()} busy={props.savingColumnId === selected.id} busyLabel="保存中…" onClick={() => props.onSaveIntro(selected)}>紹介文を保存する</Button>
-              <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)} busy={props.duplicatingColumnId === selected.id} busyLabel="複製しています"><Copy size={15} aria-hidden="true" />同じ形で書く</Button>
+              <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)} busy={props.duplicatingColumnId === selected.id} busyLabel="複製しています"><Copy size={16} aria-hidden="true" />同じ形で書く</Button>
             </span>
           ) : null}
         </div>
@@ -837,7 +837,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
       {canEdit ? (
         <div className={styles.selectFoot}>
           <TestRecipientPicker friends={props.friends} value={props.testFriendId} onChange={props.onTestFriendChange} accountId={props.accountId} />
-          <Button type="button" disabled={!props.testFriendId || props.testing !== null} busy={props.testing === selected.id} busyLabel="送信中…" onClick={() => props.onTestColumn(selected)}><Send size={15} aria-hidden="true" />自分にテストを送る</Button>
+          <Button type="button" disabled={!props.testFriendId || props.testing !== null} busy={props.testing === selected.id} busyLabel="送信中…" onClick={() => props.onTestColumn(selected)}><Send size={16} aria-hidden="true" />自分にテストを送る</Button>
           <Button type="button" variant="primary" disabled={!columnEnabled || scheduleInvalid} onClick={() => setConfirm({ column: selected, scheduledAt: scheduledIso ?? undefined })}>配信を予約する</Button>
         </div>
       ) : null}

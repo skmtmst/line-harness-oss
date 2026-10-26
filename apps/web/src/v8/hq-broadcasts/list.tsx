@@ -177,13 +177,13 @@ export default function HqBroadcastList() {
 
   const createButton = (full: boolean) => canManage ? (
     <Button variant="primary" href={NEW_HREF} className={full ? 'v8-folder-create w-full' : undefined}>
-      <Plus size={15} aria-hidden="true" />配信を作る
+      <Plus size={16} aria-hidden="true" />配信を作る
     </Button>
   ) : null
 
   const countIn = (id: string) => all.filter((run) => (id === 'none' ? !folderIdOf(run) || !(folders ?? []).some((f) => f.id === folderIdOf(run)) : folderIdOf(run) === id)).length
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? all.length : null, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: 'all', label: 'すべて', count: ready ? all.length : null, icon: <Inbox size={16} aria-hidden="true" /> },
     ...(folders ?? []).map((folder) => ({
       kind: 'folder' as const,
       id: folder.id,
@@ -385,7 +385,7 @@ export default function HqBroadcastList() {
       stats={(
         <KpiBand>
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" density="compact" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
+            <KpiCard key={kpi.key} presentation="band" density="compact" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       )}

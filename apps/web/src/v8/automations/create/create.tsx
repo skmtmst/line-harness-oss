@@ -784,7 +784,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
               <Button disabled={saving || Boolean(blockedReason)} onClick={() => void save(false)} busy={Boolean(saving)} busyLabel="処理中…">下書きを保存</Button>
               {conflict ? (
                 <Button variant="primary" onClick={() => setCompareOpen(true)}>
-                  <ArrowLeftRight size={15} aria-hidden="true" />比べてから保存
+                  <ArrowLeftRight size={16} aria-hidden="true" />比べてから保存
                 </Button>
               ) : (
                 <Button
@@ -801,7 +801,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
                     setActivateConfirmOpen(true)
                   }}
                 >
-                  <Play size={15} aria-hidden="true" />つくって動かす
+                  <Play size={16} aria-hidden="true" />つくって動かす
                 </Button>
               )}
             </>

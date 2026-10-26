@@ -62,9 +62,9 @@ export default function TemplateFolderSelect({
           className="w-full"
         >
           <span className="flex min-w-0 flex-1 items-center gap-2">
-            <Folder aria-hidden="true" size={15} className="shrink-0 text-ink-faint" />
+            <Folder aria-hidden="true" size={16} className="shrink-0 text-ink-faint" />
             <span className="min-w-0 flex-1 truncate text-left">{statusLabel ?? selected?.label ?? 'すべてのフォルダ'}</span>
-            {open ? <ChevronUp aria-hidden="true" size={14} /> : <ChevronDown aria-hidden="true" size={14} />}
+            {open ? <ChevronUp aria-hidden="true" size={16} /> : <ChevronDown aria-hidden="true" size={16} />}
           </span>
         </Button>
       </div>
@@ -97,13 +97,13 @@ export default function TemplateFolderSelect({
                   className={`flex min-h-9 w-full items-center gap-2 rounded-mini px-2.5 py-1.5 text-left text-caption ${selectedOption ? 'bg-accent-soft font-medium text-accent-deep' : 'font-medium text-ink hover:bg-canvas-sunken'}`}
                 >
                   {option.depth ? (
-                    <ChevronRight aria-hidden="true" size={13} className="ml-3 shrink-0 text-ink-faint" />
+                    <ChevronRight aria-hidden="true" size={16} className="ml-3 shrink-0 text-ink-faint" />
                   ) : (
-                    <Folder aria-hidden="true" size={14} className="shrink-0 text-ink-faint" />
+                    <Folder aria-hidden="true" size={16} className="shrink-0 text-ink-faint" />
                   )}
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>
                   <span className="shrink-0 tabular-nums text-ink-faint">{option.count ?? '—'}</span>
-                  {selectedOption ? <Check aria-hidden="true" size={14} className="shrink-0" /> : null}
+                  {selectedOption ? <Check aria-hidden="true" size={16} className="shrink-0" /> : null}
                 </button>
               </li>
             )

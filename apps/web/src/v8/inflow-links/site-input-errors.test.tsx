@@ -23,6 +23,7 @@ vi.mock('@/lib/staff-role', async (original) => ({
 }))
 import { ApiError } from '@/lib/api'
 import SiteScript from './site-script'
+import { scrollMotion } from '@/components/shared/overlay-utils'
 
 afterEach(cleanup)
 it('サイトの不足欄とサーバーが断ったドメインは、欄で一度だけ知らせて移動する', async () => {
@@ -37,7 +38,7 @@ it('サイトの不足欄とサーバーが断ったドメインは、欄で一�
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '追加する', exact: true })) })
   expect(name.getAttribute('aria-invalid')).toBe('true')
   expect(document.activeElement).toBe(name)
-  expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
+  expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: scrollMotion() })
   expect(create).not.toHaveBeenCalled()
 
   fireEvent.change(name, { target: { value: '公式ショップ' } })

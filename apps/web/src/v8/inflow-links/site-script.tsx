@@ -321,8 +321,8 @@ export default function SiteScriptV8() {
                   items={[
                     { id: 'edit', label: '編集', onSelect: () => { setSiteFieldErrors({}); setSiteDialog({ mode: 'edit', site, label: site.label, domainsText: site.domains.join('\n'), error: null }) } },
                     ...(stopped
-                      ? [{ id: 'resume', label: '再開する', icon: <Play size={15} aria-hidden />, onSelect: () => setResumeTarget(site) }]
-                      : [{ id: 'stop', label: '止める', icon: <Pause size={15} aria-hidden />, onSelect: () => { setStopReasonError(''); setStopDialog({ site, reason: '', error: null }) } }]),
+                      ? [{ id: 'resume', label: '再開する', icon: <Play size={16} aria-hidden />, onSelect: () => setResumeTarget(site) }]
+                      : [{ id: 'stop', label: '止める', icon: <Pause size={16} aria-hidden />, onSelect: () => { setStopReasonError(''); setStopDialog({ site, reason: '', error: null }) } }]),
                   ]}
                 />
               ) : null}
@@ -337,7 +337,7 @@ export default function SiteScriptV8() {
   return (
     <SaveErrorScope errors={saveErrors}><DetailPage boardId="XjOte" title="サイトスクリプト" help="ホームページに1行貼ると、サイトを見た人と LINE の友だちを結びつけ、成果も数えられます。"
       contentPadding="var(--tpl-detail-head-pad-bottom) var(--tpl-head-pad-side)"
-      actions={<Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>}>
+      actions={<Button onClick={() => setHelpOpen(true)}><CircleHelp size={16} aria-hidden="true" />貼りかたが分からないときは</Button>}>
       <div className={styles.body}>
         {readonly ? (
           <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
@@ -359,7 +359,7 @@ export default function SiteScriptV8() {
               <p className={styles.lead}>サイトごとにコードを分けます。止めたサイトの成果は数えません。</p>
               {manage ? (
                 <Button onClick={() => { setSiteFieldErrors({}); setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null }) }}>
-                  <Plus size={15} aria-hidden="true" />サイトを追加する
+                  <Plus size={16} aria-hidden="true" />サイトを追加する
                 </Button>
               ) : null}
             </div>
@@ -378,8 +378,8 @@ export default function SiteScriptV8() {
                     <CodeBlock wrap>{snippet}</CodeBlock>
                     {copyFailed ? <Notice tone="danger" className={styles.smallNoticePlacement} >コピーできませんでした。上のコードを選んでコピーしてください。</Notice> : null}
                     <div className={styles.buttons}>
-                      <CopyTextButton variant="primary" icon={<Copy size={15} aria-hidden />} value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー" />
-                      <CopyTextButton variant="secondary" icon={<Mail size={15} aria-hidden />} value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー" />
+                      <CopyTextButton variant="primary" icon={<Copy size={16} aria-hidden />} value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー" />
+                      <CopyTextButton variant="secondary" icon={<Mail size={16} aria-hidden />} value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー" />
                     </div>
                   </>
                 ) : (
@@ -428,7 +428,7 @@ export default function SiteScriptV8() {
                       <p className={styles.faint}>コードを貼ったあと、サイトを開くと数分で表示されます。</p>
                     </>
                   )}
-                  <span><Button onClick={() => void load()} busyLabel="処理中…"><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
+                  <span><Button onClick={() => void load()} busyLabel="処理中…"><RefreshCw size={16} aria-hidden="true" />いま届いているか確かめる</Button></span>
                 </div>
                 <DataTable aria-label="ページごとの表示" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
                   <TableHeadRow data-table-layout="columns">

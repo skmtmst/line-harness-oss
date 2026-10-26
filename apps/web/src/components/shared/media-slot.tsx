@@ -449,7 +449,7 @@ export default function MediaSlot({
       <>
         {kind === 'image' ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className={styles.preview} data-fit={fit} src={value ?? ''} alt={previewAlt ?? title.replace(/を追加$/, '')} />
+          <img width={320} height={240} className={styles.preview} data-fit={fit} src={value ?? ''} alt={previewAlt ?? title.replace(/を追加$/, '')} />
         ) : kind === 'video' ? (
           <video className={styles.preview} data-fit={fit} src={value ?? ''} preload="metadata" muted aria-label={previewAlt ?? valueName ?? noun} />
         ) : (

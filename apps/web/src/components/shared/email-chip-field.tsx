@@ -45,7 +45,7 @@ export function EmailChipField({ value, onValueChange, onBlur, onFocus, onKeyDow
     setCommitted(next.trim())
   }
   return <div className={styles.root}>
-    {showChip ? <Chip><span className={styles.address} title={value.trim()}>{value.trim()}</span><button type="button" className={styles.remove} disabled={disabled} aria-label={`${value.trim()}を外す`} onClick={() => { setCommitted(null); onValueChange(''); document.getElementById(id ?? '')?.focus() }}><X size={14} aria-hidden="true" /></button></Chip> : null}
+    {showChip ? <Chip><span className={styles.address} title={value.trim()}>{value.trim()}</span><button type="button" className={styles.remove} disabled={disabled} aria-label={`${value.trim()}を外す`} onClick={() => { setCommitted(null); onValueChange(''); document.getElementById(id ?? '')?.focus() }}><X size={16} aria-hidden="true" /></button></Chip> : null}
     <TextField {...props} id={id} type="text" inputMode="email" autoComplete="email" disabled={disabled}
       value={showChip ? '' : value} readOnly={showChip || props.readOnly} placeholder={showChip ? '招待は1件ずつです。選ぶとメールを直せます' : props.placeholder} invalid={invalid || Boolean(touched && problem)}
       aria-describedby={[props['aria-describedby'], showError ? errorId : undefined].filter(Boolean).join(' ') || undefined}

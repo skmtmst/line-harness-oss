@@ -420,14 +420,14 @@ function FriendAddRunsInner() {
 
   const rowMenuItems = (item: RunItem): ActionMenuItem[] => {
     const list: ActionMenuItem[] = [
-      { id: 'detail', label: '実行の詳細を開く', icon: <FileText size={14} aria-hidden="true" />, onSelect: () => router.push(detailHref(item.id)) },
+      { id: 'detail', label: '実行の詳細を開く', icon: <FileText size={16} aria-hidden="true" />, onSelect: () => router.push(detailHref(item.id)) },
     ]
     if (!item.friend.redacted && item.friend.id) {
       const friendId = item.friend.id
-      list.push({ id: 'chat', label: 'トークを開く', icon: <MessageCircle size={14} aria-hidden="true" />, onSelect: () => router.push(`/chats?friend=${encodeURIComponent(friendId)}`) })
+      list.push({ id: 'chat', label: 'トークを開く', icon: <MessageCircle size={16} aria-hidden="true" />, onSelect: () => router.push(`/chats?friend=${encodeURIComponent(friendId)}`) })
     }
     if (canManage && (item.status === 'failed' || item.status === 'partial_failed')) {
-      list.push({ id: 'retry', label: 'もう一度実行', icon: <RotateCcw size={14} aria-hidden="true" />, disabled: retrying !== null, onSelect: () => { void retryRun(item) } })
+      list.push({ id: 'retry', label: 'もう一度実行', icon: <RotateCcw size={16} aria-hidden="true" />, disabled: retrying !== null, onSelect: () => { void retryRun(item) } })
     }
     return list
   }
@@ -457,14 +457,14 @@ function FriendAddRunsInner() {
         {canManage ? (
           <Button onClick={() => { setStopError(''); setStopOpen(true) }} disabled={!activeRuleId || stopBusy || ruleState?.status === 'paused'}
             title={!activeRuleId ? '実行結果がまだありません' : undefined}>
-            <Pause size={14} aria-hidden="true" />一時停止する
+            <Pause size={16} aria-hidden="true" />一時停止する
           </Button>
         ) : null}
         <Button href="/friend-add-settings">
-          <Pencil size={14} aria-hidden="true" />設定の一覧へ
+          <Pencil size={16} aria-hidden="true" />設定の一覧へ
         </Button>
         <Button onClick={() => void exportCsv()} disabled={!items.length || csvBusy} busy={csvBusy} busyLabel="書き出しています">
-          <Download size={14} aria-hidden="true" />CSVで書き出す
+          <Download size={16} aria-hidden="true" />CSVで書き出す
         </Button>
       </div>}
     >
@@ -478,12 +478,12 @@ function FriendAddRunsInner() {
 
       <div className={styles.kpis}>
         <KpiBand data-design="KPIs">
-          <KpiCard presentation="band" icon={<UserPlus size={14} aria-hidden="true" />} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
+          <KpiCard presentation="band" icon={<UserPlus size={16} aria-hidden="true" />} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
             detail={`追加の記録 ${summary?.recentEvents == null ? emptyValue('unknown') : formatNumber(summary.recentEvents)}件`} />
-          <KpiCard presentation="band" icon={<Send size={14} aria-hidden="true" />} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={successRate} />
-          <KpiCard presentation="band" icon={<TriangleAlert size={14} aria-hidden="true" />} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
+          <KpiCard presentation="band" icon={<Send size={16} aria-hidden="true" />} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={successRate} />
+          <KpiCard presentation="band" icon={<TriangleAlert size={16} aria-hidden="true" />} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
             detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を始めてからの合計です'} />
-          <KpiCard presentation="band" icon={<Play size={14} aria-hidden="true" />} title="シナリオを始めた" value={summary ? summary.scenarioStarts : null} unit="件" detail="直近28日" />
+          <KpiCard presentation="band" icon={<Play size={16} aria-hidden="true" />} title="シナリオを始めた" value={summary ? summary.scenarioStarts : null} unit="件" detail="直近28日" />
         </KpiBand>
       </div>
 
@@ -491,7 +491,7 @@ function FriendAddRunsInner() {
         <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>{canManage ? (
             <Button variant="primary" onClick={() => void retryAllFailed()} disabled={failedItems.length === 0 || retrying !== null}
               busy={retrying === 'all'} busyLabel="実行しています">
-              <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
+              <RotateCcw size={16} aria-hidden="true" />失敗した処理をもう一度
             </Button>
           ) : null} </>} >案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</Notice>
       ) : null}

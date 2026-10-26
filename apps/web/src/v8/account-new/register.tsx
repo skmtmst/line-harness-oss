@@ -1,5 +1,6 @@
 'use client'
 
+import { scrollMotion } from '@/components/shared/overlay-utils'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
@@ -147,7 +148,7 @@ function AccountRegistrationForm() {
     if (!Object.keys(fieldErrors).length) return
     const invalid = stepPanelRef.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')
     invalid?.focus()
-    invalid?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    invalid?.scrollIntoView?.({ block: 'center', behavior: scrollMotion() })
   }, [fieldErrors, currentStep, sub])
 
   // 端末の下書きがあれば一度だけ戻す（秘密値は書いていないので入れ直す）。
@@ -696,15 +697,15 @@ function AccountRegistrationForm() {
           ) : null}
         </StepContent></div>
         <StickyBar presentation="account-registration" actions={currentStep === 5 ? (
-            <Button href="/hq" variant="primary"><ArrowLeft size={15} aria-hidden="true" />統括コンソールへ戻る</Button>
+            <Button href="/hq" variant="primary"><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
           ) : currentStep === 3 && sub === 1 && !rowsOk ? <>
-            <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={15} aria-hidden="true" />{backLabel}</Button>
-            <Button type="button" variant="primary" disabled={busy || checkRunning} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={15} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
+            <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
+            <Button type="button" variant="primary" disabled={busy || checkRunning} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={16} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
           </> : <>
             {canBack
-              ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={15} aria-hidden="true" />{backLabel}</Button>
+              ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save' || registrationStyle.busy} busyLabel={currentStep === 4 ? '保存しています…' : '登録しています…'}><ArrowRight size={15} aria-hidden="true" />{nextLabel}</Button>
+            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save' || registrationStyle.busy} busyLabel={currentStep === 4 ? '保存しています…' : '登録しています…'}><ArrowRight size={16} aria-hidden="true" />{nextLabel}</Button>
           </>} />
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
@@ -714,6 +715,6 @@ function AccountRegistrationForm() {
 }
 function CopyButton({ value }: { value: string }) {
   return (
-    <CopyTextButton value={value} label="コピーする" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="値をコピー" disabled={value === '—'} />
+    <CopyTextButton value={value} label="コピーする" variant="secondary" icon={<Copy size={16} aria-hidden="true" />} aria-label="値をコピー" disabled={value === '—'} />
   )
 }

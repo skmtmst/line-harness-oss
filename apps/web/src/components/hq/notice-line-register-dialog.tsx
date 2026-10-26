@@ -60,7 +60,7 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
         <div className="flex flex-wrap items-start gap-5">
           {qr ? (
             // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
-            <img src={qr} alt={`${info.accountName} の友だち追加 QR コード`} className="h-44 w-44 rounded-control border border-hairline" />
+            <img width={176} height={176} src={qr} alt={`${info.accountName} の友だち追加 QR コード`} className="h-44 w-44 rounded-control border border-hairline" />
           ) : null}
           <div className="grid min-w-0 flex-1 gap-2 text-caption text-ink">
             <p className="text-label font-medium">{info.accountName}{info.basicId ? `（${info.basicId}）` : ''}</p>

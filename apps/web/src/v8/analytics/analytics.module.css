@@ -935,7 +935,7 @@
   background: var(--color-accent-soft);
 }
 .funnelStep:disabled {
-  cursor: default;
+  cursor: not-allowed;
 }
 .funnelNumber {
   display: inline-flex;

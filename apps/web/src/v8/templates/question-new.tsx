@@ -266,7 +266,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={15} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >
@@ -317,7 +317,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               <div key={choice.key ?? index} className={styles.choice}>
                 <div className={styles.choiceHead}>
                   <span className={styles.choiceNo}>{`選択肢 ${index + 1}`}</span>
-                  <Button type="button" variant="text" disabled={question.choices.length <= 1} title={question.choices.length <= 1 ? '選択肢は1つ以上必要です。' : undefined} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を削除する`}><Trash2 size={14} aria-hidden="true" />削除する</Button>
+                  <Button type="button" variant="text" disabled={question.choices.length <= 1} title={question.choices.length <= 1 ? '選択肢は1つ以上必要です。' : undefined} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を削除する`}><Trash2 size={16} aria-hidden="true" />削除する</Button>
                 </div>
                 <Field label="ボタンの文字（20文字まで）" requirement={fields.requirement(`choice-${index}`)}><SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><TextField {...fields.bind(`choice-${index}`)} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></SaveErrorField></Field>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
@@ -337,7 +337,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           </div>
           <span>
             <Button type="button" variant="text" disabled={question.choices.length >= MAX_CHOICES} title={question.choices.length >= MAX_CHOICES ? `選択肢は${MAX_CHOICES}つまでです。` : undefined} onClick={addChoice}>
-              <Plus size={15} aria-hidden="true" />{`選択肢を足す（最大 ${MAX_CHOICES} つ）`}
+              <Plus size={16} aria-hidden="true" />{`選択肢を足す（最大 ${MAX_CHOICES} つ）`}
             </Button>
           </span>
         </Card>

@@ -52,7 +52,7 @@ export default function BroadcastPhone({
                 ) : photo ? (
                   photo.url ? (
                     // eslint-disable-next-line @next/next/no-img-element -- LINE に送る画像の見本（外部の URL）
-                    <img className={styles.photo} src={photo.url} alt="送る写真" />
+                    <img width={200} height={200} className={styles.photo} src={photo.url} alt="送る写真" />
                   ) : (
                     <span className={`${styles.photo} ${styles.photoEmpty}`}>
                       <ImageIcon aria-hidden="true" />

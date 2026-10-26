@@ -156,6 +156,18 @@ it('preflights a distribution and sends the reviewed token, copy policy and shop
     target: { accountIds: ['a'] },
   });
 });
+it('reads the musubo default and resets the HQ set with the read version and consent', async () => {
+  await hqStyleApi.defaultStarterSet('lesson');
+  await hqStyleApi.resetStarterSet('lesson', { expectedVersion: 3, confirmed: true });
+  expect(mocks.fetchApi.mock.calls.map((c) => [c[0], c[1]?.method ?? 'GET'])).toEqual([
+    ['/api/hq/style-starter-sets/lesson/default', 'GET'],
+    ['/api/hq/style-starter-sets/lesson/reset', 'POST'],
+  ]);
+  expect(JSON.parse(mocks.fetchApi.mock.calls[1][1]!.body as string)).toEqual({
+    expectedVersion: 3,
+    confirmed: true,
+  });
+});
 it('saves KPI choices and reminder draft revision without losing account/version scoping', async () => {
   await styleApi.saveCards(
     'a',

@@ -492,7 +492,7 @@ export default function InflowListV8({
 
   /* ===== フォルダ ===== */
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: accountRows.length, icon: <Inbox size={15} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: accountRows.length, icon: <Inbox size={16} aria-hidden="true" /> },
     ...availableGenres.map((genre) => ({
       kind: 'folder' as const,
       id: genre.name,
@@ -526,7 +526,7 @@ export default function InflowListV8({
   // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = readonly
     ? null
-    : <Button variant="primary" href="/inflow-links/new"><Plus size={15} aria-hidden="true" />流入リンクを作る</Button>
+    : <Button variant="primary" href="/inflow-links/new"><Plus size={16} aria-hidden="true" />流入リンクを作る</Button>
 
   /* ===== 道具の段 ===== */
   const toggleFilter = (next: RouteFilter) => {
@@ -538,7 +538,7 @@ export default function InflowListV8({
       <FilterChip
         selected={filter === 'has-friends'}
         onChange={() => toggleFilter('has-friends')}
-        icon={<UserPlus size={13} aria-hidden="true" />}
+        icon={<UserPlus size={16} aria-hidden="true" />}
         title={routeCountAvailable ? `友だち追加あり ${formatNumber(hasFriendsCount)} 件` : undefined}
       >
         友だち追加あり
@@ -546,7 +546,7 @@ export default function InflowListV8({
       <FilterChip
         selected={filter === 'unconfigured'}
         onChange={() => toggleFilter('unconfigured')}
-        icon={<CircleAlert size={13} aria-hidden="true" />}
+        icon={<CircleAlert size={16} aria-hidden="true" />}
       >
         {routeCountAvailable ? `動きが未設定 ${formatNumber(unconfiguredCount)}` : '動きが未設定'}
       </FilterChip>
@@ -561,7 +561,7 @@ export default function InflowListV8({
   const presetBox = (
     <div className={styles.presetWrap}>
       <Button variant="secondary" onClick={() => setPresetOpen((current) => !current)} aria-expanded={presetOpen}>
-        <Bookmark size={15} aria-hidden="true" />よく使う絞り込み
+        <Bookmark size={16} aria-hidden="true" />よく使う絞り込み
       </Button>
       {presetOpen ? (
         <div className={styles.presetPanel} role="dialog" aria-label="よく使う絞り込みと並び順">
@@ -838,10 +838,10 @@ export default function InflowListV8({
       title="流入と計測"
 
       actions={<div className={styles.headActions}>
-        <Button href="/inflow-links?tab=connections"><Megaphone size={15} aria-hidden="true" />広告とのつなぎ</Button>
+        <Button href="/inflow-links?tab=connections"><Megaphone size={16} aria-hidden="true" />広告とのつなぎ</Button>
         {/* #859: site_tracking が切れているときは口を出さない。直 URL はホスト側の停止画面が出す。 */}
         {visibility.enabled('site_tracking') ? (
-          <Button href="/inflow-links?tab=script"><Code size={15} aria-hidden="true" />サイトスクリプト</Button>
+          <Button href="/inflow-links?tab=script"><Code size={16} aria-hidden="true" />サイトスクリプト</Button>
         ) : null}
       </div>}
       stats={<>
@@ -852,7 +852,7 @@ export default function InflowListV8({
           <KpiCard
             presentation="band"
             title="経路"
-            icon={<Link2 size={13} aria-hidden="true" />}
+            icon={<Link2 size={16} aria-hidden="true" />}
             value={routeCountAvailable ? accountRouteCount : null}
             unit={routeCountAvailable ? '件' : ''}
             loading={loading}
@@ -861,7 +861,7 @@ export default function InflowListV8({
           <KpiCard
             presentation="band"
             title="友だち追加"
-            icon={<Users size={13} aria-hidden="true" />}
+            icon={<Users size={16} aria-hidden="true" />}
             help="集計は累計です（月ごとの内訳は出せません）。経路が分かる人は、流入リンクから友だちになった人です。"
             value={summaryAvailable && summary ? summary.totalFriends : null}
             unit={summaryAvailable && summary ? '人' : ''}
@@ -873,7 +873,7 @@ export default function InflowListV8({
           <KpiCard
             presentation="band"
             title="動きが未設定"
-            icon={<CircleAlert size={13} aria-hidden="true" />}
+            icon={<CircleAlert size={16} aria-hidden="true" />}
             value={routeCountAvailable ? unconfiguredCount : null}
             unit={routeCountAvailable ? '件' : ''}
             loading={loading}
@@ -886,7 +886,7 @@ export default function InflowListV8({
           <KpiCard
             presentation="band"
             title="広告とつないだ"
-            icon={<Megaphone size={13} aria-hidden="true" />}
+            icon={<Megaphone size={16} aria-hidden="true" />}
             value={adConnected ? adConnected.total : null}
             unit={adConnected ? '件' : ''}
             detail={adNamesSub}

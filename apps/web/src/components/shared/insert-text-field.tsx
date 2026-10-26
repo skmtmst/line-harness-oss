@@ -77,25 +77,32 @@ export interface InsertTextFieldProps
   tokenNames?: InsertTokenNames
 }
 
-/* lucide の形（24 の枠・線 2）。札は DOM へ直接書くので、React の印は使えない。 */
-const ICON_PATHS: Record<InsertTokenIcon, string> = {
-  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-  calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
-  idcard: '<path d="M16 10h2"/><path d="M16 14h2"/><path d="M6.17 15a3 3 0 0 1 5.66 0"/><circle cx="9" cy="11" r="2"/><rect x="2" y="5" width="20" height="14" rx="2"/>',
-  braces: '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>',
-  phone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
-  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
-  video: '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
-  store: '<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M2 7h20"/>',
-  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+/*
+ * lucide の形（24 の枠・線 1.75）。札は DOM へ直接書くので、React の印は使えない。
+ * HTML の文字列ではなく要素の名前と属性で持ち、React では要素として描く（文字列を差し込まない）。
+ */
+type IconShape = readonly ['path' | 'circle' | 'rect', Readonly<Record<string, string>>]
+const ICON_SHAPES: Record<InsertTokenIcon, readonly IconShape[]> = {
+  user: [['path', { d: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2' }], ['circle', { cx: '12', cy: '7', r: '4' }]],
+  calendar: [['path', { d: 'M8 2v4' }], ['path', { d: 'M16 2v4' }], ['rect', { width: '18', height: '18', x: '3', y: '4', rx: '2' }], ['path', { d: 'M3 10h18' }]],
+  idcard: [['path', { d: 'M16 10h2' }], ['path', { d: 'M16 14h2' }], ['path', { d: 'M6.17 15a3 3 0 0 1 5.66 0' }], ['circle', { cx: '9', cy: '11', r: '2' }], ['rect', { x: '2', y: '5', width: '20', height: '14', rx: '2' }]],
+  braces: [['path', { d: 'M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1' }], ['path', { d: 'M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1' }]],
+  phone: [['rect', { width: '14', height: '20', x: '5', y: '2', rx: '2', ry: '2' }], ['path', { d: 'M12 18h.01' }]],
+  clock: [['circle', { cx: '12', cy: '12', r: '10' }], ['path', { d: 'M12 6v6l4 2' }]],
+  video: [['path', { d: 'm16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5' }], ['rect', { x: '2', y: '6', width: '14', height: '12', rx: '2' }]],
+  store: [['path', { d: 'm2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7' }], ['path', { d: 'M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8' }], ['path', { d: 'M2 7h20' }]],
+  link: [['path', { d: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' }], ['path', { d: 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' }]],
 }
 
 const escapeHtml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+const shapesHtml = (shapes: readonly IconShape[]) =>
+  shapes.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).map(([name, value]) => `${name}="${escapeHtml(value)}"`).join(' ')}/>`).join('')
+
 function chipHtml(spec: InsertTokenSpec): string {
   return `<span class="${styles.chip}" contenteditable="false" data-token="${escapeHtml(spec.token)}" title="${escapeHtml(spec.hint)}">`
-    + `<svg class="${styles.chipIcon}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[spec.icon]}</svg>`
+    + `<svg class="${styles.chipIcon}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapesHtml(ICON_SHAPES[spec.icon])}</svg>`
     + `<span class="${styles.chipLabel}">${escapeHtml(spec.label)}</span></span>`
 }
 
@@ -696,7 +703,9 @@ export function InsertText({ value, resolvedValue, tokenNames = EMPTY_NAMES, ext
   const pieces = resolvedValue === undefined ? splitInsertTokens(value, extraTokens, tokenNames) : splitResolvedInsertTokens(value, resolvedValue, tokenNames)
   return <>{pieces.map((piece, index) => piece.kind === 'text' ? piece.text : (
     <span key={index} className={styles.chip} title={piece.spec.hint} data-token={piece.spec.token}>
-      <svg className={styles.chipIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_PATHS[piece.spec.icon] }} />
+      <svg className={styles.chipIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {ICON_SHAPES[piece.spec.icon].map(([Shape, attrs], shape) => <Shape key={shape} {...attrs} />)}
+      </svg>
       <span className={styles.chipLabel}>{piece.spec.label}</span>
     </span>
   ))}</>

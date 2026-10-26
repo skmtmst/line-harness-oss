@@ -34,8 +34,8 @@ export default function LedgerMonthNavigation({ anchor, onChange, shareUrl, hist
       <strong aria-live="polite">{monthLabel(monthKey(0, anchor))}</strong>
       <Button onClick={() => onChange(japanDate())}>今日</Button>
       <ListToolbarEnd>
-        {shareUrl ? <CopyTextButton variant="secondary" value={shareUrl} icon={<LinkIcon size={14} aria-hidden="true" />} label="友だち予約URL　コピーする" aria-label="友だち予約URLをコピーする" /> : null}
-        {historyUrl ? <CopyTextButton variant="secondary" value={historyUrl} icon={<LinkIcon size={14} aria-hidden="true" />} label="予約履歴URL　コピーする" aria-label="予約履歴URLをコピーする" /> : null}
+        {shareUrl ? <CopyTextButton variant="secondary" value={shareUrl} icon={<LinkIcon size={16} aria-hidden="true" />} label="友だち予約URL　コピーする" aria-label="友だち予約URLをコピーする" /> : null}
+        {historyUrl ? <CopyTextButton variant="secondary" value={historyUrl} icon={<LinkIcon size={16} aria-hidden="true" />} label="予約履歴URL　コピーする" aria-label="予約履歴URLをコピーする" /> : null}
       </ListToolbarEnd>
     </ListToolbarRow>
   </ListToolbarFrame>

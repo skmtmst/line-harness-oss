@@ -46,3 +46,8 @@ export async function starter(
         definition: standardStarter(style),
       };
 }
+
+/** musubo の標準の組。統括の組を見ずに、標準の保存（tenant_id が無い組）かコードの標準を返す。 */
+export function musuboStarter(db: D1Database, style: AccountStyle) {
+  return starter(db, null, style);
+}

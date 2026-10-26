@@ -357,12 +357,12 @@ export default function TemplateDetailV8() {
       {canMutate ? (
         <div className={styles.sideActions}>
           <Button href={`/broadcasts/new?templatePicker=1&templateId=${encodeURIComponent(id)}`} variant="secondary">
-            <Send size={14} aria-hidden="true" />
+            <Send size={16} aria-hidden="true" />
             一斉配信で使う
           </Button>
           {inUseVersion ? (
             <Button variant="secondary" onClick={() => void duplicate()} busy={duplicating} busyLabel="複製しています…">
-              <Copy size={14} aria-hidden="true" />
+              <Copy size={16} aria-hidden="true" />
               複製する
             </Button>
           ) : null}
@@ -471,7 +471,7 @@ export default function TemplateDetailV8() {
                         <Button variant="secondary" onClick={() => setCompareTarget((current) => (current === version.versionNumber ? null : version.versionNumber))} icon={<GitCompare aria-hidden="true" />}>比べる</Button>
                       ) : null}
                       {canMutate ? (
-                        <Button variant="secondary" onClick={() => { setRevertError(''); setRevertTarget(version.versionNumber) }}><RotateCcw size={14} aria-hidden="true" />この版に戻す</Button>
+                        <Button variant="secondary" onClick={() => { setRevertError(''); setRevertTarget(version.versionNumber) }}><RotateCcw size={16} aria-hidden="true" />この版に戻す</Button>
                       ) : null}
                     </div>
                   ) : null}
@@ -503,7 +503,7 @@ export default function TemplateDetailV8() {
           <div className={styles.dialogFooter}>
             <Button variant="secondary" onClick={() => { setPublishOpen(false); setPublishError('') }} disabled={publishing}>キャンセル</Button>
             <Button variant="primary" onClick={() => void doPublish()} busy={publishing} busyLabel="公開しています…">
-              <Upload size={14} aria-hidden="true" />
+              <Upload size={16} aria-hidden="true" />
               {latestCount > 0 ? `公開する（${latestCount} か所に反映）` : '公開する'}
             </Button>
           </div>
@@ -540,7 +540,7 @@ export default function TemplateDetailV8() {
         footer={(
           <div className={styles.dialogFooter}>
             <Button variant="secondary" onClick={() => setBlockedOpen(false)}>閉じる</Button>
-            <Button variant="secondary" onClick={showAllAndScroll}><List size={14} aria-hidden="true" />使っている所をすべて見る</Button>
+            <Button variant="secondary" onClick={showAllAndScroll}><List size={16} aria-hidden="true" />使っている所をすべて見る</Button>
           </div>
         )}
       >

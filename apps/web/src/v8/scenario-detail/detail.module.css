@@ -94,7 +94,6 @@
 }
 
 .iconButton:disabled {
-  color: var(--color-ink-disabled);
   cursor: not-allowed;
 }
 
@@ -794,3 +793,7 @@ button.stepTitle:hover {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
 }
+
+/* 「＋ ここに挿入」の押せる範囲は高さ 24（§6.5 の 7）。行の高さは変えない。 */
+.insertRow > button { position: relative; }
+.insertRow > button::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }

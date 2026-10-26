@@ -68,7 +68,7 @@
 .cheadStar svg { width: var(--tpl-inbox-chead-star-icon); height: var(--tpl-inbox-chead-star-icon); }
 .cheadStar[aria-pressed='true'] { background: var(--color-status-warn-soft); outline-color: var(--color-warning); color: var(--color-warning); }
 .cheadSquare[aria-expanded='true'] { background: var(--color-surface-pearl); }
-.cheadSquare:disabled { cursor: wait; opacity: 0.6; }
+.cheadSquare:disabled { cursor: wait; opacity: var(--polish-disabled-opacity); }
 
 .cheadName:focus-visible, .cheadSquare:focus-visible, .cheadBack:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 }

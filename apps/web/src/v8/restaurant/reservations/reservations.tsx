@@ -58,7 +58,7 @@ function HeadControls({ storePicker, view, day, storeId, busy, canWrite, onView,
       {canWrite ? (
         <span className={styles.headButtons}>
           <RowActions subjectName="予約台帳" menuItems={[{id:"waitlist",label:"キャンセル待ちを見る",disabled:busy||!storeId,onSelect:()=>setWaitOpen(true)}]}/>
-          <Button presentation="restaurant" disabled={busy} onClick={() => onPhone({ date: day, hold: true })}><Lock size={15} aria-hidden="true" />枠を押さえる</Button>
+          <Button presentation="restaurant" disabled={busy} onClick={() => onPhone({ date: day, hold: true })}><Lock size={16} aria-hidden="true" />枠を押さえる</Button>
           <Button presentation="restaurant" variant="primary" disabled={busy} onClick={() => onPhone({ date: day })}><Phone size={16} aria-hidden="true" />電話の予約を入れる</Button>
         </span>
       ) : null}

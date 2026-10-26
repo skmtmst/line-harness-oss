@@ -11,7 +11,7 @@ export default function BookingsTab({ accountId, friendId, friendName, canEdit }
     <div className={styles.bookingsStack}>
       <EntitlementsCard accountId={accountId} friendId={friendId} friendName={friendName} canEdit={canEdit} />
       <EmptyTab
-        icon={<CalendarDays size={17} />}
+        icon={<CalendarDays size={16} />}
         title="この友だちの予約だけを集めた画面はまだありません"
         text="予約の一覧からはこの人の予約を探せます。"
         actions={[{ label: '予約一覧を見る ↗', href: '/booking/bookings' }]}

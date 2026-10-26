@@ -228,11 +228,11 @@ export default function AccountDetailV8() {
     <div className={styles.headActions}>
       {canManage ? (
         <Button type="button" onClick={() => setEditing(true)}>
-          <Pencil size={14} aria-hidden="true" />編集する
+          <Pencil size={16} aria-hidden="true" />編集する
         </Button>
       ) : null}
       <Button href={`/accounts/handover?id=${account.id}`}>
-        <ArrowLeftRight size={14} aria-hidden="true" />乗り換え
+        <ArrowLeftRight size={16} aria-hidden="true" />乗り換え
       </Button>
     </div>
   )
@@ -350,7 +350,7 @@ export default function AccountDetailV8() {
             <Card variant="aside" aria-labelledby="acd-cando">
               <CardHeader size="stacked" headingLevel={3} titleId="acd-cando" title="このアカウントでできること" />
               <p className={styles.bullets}>{CAN_DO}</p>
-              <Button href="/?qr=base" className={styles.fit}><QrCode size={14} aria-hidden="true" />友だち追加URLとQRを見る</Button>
+              <Button href="/?qr=base" className={styles.fit}><QrCode size={16} aria-hidden="true" />友だち追加URLとQRを見る</Button>
             </Card>
             <Card variant="aside" aria-labelledby="acd-careful">
               <CardHeader size="stacked" headingLevel={3} titleId="acd-careful" title="気をつけること" />
@@ -368,12 +368,12 @@ export default function AccountDetailV8() {
               <div className={styles.actions}>
                 {account.archivedAt ? (
                   <Button type="button" onClick={() => setRestoreTarget(account)}>
-                    <ArchiveRestore size={14} aria-hidden="true" />アーカイブから戻す
+                    <ArchiveRestore size={16} aria-hidden="true" />アーカイブから戻す
                   </Button>
                 ) : (
                   <>
                     <Button type="button" onClick={() => setStopTarget(account)}>
-                      {account.isActive ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
+                      {account.isActive ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
                       {account.isActive ? '送受信を止める' : '送受信を再開する'}
                     </Button>
                     <Button type="button" variant="danger" disabled={blocked !== null} title={blocked ?? undefined} aria-describedby={blocked ? archiveReasonId : undefined} onClick={() => setArchiveTarget(account)}>

@@ -129,13 +129,13 @@ export default function SearchConsoleV8() {
   const settingsSiteUrl = data?.siteUrl ?? setup?.siteUrl
   const settingsHref = settingsSiteUrl ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(settingsSiteUrl)}` : null
   const periodControl = <SaveErrorField names={["days"]}><PeriodPicker days={days} onChange={(value) => setDays(value as RangeDays)} supportedDays={RANGES} /></SaveErrorField>
-  const settingsButton = settingsHref ? <Button external variant="secondary" href={settingsHref}  ><SlidersHorizontal size={15} aria-hidden="true" />連携を設定</Button> : null
+  const settingsButton = settingsHref ? <Button external variant="secondary" href={settingsHref}  ><SlidersHorizontal size={16} aria-hidden="true" />連携を設定</Button> : null
 
   return <ListPage
     boardId="h1G4d"
     title="Search Console"
     help={<>Google の検索から、どのキーワード・どのページで人が来たかを見ます。サイトスクリプトとつなぐと、検索から友だち追加までを結べます。</>}
-    actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>}
+    actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>}
   >
     {loading ? <div className={styles.body} data-gap="tab"><DelayedSkeleton loading skeleton={<Skeleton className="block h-36 w-full rounded-card" />} /></div>
       : loadError ? <div className={styles.body} data-gap="tab"><ListState kind="error" error={loadError} onRetry={() => setAttempt((current) => current + 1)} /></div>
@@ -151,7 +151,7 @@ export default function SearchConsoleV8() {
             const previous = data.previousSummary[item.key] * (item.key === 'ctr' ? 100 : 1)
             const difference = value - previous
             const detail = item.key === 'clicks' || item.key === 'impressions' ? `前の${data.rangeDays}日より ${difference >= 0 ? '+' : ''}${formatNumber(difference)}` : item.help
-            return <KpiCard key={item.key} presentation="band" title={item.label} icon={<item.icon size={13} aria-hidden="true" />} value={Math.round(value * 10) / 10} unit={item.unit} detail={detail} />
+            return <KpiCard key={item.key} presentation="band" title={item.label} icon={<item.icon size={16} aria-hidden="true" />} value={Math.round(value * 10) / 10} unit={item.unit} detail={detail} />
           })}
         </KpiBand>
         <div className={styles.body} data-gap="tab">

@@ -1,4 +1,5 @@
 'use client'
+import CloseButton from '@/components/shared/close-button'
 import { eventsApi } from '@/lib/api';
 
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -799,14 +800,7 @@ export default function ActionEditor({
             </p>
             <p className="hidden">{title}に実行する動作を決めます。上から順に実行します。</p>
           </div>
-          <button
-            type="button"
-            onClick={closeWhenSaved}
-            className="text-ink-secondary shrink-0 px-2 text-2xl leading-none"
-            aria-label="閉じる"
-          >
-            ×
-          </button>
+          <CloseButton onClick={closeWhenSaved} />
         </div>
 
         {pendingCount > 0 && <p role="status">保存しています…</p>}

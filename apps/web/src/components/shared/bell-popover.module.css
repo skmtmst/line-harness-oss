@@ -86,8 +86,7 @@
 }
 
 .markAll:disabled {
-  color: var(--color-ink-faint);
-  cursor: default;
+  cursor: not-allowed;
 }
 
 .markAll:hover:not(:disabled),

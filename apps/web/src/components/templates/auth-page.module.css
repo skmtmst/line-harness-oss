@@ -43,6 +43,6 @@
 .detailValue strong { color: var(--color-ink); font-size: var(--polish-text-body); font-weight: var(--font-weight-bold); }
 
 /* 絵 （運営のログイン 2段目）：窓は余白28・段の間16・浮いた影。題は左寄せで、ページの頭の余白を持ち込まない。 */
-.card[data-auth-layout='ops'] { padding: 28px; gap: 16px; box-shadow: var(--shadow-float); }
+.card[data-auth-layout='ops'] { padding: 24px; gap: 16px; box-shadow: var(--shadow-float); }
 .card[data-auth-layout='ops'] > header { padding: 0; }
 .card[data-auth-layout='ops'] h1 { text-align: left; }

@@ -67,7 +67,7 @@
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 24px 28px;
+  padding: 24px 24px;
 }
 
 .side {
@@ -645,7 +645,6 @@
   background: var(--color-canvas-sunken);
 }
 .insertChip:disabled {
-  color: var(--color-ink-faint);
   cursor: not-allowed;
 }
 .counter {

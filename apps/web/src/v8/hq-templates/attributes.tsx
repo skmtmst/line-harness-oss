@@ -195,7 +195,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     { title: '対応中', icon: Loader, value: markStats?.supportStatus?.inProgressFriendCount ?? null, unit: '人', detail: '担当が付いている' },
     { title: '過去7日の変更', icon: History, value: markStats?.markChanges?.count ?? null, unit: '回', detail: markStats?.markChanges ? '記録に残った分・手動と自動' : '手動・自動' },
   ]
-  const band = <KpiBand data-design="KPIs" className={listStyles.kpis}>{kpis.map((kpi) => <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={13} />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />)}</KpiBand>
+  const band = <KpiBand data-design="KPIs" className={listStyles.kpis}>{kpis.map((kpi) => <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={16} />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />)}</KpiBand>
   const hostBase: Omit<AttributeListHost<FriendField>, 'items'> = {
     status, busy, error, reload: () => { void load(); void loadFolders() }, onCreate: () => { if (!busy && canEdit) { setEditor('new'); setRestored(null); setError('') } },
     onEdit: (id) => open(id), onRemove: (id) => setDeleting(entries.find((entry) => entry.row.id === id) ?? null), onDistribute: (id) => open(id, true), onOrder: order, kpis: band,
@@ -223,7 +223,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
     return <SaveErrorScope errors={saveErrors}> <HqMarkEditor key={`${current?.template.id ?? 'new'}:${current?.template.revision ?? 'new'}`} definition={definition} busy={busy} locked={uncertain} notices={notices} footer={footer} onCancel={() => setEditor(null)} onSave={(definition) => void save({ type: 'mark', name: definition.mark.name, description: current?.template.description ?? '', folderId: current?.template.folder_id ?? null, definition }, saveIntent.current)} /></SaveErrorScope>
   }
   const page = <SaveErrorScope errors={saveErrors}> <ListPage boardId={tab === 'fields' ? 'y0sapC' : 'Qgjmc'} headingSize="regular" title={title} help={description} explanationToggle={<PageExplanationToggle />}
-    actions={type === 'mark' && canEdit ? <Button variant="primary" disabled={busy || status !== 'ready'} onClick={hostBase.onCreate}><Plus size={15} aria-hidden="true" />マークを作る</Button> : undefined}
+    actions={type === 'mark' && canEdit ? <Button variant="primary" disabled={busy || status !== 'ready'} onClick={hostBase.onCreate}><Plus size={16} aria-hidden="true" />マークを作る</Button> : undefined}
     tabs={<AttributeTabs tab={tab} onSelect={onTab} />} overlays={<>
       {distribution?.saved ? <AttributeDistribution key={distribution.detail.template.id} detail={distribution.detail} canEdit={canEdit} saved onClose={() => { setDistribution(null); void load() }} /> : null}
       <ConfirmDialog open={!!deleting} title="ひな形を削除" deleteName={deleting?.row.name ?? ''} description={`「${deleting?.row.name ?? ''}」を削除します。配布済みのアカウントの情報と履歴は残ります。`} destructive confirmLabel="削除する" busy={busy} error={error || undefined} onCancel={() => { if (!busy) setDeleting(null) }} onConfirm={() => perform(async () => { if (!deleting) return; await api.remove(deleting.row.id, deleting.row.revision); setDeleting(null); await load() })} />

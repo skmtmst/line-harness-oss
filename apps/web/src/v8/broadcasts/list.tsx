@@ -174,7 +174,7 @@ function HqMark() {
   return (
     <span className={styles.hqMark} title="統括から送った配信です。店では変えられません（見る・複製するだけ）">
       <span className={styles.hqChip}>統括から</span>
-      <Lock size={14} aria-label="店では変えられません" className={styles.hqLock} />
+      <Lock size={16} aria-label="店では変えられません" className={styles.hqLock} />
     </span>
   )
 }
@@ -679,7 +679,7 @@ export default function BroadcastListV8() {
     if (isFromHeadquarters(broadcast)) {
       return [
         { id: 'view', label: "配信の詳細を見る", external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
-        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={14} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
+        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={16} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
       ]
     }
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
@@ -697,7 +697,7 @@ export default function BroadcastListV8() {
       id: 'duplicate',
       label: '複製',
       external: false,
-      icon: <Copy size={14} aria-hidden="true" />,
+      icon: <Copy size={16} aria-hidden="true" />,
       href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`),
     })
     items.push({
@@ -756,8 +756,8 @@ export default function BroadcastListV8() {
       aria-expanded={createMenuOpen}
       onClick={(event) => { createAnchorRef.current = event.currentTarget; setCreateMenuOpen(true) }}
     >
-      <Plus size={15} aria-hidden="true" />
-      {full ? <>配信を作る<ChevronDown size={14} aria-hidden="true" /></> : '配信を作る'}
+      <Plus size={16} aria-hidden="true" />
+      {full ? <>配信を作る<ChevronDown size={16} aria-hidden="true" /></> : '配信を作る'}
     </Button>
   ))
 
@@ -777,7 +777,7 @@ export default function BroadcastListV8() {
     <FilterPopover open={datePopoverOpen} onClose={() => setDatePopoverOpen(false)} label="配信日で絞る（開始〜終了）"
       trigger={<FilterChip selected={Boolean(dateFrom || dateTo)} aria-haspopup="dialog" aria-expanded={datePopoverOpen}
         onChange={() => setDatePopoverOpen((open) => !open)} selectedIcon={false}>
-        {dateRangeLabel(dateFrom, dateTo)}<CalendarDays size={14} aria-hidden="true" />
+        {dateRangeLabel(dateFrom, dateTo)}<CalendarDays size={16} aria-hidden="true" />
       </FilterChip>}
       actions={<>
         {(dateFrom || dateTo) ? <Button type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>外す</Button> : null}
@@ -797,12 +797,12 @@ export default function BroadcastListV8() {
       textTone="quiet"
       onClick={() => setSavedViewOpen((open) => !open)}
     >
-      <Bookmark size={14} aria-hidden="true" />
+      <Bookmark size={16} aria-hidden="true" />
       この条件を保存する
     </Button>
   ) : (
     <span className={`${styles.ghostButton} ${styles.viewerSpace}`} aria-hidden="true">
-      <Bookmark size={14} aria-hidden="true" />
+      <Bookmark size={16} aria-hidden="true" />
       この条件を保存する
     </span>
   )
@@ -815,7 +815,7 @@ export default function BroadcastListV8() {
         aria-expanded={savedMenuOpen}
         onClick={(event) => { savedAnchorRef.current = event.currentTarget; setSavedMenuOpen(true) }}
       >
-        <Bookmark size={14} aria-hidden="true" />
+        <Bookmark size={16} aria-hidden="true" />
         {savedViews.find((view) => view.id === savedViewId)?.name ?? '保存した検索'}
       </Button>
       <ActionMenu
@@ -849,7 +849,7 @@ export default function BroadcastListV8() {
           key={chip.key}
           selected={statusFilter === chip.key}
           onChange={() => setStatusFilter(chip.key)}
-          icon={<chip.icon size={13} aria-hidden="true" />}
+          icon={<chip.icon size={16} aria-hidden="true" />}
         >
           {chipText(chip.label, chipCount(statusCounts, chip.key))}
         </FilterChip>
@@ -1107,7 +1107,7 @@ export default function BroadcastListV8() {
               presentation="band"
               density="compact"
               title={kpi.title}
-              icon={<kpi.icon size={14} aria-hidden="true" />}
+              icon={<kpi.icon size={16} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}

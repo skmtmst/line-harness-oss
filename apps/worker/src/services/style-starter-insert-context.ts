@@ -50,7 +50,9 @@ export async function prepareStarterInsert(db:D1Database,account:string,tenant:s
                 ? 'reminders'
                 : item.kind === 'booking_menu'
                   ? 'menus'
-                  : null;
+                  : item.kind === 'scenario'
+                    ? 'scenarios'
+                    : null;
       if (!table || !chosen.resourceId)
         throw new StyleError('invalid_resource');
       const col = item.kind === 'rich_menu' ? 'account_id' : 'line_account_id';

@@ -20,5 +20,5 @@ export function formBlockIcon(block: FormBlock) {
   const Icon = formKindIcon(block.kind === 'input'
     ? block.fixedField ?? block.type
     : block.kind === 'text' ? 'text-deco' : block.kind)
-  return <Icon size={15} aria-hidden="true" />
+  return <Icon size={16} aria-hidden="true" />
 }

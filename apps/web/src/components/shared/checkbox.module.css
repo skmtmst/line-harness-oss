@@ -24,7 +24,7 @@
 }
 
 .root[data-disabled='true'] {
-  opacity: 0.5; /* opacity: 0.5 */
+  opacity: var(--polish-disabled-opacity); /* opacity: 0.5 */
 }
 
 .line {
@@ -33,14 +33,14 @@
   gap: 8px; /* gap: 8 */
   cursor: pointer;
   /*
-   * 押せる範囲は札（label）自体を 3px ずつ広げて 24×24（WCAG 2.5.8、
+   * 押せる範囲は札（label）自体を (24 − 18) / 2 ずつ広げて 24×24（WCAG 2.5.8、
    * ★管理画面 修正方針 §4）。透明な input をはみ出させる方式だと、見えない
    * はみ出しが表のセルの外側判定に載る（M3 報告・parity 1003-2106）。
    * padding で広げ margin で戻すので、配置・見た目は変わらない。
    * 札の押下で input が切り替わるのは label の既定の動き。
    */
-  padding: 3px;
-  margin: -3px;
+  padding: calc((var(--polish-hit-min) - var(--choice-box-size, 18px)) / 2);
+  margin: calc((var(--polish-hit-min) - var(--choice-box-size, 18px)) / -2);
 }
 
 .root[data-disabled='true'] .line {

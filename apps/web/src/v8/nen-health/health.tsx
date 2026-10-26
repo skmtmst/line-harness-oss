@@ -166,10 +166,10 @@ export default function HealthV8({
   const pending = kpis === null
   const stats = accountId ? (
     <KpiBand data-design="KPIs" aria-label="健康日記の数の帯">
-      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending} detail={pending ? '読み込んでいます' : `登録 ${kpis.petsTotal} 匹のうち`} />
-      <KpiCard presentation="band" title="気になる変化" icon={<Activity size={13} aria-hidden="true" />} value={pending ? null : kpis.concerning} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
-      <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={13} aria-hidden="true" />} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending} detail="直近7日に付いた記録" />
-      <KpiCard presentation="band" title="30日 記録なし" icon={<PawPrint size={13} aria-hidden="true" />} value={pending ? null : kpis.silent30} unit="匹" loading={pending} detail="声をかけられます" />
+      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={16} aria-hidden="true" />} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending} detail={pending ? '読み込んでいます' : `登録 ${kpis.petsTotal} 匹のうち`} />
+      <KpiCard presentation="band" title="気になる変化" icon={<Activity size={16} aria-hidden="true" />} value={pending ? null : kpis.concerning} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
+      <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={16} aria-hidden="true" />} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending} detail="直近7日に付いた記録" />
+      <KpiCard presentation="band" title="30日 記録なし" icon={<PawPrint size={16} aria-hidden="true" />} value={pending ? null : kpis.silent30} unit="匹" loading={pending} detail="声をかけられます" />
     </KpiBand>
   ) : undefined
 
@@ -183,7 +183,7 @@ export default function HealthV8({
       explanation="「気になる変化」は、体重が8週で±10%以上変わった・便の異常が3回続いた・食いつき不良が3回続いた、のどれかに当てはまるペットです。行の「…」から 30日のまとめ を開けます。"
       actions={(
         <Button type="button" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? 'ブラウザの印刷で PDF に保存します' : '一覧の行の「…」から「30日のまとめ」を開くと書き出せます'}>
-          <FileText size={15} aria-hidden="true" />獣医師向け PDF を書き出す
+          <FileText size={16} aria-hidden="true" />獣医師向け PDF を書き出す
         </Button>
       )}
       tabs={tabs}
@@ -306,13 +306,13 @@ function HealthListV8({
         </ListToolbarSearchSlot>
         {concernOnly ? null : (
           <span className={styles.chips} role="group" aria-label="よく使う札">
-            <FilterChip selected={filters.change === 'concern'} onChange={(next) => set({ change: next ? 'concern' : '' })} icon={<Columns2 size={13} aria-hidden="true" />} title="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットだけ出します">
+            <FilterChip selected={filters.change === 'concern'} onChange={(next) => set({ change: next ? 'concern' : '' })} icon={<Columns2 size={16} aria-hidden="true" />} title="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットだけ出します">
               {kpis ? `気になる変化 ${kpis.concerning}` : '気になる変化'}
             </FilterChip>
-            <FilterChip selected={filters.last === '7'} onChange={(next) => set({ last: next ? '7' : '' })} icon={<CalendarDays size={13} aria-hidden="true" />} title="7日以内に記録が付いたペットだけ出します">
+            <FilterChip selected={filters.last === '7'} onChange={(next) => set({ last: next ? '7' : '' })} icon={<CalendarDays size={16} aria-hidden="true" />} title="7日以内に記録が付いたペットだけ出します">
               今週 記録あり
             </FilterChip>
-            <FilterChip selected={filters.change === 'silent'} onChange={(next) => set({ change: next ? 'silent' : '' })} icon={<CalendarDays size={13} aria-hidden="true" />} title="30日以上 記録のないペットだけ出します">
+            <FilterChip selected={filters.change === 'silent'} onChange={(next) => set({ change: next ? 'silent' : '' })} icon={<CalendarDays size={16} aria-hidden="true" />} title="30日以上 記録のないペットだけ出します">
               {kpis ? `30日 記録なし ${kpis.silent30}` : '30日 記録なし'}
             </FilterChip>
           </span>
@@ -320,7 +320,7 @@ function HealthListV8({
         <ListToolbarEnd>
           <span ref={savedRef} className={styles.savedBox}>
             <Button type="button" aria-haspopup="menu" aria-expanded={savedOpen} onClick={() => setSavedOpen((current) => !current)}>
-              <Bookmark size={15} aria-hidden="true" />よく使う絞り込み
+              <Bookmark size={16} aria-hidden="true" />よく使う絞り込み
             </Button>
             <ActionMenu
               open={savedOpen}
@@ -399,7 +399,7 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
         <span className={styles.petCell}>
           {row.pet.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- お客様がマイページで登録した写真
-            <img src={row.pet.imageUrl} alt="" className={styles.face} />
+            <img width={28} height={28} src={row.pet.imageUrl} alt="" className={styles.face} />
           ) : (
             <span aria-hidden="true" className={styles.face}>{name.slice(0, 1)}</span>
           )}

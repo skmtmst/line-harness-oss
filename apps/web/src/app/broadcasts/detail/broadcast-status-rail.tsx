@@ -110,7 +110,7 @@ export default function BroadcastStatusRail({
                   aria-hidden="true"
                   className={`flex h-5 w-5 items-center justify-center rounded-pill border text-micro ${done ? 'border-accent-deep bg-accent-soft text-accent-deep' : current ? 'border-accent-deep text-accent-deep' : 'border-hairline text-ink-faint'}`}
                 >
-                  {done ? <Check size={12} strokeWidth={3} /> : null}
+                  {done ? <Check size={16} strokeWidth={3} /> : null}
                 </span>
                 <span
                   aria-current={current ? 'step' : undefined}

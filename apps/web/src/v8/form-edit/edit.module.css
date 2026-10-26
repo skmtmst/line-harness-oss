@@ -76,7 +76,7 @@
 .choiceRow { display: flex; align-items: center; gap: var(--tpl-fe-open-head-gap); min-height: var(--tpl-fe-control-h); }
 .choiceInput { flex: 1; min-width: 0; height: var(--tpl-fe-choice-h); }
 .choiceRemove { flex: none; width: var(--tpl-fe-control-h); height: var(--tpl-fe-control-h); display: inline-flex; align-items: center; justify-content: center; border: 0; background: none; border-radius: var(--radius-control); color: var(--color-ink-secondary); cursor: pointer; }
-.choiceRemove:disabled { opacity: 0.4; cursor: not-allowed; }
+.choiceRemove:disabled { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
 .saveTo { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); min-width: 0; }
 .saveTo > .fieldLabel { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); white-space: nowrap; }
 .saveSelect { display: flex; flex: 1; min-width: 0; max-width: 100%; }

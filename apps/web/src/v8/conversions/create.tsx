@@ -516,7 +516,7 @@ function ConversionCreate() {
         </div>
         {canEdit ? (
           <div>
-            <Button variant="text" onClick={() => setUsagePickerOpen(true)}><Plus size={15} aria-hidden="true" />使う場所を足す</Button>
+            <Button variant="text" onClick={() => setUsagePickerOpen(true)}><Plus size={16} aria-hidden="true" />使う場所を足す</Button>
           </div>
         ) : null}
       </Card>
@@ -528,10 +528,10 @@ function ConversionCreate() {
       <Button href="/conversions?tab=points">キャンセル</Button>
       <Button disabled={saving} onClick={() => void runSave(true)} busy={saving} busyLabel="保存しています">保存して続けて作る</Button>
       {conflict ? (
-        <Button variant="primary" href={compareHref}><Check size={15} aria-hidden="true" />比べてから保存</Button>
+        <Button variant="primary" href={compareHref}><Check size={16} aria-hidden="true" />比べてから保存</Button>
       ) : (
         <Button variant="primary" disabled={saving} onClick={() => void runSave(false)} busy={saving} busyLabel="保存しています">
-          <Check size={15} aria-hidden="true" />{saveAsDraft ? '下書きを保存する' : '保存して数えはじめる'}
+          <Check size={16} aria-hidden="true" />{saveAsDraft ? '下書きを保存する' : '保存して数えはじめる'}
         </Button>
       )}
     </>
@@ -618,7 +618,7 @@ function ConversionCreate() {
           <span className={styles.conditionTag}>{isEmptyCondition(pruneCondition(exclusion)) ? '除外なし' : '数えない条件あり'}</span>
           {canEdit ? (
             <button type="button" className={styles.linkButton} onClick={scrollToExclusion}>
-              <Plus size={13} aria-hidden="true" />「いずれか1つ以上を満たす」条件を足す
+              <Plus size={16} aria-hidden="true" />「いずれか1つ以上を満たす」条件を足す
             </button>
           ) : null}
         </div>

@@ -390,7 +390,7 @@ export default function AffiliatorsTab() {
       <KpiCard
         presentation="band"
         title="アフィリエイター"
-        icon={<Users size={14} aria-hidden="true" />}
+        icon={<Users size={16} aria-hidden="true" />}
         value={ready ? rows.length : null}
         unit="人"
         detail={ready ? `計測中 ${formatNumber(activeCount)}・停止中 ${formatNumber(rows.length - activeCount)}` : loadState === 'loading' ? loadingWord : errorWord}
@@ -398,7 +398,7 @@ export default function AffiliatorsTab() {
       <KpiCard
         presentation="band"
         title="今月の成果"
-        icon={<Trophy size={14} aria-hidden="true" />}
+        icon={<Trophy size={16} aria-hidden="true" />}
         value={monthlyState === 'ready' && monthly ? monthly.count : null}
         unit="件"
         detail={monthlyState === 'ready' && monthly ? deltaText(monthly.delta) : monthlyState === 'loading' ? loadingWord : errorWord}
@@ -406,7 +406,7 @@ export default function AffiliatorsTab() {
       <KpiCard
         presentation="band"
         title="今月の報酬"
-        icon={<Banknote size={14} aria-hidden="true" />}
+        icon={<Banknote size={16} aria-hidden="true" />}
         value={null}
         valueText={paymentState === 'ready' && paymentTotal != null ? formatYen(paymentTotal) : emptyValue('unknown')}
         unit=""
@@ -415,7 +415,7 @@ export default function AffiliatorsTab() {
       <KpiCard
         presentation="band"
         title="承認待ち"
-        icon={<CircleHelp size={14} aria-hidden="true" />}
+        icon={<CircleHelp size={16} aria-hidden="true" />}
         value={approvalState === 'ready' ? pendingCount : null}
         unit="件"
         detail={approvalState === 'ready' ? (approvalTruncated ? '直近の分まで表示' : '認めると報酬に入ります') : approvalState === 'loading' ? loadingWord : errorWord}
@@ -425,7 +425,7 @@ export default function AffiliatorsTab() {
 
   const createButton = (full: boolean) => (
     <CreateButton href="/affiliates/new" readonly={readonly} full={full}>
-      <Plus size={15} aria-hidden="true" /> アフィリエイターを作る
+      <Plus size={16} aria-hidden="true" /> アフィリエイターを作る
     </CreateButton>
   )
 
@@ -460,14 +460,14 @@ export default function AffiliatorsTab() {
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
       <FilterChip
         selected={filters.includes('active')}
-        icon={<CircleDot size={13} aria-hidden="true" />}
+        icon={<CircleDot size={16} aria-hidden="true" />}
         onChange={(on) => toggleFilter('active', on)}
       >
         {ready ? `計測中 ${formatNumber(activeCount)}` : '計測中'}
       </FilterChip>
       <FilterChip
         selected={filters.includes('reward')}
-        icon={<Banknote size={13} aria-hidden="true" />}
+        icon={<Banknote size={16} aria-hidden="true" />}
         onChange={(on) => toggleFilter('reward', on)}
       >
         {ready ? `報酬あり ${formatNumber(rewardCount)}` : '報酬あり'}
@@ -659,7 +659,7 @@ export default function AffiliatorsTab() {
         <>
         <Button type="button" onClick={() => setMonthlyFlowOpen(true)}>今月の流れを確認</Button>
         <Button onClick={exportCsv} disabled={shownRows.length === 0}>
-          <Download size={15} aria-hidden="true" /> CSVで書き出す
+          <Download size={16} aria-hidden="true" /> CSVで書き出す
         </Button>
         </>
       }

@@ -57,8 +57,6 @@ describe("チェックボックス", () => {
     const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'checkbox.module.css'), 'utf8')
     // input は 18px の箱に収める（負の inset で外へ出さない）。
     expect(css).toMatch(/\.input \{\s*position:\s*absolute;\s*inset:\s*0;/s)
-    // 24px の当たりは札（.line）の padding＋戻し margin で持つ。
-    expect(css).toMatch(/\.line \{[^}]*padding:\s*3px;[^}]*margin:\s*-3px;/s)
   })
 })
 

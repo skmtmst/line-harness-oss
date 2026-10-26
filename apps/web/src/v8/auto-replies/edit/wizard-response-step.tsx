@@ -57,7 +57,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                       aria-pressed={form.mode === value}
                       onClick={() => patch({ mode: value })}
                     >
-                      <Icon size={14} aria-hidden="true" />
+                      <Icon size={16} aria-hidden="true" />
                       {label}
                     </button>
                   ))}

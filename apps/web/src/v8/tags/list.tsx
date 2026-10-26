@@ -93,13 +93,13 @@ export default function TagsList({
   const actions = currentTabBlocked ? null : tab === 'tags' ? (
     canEdit ? (
       <Button type="button" onClick={() => setCsvOpen(true)}>
-        <Upload size={15} aria-hidden="true" />
+        <Upload size={16} aria-hidden="true" />
         CSVで一括登録する
       </Button>
     ) : null
   ) : tab === 'marks' ? (
     canEdit ? (
-      <Button href="/tags/marks/new" variant="primary"><Plus size={15} aria-hidden="true" />マークを作る</Button>
+      <Button href="/tags/marks/new" variant="primary"><Plus size={16} aria-hidden="true" />マークを作る</Button>
     ) : null
   ) : tab === 'searches' && canEdit ? (
     <Button href="/friends" variant="primary"><Search size={16} aria-hidden="true" />友だち一覧で条件を作る</Button>

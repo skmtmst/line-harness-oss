@@ -503,7 +503,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                         busyLabel="開いています…"
                         onClick={() => void connect(service)}
                       >
-                        {service.connect === 'login' ? <LogIn size={15} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />}
+                        {service.connect === 'login' ? <LogIn size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
                         {connectLabel(service)}
                       </Button>
                     ) : service.status === 'applying' ? (
@@ -514,7 +514,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                           disabled={busy !== null}
                           onClick={() => preparing.open(`${service.name}の申し込みの取り消し`)}
                         >
-                          <X size={15} aria-hidden="true" />
+                          <X size={16} aria-hidden="true" />
                           申し込みを取り消す
                         </Button>
                       </>
@@ -528,7 +528,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                             busyLabel="開いています…"
                             onClick={() => void startUberOAuth(service, true)}
                           >
-                            <LogIn size={15} aria-hidden="true" />
+                            <LogIn size={16} aria-hidden="true" />
                             Uber Eats にログインし直す
                           </Button>
                         ) : null}
@@ -540,7 +540,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                           busyLabel="確認しています…"
                           onClick={() => void checkConnection(service)}
                         >
-                          <Plug size={15} aria-hidden="true" />
+                          <Plug size={16} aria-hidden="true" />
                           接続を確かめる
                         </Button>
                         <span className={styles.rowSpacer} />
@@ -595,7 +595,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         title="つなぐお店を選んでください"
         description={`${withParticle(picking?.service.name ?? '', 'での')}許可をいただきました。${withParticle(picking?.service.name ?? '', 'に')}登録されているお店が${picking?.stores.length ?? 0}件見つかりました。musubo につなぐお店を選んでください。`}
         confirmLabel="このお店につなぐ"
-        confirmIcon={<Check size={15} aria-hidden="true" />}
+        confirmIcon={<Check size={16} aria-hidden="true" />}
         confirmDisabled={pickedStoreId === '' || busy !== null}
         busy={busy?.action === 'select'}
         busyLabel="接続しています…"

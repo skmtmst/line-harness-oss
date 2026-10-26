@@ -150,7 +150,7 @@ export default function Notice({
 export function NoticeStates({ items }: { items: NonNullable<NoticeProps['states']> }) {
   return <ul className={styles.states} aria-label="保存の状態">
     {items.map(({ label, state }) => <li key={label} className={styles.state}>
-      <span className={styles.stateMark} data-state={state} aria-hidden="true">{state === 'done' ? <Check size={10} /> : null}</span>
+      <span className={styles.stateMark} data-state={state} aria-hidden="true">{state === 'done' ? <Check size={16} /> : null}</span>
       {label}
     </li>)}
   </ul>

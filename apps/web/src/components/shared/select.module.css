@@ -36,7 +36,7 @@
 }
 
 .disabled {
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .disabled .trigger {
@@ -167,8 +167,8 @@
 }
 
 :root .leadingIcon svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 
 /*
@@ -259,3 +259,6 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
   outline: 1px solid transparent;
   box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
 }
+
+/* 箱ごと薄くした時は、中の押せない部品を重ねて薄くしない。 */
+html:root .disabled :is(button, input, textarea):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-enabled-opacity); }

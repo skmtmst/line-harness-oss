@@ -64,9 +64,11 @@ export type StarterSetItem = {
     | 'reminder'
     | 'booking_menu'
     | 'dashboard'
-    | 'friend_add_rule';
+    | 'friend_add_rule'
+    | 'tag_set'
+    | 'scenario';
   name: string;
-  /** friend_add_rule が送るごあいさつ。同じ組の template の key を指す。 */
+  /** friend_add_rule が送るごあいさつ。同じ組の template の key。 */
   templateKey?: string;
   feature?: string;
   text?: string;
@@ -78,6 +80,10 @@ export type StarterSetItem = {
   offsetDays?: number;
   sendAtTime?: string;
   triggerType?: 'calendar_booked' | 'restaurant.departed';
+  /** tag_set の見本のタグの名前。入れた時点では本物のタグは作られない。 */
+  tags?: Array<{ name: string }>;
+  /** scenario の通数。delayMinutes は前の通（1 通目はシナリオの始まり）からの分。 */
+  steps?: Array<{ delayMinutes: number; text: string }>;
 };
 
 /** 入れなかった理由。Worker が決まった値だけを返す。 */
@@ -90,6 +96,19 @@ export type StarterEnsureResult = {
   existing: number;
   starterSet: { id: string; version: number };
 };
+
+/** musubo の標準の初期セット。統括の組とは別に読む。 */
+export type StyleStarterDefault = {
+  style: AccountStyle;
+  id: string;
+  version: number;
+  definition: { items: StarterSetItem[] };
+};
+
+/** 統括の組を標準へ戻す口の返事。自分の組が無い時は reset が false で何も変わらない。 */
+export type StyleStarterResetResult =
+  | { id: string; version: number; reset: true; previousId: string; autoInsert: boolean }
+  | { id: null; version: 0; reset: false; previousId: null };
 
 export type StyleBookingDetails = {
   id: string;

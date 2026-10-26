@@ -102,7 +102,7 @@ export default function Step2Connect({
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
             <h2 className={styles.panelTitle}>Messaging API の情報を入れる</h2>
-            <span className={styles.precheckHelpMark} title="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。" aria-label="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。"><CircleHelp size={14} aria-hidden="true" /></span>
+            <span className={styles.precheckHelpMark} title="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。" aria-label="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
           <p className={styles.precheckLead}>LINE公式アカウントと musubo をつなぐための2項目です。ほかの項目は musubo が自動で設定するので入力はいりません。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
@@ -126,7 +126,7 @@ export default function Step2Connect({
               <p className={styles.help}>同じ画面の「チャネルシークレット」です。</p>
             </div>
           </div>
-          <span className={styles.secretNote}><Lock size={14} aria-hidden="true" />シークレットは保存したあと画面には出ません。あとから入れ替えはできます。</span>
+          <span className={styles.secretNote}><Lock size={16} aria-hidden="true" />シークレットは保存したあと画面には出ません。あとから入れ替えはできます。</span>
         </Card>
       )}
       {sub === 2 && (
@@ -137,7 +137,7 @@ export default function Step2Connect({
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
             <h2 className={styles.panelTitle}>Webhook（受信のつなぎ）を設定する</h2>
-            <span className={styles.precheckHelpMark} title="LINE からのメッセージを musubo が受け取るための通り道です。" aria-label="LINE からのメッセージを musubo が受け取るための通り道です。"><CircleHelp size={14} aria-hidden="true" /></span>
+            <span className={styles.precheckHelpMark} title="LINE からのメッセージを musubo が受け取るための通り道です。" aria-label="LINE からのメッセージを musubo が受け取るための通り道です。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
             <p className={styles.precheckNoteTitle}>LINE Developers の Webhook 設定を開いてください</p>
@@ -149,7 +149,7 @@ export default function Step2Connect({
           </div>
           {/* 承認済み v07 Ds3E2「AC Webhook URL」。白い枠＋細い線で、上下の色付きの箱と見分ける。 */}
           <Card surface="bordered" layout="vertical" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn6-pre-head-gap)" data-design-node="Ds3E2">
-            <p className={styles.webhookUrlTitle}><LinkIcon size={14} aria-hidden="true" />musubo の Webhook URL</p>
+            <p className={styles.webhookUrlTitle}><LinkIcon size={16} aria-hidden="true" />musubo の Webhook URL</p>
             <p className={styles.precheckLead}>下のURLをコピーし、「Messaging API設定」のWebhook URLに貼り付けて「更新」を押します。</p>
             <div className={styles.webhookUrlRow}>
               {/* 承認済み v07 の枠 E01lkh（高さ36・左右12・角10）。余白は1語にまとめた変数では
@@ -160,7 +160,7 @@ export default function Step2Connect({
               <Card layout="horizontal" surface="bordered" corner="control" contentPadding="var(--space-8) var(--space-12)">
                 <span className={styles.endpointValue}><TruncatedText value={WEBHOOK_URL || String(emptyValue('unknown'))} url /></span>
               </Card>
-              <CopyTextButton value={WEBHOOK_URL} label="コピー" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="Webhook URL をコピー" disabled={!WEBHOOK_URL} />
+              <CopyTextButton value={WEBHOOK_URL} label="コピー" variant="secondary" icon={<Copy size={16} aria-hidden="true" />} aria-label="Webhook URL をコピー" disabled={!WEBHOOK_URL} />
             </div>
           </Card>
           <Notice tone="warn" heading={<>すでにほかのツールのURLが入っているとき</>}>
@@ -188,7 +188,7 @@ export default function Step2Connect({
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
             <h2 className={styles.panelTitle}>LINEログインの情報を入れる</h2>
-            <span className={styles.precheckHelpMark} title="友だち追加の窓口（LIFF）を musubo が自動で作るために使います。" aria-label="友だち追加の窓口（LIFF）を musubo が自動で作るために使います。"><CircleHelp size={14} aria-hidden="true" /></span>
+            <span className={styles.precheckHelpMark} title="友だち追加の窓口（LIFF）を musubo が自動で作るために使います。" aria-label="友だち追加の窓口（LIFF）を musubo が自動で作るために使います。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
           <p className={styles.precheckLead}>友だち追加の窓口（LIFF）を musubo が自動で作るために使います。入れていただくのはこの2項目だけです。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
@@ -225,7 +225,7 @@ export default function Step2Connect({
               </div>
             ))}
           </div>
-          <span className={styles.secretNote}><Info size={14} aria-hidden="true" />2つともチェックを入れると「次のステップへ」が押せるようになります。</span>
+          <span className={styles.secretNote}><Info size={16} aria-hidden="true" />2つともチェックを入れると「次のステップへ」が押せるようになります。</span>
         </Card>
       )}
     </CreateStepColumns>

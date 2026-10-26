@@ -1,5 +1,6 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { memberRanksApi } from '@/lib/api/helpers/gap3';
 import { useOverlayLayer } from '@/components/shared/overlay-utils';
@@ -443,14 +444,7 @@ export default function AdvancedSearchDialog({
                 保存した検索から読み込む
               </Button>
             ) : null}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="閉じる"
-              className="flex h-8 w-8 items-center justify-center rounded-control text-xl leading-none text-ink-faint hover:bg-canvas-sunken"
-            >
-              ×
-            </button>
+            <CloseButton onClick={onClose} />
           </div>
         </div>
 
@@ -821,7 +815,7 @@ export default function AdvancedSearchDialog({
           >
             <div className="flex items-start justify-between gap-3">
               <h3 id={saveTitleId} className="text-lg font-bold text-ink">この条件を保存</h3>
-              <button type="button" onClick={() => setSaveOpen(false)} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
+              <button type="button" onClick={() => setSaveOpen(false)} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
                 <X aria-hidden="true" className="h-5 w-5" />
               </button>
             </div>
@@ -1001,7 +995,7 @@ function OrAxisPicker({
             onAdd(condition)
             setDraft('')
           }}
-          className="shrink-0 rounded-pill border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
+          className="shrink-0 rounded-pill border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary"
         >
           ＋ 追加する
         </button>

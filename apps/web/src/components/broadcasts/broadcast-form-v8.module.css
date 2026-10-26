@@ -90,7 +90,6 @@
 .root ::selection { background: var(--color-accent-soft); color: var(--color-ink); }
 .root :global(.broadcast-message-type) { font-size: 12px; white-space: nowrap; padding: var(--space-4) var(--space-6); color: var(--color-ink-secondary); border-bottom: 2px solid transparent; }
 .root :global(.broadcast-message-type[data-active='true']) { border-color: var(--color-accent-deep); color: var(--color-accent-deep); }
-.root :global(.broadcast-message-type[aria-disabled='true']) { opacity: .45; cursor: not-allowed; }
 .root :global(.broadcast-template-row) { display: flex; align-items: center; gap: var(--space-14); padding: var(--space-12); border-bottom: 1px solid var(--color-hairline); width: 100%; text-align: left; }
 .root :global(.broadcast-template-row small) { display: block; color: var(--color-ink-faint); font-size: 12px; }
 .root :global(.broadcast-url-row) { display: grid; grid-template-columns: minmax(0, .7fr) minmax(0, 1.4fr) 7rem; }
@@ -142,9 +141,9 @@
 .root[data-step='message'] .heading h2 { font-size: 18px; line-height: var(--space-24); }
 .root[data-step='message'] .heading p { line-height: var(--space-16); }
 
-.root[data-step='message'] .previewHead, .root[data-step='message'] .previewSummary { padding-left: 7px; padding-right: 7px; }
-.root[data-step='message'] .previewSummary { padding-top: 17px; }
+.root[data-step='message'] .previewHead, .root[data-step='message'] .previewSummary { padding-left: 6px; padding-right: 6px; }
+.root[data-step='message'] .previewSummary { padding-top: 16px; }
 .root[data-step='message'] .previewSummary h3 { line-height: 18px; }
-.root[data-step='message'] .previewActions { margin-top: -7px; }
+.root[data-step='message'] .previewActions { margin-top: -6px; }
 /* 動画の枠とプレビュー画像の小さい枠を横に並べる（MediaSlot・Z7vd2）。 */
 .mediaRow { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-slot-w-compact); gap: var(--tpl-slot-row-gap); align-items: start; }

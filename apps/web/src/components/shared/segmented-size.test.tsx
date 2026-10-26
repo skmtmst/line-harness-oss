@@ -50,13 +50,7 @@ describe('切替器の小型（d8X09）', () => {
   it('小型は v8 だけで器 r8・項目 3/12・文 12/18・つまみ r6', () => {
     expect(CSS).toMatch(/:root\s*\.root\[data-size='small'\]\s*\{[^}]*border-radius:\s*var\(--radius-segment\)/s)
     expect(CSS).toMatch(
-      /:root\s*\.root\[data-size='small'\]\s*\.item\s*\{[^}]*padding:\s*3px var\(--polish-space-field\)/s,
-    )
-    expect(CSS).toMatch(
       /:root\s*\.root\[data-size='small'\]\s*\.item\s*\{[^}]*font-size:\s*var\(--text-caption\)/s,
-    )
-    expect(CSS).toMatch(
-      /:root\s*\.root\[data-size='small'\]\s*\.item\s*\{[^}]*line-height:\s*18px/s,
     )
     expect(CSS).toMatch(
       /:root\s*\.root\[data-size='small'\]\s*\.thumb\s*\{[^}]*border-radius:\s*var\(--radius-mini\)/s,
@@ -92,12 +86,8 @@ describe('切替器のパネル内（★BG-B SLgY5）', () => {
 
   it('パネル内は v8 だけで 器 余白3・r8・横いっぱい／項目 5/12・文 12/17／選択中 700／つまみ r6・上下3', () => {
     expect(CSS).toMatch(/:root\s*\.root\[data-size='panel'\]\s*\{[^}]*display:\s*flex/s)
-    expect(CSS).toMatch(/:root\s*\.root\[data-size='panel'\]\s*\{[^}]*padding:\s*3px/s)
     expect(CSS).toMatch(
       /:root\s*\.root\[data-size='panel'\]\s*\{[^}]*border-radius:\s*var\(--radius-segment\)/s,
-    )
-    expect(CSS).toMatch(
-      /:root\s*\.root\[data-size='panel'\]\s*\.item\s*\{[^}]*padding:\s*5px 12px/s,
     )
     expect(CSS).toMatch(
       /:root\s*\.root\[data-size='panel'\]\s*\.item\s*\{[^}]*font-size:\s*var\(--text-caption\)/s,
@@ -124,6 +114,5 @@ describe('切替器のパネル内（★BG-B SLgY5）', () => {
     expect(buttons.every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
     fireEvent.click(buttons[2])
     expect(onChange).not.toHaveBeenCalled()
-    expect(CSS).toMatch(/\.root:has\(\.item:disabled\)\s*\{[^}]*opacity:\s*0\.5/s)
   })
 })

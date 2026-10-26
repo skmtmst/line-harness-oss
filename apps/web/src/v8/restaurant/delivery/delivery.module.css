@@ -47,7 +47,7 @@
 }
 
 .spin {
-  animation: deliverySpin 1s linear infinite;
+  animation: deliverySpin var(--motion-spin) linear infinite;
 }
 
 @keyframes deliverySpin {

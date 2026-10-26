@@ -442,10 +442,10 @@ export default function AutomationRunsV8() {
   /* ===== 数の帯 ===== */
   const summary = data?.summary ?? null
   const cells: BandCell[] = [
-    { key: 'executed', title: 'この30日に動いた', icon: <Activity size={13} aria-hidden="true" />, value: summary?.executed ?? null, unit: '回', detail: summary?.mostRunName ? `いちばん動いた：${summary.mostRunName}` : '実行結果を集計' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: summary?.skipped ?? null, unit: '回', detail: '条件が厳しすぎないか見てください' },
-    { key: 'failed', title: '失敗', icon: <TriangleAlert size={13} aria-hidden="true" />, value: summary?.failed ?? null, unit: '件', detail: '「中身を見る」から理由を確かめられます' },
-    { key: 'total', title: 'すべて', icon: <Layers size={13} aria-hidden="true" />, value: summary?.total ?? null, unit: '回', detail: 'この30日' },
+    { key: 'executed', title: 'この30日に動いた', icon: <Activity size={16} aria-hidden="true" />, value: summary?.executed ?? null, unit: '回', detail: summary?.mostRunName ? `いちばん動いた：${summary.mostRunName}` : '実行結果を集計' },
+    { key: 'skipped', title: '条件に外れた', icon: <Filter size={16} aria-hidden="true" />, value: summary?.skipped ?? null, unit: '回', detail: '条件が厳しすぎないか見てください' },
+    { key: 'failed', title: '失敗', icon: <TriangleAlert size={16} aria-hidden="true" />, value: summary?.failed ?? null, unit: '件', detail: '「中身を見る」から理由を確かめられます' },
+    { key: 'total', title: 'すべて', icon: <Layers size={16} aria-hidden="true" />, value: summary?.total ?? null, unit: '回', detail: 'この30日' },
   ]
 
   /* ===== 道具の段 ===== */
@@ -455,7 +455,7 @@ export default function AutomationRunsV8() {
   ]} />
   const savedBox = (
     <div className={styles.savedBox}>
-      <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
+      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["saved"]}><Select
         aria-label="よく使う絞り込み"
         value={saved}
@@ -575,7 +575,7 @@ export default function AutomationRunsV8() {
       title="オートメーション"
 
       actions={canExport
-        ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
+        ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
         : undefined}
       tabs={<AutomationTabs active="runs" counts={tabCounts} />}
       stats={<AutomationBand label="動いた記録の数の帯" cells={cells} />}

@@ -126,7 +126,7 @@ export function CardHeader({
   help,
 }: {
   title: ReactNode
-  /** 題の右の「？」（HelpTip）。題とは間 6 で、題の行の高さの真ん中にそろえる。 */
+  /** 題の右の「？」（HelpTip）。題とは間 8 で、題の行の高さの真ん中にそろえる。 */
   help?: ReactNode
   optional?: boolean
   meta?: ReactNode
