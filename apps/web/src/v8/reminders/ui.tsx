@@ -10,6 +10,7 @@ import { ChevronLeft } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
 import RadioCard from '@/components/shared/radio-card'
 import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import styles from './edit.module.css'
@@ -104,11 +105,12 @@ export function PhoneV8({
   /** 本文がまだ無いとき true。札だけにする。 */
   empty?: boolean
 }) {
-  return (
-    <LinePreview accountName={accountName} caption={chip} empty={empty} note="友だちのLINEに届く見え方の例です。差し込みは見本の値で表示しています。">
+  return <>
+    <LinePreview accountName={accountName} caption={chip} empty={empty}>
       {empty ? null : <div className={styles.phoneBubble}>{message ?? '本文はまだありません'}</div>}
     </LinePreview>
-  )
+    <Notice tone="info" compact>名前や日時は見本の値です。</Notice>
+  </>
 }
 
 /** 選ぶカードは共通 RadioCard（本物の radio・カード全体が押せる）。 */

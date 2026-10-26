@@ -155,7 +155,7 @@ const EmergencyControlV8 = (
 
   const [restoreDrift, setRestoreDrift] = useState<OperationRestoreDrift | null>(null)
 
-  /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+  /* V-1: 二段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
 
   const previewGeneration = useRef(0)
@@ -878,7 +878,7 @@ const EmergencyControlV8 = (
         </div>
       </Dialog>
 
-      {/* 本人確認の窓：2段階認証の人は6桁、無い人はパスワード。 */}
+      {/* 本人確認の窓：二段階認証の人は6桁、無い人はパスワード。 */}
       <StepUpDialog
         open={stepUpMode !== null}
         action={stepUpMode === 'stop' ? '緊急停止する' : '復旧する'}

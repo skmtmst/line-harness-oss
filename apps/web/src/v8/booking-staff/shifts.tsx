@@ -1090,7 +1090,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const previewContent = <>
           {previewUrl ? (
             <div className={layout.sideActions}>
-              <Button href={previewUrl} className={styles.sideButton}><Smartphone className={styles.btnIcon} aria-hidden="true" />お客さまに見える画面を確かめる</Button>
+              <Button href={previewUrl} external className={styles.sideButton}><Smartphone className={styles.btnIcon} aria-hidden="true" />お客さまに見える画面を確かめる</Button>
             </div>
           ) : null}
           <p className={layout.sideTitle} title={`お客さまの予約画面（${isSelf ? 'あなた' : `${staff.display_name}さん`}を指名したとき）`}>

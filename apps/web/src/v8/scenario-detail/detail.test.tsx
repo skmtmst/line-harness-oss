@@ -136,6 +136,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import ScenarioDetailV8 from './detail'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { ApiError } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -163,6 +164,8 @@ beforeEach(() => {
   updateScenario.mockResolvedValue({ success: true, data: { id: 'sc-1' } })
   getScenario.mockReset()
   getScenario.mockResolvedValue({ success: true, data: { ...scenario, updatedAt: '2026-10-01T05:10:00.000Z' } })
+  vi.mocked(scenarioReferenceData.scenario).mockReset()
+  vi.mocked(scenarioReferenceData.scenario).mockResolvedValue({ success: true, data: scenario })
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -176,6 +179,17 @@ afterEach(() => {
 })
 
 describe('V8 シナリオ配信の編集', () => {
+  it('下見は差し込みの名前を見本値に置き換える', async () => {
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValueOnce({ success: true, data: {
+      ...scenario,
+      steps: [{ ...scenario.steps[0], messageContent: 'こんにちは、{{name}}さん' }, scenario.steps[1]],
+    } } as never)
+    await render()
+    expect(screen.getByText('こんにちは、山田花子さん')).toBeTruthy()
+    expect(screen.getByText('名前や日時は見本の値です。')).toBeTruthy()
+    expect(screen.queryByText('こんにちは、{{name}}さん')).toBeNull()
+  })
+
   it('絵（PMLkX）の操作と3つの箱・数の帯が出る', async () => {
     await render()
     for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {

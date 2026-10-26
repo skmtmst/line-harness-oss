@@ -8,6 +8,7 @@ import { InsertText } from '@/components/shared/insert-text-field'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import LinePreview from '@/components/shared/line-preview'
+import { renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import Link from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -513,7 +514,7 @@ export function ScenarioDetailBody({
                       const q = shownStep.question as { text?: string; choices?: { label?: string }[] }
                       return (
                         <div className={styles.talkBubble}>
-                          {q.text ?? shownStep.messageContent}
+                          {renderReminderBodySample(q.text ?? shownStep.messageContent)}
                           {(q.choices ?? []).map((choice, i) => (
                             <span key={i} className={styles.talkChoice}>
                               {choice.label ?? `選択肢${i + 1}`}
@@ -522,10 +523,11 @@ export function ScenarioDetailBody({
                         </div>
                       )
                     }
-                    return <div className={styles.talkBubble}>{c}</div>
+                    return <div className={styles.talkBubble}>{renderReminderBodySample(c)}</div>
                   })()
                 : null}
             </LinePreview>
+            <Notice tone="info" compact>名前や日時は見本の値です。</Notice>
           </div>
         </aside>
       </div>

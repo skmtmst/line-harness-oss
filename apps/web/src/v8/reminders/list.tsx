@@ -1120,8 +1120,8 @@ export default function RemindersListV8() {
 
       <ConfirmDialog
         open={bulkPauseIds !== null}
-        title={`${bulkPauseIds?.length ?? 0}件のリマインダーを停止しますか？`}
-        description="再開するまで、選んだリマインダーの通知は送られません。"
+        title={`${bulkPauseIds?.length ?? 0}件のリマインダを停止しますか？`}
+        description="再開するまで、選んだリマインダの通知は送られません。"
         confirmLabel="停止する"
         onCancel={() => setBulkPauseIds(null)}
         onConfirm={() => {

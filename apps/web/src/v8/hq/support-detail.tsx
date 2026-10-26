@@ -195,6 +195,8 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
     ? [detail.ticketLabel, supportKindWord(detail.kind, detail.kindLabel), accountName, `${supportTime(detail.createdAt)} に送信`].filter(Boolean).join('・')
     : '問い合わせの内容と運営からの返事を確認します。'
 
+  if (idMissing) return <TargetMissing kind="unspecified" title="開くお問い合わせが指定されていません" description="一覧から開くお問い合わせを選び直してください。" backHref="/hq/support" backLabel="問い合わせの一覧へ戻る" />
+
   return (
     <ListPage boardId="OhguS" title={title} help={description} folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}>
       <PageContent>

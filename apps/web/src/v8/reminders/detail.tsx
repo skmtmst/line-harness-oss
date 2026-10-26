@@ -37,6 +37,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import SegmentedControl from '@/components/shared/segmented'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -441,17 +442,17 @@ function ReminderDetailV8() {
 
   if (!reminderId) {
     return (
-      <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="リマインダが指定されていません" description="一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} /></SaveErrorScope>
+      <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="開くリマインダが指定されていません" description="一覧から開くリマインダを選び直してください。" backHref="/reminders" backLabel="リマインダ一覧へ戻る" /></SaveErrorScope>
     )
   }
   if (loading) return <SaveErrorScope errors={saveErrors}><DetailLoading label="リマインダの詳細を読み込んでいます" /></SaveErrorScope>
   if (missing) {
     return (
-      <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" action={<Button href="/reminders">リマインダ一覧へ戻る</Button>} /></SaveErrorScope>
+      <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このリマインダは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" backHref="/reminders" backLabel="リマインダ一覧へ戻る" /></SaveErrorScope>
     )
   }
   if (error || !data) {
-    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="詳細を表示できませんでした" description={error || '詳細を読み込めませんでした。'} onRetry={() => void load()} /></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="リマインダを読み込めませんでした" description={error || '詳細を読み込めませんでした。'} onRetry={() => void load()} /></SaveErrorScope>
   }
 
   const hasErrors = data.summary.errors > 0
