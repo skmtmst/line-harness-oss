@@ -6,4 +6,5 @@ export function emptyValue(kind: EmptyValueKind): string { return EMPTY_VALUE_LA
 export function displayValue(value: string | number | boolean | null | undefined, kind: EmptyValueKind = 'unknown'): string {
  return value === null || value === undefined || value === '' ? emptyValue(kind) : String(value)
 }
-export default function EmptyValue({kind,children}: {kind:EmptyValueKind;children?:ReactNode}) { return <>{children ?? emptyValue(kind)}</> }
+/** 値が無い所は薄い灰の「—」1 つ（決まり）。 */
+export default function EmptyValue({kind,children}: {kind:EmptyValueKind;children?:ReactNode}) { return <span data-empty-value className="text-ink-faint">{children ?? emptyValue(kind)}</span> }

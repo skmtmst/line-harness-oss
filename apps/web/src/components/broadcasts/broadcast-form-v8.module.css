@@ -48,7 +48,7 @@
 .exclusion:has(input:checked) { background: var(--color-accent-soft); border-color: var(--color-accent-deep); }
 .exclusion small { display: block; margin-top: var(--space-4); font-size: 12px; color: var(--color-ink-secondary); }
 .exclusionText { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; font-size: var(--text-caption); color: var(--color-ink); }
-.exclusionText small { font-size: var(--text-micro); color: var(--color-ink-secondary); }
+.exclusionText small { font-size: var(--text-micro); font-weight: var(--font-weight-ui); color: var(--color-ink-secondary); }
 .excludeTag { min-width: 0; }
 .audienceCount { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-14); border-radius: var(--radius-control); background: var(--color-surface-pearl); font-size: 13px; }
 .audienceCount span { display: flex; align-items: center; gap: var(--space-8); }
@@ -67,7 +67,7 @@
 .pcPreview :global(section > div) { width: 100%; height: 440px; border-radius: var(--radius-panel); }
 /* 手順 1〜2 の右の欄：届く人数と内訳。箱は共通のカード、中の字だけここで決める。 */
 .reachCard { width: 100%; }
-.reachRows { font-size: var(--text-micro); }
+.reachRows { font-size: var(--text-micro); font-weight: var(--font-weight-ui); }
 .reachRows > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-4) 0; }
 .reachRows dt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); }
 .reachRows dd { flex-shrink: 0; white-space: nowrap; font-variant-numeric: var(--font-numeric); color: var(--color-ink); }

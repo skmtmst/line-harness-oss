@@ -8,6 +8,7 @@ import { BubblePreview } from './broadcast-preview-model'
 import { type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import EmptyValue from '@/components/shared/empty-value'
 import KpiCard from '@/components/shared/kpi-card'
 import Checkbox from '@/components/shared/checkbox'
 import LinePreview from '@/components/shared/line-preview'
@@ -61,17 +62,17 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
   const reach = currentStep === 'basic' || currentStep === 'audience'
   const blocked = preflight?.exclusions?.blocked
   const matched = preflight?.audience?.matched
-  const people = (value: number | null | undefined) => (value === null || value === undefined ? '—' : `${formatNumber(value)} 人`)
+  const people = (value: number | null | undefined) => (value === null || value === undefined ? null : `${formatNumber(value)} 人`)
   return (<aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label={reach ? '届く人' : 'LINEの見え方'}>
         {reach ? <>
           <div className={styles.previewHead}><h3 className="sr-only">届く人</h3>{closeButton}</div>
           <Card layout="vertical" padding="compact" gap="tight" className={styles.reachCard}>
-            <div aria-live="polite"><KpiCard presentation="inline" title="届く人" value={audienceDisplayCount} unit="人" detail={null} icon={null} loading={audienceDisplayCount === null && preflightStatus === 'loading'} /></div>
-            <dl className={styles.reachRows}>{[
+            <div aria-live="polite"><KpiCard presentation="inline" title="届く人" value={audienceDisplayCount} unit="人" detail={null} icon={null} valueTone={audienceDisplayCount === null ? 'faint' : 'default'} loading={audienceDisplayCount === null && preflightStatus === 'loading'} /></div>
+            <dl className={styles.reachRows}>{([
               [confirmAudienceLabel, people(matched)],
-              ['ブロック中で除く', blocked === undefined ? '—' : blocked === 0 ? '0 人' : `− ${formatNumber(blocked)} 人`],
+              ['ブロック中で除く', blocked === undefined ? null : blocked === 0 ? '0 人' : `− ${formatNumber(blocked)} 人`],
               ['除くタグ', tags.find((tag) => tag.id === excludeTagId)?.name ?? 'なし'],
-            ].map(([label, value]) => <div key={label}><dt title={label}>{label}</dt><dd title={value}>{value}</dd></div>)}</dl>
+            ] as Array<[string, string | null]>).map(([label, value]) => <div key={label}><dt title={label}>{label}</dt><dd title={value ?? undefined}>{value ?? <EmptyValue kind="unknown" />}</dd></div>)}</dl>
             <TextLink href="/friends">届く人の一覧へ</TextLink>
           </Card>
         </> : <>
