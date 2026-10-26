@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ACCOUNT_STYLES, STYLE_DEFAULT_METRIC_IDS, type AccountStyle } from '@line-crm/shared'
 import { styleTerm } from '@/lib/terms'
-import { STYLE_CONFIG } from '@/v8/style-dashboard'
+import { STYLE_CONFIG } from '@/v8/style-dashboard/public/sample-parts/index'
 import { defaultCards } from '../../../../../worker/src/services/style-setup-core'
 import { standardStarter } from '../../../../../worker/src/services/style-starter-definition'
 import { SAMPLE_MENUS } from '../model'
