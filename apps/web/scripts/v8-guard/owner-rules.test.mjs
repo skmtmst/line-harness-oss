@@ -126,8 +126,9 @@ test('選んだ文字の地・タップの光・画像の幅と高さ・動き�
     assert.ok((await kindsOf(page)).includes('img-size'))
     await page.setContent(`${ok}<main><p class="r" style="transition-delay:.2s">本文</p></main>`)
     assert.ok((await kindsOf(page)).includes('reduced-motion-delay'))
-    await page.setContent('<main>本文</main>')
+    await page.setContent('<html data-theme="v8"><body><main>本文</main></body></html>')
     assert.ok((await kindsOf(page)).includes('selection-color'))
+    assert.ok((await kindsOf(page)).includes('tap-highlight'))
   } finally { await browser.close() }
 })
 

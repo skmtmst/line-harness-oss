@@ -116,10 +116,13 @@ export default function scanPolishRules() {
     if (gap !== null && Math.abs(gap - 8) > 0.5) add('button-icon-gap', el, { gap: Math.round(gap * 10) / 10 }, el.textContent)
   }
   // 仕上げ（§6.5 の 7）：文字を選んだ時の地（ブランドの深い緑の薄い色）・端末のタップの光なし・画像の幅と高さ・動きを減らす設定の遅れなし。
-  const selection = getComputedStyle(document.body, '::selection').backgroundColor
-  if (/^rgba\(0, 0, 0, 0\)$|^transparent$/.test(selection)) add('selection-color', document.body, { selection })
-  const tap = css(document.documentElement).webkitTapHighlightColor
-  if (tap && !/rgba\(0, 0, 0, 0\)|transparent/.test(tap)) add('tap-highlight', document.documentElement, { tap })
+  // 画面全体の値なので、アプリの CSS を読んだ V8 の画面（data-theme="v8"）だけで見る。
+  if (document.documentElement.dataset.theme === 'v8') {
+    const selection = getComputedStyle(document.body, '::selection').backgroundColor
+    if (/^rgba\(0, 0, 0, 0\)$|^transparent$/.test(selection)) add('selection-color', document.body, { selection })
+    const tap = css(document.documentElement).webkitTapHighlightColor
+    if (tap && !/rgba\(0, 0, 0, 0\)|transparent/.test(tap)) add('tap-highlight', document.documentElement, { tap })
+  }
   for (const img of document.querySelectorAll('img')) {
     if (!visible(img) || (img.hasAttribute('width') && img.hasAttribute('height'))) continue
     // 元の大きさのまま出す写真（幅を CSS が決めない物）は、属性で幅を決めると見た目が変わるので数えない。
