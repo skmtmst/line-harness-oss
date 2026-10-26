@@ -1,10 +1,12 @@
 name: Security scan
 
-# Report-only security checks. Nothing here blocks a merge: findings are left in
-# the job summary (and the code scanning tab for CodeQL) for the owner to read.
+# Security checks. Nothing here blocks a merge: findings are left in the job
+# summary (and the code scanning tab for CodeQL) for the owner to read.
 #
 # - pnpm audit: known vulnerabilities in production dependencies (high and above).
-# - CodeQL: risky patterns in the JavaScript / TypeScript source.
+#   Report only on pull requests. On the weekly schedule and manual runs, any
+#   high or critical finding turns the run red so the week's scan is noticed.
+# - CodeQL: risky patterns in the JavaScript / TypeScript source. Report only.
 #
 # This workflow does not open dependency update pull requests. The owner has
 # held back "wait 7 days before taking a freshly published npm version", so
@@ -31,7 +33,7 @@ jobs:
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+    continue-on-error: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -41,8 +43,10 @@ jobs:
         with:
           node-version: '22.23.4'
 
-      - name: pnpm audit (production dependencies, report only)
-        continue-on-error: true
+      - name: pnpm audit (production dependencies)
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        env:
+          AUDIT_EVENT: ${{ github.event_name }}
         run: |
           set +e
           pnpm audit --prod --audit-level=high > audit.txt 2>&1
@@ -53,8 +57,10 @@ jobs:
             echo
             if [ "$status" -eq 0 ]; then
               echo 'No high or critical vulnerabilities in production dependencies.'
+            elif [ "$AUDIT_EVENT" = 'pull_request' ]; then
+              echo "Found high or critical vulnerabilities (exit $status). Report only on pull requests; nothing is blocked."
             else
-              echo "Found high or critical vulnerabilities (exit $status). Report only; nothing is blocked."
+              echo "Found high or critical vulnerabilities (exit $status). This $AUDIT_EVENT run fails so the finding is noticed."
             fi
             echo
             echo '```'
