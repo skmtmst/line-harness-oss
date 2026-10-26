@@ -1707,6 +1707,35 @@ describe('admin CRUD', () => {
     ]));
   });
 
+  test('GET publish-validation — 申込フォームが止まっていれば form_active で止める', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.getWebinarEditorSettings.mockResolvedValue({
+      webinar_id: 'w1', version: 4, delivery_kind: 'scheduled',
+      viewing_condition_json: '{}', public_description: '', registration_form_id: 'form-1',
+      notification_messages_json: '{}', notification_test_json: '{"status":"passed"}',
+      action_template_body: '', missing_result_policy: 'escalate',
+      public_page_test_json: '{"status":"passed"}', published_version: null, published_at: null,
+      created_at: 'x', updated_at: 'x',
+    });
+    dbMocks.getWebinarCtas.mockResolvedValue([{ at_seconds: 300, kind: 'url', url: 'https://example.com' }]);
+    dbMocks.getWebinarActions.mockResolvedValue([{ id: 'action-1' }]);
+    const check = async () => {
+      const res = await adminReq('/api/webinars/w1/publish-validation');
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { data: { blockers: string[]; checks: Array<{ key: string; status: string }> } }).data;
+    };
+
+    dbMocks.getFormById.mockResolvedValue({ id: 'form-1', name: '申込フォーム', is_active: 0, fields: '[]' });
+    const stopped = await check();
+    expect(stopped.checks).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'form_active', status: 'failed' })]));
+    expect(stopped.blockers).toContain('form_active');
+
+    dbMocks.getFormById.mockResolvedValue({ id: 'form-1', name: '申込フォーム', is_active: 1, fields: '[]' });
+    const active = await check();
+    expect(active.checks).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'form_active', status: 'passed' })]));
+    expect(active.blockers).not.toContain('form_active');
+  });
+
   test('GET participants — 実行エラーと担当者連携状態をカーソル付きで返す', async () => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
     dbMocks.getWebinarParticipantOperations.mockResolvedValue([{

@@ -1,11 +1,6 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { describe, expect, it } from 'vitest'
 import type { WebinarCtaCard } from '@/lib/api'
 import { cardFieldProblems, parseMinSec } from '@/v8/webinar-edit/cta-validation'
-
-const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/cta.tsx'), 'utf8')
 
 const card = (over: Partial<WebinarCtaCard> = {}): WebinarCtaCard => ({
   atSeconds: 0,
@@ -19,6 +14,8 @@ const card = (over: Partial<WebinarCtaCard> = {}): WebinarCtaCard => ({
   ...over,
 })
 
+/* 保存の前にこのチェックを通すことは cta-v8-react.test.tsx（空のまま保存すると送らない）と
+ * v8/webinar-edit/edit.test.tsx（足りない欄のカードを開いて印を付ける）が押して見る。 */
 describe('CTAカードの保存前チェック (N-119)', () => {
   it('不足の無いカードはそのまま通る', () => {
     expect(cardFieldProblems(card(), '10:00', 3600)).toEqual({ time: null, title: null, button: null, link: null })
@@ -48,11 +45,4 @@ describe('CTAカードの保存前チェック (N-119)', () => {
     expect(problems.every((item) => Object.values(item).some(Boolean))).toBe(true)
   })
 
-  it('編集タブの保存はこのチェックを通してからAPIを呼ぶ', () => {
-    // 関数だけ直して配線を忘れると、不足のまま保存されて公開前検証で初めて止まる。
-    expect(PAGE).toContain('cardFieldProblems(card, times[i]')
-    expect(PAGE).toContain('fields.define(`cta-${i}-link`')
-    expect(PAGE.indexOf('if (fields.submit().length > 0)'))
-      .toBeLessThan(PAGE.indexOf('webinarApi.saveCtas(webinarId, next)'))
-  })
 })
