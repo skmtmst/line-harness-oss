@@ -12,6 +12,7 @@ import Button from '@/components/shared/button'
 import Checkbox,{ UnavailableSelection } from '@/components/shared/checkbox'
 import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-menu'
 import EmptyList from '@/components/shared/empty-list'
+import IconLabel from '@/components/shared/icon-label'
 import { emptyValue } from '@/components/shared/empty-value'
 import { type FolderDotFolder } from '@/components/shared/folder-dot'
 import ListDateTime from '@/components/shared/list-date-time'
@@ -77,10 +78,7 @@ type RenderTemplateListContext = {
 
 /** 種類の小さな印（色なし）。1行の色の点はフォルダだけにする。 */
 const KIND_ICONS = { image: ImageIcon, flex: LayoutTemplate, carousel: GalleryHorizontal, question: HelpCircle, video: Video } as const
-function KindIcon({ kind }: { kind: string }) {
-  const Icon = KIND_ICONS[kind as keyof typeof KIND_ICONS] ?? FileText
-  return <Icon size={14} aria-hidden="true" className={styles.kindIcon} />
-}
+const kindIcon = (kind: string) => KIND_ICONS[kind as keyof typeof KIND_ICONS] ?? FileText
 
 export function renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, openPicker, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: RenderTemplateListContext) {
   return (accountLoading || view === 'loading' ? (
@@ -194,7 +192,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                     />
                     {narrow ? (
                       <Td>
-                        <span className={styles.kindLabel} aria-label={`種類：${kindText}`}><KindIcon kind={isRichVideoTemplate(t) ? 'video' : kindLabel} />{kindText}</span>
+                        <IconLabel icon={kindIcon(isRichVideoTemplate(t) ? 'video' : kindLabel)} aria-label={`種類：${kindText}`}>{kindText}</IconLabel>
                       </Td>
                     ) : (
                       <Td className={styles.previewCell} title={`種類：${kindText}`}>

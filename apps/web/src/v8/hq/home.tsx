@@ -43,6 +43,7 @@ import { connectionReasonLine } from './connection-reasons';
 import styles from './home.module.css';
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/public/folder-colors/index'
 import StatusBadge from '@/components/shared/status-badge';
+import IconLabel from '@/components/shared/icon-label';
 import TagPill from '@/components/shared/tag-pill';
 import TagOverflow from '@/components/shared/tag-overflow';
 import TruncatedText from '@/components/shared/truncated-text';
@@ -530,7 +531,7 @@ export default function HqHomeV8() {
                   <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>
                 </div>
                 <TagOverflow label={`${name}の分類`}>
-                  {folderDotOf(account) ? <span className={styles.folderLabel} aria-label={`フォルダ：${folderDotOf(account)!.name}`}><FolderIcon size={14} aria-hidden="true" className={styles.folderIcon} />{folderDotOf(account)!.name}</span> : null}
+                  {folderDotOf(account) ? <IconLabel icon={FolderIcon} aria-label={`フォルダ：${folderDotOf(account)!.name}`}>{folderDotOf(account)!.name}</IconLabel> : null}
                   {(account.tags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
                 </TagOverflow>
                 <dl className={styles.stats}>
