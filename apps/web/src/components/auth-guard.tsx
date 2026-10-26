@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
 import { isPublicAuthPath } from '@/lib/auth-email'
+import { MOBILE_LOGIN_NEXT, isMobileShellPath } from '@/lib/mobile-shell'
 import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
 import { forgetSessionSnapshot, rememberSessionSnapshot, type SessionSnapshot } from '@/lib/session-snapshot'
 import { forgetAuthCheck, readAuthCheck, rememberAuthCheck } from '@/lib/auth-check-marker'
@@ -189,7 +190,8 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         lastSessionCheck = null
         forgetSessionSnapshot()
         forgetAuthCheck()
-        if (!cancelled) router.replace('/login')
+        // 電話の画面（/m）から来た人は、ログインの後に /m へ戻す（決まった印だけを渡す）。
+        if (!cancelled) router.replace(isMobileShellPath(pathname) ? `/login?next=${MOBILE_LOGIN_NEXT}` : '/login')
       }
     }
 
@@ -202,7 +204,8 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
   }, [pathname, router])
 
   // 初めての確認（開いた直後・ログイン直後）だけ。くるくるではなく外枠の骨組みで待つ。
-  if (!checked) return <AuthPendingShell />
+  // 電話の画面では PC の左メニューの骨組みを出さない（確認が済むまで中身も出さない）。
+  if (!checked) return isMobileShellPath(pathname) ? <div role="status" aria-busy="true" aria-label="読み込み中" /> : <AuthPendingShell />
 
   if ((tenantStatus === 'suspended' || tenantStatus === 'archived') && !pathname.startsWith('/hq/support')) {
     return <TenantAccessProvider status={tenantStatus}><TenantSuspended /></TenantAccessProvider>
