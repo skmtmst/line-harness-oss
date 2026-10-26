@@ -46,7 +46,7 @@ const FACTOR_ROWS: Array<{ label: string; dog: string; cat: string }> = [
 ]
 
 const FORMULAS: Array<{ label: string; value: string }> = [
-  { label: '安静時エネルギー', value: '70 × 体重(kg) の 0.75 乗' },
+  { label: '安静時エネルギー', value: '70 × 体重（kg） の 0.75 乗' },
   { label: '1日の必要カロリー', value: '安静時エネルギー × 係数' },
   { label: '1日の目安（g）', value: '必要カロリー ÷ 主食の kcal/100g × 100' },
   { label: '然の鹿肉の目安（g）', value: '必要カロリー × 上限% ÷ 然商品の kcal/100g × 100' },

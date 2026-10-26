@@ -175,9 +175,9 @@ function PassCreateInner() {
     }
   }
 
-  const summary1 = [KIND_LABEL[form.kind], form.name.trim() || '名前はまだ', countLabel({ kind: form.kind, count: Number(form.count) || null, monthlyLimit: Number(form.monthlyLimit) || null }), form.price.trim() === '' ? '値段はまだ' : yen(Number(form.price) || 0)].join(' ・ ')
+  const summary1 = [KIND_LABEL[form.kind], form.name.trim() || '名前はまだ', countLabel({ kind: form.kind, count: Number(form.count) || null, monthlyLimit: Number(form.monthlyLimit) || null }), form.price.trim() === '' ? '値段はまだ' : yen(Number(form.price) || 0)].join('・')
   const summary2 = form.menuIds.length === 0 ? 'すべての予約' : form.menuIds.map(menuNameOf).join('・')
-  const summary3 = `${periodLabel({ kind: form.kind, validDays: form.validDays })} ・ ${form.allowWithoutPass ? '券が無い人も予約できる' : '券が無い人は予約できない'}`
+  const summary3 = `${periodLabel({ kind: form.kind, validDays: form.validDays })}・${form.allowWithoutPass ? '券が無い人も予約できる' : '券が無い人は予約できない'}`
   const summary4 = 'まだ（あとで Stripe とつなぐ）'
 
   const stepCard = (n: StepKey, title: string, summary: string, content: ReactNode, change?: () => void) => (

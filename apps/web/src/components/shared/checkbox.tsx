@@ -70,20 +70,56 @@ export default function Checkbox({
             onChange={(event) => { if (!rest.disabled) onCheckedChange(event.target.checked) }}
             className={styles.input}
           />
-          <span aria-hidden="true" className={styles.box}>
-            <svg className={`${styles.mark} ${styles.check}`} viewBox="0 0 24 24">
-              <path d="M4 12l5 5L20 6" pathLength={1} />
-            </svg>
-            <svg className={`${styles.mark} ${styles.minus}`} viewBox="0 0 24 24">
-              <path d="M5 12h14" pathLength={1} />
-            </svg>
-          </span>
+          <CheckboxMark />
         </span>
         {children ? <span className={styles.label}>{children}</span> : null}
       </label>
       {hasNote ? (
         <span id={noteId} className={error ? styles.error : styles.description}>{error ?? description}</span>
       ) : null}
+    </span>
+  )
+}
+
+/** 四角と印。本物の input の直後に置く（CSS の `.input:checked + .box` で色と印が変わる）。 */
+function CheckboxMark() {
+  return (
+    <span aria-hidden="true" className={styles.box}>
+      <svg className={`${styles.mark} ${styles.check}`} viewBox="0 0 24 24">
+        <path d="M4 12l5 5L20 6" pathLength={1} />
+      </svg>
+      <svg className={`${styles.mark} ${styles.minus}`} viewBox="0 0 24 24">
+        <path d="M5 12h14" pathLength={1} />
+      </svg>
+    </span>
+  )
+}
+
+/**
+ * 文字や札を自分で持つ部品（選ぶカードなど）が使う、チェックの四角だけ。
+ * 大きさ・角丸・線・選んだ時の動きは Checkbox と同じ1種類。
+ */
+export function CheckboxControl({
+  checked,
+  onCheckedChange,
+  invalid = false,
+  ...rest
+}: {
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+  invalid?: boolean
+} & Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'checked' | 'onChange' | 'className' | 'children'>) {
+  return (
+    <span className={styles.control}>
+      <input
+        {...rest}
+        type="checkbox"
+        checked={checked}
+        aria-invalid={invalid || undefined}
+        onChange={(event) => { if (!rest.disabled) onCheckedChange(event.target.checked) }}
+        className={styles.input}
+      />
+      <CheckboxMark />
     </span>
   )
 }

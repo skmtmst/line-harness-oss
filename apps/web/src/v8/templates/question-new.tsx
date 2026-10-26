@@ -184,7 +184,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     }
     try {
       const result = id ? await api.templates.update(id, { ...payload, ...editVersion.current }) : await api.templates.create(payload)
-      if (!result.success) { setError(result.error || '保存できませんでした。'); return false }
+      if (!result.success) { setError(result.error || '保存できませんでした。時間をおいて、もう一度お試しください。'); return false }
       editVersion.current = { expectedVersion: result.data.publishedVersion, expectedDraftRevision: result.data.draftRevision }
       return true
     } catch (caught) {

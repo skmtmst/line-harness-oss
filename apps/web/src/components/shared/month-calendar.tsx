@@ -4,6 +4,7 @@ import StatusBadge from './status-badge'
 import type { ComponentProps } from 'react'
 import styles from './month-calendar.module.css'
 import CalendarPeriod from './calendar-period'
+import { formatNumber } from '@/lib/format'
 
 export type MonthCalendarDay = { date: string; day: string | number; inMonth: boolean; closed?: boolean; today?: boolean; selected?: boolean; empty?: boolean; groups?: number; people?: number; mark?: { tone: ComponentProps<typeof StatusBadge>['tone']; label: string } | null }
 
@@ -18,7 +19,7 @@ export default function MonthCalendarGrid({ title, days, onDay }: { title: strin
           {days.map((d) => (
             <button key={d.date} type="button" role="gridcell" className={styles.monthCell} data-out={!d.inMonth || undefined} data-closed={d.closed || undefined} data-today={d.today || undefined} data-selected={d.selected || undefined} aria-current={d.today ? 'date' : undefined} aria-selected={Boolean(d.selected)} aria-label={`${d.date}${d.today ? '・今日' : ''}${d.selected ? '・選択中' : ''}`} onClick={() => onDay(d.date)}>
               <span className={styles.monthTop}><strong>{d.day}</strong>{d.today ? <span className={styles.monthNote}>今日</span> : null}<span className={styles.grow} />{d.mark ? <StatusBadge tone={d.mark.tone} dot={false} size="micro">{d.mark.label}</StatusBadge> : null}</span>
-              {d.closed ? <span className={styles.monthNote}>定休日</span> : d.empty ? <span className={styles.monthNote}>予約なし</span> : d.groups !== undefined ? <><strong className={styles.monthGroups}>{d.groups}組</strong><span className={styles.monthNote}>{d.people}人</span></> : null}
+              {d.closed ? <span className={styles.monthNote}>定休日</span> : d.empty ? <span className={styles.monthNote}>予約なし</span> : d.groups !== undefined ? <><strong className={styles.monthGroups}>{d.groups}組</strong><span className={styles.monthNote}>{formatNumber(d.people)}人</span></> : null}
             </button>
           ))}
         </div>

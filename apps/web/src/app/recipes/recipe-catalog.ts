@@ -1,5 +1,6 @@
 import type { FeatureKey } from '../../lib/feature-key'
 import type { Recipe as ApiRecipe } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /**
  * レシピの正本。設計 ★管理画面 34-2「レシピ一覧」（`y0P0Qx`）の 3 本。
@@ -258,7 +259,7 @@ export function featureSummary(recipe: Recipe, features: Record<string, boolean>
 
 /** 下の帯のボタンの文字。件数が決まっていないときは件数を言わない。 */
 export function createButtonLabel(recipe: Pick<Recipe, 'itemCount'>): string {
-  return recipe.itemCount != null ? `${recipe.itemCount}件を下書きで作る` : '下書きで作る'
+  return recipe.itemCount != null ? `${formatNumber(recipe.itemCount)}件を下書きで作る` : '下書きで作る'
 }
 
 /**

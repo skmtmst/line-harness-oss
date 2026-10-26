@@ -1,6 +1,7 @@
 import { formatYen as yen } from '@line-crm/shared';
 import type { BookingPassPlan } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 回数券・月謝（B2）の言葉。docs/v8-requirements/gap-features/B2-tickets-monthly.md。
@@ -19,7 +20,7 @@ export function validLabel(days: number): string {
 }
 
 export function countLabel(plan: Pick<BookingPassPlan, 'kind' | 'count' | 'monthlyLimit'>): string {
-  if (plan.kind === 'ticket') return plan.count === null ? '—' : `${plan.count} 回`
+  if (plan.kind === 'ticket') return plan.count === null ? '—' : `${formatNumber(plan.count)} 回`
   return plan.monthlyLimit === null ? '—' : `月 ${plan.monthlyLimit} 回`
 }
 

@@ -8,6 +8,7 @@ import Button from './button'
 import Checkbox from './checkbox'
 import { EntityPickerDialog } from './entity-picker'
 import { notifyToast } from './toast'
+import { formatNumber } from '@/lib/format'
 
 type Item = { id: string; name: string }
 const UNFILED = '__unfiled__'
@@ -52,7 +53,7 @@ export function useFolderMove<T extends Item>({ accountId, canEdit, items, folde
       if (account.current !== startedAccount) return
       setTargets(failed)
       setSelected(new Set(failed.map((item) => item.id)))
-      if (failed.length) setError(`${failed.length}件を移せませんでした。${cause instanceof ApiError && cause.status === 409 ? '別の人が先に変更しました。一覧を読み直してください。' : '一覧とフォルダを読み直してお試しください。'}`)
+      if (failed.length) setError(`${formatNumber(failed.length)}件を移せませんでした。${cause instanceof ApiError && cause.status === 409 ? '別の人が先に変更しました。一覧を読み直してください。' : '一覧とフォルダを読み直してお試しください。'}`)
       if (done) notifyToast(`${done}件をフォルダへ移しました`)
       await onChanged()
     } catch {

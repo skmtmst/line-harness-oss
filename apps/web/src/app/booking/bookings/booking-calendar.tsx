@@ -13,7 +13,7 @@ import Link from 'next/link'
 import type { BookingRequest } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import { formatDay, formatRange, formatTime } from '@/lib/format'
+import { formatDay, formatRange, formatTime, formatNumber } from '@/lib/format'
 
 // BOOKING-01: 9〜18時の固定10マスは「空き枠」ではなく、空き枠APIの実績が
 // まだ届いていないときの表示レンジ。実際に受け付けられる枠が届いたら、
@@ -349,7 +349,7 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen, onDateClick
               ) : (
                 <p className="text-ink text-xs font-semibold">{dateLabel(day)}</p>
               )}
-              <p className="text-success mt-0.5 text-xs font-semibold">{count}件</p>
+              <p className="text-success mt-0.5 text-xs font-semibold">{formatNumber(count)}件</p>
             </div>
           )
         })}
@@ -709,7 +709,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           {mode === 'day' ? (
             <CalendarFrame
               title={dateLabel(anchorDay)}
-              meta={listMissing ? '—' : `${activeItems.length}件 ／ 売上見込み ${money(sales)}`}
+              meta={listMissing ? '—' : `${formatNumber(activeItems.length)}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -1))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 1))}
               onToday={() => onAnchorChange(todayKey())}
@@ -719,7 +719,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           ) : (
             <CalendarFrame
               title={`${formatRange(`${days[0]}T00:00:00+09:00`, `${days[6]}T00:00:00+09:00`)}`}
-              meta={listMissing ? '—' : `${activeItems.length}件 ／ 売上見込み ${money(sales)}`}
+              meta={listMissing ? '—' : `${formatNumber(activeItems.length)}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -7))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 7))}
               onToday={() => onAnchorChange(todayKey())}
@@ -736,15 +736,15 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           {!listMissing ? (
             <SidePanel title={`${periodWithToday} 気をつけること`} tone={requested > 0 || phoneCount > 0 ? 'warning' : 'plain'}>
               {requested > 0 && <p>● 未承認の予約が {requested}件あります。内容を確認してください。</p>}
-              {phoneCount > 0 && <p>● 電話予約が {phoneCount}件あります。LINE未連携の方には当日の連絡ができません。</p>}
+              {phoneCount > 0 && <p>● 電話予約が {formatNumber(phoneCount)}件あります。LINE未連携の方には当日の連絡ができません。</p>}
               {requested === 0 && phoneCount === 0 && <p>いま確認が必要な予約はありません。</p>}
             </SidePanel>
           ) : null}
           {/* R316: 日の内訳も週と同じ「内訳」にそろえ、選んだ期間を名指しする。 */}
           <SidePanel title={`${periodHead}の内訳`}>
-            <p className="flex justify-between"><span>予約</span><strong>{listMissing ? '—' : `${activeItems.length}件`}</strong></p>
-            <p className="flex justify-between"><span>うちLINEから</span><strong className="text-success">{listMissing ? '—' : `${lineCount}件`}</strong></p>
-            <p className="flex justify-between"><span>うち電話</span><strong className="text-action">{listMissing ? '—' : `${phoneCount}件`}</strong></p>
+            <p className="flex justify-between"><span>予約</span><strong>{listMissing ? '—' : `${formatNumber(activeItems.length)}件`}</strong></p>
+            <p className="flex justify-between"><span>うちLINEから</span><strong className="text-success">{listMissing ? '—' : `${formatNumber(lineCount)}件`}</strong></p>
+            <p className="flex justify-between"><span>うち電話</span><strong className="text-action">{listMissing ? '—' : `${formatNumber(phoneCount)}件`}</strong></p>
             <p className="flex justify-between"><span>売上見込み</span><strong>{listMissing ? '—' : money(sales)}</strong></p>
           </SidePanel>
           <SidePanel title="つながる先">

@@ -136,6 +136,7 @@ export default function ReorderHandle({
       // 一覧の行の矢印移動（row-roving）に ↑↓ を取られないようにする。←→ は行の中の移動に使う。
       data-roving-own="vertical"
       data-reorder-handle=""
+      data-hit-area=""
       aria-label={ariaLabel ?? `${label}を並び替え。上下キーで移動`}
       title={title ?? 'ドラッグまたは上下キーで並び替え'}
       className={[look === 'icon' && styles.action, look === 'icon' && styles.grip, look === 'inline' && `${INLINE_CLASS} ${styles.inlineGrip}`, className].filter(Boolean).join(' ')}

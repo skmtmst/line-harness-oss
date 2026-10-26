@@ -13,6 +13,7 @@ import styles from './form.module.css'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 ウェビナーの編集 ①基本設定（並びは作る  と同じ）。
@@ -147,7 +148,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
     try {
       if (dirty && !(await save())) return
       const response = await webinarApi.testNotifications(webinar.id)
-      setTestResult(`通知テスト：成功 ${response.data.sent} 件・失敗 ${response.data.failed} 件`)
+      setTestResult(`通知テスト：成功 ${formatNumber(response.data.sent)} 件・失敗 ${formatNumber(response.data.failed)} 件`)
       setTestConfirm(false)
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)

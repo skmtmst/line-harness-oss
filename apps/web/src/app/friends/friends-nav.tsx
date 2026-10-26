@@ -86,7 +86,7 @@ export function FriendsDataMenuV8({
           },
           {
             id: 'csv-import',
-            label: '取り込む',
+            label: 'CSVから取り込む',
             external: true,
             qaOpen: 'friends-data-menu-csv-import',
             onSelect: () => router.push(csvHref),
@@ -124,8 +124,8 @@ export function FriendsDataMenuV8({
 
 /**
  * 一覧タブの板の頭（・sdbsQ）：題「友だち」＋説明1行、右に
- * 「データ管理 ▾」（副）→「友だちを取り込む」（主・緑は1つ）。
- * 「友だちを取り込む」の行き先は既にある CSV 取り込み（/friends/migrations）。
+ * 「データ管理 ▾」（副）→「CSVから取り込む」（主・緑は1つ）。
+ * 「CSVから取り込む」の行き先は既にある CSV 取り込み（/friends/migrations）。
  * 一覧の表そのもの（KPI・絞り込み・表）は機能11の担当で、ここでは触らない。
  */
 export function FriendsListHeadV8({
@@ -133,7 +133,7 @@ export function FriendsListHeadV8({
 }: {
   onExportCurrentPage?: (() => void) | null
 }) {
-  /* 板 ：閲覧のみは「取り込む」を押せない形にする（隠さない）。
+  /* 板 ：閲覧のみは「CSVから取り込む」を押せない形にする（隠さない）。
      役割が読めるまでは今までどおり出す（このファイルの CSV と同じ守り）。 */
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)
@@ -152,12 +152,12 @@ export function FriendsListHeadV8({
         {canEdit ? (
           <Button variant="primary" href="/friends/migrations">
             <Upload aria-hidden="true" className="h-3.5 w-3.5" />
-            友だちを取り込む
+            CSVから取り込む
           </Button>
         ) : (
           <Button type="button" variant="primary" disabled title={readonlyReason}>
             <Upload aria-hidden="true" className="h-3.5 w-3.5" />
-            友だちを取り込む
+            CSVから取り込む
           </Button>
         )}
       </div>

@@ -16,7 +16,7 @@ describe('お客さん向けの失敗・読み込み中の文言', () => {
 
   it('読み直し・読み込み中・送信失敗の文言が決まっている', () => {
     expect(RETRY_LABEL).toBe('もう一度読み込む');
-    expect(LOADING_LABEL).toBe('読み込み中...');
+    expect(LOADING_LABEL).toBe('読み込み中…');
     expect(SUBMIT_FAILED_MESSAGE).toContain('送信できませんでした');
     expect(SUBMIT_FAILED_MESSAGE).not.toContain('Error');
   });

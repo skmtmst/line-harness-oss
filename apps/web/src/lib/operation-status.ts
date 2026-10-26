@@ -148,7 +148,7 @@ export function buildResearchReport(input: {
     `- 出力日時: ${formatOperationDate(input.generatedAt)}`,
     `- 全体状態: ${input.overall}`,
     `- 確認アカウント数: ${input.rows.length}`,
-    `- 異常・注意: ${abnormal.length}件`,
+    `- 異常・注意: ${formatNumber(abnormal.length)}件`,
     `- 今月の配信残数: ${remaining}`,
     '',
     '## 異常・注意の内容',

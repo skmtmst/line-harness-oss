@@ -16,3 +16,19 @@ test('a framed box clipped by its parent fails; scrollable and restored boxes re
     assert.deepEqual(await page.evaluate(scan),[])
   } finally { await browser.close() }
 })
+
+test('small UI text drawn at weight 400 fails; 500 and larger reading text pass', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<html data-theme="v8"><body><main><p id="small" style="font-size:12px;font-weight:500">補足の文字</p><p style="font-size:15px;font-weight:400">読み物の本文</p></main></body></html>')
+    assert.deepEqual(await page.evaluate(scan), [])
+    await page.locator('#small').evaluate(el => { el.style.fontWeight = '400' })
+    const broken = await page.evaluate(scan)
+    assert.equal(broken.length, 1)
+    assert.equal(broken[0].kind, 'thintext')
+    assert.deepEqual(broken[0].measure, { size: 12, weight: 400 })
+    await page.locator('#small').evaluate(el => { el.style.fontWeight = '500' })
+    assert.deepEqual(await page.evaluate(scan), [])
+  } finally { await browser.close() }
+})

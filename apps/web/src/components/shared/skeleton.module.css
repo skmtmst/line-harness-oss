@@ -11,11 +11,11 @@
 .list { width: 100%; min-width: 0; }
 .listRow { display: flex; align-items: center; gap: var(--polish-space-section); height: var(--tpl-list-row-h); padding: 0 var(--polish-space-section); box-shadow: var(--shadow-row-line); }
 .listRow:last-child { box-shadow: none; }
-.listRow [data-skeleton] { display: block; height: var(--polish-skeleton-height); background: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
+.listRow [data-skeleton] { display: block; height: var(--polish-skeleton-height); background-color: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
 .nameBone { flex: 2 1 0; max-width: 40%; }
 .numberBone { flex: 1 1 0; max-width: 12%; }
 .dateBone { flex: 1 1 0; max-width: 24%; }
 :root .row { height: var(--polish-table-row); padding-block: 0; }
-:root .row [data-skeleton] { background: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
+:root .row [data-skeleton] { background-color: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
 
 :root :global([data-list-skeleton]) .row { height: var(--tpl-list-row-h); }

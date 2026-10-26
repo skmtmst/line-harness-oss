@@ -97,7 +97,7 @@ export default function VersionHistory({
                 ) : null}
                 {version.author || version.at ? (
                   <span className="text-ink-faint mt-0.5 block text-xs">
-                    {[version.author, version.at].filter(Boolean).join(' ・ ')}
+                    {[version.author, version.at].filter(Boolean).join('・')}
                   </span>
                 ) : null}
               </button>

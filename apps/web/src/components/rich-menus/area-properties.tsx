@@ -371,7 +371,7 @@ export function AreaProperties({
             <>
               <div className="text-ink text-lg font-bold tabular-nums">
                 {taps?.count ?? 0}
-                <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>
+                <span className="text-ink-faint ml-0.5 text-xs font-medium">回</span>
               </div>
               {taps && taps.viaTrackedLink > 0 && (
                 <p className="text-ink-faint text-micro">
@@ -474,7 +474,7 @@ export function AreaProperties({
             aria-label="切り替え先のページ"
             invalid={Boolean(error)}
             options={[
-              { value: '', label: '選択...' },
+              { value: '', label: '選択…' },
               ...pages.map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: p.name })),
             ]}
             size="full"

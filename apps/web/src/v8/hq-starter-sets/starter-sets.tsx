@@ -31,6 +31,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { STYLE_CHOICES, styleLabel } from '@/v8/onboarding/public/model/index'
 import styles from './starter-sets.module.css'
 import { DISTRIBUTE_ACCOUNT_LIMIT, useDistribute } from './use-distribute'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 統括の「スタイルの初期セット」（★V8 修正案の列 VHp7p `J6647`。決まり ）。
@@ -51,9 +52,9 @@ const KIND_ROWS: ReadonlyArray<{ kind: StarterSetItem['kind']; label: string; ho
 
 function nameOf(list: StarterSetItem[], kind: StarterSetItem['kind']): { main: string; sub?: string } {
   if (kind === 'rich_menu') return { main: list[0].name, sub: list[0].buttons ? `${list[0].buttons.length}つのボタン` : undefined }
-  if (kind === 'automation') return { main: list.length > 1 ? `${list[0].name} ほか ${list.length}件` : list[0].name, sub: 'LINE に自動で送る物' }
+  if (kind === 'automation') return { main: list.length > 1 ? `${list[0].name} ほか ${formatNumber(list.length)}件` : list[0].name, sub: 'LINE に自動で送る物' }
   if (kind === 'booking_menu' && list.length <= 3) return { main: list.map((item) => item.name).join('・') }
-  return { main: list.length > 1 ? `${list[0].name} ほか ${list.length}件` : list[0].name }
+  return { main: list.length > 1 ? `${list[0].name} ほか ${formatNumber(list.length)}件` : list[0].name }
 }
 
 function shortDate(iso: string | undefined): string {
@@ -228,7 +229,7 @@ export default function HqStarterSetsV8() {
             <h3 id="hss-samples" className={styles.sectionTitle}>テンプレートの見本</h3>
             <HelpTip label="テンプレートの見本の説明">この業種で新しいアカウントに「【見本】」の名前で入るメッセージです。差し込み（名前・日時・店名・URL）は送る前に入れます。</HelpTip>
             <span className={styles.spacer} />
-            {samples ? <span className={styles.sampleCount}>{`${samples.length}件`}</span> : null}
+            {samples ? <span className={styles.sampleCount}>{`${formatNumber(samples.length)}件`}</span> : null}
           </div>
           {samplesError ? <ListState kind="error" title="見本を読み込めませんでした" onRetry={() => setSamplesTick((value) => value + 1)} /> : samples === null ? <ListState kind="loading" title="読み込んでいます…" /> : (
             <div className={styles.table}>

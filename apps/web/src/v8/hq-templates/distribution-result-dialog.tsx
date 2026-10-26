@@ -8,6 +8,7 @@ import TagPill, { type TagPillProps } from '@/components/shared/tag-pill'
 import StatusBadge from '@/components/shared/status-badge'
 import { failedStatus } from './folder-distribution'
 import styles from './console.module.css'
+import { formatNumber } from '@/lib/format'
 
 export function resultSentence(store: DistributionResult['stores'][number]): string {
   if (store.status !== 'succeeded') return '配っています'
@@ -27,7 +28,7 @@ export default function DistributionResultDialog({ open, title, summary, rows, t
   const failures = rows.filter((row) => failedStatus(row.store.status))
   return <Dialog open={open} designNode="dEvJM" designWidth={720} designTop={220} title={title} designHeaderPadding="24px 24px 0"
     busy={busy} cancelLabel="閉じる" onCancel={onClose}
-    {...(failures.length ? { confirmLabel: `失敗した ${failures.length} 件をやり直す`, confirmIcon: <RotateCw size={15} />,
+    {...(failures.length ? { confirmLabel: `失敗した ${formatNumber(failures.length)} 件をやり直す`, confirmIcon: <RotateCw size={15} />,
       onConfirm: onRetry } : {})}>
     {tag ? <TagPill {...tag} /> : null}
     <p className={styles.resultSummary}>{summary}</p>
@@ -45,7 +46,7 @@ export default function DistributionResultDialog({ open, title, summary, rows, t
         </div>
       })}
     </div>
-    {failures.length ? <p className={styles.resultBand}>{`失敗した ${failures.length} 件だけやり直せます。各行の理由を直してから、やり直してください。`}</p> : null}
+    {failures.length ? <p className={styles.resultBand}>{`失敗した ${formatNumber(failures.length)} 件だけやり直せます。各行の理由を直してから、やり直してください。`}</p> : null}
     {onRefresh ? <Button disabled={busy} onClick={onRefresh}>結果を再確認</Button> : null}
   </Dialog>
 }

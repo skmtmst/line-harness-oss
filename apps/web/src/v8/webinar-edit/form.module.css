@@ -31,7 +31,7 @@
   font-weight: 500;
   line-height: var(--tpl-text-sm-lh);
 }
-.optional { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; }
+.optional { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: var(--font-weight-ui); }
 .pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

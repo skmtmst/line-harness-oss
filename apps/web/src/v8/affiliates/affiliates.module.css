@@ -352,7 +352,7 @@
   margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 /* 文の途中で言葉のまとまりごとに早く折れないように（絵は字の途中で折る）。 */
 .closeExcluded {
@@ -385,7 +385,7 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: var(--text-body);
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 /* 支払い：払う額 150・中身 70・振込先 170・状態 130・操作 170。行 59。 */

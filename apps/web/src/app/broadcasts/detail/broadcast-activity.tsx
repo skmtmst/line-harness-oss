@@ -59,8 +59,8 @@ export default function BroadcastActivity({
               <p className="text-ink text-sm font-medium">{entry.label}</p>
               <p className="text-ink-faint mt-0.5 text-xs">
                 {formatDateTime(entry.createdAt)}
-                {entry.actorName ? ` ・ ${entry.actorName}` : null}
-                {entry.reason ? ` ・ 理由：${entry.reason}` : null}
+                {entry.actorName ? `・${entry.actorName}` : null}
+                {entry.reason ? `・理由：${entry.reason}` : null}
               </p>
             </div>
           </li>

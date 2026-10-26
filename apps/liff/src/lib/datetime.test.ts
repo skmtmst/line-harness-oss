@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   addDays,
+  formatDateLong,
+  formatDateTimeLong,
   formatJp,
   formatHoldLeft,
   formatJstDeadline,
@@ -87,4 +89,17 @@ it.each([
   expect(utcToJstWeekday(at)).toBe('木');
   expect(utcToJstHm(at)).toBe(time);
   expect(jstStartsAtIso('2026-10-01', time)).toBe(`${at.slice(0, 16)}:00.000Z`);
+});
+
+describe('詳しい日時の書き方', () => {
+  it('締め切りや期限は年まで出し、秒は出さない（日本時間）', () => {
+    expect(formatDateTimeLong('2026-10-25T08:51:30Z')).toBe('2026年10月25日 17:51');
+    expect(formatDateTimeLong('2026-12-31T15:05:00Z')).toBe('2027年1月1日 00:05');
+    expect(formatDateLong('2026-10-25T08:51:30Z')).toBe('2026年10月25日');
+  });
+
+  it('店の時間帯を渡すとその時刻で出し、読めない値は空にする', () => {
+    expect(formatDateTimeLong('2026-10-25T08:51:00Z', 'America/New_York')).toBe('2026年10月25日 04:51');
+    expect(formatDateTimeLong('not a date')).toBe('');
+  });
 });

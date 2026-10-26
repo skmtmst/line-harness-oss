@@ -301,7 +301,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
 
       { if (!fieldFailure)
 
-      setError('テスト送信できませんでした') }
+      setError('テスト送信できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setTesting(false)
     }

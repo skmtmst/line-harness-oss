@@ -76,7 +76,7 @@ test('基本の編集は取消で送らず、失敗では値を保ち、保存�
   fireEvent.change(screen.getByRole('textbox',{name:'名前'}),{target:{value:'新しい名前'}})
   vi.mocked(api.friendFields.saveForFriend).mockResolvedValueOnce({success:false,error:'保存失敗'} as never)
   fireEvent.click(screen.getByRole('button',{name:'保存する'}))
-  await waitFor(()=>expect(screen.getByRole('alert').textContent).toBe('保存できませんでした'))
+  await waitFor(()=>expect(screen.getByRole('alert').textContent).toBe('保存できませんでした。時間をおいて、もう一度お試しください。'))
   expect((screen.getByRole('textbox',{name:'名前'}) as HTMLInputElement).value).toBe('新しい名前')
   vi.mocked(api.friendFields.saveForFriend).mockResolvedValueOnce({success:true} as never)
   fireEvent.click(screen.getByRole('button',{name:'保存する'}))

@@ -43,6 +43,7 @@ import {
   formatYen,
 } from './format'
 import styles from './delivery.module.css'
+import { formatNumber } from '@/lib/format'
 
 const STATUS_TONES: Record<DeliveryOrderStatus, StatusBadgeTone> = {
   new: 'info',
@@ -238,7 +239,7 @@ export default function HistoryBoard({
               value={null}
               unit=""
               valueText={formatYen(totals ? totals.amount : null)}
-              detail={<span title={countNote}>{totals ? `${totals.count}件` : DASH}</span>}
+              detail={<span title={countNote}>{totals ? `${formatNumber(totals.count)}件` : DASH}</span>}
             />
             {byService.map((row) => (
               <KpiCard
@@ -248,7 +249,7 @@ export default function HistoryBoard({
                 value={null}
                 unit=""
                 valueText={formatYen(row.amount)}
-                detail={`${row.count}件`}
+                detail={`${formatNumber(row.count)}件`}
               />
             ))}
           </KpiBand>

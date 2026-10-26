@@ -51,7 +51,7 @@
 .startDot { fill: var(--diagram-line); }
 .message { fill: var(--diagram-fill); stroke: var(--diagram-line); }
 .messageTitle { font-weight: 600; }
-.messageDate { font-weight: 400; }
+.messageDate { font-weight: var(--font-weight-ui); }
 .bubble { fill: var(--diagram-bubble); }
 .bubbleText { fill: var(--diagram-ink); }
 .bubbleText { font-weight: 600; }

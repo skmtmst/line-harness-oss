@@ -2,7 +2,7 @@
 /*
  * 友だちの残高（板 ）。絵の骨組み（`design/v8/html/.html`）にそろえる。
  * 頭の CSV の空け・数の帯の空け（直近30日 増えた・直近30日 減った）・申請の行
- * （申請 佐藤 直人（10月2日（金）15:20））・申請した人の言い方をここで留める。
+ * （申請 佐藤 直人（10/02 15:20））・申請した人の言い方をここで留める。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -186,7 +186,7 @@ describe('残高の絵合わせ（板 `CJlf4`）', () => {
     await waitForRows()
     const body = container.textContent ?? ''
     expect(body).toContain('承認待ちのマイル変更 1 件')
-    expect(body).toContain('申請 佐藤 直人（10月2日（金）15:20）')
+    expect(body).toContain('申請 佐藤 直人（10/02 15:20）')
     expect(body).toContain('申請した人とは別のオーナー')
   })
 

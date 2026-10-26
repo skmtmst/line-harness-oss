@@ -75,7 +75,6 @@
   color: var(--color-ink-secondary);
   cursor: pointer;
 }
-.remove::before { content: ''; position: absolute; inset: -6px; }
 .remove svg { width: var(--tag-pill-font); height: var(--tag-pill-font); }
 .remove:hover { background: var(--color-shell); }
 .link:focus-visible, .remove:focus-visible, .toggle:focus-visible {
@@ -105,3 +104,6 @@
   --tag-pill-gap: 8px;
   line-height: 20px;
 }
+
+/* 文字の上下の真ん中：英数字が Inter になり和文の字面が約 0.5px 上に寄るので、名前の文字だけを共通の値で下げる（札の大きさは変えない）。 */
+:root .pill:not([data-size='md']) .name { translate: 0 var(--text-optical-shift); } /* md は行の高さ 20px で既に真ん中 */

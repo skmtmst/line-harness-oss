@@ -31,7 +31,7 @@ import AggregationStatus from '@/components/shared/aggregation-status'
 /*
  * ★V8 分析「ファネル」（Pencil ）。
  * 数の帯 → 選ぶ段（ファネル・何日以内・比較する条件・作る・読み直す）→ 左に全体の流れ、
- * 右に選んだ段（到達・止まった・進行中 → 対象者を開く／この対象者へ配信を作成）と比較 → 注。
+ * 右に選んだ段（到達・止まった・進行中 → 対象者を開く／この対象者へ配信を作る）と比較 → 注。
  * その下に、定義の操作（期間・再集計・編集・停止・保管）・結果の保存・停止中のファネル。
  * 作る／編集のフォームと保存の欄は、入口（app/analytics/page.tsx）が今の部品を渡す。
  * 呼ぶ口・世代の守り・判定不能の扱い・CSV は今の画面（FunnelTab）と同じ。
@@ -368,7 +368,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
                 <p className={styles.caption}>{audienceNote}</p>
                 {canManage ? <>
                   <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('friends')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={15} aria-hidden="true" />対象者を開く</Button></span>
-                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('broadcast')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={15} aria-hidden="true" />この対象者へ配信を作成</Button></span>
+                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => void openAudience('broadcast')} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={15} aria-hidden="true" />この対象者へ配信を作る</Button></span>
                 </> : <p className={styles.caption}>対象者づくりは統括・管理者が行えます。</p>}
               </> : <p className={styles.caption}>停止中・保管したファネルでは対象者づくりはできません。結果の確認だけができます。</p>)
                 : <p className={styles.caption}>{run && !measurable ? 'この結果は判定不能のため、対象者は選べません。' : '段を押すと、到達・停止・進行中の人を選べます。'}</p>}

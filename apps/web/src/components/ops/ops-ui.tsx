@@ -4,6 +4,7 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { ReactNode } from 'react'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import { ApiError } from '@/lib/api'
+import { formatListDay, formatListTimestamp } from '@/lib/format'
 
 /**
  * 運営コンソール（★管理画面 37）だけで使う小さな部品と表記の決まり。
@@ -49,12 +50,6 @@ export const PLAN_STATUS_LABEL: Record<string, string> = {
 
 export const ROLE_LABEL: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: 'スタッフ' }
 
-const JST_DATETIME = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo',
-  year: 'numeric', month: '2-digit', day: '2-digit',
-  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-})
-
 /*
  * 運営コンソールの日時はすべて日本時間で出す。端末のタイムゾーンに従うと、
  * スタッフ画面（Asia/Tokyo 固定）や監査ログと同じ記録が別の時刻に見えて
@@ -62,15 +57,12 @@ const JST_DATETIME = new Intl.DateTimeFormat('ja-JP', {
  */
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  const parts = JST_DATETIME.formatToParts(d)
-  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${pick('year')}-${pick('month')}-${pick('day')} ${pick('hour')}:${pick('minute')}`
+  return formatListTimestamp(value, { fallback: value })
 }
 
 export function formatDate(value: string | null | undefined): string {
-  return formatDateTime(value).slice(0, 10)
+  if (!value) return '—'
+  return formatListDay(value, value)
 }
 
 export const AUDIT_ACTION_LABEL: Record<string, { label: string; tone: ChipTone }> = {

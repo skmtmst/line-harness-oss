@@ -8,6 +8,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import type { StyleRoster } from './model'
 import styles from './style-dashboard.module.css'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 教室の「名簿のパネル」（k2MBw）。一覧で回を押すと右に開く。
@@ -64,7 +65,7 @@ export function LessonRoster({ roster, canWrite, onClose, onPay, onAttend, onAbs
       {hidden > 0 ? <button type="button" className={styles.sideMoreButton} onClick={() => setAll(true)}>ほか {hidden}人を表示する<ArrowRight size={14} aria-hidden="true" /></button> : null}
       {canWrite ? (
         <div className={styles.rosterFoot}>
-          <Button onClick={onPay}><CreditCard size={16} aria-hidden="true" />支払いのリンクを送る（{roster.payLinkCount}人）</Button>
+          <Button onClick={onPay}><CreditCard size={16} aria-hidden="true" />支払いのリンクを送る（{formatNumber(roster.payLinkCount)}人）</Button>
           <span className={styles.grow} />
           <Button variant="text" textTone="danger" onClick={onCancelClass}>休講にする</Button>
         </div>

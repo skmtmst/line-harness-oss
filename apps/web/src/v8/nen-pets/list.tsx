@@ -63,7 +63,7 @@ export default function PetsListV8({
       if (request !== requestRef.current) return
       if (!res.success) throw new Error(res.error)
       if (!res.data?.kpis || !Number.isFinite(res.data.kpis.total) || !Array.isArray(res.data.items)) {
-        throw new Error('ペット一覧の内容を確認できませんでした。')
+        throw new Error('ペット一覧の内容を確認できませんでした。時間をおいて、もう一度お試しください。')
       }
       setData(res.data)
       onKpis(res.data.kpis)

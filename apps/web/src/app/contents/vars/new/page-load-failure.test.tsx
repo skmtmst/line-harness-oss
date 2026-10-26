@@ -93,7 +93,7 @@ function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
 }
 
 /** 「登録する」の完全一致だけを拾う。部分一致だと秘密値警告側の
- *  「内容を確認して登録する」まで一緒に拾ってしまう。
+ *  「内容を確認して作る」まで一緒に拾ってしまう。
  *  本線7b9d6c8のボタン文言統一（「登録」→「登録する」）に合わせる。 */
 function byExactText(tag: string, text: string): HTMLElement {
   const found = Array.from(document.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)

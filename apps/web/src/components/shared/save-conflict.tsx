@@ -230,7 +230,7 @@ export function SaveConflictCompareDialog({
         <div className={styles.changes} data-save-conflict-changes="">
           {lines.map((line, index) => (
             <p key={index} className={styles.changeLine} data-kind={line.kind ?? 'change'}>
-              {line.kind === 'remove' ? '－ ' : line.kind === 'add' ? '＋ ' : '・ '}
+              {line.kind === 'remove' ? '－ ' : line.kind === 'add' ? '＋ ' : '・'}
               {line.text}
             </p>
           ))}
@@ -238,6 +238,36 @@ export function SaveConflictCompareDialog({
         </div>
       )}
     </Dialog>
+  )
+}
+
+/** 「違いを比べる」の表の1行。 */
+export type SaveConflictCompareRow = { label: string; mine: ReactNode; saved: ReactNode }
+
+/**
+ * 「違いを比べる」の表。項目ごとに、いまの入力と保存されている内容を横に並べる。
+ * 保存されている側は注意の色。項目の列は見出し（読み上げで行の名前になる）。
+ */
+export function SaveConflictCompareTable({ rows }: { rows: ReadonlyArray<SaveConflictCompareRow> }) {
+  return (
+    <table className={styles.compareTable}>
+      <thead>
+        <tr>
+          <th scope="col" className={styles.compareLabelCol}><span className="sr-only">項目</span></th>
+          <th scope="col">いまの入力</th>
+          <th scope="col" className={styles.compareSaved}>保存されている内容</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.label}>
+            <th scope="row" className={styles.compareLabelCol}>{row.label}</th>
+            <td>{row.mine}</td>
+            <td className={styles.compareSaved}>{row.saved}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 

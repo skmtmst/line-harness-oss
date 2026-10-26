@@ -62,7 +62,7 @@ describe('プール管理の発行前ゲート（#703）', () => {
       expect(view.getByText('この機能は設定でオフになっています')).toBeTruthy()
     })
     expect(view.queryByText('新規プール')).toBeNull()
-    expect(view.queryByText('読み込み中...')).toBeNull()
+    expect(view.queryByText('読み込み中…')).toBeNull()
     expect(seenPaths).not.toContain('/api/traffic-pools')
   })
 

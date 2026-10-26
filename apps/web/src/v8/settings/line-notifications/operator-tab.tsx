@@ -35,6 +35,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 LINE通知 運用者へのお知らせ（板 ）。
@@ -218,7 +219,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
           <tbody>
             {visible.map((rule) => {
               const published = rule.status === 'published'
-              const recipients = conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${rule.recipientCount} 人` : '受け取れる人なし')
+              const recipients = conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${formatNumber(rule.recipientCount)} 人` : '受け取れる人なし')
               const schedule = conditionsOf(rule).scheduleLabel ?? 'いつでも'
               return <Tr key={rule.id} data-row-id={rule.id}>
                 <Td className={styles.opName}>

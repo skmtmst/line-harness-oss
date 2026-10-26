@@ -869,7 +869,7 @@ function CommonVarsListInner() {
 
 export default function CommonVarsListV8() {
   return (
-    <Suspense fallback={<div className={styles.suspense}>読み込み中...</div>}>
+    <Suspense fallback={<div className={styles.suspense}>読み込み中…</div>}>
       <CommonVarsListInner />
     </Suspense>
   )

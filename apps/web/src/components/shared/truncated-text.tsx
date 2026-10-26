@@ -1,10 +1,10 @@
 'use client'
 
 import { createContext, useContext, useCallback, useEffect, useId, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { HTMLAttributes } from 'react'
 import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
 import { observeElementResize } from './element-resize-observer'
+import TooltipBubble from './tooltip-bubble'
 import styles from './truncated-text.module.css'
 
 /** 全文を開く操作が別にある群では、同じ文字へのTab停止を重ねない。 */
@@ -77,6 +77,6 @@ export default function TruncatedText({ value, url = false, className, tone, ...
   }, [position, close])
   return <>
     <span {...props} ref={ref} title={value} className={[styles.text, className].filter(Boolean).join(' ')} data-text-tone={tone} data-truncated-text="" tabIndex={nested || !independentFocus ? undefined : clipped ? 0 : undefined} aria-describedby={position ? id : undefined} aria-label={props['aria-label'] ?? (shown !== value || clipped ? value : undefined)} onMouseEnter={open} onMouseLeave={leave} onFocus={open} onBlur={close}>{shown}</span>
-    {position ? createPortal(<span id={id} role="tooltip" className={styles.tooltip} data-below={position.below} style={{ left: position.left, top: position.top }} onMouseEnter={clear} onMouseLeave={leave}>{value}</span>, document.body) : null}
+    {position ? <TooltipBubble id={id} text={value} left={position.left} top={position.top} below={position.below} onMouseEnter={clear} onMouseLeave={leave} /> : null}
   </>
 }

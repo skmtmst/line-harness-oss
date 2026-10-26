@@ -173,7 +173,7 @@ export default function PaymentTab() {
         if (succeeded > 0) notifyToast(`${formatNumber(succeeded)} 人分の支払明細を発行しました。`)
         const names = failedNames.slice(0, 5).join('、')
         const rest = failedNames.length > 5 ? `ほか${failedNames.length - 5} 人` : ''
-        setOperationError(`${failedNames.length} 人分を発行できませんでした（${names}${rest}）。もう一度押すと失敗分を試し直せます。`)
+        setOperationError(`${formatNumber(failedNames.length)} 人分を発行できませんでした（${names}${rest}）。もう一度押すと失敗分を試し直せます。`)
       }
       if (resumed && succeeded > 0) void load()
     } catch (cause) {

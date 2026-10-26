@@ -164,7 +164,7 @@
   justify-content: center;
   margin: 0;
   padding: 0 12px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   color: var(--v8-line-empty);
   text-align: center;
@@ -188,7 +188,7 @@
   height: 30px;
   border-top: 1px solid var(--v8-line-hairline);
   background: var(--v8-line-chrome);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 17px;
   color: var(--v8-line-menu);
@@ -211,7 +211,7 @@
 }
 
 /* cfVyj の実測。既存の 管理画面 パネルには適用しない。 */
-:root .phoneRoot { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; }
+:root .phoneRoot { font-family: var(--font-sans); font-weight: var(--font-weight-reading); } /* LINE の見え方は LINE と同じ太さ。管理画面の UI 文字の 500 は当てない */
 :root .statusBar { align-items: flex-start; }
 :root .statusIcons { flex-shrink: 0; }
 :root .talkHead svg { flex-shrink: 0; }
@@ -244,13 +244,13 @@
 
 :root .island, :root .dateChip > span { border-radius: 999px; }
 :root .bubbleText { flex: 1; word-break: normal; }
-:root .clock { font-variant-numeric: tabular-nums; }
+:root .clock { font-variant-numeric: var(--font-numeric); }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 :root .phoneRoot { -webkit-font-smoothing: auto; }
 
 /* LINEの時刻は正本のInterと同じ比例幅。管理画面の等幅数字を継承しない。 */
-:root .messageTime { font-variant-numeric: tabular-nums; }
+:root .messageTime { font-variant-numeric: var(--font-numeric); }
 
 /* ★V8 絵（「段の題 LINEでの見え方」）：題は右の列の幅いっぱいで左寄せ・15px/600/23・? との間6。スマホは下の真ん中。 */
 :root .phoneRoot { width: 100%; }
@@ -289,3 +289,6 @@
   font-size: var(--tpl-section-title-size);
   font-weight: var(--tpl-section-title-weight);
 }
+
+/* LINE の見え方の中の緑は LINE の明るい緑のまま（管理画面の緑は深い緑）。 */
+:root .phoneRoot { --color-accent: var(--color-line-green); --color-accent-hover: var(--color-line-green-hover); }

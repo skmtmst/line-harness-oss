@@ -293,7 +293,7 @@ describe('二者承認の見た目', () => {
   })
 
   it('承認まわりの日時は「8月24日（月）10:00」の書き方', () => {
-    expect(formatApprovalDateTime('2026-09-25T20:10:00+09:00')).toBe('9月25日（金）20:10')
+    expect(formatApprovalDateTime('2026-09-25T20:10:00+09:00')).toBe('2026年9月25日 20:10')
     expect(formatApprovalDateTime(null)).toBe('—')
     expect(formatApprovalDateTime('壊れた値')).toBe('—')
   })

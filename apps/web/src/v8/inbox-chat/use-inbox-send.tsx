@@ -109,7 +109,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           } as Parameters<typeof api.chats.sendCombined>[1],
           sendKeysRef.current.get(signature),
         ))
-        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。')
+        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。時間をおいて、もう一度お試しください。')
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         /*
@@ -161,7 +161,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           { messageType: 'image', content: imgPayload, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         ))
-        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。')
+        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。時間をおいて、もう一度お試しください。')
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         dropSentDraft(sendingChatId, sendingAccountId, { image: pendingImage })
@@ -208,7 +208,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           { ...input, revision: currentRevision, quotedMessageId: useCombined ? undefined : quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         ))
-        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。')
+        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。時間をおいて、もう一度お試しください。')
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         const sentKey = draftKeyOf(sendingAccountId, sendingChatId)
@@ -249,7 +249,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           { content, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(correctingId ? { correctionOfMessageId: correctingId } : {}), ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
         ))
-        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。')
+        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。時間をおいて、もう一度お試しください。')
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         /*
@@ -337,7 +337,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       ))
       if (!sendResult.success) {
         if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-          setSendError(sendResult.error || '送信できませんでした。')
+          setSendError(sendResult.error || '送信できませんでした。時間をおいて、もう一度お試しください。')
         }
         return
       }

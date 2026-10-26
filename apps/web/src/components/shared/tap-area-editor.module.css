@@ -39,13 +39,13 @@
 .row:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -2px; }
 .letter {
   flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
-  border-radius: var(--radius-mini, 6px); background: var(--color-surface-pearl); color: var(--color-ink-secondary); font-size: 11px; font-weight: 700;
+  border-radius: var(--radius-mini, 6px); background: var(--color-surface-pearl); color: var(--color-ink-secondary); font-size: 12px; font-weight: 700;
 }
 .row[data-selected] .letter { background: var(--color-accent-deep); color: var(--color-on-accent); }
 .name { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 /* 動きの要約と未設定は 11px。未設定は太字にしない。 */
-.summary { flex: none; max-width: 60%; margin-left: auto; overflow: hidden; color: var(--color-ink-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.unset { flex: none; margin-left: auto; color: var(--color-warning); font-size: 11px; }
+.summary { flex: none; max-width: 60%; margin-left: auto; overflow: hidden; color: var(--color-ink-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.unset { flex: none; margin-left: auto; color: var(--color-warning); font-size: 12px; }
 
 /* 狭い白い板では画像の下に一覧を回す（画像は 320 のまま）。 */
 @container (max-width: 560px) {

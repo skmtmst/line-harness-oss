@@ -129,7 +129,7 @@
 .optional {
   color: var(--color-ink-faint);
   font-size: 12px;
-  font-weight: 400;
+  font-weight: var(--font-weight-ui);
 }
 
 .hint {

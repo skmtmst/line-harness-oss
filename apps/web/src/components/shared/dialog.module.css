@@ -273,7 +273,7 @@
   width: min(var(--tpl-dialog-width), 100%); padding: 0; gap: 0; overflow: hidden;
   border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--polish-window-edge); outline-offset: -1px;
   box-shadow: var(--polish-window-shadow);
-  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 :root .panel[data-size='large'] { width: min(var(--tpl-dialog-large-width), 100%); }
 /* 絵の窓の幅・上からの位置を画面が渡したとき（designWidth・designTop）。狭い画面では画面の幅まで。
@@ -323,7 +323,7 @@
   font-weight: 700;
 }
 
-:root .description { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--color-ink-secondary); }
+:root .description { font-size: 13px; line-height: 20px; font-weight: var(--font-weight-ui); color: var(--color-ink-secondary); }
 /* 注意帯の説明は 1 行で本文いっぱいに使う。字体が変わって文が少し広く出ても折り返さないよう、横の内側を 8px に締める（上下はそのまま）。 */
 :root .panel[data-description-band='danger'] > .headerRow { padding-bottom: 0; }
 :root .descriptionBand {
@@ -356,7 +356,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 .stepItem { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; min-height: 0; font-family: inherit; color: var(--color-ink); font-size: 13px; font-weight: 600; line-height: 20px; }
 .stepItem:disabled { opacity: 1; }
 .stepItem:focus-visible .stepCircle { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
-.stepCircle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 22px; height: 22px; border-radius: 999px; background: var(--color-shell-gray); font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 11px; line-height: 17px; font-weight: 600; }
+.stepCircle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 22px; height: 22px; border-radius: 999px; background: var(--color-shell-gray); font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 12px; line-height: 17px; font-weight: 600; }
 .stepDone { background: var(--color-accent-deep); color: var(--color-canvas); }
 .stepCurrent { background: var(--color-ink); color: var(--color-canvas); }
 .stepLine { width: 28px; height: 1.5px; background: var(--color-accent-deep); }
@@ -372,7 +372,6 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .designButton[data-dialog-action='primary'] { box-shadow: var(--v8-parts-primary-shadow); }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .panel { -webkit-font-smoothing: antialiased; }
 
 /* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
 :root .panel[data-design-layout='stacked'] { --dialog-stack-gap: 14px; padding: 24px; gap: var(--dialog-stack-gap); }
@@ -383,7 +382,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel[data-design-layout='stacked'] .actions { padding: 0; border: 0; }
 :root .panel[data-confirm-first] .actions > button:last-child { order: -1; }
 
-:root .panel[data-design-layout='stacked'] .close { width: 28px; height: 28px; min-height: 0; padding: 0; }
+:root .panel[data-design-layout='stacked'] .close { width: var(--control-icon-size); height: var(--control-icon-size); min-height: 0; padding: 0; }
 
 :root .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
 :root .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }

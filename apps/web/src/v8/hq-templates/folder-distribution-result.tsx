@@ -11,6 +11,7 @@ import type { HqAccount } from '@/lib/hq-templates-api'
 import { failedStatus, folderResultRows, settledResult, type FolderRun } from './folder-distribution'
 import DistributionResultDialog from './distribution-result-dialog'
 import styles from './console.module.css'
+import { formatNumber } from '@/lib/format'
 
 export default function FolderDistributionResult({ name, runs, accounts, folders = [], busy, error, onBack, onRefresh, onRetry, onRecheck }: {
   name: string; runs: FolderRun[]; accounts: HqAccount[]; folders?: HqTemplateFolder[]; busy: boolean; error: string
@@ -48,7 +49,7 @@ export default function FolderDistributionResult({ name, runs, accounts, folders
     <div className={styles.footer}>
       <Button disabled={busy || unresolved} onClick={onBack}>ひな形一覧へ</Button>
       <Button disabled={busy} onClick={onRefresh}>結果を再確認</Button>
-      {failures.length ? <Button variant="primary" disabled={busy || unresolved || unsubmitted > 0} onClick={onRetry}>{`失敗した ${failures.length} 件だけ再確認`}</Button> : null}
+      {failures.length ? <Button variant="primary" disabled={busy || unresolved || unsubmitted > 0} onClick={onRetry}>{`失敗した ${formatNumber(failures.length)} 件だけ再確認`}</Button> : null}
       {unsubmitted > 0 ? <Button variant="primary" disabled={busy || unresolved} onClick={onRecheck}>未配布分を再確認</Button> : null}
     </div>
 

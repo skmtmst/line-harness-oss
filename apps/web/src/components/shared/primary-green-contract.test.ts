@@ -52,7 +52,8 @@ const CSS = readUiSource(path.join(SRC, 'app', 'globals.css'), 'utf8')
 describe('白文字を載せる緑', () => {
   it('トークンが決定の色になっている', () => {
     expect(CSS).toContain('--color-accent-deep: #087a3e;')
-    expect(CSS, 'LINEの緑は残す').toContain('--color-accent: #06c755;')
+    // 画面の緑は深い緑 1 色。明るい LINE の緑を画面の緑の値に戻さない。
+    expect(CSS).not.toContain('--color-accent: #06c755;')
   })
 
   /*

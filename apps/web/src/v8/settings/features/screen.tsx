@@ -167,6 +167,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
         <button
           type="button"
           className={styles.groupToggle}
+          data-hit-area=""
           aria-expanded={open}
           aria-label={`${group.label}を${open ? '畳む' : '開く'}`}
           onClick={() => onOpenChange(!open)}

@@ -242,7 +242,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
         const deleted = await api.mileage.deleteRule(res.data.id).catch(() => null)
         if (!deleted?.success) {
           await api.mileage.updateRule(res.data.id, { isActive: false }).catch((saveFailure) => { saveErrors.capture(saveFailure); return undefined })
-          throw new Error(`${draftResponse.error}(作りかけの決めごとが残っているかもしれません。一覧で確認してください)`)
+          throw new Error(`${draftResponse.error}（作りかけの決めごとが残っているかもしれません。一覧で確認してください）`)
         }
         throw new Error(draftResponse.error)
       }

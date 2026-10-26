@@ -9,7 +9,7 @@
   line-height: var(--tpl-wh-cell-lh);
 }
 .inlineLink {
-  color: var(--color-action);
+  color: var(--color-link);
   font-weight: 600;
 }
 .cardRow {

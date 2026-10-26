@@ -1,4 +1,5 @@
 import type { InboxSavedViewConditions } from './saved-view-types'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 保存した検索の中身を、運用者の言葉で1行にする（設計 `ASsb3`）。
@@ -57,7 +58,7 @@ export function savedViewSummary(
     const names = conditions.assignees.map((id) => operatorNames.get(id)).filter(Boolean)
     parts.push(names.length === conditions.assignees.length
       ? `担当者：${names.join('・')}`
-      : `担当者：${conditions.assignees.length}人`)
+      : `担当者：${formatNumber(conditions.assignees.length)}人`)
   }
 
   if (conditions.statuses.length > 0 && conditions.statuses.length < 4) {
@@ -74,7 +75,7 @@ export function savedViewSummary(
   // 設計 `ASsb3` は「未読のみ」。「自分の」は担当者の軸が言っている。
   if (conditions.unread === 'mine') parts.push('未読のみ')
 
-  if (conditions.messageTypes.length > 0) parts.push(`種別：${conditions.messageTypes.length}件`)
+  if (conditions.messageTypes.length > 0) parts.push(`種別：${formatNumber(conditions.messageTypes.length)}件`)
 
   if (conditions.receivedFrom || conditions.receivedTo) {
     parts.push(`受信日：${conditions.receivedFrom ?? ''}〜${conditions.receivedTo ?? ''}`)

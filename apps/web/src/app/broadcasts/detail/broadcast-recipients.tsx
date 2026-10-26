@@ -278,7 +278,7 @@ export default function BroadcastRecipients({
           ) : null}
           <p className="text-ink-faint text-xs">
             {total > 0 ? `対象 ${formatNumber(total)}人` : null}
-            {pending != null && pending > 0 ? ` ・ 送る前 ${formatNumber(pending)}人は名前の一覧がありません` : null}
+            {pending != null && pending > 0 ? `・送る前 ${formatNumber(pending)}人は名前の一覧がありません` : null}
           </p>
         </>
       )}

@@ -78,6 +78,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                             <button
                               type="button"
                               className={styles.chipRemove}
+                              data-hit-area=""
                               aria-label={`「${rule.keyword.trim()}」を外す`}
                               onClick={() =>
                                 patch({

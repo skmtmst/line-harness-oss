@@ -32,7 +32,7 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
     setBusy(true); setError('')
     try {
       const res = await styleApi.save(accountId, { expectedVersion: version, style: choice, answers: {} })
-      if (!res.success) throw new Error('使い方を保存できませんでした')
+      if (!res.success) throw new Error('使い方を保存できませんでした。時間をおいて、もう一度お試しください。')
       setVersion(res.data.version)
       accountStyleUpdated(accountId)
       try { sessionStorage.removeItem(REGISTRATION_STYLE_KEY) } catch { /* 保存済みの版を再読すれば再開できる。 */ }

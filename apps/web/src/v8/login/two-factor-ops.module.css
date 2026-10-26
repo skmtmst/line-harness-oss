@@ -87,7 +87,7 @@
   border: 0;
   padding: 0;
   background: none;
-  color: var(--color-focus-ring);
+  color: var(--color-link);
   font: inherit;
   font-size: var(--text-body);
   font-weight: 500;

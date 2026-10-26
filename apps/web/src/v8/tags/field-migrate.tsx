@@ -303,7 +303,7 @@ function FieldMigrate() {
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
 
-      setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした') }
+      setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setChecking(false)
     }
@@ -619,7 +619,7 @@ function FieldMigrate() {
         <Card variant="form" gap="normal" aria-labelledby="migrate-preview">
           <CardHeader title="事前確認の結果" titleId="migrate-preview" meta="登録済みの値を読み取り、移せる数だけを確かめました。まだ何も変えていません。" />
           <CreateSummaryCard title="値の移行" rows={[
-            { label: '値がある友だち', value: `${preview.summary.total} 人` },
+            { label: '値がある友だち', value: `${formatNumber(preview.summary.total)} 人` },
             { label: 'そのまま移せる', value: `${preview.summary.convertible} 人` },
             { label: '人が確認する', value: `${preview.summary.review} 人` },
             { label: '空欄', value: `${preview.summary.invalid} 人` },
@@ -644,8 +644,8 @@ function FieldMigrate() {
       {run ? (
         <Card variant="form" gap="normal" aria-live="polite">
           <CreateSummaryCard title="移行の結果" description={RUN_STATUS_LABELS[run.status]} rows={[
-            { label: '移行できた', value: `${run.summary.succeeded} 人` },
-            { label: '移行できなかった', value: `${run.summary.failed} 人` },
+            { label: '移行できた', value: `${formatNumber(run.summary.succeeded)} 人` },
+            { label: '移行できなかった', value: `${formatNumber(run.summary.failed)} 人` },
             { label: '確認が必要なまま', value: `${run.summary.review + run.summary.invalid} 人` },
           ]} />
           {run.rows.filter((row) => row.status === 'failed').map((row) => (

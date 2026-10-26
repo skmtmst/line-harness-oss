@@ -273,10 +273,10 @@ export default function AffiliateOfferCreateV8() {
           <Button href="/affiliates">キャンセル</Button>
           {canEdit ? (
             <>
-              <Button variant="secondary" disabled={saving} busy={saving} busyLabel="保存中..." onClick={() => runSave(false)}>
+              <Button variant="secondary" disabled={saving} busy={saving} busyLabel="保存中…" onClick={() => runSave(false)}>
                 保存して続けて作る
               </Button>
-              <Button variant="primary" disabled={saving} busy={saving} busyLabel="保存中..." onClick={() => runSave(true)}>
+              <Button variant="primary" disabled={saving} busy={saving} busyLabel="保存中…" onClick={() => runSave(true)}>
                 <Check size={15} aria-hidden="true" />保存して公開
               </Button>
             </>

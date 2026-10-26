@@ -4,6 +4,7 @@ import SectionHeader from '@/components/shared/section-header'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import { formatAt, slotTimeLabel } from './format'
+import { formatNumber } from '@/lib/format'
 
 const CAUSES = { reservation: '予約の変更', tables: '卓の変更', rules: 'ルールの保存', inventory: '在庫の再計算' }
 export function RulesState({ state, error, onRetry, timezone }: {
@@ -11,7 +12,7 @@ export function RulesState({ state, error, onRetry, timezone }: {
 }) {
   if (error || !state) return <ListState kind={error ? 'error' : 'loading'} description={error || undefined} onRetry={onRetry} />
   return <>
-    <SectionHeader title="自動停止中" note={`${state.stoppedTotal}件${state.stoppedTotal > state.stopped.length ? `（先頭${state.stopped.length}件）` : ''}`} />
+    <SectionHeader title="自動停止中" note={`${formatNumber(state.stoppedTotal)}件${state.stoppedTotal > state.stopped.length ? `（先頭${formatNumber(state.stopped.length)}件）` : ''}`} />
     {state.stopped.length === 0 ? <ListEmptyMessage>この日に自動停止している枠はありません</ListEmptyMessage> : <DataTable aria-label="自動停止中の枠">
       <thead><TableHeadRow><Th>時間</Th><Th>止めている受付</Th><Th>理由</Th><Th>元の配分</Th></TableHeadRow></thead>
       <tbody>{state.stopped.map((slot) => <Tr key={slot.slotId}>
@@ -21,7 +22,7 @@ export function RulesState({ state, error, onRetry, timezone }: {
         <Td>{[slot.lineOriginal !== null ? `LINE ${slot.lineOriginal}` : '', slot.sameDayOriginal !== null ? `当日受付 ${slot.sameDayOriginal}` : ''].filter(Boolean).join('・')}</Td>
       </Tr>)}</tbody>
     </DataTable>}
-    <SectionHeader title="停止・復元の記録" note={`${state.historyTotal}件${state.historyTotal > state.history.length ? `（直近${state.history.length}件）` : ''}`} />
+    <SectionHeader title="停止・復元の記録" note={`${formatNumber(state.historyTotal)}件${state.historyTotal > state.history.length ? `（直近${formatNumber(state.history.length)}件）` : ''}`} />
     {state.history.length === 0 ? <ListEmptyMessage>この日の停止・復元の記録はありません</ListEmptyMessage> : <DataTable aria-label="停止・復元の記録">
       <thead><TableHeadRow><Th>記録日時</Th><Th>枠</Th><Th>変更</Th><Th>配分の変化</Th><Th>きっかけ</Th></TableHeadRow></thead>
       <tbody>{state.history.map((entry) => {

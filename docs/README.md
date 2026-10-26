@@ -796,5 +796,6 @@
 - [スタイルを選ぶ時の見本として、飲食店・サロン・面談・標準・EC ごとに「お客さま](release-log/unreleased/1837-kenta-style-player.md)
 - [スタイルを選ぶ画面・最初の1通の確かめ・初期セットを配る](release-log/unreleased/1837-kenta-first-ten-screens.md)
 - [店の比較の違いだけ表示](release-log/unreleased/1837-kenta-store-diff.md)
+- [直し③⑤（部品と言葉づかい）](release-log/unreleased/1836-kenta-train-m2c-1026.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

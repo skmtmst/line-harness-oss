@@ -149,7 +149,7 @@ export function renderBroadcastConfirmDialogs({ approvalCandidates, approvalCand
     {/* 共通の「送る前の確かめ」（U1・板 F94nep／RxxfO）。承認が要るときは、承認者を選ぶ下の窓を使う。 */}
     <SendConfirmDialog
       open={confirmOpen && !needsApprovalSingle}
-      subtitle={`${title.trim() || '新しい一斉配信'} ・ ${confirmAudienceLabel}`}
+      subtitle={`${title.trim() || '新しい一斉配信'}・${confirmAudienceLabel}`}
       scheduled={sendMode === 'scheduled'}
       state={currentStep ? sendPreview.state : audienceCount === null ? 'error' : 'ready'}
       block={(broadcastRole === 'viewer' || broadcastRole === 'staff') && !canSendBroadcast ? 'no-permission' : null}

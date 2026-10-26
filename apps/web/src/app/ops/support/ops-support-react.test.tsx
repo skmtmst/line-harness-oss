@@ -253,7 +253,7 @@ describe('画面', () => {
     await flush()
     expect(host.textContent).toContain('お客様の状況・やり取りとナレッジをもとに作った下書きです')
     expect(host.textContent).toContain('作り直す')
-    expect(host.querySelector('[title="2026-09-15 09:31 に作成"]')?.textContent).toBe('AI の下書き')
+    expect(host.querySelector('[title="09/15 09:31 に作成"]')?.textContent).toBe('AI の下書き')
     const textarea = host.querySelector('textarea[aria-label="返信"]') as HTMLTextAreaElement
     expect(textarea.value).toContain('山田さま')
     const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '返信する')

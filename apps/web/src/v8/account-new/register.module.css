@@ -38,11 +38,11 @@
 .field { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); min-width: 0; }
 .label { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 600; color: var(--color-ink); }
 .fieldError { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-danger); }
-.help { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+.help { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 .secretRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-panel-gap); }
 .secretNote {
   display: inline-flex; align-items: center; gap: var(--tpl-htn-gap-s);
-  font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint);
 }
 
 /* ③ 基本情報 */
@@ -70,7 +70,7 @@
 .progressHead strong { font-weight: 700; }
 .progressTrack { height: var(--tpl-htn-progress-h); border-radius: var(--tpl-htn-radius-pill); background: var(--color-hairline); overflow: hidden; }
 .progressFill { display: block; height: 100%; border-radius: var(--tpl-htn-radius-pill); background: var(--color-accent-deep); }
-.progressWarn { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-status-warn-deep); }
+.progressWarn { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-status-warn-deep); }
 .progressNote { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
 
 /* 下の帯：本文のすぐ下に置き、長いときは画面の下に追従する。ボタンは中央。 */
@@ -94,7 +94,7 @@
 .subBadge {
   align-self: flex-start; padding: var(--tpl-htn-chip-pad); border-radius: var(--tpl-htn-radius-pill);
   background: var(--color-surface-pearl); box-shadow: var(--tpl-htn-ring);
-  font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--color-ink-secondary);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--color-ink-secondary);
 }
 
 /* ① 事前確認（p6zMkA）。カードの頭は 題・？・のび・札 の順（B2SpuV）。 */
@@ -280,7 +280,7 @@
   flex: 1 1 auto; display: flex; flex-direction: column;
 }
 .outlineTitle { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
-.outlineCount { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+.outlineCount { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 /* 題のかたまりと段の間だけ、もう一段あける（ZibvL）。 */
 .outlineGap { height: var(--tpl-htn-gap-xs); }
 /* 段より下を押し下げて、自動の説明をいちばん下に置く（t8JqzS）。 */
@@ -292,11 +292,11 @@
 .outlineNum {
   flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
   width: var(--tpl-htn6-ac-num); height: var(--tpl-htn6-ac-num); border-radius: var(--tpl-htn-radius-pill);
-  font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); font-weight: 700;
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); font-weight: 700;
 }
 .outlineText { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-text-gap); min-width: 0; }
 .outlineRowTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; }
-.outlineRowNote { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+.outlineRowNote { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 /* 済んだ段。 */
 .outlineDone .outlineNum { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .outlineDone .outlineRowTitle { color: var(--color-ink-faint); }
@@ -312,8 +312,8 @@
   display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-auto-gap);
   padding: var(--tpl-htn6-ac-auto-pad); border-radius: var(--tpl-htn6-ac-radius); background: var(--color-accent-soft);
 }
-.outlineAutoTitle { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); font-weight: 700; color: var(--color-accent-deep); }
-.outlineAutoBody { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-secondary); }
+.outlineAutoTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); font-weight: 700; color: var(--color-accent-deep); }
+.outlineAutoBody { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-secondary); }
 /* ②の入力は縦に積む（正本 v07 の AC入力）。横2列にしない。 */
 .acInputs { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-input-gap); min-width: 0; }
 .acField { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-field-gap); min-width: 0; }

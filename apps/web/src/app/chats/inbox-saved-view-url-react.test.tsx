@@ -429,4 +429,23 @@ describe('受信箱の保存検索URL復元(N-021)', () => {
     expect(queries[queries.length - 1].get('quickFilter')).toBe('overdue')
     expect(host.textContent).not.toContain(MISSING_VIEW_NOTICE)
   })
+
+  it('保存した検索の件数はカンマ付きで出し、未接続なら0件にせず「—件」と理由を出す', async () => {
+    net.handler = baseHandler({
+      savedViews: () => Promise.resolve({ success: true, data: [
+        { ...overdueLineView('sv-1'), matchCount: 1234 },
+        { ...overdueLineView('sv-2'), name: '件数がまだ無い検索', matchCount: null },
+      ] }),
+    })
+    await render()
+    await flush()
+    await openSavedViews()
+
+    const row = (name: string) => [...document.body.querySelectorAll('button')]
+      .find((button) => button.getAttribute('title') === name)?.parentElement
+    expect(row('未対応・期限超過')?.textContent).toContain('1,234件')
+    expect(row('件数がまだ無い検索')?.textContent).toContain('—件')
+    expect(row('件数がまだ無い検索')?.textContent).not.toContain('0件')
+    expect(document.body.textContent).toContain('「—件」は0件ではありません。')
+  })
 })

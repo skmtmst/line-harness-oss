@@ -820,7 +820,7 @@ export default function HqBroadcastCreate() {
         status={draftLabel}
          title={<>一括配信を作る</>} headingSize="compact"
         help="送るアカウントを選び、配信対象・メッセージ・送信設定を確かめてから配信します。下書きの保存では、友だちへ送信しません。"
-        steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} summaries={{ basic: title.trim(), audience: `${chosen.length}アカウント`, message: `${bubbles.length}通`, schedule: sendWhenLabel ?? '未設定' }} /></>}
+        steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} summaries={{ basic: title.trim(), audience: `${chosen.length}アカウント`, message: `${formatNumber(bubbles.length)}通`, schedule: sendWhenLabel ?? '未設定' }} /></>}
         >
         {error ? (
           <Notice
@@ -849,7 +849,7 @@ export default function HqBroadcastCreate() {
                 <SaveErrorField names={["hq-broadcast-method","value","method"]}><RadioCardGroup legend="配信方法" className={formStyles.methodCards}>
                   {/* EpTBB：3つのカードは左上に印（書く・テンプレート・写す）。 */}
                   {([
-                    ['new', '新しいメッセージを作成', 'テキスト・画像・カルーセルなどを組み合わせて一から作ります。', SquarePen],
+                    ['new', '新しいメッセージを作る', 'テキスト・画像・カルーセルなどを組み合わせて一から作ります。', SquarePen],
                     ['template', 'テンプレートを選択', '統括のテンプレートを呼び出して手直しします。', FileText],
                     ['duplicate', '過去の配信を複製', '送った一括配信をそのまま写して作り直します。', Copy],
                   ] as const).map(([value, label, note, Icon]) => (
@@ -877,7 +877,7 @@ export default function HqBroadcastCreate() {
                     return (
                       <div key={item.id} className={formStyles.recentRow}>
                         <Send size={14} aria-hidden /><span className={formStyles.recentName} title={item.title}>{item.title}</span>
-                        <span className="text-ink-faint">{jpDateTime(item.scheduledAt)} 送信 ・ {formatNumber(people)} 人</span>
+                        <span className="text-ink-faint">{jpDateTime(item.scheduledAt)} 送信・{formatNumber(people)} 人</span>
                         <Button size="compact" onClick={() => duplicate(item)}>複製する</Button>
                       </div>
                     )
@@ -1036,8 +1036,8 @@ export default function HqBroadcastCreate() {
                 <div className={formStyles.checkList}>
                   {([
                     { key: 'basic', label: '配信名', value: title.trim() || '配信名を入力してください', done: steps[0].state === 'done' || Boolean(title.trim()), move: '基本設定へ戻る' },
-                    { key: 'audience', label: '送るアカウント・配信対象', value: `${accountsLabel} ・ ${audienceFull} ・ ${peopleLabel}（ブロック中の人を除く）`, done: steps[1].state === 'done' || (chosen.length > 0 && (audience === 'all' || audience === 'scenario' || (audience === 'tag' && Boolean(tagName)) || (audience === 'advanced' && (Boolean(pruneCondition(condition)) || Boolean(savedName))))), move: '対象者へ戻る' },
-                    { key: 'message', label: 'メッセージ', value: `${bubbles.length > 1 ? `${bubbles.length} 件` : KIND_LABEL[kind]} ・ ${previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}`, done: bubblesDone && previewConfirmed, move: 'メッセージへ戻る' },
+                    { key: 'audience', label: '送るアカウント・配信対象', value: `${accountsLabel}・${audienceFull}・${peopleLabel}（ブロック中の人を除く）`, done: steps[1].state === 'done' || (chosen.length > 0 && (audience === 'all' || audience === 'scenario' || (audience === 'tag' && Boolean(tagName)) || (audience === 'advanced' && (Boolean(pruneCondition(condition)) || Boolean(savedName))))), move: '対象者へ戻る' },
+                    { key: 'message', label: 'メッセージ', value: `${bubbles.length > 1 ? `${formatNumber(bubbles.length)} 件` : KIND_LABEL[kind]}・${previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}`, done: bubblesDone && previewConfirmed, move: 'メッセージへ戻る' },
                     { key: 'schedule', label: '送信設定', value: sendWhenLabel, done: when === 'now' || Boolean(scheduledAt), move: '送信設定へ戻る' },
                   ] as const).map((row) => (
                     <div className={formStyles.checkRow} key={row.key}>
@@ -1126,7 +1126,7 @@ export default function HqBroadcastCreate() {
                     onRequestClose={() => setApprovalRequestOpen(false)}
                     onChanged={() => { void hqBroadcastsApi.get(run.id).then((res) => { setRun(res.data); setRunKey(key) }).catch(() => undefined) }}
                     scheduledLabel={scheduledAt ? jpDateTime(scheduledAt) : null}
-                    messageSummary={`${bubbles.length} 通`}
+                    messageSummary={`${formatNumber(bubbles.length)} 通`}
                   />
                 ) : null}
                 <p className="text-xs text-ink-faint">{when === 'later' ? '予約後も送る前までは、一括配信の詳細から止められます。' : '「今すぐ送る」で確認画面を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
@@ -1146,7 +1146,7 @@ export default function HqBroadcastCreate() {
       {/* 共通の「送る前の確かめ」（U1・板 i7TdtN）。統括担当が 1 人だけで人数を入れて確かめるときは、下の窓を使う。 */}
       <SendConfirmDialog
         open={confirmOpen && gate !== 'single'}
-        subtitle={`${title.trim() || '新しい一括配信'} ・ ${formatNumber(totals?.sendStores ?? 0)} アカウントへ`}
+        subtitle={`${title.trim() || '新しい一括配信'}・${formatNumber(totals?.sendStores ?? 0)} アカウントへ`}
         scheduled={when !== 'now'}
         state={sendPreview.state}
         onRetry={() => setPreviewSeq((value) => value + 1)}

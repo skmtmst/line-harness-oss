@@ -17,6 +17,7 @@ type SeriesImpactItem = Awaited<ReturnType<typeof bookingAdvancedApi.impact>>['d
 import type { Gap2Booking } from '@line-crm/shared'
 import { dayOf, dayWithWeekday, hm } from './series-model'
 import styles from './series-scope-dialog.module.css'
+import { formatNumber } from '@/lib/format'
 
 export type SeriesTarget = {
   seriesId: string
@@ -70,7 +71,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
         const from = res.data.bookings.find((b) => b.id === target.bookingId)?.series_index ?? target.index
         const candidates = res.data.bookings.filter((b) => (b.series_index ?? 0) >= from && !['cancelled', 'rejected', 'expired'].includes(b.status)).sort((a, b) => (a.series_index ?? 0) - (b.series_index ?? 0))
         const selected = scope === 'this' ? candidates.slice(0, 1) : candidates
-        if (selected.some((b) => !preview.data.items.some((item) => item.bookingId === b.id))) throw new Error('見込みの一部を確認できませんでした')
+        if (selected.some((b) => !preview.data.items.some((item) => item.bookingId === b.id))) throw new Error('見込みの一部を確認できませんでした。時間をおいて、もう一度お試しください。')
         setVersion(res.data.series.version)
         setImpact(Object.fromEntries(preview.data.items.map((item) => [item.bookingId, item])))
         setAll(candidates)
@@ -93,12 +94,12 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
       if (changing && newStartsAt) {
         const res = await bookingSeriesApi.change(accountId, target.seriesId, { scope, fromBookingId: target.bookingId, change: { startsAt: newStartsAt }, expectedVersion: version })
         const { changed, conflicts } = res.data
-        notifySaved(conflicts.length ? `${changed.length} 件を変えました（${conflicts.length} 件は埋まっていて前のままです）` : `${changed.length} 件を変えました`)
+        notifySaved(conflicts.length ? `${formatNumber(changed.length)} 件を変えました（${formatNumber(conflicts.length)} 件は埋まっていて前のままです）` : `${formatNumber(changed.length)} 件を変えました`)
         onDone({ count: changed.length })
       } else {
         const res = await bookingSeriesApi.cancel(accountId, target.seriesId, { scope, fromBookingId: target.bookingId, expectedVersion: version })
         const fee = res.data.fees.reduce((n, f) => n + f.feeNow, 0)
-        notifySaved(fee > 0 ? `${res.data.cancelled.length} 件を取り消しました（キャンセル料の見込み ${yen(fee)}）` : `${res.data.cancelled.length} 件を取り消しました`)
+        notifySaved(fee > 0 ? `${formatNumber(res.data.cancelled.length)} 件を取り消しました（キャンセル料の見込み ${yen(fee)}）` : `${formatNumber(res.data.cancelled.length)} 件を取り消しました`)
         onDone({ count: res.data.cancelled.length })
       }
     } catch {
@@ -113,10 +114,10 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
       designWidth={560}
       designTop={170}
       title={changing ? '繰り返しの予約を変えますか？' : '繰り返しの予約を取り消しますか？'}
-      description={`${target.customerName} さん ・ ${target.ruleText} ・ ${target.menuName} ・ ${target.index} 回目 ${dayOf(target.startsAt)}`}
+      description={`${target.customerName} さん・${target.ruleText}・${target.menuName}・${target.index} 回目 ${dayOf(target.startsAt)}`}
       tone={changing ? 'default' : 'destructive'}
       confirmation
-      confirmLabel={`${count} 件を${changing ? '変える' : '取り消す'}`}
+      confirmLabel={`${formatNumber(count)} 件を${changing ? '変える' : '取り消す'}`}
       busyLabel={changing ? '変えています…' : '取り消しています…'}
       confirmDisabled={!items || !impact || count === 0 || (changing && !newStartsAt)}
       footerAlign="center"
@@ -132,7 +133,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
           <RadioCard name="series-scope" value="following" checked={scope === 'following'} onChange={() => setScope('following')} title={`この回から後ぜんぶ（${all ? all.length : '…'} 件）`}
             note={changing ? `${dayOf(target.startsAt)} から ${dayOf(last)} まで ${newTime} に変える。埋まっている回は前のまま` : `${dayOf(target.startsAt)} から ${dayOf(last)} まで取り消す。繰り返しはここで終わる`} />
         </RadioCardGroup>
-        <h3 className={styles.heading}>{changing ? (items && count !== items.length ? `変わる日（${items.length} 件のうち ${count} 件）` : `変わる日（${items?.length ?? '…'} 件）`) : `取り消す日（${items?.length ?? '…'} 件）`}</h3>
+        <h3 className={styles.heading}>{changing ? (items && count !== items.length ? `変わる日（${formatNumber(items.length)} 件のうち ${formatNumber(count)} 件）` : `変わる日（${items?.length ?? '…'} 件）`) : `取り消す日（${items?.length ?? '…'} 件）`}</h3>
         {loadError ? <Notice tone="danger">対象の日とキャンセル料の見込みを確認できませんでした。<button type="button" className={styles.retry} onClick={() => setRetry((n) => n + 1)}>もう一度</button></Notice> : null}
         {!loadError ? <DataTable aria-busy={!items}>
           <thead><Tr><Th>日</Th><Th>{changing ? '前' : '時間'}</Th><Th>{changing ? '後' : 'キャンセル料'}</Th></Tr></thead>

@@ -1,5 +1,5 @@
 import { formatYen } from '@/components/ops/ops-charts'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 export function deltaLabel(delta: number): string {
   if (delta === 0) return '前月比 ±¥0'
@@ -16,7 +16,7 @@ export function contractDetail(
   filledByListPriceCount: number,
 ): string {
   const base = `${active}件（ライト${byPlan.light}・スタンダード${byPlan.standard}・プロ${byPlan.pro}）`
-  return filledByListPriceCount > 0 ? `${base}・定価で補い ${filledByListPriceCount}件` : base
+  return filledByListPriceCount > 0 ? `${base}・定価で補い ${formatNumber(filledByListPriceCount)}件` : base
 }
 
 export function revenueSourceLabel(pricing: 'stripe_actual' | 'list_price', lastSyncedAt: string | null): string {

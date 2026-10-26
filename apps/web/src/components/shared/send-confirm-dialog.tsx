@@ -183,7 +183,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
             </div>
           ) : (
             <div className={styles.stack}>
-              <strong className={styles.big}>{perAccount?.length && accountCount ? `${formatNumber(accountCount)} アカウント ・ 合計 ${formatNumber(recipients ?? 0)} 人` : `${formatNumber(recipients ?? 0)} 人`}</strong>
+              <strong className={styles.big}>{perAccount?.length && accountCount ? `${formatNumber(accountCount)} アカウント・合計 ${formatNumber(recipients ?? 0)} 人` : `${formatNumber(recipients ?? 0)} 人`}</strong>
               {recipientsNote ? <span className={styles.note}>{recipientsNote}</span> : null}
               {approval ? <span className={styles.note}>{approval.note}</span> : null}
               {perAccount?.length ? (

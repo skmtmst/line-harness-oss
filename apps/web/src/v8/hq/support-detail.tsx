@@ -192,7 +192,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   usePageTitle(ticketLabel || 'お問い合わせ')
   usePageCrumbs(ticketLabel ? [{ label: '統括の設定', href: '/hq/settings' }, { label: 'お問い合わせ', href: '/hq/support' }] : [{ label: '統括の設定', href: '/hq/settings' }])
   const description = ready
-    ? [detail.ticketLabel, supportKindWord(detail.kind, detail.kindLabel), accountName, `${supportTime(detail.createdAt)} に送信`].filter(Boolean).join(' ・ ')
+    ? [detail.ticketLabel, supportKindWord(detail.kind, detail.kindLabel), accountName, `${supportTime(detail.createdAt)} に送信`].filter(Boolean).join('・')
     : '問い合わせの内容と運営からの返事を確認します。'
 
   return (
@@ -296,7 +296,7 @@ function Message({ mine, author, at, body, attachments }: { mine: boolean; autho
   const files = attachments ?? []
   return (
     <li className={mine ? `${styles.message} ${styles.messageMine}` : styles.message}>
-      <span className={styles.author}>{`${author} ・ ${supportTime(at)}`}</span>
+      <span className={styles.author}>{`${author}・${supportTime(at)}`}</span>
       <p className={mine ? `${styles.bubble} ${styles.bubbleMine}` : styles.bubble}>{body}</p>
       {files.length > 0 ? (
         <span className={styles.files}>

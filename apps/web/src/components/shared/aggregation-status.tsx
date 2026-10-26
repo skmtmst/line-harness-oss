@@ -1,5 +1,6 @@
 'use client'
 
+import { formatDateTime } from '@/lib/format'
 import Button from './button'
 import Notice from './notice'
 
@@ -10,8 +11,7 @@ export type AggregationState =
   | { kind: 'complete'; dataAt: string | null }
 
 function time(value: string | null) {
-  if (!value || !Number.isFinite(Date.parse(value))) return '未取得'
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(value))
+  return formatDateTime(value, '未取得')
 }
 
 /**  E2：読み込みの404と、件数が0の完成した集計を区別する。 */

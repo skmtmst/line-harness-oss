@@ -60,7 +60,7 @@ it('閲覧のみには作る・編集・変更・停止・発行のボタンを�
   render(<OrganizationV8 />)
   expect(await screen.findByText('試験担当')).toBeTruthy()
   expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
-  for (const name of ['店舗を追加する', '編集する', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行', '試験担当のその他操作']) {
+  for (const name of ['店舗を作る', '編集する', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行', '試験担当のその他操作']) {
     expect(screen.queryByRole('button', { name })).toBeNull()
   }
 })

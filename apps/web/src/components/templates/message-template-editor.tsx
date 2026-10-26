@@ -16,6 +16,7 @@ import LinePreview from '@/components/shared/line-preview'
 import { Field, TextArea } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
+import { formatNumber } from '@/lib/format'
 
 export const LEGACY_MESSAGE_NOTICE = 'この形は新しく作れません。新しく作るときはカルーセル・リッチメッセージを使ってください。'
 
@@ -232,7 +233,7 @@ export function MessageTemplateEditor({
           ) : (
             hqInserts ? <HqMessageBody value={messageContent} label={bodyAriaLabel} readOnly={disabled} onChange={messageContent=>onChange({...value,messageContent})}/> : (<TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />)
           )}
-          <p className="text-ink-faint mt-1 text-xs tabular-nums">{messageContent.length} 文字{messageContent.length > splitAt ? ` ・ 約${splitAt}文字を超えると複数のメッセージに分割されます` : ' ・ 分割なし'}</p>
+          <p className="text-ink-faint mt-1 text-xs tabular-nums">{formatNumber(messageContent.length)} 文字{messageContent.length > splitAt ? `・約${splitAt}文字を超えると複数のメッセージに分割されます` : '・分割なし'}</p>
         </Field>
         {!hqInserts && <div>
           <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>

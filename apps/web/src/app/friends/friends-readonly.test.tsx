@@ -14,7 +14,7 @@ it('閲覧のみには理由を出し、取り込みを押せないようにす�
   try {
     act(() => root.render(<FriendsListHeadV8 />))
     expect(host.textContent).toContain('閲覧のみの権限です')
-    const importer = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('友だちを取り込む'))!
+    const importer = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('CSVから取り込む'))!
     expect(importer.disabled).toBe(true)
     expect(importer.title).toContain('権限')
     access.chatEdit = true

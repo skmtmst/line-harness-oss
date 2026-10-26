@@ -83,7 +83,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
         weightKg,
         expectedUpdatedAt: version,
       })
-      if (!result.success) throw new Error('ペットを保存できませんでした。')
+      if (!result.success) throw new Error('ペットを保存できませんでした。時間をおいて、もう一度お試しください。')
       onSaved()
       onClose()
     } catch (caught) {

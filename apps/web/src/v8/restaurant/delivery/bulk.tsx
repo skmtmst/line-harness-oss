@@ -39,6 +39,7 @@ import {
 import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { DASH, INTAKE_STOP_PRESET_OPTIONS, SERVICE_TONES, formatYen } from './format'
 import styles from './delivery.module.css'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 受付停止の確認（XCVGd）。上からの位置は絵のとおり 230。
@@ -364,7 +365,7 @@ export function IntakeStopDialog({
                       <StatusBadge tone={SERVICE_TONES[state.service]} size="compact" dot={false}>{label}</StatusBadge>
                     </>
                   )}
-                  note={preparing ? `営業状態の連携は${PREPARING_WORD}` : stopped ? 'すでに停止中・対象外' : `現在 受付中・${state.todayCount}件対応中`}
+                  note={preparing ? `営業状態の連携は${PREPARING_WORD}` : stopped ? 'すでに停止中・対象外' : `現在 受付中・${formatNumber(state.todayCount)}件対応中`}
                 />
               )
             })

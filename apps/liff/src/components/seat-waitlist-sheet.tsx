@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { formatDateTimeLong } from '../lib/datetime.js';
 import Button from './ui/button/index.js';
 
 /** 人数を指定した満席の時刻だけを、既存の本人用APIへつなぐ。 */
@@ -42,7 +43,7 @@ export default function SeatWaitlistSheet({ storeId, storeName, startsAt, guestC
     <Button variant="overlay" aria-label="閉じる" onClick={onClose} />
     <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-(--liff-radius-lg) bg-canvas p-4 pb-8">
       <h2 className="text-[15px] font-bold text-ink">空いたら知らせる</h2>
-      <p className="mt-1 text-[13px] text-liff-sub">{storeName}・{new Date(startsAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{guestCount}名</p>
+      <p className="mt-1 text-[13px] text-liff-sub">{storeName}・{formatDateTimeLong(startsAt)}・{guestCount}名</p>
       {message ? <p className="mt-3" role="status">{message}</p> : entryId === undefined && !error ? <p className="mt-3" role="status">読み込んでいます。</p> : entryId ? <p className="mt-3">登録ずみです。空いたらLINEで知らせます。</p> : !error ? <p className="mt-3">満席の時刻に登録すると、空いたらLINEで知らせます。</p> : null}
       {error && <p className="mt-3 text-[13px] text-danger" role="alert">{error}</p>}
       <div className="mt-4 flex gap-2">

@@ -1,3 +1,4 @@
+import { formatNumber } from '@/lib/format'
 import { isRuleComplete, pruneCondition, type SegmentCondition, type SegmentRule } from '@/components/shared/condition-builder';
 
 /**
@@ -58,8 +59,8 @@ export function describeConditionRule(
     case 'support_mark': {
       const count = Array.isArray(v?.markIds) ? v.markIds.length : 0
       return v?.exclude === true
-        ? `選んだ対応マーク（${count} 件）の人を除く`
-        : `対応マーク（${count} 件）の人`
+        ? `選んだ対応マーク（${formatNumber(count)} 件）の人を除く`
+        : `対応マーク（${formatNumber(count)} 件）の人`
     }
     case 'friend_field':
       return '友だち情報で絞る人'

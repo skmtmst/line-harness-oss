@@ -117,7 +117,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
       // 保存だけ失敗したのに一覧へ出続けると「入っている」と誤認させる。
       // 失敗を表示し、サーバの真値へ戻す。
       { if (!fieldFailure)
-      setSaveError('テスト送信先を保存できませんでした。') }
+      setSaveError('テスト送信先を保存できませんでした。時間をおいて、もう一度お試しください。') }
       void load()
     } finally { setSaving(false) }
   }
@@ -134,12 +134,12 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
-      setSaveError('テスト送信先を保存できませんでした。') }
+      setSaveError('テスト送信先を保存できませんでした。時間をおいて、もう一度お試しください。') }
       void load()
     } finally { setSaving(false) }
   }
 
-  if (loading) return <SaveErrorScope errors={saveErrors}><p className="text-xs text-ink-faint">読み込み中...</p></SaveErrorScope>
+  if (loading) return <SaveErrorScope errors={saveErrors}><p className="text-xs text-ink-faint">読み込み中…</p></SaveErrorScope>
   if (loadError) {
     return (
       <SaveErrorScope errors={saveErrors}>
@@ -205,13 +205,13 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
       <div className="relative">
         <SaveErrorField names={["search"]}><input
           type="text"
-          placeholder="友だちを検索して追加..."
+          placeholder="友だちを検索して追加…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="w-full border border-hairline rounded-control px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-focus-ring"
         /></SaveErrorField>
-        {searching && <span className="absolute right-2 top-1.5 text-xs text-ink-faint">検索中...</span>}
-        {saving && <span className="absolute right-2 top-1.5 text-xs text-success">保存中...</span>}
+        {searching && <span className="absolute right-2 top-1.5 text-xs text-ink-faint">検索中…</span>}
+        {saving && <span className="absolute right-2 top-1.5 text-xs text-success">保存中…</span>}
 
         {searchResults.length > 0 && (
           <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-canvas border border-hairline rounded-control shadow-float max-h-40 overflow-y-auto">

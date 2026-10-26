@@ -50,6 +50,7 @@ import styles from './list.module.css'
 import { useTemplatePanelDetail } from './panel-detail'
 import StaffAssetList from './staff-asset-list'
 import { createBlockedReason,failureOf,failureOfResponse,listView,usageRows,type TemplatesFailure,type UsageDetail } from './words'
+import { formatNumber } from '@/lib/format'
 
 export default function TemplatesListV8() {
   const saveErrors = useSaveFormErrors()
@@ -472,7 +473,7 @@ export default function TemplatesListV8() {
     setFolderError('')
     try {
       const res = await api.folders.delete(deletingFolder.id, selectedAccountId ?? undefined)
-      if (!res.success) throw new Error(res.error ?? '削除できませんでした')
+      if (!res.success) throw new Error(res.error ?? '削除できませんでした。時間をおいて、もう一度お試しください。')
       setDeletingFolder(null)
       if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
       await loadFolders()
@@ -480,7 +481,7 @@ export default function TemplatesListV8() {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
-      setFolderError('フォルダを削除できませんでした。') }
+      setFolderError('フォルダを削除できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
       setFolderBusy(false)
     }
@@ -555,7 +556,7 @@ export default function TemplatesListV8() {
           const result = await api.templates.update(id, { folderId })
           if (!result.success) failed += 1
         }
-        return failed > 0 ? { success: false as const, error: `${failed} 件` } : { success: true as const }
+        return failed > 0 ? { success: false as const, error: `${formatNumber(failed)} 件` } : { success: true as const }
       } finally {
         moveLock.current = false
         setMoving(false)
@@ -630,13 +631,13 @@ export default function TemplatesListV8() {
         if (!result.success) failed += 1
       }
       if (failed > 0) {
-        setBulkDeleteError(`${failed} 件を削除できませんでした。状態を読み直してからお試しください。`)
+        setBulkDeleteError(`${formatNumber(failed)} 件を削除できませんでした。状態を読み直してからお試しください。`)
         await Promise.all([load(), loadFolders()])
         return
       }
       setPendingBulkDelete(null)
       setSelectedIds(new Set())
-      notifyToast(`${pendingBulkDelete.length} 件のテンプレートを削除しました`, { tone: 'success' })
+      notifyToast(`${formatNumber(pendingBulkDelete.length)} 件のテンプレートを削除しました`, { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
       const fieldFailure = saveErrors.capture(reason)

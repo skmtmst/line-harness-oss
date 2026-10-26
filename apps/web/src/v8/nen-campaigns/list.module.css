@@ -214,7 +214,7 @@
   line-height: var(--tpl-nc-text-lh);
 }
 .link {
-  color: var(--color-action);
+  color: var(--color-link);
   text-decoration: underline;
 }
 .error {

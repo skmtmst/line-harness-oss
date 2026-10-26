@@ -106,7 +106,7 @@ export default function FileOpen() {
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="ファイル" />
       <div className="mx-auto w-full max-w-md px-4 pt-3 pb-40">
-        {state.name === 'loading' && <LoadingView label="本人確認をしています..." />}
+        {state.name === 'loading' && <LoadingView label="本人確認をしています…" />}
         {(state.name === 'ready' || state.name === 'fetching' || state.name === 'opened') && (
           <FileCard state={state} />
         )}
@@ -115,7 +115,7 @@ export default function FileOpen() {
       {(state.name === 'ready' || state.name === 'fetching') && (
         <BottomBar>
           <Button variant="primary" disabled={state.name === 'fetching'} onClick={() => void open(state.file)}>
-            {state.name === 'fetching' ? '開いています...' : 'ファイルを開く'}
+            {state.name === 'fetching' ? '開いています…' : 'ファイルを開く'}
           </Button>
         </BottomBar>
       )}
@@ -138,7 +138,7 @@ function FileCard({ state }: { state: Extract<State, { name: 'ready' | 'fetching
       <Card className="space-y-1 p-4">
         <p className="text-[15px] font-bold break-all text-ink" data-file-name>{file.filename}</p>
         <p className="text-[13px] text-liff-sub">
-          {KIND_LABEL[file.kind]} ・ {formatFileSize(file.size)}
+          {KIND_LABEL[file.kind]}・{formatFileSize(file.size)}
         </p>
       </Card>
       {state.name === 'opened' && file.kind === 'image' && (

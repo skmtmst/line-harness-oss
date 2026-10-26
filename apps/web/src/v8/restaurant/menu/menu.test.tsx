@@ -85,10 +85,10 @@ describe('MJoJR メニュー管理', () => {
     await waitFor(() => expect(fetchApi).toHaveBeenCalledWith('/api/restaurant-test/menus/m4?account_id=account-1', { method: 'DELETE' }))
   })
 
-  it('メニューを追加するは選んでいる店舗で編集ページを開く', async () => {
+  it('メニューを作るは選んでいる店舗で編集ページを開く', async () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
-    fireEvent.click(screen.getByRole('button', { name: /メニューを追加する/ }))
+    fireEvent.click(screen.getByRole('button', { name: /メニューを作る/ }))
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/restaurant-test/menu/edit?store=store-1'))
   })
 
@@ -97,7 +97,7 @@ describe('MJoJR メニュー管理', () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
     expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /メニューを追加する/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /メニューを作る/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /の操作$/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '再開' })).toBeNull()
   })
