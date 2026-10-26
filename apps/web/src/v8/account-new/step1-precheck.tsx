@@ -57,7 +57,7 @@ export default function Step1Precheck({
         {/* カードの頭は 題・？・のび・札 の順（v07 B2SpuV）。 */}
         <div className={styles.precheckHead}>
           <h2 className={styles.panelTitle}>ご利用環境の確認</h2>
-          <span className={styles.precheckHelpMark} title="答えに合わせて、このあとの手順が変わります。" aria-label="答えに合わせて、このあとの手順が変わります。"><CircleHelp size={14} aria-hidden="true" /></span>
+          <span className={styles.precheckHelpMark} title="答えに合わせて、このあとの手順が変わります。" aria-label="答えに合わせて、このあとの手順が変わります。"><CircleHelp size={16} aria-hidden="true" /></span>
           <p className={styles.subBadge}>{badge}</p>
         </div>
         <p className={styles.precheckLead}>{precheckAt === 'done'
@@ -120,7 +120,7 @@ export default function Step1Precheck({
             <p className={styles.precheckResultHeading}>あなたの接続前チェック結果</p>
             {PRECHECK_RESULT.map((item) => (
               <div key={item.title} className={styles.precheckResultItem}>
-                <span className={styles.precheckResultMark} aria-hidden="true"><Check size={13} /></span>
+                <span className={styles.precheckResultMark} aria-hidden="true"><Check size={16} /></span>
                 <div className={styles.precheckResultText}>
                   <p className={styles.precheckResultTitle}>{item.title}</p>
                   <p className={styles.precheckResultBody}>{item.body}</p>

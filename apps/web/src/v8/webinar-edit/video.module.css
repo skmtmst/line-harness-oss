@@ -82,7 +82,7 @@
   font: inherit;
   font-size: var(--text-body);
 }
-.dateInput:disabled { opacity: 0.6; }
+.dateInput:disabled { opacity: var(--polish-disabled-opacity); }
 /* 保存で落ちた日付の欄。枠を危険の色にする。 */
 .dateInput[aria-invalid='true'] { border-color: var(--color-danger); outline-color: var(--color-danger); }
 

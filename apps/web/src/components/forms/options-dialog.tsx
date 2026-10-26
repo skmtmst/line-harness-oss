@@ -1,5 +1,6 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
 import { jstDateOffset as japanDateOffset } from '@/lib/jst-datetime'
 
 /**
@@ -75,9 +76,7 @@ export default function OptionsDialog({
             <h2 className="text-ink text-base font-bold">オプション設定</h2>
             <p className="mt-0.5 text-xs text-ink-faint">答え終わったあとの動きと、受付のきまり</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="text-ink-faint hover:text-ink px-2 text-lg">
-            ×
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">

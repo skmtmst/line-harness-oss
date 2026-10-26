@@ -308,10 +308,10 @@ export function AffiliatePaymentConfirmDialog({
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
           <p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>
           <div className="flex shrink-0 items-center gap-2">
-            <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={15} />キャンセル</Button>
+            <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={16} />キャンセル</Button>
             {phase === 'ready' && preview ? (
               <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
-                <Check size={15} />{`${yen(preview.amount)} で確定する`}
+                <Check size={16} />{`${yen(preview.amount)} で確定する`}
               </Button>
             ) : null}
           </div>
@@ -362,7 +362,7 @@ export function AffiliatePaymentConfirmDialog({
           </p>
 
           <div className="flex items-center gap-3 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm">
-            <Landmark size={18} className="shrink-0 text-ink-faint" aria-hidden="true" />
+            <Landmark size={20} className="shrink-0 text-ink-faint" aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-ink">振込先　{settlement?.bankProfileRegistered ? '登録済み' : '登録されていません'}</p>
               <p className="mt-0.5 text-xs text-ink-faint">

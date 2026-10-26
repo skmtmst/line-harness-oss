@@ -527,7 +527,7 @@ function NotificationToggle({ setting, busy, onToggle }: { setting: EcNotificati
 
 function CardPreview({ setting }: { setting: EcNotificationSetting }) {
   return <div className="border-nen-border bg-nen-ivory overflow-hidden rounded-card border shadow-float">
-    {setting.imageUrl && <img src={setting.imageUrl} alt="" className={styles.previewImage} />}
+    {setting.imageUrl && <img width={400} height={180} src={setting.imageUrl} alt="" className={styles.previewImage} />}
     <div className="p-5">
       <div className="border-nen-gold-soft flex items-center gap-2 border-b pb-3">
         <span className="text-nen-gold font-serif text-xl font-bold">然</span>
@@ -1204,7 +1204,7 @@ function LineNotificationsPage() {
     layout="narrow-nav"
     contentLayout={tab === 'customer' ? 'wide' : undefined}
     actions={tab === 'operator' && expandedSetting === null && canManage ? <>
-      <Button onClick={() => setOperatorExportOpen(true)} disabled={!selectedAccountId}><Download aria-hidden="true" size={15} />CSVで書き出す</Button>
+      <Button onClick={() => setOperatorExportOpen(true)} disabled={!selectedAccountId}><Download aria-hidden="true" size={16} />CSVで書き出す</Button>
       <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
     </> : undefined}
     title="LINE通知" help={tab === 'customer' ? '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。' : tab === 'failures' ? '送れなかった理由や再試行の予定を確かめます。ブロックなどの対象外と、再試行が必要な失敗を分けて確認してください。' : undefined}

@@ -175,7 +175,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
                         {/* 上下の 8px は窓分けの行が持つ（外の余白は測った高さに入らない）。 */}
                         <div className="flex items-center justify-center gap-1.5" style={{ marginTop: !showDateSep && idx === 0 ? 8 : 0, marginBottom: isLast ? 8 : 0 }}>
                           <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-micro font-semibold text-action shadow-card">
-                            <Link2 aria-hidden="true" size={13} />
+                            <Link2 aria-hidden="true" size={16} />
                             シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
                           </span>
                           <time className="text-micro text-ink-faint">{startedAt}</time>

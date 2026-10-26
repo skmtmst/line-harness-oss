@@ -23,7 +23,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 7px 8px;
+  padding: 6px 8px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
@@ -47,7 +47,7 @@
 
 .disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .chip {
@@ -90,8 +90,8 @@
 }
 
 .chipRemove svg {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
 }
 
 .overflow {
@@ -201,7 +201,7 @@
 
 .clearAll:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .list {
@@ -231,7 +231,7 @@
 
 .option[aria-disabled='true'] {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 /* 行の印は見た目だけ。押すのは行なので、印へは操作を通さない。 */
@@ -382,3 +382,6 @@
   }
 }
 }
+
+/* 箱ごと薄くした時は、中の押せない部品を重ねて薄くしない。 */
+html:root .disabled :is(button, input, textarea):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-enabled-opacity); }

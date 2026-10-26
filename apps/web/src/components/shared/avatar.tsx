@@ -68,7 +68,7 @@ export default function Avatar({
     >
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element -- LINE CDN の利用者画像。大きさは固定で最適化は要らない。
-        <img src={src!} alt={labelled ? alt : ''} className={styles.image} onError={() => setFailedSrc(src ?? null)} />
+        <img width={40} height={40} src={src!} alt={labelled ? alt : ''} className={styles.image} onError={() => setFailedSrc(src ?? null)} />
       ) : label ? (
         avatarInitials(label)
       ) : (

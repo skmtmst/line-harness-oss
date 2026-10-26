@@ -59,7 +59,7 @@ export default function CarouselButtons({ actions, selectedIndex, fields, hqHost
       textMax={MESSAGE_TEXT_MAX}
     /></SaveErrorField></Field>
     return <Fragment key={ai}>
-      <CardHeader size="stacked" headingLevel={3} title={`ボタン ${ai + 1}`} action={actions.length > 1 ? <IconButton size="row" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} onClick={() => { setEditing(null); onChange(actions.filter((_, index) => index !== ai)) }}><Trash2 size={14} aria-hidden="true" /></IconButton> : undefined} />
+      <CardHeader size="stacked" headingLevel={3} title={`ボタン ${ai + 1}`} action={actions.length > 1 ? <IconButton size="row" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} onClick={() => { setEditing(null); onChange(actions.filter((_, index) => index !== ai)) }}><Trash2 size={16} aria-hidden="true" /></IconButton> : undefined} />
       <div {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
         {host ? <SettingsFormRow layout="columns">{label}{tap}</SettingsFormRow> : tap}
       </div>

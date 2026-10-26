@@ -346,7 +346,7 @@ function OverflowTools({ children, label }: { children: ReactNode; label: string
   }, [children])
   return <details ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional data-toolbar-overflow-group data-collapsed={collapsed || undefined} open={collapsed ? undefined : true}
     onKeyDown={event => { if (event.key === 'Escape' && collapsed) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}>
-    <summary aria-label={label}>{label}<ChevronDown size={14} aria-hidden="true" /></summary><div data-toolbar-optional-content role="group" aria-label={label}>{children}</div>
+    <summary aria-label={label}>{label}<ChevronDown size={16} aria-hidden="true" /></summary><div data-toolbar-optional-content role="group" aria-label={label}>{children}</div>
   </details>
 }
 

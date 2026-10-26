@@ -83,7 +83,7 @@ function CreateRuleButton({ full, compact, disabled, disabledTitle, menuOpen, on
       aria-expanded={menuOpen}
       aria-haspopup="menu"
     >
-      {compact ? <><Plus size={15} aria-hidden="true" />ルールを作る</> : <>＋ ルールを作る <ChevronDown size={14} aria-hidden="true" /></>}
+      {compact ? <><Plus size={16} aria-hidden="true" />ルールを作る</> : <>＋ ルールを作る <ChevronDown size={16} aria-hidden="true" /></>}
     </Button>
   )
 }
@@ -543,13 +543,13 @@ export default function AutoRepliesListV8() {
       {
         id: 'edit',
         label: '編集する',
-        icon: <Pencil size={14} aria-hidden="true" />,
+        icon: <Pencil size={16} aria-hidden="true" />,
         onSelect: () => goEdit(r.id),
       },
       {
         id: 'runs',
         label: '実行結果を見る',
-        icon: <Activity size={14} aria-hidden="true" />,
+        icon: <Activity size={16} aria-hidden="true" />,
         onSelect: () =>
           withViewTransition(() => {
             router.push(`/auto-replies/runs?id=${r.id}`)
@@ -558,7 +558,7 @@ export default function AutoRepliesListV8() {
       {
         id: 'duplicate',
         label: '複製する',
-        icon: <Copy size={14} aria-hidden="true" />,
+        icon: <Copy size={16} aria-hidden="true" />,
         onSelect: () => {
           setDuplicateError('')
           void runDuplicate(r)
@@ -572,7 +572,7 @@ export default function AutoRepliesListV8() {
           ? {
               id: 'stop',
               label: '止める',
-              icon: <Pause size={14} aria-hidden="true" />,
+              icon: <Pause size={16} aria-hidden="true" />,
               dividerBefore: true,
               onSelect: () => {
                 setToggleError('')
@@ -583,7 +583,7 @@ export default function AutoRepliesListV8() {
           : {
               id: 'resume',
               label: '再開する',
-              icon: <Play size={14} aria-hidden="true" />,
+              icon: <Play size={16} aria-hidden="true" />,
               dividerBefore: true,
               onSelect: () => {
                 setToggleError('')
@@ -595,13 +595,13 @@ export default function AutoRepliesListV8() {
     items.push({
       id: 'move',
       label: 'フォルダへ移す',
-      icon: <FolderIcon size={14} aria-hidden="true" />,
+      icon: <FolderIcon size={16} aria-hidden="true" />,
       onSelect: () => openMove([r.id]),
     })
     items.push({
       id: 'delete',
       label: '削除する',
-      icon: <Trash2 size={14} aria-hidden="true" />,
+      icon: <Trash2 size={16} aria-hidden="true" />,
       tone: 'danger',
       dividerBefore: true,
       onSelect: () => requestDelete(r),
@@ -804,7 +804,7 @@ export default function AutoRepliesListV8() {
                 setPage(1)
               }}
               title="無効にしてあるルール"
-              icon={<Pause size={14} aria-hidden="true" />}
+              icon={<Pause size={16} aria-hidden="true" />}
             >
               停止中のみ
             </FilterChip>
@@ -815,7 +815,7 @@ export default function AutoRepliesListV8() {
                 setPage(1)
               }}
               title="曜日か時間帯を決めているルール"
-              icon={<CircleHelp size={14} aria-hidden="true" />}
+              icon={<CircleHelp size={16} aria-hidden="true" />}
             >
               時間帯あり
             </FilterChip>
@@ -826,7 +826,7 @@ export default function AutoRepliesListV8() {
                 setPage(1)
               }}
               title="今月1度も当たっていないルール"
-              icon={<Ban size={14} aria-hidden="true" />}
+              icon={<Ban size={16} aria-hidden="true" />}
             >
               今月0回
             </FilterChip>
@@ -838,7 +838,7 @@ export default function AutoRepliesListV8() {
                   setPage(1)
                 }}
                 title="同じ受信に当たり得る、ほかのルールがあるもの"
-                icon={<Layers size={14} aria-hidden="true" />}
+                icon={<Layers size={16} aria-hidden="true" />}
               >
                 重なりあり
               </FilterChip>
@@ -853,7 +853,7 @@ export default function AutoRepliesListV8() {
   const savedBox = (
               <SaveErrorField names={["savedFilter","zeroThisMonthOnly","saved_filter","zero_this_month_only"]}><Select
                 aria-label="よく使う絞り込み"
-                icon={<Bookmark size={14} aria-hidden="true" />}
+                icon={<Bookmark size={16} aria-hidden="true" />}
                 value={savedFilter}
                 onChange={(value) => {
                   if (value === 'toggle-zero') setZeroThisMonthOnly(!zeroThisMonthOnly)
@@ -924,7 +924,7 @@ export default function AutoRepliesListV8() {
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} detailLayout={kpi.key === 'actions' ? 'single' : undefined} action={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? { label: '重なりを見る', onClick: () => { setConflictOnly(true); setPage(1) } } : undefined} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} detailLayout={kpi.key === 'actions' ? 'single' : undefined} action={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? { label: '重なりを見る', onClick: () => { setConflictOnly(true); setPage(1) } } : undefined} />
           ))}
         </KpiBand>
       </>}

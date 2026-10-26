@@ -153,8 +153,8 @@ export default function ConfirmDialog({
   const shownTitleIcon = titleIcon === false ? undefined : titleIcon ?? (primaryAction === 'cancel'
     ? undefined
     : destructive
-      ? <TriangleAlert size={22} />
-      : <CircleCheck size={22} />)
+      ? <TriangleAlert size={20} />
+      : <CircleCheck size={20} />)
   const shownConfirmIcon = confirmIcon ?? (destructive ? <Trash2 size={16} /> : undefined)
 
   return (

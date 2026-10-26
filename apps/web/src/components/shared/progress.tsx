@@ -95,7 +95,7 @@ export default function Progress({
         className={[styles.root, className].filter(Boolean).join(' ')}
       >
         <p className={styles.head}>
-          <CircleCheck aria-hidden="true" size={18} className={styles.doneIcon} />
+          <CircleCheck aria-hidden="true" size={20} className={styles.doneIcon} />
           <span className={styles.title}>{title}</span>
         </p>
         <div aria-hidden="true" className={styles.track}>
@@ -119,7 +119,7 @@ export default function Progress({
         className={[styles.root, className].filter(Boolean).join(' ')}
       >
         <p className={styles.head}>
-          <TriangleAlert aria-hidden="true" size={18} className={styles.partialIcon} />
+          <TriangleAlert aria-hidden="true" size={20} className={styles.partialIcon} />
           <span className={styles.title}>{title}</span>
         </p>
         <div aria-hidden="true" className={styles.track}>

@@ -314,7 +314,7 @@ export default function Dialog({
         {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
         <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
-          <X aria-hidden="true" size={18} />
+          <X aria-hidden="true" size={20} />
         </IconButton>
       </div>
       {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout === 'stacked' ? descriptionNode : null}
@@ -381,7 +381,7 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
       {index > 0 ? <span className={styles.stepLine} aria-hidden="true" /> : null}
       <button type="button" className={styles.stepItem} onClick={step.onSelect} disabled={!step.onSelect} aria-current={step.current ? 'step' : undefined}>
         <span className={`${styles.stepCircle} ${step.done ? styles.stepDone : step.current ? styles.stepCurrent : ''}`}>
-          {step.done ? <Check size={12} aria-hidden="true" /> : index + 1}
+          {step.done ? <Check size={16} aria-hidden="true" /> : index + 1}
         </span>
         <span>{step.label}</span>
       </button>

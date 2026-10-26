@@ -1,5 +1,6 @@
 'use client'
 
+import CloseButton from '@/components/shared/close-button'
 import type {
   FormBlock,
   FormInputBlock,
@@ -474,8 +475,7 @@ export default function BlockEditor({
                           className="bg-accent-soft text-accent-deep rounded-pill inline-flex items-center gap-1 px-2 py-0.5 text-xs"
                         >
                           {field?.name ?? '（消えた項目）'}
-                          <button
-                            onClick={() =>
+                          <CloseButton aria-label={`${field?.name ?? ''}を外す`} onClick={() =>
                               patchInput({
                                 destinations: {
                                   ...block.destinations,
@@ -484,12 +484,7 @@ export default function BlockEditor({
                                   ).filter((x) => x !== id),
                                 },
                               })
-                            }
-                            aria-label={`${field?.name ?? ''}を外す`}
-                            className="hover:text-ink"
-                          >
-                            ×
-                          </button>
+                            } />
                         </span>
                       )
                     })}

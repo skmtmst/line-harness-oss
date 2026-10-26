@@ -11,7 +11,7 @@
 .button svg { width: var(--tpl-insert-icon); height: var(--tpl-insert-icon); stroke-width: 1.75; flex-shrink: 0; }
 @media (hover: hover) and (pointer: fine) { .button:hover { background: var(--color-hover); } }
 .button:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
-.button:disabled { opacity: var(--polish-disabled-opacity); cursor: default; }
+.button:disabled { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
 .count { margin-left: auto; font-size: var(--text-micro); color: var(--color-ink-faint); white-space: nowrap; }
 /* 狭い枠でも、差し込みと同じ行に入るなら文字数はその行の右端に置く。入らない時だけ折り返し、次の行の右端へ寄る（margin-left: auto）。 */
 

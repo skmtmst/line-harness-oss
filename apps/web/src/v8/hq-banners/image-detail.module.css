@@ -46,4 +46,4 @@
   cursor: pointer;
 }
 
-.remove:disabled { opacity: 0.5; }
+.remove:disabled { opacity: var(--polish-disabled-opacity); }

@@ -113,8 +113,8 @@ export default function QaListV8() {
   const failure = load.kind === 'error' ? loadFailureCopy(load.error, 'Q&A') : null
 
   const actions = <>
-    {permissions.importQa ? <Button onClick={() => setImportOpen(true)}><Upload size={15} aria-hidden="true" />取り込む（PDF・Web）</Button> : null}
-    {permissions.editQa ? <Button variant="primary" onClick={() => setEdit({})}><Plus size={15} aria-hidden="true" />Q&A を追加</Button> : null}
+    {permissions.importQa ? <Button onClick={() => setImportOpen(true)}><Upload size={16} aria-hidden="true" />取り込む（PDF・Web）</Button> : null}
+    {permissions.editQa ? <Button variant="primary" onClick={() => setEdit({})}><Plus size={16} aria-hidden="true" />Q&A を追加</Button> : null}
   </>
 
   return (
@@ -185,7 +185,7 @@ export default function QaListV8() {
           canCreate={permissions.editQa}
           filtered={filtered}
           onClearFilters={() => setUrl({ q: '', status: '', page: '1' })}
-          action={permissions.importQa && !filtered ? <Button onClick={() => setImportOpen(true)}><Upload size={15} aria-hidden="true" />取り込む</Button> : undefined}
+          action={permissions.importQa && !filtered ? <Button onClick={() => setImportOpen(true)}><Upload size={16} aria-hidden="true" />取り込む</Button> : undefined}
         />
       ) : null}
       {load.kind === 'ready' && load.items.length > 0 ? (

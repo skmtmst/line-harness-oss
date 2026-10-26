@@ -377,7 +377,7 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
         {/* 設計 `seGRS`。 */}
         <label className="mt-4 block">
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
-          <SaveErrorField names={["text"]}><input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></SaveErrorField>
+          <SaveErrorField names={["text"]}><input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger" /></SaveErrorField>
         </label>
     </div>
   </Dialog>

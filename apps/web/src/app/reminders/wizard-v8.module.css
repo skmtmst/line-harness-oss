@@ -82,7 +82,7 @@
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 24px 28px;
+  padding: 24px 24px;
 }
 
 .side {
@@ -212,6 +212,8 @@
   cursor: pointer;
   transition: background-color 120ms ease-out, border-color 120ms ease-out;
 }
+/* 選ぶカードの動きは共通の値（§6.11）。上の規則は型の候補として残すので、同じ選び先の後ろで上書きする。 */
+.choice { transition: background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out); }
 .choice:hover {
   background: var(--color-canvas-sunken);
 }
@@ -469,7 +471,6 @@
   color: var(--color-ink);
 }
 .stepAction:disabled {
-  color: var(--color-ink-disabled);
   cursor: not-allowed;
 }
 .stepPreview {
@@ -561,7 +562,6 @@
   color: var(--color-accent-deep);
 }
 .addStep:disabled {
-  color: var(--color-ink-disabled);
   cursor: not-allowed;
 }
 
@@ -874,7 +874,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 22px 4px;
+  padding: 10px 20px 4px;
   background: var(--v8-bphone-chrome);
   color: var(--v8-bphone-ink);
   font-size: 12px;

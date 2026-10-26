@@ -413,10 +413,10 @@ export default function AutomationListV8() {
   const ready = loadStatus === 'ready'
   const estimatedHoursSaved = summary ? Math.round(summary.executionCount30d / 120) : null
   const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
-    { key: 'runs', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
-    { key: 'failed', title: '失敗', icon: <FileWarning size={13} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
+    { key: 'rules', title: 'ルール', icon: <ListChecks size={16} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
+    { key: 'runs', title: '今月動いた', icon: <Activity size={16} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
+    { key: 'failed', title: '失敗', icon: <FileWarning size={16} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
+    { key: 'skipped', title: '条件に外れた', icon: <Filter size={16} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
   ]
 
   /* ===== フォルダ ===== */
@@ -431,7 +431,7 @@ export default function AutomationListV8() {
   /* 閲覧のみには押せない「ルールを作る」を置かない（場所だけ空ける）。 */
   const createButton = (full: boolean) => canEdit ? (
     <Button variant="primary" href="/automations/new" className={full ? 'v8-folder-create w-full' : undefined}>
-      <Plus size={15} aria-hidden="true" />ルールを作る
+      <Plus size={16} aria-hidden="true" />ルールを作る
     </Button>
   ) : <span className={full ? styles.createSpace : styles.createSpaceInline} aria-hidden="true" />
 
@@ -455,7 +455,7 @@ export default function AutomationListV8() {
   )
   const savedBox = (
     <div className={styles.savedBox}>
-      <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
+      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["saved"]}><Select aria-label="よく使う絞り込み" value={saved} onChange={(value) => {
         setSaved(value as SavedKey)
         if (value === 'name' || value === 'runs') setSort(value)
@@ -596,7 +596,7 @@ export default function AutomationListV8() {
       title="オートメーション"
 
       actions={canEdit
-        ? <Button href={automationTabHref('templates')}><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button>
+        ? <Button href={automationTabHref('templates')}><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button>
         : <span className={styles.createSpaceInline} aria-hidden="true" />}
       tabs={<AutomationTabs active="rules" counts={tabCounts} />}
       stats={<>

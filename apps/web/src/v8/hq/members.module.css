@@ -97,7 +97,7 @@
   cursor: pointer;
 }
 
-.textButton:disabled { opacity: 0.5; }
+.textButton:disabled { opacity: var(--polish-disabled-opacity); }
 
 .legend {
   margin: 0;

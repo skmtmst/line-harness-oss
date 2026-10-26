@@ -94,7 +94,7 @@
 }
 
 .navButton:disabled {
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
   cursor: not-allowed;
 }
 

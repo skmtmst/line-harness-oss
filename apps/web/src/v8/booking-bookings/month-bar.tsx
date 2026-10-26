@@ -45,7 +45,7 @@ export function BookingMonthBar({ monthLabel, isThisMonth, onPrev, onNext, onTod
 export function BookingUrlCopy({ label, copied, onCopy }: { label: string; copied: boolean; onCopy: () => void }) {
   return (
     <Button size="compact" onClick={onCopy} aria-label={`${label}をコピーする`}>
-      <Link2 size={14} aria-hidden="true" />{label}<span className={styles.copyWord}>{copied ? 'コピー済み' : 'コピーする'}</span>
+      <Link2 size={16} aria-hidden="true" />{label}<span className={styles.copyWord}>{copied ? 'コピー済み' : 'コピーする'}</span>
     </Button>
   )
 }

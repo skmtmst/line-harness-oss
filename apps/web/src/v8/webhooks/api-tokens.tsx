@@ -73,7 +73,7 @@ export default function WebhooksApiTokensV8() {
       headingSize="regular"
       title="外部連携"
 
-      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
+      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="api-tokens" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!canManage ? <ViewerBand /> : null}
@@ -96,7 +96,7 @@ export default function WebhooksApiTokensV8() {
           title="API 接続の鍵を発行する"
           designWidth={540}
           confirmLabel="発行する"
-          confirmIcon={<KeyRound size={15} />}
+          confirmIcon={<KeyRound size={16} />}
           busy={creating}
           error={createError || undefined}
           onConfirm={() => handleCreate()}
@@ -142,7 +142,7 @@ export default function WebhooksApiTokensV8() {
           footer={(
             <div className={styles.issuedFooter}>
               <Button variant="primary" onClick={() => setIssued(null)}>
-                <Check size={15} aria-hidden="true" />写したので閉じる
+                <Check size={16} aria-hidden="true" />写したので閉じる
               </Button>
             </div>
           )}
@@ -198,7 +198,7 @@ export default function WebhooksApiTokensV8() {
       <div className={styles.body}>
         <div className={styles.createRow}>
           {canManage
-            ? <Button variant="primary" onClick={openCreate}><Plus size={15} aria-hidden="true" />API 接続の鍵を発行する</Button>
+            ? <Button variant="primary" onClick={openCreate}><Plus size={16} aria-hidden="true" />API 接続の鍵を発行する</Button>
             : <span className={styles.createSpace} aria-hidden="true" />}
           <span className={styles.spacer} aria-hidden="true" />
           <p className={styles.createRule}>鍵の発行・入れ替え・停止は統括だけができます</p>

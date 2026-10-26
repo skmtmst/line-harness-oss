@@ -217,7 +217,7 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
                   return withViewTransition(() => router.push(detailHref(target)))
                 }} busyLabel="処理中…"
               >
-                <List size={15} aria-hidden="true" />
+                <List size={16} aria-hidden="true" />
                 使っている所をすべて見る
               </Button>
             ) : null}
@@ -238,7 +238,7 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
                   <span className={styles.usageName} title={row.status ? `${row.name}（${row.status}）` : row.name}>{row.name}</span>
                   {row.href ? (
                     <Link href={row.href} className={styles.usageOpen}>
-                      <SquareArrowOutUpRight size={15} aria-hidden="true" />
+                      <SquareArrowOutUpRight size={16} aria-hidden="true" />
                       開いて差し替える
                     </Link>
                   ) : null}

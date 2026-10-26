@@ -133,10 +133,10 @@ export function MembersKpiBand({
   const pending = loading || !kpis
   return (
     <KpiBand className={styles.band} aria-label="会員の数の帯" title={pending ? undefined : `通年の購入 合計 ${yen(kpis.annualTotalYen)}・ライフタイム 合計 ${yen(kpis.lifetimeTotalYen)}・マイル残高 ${formatNumber(kpis.balanceTotal)}・今月使ったマイル ${formatNumber(kpis.usedThisMonth)}`}>
-      <KpiCard presentation="band" title="会員" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.members} unit="人" loading={loading} detail={pending ? emptyValue('unknown') : `LINE 連携済み ${formatNumber(kpis.linkedMembers ?? 0)}`} />
-      <KpiCard presentation="band" title={topTwoLabel} icon={<CircleHelp size={13} aria-hidden="true" />} value={pending || topTwo.length === 0 ? null : topTwoCount} unit="人" loading={loading} detail={topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : emptyValue('unknown')} />
-      <KpiCard presentation="band" title="ペット登録あり" icon={<CircleHelp size={13} aria-hidden="true" />} value={pending ? null : kpis.petMembers ?? 0} unit="人" loading={loading} detail={pending || petPercent === null ? emptyValue('unknown') : `会員の ${petPercent}%`} />
-      <KpiCard presentation="band" title="今月の購入" icon={<Undo2 size={13} aria-hidden="true" />} value={null} valueText={pending ? emptyValue('unknown') : yen(kpis.monthPurchaseYen ?? 0)} unit="" loading={loading} detail={pending ? emptyValue('unknown') : `会員 ${formatNumber(kpis.monthBuyers ?? 0)} 人`} />
+      <KpiCard presentation="band" title="会員" icon={<History size={16} aria-hidden="true" />} value={pending ? null : kpis.members} unit="人" loading={loading} detail={pending ? emptyValue('unknown') : `LINE 連携済み ${formatNumber(kpis.linkedMembers ?? 0)}`} />
+      <KpiCard presentation="band" title={topTwoLabel} icon={<CircleHelp size={16} aria-hidden="true" />} value={pending || topTwo.length === 0 ? null : topTwoCount} unit="人" loading={loading} detail={topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : emptyValue('unknown')} />
+      <KpiCard presentation="band" title="ペット登録あり" icon={<CircleHelp size={16} aria-hidden="true" />} value={pending ? null : kpis.petMembers ?? 0} unit="人" loading={loading} detail={pending || petPercent === null ? emptyValue('unknown') : `会員の ${petPercent}%`} />
+      <KpiCard presentation="band" title="今月の購入" icon={<Undo2 size={16} aria-hidden="true" />} value={null} valueText={pending ? emptyValue('unknown') : yen(kpis.monthPurchaseYen ?? 0)} unit="" loading={loading} detail={pending ? emptyValue('unknown') : `会員 ${formatNumber(kpis.monthBuyers ?? 0)} 人`} />
     </KpiBand>
   )
 }
@@ -198,7 +198,7 @@ function CsvExportButton({ accountId }: { accountId: string }) {
   return (
     <span className={styles.csvWrap}>
       <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy} busy={Boolean(busy)} busyLabel="書き出しています…">
-        <Download size={15} aria-hidden="true" />
+        <Download size={16} aria-hidden="true" />
         CSVで書き出す
       </Button>
       {error ? <span className={styles.csvError} role="alert">{error}</span> : null}

@@ -146,15 +146,15 @@ export default function OpsTenantsV8() {
     <OpsListPage boardId="XWtYC" title="契約先アカウント" readOnly={readOnly} help="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
       actions={readOnly ? null : <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus aria-hidden="true" />契約先を作る</Button>}
         stats={<KpiBand>
-          <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="契約中" value={summary ? summary.active : null} unit="社" detail="請求が生きている契約先（決済失敗を含む）" loading={kpiLoading} />
-          <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail={trialEnd ? `期限 ${monthDay(trialEnd)}` : '期限切れ前に案内'} loading={kpiLoading} />
-          <KpiCard presentation="cell" icon={<CreditCard size={13} aria-hidden="true" />} title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail={pastDue ? pastDue.name : 'Stripe で支払いが止まっている'} loading={kpiLoading} />
-          <KpiCard presentation="cell" icon={<Pause size={13} aria-hidden="true" />} title="停止中" value={summary ? summary.suspended : null} unit="社" detail={suspended ? suspended.name : '運営が止めた契約先'} loading={kpiLoading} />
+          <KpiCard presentation="cell" icon={<BadgeCheck size={16} aria-hidden="true" />} title="契約中" value={summary ? summary.active : null} unit="社" detail="請求が生きている契約先（決済失敗を含む）" loading={kpiLoading} />
+          <KpiCard presentation="cell" icon={<Hourglass size={16} aria-hidden="true" />} title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail={trialEnd ? `期限 ${monthDay(trialEnd)}` : '期限切れ前に案内'} loading={kpiLoading} />
+          <KpiCard presentation="cell" icon={<CreditCard size={16} aria-hidden="true" />} title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail={pastDue ? pastDue.name : 'Stripe で支払いが止まっている'} loading={kpiLoading} />
+          <KpiCard presentation="cell" icon={<Pause size={16} aria-hidden="true" />} title="停止中" value={summary ? summary.suspended : null} unit="社" detail={suspended ? suspended.name : '運営が止めた契約先'} loading={kpiLoading} />
         </KpiBand>}
         toolbar={<OpsListToolbar
           search={{ value: q, onChange: setQ, placeholder: '統括名・メール・店舗名で探す', label: '契約先を探す' }}
           filters={<>
-            <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
+            <FilterChip icon={<CircleDot size={16} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
               {loading || listLoadError ? 'すべて' : `すべて ${rows.length}`}
             </FilterChip>
             {/* 状態の札は文字だけ（星はお気に入りの印に見える・絵 XWtYC）。 */}
@@ -195,7 +195,7 @@ export default function OpsTenantsV8() {
         title="契約先を作る"
         confirmLabel="作る"
         cancelLabel="キャンセル"
-        confirmIcon={<Plus size={15} aria-hidden="true" />}
+        confirmIcon={<Plus size={16} aria-hidden="true" />}
         busy={createBusy}
         error={createError || undefined}
         designNode="i0FTN"

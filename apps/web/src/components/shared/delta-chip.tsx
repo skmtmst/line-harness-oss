@@ -40,7 +40,7 @@ export default function DeltaChip({
   const Icon = tone === 'attention' ? TriangleAlert : (direction ?? tone) === 'up' ? TrendingUp : TrendingDown
   return (
     <span className={[styles.root, styles[tone]].join(' ')}>
-      <Icon size={12} aria-hidden="true" className={tone === 'attention' ? styles.attentionIcon : undefined} />
+      <Icon size={16} aria-hidden="true" className={tone === 'attention' ? styles.attentionIcon : undefined} />
       <span>{children}</span>
     </span>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useRef, type RefObject } from 'react'
-import { motionMs, shouldAnimateLeave } from './overlay-utils'
+import { motionEasing, motionMs, shouldAnimateLeave } from './overlay-utils'
 
 /** 通知の位置だけを詰める。閉じるフェードとは別の箱を動かす。 */
 export function useStackMotion(container: RefObject<HTMLDivElement | null>, version: unknown) {
@@ -21,7 +21,7 @@ export function useStackMotion(container: RefObject<HTMLDivElement | null>, vers
       animations.current.get(id)?.cancel()
       animations.current.delete(id)
       if (before === undefined || Math.abs(before + offset - top) < 1 || !shouldAnimateLeave() || !element.animate) continue
-      const animation = element.animate([{ transform: `translateY(${before + offset - top}px)` }, { transform: 'translateY(0)' }], { duration: motionMs('--motion-base', 200), easing: 'cubic-bezier(0.2, 0, 0, 1)' })
+      const animation = element.animate([{ transform: `translateY(${before + offset - top}px)` }, { transform: 'translateY(0)' }], { duration: motionMs('--motion-base', 200), easing: motionEasing() })
       animations.current.set(id, animation)
     }
     for (const [id, animation] of animations.current) if (!next.has(id)) { animation.cancel(); animations.current.delete(id) }

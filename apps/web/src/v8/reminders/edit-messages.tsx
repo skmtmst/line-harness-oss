@@ -173,7 +173,7 @@ export function MessagesStageV8({
         preview={narrow ? (
           <div className={styles.narrowSide}>
             <Button type="button" className={styles.wideButton} onClick={() => setPhoneOpen(true)}>
-              <Smartphone size={15} aria-hidden="true" />LINEでの見え方を見る
+              <Smartphone size={16} aria-hidden="true" />LINEでの見え方を見る
             </Button>
             {examples}
           </div>
@@ -190,7 +190,7 @@ export function MessagesStageV8({
             onDraft={onSaveDraft}
             draftBusy={busy}
             nextLabel="次へ：配信予定"
-            nextIcon={<ArrowRight size={15} aria-hidden="true" />}
+            nextIcon={<ArrowRight size={16} aria-hidden="true" />}
             onNext={onNext}
             nextDisabled={busy || !allStepsHaveContent}
           />
@@ -230,13 +230,13 @@ export function MessagesStageV8({
                   </button>
                   <span className={styles.spacer} aria-hidden="true" />
                   <Button type="button" variant="text" title={stepOrder.moveReason(step.stableStepId, -1) ?? undefined} disabled={!stepOrder.canMoveBy(step.stableStepId, -1)} onClick={() => stepOrder.moveBy(step.stableStepId, -1, 'menu')}>
-                    <ArrowUp size={15} aria-hidden="true" />前へ
+                    <ArrowUp size={16} aria-hidden="true" />前へ
                   </Button>
                   <Button type="button" variant="text" title={stepOrder.moveReason(step.stableStepId, 1) ?? undefined} disabled={!stepOrder.canMoveBy(step.stableStepId, 1)} onClick={() => stepOrder.moveBy(step.stableStepId, 1, 'menu')}>
-                    <ArrowDown size={15} aria-hidden="true" />後ろへ
+                    <ArrowDown size={16} aria-hidden="true" />後ろへ
                   </Button>
                   <Button type="button" variant="text" disabled={settings.steps.length <= 1} onClick={() => removeStep(step.stableStepId)}>
-                    <Trash2 size={15} aria-hidden="true" />消す
+                    <Trash2 size={16} aria-hidden="true" />消す
                   </Button>
                 </div>
                 {open ? (
@@ -277,7 +277,7 @@ export function MessagesStageV8({
           })}
           <div>
             <Button type="button" variant="text" onClick={addStep} disabled={settings.steps.length >= MAX_STEPS}>
-              <Plus size={15} aria-hidden="true" />通知を足す
+              <Plus size={16} aria-hidden="true" />通知を足す
             </Button>
           </div>
         </section>

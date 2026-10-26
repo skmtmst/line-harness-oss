@@ -111,7 +111,7 @@
 .helpToggle:disabled,
 .helpLink:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .helpChoices {

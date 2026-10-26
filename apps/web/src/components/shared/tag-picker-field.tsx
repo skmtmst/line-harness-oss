@@ -58,7 +58,7 @@ export default function TagPickerField({ label = 'タグを付ける', value, on
   }) : <span className={styles.placeholder}>タグを選ぶ</span>}</span>
   return <>
     {readOnly ? <div className={styles.field}>{selection}</div> : <button id={fieldId} ref={buttonRef} aria-describedby={describedBy} type="button" className={styles.field} aria-label={`${label}：${value.length ? '変える' : '選ぶ'}`} aria-haspopup="dialog" aria-invalid={invalid || undefined} disabled={disabled} title={disabled ? disabledReason : undefined} onClick={() => { setOpen(true); void load() }}>
-      <TagIcon size={14} aria-hidden="true" />{selection}<span className={styles.change}>{value.length ? '変える' : '選ぶ'}</span><ChevronRight size={14} aria-hidden="true" />
+      <TagIcon size={16} aria-hidden="true" />{selection}<span className={styles.change}>{value.length ? '変える' : '選ぶ'}</span><ChevronRight size={16} aria-hidden="true" />
     </button>}
     {open ? <TagPickerDialog key={id ?? "hq"} multiple={multiple} items={items} folders={folders} folderFailed={folderFailed} status={status} initialIds={value} accountId={id} onCreated={tag => { createdItems.current.push(tag); setItems(current => [...current.filter(item => item.id !== tag.id), tag]) }} onCancel={() => setOpen(false)} onConfirm={ids => { onChange(ids); setOpen(false) }} onRetry={() => void load()} /> : null}
   </>
@@ -101,7 +101,7 @@ function TagPickerDialog({ multiple, items, folders, folderFailed, status, initi
     finally { if (mounted.current) setBusy(false) }
   }
   return <FolderPickerShell busy={busy} title="タグを選ぶ" onClose={() => { if (!busy) onCancel() }} rows={rows} activeId={folder} onFolder={setFolder}
-    search={<div className={styles.searchRow}><SearchField ref={inputRef} aria-label="タグ名で探す" placeholder="タグ名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />{!creating && status === 'ready' ? <Button variant="text" onClick={() => setCreating(true)}><Plus size={14} />その場でタグを作る</Button> : null}</div>}
+    search={<div className={styles.searchRow}><SearchField ref={inputRef} aria-label="タグ名で探す" placeholder="タグ名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />{!creating && status === 'ready' ? <Button variant="text" onClick={() => setCreating(true)}><Plus size={16} />その場でタグを作る</Button> : null}</div>}
     sideNote={folderFailed ? <p className={styles.error}>フォルダを読み込めませんでした</p> : null}
     footer={<><span className={styles.count} aria-live="polite">{formatNumber(selected.length)}件選んでいます</span><Button disabled={busy} onClick={onCancel}>キャンセル</Button><Button variant="primary" disabled={busy || status !== 'ready'} onClick={() => onConfirm(selected)}>選ぶ（{formatNumber(selected.length)}件）</Button></>}
   >

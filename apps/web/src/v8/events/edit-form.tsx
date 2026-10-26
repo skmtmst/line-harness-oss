@@ -20,6 +20,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import Dialog from '@/components/shared/dialog';
 import Button from '@/components/shared/button';
 import SelectionButton from '@/components/shared/selection-button';
+import { X } from 'lucide-react';
 import Notice from '@/components/shared/notice';
 import { notifyToast } from '@/components/shared/toast';
 import Select from '@/components/shared/select';
@@ -901,7 +902,7 @@ export function BulkSlotDialog({
         options={[30, 45, 60, 90, 120].map((minutes) => ({ value: String(minutes), label: `${minutes}分` }))} /></Field>
     </FormSection> : <>
     {patterns.map((pattern, index) => <FormSection key={index} id={`ev-form-pattern-${index}`} title={`${index + 1}件目の時刻パターン`}
-      action={patterns.length > 1 ? <Button variant="danger" aria-label={`${index + 1}件目のパターンを削除`} onClick={() => setPatterns((items) => items.filter((_, position) => position !== index))}>×</Button> : null}>
+      action={patterns.length > 1 ? <Button variant="danger" aria-label={`${index + 1}件目のパターンを削除`} title={`${index + 1}件目のパターンを削除`} onClick={() => setPatterns((items) => items.filter((_, position) => position !== index))}><X size={16} aria-hidden="true" /></Button> : null}>
       <Field label="開始"><TimeField value={pattern.start} aria-label={`${index + 1}件目の開始`} onChange={(value) => setPatterns((items) => items.map((item, position) => position === index ? { ...item, start: value } : item))} /></Field>
       <Field label="終了"><TimeField value={pattern.end} aria-label={`${index + 1}件目の終了`} onChange={(value) => setPatterns((items) => items.map((item, position) => position === index ? { ...item, end: value } : item))} /></Field>
     </FormSection>)}

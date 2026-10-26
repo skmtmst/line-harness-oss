@@ -215,7 +215,7 @@ export default function AdConnectionsV8() {
   return (
     <SaveErrorScope errors={saveErrors}><DetailPage boardId="FDBsG" contentPadding="0 var(--tpl-head-pad-side)" title={<>広告とのつなぎ</>}
         help={<>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</>}
-        actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>}>
+        actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={16} aria-hidden="true" />送信履歴を見る</Button></>}>
 
       <div className={adsStyles.body}>
         {editing && manage ? <AdMappingDialog key={`${accountId}:${editing.pointId}:${editing.provider}`} item={editing} onClose={() => setEditing(null)} onSave={(values) => saveMapping(editing, values)} /> : null}
@@ -243,11 +243,11 @@ export default function AdConnectionsV8() {
           />
         ) : (
           <KpiBand aria-label="広告への送信の概要">
-            <KpiCard icon={<Send size={13} aria-hidden="true" />} title="送った件数" value={model.loading ? null : model.sentCount} unit="件" detail="この30日" />
-            <KpiCard icon={<Clock size={13} aria-hidden="true" />} title="待っている" value={model.loading ? null : model.pendingCount} unit="件" detail="送信処理を待っています" />
-            <KpiCard icon={<XCircle size={13} aria-hidden="true" />} title="断られた" value={model.loading ? null : model.failedCount} unit="件" detail="送信履歴で理由を見られます" />
+            <KpiCard icon={<Send size={16} aria-hidden="true" />} title="送った件数" value={model.loading ? null : model.sentCount} unit="件" detail="この30日" />
+            <KpiCard icon={<Clock size={16} aria-hidden="true" />} title="待っている" value={model.loading ? null : model.pendingCount} unit="件" detail="送信処理を待っています" />
+            <KpiCard icon={<XCircle size={16} aria-hidden="true" />} title="断られた" value={model.loading ? null : model.failedCount} unit="件" detail="送信履歴で理由を見られます" />
             {/* やり直して成功の数を返す口が無いので「—」（0 にしない）。 */}
-            <KpiCard icon={<RotateCw size={13} aria-hidden="true" />} title="やり直して成功" value={null} unit="" detail="自動でやり直し" />
+            <KpiCard icon={<RotateCw size={16} aria-hidden="true" />} title="やり直して成功" value={null} unit="" detail="自動でやり直し" />
           </KpiBand>
         )}
         <h2 className={adsStyles.sectionTitle}>成果地点と、広告に返す名前の対応</h2>

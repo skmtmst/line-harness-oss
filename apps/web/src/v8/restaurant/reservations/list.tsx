@@ -128,8 +128,8 @@ export default function ListView({ view, rows, total, tables, page, period, stat
         ) : null}
 </>} trailingToolbar={<>        <span className={styles.dateSpacer} />
         {view === 'list' && onPageSize ? <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => onPageSize(Number(value))} options={PAGE_SIZE_SELECT_OPTIONS} /> : null}
-        {canImport ? <Button presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={15} aria-hidden="true" />受信データを試す</Button> : null}
-        {canWrite ? <Button presentation="restaurant" disabled={busy} onClick={onCreate}><Plus size={15} aria-hidden="true" />手動で予約を作る</Button> : null}
+        {canImport ? <Button presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={16} aria-hidden="true" />受信データを試す</Button> : null}
+        {canWrite ? <Button presentation="restaurant" disabled={busy} onClick={onCreate}><Plus size={16} aria-hidden="true" />手動で予約を作る</Button> : null}
       </>} renderBody={body=><DetailColumns variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
         {rows.length===0?<ListState kind="empty" title="条件に合う予約はありません。"/>:body}
         {view === 'list' && pageCount > 1 ? (

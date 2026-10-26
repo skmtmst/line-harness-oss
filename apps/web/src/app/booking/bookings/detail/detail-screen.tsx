@@ -192,7 +192,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                           type="button"
                           onClick={() => void retryCalendar()}
                           disabled={retrying !== null || queuedCalendar}
-                          className="text-action ml-2 underline disabled:opacity-40"
+                          className="text-action ml-2 underline"
                         >
                           {retrying === 'calendar' ? '再試行中…' : 'もう一度反映する'}
                         </button>
@@ -537,7 +537,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                     <button
                       onClick={() => setDecideTarget('reject')}
                       disabled={acting}
-                      className="text-danger hover:bg-danger-bg rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
+                      className="text-danger hover:bg-danger-bg rounded-control px-4 py-2 text-sm font-medium"
                     >
                       拒否する
                     </button>
@@ -567,7 +567,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                     <button
                       onClick={() => setDecideTarget('cancel')}
                       disabled={acting}
-                      className="text-danger hover:bg-danger-bg rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
+                      className="text-danger hover:bg-danger-bg rounded-control px-4 py-2 text-sm font-medium"
                     >
                       キャンセル
                     </button>
@@ -599,7 +599,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                           type="button"
                           onClick={() => void retryNotification(op.id)}
                           disabled={retrying !== null}
-                          className="text-action mt-1 text-xs underline disabled:opacity-40"
+                          className="text-action mt-1 text-xs underline"
                         >
                           {retrying === op.id ? '再送中…' : 'もう一度送る'}
                         </button>
@@ -619,7 +619,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                           type="button"
                           onClick={() => void retryCalendar()}
                           disabled={retrying !== null || queuedCalendar}
-                          className="text-action mt-1 text-xs underline disabled:opacity-40"
+                          className="text-action mt-1 text-xs underline"
                         >
                           {retrying === 'calendar' ? '再試行中…' : 'もう一度反映する'}
                         </button>
@@ -725,7 +725,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                       type="button"
                       onClick={() => void loadMoreAudit()}
                       disabled={auditLoading}
-                      className="text-action mt-3 text-xs underline disabled:opacity-40"
+                      className="text-action mt-3 text-xs underline"
                     >
                       {auditLoading ? '読み込み中…' : `あと${formatNumber(auditRemaining)}件の記録を読み込む`}
                     </button>

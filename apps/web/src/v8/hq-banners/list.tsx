@@ -440,7 +440,7 @@ function Thumb({ image }: { image: BannerImage | null }) {
     <span className={styles.thumb}>
       {image && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image.media.url} alt="" loading="lazy" onError={() => setFailed(true)} />
+        <img width={240} height={126} src={image.media.url} alt="" loading="lazy" onError={() => setFailed(true)} />
       ) : null}
     </span>
   )

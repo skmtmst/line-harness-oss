@@ -264,7 +264,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
               disabled={deleting || deleteImpactLoading || !deleteImpact?.canArchive}
               onClick={() => void removeForm(false)}
             >
-              <Archive size={15} aria-hidden="true" />
+              <Archive size={16} aria-hidden="true" />
               アーカイブする
             </Button>
           </DialogActions>

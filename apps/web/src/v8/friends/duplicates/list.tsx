@@ -109,7 +109,7 @@ export default function DuplicatesListV8() {
         explanationToggle={<PageExplanationToggle />}
         tabs={<FriendsTabs current="duplicates" line={false} action={(
           <Button type="button" variant="secondary" onClick={exportVisible} disabled={d.candidates.length === 0}>
-            <Download size={14} aria-hidden="true" />
+            <Download size={16} aria-hidden="true" />
             表示中をCSVで書き出す
           </Button>
         )} />}
@@ -123,7 +123,7 @@ export default function DuplicatesListV8() {
             <KpiCard
               key={kpi.key}
               presentation="band"
-              icon={<Inbox size={14} />}
+              icon={<Inbox size={16} />}
               title={kpi.title}
               value={null}
               valueText={kpi.valueText}
@@ -161,7 +161,7 @@ export default function DuplicatesListV8() {
           <span className={styles.spacer} />
           {d.data?.computedAt ? <span className={styles.reviewed}>{`${slashDateTime(d.data.computedAt)} に見直した`}</span> : null}
           <Button type="button" variant="secondary" onClick={() => void d.detect()} disabled={d.refreshing} busy={d.refreshing} busyLabel="見直し中…">
-            <RotateCw size={14} aria-hidden="true" />
+            <RotateCw size={16} aria-hidden="true" />
             もう一度見直す
           </Button>
         </div>

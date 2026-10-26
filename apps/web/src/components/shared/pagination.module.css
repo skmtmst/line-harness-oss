@@ -44,7 +44,7 @@ button.item:hover:not(:disabled, .current) {
 
 button.item:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .control {
@@ -155,14 +155,13 @@ html:root .current {
 :root :global([data-list-skeleton]) .pagination:has(> .summary) { flex: 1; min-width: 0; }
 :root :global([data-list-skeleton]) .pagination:has(> .summary) .summary { margin-right: auto; }
 
-/* 前後に進めない時も、送り先の枠を残し、矢印だけを薄くする。 */
+/* 前後に進めない時も枠は残し、ほかの押せない操作と同じく全体を薄くする（影は付けない）。 */
 html:root button.control:disabled {
-  opacity: 1;
+  opacity: var(--polish-disabled-opacity);
   outline: 1px solid var(--color-control-border);
   outline-offset: -1px;
-  box-shadow: var(--control-shadow);
+  box-shadow: none;
 }
-html:root button.control:disabled .controlGlyph { opacity: .5; }
 
 /*
  * 選ばれているページ番号は黒い地に白い数字。枠と薄い緑の地はやめる。

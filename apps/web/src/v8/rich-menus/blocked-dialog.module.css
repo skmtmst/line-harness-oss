@@ -66,6 +66,6 @@
   cursor: pointer;
 }
 .rowAction:hover { text-decoration: underline; }
-.rowAction:disabled { color: var(--color-ink-faint); cursor: default; }
+.rowAction:disabled { cursor: not-allowed; }
 .error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); font-weight: 600; }
 .footer { display: flex; align-items: center; justify-content: center; gap: var(--tpl-toolbar-gap); }

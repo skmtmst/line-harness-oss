@@ -33,7 +33,7 @@ export default function LogRecordJson({ value, label = '記録', canCopy }: {
     <div className={styles.root} data-log-record-json={open ? 'open' : 'closed'}>
       <div className={styles.head}>
         <Button size="compact" aria-expanded={open} aria-controls={open ? bodyId : undefined} onClick={() => setOpen(!open)}>
-          {open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+          {open ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
           {open ? `${label}の JSON を閉じる` : `${label}の JSON を開く`}
         </Button>
         {open && canCopy ? <CopyTextButton value={text} variant="secondary" label="JSON をコピー" aria-label={`${label}の JSON をコピー`} /> : null}

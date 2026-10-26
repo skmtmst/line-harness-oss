@@ -398,7 +398,7 @@ function RewardEditorInner() {
         <h2 className={styles.sideTitle}>出す前に</h2>
         <div>
           <Button onClick={() => void testExchange()} disabled={saving || testing} busy={testing} busyLabel="交換テスト中">
-            <FlaskConical size={15} aria-hidden="true" /> 自分で交換をテスト
+            <FlaskConical size={16} aria-hidden="true" /> 自分で交換をテスト
           </Button>
         </div>
         <p className={styles.sideNote}>残高と在庫は動きません。</p>
@@ -421,7 +421,7 @@ function RewardEditorInner() {
           下書きを保存
         </Button>
         <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
-          <Check size={15} aria-hidden="true" /> 保存して出す
+          <Check size={16} aria-hidden="true" /> 保存して出す
         </Button>
       </>} dirty={false}
     >
@@ -521,7 +521,7 @@ function RewardEditorInner() {
           </Card>
         ) : (
           <Button variant="text" onClick={() => setAudience('conditioned')}>
-            <Plus size={13} aria-hidden="true" />条件を足す（タグ・会員ランクなど）
+            <Plus size={16} aria-hidden="true" />条件を足す（タグ・会員ランクなど）
           </Button>
         )}
       </Card>

@@ -166,10 +166,10 @@ export default function AutomationTemplatesV8() {
   const stoppedCount = rules ? rules.length - activeCount : 0
   const neverRunCount = rules ? rules.filter((rule) => rule.isActive && rule.executionCount30d === 0).length : 0
   const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: rules ? rules.length : null, unit: '件', detail: rules ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
-    { key: 'runs', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
-    { key: 'failed', title: '失敗', icon: <FileWarning size={13} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: rules ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
+    { key: 'rules', title: 'ルール', icon: <ListChecks size={16} aria-hidden="true" />, value: rules ? rules.length : null, unit: '件', detail: rules ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
+    { key: 'runs', title: '今月動いた', icon: <Activity size={16} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
+    { key: 'failed', title: '失敗', icon: <FileWarning size={16} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
+    { key: 'skipped', title: '条件に外れた', icon: <Filter size={16} aria-hidden="true" />, value: skipped, unit: '回', detail: rules ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
   ]
 
   /* ===== 本文 ===== */
@@ -193,7 +193,7 @@ export default function AutomationTemplatesV8() {
         <ListPageSection><div className={styles.tools}>
           <span className={styles.toolsLabel}>きっかけ</span>
           <div role="group" aria-label="きっかけで絞り込む" className={styles.chips}>
-            <FilterChip selected={trigger === ''} onChange={() => setTrigger('')} icon={<CircleDot size={13} aria-hidden="true" />}>
+            <FilterChip selected={trigger === ''} onChange={() => setTrigger('')} icon={<CircleDot size={16} aria-hidden="true" />}>
               {`すべて ${items.length}`}
             </FilterChip>
             {shownChips.map((chip) => (
@@ -212,7 +212,7 @@ export default function AutomationTemplatesV8() {
             ) : null}
           </div>
           <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">
-            <RefreshCw size={15} aria-hidden="true" />見本を再読み込み
+            <RefreshCw size={16} aria-hidden="true" />見本を再読み込み
           </Button>
         </div>
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}</ListPageSection>
@@ -263,7 +263,7 @@ export default function AutomationTemplatesV8() {
       title="オートメーション"
       help={AUTOMATIONS_DESCRIPTION}
       actions={canEdit
-        ? <Button href={automationTabHref('templates')}><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button>
+        ? <Button href={automationTabHref('templates')}><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button>
         : null}
       tabs={<AutomationTabs active="templates" counts={tabCounts} />}
       stats={<>

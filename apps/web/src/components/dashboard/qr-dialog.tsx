@@ -1,4 +1,5 @@
 'use client'
+import CloseButton from '@/components/shared/close-button'
 import DownloadIcon from './qr-download-icon'
 import QrStoppedNotice from './qr-stopped-notice'
 import QrRoutePicker, { type QrRoutePickerProps } from './qr-route-picker'
@@ -359,13 +360,7 @@ export default function QrDialog({
               {direct?.description ?? resource?.description ??'チラシ・店頭POP・名刺などに印刷して使えます。読み取ると友だち追加の画面が開きます。'}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="閉じる"
-            className="text-ink-faint hover:text-ink shrink-0 text-lg leading-none"
-          >
-            ✕
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
 
         {resource?.routePicker ? <div className="mb-4"><QrRoutePicker {...resource.routePicker} /></div> : null}

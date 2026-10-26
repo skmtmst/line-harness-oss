@@ -7,7 +7,7 @@ import EmptyTab from './empty-tab'
 export default function ScenarioTab({ canEnroll, onEnroll }: { canEnroll: boolean; onEnroll: () => void }) {
   return (
     <EmptyTab
-      icon={<Workflow size={17} />}
+      icon={<Workflow size={16} />}
       title="この友だちに届いている配信・シナリオの一覧はまだ見られません"
       text="この友だちをシナリオへ登録する操作はここからできます。"
       actions={[

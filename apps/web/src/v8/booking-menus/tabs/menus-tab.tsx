@@ -246,7 +246,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         </div>
         <span className={styles.toolbarSpacer} />
         {canEdit ? (
-          <Button variant="primary" href="/booking/menus/new">{<><Plus size={15} aria-hidden="true" />予約メニューを作る</>}</Button>
+          <Button variant="primary" href="/booking/menus/new">{<><Plus size={16} aria-hidden="true" />予約メニューを作る</>}</Button>
         ) : (
           /* 閲覧のみ：作るボタンは置かず、場所だけ空ける（下の段の位置を変えない）。 */
           <span className={styles.createSlot} aria-hidden="true" />

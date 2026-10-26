@@ -90,7 +90,7 @@ export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMeth
               : recentState === 'error' ? <Notice tone="danger" action={<Button onClick={retryRecent}>もう一度読み込む</Button>}>最近の配信を読み込めませんでした。</Notice>
               : recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
               <div key={broadcast.id} className={styles.recentRow}>
-                <Send size={14} aria-hidden /><span className={styles.recentName} title={broadcast.title}>{broadcast.title}</span>
+                <Send size={16} aria-hidden /><span className={styles.recentName} title={broadcast.title}>{broadcast.title}</span>
                 <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'}・{broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>
                 <Button size="compact" onClick={() => duplicateRecent(broadcast)}>複製する</Button>
               </div>

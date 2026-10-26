@@ -646,14 +646,14 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
       <BookingPageStats><KpiBand layout="booking">
         <KpiCard
           value={listMissing ? null : activeItems.length} unit="件" unitSpacing="tight"
-          icon={<CalendarDays size={14} />} presentation="band"
+          icon={<CalendarDays size={16} />} presentation="band"
           title={mode === 'day' && isToday ? '今日の予約' : `${periodWithToday}の予約`}
           help={periodWithToday}
           detail={listMissing ? listMissingDetail : `LINEから ${lineCount}・電話 ${phoneCount}`}
         />
         <KpiCard
           value={listMissing || availability.status !== 'ready' ? null : capacity.freeSlots}
-          unit="枠" unitSpacing="tight" icon={<CalendarPlus size={14} />} presentation="band"
+          unit="枠" unitSpacing="tight" icon={<CalendarPlus size={16} />} presentation="band"
           title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'}
           valueText={mode === 'week' ? (listMissing ? '—' : weekRateValue) : undefined}
           help={mode === 'day' ? availabilityNote : weekRateDetail} helpDisplay={mode === 'day' ? 'question' : 'label'}
@@ -661,13 +661,13 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         />
         <KpiCard
           value={listMissing ? null : mode === 'day' ? requested : availability.status === 'ready' ? capacity.freeSlots : null}
-          unit={mode === 'day' ? '件' : '枠'} unitSpacing="tight" icon={<CircleAlert size={14} />} presentation="band"
+          unit={mode === 'day' ? '件' : '枠'} unitSpacing="tight" icon={<CircleAlert size={16} />} presentation="band"
           title={mode === 'day' ? '未承認・要対応' : 'あいている枠'}
           detail={listMissing ? listMissingDetail : mode === 'day' ? `確認待ち ${requested}件` : availabilityNote}
         />
         <KpiCard
           value={listMissing ? null : cancelled} unit="件" unitSpacing="tight"
-          icon={<CalendarX size={14} />} presentation="band" title="キャンセル"
+          icon={<CalendarX size={16} />} presentation="band" title="キャンセル"
           detail={listMissing ? listMissingDetail : mode === 'day' ? (isToday ? '今日' : '選んだ日') : 'この1週間'}
         />
       </KpiBand></BookingPageStats>

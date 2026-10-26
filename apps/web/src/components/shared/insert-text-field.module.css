@@ -17,7 +17,7 @@
 .editor[aria-invalid='true'] { outline: 1px solid var(--color-danger); outline-offset: -1px; }
 .editor[aria-invalid='true']:focus-visible { outline: 2px solid var(--color-danger); }
 
-.editor[aria-disabled='true'] { cursor: not-allowed; opacity: 0.6; }
+.editor[aria-disabled='true'] { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 
 /* 短い本文欄の任意の口。既定の欄と差し込み札の見た目は変えない。 */
 .editorCompact {
@@ -65,9 +65,9 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   margin: 0 2px;
-  padding: 1px 6px 1px 5px;
+  padding: 1px 6px 1px 4px;
   border-radius: var(--radius-mini);
   background: var(--color-accent-soft);
   color: var(--color-ink);
@@ -79,7 +79,7 @@
   user-select: all;
   cursor: default;
 }
-.chipIcon { width: 11px; height: 11px; flex-shrink: 0; }
+.chipIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); flex-shrink: 0; }
 .chipLabel { white-space: nowrap; }
 
 /*
@@ -90,7 +90,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
+  padding: 2px 8px;
   border: 0;
   border-radius: var(--radius-pill);
   outline: 1px solid var(--color-control-border);
@@ -103,9 +103,9 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.insertButton svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--color-ink-secondary); }
+.insertButton svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--color-ink-secondary); }
 .insertButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
-.insertButton:disabled { cursor: not-allowed; opacity: 0.5; }
+.insertButton:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 .insertButton:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
 .insertButton[aria-expanded='true'] { outline-color: var(--color-accent); background: var(--color-accent-soft); }
 }

@@ -224,7 +224,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
             title={!preview ? '日時・定員・受付を変えると押せます' : reasonMissing ? '押すと変える理由の欄へ移ります' : undefined}
             onClick={requestConfirm}
           >
-            <Check size={15} aria-hidden="true" />変えてお知らせする
+            <Check size={16} aria-hidden="true" />変えてお知らせする
           </Button>
         </>
       )}
@@ -344,7 +344,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
         designNode="qUdNh"
         designWidth={620}
         designTop={185}
-        confirmIcon={<Send size={15} aria-hidden="true" />}
+        confirmIcon={<Send size={16} aria-hidden="true" />}
         title="変更内容を確認"
         cancelLabel="戻って直す"
         confirmLabel={`変えて ${preview?.total_confirmed ?? 0} 人にお知らせする`}

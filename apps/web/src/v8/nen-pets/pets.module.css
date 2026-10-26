@@ -441,7 +441,6 @@
   cursor: pointer;
 }
 .addLink:disabled {
-  color: var(--color-ink-faint);
   cursor: not-allowed;
 }
 .treat {

@@ -85,7 +85,7 @@
   cursor: pointer;
 }
 .ghostButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
-.ghostButton:disabled { cursor: not-allowed; opacity: 0.5; }
+.ghostButton:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 
 /* 並び（新しい順）：押すと古い順と入れ替わる。 */
 .sortButton {

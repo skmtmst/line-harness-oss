@@ -58,7 +58,7 @@
 .twoLine { align-items: flex-start; }
 .states { display: flex; flex-wrap: wrap; gap: var(--polish-space-row) var(--polish-space-card); padding: 0; margin: var(--polish-space-field) 0 0; list-style: none; font-size: var(--text-micro); }
 .state { display: inline-flex; align-items: center; gap: var(--space-6); }
-.stateMark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--polish-icon-small); height: var(--polish-icon-small); border-radius: var(--radius-pill); }
+.stateMark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--space-14); height: var(--space-14); border-radius: var(--radius-pill); }
 .stateMark[data-state='done'] { background: var(--color-success); color: var(--color-on-accent); }
 .stateMark[data-state='pending'] { box-shadow: inset 0 0 0 var(--choice-ring) var(--color-status-warn); }
 :root .notice .stateMark > svg { width: var(--space-10); height: var(--space-10); }

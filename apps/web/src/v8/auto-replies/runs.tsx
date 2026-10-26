@@ -391,7 +391,7 @@ export default function AutoReplyRunsV8() {
       list.push({
         id: 'chat',
         label: 'トークを開く',
-        icon: <MessageCircle size={14} aria-hidden="true" />,
+        icon: <MessageCircle size={16} aria-hidden="true" />,
         external: false,
         href: `/chats?friend=${encodeURIComponent(item.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
@@ -400,7 +400,7 @@ export default function AutoReplyRunsV8() {
       list.push({
         id: 'retry',
         label: 'もう一度実行',
-        icon: <RotateCcw size={14} aria-hidden="true" />,
+        icon: <RotateCcw size={16} aria-hidden="true" />,
         disabled: retryingId !== null || retryingAll,
         onSelect: () => { void retryRun(item) },
       })
@@ -420,16 +420,16 @@ export default function AutoReplyRunsV8() {
       actions={<div className={styles.headActions}>
         {canManage ? (
           <Button onClick={() => setStopOpen(true)} disabled={!isActiveRule || stopping}>
-            <Pause size={14} aria-hidden="true" />一時停止する
+            <Pause size={16} aria-hidden="true" />一時停止する
           </Button>
         ) : null}
         {canManage && data?.rule.id ? (
           <Button href={`/auto-replies/edit?id=${encodeURIComponent(data.rule.id)}`}>
-            <Pencil size={14} aria-hidden="true" />ルールの編集へ
+            <Pencil size={16} aria-hidden="true" />ルールの編集へ
           </Button>
         ) : null}
         <Button onClick={() => void exportCsv()} disabled={exporting || loading} busy={exporting} busyLabel="書き出しています">
-          <Download size={14} aria-hidden="true" />CSVで書き出す
+          <Download size={16} aria-hidden="true" />CSVで書き出す
         </Button>
         {exporting ? (
           <Button onClick={() => { exportCancelledRef.current = true }}>書き出しを止める</Button>
@@ -442,13 +442,13 @@ export default function AutoReplyRunsV8() {
 
       <div className={styles.kpis}>
       <KpiBand data-design="KPIs">
-        <KpiCard presentation="band" icon={<MessageSquare size={14} aria-hidden="true" />} title="今月当たった" value={data ? data.summary.monthHits : null} unit="回"
+        <KpiCard presentation="band" icon={<MessageSquare size={16} aria-hidden="true" />} title="今月当たった" value={data ? data.summary.monthHits : null} unit="回"
           detail={`累計 ${data ? formatNumber(data.summary.totalHits) : emptyValue('unknown')}回`} />
-        <KpiCard presentation="band" icon={<Users size={14} aria-hidden="true" />} title="担当者へ引き継ぎ" value={data ? data.summary.handovers : null} unit="件"
+        <KpiCard presentation="band" icon={<Users size={16} aria-hidden="true" />} title="担当者へ引き継ぎ" value={data ? data.summary.handovers : null} unit="件"
           detail={`確認待ち ${data ? formatNumber(data.handovers.waiting) : emptyValue('unknown')}件`} />
-        <KpiCard presentation="band" icon={<TriangleAlert size={14} aria-hidden="true" />} title="失敗した処理" value={data ? failedCount : null} unit="件"
+        <KpiCard presentation="band" icon={<TriangleAlert size={16} aria-hidden="true" />} title="失敗した処理" value={data ? failedCount : null} unit="件"
           detail={failedCount > 0 ? '理由と送信記録を確認してください' : '記録を開始してからの合計です'} />
-        <KpiCard presentation="band" icon={<Timer size={14} aria-hidden="true" />} title="平均で返すまで"
+        <KpiCard presentation="band" icon={<Timer size={16} aria-hidden="true" />} title="平均で返すまで"
           value={data?.summary.averageResponseMs == null ? null : Number((data.summary.averageResponseMs / 1000).toFixed(1))} unit="秒"
           detail={`最後に動いた ${data ? formatTime(data.summary.lastRunAt) : emptyValue('unknown')}`} />
       </KpiBand>
@@ -464,7 +464,7 @@ export default function AutoReplyRunsV8() {
               busy={retryingAll}
               busyLabel="実行しています"
             >
-              <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
+              <RotateCcw size={16} aria-hidden="true" />失敗した処理をもう一度
             </Button>
           ) : null} </>} >止まった行の理由を確認してください。「要確認」の行は届いたか分からないため、送り直しません。</Notice>
       ) : null}

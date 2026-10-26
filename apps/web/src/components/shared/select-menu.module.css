@@ -123,7 +123,7 @@
 
 .item:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 .divider {
@@ -204,4 +204,4 @@
 /* ：開いた選ぶ欄も浮く面の薄い縁を使う。 */
 :root .surface { border-color: var(--surface-edge); }
 
-:root .item { padding-block: 7.5px 6.5px; }
+:root .item { padding-block: 8px 6px; }

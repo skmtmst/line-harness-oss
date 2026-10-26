@@ -594,7 +594,7 @@ export default function ScenarioFirstStepV8() {
               busy={saving}
               busyLabel="保存中…"
             >
-              <PencilLine size={15} aria-hidden="true" />作って編集へ
+              <PencilLine size={16} aria-hidden="true" />作って編集へ
             </Button>
           ) : null}
         </>

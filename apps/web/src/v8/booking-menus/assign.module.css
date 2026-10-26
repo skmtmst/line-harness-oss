@@ -37,7 +37,7 @@
 .matrixMenuHead {
   color: var(--color-ink-secondary);
   font-size: var(--tpl-bm-12);
-  font-weight: 600;
+  font-weight: var(--polish-control-weight);
   text-align: left;
 }
 
@@ -188,10 +188,6 @@
 
 .unitField input:focus-visible {
   outline: none;
-}
-
-.unitField input:disabled {
-  color: var(--color-ink-faint);
 }
 
 .unitSuffix {

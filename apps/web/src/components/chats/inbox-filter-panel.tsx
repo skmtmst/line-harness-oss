@@ -98,10 +98,10 @@ export default function InboxFilterPanel({
         className="bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-overlay sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"
       >
         <header className="border-hairline flex h-14 shrink-0 items-center gap-2 border-b px-5">
-          <Filter aria-hidden="true" size={18} className="text-ink" />
+          <Filter aria-hidden="true" size={20} className="text-ink" />
           <h2 className="text-ink text-base font-bold">絞り込み</h2>
           <button type="button" onClick={onClose} aria-label="絞り込みを閉じる" className="text-ink-faint hover:bg-canvas-sunken ml-auto rounded-control p-1">
-            <X aria-hidden="true" size={18} />
+            <X aria-hidden="true" size={20} />
           </button>
         </header>
 

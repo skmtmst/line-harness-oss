@@ -110,9 +110,10 @@
 .viewSwitch {
   flex-shrink: 0;
 }
-/* 見え方の切り替え（絵：器の余白3・項目 5/12・文字12）。小型の切り替えより左右を広げる。 */
+/* 見え方の切り替え（器の余白2・項目 4/12・文字12。器の高さは小さいボタンと同じ 32）。小型の切り替えより左右を広げる。 */
 :global(:root) .viewSwitch:nth-child(n) {
   padding: var(--tpl-nm-seg-pad);
+  min-height: var(--control-h-compact);
 }
 :global(:root) .viewSwitch:nth-child(n) button {
   padding: var(--tpl-nm-seg-item-pad);

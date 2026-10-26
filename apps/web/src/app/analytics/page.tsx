@@ -126,7 +126,7 @@ function SaveAnalysisAction({
         </div>
       ) : (
         <Button onClick={() => setOpen(true)} variant="secondary">
-          <Bookmark size={15} aria-hidden="true" />この分析を保存
+          <Bookmark size={16} aria-hidden="true" />この分析を保存
         </Button>
       )}
       {error && <p className="text-danger text-xs">{error}</p>}

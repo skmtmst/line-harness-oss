@@ -200,11 +200,11 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           <p className={styles.sectionDesc}>日にちを押すと休みにできます。定休日（毎週）は受付枠で決めます</p>
         </div>
         <div className={styles.calNav}>
-          <button type="button" className={styles.calNavButton} aria-label="前の月" onClick={() => setMonth(shiftMonth(month, -1))}><ChevronLeft size={15} aria-hidden="true" /></button>
+          <button type="button" className={styles.calNavButton} aria-label="前の月" onClick={() => setMonth(shiftMonth(month, -1))}><ChevronLeft size={16} aria-hidden="true" /></button>
           <span className={styles.calMonth}>{monthLabel}</span>
-          <button type="button" className={styles.calNavButton} aria-label="次の月" onClick={() => setMonth(shiftMonth(month, 1))}><ChevronRight size={15} aria-hidden="true" /></button>
+          <button type="button" className={styles.calNavButton} aria-label="次の月" onClick={() => setMonth(shiftMonth(month, 1))}><ChevronRight size={16} aria-hidden="true" /></button>
           {canEdit ? (
-            <button type="button" className={styles.calAdd} onClick={() => openNew()}><Plus size={15} aria-hidden="true" />臨時休業を足す</button>
+            <button type="button" className={styles.calAdd} onClick={() => openNew()}><Plus size={16} aria-hidden="true" />臨時休業を足す</button>
           ) : null}
         </div>
 

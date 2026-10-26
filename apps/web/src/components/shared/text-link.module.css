@@ -3,7 +3,7 @@
 /*
  * リンク（→つき。Pencil ★V8 `g5Db8`）。
  *
- *   文字 12px/500 action・矢印 12px、間 4
+ *   文字 12px/500 action・矢印 16px、間 8（§6.5 の 5）
  *   乗せると矢印が 2px 右へ滑る（120ms）
  *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない
  */
@@ -11,7 +11,7 @@
 .root {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--polish-space-row);
   color: var(--color-action);
   text-decoration: none;
 }
@@ -55,3 +55,7 @@
 
 .root[data-icon-tone='link'] { color: var(--color-link); }
 .root[data-icon-tone='link'] svg { flex: none; color: var(--color-link); }
+
+/* 押せる範囲は高さ 24 以上（§6.5 の 7）。文字の大きさと並びは変えず、透明な当たりで上下に広げる。 */
+.root { position: relative; }
+.root::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }

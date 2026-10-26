@@ -27,7 +27,7 @@ export default function ImageMultiSelect({ items, selectedIds, max, onToggle, co
                   // 3 枚そろったら、選んでいないタイルは押しても増えないので触れない形にする。
                   disabled={disabled || (!selectedTile && full)}
                   onClick={() => onToggle(image.id)}
-                  className={compact ? styles.tile : "flex flex-col gap-1.5 text-left disabled:opacity-50"}
+                  className={compact ? styles.tile : "flex flex-col gap-1.5 text-left "}
                 >
                   <span
                     className={
@@ -38,7 +38,7 @@ export default function ImageMultiSelect({ items, selectedIds, max, onToggle, co
                   >
                     {/* 統括の画像は Worker から配信されるので next/image の最適化は使わない（image-tile と同じ） */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image.url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    <img width={120} height={120} src={image.url} alt="" className="h-full w-full object-cover" loading="lazy" />
                     {selectedTile ? (
                       <span className="absolute bottom-2 left-2 rounded-pill bg-accent-deep px-2 py-0.5 text-nano font-semibold text-on-accent">
                         {`${index + 1}枚目`}

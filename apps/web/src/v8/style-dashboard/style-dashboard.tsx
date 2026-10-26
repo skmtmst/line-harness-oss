@@ -60,11 +60,11 @@ import { useStyleDashboard } from './use-style-dashboard'
  */
 
 const KPI_ICON: Record<string, ReactNode> = {
-  today: <CalendarCheck size={13} aria-hidden="true" />, waiting: <BellRing size={13} aria-hidden="true" />, free: <Armchair size={13} aria-hidden="true" />,
-  noshow: <UserRoundX size={13} aria-hidden="true" />, new: <Sparkles size={13} aria-hidden="true" />, rebook: <Repeat2 size={13} aria-hidden="true" />,
-  income: <CreditCard size={13} aria-hidden="true" />, meetings: <Video size={13} aria-hidden="true" />, results: <ClipboardList size={13} aria-hidden="true" />,
-  week: <CalendarDays size={13} aria-hidden="true" />, classes: <CalendarCheck size={13} aria-hidden="true" />, attendance: <ClipboardList size={13} aria-hidden="true" />,
-  fill: <Clock3 size={13} aria-hidden="true" />, recall: <BellRing size={13} aria-hidden="true" />,
+  today: <CalendarCheck size={16} aria-hidden="true" />, waiting: <BellRing size={16} aria-hidden="true" />, free: <Armchair size={16} aria-hidden="true" />,
+  noshow: <UserRoundX size={16} aria-hidden="true" />, new: <Sparkles size={16} aria-hidden="true" />, rebook: <Repeat2 size={16} aria-hidden="true" />,
+  income: <CreditCard size={16} aria-hidden="true" />, meetings: <Video size={16} aria-hidden="true" />, results: <ClipboardList size={16} aria-hidden="true" />,
+  week: <CalendarDays size={16} aria-hidden="true" />, classes: <CalendarCheck size={16} aria-hidden="true" />, attendance: <ClipboardList size={16} aria-hidden="true" />,
+  fill: <Clock3 size={16} aria-hidden="true" />, recall: <BellRing size={16} aria-hidden="true" />,
 }
 
 const ALERT_ICON: Record<NonNullable<StyleAlertAction['icon']>, ReactNode> = {
@@ -77,7 +77,7 @@ function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
     <KpiCard
       presentation="band"
       title={kpi.title}
-      icon={KPI_ICON[kpi.id] ?? <CircleUserRound size={13} aria-hidden="true" />}
+      icon={KPI_ICON[kpi.id] ?? <CircleUserRound size={16} aria-hidden="true" />}
       help={kpi.help}
       helpDisplay="question"
       value={kpi.value}

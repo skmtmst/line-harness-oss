@@ -638,7 +638,7 @@ export default function FriendsListV8() {
           presentation="band"
           density="compact"
           title={kpi.title}
-          icon={<kpi.icon size={14} aria-hidden="true" />}
+          icon={<kpi.icon size={16} aria-hidden="true" />}
           value={kpi.value}
           unit="人"
           loading={statsLoading}
@@ -646,7 +646,7 @@ export default function FriendsListV8() {
           onRetry={statsFailed ? () => void loadStats(selectedAccountId) : undefined}
           delta={kpi.delta ? (
             <span className={kpi.delta.tone === 'warn' ? `${styles.delta} ${styles.deltaWarn}` : kpi.delta.tone === 'up' ? `${styles.delta} ${styles.deltaUp}` : styles.delta}>
-              {kpi.delta.tone === 'up' ? <TrendingUp size={12} aria-hidden="true" /> : null}
+              {kpi.delta.tone === 'up' ? <TrendingUp size={16} aria-hidden="true" /> : null}
               {kpi.delta.text}
             </span>
           ) : undefined}
@@ -658,13 +658,13 @@ export default function FriendsListV8() {
   const headActions = (
     <>
       <Button type="button" variant="secondary" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}>
-        <Download size={14} aria-hidden="true" />
+        <Download size={16} aria-hidden="true" />
         表示中をCSVで書き出す
       </Button>
       {/* 閲覧のみは押せないボタンを置かない。CSV が右端へ寄る（絵 x6QsVz）。 */}
       {canImport ? (
         <Button variant="primary" href="/friends/migrations">
-          <Upload size={14} aria-hidden="true" />
+          <Upload size={16} aria-hidden="true" />
           CSVから取り込む
         </Button>
       ) : null}
@@ -728,13 +728,13 @@ export default function FriendsListV8() {
         {!readOnly && narrow ? columnsButton : null}
         {savedSearchEnabled ? (
           <Button type="button" variant="secondary" onClick={() => setSavedOpen(true)}>
-            <Bookmark size={14} aria-hidden="true" />
+            <Bookmark size={16} aria-hidden="true" />
             保存した検索
           </Button>
         ) : null}
         {broadcastHandoffHref ? (
           <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
-            <Megaphone size={14} aria-hidden="true" />
+            <Megaphone size={16} aria-hidden="true" />
             この条件で配信を作る
           </Link>
         ) : null}
@@ -743,10 +743,10 @@ export default function FriendsListV8() {
       <ListToolbarRow>
         {/* 絵 y2n1z：1152 でも［未対応］［注目のみ］は札のまま（「状態」の選ぶ欄に畳まない）。 */}
         <div role="group" aria-label="すばやく絞り込む" className={styles.chips}><ResponsiveFilterChips preserveChips>
-          <FilterChip selected={responseFilter === 'unhandled'} icon={<CircleDot size={14} aria-hidden="true" />} onChange={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))}>
+          <FilterChip selected={responseFilter === 'unhandled'} icon={<CircleDot size={16} aria-hidden="true" />} onChange={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))}>
             未対応
           </FilterChip>
-          <FilterChip selected={attentionOnly} onChange={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} icon={<Star size={14} aria-hidden="true" />}>
+          <FilterChip selected={attentionOnly} onChange={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} icon={<Star size={16} aria-hidden="true" />}>
             注目のみ
           </FilterChip>
         </ResponsiveFilterChips></div>
@@ -922,7 +922,7 @@ export default function FriendsListV8() {
               </Th>
             ) : null}
             <Th colSpan={2} columnKind="name">
-              <span className={styles.thFriendInner}><Star size={14} aria-label="注目" className={styles.thStar} />友だち</span>
+              <span className={styles.thFriendInner}><Star size={16} aria-label="注目" className={styles.thStar} />友だち</span>
             </Th>
             {displayColumns.map((column) => (
               <Th key={column.key}>{column.label}</Th>

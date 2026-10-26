@@ -340,7 +340,7 @@ function WebhooksCreateV8Inner() {
         <CardHeader size="stacked" titleId="wh-new-test" title="試しに送る" />
         <p className={styles.sideNote}>見本の中身を1回だけ送ります</p>
         <div>
-          <Button disabled title="送り先を作ってから送れます（一覧の「設定 → 試しに送る」）"><Send size={15} aria-hidden="true" />試しに送る</Button>
+          <Button disabled title="送り先を作ってから送れます（一覧の「設定 → 試しに送る」）"><Send size={16} aria-hidden="true" />試しに送る</Button>
         </div>
       </Card>
       <Card spacing="preview" aria-labelledby="wh-new-care">
@@ -451,7 +451,7 @@ function WebhooksCreateV8Inner() {
             /></SaveErrorField>
           </Field>
           </div>
-          <Button type="button" onClick={() => setSecret(generateSecret())}><RefreshCw size={15} aria-hidden="true" />作り直す</Button>
+          <Button type="button" onClick={() => setSecret(generateSecret())}><RefreshCw size={16} aria-hidden="true" />作り直す</Button>
         </div>
       </Card>
 
@@ -480,7 +480,7 @@ function WebhooksCreateV8Inner() {
             ))}
             <div>
               <Button variant="text" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((open) => !open)}>
-                {detailsOpen ? <ChevronUp size={15} aria-hidden="true" /> : <ChevronDown size={15} aria-hidden="true" />}詳細条件
+                {detailsOpen ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}詳細条件
               </Button>
             </div>
             {detailsOpen ? (

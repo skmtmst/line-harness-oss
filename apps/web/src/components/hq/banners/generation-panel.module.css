@@ -36,7 +36,7 @@
   flex-shrink: 0;
   align-items: center;
   height: 26px;
-  padding: 0 9px;
+  padding: 0 8px;
   border: 1.5px solid;
   border-radius: var(--radius-pill);
   font-size: var(--text-micro);
@@ -51,7 +51,7 @@
 }
 
 .emphasis:disabled {
-  opacity: 0.5;
+  opacity: var(--polish-disabled-opacity);
 }
 
 /* 入っている行（強調カラーで目立たせる行）。 */

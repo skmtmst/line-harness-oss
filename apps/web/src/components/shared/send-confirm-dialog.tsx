@@ -152,7 +152,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
       open={open}
       title="送る前の確かめ"
       titleIcon={false}
-      confirmIcon={<Send size={15} aria-hidden="true" />}
+      confirmIcon={<Send size={16} aria-hidden="true" />}
       description={subtitle}
       confirmLabel={primaryLabel}
       busyLabel="送っています…"
@@ -189,7 +189,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
               {perAccount?.length ? (
                 <div className={styles.accountsBox}>
                   <button type="button" className={styles.accountsHead} aria-expanded={accountsOpen} onClick={() => setAccountsOpen((v) => !v)}>
-                    {accountsOpen ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+                    {accountsOpen ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
                     {accountsOpen ? '店ごとの内訳を畳む' : '店ごとの内訳を開く'}
                     <span className={styles.accountsCols}>送る人 ／ 止めている人</span>
                   </button>
@@ -222,7 +222,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
             <span className={styles.sender}>
               {sender.iconUrl
                 // eslint-disable-next-line @next/next/no-img-element -- 送り手のアイコン（同じ店の登録メディア）
-                ? <img src={sender.iconUrl} alt="" className={styles.senderIcon} />
+                ? <img width={24} height={24} src={sender.iconUrl} alt="" className={styles.senderIcon} />
                 : <span className={styles.senderIcon} aria-hidden="true">{sender.name.slice(0, 1)}</span>}
               <strong className={styles.strong}>{sender.name}</strong>
             </span>

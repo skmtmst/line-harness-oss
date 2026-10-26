@@ -270,7 +270,7 @@ export function Toast({
       <Icon
         className={[styles.icon, item.tone === 'success' ? styles.iconSuccess : item.tone === 'info' ? styles.iconInfo : styles.iconError].join(' ')}
         aria-hidden="true"
-        size={15}
+        size={16}
       />
       <span className={styles.message}>{item.message}</span>
       {item.actionLabel && item.onAction ? (
@@ -285,7 +285,7 @@ export function Toast({
           {item.actionLabel}
         </button>
       ) : null}
-      {dismiss ? <button type="button" className={styles.close} onClick={dismiss} aria-label="知らせを閉じる"><X aria-hidden="true" size={14} /></button> : null}
+      {dismiss ? <button type="button" className={styles.close} onClick={dismiss} aria-label="知らせを閉じる"><X aria-hidden="true" size={16} /></button> : null}
     </div>
   )
 }

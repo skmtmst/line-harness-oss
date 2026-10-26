@@ -107,7 +107,7 @@ export default function PoolsV8() {
   const isEmpty = !loading && !error && ordered.length === 0
   const createButton = (
     <Button variant="primary" href="/pools/new">
-      <Plus size={15} aria-hidden="true" />新規プール
+      <Plus size={16} aria-hidden="true" />新規プール
     </Button>
   )
 
@@ -365,7 +365,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
             aria-expanded={addOpen}
             onClick={() => setAddOpen(!addOpen)}
           >
-            <Plus size={14} aria-hidden="true" />アカウントを追加
+            <Plus size={16} aria-hidden="true" />アカウントを追加
           </Button>
           <ActionMenu
             open={addOpen}

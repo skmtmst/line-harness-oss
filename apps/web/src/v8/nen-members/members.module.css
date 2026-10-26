@@ -398,7 +398,6 @@
   cursor: pointer;
 }
 .textAction:disabled {
-  color: var(--color-ink-faint);
   cursor: not-allowed;
 }
 
