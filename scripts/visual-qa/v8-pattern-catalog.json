@@ -3493,7 +3493,8 @@
             "AuthDetailRow"
           ],
           "vars": [
-            "--tpl-ms-otp-card-w"
+            "--tpl-ms-otp-card-w",
+            "--tpl-auth-card-w"
           ]
         },
         "pen": [],
