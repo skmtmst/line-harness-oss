@@ -114,7 +114,7 @@ export type RowMenuProps = {
   onOpenChange?: (open: boolean) => void
   /**
    * 見た目。'plain' は一覧の標準操作、'box' は行内の小さい印ボタン。
-   * V8では両方とも共通の薄い枠を持つ（・一覧の型）。
+   * 通常は線なし、乗せたときだけ薄い灰を見せる。
    */
   appearance?: 'box' | 'plain'
   /**
@@ -255,6 +255,8 @@ export type RowAction = {
 export type RowActionDestructiveItem = Omit<ActionMenuItem, 'tone' | 'dividerBefore'>
 
 export type RowActionsProps = {
+  /** 主操作を1つ表示する。詳細もある場合はメニューへ移す。 */
+  primary?: RowAction
   /** 行うことなど、枠付きの小さなメニューを使う行。既定は一覧の枠なし。 */
   menuAppearance?: RowMenuProps['appearance']
   menuSize?: RowMenuProps['size']
@@ -278,14 +280,14 @@ export type RowActionsProps = {
   className?: string
 }
 
-function RowActionButton({ action, defaultLabel }: { action: RowAction; defaultLabel: string }) {
+function RowActionButton({ action, defaultLabel, primary = false }: { action: RowAction; defaultLabel: string; primary?: boolean }) {
   const label = action.label ?? defaultLabel
   const props =
     'href' in action && action.href !== undefined
       ? { href: action.href }
       : { onClick: action.onClick, disabled: action.disabled }
   return (
-    <Button {...props} size="compact" className={styles.rowButton}>
+    <Button {...props} variant={primary ? 'primary' : 'secondary'} size="compact" className={styles.rowButton}>
       {label}
     </Button>
   )
@@ -298,6 +300,7 @@ function RowActionButton({ action, defaultLabel }: { action: RowAction; defaultL
 export function RowActions({
   menuAppearance = 'plain',
   menuSize,
+  primary,
   detail,
   edit,
   menuItems = [],
@@ -315,13 +318,18 @@ export function RowActions({
       else edit.onClick?.()
     },
   }] : []
-  const normalItems = [...editItem, ...menuItems.filter((item) => !edit || item.id !== 'edit')]
+  const detailItems: ActionMenuItem[] = primary && detail ? [{
+    id: 'detail', label: detail.label ?? '詳細', disabled: detail.disabled,
+    disabledReason: detail.disabled ? 'ほかの操作を反映しています' : undefined,
+    onSelect: () => { if (detail.href !== undefined) window.location.assign(detail.href); else detail.onClick?.() },
+  }] : []
+  const normalItems = [...detailItems, ...editItem, ...menuItems.filter((item) => (!edit || item.id !== 'edit') && (!detailItems.length || item.id !== 'detail'))]
   const items: ActionMenuItem[] = destructiveItem
     ? [...normalItems, { ...destructiveItem, tone: 'danger' }]
     : normalItems
   return (
     <span data-row-actions="" className={[styles.rowActions, className].filter(Boolean).join(' ')}>
-      {detail ? <RowActionButton action={detail} defaultLabel="詳細" /> : null}
+      {primary ? <RowActionButton action={primary} defaultLabel="承認する" primary /> : detail ? <RowActionButton action={detail} defaultLabel="詳細" /> : null}
       <RowMenu appearance={menuAppearance} size={menuSize} items={items}
         label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
         menuLabel={subjectName ? `${subjectName}の操作` : '操作'}

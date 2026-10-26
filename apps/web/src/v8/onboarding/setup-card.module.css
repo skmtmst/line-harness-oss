@@ -6,7 +6,6 @@
   --sc-title-lh: 24px;
   --sc-body-lh: 20px;
   --sc-caption-lh: 18px;
-  --sc-track-h: 6px;
   --sc-small-icon: 16px;
 }
 
@@ -35,21 +34,9 @@
   white-space: nowrap;
 }
 
+/* 進み具合は共通の段に区切った緑（ProgressBar）。この板では幅いっぱいに伸ばす。 */
 .track {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: var(--sc-track-h);
-  overflow: hidden;
-  border-radius: var(--polish-radius-pill);
-  background: var(--polish-hover);
-}
-
-.fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: var(--polish-radius-pill);
-  background: var(--color-accent);
+  --progress-steps-w: 100%;
 }
 
 .rows {

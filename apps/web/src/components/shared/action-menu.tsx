@@ -217,7 +217,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
       data-design-node="xifuV"
     >
       {(choiceHeading === undefined ? orderActionMenuItems(items) : items.map((item, index) => ({ ...item, sectionBefore: index === 0 ? choiceHeading : undefined }))).map((item) => {
-        const itemLabel = normalizeActionLabel(item.label)
+        const itemLabel = normalizeActionLabel(item.label.replace(/(?:â€¦|\.{3})\s*$/u, ''))
         const Item = item.href && !item.disabled ? 'a' : 'button'
         return (
         <div key={item.id} data-menu-group={item.group}>

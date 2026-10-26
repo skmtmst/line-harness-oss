@@ -153,14 +153,23 @@
 :root .fill,
 :root .indeterminate { border-radius: 3px; }
 
-.track[data-appearance='onboarding'] { flex-shrink: 0; width: var(--tpl-d23-ob-bar-w); height: var(--tpl-d23-ob-bar-h); border-radius: var(--tpl-d23-ob-bar-radius); background: var(--color-surface-pearl); }
-.track[data-appearance='onboarding'] .fill { background: var(--color-action); border-radius: var(--tpl-d23-ob-bar-radius); }
+.track[data-appearance='onboarding'] { flex-shrink: 0; width: var(--progress-steps-w, var(--tpl-d23-ob-bar-w)); height: var(--tpl-d23-ob-bar-h); border-radius: var(--tpl-d23-ob-bar-radius); background: var(--color-progress-track); }
+.track[data-appearance='onboarding'] .fill { background: var(--color-progress-on); border-radius: var(--tpl-d23-ob-bar-radius); }
+/* 段に区切った緑：済んだ段は緑、まだの段は棒の地の色。段の間は白く抜かず、地を透かさない隙間にする。 */
+.track[data-segmented] { display: flex; gap: var(--progress-segment-gap); overflow: visible; background: transparent; }
+.segment { flex: 1 1 0; min-width: 0; height: 100%; border-radius: var(--polish-radius-pill); background: var(--color-progress-track); transition: background-color var(--motion-base) var(--motion-ease-out); }
+.segment[data-on] { background: var(--color-progress-on); }
+
+/* 段の済み・まだの印（押せる形にしない丸）。 */
+.stepMark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--step-mark-size); height: var(--step-mark-size); border-radius: var(--polish-radius-pill); background: var(--color-canvas); box-shadow: inset 0 0 0 var(--step-mark-ring) var(--color-step-todo-border); color: var(--color-canvas); }
+.stepMark[data-step-mark='done'] { background: var(--color-progress-on); box-shadow: none; }
+.stepMarkIcon { display: block; width: var(--step-mark-icon); height: var(--step-mark-icon); fill: none; stroke: currentColor; stroke-width: var(--polish-choice-mark-stroke); stroke-linecap: round; stroke-linejoin: round; }
 .track[data-appearance='quota'] { display: block; width: 100%; height: var(--tpl-db-bar-h); border-radius: var(--tpl-db-bar-radius); }
 .track[data-appearance='quota'] .fill { border-radius: var(--tpl-db-bar-radius); }
 .track[data-tone='danger'] .fill { background: var(--color-danger); }
 
 @media (prefers-reduced-motion: reduce) {
-  .fill, .fail { transition: none; }
+  .fill, .fail, .segment { transition: none; }
   .indeterminate, .spin { animation: none; }
 }
 

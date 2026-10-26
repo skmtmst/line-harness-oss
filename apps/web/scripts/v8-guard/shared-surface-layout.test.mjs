@@ -1,10 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { expect } from '@playwright/test'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { compileUiStyles } from './compile-ui-styles.mjs'
+import scanRowHeights from './control-row-height-browser.mjs'
 import { measureControlCentering } from '../../../../scripts/visual-qa/control-centering.mjs'
 
 const require = createRequire(import.meta.url)
@@ -20,6 +22,22 @@ import {Steps} from './src/components/templates/steps';
 import {PageHeading} from './src/components/templates/page-frame';
 import Checkbox,{SettingCheckbox} from './src/components/shared/checkbox';
 import CheckCard from './src/components/shared/check-card';
+import FilterChip from './src/components/shared/filter-chip';
+import {RowMenu} from './src/components/shared/row-actions';
+import Pagination from './src/components/shared/pagination';
+import IconButton from './src/components/shared/icon-button';
+import SegmentedControl from './src/components/shared/segmented';
+import {Star} from 'lucide-react';
+import {TextField,TextArea} from './src/components/shared/text-field';
+import SearchField from './src/components/shared/search-field';
+import NumberField from './src/components/shared/number-field';
+import EntitySelect from './src/components/shared/entity-select';
+import Select from './src/components/shared/select';
+import FolderSelect from './src/components/shared/folder-select';
+import {EntityPickerSummary} from './src/components/shared/entity-picker';
+import Combobox from './src/components/shared/combobox';
+import MultiSelect from './src/components/shared/multi-select';
+import TimeField from './src/components/shared/time-field-v8';
 import Radio from './src/components/shared/radio';
 import Toggle from './src/components/shared/toggle';
 import {DataTable,TableHeadRow,Th,Tr,Td} from './src/components/shared/table';
@@ -44,6 +62,47 @@ function Fixture(){
   <CheckCard title="カード" checked={value} onChange={setValue}/>
   <div data-center-row><Radio name="channel" checked={value} onChange={()=>setValue(!value)}>ラジオ</Radio></div>
   <div data-center-row><Toggle label="切り替え" checked={value} onChange={setValue}/></div></section>
+  <section id="control-density">
+    <div data-control-row style={{display:'flex',alignItems:'center',gap:12}}>
+      <TextField aria-label="寸法の名前" defaultValue="名前" />
+      <SearchField aria-label="寸法の検索" value="" onChange={()=>{}} placeholder="名前で探す" />
+      <Select aria-label="寸法の選択" menuAlign="end" label="状態" value="all" options={[{value:'all',label:'すべて'},{value:'active',label:'とても長い選択肢の名前を最後まで確認する'}]} onChange={()=>{}} />
+      <Button variant="secondary" aria-label="寸法の保存">保存する</Button>
+    </div>
+    <TextArea aria-label="寸法の本文" defaultValue="本文" />
+  </section>
+  <section id="choice-appearance" style={{display:'grid',gridTemplateColumns:'320px 320px',gap:16}}>
+    <div data-choice-case="select"><Select size="full" aria-label="共通の選択" value="a" options={[{value:'a',label:'変えない'}]} onChange={()=>{}}/></div>
+    <div data-choice-case="folder"><FolderSelect size="full" aria-label="共通のフォルダ" value="" folders={[]} onChange={()=>{}}/></div>
+    <div data-choice-case="entity"><EntityPickerSummary label="親アカウント" noun="アカウント" name="変えない" onOpen={()=>{}}/></div>
+    <div data-choice-case="combo"><Combobox aria-label="共通の候補" options={[{value:'a',label:'変えない'}]} value="" onChange={()=>{}}/></div>
+    <div data-choice-case="multi"><MultiSelect aria-label="共通の複数選択" options={[{value:'a',label:'変えない'}]} values={[]} onChange={()=>{}}/></div>
+    <div data-choice-case="text"><Select treatment="text" aria-label="文字型の選択" value="a" options={[{value:"a",label:"変えない"}]} onChange={()=>{}}/></div>
+    <div data-choice-case="time"><TimeField aria-label="共通の時刻" value="09:00" onChange={()=>{}} /></div>
+  </section>
+  <section id="choice-time-narrow" style={{width:84}}><TimeField aria-label="狭い時刻" value="09:00" onChange={()=>{}}/></section>
+  <section id="input-sample"><TextField aria-label="入力の見本" placeholder="you@example.com" /></section>
+  <section id="display-choices" style={{width:320}}><SegmentedControl aria-label="表示の切り替え" value="line" size="panel" equalWidth options={[{value:'line',label:'LINEの友だち',count:128},{value:'phone',label:'LINE未連携の電話客',count:64}]} onChange={()=>{}} /></section>
+  <section id="favorites"><IconButton variant="attention" pressed aria-label="お気に入り済み"><Star /></IconButton><IconButton variant="attention" pressed={false} aria-label="お気に入りにする"><Star /></IconButton></section>
+  <section id="filter-states" style={{display:'flex',alignItems:'center',gap:12}}>
+    <FilterChip selected={value} onChange={setValue}>すばやく絞る</FilterChip>
+    <FilterChip selected showCheck={false} onChange={()=>{}}>状態</FilterChip>
+  </section>
+  <section id="choice-states" style={{display:'flex',alignItems:'center',gap:24,padding:24}}>
+    <Checkbox aria-label="未選択" checked={false} onCheckedChange={()=>{}}>未選択</Checkbox>
+    <Checkbox aria-label="選択済み" checked onCheckedChange={()=>{}}>選択済み</Checkbox>
+    <Checkbox aria-label="一部選択" checked={false} indeterminate onCheckedChange={()=>{}}>一部選択</Checkbox>
+    <Checkbox aria-label="焦点" checked onCheckedChange={()=>{}}>焦点</Checkbox>
+    <Checkbox aria-label="押せない" checked disabled onCheckedChange={()=>{}}>押せない</Checkbox>
+    <Checkbox aria-label="誤り" checked={false} invalid onCheckedChange={()=>{}}>誤り</Checkbox>
+  </section>
+  <section id="owner-inputs" style={{display:'flex',gap:24,alignItems:'center'}}>
+    <SearchField width={360} aria-label="幅を保つ検索" placeholder="注文番号やお客さまの名前で検索" value="" onChange={()=>{}}/>
+    <EntitySelect width={114} aria-label="担当で絞り込む" label="担当" valuePrefix="担当：" value="all" options={[{value:'all',label:'すべて'},{value:'staff',label:'担当者'}]} onChange={()=>{}}/>
+    <NumberField short aria-label="単位のある予算" defaultValue="12345" unit="円"/>
+    <div style={{display:'flex'}}><NumberField aria-label="紹介者へのマイル付与" defaultValue="0" unit="mile"/></div>
+  </section>
+  <section id="row-controls"><RowMenu label="行の操作" items={[{label:'初期値に戻す…',tone:'danger',onSelect:()=>{}}]} /><RowMenu label="小さい行の操作" appearance="box" items={[{label:'編集',onSelect:()=>{}}]} /><Pagination page={1} pageCount={2} onPageChange={()=>{}} /><Pagination page={1} pageCount={1} summary="1件中1件" ariaLabel="1ページの送り" onPageChange={()=>{}} /></section>
   <section id="windows">{['通常','確認','危険','警告','手順','選択','長文','引き出し'].map(name=><Button key={name} onClick={()=>setWindow(name)}>{name}</Button>)}</section>
   {window==='引き出し'?<Drawer open title="設定を編集する" headerIcon={props.headerIcon} description={props.description} onClose={()=>setWindow('')} footer={<Button onClick={()=>setWindow('')}>保存する</Button>}><input aria-label="名前" defaultValue="保持する名前"/></Drawer>:
    ['確認','危険','警告'].includes(window)?<ConfirmDialog {...props} title="内容を確認しますか？" destructive={window==='危険'} warning={window==='警告'}/>:
@@ -57,11 +116,13 @@ function Fixture(){
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
   tsconfig: `${webRoot}/tsconfig.json`, define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
   plugins: [{ name: 'fixture', setup(b) {
+    b.onResolve({filter:/^next\/dynamic$/},()=>({path:'dynamic',namespace:'fixture'}))
     b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'navigation', namespace: 'fixture' }))
     b.onResolve({ filter: /^@\/contexts\/account-context$/ }, () => ({ path: 'account', namespace: 'fixture' }))
     b.onResolve({ filter: /^next\/link$|^@\/components\/shared\/list-navigation$/ }, () => ({ path: 'link', namespace: 'fixture' }))
     b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'navigation'
       ? 'export const useRouter=()=>({push(){},replace(){},prefetch(){}});export const usePathname=()=>"/fixture";export const useSearchParams=()=>new URLSearchParams();'
+      : args.path === 'dynamic' ? 'export default function dynamic(){return function Preview(){return null}}'
       : args.path === 'account' ? 'export const useOptionalAccount=()=>null;export const useAccount=()=>({selectedAccountId:null,selectedAccount:null});'
       : 'import React from "react";export default function Link(p){return React.createElement("a",p)}', resolveDir: webRoot }))
     b.onLoad({ filter: /\.module\.css$/ }, args => {
@@ -84,7 +145,7 @@ const css = [globals, ...sheets].join('\n').replace(/:global\(([^()]*)\)/g, '$1'
 
 async function mount(page, width) {
   await page.setViewportSize({ width, height: 900 })
-  await page.setContent(`<html data-theme="v8"><style>${css}*{box-sizing:border-box}body{margin:0}main{margin:24px 24px 24px 264px}#selection{margin-top:24px}#windows{display:flex;gap:8px}[data-center-row]{height:40px;display:flex;align-items:center}#selection>label{margin-block:12px}</style><div id="root"></div></html>`)
+  await page.setContent(`<html data-theme="v8"><style>${css}*{box-sizing:border-box}.fixed{position:fixed}body{margin:0}main{margin:24px 24px 24px 264px}#selection{margin-top:24px}#windows{display:flex;gap:8px}[data-center-row]{height:40px;display:flex;align-items:center}#selection>label{margin-block:12px}</style><div id="root"></div></html>`)
   await page.addScriptTag({ content: compiled.outputFiles[0].text })
   await page.getByRole('button', { name: '通常', exact: true }).waitFor()
 }
@@ -140,7 +201,19 @@ for (const width of [1152,1440,1920]) {
         const style=getComputedStyle(frame),rect=frame.getBoundingClientRect();
         return {width:rect.width,height:rect.height,radius:style.borderRadius,ring:style.outlineWidth,image:style.backgroundImage};
       }))
-      assert.ok(boxes.every(box=>box.width===16&&box.height===16&&box.radius==='4px'&&box.ring==='1px'&&box.image==='none'),JSON.stringify(boxes))
+      assert.ok(boxes.every(box=>box.width===16&&box.height===16&&box.radius==='5px'&&box.ring==='1px'&&box.image.includes('linear-gradient')),JSON.stringify(boxes))
+      const markOffsets = () => page.locator('#selection input[type="checkbox"]').evaluateAll(inputs => inputs.map(input => {
+        const frame = input.nextElementSibling
+        const path = frame.querySelector('svg path')
+        const box = frame.getBoundingClientRect(), bbox = path.getBBox(), matrix = path.getScreenCTM()
+        const center = new DOMPoint(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2).matrixTransform(matrix)
+        return { dx: center.x - box.x - box.width / 2, dy: center.y - box.y - box.height / 2 }
+      }))
+      assert.ok((await markOffsets()).every(({dx,dy}) => Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5))
+      await page.locator('#selection input[type="checkbox"] + span svg').first().evaluate(el => { el.style.transform = 'translateY(2px)' })
+      await expect.poll(async () => (await markOffsets()).some(({dy}) => Math.abs(dy) > 0.5)).toBe(true)
+      await page.locator('#selection input[type="checkbox"] + span svg').first().evaluate(el => { el.style.transform = '' })
+      await expect.poll(async () => (await markOffsets()).every(({dx,dy}) => Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5)).toBe(true)
       await page.getByRole('checkbox',{name:'ラベル付き',exact:true}).focus(); await page.keyboard.press('Space')
       assert.equal(await page.getByRole('checkbox',{name:'全選択',exact:true}).isChecked(),false)
       // 実寸をずらした場合に、この計測がずれを見逃さないことを確かめる。
@@ -149,6 +222,223 @@ for (const width of [1152,1440,1920]) {
       await page.getByRole('checkbox',{name:'全選択',exact:true}).evaluate(el=>el.style.top='')
       assert.ok((await measure()).every(row=>Math.abs(row.offset)<=0.5))
     } finally {await browser.close()}
+  })
+
+  test(`共通の操作は36px、入力は選ぶ欄と同じ影と地を保つ ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ reducedMotion: 'reduce' })
+      await mount(page, width)
+      const read = () => page.locator('#control-density').evaluate(root => {
+        const selectors = ['input[aria-label="寸法の名前"]', '[data-search-field]', 'button[aria-label="寸法の選択"]', 'button[aria-label="寸法の保存"]', 'textarea']
+        return selectors.map(selector => { const el = root.querySelector(selector), box = el.getBoundingClientRect(), css = getComputedStyle(el); return { height: box.height, center: box.top + box.height / 2, image: css.backgroundImage, shadow: css.boxShadow } })
+      })
+      const controls = await read()
+      assert.ok(controls.slice(0,4).every(control => control.height === 36), JSON.stringify(controls))
+      assert.ok(controls.slice(0,4).every(control => Math.abs(control.center - controls[0].center) <= 0.5), JSON.stringify(controls))
+      assert.ok(controls.every(control => control.image.includes('linear-gradient') && control.shadow !== 'none'), JSON.stringify(controls))
+      assert.equal(controls[0].image, controls[2].image)
+      assert.equal(controls[0].shadow, controls[2].shadow)
+      assert.equal(controls[1].shadow, controls[2].shadow)
+      assert.equal(controls[4].shadow, controls[2].shadow)
+      assert.deepEqual(await page.evaluate(scanRowHeights), [])
+      const input = page.getByRole('textbox', { name: '寸法の名前', exact: true })
+      await input.evaluate(el => { el.style.height = '30px'; el.style.minHeight = '0' })
+      assert.ok((await page.evaluate(scanRowHeights)).some(finding => finding.kind === 'rowheight'))
+      await input.evaluate(el => { el.style.height = ''; el.style.minHeight = '' })
+      assert.deepEqual(await page.evaluate(scanRowHeights), [])
+    } finally { await browser.close() }
+  })
+
+  test(`絞り込みの札は緑と選択の印を保ち、タッチでは44pxを確保する ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ reducedMotion: 'reduce' })
+      await mount(page, width)
+      const quick = page.getByRole('button', { name: 'すばやく絞る', exact: true })
+      const style = () => quick.evaluate(el => { const css = getComputedStyle(el); return { height: el.getBoundingClientRect().height, whiteSpace: css.whiteSpace, background: css.backgroundColor, color: css.color, marks: el.querySelectorAll('svg').length } })
+      assert.equal((await style()).height, 36)
+      assert.equal((await style()).whiteSpace, 'nowrap')
+      assert.equal((await style()).background, 'rgb(255, 255, 255)')
+      await quick.click()
+      const selected = await style()
+      await expect.poll(async () => (await style()).background).toBe('rgb(232, 245, 236)')
+      await expect.poll(async () => (await style()).color).toBe('rgb(8, 122, 62)')
+      assert.equal(selected.marks, 1)
+      assert.equal(await page.getByRole('button', { name: '状態', exact: true }).locator('svg').count(), 0)
+      await quick.evaluate(el => { el.style.background = 'black' })
+      await expect.poll(async () => (await style()).background).toBe('rgb(0, 0, 0)')
+      await quick.evaluate(el => { el.style.background = '' })
+      await expect.poll(async () => (await style()).background).toBe('rgb(232, 245, 236)')
+      const touch = await browser.newPage({ hasTouch: true, reducedMotion: 'reduce' })
+      await mount(touch, width)
+      assert.ok(await touch.getByRole('button', { name: 'すばやく絞る', exact: true }).evaluate(el => el.getBoundingClientRect().height >= 44))
+      const touchHeights=()=>touch.locator('#choice-appearance [data-choice-field]').evaluateAll(fields=>fields.map(el=>el.getBoundingClientRect().height))
+      assert.ok((await touchHeights()).every(height=>height===44))
+      const touchCombo=touch.locator('[data-choice-case="combo"] [data-choice-field]')
+      await touchCombo.evaluate(el=>{el.style.setProperty('--choice-touch-h','40px')})
+      await expect.poll(async ()=>(await touchHeights()).some(height=>height!==44)).toBe(true)
+      await touchCombo.evaluate(el=>{el.style.removeProperty('--choice-touch-h')})
+      await expect.poll(async ()=>(await touchHeights()).every(height=>height===44)).toBe(true)
+    } finally { await browser.close() }
+  })
+
+  test(`チェックの6状態で緑・角丸・焦点・誤りを保つ ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ reducedMotion: 'reduce' })
+      await mount(page, width)
+      await page.getByRole('checkbox', { name: '焦点', exact: true }).focus()
+      await page.keyboard.press('Tab')
+      await page.keyboard.press('Shift+Tab')
+      const states = await page.locator('#choice-states input').evaluateAll(inputs => inputs.map(input => {
+        const frame = input.nextElementSibling, style = getComputedStyle(frame)
+        return { name: input.getAttribute('aria-label'), radius: style.borderRadius, image: style.backgroundImage, ring: style.outlineColor, focus: input.matches(':focus-visible'), disabled: input.disabled, opacity: getComputedStyle(input.closest('[data-disabled]') ?? frame).opacity }
+      }))
+      assert.ok(states.every(state => state.radius === '5px'), JSON.stringify(states))
+      for (const name of ['選択済み', '一部選択', '焦点', '押せない']) assert.ok(states.find(state => state.name === name).image.includes('linear-gradient'), JSON.stringify(states))
+      assert.equal(states.find(state => state.name === '焦点').focus, true)
+      assert.notEqual(states.find(state => state.name === '焦点').ring, states.find(state => state.name === '誤り').ring)
+      assert.equal(states.find(state => state.name === '押せない').disabled, true)
+      assert.ok(+states.find(state => state.name === '押せない').opacity < 1)
+      if (process.env.V8_CHOICE_SHOTS_DIR) {
+        mkdirSync(process.env.V8_CHOICE_SHOTS_DIR, { recursive: true })
+        await page.locator('#choice-states').screenshot({ path: join(process.env.V8_CHOICE_SHOTS_DIR, `resume-six-states-${width}.png`) })
+      }
+    } finally { await browser.close() }
+  })
+
+  test(`スイッチは見える軌道の外にも当たりがあり、当たりを壊すと押せない ${width}`, async () => {
+    const browser=await connectGuardBrowser()
+    try {
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      const toggle=page.getByRole('switch',{name:'切り替え',exact:true})
+      const clickOutside=async()=>{const rect=await toggle.boundingBox();await page.mouse.click(rect.x+rect.width/2,rect.y-1)}
+      await clickOutside()
+      await expect(toggle).toHaveAttribute('aria-checked','true')
+      await toggle.evaluate(el=>el.setAttribute('data-hit-fault',''))
+      await page.addStyleTag({content:'[data-hit-fault]::before { content: none !important; }'})
+      await clickOutside()
+      await expect(toggle).toHaveAttribute('aria-checked','true')
+      await toggle.evaluate(el=>el.removeAttribute('data-hit-fault'))
+      await clickOutside()
+      await expect(toggle).toHaveAttribute('aria-checked','false')
+      const touch=await browser.newPage({hasTouch:true,reducedMotion:'reduce'})
+      await mount(touch,width)
+      const touchToggle=touch.getByRole('switch',{name:'切り替え',exact:true}),touchRect=await touchToggle.boundingBox()
+      await touch.touchscreen.tap(touchRect.x+touchRect.width/2,touchRect.y-10)
+      await expect(touchToggle).toHaveAttribute('aria-checked','true')
+    } finally {await browser.close()}
+  })
+
+  test(`検索幅・すべての名前・数値の単位を欄内で保つ ${width}`, async()=>{
+    const browser=await connectGuardBrowser()
+    try {
+      const page=await browser.newPage({reducedMotion:'reduce'});await mount(page,width)
+      const result=await page.locator('#owner-inputs').evaluate(root=>{
+        const input=root.querySelector('input[type=search]'),search=input.parentElement,label=root.querySelector('[data-choice-value]'),number=root.querySelector('input[type=number]'),unit=root.querySelector('[data-number-unit]'),frame=number.parentElement
+        return {search:search.getBoundingClientRect().width,textFits:label.scrollWidth<=label.clientWidth,unitInside:unit.getBoundingClientRect().right<=frame.getBoundingClientRect().right-8,minimumInput:root.querySelector('input[aria-label="紹介者へのマイル付与"]').getBoundingClientRect().width,displayWidth:root.querySelector('[data-number-display]').getBoundingClientRect().width,inputWidth:number.getBoundingClientRect().width,numberValue:number.value,display:root.querySelector('[data-number-display]').textContent,height:frame.getBoundingClientRect().height}
+      })
+      assert.ok(result.minimumInput>=48,JSON.stringify(result));assert.ok(result.displayWidth<=result.inputWidth+0.5,JSON.stringify(result));assert.equal(result.search,360);assert.ok(result.textFits,JSON.stringify(result));assert.ok(result.unitInside,JSON.stringify(result));assert.equal(result.numberValue,'12345');assert.equal(result.display,'12,345');assert.equal(result.height,36)
+      await page.getByRole('spinbutton',{name:'単位のある予算'}).focus();await expect(page.locator('[data-number-display]')).toHaveCount(0)
+    } finally {await browser.close()}
+  })
+
+  test(`7種類の選ぶ欄は高さ・影・矢印・焦点をそろえる ${width}`, async () => {
+    const browser=await connectGuardBrowser()
+    try {
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      const measure=()=>page.locator('#choice-appearance [data-choice-case]').evaluateAll(cases=>cases.map(item=>{
+        const field=item.querySelector('[data-choice-field]'),arrow=field.querySelector('[data-choice-chevron],[data-choice-action]:not([data-choice-clear]) > svg'),b=field.getBoundingClientRect(),a=arrow.getBoundingClientRect(),s=getComputedStyle(field)
+        return {kind:item.dataset.choiceCase,height:b.height,image:s.backgroundImage,shadow:s.boxShadow,radius:s.borderRadius,border:s.borderWidth,dy:a.y+a.height/2-b.y-b.height/2,right:b.right-a.right}
+      }))
+      const good=await measure()
+      assert.equal(good.length,7)
+      assert.ok(good.every(item=>item.height===36&&Math.abs(item.dy)<=1&&Math.abs(item.right-12)<=1),JSON.stringify(good))
+      assert.ok(good.every(item=>item.image===good[0].image&&item.shadow===good[0].shadow&&item.radius===good[0].radius&&item.border==='0px'),JSON.stringify(good))
+      const entity=page.locator('[data-choice-case="entity"] [data-choice-chevron]')
+      await entity.evaluate(el=>el.style.transform='translateY(calc(-50% + 2px))')
+      await expect.poll(async () => (await measure()).some(item=>Math.abs(item.dy)>1)).toBe(true)
+      await entity.evaluate(el=>el.style.transform='')
+      await expect.poll(async () => (await measure()).every(item=>Math.abs(item.dy)<=1)).toBe(true)
+      const narrow=await page.getByRole('combobox',{name:'狭い時刻'}).evaluate(input=>{const css=getComputedStyle(input),ctx=document.createElement('canvas').getContext('2d');ctx.font=`${css.fontStyle} ${css.fontWeight} ${css.fontSize} ${css.fontFamily}`;return {text:ctx.measureText(input.value).width+(input.value.length-1)*(parseFloat(css.letterSpacing)||0),space:input.clientWidth-(parseFloat(css.paddingLeft)||0)-(parseFloat(css.paddingRight)||0)}})
+      assert.ok(narrow.text<=narrow.space+1,JSON.stringify(narrow))
+      const textChoice=page.getByRole('button',{name:'文字型の選択',exact:true})
+      await page.keyboard.press('Tab')
+      await textChoice.focus()
+      await expect.poll(() => textChoice.evaluate(el=>getComputedStyle(el).outlineWidth)).toBe('2px')
+      await expect.poll(() => textChoice.evaluate(el=>getComputedStyle(el).outlineColor)).toBe('rgb(37, 99, 235)')
+      await textChoice.evaluate(el=>el.setAttribute('data-choice-invalid','true'))
+      await expect.poll(() => textChoice.evaluate(el=>{const probe=document.createElement('i');probe.style.color='var(--color-danger)';el.append(probe);const color=getComputedStyle(probe).color;probe.remove();return getComputedStyle(el).boxShadow.includes(color)})).toBe(true)
+    } finally { await browser.close() }
+  })
+
+  test(`見本・表示切替・お気に入りは共通の形を保つ ${width}`, async () => {
+    const browser=await connectGuardBrowser()
+    try {
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      const sample=page.getByRole('textbox',{name:'入力の見本'})
+      assert.equal(await sample.getAttribute('placeholder'),'例：you@example.com')
+      const colors=await sample.evaluate(el=>({sample:getComputedStyle(el,'::placeholder').color,value:getComputedStyle(el).color}))
+      assert.notEqual(colors.sample,colors.value,JSON.stringify(colors))
+      const group=page.getByRole('group',{name:'表示の切り替え'})
+      const layout=await group.evaluate(root=>({height:root.getBoundingClientRect().height,background:getComputedStyle(root).backgroundColor,thumb:getComputedStyle(root.querySelector('[data-sliding-indicator]')||root.firstElementChild).backgroundColor,items:[...root.querySelectorAll('button')].map(el=>({width:el.getBoundingClientRect().width,scroll:el.scrollWidth,client:el.clientWidth,title:el.title}))}))
+      assert.equal(layout.height,36,JSON.stringify(layout))
+      assert.equal(layout.thumb,'rgb(255, 255, 255)',JSON.stringify(layout))
+      assert.equal(layout.background,'rgb(245, 245, 247)',JSON.stringify(layout))
+      assert.ok(Math.abs(layout.items[0].width-layout.items[1].width)<=0.5,JSON.stringify(layout))
+      assert.ok(layout.items.every(item=>item.title),JSON.stringify(layout))
+      const trigger=page.getByRole('button',{name:'寸法の選択',exact:true})
+      await trigger.click()
+      const menu=page.locator('[data-menu-portal][data-ready="true"]')
+      await menu.waitFor()
+      const right=await menu.evaluate(el=>el.getBoundingClientRect().right)
+      const anchorRight=await trigger.evaluate(el=>el.getBoundingClientRect().right)
+      assert.ok(Math.abs(right-anchorRight)<=1,JSON.stringify({right,anchorRight}))
+      assert.equal(await menu.getAttribute('data-align'),'end')
+      await page.keyboard.press('Escape')
+      const star=page.getByRole('button',{name:'お気に入り済み'}).locator('svg')
+      const paint=await star.evaluate(el=>({fill:getComputedStyle(el).fill,color:getComputedStyle(el).color}))
+      assert.equal(paint.fill,'rgb(251, 191, 36)',JSON.stringify(paint))
+      assert.equal(paint.color,'rgb(245, 158, 11)',JSON.stringify(paint))
+      await star.evaluate(el=>el.parentElement.setAttribute('data-part','attention-star'))
+      assert.deepEqual(await star.evaluate(el=>({fill:getComputedStyle(el).fill,color:getComputedStyle(el).color})),paint)
+    } finally { await browser.close() }
+  })
+
+  test(`行のメニューは線なし、現在のページは灰、1ページでは件数だけ ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      for (const name of ['行の操作','小さい行の操作']) {
+        const trigger=page.getByRole('button',{name,exact:true})
+        const appearance=await trigger.evaluate(el=>{const s=getComputedStyle(el),after=getComputedStyle(el,'::after');return {background:s.backgroundColor,shadow:s.boxShadow,border:s.borderWidth,after:after.content}})
+        assert.equal(appearance.background,'rgba(0, 0, 0, 0)',JSON.stringify(appearance))
+        assert.equal(appearance.shadow,'none',JSON.stringify(appearance))
+        assert.equal(appearance.border,'0px',JSON.stringify(appearance))
+        assert.ok(['none','normal'].includes(appearance.after),JSON.stringify(appearance))
+        await trigger.hover()
+        await expect.poll(() => trigger.evaluate(el=>getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)')
+      }
+      await page.getByRole('button',{name:'行の操作',exact:true}).click()
+      await page.getByRole('menuitem',{name:'初期値に戻す',exact:true}).waitFor()
+      const menu=await page.getByRole('menu').evaluate(el=>({width:el.getBoundingClientRect().width,text:el.innerText}))
+      assert.ok(menu.width<224,JSON.stringify(menu))
+      assert.ok(!menu.text.endsWith('…'),JSON.stringify(menu))
+      await page.keyboard.press('Escape')
+      const current=page.locator('[aria-current="page"]')
+      assert.equal(await current.count(),1)
+      const state=await current.evaluate(el=>({background:getComputedStyle(el).backgroundColor,weight:getComputedStyle(el).fontWeight}))
+      assert.equal(state.background,'rgb(247, 247, 245)',JSON.stringify(state))
+      assert.ok(Number(state.weight)>=600,JSON.stringify(state))
+      assert.equal(await page.getByRole('navigation',{name:'1ページの送り'}).count(),0)
+      await expect(page.getByText('1件中1件',{exact:true})).toBeVisible()
+      await page.close()
+    } finally { await browser.close() }
   })
 
   test(`8種類の窓で頭と操作が切れず、明るい面と任意の印を保つ ${width}`,async()=>{

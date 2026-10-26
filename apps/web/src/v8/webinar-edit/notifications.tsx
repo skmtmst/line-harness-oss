@@ -17,7 +17,6 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import { TextField } from '@/components/shared/text-field'
 import { notifyToast } from '@/components/shared/toast'
@@ -347,7 +346,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
             <div className={styles.rowExtra}>{row.extra}</div>
             {readOnly
               ? <span className={styles.state}>{row.on ? '送る' : '送らない'}</span>
-              : <SaveErrorField names={[`rows.${saveFieldIndex}.on`,"on","row.on"]}><SettingCheckbox checked={row.on} onChange={row.toggle} label={row.label} /></SaveErrorField>}
+              : <SaveErrorField names={[`rows.${saveFieldIndex}.on`,"on","row.on"]}><Toggle checked={row.on} onChange={row.toggle} label={row.label} /></SaveErrorField>}
           </li>
         ))}
       </ul>

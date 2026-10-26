@@ -20,13 +20,12 @@ import {
 import Button from '@/components/shared/button'
 import RadioCard, {RadioCardGroup} from '@/components/shared/radio-card'
 import CustomerDesignPicker from '@/components/shared/customer-design-picker'
-import Checkbox from '@/components/shared/checkbox'
 import ColorWell from '@/components/shared/color-well'
 import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle, { ToggleField } from '@/components/shared/toggle'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
@@ -147,11 +146,11 @@ export function AppearanceTab(props: Props) {
         </div>
         <div className={styles.toggleRow}>
           <span>1人1回だけ答えられる</span>
-          <SaveErrorField names={["enabled","options.oncePerFriend?.enabled","oncePerFriend?.enabled","options.once_per_friend?.enabled","once_per_friend?.enabled"]}><SettingCheckbox checked={options.oncePerFriend?.enabled ?? false} onChange={(enabled) => onChangeOptions({ oncePerFriend: { ...options.oncePerFriend, enabled } })} label="1人1回だけ答えられる" /></SaveErrorField>
+          <SaveErrorField names={["enabled","options.oncePerFriend?.enabled","oncePerFriend?.enabled","options.once_per_friend?.enabled","once_per_friend?.enabled"]}><Toggle checked={options.oncePerFriend?.enabled ?? false} onChange={(enabled) => onChangeOptions({ oncePerFriend: { ...options.oncePerFriend, enabled } })} label="1人1回だけ答えられる" /></SaveErrorField>
         </div>
         <div className={styles.toggleRow}>
           <span>{`答えの数が ${polishFormatNumber(options.totalLimit?.max ?? 300)}件 になったら締め切る`}</span>
-          <SaveErrorField names={["enabled","options.totalLimit?.enabled","totalLimit?.enabled","options.total_limit?.enabled","total_limit?.enabled"]}><SettingCheckbox
+          <SaveErrorField names={["enabled","options.totalLimit?.enabled","totalLimit?.enabled","options.total_limit?.enabled","total_limit?.enabled"]}><Toggle
             checked={options.totalLimit?.enabled ?? false}
             onChange={(enabled) => onChangeOptions({ totalLimit: { ...options.totalLimit, enabled, max: options.totalLimit?.max ?? 300 } })}
             label="答えの数が上限になったら締め切る"
@@ -172,8 +171,8 @@ export function AppearanceTab(props: Props) {
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-label="受付のつづきと見た目">
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>受付のきまり（つづき）</h3>
-          <SaveErrorField names={["restorePrevious","options.restorePrevious","restore_previous","options.restore_previous"]}><Checkbox checked={options.restorePrevious ?? false} onCheckedChange={(restorePrevious) => onChangeOptions({ restorePrevious })}>前回の答えを最初から入れておく</Checkbox></SaveErrorField>
-          <SaveErrorField names={["enabled","options.confirmDialog?.enabled","confirmDialog?.enabled","options.confirm_dialog?.enabled","confirm_dialog?.enabled"]}><Checkbox checked={options.confirmDialog?.enabled ?? false} onCheckedChange={(enabled) => onChangeOptions({ confirmDialog: { ...options.confirmDialog, enabled } })}>送る前に確認の画面を出す</Checkbox></SaveErrorField>
+          <SaveErrorField names={["restorePrevious","options.restorePrevious","restore_previous","options.restore_previous"]}><ToggleField checked={options.restorePrevious ?? false} onChange={(restorePrevious) => onChangeOptions({ restorePrevious })}>前回の答えを最初から入れておく</ToggleField></SaveErrorField>
+          <SaveErrorField names={["enabled","options.confirmDialog?.enabled","confirmDialog?.enabled","options.confirm_dialog?.enabled","confirm_dialog?.enabled"]}><ToggleField checked={options.confirmDialog?.enabled ?? false} onChange={(enabled) => onChangeOptions({ confirmDialog: { ...options.confirmDialog, enabled } })}>送る前に確認の画面を出す</ToggleField></SaveErrorField>
           <div className={styles.field}><Field label="期限を過ぎた人に出す文" htmlFor="fe-deadline-message"><SaveErrorField names={["message","options.deadline?.message","deadline?.message"]}><TextField id="fe-deadline-message" value={options.deadline?.message ?? ''} placeholder="受付は終了しました" onChange={(e) => onChangeOptions({ deadline: { ...options.deadline, enabled: options.deadline?.enabled ?? false, message: e.target.value } })} /></SaveErrorField></Field></div>
           <div className={styles.field}><Field label="ページの題名（LINE の上に出る）" htmlFor="fe-page-title"><SaveErrorField names={["pageTitle","options.pageTitle","page_title","options.page_title"]}><TextField id="fe-page-title" value={options.pageTitle ?? ''} placeholder="回答フォーム" onChange={(e) => onChangeOptions({ pageTitle: e.target.value || null })} /></SaveErrorField></Field></div>
         </div>

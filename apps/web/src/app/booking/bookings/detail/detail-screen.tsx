@@ -37,6 +37,7 @@ import { formatNumber } from '@/lib/format'
 import { ACTION_LABELS, STATUS_LABELS, STATUS_BADGE, OPERATION_STATUS_LABELS, POLICY_FIELD_LABELS, notificationOpLine, decideDescription, jpDateTime, jpTime, jpStamp, jstDate, jstHHMM, bookingNumber, approvedText, auditLine } from './detail-model'
 
 import type { BookingDetailModel } from '@/app/booking/bookings'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 export default function BookingDetailScreen({ model }: { model: BookingDetailModel }) {
   const {
@@ -262,7 +263,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                     <Select size="full" aria-label="時間" value={editTime} onChange={(value) => setEditTime(value)} disabled={saving || editSlotsLoading} options={[ { value: '', label: editSlotsLoading ? '確認中です' : '選択してください' }, ...editSlots.map((slot) => ({ value: slot.start, label: `${slot.start}〜${slot.end}${ slot.date === jstDate(detail.startsAt) && slot.start === jstHHMM(detail.startsAt) ? '（現在）' : '' }`, })), ]} />
                   </EditField>
                   <EditField label="料金（円・税込）">
-                    <input
+                    <SharedTextField
                       disabled={saving}
                       type="number"
                       min={0}
@@ -272,7 +273,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                     />
                   </EditField>
                   <EditField label="変更理由（記録に残ります・任意）">
-                    <input
+                    <SharedTextField
                       disabled={saving}
                       type="text"
                       value={editReason}
@@ -284,7 +285,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                 </div>
                 <div className="mt-3 grid gap-3">
                   <EditField label="お客様からの要望">
-                    <textarea
+                    <SharedTextArea
                       disabled={saving}
                       value={editCustomerNote}
                       onChange={(event) => setEditCustomerNote(event.target.value)}
@@ -293,7 +294,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                     />
                   </EditField>
                   <EditField label="店内メモ（お客様には見えません）">
-                    <textarea
+                    <SharedTextArea
                       disabled={saving}
                       value={editInternalNote}
                       onChange={(event) => setEditInternalNote(event.target.value)}

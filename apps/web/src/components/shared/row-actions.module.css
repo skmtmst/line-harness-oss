@@ -184,24 +184,11 @@ html:root .action[data-row-menu] {
   background: transparent;
   box-shadow: none;
 }
-/* 見える枠は28角、押せる所は既存の36角。型の列幅を動かさない。 */
+/* 押せる所の大きさを保ち、通常時は線を見せない。 */
 html:root .action[data-row-menu]:not(:focus-visible) {
   outline: 1px solid transparent;
 }
 
-html:root .action[data-row-menu]::after {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-  z-index: -1;
-  width: var(--tpl-icon-btn-row);
-  height: var(--tpl-icon-btn-row);
-  border-radius: var(--polish-radius-control);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--control-shadow);
-}
 html:root .action[data-row-menu]:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
@@ -223,3 +210,6 @@ html:root .inlineGrip:not(:has(svg)) {
 .statusActions { display: inline-flex; flex: none; align-items: center; gap: var(--polish-space-field); }
 .statusAction { display: inline-flex; flex: none; }
 .statusAction > :is(button, a) { min-width: var(--polish-row-action-width); }
+
+html:root .action[data-row-menu]:not(:focus-visible) { border: 0; outline-color: transparent; background: transparent; box-shadow: none; }
+html:root .action[data-row-menu]:hover:not(:disabled) { background: var(--polish-hover); }

@@ -18,6 +18,7 @@ import type { Dispatch,SetStateAction } from 'react'
 import { TYPE_LABELS,formatScheduleTime } from './broadcast-form-model'
 import styles from './broadcast-form-v8.module.css'
 import { type TestSendView } from './test-send-view'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 const TemplateRichEditor = dynamic(() => import('../../v8/template-edit/rich/index'))
 const TemplateRichVideoEditor = dynamic(() => import('../../v8/template-edit/rich-video/index'))
 const CarouselV8 = dynamic(() => import('../../v8/templates/carousel/index'))
@@ -278,5 +279,5 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
     </ConfirmDialog>
 
   {inlineComposer && inlineHost ? inlineComposer.kind === 'carousel' ? <CarouselV8 key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : inlineComposer.kind === 'rich_message' ? <TemplateRichEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : <TemplateRichVideoEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : null}
-  <Dialog open={templateSaveIndex !== null} title="テンプレートにする" description={`${(templateSaveIndex ?? 0) + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。`} onCancel={() => setTemplateSaveIndex(null)} confirmLabel="保存する" onConfirm={() => void saveComposerTemplate()} busy={composerBusy} error={templateSaveError || undefined}><label>テンプレートの名前<SaveErrorField names={["templateSaveName","name","template_save_name"]}><input aria-label="テンプレートの名前" value={templateSaveName} onChange={(event) => setTemplateSaveName(event.target.value)} className={styles.textInput} /></SaveErrorField></label></Dialog></>)
+  <Dialog open={templateSaveIndex !== null} title="テンプレートにする" description={`${(templateSaveIndex ?? 0) + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。`} onCancel={() => setTemplateSaveIndex(null)} confirmLabel="保存する" onConfirm={() => void saveComposerTemplate()} busy={composerBusy} error={templateSaveError || undefined}><label>テンプレートの名前<SaveErrorField names={["templateSaveName","name","template_save_name"]}><SharedTextField aria-label="テンプレートの名前" value={templateSaveName} onChange={(event) => setTemplateSaveName(event.target.value)} className={styles.textInput} /></SaveErrorField></label></Dialog></>)
 }

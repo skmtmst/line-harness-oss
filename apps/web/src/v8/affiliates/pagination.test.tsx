@@ -45,11 +45,11 @@ afterEach(cleanup)
 
 it.each([
   ['案件', OffersTab, '件'], ['成果承認', ApprovalsTab, '件'], ['支払い', PaymentTab, '人'],
-] as const)('%sは1ページでも共通の件数と送り先を出す', async (_name, Tab, unit) => {
+] as const)('%sは1ページは共通の件数だけを出す', async (_name, Tab, unit) => {
   render(<Tab />)
   expect(await screen.findByText(`1${unit}中 1〜1${unit}`)).toBeTruthy()
-  expect((screen.getByRole('button', { name: '前のページ' }) as HTMLButtonElement).disabled).toBe(true)
-  expect((screen.getByRole('button', { name: '次のページ' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByRole('button', { name: '前のページ' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '次のページ' })).toBeNull()
 })
 
 it.each([
@@ -58,5 +58,5 @@ it.each([
   fixture.empty = true
   render(<Tab />)
   expect(await screen.findByText(`0${unit}`)).toBeTruthy()
-  expect(screen.getByRole('button', { name: '1ページ目へ' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '1ページ目へ' })).toBeNull()
 })

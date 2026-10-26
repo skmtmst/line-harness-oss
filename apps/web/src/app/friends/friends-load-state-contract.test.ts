@@ -28,7 +28,7 @@ describe("管理画面 友だち一覧の読込状態", () => {
      */
     expect(TABLE).toContain("status === 'ready' ? `${formatNumber(total)}件` : '—'")
     expect(PAGE).not.toContain("{loadStatus === 'ready' ? `${formatNumber(total)}件` : '—'}")
-    expect(PAGE).toContain("onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}")
+    // CSVの読み込み中の禁止は実際のメニューで確かめる（scored-only-handoff-react）。
     expect(PAGE).toContain('<ListPage')
   })
 

@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Link from '@/components/shared/list-navigation'
-import { Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { canManageRole } from '@/lib/staff-role'
 import styles from './first-steps.module.css'
-import { ProgressBar } from '@/components/shared/progress'
+import { ProgressBar, StepMark } from '@/components/shared/progress'
 
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { doneCount, type StepResult } from '@/v8/settings/public/getting-started-steps/index'
@@ -95,7 +95,13 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   }
 }
 
+/** 次にやる 1 つ。まだで、行き先があるうちの最初の段。 */
+export function nextFirstStepKey(summary: FirstStepsSummary): string | null {
+  return summary.steps.find((step) => !step.done && step.href)?.key ?? null
+}
+
 export function FirstStepsCard({ summary, folded, onToggle, onRecheck }: { summary: FirstStepsSummary; folded: boolean; onToggle: () => void; onRecheck?: () => void }) {
+  const nextKey = nextFirstStepKey(summary)
   return (
     <section className={styles.card} aria-labelledby="first-steps-title" data-design-node="r3X34">
       <div className={styles.head}>
@@ -111,8 +117,8 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck }: { summa
       </div>
       <ul id="first-steps-list" className={styles.grid} hidden={folded}>
         {summary.steps.map((step) => (
-          <li key={step.key} className={styles.step} data-done={step.done ? '' : undefined}>
-            <span className={styles.check} aria-hidden="true">{step.done ? <Check className={styles.checkIcon} strokeWidth={3} /> : null}</span>
+          <li key={step.key} className={styles.step} data-done={step.done ? '' : undefined} data-next={step.key === nextKey ? '' : undefined}>
+            <StepMark done={step.done} />
             <span className={styles.label} title={step.label}>
               {step.label}
               <span className="sr-only">{step.done ? '（済み）' : step.state === 'unknown' ? '（未確認）' : step.state === 'forbidden' ? '（権限がありません）' : '（まだ）'}</span>

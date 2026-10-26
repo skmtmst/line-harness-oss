@@ -44,7 +44,7 @@ import { describeReminderDiff } from './conflict-diff'
 import styles from './edit.module.css'
 import { BackToReminders, ReminderV8Stepper, type ReminderV8StepKey, ChoiceCardV8, PhoneV8, SummaryCardV8, WizardFooterV8 } from './ui';
 import { reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels';
-import { SettingCheckbox } from '@/components/shared/checkbox';
+import Toggle from '@/components/shared/toggle';
 import Dialog from '@/components/shared/dialog';
 import { emptyValue } from '@/components/shared/empty-value';
 import { CreatePage } from '@/components/templates';
@@ -769,8 +769,8 @@ export function TargetStageV8({
                 <span className={styles.stopNote}>{row.note}</span>
               </span>
               {row.locked
-                ? <SettingCheckbox label={row.label} checked locked />
-                : <SaveErrorField names={[`stopRows.${saveFieldIndex}.checked`,"checked","row.checked"]}><SettingCheckbox label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} /></SaveErrorField>}
+                ? <Toggle label={row.label} checked locked />
+                : <SaveErrorField names={[`stopRows.${saveFieldIndex}.checked`,"checked","row.checked"]}><Toggle label={row.label} checked={row.checked} onChange={(next) => row.onChange?.(next)} /></SaveErrorField>}
             </div>
           ))}
         </div>

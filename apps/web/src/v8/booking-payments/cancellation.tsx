@@ -5,7 +5,7 @@ import { formatYen as yen } from '@line-crm/shared';
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
 
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 
 import { DataTable, Tr, Th, Td, TableHeadRow } from '@/components/shared/table'
 
@@ -176,7 +176,7 @@ export function CancellationSection({ state, connected, testMode, canEdit }: { s
         ) : (
           <>
             {canEdit ? (
-              <SettingCheckbox checked={draft.enabled} onChange={(enabled) => state.setDraft({ ...draft, enabled })} label="キャンセル料を使う" />
+              <Toggle checked={draft.enabled} onChange={(enabled) => state.setDraft({ ...draft, enabled })} label="キャンセル料を使う" />
             ) : <p className={styles.readValue}>{draft.enabled ? 'キャンセル料を使う' : 'キャンセル料は使わない'}</p>}
             <DataTable aria-label="キャンセル料の段">
               <thead><TableHeadRow><Th>いつ取り消したか</Th><Th>キャンセル料</Th><Th aria-label="操作" /></TableHeadRow></thead><tbody>

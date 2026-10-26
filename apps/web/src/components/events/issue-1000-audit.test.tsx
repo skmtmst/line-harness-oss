@@ -234,7 +234,7 @@ it('D11: 一括追加の途中失敗後は、残りだけを同じ鍵で再送�
   await pickDate('開始日', '2026-10-01')
   await pickDate('終了日', '2026-10-03')
   await click('土')
-  await act(async () => { document.querySelector<HTMLInputElement>('[role="dialog"] input[type="checkbox"]')!.click() })
+  await act(async () => { document.querySelector<HTMLInputElement>('[role="dialog"] [role="switch"]')!.click() })
   await pickTime('時間帯の終了', '15:30')
   await act(async () => { fireEvent.change(document.querySelector('[role="dialog"] input[type="number"]')!, { target: { value: '10' } }) })
   await click('生成')

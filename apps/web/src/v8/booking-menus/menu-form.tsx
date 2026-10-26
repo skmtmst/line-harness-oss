@@ -14,7 +14,6 @@ import Select from '@/components/shared/select'
 import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import CheckCard from '@/components/shared/check-card'
 import { useMenuPayment } from '@/v8/booking-payments/public/menu-payment/index'
 import { BookingMenuPaymentCard, useMenuDeposit } from '@/v8/booking-payments/public/menu-deposit/index'
@@ -1137,7 +1136,7 @@ export default function MenuFormV8() {
                 {/* 保存する設定はチェック（決まり14・絵どおり：言葉は左、チェックは右）。 */}
                 <div className={styles.toggleLine}>
                   <span className={styles.toggleLineLabel}>「指名なし」でも受ける</span>
-                  <SaveErrorField names={["noAssign","no_assign"]}><SettingCheckbox label="「指名なし」でも受ける" checked={noAssign} onChange={toggleNoAssign} /></SaveErrorField>
+                  <SaveErrorField names={["noAssign","no_assign"]}><Toggle label="「指名なし」でも受ける" checked={noAssign} onChange={toggleNoAssign} /></SaveErrorField>
                 </div>
               </>
             )}

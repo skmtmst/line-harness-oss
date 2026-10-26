@@ -163,26 +163,15 @@ html:root button.control:disabled {
   box-shadow: none;
 }
 
-/*
- * 選ばれているページ番号は黒い地に白い数字。枠と薄い緑の地はやめる。
- * ほかの番号・前後の矢印は今のまま。
- */
-html:root .current {
-  outline: 1px solid transparent;
-  border-color: transparent;
-  background: var(--color-ink);
-  color: var(--color-canvas);
-  box-shadow: none;
-  font-weight: 600;
-}
-
-/*
- * 全体の「選ばれている操作」の面（globals の aria-current 指定）より
- * ページ送りの現在地を優先する。黒い地に白い数字のまま。
- */
+/* 現在のページは薄い灰の地と太字。焦点の青い輪は保つ。 */
 html:root nav[data-pagination] .current {
   border-color: transparent !important;
-  background: var(--gradient-selected-chip) var(--color-ink) !important; /* 選んだ黒い札と同じ奥行き */
-  color: var(--color-canvas) !important;
-  box-shadow: var(--shadow-selected-chip) !important;
+  background: var(--color-canvas-sunken) !important;
+  color: var(--color-ink) !important;
+  box-shadow: none !important;
+  font-weight: var(--polish-value-weight);
 }
+
+/* 選択していない番号は枠と影を見せず、前後の操作の枠は残す。 */
+html:root button.page:not(.current) { outline-color: transparent; box-shadow: none; }
+html:root nav[data-pagination] .current { font-weight: var(--polish-weight-title); }

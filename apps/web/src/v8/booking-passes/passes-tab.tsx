@@ -25,7 +25,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { bookingApi } from '@/lib/api'
 import { bookingPassPlansApi } from '@/lib/api/helpers/gap3'
 import { bookingPassNoticesApi, type PassNoticeSettings } from '@/lib/api/helpers/booking-pass-notices'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { formatNumber } from '@/lib/format'
 import { KIND_LABEL, STATUS_LABEL, countLabel, failureText, periodLabel, yen } from './words'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -365,8 +365,8 @@ function NoticeDialog({ accountId, plan, onClose }: { accountId: string; plan: B
           <>
             {message ? <Notice tone="danger" message={message} /> : null}
             <p className={styles.note}>今は試験運転です。LINE へは送らず、送る予定だけを記録します。</p>
-            <span className={styles.picked}><SettingCheckbox checked={remainingOne} onChange={setRemainingOne} label="残りが 1 回になったら知らせる" /><span>残りが 1 回になったら知らせる</span></span>
-            <span className={styles.picked}><SettingCheckbox checked={expiry} onChange={setExpiry} label="期限の 14 日前に知らせる" /><span>期限の 14 日前に知らせる</span></span>
+            <span className={styles.picked}><Toggle checked={remainingOne} onChange={setRemainingOne} label="残りが 1 回になったら知らせる" /><span>残りが 1 回になったら知らせる</span></span>
+            <span className={styles.picked}><Toggle checked={expiry} onChange={setExpiry} label="期限の 14 日前に知らせる" /><span>期限の 14 日前に知らせる</span></span>
           </>
         ) : null}
       </div>

@@ -1,10 +1,15 @@
+// @vitest-environment happy-dom
 import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
-import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { resolve } from 'node:path'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import SegmentedControl from '@/components/shared/segmented'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+afterEach(cleanup)
 
-const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const PAGE = readUiSource(resolve(__dirname, './page.tsx'), 'utf8')
+const API = readApiSource(resolve(__dirname, '../../lib/api.ts'), 'utf8')
 
 describe("管理画面 機能20 分析", () => {
   it('クロス分析とファネルは旧集計へ戻らず、版付きの不変結果を使う', () => {
@@ -88,7 +93,14 @@ describe("管理画面 機能20 分析", () => {
     expect(PAGE).toContain("id=\"cross-measure-event\"")
     expect(PAGE).toContain("kind: 'events'")
     // N-288: 期間切替は選択状態を持ち、棒・段は名前を持つ。
-    expect(readFileSync(new URL('../../components/shared/segmented.tsx', import.meta.url), 'utf8')).toContain('aria-pressed={option.value === value}')
+    const change=vi.fn(),options=[{value:'30',label:'30日'},{value:'7',label:'7日'}]
+    const view=render(createElement(SegmentedControl,{'aria-label':'期間',value:'30',options,onChange:change}))
+    expect(screen.getByRole('button',{name:'30日'}).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button',{name:'7日'}))
+    expect(change).toHaveBeenCalledWith('7')
+    view.rerender(createElement(SegmentedControl,{'aria-label':'期間',value:'7',options,onChange:change}))
+    expect(screen.getByRole('button',{name:'30日'}).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('button',{name:'7日'}).getAttribute('aria-pressed')).toBe('true')
     expect(PAGE).toContain('label="全体の流れ" disabled={!measurable}')
   })
 

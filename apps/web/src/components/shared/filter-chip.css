@@ -68,7 +68,7 @@
  * 選んだ札は  の薄い緑の地・緑の枠・濃い緑の文字。
  */
 :root .v6-filter-chip {
-  height: 36px;
+  height: var(--control-h);
   gap: calc(var(--tpl-toolbar-gap) / 2);
   padding: 0 var(--polish-space-field);
   font-size: var(--text-caption);
@@ -89,7 +89,7 @@
 }
 
 /* V8 正本 O2fCAt / XGJDa。 */
-:root .v6-filter-chip { height: 36px; border: 0; outline: 1px solid var(--color-control-border); box-shadow: var(--control-shadow); outline-offset: -1px; color: var(--color-ink); line-height: 18px; font-family: var(--font-sans); }
+:root .v6-filter-chip { height: var(--control-h); border: 0; outline: 1px solid var(--color-control-border); box-shadow: var(--control-shadow); outline-offset: -1px; color: var(--color-ink); line-height: 18px; font-family: var(--font-sans); }
 :root .v6-filter-chip[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); outline-color: var(--color-selection-border); box-shadow: none; }
 :root .v6-filter-chip__icon { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 :root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-selection-border); }
@@ -119,10 +119,13 @@
 :root .v6-filter-chip[aria-haspopup]:hover:not(:disabled) { background: var(--color-canvas-sunken); }
 
 /*
- * 奥行き（くっきり版）。選んでいない札は白い副ボタンと同じ薄いグラデと外周 1px の影、
- * 選んだ黒い札は上が少し明るい黒と内側の光。値は globals.css の共通の値。
+ * 奥行き（くっきり版）。押していない札は白い副ボタンと同じ薄いグラデと外周 1px の影、
+ * 押した札は薄い緑の地・緑の文字・左に ✓（黒い札は使わない）。値は globals.css の共通の値。
  */
 :root .v6-filter-chip:not([aria-pressed='true']):not(:hover) { outline-color: transparent; background: var(--gradient-raised-control) var(--color-canvas); box-shadow: var(--shadow-raised-control); }
 :root .v6-filter-chip:not([aria-pressed='true']):hover:not(:disabled) { outline-color: transparent; box-shadow: var(--shadow-raised-control); }
-:root .v6-filter-chip[aria-pressed='true'] { background: var(--gradient-selected-chip) var(--color-ink); box-shadow: var(--shadow-selected-chip); }
+:root .v6-filter-chip[aria-pressed='true'] { outline-color: transparent; background: var(--color-selection-bg); color: var(--color-selection-border); box-shadow: inset 0 0 0 1px var(--color-accent-border); }
+:root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: inherit; }
 :root .v6-filter-chip:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
+:root .v6-filter-chip__count[data-filter-count] { display: inline-flex; align-items: center; justify-content: center; min-width: var(--step-mark-size); height: var(--step-mark-size); padding-inline: var(--space-4); border-radius: var(--radius-pill); background: var(--color-choice-on); color: var(--color-on-accent); }

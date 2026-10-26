@@ -261,10 +261,11 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByText(READ_ONLY_MESSAGE)).toBeTruthy()
     expect(screen.queryByRole('link', { name: /成果地点を作る/ })).toBeNull()
     expect(screen.queryByRole('link', { name: '使う場所を足す' })).toBeNull()
-    // 1ページでも頁送りを出すV8。端の前/次だけは押せない（閲覧の境界）。変更操作は隠す。
+    // 1ページでは移動を置かず、閲覧のみの変更操作も隠す。
     const disabled = Array.from(document.querySelectorAll('button')).filter((button) => button.disabled)
     expect(disabled.filter((button) => !button.closest('[data-pagination]'))).toEqual([])
-    expect(disabled.map((button) => button.getAttribute('aria-label'))).toEqual(['前のページ', '次のページ'])
+    expect(disabled).toEqual([])
+    expect(screen.queryByRole('button', { name: '次のページ' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '成果地点「商品を買った」の操作' }))
     await flush()
     expect(screen.getByRole('menuitem', { name: '成果地点の詳細を見る' })).toBeTruthy()

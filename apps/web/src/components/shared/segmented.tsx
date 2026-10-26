@@ -22,6 +22,7 @@ export default function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  onClear,
   'aria-label': ariaLabel,
   className,
   size = 'medium',
@@ -29,12 +30,16 @@ export default function SegmentedControl<T extends string>({
   appearance = 'track',
   equalWidth = false,
   fit,
+  selectionMode = 'buttons',
 }: {
   id?: string
+  selectionMode?: 'buttons' | 'radio'
   invalid?: boolean
   options: { value: T; label: ReactNode; ariaLabel?: string; title?: string; count?: number | string }[]
   value: T
   onChange: (value: T) => void
+  /** 選択中をもう一度押したときだけ解除する。キーボードの移動では解除しない。 */
+  onClear?: () => void
   'aria-label': string
   className?: string
   /**
@@ -60,6 +65,7 @@ export default function SegmentedControl<T extends string>({
   /** 文字の幅へ器を収める。縦の入力・カードで横いっぱいに伸ばさない。 */
   fit?: 'content'
 }) {
+  const role = selectionMode === 'radio' ? 'radiogroup' : 'group'
   const field = useFieldContext()
   const bad = invalid || field?.invalid
   const rootRef = useRef<HTMLDivElement>(null)
@@ -107,10 +113,12 @@ export default function SegmentedControl<T extends string>({
 
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (disabled || options.length === 0) return
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    let next: number
+    if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = options.length - 1
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') next = (selectedIndex + (event.key === 'ArrowRight' ? 1 : -1) + options.length) % options.length
+    else return
     event.preventDefault()
-    const delta = event.key === 'ArrowRight' ? 1 : -1
-    const next = (selectedIndex + delta + options.length) % options.length
     onChange(options[next].value)
     itemRefs.current[next]?.focus()
   }
@@ -124,7 +132,7 @@ export default function SegmentedControl<T extends string>({
       data-invalid={bad || undefined}
       aria-describedby={field?.describedBy}
       style={bad ? { outline: '1px solid var(--color-danger)' } : undefined}
-      role="group"
+      role={role}
       aria-label={ariaLabel}
       className={[styles.root, className].filter(Boolean).join(' ')}
       data-size={size}
@@ -133,7 +141,7 @@ export default function SegmentedControl<T extends string>({
       data-segmented-fit={fit}
       onKeyDown={onKeyDown}
     >
-      <SlidingIndicator className={styles.thumb} left={thumb.left} width={thumb.width} selection={thumb.selection} />
+      {options.some(option => option.value === value) ? <SlidingIndicator className={styles.thumb} left={thumb.left} width={thumb.width} selection={thumb.selection} /> : null}
       {options.map((option, index) => (
         <button
           key={option.value}
@@ -147,11 +155,14 @@ export default function SegmentedControl<T extends string>({
             .join(' ')}
           data-part={appearance === 'track' ? 'joined-segment' : undefined}
           aria-label={option.ariaLabel ?? (option.count !== undefined && typeof option.label === 'string' ? `${option.label} ${option.count}` : undefined)}
-          title={option.title}
-          aria-pressed={option.value === value}
-          onClick={() => onChange(option.value)}
+          title={option.title ?? (equalWidth && typeof option.label === 'string' ? option.label : undefined)}
+          role={role === 'radiogroup' ? 'radio' : undefined}
+          tabIndex={role === 'radiogroup' ? (index === selectedIndex ? 0 : -1) : undefined}
+          aria-checked={role === 'radiogroup' ? option.value === value : undefined}
+          aria-pressed={role === 'group' ? option.value === value : undefined}
+          onClick={() => option.value === value && onClear ? onClear() : onChange(option.value)}
         >
-          {option.label}{option.count !== undefined ? <>{' '}<span className={styles.count} data-segment-count>{option.count}</span></> : null}
+          {option.label}{option.count !== undefined ? <>{size === 'panel' ? null : ' '}<span className={styles.count} data-segment-count>{option.count}</span></> : null}
         </button>
       ))}
     </div>

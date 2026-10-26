@@ -24,7 +24,6 @@ import { X } from 'lucide-react';
 import Notice from '@/components/shared/notice';
 import { notifyToast } from '@/components/shared/toast';
 import Select from '@/components/shared/select';
-import Checkbox from '@/components/shared/checkbox';
 import { Field, TextInput } from '@/components/shared/form-controls';
 import EventQuestionsEditor from '@/components/events/event-questions-editor';
 import DateField from '@/components/shared/date-field';
@@ -45,6 +44,7 @@ import { AddSlotDialog, EditSlotDialog } from "./edit-form-gap-parts"
 
 import { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
 import { formatNumber } from '@/lib/format'
+import { ToggleField } from '@/components/shared/toggle'
 export { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
 
 type Tab = 'overview' | 'slots' | 'publish'
@@ -447,12 +447,12 @@ function OverviewTab({
           placeholder="開催趣旨、注意事項、持ち物などを記載…"
         /></SaveErrorField>
       </Field>
-        <Checkbox
+        <ToggleField
           checked={draft.description_centered === 1}
-          onCheckedChange={(checked) => update('description_centered', checked ? 1 : 0)}
+          onChange={(checked) => update('description_centered', checked ? 1 : 0)}
         >
           詳細を中央揃えで表示
-        </Checkbox>
+        </ToggleField>
       </FormSection>
       {afterBasics}
       <FormSection id="ev-form-questions" title="申し込みのときに聞くこと" description="予約フォームに質問を追加できます。回答は申込の一覧で確認できます。">
@@ -894,7 +894,7 @@ export function BulkSlotDialog({
           selected={weekdays.includes(index)} onClick={() => toggleWeekday(index)}>{day}</SelectionButton>)}
       </div>
     </Field>
-    <Checkbox checked={divideBand} onCheckedChange={setDivideBand}>時間帯を同じ長さの枠に分ける</Checkbox>
+    <ToggleField checked={divideBand} onChange={setDivideBand}>時間帯を同じ長さの枠に分ける</ToggleField>
     {divideBand ? <FormSection id="ev-form-time-band" title="同じ長さの枠">
       <Field label="時間帯の開始"><SaveErrorField names={["bandStart","band_start"]}><TimeField value={bandStart} onChange={setBandStart} aria-label="時間帯の開始" /></SaveErrorField></Field>
       <Field label="時間帯の終了"><SaveErrorField names={["bandEnd","band_end"]}><TimeField value={bandEnd} onChange={setBandEnd} aria-label="時間帯の終了" /></SaveErrorField></Field>
@@ -937,14 +937,14 @@ function PublishTab({
   }, [tags])
   return <>
     <FormSection id="ev-form-publish" title="公開設定">
-      <Checkbox checked={draft.requires_approval === 1} onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
-        description={<>ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />OFF: 定員空きがあれば即時確定</>}>承認制</Checkbox>
+      <ToggleField checked={draft.requires_approval === 1} onChange={(checked) => update('requires_approval', checked ? 1 : 0)}
+        description={<>ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />OFF: 定員空きがあれば即時確定</>}>承認制</ToggleField>
       <Field label="承認の期限" htmlFor="ev-approval-deadline" note="期限を過ぎた申請は自動で期限切れになり、席を戻します。">
         <SaveErrorField names={["approval_deadline_hours"]}><Select id="ev-approval-deadline" aria-label="承認の期限" value={String(draft.approval_deadline_hours)} disabled={draft.requires_approval !== 1}
           onChange={(value) => update('approval_deadline_hours', Number(value))} options={APPROVAL_DEADLINE_OPTIONS} size="full" /></SaveErrorField>
       </Field>
-      <Checkbox checked={draft.waitlist_enabled === 1} onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
-        description={<>ON: 定員に達したあとも申込を受け、待ちとして記録する<br />OFF: 定員に達したら締め切る<br />待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。</>}>キャンセル待ちを受ける</Checkbox>
+      <ToggleField checked={draft.waitlist_enabled === 1} onChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+        description={<>ON: 定員に達したあとも申込を受け、待ちとして記録する<br />OFF: 定員に達したら締め切る<br />待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。</>}>キャンセル待ちを受ける</ToggleField>
       {tagPruned ? <Notice tone="warn" message="選んでいたタグは、今のアカウントにないため外しました。選び直してください。" onClose={() => setTagPruned(false)} /> : null}
       <Field label="公開対象" htmlFor="ev-visible-tag" note="絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。URL を直接開いても表示されません。">
         <SaveErrorField names={["visible_tag_id"]}><EntitySelect kind="tag" aria-label="公開対象" id="ev-visible-tag" value={draft.visible_tag_id ?? ''} onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
@@ -958,7 +958,7 @@ function PublishTab({
         <SaveErrorField names={["cancel_deadline_hours_before"]}><Select aria-label="キャンセル期限（友だち側）" value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
           onChange={(value) => update('cancel_deadline_hours_before', parseDeadlineSelect(value))} options={deadlineOptionsWithSaved(EVENT_CANCEL_DEADLINE_OPTIONS, draft.cancel_deadline_hours_before)} /></SaveErrorField>
       </Field>
-      <Checkbox checked={draft.reminder_day_before_enabled === 1} onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)} description="前日 18:00 JST に LINE で通知">前日リマインダ</Checkbox>
+      <ToggleField checked={draft.reminder_day_before_enabled === 1} onChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)} description="前日 18:00 JST に LINE で通知">前日リマインダ</ToggleField>
       <Field label="開始 N 時間前リマインダ">
         <SaveErrorField names={["reminder_hours_before"]}><Select aria-label="開始 N 時間前リマインダ" value={draft.reminder_hours_before == null ? 'off' : String(draft.reminder_hours_before)}
           onChange={(value) => update('reminder_hours_before', value === 'off' ? null : Number(value))}

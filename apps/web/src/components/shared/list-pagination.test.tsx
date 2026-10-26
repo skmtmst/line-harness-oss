@@ -5,12 +5,12 @@ import ListPagination from './list-pagination'
 
 afterEach(cleanup)
 
-it('全件が1ページなら件数と現在地を残し、移動は送らない', () => {
+it('全件が1ページなら件数だけを残し、移動の操作を出さない', () => {
   const change = vi.fn()
   render(<ListPagination total={4} page={1} pageSize={20} unit="人" onPageChange={change} />)
   expect(screen.getByText('4人中 1〜4人')).toBeTruthy()
-  expect(screen.getByRole('button', { name: '1ページ目へ' }).getAttribute('aria-current')).toBe('page')
-  fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+  expect(screen.queryByRole('button', { name: '1ページ目へ' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '次のページ' })).toBeNull()
   expect(change).not.toHaveBeenCalled()
 })
 

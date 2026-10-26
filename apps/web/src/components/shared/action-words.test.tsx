@@ -42,3 +42,10 @@ it('行の編集と確認窓の実行を統一し、別の動きと説明は保�
   expect(confirm).toHaveBeenCalledOnce()
   expect(screen.getByText('届く中身を変更します。')).toBeTruthy()
 })
+
+it('メニューの末尾の省略記号を外して、元の操作を呼ぶ', () => {
+  const reset = vi.fn()
+  render(<ActionMenu open items={[{ id: 'reset', label: '初期値に戻す…', tone: 'danger', onSelect: reset }]} onClose={() => {}} />)
+  fireEvent.click(screen.getByRole('menuitem', { name: '初期値に戻す', exact: true }))
+  expect(reset).toHaveBeenCalledOnce()
+})

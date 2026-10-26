@@ -224,7 +224,7 @@ describe('NEXT-17: クーポンの設定が保存値へ入る', () => {
   })
   it('抽選ありでは確率・当選上限の入力値がそのまま保存される', async () => {
     await renderEditor('coupon')
-    await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: '抽選する' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: '抽選する' })) })
     await setDateTime('使える期間の開始', '2026-10-01T09:00')
     await setDateTime('使える期間の終了', '2026-11-30T23:59')
     await act(async () => {

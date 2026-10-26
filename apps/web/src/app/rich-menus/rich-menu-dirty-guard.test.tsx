@@ -378,7 +378,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
 
     const radios = document.querySelectorAll<HTMLInputElement>('input[name="timing"]')
     fireEvent.click(radios[1])
-    fireEvent.click(screen.getByRole('checkbox', { name: '終わりを決める' }))
+    fireEvent.click(screen.getByRole('switch', { name: '終わりを決める' }))
     await flush()
     await pickDateTime('公開を始める日時', '2026-10-01T10:00')
     await pickDateTime('終わる日時', '2026-10-07T10:00')
@@ -699,7 +699,7 @@ describe('公開入力の下書き（localStorage）', () => {
 
     const radios = document.querySelectorAll<HTMLInputElement>('input[name="timing"]')
     fireEvent.click(radios[1])
-    fireEvent.click(screen.getByRole('checkbox', { name: '終わりを決める' }))
+    fireEvent.click(screen.getByRole('switch', { name: '終わりを決める' }))
     await flush()
     await pickDateTime('公開を始める日時', '2026-10-01T10:00')
     await pickDateTime('終わる日時', '2026-10-07T10:00')

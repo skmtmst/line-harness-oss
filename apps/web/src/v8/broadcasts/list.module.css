@@ -8,9 +8,8 @@
 .viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after); }
 
 .createFull { width: 100%; }
-/* 閲覧のみ：押せない「配信を作る」「フォルダを追加」「この条件を保存する」は置かず、場所だけ空ける。 */
+/* 閲覧のみ：押せない「配信を作る」「フォルダを追加」は置かず、場所だけ空ける。 */
 .viewerAddSpace { display: block; height: var(--tpl-fx4-viewer-add-h); }
-.viewerSpace { visibility: hidden; }
 
 .note {
   color: var(--color-ink-faint);
@@ -66,26 +65,6 @@
   align-items: center;
   gap: var(--tpl-toolbar-gap);
 }
-
-/* 枠の無い文字のボタン（この条件を保存する）。 */
-.ghostButton {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-bc-control-gap);
-  height: var(--tpl-chip-h);
-  padding: var(--tpl-bc-ghost-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-chip-label-lh);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.ghostButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
-.ghostButton:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 
 /* 並び（新しい順）：押すと古い順と入れ替わる。 */
 .sortButton {

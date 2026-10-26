@@ -153,12 +153,12 @@ it('下書きの配信したい日時を日本時間で残し、予約済みと�
 })
 
 describe('V8 NEN配信の一覧', () => {
-  it.each(['columns', 'history'] as const)('%sは1ページでも件数とページ送りを同じ帯に出す', async (tab) => {
+  it.each(['columns', 'history'] as const)('%sは1ページは件数だけを帯に出す', async (tab) => {
     await render(baseProps({ tab }))
-    const pager = within(host).getByRole('navigation', { name: 'ページ送り' })
+    const pager = host.querySelector('[data-pagination]')!
     expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe(tab === 'columns' ? '2件中 1〜2件' : '1件中 1〜1件')
-    expect(within(pager).getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
-    expect(within(pager).getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(within(pager as HTMLElement).queryByRole('button', { name: '前のページ' })).toBeNull()
+    expect(within(pager as HTMLElement).queryByRole('button', { name: '次のページ' })).toBeNull()
   })
 
   it('送信履歴の総数と実際に読めた範囲を分け、次ページのカーソルを渡す', async () => {
@@ -214,8 +214,8 @@ describe('V8 NEN配信の一覧', () => {
     expect(items).not.toContain('テスト送信')
     expect(items).not.toContain('編集する')
     // 閲覧のみには押せない更新を置かない。ページ送りの境界は残す。
-    expect(host.querySelector('[data-pagination] button[aria-label="前のページ"]')).toHaveProperty('disabled', true)
-    expect(host.querySelector('[data-pagination] button[aria-label="次のページ"]')).toHaveProperty('disabled', true)
+    expect(host.querySelector('[data-pagination] button[aria-label="前のページ"]')).toBeNull()
+    expect(host.querySelector('[data-pagination] button[aria-label="次のページ"]')).toBeNull()
     expect([...host.querySelectorAll('button[disabled]')].filter(b => !b.closest('[data-pagination]'))).toEqual([])
     await render(baseProps({ tab: 'columns' }))
     expect(host.textContent).not.toContain('コラムを書く')

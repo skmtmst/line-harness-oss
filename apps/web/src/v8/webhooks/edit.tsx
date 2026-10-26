@@ -10,6 +10,7 @@ import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 
 /**
@@ -182,7 +183,7 @@ function EditWebhookPageInner() {
           <p className="text-ink text-sm font-semibold">基本の設定</p>
 
           <Field label="名前" htmlFor="wh-edit-name" required>
-            <SaveErrorField names={["name"]}><input
+            <SaveErrorField names={["name"]}><SharedTextField
               id="wh-edit-name"
               type="text"
               value={name}
@@ -192,7 +193,7 @@ function EditWebhookPageInner() {
           </Field>
 
           <Field label="送り先のURL" htmlFor="wh-edit-url" required note="https:// のみです。">
-            <SaveErrorField names={["url"]}><input
+            <SaveErrorField names={["url"]}><SharedTextField
               id="wh-edit-url"
               type="url"
               value={url}
@@ -202,7 +203,7 @@ function EditWebhookPageInner() {
           </Field>
 
           <Field label="送るイベント" htmlFor="wh-edit-events" note="カンマ区切り。* を入れると全部のイベントを送ります。">
-            <SaveErrorField names={["eventTypes","event_types"]}><input
+            <SaveErrorField names={["eventTypes","event_types"]}><SharedTextField
               id="wh-edit-events"
               type="text"
               value={eventTypes}
@@ -217,7 +218,7 @@ function EditWebhookPageInner() {
             note="相手が 5xx を返したときや、つながらなかったときに送り直します。1分・5分・30分…と間隔を空け、上限は7回です。相手が 4xx を返した場合は送り直しません。"
           >
             <div className="flex items-center gap-1.5">
-              <SaveErrorField names={["maxRetries","max_retries"]}><input
+              <SaveErrorField names={["maxRetries","max_retries"]}><SharedTextField
                 id="wh-edit-retries"
                 type="number"
                 min={0}

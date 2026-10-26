@@ -453,10 +453,10 @@ it('通知の段は初回だけ取得し、段を移ってブラウザで戻っ�
   await render(<WebinarEditV8 />)
   expect(notificationReads).toBe(1)
   expect(host.textContent).not.toContain('保存していない変更があります')
-  const toggle = screen.getByRole('checkbox', { name: '申込のお礼', exact: true }) as HTMLInputElement
-  expect(toggle.checked).toBe(true)
+  const toggle = screen.getByRole('switch', { name: '申込のお礼', exact: true }) as HTMLInputElement
+  expect((toggle.getAttribute('aria-checked') === 'true')).toBe(true)
   await act(async () => { fireEvent.click(toggle) })
-  expect(toggle.checked).toBe(false)
+  expect((toggle.getAttribute('aria-checked') === 'true')).toBe(false)
   expect(host.textContent).toContain('保存していない変更があります')
   expect(puts.filter(row => row.path.endsWith('/notifications'))).toHaveLength(0)
   await act(async () => { screen.getByRole('button', { name: '基本設定に戻る', exact: true }).click() })
@@ -465,15 +465,15 @@ it('通知の段は初回だけ取得し、段を移ってブラウザで戻っ�
     window.dispatchEvent(new Event('popstate'))
   })
   expect(notificationReads).toBe(1)
-  const returned = screen.getByRole('checkbox', { name: '申込のお礼', exact: true }) as HTMLInputElement
+  const returned = screen.getByRole('switch', { name: '申込のお礼', exact: true }) as HTMLInputElement
   expect(returned).toBe(toggle)
-  expect(returned.checked).toBe(false)
+  expect((returned.getAttribute('aria-checked') === 'true')).toBe(false)
   const save = screen.getByRole('button', { name: '下書きを保存', exact: true }) as HTMLButtonElement
   expect(save.disabled).toBe(false)
   await act(async () => { save.click() })
   const writes = puts.filter(row => row.path.endsWith('/notifications'))
   expect(writes).toHaveLength(1)
   expect(writes[0].body).toMatchObject({ registrationEnabled: false })
-  expect(returned.checked).toBe(false)
+  expect((returned.getAttribute('aria-checked') === 'true')).toBe(false)
   expect(host.textContent).not.toContain('保存していない変更があります')
 })

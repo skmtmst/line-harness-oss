@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { Bookmark } from 'lucide-react'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 
 export default function AnalyticsPage() {
@@ -110,7 +111,7 @@ function SaveAnalysisAction({
       {open ? (
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor={`saved-analysis-${sourceKind}`} className="sr-only">保存する分析名</label>
-          <input
+          <SharedTextField
             id={`saved-analysis-${sourceKind}`}
             value={name}
             onChange={(event) => setName(event.target.value)}

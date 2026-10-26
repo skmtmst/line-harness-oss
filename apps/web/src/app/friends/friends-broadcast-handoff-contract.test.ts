@@ -27,7 +27,7 @@ describe('一覧 → 配信作成の条件引き継ぎ', () => {
     // R115: 本人の役割で判定する。アカウントの役割メモは使わない。
     expect(LIST_PAGE).toContain('canRunBulk(staffRole)')
     expect(LIST_PAGE).not.toContain('canRunBulk(selectedAccount')
-    expect(LIST_PAGE).toContain('data-broadcast-handoff')
+    // 実際に役割を変えたメニューの出し分けは scored-only-handoff-react で確認する。
   })
 
   it('配信作成は condition を形チェックし、壊れた値は採用せず警告を出す', () => {

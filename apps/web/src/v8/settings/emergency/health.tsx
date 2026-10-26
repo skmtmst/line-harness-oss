@@ -22,6 +22,7 @@ import { formatTime as polishFormatTime, formatDate as polishFormatDate, formatN
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * ★V8 運用状態 健全性チェック（Pencil ）。
@@ -225,7 +226,7 @@ export function OpenAlerts({
                 ) : null}
               </div>
               {openNoteId === alert.id && alert.status === 'open' ? (
-                <Field label="受領メモ。「受領を記録する」で記録します。" htmlFor={`operation-alert-note-${alert.id}`}><SaveErrorField names={["notes"]}><input
+                <Field label="受領メモ。「受領を記録する」で記録します。" htmlFor={`operation-alert-note-${alert.id}`}><SaveErrorField names={["notes"]}><SharedTextField
                     id={`operation-alert-note-${alert.id}`}
                     value={notes[alert.id] ?? ''}
                     maxLength={500}

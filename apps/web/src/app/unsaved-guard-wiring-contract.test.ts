@@ -398,7 +398,7 @@ const NOT_RENDERED: Record<string, string> = {
  * 画面を編集画面とみなし、分類を求める。
  */
 const EDITOR_SAVE_SIGNATURE = /(?:\bapi(?:\.[A-Za-z]+)+|\b[a-z][A-Za-z]*Api)\.(?:create|update|save|patch|upsert)[A-Za-z]*\(/
-const EDITOR_INPUT_SIGNATURE = /<(input|textarea|TextField|TextArea|Select|DateField|DateTimeField|TimeField)\b/g
+const EDITOR_INPUT_SIGNATURE = /<(input|textarea|TextField|TextArea|SharedTextField|SharedTextArea|Select|DateField|DateTimeField|TimeField)\b/g
 const EDITOR_MIN_INPUTS = 3
 
 /*

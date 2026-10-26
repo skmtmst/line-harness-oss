@@ -16,7 +16,6 @@ import Notice from '@/components/shared/notice'
 import SectionHeader from '@/components/shared/section-header'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import { Field } from '@/components/shared/form-controls'
@@ -538,7 +537,7 @@ export default function BookingMediaPage() {
             <div className={styles.switchRow}>
               {/* 閲覧のみには押せる形のスイッチを置かない。オン・オフは札で見せる。 */}
               {canManage ? (
-                <SaveErrorField names={["closeOn","allClose","close_on","all_close"]}><SettingCheckbox checked={closeOn} label="LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す" onChange={(next) => setAllClose(next)} /></SaveErrorField>
+                <SaveErrorField names={["closeOn","allClose","close_on","all_close"]}><Toggle checked={closeOn} label="LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す" onChange={(next) => setAllClose(next)} /></SaveErrorField>
               ) : <StatusBadge tone={closeOn ? 'success' : 'neutral'}>{closeOn ? 'オン' : 'オフ'}</StatusBadge>}
               <span className={styles.switchText}>
                 <span className={styles.switchTitle}>LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す</span>
@@ -548,7 +547,7 @@ export default function BookingMediaPage() {
             <div className={styles.switchRow}>
               {/* オフにすると LINE の知らせだけ止める（管理画面の「もう開けてよい」は残る）。閲覧のみは札。 */}
               {canManage && notice ? (
-                <SaveErrorField names={["notifyReopen","notice.notifyReopen","notify_reopen","notice.notify_reopen"]}><SettingCheckbox checked={notice.notifyReopen} label="キャンセルで席が空いたら「もう開けてよい」を知らせる" onChange={(next) => setNotice({ ...notice, notifyReopen: next })} /></SaveErrorField>
+                <SaveErrorField names={["notifyReopen","notice.notifyReopen","notify_reopen","notice.notify_reopen"]}><Toggle checked={notice.notifyReopen} label="キャンセルで席が空いたら「もう開けてよい」を知らせる" onChange={(next) => setNotice({ ...notice, notifyReopen: next })} /></SaveErrorField>
               ) : <StatusBadge tone={notice?.notifyReopen === false ? 'neutral' : 'success'}>{notice?.notifyReopen === false ? 'オフ' : 'オン'}</StatusBadge>}
               <span className={styles.switchText}>
                 <span className={styles.switchTitle}>キャンセルで席が空いたら「もう開けてよい」を知らせる</span>

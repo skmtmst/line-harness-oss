@@ -138,7 +138,7 @@ describe('V8 設定のサクサク感', () => {
     })
     await flush()
     // スイッチを1つ切って未保存にする。
-    const firstSwitch = host.querySelector('[type="checkbox"]') as HTMLElement
+    const firstSwitch = host.querySelector('[role="switch"]:not([aria-label*="まとめて"])') as HTMLElement
     expect(firstSwitch).not.toBeNull()
     await act(async () => { firstSwitch.click() })
     await flush()
@@ -155,7 +155,7 @@ describe('V8 設定のサクサク感', () => {
   it('先にほかの人が保存した時は編集を保ち、比べた後だけ再保存する', async () => {
     await act(async () => { root.render(<><SettingsPage /><ToastHost /></>) })
     await flush()
-    const firstSwitch = host.querySelector('[type="checkbox"]') as HTMLElement
+    const firstSwitch = host.querySelector('[role="switch"]:not([aria-label*="まとめて"])') as HTMLElement
     await act(async () => { firstSwitch.click() })
     const reason = host.querySelector('#feature-settings-reason') as HTMLInputElement
     await act(async () => { setInputValue(reason, '使わない機能を止める') })

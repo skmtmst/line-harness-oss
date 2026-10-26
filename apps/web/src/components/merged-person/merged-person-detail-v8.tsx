@@ -24,6 +24,7 @@ import { useMergedPerson } from './use-merged-person'
 import styles from '@/app/friends/friends-v8.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 function shortDate(iso: string): string {
   const d = new Date(iso)
@@ -292,7 +293,7 @@ export default function MergedPersonDetailViewV8({
         </p>
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-ink)' }}>
           <span>解除する理由<RequiredBadge /></span>
-          <SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><textarea
+          <SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><SharedTextArea
             value={m.unlinkReason}
             onChange={(event) => m.setUnlinkReason(event.target.value)}
             placeholder="確認した根拠を書いてください"

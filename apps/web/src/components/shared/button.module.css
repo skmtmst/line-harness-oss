@@ -397,3 +397,6 @@ html:root .button:is(.standard, .field, .compact)[data-text-content]:is(:not([da
   font-weight: 700;
   line-height: 20px;
 }
+
+/* 同じ操作の段では、部品の小型指定より共通の高さを優先する。 */
+html:root :is([data-toolbar-row], [data-control-row]) .button { height: var(--control-h); min-height: var(--control-h); }

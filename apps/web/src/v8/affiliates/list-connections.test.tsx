@@ -44,12 +44,12 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('成果一覧の接続', () => {
-  it.each(['offers', 'approvals', 'report'] as const)('%sは1ページでも件数と前後のページ送りがある', async tab => {
+  it.each(['offers', 'approvals', 'report'] as const)('%sは1ページなら件数だけを残す', async tab => {
     draw(tab)
-    const pager = await screen.findByRole('navigation', { name: 'ページ送り' })
-    expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('1件中 1〜1件')
-    expect(within(pager).getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
-    expect(within(pager).getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(await screen.findByText('1件中 1〜1件')).toBeTruthy()
+    expect(screen.queryByRole('navigation', { name: 'ページ送り' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '前のページ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '次のページ' })).toBeNull()
   })
   it.each(['offers', 'approvals', 'report'] as const)('%sの常設説明は題から開閉できる', async tab => {
     draw(tab)
@@ -85,7 +85,7 @@ describe('成果一覧の接続', () => {
     fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
     expect(data.exportCsv.mock.calls.at(-1)?.[1]).toHaveLength(22)
     fireEvent.change(screen.getByPlaceholderText('名前で探す'), { target: { value: '紹介者21' } })
-    await waitFor(() => expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('1件中 1〜1件'))
+    await waitFor(() => expect(container.querySelector('[data-pagination-summary]')?.textContent).toBe('1件中 1〜1件'))
     await waitFor(() => expect(window.location.search).not.toContain('page=2'))
     fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
     expect(data.exportCsv.mock.calls.at(-1)?.[1]).toHaveLength(2)

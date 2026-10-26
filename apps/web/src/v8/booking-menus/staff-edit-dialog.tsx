@@ -17,6 +17,7 @@ import { api, type BookingStaff } from '@/lib/api'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 /*
  * 予約スタッフの作成・編集の窓。管理画面 一覧（staff/page.tsx）と V8 予約設定の
@@ -81,7 +82,7 @@ export function StaffEditModal({
     <SaveErrorScope errors={saveErrors}><Dialog open title={form.id ? 'スタッフ編集' : '新規スタッフ'} onCancel={onClose} onConfirm={() => void submit()} confirmLabel="保存する" busy={saving} designWidth={560}>
         <div className="px-6 py-4 space-y-4">
           <Field label="内部名（管理用）" required>
-            <SaveErrorField names={["name","form.name"]}><input
+            <SaveErrorField names={["name","form.name"]}><SharedTextField
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
@@ -91,7 +92,7 @@ export function StaffEditModal({
             /></SaveErrorField>
           </Field>
           <Field label="表示名" required>
-            <SaveErrorField names={["display_name","form.display_name"]}><input
+            <SaveErrorField names={["display_name","form.display_name"]}><SharedTextField
               type="text"
               value={form.display_name ?? ''}
               onChange={(e) => set('display_name', e.target.value)}
@@ -101,7 +102,7 @@ export function StaffEditModal({
             /></SaveErrorField>
           </Field>
           <Field label="役職">
-            <SaveErrorField names={["role","form.role"]}><input
+            <SaveErrorField names={["role","form.role"]}><SharedTextField
               type="text"
               value={form.role ?? ''}
               onChange={(e) => set('role', e.target.value)}
@@ -121,7 +122,7 @@ export function StaffEditModal({
             http:// または https:// で始まるURLを入力してください。
           </p>
           <Field label="紹介文">
-            <SaveErrorField names={["bio","form.bio"]}><textarea
+            <SaveErrorField names={["bio","form.bio"]}><SharedTextArea
               value={form.bio ?? ''}
               onChange={(e) => set('bio', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.bio}

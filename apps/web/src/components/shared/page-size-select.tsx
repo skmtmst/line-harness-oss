@@ -10,7 +10,7 @@ export const PAGE_SIZE_SELECT_OPTIONS = pageSizeOptions(PAGE_SIZES)
 /**
  * 一覧ツールバーの表示件数（監査 #668）。
  *
- * 「表示件数」の字ラベルと `{N}件表示` の選択肢を1形にする。
+ * 可視の字ラベルを置かず、 `{N}件表示` の選択肢を1形にする。
  * 以前は画面ごとに「20件表示」「20件」「2件を表示」と書き方が違い、
  * 押せるのか表示だけなのか読み分けられなかった。
  * 選択肢の「件表示」は設計（design-structure.json）側の語でもある。
@@ -21,7 +21,7 @@ export default function PageSizeSelect({
   onChange,
   options = PAGE_SIZES,
   className,
-  label = '表示件数',
+  label: _label,
   ...rest
 }: {
   value: number
@@ -29,7 +29,7 @@ export default function PageSizeSelect({
   /** 選べる件数。既定は 10・20・50。 */
   options?: readonly number[]
   className?: string
-  /** 板  は字ラベルなし（箱に「20件表示」）。他は今のまま。 */
+  /** @deprecated 字ラベルは表示しない。読み上げ名は「表示件数」。 */
   label?: string | null
 } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange' | 'className' | 'size'>) {
   // Select は素の select の属性を全部は受けない。呼び出し側は value/onChange
@@ -37,7 +37,7 @@ export default function PageSizeSelect({
   const { disabled, id, name } = rest
   return (
     <label data-page-size className={['flex min-w-0 items-center gap-2', className].filter(Boolean).join(' ')}>
-      {label ? <span className="text-ink-faint text-xs whitespace-nowrap">{label}</span> : null}
+
       <Select
         size="page-size"
         value={String(value)}

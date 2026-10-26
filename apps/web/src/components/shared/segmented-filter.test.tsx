@@ -20,6 +20,8 @@ describe('絞り込みの切り替え', () => {
 
   it('件数を各項目の文字の後ろに小さく添える', () => {
     const { container } = render(<SegmentedControl aria-label="状態" options={[...OPTIONS]} value="all" onChange={() => {}} />)
+    expect(screen.getByRole('button', { name: 'すべて 5' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '要確認 3' }).getAttribute('aria-pressed')).toBe('false')
     const counts = [...container.querySelectorAll('[data-segment-count]')].map((node) => node.textContent)
     expect([counts, screen.getByRole('button', { name: '要確認 3' }).textContent]).toEqual([['5', '1', '3', '1'], '要確認 3'])
   })
@@ -33,4 +35,34 @@ describe('絞り込みの切り替え', () => {
     expect(onChange.mock.calls).toEqual([['warn'], ['all']])
   })
 
+})
+
+it('ラジオとして使う時は1つのTab入口を保ち、Home・Endで移動し、未選択へ戻せる', () => {
+  const onChange = vi.fn()
+  const { rerender } = render(<SegmentedControl selectionMode="radio" aria-label="対応状況" options={[{ value: 'open', label: '未対応' }, { value: 'done', label: '対応済み' }]} value="open" onChange={onChange} />)
+  const radios = screen.getAllByRole('radio')
+  expect(radios.map(node => [node.getAttribute('aria-checked'), node.tabIndex])).toEqual([['true', 0], ['false', -1]])
+  fireEvent.keyDown(radios[0], { key: 'End' })
+  expect(document.activeElement).toBe(radios[1])
+  fireEvent.keyDown(radios[1], { key: 'Home' })
+  expect(onChange.mock.calls).toEqual([['done'], ['open']])
+  rerender(<SegmentedControl<string> selectionMode="radio" aria-label="対応状況" options={[{ value: 'open', label: '未対応' }, { value: 'done', label: '対応済み' }]} value="all" onChange={onChange} />)
+  expect(screen.getAllByRole('radio').map(node => node.getAttribute('aria-checked'))).toEqual(['false', 'false'])
+})
+
+it('選択中の押し直しだけ解除し、キー移動と無効時は解除しない', () => {
+  const onChange=vi.fn(),onClear=vi.fn()
+  const props={selectionMode:'radio' as const,'aria-label':'状態',options:[{value:'open',label:'未対応'},{value:'done',label:'対応済み'}],value:'open',onChange,onClear}
+  const view=render(<SegmentedControl {...props}/>)
+  fireEvent.click(screen.getByRole('radio',{name:'未対応'}))
+  expect(onClear).toHaveBeenCalledOnce()
+  expect(onChange).not.toHaveBeenCalled()
+  fireEvent.keyDown(screen.getByRole('radio',{name:'未対応'}),{key:'End'})
+  expect(onChange).toHaveBeenCalledWith('done')
+  expect(onClear).toHaveBeenCalledOnce()
+  view.rerender(<SegmentedControl {...props} disabled/>)
+  fireEvent.click(screen.getByRole('radio',{name:'未対応'}))
+  fireEvent.keyDown(screen.getByRole('radio',{name:'未対応'}),{key:'End'})
+  expect(onChange).toHaveBeenCalledTimes(1)
+  expect(onClear).toHaveBeenCalledOnce()
 })

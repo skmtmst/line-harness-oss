@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import Checkbox, { CheckboxControl, SettingCheckbox } from './checkbox'
+import Checkbox, { CHECK_MARK_PATH, CheckboxControl, MINUS_MARK_PATH, SettingCheckbox } from './checkbox'
 import CheckCard from './check-card'
 
 afterEach(() => cleanup())
@@ -108,5 +108,41 @@ describe('チェックボックスは1種類', () => {
     const { container: plain } = render(<CheckboxControl checked onCheckedChange={() => {}} aria-label="店頭QR" />)
     const shape = (root: HTMLElement) => root.querySelector('input[type="checkbox"]')!.parentElement!.innerHTML.replace(/ (id|aria-[a-z]+)="[^"]*"/g, '')
     expect(shape(card)).toBe(shape(plain))
+  })
+})
+
+/** M・l・h だけの線の外接箱（viewBox の単位）。線の太さは上下左右に同じだけ足すので中心は変わらない。 */
+function pathBox(d: string) {
+  const points: Array<[number, number]> = []
+  let x = 0
+  let y = 0
+  for (const [, op, args] of d.matchAll(/([MLlh])([^MLlh]*)/g)) {
+    const nums = (args.match(/-?\d*\.?\d+/g) ?? []).map(Number)
+    if (op === 'h') { for (const dx of nums) { x += dx; points.push([x, y]) } continue }
+    for (let i = 0; i < nums.length; i += 2) {
+      if (op === 'l') { x += nums[i]; y += nums[i + 1] } else { x = nums[i]; y = nums[i + 1] }
+      points.push([x, y])
+    }
+  }
+  const xs = points.map(([px]) => px)
+  const ys = points.map(([, py]) => py)
+  return { cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2 }
+}
+
+describe('印は箱の真ん中（上下左右とも 0.5px 以内）', () => {
+  // 印は箱と同じ大きさ（--polish-icon-control 16px）で viewBox 24 を描く。1 単位＝16/24px。
+  const PX_PER_UNIT = 16 / 24
+  it.each([['✓', CHECK_MARK_PATH], ['－', MINUS_MARK_PATH]])('%s の外接箱の中心が (12, 12) から 0.5px 以内', (_name, d) => {
+    const { cx, cy } = pathBox(d)
+    expect(Math.abs(cx - 12) * PX_PER_UNIT).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(cy - 12) * PX_PER_UNIT).toBeLessThanOrEqual(0.5)
+  })
+  it('対照：前の ✓（M4 12l5 5L20 6）は判別できる形で中心から外れている', () => {
+    expect(pathBox('M4 12l5 5L20 6').cy).not.toBe(12)
+  })
+  it('部品は真ん中にそろえた印の線を描く', () => {
+    const { container } = render(<Checkbox checked onCheckedChange={() => {}} aria-label="選ぶ" />)
+    const paths = [...container.querySelectorAll('svg path')].map((path) => path.getAttribute('d'))
+    expect(paths).toEqual([CHECK_MARK_PATH, MINUS_MARK_PATH])
   })
 })

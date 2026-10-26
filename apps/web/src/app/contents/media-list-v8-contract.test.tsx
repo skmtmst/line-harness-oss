@@ -189,7 +189,8 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     expect(host!.querySelector('[aria-label="一覧で並べる"]')).not.toBeNull()
     const pager = host!.querySelector('[data-list-pager]')!
     expect(pager.textContent).not.toContain('管理者だけ')
-    expect(pager.querySelector('nav')).not.toBeNull()
+    expect(pager.querySelector('nav')).toBeNull()
+    expect(pager.textContent).toContain('3件中 1〜3件')
   })
   test('共通の表示切替から一覧へ移り、戻してもメディアと登録操作を保つ', async () => {
     await renderPage()

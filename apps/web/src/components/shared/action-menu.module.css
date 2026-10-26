@@ -12,7 +12,7 @@
   z-index: 60;
   display: flex;
   width: max-content;
-  min-width: 224px;
+  min-width: 0;
   max-width: min(320px, calc(100vw - 16px));
   max-height: min(70dvh, 20rem);
   flex-direction: column;

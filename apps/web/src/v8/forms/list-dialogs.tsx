@@ -21,6 +21,7 @@ import { Archive,TriangleAlert } from 'lucide-react';
 import type { Dispatch,SetStateAction } from 'react';
 import styles from './list.module.css';
 import { answerSubText,destinationText,formAnswerCount,formAnswerUrl,referenceLabel,subLineText,UNFILED_VALUE,type Form } from './model';
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 type RenderFormDialogsContext = {
   active: Form | null
@@ -335,7 +336,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
           </div>
         )}
       >
-        <Field label="フォーム名"><SaveErrorField names={["renameName","rename_name"]}><input
+        <Field label="フォーム名"><SaveErrorField names={["renameName","rename_name"]}><SharedTextField
             type="text"
             value={renameName}
             onChange={(e) => setRenameName(e.target.value)}

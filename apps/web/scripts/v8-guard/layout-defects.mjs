@@ -16,6 +16,7 @@ import scanFormRules from './form-rules-browser.mjs'
 import { collectReservationReading, assessReservationReading } from './reservation-reading-browser.mjs'
 import scanB244Rules from './rules-browser.mjs'
 import scanPolishRules from './polish-rules-browser.mjs'
+import scanControlRowHeights from './control-row-height-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
 export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/conversions', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }
@@ -35,7 +36,7 @@ export function identifyStableTargets(findings) {
 }
 export async function measurePage(page) {
   const reservationReading = assessReservationReading(await page.evaluate(collectReservationReading))
-  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanFormRules), ...await page.evaluate(scanB244Rules), ...await page.evaluate(scanPolishRules)]
+  const findings = [...await page.evaluate(scanLayoutDefects), ...await page.evaluate(scanOwnerRules), ...await page.evaluate(scanPendec2Rules), ...await page.evaluate(scanControlOverlap), ...await page.evaluate(scanFormRules), ...await page.evaluate(scanB244Rules), ...await page.evaluate(scanPolishRules), ...await page.evaluate(scanControlRowHeights)]
   return await page.evaluate(identifyStableTargets, [...findings, ...reservationReading])
 }
 async function measureRoute(browser, baseUrl, route, width) {

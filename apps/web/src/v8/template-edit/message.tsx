@@ -28,7 +28,7 @@ import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from 
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
 import { buildTemplatePreview, extractMessageUrls } from '../../components/templates/template-preview-model'
 import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateAccountBinding, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
@@ -611,7 +611,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                       <Link2 size={16} aria-hidden="true" className={styles.urlIcon} />
                       <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
                       <span className={styles.urlNote}>短縮して、押された数を数える</span>
-                      <SettingCheckbox checked locked label={`${url}を短縮して数える（いつもオン）`} />
+                      <Toggle checked locked label={`${url}を短縮して数える（いつもオン）`} />
                     </div>
                   ))}
                   <p className={styles.hint}>リンク名（計測に出る名前）と短縮URLは、配信のときに自動で付きます。</p>

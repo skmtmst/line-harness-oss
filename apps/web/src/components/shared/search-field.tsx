@@ -1,5 +1,6 @@
 'use client'
 
+import { inputPlaceholder } from './input-placeholder'
 import { LoaderCircle, Search, X } from 'lucide-react'
 import React, { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { InputHTMLAttributes } from 'react'
@@ -8,13 +9,15 @@ import { fitListSearchPlaceholder } from './search-field-size.mjs'
 import styles from './search-field.module.css'
 
 export interface SearchFieldProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'type' | 'aria-label'> {
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'type' | 'aria-label' | 'width'> {
   /**
    * #976 U087: 検索欄は見た目に常設ラベルがないので、placeholder だけだと
    * 入力後に「何を探す欄か」が残らず、読み上げでも名前を取れない。
    * 呼び出し側に名前を必須にする。「友だちを検索」のように目的語まで書く。
    */
   'aria-label': string
+  /** 外枠の幅。見本が長い欄は、文字と印を含めた幅を渡す。 */
+  width?: number | string
   loading?: boolean
   onChange: (value: string) => void
   onClear?: () => void
@@ -26,9 +29,10 @@ export interface SearchFieldProps
 
 /** Pencil V5 `phlR1` を正本にした検索欄。 */
 const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function SearchField(
-  { className, disabled, hidden, loading = false, onChange, onClear, updateMode = 'debounced', shortcut: _shortcut, value, onKeyDown, ...props },
+  { className, width, style, disabled, hidden, loading = false, onChange, onClear, updateMode = 'debounced', shortcut: _shortcut, value, onKeyDown, ...props },
   ref,
 ) {
+  const { width: styleWidth, ...inputStyle } = style ?? {}
   const [draft, setDraft] = useState(String(value ?? ''))
   const callback = useRef(onChange)
   callback.current = onChange
@@ -73,9 +77,11 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
       className={[styles.search, disabled ? styles.disabled : null, className]
         .filter(Boolean)
         .join(' ')}
+      style={width !== undefined || styleWidth !== undefined ? { width: width ?? styleWidth, maxWidth: '100%', flexShrink: 0 } : undefined}
       aria-busy={loading || undefined}
       hidden={hidden}
       data-design-node="phlR1"
+      data-search-field
     >
       <Search className={styles.searchIcon} aria-hidden="true" />
       <input
@@ -84,8 +90,10 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
         value={draft}
         disabled={disabled}
         className={styles.input}
+        style={inputStyle}
         onChange={(event) => { const next = event.target.value; setDraft(next); if (!composing.current && !(event.nativeEvent as InputEvent).isComposing) schedule(next) }}
         {...props}
+        placeholder={inputPlaceholder(props.placeholder)}
         onKeyDown={guardCompositionEnter(onKeyDown)}
         onCompositionStart={(event) => { composing.current = true; cancel(); props.onCompositionStart?.(event) }}
         onCompositionEnd={(event) => { composing.current = false; schedule(event.currentTarget.value); props.onCompositionEnd?.(event) }}

@@ -9,7 +9,6 @@ import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Wor
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import { ActionAddButton, ActionDragHandle, ActionRow, type ActionChoice } from '@/components/shared/action-list'
 import { useReorder } from '@/components/shared/row-actions'
 import { EntityPickerField } from '@/components/shared/entity-picker'
@@ -36,6 +35,8 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { scenarioReferenceData } from './scenario-reference-data'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import InlineSettings from '@/components/shared/inline-settings'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
+import { ToggleField } from '@/components/shared/toggle'
 
 /*
  * シナリオのアクションを編集する窓（設計 `管理画面 5 hz9ti 送信後のアクションを設定`）。
@@ -900,7 +901,7 @@ export default function ActionEditor({
                         <Button onClick={() => openCondition(action)}>{action.condition ? '条件ON' : '条件OFF'}</Button>
                       </>}>
                       <ActionConfigEditor action={action} accountId={selectedAccountId} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={config => save(action, { config })} />
-                      <SaveErrorField names={[`actions.${index}.repeatOnRefire`,`actions.${index}.repeat_on_refire`,"repeatOnRefire","action.repeatOnRefire","repeat_on_refire","action.repeat_on_refire"]}><Checkbox checked={action.repeatOnRefire} onCheckedChange={checked => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox></SaveErrorField>
+                      <SaveErrorField names={[`actions.${index}.repeatOnRefire`,`actions.${index}.repeat_on_refire`,"repeatOnRefire","action.repeatOnRefire","repeat_on_refire","action.repeat_on_refire"]}><ToggleField checked={action.repeatOnRefire} onChange={checked => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</ToggleField></SaveErrorField>
                     </ActionRow>)}
                     {actions.length === 0 && (
                       <p className="text-ink-faint rounded-card border-hairline border border-dashed py-8 text-center text-sm">
@@ -1047,7 +1048,7 @@ export function ActionConfigEditor({
           <SaveErrorField names={["fieldId","c.fieldId","field_id","c.field_id"]}><EntityPickerField label="友だち情報の項目" noun="友だち情報欄" items={fields} value={String(c.fieldId ?? '')} onChange={fieldId => onChange({ ...c, fieldId })} /></SaveErrorField>
           <span className="text-ink-secondary text-sm">に</span>
           {c.op !== 'clear' && (
-            <SaveErrorField names={["value","c.value"]}><input
+            <SaveErrorField names={["value","c.value"]}><SharedTextField
               value={String(c.value ?? '')}
               onChange={(e) => onChange({ ...c, value: e.target.value })}
               className={inputClass}
@@ -1127,12 +1128,12 @@ export function ActionConfigEditor({
                   />
                 ))}
               </RadioCardGroup>
-              <SaveErrorField names={["rememberPrevious","c.rememberPrevious","remember_previous","c.remember_previous"]}><Checkbox
+              <SaveErrorField names={["rememberPrevious","c.rememberPrevious","remember_previous","c.remember_previous"]}><ToggleField
                 checked={c.rememberPrevious === true}
-                onCheckedChange={(checked) => onChange({ ...c, rememberPrevious: checked })}
+                onChange={(checked) => onChange({ ...c, rememberPrevious: checked })}
               >
                 いま読んでいるシナリオを控えて、あとで「1つ前のシナリオを再開」で戻せるようにする
-              </Checkbox></SaveErrorField>
+              </ToggleField></SaveErrorField>
             </div>
           )}
         </div>
@@ -1151,7 +1152,7 @@ export function ActionConfigEditor({
             ]}
           /></SaveErrorField>
           <span className="text-ink-secondary text-sm">に</span>
-          <SaveErrorField names={["value","c.value"]}><input
+          <SaveErrorField names={["value","c.value"]}><SharedTextField
             value={String(c.value ?? '')}
             onChange={(e) => onChange({ ...c, value: e.target.value })}
             className={inputClass}
@@ -1171,7 +1172,7 @@ export function ActionConfigEditor({
       )
 
     case 'send_message':
-      return <SaveErrorField names={["content","c.content"]}><textarea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} placeholder="送信する本文" /></SaveErrorField>
+      return <SaveErrorField names={["content","c.content"]}><SharedTextArea value={String(c.content ?? '')} onChange={(e) => onChange({ ...c, content: e.target.value })} placeholder="送信する本文" /></SaveErrorField>
     case 'send_template': {
       const templateId = typeof c.templateId === 'string' ? c.templateId : ''
       const selected = templates.find((t) => t.id === templateId)

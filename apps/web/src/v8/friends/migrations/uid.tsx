@@ -13,6 +13,7 @@ import { PageFrame } from '@/components/templates/page-frame'
 import { PageFooter } from '@/components/templates/page-footer'
 import { Steps } from '@/components/templates/steps'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import KpiCard from '@/components/shared/kpi-card'
@@ -180,13 +181,13 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                     ['conflict', `競合 ${formatNumber(active.counts.conflict)}`],
                     ['unmatched', `一致しない ${formatNumber(active.counts.unmatched)}`],
                   ] as Array<[ItemClassification, string]>).map(([value, label]) => (
-                    <button key={value} type="button" aria-pressed={m.classification === value} className={m.classification === value ? `${styles.chip} ${styles.chipOn}` : styles.chip} onClick={() => m.onFilterChange(active.id, m.classification === value ? '' : value, m.pendingOnly)}>
+                    <FilterChip key={value} selected={m.classification === value} onChange={() => m.onFilterChange(active.id, m.classification === value ? '' : value, m.pendingOnly)}>
                       {label}
-                    </button>
+                    </FilterChip>
                   ))}
-                  <button type="button" aria-pressed={m.pendingOnly} className={m.pendingOnly ? `${styles.chip} ${styles.chipOn}` : styles.chip} onClick={() => m.onFilterChange(active.id, m.classification, !m.pendingOnly)}>
+                  <FilterChip selected={m.pendingOnly} onChange={() => m.onFilterChange(active.id, m.classification, !m.pendingOnly)}>
                     {`未判断 ${m.unresolved == null ? emptyValue('unknown') : formatNumber(m.unresolved)}`}
-                  </button>
+                  </FilterChip>
                 </div>
                 <span className={styles.spacer} />
                 {canDecideItems && !decisionsLocked && bulkTargets.length > 0 ? (

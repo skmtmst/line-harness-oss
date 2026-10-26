@@ -48,6 +48,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { formatMileageDate } from './display'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 /*
  * ★V8 マイル「友だちの残高」（板 、状態は見本帳 ）。
@@ -551,7 +552,7 @@ export default function BalancesTab() {
           onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
           onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
         >
-          <Field label="差し戻す理由"><SaveErrorField names={["rejectReason","reject_reason"]}><textarea
+          <Field label="差し戻す理由"><SaveErrorField names={["rejectReason","reject_reason"]}><SharedTextArea
               className={styles.textarea}
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}

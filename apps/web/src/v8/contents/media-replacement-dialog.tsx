@@ -16,6 +16,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 export default function MediaReplacementDialog({
   source,
@@ -186,7 +187,7 @@ export default function MediaReplacementDialog({
               setCandidateQuery(candidateQueryInput.trim())
             }}
           >
-            <SaveErrorField names={["candidateQueryInput","candidate_query_input"]}><input
+            <SaveErrorField names={["candidateQueryInput","candidate_query_input"]}><SharedTextField
               type="text"
               aria-label="差し替え候補を名前で探す"
               placeholder="名前で探す"

@@ -2,12 +2,16 @@ import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import { useState } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import TemplateDefinitionEditor, { definitionError, definitionForName, freshDefinition } from './template-definition-editor'
 import { loadCreationAttempt, persistCreationAttempt } from '@/lib/hq-template-create-attempt'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import type { MessageTemplateDefinition } from '@/lib/hq-templates-api'
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { messageReferences: vi.fn(), uploadImage: vi.fn() } }))
+async function choose(label: string, option: string) {
+  fireEvent.click(screen.getByRole('button',{name:label,exact:true}))
+  fireEvent.click(within(await screen.findByRole('option',{name:option,exact:true})).getByRole('button'))
+}
 let captured: MessageTemplateDefinition
 function Harness() {
   const [value, setValue] = useState(definitionForName('template',freshDefinition('template'),'案内','') as MessageTemplateDefinition)
@@ -21,13 +25,13 @@ test('V8 titles and four button types save together and restore after an uncerta
   render(<Harness />)
   fireEvent.change(screen.getByLabelText('ひな形のタイトル'),{target:{value:'新商品'}})
   fireEvent.change(screen.getByLabelText('配信する本文'),{target:{value:'本文'}})
-  fireEvent.change(screen.getByLabelText('ひな形の形式'),{target:{value:'flex'}})
+  await choose('ひな形の形式','カード型')
   await waitFor(() => expect(hqTemplatesApi.messageReferences).toHaveBeenCalled())
   for (const action of ['url','message','form','scenario']) {
     fireEvent.click(screen.getByRole('button',{name:'ボタンを追加'}))
     const n = captured.card!.buttons.length
     fireEvent.change(screen.getByLabelText(`ボタン${n}の文字`),{target:{value:'開く'}})
-    fireEvent.change(screen.getByLabelText(`ボタン${n}を押したとき`),{target:{value:action}})
+    await choose(`ボタン${n}を押したとき`,{url:'URLを開く',message:'テキストを送る',form:'回答フォーム',scenario:'シナリオを開始'}[action]!)
     if(action === 'form' || action === 'scenario') {
       await pickEntity(`ボタン${n}の参照先`, action === 'form' ? '回答（本店）' : '案内（本店）')
     } else fireEvent.change(screen.getByLabelText(`ボタン${n}の内容`),{target:{value:action === 'url' ? 'https://example.com' : '問い合わせ'}})
@@ -46,7 +50,7 @@ test('failed reference lookup preserves typed title and body on retry', async ()
   vi.mocked(hqTemplatesApi.messageReferences).mockRejectedValueOnce(new Error('offline')).mockResolvedValue([])
   render(<Harness />)
   fireEvent.change(screen.getByLabelText('配信する本文'),{target:{value:'入力を残す'}})
-  fireEvent.change(screen.getByLabelText('ひな形の形式'),{target:{value:'flex'}})
+  await choose('ひな形の形式','カード型')
   fireEvent.click(await screen.findByRole('button',{name:'参照先を再読み込み'}))
   await waitFor(()=>expect(screen.queryByRole('alert')).toBeNull())
   expect(captured.card!.body).toBe('入力を残す')

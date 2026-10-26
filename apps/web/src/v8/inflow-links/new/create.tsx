@@ -7,7 +7,7 @@ const FIELD_REQUIREMENTS = {
 }
 
 
-import Toggle from '@/components/shared/toggle';
+import Toggle, { ToggleField } from '@/components/shared/toggle'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand, SaveConflictCompareTable } from '@/components/shared/save-conflict'
@@ -33,7 +33,6 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
-import Checkbox from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { focusField } from '../focus-field'
 import { groupTagsByFolder } from './tag-options'
@@ -527,7 +526,7 @@ function InflowCreate() {
           <p className={styles.cardNote}>上の「見分けるための文字」を決めると、発行されるURLがここに出ます。例のURLは実際には開けないので配らないでください。</p>
         ) : null}
         {/* 絵には無いが、公開オフで仕込む口は残す（URL の発行の話なのでこの段の最後に置く）。 */}
-        <SaveErrorField names={["isActive","is_active"]}><Checkbox checked={isActive} onCheckedChange={setIsActive} description={isActive ? '発行すると、すぐにこのURLが使えます。' : '公開オフのまま発行すると、URLを開いても友だち追加できません。'}>発行したらすぐ使えるようにする</Checkbox></SaveErrorField>
+        <SaveErrorField names={["isActive","is_active"]}><ToggleField checked={isActive} onChange={setIsActive} description={isActive ? '発行すると、すぐにこのURLが使えます。' : '公開オフのまま発行すると、URLを開いても友だち追加できません。'}>発行したらすぐ使えるようにする</ToggleField></SaveErrorField>
       </Card>
 
       <Dialog
