@@ -222,5 +222,21 @@ export default function scanPolishRules() {
     const crowded = boxes.some((o) => o.el !== el && !o.el.contains(el) && !el.contains(o.el) && o.box.left < zone.right && o.box.right > zone.left && o.box.top < zone.bottom && o.box.bottom > zone.top)
     if (crowded) add('hit-size', el, { width: Math.round(w), height: Math.round(h) }, el.getAttribute('aria-label') || el.textContent)
   }
+  // 色の地の四角・丸の中の印（§6.5 の 5）：印の中心と箱の中心の差は上下・左右とも 0.5 以内。
+  for (const svg of document.querySelectorAll('svg')) {
+    if (!visible(svg)) continue
+    const sr = svg.getBoundingClientRect()
+    if (sr.width > 40) continue
+    let box = svg.parentElement
+    for (let hop = 0; box && hop < 3; hop++, box = box.parentElement) {
+      const bc = css(box), br = box.getBoundingClientRect()
+      const filled = !/rgba\(0, 0, 0, 0\)|transparent/.test(bc.backgroundColor)
+      if (!filled || br.width > 64 || br.height > 64 || br.width < sr.width + 4 || parseFloat(bc.borderTopLeftRadius) <= 0) continue
+      if (box.textContent.trim() || box.querySelectorAll('svg').length !== 1 || [...box.querySelectorAll('*')].some((el) => el !== svg && !svg.contains(el) && !el.contains(svg) && visible(el))) break
+      const dx = Math.abs((br.left + br.right) / 2 - (sr.left + sr.right) / 2), dy = Math.abs((br.top + br.bottom) / 2 - (sr.top + sr.bottom) / 2)
+      if (dx > 0.5 || dy > 0.5) add('box-icon-center', box, { dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10 })
+      break
+    }
+  }
   return findings
 }

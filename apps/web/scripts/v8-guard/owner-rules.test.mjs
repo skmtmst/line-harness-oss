@@ -90,7 +90,7 @@ test('印が 16・20 以外の大きさや 1.75 以外の線だと落ち、左�
     const page = await browser.newPage()
     const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => !['selection-color', 'tap-highlight'].includes(kind))
     const icon = (size, stroke = 1.75, cls = 'lucide') => `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}"><path d="M4 12h16"/></svg>`
-    await page.setContent(`<main><button>${icon(16)}保存</button><h2>${icon(20)}見出し</h2><div data-list-state="empty">${icon(40)}</div><span style="display:inline-flex;width:16px;height:16px;border-radius:50%;background:#087a3e">${icon(10)}</span></main><aside><a class="sidebar_item__x" href="#">${icon(18)}友だち</a></aside>`)
+    await page.setContent(`<main><button>${icon(16)}保存</button><h2>${icon(20)}見出し</h2><div data-list-state="empty">${icon(40)}</div><span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#087a3e">${icon(10)}</span></main><aside><a class="sidebar_item__x" href="#">${icon(18)}友だち</a></aside>`)
     assert.deepEqual(await kinds(), [])
     await page.setContent(`<main><button>${icon(14)}保存</button></main>`)
     assert.ok((await kinds()).includes('icon-size'))
@@ -229,5 +229,18 @@ test('押せる所が 24 未満で上下の隣と近いと落ち、透明な当�
     assert.deepEqual(await kinds(), [])
     await page.setContent('<main><p>説明の文の中の <a href="#">リンク</a> は数えない。</p><a href="#" style="display:inline-block;margin:40px">離れた小さなリンク</a></main>')
     assert.deepEqual(await kinds(), [])
+  } finally { await browser.close() }
+})
+
+test('色の地の箱の中の印が真ん中から 0.5 より離れると落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind === 'box-icon-center')
+    const box = style => `<main><span style="display:grid;place-items:center;width:32px;height:32px;border-radius:8px;background:#e8f8ee;${style}"><svg width="16" height="16" viewBox="0 0 24 24" style="display:block"></svg></span></main>`
+    await page.setContent(box(''))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(box('padding-top:3px;box-sizing:border-box'))
+    assert.deepEqual(await kinds(), ['box-icon-center'])
   } finally { await browser.close() }
 })
