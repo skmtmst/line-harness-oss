@@ -4,7 +4,7 @@ import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
 import { HorizontalBarChart } from '@/components/shared/charts'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
 import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListState from '@/components/shared/list-state'
@@ -578,7 +578,7 @@ function Responses() {
                         } />
                         <Td className={styles.ellipsis} title={first}>{first}</Td>
                         <Td>
-                          {incomplete === null ? <span className={styles.faint}>{emptyValue('unknown')}</span>
+                          {incomplete === null ? <EmptyCell />
                             : <StatusBadge tone={incomplete ? 'danger' : 'success'}>{incomplete ? '未完' : '済み'}</StatusBadge>}
                         </Td>
                         {canDeleteResponse ? <ActionCell><RowMenu size="row" label={`回答 ${item.id} の操作`} items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(item) }]} /></ActionCell> : null}

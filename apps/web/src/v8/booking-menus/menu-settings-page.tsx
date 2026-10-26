@@ -42,6 +42,7 @@ export default function MenuSettingsPage({ accountId, tabNode, canEditMenus, men
     {accountId ? <MenusTabV8
       accountId={accountId} menus={menus} status={menusStatus} error={menusError}
       menuCount={settings?.menuCount} canEdit={canEditMenus} onReload={reloadCore}
+      onOpenStaff={() => requestTab('staff')}
     /> : <StateCard icon={<AccountIcon />} title="LINEアカウントを選んでください"
       description="共通メニューで、予約設定を開くLINEアカウントを選んでください。" />}
   </CreatePage>

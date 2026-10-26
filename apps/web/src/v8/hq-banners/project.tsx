@@ -60,6 +60,7 @@ import styles from './project.module.css'
 import ReferenceFrame from './reference-frame'
 import { bannerFailureMessage,tileLabel } from './words'
 import { formatNumber } from '@/lib/format'
+import StatusBadge from '@/components/shared/status-badge'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound' | 'missing'
 type Filter = 'all' | 'favorite' | 'delivered'
@@ -668,7 +669,7 @@ function ProjectInner() {
                     <div className={styles.tileMeta}>
                       <TruncatedText className={styles.metaText} value={tileLabel(presets.find((p) => p.key === image.generation?.presetKey), image)} />
                       <span className={styles.spacer} />
-                      {image.deliveredAccountIds.length > 0 ? <span className={styles.pillOk}><span className={styles.dot} aria-hidden="true" />配布済み</span> : null}
+                      {image.deliveredAccountIds.length > 0 ? <StatusBadge tone="success">配布済み</StatusBadge> : null}
                       {canManage ? (
                         <button type="button" data-part="attention-star" className={styles.star} onClick={(event) => attentionMotion(event, () => toggleImageFavorite(image))} aria-pressed={image.isFavorite} aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}>
                           <Star aria-hidden="true" className={image.isFavorite ? styles.starOn : styles.starOff} />

@@ -21,6 +21,7 @@ import { Archive,TriangleAlert } from 'lucide-react';
 import type { Dispatch,SetStateAction } from 'react';
 import styles from './list.module.css';
 import { answerSubText,destinationText,formAnswerCount,formAnswerUrl,referenceLabel,subLineText,UNFILED_VALUE,type Form } from './model';
+import StatusBadge from '@/components/shared/status-badge'
 
 type RenderFormDialogsContext = {
   active: Form | null
@@ -174,15 +175,9 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
             /> : <p className={styles.panelValue}>{displayFormName(active.name)}</p>}
             <p className={styles.panelLabel}>状態</p>
             <p className={styles.panelValueRow}>
-              <span className={styles.statusPill} data-tone={active.isActive ? 'live' : 'draft'}>
-                <span className={styles.dot} aria-hidden="true" />
-                {active.isActive ? '公開中' : '下書き'}
-              </span>
+              <StatusBadge tone={active.isActive ? 'success' : 'neutral'}>{active.isActive ? '公開中' : '下書き'}</StatusBadge>
               {(active.pendingPostActionCount ?? 0) > 0 ? (
-                <span className={styles.pendingBadge}>
-                  <span className={styles.dot} aria-hidden="true" />
-                  {`後処理の未完 ${active.pendingPostActionCount}`}
-                </span>
+                <StatusBadge tone="danger">{`後処理の未完 ${active.pendingPostActionCount}`}</StatusBadge>
               ) : null}
             </p>
             <p className={styles.panelLabel}>保存先</p>

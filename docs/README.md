@@ -803,5 +803,6 @@
 - [使っている部品に重大な弱点が見つかった週は、自動の点検が赤くなって分かるようにし](release-log/unreleased/1840-kenta-audit-weekly-red.md)
 - [統括のアカウントのカードの高さとボタンの位置を、同じ行でそろえた](release-log/unreleased/1841-kenta-hq-card-height.md)
 - [最初の10分の全アカウントのまとめ（運営だけ）](release-log/unreleased/1843-kenta-funnel-summary.md)
+- [状態の札を地の色のある札にそろえた](release-log/unreleased/1842-kenta-status-chip.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

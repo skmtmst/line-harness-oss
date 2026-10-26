@@ -12,8 +12,9 @@ import Button from '@/components/shared/button'
 import Checkbox,{ UnavailableSelection } from '@/components/shared/checkbox'
 import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-menu'
 import EmptyList from '@/components/shared/empty-list'
+import IconLabel from '@/components/shared/icon-label'
 import { emptyValue } from '@/components/shared/empty-value'
-import { folderDisplayColor,type FolderDotFolder } from '@/components/shared/folder-dot'
+import { type FolderDotFolder } from '@/components/shared/folder-dot'
 import ListDateTime from '@/components/shared/list-date-time'
 import Link from '@/components/shared/list-navigation'
 import ListState from '@/components/shared/list-state'
@@ -22,10 +23,9 @@ import { RovingTbody } from '@/components/shared/row-roving'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable,NameCell,RowNameLink,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
-import TagPill from '@/components/shared/tag-pill'
 import TruncatedText from '@/components/shared/truncated-text'
 import { formatListTimestamp,formatNumber } from '@/lib/format'
-import { FileText,Folder as FolderIcon,Trash2 } from 'lucide-react'
+import { FileText,Folder as FolderIcon,GalleryHorizontal,HelpCircle,Image as ImageIcon,LayoutTemplate,Trash2,Video } from 'lucide-react'
 import type { Dispatch,SetStateAction } from 'react'
 import LineBubbleThumb from './line-bubble-thumb'
 import { bubbleThumbOf } from './line-bubble-thumb-model'
@@ -75,6 +75,10 @@ type RenderTemplateListContext = {
   usedSelectedCount: number
   view: TemplatesListView
 }
+
+/** 種類の小さな印（色なし）。1行の色の点はフォルダだけにする。 */
+const KIND_ICONS = { image: ImageIcon, flex: LayoutTemplate, carousel: GalleryHorizontal, question: HelpCircle, video: Video } as const
+const kindIcon = (kind: string) => KIND_ICONS[kind as keyof typeof KIND_ICONS] ?? FileText
 
 export function renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, openPicker, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: RenderTemplateListContext) {
   return (accountLoading || view === 'loading' ? (
@@ -188,7 +192,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                     />
                     {narrow ? (
                       <Td>
-                        <TagPill name={kindText} color={folder ? folderDisplayColor(folder) : undefined} aria-label={`種類：${kindText}`} />
+                        <IconLabel icon={kindIcon(isRichVideoTemplate(t) ? 'video' : kindLabel)} aria-label={`種類：${kindText}`}>{kindText}</IconLabel>
                       </Td>
                     ) : (
                       <Td className={styles.previewCell} title={`種類：${kindText}`}>
@@ -197,7 +201,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                       </Td>
                     )}
                     <Td>
-                      <StatusBadge tone={publish.tone === 'live' ? 'success' : publish.tone === 'changes' ? 'warning' : 'neutral'}>
+                      <StatusBadge tone={publish.tone === 'live' ? 'success' : publish.tone === 'changes' ? 'caution' : 'neutral'}>
                         {publish.label}
                       </StatusBadge>
                     </Td>

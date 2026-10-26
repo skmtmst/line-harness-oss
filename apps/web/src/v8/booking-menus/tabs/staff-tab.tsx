@@ -256,10 +256,9 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
               })() : <span className={styles.staffCellMain}>…</span>}
             </span>
             <span className={styles.staffColLink}>
-              <span className={`${styles.linkState} ${extra?.calendar === 'connected' ? styles.linkStateOn : ''}`}>
-                <span className={styles.linkStateDot} aria-hidden="true" />
+              <StatusBadge tone={extra?.calendar === 'connected' ? 'success' : extra?.calendar === 'error' ? 'caution' : 'neutral'}>
                 {extra?.calendar === 'connected' ? 'つながっている' : extra?.calendar === 'error' ? '確認できません' : 'つないでいない'}
-              </span>
+              </StatusBadge>
               <span className={styles.staffCellSub}>ログイン：{memberLabel(person)}</span>
             </span>
             <span className={styles.staffColStatus}>

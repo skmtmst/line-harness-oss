@@ -4,11 +4,12 @@ import { pathToFileURL } from 'node:url'
 import postcss from 'postcss'
 
 export const RULE_VALUES = {
-  '--color-badge-neutral-bg': '#ffffff', '--color-badge-neutral': '#1d1d1f',
-  '--color-badge-success-bg': '#ffffff', '--color-badge-success': '#1d1d1f',
-  '--color-badge-warning-bg': '#ffffff', '--color-badge-warning': '#c2410c',
-  '--color-badge-danger-bg': '#ffffff', '--color-badge-danger': '#b91c1c',
-  '--color-badge-info-bg': '#ffffff', '--color-badge-info': '#1d1d1f',
+  '--color-badge-neutral-bg': '#eef0f3', '--color-badge-neutral': '#3a3f47',
+  '--color-badge-success-bg': '#e3f4ea', '--color-badge-success': '#08703a',
+  '--color-badge-warning-bg': '#fff1e0', '--color-badge-warning': '#a24d00',
+  '--color-badge-danger-bg': '#fde8e7', '--color-badge-danger': '#b3261e',
+  '--color-badge-info-bg': '#e8effd', '--color-badge-info': '#1d4fd7',
+  '--polish-status-caution-bg': '#fdf3d6', '--polish-status-caution-ink': '#8a5a00',
   '--text-body': '13px', '--text-label': '12px', '--text-caption': '12px',
   '--radius-segment': '10px', '--color-table-head': '#f7f8fa',
   '--color-focus-ring': '#2563eb',
