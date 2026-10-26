@@ -25,7 +25,7 @@ export type BellItem = {
 
 export type BellPopoverState = 'loading' | 'ready' | 'error' | 'no-account'
 
-export type BellPopoverProps = {
+export type BellPopoverProps<F extends string = BellFilter> = {
   open: boolean
   onClose: () => void
   /** 開くボタン（ベル）。外を押したかの判定と、Esc で焦点を戻す先。 */
@@ -37,8 +37,14 @@ export type BellPopoverProps = {
   /** 見せる行（呼ぶ側で未読が先・新しい順にし、5件までに切る）。 */
   items: BellItem[]
   unreadCount: number
-  filter: BellFilter
-  onFilterChange: (filter: BellFilter) => void
+  filter: F
+  onFilterChange: (filter: F) => void
+  /** 種類のタブ。省くと「すべて・エラー・アップデート」。 */
+  filters?: { value: F; label: string }[]
+  /** 題と読み上げの名前。省くと「お知らせ」。 */
+  title?: string
+  /** 行が無いときの文。省くと「{題}はまだありません。」。 */
+  emptyText?: string
   errorMessage?: string
   onRetry?: () => void
   onSelect: (id: string) => void
@@ -64,8 +70,9 @@ const PERIODS: { value: BellItem['period']; label: string }[] = [
  * ページを移らずにベルの下へ出す（role="dialog"・モーダルではない）。
  * 外を押す・Esc で閉じ、Esc のときは焦点をベルへ戻す。
  * 中身（取得・既読）は呼ぶ側が持つ。ここは見た目と開閉だけ。
+ * タブ・題・空の文は差し替えられる（通知の小窓は「すべて・未読・システム」）。
  */
-export default function BellPopover({
+export default function BellPopover<F extends string = BellFilter>({
   open,
   onClose,
   getAnchor,
@@ -76,15 +83,18 @@ export default function BellPopover({
   unreadCount,
   filter,
   onFilterChange,
+  filters,
+  title = 'お知らせ',
+  emptyText,
   errorMessage,
   onRetry,
   onSelect,
   onMarkAllRead,
   onViewAll,
-}: BellPopoverProps) {
+}: BellPopoverProps<F>) {
   const panelRef = useRef<HTMLElement>(null)
 
-  // 開いたら小窓へ焦点を移す（読み上げは「お知らせ ダイアログ」）。
+  // 開いたら小窓へ焦点を移す（読み上げは「{題} ダイアログ」）。
   useEffect(() => {
     if (!open) return
     const frame = window.requestAnimationFrame(() => panelRef.current?.focus())
@@ -111,13 +121,13 @@ export default function BellPopover({
         ref={panelRef}
         id={id}
         role="dialog"
-        aria-label="お知らせ"
+        aria-label={title}
         tabIndex={-1}
         className={styles.panel}
         data-design-node="mV28V"
       >
         <header className={styles.head}>
-          <h2 className={styles.title}>お知らせ</h2>
+          <h2 className={styles.title}>{title}</h2>
           {state === 'ready' ? <span className={styles.unread}>{`未読 ${unreadCount}`}</span> : null}
           {state === 'ready' && onMarkAllRead ? (
             <button type="button" className={styles.markAll} onClick={onMarkAllRead} disabled={unreadCount === 0}>
@@ -129,9 +139,9 @@ export default function BellPopover({
         {state !== 'no-account' ? (
           <div className={styles.filters}>
             <SegmentedControl
-              aria-label="お知らせの種類"
+              aria-label={`${title}の種類`}
               size="compact"
-              options={FILTERS}
+              options={filters ?? (FILTERS as { value: F; label: string }[])}
               value={filter}
               onChange={onFilterChange}
             />
@@ -141,14 +151,14 @@ export default function BellPopover({
         {state === 'loading' ? (
           <p className={styles.state} role="status">読み込み中…</p>
         ) : state === 'no-account' ? (
-          <p className={styles.state}>LINEアカウントを選ぶと、そのアカウントのお知らせが出ます。</p>
+          <p className={styles.state}>{`LINEアカウントを選ぶと、そのアカウントの${title}が出ます。`}</p>
         ) : state === 'error' ? (
           <div className={styles.state} role="alert">
-            <span>{errorMessage || 'お知らせを読み込めませんでした。'}</span>
+            <span>{errorMessage || `${title}を読み込めませんでした。`}</span>
             {onRetry ? <button type="button" className={styles.retry} onClick={onRetry}>もう一度</button> : null}
           </div>
         ) : items.length === 0 ? (
-          <p className={styles.state}>お知らせはまだありません。</p>
+          <p className={styles.state}>{emptyText ?? `${title}はまだありません。`}</p>
         ) : (
           <div>
             {PERIODS.map((period) => {
@@ -183,7 +193,7 @@ export default function BellPopover({
           </div>
         )}
 
-        {/* 下は「すべて見る」だけ。通知設定はその先のお知らせの画面にある（オーナー 2026-10-08：押すものが2つ並ぶのはおかしい）。 */}
+        {/* 下は「すべて見る」だけ。通知設定はその先の一覧の画面にある（オーナー 2026-10-08：押すものが2つ並ぶのはおかしい）。 */}
         <footer className={styles.foot}>
           <button type="button" className={styles.viewAll} onClick={onViewAll}>すべて見る →</button>
         </footer>

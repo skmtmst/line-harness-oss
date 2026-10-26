@@ -5001,7 +5001,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     })
     let rows = withSla
     if (query.get('slaState') === 'overdue') rows = rows.filter((chat) => chat.slaState === 'overdue')
-    if (query.get('sort') === 'sla_due') rows = [...rows].sort((a, b) => (a.slaDueAt ? Date.parse(a.slaDueAt) : Infinity) - (b.slaDueAt ? Date.parse(b.slaDueAt) : Infinity))
+    if (query.get('sort') === 'sla_due') rows = [...rows].sort((a, b) => (a.slaDueAt ? Date.parse(a.slaDueAt) : Infinity) - (b.slaDueAt ? Date.parse(b.slaDueAt) : Infinity)); else if (query.get('sort') === 'latest') rows = [...rows].sort((a, b) => String(b.lastMessageAt ?? '').localeCompare(String(a.lastMessageAt ?? ''))) // latest は未読を先にしない新しい順
     const limit = Number(query.get('limit') ?? 0)
     return { success: true, data: limit > 0 && query.get('sort') === 'sla_due' && query.get('slaState') === 'overdue' && limit === 1 ? rows.slice(0, 1) : rows, total: rows.length }
   }
@@ -6140,7 +6140,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       item('nc-6', 'maintenance.scheduled', 'update', 'メンテナンス予定 8/30 2:00〜4:00', '詳細を見る', true, '2026-08-12T00:00:00.000Z'),
     ]
     const category = query.get('category')
-    const shown = category && category !== 'all' ? items.filter((x) => x.category === category) : items
+    const shown = (category && category !== 'all' ? items.filter((x) => x.category === category) : items).filter((x) => query.get('unread') !== '1' || !x.isRead) // unread=1 は未読だけ
     return {
       success: true,
       data: {
@@ -6815,7 +6815,7 @@ const server = createServer((req, res) => {
   }
 
   /* ③-2 第3波（お客さまの分け方・会員ランク・店の比較・自動の LINE・回数券・月謝）の見本。保存はしない。 */
-  if (/^\/api\/(analytics\/customer-segments|member-ranks|hq\/store-comparison|ec\/auto-line|booking\/admin\/pass-plans|friends\/[^/]+\/member-rank|friends\/[^/]+\/delivery-consents)/.test(url.pathname)) {
+  if (/^\/api\/(analytics\/customer-segments|member-ranks|hq\/store-comparison|ec\/auto-line|booking\/admin\/pass-plans|friends\/[^/]+\/member-rank|friends\/[^/]+\/delivery-consents|dashboard\/comparisons$)/.test(url.pathname)) {
     let raw = ''
     req.on('data', (chunk) => { raw += chunk })
     req.on('end', () => {

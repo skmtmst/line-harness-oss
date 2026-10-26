@@ -171,6 +171,37 @@ export function formatRelative(value: DateInput, now?: DateInput, fallback = '�
   return formatDay(value, fallback)
 }
 
+/**
+ * 一覧の行の右上に収める短い時刻（受信箱のトーク一覧など）。暦は日本時間で数える。
+ * 今日は 17:51 / 昨日 / 6日前までは 月曜日 / 7日より古い物は MM/DD / 別の年は YYYY/MM/DD。
+ * 時計のずれで未来の時刻になったときは、相対の言葉にせず日付で出す。
+ */
+export function formatListRecent(value: DateInput, options: { fallback?: string; now?: DateInput } = {}): string {
+  const { fallback = '—', now } = options
+  const p = toJst(value)
+  if (!p) return fallback
+  const n = nowJst(now)
+  const dayIndex = (e: number) => Math.floor((e + JST_OFFSET_MS) / 86_400_000)
+  const dayDiff = dayIndex(n.epoch) - dayIndex(p.epoch)
+  if (p.epoch <= n.epoch) {
+    if (dayDiff === 0) return `${pad2(p.h)}:${pad2(p.min)}`
+    if (dayDiff === 1) return '昨日'
+    if (dayDiff < 7) return `${WEEKDAYS[p.w]}曜日`
+  }
+  const day = `${pad2(p.m)}/${pad2(p.d)}`
+  return p.y === n.y ? day : `${p.y}/${day}`
+}
+
+/** 短い時刻の全文（指を乗せたときの title）。「2026年10月25日 17:51（3分前）」。 */
+export function formatListRecentTitle(value: DateInput, options: { fallback?: string; now?: DateInput } = {}): string {
+  const { fallback = '', now } = options
+  const p = toJst(value)
+  if (!p) return fallback
+  const full = `${p.y}年${p.m}月${p.d}日 ${pad2(p.h)}:${pad2(p.min)}`
+  const relative = formatRelative(value, now, '')
+  return relative.endsWith('前') ? `${full}（${relative}）` : full
+}
+
 /** M月D日〜M月D日。両側とも月日を書く（9月1日〜9月30日）。年が違う側だけ `YYYY年` を付ける。 */
 export function formatRange(from: DateInput, to: DateInput, fallback = '—'): string {
   const a = toJst(from)
