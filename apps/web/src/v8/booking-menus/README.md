@@ -16,7 +16,7 @@
 
 ## 外に見せる名前（index.ts）
 
-- [index.ts](index.ts)：`MenuFormV8`・`BookingSettingsV8`・`AssignMatrixV8`・`AccountIcon`・`SkeletonRows`・`StateCard`・`useV8TabEdit`・`bookingChannelsApi`
+- [index.ts](index.ts)：`MenuFormV8`・`BookingSettingsV8`・`AssignMatrixV8`・`AccountIcon`・`SkeletonRows`・`StateCard`・`useV8TabEdit`・`bookingChannelsApi`・`LiffPhoneMenuStep`・`LiffPhoneStaffStep`・`LiffPhoneDatetimeStep`（お客さまの予約画面の写し。スタイル体験の見本も作り物のデータで使う）
 - [public/lib-booking-channels/index.ts](public/lib-booking-channels/index.ts)：`bookingChannelsApi`
 - [public/tab-parts/index.ts](public/tab-parts/index.ts)：`AccountIcon`・`SkeletonRows`・`StateCard`・`useV8TabEdit`
 
