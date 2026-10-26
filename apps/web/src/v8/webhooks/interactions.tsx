@@ -12,11 +12,12 @@ import { formatNumber } from '@/lib/format'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
-import StatusBadge from '@/components/shared/status-badge'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { Tabs } from '@/components/shared/tabs'
 import { LogEntryCopy } from '@/components/shared/log-entry-details'
+import { LogRecordJson } from '@/v8/log-record'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
 import Notice from '@/components/shared/notice'
@@ -77,10 +78,12 @@ function bodyLines(item: WebhookInteraction): { main: string; sub: string } {
   return { main: head || emptyValue('unknown'), sub: [tail, retried].filter(Boolean).join('・') }
 }
 
-function replyLabel(item: WebhookInteraction): { text: string; failed: boolean } {
-  if (item.status === 'failed') return { text: item.responseLabel, failed: true }
-  if (item.direction === 'incoming') return { text: '受け取った', failed: false }
-  return { text: item.responseLabel, failed: false }
+/* 返事の札。言葉は口の返事、色は記録の状態（処理中・送り直し済みを成功の緑にしない）。 */
+function replyLabel(item: WebhookInteraction): { text: string; tone: StatusBadgeTone } {
+  const { tone } = interactionState(item)
+  if (item.status === 'failed') return { text: item.responseLabel, tone }
+  if (item.direction === 'incoming') return { text: '受け取った', tone }
+  return { text: item.responseLabel, tone }
 }
 
 function seconds(ms: number | null): string {
@@ -103,6 +106,14 @@ function retryabilityText(item: WebhookInteraction, allowed: boolean): string {
   if (item.failureReasonCode === 'secret_unavailable') return '署名に使う合言葉をこちらで確認できませんでした。相手には一度も送っていません。連携の設定を保存し直してから「やり直す」を押してください。'
   if (item.failureReasonCode === 'unknown') return '相手先に届いたか分かっていません。相手先の記録で同じ処理がないか確かめてから「やり直す」を押してください。'
   return 'この画面の「やり直す」から、同じ届け番号でもう一度送れます。届いていた場合でも相手先で二重に処理されない仕組みです。'
+}
+
+/** 状態の札の言葉と色。色は共通の札（StatusBadge）の5色だけを使う。 */
+function interactionState(item: WebhookInteraction): { label: string; tone: StatusBadgeTone } {
+  if (item.status === 'failed') return { label: '失敗', tone: 'danger' }
+  if (item.status === 'succeeded') return { label: '成功', tone: 'success' }
+  if (item.status === 'retried') return { label: '送り直し済み', tone: 'neutral' }
+  return { label: '処理中', tone: 'warning' }
 }
 
 function canRetryNow(item: WebhookInteraction, allowed: boolean): boolean {
@@ -406,7 +417,7 @@ export default function WebhooksInteractionsV8() {
               return (
                 <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
                   <Td className={styles.colWhen}>
-                    <span className={styles.main}>{shortDateTime(item.startedAt)}</span>
+                    <time dateTime={item.startedAt} className={styles.main}>{shortDateTime(item.startedAt)}</time>
                     <span className={styles.sub}>{item.direction === 'outgoing' ? '送る' : '受け取る'}</span>
                   </Td>
                   <Td grow className={styles.colName}><FolderDotName>
@@ -417,7 +428,7 @@ export default function WebhooksInteractionsV8() {
                     {lines.sub ? <span className={styles.sub} title={lines.sub}>{lines.sub}</span> : null}
                   </Td>
                   <Td className={styles.colReply}>
-                    <StatusBadge tone={reply.failed ? 'danger' : 'success'}>{reply.text}</StatusBadge>
+                    <StatusBadge tone={reply.tone}>{reply.text}</StatusBadge>
                   </Td>
                   <Td align="right" className={styles.colTime}><span className={styles.main}>{seconds(item.durationMs)}</span></Td>
                   <ActionCell className={styles.colOps}>
@@ -500,6 +511,13 @@ export default function WebhooksInteractionsV8() {
 }
 
 /** 窓のきっかけ：「予約が入った・Masato S.」→「予約が入った（Masato S.）」。文が無ければ種類の言葉。 */
+/* JSON で見せる記録。きっかけの文はお客さまの名前が入ることがあるので写さない。 */
+function jsonRecord(item: WebhookInteraction): Partial<WebhookInteraction> {
+  const record: Partial<WebhookInteraction> = { ...item }
+  delete record.triggerSummary
+  return record
+}
+
 function dialogTrigger(item: WebhookInteraction): string {
   const [head, ...rest] = item.triggerSummary.split('・')
   if (!head) return triggerWord(item)
@@ -522,7 +540,7 @@ function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, bu
   onRetry: () => void
 }) {
   const retryable = canRetryNow(item, canRetry)
-  const failed = item.status === 'failed'
+  const state = interactionState(item)
   const why = retryabilityText(item, canRetry)
   /* 送り直せるふつうの失敗は札だけ（説明は札の title）。それ以外は理由を札の横に出す。 */
   const showWhy = !(retryable && !item.failureReasonCode?.match(/^(unknown|secret_unavailable)$/))
@@ -553,10 +571,9 @@ function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, bu
       }
     >
       <div className={styles.dialogBody}>
-        <LogEntryCopy canCopy={canRetry} entry={{ occurredAt: item.startedAt, target: item.webhookName, status: item.status === 'failed' ? '失敗' : item.status === 'succeeded' ? '成功' : item.status === 'retried' ? '送り直し済み' : '処理中', reason: item.failureReason ?? item.responseLabel }} />
-        <span className={styles.dialogState} data-tone={failed ? 'danger' : item.status === 'succeeded' ? 'active' : 'neutral'}>
-          <span className={styles.pillDot} aria-hidden="true" />
-          {failed ? '失敗' : item.status === 'succeeded' ? '成功' : '処理中'}
+        <LogEntryCopy canCopy={canRetry} entry={{ occurredAt: item.startedAt, target: item.webhookName, status: state.label, reason: item.failureReason ?? item.responseLabel }} />
+        <span className={styles.dialogState}>
+          <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
         </span>
         <dl className={styles.dialogList}>
           <div className={styles.dialogRow}><dt>きっかけ</dt><dd>{dialogTrigger(item)}</dd></div>
@@ -580,6 +597,7 @@ function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, bu
             </dd>
           </div>
         </dl>
+        {techOpen ? <div className={styles.dialogJson}><LogRecordJson value={jsonRecord(item)} label="この記録" canCopy={canRetry} /></div> : null}
         <p className={styles.dialogNote}>接続先URL、秘密値、送受信の本文は、この記録には表示しません。</p>
       </div>
     </Dialog>

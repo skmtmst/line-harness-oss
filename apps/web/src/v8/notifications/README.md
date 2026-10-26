@@ -1,4 +1,4 @@
-> 文書：notifications のコード案内｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+> 文書：notifications のコード案内｜区分：今の説明｜最終確認：2026-10-26（日本時間）
 
 # 通知（V8）の動き：コードの入口
 
@@ -8,12 +8,13 @@
 
 - `/notifications` → [app/notifications/page.tsx](../../app/notifications/page.tsx)
 
-本体：[list.tsx](list.tsx)
+本体：[list.tsx](list.tsx)、ベルの小窓 [bell-panel.tsx](bell-panel.tsx)（上の帯から `components/shell/bell-notifications.tsx` が読む）、タブの決まり [tabs.ts](tabs.ts)
 
 ## 外に見せる名前（index.ts）
 
 - [index.ts](index.ts)：`NotificationsV8`・`notificationDestination`・`notificationLinkLabel`
 - [public/destination/index.ts](public/destination/index.ts)：`notificationDestination`・`notificationLinkLabel`
+- [public/bell/index.ts](public/bell/index.ts)：`BellPanel`・`NOTIFICATION_TABS`・`notificationQueryForTab`・`markAllCategoryForTab`・`isSystemNotification`
 
 機能の内部は宣言元を直接読み、外部は明示された公開入口を使います。Nextのpage・layoutとWorkerのroute登録は直接接続します。決まりは [コードの構成と名前](../../../../../docs/code-structure.md)。
 
@@ -28,5 +29,6 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [BEHAVIOR.md](BEHAVIOR.md)
 - [list-account-race.test.tsx](list-account-race.test.tsx)
 - [list.test.tsx](list.test.tsx)
+- [ベルの小窓の試験](../../components/shell/bell-notifications-react.test.tsx)
 
 実行：`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web test -- src/v8/notifications`。関連する入口の試験も実行してください。保存・入力保持・権限・別店舗・失敗からの回復を守り、文書の整合だけを動作の合格に数えません。

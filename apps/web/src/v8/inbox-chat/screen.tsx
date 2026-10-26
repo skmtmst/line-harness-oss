@@ -14,10 +14,11 @@ import { api,type ChatDetailMessage } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useStaffRole } from '@/lib/staff-role';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { useRouter,useSearchParams } from 'next/navigation';
 import { Suspense,useEffect,useRef,useState } from 'react';
-import { jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,statusFilters,statusFiltersV8 } from './inbox-model';
+import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,inboxSortFromParam,statusFilters,statusFiltersV8 } from './inbox-model';
 
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
@@ -71,6 +72,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (params.get('unanswered') === '1' || params.get('unanswered') === 'true') return 'unread'
     return 'all'
   })
+
+  /* 並び（未読が先／新しい順）は URL の `?sort=` が正本。戻る・共有で同じ並びに戻る。 */
+  const samePageUrl = useSamePageUrl()
+  const sortOrder = inboxSortFromParam(params.get('sort'))
+  const setSortOrder = (next: InboxSort) => {
+    const query = new URLSearchParams(params.toString())
+    if (next === 'latest') query.set('sort', 'latest')
+    else query.delete('sort')
+    const text = query.toString()
+    samePageUrl.replace(`${window.location.pathname}${text ? `?${text}` : ''}`)
+  }
 
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
 
@@ -239,6 +251,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     assigneeFilter,
     unreadOnly,
     quickFilter,
+    sort: sortOrder,
     setError,
   })
 
@@ -756,7 +769,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef,
           setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats,
           handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
-          clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails,
+          clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,
         }} />
 
         {/* Right Panel: Chat Detail */}

@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+import { broadcastSaveProblem, broadcastStepPassed, broadcastStepProblems } from './broadcast-step-gate'
+import { TITLE_MAX } from './broadcast-form-model'
 
 /**
  * 作成画面が設計 `LMiL2` の5段の帯を持ち、その帯が実際に節へ飛べることを見る。
@@ -58,14 +60,16 @@ describe('作成画面の5段の帯（設計 LMiL2）', () => {
    * 一番困る形になる。段の計算式の中だけを見る。
    */
   it('段の判定は保存の検査と同じ関数を通す', () => {
-    expect(STEP_CALL).toContain('bubblesError(bubbles)')
-    expect(STEP_CALL).toContain('audienceError(targetMode')
+    // 帯の ✓ も保存の検査も、段ごとの確かめ（broadcast-step-gate）の結果だけを読む。
+    expect(['basic', 'audience', 'message', 'schedule'].filter((step) => !STEP_CALL.includes(`broadcastStepPassed(liveStepProblems, '${step}')`))).toEqual([])
+    // 保存の検査が同じ結果を読むことは、画面を動かす試験（broadcast-form-step-gate-react）で見る。
   })
 
   it('送信設定は「今すぐ」か、日付と時刻がそろって初めて済みになる', () => {
-    expect(STEP_CALL).toContain("sendMode === 'now'")
-    expect(STEP_CALL).toContain('Boolean(scheduledDate)')
-    expect(STEP_CALL).toContain('Boolean(scheduledTime)')
+    const base = { title: '配信', titleMax: TITLE_MAX, audienceProblem: '', bubbleProblem: '', buttonProblem: '', lengthProblem: null, scheduledTime: '10:00', now: 0, quotaInsufficient: false, stepped: true }
+    expect(broadcastStepPassed(broadcastStepProblems({ ...base, sendMode: 'now', scheduledDate: '', scheduledAt: null }), 'schedule')).toBe(true)
+    expect(broadcastStepPassed(broadcastStepProblems({ ...base, sendMode: 'scheduled', scheduledDate: '', scheduledAt: null }), 'schedule')).toBe(false)
+    expect(broadcastStepPassed(broadcastStepProblems({ ...base, sendMode: 'scheduled', scheduledDate: '2026-11-01', scheduledAt: '2026-11-01T01:00:00.000Z' }), 'schedule')).toBe(true)
   })
 
   /**
@@ -94,11 +98,9 @@ describe('配信名の字数（設計 zZ9fA）', () => {
 
   /** 数えるだけで止めないと、上限を超えたまま保存できてしまう。 */
   it('上限を超えたら保存の検査で止める', () => {
-    const validate = FORM.slice(
-      FORM.indexOf('const validate = () => {'),
-      FORM.indexOf('/**\n   * 配信前チェック。'),
-    )
-    expect(validate).toContain('title.trim().length > TITLE_MAX')
+    const base = { titleMax: TITLE_MAX, audienceProblem: '', bubbleProblem: '', buttonProblem: '', lengthProblem: null, sendMode: 'now' as const, scheduledDate: '', scheduledTime: '10:00', scheduledAt: null, now: 0, quotaInsufficient: false, stepped: true }
+    expect(broadcastSaveProblem(broadcastStepProblems({ ...base, title: 'あ'.repeat(TITLE_MAX + 1) }))).toBe(`配信名は${TITLE_MAX}文字までにしてください`)
+    expect(broadcastSaveProblem(broadcastStepProblems({ ...base, title: 'あ'.repeat(TITLE_MAX) }))).toBe('')
   })
 })
 

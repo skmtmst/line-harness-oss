@@ -10,11 +10,10 @@ import { InboxMessage, InboxMessageDay, InboxQuotedMessage, InboxThreadLoading }
 import ListState from '@/components/shared/list-state';
 import EmailThread from '@/components/support/email-thread';
 import { InboxConversationPane, InboxMessages } from '@/components/templates/inbox-page';
-import { formatDateTime, formatTime } from '@/lib/format';
+import { formatDateTime, formatListRecent, formatTime } from '@/lib/format';
 import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary } from '@/v8/ai-reply/public/inbox-ai/index'
 import AttachmentMessage from '@/v8/inbox-chat/attachment-message';
 import ConversationHead from '@/v8/inbox-chat/conversation-head';
-import { formatInboxListTime } from '@/v8/inbox-chat/list-time';
 import { ChatSearchBar } from '@/v8/inbox-search/public/chat-search-bar/index'
 import { Link2 } from 'lucide-react';
 import { AUTO_SOURCE_LABEL, CORRECTION_TEMPLATE, Chat, formatByteSize, formatDayJa, formatInboxDatetime, formatYmdSlash, sameYmd } from './inbox-model';
@@ -71,7 +70,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
           <ConversationHead
             name={chatDetail.friendName}
             pictureUrl={chatDetail.friendPictureUrl}
-            sub={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・${formatInboxListTime(chatDetail.lastMessageAt)}`}
+            sub={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・${formatListRecent(chatDetail.lastMessageAt)}`}
             subTitle={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 ${formatInboxDatetime(chatDetail.lastMessageAt)}`}
             onBack={() => setSelectedChatId(null)}
             attention={{ on: Boolean(chatDetail.isAttention), saving: attentionSaving, onToggle: () => void handleAttentionUpdate() }}

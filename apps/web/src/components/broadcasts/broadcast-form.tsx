@@ -30,6 +30,7 @@ import { saveBroadcast } from './broadcast-send-actions'
 import { testBroadcast } from './broadcast-test-actions'
 
 import { broadcastSteps,type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
+import { broadcastNextBlockReason,broadcastSaveProblem,broadcastSaveProblemStep,broadcastStepPassed,broadcastStepProblems } from './broadcast-step-gate'
 import { createLoadGeneration,filterSendableTemplates } from '@/components/scenarios/carousel-picker'
 import ActionList,{ ActionAddButton } from '@/components/shared/action-list'
 import Button from '@/components/shared/button'
@@ -817,34 +818,31 @@ export default function BroadcastForm({
     setError(validationError)
   }
 
-  const validate = () => {
-    if (!title.trim()) return '管理用タイトルを入力してください'
-    if (title.trim().length > TITLE_MAX) return `配信名は${TITLE_MAX}文字までにしてください`
-    // 宛先が空のまま保存すると、絞ったつもりで全員に届く。
-    const audienceProblem = audienceError(targetMode, { scenarioId, tagId, condition })
-    if (audienceProblem) return audienceProblem
-    const bubbleProblem = bubblesError(bubbles)
-    if (bubbleProblem) return bubbleProblem
+  /*
+   * 段ごとの確かめ。帯の ✓・［次へ］・保存の検査は、どれもこの1つの結果を読む。
+   * 送信枠は配信前チェックの結果を使うので、下で数えてから組み立てる（stepProblems）。
+   */
+  const stepCheckInput = () => ({
+    title,
+    titleMax: TITLE_MAX,
+    audienceProblem: audienceError(targetMode, { scenarioId, tagId, condition }),
+    bubbleProblem: bubblesError(bubbles),
     // 監査 R206: ボタンの不備は「保存できませんでした」で済ませない。
-    // 何番の何が足りないかを言い、直したら保存できる。
-    const buttonProblem = messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })
-    if (buttonProblem) return buttonProblem
-    if (currentStep && sendMode === 'scheduled' && (!scheduledDate || !scheduledTime)) return '予約する日付と時刻を入力してください'
-    return ''
-  }
+    buttonProblem: messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) }),
+    sendMode,
+    scheduledDate,
+    scheduledTime,
+    scheduledAt: scheduledAtIso(),
+    stepped: Boolean(currentStep),
+  })
+  const validate = () => broadcastSaveProblem(stepProblems())
   /**
    * R580: いまの入力に対する検査結果が、どの段の不備か。
-   *
-   * `validate` と同じ順序・同じ関数で判定する。別々に書くと、帯は
-   * 「対象者 済み」なのに保存で断られる、という一番困る形になる
-   * （段の帯と保存の検査を同じ関数に寄せる契約と同じ考え）。
-   * 送信設定の段は入力の不備を持たない（日時は保存の検査対象外）。
+   * `validate` と同じ結果から読む。送信設定の段は移動の導線を出さない（今のまま）。
    */
   const validationStep = (): 'basic' | 'audience' | 'message' | null => {
-    if (!title.trim() || title.trim().length > TITLE_MAX) return 'basic'
-    if (audienceError(targetMode, { scenarioId, tagId, condition })) return 'audience'
-    if (bubblesError(bubbles) || messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })) return 'message'
-    return null
+    const step = broadcastSaveProblemStep(stepProblems())
+    return step === 'schedule' ? null : step
   }
   /**
    * 配信前チェックへ渡す入力。
@@ -906,6 +904,37 @@ export default function BroadcastForm({
     if (sendMode !== 'scheduled' || !scheduledDate) return null
     return datetimeLocalJstToUtcIso(`${scheduledDate}T${scheduledTime}`)
   }
+
+  /*
+    最終確認に並べる値。**どれも固定値で作らない。**
+
+    人数は `runPreflight` が数えたものだけを使う（`preflight.audienceCount`）。
+    数えられていないときは `null` のままにして、下の `canConfirm` で
+    送らせない。「たぶんこのくらい」を書くと、その数を根拠に押される。
+  */
+  /*
+   * **いまの入力に対する確認だけを確定値として使う。**
+   * 宛先・本文・日時を変えると指紋がずれ、前の応答は古い確認として解除される。
+   * 再計算が終わるまで「—」のままにし、古い人数のまま予約させない（IDEA-06）。
+   */
+  const currentPreflightKey = JSON.stringify(preflightRequestBody())
+  const preflight = preflightResult !== null && preflightKey === currentPreflightKey ? preflightResult : null
+  const {
+    audienceCount, audienceDisplayCount, confirmAudienceLabel, exclusionNote,
+    quota, quotaInsufficient, quotaNote, evaluatedAtLabel, concurrentBroadcasts,
+    scheduledLabel, sendWhenLabel, unconfirmedCount,
+  } = broadcastPreflightSummary({
+    preflight, targetMode, tags, tagId, scenarios, scenariosStatus, audience,
+    excludeTagId, sendMode, scheduledDate, scheduledTime, spreadMinutes,
+    testPassed: testResult?.kind === 'success', previewConfirmed,
+  })
+  const stepProblems = () => broadcastStepProblems({
+    ...stepCheckInput(),
+    lengthProblem: lengthNotice.tone === 'error' ? lengthNotice.description : null,
+    now: Date.now(),
+    quotaInsufficient,
+  })
+  const liveStepProblems = stepProblems()
 
   const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, selectedAccountId, spreadMinutes, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount)
 
@@ -978,29 +1007,6 @@ export default function BroadcastForm({
   const testBlockReason = bubblesError(bubbles) || messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })
   const openTestDialog = () => openBroadcastTest({ rejectValidation, saveErrors, selectedAccountId, setTestDialogOpen, setTestRecipients, setTestRecipientState, testRecipientsGeneration, validate })
 
-  /*
-    最終確認に並べる値。**どれも固定値で作らない。**
-
-    人数は `runPreflight` が数えたものだけを使う（`preflight.audienceCount`）。
-    数えられていないときは `null` のままにして、下の `canConfirm` で
-    送らせない。「たぶんこのくらい」を書くと、その数を根拠に押される。
-  */
-  /*
-   * **いまの入力に対する確認だけを確定値として使う。**
-   * 宛先・本文・日時を変えると指紋がずれ、前の応答は古い確認として解除される。
-   * 再計算が終わるまで「—」のままにし、古い人数のまま予約させない（IDEA-06）。
-   */
-  const currentPreflightKey = JSON.stringify(preflightRequestBody())
-  const preflight = preflightResult !== null && preflightKey === currentPreflightKey ? preflightResult : null
-  const {
-    audienceCount, audienceDisplayCount, confirmAudienceLabel, exclusionNote,
-    quota, quotaInsufficient, quotaNote, evaluatedAtLabel, concurrentBroadcasts,
-    scheduledLabel, sendWhenLabel, unconfirmedCount,
-  } = broadcastPreflightSummary({
-    preflight, targetMode, tags, tagId, scenarios, scenariosStatus, audience,
-    excludeTagId, sendMode, scheduledDate, scheduledTime, spreadMinutes,
-    testPassed: testResult?.kind === 'success', previewConfirmed,
-  })
 
   /**
    * 確認の窓を開く。
@@ -1067,10 +1073,10 @@ export default function BroadcastForm({
    * 数え終わる前は毎回「未入力」に見えて、進み表示として読めなくなる。
    */
   const progressSteps = broadcastSteps({
-    basicDone: title.trim().length > 0 && title.trim().length <= TITLE_MAX,
-    audienceDone: !audienceError(targetMode, { scenarioId, tagId, condition }),
-    messageDone: !bubblesError(bubbles) && !messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) }),
-    scheduleDone: sendMode === 'now' || (sendMode === 'scheduled' && Boolean(scheduledDate) && Boolean(scheduledTime)),
+    basicDone: broadcastStepPassed(liveStepProblems, 'basic'),
+    audienceDone: broadcastStepPassed(liveStepProblems, 'audience'),
+    messageDone: broadcastStepPassed(liveStepProblems, 'message'),
+    scheduleDone: broadcastStepPassed(liveStepProblems, 'schedule'),
   })
   const stepOrder: BroadcastStepKey[] = ['basic', 'audience', 'message', 'schedule', 'confirm']
   const currentStepIndex = currentStep ? stepOrder.indexOf(currentStep) : -1
@@ -1170,6 +1176,13 @@ export default function BroadcastForm({
   }, [currentStep])
 
   const canConfirm = audienceCount !== null && audienceCount > 0
+  /*
+   * ［次へ］は、今の段の確かめが通るまで押せない。押せない理由は下の帯の左に1行で出す
+   * （title だけだと指を乗せないと見えない）。最終確認の段の止め方（人数・文字数）は今のまま。
+   */
+  const nextBlockReason = currentStep ? broadcastNextBlockReason(liveStepProblems, currentStep) : null
+  const confirmBlockReason = !canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : null
+  const footerReason = currentStep === 'confirm' ? confirmBlockReason : nextBlockReason
 
   /*
    * 二者承認の出し分け（設計 A-1・A-4）。人数は配信前チェックの数だけを使う。
@@ -1246,7 +1259,7 @@ export default function BroadcastForm({
     <header className={styles.header} data-steps-below={true}>
       <div className={styles.heading}>
         <h2>一斉配信を作る</h2>
-        <p aria-live="polite">{draftStatusLabel || '下書き・未保存'}</p>
+        <p>{currentStepIndex >= 0 ? <><span data-step-count>{`${currentStepIndex + 1}/${stepOrder.length} ${steps[currentStepIndex]?.label ?? ''}`}</span>{' ・ '}</> : null}<span aria-live="polite">{draftStatusLabel || '下書き・未保存'}</span></p>
       </div>
       {/* ★V8：手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。v7 はこれまでの帯のまま。 */}
       {<div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} summaries={currentStep ? { basic: title.trim(), audience: confirmAudienceLabel, message: `${formatNumber(bubbles.length)}通・${bubbles.map(bubble => String(bubble.content.text ?? typeLabel(bubble.type))).join(' / ')}`, schedule: sendWhenLabel ?? '未設定' } : undefined} /></div>}
@@ -1395,21 +1408,21 @@ export default function BroadcastForm({
       <BroadcastPreviewRail {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
 
-    <StickyBar className={styles.footer} actions={(
+    <StickyBar className={styles.footer} status={currentStep && footerReason ? <span id="broadcast-footer-reason" role="note">{footerReason}</span> : undefined} actions={(
       <>
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
           <Button variant="secondary" type="button" disabled={saving || composerBusy} onClick={() => saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
-            <Button variant="primary" disabled={composerBusy} onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
+            <Button variant="primary" disabled={composerBusy || nextBlockReason !== null} aria-describedby={nextBlockReason ? 'broadcast-footer-reason' : undefined} onClick={() => { if (nextBlockReason === null) goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)]) }}>
               {currentStep === 'basic' ? '対象設定へ'
                 : currentStep === 'audience' ? 'メッセージ設定へ'
                   : currentStep === 'message' ? <><span>送信設定へ</span><ArrowRight size={15} aria-hidden /></>
                     : '配信前チェックへ'}
             </Button>
           ) : (
-            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={openConfirm} busy={saving}>
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={confirmBlockReason ?? undefined} aria-describedby={confirmBlockReason ? 'broadcast-footer-reason' : undefined} onClick={openConfirm} busy={saving}>
               {sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
             </Button>
           )}

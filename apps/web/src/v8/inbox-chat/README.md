@@ -1,4 +1,4 @@
-> 文書：inbox-chat のコード案内｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+> 文書：inbox-chat のコード案内｜区分：今の説明｜最終確認：2026-10-26（日本時間）
 
 # inbox-chat：コードの入口
 
@@ -33,12 +33,14 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [customer-panel-react.test.tsx](customer-panel-react.test.tsx)
 - [deep-link-react.test.tsx](deep-link-react.test.tsx)
 - [head-menus.test.tsx](head-menus.test.tsx)
-- [list-time.test.ts](list-time.test.ts)
 - [manual-send-path.test.ts](manual-send-path.test.ts)
 - [rules-popover.test.tsx](rules-popover.test.tsx)
 - [schedule-dialog.test.tsx](schedule-dialog.test.tsx)
 - [schedule-presets.test.ts](schedule-presets.test.ts)
 - [sidebar-safety-react.test.tsx](sidebar-safety-react.test.tsx)
 - [sla.test.tsx](sla.test.tsx)
+- 並びの切り替え（`?sort=latest`）：[inbox-sort-control-react.test.tsx](../../app/chats/inbox-sort-control-react.test.tsx)
+- 開いたら既読：[inbox-open-read-react.test.tsx](../../app/chats/inbox-open-read-react.test.tsx)
+- 一覧の時刻（今日は時刻・6日前までは曜日・前は月/日）：[format-list-recent.test.ts](../../lib/format-list-recent.test.ts)
 
 実行：`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web test -- src/v8/inbox-chat`。関連する入口の試験も実行してください。保存・入力保持・権限・別店舗・失敗からの回復を守り、文書の整合だけを動作の合格に数えません。
