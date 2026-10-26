@@ -157,6 +157,42 @@ function buttonByText(text: string): HTMLButtonElement | undefined {
   return [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === text) as HTMLButtonElement | undefined
 }
 
+describe('V8 一斉配信一覧の結果の列', () => {
+  const sentRow = { ...base, id: 'bc-3', title: '新商品発売のお知らせ', status: 'sent', displayStatus: 'sent', displayStatusLabel: '送信済み', scheduledAt: null, sentAt: '2026-08-20T03:00:00.000Z', successCount: 624, insightSummary: { delivered: 624, uniqueImpression: 444, uniqueClick: 96, openRate: 0.712, clickRate: 0.154 } }
+  const renderRows = async () => {
+    listBroadcasts.mockImplementation(async () => ({
+      success: true, data: [base, sentRow], kpis: { scheduled: 1, thisMonth: 1, delivered: 624, openRate: 71.2, drafts: 0 },
+      statusCounts: { all: 2, scheduled: 1, sent: 1 }, pagination: { total: 2, limit: 20, cursor: 0, nextCursor: null },
+    }))
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    const rowOf = (title: string) => [...host.querySelectorAll('tbody tr')].find((tr) => tr.textContent?.includes(title)) as HTMLTableRowElement
+    return { sent: rowOf('新商品発売のお知らせ'), unsent: rowOf('8月キャンペーンのお知らせ'), heads: [...host.querySelectorAll('thead th')].map((th) => th.textContent?.trim()) }
+  }
+
+  it('広い幅は届いた・開封・クリックの3列に右そろえで、送っていない行は — で数を作らない', async () => {
+    narrow.value = false
+    const { sent, unsent, heads } = await renderRows()
+    expect(heads).toEqual(expect.arrayContaining(['届いた', '開封', 'クリック']))
+    const right = [...sent.querySelectorAll('td[data-align="right"]')].map((td) => td.textContent?.trim())
+    expect(right).toEqual(['624 人', '71.2%', '15.4%'])
+    const unsentRight = [...unsent.querySelectorAll('td[data-align="right"]')].map((td) => td.textContent?.trim())
+    expect(unsentRight).toHaveLength(3)
+    for (const text of unsentRight) expect(text).not.toMatch(/\d/)
+  })
+
+  it('狭い幅は1列の2段（上に人数・下に開封とクリック）で、送っていない行は — で数を作らない', async () => {
+    narrow.value = true
+    const { sent, unsent, heads } = await renderRows()
+    narrow.value = false
+    expect(heads).toContain('結果')
+    expect(heads).not.toContain('クリック')
+    expect(sent.textContent).toContain('624 人')
+    expect(sent.textContent).toContain('開封 71.2%・クリック 15.4%')
+    expect(unsent.textContent).not.toMatch(/0\s*人/)
+  })
+})
+
 describe('V8 一斉配信一覧（src/v8）の動き', () => {
   it('does not evaluate the creation module while only the list is open', async () => {
     act(() => { root.render(<BroadcastListV8 />) })

@@ -10,20 +10,7 @@ const SOURCE = readFileSync(new URL('../../v8/broadcasts/list.tsx', import.meta.
 
 describe('V8 一斉配信の結果と日時', () => {
 
-  /**
-   * まだ送っていない配信に `0件` と書かない。
-   *
-   * 0通届いたのではなく、届く前だから数が無い。単位を付けた 0 は
-   * 「送ったが誰にも届かなかった」に読める。
-   */
-  it('送信済みでない行の結果は — で、数や単位を作らない', () => {
-    const stats = SOURCE.slice(SOURCE.indexOf('function BroadcastResultCells'), SOURCE.indexOf('function StatusBadge'))
-    expect(stats).toContain("const sent = broadcast.status === 'sent'")
-    expect(stats).toContain("sent ? `${formatNumber(")
-    expect(stats.match(/emptyValue\('unknown'\)/g)?.length).toBe(4)
-    expect(stats).not.toMatch(/0\s*件/)
-    expect(stats).not.toMatch(/0\s*人/)
-  })
+  /* 送っていない行の結果を — にし 0 を作らない動きは v8/broadcasts/list.test.tsx「結果の列」が画面を描いて確かめる。 */
 
   /**
    * 日時は JST で書く。
