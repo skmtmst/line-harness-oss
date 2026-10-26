@@ -10,7 +10,7 @@ const FIELD_REQUIREMENTS = {
 import Toggle from '@/components/shared/toggle';
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
-import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { SaveConflictBand, SaveConflictCompareTable } from '@/components/shared/save-conflict'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -33,7 +33,6 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
-import { Th } from '@/components/shared/table'
 import Checkbox from '@/components/shared/checkbox'
 import { TextField } from '@/components/shared/text-field'
 import { focusField } from '../focus-field'
@@ -546,24 +545,7 @@ function InflowCreate() {
           {conflict ? `${conflictSavedAt ? `${conflictSavedAt} に` : ''}保存された「${conflict.name}」と、いまの入力の違う項目だけ並べています。` : ''}
         </p>
         {conflictRows.length > 0 ? (
-          <table className={styles.compareTable}>
-            <thead>
-              <tr>
-                <Th className={styles.compareLabelCol}><span className="sr-only">項目</span></Th>
-                <Th>いまの入力</Th>
-                <Th className={styles.compareSaved}>保存されている内容</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {conflictRows.map((row) => (
-                <tr key={row.label}>
-                  <Th scope="row" className={styles.compareLabelCol}>{row.label}</Th>
-                  <td>{row.mine}</td>
-                  <td className={styles.compareSaved}>{row.saved}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SaveConflictCompareTable rows={conflictRows} />
         ) : (
           <p className={styles.cardNote}>見分けるための文字のほかに、違う項目はありません。</p>
         )}

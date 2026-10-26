@@ -241,6 +241,36 @@ export function SaveConflictCompareDialog({
   )
 }
 
+/** 「違いを比べる」の表の1行。 */
+export type SaveConflictCompareRow = { label: string; mine: ReactNode; saved: ReactNode }
+
+/**
+ * 「違いを比べる」の表。項目ごとに、いまの入力と保存されている内容を横に並べる。
+ * 保存されている側は注意の色。項目の列は見出し（読み上げで行の名前になる）。
+ */
+export function SaveConflictCompareTable({ rows }: { rows: ReadonlyArray<SaveConflictCompareRow> }) {
+  return (
+    <table className={styles.compareTable}>
+      <thead>
+        <tr>
+          <th scope="col" className={styles.compareLabelCol}><span className="sr-only">項目</span></th>
+          <th scope="col">いまの入力</th>
+          <th scope="col" className={styles.compareSaved}>保存されている内容</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.label}>
+            <th scope="row" className={styles.compareLabelCol}>{row.label}</th>
+            <td>{row.mine}</td>
+            <td className={styles.compareSaved}>{row.saved}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 /** 409は画面ごとに判定しない。版以外の業務上の衝突も、codeは呼び出し側で区別する。 */
 export function isConflictResponse(error: unknown): error is ApiError & { status: 409 } {
   return error instanceof ApiError && error.status === 409
