@@ -171,3 +171,16 @@ test('状態の札の点と文字の間が 8 でないと落ちる', async () =>
     assert.deepEqual(await kinds(), ['status-dot-gap'])
   } finally { await browser.close() }
 })
+
+test('数の帯の数字と単位が同じ下の線に乗っていないと落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind === 'kpi-unit-baseline')
+    const kpi = align => `<main><p style="display:flex;align-items:${align};gap:3px;margin:0"><span style="display:block;font-size:34px;line-height:36px"><span data-kpi-number>214</span></span><span data-kpi-unit style="font-size:12px;line-height:18px">人</span></p></main>`
+    await page.setContent(kpi('baseline'))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(kpi('flex-start'))
+    assert.deepEqual(await kinds(), ['kpi-unit-baseline'])
+  } finally { await browser.close() }
+})

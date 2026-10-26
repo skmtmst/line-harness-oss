@@ -173,5 +173,13 @@ export default function scanPolishRules() {
     const gap = text.left - markRight
     if (Math.abs(gap - 8) > 0.5) add('status-dot-gap', badge, { gap: Math.round(gap * 10) / 10 }, badge.textContent)
   }
+  // 数の帯（§6.7）：数字と単位は同じ下の線（ベースライン）に乗せる。
+  const baseline = (el) => { const probe = document.createElement('span'); probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline'; el.appendChild(probe); const y = probe.getBoundingClientRect().top; probe.remove(); return y }
+  for (const unit of document.querySelectorAll('[data-kpi-unit]')) {
+    const number = unit.parentElement?.querySelector('[data-kpi-number]')
+    if (!number || !visible(unit) || !visible(number)) continue
+    const diff = Math.abs(baseline(number) - baseline(unit))
+    if (diff > 0.5) add('kpi-unit-baseline', unit, { diff: Math.round(diff * 10) / 10 }, unit.parentElement.textContent)
+  }
   return findings
 }
