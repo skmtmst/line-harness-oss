@@ -240,7 +240,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
           <tbody>
             {rows.map((row) => (
               <Tr key={row.friendId} className={styles.row} data-row-id={row.friendId}>
-                <Td className={styles.colStore}><span className={styles.store} title={row.displayName ?? undefined}>{row.displayName ?? emptyValue('unconfigured')}</span></Td>
+                <Td className={styles.colStore}><span className={styles.store} title={row.displayName ?? undefined}>{row.displayName ?? emptyValue('unknown')}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={row.state === 'sent' ? 'success' : row.state === 'failed' ? 'danger' : 'neutral'} title={row.errorCode ?? undefined}>{stateLabel(row.state)}</StatusBadge></Td>
                 <Td className={styles.colState}><span className={styles.faint}>{row.sentAt ? jpDateTime(row.sentAt) : emptyValue('unknown')}</span></Td>
               </Tr>
