@@ -1,7 +1,4 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -41,14 +38,6 @@ afterEach(() => {
   delete document.documentElement.dataset.theme
 })
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const read = (rel: string) => readFileSync(join(HERE, rel), 'utf8')
-const LIST = read('../../../v8/hq-banners/list.tsx')
-const TOOLBAR = read('../../../components/shared/list-toolbar.tsx')
-const TOOLBAR_CSS = read('../../../components/shared/list-toolbar.module.css')
-const project = LIST.slice(LIST.indexOf('function ProjectsView'), LIST.indexOf('function LibraryView'))
-const library = LIST.slice(LIST.indexOf('function LibraryView'))
-
 describe('バナー生成の検索行（U017）', () => {
   it('プロジェクト検索は共通の検索スロットへ置く', async () => {
     render(createElement(HqBannersListV8))
@@ -84,14 +73,8 @@ describe('バナー生成の検索行（U017）', () => {
     expect(sort.closest('[data-toolbar-end]')).not.toBeNull()
   })
 })
-describe('バナー生成のタブ行（U032）', () => {
-  it('共通の道具の段は狭い幅で折り返せる', () => {
-    expect(TOOLBAR_CSS).toMatch(/\.row[12]\s*\{[^}]*flex-wrap:\s*wrap/s)
-    expect(TOOLBAR_CSS).toMatch(/\.searchSlot\s*\{[^}]*max-width:\s*100%/s)
-  })
-  it('作成は型が配置できる口へ渡し、タブ切替は共通部品へ残す', () => {
-    expect(project).toContain('createAction={createProject}')
-    expect(library).toContain('createAction={uploadImage}')
-    expect(LIST).toContain('<Tabs')
-  })
-})
+/*
+ * タブ行：作成の口が型の作成の場所へ渡ることとタブは v8/hq-banners/list.test.tsx
+ * 「数・タブ・説明とフォルダなしの作成入口を型へ接続する」が描いて見る。狭い幅の折り返しは
+ * v8-screen-guard（1152/1440/1920 のはみ出し0）が見る。
+ */
