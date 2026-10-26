@@ -33,7 +33,7 @@ describe('対応が必要な受信の表', () => {
     expect(screen.getAllByText('（絵文字）')).toHaveLength(1)
     const waits = screen.getAllByText(/日前$/)
     expect(waits).toHaveLength(2)
-    expect(waits.every((wait) => wait.closest('[data-tone="danger"], [class*="danger"]') !== null)).toBe(true)
+    expect(waits.every((wait) => wait.className.includes('tagDanger'))).toBe(true)
   })
 
   it('ページ送りがある時は「ほかに無い」と書かない', async () => {

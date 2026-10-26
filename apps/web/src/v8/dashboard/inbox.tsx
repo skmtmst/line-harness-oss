@@ -14,7 +14,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { formatTime } from '@/lib/format'
 import { RetryLabel } from '@/components/shared/retry-label'
-import { Loading } from './sections'
+import { Loading, Tag } from './sections'
 import styles from './dashboard.module.css'
 
 /*
@@ -159,7 +159,7 @@ export function InboxSection({ onSummaryChange }: {
               <Td grow>{isEmojiOnly(item.preview)
                 ? <span className={styles.inboxEmoji}>{item.preview}<span className={styles.inboxEmojiNote}>（絵文字）</span></span>
                 : <TruncatedText value={item.preview} />}</Td>
-              <Td className={styles.colWait}><StatusBadge tone="danger" size="compact" dot={false}>{elapsed(item.lastIncomingAt)}</StatusBadge></Td>
+              <Td className={styles.colWait}><Tag tone="danger">{elapsed(item.lastIncomingAt)}</Tag></Td>
               <Td className={styles.colState}><StatusBadge tone="danger" size="compact">未対応</StatusBadge></Td>
             </Tr>
           ))}</tbody>
