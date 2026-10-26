@@ -168,5 +168,5 @@ a.planTitle:hover { text-decoration: underline; }
 .pendingMeta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); }
 
 /* 受信の内容が絵文字だけの時の添え書き。 */
-.inboxEmoji { display: inline-flex; align-items: baseline; gap: var(--space-4); min-width: 0; white-space: nowrap; }
-.inboxEmojiNote { color: var(--color-ink-faint); font-size: var(--text-caption); }
+.inboxEmoji { display: inline-flex; align-items: baseline; gap: var(--space-4); min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.inboxEmojiNote { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--color-ink-faint); font-size: var(--text-caption); }

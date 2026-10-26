@@ -157,7 +157,7 @@ export function InboxSection({ onSummaryChange }: {
                 </Link>
               </Td>
               <Td grow>{isEmojiOnly(item.preview)
-                ? <span className={styles.inboxEmoji}>{item.preview}<span className={styles.inboxEmojiNote}>（絵文字）</span></span>
+                ? <span className={styles.inboxEmoji} title={`${item.preview}（絵文字）`}>{item.preview}<span className={styles.inboxEmojiNote}>（絵文字）</span></span>
                 : <TruncatedText value={item.preview} />}</Td>
               <Td className={styles.colWait}><Tag tone="danger">{elapsed(item.lastIncomingAt)}</Tag></Td>
               <Td className={styles.colState}><StatusBadge tone="danger" size="compact">未対応</StatusBadge></Td>
