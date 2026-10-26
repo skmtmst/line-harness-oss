@@ -7,6 +7,8 @@ import {
   Result,
   StarterSetItem,
   StyleStarterSet,
+  StyleStarterDefault,
+  StyleStarterResetResult,
   StarterDistributionInput,
   StarterDistributionPreview,
 } from './styles-common';
@@ -34,6 +36,18 @@ export const hqStyleApi = {
     fetchApi<Result<{ id: string; version: number; autoInsert: boolean }>>(
       '/api/hq/style-starter-sets/' + encodeURIComponent(style),
       write('PUT', body),
+    ),
+  defaultStarterSet: (style: AccountStyle) =>
+    fetchApi<Result<StyleStarterDefault>>(
+      '/api/hq/style-starter-sets/' + encodeURIComponent(style) + '/default',
+    ),
+  resetStarterSet: (
+    style: AccountStyle,
+    body: { expectedVersion: number; confirmed: true },
+  ) =>
+    fetchApi<Result<StyleStarterResetResult>>(
+      '/api/hq/style-starter-sets/' + encodeURIComponent(style) + '/reset',
+      write('POST', body),
     ),
   preflight: (style: AccountStyle, body: StarterDistributionInput) =>
     fetchApi<Result<StarterDistributionPreview>>(

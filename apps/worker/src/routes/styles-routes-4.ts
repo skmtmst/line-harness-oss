@@ -9,7 +9,8 @@ import {
   publishAutomationDraft,
 } from '../features/automations/automation-drafts/index.js';
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
+import { starter } from '../services/style-starter-set.js';
 
 import {
   getReminderDraftVersion,
@@ -25,6 +26,20 @@ import { StyleError, profile } from '../services/style-setup.js';
 import { validRestaurantDate } from '../services/restaurant-booking.js';
 import { base, account, json, edit, text, oneOf } from './styles-common.js';
 export const styles = new Hono<Env>();
+
+/** タグの見本はタグの表に行を持たないので、見本の名前を今の初期セットの組から読む。 */
+async function heldTagSet(c: Context<Env>, a: string, key: string) {
+  const p = await profile(c.env.DB, a);
+  if (!p) return null;
+  try {
+    const set = await starter(c.env.DB, c.get('staff')?.tenantId ?? null, p.style);
+    return set.definition.items.find((i) => i.key === key && i.kind === 'tag_set') ?? null;
+  } catch (error) {
+    // 統括の組が読めない形でも、一覧そのものは返す。
+    if (error instanceof StyleError) return null;
+    throw error;
+  }
+}
 
 // 空きの例外設定を使い、既存予約を取り消さない。
 styles.post(base + '/closures', async (c) => {
@@ -185,6 +200,18 @@ styles.get(base + '/starter-items', async (c) => {
             .bind(item.target_id, a)
             .first<{ status: string }>()
         )?.status ?? 'missing';
+    else if (item.kind === 'scenario')
+      status =
+        (
+          await c.env.DB.prepare(
+            'SELECT is_active FROM scenarios WHERE id=? AND line_account_id=?',
+          )
+            .bind(item.target_id, a)
+            .first<{ is_active: number }>()
+        )?.is_active
+          ? 'active'
+          : 'stopped';
+    else if (item.kind === 'tag_set') status = 'held';
     else if (item.kind === 'friend_add_rule')
       // 受け皿に下書きがある間は「下書き」。公開は友だち追加の画面の確認窓からだけ。
       status =
@@ -216,7 +243,19 @@ styles.get(base + '/starter-items', async (c) => {
                   .all()
               ).results,
             }
-          : null;
+          : item.kind === 'scenario'
+            ? {
+                steps: (
+                  await c.env.DB.prepare(
+                    `SELECT s.delay_minutes delayMinutes,s.message_content text FROM scenario_steps s JOIN scenarios r ON r.id=s.scenario_id WHERE r.id=? AND r.line_account_id=? ORDER BY s.step_order`,
+                  )
+                    .bind(item.target_id, a)
+                    .all()
+                ).results,
+              }
+            : item.kind === 'tag_set'
+              ? { tags: (await heldTagSet(c, a, String(item.item_key)))?.tags ?? [] }
+              : null;
     const table = resourceTables[String(item.kind)];
     const resource = table
       ? await c.env.DB.prepare(
@@ -229,7 +268,7 @@ styles.get(base + '/starter-items', async (c) => {
       ...item,
       definition,
       key: item.item_key,
-      name: resource?.name ?? null,
+      name: resource?.name ?? (item.kind === 'tag_set' ? (await heldTagSet(c, a, String(item.item_key)))?.name ?? null : null),
       isSample: !!item.is_sample,
       setId: item.set_id,
       setVersion: item.set_version,
@@ -237,12 +276,12 @@ styles.get(base + '/starter-items', async (c) => {
         ? JSON.parse(String(item.pending_update))
         : null,
       requiresActivation:
-        ['automation', 'reminder', 'booking_menu', 'rich_menu', 'friend_add_rule'].includes(
+        ['automation', 'reminder', 'booking_menu', 'rich_menu', 'friend_add_rule', 'tag_set', 'scenario'].includes(
           String(item.kind),
         ) && !blockedConfirmation,
-      // ごあいさつの公開は［まとめて動かす］に混ぜない。
-      activationAllowed: !blockedConfirmation && item.kind !== 'friend_add_rule',
-      href: item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : undefined,
+      // ごあいさつの公開・タグにする・シナリオを動かすは［まとめて動かす］に混ぜない。
+      activationAllowed: !blockedConfirmation && !['friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind)),
+      href: item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : item.kind === 'scenario' ? '/scenarios' : item.kind === 'tag_set' ? '/tags' : undefined,
       currentSnapshot: await resourceSnapshot(
         c.env.DB,
         a,

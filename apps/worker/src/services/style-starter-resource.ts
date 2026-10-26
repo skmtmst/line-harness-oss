@@ -6,6 +6,7 @@ import type { AccountStyle, SetupAnswer } from '@line-crm/shared';
 import type { StarterItem } from './style-starter-definition.js';
 import { StyleError } from './style-setup-core.js';
 import { friendAddWelcomeDefinition } from './style-starter-friend-add.js';
+import { scenarioStepStatements } from './style-starter-samples.js';
 
 export const resourceTables: Record<
   string,
@@ -17,6 +18,7 @@ export const resourceTables: Record<
   automation: { table: 'automation_definitions', account: 'line_account_id' },
   booking_menu: { table: 'menus', account: 'line_account_id' },
   friend_add_rule: { table: 'friend_add_rules', account: 'line_account_id' },
+  scenario: { table: 'scenarios', account: 'line_account_id' },
 };
 /** SQL の照合には、子行を含む編集内容と公開状態の両方を含める。 */
 export function snapshotSql(kind: string) {
@@ -24,8 +26,13 @@ export function snapshotSql(kind: string) {
     `(SELECT json_group_array(json_object(${table === 'rich_menu_pages' ? "'id',id,'name',name,'image',image_r2_key,'order',order_index" : table === 'rich_menu_areas' ? "'id',id,'x',bounds_x,'y',bounds_y,'w',bounds_width,'h',bounds_height,'action',action_type,'data',action_data,'label',label,'template',template_id,'form',form_id" : "'id',id,'status',status,'trigger',trigger_type,'config',trigger_config,'conditions',condition_config,'actions',action_config"})) FROM ${table} WHERE ${where})`;
   if (kind === 'dashboard')
     return `(SELECT json_object('cards',cards_json) FROM account_styles WHERE line_account_id=? AND line_account_id=?)`;
+  // タグの見本は行を持たない。店が触れる物が無いので、いつも同じ値（＝手を加えていない）。
+  if (kind === 'tag_set')
+    return `(SELECT json_object('heldTagSet',?,'account',?))`;
   const r = resourceTables[kind];
   if (!r) throw new StyleError('invalid_resource');
+  if (kind === 'scenario')
+    return `(SELECT json_object('name',name,'description',description,'trigger',trigger_type,'active',is_active,'published',current_published_version_id,'updated',updated_at,'steps',(SELECT json_group_array(json_object('id',s.id,'order',s.step_order,'delay',s.delay_minutes,'type',s.message_type,'content',s.message_content,'draft',s.is_draft)) FROM scenario_steps s WHERE s.scenario_id=r.id),'triggers',(SELECT COUNT(*) FROM scenario_triggers t WHERE t.scenario_id=r.id)) FROM scenarios r WHERE id=? AND line_account_id=?)`;
   if (kind === 'reminder')
     return `(SELECT json_object('name',name,'active',is_active,'status',lifecycle_status,'draft',current_draft_version_id,'published',current_published_version_id,'updated',updated_at,'versions',(SELECT json_group_array(json_object('id',v.id,'settings',v.settings_snapshot,'status',v.status,'steps',(SELECT json_group_array(json_object('id',s.id,'offset',s.offset_minutes,'content',s.message_content)) FROM reminder_version_steps s WHERE s.reminder_version_id=v.id))) FROM reminder_versions v WHERE v.reminder_id=r.id)) FROM reminders r WHERE id=? AND line_account_id=?)`;
   if (kind === 'friend_add_rule')
@@ -225,6 +232,24 @@ export async function overwriteResource(
       );
     return statements;
   }
+  if (item.kind === 'tag_set')
+    // 見本の名前を初期セットの組から読むので、書き換える行が無い。
+    return [];
+  if (item.kind === 'scenario')
+    // 手を加えていない止めた見本だけが来る（照合は呼ぶ側）。止めたまま、名前と通数を差し替える。
+    return [
+      db
+        .prepare(
+          `UPDATE scenarios SET name=?,is_active=0,updated_at=? WHERE id=? AND line_account_id=?`,
+        )
+        .bind(name, now, id, account),
+      db
+        .prepare(
+          `DELETE FROM scenario_steps WHERE scenario_id=? AND scenario_id IN(SELECT id FROM scenarios WHERE id=? AND line_account_id=?)`,
+        )
+        .bind(id, id, account),
+      ...scenarioStepStatements(db, id, item, now),
+    ];
   if (item.kind === 'friend_add_rule')
     // 下書きの文だけを差し替える。公開済みの版・受け皿の状態は触らない。
     return [

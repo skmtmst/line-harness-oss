@@ -1,6 +1,7 @@
 import {prepareStarterInsert} from './style-starter-insert-context.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
 import { friendAddStarterStatements } from './style-starter-friend-add.js';
+import { scenarioStepStatements, starterTagSetTarget } from './style-starter-samples.js';
 import {
   recordSnapshot,
   resourceSnapshot,
@@ -155,7 +156,9 @@ export async function insertStyleStarterItems(
               ? 'reminders'
               : item.kind === 'booking_menu'
                 ? 'menus'
-                : null;
+                : item.kind === 'scenario'
+                  ? 'scenarios'
+                  : null;
     const accountColumn =
       item.kind === 'rich_menu' ? 'account_id' : 'line_account_id';
     if (chosen && chosen.mode !== 'sample') {
@@ -360,6 +363,19 @@ export async function insertStyleStarterItems(
           .prepare('UPDATE rich_menu_groups SET default_page_id=? WHERE id=?')
           .bind(page, id),
       );
+    } else if (item.kind === 'tag_set') {
+      // 本物のタグはまだ作らない。作ると③が押さずに「済み」になり、同じ名前のタグも作れなくなる。
+      id = starterTagSetTarget(item.key);
+    } else if (item.kind === 'scenario') {
+      // 止めた下書き。きっかけを持たせず、友だち追加の決まりにもつながないので、だれも入らない。
+      statements.push(
+        db
+          .prepare(
+            `INSERT INTO scenarios(id,name,description,trigger_type,is_active,allow_concurrent,line_account_id,created_at,updated_at) VALUES(?,?,?,'manual',0,1,?,?,?)`,
+          )
+          .bind(id, '【見本】' + item.name, '友だち追加から始める見本です。動かすまで、だれにも届きません。', account, now, now),
+        ...scenarioStepStatements(db, id, item, now),
+      );
     } else if (item.kind === 'friend_add_rule') {
       const prepared = await friendAddStarterStatements(db, account, item, now);
       // 受け皿に店の設定か下書きが既にある。上書きせず、黙って落とさずに理由を返す。
@@ -414,6 +430,8 @@ export async function insertStyleStarterItems(
         item.kind === 'automation' ||
         item.kind === 'reminder' ||
         item.kind === 'friend_add_rule' ||
+        item.kind === 'tag_set' ||
+        item.kind === 'scenario' ||
         item.kind === 'booking_menu' ||
         item.kind === 'rich_menu',
     });
