@@ -150,6 +150,7 @@ describe('最初の10分のまとめ', () => {
       ['受け皿が無い', `UPDATE friend_add_rules SET is_unknown_route_fallback = 0`, `UPDATE friend_add_rules SET is_unknown_route_fallback = 1`],
       ['止めたシナリオ', `UPDATE scenarios SET is_active = 0`, `UPDATE scenarios SET is_active = 1`],
       ['振り分けから始まらないシナリオ', `UPDATE scenarios SET id = 'sc-other'`, `UPDATE scenarios SET id = 'sc-la-1'`],
+      ['最初の1通が無い', `UPDATE messages_log SET direction = 'incoming'`, `UPDATE messages_log SET direction = 'outgoing'`],
     ];
     for (const [label, breakIt, restore] of missing) {
       testDb.raw.prepare(breakIt).run();
@@ -157,6 +158,14 @@ describe('最初の10分のまとめ', () => {
       testDb.raw.prepare(restore).run();
       expect({ label, count: (await read()).body?.allStepsDone.count }).toEqual({ label, count: 1 });
     }
+  });
+
+  it('10分ちょうどは10分以内、10分を少しでも過ぎたら入れない', async () => {
+    account('la-1', at(0));
+    firstMessage('la-1', at(10));
+    account('la-2', at(0));
+    firstMessage('la-2', jstIso(base + 10 * 60_000 + 1_000));
+    expect((await read()).body).toMatchObject({ minutesToFirstMessage: { median: 10, p75: 11, reached: 2 }, withinTenMinutesPercent: 50 });
   });
 
   it('期間に店が無い時は 0 と空の分を返す', async () => {
