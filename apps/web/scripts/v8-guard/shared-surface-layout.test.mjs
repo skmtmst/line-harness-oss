@@ -250,11 +250,14 @@ for (const stripWidth of [852,1140]) {
         const hit=(a,b)=>!!a&&!!b&&a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top
         const note=card.querySelector('[data-kpi-detail] > span:first-child')
         return {labelCut:cut(card.querySelector('[data-kpi-label]'))||(!!label&&box(card).right<label.right),noteCut:cut(note),
-          overlap:hit(badge,label)||hit(badge,number),inside:!badge||badge.right<=box(card).right}
+          overlap:hit(badge,label)||hit(badge,number),inside:!badge||badge.right<=box(card).right,
+          link:card.querySelector('[data-kpi-detail] a')?getComputedStyle(card.querySelector('[data-kpi-detail] a')).color:null}
       }))
       const rows=await measure()
       assert.equal(rows.length,4)
       assert.ok(rows.every(row=>!row.labelCut&&!row.noteCut&&!row.overlap&&row.inside),JSON.stringify(rows))
+      // 行き先「〇〇へ →」は文字のリンクの決まり（緑）。
+      assert.ok(rows.filter(row=>row.link).length===3&&rows.every(row=>!row.link||row.link==='rgb(8, 122, 62)'),JSON.stringify(rows))
       // 札を題の上へ重ねると、この計測が見逃さないことを確かめる。
       await page.locator(`[data-kpi-fixture="${stripWidth}"] [data-kpi-badge]`).first().evaluate(el=>{const label=el.closest('[data-design-version]').querySelector('[data-kpi-label]').getBoundingClientRect();Object.assign(el.style,{position:'fixed',left:`${label.left}px`,top:`${label.top}px`})})
       assert.ok((await measure()).some(row=>row.overlap))

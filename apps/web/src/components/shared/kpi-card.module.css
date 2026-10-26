@@ -330,7 +330,7 @@
 :root .icon { width: var(--polish-icon-large); height: var(--polish-icon-large); border: 0; outline-color: transparent; border-radius: 0; background: none; }
 :root .icon svg { width: var(--polish-icon-large); height: var(--polish-icon-large); stroke-width: var(--polish-icon-stroke); }
 :root .number, :root .card[data-kpi-presentation='inline'] .number { font-weight: var(--polish-value-weight); font-variant-numeric: var(--font-numeric); }
-:root .link { color: var(--color-ink); }
+:root .link { color: var(--color-link); } /* 行き先「〇〇へ →」は文字のリンクの決まり（緑・500） */
 :root .link:hover, :root .valueAction:hover { text-decoration: underline; }
 
 :root .card[data-kpi-presentation='inline'] .unit { font-weight: var(--polish-control-weight); }

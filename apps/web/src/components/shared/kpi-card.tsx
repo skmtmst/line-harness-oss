@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { ArrowRight, MoreHorizontal } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import StatusBadge from './status-badge'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import { isKpiNumberText } from './kpi-number-text'
@@ -277,10 +277,16 @@ export default function KpiCard({
         ) : null}
       </div>
 
-      <div className={styles.valueRow} data-unit-spacing={unitSpacing}>
+      {/*
+        帯の1マスに数が入りきらない時（「¥38,500」など）は、隣へはみ出さず字を少し小さくする。
+        省略はしない。数の字数と単位の幅を CSS へ渡し、マスの幅から入る大きさを決める。
+      */}
+      <div className={styles.valueRow} data-unit-spacing={unitSpacing} data-kpi-fit
+        style={{ '--kpi-fit-chars': Math.max(1, displayedNumber.length), '--kpi-fit-unit': `${showUnit ? (unit ?? '').length * 12 + 2 : 0}px` } as CSSProperties}>
+      {/* 状態の言葉（「有効」など）は札だけで出す。数の場所に空の「—」を並べない（「—」は値が本当に無い時だけ）。 */}
       {loading ? (
         <div data-kpi-skeleton className={styles.skeleton} aria-hidden="true" />
-      ) : (
+      ) : statusText ? null : (
         <p
           className={[
             styles.value,
