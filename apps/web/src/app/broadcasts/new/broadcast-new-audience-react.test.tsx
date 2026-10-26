@@ -126,6 +126,9 @@ describe('配信作成への分析対象者の受け渡し(N-274)', () => {
     await mount(); await flush()
     expect(host.textContent).toContain('権限')
     expect(host.querySelector('[data-design-node="FU2aU"]')).toBeNull()
+    // 押せない［次へ］や下書き保存も出さない（隠す）。
+    const labels = [...host.querySelectorAll('button')].map((button) => button.textContent ?? '')
+    expect(labels.some((label) => label.includes('対象設定へ') || label.includes('下書きを保存する'))).toBe(false)
   })
 
   it('有効な対象者は人数と期限を出してフォームを開く', async () => {

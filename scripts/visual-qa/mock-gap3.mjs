@@ -74,7 +74,21 @@ const PLANS = [
 ]
 const HOLDERS = { 'pp-1': 42, 'pp-2': 22, 'pp-3': 22, 'pp-4': 0 }
 
+/**
+ * 数の帯の比べる値（`GET /api/dashboard/comparisons`）。形は shared の DashboardComparisons。
+ * 予約は先週より少ない（赤）、友だちは少ない（赤）、配信の失敗は少ない（緑）。月の数は前の月の記録が無い（null）。
+ * 今の数は、同じ見本の帯・欄の数（予約 0・有効友だち 398・失敗 3）とそろえる（違うと画面は札を出さない）。
+ */
+const COMPARISON_WINDOW = { asOf: '2026-01-13T18:30:00+09:00', previousFrom: '2026-01-06T00:00:00+09:00', previousTo: '2026-01-07T00:00:00+09:00' }
+const week = (current, previous, better) => ({ current, previous, better, basis: 'same_weekday_last_week', ...COMPARISON_WINDOW })
+const DASHBOARD_COMPARISONS = {
+  generatedAt: '2026-01-13T18:30:00+09:00',
+  comparisons: { todayBookings: week(0, 2, 'high'), activeFriends: week(398, 402, 'high'), deliveryFailures: week(3, 5, 'low'), monthlySent: null, monthlyBroadcasts: null },
+  skipped: { monthlySent: 'no_previous_record', monthlyBroadcasts: 'no_previous_record' },
+}
+
 export function gap3Respond(method, pathname, body = {}, query = new URLSearchParams()) {
+  if (method === 'GET' && pathname === '/api/dashboard/comparisons') return ok(DASHBOARD_COMPARISONS)
   if (method === 'GET' && pathname === '/api/analytics/customer-segments') {
     const cells = []
     for (let r = 1; r <= 5; r += 1) for (let f = 1; f <= 5; f += 1) cells.push({ r, f, name: SEGMENT_NAMES[r - 1][f - 1], count: SEGMENT_COUNTS[r - 1][f - 1], optedOutCount: 0 })

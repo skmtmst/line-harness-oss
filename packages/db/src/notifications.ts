@@ -196,6 +196,8 @@ export async function getNotificationCenter(
     lineAccountId: string;
     staffId: string;
     category?: 'error' | 'update';
+    /** この担当者の未読だけ。ベルで先頭の数件に切ると、6件目以降の未読が埋もれるため口で絞る。 */
+    unreadOnly?: boolean;
     limit?: number;
     /** 通知一覧画面の「さらに読み込む」用。パネルは0のまま。 */
     offset?: number;
@@ -209,6 +211,7 @@ export async function getNotificationCenter(
     conditions.push('n.category = ?');
     values.push(input.category);
   }
+  if (input.unreadOnly) conditions.push('r.notification_id IS NULL');
   values.push(input.limit ?? 20, input.offset ?? 0);
   const result = await db.prepare(`
     SELECT n.*, r.read_at

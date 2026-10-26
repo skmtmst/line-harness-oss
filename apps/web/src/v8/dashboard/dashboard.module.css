@@ -12,6 +12,11 @@
 
 /* 数の帯の寸法はKpiBandとKpiCardの共通値を使う。左右はカードと同じ内側へそろえる。 */
 .todayBand { margin: 0 var(--tpl-list-inset) var(--space-16); }
+/* 帯の上の「いつ時点か」の1行。文字は段の下の「更新」と同じ。 */
+.asOf {
+  margin: 0 var(--tpl-list-inset) var(--space-8); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .cellDetail {
   display: flex; flex-wrap: wrap; gap: var(--tpl-db-row-gap) var(--tpl-db-fig-gap);
   padding: var(--tpl-db-th-pad); border-bottom: 1px solid var(--color-hairline);
@@ -69,6 +74,8 @@ a.kv:hover .kvKey { text-decoration: underline; }
 .kvValue { flex-shrink: 0; white-space: nowrap; color: var(--color-ink); font-size: var(--polish-text-body); font-weight: 600; line-height: var(--tpl-db-text-lh); font-variant-numeric: tabular-nums;  font-family: var(--font-inter), Inter, sans-serif; }
 .kvDanger .kvKey, .kvDanger .kvValue { color: var(--color-danger); font-weight: 600; }
 .kvFaint .kvValue { color: var(--color-ink-faint); }
+/* 値の左に差の札を並べる（札は値の太さ・色を引き継がない）。 */
+.kvDelta { display: inline-flex; align-items: center; gap: var(--tpl-db-kv-gap); }
 .dot { width: var(--tpl-db-dot); height: var(--tpl-db-dot); flex-shrink: 0; border-radius: var(--radius-pill); background: var(--color-ink-faint); }
 .dotSuccess { background: var(--color-success); }
 .dotDanger { background: var(--color-danger); }
