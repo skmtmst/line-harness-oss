@@ -484,3 +484,43 @@ describe('日本語の秘密値検知(限定語彙+区切り記号必須とい�
     expect(api.create.mock.calls[0][0]).toMatchObject({ memo })
   })
 })
+
+describe('共通情報の新規作成: 入力前の注意と送信前の警告(実React)', () => {
+  it('入力を始める前から、秘密の値を入れない注意を出す', async () => {
+    await render()
+    expect(host.textContent).toContain('秘密の値は入れないでください')
+  })
+
+  it('中身に秘密値らしい言葉があると警告で止め、「入力に戻って修正する」で中身の欄へ戻る', async () => {
+    await render()
+    await setValue(byId('cv-name'), '営業時間')
+    await setValue(byId('cv-key'), 'shop_hours')
+    await setValue(byId('cv-value'), 'パスワード: hunter2')
+    await click(byExactText('button', '保存して公開'))
+    const warning = document.querySelector('[role="alertdialog"]')
+    expect(warning?.textContent).toContain('値に、パスワードやトークンなどの秘密値らしい内容があります。')
+    expect(api.create).not.toHaveBeenCalled()
+    await click(byExactTextInBody('button', '入力に戻って修正する'))
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-value')
+    expect(api.create).not.toHaveBeenCalled()
+  })
+
+  it('社内メモが理由のときは、「入力に戻って修正する」で社内メモの欄へ戻る', async () => {
+    await render()
+    await setValue(byId('cv-name'), '営業時間')
+    await setValue(byId('cv-key'), 'shop_hours')
+    await setValue(byId('cv-memo'), 'パスワード: hunter2')
+    await click(byExactText('button', '保存して公開'))
+    await click(byExactTextInBody('button', '入力に戻って修正する'))
+    expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-memo')
+  })
+
+  it('空欄にできない種別だけ、中身の欄に必須の印を付ける', async () => {
+    await render()
+    const valueField = () => byId('cv-value').closest('[data-form-requirement]')?.getAttribute('data-form-requirement')
+    expect(valueField()).toBe('optional')
+    await click(typeRadio('date') as HTMLInputElement)
+    expect(valueField()).toBe('required')
+  })
+})

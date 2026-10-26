@@ -6,14 +6,12 @@ import { describe, expect, it } from 'vitest'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /*
- * ★V8 共通情報 編集（板 ）の言葉の確認。
- * 社内メモの説明は板どおり「出ません」にそろえる。
+ * ★V8 共通情報 編集の社内メモの説明（「メモ（お客さまには出ません）」）は
+ * `edit/page-behavior.test.tsx` が描いて確かめる。ここは古い言葉へ戻さない見張りだけ。
  */
 describe('共通情報編集の言葉（AYc6O）', () => {
-  it('社内メモの説明が板どおり', () => {
-    // 入口は src/v8/common-vars-edit/edit.tsx（古い edit-v8.tsx はもう描かれない）。
+  it('社内メモの説明を古い言葉へ戻さない', () => {
     const source = readUiSource(join(SRC, '../../v8/common-vars-edit/edit.tsx'), 'utf8')
-    expect(source).toContain('メモ（お客さまには出ません）')
     expect(source).not.toContain('お客さまには出せません')
   })
 })
