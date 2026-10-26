@@ -23,12 +23,12 @@ const starterRows = () => f.raw.prepare("SELECT item_key,kind,target_id,is_sampl
 const published = () => selectPublishedFriendAddRule(f.db, { accountId: 'a', friendId: 'friend', kind: 'first_time', entryRouteId: null, now: new Date() });
 
 const EXPECTED_KEYS: Record<string, string[]> = {
-  standard: ['welcome', 'friend-add-welcome', 'menu', 'dashboard'],
-  ec: ['welcome', 'friend-add-welcome', 'menu', 'dashboard'],
-  restaurant: ['welcome', 'friend-add-welcome', 'menu', 'reminder-thanks', 'dashboard'],
-  salon: ['welcome', 'friend-add-welcome', 'menu', 'booking', 'reminder-day-before', 'reminder-today', 'reminder-thanks', 'dashboard'],
-  consult: ['welcome', 'friend-add-welcome', 'menu', 'booking', 'reminder-day-before', 'reminder-today', 'reminder-thanks', 'dashboard'],
-  lesson: ['welcome', 'friend-add-welcome', 'menu', 'reminder-day-before', 'reminder-today', 'reminder-thanks', 'dashboard'],
+  standard: ['welcome', 'friend-add-welcome', 'menu', 'segment-tags', 'friend-add-scenario', 'dashboard'],
+  ec: ['welcome', 'friend-add-welcome', 'menu', 'segment-tags', 'friend-add-scenario', 'dashboard'],
+  restaurant: ['welcome', 'friend-add-welcome', 'menu', 'reminder-thanks', 'segment-tags', 'friend-add-scenario', 'dashboard'],
+  salon: ['welcome', 'friend-add-welcome', 'menu', 'booking', 'reminder-day-before', 'reminder-today', 'reminder-thanks', 'segment-tags', 'friend-add-scenario', 'dashboard'],
+  consult: ['welcome', 'friend-add-welcome', 'menu', 'booking', 'reminder-day-before', 'reminder-today', 'reminder-thanks', 'segment-tags', 'friend-add-scenario', 'dashboard'],
+  lesson: ['welcome', 'friend-add-welcome', 'menu', 'reminder-day-before', 'reminder-today', 'reminder-thanks', 'segment-tags', 'friend-add-scenario', 'dashboard'],
 };
 
 test.each(ACCOUNT_STYLES)('%s の初期セットは、ごあいさつにつないだ友だち追加の決まりを 1 つだけ持つ', (style) => {
