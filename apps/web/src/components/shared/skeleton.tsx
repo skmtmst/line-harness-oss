@@ -232,9 +232,21 @@ export function SkeletonRow({ className }: { className?: string }) {
 }
 
 /** 一覧の列に沿う3〜6行の骨格。カード一覧も同じ待ち時間の部品で包む。 */
-export function ListSkeleton({ rows = 4, columns = 3, shape = 'list' }: { rows?: number; columns?: number; shape?: 'list' | 'cards' }) {
+/** 読み込み中の形。型ごとに1つ：一覧＝行、ダッシュボード＝カードの並び、予約＝時間の表の枠。 */
+export type LoadingShape = 'list' | 'cards' | 'board'
+
+/** 予約の時間の表の骨組み。上に列の見出し、左に時刻、右に枠の行。 */
+export function BoardSkeleton({ rows = 6, columns = 4 }: { rows?: number; columns?: number }) {
+  return <div className={styles.board} aria-hidden="true" data-skeleton-shape="board">
+    <div className={styles.boardHead}><span className={styles.boardTime} />{Array.from({ length: columns }, (_, column) => <Skeleton key={column} className={styles.boardHeadBone} />)}</div>
+    {Array.from({ length: rows }, (_, row) => <div key={row} className={styles.boardRow}><Skeleton className={styles.boardTime} />{Array.from({ length: columns }, (_, column) => <span key={column} className={styles.boardCell} />)}</div>)}
+  </div>
+}
+
+export function ListSkeleton({ rows = 4, columns = 3, shape = 'list' }: { rows?: number; columns?: number; shape?: LoadingShape }) {
   const count = Math.min(6, Math.max(3, rows))
   if (shape === 'cards') return <CardsSkeleton count={count} />
+  if (shape === 'board') return <BoardSkeleton />
   return <div className={styles.list} aria-hidden="true">
     {Array.from({ length: count }, (_, index) => <div key={index} className={styles.listRow}>
       {Array.from({ length: Math.max(1, columns) }, (_, column) => <Skeleton key={column} className={column === 0 ? styles.nameBone : column === columns - 1 ? styles.dateBone : styles.numberBone} />)}

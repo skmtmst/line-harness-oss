@@ -7,7 +7,7 @@ import Button from './button'
 import TargetMissing from './target-missing'
 import { loadFailureCopy, permissionDeniedMessage, type PermissionScope } from './api-error-message'
 import styles from './list-state.module.css'
-import { DelayedSkeleton, ListSkeleton } from './skeleton'
+import { DelayedSkeleton, ListSkeleton, type LoadingShape } from './skeleton'
 
 /**
  * 一覧に中身を出せないときの1枚。
@@ -92,7 +92,8 @@ export default function ListState({
   icon,
   loadingShape = 'list',
 }: {
-  loadingShape?: 'list' | 'cards'
+  /** 読み込み中の形。一覧＝list、ダッシュボード＝cards、予約の盤＝board。 */
+  loadingShape?: LoadingShape
   permissionScope?: PermissionScope
   kind: ListStateKind
   /** 空の表示で、その機能の印を渡す。 */

@@ -804,6 +804,7 @@ export default function TagsTab({
             unitSpacing="tight"
             unit={kpi.value == null ? '' : kpi.unit}
             detail={kpi.detail}
+            loading={!ready}
           />
         ))}
       </KpiBand>

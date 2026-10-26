@@ -28,7 +28,7 @@ export default function HomeDashboard() {
   // QR・質問の再開は業種より先に既存の共通画面へ渡す。閉じると業種のホームへ戻る。
   if (qrRequested || setupRequested) return <StandardDashboard key={selectedAccountId} usageStyle={profile.data?.style === 'ec' ? 'ec' : 'standard'} />
   if (selectedAccountId && !profile.data) return <PageFrame kind="dashboard"><PageHeading title="ダッシュボード" /><PageContent layout="stats">
-    {profile.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={profile.error} onRetry={profile.reload} /> : <ListState kind="loading" title="使い方のスタイルを確認しています" />}
+    {profile.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={profile.error} onRetry={profile.reload} /> : <ListState kind="loading" loadingShape="cards" title="使い方のスタイルを確認しています" />}
   </PageContent></PageFrame>
   const style = profile.data?.style ?? 'standard'
   if (INDUSTRY.includes(style)) return <StyleDashboard key={style} style={style as IndustryStyle} />

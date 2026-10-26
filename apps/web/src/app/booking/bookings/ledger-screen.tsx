@@ -459,7 +459,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             </div>
           ) : loading ? (
             <div className="bg-canvas rounded-card border-hairline border">
-              <ListState kind="loading" title="予約を読み込んでいます" />
+              <ListState kind="loading" loadingShape="board" title="予約を読み込んでいます" />
             </div>
           ) : error ? (
             // ★管理画面 `x63W5x`：失敗を「まだありません」と言わない。
