@@ -789,5 +789,6 @@
 - [ベルと通知の画面のタブを「すべて・未読・システム」にし、未読は古いものまで漏れず](release-log/unreleased/1835-kenta-bell-inbox.md)
 - [一斉配信を作る画面に「2/5 配信対象」のように今の段を出し、配信名・送る相手・](release-log/unreleased/1835-kenta-broadcast-steps.md)
 - [運用状態の更新履歴を、検証へ入れた1回ごとに1枚のカードで見られるようにした。日](release-log/unreleased/1835-kenta-release-history.md)
+- [スタイルを選ぶ画面・最初の1通の確かめ・初期セットを配る](release-log/unreleased/0000-kenta-first-ten-screens.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
