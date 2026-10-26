@@ -11,7 +11,7 @@
 .root {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   padding: 2px 8px;
   font-weight: 600;
   white-space: nowrap;

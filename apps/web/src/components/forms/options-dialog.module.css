@@ -16,7 +16,7 @@
 
 @media (min-width: 640px) {
   .panel {
-    margin-block: 74px; /* margin: 74 */
+    margin-block: 72px; /* margin: 74 */
     max-height: calc(100dvh - 148px);
   }
 }

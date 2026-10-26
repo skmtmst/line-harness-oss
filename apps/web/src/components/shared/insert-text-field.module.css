@@ -65,9 +65,9 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   margin: 0 2px;
-  padding: 1px 6px 1px 5px;
+  padding: 1px 6px 1px 4px;
   border-radius: var(--radius-mini);
   background: var(--color-accent-soft);
   color: var(--color-ink);
@@ -90,7 +90,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
+  padding: 2px 8px;
   border: 0;
   border-radius: var(--radius-pill);
   outline: 1px solid var(--color-control-border);

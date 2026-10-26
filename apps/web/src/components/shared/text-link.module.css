@@ -57,4 +57,4 @@
 
 /* 押せる範囲は高さ 24 以上（§6.5 の 7）。文字の大きさと並びは変えず、透明な当たりで上下に広げる。 */
 .root { position: relative; }
-.root::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - 24px) / 2)); }
+.root::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }

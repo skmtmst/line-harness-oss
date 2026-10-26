@@ -294,5 +294,20 @@ export default function scanPolishRules() {
       if (overlap) { add('badge-overlap', badge, {}, badge.textContent); break }
     }
   }
+  // 余白の段（§6.5 の 1・globals.css の --space-*）：padding・margin・gap と余白の変数の手書きは、0・線の 1・2〜32 の段・32 より大きい 4 の倍数だけ。
+  const steps = [0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 32]
+  const onScale = (n) => steps.includes(n) || (n > 32 && n % 4 === 0)
+  // 画面で使われている規則だけを見る（Tailwind が試験の文字から作った使われない規則は数えない）。
+  const used = (selector) => { try { return Boolean(document.querySelector(selector.replace(/::?(before|after|placeholder|selection|marker|backdrop|-webkit-[\w-]+)/g, '').replace(/:(hover|active|focus|focus-visible|focus-within|visited)/g, '') || '*')) } catch { return true } }
+  for (const { rule } of rules) {
+    if (!used(rule.selectorText)) continue
+    for (let i = 0; i < rule.style.length; i++) {
+      const prop = rule.style[i]
+      if (!/^(padding|margin|gap|row-gap|column-gap)(-(top|right|bottom|left|inline|block)(-(start|end))?)?$/.test(prop) && !/^--.*(pad|gap|margin|space|inset)(-|$)/.test(prop)) continue
+      const plain = withoutVars(rule.style.getPropertyValue(prop)).replace(/calc\((?:[^()]|\([^()]*\))*\)/g, ' ')
+      const off = [...plain.matchAll(/(?<![\w.-])-?(\d*\.?\d+)px\b/g)].map((m) => Number(m[1])).filter((n) => !onScale(n))
+      if (off.length) add('space-scale', null, { prop, value: rule.style.getPropertyValue(prop).trim() }, rule.selectorText)
+    }
+  }
   return findings
 }

@@ -42,7 +42,7 @@
   height: 36px;
   flex-shrink: 0;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--color-canvas);
@@ -389,7 +389,7 @@
   font-size: var(--text-nano);
   font-weight: 600;
   font-variant-numeric: var(--font-numeric);
-  padding: 0 3px;
+  padding: 0 2px;
 }
 
 /* 自分。名まえの頭1文字を36pxの丸で出す。 */
@@ -643,6 +643,6 @@ html:root .root[data-scrolled] { background: var(--bar-scrolled-bg); -webkit-bac
 
 /* パンくずのリンクと左メニューを畳むボタンの押せる範囲（§6.5 の 7）。見た目は変えず、透明な当たりで広げる（パンくずは高さ 24、畳むボタンは 36 角）。 */
 .crumbHome, .crumbFromLink { position: relative; }
-.crumbHome::before, .crumbFromLink::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - 24px) / 2)); }
+.crumbHome::before, .crumbFromLink::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton { position: relative; }
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton::before { content: ''; position: absolute; inset: -2px; }

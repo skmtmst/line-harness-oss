@@ -383,7 +383,7 @@
 :root .active { color: var(--color-ink); }
 :root .section { gap: 1px; }
 :root .sectionHeading,
-:root .sectionToggle { min-height: 0; box-sizing: border-box; height: 30px; padding: 10px 10px 3px; line-height: 17px; font-size: 11px; }
+:root .sectionToggle { min-height: 0; box-sizing: border-box; height: 30px; padding: 10px 10px 2px; line-height: 17px; font-size: 11px; }
 :root .desktop { padding-top: 16px; }
 :root .desktop[data-collapsed] .item { height: 36px; min-height: 36px; }
 
@@ -489,7 +489,7 @@
 }
 :root .railTipCount {
   min-width: 18px;
-  padding: 0 5px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--color-danger);
   color: var(--color-canvas);

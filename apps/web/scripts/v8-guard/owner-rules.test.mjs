@@ -272,3 +272,17 @@ test('印と 1 行の文字の上下の真ん中が 0.5 より離れる・札が
     assert.deepEqual(await kinds(), ['badge-overlap'])
   } finally { await browser.close() }
 })
+
+test('余白の段にない padding・margin・gap・余白の変数を書くと落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scanPolish)).map(f => f.kind).filter(kind => kind === 'space-scale')
+    await page.setContent('<style>:root{--x-pad:12px 16px}.a{padding:8px 12px;margin:-24px;gap:36px;padding-top:calc(100% - 13px)}</style><main><p class="a">本文</p></main>')
+    assert.deepEqual(await kinds(), [])
+    await page.addStyleTag({ content: '.a{padding:9px 12px}' })
+    assert.ok((await kinds()).length > 0)
+    await page.setContent('<style>:root{--x-gap:13px}</style><main>本文</main>')
+    assert.deepEqual(await kinds(), ['space-scale'])
+  } finally { await browser.close() }
+})

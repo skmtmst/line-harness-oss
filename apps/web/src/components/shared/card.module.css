@@ -212,7 +212,7 @@ html:root .headerContent .meta { display: flex; flex-direction: column; align-it
   font-size: var(--tpl-section-title-size);
   font-weight: var(--tpl-section-title-weight);
 }
-:root .headerRestaurant{min-height:58px;padding:20px 24px 15px;align-items:flex-start;}
+:root .headerRestaurant{min-height:58px;padding:20px 24px 14px;align-items:flex-start;}
 :root .headerRestaurant .titleGroup{flex-direction:column;gap:2px;}
 :root .headerRestaurant .title{font-size:15px;line-height:23px;}
 :root .headerRestaurant .meta{font-size:14px;line-height:21px;}

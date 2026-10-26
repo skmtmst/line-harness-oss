@@ -82,7 +82,7 @@
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 24px 28px;
+  padding: 24px 24px;
 }
 
 .side {
@@ -872,7 +872,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 22px 4px;
+  padding: 10px 20px 4px;
   background: var(--v8-bphone-chrome);
   color: var(--v8-bphone-ink);
   font-size: 12px;

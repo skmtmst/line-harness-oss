@@ -709,8 +709,8 @@ export default function Sidebar({
           <div><SidebarIdentity /></div>
         </>
       ) : preview ? (
-        <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
-          <p className="mb-[11px] text-caption font-normal text-ink-faint">現在のLINEアカウント</p>
+        <div className={`px-[12px] pb-[8px] pt-[16px] ${styles.collapseHide}`}>
+          <p className="mb-[10px] text-caption font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-card border border-hairline bg-canvas px-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-body font-semibold text-accent-deep">サ</div>
             <div className="ml-3 min-w-0 flex-1">

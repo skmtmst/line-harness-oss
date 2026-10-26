@@ -107,7 +107,7 @@
  * つまみ r6。箱型（dtJVi）の合格は変えない。v8 だけ。
  */
 :root .root[data-size='small'] { border-radius: var(--radius-segment); }
-:root .root[data-size='small'] .item { min-height: 0; padding: 3px var(--polish-space-field); font-size: var(--text-caption); line-height: 18px; }
+:root .root[data-size='small'] .item { min-height: 0; padding: 2px var(--polish-space-field); font-size: var(--text-caption); line-height: 20px; }
 :root .root[data-size='small'] .thumb { border-radius: var(--radius-mini); }
 
 /* 詰めた形（ベルの小窓 mV28V の分類）。器・つまみの角丸は既定のまま。v8 だけ。 */
@@ -121,8 +121,8 @@
  */
 :root .root[data-equal-width][data-size='panel'] .item { padding: 4px 12px; }
 .root[data-equal-width] .item { flex: 1; min-width: 0; min-height: 0; }
-:root .root[data-size='panel'] { display: flex; padding: 3px; border-radius: var(--radius-segment); }
-:root .root[data-size='panel'] .item { padding: 5px 12px; font-size: var(--text-caption); line-height: 17px; }
+:root .root[data-size='panel'] { display: flex; padding: 2px; border-radius: var(--radius-segment); }
+:root .root[data-size='panel'] .item { padding: 6px 12px; font-size: var(--text-caption); line-height: 17px; }
 :root .root[data-size='panel'] .selected { font-weight: 700; }
 :root .root[data-size='panel'] .thumb { top: 3px; bottom: 3px; border-radius: var(--radius-mini); }
 /* 連動タイミング。この寸法を頼んだ場所だけに効く。 */
@@ -176,7 +176,7 @@ html:root .root .item, html:root .root .thumb, html:root .root[data-size] .thumb
 :root .root[data-size='booking'] .item { display: flex; align-items: center; justify-content: center; gap: var(--tpl-chip-gap); width: var(--tpl-booking-seg-item-width); height: var(--tpl-chip-h); padding: 0; white-space: nowrap; }
 :root .root[data-size='booking'] .item:last-child { width: var(--tpl-booking-seg-last-width); }
 :root .root[data-size='booking'] .count { font-size: var(--text-caption); }
-@layer components { html:root .root[data-appearance='reservation'] .item{padding:6px 13px;min-height:36px;border-radius:var(--radius-pill);} html:root .root[data-appearance='reservation'] .selected{outline-color:var(--color-accent);font-weight:600;} }
+@layer components { html:root .root[data-appearance='reservation'] .item{padding:6px 12px;min-height:36px;border-radius:var(--radius-pill);} html:root .root[data-appearance='reservation'] .selected{outline-color:var(--color-accent);font-weight:600;} }
 
 /* ・・：10-10 に採用した共通の形。 */
 :root .thumb { background: var(--color-selection-bg); box-shadow: var(--choice-selected-shadow); }

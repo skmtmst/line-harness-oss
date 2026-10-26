@@ -95,7 +95,7 @@
 .iconWrap { display: contents; }
 /* 正本 hNXm7。空の表示以外の失敗・権限・読込の扱いは維持する。 */
 :root .root[data-list-state='empty'] {
-  justify-content: flex-start; min-height: 0; padding: 28px 24px;
+  justify-content: flex-start; min-height: 0; padding: 24px 24px;
   /* 枠は付けない：空の表示は表・カードの中に出るので、箱の中に箱を重ねない（2026-10-08 オーナー「ここに枠があるのは違和感」。Pencil hNXm7 の線も外した）。 */
   font-family: var(--font-sans);
 }

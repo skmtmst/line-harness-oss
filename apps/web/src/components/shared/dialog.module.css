@@ -298,7 +298,7 @@
  * 段の間2＋ここの5＝7 を足して補足の上端を y151 にそろえる。
  */
 :root .titleNote {
-  margin-top: 5px;
+  margin-top: 4px;
   font-size: var(--text-caption);
   line-height: 18px;
   font-weight: 500;
@@ -387,7 +387,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
 :root .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }
 /*  の続いた窓。呼び出し側が選んだときだけ、既定の段の帯を外す。 */
-:root .panel[data-layout='continuous'] { padding: 22px 24px; gap: 14px; }
+:root .panel[data-layout='continuous'] { padding: 20px 24px; gap: 14px; }
 :root .panel[data-layout='continuous'] > .headerRow { padding: 0; align-items: center; }
 :root .panel[data-layout='continuous'] .title { font-size: 16px; font-weight: 700; line-height: 23px; }
 :root .panel[data-layout='continuous'] .description { font-size: 12px; line-height: 17px; }

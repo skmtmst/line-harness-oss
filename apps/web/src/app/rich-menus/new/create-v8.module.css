@@ -53,7 +53,7 @@
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 24px 28px;
+  padding: 24px 24px;
 }
 
 .cardTitle {
@@ -270,7 +270,7 @@
 
 .previewMenuTab {
   flex: 1;
-  padding: 3px 4px;
+  padding: 2px 4px;
   border-radius: var(--radius-mini) var(--radius-mini) 0 0;
   font-size: var(--text-nano);
   line-height: 1.4;
@@ -610,4 +610,4 @@
 
 /* 文字だけのボタンの押せる範囲は高さ 24（§6.5 の 7）。 */
 .checkAction > button { position: relative; }
-.checkAction > button::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - 24px) / 2)); }
+.checkAction > button::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }

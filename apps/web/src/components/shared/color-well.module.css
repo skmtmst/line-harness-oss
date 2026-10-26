@@ -121,7 +121,7 @@
   display: flex;
   gap: 2px;
   height: 36px;
-  padding: 3px;
+  padding: 2px;
   border-radius: var(--radius-control);
   background: var(--color-surface-pearl);
 }

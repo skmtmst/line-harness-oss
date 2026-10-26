@@ -194,7 +194,7 @@
 :root .valueRow { display: flex; align-items: center; width: 100%; gap: 6px; }
 /* 数字と単位（人・通・件・%）は同じ下の線（ベースライン）に乗せる。箱の下端でそろえると字の大きさの差でずれる。 */
 :root .value {
-  display: flex; align-items: baseline; flex: 1; gap: 3px; min-height: 0;
+  display: flex; align-items: baseline; flex: 1; gap: 2px; min-height: 0;
   white-space: nowrap;
 }
 :root .number {
@@ -313,7 +313,7 @@
 :root .strip[data-restaurant-fusion] .valueRow { padding-left: 0; }
 :root .strip[data-restaurant-fusion] .detail { padding-left: 0; }
 
-:root .strip[data-restaurant-fusion='dashboard'] { margin: 13px 24px 0; }
+:root .strip[data-restaurant-fusion='dashboard'] { margin: 12px 24px 0; }
 
 /* 数を押して内訳を開く口。数字と単位の配置は通常の数と同じ。 */
 .valueAction { min-height: 0; display: inline-flex; align-items: inherit; gap: inherit; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
