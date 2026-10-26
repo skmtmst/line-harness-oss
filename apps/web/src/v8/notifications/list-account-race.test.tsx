@@ -15,6 +15,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fx.account, loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...(await original<object>()), useStaffRole: () => 'owner' }))
 
 const item = (id: string, title: string): NotificationCenterItem => ({
   id, eventType: 'maintenance.scheduled', category: 'update', title, body: '', metadata: null, isRead: false, createdAt: '2026-10-01T00:00:00.000Z',

@@ -162,6 +162,28 @@ describe('実行の詳細の画面（N43uVX）', () => {
     expect(buttonByText('失敗した処理をもう一度')).toBeUndefined()
   })
 
+  it('実行の JSON は開いた時だけ出し、友だちの名前・ID と設定の文面を入れない', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    await render()
+    expect(host.querySelector('pre')).toBeNull()
+    await act(async () => { buttonByText('この実行の JSON を開く')!.click() })
+    const text = host.querySelector('pre')?.textContent ?? ''
+    expect(text).toContain('"id": "run-4"')
+    expect(text).toContain('"errorCode": "action_failed"')
+    for (const leak of ['山田 太郎', 'friend-4', '共通のあいさつ']) expect(text).not.toContain(leak)
+    await act(async () => { buttonByText('JSON をコピー')!.click() })
+    expect(writeText).toHaveBeenLastCalledWith(text)
+  })
+
+  it('閲覧のみは実行の JSON を読めるが写す操作は出さない', async () => {
+    roleState.role = 'viewer'
+    await render()
+    await act(async () => { buttonByText('この実行の JSON を開く')!.click() })
+    expect(host.querySelector('pre')?.textContent).toContain('"id": "run-4"')
+    expect(buttonByText('JSON をコピー')).toBeUndefined()
+  })
+
   it('顧客名が隠された記録は「トークを開く」を出さない', async () => {
     detail = { ...detail, friend: { displayName: '顧客名は非表示', redacted: true } }
     await render()

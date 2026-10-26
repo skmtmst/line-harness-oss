@@ -1220,7 +1220,7 @@ describe('W: 運用状態の確認項目の追加（-32）', () => {
     expect(quota?.value).toMatchObject({ sendable: 200, forecastRemaining: -300 });
   });
 
-  it('鍵の期限は切れていればdanger、14日以内ならwarning、未記録ならunknown', async () => {
+  it('鍵の期限は切れていればdanger、取り替えの時期を過ぎても古いままならwarning、未記録ならunknown', async () => {
     const { runOperationHealthChecks } = await import('../services/operations-health.js');
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'unlimited' })));
 
@@ -1228,9 +1228,9 @@ describe('W: 運用状態の確認項目の追加（-32）', () => {
     let checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T00:00:00.000Z' });
     expect(checked.run.results.find((r) => r.checkKey === 'credential_expiry')).toMatchObject({ status: 'danger' });
 
-    testDb.raw.prepare("UPDATE line_accounts SET token_expires_at = '2026-09-25T05:00:00.000Z' WHERE id = 'account-1'").run();
+    testDb.raw.prepare("UPDATE line_accounts SET token_expires_at = '2026-09-20T05:00:00.000Z' WHERE id = 'account-1'").run();
     checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T05:00:00.000Z' });
-    expect(checked.run.results.find((r) => r.checkKey === 'credential_expiry')).toMatchObject({ status: 'warning', value: { daysLeft: 10 } });
+    expect(checked.run.results.find((r) => r.checkKey === 'credential_expiry')).toMatchObject({ status: 'warning', value: { daysLeft: 5 } });
 
     testDb.raw.prepare('UPDATE line_accounts SET token_expires_at = NULL WHERE id = ?').bind('account-1').run();
     checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T10:00:00.000Z' });

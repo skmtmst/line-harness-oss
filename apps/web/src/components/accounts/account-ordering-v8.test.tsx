@@ -53,3 +53,13 @@ it('変更中の Escape では確認を開き、編集を続けると変更を�
   expect((screen.getByRole('button', { name: '構成を保存する' }) as HTMLButtonElement).disabled).toBe(false)
   expect(updateHierarchy).not.toHaveBeenCalled()
 })
+
+it('窓は板 a7lUk の「LINEアカウント階層を編集」で、未設定のアカウントを分けて出し、変えると未保存と分かる', async () => {
+  render(<AccountOrdering onClose={vi.fn()} />)
+  const dialog = screen.getByRole('dialog', { name: 'LINEアカウント階層を編集' })
+  expect(dialog.closest('[data-design-node="a7lUk"]') ?? dialog.querySelector('[data-design-node="a7lUk"]') ?? (dialog.getAttribute('data-design-node') === 'a7lUk' ? dialog : null)).toBeTruthy()
+  await waitFor(() => expect(dialog.textContent).toContain('未設定のLINEアカウント'))
+  expect((screen.getByRole('button', { name: '構成を保存する' }) as HTMLButtonElement).disabled).toBe(true)
+  await moveFree()
+  expect((screen.getByRole('button', { name: '構成を保存する' }) as HTMLButtonElement).disabled).toBe(false)
+})

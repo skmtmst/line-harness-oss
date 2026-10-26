@@ -44,7 +44,8 @@ export async function restaurantMenuButtons(
           .bind(account)
           .first<{ token: string }>();
         if (!link) continue;
-        actionData = `https://liff.line.me/${encodeURIComponent(line.liff_id)}?${new URLSearchParams({ page: 'restaurant', token: link.token })}`;
+        // 予約の確認は席予約の画面の「自分の予約」（view=mine）を開く。
+        actionData = `https://liff.line.me/${encodeURIComponent(line.liff_id)}?${new URLSearchParams({ page: 'restaurant', token: link.token, ...(button.actionData === 'history' ? { view: 'mine' } : {}) })}`;
       } else if (style === 'lesson')
         actionData = `https://liff.line.me/${encodeURIComponent(line.liff_id)}?page=event`;
       else

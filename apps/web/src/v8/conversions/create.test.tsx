@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConversionDefinitionPreview } from '@/lib/api'
 import ConversionCreateV8 from './create'
@@ -192,5 +192,131 @@ describe('V8 成果地点を作る', () => {
     expect(screen.getByRole('link', { name: 'キャンセル' }).getAttribute('href')).toBe('/conversions?tab=points')
     // 押せない入力の欄も置かない（作る画面なので帯だけ）
     expect(screen.queryByLabelText('成果地点の名前')).toBeNull()
+  })
+})
+
+/* 口の返事を1つだけ差し替える（ほかは上の既定のまま）。 */
+function overrideFetch(handler: (url: URL, init?: RequestInit) => Response | null) {
+  const base = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => handler(new URL(String(input)), init) ?? base(input, init))
+}
+
+async function choose(label: string, option: string) {
+  fireEvent.click(screen.getByRole('button', { name: label }))
+  fireEvent.click(within(screen.getByRole('option', { name: option })).getByRole('button'))
+  await flush()
+}
+
+describe('V8 成果地点を作る：送る形と確かめ', () => {
+  it('使う場所の候補は実在する分析とNEN配信の一覧から読み、その実IDを送る', async () => {
+    overrideFetch((url) => {
+      if (url.pathname === '/api/analytics/funnels') {
+        return json({ success: true, data: [{ id: 'fn-7', name: '購入までの流れ', windowDays: 30, createdAt: '', status: 'active', currentVersion: { id: 'fv-3', versionNumber: 3, createdAt: '' }, migrationState: 'ready' }] })
+      }
+      if (url.pathname === '/api/nen-campaigns/settings') {
+        return json({ success: true, data: [{ campaignKey: 'spring-sale', label: '春のセール' }] })
+      }
+      return null
+    })
+    await mount()
+    fireEvent.change(nameInput(), { target: { value: '定期便を始めた' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: '分析（ファネル・レポート）' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'NEN配信' }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: /保存して数えはじめる/ }))
+    await waitFor(() => expect(posted.length).toBe(1))
+    expect(posted[0].usages).toEqual([
+      { refKind: 'analytics', refId: 'fn-7', refVersionId: 'fv-3' },
+      { refKind: 'nen_campaign', refId: 'spring-sale' },
+    ])
+  })
+
+  it('起点・数え方・取り消しの扱いを選んだとおりに定義の口へ送る', async () => {
+    await mount()
+    fireEvent.change(nameInput(), { target: { value: '動画を最後まで見た' } })
+    await choose('できごと', '動画を見終えた（ウェビナー）')
+    fireEvent.click(screen.getByRole('radio', { name: /30日に1回まで/ }))
+    await choose('取り消されたとき', '件数と金額を引く')
+    fireEvent.click(screen.getByRole('button', { name: /保存して数えはじめる/ }))
+    await waitFor(() => expect(posted.length).toBe(1))
+    expect(posted[0]).toMatchObject({
+      name: '動画を最後まで見た',
+      sourceType: 'webinar_completed',
+      deduplicationMode: 'window',
+      deduplicationWindowDays: 30,
+      reversalPolicy: 'source_cancelled',
+    })
+  })
+
+  it('タグ起点はタグとして送り、注文起点だけが「注文の金額」を選べる', async () => {
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: '金額の出し方' }))
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toContain('注文の金額')
+    fireEvent.click(screen.getByRole('button', { name: '金額の出し方' }))
+    fireEvent.change(nameInput(), { target: { value: 'タグが付いた' } })
+    await choose('できごと', 'タグが付いた（タグ）')
+    fireEvent.click(screen.getByRole('button', { name: /保存して数えはじめる/ }))
+    await waitFor(() => expect(posted.length).toBe(1))
+    expect(posted[0].sourceType).toBe('tag_added')
+    expect(posted[0].valueMode).not.toBe('source')
+  })
+
+  it('数え方の3択は一覧と同じ呼び名の札で出す', async () => {
+    await mount()
+    const names = (screen.getAllByRole('radio') as HTMLInputElement[])
+      .filter((radio) => radio.name === 'conversion-create-dedup')
+      .map((radio) => radio.closest('label')?.textContent ?? '')
+    expect(names.map((name) => name.split(/はじめて|短い間|買うたび/)[0])).toEqual(['1人1回だけ', '30日に1回まで', '何回でも'])
+  })
+
+  it('決まった額がマイナスなら保存の口と同じ条件を先に言い、送らない', async () => {
+    await mount()
+    fireEvent.change(nameInput(), { target: { value: '定期便を始めた' } })
+    await choose('金額の出し方', '決まった額')
+    fireEvent.change(screen.getByLabelText('決まった金額'), { target: { value: '-1' } })
+    fireEvent.click(screen.getByRole('button', { name: /保存して数えはじめる/ }))
+    await flush()
+    expect(screen.getByRole('alert').textContent).toBe('固定で付ける金額は0以上の数値で入力してください')
+    expect(posted).toHaveLength(0)
+  })
+
+  it('同じ名前の警告は同じ集計対象の中だけで出し、二重に数える理由を添える', async () => {
+    overrideFetch((url) => (url.pathname === '/api/conversions/points'
+      ? json({ success: true, data: [
+          { id: 'cp-b', name: '別の店の購入', eventType: 'ec_order_confirmed', value: null, lineAccountId: 'account-b', version: 1, createdAt: '' },
+          { id: 'cp-a', name: 'この店の購入', eventType: 'ec_order_confirmed', value: null, lineAccountId: 'account-a', version: 1, createdAt: '' },
+        ] })
+      : null))
+    await mount()
+    fireEvent.change(nameInput(), { target: { value: '別の店の購入' } })
+    await flush()
+    expect(screen.queryByText(/がすでにあります/)).toBeNull()
+    fireEvent.change(nameInput(), { target: { value: 'この店の購入' } })
+    await flush()
+    expect(screen.getByText('同じ名前の「この店の購入」がすでにあります')).toBeTruthy()
+    expect(screen.getByText('このまま保存すると、同じ意味の成果地点が2つになり、分析の数字が二重になります')).toBeTruthy()
+  })
+
+  it('試算は入力中の条件で口を呼び、除いた理由を出し、成果を追加しないと断る', async () => {
+    const previews: Array<Record<string, unknown>> = []
+    overrideFetch((url, init) => {
+      if (url.pathname !== '/api/conversions/definitions/preview') return null
+      previews.push(JSON.parse(String(init?.body ?? '{}')))
+      return json({ success: true, data: {
+        range: { from: '2026-09-01', to: '2026-09-30', timeZone: 'Asia/Tokyo' },
+        matchedCount: 10, estimatedCount: 8, estimatedValue: 8000,
+        duplicateExcludedCount: 1, cancellationCount: 1, excludedReasons: ['テスト用の注文を除きました'],
+        missingValueCount: 0, dailyAverage: 1, deduplicationWindowDays: 30,
+      } satisfies ConversionDefinitionPreview })
+    })
+    await mount()
+    await choose('できごと', '予約が確定した（予約管理）')
+    await waitFor(() => expect(previews.at(-1)?.sourceType).toBe('reservation_confirmed'))
+    expect(posted).toHaveLength(0)
+    await waitFor(() => expect(screen.getByText('テスト用の注文を除きました')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'この試算の説明' }))
+    const note = screen.getByRole('note').textContent ?? ''
+    expect(note).toContain('入力中の条件だけで試算しています。')
+    expect(note).toContain('試算では成果を追加しません。')
   })
 })

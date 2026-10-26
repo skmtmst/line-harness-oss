@@ -1,15 +1,16 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
-import { readFileSync as readOwnFile } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
+import type { UidMigrationDetail } from '@/lib/api'
 
 vi.hoisted(() => {
   // migration.tsx が参照する api.ts はモジュール評価時に必須。
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import { parseUidCsv, splitUidCsvLine } from './migration'
+import { parseUidCsv, runStatusView, splitUidCsvLine } from './migration'
+import { FRIENDS_MERGED_TABS } from '@/v8/friends/friends-tabs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = [
@@ -17,9 +18,6 @@ const PAGE = [
   './use-uid-migration.ts',
   './uid-migration.tsx',
 ].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
-/* #984 LAY-14: 友だち配下の主タブの正本。 */
-const TABS = readFileSync(new URL('../../v8/friends/friends-tabs.ts', import.meta.url), 'utf8')
-const NAV = readOwnFile(join(HERE, '../friends/friends-nav.tsx'), 'utf8')
 const CSS = readFileSync(new URL('../friends/friends-v8.module.css', import.meta.url), 'utf8')
 
 /**
@@ -28,6 +26,8 @@ const CSS = readFileSync(new URL('../friends/friends-v8.module.css', import.meta
  * **21件目以降も判断できる**こと（ページ送り＋未判断のみ）、
  * **引用符・列ずれの行を結び付けない**こと、**一致先なしに
  * 新規作成を選ばせない**ことを守る。
+ * 画面の動き（ページ送り・絞り込み・確認窓・切り戻し・段の表示・タブ）は
+ * `migration-uid-flow-react.test.tsx` が描いて確かめる。ここは CSV の読み方・言葉の関数と「置かないもの」だけ。
  */
 describe("管理画面 機能3 UID移行の対応表", () => {
   it('引用符の中のカンマで列をずらさない', () => {
@@ -57,21 +57,11 @@ describe("管理画面 機能3 UID移行の対応表", () => {
     expect(parseUidCsv('foo,bar\nold-1,new-1')).toEqual([])
   })
 
-  it('対応表をページで区切って読む', () => {
-    expect(PAGE).toContain('limit')
-    expect(PAGE).toContain('offset')
-    expect(PAGE).toContain('ITEM_PAGE_SIZE')
+  it('対応表を先頭20件だけで切らない', () => {
     expect(PAGE).not.toContain('.slice(0, 20)')
   })
 
-  it('分類と未判断のみの絞り込みを持つ', () => {
-    expect(PAGE).toContain('分類で絞り込む')
-    expect(PAGE).toContain('未判断のみ')
-    expect(PAGE).toContain('pendingOnly')
-  })
-
-  it('一致先なしの行に新規作成を選ばせない', () => {
-    expect(PAGE).toContain('一致先なし')
+  it('一致先なしの行を新規作成に倒さない', () => {
     expect(PAGE).not.toContain("item.newUid ? 'link' : 'create'")
   })
 
@@ -80,142 +70,80 @@ describe("管理画面 機能3 UID移行の対応表", () => {
     保存は詳細ダイアログ内の「この組合せを承認」「除外する」が担う。
     「移行内容を確認」という、読むつもりの操作で保存する名前は残さない。
   */
-  it('行の操作は読み取り専用で、保存はダイアログ内の明示操作だけ', () => {
-    expect(PAGE).toContain('詳細を見る')
-    expect(PAGE).toContain('この組合せを承認')
-    expect(PAGE).toContain('onShowDetail(item)')
-    expect(PAGE).toContain("decide(detailItem, 'link')")
+  it('行の操作で保存しない', () => {
     expect(PAGE).not.toContain('移行内容を確認</button>')
     expect(PAGE).not.toContain("onDecide(item, 'link')")
   })
 })
 
 /**
- * #984 LAY-13/14: UID移行のタブとフォームの段組み。
- * 主タブは友だち一覧と同じ定義・同じ部品・同じ選択色。
- * 入力は「移行元 → 移行先」の同幅2欄、全幅の利用目的、CSV、操作の順。
- */
-/**
  * FRIEND-15/16/33/36: 状態表示と実行・復旧の操作構造。
  */
 describe('UID移行の状態と実行・復旧の導線', () => {
-  it('説明文とバッジは run.status で連動し、完了履歴へ未変更と言わない', () => {
-    expect(PAGE).toContain('runStatusView')
-    expect(PAGE).toContain("'本移行と照合が完了しています。必要な場合はこの履歴から切り戻せます。'")
-    expect(PAGE).toContain("'切り戻し済みです。反映した内容は移行前の状態へ戻しています。'")
-    expect(PAGE).toContain('一部失敗')
+  const run = (status: UidMigrationDetail['status'], applied = 0, failed = 0) => ({
+    status, counts: { total: applied + failed, auto: 0, review: 0, unmatched: 0, conflict: 0, applied, failed },
+  }) as UidMigrationDetail
+
+  it('説明文とバッジは run.status で決め、完了履歴へ未変更と言わない', () => {
+    expect(runStatusView(run('completed'), 0)).toMatchObject({
+      description: '本移行と照合が完了しています。必要な場合はこの履歴から切り戻せます。',
+      badgeLabel: '本移行済み',
+    })
+    expect(runStatusView(run('rolled_back'), 0).description).toBe('切り戻し済みです。反映した内容は移行前の状態へ戻しています。')
+    expect(runStatusView(run('failed', 1, 1), 0).badgeLabel).toBe('一部失敗')
+    expect(runStatusView(run('failed', 0, 1), 0).description).toBe('本移行は失敗しました。実データは変更されていません。')
+    expect(runStatusView(run('review'), 2)).toMatchObject({ description: '実データはまだ変更していません。', badgeLabel: '要確認 2件' })
   })
 
-  it('対応表の遅延応答は世代番号で捨てる', () => {
-    expect(PAGE).toContain('detailTicket')
-    expect(PAGE).toContain('ticket !== detailTicket.current')
-  })
-
-  it('本移行は確認画面を挟み、入口クリックだけでは実行しない', () => {
-    expect(PAGE).toContain('本移行を実行')
-    expect(PAGE).toContain('setConfirmExecute(true)')
-    // 「確定して次へ」のような曖昧な名前で直接実行しない。
+  it('本移行は曖昧な名前の入口から直接実行しない', () => {
+    // 確認窓を開くだけで実行しないことは描画の試験（FRIEND-33）で押して確かめる。
     expect(PAGE).not.toContain('対応表を確定して次へ')
     expect(PAGE).not.toContain('onClick={onExecute}')
-  })
-
-  it('完了・一部失敗の履歴から確認付きの切り戻しへ進める', () => {
-    expect(PAGE).toContain('この移行を切り戻す')
-    expect(PAGE).toContain('api.friendMigrations.rollback')
-    expect(PAGE).toContain('rollbackable')
-    expect(PAGE).toContain('rollbackConflicts')
   })
 })
 
 describe('UID移行のタブと段組み（#984 LAY-13/14）', () => {
-  it('データ管理は友だち一覧と同じ定義・同じ部品を使う', () => {
-    expect(PAGE).toContain('<FriendsManageNavV8 current="UID移行"')
-    expect(NAV).toContain('FRIENDS_MERGED_TABS')
-    expect(NAV).toContain('データ管理')
-    // 手書きの別タブ実装（青い選択色の nav）へは戻さない。
+  it('手書きの別タブ実装（青い選択色の nav）へは戻さない', () => {
     expect(PAGE).not.toContain('aria-label="友だち画面"')
     expect(PAGE).not.toContain('border-b-2 pb-3 font-semibold')
   })
 
-  it('友だち主タブの正本は4項目を同じ順で定義する', () => {
-    expect(TABS).toContain("key: 'list'")
-    expect(TABS).toContain("key: 'duplicates'")
-    expect(TABS).toContain("key: 'merged'")
-    expect(TABS).toContain("key: 'uid-migration'")
-    expect(TABS).toContain("'/accounts?tab=migration'")
+  it('友だち主タブの正本は4項目を同じ順で定義し、UID移行は /accounts?tab=migration へ行く', () => {
+    expect(FRIENDS_MERGED_TABS.map((tab) => tab.key)).toEqual(['list', 'duplicates', 'merged', 'uid-migration'])
+    expect(FRIENDS_MERGED_TABS.find((tab) => tab.key === 'uid-migration')?.href).toBe('/accounts?tab=migration')
   })
 
   /*
    * 右端の「移行履歴」は下の履歴節へ飛ぶだけの補助リンクで、同じ節が
    * 画面内に常に見えるため置かない（重複を出さない・管理画面判断 2026-09-26）。
-   * 以前この補助リンクの存在を固定していたが、使いやすさの直しを優先し
-   * 存在固定をやめる。「CSVで書き出す・取り込む」は別画面への導線なので残す。
+   * 「CSVで書き出す・取り込む」は別画面への導線なので残す（描画の試験で押して確かめる）。
    */
   it('下の履歴節へ飛ぶだけの「移行履歴」ボタンは置かない', () => {
     expect(PAGE).not.toContain('href="#migration-history"')
-    expect(NAV).toContain("const csvHref = '/friends/migrations'")
   })
 
-  it('移行元・移行先の選び欄は欄いっぱいに広げる', () => {
-    // 選び欄は Select 1 本化済み。幅は部品の size="full" で持たせる。
-    expect(PAGE).toContain('<EntitySelect aria-label="移行元アカウント"')
-    expect(PAGE).toContain('<EntitySelect aria-label="移行先アカウント"')
-    expect(PAGE.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(2)
+  it('移行元・移行先の選び欄に古い幅の上書きを残さない', () => {
     expect(PAGE).not.toContain('[data-selects-wide] select')
   })
 
-  it('移行元と移行先は同幅の2欄、利用目的は全幅', () => {
-    expect(PAGE).toContain('className={styles.duoCards}')
+  it('移行元と移行先は同幅の2欄', () => {
     expect(CSS).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
-    expect(PAGE).toContain('利用目的')
-    // 利用目的は共通の入力欄（高さ40px・タッチ44pxを部品側が持つ）。
-    expect(PAGE).toContain("import { TextField } from '@/components/shared/text-field'")
-    expect(PAGE).toContain('<TextField')
-  })
-})
-
-/**
- * #985 CHK-06 を #1015 で固定: 5段階表示は実データの進捗に連動させる。
- * 先頭だけ常に✓だった固定表示へは戻さない。
- */
-describe('UID移行の5段階表示（#1015 CHK-06）', () => {
-  it('現在位置は実データの状態から決める', () => {
-    // 完了・切り戻しは全段階済み、実行可能・実行中・失敗は本移行の段階、
-    // それ以外は要確認の判断の段階を示す。
-    expect(PAGE).toContain("active.status === 'completed' || active.status === 'rolled_back'")
-    expect(PAGE).toContain('STEPS.length')
-    expect(PAGE).toContain("active.status === 'ready' || active.status === 'executing' || active.status === 'failed' || unresolved === 0")
-  })
-
-  it('手順の表示は採用済みV8の共通の帯を使う', () => {
-    expect(PAGE).toContain('<Steps')
-    expect(PAGE).toContain('label="移行の手順"')
-    expect(PAGE).toContain('steps={MIGRATION_STEPS.map')
-  })
-
-  it('完了・現在・未着手を分け、失敗を完了にしない', () => {
-    expect(PAGE).toContain("state: index < currentStep ? 'done' as const : 'todo' as const")
-    expect(PAGE).toContain('currentKey={currentStep < MIGRATION_STEPS.length ? String(currentStep) : undefined}')
   })
 })
 
 /**
  * カード同士の縦の間隔そろえ（★管理画面 16px・2026-09-26）。
  * 親を縦並び＋gap-4 にし、子ごとの mb/mt で間隔を作らない。
- * 空の案内も白地・枠・角丸のカードの中に出す（灰色の地だけにしない）。
+ * 空の案内を白地・枠・角丸のカードの中に出すことは描画の試験で確かめる。
  */
 describe("UID移行のカード間隔", () => {
   it('画面の親は縦並び＋gap-4 で、カード間の mb/mt を持たない', () => {
-    expect(PAGE).toContain('className={styles.board} data-design-node="Z0jHp"')
     expect(CSS).toMatch(/\.board\s*\{[^}]*gap: 16px/s)
     // カードの断片（section・帯・履歴節）に個別の縦余白を付けない。
     expect(PAGE).not.toMatch(/<(section|div)[^>]*className="[^"]*\bmb-[46]\b/)
   })
 
-  it('空の案内は履歴と同じカード（白地・枠・角丸）の中に出す', () => {
-    expect(PAGE).toContain('テスト移行の結果')
-    expect(PAGE).toContain('テスト移行はまだありません')
-    // 灰色の ListState をカードの外に直接置かない。
+  it('灰色の ListState をカードの外に直接置かない', () => {
     expect(PAGE).not.toMatch(/\} : <ListState kind="empty"/)
   })
 

@@ -9,6 +9,7 @@ import {
 } from '@line-crm/shared';
 import {
   getDashboardActivity,
+  getDashboardComparisons,
   getDashboardOverview,
   getDashboardDefaultPreference,
   getDashboardPreference,
@@ -434,6 +435,23 @@ dashboard.get('/api/dashboard/upcoming', async (c) => {
       now: new Date().toISOString(),
       days,
     });
+    return c.json({ success: true as const, data });
+  } catch (err) {
+    throw err;
+  }
+});
+
+/**
+ * 数の帯の比べる値（今日の数は先週の同じ曜日、今月の数は前の月の同じ日まで）。
+ *
+ * 最初の表示の口（overview）を遅くしないよう、画面が後から読む別の口にする。
+ * 前の記録が無い数・取れなかった数は null で返し、0 として比べさせない。
+ */
+dashboard.get('/api/dashboard/comparisons', async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const data = await getDashboardComparisons(c.env.DB, { lineAccountId: access.accountId });
     return c.json({ success: true as const, data });
   } catch (err) {
     throw err;

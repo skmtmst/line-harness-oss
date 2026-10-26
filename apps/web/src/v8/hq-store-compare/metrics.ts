@@ -24,6 +24,9 @@ export const METRICS: MetricDef[] = [
   { key: 'responseMinutes', short: '返事の速さ', label: '返事の速さ', good: 'low', help: 'お客さまへの最初の返事までの時間の真ん中の値（人の返事だけ）。' },
 ]
 
+/** 足し上げる数（件数・人数）。そろった日数が違う店どうしでは比べられない。 */
+const COUNT_KEYS: ReadonlySet<StoreComparisonKey> = new Set(['friendChange', 'bookings', 'visits'])
+
 export type MetricValue = StoreComparisonRow['metrics'][StoreComparisonKey]
 
 const nf = new Intl.NumberFormat('ja-JP')
@@ -74,12 +77,14 @@ export type StoreAverage = Record<StoreComparisonKey, number | null>
 
 /**
  * 全店の平均との差（口が「比べる相手：全店の平均」で返す差と同じ式）。
- * 取れない数（available:false・値が null）と、平均が出ない数（店が 3 未満など）は null。
+ * 取れない数（available:false・値が null）、平均が出ない数（店が 3 未満など）、日数がそろっていない店の件数は null。
  */
 export function averageDiff(row: StoreComparisonRow, average: StoreAverage, key: StoreComparisonKey): number | null {
   const metric = row.metrics[key]
   const base = average[key]
   if (!metric?.available || metric.value === null || base === null || base === undefined) return null
+  /* 件数は、期間の全部の日がそろった店だけが平均と比べられる（口の差・平均と同じ条件）。 */
+  if (COUNT_KEYS.has(key) && row.coveredDays !== row.periodDays) return null
   return metric.value - base
 }
 
@@ -137,4 +142,11 @@ export function diffTitle(key: StoreComparisonKey, diff: number | null, compare:
   const abs = Math.abs(diff)
   const amount = key === 'blockRate' || key === 'clickRate' || key === 'noShowRate' ? `${one.format(abs)} pt` : key === 'friendChange' ? `${nf.format(Math.round(abs))} 人` : key === 'responseMinutes' ? `${nf.format(Math.round(abs))} 分` : `${nf.format(Math.round(abs))} 件`
   return `${base}より ${amount} ${diff > 0 ? '多い' : '少ない'}`
+}
+
+/** 期間の途中から集計した店の件数に添える「12 日分」。全部の日がそろった・0 日の店は null。 */
+export function coverageLabel(key: StoreComparisonKey, row: Pick<StoreComparisonRow, 'coveredDays' | 'periodDays'>): string | null {
+  if (!COUNT_KEYS.has(key)) return null
+  if (!(row.coveredDays > 0) || row.coveredDays >= row.periodDays) return null
+  return `${nf.format(row.coveredDays)} 日分`
 }

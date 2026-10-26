@@ -3,7 +3,7 @@ import { logger } from '@line-crm/shared/server';
 import { withDisplayReadCache } from './display-read-cache.js';
 import { type DashboardPeriod, type AccountStatsScope, type DashboardOverview, type DashboardSectionStatus, type DashboardMetricState, type DashboardMetricReason } from './dashboard-types.js';
 import { periodStart, monthStart, oldestDashboardTime, dashboardFreshness, summarizeDashboardFreshness } from './dashboard-freshness.js';
-import { accountScopeSql, count, friendBreakdown, inboxState, ZERO_BREAKDOWN } from './dashboard-inbox.js';
+import { accountScopeSql, broadcastScopeSql, count, friendBreakdown, inboxState, ZERO_BREAKDOWN } from './dashboard-inbox.js';
 import { friendTrend, conversionSummary } from './dashboard-snapshots.js';
 
 
@@ -54,12 +54,7 @@ async function dashboardOverview(
   const bookingAccount = accountScopeSql(scope, 'line_account_id');
   const migrationFrom = accountScopeSql(scope, 'from_account_id');
   const migrationTo = accountScopeSql(scope, 'to_account_id');
-  const broadcastAccount = accountScopeSql(scope, 'b.line_account_id');
-  const broadcastJsonAccount = accountScopeSql(scope, 'value');
-  const broadcastScope = `(${broadcastAccount.sql} OR (
-    b.target_type = 'multi-account-dedup' AND b.account_ids IS NOT NULL
-    AND EXISTS (SELECT 1 FROM json_each(b.account_ids) WHERE ${broadcastJsonAccount.sql})
-  ))`;
+  const broadcastScope = broadcastScopeSql(scope);
   const emptyOperations: DashboardOverview['operations'] = {
     scenarios: { active: 0, paused: 0 }, migrations: { active: 0, completed: 0 },
     bookings: { pending: 0, upcoming: 0 }, inflowTop: [], funnelAlerts: 0,
@@ -158,8 +153,8 @@ async function dashboardOverview(
     safe('broadcasts', count(
       db,
       `SELECT COUNT(*) AS n FROM broadcasts b
-        WHERE status = 'sent' AND COALESCE(b.sent_at, b.created_at) >= ? AND ${broadcastScope}`,
-      month, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
+        WHERE status = 'sent' AND COALESCE(b.sent_at, b.created_at) >= ? AND ${broadcastScope.sql}`,
+      month, ...broadcastScope.binds,
     ), 0),
     safe('operations', operationsPromise, emptyOperations),
   ]);

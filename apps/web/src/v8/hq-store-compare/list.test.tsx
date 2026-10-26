@@ -22,7 +22,7 @@ const { default: StoreComparisonList } = await import('./list')
 
 const metric = (value: number | null, diff: number | null, unit = '件') => ({ value, diff, unit, available: value !== null })
 const row = (id: string, name: string, bookings: number, bookingsDiff: number, block: number, blockDiff: number) => ({
-  accountId: id, name, style: null, computedAt: '2026-10-24T19:30:00.000Z',
+  accountId: id, name, style: null, computedAt: '2026-10-24T19:30:00.000Z', coveredDays: 30, periodDays: 30,
   metrics: {
     friendChange: metric(4, 0, '人'), blockRate: metric(block, blockDiff, '%'), clickRate: metric(null, null, '%'),
     bookings: metric(bookings, bookingsDiff), visits: metric(10, 1), noShowRate: metric(2, -0.5, '%'), responseMinutes: metric(8, 0, '分'),
@@ -155,15 +155,31 @@ describe('数が取れない理由', () => {
     expect(screen.queryByTitle('この数はまだ取れていません')).toBeNull()
   })
 
-  it('一部の店だけ集計がそろっていないときは店の数を出し、集計済みの店では出さない', async () => {
+  it('一部の店だけまだ集計していないときは店の数を出し、集計済みの店では出さない', async () => {
     api.get.mockResolvedValueOnce({ success: true, data: uncomputed([{ ...DATA.rows[0], computedAt: null, metrics: NOTHING as typeof DATA.rows[0]['metrics'] }, DATA.rows[1]]) })
     const view = render(<StoreComparisonList />)
     await screen.findByText('大宮店')
-    expect(screen.getByText(/集計がそろっていない店が 1 店あります/)).toBeTruthy()
+    expect(screen.getByText(/まだ集計していない店が 1 店あります/)).toBeTruthy()
     view.unmount()
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')
-    expect(screen.queryByText(/集計していません|集計がそろっていない/)).toBeNull()
+    expect(screen.queryByText(/集計していません|集計していない店/)).toBeNull()
+  })
+
+  it('期間の途中から集計した店は、件数の横に何日分かを出し、割合とそろった店には出さない', async () => {
+    const partial = { ...DATA.rows[0], coveredDays: 12, metrics: { ...DATA.rows[0].metrics, bookings: metric(12, null), friendChange: metric(4, null, '人'), visits: metric(10, null) } }
+    api.get.mockResolvedValue({ success: true, data: { ...DATA, rows: [partial, DATA.rows[1]] } })
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    const cells = (id: string) => [...document.querySelectorAll(`[data-row-id="${id}"] td`)].slice(1).map((cell) => cell.textContent)
+    // 友だちの増減・予約・来店の 3 つだけ。「—」の店と、ブロック率などの割合には出さない。
+    expect(cells('s1').filter((text) => text?.includes('12 日分'))).toHaveLength(3)
+    expect(cells('s1')[1]).not.toContain('日分')
+    expect(cells('s2').some((text) => text?.includes('日分'))).toBe(false)
+    expect(screen.getAllByTitle('期間のうち12 日分の数です（日数が違うので差は出しません）')).toHaveLength(3)
+    expect(screen.queryByText(/まだ集計していない店/)).toBeNull()
+    fireEvent.click(screen.getByText('大宮店'))
+    expect((await screen.findAllByText('12 日分')).length).toBeGreaterThan(3)
   })
 
   it('LINE の鍵が切れた店の行に知らせを出し、［更新する］で確かめ直して読み直す', async () => {
@@ -204,7 +220,7 @@ describe('違いだけ表示と「7 項目中 5 つが違う」（全店の平�
   const store = (id: string, name: string, values: { blockRate: number; bookings: number; visits: number; noShowRate: number }, compare: 'previous' | 'average' = 'average') => {
     const make = (key: keyof typeof AVERAGE, value: number | null, unit: string) => ({ value, unit, available: value !== null, diff: value === null || AVERAGE[key] === null ? null : compare === 'average' ? value - (AVERAGE[key] as number) : 1 })
     return {
-      accountId: id, name, style: null, computedAt: '2026-10-24T19:30:00.000Z',
+      accountId: id, name, style: null, computedAt: '2026-10-24T19:30:00.000Z', coveredDays: 30, periodDays: 30,
       metrics: {
         friendChange: make('friendChange', 4, '人'), blockRate: make('blockRate', values.blockRate, '%'), clickRate: make('clickRate', null, '%'),
         bookings: make('bookings', values.bookings, '件'), visits: make('visits', values.visits, '件'), noShowRate: make('noShowRate', values.noShowRate, '%'), responseMinutes: make('responseMinutes', 8, '分'),
@@ -228,6 +244,17 @@ describe('違いだけ表示と「7 項目中 5 つが違う」（全店の平�
     const missing = { ...ROWS[0], metrics: { ...ROWS[0].metrics, blockRate: { value: null, diff: null, unit: '%', available: true } } }
     expect(diffCount(missing as never, AVERAGE)).toEqual({ differ: 2, compared: 5 })
     expect(columnsWithDiff(ROWS as never, AVERAGE).map((def) => def.key)).toEqual(['blockRate', 'clickRate', 'bookings', 'visits', 'noShowRate'])
+  })
+
+  it('期間の途中から集計した店の件数（友だちの増減・予約・来店）は、日数が違うので平均と比べず分母から外す', async () => {
+    /* 12 日分の大宮：予約・来店は平均と違って見えるが比べない。割合（ブロック率・無断率）は比べる。 */
+    const partial = { ...ROWS[0], coveredDays: 12, metrics: { ...ROWS[0].metrics, friendChange: { ...ROWS[0].metrics.friendChange, diff: null }, bookings: { ...ROWS[0].metrics.bookings, diff: null }, visits: { ...ROWS[0].metrics.visits, diff: null } } }
+    expect(diffCount(partial as never, AVERAGE)).toEqual({ differ: 1, compared: 3 })
+    api.get.mockResolvedValue({ success: true, data: { ...DIFF_DATA, rows: [partial, ROWS[1]] } })
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    expect(document.querySelector('[data-diff-count="s1"]')?.textContent).toBe('1 つが違う（3 項目中）')
+    expect(screen.getAllByText('12 日分')).toHaveLength(3)
   })
 
   it('表の店の名前の下に「N つが違う（6 項目中）」を出す。集計前の店には出さない', async () => {

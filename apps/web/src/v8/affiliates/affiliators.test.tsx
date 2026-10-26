@@ -166,3 +166,33 @@ it('W2: readonly users retain folder filtering without adding or moving folders'
   fireEvent.click(menu)
   expect(screen.queryByRole('menuitem',{name:'フォルダへ移す'})).toBeNull()
 })
+
+describe('V8 アフィリエイター：読み込みの状態と報酬', () => {
+  it('読み込み中・読めなかった・まだいないを言い分ける', async () => {
+    let release: (value: unknown) => void = () => {}
+    affiliatesList.mockReturnValue(new Promise((resolve) => { release = resolve }))
+    await render()
+    expect(host.querySelector('[data-list-state="loading"][aria-label="アフィリエイターを読み込んでいます"]')).not.toBeNull()
+    await act(async () => { release({ success: true, data: [] }) })
+    for (let i = 0; i < 5; i += 1) await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
+    expect(host.textContent).toContain('まだアフィリエイターがいません')
+    expect(host.textContent).not.toContain('読み込めませんでした')
+
+    act(() => root.unmount())
+    root = createRoot(host)
+    allReport.mockRejectedValue(new Error('offline'))
+    await render()
+    expect(host.textContent).toContain('アフィリエイターを読み込めませんでした')
+    expect(host.textContent).not.toContain('まだアフィリエイターがいません')
+  })
+
+  it('報酬の列は案件ごとの確定額と売上の割合から出す', async () => {
+    await render()
+    const reward = (name: string) => {
+      const row = [...host.querySelectorAll('tbody tr')].find((tr) => tr.querySelector('a[data-row-link]')?.textContent === name)
+      return [...(row?.querySelectorAll('td') ?? [])].map((cell) => cell.textContent)
+    }
+    expect(reward('少ない人')).toContain('¥3,000')
+    expect(reward('多い人')).toContain('¥10,000')
+  })
+})

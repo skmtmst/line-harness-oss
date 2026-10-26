@@ -32,6 +32,7 @@ const definitions: Array<[string,string,string]> = [
   ["post", "/api/dashboard/style/closures", "休業・貸切"],
   ["patch", "/api/dashboard/style/meet/{id}", "個別相談"],
   ["get", "/api/dashboard/style/starter-items", "登録した見本"],
+  ["post", "/api/dashboard/style/starter-items/ensure", "足りない見本を入れ直す"],
   ["post", "/api/dashboard/style/activate", "見本の利用開始"],
   ["get", "/api/dashboard/style/menus/{id}", "予約メニュー"],
   ["get", "/api/dashboard/style/bookings/{id}", "予約一覧"],
