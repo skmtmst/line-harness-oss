@@ -103,9 +103,10 @@ describe('R614 合言葉なしの直リンク', () => {
     // 進み具合で「LINEログイン済み」と断定しない。
     expect(host.textContent).not.toContain('LINEログイン')
     expect(host.textContent).not.toContain('メールログイン')
-    // 戻り先はLINE限定にしない（小さなリンクを開いた先に出す）。
+    // 戻り先はLINE限定にしない（帯の「ログインに戻る」と、カードの下の「別のアカウントで入る」）。
     await openHelpChoices()
     expect(host.textContent).toContain('ログインに戻る')
+    expect(host.textContent).toContain('別のアカウントで入る')
     expect(host.textContent).not.toContain('別のLINEアカウントでログイン')
   })
 
@@ -126,9 +127,9 @@ describe('R507残部 戻りリンクの経路合わせ', () => {
     window.history.replaceState(null, '', '/login/two-factor#lh_2fa=verify-tok-1&lh_method=password')
     await render()
 
-    expect(host.textContent).toContain('メールログイン')
+    expect(host.textContent).not.toContain('LINEログイン')
     await openHelpChoices()
-    expect(host.textContent).toContain('ログインに戻る')
+    expect(host.textContent).toContain('別のアカウントで入る')
     expect(host.textContent).not.toContain('別のLINEアカウントでログイン')
   })
 
@@ -137,7 +138,7 @@ describe('R507残部 戻りリンクの経路合わせ', () => {
     await render()
     await openHelpChoices()
 
-    expect(host.textContent).toContain('LINEログイン')
+    expect(host.textContent).toContain('別のアカウントで入る')
     expect(host.textContent).toContain('別のLINEアカウントでログイン')
     await enterCode('123456')
     expect(host.textContent).not.toContain('ログインからやり直してください')

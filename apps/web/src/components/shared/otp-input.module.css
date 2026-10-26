@@ -180,6 +180,11 @@
   to { rotate: 360deg; }
 }
 .check { color: var(--color-success); }
+/*
+ * 確かめている間・通った後も、マスは薄くせず数字を読めるまま残す（押せないだけ）。
+ * 通ったら数字も緑。
+ */
+:root .group[data-state='success'] .slot { color: var(--color-success); -webkit-text-fill-color: var(--color-success); }
 .srOnly {
   position: absolute;
   width: 1px;
@@ -189,9 +194,11 @@
   white-space: nowrap;
 }
 /* 6桁のコードは 52px の正方形を 3＋3 の 2 組にし、両端を下のボタンにそろえる。 */
-:root .group[data-format='digits'] { display: flex; width: 100%; gap: 0; justify-content: space-between; }
-:root .group[data-format='digits'] .slot { width: 52px; height: 52px; flex: 0 0 52px; }
-.cluster { display: flex; gap: 12px; }
+/* 狭いカードでは 6 マスが幅いっぱいに縮み、3 桁ずつの間を少し空ける。広いカード（設定）でも組の間は広げず左から並べる。 */
+:root .group[data-format='digits'] { display: flex; width: 100%; gap: var(--space-20); justify-content: flex-start; }
+:root .group[data-format='digits'] .slot { width: auto; min-width: 0; max-width: 52px; height: 52px; flex: 1 1 0; }
+.cluster { display: flex; min-width: 0; flex: 1 1 0; gap: var(--space-6); }
+:root .group[data-format='digits'] .cluster { max-width: calc(52px * 3 + var(--space-6) * 2); }
 :root .field:has(.label):has(.group[data-format='digits']) { display: flex; width: 100%; align-items: stretch; }
 /* 確かめている輪と ✓ は、広げたまとまりの外に出ないよう、右下の下に置く。 */
 :root .group[data-format='digits'] :is(.spinner, .check) { top: calc(100% + 8px); left: auto; right: 0; translate: 0 0; }
@@ -214,13 +221,13 @@ html:root .group .slot[value='']:focus { background-image: linear-gradient(var(-
 
 /* 狭い電話でも 3＋3 の6マスが1行に収まるように、組の中の間だけを詰める。 */
 @media (max-width: 380px) {
-  :root .group[data-format='digits'] .slot { width: 36px; height: 44px; flex-basis: 36px; font-size: 20px; }
-  .cluster { gap: 6px; }
+  :root .group[data-format='digits'] { gap: var(--space-12); }
+  :root .group[data-format='digits'] .slot { height: 44px; font-size: 20px; }
 }
 
 @media (max-width: 340px) {
-  :root .group[data-format='digits'] .slot { width: 32px; height: 44px; flex-basis: 32px; font-size: 18px; }
-  .cluster { gap: 4px; }
+  :root .group[data-format='digits'] .slot { height: 44px; font-size: 18px; }
+  .cluster { gap: var(--space-4); }
 }
 
 /* 指を乗せた・押した時の薄い地を、入力済みのマスに残さない（層の外の共通の乗せた色より後ろで消す）。 */
@@ -237,3 +244,7 @@ html:root .group .slot:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--color-ink);
   caret-color: var(--color-ink);
 }
+
+/* 確かめている間・通った後のマスは、押せない部品の共通の薄さと影消し（層の外・!important）より強く、箱の形を残す。 */
+html:root .group:is([aria-busy='true'], [data-state='success']) .slot:disabled { opacity: 1; cursor: default; box-shadow: var(--shadow-raised-control) !important; }
+html:root .group[data-state='success'] .slot:disabled { box-shadow: var(--shadow-raised-control), inset 0 0 0 1.5px var(--color-success) !important; }

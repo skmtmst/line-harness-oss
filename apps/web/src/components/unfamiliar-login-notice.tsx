@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Notice, { useNoticeClosedToday } from '@/components/shared/notice'
 import { isSecurityNoticePinned } from '@/components/recovery-code-notice'
+import TextLink from '@/components/shared/text-link'
 
 /**
  * V-2: いつもと違う端末・場所からのログイン帯（管理画面-30 §14）。
@@ -50,9 +50,9 @@ export default function UnfamiliarLoginNotice() {
       onClose={pinned ? undefined : close}
       actionLayout="stack-on-narrow"
       action={
-        <Link href="/staff" className="text-action whitespace-nowrap text-xs font-medium underline underline-offset-2">
+        <TextLink inline href="/staff">
           ログイン中の端末を確認する
-        </Link>
+        </TextLink>
       }
     >
       いつもと違う端末・場所からのログインです。このログイン中は大事な操作の前に毎回の本人確認を求めます。心当たりがなければ、他の端末のログインを終了してパスワードを変更してください。

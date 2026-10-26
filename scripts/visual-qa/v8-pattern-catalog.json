@@ -2584,6 +2584,56 @@
       }
     },
     {
+      "id": "inline-link",
+      "name": "本文の中のリンク",
+      "role": "文の中の押せる言葉は緑の文字（乗せると下線）。矢印なし・周りの文字の大きさのまま（TextLink の inline）",
+      "rules": [
+        "§6.12-12",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/text-link.tsx",
+            "apps/web/src/components/shared/text-link.module.css"
+          ],
+          "components": [
+            "TextLink"
+          ],
+          "vars": [
+            "--color-link"
+          ]
+        },
+        "pen": [
+          {
+            "id": "g5Db8",
+            "name": "リンク"
+          }
+        ],
+        "status": "決まっている（2026-10-26 オーナー：本文の中のリンクは緑）"
+      },
+      "code": {
+        "selectorHint": "inline-link|prose-link",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "own-link",
+            "re": "<(?:a|Link)\\b[^>]*className=[\"'][^\"']*\\b(?:text-action|text-accent-deep|text-link)\\b[^\"']*[\"']",
+            "why": "文の中のリンクを画面で色付けして手書き（黒い text-action のままだと押せると分からない）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "scripts/visual-qa/v8-pattern-audit.mjs（持ち主の見張り：新しい候補 0）"
+        ],
+        "needed": ""
+      }
+    },
+    {
       "id": "csv",
       "name": "CSV",
       "role": "「CSVで書き出す」・ファイル名「機能名_YYYY-MM-DD.csv」（日本時間）を共通の関数で",
@@ -3503,7 +3553,8 @@
             "AuthDetailRow"
           ],
           "vars": [
-            "--tpl-ms-otp-card-w"
+            "--tpl-ms-otp-card-w",
+            "--tpl-auth-card-w"
           ]
         },
         "pen": [],
