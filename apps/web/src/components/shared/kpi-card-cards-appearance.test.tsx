@@ -28,4 +28,20 @@ describe('数のカードの形（案A）', () => {
     expect(container.querySelector('[data-kpi-strip]')?.hasAttribute('data-kpi-appearance')).toBe(false)
     expect([...container.querySelectorAll('[data-design-version]')].map((card) => card.hasAttribute('data-kpi-zero'))).toEqual([true, false])
   })
+
+  it('注意・危険の数は数字に色を付けず、右上の札（黄「要確認」・赤「要対応」）で知らせる。0 件は札を出さない', () => {
+    const { container } = render(<KpiBand>
+      <KpiCard presentation="band" title="接続に問題" value={2} unit="件" detail={null} valueTone="warning" />
+      <KpiCard presentation="band" title="失敗した更新" value={1} unit="回" detail={null} valueTone="danger" />
+      <KpiCard presentation="band" title="未配席" value={0} unit="件" detail={null} valueTone="default" />
+      <KpiCard presentation="band" title="未返信" value={3} unit="件" detail={null} valueTone="warning" badge="明日" badgeTone="neutral" />
+    </KpiBand>)
+    const cards = [...container.querySelectorAll('[data-design-version]')]
+    const badges = cards.map((card) => { const el = card.querySelector('[data-kpi-badge]'); return el ? [el.getAttribute('data-kpi-badge'), el.textContent] : null })
+    expect(badges).toEqual([['warning', '要確認'], ['danger', '要対応'], null, ['neutral', '明日']])
+    for (const card of cards) {
+      const number = card.querySelector('[data-kpi-number]')?.closest('p')
+      expect(number?.className ?? '').not.toMatch(/warning|danger/i)
+    }
+  })
 })

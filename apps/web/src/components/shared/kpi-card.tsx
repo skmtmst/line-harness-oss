@@ -131,7 +131,10 @@ export type KpiCardProps = {
   hidden?: boolean
   id?: string
   'aria-label'?: string
-  /** faint は「値を出せない」の見せ方。0 を薄くする用途には使わない。 */
+  /**
+   * faint は「値を出せない」の見せ方。0 を薄くする用途には使わない。
+   * warning・danger は数字の色を変えず、右上に札（黄「要確認」・赤「要対応」）を出す。
+   */
   valueTone?: 'default' | 'warning' | 'faint' | 'danger'
   /** 数と補足のあいだのメーター（送信枠の使った割合など）。value は 0〜100。 */
   meter?: { value: number; label: string; tone?: 'danger' }
@@ -216,6 +219,13 @@ export default function KpiCard({
     : valueRange !== undefined ? rangeText !== '—'
       : valueText !== undefined ? textIsNumber && valueTextWithUnit
         : isCountableValue(value)
+  /*
+   * 数字に色は付けない（数は黒、0 は帯が薄い灰にする）。注意・危険は右上の札で知らせる。
+   * 呼び出し側が札を渡していなければ、注意は黄の「要確認」、危険は赤の「要対応」を出す。
+   */
+  const toneBadge = !loading && (valueTone === 'warning' || valueTone === 'danger') ? valueTone : null
+  const shownBadge = badge ?? (toneBadge === 'warning' ? '要確認' : toneBadge === 'danger' ? '要対応' : undefined)
+  const shownBadgeTone = badge ? badgeTone : toneBadge ?? badgeTone
   const numberAndUnit = <>
     <KpiRollingValue text={displayedNumber} identity={cardProps.id ?? title} loading={loading || Boolean(cardProps.hidden)} />
     {showUnit ? <span data-kpi-unit className={styles.unit}>{unit}</span> : null}
@@ -262,8 +272,8 @@ export default function KpiCard({
           ) : null}
         </p>
         {menu && !menuDescription ? <span className={styles.menu}>{menu}</span> : null}
-        {badge ? (
-          <span className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[badgeTone]].filter(Boolean).join(' ')}>{badge}</span>
+        {shownBadge ? (
+          <span data-kpi-badge={shownBadgeTone} className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[shownBadgeTone]].filter(Boolean).join(' ')}>{shownBadge}</span>
         ) : null}
       </div>
 
@@ -274,8 +284,6 @@ export default function KpiCard({
         <p
           className={[
             styles.value,
-            valueTone === 'warning' ? styles.valueWarning : null,
-            valueTone === 'danger' ? styles.valueDanger : null,
             valueTone === 'faint' ? styles.valueFaint : null,
           ]
             .filter(Boolean)

@@ -125,10 +125,6 @@
    */
 }
 
-.valueWarning {
-  color: var(--color-warning);
-}
-
 .valueFaint {
   color: var(--color-ink-faint);
 }
@@ -303,7 +299,6 @@
 :root .card[data-kpi-presentation='inline'] .unit { font-size: var(--text-caption); font-weight: var(--font-weight-ui); }
 :root .card[data-kpi-presentation='inline'] .value { gap: 4px; }
 :root .card[data-kpi-presentation='inline'] .detail { display: none; }
-:root .valueDanger { color: var(--color-danger); }
 :root .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
   border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
 }
