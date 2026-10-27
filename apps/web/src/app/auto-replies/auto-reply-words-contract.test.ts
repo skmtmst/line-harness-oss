@@ -236,9 +236,13 @@ describe('読み込みの状態を言い分ける', () => {
   })
 })
 
+/*
+ * 一覧の画面で読み込みの言い方・4指標・アカウント切替・テンプレートの言葉が
+ * どう出るかは v8/auto-replies/list.test.tsx・list-behavior.test.tsx が描いて確かめる。
+ * ここには表を画面に作り直さない・内部語を書かない禁止の見張りだけを残す。
+ */
 describe('一覧の画面が置き換え表を通す', () => {
   it('言い換えは純粋関数の側だけが持つ（画面に表を作り直さない）', () => {
-    expect(PAGE).toContain("./words'")
     expect(WORDS).not.toContain("from 'react'")
     expect(PAGE).not.toContain('const matchTypeLabel')
     expect(PAGE).not.toContain('const ACTION_SUMMARY_LABELS')
@@ -264,39 +268,12 @@ describe('一覧の画面が置き換え表を通す', () => {
     }
   })
 
-  it('読み込みの言い方を画面でも混ぜない', () => {
-    expect(PAGE).toContain('LOAD_STATE_WORDS[visibleLoadState]')
-    expect(PAGE).toContain("reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error'")
-  })
-
-  it('4指標を実APIから数え、未取得を 0 と出さない', () => {
-    // #721: 指標1は visualActive（有効なルール）経由で読む。総数は
-    // 「すべて」の行とページ送りだけにし、KPIでは重ねて出さない（R12）。
-    // 2文で「呼ぶ側」と「数える元」の両方を固定する。
-    expect(PAGE).toContain('value: ready ? rules.filter((r) => r.isActive).length : null')
-    expect(PAGE).toContain("const rules = optimisticRows")
-    expect(PAGE).toContain('value: ready ? (monthlyHits === null ? null : monthlyHits) : null')
-    expect(PAGE).toContain('const monthlyHits = hitsAllKnown')
-    expect(PAGE).toContain('api.autoReplies.summary(selectedAccountId)')
-    expect(PAGE).toContain("actionExecutionCount === null ? null : actionExecutionCount")
-    expect(PAGE).toContain("conflictCount === null ? null : conflictCount")
-  })
-
-  it('アカウント切替時は、前の取得結果を状態にも画面にも出さない', () => {
-    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
-    expect(PAGE).toContain('isCurrentAutoReplyLoad(')
-    expect(PAGE).toContain('visibleAutoReplyLoadState(')
-  })
-
-  it('開く先が無いテンプレートをリンクにしない', () => {
-    expect(PAGE).toContain('templateWord(')
-  })
-
   it('R11: テンプレート名から別画面へ飛ばさない（名前は黒文字）', () => {
     expect(PAGE).not.toContain('href="/templates"')
   })
 })
 
+/* 消せない状態・権限で断られた時・何が止まるかの文は list-behavior.test.tsx が削除の窓を開いて確かめる。 */
 describe('削除確認 Gy9OK の絵と、押せる形', () => {
 
   it('確認の印を飾りとして出し、実行と取消を使える', () => {
@@ -316,22 +293,4 @@ describe('削除確認 Gy9OK の絵と、押せる形', () => {
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     expect(cancel).toHaveBeenCalledOnce()
   })
-
-  it('消せない状態では確認のボタンを出さず、理由を本文に出す', () => {
-    expect(PAGE).toContain('const deleteTargetStale =')
-    expect(PAGE).toContain('disabled={deleting || deleteTargetStale}')
-    expect(PAGE).toContain('{deleteTargetStale && (')
-  })
-
-  it('権限で断られたときに、読み直せとは書かない', () => {
-    expect(PAGE).toContain('reason instanceof ApiError && reason.status === 403')
-    expect(PAGE).toContain('NO_WRITE_PERMISSION.label')
-  })
-  it('何が止まり・何が残り・戻せないことを、これまでどおり読ませる', () => {
-    expect(PAGE).toContain('新しく届くメッセージへの自動返信')
-    expect(PAGE).toContain('タグ付けなどの後の処理が止まります')
-    expect(PAGE).toContain('これまでの実行結果は消えません')
-    expect(PAGE).toContain('削除は元に戻せません')
-  })
-
 })

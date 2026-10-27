@@ -168,3 +168,15 @@ test('REM3-06 new staff can choose registered media and save its public URL',asy
     for (let index = 0; index < 4; index++) expect(within(phone).getByText(`既存担当${index}`)).toBeTruthy()
     expect(within(phone).getAllByText(/既存担当|新しい担当/).map(node => node.textContent)).toEqual(['既存担当0', '既存担当1', '既存担当2', '既存担当3', '新しい担当'])
  })
+
+test('指名料（B9）：管理者が入れた額を登録に載せ、右の見本にも「指名料 +¥」で出す', async () => {
+  render(<StaffNewV8 />)
+  await screen.findByRole('button', { name: '予約を受けられるメニュー' })
+  fireEvent.change(screen.getByLabelText('スタッフ名（管理画面での呼び名）'), { target: { value: '田中' } })
+  await pickEntities('予約を受けられるメニュー', ['カット'])
+  fireEvent.change(await screen.findByLabelText('指名料'), { target: { value: '500' } })
+  const phone = screen.getByRole('region', { name: 'お客さまの予約画面の見本' })
+  expect(within(phone).getByText(/指名料 \+¥500/)).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' })) })
+  await waitFor(() => expect(fixture.create).toHaveBeenCalledWith('account-a', expect.objectContaining({ nominationFee: 500 })))
+})

@@ -27,6 +27,7 @@ import { Bookmark, ListFilter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { CHANNELS, ChannelBadge, EmailInboxItem, INBOX_SORT_OPTIONS, InboxSavedView, InboxSort, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd, statusFiltersV8 } from './inbox-model';
+import { chatListPreview } from './list-preview';
 import styles from './list-parts.module.css';
 import { savedViewSummary } from './saved-view-summary';
 import { normalizeSavedViewConditions } from './saved-view-types';
@@ -559,19 +560,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   ? formatWaitingDuration(chat.lastMessageAt, Date.now())
                   : null
                 // 最新メッセージの本文 preview。flex/image は文字列で見せても意味が薄いので type 表記に置換。
-                const previewRaw = chat.lastMessageContent ?? ''
-                const preview = (() => {
-                  // 絵文字は付けない。言葉だけで何かは分かる。
-                  if (chat.lastMessageType === 'image') return '画像'
-                  if (chat.lastMessageType === 'flex') return 'Flexメッセージ'
-                  if (chat.lastMessageType === 'sticker') return 'スタンプ'
-                  if (chat.lastMessageType === 'video') return '動画'
-                  if (chat.lastMessageType === 'audio') return '音声'
-                  if (chat.lastMessageType === 'file') return 'ファイル'
-                  if (chat.lastMessageType === 'location') return '位置情報'
-                  if (chat.lastMessageType === 'unsent') return '送信を取り消しました'
-                  return previewRaw.replace(/\n+/g, ' ').slice(0, 60)
-                })()
+                const preview = chatListPreview(chat)
                 // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
                 // 直書きボタンの借金に数えられる (design-debt)。
                 const node = (

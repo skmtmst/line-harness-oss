@@ -7,14 +7,16 @@
 ## URLから本体へ
 
 - `/chats` → [app/chats/page.tsx](../../app/chats/page.tsx)
+- `/m/chats`（電話の画面のトーク） → [app/m/chats/page.tsx](../../app/m/chats/page.tsx)
 
-本体：[screen.tsx](screen.tsx)
+本体：[screen.tsx](screen.tsx)。電話の画面は [mobile-talk-screen.tsx](mobile-talk-screen.tsx)（一覧と会話を 2 枚に分け、取得・送信・下書き・アカウントの照合は同じフックを使う。決まりは `docs/v8-design-rules.md` §6.48）。
 
 ## 外に見せる名前（index.ts）
 
 - [index.ts](index.ts)：`TemplatePickerView`・`TemplatePickerSideKey`・`ConversationHead`
 - [public/conversation-head/index.ts](public/conversation-head/index.ts)：`ConversationHead`
 - [public/template-picker-view/index.ts](public/template-picker-view/index.ts)：`TemplatePickerSideKey`・`TemplatePickerView`
+- [public/mobile-talk-item/index.ts](public/mobile-talk-item/index.ts)：`talkItem`（電話の画面の会話の一覧の 1 件の形）
 
 機能の内部は宣言元を直接読み、外部は明示された公開入口を使います。Nextのpage・layoutとWorkerのroute登録は直接接続します。決まりは [コードの構成と名前](../../../../../docs/code-structure.md)。
 
@@ -34,6 +36,7 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [deep-link-react.test.tsx](deep-link-react.test.tsx)
 - [head-menus.test.tsx](head-menus.test.tsx)
 - [manual-send-path.test.ts](manual-send-path.test.ts)
+- [mobile-talk-screen.test.tsx](mobile-talk-screen.test.tsx)（電話の画面：1 回だけ送る・失敗の後に同じキー・閲覧のみ・別のアカウント・権限）
 - [rules-popover.test.tsx](rules-popover.test.tsx)
 - [schedule-dialog.test.tsx](schedule-dialog.test.tsx)
 - [schedule-presets.test.ts](schedule-presets.test.ts)

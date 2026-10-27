@@ -100,6 +100,24 @@ describe('テスト送信先の設定欄 (N-070)', () => {
     expect(screen.getByText('別アカウントの人')).toBeTruthy()
   })
 
+  it('保存済みの人はログインユーザー候補から外し、候補を押すと同じアカウントの送信先へ足して保存する', async () => {
+    apiMocks.getTestRecipients.mockReturnValue(ok([{ id: 'f1', displayName: '田中 太郎', pictureUrl: null }]))
+    apiMocks.getTestRecipientLoginUsers.mockReturnValue(ok([
+      { id: 'f1', displayName: '田中 太郎', pictureUrl: null, staffName: '田中 太郎', sameAccount: true },
+      { id: 'f2', displayName: '候補 花子', pictureUrl: null, staffName: '候補 花子', sameAccount: true },
+    ]))
+    apiMocks.updateTestRecipients.mockReturnValue(ok(null))
+    render(<TestRecipientsSetting accountId="acc-a" />)
+    await flush()
+    expect(apiMocks.getTestRecipientLoginUsers).toHaveBeenCalledWith('acc-a')
+    expect(screen.getByText('ログインユーザーから追加')).toBeTruthy()
+    expect(screen.queryByTitle('田中 太郎をテスト送信先に追加')).toBeNull()
+    fireEvent.click(screen.getByTitle('候補 花子をテスト送信先に追加'))
+    await flush()
+    expect(apiMocks.updateTestRecipients).toHaveBeenCalledWith('acc-a', ['f1', 'f2'])
+    expect(screen.queryByTitle('候補 花子をテスト送信先に追加')).toBeNull()
+  })
+
   it('保存に失敗したら失敗を出し、サーバの真値へ戻す', async () => {
     apiMocks.getTestRecipients.mockReturnValue(ok([]))
     apiMocks.getTestRecipientLoginUsers.mockReturnValue(ok([

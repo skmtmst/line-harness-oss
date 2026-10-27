@@ -195,6 +195,7 @@ it('新規保存の応答消失を再送するときは同じ作成キーを使�
   await save()
   expect(net.createDraft).toHaveBeenCalledTimes(2)
   expect(net.createDraft.mock.calls[1][1]).toBe(net.createDraft.mock.calls[0][1])
+  expect(String(net.createDraft.mock.calls[0][1] ?? '')).not.toBe('')
   expect(net.publishDraft).not.toHaveBeenCalled()
 })
 
