@@ -1,5 +1,4 @@
-import { Children, isValidElement, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
-import type { KpiCardProps } from './kpi-card'
+import { Children, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import kpiStyles from './kpi-card.module.css'
 
 /** 4つ並びのときの並べ方（管理画面 の見た目）。 */
@@ -24,6 +23,7 @@ export default function KpiBand({
   layout,
   maxColumns,
   frame,
+  appearance,
   ...rest
 }: {
   children: ReactNode
@@ -33,6 +33,11 @@ export default function KpiBand({
   className?: string
   /** 隣に線やカードが無い所では、帯をカードの枠つきで置く。 */
   frame?: 'card'
+  /**
+   * 数のカードの形（案A）。マスを線で区切らず、1マスずつ白いカードにして間を空ける。
+   * 題の左に灰の小箱の印、右上に状態の小さな札、0 は薄い灰の数字、流れの数は右下に細いグラフ。
+   */
+  appearance?: 'cards'
   /** 型が区切りを持つ帯はinset-top、マスの間だけ区切る帯はdividers。 */
   border?: 'inset-top' | 'dividers'
   /** 親の本文が左右の余白を持つ場合、帯の両端では重ねない。 */
@@ -49,23 +54,17 @@ export default function KpiBand({
       const rows: ReactNode[][] = []
       for (let start = 0; start < items.length; start += maxColumns) rows.push(items.slice(start, start + maxColumns))
       return <div data-shared-part="kpi-band-rows" {...rest} style={{ ...rest.style, '--kpi-band-row-columns': maxColumns } as CSSProperties}>
-        {rows.map((row, index) => <KpiBand key={index} gridClassName={gridClassName} className={className} presentation={presentation} border={border} edgeInset={edgeInset} density={density} layout={layout}>{row}</KpiBand>)}
+        {rows.map((row, index) => <KpiBand key={index} gridClassName={gridClassName} className={className} presentation={presentation} border={border} edgeInset={edgeInset} density={density} layout={layout} appearance={appearance}>{row}</KpiBand>)}
       </div>
     }
   }
-  const wideValues = Children.toArray(children).some(child => {
-    if (!isValidElement<Pick<KpiCardProps, 'value' | 'valueText' | 'valueRange'>>(child)) return false
-    if (child.props.valueRange !== undefined) return true
-    if (typeof child.props.valueText === 'string' && /\d\s*[/〜～]\s*\d/.test(child.props.valueText)) return true
-    return String(child.props.valueText ?? child.props.value ?? '').replace(/[^0-9]/g, '').length >= 9
-  })
   return (
     <div
-      data-kpi-wide-values={wideValues || undefined}
       className={`${kpiStyles.strip} ${gridClassName}${className ? ` ${className}` : ''}`}
       data-kpi-layout={layout}
       data-kpi-border={border}
       data-kpi-frame={frame}
+      data-kpi-appearance={appearance}
       data-kpi-edge-inset={edgeInset}
       data-kpi-density={density}
       data-shared-part="kpi-band"

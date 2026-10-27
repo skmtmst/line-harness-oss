@@ -50,6 +50,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { EntityPickerField } from '@/components/shared/entity-picker'
 import Notice from '@/components/shared/notice'
 import { AudienceSection, audienceVisibility, type AudienceMode } from './audience-section'
+import { CustomerBookingCard, useMenuCustomerBooking } from './customer-booking'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import type { FriendListItem } from '@/lib/api'
 import HelpTip from '@/components/shared/help-tip'
@@ -200,6 +201,9 @@ export default function MenuFormV8() {
   const [previewFriendId, setPreviewFriendId] = useState('')
   const [previewFriends, setPreviewFriends] = useState<FriendListItem[]>([])
   const canEditAudience = canManageRole(useStaffRole())
+  /* お客さまの予約のしかた（B4・B5）。変えられるのは見せる相手と同じくオーナー・管理者だけ。 */
+  const customerBooking = useMenuCustomerBooking(canEditAudience)
+  const loadCustomerBooking = customerBooking.load
   const [resourceIds, setResourceIds] = useState<Set<string>>(new Set())
   const [resourceQuantities, setResourceQuantities] = useState<Record<string, string>>({})
   const [resourceSaving, setResourceSaving] = useState(false)
@@ -259,6 +263,7 @@ export default function MenuFormV8() {
       setAudienceMode(wide.audience_mode ?? 'all')
       setAudienceTagIds(storedStringList(wide.audience_tag_ids_json))
     }
+    loadCustomerBooking(menu)
     setResourceIds(new Set((menu.assigned_resources ?? []).map((item) => item.resourceId)))
     setResourceQuantities(Object.fromEntries((menu.assigned_resources ?? []).map((item) => [item.resourceId, String(item.quantity)])))
     const ids = new Set<string>()
@@ -280,7 +285,7 @@ export default function MenuFormV8() {
       [...ids].sort().join(','), resourceSignature((menu.assigned_resources ?? []).map((item) => item.resourceId), Object.fromEntries((menu.assigned_resources ?? []).map((item) => [item.resourceId, String(item.quantity)]))),
       optionalHit,
     ])
-  }, [])
+  }, [loadCustomerBooking])
 
   const loadAll = useCallback(async () => {
     if (!selectedAccountId) {
@@ -409,8 +414,9 @@ export default function MenuFormV8() {
     setResourceMessage(null)
     setAutoTagId(null)
     setAudienceMode('all'); setAudienceTagIds([]); setPreviewFriendId('')
+    loadCustomerBooking(null)
     setNoAssign(false)
-  }, [selectedAccountId])
+  }, [selectedAccountId, loadCustomerBooking])
 
   /* ---- 導出 ---- */
   const categoryOptions = useMemo(() => {
@@ -473,7 +479,7 @@ export default function MenuFormV8() {
   /* デポジット（B1・CnV1I）と会い方・会議の URL（B7・ELruS）。どちらもメニューを保存したあとに口へ書く。 */
   const deposit = useMenuDeposit(selectedAccountId, editTarget?.id ?? null)
   const meeting = useMenuMeeting(selectedAccountId, editTarget?.id ?? null, ((editTarget as (BookingMenu & { meeting_mode?: MeetingMode | null }) | null)?.meeting_mode) ?? null)
-  const dirty = payment.dirty || deposit.dirty || meeting.dirty || baselineRef.current !== '' && baselineRef.current !== currentSignature ||
+  const dirty = payment.dirty || deposit.dirty || meeting.dirty || customerBooking.dirty || baselineRef.current !== '' && baselineRef.current !== currentSignature ||
     (baselineRef.current === '' && Boolean(
       name || effectiveCategory || description || durationMinutes !== '60' ||
       bufferAfterMinutes !== '0' || basePrice || concurrentCapacity !== '1' ||
@@ -528,6 +534,7 @@ export default function MenuFormV8() {
     if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
     if (staffStatus === 'loading') return '担当スタッフを読み込んでいます。読み込みが終わってから保存してください'
     if (staffStatus === 'error') return '担当スタッフを読み込めませんでした。読み直してから保存してください'
+    if (customerBooking.error) return customerBooking.error
     if ([...resourceIds].some((id) => !Number.isInteger(Number(resourceQuantities[id] ?? '1')) || Number(resourceQuantities[id] ?? '1') < 1 || Number(resourceQuantities[id] ?? '1') > 1000)) return '必要数は1〜1000の整数で入力してください。'
     return bookingMenuError({
       name,
@@ -692,6 +699,7 @@ export default function MenuFormV8() {
       auto_tag_id: autoTagId,
       is_active: publish ? 1 : 0,
       ...({ audience_mode: audienceMode, audience_tag_ids: audienceMode === 'all' ? [] : audienceTagIds } as Partial<BookingMenu>),
+      ...(customerBooking.body() as Partial<BookingMenu>),
     }
   }
 
@@ -832,6 +840,7 @@ export default function MenuFormV8() {
         throw new Error('メニューは保存されましたが、お支払いの方法・会い方を保存できませんでした。もう一度押してください。')
       }
       setCreatedMenuNeedingFollowUp(null)
+      customerBooking.markSaved()
       notifySaved(editTarget ? 'メニューを保存しました' : publish ? 'メニューを公開しました' : '下書きを保存しました')
       if (editTarget) {
         const fresh = await bookingApi.listMenus(selectedAccountId)
@@ -1189,6 +1198,8 @@ export default function MenuFormV8() {
           {/* 見せる相手（B9・絵 L6ifay）。 */}
           <AudienceSection accountId={selectedAccountId ?? null} mode={audienceMode} tagIds={audienceTagIds} onMode={setAudienceMode} onTagIds={setAudienceTagIds} canEdit={canEditAudience}
             friendId={previewFriendId} onFriendId={setPreviewFriendId} onFriends={setPreviewFriends} />
+          {/* お客さまの予約のしかた（B4 繰り返し・B5 人数と追加メニュー）。 */}
+          <CustomerBookingCard state={customerBooking} menus={menus} selfId={editTarget?.id ?? null} readOnly={!canEditAudience} />
           {/* お支払い（B1・CnV1I）：予約のきまりのすぐ下に、独立した段で。 */}
           <BookingMenuPaymentCard payment={payment} deposit={deposit} price={basePrice.trim() === '' ? null : Number(basePrice) || 0} readOnly={Boolean(editTarget && !canEdit)} />
 

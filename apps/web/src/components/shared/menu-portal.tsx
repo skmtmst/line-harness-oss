@@ -150,7 +150,7 @@ export default function MenuPortal({
       const anchor = anchorRef.current()
       const target = anchor?.matches('button, input, a[href], [tabindex]')
         ? anchor : anchor?.querySelector<HTMLElement>('input, button, [tabindex="0"]')
-      if (restoreFocus) target?.focus()
+      if (restoreFocus) target?.focus({ preventScroll: true })
     }
   }
 
@@ -160,7 +160,9 @@ export default function MenuPortal({
 
   useLayoutEffect(() => {
     if (!open || !mounted) return
+    let closeRequested = false
     const measure = () => {
+      if (closeRequested) return
       const anchor = anchorRef.current()
       const panel = panelRef.current
       if (!anchor || !panel) return
@@ -178,8 +180,13 @@ export default function MenuPortal({
       const margin = MENU_PORTAL_MARGIN
       const dialogContent = anchor?.closest<HTMLElement>('[data-dialog-content]')
       const contentRect = dialogContent?.getBoundingClientRect()
-      const upperBoundary = Math.max(margin, contentRect?.top ?? margin)
-      const lowerBoundary = Math.min(viewportHeight - margin, contentRect?.bottom ?? viewportHeight - margin)
+      if (contentRect && contentRect.height > 0 && triggerRect.height > 0 && (triggerRect.bottom <= contentRect.top || triggerRect.top >= contentRect.bottom)) { closeRequested = true; closeRef.current(); return }
+      // 本文内に入る小さいパレットは本文へ収める。短い本文で選択肢を潰す場合はportal本来の画面内の余地を使う。
+      const contentTop = Math.max(margin, contentRect?.top ?? margin)
+      const contentBottom = Math.min(viewportHeight - margin, contentRect?.bottom ?? viewportHeight - margin)
+      const fitsContent = Math.max(contentBottom - anchorRect.bottom - gap, anchorRect.top - gap - contentTop) >= contentHeight
+      const upperBoundary = fitsContent ? contentTop : margin
+      const lowerBoundary = fitsContent ? contentBottom : viewportHeight - margin
       const spaceBelow = lowerBoundary - anchorRect.bottom - gap
       const spaceAbove = anchorRect.top - gap - upperBoundary
       let placement: MenuPortalPlacement
@@ -281,7 +288,7 @@ export default function MenuPortal({
     document.addEventListener('keydown', onKeyDown)
     return () => {
       openPanels.splice(openPanels.indexOf(panel), 1)
-      if (focusPanel && (panel.contains(document.activeElement) || document.activeElement === document.body)) anchor?.focus()
+      if (focusPanel && (panel.contains(document.activeElement) || document.activeElement === document.body)) anchor?.focus({ preventScroll: true })
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }

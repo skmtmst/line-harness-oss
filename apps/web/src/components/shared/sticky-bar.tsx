@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import styles from './sticky-bar.module.css'
-import { normalizeStickyDestructiveActions, normalizeStickySaveActions } from './sticky-save-actions'
+import { normalizeStickyDestructiveActions, normalizeStickySaveActions, separateStickyInputReasons } from './sticky-save-actions'
 
 export { default as StickyBarAction } from './sticky-bar-action'
 
@@ -74,13 +74,16 @@ export default function StickyBar({
   presentation?: 'account-registration' | 'account-handover' | 'distribution'
   className?: string
 }) {
+  const separated = separateStickyInputReasons(presentation ? actions : normalizeStickySaveActions(actions))
+  const sharedActions = separated.actions
+  const inputReasons = separated.reasons.length ? <div className={styles.inputReasons} role="status">{separated.reasons.join(' ')}</div> : null
   if (presentation) return (
     <div data-shared-part="sticky-bar" className={[styles.inlineBar, className].filter(Boolean).join(' ')} data-presentation={presentation}>
       {status}
-      {actions}
+      {sharedActions}
+      {inputReasons}
     </div>
   )
-  const sharedActions = normalizeStickySaveActions(actions)
   if (split) return (
     <div data-shared-part="sticky-bar" className={[styles.bar, styles.splitBar, outlined ? styles.outlined : null, className].filter(Boolean).join(' ')}
       style={{ '--sticky-trailing-width': split.trailingWidth } as CSSProperties}>
@@ -88,13 +91,14 @@ export default function StickyBar({
       <div className={styles.splitTrailing}>
         {info ? <div className={styles.info}>{info}</div> : null}
         <div className={styles.actions} data-sticky-actions>{sharedActions}</div>
+        {inputReasons}
       </div>
     </div>
   )
   return (
     <div
       data-shared-part="sticky-bar"
-      data-sticky-layout={info ? undefined : "center"}
+      data-sticky-layout="center"
       className={[
         styles.bar,
         info ? styles.withInfo : null,
@@ -107,16 +111,12 @@ export default function StickyBar({
       <div className={styles.lead} data-sticky-lead>
         {normalizeStickyDestructiveActions(destructive)}
         {status ? <p className={styles.status} title={typeof status === 'string' ? status : undefined}>{status}</p> : null}
+        {info ? <div className={styles.info}>{info}</div> : null}
       </div>
-      {info ? <div className={styles.info}>{info}</div> : null}
       <div className={styles.actions} data-sticky-actions>{sharedActions}</div>
-      {/*
-       * 右端は空ける。ここに何か置くと中央が中央でなくなる。
-       * ただし一言を渡した画面は、承認済み ★BG-B `X2oLn` の右の列
-       * （`J94Yj` は `justifyContent: end`）どおりボタンが右端に付くので、
-       * この空き箱は作らない。
-       */}
-      {info ? null : <div aria-hidden="true" />}
+      {/* 左の補足の有無によらず、真ん中の操作のために右側も同じ幅を持つ。 */}
+      <div aria-hidden="true" />
+      {inputReasons}
     </div>
   )
 }

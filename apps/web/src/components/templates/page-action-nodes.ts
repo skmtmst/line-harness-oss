@@ -3,11 +3,19 @@ import { ArrowRight } from 'lucide-react'
 import Button, { type ButtonProps } from '@/components/shared/button'
 import type { ReactElement } from 'react'
 
-/** Only structural wrappers are flattened; stateful controls keep their own behavior. */
+function structuralWrapper(node: ReactNode): node is ReactElement<{ children?: ReactNode }> {
+  return isValidElement<{ children?: ReactNode }>(node) && (node.type === Fragment || (node.type === 'div' || node.type === 'span') && Object.keys(node.props).every(key => key === 'children'))
+}
+
+/** 表示条件や操作を持たない包みだけを展開する。 */
 export function headingActionNodes(children: ReactNode): ReactNode[] {
-  return Children.toArray(children).flatMap(node => {
-    if (isValidElement<{ children?: ReactNode }>(node) && (node.type === Fragment || (node.type === 'div' || node.type === 'span') && !('className' in node.props) && !('style' in node.props))) return headingActionNodes(node.props.children)
-    return [node]
+  return flattenActionNodes(children, '')
+}
+function flattenActionNodes(children: ReactNode, parentKey: string): ReactNode[] {
+  return Children.toArray(children).flatMap((node, index) => {
+    const key = `${parentKey}/${isValidElement(node) ? node.key ?? index : index}`
+    if (structuralWrapper(node)) return flattenActionNodes(node.props.children, key)
+    return [isValidElement(node) ? cloneElement(node, { key }) : node]
   })
 }
 
@@ -18,11 +26,10 @@ export function actionLabel(node: ReactNode): string {
   }).join('')
 }
 
-/** Create-flow progress actions end with one right arrow, after the spoken label. */
+/** 作成フローの進む操作は、名前の後ろに右矢印を1つ置く。 */
 export function normalizeProgressActionArrows(node: ReactNode): ReactNode {
   if (Array.isArray(node)) return Children.map(node, normalizeProgressActionArrows)
-  if (isValidElement<{ children?: ReactNode; className?: unknown; style?: unknown }>(node)
-    && (node.type === Fragment || (node.type === 'div' || node.type === 'span') && node.props.className === undefined && node.props.style === undefined)) {
+  if (structuralWrapper(node)) {
     const children = normalizeProgressActionArrows(node.props.children)
     return children === node.props.children ? node : cloneElement(node, {}, children)
   }
@@ -35,10 +42,10 @@ export function normalizeProgressActionArrows(node: ReactNode): ReactNode {
   return cloneElement(node, {}, [...content, arrow ?? createElement(ArrowRight, { key: 'progress-arrow', size: 16, 'aria-hidden': true })])
 }
 
-/** Supplementary saves keep their original callbacks and disabled conditions. */
+/** 補助の保存を取り出し、元の処理と無効条件を保つ。 */
 export function splitFormActions(children: ReactNode) {
   const nodes = headingActionNodes(children)
   const secondary = nodes.filter((node): node is ReactElement<ButtonProps> => isValidElement<ButtonProps>(node) && node.type === Button
-    && node.props.variant !== 'primary' && /複製|下書き|続けて作る/.test(actionLabel(node.props.children)))
+    && node.props.variant !== 'primary' && !/danger/.test(node.props.variant ?? '') && /複製|下書き.*保存|続けて作る/.test(actionLabel(node.props.children)))
   return { secondary, main: nodes.filter(node => !secondary.includes(node as ReactElement<ButtonProps>)) }
 }

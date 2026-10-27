@@ -267,6 +267,10 @@ test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗�
   // 口が失敗したら札が戻り、知らせに「もう一度」が出る。
   await act(async () => { resolveUpdate!(json({ success: false, error: 'boom' })) })
   expect(board.textContent).toContain('動いている')
+  // 帯や絞り込みの「動いている」でなく、その行の札が元の「有効」へ戻ったかを見る。
+  const row = board.querySelector('[data-row-id="wh-1"]')!
+  expect(row.textContent).toContain('有効')
+  expect(row.textContent).not.toContain('停止中')
 })
 
 test('v8 で行を右クリックすると「設定」と同じ操作が押した位置に出る', async () => {

@@ -10,5 +10,5 @@ export default function PermissionLockedButton({ reason, variant = 'primary', ic
   icon?: ReactNode
   children: ReactNode
 }) {
-  return <Button type="button" variant={variant} icon={icon} disabled disabledReason={reason} disabledReasonPlacement="tooltip">{children}</Button>
+  return <Button type="button" variant={variant} icon={icon} lockedReason={reason}>{children}</Button>
 }

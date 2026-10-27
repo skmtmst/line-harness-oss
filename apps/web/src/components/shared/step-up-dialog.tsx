@@ -4,6 +4,7 @@ import React, { useEffect, useId, useState } from 'react'
 import { KeyRound } from 'lucide-react'
 import Dialog from './dialog'
 import OtpInput, { otpFailureMessage } from './otp-input'
+import TextLink from './text-link'
 
 interface StepUpDialogProps {
   presentation?: 'mfa-off'
@@ -56,7 +57,7 @@ export default function StepUpDialog({ open, action, presentation, method = 'tot
           認証アプリ（6桁コード）またはパスワードのどちらかを登録すると、この操作へ進めます。
         </p>
         <p className="mt-2 text-sm font-bold">
-          <a href="/staff" className="text-action hover:underline">確認方法を設定する</a>
+          <TextLink inline href="/staff">確認方法を設定する</TextLink>
         </p>
       </Dialog>
     )

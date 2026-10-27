@@ -76,14 +76,14 @@
 
 .status {
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: auto-phrase;
   color: var(--color-ink-faint); /* fill: $ink-faint */
   font-size: var(--text-caption); /* fontSize: $size-caption */
   font-weight: 600; /* fontWeight: 600 */
 }
-/* 複数の状態表示も一行のまま並べる。全内容は title で確認できる。 */
+/* 複数の状態も省略せず、左欄の中で全文を読める。 */
 .status > :global([data-status-line]) { display: inline; }
 
 /*
@@ -97,19 +97,7 @@
  * 3列目を操作そのものにして右そろえにする。
  * 一言を渡さない画面（40画面以上）は3列・中央寄せのままで変わらない。
  */
-.withInfo {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.withInfo .lead { flex: 1 1 auto; flex-wrap: wrap; }
-.withInfo .info { flex: 0 1 auto; }
-.withInfo .actions {
-  flex: 0 1 auto;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
+.withInfo .lead { flex-wrap: wrap; }
 
 /*
  * ここは**置き場所だけ**を決める。色・形・アイコンは中身の部品が持つ
@@ -130,6 +118,19 @@
   flex-wrap: wrap;
 }
 
+/* 処理失敗は操作の次の行へ。文の長さで中央の操作列を広げない。 */
+.actions :global([data-button-error]),
+.inlineBar :global([data-button-error]) {
+  flex-basis: 100%;
+  width: 0;
+  min-width: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+  color: var(--color-danger);
+}
+.inlineBar:has(:global([data-button-error])),
+.splitTrailing .actions:has(:global([data-button-error])) { flex-wrap: wrap; }
+
 /*
  * 1440 では、左の削除と中央の操作がぶつかることがある。
  * **横スクロールさせずに2段へ折る。**
@@ -142,12 +143,12 @@
   }
 
   .actions {
-    justify-content: flex-end;
+    justify-content: center;
   }
 
   /* 2段に折れたら、一言は操作と同じ右そろえにする（横スクロールは出さない）。 */
   .info {
-    justify-content: flex-end;
+    justify-content: center;
   }
 }
 /* 左の一覧と右の作る欄が独立した操作を持つ板用。既定の帯は変えない。 */
@@ -156,16 +157,19 @@
 .splitLead:empty { padding: 0; }
 .splitLead:not(:empty) { background: var(--color-canvas); border: 1px solid var(--color-hairline); border-right: 0; border-radius: var(--radius-card) 0 0 var(--radius-card); }
 .splitLead { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 12px 24px; }
-.splitTrailing { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 16px; min-width: 0; border: 1px solid var(--color-hairline); border-radius: var(--radius-none) var(--radius-card) var(--radius-card) var(--radius-none); background: var(--color-canvas); }
+.splitTrailing { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 16px; min-width: 0; border: 1px solid var(--color-hairline); border-radius: var(--radius-none) var(--radius-card) var(--radius-card) var(--radius-none); background: var(--color-canvas); }
 .splitTrailing .info { flex-shrink: 0; }
-.splitTrailing .actions { flex-wrap: nowrap; justify-content: flex-end; }
+.splitTrailing .actions { flex-wrap: nowrap; justify-content: center; }
 @media (max-width: 1151px) {
   .bar.splitBar { grid-template-columns: minmax(0, 1fr); }
   .splitLead:not(:empty) { border-right: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
-  .splitTrailing { border-radius: var(--radius-card); justify-content: flex-end; flex-wrap: wrap; }
+  .splitTrailing { border-radius: var(--radius-card); justify-content: center; flex-wrap: wrap; }
 }
 }
 
 .inlineBar[data-presentation='distribution'] { justify-content: center; gap: var(--tpl-wh-check-gap); padding: var(--tpl-htn-footer-pad); background: var(--color-canvas); box-shadow: var(--tpl-htn-line-top); }
 
 .region { position: sticky; bottom: 0; z-index: 2; margin-top: auto; display: flex; flex-direction: column; gap: var(--sticky-region-gap); }
+
+.inputReasons { grid-column: 1 / -1; flex-basis: 100%; min-width: 0; text-align: center; color: var(--color-ink-secondary); font-size: var(--text-caption); overflow-wrap: anywhere; }
+.inlineBar:has(> .inputReasons), .splitTrailing:has(> .inputReasons) { flex-wrap: wrap; }

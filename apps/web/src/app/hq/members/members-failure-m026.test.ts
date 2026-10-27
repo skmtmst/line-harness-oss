@@ -6,22 +6,13 @@ const SETTINGS = readFileSync(new URL('../../../v8/hq/settings.tsx', import.meta
 
 /**
  * M026：権限ダイアログ原文・再送と統括名保存に再試行の案内なし。
- * 原文のまま出さず、共通の状態別案内（再試行の言葉つき）へ渡す。
+ * 共通の状態別案内へ渡すことは members-failure-react が描いて押して見る。
+ * ここは原文のまま出す古い形へ戻さない禁止の見張りだけを残す。
  */
 describe('M026 権限者の失敗表示', () => {
-  it('権限ダイアログの失敗は状態別案内へ渡す', () => {
-    expect(PAGE).toContain("describeApiFailure(caught, '保存'")
-    expect(PAGE).toContain("scope: 'hq'")
+  it('権限ダイアログ・招待の再送・統括名の保存を原文の代替文へ戻さない', () => {
     expect(PAGE).not.toContain("caught.message : '保存できませんでした。もう一度お試しください。'")
-  })
-
-  it('招待の再送の失敗は再試行の言葉つきにする', () => {
-    expect(PAGE).toContain("describeApiFailure(caught, '招待メールの再送'")
     expect(PAGE).not.toContain("caught.message : '招待メールを送り直せませんでした。'")
-  })
-
-  it('統括名保存の失敗は再試行の言葉つきにする（統括名の保存は /hq/settings）', () => {
-    expect(SETTINGS).toContain("describeApiFailure(caught, '統括名の保存'")
     expect(SETTINGS).not.toContain("caught.message : '統括名を保存できませんでした。'")
   })
 })

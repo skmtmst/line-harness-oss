@@ -7,6 +7,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
 export interface SettingsPageProps extends PageHeadingProps {
+  readOnly?: boolean | 'hq'
   heightMode?: 'viewport' | 'content'
   /** 板ごとの寸法。画面CSSから型の領域を上書きしない。 */
   layout?: 'accounts' | 'account-detail' | 'account-handover' | 'wide-nav' | 'narrow-nav' | 'customer-look'
@@ -23,10 +24,10 @@ export interface SettingsPageProps extends PageHeadingProps {
   /** 板の頭の下・中のメニューより上に置く帯（競合の帯など。）。帯の段の余白で置く。 */
   notice?: ReactNode
 }
-export function SettingsPage({ boardId, heightMode, standalone, layout, navigation, children, saveActions, saveStatus, contentLayout, savePlacement, preview, previewLayout, explanation, explanationKey, titleAccessory, notice, ...heading }: SettingsPageProps) {
+export function SettingsPage({ readOnly, boardId, heightMode, standalone, layout, navigation, children, saveActions, saveStatus, contentLayout, savePlacement, preview, previewLayout, explanation, explanationKey, titleAccessory, notice, ...heading }: SettingsPageProps) {
   const footer = saveActions ? <div className={styles.footer} style={savePlacement === 'content' ? { marginBlock: 0 } : undefined} data-template-region="footer"><StickyBar actions={saveActions} status={saveStatus} /></div> : null
   const page = <PageFrame kind="settings" heightMode={heightMode} layout={layout} boardId={boardId} standalone={standalone} hasFooter={!!saveActions}>
-    <PageHeading {...heading} titleAccessory={titleAccessory} explanationToggle={explanation ? <PageExplanationToggle /> : undefined} />
+    <PageHeading {...heading} readOnlyBand={readOnly || heading.readOnlyBand} titleAccessory={titleAccessory} explanationToggle={explanation ? <PageExplanationToggle /> : undefined} />
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing="band">{notice}</div> : null}
     <div className={styles.settings} data-template-region="body" data-content-layout={contentLayout}>
       <nav aria-label="この設定の目次" className={styles.settingsNav} data-template-region="navigation">{navigation}</nav>

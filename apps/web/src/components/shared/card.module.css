@@ -247,7 +247,7 @@ html:root .records > [data-card-footer] { padding-inline: var(--polish-space-sec
 html:root .headerStacked { padding: 0; }
 
 /* 内側の薄い面は平らにする。form/asideの外枠を重ねない。 */
-html:root .card[data-card-surface='muted'] { border: 0; outline: revert; box-shadow: none; background: var(--color-surface-pearl); }
+html:root .card[data-card-surface='muted'] { border: 0; outline-color: transparent; box-shadow: none; background: var(--color-surface-pearl); }
 
 html:root .card[data-card-selected] { --card-edge: var(--color-control-border); background: var(--polish-selection-bg); }
 
@@ -270,8 +270,10 @@ html:root .withActions { display: flex; flex-direction: column; }
 .bottomActions { min-width: 0; }
 
 /* カードは線を描かず、共通の影で面を分ける。選択の状態は共通の色を保つ。 */
-html:root .card:not([data-card-surface='muted']):not([data-card-surface='danger']):not(.inset) {
-  border: 0; outline: none; box-shadow: var(--card-shadow);
+html:root .card:not([data-card-surface='muted']):not([data-card-surface='danger']):not([data-card-surface='inset']):not([data-card-frame]):not([data-card-selected]):not(:focus-visible):not(.inset) {
+  border: 0; outline-color: transparent; box-shadow: var(--card-shadow);
 }
 .actionRow { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--polish-space-row); min-width: 0; }
 html:root .actionRow > :is(button, a) { min-width: 0; width: 100%; padding-inline: var(--polish-space-row); }
+
+html:root .card:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

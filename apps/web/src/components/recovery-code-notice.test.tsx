@@ -11,7 +11,7 @@ it('uses authenticated remaining counts and removes the low-code notice immediat
   const snapshot = { impersonation: null, unfamiliarAt: null, stepUpMethod: 'totp' as const, recoveryCodesRemaining: 2 }
   rememberSessionSnapshot(snapshot)
   render(<RecoveryCodeNotice />)
-  await screen.findByText('回復コードが残り少なくなっています（残り 2 個）')
+  await screen.findByText('要確認：回復コードが残り少なくなっています（残り 2 個）')
   act(() => rememberSessionSnapshot({ ...snapshot, recoveryCodesRemaining: 8 }))
   expect(screen.queryByRole('note')).toBeNull()
 })
@@ -36,7 +36,7 @@ it.each(['/staff', '/ops/two-factor'])('%sで作り直している間は同じ�
 
 it.each([[0, '回復コードが残っていません'], [1, '回復コードが残り少なくなっています（残り 1 個）'], [2, '回復コードが残り少なくなっています（残り 2 個）']])('残り%i個の題は数と合う', async (remaining, heading) => {
   render(<RecoveryCodeNotice remaining={remaining} />)
-  expect(await screen.findByText(heading)).toBeTruthy()
+  expect(await screen.findByText(`要確認：${heading}`)).toBeTruthy()
 })
 
 it('［閉じる］でその日はその端末で出さず、日が変わるとまた出す。作り直すの道は残す', async () => {
@@ -54,7 +54,7 @@ it('［閉じる］でその日はその端末で出さず、日が変わると�
   // 日本時間の次の日（10/26 0:00 JST = 10/25 15:00 UTC）にはまた出る。
   vi.setSystemTime(new Date('2026-10-25T15:00:00Z'))
   render(<RecoveryCodeNotice remaining={0} />)
-  expect(await screen.findByText('回復コードが残っていません')).toBeTruthy()
+  expect(await screen.findByText('要確認：回復コードが残っていません')).toBeTruthy()
 })
 
 it.each(['/', '/settings', '/hq/settings'])('%sでは閉じた日も残し、閉じる印を出さない', async pathname => {

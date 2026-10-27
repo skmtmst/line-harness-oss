@@ -26,19 +26,6 @@ import {
 } from './change-impact'
 
 const EDIT = readUiSource(new URL('./edit/page.tsx', import.meta.url), 'utf8')
-const IMPACT_REVIEW = readUiSource(new URL('../../../v8/common-vars-edit/edit.tsx', import.meta.url), 'utf8')
-
-/**
- * **ファイル全体を `toContain` で見ない。** 画面のどこかに同じ字が
- * あるだけで通ってしまう。保存の関数と影響確認の節を切り出して見る。
- */
-function sliceBetween(source: string, start: string, end: string): string {
-  const from = source.indexOf(start)
-  expect(from, `${start} が見つからない`).toBeGreaterThan(-1)
-  const to = source.indexOf(end, from + start.length)
-  expect(to, `${end} が見つからない`).toBeGreaterThan(from)
-  return source.slice(from, to)
-}
 
 // 分割後も対象の処理だけを検査し、別の関数の同じ語で通さない。
 function implementationBody(file: URL, name: string): string {
@@ -49,8 +36,6 @@ function implementationBody(file: URL, name: string): string {
   return declaration.body.getText(tree)
 }
 const SAVE_FN = implementationBody(new URL('../../../v8/common-vars-edit/edit-save.tsx', import.meta.url), 'saveCommonVar')
-const IMPACT_SECTION = sliceBetween(EDIT, '<section className={styles.card} aria-labelledby="cv-edit-impact-heading">', '</section>')
-const IMPACT_ROWS = implementationBody(new URL('../../../v8/common-vars-edit/edit-impact.tsx', import.meta.url), 'ImpactRows')
 
 function usage(over: Partial<CommonVarDeleteImpactItem> = {}): CommonVarDeleteImpactItem {
   return {
@@ -272,105 +257,21 @@ describe('取れないものは、取れないと書く', () => {
   })
 })
 
-describe('共通情報編集（V8）の画面', () => {
-  it('保存の catch は一言で片付けず、理由を作る関数を通す', () => {
-    expect(SAVE_FN).toContain('setError(saveErrorText(e))')
+/*
+ * 編集画面の動き（保存・予約の失敗の言葉・競合で入力を残す・影響確認の節の状態・
+ * 作れない行と上限超えの出し方・型の検査）は `edit/page-behavior.test.tsx` が描いて押して守る。
+ * 一覧の権限なし／通信障害の言い分けは `vars-load-failure-react.test.tsx`。
+ * ここは一言で片付ける文・断言の文へ戻さない禁止の見張りだけを残す。
+ */
+describe('共通情報編集（V8）の画面を古い形へ戻さない', () => {
+  it('保存・予約の失敗を一言の文や生の文言で片付けない', () => {
     expect(SAVE_FN).not.toContain("setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')")
-  })
-
-  it('予約の catch は生文言を出さず、予約用の変換を通す（#578 L7）', () => {
-    expect(EDIT).toContain('setError(scheduleErrorText(e))')
     expect(EDIT).not.toContain("e.message : '予約に失敗しました'")
   })
 
-  it('入力を変えたら古い「保存しました。」を消す（#578 L9）', () => {
-    expect(SAVE_FN).toContain('notifySaved()')
+  it('古い「保存しました。」の出し方や、配信中にも反映と断言する文へ戻さない', () => {
     expect(EDIT).not.toContain('{saved &&')
-    expect(EDIT).toContain('setSaved(false); setName')
-    expect(EDIT).toContain('setSaved(false); setValue')
-  })
-
-  it('一覧の読み込み失敗は権限なしと通信障害で分ける（#578 L8）', () => {
-    const LIST = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-    expect(LIST).toContain('見る権限がありません')
-    expect(LIST).toContain('接続を確かめて')
-  })
-
-  it('影響確認の節を必ず出す。読めないときも節ごと消さない', () => {
-    expect(IMPACT_SECTION).toContain('変える前に影響を見る')
-    expect(IMPACT_ROWS).toContain('NOT_AVAILABLE')
-    expect(IMPACT_SECTION).toContain('impactStateText(impactState)')
-  })
-
-  it('節の中で、変わる場所・送信済み・使用先の種類を書き分ける', () => {
-    expect(IMPACT_SECTION).toContain('formatNumber(impact.total)')
-    expect(IMPACT_SECTION).toContain('historicalText(impact)')
-    expect(IMPACT_ROWS).toContain('visible.map')
-    expect(IMPACT_ROWS).toContain('row.kindLabel')
-  })
-
-  it('1件ずつ見る画面では、保存後の文を作れない行を空文字で埋めない', () => {
-    // 空で出すと「保存すると空になる」と読める。
-    expect(IMPACT_REVIEW).toContain("row.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`")
-  })
-
-  it('1件ずつ見る画面では、上限を超える行の文字数を強調する', () => {
-    expect(IMPACT_REVIEW).toContain('row.exceedsCharacterLimit')
-    expect(IMPACT_REVIEW).toContain('characterCountText(row)')
-  })
-
-  it('状態の語彙は口とそろえ、編集中・公開中・予約中の内訳を保存前に出す（IDEA-14）', () => {
-    // 「公開中」は口（commonVarUsageStatus）が返す状態名になった。
-    // 画面は口の呼び名をそのまま数え、自分で呼び名を作らない。
-    expect(IMPACT_REVIEW).toContain('配信予約中')
-    expect(EDIT).toContain('reflectionScopeText(impact)')
-    expect(EDIT).toContain('reflectionTimingText(impact)')
-    expect(IMPACT_SECTION).toContain('reflectionScopeText(impact)')
-    // 「配信中にも全部反映」のような、固定済み送信を直すと読める断言をしない。
     expect(EDIT).not.toContain('配信中の設定にも反映されます')
-  })
-
-  it("競合で入力を消さない。loadではなく版だけ取り直す", () => {
-    // load は名前・値・メモまで初期化する。409/428で呼ぶと入力が消える。
-    const CATCH = sliceBetween(SAVE_FN, '} catch (e) {', '} finally {')
-    expect(CATCH).toContain('await refreshBaseline(item.id, accountAtRequest, e)')
-    expect(CATCH).not.toContain('void load()')
-  })
-
-  it('読み込めなかったときだけ再読み込みを出す', () => {
-    expect(IMPACT_SECTION).toContain("impactState === 'error'")
-    expect(IMPACT_SECTION).toContain('{STATE_TEXT.retry}')
-  })
-
-  it('未取得を0か所として描かない', () => {
-    expect(IMPACT_SECTION).toContain("impactState !== 'ready' || !impact")
-  })
-
-  it('0か所確定のとき「1件ずつ見る」への案内を出さない（VAR-02）', () => {
-    // V8は一覧をこの節で表示する。0件で存在しない行を開く案内を出さない。
-    expect(IMPACT_SECTION).toContain('<ImpactRows impact={impact}')
-    expect(IMPACT_ROWS).toContain('rows.length === 0')
-    expect(IMPACT_ROWS).toContain('rest > 0')
-  })
-
-  it('見え方の節は、確認中・0件確定・使用先ありを分けて言う（VAR-02）', () => {
-    const PREVIEW_SECTION = IMPACT_SECTION + IMPACT_ROWS
-    // 0件が確定したあとも「確認中です」と出し続けない
-    expect(PREVIEW_SECTION).toContain('impact.total === 0')
-    expect(PREVIEW_SECTION).toContain('使われている場所がないため')
-    expect(PREVIEW_SECTION).not.toContain('使用先の本文を確認中です')
-    // 読み込み中・失敗は状態の言葉で言う。0件と混ぜない
-    expect(PREVIEW_SECTION).toContain("impactState !== 'ready' || !impact")
-    expect(PREVIEW_SECTION).toContain('impactStateText(impactState)')
-    // 使用先はあるが保存ですぐ変わるものが無い（送信済みだけ等）も分ける
-    expect(PREVIEW_SECTION).toContain('すぐ変わる使用先の文はありません')
-  })
-
-  it('VAR-06: 保存と更新予約は新規画面と同じ型検査を通す', () => {
-    // 型に合わない値・代替値は影響確認を呼ぶ前に止めて理由を出す。
-    expect(EDIT).toContain('commonVarValueError(item.type, value)')
-    expect(EDIT).toContain("commonVarValueError(item.type, fallbackValue, '代替値')")
-    expect(EDIT).toContain("commonVarValueError(item.type, draft.value, '更新後の値')")
   })
 })
 

@@ -5,7 +5,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
 import { GridCell,GridHeadRow,GridRow,GridTable } from '@/components/shared/grid-table'
@@ -296,7 +296,7 @@ export default function FileScanScreen() {
                       />
                     </span>
                   ) : (
-                    <span className={styles.muted}>{emptyValue('unknown')}</span>
+                    <EmptyCell />
                   )}
                 </GridCell>
               </GridRow>

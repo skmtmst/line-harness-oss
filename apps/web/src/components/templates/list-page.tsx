@@ -2,7 +2,7 @@
 'use client'
 
 import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
-import type { CSSProperties, ReactNode } from 'react'
+import { Fragment, type CSSProperties, type ReactNode } from 'react'
 import { CollapsedFolderActions, type FolderPanelRow } from '@/components/shared/folder-panel'
 import Select from '@/components/shared/select'
 import { ListToolbarLeading } from '@/components/shared/list-toolbar'
@@ -32,7 +32,8 @@ export interface ListFolderNav {
 export interface ListPageBodyProps {
   /** ：テンプレート一覧を基準にした段・寸法。窓や設定内の一覧は対象外。 */
   skeleton?: boolean
-  readOnly?: boolean
+  readOnly?: boolean | 'hq'
+  readOnlyNeed?: PageHeadingProps['readOnlyNeed']
   stats?: ReactNode
   folders?: ReactNode
   /** 狭い板でも同じフォルダ選択・作る操作へ到達できる口。渡すと folderNav より優先する。 */
@@ -90,7 +91,7 @@ function hasListFolders({ folderNav, folders, collapsedFolders }: ListPageBodyPr
   return navs.length ? navs.some(nav => nav.rows.length > 1) : !!(folders || collapsedFolders)
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, tableInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, explanationInset = 'notice', listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ readOnly, readOnlyNeed, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, tableInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, explanationInset = 'notice', listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
   const navs = listFolderNavs(folderNav)
   const hasFolders = hasListFolders({ folderNav, folders, collapsedFolders, children })
   const noFolderChoices = navs.length > 0 && navs.every(nav => nav.rows.length <= 1)
@@ -99,7 +100,7 @@ export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFold
   const help = listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null
   const helpAtEnd = listHelpPlacement === 'end' && Boolean(toolbar)
   return <ListFolderContext.Provider value={hasFolders}><div className={styles.listBody} data-list-folders={hasFolders} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} data-table-inset={tableInset || undefined} style={fillWidth ? { width: '100%' } : undefined}>
-    {readOnly ? <ReadOnlyNotice /> : null}
+    {readOnly ? <ReadOnlyNotice scope={readOnly === 'hq' ? 'hq' : 'store'} need={readOnlyNeed} /> : null}
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">
       {folders && !noFolderChoices ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
@@ -126,13 +127,13 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = '�
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
-export function ListPage({ boardId, layout, heightMode, standalone, createPlacement, tabs, title, help, explanation, explanationKey, titleAccessory, explanationToggle, identity, actions, crumbs, subtitle, steps, headingSize, bottomSpacing, ...body }: ListPageProps) {
+export function ListPage({ readOnly, readOnlyNeed, readOnlyBand, boardId, layout, heightMode, standalone, createPlacement, tabs, title, help, explanation, explanationKey, titleAccessory, explanationToggle, identity, actions, crumbs, subtitle, steps, headingSize, bottomSpacing, ...body }: ListPageProps) {
   const navs = listFolderNavs(body.folderNav)
   const headingCreates = createPlacement === 'heading' || !hasListFolders(body) ? navs.filter(nav => nav.createAction) : []
   const resolvedBody = headingCreates.length ? { ...body, collapsedFolders: undefined, folderNav: navs.map(nav => ({ ...nav, createAction: undefined })) } : body
-  const headingActions = headingCreates.length ? <>{headingCreates.map((nav,index) => <span key={index} data-list-heading-create data-create-placement={createPlacement}>{nav.createAction}</span>)}{actions}</> : actions
+  const headingActions = headingCreates.length ? <>{headingCreates.map((nav,index) => <Fragment key={index}>{nav.createAction}</Fragment>)}{actions}</> : actions
   const page = <PageFrame kind="list" createPlacement={createPlacement} boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone} skeleton={body.skeleton}>
-    <PageHeading {...{ title, help, titleAccessory, explanationToggle: explanationToggle !== undefined ? explanationToggle : explanation ? <PageExplanationToggle /> : undefined, identity, actions: headingActions, crumbs, subtitle, steps, headingSize, bottomSpacing }} />
+    <PageHeading readOnlyBand={readOnly || readOnlyBand} readOnlyNeed={readOnlyNeed} {...{ title, help, titleAccessory, explanationToggle: explanationToggle !== undefined ? explanationToggle : explanation ? <PageExplanationToggle /> : undefined, identity, actions: headingActions, crumbs, subtitle, steps, headingSize, bottomSpacing }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...resolvedBody} explanation={explanation} />
   </PageFrame>
@@ -149,9 +150,9 @@ export function ListPager({ children }: { children: ReactNode }) {
   return <div className={styles.paginationRow} data-list-pager>{children}</div>
 }
 
-/** Lists of cards use the same spacing as other groups of content. */
+/** Lists of cards use the same spacing as other groups of content. Cards in one row take the tallest height so their bottom actions line up. */
 export function ListPageCards({ children, columns = 3, narrowColumns, inset }: { children: ReactNode; columns?: 1 | 3 | 4; narrowColumns?: 1 | 2 | 3; inset?: 'parent' }) {
-  return <div className={styles.listCards} data-card-columns={columns} data-card-narrow-columns={narrowColumns} data-card-inset={inset} style={{ '--tpl-list-card-columns': columns, '--tpl-list-card-narrow-columns': narrowColumns } as CSSProperties}>{children}</div>
+  return <div className={styles.listCards} data-card-height="equal" data-card-columns={columns} data-card-narrow-columns={narrowColumns} data-card-inset={inset} style={{ '--tpl-list-card-columns': columns, '--tpl-list-card-narrow-columns': narrowColumns } as CSSProperties}>{children}</div>
 }
 
 /** カードなどの本文の余白と段の間を一覧型が持つ。 */

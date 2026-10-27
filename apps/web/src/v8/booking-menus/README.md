@@ -1,4 +1,4 @@
-> 文書：booking-menus のコード案内｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+> 文書：booking-menus のコード案内｜区分：今の説明｜最終確認：2026-10-26（日本時間）
 
 # 予約設定（V8）の動き：コードの入口
 
@@ -40,6 +40,7 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [channels-conflict.test.tsx](channels-conflict.test.tsx)
 - [channels-summary.test.tsx](channels-summary.test.tsx)
 - [channels-tab.test.tsx](channels-tab.test.tsx)
+- [customer-booking.test.tsx](customer-booking.test.tsx)
 - [holidays.test.tsx](holidays.test.tsx)
 - [hours-field-errors.test.tsx](hours-field-errors.test.tsx)
 - [lib/preview-slots.test.ts](lib/preview-slots.test.ts)
@@ -57,6 +58,7 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [slot-check-race.test.tsx](slot-check-race.test.tsx)
 - [staff-calendar.test.tsx](staff-calendar.test.tsx)
 - [staff-edit-dialog.test.tsx](staff-edit-dialog.test.tsx)
+- [staff-nomination-fee.test.tsx](staff-nomination-fee.test.tsx)
 - [tabs-load-error.test.tsx](tabs-load-error.test.tsx)
 - [tabs/loading-timing.test.tsx](tabs/loading-timing.test.tsx)
 

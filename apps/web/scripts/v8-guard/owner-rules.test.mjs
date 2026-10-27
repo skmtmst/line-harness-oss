@@ -19,6 +19,22 @@ test('a framed box clipped by its parent fails; scrollable and restored boxes re
   } finally { await browser.close() }
 })
 
+test('高さをそろえる段で、同じ行のカードの高さか下端の操作がずれると落ち、そろえば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const card = (id, info) => `<article id="${id}" data-design-part="card" style="display:flex;flex-direction:column"><div style="flex:1 0 auto;min-height:${info}px">情報</div><div data-card-actions style="height:32px">操作</div></article>`
+    await page.setContent(`<main><div data-card-height="equal" style="display:grid;grid-template-columns:repeat(3,200px);align-items:start;gap:16px">${card('warned', 120)}${card('plain', 60)}${card('archived', 40)}</div></main>`)
+    const broken = (await page.evaluate(scan)).filter(f => f.kind === 'cardrow')
+    assert.equal(broken.length, 1)
+    assert.deepEqual(broken[0].measure, { height: 80, actions: 80 })
+    await page.locator('[data-card-height]').evaluate(el => { el.style.alignItems = 'stretch' })
+    assert.deepEqual((await page.evaluate(scan)).filter(f => f.kind === 'cardrow'), [])
+    await page.locator('#plain > [data-card-actions]').evaluate(el => { el.style.marginBottom = '20px' })
+    assert.deepEqual((await page.evaluate(scan)).filter(f => f.kind === 'cardrow').map(f => f.measure), [{ height: 0, actions: 20 }])
+  } finally { await browser.close() }
+})
+
 test('small UI text drawn at weight 400 fails; 500 and larger reading text pass', async () => {
   const browser = await connectGuardBrowser()
   try {

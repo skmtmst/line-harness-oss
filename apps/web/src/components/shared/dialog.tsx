@@ -90,8 +90,8 @@ export type DialogProps = {
   /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
   confirmDisabled?: boolean
   confirmDisabledReason?: string
-  /** 入力不足は本文に1行、権限不足はTabで止まれるボタンと吹き出しにする。 */
-  confirmDisabledReasonPlacement?: 'inline' | 'tooltip'
+  /** 権限不足はTabで止まれるボタンと吹き出しにする。 */
+  confirmLockedReason?: string
   actionWidthReserve?: 'states' | 'idle'
   confirmPlacement?: 'start'
   error?: string
@@ -171,7 +171,7 @@ export default function Dialog({
   cancelLabel = 'キャンセル',
   confirmDisabled = false,
   confirmDisabledReason,
-  confirmDisabledReasonPlacement = 'inline',
+  confirmLockedReason,
   actionWidthReserve,
   confirmPlacement,
   onConfirm,
@@ -202,8 +202,11 @@ export default function Dialog({
   }, [open])
   const busy = providedBusy === true || automaticBusy
   const runConfirm = onConfirm ? () => {
-    if (busy || automaticLock.current) return
-    const pending = onConfirm() as unknown
+    if (busy || confirmDisabled || confirmLockedReason || automaticLock.current) return
+    setAutomaticError('')
+    let pending: unknown
+    try { pending = onConfirm() }
+    catch { setAutomaticError('実行できませんでした。もう一度お試しください。'); return }
     if (!pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
     const generation = automaticGeneration.current
     automaticLock.current = true
@@ -239,7 +242,7 @@ export default function Dialog({
       : primaryAction === 'cancel' ? () => cancelRef.current : undefined,
   )
   const layer = useOverlayLayer(open && modal)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open || !modal) return
     document.dispatchEvent(new Event(OVERLAY_MODAL_OPEN_EVENT))
   }, [open, modal])
@@ -356,15 +359,17 @@ export default function Dialog({
             <Button
               actionWording
               data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
-              variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
+              variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? isDeleteConfirmation(confirmLabel) ? 'text' : 'secondary' : 'primary'}
+              textTone={tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? 'danger' : undefined}
               className={styles.designButton}
               widthReserve={actionWidthReserve}
               onClick={runConfirm}
-              disabled={busy || confirmDisabled} disabledReason={confirmDisabledReason} disabledReasonPlacement={confirmDisabledReasonPlacement} title={confirmDisabled && confirmDisabledReasonPlacement === 'inline' ? confirmDisabledReason : undefined} busy={busy} busyLabel={busyLabel}>
-              {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
+              disabled={busy || confirmDisabled} aria-description={confirmDisabled && !confirmLockedReason ? confirmDisabledReason : undefined} lockedReason={confirmLockedReason} busy={busy} busyLabel={busyLabel}>
+              {!busy && confirmIcon && !isDeleteConfirmation(confirmLabel) ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
               {tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
             </Button>
           </span>
+          {confirmDisabled && !busy && !confirmLockedReason && confirmDisabledReason ? <p className={styles.confirmReason} role="status">{confirmDisabledReason}</p> : null}
         </div>
       ) : null)}
       </div>

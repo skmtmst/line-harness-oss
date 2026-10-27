@@ -158,6 +158,7 @@
 .track[data-appearance='quota'] { display: block; width: 100%; height: var(--tpl-db-bar-h); border-radius: var(--tpl-db-bar-radius); }
 .track[data-appearance='quota'] .fill { border-radius: var(--tpl-db-bar-radius); }
 .track[data-tone='danger'] .fill { background: var(--color-danger); }
+.track[data-tone='warning'] .fill { background: var(--color-warning); }
 
 @media (prefers-reduced-motion: reduce) {
   .fill, .fail { transition: none; }

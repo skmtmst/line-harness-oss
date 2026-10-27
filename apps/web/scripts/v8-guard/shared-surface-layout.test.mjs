@@ -32,6 +32,8 @@ import CommandPalette from './src/components/shared/command-palette';
 import Notice from './src/components/shared/notice';
 import {DialogContentRow} from './src/components/shared/dialog-form-row';
 import {EntityPickerField} from './src/components/shared/entity-picker';
+import KpiBand from './src/components/shared/kpi-band';
+import KpiCard from './src/components/shared/kpi-card';
 function Fixture(){
  const [window,setWindow]=useState(''),[value,setValue]=useState(false),[current,setCurrent]=useState('now');
  const steps=[{key:'done',label:'事前確認',state:'done',onSelect:()=>setCurrent('done')},{key:'now',label:'アカウント接続',state:'current'}, {key:'next',label:'接続確認',state:'todo'}, {key:'choice',label:'使い方を選ぶ',state:'todo'}, {key:'finish',label:'完了',state:'todo'}];
@@ -46,6 +48,18 @@ function Fixture(){
   <div data-center-row><Radio name="channel" checked={value} onChange={()=>setValue(!value)}>ラジオ</Radio></div>
   <div data-center-row><Toggle label="切り替え" checked={value} onChange={setValue}/></div></section>
   <section id="entity-selection"><EntityPickerField label="親候補" noun="アカウント" items={Array.from({length:20},(_,i)=>({id:String(i),name:"親候補"+i,meta:"候補の説明"}))} value="0" onChange={()=>{}} /></section>
+  <section id="notices" style={{maxWidth:720}}>
+   <Notice tone="info" heading="回復コードが残っていません" message="認証アプリが使えない時に入れなくなる前に、作り直してください。" action={<Button>作り直す</Button>} onClose={()=>{}}/>
+   <Notice tone="warn" heading="いつもと違う端末・場所からのログインです。心当たりがなければ、ほかの端末のログインを終えてパスワードを変えてください" message="大事な操作の前に毎回、本人確認をします。" action={<Button>ログイン中の端末を見る</Button>} onClose={()=>{}}/>
+   <Notice tone="warn" heading="ほかの人がこの内容を保存しました" message="読み直すと、ほかの人の変更を見てから続けられます。" states={[{label:'済み',state:'done'},{label:'未保存',state:'pending'}]} footer={<button type="button">入力を破棄する</button>} action={<><Button>読み直す</Button><Button variant="primary">上書きする</Button></>} onClose={()=>{}}/>
+   <Notice tone="info" action={<Button>開く</Button>} onClose={()=>{}}>題のない1行の知らせです。</Notice>
+  </section>
+  {[852,1140].map(w=><section key={w} data-kpi-fixture={w} style={{width:w}}><KpiBand appearance="cards">
+   <KpiCard presentation="band" title="対応が必要な受信" icon={<svg viewBox="0 0 16 16"/>} value={5} unit="件" badge="最長 6日前" badgeTone="danger" detail="LINE 1・メール 4" action={{label:'受信箱へ',href:'/chats'}}/>
+   <KpiCard presentation="band" title="今日の友だち" icon={<svg viewBox="0 0 16 16"/>} value={3} unit="人" detail="ブロック 0 人" sparkline={[1,2,2,3]}/>
+   <KpiCard presentation="band" title="接続に問題" icon={<svg viewBox="0 0 16 16"/>} value={12345} unit="通" valueTone="warning" detail="枠 200 通のうち 2%" action={{label:'配信へ',href:'/broadcasts'}}/>
+   <KpiCard presentation="band" title="今日の予約" icon={<svg viewBox="0 0 16 16"/>} value={0} unit="件" badge="なし" badgeTone="neutral" detail="次の予定はありません" action={{label:'予約へ',href:'/booking'}}/>
+  </KpiBand></section>)}
   <section id="windows">{['通常','確認','危険','警告','手順','選択','長文','引き出し'].map(name=><Button key={name} onClick={()=>setWindow(name)}>{name}</Button>)}</section>
   {window==='引き出し'?<Drawer open title="設定を編集する" headerIcon={props.headerIcon} description={props.description} onClose={()=>setWindow('')} footer={<Button onClick={()=>setWindow('')}>保存する</Button>}><input aria-label="名前" defaultValue="保持する名前"/></Drawer>:
    ['確認','危険','警告'].includes(window)?<ConfirmDialog {...props} title="内容を確認しますか？" destructive={window==='危険'} warning={window==='警告'}/>:
@@ -217,6 +231,61 @@ for (const width of [1152,1440,1920]) {
         await panel.getByRole('button',{name:'閉じる',exact:true}).click()
         await panel.waitFor({state:'detached'})
       }
+    }finally{await browser.close()}
+  })
+}
+
+for (const width of [1152,1440]) {
+  test(`知らせの［×］を操作のボタンと縦の真ん中でそろえる（題が1行でも2行でも） ${width}`,async()=>{
+    const browser=await connectGuardBrowser()
+    try{
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      const measure=()=>page.locator('#notices').evaluate(root=>[...root.querySelectorAll('[data-design-part="notice"]')].map(notice=>{
+        const close=notice.querySelector('button[aria-label="通知を閉じる"]')
+        const actions=[...notice.querySelectorAll('[class*="action"] [data-shared-button]')]
+        const center=el=>{const r=el.getBoundingClientRect();return r.top+r.height/2}
+        const heading=notice.querySelector('[class*="heading"]')
+        return {lines:heading?Math.round(heading.getBoundingClientRect().height/parseFloat(getComputedStyle(heading).lineHeight)):0,
+          offsets:actions.map(button=>center(close)-center(button))}
+      }))
+      const rows=await measure()
+      assert.equal(rows.length,4)
+      assert.ok(rows.some(row=>row.lines>=2),JSON.stringify(rows))
+      assert.ok(rows.every(row=>row.offsets.length>0&&row.offsets.every(offset=>Math.abs(offset)<=0.5)),JSON.stringify(rows))
+      // ［×］を2pxずらすと、この計測が見逃さないことを確かめる。
+      await page.locator('#notices button[aria-label="通知を閉じる"]').first().evaluate(el=>{el.style.position='relative';el.style.top='-2px'})
+      assert.ok((await measure()).some(row=>row.offsets.some(offset=>Math.abs(offset)>0.5)))
+    }finally{await browser.close()}
+  })
+}
+
+for (const stripWidth of [852,1140]) {
+  test(`数のカードは札があっても題と補足を切らず、札は題・数字と重ならない（帯の幅 ${stripWidth}）`,async()=>{
+    const browser=await connectGuardBrowser()
+    try{
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,1440)
+      const measure=()=>page.locator(`[data-kpi-fixture="${stripWidth}"]`).evaluate(root=>[...root.querySelectorAll('[data-kpi-strip] > [data-design-version]')].map(card=>{
+        const box=el=>el?.getBoundingClientRect()
+        // 「…」で省略している（text-overflow: ellipsis で中身が入り切らない）要素があれば切れている。
+        const cut=el=>!!el&&[el,...el.querySelectorAll('*')].some(node=>getComputedStyle(node).textOverflow==='ellipsis'&&node.scrollWidth>node.clientWidth+1)
+        const text=card.querySelector('[data-kpi-label] [data-help-trigger] > span')??card.querySelector('[data-kpi-label]')
+        const badge=box(card.querySelector('[data-kpi-badge]')),label=box(text),number=box(card.querySelector('[data-kpi-value]'))
+        const hit=(a,b)=>!!a&&!!b&&a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top
+        const note=card.querySelector('[data-kpi-detail] > span:first-child')
+        return {labelCut:cut(card.querySelector('[data-kpi-label]'))||(!!label&&box(card).right<label.right),noteCut:cut(note),
+          overlap:hit(badge,label)||hit(badge,number),inside:!badge||badge.right<=box(card).right,
+          link:card.querySelector('[data-kpi-detail] a')?getComputedStyle(card.querySelector('[data-kpi-detail] a')).color:null}
+      }))
+      const rows=await measure()
+      assert.equal(rows.length,4)
+      assert.ok(rows.every(row=>!row.labelCut&&!row.noteCut&&!row.overlap&&row.inside),JSON.stringify(rows))
+      // 行き先「〇〇へ →」は文字のリンクの決まり（緑）。
+      assert.ok(rows.filter(row=>row.link).length===3&&rows.every(row=>!row.link||row.link==='rgb(8, 122, 62)'),JSON.stringify(rows))
+      // 札を題の上へ重ねると、この計測が見逃さないことを確かめる。
+      await page.locator(`[data-kpi-fixture="${stripWidth}"] [data-kpi-badge]`).first().evaluate(el=>{const label=el.closest('[data-design-version]').querySelector('[data-kpi-label]').getBoundingClientRect();Object.assign(el.style,{position:'fixed',left:`${label.left}px`,top:`${label.top}px`})})
+      assert.ok((await measure()).some(row=>row.overlap))
     }finally{await browser.close()}
   })
 }

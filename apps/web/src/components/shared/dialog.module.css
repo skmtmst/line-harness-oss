@@ -161,6 +161,7 @@
 /* 子のボタンの輪・影がスクロール窓の下端に触れない内側の逃げ。 */
 .content::after {
   content: '';
+  grid-column: 1 / -1;
   flex: 0 0 var(--space-8);
   block-size: var(--space-8);
 }
@@ -392,7 +393,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel[data-design-layout='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
 :root .panel[data-design-layout='stacked'] > .content { padding: 0; align-items: stretch; }
 :root .panel[data-design-layout='stacked'] .actions { padding: 0; border: 0; }
-:root .panel[data-confirm-first] .actions .buttonPair > button:last-child { order: -1; }
+:root .panel[data-confirm-first] .actions .buttonPair > button:last-of-type { order: -1; }
 
 :root .panel[data-design-layout='stacked'] .close { width: var(--control-icon-size); height: var(--control-icon-size); min-height: 0; padding: 0; }
 
@@ -412,7 +413,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel[data-layout='account-inset'] > .headerRow,
 :root .panel[data-layout='account-inset'] > .content { padding: 0; }
 :root .panel[data-layout='account-inset'] .title { font-size: var(--tpl-acd-dlg-title-size); line-height: var(--tpl-acd-dlg-title-lh); }
-:root .panel[data-layout='account-inset'] .insetActions { display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acd-dlg-foot-pad); box-shadow: var(--tpl-acd-line-top); }
+:root .panel[data-layout='account-inset'] .insetActions { display: flex; justify-content: center; align-items: center; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acd-dlg-foot-pad); box-shadow: var(--tpl-acd-line-top); }
 
 html:root .stepCurrent { background: var(--color-selection-border); color: var(--color-canvas); }
 
@@ -547,3 +548,5 @@ html:root .panel[data-confirmation='compact'][data-design-layout='stacked'] > .f
   :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] { grid-template-columns: minmax(0, 1fr); }
   :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] .buttonPair { grid-column: 1; justify-self: stretch; }
 }
+
+.confirmReason { grid-column: 1 / -1; margin: 0; min-width: 0; text-align: center; color: var(--color-ink-secondary); font-size: var(--text-caption); overflow-wrap: anywhere; }

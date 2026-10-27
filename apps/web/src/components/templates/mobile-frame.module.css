@@ -1,0 +1,303 @@
+/*
+ * 電話の専用の画面（/m）の外枠。電話の画面の値（--phone-*）はこの型が持ち、外枠の中の画面と型だけが読む。PC の値は変えない。
+ * 押せる所は指で押すので 44 以上、行は 56 以上。入力欄は 16（16 未満だと iPhone が入力時に画面を拡大する）。
+ * 上の帯 52・下のタブ 56 に、端末の安全域を足す。
+ */
+.frame {
+  --phone-bar-h: 52px;
+  --phone-tab-h: 56px;
+  --phone-hit: 44px;
+  --phone-row-min-h: 56px;
+  --phone-gutter: 16px;
+  --phone-gap: 12px;
+  --phone-card-pad: 12px 16px;
+  --phone-card-gap: 8px;
+  --phone-title-text: var(--text-title);
+  --phone-section-text: var(--text-section);
+  --phone-body-text: 15px;
+  --phone-body-lh: 22px;
+  --phone-support-text: 13px;
+  --phone-support-lh: 18px;
+  --phone-note-text: 12px;
+  --phone-input-text: 16px;
+  --phone-tab-text: 12px;
+  --phone-tab-icon: 24px;
+  --phone-badge-h: 18px;
+  --phone-badge-pad: 0 5px;
+  --phone-unread-dot: 10px;
+  --phone-layer: 30;
+  --phone-safe-top: env(safe-area-inset-top, 0px);
+  --phone-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+  font-size: var(--phone-body-text);
+  line-height: var(--phone-body-lh);
+}
+
+/*
+ * 入力欄は 16。電話の外枠の中だけの値（PC の欄の文字は変えない）。共通部品の PC の文字の大きさより先にする。
+ */
+html:root .frame :is(input:not([type='checkbox']):not([type='radio']), textarea, select) {
+  font-size: var(--phone-input-text);
+}
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: var(--phone-layer);
+  padding-top: var(--phone-safe-top);
+  background: var(--color-canvas);
+  box-shadow: var(--bar-scrolled-line);
+}
+
+.barRow {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+  height: var(--phone-bar-h);
+  padding: 0 var(--phone-gutter);
+}
+
+.back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--phone-hit);
+  height: var(--phone-hit);
+  margin-left: calc(var(--phone-gap) * -1);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+}
+
+.back:focus-visible,
+.tab:focus-visible,
+.card:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--polish-focus-offset);
+}
+
+.backIcon {
+  width: var(--phone-tab-icon);
+  height: var(--phone-tab-icon);
+}
+
+.brand {
+  flex: none;
+  color: var(--color-accent-deep);
+  font-size: var(--phone-support-text);
+  font-weight: var(--font-weight-ui);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--phone-title-text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerEnd {
+  display: flex;
+  flex: none;
+  align-items: center;
+  max-width: 50%;
+  min-width: 0;
+}
+
+.band {
+  padding: 0 var(--phone-gutter) var(--polish-space-row);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--phone-gap) var(--phone-gutter);
+  outline: 0;
+}
+
+/* 下のタブ・返信欄の分だけ、本文の最後の行が隠れないように下を空ける。 */
+.frame[data-phone-tabs] .main {
+  padding-bottom: calc(var(--phone-tab-h) + var(--phone-safe-bottom) + var(--phone-gap));
+}
+
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--phone-layer);
+  padding: var(--polish-space-row) var(--phone-gutter) calc(var(--polish-space-row) + var(--phone-safe-bottom));
+  background: var(--color-canvas);
+  box-shadow: inset 0 1px 0 var(--color-hairline);
+}
+
+.tabs {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--phone-layer);
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  height: calc(var(--phone-tab-h) + var(--phone-safe-bottom));
+  padding-bottom: var(--phone-safe-bottom);
+  background: var(--color-canvas);
+  box-shadow: inset 0 1px 0 var(--color-hairline);
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-layout-zero);
+  min-width: var(--phone-hit);
+  min-height: var(--phone-tab-h);
+  color: var(--color-ink-secondary);
+  font-size: var(--phone-tab-text);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--phone-support-lh);
+  text-decoration: none;
+}
+
+.tab[aria-current='page'] {
+  color: var(--color-accent-deep);
+  font-weight: 600;
+  box-shadow: inset 0 2px 0 var(--color-accent-deep);
+}
+
+.tabIcon {
+  position: relative;
+  display: inline-flex;
+  width: var(--phone-tab-icon);
+  height: var(--phone-tab-icon);
+}
+
+.tabIcon svg {
+  width: var(--phone-tab-icon);
+  height: var(--phone-tab-icon);
+}
+
+.tabBadge {
+  position: absolute;
+  top: calc(var(--phone-badge-h) / -3);
+  left: calc(var(--phone-tab-icon) - var(--phone-badge-h) / 2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--phone-badge-h);
+  height: var(--phone-badge-h);
+  padding: var(--phone-badge-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-status-danger);
+  color: var(--color-canvas);
+  font-size: var(--phone-note-text);
+  font-variant-numeric: var(--font-numeric);
+  font-weight: 600;
+  line-height: var(--phone-badge-h);
+}
+
+.tabLabel {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+}
+
+.section + .section {
+  margin-top: var(--polish-space-section);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
+  min-height: var(--phone-hit);
+}
+
+.sectionTitle {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--phone-section-text);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionCount {
+  flex: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--phone-support-text);
+  font-variant-numeric: var(--font-numeric);
+  font-weight: var(--font-weight-ui);
+}
+
+.sectionAction {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--phone-card-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cardItem {
+  min-width: 0;
+}
+
+.card {
+  display: block;
+  min-height: var(--phone-row-min-h);
+  padding: var(--phone-card-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--card-shadow);
+  color: inherit;
+  text-decoration: none;
+}
+
+.tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+  margin-bottom: var(--phone-gap);
+}
+
+/* 一覧の上の探す欄と切り替えも指で押せる 44。共通部品の PC の高さより、電話の外枠の値を先にする。 */
+html:root .tools > :first-child {
+  height: var(--phone-hit);
+}
+
+html:root .tools [role='group'] button {
+  min-height: var(--phone-hit);
+}
+
+/* 外枠の中の押せる所は全部 44 以上（返信欄・添付のクリップなど共通部品の PC の小さい形も含む）。 */
+html:root .frame :is(button, a[href], [role='button']) {
+  min-width: var(--phone-hit);
+  min-height: var(--phone-hit);
+}
+
+html:root .frame textarea {
+  min-height: var(--phone-hit);
+}

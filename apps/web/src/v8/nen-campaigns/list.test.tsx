@@ -109,6 +109,8 @@ it('旧一覧のヘッダー操作を残し、閲覧のみでは隠す', async (
   const action = vi.fn()
   const props = baseProps({ tab: 'columns', topAction: <button onClick={action}>ECのコラムを取り込む</button> })
   await render(props)
+  // 画面の題（h1）は一覧の型が1つだけ持つ。本文の見出しを h1 で重ねない。
+  expect(host.querySelectorAll('h1')).toHaveLength(1)
   await act(async () => { button('ECのコラムを取り込む')!.click() })
   expect(action).toHaveBeenCalledTimes(1)
   role.value = 'viewer'

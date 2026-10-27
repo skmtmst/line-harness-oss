@@ -30,7 +30,7 @@ import { ExecuteConfirmDialog, MigrationItemDialog, RollbackConfirmDialog, runSt
 import { classLabel, decisionLabel, formatMappingBytes, ITEM_PAGE_SIZE, MIGRATION_STEPS, useUidMigration, type ItemClassification } from './use-uid-migration'
 import styles from './migrations.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
@@ -332,7 +332,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                           </button>
                         ) : run.rollbackable === true ? (
                           <span className={styles.small} title={rollbackBlockedReason ?? undefined}>ownerのみ</span>
-                        ) : <span className={styles.faint}>{emptyValue('unknown')}</span>}
+                        ) : <EmptyCell />}
                       </Td>
                     </Tr>
                   )

@@ -401,3 +401,6 @@ html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order'
 html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order']) :is(.body, .footer) {
   padding-block-start: var(--polish-window-divider-space);
 }
+
+/* 引き出しの主な操作は共通の中央の並びを使う。 */
+html:root .panel .footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-8); }

@@ -104,7 +104,7 @@ export default function Card({
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
       data-card-spacing-sides={contentPadding && hasSides(contentPadding) ? '' : undefined}
       style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding ?? '0px', '--card-content-gap': gapValue ?? '0px' } as CSSProperties : style} {...props}>
-      {actions ? <><div className={styles.information}>{children}</div><div className={styles.bottomActions}>{actions}</div></> : children}
+      {actions ? <><div className={styles.information}>{children}</div><div className={styles.bottomActions} data-card-actions>{actions}</div></> : children}
     </CardTag>
   )
 }

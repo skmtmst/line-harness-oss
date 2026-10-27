@@ -7,11 +7,10 @@ import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import PreviewLauncher from './preview-launcher'
 import styles from './page-templates.module.css'
 import { StepContent } from './steps'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export interface CreatePageProps extends PageHeadingProps {
   step?: number | null
-  readOnly?: boolean
+  readOnly?: boolean | 'hq'
   /** 本文の入力をネイティブfieldsetでまとめて無効にする。 */
   contentDisabled?: boolean
   contentLabel?: string
@@ -67,8 +66,7 @@ export function CreatePage({ step = null, readOnly, contentDisabled, contentLabe
   const dialogPreview = typeof preview === 'function' ? preview(true) : preview
   return <PageFrame kind="create" boardId={boardId} elementRef={elementRef} standalone={standalone} heightMode={heightMode ?? (footerActions ? 'viewport' : 'content')} hasFooter={!!footerActions}>
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
-    <PageHeading {...heading} actions={<>{heading.actions}{formActions.secondary.length ? <FormSecondaryActions buttons={formActions.secondary} /> : null}</>} />
-    {readOnly ? <div className={styles.createNotice} data-template-region="notice"><ReadOnlyNotice /></div> : null}
+    <PageHeading {...heading} readOnlyBand={readOnly || heading.readOnlyBand} actions={<>{heading.actions}{formActions.secondary.length ? <FormSecondaryActions buttons={formActions.secondary} /> : null}</>} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
     {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher label={previewLabel} title={previewTitle}>{dialogPreview}</PreviewLauncher>}</div> : null}

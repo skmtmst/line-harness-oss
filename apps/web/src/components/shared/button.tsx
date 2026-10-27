@@ -1,7 +1,7 @@
 
 import Link from '@/components/shared/list-navigation'
 import type { LinkProps } from 'next/link'
-import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
+import { Check, LoaderCircle, ArrowUpRight, LogIn, Settings, RotateCcw } from 'lucide-react'
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import styles from './button.module.css'
 import { normalizeActionLabel, normalizeActionNode } from './action-words'
@@ -33,6 +33,10 @@ type CommonProps = {
   textTone?: 'action' | 'ink' | 'danger' | 'accent' | 'quiet'
   /** よく使う絞り込みが適用中の印。開閉状態は aria-expanded で別に伝える。 */
   filterActive?: boolean
+  /** 選んでいる絞り込み条件の数。0件は表示しない。 */
+  count?: number
+  /** 権限で使えない理由。Tab・吹き出しを保ち、送信と移動を止める専用の口。 */
+  lockedReason?: string | null
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
   presentation?: 'account-inline' | 'registration-inline' | 'restaurant' | 'row-action'
   className?: string
@@ -48,8 +52,6 @@ type NativeButtonProps = CommonProps &
     href?: never
     /** 既存の無効条件に対応する理由。押せる状態では表示しない。 */
     disabledReason?: string | null
-    /** 入力で直せる理由はボタンの下に1行、権限の理由は吹き出しに表示する。 */
-    disabledReasonPlacement?: 'inline' | 'tooltip'
     /** 開いた直後に標的を寄せたいときだけ渡す（未保存の離脱確認の主ボタン）。 */
     ref?: React.Ref<HTMLButtonElement>
     /**
@@ -112,9 +114,10 @@ function hasButtonText(children: ReactNode): boolean {
     return hasButtonText(child.props.children)
   })
 }
-function iconButtonLabel(props: {children:ReactNode;title?:string;actionWording?:boolean;'aria-label'?:string;'aria-labelledby'?:string}) {
+function iconButtonLabel(props: {children:ReactNode;title?:string;actionWording?:boolean;count?:number;'aria-label'?:string;'aria-labelledby'?:string}) {
   const label = props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
-  return props.actionWording && typeof label === 'string' ? normalizeActionLabel(label) : label
+  const normalized = props.actionWording && typeof label === 'string' ? normalizeActionLabel(label) : label
+  return normalized && props.count !== undefined && Number.isFinite(props.count) && props.count > 0 ? `${normalized} ${props.count}件の条件` : normalized
 }
 
 /** 字の色の指定を束ねの名前へ。`action`（既定）は何も足さない。 */
@@ -131,12 +134,19 @@ export default function Button(props: ButtonProps) {
   const tone = props.textTone && props.textTone !== 'action' ? styles[TEXT_TONE[props.textTone]] : null
   const classes = [styles.button, styles[variant], styles[size], tone, props.filterActive && styles.filterActive, props.className].filter(Boolean).join(' ')
 
+  if (props.lockedReason && 'href' in props && props.href !== undefined) {
+    // 移動先をDOMに残さず、通常のリンクと同じ属性・文字を持つ焦点可能なボタンへ。
+    const { href: _href, external: _external, target: _target, rel: _rel, download: _download, onClick: _onClick, ...locked } = props
+    return <NativeButton {...(locked as NativeButtonProps)} classes={classes} />
+  }
+
   if ('href' in props && props.href !== undefined) {
-    const { children, icon, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, filterActive: _filterActive, ...linkProps } = props
+    const { children, icon, count, lockedReason: _lockedReason, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, filterActive: _filterActive, ...linkProps } = props
     const newTab = external || linkProps.target === '_blank'
     return (
       <Link href={href} className={classes} data-shared-button="" data-variant={variant} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} data-text-content={hasButtonText(children) || undefined} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {icon}{props.actionWording ? normalizeActionNode(children) : children}
+        <ConditionCount count={count} />
         {newTab ? <ArrowUpRight size={16} aria-hidden="true" data-external-icon /> : null}
       </Link>
     )
@@ -149,6 +159,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const {
     children: rawChildren,
     icon,
+    count,
     actionWording: _actionWording,
     classes,
     className: _className,
@@ -168,7 +179,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     widthReserve = 'states',
     disabled,
     disabledReason,
-    disabledReasonPlacement = 'tooltip',
+    lockedReason,
     onPointerEnter: onPointerEnterProp,
     onPointerLeave: onPointerLeaveProp,
     onPointerDown: onPointerDownProp,
@@ -180,9 +191,11 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     ...buttonProps
   } = props
   const children = props.actionWording ? normalizeActionNode(rawChildren) : rawChildren
-  const permissionLocked = Boolean(disabled && disabledReason && disabledReasonPlacement === 'tooltip')
+  const permissionLocked = Boolean(lockedReason)
+  const ariaLocked = buttonProps['aria-disabled'] === true || buttonProps['aria-disabled'] === 'true'
   const reasonId = useId()
   const tipId = useId()
+  const focusFrame = useRef(0)
   const [tip, setTip] = useState<{ left: number; top: number; below: boolean } | null>(null)
   const showReason = useCallback(() => {
     const element = elementRef.current
@@ -196,9 +209,10 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     setTip({ left: Math.max(edge, Math.min(rect.left, window.innerWidth - width - edge)), top: below ? rect.bottom + gap : rect.top - gap, below })
   }, [])
   const hideReason = useCallback(() => setTip(null), [])
+  useEffect(() => () => cancelAnimationFrame(focusFrame.current), [])
   useEffect(() => {
     if (!tip) return
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') hideReason() }
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { cancelAnimationFrame(focusFrame.current); hideReason() } }
     document.addEventListener('keydown', key)
     window.addEventListener('scroll', hideReason, true)
     window.addEventListener('resize', hideReason)
@@ -295,7 +309,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   }
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (permissionLocked) { event.preventDefault(); event.stopPropagation(); return }
+    if (permissionLocked || ariaLocked) { event.preventDefault(); event.stopPropagation(); return }
     if (busyNow || disabled || automaticLock.current) return
     // Reactがbusyを描き直す前と、onClick内からの再入も共通の門で止める。
     automaticLock.current = true
@@ -330,14 +344,14 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined}
       data-presentation={presentation}
       ref={setRefs}
-      disabled={Boolean(disabled && !permissionLocked) || busyNow}
+      disabled={!permissionLocked && (Boolean(disabled) || busyNow)}
       aria-busy={busyNow ? true : undefined}
       {...buttonProps}
-      aria-disabled={permissionLocked || buttonProps['aria-disabled'] ? true : undefined}
+      aria-disabled={permissionLocked || ariaLocked ? true : undefined}
       aria-describedby={[buttonProps['aria-describedby'], permissionLocked ? reasonId : null].filter(Boolean).join(' ') || undefined}
       data-text-content={hasButtonText(busyNow ? busyLabel : shownDone ? doneLabel : children) || undefined}
       data-permission-locked={permissionLocked ? '' : undefined}
-      title={disabled && disabledReason && !permissionLocked ? disabledReason : buttonProps.title}
+      title={buttonProps.title}
       aria-description={permissionLocked ? undefined : disabled && disabledReason ? disabledReason : buttonProps['aria-description']}
       aria-label={iconButtonLabel(props)}
       onPointerEnter={(event) => { onPointerEnterProp?.(event); if (permissionLocked && event.pointerType !== 'touch') showReason() }}
@@ -345,12 +359,20 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
         onPointerLeaveProp?.(event)
         if (permissionLocked && event.pointerType !== 'touch' && document.activeElement !== event.currentTarget) hideReason()
       }}
-      onPointerDown={(event) => { onPointerDownProp?.(event); if (permissionLocked && event.pointerType === 'touch') showReason() }}
-      onFocus={(event) => { onFocusProp?.(event); if (permissionLocked) showReason() }}
-      onBlur={(event) => { onBlurProp?.(event); if (permissionLocked) hideReason() }}
+      onPointerDown={(event) => { if (permissionLocked) { if (event.pointerType === 'touch') showReason() } else if (!ariaLocked) onPointerDownProp?.(event) }}
+      onFocus={(event) => {
+        onFocusProp?.(event)
+        if (permissionLocked) {
+          showReason()
+          // Tabの自動スクロールが終わった位置で描き直す。最初のscrollで理由を消したままにしない。
+          cancelAnimationFrame(focusFrame.current)
+          focusFrame.current = requestAnimationFrame(() => { if (document.activeElement === elementRef.current) showReason() })
+        }
+      }}
+      onBlur={(event) => { onBlurProp?.(event); cancelAnimationFrame(focusFrame.current); if (permissionLocked) hideReason() }}
       onKeyDown={(event) => {
+        if ((permissionLocked || ariaLocked) && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); event.stopPropagation(); return }
         onKeyDownProp?.(event)
-        if (permissionLocked && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); event.stopPropagation() }
       }}
       onClick={handleClick}
     >
@@ -358,9 +380,28 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       {shownDone ? <Check size={16} aria-hidden="true" /> : null}
       {!busyNow && !shownDone ? icon : null}
       {busyNow ? busyLabel : shownDone ? doneLabel : children}
+      <ConditionCount count={count} />
     </button>
-    {permissionLocked ? <><span id={reasonId} hidden>{disabledReason}</span>{tip ? <TooltipBubble id={tipId} text={disabledReason!} left={tip.left} top={tip.top} below={tip.below} /> : null}</> : null}
-    {disabled && !busyNow && disabledReason && disabledReasonPlacement === 'inline' ? <span className={styles.disabledReason} role="status">{disabledReason}</span> : null}
+    {permissionLocked ? <><span id={reasonId} hidden>{lockedReason}</span>{tip ? <TooltipBubble id={tipId} text={lockedReason!} left={tip.left} top={tip.top} below={tip.below} /> : null}</> : null}
+    {disabled && !buttonProps.hidden && !permissionLocked && !busyNow && disabledReason ? <span className={styles.disabledReason} role="status">{disabledReason}</span> : null}
     {automaticError ? <span role="alert" data-button-error>{automaticError}</span> : null}
   </>)
+}
+
+function ConditionCount({ count }: { count?: number }) {
+  return count !== undefined && Number.isFinite(count) && count > 0
+    ? <span className={styles.conditionCount} aria-label={`${count}件の条件`}>{count}</span> : null
+}
+
+/** アカウント操作の文字と印は、この対応表だけで決める。 */
+const ACCOUNT_ACTIONS = {
+  enter: { label: '入る', icon: LogIn },
+  detail: { label: '詳細', icon: null },
+  settings: { label: '設定', icon: Settings },
+  restore: { label: '戻す', icon: RotateCcw },
+} as const
+
+export function AccountActionButton({ action, ...props }: Omit<NativeButtonProps, 'children' | 'icon'> & { action: keyof typeof ACCOUNT_ACTIONS }) {
+  const { label, icon: Icon } = ACCOUNT_ACTIONS[action]
+  return <Button {...props} icon={Icon ? <Icon aria-hidden="true" /> : undefined}>{label}</Button>
 }

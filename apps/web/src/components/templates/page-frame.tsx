@@ -1,4 +1,5 @@
-import type { CSSProperties, ReactNode, Ref } from 'react'
+import type { ComponentProps, CSSProperties, ReactNode, Ref } from 'react'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import HelpTip from '@/components/shared/help-tip'
 import ScreenExplanation from '@/components/shared/screen-explanation'
 import styles from './page-templates.module.css'
@@ -6,6 +7,9 @@ import PageHeadingActions from './page-heading-actions'
 export { PageFooter } from './page-footer'
 
 export interface PageHeadingProps {
+  readOnlyBand?: boolean | 'hq'
+  /** 上の権限帯と押せない操作で同じ理由を使う。 */
+  readOnlyNeed?: ComponentProps<typeof ReadOnlyNotice>['need']
   title: ReactNode
   subtitle?:ReactNode
   /** 認証画面では h1。管理画面内では外側の h1 に続く h2。 */
@@ -71,7 +75,7 @@ export function PageTitle({ children, as: Tag = 'h1', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, readOnlyBand, readOnlyNeed, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   /*
    * 絵の値を渡された分だけ、この頭の中だけに効く変数で下へ流す。`.heading`・`.title` は
@@ -90,6 +94,7 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', title
     <div className={styles.headingText}>
       <ScreenExplanation titleClassName={styles.titleRow} panelClassName={styles.description} screenKey={explanationKey} title={<><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}{help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}{explanationToggle}</>}>{explanation}</ScreenExplanation>
       {subtitle?<p className={styles.subtitle}>{subtitle}</p>:null}
+      {readOnlyBand ? <div className={styles.headingNotice} data-template-region="notice"><ReadOnlyNotice scope={readOnlyBand === 'hq' ? 'hq' : 'store'} need={readOnlyNeed} /></div> : null}
       {tabs ? <div className={styles.headingTabs} data-template-region="heading-tabs">{tabs}</div> : null}
     </div>
     {crumbs ? <div className={styles.crumbs} data-template-region="crumbs">{crumbs}</div> : null}

@@ -178,46 +178,6 @@
   white-space: nowrap;
 }
 
-.dot {
-  width: var(--tpl-fm-dot);
-  height: var(--tpl-fm-dot);
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-
-/* 状態の札（公開中・下書き）。点＋太字。 */
-.statusPill,
-.pendingBadge,
-.reviewBadge {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--tpl-fm-pill-gap);
-  padding: var(--tpl-fm-badge-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-fm-badge-lh);
-  white-space: nowrap;
-}
-
-.statusPill[data-tone='live'] {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.pendingBadge {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
-.reviewBadge {
-  background: var(--color-status-warn-soft);
-}
-
 .answerCell {
   white-space: nowrap;
 }

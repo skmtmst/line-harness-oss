@@ -4,7 +4,7 @@
  * つまみを出さず理由を言う（一部の行だけで番号を振り直さない）。
  */
 import React from 'react'
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
 const scenario = (id: string, name: string, folderId: string | null) => ({
@@ -156,5 +156,18 @@ describe('V8 シナリオ一覧のフォルダの丸', () => {
     const unfiledRow = view.getByText('会員更新リマインド').closest('tr') as HTMLElement
     expect(unfiledRow.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
     expect(unfiledRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
+  })
+})
+
+describe('V8 シナリオ一覧の読み終えた割合', () => {
+  test('読み終えた ÷ 購読中 を細い棒と「2 / 10 人」の1行で出す', async () => {
+    const view = render(<ScenariosListV8 />)
+    const row = (await view.findByText('新規登録7日間フォロー')).closest('tr') as HTMLElement
+    const bar = within(row).getByRole('progressbar', { name: '新規登録7日間フォローの読み終えた割合' })
+    expect(bar.getAttribute('aria-valuenow')).toBe('2')
+    expect(bar.getAttribute('aria-valuemax')).toBe('10')
+    expect(row.textContent).toContain('2 / 10 人')
+    expect(row.textContent).not.toContain('読み終えた 2 人')
+    expect(view.getByRole('columnheader', { name: '読み終えた / 購読中' })).not.toBeNull()
   })
 })
