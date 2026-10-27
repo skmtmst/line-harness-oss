@@ -69,7 +69,6 @@ import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/dupl
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 
-import { ProgressBar } from '@/components/shared/progress'
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors';
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
