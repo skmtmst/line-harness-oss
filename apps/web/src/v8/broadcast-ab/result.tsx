@@ -1,6 +1,5 @@
 'use client'
 
-import KpiBand from '@/components/shared/kpi-band'
 import Card from '@/components/shared/card'
 import KpiCard from '@/components/shared/kpi-card'
 
@@ -65,16 +64,16 @@ const count = (value: number | null, unit: string) => (value === null ? '—（�
 
 function Variant({ variant, winner, metric }: { variant: AbVariantResult; winner: boolean; metric: AbResult['metric'] }) {
   return (
-    <Card as="article" className={styles.variant} padding="default" gap="var(--polish-space-field)">
+    <Card as="article" surface="muted" className={styles.variant} padding="default" gap="var(--polish-space-field)">
       <div className={styles.variantHead}>
         <span className={styles.variantTitle} title={variant.label ?? undefined}>{`${variant.key} 案${variant.label ? `：${variant.label}` : ''}`}</span>
         {winner ? <StatusBadge tone="success" dot>勝ち</StatusBadge> : null}
       </div>
-      <KpiBand maxColumns={2}>
-        <KpiCard detail="" presentation="band" title="送った" value={variant.sent} unit="人" />
-        <KpiCard detail="" presentation="band" title="クリック率" valueText={pct(variant.clickRate)} value={null} unit="" />
-        <KpiCard detail="" presentation="band" title={metric === 'purchase' ? '購入' : '予約'} valueText={metric === 'purchase' ? count(variant.purchases, '件') : count(variant.bookings, '件')} value={null} unit="" />
-      </KpiBand>
+      <div className={styles.settingsGrid}>
+        <KpiCard detail="" presentation="inline" title="送った" value={variant.sent} unit="人" />
+        <KpiCard detail="" presentation="inline" title="クリック率" valueText={pct(variant.clickRate)} value={null} unit="" />
+        <KpiCard detail="" presentation="inline" title={metric === 'purchase' ? '購入' : '予約'} valueText={metric === 'purchase' ? count(variant.purchases, '件') : count(variant.bookings, '件')} value={null} unit="" />
+      </div>
     </Card>
   )
 }
