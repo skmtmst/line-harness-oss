@@ -635,12 +635,6 @@
   .switchChevron { transition: rotate var(--motion-switch-glide) var(--motion-ease-out); }
 }
 
-/*
- * 下に流した時だけ、帯を白の 72%＋すりガラス＋下端の薄い線にする。
- * 一番上にいる時は今のまま（透明）。値は globals.css の共通の値。
- */
-html:root .root[data-scrolled] { background: var(--bar-scrolled-bg); -webkit-backdrop-filter: var(--bar-scrolled-filter); backdrop-filter: var(--bar-scrolled-filter); box-shadow: var(--bar-scrolled-line); }
-
 /* パンくずのリンクと左メニューを畳むボタンの押せる範囲（§6.5 の 7）。見た目は変えず、透明な当たりで広げる（パンくずは高さ 24、畳むボタンは 36 角）。 */
 .crumbHome, .crumbFromLink { position: relative; }
 .crumbHome::before, .crumbFromLink::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }
