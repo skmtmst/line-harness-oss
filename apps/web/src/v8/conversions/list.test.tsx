@@ -327,7 +327,7 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByRole('button', { name: /フォルダを追加/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'フォルダ「通販」の操作' })).toBeTruthy()
     expect(host.querySelector('tr[data-row-id="cp-1"] [aria-label="フォルダ：通販"]')).not.toBeNull()
-    expect(host.querySelector('tr[data-row-id="cp-6"] [data-folder-dot]')).toBeNull()
+    expect(host.querySelector('tr[data-row-id="cp-6"] [data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
     fireEvent.click(folderNav.querySelector('button[title="通販"]')!)
     await flush()
     expect(screen.getByText('商品を買った')).toBeTruthy()

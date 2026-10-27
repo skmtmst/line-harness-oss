@@ -62,6 +62,9 @@
 :global(:root) .stats [data-kpi-strip]:last-child { margin-bottom: 0; }
 :global(:root) .stats:has([data-kpi-strip]) + .split > .main > .toolbar:first-child { padding-top: var(--space-16); padding-bottom: var(--space-16); }
 :global(:root) .frame > [data-kpi-strip] + * { margin-top: var(--space-12); }
+/* 板の直下・一覧の本文に直に置いた数の帯も、型の stats と同じ左右の内側の余白に収める（題・道具の行と端をそろえる）。 */
+:global(:root) .frame > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); }
+:global(:root) .listBody:not([data-table-inset]) .content > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .listCards { display: grid; grid-template-columns: repeat(var(--tpl-list-card-columns), minmax(0, 1fr)); gap: var(--polish-space-card); padding-inline: var(--tpl-list-inset); align-items: start; }
 :global(:root) .listCards[data-card-inset='parent'] { padding-inline: 0; }
@@ -105,6 +108,7 @@
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardCell { grid-column: 1 / -2; }
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: -2 / -1; width: auto; }
 :global(:root) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
+:global(:root) .bodyEndActions { display: flex; flex: none; align-items: center; justify-content: center; gap: var(--polish-space-field); width: 100%; padding-block: var(--polish-space-section); }
 :global(:root) .preview { align-self: flex-start; position: sticky; top: 0; max-height: 100%; width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 /* 作成の右欄は白い板と同じ面。端末の中の地は見え方の部品が持つ。 */
 :global(:root) .frame[data-page-template='create'] [data-template-region='preview'] { background: var(--color-canvas); }
@@ -214,6 +218,19 @@
 :global(:root) .dashboardAsideSection { display: flex; flex-direction: column; gap: var(--polish-space-field); padding: var(--polish-space-card) var(--polish-space-section); }
 :global(:root) .dashboardAsideSection + .dashboardAsideSection { border-top: 1px solid var(--color-hairline); }
 :global(:root) .dashboardRow[data-row='trend'] .dashboardAsideSection:last-child { padding-bottom: 0; }
+/* grouping="cards" は段の中身と右欄の項目を共通カードに分ける。板が狭い時も本文カードを横幅いっぱいに保つ。 */
+:global(:root) .dashboardRow[data-grouping='cards'] { gap: var(--polish-space-field); margin: 0 var(--tpl-list-inset) var(--polish-space-field); border-bottom: 0; }
+:global(:root) .dashboardRow[data-grouping='cards'] > .dashboardAside { border-left: 0; padding: 0; display: flex; flex-direction: column; gap: var(--polish-space-field); }
+:global(:root) .dashboardRow[data-grouping='cards'] > .dashboardAside > * { gap: var(--polish-space-field); }
+:global(:root) .dashboardRow[data-grouping='cards'] .dashboardAsideSection + .dashboardAsideSection { border-top: 0; }
+:global(:root) .dashboardRow[data-grouping='cards'][data-row='trend'] .dashboardAsideSection:last-child { padding-bottom: var(--polish-space-card); }
+:global(:root) .dashboardColumns[data-grouping='cards'] { column-gap: var(--polish-space-field); }
+:global(:root) .dashboardRow[data-grouping='cards'] .dashboardCell + .dashboardCell { border-left: 0; }
+:global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] { min-height: 0; }
+@container v8-page (width >= 1100px) {
+  :global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] { align-items: flex-start; }
+  :global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] > .dashboardCell { align-self: flex-start; }
+}
 
 /* 入力側と各段は中身の高さを保つ。 */
 :global(:root) [data-page-template='create'] > .heading .headingText { flex: 1 1 auto; }
@@ -358,7 +375,7 @@
 .detailColumns[data-presentation='card'] .detailColumnAside { padding-left: 0; border-left: 0; }
 .detailColumns[data-detail-columns='restaurant-ledger'] { grid-template-columns: minmax(0, 1fr) var(--tpl-board-detail-w); gap: var(--polish-space-card); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-tables'] { gap: var(--tpl-rs-body-gap); margin-right: 0; }
-.detailColumns[data-detail-columns='restaurant-inventory'] { grid-template-columns: minmax(0, 1fr) var(--tpl-rs-inv-side-w); }
+.detailColumns[data-detail-columns='restaurant-inventory'] { grid-template-columns: minmax(0, 1fr) var(--tpl-rs-inv-side-w); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-ledger'] { grid-template-columns: minmax(0, 1fr) var(--tpl-board-detail-w); gap: var(--polish-space-card); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-tables'] { grid-template-columns: minmax(0, 1fr) var(--tpl-floor-aside-w); }
 /* 枠を持つ詳細カードの高さは内容で決め、図面の高さへ引き伸ばさない。 */
@@ -582,3 +599,5 @@
 @container v8-page (width < 1100px) {
  :global(:root) .dashboardRow[data-aside-size='column'] { display: flex; }
 }
+
+.heading [data-page-heading-actions] { display: inline-flex; align-items: center; gap: var(--polish-space-row); }

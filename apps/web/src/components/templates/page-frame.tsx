@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode, Ref } from 'react'
 import HelpTip from '@/components/shared/help-tip'
 import ScreenExplanation from '@/components/shared/screen-explanation'
 import styles from './page-templates.module.css'
+import PageHeadingActions from './page-heading-actions'
 export { PageFooter } from './page-footer'
 
 export interface PageHeadingProps {
@@ -93,15 +94,15 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', title
     </div>
     {crumbs ? <div className={styles.crumbs} data-template-region="crumbs">{crumbs}</div> : null}
     {steps ? <div className={styles.steps} data-template-region="steps">{steps}</div> : null}
-    {actions ? <div className={styles.actions}>{actions}</div> : null}
+    {actions ? <div className={styles.actions}><PageHeadingActions>{actions}</PageHeadingActions></div> : null}
   </header>
 }
 
-export function PageFrame({ kind, children, boardId, layout, heightMode, standalone = false, hasFooter = false, skeleton = false, elementRef }: {
-  kind: string; children: ReactNode; boardId?: string; layout?: string; heightMode?: 'viewport' | 'content'; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean; elementRef?: Ref<HTMLDivElement>
+export function PageFrame({ kind, children, boardId, layout, heightMode, standalone = false, hasFooter = false, skeleton = false, elementRef, createPlacement }: {
+  kind: string; children: ReactNode; boardId?: string; layout?: string; heightMode?: 'viewport' | 'content'; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean; elementRef?: Ref<HTMLDivElement>; createPlacement?: 'heading'
 }) {
   const resolvedHeight = heightMode ?? (kind === 'list' && !standalone ? 'content' : undefined)
-  return <div ref={elementRef} className={styles.frame} data-frame-height={resolvedHeight} data-height-mode={resolvedHeight} data-list-skeleton={skeleton || kind === 'list' ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
+  return <div ref={elementRef} className={styles.frame} data-frame-height={resolvedHeight} data-height-mode={resolvedHeight} data-list-skeleton={skeleton || kind === 'list' ? 'templates' : undefined} data-page-template={kind} data-list-create-placement={createPlacement} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
 }
 
 /** 内容で終わる板の本文。下の24はPageFrameが持ち、本文と二重にしない。 */

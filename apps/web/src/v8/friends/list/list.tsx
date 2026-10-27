@@ -657,7 +657,7 @@ export default function FriendsListV8() {
 
   const headActions = (
     <>
-      <Button type="button" variant="secondary" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}>
+      <Button type="button" variant="text" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}>
         <Download size={16} aria-hidden="true" />
         表示中をCSVで書き出す
       </Button>

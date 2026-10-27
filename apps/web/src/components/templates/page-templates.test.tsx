@@ -7,6 +7,12 @@ import { PageFrame } from './page-frame'
 
 afterEach(cleanup)
 describe('V8 の型へ渡す操作', () => {
+  it('CreatePage の本文末尾に中央配置用の操作口を置く', () => {
+    const { container } = render(<CreatePage title="作成" footerActions={null} bodyEndActions={<button>下書きとして保存</button>}>本文</CreatePage>)
+    const actions = container.querySelector('[data-template-region="body-end-actions"]')
+    expect(actions?.textContent).toContain('下書きとして保存')
+    expect(actions?.parentElement?.getAttribute('data-template-region')).toBe('content')
+  })
   it('作成型は下帯があると画面高さ、無いと内容高さ、明示指定を優先する', () => {
     const { container, rerender } = render(<CreatePage title="作成" footerActions={<button>次へ</button>}>短い内容</CreatePage>)
     const frame = () => container.querySelector('[data-page-template="create"]')!

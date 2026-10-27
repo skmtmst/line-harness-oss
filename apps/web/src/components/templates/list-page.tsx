@@ -77,6 +77,8 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   boardId?: string
   layout?: 'event-list'
   standalone?: boolean
+  /** 明示された画面では、フォルダ機能を保ったまま主操作を題の右へ置く。 */
+  createPlacement?: 'heading'
   tabs?: ReactNode
 }
 
@@ -124,12 +126,12 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = '�
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
-export function ListPage({ boardId, layout, heightMode, standalone, tabs, title, help, explanation, explanationKey, titleAccessory, explanationToggle, identity, actions, crumbs, subtitle, steps, headingSize, bottomSpacing, ...body }: ListPageProps) {
+export function ListPage({ boardId, layout, heightMode, standalone, createPlacement, tabs, title, help, explanation, explanationKey, titleAccessory, explanationToggle, identity, actions, crumbs, subtitle, steps, headingSize, bottomSpacing, ...body }: ListPageProps) {
   const navs = listFolderNavs(body.folderNav)
-  const headingCreates = !hasListFolders(body) ? navs.filter(nav => nav.createAction) : []
+  const headingCreates = createPlacement === 'heading' || !hasListFolders(body) ? navs.filter(nav => nav.createAction) : []
   const resolvedBody = headingCreates.length ? { ...body, collapsedFolders: undefined, folderNav: navs.map(nav => ({ ...nav, createAction: undefined })) } : body
-  const headingActions = headingCreates.length ? <>{headingCreates.map((nav,index) => <span key={index} data-list-heading-create>{nav.createAction}</span>)}{actions}</> : actions
-  const page = <PageFrame kind="list" boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone} skeleton={body.skeleton}>
+  const headingActions = headingCreates.length ? <>{headingCreates.map((nav,index) => <span key={index} data-list-heading-create data-create-placement={createPlacement}>{nav.createAction}</span>)}{actions}</> : actions
+  const page = <PageFrame kind="list" createPlacement={createPlacement} boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone} skeleton={body.skeleton}>
     <PageHeading {...{ title, help, titleAccessory, explanationToggle: explanationToggle !== undefined ? explanationToggle : explanation ? <PageExplanationToggle /> : undefined, identity, actions: headingActions, crumbs, subtitle, steps, headingSize, bottomSpacing }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...resolvedBody} explanation={explanation} />

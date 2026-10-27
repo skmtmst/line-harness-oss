@@ -3,6 +3,7 @@
 import BulkBar from '@/components/shared/bulk-bar'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import Card, { CardActionRow } from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field,FieldError } from '@/components/shared/form-controls'
@@ -214,7 +215,7 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
   const ownerLine = `${owner ? `${owner}さん` : '名前未取得'}${text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}`
   const received = Date.parse(text(photo.created_at))
   return (
-    <li className={styles.cardItem}><article aria-label={`${name}の投稿写真`} className={`${adopted ? styles.cardAdopted : styles.card}${selected ? ` ${styles.cardSelected}` : ''}`}>
+    <li className={styles.cardItem}><Card as="article" layout="vertical" padding="default" gap="normal" selected={selected} aria-label={`${name}の投稿写真`}>
       <div className={styles.cardPhoto}>
         {imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element -- お客様が投稿した写真
@@ -253,10 +254,10 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
       ) : null}
       {status === 'pending' ? (
         props.canEdit ? (
-          <div className={styles.cardActions}>
+          <CardActionRow>
             <Button variant="secondary" disabled={busy} aria-label={`${name}の写真を見送る`} onClick={() => props.onReject(photoId)}><X size={16} aria-hidden="true" />見送る</Button>
-            <Button variant="secondary" disabled={busy} aria-label={`${name}の写真を採用する`} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中…"><Check size={16} aria-hidden="true" />採用する</Button>
-          </div>
+            <Button variant="primary" disabled={busy} aria-label={`${name}の写真を採用する`} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中…"><Check size={16} aria-hidden="true" />採用する</Button>
+          </CardActionRow>
         ) : (
           /* 閲覧のみには押せないボタンを置かない。場所だけ空けて、並びをそろえる。 */
           <span className={styles.cardActionSpace} aria-hidden="true" />
@@ -281,7 +282,7 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
           <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中…"><Send size={16} aria-hidden="true" />LINE通知を再送</Button>
         </div>
       ) : null}
-    </article></li>
+    </Card></li>
   )
 }
 

@@ -6,6 +6,7 @@ import { bookingPhotosApi } from '@/lib/api-booking-photos'
 import { api } from '@/lib/api'
 import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
+import { CardActionRow } from '@/components/shared/card'
 import Card, { CardContent } from '@/components/shared/card'
 import ListState, { ListEmptyMessage } from '@/components/shared/list-state'
 import MediaThumbnail from '@/components/shared/media-thumbnail'
@@ -41,7 +42,7 @@ function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, 
       {editable ? <SaveErrorField names={[fieldKey]}><div className={orderActions ? styles.storeActions : styles.actions} role="group" aria-label={`${name}の写真を選ぶ操作`}>
         <Button onClick={onPick} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を選ぶ`}>{photo ? '替える' : '写真を選ぶ'}</Button>
         {photo || orderActions ? <Button onClick={onRemove} disabled={busy || !photo} disabledReason={disabledReason ?? (!photo ? '写真はありません。' : undefined)} aria-label={`${name}の写真を外す`}>外す</Button> : null}
-        {orderActions}
+        {orderActions ? <CardActionRow>{orderActions}</CardActionRow> : null}
         {onSave && changed ? <Button variant="primary" onClick={onSave} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を保存する`}>保存する</Button> : null}
       </div></SaveErrorField> : null}
     </CardContent>
