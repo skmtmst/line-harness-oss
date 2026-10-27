@@ -458,7 +458,7 @@ export default function HqStoreList(props: HqStoreListProps) {
           <TableHeadRow>
             {type === 'rich_menu' ? <Th className={storeStyles.headCell}>順</Th> : null}
             {type === 'template' ? <Th className={storeStyles.headCell}><Checkbox aria-label="表示中のテンプレートをすべて選ぶ" checked={shown.length > 0 && shown.every((row) => selectedIds.includes(row.id))} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...new Set([...current, ...shown.map((row) => row.id)])] : current.filter((id) => !shown.some((row) => row.id === id)))} /></Th> : null}
-            <Th className={storeStyles.headCell}>{words.column}</Th>
+            <Th className={storeStyles.headCell}>{ordered.length > 0 && ordered.every(row => row.content_summary) ? words.column : words.column.replace(/（[^）]+）/, '')}</Th>
             {columns.map((column) => <Th key={column.key} className={storeStyles.headCell}>{column.head}</Th>)}
             <Th aria-label="操作" />
           </TableHeadRow>
@@ -486,7 +486,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                         <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
                       ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
                     </div>
-                  )} folder={folder ? { name: folder.name, color: folder.color } : null}
+                  )} description={sub} folder={folder ? { name: folder.name, color: folder.color } : null}
                 />}
                 {columns.map((column) => column.cell(row))}
                 <Td className={storeStyles.menuCell}>

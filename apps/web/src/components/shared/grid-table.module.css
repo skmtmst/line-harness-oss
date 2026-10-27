@@ -16,7 +16,7 @@
 }
 .row {
   display: grid;
-  grid-template-columns: var(--grid-table-columns);
+  grid-template-columns: var(--grid-table-content-columns, var(--grid-table-columns));
   align-items: center;
   column-gap: var(--grid-table-gap);
   min-width: 0;
@@ -109,7 +109,7 @@ html:root .table:is([data-table-presentation='dashboard'], [data-table-presentat
 }
 html:root .table[data-table-presentation='dashboard'] .row[data-selected] { background: var(--polish-selection-bg); }
 /* 分析の列幅は見出しと全行の内容から一度だけ決める。 */
-html:root .table[data-table-presentation='metrics'] { display: grid; grid-template-columns: var(--grid-table-columns); }
+html:root .table[data-table-presentation='metrics'] { display: grid; grid-template-columns: var(--grid-table-content-columns, var(--grid-table-columns)); }
 html:root .table[data-table-presentation='metrics'] .row { display: contents; }
 html:root .table[data-table-presentation='metrics'] .row > * {
   min-height: var(--grid-table-row-height); border-block-end: 1px solid var(--color-hairline);

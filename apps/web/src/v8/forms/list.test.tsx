@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
 import FormsListV8 from './list'
+import { formQuestionCount, type Form } from './model'
+import { fieldsToLayout } from '@line-crm/shared'
 
 ;
 // @vitest-environment happy-dom
@@ -356,4 +358,11 @@ it('一覧フロー：余白・Enter・Spaceでフォームのパネル、名前
   expect(new URLSearchParams(window.location.search).has('form')).toBe(false)
   await act(async () => { fireEvent.keyDown(row, { key: ' ' }) })
   expect(new URLSearchParams(window.location.search).get('form')).toBe('f-1')
+})
+
+it('質問数は配置の入力欄を数え、見出し・説明を数えず、互換fieldsの欠落でも落とさない', () => {
+  const fields = [{ name: 'answer', label: '回答', type: 'text' }, { name: 'title', label: '題', type: 'heading' }]
+  const layout = fieldsToLayout(fields)
+  expect(formQuestionCount({ fields: [], layout })).toBe(1)
+  expect(formQuestionCount({ fields, layout: undefined } as unknown as Form)).toBe(1)
 })

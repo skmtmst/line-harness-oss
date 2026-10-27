@@ -71,3 +71,58 @@ test('late calendar data refreshes flex column widths and keeps every row aligne
     }
   } finally { await browser.close() }
 })
+
+test('内容幅の表は長い名前の列を縮めても日付・数値・リンクの読み取り幅を守る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1024, height: 900 } })
+    await page.setContent('<style>*{box-sizing:border-box}main{width:500px}table{width:100%;table-layout:fixed;border-collapse:collapse}th,td{padding:0 8px;font:14px Arial}span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style><main><div class="frame" data-column-sizing="content"><table><thead><tr><th>日時</th><th>件数</th><th data-cell-grow>担当者</th><th>操作</th></tr></thead><tbody><tr><td><span data-list-date-time>2026/10/26 23:59</span></td><td data-list-number>12,345</td><td data-cell-grow><span>long.member.name@example-company.test</span></td><td><a href="#">詳しく見る</a></td></tr><tr><td><span data-list-date-time>2026/10/25 18:30</span></td><td data-list-number>9,876</td><td data-cell-grow><span>another.long.name@example-company.test</span></td><td><a href="#">詳しく見る</a></td></tr></tbody></table></div></main>')
+    await page.locator('.frame').evaluate(fitListColumns)
+    const protectedCells = await page.locator('tbody tr').evaluateAll(rows => rows.map(row => [...row.children].slice(0, 2).map(cell => ({ width: cell.getBoundingClientRect().width, scroll: cell.scrollWidth, client: cell.clientWidth }))))
+    for (const row of protectedCells) for (const cell of row) assert.ok(cell.width > 0 && cell.client >= cell.scroll - 1, JSON.stringify({ row, protectedCells }))
+    const email = await page.locator('tbody tr:first-child td:nth-child(3) span').evaluate(node => ({ scroll: node.scrollWidth, client: node.clientWidth }))
+    assert.ok(email.scroll > email.client, 'long text may be ellipsized in the flexible name cell')
+  } finally { await browser.close() }
+})
+
+test('内容に合わせてメールを広げ、短い状態列を縮める。固定の等分割の故障は見つかる', async () => {
+  const { fitGridContentColumns } = await import('../../src/components/shared/grid-content-columns.mjs')
+  const scanOwner = (await import('./owner-rules-browser.mjs')).default
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    for (const width of [1024, 1152, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.setContent('<style>*{box-sizing:border-box}.table{width:calc(100vw - 280px);font:14px Arial}.row{display:grid;grid-template-columns:var(--grid-table-content-columns,repeat(4,1fr));gap:16px;padding:0 24px}.text{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}</style><main><div class="table" role="table"><div class="row" role="row"><span role="columnheader">名前</span><span role="columnheader">メールアドレス</span><span role="columnheader">状態</span><span role="columnheader">最終ログイン</span></div><div class="row" role="row"><span>担当者</span><span><span class="text" title="long.member.name@example-company.test">long.member.name@example-company.test</span></span><span>有効</span><span>10/26 12:00</span></div></div></main>')
+      assert.ok((await page.evaluate(scanOwner)).some(f => f.kind === 'table-unused-space'))
+      await page.locator('.table').evaluate(fitGridContentColumns)
+      assert.deepEqual(await page.evaluate(scanOwner), [])
+      const widths = await page.locator('.row').last().locator(':scope > span').evaluateAll(cells => cells.map(cell => cell.getBoundingClientRect().width))
+      assert.ok(widths[1] > widths[2])
+      const initial = await page.locator('.table').getAttribute('style')
+      await page.locator('.table').evaluate(fitGridContentColumns)
+      assert.equal(await page.locator('.table').getAttribute('style'), initial)
+    }
+  } finally { await browser.close() }
+})
+
+test('狭くても操作列は縮めず、幅を往復し短い内容に変えても同じ配分へ戻る', async () => {
+  const { fitGridContentColumns } = await import('../../src/components/shared/grid-content-columns.mjs')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>*{box-sizing:border-box}.table{width:420px;font:14px Arial}.row{display:grid;grid-template-columns:var(--grid-table-content-columns,repeat(3,1fr));gap:12px}.text{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}button{width:112px}</style><main><div class="table" role="table"><div class="row" role="row"><span>名前</span><span>メール</span><span>操作</span></div><div class="row" role="row"><span class="text">とても長い担当者の名前</span><span class="text">long.member@example-company.test</span><span><button>権限を変更する</button></span></div></div></main>')
+    await page.locator('.table').evaluate(fitGridContentColumns)
+    const first = await page.locator('.table').getAttribute('style')
+    for (const width of [720, 420]) {
+      await page.locator('.table').evaluate((el, width) => { el.style.width = `${width}px` }, width)
+      await page.locator('.table').evaluate(fitGridContentColumns)
+      assert.equal(await page.locator('button').evaluate(el => el.getBoundingClientRect().width <= el.parentElement.getBoundingClientRect().width), true)
+    }
+    const after = await page.locator('.table').evaluate(el => el.style.getPropertyValue('--grid-table-content-columns'))
+    assert.ok(first.includes(after))
+    await page.locator('.text').last().evaluate(el => { el.textContent = 'a@b.test' })
+    await page.locator('.table').evaluate(fitGridContentColumns)
+    assert.notEqual(await page.locator('.table').evaluate(el => el.style.getPropertyValue('--grid-table-content-columns')), after)
+  } finally { await browser.close() }
+})

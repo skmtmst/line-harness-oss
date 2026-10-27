@@ -6,9 +6,12 @@ export function fitListColumns(frame) {
   if (!body) return
   const nameIndex = [...body.children].findIndex(cell => cell.hasAttribute('data-cell-grow') || cell.querySelector('[data-list-name], [data-row-link], [data-list-name-cell]'))
   if (nameIndex < 0) return
-  const flexibleContent = frame.hasAttribute('data-column-layout') && frame.dataset.columnSizing === 'content'
+  const flexibleContent = frame.dataset.columnSizing === 'content'
   const scope = `${Math.round(frame.getBoundingClientRect().width)}:${body.children.length}:${nameIndex}:${[...body.children].map(cell => cell.getBoundingClientRect().width > 0).join(',')}:${flexibleContent ? rows.map(row => row.textContent).join('\n') : ''}`
+  const cols = [...table.querySelectorAll(':scope > colgroup > col')]
+  for (const col of cols) if (col.listColumnOriginalWidth === undefined) col.listColumnOriginalWidth = col.style.width
   if (frame.listColumnScope !== scope) {
+    for (const col of cols) col.style.width = col.listColumnOriginalWidth
     for (const row of rows) for (const cell of row.children) {
       cell.removeAttribute('data-content-name-column')
       cell.removeAttribute('data-content-support-column')
@@ -48,11 +51,31 @@ export function fitListColumns(frame) {
     if (index === nameIndex || cell.hasAttribute('data-cell-weight') || !cell.getBoundingClientRect().width) return null
     const cells = rows.map(row => row.children[index]).filter(Boolean).filter(cell => cell.getBoundingClientRect().width)
     if (controlsOnly && !cells.some(cell => cell.querySelector('button, input, [role="button"], [data-design-node="xRvDB"]'))) return null
-    // A genuinely long secondary value keeps its existing truncation budget.
     const required = Math.max(0, ...cells.map(intrinsic))
-    const unbroken = cells.some(cell => cell.matches('[data-list-number]') || cell.querySelector('button, a, input, [data-design-node="xRvDB"], [data-list-date-time]'))
-    return Math.ceil(controlsOnly ? Math.max(frame.listColumnCeilings[index], required) : unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
+    if (controlsOnly) return Math.ceil(Math.max(frame.listColumnCeilings[index], required))
+    if (flexibleContent) return Math.ceil(required)
+    const unbroken = cells.some(cell => cell.matches('[data-list-number], [data-list-date-time]') || cell.querySelector('a, [data-list-date-time]'))
+    return Math.ceil(unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
   })
+  if (flexibleContent && !controlsOnly && ![...body.children].some(cell => cell.hasAttribute('data-cell-weight'))) {
+    const nameBudget = number(getComputedStyle(body.children[nameIndex]).minWidth)
+    const fixed = widths.map((_, index) => rows.some(row => {
+      const cell = row.children[index]
+      return cell && (cell.matches('[data-list-number], [data-list-date-time]') || cell.querySelector('button,input,a,[role="button"],[data-list-date-time]'))
+    }))
+    const controls = widths.reduce((sum, width, index) => sum + (fixed[index] ? width ?? 0 : 0), 0)
+    const available = Math.max(0, table.getBoundingClientRect().width - nameBudget - controls)
+    const total = widths.reduce((sum, width, index) => sum + (fixed[index] ? 0 : width ?? 0), 0)
+    if (total > available) {
+      let low = 0, high = Math.max(...widths.map(width => width ?? 0))
+      for (let step = 0; step < 24; step++) {
+        const cap = (low + high) / 2
+        if (widths.reduce((sum, width, index) => sum + (fixed[index] ? 0 : Math.min(width ?? 0, cap)), 0) > available) high = cap
+        else low = cap
+      }
+      widths.forEach((width, index) => { if (width !== null && !fixed[index]) widths[index] = Math.min(width, low) })
+    }
+  }
   // 割合（weight）を指定した列：測った列を除いた残りの幅を、割合で分ける（実寸の px にして、ほかの測った列と同じ道で渡す）。
   const weights = [...body.children].map(cell => Number(cell.dataset.cellWeight) || 0)
   const weightTotal = weights.reduce((sum, weight) => sum + weight, 0)
@@ -69,7 +92,7 @@ export function fitListColumns(frame) {
   // Keep its column model in sync with the same measured content budget.
   if (getComputedStyle(body).display !== 'flex') {
     for (const [index, col] of [...table.querySelectorAll(':scope > colgroup > col')].entries()) {
-      if (widths[index] != null) col.style.width = `${widths[index]}px`
+      col.style.width = widths[index] != null ? `${widths[index]}px` : col.listColumnOriginalWidth
     }
   }
   for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
