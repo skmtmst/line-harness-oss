@@ -804,7 +804,7 @@
 - [使っている部品に重大な弱点が見つかった週は、自動の点検が赤くなって分かるようにし](release-log/unreleased/1840-kenta-audit-weekly-red.md)
 - [統括のアカウントのカードの高さとボタンの位置を、同じ行でそろえた](release-log/unreleased/1841-kenta-hq-card-height.md)
 - [状態の札を地の色のある札にそろえた](release-log/unreleased/1842-kenta-status-chip.md)
-- [スマートフォン専用の画面（トークと対応）](release-log/unreleased/0000-kenta-phone-shell-talk.md)
-- [予約のしかたと指名料](release-log/unreleased/0000-kenta-booking-options.md)
+- [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
+- [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
