@@ -508,3 +508,16 @@ it('名前と属性が同じパネルの移動は保持し、コピー・見た�
   put(root, next, moved.replace('styles.rail', 'styles.changed'))
   expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'detail-panel')).toHaveLength(1)
 })
+
+describe('画面の押し口は共通部品を通す', () => {
+  it('共通Buttonの隣に手書きを足したら拾い、共通へ戻せば消える', () => {
+    const catalog = loadCatalog(DEFAULT_CATALOG)
+    const pattern = catalog.patterns.find((item: { id: string }) => item.id === 'primary-button')
+    const scan = (body: string) => scanCodeFile(pattern, 'apps/web/src/v8/demo/actions.tsx', body, catalog._global).filter((hit: { signal: string }) => hit.signal === 'raw-button')
+    const common = "import Button from '@/components/shared/button'; export const A = () => <Button>詳細</Button>"
+    expect(scan(common)).toHaveLength(0)
+    expect(scan(common + '; export const B = () => <button>詳細</button>')).toHaveLength(1)
+    expect(scan(common + '; const sample = "<button>詳細</button>"')).toHaveLength(0)
+    expect(scan(common)).toHaveLength(0)
+  })
+})

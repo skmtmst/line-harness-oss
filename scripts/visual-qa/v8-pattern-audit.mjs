@@ -274,6 +274,7 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
       if (m[0].length === 0) { signal._re.lastIndex += 1; continue }
       const proof = sourceEvidence(rel, content, ['own-label', 'limit-text'].includes(signal.id) ? m.index + m[0].length - 1 : m.index, ['own-label', 'limit-text'].includes(signal.id) ? 1 : m[0].length)
       if (proof?.comment) continue
+      if (signal.id === 'raw-button' && (!rel.startsWith('apps/web/src/v8/') || proof?.tag !== 'button' || proof.searchString)) continue
       if (rel.startsWith('apps/liff/') && codeRoot && pattern.owner?.liff
         && isRegisteredComponent(codeRoot, proof?.imports?.[proof.tag], pattern.owner.liff, join(codeRoot, rel))) continue
       if (signal.id === 'limit-text' && proof?.attribute === 'hint' && codeRoot

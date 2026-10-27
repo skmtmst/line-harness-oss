@@ -2689,6 +2689,12 @@
         ],
         "signals": [
           {
+            "id": "raw-button",
+            "re": "<button\\b",
+            "ext": ".tsx",
+            "why": "画面の押し口は共通Button・IconButtonへ渡す"
+          },
+          {
             "id": "green-fill",
             "css": {
               "all": [

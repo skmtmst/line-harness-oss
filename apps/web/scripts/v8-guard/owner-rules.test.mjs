@@ -327,3 +327,21 @@ test('手書きの動きを同じ選び先の後ろの規則で共通の値に�
     assert.ok((await kinds()).length > 0)
   } finally { await browser.close() }
 })
+
+test('表の省略に余りがある・括弧の補足が欠ける・詳細の矢印を検出し、復元後は通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><table style="width:700px;table-layout:fixed"><thead><tr><th>フォーム（質問の数）</th><th>状態</th></tr></thead><tbody><tr><td><span style="display:block;width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">とても長いフォームの名前</span></td><td>公開中</td></tr></tbody></table><button>詳細<svg class="lucide-log-in" /></button></main>')
+    const broken = await page.evaluate(scan)
+    for (const kind of ['table-unused-space', 'table-missing-detail', 'action-icon']) assert.ok(broken.some(f => f.kind === kind), kind)
+    await page.locator('td').first().evaluate(cell => { cell.firstChild.style.width = '100%'; const sub = document.createElement('span'); sub.textContent = '質問 6'; sub.setAttribute('data-list-name-description', ''); cell.append(sub) })
+    await page.locator('button svg').evaluate(el => el.remove())
+    assert.deepEqual(await page.evaluate(scan), [])
+    await page.locator('th').first().evaluate(el => { el.textContent = 'メニュー（大きさ・ボタン）' })
+    await page.locator('td').first().evaluate(el => { el.innerHTML = '通常メニュー<span data-list-name-description>大 6 ボタン</span>' })
+    assert.deepEqual(await page.evaluate(scan), [])
+    await page.locator('td').first().evaluate(el => { el.textContent = '大阪店 6 ボタン' })
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'table-missing-detail'))
+  } finally { await browser.close() }
+})

@@ -58,6 +58,49 @@ export default function scanOwnerRules() {
       if (spread(heights) > 1 || spread(bottoms) > 1) add('cardrow', row[0], { height: Math.ceil(spread(heights)), actions: Math.ceil(spread(bottoms)) }, '', row[row.length - 1])
     }
   }
+  // 列に入らない文字があるのに、同じ行で80px以上を余らせない。
+  for (const table of root.querySelectorAll('table,[role="table"]')) {
+    const rows = [...table.querySelectorAll('tr,[role="row"]')].filter(visible)
+    const head = rows.find(row => row.querySelector('th,[role="columnheader"]'))
+    const spareInCells = cells => cells.map(cell => {
+          const box = cell.getBoundingClientRect(), c = css(cell)
+          const content = [...cell.childNodes].flatMap(node => {
+            if (node.nodeType === 3 && node.textContent.trim()) { const range = document.createRange(); range.selectNodeContents(node); return [range.getBoundingClientRect()] }
+            if (node.nodeType !== 1) return []
+            const range = document.createRange(); range.selectNodeContents(node)
+            return [...range.getClientRects(), ...node.querySelectorAll('button,input,svg,img')].map(el => el.getBoundingClientRect ? el.getBoundingClientRect() : el)
+          }).filter(rect => rect.width > 0)
+          const used = content.length ? Math.min(box.width, Math.max(...content.map(rect => rect.right)) - box.left) : 0
+          return Math.max(0, box.width - used - (parseFloat(c.paddingRight) || 0) - (parseFloat(c.paddingLeft) || 0))
+        })
+
+    // 見出しや別の行が必要とする幅は空きに数えず、列全体で回せる余りだけを数える。
+    const spareRows = rows.map(row => spareInCells([...row.children].filter(visible)))
+    for (const row of rows.filter(row => row !== head)) {
+      const cells = [...row.children].filter(visible)
+      const clipped = cells.flatMap(cell => [cell, ...cell.querySelectorAll('*')]).filter(el => {
+        const c = css(el)
+        return c.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim()
+      })
+      if (clipped.length) {
+        const spare = cells.reduce((sum, _, index) => sum + Math.min(...spareRows.filter(widths => widths.length === cells.length).map(widths => widths[index])), 0)
+        if (spare >= 80) add('table-unused-space', clipped[0], { spare: Math.floor(spare) }, clipped[0].textContent)
+      }
+      if (!head || cells.length !== head.children.length) continue
+      for (const [index, header] of [...head.children].entries()) {
+        const match = header.textContent.match(/（([^）]+)）/)
+        if (!match) continue
+        const terms = match[1].split('・')
+        const text = cells[index]?.querySelector('[data-list-name-description]')?.textContent.trim() ?? ''
+        const matches = term => term === '質問の数' ? /質問\s*\d+/.test(text) : term === '大きさ' ? /^(大|小)(?:\s|・|$)/.test(text) : term === 'ボタン' ? /\d+\s*(?:ボタン|面)/.test(text) : null
+        const missing = terms.filter(term => matches(term) === false)
+        if (cells[index]?.textContent.trim() && missing.length) add('table-missing-detail', cells[index], { missing }, header.textContent)
+      }
+    }
+  }
+  for (const button of root.querySelectorAll('button')) {
+    if (visible(button) && button.textContent.trim() === '詳細' && button.querySelector('.lucide-log-in')) add('action-icon', button, {}, '詳細')
+  }
   // 14px 未満の UI 文字を太さ 400 で描かない。
   // お客さまのスマホの見え方（LINE の見本）は LINE と同じ太さなので数えない。
   // V8 の画面（<html data-theme="v8">）だけを見る。アプリの CSS の無い素の見本はブラウザ既定の太さなので数えない。
