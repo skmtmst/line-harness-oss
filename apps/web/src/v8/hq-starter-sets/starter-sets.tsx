@@ -43,10 +43,10 @@ import { formatNumber } from '@/lib/format'
  */
 
 const KIND_ROWS: ReadonlyArray<{ kind: StarterSetItem['kind']; label: string; how: { text: string; tone: 'neutral' | 'warning' } }> = [
-  { kind: 'rich_menu', label: 'リッチメニュー', how: { text: '見本の札つきで入る', tone: 'neutral' } },
-  { kind: 'template', label: 'テンプレート', how: { text: '見本の札つきで入る', tone: 'neutral' } },
+  { kind: 'rich_menu', label: 'リッチメニュー', how: { text: '「見本」の印つきで入る', tone: 'neutral' } },
+  { kind: 'template', label: 'テンプレート', how: { text: '「見本」の印つきで入る', tone: 'neutral' } },
   { kind: 'automation', label: 'オートメーション', how: { text: '止めた状態で入る', tone: 'warning' } },
-  { kind: 'booking_menu', label: '予約メニュー', how: { text: '見本の札つきで入る', tone: 'neutral' } },
+  { kind: 'booking_menu', label: '予約メニュー', how: { text: '「見本」の印つきで入る', tone: 'neutral' } },
   { kind: 'dashboard', label: 'ダッシュボードの型', how: { text: 'そのまま入る', tone: 'neutral' } },
 ]
 
@@ -155,7 +155,7 @@ export default function HqStarterSetsV8() {
       boardId="J6647"
       title="スタイルの初期セット"
       tabs={<Tabs size="compact" label="テンプレートの種類" items={hqTemplateTabsForStarterSets()} />}
-      help="スタイルごとに、新しいアカウントへ最初から入れる物です。入った物には「見本」の札が付き、店で直せます。"
+      help="スタイルごとに、新しいアカウントへ最初から入れる物です。入った物には「見本」の印が付き、店で直せます。"
       actions={canEdit ? <>
         <Button onClick={() => preparing.open('標準に戻す')}>標準に戻す</Button>
         <Button variant="primary" onClick={() => preparing.open('初期セットを作る')}><Plus aria-hidden="true" className={styles.buttonIcon} />初期セットを作る</Button>
@@ -177,7 +177,7 @@ export default function HqStarterSetsV8() {
         <div className={styles.auto}>
           <span className={styles.autoText}>
             <span className={styles.autoTitle}>新しいアカウントで、このスタイルを選んだときに自動で入れる</span>
-            <span className={styles.autoNote}>入った物には「見本」の札が付き、店で直せます</span>
+            <span className={styles.autoNote}>入った物には「見本」の印が付き、店で直せます</span>
           </span>
           {/* 新しいアカウントへは必ず入る（口に切り替えが無い）。押せないスイッチは置かず、状態の札で出す。 */}
           {set && canEdit

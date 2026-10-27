@@ -5,7 +5,7 @@ import type { StaffMember } from '@line-crm/shared'
  * ★V8（夕41）：設定の画面の、白い板の中の左の「設定の中のメニュー」。
  *
  *   - 絵の並び（会社とロゴは API ができるまで出さない）
- *   - 機能設定の下にマニュアルの対応表・ファイルの検査
+ *   - 機能設定の下にマニュアルの対応表・ファイルの安全確認
  *   - 「専用」の小見出しの下に EC連携・LINE通知
  *   - いまの画面が選ばれた形になる
  *   - 見るだけの人には、見られる画面だけ出す（左のメニューと同じ決まり）
@@ -98,7 +98,7 @@ describe('★V8 設定の中のメニュー', () => {
       '機能設定',
       // 機能設定を開いているときだけ下の2つを出す（絵には無いが、ここからしか行けない）
       'マニュアルの対応表',
-      'ファイルの検査',
+      'ファイルの安全確認',
       '運用状態',
       'EC連携',
       'LINE通知',
@@ -136,7 +136,7 @@ describe('★V8 設定の中のメニュー', () => {
     await waitFor(() => expect(view.queryByRole('link', { name: 'SNS 連携' })).toBeTruthy())
     expect(view.getByRole('link', { name: 'SNS 連携' }).getAttribute('aria-current')).toBe('page')
     expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
-    expect(view.queryByRole('link', { name: 'ファイルの検査' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'ファイルの安全確認' })).toBeNull()
   })
 
   it('機能設定の下の2つは、ほかの設定の画面では出さない', async () => {

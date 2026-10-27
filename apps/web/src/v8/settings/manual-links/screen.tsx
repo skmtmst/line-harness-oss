@@ -125,7 +125,7 @@ export default function ManualLinksScreen() {
           kind="empty"
           emptyPreset="filtered"
           title="条件に合うものはありません"
-          description="札や検索を外すと、すべて出ます"
+          description="絞り込みや検索を外すと、すべて出ます"
           action={query || filter !== 'all' ? (
             <Button variant="secondary" onClick={() => { setQuery(''); setFilter('all') }}>条件を外す</Button>
           ) : undefined}

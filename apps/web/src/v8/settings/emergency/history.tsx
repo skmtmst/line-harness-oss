@@ -184,7 +184,7 @@ export default function UpdateHistoryV8() {
       )}
 
       <div className={styles.foot}>
-        <p className={styles.footText}>自前でデプロイしている環境では、手動アップデートガイドの手順で更新します。</p>
+        <p className={styles.footText}>自分のサーバーで動かしている場合は、手動アップデートガイドの手順で更新します。</p>
         <Button external href={MANUAL_UPDATE_GUIDE_URL}><BookOpen size={16} aria-hidden="true" />手動アップデートガイドを開く</Button>
       </div>
     </div>

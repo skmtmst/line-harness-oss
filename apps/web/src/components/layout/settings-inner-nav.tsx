@@ -69,10 +69,10 @@ const SETTINGS_ONLY_ITEMS: MenuItem[] = [
   { id: 'settings-delivery', href: '/settings/delivery', label: 'デリバリー連携', icon: '', note: 'Uber Eats・出前館・ロケットナウの注文をまとめて受け取ります', required: true },
 ]
 
-/** 機能設定の下に付く2つの画面（絵の「下にマニュアルの対応表・ファイルの検査」）。 */
+/** 機能設定の下に付く2つの画面（絵の「下にマニュアルの対応表・ファイルの安全確認」）。 */
 const SETTINGS_CHILDREN = [
   { href: '/settings/manual-links', label: 'マニュアルの対応表' },
-  { href: '/settings/file-scan', label: 'ファイルの検査' },
+  { href: '/settings/file-scan', label: 'ファイルの安全確認' },
 ] as const
 
 /** この中のメニューを出す画面（左のメニューの「設定」が光る画面と同じ範囲）。 */

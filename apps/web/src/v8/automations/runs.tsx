@@ -499,7 +499,7 @@ export default function AutomationRunsV8() {
       <ListState
         kind="empty"
         title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'}
-        description={query || resultFilter !== 'all' ? '検索や絞り込みの札を外すと、すべて出ます。' : 'オートメーションが動くと、結果がここに残ります。'}
+        description={query || resultFilter !== 'all' ? '検索や絞り込みを外すと、すべて出ます。' : 'オートメーションが動くと、結果がここに残ります。'}
       />
     )
   } else {

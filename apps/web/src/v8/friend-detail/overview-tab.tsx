@@ -141,12 +141,12 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         <div className={styles.mile}>
           <span className={styles.mileNum}>{mileageStatus === 'ready' && mileage ? formatNumber(mileage.available) : emptyValue('unknown')}</span>
           <span className={styles.mileUnit}>
-            mile 使える{mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
+            マイル使える{mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
           </span>
         </div>
       )}{rankLine ? <p className={styles.memo}>{rankLine}</p> : null}</> },
         { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)}>{perms.manage ? '変える' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} /> },
-        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Link className={styles.groupLink} href="/rich-menus">変更する</Link> : null, content: <>{richMenuStatus === 'error' ? (
+        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Link className={styles.groupLink} href="/rich-menus">変える</Link> : null, content: <>{richMenuStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
           読み込めませんでした
           <button type="button" className={styles.retry} onClick={() => void data.loadRichMenu()}>もう一度読み込む</button>

@@ -145,6 +145,15 @@ export const terms = {
   W13: "承認の流れ",
   W14: "マニュアルの対応表",
   W15: "最後に取り込んだ日時",
+  W16: "保存と送信のしくみ",
+  W17: "自分のサーバーで動かしている場合",
+  W18: "ファイルの安全確認",
+  W19: "印／絞り込み",
+  W20: "マイル",
+  W21: "変える",
+  W22: "手順 N",
+  W23: "配信名",
+  W24: "LINEの接続が切れています",
 } as const
 
 /**
@@ -168,6 +177,15 @@ export const termsAvoid: ReadonlyArray<{ id: keyof typeof terms; avoid: RegExp }
   { id: 'W13', avoid: /承認ワークフロー/ },
   { id: 'W14', avoid: /正本表/ },
   { id: 'W15', avoid: /最終同期/ },
+  { id: 'W16', avoid: /裏の仕組み|保管庫/ },
+  { id: 'W17', avoid: /自前でデプロイ|(?<![A-Za-z])デプロイ/ },
+  { id: 'W18', avoid: /ファイルの検査/ },
+  { id: 'W19', avoid: /札/ },
+  { id: 'W20', avoid: /(?:\d|\})\s*mile(?![A-Za-z_])|unit="mile"|>\s*mile\s*</ },
+  { id: 'W21', avoid: /内容を変更する|この内容で変更する|>\s*変更する\s*</ },
+  { id: 'W22', avoid: /STEP ?[0-9]/ },
+  { id: 'W23', avoid: /管理用タイトル/ },
+  { id: 'W24', avoid: /トークンの期限切れ/ },
 ]
 
 export function term(key: keyof typeof terms): string { return terms[key] }

@@ -22,7 +22,7 @@ const ANALYTICS_TIME = read('../app/analytics/analytics-time.ts')
 describe('#640 省略表示の全文確認（title）', () => {
   it('/scenarios: 数のセルは title で全文を出す', () => {
     // V8 の数セルに導線リンクは無い。数はそのまま出し、全文は title で読める。
-    expect(SCENARIO_LIST).toMatch(/title=\{`購読中[\s\S]{0,200}?読み終えた/)
+    expect(SCENARIO_LIST).toMatch(/title=\{`配信中[\s\S]{0,200}?最後まで配信/)
   })
 
   it('/auto-replies V8: 応答数・長い条件・連動内容に全文確認を残す', () => {
