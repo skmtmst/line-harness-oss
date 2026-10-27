@@ -80,14 +80,15 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: pageTitle, useP
 vi.mock('@/lib/use-unsaved-guard', () => ({
   useUnsavedGuard: () => ({ leaveTarget: null, confirmLeave: () => {}, cancelLeave: () => {} }),
 }))
-vi.mock('@/v8/conversions/list', () => ({
-  default: ({ embedded }: { embedded?: boolean }) => React.createElement('div', { 'data-testid': embedded ? 'embedded-conversions' : 'standalone-conversions' }),
+vi.mock('@/v8/conversions', () => ({
+  ConversionListV8: ({ embedded }: { embedded?: boolean }) => React.createElement('div', { 'data-testid': embedded ? 'embedded-conversions' : 'standalone-conversions' }),
 }))
 
 // 今の入口そのものを通す（入口が別の画面を出すように変われば、この試験も追いかける）。
 import AffiliatesPage from '@/app/affiliates/page'
 import NewAffiliatePage from '@/app/affiliates/new/page'
 import LegacyConversionsPage from '@/app/conversions/page'
+import { AffiliateTabs } from './frame'
 import { ApiError } from '@/lib/api'
 
 beforeEach(() => {
@@ -142,8 +143,12 @@ describe('成果地点タブの統合', () => {
   it('成果とアフィリエイト内のタブで成果地点一覧を開く', () => {
     fixture.searchParams = new URLSearchParams('tab=points')
     render(<AffiliatesPage />)
-    expect(document.querySelector('a[href="/affiliates?tab=points"]')?.textContent).toContain('コンバージョン')
     expect(screen.getByTestId('embedded-conversions')).toBeTruthy()
+  })
+
+  it('コンバージョンのタブは統合後の一覧URLへつなぐ', () => {
+    render(<AffiliateTabs />)
+    expect(document.querySelector('a[href="/affiliates?tab=points"]')?.textContent).toContain('コンバージョン')
   })
 
   it('旧コンバージョン一覧URLを同じタブへ検索条件つきで移す', async () => {

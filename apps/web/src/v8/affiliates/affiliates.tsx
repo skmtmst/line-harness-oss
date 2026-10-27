@@ -22,7 +22,7 @@ import OffersTab from './offers'
 import ApprovalsTab from './approvals'
 import PaymentTab from './payment'
 import ReportTab from './report'
-import ConversionListV8 from '@/v8/conversions/list'
+import { ConversionListV8 } from '@/v8/conversions'
 
 /* 上の帯・タブの題は画面名だけ（タブ名を括弧で足さない。・ と同じ・2026-10-15 判定役）。 */
 const PAGE_TITLE = '成果とアフィリエイト'

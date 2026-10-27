@@ -17,7 +17,7 @@ const APP = join(SRC, 'app')
 
 const MAINB_V8_SCREENS = [
   ['/mileage', '@/v8/mileage/mileage', 'v8/mileage/mileage.tsx', '<MileageShell.Provider'],
-  ['/conversions', '@/v8/conversions/list', 'v8/conversions/list.tsx', '<ListPage'],
+  ['/affiliates', '@/v8/affiliates/affiliates', 'v8/affiliates/affiliates.tsx', '<AffiliateShell.Provider'],
   ['/conversions/new', '@/v8/conversions/create', 'v8/conversions/create.tsx', '<CreatePage'],
   ['/webhooks', '@/v8/webhooks/outgoing', 'v8/webhooks/outgoing.tsx', '<ListPage'],
   ['/webhooks/new', '@/v8/webhooks/create', 'v8/webhooks/create.tsx', '<CreatePage'],

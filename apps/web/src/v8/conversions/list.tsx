@@ -67,7 +67,7 @@ import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { AffiliateTabs, useAffiliateShell } from '@/v8/affiliates/frame'
+import { AffiliateTabs, useAffiliateShell } from '@/v8/affiliates/public/tabs'
 
 /*
  * ★V8 コンバージョンの一覧（Pencil：一覧 ・1152 ・閲覧のみ ・
