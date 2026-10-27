@@ -132,7 +132,6 @@ export function CardHeader({
   meta,
   action,
   size = 'standard',
-  actionTone = 'accent',
   headingLevel = 2,
   titleId,
   help,
@@ -144,7 +143,6 @@ export function CardHeader({
   meta?: ReactNode
   action?: ReactNode
   size?: 'standard' | 'roomy' | 'stacked' | 'panel' | 'restaurant' | 'content'
-  actionTone?: 'accent' | 'info'
   headingLevel?: 2 | 3
   titleId?: string
 }) {
@@ -164,7 +162,7 @@ export function CardHeader({
         {meta ? <span className={styles.meta}>{meta}</span> : null}
       </div>
       {action ? (
-        <div className={`${styles.action} ${actionTone === 'info' ? styles.actionInfo : ''}`}>
+        <div className={styles.action}>
           {action}
         </div>
       ) : null}

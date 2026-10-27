@@ -43,8 +43,9 @@ describe('StatusChip（状態の札・設計 B）', () => {
     expect(markup.match(/data-tone=/g)).toHaveLength(2)
   })
 
-  test('注意・危険の札は既定で薄い色面を持つ', () => {
+  test('注意・危険の札は意味のトーンを付け、独自fill APIを持たない', () => {
     const markup = renderToStaticMarkup(<><StatusBadge tone="warning">期限が近い</StatusBadge><StatusBadge tone="danger">期限切れ</StatusBadge></>)
-    expect(markup.match(/data-fill="true"/g)).toHaveLength(2)
+    expect(markup.match(/data-tone="(?:warning|danger)"/g)).toHaveLength(2)
+    expect(markup).not.toContain('data-fill')
   })
 })

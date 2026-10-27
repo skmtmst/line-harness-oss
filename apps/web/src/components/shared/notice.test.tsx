@@ -8,6 +8,38 @@ import Notice from './notice'
 afterEach(() => cleanup())
 
 describe('帯（Notice）の4種類', () => {
+  const word = (container: HTMLElement) => container.querySelector('[data-notice-status-word]')?.textContent ?? null
+  it.each([
+    ['warn', '要確認：'],
+    ['danger', '失敗：'],
+    ['info', null],
+    ['success', null],
+  ] as const)('%s の頭の言葉は文字の題・JSXの題・題の無い本文のどれでも同じ', (tone, expected) => {
+    const text = render(<Notice tone={tone} heading="保存の状態" message="内容" />)
+    expect(word(text.container)).toBe(expected)
+    expect(text.container.querySelector('[data-notice-heading]')?.textContent).toBe(`${expected ?? ''}保存の状態`)
+    text.unmount()
+    const jsx = render(<Notice tone={tone} heading={<>送れなかった通知が <strong>3</strong> 件あります</>} message="内容" />)
+    expect(word(jsx.container)).toBe(expected)
+    expect(jsx.container.querySelector('[data-notice-heading]')?.textContent).toBe(`${expected ?? ''}送れなかった通知が 3 件あります`)
+    jsx.unmount()
+    const body = render(<Notice tone={tone}><p>一覧を読み込めませんでした。</p></Notice>)
+    expect(word(body.container)).toBe(expected)
+    // 本文だけの帯では、点のすぐ後ろの本文の頭に置く。
+    if (expected) expect(body.container.querySelector('[data-design-part="notice"] > div')?.firstElementChild?.hasAttribute('data-notice-status-word')).toBe(true)
+  })
+
+  it('呼び出し側が同じ言葉で書き出している時は重ねない', () => {
+    const { container } = render(<Notice tone="danger" heading={<>{'失敗した処理が 2 件あります'}</>} message="内容" />)
+    expect(word(container)).toBeNull()
+    expect(container.querySelector('[data-notice-heading]')?.textContent).toBe('失敗した処理が 2 件あります')
+  })
+
+  it('危ない操作の窓の問いかけだけ頭の言葉を外せる', () => {
+    const { container } = render(<Notice tone="danger" statusWord={false}>このテンプレートを削除しますか？</Notice>)
+    expect(word(container)).toBeNull()
+  })
+
   it.each(['info', 'success', 'warn', 'danger'] as const)('%s は題の前に8pxの色点だけを出す', tone => {
     const { container } = render(<Notice tone={tone} heading="題" message="説明" />)
     const notice = container.firstElementChild!

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
+import { Children, isValidElement, useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
 import { Check, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import styles from './notice.module.css'
@@ -17,6 +17,23 @@ const NODE_BY_TONE: Record<CanonicalTone, string> = {
   success: 'uR9s8',
   warn: 'uR9s8',
   danger: 'uR9s8',
+}
+
+/* 色だけに頼らないよう、注意と失敗は題（題が無ければ本文）の頭に言葉を付ける。 */
+const STATUS_WORD_BY_TONE: Partial<Record<CanonicalTone, string>> = {
+  warn: '要確認',
+  danger: '失敗',
+}
+
+/** 文字・断片・要素の中の文字だけをつないで、書き出しを読む。 */
+function leadingText(node: ReactNode): string {
+  let text = ''
+  Children.forEach(node, child => {
+    if (text.length > 8) return
+    if (typeof child === 'string' || typeof child === 'number') text += String(child)
+    else if (isValidElement<{ children?: ReactNode }>(child)) text += leadingText(child.props.children)
+  })
+  return text.trimStart()
 }
 
 export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
@@ -58,6 +75,11 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   icon?: ReactNode
   /** アカウントの短い説明。既定の帯の色・寸法は変えない。 */
   presentation?: 'account-note' | 'ops'
+  /**
+   * 頭の言葉（注意＝「要確認：」・失敗＝「失敗：」）を付けない。危ない操作の窓で、
+   * 題そのものが問いかけになっている帯だけが使う。知らせでは使わない。
+   */
+  statusWord?: false
 }
 
 /**
@@ -86,6 +108,7 @@ export default function Notice({
   icon,
   marker,
   presentation,
+  statusWord,
   role,
   ...props
 }: NoticeProps) {
@@ -93,6 +116,13 @@ export default function Notice({
   void icon
   void marker
   const canonical = tone
+  const body = typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))
+  const word = statusWord === false ? undefined : STATUS_WORD_BY_TONE[canonical]
+  const lead = heading ? heading : body
+  // 呼び出し側がもう同じ言葉で書き出している時（「失敗した処理が…」など）は重ねない。
+  const prefix = word && !leadingText(lead).startsWith(word)
+    ? <span className={heading ? styles.statusWord : `${styles.statusWord} ${styles.statusWordLead}`} data-notice-status-word>{word}：</span>
+    : null
   const node = NODE_BY_TONE[canonical]
   const hasHelp = help !== undefined && help !== null
   const helpTip = hasHelp ? (
@@ -120,8 +150,8 @@ export default function Notice({
     >
       <span className={styles.dot} data-notice-dot aria-hidden="true" />
       <div className={styles.message}>
-        {heading ? <><div className={styles.headingRow}><div className={styles.heading}>{heading}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}</div></>
-          : typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}
+        {heading ? <><div className={styles.headingRow}><div className={styles.heading} data-notice-heading>{prefix}{heading}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{body}</div></>
+          : <>{prefix}{body}</>}
         {hasHelp && !heading ? helpTip : null}
         {states?.length ? <NoticeStates items={states} /> : null}
         {footer ? <div className={styles.footer}>{footer}</div> : null}

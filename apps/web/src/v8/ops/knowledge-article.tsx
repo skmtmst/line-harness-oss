@@ -218,7 +218,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
               本文と手順を読み、いまの作りと合っていることを確かめました
             </Checkbox></SaveErrorField>
             {sourceTicket ? <Checkbox checked={sourceTicket.resolved} disabled title="元の問い合わせの状態は問い合わせ側で変更します。" onCheckedChange={() => {}}>元の問い合わせ {sourceTicket.label} が「解決」になっている</Checkbox> : null}
-            {sourceTicket && ticketBlocked ? <Notice tone="danger" appearance="soft" density="compact" icon={null}>{`元の問い合わせ ${sourceTicket.label} がまだ「${sourceTicket.stageLabel}」です。解決にしてから承認できます。`}</Notice> : null}
+            {sourceTicket && ticketBlocked ? <Notice tone="warn" role="alert" appearance="soft" density="compact" icon={null}>{`元の問い合わせ ${sourceTicket.label} がまだ「${sourceTicket.stageLabel}」です。解決にしてから承認できます。`}</Notice> : null}
             {!sourceTicket ? <Notice tone={ticketError ? 'danger' : 'info'} action={ticketError ? <Button onClick={() => setTicketAttempt(value => value + 1)}>もう一度読み込む</Button> : undefined}>{ticketError || '元の問い合わせの状態を確認しています。'}</Notice> : null}
             <p className={styles.evidence}>承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</p>
           </div>

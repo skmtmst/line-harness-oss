@@ -114,7 +114,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
     <>
       {role !== null && !canManageRole(role) ? <ReadOnlyNotice>閲覧のみです。営業時間と店舗情報を確認できます。</ReadOnlyNotice> : null}
       {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
-      {!data.stale && data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
+      {!data.stale && data.closed ? <Notice tone="warn" role="alert">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
       {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認する</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${formatNumber(data.pendingChangeCount)} 件）。`}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}

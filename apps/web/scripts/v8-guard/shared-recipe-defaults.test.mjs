@@ -83,6 +83,25 @@ async function openSurfaces(page, width) {
   await page.evaluate(() => document.fonts.ready)
 }
 
+/** カードに見える線（border・outline・外側の1pxの影）を拾う。入れ子の内側の面（inset・muted・ring・danger）は数えない。 */
+function cardEdgeIssues(cards) {
+  const visible = color => color !== 'transparent' && !/rgba\([^)]*,\s*0\)$/.test(color)
+  return cards.flatMap(card => {
+    if (card.matches('[data-card-surface="inset"], [data-card-surface="muted"], [data-card-surface="danger"], [data-card-frame="ring"]')) return []
+    const style = getComputedStyle(card)
+    const issues = []
+    for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+      if (parseFloat(style[`border${side}Width`]) > 0 && style[`border${side}Style`] !== 'none' && visible(style[`border${side}Color`])) issues.push(`border-${side.toLowerCase()}`)
+    }
+    if (parseFloat(style.outlineWidth) > 0 && style.outlineStyle !== 'none' && visible(style.outlineColor)) issues.push('outline')
+    // 外側の 0 0 0 1px は線に見える。色が透明なら数えない。内側（inset）の線は入れ子の面だけが持つ。
+    for (const layer of style.boxShadow.split(/,(?![^(]*\))/)) {
+      if (/^\s*(?:rgba?\([^)]*\)\s*)?0px 0px 0px 1px/.test(layer) && !/inset/.test(layer) && visible((layer.match(/rgba?\([^)]*\)/) ?? ['transparent'])[0])) issues.push('1px shadow edge')
+    }
+    return issues.length ? [`${card.id || card.className}: ${issues.join(' ')}`] : []
+  })
+}
+
 /** 見出し・段・道具は製品の型が描く。画面固有のAPIや文言はこの検査の対象外。 */
 function surfaceDistances() {
   const distance = (from, to) => Math.round((to.getBoundingClientRect().top - from.getBoundingClientRect().bottom) * 100) / 100
@@ -122,18 +141,17 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
         document.querySelector('#section-with-tools [data-page-template]').getBoundingClientRect().bottom - text.getBoundingClientRect().bottom]
     })
     assert.deepEqual(sectionGaps, [14, 8, 24])
-    const flat = await page.locator('#flat').evaluate(el => {
-      const css = getComputedStyle(el)
-      return { shadow: css.boxShadow, line: css.outlineWidth, padding: css.padding }
-    })
-    assert.equal(flat.shadow, 'none')
-    assert.equal(flat.line, '1px')
-    assert.notEqual(await page.locator('#raised').evaluate(el => getComputedStyle(el).boxShadow), 'none')
-    assert.equal(await page.locator('#raised').evaluate(el => getComputedStyle(el).padding), flat.padding)
+    // カードは1つの定義（白地＋影だけ・線なし）。平らなカードは無く、どの口から作っても同じ影になる。
+    assert.deepEqual(await page.locator('[data-design-part="card"]').evaluateAll(cardEdgeIssues), [])
+    const raised = await page.locator('#raised').evaluate(el => ({ shadow: getComputedStyle(el).boxShadow, padding: getComputedStyle(el).padding }))
+    assert.notEqual(raised.shadow, 'none')
+    assert.equal(await page.locator('#flat').evaluate(el => getComputedStyle(el).padding), raised.padding)
     assert.equal(await page.locator('#raised').evaluate(el => el.getBoundingClientRect().height), await page.locator('#flat').evaluate(el => el.getBoundingClientRect().height))
-    for (const id of ['flat-form', 'flat-bordered', 'flat-outlined', 'flat-inset', 'selected-flat']) {
-      assert.equal(await page.locator('#' + id).evaluate(el => getComputedStyle(el).boxShadow), 'none', id)
+    for (const id of ['flat', 'flat-form', 'flat-bordered', 'flat-outlined', 'selected-flat']) {
+      assert.equal(await page.locator('#' + id).evaluate(el => getComputedStyle(el).boxShadow), raised.shadow, id)
     }
+    // 入れ子の内側の面だけは影を持たず、内側の細い線で分ける。
+    assert.notEqual(await page.locator('#flat-inset').evaluate(el => getComputedStyle(el).boxShadow), raised.shadow)
     const fonts = await page.locator('#surfaces [data-part="create-summary"] dd').evaluateAll(nodes => nodes.map(el => getComputedStyle(el).fontWeight))
     // 要約の値は 14px 以下の UI 文字なので 500（太字の 600 にはしない）。
     assert.deepEqual(fonts, ['500', '500'])
@@ -187,5 +205,25 @@ test('題の下へ古い余白を戻す故障を実寸で見つけ、復元後�
     assert.throws(() => assert.equal(broken.hq, 8))
     await toolbar.evaluate(el => el.style.removeProperty('margin-top'))
     assert.equal((await page.evaluate(surfaceDistances)).hq, 8)
+  } finally { await browser.close() }
+})
+
+test('カードの影へ1pxの線を戻す故障を実寸で見つけ、元に戻すと通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await openSurfaces(page, 1440)
+    const cards = page.locator('[data-design-part="card"]')
+    assert.deepEqual(await cards.evaluateAll(cardEdgeIssues), [])
+    const original = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--card-shadow'))
+    await page.evaluate(() => document.documentElement.style.setProperty('--card-shadow', '0 0 0 1px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(16, 24, 40, 0.06)'))
+    const broken = await cards.evaluateAll(cardEdgeIssues)
+    assert.ok(broken.some(issue => issue.includes('1px shadow edge')), JSON.stringify(broken))
+    await page.evaluate(() => document.documentElement.style.removeProperty('--card-shadow'))
+    await page.evaluate(() => { document.querySelector('#raised').style.outline = '1px solid #c9ced6' })
+    assert.ok((await cards.evaluateAll(cardEdgeIssues)).some(issue => issue.startsWith('raised: ') && issue.includes('outline')))
+    await page.evaluate(() => document.querySelector('#raised').style.removeProperty('outline'))
+    assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--card-shadow')), original)
+    assert.deepEqual(await cards.evaluateAll(cardEdgeIssues), [])
   } finally { await browser.close() }
 })

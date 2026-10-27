@@ -35,7 +35,7 @@ describe('補足と成功通知の色を役割に合わせる', () => {
     const meta = screen.getByText('3件')
     expect(screen.getByText('対応状況')).toBeTruthy()
     expect(action.getAttribute('href')).toBe('/chats')
-    expect(getComputedStyle(action).color).toBe(roleColor('action'))
+    expect(getComputedStyle(action).color).toBe(roleColor('link'))
     expect(getComputedStyle(meta).color).toBe(roleColor('ink-secondary'))
     for (const element of [action, meta]) {
       expect(contrastRatio(getComputedStyle(element).color, roleColor('canvas'))).toBeGreaterThanOrEqual(4.5)

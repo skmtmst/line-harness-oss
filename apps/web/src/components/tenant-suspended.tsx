@@ -15,7 +15,7 @@ export default function TenantSuspended() {
       description="ご契約の利用が停止されています。"
     >
       <div className="w-full">
-        <Notice tone="danger" data-design-node="R7p6Ba">
+        <Notice tone="info" data-design-node="R7p6Ba">
           <p className="text-caption text-ink-secondary">
             ご不明な点は「お問い合わせ」からお送りください。<br />
             運営からのお知らせは引き続き確認できます。

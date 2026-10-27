@@ -93,20 +93,13 @@
   font-size: var(--text-caption);
 }
 
-/*
- * #669 カード頭の操作（「すべて見る →」など）はテキストリンクなので
- * リンク色（action）にする。緑だと主操作ボタンと見分けがつかない。
- */
+/* カード頭の行き先リンク（「〇〇へ →」）は文字のリンクの緑。色の口は1つだけ。 */
 .action {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   color: var(--color-link);
   white-space: nowrap;
-}
-
-.actionInfo {
-  color: var(--color-link);
 }
 
 .action :is(a, button):focus-visible {

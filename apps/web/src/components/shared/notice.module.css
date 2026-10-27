@@ -21,12 +21,13 @@
 .dot {
   display: block;
   flex: none;
-  width: 8px;
-  height: 8px;
+  width: var(--space-8);
+  height: var(--space-8);
   border-radius: var(--radius-pill);
   background: var(--color-status-info);
+  /* 題（題が無ければ本文）の1行目の上下の真ん中。行の高さは題も本文も同じ値を読む。 */
   align-self: flex-start;
-  margin-top: 6px;
+  margin-top: calc((var(--tpl-ro-band-lh) - var(--space-8)) / 2);
 }
 .info .dot { background: var(--color-status-info); }
 .success .dot { background: var(--color-success); }
@@ -36,10 +37,14 @@
 .notice[data-has-action] .message { flex-basis: 24em; }
 .headingRow { display: flex; align-items: center; gap: var(--space-6); }
 .heading { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; }
+/* 「要確認：」「失敗：」。題の中では題の文字のまま、題が無い時は本文の頭に濃い文字で置く。 */
+.statusWord { color: var(--color-ink); font-weight: 600; }
+/* 本文が段落で始まっても同じ行の頭に並ぶよう、行の始まりへ寄せる。 */
+.statusWordLead { float: inline-start; margin-inline-end: 0.25em; }
 .description { display: block; color: var(--color-ink-secondary); }
 .action { display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); margin-left: auto; max-width: 100%; }
 .action .close { align-self: center; }
-.action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-action); font-weight: 600; }
+.action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-link); font-weight: var(--font-weight-ui); }
 .close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--space-32); height: var(--space-32); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); cursor: pointer; }
 .close:hover { background: var(--color-surface-pearl); }
 .close:focus-visible, .notice a:focus-visible { outline: revert; }
