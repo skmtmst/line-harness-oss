@@ -68,6 +68,7 @@ import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/dupl
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 
+import { ProgressBar } from '@/components/shared/progress'
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors';
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
@@ -699,14 +700,14 @@ export default function ScenariosListV8() {
       detail: `有効 ${stats ? stats.scenarios.active : emptyValue('unknown')}・停止中 ${scenarioStopped ?? emptyValue('unknown')}`,
     },
     {
-      title: '購読中',
+      title: '配信中',
       icon: Users,
       value: statsFailed ? null : stats?.scenarios.subscribers ?? null,
       unit: '人',
       detail: 'いま途中にいる人（重複を含む）',
     },
     {
-      title: '読み終えた人',
+      title: '最後まで配信した人',
       icon: CheckCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
@@ -796,7 +797,7 @@ export default function ScenariosListV8() {
     <>
       <Th aria-label="並び替え" />
       <Th className={styles.headCell}>シナリオ</Th>
-      <Th className={styles.headCell}>購読中 / 読み終えた</Th>
+      <Th className={styles.headCell}>配信中・最後まで配信</Th>
       <Th className={styles.headCell}>状態</Th>
       <Th aria-label="操作" />
     </>
@@ -958,10 +959,20 @@ export default function ScenariosListV8() {
                     />
                     <Td
                       className={styles.countCell}
-                      title={`購読中 ${subscribers} 人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}
+                      title={`配信中 ${subscribers} 人・最後まで配信 ${formatNumber(s.completedCount ?? 0)} 人`}
                     >
-                      <div className={styles.countMain}>{`${subscribers} 人`}</div>
-                      <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}</div>
+                      {/* 配信中と最後まで配信は別の人。割らずに並べ、棒は「最後まで ÷ 登録した人（＝足した数）」で分母を言葉で書く。 */}
+                      <div className={styles.countMain}>{`配信中 ${subscribers} 人・最後まで配信 ${formatNumber(s.completedCount ?? 0)} 人`}</div>
+                      {s.subscriberCount === undefined ? null : (() => {
+                        const completed = s.completedCount ?? 0
+                        const enrolled = (s.subscriberCount ?? 0) + completed
+                        return enrolled === 0 ? <div className={styles.countSub}>{emptyValue('unknown')}</div> : (
+                          <div className={styles.countRow}>
+                            <ProgressBar value={completed} max={enrolled} label={`${s.name ?? 'シナリオ'}を最後まで配信した割合`} className={styles.countBar} />
+                            <span className={styles.countSub}>{scenarioCompletionDetail(s.subscriberCount ?? 0, completed)}</span>
+                          </div>
+                        )
+                      })()}
                     </Td>
                     <Td>
                       <SharedStatusPill tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? '有効' : '停止中'}</SharedStatusPill>

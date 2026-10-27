@@ -88,6 +88,17 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 
 import ScenariosListV8 from './list'
 
+test('配信中と最後まで配信を割らずに並べ、棒は登録した人を分母にして言葉で書く', async () => {
+  const view = render(<ScenariosListV8 />)
+  await view.findByText('新規登録7日間フォロー')
+  expect(view.getAllByText('配信中 10 人・最後まで配信 2 人').length).toBeGreaterThan(0)
+  expect(view.getAllByText('登録した 12 人の 17%').length).toBeGreaterThan(0)
+  const bar = view.getAllByRole('progressbar').find((el) => el.getAttribute('aria-label')?.includes('最後まで配信した割合'))!
+  expect(bar.getAttribute('aria-valuemax')).toBe('12')
+  expect(bar.getAttribute('aria-valuenow')).toBe('2')
+  view.unmount()
+})
+
 test('シナリオの説明本文を型へつなぎ、開閉と同じ人の保存キーを保つ', async () => {
   const stored = new Map<string, string>()
   const descriptor = Object.getOwnPropertyDescriptor(window, 'localStorage')
