@@ -811,5 +811,6 @@
 - [画面の地・カードの影・知らせ・日付の表示](release-log/unreleased/0000-kenta-tone2-card-a.md)
 - [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
+- [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

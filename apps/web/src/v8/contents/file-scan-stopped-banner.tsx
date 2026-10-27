@@ -29,7 +29,7 @@ export default function FileScanStoppedBanner({ accountId }: { accountId: string
   if (!stopped) return null
   return (
     <NoteBar tone="warn">
-      ファイルの検査が止まっています。上げたファイルは持ちのまま、確かめ終わるまで使えません。しばらくしてから自動で続きます。
+      ファイルの安全確認が止まっています。上げたファイルは持ちのまま、確かめ終わるまで使えません。しばらくしてから自動で続きます。
     </NoteBar>
   )
 }

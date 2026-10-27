@@ -33,7 +33,7 @@ export default function LinkedActionList({ value, onChange, accountId, allowedTy
     const type = typeLabel ?? ACTION_TYPES.find(([label]) => ACTION_DEFINITIONS[label].actionType === action.definition!.type && (label !== 'テンプレート送信' || Boolean(params.templateId)) && (label !== 'テキスト送信' || !params.templateId))?.[0]
     const def = type ? ACTION_DEFINITIONS[type] : undefined
     const options = def?.resource ? resources?.[def.resource] as Array<{ id: string; name: string }> | undefined : undefined
-    const label = typeof params.content === 'string' ? params.content : params.amount !== undefined ? `${params.amount} mile`
+    const label = typeof params.content === 'string' ? params.content : params.amount !== undefined ? `${params.amount} マイル`
       : def?.paramKey ? options?.find(item => item.id === params[def.paramKey!])?.name ?? action.label : action.label
     const minutes = Number(params.delayMinutes ?? 0)
     return { ...action, label, timing: minutes > 0 ? `${minutes}分後` : 'すぐに', definition: { ...action.definition, params } }

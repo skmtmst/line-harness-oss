@@ -386,7 +386,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
           description={listState === 'empty' && !accountId
             ? 'LINEアカウントを選ぶ欄で、確認するアカウントを選びます。'
             : listState === 'empty' && recordsNarrowing
-              ? '札や検索を外すと、すべて出ます'
+              ? '絞り込みや検索を外すと、すべて出ます'
               : undefined}
           action={listState === 'empty' && accountId && recordsNarrowing
             ? <Button type="button" variant="secondary" onClick={clearRecordFilters}>条件を外す</Button>

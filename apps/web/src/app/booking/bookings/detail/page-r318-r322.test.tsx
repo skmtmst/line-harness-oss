@@ -139,7 +139,7 @@ describe('R318: 競合後の再試行は触った欄だけ送る', () => {
 
     render(<Page />)
     await flush()
-    fireEvent.click(screen.getByRole('button', { name: '内容を変更する' }))
+    fireEvent.click(screen.getByRole('button', { name: '内容を変える' }))
     await flush()
     expect((screen.getByLabelText('料金（円・税込）') as HTMLInputElement).value).toBe('1000')
 
@@ -149,7 +149,7 @@ describe('R318: 競合後の再試行は触った欄だけ送る', () => {
     // 保存の直前に別担当が料金2000円・版2へ更新したことにする。
     server.price = 2000
     server.lockVersion = 2
-    fireEvent.click(screen.getByRole('button', { name: 'この内容で変更する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この内容にする' }))
     await flush()
 
     // 1回目はメモしか送っていない（差分保存）。
@@ -166,7 +166,7 @@ describe('R318: 競合後の再試行は触った欄だけ送る', () => {
       .toBe('自分のメモ')
 
     // 再試行。新しい版でメモだけ送る。
-    fireEvent.click(screen.getByRole('button', { name: 'この内容で変更する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この内容にする' }))
     await flush()
     expect(sentPatches).toHaveLength(2)
     expect(sentPatches[1]).toMatchObject({ lock_version: 2, internal_note: '自分のメモ' })
@@ -234,12 +234,12 @@ describe('R322: 別の予約へ移動後は前の保存で今の表示を消さ�
     await flush()
     expect(screen.getByText('Aメニュー')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '内容を変更する' }))
+    fireEvent.click(screen.getByRole('button', { name: '内容を変える' }))
     await flush()
     fireEvent.change(screen.getByLabelText('店内メモ（お客様には見えません）'), {
       target: { value: 'Aの新しいメモ' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'この内容で変更する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この内容にする' }))
     await flush()
 
     // 保存の応答を待たずBへ移動する。
@@ -316,7 +316,7 @@ describe('R320/R321: 申し送りの入口と履歴の件数', () => {
    it('WEB298：編集したメモがある間は離脱を防ぐ', async () => {
      m.get.mockResolvedValue({ booking: booking('A') })
      render(<Page />); await flush()
-     fireEvent.click(screen.getByRole('button', { name: '内容を変更する' })); await flush()
+     fireEvent.click(screen.getByRole('button', { name: '内容を変える' })); await flush()
      fireEvent.change(screen.getByLabelText('店内メモ（お客様には見えません）'), { target: { value: '未保存のメモ' } })
      const event = new Event('beforeunload', { cancelable: true })
      window.dispatchEvent(event)
@@ -327,9 +327,9 @@ describe('R320/R321: 申し送りの入口と履歴の件数', () => {
      m.get.mockImplementation(async (_account: string, id: string) => ({ booking: booking(id) }))
      m.update.mockImplementationOnce(() => new Promise((_resolve, failure) => { reject = failure }))
      const view = render(<Page />); await flush()
-     fireEvent.click(screen.getByRole('button', { name: '内容を変更する' })); await flush()
+     fireEvent.click(screen.getByRole('button', { name: '内容を変える' })); await flush()
      fireEvent.change(screen.getByLabelText('店内メモ（お客様には見えません）'), { target: { value: '修正' } })
-     fireEvent.click(screen.getByRole('button', { name: 'この内容で変更する' })); await flush()
+     fireEvent.click(screen.getByRole('button', { name: 'この内容にする' })); await flush()
      m.id = 'B'; view.rerender(<Page />); await flush()
      m.get.mockClear()
      await act(async () => { reject(new ApiErrorMock(409, 'conflict', 'version_conflict')) }); await flush()
@@ -340,10 +340,10 @@ describe('R320/R321: 申し送りの入口と履歴の件数', () => {
      m.get.mockResolvedValue({ booking: booking('A') })
      m.update.mockImplementationOnce(() => new Promise(() => {}))
      render(<Page />); await flush()
-     fireEvent.click(screen.getByRole('button', { name: '内容を変更する' })); await flush()
+     fireEvent.click(screen.getByRole('button', { name: '内容を変える' })); await flush()
      const note = screen.getByLabelText('店内メモ（お客様には見えません）') as HTMLTextAreaElement
      fireEvent.change(note, { target: { value: '保存するメモ' } })
-     fireEvent.click(screen.getByRole('button', { name: 'この内容で変更する' })); await flush()
+     fireEvent.click(screen.getByRole('button', { name: 'この内容にする' })); await flush()
      expect(note.matches(':disabled')).toBe(true)
    })
  })

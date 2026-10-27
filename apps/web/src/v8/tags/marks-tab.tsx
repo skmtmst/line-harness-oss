@@ -488,6 +488,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
             value={kpi.value}
             unit={kpi.value == null ? '' : kpi.unit}
             detail={kpi.detail}
+            loading={statsStatus === 'loading'}
           />
         ))}
       </KpiBand>}

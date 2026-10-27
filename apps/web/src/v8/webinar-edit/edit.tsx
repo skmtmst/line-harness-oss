@@ -69,7 +69,7 @@ const DETAIL_KEYS = ['participants', 'analytics', 'comments'] as const
 const STEP_TITLE: Record<StepKey, string> = {
   basic: 'ウェビナーを編集',
   video: '動画と公開期間',
-  cta: 'CTA・フォーム',
+  cta: '案内ボタン・フォーム',
   notifications: '通知と視聴後のこと',
   review: '公開の前に確かめる',
 }

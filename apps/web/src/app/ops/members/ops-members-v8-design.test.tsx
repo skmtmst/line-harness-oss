@@ -2,9 +2,9 @@
 /*
  * 板  メンバー管理の絵合わせ（V8）。
  * - 頭：説明、段切り替えは運営メンバー・情報
- * - 数の帯：3つ（2要素認証の札は出さない）、有効・招待中と監査ログに記録
+ * - 数の帯：3つ（二段階認証の札は出さない）、有効・招待中と監査ログに記録
  * - 招待の行が常に出る（開閉ボタン・キャンセルは無い）
- * - 行：（自分）、2要素認証待ちの札、短い最終ログイン
+ * - 行：（自分）、二段階認証待ちの札、短い最終ログイン
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -79,7 +79,7 @@ describe('FvbHW メンバー管理の絵合わせ', () => {
     expect(body).toContain('有効 2・招待中 1')
     expect(body).toContain('監査ログに記録')
     expect(body).not.toContain('未設定 1人')
-    expect(host.querySelector('[title="2要素認証 設定済み 2人 / 3人・未設定 1人"]')).not.toBeNull()
+    expect(host.querySelector('[title="二段階認証 設定済み 2人 / 3人・未設定 1人"]')).not.toBeNull()
     // 招待の行
     expect(body).toContain('招待メールを送る')
     expect(body).not.toContain('運営メンバーを招待')
@@ -88,7 +88,7 @@ describe('FvbHW メンバー管理の絵合わせ', () => {
     expect(body).toContain('Kenta Kawano（自分）')
     expect(body).toContain('10/02 07:10')
     expect(body).toContain('10/01 22:40')
-    expect(body).toContain('2要素認証待ち')
+    expect(body).toContain('二段階認証待ち')
     expect(body).toContain('招待中')
     const menu = host.querySelector<HTMLButtonElement>('button[aria-label="検証 次郎のその他操作"]') ?? Array.from(host.querySelectorAll<HTMLButtonElement>('button[data-row-menu]')).find(button => !button.disabled)!
     expect(menu).toBeTruthy()

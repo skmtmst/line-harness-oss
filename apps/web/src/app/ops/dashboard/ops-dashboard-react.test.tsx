@@ -131,7 +131,7 @@ describe('画面', () => {
     expect(details).toContain('4,820 / 5,000')
     expect(details).toContain('1.8GB / 5.0GB')
     expect(text).toContain('96%')
-    expect(text).toContain('Stripe の入金実績（最終同期 9月25日 03:00）')
+    expect(text).toContain('Stripe の入金実績（最後に取り込んだ日時 9月25日 03:00）')
     expect(text.toLowerCase()).not.toContain(['m', 'r', 'r'].join(''))
     expect(host.querySelector('[data-design-node="CyW0E"]')).not.toBeNull()
     expect(host.querySelector('[data-design-node="Xvofy"]')).toBeNull()

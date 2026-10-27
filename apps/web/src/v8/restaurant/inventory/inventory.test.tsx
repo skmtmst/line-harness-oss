@@ -77,7 +77,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
   it('下の帯の保存は、配分（全部の時間帯）と開ける時間を今の口へ送る', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'OTA（予約媒体）' }), { target: { value: '7' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
     fireEvent.click(screen.getByRole('button', { name: /開ける時間と配分を保存/ }))
     await waitFor(() => expect(fixture.saveOpeningHours).toHaveBeenCalled())
     expect(fixture.saveInventoryAllocation).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', otaCapacity: 7, slots: [{ id: 's17', expectedVersion: 3 }, { id: 's19', expectedVersion: 3 }] }))
@@ -156,7 +156,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
 it('OP-R04 未保存の配分があるタブの移動は確認し、取り消すと入力を残す',async()=>{
  document.documentElement.dataset.theme='v8'
  render(<InventoryPage/>)
- const input=await screen.findByRole('spinbutton',{name:'OTA（予約媒体）'})
+ const input=await screen.findByRole('spinbutton',{name:'予約サイト'})
  fireEvent.change(input,{target:{value:'7'}})
  fireEvent.click(screen.getByRole('tab',{name:'予約経路の連携'}))
  const dialog=await screen.findByRole('dialog',{name:'保存していない変更があります'})
@@ -173,7 +173,7 @@ it('OP-R04 未保存の配分があるタブの移動は確認し、取り消す
 it('inventory channel read failure does not become no channels',async()=>{
  fetchApi.mockRejectedValueOnce(new Error('人工取得失敗'))
  render(<InventoryPage />)
- const error=await screen.findByText('予約媒体を読み込めませんでした')
+ const error=await screen.findByText('予約サイトを読み込めませんでした')
  fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
- await waitFor(()=>expect(screen.queryByText('予約媒体を読み込めませんでした')).toBeNull())
+ await waitFor(()=>expect(screen.queryByText('予約サイトを読み込めませんでした')).toBeNull())
 })

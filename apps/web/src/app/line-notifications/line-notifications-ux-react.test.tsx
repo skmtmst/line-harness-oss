@@ -124,11 +124,11 @@ it('顧客タブの読み込み中は骨組みが出て「読み込み中」の�
   delete document.documentElement.dataset.theme
 })
 
-it('LINE通知は題の用語説明と画面の説明を両方開ける', async () => {
+it('LINE通知は題の用語説明と画面の説明を「？」1つで開ける', async () => {
   fixture.tab = 'failures'
   render(<LineNotificationsPage />)
-  const help = screen.getByRole('button', { name: 'LINE通知の説明' })
+  expect(screen.queryByRole('button', { name: 'LINE通知の説明' })).toBeNull()
+  const help = screen.getByRole('button', { name: 'この画面の説明' })
   await act(async () => { help.click() })
   expect(screen.getByText(/送れなかった理由や再試行の予定/)).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'この画面の説明' })).toBeTruthy()
 })

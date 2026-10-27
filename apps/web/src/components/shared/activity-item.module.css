@@ -1,31 +1,9 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 動きの印・動きの行（Pencil ★V8 `x4FeKG`・`EsjP2`）。
- *
- *   行の高さ 50・左右の間隔 12
- *   左のレール 24 幅：印は 24x24 の正円（shell 地・中の印 12）
- *   縦線は 1x26（hairline）、印の真下から次の行へ繋がる
- *   題 13/500 ink・補足 12 ink-secondary・時刻 12 ink-faint
- *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない
+ * 動きの印（Pencil ★V8 `x4FeKG`）。行そのものは共通の行（icon-row）が持つ。
+ * 印は 24x24 の正円（shell 地・中の印 16）。
  */
-
-.row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  min-height: 50px;
-}
-
-.rail {
-  width: 24px;
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-}
-
 .marker {
   width: 24px;
   height: 24px;
@@ -36,55 +14,9 @@
   align-items: center;
   justify-content: center;
 }
-
-.line {
-  width: 1px;
-  flex: 1;
-  min-height: 26px;
-  background: var(--color-hairline);
 }
-
-.body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.title {
-  color: var(--color-ink);
-}
-
-.note {
-  font-size: var(--text-caption);
-  color: var(--color-ink-secondary);
-}
-
-.time {
-  flex-shrink: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-faint);
-}
-
-/* Pencil の文字は行の高さ 1.5（--text-lh）。互換経路は書かない（既定のまま）。 */
-:root .title,
-:root .note,
-:root .time {
-  line-height: var(--text-lh);
-}
-
-:root .title { line-height: 20px; }
-:root .note, :root .time { line-height: 18px; }
 
 :root .marker { border-radius: var(--polish-radius-pill); gap: 0; }
-:root .body { align-items: flex-start; gap: 0; }
-}
-
 :root .marker svg { flex-shrink: 0; }
-
-/* ②：役割ごとの文字の段。 */
-:root .title { font-size: var(--polish-text-body); font-weight: var(--polish-weight-label); }
-
-:root .title { font-size: var(--text-body); }
 
 .microTime { display: block; color: var(--color-ink-secondary); font-family: var(--font-inter), Inter, sans-serif; font-size: var(--text-micro); line-height: var(--activity-time-line-height, var(--text-micro--line-height)); }

@@ -131,6 +131,8 @@ a.planTitle:hover { text-decoration: underline; }
 
 /* ── 段E：最近の動き ── */
 .activity { display: flex; flex-direction: column; gap: var(--tpl-db-act-gap); margin: 0 var(--tpl-list-inset); padding: var(--tpl-db-act-pad); }
+/* 履歴の縦線が行の間の隙間もつなぐように、共通の行へ隙間を渡す。 */
+.activity { --icon-row-list-gap: var(--tpl-db-act-gap); }
 .activityLink { display: block; color: inherit; text-decoration: none; border-radius: var(--tpl-db-th-radius); }
 .activityLink:hover { background: var(--color-surface-pearl); }
 

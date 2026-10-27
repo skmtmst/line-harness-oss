@@ -100,7 +100,7 @@ describe('タグの保管の窓', () => {
       { kind: 'common_action', name: 'b', version: 4, state: 'draft' },
     ] }) })
     render(<DeleteTagDialog tag={tag} accountId="acc" onCancel={() => {}} onArchived={() => {}} />)
-    await waitFor(() => expect(rowValue('使用中の版')).toBe('公開 v3・下書き v4'))
+    await waitFor(() => expect(rowValue('使用中の版')).toBe('公開 第3版・下書き 第4版'))
     expect(screen.getByText('公開している版があるので消せません')).toBeTruthy()
     cleanup()
     net.dependencies.mockResolvedValue({ success: true, data: impact() })

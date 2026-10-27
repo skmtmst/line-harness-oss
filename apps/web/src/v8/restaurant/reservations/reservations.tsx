@@ -296,8 +296,8 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
 }
 
 const DESCRIPTION: Record<'today' | 'list', string> = {
-  today: '予約媒体・LINE・電話の予約を、時間と卓で確認します。',
-  list: '予約媒体・LINE・電話の予約を、一つの時間軸で確認します。',
+  today: '予約サイト・LINE・電話の予約を、時間と卓で確認します。',
+  list: '予約サイト・LINE・電話の予約を、一つの時間軸で確認します。',
 }
 
 /*

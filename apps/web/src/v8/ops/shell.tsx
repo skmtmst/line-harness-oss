@@ -50,14 +50,14 @@ export const OPS_MENU: Array<{ href: string; label: string; icon: typeof LayoutD
   { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
 ]
 
-/** 下端の入口。2要素認証とログアウトは左下の本人カードから開く。 */
+/** 下端の入口。二段階認証とログアウトは左下の本人カードから開く。 */
 const OPS_FOOT: Array<{ href: string; label: string; icon: typeof LayoutDashboard }> = [
   { href: '/ops/members', label: 'メンバー管理', icon: Users },
 ]
 
 /** 道から画面名を引く（パンくずの最後の段）。 */
 export function opsTitleForPath(pathname: string): string {
-  const all = [...OPS_MENU, ...OPS_FOOT, { href: '/ops/invite', label: 'メンバーの招待' }, { href: '/ops/two-factor', label: '2要素認証' }]
+  const all = [...OPS_MENU, ...OPS_FOOT, { href: '/ops/invite', label: 'メンバーの招待' }, { href: '/ops/two-factor', label: '二段階認証' }]
   const hit = all.filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0]
   if (pathname.startsWith('/ops/tenants/detail')) return '契約先の詳細'
@@ -161,7 +161,7 @@ function OpsShellFrame({
       <SidebarUserMenu name={me?.name || '—'} role="運営" collapsed={collapsed && !drawer} pathname={pathname} items={[
         { id: 'profile', label: 'プロフィールを編集', href: '/staff' },
         { id: 'members', label: 'メンバー管理', href: '/ops/members' },
-        { id: 'two-factor', label: me?.totpEnabled ? '2要素認証（設定済み）' : '2要素認証の設定', href: '/ops/two-factor' },
+        { id: 'two-factor', label: me?.totpEnabled ? '二段階認証（設定済み）' : '二段階認証の設定', href: '/ops/two-factor' },
         { id: 'logout', label: 'ログアウト', tone: 'danger', dividerBefore: true, onSelect: () => void logoutAndGoToLogin('/ops/login') },
       ]} />
     </>

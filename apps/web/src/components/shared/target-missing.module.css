@@ -30,7 +30,7 @@
   height: 40px;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
 }

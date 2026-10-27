@@ -412,7 +412,7 @@ export default function TemplateDetailV8() {
         {compareTarget === 'draft' ? compareBox : null}
 
         <Card variant="form" aria-label="本文">
-          <CardHeader size="content" title={template.hasDraft ? '本文（下書き）' : '本文'} meta="緑の札は差し込み。受け取る人ごとに変わります。" action={canMutate ? <Button href={editHref} variant="secondary" icon={<Pencil aria-hidden="true" />}>編集する</Button> : undefined} />
+          <CardHeader size="content" title={template.hasDraft ? '本文（下書き）' : '本文'} meta="緑の印は差し込み。受け取る人ごとに変わります。" action={canMutate ? <Button href={editHref} variant="secondary" icon={<Pencil aria-hidden="true" />}>編集する</Button> : undefined} />
           <div className={styles.bodyBox}>{template.messageType === 'text' ? <InsertText value={draftContent} /> : draftContent}</div>
         </Card>
 
