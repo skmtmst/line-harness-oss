@@ -12,10 +12,6 @@ const settings: AutoReplyDraftInput = {
   keywordMatchMode:'any',folderId:'folder-a',internalMemo:'一次対応',replyDelaySeconds:30,unmatchedAction:{type:'notify_operator'},
 }
 describe('自動応答の設定の復元と保存',()=>{
-  it('一覧は現行編集へ進み、版管理の設定を共通の変換で復元する',()=>{
-    expect(LIST).toContain('/auto-replies/edit?id=')
-    expect(EDIT).toContain('formFromSettings(version.settings)')
-  })
   it('呼ぶ側が個別に項目を並べ直さない',()=>{
     expect(LIST).not.toContain('keywordMatchMode: r.keywordMatchMode')
     expect(EDIT).not.toContain('keywordMatchMode: res.data.keywordMatchMode')

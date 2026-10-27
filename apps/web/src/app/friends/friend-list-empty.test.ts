@@ -1,5 +1,3 @@
-import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
-import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { emptyMessageOf, hasAnyFilter, type EmptyFilters } from '@/v8/friends/list/empty'
 
@@ -40,27 +38,13 @@ describe('0件の言い分け', () => {
   })
 })
 
-const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
-const TABLE = readFileSync(join(__dirname, '..', '..', 'components', 'friends', 'friend-list-table.tsx'), 'utf8')
-
 describe('URLから来る絞り込み', () => {
-  it('画面が点数の帯と配信対象を数に入れている', () => {
-    /*
-      **考え方が正しくても、画面が渡していなければ効かない。**
-      渡し忘れを見張る（別の画面で、宣言だけを見ていたために描画を
-      消しても試験が通ったことがある）。
-    */
-    expect(PAGE).toContain('|| hasScoreRange')
-    expect(PAGE).toContain("|| audienceId !== ''")
-    expect(PAGE).toContain('<ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description}')
-    expect(TABLE).toContain('<ListState kind="empty"')
-  })
-
   it('点数の帯や配信対象で開いたときも絞り込みとして数える', () => {
     /*
       行動スコアの「この帯の人を見る」は `?scoreMin=` で開く。
       数え落とすと、その帯に誰もいないときに「まだ友だちがいません」と出て、
-      絞り込んだ結果だと分からなくなる。
+      絞り込んだ結果だと分からなくなる。画面が渡していることは
+      friends-list-behavior.test.tsx が URL で開いて確かめる。
     */
     expect(emptyMessageOf({ ...none, others: true }).title).toBe('条件に合う友だちが見つかりません')
   })

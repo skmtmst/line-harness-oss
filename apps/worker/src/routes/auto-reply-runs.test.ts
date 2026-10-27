@@ -157,6 +157,21 @@ describe('GET /api/auto-reply-runs', () => {
     expect(json.data.items[0].canRetry).toBe(false);
   });
 
+  it.each([
+    ['reply_failed', 'permanent_failed', 'LINEへの返信を受け付けてもらえませんでした'],
+    ['partial_failed', 'permanent_failed', '返信または一部の処理だけ完了しました'],
+    ['failed', 'permanent_failed', '自動応答を完了できませんでした'],
+    ['skipped', 'skipped', '条件に合わず何もしませんでした'],
+  ])('失敗と見送りを分ける: %s は %s として返す', async (status, expected, expectedDetail) => {
+    const original = await mocks.listAutoReplyEvaluationRuns();
+    mocks.listAutoReplyEvaluationRuns.mockResolvedValueOnce({ ...original, items: [{ ...original.items[0], status }] });
+    const response = await app().request('/api/auto-reply-runs', {}, { DB: db } as Env['Bindings']);
+    const json = await response.json() as { data: { items: Array<{ status: string; domainStatus: string; detail: string }> } };
+    expect(json.data.items[0].status).toBe(expected);
+    expect(json.data.items[0].domainStatus).toBe(status);
+    expect(json.data.items[0].detail).toBe(expectedDetail);
+  });
+
   it('受信本文はチャット閲覧権限がある担当者にだけ返す', async () => {
     const response = await app({ ...staff, permissionKeys: ['/chats'] }).request(
       '/api/auto-reply-runs?rule_id=rule-a',

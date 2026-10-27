@@ -10,68 +10,35 @@ const FORM = readUiSource(
 )
 
 /**
- * 一斉配信の作成（設計 `zZ9fA` 6-1-A ／ `XQfMD` 6-1-C ／ `p97Tf` 6-1-D）。
+ * 一斉配信の作成（設計 `zZ9fA` 6-1-A ／ `XQfMD` 6-1-C ／ `p97Tf` 6-1-D）の禁止の見張り。
  *
- * **節の番号は `broadcast-section-numbers` の試験が見ている**ので、ここでは
- * 見ない。同じことを2か所で数えると、片方だけ直したときに食い違う。
+ * LINEプレビューの確認の記録・本文の上限（欄で止める・保存とテスト送信を止める・理由を出す）は
+ * broadcast-form-preview-length-react.test.tsx が、知らない種類の呼び名は broadcast-form-model.test.ts が、
+ * 未取得の人数を「—」で出すことは broadcast-form-final-confirm-react.test.tsx が見る。
+ * **節の番号は `broadcast-section-numbers` の試験が見ている**ので、ここでは見ない。
  */
 describe('一斉配信の作成', () => {
-  it('右側をLINEプレビューと明記し、確認済みを利用者が記録できる', () => {
-    expect(FORM).toContain('実際のLINE表示に近い確認用プレビューです。')
-    expect(FORM).toContain("previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'")
-    // m21u: 素の input を共通の Checkbox へ置き換えた。利用者が記録できる動きは保つ。
-    expect(FORM).toContain('onCheckedChange={setPreviewConfirmed}')
-    expect(FORM).toContain('+ (previewConfirmed ? 0 : 1)')
-    expect(FORM).toContain('}, [bubbles, scheduledDate, scheduledTime, sendMode, visualQaAugustCampaign])')
-  })
-
   it('本文の上限を直書きしない', () => {
-    // G-9では入力欄と上限表示を共通部品へ移した。保存時の上限検査はフォームに残す。
-    const composer = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../shared/message-composer.tsx'), 'utf8')
     expect(FORM).not.toMatch(/maxLength=\{500\}/)
     expect(FORM).not.toMatch(/\/ 500/)
-    expect(composer).toContain('maxLength={MAX_TEXT_LENGTH}')
-    expect(composer).toContain('messageLengthLabel(value.length)')
-    expect(composer).toContain('bubbles.length >= MAX_BUBBLES')
-    expect(FORM).toContain('messageLengthNotice')
   })
 
   it('送信対象の未取得を半角ハイフンで書かない', () => {
     expect(FORM).not.toMatch(/formatNumber\([^)]+\) \?\? '-'/)
-    expect(FORM).toContain("formatNumber(audienceCount)")
-  })
-
-  it('上限を超えたまま保存・送信できない', () => {
-    /*
-     * 本文の欄は `maxLength` で止まるが、下書きやテンプレートから読み込むと
-     * 上限を超えた本文が入ることがある。**そのとき保存だけが静かに 400 で
-     * 失敗する**——押した人にはどの通のどこが長いのか分からない。
-     */
-    expect(FORM, '保存が止まらない').toContain("disabled={saving || lengthNotice.tone === 'error'}")
-    expect(FORM, 'テスト送信が止まらない').toContain("disabled={testSending || saving || lengthNotice.tone === 'error'}")
-  })
-
-  it('上限超過を、押す前に本文の文字で出す', () => {
-    /* 右の点検欄は宛先と本文が決まるまで出ないので、こちらは常に出す。 */
-    expect(FORM).toContain("{shows('message') && lengthNotice.tone === 'error' && (")
-    expect(FORM).toContain('<p className="text-danger text-sm font-bold">{lengthNotice.title}</p>')
-    expect(FORM, '押せない理由が吹き出しに出ない').toContain(
-      "title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}",
-    )
   })
 
   it('知らない種類でも内部の語を出さない', () => {
     // `?? template.messageType` だと札に `text` や `carousel` が出る。
     expect(FORM).not.toContain('?? template.messageType')
-    expect(FORM).toContain("?? 'その他'")
   })
 })
 
 /*
- * 狭い幅での横はみ出し（監査 R149）。
+ * 狭い幅での横はみ出し。
  *
  * 素材を引用した吹き出しの見出し行（種類の選択肢＋移動・削除）が折れないと、
  * 390px で解除や並べ替えが右側へ隠れる。段の列自体も縮める。
+ * 見た目の値なので画面を動かす試験では赤くできない。実ブラウザの崩れの見張りに移すまで残す。
  */
 describe('狭い幅で操作が隠れない', () => {
   it('吹き出しは共通 composer で幅を縮め、操作の幅を保つ', () => {

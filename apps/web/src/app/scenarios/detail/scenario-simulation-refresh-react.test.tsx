@@ -317,10 +317,15 @@ describe('SCENARIO-15: 設定を保存し直すと試算を取り直す', () => 
     expect(plannedNumber()).toBe('10')
     const before = network.simulateCalls
 
+    expect(host.textContent).toContain('同時購読を許可中')
     network.plannedNow = 7
     await toggleConcurrent()
     await flush()
 
+    // 窓で外した値をそのまま保存へ渡し、見出しの状態も同じ値で言い換える。
+    expect(network.updateBodies[0]).toMatchObject({ allowConcurrent: false })
+    expect(host.textContent).toContain('同時に1つだけ')
+    expect(host.textContent).not.toContain('同時購読を許可中')
     expect(network.simulateCalls).toBeGreaterThan(before)
     expect(plannedNumber()).toBe('7')
   })

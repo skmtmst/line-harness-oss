@@ -26,6 +26,19 @@ export const ROUTES = {
 /** iPad 横（1024px）まで崩れないことを見張る。 */
 export const WIDTHS = [1024, 1152, 1440, 1920]
 
+/*
+ * 電話の専用の画面（/m）だけを電話の幅で見る。全機能の管理画面（ROUTES）は 390 で点検しない決まりのまま。
+ * ROUTES に /m を入れない・MOBILE_ROUTES に PC の住所を入れない（layout-overflow.test.mjs が守る）。
+ */
+export const MOBILE_ROUTES = {
+  'mobile-talk': '/m/chats',
+  'mobile-thread': '/m/chats?friend=friend-1',
+  'mobile-todo': '/m/todo',
+}
+
+/** iPhone の 390×844 と 430×932。 */
+export const MOBILE_VIEWPORTS = [{ width: 390, height: 844 }, { width: 430, height: 932 }]
+
 const SESSION = {
   lh_csrf: 'visual-qa-csrf',
   lh_staff_role: 'owner',
@@ -35,9 +48,11 @@ const SESSION = {
   lh_selected_account: 'visual-qa-account',
 }
 
-export async function openPage(browser, { baseUrl, route, width, stable = false, settleMs = 2500, onPageError, requireSuccess = false }) {
+export async function openPage(browser, { baseUrl, route, width, height = 900, mobile = false, stable = false, settleMs = 2500, onPageError, requireSuccess = false }) {
   const page = await browser.newPage({
-    viewport: { width, height: 900 },
+    viewport: { width, height },
+    // 電話の画面は指で触る端末として開く（押せる所 44px・入力欄 16px の決まりが効く形）。
+    ...(mobile ? { isMobile: true, hasTouch: true } : {}),
     ...(stable ? { reducedMotion: 'reduce' } : {}),
   })
   try {

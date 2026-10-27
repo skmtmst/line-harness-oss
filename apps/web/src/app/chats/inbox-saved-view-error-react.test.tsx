@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, screen } from '@testing-library/react'
 import ChatsPage from './page'
 import * as toast from '@/components/shared/toast'
 
@@ -25,6 +26,8 @@ const nav = vi.hoisted(() => ({
 
 const net = vi.hoisted(() => ({
   calls: [] as string[],
+  /** 保存POSTに載った本文。 */
+  saveBodies: [] as unknown[],
   /** 保存POSTへ返す応答。{status, body} で失敗を作る。 */
   saveResponse: { status: 200, body: { success: true, data: { id: 'sv-new' } } } as {
     status: number
@@ -62,6 +65,7 @@ function installFetch() {
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
     net.calls.push(`${(init?.method ?? 'GET').toUpperCase()} ${path}`)
     if (path.startsWith('/api/inbox/saved-views') && (init?.method ?? 'GET') === 'POST') {
+      net.saveBodies.push(JSON.parse(String(init?.body ?? 'null')))
       return new Response(JSON.stringify(net.saveResponse.body), {
         status: net.saveResponse.status,
         headers: { 'Content-Type': 'application/json' },
@@ -118,6 +122,7 @@ beforeEach(() => {
   nav.calls.length = 0
   nav.last = null
   net.calls.length = 0
+  net.saveBodies.length = 0
   net.saveResponse = { status: 200, body: { success: true, data: { id: 'sv-new' } } }
   vi.stubGlobal('localStorage', makeStorage())
   vi.stubGlobal('sessionStorage', makeStorage())
@@ -214,6 +219,17 @@ describe('保存した検索の保存失敗(N-027)', () => {
     // API内部文言は素通ししない。
     expect(dialog.textContent).not.toContain('Internal server error')
   })
+
+  it('保存先が成功の形で失敗（success:false）を返しても、内部の文言ではなく汎用の文言を出す', async () => {
+    net.saveResponse = { status: 200, body: { success: false, error: 'D1_ERROR: constraint failed' } }
+    const dialog = await openSaveDialog()
+    await typeName(dialog, '夕方の未対応')
+    await submit(dialog)
+
+    expect(dialog.textContent).toContain('保存できませんでした。時間を置いてもう一度お試しください。')
+    expect(dialog.textContent).not.toContain('D1_ERROR')
+    expect(document.body.querySelector('[aria-label="保存した検索を作成"]')).toBeTruthy()
+  })
 })
 
 it('保存できた検索は名前付きのトーストで一度だけ知らせる', async () => {
@@ -223,4 +239,23 @@ it('保存できた検索は名前付きのトーストで一度だけ知らせ�
   await submit(dialog)
   expect(saved).toHaveBeenCalledExactlyOnceWith('保存した検索「朝イチの未対応」を保存しました')
   expect(document.body.querySelector('[aria-label="保存した検索を作成"]')).toBeNull()
+})
+
+it('窓で変えた条件と「よく使う」を、そのまま保存の口へ送る（画面の今の絞り込みで上書きしない）', async () => {
+  const dialog = await openSaveDialog()
+  await typeName(dialog, '対応済みの要返信')
+  await act(async () => { dialog.querySelector<HTMLButtonElement>('button[aria-label="保存する対応状況"]')!.click() })
+  await act(async () => { fireEvent.click(screen.getByRole('option', { name: '対応済み' }).querySelector('button')!) })
+  await act(async () => { dialog.querySelector<HTMLButtonElement>('button[aria-label="保存する絞り込み"]')!.click() })
+  await act(async () => { fireEvent.click(screen.getByRole('option', { name: '要返信' }).querySelector('button')!) })
+  // 画面から開いた窓では「よく使うに追加」が最初から入っている。
+  expect((screen.getByRole('checkbox', { name: /よく使うに追加/ }) as HTMLInputElement).checked).toBe(true)
+  await submit(dialog)
+
+  expect(net.saveBodies).toHaveLength(1)
+  expect(net.saveBodies[0]).toMatchObject({
+    name: '対応済みの要返信',
+    isFavorite: true,
+    conditions: { statuses: ['resolved'], quickFilter: 'reply', unread: 'all', channels: ['line', 'email'] },
+  })
 })

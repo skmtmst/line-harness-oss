@@ -263,6 +263,7 @@ describe('NEXT-18: リッチメッセージの面数と保存値が一致する'
     })
     await nameAndSave()
     expect(fixture.createCalls).toHaveLength(1)
+    expect(fixture.createCalls[0]).toMatchObject({ lineAccountId: 'account-a', kind: 'rich_message' })
     const payload = fixture.createCalls[0].payload
     expect(payload.shape).toBe('6')
     const tapAreas = payload.tapAreas as Array<Record<string, unknown>>

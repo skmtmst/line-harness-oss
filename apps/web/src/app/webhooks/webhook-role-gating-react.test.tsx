@@ -114,6 +114,25 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
   })
 
+  it('手元に統括の保存値が残っていても、本人確認が管理者なら作成を出さない', async () => {
+    staffRole = 'admin'
+    window.localStorage.setItem('lh_staff_role', 'owner')
+    try {
+      for (const tabQuery of ['', 'tab=incoming']) {
+        query = tabQuery
+        await act(async () => {
+          root.render(<WebhooksPage />)
+        })
+        await settle()
+        expect(host.textContent, tabQuery || 'outgoing').not.toContain('最初の送り先を作る')
+        expect(host.textContent, tabQuery || 'outgoing').not.toContain('受け取り口を作る')
+        expect(host.textContent, tabQuery || 'outgoing').not.toContain('見本から作る')
+      }
+    } finally {
+      window.localStorage.removeItem('lh_staff_role')
+    }
+  })
+
   it('管理者には受け取り口の作成を出さず、統括への依頼を案内する', async () => {
     query = 'tab=incoming'
     staffRole = 'admin'

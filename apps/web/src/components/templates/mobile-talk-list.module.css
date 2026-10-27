@@ -1,0 +1,83 @@
+/* 電話の画面の会話の一覧。値は外枠の型（mobile-frame.module.css）の --phone-* だけを読む。 */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--phone-gap);
+  min-width: 0;
+}
+
+.face {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.unreadDot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--phone-unread-dot);
+  height: var(--phone-unread-dot);
+  border-radius: var(--radius-pill);
+  background: var(--color-status-danger);
+  box-shadow: 0 0 0 2px var(--color-canvas);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--polish-space-row);
+  min-width: 0;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--phone-body-text);
+  font-weight: var(--font-weight-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row[data-unread] .name {
+  font-weight: 700;
+}
+
+.time {
+  flex: none;
+  color: var(--color-ink-faint);
+  font-size: var(--phone-note-text);
+  font-variant-numeric: var(--font-numeric);
+  font-weight: var(--font-weight-ui);
+}
+
+.row[data-unread] .time {
+  color: var(--color-ink);
+}
+
+.preview {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--phone-support-text);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--phone-support-lh);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.row[data-unread] .preview {
+  color: var(--color-ink);
+}
+
+.outgoing {
+  color: var(--color-ink-faint);
+}
