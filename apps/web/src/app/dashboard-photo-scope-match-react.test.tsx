@@ -150,7 +150,7 @@ function photoCard(): { count: number; detail: string; href: string } {
   if (!heading) throw new Error('写真審査のカードが見つかりません')
   const card = heading.closest('[data-kpi-presentation]') as HTMLElement
   const value = card.querySelector('[data-kpi-number]')?.textContent?.replace(/[^0-9]/g, '') ?? ''
-  const detail = card.querySelector('span[title]')?.getAttribute('title') ?? ''
+  const detail = card.querySelector('[data-kpi-detail] span[title]')?.getAttribute('title') ?? ''
   const href = (card.querySelector('a[href]') as HTMLAnchorElement).getAttribute('href') ?? ''
   return { count: Number(value), detail, href }
 }

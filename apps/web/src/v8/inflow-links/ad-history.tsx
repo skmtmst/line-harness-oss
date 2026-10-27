@@ -22,7 +22,7 @@ import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
 import { DetailPage } from '@/components/templates'
 import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
@@ -151,7 +151,7 @@ export default function AdHistoryV8() {
               </Td>
               <Td className={styles.colMedia}><span className={styles.cellText}>{adPlatformLabel(platform)}</span></Td>
               {/* 流入元は送信記録の口が返さないので「—」。 */}
-              <Td className={styles.colSource} collapseAt="narrow"><span className={styles.cellFaint}>{emptyValue('unknown')}</span></Td>
+              <Td className={styles.colSource} collapseAt="narrow"><EmptyCell /></Td>
               <Td className={styles.colStatus}>
                 <StatusBadge tone={state.tone} size="compact" title={log.status === 'failed' && log.errorMessage ? `断られた理由：${log.errorMessage}` : undefined}>{state.label}</StatusBadge>
               </Td>
@@ -163,7 +163,7 @@ export default function AdHistoryV8() {
                   <Button onClick={() => void retry(log)} busy={retryingId === log.id} busyLabel="やり直しています…" disabled={retryingId !== null}>
                     <RotateCw size={16} aria-hidden="true" />やり直す
                   </Button>
-                ) : <span className={styles.cellFaint}>{emptyValue('unknown')}</span>}
+                ) : <EmptyCell />}
               </Td>
             </Tr>
           )

@@ -20,7 +20,7 @@ import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, useRegisterE
 import styles from './analytics.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import { DetailColumns } from '@/components/templates/detail-columns'
@@ -77,7 +77,7 @@ function summarizeSnapshotResult(result: unknown, limit = 12): Array<{ path: str
 
 function latestPill(item: SavedAnalyticsSummary) {
   const latest = item.latestSnapshot
-  if (!latest) return <span className={styles.faint}>{emptyValue('unknown')}</span>
+  if (!latest) return <EmptyCell />
   // 版ずれ（定義が古い）は集計状態とは別の軸。版ずれを先に出す。
   if (latest.definitionStale) return <StatePill tone="info">更新後未集計</StatePill>
   if (latest.state === 'available') return <StatePill tone="ok">最新の期間</StatePill>

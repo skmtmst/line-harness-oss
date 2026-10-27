@@ -31,7 +31,7 @@ import { FieldError, Field } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
 import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
@@ -439,7 +439,7 @@ export default function OpsAnnouncementsV8() {
                   <span className={`${parts.fixed} ${styles.colOps}`} role="cell">
                     {/* 行の右端は「…」1つ（B-253）。閲覧のみは押せる操作が無いので出さない。送信中は中身の無い「…」（使える操作はありません）。 */}
                     {readOnly
-                      ? <span className={styles.faint}>{emptyValue('unknown')}</span>
+                      ? <EmptyCell />
                       : <RowMenu
                           label={`「${a.subject}」の操作`}
                           size="row"
