@@ -2628,7 +2628,8 @@
       },
       "guard": {
         "tests": [
-          "scripts/visual-qa/v8-pattern-audit.mjs（持ち主の見張り：新しい候補 0）"
+          "apps/web/src/components/shared/text-link.test.tsx",
+          "scripts/visual-qa/v8-pattern-audit.mjs"
         ],
         "needed": ""
       }
