@@ -9,6 +9,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import RichMenuCreateForm from './rich-menu-create-form'
 import { freshRichMenuCreateValue } from './rich-menu-create-model'
@@ -69,5 +70,24 @@ describe('例外時のフォームも現役の共通部品で出す', () => {
     expect(areaSection!.querySelector('[role="alert"]')).toBeNull()
     expect(areaSection!.querySelector('[data-design-part="notice"]')).not.toBeNull()
     expect(areaSection!.textContent).toContain('アクションが未設定です')
+  })
+
+  it('上の3欄（メニュー名・フォルダ・トーク画面の下の文言）は共通の入力で、名前と文言は書き換えられる', async () => {
+    const changes: Array<{ name: string; chatBarText: string }> = []
+    await act(async () => {
+      root.render(<RichMenuCreateForm value={freshRichMenuCreateValue()} onChange={(next) => changes.push(next)} folders={[{ id: 'f-1', name: '会員向け' }]} />)
+    })
+    const name = host.querySelector<HTMLInputElement>('#rich-menu-name')!
+    const chatBar = host.querySelector<HTMLInputElement>('#rich-menu-chat-bar-text')!
+    expect(host.querySelector(`label[for="rich-menu-name"]`)?.textContent).toContain('メニュー名')
+    expect(host.querySelector(`label[for="rich-menu-chat-bar-text"]`)?.textContent).toContain('トーク画面の下の文言')
+    expect(host.querySelector('[aria-label="フォルダ"]')).not.toBeNull()
+    expect(chatBar.maxLength).toBe(14)
+    await act(async () => {
+      fireEvent.change(name, { target: { value: '会員メニュー' } })
+      fireEvent.change(chatBar, { target: { value: 'ひらく' } })
+    })
+    expect(changes.map((next) => next.name)).toContain('会員メニュー')
+    expect(changes.map((next) => next.chatBarText)).toContain('ひらく')
   })
 })

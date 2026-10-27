@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { describe,expect,it } from 'vitest'
 import { SIZE_LABEL } from '../../v8/rich-menus/new/create-options'
 import { imageUploadErrorText } from '../../v8/rich-menus/new/image-upload-error'
+import { unpublishWarningText } from '../../v8/rich-menus/errors'
 
 const EDIT = readFileSync(new URL('../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 const UNPUBLISH = readFileSync(new URL('../../v8/rich-menu-edit/detail.tsx', import.meta.url), 'utf8')
@@ -26,10 +27,9 @@ describe('#578 リッチメニューの軽整理', () => {
   it('取得結果を as で断定せず、形を確かめる', () => {
     expect(isGroupResponse({ id: 'menu', name: '案内', pages: [] })).toBe(true)
     for (const value of [null, {}, { id: 1, name: '案内', pages: [] }, { id: 'menu', name: '案内', pages: null }]) expect(isGroupResponse(value)).toBe(false)
+    // 形の違う返事を受け取らないことは、直す画面（create-steps-react）と切替のつながり（connections-v8-react）が描いて見る。
     const loadEdit = EDIT.slice(EDIT.indexOf('const loadEditGroup'), EDIT.indexOf('/* ---------- 下書きの作成・保存'))
-    expect(loadEdit).toContain('isGroupResponse(res.data)')
     expect(loadEdit).not.toContain('res.data as Group')
-    expect(CONNECTIONS).toContain('function isRichMenuGroupResponse')
     expect(CONNECTIONS).not.toContain('response.data as RichMenuGroup')
   })
 
@@ -47,9 +47,9 @@ describe('#578 リッチメニューの軽整理', () => {
   })
 
   it('取り下げの部分的失敗を日本語の定型文に写す', () => {
-    expect(UNPUBLISH).toContain('unpublishWarningText')
+    // 種類ごとの日本語で知らせることは v8/rich-menu-edit/editor-missing-behavior-react.test.tsx が押して見る。
+    expect(unpublishWarningText('delete alias richmenu-alias-1 failed')).toBe('切り替え設定の一部を取り下げきれていません')
     expect(UNPUBLISH).not.toContain('warnings.join(')
-    expect(UNPUBLISH).toContain('切り替え設定の一部を取り下げきれていません')
   })
 
   it('タグ取得の失敗を黙らせず、注記と再試しを出す', () => {
