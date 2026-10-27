@@ -49,17 +49,19 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 /* 共通の選ぶ欄は listbox の部品で、その操作は部品自身の試験が持つ。ここでは選んだあとの一覧の判断を見る。 */
-const nativeSelect = vi.hoisted(() => ({ 'aria-label': label, value, onChange, options, folders }: {
+const nativeSelect = vi.hoisted(() => function NativeSelect({ 'aria-label': label, value, onChange, options, folders }: {
   'aria-label'?: string
   value: string
   onChange: (value: string) => void
   options?: Array<{ value: string; label: string }>
   folders?: Array<{ value: string; label: string }>
-}) => React.createElement(
-  'select',
-  { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
-  [{ value: '', label: '（なし）' }, ...(options ?? folders ?? [])].map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
-))
+}) {
+  return React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    [{ value: '', label: '（なし）' }, ...(options ?? folders ?? [])].map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  )
+})
 vi.mock('@/components/shared/select', () => ({ default: nativeSelect }))
 vi.mock('@/components/shared/folder-select', () => ({ default: nativeSelect }))
 

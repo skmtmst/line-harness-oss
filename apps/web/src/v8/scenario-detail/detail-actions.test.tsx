@@ -189,11 +189,11 @@ async function render(props: { showStarted?: boolean } = {}) {
   await screen.findByRole('heading', { level: 1, name: '新規登録フォロー' })
 }
 
-function useScenario(patch: Partial<typeof base>) {
+function stubScenario(patch: Partial<typeof base>) {
   calls.scenario.mockResolvedValue(ok({ ...base, ...patch }))
 }
 
-function useStats(activeNow: number | undefined) {
+function stubStats(activeNow: number | undefined) {
   calls.stats.mockResolvedValue(activeNow === undefined
     ? { success: false, error: 'offline' }
     : ok({ enrolledTotal: 40, activeNow, completed: 12, paused: 0, steps: [] }))
@@ -224,8 +224,8 @@ async function openDeleteScenario() {
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   for (const fn of Object.values(calls)) fn.mockReset()
-  useScenario({})
-  useStats(116)
+  stubScenario({})
+  stubStats(116)
   calls.update.mockResolvedValue(ok({ id: 'sc-1' }))
   calls.get.mockResolvedValue(ok({ ...base, steps: [] }))
   calls.remove.mockResolvedValue(ok(null))
@@ -282,7 +282,7 @@ describe('シナリオ全体を削除する確認', () => {
       [0, '現在購読中の友だちは0人です。'],
       [116, '現在116 人が購読中です。途中の人は続きを受け取れません。'],
     ] as const) {
-      useStats(activeNow)
+      stubStats(activeNow)
       act(() => root.unmount())
       root = createRoot(host)
       await render()
@@ -462,7 +462,7 @@ describe('シナリオの複製は通の中身を落とさない', () => {
 
 describe('始めた直後の知らせ', () => {
   it('始めた直後だけ知らせの帯を出し、試算の人数・開始の記録を読み、配信結果へ進める', async () => {
-    useStats(undefined)
+    stubStats(undefined)
     await render({ showStarted: true })
     const band = await waitFor(() => {
       const found = screen.getAllByRole('status').find((el) => el.textContent?.includes('配信を始めました'))
@@ -503,7 +503,7 @@ describe('まとめてテストを送る', () => {
   })
 
   it('全アカウント共通のシナリオは、選んでいるアカウントの友だちから選ぶ', async () => {
-    useScenario({ lineAccountId: null })
+    stubScenario({ lineAccountId: null })
     await render()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'まとめてテストを送る' })) })
     await screen.findByText('試験 花子')
@@ -526,13 +526,13 @@ describe('置き場（フォルダ）はシナリオの所属アカウントの�
     act(() => root.unmount())
     root = createRoot(host)
     calls.folders.mockClear()
-    useScenario({ lineAccountId: null })
+    stubScenario({ lineAccountId: null })
     await render()
     expect(calls.folders).toHaveBeenCalledWith('scenario', 'account-selected')
   })
 
   it('候補に無い保存値は消さず「名前を確認できません」と理由を出す', async () => {
-    useScenario({ folderId: 'folder-other-account' })
+    stubScenario({ folderId: 'folder-other-account' })
     await render()
     expect(host.textContent).toContain('フォルダ：名前を確認できません')
     fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変える' }))
@@ -545,7 +545,7 @@ describe('置き場（フォルダ）はシナリオの所属アカウントの�
 
   it('候補を読めないあいだは置き場を変えられず、読めなかったと出す', async () => {
     calls.folders.mockResolvedValue({ success: false, error: 'offline' })
-    useScenario({ folderId: 'folder-a' })
+    stubScenario({ folderId: 'folder-a' })
     await render()
     expect(host.textContent).toContain('フォルダ：確認できません')
     fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変える' }))
@@ -559,7 +559,7 @@ describe('置き場（フォルダ）はシナリオの所属アカウントの�
 
 describe('保存・開始のきっかけ・配信の3つの段', () => {
   it('保存の段は保存だけでは届かないと断り、止めているシナリオは配信の段から開始の確認を開く', async () => {
-    useScenario({ isActive: false })
+    stubScenario({ isActive: false })
     await render()
     expect(screen.getByText('保存しただけでは誰にも届きません')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /配信を再開する/ }))
@@ -586,7 +586,7 @@ describe('保存・開始のきっかけ・配信の3つの段', () => {
   })
 
   it('試算を取り直しているあいだは、開始の確認で古い人数を出さず「試算中」とし、始められない', async () => {
-    useScenario({ isActive: false })
+    stubScenario({ isActive: false })
     calls.simulate.mockReturnValue(new Promise(() => {}))
     await render()
     fireEvent.click(screen.getByRole('button', { name: /配信を再開する/ }))
