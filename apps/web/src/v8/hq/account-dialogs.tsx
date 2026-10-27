@@ -47,7 +47,7 @@ export function accountHandle(account: AccountWithStats): string {
 }
 
 /* 板 ：アカウントの設定（名前・親・フォルダ・ほかの設定・アーカイブ）。2026-10-08 タグ→フォルダ（1つだけ・API-17）。 */
-export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onEditRegistration, canCreateFolder = false, onFolderCreated }: {
+export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onArchive, onEditRegistration, canCreateFolder = false, onFolderCreated }: {
   account: AccountWithStats
   accounts: AccountWithStats[]
   archived: boolean

@@ -89,6 +89,7 @@ async function fillCode(code: string) {
 
 test('設定の窓は板 HMpVx・名前・親・登録内容編集・アーカイブが出る', async () => {
   const onEditRegistration = vi.fn()
+  const onArchive = vi.fn()
   await act(async () => root.render(
     <AccountSettingsDialog
       account={account}
@@ -96,8 +97,8 @@ test('設定の窓は板 HMpVx・名前・親・登録内容編集・アーカ�
       archived={false}
       onClose={() => {}}
       onSaved={() => {}}
-      onArchive={() => {}}
-      onEditRegistration
+      onArchive={onArchive}
+      onEditRegistration={onEditRegistration}
     />,
   ))
   await settle()
@@ -107,6 +108,8 @@ test('設定の窓は板 HMpVx・名前・親・登録内容編集・アーカ�
   const editRegistration = getByRole(document.body, 'button', { name: 'LINE の登録内容を編集' })
   await act(async () => { fireEvent.click(editRegistration) })
   expect(onEditRegistration).toHaveBeenCalledOnce()
+  await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: 'アーカイブ' })) })
+  expect(onArchive).toHaveBeenCalledOnce()
 })
 
 test('保存の窓は板 D6ljr・理由と6桁で保存の口へ送る', async () => {
