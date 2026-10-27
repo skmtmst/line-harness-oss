@@ -29,3 +29,18 @@ test('segmented choice has one selected option and every action has a name', asy
     assert.deepEqual(await page.evaluate(scan),[])
   } finally { await browser.close() }
 })
+test('radio segmented counts aria-checked, allows none and rejects two', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><div data-segmented-control role="radiogroup" aria-label="対応状況"><button role="radio" aria-checked="true">未対応</button><button role="radio" aria-checked="false">対応済み</button></div></main>')
+    assert.deepEqual(await page.evaluate(scan),[])
+    await page.locator('button').first().evaluate(el=>el.setAttribute('aria-checked','false'))
+    assert.deepEqual(await page.evaluate(scan),[])
+    await page.locator('button').evaluateAll(els=>els.forEach(el=>el.setAttribute('aria-checked','true')))
+    assert.ok((await page.evaluate(scan)).some(f=>f.kind==='segselected'))
+    await page.locator('div').evaluate(el=>el.setAttribute('role','group'))
+    await page.locator('button').evaluateAll(els=>els.forEach(el=>{el.removeAttribute('role');el.removeAttribute('aria-checked');el.setAttribute('aria-pressed','false')}))
+    assert.ok((await page.evaluate(scan)).some(f=>f.kind==='segselected'))
+  } finally { await browser.close() }
+})

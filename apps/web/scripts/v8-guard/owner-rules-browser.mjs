@@ -26,6 +26,45 @@ export default function scanOwnerRules() {
   // 小窓・吹き出し・通知はmainの外へ描かれる。面の検査はその口にも届かせる。
   const portals = [...document.querySelectorAll('[role="dialog"],[role="tooltip"],[aria-label="知らせ"]')]
   const surfaces = [...new Set([root,...root.querySelectorAll('*'),...portals.flatMap(el => [el,...el.querySelectorAll('*')])])]
+  // ダイアログ・カード・固定の下帯で、子の影や輪が overflow の切り抜き端に当たらないか測る。
+  // box-shadow は DOM の外枠より広がるため、要素の矩形だけを見る boxclip とは分ける。
+  const shadowOutsets = el => {
+    const c = css(el), out = { top: 0, right: 0, bottom: 0, left: 0 }
+    const re = /(inset\s+)?(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px\s+(\d+(?:\.\d+)?)px(?:\s+(-?\d+(?:\.\d+)?)px)?/g
+    for (const match of c.boxShadow.matchAll(re)) {
+      if (match[1]) continue
+      const x = Number(match[2]), y = Number(match[3]), blur = Number(match[4]), spread = Number(match[5] ?? 0)
+      const soft = Math.max(0, spread + blur * 2)
+      out.top = Math.max(out.top, soft - y); out.bottom = Math.max(out.bottom, soft + y)
+      out.left = Math.max(out.left, soft - x); out.right = Math.max(out.right, soft + x)
+    }
+    if (c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0) {
+      const ring = parseFloat(c.outlineWidth) + Math.max(0, parseFloat(c.outlineOffset) || 0)
+      for (const side of Object.keys(out)) out[side] = Math.max(out[side], ring)
+    }
+    return out
+  }
+  for (const el of surfaces.filter(visible)) {
+    if (!el.closest('[role="dialog"],[data-design-part="card"],[data-shared-part="sticky-bar"]')) continue
+    const out = shadowOutsets(el)
+    if (!Object.values(out).some(value => value > 0)) continue
+    const r = el.getBoundingClientRect()
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const pc = css(p), clipsX = pc.overflowX !== 'visible', clipsY = pc.overflowY !== 'visible'
+      if (!clipsX && !clipsY) continue
+      const q = p.getBoundingClientRect(), edge = {
+        left: q.left + p.clientLeft, top: q.top + p.clientTop,
+        right: q.left + p.clientLeft + p.clientWidth, bottom: q.top + p.clientTop + p.clientHeight,
+      }
+      const cut = {
+        left: clipsX ? Math.max(0, Math.ceil(edge.left - (r.left - out.left))) : 0,
+        right: clipsX ? Math.max(0, Math.ceil((r.right + out.right) - edge.right)) : 0,
+        top: clipsY ? Math.max(0, Math.ceil(edge.top - (r.top - out.top))) : 0,
+        bottom: clipsY ? Math.max(0, Math.ceil((r.bottom + out.bottom) - edge.bottom)) : 0,
+      }
+      if (Object.values(cut).some(value => value > 0)) add('shadow-clip', el, cut, '', p)
+    }
+  }
   for (const el of surfaces.filter(visible)) {
     const c = css(el), r = el.getBoundingClientRect(), name = el.getAttribute('data-pencil-name') || ''
     // 時間×卓、スマホの見え方、画像そのものは意図した端接触。ALLOW.tsvと同じ対象限定。
@@ -44,6 +83,15 @@ export default function scanOwnerRules() {
       }
     }
   }
+  // 画面の題と、固定表示する吹き出しが重なる配置を検出する。
+  for (const tooltip of portals.filter(el => el.matches('[role="tooltip"]') && visible(el))) {
+    const a = tooltip.getBoundingClientRect()
+    for (const heading of root.querySelectorAll('h1,h2,h3,[data-page-title]')) {
+      if (!visible(heading)) continue
+      const b = heading.getBoundingClientRect(), width = Math.min(a.right, b.right) - Math.max(a.left, b.left), height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+      if (width > 0 && height > 0) add('tooltip-heading-overlap', tooltip, { width: Math.ceil(width), height: Math.ceil(height) }, heading.textContent ?? '', heading)
+    }
+  }
   // 14px 未満の UI 文字を太さ 400 で描かない。
   // お客さまのスマホの見え方（LINE の見本）は LINE と同じ太さなので数えない。
   // V8 の画面（<html data-theme="v8">）だけを見る。アプリの CSS の無い素の見本はブラウザ既定の太さなので数えない。
@@ -53,6 +101,66 @@ export default function scanOwnerRules() {
     if (!text) continue
     const c = css(el), size = parseFloat(c.fontSize), weight = Number(c.fontWeight)
     if (size < 14 && weight < 500) add('thintext', el, { size, weight }, text)
+  }
+  // 同じ段の押せるもの同士は、外枠が 1px でも重ならない（予約管理の予約元と印刷が重なった）。
+  // 欄の中に収めた印（消すボタンなど）は欄の内側にあるので数えない。見える範囲は切り抜きの内側だけ、
+  // 追従の帯・浮く窓など別の層にあるもの同士は比べない。
+  const CONTROLS = 'button,a[href],input:not([type="hidden"]),textarea,select,[role="button"],[role="combobox"],[role="tab"],[role="switch"],[role="checkbox"],[role="radio"]'
+  const layerOf = el => { for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (/^(fixed|sticky)$/.test(css(p).position)) return p; return null }
+  const painted = el => {
+    const r = el.getBoundingClientRect()
+    let left = r.left, right = r.right, top = r.top, bottom = r.bottom
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const c = css(p), q = p.getBoundingClientRect()
+      if (c.overflowX !== 'visible') { left = Math.max(left, q.left); right = Math.min(right, q.right) }
+      if (c.overflowY !== 'visible') { top = Math.max(top, q.top); bottom = Math.min(bottom, q.bottom) }
+    }
+    return { left, right, top, bottom }
+  }
+  const scopes = [root, ...portals]
+  const controls = [...new Set(scopes.flatMap(scope => [...scope.querySelectorAll(CONTROLS)]))]
+    .filter(el => visible(el) && css(el).pointerEvents !== 'none')
+    .map(el => ({ el, r: painted(el), layer: layerOf(el) }))
+    .filter(({ r }) => r.right - r.left > 2 && r.bottom - r.top > 2)
+  const inside = (a, b) => a.left >= b.left - 0.5 && a.right <= b.right + 0.5 && a.top >= b.top - 0.5 && a.bottom <= b.bottom + 0.5
+  const label = el => (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 40)
+  for (let i = 0; i < controls.length; i++) for (let j = i + 1; j < controls.length; j++) {
+    const a = controls[i], b = controls[j]
+    if (a.layer !== b.layer || a.el.contains(b.el) || b.el.contains(a.el)) continue
+    const width = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left)
+    const height = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top)
+    if (width < 1 || height < 1 || (a.el.matches('input,textarea') && inside(b.r, a.r) && a.el.parentElement?.contains(b.el)) || (b.el.matches('input,textarea') && inside(a.r, b.r) && b.el.parentElement?.contains(a.el))) continue
+    add('control-collide', a.el, { width: Math.round(width), height: Math.round(height) }, `${label(a.el)} ⟂ ${label(b.el)}`, b.el)
+  }
+  // カードに置いた操作は、カードの外へ出さない（無効な操作も見た目を測る）。
+  for (const el of [...root.querySelectorAll(CONTROLS)].filter(visible)) {
+    const card = el.closest('[data-design-part="card"],article')
+    if (!card || el.closest('[data-line-preview-part]')) continue
+    const r = el.getBoundingClientRect(), q = card.getBoundingClientRect()
+    if (r.left < q.left - 0.5 || r.right > q.right + 0.5) add('card-control-overflow', el, { left: Math.max(0, Math.ceil(q.left - r.left)), right: Math.max(0, Math.ceil(r.right - q.right)) })
+  }
+  for (const heading of root.querySelectorAll('[data-template-region="heading"]')) {
+    const actions = heading.querySelector('[data-page-heading-actions]')
+    if (!actions) continue
+    const controls = [...actions.querySelectorAll('button,a[href]')].filter(visible)
+    const primary = controls.filter(el => el.dataset.variant === 'primary')
+    const secondary = controls.filter(el => el.dataset.variant !== 'primary' && el.getAttribute('aria-haspopup') !== 'menu')
+    if (primary.length > 1) add('heading-primary-count', actions, { count: primary.length })
+    if (secondary.length > 1) add('heading-secondary-count', actions, { count: secondary.length })
+    for (const el of secondary) if (el.dataset.variant && el.dataset.variant !== 'text') add('heading-secondary-style', el, { count: 1 })
+  }
+  for (const body of root.querySelectorAll('[data-list-folders]')) {
+    const frame = body.closest('[data-page-template]')
+    if (!frame) continue
+    const folders = body.dataset.listFolders === 'true'
+    const rail = [...body.querySelectorAll('[data-template-region="folders"]')].find(visible)
+    for (const el of [...frame.querySelectorAll('[data-variant="primary"]')].filter(visible)) {
+      if (!/作る|つくる|新規|追加/.test(el.textContent) || el.closest('table,[role="dialog"],[data-shared-part="sticky-bar"],[data-design-part="card"]')) continue
+      const correct = frame.dataset.listCreatePlacement === 'heading' || !folders
+        ? el.closest('[data-template-region="heading"]')
+        : rail ? rail.contains(el) : el.closest('[data-template-region="toolbar"]')
+      if (!correct) add('create-action-placement', el, { folders: Number(folders), rail: Number(Boolean(rail)) })
+    }
   }
   return findings
 }

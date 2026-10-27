@@ -1621,7 +1621,7 @@
   --tpl-sa-notice-pad: 10px 14px; --tpl-sa-notice-gap: 10px; --tpl-sa-notice-lh: 20px; --tpl-sa-notice-radius: var(--polish-radius-control);
   --tpl-sa-kpi-gap: 12px; --tpl-sa-kpi-pad: 14px; --tpl-sa-kpi-inner-gap: 4px; --tpl-sa-kpi-value-size: 20px; --tpl-sa-kpi-value-lh: 24px; --tpl-sa-search-w: 260px; --tpl-sa-tool-gap: 8px; --tpl-sa-head-actions-gap: 12px;
   --tpl-sa-staff-head-pad: 20px 24px 12px; --tpl-sa-staff-head-gap: 8px; --tpl-sa-staff-desc-lh: 17px; --tpl-sa-staff-tab-gap: 24px; --tpl-sa-staff-tab-pad: 12px; --tpl-sa-staff-tab-line: 2px; --tpl-sa-band-pad: 0 24px 8px;
-  --tpl-sa-staff-main-pad: 24px 24px 24px 10px; --tpl-sa-staff-main-gap: 16px; --tpl-sa-staff-aside-w: 380px; --tpl-sa-staff-aside-pad: var(--polish-space-card); --tpl-sa-staff-aside-gap: 14px;
+  --tpl-sa-staff-main-pad: 24px 24px 24px 10px; --tpl-sa-staff-main-gap: 16px; --tpl-sa-staff-aside-w: 380px; --tpl-sa-staff-aside-pad: var(--polish-space-card) var(--polish-space-section); --tpl-sa-staff-aside-gap: 14px;
   --tpl-sa-staff-search-w: 220px; --tpl-sa-staff-search-w-narrow: 200px; --tpl-sa-staff-invite-w: 128px; --tpl-sa-control-h: 36px; --tpl-sa-staff-select-w: 150px;
   --tpl-sa-staff-card-pad: var(--polish-space-card); --tpl-sa-staff-card-gap: var(--polish-space-row); --tpl-sa-staff-sub-lh: 17px; --tpl-sa-staff-row-pad: 10px 8px; --tpl-sa-staff-col-gap: 12px;
   --tpl-sa-staff-scope-w: 102px; --tpl-sa-staff-role-w: 84px; --tpl-sa-staff-last-w: 72px; --tpl-sa-staff-menu-w: 28px; --tpl-sa-staff-scope-w-narrow: 160px; --tpl-sa-staff-last-w-narrow: 147px;
@@ -3174,7 +3174,7 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
   --tpl-people-block-gap: 4px;
 }
 
-:root { --tpl-onboarding-step-ring: inset 0 0 0 var(--choice-ring) var(--color-hairline); --tpl-op-support-negative-gap: calc(-1 * var(--tpl-op-me-gap)); --tpl-op-support-band-bleed: calc(-1 * var(--polish-space-section)); }
+:root { --tpl-onboarding-step-ring: inset 0 0 0 var(--choice-ring) var(--color-hairline); --tpl-op-support-negative-gap: calc(-1 * var(--tpl-op-me-gap)); }
 
 :root { --tpl-rm-review-thumb-w: 165px; --tpl-rm-face-row-h: 38px; --tpl-rm-face-label-lh: 18px; --tpl-rm-face-name-lh: 19px; --tpl-rm-face-summary-lh: 16px; --tpl-ledger-month-lh: normal; --tpl-cv-delete-reason-w: 92px; --tpl-fr-name-content-min: 160px; --tpl-rt-flow-timing-w: 132px; --tpl-rt-flow-row-h: 58px; --tpl-rt-flow-name-lh: 20px; --tpl-rt-flow-note-lh: 18px; --tpl-rm-review-label-lh: 17px; --tpl-rm-review-action-h: 38px; --tpl-rm-review-letter: 22px; }
 

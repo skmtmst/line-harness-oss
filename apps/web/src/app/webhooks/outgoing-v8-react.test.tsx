@@ -159,7 +159,7 @@ test('v8 の左のフォルダの列（共通・種類 webhook）で絞れる。
   expect(nav.querySelector('button[title="顧客"]')?.textContent).toContain('1')
   expect(nav.querySelector('button[title="未分類"]')?.textContent).toContain('1')
   expect(host.querySelector('tr[data-row-id="wh-1"] [aria-label="フォルダ：顧客"]')).not.toBeNull()
-  expect(host.querySelector('tr[data-row-id="wh-2"] [data-folder-dot]')).toBeNull()
+  expect(host.querySelector('tr[data-row-id="wh-2"] [data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
   await act(async () => { (nav.querySelector('button[title="顧客"]') as HTMLButtonElement).click() })
   expect(host.querySelector('tr[data-row-id="wh-1"]')).not.toBeNull()
   expect(host.querySelector('tr[data-row-id="wh-2"]')).toBeNull()
@@ -169,13 +169,14 @@ test('v8 の左のフォルダの列（共通・種類 webhook）で絞れる。
   await act(async () => { (nav.querySelector('button[title="すべて"]') as HTMLButtonElement).click() })
 })
 
-test('v8 の行の名前の前にフォルダの丸が付く。フォルダに入っていない送り先は丸を出さない（閲覧のみでも出す）', async () => {
+test('v8 の行の名前の前にフォルダの丸が付く。フォルダに入っていない送り先は灰色の丸（閲覧のみでも出す）', async () => {
   staffRole = 'staff'
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const row = host.querySelector('[data-design-node="ZSbFY"] tr[data-row-id="wh-1"]')
   const dots = row?.querySelectorAll('[data-folder-dot]') ?? []
-  expect(dots).toHaveLength(0)
+  expect(dots).toHaveLength(1)
+  expect(dots[0].getAttribute('data-folder-dot')).toBe('unfiled')
 })
 
 test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async () => {
@@ -186,7 +187,7 @@ test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async (
   expect(board?.textContent).toContain('まだ送り先がありません')
 })
 
-test('v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタン・設定は置かない', async () => {
+test('v8 の閲覧のみ（l5SRfT）は帯が出て、［送り先を作る］は押せない形で理由を伝え、設定は置かない', async () => {
   staffRole = 'staff'
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
@@ -194,7 +195,25 @@ test('v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタ�
   expect(board).not.toBeNull()
   expect(board?.textContent).toContain('閲覧のみで見ています')
   const clickable = [...board!.querySelectorAll('a, button')]
-  expect(clickable.some((element) => element.textContent?.includes('送り先を作る'))).toBe(false)
+  // 作る口は空白にせず、押せない本物のボタン。行き先へのリンクは置かない。
+  const creates = clickable.filter((element) => element.textContent?.includes('送り先を作る'))
+  expect(creates.length).toBeGreaterThan(0)
+  for (const create of creates) {
+    expect(create.tagName).toBe('BUTTON')
+    expect(create.getAttribute('aria-disabled')).toBe('true')
+    expect(create.hasAttribute('href')).toBe(false)
+    const reason = document.getElementById(create.getAttribute('aria-describedby') ?? '')
+    expect(reason?.textContent).toBe('送り先は統括の担当者だけが作れます')
+  }
+  const create = creates[0] as HTMLButtonElement
+  const before = window.location.href
+  await act(async () => { create.click() })
+  expect(window.location.href).toBe(before)
+  // キーボードで焦点を当てると理由の吹き出しが出る（マウスは部品の試験で見る）。
+  await act(async () => { create.focus() })
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toBe('送り先は統括の担当者だけが作れます')
+  await act(async () => { create.blur() })
+  expect(document.querySelector('[role="tooltip"]')).toBeNull()
   expect(clickable.some((element) => element.textContent === '設定')).toBe(false)
   // 見るだけの操作（送信の記録を見る）は行の「…」の中に残る。
   const trigger = board!.querySelector('[aria-label="「顧客台帳（CRM）」の操作"]') as HTMLButtonElement

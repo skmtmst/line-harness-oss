@@ -85,7 +85,7 @@ describe('V8 統括のアカウントを探す', () => {
     const person = screen.getByText('店舗11').closest('[data-list-person-cell]')
     expect(person?.querySelector('[data-avatar]')).toBeTruthy()
     const name = person?.querySelector('[data-list-name]')
-    expect(name?.querySelector('[data-folder-dot]')).toBeNull()
+    expect(name?.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
     expect(name?.getAttribute('data-has-annotation')).toBe('true')
     expect(name?.textContent).toContain('要確認')
     expect(person?.textContent).toContain('@shop11')

@@ -41,8 +41,10 @@ export default function scanPendec2Rules() {
   for(const seg of all('[data-segmented-control],[class*="segmented_root"]')) {
     const buttons=[...seg.querySelectorAll(':scope > button')].filter(visible)
     for(const b of buttons) if(!b.textContent.trim() && !b.getAttribute('aria-label')) add('segempty',b,{count:1})
-    const selected=buttons.filter(b=>b.getAttribute('aria-pressed')==='true')
-    if(buttons.length && selected.length!==1) add('segselected',seg,{count:Math.abs(selected.length-1) || 1})
+    // 押しボタンの切り替えは1つだけ押された形。radioの切り替えはaria-checkedで数え、選んでいない0件は許し2件以上だけを崩れにする。
+    const radio=seg.getAttribute('role')==='radiogroup'
+    const selected=buttons.filter(b=>b.getAttribute(radio ? 'aria-checked' : 'aria-pressed')==='true')
+    if(buttons.length && (radio ? selected.length>1 : selected.length!==1)) add('segselected',seg,{count:Math.abs(selected.length-1) || 1})
 
   }
   return findings

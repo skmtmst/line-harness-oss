@@ -31,6 +31,7 @@ import Button from './src/components/shared/button';
 import CommandPalette from './src/components/shared/command-palette';
 import Notice from './src/components/shared/notice';
 import {DialogContentRow} from './src/components/shared/dialog-form-row';
+import {EntityPickerField} from './src/components/shared/entity-picker';
 function Fixture(){
  const [window,setWindow]=useState(''),[value,setValue]=useState(false),[current,setCurrent]=useState('now');
  const steps=[{key:'done',label:'事前確認',state:'done',onSelect:()=>setCurrent('done')},{key:'now',label:'アカウント接続',state:'current'}, {key:'next',label:'接続確認',state:'todo'}, {key:'choice',label:'使い方を選ぶ',state:'todo'}, {key:'finish',label:'完了',state:'todo'}];
@@ -44,6 +45,7 @@ function Fixture(){
   <CheckCard title="カード" checked={value} onChange={setValue}/>
   <div data-center-row><Radio name="channel" checked={value} onChange={()=>setValue(!value)}>ラジオ</Radio></div>
   <div data-center-row><Toggle label="切り替え" checked={value} onChange={setValue}/></div></section>
+  <section id="entity-selection"><EntityPickerField label="親候補" noun="アカウント" items={Array.from({length:20},(_,i)=>({id:String(i),name:"親候補"+i,meta:"候補の説明"}))} value="0" onChange={()=>{}} /></section>
   <section id="windows">{['通常','確認','危険','警告','手順','選択','長文','引き出し'].map(name=><Button key={name} onClick={()=>setWindow(name)}>{name}</Button>)}</section>
   {window==='引き出し'?<Drawer open title="設定を編集する" headerIcon={props.headerIcon} description={props.description} onClose={()=>setWindow('')} footer={<Button onClick={()=>setWindow('')}>保存する</Button>}><input aria-label="名前" defaultValue="保持する名前"/></Drawer>:
    ['確認','危険','警告'].includes(window)?<ConfirmDialog {...props} title="内容を確認しますか？" destructive={window==='危険'} warning={window==='警告'}/>:
@@ -90,6 +92,29 @@ async function mount(page, width) {
 }
 
 for (const width of [1152,1440,1920]) {
+  test(`EntityPickerの選択印は行内中央で、最後の候補まで表示する ${width}`, async () => {
+    const browser=await connectGuardBrowser()
+    try {
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      await page.getByRole('button',{name:'親候補：変える',exact:true}).click()
+      const dialog=page.getByRole('dialog',{name:'アカウントを選ぶ'})
+      await dialog.waitFor()
+      const radios=dialog.getByRole('radio')
+      assert.equal(await radios.count(),20)
+      const last=radios.last()
+      await last.scrollIntoViewIfNeeded()
+      const geometry=await last.evaluate(el=>{const row=el.closest('label'),r=row.getBoundingClientRect(),b=el.getBoundingClientRect();return {dy:b.y+b.height/2-r.y-r.height/2,contained:b.bottom<=r.bottom&&b.right<=r.right,marks:row.querySelectorAll('input[type="radio"]').length}})
+      assert.ok(Math.abs(geometry.dy)<=1,JSON.stringify(geometry))
+      assert.ok(geometry.contained,JSON.stringify(geometry))
+      assert.equal(geometry.marks,1)
+      await last.check()
+      assert.equal(await last.isChecked(),true)
+      const bounds=await last.evaluate(el=>({y:el.getBoundingClientRect().y,height:innerHeight}))
+      assert.ok(bounds.y>=0&&bounds.y<bounds.height,JSON.stringify(bounds))
+    } finally { await browser.close() }
+  })
+
   test(`手順は名前を丸の下に置き、状態と接続と戻る操作を保つ ${width}`, async () => {
     const browser = await connectGuardBrowser()
     try {
