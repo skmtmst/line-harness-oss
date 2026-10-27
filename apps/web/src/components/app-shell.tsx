@@ -13,6 +13,8 @@ import { PageChromeProvider, usePageChrome } from './shell/page-chrome'
 import styles from './app-shell.module.css'
 import { isPublicAuthPath } from '@/lib/auth-email'
 import OpsShell from './ops/ops-shell'
+import MobileShell from './mobile/mobile-shell'
+import { isMobileShellPath } from '@/lib/mobile-shell'
 import ImpersonationNotice from './ops/impersonation-notice'
 import RecoveryCodeNotice from './recovery-code-notice'
 import UnfamiliarLoginNotice from './unfamiliar-login-notice'
@@ -46,6 +48,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // 運営コンソール（★管理画面 37）。統括・店舗の共通メニューとは別の外枠を使う。
   if (pathname === '/ops' || pathname.startsWith('/ops/')) {
     return <OpsShell>{children}</OpsShell>
+  }
+
+  // 電話の専用の画面（/m）。管理画面を縮めず、下のタブの別の外枠で開く。`/mileage` などは入れない。
+  if (isMobileShellPath(pathname)) {
+    return <MobileShell>{children}</MobileShell>
   }
 
   // 参照画像との比較専用。開発中だけ表示し、実データの取得・保存は行わない。

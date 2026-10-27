@@ -4120,13 +4120,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (chat) {
     // 一覧と同じ行を返す。`{items,total}` のままだと、開いた会話の名前が
     // `undefined` になり `friendName.charAt(0)` で落ちる。
-    const row = CHATS.find((c) => c.id === chat[1])
+    const row = CHATS.find((c) => c.id === chat[1] || c.friendId === chat[1]) // 本物の口と同じく友だちの ID でも開け、その ID を返す
     if (row) {
       const friend = FRIEND_DETAILS[row.friendId]
       return {
         success: true,
         data: {
-          ...row,
+          ...row, ...(row.friendId === chat[1] ? { id: chat[1] } : {}),
           friendRealName: friend?.realName ?? null,
           isAttention: friend?.metadata?.__attention === '1',
           messages: FRIEND_MESSAGES[row.friendId] ?? [],

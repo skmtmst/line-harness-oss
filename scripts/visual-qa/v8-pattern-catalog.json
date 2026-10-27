@@ -3533,6 +3533,142 @@
         "overrideSelectors": [],
         "signals": []
       }
+    },
+    {
+      "id": "mobile-frame",
+      "name": "モバイルの外枠",
+      "role": "電話の専用の画面（/m）の上の帯・本文・下のタブ。段の題とカード1列もこの型が持つ",
+      "rules": [
+        "§6.48"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/templates/mobile-frame.tsx",
+            "apps/web/src/components/templates/mobile-frame.module.css",
+            "apps/web/src/components/mobile/mobile-shell.tsx",
+            "apps/web/src/components/mobile/mobile-screen.tsx"
+          ],
+          "components": [
+            "MobileFrame",
+            "MobileSection",
+            "MobileCardList",
+            "MobileCardLink",
+            "MobileCard",
+            "MobileListTools",
+            "MobileShell",
+            "MobileScreen"
+          ],
+          "vars": [
+            "--phone-bar-h",
+            "--phone-tab-h",
+            "--phone-hit",
+            "--phone-input-text"
+          ]
+        },
+        "pen": [],
+        "status": "絵はあとで司令塔が描く。値は決まりの §6.48"
+      },
+      "code": {
+        "selectorHint": "tabBar|bottomNav|mobile",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "own-tab-bar",
+            "re": "\\b(function|const)\\s+\\w*(BottomTabs|TabBar|BottomNav)\\b\\s*[=(]",
+            "why": "下のタブを自作"
+          }
+        ]
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/templates/mobile-frame.test.tsx",
+          "apps/web/src/lib/mobile-shell.test.ts"
+        ],
+        "needed": "390・430 の崩れの見張り（layout-overflow の電話の段）"
+      }
+    },
+    {
+      "id": "mobile-talk-list",
+      "name": "モバイルの会話の一覧",
+      "role": "電話の画面のトークの一覧と、対応の「返事を待っているトーク」を同じカード1列で出す",
+      "rules": [
+        "§6.48"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/templates/mobile-talk-list.tsx",
+            "apps/web/src/components/templates/mobile-talk-list.module.css",
+            "apps/web/src/v8/inbox-chat/mobile-talk-item.ts"
+          ],
+          "components": [
+            "MobileTalkList"
+          ],
+          "vars": [
+            "--phone-unread-dot"
+          ]
+        },
+        "pen": [],
+        "status": "絵はあとで司令塔が描く"
+      },
+      "code": {
+        "selectorHint": "talkList|talkRow",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "own-talk-card",
+            "re": "\\b(function|const)\\s+\\w*(MobileChatList|TalkCard|ChatCard)\\b\\s*[=(]",
+            "why": "電話の会話の行を自作"
+          }
+        ]
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/templates/mobile-frame.test.tsx",
+          "apps/web/src/v8/inbox-chat/mobile-talk-screen.test.tsx"
+        ],
+        "needed": ""
+      }
+    },
+    {
+      "id": "mobile-booking-card",
+      "name": "モバイルの予約のカード",
+      "role": "電話の画面の「今日」の予約1件（時刻・名前・人数・卓や担当・状態の札・来店などの操作）。段②で作る",
+      "rules": [
+        "§6.48"
+      ],
+      "owner": {
+        "code": {
+          "files": [],
+          "components": [
+            "MobileBookingCard"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "段②（今日）で components/templates/mobile-booking-card.tsx に作る。状態の札は StatusBadge・予約の状態の色は booking-state を使う"
+      },
+      "code": {
+        "selectorHint": "bookingCard|reservationCard",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "own-booking-card",
+            "re": "\\b(function|const)\\s+\\w*(MobileBookingCard|PhoneBookingCard|ReservationCard)\\b\\s*[=(]",
+            "why": "電話の予約のカードを自作"
+          }
+        ]
+      },
+      "pen": {
+        "markers": []
+      }
     }
   ]
 }

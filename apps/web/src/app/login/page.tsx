@@ -15,6 +15,7 @@ import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, emailError, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import { MOBILE_LOGIN_NEXT, MOBILE_ROOT, isMobileLoginReturn } from '@/lib/mobile-shell'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -43,6 +44,11 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const turnstileRef = useRef<TurnstileHandle | null>(null)
+  /*
+   * 電話の画面（/m）から来た人（`?next=m`）。ログインの後は /m へ戻す。
+   * 電話の画面はメールとパスワードで入る（ホーム画面に置いた画面から LINE へ出ると戻ってこないことがあるため）。
+   */
+  const [mobileReturn, setMobileReturn] = useState(false)
   const setTurnstileHandle = useCallback((handle: TurnstileHandle | null) => {
     turnstileRef.current = handle
   }, [])
@@ -61,6 +67,7 @@ export default function LoginPage() {
       turnstileRef.current?.reset()
     }
     window.addEventListener('pageshow', restore)
+    setMobileReturn(isMobileLoginReturn(window.location.search))
     const errorCode = new URLSearchParams(window.location.search).get('error')
     if (errorCode === 'not_authorized') {
       setError('このLINEアカウントには管理者権限がありません。オーナーに追加を依頼してください。')
@@ -102,18 +109,19 @@ export default function LoginPage() {
     // 「消した」印は共有の localStorage。外すと次の認証確認で一度だけ
     // 前回の店舗選択を捨てる（NEXT-07）。
     resetAuthSelectionCleared(localStorage, sessionStorage)
+    const twoFactorNext = mobileReturn ? `?next=${MOBILE_LOGIN_NEXT}` : ''
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup', res.data.challengeToken))
+      window.location.assign(twoFactorChallengeHandoffPath(`/login/two-factor/setup${twoFactorNext}`, res.data.challengeToken))
       return
     }
     if (res.data.twoFactor && res.data.challengeToken) {
       // R507: 二段階認証の画面で実際のログイン方法を出せるよう、経路の印を付ける。
-      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor', res.data.challengeToken))
+      window.location.assign(twoFactorChallengeHandoffPath(`/login/two-factor${twoFactorNext}`, res.data.challengeToken))
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
     else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
-    window.location.assign('/')
+    window.location.assign(mobileReturn ? MOBILE_ROOT : '/')
   }
 
   const lineLogin = () => {
@@ -130,12 +138,17 @@ export default function LoginPage() {
       node="UufG8"
       cardNode="m3tWJ"
       title="ログイン"
-      description={
+      description={mobileReturn ? (
+        <>
+          メールアドレスとパスワードでログインします。<br />
+          LINE でログインする人は PC の画面から入ってください。
+        </>
+      ) : (
         <>
           メールアドレスとパスワードでログインします。<br />
           LINE で登録した人は「LINE でログイン」を使ってください。
         </>
-      }
+      )}
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
@@ -174,15 +187,17 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <div className="flex w-full items-center gap-3" aria-hidden="true">
-        <span className="h-px flex-1 bg-hairline" />
-        <span className="text-caption text-ink-faint">または</span>
-        <span className="h-px flex-1 bg-hairline" />
-      </div>
+      {mobileReturn ? null : <>
+        <div className="flex w-full items-center gap-3" aria-hidden="true">
+          <span className="h-px flex-1 bg-hairline" />
+          <span className="text-caption text-ink-faint">または</span>
+          <span className="h-px flex-1 bg-hairline" />
+        </div>
 
-      <Button fullWidth variant="line" onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
-        <LineLoginMark className="h-4.5 w-4.5" />LINE でログイン
-      </Button>
+        <Button fullWidth variant="line" onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
+          <LineLoginMark className="h-4.5 w-4.5" />LINE でログイン
+        </Button>
+      </>}
 
       <p className="text-caption text-ink-faint">
         はじめての方は{' '}
