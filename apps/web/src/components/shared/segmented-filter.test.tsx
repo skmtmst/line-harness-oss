@@ -35,6 +35,24 @@ describe('絞り込みの切り替え', () => {
     expect(onChange.mock.calls).toEqual([['warn'], ['all']])
   })
 
+  it('0件だけを区別し、0件の項目も選べて未取得を0件にしない', () => {
+    const onChange = vi.fn()
+    render(<SegmentedControl aria-label="件数" value="all" onChange={onChange} options={[
+      { value: 'all', label: 'すべて', count: 2 },
+      { value: 'empty', label: '保留', count: 0 },
+      { value: 'text-zero', label: '停止', count: '0' },
+      { value: 'unknown', label: '未取得', count: '—' },
+    ]} />)
+    expect(screen.getByRole('button', { name: 'すべて 2' }).hasAttribute('data-empty')).toBe(false)
+    expect(screen.getByRole('button', { name: '未取得 —' }).hasAttribute('data-empty')).toBe(false)
+    expect(screen.getByRole('button', { name: '停止 0' }).hasAttribute('data-empty')).toBe(true)
+    const empty = screen.getByRole('button', { name: '保留 0' })
+    expect(empty.hasAttribute('data-empty')).toBe(true)
+    expect(empty.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(empty)
+    expect(onChange).toHaveBeenCalledWith('empty')
+  })
+
 })
 
 it('ラジオとして使う時は1つのTab入口を保ち、Home・Endで移動し、未選択へ戻せる', () => {

@@ -13,3 +13,9 @@ it('改行のある補足も？に集め、誤りは本文に残す',()=>{
  expect(fieldNoteIsLong('1行目\n2行目')).toBe(true)
  render(<Field label="名前" note="長い説明です。長い説明です。長い説明です。長い説明です。長い説明です。" error="名前を入れてください"><input/></Field>);expect(screen.getByRole('alert').textContent).toBe('名前を入れてください')
 })
+
+it('説明のないラベルを同じ文の吹き出しにしない', () => {
+ render(<Field label="タグ名"><input /></Field>)
+ expect(screen.getByText('タグ名').getAttribute('title')).toBeNull()
+ expect(screen.queryByRole('button', {name: 'タグ名の説明'})).toBeNull()
+})

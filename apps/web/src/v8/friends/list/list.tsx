@@ -709,22 +709,21 @@ export default function FriendsListV8() {
         <FilterPopover open={filtersOpen} onClose={() => setFiltersOpen(false)} label="絞り込み"
           trigger={<FilterChip selected={extraFilterCount > 0} showCheck={false} count={extraFilterCount || undefined} aria-haspopup="dialog" aria-expanded={filtersOpen} onChange={() => setFiltersOpen(!filtersOpen)}>絞り込み</FilterChip>}
           actions={<Button onClick={() => setFiltersOpen(false)}>閉じる</Button>}>
-        <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
+        <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" size="full" value={responseFilter}
           onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
           options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} /></SaveErrorField>
-        <SaveErrorField names={["operatorId","operator_id"]}><EntitySelect aria-label="担当で絞り込む" width={132} value={operatorId}
+        <SaveErrorField names={["operatorId","operator_id"]}><EntitySelect aria-label="担当で絞り込む" size="full" value={operatorId}
           onChange={(value) => resetPageWith(() => setOperatorId(value))}
           options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name }))])} /></SaveErrorField>
-        <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" width={147} value={scenarioId}
+        <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" size="full" value={scenarioId}
           onChange={(value) => resetPageWith(() => setScenarioId(value))}
           options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
-        <FilterChip
-          selected={advanced !== null}
-          onChange={() => { setFiltersOpen(false); setAdvancedOpen(true) }}
+        <Button fullWidth filterActive={advanced !== null} aria-haspopup="dialog"
+          onClick={() => { setFiltersOpen(false); setAdvancedOpen(true) }}
         >
           <SlidersHorizontal size={16} aria-hidden="true" />
           詳細条件
-        </FilterChip>
+        </Button>
         </FilterPopover>
       </ListToolbarRow>
       <ListToolbarRow>

@@ -143,4 +143,4 @@ html:root :is([data-toolbar-row], [data-control-row]) .button { width: var(--con
 .button[data-variant='attention'][aria-pressed='false'] > svg { opacity: 0; }
 :global(tr):is(:hover, :focus-within) .button[data-variant='attention'] > svg,
 .button[data-variant='attention']:is(:hover, :focus-visible) > svg { opacity: 1; }
-@media (hover: none) { .button[data-variant='attention'] > svg { opacity: 1; } }
+@media (hover: none) { .button[data-variant='attention'][aria-pressed='false']:not(:focus-visible):not(:hover) > svg { opacity: var(--polish-disabled-opacity); } }

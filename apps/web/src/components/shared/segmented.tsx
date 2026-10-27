@@ -28,7 +28,7 @@ export default function SegmentedControl<T extends string>({
   size = 'medium',
   disabled = false,
   appearance = 'track',
-  equalWidth = false,
+  equalWidth = true,
   fit,
   selectionMode = 'buttons',
 }: {
@@ -60,7 +60,7 @@ export default function SegmentedControl<T extends string>({
    * 高さ32・左右14・間8の離れた札4つで、選んだ札だけ薄い緑の面と緑の枠。
    */
   appearance?: 'track' | 'choices' | 'reservation' | 'intake-stop'
-  /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
+  /** 選択肢は既定で器の幅へ均等に並べる。 */
   equalWidth?: boolean
   /** 文字の幅へ器を収める。縦の入力・カードで横いっぱいに伸ばさない。 */
   fit?: 'content'
@@ -154,6 +154,7 @@ export default function SegmentedControl<T extends string>({
             .filter(Boolean)
             .join(' ')}
           data-part={appearance === 'track' ? 'joined-segment' : undefined}
+          data-empty={option.count === 0 || option.count === '0' || undefined}
           aria-label={option.ariaLabel ?? (option.count !== undefined && typeof option.label === 'string' ? `${option.label} ${option.count}` : undefined)}
           title={option.title ?? (equalWidth && typeof option.label === 'string' ? option.label : undefined)}
           role={role === 'radiogroup' ? 'radio' : undefined}

@@ -303,7 +303,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
     {selection ? <span data-choice-selection className={styles.fieldChips}>{selection}</span> :
     <span className={styles.fieldValue}>
       {empty ? <span className={styles.fieldPlaceholder} title={placeholder ?? `${noun}を選ぶ`}>{placeholder ?? `${noun}を選ぶ`}</span> : <>
-        <>{valuePrefix ? <span data-choice-value className={styles.fieldName} title={name}>{prefixedValue ? <SelectValueText {...prefixedValue} head={prefixedValue.head.replace(/^担当者(?=[:：]?$)/, '担当')} /> : name?.replace(/^担当者：/, '担当：')}</span> : <span data-choice-value className={styles.fieldName} title={name} aria-label={`選択中の${noun}：${name}`}>{name}</span>}</>
+        <>{valuePrefix ? <span data-choice-value className={styles.fieldName} title={name}>{prefixedValue ? <SelectValueText {...prefixedValue} /> : name}</span> : <span data-choice-value className={styles.fieldName} title={name} aria-label={`選択中の${noun}：${name}`}>{name}</span>}</>
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}
     </span>}

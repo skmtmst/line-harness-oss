@@ -198,9 +198,9 @@
 }
 
 /* ：候補のカードも同じ選択の枠・輪・点。 */
-html:root .tpCard { position: relative; padding-right: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
+html:root .tpCard { position: relative; }
 html:root .tpCard[data-selected] { background: var(--polish-selection-bg); outline: var(--choice-card-ring) solid var(--polish-selection-ink); outline-offset: -2px; }
-html:root .cardRadio { appearance: none; opacity: 1; width: var(--choice-size); height: var(--choice-size); right: var(--space-16); top: var(--space-16); margin: 0; border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
+html:root .cardRadio { position: static; flex: none; align-self: center; appearance: none; opacity: 1; width: var(--choice-size); height: var(--choice-size); margin: 0; border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
 html:root .cardRadio:checked { border-color: var(--polish-selection-ink); background: radial-gradient(circle, var(--polish-selection-ink) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
 html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 

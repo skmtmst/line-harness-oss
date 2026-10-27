@@ -36,7 +36,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
   it('項目名を欄に残しても窓の候補名と確定するIDは変えない', async () => {
     const onChange = vi.fn()
     render(<EntityPickerField label="担当者" noun="担当者" items={items} value="a" valuePrefix="担当者：" onChange={onChange} />)
-    expect(screen.getByText('来店アンケート').parentElement?.textContent).toBe('担当：来店アンケート')
+    expect(screen.getByText('来店アンケート').parentElement?.textContent).toBe('担当者：来店アンケート')
     fireEvent.click(screen.getByRole('button', { name: '担当者：変える' }))
     const dialog = await screen.findByRole('dialog', { name: '担当者を選ぶ' })
     expect(within(dialog).queryByText('担当者：来店アンケート')).toBeNull()

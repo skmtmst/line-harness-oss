@@ -25,6 +25,7 @@ import CheckCard from './src/components/shared/check-card';
 import FilterChip from './src/components/shared/filter-chip';
 import {RowMenu} from './src/components/shared/row-actions';
 import Pagination from './src/components/shared/pagination';
+import { ToggleGroupActions } from './src/components/shared/toggle';
 import IconButton from './src/components/shared/icon-button';
 import SegmentedControl from './src/components/shared/segmented';
 import {Star} from 'lucide-react';
@@ -34,7 +35,7 @@ import NumberField from './src/components/shared/number-field';
 import EntitySelect from './src/components/shared/entity-select';
 import Select from './src/components/shared/select';
 import FolderSelect from './src/components/shared/folder-select';
-import {EntityPickerSummary} from './src/components/shared/entity-picker';
+import {EntityPickerSummary,EntityPickerField} from './src/components/shared/entity-picker';
 import Combobox from './src/components/shared/combobox';
 import MultiSelect from './src/components/shared/multi-select';
 import TimeField from './src/components/shared/time-field-v8';
@@ -50,7 +51,7 @@ import CommandPalette from './src/components/shared/command-palette';
 import Notice from './src/components/shared/notice';
 import {DialogContentRow} from './src/components/shared/dialog-form-row';
 function Fixture(){
- const [window,setWindow]=useState(''),[value,setValue]=useState(false),[current,setCurrent]=useState('now');
+ const [window,setWindow]=useState(''),[value,setValue]=useState(false),[current,setCurrent]=useState('now'),[countState,setCountState]=useState('active');
  const steps=[{key:'done',label:'事前確認',state:'done',onSelect:()=>setCurrent('done')},{key:'now',label:'アカウント接続',state:'current'}, {key:'next',label:'接続確認',state:'todo'}, {key:'choice',label:'使い方を選ぶ',state:'todo'}, {key:'finish',label:'完了',state:'todo'}];
  const props={open:!!window,onCancel:()=>setWindow(''),onConfirm:()=>setWindow(''),title:'新しく作る',description:'名前を入力してください。内容は作成する前に確認できます。',headerIcon:<svg viewBox="0 0 16 16"><path d="M2 2h12v12H2z" fill="none" stroke="currentColor"/></svg>};
  return <main><CommandPalette items={[{href:"/friends",label:"友だち一覧"}]}/>
@@ -82,8 +83,9 @@ function Fixture(){
   </section>
   <section id="choice-time-narrow" style={{width:84}}><TimeField aria-label="狭い時刻" value="09:00" onChange={()=>{}}/></section>
   <section id="input-sample"><TextField aria-label="入力の見本" placeholder="you@example.com" /></section>
-  <section id="display-choices" style={{width:320}}><SegmentedControl aria-label="表示の切り替え" value="line" size="panel" equalWidth options={[{value:'line',label:'LINEの友だち',count:128},{value:'phone',label:'LINE未連携の電話客',count:64}]} onChange={()=>{}} /></section>
-  <section id="favorites"><IconButton variant="attention" pressed aria-label="お気に入り済み"><Star /></IconButton><IconButton variant="attention" pressed={false} aria-label="お気に入りにする"><Star /></IconButton></section>
+  <section id="display-choices" style={{width:320}}><SegmentedControl aria-label="表示の切り替え" value="line" size="panel" options={[{value:'line',label:'LINEの友だち',count:128},{value:'phone',label:'LINE未連携の電話客',count:64}]} onChange={()=>{}} /></section>
+  <section id="empty-choices"><SegmentedControl aria-label="件数の切り替え" value={countState} options={[{value:'empty',label:'保留',count:0},{value:'active',label:'対応中',count:2},{value:'unknown',label:'未取得',count:'—'}]} onChange={setCountState}/></section>
+  <EntityPickerField label="親候補" noun="アカウント" items={Array.from({length:20},(_,i)=>({id:String(i),name:"親候補"+i,meta:"候補の説明"}))} value="0" onChange={()=>{}} /><ToggleGroupActions total={6} enabled={4} label="配信" onChange={()=>{}} /><section id="favorites"><IconButton variant="attention" pressed aria-label="お気に入り済み"><Star /></IconButton><IconButton variant="attention" pressed={false} aria-label="お気に入りにする"><Star /></IconButton></section>
   <section id="filter-states" style={{display:'flex',alignItems:'center',gap:12}}>
     <FilterChip selected={value} onChange={setValue}>すばやく絞る</FilterChip>
     <FilterChip selected showCheck={false} onChange={()=>{}}>状態</FilterChip>
@@ -209,11 +211,17 @@ for (const width of [1152,1440,1920]) {
         const center = new DOMPoint(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2).matrixTransform(matrix)
         return { dx: center.x - box.x - box.width / 2, dy: center.y - box.y - box.height / 2 }
       }))
-      assert.ok((await markOffsets()).every(({dx,dy}) => Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5))
+      assert.ok((await markOffsets()).every(({dx,dy}) => Math.abs(dx) <= 0.1 && Math.abs(dy) <= 0.1))
+      const mark = page.locator('#selection input[type="checkbox"] + span svg path').first()
+      const centeredPath = await mark.getAttribute('d')
+      await mark.evaluate(el => el.setAttribute('d', 'M4 12l5 5L20 6'))
+      await expect.poll(async () => (await markOffsets()).some(({dy}) => Math.abs(dy) > 0.1)).toBe(true)
+      await mark.evaluate((el, path) => el.setAttribute('d', path), centeredPath)
+      await expect.poll(async () => (await markOffsets()).every(({dx,dy}) => Math.abs(dx) <= 0.1 && Math.abs(dy) <= 0.1)).toBe(true)
       await page.locator('#selection input[type="checkbox"] + span svg').first().evaluate(el => { el.style.transform = 'translateY(2px)' })
-      await expect.poll(async () => (await markOffsets()).some(({dy}) => Math.abs(dy) > 0.5)).toBe(true)
+      await expect.poll(async () => (await markOffsets()).some(({dy}) => Math.abs(dy) > 0.1)).toBe(true)
       await page.locator('#selection input[type="checkbox"] + span svg').first().evaluate(el => { el.style.transform = '' })
-      await expect.poll(async () => (await markOffsets()).every(({dx,dy}) => Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5)).toBe(true)
+      await expect.poll(async () => (await markOffsets()).every(({dx,dy}) => Math.abs(dx) <= 0.1 && Math.abs(dy) <= 0.1)).toBe(true)
       await page.getByRole('checkbox',{name:'ラベル付き',exact:true}).focus(); await page.keyboard.press('Space')
       assert.equal(await page.getByRole('checkbox',{name:'全選択',exact:true}).isChecked(),false)
       // 実寸をずらした場合に、この計測がずれを見逃さないことを確かめる。
@@ -385,11 +393,12 @@ for (const width of [1152,1440,1920]) {
       const colors=await sample.evaluate(el=>({sample:getComputedStyle(el,'::placeholder').color,value:getComputedStyle(el).color}))
       assert.notEqual(colors.sample,colors.value,JSON.stringify(colors))
       const group=page.getByRole('group',{name:'表示の切り替え'})
-      const layout=await group.evaluate(root=>({height:root.getBoundingClientRect().height,background:getComputedStyle(root).backgroundColor,thumb:getComputedStyle(root.querySelector('[data-sliding-indicator]')||root.firstElementChild).backgroundColor,items:[...root.querySelectorAll('button')].map(el=>({width:el.getBoundingClientRect().width,scroll:el.scrollWidth,client:el.clientWidth,title:el.title}))}))
+      const layout=await group.evaluate(root=>({height:root.getBoundingClientRect().height,endGap:root.getBoundingClientRect().right-root.querySelector('button:last-child').getBoundingClientRect().right-parseFloat(getComputedStyle(root).paddingRight),background:getComputedStyle(root).backgroundColor,thumb:getComputedStyle(root.querySelector('[data-sliding-indicator]')||root.firstElementChild).backgroundColor,items:[...root.querySelectorAll('button')].map(el=>({width:el.getBoundingClientRect().width,scroll:el.scrollWidth,client:el.clientWidth,title:el.title}))}))
       assert.equal(layout.height,36,JSON.stringify(layout))
       assert.equal(layout.thumb,'rgb(255, 255, 255)',JSON.stringify(layout))
       assert.equal(layout.background,'rgb(245, 245, 247)',JSON.stringify(layout))
       assert.ok(Math.abs(layout.items[0].width-layout.items[1].width)<=0.5,JSON.stringify(layout))
+      assert.ok(Math.abs(layout.endGap)<=0.5,JSON.stringify(layout))
       assert.ok(layout.items.every(item=>item.title),JSON.stringify(layout))
       const trigger=page.getByRole('button',{name:'寸法の選択',exact:true})
       await trigger.click()
@@ -406,6 +415,64 @@ for (const width of [1152,1440,1920]) {
       assert.equal(paint.color,'rgb(245, 158, 11)',JSON.stringify(paint))
       await star.evaluate(el=>el.parentElement.setAttribute('data-part','attention-star'))
       assert.deepEqual(await star.evaluate(el=>({fill:getComputedStyle(el).fill,color:getComputedStyle(el).color})),paint)
+      const batch=page.getByRole('group',{name:'配信の一括設定'})
+      assert.ok((await batch.innerText()).includes('6 件中 4 件オン'))
+      assert.equal(await batch.getByRole('switch').count(),0)
+      for (const name of ['配信をすべてオン','配信をすべてオフ']) {
+        const button=batch.getByRole('button',{name})
+        assert.equal(await button.evaluate(el=>getComputedStyle(el).color),'rgb(8, 122, 62)')
+        assert.equal(await button.evaluate(el=>document.getElementById(el.getAttribute('aria-describedby')).textContent),'6 件中 4 件オン')
+      }
+      const empty=page.getByRole('button',{name:'保留 0',exact:true})
+      const faint=await empty.evaluate(el=>{const probe=document.createElement('span');probe.style.color='var(--color-ink-faint)';el.append(probe);const color=getComputedStyle(probe).color;probe.remove();return color})
+      assert.equal(await empty.evaluate(el=>getComputedStyle(el).color),faint)
+      assert.equal(await empty.locator('[data-segment-count]').evaluate(el=>getComputedStyle(el).color),faint)
+      await empty.click()
+      assert.equal(await empty.getAttribute('aria-pressed'),'true')
+      assert.equal(await empty.evaluate(el=>getComputedStyle(el).color),faint)
+      assert.equal(await page.getByRole('button',{name:'未取得 —',exact:true}).getAttribute('data-empty'),null)
+      const offStar=page.getByRole('button',{name:'お気に入りにする'})
+      await page.mouse.move(0,0)
+      await page.locator('body').click({position:{x:1,y:1}})
+      assert.equal(await offStar.locator('svg').evaluate(el=>getComputedStyle(el).opacity),'0')
+      await page.keyboard.press('Tab')
+      await offStar.focus()
+      await expect.poll(()=>offStar.locator('svg').evaluate(el=>getComputedStyle(el).opacity)).toBe('1')
+      await offStar.evaluate(el=>el.blur())
+      const touch=await browser.newContext({hasTouch:true,isMobile:true,viewport:{width,height:900},reducedMotion:'reduce'})
+      try {
+        const touchPage=await touch.newPage()
+        await mount(touchPage,width)
+        const faded=await touchPage.getByRole('button',{name:'お気に入りにする'}).locator('svg').evaluate(el=>Number(getComputedStyle(el).opacity))
+        assert.ok(faded>0 && faded<1,String(faded))
+        assert.equal(await touchPage.getByRole('button',{name:'お気に入り済み'}).locator('svg').evaluate(el=>getComputedStyle(el).opacity),'1')
+      } finally { await touch.close() }
+
+    } finally { await browser.close() }
+  })
+
+  test(`候補の選択印は1個で行内中央、最後の候補まで操作できる ${width}`, async () => {
+    const browser=await connectGuardBrowser()
+    try {
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      await page.getByRole('button',{name:'親候補：変える',exact:true}).click()
+      const dialog=page.getByRole('dialog',{name:'アカウントを選ぶ'})
+      await dialog.waitFor()
+      const radios=dialog.getByRole('radio')
+      assert.equal(await radios.count(),20)
+      const last=radios.last()
+      await last.scrollIntoViewIfNeeded()
+      const geometry=await last.evaluate(el=>{const row=el.closest('label'),r=row.getBoundingClientRect(),b=el.getBoundingClientRect(),text=row.querySelector('[class*="tpCardText"]').getBoundingClientRect();return {dy:b.y+b.height/2-r.y-r.height/2,left:b.left-r.left,padding:parseFloat(getComputedStyle(row).paddingLeft),beforeText:b.right<=text.left,contained:b.bottom<=r.bottom&&b.right<=r.right,marks:row.querySelectorAll('input[type="radio"]').length}})
+      assert.ok(Math.abs(geometry.dy)<=1,JSON.stringify(geometry))
+      assert.ok(geometry.contained,JSON.stringify(geometry))
+      assert.ok(Math.abs(geometry.left-geometry.padding)<=1,JSON.stringify(geometry))
+      assert.ok(geometry.beforeText,JSON.stringify(geometry))
+      assert.equal(geometry.marks,1)
+      await last.check()
+      assert.equal(await last.isChecked(),true)
+      const bounds=await last.evaluate(el=>({y:el.getBoundingClientRect().y,height:innerHeight}))
+      assert.ok(bounds.y>=0&&bounds.y<bounds.height,JSON.stringify(bounds))
     } finally { await browser.close() }
   })
 
@@ -432,9 +499,20 @@ for (const width of [1152,1440,1920]) {
       await page.keyboard.press('Escape')
       const current=page.locator('[aria-current="page"]')
       assert.equal(await current.count(),1)
-      const state=await current.evaluate(el=>({background:getComputedStyle(el).backgroundColor,weight:getComputedStyle(el).fontWeight}))
+      const state=await current.evaluate(el=>({background:getComputedStyle(el).backgroundColor,weight:getComputedStyle(el).fontWeight,outline:getComputedStyle(el).outlineColor,shadow:getComputedStyle(el).boxShadow,border:getComputedStyle(el).borderWidth}))
       assert.equal(state.background,'rgb(247, 247, 245)',JSON.stringify(state))
       assert.ok(Number(state.weight)>=600,JSON.stringify(state))
+      assert.equal(state.outline,'rgba(0, 0, 0, 0)',JSON.stringify(state))
+      assert.equal(state.shadow,'none',JSON.stringify(state))
+      assert.equal(state.border,'0px',JSON.stringify(state))
+      await current.evaluate(el => el.style.outlineColor='rgb(20, 20, 20)')
+      await expect.poll(()=>current.evaluate(el=>getComputedStyle(el).outlineColor)).not.toBe('rgba(0, 0, 0, 0)')
+      await current.evaluate(el => el.style.removeProperty('outline-color'))
+      await expect.poll(()=>current.evaluate(el=>getComputedStyle(el).outlineColor)).toBe('rgba(0, 0, 0, 0)')
+      await page.keyboard.press('Tab')
+      await current.focus()
+      await expect.poll(()=>current.evaluate(el=>getComputedStyle(el).outlineColor)).toBe('rgb(37, 99, 235)')
+      await current.evaluate(el=>el.blur())
       assert.equal(await page.getByRole('navigation',{name:'1ページの送り'}).count(),0)
       await expect(page.getByText('1件中1件',{exact:true})).toBeVisible()
       await page.close()

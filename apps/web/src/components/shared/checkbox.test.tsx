@@ -129,16 +129,17 @@ function pathBox(d: string) {
   return { cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2 }
 }
 
-describe('印は箱の真ん中（上下左右とも 0.5px 以内）', () => {
+describe('印は箱の真ん中（上下左右とも 0.1px 以内）', () => {
   // 印は箱と同じ大きさ（--polish-icon-control 16px）で viewBox 24 を描く。1 単位＝16/24px。
   const PX_PER_UNIT = 16 / 24
-  it.each([['✓', CHECK_MARK_PATH], ['－', MINUS_MARK_PATH]])('%s の外接箱の中心が (12, 12) から 0.5px 以内', (_name, d) => {
+  const LIMIT = 0.1
+  it.each([['✓', CHECK_MARK_PATH], ['－', MINUS_MARK_PATH]])('%s の外接箱の中心が (12, 12) から 0.1px 以内', (_name, d) => {
     const { cx, cy } = pathBox(d)
-    expect(Math.abs(cx - 12) * PX_PER_UNIT).toBeLessThanOrEqual(0.5)
-    expect(Math.abs(cy - 12) * PX_PER_UNIT).toBeLessThanOrEqual(0.5)
+    expect(Math.abs(cx - 12) * PX_PER_UNIT).toBeLessThanOrEqual(LIMIT)
+    expect(Math.abs(cy - 12) * PX_PER_UNIT).toBeLessThanOrEqual(LIMIT)
   })
-  it('対照：前の ✓（M4 12l5 5L20 6）は判別できる形で中心から外れている', () => {
-    expect(pathBox('M4 12l5 5L20 6').cy).not.toBe(12)
+  it('対照：中心が約0.33pxずれた線も許容範囲を超える', () => {
+    expect(Math.abs(pathBox('M4 12l5 5L20 6').cy - 12) * PX_PER_UNIT).toBeGreaterThan(LIMIT)
   })
   it('部品は真ん中にそろえた印の線を描く', () => {
     const { container } = render(<Checkbox checked onCheckedChange={() => {}} aria-label="選ぶ" />)

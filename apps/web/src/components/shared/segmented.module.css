@@ -216,3 +216,7 @@ html:root :is([data-toolbar-row], [data-control-row]) .root .item { display: inl
 :root .root[data-size='panel'] .count { margin-inline-start: var(--space-4); }
 
 html:root .root[data-equal-width] .item { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 0件は項目全体を薄く示す。読めていない件数と押せない状態にはしない。 */
+html:root .root .item[data-empty],
+html:root .root .item[data-empty] .count { color: var(--color-ink-faint); }
