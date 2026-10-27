@@ -802,4 +802,5 @@
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
 
+- [左メニューのスクロール・予約表示・敬称の修正](release-log/unreleased/0000-kenta-sidebar-scroll.md)
 - [配布する更新ファイルにMacの管理情報を混ぜない修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
