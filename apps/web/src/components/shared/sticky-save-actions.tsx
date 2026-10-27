@@ -23,13 +23,23 @@ function withoutDecorations(node: ReactNode): ReactNode {
 /** Reserve the save mark by default; an explicit role mark takes precedence. */
 export function normalizeStickySaveActions(node: ReactNode): ReactNode {
   if (Array.isArray(node)) return Children.map(node, normalizeStickySaveActions)
-  if (!isValidElement<ActionChildren & { variant?: string; href?: unknown; icon?: ReactNode }>(node)) return node
+  if (!isValidElement<ActionChildren & { variant?: string; href?: unknown; icon?: ReactNode; disabled?: boolean; disabledReason?: string | null; disabledReasonPlacement?: 'inline' | 'tooltip' }>(node)) return node
   if (node.type === Button && node.props.variant === 'primary' && node.props.href === undefined
     && /(保存|登録|作る|つくって|動かす|変更|公開|発行|有効|追加|やり直す)/.test(actionText(node.props.children))) {
     const Mark = /保存/.test(actionText(node.props.children)) && !/(登録|作る|つくって|動かす|公開|発行|有効|追加|やり直す)/.test(actionText(node.props.children)) ? Check : Save
-    return cloneElement(node, {}, <>{node.props.icon === undefined ? <Mark size={16} aria-hidden="true" data-sticky-save-icon /> : null}{withoutDecorations(node.props.children)}</>)
+    const reason = node.props.disabled && node.props.disabledReason ? { disabledReasonPlacement: node.props.disabledReasonPlacement ?? 'inline' as const } : {}
+    return cloneElement(node, reason, <>{node.props.icon === undefined ? <Mark size={16} aria-hidden="true" data-sticky-save-icon /> : null}{withoutDecorations(node.props.children)}</>)
   }
   if (node.props.children === undefined) return node
   const children = normalizeStickySaveActions(node.props.children)
   return children === node.props.children ? node : cloneElement(node, {}, children)
+}
+
+/** 削除の入口は保存から離し、赤い文字だけにそろえる。確認処理と無効条件は保つ。 */
+export function normalizeStickyDestructiveActions(node: ReactNode): ReactNode {
+  if (Array.isArray(node)) return Children.map(node, normalizeStickyDestructiveActions)
+  if (!isValidElement<ActionChildren & { variant?: string; icon?: ReactNode; textTone?: string }>(node)) return node
+  if (node.type === Button) return cloneElement(node, { variant: 'text', textTone: 'danger', icon: undefined }, withoutDecorations(node.props.children))
+  if (node.props.children === undefined) return node
+  return cloneElement(node, {}, normalizeStickyDestructiveActions(node.props.children))
 }

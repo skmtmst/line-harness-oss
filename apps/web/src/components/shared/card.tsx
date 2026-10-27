@@ -159,3 +159,8 @@ export function CardHeader({
     </div>
   )
 }
+
+/** カード内で操作を等分する。文字の自然幅でカードを押し広げない。 */
+export function CardActionRow({ children, ...props }: Omit<HTMLAttributes<HTMLDivElement>, 'className' | 'style'>) {
+  return <div {...props} className={styles.actionRow} data-card-action-row>{children}</div>
+}

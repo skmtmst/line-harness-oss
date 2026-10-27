@@ -2,9 +2,10 @@
 import Link from '@/components/shared/list-navigation'
 import type { LinkProps } from 'next/link'
 import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
-import React, { useEffect, useLayoutEffect, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import styles from './button.module.css'
 import { normalizeActionLabel, normalizeActionNode } from './action-words'
+import TooltipBubble from './tooltip-bubble'
 
 type CommonProps = {
   /**
@@ -47,6 +48,8 @@ type NativeButtonProps = CommonProps &
     href?: never
     /** 既存の無効条件に対応する理由。押せる状態では表示しない。 */
     disabledReason?: string | null
+    /** 入力で直せる理由はボタンの下に1行、権限の理由は吹き出しに表示する。 */
+    disabledReasonPlacement?: 'inline' | 'tooltip'
     /** 開いた直後に標的を寄せたいときだけ渡す（未保存の離脱確認の主ボタン）。 */
     ref?: React.Ref<HTMLButtonElement>
     /**
@@ -132,7 +135,7 @@ export default function Button(props: ButtonProps) {
     const { children, icon, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, filterActive: _filterActive, ...linkProps } = props
     const newTab = external || linkProps.target === '_blank'
     return (
-      <Link href={href} className={classes} data-shared-button="" data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} data-text-content={hasButtonText(children) || undefined} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
+      <Link href={href} className={classes} data-shared-button="" data-variant={variant} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} data-text-content={hasButtonText(children) || undefined} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
         {icon}{props.actionWording ? normalizeActionNode(children) : children}
         {newTab ? <ArrowUpRight size={16} aria-hidden="true" data-external-icon /> : null}
       </Link>
@@ -165,11 +168,46 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     widthReserve = 'states',
     disabled,
     disabledReason,
+    disabledReasonPlacement = 'tooltip',
+    onPointerEnter: onPointerEnterProp,
+    onPointerLeave: onPointerLeaveProp,
+    onPointerDown: onPointerDownProp,
+    onFocus: onFocusProp,
+    onBlur: onBlurProp,
+    onKeyDown: onKeyDownProp,
     ref,
     onClick,
     ...buttonProps
   } = props
   const children = props.actionWording ? normalizeActionNode(rawChildren) : rawChildren
+  const permissionLocked = Boolean(disabled && disabledReason && disabledReasonPlacement === 'tooltip')
+  const reasonId = useId()
+  const tipId = useId()
+  const [tip, setTip] = useState<{ left: number; top: number; below: boolean } | null>(null)
+  const showReason = useCallback(() => {
+    const element = elementRef.current
+    if (!element) return
+    const css = getComputedStyle(document.documentElement)
+    const edge = Number.parseFloat(css.getPropertyValue('--polish-space-row')) || 8
+    const width = Number.parseFloat(css.getPropertyValue('--polish-tooltip-width')) || 288
+    const gap = Number.parseFloat(css.getPropertyValue('--polish-tooltip-gap')) || 8
+    const rect = element.getBoundingClientRect()
+    const below = rect.top < 48
+    setTip({ left: Math.max(edge, Math.min(rect.left, window.innerWidth - width - edge)), top: below ? rect.bottom + gap : rect.top - gap, below })
+  }, [])
+  const hideReason = useCallback(() => setTip(null), [])
+  useEffect(() => {
+    if (!tip) return
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') hideReason() }
+    document.addEventListener('keydown', key)
+    window.addEventListener('scroll', hideReason, true)
+    window.addEventListener('resize', hideReason)
+    return () => {
+      document.removeEventListener('keydown', key)
+      window.removeEventListener('scroll', hideReason, true)
+      window.removeEventListener('resize', hideReason)
+    }
+  }, [tip, hideReason])
 
   /*
    * ★管理画面 仕上げ §2「保存中・完了」。DOM に出す文字は常に今のラベル1つだけ
@@ -257,6 +295,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   }
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (permissionLocked) { event.preventDefault(); event.stopPropagation(); return }
     if (busyNow || disabled || automaticLock.current) return
     // Reactがbusyを描き直す前と、onClick内からの再入も共通の門で止める。
     automaticLock.current = true
@@ -287,16 +326,32 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       type={type}
       className={classes}
       data-shared-button=""
+      data-variant={_variant ?? 'secondary'}
       data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined}
       data-presentation={presentation}
       ref={setRefs}
-      disabled={disabled || busyNow}
+      disabled={Boolean(disabled && !permissionLocked) || busyNow}
       aria-busy={busyNow ? true : undefined}
       {...buttonProps}
+      aria-disabled={permissionLocked || buttonProps['aria-disabled'] ? true : undefined}
+      aria-describedby={[buttonProps['aria-describedby'], permissionLocked ? reasonId : null].filter(Boolean).join(' ') || undefined}
       data-text-content={hasButtonText(busyNow ? busyLabel : shownDone ? doneLabel : children) || undefined}
-      title={disabled && disabledReason ? disabledReason : buttonProps.title}
-      aria-description={disabled && disabledReason ? disabledReason : buttonProps['aria-description']}
+      data-permission-locked={permissionLocked ? '' : undefined}
+      title={disabled && disabledReason && !permissionLocked ? disabledReason : buttonProps.title}
+      aria-description={permissionLocked ? undefined : disabled && disabledReason ? disabledReason : buttonProps['aria-description']}
       aria-label={iconButtonLabel(props)}
+      onPointerEnter={(event) => { onPointerEnterProp?.(event); if (permissionLocked && event.pointerType !== 'touch') showReason() }}
+      onPointerLeave={(event) => {
+        onPointerLeaveProp?.(event)
+        if (permissionLocked && event.pointerType !== 'touch' && document.activeElement !== event.currentTarget) hideReason()
+      }}
+      onPointerDown={(event) => { onPointerDownProp?.(event); if (permissionLocked && event.pointerType === 'touch') showReason() }}
+      onFocus={(event) => { onFocusProp?.(event); if (permissionLocked) showReason() }}
+      onBlur={(event) => { onBlurProp?.(event); if (permissionLocked) hideReason() }}
+      onKeyDown={(event) => {
+        onKeyDownProp?.(event)
+        if (permissionLocked && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); event.stopPropagation() }
+      }}
       onClick={handleClick}
     >
       {busyNow ? <LoaderCircle className={styles.spin} size={16} aria-hidden="true" /> : null}
@@ -304,6 +359,8 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       {!busyNow && !shownDone ? icon : null}
       {busyNow ? busyLabel : shownDone ? doneLabel : children}
     </button>
+    {permissionLocked ? <><span id={reasonId} hidden>{disabledReason}</span>{tip ? <TooltipBubble id={tipId} text={disabledReason!} left={tip.left} top={tip.top} below={tip.below} /> : null}</> : null}
+    {disabled && !busyNow && disabledReason && disabledReasonPlacement === 'inline' ? <span className={styles.disabledReason} role="status">{disabledReason}</span> : null}
     {automaticError ? <span role="alert" data-button-error>{automaticError}</span> : null}
   </>)
 }

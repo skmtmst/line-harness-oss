@@ -268,3 +268,10 @@ html:root .card[data-card-frame='flat'] {
 html:root .withActions { display: flex; flex-direction: column; }
 .information { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: inherit; }
 .bottomActions { min-width: 0; }
+
+/* カードは線を描かず、共通の影で面を分ける。選択の状態は共通の色を保つ。 */
+html:root .card:not([data-card-surface='muted']):not([data-card-surface='danger']):not(.inset) {
+  border: 0; outline: none; box-shadow: var(--card-shadow);
+}
+.actionRow { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--polish-space-row); min-width: 0; }
+html:root .actionRow > :is(button, a) { min-width: 0; width: 100%; padding-inline: var(--polish-space-row); }

@@ -1,9 +1,9 @@
 'use client'
 
 import { createPortal } from 'react-dom'
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { isImeComposing } from './ime'
-import { useV8Leave } from './overlay-utils'
+import { OVERLAY_MODAL_OPEN_EVENT, useV8Leave } from './overlay-utils'
 import styles from './menu-portal.module.css'
 
 const openPanels: HTMLDivElement[] = []
@@ -128,6 +128,13 @@ export default function MenuPortal({
   escapeRef.current = onEscape
   const anchorRef = useRef(getAnchor)
   anchorRef.current = getAnchor
+
+  useEffect(() => {
+    if (!open) return
+    const closeForModal = () => closeRef.current()
+    document.addEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
+    return () => document.removeEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
+  }, [open])
   const positionRef = useRef(getPositionRect)
   positionRef.current = getPositionRect
 
@@ -169,8 +176,12 @@ export default function MenuPortal({
       const viewportWidth = window.innerWidth
       const viewportHeight = window.innerHeight
       const margin = MENU_PORTAL_MARGIN
-      const spaceBelow = viewportHeight - anchorRect.bottom - gap - margin
-      const spaceAbove = anchorRect.top - gap - margin
+      const dialogContent = anchor?.closest<HTMLElement>('[data-dialog-content]')
+      const contentRect = dialogContent?.getBoundingClientRect()
+      const upperBoundary = Math.max(margin, contentRect?.top ?? margin)
+      const lowerBoundary = Math.min(viewportHeight - margin, contentRect?.bottom ?? viewportHeight - margin)
+      const spaceBelow = lowerBoundary - anchorRect.bottom - gap
+      const spaceAbove = anchorRect.top - gap - upperBoundary
       let placement: MenuPortalPlacement
       if (contentHeight <= spaceBelow || spaceBelow >= spaceAbove) {
         placement = 'down'
@@ -183,7 +194,7 @@ export default function MenuPortal({
       const top =
         placement === 'down'
           ? anchorRect.bottom + gap
-          : Math.max(margin, anchorRect.top - gap - shownHeight)
+          : Math.max(upperBoundary, anchorRect.top - gap - shownHeight)
       // 寄せた側で画面の端を越えるときは、反対側の端にそろえる（左寄せ→右端・右寄せ→左端）。
       let rawLeft = align === 'end' ? anchorRect.right - panelWidth : anchorRect.left
       if (align === 'start' && rawLeft + panelWidth > viewportWidth - margin) rawLeft = anchorRect.right - panelWidth

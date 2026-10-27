@@ -51,7 +51,7 @@ describe('引き出しの幅（width="narrow"）', () => {
   })
 })
 
-describe('窓の下のボタンを中央に（footerAlign="center"）', () => {
+describe('窓の下の操作は既定で中央にそろえる', () => {
   it('渡さなければ印を付けない。渡すと data-footer-align="center"', () => {
     const { rerender } = render(<Dialog open modal={false} title="窓" onCancel={vi.fn()} onConfirm={vi.fn()} />)
     expect(screen.getByRole('dialog').getAttribute('data-footer-align')).toBeNull()
@@ -59,8 +59,10 @@ describe('窓の下のボタンを中央に（footerAlign="center"）', () => {
     expect(screen.getByRole('dialog').getAttribute('data-footer-align')).toBe('center')
   })
 
-  it('中央寄せは v8 の印つきの窓だけ', () => {
-    expect(dialogCss).toMatch(/:root \.panel\[data-footer-align='center'\] \.actions \{ justify-content: center; \}/)
+  it('既定の操作組を中央に置き、明示された lead は左欄に保つ', () => {
+    expect(dialogCss).toMatch(/:root \.actions\[data-dialog-action-pair\] \{ display: grid; grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\)/)
+    expect(dialogCss).toMatch(/:root \.footerLead \{ grid-column: 1;/)
+    expect(dialogCss).toMatch(/:root \.buttonPair \{ grid-column: 2;/)
   })
 })
 

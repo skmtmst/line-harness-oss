@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import styles from './sticky-bar.module.css'
-import { normalizeStickySaveActions } from './sticky-save-actions'
+import { normalizeStickyDestructiveActions, normalizeStickySaveActions } from './sticky-save-actions'
 
 export { default as StickyBarAction } from './sticky-bar-action'
 
@@ -105,7 +105,7 @@ export default function StickyBar({
         .join(' ')}
     >
       <div className={styles.lead} data-sticky-lead>
-        {destructive}
+        {normalizeStickyDestructiveActions(destructive)}
         {status ? <p className={styles.status} title={typeof status === 'string' ? status : undefined}>{status}</p> : null}
       </div>
       {info ? <div className={styles.info}>{info}</div> : null}

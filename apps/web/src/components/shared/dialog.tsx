@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom'
 import { Check, PanelsTopLeft, X } from 'lucide-react'
 import Button from './button'
 import IconButton from './icon-button'
-import { OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
+import { OVERLAY_MODAL_OPEN_EVENT, OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 import { useFormInputDirty } from './form-input-dirty'
 import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
@@ -90,6 +90,8 @@ export type DialogProps = {
   /** 実行ボタンを押せない形で出す（確かめのチェックが入るまで、など）。処理中の busy とは別。 */
   confirmDisabled?: boolean
   confirmDisabledReason?: string
+  /** 入力不足は本文に1行、権限不足はTabで止まれるボタンと吹き出しにする。 */
+  confirmDisabledReasonPlacement?: 'inline' | 'tooltip'
   actionWidthReserve?: 'states' | 'idle'
   confirmPlacement?: 'start'
   error?: string
@@ -169,6 +171,7 @@ export default function Dialog({
   cancelLabel = 'キャンセル',
   confirmDisabled = false,
   confirmDisabledReason,
+  confirmDisabledReasonPlacement = 'inline',
   actionWidthReserve,
   confirmPlacement,
   onConfirm,
@@ -236,6 +239,10 @@ export default function Dialog({
       : primaryAction === 'cancel' ? () => cancelRef.current : undefined,
   )
   const layer = useOverlayLayer(open && modal)
+  useEffect(() => {
+    if (!open || !modal) return
+    document.dispatchEvent(new Event(OVERLAY_MODAL_OPEN_EVENT))
+  }, [open, modal])
   const shortConfirmation = confirmation && !children && !steps
   const confirmationSizeClass = confirmation && compact
     ? tone === 'destructive'
@@ -319,7 +326,7 @@ export default function Dialog({
       </div>
       {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
-      {children ? <div className={styles.content} data-window-body data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
+      {children ? <div className={styles.content} data-window-body data-dialog-content data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <Notice tone="danger" role="alert">
         {error || automaticError}
       </Notice> : null}
@@ -332,30 +339,32 @@ export default function Dialog({
          * 実行ボタンの無い参照窓では「キャンセル」を出さない。閉じ方は右上の×
          * に一本化する（UI-25）。
          */
-        <div className={styles.actions} data-dialog-actions>
+        <div className={styles.actions} data-dialog-actions data-dialog-action-pair>
           {footerLead ? <span className={styles.footerLead}>{footerLead}</span> : null}
-          <Button
-            data-dialog-action={primaryAction === 'cancel' ? 'primary' : 'secondary'}
-            variant={primaryAction === 'cancel' ? 'primary' : undefined}
-            className={styles.designButton}
-            widthReserve={actionWidthReserve}
-            ref={primaryAction === 'cancel' ? cancelRef : undefined}
-            onClick={discard.requestClose}
-            disabled={busy}
-          >
-            {cancelLabel}
-          </Button>
-          <Button
-            actionWording
-            data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
-            variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
-            className={styles.designButton}
-            widthReserve={actionWidthReserve}
-            onClick={runConfirm}
-            disabled={busy || confirmDisabled} title={confirmDisabled ? confirmDisabledReason : undefined} busy={busy} busyLabel={busyLabel}>
-            {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
-            {tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
-          </Button>
+          <span className={styles.buttonPair}>
+            <Button
+              data-dialog-action={primaryAction === 'cancel' ? 'primary' : 'secondary'}
+              variant={primaryAction === 'cancel' ? 'primary' : undefined}
+              className={styles.designButton}
+              widthReserve={actionWidthReserve}
+              ref={primaryAction === 'cancel' ? cancelRef : undefined}
+              onClick={discard.requestClose}
+              disabled={busy}
+            >
+              {cancelLabel}
+            </Button>
+            <Button
+              actionWording
+              data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
+              variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
+              className={styles.designButton}
+              widthReserve={actionWidthReserve}
+              onClick={runConfirm}
+              disabled={busy || confirmDisabled} disabledReason={confirmDisabledReason} disabledReasonPlacement={confirmDisabledReasonPlacement} title={confirmDisabled && confirmDisabledReasonPlacement === 'inline' ? confirmDisabledReason : undefined} busy={busy} busyLabel={busyLabel}>
+              {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
+              {tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
+            </Button>
+          </span>
         </div>
       ) : null)}
       </div>

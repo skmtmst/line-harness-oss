@@ -7,6 +7,7 @@ import Select, { type SelectProps } from './select'
 import EntitySelect from './entity-select'
 import SearchField from './search-field'
 import FilterChip from './filter-chip'
+import { RowMenu } from './row-actions'
 import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
 import { toolbarContentFit, fitToolbarWrap, measureToolbarOptionalWidth, fitToolbarOptionalWidth, fitToolbarOverflowPanel, observeToolbarContent } from './list-toolbar-fit.mjs'
@@ -261,9 +262,10 @@ function containsFilterChips(node: ReactNode): boolean {
 }
 
 /** 保存検査の包みを含め、部品の役目から並べる。画面CSSで順序を上書きしない。 */
-function toolbarRole(node: ReactNode): 'search' | 'filter' | 'sort' | 'count' {
+function toolbarRole(node: ReactNode): 'search' | 'filter' | 'sort' | 'count' | 'action' {
   if (!isValidElement<{ children?: ReactNode; 'aria-label'?: string; label?: string }>(node)) return 'filter'
   if (node.type === ListToolbarSearchSlot || node.type === SearchField) return 'search'
+  if (node.type === RowMenu) return 'action'
   if (node.type === PageSizeSelect) return 'count'
   if (node.type === ListToolbarSort) return 'sort'
   if (/表示件数|1ページ|件表示/.test(node.props['aria-label'] ?? node.props.label ?? '')) return 'count'
@@ -284,7 +286,7 @@ export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanEl
 /** : the shared end owns order; keep each control and its handler intact. */
 function orderedTrailingTools(nodes: ReactNode, accessory?: ReactNode): ReactNode[] {
   const flatten = (items: ReactNode): ReactNode[] => Children.toArray(items).flatMap(node => isValidElement<{ children?: ReactNode }>(node) && node.type === Fragment ? flatten(node.props.children) : [node])
-  const rank = (node: ReactNode) => ({ search: 0, filter: 0, sort: 1, count: 2 })[toolbarRole(node)]
+  const rank = (node: ReactNode) => ({ search: 0, filter: 0, sort: 1, count: 2, action: 3 })[toolbarRole(node)]
   const tools = flatten(nodes).sort((a, b) => rank(a) - rank(b))
   if (!accessory) return tools
   // 一覧の操作の説明（？）は、絞り込み・並びのあと、件数の直前（・）。
@@ -440,7 +442,7 @@ export function ResponsiveFilterChips({ children, label = '状態', preserveChip
   const allIndex = chips.findIndex(child => /^すべて(?:$|\s|[\d（(])/.test(text(child.props.children)))
   const current = selected.length > 1 ? 'multiple' : selected.length === 1 ? String(selected[0]) : allIndex >= 0 ? String(allIndex) : 'all'
   return <span ref={ref} className={styles.filterChoices} data-filter-collapsed={!preserveChips && collapsed || undefined}>
-    <span className={styles.filterWide} data-filter-chips>{children}</span>
+    <span className={styles.filterWide} data-filter-chips>{allIndex >= 0 ? chips.map(chip => cloneElement(chip, { showCheck: false })) : children}</span>
     {!preserveChips ? <span className={styles.filterNarrow}><Select size="content" label={label} aria-label={label} value={current}
       options={[...(allIndex >= 0 ? [] : [{ value: 'all', label: 'すべて', disabled: selected.length > 1 }]), ...(selected.length > 1 ? [{ value: 'multiple', label: `${formatNumber(selected.length)}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
       onChange={next => { if (next === 'all') { if (selected.length === 1) chips[selected[0]].props.onChange(false) } else { const chip = chips[Number(next)]; chip?.props.onChange(!chip.props.selected) } }} /></span> : null}
