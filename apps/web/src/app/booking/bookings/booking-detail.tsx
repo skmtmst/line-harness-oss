@@ -8,6 +8,7 @@ import { formatDateTime, formatTime, formatNumber } from '@/lib/format'
 import type { AccountStyle } from '@line-crm/shared'
 import { bookingWords } from '@/v8/booking-bookings/public/words/index'
 import { BookingGapSections } from '@/v8/booking-gap/public/booking-gap-sections/index'
+import { withHonorific } from '@line-crm/shared'
 
 /*
  * ★V8-B 予約の詳細（`AjZhH`）。台帳の行から開く小窓。
@@ -81,7 +82,7 @@ export default function BookingDetailV8({
     <Dialog
       open
       designNode="AjZhH"
-      title={`${name}さん`}
+      title={`${withHonorific(name)}`}
       onCancel={onClose}
       footer={
         <div className="flex flex-wrap justify-end gap-2">

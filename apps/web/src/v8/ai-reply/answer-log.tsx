@@ -40,6 +40,7 @@ import { QA_HELP } from './qa-list'
 import { useAiSettings } from './use-ai-settings'
 import { ACTION_LABEL, ACTION_TONE, QA_STATUS_LABEL, handoffReasonText } from './words'
 import styles from './qa-list.module.css'
+import { withHonorific } from '@line-crm/shared'
 
 const ACTION_OPTIONS = [
   { value: '', label: 'したこと：すべて' },
@@ -155,7 +156,7 @@ export default function AnswerLogV8() {
         <Drawer
           open={detail !== null}
           title="AI が答えた記録"
-          description={opened ? `${at(opened.createdAt)}・${opened.friendName} さん` : undefined}
+          description={opened ? `${at(opened.createdAt)}・${withHonorific(opened.friendName, 'さん', { space: true })}` : undefined}
           closeAppearance="box"
           heightMode="viewport"
           onClose={() => setUrl({ log: '' })}

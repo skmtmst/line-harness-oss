@@ -22,6 +22,7 @@ import { ChatImageMessage, StickerMessageImage } from "./screen-gap-parts";
 import { useMemo } from 'react';
 import type { Props } from './inbox-conversation-view-types';
 import InboxReplyComposer from './inbox-reply-composer';
+import { withHonorific } from '@line-crm/shared'
 
 export default function InboxConversation({ operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo, loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages }: Props) {
   const messages = useMemo(() => pendingMessages?.length ? [...(chatDetail?.messages ?? []), ...pendingMessages] : (chatDetail?.messages ?? []), [chatDetail?.messages, pendingMessages])
@@ -125,7 +126,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
                 hasMore={messagesHasMore}
                 loadingOlder={loadingOlderMessages}
                 onLoadOlder={() => { void loadOlderMessages() }}
-                label={`${chatDetail.friendName}さんとのメッセージ`}
+                label={`${withHonorific(chatDetail.friendName)}とのメッセージ`}
                 total={chatDetail.total === undefined ? undefined : chatDetail.total + (pendingMessages?.length ?? 0)}
                 scrollToId={chatSearchTarget?.id ?? null}
                 scrollSeq={chatSearchTarget?.seq ?? 0}

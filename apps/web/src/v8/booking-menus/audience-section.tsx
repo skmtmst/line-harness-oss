@@ -18,6 +18,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import TagPickerField from '@/components/shared/tag-picker-field'
 import { api, type FriendListItem } from '@/lib/api'
 import styles from './menu-form.module.css'
+import { withHonorific } from '@line-crm/shared'
 
 export type AudienceMode = 'all' | 'include_tags' | 'exclude_tags'
 
@@ -60,7 +61,7 @@ export function AudienceSection({ accountId, mode, tagIds, onMode, onTagIds, can
     return () => { live = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId])
-  const options = useMemo(() => [{ value: '', label: 'この人で見る：選ばない（全員の見本）' }, ...friends.map((friend) => ({ value: friend.id, label: `この人で見る：${friend.displayName}さん` }))], [friends])
+  const options = useMemo(() => [{ value: '', label: 'この人で見る：選ばない（全員の見本）' }, ...friends.map((friend) => ({ value: friend.id, label: `この人で見る：${withHonorific(friend.displayName)}` }))], [friends])
   return (
     <Card variant="form" gap="normal">
       <CardHeader size="stacked" title={<span className={styles.titleWithMark}>見せる相手<HelpTip label="見せる相手の説明">会員だけ・初めての人だけ・常連だけのメニューを出し分けます。タグは「どれか1つ」が付いていれば当てはまります。</HelpTip><StatusBadge tone="success" dot={false} size="compact">足した物</StatusBadge></span>} />

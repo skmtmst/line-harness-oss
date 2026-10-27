@@ -9,6 +9,8 @@ export * from "./response-window";
 export * from "./reminder-timing";
 export * from "./reminder-name";
 export * from "./anniversary";
+export { withHonorific } from "./honorific";
+export type { Honorific } from "./honorific";
 export * from "./shipping-schedule";
 export * from "./form-layout";
 export * from "./customer-look";

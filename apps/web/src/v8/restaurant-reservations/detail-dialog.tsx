@@ -1,6 +1,6 @@
 'use client'
 import {ReservationDining,ReservationFacts,ReservationSource,ReservationDetailsActions} from '@/components/shared/reservation-board'
-import {seatBoardEntry} from '@line-crm/shared'
+import {seatBoardEntry, withHonorific } from '@line-crm/shared'
 
 /*
  * ★V8-B 予約台帳「予約の詳細」の窓（板 `AjZhH`）。
@@ -105,7 +105,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   if(inline)return <Card surface="inset" contentPadding="16px" layout="vertical" gap="10px">
     <SectionHeader title="予約の詳細" actions={<>{attendance}<Button size="inline" variant="text" aria-label="予約の詳細を閉じる" onClick={onClose}><X size={16} aria-hidden="true"/></Button></>}/>
     <p className={styles.fact}>{`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}・${table?.code??'未配席'}`}</p>
-    <SectionHeader size="customer" title={`${reservation.customer_name} さま`} note={<ReservationSource value={reservation.source} note={reservation.note}/>}/>
+    <SectionHeader size="customer" title={`${withHonorific(reservation.customer_name, 'さま', { space: true })}`} note={<ReservationSource value={reservation.source} note={reservation.note}/>}/>
     <ReservationFacts items={[{label:'人数・コース',value:`${reservation.guest_count}名・${reservation.course_name??'席のみ'}${course?.price?` ${polishFormatYen(course.price)}`:''}`},{label:'電話',value:maskPhone(reservation.customer_phone)||'電話未登録'}]}/>
     <ReservationDining dense entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)}/>
     <ReservationFacts items={[{label:'来店',value:<span title={historyText(history)}>{history.state==='ready'?`${polishFormatNumber(history.count)}回`:'—'}</span>}]}/>
@@ -115,7 +115,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   return (
     <RsDialog
       open
-      title={`${reservation.customer_name}さん・${reservation.guest_count}名`}
+      title={`${withHonorific(reservation.customer_name)}・${reservation.guest_count}名`}
       width={560}
       top={160}
       busy={busy}

@@ -37,6 +37,7 @@ import { formatNumber } from '@/lib/format'
 import { ACTION_LABELS, STATUS_LABELS, STATUS_BADGE, OPERATION_STATUS_LABELS, POLICY_FIELD_LABELS, notificationOpLine, decideDescription, jpDateTime, jpTime, jpStamp, jstDate, jstHHMM, bookingNumber, approvedText, auditLine } from './detail-model'
 
 import type { BookingDetailModel } from '@/app/booking/bookings'
+import { withHonorific } from '@line-crm/shared'
 
 export default function BookingDetailScreen({ model }: { model: BookingDetailModel }) {
   const {
@@ -369,7 +370,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                 ) : null}
               </div>
               <Row label="お名前">
-                {detail.customer.displayName ? `${detail.customer.displayName} さま` : '未設定'}
+                {detail.customer.displayName ? `${withHonorific(detail.customer.displayName, 'さま', { space: true })}` : '未設定'}
               </Row>
               {isLineLinked ? (
                 <Row label="LINEの表示名">{detail.customer.displayName ?? '未設定'}</Row>

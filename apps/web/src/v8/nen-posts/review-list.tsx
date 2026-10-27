@@ -26,6 +26,7 @@ import styles from './review.module.css'
 import { safePhotoSrc } from './src'
 import { mileStatusLabel,text } from './text'
 import { formatPhotoReceivedAt } from './time'
+import { withHonorific } from '@line-crm/shared'
 
 export type ReviewListV8Props = {
   accountId: string
@@ -211,7 +212,7 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
   const notificationFailed = text(photo.review_notification_status) === 'failed'
   const adopted = status === 'adopted'
   const owner = text(photo.owner_name)
-  const ownerLine = `${owner ? `${owner}さん` : '名前未取得'}${text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}`
+  const ownerLine = `${owner ? withHonorific(owner) : '名前未取得'}${text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}`
   const received = Date.parse(text(photo.created_at))
   return (
     <li className={styles.cardItem}><article aria-label={`${name}の投稿写真`} className={`${adopted ? styles.cardAdopted : styles.card}${selected ? ` ${styles.cardSelected}` : ''}`}>
@@ -334,7 +335,7 @@ export function RejectDialogV8({
   const owner = photo ? text(photo.owner_name) : ''
   const received = photo ? Date.parse(text(photo.created_at)) : Number.NaN
   const sub = photo
-    ? `${owner ? `${owner}さん` : 'お名前は未取得'}${text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}・${Number.isFinite(received) ? polishFormatListDay(new Date(received)) : '日時不明'}${text(photo.caption) ? `「${text(photo.caption)}」` : ''}`
+    ? `${owner ? withHonorific(owner) : 'お名前は未取得'}${text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}・${Number.isFinite(received) ? polishFormatListDay(new Date(received)) : '日時不明'}${text(photo.caption) ? `「${text(photo.caption)}」` : ''}`
     : ''
   return (
     <Dialog open designNode="ujcar" designWidth={620} designTop={90} title="この写真を見送りますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。見送っても、この方のマイルは減りません。" confirmation tone="destructive" busy={busy} error={reasonError} onCancel={onClose} onConfirm={onConfirm} confirmLabel="見送る">
