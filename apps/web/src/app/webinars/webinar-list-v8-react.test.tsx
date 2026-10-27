@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -91,7 +93,7 @@ let fetchCalls: string[] = []
 beforeEach(() => {
   window.history.replaceState(null, '', '/webinars')
   listItems = [webinar()]
-  staffRole = 'admin'
+  staffRole = verifiedStaffRole('admin')
   fetchCalls = []
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -165,7 +167,7 @@ test('v8 で何も無いときは eAQ3t の「まだ無い」が出る', async (
 
 // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
 test('v8 の閲覧のみ（jiNg0）は作る・編集を出さず、閲覧のみの帯を出す', async () => {
-  staffRole = 'staff'
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="UyUMw"]')
@@ -173,7 +175,7 @@ test('v8 の閲覧のみ（jiNg0）は作る・編集を出さず、閲覧のみ
   const texts = [...board!.querySelectorAll('button, a')].map((el) => el.textContent ?? '')
   expect(texts.some((t) => t.includes('ウェビナーを作る'))).toBe(false)
   expect(texts.some((t) => t === '編集')).toBe(false)
-  expect(board?.textContent).toContain('閲覧のみで見ています')
+  expect(board?.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
 })
 
 /* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。
@@ -306,3 +308,5 @@ test('アーカイブ済みを開いて記録を読み、確認してから下�
   await act(async () => { ([...dialog.querySelectorAll('button')].find((el) => el.textContent === '下書きに戻す') as HTMLButtonElement).click() })
   expect(requests.filter((r) => r.method === 'PUT').map((r) => JSON.parse(r.body!))).toEqual([{ status: 'draft' }])
 })
+
+afterEach(() => { verifiedStaffRole(null) })

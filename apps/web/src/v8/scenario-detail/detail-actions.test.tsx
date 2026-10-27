@@ -1,3 +1,4 @@
+import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * シナリオ配信の編集（src/v8/scenario-detail）で、消す・写す・始めた直後・テスト送信・置き場の動きを、
@@ -465,7 +466,7 @@ describe('始めた直後の知らせ', () => {
     stubStats(undefined)
     await render({ showStarted: true })
     const band = await waitFor(() => {
-      const found = screen.getAllByRole('status').find((el) => el.textContent?.includes('配信を始めました'))
+      const found = (screen.getAllByRole('status').find((el) => el.textContent?.includes('配信を始めました')) ?? querySupplementaryPageAction('配信を始めました'))
       expect(found).toBeTruthy()
       return found!
     })
@@ -492,7 +493,7 @@ describe('始めた直後の知らせ', () => {
 describe('まとめてテストを送る', () => {
   it('上の「まとめてテストを送る」で全部の通のテスト送信を開き、シナリオの LINE アカウントの友だちから選ぶ', async () => {
     await render()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'まとめてテストを送る' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: 'まとめてテストを送る' })) })
     await screen.findByText('試験 花子')
     expect(calls.friends).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'account-a' }))
     // 送る通は、配信の時刻の書き方で1通ずつ並ぶ（詳細画面の行にも同じ時刻が出るので、送る内容の行の中だけを見る）。
@@ -505,7 +506,7 @@ describe('まとめてテストを送る', () => {
   it('全アカウント共通のシナリオは、選んでいるアカウントの友だちから選ぶ', async () => {
     stubScenario({ lineAccountId: null })
     await render()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'まとめてテストを送る' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: 'まとめてテストを送る' })) })
     await screen.findByText('試験 花子')
     expect(calls.friends).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'account-selected' }))
   })
@@ -513,7 +514,7 @@ describe('まとめてテストを送る', () => {
   it('友だちを読めなかったら、読めなかったと出す（0人と混ぜない）', async () => {
     calls.friends.mockRejectedValue(new Error('offline'))
     await render()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'まとめてテストを送る' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: 'まとめてテストを送る' })) })
     await screen.findByText('友だちを読み込めませんでした。')
   })
 })

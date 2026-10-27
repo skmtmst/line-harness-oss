@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { hqRichMenuDefinitionFromSeed,type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
@@ -29,7 +30,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('統括から店舗のAPIを呼んではいけません') }))
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); document.documentElement.removeAttribute('data-theme') })
-const click = (name: string) => fireEvent.click(screen.getByRole('button', { name, exact: true }))
+const click = (name: string) => fireEvent.click(getPageAction({ name, exact: true }))
 const start = async (count = 'なし') => {
   render(<RichMenuCreateV8 host={host} />)
   fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: '統括メニュー' } })

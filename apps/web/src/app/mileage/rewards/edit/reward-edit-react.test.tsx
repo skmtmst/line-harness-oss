@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * マイルの使い道をつくる・編集する（設計 `p9CcEB` 17-1-G）を本物の React で動かして守る。
@@ -148,7 +149,7 @@ async function input(id: string, value: string) {
 }
 
 function button(text: string, scope: ParentNode = host): HTMLButtonElement {
-  const found = [...scope.querySelectorAll('button')].find((b) => b.textContent?.trim() === text)
+  const found = ([...scope.querySelectorAll('button')].find((b) => b.textContent?.trim() === text) ?? querySupplementaryPageAction(text))
   if (!found) throw new Error(`「${text}」のボタンがありません`)
   return found as HTMLButtonElement
 }

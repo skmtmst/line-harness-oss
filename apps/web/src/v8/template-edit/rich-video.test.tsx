@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
@@ -17,7 +19,7 @@ import Editor from './rich-video'
 import type { TemplateEditHost } from './host'
 const draft:RichVideoDraft={name:'動画',folderId:'',originalContentUrl:'https://worker.example/images/video.mp4',previewImageUrl:'https://worker.example/images/preview.jpg',height:520,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'https://example.com/menu',altText:'新しい動画です'}
 function stored(button=true){return {...richVideoContent({...draft,buttonEnabled:button}),baseUrl:'https://worker.example/images/imagemaps/map'}}
-beforeEach(()=>{vi.clearAllMocks();mocks.role='owner';mocks.account='a';mocks.get.mockResolvedValue({success:true,data:{id:'r',accountId:'a',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored()),publishedVersion:1,draftRevision:0}});mocks.update.mockResolvedValue({success:true,data:{id:'r'}})})
+beforeEach(()=>{vi.clearAllMocks();mocks.role = verifiedStaffRole('owner');mocks.account='a';mocks.get.mockResolvedValue({success:true,data:{id:'r',accountId:'a',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored()),publishedVersion:1,draftRevision:0}});mocks.update.mockResolvedValue({success:true,data:{id:'r'}})})
 afterEach(cleanup)
 describe('リッチビデオ編集',()=>{
  it('統括は店を選ばず取り込み、ひな形の口へ保存して配る（Ni0V8）',async()=>{
@@ -79,8 +81,8 @@ describe('リッチビデオ編集',()=>{
   expect((screen.getByLabelText('通知に出る文') as HTMLInputElement).value).toBe('新しい通知');
  });
  it('閲覧のみには保存・アップロード・スイッチを出さない',async()=>{
-  mocks.role='staff';render(<Editor id="r"/>);await screen.findByDisplayValue('新しい動画です');
-  expect(screen.getByRole('status').textContent).toContain('閲覧のみ');expect(screen.queryByRole('button',{name:'保存する'})).toBeNull();expect(screen.queryByRole('button',{name:'ファイルを選ぶ'})).toBeNull();expect(screen.queryByRole('checkbox')).toBeNull();
+  mocks.role = verifiedStaffRole('staff');render(<Editor id="r"/>);await screen.findByDisplayValue('新しい動画です');
+  expect(screen.getByRole('status').textContent).toContain(PERMISSION_LOCK_SUMMARY.feature);expect(screen.queryByRole('button',{name:'保存する'})).toBeNull();expect(screen.queryByRole('button',{name:'ファイルを選ぶ'})).toBeNull();expect(screen.queryByRole('checkbox')).toBeNull();
  });
  it('読み込み失敗時に保存せず、別アカウントに切り替えても保存しない',async()=>{
   mocks.get.mockRejectedValue(new Error('failed'));const {unmount}=render(<Editor id="r"/>);await screen.findByRole('alert');expect((screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement).disabled).toBe(true);unmount();
@@ -102,3 +104,5 @@ describe('リッチビデオ編集',()=>{
   expect(bubble.type).toBe('rich_video');expect(assetBubbleError(bubble)).toBe('');expect(JSON.parse(bubbleLegacyMessage(bubble).messageContent).video).toEqual(content.video);expect(bubbleLegacyMessage(bubble).messageType).toBe('imagemap');
  });
 })
+
+afterEach(() => { verifiedStaffRole(null) })

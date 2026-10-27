@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 import { screen } from '@testing-library/react'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
@@ -170,7 +171,7 @@ async function typeText(input: HTMLInputElement, value: string): Promise<void> {
 }
 
 async function clickButton(el: HTMLElement | Document, text: string): Promise<void> {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]'))
+  const button = (Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]')) ?? querySupplementaryPageAction(text))
   if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
   await act(async () => { (button as HTMLButtonElement).click() })
 }

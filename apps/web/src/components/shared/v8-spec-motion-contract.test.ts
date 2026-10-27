@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import React from 'react'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { SlidingIndicator } from './sliding-indicator'
+import Button from './button'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
@@ -42,10 +43,18 @@ describe('V8 仕上げ3回目の動き', () => {
     expect(toast).toMatch(/--toast-duration:\s*4000ms/)
     // 消える側に 120ms の逆再生を足すと、4秒・5秒・⌘Z の即時除去の
     // 契約が崩れるため入れない（toast.test.tsx が保証）。
-    const button = read('./button.tsx')
-    expect(button).toMatch(/disabled=\{disabled \|\| busyNow\}/)
-    expect(button).toMatch(/aria-busy=\{busyNow \? true : undefined\}/)
-    expect(button).toMatch(/busyLabel = '保存しています…'/)
+    const save = vi.fn()
+    const view = render(React.createElement(Button, { busy: true, onClick: save, children: '保存する' }))
+    const button = screen.getByRole('button', { name: '保存しています…' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(button.getAttribute('aria-busy')).toBe('true')
+    fireEvent.click(button)
+    expect(save).not.toHaveBeenCalled()
+    view.rerender(React.createElement(Button, { disabled: true, disabledReason: '内容を入力してください', onClick: save, children: '保存する' }))
+    expect(button.disabled).toBe(true)
+    fireEvent.click(button)
+    expect(save).not.toHaveBeenCalled()
+    view.unmount()
   })
 
   it("⑤ プルダウンの開いた中身は提案 F で 150ms（StFE7）。候補つき入力は200ms・色・暦ポップは120msのまま。「…」は 120ms", () => {

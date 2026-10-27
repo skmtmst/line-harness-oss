@@ -1,3 +1,4 @@
+import { getPageAction, findPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -34,7 +35,7 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
     render(<HqDeliveryConsole type="auto_reply" />)
     const search = await screen.findByRole('searchbox', { name: 'ひな形を検索' })
     fireEvent.click(within(search.closest('[data-template-region="toolbar"]') as HTMLElement).getByRole('button', { name: 'ひな形を作る', exact: true }))
-    const save = await screen.findByRole('button', { name: '下書きとして保存' }) as HTMLButtonElement
+    const save = await findPageAction({ name: '下書きとして保存' }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(save.title).toBe('統括での名前を入力してください。')
     fireEvent.click(save)
@@ -50,7 +51,7 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
     const message = await screen.findByLabelText('最初に送る内容')
     expect((message as HTMLTextAreaElement).value).toBe('最初の本文')
     fireEvent.change(message, { target: { value: '新しい本文' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存する' }))
     await waitFor(() => expect(calls.update).toHaveBeenCalled())
     const input = calls.update.mock.calls[0][1]
     expect(input.expectedRevision).toBe(2)
@@ -103,7 +104,7 @@ it('保存できない欄の理由を出し、入力した本文を残す', asyn
   fireEvent.click(await screen.findByRole('button', { name: '追加のお礼', exact: true }))
   const input = await screen.findByLabelText('最初に送る内容')
   fireEvent.change(input, { target: { value: '保存前の本文' } })
-  fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+  fireEvent.click(getPageAction({ name: '下書きを保存する' }))
   expect(await screen.findByText('本文を短くしてください')).toBeTruthy()
   expect((input as HTMLTextAreaElement).value).toBe('保存前の本文')
   expect(input.getAttribute('aria-invalid')).toBe('true')
@@ -138,7 +139,7 @@ it('保存済みテンプレートと後処理を正しく案内し、他欄の�
   expect(await screen.findByText('テンプレート「予約の案内」')).toBeTruthy()
   expect(screen.getByText('1つ')).toBeTruthy()
   fireEvent.change(screen.getByLabelText('説明'), { target: { value: '変更した説明' } })
-  fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' }))
+  fireEvent.click(getPageAction({ name: '下書きとして保存' }))
   await waitFor(() => expect(calls.update).toHaveBeenCalled())
   expect(calls.update).toHaveBeenCalledWith('delivery-1', { name: '追加のお礼', description: '変更した説明', definition, expectedRevision: 2 })
 })
@@ -154,7 +155,7 @@ it('HQ action selection saves canonical actions and references with the original
  fireEvent.click(await screen.findByRole('button', { name: '何を返すかに進む' }))
  fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })); fireEvent.click(screen.getByRole('menuitem', { name: 'タグを付ける' }))
  fireEvent.click(await screen.findByRole('radio', { name: /会員/ })); fireEvent.click(screen.getByRole('button', { name: '選ぶ', exact: true }))
- fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' }))
+ fireEvent.click(getPageAction({ name: '下書きとして保存' }))
  await waitFor(() => expect(calls.update).toHaveBeenCalled())
  expect(calls.update.mock.calls[0][1]).toMatchObject({ expectedRevision: 2, definition: { schemaVersion: 1, settings: { priority: 42, responseContent: '返答', actions: [preserved, { actionType: 'tag', config: { op: 'add', tagIds: ['tag-a'] }, onFailure: 'stop' }] }, references: [{ sourceId: 'notice', kind: 'notification_rule', name: '担当者' }, { sourceId: 'tag-a', kind: 'tag', name: '会員', accountId: 'account-1' }] } })
  expect(calls.distribute).not.toHaveBeenCalled(); expect(calls.preflight).not.toHaveBeenCalled()

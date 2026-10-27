@@ -48,7 +48,7 @@ describe('スタイルを選ぶ画面（共通節 S）', () => {
     view('salon')
     fireEvent.click(screen.getByRole('button', { name: 'このスタイルにする' }))
     view('lesson')
-    expect(screen.getByRole('status').textContent).toBe(`選んでいるスタイル：${styleLabel('salon')}`)
+    expect(screen.getByText(`選んでいるスタイル：${styleLabel('salon')}`).getAttribute('role')).toBe('status')
     expect(screen.getByRole('button', { name: 'このスタイルにする' })).toBeTruthy()
     expect(calls.save).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '次へ' }))
@@ -61,7 +61,8 @@ describe('スタイルを選ぶ画面（共通節 S）', () => {
 
   it('選ぶまで［次へ］は押せず、帯は「まだ選んでいません」', () => {
     render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
-    expect(screen.getByRole('status').textContent).toBe('まだ選んでいません')
+    expect(screen.getByText('まだ選んでいません').getAttribute('role')).toBe('status')
+    expect(screen.getByText('スタイルを選んでください')).toBeTruthy()
     const next = screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement
     expect(next.disabled).toBe(true)
     fireEvent.click(next)

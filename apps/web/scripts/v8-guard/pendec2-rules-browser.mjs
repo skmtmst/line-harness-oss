@@ -39,10 +39,12 @@ export default function scanPendec2Rules() {
     if(excess>2 || card.scrollHeight>card.clientHeight+2 && c.overflowY!=='auto') add('cardspill',card,{excess:Math.ceil(Math.max(excess,card.scrollHeight-card.clientHeight))})
   }
   for(const seg of all('[data-segmented-control],[class*="segmented_root"]')) {
-    const buttons=[...seg.querySelectorAll(':scope > button')].filter(visible)
+    const buttons=[...seg.querySelectorAll(':scope > button, :scope > [role="radio"]')].filter(visible)
     for(const b of buttons) if(!b.textContent.trim() && !b.getAttribute('aria-label')) add('segempty',b,{count:1})
     // 押しボタンの切り替えは1つだけ押された形。radioの切り替えはaria-checkedで数え、選んでいない0件は許し2件以上だけを崩れにする。
-    const radio=seg.getAttribute('role')==='radiogroup'
+    const radioGroup=seg.getAttribute('role')==='radiogroup'
+    const radio=radioGroup && buttons.every(b=>b.getAttribute('role')==='radio' && ['true','false'].includes(b.getAttribute('aria-checked')))
+    if(radioGroup && (!radio || !buttons.length)) { add('segselected',seg,{count:1}); continue }
     const selected=buttons.filter(b=>b.getAttribute(radio ? 'aria-checked' : 'aria-pressed')==='true')
     if(buttons.length && (radio ? selected.length>1 : selected.length!==1)) add('segselected',seg,{count:Math.abs(selected.length-1) || 1})
 

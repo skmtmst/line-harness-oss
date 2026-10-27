@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * V8 一斉配信の詳細・予約したあと（src/v8/broadcast-detail）の動きの試験。BEHAVIOR.md の主な動きを守る。
@@ -161,8 +162,8 @@ async function render(node: React.ReactNode) {
 }
 
 const buttons = () => [...document.querySelectorAll('button')] as HTMLButtonElement[]
-const buttonText = (text: string) => buttons().find((button) => button.textContent?.trim() === text)
-const linkText = (text: string) => [...document.querySelectorAll('a')].find((a) => a.textContent?.trim() === text) as HTMLAnchorElement | undefined
+const buttonText = (text: string) => (buttons().find((button) => button.textContent?.trim() === text) ?? querySupplementaryPageAction(text))
+const linkText = (text: string) => ([...document.querySelectorAll('a')].find((a) => a.textContent?.trim() === text) ?? querySupplementaryPageAction(text)) as HTMLAnchorElement | undefined
 
 describe('V8 一斉配信の詳細', () => {
   it('編集できてもテスト送信の鍵が無ければ押し口を隠す', async () => {

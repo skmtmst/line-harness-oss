@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 監査 WEB232：「下書きを保存」で作れたのに止められなかったら、一覧へ移らずに知らせ、
@@ -51,10 +52,10 @@ test('止められなかったら知らせて残り、もう一度押すと止�
   fireEvent.change(document.querySelector('#wh-new-url')!, { target: { value: 'https://example.com/hook' } })
   fireEvent.change(document.querySelector('#wh-new-secret')!, { target: { value: 'x'.repeat(40) } })
   fireEvent.click(document.querySelector('input[name="wh-new-mode"][value="all"]')!)
-  await act(async () => { screen.getByRole('button', { name: '下書きを保存' }).click() })
+  await act(async () => { getPageAction({ name: '下書きを保存' }).click() })
   await waitFor(() => expect(screen.getByText(/まだ止められていません/)).toBeTruthy())
   expect(nav.push).not.toHaveBeenCalled()
-  await act(async () => { screen.getByRole('button', { name: '下書きを保存' }).click() })
+  await act(async () => { getPageAction({ name: '下書きを保存' }).click() })
   await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/webhooks?highlight=wh-1'))
   expect(calls.filter((call) => call.startsWith('POST /api/webhooks/outgoing'))).toHaveLength(1)
   expect(puts).toBe(2)
@@ -64,7 +65,7 @@ test('名前とURLが足りないまま保存すると、帯で済ませず欄�
   vi.stubGlobal('fetch', async () => json({ success: true, data: [] }))
   render(<WebhooksCreateV8 />)
   fireEvent.change(document.querySelector('#wh-new-url')!, { target: { value: 'http://example.com' } })
-  await act(async () => { screen.getByRole('button', { name: '下書きを保存' }).click() })
+  await act(async () => { getPageAction({ name: '下書きを保存' }).click() })
   await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
   const name = document.querySelector('#wh-new-name') as HTMLInputElement
   expect(name.getAttribute('aria-invalid')).toBe('true')

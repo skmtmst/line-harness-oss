@@ -31,11 +31,12 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-it('下帯の削除入口に印があり、押すと使用先を確認し、取消では削除しない', async () => {
+it('下帯の削除入口は赤い文字で、押すと使用先を確認し、取消では削除しない', async () => {
   render(<Editor />)
   const trigger = await screen.findByRole('button', { name: '削除する', exact: true })
-  expect(trigger.className).toContain('danger-outline')
-  expect(trigger.querySelector('svg.lucide-trash-2')?.getAttribute('aria-hidden')).toBe('true')
+  expect(trigger.getAttribute('data-variant')).toBe('text')
+  expect(trigger.className).toContain('textDanger')
+  expect(trigger.querySelector('svg')).toBeNull()
   expect(trigger.closest('[data-shared-part="sticky-bar"]')).not.toBeNull()
   fireEvent.click(trigger)
   const dialog = await screen.findByRole('alertdialog')
@@ -44,8 +45,9 @@ it('下帯の削除入口に印があり、押すと使用先を確認し、取�
   expect(within(dialog).queryByRole('button', { name: '削除する', exact: true })).toBeNull()
   fireEvent.change(within(dialog).getByRole('textbox', { name: /消した理由/ }), { target: { value: '店舗情報の変更のため' } })
   const confirm = within(dialog).getByRole('button', { name: '削除する', exact: true })
-  expect(confirm.className).toContain('danger')
-  expect(confirm.className).not.toContain('danger-outline')
+  expect(confirm.getAttribute('data-variant')).toBe('text')
+  expect(confirm.className).toContain('textDanger')
+  expect(confirm.querySelector('svg')).toBeNull()
   expect(state.remove).not.toHaveBeenCalled()
   fireEvent.click(within(dialog).getByRole('button', { name: '閉じる', exact: true }))
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())

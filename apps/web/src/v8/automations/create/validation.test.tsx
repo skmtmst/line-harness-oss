@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -31,7 +32,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals() })
 
 it('名前の誤りは欄だけに出し、処理の誤りは設定を開いて選ぶ欄へ移る', async () => {
   render(<NewAutomationV8 />)
-  const save = screen.getByRole('button', { name: '下書きを保存' })
+  const save = getPageAction({ name: '下書きを保存' })
   fireEvent.click(save)
   const name = screen.getByRole('textbox', { name: '名前', exact: true })
   await waitFor(() => expect(document.activeElement).toBe(name))
@@ -40,7 +41,7 @@ it('名前の誤りは欄だけに出し、処理の誤りは設定を開いて�
   expect(createDraft).not.toHaveBeenCalled()
 
   fireEvent.change(name, { target: { value: '予約のお礼' } })
-  fireEvent.click(save)
+  fireEvent.click(getPageAction({ name: '下書きを保存' }))
   const tag = await screen.findByRole('button', { name: '自動化で付けるタグ：選ぶ' })
   await waitFor(() => expect(document.activeElement).toBe(tag))
   expect(tag.getAttribute('aria-invalid')).toBe('true')

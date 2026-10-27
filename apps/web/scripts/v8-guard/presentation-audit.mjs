@@ -21,7 +21,8 @@ function walk(dir, parts = []) {
 }
 walk(fileURLToPath(new URL('../../src/app', import.meta.url)))
 // 各入口は既存の固定URL（idを含む）で開く。まだ地図にない入口も省かない。
-const routes = [...known, ...pages.filter(path => !known.some(r => r.split('?')[0] === path))]
+// 電話専用の入口はPC管理画面と分け、既存の390/430pxの見張りで検査する。
+const routes = [...known, ...pages.filter(path => !known.some(r => r.split('?')[0] === path))].filter(route => !/^\/m(?:\/|\?|$)/.test(route))
 const selected = process.env.PRESENTATION_ROUTES?.split(',') ?? routes
 const browser = await chromium.launch()
 const rows = []
@@ -33,6 +34,11 @@ try {
       page = await openPage(browser, { baseUrl, route, width, stable: true, settleMs: 0, requireSuccess: true, onPageError: e => errors.push(e.message) })
       await page.waitForFunction(() => document.querySelector('main h1,main h2') || /画面を表示できませんでした/.test(document.body.innerText), undefined, { timeout: 5000 })
       await page.waitForLoadState('networkidle')
+      const pageFailure = await page.evaluate(() => /画面を表示できませんでした/.test(document.body.innerText) || [...document.querySelectorAll('main h1,main h2')].some(el => el.textContent?.trim() === 'ページが見つかりません'))
+      if (pageFailure) throw new Error('画面のエラー境界を表示しています')
+      const loadFailure = await page.evaluate(() => Boolean(document.querySelector('[data-list-state="error"]')) || [...document.querySelectorAll('[role="alert"]')].some(el => /読み込めません|読み込みに失敗|取得できません|取得に失敗/.test(el.textContent ?? '')))
+      if (loadFailure) throw new Error('取得失敗の状態を表示しています')
+      if (/^\/(login|403|404)(\/|$)/.test(new URL(page.url()).pathname) && !/^\/(login|403|404)(\/|$)/.test(route.split('?')[0])) throw new Error('予定外の認証/エラー画面へ移りました')
       const inventory = await page.evaluate(() => {
         const main = document.querySelector('main')
         const visible = el => !!el && el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0 && getComputedStyle(el).visibility !== 'hidden' && !el.closest('[hidden],[inert]')

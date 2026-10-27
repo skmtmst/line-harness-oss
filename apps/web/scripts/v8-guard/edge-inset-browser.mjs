@@ -1,7 +1,7 @@
 /**
  * 白い板の中の主な塊（数の帯・カード・知らせ）が、板の左右の内側の余白からはみ出して
  * 板の端にくっついていないかを測る。内側の余白は題の左端と、型の標準の
- * 内側の余白（--tpl-list-inset）の小さい方。題が印や左の設定メニューの分だけ右にある画面でも、
+ * 内側の余白（--tpl-list-inset）。題が印や左の設定メニューの分だけ右にある画面でも、
  * 標準の余白を守っている塊は通す。
  * 表は行の線を板の端まで引き、中身を内側に置く作りなので数えない（中身の切れは別の見張り）。
  * page.evaluate で単独に動く。見本の座標や許可表は持たない。
@@ -15,15 +15,14 @@ export default function scanEdgeInset() {
   const title = main.querySelector('[data-page-title]') || main.querySelector('[data-template-region="heading"] :is(h1,h2)') || main.querySelector('h1') || main.querySelector('h2')
   if (!title) return findings
   // 白い板＝題を包む白地のうち一番外側（型の PageFrame も、型を使わない画面の板も同じ見つけ方）。
-  let frame = null
-  for (let p = title.parentElement; p && p !== main.parentElement; p = p.parentElement) if (css(p).backgroundColor === 'rgb(255, 255, 255)') frame = p
+  let frame = title.closest('[data-page-template]')
+  if (!frame) for (let p = title.parentElement; p && p !== main.parentElement; p = p.parentElement) if (css(p).backgroundColor === 'rgb(255, 255, 255)') frame = p
   if (!frame) return findings
   const board = frame.getBoundingClientRect()
   const inset = title.getBoundingClientRect().left - board.left
-  // 題そのものが端にある板（本文を全幅で使う特別な画面）は測る基準が無い。
-  if (inset < 8) return findings
-  const standard = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tpl-list-inset')) || 24
-  const need = Math.min(inset, standard)
+  // 型の標準24pxを基準にする。検査される側のCSS変数が壊れても基準を一緒に縮めない。
+  const need = 24
+  if (inset < need - 1) findings.push({ kind: 'edge-hug', target: '[data-page-title]', text: 'title', measure: { left: Math.round(inset), inset: Math.round(need) } })
   const visible = el => {
     for (let p = el; p; p = p.parentElement) {
       const c = css(p)
@@ -68,8 +67,16 @@ export default function scanEdgeInset() {
       const cells = [...row.cells].filter(visible)
       if (!cells.length) continue
       const first = cells[0], last = cells.at(-1)
-      const left = first.getBoundingClientRect().left + parseFloat(css(first).paddingLeft) - board.left
-      const right = board.right - last.getBoundingClientRect().right + parseFloat(css(last).paddingRight)
+      let contentLeft = first.getBoundingClientRect().left + parseFloat(css(first).paddingLeft), contentRight = last.getBoundingClientRect().right - parseFloat(css(last).paddingRight)
+      for (let parent = table.parentElement; parent && parent !== frame; parent = parent.parentElement) {
+        if (['auto','scroll'].includes(css(parent).overflowX) && parent.scrollWidth > parent.clientWidth) {
+          const clip = parent.getBoundingClientRect()
+          contentLeft = Math.max(contentLeft, clip.left + parent.clientLeft)
+          contentRight = Math.min(contentRight, clip.left + parent.clientLeft + parent.clientWidth)
+        }
+      }
+      const left = contentLeft - board.left
+      const right = board.right - contentRight
       if (left < need - 1 || right < need - 1) findings.push({ kind: 'edge-hug', target: selector(row), text: 'table-content', measure: { left: Math.round(left), right: Math.round(right), inset: Math.round(need) } })
     }
   }

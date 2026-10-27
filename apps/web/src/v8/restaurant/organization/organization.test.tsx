@@ -1,5 +1,7 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -21,7 +23,7 @@ const member = { id: 'member', organization_id: 'org', store_id: 'store', staff_
 const data = { organization: { id: 'org', name: '試験組織', tenant_name: '試験統括' }, stores: [{ id: 'store', name: '試験店', code: 'S', area: '渋谷', capacity: 20, status: 'active', line_account_id: 'account-1', line_account_name: '試験店' }], memberships: [member], tables: [], menuItems: [], reservations: [], inventory: [], approvals: [], connectors: [], reviews: [], posts: [], lineFlows: [] }
 
 beforeEach(() => {
-  fixture.role = 'owner'
+  fixture.role = verifiedStaffRole('owner')
   fixture.snapshot.mockResolvedValue({ data })
   fixture.loginMembers.mockResolvedValue({ data: [{ id: 'login', name: '試験ログイン' }, { id: 'next', name: '別のログイン' }] })
   fixture.updateMembership.mockResolvedValue({ success: true })
@@ -56,10 +58,10 @@ it('連携メンバーの停止は本人確認が必要なら確認後に同じ�
 })
 
 it('閲覧のみには作る・編集・変更・停止・発行のボタンを置かない', async () => {
-  fixture.role = 'staff'
+  fixture.role = verifiedStaffRole('staff')
   render(<OrganizationV8 />)
   expect(await screen.findByText('試験担当')).toBeTruthy()
-  expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
+  expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
   for (const name of ['店舗を作る', '編集する', 'ユーザーを追加する', '変更', '停止', 'アドレスを発行', '試験担当のその他操作']) {
     expect(screen.queryByRole('button', { name })).toBeNull()
   }
@@ -130,3 +132,5 @@ it('担当の役割は日本語で示し、保存用の役割IDは保つ', async
   expect(within(dialog).getByRole('button', { name: '役割' }).textContent).toContain('スタッフ')
   expect(dialog.querySelector<HTMLInputElement>('input[name="role"]')?.value).toBe('staff')
 })
+
+afterEach(() => { verifiedStaffRole(null) })

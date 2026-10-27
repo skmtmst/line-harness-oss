@@ -8,8 +8,9 @@ const TAG_IMPORT_HEADERS = ['タグ名', 'フォルダ'] as const
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
-it('タグ取り込み用の空ひな形を既存のCSV読取で読める', () => {
-  expect(parseTagCsv(csvTemplate(TAG_IMPORT_HEADERS))).toEqual([])
+it('空ひな形は登録不可で、記入後は既存のCSV読取で読める', () => {
+  expect(() => parseTagCsv(csvTemplate(TAG_IMPORT_HEADERS))).toThrow('登録するタグがありません')
+  expect(parseTagCsv(csvTemplate(TAG_IMPORT_HEADERS) + '会員,お客さま\r\n')).toEqual([{ line: 2, name: '会員', folderName: 'お客さま' }])
   expect(csvTemplate(['列,名', '名"前'])).toBe('\uFEFF"列,名","名""前"\r\n')
 })
 

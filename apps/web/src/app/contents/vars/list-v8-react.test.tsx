@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
@@ -177,7 +178,7 @@ test('staff では閲覧のみの帯が出て、作る操作は出さない', as
   window.localStorage.setItem('lh_staff_role', 'staff'); rememberStaffIdentity({ role: 'staff' } as StaffMember)
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  expect(host?.textContent).toContain('閲覧のみで見ています')
+  expect(host?.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
   const createButtons = Array.from(host?.querySelectorAll('button, a') ?? [])
     .filter((element) => element.textContent?.includes('共通情報を作る'))
   expect(createButtons).toHaveLength(0)
@@ -199,8 +200,8 @@ test('止める窓は予約中の配信の帯を出す（Hhl9M）', async () => 
     .find((button) => button.getAttribute('aria-label') === '共通情報「会社名」の操作')
   expect(trigger).toBeTruthy()
   await act(async () => { trigger!.click() })
-  const stopItem = Array.from(document.body.querySelectorAll('[role="menuitem"],[role="menuitemradio"]'))
-    .find((el) => (el.textContent ?? '').trim() === '止める')
+  const stopItem = (Array.from(document.body.querySelectorAll('[role="menuitem"],[role="menuitemradio"]'))
+    .find((el) => (el.textContent ?? '').trim() === '止める') ?? querySupplementaryPageAction('止める'))
   expect(stopItem).toBeTruthy()
   await act(async () => { (stopItem as HTMLElement).click() })
   await act(async () => { await Promise.resolve() })

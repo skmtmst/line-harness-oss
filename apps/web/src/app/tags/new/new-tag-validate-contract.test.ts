@@ -27,7 +27,7 @@ describe('タグ作成の名前検査の契約', () => {
     expect(ROUTE).not.toContain('LegacyNewTagPage')
     expect(ROUTE).toContain('<CreatePage')
     expect(LIST).toContain('<Button href="/tags/new" variant="primary"')
-    expect(EDITOR).toContain('href={`/tags/new?copy=${tag.id}`}')
+    expect(EDITOR).toContain('href: `/tags/new?copy=${tag.id}`')
   })
 
   it('現役V8作成画面が旧画面の保存項目を引き継ぐ', () => {

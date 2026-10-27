@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -49,7 +51,7 @@ const channels = [
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
   fixture.inventoryDay.mockResolvedValue({ data: days })
   fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours, version: 4, updatedBy: 'mem-2', updatedAt: at(0, 14, 2) } })
@@ -137,13 +139,13 @@ describe('Y8SjT2 予約枠・在庫', () => {
   })
 
   it('閲覧のみ（staff）には保存の帯・時間帯の足し引きを置かない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
     expect(screen.queryByRole('button', { name: /開ける時間と配分を保存/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '＋ 時間帯を足す' })).toBeNull()
     expect(screen.queryByRole('button', { name: '媒体の受付を閉じる' })).toBeNull()
-    expect(screen.getByRole('status').textContent).toContain('閲覧のみで見ています。')
+    expect(screen.getByRole('status').textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
   })
 
   it('埋まっている卓は個室→テーブル→カウンターの順、3つ以上の連番は「〜」で縮める', () => {
@@ -177,3 +179,5 @@ it('inventory channel read failure does not become no channels',async()=>{
  fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
  await waitFor(()=>expect(screen.queryByText('予約媒体を読み込めませんでした')).toBeNull())
 })
+
+afterEach(() => { verifiedStaffRole(null) })

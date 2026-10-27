@@ -29,7 +29,7 @@ describe('現役V8のタグ編集', () => {
   })
   it('編集から同じタグを複製して作れる', () => {
     expect(EDITOR).toContain('複製して作る')
-    expect(EDITOR).toContain('href={`/tags/new?copy=${tag.id}`}')
+    expect(EDITOR).toContain('href: `/tags/new?copy=${tag.id}`')
   })
   it('R620: 遡及OFFでは既存へ反映せず、確認した時だけ反映する', () => {
     expect(EDITOR).toContain('if (applyToExisting && (tag.friendCount ?? 0) > 0')

@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -193,7 +194,7 @@ test('v8 の閲覧のみ（l5SRfT）は帯が出て、［送り先を作る］�
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board).not.toBeNull()
-  expect(board?.textContent).toContain('閲覧のみで見ています')
+  expect(board?.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
   const clickable = [...board!.querySelectorAll('a, button')]
   // 作る口は空白にせず、押せない本物のボタン。行き先へのリンクは置かない。
   const creates = clickable.filter((element) => element.textContent?.includes('送り先を作る'))
@@ -261,7 +262,7 @@ test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗�
   expect(settingButton.getAttribute('aria-expanded')).toBe('false')
   await act(async () => { settingButton.click() })
   expect(settingButton.getAttribute('aria-expanded')).toBe('true')
-  const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.includes('止める'))!
+  const stopItem = ([...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.includes('止める')) ?? querySupplementaryPageAction('止める'))!
   await act(async () => { (stopItem as HTMLElement).click() })
   expect(board.textContent).toContain('止めている')
   // 口が失敗したら札が戻り、知らせに「もう一度」が出る。
@@ -311,7 +312,7 @@ test('v8 で行を右クリックすると「設定」と同じ操作が押し�
     expect(menu?.textContent).toContain(label)
   }
   // 右クリックから「止める」を押すと「設定」と同じく札が変わる。
-  const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === '止める') as HTMLElement
+  const stopItem = ([...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === '止める') ?? querySupplementaryPageAction('止める')) as HTMLElement
   await act(async () => { stopItem.click() })
   expect(board.textContent).toContain('止めている')
   expect(document.querySelector('[role="menu"]')).toBeNull()

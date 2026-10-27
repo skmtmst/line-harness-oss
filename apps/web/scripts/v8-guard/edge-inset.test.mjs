@@ -33,6 +33,19 @@ test('数の帯・カード・知らせが板の端にくっつくと落ち、�
   } finally { await browser.close() }
 })
 
+test('題も帯も一緒に12px・0pxへ縮める故障を見逃さない', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1000, height: 600 } })
+    for (const inset of [12, 0]) {
+      await page.setContent(board(band(`margin:0 ${inset}px`)).replace('padding:16px 24px', `padding:16px ${inset}px`))
+      const findings = await page.evaluate(scan)
+      assert.ok(findings.some(f => f.text === 'title'))
+      assert.ok(findings.some(f => f.text === 'band'))
+    }
+  } finally { await browser.close() }
+})
+
 test('表の行の線・左の列・頭の線は端まで引いてよい', async () => {
   const browser = await connectGuardBrowser()
   try {
@@ -60,28 +73,6 @@ test('題が印の分だけ右にある板でも、標準の内側の余白（24
   } finally { await browser.close() }
 })
 
-test('タグの数の帯は1024・1152・1440で題の左と道具の行の右にそろう', { skip: !process.env.V8_GUARD_BASE }, async () => {
-  const browser = await connectGuardBrowser()
-  try {
-    for (const width of [1024, 1152, 1440]) {
-      const page = await openPage(browser, { baseUrl: process.env.V8_GUARD_BASE, route: '/tags', width, stable: true, settleMs: 0, requireSuccess: true })
-      try {
-        await page.waitForSelector('main [data-kpi-strip]')
-        const edges = await page.evaluate(() => {
-          const main = document.querySelector('main')
-          const title = main?.querySelector('[data-template-region="heading"] h1, [data-template-region="heading"] h2')
-          const band = main?.querySelector('[data-kpi-strip]')
-          const toolbar = main?.querySelector('[data-template-region="toolbar"]')
-          if (!title || !band || !toolbar) throw new Error('タグの題・数の帯・道具の行が見つかりません')
-          return { titleLeft: title.getBoundingClientRect().left, bandLeft: band.getBoundingClientRect().left, bandRight: band.getBoundingClientRect().right, toolbarRight: toolbar.getBoundingClientRect().right }
-        })
-        assert.ok(Math.abs(edges.bandLeft - edges.titleLeft) <= 0.5, `${width}px left edge: ${JSON.stringify(edges)}`)
-        assert.ok(Math.abs(edges.bandRight - edges.toolbarRight) <= 0.5, `${width}px right edge: ${JSON.stringify(edges)}`)
-      } finally { await page.close() }
-    }
-  } finally { await browser.close() }
-})
-
 test('崩れの見張り（layout-defects）がこの判定を含む', async () => {
   const browser = await connectGuardBrowser()
   try {
@@ -103,6 +94,17 @@ test('表の線は端まで伸びても中身と道具には内側の余白が�
     await page.locator('[data-template-region="toolbar"]').evaluate(el => { el.style.marginInline = '24px' })
     await page.locator('td').evaluate(el => { el.style.paddingInline = '24px' })
     assert.deepEqual(await page.evaluate(scan), [])
+  } finally { await browser.close() }
+})
+
+test('横送りできる比較表は窓の内側の余白で測り、窓自体の右端越えは落とす', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1100, height: 600 } })
+    await page.setContent(board('<div id="scroll" style="width:952px;margin:0 24px;overflow-x:auto"><table style="width:1600px;border-collapse:collapse"><tr><td style="padding:12px 24px">比較の項目</td></tr></table></div>'))
+    assert.deepEqual(await page.evaluate(scan), [])
+    await page.locator('#scroll').evaluate(el => { el.style.width = '1000px' })
+    assert.ok((await page.evaluate(scan)).some(f => f.text === 'table-content'))
   } finally { await browser.close() }
 })
 

@@ -30,39 +30,80 @@ export default function scanOwnerRules() {
   // box-shadow は DOM の外枠より広がるため、要素の矩形だけを見る boxclip とは分ける。
   const shadowOutsets = el => {
     const c = css(el), out = { top: 0, right: 0, bottom: 0, left: 0 }
-    const re = /(inset\s+)?(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px\s+(\d+(?:\.\d+)?)px(?:\s+(-?\d+(?:\.\d+)?)px)?/g
-    for (const match of c.boxShadow.matchAll(re)) {
-      if (match[1]) continue
-      const x = Number(match[2]), y = Number(match[3]), blur = Number(match[4]), spread = Number(match[5] ?? 0)
+    for (const shadow of c.boxShadow.split(/,(?![^()]*\))/)) {
+      if (/\binset\b/.test(shadow)) continue
+      const lengths = [...shadow.matchAll(/(-?\d+(?:\.\d+)?)px/g)].map(match => Number(match[1]))
+      if (lengths.length < 2) continue
+      const [x, y, blur = 0, spread = 0] = lengths
       const soft = Math.max(0, spread + blur * 2)
       out.top = Math.max(out.top, soft - y); out.bottom = Math.max(out.bottom, soft + y)
       out.left = Math.max(out.left, soft - x); out.right = Math.max(out.right, soft + x)
     }
     if (c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0) {
-      const ring = parseFloat(c.outlineWidth) + Math.max(0, parseFloat(c.outlineOffset) || 0)
+      const ring = Math.max(0, parseFloat(c.outlineWidth) + (parseFloat(c.outlineOffset) || 0))
       for (const side of Object.keys(out)) out[side] = Math.max(out[side], ring)
     }
     return out
   }
+  const checkedScrollWindows = new Set()
+  const clipPixels = value => value > 1e-6 ? Math.ceil(value) : 0
   for (const el of surfaces.filter(visible)) {
     if (!el.closest('[role="dialog"],[data-design-part="card"],[data-shared-part="sticky-bar"]')) continue
     const out = shadowOutsets(el)
     if (!Object.values(out).some(value => value > 0)) continue
     const r = el.getBoundingClientRect()
-    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    // viewport固定の要素は、包含ブロックを作らない祖先のoverflowでは切れない。
+    let fixedContainer = null
+    if (css(el).position === 'fixed') {
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        const style = css(p)
+        if (style.transform !== 'none' || style.perspective !== 'none' || style.filter !== 'none' || style.backdropFilter && style.backdropFilter !== 'none' || /transform|filter|perspective/.test(style.willChange) || /paint|layout|strict|content/.test(style.contain)) { fixedContainer = p; break }
+      }
+      if (!fixedContainer) continue
+    }
+    for (let p = fixedContainer ?? el.parentElement; p && p !== document.body; p = p.parentElement) {
       const pc = css(p), clipsX = pc.overflowX !== 'visible', clipsY = pc.overflowY !== 'visible'
       if (!clipsX && !clipsY) continue
+      let stickyX = false, stickyY = false
+      for (let host = el; host && host !== p; host = host.parentElement) {
+        const style = css(host)
+        if (style.position === 'sticky') { stickyX ||= style.left !== 'auto' || style.right !== 'auto'; stickyY ||= style.top !== 'auto' || style.bottom !== 'auto' }
+      }
+      const scrollX = !stickyX && ['auto','scroll'].includes(pc.overflowX) && p.scrollWidth > p.clientWidth
+      const scrollY = !stickyY && ['auto','scroll'].includes(pc.overflowY) && p.scrollHeight > p.clientHeight
       const q = p.getBoundingClientRect(), edge = {
-        left: q.left + p.clientLeft, top: q.top + p.clientTop,
-        right: q.left + p.clientLeft + p.clientWidth, bottom: q.top + p.clientTop + p.clientHeight,
+        left: q.left + p.clientLeft - (scrollX ? p.scrollLeft : 0), top: q.top + p.clientTop - (scrollY ? p.scrollTop : 0),
+        right: q.left + p.clientLeft - (scrollX ? p.scrollLeft : 0) + (scrollX ? p.scrollWidth : p.clientWidth),
+        bottom: q.top + p.clientTop - (scrollY ? p.scrollTop : 0) + (scrollY ? p.scrollHeight : p.clientHeight),
       }
       const cut = {
-        left: clipsX ? Math.max(0, Math.ceil(edge.left - (r.left - out.left))) : 0,
-        right: clipsX ? Math.max(0, Math.ceil((r.right + out.right) - edge.right)) : 0,
-        top: clipsY ? Math.max(0, Math.ceil(edge.top - (r.top - out.top))) : 0,
-        bottom: clipsY ? Math.max(0, Math.ceil((r.bottom + out.bottom) - edge.bottom)) : 0,
+        left: clipsX ? clipPixels(edge.left - (r.left - out.left)) : 0,
+        right: clipsX ? clipPixels((r.right + out.right) - edge.right) : 0,
+        top: clipsY ? clipPixels(edge.top - (r.top - out.top)) : 0,
+        bottom: clipsY ? clipPixels((r.bottom + out.bottom) - edge.bottom) : 0,
       }
       if (Object.values(cut).some(value => value > 0)) add('shadow-clip', el, cut, '', p)
+      // スクロール窓の途中で隠れる部分は読み進められる。窓自体の外側の切れはその窓の要素を検査する。
+      if (scrollX || scrollY) {
+        if (!checkedScrollWindows.has(p)) {
+          checkedScrollWindows.add(p)
+          const windowRect = p.getBoundingClientRect()
+          for (let outer = p.parentElement; outer && outer !== document.body; outer = outer.parentElement) {
+            const c = css(outer), b = outer.getBoundingClientRect()
+            const sx = ['auto','scroll'].includes(c.overflowX) && outer.scrollWidth > outer.clientWidth
+            const sy = ['auto','scroll'].includes(c.overflowY) && outer.scrollHeight > outer.clientHeight
+            const cutWindow = {
+              left: !sx && c.overflowX !== 'visible' ? clipPixels(b.left + outer.clientLeft - windowRect.left) : 0,
+              right: !sx && c.overflowX !== 'visible' ? clipPixels(windowRect.right - b.left - outer.clientLeft - outer.clientWidth) : 0,
+              top: !sy && c.overflowY !== 'visible' ? clipPixels(b.top + outer.clientTop - windowRect.top) : 0,
+              bottom: !sy && c.overflowY !== 'visible' ? clipPixels(windowRect.bottom - b.top - outer.clientTop - outer.clientHeight) : 0,
+            }
+            if (Object.values(cutWindow).some(value => value > 0)) add('scroll-window-clip', p, cutWindow, '', outer)
+            if (sx || sy) break
+          }
+        }
+        break
+      }
     }
   }
   for (const el of surfaces.filter(visible)) {
@@ -105,6 +146,49 @@ export default function scanOwnerRules() {
       const spread = values => values.length > 1 ? Math.max(...values) - Math.min(...values) : 0
       if (spread(heights) > 1 || spread(bottoms) > 1) add('cardrow', row[0], { height: Math.ceil(spread(heights)), actions: Math.ceil(spread(bottoms)) }, '', row[row.length - 1])
     }
+  }
+  // 列に入らない文字があるのに、同じ行で80px以上を余らせない。
+  for (const table of root.querySelectorAll('table,[role="table"]')) {
+    const rows = [...table.querySelectorAll('tr,[role="row"]')].filter(visible)
+    const head = rows.find(row => row.querySelector('th,[role="columnheader"]'))
+    const spareInCells = cells => cells.map(cell => {
+          const box = cell.getBoundingClientRect(), c = css(cell)
+          const content = [...cell.childNodes].flatMap(node => {
+            if (node.nodeType === 3 && node.textContent.trim()) { const range = document.createRange(); range.selectNodeContents(node); return [range.getBoundingClientRect()] }
+            if (node.nodeType !== 1) return []
+            const range = document.createRange(); range.selectNodeContents(node)
+            return [...range.getClientRects(), ...node.querySelectorAll('button,input,svg,img')].map(el => el.getBoundingClientRect ? el.getBoundingClientRect() : el)
+          }).filter(rect => rect.width > 0)
+          const used = content.length ? Math.min(box.width, Math.max(...content.map(rect => rect.right)) - box.left) : 0
+          return Math.max(0, box.width - used - (parseFloat(c.paddingRight) || 0) - (parseFloat(c.paddingLeft) || 0))
+        })
+
+    // 見出しや別の行が必要とする幅は空きに数えず、列全体で回せる余りだけを数える。
+    const spareRows = rows.map(row => spareInCells([...row.children].filter(visible)))
+    for (const row of rows.filter(row => row !== head)) {
+      const cells = [...row.children].filter(visible)
+      const clipped = cells.flatMap(cell => [cell, ...cell.querySelectorAll('*')]).filter(el => {
+        const c = css(el)
+        return c.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1 && el.textContent.trim()
+      })
+      if (clipped.length) {
+        const spare = cells.reduce((sum, _, index) => sum + Math.min(...spareRows.filter(widths => widths.length === cells.length).map(widths => widths[index])), 0)
+        if (spare >= 80) add('table-unused-space', clipped[0], { spare: Math.floor(spare) }, clipped[0].textContent)
+      }
+      if (!head || cells.length !== head.children.length) continue
+      for (const [index, header] of [...head.children].entries()) {
+        const match = header.textContent.match(/（([^）]+)）/)
+        if (!match) continue
+        const terms = match[1].split('・')
+        const text = cells[index]?.querySelector('[data-list-name-description]')?.textContent.trim() ?? ''
+        const matches = term => term === '質問の数' ? /質問\s*\d+/.test(text) : term === '大きさ' ? /^(大|小)(?:\s|・|$)/.test(text) : term === 'ボタン' ? /\d+\s*(?:ボタン|面)/.test(text) : null
+        const missing = terms.filter(term => matches(term) === false)
+        if (cells[index]?.textContent.trim() && missing.length) add('table-missing-detail', cells[index], { missing }, header.textContent)
+      }
+    }
+  }
+  for (const button of root.querySelectorAll('button')) {
+    if (visible(button) && button.textContent.trim() === '詳細' && button.querySelector('.lucide-log-in')) add('action-icon', button, {}, '詳細')
   }
   // 14px 未満の UI 文字を太さ 400 で描かない。
   // お客さまのスマホの見え方（LINE の見本）は LINE と同じ太さなので数えない。

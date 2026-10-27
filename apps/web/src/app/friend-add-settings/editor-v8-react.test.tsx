@@ -1,3 +1,4 @@
+import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -119,7 +120,7 @@ test('v8 の作る①は板 wDzkc・手順の輪・設定内容・下の帯が�
   })
   expect(host.textContent).toContain('初回案内を作る')
   expect(host.textContent).toContain('設定内容')
-  expect(host.textContent).toContain('下書きを保存')
+  expect(getPageAction({ name: '下書きを保存' })).toBeTruthy()
   expect(host.textContent).toContain('次へ：流入リンク')
   expect(host.textContent).toContain('だれに送るか')
 })
@@ -129,7 +130,7 @@ test('名前が空なら保存せず、理由を1回だけ出し、赤い名前�
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<FriendAddSettingsPage />))
   await eventually(() => expect(host.querySelector('#fa-name')).toBeTruthy())
-  const save = [...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存')!
+  const save = ([...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
   await act(async () => save.click())
   const name = host.querySelector<HTMLInputElement>('#fa-name')!
   await eventually(() => expect(document.activeElement).toBe(name))
@@ -149,7 +150,7 @@ test('流入リンクが未選択なら次へ進まず、選択欄と理由を�
   await act(async () => root.render(<FriendAddSettingsPage />))
   await eventually(() => expect(host.querySelector('[data-friend-add-routes] input[type="checkbox"]')).toBeTruthy())
   const search = host.querySelector<HTMLInputElement>('input[aria-label="流入リンクの名前で探す"]')!
-  const next = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('次へ：初回案内'))!
+  const next = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('次へ：初回案内')) ?? querySupplementaryPageAction('次へ：初回案内'))!
   await act(async () => next.click())
   const checkbox = host.querySelector<HTMLInputElement>('[data-friend-add-routes] input[type="checkbox"]')!
   await eventually(() => expect(document.activeElement).toBe(checkbox))
@@ -166,7 +167,7 @@ test('シナリオが未選択なら選べる赤い欄へ移り、選ぶと誤�
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<FriendAddSettingsPage />))
   await eventually(() => expect(host.querySelector('[aria-label="最初に送るメッセージ"]')).toBeTruthy())
-  const next = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('次へ：あわせて行うこと'))!
+  const next = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('次へ：あわせて行うこと')) ?? querySupplementaryPageAction('次へ：あわせて行うこと'))!
   await act(async () => next.click())
   const field = () => host.querySelector<HTMLElement>('#fa-scenario')!
   const open = () => host.querySelector<HTMLButtonElement>('button[aria-label="実際に配信するシナリオ：選ぶ"]')!
@@ -175,7 +176,7 @@ test('シナリオが未選択なら選べる赤い欄へ移り、選ぶと誤�
   expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1)
   await act(async () => open().click())
   await act(async () => document.querySelector<HTMLInputElement>('input[type="radio"][aria-label="新規登録7日間フォロー"]')!.click())
-  const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選ぶ')!
+  const confirm = ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選ぶ') ?? querySupplementaryPageAction('選ぶ'))!
   await act(async () => confirm.click())
   expect(host.querySelector('[role="alert"]')).toBeNull()
 })
@@ -184,7 +185,7 @@ test('未入力のまま次へを押しても、名前欄へ移り、保存・�
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<FriendAddSettingsPage />))
   await eventually(() => expect(host.querySelector('#fa-name')).toBeTruthy())
-  const next = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('次へ：流入リンク'))!
+  const next = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('次へ：流入リンク')) ?? querySupplementaryPageAction('次へ：流入リンク'))!
   await act(async () => next.click())
   await eventually(() => expect(document.activeElement?.id).toBe('fa-name'))
   expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1)
@@ -204,7 +205,7 @@ test('狭い画面の条件編集は小窓で開き、変更した期間を閉�
   await act(async () => root.render(<FriendAddSettingsPage />))
   await eventually(() => expect(host.querySelector('[data-friend-add-routes]')).toBeTruthy())
   expect(host.querySelector('#fa-from')).toBeNull()
-  const open = [...host.querySelectorAll('button')].find((button) => button.textContent?.replace(/\s/g, '') === '対象をしぼる任意')!
+  const open = ([...host.querySelectorAll('button')].find((button) => button.textContent?.replace(/\s/g, '') === '対象をしぼる任意') ?? querySupplementaryPageAction('対象をしぼる任意'))!
   await act(async () => open.click())
   await eventually(() => expect(document.querySelector('[role="dialog"] #fa-from')).toBeTruthy())
   const dialog = document.querySelector('[role="dialog"]')!
@@ -213,7 +214,7 @@ test('狭い画面の条件編集は小窓で開き、変更した期間を閉�
   expect(dialog.querySelector('#fa-from')?.textContent).toBe('日時を選ぶ')
   await act(async () => dialog.querySelector<HTMLButtonElement>('[aria-label="閉じる"]')!.click())
   await eventually(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
-  const save = [...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存')!
+  const save = ([...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
   await act(async () => save.click())
   const request = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === 'PUT')!
   const payload = JSON.parse(String(request[1]?.body))
@@ -246,9 +247,9 @@ test('WEB157: 競合の比較はシナリオと条件の差も表示する',asyn
   return base(url)
  }))
  await act(async()=>root.render(<FriendAddSettingsPage/>));await settle()
- const save=[...host.querySelectorAll('button')].find(button=>button.textContent?.includes('下書きを保存'))!
+ const save=([...host.querySelectorAll('button')].find(button=>button.textContent?.includes('下書きを保存')) ?? querySupplementaryPageAction('下書きを保存'))!
  await act(async()=>save.click());await settle()
- const compare=[...host.querySelectorAll('button')].find(button=>button.textContent?.includes('違いを比べる'))!
+ const compare=([...host.querySelectorAll('button')].find(button=>button.textContent?.includes('違いを比べる')) ?? querySupplementaryPageAction('違いを比べる'))!
  expect(compare).toBeTruthy()
  await act(async()=>compare.click());await settle()
  expect(document.body.textContent).toContain('友だちの条件')

@@ -1,3 +1,4 @@
+import { getPageAction, queryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /**
  * 回答フォームの編集（★V8・src/v8/form-edit）の動き。
@@ -136,7 +137,7 @@ describe('回答フォームの編集（V8）', () => {
     await render('id=form-1')
     await screen.findByText('ページ1 のブロック')
     for (const name of ['下書きを保存', 'この版を公開']) {
-      expect(screen.queryByRole('button', { name }) !== null).toBe(role !== 'staff')
+      expect(queryPageAction({ name }) !== null).toBe(role !== 'staff')
     }
     if (role === 'staff') expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
   })
@@ -178,7 +179,7 @@ describe('回答フォームの編集（V8）', () => {
     formsGet.mockResolvedValueOnce({ success: true, data: structuredClone(formData) })
       .mockResolvedValue({ success: true, data: { ...structuredClone(formData), name: '別の人の保存' } })
     await render('id=form-1')
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await screen.findByRole('button', { name: '比べてから保存' })
     forcedRole.value = 'staff'
     await render('id=form-1')
@@ -224,7 +225,7 @@ describe('回答フォームの編集（V8）', () => {
     formsGet.mockImplementation(async () => ({ success: true, data: broken }))
     await render('id=form-1&tab=appearance')
     await screen.findByText('受付のきまり（つづき）')
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(formsUpdate).not.toHaveBeenCalled()
     expect(await screen.findByText('ページ2 のブロック')).toBeTruthy()
@@ -241,7 +242,7 @@ describe('回答フォームの編集（V8）', () => {
     formsGet.mockImplementation(async () => ({ success: true, data: { ...structuredClone(formData), name: '' } }))
     await render('id=form-1')
     await screen.findByText('ページ1 のブロック')
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(formsUpdate).not.toHaveBeenCalled()
     const name = document.getElementById('fe-name') as HTMLInputElement
@@ -260,7 +261,7 @@ describe('回答フォームの編集（V8）', () => {
       .mockImplementation(async () => ({ success: true, data: { ...structuredClone(formData), name: '来店アンケート（マサト）' } }))
     await render('id=form-1')
     await screen.findByText('ページ1 のブロック')
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(formsUpdate).toHaveBeenCalled())
     const title = await screen.findByText(/^ほかの人が.*フォーム「来店アンケート.*」を保存しました$/)
     const band = title.closest('[data-design-node="J1pdB"]') as HTMLElement
@@ -335,7 +336,7 @@ describe('回答フォームの下書き自動保存（一斉配信と同じ形�
 
     formsUpdate.mockImplementation(async () => ({ success: true, data: { id: 'form-1', contentRevision: 9, updatedAt: '' } }))
     fireEvent.change(screen.getByDisplayValue('今日のご来店の目的を教えてください'), { target: { value: '今日の目的は？' } })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '下書きを保存' })) })
     for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve() })
     expect(formsUpdate).toHaveBeenCalledTimes(2)
     expect(formsUpdate.mock.calls[1][2]).toEqual(expect.objectContaining({ expectedContentRevision: 8 }))
@@ -374,7 +375,7 @@ describe('参考の文字の保存と読み直し', () => {
     })
     await render('id=form-1')
     fireEvent.change(screen.getByLabelText(hintLabel), { target: { value: '例：山田 太郎' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(formsUpdate).toHaveBeenCalled())
     restart()
     await render('id=form-1')
@@ -383,7 +384,7 @@ describe('参考の文字の保存と読み直し', () => {
     expect(formsPublish).not.toHaveBeenCalled()
     fireEvent.change(screen.getByLabelText(hintLabel), { target: { value: '' } })
     formsUpdate.mockClear()
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(formsUpdate).toHaveBeenCalled())
     restart()
     await render('id=form-1')
@@ -400,7 +401,7 @@ describe('参考の文字の保存と読み直し', () => {
     }
     await open()
     fireEvent.change(screen.getByLabelText(hintLabel), { target: { value: '例：統括の見本' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(onSave).toHaveBeenCalled())
     restart()
     await open()

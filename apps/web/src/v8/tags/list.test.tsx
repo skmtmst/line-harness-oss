@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /**
  * ★V8 タグ タグの一覧（src/v8/tags）の動きの試験。
  * 絵（・・）の置き場に移した操作が、押せる形で残っているかを見る。
@@ -59,7 +61,7 @@ async function render(node: React.ReactElement) {
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/tags')
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   narrow.value = false
   replaceMock.mockReset()
   container = document.createElement('div')
@@ -105,11 +107,11 @@ describe('V8 タグ タグの一覧', () => {
     expect(container.querySelectorAll('tbody [data-list-name]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     await act(async () => root.unmount())
     root = createRoot(container)
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     narrow.value = false
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="fkGUR"]')).not.toBeNull()
-    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'CSVで一括登録する' })).toBeNull()
     expect(screen.queryAllByRole('button', { name: 'タグを作る' })).toHaveLength(0)
     expect(screen.queryAllByRole('link', { name: 'タグを作る' })).toHaveLength(0)
@@ -147,7 +149,7 @@ describe('V8 タグ タグの一覧', () => {
   })
 
   it('保存した検索のタブでは閲覧のみの作成リンクを隠し、検索の閲覧は保つ', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await render(<TagsList fixture={fixture} />)
     await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '保存した検索' })) })
     expect(screen.queryByRole('link', { name: '友だち一覧で条件を作る' })).toBeNull()
@@ -184,3 +186,5 @@ describe('V8 タグ タグの一覧', () => {
     expect(tagLinkText(base)).toBe('—')
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

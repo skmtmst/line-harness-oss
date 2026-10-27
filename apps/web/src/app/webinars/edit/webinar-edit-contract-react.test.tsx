@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * V8 ウェビナーの編集画面を描いて押す契約。
@@ -167,7 +168,7 @@ it('分析の段（z2dgw）は親の集計を出し、CSV は参加者の口か�
   await render()
   expect(host.querySelector('[data-design-node="z2dgw"]')).not.toBeNull()
   expect(gets('/analytics')).toBe(1)
-  const csv = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('CSVで書き出す')) as HTMLButtonElement
+  const csv = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('CSVで書き出す')) ?? querySupplementaryPageAction('CSVで書き出す')) as HTMLButtonElement
   await act(async () => { csv.click() })
   for (let i = 0; i < 4; i += 1) await act(async () => {})
   expect(gets('/api/webinars/webinar-1/participants.csv')).toBe(1)
@@ -185,7 +186,7 @@ it('通知と CTA は子の段が1回だけ取り、CTA の枚数は取得と保
   await goStep('cta')
   await act(async () => { (host.querySelector('button[aria-label="カード1の操作"]') as HTMLButtonElement).click() })
   await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '複製する' })) })
-  const save = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '下書きを保存') as HTMLButtonElement
+  const save = ([...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存')) as HTMLButtonElement
   await act(async () => { save.click() })
   for (let i = 0; i < 4; i += 1) await act(async () => {})
   expect(requests.find((request) => request.method === 'PUT' && request.path.endsWith('/ctas'))?.body).toEqual({ ctas: [expect.objectContaining({ title: '資料' }), expect.objectContaining({ title: '資料' })] })
@@ -197,7 +198,7 @@ it('通知と CTA は子の段が1回だけ取り、CTA の枚数は取得と保
 
 it('公開中で URL を検査済みなら、編集の口の URL を別窓で開く', async () => {
   await render()
-  const link = [...host.querySelectorAll('a')].find((anchor) => anchor.textContent?.includes('公開ページを見る'))
+  const link = ([...host.querySelectorAll('a')].find((anchor) => anchor.textContent?.includes('公開ページを見る')) ?? querySupplementaryPageAction('公開ページを見る'))
   expect(link?.getAttribute('href')).toBe(PUBLIC_URL)
   expect(link?.getAttribute('target')).toBe('_blank')
   expect(link?.getAttribute('rel')).toContain('noopener')

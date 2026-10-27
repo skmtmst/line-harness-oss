@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
@@ -75,9 +76,9 @@ function nameInput(): HTMLInputElement {
 describe('R172 名前空欄の下書き保存する', () => {
   it('入力欄の下に案内を出し、欄へフォーカスとスクロールを移す', async () => {
     await mount()
-    const draft = [...host.querySelectorAll('button')].find((el) =>
+    const draft = ([...host.querySelectorAll('button')].find((el) =>
       el.textContent?.includes('あとで決める'),
-    ) as HTMLButtonElement
+    ) ?? querySupplementaryPageAction('あとで決める')) as HTMLButtonElement
     expect(draft, '下書き保存ボタンが見つかりません').toBeTruthy()
     await act(async () => {
       draft.click()
@@ -94,9 +95,9 @@ describe('R172 名前空欄の下書き保存する', () => {
 
   it('名前を入れ直すと欄下の案内が消える', async () => {
     await mount()
-    const draft = [...host.querySelectorAll('button')].find((el) =>
+    const draft = ([...host.querySelectorAll('button')].find((el) =>
       el.textContent?.includes('あとで決める'),
-    ) as HTMLButtonElement
+    ) ?? querySupplementaryPageAction('あとで決める')) as HTMLButtonElement
     await act(async () => {
       draft.click()
     })

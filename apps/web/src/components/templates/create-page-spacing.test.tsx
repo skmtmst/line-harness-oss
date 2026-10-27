@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { cleanup, render } from '@testing-library/react'
+import { getPageAction } from '@/test-utils/page-action'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import HqCreate from '@/v8/hq-broadcasts/create'
 
@@ -60,7 +61,8 @@ describe('作成の型の余白の口', () => {
     expect(frame).toBeTruthy()
     expect(frame.querySelector('[data-template-region="content"] input[aria-label="配信名"]')).toBeTruthy()
     expect(frame.querySelector('[data-template-region="preview"][aria-label="LINEの見え方"]')).toBeTruthy()
-    expect(frame.querySelector('[data-template-region="footer"]')?.textContent).toContain('下書きを保存する')
+    expect(frame.querySelector('[data-template-region="footer"]')?.textContent).toContain('対象設定へ')
+    expect(getPageAction({ name: '下書きを保存する' }).getAttribute('role')).toBe('menuitem')
   })
 })
 

@@ -9,6 +9,7 @@ import FormsListV8 from './list'
 
 ;
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 回答フォーム一覧（src/v8/forms）の動きの試験。BEHAVIOR.md の「今までと変えたところ」を守る。
  * 未分類の件数・閲覧のみの帯と押せない「フォルダを追加」・行の「…」の読み上げ名・1152 で保存先を出さない・表示件数 10/20/50。
@@ -103,7 +104,7 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   const values = new Map<string, string>()
   const storage = {
     getItem: (key: string) => values.get(key) ?? null,
@@ -187,7 +188,7 @@ describe('V8 回答フォーム一覧', () => {
   })
 
   it('変えられない人には閲覧のみの帯が出て、「フォルダを追加」は出さない（押せない飾りを置かない）', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await mount()
     expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
@@ -205,7 +206,7 @@ describe('V8 回答フォーム一覧', () => {
   })
 
   it('フォームの編集権限がある staff は変更でき、フォルダの管理だけは出さない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     window.localStorage.setItem('lh_staff_role', 'staff')
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/form-submissions'] } as StaffMember)
     await mount()
@@ -358,3 +359,5 @@ it('一覧フロー：余白・Enter・Spaceでフォームのパネル、名前
   await act(async () => { fireEvent.keyDown(row, { key: ' ' }) })
   expect(new URLSearchParams(window.location.search).get('form')).toBe('f-1')
 })
+
+afterEach(() => { verifiedStaffRole(null) })
