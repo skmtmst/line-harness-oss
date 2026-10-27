@@ -10,6 +10,8 @@ const fixture = vi.hoisted(() => ({
   previewBlockers: ['incompatible_dimensions'] as MediaVersionBlocker[],
   canReplace: false,
   createdVersions: [] as Array<Record<string, unknown>>,
+  usageCount: 0,
+  openedReplacement: [] as string[],
 }))
 
 class ApiError extends Error {
@@ -26,7 +28,7 @@ vi.mock('@/lib/api', () => ({
         success: true,
         data: {
           media: { id: 'media-a', filename: 'A.png', kind: 'image' },
-          usageCount: 0,
+          usageCount: fixture.usageCount,
           references: [],
           versions: [{ versionNo: 1 }],
           checkedAt: '2026-09-16T09:00:00+09:00',
@@ -122,7 +124,7 @@ async function renderDialog() {
         folderName=""
         canManage
         onClose={() => undefined}
-        onOpenReplacement={() => undefined}
+        onOpenReplacement={(item) => { fixture.openedReplacement.push(item.id) }}
         onVersionCreated={() => undefined}
       />,
     )
@@ -162,6 +164,8 @@ beforeEach(() => {
   fixture.createdVersions.length = 0
   fixture.previewBlockers = ['incompatible_dimensions']
   fixture.canReplace = false
+  fixture.usageCount = 0
+  fixture.openedReplacement.length = 0
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -177,6 +181,30 @@ afterEach(async () => {
   })
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+})
+
+describe('使用中のメディアの詳細（voJtX）', () => {
+  it('使っている数を添えて、版を足しても固定版は変わらない・使っているあいだは消せないと言い、使用先の差し替えへ進める', async () => {
+    fixture.usageCount = 2
+    await renderDialog()
+    const detail = document.querySelector('[data-design-node="voJtX"]')
+    expect(detail).not.toBeNull()
+    const text = detail?.textContent ?? ''
+    expect(text).toContain('この画像を差し替える')
+    expect(text).toContain('名前と管理用URLを保ったまま新しい版を追加します。')
+    expect(text).toContain('現在このメディアを使っている2か所の固定版は変わりません')
+    expect(text).toContain('使われているあいだは削除できません。先にこの2か所から外してください。')
+    const replace = [...(detail?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '使用先を差し替える')
+    await act(async () => { replace?.click(); await settle() })
+    expect(fixture.openedReplacement).toEqual(['media-a'])
+  })
+
+  it('使っていなければ「使用先を差し替える」と消せない理由を出さない', async () => {
+    await renderDialog()
+    const text = document.querySelector('[data-design-node="voJtX"]')?.textContent ?? ''
+    expect(text).not.toContain('使われているあいだは削除できません')
+    expect(text).not.toContain('使用先を差し替える')
+  })
 })
 
 describe('メディア版追加の内容互換性（N-199）', () => {
