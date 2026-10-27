@@ -1,7 +1,7 @@
 'use client'
 
 import { Mail } from 'lucide-react'
-import Link from 'next/link'
+import TextLink from '@/components/shared/text-link'
 import { useCallback, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
@@ -103,9 +103,9 @@ export default function PasswordForgotPage() {
       </form>
       <p className="text-caption text-ink-faint">
         思い出した方は{' '}
-        <Link href="/login" className="font-semibold text-action hover:underline">
+        <TextLink inline href="/login">
           ログイン
-        </Link>
+        </TextLink>
       </p>
     </AuthCard>
   )

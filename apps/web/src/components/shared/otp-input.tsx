@@ -23,6 +23,8 @@ import styles from './otp-input.module.css'
  *   （`busy`）は枠を押せない形にして輪を出し、同じ6桁を二重に送らない
  * - 違った（`invalid` が立った）ら、6桁を消して1マス目へ戻し、枠を赤くして横に揺らす
  *   （動きを減らす設定では揺らさない）。通った（`success`）ら緑の枠と ✓
+ * - 確かめている間・通った後も、マスは薄くせず数字を読めるまま残す
+ * - 下のボタンが回る印を出す画面は `inlineStatus={false}` で、マスのそばの輪と ✓ を出さない
  */
 /** 全角の数字を半角に。数字以外は落とす。 */
 export function otpDigits(raw: string): string {
@@ -33,8 +35,8 @@ export function otpDigits(raw: string): string {
  * 確かめの失敗を人の言葉に（サーバーの文をそのまま出さない所だけ置き換える）。
  * 違うコード・回数の上限・期限切れ・使用済み。ほかはそのまま返す。
  */
-export function otpFailureMessage(message: string): string {
-  if (/正しくありません|invalid|incorrect|違います/i.test(message)) return 'コードが違います。もう一度入れてください'
+export function otpFailureMessage(message: string, { wrongCode = 'コードが違います。もう一度入れてください' }: { wrongCode?: string } = {}): string {
+  if (/正しくありません|invalid|incorrect|違います/i.test(message)) return wrongCode
   // 次にすることまで書いてある文（「ログインからやり直してください」など）はそのまま。
   if (/やり直して/.test(message)) return message
   if (/回数|too many|rate/i.test(message)) return '何度か違うコードが入りました。少し待ってから、もう一度入れてください'
@@ -63,7 +65,10 @@ export default function OtpInput({
   busy = false,
   visualLabel,
   format = 'digits',
+  inlineStatus = true,
 }: {
+  /** マスのそばに確かめ中の輪と通った ✓ を出すか。ボタンが状態を言う画面では false。 */
+  inlineStatus?: boolean
   format?: 'digits' | 'recovery'
   visualLabel?: string
   value: string
@@ -284,8 +289,8 @@ export default function OtpInput({
           </Fragment>
         ))
       )}
-      {busy ? <span className={styles.spinner} aria-hidden="true" /> : null}
-      {success && !busy ? <Check className={styles.check} size={20} aria-hidden="true" /> : null}
+      {inlineStatus && busy ? <span className={styles.spinner} aria-hidden="true" /> : null}
+      {inlineStatus && success && !busy ? <Check className={styles.check} size={20} aria-hidden="true" /> : null}
     </div>
     {/* 確かめている・通ったを読み上げにも伝える（見た目の輪・✓ と同じ時に）。 */}
     <span className={styles.srOnly} role="status" aria-live="polite">{busy ? '確かめています' : success ? '確認できました' : ''}</span>

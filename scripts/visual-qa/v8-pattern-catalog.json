@@ -2501,6 +2501,11 @@
             "id": "svg-line",
             "re": "<(polyline|path)\\b[^>]*\\b(points|d)=\\{",
             "why": "SVG で線を手描き"
+          },
+          {
+            "id": "hand-bar",
+            "re": "role=[\\\"']progressbar[\\\"']|style=\\{\\{\\s*width:\\s*`\\$\\{[^`]*\\}%`",
+            "why": "棒を手書き（進み・使用量は ProgressBar）"
           }
         ]
       },
@@ -2576,6 +2581,57 @@
       "guard": {
         "tests": [],
         "needed": "external を作ったら：target=\"_blank\" を画面で書くと落ちる試験"
+      }
+    },
+    {
+      "id": "inline-link",
+      "name": "本文の中のリンク",
+      "role": "文の中の押せる言葉は緑の文字（乗せると下線）。矢印なし・周りの文字の大きさのまま（TextLink の inline）",
+      "rules": [
+        "§6.12-12",
+        "B-158"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/text-link.tsx",
+            "apps/web/src/components/shared/text-link.module.css"
+          ],
+          "components": [
+            "TextLink"
+          ],
+          "vars": [
+            "--color-link"
+          ]
+        },
+        "pen": [
+          {
+            "id": "g5Db8",
+            "name": "リンク"
+          }
+        ],
+        "status": "決まっている（2026-10-26 オーナー：本文の中のリンクは緑）"
+      },
+      "code": {
+        "selectorHint": "inline-link|prose-link",
+        "overrideSelectors": [],
+        "signals": [
+          {
+            "id": "own-link",
+            "re": "<(?:a|Link)\\b[^>]*className=[\"'][^\"']*\\b(?:text-action|text-accent-deep|text-link)\\b[^\"']*[\"']",
+            "why": "文の中のリンクを画面で色付けして手書き（黒い text-action のままだと押せると分からない）"
+          }
+        ]
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/text-link.test.tsx",
+          "scripts/visual-qa/v8-pattern-audit.mjs"
+        ],
+        "needed": ""
       }
     },
     {
@@ -2888,6 +2944,11 @@
             "id": "raw-check",
             "re": "type=[\"'](checkbox|radio)[\"']",
             "why": "素のチェック・ラジオ"
+          },
+          {
+            "id": "locked-check",
+            "re": "<Checkbox\\s+checked\\s[^>]*\\bdisabled\\b",
+            "why": "外せない決まりをチェックの形で出す（札で言い切る）"
           }
         ]
       },
@@ -3493,7 +3554,8 @@
             "AuthDetailRow"
           ],
           "vars": [
-            "--tpl-ms-otp-card-w"
+            "--tpl-ms-otp-card-w",
+            "--tpl-auth-card-w"
           ]
         },
         "pen": [],

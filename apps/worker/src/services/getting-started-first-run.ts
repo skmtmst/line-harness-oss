@@ -23,7 +23,7 @@ export async function firstRunTimes(db: D1Database, accountId: string) {
     db.prepare('SELECT MIN(applied_at) AS at FROM style_starter_items WHERE line_account_id = ?')
       .bind(accountId).first<{ at: string | null }>(),
     db.prepare(
-      `SELECT MIN(received_at) AS at FROM line_webhook_events
+      `SELECT MIN(received_at) AS at FROM line_webhook_events INDEXED BY idx_line_webhook_events_account
         WHERE line_account_id = ? AND event_type = 'follow' AND status = 'succeeded'`,
     ).bind(accountId).first<{ at: string | null }>(),
     firstDeliveredMessageAt(db, accountId),
