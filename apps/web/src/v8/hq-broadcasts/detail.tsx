@@ -1,5 +1,4 @@
 'use client'
-import TargetMissing from '@/components/shared/target-missing'
 import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -12,7 +11,7 @@ import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval
 import { downloadApiFile, ApiError, describeSaveFailure } from '@/lib/api'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import type { HqBroadcastRun } from '@line-crm/shared'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { ListPageSection } from '@/components/templates/list-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -20,6 +19,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
 import StatusBadge from '@/components/shared/status-badge'
 import RowMenu from './row-menu'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -464,7 +464,8 @@ function HqBroadcastDetailBody() {
   }
 
   let body
-  if (loadError && !run) body = <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => void load()} />
+  if (!id) body = null
+  else if (loadError && !run) body = <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => void load()} />
   else if (!run) body = <DetailLoading />
   else body = run.status === 'prepared'
     ? <PreparedCard run={run} />
@@ -502,7 +503,17 @@ function HqBroadcastDetailBody() {
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
 
 
-  if (!id) return <TargetMissing kind="unspecified" title="一括配信が選ばれていません" description="一覧から、開く一括配信を選び直してください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
+  /* 選ばれていない時は対象なしの1枚だけ。右の設定・スマホ・タブは出さない。 */
+  if (!id) {
+    return (
+      <PageFrame kind="detail" boardId="M2tJM xOXuY">
+        <PageHeading title="一括配信" />
+        <PageContent>
+          <TargetMissing kind="unspecified" title="一括配信が選ばれていません" description="一括配信の一覧から開いてください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
+        </PageContent>
+      </PageFrame>
+    )
+  }
 
   return (
     <>

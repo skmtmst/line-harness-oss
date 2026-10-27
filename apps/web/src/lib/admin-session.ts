@@ -1,4 +1,5 @@
 import { clearApiReadCache } from './api/transport/read-cache'
+import { MOBILE_LOGIN_NEXT, MOBILE_ROOT, isMobileLoginReturn } from './mobile-shell'
 export const ADMIN_SESSION_STORAGE_KEY = 'lh_admin_session_fallback'
 export const TWO_FACTOR_CHALLENGE_STORAGE_KEY = 'lh_two_factor_challenge'
 const TWO_FACTOR_NEXT_STORAGE_KEY = 'lh_2fa_next'
@@ -118,18 +119,21 @@ export function captureTwoFactorChallenge(): string {
     clearHandoffHash()
     if (!accepted) return readSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY) || ''
     if (isOpsTwoFactorReturn(window.location.search, '', null)) writeSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY, 'ops')
+    else if (isMobileLoginReturn(window.location.search)) writeSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY, MOBILE_LOGIN_NEXT)
     writeSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY, token)
   }
 
   return token || readSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY) || ''
 }
 
-/** 2 要素認証のあとの戻り先。'/ops' か '/'。読んだら消す。 */
+/** 2 要素認証のあとの戻り先。'/ops'・'/m'（電話の画面）・'/' の決まった 3 つだけ。読んだら消す。 */
 export function takeTwoFactorNextPath(): string {
   if (typeof window === 'undefined') return '/'
   const next = readSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY)
   removeSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY)
-  return isOpsTwoFactorReturn(window.location.search, window.location.hash, next) ? '/ops' : '/'
+  if (isOpsTwoFactorReturn(window.location.search, window.location.hash, next)) return '/ops'
+  if (next === MOBILE_LOGIN_NEXT || isMobileLoginReturn(window.location.search)) return MOBILE_ROOT
+  return '/'
 }
 
 export function clearTwoFactorChallenge(): void {

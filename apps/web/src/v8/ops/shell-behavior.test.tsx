@@ -21,15 +21,15 @@ describe('運営の自分の操作とメニューを閉じる動き', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'ログアウト', exact: true }))
     await waitFor(() => expect(logout).toHaveBeenCalledWith('/ops/login'))
   })
-  it('本人の入口は左下だけに置き、上の帯と2要素認証の入口を重複させない', async () => {
+  it('本人の入口は左下だけに置き、上の帯と二段階認証の入口を重複させない', async () => {
     const { container } = render(<OpsShellV8 {...props} />)
     const self = screen.getByRole('button', { name: '自分のメニュー', exact: true })
     expect(self.closest('aside')).not.toBeNull()
     expect(container.querySelector('header')?.textContent).not.toContain(me.name)
     expect(screen.queryByRole('button', { name: 'ログアウト', exact: true })).toBeNull()
-    expect(screen.queryByRole('link', { name: '2要素認証', exact: true })).toBeNull()
+    expect(screen.queryByRole('link', { name: '二段階認証', exact: true })).toBeNull()
     fireEvent.keyDown(self, { key: 'ArrowUp' })
-    expect(await screen.findByRole('menuitem', { name: '2要素認証（設定済み）' })).not.toBeNull()
+    expect(await screen.findByRole('menuitem', { name: '二段階認証（設定済み）' })).not.toBeNull()
   })
   it('注意を残し、環境の札は版の表示へまとめる', () => {
     render(<OpsHead title="監査ログ" environment="staging" />)
@@ -40,7 +40,7 @@ describe('運営の自分の操作とメニューを閉じる動き', () => {
     render(<OpsShellV8 {...props} />)
     fireEvent.click(screen.getByRole('button', { name: '自分のメニュー', exact: true }))
     const menu = await screen.findByRole('menu', { name: '自分の操作', exact: true })
-    for (const [name, href] of [['プロフィールを編集', '/staff'], ['メンバー管理', '/ops/members'], ['2要素認証（設定済み）', '/ops/two-factor']]) {
+    for (const [name, href] of [['プロフィールを編集', '/staff'], ['メンバー管理', '/ops/members'], ['二段階認証（設定済み）', '/ops/two-factor']]) {
       expect(within(menu).getByRole('menuitem', { name, exact: true }).getAttribute('href')).toBe(href)
     }
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'ログアウト', exact: true }))

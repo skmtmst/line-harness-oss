@@ -47,7 +47,7 @@
 .colSelect { width: var(--tpl-scn-col-select); }
 .colGrip { width: var(--tpl-scn-col-grip); }
 .colName { width: var(--tpl-scn-col-name); }
-.colCount { width: var(--tpl-scn-col-count); }
+.colCount { width: calc(var(--tpl-scn-col-count) + var(--space-32) * 2 + var(--space-20)); }
 .colState { width: var(--tpl-scn-col-state); }
 .colMenu { width: var(--tpl-scn-col-menu); }
 
@@ -121,7 +121,7 @@
   white-space: nowrap;
 }
 
-/* 「購読中 / 読み終えた」列。 */
+/* 「配信中・最後まで配信」列。棒と割合の行は横に並べる。 */
 .countCell {
   white-space: nowrap;
 }
@@ -131,6 +131,23 @@
   font-size: var(--text-caption);
   line-height: var(--tpl-row-name-lh);
   font-variant-numeric: tabular-nums;
+}
+
+.countRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+  margin-top: var(--tpl-scn-count-gap);
+}
+
+.countBar {
+  flex: 1;
+  min-width: var(--space-32);
+}
+
+.countRow > .countSub {
+  margin-top: 0;
 }
 
 .countSub {

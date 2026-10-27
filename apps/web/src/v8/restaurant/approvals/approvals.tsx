@@ -258,7 +258,7 @@ export default function ApprovalsV8() {
   return (
     <RestaurantFrame
       boardId="t8WgD8"
-      title="承認ワークフロー"
+      title="承認の流れ"
       description="Google投稿・LINE配信・メニュー改定を公開前に確認します。"
       allStores
     >

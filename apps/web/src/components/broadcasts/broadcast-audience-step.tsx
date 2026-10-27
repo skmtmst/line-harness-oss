@@ -3,6 +3,7 @@
 import type { Tag } from '@line-crm/shared'
 
 
+import { BroadcastBlockedExclusion } from '@/components/broadcasts/broadcast-blocked-exclusion'
 import { type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
 import Button from '@/components/shared/button'
@@ -19,6 +20,7 @@ import { Send } from 'lucide-react'
 import Link from 'next/link'
 import type { Dispatch,SetStateAction } from 'react'
 import styles from './broadcast-form-v8.module.css'
+import TextLink from '@/components/shared/text-link'
 
 type BroadcastAudienceStepContext = {
   audienceDisplayCount: number | null
@@ -79,9 +81,6 @@ export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, co
             </div>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {/* ブロック中の人は countRules の is_following=true で外れている。
-                外していることを書かないと、人数が合わないように見える。 */}
-            <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
             <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" href="/friends">
               対象を一覧で見る
             </Button>
@@ -97,7 +96,7 @@ export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, co
                 画面の骨格検査はimportを1段だけ読むため、消してはいけない語を
                 呼び出し元にも残す。 */}
           </div>
-          {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
+          {targetMode === 'scenario' && <div className="border-hairline mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
             <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect clearable size="full" kind="scenario"
               aria-label="どのシナリオ"
@@ -148,7 +147,7 @@ export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, co
             {tagsStatus === 'ready' && tags.length === 0 && (
               <p className="mt-1 text-xs text-ink-faint">
                 タグはまだありません。先に
-                <Link href="/tags" className="font-semibold text-action hover:underline">タグ</Link>
+                <TextLink inline href="/tags">タグ</TextLink>
                 で作成してください。
               </p>
             )}
@@ -171,10 +170,9 @@ export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, co
               <Button type="button" onClick={openConditionDialog}>条件を編集</Button>
             </div>
           </div>}
-          <div className={styles.exclusion}>
-            <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
-            <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
-          </div>
+          {/* ブロック中の人は countRules の is_following=true で外れている。
+              外していることを書かないと、人数が合わないように見える。 */}
+          <BroadcastBlockedExclusion />
           <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTagId","exclude_tag_id"]}><EntitySelect kind="tag" aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]} size="full" /></SaveErrorField></label>
           <div className={styles.exclusion}>
             <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
@@ -182,7 +180,7 @@ export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, co
           </div>
           <div className={styles.audienceCount} aria-live="polite"><span><Send size={16} aria-hidden /> この条件で送る人数</span><strong className={audienceDisplayCount === 0 ? 'text-danger' : preflightStatus === 'error' ? 'text-warning' : ''}>{audienceDisplayCount !== null ? `${formatNumber(audienceDisplayCount)}人` : preflightStatus === 'loading' ? '数えています…' : '—人'}</strong></div>
           {audienceDisplayCount === 0 ? <Notice tone="danger">この条件に当てはまる友だちがいません。条件を変えてください</Notice> : preflightStatus === 'error' ? <Notice tone="warn" action={<Button size="compact" onClick={() => void runPreflight()}>もう一度数える</Button>}>人数を数えられませんでした。送る前にもう一度数えてください</Notice> : preflightStatus === 'idle' ? <p className="text-xs text-ink-faint">対象とメッセージを入力すると人数を数えます</p> : null}
-          <Notice tone="info"><strong>対象の確認ポイント</strong><br />人数は送る直前にもう一度数え直します。ブロック中の人には送りません</Notice>
+          <Notice tone="info"><strong>対象の確認ポイント</strong><br />人数は送る直前にもう一度数え直します</Notice>
           {preflight?.audience && <details className={styles.details}><summary>対象プレビュー・除外の内訳</summary><p className="text-xs text-ink-secondary">条件一致 {formatNumber(preflight.audience.matched)}人・送信可能 {formatNumber(preflight.audience.sendable)}人・{exclusionNote ?? '除外 —'}</p>{preflight.audience.representatives.map((friend) => <Link key={friend.friendId} href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`} className="block text-xs text-action">{friend.displayName ?? '名前未登録'}　{friend.summary}</Link>)}</details>}
         </section>)
 }

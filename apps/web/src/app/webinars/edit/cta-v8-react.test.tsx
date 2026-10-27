@@ -1,7 +1,7 @@
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
- * ★V8 CTA・フォーム（）の描画。
+ * ★V8 案内ボタン・フォーム（）の描画。
  * 差し替えるのは通信だけ。カードの一覧・選んだカードの欄・申込フォームが実在する。
  */
 import { fireEvent, screen, within } from '@testing-library/react'
@@ -60,7 +60,7 @@ function render(props: Partial<PaneSaveProps & Pick<EditContext, 'onEditorChange
   return host
 }
 
-describe('CTA・フォームのV8（Q0Jrk）', () => {
+describe('案内ボタン・フォームのV8（Q0Jrk）', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     apiMocks.saveCtas.mockResolvedValue({ data: [] })
@@ -92,7 +92,7 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     const host = render()
     await act(async () => undefined)
     expect(host.querySelector('[data-design-node="Q0Jrk"]')).not.toBeNull()
-    expect(host.textContent).toContain('CTA カード 1 枚')
+    expect(host.textContent).toContain('案内ボタンのカード 1 枚')
     expect(host.textContent).toContain('個別導入診断、受付中です')
     expect(host.textContent).toContain('申込に使う回答フォーム')
     expect(host.textContent).toContain('カードの見え方')
@@ -102,11 +102,11 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     const host = render()
     await act(async () => undefined)
     await pickEntity('申込に使う回答フォーム', 'フォーム1')
-    const add = [...host.querySelectorAll('button')].find((el) => el.textContent === 'CTA カードを足す')
+    const add = [...host.querySelectorAll('button')].find((el) => el.textContent === '案内ボタンのカードを足す')
     await act(async () => {
       add!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(host.textContent).toContain('CTA カード 2 枚')
+    expect(host.textContent).toContain('案内ボタンのカード 2 枚')
     const save = [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')
     await act(async () => {
       save!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -164,7 +164,7 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     })
     const host = render()
     await act(async () => undefined)
-    expect(host.textContent).toContain('CTA カード 2 枚')
+    expect(host.textContent).toContain('案内ボタンのカード 2 枚')
     const save = [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')
     await act(async () => {
       save!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -225,7 +225,7 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     await click('最新を読み込んで続ける')
     expect(changed).not.toHaveBeenCalled()
     const confirm = screen.getByRole('dialog', { name: '最新を読み込んで続けますか？' })
-    expect(within(confirm).getByText(/CTA カードの入力は残します/)).toBeTruthy()
+    expect(within(confirm).getByText(/案内ボタンのカードの入力は残します/)).toBeTruthy()
     await act(async () => { within(confirm).getByRole('button', { name: '最新を読み込んで続ける' }).click() })
     expect(changed).toHaveBeenCalledWith(latest)
     expect(host.querySelector('button[aria-label^="申込に使う回答フォーム"]')?.parentElement?.textContent).toContain('保存済みのフォーム')

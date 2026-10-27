@@ -1,5 +1,6 @@
 /*
  * V8のページを1024・1152・1440・1920で開き、崩れを数える。1つでもあれば終了コード1。
+ * 電話の専用の画面（/m）だけは 390・430 で開き、押せる所 44px・入力欄 16px・下のタブとの重なりも数える。
  *
  *   node apps/web/scripts/v8-guard/layout-overflow.mjs <baseUrl> [out.json]
  *
@@ -22,7 +23,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
-import { ROUTES, WIDTHS, openPage } from './browser-env.mjs'
+import { MOBILE_ROUTES, MOBILE_VIEWPORTS, ROUTES, WIDTHS, openPage } from './browser-env.mjs'
 
 const [baseUrl = 'http://127.0.0.1:4310', out] = process.argv.slice(2)
 const STRESS = process.env.STRESS === '1'
@@ -92,6 +93,56 @@ export const scanLayoutOverflow = () => {
   return res
 }
 
+/*
+ * 電話の画面（/m）だけの 3 つの決まり。
+ *   small-target : 押せる所（リンク・ボタン・欄・タブ）が 44px 未満
+ *   small-input  : 入力欄の文字が 16px 未満（iPhone が入力時に画面を拡大する）
+ *   tab-overlap  : 一番下まで送った時に、本文が下のタブ・返信欄の下に隠れる
+ */
+export const scanMobileRules = () => {
+  const MIN_HIT = 44
+  const MIN_INPUT = 16
+  const label = (e) => {
+    const t = (e.getAttribute('aria-label') || e.innerText || e.getAttribute('placeholder') || '').trim().replace(/\s+/g, ' ').slice(0, 30)
+    return `${e.tagName.toLowerCase()}「${t}」`
+  }
+  const shown = (e) => {
+    const r = e.getBoundingClientRect()
+    if (r.width <= 1 || r.height <= 1) return false
+    const cs = getComputedStyle(e)
+    return cs.visibility !== 'hidden' && cs.display !== 'none' && !e.closest('[aria-hidden="true"],.sr-only')
+  }
+  const res = { smallTarget: [], smallInput: [], tabOverlap: [] }
+  for (const e of document.querySelectorAll('a[href],button,[role="button"],[role="tab"],input:not([type="hidden"]),select,textarea')) {
+    if (!shown(e)) continue
+    // 欄の中の飾りの部品（選ぶ欄の中の小さな×など）は、欄そのものが 44 を持つので数えない。
+    if (e.matches('input[type="checkbox"],input[type="radio"]') && e.closest('label')) continue
+    const r = e.getBoundingClientRect()
+    if (Math.round(r.height) < MIN_HIT || Math.round(r.width) < MIN_HIT) res.smallTarget.push(`${label(e)} ${Math.round(r.width)}x${Math.round(r.height)}`)
+  }
+  for (const e of document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),select,textarea')) {
+    if (!shown(e)) continue
+    const size = parseFloat(getComputedStyle(e).fontSize)
+    if (size < MIN_INPUT) res.smallInput.push(`${label(e)} ${size}px`)
+  }
+  const main = document.querySelector('main')
+  const bottomBars = [...document.querySelectorAll('nav[aria-label="電話のメニュー"],[data-phone-footer-part]')].filter(shown)
+  if (main && bottomBars.length) {
+    window.scrollTo(0, document.documentElement.scrollHeight)
+    const top = Math.min(...bottomBars.map((bar) => bar.getBoundingClientRect().top))
+    let last = null
+    for (const e of main.querySelectorAll('*')) {
+      if (!shown(e) || e.children.length) continue
+      const r = e.getBoundingClientRect()
+      if (!last || r.bottom > last.r.bottom) last = { e, r }
+    }
+    if (last && last.r.bottom > top + 1) res.tabOverlap.push(`${label(last.e)} 下端 ${Math.round(last.r.bottom)} > ${Math.round(top)}`)
+    window.scrollTo(0, 0)
+  }
+  for (const k of Object.keys(res)) res[k] = [...new Set(res[k])]
+  return res
+}
+
 const stress = () => {
   const m = document.querySelector('main')
   if (!m) return
@@ -126,6 +177,22 @@ for (const theme of ['v8']) {
         bad += n
         console.log(`崩れ ${theme} ${width} ${route}`, JSON.stringify({ pageX: r.pageX, overflow: r.overflow.slice(0, 5), outOfMain: r.outOfMain.slice(0, 5), noTitle: r.noTitle.slice(0, 5), accountName: r.accountName.slice(0, 5), narrowColumn: r.narrowColumn.slice(0, 5), cutAlert: r.cutAlert.slice(0, 5) }))
       }
+    }
+  }
+}
+// 電話の専用の画面（/m）だけを 390・430 で。PC の崩れに加えて電話だけの 3 つを数える。
+for (const { width, height } of MOBILE_VIEWPORTS) {
+  for (const [name, route] of Object.entries(MOBILE_ROUTES)) {
+    const page = await openPage(browser, { baseUrl, route, width, height, mobile: true })
+    if (STRESS) { await page.evaluate(stress); await page.waitForTimeout(300) }
+    const r = await page.evaluate(scanLayoutOverflow)
+    const m = await page.evaluate(scanMobileRules)
+    await page.close()
+    res[`mobile ${width} ${name}`] = { ...r, ...m }
+    const n = (r.pageX ? 1 : 0) + r.overflow.length + r.outOfMain.length + r.noTitle.length + r.accountName.length + r.narrowColumn.length + r.cutAlert.length + m.smallTarget.length + m.smallInput.length + m.tabOverlap.length
+    if (n) {
+      bad += n
+      console.log(`崩れ mobile ${width} ${route}`, JSON.stringify({ pageX: r.pageX, overflow: r.overflow.slice(0, 5), outOfMain: r.outOfMain.slice(0, 5), noTitle: r.noTitle.slice(0, 5), narrowColumn: r.narrowColumn.slice(0, 5), cutAlert: r.cutAlert.slice(0, 5), smallTarget: m.smallTarget.slice(0, 8), smallInput: m.smallInput.slice(0, 5), tabOverlap: m.tabOverlap.slice(0, 5) }))
     }
   }
 }

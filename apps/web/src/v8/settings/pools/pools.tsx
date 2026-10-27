@@ -220,7 +220,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
 
   return (
     <Card layout="vertical" padding="compact" gap="var(--polish-space-field)" aria-label={pool.name}>
-      <CardHeader size="stacked" title={pool.name} meta={`slug：${pool.slug}${isMain ? '・既定' : ''}`} action={
+      <CardHeader size="stacked" title={pool.name} meta={`URLの名前：${pool.slug}${isMain ? '・既定' : ''}`} action={
         canManage ? (
           <div className={styles.menuBox}>
             <RowMenu

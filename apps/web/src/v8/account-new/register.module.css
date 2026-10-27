@@ -68,8 +68,6 @@
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink);
 }
 .progressHead strong { font-weight: 700; }
-.progressTrack { height: var(--tpl-htn-progress-h); border-radius: var(--tpl-htn-radius-pill); background: var(--color-hairline); overflow: hidden; }
-.progressFill { display: block; height: 100%; border-radius: var(--tpl-htn-radius-pill); background: var(--color-accent-deep); }
 .progressWarn { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-status-warn-deep); }
 .progressNote { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
 

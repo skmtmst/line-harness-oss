@@ -178,7 +178,7 @@ export default function SnsSettingsPage() {
               <CustomerInfoRows
                 rows={[
                   { label: '店舗', value: googleLocation ?? '—' },
-                  { label: '最終同期', value: formatDate(google.connection.lastSyncedAt, { style: 'detail', fallback: '—' }) },
+                  { label: '最後に取り込んだ日時', value: formatDate(google.connection.lastSyncedAt, { style: 'detail', fallback: '—' }) },
                   { label: '口コミ', value: google.summary.storedCount > 0 ? `${formatNumber(google.summary.storedCount)}件・未返信 ${formatNumber(google.summary.unrepliedCount)}件` : '—' },
                   { label: '投稿', value: google.summary.postsAttentionCount > 0 ? `要対応 ${formatNumber(google.summary.postsAttentionCount)}件` : '—' },
                 ]}

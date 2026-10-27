@@ -43,7 +43,7 @@ it('1回ごとに1枚：日付・種類の数・3行・［すべて見る］を�
 
   const top = cards()[1]
   expect(top.querySelector('time')?.getAttribute('datetime')).toBe('2026-10-25T10:00+09:00')
-  expect(within(top).getByText('v0.26.0')).toBeTruthy()
+  expect(within(top).getByText('0.26.0')).toBeTruthy()
   expect(within(within(top).getByRole('list', { name: '種類ごとの数' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['追加 1', '変更 1', '修正 2'])
   expect(within(within(top).getByRole('list', { name: 'この回のおもな変更' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['配信の宛先の誤りを直した', '保存できない時の知らせを直した', '予約の札を足した'])
   expect(within(top).getByText('すべて見る（4 行）')).toBeTruthy()
@@ -77,7 +77,7 @@ it('検証への配備の1枚に結果と配備の仕方を出し、行はその
   await waitFor(() => expect(document.querySelector('[data-update-card="deployment"]')).toBeTruthy())
   const deployed = cards().find((card) => card.querySelector('time')?.getAttribute('datetime') === '2026-10-25T09:45+09:00')!
   expect(within(deployed).getByText('成功')).toBeTruthy()
-  expect(within(deployed).getByText('v0.26.0・検証へ自動で配備')).toBeTruthy()
+  expect(within(deployed).getByText('0.26.0・検証へ自動で配備')).toBeTruthy()
   expect(within(within(deployed).getByRole('list', { name: 'この回のおもな変更' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['配信の宛先の誤りを直した', '保存できない時の知らせを直した', '予約の札を足した'])
   // 配備より後の行は日の1枚、最初の配備より前の行も日の1枚。
   expect(cards().map((card) => card.dataset.updateCard)).toEqual(['pending', 'day', 'deployment', 'deployment', 'day', 'archive'])

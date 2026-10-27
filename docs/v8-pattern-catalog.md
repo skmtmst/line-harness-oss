@@ -150,7 +150,7 @@
 <a id="kpi-band"></a>
 ## kpi-band 数の帯
 
-- 数字は共通値の34px・500・行40、上下16。数値の範囲・使用数／上限・9桁以上の金額等がある帯は、共通KpiBandが2列へ分け、数字・単位を省略しない（2026-10-23の指定寸法を保つための共通側の対応）。
+- 数字は共通値の34px・500・行40、上下16。どの帯も横一列（全部のマスの上端が同じ）。入りきらない数だけ共通KpiBandが字を小さくし、数字・単位は省略しない（2026-10-26 オーナー：数の帯は横一列にそろえる）。
 
 - **役目**：数（KPI）を線で区切った1本の帯で並べる
 - **補足**：Gの最新版に従い、既定は文節で折り返す。`detailLayout="single"` は1行＋省略で全文を `title` に残し、`qualifier` は括弧の前で改行する。行き先は次の行。幅・高さを画面のCSSで上書きせず、帯全体のマスの高さをそろえる。
@@ -1181,3 +1181,26 @@
 - 自動再生とクロスフェードは決まり §6.15 の 11 の例外で、この部品の中だけ。
 - 使用先：スタイルを選ぶ画面の見本の枠（style-choice）。
 - 見張り：`player.test.tsx`・`script.test.ts`・実ブラウザの `apps/web/scripts/v8-guard/style-experience-player.test.mjs`。
+
+## mobile-frame モバイルの外枠（電話の専用の画面 /m）
+
+- **役目**：電話の専用の画面（`/m`）の上の帯・本文・下のタブ。段の題（`MobileSection`）・一覧の上の道具（`MobileListTools`：探す欄と表示の切り替え）・カード 1 列（`MobileCardList`・`MobileCardLink`・`MobileCard`）もこの型が持つ。管理画面を縮めた物ではなく、機能をしぼった別の外枠。
+- **持ち主（コード）**：`components/templates/mobile-frame.tsx`・同CSS（形と値）、`components/mobile/mobile-shell.tsx`（ログインの確認・アカウント・代理ログインの帯・セッション切れ・閲覧のみの帯・タブの出し入れ）、`components/mobile/mobile-screen.tsx`（画面 1 枚の題・戻る・返信欄と、権限・店の未選択の表示）。住所の判定とタブの表は `lib/mobile-shell.ts`。
+- **決まり**：[§6.48](v8-design-rules.md)。値は外枠の型 `mobile-frame.module.css` の `--phone-*`（外枠の中だけで効く）。画面で高さ・余白・文字の大きさを書かない。タブは作った画面だけを出す。
+- **見つけ方（コード）**：own-tab-bar（`BottomTabs`・`TabBar`・`BottomNav` を自作）。
+- **見張り**：`templates/mobile-frame.test.tsx`・`lib/mobile-shell.test.ts`、崩れの見張り `apps/web/scripts/v8-guard/layout-overflow.mjs` の電話の段（`MOBILE_ROUTES` × 390・430）。
+
+## mobile-talk-list モバイルの会話の一覧
+
+- **役目**：電話の画面のトークの一覧と、対応の「返事を待っているトーク」を同じカード 1 列で出す。顔・名前・時刻・最後のメッセージ。未読は顔の赤い点と名前の太字（色だけに頼らない）。
+- **持ち主（コード）**：`components/templates/mobile-talk-list.tsx`・同CSS。一覧の 1 件の形へ直すのは `v8/inbox-chat/mobile-talk-item.ts`（公開名は `v8/inbox-chat/public/mobile-talk-item`）、最後のメッセージの言葉は PC と同じ `v8/inbox-chat/list-preview.ts`。
+- **決まり**：[§6.48](v8-design-rules.md)。取得・並び・押した時の既読は画面が持つ。会話の中の吹き出しは PC と同じ `v8/inbox-chat/message-row.tsx`（`InboxMessageRow`）、送る前の見本は `LinePreview`。新しい吹き出しを作らない。
+- **見つけ方（コード）**：own-talk-card（`MobileChatList`・`TalkCard`・`ChatCard` を自作）。
+- **見張り**：`templates/mobile-frame.test.tsx`・`v8/inbox-chat/mobile-talk-screen.test.tsx`。
+
+## mobile-booking-card モバイルの予約のカード
+
+- **役目**：電話の画面の「今日」の予約 1 件（時刻・お客さまの名前・人数・卓や担当・状態の札・［来店］などの操作）。
+- **持ち主（コード）**：段②（今日）で `components/templates/mobile-booking-card.tsx` に作る（まだ無い）。状態の札は `StatusBadge`、予約の状態の色と言葉は `shared/booking-state.ts`・`booking-presentation.tsx` を使う。
+- **決まり**：[§6.48](v8-design-rules.md)。版（`expectedVersion`）と `requestId` は PC と同じ口へ渡す。閲覧のみには操作を出さない。
+- **見つけ方（コード）**：own-booking-card（`MobileBookingCard`・`PhoneBookingCard`・`ReservationCard` を自作）。

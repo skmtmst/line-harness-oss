@@ -130,7 +130,9 @@ a.planTitle:hover { text-decoration: underline; }
 .figKey { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; }
 
 /* ── 段E：最近の動き ── */
-.activity { display: flex; flex-direction: column; gap: var(--tpl-db-act-gap); padding: var(--tpl-db-act-pad); }
+.activity { display: flex; flex-direction: column; gap: var(--tpl-db-act-gap); margin: 0 var(--tpl-list-inset); padding: var(--tpl-db-act-pad); }
+/* 履歴の縦線が行の間の隙間もつなぐように、共通の行へ隙間を渡す。 */
+.activity { --icon-row-list-gap: var(--tpl-db-act-gap); }
 .activityLink { display: block; color: inherit; text-decoration: none; border-radius: var(--tpl-db-th-radius); }
 .activityLink:hover { background: var(--color-surface-pearl); }
 
@@ -152,3 +154,7 @@ a.planTitle:hover { text-decoration: underline; }
 /* 数のマスの下の補足は1行（狭い幅で2行に割らない）。全文は内訳で読める。 */
 .todayBand > * > p:last-child > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pendingMeta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); }
+
+/* 受信の内容が絵文字だけの時の添え書き。 */
+.inboxEmoji { display: inline-flex; align-items: baseline; gap: var(--space-4); min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.inboxEmojiNote { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--color-ink-faint); font-size: var(--text-caption); }

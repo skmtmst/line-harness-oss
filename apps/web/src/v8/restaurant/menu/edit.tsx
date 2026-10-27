@@ -171,7 +171,7 @@ function MenuEditBody() {
         busy={busy}
         readOnly={!canEdit}
         title={<span className={styles.title}><span className={styles.titleParent}>メニュー管理 ›</span>{title}</span>}
-        help={<>コースと単品の名前・値段・提供時間・アレルギーと、お支払いの方法を決めます。価格を変えると承認ワークフローへ申請されます。</>}
+        help={<>コースと単品の名前・値段・提供時間・アレルギーと、お支払いの方法を決めます。価格を変えると承認の流れへ回ります。</>}
         preview={side}
         previewSurface="plain"
         previewToggle={<PreviewLauncher title="お支払いの説明" label="お支払いの説明を見る">{side}</PreviewLauncher>}
@@ -213,7 +213,7 @@ function MenuEditBody() {
               <SaveErrorField names={['allergens', 'draft.allergens']}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
             </Field>
             <p className={styles.note}>{editing
-              ? `価格を変えると承認ワークフローへ申請されます。承認されるまで、いまの価格（${formatYen(editing.price)}）のまま出ます。空欄の開始日時は承認後すぐに反映します。`
+              ? `価格を変えると承認の流れへ回ります。承認されるまで、いまの価格（${formatYen(editing.price)}）のまま出ます。空欄の開始日時は承認後すぐに反映します。`
               : '追加したメニューは、予約台帳・Google投稿・LINEカードで同じマスターとして使われます。'}</p>
           </Card>
         ) : (

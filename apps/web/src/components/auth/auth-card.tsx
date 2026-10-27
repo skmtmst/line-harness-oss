@@ -22,11 +22,11 @@ export default function AuthCard({
   cardNode,
   variant,
   titleId,
-  steps,
   authLayout,
   brandName,
-  titleAlign,
-  hero,
+  brandNote,
+  step,
+  wide,
 }: {
   title: string
   description: ReactNode
@@ -37,26 +37,23 @@ export default function AuthCard({
   cardNode?: string
   variant?: 'totp'
   titleId?: string
-  steps?: ReactNode
   authLayout?: 'admin' | 'ops'
+  /** カードの頭に出す会社名。無ければ musubo。 */
   brandName?: string
-  titleAlign?: 'center' | 'start'
-  /** 題の上に置く印（二段階認証の盾など）。 */
-  hero?: ReactNode
+  /** 会社名の下の小さな文字。 */
+  brandNote?: string
+  /** ログインの何段目か（「2 / 2」）。カードの頭の右に出す。 */
+  step?: { current: number; total: number }
+  /** 中身が広いカード（二段階認証の設定）。 */
+  wide?: boolean
 }) {
   // ログイン前の画面もタブの題を「<見出し> | musubo」にする。
   useEffect(() => { setDocumentTitle(title) }, [title])
   // V8 login confirmation/enrollment inherits its existing card tokens.
   if (variant === 'totp') return <main className={authStyles.page} data-auth-layout={authLayout}>
-    {authLayout === 'admin' ? <div className={authStyles.brand}><span className={authStyles.brandMark} aria-hidden="true">{brandName ? nameInitial(brandName) : 'm'}</span><div><strong>{brandName ?? 'musubo'}</strong><small>musubo</small></div></div> : null}
-    <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-title-align={titleAlign} data-hero={hero ? '' : undefined} data-design-node={cardNode}>
-    {steps}
-    {hero}
-    {/*
-      ★オーナー決定（2026-10-24）：題 32/600・題の上 16・題と説明の間 8。
-      題と説明は1組の見出しとして PageHeading に渡す（別の行に分けると
-      題と入力の間が 16＋20＋16＝52 になり、48 の上限を超えていた）。
-    */}
+    <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-auth-width={wide ? 'wide' : undefined} data-design-node={cardNode}>
+    <AuthCardHead brandName={brandName} brandNote={brandNote} step={step} />
+    {/* 題 20/600 と説明 1 行を 1 組の見出しとして渡す。 */}
     <PageHeading
       title={title}
       titleAs="h1"
@@ -68,6 +65,33 @@ export default function AuthCard({
     />
     {children}
   </section></main>
+
+  const legal = (
+    <footer className="flex flex-wrap items-center justify-center gap-4 text-micro text-ink-faint">
+      <LegalLink href={LEGAL_LINKS.terms}>利用規約</LegalLink>
+      <LegalLink href={LEGAL_LINKS.privacy}>プライバシーポリシー</LegalLink>
+      <LegalLink href={LEGAL_LINKS.commerce}>特定商取引法に基づく表記</LegalLink>
+      {/*
+        ログインしていない人のお問い合わせは、サービスサイトの /contact/ へ。
+        /hq/support はログインが要り、ログイン画面へ戻されてしまう（監査 m18e）。
+      */}
+      <a href={CONTACT_URL} target="_blank" rel="noreferrer" className="hover:underline">
+        お問い合わせ
+      </a>
+    </footer>
+  )
+
+  // ログインの 1 段目：二段階認証（2 段目）と同じ地・同じ幅・同じカード（枠の線なしで影だけ）。
+  if (step) return (
+    <main data-design-node={node} className={authStyles.page} data-auth-layout="admin" data-auth-foot="">
+      <section data-design-node={cardNode} className={authStyles.card} aria-label={title} data-auth-layout="admin">
+        <AuthCardHead brandName={brandName} brandNote={brandNote} step={step} />
+        <PageHeading title={title} titleAs="h1" titleId={titleId} inset="none" subtitle={description} subtitleSize="body" />
+        {children}
+      </section>
+      {legal}
+    </main>
+  )
 
   return (
     <main data-design-node={node} className="flex min-h-svh flex-col items-center justify-center bg-shell px-4 py-8 sm:px-6">
@@ -87,20 +111,20 @@ export default function AuthCard({
         </div>
         {children}
       </section>
-      <footer className="mt-6 flex flex-wrap items-center justify-center gap-4 text-micro text-ink-faint">
-        <LegalLink href={LEGAL_LINKS.terms}>利用規約</LegalLink>
-        <LegalLink href={LEGAL_LINKS.privacy}>プライバシーポリシー</LegalLink>
-        <LegalLink href={LEGAL_LINKS.commerce}>特定商取引法に基づく表記</LegalLink>
-        {/*
-          ログインしていない人のお問い合わせは、サービスサイトの /contact/ へ。
-          /hq/support はログインが要り、ログイン画面へ戻されてしまう（監査 m18e）。
-        */}
-        <a href={CONTACT_URL} target="_blank" rel="noreferrer" className="hover:underline">
-          お問い合わせ
-        </a>
-      </footer>
+      <div className="mt-6">{legal}</div>
     </main>
   )
+}
+
+/** カードの頭：会社の印・会社名・musubo、右に「2 / 2」、下に薄い線（統括のアカウントのカードと同じ作り）。 */
+function AuthCardHead({ brandName, brandNote = 'musubo', step }: { brandName?: string; brandNote?: string; step?: { current: number; total: number } }) {
+  const name = brandName || 'musubo'
+  // 会社名が無い時は「musubo」を 2 回並べない。
+  return <div className={authStyles.head} data-auth-head="">
+    <span className={authStyles.headMark} aria-hidden="true" data-auth-brand-mark="">{nameInitial(name)}</span>
+    <div className={authStyles.headName}><strong>{name}</strong>{brandName || brandNote !== 'musubo' ? <small>{brandNote}</small> : null}</div>
+    {step ? <span className={authStyles.headStep}><span className="sr-only">ログインの手順 </span>{step.current} / {step.total}</span> : null}
+  </div>
 }
 
 function LegalLink({ href, children }: { href: string | null; children: ReactNode }) {
@@ -140,7 +164,7 @@ export function AuthField({
         <label htmlFor={htmlFor} className="text-label font-medium text-ink">
           {label}
         </label>
-        {action}
+        {action ? <span className="shrink-0 text-label">{action}</span> : null}
       </div>
       {hint ? <p className="text-micro text-ink-faint">{hint}</p> : null}
       {children}

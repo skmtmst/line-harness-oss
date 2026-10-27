@@ -158,6 +158,8 @@ export interface BookingStaff {
   is_active: number;
   /** N-411: 本人勤務の対象となるログインユーザー。 */
   staff_member_id?: string | null;
+  /** お客さまが指名したときだけ足す料金（円）。 */
+  nomination_fee?: number;
 }
 
 export interface BookingMenuStaff {

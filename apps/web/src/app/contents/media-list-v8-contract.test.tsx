@@ -11,7 +11,6 @@ vi.hoisted(() => {
 import MediaLibraryPage from './page'
 
 // happy-dom では import.meta.url が file 形にならないため、作業場所からの相対で読む。
-const LIST_V8 = readFileSync('src/app/contents/list-v8.tsx', 'utf8')
 const PAGE = readFileSync('src/app/contents/page.tsx', 'utf8')
 
 /*
@@ -267,51 +266,13 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
   })
 })
 
-describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
-  test('V8に固定し旧テーマの分岐を持たない', () => {
-    expect(PAGE).toContain('<MediaLibraryListV8 />')
+/*
+ * 数の帯・道具の段・札の中身・「…」の操作・ページ送りは src/v8/contents/list-view.test.tsx が
+ * 画面を描いて守る。ここには入口の禁止の見張りだけを残す。
+ */
+describe('V8 登録メディア一覧（O7hUt7）の入口', () => {
+  test('旧テーマの分岐と旧い板を持たない', () => {
     expect(PAGE).not.toContain('useAdminTheme')
     expect(PAGE).not.toContain('data-design-node="g89Tc"')
-  })
-
-  test('数の帯・道具の段・表示範囲とページ送りを持つ', () => {
-    expect(LIST_V8).toContain('boardId="O7hUt7"')
-    expect(LIST_V8).toContain('登録メディアの集計')
-    expect(LIST_V8).toContain('使っている容量')
-    expect(LIST_V8).toContain('アーカイブ')
-    expect(LIST_V8).toContain('ファイル名')
-    expect(LIST_V8).toContain('aria-label="並べ方"')
-    expect(LIST_V8).toContain('...SORT_OPTIONS.map')
-    expect(LIST_V8).toContain('aria-label="表示件数"')
-    expect(LIST_V8).toContain('<ListRange')
-    expect(LIST_V8).toContain('<Pagination')
-    expect(LIST_V8).toContain('<BulkBar')
-  })
-
-
-  test("管理画面 の列・絞り込み・操作を残す", () => {
-    // 列（札の中身）。
-    expect(LIST_V8).toContain('formatMediaDetails(item)')
-    expect(LIST_V8).toContain('どこでも使っていない')
-    expect(LIST_V8).toContain('使用先：')
-    expect(LIST_V8).toContain('使用先を確認できない')
-    // 絞り込み。
-    expect(LIST_V8).toContain('selected={showUnusedOnly}')
-    expect(LIST_V8).toContain("{ value: 'near-limit', label: '上限に近いものだけ' }")
-    expect(LIST_V8).toContain("showArchivedOnly ? 'archived'")
-    expect(LIST_V8).toContain('使われている順')
-    // フォルダの列は共通の ManagedFolderPanel（名前・色・並べ替え・消すまで・）。
-    expect(LIST_V8).toMatch(/<ManagedFolderPanel[\s\S]*?kind="media"/)
-    // 操作。
-    expect(LIST_V8).toContain('使用箇所を見る')
-    expect(LIST_V8).toContain('名前を変える')
-    expect(LIST_V8).toContain('フォルダへ移す')
-    expect(LIST_V8).toContain('ダウンロード')
-    expect(LIST_V8).toContain('アーカイブ')
-    expect(LIST_V8).toContain('削除する')
-    expect(LIST_V8).toContain('別のメディアに差し替える')
-    expect(LIST_V8).toContain('data-design-node="YfTfJ"')
-    expect(LIST_V8).toContain('<Field label="理由（あとから履歴で確認できます）" required')
-    expect(LIST_V8).toContain('選択したメディアを削除')
   })
 })

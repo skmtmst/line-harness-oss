@@ -2,7 +2,6 @@
 
 import { beginAdminLoginHandoff, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import LineLoginMark from '@/components/auth/line-login-mark'
@@ -11,10 +10,14 @@ import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
+import TextLink from '@/components/shared/text-link'
+import { AuthSubmit } from '@/components/templates/auth-page'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, emailError, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import { MOBILE_LOGIN_NEXT, MOBILE_ROOT, isMobileLoginReturn } from '@/lib/mobile-shell'
+import { useBrand } from '@/lib/use-brand'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -35,6 +38,7 @@ const EMPTY_PASSWORD_MESSAGE = 'パスワードを入力してください'
  * パスワードのあとに既存の 6 桁コードの画面へ。
  */
 export default function LoginPage() {
+  const brand = useBrand()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
@@ -43,6 +47,11 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const turnstileRef = useRef<TurnstileHandle | null>(null)
+  /*
+   * 電話の画面（/m）から来た人（`?next=m`）。ログインの後は /m へ戻す。
+   * 電話の画面はメールとパスワードで入る（ホーム画面に置いた画面から LINE へ出ると戻ってこないことがあるため）。
+   */
+  const [mobileReturn, setMobileReturn] = useState(false)
   const setTurnstileHandle = useCallback((handle: TurnstileHandle | null) => {
     turnstileRef.current = handle
   }, [])
@@ -61,6 +70,7 @@ export default function LoginPage() {
       turnstileRef.current?.reset()
     }
     window.addEventListener('pageshow', restore)
+    setMobileReturn(isMobileLoginReturn(window.location.search))
     const errorCode = new URLSearchParams(window.location.search).get('error')
     if (errorCode === 'not_authorized') {
       setError('このLINEアカウントには管理者権限がありません。オーナーに追加を依頼してください。')
@@ -102,18 +112,19 @@ export default function LoginPage() {
     // 「消した」印は共有の localStorage。外すと次の認証確認で一度だけ
     // 前回の店舗選択を捨てる（NEXT-07）。
     resetAuthSelectionCleared(localStorage, sessionStorage)
+    const twoFactorNext = mobileReturn ? `?next=${MOBILE_LOGIN_NEXT}` : ''
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup', res.data.challengeToken))
+      window.location.assign(twoFactorChallengeHandoffPath(`/login/two-factor/setup${twoFactorNext}`, res.data.challengeToken))
       return
     }
     if (res.data.twoFactor && res.data.challengeToken) {
       // R507: 二段階認証の画面で実際のログイン方法を出せるよう、経路の印を付ける。
-      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor', res.data.challengeToken))
+      window.location.assign(twoFactorChallengeHandoffPath(`/login/two-factor${twoFactorNext}`, res.data.challengeToken))
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
     else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
-    window.location.assign('/')
+    window.location.assign(mobileReturn ? MOBILE_ROOT : '/')
   }
 
   const lineLogin = () => {
@@ -125,17 +136,28 @@ export default function LoginPage() {
     window.location.assign(`${apiUrl}/api/auth/line?${new URLSearchParams({ handoff: beginAdminLoginHandoff(), ...(remember ? { remember: '1' } : {}) })}`)
   }
 
+  // 入れ終わるまでは押せない形（本物の緑を薄く）にし、下の灰の 1 行で理由を言う。送る時の検査はそのまま。
+  const missingInput = !email.trim() || !password
+  const submitReason = missingInput && busy === null ? 'メールアドレスとパスワードを入れると押せます' : null
+
   return (
     <AuthCard
       node="UufG8"
       cardNode="m3tWJ"
       title="ログイン"
-      description={
+      brandName={brand.name ?? undefined}
+      step={{ current: 1, total: 2 }}
+      description={mobileReturn ? (
+        <>
+          メールアドレスとパスワードでログインします。<br />
+          LINE でログインする人は PC の画面から入ってください。
+        </>
+      ) : (
         <>
           メールアドレスとパスワードでログインします。<br />
           LINE で登録した人は「LINE でログイン」を使ってください。
         </>
-      }
+      )}
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
@@ -158,9 +180,9 @@ export default function LoginPage() {
           label="パスワード"
           htmlFor="login-password"
           action={
-            <Link href="/password/forgot" className="shrink-0 whitespace-nowrap text-body font-medium text-accent-deep hover:underline">
+            <TextLink inline href="/password/forgot">
               パスワードを忘れた方
-            </Link>
+            </TextLink>
           }
         >
           <PasswordField id="login-password" value={password} onChange={handlePasswordChange} autoComplete="current-password" />
@@ -170,25 +192,29 @@ export default function LoginPage() {
           checked={remember}
           onCheckedChange={setRemember}
         >この端末では7日間ログインを保持する</Checkbox>
-        <Button fullWidth type="submit" variant="primary" disabled={busy !== null || !TURNSTILE_SITE_KEY} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
-        </Button>
+        <AuthSubmit reasonId="login-submit-reason" reason={submitReason}>
+          <Button fullWidth type="submit" variant="primary" disabled={busy !== null || !TURNSTILE_SITE_KEY || missingInput} aria-describedby={submitReason ? 'login-submit-reason' : undefined} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
+          </Button>
+        </AuthSubmit>
       </form>
 
-      <div className="flex w-full items-center gap-3" aria-hidden="true">
-        <span className="h-px flex-1 bg-hairline" />
-        <span className="text-caption text-ink-faint">または</span>
-        <span className="h-px flex-1 bg-hairline" />
-      </div>
+      {mobileReturn ? null : <>
+        <div className="flex w-full items-center gap-3" aria-hidden="true">
+          <span className="h-px flex-1 bg-hairline" />
+          <span className="text-caption text-ink-faint">または</span>
+          <span className="h-px flex-1 bg-hairline" />
+        </div>
 
-      <Button fullWidth variant="line" onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
-        <LineLoginMark className="h-4.5 w-4.5" />LINE でログイン
-      </Button>
+        <Button fullWidth variant="line" onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
+          <LineLoginMark className="h-4.5 w-4.5" />LINE でログイン
+        </Button>
+      </>}
 
-      <p className="text-caption text-ink-faint">
+      <p className="text-center text-caption text-ink-faint">
         はじめての方は{' '}
-        <Link href="/register" className="font-semibold text-action hover:underline">
+        <TextLink inline href="/register">
           無料で始める
-        </Link>
+        </TextLink>
       </p>
     </AuthCard>
   )

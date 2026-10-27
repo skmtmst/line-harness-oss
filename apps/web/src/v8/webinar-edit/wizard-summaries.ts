@@ -6,7 +6,7 @@ export function webinarStepSummaries(webinar: Webinar, editor: WebinarEditor, ct
   return {
     basic: webinar.title,
     video: `${webinar.videoPrefix || webinar.videoMediaId ? '動画あり' : '動画未設定'}・配信枠 ${formatNumber(webinar.schedule.length)}件`,
-    cta: `CTA ${formatNumber(ctaCount)}件・${editor.publicPage.form?.name ?? '申込フォーム未設定'}`,
+    cta: `案内ボタン ${formatNumber(ctaCount)}件・${editor.publicPage.form?.name ?? '申込フォーム未設定'}`,
     notifications: `通知文 ${Object.values(editor.notificationMessages).filter(value => value.trim()).length}種類`,
   }
 }

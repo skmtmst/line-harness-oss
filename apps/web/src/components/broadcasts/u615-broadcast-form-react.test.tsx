@@ -192,6 +192,6 @@ describe('監査 #615：一斉配信の受け入れ', () => {
     await renderStepped('message')
 
     expect(container.textContent ?? '').not.toContain('2026/08/24')
-    expect(container.textContent ?? '').toContain('配信日時は手順4で設定します')
+    expect(container.textContent ?? '').toContain('配信日時は手順 4 で設定します')
   })
 })

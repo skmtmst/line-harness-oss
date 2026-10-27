@@ -306,7 +306,7 @@ test('下書きの削除も確認前には送信せず、元に戻すで延期�
   expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(true)
 })
 
-test('停止中のリマインダーの再開は確認も延期もせず送る', async () => {
+test('停止中のリマインダの再開は確認も延期もせず送る', async () => {
   document.documentElement.dataset.theme = 'v8'
   handler = url => url.pathname === '/api/reminders'
     ? response({ success: true, data: { items: [{ ...reminder, isActive: false, lifecycleStatus: 'stopped' }], total: 1, limit: 20 } })
@@ -320,7 +320,7 @@ test('停止中のリマインダーの再開は確認も延期もせず送る',
   expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
 })
 
-test('リマインダーの全件選択はページ外の停止対象も確認する', async () => {
+test('リマインダの全件選択はページ外の停止対象も確認する', async () => {
   document.documentElement.dataset.theme = 'v8'
   const rows = Array.from({ length: 101 }, (_, i) => ({ ...reminder, id: `r-${i}`, name: `お知らせ${i}` }))
   handler = url => {
@@ -338,7 +338,7 @@ test('リマインダーの全件選択はページ外の停止対象も確認�
   expect(host.textContent).toContain('101件を選択中')
   const stop = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '止める') as HTMLElement
   await act(async () => stop.click())
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('101件のリマインダーを停止しますか？')
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('101件のリマインダを停止しますか？')
 })
 
 test('初回読込では空と表示せず、失敗と成功0件を別の案内にする', async () => {

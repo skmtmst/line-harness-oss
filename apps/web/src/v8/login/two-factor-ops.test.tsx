@@ -81,7 +81,12 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
   it('管理画面の2段目もV8で出し、LINEでのログイン方法を保つ', async () => {
     await open('/login/two-factor#lh_2fa=challenge-1', 'v8')
     expect(host.textContent).toContain('二段階認証')
-    expect(host.textContent).toContain('LINEログイン')
+    // 頭は会社の印・会社名・「2 / 2」。盾と手順の帯は出さない。
+    expect(host.querySelector('[data-auth-head]')?.textContent).toContain('テスト統括')
+    expect(host.querySelector('[data-auth-head]')?.textContent).toContain('2 / 2')
+    const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === 'コードが使えない場合')
+    await act(async () => { toggle?.click() })
+    expect(host.textContent).toContain('別のLINEアカウントでログイン')
   })
 
   it('旧テーマ属性が残っても運営はV8で出す', async () => {
@@ -126,6 +131,8 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
 
   it('6桁そろうと押さずに確かめ、正しいコードでログインへ進む', async () => {
     const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    let answer: (response: Response) => void = () => {}
+    verifyAnswer = () => new Promise<Response>((resolve) => { answer = resolve }) as unknown as Response
     try {
       await openAdmin()
       await act(async () => {
@@ -133,7 +140,21 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
         await Promise.resolve()
       })
       expect(bodies[0]).toMatchObject({ challengeToken: 'challenge-1', code: '482917' })
-      expect(host.textContent).toContain('確認しています…')
+      // 確かめ中：6 マスは数字を残したまま、ボタンは緑のまま回る印と「確かめています…」。
+      expect(slots().map((input) => input.value).join('')).toBe('482917')
+      const button = [...host.querySelectorAll('button')].find((b) => b.getAttribute('aria-busy') === 'true')
+      expect(button?.textContent).toBe('確かめています…')
+      expect(host.textContent).toContain('確かめています…')
+      await act(async () => {
+        answer(json({ success: true, data: { sessionToken: 'session-1' }, csrfToken: 'csrf-1' }))
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      // 通った：枠は緑（data-state）、下の 1 行とボタンが「開いています」。✓ はマスのそばに出さない。
+      expect(host.querySelector('[role="group"][data-state="success"]')).not.toBeNull()
+      expect(host.textContent).toContain('確認できました。開いています…')
+      expect([...host.querySelectorAll('button')].some((b) => b.textContent === '開いています')).toBe(true)
+      expect(host.querySelector('[role="group"] svg')).toBeNull()
+      expect(slots().map((input) => input.value).join('')).toBe('482917')
       expect(host.querySelector('[role="status"]')?.textContent).toBe('確認できました')
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 500)) })
       expect(assign).toHaveBeenCalledTimes(1)
@@ -143,6 +164,23 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
     }
   })
 
+  it('入れ終わるまでは主ボタンを押せない形にし、下の1行で6桁目で自動でログインすると伝える', async () => {
+    await openAdmin()
+    const submit = () => [...host.querySelectorAll('button')].find((button) => button.textContent === '確認してログイン') as HTMLButtonElement | undefined
+    const reason = () => host.querySelector('#ops-two-factor-submit-reason')
+    expect(submit()?.disabled).toBe(true)
+    expect(reason()?.textContent).toBe('6 桁を入れると自動でログインします')
+    expect(submit()?.getAttribute('aria-describedby')).toBe('ops-two-factor-submit-reason')
+    verifyAnswer = () => new Promise<Response>(() => {}) as unknown as Response
+    await act(async () => {
+      fireEvent.change(slots()[0], { target: { value: '482917' } })
+      await Promise.resolve()
+    })
+    // 6 桁目で自動で確かめ始めたら、理由の 1 行は消える。
+    expect(bodies[0]).toMatchObject({ code: '482917' })
+    expect(reason()).toBeNull()
+  })
+
   it('間違えると赤い理由を出し、四角を空にして1つ目へ戻る', async () => {
     verifyAnswer = () => json({ success: false, error: '認証コードが正しくありません' }, 400)
     await openAdmin()
@@ -150,17 +188,18 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
       fireEvent.change(slots()[0], { target: { value: '000000' } })
       await new Promise((resolve) => setTimeout(resolve, 20))
     })
-    expect(host.querySelector('[role="alert"]')?.textContent).toBe('コードが違います。もう一度入れてください')
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('コードが違います。今の数字を入れ直してください。')
     expect(slots().map((input) => input.value).join('')).toBe('')
     expect(document.activeElement).toBe(slots()[0])
   })
 
   it('回復コードを使う道とログインへ戻る道を小さなリンクから開く', async () => {
     await openAdmin()
+    // 「別のアカウントで入る」はカードの下にいつも出し、ログインの 1 段目に戻る。
+    const back = [...host.querySelectorAll('a')].find((link) => link.textContent === '別のアカウントで入る')
+    expect(back?.getAttribute('href')).toBe('/login')
     const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === 'コードが使えない場合')
     await act(async () => { toggle?.click() })
-    const back = [...host.querySelectorAll('a')].find((link) => link.textContent === 'ログインに戻る')
-    expect(back?.getAttribute('href')).toBe('/login')
     const useRecovery = [...host.querySelectorAll('button')].find((button) => button.textContent === '回復コードを使う')
     await act(async () => { useRecovery?.click() })
     expect(host.querySelector('h1')?.textContent).toBe('回復コードでログイン')

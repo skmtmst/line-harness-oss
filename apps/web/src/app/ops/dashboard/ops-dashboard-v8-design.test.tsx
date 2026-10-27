@@ -17,6 +17,8 @@ import OpsDashboardPage from './page'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
+// 最初の10分の段は口も試験も別（v8/ops/first-run.test.tsx）。ここではダッシュボード本体の口だけを見る。
+vi.mock('@/v8/ops/dashboard/first-run', () => ({ default: () => null }))
 
 const GB = 1024 ** 3
 
