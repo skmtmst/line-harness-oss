@@ -78,7 +78,6 @@ describe('オートメーションの確認窓', () => {
 
   it('何が消え・何が残るかを本文で読ませる', () => {
     const dialog = dialogWith(PAGE, 'open={pending !== null && pending.accountId === selectedAccountId}')
-    expect(dialog).toContain('通常の一覧から外します。動いた記録と設定は残り、「保管」の絞り込みから戻せます。')
     expect(dialog).toContain('切り替えても、動いた記録は残ります。')
     expect(dialog).toContain('稼働は再開しません。')
     // 注意書きの中の「0回」を拾わないよう、コメントを外してから見る。

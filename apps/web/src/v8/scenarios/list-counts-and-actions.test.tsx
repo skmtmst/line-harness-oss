@@ -162,15 +162,16 @@ afterEach(() => {
 describe('読了率の母数', () => {
   test('いま途中と読み終えた人の合計を母数にし、購読中は重複を含むと書く', async () => {
     await mount()
-    await waitFor(() => expect(kpi('読み終えた人').textContent).toContain('登録した 40 人の 25%'))
-    expect(kpi('購読中').textContent?.replace(/\n/g, '')).toContain('いま途中にいる人（重複を含む）')
+    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('登録した 40 人の 25%'))
+    expect(kpi('配信中').textContent?.replace(/\n/g, '')).toContain('いま途中にいる人（重複を含む）')
+    expect(screen.getAllByTitle('配信中 10 人・最後まで配信 2 人')).toHaveLength(2)
   })
 
   test('登録した人が0なら0%と言わず「—」にする', async () => {
     state.stats = { scenarios: { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 } }
     await mount()
-    await waitFor(() => expect(kpi('読み終えた人').textContent).toContain('—'))
-    expect(kpi('読み終えた人').textContent).not.toContain('%')
+    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('—'))
+    expect(kpi('最後まで配信した人').textContent).not.toContain('%')
   })
 })
 

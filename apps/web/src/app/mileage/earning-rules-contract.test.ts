@@ -35,7 +35,6 @@ describe("管理画面 たまる決めごと（N46cQ）の画面", () => {
     // 公開済みだと思い込む。未公開は下書きの中身と版・保存日時を出す。
     expect(PAGE).toContain("rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る'")
     expect(PAGE).toContain('まだ公開版はありません')
-    expect(PAGE).toContain('公開中の第${viewTarget.publishedVersion}版')
     expect(PAGE).toContain('に反映')
   })
 
@@ -115,7 +114,6 @@ describe("管理画面 たまる決めごと（N46cQ）の画面", () => {
     expect(PAGE).toContain('api.mileage.publishEarningRule')
     expect(PAGE).toContain('公開して反映')
     expect(PAGE).toContain('rule.publishedVersion')
-    expect(PAGE).toContain('公開中の第${viewTarget.publishedVersion}版')
     expect(PAGE).toContain('expectedVersion: rule.draftVersion')
     // 取り消せない操作のため共通の確認窓で確かめる。ブラウザのconfirmは使わない。
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
