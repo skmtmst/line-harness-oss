@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest'
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 /* 完全切り替え：管理画面 の scenario-list.tsx は捨て、V8 を見る。入口は src/v8/scenarios/list.tsx（古い list-v8.tsx はもう描かれない）。 */
-const SCENARIO_LIST = read('../v8/scenarios/list.tsx')
 const AUTO_REPLIES = readUiSource(new URL('../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
 const FRIEND_ADD = read('../v8/friend-add/list.tsx')
 const VARS = readUiSource(new URL('../app/contents/vars/page.tsx', import.meta.url), 'utf8')
@@ -20,10 +19,7 @@ const ANALYTICS_TIME = read('../app/analytics/analytics-time.ts')
  * - 日時は JST・画面ごとの統一フォーマットで出す。
  */
 describe('#640 省略表示の全文確認（title）', () => {
-  it('/scenarios: 数のセルは title で全文を出す', () => {
-    // V8 の数セルに導線リンクは無い。数はそのまま出し、全文は title で読める。
-    expect(SCENARIO_LIST).toMatch(/title=\{`配信中[\s\S]{0,200}?最後まで配信/)
-  })
+  // /scenarios の数のセルの title は v8/scenarios/list-folder-dot-and-reorder.test.tsx が描いて読む。
 
   it('/auto-replies V8: 応答数・長い条件・連動内容に全文確認を残す', () => {
     expect(AUTO_REPLIES).toContain('title={`今月 ${r.hits?.period')

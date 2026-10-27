@@ -169,6 +169,8 @@ describe('V8 シナリオ一覧の最後まで配信した割合', () => {
     expect(bar.getAttribute('aria-valuenow')).toBe('2')
     expect(bar.getAttribute('aria-valuemax')).toBe('12')
     expect(row.textContent).toContain('配信中 10 人・最後まで配信 2 人')
+    // 狭い列で省略されても、全文は title で読める。
+    expect(row.querySelector('[title="配信中 10 人・最後まで配信 2 人"]')).not.toBeNull()
     expect(row.textContent).toContain('登録した 12 人の 17%')
     expect(row.textContent).not.toContain('2 / 10 人')
     expect(view.getByRole('columnheader', { name: '配信中・最後まで配信' })).not.toBeNull()
