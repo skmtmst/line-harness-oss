@@ -682,6 +682,7 @@ export function TargetStageV8({
             accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
             chip={firstStep ? '1通目の通知' : '通知は手順3で作ります'}
             empty={!firstStep}
+            hasSampledBody={Boolean(firstStep?.messageContent.trim())}
             message={firstStep ? renderReminderBodySample(firstStep.messageContent || '本文はまだありません') : undefined}
           />
         </>

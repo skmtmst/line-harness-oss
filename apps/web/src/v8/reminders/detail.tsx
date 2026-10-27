@@ -631,7 +631,7 @@ function OverviewTab({
     <>
       {hasErrors ? (
         <Notice tone="danger" heading={<> 送れなかった通知が {formatNumber(data.summary.errors)}通あります </>} action={<> <Button onClick={onShowErrors}>
-            <ArrowRight size={16} aria-hidden="true" />実行結果を見る
+            実行結果を見る<ArrowRight size={16} aria-hidden="true" />
           </Button> </>} >友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</Notice>
       ) : null}
 
@@ -698,7 +698,7 @@ function OverviewTab({
             </div>
             <div className={styles.moreRow}>
               <Button variant="text" onClick={onShowAllRuns}>
-                <ArrowRight size={16} aria-hidden="true" />すべての実行結果
+                すべての実行結果<ArrowRight size={16} aria-hidden="true" />
               </Button>
             </div>
           </>

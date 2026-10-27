@@ -489,6 +489,7 @@ export function ScenarioDetailBody({
                   : undefined
               }
               empty={shownStep ? false : '配る内容がまだありません'}
+              note={shownStep && (shownTpl?.messageContent ?? shownStep.messageContent).trim() ? '名前や日時は見本の値です。' : undefined}
             >
               {shownStep
                 ? (() => {
@@ -527,7 +528,6 @@ export function ScenarioDetailBody({
                   })()
                 : null}
             </LinePreview>
-            <Notice tone="info" compact>名前や日時は見本の値です。</Notice>
           </div>
         </aside>
       </div>

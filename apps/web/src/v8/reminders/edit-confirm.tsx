@@ -158,6 +158,7 @@ export function ConfirmStageV8({
             accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
             chip={firstStep ? `1通目は ${describeReminderTiming(firstStep, settings.deliveryMode)}に届きます` : '通知ステップがありません'}
             empty={!firstStep}
+            hasSampledBody={Boolean(firstStep?.messageContent.trim())}
             message={firstStep ? renderReminderBodySample(firstStep.messageContent || '本文はまだありません') : undefined}
           />
         </>
@@ -311,7 +312,7 @@ export function DoneStageV8({
               <CalendarClock size={16} aria-hidden="true" />配信予定を見る
             </Button>
             <Button variant="primary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}`}>
-              <ArrowRight size={16} aria-hidden="true" />詳細を見る
+              詳細を見る<ArrowRight size={16} aria-hidden="true" />
             </Button>
           </div>
         </Card>

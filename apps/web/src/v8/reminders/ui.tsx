@@ -4,13 +4,10 @@ import { Steps } from '@/components/templates/steps'
 import type { ReactNode } from 'react'
 import type { ReminderDraftSettings } from '@line-crm/shared'
 import { reminderStepTimings, reminderStopSummary, reminderTriggerLabel } from '@/components/reminders/reminder-labels'
-import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ChevronLeft } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
 import RadioCard from '@/components/shared/radio-card'
 import LinePreview from '@/components/shared/line-preview'
-import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import styles from './edit.module.css'
@@ -96,20 +93,27 @@ export function PhoneV8({
   accountName,
   chip,
   message,
+  hasSampledBody = false,
   empty,
 }: {
   accountName: string
   /** 吹き出しの上の札（届く日時など）。 */
   chip?: string
   message?: ReactNode
+  /** 本文に差し込み値の見本を表示しているときだけ説明を出す。 */
+  hasSampledBody?: boolean
   /** 本文がまだ無いとき true。札だけにする。 */
   empty?: boolean
 }) {
   return <>
-    <LinePreview accountName={accountName} caption={chip} empty={empty}>
+    <LinePreview
+      accountName={accountName}
+      caption={chip}
+      empty={empty}
+      note={!empty && hasSampledBody ? '名前や日時は見本の値です。' : undefined}
+    >
       {empty ? null : <div className={styles.phoneBubble}>{message ?? '本文はまだありません'}</div>}
     </LinePreview>
-    <Notice tone="info" compact>名前や日時は見本の値です。</Notice>
   </>
 }
 
@@ -153,8 +157,8 @@ export function WizardFooterV8({
         </Button>
       ) : null}
       <Button type="button" variant="primary" onClick={onNext} disabled={nextDisabled || nextBusy} busy={nextBusy} busyLabel="処理中…">
-        {nextIcon}
         {nextLabel}
+        {nextIcon}
       </Button>
     </>
   )

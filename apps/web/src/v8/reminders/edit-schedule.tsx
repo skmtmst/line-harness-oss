@@ -84,6 +84,7 @@ export function ScheduleStageV8({
               : previewFailed ? '配信予定を読み込めませんでした'
                 : preview ? '送信予定はまだありません' : '配信予定を確認しています'}
             empty={!nextItem}
+            hasSampledBody={Boolean(nextItem && firstReminderStepMessage(settings, nextItem.stableStepId).trim())}
             message={nextItem ? renderReminderBodySample(firstReminderStepMessage(settings, nextItem.stableStepId) || '本文はまだありません') : undefined}
           />
         </>

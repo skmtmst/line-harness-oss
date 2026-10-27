@@ -186,8 +186,18 @@ describe('V8 シナリオ配信の編集', () => {
     } } as never)
     await render()
     expect(screen.getByText('こんにちは、山田花子さん')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方の説明' }))
     expect(screen.getByText('名前や日時は見本の値です。')).toBeTruthy()
     expect(screen.queryByText('こんにちは、{{name}}さん')).toBeNull()
+  })
+
+  it('本文が空なら見本の説明を出さない', async () => {
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValueOnce({ success: true, data: {
+      ...scenario,
+      steps: [{ ...scenario.steps[0], messageContent: '' }],
+    } } as never)
+    await render()
+    expect(screen.queryByRole('button', { name: 'LINEでの見え方の説明' })).toBeNull()
   })
 
   it('絵（PMLkX）の操作と3つの箱・数の帯が出る', async () => {
