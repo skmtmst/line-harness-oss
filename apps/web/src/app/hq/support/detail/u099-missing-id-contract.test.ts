@@ -26,7 +26,7 @@ describe('問い合わせ詳細の id なし（#975 U099）', () => {
   })
 
   it('id があるときだけ詳細を取得する', () => {
-    expect(PAGE).toContain('if (id === undefined) return')
+    expect(PAGE).toContain('if (!id) return')
     expect(PAGE).toContain('if (id) void load(id)')
   })
 })

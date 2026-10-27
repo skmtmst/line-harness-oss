@@ -122,3 +122,26 @@ it('統括のフォルダは色の保存に失敗しても窓を残し、再試�
   await screen.findByRole('button', { name: 'フォルダ「キャンペーン」の操作' })
   expect((document.querySelector('nav svg.lucide-folder') as SVGElement).style.color).toBe('#ec4899')
 })
+
+it('選ばれていない一括配信に架空の配信設定を出さない', async () => {
+  params.value = new URLSearchParams()
+  render(<HqBroadcastDetail />)
+  expect(await screen.findByText('一括配信が選ばれていません')).toBeTruthy()
+  expect(screen.queryByRole('complementary', { name: '配信した設定とメッセージ' })).toBeNull()
+  expect(screen.queryByText('テキスト 1通')).toBeNull()
+})
+
+it('対象を切り替えたら、前の一括配信の設定を読み込み中に残さない', async () => {
+  hq.get.mockReset().mockResolvedValueOnce({ data: run('old-run', '前の配信', [target('a', 'sent', 10, 5)]) })
+  params.value = new URLSearchParams('id=old-run')
+  const view = render(<HqBroadcastDetail />)
+  await screen.findByRole('heading', { name: /前の配信/ })
+  let finish!: (response: { data: ReturnType<typeof run> }) => void
+  hq.get.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  params.value = new URLSearchParams('id=new-run')
+  view.rerender(<HqBroadcastDetail />)
+  expect(screen.queryByRole('heading', { name: /前の配信/ })).toBeNull()
+  expect(screen.queryByRole('complementary', { name: '配信した設定とメッセージ' })).toBeNull()
+  finish({ data: run('new-run', '次の配信', [target('b', 'sent', 20, 10)]) })
+  expect(await screen.findByRole('heading', { name: /次の配信/ })).toBeTruthy()
+})

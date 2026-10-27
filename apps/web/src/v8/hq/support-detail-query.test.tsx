@@ -39,8 +39,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
+import { api } from '@/lib/api'
+import * as staffIdentity from '@/lib/staff-role'
 import HqSupportDetailV8 from './support-detail'
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.restoreAllMocks(); nav.id = 'req-a' })
 
 test('別の問い合わせへ移ると、その問い合わせを出し、書きかけを残さない', async () => {
   const view = render(<HqSupportDetailV8 />)
@@ -55,4 +57,18 @@ test('別の問い合わせへ移ると、その問い合わせを出し、書�
   await waitFor(() => expect(screen.getAllByText('ログインについて').length).toBeGreaterThan(0))
   expect(screen.queryByText('請求書について')).toBeNull()
   expect((document.querySelector('textarea') as HTMLTextAreaElement).value).toBe('')
+})
+
+test('指定のないお問い合わせでは送信者と履歴を出さない', async () => {
+  nav.id = ''
+  const detail = vi.spyOn(api.hqSupport, 'detail')
+  const context = vi.spyOn(api.hqSupport, 'context')
+  const history = vi.spyOn(api.hqSupport, 'list')
+  const staff = vi.spyOn(staffIdentity, 'loadStaffIdentity')
+  const tenant = vi.spyOn(api.tenants, 'me')
+  render(<HqSupportDetailV8 />)
+  await screen.findByText('開くお問い合わせが指定されていません')
+  expect(screen.queryByRole('region', { name: '送信者' })).toBeNull()
+  expect(screen.queryByText('これまでの問い合わせ')).toBeNull()
+  for (const get of [detail, context, history, staff, tenant]) expect(get).not.toHaveBeenCalled()
 })

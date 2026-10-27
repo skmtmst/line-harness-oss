@@ -1,4 +1,5 @@
 'use client'
+import TargetMissing from '@/components/shared/target-missing'
 import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -358,6 +359,11 @@ export function deliveryWayText(input: Pick<HqBroadcastRun['input'], 'stealthSpr
 }
 
 export default function HqBroadcastDetail() {
+  const params = useSearchParams()
+  return <HqBroadcastDetailBody key={params.get('id') ?? ''} />
+}
+
+function HqBroadcastDetailBody() {
   usePageCrumbs([{ label: '一括配信', href: '/hq/broadcasts' }])
   const params = useSearchParams()
   const samePageUrl = useSamePageUrl()
@@ -458,8 +464,7 @@ export default function HqBroadcastDetail() {
   }
 
   let body
-  if (!id) body = <Notice tone="warn">一括配信が選ばれていません。一括配信の一覧から開いてください。</Notice>
-  else if (loadError && !run) body = <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => void load()} />
+  if (loadError && !run) body = <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => void load()} />
   else if (!run) body = <DetailLoading />
   else body = run.status === 'prepared'
     ? <PreparedCard run={run} />
@@ -496,6 +501,8 @@ export default function HqBroadcastDetail() {
   const exampleStore = sentTo[0]?.accountName ?? '店の名前'
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
 
+
+  if (!id) return <TargetMissing kind="unspecified" title="一括配信が選ばれていません" description="一覧から、開く一括配信を選び直してください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
 
   return (
     <>
@@ -589,7 +596,7 @@ export default function HqBroadcastDetail() {
             ) : null}
             </ListPageSection>
           </div>
-          <aside className={detailStyles.side} aria-label="配信した設定とメッセージ">
+          {run ? <aside className={detailStyles.side} aria-label="配信した設定とメッセージ">
             <h3 className={detailStyles.secTitle}>配信した設定</h3>
             <dl className={detailStyles.rows}>
               {[
@@ -613,7 +620,7 @@ export default function HqBroadcastDetail() {
                 />
               </>
             ) : null}
-          </aside>
+          </aside> : null}
         </div>
       </PageFrame>
       {ask ? (

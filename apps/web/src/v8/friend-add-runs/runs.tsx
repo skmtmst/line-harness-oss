@@ -32,7 +32,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
+import { CursorPagination } from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
@@ -412,11 +412,6 @@ function FriendAddRunsInner() {
     { key: 'pending', label: 'テスト待ち', count: counts.pending },
     { key: 'returning', label: '再追加', count: counts.returning },
   ]
-  const pageCount = cursorPage + (data?.nextCursor ? 1 : 0)
-  const changePage = (next: number) => {
-    if (next === cursorPage + 1 && data?.nextCursor) goNext(data.nextCursor)
-    else if (next < cursorPage) for (let i = next; i < cursorPage; i += 1) goPrev()
-  }
 
   const rowMenuItems = (item: RunItem): ActionMenuItem[] => {
     const list: ActionMenuItem[] = [
@@ -575,12 +570,10 @@ function FriendAddRunsInner() {
         )}
         {!loading && !error && data && items.length > 0 ? (
           <div className={styles.pager}>
-            <Pagination
-              page={cursorPage}
-              pageCount={pageCount}
-              onPageChange={changePage}
-              disabled={loading}
-              range={{ total: data.total, first: (cursorPage - 1) * perPage + 1, last: (cursorPage - 1) * perPage + items.length }}
+            <CursorPagination
+              page={cursorPage} pageSize={perPage} shown={items.length} total={data.total}
+              hasNext={Boolean(data.nextCursor)} disabled={loading}
+              onPrevious={goPrev} onNext={() => { if (data.nextCursor) goNext(data.nextCursor) }}
             />
           </div>
         ) : null}

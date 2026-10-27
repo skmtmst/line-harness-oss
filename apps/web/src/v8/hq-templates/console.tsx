@@ -1,4 +1,5 @@
 'use client'
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 
 import { formDistributedLine,formStatusLine } from './form-status-line'
 export { hostContentOf,hostDefinition } from './console-content'
@@ -151,7 +152,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     const wanted = new URLSearchParams(window.location.search).get('kind')
     if (KIND_TABS.some((tab) => tab.kind === wanted)) setKind(wanted as TemplateKind)
   }, [])
-  const [kindRows, setKindRows] = useState<HqTemplate[] | null>(null)
+  const { value: kindRows, setValue: setKindRows } = useListSnapshot<HqTemplate[] | null>(kind, null)
   const [kindCounts, setKindCounts] = useState<Partial<Record<TemplateKind, number>> | null>(null)
   /* 一覧の集計（API-18：今月送った数・新しい版を未配布）。取れなければ null（数の帯は「—」か行から数える）。 */
   const [listStats, setListStats] = useState<HqTemplateListStats | null>(null)
@@ -270,7 +271,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     void hqTemplatesApi.listByKind(kind).then((rows) => { if (current) setKindRows(rows) }).catch(() => { if (current) setKindRows(null) })
     void hqTemplatesApi.kindCounts().then((counts) => { if (current) setKindCounts(counts) }).catch(() => undefined)
     return () => { current = false }
-  }, [type, kind, stage])
+  }, [type, kind, stage, setKindRows])
   /* 詳細・回答フォームの編集を開いたら、版の履歴と配った先ごとの版を読む（API-18）。読めなくても画面は出す。 */
   const detailId = detail?.template.id ?? null
   const detailRevision = detail?.template.revision ?? null
@@ -705,7 +706,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
 
   /* ───── 一覧（店の同じ機能の一覧と同じ形・ /  /  / 。2026-10-08 オーナー） ───── */
   if (stage === 'list' || stage === 'saved') {
-    const listRows = type === 'template' && kindRows ? kindRows : templates
+    const listRows = type === 'template' ? kindRows ?? templates.filter((row) => (row.kind ?? 'message') === kind) : templates
     const duplicateRow = (row: HqTemplate) => void perform(async () => {
       const key = `${row.id}:${row.revision}`
       const requestId = duplicateAttempts.current.get(key) ?? crypto.randomUUID()

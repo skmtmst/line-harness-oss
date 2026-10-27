@@ -612,3 +612,17 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     expect(within(result).getByText('成功')).toBeTruthy()
   })
 })
+
+it('種類を替えると前の種類の行を隠し、遅い前の応答も表示しない', async () => {
+  let resolveVideo!: (rows: typeof listRow[]) => void
+  calls.listByKind.mockImplementation((kind: string) => kind === 'rich_video' ? new Promise(resolve => { resolveVideo = resolve }) : Promise.resolve([listRow]))
+  render(<HqTemplatesV8 type="template" />)
+  await screen.findByRole('link', { name: '予約前日のご案内' })
+  fireEvent.click(screen.getByRole('tab', { name: /リッチビデオ/ }))
+  await waitFor(() => expect(calls.listByKind).toHaveBeenCalledWith('rich_video'))
+  expect(screen.queryByRole('link', { name: '予約前日のご案内' })).toBeNull()
+  fireEvent.click(screen.getByRole('tab', { name: /^メッセージ/ }))
+  await screen.findByRole('link', { name: '予約前日のご案内' })
+  await act(async () => { resolveVideo([{ ...listRow, id: 'video-only', kind: 'rich_video', name: '動画だけの案内' }]) })
+  expect(screen.queryByRole('link', { name: '動画だけの案内' })).toBeNull()
+})

@@ -27,6 +27,7 @@ import {
   metricText,
   periodCaption,
   rangeFor,
+  reportPeriodLabel,
   shortDate,
   shownValue,
   useOverview,
@@ -69,6 +70,7 @@ function RouteBreakdown({ accountId, from, to }: { accountId: string; from: stri
 
 export default function FriendsV8({ accountId }: { accountId: string }) {
   const { days, setDays, range, customRange, setRange } = useReportPeriod()
+  const periodLabel = reportPeriodLabel(days, Boolean(customRange))
   const [selectedDate, setSelectedDate] = useState('')
   const [asideExpanded, setAsideExpanded] = useState(false)
   const state = useOverview<AnalyticsFriendsOverview>(
@@ -100,8 +102,8 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="増えた" icon={<Users size={16} aria-hidden="true" />} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)} 人` }, state.retry)} />
-      <KpiCard presentation="band" title="減った" icon={<UserMinus size={16} aria-hidden="true" />} value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, { detail: `この${days}日・解除を含む` }, state.retry)} />
+      <KpiCard presentation="band" title="増えた" icon={<Users size={16} aria-hidden="true" />} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `${periodLabel}。初回 ${metricText(overview.metrics.firstTime)} 人` }, state.retry)} />
+      <KpiCard presentation="band" title="減った" icon={<UserMinus size={16} aria-hidden="true" />} value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, { detail: `${periodLabel}・解除を含む` }, state.retry)} />
       <KpiCard presentation="band" title="差し引き" icon={<ArrowLeftRight size={16} aria-hidden="true" />} value={netValue} unit="人" signed {...metricCardState(overview.metrics.net, { detail: `友だちは ${metricText(overview.metrics.currentFriends)} 人` }, state.retry)} />
       <KpiCard presentation="band" title="ブロック率" icon={<CircleHelp size={16} aria-hidden="true" />} value={null} unit="%" detail="ブロックの数は未取得" />
     </KpiBand>
@@ -110,7 +112,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
       <DetailColumns presentation="analysis" asideLabel="流入と減った友だちを見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<>
 
           <Card variant="form" padding="roomy" layout="vertical" gap="normal" aria-labelledby="friends-routes-title">
-            <CardHeader size="stacked" titleId="friends-routes-title" title="どこから増えたか" meta={`流入リンクごと・この${days}日`} />
+            <CardHeader size="stacked" titleId="friends-routes-title" title="どこから増えたか" meta={`流入リンクごと・${periodLabel}`} />
             <RouteBreakdown accountId={accountId} from={range.from} to={range.to} />
             <Link href="/inflow-links" className={styles.more}>流入と計測で詳しく見る →</Link>
           </Card>
@@ -122,7 +124,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
       </>}>
         <Card variant="form" padding="roomy" layout="vertical" gap="normal" aria-labelledby="friends-daily-title">
           <CardHeader size="stacked" titleId="friends-daily-title"
-            title={`日ごとの増減（この${days}日）`}
+            title={`日ごとの増減（${periodLabel}）`}
             help={<HelpTip label="日ごとの増減の説明">{`棒を選ぶとその日の数と配信・シナリオが出ます。${caption}`}</HelpTip>}
             action={<RangePickerV8 customRange={customRange} onRangeChange={setRange} size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} />} />
           <BarChartLegend layout="analytics" items={[

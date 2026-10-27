@@ -16,9 +16,9 @@ vi.mock('@/lib/api', () => ({
   api: {
     staff: { me: async () => ({ success: true, data: { role: state.role } }) },
     analytics: {
-      friendsOverview: async (account: string, range: unknown) => {
+      friendsOverview: async (account: string, range: { from: string; to: string }) => {
         state.calls.push(`${account}:${JSON.stringify(range)}`)
-        return { success: true, data: { period: { from: '2026-09-01', to: '2026-09-30' }, dataCutoffAt: '2026-09-30T00:00:00Z', data: { state: 'available', stateReason: null, metrics: { added: metric(48), removed: metric(11), net: metric(37), currentFriends: metric(1284), firstTime: metric(45) }, days: [{ date: '2026-09-01', added: 2, removed: 1, net: 1 }], campaigns: state.events ? [{ id: 'broadcast-a', date: '2026-09-01', name: '秋のお知らせ', kind: 'broadcast' }, { id: 'scenario-a', date: '2026-09-01', name: '初回の案内', kind: 'scenario' }] : [] } } }
+        return { success: true, data: { period: range, dataCutoffAt: new Date().toISOString(), data: { state: 'available', stateReason: null, metrics: { added: metric(48), removed: metric(11), net: metric(37), currentFriends: metric(1284), firstTime: metric(45) }, days: [{ date: range.from, added: 2, removed: 1, net: 1 }], campaigns: state.events ? [{ id: 'broadcast-a', date: range.from, name: '秋のお知らせ', kind: 'broadcast' }, { id: 'scenario-a', date: range.from, name: '初回の案内', kind: 'scenario' }] : [] } } }
       },
       routesOverview: async () => ({ success: true, data: { period: { from: '2026-09-01', to: '2026-09-30' }, dataCutoffAt: '2026-09-30T00:00:00Z', data: { attributionModel: 'first_touch', attributionLabel: '最初に触れた経路', routes: [], searchConsoleHref: '/search-console' } } }),
     },
@@ -28,6 +28,7 @@ vi.mock('@/lib/api', () => ({
 let root: Root
 let host: HTMLDivElement
 beforeEach(() => {
+  window.history.replaceState(null, '', '/analytics')
   document.documentElement.dataset.theme = 'v8'
   state.role = 'viewer'; state.query = ''; state.account = 'account-a'; state.events = false; state.calls = []
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -73,7 +74,21 @@ describe('V8の閲覧と実測値の保護', () => {
     await act(async () => range.click())
     expect(state.calls.length).toBe(2)
     expect(state.calls.every((call) => call.startsWith('account-a:'))).toBe(true)
-    expect(range.getAttribute('aria-pressed')).toBe('true')
+    const selectedRange = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '過去7日')
+    expect(selectedRange?.getAttribute('aria-pressed')).toBe('true')
+    const requested = JSON.parse(state.calls[1].slice('account-a:'.length)) as { from: string; to: string }
+    expect((Date.parse(requested.to) - Date.parse(requested.from)) / 86_400_000).toBe(6)
+  })
+  it('任意期間の見出しと補足は選択した範囲を示す', async () => {
+    const custom = { from: '2026-09-01', to: '2026-09-15' }
+    state.query = `range=${encodeURIComponent(JSON.stringify(custom))}`
+    window.history.replaceState(null, '', `/analytics?${state.query}`)
+    await render()
+    expect(state.calls).toHaveLength(1)
+    expect(state.calls[0].startsWith('account-a:')).toBe(true)
+    expect(JSON.parse(state.calls[0].slice('account-a:'.length))).toEqual(custom)
+    expect(host.textContent).toContain('日ごとの増減（この期間）')
+    expect(host.textContent).not.toContain('この30日')
   })
   it('成果地点レポートの新入口は対象アカウントを引き継ぎ、取得失敗を再読込できる', async () => {
     state.query = 'view=conversion-report'

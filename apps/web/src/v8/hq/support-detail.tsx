@@ -73,7 +73,7 @@ export default function HqSupportDetailV8() {
 }
 
 function HqSupportDetailByQuery() {
-  const queryId = useSearchParams().get('id')
+  const queryId = useSearchParams().get('id')?.trim() || null
   return <HqSupportDetailInner key={queryId ?? ''} queryId={queryId} />
 }
 
@@ -128,9 +128,8 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   }, [])
 
   useEffect(() => {
-    if (id === undefined) return
-    if (id) void load(id)
-    // 送信者と履歴は id が無くても読む（U099：右の一覧から正しい件へ戻れるように）。
+    if (!id) return
+    void load(id)
     void Promise.allSettled([loadStaffIdentity(), api.tenants.me(), api.hqSupport.list(), api.hqSupport.context()]).then(([meRes, tenantRes, listRes, contextRes]) => {
       if (meRes.status === 'fulfilled' && meRes.value.success) setMe(meRes.value.data)
       if (tenantRes.status === 'fulfilled' && tenantRes.value.success) setTenantName(tenantRes.value.data.name)
@@ -268,7 +267,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           )}
         </div>
 
-        <aside className={styles.side}>
+        {ready ? <aside className={styles.side}>
           <section className={styles.sender} aria-label="送信者">
             <h2 className={styles.senderTitle}>送信者</h2>
             <p className={styles.senderLines} title={hasSenderEmail ? 'この内容が続きに添えられます。返信はこのメールアドレスに届きます。' : 'この内容が続きに添えられます。返信はこの画面のやり取りに届きます。'}>
@@ -285,7 +284,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           })) : []}>
             {history === null ? <DetailLoading /> : !Array.isArray(history) ? <p>これまでの問い合わせを読み込めませんでした。</p> : history.length === 0 ? <p>まだ問い合わせはありません。</p> : null}
           </CreateSummaryCard>
-        </aside>
+        </aside> : null}
       </PageContent>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="書きかけの続き" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </ListPage>

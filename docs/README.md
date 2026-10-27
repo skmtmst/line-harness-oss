@@ -459,6 +459,7 @@
 - [0.24.0.md](release-log/0.24.0.md)
 - [リマインダ](release-log/0.25.0.md)
 - [反映履歴の書き方](release-log/README.md)
+- [下見・件数・待ち時間の不具合の修正](release-log/unreleased/0000-kenta-swbs.md)
 - [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
 - [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
 - [対応が要るものの速さとお知らせの下の空き](release-log/unreleased/1798-kenta-hq-attention-speed.md)

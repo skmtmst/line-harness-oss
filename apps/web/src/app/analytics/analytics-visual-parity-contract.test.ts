@@ -7,7 +7,7 @@ const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 describe("管理画面 機能20の画面比較で直した契約", () => {
   it('概要4画面に設計の判断材料を残す', () => {
     for (const text of [
-      '日ごとの増減（この${days}日）',
+      '日ごとの増減（${periodLabel}）',
       // 監査 R71: 集計はクリック時刻の時間帯。送った時刻ではないので名前を実態に合わせた。
       '押された時間帯ごとの回数',
       '売上 ${yen(revenue)} − 費用',
