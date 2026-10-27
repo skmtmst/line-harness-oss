@@ -810,5 +810,6 @@
 - [ダッシュボードの数を4枚にそろえ、いつもと違う端末の知らせを見やすい場所に移した](release-log/unreleased/1844-kenta-dashboard-kpi.md)
 - [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
+- [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
