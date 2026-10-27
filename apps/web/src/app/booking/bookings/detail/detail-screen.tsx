@@ -242,7 +242,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
             {editing ? (
               <section className="bg-canvas rounded-card border-hairline border p-5" data-design-node="YXrF6">
                 <fieldset disabled={saving} className="contents">
-                <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
+                <h2 className="text-ink mb-3 text-sm font-semibold">予約の内容を変える</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">
                     <EntitySelect kind="booking_menu" disabled={saving} size="full" aria-label="予約メニュー" value={editMenuId} onChange={(value) => { setEditMenuId(value); setEditTime('') }} options={editMenus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))} />
@@ -322,7 +322,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                     variant="primary"
                     type="button"
                     onClick={() => void saveEdit()}
-                    disabled={saving} busy={saving} busyLabel="保存しています">この内容で変更する
+                    disabled={saving} busy={saving} busyLabel="保存しています">この内容にする
                   </Button>
                   <Button
                     type="button"
@@ -532,7 +532,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                       onClick={() => void startEdit()}
                       disabled={acting}
                     >
-                      内容を変更する
+                      内容を変える
                     </Button>
                     <button
                       onClick={() => setDecideTarget('reject')}
@@ -556,7 +556,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                       onClick={() => void startEdit()}
                       disabled={acting}
                     >
-                      内容を変更する
+                      内容を変える
                     </Button>
                     <Button
                       onClick={() => setDecideTarget('no_show')}

@@ -187,7 +187,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
       <div className={styles.channelCards}>
         <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.card} aria-labelledby="rs-intake-title">
           <CardHeader size="stacked" titleId="rs-intake-title" title="予約メールの取り込みアドレス" />
-          <p className={styles.cardText}>予約媒体から届く予約のお知らせメールを、このアドレスへ転送すると台帳に入ります。</p>
+          <p className={styles.cardText}>予約サイトから届く予約のお知らせメールを、このアドレスへ転送すると台帳に入ります。</p>
           <Field label="取り込みアドレス" htmlFor="rs-intake-address" optional={false}>
             <div className={styles.addressBox}>
               <TextField id="rs-intake-address" readOnly title={address ?? undefined} value={address ?? (canEdit ? 'まだ発行されていません' : '管理者だけが見られます')} />
@@ -269,7 +269,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
           </>
         )}
       >
-        <DialogNote>新しいアドレスを発行します。今のアドレスも 90 日は受け取り、その後は使えなくなります。予約媒体の転送先を新しいアドレスへ変えてください。</DialogNote>
+        <DialogNote>新しいアドレスを発行します。今のアドレスも 90 日は受け取り、その後は使えなくなります。予約サイトの転送先を新しいアドレスへ変えてください。</DialogNote>
       </RsDialog>
       <RsDialog
         open={howToOpen}
@@ -280,11 +280,11 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
         actions={<Button variant="primary" onClick={() => setHowToOpen(false)}>わかった</Button>}
       >
         <ol className={styles.howTo}>
-          <li>予約媒体の管理画面で、予約のお知らせメールの送り先を開きます。</li>
+          <li>予約サイトの管理画面で、予約のお知らせメールの送り先を開きます。</li>
           <li>送り先に、上の取り込みアドレス{address ? `（${address}）` : ''}を足します。</li>
           <li>試しに予約を1件入れ、この画面の「今日の取り込み」に数が出るかを確かめます。</li>
         </ol>
-        <DialogNote>検証環境は受信専用です。予約媒体へは書き戻しません。</DialogNote>
+        <DialogNote>検証環境は受信専用です。予約サイトへは書き戻しません。</DialogNote>
       </RsDialog>
       <RsDialog
         open={Boolean(detail)}

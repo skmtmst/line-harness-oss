@@ -44,14 +44,19 @@ export default function scanOwnerRules() {
       }
     }
   }
-  // 高さをそろえる段（data-card-height="equal"）では、同じ行のカードの高さと下端の操作の位置が1pxもずれない。
-  for (const group of root.querySelectorAll('[data-card-height="equal"]')) {
+  // 横に並ぶカードの高さと下端の操作の位置が1pxもずれない。
+  // 対象は高さをそろえる段（data-card-height="equal"）と、印の無い段で同じ幅の列に並ぶカード（カードの格子）。
+  // 幅の違う本文と横の欄、data-card-height="natural" の段は対象外。
+  const groups = new Set([...root.querySelectorAll('[data-design-part="card"]')].map(card => card.parentElement).filter(Boolean))
+  for (const group of groups) {
+    if (group.dataset.cardHeight === 'natural') continue
     const rows = new Map()
     for (const card of [...group.children].filter(el => el.matches('[data-design-part="card"]') && visible(el))) {
       const top = Math.round(card.getBoundingClientRect().top)
       rows.set(top, [...rows.get(top) ?? [], card])
     }
-    for (const row of [...rows.values()].filter(row => row.length > 1)) {
+    const sameWidths = row => { const w = row.map(card => card.getBoundingClientRect().width); const max = Math.max(...w); return max > 0 && (max - Math.min(...w)) / max <= 0.1 }
+    for (const row of [...rows.values()].filter(row => row.length > 1 && (group.dataset.cardHeight === 'equal' || sameWidths(row)))) {
       const heights = row.map(card => card.getBoundingClientRect().height)
       const bottoms = row.map(card => card.querySelector(':scope > [data-card-actions]')).filter(Boolean).map(el => el.getBoundingClientRect().bottom)
       const spread = values => values.length > 1 ? Math.max(...values) - Math.min(...values) : 0

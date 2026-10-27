@@ -57,7 +57,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(text()).toContain('アレルギー：なし')
     await waitFor(() => expect(text()).toContain('これまでの来店 3 回・前回 08/14'))
     expect(fixture.customerHistory).toHaveBeenCalledWith('account-1', 'store-1', { phone: '090-1234-5678', lineUid: undefined })
-    for (const name of ['取り消す', '変更する']) expect(within(dialog).getByRole('button', { name })).not.toBeNull()
+    for (const name of ['取り消す', '内容を変える']) expect(within(dialog).getByRole('button', { name })).not.toBeNull()
   })
 
   it('「次の予約」の「詳細を見る」でも開く', async () => {
@@ -76,9 +76,9 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled', expectedVersion: 1 }))
   })
 
-  it('変更するで今の変更の窓へ移る', async () => {
+  it('内容を変えるで今の変更の窓へ移る', async () => {
     const dialog = await openDetail()
-    fireEvent.click(within(dialog).getByRole('button', { name: '変更する' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '内容を変える' }))
     expect(await screen.findByRole('dialog', { name: '鈴木 真理さんの予約を変更' })).not.toBeNull()
     expect(screen.queryByRole('dialog', { name: '鈴木 真理さん・4名' })).toBeNull()
   })
@@ -87,7 +87,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     render(<ReservationsPage />)
     fireEvent.click(await screen.findByRole('button', { name: /^押さえ / }))
     expect(await screen.findByRole('button', { name: '押さえを解除' })).not.toBeNull()
-    expect(screen.queryByRole('button', { name: '変更する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '内容を変える' })).toBeNull()
   })
 
   it('閲覧のみには 取り消す・変更する・卓を変える・予約を入れる を置かない', async () => {
@@ -95,7 +95,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     const dialog = await openDetail()
     expect(within(dialog).getAllByRole('button', { name: '閉じる' }).length).toBe(2)
     expect(within(dialog).queryByRole('button', { name: '取り消す' })).toBeNull()
-    expect(within(dialog).queryByRole('button', { name: '変更する' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: '内容を変える' })).toBeNull()
     expect(screen.queryByRole('button', { name: '卓を変える' })).toBeNull()
     expect(screen.queryByRole('button', { name: /電話の予約を入れる/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /に予約を入れる$/ })).toBeNull()

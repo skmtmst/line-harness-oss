@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 設定の中の「ファイルの検査」を本物の React で動かす試験。
+ * 設定の中の「ファイルの安全確認」を本物の React で動かす試験。
  * 見るのは主な状態の言い分けだけ:
  *   - 空 … 当てはまるファイルがありません
  *   - 読み込み中 … 待っている表示
@@ -102,7 +102,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
 })
 
-describe('ファイルの検査の設定画面', () => {
+describe('ファイルの安全確認の設定画面', () => {
   const externalConfig = {
     externalProvider: 'scanner', externalEndpointUrl: 'https://scan.example.com/check',
     externalSecretRef: 'FILE_SCAN_SECRET_PRIMARY', externalEnabled: true,
@@ -220,7 +220,7 @@ describe('ファイルの検査の設定画面', () => {
     mocks.list.mockRejectedValue(new Error('network'))
     render(<FileScanSettingsPage />)
     await waitFor(() => {
-      expect(screen.getByText('ファイルの検査を読み込めませんでした')).toBeTruthy()
+      expect(screen.getByText('ファイルの安全確認を読み込めませんでした')).toBeTruthy()
     })
   })
 
@@ -230,7 +230,7 @@ describe('ファイルの検査の設定画面', () => {
     mocks.getConfig.mockResolvedValue({ success: true, data: { config: null } })
     render(<FileScanSettingsPage />)
     await waitFor(() => {
-      expect(screen.getByText('ファイルの検査は管理者だけが開けます')).toBeTruthy()
+      expect(screen.getByText('ファイルの安全確認は管理者だけが開けます')).toBeTruthy()
     })
   })
 

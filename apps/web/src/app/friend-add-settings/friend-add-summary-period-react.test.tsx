@@ -35,14 +35,14 @@ describe('R31 一覧のまとめは直近7日にそろえる', () => {
     await act(async () => { root.render(<Page />); await Promise.resolve(); await new Promise((resolve) => setTimeout(resolve, 0)); await Promise.resolve() })
     expect(host.textContent).toContain('直近7日の友だち追加')
     expect(host.textContent).toContain('直近7日の送信')
-    expect(host.textContent).toContain('経路が分からなかった人')
     // 司令塔の10-11指示：帯の補足は題の横の「？」へまとめる。
-    const help = host.querySelector<HTMLButtonElement>('button[aria-label="友だち追加時の配信の説明"]')!
+    const help = host.querySelector<HTMLButtonElement>('button[aria-label="この画面の説明"]')!
     expect(help).not.toBeNull()
     await act(async () => { help.click() })
     const note = document.querySelector('[role="note"][id]')?.textContent
     expect(note).toContain('直近7日')
     expect(note).toContain('実際に送った通数')
+    expect(note).toContain('経路が分からなかった人')
 
   })
 })

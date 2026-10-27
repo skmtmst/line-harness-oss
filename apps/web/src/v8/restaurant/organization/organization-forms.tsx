@@ -201,9 +201,9 @@ export function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: 
   }
 
   return (
-    <Panel title="予約メール取り込みアドレス" description="予約媒体から届く通知メールの転送先として設定します。">
+    <Panel title="予約メール取り込みアドレス" description="予約サイトから届く通知メールの転送先として設定します。">
       <div className={styles.intakeBody}>
-      <Notice tone="warn">このアドレスは予約メールの専用受信口です。第三者へ共有せず、予約媒体の通知設定だけに使用してください。</Notice>
+      <Notice tone="warn">このアドレスは予約メールの専用受信口です。第三者へ共有せず、予約サイトの通知設定だけに使用してください。</Notice>
       {notice ? <Notice tone="success" role="status">{notice}</Notice> : null}
       {actionError ? <Notice tone="danger" className={styles.intakeErrorNoticePlacement} >{actionError}</Notice> : null}
       {!store ? (

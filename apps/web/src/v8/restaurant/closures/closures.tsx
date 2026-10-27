@@ -255,7 +255,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   return (
     <SaveErrorScope errors={saveErrors}><>
       {tasksError?<ListState kind="error" title="枠を閉じる知らせを読み込めませんでした" onRetry={()=>void loadTasks()}/>:null}
-      {mediaError?<ListState kind="error" title="予約媒体を読み込めませんでした" onRetry={()=>setMediaRetry(n=>n+1)}/>:null}
+      {mediaError?<ListState kind="error" title="予約サイトを読み込めませんでした" onRetry={()=>setMediaRetry(n=>n+1)}/>:null}
       {first && firstItem ? (
         <div className={styles.bandRow}>
           <Notice tone="warn" role="status" data-closure-band="" icon={<Bell size={20} aria-hidden="true" />} action={<>

@@ -400,7 +400,7 @@ export default function TriggerEditor({
               : ''}
           </p>
           <p className="text-ink-faint mt-1 text-xs">
-            条件そのものは、シナリオ詳細の「開始のきっかけ」札にある「対象」から編集します。
+            条件そのものは、シナリオ詳細の「開始のきっかけ」のカードにある「対象」から編集します。
           </p>
         </section>
 

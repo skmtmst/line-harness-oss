@@ -73,7 +73,7 @@ type RowKey = 'registration' | 'dayBefore' | 'hourBefore' | 'start' | 'missed' |
 
 const TRIGGERS: Array<{ key: WebinarAction['trigger']; label: string }> = [
   { key: 'completed', label: '視聴完了' },
-  { key: 'cta_clicked', label: 'CTA クリック' },
+  { key: 'cta_clicked', label: '案内ボタンを押した' },
   { key: 'unviewed', label: '未視聴' },
 ]
 const ACTION_LABEL: Record<WebinarAction['actionType'], string> = {

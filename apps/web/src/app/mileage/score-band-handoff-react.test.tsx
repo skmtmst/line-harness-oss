@@ -90,7 +90,7 @@ function queryOf(anchor: HTMLAnchorElement | undefined): URLSearchParams {
 }
 
 async function openHelp() {
-  const toggle = container.querySelector('button[aria-label="マイルの説明"]') as HTMLButtonElement | null
+  const toggle = container.querySelector('button[aria-label="この画面の説明"]') as HTMLButtonElement | null
   if (toggle) await act(async () => { toggle.click() })
 }
 

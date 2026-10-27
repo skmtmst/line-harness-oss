@@ -268,7 +268,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           )}
         </div>
 
-        <aside className={styles.side}>
+        {ready ? <aside className={styles.side}>
           <section className={styles.sender} aria-label="送信者">
             <h2 className={styles.senderTitle}>送信者</h2>
             <p className={styles.senderLines} title={hasSenderEmail ? 'この内容が続きに添えられます。返信はこのメールアドレスに届きます。' : 'この内容が続きに添えられます。返信はこの画面のやり取りに届きます。'}>
@@ -285,7 +285,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           })) : []}>
             {history === null ? <DetailLoading /> : !Array.isArray(history) ? <p>これまでの問い合わせを読み込めませんでした。</p> : history.length === 0 ? <p>まだ問い合わせはありません。</p> : null}
           </CreateSummaryCard>
-        </aside>
+        </aside> : null}
       </PageContent>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="書きかけの続き" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </ListPage>

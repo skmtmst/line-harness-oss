@@ -71,14 +71,14 @@ test('数の帯に実数と補足が出る（直書きの数にしない）', ()
   // 参加は申込の 81%、視聴完了は参加の 71%。
   expect(text).toContain('申込の 81%')
   expect(text).toContain('参加の 71%')
-  // フォーム送信は件で、CTA を押した 23 人のうち。
-  expect(text).toContain('CTA を押した 23 人のうち')
+  // フォーム送信は件で、案内ボタンを押した 23 人のうち。
+  expect(text).toContain('案内ボタンを押した 23 人のうち')
 })
 
 test('棒に5段と減り・いちばん減っている段が出る', () => {
   renderFunnel()
   const text = container.textContent ?? ''
-  for (const label of ['申込', '参加（入場）', '視聴完了', 'CTA を押した', 'フォーム送信']) {
+  for (const label of ['申込', '参加（入場）', '視聴完了', '案内ボタンを押した', 'フォーム送信']) {
     expect(text).toContain(label)
   }
   // 124→100（-24）、100→71（-29）、71→23（-48）、23→9（-14）。
@@ -86,8 +86,8 @@ test('棒に5段と減り・いちばん減っている段が出る', () => {
   expect(text).toContain('−29')
   expect(text).toContain('−48')
   expect(text).toContain('−14')
-  // いちばん減っているのは視聴完了→CTA を押した。
-  expect(text).toContain('いちばん減っているのは「視聴完了 → CTA を押した」です')
+  // いちばん減っているのは視聴完了→案内ボタンを押した。
+  expect(text).toContain('いちばん減っているのは「視聴完了 → 案内ボタンを押した」です')
 })
 
 test('申込が無いときは割合を「—」にする（0にしない）', () => {

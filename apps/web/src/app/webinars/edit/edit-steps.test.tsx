@@ -47,11 +47,11 @@ const analytics = (reservations: number): WebinarAnalytics => ({
 
 describe('段の並び', () => {
   it('設計と同じ5段', () => {
-    expect(STEPS.map((s) => s.title)).toEqual(['基本設定', '動画', 'CTA・フォーム', '通知', '確認'])
+    expect(STEPS.map((s) => s.title)).toEqual(['基本設定', '動画', '案内ボタン・フォーム', '通知', '確認'])
   })
 
   it('次へは行き先の名前で言う', () => {
-    expect(nextLabelOf('video')).toBe('CTA・フォームへ')
+    expect(nextLabelOf('video')).toBe('案内ボタン・フォームへ')
     expect(nextStepOf('review')).toBeNull()
     expect(nextLabelOf('review')).toBeNull()
   })

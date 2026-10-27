@@ -5,6 +5,7 @@ import { Fragment, type ReactNode } from 'react'
 import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
 import HelpTip from './help-tip'
 import FlexPreview from '@/components/flex-preview'
+import { fillPreviewSample, previewSampleNote } from './preview-sample'
 import styles from './line-preview.module.css'
 
 export interface LinePreviewProps {
@@ -126,9 +127,13 @@ export function LinePreviewMessage({ accountName, avatar, time, children, direct
   /** 写真など、それ自体が角丸の札になる中身。白い吹き出しとしっぽを付けず、そのまま置く。 */
   bare?: boolean
 }) {
+  /* 本文が文字なら、差し込みの記号を見本の値にして出す（記号のままスマホに出さない）。 */
+  const sample = typeof children === 'string' ? fillPreviewSample(children) : null
+  const body = sample ? sample.text : children
+  const sampleNote = sample ? previewSampleNote(sample.kinds) : null
   if (direction === 'outgoing') return <div className={styles.outgoingRow}>
     {time ? <span className={styles.messageTime}>{time}</span> : null}
-    <div className={styles.outgoingBubble}>{children}</div>
+    <div className={styles.outgoingBubble}>{body}</div>
   </div>
   return <div className={styles.messageRow} data-density={density}>
     <span className={styles.senderAvatar}>{avatar}</span>
@@ -137,12 +142,18 @@ export function LinePreviewMessage({ accountName, avatar, time, children, direct
       <div className={styles.bubbleRow}>
         {bare ? children : <div className={styles.bubble}>
           <svg className={styles.tail} viewBox="0 0 10 8" aria-hidden="true"><path d="M8 0 0 6 10 8Z" fill="currentColor" /></svg>
-          <div className={styles.bubbleBody}><span className={styles.bubbleText}>{typeof children === 'string' ? withUrlLines(children) : children}</span></div>
+          <div className={styles.bubbleBody}><span className={styles.bubbleText}>{typeof body === 'string' ? withUrlLines(body) : body}</span></div>
         </div>}
         <span className={styles.messageTime}>{time}</span>
       </div>
+      {sampleNote ? <LinePreviewSampleNote>{sampleNote}</LinePreviewSampleNote> : null}
     </div>
   </div>
+}
+
+/** 差し込みを見本の値にしたことを、吹き出しの下に小さく添える。 */
+export function LinePreviewSampleNote({ children }: { children: ReactNode }) {
+  return <span className={styles.sampleNote} data-preview-sample-note="">{children}</span>
 }
 
 /** cfVyj の商品カード。操作は必ず呼び出し側から渡す。 */

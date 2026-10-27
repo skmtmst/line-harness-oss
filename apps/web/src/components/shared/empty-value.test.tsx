@@ -12,3 +12,7 @@ it('空の意味を3語に限定する',()=>{
 it('数値の0・falseは空にせず、まだ設定していない値は未設定',()=>{
  expect(displayValue(0)).toBe('0');expect(displayValue(false)).toBe('false');expect(displayValue(null,'unconfigured')).toBe('未設定');expect(emptyValue('none')).toBe('なし')
 })
+it('「—」は本当に値が無い時だけ。空白だけは空、値がある時は空の印を並べない',()=>{
+ expect(displayValue('   ')).toBe('—');expect(displayValue(' 2.6.4 ')).toBe('2.6.4');expect(displayValue('2.6.4')).not.toContain('—')
+ expect(displayValue('',"none")).toBe('なし')
+})

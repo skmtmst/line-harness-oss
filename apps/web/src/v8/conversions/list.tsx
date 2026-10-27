@@ -1182,7 +1182,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       title="コンバージョン"
       actions={
         <Button onClick={() => exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={16} aria-hidden="true" />CSV で書き出す
+          <Download size={16} aria-hidden="true" />CSVで書き出す
         </Button>
       }
       stats={<>

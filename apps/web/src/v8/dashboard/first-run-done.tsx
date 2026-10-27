@@ -21,7 +21,7 @@ const KIND_ROWS: ReadonlyArray<{ kind: Exclude<StarterSetItem['kind'], 'dashboar
   { kind: 'rich_menu', label: 'リッチメニュー' },
   { kind: 'template', label: 'テンプレート' },
   { kind: 'automation', label: 'オートメーション' },
-  { kind: 'reminder', label: 'リマインダー' },
+  { kind: 'reminder', label: 'リマインダ' },
   { kind: 'booking_menu', label: '予約メニュー' },
   { kind: 'friend_add_rule', label: '友だち追加の決まり' },
 ]
