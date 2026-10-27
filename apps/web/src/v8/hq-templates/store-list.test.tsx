@@ -326,5 +326,5 @@ it('同じ名前（409 FOLDER_NAME_CONFLICT）は名前の欄に、読めない�
   expect((document.querySelector('[role="dialog"] input') as HTMLInputElement).getAttribute('aria-invalid')).toBe('true')
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('同じ名前のフォルダがあります。')
   await act(async () => (buttons().find((el) => el.textContent === '追加する') as HTMLButtonElement).click())
-  expect(document.querySelector('[data-folder-dialog-error]')?.textContent).toBe('フォルダを保存できませんでした。（状態 500・UNAVAILABLE）')
+  expect(document.querySelector('[data-folder-dialog-error]')?.textContent).toBe('失敗：フォルダを保存できませんでした。（状態 500・UNAVAILABLE）')
 })

@@ -121,7 +121,7 @@ export default function Notice({
   const lead = heading ? heading : body
   // 呼び出し側がもう同じ言葉で書き出している時（「失敗した処理が…」など）は重ねない。
   const prefix = word && !leadingText(lead).startsWith(word)
-    ? <span className={heading ? styles.statusWord : `${styles.statusWord} ${styles.statusWordLead}`} data-notice-status-word>{word}：</span>
+    ? <span className={styles.statusWord} data-notice-status-word>{word}：</span>
     : null
   const node = NODE_BY_TONE[canonical]
   const hasHelp = help !== undefined && help !== null
@@ -131,6 +131,7 @@ export default function Notice({
       {helpHref ? <a href={helpHref}>くわしく</a> : null}
     </HelpTip>
   ) : null
+  const closeButton = onClose ? <button type="button" className={styles.close} onClick={onClose} aria-label="通知を閉じる"><X aria-hidden="true" size={16} /></button> : null
   return (
     <div
       {...props}
@@ -156,7 +157,8 @@ export default function Notice({
         {states?.length ? <NoticeStates items={states} /> : null}
         {footer ? <div className={styles.footer}>{footer}</div> : null}
       </div>
-      {action || onClose ? <span className={styles.action}>{action}{onClose ? <button type="button" className={styles.close} onClick={onClose} aria-label="通知を閉じる"><X aria-hidden="true" size={16} /></button> : null}</span> : null}
+      {/* ［×］は操作と同じ行に入れ、操作のボタンと縦の真ん中をそろえる（題が1行でも2行でも）。 */}
+      {action ? <span className={styles.action}>{action}{closeButton}</span> : closeButton}
     </div>
   )
 }

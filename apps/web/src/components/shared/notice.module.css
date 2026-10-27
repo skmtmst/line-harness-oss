@@ -37,10 +37,8 @@
 .notice[data-has-action] .message { flex-basis: 24em; }
 .headingRow { display: flex; align-items: center; gap: var(--space-6); }
 .heading { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; }
-/* 「要確認：」「失敗：」。題の中では題の文字のまま、題が無い時は本文の頭に濃い文字で置く。 */
-.statusWord { color: var(--color-ink); font-weight: 600; }
-/* 本文が段落で始まっても同じ行の頭に並ぶよう、行の始まりへ寄せる。 */
-.statusWordLead { float: inline-start; margin-inline-end: 0.25em; }
+/* 「要確認：」「失敗：」。題（題が無い時は本文）の頭に濃い文字で置く。題や本文が段落で始まっても同じ行の頭に並ぶよう、行の始まりへ寄せる。 */
+.statusWord { float: inline-start; color: var(--color-ink); font-weight: 600; }
 .description { display: block; color: var(--color-ink-secondary); }
 .action { display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); margin-left: auto; max-width: 100%; }
 .action .close { align-self: center; }

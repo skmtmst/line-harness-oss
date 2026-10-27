@@ -201,7 +201,7 @@ describe('画面', () => {
     const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期')) as HTMLButtonElement
     await act(async () => { button.click() })
     await flush()
-    expect(host.querySelector('[role="alert"]')?.textContent).toBe('Stripe の接続設定がまだありません')
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('失敗：Stripe の接続設定がまだありません')
     expect(button.disabled).toBe(false)
   })
 

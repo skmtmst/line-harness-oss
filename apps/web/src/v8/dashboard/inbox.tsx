@@ -14,7 +14,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { formatTime } from '@/lib/format'
 import { RetryLabel } from '@/components/shared/retry-label'
-import { Loading } from './sections'
+import { Loading, Tag } from './sections'
 import styles from './dashboard.module.css'
 
 /*
@@ -34,6 +34,12 @@ type InboxItem = {
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20]
 const DEFAULT_PAGE_SIZE = 5
 const PAGE_SIZE_STORAGE_PREFIX = 'lh_pending_inbox_page_size:'
+
+/** 文字の入っていない内容（絵文字・スタンプだけ）。後ろに灰で「（絵文字）」と添える。 */
+export function isEmojiOnly(text: string): boolean {
+  const trimmed = text.trim()
+  return trimmed !== '' && /^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f\s]+$/u.test(trimmed) && !/^[\d#*\s]+$/.test(trimmed)
+}
 
 function elapsed(iso: string): string {
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000))
@@ -150,12 +156,15 @@ export function InboxSection({ onSummaryChange }: {
                   {item.customerName}
                 </Link>
               </Td>
-              <Td grow><TruncatedText value={item.preview} /></Td>
-              <Td className={styles.colWait}>{elapsed(item.lastIncomingAt)}</Td>
+              <Td grow>{isEmojiOnly(item.preview)
+                ? <span className={styles.inboxEmoji} title={`${item.preview}（絵文字）`}>{item.preview}<span className={styles.inboxEmojiNote}>（絵文字）</span></span>
+                : <TruncatedText value={item.preview} />}</Td>
+              <Td className={styles.colWait}><Tag tone="danger">{elapsed(item.lastIncomingAt)}</Tag></Td>
               <Td className={styles.colState}><StatusBadge tone="danger" size="compact">未対応</StatusBadge></Td>
             </Tr>
           ))}</tbody>
           </DataTable>
+          {pageCount <= 1 && items.length < pageSize ? <p className={styles.note}>ほかに対応が必要な受信はありません</p> : null}
           {pageCount > 1 ? (
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="受信一覧のページ送り" className={styles.inboxPager} />
           ) : null}</>

@@ -14,7 +14,7 @@ import Notice from '@/components/shared/notice'
 import PeriodPicker from '@/components/shared/period-picker'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RetryLabel } from '@/components/shared/retry-label'
-import { DashboardColumns,DashboardPage,DashboardRow } from '@/components/templates/dashboard-page'
+import { DashboardAsideSection,DashboardColumns,DashboardPage,DashboardRow } from '@/components/templates/dashboard-page'
 import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
@@ -41,6 +41,7 @@ import { PERIODS,jstDay,useDashboard } from './use-dashboard'
 import { dashboardCardForStyle } from './style-cards'
 import { asOfLine,comparisonOf,useDashboardComparisons } from './comparisons'
 import KpiDelta from './kpi-delta'
+import { kpiFillCell,kpiFillIds,useNextBroadcast } from './kpi-fill'
 export { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 
 
@@ -142,11 +143,10 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           unit="件"
           help={NOT_COMPARED_HELP}
           loading={d.pendingDetailState === 'loading'}
+          badge={d.pendingDetailState !== 'ready' || total === null ? undefined : total > 0 && d.pendingOldest !== null ? `最長 ${formatWaitRough(d.pendingOldest)}` : total === 0 ? 'なし' : undefined}
+          badgeTone={total === 0 ? 'neutral' : 'danger'}
           detail={d.pendingDetailState === 'ready'
-            ? <span className={styles.pendingMeta}>
-                {total !== null && total > 0 && d.pendingOldest !== null ? <Tag>{`最長 ${formatWaitRough(d.pendingOldest)}`}</Tag> : null}
-                <span>{`LINE ${d.lineUnread === null ? '未取得' : d.lineUnread}・メール ${d.mailUnread === null ? '未取得' : d.mailUnread}`}</span>
-              </span>
+            ? `LINE ${d.lineUnread === null ? '未取得' : d.lineUnread}・メール ${d.mailUnread === null ? '未取得' : d.mailUnread}`
             : d.pendingDetailState === 'error' ? STATE_TEXT.error : STATE_TEXT.loading}
           action={{ label: '受信箱へ', href: '/chats?status=unread' }}
         />,
@@ -238,9 +238,23 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   }
   const todayCells = d.visibleToday.map((item) => ({ id: item.id, cell: todayCell(item.id) })).filter((entry) => entry.cell !== null)
   const openCell = todayCells.find((entry) => entry.id === openDetail)
-  const todayAsOf = asOfLine(data, todayCells.some((entry) => entry.id === 'today-bookings') && bookingDeltaShown(d.todayActiveBookings ?? (d.displayedBookings === null ? null : d.todayBookings.length)))
 
   const overviewFailed = !data && !d.loading && d.error !== ''
+  /* 数の帯はいつも4マス。選んだ数を先に、足りない分を今日の友だち・今月の配信・次の配信で埋める。予約のマスは4枚目に置く。 */
+  const chosenIds = todayCells.map((entry) => entry.id)
+  const fillIds = kpiFillIds(chosenIds)
+  const nextBroadcast = useNextBroadcast(d.selectedAccountId, fillIds.includes('fill-next-broadcast'))
+  const activeFriendsCompare = comparisonOf(comparisons, 'activeFriends')
+  const fillInput = { data, overviewFailed, trendAvailable: Boolean(data && d.sectionAvailable('trend')), today: d.today, activeFriendsCompare, nextBroadcast }
+  const fillCells = fillIds.map((id) => ({ id, node: kpiFillCell(id, fillInput) }))
+  const bookingCell = todayCells.find((entry) => entry.id === 'today-bookings')
+  const bandCells: { id: string; node: ReactNode }[] = [
+    ...todayCells.filter((entry) => entry !== bookingCell).map((entry) => ({ id: entry.id, node: entry.cell?.node })),
+    ...fillCells,
+    ...(bookingCell ? [{ id: bookingCell.id, node: bookingCell.cell?.node }] : []),
+  ]
+  const friendsCompared = fillIds.includes('fill-friends') && activeFriendsCompare !== null
+  const todayAsOf = asOfLine(data, friendsCompared || (todayCells.some((entry) => entry.id === 'today-bookings') && bookingDeltaShown(d.todayActiveBookings ?? (d.displayedBookings === null ? null : d.todayBookings.length))))
   /* ── 右の列・段D のカード ──────────────────────── */
   const rightCard = (id: DashboardCardId): ReactNode => {
     /* 概要が取れなかった（data なし）ときは骨組みを出し続けず、段ごとに「読み込めませんでした」を出す。 */
@@ -272,8 +286,8 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   }
 
   /* ── 本文の段（編集の並び順どおり） ───────────────── */
-  /* 右の列は上の数の帯の1マス分（帯が3・4マスのとき。帯が無い・2マス以下は4等分の1列）。 */
-  const asideColumns = todayCells.length >= 3 ? todayCells.length : undefined
+  /* 右の列は上の数の帯の1マス分（帯はいつも4マス）。 */
+  const asideColumns = bandCells.length >= 3 ? bandCells.length : undefined
   const visibleRightIds = new Set(d.visibleRight.map((item) => item.id))
   const placedAside = new Set<DashboardCardId>()
   const rows: ReactNode[] = []
@@ -333,7 +347,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
         asideColumns={asideColumns}
         aside={asideIds.length > 0 ? (
           variant === 'link'
-            ? <>{asideIds.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</>
+            ? <>{asideIds.map((id) => <DashboardAsideSection key={id}>{rightCard(id)}</DashboardAsideSection>)}</>
             : <div className={styles.asideStack} data-variant={variant}>{asideIds.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</div>
         ) : undefined}
       >
@@ -402,6 +416,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
     <KpiValueMotionProvider scope={d.selectedAccountId ? JSON.stringify([d.selectedAccountId, d.period, d.today]) : null}>
     <DashboardPage
       boardId="WQmep"
+      grouping="cards"
       headingSize="compact"
       title={usageStyle ? 'ダッシュボード' : greeting(d.staffName)}
       help={headline(data?.asOf, d.displayedHealthRisk)}
@@ -425,12 +440,10 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
         onReset={d.resetPreferences}
       /> : null}
     >
-      {todayCells.length > 0 && todayAsOf ? <p className={styles.asOf} title={todayAsOf}>{todayAsOf}</p> : null}
-      {todayCells.length > 0 ? (
-        <KpiBand className={styles.todayBand} frame="card" data-design="TodayTasks">
-          {todayCells.map((entry) => entry.cell?.node)}
-        </KpiBand>
-      ) : null}
+      {todayAsOf ? <p className={styles.asOf} title={todayAsOf}>{todayAsOf}</p> : null}
+      <KpiBand className={styles.todayBand} appearance="cards" data-design="TodayTasks">
+        {bandCells.map((entry) => <Fragment key={entry.id}>{entry.node}</Fragment>)}
+      </KpiBand>
       {openCell?.cell ? (
         <div className={styles.cellDetail} role="region" aria-label="内訳">
           {openCell.cell.detail}

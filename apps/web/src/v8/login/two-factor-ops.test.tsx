@@ -150,7 +150,7 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
       fireEvent.change(slots()[0], { target: { value: '000000' } })
       await new Promise((resolve) => setTimeout(resolve, 20))
     })
-    expect(host.querySelector('[role="alert"]')?.textContent).toBe('コードが違います。もう一度入れてください')
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('失敗：コードが違います。もう一度入れてください')
     expect(slots().map((input) => input.value).join('')).toBe('')
     expect(document.activeElement).toBe(slots()[0])
   })

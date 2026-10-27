@@ -117,7 +117,9 @@ describe('帯（Notice）の4種類', () => {
     expect(screen.getByText('いつもと違う端末からのログインです')).toBeTruthy()
     expect(screen.getByRole('link', { name: '端末を確認する' }).getAttribute('href')).toBe('/staff')
     expect(container.querySelector('[role="note"] > [data-notice-dot][aria-hidden="true"]')).not.toBeNull()
+    // 閉じる口は操作と同じ行に入れ、操作のボタンと縦の真ん中をそろえる。
     expect(notice.children.length).toBe(3)
+    expect(screen.getByRole('button', { name: '通知を閉じる' }).parentElement).toBe(screen.getByRole('link', { name: '端末を確認する' }).parentElement)
     fireEvent.click(screen.getByRole('button', { name: '通知を閉じる' }))
     expect(onClose).toHaveBeenCalledOnce()
   })

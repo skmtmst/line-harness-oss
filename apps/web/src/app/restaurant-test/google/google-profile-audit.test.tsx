@@ -7,9 +7,7 @@ import { HoursEditor } from '@/v8/restaurant/google/profile-hours'
 const weekly = Object.fromEntries(['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'].map(day => [day, [{ open: '11:00', close: '22:00' }]]))
 const profile = { store: { name: '対象店舗' }, aiAvailable: true, closed: false, timeZone: 'Asia/Tokyo', today: { date: '2026-10-11', weekday: 'SUNDAY' }, profile: { title: '対象店舗', regularHours: weekly, specialHours: [] } }
 
-const fixture = vi.hoisted(() => ({ profile: null as any }))
-fixture.profile = profile
-vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { profile: async () => fixture.profile } }))
+vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { profile: async () => profile } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
