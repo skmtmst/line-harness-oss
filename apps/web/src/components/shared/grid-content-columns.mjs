@@ -2,24 +2,18 @@
 export function fitGridContentColumns(frame) {
   const rows = [...frame.querySelectorAll(':scope > [role="row"]')]
   if (rows.length < 2 || !frame.clientWidth) return
-  const context = document.createElement('canvas').getContext('2d')
-  if (!context) return
   const number = value => parseFloat(value) || 0
-  const measure = node => {
-    if (node.nodeType === 3) {
-      const css = getComputedStyle(node.parentElement)
-      context.font = `${css.fontWeight} ${css.fontSize} ${css.fontFamily}`
-      return context.measureText(node.textContent.trim()).width
-    }
-    if (node.nodeType !== 1) return 0
-    const css = getComputedStyle(node)
-    if (css.display === 'none' || css.visibility === 'hidden' || node.matches('.sr-only,[hidden],[role="menu"],[role="tooltip"]')) return 0
-    if (node.matches('button,input,svg,img')) return node.getBoundingClientRect().width
-    const sizes = [...node.childNodes].map(measure).filter(width => width > 0)
-    if (!sizes.length && !node.textContent.trim()) return node.getBoundingClientRect().width
-    const inline = css.display === 'inline' || css.display === 'inline-flex' || css.display === 'flex' && css.flexDirection === 'row'
-    const content = inline ? sizes.reduce((sum, size) => sum + size, 0) + number(css.columnGap) * Math.max(0, sizes.length - 1) : Math.max(0, ...sizes)
-    return content + number(css.paddingLeft) + number(css.paddingRight) + number(css.borderLeftWidth) + number(css.borderRightWidth)
+  // 同じ行に見えない写しを置き、省略や札の余白も含めた本来の幅（max-content）を測る。
+  const measure = cell => {
+    const probe = cell.cloneNode(true)
+    probe.setAttribute('aria-hidden', 'true')
+    probe.setAttribute('data-column-probe', '')
+    probe.removeAttribute('id')
+    probe.style.cssText += ';position:absolute;inset:0 auto auto 0;width:max-content;min-width:0;max-width:none;visibility:hidden;pointer-events:none'
+    cell.parentElement.append(probe)
+    const width = probe.getBoundingClientRect().width
+    probe.remove()
+    return width
   }
   const css = getComputedStyle(rows[0])
   const count = rows[0].children.length

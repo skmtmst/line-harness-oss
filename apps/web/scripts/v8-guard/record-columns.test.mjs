@@ -93,7 +93,7 @@ test('内容に合わせてメールを広げ、短い状態列を縮める。�
     const page = await browser.newPage()
     for (const width of [1024, 1152, 1440]) {
       await page.setViewportSize({ width, height: 900 })
-      await page.setContent('<style>*{box-sizing:border-box}.table{width:calc(100vw - 280px);font:14px Arial}.row{display:grid;grid-template-columns:var(--grid-table-content-columns,repeat(4,1fr));gap:16px;padding:0 24px}.text{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}</style><main><div class="table" role="table"><div class="row" role="row"><span role="columnheader">名前</span><span role="columnheader">メールアドレス</span><span role="columnheader">状態</span><span role="columnheader">最終ログイン</span></div><div class="row" role="row"><span>担当者</span><span><span class="text" title="long.member.name@example-company.test">long.member.name@example-company.test</span></span><span>有効</span><span>10/26 12:00</span></div></div></main>')
+      await page.setContent('<style>*{box-sizing:border-box}.table{width:calc(100vw - 280px);font:14px Arial}.row{display:grid;grid-template-columns:var(--grid-table-content-columns,repeat(4,minmax(0,1fr)));gap:16px;padding:0 24px}.text{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}</style><main><div class="table" role="table"><div class="row" role="row"><span role="columnheader">名前</span><span role="columnheader">メールアドレス</span><span role="columnheader">状態</span><span role="columnheader">最終ログイン</span></div><div class="row" role="row"><span>担当者</span><span><span class="text" title="long.member.name@example-company.test">long.member.name@example-company.test</span></span><span>有効</span><span>10/26 12:00</span></div></div></main>')
       assert.ok((await page.evaluate(scanOwner)).some(f => f.kind === 'table-unused-space'))
       await page.locator('.table').evaluate(fitGridContentColumns)
       assert.deepEqual(await page.evaluate(scanOwner), [])
@@ -124,5 +124,17 @@ test('狭くても操作列は縮めず、幅を往復し短い内容に変え�
     await page.locator('.text').last().evaluate(el => { el.textContent = 'a@b.test' })
     await page.locator('.table').evaluate(fitGridContentColumns)
     assert.notEqual(await page.locator('.table').evaluate(el => el.style.getPropertyValue('--grid-table-content-columns')), after)
+  } finally { await browser.close() }
+})
+
+test('札の印・余白まで本来の幅で測り、状態の札を省略しない', async () => {
+  const { fitGridContentColumns } = await import('../../src/components/shared/grid-content-columns.mjs')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<style>*{box-sizing:border-box}.table{width:760px;font:14px Arial}.row{display:grid;grid-template-columns:var(--grid-table-content-columns,repeat(3,minmax(0,1fr)));gap:16px}.pill{display:inline-flex;align-items:center;max-width:100%;padding:2px 10px;border-radius:99px;background:#eee}.pill::before{content:"";flex:none;width:8px;height:8px;margin-right:6px;border-radius:50%;background:green}.text{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}</style><main><div class="table" role="table"><div class="row" role="row"><span>名前</span><span>メール</span><span>状態</span></div><div class="row" role="row"><span>担当者</span><span><span class="text">member@example.test</span></span><span><span class="pill"><span class="text">有効</span></span></span></div></div></main>')
+    await page.locator('.table').evaluate(fitGridContentColumns)
+    const pill = await page.locator('.pill .text').evaluate(el => ({ scroll: el.scrollWidth, client: el.clientWidth }))
+    assert.ok(pill.scroll <= pill.client, JSON.stringify(pill))
   } finally { await browser.close() }
 })
