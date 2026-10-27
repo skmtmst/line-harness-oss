@@ -68,7 +68,7 @@ type RunItem = EcNotificationRun & {
 
 const STATUS: Record<EcNotificationRun['status'], { label: string; tone: 'good' | 'info' | 'muted' | 'danger' }> = {
   pending: { label: '送信処理中', tone: 'info' },
-  accepted: { label: 'LINEが受け付けた', tone: 'good' },
+  accepted: { label: 'LINEが受け付けました', tone: 'good' },
   excluded: { label: '送信対象外', tone: 'muted' },
   failed: { label: '送れなかった', tone: 'danger' },
 }
@@ -268,7 +268,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           {(detail.attemptHistory?.length ?? 0) > 0 ? (
             <ul className={styles.runAttempts} aria-label="試行の履歴">
               {detail.attemptHistory!.map((attempt) => (
-                <li key={`${detail.id}-${attempt.number}`}>{`${attempt.number} 回目 ${shortJst(attempt.attemptedAt)}／${attempt.outcome === 'provider_accepted' ? 'LINEが受け付けた' : attempt.error || '送信失敗'}`}</li>
+                <li key={`${detail.id}-${attempt.number}`}>{`${attempt.number} 回目 ${shortJst(attempt.attemptedAt)}／${attempt.outcome === 'provider_accepted' ? 'LINEが受け付けました' : attempt.error || '送信失敗'}`}</li>
               ))}
             </ul>
           ) : <p className={styles.minor}>試行の履歴はまだありません。</p>}
