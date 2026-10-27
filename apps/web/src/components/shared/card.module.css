@@ -221,7 +221,7 @@ html:root .headerContent .meta { display: flex; flex-direction: column; align-it
 /* 固定HTMLの枠は内側のoutline。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
 html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']):where(:not([data-card-frame='ring'])) {
   border: 0;
-  outline: 1px solid var(--surface-edge);
+  outline-color: transparent;
   outline-offset: -1px;
 }
 html:root .paddingCompact { padding: var(--space-16); }

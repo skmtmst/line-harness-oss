@@ -1,5 +1,7 @@
 'use client'
 
+import Card from '@/components/shared/card'
+
 import { PageContent } from '@/components/templates/page-frame'
 
 /*
@@ -294,7 +296,7 @@ function BillingInner() {
           const price = billingPlanPrice(plan, interval)
           const isCurrent = plan.key === currentKey
           return (
-            <section key={plan.key} className={isCurrent ? `${styles.plan} ${styles.planCurrent}` : styles.plan} aria-current={isCurrent ? 'true' : undefined}>
+            <Card as="section" layout="vertical" padding="default" gap="normal" key={plan.key} aria-current={isCurrent ? 'true' : undefined}>
               <div className={styles.planHead}>
                 <h2 className={styles.planName}>{plan.name}</h2>
                 {plan.recommended ? <span className={styles.badge}>おすすめ</span> : null}
@@ -342,11 +344,12 @@ function BillingInner() {
                 ) : null}
                 {!price.available && !isCurrent && !changeRoute ? <p className={styles.planNote}>価格がまだ設定されていません</p> : null}
               </div>
-            </section>
+            </Card>
           )
         })}
       </div>
 
+      <p className={styles.note}>数は目安です</p>
       {blockedNote ? <p className={styles.note} data-design="Note">{blockedNote}</p> : null}
 
       <ConfirmDialog
