@@ -14,14 +14,14 @@
 .tooltip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); z-index: 2; background: var(--color-ink); color: var(--color-canvas); padding: 6px 8px; border-radius: var(--radius-mini); font-size: 12px; white-space: nowrap; }
 .hit:hover .tooltip, .hit:focus-visible .tooltip { display: block; }
 .axis { position: absolute; top: calc(100% + 8px); left: 0; right: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--color-ink-faint); }
-.funnel { display: flex; flex-direction: column; gap: 12px; }
+.funnel { --chart-funnel-label-w: 140px; --chart-funnel-track-min: 20px; display: grid; gap: 12px; }
 /* 段の行は枠の無い行。棒は LINE の緑、選んだ段は薄い緑の地と濃い緑の棒。 */
-.funnelRow { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; border: 0; background: transparent; border-radius: var(--radius-control); padding: 12px; color: var(--color-ink); font-size: 12px; }
+.funnelRow { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; text-align: left; gap: 12px; width: 100%; min-width: 0; border: 0; background: transparent; border-radius: var(--radius-control); padding: 12px; color: var(--color-ink); font-size: 12px; }
 .funnelRow[aria-pressed='true'] { background: var(--color-accent-soft); }
 .funnelBar { background: var(--color-accent); }
 .funnelRow[aria-pressed='true'] .funnelBar { background: var(--color-accent-deep); }
 .label { width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.track { flex: 1; min-width: 20px; background: var(--color-canvas-sunken); border-radius: var(--radius-chart-bar); height: 16px; overflow: hidden; }
+.track { min-width: 0; background: var(--color-canvas-sunken); border-radius: var(--radius-chart-bar); height: 16px; overflow: hidden; }
 .track span { display: block; height: 100%; }
 .line { display: block; width: 100%; height: 200px; overflow: visible; }
 .line text { fill: var(--color-ink-faint); font-size: 12px; }

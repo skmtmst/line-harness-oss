@@ -132,8 +132,7 @@
 .progressPanel h2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; }
 .progressRow { display: flex; align-items: center; gap: var(--tpl-htn-panel-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); }
 /* 絵：棒は高さ 8・地は薄い灰（#fafafc）。 */
-.progressTrack { flex: 1; height: var(--tpl-htn-dist-progress-h); border-radius: var(--tpl-htn-radius-pill); background: var(--tpl-htn-soft-bg); overflow: hidden; }
-.progressFill { display: block; height: 100%; border-radius: var(--tpl-htn-radius-pill); background: var(--color-accent-deep); }
+.progressBar { flex: 1; }
 
 /* 下の帯：本文のすぐ下・長いときは画面の下に追従。ボタンは中央。 */
 .footer {

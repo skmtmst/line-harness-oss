@@ -64,9 +64,8 @@ describe('V8 登録メディア一覧の契約', () => {
     expect(PAGE).toContain("{ value: 'near-limit', label: '上限に近いものだけ' }")
     expect(PAGE).toContain('setShowNearLimitOnly(true)')
     expect(PAGE).toContain('nearLimitOnly: showNearLimitOnly')
-    // 棒と残量とstate別の案内は案内側に寄せている。
+    // 棒と残量とstate別の案内は案内側に寄せている（棒が出ることは media-quota-guidance.test.tsx が画面で確かめる）。
     expect(GUIDANCE).toContain('quota.remainingBytes')
-    expect(GUIDANCE).toContain('style={{ width')
     expect(GUIDANCE).toContain('80%以上')
     expect(GUIDANCE).toContain('上限に達しました')
   })

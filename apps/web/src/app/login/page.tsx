@@ -2,7 +2,6 @@
 
 import { beginAdminLoginHandoff, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import LineLoginMark from '@/components/auth/line-login-mark'
@@ -11,10 +10,13 @@ import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
+import TextLink from '@/components/shared/text-link'
+import { AuthSubmit } from '@/components/templates/auth-page'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, emailError, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import { useBrand } from '@/lib/use-brand'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -35,6 +37,7 @@ const EMPTY_PASSWORD_MESSAGE = 'パスワードを入力してください'
  * パスワードのあとに既存の 6 桁コードの画面へ。
  */
 export default function LoginPage() {
+  const brand = useBrand()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
@@ -125,11 +128,17 @@ export default function LoginPage() {
     window.location.assign(`${apiUrl}/api/auth/line?${new URLSearchParams({ handoff: beginAdminLoginHandoff(), ...(remember ? { remember: '1' } : {}) })}`)
   }
 
+  // 入れ終わるまでは押せない形（本物の緑を薄く）にし、下の灰の 1 行で理由を言う。送る時の検査はそのまま。
+  const missingInput = !email.trim() || !password
+  const submitReason = missingInput && busy === null ? 'メールアドレスとパスワードを入れると押せます' : null
+
   return (
     <AuthCard
       node="UufG8"
       cardNode="m3tWJ"
       title="ログイン"
+      brandName={brand.name ?? undefined}
+      step={{ current: 1, total: 2 }}
       description={
         <>
           メールアドレスとパスワードでログインします。<br />
@@ -158,9 +167,9 @@ export default function LoginPage() {
           label="パスワード"
           htmlFor="login-password"
           action={
-            <Link href="/password/forgot" className="shrink-0 whitespace-nowrap text-body font-medium text-accent-deep hover:underline">
+            <TextLink inline href="/password/forgot">
               パスワードを忘れた方
-            </Link>
+            </TextLink>
           }
         >
           <PasswordField id="login-password" value={password} onChange={handlePasswordChange} autoComplete="current-password" />
@@ -170,8 +179,10 @@ export default function LoginPage() {
           checked={remember}
           onCheckedChange={setRemember}
         >この端末では7日間ログインを保持する</Checkbox>
-        <Button fullWidth type="submit" variant="primary" disabled={busy !== null || !TURNSTILE_SITE_KEY} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
-        </Button>
+        <AuthSubmit reasonId="login-submit-reason" reason={submitReason}>
+          <Button fullWidth type="submit" variant="primary" disabled={busy !== null || !TURNSTILE_SITE_KEY || missingInput} aria-describedby={submitReason ? 'login-submit-reason' : undefined} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
+          </Button>
+        </AuthSubmit>
       </form>
 
       <div className="flex w-full items-center gap-3" aria-hidden="true">
@@ -184,11 +195,11 @@ export default function LoginPage() {
         <LineLoginMark className="h-4.5 w-4.5" />LINE でログイン
       </Button>
 
-      <p className="text-caption text-ink-faint">
+      <p className="text-center text-caption text-ink-faint">
         はじめての方は{' '}
-        <Link href="/register" className="font-semibold text-action hover:underline">
+        <TextLink inline href="/register">
           無料で始める
-        </Link>
+        </TextLink>
       </p>
     </AuthCard>
   )

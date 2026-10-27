@@ -35,22 +35,7 @@
   white-space: nowrap;
 }
 
-.track {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: var(--sc-track-h);
-  overflow: hidden;
-  border-radius: var(--polish-radius-pill);
-  background: var(--polish-hover);
-}
 
-.fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: var(--polish-radius-pill);
-  background: var(--color-accent);
-}
 
 .rows {
   display: flex;

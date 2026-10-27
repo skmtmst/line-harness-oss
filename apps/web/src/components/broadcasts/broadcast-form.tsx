@@ -1405,7 +1405,7 @@ export default function BroadcastForm({
       </Notice>
     )}
       </StepContent>
-      <BroadcastPreviewRail {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
+      <BroadcastPreviewRail {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
 
     <StickyBar className={styles.footer} status={currentStep && footerReason ? <span id="broadcast-footer-reason" role="note">{footerReason}</span> : undefined} actions={(
