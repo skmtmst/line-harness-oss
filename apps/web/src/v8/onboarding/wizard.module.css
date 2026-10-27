@@ -41,20 +41,9 @@
 }
 
 .track {
-  position: relative;
   flex: 1;
-  height: var(--ob-track-h);
-  overflow: hidden;
-  border-radius: var(--polish-radius-pill);
-  background: var(--polish-hover);
 }
 
-.fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: var(--polish-radius-pill);
-  background: var(--color-accent);
-}
 
 .where {
   display: flex;

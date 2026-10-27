@@ -4,24 +4,18 @@ import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mj
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+/*
+ * 登録の口が一般の登録（/accounts/new）へ行くことは、描いて見る試験が守る：
+ * hq-home-wiring-react（/hq）と open/hq-open-account-load-failure-react（/hq/open）。
+ * ここは飲食の店舗作成へ戻さない禁止の見張りだけを残す。
+ */
 const here = dirname(fileURLToPath(import.meta.url))
 const hqPage = readFileSync(join(here, '../../v8/hq/home.tsx'), 'utf8')
-const hqBrowser = hqPage
 const hqOpenPage = readFileSync(join(here, 'open', 'page.tsx'), 'utf8')
 
 describe('HQ account create entry', () => {
-  it('HQ page links to the general account flow', () => {
-    // 登録口は板  の左の列（一覧の部品）と、空のときの案内に置く。
-    assert.match(hqPage, /href="\/accounts\/new"/)
-    assert.match(hqBrowser, /href="\/accounts\/new"/)
-    assert.match(hqBrowser, /アカウントを登録/)
+  it('HQ の登録口を飲食の店舗作成へ戻さない', () => {
     assert.doesNotMatch(hqPage, /restaurant-test\/stores\/new/)
-    assert.doesNotMatch(hqBrowser, /restaurant-test\/stores\/new/)
-  })
-
-  it('HQ open page links to the general account flow', () => {
-    assert.match(hqOpenPage, /href="\/accounts\/new"/)
-    assert.match(hqOpenPage, /＋ ?LINEアカウントを登録する/)
     assert.doesNotMatch(hqOpenPage, /restaurant-test\/stores\/new/)
   })
 })

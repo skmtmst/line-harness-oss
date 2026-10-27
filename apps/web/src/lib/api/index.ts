@@ -620,6 +620,8 @@ export type {
   OpsDashboardPeriod,
   OpsDashboard,
   OpsLineUnregistered,
+  OpsFirstRunStage,
+  OpsFirstRunFunnel,
   OpsAnnouncementAudience,
   OpsAnnouncementChannel,
   OpsAnnouncementStatus,

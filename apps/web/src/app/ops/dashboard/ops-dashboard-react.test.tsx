@@ -8,6 +8,8 @@ import { contractDetail, deltaLabel, minutesLabel, revenueDetail, revenueSourceL
 import { formatBytes, formatYen, formatYenShort, niceCeiling } from '@/components/ops/ops-charts'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
+// 最初の10分の段は口も試験も別（v8/ops/first-run.test.tsx）。ここではダッシュボード本体の口だけを見る。
+vi.mock('@/v8/ops/dashboard/first-run', () => ({ default: () => null }))
 
 /** 現役V8でAPIの数・要対応・使用量と詳細情報、同期・再取得を守る。 */
 

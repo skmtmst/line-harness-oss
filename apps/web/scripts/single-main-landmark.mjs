@@ -11,6 +11,8 @@ const ALLOWED = [
   'v8/ops/login.tsx',
   'v8/ops/invite.tsx',
   'v8/ops/two-factor.tsx',
+  /* 電話の画面（/m）。app-shell は共通の枠を付けず電話の外枠だけで描く。 */
+  'components/templates/mobile-frame.tsx',
 ]
 const ALLOWED_DIRS = ['app/login/', 'app/staff/invite/', 'app/staff/email-change/', 'app/visual-qa/', 'v8/login/']
 /*

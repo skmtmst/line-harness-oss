@@ -42,6 +42,7 @@ import { styleSetupRead, styleSetupWrite } from './style-setup-fixtures.mjs'
 import { encodePng } from './v8-png.mjs'
 import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY, BILLING_METRICS } from './billing-fixture.mjs'
+import { opsFirstRunMock } from './ops-first-run-mock.mjs'
 import {
   mileageWriteResponse,
   MILEAGE_REWARDS,
@@ -3345,10 +3346,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       }
     }
   }
-  if (method === 'GET' && pathname === '/api/ops/dashboard') {
-    const period = query.get('period')
-    const selected = period === 'prev_month' || period === 'year' ? period : 'month'
-    return { success: true, data: { ...OPS_DASHBOARD, period: selected } }
+  if (method === 'GET' && (pathname === '/api/ops/dashboard' || pathname === '/api/ops/dashboard/first-run')) {
+    const selected = ['prev_month', 'year'].includes(query.get('period')) ? query.get('period') : 'month'
+    return { success: true, data: pathname === '/api/ops/dashboard' ? { ...OPS_DASHBOARD, period: selected } : opsFirstRunMock(selected) }
   }
   if (method === 'GET' && pathname === '/api/ops/dashboard/line-unregistered') {
     return { success: true, data: OPS_LINE_UNREGISTERED }
@@ -4120,13 +4120,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (chat) {
     // 一覧と同じ行を返す。`{items,total}` のままだと、開いた会話の名前が
     // `undefined` になり `friendName.charAt(0)` で落ちる。
-    const row = CHATS.find((c) => c.id === chat[1])
+    const row = CHATS.find((c) => c.id === chat[1] || c.friendId === chat[1]) // 本物の口と同じく友だちの ID でも開け、その ID を返す
     if (row) {
       const friend = FRIEND_DETAILS[row.friendId]
       return {
         success: true,
         data: {
-          ...row,
+          ...row, ...(row.friendId === chat[1] ? { id: chat[1] } : {}),
           friendRealName: friend?.realName ?? null,
           isAttention: friend?.metadata?.__attention === '1',
           messages: FRIEND_MESSAGES[row.friendId] ?? [],

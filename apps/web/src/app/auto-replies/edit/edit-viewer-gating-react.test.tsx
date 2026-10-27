@@ -2,14 +2,10 @@
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: null, loading: false, accounts: [{ id: 'account-1' }] }) }))
 /*
  * R527: 作成・編集のURLを直接開いた見るだけ（staff）にも保存の入口を出さない。
- * owner には出す。実マウントと文字契約で固定する。
+ * owner には出す。実マウントで固定する。
  */
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { join as sourceJoin } from 'node:path'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AutoReplyEditPage from './page'
 
@@ -87,26 +83,5 @@ describe('R527 編集URLの出し分け（役割×操作）', () => {
     expect(host.textContent).not.toContain(
       'オーナーか管理者に頼んでください',
     )
-  })
-})
-
-/*
- * 直しを戻すと赤くなる文字契約。実マウントの試験が本命で、
- * こちらは分岐の削除・無条件表示への戻しを見張る。
- */
-const HERE = __dirname
-const PAGE = readFileSync(sourceJoin(__dirname, '../../../v8/auto-replies/edit/wizard.tsx'), 'utf8')
-
-describe('R527 編集URLの出し分け契約', () => {
-  it('変更の可否は共通の出し分けで決める', () => {
-    expect(PAGE).toContain("from '@/lib/staff-role'")
-    expect(PAGE).toContain('useStaffRole')
-    expect(PAGE).toContain("useFeatureAccess('autoReplies')")
-  })
-
-  it('手順と編集窓が canManage で守られている', () => {
-    expect(PAGE).toContain('if (!canManage)')
-    expect(PAGE).toContain('kind="forbidden"')
-    expect(PAGE).toContain('オーナーか管理者に頼んでください')
   })
 })

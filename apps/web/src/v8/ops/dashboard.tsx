@@ -11,6 +11,7 @@ import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { formatYen, formatBytes } from '@/components/ops/ops-charts'
 import { contractDetail, minutesLabel, revenueDetail } from '@/v8/ops/dashboard/format'
+import OpsFirstRunCard from '@/v8/ops/dashboard/first-run'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
@@ -228,6 +229,8 @@ export default function OpsDashboardV8() {
               ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </Card>
           ]}</DashboardColumns>
+
+          <OpsFirstRunCard period={period} />
         </div>
       )}
 

@@ -7,21 +7,15 @@ const listPage = read('../../../v8/hq-banners/list.tsx')
 const projectPage = read('../../../v8/hq-banners/project.tsx')
 const panel = read('../../../components/hq/banners/generation-panel.tsx')
 const modal = read('../../../v8/hq-banners/image-detail.tsx')
-const frame = read('../../../v8/hq-banners/frame.tsx')
-const dialog = read('../../../components/shared/dialog.tsx')
-const dialogCss = read('../../../components/shared/dialog.module.css')
-const picker = read('../../../components/shared/hq-account-picker.tsx')
-const projects = listPage
-const library = listPage
-const shell = listPage
-/* ★V8 のプロジェクトの中。承認済み ★BG-B `qIp42` に合わせた言葉と見出しの見張りに使う。 */
-const v8Project = read('../../../v8/hq-banners/project.tsx')
-const banners = [listPage, projectPage, panel, modal, projects, library, shell]
+const banners = [listPage, projectPage, panel, modal]
 
 /**
  * 統括のバナー生成の画面が、設計と共通ルールから外れていないかを見張る。
  * 動きの正本は `docs/hq-banner-generation.md`、見た目の正本は Pencil ★V8（`docs/v8-design-rules.md`）。
- * 当時の下書き 管理画面-35 は本線に入らなかった（原本なし）。
+ * 行き先・タブ・権限・空・生成・やめる・参照画像は描いて押す試験が見る：
+ * banners-flow-react・components/hq/banners/generation-panel-v8-react・generation-panel・reference-picker-v8・
+ * image-detail-tags-v8・image-detail-modal、v8/hq-banners/list・project。
+ * ここに残すのは、メニューの定義と、戻してはいけない古い形の禁止の見張りだけ。
  */
 describe('統括 バナー生成', () => {
   it('統括メニューに「バナー生成」があり、行き先は /hq/banners', () => {
@@ -29,110 +23,24 @@ describe('統括 バナー生成', () => {
     expect(item?.href).toBe('/hq/banners')
   })
 
-  it('詳細はクエリ（?id=）で表し、動的セグメントを作らない', () => {
-    expect(projects).toContain('/hq/banners/project?id=')
-    expect(library).toContain('/hq/banners/project?id=')
-    expect(projectPage).toContain("params.get('id')")
-  })
-
-  it('タブは ?tab= で切り替え、履歴を積まない（replace）', () => {
-    expect(listPage).toContain("params.get('tab') === 'library'")
-    expect(listPage).toContain("samePageUrl.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')")
-    expect(shell).not.toMatch(/href:\s*'\/hq\/banners/)
-  })
-
-
-  it('生成パネルに品質やクレジットの選択を置かない（2026-09-12 決定）', () => {
+  it('生成パネルに品質やクレジットの選択・生成ボタン・用途のプルダウンを戻さない（2026-09-12 決定）', () => {
     const withoutComments = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     expect(withoutComments).not.toMatch(/品質|クレジット|高精細|quality/)
-    for (const label of ['出力サイズ', '画像に入れるテキスト', 'カラー', '人物', '追加の指示', '枚数']) {
-      expect(panel).toContain(label)
-    }
-    // 色は4つの役割（ベース・メイン・サブ・強調）を COLOR_ROLES から並べる（★BG-B `KkTNS`）
-    expect(panel).toContain('COLOR_ROLES.map')
-    expect(panel).toContain('4つの役割で指定します')
-  })
-
-  it('生成条件を登録し、保存済みの生成状態を読み直す。失敗は理由を出す', () => {
-    expect(projectPage).toContain('api.hqBanners.projects.createGeneration(')
-    expect(projectPage).toContain('api.hqBanners.generations.get(current.id)')
-    expect(projectPage).toContain("if (!['queued', 'running'].includes(current.status)) break")
-
-    expect(projectPage).toContain('api.hqBanners.generations.cancel(running.id)')
-    // 画面を離れて戻ったとき、途中の生成があれば続きから動かす
-    expect(projectPage).toContain('activeGeneration(generations)')
-  })
-
-  it('保存・実行は下部追従バーにしか置かない', () => {
-    expect(projectPage).toContain('<StickyBar')
-    // ボタン「生成する（N 枚）」は描いた画面で src/v8/hq-banners/project.test.tsx が見る。
-    expect(projectPage).toContain('生成をやめる')
-    expect(projectPage).toContain('条件をクリア')
     expect(panel).not.toMatch(/生成する/)
+    expect(panel).not.toContain('用途を選んでください')
   })
 
-  it('V8（iMnph）は外枠に板IDを付け、切り替えに件数を出す', () => {
-    expect(projectPage).toContain("'iMnph'")
-    expect(projectPage).toContain('画像を押すと詳細')
-    for (const label of ['すべて', 'お気に入り', '配布済み']) {
-      expect(projectPage).toContain(label)
-    }
-  })
-
-  /*
-   * 承認済み ★BG-B `qIp42` にあって実装に無かった2つ（2026-10-08 に足した）。
-   * `ta8eS`「利用量」＝パネルの棒の上の見出し。共通部品の既定は変えず、名前（`usageHeading`）を1つ足して
-   * 板がそう描いている V8 だけが渡す。`b1So7a`「生成する（2枚）」＝下の帯のボタンで、管理画面 と同じ言葉。
-   * パネルの見出し `S0ay0i`「画像を生成」とは別なので、パネル側に「生成する」は入れない（上の it が見張る）。
-   */
-  it('V8 は板 qIp42 の「利用量」と「生成する（N枚）」を持ち、既存の生成処理を使う', () => {
-    expect(panel).toContain('usageHeading')
-    expect(panel).toContain('利用量')
-    expect(v8Project).toContain('usageHeading')
-    expect(projectPage).toContain('usageHeading')
-  })
-
-  it('モーダルは全面1枚のオーバーレイで、幅は max-width（1920/1160 の固定幅を書かない）', () => {
-    expect(frame).toContain('<Dialog')
-    expect(dialogCss).toMatch(/position:\s*fixed/)
-    expect(dialogCss).toMatch(/width:\s*min\(/)
+  it('詳細の窓に固定幅を書かない（1920/1160）', () => {
     expect(modal).not.toMatch(/width:\s*1160|width:\s*1920/)
-    expect(dialog).toContain('useOverlayFocus')
   })
 
-  it('アカウントへ渡すは、渡し済みのアカウントを灰色にして二度渡さない', () => {
-    expect(modal).toContain('delivered.has(account.id)')
-    expect(modal).toContain('disabledIds={image.deliveredAccountIds}')
-    expect(picker).toContain('disabledIds.includes(account.id)')
-    expect(modal).toContain('配布済み')
-    expect(modal).toContain('アカウントへ配る')
-  })
-
-  it('「削除」ではなく「一覧から外す」「アーカイブ」と言う', () => {
+  it('「削除」と言わない・準備中のボタンを置かない・選べないプルダウンを出さない', () => {
     for (const source of banners) {
       expect(source).not.toMatch(/>削除</)
-    }
-    expect(modal).toContain('一覧から外す')
-    expect(projectPage).toContain('アーカイブする')
-  })
-
-  it('空・読込中・失敗・権限不足は共通の ListState で出す', () => {
-    for (const source of [projects, library, projectPage]) {
-      expect(source).toContain('kind="loading"')
-      expect(source).toContain('kind="error"')
-      expect(source).toContain('kind="forbidden"')
-      expect(source).toContain('kind="empty"')
-    }
-    expect(projects).toContain('まだプロジェクトがありません')
-    expect(projects).toContain('最初のプロジェクトを作る')
-  })
-
-  it('使えない操作を置かない（準備中のボタンが無い）', () => {
-    for (const source of banners) {
       expect(source).not.toMatch(/準備中/)
     }
     // 画像ライブラリの並び順は1種類しか無いので、選べないプルダウンを出さない
-    expect(library).not.toContain('<SelectField')
+    expect(listPage).not.toContain('<SelectField')
   })
 
   it('Tailwind の任意値記法を使わない（規格外の値が普通のクラスに見える）', () => {
@@ -140,47 +48,5 @@ describe('統括 バナー生成', () => {
       const arbitrary = source.match(/className="[^"]*\[[^"]*"/g) ?? []
       expect(arbitrary).toEqual([])
     }
-  })
-
-  it('出力サイズ（★BG-B `xy4EW`）: LINE の規格をカードで並べ、ほかの用途は畳む', () => {
-    expect(panel).toContain('data-design-node="xy4EW"')
-    expect(panel).toContain('LINEの規格から選ぶ')
-    expect(panel).toContain('ほかの用途から選ぶ（Instagram・X・OGPなど）')
-    // プルダウンではなく共通のラジオカードで出す（選択中は淡い緑）
-    expect(panel).toContain('presetCardLabel')
-    expect(panel).toContain('presetSizeLabel')
-    expect(panel).not.toContain('用途を選んでください')
-  })
-
-  it('追加の指示（★BG-B `dT1xq`）: 任意であることと文字数の上限を添える', () => {
-    expect(panel).toContain('note={`任意・${CUSTOM_PROMPT_MAX}文字まで`}')
-    expect(panel).toContain('例: 桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気')
-  })
-
-  it('参照画像（★BG-B `L1ax1Y`）: 最大 3 枚、1 枚ずつ使い方を決められる', () => {
-    expect(panel).toContain('ライブラリから選ぶ')
-    expect(panel).toContain('ファイルを選ぶ')
-    expect(panel).toContain('data-design-node="L1ax1Y"')
-    // 使い方の説明は選ぶ前から読める（★BG-B `R6MBHf`）
-    expect(panel).toContain('data-design-node="R6MBHf"')
-    expect(panel).toContain('BANNER_REFERENCE_MODE_DESCRIPTION')
-    expect(panel).toContain('BANNER_MAX_REFERENCE_IMAGES')
-    expect(panel).toContain("accept=\"image/png,image/jpeg,image/webp\"")
-    expect(modal).toContain('参照画像にする')
-  })
-
-  it('参照画像を選ぶ（★BG-C `cOgWE`）: 複数選択して使い方つきで返す', () => {
-    const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
-    // 板IDは承認時に ★V8  から ★BG-C `cOgWE` へ改名した（同じダイアログ）
-    expect(picker).toContain('designNode="cOgWE"')
-    // 複数選択・選択順・使い方の受渡しはreference-picker-v8.test.tsxが実DOMで検証する。
-    expect(picker).toContain('data-design-node="JOi8G"')
-    expect(picker).toContain('選んだ画像の使い方')
-    expect(picker).toContain('枚を使う')
-    expect(picker).toContain('この画像を使う')
-    expect(picker).toContain('ファイルを選ぶ')
-    // 手元のファイルはプロジェクトへ取り込んでから参照にする（ライブラリにも残る）
-    expect(projectPage).toContain('const uploadReference = async (file: File)')
-    expect(projectPage).toContain('if (uploaded) addReference(uploaded)')
   })
 })

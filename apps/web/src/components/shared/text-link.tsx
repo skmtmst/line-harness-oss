@@ -10,7 +10,9 @@ import styles from './text-link.module.css'
  * 文字 12px/500 の緑のリンクの右に小さな矢印が付く。乗せると矢印が
  * 2px 右に滑る（120ms）。「受信箱で開く」「配信設定へ」など、
  * 行き先を示す小さな導線に使う。
- * `inline` は本文内のリンクで、矢印を付けず周りと同じ大きさにする。
+ *
+ * `inline` は本文の中のリンク（「パスワードを忘れた方」「無料で始める」など）。
+ * 矢印を付けず、周りの文字の大きさのまま緑の文字にし、乗せると下線。
  */
 export default function TextLink({
   href,
@@ -24,9 +26,9 @@ export default function TextLink({
 }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
   tone?:'action'
   iconTone?: 'link'
-  /** 本文内のリンク。矢印なし・周りと同じ大きさ。 */
-  inline?: boolean
   external?: boolean
+  /** 本文の中のリンク。矢印なし・周りの文字の大きさのまま。 */
+  inline?: boolean
   href: string
   children: React.ReactNode
   className?: string

@@ -341,7 +341,11 @@ export async function setMileageManualAdjustmentPolicy(
 
 /** 初期セットは実際に保存された機能の束があるときだけ完了。 */
 export async function hasSavedFeatureConfiguration(db: D1Database, accountId: string): Promise<boolean> {
-  const value = await getAccountSetting(db, accountId, 'feature.settings_bundle_v1');
+  return isSavedFeatureConfiguration(await getAccountSetting(db, accountId, 'feature.settings_bundle_v1'));
+}
+
+/** 保存された機能の束の値が「済み」と言える形か。全アカウントの集計も同じ判定を使う。 */
+export function isSavedFeatureConfiguration(value: string | null | undefined): boolean {
   if (!value) return false;
   try {
     const data = JSON.parse(value);

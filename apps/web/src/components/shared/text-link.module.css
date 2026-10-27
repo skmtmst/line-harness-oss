@@ -62,6 +62,7 @@
 .root { position: relative; }
 .root::before { content: ''; position: absolute; inset-inline: 0; inset-block: min(0px, calc((100% - var(--polish-hit-min)) / 2)); }
 
+/* 本文の中のリンク：矢印なし・周りの文字の大きさと行の高さのまま・緑・乗せると下線・語の途中で折らない。 */
 .root[data-inline] { display: inline; color: var(--color-link); white-space: nowrap; }
 .root[data-inline] .label { font-size: inherit; line-height: inherit; }
 .root[data-inline]:hover { text-decoration: underline; }
