@@ -806,5 +806,6 @@
 - [最初の10分の全アカウントのまとめ（運営だけ）](release-log/unreleased/1843-kenta-funnel-summary.md)
 - [状態の札を地の色のある札にそろえた](release-log/unreleased/1842-kenta-status-chip.md)
 - [ダッシュボードの数を4枚にそろえ、いつもと違う端末の知らせを見やすい場所に移した](release-log/unreleased/1844-kenta-dashboard-kpi.md)
+- [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
