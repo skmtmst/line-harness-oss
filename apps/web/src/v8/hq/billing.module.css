@@ -11,6 +11,9 @@
 
 /* 契約の帯（灰の地・角丸8・12/18） */
 .contract {
+  display: flex;
+  align-items: center;
+  gap: var(--polish-space-row);
   margin: 0;
   padding: var(--tpl-hq-contract-pad);
   border-radius: var(--radius-control);
