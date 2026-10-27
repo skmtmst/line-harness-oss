@@ -161,7 +161,7 @@ describe('結果が分からない失敗を無条件に送り直さない', () =
     expect(document.body.textContent).toContain('「予約台帳」へ届いたかどうか分かっていません。')
     await act(async () => { confirm.click() })
     expect(retries().map((call) => [call.url, call.body])).toEqual([
-      ['http://worker.test/api/webhooks/interactions/wi-1/retry?lineAccountId=account-a', { confirmed: true }],
+      [`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/interactions/wi-1/retry?lineAccountId=account-a`, { confirmed: true }],
     ])
   })
 
@@ -182,7 +182,7 @@ describe('結果が分からない失敗を無条件に送り直さない', () =
       : undefined
     await render()
     await act(async () => { buttonByText('失敗したものをまとめてやり直す')!.click() })
-    expect(retries().map((call) => call.url)).toEqual(['http://worker.test/api/webhooks/interactions/retry-failed?lineAccountId=account-a'])
+    expect(retries().map((call) => call.url)).toEqual([`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/interactions/retry-failed?lineAccountId=account-a`])
     expect(notice()).toContain('まだ失敗のまま残っているものが3 件あります。もう一度押すと続きをやり直します。')
     expect(notice()).toContain('届いたか分からないものが1 件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。')
   })

@@ -140,7 +140,7 @@ describe('削除は共通の確認窓を通し、対象アカウントで削除�
     expect(box.textContent).toContain('すでに送った記録は残ります。')
     expect(box.textContent).toContain('この操作は取り消せません。')
     await act(async () => { confirmButton('削除する').click() })
-    expect(deletes().map((call) => call.url)).toEqual(['http://worker.test/api/webhooks/outgoing/out-1?lineAccountId=account-a'])
+    expect(deletes().map((call) => call.url)).toEqual([`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/outgoing/out-1?lineAccountId=account-a`])
     await vi.waitFor(() => expect(dialog()).toBeNull())
   })
 
@@ -157,7 +157,7 @@ describe('削除は共通の確認窓を通し、対象アカウントで削除�
     expect(box.textContent).toContain('すでに受け取った記録は残ります。')
     expect(box.textContent).toContain('この操作は取り消せません。')
     await act(async () => { confirmButton('削除する').click() })
-    expect(deletes().map((call) => call.url)).toEqual(['http://worker.test/api/webhooks/incoming/in-1?lineAccountId=account-a'])
+    expect(deletes().map((call) => call.url)).toEqual([`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/incoming/in-1?lineAccountId=account-a`])
     await vi.waitFor(() => expect(dialog()).toBeNull())
   })
 
@@ -400,7 +400,7 @@ describe('試し送信は送り先を確かめてから送る', () => {
     expect(box.querySelector('code')?.textContent).toBe('https://crm.example.com/line/hook?token=secret-path')
     route = (url, method) => method === 'POST' && url.includes('/test') ? json({ success: true, data: { delivered: true, responseStatus: 200 } }) : undefined
     await act(async () => { confirmButton('この送り先へ送る').click() })
-    expect(writes().map((call) => call.url)).toEqual(['http://worker.test/api/webhooks/outgoing/out-1/test?lineAccountId=account-a'])
+    expect(writes().map((call) => call.url)).toEqual([`${process.env.NEXT_PUBLIC_API_URL}/api/webhooks/outgoing/out-1/test?lineAccountId=account-a`])
   })
 })
 
