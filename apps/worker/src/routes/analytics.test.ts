@@ -48,6 +48,7 @@ const mocks = {
   setAnalyticsReportScheduleStatus: vi.fn(),
   getStaffMembers: vi.fn(),
   createAnalyticsCrossAudience: vi.fn(),
+  addConversionDefinitionUsage: vi.fn(),
   getCurrentFunnelVersion: vi.fn(),
   getLineAccountById: vi.fn(),
   getLineAccounts: vi.fn(),
@@ -934,6 +935,66 @@ describe('ファネルAPI', () => {
       windowDays: 14, steps: body.steps,
     });
     expect(version.status).toBe(422);
+  });
+
+  describe('段の成果地点への利用先記録', () => {
+    const conversionSteps = [
+      { label: '追加', kind: 'friend_add', match: {} },
+      { label: '購入', kind: 'conversion', match: { conversionPointId: 'cp-1' } },
+    ];
+    // 成果地点の版と名前だけを返す DB（利用先記録の CAS が読む）。
+    const pointEnv = {
+      DB: {
+        prepare: (sql: string) => ({
+          bind: () => ({
+            first: async () => sql.includes('FROM conversion_points') ? { version: 3, name: '購入完了' } : null,
+          }),
+        }),
+      } as unknown as D1Database,
+    };
+    const send = (path: string, payload: unknown) => app.fetch(
+      new Request(`https://example.com${path}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      }),
+      pointEnv,
+    );
+
+    it('作成と新版は、下書き・停止中の地点にも allowInactive で記し、成功なら断りを返さない', async () => {
+      mocks.createVersionedFunnel.mockResolvedValueOnce({
+        funnelId: 'fn-v6', version: { id: 'fv-1', versionNumber: 1, steps: conversionSteps },
+      });
+      const created = await send(`/api/analytics/funnels?${ACCOUNT}`, { name: '購入まで', windowDays: 14, steps: conversionSteps });
+      expect(created.status).toBe(201);
+      expect(await created.json()).toMatchObject({ success: true, data: { funnelId: 'fn-v6', usageWarnings: [] } });
+      expect(mocks.addConversionDefinitionUsage).toHaveBeenCalledWith(pointEnv.DB, expect.objectContaining({
+        conversionPointId: 'cp-1', lineAccountId: 'account-a', expectedVersion: 3,
+        refKind: 'analytics', refId: 'fn-v6', refVersionId: 'fv-1', allowInactive: true,
+      }));
+
+      mocks.createFunnelVersion.mockResolvedValueOnce({ id: 'fv-2', versionNumber: 2, steps: conversionSteps });
+      const version = await send(`/api/analytics/funnels/fn-v6/versions?${ACCOUNT}`, { windowDays: 14, steps: conversionSteps, expectedVersionNumber: 1 });
+      expect(version.status).toBe(201);
+      expect(await version.json()).toMatchObject({ data: { id: 'fv-2', usageWarnings: [] } });
+      expect(mocks.addConversionDefinitionUsage).toHaveBeenLastCalledWith(pointEnv.DB, expect.objectContaining({
+        refId: 'fn-v6', refVersionId: 'fv-2', allowInactive: true,
+      }));
+    });
+
+    it('記録に失敗した地点は作成を失敗にせず、地点名を応答の usageWarnings に載せる', async () => {
+      mocks.createVersionedFunnel.mockResolvedValueOnce({
+        funnelId: 'fn-v6', version: { id: 'fv-1', versionNumber: 1, steps: conversionSteps },
+      });
+      mocks.addConversionDefinitionUsage.mockRejectedValue(new Error('conversion_definition_inactive'));
+      const created = await send(`/api/analytics/funnels?${ACCOUNT}`, { name: '購入まで', windowDays: 14, steps: conversionSteps });
+      expect(created.status).toBe(201);
+      expect(await created.json()).toMatchObject({ success: true, data: { funnelId: 'fn-v6', usageWarnings: ['購入完了'] } });
+
+      mocks.createFunnelVersion.mockResolvedValueOnce({ id: 'fv-2', versionNumber: 2, steps: conversionSteps });
+      const version = await send(`/api/analytics/funnels/fn-v6/versions?${ACCOUNT}`, { windowDays: 14, steps: conversionSteps, expectedVersionNumber: 1 });
+      expect(version.status).toBe(201);
+      expect(await version.json()).toMatchObject({ data: { usageWarnings: ['購入完了'] } });
+      mocks.addConversionDefinitionUsage.mockReset();
+    });
   });
 });
 

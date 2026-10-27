@@ -51,18 +51,13 @@ describe('Issue #637 h1は1画面に1つ', () => {
   })
 
   it('本文見出しをh1に戻さない（重複が直った画面はh2版を使う）', () => {
-    expect(read('v8/nen-campaigns/list.tsx')).toContain('<ListPage')
+    // 画面の題（h1）が1つだけなのは、描いて数える試験が守る：
+    // NEN配信の一覧は v8/nen-campaigns/list.test.tsx、EC連携は app/ec-commerce/ec-connector-v8.test.tsx。
     // 上の帯のパンくずは見出しにしない。画面の題（h1）は本文の頭が持つ。
     expect(read('components/shared/top-bar.tsx').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')).not.toMatch(/<h1[\s>]/)
-    for (const rel of ['v8/settings/ec-commerce/screen.tsx']) {
-      const src = read(rel)
-      expect(src, rel + ' が共有PageHeader（h1）へ戻っている').toContain(
-        "SbSettingsScreen",
-      )
-      expect(src, rel + ' が共有PageHeader（h1）へ戻っている').not.toContain(
-        "@/components/shared/page-header",
-      )
-    }
+    expect(read('v8/settings/ec-commerce/screen.tsx'), '共有PageHeader（h1）へ戻っている').not.toContain(
+      "@/components/shared/page-header",
+    )
   })
 
   it('/nen-members の深い画面（掲載管理・1枚表示）もh1を置かない', () => {
@@ -95,15 +90,7 @@ describe('Issue #637 画面名とナビ名の一致', () => {
     expect(menuLabel('/nen-members')).toBe('投稿')
     expect(menuLabel('/nen-campaigns')).toBe('NEN配信')
     expect(menuLabel('/ec-commerce')).toBe('EC連携')
-  })
-
-  it('独立したコンバージョンと成果・アフィリエイトが上部バーへ画面名を渡す', () => {
-    // タブ名を引く古い関数（conversions/conversions-tab-title.ts）はどの画面も使っていないので 2026-10-07 に消した。
-    // 画面名を渡すのは下の page.tsx と affiliates-v8.tsx（今の画面）。
-    const src = read('app/conversions/page.tsx')
-    expect(src).toContain("usePageTitle('コンバージョン')")
-    expect(src).toContain('router.replace(target)')
-    expect(src).toContain('`/affiliates?${params.toString()}`')
-    // 成果とアフィリエイトの画面名は entry-behavior.test.tsx で実入口を描画して確かめる。
+    // 入口が上の帯へこの名前を渡すことは、描いて確かめる：コンバージョンは
+    // conversions/conversion-points-rowmenu-react.test.tsx、成果とアフィリエイトは v8/affiliates/entry-behavior.test.tsx。
   })
 })
