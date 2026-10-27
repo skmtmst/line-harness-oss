@@ -105,6 +105,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                 menuCount={settings?.menuCount}
                 canEdit={canEditMenus}
                 onReload={reloadCore}
+                onOpenStaff={() => requestTab('staff')}
               />
             ) : tab === 'hours' ? (
               <HoursTabV8

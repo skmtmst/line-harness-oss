@@ -444,7 +444,7 @@
 .colStatus {
   display: flex;
   align-items: center;
-  width: var(--tpl-bm-96);
+  width: calc(var(--tpl-bm-160) + var(--tpl-bm-8));
   flex-shrink: 0;
 }
 
@@ -1137,37 +1137,6 @@
   margin-top: var(--tpl-bm-2);
   color: var(--color-ink-faint);
   font-size: var(--tpl-bm-12);
-}
-
-/* 見本：「つながっている」は薄緑の札＋緑の点。つないでいないは灰。 */
-.linkState {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-bm-5);
-  padding: var(--tpl-bm-2) var(--tpl-bm-8);
-  line-height: var(--tpl-bm-18);
-  border-radius: var(--radius-pill);
-  background: var(--color-v8-pill-off);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-12);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.linkStateDot {
-  width: var(--tpl-bm-6);
-  height: var(--tpl-bm-6);
-  border-radius: var(--radius-pill);
-  background: var(--color-ink-faint);
-}
-
-.linkStateOn {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.linkStateOn .linkStateDot {
-  background: var(--color-success);
 }
 
 .noteText {

@@ -1,7 +1,7 @@
 'use client'
 
 import { ProgressBar } from '@/components/shared/progress'
-import StatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import Link from '@/components/shared/list-navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Bell, Send, TriangleAlert, UserPlus } from 'lucide-react'
@@ -40,9 +40,9 @@ export function sectionUpdated(section: Section | undefined): string | null {
   return dashboardFreshnessText(section.freshness, section.asOf, section.reason)
 }
 
-/** 札（ の黄色い札）。tone で緑・赤も出す。 */
+/** 札（共通の状態の札）。既定は要確認の黄。tone で緑・赤も出す。 */
 export function Tag({ children, tone = 'warning' }: { children: ReactNode; tone?: 'warning' | 'success' | 'danger' }) {
-  return <span className={tone === 'success' ? `${styles.tag} ${styles.tagSuccess}` : tone === 'danger' ? `${styles.tag} ${styles.tagDanger}` : `${styles.tag} ${styles.tagWarning}`}>{children}</span>
+  return <StatusBadge tone={tone === 'warning' ? 'caution' : tone} size="compact">{children}</StatusBadge>
 }
 
 /** 鍵と値の1行。`href` があれば行ごと押せる（その状態で絞った一覧へ）。 */
@@ -56,8 +56,9 @@ export function KeyValue({ label, value, tone = 'default', dot, href, title }: {
 }) {
   const body = (
     <>
-      {dot ? <span className={dot === 'success' ? `${styles.dot} ${styles.dotSuccess}` : dot === 'danger' ? `${styles.dot} ${styles.dotDanger}` : dot === 'warning' ? `${styles.dot} ${styles.dotWarning}` : styles.dot} aria-hidden="true" /> : null}
-      <span className={styles.kvKey} title={typeof label === 'string' ? label : undefined}>{label}</span>
+      {dot
+        ? <span className={styles.kvKey}><StatusBadge tone={dot === 'faint' ? 'neutral' : dot === 'warning' ? 'caution' : dot}>{label}</StatusBadge></span>
+        : <span className={styles.kvKey} title={typeof label === 'string' ? label : undefined}>{label}</span>}
       <span className={styles.kvValue}>{value}</span>
     </>
   )
@@ -203,7 +204,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
       {rows.map((row) => (
         <KeyValue
           key={row.label}
-          label={<StatusPill tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusPill>}
+          label={<StatusBadge tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusBadge>}
           value={row.value === null ? emptyValue('unknown') : `${formatNumber(row.value)} 件`}
           tone={row.label === '未対応' && (row.value ?? 0) > 0 ? 'danger' : 'default'}
           href={row.href}

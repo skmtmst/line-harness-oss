@@ -44,12 +44,6 @@
   white-space: nowrap;
 }
 
-.badgeButton {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
 .none {
   color: var(--color-ink-faint);
 }

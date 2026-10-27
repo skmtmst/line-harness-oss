@@ -4,9 +4,13 @@ import HelpTip from './help-tip'
 import TruncatedText from './truncated-text'
 import styles from './status-badge.module.css'
 
-export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
+/**
+ * 札の色。warning＝橙（対応中・送信中など進んでいる途中）、caution＝黄（要確認・承認待ち）、
+ * danger＝赤（未対応・失敗）、success＝緑（済み・正常・有効）、info＝青、neutral＝灰（保留・種類）。
+ */
+export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger'
 
-/** 色だけに頼らず、必ず状態を文字で伝える共通バッジ。 */
+/** 色だけに頼らず、必ず状態を文字で伝える共通バッジ。地の色のある札に色の点と字を載せる。 */
 export default function StatusBadge({
   children,
   status,
@@ -17,7 +21,6 @@ export default function StatusBadge({
   helpLabel,
   helpHref,
   dot = true,
-  fill = true,
   surface = 'tinted',
   distinctFrom,
   ...props
@@ -50,8 +53,6 @@ export default function StatusBadge({
    * （「変わる」は点なしの札）。
    */
   dot?: boolean
-  /** 注意・危険の状態を薄い色面で示す。 */
-  fill?: boolean
 }) {
   const label = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
   if (typeof label === 'string' && distinctFrom !== undefined
@@ -62,7 +63,7 @@ export default function StatusBadge({
   const hasHelp = help !== undefined && help !== null
   const heading = helpLabel ? statusLabel(helpLabel) : (typeof label === 'string' ? label : 'この状態')
   return (
-    <span className={classes} data-size={size} data-tone={tone} data-fill={fill || undefined} data-design-node="xRvDB" data-surface={surface} {...props}>
+    <span className={classes} data-size={size} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
       {typeof label === 'string' ? <TruncatedText value={label} /> : label}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>

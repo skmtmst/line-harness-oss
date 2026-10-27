@@ -13,9 +13,9 @@
   height: var(--tpl-badge-h);
   padding: var(--badge-padding, var(--polish-status-pad));
   border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  color: var(--color-ink);
+  border-radius: var(--polish-status-radius);
+  background: var(--status-bg, var(--polish-status-neutral-bg));
+  color: var(--status-ink, var(--polish-status-neutral-ink));
   font-family: var(--font-sans);
   font-size: var(--polish-text-support);
   font-weight: var(--polish-status-weight);
@@ -28,20 +28,19 @@
   height: var(--polish-status-dot-size);
   flex: 0 0 var(--polish-status-dot-size);
   border-radius: var(--radius-pill);
-  background: var(--polish-status-neutral-dot);
+  background: var(--status-dot, var(--polish-status-neutral-dot));
 }
 .noDot::before { content: none; }
-.success::before { background: var(--polish-status-success-dot); }
-.info::before { background: var(--polish-status-info-dot); }
-.warning { color: var(--polish-status-warning-ink); }
-.badge[data-fill='true'].warning { background: var(--color-warning-bg); }
-.warning::before { background: var(--polish-status-warning-dot); }
-.danger { color: var(--polish-status-danger-ink); }
-.badge[data-fill='true'].danger { background: var(--color-danger-bg); }
-.danger::before { background: var(--polish-status-danger-dot); }
-.neutral::before { background: var(--polish-status-neutral-dot); }
+/* 地の色のある札：色の点＋色の字＋薄い地。色の値は globals.css の --polish-status-*。 */
+.success { --status-dot: var(--polish-status-success-dot); --status-bg: var(--polish-status-success-bg); --status-ink: var(--polish-status-success-ink); }
+.info { --status-dot: var(--polish-status-info-dot); --status-bg: var(--polish-status-info-bg); --status-ink: var(--polish-status-info-ink); }
+.warning { --status-dot: var(--polish-status-warning-dot); --status-bg: var(--polish-status-warning-bg); --status-ink: var(--polish-status-warning-ink); }
+.caution { --status-dot: var(--polish-status-caution-dot); --status-bg: var(--polish-status-caution-bg); --status-ink: var(--polish-status-caution-ink); }
+.danger { --status-dot: var(--polish-status-danger-dot); --status-bg: var(--polish-status-danger-bg); --status-ink: var(--polish-status-danger-ink); }
+.neutral { --status-dot: var(--polish-status-neutral-dot); --status-bg: var(--polish-status-neutral-bg); --status-ink: var(--polish-status-neutral-ink); }
+.badge[data-surface='white'] { background: var(--color-canvas); }
 .compact, .micro { font-size: var(--polish-text-support); }
-.annotation { padding: 0 var(--tpl-tag-name-gap); color: var(--color-ink-faint); font-size: var(--tpl-tag-note-size); font-weight: 500; line-height: var(--tpl-row-sub-lh); }
+.annotation { padding: 0 var(--tpl-tag-name-gap); background: transparent; color: var(--color-ink-faint); font-size: var(--tpl-tag-note-size); font-weight: 500; line-height: var(--tpl-row-sub-lh); }
 .badge[data-size='dining'] { padding: 2px 14px; }
 .badge[data-size='delivery'] { padding: var(--tpl-rt-dlv-badge-pad); gap: var(--tpl-rt-dlv-badge-gap); }
 .badge[data-size='delivery']:has(> svg) { gap: var(--tpl-rt-dlv-badge-mark-gap); }

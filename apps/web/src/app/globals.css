@@ -545,21 +545,26 @@
   --polish-status-dot-size: 6px;
   --polish-status-gap: 8px;
   --polish-status-pad: 2px 8px;
+  /* 状態の札は地の色のある札（点は残し、色だけに頼らない）。字と地の明暗差はどれも 4.5:1 以上。 */
+  --polish-status-radius: var(--polish-radius-small); --polish-row-menu-hover-bg: #eef0f3; /* 行の「…」に乗せた時の地（行の地より一段濃い） */
   --polish-status-success-dot: #16a34a;
-  --polish-status-success-bg: var(--color-canvas);
-  --polish-status-success-ink: var(--color-ink);
+  --polish-status-success-bg: #e3f4ea;
+  --polish-status-success-ink: #08703a;
   --polish-status-warning-dot: #f97316;
-  --polish-status-warning-bg: var(--color-canvas);
-  --polish-status-warning-ink: #c2410c;
+  --polish-status-warning-bg: #fff1e0;
+  --polish-status-warning-ink: #a24d00;
+  --polish-status-caution-dot: #d99a00;
+  --polish-status-caution-bg: #fdf3d6;
+  --polish-status-caution-ink: #8a5a00;
   --polish-status-danger-dot: #ef4444;
-  --polish-status-danger-bg: var(--color-canvas);
-  --polish-status-danger-ink: #b91c1c;
+  --polish-status-danger-bg: #fde8e7;
+  --polish-status-danger-ink: #b3261e;
   --polish-status-info-dot: #2563eb;
-  --polish-status-info-bg: var(--color-canvas);
-  --polish-status-info-ink: var(--color-ink);
+  --polish-status-info-bg: #e8effd;
+  --polish-status-info-ink: #1d4fd7;
   --polish-status-neutral-dot: #94a3b8;
-  --polish-status-neutral-bg: var(--color-canvas);
-  --polish-status-neutral-ink: var(--color-ink);
+  --polish-status-neutral-bg: #eef0f3;
+  --polish-status-neutral-ink: #3a3f47;
 }
 :root {
   --polish-table-row: 56px;
@@ -922,7 +927,7 @@
   --tpl-hb-tool-gap: 8px; --tpl-hb-project-search-w: 280px; --tpl-hb-library-search-w: 230px; --tpl-hb-project-sort-w: 150px; --tpl-hb-library-sort-w: 170px;
   --tpl-hb-small-lh: 16px; --tpl-hb-label-lh: 20px; --tpl-hb-control-h: 36px; --tpl-hb-control-pad: 0 10px 0 12px;
   --tpl-hb-card-radius: var(--polish-radius-card); --tpl-hb-mosaic-gap: 2px; --tpl-hb-mosaic-h: 120px; --tpl-hb-card-pad: var(--polish-space-card); --tpl-hb-title-lh: 19px; --tpl-hb-star: 24px; --tpl-hb-star-glyph: var(--polish-icon-control);
-  --tpl-hb-desc-gap: 6px; --tpl-hb-desc-gap-small: 4px; --tpl-hb-meta-gap: 4px; --tpl-hb-pill-gap: 4px; --tpl-hb-pill-pad: 2px 8px; --tpl-hb-pill-lh: 18px; --tpl-hb-dot: 6px;
+  --tpl-hb-desc-gap: 6px; --tpl-hb-desc-gap-small: 4px; --tpl-hb-meta-gap: 4px;
   --tpl-hb-tile-h: 108px; --tpl-hb-tile-radius: 10px; --tpl-hb-tile-gap: 8px;
   --tpl-hb-footer-inset: 24px; --tpl-hb-footer-margin: -24px; --tpl-hb-selection-margin: auto;
   --tpl-hb-selection-outline: 2px solid var(--color-accent-deep); --tpl-hb-selection-inset: -2px; --tpl-hb-selection-outset: 2px;
@@ -938,7 +943,7 @@
   --tpl-bc-note-lh: 17px; --tpl-bc-tools-gap: 10px; --tpl-bc-search-w: 280px; --tpl-bc-narrow-search-w: 180px; --tpl-bc-status-select-w: 152px; --tpl-bc-page-size-w: 96px;
   --tpl-bc-control-gap: 6px; --tpl-bc-date-pad: 0 10px; --tpl-bc-ghost-pad: 0 14px; --tpl-bc-sort-h: 30px; --tpl-bc-popover-w: 260px; --tpl-bc-save-input-w: 240px;
   --tpl-bc-cell-pad-block: 8px; --tpl-bc-head-pad-block: 12px; --tpl-bc-col-gap: 16px; --tpl-bc-edge-pad: 20px; --tpl-bc-cell-lh: 18px; --tpl-bc-result-lh: 19px;
-  --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-menu: 56px; --tpl-bc-col-select: 48px;
+  --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-delivered: 88px; --tpl-bc-col-rate: 72px; --tpl-bc-col-menu: 56px; --tpl-bc-col-select: 48px;
   --tpl-bc-badge-gap: 4px; --tpl-bc-badge-pad: 2px 8px; --tpl-bc-menu-size: 28px; --tpl-bc-pager-lh: 21px; --tpl-bc-state-pad: 24px 24px; --tpl-bc-state-icon: 32px;
   --tpl-title-size: var(--polish-text-page); --tpl-title-weight: 600; --tpl-title-lh: 40px; --tpl-title-tracking: -0.01em;
   /* ウェビナーの編集・参加者・分析・コメント演出（・・・・・・・・・）。 */
@@ -1198,7 +1203,7 @@
   --tpl-fm-note-lh: 17px; --tpl-fm-text-button-gap: 6px; --tpl-fm-band-gap: 10px; --tpl-fm-band-pad: 10px 14px; --tpl-fm-band-lh: 20px;
   --tpl-fm-search-w: 200px; --tpl-fm-sort-w: 160px; --tpl-fm-narrow-row-gap: 8px; --tpl-fm-folder-w: 150px;
   --tpl-fm-col-dest: 136px; --tpl-fm-col-status: 96px; --tpl-fm-col-answers: 126px; --tpl-fm-col-url: calc(var(--copy-feedback-min-w) + 2 * var(--tpl-row-pad-side)); --tpl-fm-col-menu: 60px;
-  --tpl-fm-name-gap: 8px; --tpl-fm-cell-lh: 17px; --tpl-fm-dot: 6px; --tpl-fm-pill-gap: 4px; --tpl-fm-badge-pad: 2px 8px; --tpl-fm-badge-lh: 18px;
+  --tpl-fm-name-gap: 8px; --tpl-fm-cell-lh: 17px; --tpl-fm-badge-pad: 2px 8px;
   --tpl-fm-answer-lh: 19px; --tpl-fm-answer-gap: 2px; --tpl-fm-answer-sub-lh: 16px; --tpl-fm-url-gap: 6px; --tpl-fm-control-h: 36px; --tpl-fm-url-pad: 0 14px; --tpl-fm-url-lh: 20px;
   --tpl-fm-skeleton-bar: 12px; --tpl-fm-pager-pad: 10px 20px; --tpl-fm-pager-lh: 21px; --tpl-fm-state-pad: 24px 24px; --tpl-fm-state-icon: 32px;
   --tpl-fm-panel-gap: 16px; --tpl-fm-panel-label-gap: var(--polish-space-row); --tpl-fm-input-pad: 0 12px; --tpl-fm-swatch: 28px; --tpl-fm-radio-gap: 4px;
@@ -1284,7 +1289,7 @@
   --tpl-am-ver-use-row-line: inset 0 1px 0 var(--color-hairline); --tpl-am-ver-num-pad-end: 12px; --tpl-am-ver-col-pinned: 90px; --tpl-am-ver-col-num: 70px; --tpl-am-ver-col-state: 100px; --tpl-am-ver-col-ops: 150px; --tpl-am-ver-foot-pad: 10px 12px;
   --tpl-am-saved-w: 153px; --tpl-am-folder-w: 150px; --tpl-am-search-w: 240px;
   /* 一斉配信の詳細・予約したあと（・・・・・）。src/v8/broadcast-detail が読む。 */
-  --tpl-bd-head-pad: 20px 24px; --tpl-bd-head-gap: 14px; --tpl-bd-name-gap: 4px; --tpl-bd-title-size: var(--tpl-title-size); --tpl-bd-title-lh: var(--tpl-title-lh); --tpl-bd-badge-pad: 2px 8px; --tpl-bd-badge-gap: 4px; --tpl-bd-dot: 6px; --tpl-bd-badge-size: 12px; --tpl-bd-badge-lh: 18px;
+  --tpl-bd-head-pad: 20px 24px; --tpl-bd-head-gap: 14px; --tpl-bd-name-gap: 4px; --tpl-bd-title-size: var(--tpl-title-size); --tpl-bd-title-lh: var(--tpl-title-lh);
   --tpl-bd-meta-size: 13px; --tpl-bd-meta-lh: 20px; --tpl-bd-rail-pad-top: 8px; --tpl-bd-draft-steps-top: 0; --tpl-bd-rail-gap: 8px; --tpl-bd-rail-step-gap: 6px; --tpl-bd-rail-mark: 22px; --tpl-bd-rail-size: 13px; --tpl-bd-rail-lh: 20px; --tpl-bd-rail-line: 24px; --tpl-bd-icon-btn: 36px;
   --tpl-bd-conflict-wrap-pad: 0 24px 8px; --tpl-bd-conflict-pad: 12px 16px; --tpl-bd-conflict-gap: 12px; --tpl-bd-conflict-title-size: var(--polish-text-section); --tpl-bd-conflict-title-lh: 20px; --tpl-bd-conflict-desc-size: var(--polish-text-body); --tpl-bd-conflict-desc-lh: 19px; --tpl-bd-conflict-text-gap: 2px; --tpl-bd-conflict-icon: 20px;
   --tpl-bd-tabs-pad: 0 24px; --tpl-bd-main-pad: 20px 24px; --tpl-bd-main-gap: 20px; --tpl-bd-side-width: 380px; --tpl-bd-side-pad: var(--polish-space-section); --tpl-bd-side-gap: 16px; --tpl-bd-row-pad: 8px 0; --tpl-bd-row-label: 96px; --tpl-bd-row-size: var(--polish-text-body); --tpl-bd-row-lh: 17px;
@@ -1363,7 +1368,7 @@
   --tpl-tl-note-lh: 17px; --tpl-tl-band-gap: 10px; --tpl-tl-band-after: 8px; --tpl-tl-band-pad: 10px 14px; --tpl-tl-band-lh: 20px;
   --tpl-tl-search-w: 220px; --tpl-tl-folder-w: 150px; --tpl-tl-narrow-search-w: 200px; --tpl-tl-narrow-row-gap: 8px;
   --tpl-tl-col-select: 48px; --tpl-tl-col-kind: 160px; --tpl-tl-col-publish: 128px; --tpl-tl-col-usage: 112px; --tpl-tl-col-monthly: 104px; --tpl-tl-col-updated: 88px; --tpl-tl-col-menu: 60px; /* 統括のひな形（店と同じ一覧＋配る口・）。 */ --tpl-tl-col-hq-dest: 184px; --tpl-tl-hq-row-pad-x: 24px; --tpl-tl-hq-actions-gap: 4px;
-  --tpl-tl-row-h: var(--tpl-list-row-h); --tpl-tl-row-pad-block: 10px; --tpl-tl-tab-lh: 16px; --tpl-tl-tab-pad-bottom: 12px; --tpl-tl-badge-pad: 2px 8px; --tpl-tl-badge-lh: 18px; --tpl-tl-kind-radius: var(--polish-radius-small); --tpl-tl-pill-gap: 4px; --tpl-tl-dot: 6px; --tpl-tl-cell-lh: 17px;
+  --tpl-tl-row-h: var(--tpl-list-row-h); --tpl-tl-row-pad-block: 10px; --tpl-tl-tab-lh: 16px; --tpl-tl-tab-pad-bottom: 12px; --tpl-tl-badge-pad: 2px 8px; --tpl-tl-badge-lh: 18px; --tpl-tl-kind-radius: var(--polish-radius-small); --tpl-tl-pill-gap: 4px; --tpl-tl-cell-lh: 17px;
   --tpl-tl-bulk-pad: 10px 24px; --tpl-tl-pager-lh: 21px; --tpl-tl-pager-pad: 10px 20px; --tpl-tl-skeleton-gap: 16px; --tpl-tl-skeleton-pad: 14px 24px; --tpl-tl-skeleton-dot: 32px; --tpl-tl-skeleton-bar: 10px;
   --tpl-tl-state-pad: 24px 24px; --tpl-tl-state-icon: 32px; --tpl-tl-usage-gap: 12px; --tpl-tl-usage-pad: 8px 0; --tpl-tl-usage-kind-w: 96px; --tpl-tl-control-h: 36px; --tpl-tl-ghost-pad: 0 14px; --tpl-tl-usage-more-pad: 6px; --tpl-tl-kind-card-pad: var(--polish-space-card); --tpl-tl-dialog-actions-pad: 14px 24px;
   --tpl-nm-tab-h: 27.5px; --tpl-nm-kpi-label-lh: 18px; --tpl-nm-band-top-line: inset 0 1px 0 var(--color-hairline); --tpl-nm-ro-row-pad: 12px 24px; --tpl-nm-kpi-more: 16px; --tpl-nm-body-pad: 16px 24px 24px; --tpl-nm-rail-w: 300px; --tpl-nm-col-gap: 16px; --tpl-nm-left-gap: 12px; --tpl-nm-adopted-gap: 14px; --tpl-nm-tools-gap: 8px; --tpl-nm-search-w: 240px; --tpl-nm-search-wide-w: 280px; --tpl-nm-seg-pad: 2px; --tpl-nm-seg-item-pad: 4px 12px;
@@ -1570,11 +1575,11 @@
   --tpl-steps-num-size: 12px; --tpl-steps-check: 12px; --tpl-steps-line-w: 24px; --tpl-steps-line-h: 1px; --tpl-steps-top-gap: 12px; --tpl-steps-head-gap: 8px;
   /* ダッシュボード：数の帯・右の列・グラフ・表・友だち追加リンク・最近の動き。 */
   --tpl-db-num-size: 28px; --tpl-db-num-lh: 32px; --tpl-db-unit-size: 13px; --tpl-db-unit-lh: 20px; --tpl-db-cell-pad: 16px 20px; --tpl-db-cell-gap: 8px;
-  --tpl-db-tag-pad: 2px 6px; --tpl-db-tag-radius: var(--polish-radius-small); --tpl-db-tag-gap: 2px; --tpl-db-aside-pad: var(--polish-space-card); --tpl-db-aside-pad-narrow: 16px 16px; --tpl-db-aside-gap: 10px; --tpl-db-aside-tail-pad: 0px; --tpl-db-aside-tail-pull: -7px; --tpl-db-aside-inbox-tail-pad: 6px; --tpl-db-kv-gap: 8px; --tpl-db-dot: 7px;
+  --tpl-db-tag-gap: 2px; --tpl-db-aside-pad: var(--polish-space-card); --tpl-db-aside-pad-narrow: 16px 16px; --tpl-db-aside-gap: 10px; --tpl-db-aside-tail-pad: 0px; --tpl-db-aside-tail-pull: -7px; --tpl-db-aside-inbox-tail-pad: 6px; --tpl-db-kv-gap: 8px;
   --tpl-db-quota-size: 26px; --tpl-db-quota-lh: 30px; --tpl-db-quota-gap: 4px; --tpl-db-bar-h: 6px; --tpl-db-bar-radius: var(--polish-radius-small); --tpl-db-small-lh: 17px; --tpl-db-text-lh: 20px; --tpl-db-caption-lh: 18px;
   --tpl-db-chart-h: 190px; --tpl-db-columns-min-h: 190px; --tpl-db-chart-axis: 30px; --tpl-db-chart-top: 8px; --tpl-db-chart-plot-h: 140px; --tpl-db-chart-label-gap: var(--polish-space-row); --tpl-db-chart-bar-w: 22px; --tpl-db-chart-bar-gap: 4px; --tpl-db-chart-bar-r: 4px; --tpl-db-chart-bar-soft: #7cc79a; --tpl-db-chart-bar-blocked: #c9ced6; --tpl-db-chart-tick-shift: -8px; --tpl-db-chart-tick-left: 4px;
   --tpl-db-legend-gap: 12px; --tpl-db-swatch: 8px; --tpl-db-swatch-r: 2px; --tpl-db-swatch-gap: 6px;
-  --tpl-db-th-pad: 8px 12px; --tpl-db-th-radius: var(--polish-radius-control); --tpl-db-th-bg: #fafafb; --tpl-db-td-pad: 10px 12px; --tpl-db-col-gap: 16px; --tpl-db-col-name: 260px; --tpl-db-col-wait: 100px; --tpl-db-col-state: 90px; --tpl-db-route-pad: 1px 6px; --tpl-db-route-radius: var(--polish-radius-small);
+  --tpl-db-th-pad: 8px 12px; --tpl-db-th-radius: var(--polish-radius-control); --tpl-db-th-bg: #fafafb; --tpl-db-td-pad: 10px 12px; --tpl-db-col-gap: 16px; --tpl-db-col-name: 260px; --tpl-db-col-wait: 100px; --tpl-db-col-state: 90px;
   --tpl-db-route-w: 220px; --tpl-db-control-h: 36px; --tpl-db-control-radius: var(--polish-radius-control); --tpl-db-url-pad: 0 12px; --tpl-db-row-gap: 8px;
   --tpl-db-fig-size: 28px; --tpl-db-fig-lh: 33px; --tpl-db-fig-gap: 16px; --tpl-db-fig-inner-gap: 2px;
   --tpl-db-act-pad: 16px 24px; --tpl-db-act-gap: 4px; --tpl-db-band-pad: 10px 14px; --tpl-db-band-gap: 12px; --tpl-db-band-radius: var(--polish-radius-control); --tpl-db-progress-w: 120px; --tpl-db-progress-h: 4px; --tpl-db-close: 14px; --tpl-db-menu: 16px; --tpl-db-head-h: 23px; --tpl-db-chart-right: 23px; --tpl-db-chart-day-w: 80px; --tpl-db-inbox-gap: 12px; --tpl-db-inbox-row-h: var(--tpl-list-row-multi-h); --tpl-db-num-ls: -0.5px; --tpl-db-fig-glyph-lh: 33px; --tpl-db-focus-ring: 2px;
@@ -1651,7 +1656,7 @@
   --tpl-sb-ml-col-id: 70px; --tpl-sb-ml-col-name: 150px; --tpl-sb-ml-col-checked: 130px; --tpl-sb-ml-col-status: 90px; --tpl-sb-ml-col-action: 76px; --tpl-sb-ml-edit-w: 240px;
   --tpl-sb-fs-col-uploader: 120px; --tpl-sb-fs-col-action: 200px; --tpl-sb-more: 28px; --tpl-sb-ext-pad: 16px; --tpl-sb-form-w: 420px;
   --tpl-sb-nav-w-narrow: 200px; --tpl-sb-narrow-pad-top: 16px; --tpl-sb-narrow-pad-bottom: 24px; --tpl-sb-narrow-pad-side: 24px; --tpl-sb-narrow-gap: var(--polish-space-card);
-  --tpl-sb-tab-gap: 20px; --tpl-sb-tab-pad-bottom: 8px; --tpl-sb-tab-line: 2px; --tpl-sb-ec-head-pad: 8px 16px; --tpl-sb-ec-row-pad: 10px 16px; --tpl-sb-ec-gap: 14px; --tpl-sb-ec-lh: 17px; --tpl-sb-dot: 6px; --tpl-sb-sort-w: 120px;
+  --tpl-sb-tab-gap: 20px; --tpl-sb-tab-pad-bottom: 8px; --tpl-sb-tab-line: 2px; --tpl-sb-ec-head-pad: 8px 16px; --tpl-sb-ec-row-pad: 10px 16px; --tpl-sb-ec-gap: 14px; --tpl-sb-ec-lh: 17px; --tpl-sb-sort-w: 120px;
   --tpl-sb-ec-col-when: 170px; --tpl-sb-ec-col-who: 150px; --tpl-sb-ec-col-what: 222px; --tpl-sb-ec-col-done: 170px; --tpl-sb-ec-col-status: 90px; --tpl-sb-ec-col-menu: 36px;
   --tpl-sb-kpi-pad: 14px; --tpl-sb-kpi-gap: 4px; --tpl-sb-kpi-num: 20px; --tpl-sb-kpi-num-lh: 24px;
   --tpl-sb-ln-col-when: 150px; --tpl-sb-ln-col-who: 184px; --tpl-sb-ln-col-count: 58px; --tpl-sb-ln-col-status: 110px; --tpl-sb-ln-col-toggle: 54px; --tpl-sb-ln-col-edit: 94px;
@@ -1663,7 +1668,7 @@
   /* 作業役 rest3（会員一覧 ）。 */ --tpl-rest3-mb-gap: 16px;
   /* 作業役 rest3（運用状態 更新履歴 ）。 */ --tpl-rest3-uh-gap: 14px; --tpl-rest3-uh-row-h: var(--polish-table-row); --tpl-rest3-uh-head-h: var(--polish-table-head); --tpl-rest3-uh-row-pad: 0 14px; --tpl-rest3-uh-cols: minmax(0, 130px) minmax(0, 426px) minmax(0, 100px) 100px minmax(0, 1fr); --tpl-rest3-uh-cols-narrow: minmax(0, 80px) minmax(0, 1fr) 64px 72px 80px; --tpl-rest3-mb-dot: 6px; --tpl-rest3-mb-dot-gap: 4px; --tpl-rest3-mb-row-h: var(--polish-table-row); --tpl-rest3-mb-head-h: var(--polish-table-head); --tpl-rest3-mb-row-pad: 10px 24px; --tpl-rest3-mb-cols: minmax(0, 338px) 96px 84px 96px 84px minmax(0, 130px) 72px 60px minmax(36px, 1fr); --tpl-rest3-mb-cols-narrow: minmax(0, 1fr) 96px 84px 96px 84px minmax(0, 130px) 36px;
   --tpl-sb-hc-banner-pad: 14px 16px; --tpl-sb-hc-banner-icon: 20px; --tpl-sb-hc-banner-title: var(--polish-text-section); --tpl-sb-hc-banner-title-lh: 22px; --tpl-sb-hc-body-lh: 17px; --tpl-sb-hc-alert-pad: 8px 0; --tpl-sb-hc-row-pad: 12px 16px; --tpl-sb-hc-col-judge: 90px; --tpl-sb-hc-col-time: 110px; --tpl-sb-hc-col-how: 220px;
-  --tpl-sb-ln-preview-w: 390px; --tpl-sb-ln-brand-track: 0.22em; --tpl-sb-focus-ring: 2px solid var(--color-accent); --tpl-sb-dot-radius: 50%;
+  --tpl-sb-ln-preview-w: 390px; --tpl-sb-ln-brand-track: 0.22em; --tpl-sb-focus-ring: 2px solid var(--color-accent);
   --tpl-sb-line-top: inset 0 1px 0 var(--color-hairline); --tpl-sb-line-top-soft: inset 0 1px 0 var(--color-divider); --tpl-sb-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-sb-line-bottom-soft: inset 0 -1px 0 var(--color-divider);
   --tpl-inbox-list-width: 372px; --tpl-inbox-summary-width: 320px;
   /* 飲食店向け（担当 a：店舗ダッシュボード CHz31・承認 ・組織 bSp4h・LINE来店フォロー xLpnS・Googleビジネス  ほか）。 */

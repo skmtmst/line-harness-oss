@@ -49,7 +49,7 @@ describe('表は器の幅にぴったり収める', () => {
     }
     render(React.createElement(React.Fragment, null,
       React.createElement(MenusTabV8, { accountId: 'account-test', menus: [menu], status: 'ready', error: null,
-        menuCount: 1, canEdit: true, onReload: () => {} }),
+        menuCount: 1, canEdit: true, onReload: () => {}, onOpenStaff: () => {} }),
       React.createElement(RowMenu, { label: '共通の基準', appearance: 'box', size: 'row', items: [] }),
     ))
     expect(screen.getByRole('button', { name: menu.name, exact: true })).toBeTruthy()

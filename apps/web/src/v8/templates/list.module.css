@@ -39,9 +39,6 @@
   gap: var(--tpl-toolbar-gap);
 }
 
-
-
-
 .perPageBox {
   flex-shrink: 0;
 }
@@ -80,11 +77,6 @@
   flex: 1 1 0;
 }
 
-
-
-
-
-
 /* 表。見出しと行の区切り線だけ。外側の枠は作らない。 */
 .tableWrap {
   min-width: 0;
@@ -113,7 +105,6 @@
   height: var(--tpl-tl-row-h);
   padding-block: var(--tpl-tl-row-pad-block);
 }
-
 
 .selectCell {
   text-align: center;
@@ -164,39 +155,6 @@
   font-size: var(--text-caption);
   line-height: var(--tpl-tl-badge-lh);
   white-space: nowrap;
-}
-
-/* 公開の札（公開中・未公開の変更・下書きだけ）。点＋太字。 */
-.publishPill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-tl-pill-gap);
-  padding: var(--tpl-tl-badge-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-tl-badge-lh);
-  white-space: nowrap;
-}
-
-.publishPill[data-tone='live'] {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.publishPill[data-tone='changes'] {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-}
-
-.publishDot {
-  width: var(--tpl-tl-dot);
-  height: var(--tpl-tl-dot);
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-  background: currentColor;
 }
 
 .usageLink {
