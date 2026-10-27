@@ -4,6 +4,7 @@ import { connectGuardBrowser } from './browser-session.mjs'
 import scan from './owner-rules-browser.mjs'
 import scanPolish from './polish-rules-browser.mjs'
 import scanRowCentering from './row-centering-browser.mjs'
+import scanHoverReveal from './hover-reveal-browser.mjs'
 
 test('a framed box clipped by its parent fails; scrollable and restored boxes remain usable', async () => {
   const browser = await connectGuardBrowser()
@@ -369,5 +370,20 @@ test('印の無い段でも、同じ幅に並ぶカードの高さが 1px を超
     assert.equal((await rows()).length, 1)
     await page.locator('#grid').evaluate(el => { el.dataset.cardHeight = 'natural' })
     assert.deepEqual(await rows(), [])
+  } finally { await browser.close() }
+})
+
+test('乗せた時だけ出す物は、焦点でもタッチの端末でも出す。片方が欠けると落ち、そろえば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const css = rules => `<style>.tool{opacity:0}.row:hover .tool{opacity:1}${rules}</style>`
+    const body = '<main><div class="row">行の名前<button class="tool" style="width:24px;height:24px">外す</button><input type="checkbox" style="opacity:0;width:20px;height:20px"></div></main>'
+    await page.setContent(css('') + body)
+    assert.deepEqual((await page.evaluate(scanHoverReveal)).map(f => f.kind).sort(), ['hover-focus', 'hover-touch'])
+    await page.setContent(css('.tool:focus-visible,.row:focus-within .tool{opacity:1}') + body)
+    assert.deepEqual((await page.evaluate(scanHoverReveal)).map(f => f.kind), ['hover-touch'])
+    await page.setContent(css('.tool:focus-visible,.row:focus-within .tool{opacity:1}@media (hover: none){.tool{opacity:1}}') + body)
+    assert.deepEqual(await page.evaluate(scanHoverReveal), [])
   } finally { await browser.close() }
 })
