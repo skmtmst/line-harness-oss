@@ -157,7 +157,7 @@ it('WEB-125: 同じ人の競合では窓の入力を残して改訂値だけ読�
   await act(async () => { button('保存する')!.click() }); await settle()
   expect(document.querySelector('[data-support-editor]')).not.toBeNull()
   await act(async () => { button('保存する')!.click() }); await settle()
-  expect(chatUpdate).toHaveBeenLastCalledWith('friend-a', { status: 'on_hold', operatorId: null, revision: 4 })
+  expect(chatUpdate).toHaveBeenLastCalledWith('friend-a', { status: 'on_hold', operatorId: null, notes: '折り返し予定', revision: 4 })
 })
 
 it.each(['success', 'failure', 'throw'])('WEB-125: Aの保存の%sでBの窓・読込待ちを変えない', async (outcome) => {
@@ -184,7 +184,7 @@ it.each(['success', 'failure', 'throw'])('WEB-125: Aの保存の%sでBの窓・�
   await act(async () => resolveB(chat('friend-b', 'in_progress', 8))); await settle()
   expect(button('保存する')!.disabled).toBe(false)
   await act(async () => button('保存する')!.click()); await settle()
-  expect(chatUpdate).toHaveBeenLastCalledWith('friend-b', { status: 'in_progress', operatorId: null, revision: 8 })
+  expect(chatUpdate).toHaveBeenLastCalledWith('friend-b', { status: 'in_progress', operatorId: null, notes: '折り返し予定', revision: 8 })
 })
 
 it('WEB-125: シナリオの窓も同じIDのアカウント切り替えで捨てる', async () => {

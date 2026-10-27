@@ -40,6 +40,7 @@ import { memberRanksApi } from '@/lib/api/helpers/gap3'
 import DeliveryConsentDrawer, { DeliveryConsentSummary, useDeliveryConsents } from './delivery-consent'
 import { api } from '@/lib/api'
 import { notifyToast } from '@/components/shared/toast'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
 /*
@@ -95,6 +96,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
   onEditSupport: () => void
 }) {
   const { selectedAccountId } = useAccount()
+  const saveErrors = useSaveFormErrors()
   const starred = fields.filter((f) => f.isStarred)
   const { mileage, mileageStatus, richMenu, richMenuStatus } = data
   const support = friend.support
@@ -160,10 +162,10 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
       await data.loadFriend()
       setTagDialogOpen(false)
       notifyToast('タグを更新しました')
-    } catch {
+    } catch (caught) {
       if (request !== tagRequestRef.current) return
       await data.loadFriend()
-      setTagError('タグを保存できませんでした。現在の内容を読み直してください')
+      setTagError(saveErrors.capture(caught) ? '' : 'タグを保存できませんでした。現在の内容を読み直してください')
     } finally {
       if (request === tagRequestRef.current) setTagBusy(false)
     }
@@ -265,12 +267,12 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
       </div>}
     />
   </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} rows={consents.rows} canEdit={perms.manage} onClose={() => setConsentOpen(false)} onSaved={consents.reload} />
-    <Dialog open={tagDialogOpen} title="タグを編集" designWidth={480} busy={tagBusy} error={tagError} confirmLabel="保存する" onConfirm={() => void saveTags()} onCancel={() => setTagDialogOpen(false)}>
+    <SaveErrorScope errors={saveErrors}><Dialog open={tagDialogOpen} title="タグを編集" designWidth={480} busy={tagBusy} error={tagError} confirmLabel="保存する" onConfirm={() => void saveTags()} onCancel={() => setTagDialogOpen(false)}>
       <div className={styles.dialogBody} data-friend-tag-editor>
         {availableTags.map((tag) => <Checkbox key={tag.id} checked={selectedTagIds.includes(tag.id)} disabled={tagBusy} onCheckedChange={(checked) => setSelectedTagIds((current) => checked ? [...current, tag.id] : current.filter((id) => id !== tag.id))}>{tag.name}</Checkbox>)}
         {!tagBusy && availableTags.length === 0 && !tagError ? <p className={styles.memo}>選べるタグはありません</p> : null}
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   </>
   )
 }
