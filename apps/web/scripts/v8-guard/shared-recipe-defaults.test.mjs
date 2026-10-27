@@ -20,9 +20,20 @@ const compiled = await build({
     import {Field} from './src/components/shared/form-controls';
     import Notice from './src/components/shared/notice';
     import Button from './src/components/shared/button';
+    import Select from './src/components/shared/select';
+    import TruncatedText from './src/components/shared/truncated-text';
+    import {DataTable,TableHeadRow,Th,Tr,Td} from './src/components/shared/table';
+    import compareStyles from './src/v8/friends/compare/compare.module.css';
     import SurfaceLayoutFixture from './scripts/v8-guard/surface-layout-fixture';
 
     function Fixture(){const [value,setValue]=useState('one');
+      if(window.comparisonFixture)return <main id="comparison-fixture"><DataTable><colgroup><col className={compareStyles.colItem}/><col/><col/><col className={compareStyles.colUse}/></colgroup><thead><TableHeadRow presentation="embedded">{['項目','候補A','候補B','使う値'].map(label=><Th key={label}>{label}</Th>)}</TableHeadRow></thead><tbody>{[
+        ['LINE表示名','田中 はなこ','田中 花子','画面確認アカウント・田中 はなこ：田中 はなこ'],
+        ['メール','ta***@example.jp','ta***@example.jp','画面確認アカウント・田中 はなこ：ta***@example.jp'],
+        ['ステータスメッセージ','予約受付中','受付中','A：予約受付中'],
+        ['last_purchase_date','2026-10-01','2026-10-02','A：2026-10-01'],
+        ['a'.repeat(100),'登録済み','登録なし','A：登録済み'],
+      ].map(([label,left,right,choice])=><Tr key={label}><Td><TruncatedText className={compareStyles.itemName} value={label}/></Td><Td>{left}</Td><Td>{right}</Td><Td><Select aria-label={label+'に使う値'} size="full" value="left" onChange={()=>{}} options={[{value:'left',label:choice}]}/></Td></Tr>)}</tbody></DataTable></main>;
       if(window.noticeFixture)return <main id="notice-fixtures">{['body','heading','compact','compact-info','help','danger','success'].flatMap(kind=>['action','close','none'].map(operation=><Notice key={kind+operation} data-notice-fixture={kind} tone={kind==='compact-info'?'info':kind==='danger'?'danger':kind==='success'?'success':'warn'} compact={kind.startsWith('compact')} title={kind==='compact-info'?'長い案内の全文':undefined} heading={kind==='heading'||kind==='help'?<>保存の状態を確認してください。長い題が折り返しても最初の行に点をそろえます。</>:undefined} help={kind==='help'?'確認する内容の説明':undefined} action={operation==='action'?<Button>内容を見る</Button>:undefined} onClose={operation==='close'?()=>{}:undefined}>{kind==='body'?<p>一覧を読み直してください。文章が長い時も最初の文字に点をそろえて表示します。</p>:kind==='compact-info'?'長い案内の内容をここに表示します。全文は省略しても確認できます。表示しきれない時だけ省略します。':'入力は残っています。'}</Notice>))}</main>;
       if(window.surfaceFixture)return <main><SurfaceLayoutFixture/></main>;
       return <main>
@@ -291,5 +302,53 @@ test('カードの影へ1pxの線を戻す故障を実寸で見つけ、元に�
     await page.evaluate(() => document.querySelector('#raised').style.removeProperty('outline'))
     assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--card-shadow')), original)
     assert.deepEqual(await cards.evaluateAll(cardEdgeIssues), [])
+  } finally { await browser.close() }
+})
+
+// 実画面の1152幅で表は802px、1440幅で1090px。共有の表・選ぶ欄と、画面のcolgroupの定義をそのまま使う。
+for (const width of [1152, 1440]) test(`比較の使う値は出所・名前・値を保ち、省略する前に列の空きを配る（${width}px）`, async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width, height: 900 } })
+    await page.setContent(`<html lang="ja" data-theme="v8"><style>${css}@layer base{*{box-sizing:border-box;margin:0}body{font-family:Arial,sans-serif;font-size:13px}}#comparison-fixture{width:calc(100vw - 350px);margin:24px auto}</style><div id="root"></div></html>`)
+    await page.evaluate(() => { window.comparisonFixture = true })
+    await page.addScriptTag({ content: compiled.outputFiles[0].text })
+    await page.locator('#comparison-fixture [data-select-value]').last().waitFor()
+    const check = async () => {
+      const measured = await page.locator('#comparison-fixture').evaluate(root => ({
+        overflow: document.documentElement.scrollWidth > innerWidth,
+        values: [...root.querySelectorAll('[data-select-value]')].map(value => ({ text: value.textContent, title: value.title, client: value.clientWidth, scroll: value.scrollWidth })),
+        cells: [...root.querySelectorAll('td')].map(cell => ({ client: cell.clientWidth, scroll: cell.scrollWidth })),
+        labels: [...root.querySelectorAll('tbody tr td:first-child [data-truncated-text]')].map(label => { const range = document.createRange(); range.selectNodeContents(label); const style = getComputedStyle(label); return { text: label.textContent, title: label.title, lines: new Set([...range.getClientRects()].map(rect => rect.top)).size, whiteSpace: style.whiteSpace, ellipsis: style.textOverflow, client: label.clientWidth, scroll: label.scrollWidth } }),
+      }))
+      assert.equal(measured.overflow, false, JSON.stringify(measured))
+      assert.equal(measured.values.length, 5)
+      for (const value of measured.values) {
+        assert.equal(value.text, value.title)
+        assert.ok(value.scroll <= value.client, `comparison value cut: ${JSON.stringify(value)}`)
+      }
+      assert.ok(measured.cells.every(cell => cell.scroll <= cell.client + 1), JSON.stringify(measured.cells))
+      assert.equal(measured.labels.length, 5)
+      assert.ok(measured.labels.some(label => label.text === 'ステータスメッセージ'))
+      assert.ok(measured.labels.some(label => label.text.length === 100))
+      for (const label of measured.labels) {
+        assert.equal(label.lines, 1, JSON.stringify(label))
+        assert.equal(label.title, label.text)
+        assert.equal(label.whiteSpace, 'nowrap')
+        assert.equal(label.ellipsis, 'ellipsis')
+        if (width === 1440 && label.text === 'ステータスメッセージ') assert.ok(label.scroll <= label.client, `comparison item cut: ${JSON.stringify(label)}`)
+      }
+    }
+    await check()
+    await page.evaluate(() => document.documentElement.style.setProperty('--tpl-fr-cmp-col-use', '208px'))
+    await assert.rejects(check, /comparison value cut:/)
+    await page.evaluate(() => document.documentElement.style.removeProperty('--tpl-fr-cmp-col-use'))
+    await check()
+    if (width === 1440) {
+      await page.evaluate(() => document.documentElement.style.setProperty('--tpl-fr-cmp-col-item', '112px'))
+      await assert.rejects(check, /comparison item cut:.*ステータスメッセージ/)
+      await page.evaluate(() => document.documentElement.style.removeProperty('--tpl-fr-cmp-col-item'))
+      await check()
+    }
   } finally { await browser.close() }
 })

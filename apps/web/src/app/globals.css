@@ -1911,7 +1911,7 @@
   --tpl-fr-shadow-control: inset 0 0 0 1px var(--color-control-border); --tpl-fr-shadow-tab: inset 0 -2px 0 var(--color-ink);
   --tpl-fr-mp-rail-w: 364px; --tpl-fr-mp-rail-pad: 24px; --tpl-fr-mp-rail-gap: 14px; --tpl-fr-mp-values-pull: -16px; --tpl-fr-mp-value-h: 39px;
   --tpl-fr-mp-col-account-wide: 360px; --tpl-fr-mp-col-account: 320px; --tpl-fr-mp-col-name: 152px; --tpl-fr-mp-col-date: 123px;
-  --tpl-fr-cmp-history-date: 259px; --tpl-fr-cmp-col-item: 160px; --tpl-fr-cmp-col-use: 208px; --tpl-fr-cmp-card-min: 220px; --tpl-fr-cmp-attr-label-n: 82px;
+  --tpl-fr-cmp-history-date: 259px; --tpl-fr-cmp-col-item: clamp(112px, calc(100vw - 1040px), 168px); --tpl-fr-cmp-col-use: clamp(272px, calc(100vw - 736px), 416px); --tpl-fr-cmp-card-min: 220px; --tpl-fr-cmp-attr-label-n: 82px;
 }
 
 /*
