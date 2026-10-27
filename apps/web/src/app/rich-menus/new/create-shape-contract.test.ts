@@ -11,7 +11,11 @@ const FORM = readFileSync(
   'utf8',
 )
 
-/*  の画像設定と共通部品の利用を守る。形の操作はLayoutPickerの動作試験で確認する。 */
+/*
+ * 面の分け方の共通部品・「画像の作り方」の窓・右の共通の要約・LINE の見え方は
+ * v8/rich-menus/new/create-steps-react.test.tsx が描いて見る。
+ * ここには、描画では測れない見た目の値と、自前の箱を画面に戻さない禁止の見張りだけを残す。
+ */
 function block(selector: string): string {
   const at = CSS.indexOf(selector)
   if (at < 0) throw new Error(`missing ${selector}`)
@@ -19,9 +23,7 @@ function block(selector: string): string {
 }
 
 describe('リッチメニュー作る①の形と画像（JeINq）', () => {
-  it('案Aの面の分け方は共通部品に任せる', () => {
-    expect(TSX).toContain("from '@/components/shared/layout-picker'")
-    expect(TSX).toContain('<LayoutPicker')
+  it('案Aの面の分け方は共通部品に任せる（自前の見本の箱を置かない）', () => {
     expect(CSS).not.toContain('.layoutThumb {')
     // 面の見本は統括の例外時にもV8の共通フォームで使う。
     expect(FORM).toContain("fill: 'none'")
@@ -31,12 +33,9 @@ describe('リッチメニュー作る①の形と画像（JeINq）', () => {
     expect(block('.imageMeta {')).toContain('gap: 8px')
     expect(block('.imageMetaOk {')).toContain('var(--color-accent-deep)')
     expect(block('.guideLink {')).toContain('background: transparent')
-    expect(TSX).toContain('画像の作り方（大きさ・押しやすい余白）')
   })
 
   it('右の箱は共通部品（自前の題・行の指定は画面に置かない）', () => {
-    expect(TSX).toContain("from '@/components/templates/create-parts'")
-    expect(TSX).toContain('<CreateSummaryCard')
     expect(TSX).not.toContain('styles.railTitle')
     expect(TSX).not.toContain('styles.summaryList')
     expect(TSX).not.toContain('styles.summaryRow')
@@ -48,6 +47,5 @@ describe('リッチメニュー作る①の形と画像（JeINq）', () => {
 
   it('見え方の題の行の行き先は部品に任せる（題を二重にしない）', () => {
     expect(TSX).not.toContain('styles.railGoLink')
-    expect(TSX).toContain('<LinePreview')
   })
 })

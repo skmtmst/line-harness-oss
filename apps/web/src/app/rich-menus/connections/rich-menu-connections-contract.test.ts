@@ -2,42 +2,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+/*
+ * 切替のつながりの動き（板・空・所属違い・遅れた応答・読込/失敗/読み直し）は
+ * connections-v8-react.test.tsx、一覧からの入口は v8/rich-menus/list-delete-import-react.test.tsx が描いて見る。
+ * ここには、固定の数を画面に書かない禁止の見張りだけを残す。
+ */
 const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/rich-menus/connections.tsx'), 'utf8')
-const LIST = fs.readFileSync(path.join(__dirname, '../../../v8/rich-menus/list.tsx'), 'utf8')
 
 describe('V8 リッチメニューの切替つながり', () => {
-  it('現役の板へ同じ実データから切替先の有無を描く', () => {
-    expect(PAGE).toContain('boardId="wxIQ7"')
-    expect(PAGE).toContain('others.length > 0')
-    expect(PAGE).toContain('切替先を足すと、ここに')
-  })
-
-  it('既存のgroup取得だけを使い、切替数を固定値で作らない', () => {
-    expect(PAGE).toContain('api.richMenuGroups.get(groupId)')
-    expect(PAGE).toContain('analysis.edges.filter((edge) => edge.fromPageId === pageId)')
+  it('切替数を固定値で作らない', () => {
     expect(PAGE).not.toContain('切替ボタン" value="5件')
-  })
-
-  it('選択中アカウントと所属アカウントが違う場合は表示しない', () => {
-    expect(PAGE).toContain('group.accountId !== selectedAccountId')
-    expect(PAGE).toContain('kind="forbidden"')
-  })
-
-  it('アカウント切替後に届いた古い取得結果を表示しない', () => {
-    expect(PAGE).toContain('activeAccountIdRef.current !== accountId')
-    expect(PAGE).toContain('requestGenerationRef.current !== generation')
-    expect(PAGE).toContain('setGroup(null)')
-  })
-
-  it('読込・空・失敗と実値0を混ぜない', () => {
-    expect(PAGE).toContain('kind="loading"')
-    expect(PAGE).toContain('kind="empty"')
-    expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('onRetry={() => void load()}')
-  })
-
-  it('一覧から切替のつながりへ進める', () => {
-    expect(LIST).toContain('/rich-menus/connections?id=')
-    expect(LIST).toContain('切替のつながりを見る')
   })
 })

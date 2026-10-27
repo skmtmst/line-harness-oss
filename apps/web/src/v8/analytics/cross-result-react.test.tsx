@@ -82,4 +82,5 @@ it('閲覧者の期間操作は残し、分析保存は表示しない', async (
   await waitFor(() => expect(screen.getByText(/^集計できました/)).toBeTruthy())
   expect(screen.queryByRole('button', { name: 'この分析を保存' })).toBeNull()
   expect(screen.queryByRole('button', { name: '対象者を開く' })).toBeNull()
+  expect(screen.getByText('結果の保存と対象者づくりは、統括・管理者だけが行えます。')).toBeTruthy()
 })

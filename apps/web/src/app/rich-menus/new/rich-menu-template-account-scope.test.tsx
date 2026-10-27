@@ -28,7 +28,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }))
 
 import NewRichMenuPage from '../../../v8/rich-menus/new/create'
@@ -45,6 +45,10 @@ const TEMPLATES_BY_ACCOUNT: Record<string, Array<{ id: string; name: string }>> 
   'acc-2': [{ id: 'tpl-b2', name: '予約確認' }],
 }
 
+/** 指定のアカウントのテンプレート一覧を、外から返すまで止めておく。 */
+let holdTemplatesFor: string | null = null
+let releaseHeld: (() => void) | null = null
+
 function stubFetch() {
   fetchUrls.length = 0
   writes.length = 0
@@ -53,6 +57,10 @@ function stubFetch() {
     const text = String(url)
     fetchUrls.push(text)
     const parsed = new URL(text, 'http://localhost')
+    if (parsed.pathname === '/api/templates' && holdTemplatesFor && parsed.searchParams.get('account_id') === holdTemplatesFor) {
+      holdTemplatesFor = null
+      await new Promise<void>((resolve) => { releaseHeld = resolve })
+    }
     if (parsed.pathname === '/api/rich-menu-groups') return { ok: true, status: 200, json: async () => ({ success: true, data: { items: [], total: 0, page: 1, limit: 200 } }) }
     if (parsed.pathname === '/api/staff/me') return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'owner-1', role: 'owner' } }) }
     if (parsed.pathname === '/api/rich-menu-groups/scope-draft') return { ok: true, status: 200, json: async () => ({ success: true, data: {"id":"scope-draft","accountId":"acc-1","name":"scope-test","chatBarText":"メニュー","size":"large","isDefaultForAll":true,"status":"draft","targetingPriority":0,"targetingEnabled":false,"targetingCondition":null,"folderId":null,"defaultOpen":true,"version":1,"defaultPageId":"p-1","pages":[{"id":"p-1","orderIndex":0,"name":"トップ","aliasId":"","lineRichmenuId":null,"imageR2Key":null,"imageContentType":null,"areas":[{"id":"area-1","boundsX":0,"boundsY":0,"boundsWidth":2500,"boundsHeight":1686,"actionType":"message","actionData":{"text":"hello"},"intent":"text","label":"ボタン","tagIds":[],"scoreChange":null,"templateId":null,"formId":null,"trackedLinkId":null}]}]} }) }
@@ -85,6 +93,8 @@ function clickOption(label: string) {
 
 describe('m18r 作成画面のテンプレート候補は選択accountで絞る', () => {
   beforeEach(() => {
+    holdTemplatesFor = null
+    releaseHeld = null
     accountState.id = 'acc-1'
     document.documentElement.dataset.theme = 'v8'
     window.history.replaceState({}, '', '/rich-menus/new?id=scope-draft&step=buttons')
@@ -112,6 +122,42 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
     for (const url of templateUrls()) {
       expect(url).toContain('account_id=acc-1')
     }
+  })
+
+  it('編集の入口（?id=…&step=…）からでも、テンプレート一覧の取得に選択accountが付く', async () => {
+    const { default: RichMenuEditPage } = await import('../edit/page')
+    window.history.replaceState({}, '', '/rich-menus/edit?id=scope-draft&step=buttons')
+    await act(async () => {
+      root.render(<RichMenuEditPage />)
+    })
+    await settle(100)
+    expect(templateUrls().length).toBeGreaterThan(0)
+    for (const url of templateUrls()) expect(url).toContain('account_id=acc-1')
+  })
+
+  it('切り替える前のアカウントの候補が遅れて届いても、今のアカウントの候補に混ぜない', async () => {
+    holdTemplatesFor = 'acc-1'
+    await act(async () => {
+      root.render(<NewRichMenuPage />)
+    })
+    await settle(50)
+    accountState.id = 'acc-2'
+    await act(async () => {
+      root.render(<NewRichMenuPage />)
+    })
+    await settle(100)
+    await act(async () => { releaseHeld?.() })
+    await settle(100)
+    await act(async () => {
+      fireEvent.click(host.querySelector('input[type="radio"][aria-label="テンプレートを送る"]')!)
+    })
+    await settle(50)
+    await act(async () => {
+      fireEvent.click(host.querySelector('button[aria-label="送るテンプレート：選ぶ"]')!)
+    })
+    await settle(50)
+    expect(document.querySelector('input[type="radio"][aria-label="予約確認"]')).not.toBeNull()
+    expect(document.querySelector('input[type="radio"][aria-label="お知らせ"]')).toBeNull()
   })
 
   it('切り替えたら前の候補にしかない選択を外して知らせる', async () => {

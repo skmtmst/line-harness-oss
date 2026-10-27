@@ -14,10 +14,15 @@ import { describe, expect, it } from 'vitest'
 
 const SRC = join(__dirname, '..')
 
-/** 札・履歴として「失敗しました」で終わってよい所。理由を書く。 */
-const STATUS_LABELS: Record<string, string> = {
-  'app/booking/bookings/new/page.tsx': '予約確認の送信結果の札',
-  'components/staff/login-audit.tsx': 'ログイン記録の1行',
+/**
+ * 札・履歴として「失敗しました」で終わってよい文。ファイルごと外さず、その文だけを許す
+ * （同じファイルに足した利用者向けの文は見逃さない）。札として出ることは描画の試験が見る：
+ * - 予約確認の送信結果の札：app/booking/bookings/new/page-instant.test.tsx
+ * - ログイン記録の1行：app/error-copy-status-labels-react.test.tsx
+ */
+const STATUS_LABELS: Record<string, string[]> = {
+  'app/booking/bookings/new/page.tsx': ["'送信に失敗しました'"],
+  'components/staff/login-audit.tsx': ["'ログインに失敗しました'"],
 }
 
 function sources(dir: string, out: string[] = []): string[] {
@@ -33,15 +38,12 @@ describe('失敗の文に立て直し方がある', () => {
   it('「〜失敗しました」で終わる文を画面に出さない（札・履歴を除く）', () => {
     const hits = sources(SRC).flatMap((path) => {
       const file = relative(SRC, path).split('\\').join('/')
-      if (STATUS_LABELS[file]) return []
-      return (readFileSync(path, 'utf8').match(/['"][^'"`\n]{0,40}失敗しました['"]/g) ?? []).map((m) => `${file}: ${m}`)
+      const allowed = STATUS_LABELS[file] ?? []
+      return (readFileSync(path, 'utf8').match(/['"][^'"`\n]{0,40}失敗しました['"]/g) ?? [])
+        .filter((m) => !allowed.includes(m))
+        .map((m) => `${file}: ${m}`)
     })
     expect(hits, '「。通信を確かめて、もう一度お試しください。」などを続けてください').toEqual([])
   })
 
-  it('例外の札は、いまもその文を持っている（直したら表から消す）', () => {
-    for (const file of Object.keys(STATUS_LABELS)) {
-      expect(readFileSync(join(SRC, file), 'utf8'), file).toMatch(/['"][^'"`\n]{0,40}失敗しました['"]/)
-    }
-  })
 })

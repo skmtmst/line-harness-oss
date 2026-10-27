@@ -102,7 +102,7 @@ export function PhoneStaffStep({ menu, staff, designationFree, status = 'ready' 
                   <span className={styles.avatar} aria-hidden="true">{person.display_name.slice(0, 1)}</span>
                   <span className={styles.cardText}>
                     <span className={styles.cardName}>{person.display_name}</span>
-                    <span className={styles.cardDesc}>{`${person.role ?? 'スタッフ'}・指名料なし`}</span>
+                    <span className={styles.cardDesc}>{`${person.role ?? 'スタッフ'}・${(person.nomination_fee ?? 0) > 0 ? `指名料 +¥${polishFormatNumber(person.nomination_fee ?? 0)}` : '指名料なし'}`}</span>
                   </span>
                 </div>
               ))}

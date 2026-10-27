@@ -164,6 +164,22 @@ describe('R264〜R268 実行詳細', () => {
     expect(badge?.textContent).toContain('送達不明')
   })
 
+  it('写せる記録の状態も送達不明と書く（配信なしと写さない）', async () => {
+    apiMocks.runDetail.mockResolvedValue({
+      success: true,
+      data: { ...detail('account-1').data, status: 'suppressed', errorCode: 'delivery_unknown' },
+    })
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    await render()
+    const copy = host.querySelector<HTMLButtonElement>('button[aria-label="この記録をコピー"]')
+    expect(copy).not.toBeNull()
+    await act(async () => { copy!.click() })
+    expect(writeText).toHaveBeenCalledTimes(1)
+    expect(writeText.mock.calls[0][0]).toContain('送達不明')
+    expect(writeText.mock.calls[0][0]).not.toContain('配信・処理なし')
+  })
+
   it('R267: 配信なし（suppressed）の記録は一覧と同じ「配信なし」を出す', async () => {
     apiMocks.runDetail.mockResolvedValue({
       success: true,
