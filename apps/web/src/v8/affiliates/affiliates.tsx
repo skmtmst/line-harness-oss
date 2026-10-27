@@ -1,15 +1,13 @@
 'use client'
 
 /*
- * ★V8 成果とアフィリエイトの入口（/affiliates）。?tab= で5つのタブを切り替える。
+ * ★V8 成果とアフィリエイトの入口（/affiliates）。?tab= で6つのタブを切り替える。
  * 受け付ける指定は今の画面と同じ（BEHAVIOR.md「受け付ける URL と指定」）。
  *
- * オーナー決定：コンバージョン（成果地点）と成果とアフィリエイトは別画面。
- * `?tab=points` はコンバージョンの画面へ返す（古い URL を壊さない）。
+ * コンバージョン（成果地点）も同じ外枠のタブとして開く。
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
@@ -24,17 +22,14 @@ import OffersTab from './offers'
 import ApprovalsTab from './approvals'
 import PaymentTab from './payment'
 import ReportTab from './report'
+import ConversionListV8 from '@/v8/conversions/list'
 
 /* 上の帯・タブの題は画面名だけ（タブ名を括弧で足さない。・ と同じ・2026-10-15 判定役）。 */
 const PAGE_TITLE = '成果とアフィリエイト'
 
 function AffiliatesInner() {
-  const router = useRouter()
   const params = useSearchParams()
   const rawTab = params.get('tab')?.split('/')[0]
-  useEffect(() => {
-    if (rawTab === 'points') router.replace('/conversions?tab=points')
-  }, [rawTab, router])
   const tab: AffiliateTabKey = AFFILIATE_TABS.some((item) => item.key === rawTab) ? (rawTab as AffiliateTabKey) : 'affiliates'
   const focusAffiliateId = params.get('affiliate')
 
@@ -91,6 +86,7 @@ function AffiliatesInner() {
       {tab === 'approvals' ? <ApprovalsTab key={tab} /> : null}
       {tab === 'payment' ? <PaymentTab key={tab} /> : null}
       {tab === 'report' ? <ReportTab key={tab} /> : null}
+      {tab === 'points' ? <ConversionListV8 key={tab} accountId={selectedAccountId} embedded /> : null}
     </AffiliateShell.Provider>
   )
 }

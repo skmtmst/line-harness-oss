@@ -97,13 +97,12 @@ describe('Issue #637 画面名とナビ名の一致', () => {
     expect(menuLabel('/ec-commerce')).toBe('EC連携')
   })
 
-  it('独立したコンバージョンと成果・アフィリエイトが上部バーへ画面名を渡す', () => {
-    // タブ名を引く古い関数（conversions/conversions-tab-title.ts）はどの画面も使っていないので 2026-10-07 に消した。
-    // 画面名を渡すのは下の page.tsx と affiliates-v8.tsx（今の画面）。
+  it('旧コンバージョン一覧から統合後の成果地点タブへ移す', () => {
     const src = read('app/conversions/page.tsx')
-    expect(src).toContain("usePageTitle('コンバージョン')")
     expect(src).toContain('router.replace(target)')
-    expect(src).toContain('`/affiliates?${params.toString()}`')
-    // 成果とアフィリエイトの画面名は entry-behavior.test.tsx で実入口を描画して確かめる。
+    expect(src).toContain('`/affiliates?${next.toString()}`')
+    expect(src).toContain("next.set('tab', tab && AFFILIATE_TABS.has(tab) ? tab : 'points')")
+    expect(read('v8/affiliates/frame.tsx')).toContain("{ key: 'points', label: 'コンバージョン'")
+    // 統合先の実入口と旧URLの検索条件維持は entry-behavior.test.tsx で描画して確かめる。
   })
 })
