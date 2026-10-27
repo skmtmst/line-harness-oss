@@ -1,14 +1,43 @@
 // @vitest-environment happy-dom
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import FilterChip from './filter-chip'
 import { ResponsiveFilterChips } from './list-toolbar'
-import ListToolbar from './list-toolbar'
+import ListToolbar, { ListToolbarLeading, ListToolbarRow } from './list-toolbar'
 import Select from './select'
 import { SaveErrorField } from './save-form-errors'
+import { FilterPopover } from './filter-popover'
+import selectStyles from './select.module.css'
 
 afterEach(cleanup)
+
+it.each(['filters', 'leading'])('道具段の自動幅は窓の内側の全幅・内容幅・明示幅と選択を保つ: %s', async placement => {
+  const change = vi.fn()
+  const options = [{ value: 'all', label: 'すべて' }, { value: 'chosen', label: '選んだ条件' }]
+  const controls = <>
+    <Select aria-label="段の条件" size="full" width={320} value="all" options={options} onChange={change} />
+    <FilterPopover open onClose={() => {}} label="追加の条件" trigger={<button>絞り込みを開く</button>} actions={<button>適用する</button>}>
+      <Select aria-label="窓の全幅" size="full" value="all" options={options} onChange={change} />
+      <Select aria-label="窓の内容幅" size="content" value="all" options={options} onChange={change} />
+      <Select aria-label="窓の明示幅" width={119} value="all" options={options} onChange={change} />
+    </FilterPopover>
+  </>
+  render(placement === 'filters' ? <ListToolbar filters={controls} />
+    : <ListToolbarLeading leading={controls}><ListToolbarRow><button>通常の操作</button></ListToolbarRow></ListToolbarLeading>)
+  const direct = screen.getByRole('button', { name: '段の条件' }).parentElement!
+  expect(direct.classList.contains(selectStyles.content)).toBe(true)
+  expect(direct.style.width).toBe('')
+  const full = await screen.findByRole('button', { name: '窓の全幅' })
+  expect(full.parentElement!.classList.contains(selectStyles.full)).toBe(true)
+  expect(screen.getByRole('button', { name: '窓の内容幅' }).parentElement!.classList.contains(selectStyles.content)).toBe(true)
+  expect(screen.getByRole('button', { name: '窓の明示幅' }).parentElement!.style.width).toBe('119px')
+  fireEvent.click(full)
+  const chosen = await screen.findByRole('option', { name: '選んだ条件' })
+  fireEvent.click(chosen.querySelector('button') ?? chosen)
+  expect(change).toHaveBeenCalledExactlyOnceWith('chosen')
+})
+
 function Harness({ multiple = false, withAll = false }: { multiple?: boolean; withAll?: boolean }) {
   const [chosen, setChosen] = useState<string[]>(multiple ? ['有効', '停止中'] : [])
   return <><output aria-label="適用する条件">{chosen.join(',') || 'all'}</output><ResponsiveFilterChips>

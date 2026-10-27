@@ -47,6 +47,8 @@ import Dialog from './src/components/shared/dialog';
 import ConfirmDialog from './src/components/shared/confirm-dialog';
 import Drawer from './src/components/shared/drawer';
 import Button from './src/components/shared/button';
+import {ListToolbarRow} from './src/components/shared/list-toolbar';
+import {FilterPopover} from './src/components/shared/filter-popover';
 import CommandPalette from './src/components/shared/command-palette';
 import Notice from './src/components/shared/notice';
 import {DialogContentRow} from './src/components/shared/dialog-form-row';
@@ -54,6 +56,7 @@ import KpiBand from './src/components/shared/kpi-band';
 import KpiCard from './src/components/shared/kpi-card';
 function Fixture(){
  const [window,setWindow]=useState(''),[value,setValue]=useState(false),[current,setCurrent]=useState('now'),[countState,setCountState]=useState('active');
+ const [filterOpen,setFilterOpen]=useState(false);
  const steps=[{key:'done',label:'事前確認',state:'done',onSelect:()=>setCurrent('done')},{key:'now',label:'アカウント接続',state:'current'}, {key:'next',label:'接続確認',state:'todo'}, {key:'choice',label:'使い方を選ぶ',state:'todo'}, {key:'finish',label:'完了',state:'todo'}];
  const props={open:!!window,onCancel:()=>setWindow(''),onConfirm:()=>setWindow(''),title:'新しく作る',description:'名前を入力してください。内容は作成する前に確認できます。',headerIcon:<svg viewBox="0 0 16 16"><path d="M2 2h12v12H2z" fill="none" stroke="currentColor"/></svg>};
  return <main><CommandPalette items={[{href:"/friends",label:"友だち一覧"}]}/>
@@ -113,6 +116,17 @@ function Fixture(){
     <NumberField short aria-label="単位のある予算" defaultValue="12345" unit="円"/>
     <div style={{display:'flex'}}><NumberField aria-label="紹介者へのマイル付与" defaultValue="0" unit="mile"/></div>
   </section>
+  <section id="toolbar-portal-boundary"><ListToolbarRow>
+    <Select size="full" width={320} aria-label="段の状態" value="all" options={[{value:'all',label:'状態：すべて'}]} onChange={()=>{}}/>
+    <FilterPopover open={filterOpen} onClose={()=>setFilterOpen(false)} label="窓の幅を確認する" trigger={<Button onClick={()=>setFilterOpen(true)}>幅の絞り込みを開く</Button>} actions={<Button onClick={()=>setFilterOpen(false)}>窓を閉じる</Button>}>
+      <Select size="full" aria-label="窓の対応" value="all" options={[{value:'all',label:'対応：すべて'}]} onChange={()=>{}}/>
+      <EntitySelect size="full" aria-label="窓の担当者" value="all" options={[{value:'all',label:'担当者：すべて'}]} onChange={()=>{}}/>
+      <EntitySelect size="full" aria-label="窓のシナリオ" value="all" options={[{value:'all',label:'シナリオ：すべて'}]} onChange={()=>{}}/>
+      <Select size="content" aria-label="窓の内容幅" value="short" options={[{value:'short',label:'短い'}]} onChange={()=>{}}/>
+      <EntitySelect size="full" width={119} aria-label="窓の明示幅" value="fixed" options={[{value:'fixed',label:'固定'}]} onChange={()=>{}}/>
+      <Button fullWidth>詳細条件</Button>
+    </FilterPopover>
+  </ListToolbarRow></section>
   <section id="row-controls"><RowMenu label="行の操作" items={[{label:'初期値に戻す…',tone:'danger',onSelect:()=>{}}]} /><RowMenu label="小さい行の操作" appearance="box" items={[{label:'編集',onSelect:()=>{}}]} /><Pagination page={1} pageCount={2} onPageChange={()=>{}} /><Pagination page={1} pageCount={1} summary="1件中1件" ariaLabel="1ページの送り" onPageChange={()=>{}} /></section>
   <section id="notices" style={{maxWidth:720}}>
    <Notice tone="info" heading="回復コードが残っていません" message="認証アプリが使えない時に入れなくなる前に、作り直してください。" action={<Button>作り直す</Button>} onClose={()=>{}}/>
@@ -371,6 +385,50 @@ for (const width of [1152,1440,1920]) {
       })
       assert.ok(result.minimumInput>=48,JSON.stringify(result));assert.ok(result.displayWidth<=result.inputWidth+0.5,JSON.stringify(result));assert.equal(result.search,360);assert.ok(result.textFits,JSON.stringify(result));assert.ok(result.unitInside,JSON.stringify(result));assert.equal(result.numberValue,'12345');assert.equal(result.display,'12,345');assert.equal(result.height,36)
       await page.getByRole('spinbutton',{name:'単位のある予算'}).focus();await expect(page.locator('[data-number-display]')).toHaveCount(0)
+    } finally {await browser.close()}
+  })
+
+  test(`道具段は内容幅へそろえ、絞り込み窓の幅指定を保持する ${width}`, async () => {
+    const browser=await connectGuardBrowser()
+    try {
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      const direct=await page.getByRole('button',{name:'段の状態',exact:true}).evaluate(el=>{const b=el.closest('[data-choice-field]').getBoundingClientRect();return {x:b.x,width:b.width}})
+      assert.ok(direct.width>40&&direct.width<200,JSON.stringify(direct))
+      await page.getByRole('button',{name:'幅の絞り込みを開く',exact:true}).click()
+      const panel=page.getByRole('dialog',{name:'窓の幅を確認する',exact:true})
+      const measure=()=>panel.evaluate(root=>{
+        const r=root.getBoundingClientRect(),s=getComputedStyle(root)
+        const box=name=>{const frame=root.querySelector('button[aria-label="'+name+'"]').closest('[data-choice-field]'),b=frame.getBoundingClientRect();return {x:b.x,right:b.right,width:b.width}}
+        const detail=[...root.querySelectorAll('button')].find(el=>el.textContent==='詳細条件').getBoundingClientRect()
+        return {width:r.width,left:r.x+parseFloat(s.paddingLeft),right:r.right-parseFloat(s.paddingRight),full:['窓の対応','窓の担当者','窓のシナリオ'].map(box),content:box('窓の内容幅'),fixed:box('窓の明示幅'),detail:{x:detail.x,right:detail.right}}
+      })
+      const assertFull=value=>assert.ok(value.full.every(box=>Math.abs(box.x-value.left)<=0.5&&Math.abs(box.right-value.right)<=0.5),JSON.stringify(value))
+      await expect.poll(async()=>{const value=await measure();return value.full.every(box=>Math.abs(box.x-value.left)<=0.5&&Math.abs(box.right-value.right)<=0.5)}).toBe(true)
+      assertFull(await measure())
+      for(const panelWidth of [280,180]) {
+        await panel.evaluate((el,panelWidth)=>{el.style.width=panelWidth+'px'},panelWidth)
+        await expect.poll(async()=>Math.abs((await measure()).width-panelWidth)<=0.5).toBe(true)
+        await expect.poll(async()=>{const value=await measure();return value.full.every(box=>Math.abs(box.x-value.left)<=0.5&&Math.abs(box.right-value.right)<=0.5)}).toBe(true)
+        const value=await measure()
+        assertFull(value)
+        assert.ok(value.content.width<value.right-value.left-1,JSON.stringify(value))
+        assert.ok(value.content.right<=value.right+0.5,JSON.stringify(value))
+        assert.ok(Math.abs(value.fixed.width-119)<=0.5,JSON.stringify(value))
+        assert.ok(Math.abs(value.detail.x-value.left)<=0.5&&Math.abs(value.detail.right-value.right)<=0.5,JSON.stringify(value))
+      }
+      for(const name of ['窓の対応','窓の担当者']) {
+        const control=page.getByRole('button',{name,exact:true})
+        const original=await control.evaluate(el=>el.closest('[data-choice-field]').getAttribute('style'))
+        try {
+          await control.evaluate(el=>{el.closest('[data-choice-field]').style.width='max-content'})
+          const broken=await measure()
+          assert.throws(()=>assertFull(broken))
+        } finally {
+          await control.evaluate((el,original)=>{const frame=el.closest('[data-choice-field]');if(original===null)frame.removeAttribute('style');else frame.setAttribute('style',original)},original)
+        }
+        assertFull(await measure())
+      }
     } finally {await browser.close()}
   })
 
