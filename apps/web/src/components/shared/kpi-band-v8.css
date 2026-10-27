@@ -197,11 +197,14 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]
  * マスは名前つきの容器（kpi-card）にし、数のカードの形の細いマスの切り替えもこれで測る。
  */
 html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] { container: kpi-card / inline-size; }
-html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
-  font-size: min(var(--tpl-band-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
-}
-html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
-  font-size: min(var(--tpl-band-compact-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
+/* マスの幅が決まらない置き場（中身で幅を決める横並びなど）では幅が0と測られるので、縮めずに元の大きさのままにする。 */
+@container (min-width: 1px) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
+    font-size: min(var(--tpl-band-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
+  }
+  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
+    font-size: min(var(--tpl-band-compact-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
+  }
 }
 
 /*
