@@ -1,4 +1,5 @@
 'use client'
+import { ProgressBar } from '@/components/shared/progress'
 import {
 type BannerUsage
 } from '@/lib/hq-banners';
@@ -26,9 +27,7 @@ export function UsageBars({ usage, heading, v8Layout }: { usage: BannerUsage | n
         return (
           <div key={label} className={v8Layout ? 'flex flex-col gap-1' : 'flex items-center gap-2'}>
             {v8Layout ? <div className={styles.v8UsageLabels}><span>{label}</span><span>{`残り ${bucket.remaining} / ${bucket.limit} 枚`}</span></div> : <span className="w-8 shrink-0 text-micro text-ink-secondary">{label}</span>}
-            <span className={v8Layout ? 'h-1.5 w-full shrink-0 overflow-hidden rounded-pill bg-hairline' : 'h-1.5 min-w-0 flex-1 overflow-hidden rounded-pill bg-hairline'}>
-              <span className="block h-full rounded-pill bg-success" style={{ width: `${pct}%` }} />
-            </span>
+            <ProgressBar appearance="quota" className={v8Layout ? undefined : 'min-w-0 flex-1'} value={pct} label={`${label}の残り`} />
             {v8Layout ? null : <span className="shrink-0 text-micro text-ink-secondary">残り{bucket.remaining}/{bucket.limit}枚</span>}
           </div>
         )

@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { readFileSync, readdirSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -85,5 +85,22 @@ describe('開き先がない（TargetMissing）', () => {
     // 主ボタン（緑の塗り）は使わない。副ボタンだけ。
     expect(tsx).not.toMatch(/variant="primary"/)
     expect(tsx).toContain('variant="secondary"')
+  })
+
+  /** 「選ばれていません」を一覧の空や知らせで手書きすると、形が画面ごとに割れる。上のアカウントを選んでいない時は別の案内なので対象外。 */
+  it('対象なしを一覧の空・知らせで手書きしない', () => {
+    const SRC = join(HERE, '..', '..')
+    const files: string[] = []
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, e.name)
+        if (e.isDirectory()) walk(p)
+        else if (e.name.endsWith('.tsx') && !e.name.includes('.test.')) files.push(p)
+      }
+    }
+    walk(SRC)
+    const hand = /<ListState[^>]*title="(?![^"]*アカウント)[^"]*(指定されていません|選ばれていません)"|<Notice[^>]*>(?![^<{]*アカウント)[^<{]*(指定されていません|選ばれていません)/
+    const hits = files.filter((p) => hand.test(readFileSync(p, 'utf8'))).map((p) => relative(SRC, p))
+    expect(hits, 'TargetMissing kind="unspecified" を使う').toEqual([])
   })
 })

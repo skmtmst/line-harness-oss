@@ -19,6 +19,7 @@ import EditDrawer from './edit-drawer'
 import { KIND_LABEL, KIND_ORDER, KIND_WHEN, KIND_WHO, failureText, waitLabel } from './words'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './auto-line.module.css'
+import { EmptyCell } from '@/components/shared/empty-value'
 
 /*
  * ★V8 EC連携「自動の LINE」（G6-1 `TSRlY`）。カゴ落ち・閲覧落ち・再入荷の3行の表。
@@ -176,7 +177,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
                   )}
                 </Td>
                 <Td>{waitLabel(rule.waitMinutes)}</Td>
-                <Td align="right">{sentCount === undefined ? <span className={styles.unavailableValue}>—</span> : `${formatNumber(sentCount)} 件`}</Td>
+                <Td align="right">{sentCount === undefined ? <EmptyCell /> : `${formatNumber(sentCount)} 件`}</Td>
                 <Td align="right"><span className={styles.unavailableValue} title="クリックの計測はまだつながっていません">—</span></Td>
                 <Td align="right"><span className={styles.unavailableValue} title="購入の計測はまだつながっていません">—</span></Td>
                 <Td align="right"><span className={styles.unavailableValue} title="金額の計測はまだつながっていません">—</span></Td>

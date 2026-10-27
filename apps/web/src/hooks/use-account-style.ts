@@ -19,7 +19,27 @@ function load(accountId: string): Promise<Data> {
   })
 }
 
-/** サーバーで所属を確かめた業種。切替の最初の描画から前の店を返さない。 */
+const REMEMBERED = 'musubo:account-style:'
+/** 同じアカウントで前に読めたスタイル。読み直せない時だけ使う。 */
+function remembered(accountId: string): Data | null {
+  try {
+    const raw = window.localStorage.getItem(REMEMBERED + accountId)
+    const data = raw ? JSON.parse(raw) as Data : null
+    return data && ACCOUNT_STYLES.includes(data.style) ? data : null
+  } catch { return null }
+}
+function remember(accountId: string, data: Data) {
+  try { window.localStorage.setItem(REMEMBERED + accountId, JSON.stringify(data)) } catch { /* 覚えられない端末では毎回読む */ }
+}
+
+/** 読み直せず、前に読めたスタイルで出している時の 1 行。 */
+export const STALE_STYLE_TEXT = '要確認：表示の設定を読み直せていません'
+
+/**
+ * サーバーで所属を確かめた業種。切替の最初の描画から前の店を返さない。
+ * 読み直せない時は、同じアカウントで前に読めたスタイルで出し `stale` を立てる（画面は STALE_STYLE_TEXT を 1 行出す）。
+ * 初めてで分からない時は `error` のまま（業種の画面は開かず、予約を作る入口は止める）。
+ */
 export function useAccountStyle(accountId: string | null | undefined) {
   const [snapshot, setSnapshot] = useState<{ accountId: string; data: Data | null; error: unknown } | null>(null)
   const [tick, setTick] = useState(0)
@@ -29,6 +49,7 @@ export function useAccountStyle(accountId: string | null | undefined) {
     if (!accountId) return
     let active = true
     void load(accountId).then(data => {
+      remember(accountId, data)
       if (active) setSnapshot({ accountId, data, error: null })
     }, error => { if (active) setSnapshot({ accountId, data: null, error }) })
     return () => { active = false }
@@ -41,6 +62,8 @@ export function useAccountStyle(accountId: string | null | undefined) {
     return () => window.removeEventListener(ACCOUNT_STYLE_UPDATED, changed)
   }, [accountId])
   const current = snapshot?.accountId === accountId ? snapshot : null
-  return { data: current?.data ?? null, error: current?.error ?? null, reload,
+  const fallback = current?.error && accountId ? remembered(accountId) : null
+  if (fallback) return { data: fallback, error: null, reload, stale: true, status: 'ready' as const }
+  return { data: current?.data ?? null, error: current?.error ?? null, reload, stale: false,
     status: !accountId ? 'idle' as const : !current ? 'loading' as const : current.error ? 'error' as const : 'ready' as const }
 }

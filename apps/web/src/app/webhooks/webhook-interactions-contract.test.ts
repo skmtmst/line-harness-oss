@@ -1,115 +1,29 @@
-import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+/*
+ * 外部連携「やり取りの記録」の禁止の見張り。読み込み・空・失敗、期間を書いた補足、結果不明の送り直し、
+ * やり直せる範囲の説明、技術的な記録、アカウント切替は v8/webhooks/interactions-behavior.test.tsx と
+ * interactions-v8-react.test.tsx が画面と口の呼び出しで確かめる。タブの件数は webhook-tab-counts.test.tsx。
+ */
 const PAGE = readUiSource(join(import.meta.dirname, '../../v8/webhooks/interactions.tsx'), 'utf8')
 const HOST = readUiSource(join(import.meta.dirname, 'page.tsx'), 'utf8')
-const API = readApiSource(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V8 外部連携・やり取りの記録 Uv9AA', () => {
-  it('実ノードと実ルートを接続する', () => {
-    expect(PAGE).toContain('boardId="Uv9AA"')
-    expect(HOST).toContain("{ key: 'interactions', label: 'やり取りの記録' }")
-    expect(HOST).toContain("{ key: 'outgoing', label: 'こちらから送る' }")
-    expect(HOST).toContain("if (tab === 'interactions') return <InteractionsV8Page />")
-    expect(API).toContain('/api/webhooks/interactions?')
-  })
-
-  it('タブの件数は固定値でなく、一覧の取得結果の総数に接続する(#980)', () => {
-    // 設計が描いた作り物の件数を書かない。一覧0件のアカウントでも
-    // 「こちらから送る 6」「こちらで受け取る 3」と出ていた。
+  it('タブの件数に設計の作り物の数を書かない(#980)', () => {
     expect(HOST).not.toContain("'こちらから送る 6'")
     expect(HOST).not.toContain("'こちらで受け取る 3'")
     expect(HOST).not.toContain("'見本 14'")
-    // 「送る」「受け取る」は、選択中アカウントで絞った一覧と同じ配列の
-    // 総数を、取れたとき（status==='ready'）だけ付ける。
-    expect(HOST).toContain("outgoingStatus === 'ready'")
-    expect(HOST).toContain("incomingStatus === 'ready'")
-    expect(HOST).toContain("label('こちらから送る', outgoingCount)")
-    expect(HOST).toContain("label('こちらで受け取る', incomingCount)")
-    // 「見本」は画面に並べる見本データから別集計する。
-    expect(HOST).toContain('`見本 ${SAMPLE_COUNT}`')
   })
 
-  it('読込・空・失敗を分け、未取得を0件と見せない', () => {
-    expect(PAGE).toContain('aria-busy="true"')
-    expect(PAGE).toContain('kind="empty"')
-    expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('value: known ? known.total : null')
-    expect(PAGE).toContain('日は未取得')
-  })
-
-  it('遅れと成功率に対象期間を書く(IDEA-26)', () => {
-    // 「いつからの数字か」が分からないと遅い・悪いの判断が付かない。
-    // 成功・返事までの時間・未取得の各補足に選択中の期間を入れる。
-    expect(PAGE).toContain('この${periodDays}日で ${formatNumber(known.total > 0')
-    expect(PAGE).toContain('この${periodDays}日でいちばん遅くて')
-    expect(PAGE).toContain('この${periodDays}日は未取得')
-    expect(PAGE).toContain('この${periodDays}日の送受信の処理時間')
-  })
-
-  it('結果が分からない失敗を無条件に再送しない(IDEA-26)', () => {
-    // 単体: 相手先で確かめた確認を挟んでから confirmed=true で送る。
-    expect(PAGE).toContain("item.failureReasonCode === 'unknown'")
-    expect(PAGE).toContain('setConfirmingRetry(item)')
-    expect(PAGE).toContain('確かめたので送り直す')
-    expect(PAGE).toContain('void retry(confirmingRetry, true)')
-    // まとめて: 結果不明は送らず件数だけ返し、1件ずつの復旧を案内する。
-    expect(PAGE).toContain('d.needsReview')
-    expect(PAGE).toContain('確かめてから、一覧で1件ずつやり直してください')
-    expect(API).toContain('JSON.stringify({ confirmed: options?.confirmed === true })')
-  })
-
-  it('やり直せる範囲とやり直し済みのつながりを業務の言葉で示す(IDEA-26)', () => {
-    expect(PAGE).toContain('retryabilityText(item, canRetry)')
-    expect(PAGE).toContain('前の失敗をやり直した記録')
-    expect(PAGE).toContain('送り直せるのは統括と管理者です')
-    expect(PAGE).toContain('相手側でもう一度送ってもらってください')
-    // d23b R408: 件数は「送り直せる数」と「対象外の数」に分けて出す。
-    // 結果不明の件数も引き続き案内へ出す。
-    expect(PAGE).toContain('summary.resultUnknown')
-    expect(PAGE).toContain('summary.retryable')
-    expect(PAGE).toContain('summary.outgoingFailed')
-  })
-
-  it('技術的な記録は必要なときだけ開き、秘密情報はそこにも出さない(IDEA-26)', () => {
-    expect(PAGE).toContain('技術的な記録を開く')
-    expect(PAGE).toContain('{item.eventType}')
-    expect(PAGE).toContain('item.responseStatus !== null')
-    expect(PAGE).toContain('{item.retryOfId')
+  it('送受信の本文を記録の窓へ持ち込まない(IDEA-26)', () => {
     expect(PAGE).not.toContain('request_body_json')
     expect(PAGE).not.toContain('requestBodyJson')
-  })
-
-  // 本文・秘密値・内部エラーの表示は interactions-v8-react.test.tsx の実DOMと通信回数で確かめる。
-
-  it('送り直しは管理者だけに見せ、単体と一括の両方を持つ', () => {
-    // 役割の出し分けは interactions-v8-react.test.tsx の実DOMと故障対照で確かめる。
-    expect(PAGE).toContain('失敗したものをまとめてやり直す')
-    expect(PAGE).toContain('return allowed && item.canRetry &&')
-  })
-
-  it('アカウント切替後に前の記録や送り直し結果を表示しない', () => {
-    expect(PAGE).toContain('const generation = ++generationRef.current')
-    expect(PAGE).toContain('generationRef.current !== generation')
-    expect(PAGE).toContain('accountRef.current !== accountId')
-    expect(PAGE).toContain('loadedAccountId !== accountId')
-    expect(PAGE).toContain('if (accountRef.current === accountId) setRetrying(null)')
-    expect(PAGE).toContain('if (accountRef.current === accountId) setBulkRetrying(false)')
   })
 
   it('本文に画面タイトルや説明を重ねない', () => {
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('<h1')
-  })
-
-  // d23d R407: 受け取りの「試し」は実際の受信ではない。
-  // 「届いた記録」「受け取ったとき」の案内を試しには出さない。
-  it('受け取りの試しの記録は実処理と別の案内にする(R407)', () => {
-    expect(PAGE).toContain("item.eventType === 'incoming_webhook.test'")
-    expect(PAGE).toContain('の受け取りを試した')
-    expect(PAGE).toContain('受け取りの試しの記録です。実際の受け取りと処理の実行はしていないため')
   })
 })

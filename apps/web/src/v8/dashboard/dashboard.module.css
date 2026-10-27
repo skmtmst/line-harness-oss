@@ -23,16 +23,6 @@
   color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh);
 }
 
-/* 札（黄・緑・赤）。 */
-.tag {
-  display: inline-flex; align-items: center; gap: var(--tpl-db-tag-gap); flex-shrink: 0;
-  padding: var(--tpl-db-tag-pad); border-radius: var(--tpl-db-tag-radius);
-  font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-db-caption-lh); white-space: nowrap;
-}
-.tagWarning { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.tagSuccess { background: var(--color-accent-soft); color: var(--color-success); }
-.tagDanger { background: var(--color-danger-bg); color: var(--color-danger); }
-
 /* ── 段の中の共通の文字 ── */
 .note, .noteBody {
   margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh);
@@ -76,11 +66,6 @@ a.kv:hover .kvKey { text-decoration: underline; }
 .kvFaint .kvValue { color: var(--color-ink-faint); }
 /* 値の左に差の札を並べる（札は値の太さ・色を引き継がない）。 */
 .kvDelta { display: inline-flex; align-items: center; gap: var(--tpl-db-kv-gap); }
-.dot { width: var(--tpl-db-dot); height: var(--tpl-db-dot); flex-shrink: 0; border-radius: var(--radius-pill); background: var(--color-ink-faint); }
-.dotSuccess { background: var(--color-success); }
-.dotDanger { background: var(--color-danger); }
-/* 状態の色の丸（受信箱の状態の札と同じ色：未対応 赤・対応中 橙・保留 灰・対応済み 緑）。 */
-.dotWarning { background: var(--color-warning); }
 /* 行の右に小さな操作（接続状態の「確かめる」）。 */
 .kvWithAction { display: flex; align-items: center; gap: var(--tpl-db-kv-gap); min-width: 0; }
 .kvWithAction > .kv { flex: 1; min-width: 0; }
@@ -104,10 +89,11 @@ a.kv:hover .kvKey { text-decoration: underline; }
 .colBody { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .colWait { width: var(--tpl-db-col-wait); flex-shrink: 0; white-space: nowrap; }
 .colState { width: var(--tpl-db-col-state); flex-shrink: 0; display: flex; }
+/* 種類（メール・LINE）は灰の地の札。状態ではないので点は付けない。 */
 .route {
-  flex-shrink: 0; padding: var(--tpl-db-route-pad); border-radius: var(--tpl-db-route-radius);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
-  color: var(--color-ink-secondary); font-size: var(--text-micro); font-weight: 600; line-height: var(--tpl-db-small-lh);
+  flex-shrink: 0; padding: var(--polish-status-pad); border-radius: var(--polish-status-radius);
+  background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink);
+  font-size: var(--text-caption); font-weight: var(--polish-status-weight); line-height: var(--tpl-db-small-lh);
 }
 .inboxName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-weight: 500; }
 .inboxName:hover, .inboxName:focus-visible { color: var(--color-action); text-decoration: underline; }
@@ -144,7 +130,9 @@ a.planTitle:hover { text-decoration: underline; }
 .figKey { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; }
 
 /* ── 段E：最近の動き ── */
-.activity { display: flex; flex-direction: column; gap: var(--tpl-db-act-gap); padding: var(--tpl-db-act-pad); }
+.activity { display: flex; flex-direction: column; gap: var(--tpl-db-act-gap); margin: 0 var(--tpl-list-inset); padding: var(--tpl-db-act-pad); }
+/* 履歴の縦線が行の間の隙間もつなぐように、共通の行へ隙間を渡す。 */
+.activity { --icon-row-list-gap: var(--tpl-db-act-gap); }
 .activityLink { display: block; color: inherit; text-decoration: none; border-radius: var(--tpl-db-th-radius); }
 .activityLink:hover { background: var(--color-surface-pearl); }
 
@@ -166,3 +154,7 @@ a.planTitle:hover { text-decoration: underline; }
 /* 数のマスの下の補足は1行（狭い幅で2行に割らない）。全文は内訳で読める。 */
 .todayBand > * > p:last-child > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pendingMeta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); }
+
+/* 受信の内容が絵文字だけの時の添え書き。 */
+.inboxEmoji { display: inline-flex; align-items: baseline; gap: var(--space-4); min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
+.inboxEmojiNote { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--color-ink-faint); font-size: var(--text-caption); }

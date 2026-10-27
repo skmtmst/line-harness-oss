@@ -43,7 +43,7 @@ describe('一斉配信の段ごとの確かめ', () => {
   })
 
   it('配信名が空・長すぎるときは基本の段で止まる', () => {
-    expect(broadcastNextBlockReason(broadcastStepProblems(input({ title: '  ' })), 'basic')).toBe('管理用タイトルを入力してください')
+    expect(broadcastNextBlockReason(broadcastStepProblems(input({ title: '  ' })), 'basic')).toBe('配信名を入力してください')
     expect(broadcastNextBlockReason(broadcastStepProblems(input({ title: 'あ'.repeat(61) })), 'basic')).toBe('配信名は60文字までにしてください')
     expect(broadcastNextBlockReason(broadcastStepProblems(input({ title: 'あ'.repeat(60) })), 'basic')).toBeNull()
   })
@@ -114,7 +114,7 @@ describe('一斉配信の段ごとの確かめ', () => {
 
   it('保存の検査は段の順で最初の不備を返す（今の検査と同じ順）', () => {
     const problems = broadcastStepProblems(input({ title: '', audienceProblem: '条件を決めてください', bubbleProblem: '本文を入力してください' }))
-    expect(broadcastSaveProblem(problems)).toBe('管理用タイトルを入力してください')
+    expect(broadcastSaveProblem(problems)).toBe('配信名を入力してください')
     expect(broadcastSaveProblemStep(problems)).toBe('basic')
   })
 

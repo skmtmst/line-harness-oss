@@ -7,110 +7,30 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
 
-/** メディアの削除確認（設計 `YfTfJ` 15-1-C ／ 契約 #610）。 */
-describe('メディアの削除確認', () => {
-  it('窓を開けてから使用先を読む', () => {
-    // 一覧を出すたびに全件ぶん読むと、消さない人にも7種類の走査が走る。
-    expect(PAGE).toContain('void openDelete(item)')
-    expect(PAGE).toContain('api.media.deleteImpact')
-  })
-
-  it('使用先が読めないときは消させない', () => {
-    /*
-     * 7種類のどれかに残ったまま消すと、その画面が壊れた画像を指す。
-     */
-    expect(PAGE).toContain('使われている場所を確認できませんでした')
-    expect(PAGE).toContain('canDeleteMedia({ impact, busy: deleteBusy })')
-  })
-
-  it('消せないときは押し口ごと出さない', () => {
-    // 押せるように見えて何も起きない形にしない。
-    expect(PAGE).toContain('canDeleteMedia({ impact, busy: deleteBusy }) ? (')
+/*
+ * メディアの削除確認（設計 `YfTfJ` 15-1-C ／ 契約 #610）とまとめて削除（#550）の動きは、
+ * src/v8/contents/list-delete.test.tsx が画面を描いて押し、API への要求と画面の変化で守る。
+ * ここには禁止の見張りと、画面から確かめられない M3 の文の組み立てだけを残す。
+ */
+describe('メディアの削除確認（禁止の見張り）', () => {
+  it('ブラウザ標準の確認窓で消させない', () => {
     expect(PAGE).not.toContain('confirm(`')
-  })
-
-  it('409 は読み直してから見せる', () => {
-    // 読んだあとに使われ始めた場合。消せない理由が変わっている。
-    expect(PAGE).toContain('e.status === 409')
-    expect(PAGE).toContain('いま使われ始めたため')
-  })
-
-  it('開ける先があるときだけリンクにする', () => {
-    expect(PAGE).toContain('ref.href ? (')
-    expect(PAGE).toContain('開けません')
-  })
-
-  it('いつ時点で確かめたかを書く', () => {
-    // 「いつの話か」が無いと、消す判断ができない。
-    expect(PAGE).toContain('checkedAtText(impact.checkedAt)')
-    expect(PAGE).toContain('7種類を確認しました')
-  })
-
-  it('使用中は削除ではなく、影響確認つきの差し替えへ進める', () => {
-    expect(PAGE).toContain('setReplacementFor(source)')
-    expect(PAGE).toContain('別のメディアに差し替える')
-    expect(PAGE).toContain('使用先をまとめて差し替えられます')
-  })
-
-  it('撮影の押し口に印を付ける', () => {
-    // 札の操作は「使用箇所」＋「…」の1行。窓の撮影は「…」→中の
-    // 削除項目の2手で開ける。印は項目側（`qaOpen`）に付ける。
-    expect(PAGE).toContain("qaOpen: 'YfTfJ'")
-    expect(PAGE).toContain('data-design-node="YfTfJ"')
-  })
-
-  it('遅れて返った別の結果を、3つで照合して捨てる', () => {
-    /*
-     * Aを読み込み中に窓を閉じてBを開くと、あとから返るAの結果がBの窓に
-     * 出る。読んでいるものと押せるものが食い違う。
-     *
-     * **メディアIDだけでは足りない。** 同じメディアを開き直したときや、
-     * アカウントを変えたあとに前の返事が届いたときを止められない。
-     */
-    expect(PAGE).toContain('impactRequestRef.current.accountId === at.accountId')
-    expect(PAGE).toContain('impactRequestRef.current.mediaId === at.mediaId')
-    expect(PAGE).toContain('impactRequestRef.current.generation === at.generation')
-    expect(PAGE).toContain('if (!isCurrent()) return')
-  })
-
-  it('409の読み直しも同じ3つで照合する', () => {
-    // 読み直しの返事だけ素通しにすると、そこから取り違えが入る。
-    expect(PAGE).toContain('読み直しの返事も、同じ3つで照合してから映す')
-    expect(PAGE).toContain('if (same && again.success) setImpact(again.data)')
-  })
-
-  it('アカウント切替と窓の閉鎖で、前の読み込み・削除結果を無効にする', () => {
-    expect(PAGE).toContain('impactRequestRef.current.generation + 1')
-    expect(PAGE).toContain('deleteRequestRef.current += 1')
-    expect(PAGE).toContain('setDeleting(null)')
-    expect(PAGE).toContain('latestAccountRef.current === accountAtRequest')
-    expect(PAGE).toContain('if (!isCurrentDelete()) return')
   })
 })
 
-/** まとめて削除（点検 #498 の M2・M3／票 #550）。 */
-describe('まとめて削除の途中交代と結果', () => {
+/** まとめて削除（点検 #498 の M3／票 #550）。 */
+describe('まとめて削除の結果', () => {
   const source = readImplementation(join(dirname(fileURLToPath(import.meta.url)), '../../v8/contents/list-bulk-delete.tsx'), 'utf8')
   const tree = ts.createSourceFile('list-bulk-delete.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const declaration = tree.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'deleteMediaSelection')
   if (!declaration || !ts.isFunctionDeclaration(declaration) || !declaration.body) throw new Error('deleteMediaSelection が見つかりません')
   const bulkDelete = declaration.body.getText(tree)
 
-  it('#550 M2 アカウントが変わったら処理中の窓を閉じて抜ける', () => {
-    // 戻さずに抜けると「処理中…」のまま窓が閉じなくなる。
-    expect(bulkDelete).toContain('if (accountAtRequest !== latestAccountRef.current) {')
-    expect(bulkDelete).toContain('setBulkBusy(false)')
-    expect(bulkDelete).toContain('setBulkConfirm(null)')
-    expect(bulkDelete).toContain('setBulkProgress(null)')
-  })
-
-  it('#550 M2 何件目かを出し、件数が多くても止まって見せない', () => {
-    expect(bulkDelete).toContain('setBulkProgress({ done:')
-    expect(PAGE).toContain('処理中…（')
-    expect(PAGE).toContain('aria-live="polite"')
-  })
-
-  it('#550 M3 成功数と失敗した名前を1つの文にまとめる', () => {
+  /*
+   * 一部失敗の文は、画面ではすぐ後の一覧の読み直しが消してしまい、描いても見えない
+   * （2026-10-26 に見つけた不具合。直すまで文字の確かめを残す）。
+   */
+  it('まとめて削除の結果は成功数と失敗した名前を1つの文にまとめる', () => {
     // 件ごとに上書きすると最後の1件しか残らない。
     expect(bulkDelete).toContain('summarizeBulkDeleteResult(deleted, failedNames)')
     expect(bulkDelete).toContain('failedNames.push(name)')

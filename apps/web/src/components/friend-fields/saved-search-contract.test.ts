@@ -9,56 +9,28 @@ const friendsPage = readFileSync(resolve(root, 'src/app/friends/page.tsx'), 'utf
 const advanced = readFileSync(resolve(root, 'src/components/friends/advanced-search-dialog.tsx'), 'utf8')
 const list = readFileSync(resolve(root, 'src/v8/tags/searches-tab.tsx'), 'utf8') + readFileSync(resolve(root, 'src/components/friend-fields/saved-search-list.tsx'), 'utf8')
 
-describe('V8 保存した検索の画面契約', () => {
-  it('XBkiQを既存の保存APIへ接続する', () => {
-    expect(editPage).toContain('api.savedSearches.update')
-    expect(editPage).toContain('api.savedSearches.create')
-    expect(editPage).toContain('api.savedSearches.delete')
-    expect(editPage).toContain('api.savedSearches.preview')
-    expect(editPage).toContain('api.savedSearches.detail')
-    expect(editPage).toContain('すべて満たす')
-    expect(editPage).toContain('どれかを満たす人')
-  })
-
+/*
+ * 禁止の見張りだけを文字で持つ。動きは描いて押す試験が見る：
+ * 一覧＝`v8/tags/searches-tab-react.test.tsx`、編集＝`v8/tag-edit/search-edit-actions.test.tsx`、
+ * 友だち一覧の保存＝`components/friends/advanced-search-save-react.test.tsx`。
+ */
+describe('V8 保存した検索の禁止の見張り', () => {
   it('保存と呼び出しをブラウザ1台だけのlocalStorageへ戻さない', () => {
-    expect(advanced).toContain('api.friendSavedViews.create')
-    expect(friendsPage).toContain('api.friendSavedViews.list')
     expect(advanced + friendsPage).not.toContain("localStorage.setItem('friends.savedSearch'")
     expect(advanced + friendsPage).not.toContain("localStorage.getItem('friends.savedSearch'")
   })
 
-  it('一覧の適用リンクと編集リンクを分ける', () => {
-    expect(list).toContain('/friends?savedSearch=')
-    expect(list).toContain('/tags/searches/edit?id=')
-    /*
-      #1014 ATTR-24: 省略した名前のヒントは「条件を確認・編集」の固定文
-      ではなく、名前そのもの（title）と「名前 を編集」の読み上げに分ける。
-    */
-    expect(list).toContain('<TruncatedText value={String(search.name')
-    expect(readFileSync(resolve(root, 'src/components/shared/truncated-text.tsx'), 'utf8')).toContain('role="tooltip"')
-    expect(list).toContain('label={`保存した検索「${search.name}」の操作`}')
+  it('一覧の名前に固定のヒントを付けない', () => {
     expect(list).not.toContain('title="条件を確認・編集"')
   })
 
-  it('条件は共通の日本語変換を使い、内部の演算子や値を直書きしない', () => {
-    expect(list).toContain('describeSavedCondition')
-    expect(list).toContain('api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true })')
-    expect(list).toContain('api.scenarios.list({ accountId })')
+  it('条件の日本語変換を一覧の中で作り直さない', () => {
     expect(list).not.toContain('function describeOne')
     expect(list).not.toContain("parts.map(String).join(' ')")
   })
 
-  it('該当人数と使用先を正データで表示し、使用中は削除を止める', () => {
-    expect(list).toContain('search.matchCount')
-    expect(list).toContain('search.usedIn')
-    expect(list).toContain('search.canDelete !== true')
-    expect(editPage).toContain('original.usedIn')
-    expect(editPage).toContain('disabledReason={original.canDelete === true ? undefined : deleteReason}')
-    expect(editPage).toContain('original?.canDelete !== true')
-    expect(editPage).toContain('使っている所が無いことをサーバーで確かめてあります')
+  it('編集画面に見本の使用先を書かない', () => {
     expect(editPage).not.toContain('一斉配信「VIP未契約案内」')
     expect(editPage).not.toContain('オートメーション「3日後フォロー」')
   })
-
-
 })

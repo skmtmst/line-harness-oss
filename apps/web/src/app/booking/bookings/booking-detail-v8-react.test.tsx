@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * ★V8-B 予約の詳細（`AjZhH`）の小窓。
- * 差し替えるのは見た目だけ。来店回数・閉じる・取り消す・変更するが実在する。
+ * 差し替えるのは見た目だけ。来店回数・閉じる・取り消す・変えるが実在する。
  * 卓・人数・アレルギーは予約のデータに無いので出さない。
  */
 import React, { act } from 'react'
@@ -101,7 +101,7 @@ describe('予約の詳細のV8（AjZhH）', () => {
     expect(document.body.textContent).toContain('鈴木 真理さん')
     expect(document.body.textContent).toContain('秋の鹿肉コース')
     expect(document.body.textContent).toContain('3回')
-    for (const label of ['閉じる', '取り消す', '変更する']) {
+    for (const label of ['閉じる', '取り消す', '変える']) {
       expect(document.body.textContent).toContain(label)
     }
   })

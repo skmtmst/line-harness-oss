@@ -30,6 +30,7 @@ import { formatNumber } from '@/lib/format'
 import { KIND_LABEL, STATUS_LABEL, countLabel, failureText, periodLabel, yen } from './words'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './passes.module.css'
+import { EmptyCell } from '@/components/shared/empty-value'
 
 /*
  * ★V8 予約設定のタブ「回数券・月謝」（B2-1 `uGfHo`）。数の帯・探す欄・表・行末の「…」。
@@ -219,7 +220,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
               <Td>{periodLabel(plan)}</Td>
               <Td align="right">{yen(plan.price)}</Td>
               <Td collapseAt="narrow"><TruncatedText value={usable} /></Td>
-              <Td align="right">{holders === undefined ? <span className={styles.unavailableValue}>—</span> : `${formatNumber(holders)} 人`}</Td>
+              <Td align="right">{holders === undefined ? <EmptyCell /> : `${formatNumber(holders)} 人`}</Td>
               <Td><StatusBadge tone={plan.status === 'on_sale' ? 'success' : 'neutral'}>{STATUS_LABEL[plan.status]}</StatusBadge></Td>
               <ActionCell>
                 <span className={styles.menuBox}>

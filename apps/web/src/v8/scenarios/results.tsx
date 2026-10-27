@@ -63,7 +63,7 @@ function csvCell(value: unknown): string {
 
 /** 購読の状態の札（絵：途中・送信中・止まっている・送れずに止まった・読み終えた）。 */
 function subscriptionState(sub: Subscription): { label: string; tone: StatusBadgeTone } {
-  if (sub.pauseReason === 'delivery_unconfirmed') return { label: '要確認', tone: 'warning' }
+  if (sub.pauseReason === 'delivery_unconfirmed') return { label: '要確認', tone: 'caution' }
   if (sub.status === 'completed') return { label: '読み終えた', tone: 'info' }
   if (sub.status === 'delivering') return { label: '送信中', tone: 'success' }
   if (sub.status === 'paused') {

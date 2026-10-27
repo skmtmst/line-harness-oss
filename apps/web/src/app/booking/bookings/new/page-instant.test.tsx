@@ -290,6 +290,26 @@ describe('代理予約: 店舗タイムゾーンの instant で確定する（�
     expect(api.createProxyBooking).not.toHaveBeenCalled()
     expect(container.textContent).toContain('選んだ時間は、ほかの予約で埋まりました')
   })
+
+  it('予約確認LINEが送れなかったら、完了画面の札に「送信に失敗しました」と出す（指示ではなく結果の札）', async () => {
+    // error-copy-recovery-contract.test.ts が「〜失敗しました」で終わる文を例外として許す札。
+    api.getAvailability.mockResolvedValue(availability([slot(NY_1000)]))
+    api.createProxyBooking.mockResolvedValue({
+      booking_id: 'booking-1', status: 'confirmed', calendar_sync: 'not_configured',
+      line_notification: 'queued', reminders: [], customer_context: null,
+      operations: [{
+        id: 'operation-1', kind: 'confirmation_line', status: 'permanent_failed',
+        scheduledAt: null, completedAt: null, openedAt: null, result: {}, errorCode: 'blocked',
+      }],
+    })
+    await mount()
+    await fillInput()
+    await click(byText('button', '予約内容を確認する'))
+    await click(byText('button', 'この内容で予約を入れる'))
+
+    expect(container.textContent).toContain('予約確認LINE: 失敗')
+    expect(all('p').some((p) => p.textContent === '送信に失敗しました')).toBe(true)
+  })
 })
 
 // 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。

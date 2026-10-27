@@ -72,7 +72,9 @@ vi.mock('@/components/shared/image-uploader', () => ({
     <div data-testid="image-value">{JSON.stringify(value)}</div>
   ),
 }))
-vi.mock('@/components/scenarios/insert-toolbar', () => ({ default: () => null }))
+vi.mock('@/components/scenarios/insert-toolbar', () => ({
+  default: ({ count }: { count?: string }) => <span data-testid="body-count">{count}</span>,
+}))
 vi.mock('@/components/scenarios/step-preview', () => ({
   default: (p: Record<string, unknown>) => <pre data-testid="preview">{JSON.stringify(p)}</pre>,
 }))
@@ -86,6 +88,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 import FirstStep from '@/app/scenarios/first-step/page'
+import { LINE_TEXT_LIMIT } from '@/components/scenarios/char-counter'
 
 const ok = (data: unknown) => ({ success: true as const, data })
 const fail = { success: false as const, error: '検証用エラー' }
@@ -334,5 +337,50 @@ describe('入力が足りないときの欄への案内', () => {
     fireEvent.change(field, { target: { value: '送る本文' } })
     await click('作って編集へ')
     expect(m.addStep).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('空の保存とあとで書く', () => {
+  it('空の保存は「あとで書く」の道を理由に書いて止め、全体の誤りにはしない', async () => {
+    m.get.mockResolvedValue(ok(scenario({ steps: [] })))
+    await mount(<FirstStep />)
+    await click('作って編集へ')
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.push).not.toHaveBeenCalled()
+    expect(screen.getByText('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')).toBeTruthy()
+  })
+
+  it('「1通目はあとで書く」は保存せずに詳細へ進む', async () => {
+    m.get.mockResolvedValue(ok(scenario({ steps: [] })))
+    await mount(<FirstStep />)
+    await click('1通目はあとで書く')
+    expect(m.addStep).not.toHaveBeenCalled()
+    expect(m.updateStep).not.toHaveBeenCalled()
+    expect(m.push).toHaveBeenCalledWith('/scenarios/detail?id=sc-a')
+  })
+})
+
+describe('本文の文字数と上限', () => {
+  it('「本文」の名前で入力欄に届き、打った文字数を上限と並べて出す', async () => {
+    m.get.mockResolvedValue(ok(scenario({ steps: [] })))
+    await mount(<FirstStep />)
+    const body = screen.getByLabelText('本文')
+    expect(body.id).toBe('first-step-body')
+    fireEvent.change(body, { target: { value: 'こんにちは' } })
+    expect(screen.getByTestId('body-count').textContent).toBe(`5 / ${LINE_TEXT_LIMIT.toLocaleString('ja-JP')}`)
+  })
+
+  it('上限を超えた本文では保存を押せず、理由を本文の下に出し、保存も送らない', async () => {
+    m.get.mockResolvedValue(ok(scenario({ steps: [] })))
+    await mount(<FirstStep />)
+    fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'あ'.repeat(LINE_TEXT_LIMIT + 1) } })
+    const save = screen.getByRole('button', { name: '作って編集へ' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    expect(screen.getByText(`本文が ${LINE_TEXT_LIMIT.toLocaleString('ja-JP')} 字を超えています。LINEが受け付けないため、この状態では保存できません。`)).toBeTruthy()
+    expect(screen.getByLabelText('本文').getAttribute('aria-invalid')).toBe('true')
+    await act(async () => { fireEvent.click(save) })
+    expect(m.addStep).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'あ'.repeat(LINE_TEXT_LIMIT) } })
+    expect((screen.getByRole('button', { name: '作って編集へ' }) as HTMLButtonElement).disabled).toBe(false)
   })
 })

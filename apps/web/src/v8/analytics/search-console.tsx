@@ -58,7 +58,7 @@ function Ranking({ title, rows, kind }: { title: string; rows: SearchConsoleMetr
       </TableHeadRow></thead>
       <tbody>{rows.map(row => <Tr key={row.key}>
         <Td><TruncatedText value={kind === 'query' ? (row.key || '（検索語句なし）') : pagePath(row.key)} /></Td>
-        <Td align="right" title={`CTR ${formatNumber(row.ctr * 100, { digits: 1 })}%`}>{formatNumber(row.clicks)}</Td>
+        <Td align="right" title={`クリックされた割合 ${formatNumber(row.ctr * 100, { digits: 1 })}%`}>{formatNumber(row.clicks)}</Td>
         <Td align="right">{formatNumber(row.impressions)}</Td>
         <Td align="right">{formatNumber(row.position, { digits: 1 })}</Td>
       </Tr>)}</tbody>
@@ -105,13 +105,13 @@ export default function SearchConsoleV8() {
   const metrics: Array<{ label: string; key: keyof SearchConsoleMetric; unit: string; help: string; icon: typeof MousePointerClick }> = [
     { label: '合計クリック数', key: 'clicks', unit: '回', help: 'クリック ÷ 表示回数', icon: MousePointerClick },
     { label: '合計表示回数', key: 'impressions', unit: '回', help: 'Google検索の結果に表示された回数です', icon: Eye },
-    { label: '平均CTR', key: 'ctr', unit: '%', help: 'クリック ÷ 表示回数', icon: Percent },
+    { label: 'クリックされた割合', key: 'ctr', unit: '%', help: 'クリック ÷ 表示回数', icon: Percent },
     { label: '平均掲載順位', key: 'position', unit: '位', help: '平均値。人や場所で変わる', icon: ListOrdered },
   ]
   const exportCsv = () => {
     if (!data) return
     const lines: string[][] = [
-      ['区分', '項目', '表示回数', 'クリック数', 'CTR(%)', '掲載順位'],
+      ['区分', '項目', '表示回数', 'クリック数', 'クリックされた割合(%)', '掲載順位'],
       ['集計', `合計（${data.startDate}〜${data.endDate}）`, String(data.summary.impressions), String(data.summary.clicks), formatNumber(data.summary.ctr * 100, { digits: 1 }), formatNumber(data.summary.position, { digits: 1 })],
       ...data.daily.map((row) => ['日別', row.key, '', String(row.clicks), '', '']),
       ...data.devices.map((device) => ['デバイス', DEVICE_LABELS[device.key] ?? device.key, '', String(device.clicks), '', '']),

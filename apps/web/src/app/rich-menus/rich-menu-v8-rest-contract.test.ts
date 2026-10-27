@@ -1,44 +1,21 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-/* 一覧の入口は V8 のとき src/v8/rich-menus/list.tsx（2026-10-06〜。古い list-v8.tsx・list-v8.module.css はもう描かれない）。 */
-const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'rich-menus', 'list.tsx'), 'utf8')
 const CREATE = readFileSync(new URL('../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 const CREATE_CSS = readFileSync(new URL('./new/create-v8.module.css', import.meta.url), 'utf8')
 
 /*
- * V8 リッチメニューの残り（・・作る①〜④・）。
- * 一覧は板IDを付け（閲覧のみは ）、作る4手順は手順ごとに板IDを付け、
- * 編集中の競合は帯で知らせて書き換えない。互換経路は変えない。
+ * V8 リッチメニューの残り板。
+ * 一覧の板の印（広い・狭い・閲覧のみ）と狭い板でフォルダの列を畳むことは src/v8/rich-menus/list-ops-react.test.tsx、
+ * 作る4手順の板の印と編集の競合の帯は app/rich-menus/new/create-ops-react.test.tsx が画面を動かして見る。
+ * ここには古い板の印の禁止と、描画では測れない作る画面の畳みの CSS だけを残す。
  */
 describe('リッチメニューの残り板', () => {
-  it('一覧は板IDを付ける（閲覧のみは ZoKow）', () => {
-    // 新しい一覧は型（ListPage）の boardId で板IDを付ける。1152 は 。
-    expect(LIST).toContain("boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}")
-  })
-
-  it('作る4手順は手順ごとに板IDを付ける', () => {
-    expect(CREATE).toContain("'JeINq'")
-    expect(CREATE).toContain("'Z0uO6'")
-    expect(CREATE).toContain("'OxEMM'")
-    expect(CREATE).toContain("'F4gELj'")
+  it('作る画面に古い板の印を戻さない', () => {
     expect(CREATE).not.toContain('data-design-node="rich-menu-create-v8"')
   })
 
-  it('編集の競合は帯・比べる・読み直しを出す（r8dGXT）', () => {
-    // 帯は共通部品（save-conflict）に寄せた（2026-10-07）。ボタンの文言は共通部品が持つ。
-    expect(CREATE).toMatch(/<SaveConflictBand[\s\S]{0,400}designNode="r8dGXT"/)
-    expect(CREATE).toContain('ほかの人がこのメニューを更新しました')
-    expect(CREATE).toContain('最新を読み込んで続ける')
-  })
-
-  it('1152（Y9ASp・kmTab）は板1100px未満で畳む', () => {
-    // 新しい一覧は CSS の @container ではなく狭い板の判定（narrow）で、フォルダの列を道具の段へ畳む。
-    expect(LIST).toContain('folders={narrow ? undefined : folderPanel}')
-    expect(LIST).toContain('toolbar={wideToolbar}')
+  it('作る画面は板1100px未満で畳む', () => {
     expect(CREATE_CSS).toContain('@container (max-width: 1100px)')
   })
 })

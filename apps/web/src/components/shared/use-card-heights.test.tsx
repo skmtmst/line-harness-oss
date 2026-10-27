@@ -42,13 +42,13 @@ it.each([undefined, 'natural'] as const)('横のカードは指定された高�
   expect([...cards].map(card => card.style.minHeight)).toEqual(cardHeight === 'natural' ? ['', ''] : ['100px', '100px'])
 })
 
-it.each([48, 49])('情報と操作を持つカードも自然高の差%sで高さ合わせを判定する', difference => {
+it.each([48, 49, 200])('同じ幅に並ぶ情報と操作を持つカードは、自然高の差%sでも高い方へそろえる', difference => {
   const frames: FrameRequestCallback[] = []
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => { frames.push(cb); return frames.length })
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const natural = this.getAttribute('aria-label') === '短い' ? 100 : 100 + difference
-    return { top: 0, height: Math.max(natural, parseFloat(this.style.minHeight) || 0) } as DOMRect
+    return { top: 0, width: 200, height: Math.max(natural, parseFloat(this.style.minHeight) || 0) } as DOMRect
   })
   const { container } = render(<div style={{ display: 'grid' }}>
     <Card as="article" layout="vertical" aria-label="短い" actions={<button>開く</button>}>情報</Card>
@@ -56,7 +56,7 @@ it.each([48, 49])('情報と操作を持つカードも自然高の差%sで高�
   </div>)
   frames.splice(0).forEach(cb => cb(0))
   const cards = [...container.querySelectorAll<HTMLElement>('article')]
-  expect(cards.map(card => parseFloat(card.style.minHeight))).toEqual(difference <= 48 ? [148, 148] : [0, 0])
+  expect(cards.map(card => parseFloat(card.style.minHeight))).toEqual([100 + difference, 100 + difference])
   expect(cards.map(card => card.style.alignSelf)).toEqual(['flex-start', 'flex-start'])
 })
 
@@ -118,4 +118,20 @@ it('同じclassでもinlineの枠変更と枠の解除を再描画で反映す�
   expect(card?.hasAttribute('data-card-unframed')).toBe(false)
   rerender(<Card style={{ border: 0, outline: 'none', boxShadow: 'none' }}>入力段</Card>)
   expect(card?.hasAttribute('data-card-unframed')).toBe(true)
+})
+
+it('幅の違う本文と横の欄は、印の無い段ではそろえない', () => {
+  const frames: FrameRequestCallback[] = []
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => { frames.push(cb); return frames.length })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const main = this.getAttribute('aria-label') === '本文'
+    return { top: 0, width: main ? 800 : 320, height: Math.max(main ? 600 : 120, parseFloat(this.style.minHeight) || 0) } as DOMRect
+  })
+  const { container } = render(<div style={{ display: 'grid' }}>
+    <Card as="article" aria-label="本文">本文</Card>
+    <Card as="article" aria-label="横の欄">横</Card>
+  </div>)
+  frames.splice(0).forEach(cb => cb(0))
+  expect([...container.querySelectorAll<HTMLElement>('article')].map(card => parseFloat(card.style.minHeight))).toEqual([0, 0])
 })

@@ -45,7 +45,7 @@ import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention,
 import { jstDay, jstTime } from './shared'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import StatusBadge from '@/components/shared/status-badge'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -557,7 +557,7 @@ export default function EventsListV8() {
                   <Td align="right" className={styles.num}>
                     {e.pending_count > 0 ? (
                       <Link href={`/events/bookings?id=${e.id}`} className={styles.pendingLink}>{e.pending_count}</Link>
-                    ) : <span className={styles.faint}>{emptyValue('unknown')}</span>}
+                    ) : <EmptyCell />}
                   </Td>
                   <Td>
                     <span className={styles.stateLine}>

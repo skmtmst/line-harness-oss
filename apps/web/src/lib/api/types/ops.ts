@@ -230,6 +230,21 @@ export type OpsLineUnregistered = {
   people: Array<{ staffId: string; name: string; tenantName: string; hasEmail: boolean }>
 }
 
+/** 最初の 10 分の全アカウントのまとめ（運営だけ・数と割合だけ）。形は `apps/worker/src/services/first-run-funnel.ts`。 */
+export type OpsFirstRunStage = 'started' | 'style' | 'starter' | 'follow' | 'firstMessage'
+export type OpsFirstRunFunnel = {
+  period: OpsDashboardPeriod
+  periodLabel: string
+  accounts: number
+  /** その段まで来た数（前の地点が全部そろったお店）・前の段からの割合・前の地点からかかった分の中央値（1 段目は null）。 */
+  stages: Array<{ key: OpsFirstRunStage; count: number; percent: number; fromPrevious: number | null; minutesFromPrevious: number | null }>
+  /** 前の段からの割合がいちばん低い段。 */
+  biggestDrop: { key: OpsFirstRunStage; fromPrevious: number; lost: number } | null
+  minutesToFirstMessage: { median: number | null; p75: number | null; reached: number }
+  withinTenMinutesPercent: number
+  allStepsDone: { count: number; percent: number }
+}
+
 /** 運営からのお知らせ配信（★管理画面 37-7）。形は `apps/worker/src/routes/ops-announcements.ts`。 */
 export type OpsAnnouncementAudience = 'all' | 'plan' | 'tenants'
 

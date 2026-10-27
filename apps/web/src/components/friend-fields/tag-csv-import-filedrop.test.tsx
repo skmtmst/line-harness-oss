@@ -68,3 +68,77 @@ it('CSVの確認前に、既存タグを上書きしないこととエラー行�
   expect(screen.getByText(/同じ名前のタグは上書きしません/)).toBeTruthy()
   expect(screen.getByText(/エラーの行はCSVを直してから/)).toBeTruthy()
 })
+
+describe('タグCSV取り込みの確認から登録まで', () => {
+  const dialog = () => screen.getByRole('dialog')
+  async function toPreview(rows: Array<{ line: number; name: string; folderName: string; status: 'ready' | 'skipped' | 'invalid'; message?: string }>) {
+    vi.mocked(api.tags.importPreview).mockResolvedValueOnce({ success: true, data: {
+      summary: { total: rows.length, ready: rows.filter((row) => row.status === 'ready').length, created: 0, skipped: rows.filter((row) => row.status === 'skipped').length, invalid: rows.filter((row) => row.status === 'invalid').length, failed: 0 },
+      rows,
+    } } as Awaited<ReturnType<typeof api.tags.importPreview>>)
+    openDialog()
+    expect(dialog().getAttribute('data-design-node')).toBe('H374MR')
+    chooseFile('タグ.csv', 'タグ名,フォルダ\nVIP,会員\n常連,会員\n')
+    await screen.findByText('タグ.csv')
+    fireEvent.click(screen.getByRole('button', { name: '取り込む内容を確認' }))
+    await screen.findByRole('button', { name: /件を登録する$/ })
+  }
+
+  it('確認は読んだ行を事前確認の口へ送り、新しく作る・飛ばす・エラーの数を出す（sfTEW）', async () => {
+    await toPreview([
+      { line: 2, name: 'VIP', folderName: '会員', status: 'ready' },
+      { line: 3, name: '常連', folderName: '会員', status: 'skipped' },
+    ])
+    expect(api.tags.importPreview).toHaveBeenLastCalledWith([
+      expect.objectContaining({ name: 'VIP', folderName: '会員' }),
+      expect.objectContaining({ name: '常連', folderName: '会員' }),
+    ])
+    expect(dialog().getAttribute('data-design-node')).toBe('sfTEW')
+    for (const label of ['新しく作る', '飛ばす', 'エラー']) expect(dialog().textContent).toContain(label)
+    expect(api.tags.importCsv).not.toHaveBeenCalled()
+  })
+
+  it('登録が全部通れば完了（op1rh）で「一覧へ戻る」を出す', async () => {
+    const onCompleted = vi.fn()
+    vi.mocked(api.tags.importPreview).mockResolvedValueOnce({ success: true, data: {
+      summary: { total: 1, ready: 1, created: 0, skipped: 0, invalid: 0, failed: 0 }, rows: [{ line: 2, name: 'VIP', folderName: '会員', status: 'ready' }],
+    } } as Awaited<ReturnType<typeof api.tags.importPreview>>)
+    vi.mocked(api.tags.importCsv).mockResolvedValueOnce({ success: true, data: {
+      outcome: 'success', summary: { total: 1, ready: 0, created: 1, skipped: 0, invalid: 0, failed: 0 }, rows: [{ line: 2, name: 'VIP', folderName: '会員', status: 'created' }],
+    } } as Awaited<ReturnType<typeof api.tags.importCsv>>)
+    render(<TagCsvImportDialog open onClose={() => {}} onCompleted={onCompleted} />)
+    chooseFile('タグ.csv', 'タグ名,フォルダ\nVIP,会員\n')
+    await screen.findByText('タグ.csv')
+    fireEvent.click(screen.getByRole('button', { name: '取り込む内容を確認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '1件を登録する' }))
+    expect(await screen.findByText('1件を登録しました')).toBeTruthy()
+    expect(api.tags.importCsv).toHaveBeenLastCalledWith([expect.objectContaining({ name: 'VIP', folderName: '会員' })])
+    expect(dialog().getAttribute('data-design-node')).toBe('op1rh')
+    expect(screen.getByRole('button', { name: '一覧へ戻る' })).toBeTruthy()
+    expect(onCompleted).toHaveBeenCalledTimes(1)
+  })
+
+  it('一部だけ入らなかったら（QzRsJ）入らなかった行を5行まで理由つきで出し、その行だけCSVで出せる', async () => {
+    const failedRows = Array.from({ length: 6 }, (_, index) => ({ line: index + 3, name: `だめ${index}`, folderName: '', status: 'invalid' as const, message: `理由${index}` }))
+    vi.mocked(api.tags.importPreview).mockResolvedValueOnce({ success: true, data: {
+      summary: { total: 7, ready: 1, created: 0, skipped: 0, invalid: 6, failed: 0 }, rows: [{ line: 2, name: 'VIP', folderName: '', status: 'ready' }, ...failedRows],
+    } } as Awaited<ReturnType<typeof api.tags.importPreview>>)
+    vi.mocked(api.tags.importCsv).mockResolvedValueOnce({ success: true, data: {
+      outcome: 'partial', summary: { total: 7, ready: 0, created: 1, skipped: 0, invalid: 6, failed: 0 }, rows: [{ line: 2, name: 'VIP', folderName: '', status: 'created' }, ...failedRows],
+    } } as Awaited<ReturnType<typeof api.tags.importCsv>>)
+    openDialog()
+    chooseFile('タグ.csv', 'タグ名,フォルダ\nVIP,\n')
+    await screen.findByText('タグ.csv')
+    fireEvent.click(screen.getByRole('button', { name: '取り込む内容を確認' }))
+    fireEvent.click(await screen.findByRole('button', { name: '1件を登録する' }))
+    expect(await screen.findByText('1件を登録し、6件は入りませんでした')).toBeTruthy()
+    expect(dialog().getAttribute('data-design-node')).toBe('QzRsJ')
+    const table = screen.getByRole('table')
+    expect(table.querySelector('thead')?.textContent).toBe('行タグ名入らなかった理由')
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(5)
+    expect(table.textContent).toContain('理由0')
+    expect(table.textContent).not.toContain('VIP')
+    expect(screen.getByRole('button', { name: '入らなかった6行をCSVで出す' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '一覧へ戻る' })).toBeTruthy()
+  })
+})

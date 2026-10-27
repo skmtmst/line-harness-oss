@@ -206,9 +206,9 @@ function labelFor(step: UpdateEvent['step']): string {
   const map: Record<UpdateEvent['step'], string> = {
     preflight: 'Pre-flight',
     migration: 'Migration',
-    worker: 'Worker デプロイ',
-    admin: 'Admin デプロイ',
-    liff: 'LIFF デプロイ',
+    worker: '送受信のしくみを更新',
+    admin: '管理画面を更新',
+    liff: 'お客さまの画面を更新',
     verify: 'ヘルスチェック',
     rollback: 'Rollback',
     complete: '完了',

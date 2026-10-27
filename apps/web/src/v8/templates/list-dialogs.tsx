@@ -27,6 +27,9 @@ import { exampleHref,type TemplateExample } from './examples'
 import { BLOCKED_ROWS_SHOWN,KIND_CARDS,PendingDelete,Template,latestContentOf,publishStateOf } from './list-model'
 import styles from './list.module.css'
 import { DELETE_UNUSED_DESCRIPTION,blockedDeleteDescription,type UsageDetail } from './words'
+import StatusBadge from '@/components/shared/status-badge'
+
+const PUBLISH_TONE = { live: 'success', changes: 'warning', draft: 'neutral' } as const
 
 type RenderTemplateDialogsContext = {
   activeFolderName: string | null
@@ -390,10 +393,7 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
             </p>
             <p className={styles.panelLabel}>公開</p>
             <p className={styles.panelText}>
-              <span className={styles.publishPill} data-tone={publishStateOf(activeTemplate).tone}>
-                <span className={styles.publishDot} aria-hidden="true" />
-                {publishStateOf(activeTemplate).label}
-              </span>
+              <StatusBadge tone={PUBLISH_TONE[publishStateOf(activeTemplate).tone]}>{publishStateOf(activeTemplate).label}</StatusBadge>
             </p>
             <p className={styles.panelLabel}>使っている所</p>
             <p className={styles.panelText}>

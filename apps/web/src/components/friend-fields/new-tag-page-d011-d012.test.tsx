@@ -13,7 +13,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 const mockNet = vi.hoisted(() => ({
   foldersMode: 'ok' as 'ok' | 'fail',
-  definitionMode: 'ok' as 'ok' | 'fail',
+  definitionMode: 'ok' as 'ok' | 'fail' | 'linked',
+  definitionArgs: [] as unknown[][],
   pushed: [] as string[],
   query: '',
   created: [] as unknown[],
@@ -27,7 +28,15 @@ vi.mock('@/lib/api', () => ({
         : Promise.reject(new Error('network down')),
     },
     tags: {
-      definition: () => mockNet.definitionMode === 'ok'
+      definition: (...args: unknown[]) => { mockNet.definitionArgs.push(args); return mockNet.definitionMode === 'linked'
+        ? Promise.resolve({
+          success: true,
+          data: {
+            tag: { id: 't9', name: '元タグ', groupId: null, isStarred: false, linkedEnabled: true, mileageReward: 10, referralMileageReward: 5, mileageMultiplierBps: 15000, mileageMultiplierPriority: 2, reapplyPolicy: 'every_time', linkedActions: [{ id: 'act-1', label: '保存した名前', timing: 'すぐに' }] },
+            automation: { actions: [{ id: 'act-1', type: 'send_message', params: { content: 'ようこそ', delayMinutes: 0 } }] },
+          },
+        })
+        : mockNet.definitionMode === 'ok'
         ? Promise.resolve({
           success: true,
           data: {
@@ -35,7 +44,7 @@ vi.mock('@/lib/api', () => ({
             automation: { actions: [] },
           },
         })
-        : Promise.reject(new Error('network down')),
+        : Promise.reject(new Error('network down')) },
       createDefinition: (_accountId: string, data: { name: string }) => {
         mockNet.created.push(data)
         return Promise.resolve({ success: true, data: { tag: { id: 't-new' } } })
@@ -74,6 +83,7 @@ afterEach(() => {
   mockNet.pushed = []
   mockNet.query = ''
   mockNet.created = []
+  mockNet.definitionArgs = []
 })
 
 describe('D011 フォルダ一覧の取得失敗', () => {
@@ -138,5 +148,37 @@ describe('D012 保存して続けて作る', () => {
     mockNet.query = 'created=リピーター'
     rerender(<TagCreate />)
     await screen.findByText('「リピーター」を作成しました。続けて新しいタグを作れます。')
+  })
+})
+
+describe('タグの複製', () => {
+  test('複製元を今のアカウントで読み、名前に「のコピー」を付け、マイルと連動の動きを引き継いで作る', async () => {
+    mockNet.query = 'copy=t9'
+    mockNet.definitionMode = 'linked'
+    const { default: TagCreate } = await import('@/v8/tags/create')
+    render(<TagCreate />)
+    const nameInput = await screen.findByDisplayValue('元タグ のコピー')
+    expect(mockNet.definitionArgs).toEqual([['t9', 'a1']])
+    expect(nameInput).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'タグを作る' })) })
+    expect(mockNet.created).toEqual([expect.objectContaining({
+      name: '元タグ のコピー',
+      linkedEnabled: true,
+      reapplyPolicy: 'every_time',
+      mileage: { self: 10, referrer: 5, multiplier: 15000, priority: 2 },
+      actions: [expect.objectContaining({ id: 'act-1', type: 'send_message' })],
+    })])
+  })
+
+  test('ふつうに作るときは連動を付けず、作ったあとの編集で足すと案内する', async () => {
+    mockNet.query = ''
+    const { default: TagCreate } = await import('@/v8/tags/create')
+    render(<TagCreate />)
+    const nameInput = await screen.findByRole('textbox', { name: 'タグ名', exact: true })
+    expect(screen.getByText(/タグ連動（付いたときの動き）は作ったあとの編集で足します。/)).toBeTruthy()
+    await act(async () => { fireEvent.change(nameInput, { target: { value: '新しいタグ' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'タグを作る' })) })
+    expect(mockNet.definitionArgs).toEqual([])
+    expect(mockNet.created).toEqual([expect.objectContaining({ linkedEnabled: false, mileage: { self: 0, referrer: 0, multiplier: null, priority: 0 }, actions: [] })])
   })
 })

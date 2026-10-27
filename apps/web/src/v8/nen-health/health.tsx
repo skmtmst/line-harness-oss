@@ -305,7 +305,7 @@ function HealthListV8({
           <SearchField aria-label="ペットを探す" placeholder="ペットを探す" value={draft} onChange={(value: string) => { setDraft(value); onFiltersChange({ ...filters, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onFiltersChange({ ...filters, q: '' }); setPage(1) }} />
         </ListToolbarSearchSlot>
         {concernOnly ? null : (
-          <span className={styles.chips} role="group" aria-label="よく使う札">
+          <span className={styles.chips} role="group" aria-label="よく使う絞り込み">
             <FilterChip selected={filters.change === 'concern'} onChange={(next) => set({ change: next ? 'concern' : '' })} icon={<Columns2 size={16} aria-hidden="true" />} title="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットだけ出します">
               {kpis ? `気になる変化 ${kpis.concerning}` : '気になる変化'}
             </FilterChip>

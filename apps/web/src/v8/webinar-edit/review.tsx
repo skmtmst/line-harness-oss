@@ -17,6 +17,7 @@ import styles from './review.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { summaryRows, reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-summary'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import StatusBadge from '@/components/shared/status-badge'
 
 
 /*
@@ -138,7 +139,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   const summary: Array<[string, string]> = [
     ['開催形式', editor.deliveryKind === 'scheduled' ? '日時指定・開催回あり' : editor.deliveryKind === 'external' ? '外部の動画' : 'オンデマンド・いつでも視聴'],
     ['公開期間', publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt) ?? '—（公開期間は未設定）'],
-    ['CTA', ctx.ctaCount > 0 ? `${formatNumber(ctx.ctaCount)}件` : emptyValue('unconfigured')],
+    ['案内ボタン', ctx.ctaCount > 0 ? `${formatNumber(ctx.ctaCount)}件` : emptyValue('unconfigured')],
     ['通知', notifyCount === null ? emptyValue('unknown') : `${notifyCount.on} つ${notifyCount.missedOff ? '（見逃し案内は止めている）' : ''}`],
     ['視聴後の動き', reviewActionSummaryText(validation)],
   ]
@@ -177,7 +178,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         {state === 'loading' ? <p className={form.cardNote} role="status">公開前の確認を読み込んでいます。</p> : null}
         {checks.map((check) => (
           <div key={check.key} className={styles.check}>
-            <span className={form.pill} data-tone={check.status === 'passed' ? 'success' : check.status === 'warning' ? 'warn' : 'danger'}><span className={form.pillDot} aria-hidden="true" />{check.status === 'passed' ? 'できた' : 'まだ'}</span>
+            <StatusBadge tone={check.status === 'passed' ? 'success' : check.status === 'warning' ? 'caution' : 'danger'}>{check.status === 'passed' ? 'できた' : 'まだ'}</StatusBadge>
             <span className={`${styles.checkLabel} ${form.ellipsis}`} title={check.label}>{check.label}</span>
             {check.detail ? <span className={`${styles.checkDetail} ${form.ellipsis}`} title={check.detail}>{check.detail}</span> : null}
           </div>

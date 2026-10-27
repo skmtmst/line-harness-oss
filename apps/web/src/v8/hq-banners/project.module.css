@@ -58,23 +58,6 @@
 .tileMeta { display: flex; align-items: center; gap: var(--tpl-hb-meta-gap); height: var(--tpl-hb-star); margin-top: var(--tpl-hb-project-tile-gap); }
 .metaText { min-width: 0; overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); text-overflow: ellipsis; white-space: nowrap; }
 
-.pillOk {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: var(--tpl-hb-pill-gap);
-  padding: var(--tpl-hb-pill-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-hb-pill-lh);
-  white-space: nowrap;
-}
-
-.dot { width: var(--tpl-hb-dot); height: var(--tpl-hb-dot); border-radius: var(--radius-pill); background: currentColor; }
-
 .star { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--tpl-hb-star); height: var(--tpl-hb-star); padding: var(--polish-space-none); border: 0; border-radius: var(--radius-mini); background: transparent; cursor: pointer; }
 .star svg { width: var(--tpl-hb-star-glyph); height: var(--tpl-hb-star-glyph); }
 .starOn { fill: var(--color-status-warn); color: var(--color-status-warn); }

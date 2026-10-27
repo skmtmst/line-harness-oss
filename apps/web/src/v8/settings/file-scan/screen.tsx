@@ -5,7 +5,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
 import { GridCell,GridHeadRow,GridRow,GridTable } from '@/components/shared/grid-table'
@@ -26,14 +26,14 @@ import styles from './screen.module.css'
 import { FILE_SCAN_PAGE_SIZE,useFileScan } from './use-file-scan'
 
 /*
- * ★V8 ファイルの検査（Pencil 、状態は ）。
+ * ★V8 ファイルの安全確認（Pencil 、状態は ）。
  *
  * 動き（権限・一覧・札の絞り込み・探す・ページ送り・使えるように戻す・消す・外の検査の設定）は
  * 今までの V8（app/settings/file-scan/file-scan-v8.tsx）と同じ。処理は同じ場所の use-file-scan.ts（写し）。
  * 行の右端は「使えるように戻す」＋「…」（中の「削除する」）。
  */
 
-const TITLE = 'ファイルの検査'
+const TITLE = 'ファイルの安全確認'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
 const SAFETY_NOTICE = <Notice tone="info" icon={<ShieldCheck aria-hidden="true" />}>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
@@ -200,18 +200,18 @@ export default function FileScanScreen() {
         ) : phase === 'error' ? (
           <ListState
             kind="error"
-            title="ファイルの検査を読み込めませんでした"
+            title="ファイルの安全確認を読み込めませんでした"
             description="通信状態を確認して、もう一度読み込んでください。"
             onRetry={() => void load()}
           />
         ) : phase === 'forbidden' ? (
           <ListState
             kind="forbidden"
-            title="ファイルの検査は管理者だけが開けます"
+            title="ファイルの安全確認は管理者だけが開けます"
             description="しまったファイルの確認は、owner・admin の操作です。変えたいときは管理者に頼んでください。"
           />
         ) : (
-          <ListState kind="empty" title="LINEアカウントを選んでください" description="ファイルの検査はLINEアカウントごとに管理します。" />
+          <ListState kind="empty" title="LINEアカウントを選んでください" description="ファイルの安全確認はLINEアカウントごとに管理します。" />
         )}
         {canEdit ? dialogs : null}
       </SbSettingsScreen>
@@ -254,7 +254,7 @@ export default function FileScanScreen() {
             kind="empty"
             emptyPreset="filtered"
             title="条件に合うものはありません"
-            description="札や検索を外すと、すべて出ます"
+            description="絞り込みや検索を外すと、すべて出ます"
             action={query ? <Button variant="secondary" onClick={() => changeQuery('')}>条件を外す</Button> : undefined}
           />
         )
@@ -296,7 +296,7 @@ export default function FileScanScreen() {
                       />
                     </span>
                   ) : (
-                    <span className={styles.muted}>{emptyValue('unknown')}</span>
+                    <EmptyCell />
                   )}
                 </GridCell>
               </GridRow>

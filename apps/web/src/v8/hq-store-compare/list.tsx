@@ -33,6 +33,7 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import { columnsWithDiff, coverageLabel, diffCount, diffCountLabel, diffCountShortLabel, diffTitle, formatDiff, formatMetric, METRICS, diffTone, sameAsAverage, worseCount, type MetricDef, type StoreAverage } from './metrics'
 import styles from './list.module.css'
 import { formatNumber } from '@/lib/format'
+import { EmptyCell } from '@/components/shared/empty-value'
 
 /*
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`）。行＝店、列＝7つの数。
@@ -243,7 +244,7 @@ export default function StoreComparisonList() {
       <div className={styles.averageBand}>
         <span className={styles.averageTitle}>{`${formatNumber(total)} 店の平均`}</span>
         <TruncatedText className={styles.averageText} value={METRICS.map((def) => `${def.label} ${formatMetric(def.key, data.average[def.key] ?? null)}`).join('・')} />
-        <span className={styles.averageNote}>{`札は${compare === 'average' ? '全店の平均' : '前の期間'}との差（赤＝悪い・緑＝良い）${compare === 'average' ? '' : '・「違う」の数は全店の平均と比べます'}`}</span>
+        <span className={styles.averageNote}>{`数の横の印は${compare === 'average' ? '全店の平均' : '前の期間'}との差（赤＝悪い・緑＝良い）${compare === 'average' ? '' : '・「違う」の数は全店の平均と比べます'}`}</span>
       </div>
     </>
   )
@@ -254,7 +255,7 @@ export default function StoreComparisonList() {
         skeleton
         boardId="W4fI7A"
         title="店の比較"
-        help={<>店ごとに、友だち・予約・来店・返事の速さを並べて見ます。平均より悪い数は赤の札で知らせます。数は毎朝、前の日の分まで更新します。数の横の札は、「比べる相手」（前の期間か全店の平均）との差で、赤は悪い方・緑は良い方です。期間の途中から集計した店は、集計できた日の分だけで数を出し、件数の横に「12 日分」のように日数を出します（日数が違うので差の札は出しません）。{METRICS.map((def) => <span key={def.key}><br />{`${def.label}：${def.help}`}</span>)}</>}
+        help={<>店ごとに、友だち・予約・来店・返事の速さを並べて見ます。平均より悪い数は赤の印で知らせます。数は毎朝、前の日の分まで更新します。数の横の印は、「比べる相手」（前の期間か全店の平均）との差で、赤は悪い方・緑は良い方です。期間の途中から集計した店は、集計できた日の分だけで数を出し、件数の横に「12 日分」のように日数を出します（日数が違うので差の印は出しません）。{METRICS.map((def) => <span key={def.key}><br />{`${def.label}：${def.help}`}</span>)}</>}
         toolbar={toolbar}
         pagination={status === 'ready' && total > 0 ? (
           <ListPagePagination>
@@ -396,7 +397,7 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
                   <div className={styles.metricRow}>
                     <span className={styles.metricName}>{def.label}</span>
                     <span className={styles.metricValue}>
-                      {metric?.available && metric.value !== null ? formatMetric(def.key, metric.value) : <span className={styles.cellEmpty}>—</span>}
+                      {metric?.available && metric.value !== null ? formatMetric(def.key, metric.value) : <EmptyCell />}
                       {diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : coverage ? <span className={styles.coverage}>{coverage}</span> : null}
                     </span>
                   </div>

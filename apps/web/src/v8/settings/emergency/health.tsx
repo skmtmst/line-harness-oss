@@ -63,7 +63,7 @@ const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'title' | 'sub' | 't
   { id: 'friends', title: '友だちの急な減り', sub: 'この1日', threshold: '1日で5%以上・10人以上減ると「注意」', href: '/friends' },
   { id: 'webhook', title: 'Webhook が届いているか', sub: 'LINE からの受け取り', threshold: '受け取りの失敗が続くと「注意」', href: '/webhooks' },
   { id: 'delivery', title: '配信が送れているか', sub: '予約・自動の配信', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
-  { id: 'infra', title: '裏の仕組み', sub: 'DB・保管庫・順番待ち', threshold: '10分より古いと「古い確認」・一度も確かめていなければ「未確認」', href: '/emergency?tab=health' },
+  { id: 'infra', title: '保存と送信のしくみ', sub: 'データ・ファイル・送る前の待ち', threshold: '10分より古いと「古い確認」・一度も確かめていなければ「未確認」', href: '/emergency?tab=health' },
   { id: 'credential', title: '鍵・証明書の期限', sub: 'アクセストークンなど', threshold: '14日前で「注意」・期限切れで「エラー」', href: '/accounts' },
 ]
 
@@ -208,7 +208,7 @@ export function OpenAlerts({
               <div className={styles.alertLine}>
                 <StatusPill severity={alert.severity} />
                 <p className={styles.alertText} title={detail}>{`${checkTitle}：${alert.summary}${formatDetectedSince(alert.firstDetectedAt)}`}</p>
-                {alert.status === 'acknowledged' ? <span className={styles.status} data-tone="info">受領済み</span> : alert.status === 'resolved' ? <span className={styles.status} data-tone="info">解消済み</span> : null}
+                {alert.status === 'acknowledged' ? <StatusBadge tone="info">受領済み</StatusBadge> : alert.status === 'resolved' ? <StatusBadge tone="info">解消済み</StatusBadge> : null}
                 {response ? <Link href={response.href} className={styles.srOnly}>対象画面へ</Link> : null}
                 {canManage && alert.status === 'open' ? (
                   <Button variant="secondary" disabled={busy} busy={busy} onClick={() => {
@@ -538,7 +538,7 @@ export function HealthPanelV8({
               {lineReceipts.filter((item) => item.lineAccountId === accountId).map((item) => (
                 <div className={styles.alertRow} key={item.webhookEventId}>
                   <div className={styles.alertLine}>
-                    <StatusBadge tone="warning">{item.recoveryStatus === 'needs_review' ? '要確認' : '未完了'}</StatusBadge>
+                    <StatusBadge tone={item.recoveryStatus === 'needs_review' ? 'caution' : 'warning'}>{item.recoveryStatus === 'needs_review' ? '要確認' : '未完了'}</StatusBadge>
                     <p className={styles.alertText} title={item.webhookEventId}>受信：{formatOperationDate(item.receivedAt)}</p>
                     {item.canRetry === true && item.recoveryStatus !== 'needs_review' ? <Button variant="secondary" disabled={lineRetryId !== null} busy={lineRetryId === item.webhookEventId} onClick={() => void retryLineReceipt(item)}>やり直す</Button> : null}
                   </div>
