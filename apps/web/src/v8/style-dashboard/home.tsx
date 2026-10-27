@@ -2,6 +2,7 @@
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { useAccountStyle } from '@/hooks/use-account-style'
+import StaleStyleNotice from '@/components/shared/stale-style-notice'
 import ListState from '@/components/shared/list-state'
 import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
 import { useAccount } from '@/contexts/account-context'
@@ -31,6 +32,7 @@ export default function HomeDashboard() {
     {profile.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={profile.error} onRetry={profile.reload} /> : <ListState kind="loading" loadingShape="cards" title="使い方のスタイルを確認しています" />}
   </PageContent></PageFrame>
   const style = profile.data?.style ?? 'standard'
-  if (INDUSTRY.includes(style)) return <StyleDashboard key={style} style={style as IndustryStyle} />
-  return <StandardDashboard key={selectedAccountId} usageStyle={style === 'ec' ? 'ec' : 'standard'} />
+  const stale = profile.stale ? <StaleStyleNotice onRetry={profile.reload} /> : null
+  if (INDUSTRY.includes(style)) return <>{stale}<StyleDashboard key={style} style={style as IndustryStyle} /></>
+  return <>{stale}<StandardDashboard key={selectedAccountId} usageStyle={style === 'ec' ? 'ec' : 'standard'} /></>
 }

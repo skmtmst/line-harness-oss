@@ -42,6 +42,7 @@ import Button from '@/components/shared/button'
 import ListToolbar from '@/components/shared/list-toolbar'
 
 import ListState from '@/components/shared/list-state'
+import StaleStyleNotice from '@/components/shared/stale-style-notice'
 
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 
@@ -248,6 +249,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
     return (
       <PeopleDayFrame usageStyle={usageStyle} view={view} date={calendarFrom} rows={calendarItems} ready={calendarStatus === 'ready'} availability={availability} actions={headingActions} canWrite={canOperate} onOpen={setDetailId}>
         {model.styleProfile?.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={model.styleProfile.error} onRetry={model.styleProfile.reload} /> : null}
+        {model.styleProfile?.stale ? <StaleStyleNotice onRetry={model.styleProfile.reload} /> : null}
         {/*
           ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
@@ -284,6 +286,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
     <BookingLedgerFrame view={view}>
       {pageHead}
       {model.styleProfile?.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={model.styleProfile.error} onRetry={model.styleProfile.reload} /> : null}
+        {model.styleProfile?.stale ? <StaleStyleNotice onRetry={model.styleProfile.reload} /> : null}
       <BookingLedgerBody view={view} readOnly={!canOperate}
         stats={<>
           {summaryError && (
