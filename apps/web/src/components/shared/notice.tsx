@@ -110,6 +110,7 @@ export default function Notice({
       {helpHref ? <a href={helpHref}>くわしく</a> : null}
     </HelpTip>
   ) : null
+  const closeButton = onClose ? <button type="button" className={styles.close} onClick={onClose} aria-label="通知を閉じる"><X aria-hidden="true" size={16} /></button> : null
   return (
     <div
       {...props}
@@ -140,8 +141,8 @@ export default function Notice({
         {states?.length ? <NoticeStates items={states} /> : null}
         {footer ? <div className={styles.footer}>{footer}</div> : null}
       </div>
-      {action ? <span className={styles.action}>{action}</span> : null}
-      {onClose ? <button type="button" className={styles.close} onClick={onClose} aria-label="通知を閉じる"><X aria-hidden="true" size={16} /></button> : null}
+      {/* ［×］は操作と同じ行に入れ、操作のボタンと縦の真ん中をそろえる（題が1行でも2行でも）。 */}
+      {action ? <span className={styles.action}>{action}{closeButton}</span> : closeButton}
     </div>
   )
 }

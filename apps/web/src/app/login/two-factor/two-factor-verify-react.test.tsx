@@ -18,7 +18,7 @@ const fixture = vi.hoisted(() => ({
   verify: null as null | { status: number; body: Record<string, unknown> } | { reject: unknown },
 }))
 
-vi.mock('next/link', () => ({ default: () => null }))
+vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/login/two-factor',
@@ -52,6 +52,12 @@ async function enterCode(digits: string) {
     setter.call(first, digits)
     first.dispatchEvent(new Event('input', { bubbles: true }))
   })
+}
+
+/** 「コードが使えない場合」を開く（回復コードと、経路に合わせた戻り道が出る）。 */
+async function openHelpChoices() {
+  const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === 'コードが使えない場合')
+  await act(async () => { toggle?.click() })
 }
 
 /* 6桁目が入った瞬間に送られる（動きの点検・6）。ボタンを押す前に返事を待つだけ。 */
@@ -107,7 +113,7 @@ describe('R506 通信断の案内', () => {
     await enterCode('654321')
     await submit()
 
-    expect(host.textContent).toContain('コードが違います。もう一度入れてください')
+    expect(host.textContent).toContain('コードが違います。今の数字を入れ直してください。')
     expect(host.textContent).not.toContain('接続を確かめて')
   })
 
@@ -121,20 +127,26 @@ describe('R506 通信断の案内', () => {
   })
 })
 
-describe('R507 ログイン方法の進行表示', () => {
+/*
+ * 手順の帯（メールログイン → 二段階認証）は出さない。
+ * ログイン方法は「コードが使えない場合」の中の LINE 限定の戻り道だけが使う。経路を取り違えないことを見張る。
+ */
+describe('R507 ログイン方法の取り違え', () => {
   it('メール経路ではLINEログイン済みと出さない', async () => {
     fixture.hash = '#lh_2fa=verify-tok-1&lh_method=password'
     window.history.replaceState(null, '', `/login/two-factor${fixture.hash}`)
     await render()
+    await openHelpChoices()
 
-    expect(host.textContent).toContain('メールログイン')
     expect(host.textContent).not.toContain('LINEログイン')
+    expect(host.textContent).not.toContain('別のLINEアカウントでログイン')
   })
 
-  it('LINE経路では今までどおりLINEログインと出す', async () => {
+  it('LINE経路では今までどおりLINEの戻り道を出す', async () => {
     await render()
+    await openHelpChoices()
 
-    expect(host.textContent).toContain('LINEログイン')
+    expect(host.textContent).toContain('別のLINEアカウントでログイン')
   })
 
   it('再読込でもメール経路の表示を保つ', async () => {
@@ -149,8 +161,9 @@ describe('R507 ログイン方法の進行表示', () => {
     document.body.appendChild(host)
     root = createRoot(host)
     await render()
+    await openHelpChoices()
 
-    expect(host.textContent).toContain('メールログイン')
-    expect(host.textContent).not.toContain('LINEログイン')
+    expect(host.textContent).toContain('回復コードを使う')
+    expect(host.textContent).not.toContain('別のLINEアカウントでログイン')
   })
 })

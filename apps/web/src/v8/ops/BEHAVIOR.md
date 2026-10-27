@@ -34,6 +34,7 @@
 - 2要素認証：`api.staff.beginTwoFactorSetup`・`confirmTwoFactorSetup`。通ったらログインし直し
 - 招待：`/api/auth/ops-invite/check`・`/api/auth/ops-invite/accept` → `/ops/two-factor`
 - ダッシュボード：`api.ops.dashboard(period)`・`lineUnregistered`・`billingSync`（Stripe と同期は書ける人だけ）
+- ダッシュボードの「最初の10分（新しいお店）」：`api.ops.firstRun(period)`。数と割合だけ。閲覧のみの人には段ごと出さず、代理ログイン中（403）も隠す
 - メンバー：`api.ops.members`・`addMember`・`resendInvite`・`setMemberActive`。運営の情報は `NoticeLineAccountCard`
 - 監査：`api.ops.audit`（50件ずつ）。CSV はいまの条件で全部（上限 2万件）
 - お知らせ：`api.ops.announcements.list / preview / create（再実行キー）/ update（版つき）/ remove`

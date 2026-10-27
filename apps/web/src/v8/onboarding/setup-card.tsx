@@ -1,5 +1,6 @@
 'use client'
 
+import { ProgressBar } from '@/components/shared/progress'
 import { useMemo } from 'react'
 import { CircleCheck, Circle, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -64,9 +65,7 @@ export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOp
         <span className={styles.count}>{`${summary.done} / ${summary.total} 済み`}</span>
         <Button onClick={() => onOpenStep(summary.nextStep)}>質問の続きを開く</Button>
       </div>
-      <span className={styles.track} role="progressbar" aria-label="使い方の設定の進み" aria-valuemin={0} aria-valuemax={summary.total} aria-valuenow={summary.done}>
-        <span className={styles.fill} style={{ width: `${rate}%` }} />
-      </span>
+      <ProgressBar appearance="quota" value={summary.done} max={summary.total} label="使い方の設定の進み" />
       <ul className={styles.rows}>
         {summary.rows.map((row) => <SetupRow key={row.key} row={row} onOpenStep={onOpenStep} onPreparing={preparing.open} />)}
       </ul>

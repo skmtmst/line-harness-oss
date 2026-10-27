@@ -152,8 +152,11 @@ test('数の帯と窓は共通の値で描かれ、状態札の文字は読め�
     const numbers=page.locator('[data-measure-band] [data-kpi-number]')
     const metric=await numbers.evaluate(el=>{const s=getComputedStyle(el);return{size:s.fontSize,line:s.lineHeight,weight:s.fontWeight}})
     assert.deepEqual(metric,{size:'34px',line:'36px',weight:'500'})
-    const amounts=await page.locator('[data-measure-wide-band] [data-kpi-number],[data-measure-range] [data-kpi-number],[data-measure-fraction] [data-kpi-number]').evaluateAll(els=>els.map(el=>{const range=document.createRange();range.selectNodeContents(el);const r=range.getBoundingClientRect(),cell=el.closest('[data-design-version]'),c=cell.getBoundingClientRect(),s=getComputedStyle(cell),unit=el.parentElement.querySelector('[data-kpi-unit]');return{excess:Math.max(0,r.right-c.right+parseFloat(s.paddingRight)),unitExcess:unit?Math.max(0,unit.getBoundingClientRect().right-c.right+parseFloat(s.paddingRight)):0,font:getComputedStyle(el).fontSize,pad:s.paddingTop}}))
-    for(const amount of amounts){assert.equal(amount.excess,0);assert.equal(amount.unitExcess,0);assert.equal(amount.font,'34px');assert.equal(amount.pad,'16px')}
+    const amounts=await page.locator('[data-measure-wide-band] [data-kpi-number],[data-measure-range] [data-kpi-number],[data-measure-fraction] [data-kpi-number]').evaluateAll(els=>els.map(el=>{const range=document.createRange();range.selectNodeContents(el);const r=range.getBoundingClientRect(),cell=el.closest('[data-design-version]'),c=cell.getBoundingClientRect(),s=getComputedStyle(cell),unit=el.parentElement.querySelector('[data-kpi-unit]');return{excess:Math.max(0,r.right-c.right+parseFloat(s.paddingRight)),unitExcess:unit?Math.max(0,unit.getBoundingClientRect().right-c.right+parseFloat(s.paddingRight)):0,font:getComputedStyle(el).fontSize,pad:s.paddingTop,top:Math.round(c.top),band:el.closest('section').getAttributeNames().find(n=>n.startsWith('data-measure')),text:el.textContent}}))
+    // 範囲・使用数／上限・大きな金額があっても、帯は2段に逃がさず横一列。入りきらない数だけ字を小さくし、はみ出さない（省略しない）。
+    for(const amount of amounts){assert.equal(amount.excess,0);assert.equal(amount.unitExcess,0);assert.equal(amount.pad,'16px');assert.ok(parseFloat(amount.font)<=34&&parseFloat(amount.font)>=12,JSON.stringify(amount))}
+    for(const amount of amounts.filter(a=>a.text.length<=4))assert.equal(amount.font,'34px',JSON.stringify(amount))
+    for(const band of ['data-measure-range','data-measure-fraction'])assert.equal(new Set(amounts.filter(a=>a.band===band).map(a=>a.top)).size,1,band)
 
     const help=page.getByRole('button',{name:'電話ボタンのクリックの説明',exact:true})
     assert.equal(await help.evaluate(el=>el.getBoundingClientRect().height),18)

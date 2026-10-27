@@ -79,7 +79,9 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
     return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   await page.goto('/login'); await centered(page.getByRole('button', { name: 'ログイン', exact: true }))
-  const brandStyle = await page.locator('[aria-hidden="true"]').filter({ hasText: 'm' }).first().evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })
+  // ログインの 1 段目も、二段階認証と同じカードの頭（会社の印・「1 / 2」）。
+  await expect(page.locator('[data-auth-head]')).toContainText('1 / 2')
+  const brandStyle = await page.locator('[data-auth-brand-mark]').evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })
   await page.goto('/password/reset?token=fixture-reset')
   await centered(page.getByRole('button', { name: 'パスワードを設定してログインへ' }))
   await openPrimaryAuthenticatedChallenge(page, '/login/two-factor', 'fixture-challenge', 'password')
@@ -88,15 +90,22 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
     const card = input.closest('section[data-auth-layout="admin"]')
     const heading = card.querySelector('h1').getBoundingClientRect()
     const box = card.getBoundingClientRect()
-    const brand = card.previousElementSibling.getBoundingClientRect()
+    const head = card.querySelector('[data-auth-head]').getBoundingClientRect()
     const slots = input.getBoundingClientRect()
-    return { titleInset: heading.x - slots.x, titleGap: slots.top - heading.bottom, brandGap: box.top - brand.bottom, inputRight: slots.right, cardRight: box.right }
+    const boxes = [...input.querySelectorAll('input')].map(el => el.getBoundingClientRect())
+    return { titleInset: heading.x - slots.x, headInset: head.x - slots.x, titleGap: slots.top - heading.bottom, headAbove: heading.top - head.bottom, inputRight: slots.right, cardRight: box.right, oneRow: boxes.every(b => Math.abs(b.top - boxes[0].top) < 1), groupGap: boxes[3].left - boxes[2].right, innerGap: boxes[1].left - boxes[0].right }
   })
   expect(Math.abs(authLayout.titleInset)).toBeLessThanOrEqual(1)
+  expect(Math.abs(authLayout.headInset)).toBeLessThanOrEqual(1)
   expect(authLayout.titleGap).toBeGreaterThan(0)
   expect(authLayout.titleGap).toBeLessThanOrEqual(48)
-  expect(authLayout.brandGap).toBeGreaterThanOrEqual(16)
+  expect(authLayout.headAbove).toBeGreaterThanOrEqual(16)
   expect(authLayout.inputRight).toBeLessThan(authLayout.cardRight)
+  // 6 マスは 1 行、3 桁ずつの間は組の中より広い。
+  expect(authLayout.oneRow).toBe(true)
+  expect(authLayout.groupGap).toBeGreaterThan(authLayout.innerGap)
+  await expect(page.locator('[data-auth-head]')).toContainText('2 / 2')
+  await expect(page.getByRole('link', { name: '別のアカウントで入る' })).toHaveAttribute('href', '/login')
   expect(await page.getByRole('group', { name: '認証コード（6桁）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await centered(page.getByRole('button', { name: '確認してログイン', exact: true }))
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`verify-${width}.png`) })
@@ -104,11 +113,11 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   await page.getByRole('button', { name: 'コードが使えない場合' }).click()
   await page.getByRole('button', { name: '回復コードを使う' }).click()
   await expect(page.getByRole('textbox')).toHaveCount(8)
-  const back = page.getByRole('link', { name: 'ログインに戻る', exact: true })
+  const toggle = page.getByRole('button', { name: 'コードが使えない場合' })
   const method = page.getByRole('button', { name: '6桁のコードで入る', exact: true })
   const textStyle = el => { const style = getComputedStyle(el); return { size: style.fontSize, weight: style.fontWeight, color: style.color, background: style.backgroundColor } }
-  expect(await back.evaluate(textStyle)).toEqual(await method.evaluate(textStyle))
-  const mark = page.locator('main[data-auth-layout="admin"] > div:first-child > span[aria-hidden="true"]')
+  expect(await toggle.evaluate(textStyle)).toEqual(await method.evaluate(textStyle))
+  const mark = page.locator('main[data-auth-layout="admin"] [data-auth-brand-mark]')
   expect(await mark.evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })).toEqual(brandStyle)
   expect(await page.getByRole('group', { name: '回復コード（8文字）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await page.getByRole('textbox', { name: '1文字目' }).evaluate(el => {
@@ -168,7 +177,7 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
       const next = [...document.querySelectorAll('#main-content [data-page-template]')].find(node => node.getBoundingClientRect().width > 0)
       if (!next) return null
       const rect = el.getBoundingClientRect()
-      const text = [...el.querySelectorAll('div, span, p')].filter(node => node.textContent.includes('作り直してください')).pop().getBoundingClientRect()
+      const text = [...el.querySelectorAll('div, span, p')].filter(node => node.textContent.includes('入れなくなります')).pop().getBoundingClientRect()
       const painted = document.elementFromPoint(rect.x + rect.width / 2, rect.bottom - 2)
       return { separated: next.getBoundingClientRect().top >= rect.bottom, textInside: text.bottom < rect.bottom, uncovered: el.contains(painted), overflow: document.documentElement.scrollWidth - innerWidth }
     })).toEqual({ separated: true, textInside: true, uncovered: true, overflow: 0 })

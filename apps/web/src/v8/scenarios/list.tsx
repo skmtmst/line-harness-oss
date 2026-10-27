@@ -35,6 +35,7 @@ import { describeApiFailure, isForbidden, permissionDeniedMessage } from '@/comp
 import { NoPermissionBoard } from '@/v8/no-permission/index'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';
+import { ProgressBar } from '@/components/shared/progress';
 import { runUndoable, runOptimistic } from '@/lib/undoable';
 import { useLiveReorder } from '@/lib/use-live-reorder';
 import { ListPage, ListPagePagination } from '@/components/templates';

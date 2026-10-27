@@ -215,6 +215,21 @@
 :global(:root) .dashboardAsideSection + .dashboardAsideSection { border-top: 1px solid var(--color-hairline); }
 :global(:root) .dashboardRow[data-row='trend'] .dashboardAsideSection:last-child { padding-bottom: 0; }
 
+/*
+ * 段のまとまりをカードで分ける形（DashboardPage grouping="cards"）。線を引かず、
+ * 段の中身と右の列の段を共通のカード（Card）に入れて間を 12 空ける。面・縁・影はカードの部品が持つ。
+ */
+:global(:root) .dashboardRow[data-grouping='cards'] { gap: var(--polish-space-field); margin: 0 var(--tpl-list-inset) var(--polish-space-field); border-bottom: 0; }
+:global(:root) .dashboardRow[data-grouping='cards'] > .dashboardAside { border-left: 0; padding: 0; display: flex; flex-direction: column; gap: var(--polish-space-field); }
+:global(:root) .dashboardRow[data-grouping='cards'] > .dashboardAside > * { gap: var(--polish-space-field); }
+:global(:root) .dashboardRow[data-grouping='cards'] .dashboardAsideSection + .dashboardAsideSection { border-top: 0; }
+:global(:root) .dashboardRow[data-grouping='cards'][data-row='trend'] .dashboardAsideSection:last-child { padding-bottom: var(--polish-space-card); }
+:global(:root) .dashboardColumns[data-grouping='cards'] { column-gap: var(--polish-space-field); }
+:global(:root) .dashboardRow[data-grouping='cards'] .dashboardCell + .dashboardCell { border-left: 0; }
+/* 受信の表のカードは中身の高さで止め、右の列の高さに引っぱらない（下に大きな空白を作らない）。縦に並ぶ狭い板では横幅いっぱいのまま。 */
+:global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] { min-height: 0; }
+@container v8-page (width >= 1100px) { :global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] { align-items: flex-start; } :global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] > .dashboardCell { align-self: flex-start; } }
+
 /* 入力側と各段は中身の高さを保つ。 */
 :global(:root) [data-page-template='create'] > .heading .headingText { flex: 1 1 auto; }
 :global(:root) .preview { display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-field); }
@@ -574,6 +589,8 @@
 @container v8-page (width < 1100px) {
  :global(:root) .dashboardRow:not([data-row='restaurant']) { flex-direction: column; }
  :global(:root) .dashboardRow:not([data-row='restaurant']) > .dashboardAside { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
+ :global(:root) .dashboardRow[data-grouping='cards'] > .dashboardAside { border-top: 0; }
+ :global(:root) .dashboardColumns[data-grouping='cards'] { row-gap: var(--polish-space-field); }
  :global(:root) .dashboardColumns:not([data-layout='cards']) { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 :global(:root) .toolbar :global(.v6-filter-chip) { height: var(--tpl-button-h); }
