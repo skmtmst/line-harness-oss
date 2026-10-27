@@ -93,7 +93,7 @@ test('LINE一覧の失敗は一覧の中に再読み込みボタンつきで出�
   await act(async () => root.render(<ChatsPage />))
   await settle()
   await eventually(() => expect(retryButton()).toBeTruthy())
-  expect(list().textContent).toContain('チャットの読み込みに失敗しました。')
+  expect(list().textContent).toContain('LINE の会話を読み込めませんでした。')
   // APIの内部文言はそのまま出さない
   expect(list().textContent).not.toContain('server exploded')
   // 0件表示に化けない
@@ -118,7 +118,7 @@ test('再読み込みボタンで同じ条件の一覧を取り直し、成功�
   await settle()
   await eventually(() => expect(list().textContent).toContain('田中'))
   expect(retryButton()).toBeUndefined()
-  expect(list().textContent).not.toContain('チャットの読み込みに失敗しました。')
+  expect(list().textContent).not.toContain('LINE の会話を読み込めませんでした。')
   // 取り直しのリクエストが実際に出ている
   expect(calls.filter((url) => url.pathname === '/api/chats').length).toBeGreaterThanOrEqual(2)
 })
@@ -134,7 +134,7 @@ test('メールだけ見ている画面ではLINE一覧の失敗行を出さな�
     list().querySelector('[data-inbox-list-state="empty"], [data-inbox-list-state="filtered-empty"], [role="alert"]'),
   ).toBeTruthy())
   expect(retryButton()).toBeUndefined()
-  expect(list().textContent).not.toContain('チャットの読み込みに失敗しました。')
+  expect(list().textContent).not.toContain('LINE の会話を読み込めませんでした。')
 })
 
 test('同条件の読み直しでは会話を残し、遅い更新だけ「更新中」を出す', async () => {

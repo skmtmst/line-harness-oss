@@ -167,7 +167,7 @@ test('障害時は0件と断定しない', async () => {
     : base(url)
   await act(async () => root.render(<ChatsPage />))
   await settle()
-  expect(list().textContent).toContain('メールの読み込みに失敗しました。')
+  expect(list().textContent).toContain('メールを読み込めませんでした。')
   expect(state('empty')).toBeNull()
 })
 
@@ -177,7 +177,7 @@ test('LINE一覧の障害時も0件と断定しない', async () => {
     : base(url)
   await act(async () => root.render(<ChatsPage />))
   await settle()
-  expect(host.textContent).toContain('チャットの読み込みに失敗しました。')
+  expect(host.textContent).toContain('LINE の会話を読み込めませんでした。')
   expect(state('empty')).toBeNull()
 })
 
@@ -188,7 +188,7 @@ test('line 選択時はメールの待機や障害から独立して通常0件�
   await act(async () => root.render(<ChatsPage />))
   await settle()
   expect(state('empty')).toBeTruthy()
-  expect(list().textContent).not.toContain('メールの読み込みに失敗しました。')
+  expect(list().textContent).not.toContain('メールを読み込めませんでした。')
 })
 
 test('line 選択時はメールが失敗しても通常0件を表示する', async () => {
@@ -199,7 +199,7 @@ test('line 選択時はメールが失敗しても通常0件を表示する', as
   await act(async () => root.render(<ChatsPage />))
   await settle()
   expect(state('empty')).toBeTruthy()
-  expect(list().textContent).not.toContain('メールの読み込みに失敗しました。')
+  expect(list().textContent).not.toContain('メールを読み込めませんでした。')
 })
 
 test.each([

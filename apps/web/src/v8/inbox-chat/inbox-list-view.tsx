@@ -430,10 +430,11 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   失敗を「0件」に見せない（未対応の見落としになる）。
                 */}
         <InboxListFailure
-          messages={[
-            ...(channel !== 'email' && chatListFailed ? ['チャットの読み込みに失敗しました。'] : []),
-            ...(channel !== 'line' && emailError ? [emailError] : []),
+          failed={[
+            ...(channel !== 'email' && chatListFailed ? ['line' as const] : []),
+            ...(channel !== 'line' && emailError ? ['email' as const] : []),
           ]}
+          shown={channel === 'line' ? ['line'] : channel === 'email' ? ['email'] : ['line', 'email']}
           onRetry={() => {
             if (channel !== 'email' && chatListFailed) void loadChats()
             if (channel !== 'line' && emailError) void loadEmails()
