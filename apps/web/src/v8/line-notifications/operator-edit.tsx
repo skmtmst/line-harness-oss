@@ -573,7 +573,7 @@ function OperatorEditInner() {
                       <div className={styles.emptyRecipients}>
                         <p className={styles.emptyTitle}>受け取る人がいません</p>
                         <p className={styles.cardNote}>スタッフを登録し、LINE連携が済んだ人が宛先になります。</p>
-                        <TextLink href="/staff">ログインユーザーでスタッフを確認する</TextLink>
+                        <TextLink href="/staff">スタッフ一覧へ</TextLink>
                       </div>
                     ) : (
                       <EntitySelect aria-label="受け取るスタッフ" noun="スタッフ" values={recipientIds} readOnly={!canWrite}

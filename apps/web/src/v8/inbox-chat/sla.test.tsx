@@ -5,12 +5,17 @@
  *  - 担当の名前の後ろに、自動で決まったときだけ「（自動）」。
  */
 import { describe, expect, it } from 'vitest'
-import { assigneeLabel, slaBadgeOf } from './sla'
+import { assigneeLabel, formatSlaDistance, slaBadgeOf } from './sla'
 
 const now = Date.parse('2026-10-16T10:15:00.000Z')
 const at = (minutes: number) => new Date(now + minutes * 60000).toISOString()
 
 describe('slaBadgeOf', () => {
+  it('48時間を超える期限は日で表示する', () => {
+    expect(formatSlaDistance(47 * 60)).toBe('47 時間')
+    expect(formatSlaDistance(48 * 60)).toBe('2 日')
+    expect(formatSlaDistance(615 * 60)).toBe('25 日')
+  })
   it('期限オフ・ふつうは札なし', () => {
     expect(slaBadgeOf({}, now)).toBeNull()
     expect(slaBadgeOf({ slaState: 'none' }, now)).toBeNull()

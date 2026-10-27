@@ -20,13 +20,13 @@ const table = <DataTable><thead><Tr><Th>名前</Th><Th>状態</Th></Tr></thead><
 export default function SurfaceLayoutFixture() {
   return <>
     <section id="hq"><ListPage standalone heightMode="content" title="統括アカウント" toolbarSpacing="stats" toolbar={<div data-measure="tools">数の帯と道具</div>}>
-      <ListPageCards><Card frame="flat" padding="compact" layout="vertical" gap="tight" actions={<Button>開く</Button>}><h3>アカウント</h3><p>@account</p></Card></ListPageCards>
+      <ListPageCards><Card padding="compact" layout="vertical" gap="tight" actions={<Button>開く</Button>}><h3>アカウント</h3><p>@account</p></Card></ListPageCards>
     </ListPage></section>
     <section id="contents"><ListPage standalone heightMode="content" title="登録メディア" toolbar={<Button>取り込む</Button>}><ListPageCards>
-      <Card frame="flat" padding="rows" layout="media"><CardContent><CardHeader size="content" title="登録画像" meta="画像の補足" /></CardContent></Card>
+      <Card padding="rows" layout="media"><CardContent><CardHeader size="content" title="登録画像" meta="画像の補足" /></CardContent></Card>
     </ListPageCards></ListPage></section>
     <section id="banners"><ListPage standalone heightMode="content" title="バナー" toolbar={<Button>作る</Button>}><ListPageCards>
-      <Card frame="flat" padding="rows" layout="media"><CardContent><CardHeader size="content" title="プロジェクト" /></CardContent></Card>
+      <Card padding="rows" layout="media"><CardContent><CardHeader size="content" title="プロジェクト" /></CardContent></Card>
     </ListPageCards></ListPage></section>
     <section id="common-vars"><ListPage standalone heightMode="content" title="共通情報" folders={<><Button>作る</Button><div data-measure="folder-label">フォルダ</div></>} toolbar={<Button>絞り込む</Button>}>{table}</ListPage></section>
     <section id="reminder-detail"><PageFrame kind="detail" standalone heightMode="content"><PageHeading title="リマインダの詳細" subtitle="登録状況" tabs={tabs} />{table}</PageFrame></section>
@@ -36,17 +36,17 @@ export default function SurfaceLayoutFixture() {
       { id: 'hq-broadcast', title: '一括配信を作る', headingSize: 'compact' as const },
       { id: 'scenario', title: 'シナリオを作る', stepsSpacing: 'compact' as const },
       { id: 'rich-menu', title: 'リッチメニューを作る' },
-    ].map(({ id, ...heading }) => <section id={id} key={id}><CreatePage standalone dirty={false} footerActions={null} {...heading} steps={steps}><Card frame="flat" padding="compact">入力欄</Card></CreatePage></section>)}
+    ].map(({ id, ...heading }) => <section id={id} key={id}><CreatePage standalone dirty={false} footerActions={null} {...heading} steps={steps}><Card padding="compact">入力欄</Card></CreatePage></section>)}
     <section id="section-with-tools"><ListPage standalone heightMode="content" contentInset title="道具付きの段" toolbar={<Button>絞り込む</Button>}><ListPageSection><p>本文</p></ListPageSection></ListPage></section>
     <section id="section-without-tools"><ListPage standalone heightMode="content" title="本文の段"><ListPageSection><p>本文</p></ListPageSection></ListPage></section>
     <section id="surfaces">
       <Card id="raised" padding="compact">従来のカード</Card>
-      <Card id="flat" frame="flat" padding="compact">平らなカード</Card>
-      <Card id="selected-flat" frame="flat" selected padding="compact">選択中</Card>
-      <Card id="flat-form" frame="flat" variant="form">入力の面</Card>
-      <Card id="flat-bordered" frame="flat" surface="bordered" padding="compact">線の面</Card>
-      <Card id="flat-outlined" frame="flat" appearance="outlined" padding="compact">外枠の面</Card>
-      <Card id="flat-inset" frame="flat" surface="inset" padding="compact">内側の面</Card>
+      <Card id="flat" padding="compact">平らなカード</Card>
+      <Card id="selected-flat" selected padding="compact">選択中</Card>
+      <Card id="flat-form" variant="form">入力の面</Card>
+      <Card id="flat-bordered" surface="bordered" padding="compact">線の面</Card>
+      <Card id="flat-outlined" appearance="outlined" padding="compact">外枠の面</Card>
+      <Card id="flat-inset" surface="inset" padding="compact">内側の面</Card>
       {[
         { density: 'reviews' as const }, { density: 'records' as const },
         { presentation: 'inventory' as const }, { presentation: 'ledger' as const },

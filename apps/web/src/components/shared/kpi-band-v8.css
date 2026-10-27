@@ -155,15 +155,9 @@ html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='ba
 html:root [data-kpi-strip][data-kpi-presentation='band'],
 html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-border] {
   border: 0; border-radius: var(--polish-band-radius); background: var(--color-canvas);
-  /* 4辺の縁・角丸・影を同じ強さで見せる。 */
-  box-shadow: var(--polish-band-shadow), 0 0 0 1px var(--surface-edge);
-  max-width: 100%;
-}
-/* 1マスだけの帯は、白い面に浮いて見えないようカードと同じ枠を持つ。 */
-html:root [data-kpi-strip][data-kpi-presentation='band']:has(> [data-design-version]:only-child),
-html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-frame='card'] {
-  border: 1px solid var(--color-hairline);
+  /* 縁の線は引かず、カードと同じ影だけで浮かせる。中の縦の区切りは薄いまま残す。 */
   box-shadow: var(--card-shadow);
+  max-width: 100%;
 }
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-icon] { display: none; }
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] { color: var(--color-ink-secondary); font-weight: var(--polish-control-weight); }

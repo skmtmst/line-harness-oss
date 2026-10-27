@@ -20,7 +20,7 @@ it('標準ではECと専用の数字を出さず、ECの注文は既存の実デ
   render(<EcSummary accountId="ec-account" />)
   await screen.findByText('21')
   expect(net.orders).toHaveBeenCalledWith({ lineAccountId: 'ec-account', limit: 1 })
-  expect(screen.getByRole('link', { name: 'つき合わせを確認する' }).getAttribute('href')).toBe('/ec-commerce/identity-candidates')
+  expect(screen.getByRole('link', { name: 'つき合わせへ' }).getAttribute('href')).toBe('/ec-commerce/identity-candidates')
 })
 it('未接続・失敗を0にせず、読み直しと別店の切替で古い数字を捨てる', async () => {
   net.overview.mockRejectedValueOnce(new Error('offline'))

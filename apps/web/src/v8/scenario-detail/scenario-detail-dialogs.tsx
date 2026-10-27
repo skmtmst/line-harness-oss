@@ -22,7 +22,7 @@ import { formatNumber } from '@/lib/format'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { UnsavedLeaveTarget } from '@/lib/use-unsaved-guard'
 import type { DeliveryMode, Folder, ScenarioStep, ScenarioTriggerType } from '@line-crm/shared'
-import { Copy, ShieldCheck } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 import { formatScheduleLabel, messageTypeOptions, ScenarioStats, ScenarioWithSteps, StepFormState, TemplateOpt } from './detail-model'
 import styles from './detail.module.css'
@@ -434,7 +434,7 @@ export function ScenarioDetailDialogs({
             <p className={styles.dupBoxTitle}>引き継がないもの</p>
             <p className={styles.dupBoxBody}>・購読中の人・配信の記録</p>
           </div>
-        <Notice tone="info" icon={<ShieldCheck aria-hidden />}>
+        <Notice tone="info">
           <span>複製は「停止中」で作られます。開始のきっかけも写しますが、配信を始めるまで誰にも届きません。</span>
         </Notice>
           {/* 絵（Al4Ek）は操作が真ん中。共通の窓の右寄せの操作の段は使わず、本文の続きに置く。 */}

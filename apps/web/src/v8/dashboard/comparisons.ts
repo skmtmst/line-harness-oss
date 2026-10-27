@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import type { DashboardComparison, DashboardComparisonKey, DashboardComparisons } from '@line-crm/shared'
 import { api, type DashboardOverview } from '@/lib/api'
-import { formatListTimestamp } from '@/lib/format'
+import { formatDateTime } from '@/lib/format'
 
 /**
  * 数の帯の比べる値（今日の数は先週の同じ曜日）。
@@ -48,7 +48,7 @@ function dashboardInstant(value: string): string {
 }
 
 /**
- * 帯の上の「いつ時点か」の1行（「10/25 17:51 時点・先週の同じ曜日と比べています」）。
+ * 帯の上の「いつ時点か」の1行（「10月25日 17:51 時点・先週の同じ曜日と比べています」）。
  * 時刻は集計した時刻。数のもとが遅れている時は、取れた中で一番古い時刻と遅れの断りを出す。
  */
 export function asOfLine(overview: Pick<DashboardOverview, 'generatedAt' | 'asOf' | 'freshness'> | null | undefined, compared: boolean): string | null {
@@ -56,7 +56,7 @@ export function asOfLine(overview: Pick<DashboardOverview, 'generatedAt' | 'asOf
   const late = overview.freshness === 'stale' || overview.freshness === 'delayed'
   const source = late && overview.asOf ? overview.asOf : overview.generatedAt
   if (!source) return null
-  const time = formatListTimestamp(dashboardInstant(source), { fallback: '' })
+  const time = formatDateTime(dashboardInstant(source), '')
   if (!time) return null
   return `${time} 時点${late ? '（更新が遅れています）' : ''}${compared ? '・先週の同じ曜日と比べています' : ''}`
 }

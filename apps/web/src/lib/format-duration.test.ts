@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { formatDurationMinutes, formatHoursBeforeHint, formatMinutesLengthHint, formatMinutesRough } from './format-duration'
+import { formatDurationMinutes, formatElapsedMinutes, formatHoursBeforeHint, formatMinutesLengthHint, formatMinutesRough, formatTimeSpan, formatWaitRough } from './format-duration'
+
+describe('共通の経過時間と長さ', () => {
+  it.each([[59, '59分'], [60, '1時間'], [47 * 60 + 59, '47時間'], [48 * 60, '2日']])('%i分は%s', (minutes, expected) => {
+    expect(formatTimeSpan(minutes)).toBe(expected)
+  })
+  it('1分未満は「たった今」、数と単位の間隔も選べる', () => {
+    expect(formatElapsedMinutes(0.5)).toBe('たった今')
+    expect(formatTimeSpan(59, { gap: true })).toBe('59 分')
+    expect(formatWaitRough(47 * 60 + 59)).toBe('47時間前')
+    expect(formatWaitRough(48 * 60)).toBe('2日前')
+    expect(formatElapsedMinutes(Number.NaN)).toBe('—')
+  })
+})
 
 describe('formatDurationMinutes', () => {
   it.each([
@@ -16,28 +29,23 @@ describe('formatDurationMinutes', () => {
   })
 })
 
-/*
- * Issue #666: 審査の「1枚にかかる時間」は分の生値（平均55975分≒38.8日）で
- * 出ていた。60分以上は「約○時間」、24時間以上は「約○日」、30日以上は
- * 「約○ヶ月」と、眺める画面で読める単位へ切り替える。
- */
+/* 経過・待ち・平均の長さを、分・時間・48時間を超えたら日に統一する。 */
 describe('formatMinutesRough', () => {
   it.each([
     [0, '0分'],
     [1, '1分'],
     [59, '59分'],
-    [60, '約1時間'],
-    [61, '約1時間'],
-    [90, '約2時間'],
-    [1_439, '約24時間'],
-    [1_440, '約1日'],
-    [1_441, '約1日'],
-    [43_199, '約30日'],
-    [43_200, '約30日'],
-    [43_201, '約1ヶ月'],
-    // Issue #666 の実測値: 平均 55975分 ≒ 38.8日。
-    [55_975, '約1ヶ月'],
-    [86_400, '約2ヶ月'],
+    [60, '1時間'],
+    [61, '1時間'],
+    [90, '1時間'],
+    [1_439, '23時間'],
+    [1_440, '24時間'],
+    [1_441, '24時間'],
+    [43_199, '29日'],
+    [43_200, '30日'],
+    [43_201, '30日'],
+    [55_975, '38日'],
+    [86_400, '60日'],
   ])('%i分を%sで表示する', (minutes, expected) => {
     expect(formatMinutesRough(minutes)).toBe(expected)
   })

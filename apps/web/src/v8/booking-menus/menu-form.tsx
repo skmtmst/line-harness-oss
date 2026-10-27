@@ -1084,7 +1084,7 @@ export default function MenuFormV8() {
                   aria-label="金額（円）"
                 /></SaveErrorField>
               </Field>
-              <Field label="予約したときのマイル" optional={false} help="お店全体の設定で決まります" note={<TextLink external href="/mileage?tab=earning-rules">設定を見る</TextLink>}>
+              <Field label="予約したときのマイル" optional={false} help="お店全体の設定で決まります" note={<TextLink external href="/mileage?tab=earning-rules">マイル設定へ</TextLink>}>
               <SaveErrorField names={["bookingMileage","booking_mileage"]}><AffixedTextField layout="field"
                   readOnly endAdornment="マイル"
                   value={

@@ -5,6 +5,7 @@ import HelpTip from '@/components/shared/help-tip'
 import SegmentedControl from '@/components/shared/segmented'
 import Button from '@/components/shared/button'
 import { RowMenu } from '@/components/shared/row-actions'
+import Card from '@/components/shared/card'
 import type { BroadcastAb } from './use-ab'
 import styles from './ab.module.css'
 
@@ -15,7 +16,7 @@ import styles from './ab.module.css'
  */
 export default function BroadcastAbTabs({ ab, aBubbles, canEdit, locked }: { ab: BroadcastAb; aBubbles: BroadcastBubble[]; canEdit: boolean; locked?: boolean }) {
   return (
-    <section className={styles.tabsCard} aria-label="A/B の案" data-design-node="QOdsh">
+    <Card as="section" className={styles.tabsCard} contentPadding="var(--ab-pad) var(--polish-space-section)" aria-label="A/B の案" data-design-node="QOdsh">
       {ab.hasB ? (
         <SegmentedControl aria-label="編集する案" value={ab.tab} onChange={(value) => ab.setTab(value as 'A' | 'B')} options={[{ value: 'A', label: 'A 案' }, { value: 'B', label: 'B 案' }]} />
       ) : <span className={styles.onlyA}>A 案</span>}
@@ -24,6 +25,6 @@ export default function BroadcastAbTabs({ ab, aBubbles, canEdit, locked }: { ab:
       {canEdit && !locked && !ab.hasB ? <Button size="compact" onClick={() => ab.addB(aBubbles)}>B 案を追加</Button> : null}
       {canEdit && !locked && ab.hasB ? <RowMenu appearance="box" size="row" label="A/B の案の操作" items={[{ id: 'remove-b', label: 'B 案を消す', tone: 'danger', onSelect: ab.removeB }]} /> : null}
       {locked ? <span className={styles.note}>試し中は本文を直せません</span> : null}
-    </section>
+    </Card>
   )
 }

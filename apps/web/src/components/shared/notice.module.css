@@ -18,40 +18,32 @@
   line-height: var(--tpl-ro-band-lh);
 }
 .notice[hidden] { display: none; }
-.icon {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.content { display: flex; align-items: flex-start; gap: var(--polish-space-field); min-width: 0; flex: 1; }
+.dot {
+  display: block;
   flex: none;
-  width: var(--space-32);
-  height: var(--space-32);
-  padding: var(--polish-space-row);
+  width: var(--space-8);
+  height: var(--space-8);
   border-radius: var(--radius-pill);
   background: var(--color-status-info);
-  color: var(--color-on-accent);
+  /* 題（題が無ければ本文）の1行目の上下の真ん中。行の高さは題も本文も同じ値を読む。 */
+  align-self: flex-start;
+  margin-top: calc((var(--tpl-ro-band-lh) - var(--space-8)) / 2);
 }
-.icon > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
-.info .icon { background: var(--color-status-info); }
-.success .icon { background: var(--color-success); }
-.warn .icon { background: var(--color-status-warn); }
-.danger .icon { background: var(--color-status-danger); }
-.notice[data-marker='dot'] .icon::after { content: ''; width: var(--polish-space-row); height: var(--polish-space-row); border-radius: var(--radius-pill); }
-.info[data-marker='dot'] .icon { background: color-mix(in srgb, var(--color-status-info) 12%, var(--color-canvas)); }
-.info[data-marker='dot'] .icon::after { background: var(--color-status-info); }
-.success[data-marker='dot'] .icon { background: color-mix(in srgb, var(--color-success) 12%, var(--color-canvas)); }
-.success[data-marker='dot'] .icon::after { background: var(--color-success); }
-.warn[data-marker='dot'] .icon { background: color-mix(in srgb, var(--color-status-warn) 12%, var(--color-canvas)); }
-.warn[data-marker='dot'] .icon::after { background: var(--color-status-warn); }
-.danger[data-marker='dot'] .icon { background: color-mix(in srgb, var(--color-status-danger) 12%, var(--color-canvas)); }
-.danger[data-marker='dot'] .icon::after { background: var(--color-status-danger); }
+.info .dot { background: var(--color-status-info); }
+.success .dot { background: var(--color-success); }
+.warn .dot { background: var(--color-status-warn); }
+.danger .dot { background: var(--color-status-danger); }
 .message { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.notice[data-has-action] .message { flex-basis: 24em; }
+.notice[data-has-action] .content { flex-basis: 24em; }
 .headingRow { display: flex; align-items: center; gap: var(--space-6); }
 .heading { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; }
+/* 「要確認：」「失敗：」。題（題が無い時は本文）の頭に濃い文字で置く。題や本文が段落で始まっても同じ行の頭に並ぶよう、行の始まりへ寄せる。 */
+.statusWord { float: inline-start; color: var(--color-ink); font-weight: 600; }
 .description { display: block; color: var(--color-ink-secondary); }
 .action { display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-row); margin-left: auto; max-width: 100%; }
-.action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-action); font-weight: 600; }
+.action .close { align-self: center; }
+.action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-link); font-weight: var(--font-weight-ui); }
 .close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--space-32); height: var(--space-32); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); cursor: pointer; }
 .close:hover { background: var(--color-surface-pearl); }
 .close:focus-visible, .notice a:focus-visible { outline: revert; }
@@ -64,12 +56,13 @@
 :root .notice .stateMark > svg { width: var(--space-10); height: var(--space-10); }
 .footer { margin-top: var(--polish-space-field); padding-top: var(--polish-space-row); border-top: 1px solid var(--color-hairline); }
 /* 小さな欄の知らせも同じ面を使い、文を省略したときは全文のtitleを保つ。 */
-.notice[data-compact] { padding: var(--space-6) var(--space-10); gap: var(--space-6); font-size: var(--text-micro); }
+.notice[data-compact] { min-height: 36px; padding: var(--space-6) var(--space-10); gap: var(--space-6); font-size: var(--text-micro); }
+.notice[data-compact] .content { gap: var(--space-6); }
+.notice[data-compact] .close { margin-block: calc(-1 * var(--space-6)); }
 .notice[data-compact] .message { flex-basis: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.notice[data-compact] .icon { width: var(--space-24); height: var(--space-24); padding: var(--space-4); }
 /* 警告・失敗の文は切らずに折り返す（何が起きたかを全部読めるように）。1行の省略は案内と成功だけ。 */
 .notice[data-compact]:is([data-tone='warn'], [data-tone='danger'], [role='alert']) .message { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
-.notice[data-action-layout='stack-on-narrow'] .message { flex-basis: 24em; }
+.notice[data-action-layout='stack-on-narrow'] .content { flex-basis: 24em; }
 
 }
 
@@ -81,7 +74,4 @@
   :root .notice[data-action-layout='stack-on-narrow'] .action { flex-basis: 100%; justify-content: flex-end; }
 }
 
-/* 全体の線アイコンの寸法より、知らせの丸い器の寸法を優先する。 */
-:root .notice .icon { width: var(--space-32); height: var(--space-32); color: var(--color-on-accent); }
 :root .notice .stateMark > svg { width: var(--space-10); height: var(--space-10); }
-:root .notice[data-compact] .icon { width: var(--space-24); height: var(--space-24); }

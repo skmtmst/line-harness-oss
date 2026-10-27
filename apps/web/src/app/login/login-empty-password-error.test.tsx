@@ -102,7 +102,7 @@ describe('R613: 空パスワードの古い案内を消す', () => {
     await type('#login-email', 'owner@example.com')
     await submit()
 
-    expect(alertText()).toBe('パスワードを入力してください')
+    expect(alertText()).toBe('失敗：パスワードを入力してください')
 
     await type('#login-password', 'A')
     expect(alertText()).toBeNull()
@@ -115,10 +115,10 @@ describe('R613: 空パスワードの古い案内を消す', () => {
     await type('#login-password', 'Wrongpass1')
     await submit()
 
-    expect(alertText()).toBe('メールアドレスまたはパスワードが正しくありません')
+    expect(alertText()).toBe('失敗：メールアドレスまたはパスワードが正しくありません')
 
     await type('#login-password', 'Wrongpass2')
-    expect(alertText()).toBe('メールアドレスまたはパスワードが正しくありません')
+    expect(alertText()).toBe('失敗：メールアドレスまたはパスワードが正しくありません')
   })
 
   it('サーバーエラー(503)の表示もパスワード入力だけでは消えず、次の送信まで残る', async () => {
@@ -131,9 +131,9 @@ describe('R613: 空パスワードの古い案内を消す', () => {
     await type('#login-password', 'Correct1')
     await submit()
 
-    expect(alertText()).toBe('しばらくしてからもう一度お試しください')
+    expect(alertText()).toBe('失敗：しばらくしてからもう一度お試しください')
 
     await type('#login-password', 'Correct2')
-    expect(alertText()).toBe('しばらくしてからもう一度お試しください')
+    expect(alertText()).toBe('失敗：しばらくしてからもう一度お試しください')
   })
 })
