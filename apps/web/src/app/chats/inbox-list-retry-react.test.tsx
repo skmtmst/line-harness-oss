@@ -152,3 +152,21 @@ test('同条件の読み直しでは会話を残し、遅い更新だけ「更�
   await act(async () => complete(response(linePayload(['更新した会話']))))
   await eventually(() => expect(list().textContent).toContain('更新した会話'))
 })
+
+test('最初の一覧が遅いときは、読み上げの文を残したまま0.3秒後に行の形の骨組みを出す', async () => {
+  let complete!: (value: Response) => void
+  handler = url => url.pathname === '/api/chats' ? new Promise(resolve => { complete = resolve }) : base(url)
+  await act(async () => root.render(<ChatsPage />))
+  await settle()
+  const loading = list().querySelector('[data-inbox-list-state="loading"]')
+  expect(loading?.getAttribute('role')).toBe('status')
+  expect(loading?.querySelector('.sr-only')?.textContent).toBe('会話を読み込んでいます…')
+  expect(loading?.querySelector('[data-skeleton-reserve] [data-skeleton]')).not.toBeNull()
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 330)) })
+  const shown = list().querySelector('[data-inbox-list-state="loading"]')
+  expect(shown?.querySelector('[data-skeleton-reserve]')).toBeNull()
+  expect(shown?.querySelector('[data-skeleton]')).not.toBeNull()
+  await act(async () => complete(response(linePayload(['届いた会話']))))
+  await eventually(() => expect(list().textContent).toContain('届いた会話'))
+  expect(list().querySelector('[data-inbox-list-state="loading"]')).toBeNull()
+})

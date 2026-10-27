@@ -10,13 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RichMenuConnectionsPage from './page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-const mocks = vi.hoisted(() => ({ get: vi.fn(), push: vi.fn(), role: 'owner', readOnly: false, permissionKeys: [] as string[] }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), push: vi.fn(), role: 'owner', readOnly: false, permissionKeys: [] as string[], accountId: 'account-a' as string | null }))
 vi.mock('@/lib/api', async importOriginal => ({
   ...await importOriginal<typeof import('@/lib/api')>(),
   api: { richMenuGroups: { get: mocks.get }, staff: { me: async () => ({ success: true, data: { id: 'connections-qa', role: mocks.role, readOnly: mocks.readOnly, permissionKeys: mocks.permissionKeys } }) } },
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: mocks.accountId, loading: false }),
 }))
 vi.mock('next/navigation', async importOriginal => ({
   ...await importOriginal<typeof import('next/navigation')>(),
@@ -39,7 +39,7 @@ let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.role = 'owner'; mocks.readOnly = false; mocks.permissionKeys = []
+  mocks.role = 'owner'; mocks.readOnly = false; mocks.permissionKeys = []; mocks.accountId = 'account-a'
   mocks.get.mockResolvedValue({ success: true, data: group })
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
 })
@@ -131,6 +131,67 @@ describe('切替のつながりV8（wxIQ7）', () => {
     expect(dialog.textContent).toContain('公開中')
     expect(dialog.textContent).toContain('編集する')
     expect(dialog.textContent).not.toContain('LINEの見え方')
+  })
+
+  it('切替先が無いメニューは、足すとここに出ると案内する', async () => {
+    mocks.get.mockResolvedValue({ success: true, data: { ...group, pages: [{ ...group.pages[0], areas: [] }] } })
+    await render()
+    expect(host.textContent).toContain('切替先を足すと、ここに「どのメニューからどこへ移れるか」が出ます')
+    expect(host.textContent).not.toContain('緑のタブが「別のメニューへ移る」ボタンです')
+  })
+
+  it('選んでいるアカウントと所属が違うメニューは中身を出さない', async () => {
+    mocks.get.mockResolvedValue({ success: true, data: { ...group, accountId: 'account-b' } })
+    await render()
+    expect(host.textContent).toContain('選択中のアカウントでは表示できません')
+    expect(host.textContent).not.toContain('切替のつながり：会員ランク上位')
+  })
+
+  it('アカウントを替えたあとに届いた前の取得結果を出さない', async () => {
+    let resolveFirst!: (value: unknown) => void
+    let resolveSecond!: (value: unknown) => void
+    mocks.get
+      .mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve }))
+      .mockReturnValueOnce(new Promise((resolve) => { resolveSecond = resolve }))
+    await render()
+    mocks.accountId = 'account-b'
+    await render()
+    expect(mocks.get).toHaveBeenCalledTimes(2)
+    await act(async () => { resolveFirst({ success: true, data: group }) })
+    expect(host.querySelector('[data-list-state="loading"]')?.getAttribute('aria-label')).toBe('切替のつながりを読み込んでいます')
+    expect(host.textContent).not.toContain('切替のつながり：会員ランク上位')
+    await act(async () => { resolveSecond({ success: true, data: { ...group, accountId: 'account-b', name: 'B店のメニュー' } }) })
+    expect(host.textContent).toContain('切替のつながり：B店のメニュー')
+  })
+
+  it('読み込み中・アカウント未選択・失敗を出し分け、失敗は読み直せる', async () => {
+    mocks.get.mockReturnValueOnce(new Promise(() => {}))
+    await render()
+    expect(host.querySelector('[data-list-state="loading"]')?.getAttribute('aria-label')).toBe('切替のつながりを読み込んでいます')
+    act(() => root.unmount()); root = createRoot(host)
+
+    mocks.accountId = null
+    await render()
+    expect(host.textContent).toContain('LINE公式アカウントを選んでください')
+    act(() => root.unmount()); root = createRoot(host)
+
+    mocks.accountId = 'account-a'
+    mocks.get.mockReset().mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({ success: true, data: group })
+    await render()
+    expect(host.textContent).toContain('切替のつながりを読み込めませんでした')
+    expect(host.textContent).not.toContain('0 枚')
+    const retry = [...host.querySelectorAll('button')].find(node => node.textContent?.includes('もう一度読み込む'))!
+    await act(async () => { retry.click() })
+    for (let i = 0; i < 6; i += 1) await act(async () => { await Promise.resolve() })
+    expect(mocks.get).toHaveBeenCalledTimes(2)
+    expect(host.textContent).toContain('切替のつながり：会員ランク上位')
+  })
+
+  it('形の違う返事（ページの無いメニュー）は受け取らず、表示できなかったと出す', async () => {
+    mocks.get.mockResolvedValue({ success: true, data: { id: 'group-1', accountId: 'account-a', name: '会員ランク上位' } })
+    await render()
+    expect(host.textContent).toContain('切替のつながりを読み込めませんでした')
+    expect(host.textContent).not.toContain('切替のつながり：会員ランク上位')
   })
 
 })

@@ -1,39 +1,16 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
+/*
+ * 読み込み失敗・読み直し・操作の失敗の動きは scenario-load-failure-wiring.test.tsx・
+ * scenario-row-panel-react.test.tsx・v8/scenarios/list-counts-and-actions.test.tsx が描いて守る。
+ * ここは API の内部の文をそのまま出す書き方へ戻さない禁止の見張りだけを残す。
+ */
 /* 完全切り替え：管理画面 の page.tsx は捨て、V8 の一覧（src/v8/scenarios/list.tsx・page.tsx が描く本体）を見る。 */
 const PAGE = readFileSync(new URL('../../v8/scenarios/list.tsx', import.meta.url), 'utf8')
 
 describe("管理画面 シナリオ一覧の読込状態", () => {
-
-
   it('読込失敗を空のシナリオ一覧として表示しない', () => {
-    expect(PAGE).toContain('scenarioList.error')
-    /* 板 「読み込めなかった」：細い帯＋もう一度試す。 */
-    expect(PAGE).toContain('シナリオを読み込めませんでした')
-    expect(PAGE).toContain('>もう一度読み込む<')
-    expect(PAGE).toContain('onClick={() => void loadScenarios()}')
     expect(PAGE).not.toContain("setError(res.error)")
-  })
-
-  it('アカウント切替前の遅い応答と古い一覧を採用しない', () => {
-    expect(PAGE).toContain('requestKey: JSON.stringify({')
-    expect(PAGE).toContain("accountId: selectedAccountId ?? ''")
-    expect(PAGE).toContain('}, signal)')
-    expect(PAGE).toContain('page: request.page')
-  })
-
-  it('操作失敗は内部エラーを出さず一覧読込失敗と分ける', () => {
-    expect(PAGE).toContain("const [actionError, setActionError] = useState('')")
-    // V8のまとめて操作は先に表示を変え、失敗時は共通の知らせに出す。
-    expect(PAGE).toContain('runUndoable({')
-    expect(PAGE).toContain('配信を始められませんでした。')
-    expect(PAGE).toContain('停止できませんでした。')
-    expect(PAGE).toContain('results.filter((res) => !res || !res.success)')
-    expect(PAGE).toContain('if (failed > 0) throw new Error')
-    expect(PAGE).toContain('undo: () => setOptimisticRows(null)')
-    expect(PAGE).toContain('フォルダを移動できませんでした')
-    expect(PAGE).toContain('このシナリオを削除できませんでした')
-    expect(PAGE).toContain('{actionError}')
   })
 })

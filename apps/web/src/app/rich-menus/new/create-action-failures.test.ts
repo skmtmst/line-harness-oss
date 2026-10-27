@@ -44,6 +44,15 @@ describe('分割したリッチメニューの失敗処理', () => {
     expect(state.setError).not.toHaveBeenCalledWith('API error: 500')
   })
 
+  it('公開の前の下書き保存で失敗したら、保存されていないと言い、公開の口へ送らない', async () => {
+    const state = publishContext()
+    state.persistDraft = vi.fn(async () => { throw new ApiError(500, 'API error: 500') })
+    await publishMenuNow(state)
+    expect(state.setError).toHaveBeenLastCalledWith(expect.stringContaining('下書きは保存されていません'))
+    expect(state.setError).not.toHaveBeenCalledWith(expect.stringContaining('下書きは保存済みです'))
+    expect(publish).not.toHaveBeenCalled()
+  })
+
   it.each([
     ['出す相手の条件を設定してください。', '出す相手の条件を設定してください。'],
     ['targetingPriority must be an integer', '出す順番は1以上の整数で入力してください。小数は使えません。'],

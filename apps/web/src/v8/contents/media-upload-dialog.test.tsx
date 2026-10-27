@@ -1,0 +1,158 @@
+// @vitest-environment happy-dom
+/*
+ * ★V8 メディアを入れる窓（src/v8/contents/media-upload-dialog.tsx）の動き。
+ * 署名付きの保存先へ直接送り、1件ずつ進みを出し、失敗した1件だけを登録待ちへ戻して送り直せることを、
+ * 窓を描いてファイルを選び、API と送信の呼び出しで確かめる。
+ */
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
+})
+
+const calls = vi.hoisted(() => ({
+  prepare: [] as Array<{ accountId: string; files: Array<{ filename: string }> }>,
+  put: [] as string[],
+  complete: [] as Array<[string, { accountId: string; etag: string }]>,
+  /** 送信の返事を握る口。ファイル名ごと。 */
+  putAnswer: new Map<string, (progress: (value: number) => void) => Promise<string>>(),
+}))
+
+vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      media: {
+        ...actual.api.media,
+        prepareUploads: async (input: { accountId: string; files: Array<{ filename: string }> }) => {
+          calls.prepare.push(input)
+          return { success: true, data: { sessions: input.files.map((file) => ({ id: `session-${file.filename}`, filename: file.filename, uploadUrl: 'https://r2.example.test/put', method: 'PUT', requiredHeaders: {}, expiresAt: '2099-01-01T00:00:00.000Z' })) } }
+        },
+        completeUpload: async (sessionId: string, input: { accountId: string; etag: string }) => {
+          calls.complete.push([sessionId, input])
+          return { success: true, data: { uploadSessionId: sessionId, status: 'completed', mediaId: null } }
+        },
+      },
+    },
+  }
+})
+vi.mock('./media-direct-upload', async (importOriginal: () => Promise<typeof import('./media-direct-upload')>) => ({
+  ...(await importOriginal()),
+  extractMediaMetadata: async () => ({}),
+  putMediaFile: (session: { id: string; filename: string }, _file: File, onProgress: (value: number) => void) => {
+    calls.put.push(session.id)
+    const answer = calls.putAnswer.get(session.filename)
+    return answer ? answer(onProgress) : Promise.resolve(`etag-${session.filename}`)
+  },
+}))
+
+import MediaUploadDialog from './media-upload-dialog'
+
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+let root: Root
+let host: HTMLDivElement
+let onComplete = vi.fn()
+
+beforeEach(() => {
+  calls.prepare.length = 0
+  calls.put.length = 0
+  calls.complete.length = 0
+  calls.putAnswer.clear()
+  onComplete = vi.fn()
+  host = document.createElement('div')
+  document.body.appendChild(host)
+  root = createRoot(host)
+})
+
+afterEach(() => {
+  act(() => root.unmount())
+  host.remove()
+})
+
+const settle = async () => {
+  for (let i = 0; i < 6; i += 1) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+}
+const render = async () => {
+  await act(async () => root.render(
+    <MediaUploadDialog open accountId="account-a" folders={[]} initialFolderId="" onClose={() => {}} onComplete={onComplete} />,
+  ))
+  await settle()
+}
+const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')!
+const pick = async (...files: File[]) => {
+  const input = dialog().querySelector<HTMLInputElement>('input[type="file"]')!
+  Object.defineProperty(input, 'files', { value: files, configurable: true })
+  await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })) })
+  await settle()
+}
+const press = async (text: string) => {
+  const target = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === text)
+  if (!target) throw new Error(`ボタンがありません: ${text}`)
+  await act(async () => { target.click() })
+  await settle()
+}
+const png = (name: string) => new File(['x'], name, { type: 'image/png' })
+
+describe('メディアを入れる窓', () => {
+  it('LINEで送れる大きさと、保存先へ直接送ることを先に書く', async () => {
+    await render()
+    const text = dialog().textContent ?? ''
+    expect(text).toContain('音声 MP3・M4A ／ 200MBまで')
+    expect(text).toContain('動画 MP4 ／ 200MBまで')
+    expect(text).toContain('大きなファイルも管理画面を経由せず、保存先へ直接送ります。')
+  })
+
+  it('選んだ分を1回の準備で予約し、1件ずつ保存先へ直接送ってから確認を頼む', async () => {
+    await render()
+    await pick(png('a.png'), png('b.png'))
+    await press('2件を登録する')
+    expect(calls.prepare).toHaveLength(1)
+    expect(calls.prepare[0].accountId).toBe('account-a')
+    expect(calls.prepare[0].files.map((file) => file.filename)).toEqual(['a.png', 'b.png'])
+    expect(calls.put).toEqual(['session-a.png', 'session-b.png'])
+    expect(calls.complete).toEqual([
+      ['session-a.png', { accountId: 'account-a', etag: 'etag-a.png' }],
+      ['session-b.png', { accountId: 'account-a', etag: 'etag-b.png' }],
+    ])
+    expect(dialog().textContent).toContain('2 件を登録しました')
+    expect(onComplete).toHaveBeenCalledTimes(1)
+  })
+
+  it('送っている間は1件ごとの進みを読み上げ欄に出す', async () => {
+    let release: () => void = () => {}
+    calls.putAnswer.set('a.png', (progress) => {
+      progress(40)
+      return new Promise((resolve) => { release = () => resolve('etag-a') })
+    })
+    await render()
+    await pick(png('a.png'))
+    await press('1件を登録する')
+    const row = dialog().querySelector('li[aria-live="polite"]')
+    expect(row?.textContent).toContain('送信中 40%')
+    await act(async () => { release() })
+    await settle()
+    expect(dialog().textContent).toContain('1 件を登録しました')
+  })
+
+  it('送れなかった1件だけを「選び直す」で登録待ちへ戻し、その1件だけを送り直す', async () => {
+    calls.putAnswer.set('b.png', () => Promise.reject(new Error('network')))
+    await render()
+    await pick(png('a.png'), png('b.png'))
+    await press('2件を登録する')
+    expect(dialog().textContent).toContain('1 件を登録し、1 件は入りませんでした')
+    expect(calls.complete.map(([session]) => session)).toEqual(['session-a.png'])
+    expect(onComplete).toHaveBeenCalledTimes(1)
+
+    calls.putAnswer.delete('b.png')
+    await act(async () => { dialog().querySelector<HTMLButtonElement>('button[aria-label="「b.png」を選び直す"]')!.click() })
+    await settle()
+    await press('1件を登録する')
+    expect(calls.prepare.at(-1)?.files.map((file) => file.filename)).toEqual(['b.png'])
+    expect(calls.complete.map(([session]) => session)).toEqual(['session-a.png', 'session-b.png'])
+  })
+})

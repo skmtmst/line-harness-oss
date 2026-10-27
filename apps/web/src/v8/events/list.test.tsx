@@ -99,6 +99,15 @@ describe('V8 イベント予約の一覧', () => {
     expect(host.textContent).toContain('閲覧のみで見ています')
   })
 
+  it('公開前のイベントは状態を「下書き」と出し、「準備中」と言わない', async () => {
+    fetchApi.mockImplementation(async () => ({ items: [{ ...event, is_published: 0, lifecycle_status: 'draft' }], total: 1, summary: null }))
+    await render()
+    const row = [...host.querySelectorAll('tr')].find((tr) => tr.textContent?.includes('秋のしつけ教室'))
+    expect(row?.textContent).toContain('下書き')
+    expect(row?.textContent).not.toContain('公開中')
+    expect(host.textContent).not.toContain('準備中')
+  })
+
   it('行の名前の前に、左の列と同じフォルダの丸が付く', async () => {
     await render()
     const dot = host.querySelector('[data-folder-dot]')

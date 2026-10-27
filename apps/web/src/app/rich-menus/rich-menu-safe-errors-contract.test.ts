@@ -1,36 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// 文言の正本は rich-menu-errors.ts（★管理画面・★V8 の一覧で共有）。
+/*
+ * 失敗の文の中身は src/v8/rich-menus/errors.test.ts が関数を呼んで、
+ * 一覧の各操作（読み込み・並び替え・削除・取り下げ・LINEからの削除・取り込み）で
+ * その文が出ることは src/v8/rich-menus/list-ops-react.test.tsx が画面を動かして見る。
+ * ここには内部の文をそのまま出す書き方に戻さない禁止の見張りだけを残す。
+ */
 const PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
   + readFileSync(new URL('../../v8/rich-menus/errors.ts', import.meta.url), 'utf8')
 
 describe("管理画面 リッチメニューのエラー表示", () => {
   it('APIの内部エラーを画面や警告へそのまま出さない', () => {
-    expect(PAGE).toContain("api, ApiError, type RichMenuDeleteImpact")
-    expect(PAGE).toContain("setError(richMenuError(e, 'load'))")
     expect(PAGE).not.toContain('e instanceof Error ? e.message : String(e)')
     expect(PAGE).not.toContain('LINE 公式アカウントの状態取得に失敗しました:')
-  })
-
-  it('権限・不存在・競合・混雑を次の行動が分かる文にする', () => {
-    expect(PAGE).toContain('error.status === 403')
-    expect(PAGE).toContain('error.status === 404')
-    expect(PAGE).toContain('error.status === 409')
-    expect(PAGE).toContain('error.status === 429')
-    expect(PAGE).toContain('一覧を読み直してください。')
-  })
-
-  it('一覧・並び替え・削除・LINEからの削除・取り込みを別の文にする', () => {
-    for (const action of ['load', 'import']) {
-      expect(PAGE).toContain(`richMenuError(e, '${action}')`)
-    }
-    expect(PAGE).toContain("richMenuError(new Error('load_failed'), 'reorder')")
-    expect(PAGE).toContain("failureMessage: '順番を変えられませんでした。通信を確かめて、もう一度お試しください。'")
-    expect(PAGE).toContain("deleteTarget.group.status === 'published' ? 'unpublish' : 'delete'")
-    expect(PAGE).toContain(": 'externalDelete'")
-    expect(PAGE).toContain('setDeleteError(richMenuError(e, action))')
-    expect(PAGE).toContain('リッチメニューを読み込めませんでした。')
-    expect(PAGE).toContain('LINE上のリッチメニューを取り込めませんでした。')
   })
 })

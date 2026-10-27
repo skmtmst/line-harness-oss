@@ -294,11 +294,15 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     })
 
     await render()
+    // 結果が出る前の注：開かれたかは取れないので出さない、と断る。
+    expect(host.textContent).toContain('LINEで開かれたかどうかは取れないため、この画面には出しません。')
     await click('集計する')
     expect(host.textContent).toContain('このLINEアカウント内の順番は2番目です')
     await wait(5_000)
     expect(host.textContent).toContain('猫')
     expect(host.textContent).not.toContain('集計を受け付けました')
+    // 結果の注は集計期間とデータ締切を持つ。
+    expect(Array.from(host.querySelectorAll('[title]')).some((item) => /集計期間 .+〜.+ ／ データ締切 .+/.test(item.getAttribute('title') ?? ''))).toBe(true)
   })
 
   it('アカウントを切り替えた後、前のアカウントの受付応答でポーリングを始めない', async () => {
@@ -513,5 +517,176 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     })
     expect(crossStartCalls()).toBe(1)
     await act(async () => { accepted.resolve({ success: true, data: { id: 'run-once', state: 'pending' } }) })
+  })
+})
+
+describe('クロス分析の待ち順・目安・確認の間隔(#633)', () => {
+  it('待ち順・最短の目安・次回処理を日本語で出し、もう一度押さなくてよいと伝える', async () => {
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) return Promise.resolve({ success: true, data: { id: 'run-wait', state: 'pending' } })
+      if (RESULT_URL.test(url)) return Promise.resolve(pending('run-wait', 5 * 60_000))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await click('集計する')
+    await wait(0)
+
+    const box = host.querySelector('[role="status"]')?.parentElement?.querySelector('div[role="status"]:not([data-aggregation-state])')
+    const text = box?.textContent ?? host.textContent ?? ''
+    expect(text).toContain('現在の状態: このLINEアカウント内で待ち順に並んでいます')
+    expect(text).toContain('このLINEアカウント内の順番は2番目です（このアカウントであなたの前に1 件あります）')
+    expect(text).toContain('最短で約5分です。他の処理状況により延びることがあります（次回処理は09:06ごろ）')
+    expect(text).toContain('同じ分析をもう一度押す必要はありません。このままお待ちください。結果が出た後はこの画面で確認でき、失敗・時間切れのときも集計し直せます。')
+  })
+
+  it('処理中は「処理中です」とだけ言い、待ちの目安を足さない', async () => {
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) return Promise.resolve({ success: true, data: { id: 'run-busy', state: 'pending' } })
+      if (RESULT_URL.test(url)) {
+        return Promise.resolve({ success: true, data: { ...pending('run-busy', null).data, state: 'running', queuePosition: null } })
+      }
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await click('集計する')
+    await wait(0)
+
+    expect(host.textContent).toContain('現在の状態: 処理中です')
+    expect(host.textContent).not.toContain('待ち順に並んでいます')
+    expect(host.textContent).not.toContain('最短で約')
+  })
+
+  it('最初の10回は3秒ごと、その後は10秒ごとに確認し、目安が無ければ6分で自動の確認を止める', async () => {
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) return Promise.resolve({ success: true, data: { id: 'run-pace', state: 'pending' } })
+      if (RESULT_URL.test(url)) return Promise.resolve(pending('run-pace', null))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await click('集計する')
+    await wait(0)
+    expect(crossResultCalls()).toBe(1)
+
+    await wait(27_000)
+    expect(crossResultCalls()).toBe(10)
+    await wait(9_000)
+    expect(crossResultCalls()).toBe(10)
+    await wait(1_000)
+    expect(crossResultCalls()).toBe(11)
+
+    await wait(5 * 60_000 + 10_000)
+    expect(host.textContent).not.toContain('自動の確認を止めました')
+    await wait(20_000)
+    expect(host.textContent).toContain('自動の確認を止めました')
+    const atStop = crossResultCalls()
+    await wait(60_000)
+    expect(crossResultCalls()).toBe(atStop)
+  })
+
+  it('最短の目安が届いたら、打ち切りを「目安＋3分」まで延ばす', async () => {
+    let first = true
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) return Promise.resolve({ success: true, data: { id: 'run-long', state: 'pending' } })
+      if (RESULT_URL.test(url)) {
+        // 最初の確認だけ「最短5分」。打ち切りは開始から8分になる。
+        const estimate = first ? 5 * 60_000 : null
+        first = false
+        return Promise.resolve(pending('run-long', estimate))
+      }
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await click('集計する')
+    await wait(0)
+
+    await wait(7 * 60_000 + 30_000)
+    expect(host.textContent).not.toContain('自動の確認を止めました')
+    await wait(60_000)
+    expect(host.textContent).toContain('自動の確認を止めました')
+  })
+
+  it('確認の失敗が続くと、間隔を10秒・20秒・30秒と空け、30秒より延ばさない', async () => {
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) return Promise.resolve({ success: true, data: { id: 'run-retry', state: 'pending' } })
+      if (RESULT_URL.test(url)) return Promise.reject(new Error('offline'))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await click('集計する')
+    await wait(0)
+    expect(crossResultCalls()).toBe(1)
+
+    for (const [gap, expected] of [[10_000, 2], [20_000, 3], [30_000, 4], [30_000, 5]] as const) {
+      await wait(gap - 1)
+      expect(crossResultCalls()).toBe(expected - 1)
+      await wait(1)
+      expect(crossResultCalls()).toBe(expected)
+    }
+  })
+
+  it.each([400, 410])('%i の結果は控えを消し、もう一度集計してと伝えて確認を止める', async (status) => {
+    saveStoredRun('account-a', 'run-gone')
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/results/run-gone?')) return Promise.reject(new ApiError(status, 'Gone'))
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await wait(0)
+    expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toBeNull()
+    expect(host.textContent).toContain('前回のクロス分析は利用できません。もう一度集計してください')
+    const calls = crossResultCallsFor('run-gone')
+    await wait(30_000)
+    expect(crossResultCallsFor('run-gone')).toBe(calls)
+  })
+
+  it('失敗した集計は理由が無くても「もう一度集計できます」と伝え、「もう一度」で集計を送り直せる', async () => {
+    let starts = 0
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) {
+        starts += 1
+        return Promise.resolve({ success: true, data: { id: `run-failed-${starts}`, state: 'pending' } })
+      }
+      if (RESULT_URL.test(url)) {
+        return Promise.resolve({ success: true, data: { ...pending('run-failed', null).data, state: 'failed', errorCode: null } })
+      }
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await click('集計する')
+    await wait(0)
+    expect(host.textContent).toContain('クロス分析を集計できませんでした。条件を変えずにもう一度集計できます')
+
+    await click('もう一度')
+    await wait(0)
+    expect(crossStartCalls()).toBe(2)
+  })
+
+  it('他の集計が動いていて受け付けられないときは、運用の言葉で断る', async () => {
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) return Promise.resolve({ success: false, error: 'analytics_cross_busy' })
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await click('集計する')
+    await wait(0)
+    expect(host.textContent).toContain('他の集計が動いています。終わってからもう一度押してください')
+    expect(host.textContent).not.toContain('analytics_cross_busy')
+  })
+
+  it('取れなかった結果に理由が無ければ「未取得」と出す', async () => {
+    net.handler = baseHandler((url) => {
+      if (url.startsWith('/api/analytics/cross/query')) return Promise.resolve({ success: true, data: { id: 'run-none', state: 'pending' } })
+      if (RESULT_URL.test(url)) {
+        const done = finished('run-none', '犬')
+        return Promise.resolve({ ...done, data: { ...done.data, state: 'unavailable', result: { ...done.data.result, cells: [], state: 'unavailable', stateReason: null } } })
+      }
+      return Promise.reject(new Error(`未設定: ${url}`))
+    })
+    await render()
+    await click('集計する')
+    await wait(0)
+    const box = Array.from(host.querySelectorAll('p')).find((item) => item.textContent === '未取得')
+    expect(box).toBeDefined()
+    expect(host.textContent).not.toContain('この条件に該当する人はいません。')
   })
 })

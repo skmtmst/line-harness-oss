@@ -143,6 +143,7 @@ describe('V8 タグ タグの一覧', () => {
     await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '対応マーク' })) })
     expect(container.querySelector('[data-design-node="vKDj5"]')).not.toBeNull()
     expect(screen.getByText('対応マークを読み込めませんでした')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'マークを作る' }).getAttribute('href')).toMatch(/^\/tags\/marks\/new(\?|$)/)
   })
 
   it('保存した検索のタブでは閲覧のみの作成リンクを隠し、検索の閲覧は保つ', async () => {

@@ -129,6 +129,20 @@ describe('★V8 左下の自分とメニュー', () => {
     expect(href('お問い合わせ')).toBe('/hq/support')
   })
 
+  it('開いたメニューは左メニューの中ではなく最上層の器に出し、頭の一言は1行・行の組は区切り線で分ける', async () => {
+    const view = await renderMenu()
+    const menu = await openMenu(view)
+    expect(view.container.contains(menu)).toBe(false)
+    expect(document.body.contains(menu)).toBe(true)
+    await waitFor(() => expect(menu.textContent).toContain('オーナー・無料トライアル 残り14日'))
+    const note = [...menu.querySelectorAll('p')].filter((p) => p.textContent === 'オーナー・無料トライアル 残り14日')
+    expect(note).toHaveLength(1)
+    expect(note[0].getAttribute('title')).toBe('オーナー・無料トライアル 残り14日')
+    expect(menu.querySelectorAll('[role="separator"]').length).toBeGreaterThanOrEqual(2)
+    expect(menu.textContent).not.toContain('権限者・担当アカウント')
+    expect(menu.textContent).not.toContain('プランと支払い')
+  })
+
   it('店の画面・管理者にも統括に戻るを出す（上の帯の切り替えと同じ判定）', async () => {
     window.localStorage.setItem('lh_staff_role', 'admin')
     rememberStaffIdentity({ role: 'admin' } as StaffMember)

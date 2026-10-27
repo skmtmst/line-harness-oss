@@ -1,5 +1,4 @@
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,31 +7,15 @@ import { broadcastSaveProblem, broadcastStepPassed, broadcastStepProblems } from
 import { TITLE_MAX } from './broadcast-form-model'
 
 /**
- * 作成画面が設計 `LMiL2` の5段の帯を持ち、その帯が実際に節へ飛べることを見る。
+ * 作成画面の5段（設計 `LMiL2`）の判定と、段の禁止の見張り。
  *
- * **ファイル全体を toContain で見ない。** 1,200行あるので、どこか1か所に
- * 同じ語があるだけで通ってしまう。段の計算式・帯の描画・節の id を
- * それぞれ切り出して見る。
+ * 帯を描くこと・いまいる段・段の飛び先の節・「n / 60文字」・予約の注意書きは
+ * broadcast-form-steps-react.test.tsx が、帯の済みと保存の検査が同じ結果を読むことは
+ * broadcast-form-step-gate-react.test.tsx が、段の定義の順と呼び名は broadcast-steps.test.ts が見る。
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FORM = readUiSource(join(HERE, 'broadcast-form.tsx'), 'utf8')
-const STEPS = readFileSync(join(HERE, 'broadcast-steps.ts'), 'utf8')
-
-/** `start` から、対応する `)` までを切り出す。 */
-function callArguments(source: string, start: string): string {
-  const from = source.indexOf(start)
-  expect(from, `${start} が見つかりません`).toBeGreaterThan(-1)
-  let depth = 0
-  for (let i = from + start.length - 1; i < source.length; i += 1) {
-    if (source[i] === '(') depth += 1
-    else if (source[i] === ')') {
-      depth -= 1
-      if (depth === 0) return source.slice(from, i + 1)
-    }
-  }
-  throw new Error(`${start} の終わりが見つかりません`)
-}
 
 /**
  * JSX のコメントを落とす。
@@ -44,58 +27,16 @@ function withoutComments(source: string): string {
   return source.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
 }
 
-const STEP_CALL = callArguments(FORM, 'const progressSteps = broadcastSteps(')
-
 describe('作成画面の5段の帯（設計 LMiL2）', () => {
-  it('帯を描いている', () => {
-    // 設計 C：いまいる所は currentKey（URL の ?step=）で渡す。
-    expect(FORM).toContain('<Steps connectorSize=')
-    expect(FORM).toContain('steps={steps} currentKey={currentStep ?? undefined}')
-  })
-
-  /**
-   * 帯の判定と保存の検査が同じ関数を通ること。
-   *
-   * 別々に書くと、帯は「メッセージ 済み」なのに保存で断られる、という
-   * 一番困る形になる。段の計算式の中だけを見る。
-   */
-  it('段の判定は保存の検査と同じ関数を通す', () => {
-    // 帯の ✓ も保存の検査も、段ごとの確かめ（broadcast-step-gate）の結果だけを読む。
-    expect(['basic', 'audience', 'message', 'schedule'].filter((step) => !STEP_CALL.includes(`broadcastStepPassed(liveStepProblems, '${step}')`))).toEqual([])
-    // 保存の検査が同じ結果を読むことは、画面を動かす試験（broadcast-form-step-gate-react）で見る。
-  })
-
   it('送信設定は「今すぐ」か、日付と時刻がそろって初めて済みになる', () => {
     const base = { title: '配信', titleMax: TITLE_MAX, audienceProblem: '', bubbleProblem: '', buttonProblem: '', lengthProblem: null, scheduledTime: '10:00', now: 0, quotaInsufficient: false, stepped: true }
     expect(broadcastStepPassed(broadcastStepProblems({ ...base, sendMode: 'now', scheduledDate: '', scheduledAt: null }), 'schedule')).toBe(true)
     expect(broadcastStepPassed(broadcastStepProblems({ ...base, sendMode: 'scheduled', scheduledDate: '', scheduledAt: null }), 'schedule')).toBe(false)
     expect(broadcastStepPassed(broadcastStepProblems({ ...base, sendMode: 'scheduled', scheduledDate: '2026-11-01', scheduledAt: '2026-11-01T01:00:00.000Z' }), 'schedule')).toBe(true)
   })
-
-  /**
-   * 段の飛び先が実在すること。
-   *
-   * 押しても何も起きない帯は、設計の絵だけ写して機能が無い状態。
-   * `broadcast-steps.ts` に書いた id が、作成画面の節に付いているかを見る。
-   */
-  it('段の飛び先の id が、作成画面の節に付いている', () => {
-    const anchors = [...STEPS.matchAll(/anchor: '([^']+)'/g)].map((m) => m[1])
-    expect(anchors.length).toBe(5)
-    for (const anchor of anchors) {
-      expect(FORM, `${anchor} を持つ節がありません`).toContain(`id="${anchor}"`)
-    }
-  })
 })
 
 describe('配信名の字数（設計 zZ9fA）', () => {
-  it('入力欄のそばに「n / 60文字」を出す', () => {
-    const label = FORM.slice(
-      FORM.indexOf('<span className="text-ink text-sm font-bold">配信名'),
-      FORM.indexOf('placeholder="例：8月キャンペーンのお知らせ"'),
-    )
-    expect(label).toContain('{title.trim().length} / {TITLE_MAX}文字')
-  })
-
   /** 数えるだけで止めないと、上限を超えたまま保存できてしまう。 */
   it('上限を超えたら保存の検査で止める', () => {
     const base = { titleMax: TITLE_MAX, audienceProblem: '', bubbleProblem: '', buttonProblem: '', lengthProblem: null, sendMode: 'now' as const, scheduledDate: '', scheduledTime: '10:00', scheduledAt: null, now: 0, quotaInsufficient: false, stepped: true }
@@ -104,41 +45,11 @@ describe('配信名の字数（設計 zZ9fA）', () => {
   })
 })
 
-describe('画面ごとの段の番号', () => {
-  /**
-   * **本文の番号が、画面に並ぶ順と合っていること。**
-   *
-   * 以前は 1・3・2 と振ってあり、画面には「1. 送る相手 → 3. 送る内容 →
-   * 2. 送る時間」の順に出ていた。**番号が飛んで見えるので、間の節を
-   * 見落としたと読まれる。** 段の名前は ★V8 板  どおり
-   * （基本設定 → 配信対象 → メッセージを作成 → 送信設定 → 最終確認）。
-   */
-  it('5段の定義は、画面に並ぶ順と同じ', () => {
-    const definitions = [...STEPS.matchAll(/key: '([^']+)', label: '([^']+)'/g)]
-      .map((match) => [match[1], match[2]])
-    expect(definitions).toEqual([
-      ['basic', '基本設定'],
-      ['audience', '配信対象'],
-      ['message', 'メッセージを作成'],
-      ['schedule', '送信設定'],
-      ['confirm', '最終確認'],
-    ])
-  })
-})
-
 describe('予約の注意書き（設計 Bw0zt）', () => {
-  /**
-   * 予約は条件を保存するだけで、宛先は予約の時刻に決まる。
-   * いまの人数のまま固定されると思われると、増減したときに数が合わなく見える。
-   */
-  it('日時を指定したときだけ、送信直前に数え直すことを書く', () => {
+  it('予約の注意書きで、この画面で読めない送信枠を約束しない', () => {
     const start = FORM.indexOf("{sendMode === 'scheduled' && (")
     expect(start).toBeGreaterThan(-1)
     const scheduled = withoutComments(FORM.slice(start, FORM.indexOf('htmlFor="bc-spread"', start)))
-    expect(scheduled).toContain('id="bc-time"')
-    expect(scheduled).toContain('もう一度対象を数え直してから送ります')
-    // 数え直すことだけ書いて、増減しうると書かないと「同じ人数が届く」と読まれる。
-    expect(scheduled).toContain('いま出ている人数から増減することがあります')
     // 送信枠を読む口がこの画面には無い。出せない数を約束しない。
     expect(scheduled).not.toContain('送信枠')
   })
