@@ -15,6 +15,7 @@ export type ActionMenuItem = {
   group?: ActionMenuGroup
   id: string
   label: string
+  /** 未指定は種類に応じた印、nullは印なし。 */
   icon?: ReactNode
   /** 自分で結果を表示する共通操作（コピーなど）。 */
   content?: ReactNode
@@ -68,7 +69,7 @@ export function orderActionMenuItems(items: ActionMenuItem[]): ActionMenuItem[] 
     previous = group
     const Icon = group === 'view' ? Eye : group === 'manage' ? Pencil : /削除|消す/.test(item.label) ? Trash2 : Pause
     return { ...item, group, tone: group === 'destructive' ? 'danger' as const : item.tone,
-      icon: item.icon ?? <Icon size={16} aria-hidden="true" />,
+      icon: item.icon === undefined ? <Icon size={16} aria-hidden="true" /> : item.icon,
       dividerBefore, sectionBefore: first && items.length >= 5 ? titles[group] : undefined }
   }))
 }

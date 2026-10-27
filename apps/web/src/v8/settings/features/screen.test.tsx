@@ -7,8 +7,9 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearFeatureSettingsCache } from '@/lib/feature-settings-cache'
-import { fireEvent, renderHook } from '@testing-library/react'
+import { fireEvent, renderHook, within } from '@testing-library/react'
 import { useFeatureSettings } from './use-feature-settings'
+import { CATALOG_DEFAULT_FEATURES } from './feature-settings-view'
 import type { FeatureGroup } from '@/lib/feature-settings'
 
 const fixture = vi.hoisted(() => ({ role: 'owner' }))
@@ -72,6 +73,67 @@ async function flush() {
 const buttonNames = () => [...host.querySelectorAll('button')].map((button) => button.textContent?.trim() ?? '')
 
 describe('★V8 機能設定の閲覧のみ', () => {
+  it('初期値に戻す項目は印なしで、取消は下書きを保ち、確認しても保存するまで送信しない', async () => {
+    fixture.role = 'owner'
+    const requestMethod = ([input, init]: Parameters<typeof fetch>) =>
+      (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
+    const originalFetch = globalThis.fetch
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      if (String(input).includes('/api/settings/features')) return response({
+        success: true,
+        data: {
+          features: { ...CATALOG_DEFAULT_FEATURES, scenarios: !CATALOG_DEFAULT_FEATURES.scenarios },
+          sidebarItemOrder: { delivery: ['broadcasts', 'scenarios'] }, specializedFeatureKeys: [], version: 3,
+        },
+      })
+      return originalFetch(input, init)
+    })
+    try {
+      await act(async () => { root.render(<FeatureSettingsScreen />) })
+      await flush()
+      const switches = () => [...host.querySelectorAll('[role="switch"]')].map((element) => ({
+        name: element.getAttribute('aria-label')?.replace(/を(?:オン|オフ)にする$/, ''), checked: element.getAttribute('aria-checked'),
+      }))
+      const deliveryNames = () => [...host.querySelector('[aria-label="配信"]')!.querySelectorAll('li')]
+        .map((row) => row.querySelector('p')?.firstElementChild?.textContent)
+      const before = switches()
+      expect(before.length).toBeGreaterThan(0)
+      expect(deliveryNames().slice(0, 2)).toEqual(['一斉配信', 'シナリオ配信'])
+      expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(false)
+      const openReset = async () => {
+        await act(async () => { fireEvent.click(host.querySelector('[aria-label="機能設定のほかの操作"]')!) })
+        await flush()
+        const item = within(document.body).getByRole('menuitem', { name: '初期値に戻す', exact: true })
+        expect(item.querySelector('svg')).toBeNull()
+        await act(async () => { fireEvent.click(item) })
+        await flush()
+        return within(document.body).getByRole('dialog', { name: '初期値に戻しますか？', exact: true })
+      }
+      let dialog = await openReset()
+      expect(dialog.textContent).toContain('機能ごとの表示（オン・オフ）')
+      expect(dialog.textContent).toContain('メニューの並び順')
+      expect(switches()).toEqual(before)
+      await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル', exact: true })) })
+      await flush()
+      expect(within(document.body).queryByRole('dialog', { name: '初期値に戻しますか？', exact: true })).toBeNull()
+      expect(switches()).toEqual(before)
+      expect(deliveryNames().slice(0, 2)).toEqual(['一斉配信', 'シナリオ配信'])
+      expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(false)
+      dialog = await openReset()
+      await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '初期値を下書きに入れる', exact: true })) })
+      await flush()
+      expect(within(document.body).queryByRole('dialog', { name: '初期値に戻しますか？', exact: true })).toBeNull()
+      const after = switches()
+      expect(after).not.toEqual(before)
+      expect(deliveryNames().slice(0, 2)).toEqual(['シナリオ配信', '一斉配信'])
+      const previous = new Map(before.map((entry) => [entry.name, entry.checked]))
+      const changed = after.filter((entry) => entry.checked !== previous.get(entry.name))
+      expect(changed).toEqual([{ name: 'シナリオ配信', checked: String(CATALOG_DEFAULT_FEATURES.scenarios) }])
+      expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(true)
+      expect(fetchSpy.mock.calls.filter((call) => !['GET', 'HEAD'].includes(requestMethod(call)))).toHaveLength(0)
+    } finally { fetchSpy.mockRestore() }
+  })
+
   it('変更理由が空なら送信せず、その欄へ移動して誤りを一度だけ知らせる', async () => {
     fixture.role = 'owner'
     const scroll = vi.fn()

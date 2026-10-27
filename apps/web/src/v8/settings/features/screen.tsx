@@ -413,7 +413,7 @@ export default function FeatureSettingsScreen() {
                   並びを変える
                 </Button>
                 <RowMenu appearance="box" label="機能設定のほかの操作" triggerProps={{ disabled: saving }}
-                  items={[{ id: 'reset', label: '初期値に戻す', tone: 'danger', onSelect: () => setResetToDefaultsOpen(true) }]} />
+                  items={[{ id: 'reset', label: '初期値に戻す', tone: 'danger', icon: null, onSelect: () => setResetToDefaultsOpen(true) }]} />
               </>
             )}
           </div>
