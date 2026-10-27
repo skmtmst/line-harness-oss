@@ -1051,6 +1051,7 @@
 ## 受信箱の列・入力・補助面（inbox-frame）
 
 - **役目**：受信箱の3列、会話の媒体、返信入力、保存した検索と内部メモの補助面。
+- 絞り込みと並びの操作は `InboxFilterSlot`・`InboxSortSlot` に入れ、`InboxFilterControls` の中で内容幅を保つ。未読名は `InboxListName`。`InboxFilterPanel` の `value.quickFilter` は一覧と同じ期限条件、`slaEnabled` は期限超過／1時間以上待ちの区別、`auxiliaryActions` は対応ルール等の操作、`unassignedUnreadCount` は未割り当ての集計値（未取得はnull、0件は0）を受ける。取得・保存・URL更新は画面が持つ。
 - **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-conversation-head.tsx`・同CSSと`inbox-head-menus.tsx`（会話の頭・担当・対応・検索・顧客欄の開閉）、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用、送信状態と `InboxThreadLoading` の骨組み）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路、`InboxListRow` の選択表示）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
 - **持ち主（Pen）**：受信箱 eovoG。媒体と補助面の従来寸法は共通トークンへ移し、画面から上書きしない。
 - **確認**：送信・引用・添付・予約・遅延応答・入力時の確認を既存試験で守る。見た目の候補は測定と左右画像の確認後だけ記録する。
