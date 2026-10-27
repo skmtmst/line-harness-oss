@@ -60,3 +60,11 @@ it.each(['readOnly', 'view_only'])('閲覧のみの束は元のowner役割より
   render(<ReadOnlyNotice />)
   expect(screen.getByRole('status').textContent).toBe(READ_ONLY_MESSAGE)
 })
+
+// 本線の知らせの印の対照は、本人が確定した実表示で保持する。
+it('本人確定後の閲覧帯は知らせの印を使い、目の印を使わない', () => {
+  identity('viewer')
+  const view = render(<ReadOnlyNotice />)
+  expect(view.container.querySelector('.lucide-info')).not.toBeNull()
+  expect(view.container.querySelector('.lucide-eye')).toBeNull()
+})

@@ -219,7 +219,7 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
     const body = container.textContent ?? ''
     expect(body).toContain('すべて')
     expect(container.querySelector('[data-template-region="folders"]')).not.toBeNull()
-    await act(async () => { (container.querySelector('button[aria-label="マイルの説明"]') as HTMLButtonElement).click() })
+    await act(async () => { (container.querySelector('button[aria-label="この画面の説明"]') as HTMLButtonElement).click() })
     expect(container.textContent ?? '').toContain('行の「…」から 編集・自分で交換をテスト・出すのを止める・フォルダへ移す・複製。')
   })
 

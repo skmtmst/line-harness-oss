@@ -297,7 +297,7 @@ test('v8 のたまる決めごとは板 OC0gy に切り替わる', async () => {
   const view = ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === '公開版の中身を見る') ?? querySupplementaryPageAction('公開版の中身を見る')) as HTMLButtonElement
   expect(view).toBeTruthy()
   await act(async () => { view.click() })
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('公開版 v3')
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('公開中の第3版')
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('100マイル')
 })
 

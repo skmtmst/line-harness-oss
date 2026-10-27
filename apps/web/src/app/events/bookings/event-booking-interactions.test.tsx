@@ -442,7 +442,7 @@ describe('Issue #684 イベント予約の実操作', () => {
 
     expect(view.container.textContent).not.toContain('お知らせを送る')
     expect(elements(view.container).some((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')).toBe(false)
-    expect(view.container.textContent).toContain('CSV を書き出す')
+    expect(view.container.textContent).toContain('CSVで書き出す')
     expect(view.container.textContent).toContain('個別トーク')
     expect(occurrenceActionButton(view.container, 'promote-waitlist')).toBeDefined()
   })

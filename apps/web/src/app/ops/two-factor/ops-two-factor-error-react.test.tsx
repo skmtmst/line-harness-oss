@@ -21,7 +21,7 @@ class MemoryStorage implements Storage {
 }
 
 /**
- * #1058: 2要素認証の確認。
+ * #1058: 二段階認証の確認。
  * `fetchApi` は 4xx/5xx を例外で投げる。`await api.staff.confirmTwoFactorSetup` を
  * そのまま書くと例外で `setBusy(false)` が走らず「確認しています…」のまま
  * ボタンが固まるので、`opsCall` で受けてエラーを画面へ出す契約。
@@ -93,7 +93,7 @@ async function submit() {
 const submitButton = () =>
   Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('登録する') || b.textContent?.includes('登録しています'))
 
-describe('2要素認証の確認エラー', () => {
+describe('二段階認証の確認エラー', () => {
   it('400 が返ってもボタンを戻し、違うコードは人の言葉で出す', async () => {
     await renderReady()
     await submit()
@@ -141,7 +141,7 @@ describe('2要素認証の確認エラー', () => {
     await renderReady()
     await submit()
 
-    expect(host.textContent).toContain('2要素認証を登録しました')
+    expect(host.textContent).toContain('二段階認証を登録しました')
   })
 })
 

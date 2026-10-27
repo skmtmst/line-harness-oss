@@ -79,6 +79,6 @@ describe('ログインユーザーの確認窓', () => {
     expect(unlink).toContain('招待メールからLINE認証をやり直せば、また繋がります。')
     const twoFactor = dialogWith(PAGE, 'open={disablingTarget !== null}')
     expect(twoFactor).toContain('LINEログインだけでログインできるようになります。')
-    expect(twoFactor).toContain('あとから「2段階の確認を設定する」で、設定し直せます。')
+    // 戻し方の文は staff-two-factor-disable-dialog-react.test.tsx が開いた確認窓で読む。
   })
 })

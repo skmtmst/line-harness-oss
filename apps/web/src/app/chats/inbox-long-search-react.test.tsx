@@ -150,7 +150,7 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
 
   // 一覧の失敗は一覧の場所で、再読み込みつきで伝える（N-030）。
   await eventually(() => {
-    expect(list().textContent).toContain('チャットの読み込みに失敗しました。')
+    expect(list().textContent).toContain('LINE の会話を読み込めませんでした。')
   })
   expect(list().querySelector('[data-inbox-list-state="loading"]')).toBeNull()
   // タブ件数は失敗を0件と読ませない。★管理画面（2026-09-24）では「—」も出さず、件数そのものを出さない。
@@ -159,7 +159,7 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
   // 再読み込みで同じ条件（長い検索語のまま）を取り直せる。
   fail = false
   const retry = [...list().querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === '会話を読み込み直す')
+    .find((item) => item.textContent?.trim() === 'もう一度読み込む')
   expect(retry).toBeTruthy()
   await act(async () => { retry!.click() })
   await eventually(() => {

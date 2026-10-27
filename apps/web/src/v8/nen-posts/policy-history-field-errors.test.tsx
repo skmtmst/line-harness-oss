@@ -64,9 +64,9 @@ it('予約版のメニューから今の版と比較し、確定せずに書き�
   const base = { policyKey: 'photo', summary: '', effectiveFrom: null, createdBy: '担当者', createdAt: '2026-10-01T00:00:00Z' }
   versions.rows = [{ ...base, versionNumber: 1, points: 100, status: 'in_use' }, { ...base, versionNumber: 2, points: 200, status: 'reserved', effectiveFrom: '2026-10-20T00:00:00Z' }]
   await act(async () => { root.render(<PhotoPolicyHistoryV8 open canEdit onClose={() => {}} onChanged={() => {}} />) })
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '予約中のv2の操作' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '予約中の第2版の操作' })) })
   await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '比べる' })) })
-  expect(screen.getByRole('heading', { name: 'いま使っている版とv2を比べる' })).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'いま使っている版と第2版を比べる' })).toBeTruthy()
   expect(create).not.toHaveBeenCalled()
   expect(screen.queryByRole('button', { name: 'この版に戻す' })).toBeNull()
   expect(screen.getByRole('button', { name: '新しい版を作る' })).toBeTruthy()

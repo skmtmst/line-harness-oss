@@ -73,7 +73,7 @@ function FriendsToday({ data, overviewFailed, trendAvailable, today, activeFrien
     value={point ? point.added : null}
     signed
     unit="人"
-    help="今日友だちになった人の数です。差の札は、今の友だちの数を先週の同じ曜日と比べています。ブロックは日ごとの記録がある日だけ出します。"
+    help="今日友だちになった人の数です。差の印は、今の友だちの数を先週の同じ曜日と比べています。ブロックは日ごとの記録がある日だけ出します。"
     loading={!data && !overviewFailed}
     delta={point && activeFriendsCompare ? <KpiDelta current={activeFriendsCompare.current} previous={activeFriendsCompare.previous} better={DASHBOARD_COMPARISON_BETTER.activeFriends} unit="人" basis={ACTIVE_FRIENDS_BASIS} /> : null}
     detail={failed ? STATE_TEXT.error : !data ? STATE_TEXT.loading : point ? blocked : '今日の記録はまだありません'}

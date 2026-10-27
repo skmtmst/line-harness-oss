@@ -75,7 +75,7 @@ function UpdateCardView({ card, historyState }: { card: UpdateCard; historyState
   const title = card.source === 'pending' ? 'これから入る変更' : <CardDate at={card.at} />
   const note = card.source === 'pending'
     ? formatCount(card.entryCount, '行')
-    : [card.version ? `v${card.version}` : null, environment ? `${environment}へ${card.deployment && isAutomatic(card.deployment) ? '自動' : '手動'}で配備` : null].filter(Boolean).join('・') || undefined
+    : [card.version ? `${card.version}` : null, environment ? `${environment}へ${card.deployment && isAutomatic(card.deployment) ? '自動' : '手動'}で配備` : null].filter(Boolean).join('・') || undefined
   const badges = <>
     {card.latest ? <StatusBadge tone="info" dot={false}>最新</StatusBadge> : null}
     {card.source === 'archive' ? <StatusBadge tone="neutral" dot={false}>{`保管用の版（${formatCount(card.entryCount, '行')}）`}</StatusBadge> : null}
@@ -158,7 +158,7 @@ export default function UpdateHistoryV8() {
   return (
     <div className={styles.board}>
       <KpiBand aria-label="更新の集計">
-        <KpiCard title="いまの版" icon={<GitBranch size={16} />} value={null} valueText={current ? `v${current}` : '—'} unit="" detail={currentAt ? `${formatDate(currentAt, { style: 'list' })} に更新` : runningVersion.statusText} />
+        <KpiCard title="いまの版" icon={<GitBranch size={16} />} value={null} valueText={current ? `${current}` : '—'} unit="" detail={currentAt ? `${formatDate(currentAt, { style: 'list' })} に更新` : runningVersion.statusText} />
         <KpiCard title="この30日の更新" icon={<RefreshCw size={16} />} value={ready ? Math.max(recent.length, recentReleases.length) : null} unit="回" detail={ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'} />
         <KpiCard title="失敗した更新" icon={<CircleX size={16} aria-hidden="true" />} value={ready ? failed : null} unit="回" valueTone={failed > 0 ? 'danger' : 'default'} detail="この30日" />
       </KpiBand>
@@ -184,7 +184,7 @@ export default function UpdateHistoryV8() {
       )}
 
       <div className={styles.foot}>
-        <p className={styles.footText}>自前でデプロイしている環境では、手動アップデートガイドの手順で更新します。</p>
+        <p className={styles.footText}>自分のサーバーで動かしている場合は、手動アップデートガイドの手順で更新します。</p>
         <Button external href={MANUAL_UPDATE_GUIDE_URL}><BookOpen size={16} aria-hidden="true" />手動アップデートガイドを開く</Button>
       </div>
     </div>

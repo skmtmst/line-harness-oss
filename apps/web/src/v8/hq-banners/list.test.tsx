@@ -230,6 +230,6 @@ it.each(['', 'tab=library'])('数・タブ・説明とフォルダなしの作�
   expect(statsRegion.querySelector('[data-content-layout="stats"] [data-kpi-strip]')).toBeTruthy()
   expect(statsRegion.querySelectorAll('[data-kpi-label]')).toHaveLength(4)
   expect(frame.querySelector('[data-template-region="tabs"]')).toBeTruthy()
-  expect(frame.querySelector('[data-screen-explanation-toggle]')).toBeTruthy()
+  expect(frame.querySelector('[data-template-region="heading"] button[aria-label="この画面の説明"]')).toBeTruthy()
   expect(frame.querySelector('[data-template-region="heading"]')?.textContent).toContain(query ? '画像を取り込む' : 'プロジェクトを作る')
 })

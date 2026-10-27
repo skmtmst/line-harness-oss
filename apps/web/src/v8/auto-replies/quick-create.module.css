@@ -109,6 +109,13 @@
   background: var(--color-canvas);
 }
 
+/* タッチの端末では乗せられないので、外す印を常に出す。 */
+@media (hover: none) {
+  .chipRemove {
+    opacity: 1;
+  }
+}
+
 .chipInput {
   min-width: var(--tpl-ms-qc-input-min);
   flex: 1 1 0;
