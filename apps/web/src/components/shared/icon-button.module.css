@@ -124,14 +124,18 @@
 :root .button:disabled { opacity: var(--polish-disabled-opacity); }
 :root .button:is(:hover, :active):not(:disabled) { filter: none; }
 
-/* 行の「…」は普段は枠なし。焦点の青い輪を保ち、乗せたときだけ薄い灰。 */
+/* 行の「…」は普段は枠も地も無し。行に乗せた時・乗せた時・焦点・開いている時だけ薄い灰の地。寸法と押せる大きさは既存の口のまま。 */
 html:root .button[data-row-menu]:not(:focus-visible) {
   border-color: transparent;
-  outline-color: transparent;
+  outline: 1px solid transparent;
+  outline-offset: -1px;
   background: transparent;
   box-shadow: none;
 }
-html:root .button[data-row-menu]:hover:not(:disabled) { background: var(--polish-hover); }
+html:root :is(tr, [role='row']):hover .button[data-row-menu],
+html:root .button[data-row-menu]:is(:hover, :focus-visible, [aria-expanded='true']) {
+  background: var(--polish-row-menu-hover-bg);
+}
 
 html:root :is([data-toolbar-row], [data-control-row]) .button { width: var(--control-h); height: var(--control-h); min-height: var(--control-h); flex-basis: var(--control-h); }
 

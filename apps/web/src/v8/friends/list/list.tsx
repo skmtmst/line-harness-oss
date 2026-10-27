@@ -16,6 +16,7 @@ import { collectListRows } from '@/components/shared/collect-list-rows';
 import Link from '@/components/shared/list-navigation';
 import { useListScrollMemory,useListUrlJsonValue,useListUrlValue } from '@/components/shared/list-url-state';
 import StatusBadge from '@/components/shared/status-badge';
+import { statusLabel } from '@/lib/status-labels';
 import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
 import TagOverflow from '@/components/shared/tag-overflow';
 import { Bookmark,CircleDot,Columns3,Download,Megaphone,MessageSquare,SlidersHorizontal,Star,TrendingUp,Upload,UserPlus,UserRoundX,Users } from 'lucide-react';
@@ -36,7 +37,7 @@ import Checkbox from '@/components/shared/checkbox';
 import Chip from '@/components/shared/chip';
 import Dialog from '@/components/shared/dialog';
 import DisplayItemsDialog from '@/components/shared/display-items-dialog';
-import { emptyValue } from '@/components/shared/empty-value';
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
 import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select';
 import FilterChip from '@/components/shared/filter-chip';
 import { FilterPopover } from '@/components/shared/filter-popover';
@@ -115,6 +116,18 @@ const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオー�
 
 function isPageSize(value: number): value is PageSize {
   return (PAGE_SIZE_OPTIONS as readonly number[]).includes(value)
+}
+
+/** シナリオの列：状態は地の色の札（動いている＝緑「有効」・停止中＝灰）、シナリオ名は札の右。札と同じ言葉なら重ねて書かない。 */
+function ScenarioState({ scenario }: { scenario: { name: string; status: string } }) {
+  const running = scenario.status === 'active' || scenario.status === 'delivering'
+  const label = running ? statusLabel('active') : scenario.status === 'paused' ? '停止中' : statusLabel(scenario.status)
+  return (
+    <span className={styles.scenarioCell} title={scenario.name}>
+      <StatusBadge tone={running ? 'success' : 'neutral'} size="compact">{label}</StatusBadge>
+      {statusLabel(scenario.name.trim()) === label ? null : <span className={styles.cellText}>{scenario.name}</span>}
+    </span>
+  )
 }
 
 export default function FriendsListV8() {
@@ -842,7 +855,7 @@ export default function FriendsListV8() {
           </Td>
           )
           if (column.key === 'scenario') return (
-          <Td key={column.key} presentation="friend-list" className={styles.fixedContent}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
+          <Td key={column.key} presentation="friend-list" className={styles.fixedContent}>{friend.activeScenario ? <ScenarioState scenario={friend.activeScenario} /> : <EmptyCell />}</Td>
           )
           if (column.key === 'latest') return (
           <Td key={column.key} presentation="friend-list">
@@ -851,7 +864,7 @@ export default function FriendsListV8() {
                 <span className={styles.cellText} title={latest.content}>{messageWord(latest)}</span>
                 <span className={styles.sub}>{monthDayTime(latest.createdAt)}</span>
               </div>
-            ) : <span className={styles.cellText}>受信なし</span>}
+            ) : <EmptyCell />}
           </Td>
           )
           if (column.key === 'tags') return (
@@ -859,18 +872,18 @@ export default function FriendsListV8() {
             <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
               <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}</TagOverflow>
 
-              {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
+              {friend.tags.length === 0 ? <EmptyCell /> : null}
             </div>
           </Td>
           )
           if (column.key === 'source') return (
-          <Td key={column.key} presentation="friend-list" className={styles.fixedContent}><span className={styles.cellText} title={friend.firstTrackedLinkName || emptyValue('unknown')}>{friend.firstTrackedLinkName || emptyValue('unknown')}</span></Td>
+          <Td key={column.key} presentation="friend-list" className={styles.fixedContent}>{friend.firstTrackedLinkName ? <span className={styles.cellText} title={friend.firstTrackedLinkName}>{friend.firstTrackedLinkName}</span> : <EmptyCell />}</Td>
           )
           if (column.key === 'last') return (
           <Td key={column.key} presentation="friend-list" className={styles.fixedContent}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
           )
           const value = friend.fieldValues?.[column.key]
-          return <Td key={column.key}><span className={styles.cellText} title={value ?? undefined}>{value ?? '未設定'}</span></Td>
+          return <Td key={column.key}>{value ? <span className={styles.cellText} title={value}>{value}</span> : <EmptyCell />}</Td>
         })}
         <Td columnKind="menu">
           <div className={styles.menuBox}>

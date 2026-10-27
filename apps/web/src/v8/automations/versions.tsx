@@ -34,7 +34,7 @@ import { describeVersionChanges } from './version-diff'
 import styles from './versions.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
 import { useManualHref } from '@/lib/use-manual-href'
 
@@ -331,7 +331,7 @@ function VersionsInner() {
                         <Button disabled={Boolean(working)} onClick={() => { setPendingBindingId(binding.id); setDialogError('') }}>
                           {`v${published.versionNumber} へ更新する`}
                         </Button>
-                      ) : <span className={styles.cellMuted}>{emptyValue('unknown')}</span>}
+                      ) : <EmptyCell />}
                     </ActionCell>
                   </Tr>
                 ))}

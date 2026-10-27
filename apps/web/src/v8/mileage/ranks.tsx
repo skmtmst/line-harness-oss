@@ -28,6 +28,7 @@ import { ListPageSection } from '@/components/templates/list-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { MileageFrame, useMileageShell } from './frame'
 import styles from './ranks.module.css'
+import { EmptyCell } from '@/components/shared/empty-value'
 
 /*
  * ★V8 マイル「会員ランク」（G5-2 `QpgfW`）。段の表（名前・上がる条件・下がる条件・特典・今の人数）と、
@@ -160,13 +161,13 @@ export default function RanksTab() {
             <Tr key={tier.id} data-row-id={tier.id}>
               <Td><StatusBadge tone={index === 0 ? 'neutral' : index === tiers.length - 1 ? 'warning' : 'info'} dot={false}>{tier.name}</StatusBadge></Td>
               <Td grow><TruncatedText value={upText(program, tier, index === 0)} /></Td>
-              <Td>{index === 0 ? <span className={styles.unavailableValue}>—</span> : downText(program, tier)}</Td>
+              <Td>{index === 0 ? <EmptyCell /> : downText(program, tier)}</Td>
               <Td>
                 {tier.mileMultiplier > 1
                   ? <>{`${tier.mileMultiplier} 倍`}{tier.benefitDescriptions?.length ? <span className={styles.sub} title={tier.benefitDescriptions.join('・')}>{tier.benefitDescriptions.join('・')}</span> : null}</>
-                  : tier.benefitDescriptions?.length ? <span title={tier.benefitDescriptions.join('・')}>{tier.benefitDescriptions.join('・')}</span> : <span className={styles.unavailableValue}>—</span>}
+                  : tier.benefitDescriptions?.length ? <span title={tier.benefitDescriptions.join('・')}>{tier.benefitDescriptions.join('・')}</span> : <EmptyCell />}
               </Td>
-              <Td align="right">{count === undefined ? <span className={styles.unavailableValue}>—</span> : `${formatNumber(count)} 人`}</Td>
+              <Td align="right">{count === undefined ? <EmptyCell /> : `${formatNumber(count)} 人`}</Td>
               <ActionCell>
                 {readonly ? null : (
                   <span className={styles.menuBox}>

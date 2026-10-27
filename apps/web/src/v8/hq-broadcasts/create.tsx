@@ -44,6 +44,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
 import { notifyToast } from '@/components/shared/toast';
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps';
 import formStyles from '@/components/broadcasts/broadcast-form-v8.module.css';
+import { BroadcastBlockedExclusion } from '@/components/broadcasts/broadcast-blocked-exclusion';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { api, type BroadcastMessageAsset } from '@/lib/api';
 import { bubbleLegacyMessage } from '@/lib/broadcast-template';
@@ -958,7 +959,6 @@ export default function HqBroadcastCreate() {
                   </div>
                 ) : null}
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
                   <span className={formStyles.excludeTag}>
                     <SaveErrorField names={["savedName","savedSearchId","saved_name"]}><EntitySelect
                       aria-label="保存した条件から選ぶ"
@@ -970,10 +970,7 @@ export default function HqBroadcastCreate() {
                     /></SaveErrorField>
                   </span>
                 </div>
-                <div className={formStyles.exclusion}>
-                  <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
-                  <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
-                </div>
+                <BroadcastBlockedExclusion />
                 <div className={formStyles.excludeTag}><span className={formStyles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTag","exclude_tag"]}><EntityPickerField label="除くタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={excludeTag} onChange={setExcludeTag} clearable placeholder="（除外なし）" disabled={tagStatus !== 'ready' || chosen.length === 0} /></SaveErrorField></div>
                 <div className={formStyles.exclusion}>
                   <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
@@ -981,7 +978,7 @@ export default function HqBroadcastCreate() {
                 </div>
                 <div className={formStyles.audienceCount} aria-live="polite"><span><Send size={16} aria-hidden /> この条件で送る人数</span><strong>{peopleLabel}</strong></div>
                 {audience !== 'all' && !totals ? <p className="text-xs text-ink-faint">絞った人数は、最終確認でアカウントごとに数えます</p> : null}
-                <Notice tone="info"><strong>対象の確認ポイント</strong><br />人数は送る直前にもう一度数え直します。ブロック中の人には送りません</Notice>
+                <Notice tone="info"><strong>対象の確認ポイント</strong><br />人数は送る直前にもう一度数え直します</Notice>
               </section>
             ) : null}
 

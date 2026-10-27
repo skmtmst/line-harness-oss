@@ -17,7 +17,9 @@ import { api, type BookingStaff } from '@/lib/api'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
+import { AffixedTextField, TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { formatNumber } from '@/lib/format'
 
 /*
  * 予約スタッフの作成・編集の窓。管理画面 一覧（staff/page.tsx）と V8 予約設定の
@@ -45,6 +47,10 @@ export function StaffEditModal({
   // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。
   // N-411 本人勤務: 予約スタッフをログインユーザーへ紐づけるための一覧。
   const [members, setMembers] = useState<StaffMember[]>([])
+  /* 指名料（B9）。変えられるのはオーナー・管理者だけ。ほかの人の保存には載せない（口が断るため）。 */
+  const canEditFee = canManageRole(useStaffRole())
+  const savedFee = staff.nomination_fee ?? 0
+  const [fee, setFee] = useState(String(savedFee))
 
   useEffect(() => {
     let cancelled = false
@@ -62,7 +68,9 @@ export function StaffEditModal({
 
   async function submit() {
     setErr(null)
-    const parsed = parseBookingStaffInput(form, form.id ? 'update' : 'create')
+    const nextFee = Number(fee.trim() || '0')
+    const withFee = canEditFee && nextFee !== savedFee ? { ...form, nominationFee: nextFee } : form
+    const parsed = parseBookingStaffInput(withFee, form.id ? 'update' : 'create')
     if (!parsed.ok) {
       setErr(parsed.error)
       return
@@ -140,6 +148,12 @@ export function StaffEditModal({
               step={1}
               className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent tabular-nums"
             /></SaveErrorField>
+          </Field>
+          <Field label="指名料" note="お客さまが指名したときだけ掛かります。指名なしで自動で割り当てたときは掛かりません。">
+            <SaveErrorField names={["nominationFee","nomination_fee"]}>{canEditFee ? <AffixedTextField layout="field" startAdornment="¥"
+              type="number" min={0} step={1} inputMode="numeric" aria-label="指名料（円）"
+              value={fee} onChange={(e) => setFee(e.target.value)} placeholder="0"
+            /> : <AffixedTextField layout="field" startAdornment="¥" readOnly aria-label="指名料（円・変えられるのはオーナー・管理者だけ）" value={formatNumber(savedFee)} />}</SaveErrorField>
           </Field>
           <SaveErrorField names={["is_designation_optional","form.is_designation_optional"]}><Checkbox
             checked={Boolean(form.is_designation_optional)}

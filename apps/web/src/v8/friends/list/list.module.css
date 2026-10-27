@@ -252,6 +252,7 @@ button.star:hover { background: var(--color-status-warn-soft); color: var(--colo
 }
 
 .faint { color: var(--color-ink-faint); font-size: var(--text-caption); }
+.scenarioCell { display: flex; align-items: center; gap: var(--polish-status-gap); min-width: 0; }
 
 .stateCell { padding: var(--tpl-fr-state-pad); }
 

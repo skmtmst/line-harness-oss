@@ -229,8 +229,8 @@ describe('A32-01: 期限切れ(stale)の健全性を現在の判定と混ぜな�
 
     await waitFor(() => {
       expect(screen.getAllByText('LINE のアカウントとつながっているか').length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/正常/).length).toBeGreaterThan(0)
     })
-    expect((await screen.findAllByText(/正常/)).length).toBeGreaterThan(0)
     expect(screen.queryByText(/古い結果です/)).toBeNull()
     expect([...document.querySelectorAll('span')].filter((el) => el.textContent === '古い確認').length).toBe(0)
   })

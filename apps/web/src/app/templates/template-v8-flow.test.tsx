@@ -150,6 +150,19 @@ describe('V8 テンプレートの通し', () => {
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/templates/edit'))
   })
 
+  it('種類の窓の「質問」を選ぶと、質問を作る専用の画面へ進む', async () => {
+    await mount(<TemplatesListV8 />)
+    await screen.findByText('はじめの型')
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'テンプレートを作る' })[0])
+    })
+    await screen.findByText('どの種類を作りますか')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('link', { name: '質問', exact: true }))
+    })
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/templates/questions/new'))
+  })
+
   it('作る画面で名と本文を入れて保存すると知らせが出て一覧へ戻る', async () => {
     mocks.query = ''
     await mount(<TemplateEditPage />)

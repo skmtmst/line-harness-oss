@@ -4,12 +4,12 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import AnalyticsV8, { type AnalyticsSlotsV8 } from '@/v8/analytics/analytics'
 import FunnelFormV8 from '@/v8/analytics/funnel-form'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { Bookmark } from 'lucide-react'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
+import TextLink from '@/components/shared/text-link'
 
 
 export default function AnalyticsPage() {
@@ -96,9 +96,9 @@ function SaveAnalysisAction({
       <Notice
         tone="success"
         action={
-          <Link href="/analytics?tab=saved" className="text-action font-medium hover:underline">
+          <TextLink inline href="/analytics?tab=saved">
             保存した分析を見る
-          </Link>
+          </TextLink>
         }
       >
         定義とこの時点の結果を保存しました

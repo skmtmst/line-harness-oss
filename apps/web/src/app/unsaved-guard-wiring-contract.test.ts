@@ -29,6 +29,8 @@ const GUARDED = [
   'v8/friend-detail/info-tab.tsx',
   'v8/restaurant/organization/store-groups.tsx',
   'v8/inbox-chat/screen.tsx',
+  // 電話のトーク。書きかけの返信は離れる前に確かめる。
+  'v8/inbox-chat/mobile-talk-screen.tsx',
   'v8/settings/customer-look/screen.tsx',
   'v8/hq-deliveries/console.tsx',
   'v8/webhooks/incoming-actions.tsx',
@@ -170,6 +172,7 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   'v8/scenario-detail/use-scenario-settings.tsx': 'v8/scenario-detail/detail.tsx',
   // 統合後の入力の持ち主。各画面が dirty を型／番兵へ渡す。
   'v8/booking-gap/series-drawer.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/booking-menus/customer-booking.tsx': 'v8/booking-menus/menu-form.tsx',
   'v8/booking-menus/meeting-mode.tsx': 'v8/booking-menus/menu-form.tsx',
   'v8/booking-menus/staff-calendar.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/booking-menus/tabs/staff-tab.tsx': 'v8/booking-menus/settings.tsx',
@@ -248,6 +251,8 @@ const EXEMPTIONS: Record<string, string> = {
     '編集を持たない上部の帯の部品。段を替えて戻るパンくず（onSelect）を共通の未保存確認（requestUnsavedAction）へ委ねる',
   'components/shell/app-top-bar.tsx':
     '編集を持たない上部の帯。アカウント切替と移動を共通の未保存確認へ委ねる',
+  'components/mobile/mobile-shell.tsx':
+    '編集を持たない電話の外枠。下のタブ・アカウント切替を共通の未保存確認へ委ね、今の画面自身の番兵が止める',
   'components/shared/command-palette.tsx':
     '編集を持たない探す窓（⌘K）。選んだ行き先への移動を共通の未保存確認へ委ねる',
   'v8/ai-reply/qa-edit-dialog.tsx': 'G2 の Q&A を作る・直す窓（y4nixm）。保存の口は窓の中だけで、開くたびに元の Q&A か記録の質問から作り直し、入力のある窓は Dialog の dirty で閉じる前に確かめる。',

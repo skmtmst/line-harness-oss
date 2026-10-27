@@ -457,3 +457,58 @@ describe('saveCarousel', () => {
     expect(update).not.toHaveBeenCalled()
   })
 })
+
+describe('カルーセルを作る：枚数・ボタン・見え方・フォルダ・読み込めないとき', () => {
+  it('カードは10枚まで。10枚になると足す・複製を押せず、理由を title で読める', async () => {
+    await mountAt('')
+    const add = () => byText('button', 'カードを足す') as HTMLButtonElement
+    for (let i = 0; i < 9; i += 1) await act(async () => { click(add()) })
+    expect(screenText()).toContain('10 / 10 枚')
+    expect(add().disabled).toBe(true)
+    const duplicate = byText('button', 'このカードを複製') as HTMLButtonElement
+    expect(duplicate.disabled).toBe(true)
+    expect(duplicate.title).toBe('カードは10 枚までです')
+  })
+
+  it('ボタンは1枚に3つまで。3つになると足せず、理由を title で読める', async () => {
+    await mountAt('')
+    expect(screenText()).toContain('ボタン（最大 3 つ）')
+    const add = () => byText('button', 'ボタンを足す') as HTMLButtonElement
+    await act(async () => { click(add()) })
+    expect(add().disabled).toBe(false)
+    await act(async () => { click(add()) })
+    expect(add().disabled).toBe(true)
+    expect(add().title).toBe('ボタンは3つまでです。')
+    expect(container.querySelectorAll('input[placeholder="ボタンの文字"]')).toHaveLength(3)
+  })
+
+  it('画像の大きさの目安を出し、入れたタイトルを右のLINEの見え方に映す', async () => {
+    await mountAt('')
+    expect(container.querySelector('[title^="画像は横1024 × 縦678pxを推奨"]')).not.toBeNull()
+    await act(async () => { typeInto(document.getElementById('cr-title') as HTMLInputElement, '秋の定期便') })
+    const phone = container.querySelector('[data-line-preview-part="phone"]')
+    expect(phone?.textContent).toContain('秋の定期便')
+  })
+
+  it('フォルダを選んで保存すると、選んだフォルダの番号を送る', async () => {
+    calls.foldersList.mockResolvedValue({ success: true, data: [{ id: 'fol-autumn', kind: 'template', name: '秋の案内', itemCount: 0 }] })
+    await mountAt('')
+    expect(calls.foldersList).toHaveBeenCalledWith('template', 'account-a')
+    await act(async () => { typeName('秋のカルーセル') })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ' })) })
+    const option = await screen.findByRole('option', { name: /秋の案内/ })
+    await act(async () => { fireEvent.click(within(option).getByRole('button')) })
+    await act(async () => { click(saveButton()!) })
+    await settle()
+    expect(calls.templatesCreate).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'fol-autumn' }))
+  })
+
+  it('既存のカルーセルを読み込めないときは理由を出し、保存の口を押せない形にする', async () => {
+    calls.templatesGet.mockRejectedValue(new Error('network'))
+    await mountAt('id=tmpl-1')
+    expect(screenText()).toContain('読み込めませんでした。開き直してください。')
+    expect((byText('button', '下書きを保存') as HTMLButtonElement).disabled).toBe(true)
+    expect((byText('button', '保存して公開') as HTMLButtonElement).disabled).toBe(true)
+    expect(calls.templatesUpdate).not.toHaveBeenCalled()
+  })
+})

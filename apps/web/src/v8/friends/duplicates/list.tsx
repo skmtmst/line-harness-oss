@@ -26,7 +26,7 @@ import { CANDIDATE_PAGE_SIZE, useDuplicatesData } from './use-duplicates-data';
 import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDateTime, statusTone } from './words';
 import styles from './list.module.css'
 import { csvFileName } from '@/lib/csv-file-name';
-import { emptyValue } from '@/components/shared/empty-value';
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
 import Card from '@/components/shared/card'
 
 /*
@@ -307,7 +307,7 @@ export default function DuplicatesListV8() {
                   <Tr key={row.accountId} className={styles.rowCompact}>
                     <Td><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
                     {d.data!.perAccount.map((col) => {
-                      if (row.accountId === col.accountId) return <Td key={col.accountId}><span className={styles.faint}>{emptyValue('unknown')}</span></Td>
+                      if (row.accountId === col.accountId) return <Td key={col.accountId}><EmptyCell /></Td>
                       const pair = d.data!.pairwiseOverlap!.find((p) => p.fromAccountId === row.accountId && p.toAccountId === col.accountId)
                       return <Td key={col.accountId}>{formatNumber(pair?.overlap ?? 0)}</Td>
                     })}

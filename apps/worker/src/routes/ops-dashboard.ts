@@ -10,6 +10,7 @@ import {
   dashboardLineRegistration,
   dashboardTickets,
   dashboardUsage,
+  getActiveImpersonation,
   getPlatformSetting,
   latestPaidBillingInvoices,
   listContractTenants,
@@ -19,9 +20,11 @@ import {
 
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { adminSessionTokenHashFromRequest } from '../middleware/auth/credentials/auth.js';
 import { requirePlatformAdmin } from '../middleware/platform-admin.js';
 import { BILLING_PLANS, findPlan, type PlanKey } from '../services/billing-plans.js';
 import { dbFor } from '../services/db-router.js';
+import { firstRunFunnel } from '../services/first-run-funnel.js';
 
 /**
  * 運営ダッシュボード（★37-2 `Xvofy`）。
@@ -261,4 +264,25 @@ opsDashboard.get('/api/ops/dashboard/line-unregistered', async (c) => {
       people: line.unregistered.map((p) => ({ staffId: p.staffId, name: p.name, tenantName: p.tenantName, hasEmail: p.email !== null })),
     },
   });
+});
+
+/**
+ * 最初の 10 分の全アカウントのまとめ。期間（アカウントを作った日）ごとの数と割合だけを返す。
+ * 運営マスターの中でも、閲覧のみの人と代理ログイン中は読めない。
+ */
+opsDashboard.get('/api/ops/dashboard/first-run', async (c) => {
+  const db = dbFor(c.env);
+  const staff = c.get('staff');
+  if (!staff || staff.readOnly) {
+    return c.json({ success: false, error: '閲覧のみの権限では、このまとめは見られません' }, 403);
+  }
+  const tokenHash = await adminSessionTokenHashFromRequest(c);
+  if (tokenHash && await getActiveImpersonation(db, staff.id, tokenHash)) {
+    return c.json({ success: false, error: '代理ログイン中は、このまとめは見られません' }, 403);
+  }
+  const periodRaw = c.req.query('period');
+  const period: DashboardPeriod = periodRaw === 'prev_month' || periodRaw === 'year' ? periodRaw : 'month';
+  const range = resolvePeriod(period);
+  const funnel = await firstRunFunnel(db, { from: range.from, to: range.to, excludeTenantId: DEFAULT_TENANT_ID });
+  return c.json({ success: true, data: { period, periodLabel: range.label, ...funnel } });
 });

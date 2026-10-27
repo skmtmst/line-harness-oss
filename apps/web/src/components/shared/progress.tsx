@@ -181,7 +181,7 @@ const MAX_SEGMENTS = 12
  */
 export function ProgressBar({ value, label, className, max = 100, appearance, tone }: {
   value: number; label: string; className?: string; max?: number
-  appearance?: 'onboarding' | 'quota'; tone?: 'danger'
+  appearance?: 'onboarding' | 'quota'; tone?: 'danger' | 'warning'
 }) {
   const limit = Number.isFinite(max) && max > 0 ? max : 0
   const clamped = Number.isFinite(value) ? Math.min(limit, Math.max(0, value)) : 0

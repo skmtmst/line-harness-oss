@@ -62,6 +62,7 @@ vi.mock('@/components/auto-replies/inline-action-list', async (importOriginal: (
 
 import { ApiError } from '@/lib/api'
 import TemplateEditV8 from './edit'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -446,4 +447,81 @@ it('リサーチ（EsYo4）：選択肢は札の並び。札を押すとその�
   const preview = host.querySelector('[data-liff-phone-frame]')
   expect(preview?.textContent).toContain('来月も定期便を続けたいと思いますか？')
   expect(preview?.textContent).toContain('答えを送る')
+})
+
+describe('V8 メッセージを作る：フォルダ・読み込めないとき・本文の見え方', () => {
+  it('フォルダを選んで保存すると、選んだフォルダの番号を送る', async () => {
+    templatesApi.create.mockResolvedValue({ success: true, data: { id: 'template-new' } })
+    await mount()
+    expect(listFolders).toHaveBeenCalledWith('template', 'account-a')
+    type(screen.getByLabelText('テンプレート名'), '予約前日のご案内')
+    type(screen.getByLabelText('本文'), 'こんにちは')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ' })) })
+    const option = await screen.findByRole('option', { name: /予約/ })
+    await act(async () => { fireEvent.click(within(option).getByRole('button')) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.create).toHaveBeenCalledWith(expect.objectContaining({ folderId: 'fol-1' }))
+  })
+
+  it('既存のテンプレートを読み込めないときは理由を出し、保存の口を押せない形にする', async () => {
+    templatesApi.get.mockRejectedValue(new Error('network'))
+    await mount('id=template-1')
+    expect(document.body.textContent).toContain('読み込めませんでした。開き直してください。')
+    for (const name of ['下書きを保存', '保存して公開']) {
+      expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true)
+    }
+    expect(templatesApi.update).not.toHaveBeenCalled()
+  })
+
+  it('本文のURLを並べ、差し込みは見本の名前で見せ、値を確かめられない差し込みは知らせる', async () => {
+    await mount()
+    expect(document.body.textContent).toContain('本文にURLはありません。')
+    type(screen.getByLabelText('本文'), '{{name}}さん、ご予約はこちら https://example.com/booking {{field.unknown_key}}')
+    await flush()
+    const tracking = screen.getByRole('switch', { name: 'https://example.com/bookingを短縮して数える（いつもオン）' }) as HTMLButtonElement
+    expect(tracking.getAttribute('aria-checked')).toBe('true')
+    expect(tracking.disabled).toBe(true)
+    const preview = host.querySelector('[data-template-region="preview"]')!
+    expect(preview.textContent).toContain('山田 太郎さん、ご予約はこちら')
+    expect(preview.textContent).toContain('値を確認できない差し込みがあります：{{field.unknown_key}}')
+  })
+})
+
+describe('V8 クーポン・リサーチ：保存のあと', () => {
+  it('クーポンは「使われたときに行うこと」、リサーチは「回答フォームとの使い分け」を同じ画面で読める', async () => {
+    await mount('kind=coupon&visual=1')
+    expect(screen.getByRole('heading', { name: '使われたときに行うこと' })).toBeTruthy()
+    act(() => root.unmount())
+    root = createRoot(host)
+    await mount('kind=research&visual=1')
+    expect(screen.getByRole('heading', { name: '回答フォームとの使い分け' })).toBeTruthy()
+  })
+
+  it('保存できたら「下書きを保存しました」と知らせ、押しても二度は作らない', async () => {
+    let finish!: (value: unknown) => void
+    assetsCreate.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    clearToastsForTest()
+    const toastHost = document.createElement('div')
+    document.body.appendChild(toastHost)
+    const toastRoot = createRoot(toastHost)
+    await act(async () => { toastRoot.render(<ToastHost />) })
+    try {
+      await mount('kind=coupon&visual=1')
+      const draft = screen.getByRole('button', { name: '下書きを保存' })
+      await act(async () => { fireEvent.click(draft) })
+      await act(async () => { fireEvent.click(draft) })
+      expect((draft as HTMLButtonElement).disabled).toBe(true)
+      expect(assetsCreate).toHaveBeenCalledTimes(1)
+      await act(async () => { finish({ success: true, data: { id: 'asset-1' } }) })
+      await flush()
+      expect(toastHost.textContent).toContain('下書きを保存しました')
+      expect(push).toHaveBeenCalledWith('/templates?highlight=asset-1')
+      expect(assetsCreate).toHaveBeenCalledTimes(1)
+    } finally {
+      act(() => toastRoot.unmount())
+      toastHost.remove()
+      clearToastsForTest()
+    }
+  })
 })

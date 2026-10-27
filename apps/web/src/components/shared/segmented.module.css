@@ -215,7 +215,10 @@ html:root :is([data-toolbar-row], [data-control-row]) .root .item { display: inl
 :root .root:is([data-size='medium'], [data-size='panel']) { height: var(--control-h); box-sizing: border-box; }
 :root .root[data-size='panel'] .count { margin-inline-start: var(--space-4); }
 
-html:root .root[data-equal-width] .item { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 内容幅でも最長の項目を基準に等分し、空きがあるのに文字を切らない。 */
+html:root .root[data-equal-width] { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+html:root .root[data-equal-width]:is([data-size='panel'], [data-segmented-fit='fill']):not([data-segmented-fit='content']) { display: grid; width: 100%; }
+html:root .root[data-equal-width] .item { flex: 1 1 0; width: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 0件は項目全体を薄く示す。読めていない件数と押せない状態にはしない。 */
 html:root .root .item[data-empty],

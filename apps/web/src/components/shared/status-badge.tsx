@@ -4,9 +4,13 @@ import HelpTip from './help-tip'
 import TruncatedText from './truncated-text'
 import styles from './status-badge.module.css'
 
-export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
+/**
+ * 札の色。warning＝橙（対応中・送信中など進んでいる途中）、caution＝黄（要確認・承認待ち）、
+ * danger＝赤（未対応・失敗）、success＝緑（済み・正常・有効）、info＝青、neutral＝灰（保留・種類）。
+ */
+export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger'
 
-/** 色だけに頼らず、必ず状態を文字で伝える共通バッジ。 */
+/** 色だけに頼らず、必ず状態を文字で伝える共通バッジ。地の色のある札に色の点と字を載せる。 */
 export default function StatusBadge({
   children,
   status,

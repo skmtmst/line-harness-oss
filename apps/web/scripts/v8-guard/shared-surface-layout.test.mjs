@@ -50,6 +50,8 @@ import Button from './src/components/shared/button';
 import CommandPalette from './src/components/shared/command-palette';
 import Notice from './src/components/shared/notice';
 import {DialogContentRow} from './src/components/shared/dialog-form-row';
+import KpiBand from './src/components/shared/kpi-band';
+import KpiCard from './src/components/shared/kpi-card';
 function Fixture(){
  const [window,setWindow]=useState(''),[value,setValue]=useState(false),[current,setCurrent]=useState('now'),[countState,setCountState]=useState('active');
  const steps=[{key:'done',label:'事前確認',state:'done',onSelect:()=>setCurrent('done')},{key:'now',label:'アカウント接続',state:'current'}, {key:'next',label:'接続確認',state:'todo'}, {key:'choice',label:'使い方を選ぶ',state:'todo'}, {key:'finish',label:'完了',state:'todo'}];
@@ -84,6 +86,13 @@ function Fixture(){
   <section id="choice-time-narrow" style={{width:84}}><TimeField aria-label="狭い時刻" value="09:00" onChange={()=>{}}/></section>
   <section id="input-sample"><TextField aria-label="入力の見本" placeholder="you@example.com" /></section>
   <section id="display-choices" style={{width:320}}><SegmentedControl aria-label="表示の切り替え" value="line" size="panel" options={[{value:'line',label:'LINEの友だち',count:128},{value:'phone',label:'LINE未連携の電話客',count:64}]} onChange={()=>{}} /></section>
+  <section id="intrinsic-choices" style={{width:'50vw',maxWidth:'100%'}}>
+    {(['track','choices','reservation','intake-stop'] as const).flatMap(appearance=>[undefined,'content' as const].map(fit=><div key={appearance+'-'+fit} data-intrinsic-case={appearance+'-'+(fit??'default')}><SegmentedControl aria-label={appearance+' '+(fit??'default')} value="short" appearance={appearance} fit={fit} options={[{value:'short',label:'Short',count:128},{value:'long',label:'A much longer display choice',count:64}]} onChange={()=>{}}/></div>))}
+    <div data-intrinsic-case="panel"><SegmentedControl aria-label="パネルの表示" size="panel" value="line" options={[{value:'line',label:'LINEの友だち',count:128},{value:'phone',label:'LINE未連携の電話客',count:64}]} onChange={()=>{}}/></div>
+    <div data-intrinsic-case="fill"><SegmentedControl aria-label="幅いっぱいの表示" fit="fill" value="line" options={[{value:'line',label:'LINEの友だち',count:128},{value:'phone',label:'LINE未連携の電話客',count:64}]} onChange={()=>{}}/></div>
+    <div data-intrinsic-case="toolbar" data-toolbar-row style={{display:'flex'}}><SegmentedControl aria-label="操作段の表示" fit="fill" value="line" options={[{value:'line',label:'LINEの友だち',count:128},{value:'phone',label:'LINE未連携の電話客',count:64}]} onChange={()=>{}}/></div>
+    <div data-intrinsic-case="narrow" style={{width:240}}><SegmentedControl aria-label="狭い表示" fit="fill" value="line" options={[{value:'line',label:'LINEの友だち',count:128},{value:'phone',label:'LINE未連携の電話客',count:64}]} onChange={()=>{}}/></div>
+  </section>
   <section id="empty-choices"><SegmentedControl aria-label="件数の切り替え" value={countState} options={[{value:'empty',label:'保留',count:0},{value:'active',label:'対応中',count:2},{value:'unknown',label:'未取得',count:'—'}]} onChange={setCountState}/></section>
   <EntityPickerField label="親候補" noun="アカウント" items={Array.from({length:20},(_,i)=>({id:String(i),name:"親候補"+i,meta:"候補の説明"}))} value="0" onChange={()=>{}} /><ToggleGroupActions total={6} enabled={4} label="配信" onChange={()=>{}} /><section id="favorites"><IconButton variant="attention" pressed aria-label="お気に入り済み"><Star /></IconButton><IconButton variant="attention" pressed={false} aria-label="お気に入りにする"><Star /></IconButton></section>
   <section id="filter-states" style={{display:'flex',alignItems:'center',gap:12}}>
@@ -105,6 +114,18 @@ function Fixture(){
     <div style={{display:'flex'}}><NumberField aria-label="紹介者へのマイル付与" defaultValue="0" unit="mile"/></div>
   </section>
   <section id="row-controls"><RowMenu label="行の操作" items={[{label:'初期値に戻す…',tone:'danger',onSelect:()=>{}}]} /><RowMenu label="小さい行の操作" appearance="box" items={[{label:'編集',onSelect:()=>{}}]} /><Pagination page={1} pageCount={2} onPageChange={()=>{}} /><Pagination page={1} pageCount={1} summary="1件中1件" ariaLabel="1ページの送り" onPageChange={()=>{}} /></section>
+  <section id="notices" style={{maxWidth:720}}>
+   <Notice tone="info" heading="回復コードが残っていません" message="認証アプリが使えない時に入れなくなる前に、作り直してください。" action={<Button>作り直す</Button>} onClose={()=>{}}/>
+   <Notice tone="warn" heading="いつもと違う端末・場所からのログインです。心当たりがなければ、ほかの端末のログインを終えてパスワードを変えてください" message="大事な操作の前に毎回、本人確認をします。" action={<Button>ログイン中の端末を見る</Button>} onClose={()=>{}}/>
+   <Notice tone="warn" heading="ほかの人がこの内容を保存しました" message="読み直すと、ほかの人の変更を見てから続けられます。" states={[{label:'済み',state:'done'},{label:'未保存',state:'pending'}]} footer={<button type="button">入力を破棄する</button>} action={<><Button>読み直す</Button><Button variant="primary">上書きする</Button></>} onClose={()=>{}}/>
+   <Notice tone="info" action={<Button>開く</Button>} onClose={()=>{}}>題のない1行の知らせです。</Notice>
+  </section>
+  {[852,1140].map(w=><section key={w} data-kpi-fixture={w} style={{width:w}}><KpiBand appearance="cards">
+   <KpiCard presentation="band" title="対応が必要な受信" icon={<svg viewBox="0 0 16 16"/>} value={5} unit="件" badge="最長 6日前" badgeTone="danger" detail="LINE 1・メール 4" action={{label:'受信箱へ',href:'/chats'}}/>
+   <KpiCard presentation="band" title="今日の友だち" icon={<svg viewBox="0 0 16 16"/>} value={3} unit="人" detail="ブロック 0 人" sparkline={[1,2,2,3]}/>
+   <KpiCard presentation="band" title="接続に問題" icon={<svg viewBox="0 0 16 16"/>} value={12345} unit="通" valueTone="warning" detail="枠 200 通のうち 2%" action={{label:'配信へ',href:'/broadcasts'}}/>
+   <KpiCard presentation="band" title="今日の予約" icon={<svg viewBox="0 0 16 16"/>} value={0} unit="件" badge="なし" badgeTone="neutral" detail="次の予定はありません" action={{label:'予約へ',href:'/booking'}}/>
+  </KpiBand></section>)}
   <section id="windows">{['通常','確認','危険','警告','手順','選択','長文','引き出し'].map(name=><Button key={name} onClick={()=>setWindow(name)}>{name}</Button>)}</section>
   {window==='引き出し'?<Drawer open title="設定を編集する" headerIcon={props.headerIcon} description={props.description} onClose={()=>setWindow('')} footer={<Button onClick={()=>setWindow('')}>保存する</Button>}><input aria-label="名前" defaultValue="保持する名前"/></Drawer>:
    ['確認','危険','警告'].includes(window)?<ConfirmDialog {...props} title="内容を確認しますか？" destructive={window==='危険'} warning={window==='警告'}/>:
@@ -451,6 +472,34 @@ for (const width of [1152,1440,1920]) {
     } finally { await browser.close() }
   })
 
+  test(`内容幅の切り替えも等分し、空きがある長い項目を切らない ${width}`,async()=>{
+    const browser=await connectGuardBrowser()
+    try {
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      const measure=root=>root.evaluate(el=>{
+        const rect=el.getBoundingClientRect(),parent=el.parentElement.getBoundingClientRect()
+        const items=[...el.querySelectorAll('button')].map(button=>{const b=button.getBoundingClientRect();return {width:b.width,fits:button.scrollWidth<=button.clientWidth,contained:b.left>=rect.left-1&&b.right<=rect.right+1}})
+        return {items,width:rect.width,parentWidth:parent.width,kind:el.parentElement.dataset.intrinsicCase,contained:rect.left>=parent.left-1&&rect.right<=parent.right+1}
+      })
+      for(const root of await page.locator('#intrinsic-choices [data-segmented-control]').all()){
+        const geometry=await measure(root)
+        assert.ok(geometry.contained&&geometry.items.every(item=>item.contained),JSON.stringify(geometry))
+        if(geometry.kind==='narrow') assert.ok(geometry.items.some(item=>!item.fits),JSON.stringify(geometry))
+        else assert.ok(geometry.items.every(item=>item.fits),JSON.stringify(geometry))
+        assert.ok(Math.abs(geometry.items[0].width-geometry.items[1].width)<=1,JSON.stringify(geometry))
+        if(['panel','fill','toolbar','narrow'].includes(geometry.kind)) assert.ok(Math.abs(geometry.width-geometry.parentWidth)<=1,JSON.stringify(geometry))
+      }
+      await expect(page.locator('[data-intrinsic-case="narrow"] button').last()).toHaveAttribute('title','LINE未連携の電話客')
+      await expect(page.locator('[data-intrinsic-case="narrow"] button').last()).toHaveAttribute('aria-label','LINE未連携の電話客 64')
+      const root=page.locator('[data-intrinsic-case="track-content"] [data-segmented-control]')
+      await root.evaluate(el=>el.style.display='inline-flex')
+      await expect.poll(async ()=>(await measure(root)).items.every(item=>item.fits)).toBe(false)
+      await root.evaluate(el=>el.style.removeProperty('display'))
+      await expect.poll(async ()=>(await measure(root)).items.every(item=>item.fits)).toBe(true)
+    } finally {await browser.close()}
+  })
+
   test(`候補の選択印は1個で行内中央、最後の候補まで操作できる ${width}`, async () => {
     const browser=await connectGuardBrowser()
     try {
@@ -473,6 +522,10 @@ for (const width of [1152,1440,1920]) {
       assert.equal(await last.isChecked(),true)
       const bounds=await last.evaluate(el=>({y:el.getBoundingClientRect().y,height:innerHeight}))
       assert.ok(bounds.y>=0&&bounds.y<bounds.height,JSON.stringify(bounds))
+      if(process.env.V8_CHOICE_SHOTS_DIR){
+        mkdirSync(process.env.V8_CHOICE_SHOTS_DIR,{recursive:true})
+        await page.screenshot({path:join(process.env.V8_CHOICE_SHOTS_DIR,`entity-picker-${width}.png`)})
+      }
     } finally { await browser.close() }
   })
 
@@ -482,14 +535,39 @@ for (const width of [1152,1440,1920]) {
       const page = await browser.newPage({reducedMotion:'reduce'})
       await mount(page,width)
       for (const name of ['行の操作','小さい行の操作']) {
+        await page.mouse.move(0,0)
         const trigger=page.getByRole('button',{name,exact:true})
-        const appearance=await trigger.evaluate(el=>{const s=getComputedStyle(el),after=getComputedStyle(el,'::after');return {background:s.backgroundColor,shadow:s.boxShadow,border:s.borderWidth,after:after.content}})
-        assert.equal(appearance.background,'rgba(0, 0, 0, 0)',JSON.stringify(appearance))
-        assert.equal(appearance.shadow,'none',JSON.stringify(appearance))
-        assert.equal(appearance.border,'0px',JSON.stringify(appearance))
-        assert.ok(['none','normal'].includes(appearance.after),JSON.stringify(appearance))
+        const measure=()=>trigger.evaluate(el=>{
+          const s=getComputedStyle(el),after=getComputedStyle(el,'::after'),clear='rgba(0, 0, 0, 0)'
+          const borderVisible=['Top','Right','Bottom','Left'].some(side=>parseFloat(after[`border${side}Width`])>0&&after[`border${side}Color`]!==clear)
+          const afterVisible=!['none','normal'].includes(after.content)&&after.display!=='none'&&Number(after.opacity)>0&&(
+            after.backgroundColor!==clear||after.backgroundImage!=='none'||after.boxShadow!=='none'||borderVisible||
+            parseFloat(after.outlineWidth)>0&&after.outlineColor!==clear)
+          return {background:s.backgroundColor,image:s.backgroundImage,shadow:s.boxShadow,border:s.borderWidth,outlineVisible:parseFloat(s.outlineWidth)>0&&s.outlineColor!==clear,afterVisible,hoverBackground:s.backgroundColor!==clear?s.backgroundColor:after.backgroundColor}
+        })
+        const assertResting=appearance=>{
+          assert.equal(appearance.background,'rgba(0, 0, 0, 0)',JSON.stringify(appearance))
+          assert.equal(appearance.image,'none',JSON.stringify(appearance))
+          assert.equal(appearance.shadow,'none',JSON.stringify(appearance))
+          assert.equal(appearance.border,'0px',JSON.stringify(appearance))
+          assert.equal(appearance.outlineVisible,false,JSON.stringify(appearance))
+          assert.equal(appearance.afterVisible,false,JSON.stringify(appearance))
+        }
+        assertResting(await measure())
+        await trigger.evaluate(el=>el.setAttribute('data-menu-frame-fault',''))
+        for(const faultRule of ['outline:1px solid rgb(20,20,20)','border-right:1px solid rgb(20,20,20)','background-image:linear-gradient(black,black)']){
+          const fault=await page.addStyleTag({content:`[data-menu-frame-fault]::after{content:"";${faultRule}!important}`})
+          await expect.poll(async ()=>(await measure()).afterVisible,{message:faultRule}).toBe(true)
+          const faultAppearance=await measure()
+          assert.throws(()=>assertResting(faultAppearance),/afterVisible/)
+          await fault.evaluate(el=>el.remove())
+          await expect.poll(async ()=>(await measure()).afterVisible).toBe(false)
+          assertResting(await measure())
+        }
+        await trigger.evaluate(el=>el.removeAttribute('data-menu-frame-fault'))
+        assertResting(await measure())
         await trigger.hover()
-        await expect.poll(() => trigger.evaluate(el=>getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)')
+        await expect.poll(async ()=>(await measure()).hoverBackground).not.toBe('rgba(0, 0, 0, 0)')
       }
       await page.getByRole('button',{name:'行の操作',exact:true}).click()
       await page.getByRole('menuitem',{name:'初期値に戻す',exact:true}).waitFor()
@@ -560,6 +638,61 @@ for (const width of [1152,1440,1920]) {
         await panel.getByRole('button',{name:'閉じる',exact:true}).click()
         await panel.waitFor({state:'detached'})
       }
+    }finally{await browser.close()}
+  })
+}
+
+for (const width of [1152,1440]) {
+  test(`知らせの［×］を操作のボタンと縦の真ん中でそろえる（題が1行でも2行でも） ${width}`,async()=>{
+    const browser=await connectGuardBrowser()
+    try{
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      const measure=()=>page.locator('#notices').evaluate(root=>[...root.querySelectorAll('[data-design-part="notice"]')].map(notice=>{
+        const close=notice.querySelector('button[aria-label="通知を閉じる"]')
+        const actions=[...notice.querySelectorAll('[class*="action"] [data-shared-button]')]
+        const center=el=>{const r=el.getBoundingClientRect();return r.top+r.height/2}
+        const heading=notice.querySelector('[class*="heading"]')
+        return {lines:heading?Math.round(heading.getBoundingClientRect().height/parseFloat(getComputedStyle(heading).lineHeight)):0,
+          offsets:actions.map(button=>center(close)-center(button))}
+      }))
+      const rows=await measure()
+      assert.equal(rows.length,4)
+      assert.ok(rows.some(row=>row.lines>=2),JSON.stringify(rows))
+      assert.ok(rows.every(row=>row.offsets.length>0&&row.offsets.every(offset=>Math.abs(offset)<=0.5)),JSON.stringify(rows))
+      // ［×］を2pxずらすと、この計測が見逃さないことを確かめる。
+      await page.locator('#notices button[aria-label="通知を閉じる"]').first().evaluate(el=>{el.style.position='relative';el.style.top='-2px'})
+      assert.ok((await measure()).some(row=>row.offsets.some(offset=>Math.abs(offset)>0.5)))
+    }finally{await browser.close()}
+  })
+}
+
+for (const stripWidth of [852,1140]) {
+  test(`数のカードは札があっても題と補足を切らず、札は題・数字と重ならない（帯の幅 ${stripWidth}）`,async()=>{
+    const browser=await connectGuardBrowser()
+    try{
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,1440)
+      const measure=()=>page.locator(`[data-kpi-fixture="${stripWidth}"]`).evaluate(root=>[...root.querySelectorAll('[data-kpi-strip] > [data-design-version]')].map(card=>{
+        const box=el=>el?.getBoundingClientRect()
+        // 「…」で省略している（text-overflow: ellipsis で中身が入り切らない）要素があれば切れている。
+        const cut=el=>!!el&&[el,...el.querySelectorAll('*')].some(node=>getComputedStyle(node).textOverflow==='ellipsis'&&node.scrollWidth>node.clientWidth+1)
+        const text=card.querySelector('[data-kpi-label] [data-help-trigger] > span')??card.querySelector('[data-kpi-label]')
+        const badge=box(card.querySelector('[data-kpi-badge]')),label=box(text),number=box(card.querySelector('[data-kpi-value]'))
+        const hit=(a,b)=>!!a&&!!b&&a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top
+        const note=card.querySelector('[data-kpi-detail] > span:first-child')
+        return {labelCut:cut(card.querySelector('[data-kpi-label]'))||(!!label&&box(card).right<label.right),noteCut:cut(note),
+          overlap:hit(badge,label)||hit(badge,number),inside:!badge||badge.right<=box(card).right,
+          link:card.querySelector('[data-kpi-detail] a')?getComputedStyle(card.querySelector('[data-kpi-detail] a')).color:null}
+      }))
+      const rows=await measure()
+      assert.equal(rows.length,4)
+      assert.ok(rows.every(row=>!row.labelCut&&!row.noteCut&&!row.overlap&&row.inside),JSON.stringify(rows))
+      // 行き先「〇〇へ →」は文字のリンクの決まり（緑）。
+      assert.ok(rows.filter(row=>row.link).length===3&&rows.every(row=>!row.link||row.link==='rgb(8, 122, 62)'),JSON.stringify(rows))
+      // 札を題の上へ重ねると、この計測が見逃さないことを確かめる。
+      await page.locator(`[data-kpi-fixture="${stripWidth}"] [data-kpi-badge]`).first().evaluate(el=>{const label=el.closest('[data-design-version]').querySelector('[data-kpi-label]').getBoundingClientRect();Object.assign(el.style,{position:'fixed',left:`${label.left}px`,top:`${label.top}px`})})
+      assert.ok((await measure()).some(row=>row.overlap))
     }finally{await browser.close()}
   })
 }

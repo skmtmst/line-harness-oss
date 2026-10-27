@@ -4,18 +4,17 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { buildSupportEmailInboxQuery } from '@/v8/inbox-chat/support-email-query'
 
+/*
+ * 受信箱V4で**戻してはいけない形**を文字で見張る。
+ * 既読・送信・担当・対応状況・メモ・テンプレート・見出し・顧客情報の読み先は
+ * inbox-v4-react.test.tsx と app/chats/*-react.test.tsx が本物の画面で見る。
+ * メールの担当・未読・待ち時間の絞り込みは Worker の inbox-server-filters.test.ts が実 HTTP で見る。
+ */
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
-const THREAD = readFileSync(join(HERE, '..', 'shared', 'inbox-thread.tsx'), 'utf8')
-const HEAD_MENUS = readFileSync(join(HERE, '..', 'shared', 'inbox-head-menus.tsx'), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
-// 受信箱の指標カード（inbox-kpis.tsx）はどの画面からも描かれないので 2026-10-07 に消した。それを見ていた行も外した。
 const EMAIL_THREAD = readFileSync(join(HERE, '..', 'support', 'email-thread.tsx'), 'utf8')
-const WORKER_EMAIL = readFileSync(
-  join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'support-inbox.ts'),
-  'utf8',
-)
 const VISUAL_QA_MOCK = readFileSync(
   join(HERE, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'),
   'utf8',
@@ -30,76 +29,22 @@ function region(source: string, start: string, end: string): string {
 }
 
 describe('受信箱V4で既存機能を失わない', () => {
-  it('担当者別既読をLINEとメールの両方に残す', () => {
-    expect(PAGE).toContain('api.chats.markRead(chatId)')
-    expect(PAGE).toContain('/api/support/email/threads/${encodeURIComponent(item.threadId)}/read')
-    expect(WORKER_EMAIL).toContain("'/api/support/email/threads/:id/read'")
-  })
-
-  it('返信・担当・対応状態・メモの経路を残す', () => {
-    expect(PAGE).toContain('api.chats.send(sendingChatId')
-    expect(PAGE).toContain('handleOperatorUpdate')
-    expect(PAGE).toContain('handleStatusUpdate')
-    expect(EMAIL_THREAD).toContain('/reply`')
-    expect(EMAIL_THREAD).toContain('/assignee`')
-    expect(PAGE + EMAIL_THREAD).toContain('/notes`')
-  })
-
-  it('テンプレートは選択だけでは送信せず入力欄へ挿入する', () => {
-    const view = readFileSync(join(HERE, '../../v8/inbox-chat/template-picker-view.tsx'), 'utf8')
-    expect(view).toContain('入力欄に入れる')
-    expect(view).toContain('<FolderPanel')
-    expect(view).toContain('<EntityPickerDialog')
-    expect(TEMPLATE_PICKER).toContain('onPick(selected.messageContent)')
+  it('テンプレートは選択だけでは送信しない', () => {
     expect(TEMPLATE_PICKER).not.toContain('api.chats.send(')
-    expect(PAGE).toContain('setMessageContent')
   })
 })
 
 describe('受信箱V4の画面契約', () => {
-  it('一括確認を画面に出さず、送信元と担当者を分けて表示する', () => {
+  it('一括確認を画面に出さない', () => {
     expect(PAGE).not.toContain('すべて確認済みにする')
-    expect(PAGE).toContain('pictureUrl={chatDetail.friendPictureUrl}')
-    expect(PAGE).toContain('senderName={msg.sentByStaffName}')
-    expect(THREAD).toContain('{senderName} が送信')
   })
 
-  it('担当変更では、絞り込み用の「すべて」を担当者として送らない', () => {
-    /*
-      「すべて」は**一覧を絞るための行**で、担当者ではない。
-      担当を変える口に出したままだと、押せば「すべて」という人へ
-      割り当てようとする。設計 `L35UOV`（2-9）も 河野・菅野・未割り当て の
-      3つだけで、「すべて」を置いていない。
-    */
-    expect(PAGE).toContain("handleOperatorUpdate(next === 'unassigned' ? null : next)")
-    expect(HEAD_MENUS).toContain('buildOperatorRows(operators, false, value)')
-  })
-
-  it('内部メモは送信欄と分けて編集でき、保存の口を残す', () => {
-    // 設計 `B7CER8` で画面を覆う窓から「内部メモ」ボタンの上に出る紙へ移した。
-    // 覆う窓のままだと、直前のやり取りを見ながら書けない。
-    expect(PAGE).toContain('handleSaveMemo')
-    expect(PAGE).toContain('aria-labelledby="chat-internal-memo-title"')
-    expect(EMAIL_THREAD).toContain('<Dialog open={showMemoEditor}')
-    expect(EMAIL_THREAD).toContain('title="内部メモ"')
-    expect(EMAIL_THREAD).toContain('/notes`')
-    expect(EMAIL_THREAD).toContain('担当者だけに表示され、相手には送信されません。')
+  it('メールの内部メモの窓に自前の閉じるボタンを足さない', () => {
     expect(EMAIL_THREAD).not.toContain('>閉じる</button>')
   })
 
-  it('自分担当チップを外し、担当者プルダウンでLINEとメールを絞る', () => {
+  it('自分担当チップを戻さず、メールの絞り込みは担当・未読・要返信をそのまま口へ渡す', () => {
     expect(PAGE).not.toContain("{ key: 'mine' as const, label: '自分担当' }")
-    expect(PAGE).toContain('aria-label="担当者で絞り込む"')
-    const lineParams = region(PAGE, 'const buildListParams = useCallback', 'return params')
-    expect(lineParams).toContain("if (assigneeFilter !== 'all') params.operatorId = assigneeFilter")
-    expect(lineParams).toContain('if (unreadOnly) params.unreadOnly = true')
-    expect(lineParams).toContain("if (quickFilter !== 'all') params.quickFilter = quickFilter")
-    const lineQuery = region(API, '  chats: {', 'get: (id: string, params?')
-    expect(lineQuery).toContain('query.operatorId = params.operatorId')
-    expect(lineQuery).toContain("query.unreadOnly = '1'")
-    expect(lineQuery).toContain('query.quickFilter = params.quickFilter')
-    const emailLoader = region(PAGE, 'const loadEmails = useCallback', '\n  useEffect(() => {\n    void loadEmails()')
-    expect(emailLoader).toMatch(/assignee: assigneeFilter,\s+unreadOnly,\s+quickFilter: quickFilter === 'all' \? undefined : quickFilter/)
     for (const assignee of ['staff-1', 'unassigned']) {
       for (const quickFilter of ['reply', 'overdue'] as const) {
         const query = new URLSearchParams(buildSupportEmailInboxQuery({ status: 'all', assignee, unreadOnly: true, quickFilter }))
@@ -108,17 +53,6 @@ describe('受信箱V4の画面契約', () => {
         expect(query.get('quickFilter')).toBe(quickFilter)
       }
     }
-  })
-
-  it('担当・未割当・未読・待ち時間はサーバーでLIMIT前に適用する', () => {
-    // 最新chatを1行選ぶlookupのLIMIT 1は許可するが、候補全体の先行LIMITは禁止。
-    expect(WORKER_EMAIL).toContain("searchSql += ' AND t.assigned_staff_id = ?'")
-    expect(WORKER_EMAIL).toContain("searchSql += ' AND t.assigned_staff_id IS NULL'")
-    expect(WORKER_EMAIL).toContain('sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at')
-    expect(WORKER_EMAIL).toContain("searchSql += ' AND julianday(t.last_incoming_at) <= julianday(?)'")
-    const emailPage = region(WORKER_EMAIL, 'FROM support_email_threads t', 'LIMIT')
-    expect(emailPage).toContain('WHERE ${statusSql} ${searchSql}')
-    // 両経路の担当・未読・60分境界・201件目は Worker inbox-server-filters.test.ts の実HTTP試験で守る。
   })
 
   it('取得済みの200件を担当・未読・待ち時間で再び絞り込まない', () => {
@@ -131,28 +65,14 @@ describe('受信箱V4の画面契約', () => {
   })
 
   it('トーク見出しに本名・注目・代替アバターを出す', () => {
-    expect(PAGE).toContain('chatDetail.friendRealName')
-    expect(PAGE).toContain('chatDetail.isAttention')
-    expect(PAGE).toContain('handleAttentionUpdate')
-    expect(PAGE).toContain("__attention: next ? '1' : null")
-    expect(VISUAL_QA_MOCK).toContain('friendRealName: friend?.realName ?? null')
+    /*
+      画面確認の偽 API の注目の印。本名は inbox-chat-detail-mock.test.ts が偽 API を立てて見るが、
+      注目付きの会話が画面確認の固定データに無いので、注目だけはここで文字のまま見る。
+    */
     expect(VISUAL_QA_MOCK).toContain("isAttention: friend?.metadata?.__attention === '1'")
   })
 
-  it('会話を切り替えた後に古い詳細応答を表示・操作へ使わない', () => {
-    expect(PAGE).toContain('const detailRequestIdRef = useRef(0)')
-    expect(PAGE).toContain('requestId !== detailRequestIdRef.current')
-    expect(PAGE).toContain('detailRequestIdRef.current += 1')
-    expect(PAGE).toContain('detailAccountRef.current === selectedAccountId')
-    expect(PAGE).toContain('setSelectedChatId(null)')
-    expect(PAGE).toContain('current?.id === updatingChatId')
-    expect(PAGE).toContain('if (!chatDetail || attentionSaving) return')
+  it('会話を切り替えた後の詳細の失敗を、内部の文のまま出さない', () => {
     expect(PAGE).not.toContain('チャット詳細の読み込みに失敗しました:')
-  })
-
-  it('会話IDではなく友だちIDで顧客情報を読み込み、集計欠損でも画面を止めない', () => {
-    expect(PAGE).toContain('const activeFriendId = (chatDetail?.id === selectedChatId')
-    expect(PAGE).toContain('chatDetail.friendId')
-    expect(PAGE).toContain('friendId={activeFriendId}')
   })
 })

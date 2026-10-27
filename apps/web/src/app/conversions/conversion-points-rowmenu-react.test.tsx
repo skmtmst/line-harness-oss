@@ -35,6 +35,11 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}&affiliate=affiliate-a&from=notice`),
   useRouter: () => ({ replace: fixture.replace, push: () => {} }),
 }))
+const pageTitle = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shell/page-chrome', async (importOriginal: () => Promise<typeof import('@/components/shell/page-chrome')>) => {
+  const actual = await importOriginal()
+  return { ...actual, usePageTitle: (title: string) => { pageTitle(title); return actual.usePageTitle(title) } }
+})
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
@@ -268,6 +273,8 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
     fixture.tab = 'approvals'
     await mount()
     expect(fixture.replace).toHaveBeenCalledWith('/affiliates?tab=approvals&affiliate=affiliate-a&from=notice')
+    // 上の帯の画面名はナビ（lib/menu.ts）の「コンバージョン」と同じ名前を渡す。
+    expect(pageTitle).toHaveBeenCalledWith('コンバージョン')
     expect(container.querySelector('table')).toBeNull()
   })
 })

@@ -155,6 +155,13 @@ describe('公開履歴の読み込み（応答の形ずれ）', () => {
     expect(net.retry).toHaveBeenCalledExactlyOnceWith('menu-1', 'run-1')
   })
 
+  it('履歴の欄は名前つきで出し、成功した記録にはやり直す口を出さない', async () => {
+    net.publishRunsResult = { success: true, data: { runs: [run('succeeded')], published: run(), draftDiffersFromPublished: false } }
+    await renderDetail()
+    expect(container.querySelector('[aria-label="公開の履歴とLINEとの照合"]')?.textContent).toContain('成功')
+    expect(screen.queryByRole('button', { name: '失敗だけやり直す' })).toBeNull()
+  })
+
   it('照合は読むだけで始め、確認した修復後も取り込みが必要な分を知らせる', async () => {
     net.publishRunsResult = { success: true, data: { runs: [] } }
     const diff = { kind: 'alias_missing', detail: '切り替え先がありません', fix: { action: 'restore_alias', label: '切り替え先を戻す' } }

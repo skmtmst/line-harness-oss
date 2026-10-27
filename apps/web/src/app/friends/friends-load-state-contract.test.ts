@@ -2,41 +2,18 @@ import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mj
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const TABLE = readFileSync(new URL('../../components/friends/friend-list-table.tsx', import.meta.url), 'utf8')
 
+/*
+ * 友だち一覧の読込状態の禁止の見張り。
+ * 失敗・再試行・件数・CSV の止め方は friends-list-behavior.test.tsx、
+ * 遅い応答を採用しないことは friends-stale-response-contract.test.tsx が描いて確かめる。
+ */
 describe("管理画面 友だち一覧の読込状態", () => {
-  it('読込・成功・失敗を別の状態として持つ', () => {
-    expect(PAGE).toContain("type LoadStatus = 'loading' | 'ready' | 'error'")
-    expect(PAGE).toContain("setLoadStatus('loading')")
-    expect(PAGE).toContain("setLoadStatus('ready')")
-    expect(PAGE).toContain("setLoadStatus('error')")
-  })
-
-  it('読込失敗を0件の友だち一覧として表示しない', () => {
-    expect(PAGE).toContain("loadStatus === 'error'")
-    expect(PAGE).toContain('<ListState kind="error"')
-    expect(TABLE).toContain("status === 'error'")
-    expect(TABLE).toContain('表示できませんでした')
-    expect(PAGE).toContain('onRetry={() => void loadFriends()}')
+  it('読込失敗を通知の文だけにして一覧を0件のまま出す書き方に戻さない', () => {
     expect(PAGE).not.toContain('setError(response.error)')
   })
 
-  it('未取得の件数を0件にせずCSVも止める', () => {
-    /*
-     * 絞り込みの行の件数は消した（見出し・ページ送りと3重だった）。
-     * 「未取得を0件に見せない」の役目は見出しの横の1か所が持つ。
-     */
-    expect(TABLE).toContain("status === 'ready' ? `${formatNumber(total)}件` : '—'")
+  it('件数を絞り込みの行に重ねて出さない（見出しの横の1か所だけ）', () => {
     expect(PAGE).not.toContain("{loadStatus === 'ready' ? `${formatNumber(total)}件` : '—'}")
-    // CSVの読み込み中の禁止は実際のメニューで確かめる（scored-only-handoff-react）。
-    expect(PAGE).toContain('<ListPage')
-  })
-
-  it('条件変更前の遅い応答と古い一覧を採用しない', () => {
-    expect(PAGE).toContain('const loadRequestRef = useRef(0)')
-    expect(PAGE).toContain('return requestId !== loadRequestRef.current')
-    expect(PAGE.match(/if \(stale\(\)\) return/g)?.length).toBeGreaterThanOrEqual(2)
-    expect(PAGE).toContain('loadRequestRef.current += 1')
-    expect(PAGE).toContain('setFriends([])')
   })
 })

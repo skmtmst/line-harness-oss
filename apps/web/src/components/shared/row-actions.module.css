@@ -180,6 +180,7 @@ html:root :is(.inlineGrip, .grip)[data-reorder-handle] { color: var(--color-ink-
 html:root .action[data-row-menu] {
   position: relative;
   isolation: isolate;
+  border: 0;
   border-radius: var(--polish-radius-control);
   background: transparent;
   box-shadow: none;
@@ -189,6 +190,24 @@ html:root .action[data-row-menu]:not(:focus-visible) {
   outline: 1px solid transparent;
 }
 
+html:root .action[data-row-menu]::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  width: var(--tpl-icon-btn-row);
+  height: var(--tpl-icon-btn-row);
+  border-radius: var(--polish-radius-control);
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+  background: transparent;
+  box-shadow: none;
+}
+/* 普段は枠なし。行に乗せた時・乗せた時・焦点・開いている時だけ薄い灰の地（28角のまま）。 */
+html:root :is(tr, [role='row']):hover .action[data-row-menu]::after,
+html:root .action[data-row-menu]:is(:hover, :focus-visible, [aria-expanded='true'])::after {
+  background: var(--polish-row-menu-hover-bg);
+}
 html:root .action[data-row-menu]:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
@@ -210,6 +229,3 @@ html:root .inlineGrip:not(:has(svg)) {
 .statusActions { display: inline-flex; flex: none; align-items: center; gap: var(--polish-space-field); }
 .statusAction { display: inline-flex; flex: none; }
 .statusAction > :is(button, a) { min-width: var(--polish-row-action-width); }
-
-html:root .action[data-row-menu]:not(:focus-visible) { border: 0; outline-color: transparent; background: transparent; box-shadow: none; }
-html:root .action[data-row-menu]:hover:not(:disabled) { background: var(--polish-hover); }
