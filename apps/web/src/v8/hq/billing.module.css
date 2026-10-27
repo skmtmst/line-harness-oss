@@ -7,7 +7,6 @@
   height: var(--tpl-hq-button-icon);
 }
 
-
 .faint { color: var(--color-ink-faint); }
 
 /* 契約の帯（灰の地・角丸8・12/18） */
@@ -167,25 +166,5 @@
   font-size: var(--text-caption);
 }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-hq-pill-gap);
-  padding: var(--tpl-hq-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-hq-pill-lh);
-  white-space: nowrap;
-}
-
-.dot {
-  width: var(--tpl-hq-dot);
-  height: var(--tpl-hq-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-
-.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .pillInfo { background: var(--color-status-info-soft); color: var(--color-status-info); }
 .pillIdle { background: var(--color-step-idle); color: var(--color-ink-secondary); }

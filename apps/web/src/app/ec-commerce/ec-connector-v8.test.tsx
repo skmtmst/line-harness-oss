@@ -134,6 +134,8 @@ describe('V8-B つなぎ先（iLJmw）', () => {
   it('V8 の枠で今の板を包む', async () => {
     await renderV8()
     expect(document.querySelector('[data-design-node="iLJmw"]'), '板IDの枠がある').toBeTruthy()
+    // 画面の題（h1）は設定の枠が1つだけ持つ。共有の PageHeader（h1）を重ねない。
+    expect(document.querySelectorAll('h1')).toHaveLength(1)
     expect(document.body.textContent).toContain('EC連携')
     expect(document.body.textContent).toContain('つなぎ先の情報')
     expect(document.body.textContent).toContain('設定を保存する')

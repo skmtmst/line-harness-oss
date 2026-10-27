@@ -203,6 +203,20 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     expect(host.querySelector('[data-child]')).toBeNull()
   })
 
+  it.each([
+    ['/m', '/login?next=m'],
+    ['/m/chats', '/login?next=m'],
+    ['/mileage', '/login'],
+  ])('ログインしていない人が %s を開くと %s へ送る（電話の画面だけ戻り先の印を付ける）', async (path, login) => {
+    fetchSpy.mockImplementation(async () => new Response(null, { status: 401 }))
+    currentPath = path
+    await render()
+    await settle()
+
+    expect(replaceMock).toHaveBeenCalledWith(login)
+    expect(host.querySelector('[data-child]')).toBeNull()
+  })
+
   it.each(['suspended', 'archived'] as const)('%s の通常画面を管理画面の停止案内に差し替える', async (status) => {
     fetchSpy.mockImplementation(async () => sessionOk(status))
     currentPath = '/friends'

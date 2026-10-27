@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BroadcastPreflight } from '@/lib/api'
+import { formatDateTime } from '@/lib/format'
 import { broadcastPreflightSummary } from './broadcast-preflight-summary'
 
 const input = {
@@ -39,6 +40,12 @@ describe('配信の事前確認を表示する値', () => {
     const summary = broadcastPreflightSummary({ ...input, preflight: result({ quota: { state, monthlyUsed: 900, monthlyLimit: 1000, remaining: 100, planned: 10, reason: null } }) })
     expect(summary.quotaInsufficient).toBe(insufficient)
     expect(summary.quotaNote).toBe(note)
+  })
+
+  it('計算時刻は配信前チェックが数えた時刻だけを出し、今すぐ送るときは確認してから送ると書く', () => {
+    expect(broadcastPreflightSummary({ ...input, preflight: result({ audience: { matched: 10, sendable: 10, evaluatedAt: '2030-10-05T00:30:00.000Z', representatives: [] } }) }).evaluatedAtLabel).toBe(formatDateTime('2030-10-05T00:30:00.000Z'))
+    expect(broadcastPreflightSummary({ ...input, preflight: result() }).evaluatedAtLabel).toBeNull()
+    expect(broadcastPreflightSummary(input).sendWhenLabel).toBe('今すぐ（確認してから送信）')
   })
 
   it('予約日時・分散時間を示し、警告と未確認の試送信・見本だけを残件数へ数える', () => {

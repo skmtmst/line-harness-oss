@@ -56,6 +56,7 @@ function Harness({ canEdit = true }: { canEdit?: boolean }) {
       menuCount={menus.length}
       canEdit={canEdit}
       onReload={() => setMenus(server.map(toMenu))}
+      onOpenStaff={() => {}}
     />
   )
 }

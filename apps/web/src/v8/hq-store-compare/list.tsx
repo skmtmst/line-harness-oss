@@ -33,6 +33,7 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import { columnsWithDiff, coverageLabel, diffCount, diffCountLabel, diffCountShortLabel, diffTitle, formatDiff, formatMetric, METRICS, diffTone, sameAsAverage, worseCount, type MetricDef, type StoreAverage } from './metrics'
 import styles from './list.module.css'
 import { formatNumber } from '@/lib/format'
+import { EmptyCell } from '@/components/shared/empty-value'
 
 /*
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`）。行＝店、列＝7つの数。
@@ -396,7 +397,7 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
                   <div className={styles.metricRow}>
                     <span className={styles.metricName}>{def.label}</span>
                     <span className={styles.metricValue}>
-                      {metric?.available && metric.value !== null ? formatMetric(def.key, metric.value) : <span className={styles.cellEmpty}>—</span>}
+                      {metric?.available && metric.value !== null ? formatMetric(def.key, metric.value) : <EmptyCell />}
                       {diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : coverage ? <span className={styles.coverage}>{coverage}</span> : null}
                     </span>
                   </div>

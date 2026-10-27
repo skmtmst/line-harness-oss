@@ -9,4 +9,6 @@ export type MenusTabProps = {
   menuCount: number | undefined
   canEdit: boolean
   onReload: () => void
+  /** 担当スタッフのタブを開く（担当がいないメニューの札から）。 */
+  onOpenStaff: () => void
 }

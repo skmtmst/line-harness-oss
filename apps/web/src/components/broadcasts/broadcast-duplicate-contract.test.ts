@@ -17,22 +17,16 @@ function between(src: string, from: string, to: string): string {
 }
 
 /**
- * 送信済み詳細の「同じ設定で作り直す」（#605）。
+ * 送信済み詳細の「同じ設定で作り直す」の禁止の見張り。
  *
  * 要件 管理画面-06 §3 は同じ設定からの作成、§10 は `準備中` ボタンを禁じる。
- * 押すと元配信の題名・本文を引き継いだ新規作成へ進む。
+ * 押せる「複製して作る」は v8/broadcast-detail/detail.test.tsx が、
+ * 元配信を読んで題名と本文だけを引き継ぐ動き・読めないときの理由は
+ * broadcast-form-duplicate-react.test.tsx が画面を動かして見る。
  */
 describe('同じ設定で作り直す', () => {
-  it('詳細に押せる作り直しがあり、準備中のまま置かない', () => {
-    expect(DETAIL).toContain('/broadcasts/new?duplicateFrom=')
-    expect(DETAIL).toContain('複製して作る')
+  it('詳細に準備中のままの作り直しを置かない', () => {
     expect(DETAIL, '押せない作り直しが残っている').not.toContain('作り直しは準備中')
-  })
-
-  it('作り直しは元配信を読んで題名と本文を引き継ぐ', () => {
-    expect(FORM).toContain("searchParams.get('duplicateFrom')")
-    expect(FORM).toContain('api.broadcasts.get(sourceId)')
-    expect(FORM).toContain("setDeliveryMethod('duplicate')")
   })
 
   it('送信先・予約日時・配信元を引き継がない', () => {
@@ -48,9 +42,5 @@ describe('同じ設定で作り直す', () => {
     for (const key of ['setTargetMode', 'setScheduledDate', 'setScheduledTime']) {
       expect(apply, `${key} で引き継いでいる`).not.toContain(key)
     }
-  })
-
-  it('元が読めないときは黙って空にせず理由を出す', () => {
-    expect(FORM).toContain('元の配信を読み込めませんでした。作り直す配信を選び直してください。')
   })
 })

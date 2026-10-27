@@ -12,7 +12,7 @@ afterEach(() => { cleanup(); forgetSessionSnapshot(); localStorage.clear() })
 it('［閉じる］でその日は出さず、端末の確認への道は閉じる前に出している', async () => {
   rememberSessionSnapshot(snapshot('2026-10-25T01:00:00Z'))
   render(<UnfamiliarLoginNotice />)
-  expect((await screen.findByRole('link', { name: 'ログイン中の端末を確認する' })).getAttribute('href')).toBe('/staff')
+  expect((await screen.findByRole('link', { name: 'ログイン中の端末を見る' })).getAttribute('href')).toBe('/staff')
   fireEvent.click(screen.getByRole('button', { name: '通知を閉じる' }))
   expect(screen.queryByRole('note')).toBeNull()
   cleanup()
@@ -29,7 +29,7 @@ it('閉じた後に別のいつもと違うログインがあれば、また出�
   cleanup()
   rememberSessionSnapshot(snapshot('2026-10-25T05:00:00Z'))
   render(<UnfamiliarLoginNotice />)
-  expect(await screen.findByRole('link', { name: 'ログイン中の端末を確認する' })).toBeTruthy()
+  expect(await screen.findByRole('link', { name: 'ログイン中の端末を見る' })).toBeTruthy()
 })
 
 it.each(['/', '/settings'])('%sでは閉じた日も残し、閉じる印を出さない', async pathname => {
@@ -39,6 +39,6 @@ it.each(['/', '/settings'])('%sでは閉じた日も残し、閉じる印を出�
   cleanup()
   route.pathname = pathname
   render(<UnfamiliarLoginNotice />)
-  expect(await screen.findByRole('link', { name: 'ログイン中の端末を確認する' })).toBeTruthy()
+  expect(await screen.findByRole('link', { name: 'ログイン中の端末を見る' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: '通知を閉じる' })).toBeNull()
 })

@@ -12,7 +12,6 @@ import NoPermissionV8 from '@/v8/no-permission/no-permission'
 
 // happy-dom では import.meta.url が file 形にならないため、作業場所からの相対で読む。
 const BOARD = readFileSync('src/v8/no-permission/no-permission.tsx', 'utf8')
-const VARS_V8 = readFileSync('src/app/contents/vars/list-v8.tsx', 'utf8')
 
 /*
  * ★V8 権限なし（板 ）の契約。
@@ -94,15 +93,13 @@ describe('V8 権限なし（O5tUeE）の板', () => {
   })
 })
 
-describe('V8 権限なし（O5tUeE）の受け口', () => {
-  test('共通の板として作り、V8 の 403 枝で出す', () => {
-    expect(BOARD).toContain('data-design-node="O5tUeE"')
+/*
+ * 板の印（O5tUeE）と役割の表示は上の描画試験が、共通情報一覧の 403 で
+ * この案内が出ることは app/contents/vars/vars-load-failure-react.test.tsx が守る。
+ */
+describe('V8 権限なし（O5tUeE）の受け口（禁止の見張り）', () => {
+  test('「準備中」「取得できません」と言わない', () => {
     expect(BOARD).not.toContain('準備中')
     expect(BOARD).not.toContain('取得できません')
-    // 役割の仕組みは作らない。表示名を受け取るだけ。
-    expect(BOARD).toContain('roleLabel?: string | null')
-    expect(VARS_V8).toContain('isForbidden(listFailure) ? (')
-    expect(VARS_V8).toContain('共通情報を見る権限がありません')
-    expect(VARS_V8).toContain('オーナーか管理者に、共通情報を見られるよう頼んでください。')
   })
 })

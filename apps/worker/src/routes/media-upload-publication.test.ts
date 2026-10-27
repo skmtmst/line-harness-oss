@@ -119,6 +119,16 @@ describe('upload bytes and published media share one immutable result', () => {
     expect(db.raw.prepare('SELECT count(*) AS n FROM media').get()).toEqual({ n: 0 });
     expect([...bucket.objects.keys()].some(key => key.startsWith('media/'))).toBe(false);
   });
+  it('rejects bytes whose real format differs from the declared image type and publishes nothing', async () => {
+    const notPng = clean.slice();
+    notPng.set([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]);
+    bucket.seed(mediaUploadKey('session'), notPng);
+    const response = await complete();
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'media_signature_mismatch' });
+    expect(session().status).toBe('failed');
+    expect(db.raw.prepare('SELECT count(*) AS n FROM media').get()).toEqual({ n: 0 });
+  });
   it('copies a stable GET snapshot if the PUT target changes during copying', async () => {
     bucket.afterGet = (key, options) => { if (key === mediaUploadKey('session') && !options?.range) bucket.seed(key, hostile, 'changed'); };
     expect((await complete()).status).toBe(201);

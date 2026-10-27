@@ -137,6 +137,30 @@ const openMenu = async (name: string) => {
 }
 
 describe('友だち追加時の配信の一覧（V8）', () => {
+  it('一覧が遅いときは、読み上げの文を残したまま0.3秒後に行の形の骨組みを出す', async () => {
+    let complete!: (value: Response) => void
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = new URL(String(input))
+      if (url.pathname === '/api/friend-add-rules') return new Promise<Response>((resolve) => { complete = resolve })
+      return json({ success: true, data: null })
+    })
+    await act(async () => { root.render(<FriendAddListV8 />) })
+    const status = () => Array.from(host.querySelectorAll('[role="status"][aria-busy="true"]'))
+      .find((el) => el.querySelector('.sr-only')?.textContent === '友だち追加時の配信を読み込んでいます')
+    expect(status()).toBeTruthy()
+    expect(status()?.querySelector('[data-skeleton-reserve] [data-skeleton]')).not.toBeNull()
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 330)) })
+    expect(status()?.querySelector('[data-skeleton-reserve]')).toBeNull()
+    expect(status()?.querySelector('[data-skeleton]')).not.toBeNull()
+    await act(async () => complete(json({ success: true, data: {
+      items, total: items.length, nextCursor: null, folderCounts: [],
+      summary: { rules: 1, active: 1, recentAdds: 0, captured: 0, unknownRoute: 0, delivered: 0, failed: 0 },
+      options: { routes: [], scenarios: [], tags: [], folders: [] },
+    } })))
+    await waitFor(() => expect(host.textContent).toContain('店頭QRの初回案内'))
+    expect(status()).toBeUndefined()
+  })
+
   it('送るものの2行目はシナリオ・タグを1行にまとめる（シナリオの重ねは出さない）', () => {
     expect(actionLine(rule())).toBe('＋シナリオ「7日間フォロー」 ＋タグ「新規」')
   })

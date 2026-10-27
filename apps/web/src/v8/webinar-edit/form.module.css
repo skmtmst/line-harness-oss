@@ -96,32 +96,6 @@
 
 .buttons { display: flex; flex-wrap: wrap; gap: var(--tpl-toolbar-gap); }
 
-/* 状態の札（点つき）。 */
-.pill {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--tpl-wb-pill-gap);
-  padding: var(--tpl-wb-pill-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-wb-pill-lh);
-  white-space: nowrap;
-}
-.pill[data-tone='success'] { background: var(--color-success-bg); color: var(--color-success); }
-.pill[data-tone='info'] { background: var(--color-info-bg); color: var(--color-info); }
-.pill[data-tone='warn'] { background: var(--color-warning-bg); color: var(--color-warning); }
-.pill[data-tone='danger'] { background: var(--color-danger-bg); color: var(--color-danger); }
-.pillDot {
-  width: var(--tpl-badge-dot);
-  height: var(--tpl-badge-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-
 /* 文字だけのボタン（＋ 枠を足す など）。 */
 .textButton {
   width: fit-content;

@@ -66,7 +66,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
             </div>
           </div>
           <div className={styles.state}>
-            <StatusBadge tone={['requested', 'pending'].includes(next.status) ? 'warning' : 'info'}>{['requested', 'pending'].includes(next.status) ? '承認待ち' : Date.parse(next.starts_at) > Date.now() ? 'このあと' : words.active}</StatusBadge>
+            <StatusBadge tone={['requested', 'pending'].includes(next.status) ? 'caution' : 'info'}>{['requested', 'pending'].includes(next.status) ? '承認待ち' : Date.parse(next.starts_at) > Date.now() ? 'このあと' : words.active}</StatusBadge>
             <ReservationSource value={next.source === 'liff' || (!next.source && next.friend_id) ? 'line' : next.source === 'phone' ? 'phone' : next.source ?? 'line'} />
           </div>
           <ul className={styles.rows}>

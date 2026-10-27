@@ -34,26 +34,19 @@ describe('ヒット数の未取得', () => {
   })
 })
 
+/*
+ * 一覧の帯・行・絞り込みで未取得を 0 にしない動きは
+ * v8/auto-replies/list.test.tsx と list-behavior.test.tsx が描いて確かめる。
+ * ここには足りない合計・0 埋めへ戻さない禁止の見張りだけを残す。
+ */
 describe('一覧の帯と行（設計 8-1 `cmDfJ`）', () => {
   it('ヒット数が1つでも欠けていたら、合計を出さない', () => {
     expect(PAGE, '足りない合計をそのまま出している').not.toContain(
       'const monthlyHits = items.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)',
     )
-    expect(PAGE).toContain('const monthlyHits = hitsAllKnown')
-    expect(PAGE).toContain('const totalHits = hitsAllKnown')
-  })
-
-  it('「未ヒット」の絞り込みも、未取得を混ぜない', () => {
-    expect(PAGE).toContain("if (zeroThisMonthOnly && (r.hits === undefined || r.hits.period !== 0)) return false")
   })
 
   it('行のヒット数を 0 で埋めない', () => {
-    expect(PAGE).toContain("{r.hits?.period ?? emptyValue('unknown')}")
-    expect(PAGE).toContain("r.hits?.total")
     expect(PAGE).not.toContain("{r.hits?.period ?? 0}")
-  })
-
-  it('累計の副題にも、未取得のときは数を出さない', () => {
-    expect(PAGE).toContain("累計 ${totalHits === null ? emptyValue('unknown') : formatNumber(totalHits)}回")
   })
 })

@@ -13,7 +13,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import EmptyList from '@/components/shared/empty-list'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import FilterChip from '@/components/shared/filter-chip'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
@@ -381,7 +381,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const destCell = (row: HqTemplate) => {
     const destLine = distributedAccountsLine(row)
     return row.distributed_account_count === undefined ? (
-      <span className={storeStyles.cellFaint}>{emptyValue('unknown')}</span>
+      <EmptyCell />
     ) : row.distributed_account_count > 0 ? (
       <span className={storeStyles.hqDest}>
         <span className={storeStyles.usageLink}>{`${formatNumber(row.distributed_account_count)} アカウント`}</span>

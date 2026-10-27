@@ -692,9 +692,12 @@ describe('一覧の担当欄 (#953 E-05)', () => {
     expect(within(byName(/休止中メニュー/)).getByText('担当A')).toBeTruthy()
     expect(screen.queryByText('だれもいません')).toBeNull()
 
-    // 0人は休止中・公開中とも「担当なし」で、設定漏れと分かるようにする。
-    expect(within(byName(/休止で未割当/)).getByText('担当なし')).toBeTruthy()
-    expect(within(byName(/公開で未割当/)).getByText('担当なし')).toBeTruthy()
+    // 0人の担当の列は薄い灰の「—」。公開中で 0 人なら、状態の札で「担当がいないため停止中」と理由を言う。
+    expect(within(byName(/休止で未割当/)).getByText('—')).toBeTruthy()
+    expect(within(byName(/休止で未割当/)).getByText('停止中')).toBeTruthy()
+    expect(within(byName(/公開で未割当/)).getByText('—')).toBeTruthy()
+    expect(within(byName(/公開で未割当/)).getByText('担当がいないため停止中')).toBeTruthy()
+    expect(screen.queryByText('担当なし')).toBeNull()
   })
 })
 

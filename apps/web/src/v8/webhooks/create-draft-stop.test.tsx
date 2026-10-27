@@ -74,3 +74,36 @@ test('名前とURLが足りないまま保存すると、帯で済ませず欄�
   expect(screen.queryByText(/直す所があります/)).toBeNull()
   expect(document.activeElement).toBe(name)
 })
+
+test('欄から離れた時点で、触った欄だけ理由を出し、直すとその場で消す', async () => {
+  const sent: string[] = []
+  vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
+    if ((init?.method ?? 'GET') !== 'GET') sent.push(init?.method ?? '')
+    return json({ success: true, data: [] })
+  })
+  render(<WebhooksCreateV8 />)
+  const name = document.querySelector('#wh-new-name') as HTMLInputElement
+  const url = document.querySelector('#wh-new-url') as HTMLInputElement
+  const secret = document.querySelector('#wh-new-secret') as HTMLInputElement
+  fireEvent.blur(name)
+  expect(name.getAttribute('aria-invalid')).toBe('true')
+  expect(screen.getAllByText('名前を入力してください')).toHaveLength(1)
+  // まだ触っていない欄は黙っている。
+  expect(url.getAttribute('aria-invalid')).not.toBe('true')
+  expect(screen.queryByText('URLは https:// で始めてください')).toBeNull()
+
+  fireEvent.change(url, { target: { value: 'http://example.com' } })
+  fireEvent.blur(url)
+  expect(screen.getByText('URLは https:// で始めてください')).toBeTruthy()
+  fireEvent.change(url, { target: { value: 'https://example.com/hook' } })
+  expect(screen.queryByText('URLは https:// で始めてください')).toBeNull()
+
+  fireEvent.change(secret, { target: { value: 'short' } })
+  fireEvent.blur(secret)
+  expect(secret.getAttribute('aria-invalid')).toBe('true')
+
+  fireEvent.change(name, { target: { value: '予約台帳' } })
+  expect(screen.queryByText('名前を入力してください')).toBeNull()
+  expect(name.getAttribute('aria-invalid')).not.toBe('true')
+  expect(sent).toEqual([])
+})
