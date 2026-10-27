@@ -32,6 +32,9 @@ describe('R213: 編集プレビューは実際の通番号を出す', () => {
   it('省略時は1通目（新規作成の入口はそのまま）', () => {
     render(<StepPreview {...base} />)
     expect(screen.getByRole('complementary', { name: '1通目の下見' })).toBeTruthy()
+    // 作成の現在地（LINEでの見え方）と保存前の要点（設定サマリー）を同時に読める。
+    expect(screen.getByRole('region', { name: 'LINEでの見え方' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '設定サマリー' })).toBeTruthy()
     expect(screen.getByText('1日後に届きます（1通目）')).toBeTruthy()
     expect(
       screen.getByText('2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。'),
