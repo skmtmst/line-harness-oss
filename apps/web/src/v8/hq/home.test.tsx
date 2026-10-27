@@ -187,8 +187,8 @@ it('フォルダがタグにも返っても札は一つで、アーカイブの�
   accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, archivedAt: '2026-10-01', folderId: 'area', folder: { name: '渋谷エリア', color: '#0088ff' }, tags: [{ id: 'same', name: '渋谷エリア', color: '#0088ff' }, { id: 'other', name: '本店' }] }] })
   await render()
   const card = container.querySelector('article')!
-  const pills = [...card.querySelectorAll('[role="group"]')].filter(el => !el.closest('[aria-hidden="true"]') && el.textContent === '渋谷エリア')
-  expect(pills).toHaveLength(1)
+  const labels = [...card.querySelectorAll('[data-icon-label], [role="group"]')].filter(el => !el.closest('[aria-hidden="true"]') && el.textContent === '渋谷エリア')
+  expect(labels).toHaveLength(1)
   const detail = [...card.querySelectorAll('button')].find(el => el.textContent === '詳細')!
   expect(detail.querySelector('svg')).toBeNull()
   expect([...card.querySelectorAll('button')].find(el => el.textContent === '戻す')?.querySelector('svg')).not.toBeNull()
