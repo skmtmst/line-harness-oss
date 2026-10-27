@@ -46,6 +46,7 @@ import { StaffBoard } from './staff-board'
 import styles from './style-dashboard.module.css'
 import { TodayList } from './today-list'
 import { useStyleDashboard } from './use-style-dashboard'
+import { withHonorific } from '@line-crm/shared'
 
 
 
@@ -241,22 +242,22 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
           const inRange = (t: string) => input.allDay || ((input.from ?? '00:00') <= t && t < (input.to ?? '24:00'))
           if (style === 'restaurant' && store.store) {
             const res = await restaurantTestApi.previewClosure(accountId, { storeId: store.store.id, startDate: input.date, endDate: input.date, allDay: input.allDay, startTime: input.from ?? null, endTime: input.to ?? null, kind: KIND[input.reason] ?? 'other', memo: input.reason, tableIds: input.target === 'seat' ? input.ids : [] })
-            return res.data.reservations.map((r) => ({ time: formatDate(r.startsAt, { style: 'time' }), name: `${r.customerName}さま`, sub: `${r.guestCount}名`, pay: null }))
+            return res.data.reservations.map((r) => ({ time: formatDate(r.startsAt, { style: 'time' }), name: `${withHonorific(r.customerName, 'さま')}`, sub: `${r.guestCount}名`, pay: null }))
           }
-          return input.date !== date ? [] : (today?.rows ?? []).filter((r) => r.live !== false && r.booking && inRange(r.time) && (input.target === 'store' || input.ids.length === 0 || input.ids.some((id) => r.staff === today?.staff.find((x) => x.id === id)?.name))).map((r) => ({ time: r.time, name: `${r.name}さま`, sub: [r.people ? `${formatNumber(r.people)}名` : null, r.course].filter(Boolean).join('・'), pay: null }))
+          return input.date !== date ? [] : (today?.rows ?? []).filter((r) => r.live !== false && r.booking && inRange(r.time) && (input.target === 'store' || input.ids.length === 0 || input.ids.some((id) => r.staff === today?.staff.find((x) => x.id === id)?.name))).map((r) => ({ time: r.time, name: `${withHonorific(r.name, 'さま')}`, sub: [r.people ? `${formatNumber(r.people)}名` : null, r.course].filter(Boolean).join('・'), pay: null }))
         }}
         overlapMessage={(input) => `〇〇さま　${input.date.slice(5).replace('-', '/')} はお店の都合でお休みをいただくことになりました。ご予約の日を変えるか、取り消すかを選んでください。`}
         mediaNote={style === 'restaurant' ? '他の予約サイトの同じ時間の枠は、それぞれの管理画面で閉じてください。' : null} />
       {preparing.dialog}
       {cancelRow ? (
-        <CancelReservationDialog open title={`${cancelRow.name}さまの予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${formatNumber(cancelRow.people)}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
+        <CancelReservationDialog open title={`${withHonorific(cancelRow.name, 'さま')}の予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${formatNumber(cancelRow.people)}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
           facts={[{ label: 'お支払い', value: cancelRow.booking?.price ? `${formatYen(cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1))}（支払いの記録は決済の口から）` : 'お支払いなし' }]}
           fullAmount={cancelRow.booking?.price ? cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1) : null} testMode={testMode} busy={busy === 'cancel'}
-          messageFor={(i) => `${cancelRow.name}さま　${i.reason ? `${i.reason}で` : 'お店の都合で'} ${cancelRow.time} のご予約を取り消しました。申し訳ありません。${i.refund === 'full' ? 'お支払いは全額を返金します。' : ''}`}
+          messageFor={(i) => `${withHonorific(cancelRow.name, 'さま')}　${i.reason ? `${i.reason}で` : 'お店の都合で'} ${cancelRow.time} のご予約を取り消しました。申し訳ありません。${i.refund === 'full' ? 'お支払いは全額を返金します。' : ''}`}
           onClose={() => setCancelRow(null)} onConfirm={(i) => void confirmCancel(cancelRow, i)} />
       ) : null}
       {refundRow ? (
-        <RefundDialog open subtitle={`${refundRow.name}さま・${refundRow.time}${refundRow.course ? ` ${refundRow.course}` : ''}${refundRow.people ? ` ${formatNumber(refundRow.people)}名` : ''}`}
+        <RefundDialog open subtitle={`${withHonorific(refundRow.name, 'さま')}・${refundRow.time}${refundRow.course ? ` ${refundRow.course}` : ''}${refundRow.people ? ` ${formatNumber(refundRow.people)}名` : ''}`}
           facts={[{ label: '支払った額', value: refundRow.booking?.price ? `${formatYen(refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1))}` : '—' }, { label: 'これまでの返金', value: 'なし' }]}
           paidAmount={refundRow.booking?.price ? refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1) : 0} testMode={testMode}
           onClose={() => setRefundRow(null)} onConfirm={() => { setRefundRow(null); openPayment() }} />
@@ -280,7 +281,7 @@ const OUTCOMES = [{ value: 'considering', label: '検討中' }, { value: 'won', 
 function ResultDialog({ row, busy, onClose, onSave }: { row: StyleRow; busy: boolean; onClose: () => void; onSave: (outcome: 'considering' | 'won' | 'lost') => void }) {
   const [value, setValue] = useState<'considering' | 'won' | 'lost'>('considering')
   return (
-    <Dialog open title="結果を付ける" description={`${row.name}さま・${row.time}${row.endTime ?? ''}・${row.sub ?? ''}`} designWidth={480} busy={busy} confirmLabel="結果を付ける" onCancel={onClose} onConfirm={() => onSave(value)}>
+    <Dialog open title="結果を付ける" description={`${withHonorific(row.name, 'さま')}・${row.time}${row.endTime ?? ''}・${row.sub ?? ''}`} designWidth={480} busy={busy} confirmLabel="結果を付ける" onCancel={onClose} onConfirm={() => onSave(value)}>
       <RadioCardGroup className={styles.resultChoices} legend="面談の結果">
         {OUTCOMES.map((o) => <Radio key={o.value} name="outcome" checked={value === o.value} onChange={() => setValue(o.value)}>{o.label}</Radio>)}
       </RadioCardGroup>

@@ -8,6 +8,7 @@ import type {
   DashboardRange, IndustryStyle, StyleAnalytics, StyleBadge, StyleBoard, StyleKpi, StyleLayout, StyleMonth, StyleMonthDay, StyleRow, StyleSideCard, StyleToday, StyleWeek,
 } from './model'
 import { formatNumber } from '@/lib/format'
+import { withHonorific } from '@line-crm/shared'
 
 /*
  * 口（API 組4）の生の値 → 画面の形（API-CONTRACT-4 §10 の「共通のアダプター」）。
@@ -179,7 +180,7 @@ function boardOf(style: IndustryStyle, sch: StyleSchedule, now: Date): StyleBoar
     const b = e.booking
     const st = b ? bookingStatus(b, style) : { label: '', tone: 'info' as const }
     const state: StyleBoard['entries'][number]['state'] = !b ? 'booked' : b.status === 'no_show' ? 'no_show' : b.visited || ['completed', 'cancelled', 'rejected', 'expired'].includes(b.status) ? 'done' : b.status === 'seated' || b.attendance === 'visited' ? 'active' : ['requested', 'pending'].includes(b.status) ? 'pending' : 'booked'
-    return { id: e.id, columnId: e.columnIds[0], start: hm(e.startsAt, tz), end: hm(e.endsAt, tz), name: b?.name ?? e.title, menu: b ? e.title : '', state, stateLabel: st.label, nominated: b?.designation === 'designated' }
+    return { id: e.id, columnId: e.columnIds[0], start: hm(e.startsAt, tz), end: hm(e.endsAt, tz), name: b?.name ?? e.title, menu: b ? e.title : '', source: b?.source, state, stateLabel: st.label, nominated: b?.designation === 'designated' }
   })
   // 担当・卓の休み（closures）も盤に出す。人の custom_hours は残した営業時間なので休みの箱にしない。
   for (const c of sch.closures) {
@@ -210,7 +211,7 @@ function weekOf(sch: StyleSchedule, now: Date): StyleWeek {
       return start < end ? [{ day: day.date, start, end }] : []
     })
   }
-  const entries = sch.entries.flatMap(e => segments(e.startsAt, e.endsAt).map(slot => ({ id: e.id, ...slot, title: e.title, name: e.booking?.name ?? '', ...(e.booking ? { state: e.booking.status === 'no_show' ? 'no_show' as const : e.booking.visited ? 'completed' as const : reservationBookingState({ status: e.booking.attendance === 'visited' ? 'visited' : e.booking.status, holdExpiresAt: null }) } : {}) })))
+  const entries = sch.entries.flatMap(e => segments(e.startsAt, e.endsAt).map(slot => ({ id: e.id, ...slot, title: e.title, name: e.booking?.name ?? '', ...(e.booking ? { source: e.booking.source, state: e.booking.status === 'no_show' ? 'no_show' as const : e.booking.visited ? 'completed' as const : reservationBookingState({ status: e.booking.attendance === 'visited' ? 'visited' : e.booking.status, holdExpiresAt: null }) } : {}) })))
   const free = bookableScheduleSlots(sch).flatMap(s => {
     const original = parts(s.startsAt, tz)
     // A clipped continuation is not a new bookable start. Keep the API candidate's original action.
@@ -251,7 +252,7 @@ function sideFor(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedule, hre
   const tz = s.timeZone
   const fresh: StyleSideCard = {
     id: 'new', title: '新着予約（今日入った）', help: NEW_HELP, link: { label: '一覧', href },
-    rows: s.newBookings.length ? s.newBookings.slice(0, 3).map((b) => ({ label: `${md(b.startsAt, tz)} ${hm(b.startsAt, tz)}`, value: style === 'restaurant' ? `${b.name}さま ${b.partySize}名` : `${b.name}さま` })) : [{ label: 'まだありません', value: '' }],
+    rows: s.newBookings.length ? s.newBookings.slice(0, 3).map((b) => ({ label: `${md(b.startsAt, tz)} ${hm(b.startsAt, tz)}`, value: style === 'restaurant' ? `${withHonorific(b.name, 'さま')} ${b.partySize}名` : `${withHonorific(b.name, 'さま')}` })) : [{ label: 'まだありません', value: '' }],
   }
   const pay: StyleSideCard = { id: 'pay', title: 'お支払い（今日）', help: '今日の入金はオンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。', rows: [{ label: '今日の入金・未払い・返金', value: '—' }], action: { label: 'お支払いを見る', icon: 'send' } }
   const cards = [fresh, pay]

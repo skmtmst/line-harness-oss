@@ -5,7 +5,7 @@ import type { ReservationBoardEntry } from '@line-crm/shared'
 import ReservationBoard from './reservation-board'
 import ReservationMonth from './reservation-month'
 import { BookingBlock } from './booking-controls'
-import { BookingLegend, BookingNowLine, ReservationSource } from './booking-presentation'
+import { BookingLegend, BookingVisibleLegend, BookingNowLine, ReservationSource, BookingSourceLegend, BookingCardContent, BookingRest } from './booking-presentation'
 
 const base: ReservationBoardEntry = { id: 'r', kind: 'seats', version: 1, scopeId: 's', startsAt: '2026-10-23T09:00:00Z', endsAt: '2026-10-23T10:00:00Z', status: 'confirmed', customerName: '予約のお客さま', guestCount: 2, resourceIds: ['t'], resourceLabel: '卓', source: 'line', courseName: null, note: null, dining: null, holdExpiresAt: null }
 const resources = [{ id: 't', label: '卓', active: true, capacity: 2 }]
@@ -56,6 +56,36 @@ it('凡例は同じ状態の面を使い、塗りと枠に文字の説明を付�
   expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(expect.arrayContaining(['要対応（承認待ち）', '重なり・受付数超過']))
 })
 
+it('凡例に状態を渡すと、その状態だけを決まった並びで出す', () => {
+  render(<BookingLegend states={['pending', 'active', 'confirmed']} label="今日の予約の状態" />)
+  const list = screen.getByRole('list', { name: '今日の予約の状態' })
+  expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(['確定', '来店中・進行中', '要対応（承認待ち）'])
+})
+
+it('見えている予約状態だけを出し、全状態は「？」から開く', () => {
+  render(<BookingVisibleLegend states={['pending', 'active']} />)
+  const list = screen.getByRole('list', { name: '予約の状態' })
+  expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(['来店中・進行中', '要対応（承認待ち）'])
+  expect(screen.getByRole('button', { name: '予約の印の見本' })).toBeTruthy()
+  expect(screen.queryByRole('list', { name: '予約の印の見本' })).toBeNull()
+})
+
+it.each(['line', 'liff', 'manual', 'walk_in', 'counter', 'tabelog'])('予約の箱は%sの経路を省き、電話だけ灰の札にする', source => {
+  const { rerender, container } = render(<BookingCardContent name="マロン" time="10:00〜11:00" menu="カット" source={source} />)
+  expect(container.querySelector('[data-source]')).toBeNull()
+  expect(container.textContent).toBe('マロン10:00〜11:00カット')
+  rerender(<BookingCardContent name="マロン" time="10:00〜11:00" menu="カット" source="phone" />)
+  expect(container.textContent).toContain('電話')
+  expect(container.querySelector('[data-source]')).toBeNull()
+})
+
+it('詳細と一覧では手入力・ウォークインの経路名を保持する', () => {
+  const { rerender, container } = render(<ReservationSource value="manual" />)
+  expect(container.textContent).toBe('手入力')
+  rerender(<ReservationSource value="manual" note="ウォークイン（予約なしの来店）" />)
+  expect(container.textContent).toBe('ウォークイン')
+})
+
 it('種類は名前の前の装飾の丸だけに色を持ち、経路名を文字で残す', () => {
   const { container } = render(<ReservationSource value="line" />)
   const source = container.querySelector('[data-source="line"]')!
@@ -100,4 +130,53 @@ it('同じ卓の重なりは要対応、次の実予約までの空きだけを�
   expect(screen.getByRole('button', { name: /予約のお客さま/ }).getAttribute('data-booking-state')).toBe('no_show')
   expect(screen.getByRole('button', { name: /次のお客さま/ }).getAttribute('data-booking-state')).toBe('confirmed')
   expect(screen.queryByLabelText('次の予約まで空き24分')).toBeNull()
+})
+
+it.each(['confirmed', 'pending', 'active', 'hold'] as const)('予約内容は2段を共通で表示し、%sの状態を保つ', state => {
+  const { container } = render(<BookingBlock state={state}><BookingCardContent name="マロン さん" time="10:00〜11:00" menu="カット" state={state} source="phone" /></BookingBlock>)
+  const card = container.querySelector('button')!
+  expect(card.firstElementChild?.textContent).toBe('マロン さん10:00〜11:00')
+  expect(card.children[1].textContent).toContain('カット')
+  expect(card.textContent).toContain('電話')
+  expect(card.querySelector('[data-source]')).toBeNull()
+  expect(card.querySelectorAll('[data-booking-state]').length).toBe(state === 'confirmed' ? 0 : 1)
+})
+
+it('予約元の凡例は操作列の外で一覧軸にも残す', () => {
+  const { container } = render(<ReservationBoard axis="list" entries={[base]} resources={resources} toolbar={<button>日付を選ぶ</button>} trailingToolbar={<button>予約元を絞る</button>} legend={<BookingSourceLegend sources={['line', 'phone']} />} onOpen={() => {}} />)
+  const controlRow = container.querySelector('[data-control-row]')!
+  const sourceLegend = screen.getByRole('list', { name: '予約元' })
+  expect(controlRow).toBeTruthy()
+  expect(controlRow.contains(sourceLegend)).toBe(false)
+  expect(sourceLegend.textContent).toContain('LINE')
+  expect(sourceLegend.textContent).toContain('電話')
+})
+
+it('月の表の凡例へ、表示していない月の状態を混ぜない', () => {
+  render(<ReservationBoard axis="month" dates={['2026-10-01']} entries={[base, { ...base, id: 'other-month', status: 'requested', startsAt: '2026-11-01T09:00:00Z', endsAt: '2026-11-01T10:00:00Z' }]} resources={resources} onOpen={() => {}} />)
+  const legend = screen.getByRole('list', { name: '予約の状態' })
+  expect(within(legend).getAllByRole('listitem').map(item => item.textContent)).toEqual(['確定'])
+})
+
+it('休みは操作にせず、時刻と受付停止の全文をマウスと読み上げへ残す', () => {
+  const full = '10:00〜11:00 休み 予約は止めています'
+  render(<BookingRest title={full}>休み</BookingRest>)
+  const rest = screen.getByTitle(full)
+  expect(rest.textContent).toContain(full)
+  expect(rest.querySelector('[aria-hidden="true"]')?.textContent).toBe('休み')
+  expect(screen.queryByRole('button')).toBeNull()
+})
+
+it('狭い予約箱でも注意の印から全文を確認でき、焦点では状態と注意を読み上げる', () => {
+  const open = vi.fn()
+  render(<ReservationBoard entries={[{ ...base, status: 'requested', source: 'phone', currentAllergy: 'そば・小麦' }]} resources={resources} dates={['2026-10-23']} onOpen={open} />)
+  const card = screen.getByRole('button', { name: /予約のお客さま/ })
+  const warning = within(card).getByTitle('⚠ そば・小麦')
+  expect(warning.textContent).toBe('⚠')
+  expect(card.getAttribute('aria-description')).toContain('要対応（承認待ち）')
+  expect(card.getAttribute('aria-description')).toContain('注意：そば・小麦')
+  expect(within(card).getByTitle('要対応（承認待ち）').textContent).toBe('要対応')
+  expect(within(card).getByTitle('2名')).toBeTruthy()
+  fireEvent.click(warning)
+  expect(open).toHaveBeenCalledWith('r')
 })
