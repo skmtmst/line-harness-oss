@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearAdminVersionCache } from '@/lib/admin-version-cache'
 import SidebarVersion from './sidebar-version'
 
+vi.mock('@/components/update/use-update-status', () => ({
+  useUpdateStatus: () => ({ kind: 'fork', reason: 'custom build', version: '2.7.0' }),
+}))
+
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let host: HTMLDivElement
@@ -63,6 +67,20 @@ describe('メニューの下の版の表示（m18e・設計E）', () => {
     expect(host.textContent).toContain('Ver. 2.7.0（a1b2c3d）')
     expect(host.textContent).toContain('2026年9月27日 13:05 配備・検証環境')
     expect(host.textContent).not.toContain('版の情報なし')
+  })
+
+  it('カスタマイズ版の導線を「更新履歴」と表示する', async () => {
+    process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
+    fetchMock.mockResolvedValue(json({
+      version: '2.7.0', worker_hash: '', admin_hash: '', liff_hash: '',
+      git_commit: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
+      deploy_env: 'staging', released_at: '2026-09-27T04:05:00Z',
+    }))
+    act(() => { root.render(<SidebarVersion />) })
+    await settle()
+    const historyLink = host.querySelector('a[href="/updates"]')
+    expect(historyLink?.textContent).toBe('更新履歴')
+    expect(host.textContent).not.toContain('手動で更新')
   })
 
   it('取れないときは「版の情報なし」。赤や仮値は出さない', async () => {

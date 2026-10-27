@@ -11,6 +11,7 @@ import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-erro
 import { formatRelative, formatYmd } from '@/lib/format'
 import { runOptimistic } from '@/lib/undoable'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { notifyToast } from '@/components/shared/toast'
 
 /** 小窓に出す最大の件数（絵 mV28V）。 */
 export const BELL_POPOVER_LIMIT = 5
@@ -18,9 +19,14 @@ export const BELL_POPOVER_LIMIT = 5
 const FETCH_LIMIT = 50
 
 /** 未読が先・それぞれの中は口の順（新しい順）。通知の一覧と同じ並び。 */
-export function bellOrder(items: NotificationCenterItem[]): NotificationCenterItem[] {
-  return [...items.filter((item) => !item.isRead), ...items.filter((item) => item.isRead)]
+export function bellOrder<T extends NotificationCenterItem>(items: T[]): T[] {
+  const newestFirst = (rows: T[]) => [...rows].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+  return [...newestFirst(items.filter((item) => !item.isRead)), ...newestFirst(items.filter((item) => item.isRead))]
 }
+
+type ScopedNotification = NotificationCenterItem & { sourceAccountId: string; sourceAccountName: string }
+type ScopedCenterData = Omit<NotificationCenterData, 'items'> & { items: ScopedNotification[] }
+type NotificationAccount = { id: string; label: string }
 
 /**
  * ★V8 ベルの小窓の中身（取得・既読・行き先）。見た目は `v8/notifications/bell-panel.tsx`。
@@ -35,11 +41,16 @@ export function bellOrder(items: NotificationCenterItem[]): NotificationCenterIt
 export default function BellNotifications({
   popover,
   accountId,
+  accounts = [],
+  onAccountChange,
   onUnreadChange,
 }: {
   popover: TopBarNotificationsPopover
   /** 選んでいる LINE アカウント。無いとき（統括で店を選んでいない）は案内だけ出す。 */
   accountId: string | null
+  /** 統括で使えるアカウント一覧。個別アカウント画面では選択中だけ読む。 */
+  accounts?: NotificationAccount[]
+  onAccountChange: (accountId: string, after?: () => void) => void
   onUnreadChange: (count: number) => void
 }) {
   const router = useRouter()
@@ -48,7 +59,7 @@ export default function BellNotifications({
   const destinationContext = { accountId, canManage: canManageRole(role) }
   const { open, onClose } = popover
   const [tab, setTab] = useState<NotificationTab>('all')
-  const [data, setData] = useState<NotificationCenterData | null>(null)
+  const [data, setData] = useState<ScopedCenterData | null>(null)
   const [state, setState] = useState<BellPanelState>('loading')
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null)
   const requestId = useRef(0)
@@ -57,7 +68,10 @@ export default function BellNotifications({
 
   const load = useCallback(async () => {
     const id = ++requestId.current
-    if (!accountId) {
+    const targets = accountId
+      ? [accounts.find((account) => account.id === accountId) ?? { id: accountId, label: '' }]
+      : accounts
+    if (targets.length === 0) {
       setData(null)
       setState('no-account')
       return
@@ -66,49 +80,63 @@ export default function BellNotifications({
     setError(null)
     try {
       const { api } = await import('@/lib/api')
-      const response = await api.notifications.center.list(accountId, { ...notificationQueryForTab(tab), limit: FETCH_LIMIT })
+      const responses = await Promise.all(targets.map(async (account) => {
+        const response = await api.notifications.center.list(account.id, { ...notificationQueryForTab(tab), limit: FETCH_LIMIT })
+        if (!response.success) throw new Error(response.error)
+        if (!isDashboardNotificationData(response.data)) throw new Error('invalid notification center response')
+        return { account, data: response.data }
+      }))
       if (id !== requestId.current) return
-      if (!response.success) throw new Error(response.error)
-      if (!isDashboardNotificationData(response.data)) throw new Error('invalid notification center response')
-      setData(response.data)
+      const mergedItems = responses.flatMap(({ account, data: result }) => result.items.map((item) => ({
+        ...item,
+        sourceAccountId: account.id,
+        sourceAccountName: account.label,
+      })))
+      const counts = responses.reduce((sum, { data: result }) => ({
+        all: sum.all + result.counts.all,
+        error: sum.error + result.counts.error,
+        update: sum.update + result.counts.update,
+        unread: sum.unread + result.counts.unread,
+      }), { all: 0, error: 0, update: 0, unread: 0 })
+      setData({ items: mergedItems, counts, unreadCount: counts.unread })
       setState('ready')
-      unreadRef.current(response.data.counts.unread)
+      unreadRef.current(counts.unread)
     } catch (caught) {
       if (id !== requestId.current) return
       setData(null)
       setError({ message: loadFailureNotice(caught, '通知'), retryable: loadFailureCopy(caught, '通知').retryable })
       setState('error')
     }
-  }, [accountId, tab])
+  }, [accountId, accounts, tab])
 
   // 開くたび・タブを変えるたびに読み直す（閉じている間は読まない）。
   useEffect(() => {
     if (open) void load()
   }, [open, load])
 
-  const apply = useCallback((next: NotificationCenterData) => {
+  const apply = useCallback((next: ScopedCenterData) => {
     setData(next)
     unreadRef.current(next.counts.unread)
   }, [])
 
-  const markRead = useCallback((item: NotificationCenterItem) => {
-    if (!canMarkRead || !accountId || !data || item.isRead) return
+  const markRead = useCallback((item: ScopedNotification) => {
+    if (!canMarkRead || !data || item.isRead) return
     const before = data
     apply({
       ...data,
-      items: data.items.map((row) => (row.id === item.id ? { ...row, isRead: true } : row)),
+      items: data.items.map((row) => (row.id === item.id && row.sourceAccountId === item.sourceAccountId ? { ...row, isRead: true } : row)),
       counts: { ...data.counts, unread: Math.max(0, data.counts.unread - 1) },
       unreadCount: Math.max(0, data.unreadCount - 1),
     })
     runOptimistic({
-      request: async () => (await import('@/lib/api')).api.notifications.center.markRead(item.id, accountId),
+      request: async () => (await import('@/lib/api')).api.notifications.center.markRead(item.id, item.sourceAccountId),
       revert: () => apply(before),
       failureMessage: '通知を既読にできませんでした。',
     })
-  }, [accountId, apply, canMarkRead, data])
+  }, [apply, canMarkRead, data])
 
   const markAllRead = useCallback(() => {
-    if (!canMarkRead || !accountId || !data || data.counts.unread === 0) return
+    if (!canMarkRead || !data || data.counts.unread === 0) return
     const before = data
     apply({
       ...data,
@@ -117,34 +145,42 @@ export default function BellNotifications({
       unreadCount: 0,
     })
     runOptimistic({
-      request: async () => (await import('@/lib/api')).api.notifications.center.markAllRead(accountId, 'all'),
+      request: async () => Promise.all((accountId ? [accountId] : accounts.map((account) => account.id))
+        .map(async (id) => (await import('@/lib/api')).api.notifications.center.markAllRead(id, 'all'))),
       revert: () => apply(before),
       failureMessage: '通知をまとめて既読にできませんでした。',
     })
-  }, [accountId, apply, canMarkRead, data])
+  }, [accountId, accounts, apply, canMarkRead, data])
 
   const shown = useMemo(() => (data ? bellOrder(data.items).slice(0, BELL_POPOVER_LIMIT) : []), [data])
   const today = formatYmd(new Date())
   const items: BellPanelItem[] = shown.map((item) => {
     const day = formatYmd(item.createdAt)
     return {
-      id: item.id,
-      title: item.title,
+      id: `${item.sourceAccountId}:${item.id}`,
+      title: accountId ? item.title : `${item.sourceAccountName}：${item.title}`,
       body: item.body,
       kind: isSystemNotification(item) ? 'system' : 'other',
       unread: !item.isRead,
       time: formatRelative(item.createdAt, undefined, '日時不明'),
       period: day === '' ? 'unknown' : day === today ? 'today' : 'earlier',
-      linkLabel: notificationLinkLabel(item, destinationContext),
+      linkLabel: notificationLinkLabel(item, { accountId: item.sourceAccountId, canManage: destinationContext.canManage }),
     }
   })
 
   const select = (id: string) => {
-    const item = shown.find((row) => row.id === id)
+    const item = shown.find((row) => `${row.sourceAccountId}:${row.id}` === id)
     if (!item) return
     markRead(item)
     onClose()
-    router.push(notificationDestination(item, destinationContext))
+    const nextContext = { accountId: item.sourceAccountId, canManage: destinationContext.canManage }
+    const destination = notificationDestination(item, nextContext)
+    if (item.sourceAccountId !== accountId) {
+      onAccountChange(item.sourceAccountId, () => {
+        notifyToast(`${item.sourceAccountName} に切り替えました`, { tone: 'info' })
+        router.push(destination)
+      })
+    } else router.push(destination)
   }
 
   return (

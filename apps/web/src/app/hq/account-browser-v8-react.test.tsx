@@ -58,12 +58,14 @@ describe('V8 統括のアカウントを探す', () => {
     fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
     expect(screen.getByRole('textbox', { name: 'フォルダの名前' })).toBeTruthy()
   })
-  it('アーカイブは詳細と戻すだけを出し、本人確認して戻す', async () => {
+  it('アーカイブは登録内容の編集と戻すだけを出し、本人確認して戻す', async () => {
     const archived: AccountWithStats = { id: 'old', name: '旧キャンペーン', channelId: 'c-old', basicId: '@nen-old', isActive: false, country: null, role: 'owner', displayOrder: 99, archivedAt: '2026-01-01', stats: { friendCount: 0, messagesThisMonth: 0, activeScenarios: 0, staffCount: 0 } }
     mocks.list.mockResolvedValue({ success: true, data: [archived] })
     render(<AccountBrowser />); await screen.findByText('旧キャンペーン')
+    expect(document.body.textContent).toContain('アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです')
     fireEvent.click(screen.getByRole('button', { name: /^アーカイブ/ }))
-    expect(screen.getByRole('button', { name: '詳細' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '登録内容を編集' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '詳細' })).toBeNull()
     expect(screen.queryByRole('button', { name: / へ入る$/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '戻す' }))
     const dialog = await screen.findByRole('dialog', { name: '「旧キャンペーン」をアーカイブから戻しますか？' })

@@ -3,7 +3,7 @@ import { requiredText } from '@/lib/form-requirement'
 const accountNameRequirement = requiredText('名前を入力してください。')
 
 import { useEffect, useState } from 'react'
-import { CircleHelp, RotateCcw, Users } from 'lucide-react'
+import { Pencil, RotateCcw, Users } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import Button from '@/components/shared/button'
@@ -47,14 +47,14 @@ export function accountHandle(account: AccountWithStats): string {
 }
 
 /* 板 ：アカウントの設定（名前・親・フォルダ・ほかの設定・アーカイブ）。2026-10-08 タグ→フォルダ（1つだけ・API-17）。 */
-export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onArchive, onShowDetails, canCreateFolder = false, onFolderCreated }: {
+export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onEditRegistration, canCreateFolder = false, onFolderCreated }: {
   account: AccountWithStats
   accounts: AccountWithStats[]
   archived: boolean
   onClose: () => void
   onSaved: () => void
   onArchive: () => void
-  onShowDetails: () => void
+  onEditRegistration: () => void
   /** フォルダを選ぶ欄からその場で作れるか（左の列の「フォルダを追加」と同じ権限）。 */
   canCreateFolder?: boolean
   /** その場でフォルダを作ったとき（左の列を読み直す）。 */
@@ -208,8 +208,8 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
         <div className={styles.field}>
           <p className={styles.label}>ほかの設定</p>
           <div className={styles.buttonRow}>
-            <Button type="button" onClick={onShowDetails}>
-              <CircleHelp aria-hidden="true" className={styles.icon} />詳しい数値を見る
+            <Button type="button" onClick={onEditRegistration}>
+              <Pencil aria-hidden="true" className={styles.icon} />LINE の登録内容を編集
             </Button>
             <Button href="/hq/members">
               <Users aria-hidden="true" className={styles.icon} />メンバー・担当範囲

@@ -3,18 +3,6 @@
  * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  */
 
-/* 作成の幅は共通Buttonと一覧型が持つ。 */
-.createSpace {
-  display: block;
-  flex-shrink: 0;
-  height: var(--tpl-chip-h);
-  margin-bottom: var(--tpl-wh-create-after);
-}
-.narrowRow .createSpace {
-  width: var(--tpl-wh-create-w);
-  margin-bottom: 0;
-}
-
 /* 案内の帯（表の上の主列）。帯の下は道具の段の上の余白と同じだけ空ける。 */
 .noticeRow {
   flex-basis: 100%;

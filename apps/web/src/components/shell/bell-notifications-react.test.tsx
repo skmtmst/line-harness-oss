@@ -21,6 +21,7 @@ const fixture = vi.hoisted(() => ({
   list: vi.fn(),
   markRead: vi.fn(),
   markAllRead: vi.fn(),
+  changeAccount: vi.fn((_id: string, after?: () => void) => after?.()),
   toast: vi.fn(),
 }))
 vi.mock('@/lib/staff-role', async (original) => ({ ...(await original<object>()), useStaffRole: () => fixture.role }))
@@ -66,7 +67,7 @@ function centerData(items: NotificationCenterItem[]) {
   }
 }
 
-function Harness({ accountId = 'account-1', withPopover = true }: { accountId?: string | null; withPopover?: boolean }) {
+function Harness({ accountId = 'account-1', accounts = [], withPopover = true }: { accountId?: string | null; accounts?: Array<{ id: string; label: string }>; withPopover?: boolean }) {
   const [unread, setUnread] = useState(3)
   return (
     <TopBar
@@ -79,7 +80,7 @@ function Harness({ accountId = 'account-1', withPopover = true }: { accountId?: 
       onLogout={() => {}}
       notificationUnreadCount={unread}
       renderNotifications={withPopover ? (popover) => (
-        <BellNotifications popover={popover} accountId={accountId} onUnreadChange={setUnread} />
+        <BellNotifications popover={popover} accountId={accountId} accounts={accounts} onAccountChange={fixture.changeAccount} onUnreadChange={setUnread} />
       ) : undefined}
       v8Chrome
       chromeVariant="shell"
@@ -103,6 +104,7 @@ describe('★V8 ベルの小窓', () => {
     fixture.list.mockReset()
     fixture.markRead.mockReset()
     fixture.markAllRead.mockReset()
+    fixture.changeAccount.mockClear()
     fixture.markRead.mockResolvedValue({ success: true, data: null })
     fixture.markAllRead.mockResolvedValue({ success: true, data: { updated: 3 } })
     fixture.list.mockResolvedValue(centerData([
@@ -125,6 +127,18 @@ describe('★V8 ベルの小窓', () => {
     await act(async () => { fireEvent.click(within(panel).getByText('未読のエラー')) })
     expect(fixture.markRead).not.toHaveBeenCalled()
     expect(fixture.markAllRead).not.toHaveBeenCalled()
+    expect(fixture.push).toHaveBeenCalled()
+  })
+
+  it('統括では全アカウントの通知をまとめ、通知を押すと対象アカウントへ切り替えて知らせる', async () => {
+    render(<Harness accountId={null} accounts={[{ id: 'account-1', label: '本店' }, { id: 'account-2', label: '渋谷店' }]} />)
+    const panel = await openPopover()
+    await within(panel).findByText('本店：未読のエラー')
+    expect(fixture.list).toHaveBeenCalledTimes(2)
+    expect(within(panel).getByText('渋谷店：未読のエラー')).toBeTruthy()
+    await act(async () => { fireEvent.click(within(panel).getByText('渋谷店：未読のエラー')) })
+    expect(fixture.changeAccount).toHaveBeenCalledWith('account-2', expect.any(Function))
+    expect(fixture.toast).toHaveBeenCalledWith('渋谷店 に切り替えました', { tone: 'info' })
     expect(fixture.push).toHaveBeenCalled()
   })
 

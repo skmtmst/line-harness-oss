@@ -87,17 +87,21 @@ export function CreateButton({
   onClick,
   readonly,
   full,
+  ariaLabel,
+  title,
   children,
 }: {
   href?: string
   onClick?: () => void
   readonly: boolean
   full?: boolean
+  ariaLabel?: string
+  title?: string
   children: ReactNode
 }) {
   if (readonly) return null
   return (
-    <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href} onClick={onClick}>
+    <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href} onClick={onClick} aria-label={ariaLabel} title={title}>
       {children}
     </Button>
   )

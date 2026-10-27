@@ -10,7 +10,9 @@ import { columnsWithDiff, diffCount, diffTone, formatDiff, formatMetric, METRICS
 const navigation = vi.hoisted(() => ({push:vi.fn(),select:vi.fn(),replace:vi.fn(),search:''}))
 const accountState = vi.hoisted(() => ({ accounts: [] as Array<Record<string, unknown>>, refresh: vi.fn(), role: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
+const notify = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), fetchApi }))
+vi.mock('@/components/shared/toast', async (original) => ({ ...await original<typeof import('@/components/shared/toast')>(), notifyToast: notify }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => accountState.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))
 const api = vi.hoisted(() => ({ get: vi.fn(), detail: vi.fn(), export: vi.fn(), exportStatus: vi.fn(), download: vi.fn() }))
 vi.mock('@/lib/api/helpers/gap3', () => ({ storeComparisonApi: api }))
@@ -68,6 +70,7 @@ describe('店の比較の表', () => {
   it('店と7つの数を出し、初めは予約の少ない順で頼む。取れない数は「—」', async () => {
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')
+    expect(screen.getByRole('table').closest('[class*="listSection"]')).not.toBeNull()
     expect(api.get).toHaveBeenCalledWith(expect.objectContaining({ sort: 'bookings', order: 'asc', compare: 'previous', pageSize: 20 }))
     for (const def of METRICS) expect(screen.getByRole('button', { name: `${def.label}で並べ替える` })).toBeTruthy()
     expect(screen.getByText('−25')).toBeTruthy()
@@ -92,7 +95,8 @@ describe('店の比較の表', () => {
     render(<StoreComparisonList />)
     fireEvent.click(await screen.findByText('大宮店'))
     expect(await screen.findByText('秋の新メニュー')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'この店を開く' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'この店を開く' }))
+    expect(notify).toHaveBeenCalledWith('大宮店 に切り替えました', { tone: 'info' })
     expect(api.detail).toHaveBeenCalledWith('s1', expect.any(String), expect.any(String))
   })
 

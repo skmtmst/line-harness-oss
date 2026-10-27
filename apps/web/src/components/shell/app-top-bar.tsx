@@ -221,10 +221,11 @@ export default function AppTopBar() {
   const hqPill = hqShell ? { name: hqName ?? '統括', mark: brandInitial(hqName ?? '統括') } : null
   const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (staffRole ? ROLE_LABELS[staffRole] ?? '' : '')
   /* 統括の札から店を選んだら、その店へ入る（カードの「このアカウントへ入る」と同じ）。 */
-  const changeAccount = (accountId: string) => {
+  const changeAccount = (accountId: string, after?: () => void) => {
     requestUnsavedAction(() => {
       setSelectedAccountId(accountId)
-      if (hqShell && accountId) router.push('/')
+      if (hqShell && accountId && !after) router.push('/')
+      after?.()
     })
   }
 
@@ -305,7 +306,7 @@ export default function AppTopBar() {
       onLogout={logout}
       notificationUnreadCount={notificationUnread}
       renderNotifications={(popover) => (
-        <BellNotifications popover={popover} accountId={selectedAccountId || null} onUnreadChange={setNotificationUnread} />
+        <BellNotifications popover={popover} accountId={selectedAccountId || null} accounts={hqShell ? options : []} onAccountChange={changeAccount} onUnreadChange={setNotificationUnread} />
       )}
       v8Chrome
       chromeVariant="shell"

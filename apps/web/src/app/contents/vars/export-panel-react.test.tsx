@@ -153,6 +153,19 @@ describe('共通情報CSVの監査付き出力パネル', () => {
     expect(api.regenerateExport).toHaveBeenCalledWith('job-1')
   })
 
+  it('期限切れの案内は閉じられ、表示を閉じても一覧の状態は残る', async () => {
+    api.listExports.mockResolvedValue({
+      success: true,
+      data: [job({ status: 'expired', downloadUrl: null })],
+    })
+    await render()
+    expect(host.querySelector('[data-testid="vars-export-status"]')).not.toBeNull()
+    const close = host.querySelector('button[aria-label="書き出し状況を閉じる"]') as HTMLButtonElement
+    await act(async () => { close.click() })
+    expect(host.querySelector('[data-testid="vars-export-status"]')).toBeNull()
+    expect(text()).toContain('CSVで書き出す')
+  })
+
   it('アカウント未選択では依頼できない', async () => {
     await render({ accountId: null })
     const button = Array.from(host.querySelectorAll('button'))

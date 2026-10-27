@@ -79,6 +79,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('来店スタンプ（管理画面）', () => {
+  it('カード一覧の読込中は未保存の変更として扱わない', () => {
+    fx.cards.mockReturnValue(new Promise(() => {}))
+    window.history.replaceState(null, '', '/visit-stamps?tab=settings')
+    render(<VisitStampsV8 />)
+    expect(screen.queryByText('保存していない変更があります')).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+  })
+
   it('タブを移っても下書きを保ち、URLの友だちと他の指定を残して保存の帯だけを切り替える', async () => {
     window.history.replaceState(null, '', '/visit-stamps?tab=settings&friend=f1&from=detail#card')
     render(<VisitStampsV8 />)
