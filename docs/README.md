@@ -801,3 +801,5 @@
 - [直し④（部品の手入れ）](release-log/unreleased/1839-kenta-train-m2e-1026.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
+
+- [配布する更新ファイルにMacの管理情報を混ぜない修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
