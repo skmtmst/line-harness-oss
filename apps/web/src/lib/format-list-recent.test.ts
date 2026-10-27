@@ -9,6 +9,8 @@ describe('受信箱一覧の時刻（24時間は相対表示、それより前�
     expect(formatListRecent('2026-10-25T08:48:00Z', { now: NOW })).toBe('3分前')
     expect(formatListRecent('2026-10-24T15:05:00Z', { now: NOW })).toBe('17時間前')
     expect(formatListRecent('2026-10-24T14:30:00Z', { now: NOW })).toBe('18時間前')
+    expect(formatListRecent('2026-10-24T08:51:00Z', { now: NOW })).toBe('24時間前')
+    expect(formatListRecent('2026-10-24T08:50:59Z', { now: NOW })).toBe('10/24 17:50')
   })
   it('24時間超は月日・時刻。前年までは年を省き、さらに古い年は年を出す', () => {
     expect(formatListRecent('2026-10-22T03:00:00Z', { now: NOW })).toBe('10/22 12:00')

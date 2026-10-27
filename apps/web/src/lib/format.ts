@@ -161,7 +161,7 @@ export function formatRelative(value: DateInput, now?: DateInput, fallback = 'â€
   const n = nowJst(now)
   const diffMin = Math.floor((n.epoch - p.epoch) / 60_000)
   if (diffMin < 0) return formatDateTime(value, fallback, now)
-  if (diffMin < 60 * 24) return formatElapsedMinutes(diffMin)
+  if (n.epoch - p.epoch <= 24 * 60 * 60_000) return formatElapsedMinutes(diffMin)
   return formatDateTime(value, fallback, now)
 }
 
