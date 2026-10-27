@@ -126,7 +126,7 @@ describe('ウェビナー作成からの段遷移 (#1002 DETAIL-03)', () => {
     await render()
     await flush()
 
-    for (const label of ['基本設定', '動画', 'CTA・フォーム', '通知', '確認']) {
+    for (const label of ['基本設定', '動画', '案内ボタン・フォーム', '通知', '確認']) {
       expect(host.textContent).toContain(label)
     }
   })

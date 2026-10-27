@@ -67,7 +67,7 @@ const EVENT_LABELS: Record<string, string> = {
   webinar_watch_5m: 'ウェビナー',
   webinar_watch_15m: 'ウェビナー',
   webinar_completed: 'ウェビナー完了',
-  webinar_cta_clicked: 'ウェビナーCTA',
+  webinar_cta_clicked: 'ウェビナーの案内ボタン',
   instagram_dm_received: 'Instagram DM',
   instagram_comment_created: 'Instagramコメント',
   instagram_story_mentioned: 'ストーリーズ',
@@ -929,11 +929,11 @@ export default function EarningRulesTab() {
               ? `${viewTarget.draft.name}・${ruleEventLabel(viewTarget.draft.eventType, EVENT_LABELS)}・${formatMileageNumber(viewTarget.draft.amount)}マイル`
               : `${viewTarget.published.name}・${ruleEventLabel(viewTarget.published.eventType, EVENT_LABELS)}・${formatMileageNumber(viewTarget.published.amount)}マイル`}</p>
             <p>{viewTarget.publishedVersion == null
-              ? `下書き v${viewTarget.draftVersion}・${formatMileageDate(viewTarget.draftUpdatedAt)} に保存・まだ公開版はありません`
-              : `公開版 v${viewTarget.publishedVersion}・${formatMileageDate(viewTarget.published.updatedAt)} に反映`}</p>
+              ? `下書き 第${viewTarget.draftVersion}版・${formatMileageDate(viewTarget.draftUpdatedAt)} に保存・まだ公開版はありません`
+              : `公開中の第${viewTarget.publishedVersion}版・${formatMileageDate(viewTarget.published.updatedAt)} に反映`}</p>
             <p>{viewTarget.draft.targetConditions
-              ? `利用対象：条件 ${viewTarget.draft.targetConditions.rules.length + (viewTarget.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件・下書き v${viewTarget.draftVersion}`
-              : `利用対象：すべての友だち・下書き v${viewTarget.draftVersion}`}</p>
+              ? `利用対象：条件 ${viewTarget.draft.targetConditions.rules.length + (viewTarget.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件・下書き 第${viewTarget.draftVersion}版`
+              : `利用対象：すべての友だち・下書き 第${viewTarget.draftVersion}版`}</p>
           </> : null}
         </Dialog>
         <ConfirmDialog

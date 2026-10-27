@@ -25,7 +25,7 @@ type Check = { email: string; name: string; needsPassword: boolean }
  * 運営メンバーの招待を受ける V8。
  *
  * 動きは 管理画面（app/ops/invite）と同じ。メールの URL の `#invite=…` を読み、
- * パスワードが無い人は名前とパスワードを決める。進んだ先は 2要素認証の設定。
+ * パスワードが無い人は名前とパスワードを決める。進んだ先は 二段階認証の設定。
  */
 export default function OpsInviteV8() {
   const [token, setToken] = useState('')
@@ -120,8 +120,8 @@ export default function OpsInviteV8() {
       <Card variant="form" className={styles.card} aria-labelledby="ops-invite-title">
         <PageHeading inset="none" title="運営メンバーの招待" titleId="ops-invite-title" titleAs="h1" subtitleSize="body" subtitle={<>
           {check && !check.needsPassword
-            ? '運営コンソールに招待されました（有効期限は24時間）。続けると 2要素認証の設定に進みます。'
-            : '運営コンソールに招待されました（有効期限は24時間）。名前とパスワードを決めると、次に2要素認証を設定します。'}
+            ? '運営コンソールに招待されました（有効期限は24時間）。続けると二段階認証の設定に進みます。'
+            : '運営コンソールに招待されました（有効期限は24時間）。名前とパスワードを決めると、次に二段階認証を設定します。'}
         </>} />
 
         {state === 'loading' ? (
@@ -153,7 +153,7 @@ export default function OpsInviteV8() {
               </>
             ) : null}
             <Button type="submit" variant="primary" disabled={busy} className={styles.wide} busy={busy} busyLabel="進めています…">
-              <ArrowRight aria-hidden="true" />{check?.needsPassword ? 'パスワードを設定して次へ' : '設定して2要素認証へ進む'}
+              <ArrowRight aria-hidden="true" />{check?.needsPassword ? 'パスワードを設定して次へ' : '設定して二段階認証へ進む'}
             </Button>
           </form>
         )}

@@ -7,7 +7,8 @@ import IconButton from '@/components/shared/icon-button'
 import { InsertText } from '@/components/shared/insert-text-field'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import LinePreview from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewSampleNote } from '@/components/shared/line-preview'
+import { fillPreviewSample, previewSampleNote } from '@/components/shared/preview-sample'
 import Link from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -513,7 +514,7 @@ export function ScenarioDetailBody({
                       const q = shownStep.question as { text?: string; choices?: { label?: string }[] }
                       return (
                         <div className={styles.talkBubble}>
-                          {q.text ?? shownStep.messageContent}
+                          {fillPreviewSample(q.text ?? shownStep.messageContent).text}
                           {(q.choices ?? []).map((choice, i) => (
                             <span key={i} className={styles.talkChoice}>
                               {choice.label ?? `選択肢${i + 1}`}
@@ -522,7 +523,9 @@ export function ScenarioDetailBody({
                         </div>
                       )
                     }
-                    return <div className={styles.talkBubble}>{c}</div>
+                    const sample = fillPreviewSample(c)
+                    const sampleNote = previewSampleNote(sample.kinds)
+                    return <><div className={styles.talkBubble}>{sample.text}</div>{sampleNote ? <LinePreviewSampleNote>{sampleNote}</LinePreviewSampleNote> : null}</>
                   })()
                 : null}
             </LinePreview>

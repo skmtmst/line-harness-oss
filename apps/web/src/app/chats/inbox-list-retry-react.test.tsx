@@ -45,7 +45,7 @@ function base(url: URL) {
 }
 const list = () => host.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"]')!
 const retryButton = () => [...host.querySelectorAll('button')]
-  .find((item) => item.textContent?.trim() === '会話を読み込み直す')
+  .find((item) => item.textContent?.trim() === 'もう一度読み込む')
 async function settle() {
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
 }
@@ -93,7 +93,7 @@ test('LINE一覧の失敗は一覧の中に再読み込みボタンつきで出�
   await act(async () => root.render(<ChatsPage />))
   await settle()
   await eventually(() => expect(retryButton()).toBeTruthy())
-  expect(list().textContent).toContain('チャットの読み込みに失敗しました。')
+  expect(list().textContent).toContain('LINE の会話を読み込めませんでした。')
   // APIの内部文言はそのまま出さない
   expect(list().textContent).not.toContain('server exploded')
   // 0件表示に化けない
@@ -118,9 +118,29 @@ test('再読み込みボタンで同じ条件の一覧を取り直し、成功�
   await settle()
   await eventually(() => expect(list().textContent).toContain('田中'))
   expect(retryButton()).toBeUndefined()
-  expect(list().textContent).not.toContain('チャットの読み込みに失敗しました。')
+  expect(list().textContent).not.toContain('LINE の会話を読み込めませんでした。')
   // 取り直しのリクエストが実際に出ている
   expect(calls.filter((url) => url.pathname === '/api/chats').length).toBeGreaterThanOrEqual(2)
+})
+
+test('LINE とメールの両方が失敗しても知らせは1つで、押せばメールも読み直す', async () => {
+  let fail = true
+  handler = (url) => {
+    if (fail && (url.pathname === '/api/chats' || url.pathname === '/api/support/inbox')) return response({ success: false }, 503)
+    return base(url)
+  }
+  await act(async () => root.render(<ChatsPage />))
+  await settle()
+  await eventually(() => expect(retryButton()).toBeTruthy())
+  expect(list().querySelectorAll('[role="alert"]').length).toBe(1)
+  const emailCalls = () => calls.filter((url) => url.pathname === '/api/support/inbox').length
+  const before = emailCalls()
+
+  fail = false
+  await act(async () => { retryButton()!.click() })
+  await settle()
+  await eventually(() => expect(retryButton()).toBeUndefined())
+  expect(emailCalls()).toBeGreaterThan(before)
 })
 
 test('メールだけ見ている画面ではLINE一覧の失敗行を出さない', async () => {
@@ -134,7 +154,7 @@ test('メールだけ見ている画面ではLINE一覧の失敗行を出さな�
     list().querySelector('[data-inbox-list-state="empty"], [data-inbox-list-state="filtered-empty"], [role="alert"]'),
   ).toBeTruthy())
   expect(retryButton()).toBeUndefined()
-  expect(list().textContent).not.toContain('チャットの読み込みに失敗しました。')
+  expect(list().textContent).not.toContain('LINE の会話を読み込めませんでした。')
 })
 
 test('同条件の読み直しでは会話を残し、遅い更新だけ「更新中」を出す', async () => {
@@ -151,4 +171,22 @@ test('同条件の読み直しでは会話を残し、遅い更新だけ「更�
   await eventually(() => expect(list().textContent).toContain('更新中'))
   await act(async () => complete(response(linePayload(['更新した会話']))))
   await eventually(() => expect(list().textContent).toContain('更新した会話'))
+})
+
+test('最初の一覧が遅いときは、読み上げの文を残したまま0.3秒後に行の形の骨組みを出す', async () => {
+  let complete!: (value: Response) => void
+  handler = url => url.pathname === '/api/chats' ? new Promise(resolve => { complete = resolve }) : base(url)
+  await act(async () => root.render(<ChatsPage />))
+  await settle()
+  const loading = list().querySelector('[data-inbox-list-state="loading"]')
+  expect(loading?.getAttribute('role')).toBe('status')
+  expect(loading?.querySelector('.sr-only')?.textContent).toBe('会話を読み込んでいます…')
+  expect(loading?.querySelector('[data-skeleton-reserve] [data-skeleton]')).not.toBeNull()
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 330)) })
+  const shown = list().querySelector('[data-inbox-list-state="loading"]')
+  expect(shown?.querySelector('[data-skeleton-reserve]')).toBeNull()
+  expect(shown?.querySelector('[data-skeleton]')).not.toBeNull()
+  await act(async () => complete(response(linePayload(['届いた会話']))))
+  await eventually(() => expect(list().textContent).toContain('届いた会話'))
+  expect(list().querySelector('[data-inbox-list-state="loading"]')).toBeNull()
 })

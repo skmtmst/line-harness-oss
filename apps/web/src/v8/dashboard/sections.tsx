@@ -1,7 +1,8 @@
 'use client'
 
+import Card from '@/components/shared/card'
 import { ProgressBar } from '@/components/shared/progress'
-import StatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import Link from '@/components/shared/list-navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Bell, Send, TriangleAlert, UserPlus } from 'lucide-react'
@@ -40,9 +41,9 @@ export function sectionUpdated(section: Section | undefined): string | null {
   return dashboardFreshnessText(section.freshness, section.asOf, section.reason)
 }
 
-/** 札（ の黄色い札）。tone で緑・赤も出す。 */
+/** 札（共通の状態の札）。既定は要確認の黄。tone で緑・赤も出す。 */
 export function Tag({ children, tone = 'warning' }: { children: ReactNode; tone?: 'warning' | 'success' | 'danger' }) {
-  return <span className={tone === 'success' ? `${styles.tag} ${styles.tagSuccess}` : tone === 'danger' ? `${styles.tag} ${styles.tagDanger}` : `${styles.tag} ${styles.tagWarning}`}>{children}</span>
+  return <StatusBadge tone={tone === 'warning' ? 'caution' : tone} size="compact">{children}</StatusBadge>
 }
 
 /** 鍵と値の1行。`href` があれば行ごと押せる（その状態で絞った一覧へ）。 */
@@ -56,8 +57,9 @@ export function KeyValue({ label, value, tone = 'default', dot, href, title }: {
 }) {
   const body = (
     <>
-      {dot ? <span className={dot === 'success' ? `${styles.dot} ${styles.dotSuccess}` : dot === 'danger' ? `${styles.dot} ${styles.dotDanger}` : dot === 'warning' ? `${styles.dot} ${styles.dotWarning}` : styles.dot} aria-hidden="true" /> : null}
-      <span className={styles.kvKey} title={typeof label === 'string' ? label : undefined}>{label}</span>
+      {dot
+        ? <span className={styles.kvKey}><StatusBadge tone={dot === 'faint' ? 'neutral' : dot === 'warning' ? 'caution' : dot}>{label}</StatusBadge></span>
+        : <span className={styles.kvKey} title={typeof label === 'string' ? label : undefined}>{label}</span>}
       <span className={styles.kvValue}>{value}</span>
     </>
   )
@@ -203,7 +205,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
       {rows.map((row) => (
         <KeyValue
           key={row.label}
-          label={<StatusPill tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusPill>}
+          label={<StatusBadge tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusBadge>}
           value={row.value === null ? emptyValue('unknown') : `${formatNumber(row.value)} 件`}
           tone={row.label === '未対応' && (row.value ?? 0) > 0 ? 'danger' : 'default'}
           href={row.href}
@@ -334,7 +336,7 @@ export function FriendStatus({ friends }: { friends: DashboardOverview['friends'
 }
 
 /* ── 段D：今後の予定 ─────────────────────────────── */
-const upcomingKindLabel: Record<string, string> = { broadcast: '配信', reminder: 'リマインダー', booking: '予約' }
+const upcomingKindLabel: Record<string, string> = { broadcast: '配信', reminder: 'リマインダ', booking: '予約' }
 
 /** 今日の予定は時刻だけ、違う日は日付を付ける（深夜に見て読み違えない）。 */
 function upcomingTime(iso: string, today: string, jstDay: (v: string) => string): string {
@@ -370,7 +372,7 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
   const header = (
     <SectionHeader
       title="今後の予定"
-      help="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
+      help="7日分の予約配信・リマインダ・予約です。見るだけで、ここからは変えられません。"
       helpLabel="今後の予定の説明"
       {...(upcoming ? {} : { href: '/booking/bookings?view=list', linkLabel: 'すべて見る' })}
     />
@@ -535,7 +537,7 @@ function activityIcon(item: NotificationCenterItem) {
 export function RecentActivity({ items, failed }: { items: NotificationCenterItem[] | null; failed: boolean }) {
   const shown = (items ?? []).slice(0, 3)
   return (
-    <section className={styles.activity} aria-label="最近の動き">
+    <Card className={styles.activity} aria-label="最近の動き">
       <SectionHeader title="最近の動き" href="/notifications" linkLabel="すべての動きを見る" />
       {items === null ? (
         failed ? <p className={styles.note}>最近の動きを読み込めませんでした。</p> : <Loading label="最近の動き" />
@@ -552,6 +554,6 @@ export function RecentActivity({ items, failed }: { items: NotificationCenterIte
           />
         </Link>
       ))}
-    </section>
+    </Card>
   )
 }

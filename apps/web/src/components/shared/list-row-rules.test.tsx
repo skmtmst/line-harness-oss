@@ -33,9 +33,9 @@ describe('一覧の行の決まり（/193/194/195/198）', () => {
     expect(html).toContain('フォルダ：フォルダ')
     expect(html.match(/data-folder-dot=/g)).toHaveLength(1)
   })
-  it.each(['停止中', '確認用', '人気の特典', '版 3', 'v1.2.3'])('KPIの言葉「%s」は札へ移し、数字の位置は—にする', (text) => {
+  it.each(['停止中', '確認用', '人気の特典', '版 3'])('KPIの言葉「%s」は札へ移し、数字の位置に空の—を並べない', (text) => {
     render(<KpiCard title="状態" value={null} valueText={text} unit="" detail={null} />)
-    expect(document.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+    expect(document.querySelector('[data-kpi-number]')).toBeNull()
     expect(document.querySelector('[data-design-node="xRvDB"]')?.textContent).toBe(text)
   })
   it.each(['0', '1,234 人', '¥29,800', '12.4%', '1時間24分', '+3 件', '3.2 GB', '800 KB', '—', '9.8 → 9.2 kg', '3→4通目', '0→0件', 'v3'])('数字の書式「%s」を保つ', (text) => {
@@ -43,10 +43,17 @@ describe('一覧の行の決まり（/193/194/195/198）', () => {
     render(<KpiCard title="数字" value={null} valueText={text} unit="" detail={null} />)
     expect(document.querySelector('[data-kpi-number]')?.textContent).toBe(text)
   })
-  it.each(['停止中', 'v2.6.4', '3→', '→4', '3→4→5', '3件の失敗'])('数ではない「%s」を大きな数にしない', (text) => {
+  it.each(['停止中', '3→', '→4', '3→4→5', '3件の失敗'])('数ではない「%s」を大きな数にせず、空の「—」も並べずに札だけで出す', (text) => {
     expect(isKpiNumberText(text)).toBe(false)
     render(<KpiCard title="状態" value={null} valueText={text} unit="" detail={null} />)
-    expect(document.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+    expect(document.querySelector('[data-kpi-number]')).toBeNull()
+    expect(screen.getByText(text)).toBeTruthy()
+    expect(document.body.textContent).not.toContain('—')
+  })
+  it.each(['v2.6.4', '2.6.4', 'v3'])('版の番号「%s」は値として数の場所に出す', (text) => {
+    expect(isKpiNumberText(text)).toBe(true)
+    render(<KpiCard title="いまの版" value={null} valueText={text} unit="" detail={null} />)
+    expect(document.querySelector('[data-kpi-number]')?.textContent).toBe(text)
   })
   it('+Nの幅を先に確保し、全件が入れば+Nを出さない', () => {
     expect(fittingTagCount([80, 80, 80], 300, 8, () => 40)).toBe(3)

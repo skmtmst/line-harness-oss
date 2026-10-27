@@ -271,7 +271,7 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
       <Field label="開始日時" htmlFor="rs-trial-start" error={fields.error('start')} requirement={fields.requirement('start')}>
         <SaveErrorField names={["startsAt","draft.startsAt","starts_at","draft.starts_at"]}><DateTimeField id="rs-trial-start" invalid={fields.invalid('start')} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} /></SaveErrorField>
       </Field>
-      <DialogNote>試した予約は台帳に入ります。予約媒体へは何も送りません。</DialogNote>
+      <DialogNote>試した予約は台帳に入ります。予約サイトへは何も送りません。</DialogNote>
     </RsDialog>
   )
 }

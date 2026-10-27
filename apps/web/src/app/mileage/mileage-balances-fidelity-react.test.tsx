@@ -193,7 +193,7 @@ describe('残高の絵合わせ（板 `CJlf4`）', () => {
   it('頭の CSV と脚注は空けて書く', async () => {
     await waitForRows()
     expect(container.textContent ?? '').toContain('この頁の残高を CSV')
-    await act(async () => { (container.querySelector('button[aria-label="マイルの説明"]') as HTMLButtonElement).click() })
+    await act(async () => { (container.querySelector('button[aria-label="この画面の説明"]') as HTMLButtonElement).click() })
     expect(container.textContent ?? '').toContain('CSV はこのページの残高を書き出します')
   })
 })

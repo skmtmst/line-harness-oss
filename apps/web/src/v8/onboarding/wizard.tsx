@@ -1,4 +1,5 @@
 'use client'
+import { ProgressBar } from '@/components/shared/progress'
 import type { Props, Pair } from './wizard-types'
 export type { WizardStep, Props, Pair, SummaryData } from './wizard-types'
 
@@ -81,9 +82,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   const progress = (
     <div className={styles.progress}>
       <span className={styles.progressCount}>{`はじめの質問 ${Math.min(index + 1, total)} / ${total}`}</span>
-      <span className={styles.track} role="progressbar" aria-label="はじめの質問の進み" aria-valuemin={0} aria-valuemax={total} aria-valuenow={Math.min(index + 1, total)}>
-        <span className={styles.fill} style={{ width: `${Math.round((Math.min(index + 1, total) / total) * 100)}%` }} />
-      </span>
+      <ProgressBar appearance="quota" className={styles.track} value={Math.min(index + 1, total)} max={total} label="はじめの質問の進み" />
       <span className={styles.progressName}>{step === 'summary' ? '確かめ' : steps[index]?.short}</span>
     </div>
   )

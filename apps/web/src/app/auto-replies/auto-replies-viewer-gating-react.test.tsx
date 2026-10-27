@@ -8,8 +8,6 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { join as sourceJoin } from 'node:path'
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -152,26 +150,40 @@ describe('R527 自動応答一覧の出し分け（役割×操作）', () => {
   })
 })
 
+describe('R527 フォルダの列の出し分け', () => {
+  function stubWideViewport() {
+    const real = window.matchMedia
+    Object.defineProperty(window, 'matchMedia', {
+      value: () => ({ matches: false, media: '', addEventListener: () => {}, removeEventListener: () => {} }),
+      configurable: true,
+    })
+    return () => { Object.defineProperty(window, 'matchMedia', { value: real, configurable: true }) }
+  }
+
+  it.each([
+    ['staff', false],
+    ['owner', true],
+  ] as const)('%s のフォルダの列の「…」（名前の変更・削除）', async (role, shown) => {
+    const restore = stubWideViewport()
+    try {
+      listFolders.mockImplementation(async () => ({ success: true, data: [{ id: 'folder-1', name: '営業時間', color: 'blue', count: 1 }], unfiledCount: 0 }))
+      staffMe.mockImplementation(async () => ({ success: true, data: { role } }))
+      await act(async () => { root.render(<AutoRepliesPage />) })
+      await flush()
+      expect(host.textContent).toContain('営業時間')
+      expect(Boolean(host.querySelector('button[aria-label="フォルダ「営業時間」の操作"]'))).toBe(shown)
+    } finally { restore() }
+  })
+})
+
 /*
- * 直しを戻すと赤くなる文字契約。実マウントの試験が本命で、
- * こちらは分岐の削除・無条件表示への戻しを見張る。
+ * 権限の出し分けは上の実マウントが本命（フォルダの列・作るボタン・行の操作・順番）。
+ * ここには手元の保存値で決める形へ戻さない禁止の見張りだけを残す。
  */
-const HERE = __dirname
 const PAGE = readFileSync(sourceJoin(__dirname, '../../v8/auto-replies/list.tsx'), 'utf8')
 
 describe('R527 一覧の出し分け契約', () => {
-  it('変更の可否は共通の出し分けで決め、手元の保存値で決めない', () => {
-    expect(PAGE).toContain("from '@/lib/staff-role'")
-    expect(PAGE).toContain('useStaffRole')
-    expect(PAGE).toContain("useFeatureAccess('autoReplies')")
+  it('変更の可否を手元の保存値で決めない', () => {
     expect(PAGE).not.toContain("localStorage.getItem('lh_staff_role')")
-  })
-
-  it('作成・フォルダ追加・行の変更操作を権限で守る', () => {
-    expect(PAGE).toContain("useFeatureAccess('autoReplies')")
-    // フォルダ追加と「…」は共通のフォルダの列が canManage で出し分ける。
-    expect(PAGE).toMatch(/<ManagedFolderPanel[\s\S]*?canManage=\{canEdit\}/)
-    expect(PAGE).toContain('canEdit && <CreateRuleButton')
-    expect(PAGE).toContain('const readonly = !canEdit')
   })
 })

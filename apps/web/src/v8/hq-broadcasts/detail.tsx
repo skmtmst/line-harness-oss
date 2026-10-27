@@ -11,7 +11,7 @@ import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval
 import { downloadApiFile, ApiError, describeSaveFailure } from '@/lib/api'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import type { HqBroadcastRun } from '@line-crm/shared'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { ListPageSection } from '@/components/templates/list-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -19,6 +19,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
 import StatusBadge from '@/components/shared/status-badge'
 import RowMenu from './row-menu'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -240,7 +241,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
           <tbody>
             {rows.map((row) => (
               <Tr key={row.friendId} className={styles.row} data-row-id={row.friendId}>
-                <Td className={styles.colStore}><span className={styles.store} title={row.displayName ?? undefined}>{row.displayName ?? emptyValue('unconfigured')}</span></Td>
+                <Td className={styles.colStore}><span className={styles.store} title={row.displayName ?? undefined}>{row.displayName ?? emptyValue('unknown')}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={row.state === 'sent' ? 'success' : row.state === 'failed' ? 'danger' : 'neutral'} title={row.errorCode ?? undefined}>{stateLabel(row.state)}</StatusBadge></Td>
                 <Td className={styles.colState}><span className={styles.faint}>{row.sentAt ? jpDateTime(row.sentAt) : emptyValue('unknown')}</span></Td>
               </Tr>
@@ -343,7 +344,7 @@ function HqDeliveryRail({ run, approvalPending }: { run: HqBroadcastRun; approva
       {branch ? (
         <li className={detailStyles.railItem}>
           <span className={detailStyles.railLine} aria-hidden="true" />
-          <span className={detailStyles.badge} data-tone={branch.tone === 'danger' ? 'danger' : branch.tone === 'warning' ? 'warning' : 'neutral'}>{branch.label}</span>
+          <StatusBadge tone={branch.tone === 'danger' ? 'danger' : branch.tone === 'warning' ? 'warning' : 'neutral'}>{branch.label}</StatusBadge>
         </li>
       ) : null}
     </ol>
@@ -458,7 +459,7 @@ export default function HqBroadcastDetail() {
   }
 
   let body
-  if (!id) body = <Notice tone="warn">一括配信が選ばれていません。一括配信の一覧から開いてください。</Notice>
+  if (!id) body = null
   else if (loadError && !run) body = <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => void load()} />
   else if (!run) body = <DetailLoading />
   else body = run.status === 'prepared'
@@ -497,13 +498,25 @@ export default function HqBroadcastDetail() {
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
 
 
+  /* 選ばれていない時は対象なしの1枚だけ。右の設定・スマホ・タブは出さない。 */
+  if (!id) {
+    return (
+      <PageFrame kind="detail" boardId="M2tJM xOXuY">
+        <PageHeading title="一括配信" />
+        <PageContent>
+          <TargetMissing kind="unspecified" title="一括配信が選ばれていません" description="一括配信の一覧から開いてください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
+        </PageContent>
+      </PageFrame>
+    )
+  }
+
   return (
     <>
       <PageFrame kind="detail" boardId="M2tJM xOXuY">
         <PageHeading title={run?.title ?? '一括配信'}
         steps={<>{run ? <HqDeliveryRail run={run} approvalPending={approval.state?.approval.status === 'pending'} /> : null}</>}
         /* 店の詳細と同じ形：題の右に状態の札、題の下に1行の要約。 */
-        titleAccessory={badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : undefined}
+        titleAccessory={badge ? <StatusBadge tone={tone}>{badge.label}</StatusBadge> : undefined}
         crumbs={run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : undefined}
         actions={<>{run ? (
             <div className={detailStyles.actions}>

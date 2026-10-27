@@ -9,7 +9,7 @@ import FilterChip from './filter-chip'
 vi.mock('next/link', () => ({ default: ({children,...props}: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); delete document.documentElement.dataset.theme })
 
-test.each([48,49])('横の箱：高さの差%dの境目で、そろえるか上にそろえるかを変える', async difference => {
+test.each([48,49,200])('同じ幅に並ぶ横の箱は、高さの差%dでも高い方へそろえる', async difference => {
   document.documentElement.dataset.theme = 'v8'
   vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockImplementation(function () {
     const height = this.dataset.natural ? Number(this.dataset.natural) : 180
@@ -18,7 +18,7 @@ test.each([48,49])('横の箱：高さの差%dの境目で、そろえるか上�
   const view = render(<div style={{display:'flex',flexDirection:'row'}}><Card data-natural="100">短い箱</Card><Card data-natural={String(100+difference)}>長い箱</Card></div>)
   await act(async () => { await new Promise(resolve => setTimeout(resolve,60)) })
   const cards = view.container.querySelectorAll<HTMLElement>('[data-design-part="card"]')
-  expect([...cards].map(card=>parseFloat(card.style.minHeight))).toEqual(difference <=48 ? [148,148] : [0,0])
+  expect([...cards].map(card=>parseFloat(card.style.minHeight))).toEqual([100+difference,100+difference])
   expect([...cards].map(card=>card.style.alignSelf)).toEqual(['flex-start','flex-start'])
 })
 

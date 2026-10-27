@@ -40,7 +40,7 @@ describe('FileScanStoppedBanner', () => {
     health.mockResolvedValue({ success: true, data: { stopped: true, pendingCount: 2, oldestPendingAt: '2026-09-25T08:00:00+09:00' } })
     render(<FileScanStoppedBanner accountId="acc-1" />)
     await waitFor(() => {
-      expect(screen.getByText(/ファイルの検査が止まっています/)).toBeTruthy()
+      expect(screen.getByText(/ファイルの安全確認が止まっています/)).toBeTruthy()
     })
     // 赤は使わない。件数の重複も出さない。
     expect(document.body.innerHTML).not.toContain('text-danger')

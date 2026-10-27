@@ -300,7 +300,7 @@ export default function HqBroadcastList() {
         canCreate={canManage}
         filtered={Boolean(query || status !== 'all' || folderFilter !== 'all')}
         onClearFilters={() => { setQuery(''); setStatus('all'); setFolderFilter('all'); setPage(1) }}
-        filteredDescription="検索や状態の札を外すと、すべて出ます"
+        filteredDescription="検索や状態の絞り込みを外すと、すべて出ます"
       />
     )
   } else {

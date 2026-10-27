@@ -32,7 +32,7 @@ import Notice from '@/components/shared/notice'
 
 const PAGE = 50
 
-const STATE_TONE: Record<string, StatusBadgeTone> = { 承認済み: 'success', 承認待ち: 'info', 要確認: 'warning', 見送り: 'neutral' }
+const STATE_TONE: Record<string, StatusBadgeTone> = { 承認済み: 'success', 承認待ち: 'info', 要確認: 'caution', 見送り: 'neutral' }
 
 function loadDescription(err: unknown): string | undefined {
   if (isForbiddenOrRateLimited(err)) return undefined

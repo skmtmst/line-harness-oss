@@ -75,39 +75,19 @@ async function openInterval() {
   return { year, month }
 }
 
+/*
+ * 並び・申込・ポータル・失敗の案内は billing-flow-react、いまのプランと「利用中」は v8/hq/billing.test.tsx、
+ * 左下のメニューの「請求」は components/hq/sidebar-account-menu-react、上限の帯からの誘導は
+ * components/hq/banners/limit-state-react が描いて見る。ここは戻してはいけない形の禁止の見張りだけを文字で残す。
+ */
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 const page = read('../../../v8/hq/billing.tsx')
-const menu = read('../../../components/hq/account-menu.tsx')
-const limit = read('../../../components/hq/banners/limit-state.tsx')
 
 /** ★管理画面 36-2 / 36-2-A 課金プランの構造と実際の切り替え。 */
 describe('課金プラン（36-2）', () => {
-  it('帯 → プラン3枚 → 注記 → 支払い履歴の順で、画面名はトップバーだけ', () => {
-    const order = ['data-design="Status"', 'data-design="Interval"', 'data-design="Plans"', 'data-design="History"']
-    const positions = order.map((n) => page.indexOf(n))
-    expect(positions.every((p) => p >= 0)).toBe(true)
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
-    expect(page).toContain("usePageTitle('請求')")
-    expect(page).not.toContain('<h1')
-  })
-
-  it('申込は Stripe Checkout、支払い方法と解約は Stripe のポータルへ任せる', () => {
-    expect(page).toContain('api.hqBilling.checkout(plan.key, selectedInterval)')
-    expect(page).toContain('api.hqBilling.portal()')
-    expect(page).toContain('window.location.href = res.data.url')
+  it('カード番号を画面で受け取らず、「相談する」の行き止まりに戻さない', () => {
     expect(page).not.toMatch(/card_number|cardNumber|cvc/i)
-  })
-
-  it('金額の取得元を持ち、設計の価格単位を保つ', () => {
-    expect(page).toContain("data-price-source={price.fromStripe ? 'stripe' : 'fallback'}")
-    expect(page).toContain('税込')
-  })
-
-  it('プロもCheckoutへ、契約中のプランは「いまのプラン」で、変更は「支払い方法を管理」からポータルへ', () => {
     expect(page).not.toContain('相談する')
-    expect(page).toContain('いまのプラン')
-    expect(page).toContain('支払い方法を管理')
-    expect(page).toContain('利用中')
   })
 
   it('Checkout から戻ったら4秒待ち、保存済みの表示を使わずに読み直す', async () => {
@@ -123,17 +103,6 @@ describe('課金プラン（36-2）', () => {
       expect(calls.summary).toHaveBeenCalledTimes(2)
       expect(calls.summary).toHaveBeenLastCalledWith({ cache: 'reload' })
     } finally { vi.useRealTimers() }
-  })
-
-  it('左下のアカウントメニューにプランの札と「課金プラン」が出る', () => {
-    expect(menu).toContain('api.hqBilling.summary()')
-    expect(menu).toContain('billingChip(billing)')
-    expect(menu).toContain('href="/hq/billing"')
-  })
-
-  it('35-4 の上限・停止の状態から課金プランへ行ける', () => {
-    expect(limit).toContain('href="/hq/billing"')
-    expect(limit).toContain('課金プランを見る')
   })
 
   it('既定は月払い。年払いで3つの札・月あたり・年額に切り替わり、戻すと月額になる', async () => {

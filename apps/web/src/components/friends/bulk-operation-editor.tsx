@@ -14,7 +14,7 @@ type Choice = { id: string; name: string; versionId?: string }
 const LABELS: Partial<Record<FriendBulkOperation['kind'], string>> = {
   add_tag: 'どのタグ', remove_tag: 'どのタグ', assign_operator: '担当者',
   start_scenario: 'シナリオ', stop_scenario: 'シナリオ', set_support: '対応マーク',
-  set_reminder: 'リマインダー', run_common_action: 'アクション',
+  set_reminder: 'リマインダ', run_common_action: 'アクション',
 }
 
 /** 候補取得は読み取りだけ。アカウント・操作が変わったら遅い応答を捨てる。 */
@@ -98,7 +98,7 @@ export default function BulkOperationEditor({ kind, accountId, tags, input, onCh
           }} />
       </Field>
       {items.length === 0 ? <p className="text-xs text-ink-secondary">選べる{label}がありません。登録してから、もう一度開いてください。</p> : null}
-      {kind === 'set_reminder' ? <Field label="予定日時" required help="日本時間で指定します。リマインダーはこの日時を基準に通知します。">
+      {kind === 'set_reminder' ? <Field label="予定日時" required help="日本時間で指定します。リマインダはこの日時を基準に通知します。">
         <DateTimeField aria-label="予定日時" required value={input.targetDate} disabled={disabled} onChange={(targetDate) => onChange({ ...input, targetDate })} />
       </Field> : null}
     </>

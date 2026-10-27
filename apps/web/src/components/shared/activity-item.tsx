@@ -1,12 +1,13 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
+import IconRow from './icon-row'
 import styles from './activity-item.module.css'
 
 /**
  * 動きの行（Pencil ★V8 `x4FeKG`・`EsjP2`）。
  *
  * 「いつ・何が起きたか」を縦に並べる履歴の1行。左に丸い印と、
- * 次の行へ繋がる縦線。題・補足・時刻の3つで構成する。
+ * 次の行へ繋がる縦線。題・補足・時刻の3つで構成し、3つとも行の上下の真ん中に置く。
  * 最後の行は `last` で縦線を消す。
  */
 export default function ActivityItem({
@@ -26,21 +27,8 @@ export default function ActivityItem({
   /** 最後の行なら true（縦線を描かない） */
   last?: boolean
 }) {
-  return (
-    <div className={styles.row}>
-      <div className={styles.rail} aria-hidden="true">
-        <span className={styles.marker}>
-          <Icon size={16} />
-        </span>
-        {!last && <span className={styles.line} />}
-      </div>
-      <div className={styles.body}>
-        <span className={styles.title}>{title}</span>
-        {note ? <span className={styles.note}>{note}</span> : null}
-      </div>
-      <span className={styles.time}>{time}</span>
-    </div>
-  )
+  // 印・題と補足・時刻を行の上下の真ん中にそろえる（共通の行 IconRow。縦線もそこが引く）。
+  return <IconRow iconShape="round" icon={<Icon size={16} />} title={title} sub={note} end={time} connect={!last} />
 }
 
 /** V8 x4FeKG. Also usable without a timeline row. */

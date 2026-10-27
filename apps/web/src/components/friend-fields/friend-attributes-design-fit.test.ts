@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { balanced, between, withoutComments } from './design-fit-slice'
-import { filterSavedSearches, savedSearchKpiValues } from './saved-search-kpis'
+import { filterSavedSearches } from './saved-search-kpis'
 
 /*
  * 設計 `hqrOv` `rIhbN` `QKx8Q` `sfTEW` `XBkiQ` の直しを見張る。
@@ -14,6 +14,11 @@ import { filterSavedSearches, savedSearchKpiValues } from './saved-search-kpis'
  * 実際にこの直しでも「表示先」を見出しから外したのに、直しの理由を書いた
  * 注釈が同じ言葉を含むせいで既存の試験が通ってしまった。
  * ここでは**その関数の本体**と**その要素の中**だけを切り出して見る。
+ *
+ * 残すのは禁止の見張りと、絞り込みの関数の試験だけ。画面の動きは描いて押す試験が見る：
+ * 対応マーク＝`v8/tags/marks-tab-react.test.tsx`、保存した検索＝`v8/tags/searches-tab-react.test.tsx`・
+ * `v8/tag-edit/search-edit-actions.test.tsx`、情報欄＝`app/tags/fields-tab-v8-parity-react.test.tsx`、
+ * タグ編集＝`app/tags/edit/edit-page-states.test.tsx`。
  */
 
 const ROOT = path.resolve(__dirname)
@@ -23,9 +28,6 @@ const readWeb = (relative: string) =>
 
 const MARK_LIST = readWeb('src/v8/tags/marks-tab.tsx') + read('mark-list.tsx')
 const SAVED_LIST = readWeb('src/v8/tags/searches-tab.tsx') + read('saved-search-list.tsx')
-const FIELD_LIST = readWeb('src/v8/tags/fields-tab.tsx') + read('field-list.tsx')
-const TAG_EDITOR = readWeb('src/v8/tag-edit/edit.tsx') + readWeb('src/v8/tag-edit/edit-form.tsx')
-const EDIT_PAGE = readWeb('src/app/tags/searches/edit/page.tsx')
 
 describe('切り出しの道具そのもの', () => {
   it('注釈の中の言葉を本文として拾わない', () => {
@@ -51,24 +53,13 @@ describe('rIhbN 対応マーク一覧', () => {
 
   it('使用先の列に、隣の「使用中」と同じ友だちの人数を重ねて出さない', () => {
     expect(usageLabel).not.toContain('友だち')
-    expect(usageLabel).toContain('配信${usedIn.broadcasts}件')
-    expect(usageLabel).toContain('シナリオ${usedIn.scenarios}件')
   })
 
-  it('使用先が未取得のときは「なし」ではなく「—」を出す', () => {
-    expect(usageLabel).toContain("mark.usedIn === undefined ? '—' : 'なし'")
-    expect(usageLabel.indexOf('undefined')).toBeLessThan(usageLabel.indexOf("'なし'"))
-  })
-
-  it('帯の「マークの種類・使用中」を、同じ画面の一覧そのものから数える', () => {
-    expect(kindCard).toContain('listReady ? items.length : null')
-    expect(kindCard).toContain('使っている ${inUseCount}')
+  it('帯の「マークの種類・使用中」を、別の集計口から取らない', () => {
     // 別の集計口から取ると、表に行があるのに帯が0件のままになる。
     expect(kindCard).not.toContain('stats.marks.total')
     expect(kindCard).not.toContain('stats.marks.inUse')
   })
-
-
 })
 
 describe('QKx8Q 保存した検索の一覧', () => {
@@ -93,56 +84,7 @@ describe('QKx8Q 保存した検索の一覧', () => {
     expect(filterSavedSearches(unknown, '', 'unused')).toHaveLength(1)
   })
 
-  it('設計の3つの絞り込みと表の列を画面に置き、絞った結果を一覧に渡す', () => {
-    const toolbar = between(SAVED_LIST, 'toolbar={<>', '<ListToolbarEnd>')
-    expect(toolbar).toContain('placeholder="条件名で探す"')
-    expect(toolbar).toContain('使っている所：すべて')
-    expect(toolbar).toContain('該当人数：すべて')
-    expect(toolbar).toContain('setUsageFilter')
-    expect(toolbar).toContain('setMatchFilter')
-    expect(SAVED_LIST).toContain('<Th className={styles.searchColName}>条件名・内容</Th>')
-    expect(SAVED_LIST).toContain('<Th className={styles.searchColUsage}>使っている所</Th>')
-    expect(withoutComments(SAVED_LIST)).toContain('{visible.map((search)')
+  it('絞る前の一覧をそのまま表に流さない', () => {
     expect(withoutComments(SAVED_LIST)).not.toContain('{items.map((search)')
-  })
-
-
-})
-
-describe('機能4の一覧・編集画面は取得済みの設計値を表示する', () => {
-  it('友だち情報欄はフォーム使用数と表示先をAPI応答から読む', () => {
-    expect(FIELD_LIST).toContain('field.formUsageCount')
-    expect(FIELD_LIST).toContain('field.displayTargets')
-  })
-
-  it('対応マークはAPIが返す自動変更ルールを優先する', () => {
-    expect(MARK_LIST).toContain('mark.automationRules.map')
-  })
-
-  it('タグ編集は保存済みの連動アクションを復元する', () => {
-    expect(TAG_EDITOR).toContain('linkedActionFromDefinition(action, tag.linkedActions?.find')
-    expect(TAG_EDITOR).toContain('useState<LinkedAction[]>(initialActions)')
-  })
-
-  it('保存検索の該当人数は一覧で取得済みの値を初期表示に使う', () => {
-    expect(EDIT_PAGE).toContain('setPreviewCount(found.matchCount ?? null)')
-  })
-})
-
-describe('XBkiQ 保存した検索の編集', () => {
-  // m21u: 素の fieldset を共通の RadioCardGroup へ置き換えた。群と案内は保つ。
-  const shareField = between(EDIT_PAGE, '<HelpTip label="共有の説明"', '</HelpTip>')
-
-  it('共有範囲のところで、上限と共有すると何が起きるかを先に言う', () => {
-    expect(shareField).toContain('label="共有の説明"')
-    // 件数入りの文は、検索の編集画面を描く試験（tags/searches/edit）が見る。
-    expect(shareField).toContain('一斉配信・オートメーションの対象条件からも呼び出せます')
-  })
-
-  it('件数を読めていないときは、数を作らずに上限だけ書く', () => {
-    expect(shareField).toContain("savedCount === null")
-    expect(shareField).toContain("'保存できるのは50件までです。'")
-    const source = withoutComments(EDIT_PAGE)
-    expect(source.indexOf("if(!searches.success || !tagResult.success)throw")).toBeLessThan(source.indexOf('setSavedCount(searches.summary.total)'))
   })
 })

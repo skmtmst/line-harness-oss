@@ -50,9 +50,9 @@ describe('受信箱の手動返信の経路', () => {
     expect(new Headers(init.headers).has('X-Line-Harness-Source')).toBe(false)
   })
 
-  it('受信箱の画面は送信を受信箱の口（api.chats.send / sendCombined）だけで行い、Proxy を呼ばない', () => {
+  it('受信箱の画面は Proxy を呼ばない', () => {
+    // 画面の［送信］が受信箱の口 POST /api/chats/:id/send へ届くことは app/chats/inbox-send-failure-react.test.tsx が押して見る。
     const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
-    expect(page).toContain('api.chats.send(sendingChatId')
     expect(page).not.toMatch(/line-proxy|\/v2\/bot\/message\/push/)
   })
 })
