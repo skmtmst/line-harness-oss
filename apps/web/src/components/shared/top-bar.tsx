@@ -166,16 +166,6 @@ export default function TopBar({
   }, [])
   const classes = [styles.root, className].filter(Boolean).join(' ')
   const current = accounts.find((account) => account.id === selectedAccountId)
-  // 本文（main）を下へ流した時だけ、帯をすりガラスにする。一番上にいる時は今のまま。
-  const [scrolled, setScrolled] = useState(false)
-  useEffect(() => {
-    const main = document.getElementById('main-content')
-    if (!main) return
-    const update = () => setScrolled(main.scrollTop > 0)
-    update()
-    main.addEventListener('scroll', update, { passive: true })
-    return () => main.removeEventListener('scroll', update)
-  }, [])
 
   /*
    * ★V8 外側の合図。⌘\ で左メニューを畳む。
@@ -196,7 +186,7 @@ export default function TopBar({
   }, [])
 
   return (
-    <header ref={rootRef} className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined} data-scrolled={scrolled || undefined}>
+    <header ref={rootRef} className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
       {/*
         ★V8 外側（Pencil `y3gx8R`）：左に畳むボタンとパンくず
         （アカウント › 画面名）。

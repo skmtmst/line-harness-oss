@@ -1,15 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Notice, { useNoticeClosedToday } from '@/components/shared/notice'
+import Button from '@/components/shared/button'
 import { isSecurityNoticePinned } from '@/components/recovery-code-notice'
 
 /**
- * V-2: いつもと違う端末・場所からのログイン帯（管理画面-30 §14）。
+ * V-2: いつもと違う端末・場所からのログインの知らせ（管理画面-30 §14）。
+ * 回復コードの知らせと同じく、白い板の中の白いカード1枚で出す（§6.32 案A）。
  *
  * /api/auth/session が unfamiliarAt を返すときだけ描く。帯は AuthGuard の
  * 内側に載るので、答えは AuthGuard が取ったものを読む（readSessionSnapshot）。
@@ -20,7 +21,7 @@ import { isSecurityNoticePinned } from '@/components/recovery-code-notice'
  * リンク（他の端末のログイン解除）を右に置く。
  * ［閉じる］でその日は（その端末で）出さない。ダッシュボードと設定の画面には残す。
  */
-export default function UnfamiliarLoginNotice() {
+export default function UnfamiliarLoginNotice({ className }: { className?: string }) {
   const [unfamiliarAt, setUnfamiliarAt] = useState<string | null>(null)
   const pathname = usePathname()
   const pinned = isSecurityNoticePinned(pathname)
@@ -46,16 +47,12 @@ export default function UnfamiliarLoginNotice() {
   if (!unfamiliarAt || (closed && !pinned)) return null
   return (
     <Notice
+      className={className}
       tone="warn"
+      heading="いつもと違う端末・場所からのログインです"
+      message="大事な操作の前に毎回、本人確認をします。心当たりがなければ、ほかの端末のログインを終えてパスワードを変えてください。"
+      action={<Button href="/staff" variant="secondary">ログイン中の端末を見る</Button>}
       onClose={pinned ? undefined : close}
-      actionLayout="stack-on-narrow"
-      action={
-        <Link href="/staff" className="text-action whitespace-nowrap text-xs font-medium underline underline-offset-2">
-          ログイン中の端末を確認する
-        </Link>
-      }
-    >
-      いつもと違う端末・場所からのログインです。このログイン中は大事な操作の前に毎回の本人確認を求めます。心当たりがなければ、他の端末のログインを終了してパスワードを変更してください。
-    </Notice>
+    />
   )
 }
