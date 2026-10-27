@@ -125,10 +125,6 @@
    */
 }
 
-.valueWarning {
-  color: var(--color-warning);
-}
-
 .valueFaint {
   color: var(--color-ink-faint);
 }
@@ -277,6 +273,12 @@
 
 /* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */
 /* ★V8 数のマスの下の段（Pp3nS「下」：高さ18・右に行き先）。行き先のボタンが押せる高さ32で段を押し広げない（司令塔 2026-10-05） */
+/* 細いグラフ（数のカードの形で右下に置く。ほかの形では出さない）。 */
+:root .sparkline { display: none; }
+:root .sparklineLine { fill: none; stroke: var(--color-success); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+:root .sparklineArea { fill: var(--color-accent-soft); stroke: none; }
+/* 数と補足のあいだのメーター（送信枠など）。太さと色は共通のメーター（progress の quota）が持つ。 */
+:root .meter { flex-shrink: 0; }
 :root .detail .retry { min-height: 0; height: auto; padding: 0; line-height: 18px; margin-left: auto; }
 
 /*
@@ -297,7 +299,6 @@
 :root .card[data-kpi-presentation='inline'] .unit { font-size: var(--text-caption); font-weight: var(--font-weight-ui); }
 :root .card[data-kpi-presentation='inline'] .value { gap: 4px; }
 :root .card[data-kpi-presentation='inline'] .detail { display: none; }
-:root .valueDanger { color: var(--color-danger); }
 :root .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
   border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
 }
@@ -329,7 +330,7 @@
 :root .icon { width: var(--polish-icon-large); height: var(--polish-icon-large); border: 0; outline-color: transparent; border-radius: 0; background: none; }
 :root .icon svg { width: var(--polish-icon-large); height: var(--polish-icon-large); stroke-width: var(--polish-icon-stroke); }
 :root .number, :root .card[data-kpi-presentation='inline'] .number { font-weight: var(--polish-value-weight); font-variant-numeric: var(--font-numeric); }
-:root .link { color: var(--color-ink); }
+:root .link { color: var(--color-link); } /* 行き先「〇〇へ →」は文字のリンクの決まり（緑・500） */
 :root .link:hover, :root .valueAction:hover { text-decoration: underline; }
 
 :root .card[data-kpi-presentation='inline'] .unit { font-weight: var(--polish-control-weight); }

@@ -804,6 +804,7 @@
 - [使っている部品に重大な弱点が見つかった週は、自動の点検が赤くなって分かるようにし](release-log/unreleased/1840-kenta-audit-weekly-red.md)
 - [統括のアカウントのカードの高さとボタンの位置を、同じ行でそろえた](release-log/unreleased/1841-kenta-hq-card-height.md)
 - [状態の札を地の色のある札にそろえた](release-log/unreleased/1842-kenta-status-chip.md)
+- [ダッシュボードの数を4枚にそろえ、いつもと違う端末の知らせを見やすい場所に移した](release-log/unreleased/1844-kenta-dashboard-kpi.md)
 - [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
 

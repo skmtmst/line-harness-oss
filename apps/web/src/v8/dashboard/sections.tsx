@@ -1,5 +1,6 @@
 'use client'
 
+import Card from '@/components/shared/card'
 import { ProgressBar } from '@/components/shared/progress'
 import StatusBadge from '@/components/shared/status-badge'
 import Link from '@/components/shared/list-navigation'
@@ -536,7 +537,7 @@ function activityIcon(item: NotificationCenterItem) {
 export function RecentActivity({ items, failed }: { items: NotificationCenterItem[] | null; failed: boolean }) {
   const shown = (items ?? []).slice(0, 3)
   return (
-    <section className={styles.activity} aria-label="最近の動き">
+    <Card className={styles.activity} aria-label="最近の動き">
       <SectionHeader title="最近の動き" href="/notifications" linkLabel="すべての動きを見る" />
       {items === null ? (
         failed ? <p className={styles.note}>最近の動きを読み込めませんでした。</p> : <Loading label="最近の動き" />
@@ -553,6 +554,6 @@ export function RecentActivity({ items, failed }: { items: NotificationCenterIte
           />
         </Link>
       ))}
-    </section>
+    </Card>
   )
 }
