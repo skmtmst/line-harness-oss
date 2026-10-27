@@ -1,67 +1,24 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+/*
+ * 管理画面 リッチメニューの削除確認。
+ * 共通の確認窓・取り込みの確認と結果・遅れた取り込み結果・取り下げ・失敗時の文は
+ * v8/rich-menus/list-delete-import-react.test.tsx が押して見る。
+ * ここにはブラウザ標準の窓と内部IDを出さない禁止の見張りだけを残す。
+ */
 const PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
 
 describe("管理画面 リッチメニュー削除確認 szXsT", () => {
-  it('管理画面とLINE上の削除を共通確認窓へ寄せる', () => {
-    expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
-    expect(PAGE).toContain('canDeleteImpact({ impact, busy: deleteBusy })')
-    expect(PAGE).toContain("setDeleteTarget({ kind: 'managed', group })")
-    expect(PAGE).toContain("setDeleteTarget({ kind: 'external', menu })")
+  it('ブラウザ標準の confirm を使わない', () => {
     expect(PAGE.match(/\bconfirm\(/g) ?? []).toHaveLength(0)
   })
 
-  it('管理画面外のメニューは追加・上書き・LINE側への影響を確認してから取り込む', () => {
-    expect(PAGE).toContain('designNode="TL7tp"')
-    expect(PAGE).toContain('管理画面に追加するもの：')
-    expect(PAGE).toContain('上書きするもの：')
-    expect(PAGE).toContain('すでに管理中のメニューは重ねて取り込みません。')
-    expect(PAGE).toContain('LINE上に残るもの：')
-    expect(PAGE).toContain('busy={importBusy}')
-    expect(PAGE).toContain('error={importError ?? undefined}')
-    expect(PAGE).toContain('setImportedMenuName(res.data?.name ?? menu.name)')
-    expect(PAGE).toContain('LINE上の表示は変更していません。管理画面で編集できるようになりました。')
-  })
-
-  it('前のアカウントから遅れて返った取り込み結果を現在の画面へ出さない', () => {
-    expect(PAGE).toContain('const importRequestGenerationRef = useRef(0)')
-    expect(PAGE).toContain('importRequestGenerationRef.current += 1')
-    expect(PAGE).toContain('const accountId = selectedAccount.id')
-    expect(PAGE).toContain('const requestGeneration = ++importRequestGenerationRef.current')
-    expect(PAGE).toContain('importRequestGenerationRef.current !== requestGeneration')
-    expect(PAGE).toContain('activeAccountRef.current !== accountId')
-    expect(PAGE).toContain('importRequestGenerationRef.current === requestGeneration')
-    expect(PAGE).toContain('activeAccountRef.current === accountId')
-  })
-
-  it('公開中のメニューもブラウザ標準alertを使わず、取り下げの順番を窓で案内する', () => {
-    expect(PAGE).toContain("setDeleteTarget({ kind: 'managed', group })")
-    // ★管理画面 `Xn1Mz`（行の「…」統一）：削除口は共通 RowActions のメニューへそろえた。
-    // 公開中→szXsT・下書き→szXsT-draft の分け方は menuButtonProps で残す。
-    expect(PAGE).toContain('<RowMenu')
-    expect(PAGE).toContain("onSelect: () => handleDelete(g)")
-    expect(PAGE).toContain("? await api.richMenuGroups.unpublish(deleteTarget.group.id)")
-    expect(PAGE).toContain("? 'LINEから取り下げる'")
-    expect(PAGE).toContain('取り下げたあと、管理画面から削除できます。')
-    expect(PAGE).toContain('管理画面の設定と、これまでのタップ記録')
+  it('公開中のメニューの削除を alert の文で済ませない', () => {
     expect(PAGE).not.toContain('「${group.name}」は LINE に登録されています。\\n\\n')
   })
 
-  it('何が消え、何が残り、元に戻せないかを読み合わせる', () => {
-    expect(PAGE).toContain('消えるもの：')
-    expect(PAGE).toContain('残るもの：')
-    expect(PAGE).toContain('元に戻せません。')
+  it('内部の ID を利用者に見せない', () => {
     expect(PAGE).not.toContain('(richMenuId:')
-  })
-
-  it('APIの成否を確認し、失敗時は窓内の安全な文へ置き換える', () => {
-    expect(PAGE).toContain("const [deleteBusy, setDeleteBusy] = useState(false)")
-    expect(PAGE).toContain("const [deleteError, setDeleteError] = useState<string | null>(null)")
-    expect(PAGE).toContain("if (!res.success) throw new Error('delete_failed')")
-    expect(PAGE).toContain('setDeleteError(richMenuError(e, action))')
-    expect(PAGE).toContain('if (!deleteTarget || deleteBusy) return')
-    expect(PAGE).toContain('busy={deleteBusy}')
-    expect(PAGE).toContain('error={deleteError ?? undefined}')
   })
 })

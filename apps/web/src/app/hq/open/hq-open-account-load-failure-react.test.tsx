@@ -126,7 +126,18 @@ describe('hq/open のアカウント読み込み失敗の案内', () => {
     lineAccountsHandler = () => jsonResponse({ success: true, data: [] }, 200)
     await renderPage()
     expect(host.textContent).toContain('まだアカウントがありません')
-    expect(host.querySelector('a[href="/accounts/new"]')).not.toBeNull()
+    const create = host.querySelector('a[href="/accounts/new"]')
+    expect(create?.textContent).toMatch(/^＋ ?LINEアカウントを登録する$/)
+    expect(host.querySelector('a[href*="restaurant-test/stores/new"]')).toBeNull()
+  })
+
+  it('アカウントを選ぶと選択を覚え、識別子を住所に付けずに行き先の画面へ移る', async () => {
+    await renderPage()
+    const select = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'このアカウントを選ぶ')
+    await act(async () => { select!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(accountStore.setSelectedAccountId).toHaveBeenCalledWith('acc-1')
+    expect(router.push).toHaveBeenCalledWith('/tags')
+    expect(router.replace).not.toHaveBeenCalled()
   })
 
   it('不正なtargetは/hqへ戻る', async () => {

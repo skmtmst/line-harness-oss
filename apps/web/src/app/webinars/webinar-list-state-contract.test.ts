@@ -9,7 +9,6 @@ import { webinarLoadFailure } from '@/v8/webinars/helpers'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
-const OVERVIEW = readFileSync(join(HERE, '../../v8/webinars/overview.ts'), 'utf8')
 
 /**
  * ウェビナー一覧（設計 `ZC13r` 10-1 ／ `zCQXe` 10-1-L）の、
@@ -54,46 +53,17 @@ describe('読み込めなかった理由の見分け', () => {
   })
 })
 
+/*
+ * 一覧の状態（設計 10-1-L `zCQXe`）。集計の未取得・読み直し・アカウント切替、頁の器違い、
+ * 読込・失敗・権限不足の描き分けは webinar-list-contract-react.test.tsx・webinar-list-behavior.test.tsx・
+ * webinar-list-v8-react.test.tsx が描いて見る。ここは戻してはいけない形の見張りだけ。
+ */
 describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
-  it('集計が読めていないときに 0 件と書かない', () => {
-    /*
-     * 「1つも無い」と「読めなかった」は別のこと。0 と出すと消えたように見える。
-     */
-    expect(PAGE).toContain('kpiCells(visibleOverview)')
-    expect(OVERVIEW).toContain("metric.state === 'available' && metric.value !== null")
-    expect(OVERVIEW).toContain('reason')
-  })
-
-  it('集計失敗を空表示にせず、その場で再読み込みできる', () => {
-    expect(PAGE).toContain('overviewFailure && !loadFailure ?')
-    expect(PAGE).toContain('集計を読み直す')
-    expect(PAGE).toContain('overviewFailure.retryable')
-  })
-
-  it('アカウント切替時に前の集計を表示しない', () => {
-    expect(PAGE).toContain('overviewAccountId === selectedAccountId ? overview : null')
-    expect(PAGE).toContain('overviewGeneration.current !== generation')
-  })
-
-  it('読めていないときはページ送りを出さない', () => {
-    expect(PAGE).toContain('const pager = hasListData ? (')
+  it('読めていないときはページ送りを出さない（頁が2以上かでは決めない）', () => {
     expect(PAGE).not.toContain('hasListData && pageCount > 1')
   })
 
-  it('読込・失敗・権限不足を共通部品で描く', () => {
-    expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
-    expect(PAGE).toContain('listBody = <ListSkeleton />')
-    expect(PAGE).toContain('kind={loadFailure.kind}')
-    /* 画面ごとに直書きすると、同じ状態が画面ごとに違う顔になる。 */
+  it('読込の文を画面ごとに直書きしない', () => {
     expect(PAGE).not.toContain('読み込み中…')
-    expect(PAGE).toContain('kind={loadFailure.kind}')
-  })
-
-  it('頁の器で来なかった返事を、そのまま一覧へ流さない', () => {
-    /*
-     * 口の契約は頁形式(`{items,total}`)だが、器だけ違う返事が来ると
-     * `items.map is not a function` で**一覧が白い画面になる**。
-     */
-    expect(PAGE).toContain('if (!res || !res.data || !Array.isArray(res.data.items) || typeof res.data.total !==')
   })
 })

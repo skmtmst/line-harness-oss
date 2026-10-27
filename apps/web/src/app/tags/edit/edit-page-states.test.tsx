@@ -24,6 +24,9 @@ const apiCalls = vi.hoisted(() => ({
   updateArchived: vi.fn(),
 }))
 const captured = vi.hoisted(() => ({
+  onDelete: undefined as unknown as () => void,
+  initialActions: [] as unknown[],
+  groups: [] as unknown[],
   onSave: undefined as unknown as (
     values: TagEditorValues,
     andAnother: boolean,
@@ -77,7 +80,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
 vi.mock('@/v8/tag-edit/edit-form', () => ({
   definitionsForSave: (actions: unknown) => actions,
   linkedActionFromDefinition: (action: unknown) => action,
-  TagEditForm: (props: { onSave: (values: TagEditorValues, applyRetroactive: boolean, previewToken?: string) => Promise<void>; notice?: React.ReactNode; error?: string }) => {
+  TagEditForm: (props: { onSave: (values: TagEditorValues, applyRetroactive: boolean, previewToken?: string) => Promise<void>; onDelete: () => void; initialActions: unknown[]; groups: unknown[]; notice?: React.ReactNode; error?: string }) => {
+    captured.onDelete = props.onDelete
+    captured.initialActions = props.initialActions
+    captured.groups = props.groups
     captured.onSave = (values, _andAnother, applyRetroactive, previewToken) => props.onSave(values, applyRetroactive, previewToken)
     return (
       <div data-testid="tag-editor">
@@ -350,5 +356,58 @@ describe('アーカイブタグの保存500も日本語案内を出す', () => {
     expect(keys).toHaveLength(2)
     expect(keys[0]).toBeTruthy()
     expect(keys[1]).toBe(keys[0])
+  })
+})
+
+describe('編集画面のつなぎ', () => {
+  it('遡及を確かめずに保存すると、値に遡及が残っていても送らない。確かめたときだけ送る', async () => {
+    okFixtures()
+    apiCalls.updateDefinition.mockResolvedValue({ success: true, data: { ...definition, queued: 0, replayed: false } })
+    render(<Page />)
+    expect(await screen.findByTestId('tag-editor')).toBeTruthy()
+    const retro = { ...values, applyToExisting: true } as unknown as TagEditorValues
+    await act(async () => { await captured.onSave(retro, false, false) })
+    expect(apiCalls.updateDefinition.mock.calls[0]?.[3]).toMatchObject({ applyToExisting: false })
+    await act(async () => { await captured.onSave(retro, false, true, 'preview-2') })
+    expect(apiCalls.updateDefinition.mock.calls[1]?.[3]).toMatchObject({ applyToExisting: true, previewToken: 'preview-2' })
+  })
+
+  it('保存済みの連動アクションは、保存した表示名と時期を戻して編集器へ渡す', async () => {
+    const { linkedActionFromDefinition } = await vi.importActual<typeof import('@/components/friend-fields/tag-editor-v4')>('@/components/friend-fields/tag-editor-v4')
+    const action = { id: 'act-1', type: 'send_message', params: { content: '本文', delayMinutes: 0 } }
+    const saved = { id: 'act-1', label: 'ようこそ案内', timing: '1日後' }
+    apiCalls.definition.mockResolvedValue({ success: true, data: { tag: { ...tag, linkedActions: [saved] }, automation: { id: 'auto-1', actions: [action] } } })
+    apiCalls.dependencies.mockResolvedValue({ success: true, data: dependencies })
+    apiCalls.listGroups.mockResolvedValue({ success: true, data: [] })
+    render(<Page />)
+    expect(await screen.findByTestId('tag-editor')).toBeTruthy()
+    expect(captured.initialActions).toEqual([linkedActionFromDefinition(action as never, saved as never)])
+    expect(captured.initialActions).toEqual([expect.objectContaining({ label: 'ようこそ案内', timing: '1日後' })])
+  })
+
+  it('所属フォルダの選択肢は、このアカウントのフォルダだけにする', async () => {
+    okFixtures()
+    apiCalls.listGroups.mockResolvedValue({ success: true, data: [
+      { id: 'g-a', accountId: 'a1', name: 'A店のフォルダ' },
+      { id: 'g-b', accountId: 'b1', name: 'B店のフォルダ' },
+    ] })
+    render(<Page />)
+    expect(await screen.findByTestId('tag-editor')).toBeTruthy()
+    expect(apiCalls.listGroups).toHaveBeenCalledWith('a1')
+    expect((captured.groups as Array<{ id: string }>).map((group) => group.id)).toEqual(['g-a'])
+  })
+
+  it('影響を今のアカウントで読み、削除の窓に参照件数の実値を出す', async () => {
+    okFixtures()
+    const refs = { broadcasts: 2, forms: 0, templates: 0, richMenus: 0, webinars: 0, events: 0, bookingMenus: 0, entryRoutes: 0, trackedLinks: 0, affiliateOffers: 1, analyticsFunnels: 0, scenarios: 4, autoReplies: 0, savedSearches: 0, automations: 0, commonActions: 0, reminders: 0, friendAddSettings: 0 }
+    apiCalls.dependencies.mockResolvedValue({ success: true, data: { friendCount: 9, referenceCounts: refs } })
+    render(<Page />)
+    expect(await screen.findByTestId('tag-editor')).toBeTruthy()
+    expect(apiCalls.dependencies).toHaveBeenCalledWith('t1', 'a1')
+    await act(async () => { captured.onDelete() })
+    const dialog = (await screen.findByText('「通常タグ」を削除しますか？')).closest<HTMLElement>('[role="dialog"], [role="alertdialog"]')!
+    expect(dialog.textContent).toContain('9人')
+    expect(dialog.textContent).toContain('3件')
+    expect(dialog.textContent).toContain('4件')
   })
 })
