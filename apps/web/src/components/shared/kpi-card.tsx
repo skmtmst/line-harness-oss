@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { ArrowRight, MoreHorizontal } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import StatusBadge from './status-badge'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import { isKpiNumberText } from './kpi-number-text'
@@ -14,6 +14,7 @@ import { formatNumber } from '@/lib/format'
 import { RetryLabel } from './retry-label'
 import { normalizeActionLabel } from './action-words'
 import { KpiRollingValue } from './kpi-value-motion'
+import { ProgressBar } from './progress'
 
 function detailText(node: ReactNode): string {
   return React.Children.toArray(node).map(child => {
@@ -130,8 +131,15 @@ export type KpiCardProps = {
   hidden?: boolean
   id?: string
   'aria-label'?: string
-  /** faint は「値を出せない」の見せ方。0 を薄くする用途には使わない。 */
+  /**
+   * faint は「値を出せない」の見せ方。0 を薄くする用途には使わない。
+   * warning・danger は数字の色を変えず、右上に札（黄「要確認」・赤「要対応」）を出す。
+   */
   valueTone?: 'default' | 'warning' | 'faint' | 'danger'
+  /** 数と補足のあいだのメーター（送信枠の使った割合など）。value は 0〜100。 */
+  meter?: { value: number; label: string; tone?: 'danger' }
+  /** 流れが大事な数の細いグラフ（日ごとの数を古い順に）。数のカードの形（KpiBand appearance="cards"）で右下に出す。 */
+  sparkline?: readonly number[]
 }
 
 /** 旧名。KpiCard に寄せたので、新しくは KpiCardProps を使う。 */
@@ -179,6 +187,8 @@ export default function KpiCard({
   valueText,
   valueRange,
   valueTextWithUnit = false,
+  meter,
+  sparkline,
   ...cardProps
 }: KpiCardProps) {
   const valueRef = React.useRef<HTMLButtonElement>(null)
@@ -209,6 +219,13 @@ export default function KpiCard({
     : valueRange !== undefined ? rangeText !== '—'
       : valueText !== undefined ? textIsNumber && valueTextWithUnit
         : isCountableValue(value)
+  /*
+   * 数字に色は付けない（数は黒、0 は帯が薄い灰にする）。注意・危険は右上の札で知らせる。
+   * 呼び出し側が札を渡していなければ、注意は黄の「要確認」、危険は赤の「要対応」を出す。
+   */
+  const toneBadge = !loading && (valueTone === 'warning' || valueTone === 'danger') ? valueTone : null
+  const shownBadge = badge ?? (toneBadge === 'warning' ? '要確認' : toneBadge === 'danger' ? '要対応' : undefined)
+  const shownBadgeTone = badge ? badgeTone : toneBadge ?? badgeTone
   const numberAndUnit = <>
     <KpiRollingValue text={displayedNumber} identity={cardProps.id ?? title} loading={loading || Boolean(cardProps.hidden)} />
     {showUnit ? <span data-kpi-unit className={styles.unit}>{unit}</span> : null}
@@ -221,6 +238,7 @@ export default function KpiCard({
       data-kpi-density={density}
       data-kpi-range={valueRange !== undefined || undefined}
       data-kpi-detail-layout={detailLayout}
+      data-kpi-zero={!loading && valueText === undefined && valueRange === undefined && value === 0 ? '' : undefined}
       aria-busy={loading || undefined}
       data-design-version="v8"
       {...cardProps}
@@ -254,20 +272,24 @@ export default function KpiCard({
           ) : null}
         </p>
         {menu && !menuDescription ? <span className={styles.menu}>{menu}</span> : null}
-        {badge ? (
-          <span className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[badgeTone]].filter(Boolean).join(' ')}>{badge}</span>
+        {shownBadge ? (
+          <span data-kpi-badge={shownBadgeTone} className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[shownBadgeTone]].filter(Boolean).join(' ')}>{shownBadge}</span>
         ) : null}
       </div>
 
-      <div className={styles.valueRow} data-unit-spacing={unitSpacing}>
+      {/*
+        帯の1マスに数が入りきらない時（「¥38,500」など）は、隣へはみ出さず字を少し小さくする。
+        省略はしない。数の字数と単位の幅を CSS へ渡し、マスの幅から入る大きさを決める。
+      */}
+      <div className={styles.valueRow} data-unit-spacing={unitSpacing} data-kpi-fit
+        style={{ '--kpi-fit-chars': Math.max(1, displayedNumber.length), '--kpi-fit-unit': `${showUnit ? (unit ?? '').length * 12 + 2 : 0}px` } as CSSProperties}>
+      {/* 状態の言葉（「有効」など）は札だけで出す。数の場所に空の「—」を並べない（「—」は値が本当に無い時だけ）。 */}
       {loading ? (
         <div data-kpi-skeleton className={styles.skeleton} aria-hidden="true" />
-      ) : (
+      ) : statusText ? null : (
         <p
           className={[
             styles.value,
-            valueTone === 'warning' ? styles.valueWarning : null,
-            valueTone === 'danger' ? styles.valueDanger : null,
             valueTone === 'faint' ? styles.valueFaint : null,
           ]
             .filter(Boolean)
@@ -281,9 +303,11 @@ export default function KpiCard({
       )}
 
       {statusText && !loading ? <StatusBadge>{statusText}</StatusBadge> : null}
-      {delta ? <span className={styles.delta}>{delta}</span> : null}
+      {delta ? <span className={styles.delta} data-kpi-delta-slot>{delta}</span> : null}
       </div>
 
+      {sparkline && sparkline.length > 1 && !loading ? <Sparkline values={sparkline} /> : null}
+      {meter && !loading ? <ProgressBar appearance="quota" tone={meter.tone} value={meter.value} label={meter.label} className={styles.meter} /> : null}
       {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
       <p data-kpi-detail data-kpi-detail-present={Boolean(detailText(detail).trim() || onRetry || action) || undefined} className={styles.detail}>
         <span role="note" className={styles.detailText} title={detailText(detail) || undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
@@ -302,4 +326,15 @@ export default function KpiCard({
       </p>
     </div>
   )
+}
+
+/** 細いグラフ（読み上げない飾り。数そのものは数字と補足で伝える）。 */
+function Sparkline({ values }: { values: readonly number[] }) {
+  const max = Math.max(...values), min = Math.min(...values)
+  const span = max - min || 1
+  const points = values.map((value, index) => `${(index / (values.length - 1)) * 100},${22 - ((value - min) / span) * 20}`).join(' ')
+  return <svg data-kpi-sparkline className={styles.sparkline} viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <polyline points={`0,24 ${points} 100,24`} className={styles.sparklineArea} />
+    <polyline points={points} className={styles.sparklineLine} />
+  </svg>
 }
