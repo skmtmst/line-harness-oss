@@ -26,6 +26,7 @@ export default function RecoveryCodeNotice({ remaining, className }: { remaining
   const heading = count === 0 ? '回復コードが残っていません' : `回復コードが残り少なくなっています（残り ${count} 個）`
   // 題の上の細い 1 行：黄の三角・題・短い理由、右に緑の文字の［作り直す］と［閉じる ✕］。
   return <Notice className={className} tone="warn" compact action={<TextLink inline href={pathname?.startsWith('/ops') ? '/ops/two-factor' : '/staff'}>作り直す</TextLink>} onClose={pinned ? undefined : close}>
-    <strong>{heading}</strong> 認証アプリが使えない時に入れなくなります
+    {/* 注意の知らせは題の頭に「要確認：」（色だけに頼らない）。1 行の形なので題は本文の中に書く。 */}
+    <strong>要確認：{heading}</strong> 認証アプリが使えない時に入れなくなります
   </Notice>
 }
