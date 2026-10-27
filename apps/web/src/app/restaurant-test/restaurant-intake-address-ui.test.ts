@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { setImmediate } from 'node:timers'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 import { IntakeAddressPanel, StoreForm } from '@/v8/restaurant/organization/organization-forms'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
@@ -50,6 +51,8 @@ describe('飲食店向け予約メール取り込みアドレス画面', () => {
     list.mockResolvedValue({ data: [address] } as never)
     fireEvent.click(screen.getByRole('button', { name: 'アドレスを発行' }))
     await screen.findByDisplayValue(address.address)
+    // コピー部品の初期effect（世代の更新）を済ませてから操作する。
+    await act(async () => { await new Promise<void>(resolve => setImmediate(resolve)) })
     fireEvent.click(screen.getByRole('button', { name: 'メールアドレスをコピー' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(address.address))
     await screen.findByText('コピーしました')

@@ -78,6 +78,7 @@ describe('オートメーションの確認窓', () => {
 
   it('何が消え・何が残るかを本文で読ませる', () => {
     const dialog = dialogWith(PAGE, 'open={pending !== null && pending.accountId === selectedAccountId}')
+    // 保管の本文は v8/archive-restore.test.tsx が開いた確認窓で読む。
     expect(dialog).toContain('切り替えても、動いた記録は残ります。')
     expect(dialog).toContain('稼働は再開しません。')
     // 注意書きの中の「0回」を拾わないよう、コメントを外してから見る。

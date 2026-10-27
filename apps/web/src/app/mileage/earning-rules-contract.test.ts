@@ -114,6 +114,7 @@ describe("管理画面 たまる決めごと（N46cQ）の画面", () => {
     expect(PAGE).toContain('api.mileage.publishEarningRule')
     expect(PAGE).toContain('公開して反映')
     expect(PAGE).toContain('rule.publishedVersion')
+    // 版の言い方は mileage-v8-contract.test.tsx が開いた中身の窓で読む。
     expect(PAGE).toContain('expectedVersion: rule.draftVersion')
     // 取り消せない操作のため共通の確認窓で確かめる。ブラウザのconfirmは使わない。
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")

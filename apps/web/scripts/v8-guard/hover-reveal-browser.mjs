@@ -6,6 +6,7 @@
  * - 焦点を当てても 0.5 未満のまま → hover-focus
  * - `@media (hover: none)` の中に、その物を 0.5 より濃くするルールが無い → hover-touch
  * チェックボックス・ラジオ・ファイルの入力は、見た目を別の部品で描くため透明にするので数えない。
+ * 押せない物（disabled・aria-disabled）は、共通の押せない見た目で薄くしているだけなので数えない（Tab で止まれる押せないボタンも同じ）。
  * 調べ終えたら焦点を元へ戻す。
  */
 export default function scanHoverReveal() {
@@ -55,7 +56,7 @@ export default function scanHoverReveal() {
   const before = document.activeElement
   settle()
   const candidates = [...root.querySelectorAll('button,a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')]
-    .filter(el => !el.matches('input[type="checkbox"],input[type="radio"],input[type="file"],input[type="hidden"],[disabled]') && laidOut(el) && opacity(el) < 0.5)
+    .filter(el => !el.matches('input[type="checkbox"],input[type="radio"],input[type="file"],input[type="hidden"],[disabled],[aria-disabled="true"]') && laidOut(el) && opacity(el) < 0.5)
   for (const el of candidates) {
     const label = (el.getAttribute('aria-label') || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80)
     el.focus({ preventScroll: true })

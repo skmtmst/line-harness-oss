@@ -387,3 +387,22 @@ test('乗せた時だけ出す物は、焦点でもタッチの端末でも出�
     assert.deepEqual(await page.evaluate(scanHoverReveal), [])
   } finally { await browser.close() }
 })
+
+test('押せない薄いボタン（aria-disabled=true）は数えず、有効な道具（aria-disabled=false）の乗せた時だけ出る不備は落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const dim = '<style>.dim{opacity:.48}</style><main><div role="tablist"><button class="dim" role="tab" aria-disabled="true" title="今は使えません" style="width:48px;height:24px">紹介</button></div></main>'
+    await page.setContent(dim)
+    assert.deepEqual(await page.evaluate(scanHoverReveal), [])
+    await page.locator('.dim').evaluate(el => el.setAttribute('aria-disabled', 'false'))
+    assert.deepEqual((await page.evaluate(scanHoverReveal)).map(f => f.kind).sort(), ['hover-focus', 'hover-touch'])
+    await page.locator('.dim').evaluate(el => el.setAttribute('aria-disabled', 'true'))
+    assert.deepEqual(await page.evaluate(scanHoverReveal), [])
+    const hidden = '<style>.tool{opacity:0}.row:hover .tool{opacity:1}</style><div class="row">行の名前<button class="tool" aria-disabled="false" style="width:24px;height:24px">外す</button></div>'
+    await page.setContent(dim.replace('</main>', hidden + '</main>'))
+    const findings = await page.evaluate(scanHoverReveal)
+    assert.deepEqual(findings.map(f => f.kind).sort(), ['hover-focus', 'hover-touch'])
+    assert.ok(findings.every(f => f.text === '外す'))
+  } finally { await browser.close() }
+})

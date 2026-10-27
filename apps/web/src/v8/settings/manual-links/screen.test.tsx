@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { setImmediate } from 'node:timers'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
 import ManualLinksScreen from './screen'
@@ -109,7 +110,11 @@ it('読み込み中は待つ表示、0件は条件の外し方を出さず、絞
   cleanup()
   render(<ManualLinksScreen />)
   await screen.findByText('受信箱')
-  fireEvent.change(screen.getByPlaceholderText('画面の番号・画面名で探す'), { target: { value: '存在しない画面' } })
+  // 行の描画だけでなく、検索欄の初期値を同期する effect まで終えてから入力する。
+  await act(() => new Promise<void>(resolve => setImmediate(resolve)))
+  const search = screen.getByPlaceholderText('画面の番号・画面名で探す') as HTMLInputElement
+  fireEvent.change(search, { target: { value: '存在しない画面' } })
+  expect(search.value).toBe('存在しない画面')
   await screen.findByText('条件に合うものはありません')
   fireEvent.click(screen.getByRole('button', { name: '条件を外す' }))
   await screen.findByText('受信箱')

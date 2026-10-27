@@ -142,6 +142,26 @@ test.each(['all', 'email'])('メール一覧の失敗は共通の知らせで示
   expect(list().textContent).not.toContain('メールを読み込めませんでした。')
 })
 
+test('LINE とメールの両方が失敗しても知らせは1つで、押せばメールも読み直す', async () => {
+  let fail = true
+  handler = (url) => {
+    if (fail && (url.pathname === '/api/chats' || url.pathname === '/api/support/inbox')) return response({ success: false }, 503)
+    return base(url)
+  }
+  await act(async () => root.render(<ChatsPage />))
+  await settle()
+  await eventually(() => expect(retryButton()).toBeTruthy())
+  expect(list().querySelectorAll('[role="alert"]').length).toBe(1)
+  const emailCalls = () => calls.filter((url) => url.pathname === '/api/support/inbox').length
+  const before = emailCalls()
+
+  fail = false
+  await act(async () => { retryButton()!.click() })
+  await settle()
+  await eventually(() => expect(retryButton()).toBeUndefined())
+  expect(emailCalls()).toBeGreaterThan(before)
+})
+
 test('メールだけ見ている画面ではLINE一覧の失敗行を出さない', async () => {
   fixture.params = new URLSearchParams('channel=email')
   handler = (url) => url.pathname === '/api/chats'
