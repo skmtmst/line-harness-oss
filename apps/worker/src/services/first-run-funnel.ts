@@ -67,7 +67,8 @@ const FIRST_MESSAGE_LIMIT = `SELECT m.created_at FROM messages_log m
      AND (m.source = 'friend_add_routing' OR m.scenario_step_id IS NOT NULL)
    ORDER BY m.created_at LIMIT 1`;
 
-const FOLLOW_LIMIT = `SELECT e.received_at FROM line_webhook_events e
+// 状態の索引（status）を選ぶと、アカウントごとに全アカウントの成功した受信を読み直して遅くなる。アカウントの索引で読む。
+const FOLLOW_LIMIT = `SELECT e.received_at FROM line_webhook_events e INDEXED BY idx_line_webhook_events_account
    WHERE e.line_account_id = a.id AND e.event_type = 'follow' AND e.status = 'succeeded'
    ORDER BY e.received_at LIMIT 1`;
 
