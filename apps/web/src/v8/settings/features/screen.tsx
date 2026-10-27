@@ -9,7 +9,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { ReorderDialog } from './reorder-dialog'
 export { ReorderDialog } from './reorder-dialog'
 import ListState from '@/components/shared/list-state'
-import Toggle from '@/components/shared/toggle'
+import Toggle, { ToggleGroupActions } from '@/components/shared/toggle'
 import Card from '@/components/shared/card'
 import { DialogContentRow } from '@/components/shared/dialog-form-row'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -117,7 +117,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
       {item.required ? (
         <span className={styles.required} title={`${item.label}は必須機能のため、オフにできません`}>
           <Lock className={styles.requiredIcon} aria-hidden="true" />
-          必須
+          消せない
         </span>
       ) : canManage ? (
         <SaveErrorField names={["enabled"]}><Toggle
@@ -157,7 +157,6 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
 }) {
   const total = groupFeatureCount(group)
   const enabled = groupEnabledCount(group, features)
-  const allEnabled = total === 0 || enabled === total
   const switchCount = new Map<string, number>()
   for (const item of group.items) {
     const key = item.keys[0]
@@ -178,15 +177,11 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
           <Chevron className={styles.chevron} aria-hidden="true" />
         </button>
         <h2 className={styles.groupTitle}>{group.label}</h2>
-        <span className={styles.groupMeta}>{groupSummary(group, features)}</span>
+        {(!canManage || total === 0) && <span className={styles.groupMeta}>{groupSummary(group, features)}</span>}
         <span className={styles.spacer} />
         {total > 0 && canManage && (
-          <span className={styles.groupBatch}>
-            <Toggle checked={allEnabled} indeterminate={enabled > 0 && !allEnabled}
-              disabled={busy} label={`${group.label}をまとめて${allEnabled ? 'オフ' : 'オン'}にする`}
-              onChange={(next) => onGroupToggle(group, next)} />
-            <span>まとめて</span>
-          </span>
+          <ToggleGroupActions total={total} enabled={enabled} label={group.label} disabled={busy}
+            onChange={(next) => onGroupToggle(group, next)} />
         )}
       </div>
       {open && (
@@ -418,7 +413,7 @@ export default function FeatureSettingsScreen() {
                   並びを変える
                 </Button>
                 <RowMenu appearance="box" label="機能設定のほかの操作" triggerProps={{ disabled: saving }}
-                  items={[{ id: 'reset', label: '初期値に戻す', tone: 'danger', icon: <RotateCcw aria-hidden="true" />, onSelect: () => setResetToDefaultsOpen(true) }]} />
+                  items={[{ id: 'reset', label: '初期値に戻す', tone: 'danger', onSelect: () => setResetToDefaultsOpen(true) }]} />
               </>
             )}
           </div>

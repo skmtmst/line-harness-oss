@@ -113,9 +113,10 @@
 :root .toggle { gap: 0; border-radius: var(--polish-radius-pill); }
 }
 
-:root .toggle[data-indeterminate]::after { transform: translateX(calc((var(--toggle-width) - var(--toggle-height)) / 2)); }
 :root .toggle:disabled { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
 
 .field { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-12); min-width: 0; color: var(--color-ink); font-size: var(--text-body); line-height: var(--text-body--line-height); }
 .fieldBody { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .description { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+
+.groupActions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); min-width: 0; }

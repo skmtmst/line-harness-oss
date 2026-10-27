@@ -7,7 +7,9 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearFeatureSettingsCache } from '@/lib/feature-settings-cache'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, renderHook } from '@testing-library/react'
+import { useFeatureSettings } from './use-feature-settings'
+import type { FeatureGroup } from '@/lib/feature-settings'
 
 const fixture = vi.hoisted(() => ({ role: 'owner' }))
 
@@ -93,13 +95,48 @@ describe('★V8 機能設定の閲覧のみ', () => {
       fetchSpy.mockRestore()
     }
   })
+  it('すべてオンとすべてオフは下書きだけを変え、保存前には送信しない', async () => {
+    fixture.role = 'owner'
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      await act(async () => { root.render(<FeatureSettingsScreen />) })
+      await flush()
+      const group = host.querySelector('[role="group"][aria-label$="の一括設定"]')!
+      const buttons = group.querySelectorAll('button')
+      await act(async () => { fireEvent.click(buttons[1]) })
+      expect(group.textContent).toMatch(/件中 0 件オン/)
+      await act(async () => { fireEvent.click(buttons[0]) })
+      const count = group.textContent?.match(/(\d+) 件中 (\d+) 件オン/)
+      expect(count?.[1]).toBe(count?.[2])
+      expect(fetchSpy.mock.calls.filter(([, init]) => !['GET', 'HEAD'].includes((init?.method ?? 'GET').toUpperCase()))).toHaveLength(0)
+    } finally { fetchSpy.mockRestore() }
+  })
+  it('一括でオフにする時も変更不可の機能を下書き上で維持する', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const hook = renderHook(() => useFeatureSettings())
+    try {
+      await flush()
+      expect(hook.result.current.features.scenarios).toBe(true)
+      expect(hook.result.current.features.broadcasts).toBe(true)
+      const group: FeatureGroup = { id: 'delivery', label: '配信', items: [
+        { id: 'scenarios', label: 'シナリオ', note: '変更できません', keys: ['scenarios'], required: true },
+        { id: 'broadcasts', label: '一斉配信', note: '配信に使います', keys: ['broadcasts'] },
+      ] }
+      await act(async () => { hook.result.current.toggleGroup(group, false) })
+      expect(hook.result.current.features.scenarios).toBe(true)
+      expect(hook.result.current.features.broadcasts).toBe(false)
+      expect(fetchSpy.mock.calls.filter(([, init]) => !['GET', 'HEAD'].includes((init?.method ?? 'GET').toUpperCase()))).toHaveLength(0)
+    } finally { hook.unmount(); fetchSpy.mockRestore() }
+  })
   it('オーナーは変更した時だけ保存の帯が現れ、元へ戻すと消える', async () => {
     fixture.role = 'owner'
     await act(async () => { root.render(<FeatureSettingsScreen />) })
     await flush()
     expect(host.querySelectorAll('[role="switch"]:not([aria-label*="まとめて"])').length).toBeGreaterThan(0)
     expect(buttonNames()).toContain('並びを変える')
-    expect(host.querySelector('[role="switch"][aria-label*="まとめて"]')).not.toBeNull()
+    expect(host.querySelector('[role="switch"][aria-label*="まとめて"]')).toBeNull()
+    expect(buttonNames()).toContain('すべてオン')
+    expect(buttonNames()).toContain('すべてオフ')
     expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(false)
     const checkbox = host.querySelector('[role="switch"]:not([aria-label*="まとめて"])')!
     await act(async () => { fireEvent.click(checkbox) })
