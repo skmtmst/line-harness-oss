@@ -5,6 +5,7 @@ import { api, type HqLineRegistration } from '@/lib/api'
 import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import TextLink from '@/components/shared/text-link'
 
 /**
  * 契約者専用LINEの登録案内（★管理画面 33-2-現状5-B、ダイアログ GiwgF。決定 2026-09-18）。
@@ -74,7 +75,7 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
               <p className="text-body font-bold tracking-widest text-ink" aria-label="確認コード">{info.code}</p>
             ) : null}
             {info.addFriendUrl ? (
-              <a href={info.addFriendUrl} target="_blank" rel="noreferrer" className="text-action underline-offset-2 hover:underline">スマートフォンで開く（友だち追加）</a>
+              <TextLink inline external href={info.addFriendUrl}>スマートフォンで開く（友だち追加）</TextLink>
             ) : null}
             <p className="text-micro text-ink-faint">確認コードは 24 時間有効です。管理画面の「お問い合わせ」からも、いつでもこの案内を開けます。</p>
           </div>

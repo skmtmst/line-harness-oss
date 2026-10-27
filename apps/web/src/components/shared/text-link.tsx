@@ -10,6 +10,9 @@ import styles from './text-link.module.css'
  * 文字 12px/500 の緑のリンクの右に小さな矢印が付く。乗せると矢印が
  * 2px 右に滑る（120ms）。「受信箱で開く」「配信設定へ」など、
  * 行き先を示す小さな導線に使う。
+ *
+ * `inline` は本文の中のリンク（「パスワードを忘れた方」「無料で始める」など）。
+ * 矢印を付けず、周りの文字の大きさのまま緑の文字にし、乗せると下線。
  */
 export default function TextLink({
   href,
@@ -18,19 +21,22 @@ export default function TextLink({
   external = false,
   tone,
   iconTone,
+  inline = false,
   ...rest
 }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
   tone?:'action'
   iconTone?: 'link'
   external?: boolean
+  /** 本文の中のリンク。矢印なし・周りの文字の大きさのまま。 */
+  inline?: boolean
   href: string
   children: React.ReactNode
   className?: string
 }) {
   return (
-    <Link href={href} data-tone={tone} data-icon-tone={iconTone} className={[styles.root, className].filter(Boolean).join(' ')} {...rest} target={external ? '_blank' : rest.target} rel={external || rest.target === '_blank' ? 'noopener noreferrer' : rest.rel}>
+    <Link href={href} data-tone={tone} data-icon-tone={iconTone} data-inline={inline || undefined} className={[styles.root, className].filter(Boolean).join(' ')} {...rest} target={external ? '_blank' : rest.target} rel={external || rest.target === '_blank' ? 'noopener noreferrer' : rest.rel}>
       <span className={styles.label}>{children}</span>
-      {external || rest.target === '_blank' ? <ArrowUpRight size={16} aria-hidden="true" data-external-icon className={styles.arrow} /> : <ArrowRight size={16} aria-hidden="true" className={styles.arrow} />}
+      {inline ? null : external || rest.target === '_blank' ? <ArrowUpRight size={16} aria-hidden="true" data-external-icon className={styles.arrow} /> : <ArrowRight size={16} aria-hidden="true" className={styles.arrow} />}
     </Link>
   )
 }

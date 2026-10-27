@@ -121,7 +121,7 @@
   white-space: nowrap;
 }
 
-/* 「購読中 / 読み終えた」列。 */
+/* 「読み終えた / 購読中」列。 */
 .countCell {
   white-space: nowrap;
 }
@@ -133,12 +133,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-.countSub {
-  margin-top: var(--tpl-scn-count-gap);
+.countRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.countBar {
+  flex: 1;
+  min-width: var(--space-32);
+}
+
+.countRow[data-empty] .countMain {
   color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-row-sub-lh);
-  font-variant-numeric: tabular-nums;
 }
 
 /* 状態の札。 */

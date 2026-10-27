@@ -1,8 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import Button from '@/components/shared/button'
 import type { ReminderTestRecipientView } from './use-reminder-test-recipient'
+import TextLink from '@/components/shared/text-link'
 
 /**
  * テスト送信先の表示（N-070）。
@@ -107,14 +107,14 @@ export function TestRecipientGuidance({
       {view.kind === 'unset' ? (
         <p>
           テスト送信先がまだ設定されていません。
-          <Link href={settingsHref} className="text-action mx-1 hover:underline">アカウント設定</Link>
+          <TextLink inline href={settingsHref} className="mx-1">アカウント設定</TextLink>
           で送信先を登録してから「送信先を再確認」を押してください。
         </p>
       ) : null}
       {view.kind === 'unavailable' ? (
         <p>
           設定済みのテスト送信先がこのアカウントで利用できません。
-          <Link href={settingsHref} className="text-action mx-1 hover:underline">アカウント設定</Link>
+          <TextLink inline href={settingsHref} className="mx-1">アカウント設定</TextLink>
           で別の送信先を選び直してください。
         </p>
       ) : null}
