@@ -25,6 +25,8 @@
   height: 8px;
   border-radius: var(--radius-pill);
   background: var(--color-status-info);
+  align-self: flex-start;
+  margin-top: 6px;
 }
 .info .dot { background: var(--color-status-info); }
 .success .dot { background: var(--color-success); }

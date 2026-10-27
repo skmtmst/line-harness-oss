@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error Node用の静的検査を、実際のソースと同じ入口で試す
-import { sourceFiles, globalTokens, resolveValue, cssShapeCandidates, classShapeCandidates, v8Sources } from '../../../scripts/card-shape-contract.mjs'
+import { sourceFiles, globalTokens, resolveValue, cssShapeCandidates, classShapeCandidates, sharedCardIssues, v8Sources } from '../../../scripts/card-shape-contract.mjs'
 
 const SRC = resolve(__dirname, '../..')
 const read = (file: string) => readFileSync(file, 'utf8')
@@ -130,6 +130,17 @@ describe("カードの角丸と枠に共通の影を欠かさない", () => {
     expect(resolveValue('var(--alias)', vars)).toBe('12px')
     expect(resolveValue('var(--missing, var(--alias))', vars)).toBe('12px')
     expect(resolveValue('var(--a)', new Map([['--a', 'var(--b)'], ['--b', 'var(--a)']]))).toBe('var(--a)')
+  })
+
+  it('共通Cardは輪郭線・outline・1pxの線影を持たない', () => {
+    const clean = `:root { --card-shadow: 0 1px 2px rgba(0,0,0,.08); } .card { border: 0; box-shadow: var(--card-shadow); }`
+    const brokenShadow = `:root { --card-shadow: 0 0 0 1px rgba(0,0,0,.1), 0 2px 4px rgba(0,0,0,.1); } .card { border: 0; box-shadow: var(--card-shadow); }`
+    const brokenOutline = `:root { --card-shadow: 0 1px 2px rgba(0,0,0,.08); } .card { outline: 1px solid transparent; box-shadow: var(--card-shadow); }`
+    expect(sharedCardIssues(clean, new Map())).toEqual([])
+    expect(sharedCardIssues(brokenShadow, new Map())).toContain('--card-shadow: 1px shadow edge')
+    expect(sharedCardIssues(brokenOutline, new Map())).toContain('.card: outline')
+    const cardCss = read(resolve(SRC, 'components/shared/card.module.css'))
+    expect(sharedCardIssues(cardCss, tokens)).toEqual([])
   })
 
   it.each(['12px', 'var(--radius-card)', 'var(--tpl-htn-radius-l)', 'var(--missing, var(--radius-card))'])('角丸 %s と枠だけの新しいカードを検出する', radius => {

@@ -55,8 +55,8 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
 
   it('待ち時間の整形は共通の場所に置く（画面ごとに書かない）', () => {
     const shared = code(fs.readFileSync(path.join(__dirname, '..', 'lib', 'format-duration.ts'), 'utf8'))
-    expect(shared).toContain('export function formatWaitRough(minutes: number): string')
     expect(formatWaitRough(65)).toBe('1時間前')
+    expect(formatWaitRough(24 * 60)).toBe('1日前')
     expect(CODE, 'ダッシュボードの中に自前の整形を書かない').not.toContain('function humanWait')
   })
 

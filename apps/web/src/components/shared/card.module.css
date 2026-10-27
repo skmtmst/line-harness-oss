@@ -4,7 +4,7 @@
 
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  border: 1px solid var(--card-edge);
+  border: 0;
   box-shadow: var(--card-shadow);
 }
 
@@ -101,12 +101,12 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  color: var(--color-action);
+  color: var(--color-link);
   white-space: nowrap;
 }
 
 .actionInfo {
-  color: var(--color-status-info);
+  color: var(--color-link);
 }
 
 .action :is(a, button):focus-visible {
