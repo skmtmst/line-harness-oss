@@ -27,6 +27,7 @@ export function bellOrder<T extends NotificationCenterItem>(items: T[]): T[] {
 type ScopedNotification = NotificationCenterItem & { sourceAccountId: string; sourceAccountName: string }
 type ScopedCenterData = Omit<NotificationCenterData, 'items'> & { items: ScopedNotification[] }
 type NotificationAccount = { id: string; label: string }
+const NO_ACCOUNTS: NotificationAccount[] = []
 
 /**
  * ★V8 ベルの小窓の中身（取得・既読・行き先）。見た目は `v8/notifications/bell-panel.tsx`。
@@ -41,12 +42,12 @@ type NotificationAccount = { id: string; label: string }
 export default function BellNotifications({
   popover,
   accountId,
-  accounts = [],
+  accounts = NO_ACCOUNTS,
   onAccountChange,
   onUnreadChange,
 }: {
   popover: TopBarNotificationsPopover
-  /** 選んでいる LINE アカウント。無いとき（統括で店を選んでいない）は案内だけ出す。 */
+  /** 選んでいる LINE アカウント。統括で未選択のときは一覧の全アカウントを読む。 */
   accountId: string | null
   /** 統括で使えるアカウント一覧。個別アカウント画面では選択中だけ読む。 */
   accounts?: NotificationAccount[]
@@ -112,6 +113,7 @@ export default function BellNotifications({
   // 開くたび・タブを変えるたびに読み直す（閉じている間は読まない）。
   useEffect(() => {
     if (open) void load()
+    return () => { requestId.current += 1 }
   }, [open, load])
 
   const apply = useCallback((next: ScopedCenterData) => {
@@ -121,6 +123,7 @@ export default function BellNotifications({
 
   const markRead = useCallback((item: ScopedNotification) => {
     if (!canMarkRead || !data || item.isRead) return
+    const generation = requestId.current
     const before = data
     apply({
       ...data,
@@ -129,6 +132,7 @@ export default function BellNotifications({
       unreadCount: Math.max(0, data.unreadCount - 1),
     })
     runOptimistic({
+      isCurrent: () => generation === requestId.current,
       request: async () => (await import('@/lib/api')).api.notifications.center.markRead(item.id, item.sourceAccountId),
       revert: () => apply(before),
       failureMessage: '通知を既読にできませんでした。',
@@ -137,6 +141,7 @@ export default function BellNotifications({
 
   const markAllRead = useCallback(() => {
     if (!canMarkRead || !data || data.counts.unread === 0) return
+    const generation = requestId.current
     const before = data
     apply({
       ...data,
@@ -145,8 +150,14 @@ export default function BellNotifications({
       unreadCount: 0,
     })
     runOptimistic({
-      request: async () => Promise.all((accountId ? [accountId] : accounts.map((account) => account.id))
-        .map(async (id) => (await import('@/lib/api')).api.notifications.center.markAllRead(id, 'all'))),
+      isCurrent: () => generation === requestId.current,
+      request: async () => {
+        const { api } = await import('@/lib/api')
+        const results = await Promise.all((accountId ? [accountId] : accounts.map((account) => account.id))
+          .map((id) => api.notifications.center.markAllRead(id, 'all')))
+        const failure = results.find((result) => !result.success)
+        if (failure && !failure.success) throw new Error(failure.error)
+      },
       revert: () => apply(before),
       failureMessage: '通知をまとめて既読にできませんでした。',
     })

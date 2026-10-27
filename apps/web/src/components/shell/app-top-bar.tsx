@@ -306,7 +306,7 @@ export default function AppTopBar() {
       onLogout={logout}
       notificationUnreadCount={notificationUnread}
       renderNotifications={(popover) => (
-        <BellNotifications popover={popover} accountId={selectedAccountId || null} accounts={hqShell ? options : []} onAccountChange={changeAccount} onUnreadChange={setNotificationUnread} />
+        <BellNotifications popover={popover} accountId={hqShell ? null : selectedAccountId || null} accounts={options} onAccountChange={changeAccount} onUnreadChange={setNotificationUnread} />
       )}
       v8Chrome
       chromeVariant="shell"

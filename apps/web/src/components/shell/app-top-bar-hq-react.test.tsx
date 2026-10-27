@@ -19,6 +19,9 @@ const fixture = vi.hoisted(() => ({
   push: vi.fn(),
   setSelectedAccountId: vi.fn(),
   tenantsMe: vi.fn(),
+  selectedAccountId: null as string | null,
+  accounts: [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }],
+  notificationList: vi.fn(),
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -38,8 +41,8 @@ vi.mock('next/link', async () => {
 })
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
-    accounts: [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }],
-    selectedAccountId: null,
+    accounts: fixture.accounts,
+    selectedAccountId: fixture.selectedAccountId,
     setSelectedAccountId: fixture.setSelectedAccountId,
     clearSelectedAccountId: vi.fn(),
     loading: false,
@@ -54,7 +57,7 @@ vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '株式会社 然',
 vi.mock('@/lib/api', () => ({
   api: {
     tenants: { me: fixture.tenantsMe },
-    notifications: { center: { list: vi.fn(async () => ({ success: true, data: { unreadCount: 0 } })) } },
+    notifications: { center: { list: fixture.notificationList } },
   },
 }))
 
@@ -71,6 +74,10 @@ describe('★V8 統括の上の帯', () => {
     fixture.setSelectedAccountId.mockReset()
     fixture.tenantsMe.mockReset()
     fixture.tenantsMe.mockResolvedValue({ success: true, data: { name: '然 -NEN- 本部' } })
+    fixture.selectedAccountId = null
+    fixture.accounts = [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }]
+    fixture.notificationList.mockReset()
+    fixture.notificationList.mockResolvedValue({ success: true, data: { items: [], counts: { all: 0, error: 0, update: 0, unread: 0 }, unreadCount: 0 } })
     document.documentElement.dataset.theme = fixture.theme
     window.localStorage.setItem('lh_staff_name', 'Kenta Kawano')
     window.localStorage.setItem('lh_staff_role', 'owner')
@@ -101,6 +108,19 @@ describe('★V8 統括の上の帯', () => {
     await act(async () => { await Promise.resolve() })
     expect(view.queryAllByText('然 -NEN- 本部')).toHaveLength(0)
     expect(view.getAllByText('統括').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it.each(['/hq', '/friends'])('前の選択が残る%sでも、統括だけ全アカウントの通知を読む', async (pathname) => {
+    fixture.pathname = pathname
+    fixture.selectedAccountId = 'account-1'
+    fixture.accounts = [...fixture.accounts, { id: 'account-2', name: '第2店', displayName: null }]
+    const view = render(<AppTopBar />)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { fireEvent.click(view.getByRole('button', { name: /^通知/ })) })
+    await view.findByRole('dialog', { name: '通知' })
+    await waitFor(() => expect(fixture.notificationList).toHaveBeenCalledWith('account-1', { limit: 50 }))
+    if (pathname === '/hq') expect(fixture.notificationList).toHaveBeenCalledWith('account-2', { limit: 50 })
+    else expect(fixture.notificationList.mock.calls.some(([id]) => id === 'account-2')).toBe(false)
   })
 
   it('札から店を選ぶと、その店へ入る', async () => {

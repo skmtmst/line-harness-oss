@@ -298,6 +298,30 @@ describe('★V8 ベルの小窓', () => {
     expect(fixture.toast).toHaveBeenCalled()
   })
 
+  it('統括で一部のアカウントの既読処理が失敗したら未読数を戻して知らせる', async () => {
+    fixture.markAllRead.mockImplementation(async (accountId: string) => accountId === 'account-2'
+      ? { success: false, error: '保存できませんでした' }
+      : { success: true, data: { updated: 3 } })
+    render(<Harness accountId={null} accounts={[{ id: 'account-1', label: '本店' }, { id: 'account-2', label: '渋谷店' }]} />)
+    const dialog = await openPopover()
+    await within(dialog).findByText('未読 6')
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'すべて既読にする' })) })
+    await within(dialog).findByText('未読 6')
+    expect(fixture.markAllRead.mock.calls.map(([id]) => id)).toEqual(['account-1', 'account-2'])
+    expect(fixture.toast).toHaveBeenCalledWith('通知をまとめて既読にできませんでした。', expect.objectContaining({ tone: 'error' }))
+  })
+
+  it('閉じた小窓の遅い読込結果はベルの未読数を変えない', async () => {
+    let finish!: (value: ReturnType<typeof centerData>) => void
+    fixture.list.mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    render(<Harness />)
+    await openPopover()
+    await waitFor(() => expect(fixture.list).toHaveBeenCalled())
+    await act(async () => { fireEvent.click(bell()) })
+    await act(async () => { finish(centerData([])) })
+    expect(bell().getAttribute('aria-label')).toBe('通知（未読 3 件）')
+  })
+
   it('すべて見るは小窓を閉じて通知の画面へ。下に押すものは「すべて見る」1つだけ（歯車は置かない）', async () => {
     render(<Harness />)
     const dialog = await openPopover()
