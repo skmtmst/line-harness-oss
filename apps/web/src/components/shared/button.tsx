@@ -1,7 +1,7 @@
 
 import Link from '@/components/shared/list-navigation'
 import type { LinkProps } from 'next/link'
-import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
+import { Check, LoaderCircle, ArrowUpRight, LogIn, Settings, RotateCcw } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import styles from './button.module.css'
 import { normalizeActionLabel, normalizeActionNode } from './action-words'
@@ -306,4 +306,17 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     </button>
     {automaticError ? <span role="alert" data-button-error>{automaticError}</span> : null}
   </>)
+}
+
+/** アカウント操作の文字と印は、この対応表だけで決める。 */
+const ACCOUNT_ACTIONS = {
+  enter: { label: '入る', icon: LogIn },
+  detail: { label: '詳細', icon: null },
+  settings: { label: '設定', icon: Settings },
+  restore: { label: '戻す', icon: RotateCcw },
+} as const
+
+export function AccountActionButton({ action, ...props }: Omit<NativeButtonProps, 'children' | 'icon'> & { action: keyof typeof ACCOUNT_ACTIONS }) {
+  const { label, icon: Icon } = ACCOUNT_ACTIONS[action]
+  return <Button {...props} icon={Icon ? <Icon aria-hidden="true" /> : undefined}>{label}</Button>
 }

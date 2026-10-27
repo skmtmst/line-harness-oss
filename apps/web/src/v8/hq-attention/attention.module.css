@@ -34,27 +34,6 @@
   font-size: var(--text-micro);
 }
 
-.count {
-  border: 0;
-  background: transparent;
-  color: var(--color-accent-deep);
-  font: inherit;
-  font-size: var(--text-body);
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.badgeButton {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.none {
-  color: var(--color-ink-faint);
-}
-
 .help {
   display: flex;
   align-items: center;

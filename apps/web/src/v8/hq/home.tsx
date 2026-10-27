@@ -4,7 +4,7 @@ import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
-import { Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
+import { Inbox, LayoutGrid, List, Plus, MessageCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { ListPage, ListPageCards } from '@/components/templates';
@@ -12,7 +12,7 @@ import Card from '@/components/shared/card';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/shared/list-toolbar';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
-import Button from '@/components/shared/button';
+import Button, { AccountActionButton } from '@/components/shared/button';
 import Avatar from '@/components/shared/avatar';
 import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
@@ -370,35 +370,17 @@ export default function HqHomeV8() {
     </div>
   )
 
-  const cardActions = (account: AccountWithStats) => {
-    if (isArchived(account)) {
-      return (
-        <div className={styles.cardButtons}>
-          <Button className={styles.grow} onClick={() => setEditingAccount(account)}>
-            {/* 絵 JKjsE：「詳細」の印は log-in。 */}
-            <LogIn aria-hidden="true" className={styles.buttonIcon} />詳細
-          </Button>
-          {isOwner ? (
-            <Button onClick={() => setArchiveTarget({ account, mode: 'restore' })}>
-              <RotateCcw aria-hidden="true" className={styles.buttonIcon} />戻す
-            </Button>
-          ) : null}
-        </div>
-      )
-    }
-    return (
-      <div className={styles.cardButtons}>
-        <Button className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`}>
-          <LogIn aria-hidden="true" className={styles.buttonIcon} />入る
-        </Button>
-        {canManage ? (
-          <Button onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`}>
-            <Settings aria-hidden="true" className={styles.buttonIcon} />設定
-          </Button>
-        ) : null}
-      </div>
-    )
-  }
+  const cardActions = (account: AccountWithStats) => (
+    <div className={styles.cardButtons}>
+      {isArchived(account) ? <>
+        <AccountActionButton action="detail" className={styles.grow} onClick={() => setEditingAccount(account)} />
+        {isOwner ? <AccountActionButton action="restore" onClick={() => setArchiveTarget({ account, mode: 'restore' })} /> : null}
+      </> : <>
+        <AccountActionButton action="enter" className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`} />
+        {canManage ? <AccountActionButton action="settings" onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`} /> : null}
+      </>}
+    </div>
+  )
 
   /* ★V8 oFq4S：表の行末は「…」1つ（行の操作は中に）。 */
   const tableMenu = (account: AccountWithStats) => {
@@ -516,7 +498,7 @@ export default function HqHomeV8() {
             const warned = state.tone === 'warn'
             const name = account.displayName || account.name
             return (
-              <Card frame="flat" key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
+              <Card key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
                 <div className={styles.cardHead}>
                   <Avatar name={name} src={accountIconUrl(account)} size={40} shape="rounded" alt={name} style={{ width: 'var(--tpl-hq-logo)', height: 'var(--tpl-hq-logo)' }} />
                   <div className={styles.cardName}>
@@ -531,7 +513,7 @@ export default function HqHomeV8() {
                 </div>
                 <TagOverflow label={`${name}の分類`}>
                   {folderDotOf(account) ? <TagPill name={folderDotOf(account)!.name} color={folderDotOf(account)!.color} aria-label={`フォルダ：${folderDotOf(account)!.name}`} /> : null}
-                  {(account.tags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
+                  {(account.tags ?? []).filter((tag, index, tags) => tag.name.trim() !== folderDotOf(account)?.name.trim() && tags.findIndex(other => other.name.trim() === tag.name.trim()) === index).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
                 </TagOverflow>
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
