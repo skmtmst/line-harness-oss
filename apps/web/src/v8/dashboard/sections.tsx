@@ -336,7 +336,7 @@ export function FriendStatus({ friends }: { friends: DashboardOverview['friends'
 }
 
 /* ── 段D：今後の予定 ─────────────────────────────── */
-const upcomingKindLabel: Record<string, string> = { broadcast: '配信', reminder: 'リマインダー', booking: '予約' }
+const upcomingKindLabel: Record<string, string> = { broadcast: '配信', reminder: 'リマインダ', booking: '予約' }
 
 /** 今日の予定は時刻だけ、違う日は日付を付ける（深夜に見て読み違えない）。 */
 function upcomingTime(iso: string, today: string, jstDay: (v: string) => string): string {
@@ -372,7 +372,7 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
   const header = (
     <SectionHeader
       title="今後の予定"
-      help="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
+      help="7日分の予約配信・リマインダ・予約です。見るだけで、ここからは変えられません。"
       helpLabel="今後の予定の説明"
       {...(upcoming ? {} : { href: '/booking/bookings?view=list', linkLabel: 'すべて見る' })}
     />

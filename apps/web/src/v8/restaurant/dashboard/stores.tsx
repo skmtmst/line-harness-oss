@@ -61,7 +61,7 @@ export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
             <span role="columnheader" className={`${styles.cell} ${styles.colCapacity} ${styles.num}`}>収容数</span>
             <span role="columnheader" className={`${styles.cell} ${styles.colState}`}>LINE</span>
             <span role="columnheader" className={`${styles.cell} ${styles.colState}`}>Google</span>
-            <span role="columnheader" className={`${styles.cell} ${styles.colState}`}>予約媒体</span>
+            <span role="columnheader" className={`${styles.cell} ${styles.colState}`}>予約サイト</span>
           </div>
           {data.stores.map((item) => {
             const reservations = upcoming.filter((r) => r.store_id === item.id)

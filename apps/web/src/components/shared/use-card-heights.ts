@@ -1,7 +1,13 @@
 'use client'
 import { useLayoutEffect, useRef } from 'react'
 
-/** ：横の箱は自然な高さの差48以内だけそろえる（段に data-card-height="equal" があれば差に関係なくそろえる）。縦並びでは解除する。 */
+/** 横に並ぶカードの高さを高い方へそろえる。同じ幅の列（カードの格子）と data-card-height="equal" の段が対象。縦並びと "natural" の段では解除する。 */
+export function sameWidths(row: readonly HTMLElement[]): boolean {
+  const widths = row.map(card => card.getBoundingClientRect().width)
+  const max = Math.max(...widths), min = Math.min(...widths)
+  return max > 0 && (max - min) / max <= 0.1
+}
+
 const groups = new WeakMap<HTMLElement, { users: number; release: () => void }>()
 export function useCardHeights() {
   const ref = useRef<HTMLElement>(null)
@@ -51,8 +57,10 @@ export function useCardHeights() {
           }
           for (const row of rows.values()) {
             const heights = row.map(card => card.getBoundingClientRect().height)
-            const max = Math.max(...heights), min = Math.min(...heights)
-            if (row.length > 1 && (parent.dataset.cardHeight === 'equal' || max - min <= 48)) for (const card of row) card.style.minHeight = `${max}px`
+            const max = Math.max(...heights)
+            // 同じ幅の列に並ぶカード（カードの格子）は、高さの差に関係なく高い方へそろえる。
+            // 幅の違う本文と横の欄（main と aside）は別の役目なので、印の無い段ではそろえない。
+            if (row.length > 1 && (parent.dataset.cardHeight === 'equal' || sameWidths(row))) for (const card of row) card.style.minHeight = `${max}px`
           }
         })
       }

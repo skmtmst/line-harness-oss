@@ -78,7 +78,7 @@ describe('運営メンバーの招待V8（tVaUh）', () => {
     await render()
     expect(host.querySelector('#ops-invite-email')).not.toBeNull()
     expect(host.querySelector('#ops-invite-password')).toBeNull()
-    expect(host.textContent).toContain('2要素認証へ進む')
+    expect(host.textContent).toContain('二段階認証へ進む')
     await unmount()
   })
 

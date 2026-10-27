@@ -88,7 +88,7 @@ describe('R212: 一括プレビューは下書きを区別する', () => {
     render(<BulkPreviewModal open scenarioId="sc-1" onClose={vi.fn()} />)
     expect(await screen.findByText('下書き')).toBeTruthy()
     expect(
-      screen.getByText('起点からの各通の届く日時と内容の見本です。送りはしません。下書きの通には札を付けますが、実際の配信と友だち別の予定には入りません。'),
+      screen.getByText('起点からの各通の届く日時と内容の見本です。送りはしません。下書きの通には印を付けますが、実際の配信と友だち別の予定には入りません。'),
     ).toBeTruthy()
   })
 })

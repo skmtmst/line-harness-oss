@@ -290,7 +290,7 @@ export function ArchiveDialog({ account, onClose, onDone }: {
           <SaveErrorField names={["secret"]}><TextField id={secretId} type="password" autoComplete="current-password" value={secret} onChange={(event) => setSecret(event.target.value)} disabled={busy} /></SaveErrorField>
         </Field>
       ) : (
-        <Notice tone="info" presentation="account-note" icon={null}>本人確認の方法（2段階認証・パスワード）が登録されていません。そのままアーカイブします。</Notice>
+        <Notice tone="info" presentation="account-note" icon={null}>本人確認の方法（二段階認証・パスワード）が登録されていません。そのままアーカイブします。</Notice>
       )}
       <ErrorLine message={error} />
     </Frame>

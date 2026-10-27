@@ -77,7 +77,7 @@ export function joinKindLabel(participant: ParticipantRow): string {
 /** 行の成果の札。CTA・フォーム・視聴だけ。 */
 export function actionBadge(participant: ParticipantRow): { label: string; done: boolean } {
   if (participant.formSubmittedAt) return { label: 'フォーム送信', done: true }
-  if (participant.ctaClickedAt) return { label: 'CTAクリック', done: true }
+  if (participant.ctaClickedAt) return { label: '案内ボタンを押した', done: true }
   if (participant.maxWatchedSeconds > 0) return { label: '視聴のみ', done: false }
   return { label: '—', done: false }
 }
@@ -114,7 +114,7 @@ export type PaneKey = StepKey | ExtraKey
 export const STEPS: ReadonlyArray<{ key: StepKey; no: number; title: string }> = [
   { key: 'basic', no: 1, title: '基本設定' },
   { key: 'video', no: 2, title: '動画' },
-  { key: 'cta', no: 3, title: 'CTA・フォーム' },
+  { key: 'cta', no: 3, title: '案内ボタン・フォーム' },
   { key: 'notifications', no: 4, title: '通知' },
   { key: 'review', no: 5, title: '確認' },
 ]
@@ -148,7 +148,7 @@ export function nextStepOf(key: StepKey): StepKey | null {
 
 /** 実際の次へ進む口も、現在の段の名前に合わせる。 */
 export function nextLabelOf(key: StepKey): string | null {
-  return { basic: '動画の設定へ', video: 'CTA・フォームへ', cta: '通知へ', notifications: '確認へ', review: null }[key]
+  return { basic: '動画の設定へ', video: '案内ボタン・フォームへ', cta: '通知へ', notifications: '確認へ', review: null }[key]
 }
 
 export const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'

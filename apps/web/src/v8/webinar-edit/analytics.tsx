@@ -79,7 +79,7 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
     { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : emptyValue('unknown'), help: '予約した人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
     { key: 'viewers', title: '参加', icon: LogIn, value: summary?.viewers ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.viewers, summary.reservations)}` : emptyValue('unknown'), help: '入場した人の数です。予約せず直接入場した人も含みます。' },
     { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `参加の ${percent(summary.completed, summary.viewers)}` : emptyValue('unknown'), help: '動画の9割以上を実際に見た人です。' },
-    { key: 'forms', title: 'フォーム送信', icon: Send, value: summary?.formSubmissions ?? null, unit: '人', detail: summary ? `CTA を押した ${formatNumber(summary.ctaClicks)} 人のうち` : emptyValue('unknown'), help: 'フォームを送信した人の数です。同じ人が複数回送信しても1人に数えます。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
+    { key: 'forms', title: 'フォーム送信', icon: Send, value: summary?.formSubmissions ?? null, unit: '人', detail: summary ? `案内ボタンを押した ${formatNumber(summary.ctaClicks)} 人のうち` : emptyValue('unknown'), help: 'フォームを送信した人の数です。同じ人が複数回送信しても1人に数えます。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
   ]
 
   return (
@@ -118,7 +118,7 @@ function Funnel({ summary }: { summary: WebinarAnalytics['summary'] }) {
     { label: '申込', value: summary.reservations, unit: '人' },
     { label: '参加（入場）', value: summary.viewers, unit: '人' },
     { label: '視聴完了', value: summary.completed, unit: '人' },
-    { label: 'CTA を押した', value: summary.ctaClicks, unit: '人' },
+    { label: '案内ボタンを押した', value: summary.ctaClicks, unit: '人' },
     { label: 'フォーム送信', value: summary.formSubmissions, unit: '人' },
   ]
   const top = Math.max(1, ...stages.map((stage) => stage.value))
@@ -209,7 +209,7 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
           <h4 className={styles.detailTitle}>開催回ごとの結果</h4>
           {analytics.sessions.length === 0 ? <p className={styles.cardText}>まだ開催回の視聴データがありません。</p> : (
             <DataTable label="項目ごとの到達人数" className={styles.detailTable}>
-              <thead><TableHeadRow><Th>開催日時</Th><Th align="right">参加</Th><Th align="right">平均視聴</Th><Th align="right">CTA</Th></TableHeadRow></thead>
+              <thead><TableHeadRow><Th>開催日時</Th><Th align="right">参加</Th><Th align="right">平均視聴</Th><Th align="right">案内ボタン</Th></TableHeadRow></thead>
               <tbody>{analytics.sessions.map((session) => (
                 <Tr key={session.sessionStartAt}>
                   <Td>{polishFormatListDateTime(session.sessionStartAt * 1000)}</Td>
@@ -225,7 +225,7 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
           <h4 className={styles.detailTitle}>日別の結果</h4>
           {analytics.daily.length === 0 ? <p className={styles.cardText}>まだ日別のデータがありません。</p> : (
             <DataTable label="項目ごとの到達人数" className={styles.detailTable}>
-              <thead><TableHeadRow><Th>日付</Th><Th align="right">申込</Th><Th align="right">参加</Th><Th align="right">CTA</Th><Th align="right">送信</Th></TableHeadRow></thead>
+              <thead><TableHeadRow><Th>日付</Th><Th align="right">申込</Th><Th align="right">参加</Th><Th align="right">案内ボタン</Th><Th align="right">送信</Th></TableHeadRow></thead>
               <tbody>{analytics.daily.map((day) => (
                 <Tr key={day.date}><Td>{day.date}</Td><Td align="right">{formatNumber(day.reservations)}</Td><Td align="right">{formatNumber(day.viewers)}</Td><Td align="right">{formatNumber(day.ctaClicks)}</Td><Td align="right">{formatNumber(day.formSubmissions)}</Td></Tr>
               ))}</tbody>
@@ -238,7 +238,7 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
             <>
             <dl className={styles.reach}>
               {([
-                ['CTA表示', funnel.ctaImpressions], ['CTAを押した', funnel.ctaClicks], ['フォームを開いた', funnel.formOpens],
+                ['案内ボタンの表示', funnel.ctaImpressions], ['案内ボタンを押した', funnel.ctaClicks], ['フォームを開いた', funnel.formOpens],
                 ['入力を始めた', funnel.formStarts], ['送信を試みた', funnel.submitAttempts], ['送信できた', funnel.submitSuccesses], ['送信エラー', funnel.submitErrors],
               ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{formatNumber(Number(value))} 人</dd></div>)}
             </dl>

@@ -332,7 +332,7 @@ export default function BulkRunDialog({
     ] },
     { label: '対応・その他', operations: [
       { kind: 'set_support', label: '対応マークを変更', Icon: CircleCheck },
-      { kind: 'set_reminder', label: 'リマインダーを設定', Icon: Bell },
+      { kind: 'set_reminder', label: 'リマインダを設定', Icon: Bell },
       { kind: 'run_common_action', label: 'アクションを実行', Icon: Zap },
     ] },
   ] as const

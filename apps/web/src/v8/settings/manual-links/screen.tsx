@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 マニュアルの正本表（Pencil 、状態は ）。
+ * ★V8 マニュアルの対応表（Pencil 、状態は ）。
  *
  * 動き（読み込み・権限・いま全部を確かめる・直す／決める・競合の読み直し）は
  * 今までの V8（app/settings/manual-links/manual-links-v8.tsx）と同じ。処理は同じ場所の
@@ -27,7 +27,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
-const TITLE = 'マニュアルの正本表'
+const TITLE = 'マニュアルの対応表'
 const DESCRIPTION = '画面の上の「マニュアル」が開く行き先を、画面ごとに決めます'
 /** 確かめる時刻（サーバの定時の確認と同じ）。 */
 const SCHEDULE = '毎日 4:00 に確かめる'
@@ -77,7 +77,7 @@ export default function ManualLinksScreen() {
     return frame(
       <ListState
         kind={status === 'error' ? 'error' : 'loading'}
-        title={status === 'error' ? '正本表を読み込めませんでした' : undefined}
+        title={status === 'error' ? '対応表を読み込めませんでした' : undefined}
         description={status === 'error' ? '通信状態を確認して、もう一度読み込んでください。' : undefined}
         onRetry={status === 'error' ? () => void loadInitial(() => true) : undefined}
       />,
@@ -102,7 +102,7 @@ export default function ManualLinksScreen() {
 
       {!canEdit ? <ReadOnlyNotice /> : null}
       <ListToolbar
-        search={{ value: query, onChange: setQuery, placeholder: '画面ID・画面名で探す' }}
+        search={{ value: query, onChange: setQuery, placeholder: '画面の番号・画面名で探す' }}
         filters={<SegmentedControl
           aria-label="状態で絞り込む"
           value={filter}
@@ -125,7 +125,7 @@ export default function ManualLinksScreen() {
           kind="empty"
           emptyPreset="filtered"
           title="条件に合うものはありません"
-          description="札や検索を外すと、すべて出ます"
+          description="絞り込みや検索を外すと、すべて出ます"
           action={query || filter !== 'all' ? (
             <Button variant="secondary" onClick={() => { setQuery(''); setFilter('all') }}>条件を外す</Button>
           ) : undefined}
@@ -134,7 +134,7 @@ export default function ManualLinksScreen() {
         <GridTable className={styles.table} label={`画面とマニュアルの対応 ${formatNumber(total)} 件`} design={{ columns: 'var(--sett-manual-columns)', gap: 'var(--tpl-sb-tbl-gap)', padding: 'var(--tpl-sb-tbl-pad)', rowPadding: 'var(--tpl-sb-tbl-row-pad)', fontSize: 'var(--tpl-sb-tbl-head)', color: 'var(--color-ink)' }}>
           <div role="rowgroup">
             <GridHeadRow>
-              <GridCell role="columnheader">画面ID</GridCell>
+              <GridCell role="columnheader">画面の番号</GridCell>
               <GridCell role="columnheader">画面名</GridCell>
               <GridCell role="columnheader">マニュアルのURL</GridCell>
               <GridCell role="columnheader">確かめた日</GridCell>

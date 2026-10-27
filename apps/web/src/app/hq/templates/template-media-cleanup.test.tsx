@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { setImmediate } from 'node:timers'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import TemplateConsole from '@/test-utils/hq-template-console'
 import type { TemplateDefinition } from '@/lib/hq-templates-api'
 
@@ -32,8 +33,12 @@ async function cancelUploadedCreate(confirmDiscard = false) {
   const cancel = await waitFor(() => {
     const button = screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement
     expect(button.disabled).toBe(false)
+    expect(button.matches(':disabled')).toBe(false)
+    expect(button.closest('fieldset[disabled]')).toBeNull()
     return button
   })
+  // busy解除後の離脱guardのeffectも更新してから利用者の操作を行う。
+  await act(async () => { await new Promise<void>(resolve => setImmediate(resolve)) })
   fireEvent.click(cancel)
   if (confirmDiscard) fireEvent.click(await screen.findByRole('button', { name: /^(破棄する|保存せずに移る)$/ }))
 }
@@ -48,7 +53,7 @@ describe('R568 cancelled or replaced uploads are reclaimed', () => {
     await waitFor(() => expect(calls.uploadImage).toHaveBeenCalled())
     // API開始だけでは操作できない。遅いアップロードを確実に再現する。
     expect((screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
-    finishUpload(png('a.png', KEY_A))
+    await act(async () => { finishUpload(png('a.png', KEY_A)) })
     await cancelUploadedCreate(true)
     await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_A))
   })

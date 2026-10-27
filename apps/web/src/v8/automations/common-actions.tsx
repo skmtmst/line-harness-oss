@@ -326,7 +326,7 @@ export default function CommonActionsV8() {
     )
   } else if (items.length === 0) {
     listBody = query || filter !== 'all' || folderFilter
-      ? <ListState kind="empty" title="条件に合う共通アクションはありません" description="検索や絞り込みの札を外すと、すべて出ます。" action={<Button variant="secondary" onClick={() => { setQuery(''); setFilter('all'); setFolderFilter('') }}>条件を外す</Button>} />
+      ? <ListState kind="empty" title="条件に合う共通アクションはありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button variant="secondary" onClick={() => { setQuery(''); setFilter('all'); setFolderFilter('') }}>条件を外す</Button>} />
       : <ListState kind="empty" title="まだ、共通アクションはありません" description="よく使う処理をまとめると、設定の重複を減らせます。" action={canEdit ? <Button variant="primary" href="/common-actions/new"><Plus size={16} aria-hidden="true" />共通アクションを作る</Button> : undefined} />
   } else {
     listBody = (
@@ -357,7 +357,7 @@ export default function CommonActionsV8() {
                     <Td collapseAt="narrow" className={styles.colSteps}><span className={styles.main}>{`${formatNumber(item.actionCount)} 個の処理`}</span></Td>
                     <Td className={styles.colUsed}><span className={styles.main}>{`${formatNumber(item.bindingCount)} か所`}</span></Td>
                     <Td className={styles.colVersion}>
-                      <span className={styles.main}>{item.publishedVersion ? `v${item.publishedVersion}` : emptyValue('unknown')}</span>
+                      <span className={styles.main}>{item.publishedVersion ? `第${item.publishedVersion}版` : emptyValue('unknown')}</span>
                       {versionSub ? <span className={item.oldVersionBindingCount > 0 ? styles.subWarn : styles.sub}>{versionSub}</span> : null}
                     </Td>
                     <ActionCell className={styles.colOps}>

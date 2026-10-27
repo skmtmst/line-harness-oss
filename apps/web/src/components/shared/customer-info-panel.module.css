@@ -60,5 +60,7 @@
 :root .row dd > :first-child { flex: 1; min-width: 0; }
 :root .row dd > :nth-child(2) { flex: none; margin-inline-start: auto; opacity: 0.45; }
 :root .row:is(:hover, :focus-within) dd > :nth-child(2) { opacity: 1; }
+/* タッチの端末では乗せられないので、補足の操作を常に出す。 */
+@media (hover: none) { :root .row dd > :nth-child(2) { opacity: 1; } }
 /* 受信箱の外側が左右24を持つので、内側で同じ余白を重ねない。 */
 :root .panel[data-label-width='wide'] { --tpl-customer-label: max-content; padding: 0; }

@@ -167,7 +167,7 @@ test('障害時は0件と断定しない', async () => {
     : base(url)
   await act(async () => root.render(<ChatsPage />))
   await settle()
-  expect(list().textContent).toContain('メールの読み込みに失敗しました。')
+  expect(list().textContent).toContain('メールを読み込めませんでした。')
   expect(state('empty')).toBeNull()
 })
 
@@ -177,7 +177,7 @@ test('LINE一覧の障害時も0件と断定しない', async () => {
     : base(url)
   await act(async () => root.render(<ChatsPage />))
   await settle()
-  expect(host.textContent).toContain('チャットの読み込みに失敗しました。')
+  expect(host.textContent).toContain('LINE の会話を読み込めませんでした。')
   expect(state('empty')).toBeNull()
 })
 
@@ -188,7 +188,7 @@ test('line 選択時はメールの待機や障害から独立して通常0件�
   await act(async () => root.render(<ChatsPage />))
   await settle()
   expect(state('empty')).toBeTruthy()
-  expect(list().textContent).not.toContain('メールの読み込みに失敗しました。')
+  expect(list().textContent).not.toContain('メールを読み込めませんでした。')
 })
 
 test('line 選択時はメールが失敗しても通常0件を表示する', async () => {
@@ -199,7 +199,7 @@ test('line 選択時はメールが失敗しても通常0件を表示する', as
   await act(async () => root.render(<ChatsPage />))
   await settle()
   expect(state('empty')).toBeTruthy()
-  expect(list().textContent).not.toContain('メールの読み込みに失敗しました。')
+  expect(list().textContent).not.toContain('メールを読み込めませんでした。')
 })
 
 test.each([
@@ -241,7 +241,7 @@ test('条件解除の描画から再取得開始まで旧0件を通常0件とし
 
   const next = hold()
   handler = (url) => isFilteredRequest(url) ? base(url) : next.promise.then((value) => value.clone())
-  const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === '絞り込みを解除')!
+  const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === '絞り込みを外す')!
   act(() => {
     flushSync(() => button.click())
     expect(state('loading')).toBeTruthy()
@@ -281,7 +281,7 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
   await eventually(() => expect(state('filtered-empty')).toBeTruthy())
   expect(list().textContent).toContain('条件に一致する会話がありません')
   expect(list().contains(state('filtered-empty'))).toBe(true)
-  await click('絞り込みを解除')
+  await click('絞り込みを外す')
   await eventually(() => expect(list().textContent).toContain('戻った会話'))
 
   const line = calls.filter((url) => url.pathname === '/api/chats').at(-1)!

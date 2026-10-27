@@ -139,7 +139,7 @@ export default function TwoFactorSetupPage() {
         })
         const sessionBody = await session.json().catch(() => ({})) as { success?: boolean; data?: { platformAdmin?: boolean } }
         if (!session.ok || !sessionBody.success || !sessionBody.data?.platformAdmin) {
-          throw new Error('2要素認証は登録できましたが、運営メンバーの有効状態を確認できませんでした。時間をおいて、もう一度お試しください。')
+          throw new Error('二段階認証は登録できましたが、運営メンバーの有効状態を確認できませんでした。時間をおいて、もう一度お試しください。')
         }
       }
       clearTwoFactorChallenge()

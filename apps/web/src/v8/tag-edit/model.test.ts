@@ -18,7 +18,7 @@ describe('タグの編集の計算', () => {
 
   it('マイルの要約は倍率を先に、無ければ付与の数', () => {
     expect(mileageSummary('12000', 10, 0)).toBe('今のマイル倍率 1.2倍')
-    expect(mileageSummary('', 10, 5)).toBe('付くと本人 10 mile・紹介者 5 mile')
+    expect(mileageSummary('', 10, 5)).toBe('付くと本人 10 マイル・紹介者 5 マイル')
     expect(mileageSummary('', 0, 0)).toBe('マイルの設定はありません')
   })
 
