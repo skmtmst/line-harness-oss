@@ -13,6 +13,7 @@ import type {
   OpsDashboardPeriod,
   OpsDashboard,
   OpsLineUnregistered,
+  OpsFirstRunFunnel,
   OpsKnowledgeArticle,
   OpsKnowledgeInput,
   OpsSupportDetail,
@@ -93,6 +94,8 @@ export const opsMethods = {
       }
     },
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
+    firstRun: (period?: OpsDashboardPeriod) =>
+      fetchApi<ApiResponse<OpsFirstRunFunnel>>(`/api/ops/dashboard/first-run${period ? `?period=${period}` : ''}`),
     /** 運営専用ナレッジ ★管理画面 37-11。 */
     knowledge: {
       list: (params: { q?: string; kind?: string; articleKind?: string; state?: string; offset?: number } = {}) => {

@@ -1,5 +1,6 @@
 'use client'
 
+import { ProgressBar } from '@/components/shared/progress'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -36,7 +37,7 @@ export default function FolderDistributionResult({ name, runs, accounts, folders
     <div className={styles.distributionNotice}>{error ? <Notice tone="danger" message={error} /> : null}</div>
     <section className={styles.progressPanel} aria-label="配布の進み具合">
       <h2>配布の進み具合</h2>
-      <div className={styles.progressRow} role="status"><span className={styles.progressTrack} aria-hidden="true"><span className={styles.progressFill} style={{ width: `${rows.length ? Math.round(finished / rows.length * 100) : 0}%` }} /></span><strong>{`${finished} / ${rows.length}`}</strong></div>
+      <div className={styles.progressRow} role="status"><ProgressBar appearance="quota" className={styles.progressBar} value={finished} max={rows.length} label="配布の進み" /><strong>{`${finished} / ${rows.length}`}</strong></div>
       <p className={styles.note}>{`ひな形 ${new Set(rows.map((row) => row.template.id)).size} 件・成功 ${successes.length}・失敗 ${failures.length}。${unresolved ? '結果が未確認の行は、再配布せず結果を再確認してください。' : ''}`}</p>
       <div className={styles.resultList}>
         {rows.map((row) => <div className={styles.resultRow} key={`${row.template.id}:${row.accountId}`}>
