@@ -24,7 +24,7 @@ export function revenueSourceLabel(pricing: 'stripe_actual' | 'list_price', last
   if (!lastSyncedAt) return 'Stripe の入金実績'
   const date = new Date(lastSyncedAt)
   if (!Number.isFinite(date.getTime())) return 'Stripe の入金実績'
-  return `Stripe の入金実績（最終同期 ${formatDateTime(date)}）`
+  return `Stripe の入金実績（最後に取り込んだ日時 ${formatDateTime(date)}）`
 }
 
 export function minutesLabel(minutes: number | null): string {

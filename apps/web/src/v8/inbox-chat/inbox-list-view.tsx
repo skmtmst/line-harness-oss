@@ -1,5 +1,4 @@
 'use client'
-import Notice from '@/components/shared/notice'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import { formatNumber } from '@/lib/format'
 import { unreadLookup } from '@/components/chats/assignee-unread';
@@ -14,6 +13,7 @@ import SegmentedControl from '@/components/shared/segmented';
 import Select from '@/components/shared/select';
 import { InboxFloatingPanel } from '@/components/shared/inbox-content';
 import { InboxFilterControls, InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
+import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
 import { RowMenu } from '@/components/shared/row-actions';
 import SearchField from '@/components/shared/search-field';
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
@@ -426,36 +426,21 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
                   ふだん（成功時）は何も出ないので、一覧の見た目は変わらない。
                 */}
-        {channel !== 'line' && emailError && (
-          <Notice tone="danger" action={<> <button
-              type="button"
-              onClick={() => { void loadEmails() }}
-              className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
-            >
-              メールを読み込み直す
-            </button> </>} role="alert">
-            <p className="text-sm">{emailError}</p>
-
-          </Notice>
-        )}
         {/*
-                  LINE一覧の失敗行。メールだけ見ているときは出さない。
-                  「もう一度お試しください」とだけ書かれた帯では、直す手段が
-                  ページ全体の再読み込みしかない(N-030)。失敗した一覧の場所で
-                  同じ条件の再取得へ戻れるようにする。
+                  メール・LINE の一覧の失敗は知らせ1つにまとめる。押すと失敗した物を全部読み直す。
+                  失敗を「0件」に見せない（未対応の見落としになる）。
                 */}
-        {channel !== 'email' && chatListFailed && (
-          <Notice tone="danger" action={<> <button
-              type="button"
-              onClick={() => { void loadChats() }}
-              className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
-            >
-              会話を読み込み直す
-            </button> </>} role="alert">
-            <p className="text-sm">チャットの読み込みに失敗しました。</p>
-
-          </Notice>
-        )}
+        <InboxListFailure
+          failed={[
+            ...(channel !== 'email' && chatListFailed ? ['line' as const] : []),
+            ...(channel !== 'line' && emailError ? ['email' as const] : []),
+          ]}
+          shown={channel === 'line' ? ['line'] : channel === 'email' ? ['email'] : ['line', 'email']}
+          onRetry={() => {
+            if (channel !== 'email' && chatListFailed) void loadChats()
+            if (channel !== 'line' && emailError) void loadEmails()
+          }}
+        />
         {/*
                   メールの問い合わせを同じ一覧の先頭に混ぜる。
                   設計 `V2 2-1 受信箱` の一覧は「✉ 定期便の解約について」のように
@@ -691,25 +676,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           }
           // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
           if (inboxListFailed) return null
-          return (
-            <div
-              data-inbox-list-state={hasInboxFilters ? 'filtered-empty' : 'empty'}
-              className="text-ink-faint flex min-h-36 flex-col items-center justify-center px-4 py-8 text-center"
-            >
-              <p className="text-sm font-semibold text-ink-secondary">
-                {hasInboxFilters ? '条件に一致する会話がありません' : 'まだ会話がありません'}
-              </p>
-              {hasInboxFilters && (
-                <button
-                  type="button"
-                  onClick={clearInboxFilters}
-                  className="text-action mt-3 text-sm font-semibold underline underline-offset-2"
-                >
-                  絞り込みを解除
-                </button>
-              )}
-            </div>
-          )
+          return <InboxListEmpty filtered={hasInboxFilters} onClear={clearInboxFilters} />
         })()}
 
         {hasMoreChats && (

@@ -106,7 +106,7 @@ describe('一括操作の小窓の確認と実行', () => {
     ['シナリオを停止', 'scenario-a', { kind: 'stop_scenario', scenarioId: 'scenario-a' }],
     ['対応マークを変更', 'mark-a', { kind: 'set_support', markId: 'mark-a' }],
     ['対応マークを変更', '__none', { kind: 'set_support', markId: null }],
-    ['リマインダーを設定', 'reminder-a', { kind: 'set_reminder', reminderId: 'reminder-a', targetDate: '2026-10-05T01:00:00.000Z' }],
+    ['リマインダを設定', 'reminder-a', { kind: 'set_reminder', reminderId: 'reminder-a', targetDate: '2026-10-05T01:00:00.000Z' }],
     ['アクションを実行', 'action-a', { kind: 'run_common_action', commonActionId: 'action-a', commonActionVersionId: 'version-a' }],
   ])('%sで入力した内容を確認に送り、確認だけでは実行しない', async (label, value, expected) => {
     await press(label)
@@ -114,7 +114,7 @@ describe('一括操作の小窓の確認と実行', () => {
     expect([...dialog().querySelectorAll('button')].find((button) => button.textContent?.trim() === '実行内容を確認 →')?.disabled).toBe(true)
     const select = dialog().querySelector<HTMLSelectElement>('select')!
     await act(async () => { select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })) })
-    if (label === 'リマインダーを設定') await enter('予定日時', '2026-10-05T10:00')
+    if (label === 'リマインダを設定') await enter('予定日時', '2026-10-05T10:00')
     await press('実行内容を確認 →')
     expect(calls.preview).toHaveBeenCalledWith({ kind: 'explicit', friendIds: ['a', 'b'] }, expected)
     expect(calls.create).not.toHaveBeenCalled()
@@ -146,7 +146,7 @@ describe('一括操作の小窓の確認と実行', () => {
   it('別アカウントへ切り替えたあとで古い候補が届いても採用しない', async () => {
     let resolve!: (value: unknown) => void
     calls.reminders.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
-    await press('リマインダーを設定')
+    await press('リマインダを設定')
     calls.reminders.mockResolvedValue({ success: true, data: [{ id: 'b', name: 'Bの通知' }] })
     await act(async () => root.render(<BulkRunDialog open friendIds={['a', 'b']} selectedFriends={[]} tags={[]} accountId="account-b" onClose={closed} onDone={() => {}} />))
     await act(async () => resolve({ success: true, data: [{ id: 'a', name: 'Aの通知' }] }))

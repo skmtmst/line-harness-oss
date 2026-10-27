@@ -431,7 +431,7 @@ function InflowCreate() {
               aria-label="フォルダ"
               size="full"
               colors={false}
-              unfiled={{ value: '', label: '（選ばない）' }}
+              unfiled={{ value: '', label: '未分類' }}
               folders={[...genres.map((item) => ({ value: item.name, label: item.name })), ...(genre === '__new' && newGenre ? [{ value: '__new', label: newGenre }] : [])]}
               onCreate={async (name) => {
                 // フォルダの保存は、これまでと同じリンクの発行時だけ。

@@ -513,7 +513,7 @@ export default function AutomationListV8() {
         canCreate={canEdit}
         filtered={items.length > 0}
         onClearFilters={() => { setSearch(''); setOnlyActive(false); setOnlyStopped(false); setSaved(''); setFolderFilter(''); setView({ archived: '' }) }}
-        filteredDescription="検索や絞り込みの札を外すと、すべて出ます"
+        filteredDescription="検索や絞り込みを外すと、すべて出ます"
       />
     )
   } else {
@@ -634,7 +634,7 @@ export default function AutomationListV8() {
           title={pending ? `「${pending.item.name}」を${pending.kind === 'restore' ? '保管から戻し' : pending.kind === 'archive' ? '保管し' : pending.item.isActive ? '止め' : '動か'}ますか？` : ''}
           description={
             pending?.kind === 'restore' ? '通常の一覧へ戻します。動いた記録と設定は残り、稼働は再開しません。' : pending?.kind === 'archive'
-              ? '通常の一覧から外します。動いた記録と設定は残り、保管の札から戻せます。'
+              ? '通常の一覧から外します。動いた記録と設定は残り、「保管」の絞り込みから戻せます。'
               : '切り替えても、動いた記録は残ります。'
           }
           confirmLabel={pending?.kind === 'restore' ? '保管から戻す' : pending?.kind === 'archive' ? '保管する' : pending?.item.isActive ? '止める' : '動かす'}

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode, Ref } from 'react'
-import HelpTip from '@/components/shared/help-tip'
+import { PageHelp } from '@/components/shared/page-explanation'
 import ScreenExplanation from '@/components/shared/screen-explanation'
 import styles from './page-templates.module.css'
 export { PageFooter } from './page-footer'
@@ -87,7 +87,7 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', title
   return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
     {leading}
     <div className={styles.headingText}>
-      <ScreenExplanation titleClassName={styles.titleRow} panelClassName={styles.description} screenKey={explanationKey} title={<><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}{help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}{explanationToggle}</>}>{explanation}</ScreenExplanation>
+      <ScreenExplanation titleClassName={styles.titleRow} screenKey={explanationKey} title={<><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}<PageHelp label={typeof title === 'string' ? `${title}の説明` : '画面の説明'} help={help} toggle={explanationToggle} explanation={explanation} /></>} />
       {subtitle?<p className={styles.subtitle}>{subtitle}</p>:null}
       {tabs ? <div className={styles.headingTabs} data-template-region="heading-tabs">{tabs}</div> : null}
     </div>

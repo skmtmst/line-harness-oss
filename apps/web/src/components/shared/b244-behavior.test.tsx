@@ -64,23 +64,14 @@ describe('共通の必須と行メニュー', () => {
   })
 })
 
-it('初めは開き、閉じた状態を人・画面ごとに覚える', () => {
-  const person = (id: string) => rememberStaffIdentity({ id } as Parameters<typeof rememberStaffIdentity>[0])
-  person('operator-a')
+it('画面の説明は題の横の「？」で開き、帯を出さない', () => {
   const view = render(<ScreenExplanation title={<h2>予約</h2>} screenKey="booking">説明の本文</ScreenExplanation>)
   const button = screen.getByRole('button', { name: 'この画面の説明' })
-  expect(button.getAttribute('aria-expanded')).toBe('true')
-  fireEvent.click(button)
   expect(button.getAttribute('aria-expanded')).toBe('false')
-  view.unmount()
-  const second = render(<ScreenExplanation title={<h2>予約</h2>} screenKey="booking">説明の本文</ScreenExplanation>)
-  expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('false')
-  second.unmount(); person('operator-b')
-  const other = render(<ScreenExplanation title={<h2>予約</h2>} screenKey="booking">説明の本文</ScreenExplanation>)
-  expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true')
-  other.unmount(); person('operator-a')
-  render(<ScreenExplanation title={<h2>配信</h2>} screenKey="broadcasts">説明の本文</ScreenExplanation>)
-  expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true')
+  expect(view.container.textContent).not.toContain('説明の本文')
+  fireEvent.click(button)
+  expect(button.getAttribute('aria-expanded')).toBe('true')
+  expect(screen.getByRole('note').textContent).toContain('説明の本文')
 })
 
 it('保存中の二重実行を防ぎ、一部成功と残りの再試行を分ける', () => {

@@ -174,7 +174,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
       <section className={styles.section}>
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>開ける時間</h2>
-          <p className={styles.sectionDesc}>曜日ごとに受付の時間と休けいを決めます</p>
+          <p className={styles.sectionDesc}>曜日ごとに受付の時間と休憩を決めます</p>
         </div>
         <div className="contents">
           {DAYS.map(({ weekday, label }) => {

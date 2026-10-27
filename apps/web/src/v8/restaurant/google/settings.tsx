@@ -178,7 +178,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           </div>
         ) : manageNote}
       </Card>
-      <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? emptyValue('unknown')}・最終同期：${formatStampFull(connection.lastSyncedAt)}`}</p>
+      <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? emptyValue('unknown')}・最後に取り込んだ日時：${formatStampFull(connection.lastSyncedAt)}`}</p>
       <ConfirmDialog
         open={confirmDisconnect}
         title="Googleアカウントの接続を解除しますか？"

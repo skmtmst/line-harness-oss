@@ -37,7 +37,7 @@ describe("管理画面 LINE notification history contract", () => {
   })
 
   it('does not claim delivery or individual reads from a LINE API acceptance', () => {
-    expect(LIST).toContain('LINE API受付済み')
+    // 受け付けた行の言い方は v8/settings/line-notifications/runs-tab-accepted.test.tsx が描いて読む。
     expect(LIST).not.toContain('届きました')
     expect(LIST).not.toContain('開きました')
     expect(LIST).toContain('個人の既読は見られません')

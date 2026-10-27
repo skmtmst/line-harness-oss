@@ -421,7 +421,7 @@ export default function MenuFormV8() {
   const categoryOptions = useMemo(() => {
     const existing = [...new Set(menus.map((menu) => menu.category_label).filter((c): c is string => Boolean(c)))]
     return [
-      { value: '', label: '分類なし' },
+      { value: '', label: '未分類' },
       ...existing.map((label) => ({ value: label, label })),
       { value: '__new__', label: '新しい分類を入力…' },
     ]

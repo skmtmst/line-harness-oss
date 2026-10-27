@@ -64,7 +64,7 @@ const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'title' | 'sub' | 't
   { id: 'friends', title: '友だちの急な減り', sub: 'この1日', threshold: '1日で5%以上・10人以上減ると「注意」', href: '/friends' },
   { id: 'webhook', title: 'Webhook が届いているか', sub: 'LINE からの受け取り', threshold: '受け取りの失敗が続くと「注意」', href: '/webhooks' },
   { id: 'delivery', title: '配信が送れているか', sub: '予約・自動の配信', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
-  { id: 'infra', title: '裏の仕組み', sub: 'DB・保管庫・順番待ち', threshold: '10分より古いと「古い確認」・一度も確かめていなければ「未確認」', href: '/emergency?tab=health' },
+  { id: 'infra', title: '保存と送信のしくみ', sub: 'データ・ファイル・送る前の待ち', threshold: '10分より古いと「古い確認」・一度も確かめていなければ「未確認」', href: '/emergency?tab=health' },
   { id: 'credential', title: '鍵・証明書の期限', sub: 'アクセストークンなど', threshold: '14日前で「注意」・期限切れで「エラー」', href: '/accounts' },
 ]
 

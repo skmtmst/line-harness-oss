@@ -136,8 +136,8 @@ export default function RoutingDrawer({ accountId, open, onClose, onSaved }: {
                     <SaveErrorField names={["firstResponseMinutes"]}><NumberInput id="routing-minutes" numericText inputMode="numeric" unit="分" value={minutesText} disabled={!draft.enabled}
                       invalid={!minutesValid} onChange={(event) => setMinutesText(event.target.value)} /></SaveErrorField>
                   </Field>
-                  <Field label="金の札を出す" htmlFor="routing-soon">
-                    <Select id="routing-soon" aria-label="金の札を出す" size="full" disabled value="soon" onChange={() => {}} options={[{ value: 'soon', label: `残り ${SOON_MINUTES} 分から` }]} />
+                  <Field label="金の印を出す" htmlFor="routing-soon">
+                    <Select id="routing-soon" aria-label="金の印を出す" size="full" disabled value="soon" onChange={() => {}} options={[{ value: 'soon', label: `残り ${SOON_MINUTES} 分から` }]} />
                   </Field>
                 </div>
                 <Checkbox checked={draft.businessHoursOnly} disabled={!draft.enabled} onCheckedChange={(next) => setDraft({ ...draft, businessHoursOnly: next })}>

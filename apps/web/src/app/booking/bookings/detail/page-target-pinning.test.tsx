@@ -249,13 +249,13 @@ it('WEB300：保存を待つ間は予約の追加編集を止め、失敗後に�
   m.get.mockResolvedValue({ booking: booking('A', { status: 'confirmed' }) })
   m.update.mockImplementation(() => new Promise((_, no) => { reject = no }))
   render(<Page />); await flush()
-  fireEvent.click(screen.getByRole('button', { name: '内容を変更する' }))
+  fireEvent.click(screen.getByRole('button', { name: '内容を変える' }))
   await flush()
   const reason = screen.getByPlaceholderText('例：お客様の都合で時間変更') as HTMLInputElement
   fireEvent.change(reason, { target: { value: '変更の理由' } })
   const price = document.querySelector('input[type="number"]') as HTMLInputElement
   fireEvent.change(price, { target: { value: '1000' } })
-  fireEvent.click(screen.getByRole('button', { name: 'この内容で変更する' }))
+  fireEvent.click(screen.getByRole('button', { name: 'この内容にする' }))
   await waitFor(() => expect(m.update).toHaveBeenCalled())
   expect(reason.matches(':disabled')).toBe(true)
   expect(price.matches(':disabled')).toBe(true)

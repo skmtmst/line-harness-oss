@@ -286,7 +286,7 @@ describe('V8 ウェビナーの編集', () => {
       const disabled = buttons().filter((button) => button.disabled && host.contains(button))
       expect(disabled.map((button) => `${pane}:${button.textContent?.trim() || button.getAttribute('aria-label')}`)).toEqual([])
       expect(buttonText('下書きを保存')).toBeUndefined()
-      expect(buttons().some((button) => /テストを送る|条件を足す|保存する|コメントを足す|CTA カードを足す|この版を公開/.test(button.textContent ?? ''))).toBe(false)
+      expect(buttons().some((button) => /テストを送る|条件を足す|保存する|コメントを足す|案内ボタンのカードを足す|この版を公開/.test(button.textContent ?? ''))).toBe(false)
     }
   })
 
@@ -314,7 +314,7 @@ describe('V8 ウェビナーの編集', () => {
   it('CTA：別のカードに足りない欄があると、そのカードを開いて見出しの欄へ移り、カードの行に赤い印を付ける', async () => {
     nav.search = 'id=webinar-1&pane=cta'
     await render(<WebinarEditV8 />)
-    await act(async () => { buttonText('CTA カードを足す')!.click() })
+    await act(async () => { buttonText('案内ボタンのカードを足す')!.click() })
     // 1枚目（足りている）へ戻ってから保存する
     const picks = () => [...host.querySelectorAll('[data-wc-pane="cta"] button[aria-current], [data-wc-pane="cta"] button')].filter((b) => b.className.includes('cardPick')) as HTMLButtonElement[]
     await act(async () => { picks()[0].click() })

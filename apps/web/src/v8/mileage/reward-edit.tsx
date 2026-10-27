@@ -210,7 +210,7 @@ function RewardEditorInner() {
       if (!response.success) throw new Error(response.error)
       if (!cancelled) setCommonActions(response.data.commonActions.map((item) => ({
         id: item.currentPublishedVersionId,
-        label: `${item.name}（公開版 v${item.version}）`,
+        label: `${item.name}（公開中の第${item.version}版）`,
       })))
     }).catch(() => {
       if (!cancelled) setCommonActionsFailed(true)

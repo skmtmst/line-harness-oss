@@ -4,6 +4,8 @@ import { connectGuardBrowser } from './browser-session.mjs'
 import scan from './owner-rules-browser.mjs'
 import scanPolish from './polish-rules-browser.mjs'
 import scanRowHeights from './control-row-height-browser.mjs'
+import scanRowCentering from './row-centering-browser.mjs'
+import scanHoverReveal from './hover-reveal-browser.mjs'
 
 test('a framed box clipped by its parent fails; scrollable and restored boxes remain usable', async () => {
   const browser = await connectGuardBrowser()
@@ -326,6 +328,83 @@ test('手書きの動きを同じ選び先の後ろの規則で共通の値に�
     assert.deepEqual(await kinds(), [])
     await page.setContent('<style>:root{--m:120ms;--e:ease}.c{transition:color var(--m) var(--e)}.c{transition:color 120ms ease-out}</style><main><a class="c" href="#">リンク</a></main>')
     assert.ok((await kinds()).length > 0)
+  } finally { await browser.close() }
+})
+
+test('印＋文字の行で、印・文字・右のボタンの上下の真ん中が 1px を超えてずれると落ち、そろえば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const svg = '<svg width="16" height="16"><rect width="16" height="16"/></svg>'
+    await page.setContent(`<main>
+      <div id="hand" style="display:flex;align-items:center;gap:12px;height:56px"><span style="width:32px;height:32px;display:inline-flex">${svg}</span><span id="text" style="display:flex;flex-direction:column"><span>ほかの進行中の配信</span><span>一覧はまだ見られません</span></span><button style="height:36px">開く</button></div>
+      <div id="shared" data-center-row style="display:grid;grid-template-columns:auto 1fr auto;align-items:center;min-height:50px"><span data-center-row-part="icon" style="width:24px;height:24px;display:inline-flex">${svg}</span><span data-center-row-part="text">題<br>補足</span><span data-center-row-part="end">9月15日</span></div>
+    </main>`)
+    assert.deepEqual(await page.evaluate(scanRowCentering), [])
+    // 手書きの行：文字の下に空の段を足して文字を上へ寄せる（友だちの詳細で起きた形）。
+    await page.locator('#text').evaluate(el => { el.insertAdjacentHTML('beforeend', '<span style="display:block;height:12px"></span>') })
+    let broken = await page.evaluate(scanRowCentering)
+    assert.equal(broken.length, 1)
+    assert.equal(broken[0].kind, 'row-offcenter')
+    assert.ok(broken[0].measure.offset > 1)
+    await page.locator('#text > span:last-child').evaluate(el => el.remove())
+    // 共通の行：上そろえに戻すと落ちる。
+    await page.locator('#shared').evaluate(el => { el.style.alignItems = 'start' })
+    broken = await page.evaluate(scanRowCentering)
+    assert.equal(broken.length, 1)
+    assert.match(broken[0].target, /div/)
+    await page.locator('#shared').evaluate(el => { el.style.alignItems = 'center' })
+    assert.deepEqual(await page.evaluate(scanRowCentering), [])
+  } finally { await browser.close() }
+})
+
+test('印の無い段でも、同じ幅に並ぶカードの高さが 1px を超えてずれると落ち、幅の違う本文と横の欄・natural の段は数えない', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const card = (h, w = 200) => `<article data-design-part="card" style="width:${w}px;height:${h}px;box-shadow:0 1px 2px #0003">箱</article>`
+    await page.setContent(`<main><div id="grid" style="display:flex;gap:16px;align-items:flex-start">${card(120)}${card(120)}${card(120)}</div>
+      <div id="split" style="display:flex;gap:16px;align-items:flex-start">${card(600, 800)}${card(120, 320)}</div></main>`)
+    const rows = async () => (await page.evaluate(scan)).filter(f => f.kind === 'cardrow')
+    assert.deepEqual(await rows(), [])
+    await page.locator('#grid > article:nth-child(2)').evaluate(el => { el.style.height = '80px' })
+    assert.equal((await rows()).length, 1)
+    await page.locator('#grid').evaluate(el => { el.dataset.cardHeight = 'natural' })
+    assert.deepEqual(await rows(), [])
+  } finally { await browser.close() }
+})
+
+test('乗せた時だけ出す物は、焦点でもタッチの端末でも出す。片方が欠けると落ち、そろえば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const css = rules => `<style>.tool{opacity:0}.row:hover .tool{opacity:1}${rules}</style>`
+    const body = '<main><div class="row">行の名前<button class="tool" style="width:24px;height:24px">外す</button><input type="checkbox" style="opacity:0;width:20px;height:20px"></div></main>'
+    await page.setContent(css('') + body)
+    assert.deepEqual((await page.evaluate(scanHoverReveal)).map(f => f.kind).sort(), ['hover-focus', 'hover-touch'])
+    await page.setContent(css('.tool:focus-visible,.row:focus-within .tool{opacity:1}') + body)
+    assert.deepEqual((await page.evaluate(scanHoverReveal)).map(f => f.kind), ['hover-touch'])
+    await page.setContent(css('.tool:focus-visible,.row:focus-within .tool{opacity:1}@media (hover: none){.tool{opacity:1}}') + body)
+    assert.deepEqual(await page.evaluate(scanHoverReveal), [])
+  } finally { await browser.close() }
+})
+
+test('押せない薄いボタン（aria-disabled=true）は数えず、有効な道具（aria-disabled=false）の乗せた時だけ出る不備は落ちる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const dim = '<style>.dim{opacity:.48}</style><main><div role="tablist"><button class="dim" role="tab" aria-disabled="true" title="今は使えません" style="width:48px;height:24px">紹介</button></div></main>'
+    await page.setContent(dim)
+    assert.deepEqual(await page.evaluate(scanHoverReveal), [])
+    await page.locator('.dim').evaluate(el => el.setAttribute('aria-disabled', 'false'))
+    assert.deepEqual((await page.evaluate(scanHoverReveal)).map(f => f.kind).sort(), ['hover-focus', 'hover-touch'])
+    await page.locator('.dim').evaluate(el => el.setAttribute('aria-disabled', 'true'))
+    assert.deepEqual(await page.evaluate(scanHoverReveal), [])
+    const hidden = '<style>.tool{opacity:0}.row:hover .tool{opacity:1}</style><div class="row">行の名前<button class="tool" aria-disabled="false" style="width:24px;height:24px">外す</button></div>'
+    await page.setContent(dim.replace('</main>', hidden + '</main>'))
+    const findings = await page.evaluate(scanHoverReveal)
+    assert.deepEqual(findings.map(f => f.kind).sort(), ['hover-focus', 'hover-touch'])
+    assert.ok(findings.every(f => f.text === '外す'))
   } finally { await browser.close() }
 })
 

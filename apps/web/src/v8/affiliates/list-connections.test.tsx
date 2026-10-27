@@ -54,16 +54,12 @@ describe('成果一覧の接続', () => {
   it.each(['offers', 'approvals', 'report'] as const)('%sの常設説明は題から開閉できる', async tab => {
     draw(tab)
     const toggle = await screen.findByRole('button', { name: 'この画面の説明' })
-    const id = toggle.getAttribute('aria-controls')!
-    const body = document.getElementById(id)!
-    expect(body.textContent?.length).toBeGreaterThan(20)
-    expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    fireEvent.click(toggle)
-    await waitFor(() => expect(toggle.getAttribute('aria-expanded')).toBe('false'))
-    expect(body.hidden).toBe(true)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(toggle)
     await waitFor(() => expect(toggle.getAttribute('aria-expanded')).toBe('true'))
-    expect(body.hidden).toBe(false)
+    expect(document.getElementById(toggle.getAttribute('aria-describedby') ?? '')?.textContent?.length).toBeGreaterThan(20)
+    fireEvent.click(toggle)
+    await waitFor(() => expect(toggle.getAttribute('aria-expanded')).toBe('false'))
   })
   it('レポートへ直接戻った時はURLのページを保つ', async () => {
     data.size = 21

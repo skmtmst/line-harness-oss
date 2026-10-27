@@ -281,7 +281,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
         }
         throw err
       }
-    }, '開ける時間と配分を保存しました。予約媒体へは書き戻していません。').then((ok) => {
+    }, '開ける時間と配分を保存しました。予約サイトへは書き戻していません。').then((ok) => {
       if (ok) { setConflict(null); setDiffOpen(false); setAllocOverride(null); setAllocVersions(null); setRefresh((n) => n + 1) }
     })
   }
@@ -306,7 +306,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
         }
         throw err
       }
-    }, `${selected.time} の配分だけ保存しました。予約媒体へは書き戻していません。`).then((ok) => {
+    }, `${selected.time} の配分だけ保存しました。予約サイトへは書き戻していません。`).then((ok) => {
       if (ok) { setSlotAlloc(null); setSlotVersion(undefined); setRefresh((n) => n + 1) }
     })
   }
@@ -331,7 +331,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   return (
     <SaveErrorScope errors={saveErrors}><>
       {!canEdit ? <ReadOnlyNotice /> : null}
-      {channelsError?<ListState kind="error" title="予約媒体を読み込めませんでした" onRetry={()=>setChannelsRetry(n=>n+1)}/>:null}
+      {channelsError?<ListState kind="error" title="予約サイトを読み込めませんでした" onRetry={()=>setChannelsRetry(n=>n+1)}/>:null}
       {loadError ? (
         <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>もう一度読み込む</Button>} />
       ) : null}
@@ -389,14 +389,14 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button>
             </div>
             <div className={styles.allocGrid}>
-              <Field label={<><span className={styles.allocLabel}>OTA（予約媒体）</span></>}><SaveErrorField names={["ota","alloc.ota"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="OTA（予約媒体）" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} /></SaveErrorField></Field>
+              <Field label={<><span className={styles.allocLabel}>予約サイト</span></>}><SaveErrorField names={["ota","alloc.ota"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="予約サイト" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} /></SaveErrorField></Field>
               <Field label={<><span className={styles.allocLabel}>LINE 専用</span></>}><SaveErrorField names={["line","alloc.line"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} /></SaveErrorField></Field>
               <Field label={<><span className={styles.allocLabel}>当日（ウォークイン）</span></>}><SaveErrorField names={["walkin","alloc.walkin"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="当日（ウォークイン）" value={alloc.walkin} onChange={(walkin) => updateAlloc({ ...alloc, walkin })} /></SaveErrorField></Field>
               <div className={styles.allocField}><span className={styles.allocLabel}>店頭・電話</span>
                 <span className={styles.remainder}>{`${remainder}（残り）`}</span>
               </div>
             </div>
-            <p className={`${styles.note} ${allocInvalid ? styles.noteInvalid : ''}`}>OTA・LINE・当日の合計が総数を超えると保存できません。予約媒体へは書き戻しません（検証中）</p>
+            <p className={`${styles.note} ${allocInvalid ? styles.noteInvalid : ''}`}>予約サイト・LINE・当日の合計が総数を超えると保存できません。予約サイトへは書き戻しません（検証中）</p>
           </Card>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
             <StockListHeading date={date} busy={busy} onChange={changeDate}>
@@ -468,12 +468,12 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               <Card layout="vertical" padding="default" gap="tight" surface="inset" aria-label={`${selected.time} の配分だけ直す`}>
                 <h3 className={styles.sectionTitle}>{`行を押したとき：${selected.time} の配分だけ直す`}</h3>
                 <div className={styles.slotGrid}>
-                  <Field label={<><span className={styles.slotLabel}>OTA（予約媒体）</span></>}><SaveErrorField names={["ota","currentSlotAlloc.ota"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のOTA`} value={currentSlotAlloc.ota} onChange={(ota) => updateSlot({ ...currentSlotAlloc, ota })} /></SaveErrorField></Field>
+                  <Field label={<><span className={styles.slotLabel}>予約サイト</span></>}><SaveErrorField names={["ota","currentSlotAlloc.ota"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}の予約サイト`} value={currentSlotAlloc.ota} onChange={(ota) => updateSlot({ ...currentSlotAlloc, ota })} /></SaveErrorField></Field>
                   <Field label={<><span className={styles.slotLabel}>LINE 専用</span></>}><SaveErrorField names={["line","currentSlotAlloc.line"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(line) => updateSlot({ ...currentSlotAlloc, line })} /></SaveErrorField></Field>
                   <Field label={<><span className={styles.slotLabel}>当日（ウォークイン）</span></>}><SaveErrorField names={["walkin","currentSlotAlloc.walkin"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(walkin) => updateSlot({ ...currentSlotAlloc, walkin })} /></SaveErrorField></Field>
                 </div>
                 <div className={styles.slotActions}>
-                  <span className={styles.slotBase}>{`全部の時間帯の配分：OTA ${alloc.ota}・LINE ${alloc.line}・当日 ${alloc.walkin}（上で入れた数）`}</span>
+                  <span className={styles.slotBase}>{`全部の時間帯の配分：予約サイト ${alloc.ota}・LINE ${alloc.line}・当日 ${alloc.walkin}（上で入れた数）`}</span>
                   {canEdit ? (
                     <>
                       <Button onClick={() => updateSlot({ ...alloc })}>全体の配分に戻す</Button>
@@ -589,7 +589,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
       >
         <p className={styles.dialogLead}>席が少なくなりました。媒体の受付は、各媒体の管理画面で閉じてください。閉じたものに印を付けて記録します。</p>
         {closingChannels.length === 0 ? (
-          <DialogNote>受け取っている予約媒体がありません。「予約経路の連携」で確かめてください。</DialogNote>
+          <DialogNote>受け取っている予約サイトがありません。「予約経路の連携」で確かめてください。</DialogNote>
         ) : (
           <div className={styles.checkList}>
             {closingChannels.map((channel) => (
@@ -599,7 +599,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
             ))}
           </div>
         )}
-        <DialogNote>記録はこの画面だけに残ります。予約媒体へは書き戻しません（検証環境は受信専用）。閉じ忘れのまま予約が入ったら、予約台帳で重なった予約として確かめてください。</DialogNote>
+        <DialogNote>記録はこの画面だけに残ります。予約サイトへは書き戻しません（検証環境は受信専用）。閉じ忘れのまま予約が入ったら、予約台帳で重なった予約として確かめてください。</DialogNote>
       </RsDialog>
       <RsDialog
         open={diffOpen && Boolean(conflict)}
@@ -624,7 +624,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
 function ConflictDiff({ conflict, latestAlloc, latestHours }: { conflict: Conflict; latestAlloc: Alloc; latestHours: Hours | null }) {
   const lines: Array<{ label: string; mine: string; latest: string }> = []
   if (conflict.attemptedAlloc) {
-    lines.push({ label: 'OTA（予約媒体）', mine: String(conflict.attemptedAlloc.ota), latest: String(latestAlloc.ota) })
+    lines.push({ label: '予約サイト', mine: String(conflict.attemptedAlloc.ota), latest: String(latestAlloc.ota) })
     lines.push({ label: 'LINE 専用', mine: String(conflict.attemptedAlloc.line), latest: String(latestAlloc.line) })
     lines.push({ label: '当日（ウォークイン）', mine: String(conflict.attemptedAlloc.walkin), latest: String(latestAlloc.walkin) })
   }

@@ -105,7 +105,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
     <Dialog
       open={open}
       title="一括プレビュー"
-      description="起点からの各通の届く日時と内容の見本です。送りはしません。下書きの通には札を付けますが、実際の配信と友だち別の予定には入りません。"
+      description="起点からの各通の届く日時と内容の見本です。送りはしません。下書きの通には印を付けますが、実際の配信と友だち別の予定には入りません。"
       onCancel={onClose}
     >
       <div className="mb-4">
