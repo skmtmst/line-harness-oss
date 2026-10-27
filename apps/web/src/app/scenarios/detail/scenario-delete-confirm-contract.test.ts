@@ -1,36 +1,15 @@
 import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
+/*
+ * シナリオ全体を削除する確認の動き（共通の窓で開く・影響を読む・成功だけ閉じる・失敗は窓に残す・二度押し）は
+ * v8/scenario-detail/detail-actions.test.tsx が画面を描いて押して守る。ここには戻してはいけない書き方の見張りだけを残す。
+ */
 const PAGE = readFileSync(new URL('./scenario-detail-client.tsx', import.meta.url), 'utf8')
 
 describe("管理画面 dqFft シナリオ全体を削除する確認", () => {
-  it('ブラウザ標準confirmを使わず安定した押し口から共通窓を開く', () => {
+  it('ブラウザ標準confirmと、通信のせいにする古い失敗文へ戻さない', () => {
     expect(PAGE).not.toContain('if (!confirm(message)) return')
-    expect(PAGE).toContain("id: 'delete'")
-    expect(PAGE).toContain('setDeleteScenarioOpen(true)')
-    expect(PAGE).toContain('open={deleteScenarioOpen && scenario !== null}')
-    expect(PAGE).toContain('confirmLabel="このシナリオを削除する"')
-    expect(PAGE).toContain('destructive')
-  })
-
-  it('未取得と実値0と購読中を同じ数字にせず削除の影響を読む', () => {
-    expect(PAGE).toContain('stats?.activeNow === undefined')
-    expect(PAGE).toContain('stats.activeNow === 0')
-    expect(PAGE).toContain('購読中の人数は確認できません。')
-    expect(PAGE).toContain('現在購読中の友だちは0人です。')
-    expect(PAGE).toContain('人が購読中です。途中の人は続きを受け取れません。')
-    expect(PAGE).toContain('シナリオの設定と今後の配信が削除されます。')
-    expect(PAGE).toContain('これまでの配信履歴は監査記録として残ります。')
-    expect(PAGE).toContain('この操作は取り消せません。')
-  })
-
-  it('二重削除を止め、成功時だけ閉じ、失敗は窓の中で日本語にする', () => {
-    expect(PAGE).toContain('if (!scenario || deletingScenario) return')
-    expect(PAGE).toContain('busy={deletingScenario}')
-    expect(PAGE).toContain('error={deleteScenarioError}')
-    expect(PAGE).toContain('if (!res.success) throw new Error(res.error)')
-    expect(PAGE).toContain("setDeleteScenarioOpen(false)")
-    expect(PAGE).toContain('このシナリオを削除できませんでした。状態を読み直してから')
     expect(PAGE).not.toContain("setError('削除に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 })
