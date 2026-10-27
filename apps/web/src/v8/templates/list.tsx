@@ -987,6 +987,7 @@ export default function TemplatesListV8() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              loading={loading}
             />
           ))}
         </KpiBand>

@@ -35,7 +35,7 @@ export default function V8PartsPage() {
       <SampleScreenNotice what="V8 で新たに生えた部品" backHref="/settings" backLabel="設定へ戻る" />
 
       <section>
-        <h2 className="text-sm font-bold text-ink">OTP入力（2段階認証の6桁）</h2>
+        <h2 className="text-sm font-bold text-ink">OTP入力（二段階認証の6桁）</h2>
         <div className="mt-3">
           <OtpInput value={code} onChange={setCode} label="認証コード" />
         </div>
@@ -75,14 +75,14 @@ export default function V8PartsPage() {
       </section>
 
       <section>
-        <h2 className="text-sm font-bold text-ink">状態の札（送信済み・対応済み）</h2>
+        <h2 className="text-sm font-bold text-ink">状態の印（送信済み・対応済み）</h2>
         <div className="mt-3 flex items-center gap-3">
           <StatusBadge tone="success">送信済み</StatusBadge>
         </div>
       </section>
 
       <section>
-        <h2 className="text-sm font-bold text-ink">増減の札（良い・悪い・要確認）</h2>
+        <h2 className="text-sm font-bold text-ink">増減の印（良い・悪い・要確認）</h2>
         <div className="mt-3 flex items-center gap-3">
           <DeltaChip tone="up">+2.6%</DeltaChip>
           <DeltaChip tone="down">−1.1pt</DeltaChip>

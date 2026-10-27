@@ -438,7 +438,7 @@ export default function FeatureSettingsScreen() {
               kind="empty"
               emptyPreset="filtered"
               title="条件に合うものはありません"
-              description="札や検索を外すと、すべて出ます"
+              description="絞り込みや検索を外すと、すべて出ます"
               action={<Button type="button" variant="secondary" onClick={() => setQuery('')}>条件を外す</Button>}
             />
           ) : (

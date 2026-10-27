@@ -144,9 +144,9 @@ describe('段ごとの確かめで［次へ］を止める', () => {
     try {
       expect(stepCount()).toBe('1/5 基本設定')
       expect(button('対象設定へ').disabled).toBe(true)
-      expect(footerReason()).toBe('管理用タイトルを入力してください')
+      expect(footerReason()).toBe('配信名を入力してください')
       // 読み上げでも理由が分かるよう、ボタンから理由の1行へ結び付ける。
-      expect(document.getElementById(button('対象設定へ').getAttribute('aria-describedby') ?? '')?.textContent).toBe('管理用タイトルを入力してください')
+      expect(document.getElementById(button('対象設定へ').getAttribute('aria-describedby') ?? '')?.textContent).toBe('配信名を入力してください')
       await click(button('対象設定へ'))
       expect(onStepChange).not.toHaveBeenCalled()
 
@@ -163,10 +163,10 @@ describe('段ごとの確かめで［次へ］を止める', () => {
   it('下書きの保存も、帯と同じ理由で止める（帯は通るのに保存で断られる、を作らない）', async () => {
     await renderForm('basic')
     try {
-      expect(footerReason()).toBe('管理用タイトルを入力してください')
+      expect(footerReason()).toBe('配信名を入力してください')
       await click(button('下書きを保存する'))
       expect(createApi).not.toHaveBeenCalled()
-      expect(container.textContent).toContain('管理用タイトルを入力してください')
+      expect(container.textContent).toContain('配信名を入力してください')
     } finally {
       unmount()
     }

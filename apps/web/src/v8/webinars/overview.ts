@@ -39,8 +39,8 @@ export function kpiCells(overview: WebinarOverview | null) {
       detail: rate === null ? emptyValue('unknown') : `申込の ${Math.round(rate * 1000) / 10}%`, help: `視聴開始の人数です。視聴完了は一覧の集計では出していません。${metricReasons([['視聴人数', m?.viewers], ['視聴率', m?.viewRate]])}`,
     },
     {
-      key: 'cta', title: 'CTAクリック', icon: MousePointerClick, value: metricValue(m?.ctaTotalClicks), unit: '回',
-      detail: people === null ? emptyValue('unknown') : `押した人 ${formatNumber(people)}人`, help: `全期間にCTAが押された延べ回数です。${metricReasons([['CTAクリック', m?.ctaTotalClicks], ['CTAを押した人', m?.ctaUniquePeople]])}`,
+      key: 'cta', title: '案内ボタンを押した数', icon: MousePointerClick, value: metricValue(m?.ctaTotalClicks), unit: '回',
+      detail: people === null ? emptyValue('unknown') : `押した人 ${formatNumber(people)}人`, help: `全期間に案内ボタンが押された延べ回数です。${metricReasons([['案内ボタンを押した数', m?.ctaTotalClicks], ['案内ボタンを押した人', m?.ctaUniquePeople]])}`,
     },
   ]
 }

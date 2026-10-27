@@ -90,7 +90,7 @@ describe('UpcomingCard（今後の予定）', () => {
     const links = [...el.querySelectorAll('a')] as HTMLAnchorElement[]
     expect(links.map((a) => a.getAttribute('href'))).toEqual(['/reminders', '/broadcasts', '/booking/bookings?view=list'])
     expect(el.textContent).toContain('配信')
-    expect(el.textContent).toContain('リマインダー')
+    expect(el.textContent).toContain('リマインダ')
     expect(el.textContent).toContain('予約')
   })
 

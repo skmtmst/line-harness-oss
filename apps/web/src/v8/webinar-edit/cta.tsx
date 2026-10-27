@@ -42,7 +42,7 @@ import StatusBadge from '@/components/shared/status-badge'
 
 /*
  * ★V8 ウェビナーの ③CTA・フォーム（Pencil ・同時編集の帯 ）。
- * CTA カードの並び（時刻・見出し・種類・「…」）→ 選んでいるカードの中身 → 申込に使う回答フォーム。
+ * 案内ボタンのカードの並び（時刻・見出し・種類・「…」）→ 選んでいるカードの中身 → 申込に使う回答フォーム。
  * 右はカードの見え方。
  * 口・保存前の確かめ・同時編集（409）の扱いは BEHAVIOR.md。
  */
@@ -170,7 +170,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
 
       if (isConflict(cause)) { setConflictScope('cards'); setConflict(true); setLatest(null); return false }
       { if (!fieldFailure)
-      setMessage('CTA カードを保存できませんでした。入力は残っています。もう一度保存してください。') }
+      setMessage('案内ボタンのカードを保存できませんでした。入力は残っています。もう一度保存してください。') }
       return false
     }
   }
@@ -293,12 +293,12 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     >
 
       <Card variant="form" gap="normal" aria-labelledby="webinar-cta-title" data-wc-pane="cta">
-        <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? 'CTA カード' : `CTA カード ${formatNumber(ctas.length)} 枚`}</h2></div>
+        <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? '案内ボタンのカード' : `案内ボタンのカード ${formatNumber(ctas.length)} 枚`}</h2></div>
         <p className={styles.desc}>動画の途中で出す申し込みボタンです。出す時刻は 分:秒 で入れます。</p>
         {message ? <Notice tone="danger">{message}</Notice> : null}
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
         {loadFailed ? (
-          <ListState kind="error" title="CTA カードを読み込めませんでした" description="読み込めるまで保存はできません。" onRetry={() => void loadCtas()} />
+          <ListState kind="error" title="案内ボタンのカードを読み込めませんでした" description="読み込めるまで保存はできません。" onRetry={() => void loadCtas()} />
         ) : ctas === null ? <ListState kind="loading" /> : <>
           {ctas.map((card, index) => (
             <div key={index} className={form.listRow} data-selected={index === currentIndex || undefined}>
@@ -320,7 +320,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
           ))}
           {ctas.length === 0 ? <p className={form.cardNote}>まだカードがありません。</p> : null}
           {readOnly ? null : (
-            <div><Button disabled={busy} onClick={() => { setCtas((prev) => [...(prev ?? []), EMPTY_CARD(0)]); setTimes((prev) => [...prev, '0:00']); setSelected(ctas.length) }}><Plus size={16} aria-hidden="true" />CTA カードを足す</Button></div>
+            <div><Button disabled={busy} onClick={() => { setCtas((prev) => [...(prev ?? []), EMPTY_CARD(0)]); setTimes((prev) => [...prev, '0:00']); setSelected(ctas.length) }}><Plus size={16} aria-hidden="true" />案内ボタンのカードを足す</Button></div>
           )}
           {current ? (
             <fieldset className={styles.editor} disabled={busy}>
@@ -388,7 +388,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         {registrationError ? <p className={form.fieldError} role="alert">{registrationError}</p> : null}
       </Card>
 
-      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description={conflictScope === 'form' ? '申込フォームを保存されている最新版に置き換えます。CTA カードの入力は残します。' : '保存されている最新の CTA カードと申込フォームに置き換えます。この画面で直したところは消えます。'} confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
+      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description={conflictScope === 'form' ? '申込フォームを保存されている最新版に置き換えます。案内ボタンのカードの入力は残します。' : '保存されている最新の 案内ボタンのカードと申込フォームに置き換えます。この画面で直したところは消えます。'} confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
       {compareOpen && latest ? (
         <Dialog open title="違いを比べる" description="左がこの画面の入力、右が保存されている最新です。" confirmLabel="最新を読み込んで続ける" onConfirm={() => { setCompareOpen(false); setReplaceConfirm(true) }} onCancel={() => setCompareOpen(false)}>
           <DataTable className={styles.compare}>

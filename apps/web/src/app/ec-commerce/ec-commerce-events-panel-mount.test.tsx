@@ -450,7 +450,7 @@ describe('EC取込一覧の絞り込み0件 (#635)', () => {
 
     // 「0件」と分かる表示＋次の行動提案（別の言葉・絞り込み解除）。
     expect(el.textContent).toContain('条件に合うものはありません')
-    expect(el.textContent).toContain('札や検索を外すと、すべて出ます')
+    expect(el.textContent).toContain('絞り込みや検索を外すと、すべて出ます')
     const clear = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '条件を外す')
     expect(clear).toBeTruthy()
 

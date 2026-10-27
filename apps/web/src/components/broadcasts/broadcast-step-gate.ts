@@ -55,7 +55,7 @@ export const SEND_TIME_MISSING_MESSAGE = '送る時間を選んでください'
 export function broadcastStepProblems(input: BroadcastStepCheckInput): BroadcastStepProblems {
   const title = input.title.trim()
   const basic: BroadcastStepProblem | null = !title
-    ? { message: '管理用タイトルを入力してください', blocksSave: true }
+    ? { message: '配信名を入力してください', blocksSave: true }
     : title.length > input.titleMax
       ? { message: `配信名は${input.titleMax}文字までにしてください`, blocksSave: true }
       : null
