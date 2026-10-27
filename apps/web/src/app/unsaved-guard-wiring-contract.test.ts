@@ -170,6 +170,7 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   'v8/scenario-detail/use-scenario-settings.tsx': 'v8/scenario-detail/detail.tsx',
   // 統合後の入力の持ち主。各画面が dirty を型／番兵へ渡す。
   'v8/booking-gap/series-drawer.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/booking-menus/customer-booking.tsx': 'v8/booking-menus/menu-form.tsx',
   'v8/booking-menus/meeting-mode.tsx': 'v8/booking-menus/menu-form.tsx',
   'v8/booking-menus/staff-calendar.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/booking-menus/tabs/staff-tab.tsx': 'v8/booking-menus/settings.tsx',
