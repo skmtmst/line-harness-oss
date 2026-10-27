@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { openPage } from './browser-env.mjs'
@@ -8,16 +8,18 @@ if (!baseUrl || !outDir || !apiUrl) throw new Error('使い方: tone-after-shots
 // ダッシュボードは使い方のスタイルで中身が変わるので、6 つ全部を撮る。
 const dashboardStyles = ['standard', 'restaurant', 'salon', 'consult', 'lesson', 'ec']
 const routes = {
-  ...Object.fromEntries(dashboardStyles.map(style => [`dashboard-${style}`, '/'])),
+  ...Object.fromEntries(dashboardStyles.map(style => [style === 'standard' ? 'dashboard' : `dashboard-${style}`, '/'])),
   broadcasts: '/broadcasts',
   tags: '/tags',
   inbox: '/chats',
-  accounts: '/accounts',
+  accounts: '/hq',
+  'line-accounts': '/accounts',
   settings: '/settings',
   login: '/login',
 }
 mkdirSync(outDir, { recursive: true })
 const browser = await chromium.launch()
+const results = []
 for (const width of [1152, 1440]) {
   for (const [name, route] of Object.entries(routes)) {
     const style = name.startsWith('dashboard-') ? name.slice('dashboard-'.length) : 'standard'
@@ -27,7 +29,8 @@ for (const width of [1152, 1440]) {
       body: JSON.stringify({ style }),
     })
     if (!response.ok) throw new Error(`dashboard style fixture failed: ${style} ${response.status}`)
-    const page = await openPage(browser, { baseUrl, route, width, stable: true, requireSuccess: true })
+    const pageErrors = []
+    const page = await openPage(browser, { baseUrl, route, width, stable: true, requireSuccess: true, onPageError: error => pageErrors.push(error.message) })
     // Hide only the Next.js development portal; it is not part of the product UI.
     await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' })
     await page.waitForTimeout(300)
@@ -39,11 +42,16 @@ for (const width of [1152, 1440]) {
     }))
     const firstLineIssues = await page.locator('[data-notice-dot]').evaluateAll(elements => elements.flatMap(element => {
       const message = element.nextElementSibling
-      const heading = message?.querySelector('[class*="heading"]')
-      if (!heading) return []
+      const heading = message?.querySelector('[data-notice-heading]') ?? message
+      if (!heading) return ['Notice message missing']
+      const walker = document.createTreeWalker(heading, NodeFilter.SHOW_TEXT)
+      let text
+      while ((text = walker.nextNode()) && !text.textContent.trim()) { /* 最初の文字まで進む。 */ }
+      if (!text) return ['Notice first character missing']
       const range = document.createRange()
-      range.selectNodeContents(heading)
-      const firstLine = range.getClientRects()[0]
+      range.setStart(text, 0)
+      range.setEnd(text, 1)
+      const firstLine = range.getBoundingClientRect()
       if (!firstLine) return []
       const dot = element.getBoundingClientRect()
       const dotCenter = dot.top + dot.height / 2
@@ -61,13 +69,15 @@ for (const width of [1152, 1440]) {
     }))
     const actionRowIssues = await page.locator('[data-card-action-row]').evaluateAll(elements => elements.flatMap(element => {
       const style = getComputedStyle(element)
-      const columns = style.gridTemplateColumns.split(' ').map(Number)
+      const columns = style.gridTemplateColumns.split(' ').map(Number.parseFloat)
       return style.display === 'grid' && columns.length === 2 && Math.abs(columns[0] - columns[1]) < 1 ? [] : [`CardActionRow ${style.display} ${style.gridTemplateColumns}`]
     }))
-    if (shapeIssues.length || firstLineIssues.length || actionRowIssues.length || cardEdgeIssues.length) throw new Error([...shapeIssues, ...firstLineIssues, ...actionRowIssues, ...cardEdgeIssues].join('\n'))
+    if (pageErrors.length || shapeIssues.length || firstLineIssues.length || actionRowIssues.length || cardEdgeIssues.length) throw new Error([...pageErrors, ...shapeIssues, ...firstLineIssues, ...actionRowIssues, ...cardEdgeIssues].join('\n'))
+    results.push({ name, route, style, width, url: page.url(), title: await page.title(), pageErrors, notices: await page.locator('[data-notice-dot]').count(), cards: await page.locator('[data-design-part="card"]').count() })
     await page.screenshot({ path: join(outDir, `${name}-${width}.png`) })
     await page.close()
   }
 }
 await browser.close()
+writeFileSync(join(outDir, 'capture-results.json'), `${JSON.stringify(results, null, 2)}\n`)
 console.log(`撮影 ${Object.keys(routes).length * 2} 枚 → ${outDir}`)

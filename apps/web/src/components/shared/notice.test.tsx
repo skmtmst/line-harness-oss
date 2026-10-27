@@ -26,7 +26,7 @@ describe('帯（Notice）の4種類', () => {
     const body = render(<Notice tone={tone}><p>一覧を読み込めませんでした。</p></Notice>)
     expect(word(body.container)).toBe(expected)
     // 本文だけの帯では、点のすぐ後ろの本文の頭に置く。
-    if (expected) expect(body.container.querySelector('[data-design-part="notice"] > div')?.firstElementChild?.hasAttribute('data-notice-status-word')).toBe(true)
+    if (expected) expect(body.container.querySelector('[data-notice-message]')?.firstElementChild?.hasAttribute('data-notice-status-word')).toBe(true)
   })
 
   it('呼び出し側が同じ言葉で書き出している時は重ねない', () => {
@@ -46,7 +46,7 @@ describe('帯（Notice）の4種類', () => {
     const dot = notice.querySelector('[data-notice-dot]')
     expect(dot?.tagName).toBe('SPAN')
     expect(dot?.getAttribute('aria-hidden')).toBe('true')
-    expect(notice.firstElementChild).toBe(dot)
+    expect(notice.querySelector('[data-notice-message]')?.previousElementSibling).toBe(dot)
     expect(notice.querySelector('svg')).toBeNull()
     expect(notice.className).toContain(tone)
   })
@@ -116,9 +116,9 @@ describe('帯（Notice）の4種類', () => {
     expect(notice.getAttribute('data-action-layout')).toBe('stack-on-narrow')
     expect(screen.getByText('いつもと違う端末からのログインです')).toBeTruthy()
     expect(screen.getByRole('link', { name: '端末を確認する' }).getAttribute('href')).toBe('/staff')
-    expect(container.querySelector('[role="note"] > [data-notice-dot][aria-hidden="true"]')).not.toBeNull()
+    expect(container.querySelector('[role="note"] [data-notice-dot][aria-hidden="true"]')).not.toBeNull()
     // 閉じる口は操作と同じ行に入れ、操作のボタンと縦の真ん中をそろえる。
-    expect(notice.children.length).toBe(3)
+    expect(notice.children.length).toBe(2)
     expect(screen.getByRole('button', { name: '通知を閉じる' }).parentElement).toBe(screen.getByRole('link', { name: '端末を確認する' }).parentElement)
     fireEvent.click(screen.getByRole('button', { name: '通知を閉じる' }))
     expect(onClose).toHaveBeenCalledOnce()

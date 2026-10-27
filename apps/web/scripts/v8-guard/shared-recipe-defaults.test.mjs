@@ -18,9 +18,12 @@ const compiled = await build({
     import React,{useState} from 'react'; import {createRoot} from 'react-dom/client';
     import {EntityPickerField} from './src/components/shared/entity-picker';
     import {Field} from './src/components/shared/form-controls';
+    import Notice from './src/components/shared/notice';
+    import Button from './src/components/shared/button';
     import SurfaceLayoutFixture from './scripts/v8-guard/surface-layout-fixture';
 
     function Fixture(){const [value,setValue]=useState('one');
+      if(window.noticeFixture)return <main id="notice-fixtures">{['body','heading','compact','compact-info','help','danger','success'].flatMap(kind=>['action','close','none'].map(operation=><Notice key={kind+operation} data-notice-fixture={kind} tone={kind==='compact-info'?'info':kind==='danger'?'danger':kind==='success'?'success':'warn'} compact={kind.startsWith('compact')} title={kind==='compact-info'?'長い案内の全文':undefined} heading={kind==='heading'||kind==='help'?<>保存の状態を確認してください。長い題が折り返しても最初の行に点をそろえます。</>:undefined} help={kind==='help'?'確認する内容の説明':undefined} action={operation==='action'?<Button>内容を見る</Button>:undefined} onClose={operation==='close'?()=>{}:undefined}>{kind==='body'?<p>一覧を読み直してください。文章が長い時も最初の文字に点をそろえて表示します。</p>:kind==='compact-info'?'長い案内の内容をここに表示します。全文は省略しても確認できます。表示しきれない時だけ省略します。':'入力は残っています。'}</Notice>))}</main>;
       if(window.surfaceFixture)return <main><SurfaceLayoutFixture/></main>;
       return <main>
         <section id="controls"><EntityPickerField label="使うテンプレート" noun="テンプレート" value={value} onChange={setValue} items={[{id:'one',name:'予約案内'},{id:'two',name:'来店のお礼'}]}/>
@@ -55,6 +58,69 @@ const compiled = await build({
 })
 const globals = readFileSync(new URL('../../src/app/globals.css', import.meta.url), 'utf8').replace(/@theme\s*\{/g, ':root {')
 const css = [globals, ...sheets].join('\n').replace(/:global\(([^()]*)\)/g, '$1')
+
+/** 点は知らせ全体ではなく、題（無い時は本文）の最初の文字にそろえる。 */
+function noticeDotOffsets(notices) {
+  return notices.map(notice => {
+    const dot = notice.querySelector('[data-notice-dot]').getBoundingClientRect()
+    const content = notice.querySelector('[data-notice-heading]') ?? notice.querySelector('[data-notice-message]')
+    const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT)
+    let text
+    while ((text = walker.nextNode()) && !text.textContent.trim()) { /* 最初の文字まで進む。 */ }
+    if (!text) throw new Error('知らせの最初の文字がありません')
+    const range = document.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, 1)
+    const first = range.getBoundingClientRect()
+    return { offset: Math.abs(dot.top + dot.height / 2 - first.top - first.height / 2), width: dot.width, height: dot.height }
+  })
+}
+
+for (const width of [1152, 1440]) test(`知らせの点は題・本文の1行目にそろう（操作・閉じる・小さい帯・説明付き、${width}px）`, async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width, height: 1800 } })
+    await page.setContent(`<html data-theme="v8"><style>${css}@layer base{*{box-sizing:border-box;margin:0}}#notice-fixtures{width:420px;margin:24px auto}</style><div id="root"></div></html>`)
+    await page.evaluate(() => { window.noticeFixture = true })
+    await page.addScriptTag({ content: compiled.outputFiles[0].text })
+    const notices = page.locator('#notice-fixtures [data-design-part="notice"]')
+    await notices.last().waitFor()
+    const measure = () => notices.evaluateAll(noticeDotOffsets)
+    const assertAligned = rows => {
+      assert.equal(rows.length, 21)
+      assert.ok(rows.every(row => row.offset <= 1 && row.width === 8 && row.height === 8), JSON.stringify(rows))
+    }
+    assertAligned(await measure())
+    const colorPairs = await notices.evaluateAll(nodes => nodes.map(node => {
+      const tokens = { warn: '--color-status-warn', danger: '--color-status-danger', info: '--color-status-info', success: '--color-success' }
+      const probe = document.createElement('span')
+      probe.style.cssText = `position:fixed;color:var(${tokens[node.dataset.tone]})`
+      document.body.append(probe)
+      const expected = getComputedStyle(probe).color
+      probe.remove()
+      return { actual: getComputedStyle(node.querySelector('[data-notice-dot]')).backgroundColor, expected }
+    }))
+    assert.ok(colorPairs.every(pair => pair.actual === pair.expected), JSON.stringify(colorPairs))
+    const compact = await page.locator('[data-notice-fixture="compact"], [data-notice-fixture="compact-info"]').evaluateAll(nodes => nodes.map(node => ({
+      kind: node.dataset.noticeFixture, close: !!node.querySelector('[aria-label="通知を閉じる"]'),
+      action: !!node.querySelector('[data-shared-button]'), height: node.getBoundingClientRect().height,
+      cut: node.querySelector('[data-notice-message]').scrollWidth > node.querySelector('[data-notice-message]').clientWidth,
+      whiteSpace: getComputedStyle(node.querySelector('[data-notice-message]')).whiteSpace,
+      title: node.title,
+    })))
+    for (const row of compact.filter(row => !row.action)) assert.equal(row.height, 36, JSON.stringify(row))
+    for (const row of compact.filter(row => row.kind === 'compact-info')) {
+      assert.equal(row.whiteSpace, 'nowrap')
+      assert.ok(row.cut && row.title, JSON.stringify(row))
+    }
+    await notices.first().locator('[data-notice-dot]').evaluate(dot => { dot.style.transform = 'translateY(2px)' })
+    const broken = await measure()
+    assert.throws(() => assertAligned(broken))
+    assert.ok(broken.some(row => row.offset > 1))
+    await notices.first().locator('[data-notice-dot]').evaluate(dot => dot.style.removeProperty('transform'))
+    assertAligned(await measure())
+  } finally { await browser.close() }
+})
 
 test('選択窓をキャンセルしても、別の入力欄に入れた内容を保つ', async () => {
   const browser = await connectGuardBrowser()

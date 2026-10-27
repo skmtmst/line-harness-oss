@@ -18,6 +18,7 @@
   line-height: var(--tpl-ro-band-lh);
 }
 .notice[hidden] { display: none; }
+.content { display: flex; align-items: flex-start; gap: var(--polish-space-field); min-width: 0; flex: 1; }
 .dot {
   display: block;
   flex: none;
@@ -34,7 +35,7 @@
 .warn .dot { background: var(--color-status-warn); }
 .danger .dot { background: var(--color-status-danger); }
 .message { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.notice[data-has-action] .message { flex-basis: 24em; }
+.notice[data-has-action] .content { flex-basis: 24em; }
 .headingRow { display: flex; align-items: center; gap: var(--space-6); }
 .heading { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; }
 /* 「要確認：」「失敗：」。題（題が無い時は本文）の頭に濃い文字で置く。題や本文が段落で始まっても同じ行の頭に並ぶよう、行の始まりへ寄せる。 */
@@ -56,11 +57,12 @@
 .footer { margin-top: var(--polish-space-field); padding-top: var(--polish-space-row); border-top: 1px solid var(--color-hairline); }
 /* 小さな欄の知らせも同じ面を使い、文を省略したときは全文のtitleを保つ。 */
 .notice[data-compact] { min-height: 36px; padding: var(--space-6) var(--space-10); gap: var(--space-6); font-size: var(--text-micro); }
-.notice[data-compact] .action .close { margin-block: calc(-1 * var(--space-6)); }
+.notice[data-compact] .content { gap: var(--space-6); }
+.notice[data-compact] .close { margin-block: calc(-1 * var(--space-6)); }
 .notice[data-compact] .message { flex-basis: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* 警告・失敗の文は切らずに折り返す（何が起きたかを全部読めるように）。1行の省略は案内と成功だけ。 */
 .notice[data-compact]:is([data-tone='warn'], [data-tone='danger'], [role='alert']) .message { overflow: visible; white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
-.notice[data-action-layout='stack-on-narrow'] .message { flex-basis: 24em; }
+.notice[data-action-layout='stack-on-narrow'] .content { flex-basis: 24em; }
 
 }
 

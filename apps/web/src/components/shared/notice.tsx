@@ -149,13 +149,15 @@ export default function Notice({
       data-has-action={!!action || undefined}
       data-design-node={props['data-design-node'] ?? node}
     >
-      <span className={styles.dot} data-notice-dot aria-hidden="true" />
-      <div className={styles.message}>
-        {heading ? <><div className={styles.headingRow}><div className={styles.heading} data-notice-heading>{prefix}{heading}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{body}</div></>
-          : <>{prefix}{body}</>}
-        {hasHelp && !heading ? helpTip : null}
-        {states?.length ? <NoticeStates items={states} /> : null}
-        {footer ? <div className={styles.footer}>{footer}</div> : null}
+      <div className={styles.content}>
+        <span className={styles.dot} data-notice-dot aria-hidden="true" />
+        <div className={styles.message} data-notice-message>
+          {heading ? <><div className={styles.headingRow}><div className={styles.heading} data-notice-heading>{prefix}{heading}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{body}</div></>
+            : <>{prefix}{body}</>}
+          {hasHelp && !heading ? helpTip : null}
+          {states?.length ? <NoticeStates items={states} /> : null}
+          {footer ? <div className={styles.footer}>{footer}</div> : null}
+        </div>
       </div>
       {/* ［×］は操作と同じ行に入れ、操作のボタンと縦の真ん中をそろえる（題が1行でも2行でも）。 */}
       {action ? <span className={styles.action}>{action}{closeButton}</span> : closeButton}
