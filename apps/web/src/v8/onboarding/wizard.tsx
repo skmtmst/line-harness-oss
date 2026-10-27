@@ -70,7 +70,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         {step === 'summary' ? <Button onClick={() => onClose(true)} disabled={busy}>動かさずにダッシュボードへ</Button> : null}
         {step === 'summary'
           ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${formatNumber(onCount)}件）`}</Button>
-          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}><ArrowRight aria-hidden="true" className={styles.buttonIcon} />次へ</Button>}
+          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}>次へ<ArrowRight aria-hidden="true" className={styles.buttonIcon} /></Button>}
       </div>
       <div className={step === 0 ? styles.footerEnd : styles.footerSide}>
         {step === 0 ? <StyleChoiceStatus chosen={chosenStyle} /> : null}

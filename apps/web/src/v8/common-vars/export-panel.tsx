@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type CommonVarExportJob } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { formatJstDateTime } from '@/lib/presentation'
@@ -255,8 +256,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
       ) : null}
 
       {jobs.length > 1 ? (
-        <details className="text-ink-secondary w-full text-xs">
-          <summary className="cursor-pointer">最近の書き出し（{formatNumber(jobs.length)} 件）</summary>
+        <Disclosure className="w-full text-xs" appearance="inset" size="compact" title={`最近の書き出し（${formatNumber(jobs.length)} 件）`}>
           <ul className="border-hairline divide-hairline mt-1 divide-y rounded-control border">
             {jobs.slice(0, RECENT_LIMIT).map((job) => (
               <li key={job.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
@@ -286,7 +286,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
               </li>
             ))}
           </ul>
-        </details>
+        </Disclosure>
       ) : null}
       </div>
       ) : null}

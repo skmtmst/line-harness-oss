@@ -35,7 +35,7 @@ export default function V8PartsPage() {
       <SampleScreenNotice what="V8 で新たに生えた部品" backHref="/settings" backLabel="設定へ戻る" />
 
       <section>
-        <h2 className="text-sm font-bold text-ink">OTP入力（2段階認証の6桁）</h2>
+        <h2 className="text-sm font-bold text-ink">OTP入力（二段階認証の6桁）</h2>
         <div className="mt-3">
           <OtpInput value={code} onChange={setCode} label="認証コード" />
         </div>

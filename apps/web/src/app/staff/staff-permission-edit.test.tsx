@@ -195,7 +195,7 @@ test('本人確認が失効したら、古い本人データが残っていて�
   const { forgetStaffIdentity } = await import('@/lib/staff-identity-state')
   await act(async () => { forgetStaffIdentity() })
   expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
-  expect(screen.queryByRole('menuitem', { name: /2段階の確認を設定する/ })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: /二段階認証を設定する/ })).toBeNull()
   expect(fixture.updated).toHaveLength(0)
 })
 
@@ -204,6 +204,6 @@ test('閲覧のみのスタッフは自分の行でも編集と2段階の変更�
   await act(async () => { render(<StaffPage />) })
   fireEvent.click(await screen.findByRole('button', { name: /の操作$/ }))
   expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
-  expect(screen.queryByRole('menuitem', { name: /2段階の確認を設定する/ })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: /二段階認証を設定する/ })).toBeNull()
   expect(fixture.updated).toHaveLength(0)
 })

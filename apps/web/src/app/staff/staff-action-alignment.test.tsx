@@ -215,10 +215,26 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
 
     expect(within(rowFor('対象者')).getByTitle('確認が必要')).toBeTruthy()
     fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者の操作' }))
-    expect(screen.queryByRole('menuitem', { name: '2段階の確認を設定する' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '二段階認証を設定する' })).toBeNull()
     fireEvent.keyDown(document.body, { key: 'Escape' })
     fireEvent.click(within(rowFor('ログイン中の人')).getByRole('button', { name: 'ログイン中の人の操作' }))
-    expect(screen.getByRole('menuitem', { name: '2段階の確認を設定する' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '二段階認証を設定する' })).toBeTruthy()
+  })
+
+  it('本人の二段階認証を解除する前に、設定し直せることを窓で伝える', async () => {
+    const self = state.members.find((item) => item.id === 'me')!
+    self.twoFactorEnabled = true
+    try {
+      await mount()
+      fireEvent.click(within(rowFor('ログイン中の人')).getByRole('button', { name: 'ログイン中の人の操作' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: '二段階認証を解除する' }))
+      const dialog = screen.getByRole('dialog')
+      expect(dialog.textContent).toContain('LINEログインだけでログインできるようになります。')
+      expect(dialog.textContent).toContain('あとから「二段階認証を設定する」で、設定し直せます。')
+      expect(fixture.updateStaff).not.toHaveBeenCalled()
+    } finally {
+      self.twoFactorEnabled = false
+    }
   })
 
   it('外す操作は確認前に呼ばず、確認後の素早い二度押しでも1回だけ呼ぶ', async () => {

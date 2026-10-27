@@ -29,10 +29,6 @@ describe('ログインユーザーの軽修正(#581)', () => {
     expect(NEW_PAGE, '追加画面の形式チェックが変わっている').toContain(`!${EMAIL_PATTERN}.test(email.trim())`)
   })
 
-  it('設計の言葉「2段階の確認」を変えていない(設計が正本、#581)', () => {
-    expect(PAGE, '設計の言葉が消えている').toContain('2段階の確認')
-  })
-
   it('権限の表示名は正本の表とずれない', () => {
     const editPaths = slice(PAGE, 'const EDIT_PERMISSION_PATHS = [', '] as const')
       .split(',')

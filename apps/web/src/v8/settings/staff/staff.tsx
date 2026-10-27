@@ -27,6 +27,7 @@ import { Tabs } from '@/components/shared/tabs';
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt';
 import NotificationSwitch from '@/components/ui/notification-switch'
@@ -107,7 +108,7 @@ function auditActionLabel(action: string): string {
   if (normalized.includes('update') || normalized.includes('change')) return '設定変更'
   return '操作記録'
 }
-/** 2段階の確認の QR の色（globals.css の --tpl-sa-qr-*。読めないときは墨と白）。 */
+/** 二段階認証の QR の色（globals.css の --tpl-sa-qr-*。読めないときは墨と白）。 */
 function qrColors(): { dark: string; light: string } {
   const css = typeof document !== 'undefined' ? getComputedStyle(document.documentElement) : null
   return {
@@ -751,10 +752,10 @@ function scopeShort(user: AccessUserItem, accountNames: Record<string, string>):
   return accessScopeLabel(user, accountNames)
 }
 
-/** 2段階の確認の札。オン／確認が必要（作る・送る役割で未設定）／無効（見るだけで未設定・止めた人）。 */
+/** 二段階認証の札。オン／確認が必要（作る・送る役割で未設定）／無効（見るだけで未設定・止めた人）。 */
 function twoFactorState(user: AccessUserItem): { label: string; tone: 'success' | 'warning' | 'neutral' } {
   if (user.status === 'suspended') return { label: '利用停止中', tone: 'neutral' }
-  if (user.mfaEnabled) return { label: '2段階 オン', tone: 'success' }
+  if (user.mfaEnabled) return { label: '二段階認証 オン', tone: 'success' }
   if (user.roleBundle === 'view_only') return { label: '無効', tone: 'neutral' }
   return { label: '確認が必要', tone: 'warning' }
 }
@@ -1054,8 +1055,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     if (member?.role === 'owner' || (me?.role === 'owner' && me.id === user.id)) return 'owner'
     return user.roleBundle
   }
-  /* 右の「直したあとの列」：状態ごとに1人ずつの例（2段階 オン・確認が必要・無効）。 */
-  const examples = (['2段階 オン', '確認が必要', '無効'] as const)
+  /* 右の「直したあとの列」：状態ごとに1人ずつの例（二段階認証 オン・確認が必要・無効）。 */
+  const examples = (['二段階認証 オン', '確認が必要', '無効'] as const)
     .map((label) => filteredUsers.find((user) => twoFactorState(user).label === label))
     .filter((user): user is AccessUserItem => Boolean(user))
   const rowMenuItems = (user: AccessUserItem): ActionMenuItem[] => {
@@ -1067,7 +1068,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     const items: ActionMenuItem[] = []
     if (editable && member) items.push({ id: 'edit', label: '役割を変える', qaOpen: 'EOTS4-edit', onSelect: () => { close(); router.push(`/staff/edit?id=${encodeURIComponent(member.id)}`) } })
     items.push({ id: 'scope', label: administrator ? '見える画面' : '見える画面を見る', onSelect: () => { close(); openPermissions(user) } })
-    if (isSelf && member && editable) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '2段階の確認を解除する' : '2段階の確認を設定する', onSelect: () => { close(); openTwoFactor(member) } })
+    if (isSelf && member && editable) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '二段階認証を解除する' : '二段階認証を設定する', onSelect: () => { close(); openTwoFactor(member) } })
     if (resendable && member) items.push({ id: 'resend', label: 'もう一度送る', disabled: resendingId !== null, disabledReason: resendingId === member.id ? '送信中…' : undefined, onSelect: () => { close(); void runResend(member) } })
     if (administrator && member && !isSelf) {
       const policy = staffActionPolicy({ member, currentUserId: me?.id ?? null, administrator: true, activeAdministratorCount })
@@ -1177,7 +1178,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                     <div key={role.id} className={styles.roleCard}>
                       <p className={styles.roleCardHead}><span>{role.name}</span><span className={styles.roleCount}>{`${formatNumber(role.assignedUserCount)} 人`}</span></p>
                       <p className={styles.roleCardBody}>{role.description}</p>
-                      <p className={styles.roleCardFoot}>{role.requiresMfa ? '2段階の確認が必要' : role.featureAccess === 'view' ? '閲覧のみ' : role.featureAccess === 'custom' ? '機能ごとに設定' : '編集できる'}</p>
+                      <p className={styles.roleCardFoot}>{role.requiresMfa ? '二段階認証が必要' : role.featureAccess === 'view' ? '閲覧のみ' : role.featureAccess === 'custom' ? '機能ごとに設定' : '編集できる'}</p>
                     </div>
                   ))}
                 </div>
@@ -1193,7 +1194,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                   <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} />
                 </div>
               ) : null}
-              {tab === 'members' ? <details className={styles.sessions}><summary>ログイン中の端末を確認</summary><SessionsCard /></details> : null}
+              {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認"><SessionsCard /></Disclosure> : null}
             </>
           )}
         </div>
@@ -1202,7 +1203,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             {administrator ? (
               <section className={styles.asideCard} aria-label="直したあとの列">
                 <h2 className={styles.asideTitle}>直したあとの列</h2>
-                <p className={styles.asideLead}>表に足す列：職位・見せる範囲・2段階の確認・最後の操作（下は1人分の中身の例）</p>
+                <p className={styles.asideLead}>表に足す列：職位・見せる範囲・二段階認証・最後の操作（下は1人分の中身の例）</p>
                 {examples.map((user) => {
                   const state = twoFactorState(user)
                   return (
@@ -1242,7 +1243,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       <ConfirmDialog
         open={disablingTarget !== null}
         title={disablingTarget ? `${disablingTarget.name} の二段階認証を解除しますか？` : ''}
-        description="このユーザーはLINEログインだけでログインできるようになります。登録済みの認証アプリは使えなくなります。あとから「2段階の確認を設定する」で、設定し直せます。"
+        description="このユーザーはLINEログインだけでログインできるようになります。登録済みの認証アプリは使えなくなります。あとから「二段階認証を設定する」で、設定し直せます。"
         confirmLabel="解除する"
         busy={disablingTwoFactor}
         error={disableError}

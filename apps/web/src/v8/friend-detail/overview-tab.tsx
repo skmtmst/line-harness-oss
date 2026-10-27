@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import TextLink from '@/components/shared/text-link'
 import TagPill from '@/components/shared/tag-pill'
 import CustomerInfoPanel, { CustomerInfoRail } from '@/components/shared/customer-info-panel'
 import TagOverflow from '@/components/shared/tag-overflow'
@@ -353,7 +354,7 @@ export default function OverviewTab({
                     </span>
                     <span className={styles.recentText}>
                       {src
-                        ? <a className={styles.recentTitle} href={src.href} target={src.external ? '_blank' : undefined} rel="noreferrer" title={item.summary}>{item.summary}</a>
+                        ? <span className={styles.recentTitle}><TextLink href={src.href} external={src.external} title={item.summary}>{item.summary}</TextLink></span>
                         : <span className={styles.recentTitle} title={item.summary}>{item.summary}</span>}
                       <span className={styles.recentSub}>{[timelineTypeLabel(item.type), item.lineAccount?.name].filter(Boolean).join('・')}</span>
                     </span>

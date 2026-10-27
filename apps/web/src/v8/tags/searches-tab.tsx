@@ -404,7 +404,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
                 <Td className={styles.searchColOpen}>
                   {search.lineAccountId ? (
                     <Button href={`/friends?savedSearch=${search.id}`} aria-label={`「${search.name}」で友だち一覧を開く`}>
-                      <ArrowRight size={16} aria-hidden="true" />友だち一覧へ
+                      友だち一覧へ<ArrowRight size={16} aria-hidden="true" />
                     </Button>
                   ) : null}
                 </Td>
