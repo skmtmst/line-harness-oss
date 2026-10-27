@@ -6,7 +6,7 @@ export function fitListColumns(frame) {
   if (!body) return
   const nameIndex = [...body.children].findIndex(cell => cell.hasAttribute('data-cell-grow') || cell.querySelector('[data-list-name], [data-row-link], [data-list-name-cell]'))
   if (nameIndex < 0) return
-  const flexibleContent = frame.dataset.columnSizing === 'content'
+  const flexibleContent = frame.hasAttribute('data-column-layout') && frame.dataset.columnSizing === 'content'
   const scope = `${Math.round(frame.getBoundingClientRect().width)}:${body.children.length}:${nameIndex}:${[...body.children].map(cell => cell.getBoundingClientRect().width > 0).join(',')}:${flexibleContent ? rows.map(row => row.textContent).join('\n') : ''}`
   const cols = [...table.querySelectorAll(':scope > colgroup > col')]
   for (const col of cols) if (col.listColumnOriginalWidth === undefined) col.listColumnOriginalWidth = col.style.width
