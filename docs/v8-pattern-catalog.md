@@ -1158,6 +1158,7 @@
 
 ## 予約の状態・種類・現在時刻（2026-10-23）
 
+- 予約の内容は `shared/booking-presentation.tsx` の BookingCardContent（名前と時刻／メニュー、電話だけの札）、担当の受付説明は BookingStaffHeading、休憩は BookingRest を使う。
 - 持ち主：`shared/booking-controls.tsx` の BookingBlock、`shared/booking-state.ts` と同CSS、`shared/booking-presentation.tsx`。札・一覧の状態・凡例は同じ面を使う。来店中は濃い緑と白字、確定は白と細線、終了は灰。要対応（承認待ち）は赤の2px点線、期限付きの仮押さえは灰の点線、無断キャンセルは薄赤と赤の2px実線。予約の重なりの要対応は薄赤と赤い点線、注意は薄琥珀。状態は文字でも伝える。
 - 種類の色：BookingCategoryとReservationSourceは既存TagPillのTagColorDotを名前の前へ置く。丸は装飾、名前は文字。経路を札の地色へ混ぜない。BookingNowLineは中間の灰の線と、同じ灰に白字の時刻の札。
 - 使用先：ReservationBoard（時間×卓・一覧・月）、ReservationPeopleGrid、CalendarTimeEntries、スタイル別StaffBoard。月の日付の今日／選択と空き枠の操作は既存の口を保つ。
