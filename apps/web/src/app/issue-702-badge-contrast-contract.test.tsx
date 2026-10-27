@@ -28,13 +28,23 @@ describe('状態を示す文字と背景は読み取れる明暗差を保つ', (
   })
 
   it.each([
-    ['neutral', '下書き'], ['info', '予約中'], ['warning', '停止中'],
+    ['neutral', '下書き'], ['info', '予約中'], ['warning', '停止中'], ['caution', '要確認'],
     ['success', '配信中'], ['danger', '設定不足'],
   ] as const)('共通バッジの%sは文字と実際の配色を持つ', (tone, label) => {
     const { container } = render(<StatusBadge tone={tone}>{label}</StatusBadge>)
     expect(screen.getByText(label)).toBeTruthy()
     const style = getComputedStyle(container.firstElementChild!)
     expect(contrastRatio(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('状態の札は色ごとに違う地の色を持ち、白地のままにしない', () => {
+    const tones = ['neutral', 'info', 'warning', 'caution', 'success', 'danger'] as const
+    const backgrounds = tones.map((tone) => {
+      const { container } = render(<StatusBadge tone={tone}>{tone}</StatusBadge>)
+      return getComputedStyle(container.firstElementChild!).backgroundColor
+    })
+    for (const background of backgrounds) expect(background).not.toMatch(/^(rgb\(255, 255, 255\)|#fff(fff)?|white|transparent|)$/i)
+    expect(new Set(backgrounds).size).toBe(tones.length)
   })
 
   it.each([

@@ -147,9 +147,9 @@ export function ListPager({ children }: { children: ReactNode }) {
   return <div className={styles.paginationRow} data-list-pager>{children}</div>
 }
 
-/** Lists of cards use the same spacing as other groups of content. */
+/** Lists of cards use the same spacing as other groups of content. Cards in one row take the tallest height so their bottom actions line up. */
 export function ListPageCards({ children, columns = 3, narrowColumns, inset }: { children: ReactNode; columns?: 1 | 3 | 4; narrowColumns?: 1 | 2 | 3; inset?: 'parent' }) {
-  return <div className={styles.listCards} data-card-columns={columns} data-card-narrow-columns={narrowColumns} data-card-inset={inset} style={{ '--tpl-list-card-columns': columns, '--tpl-list-card-narrow-columns': narrowColumns } as CSSProperties}>{children}</div>
+  return <div className={styles.listCards} data-card-height="equal" data-card-columns={columns} data-card-narrow-columns={narrowColumns} data-card-inset={inset} style={{ '--tpl-list-card-columns': columns, '--tpl-list-card-narrow-columns': narrowColumns } as CSSProperties}>{children}</div>
 }
 
 /** カードなどの本文の余白と段の間を一覧型が持つ。 */

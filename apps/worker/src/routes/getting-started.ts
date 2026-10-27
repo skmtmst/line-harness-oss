@@ -9,6 +9,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { expectedWebhookUrl, fetchWebhookEndpoint } from '../lib/webhook-endpoint.js';
 import { starterApplication } from '../services/style-starter-ensure.js';
 import { firstRunTimes } from '../services/getting-started-first-run.js';
+import { scenarioIdsStartedBy } from '../services/first-run-funnel.js';
 
 /**
  * はじめの設定の順路。設計 ★34-1（`RAW35`）。台帳。
@@ -156,22 +157,8 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
           .first<{ hit: number }>()
       : null;
 
-    let startedScenarioIds: string[] = [];
-    for (const rule of ruleRows.results) {
-      try {
-        const definition = JSON.parse(rule.definition_snapshot) as {
-          scenarioId?: string | null;
-          actions?: Array<{ type?: string; scenarioId?: string; targetId?: string }>;
-        };
-        const actionIds = (definition.actions ?? [])
-          .filter((action) => action.type === 'start_scenario')
-          .map((action) => action.scenarioId ?? action.targetId);
-        startedScenarioIds.push(definition.scenarioId ?? '', ...actionIds.filter(Boolean) as string[]);
-      } catch {
-        // 壊れた公開版を「設定済み」にしない。ほかの正常なルールは判定を続ける。
-      }
-    }
-    startedScenarioIds = [...new Set(startedScenarioIds.filter(Boolean))];
+    // 壊れた公開版を「設定済み」にしない。ほかの正常なルールは判定を続ける。
+    const startedScenarioIds = [...new Set(ruleRows.results.flatMap((rule) => scenarioIdsStartedBy(rule.definition_snapshot)))];
 
     const scenarioTotal = await c.env.DB.prepare(
       `SELECT COUNT(*) AS c FROM scenarios${accountId ? ' WHERE line_account_id = ?' : ' WHERE 1 = 0'}`,

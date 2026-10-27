@@ -57,7 +57,7 @@ import { runOptimistic } from '@/lib/undoable';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
-import { emptyValue } from '@/components/shared/empty-value';
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RefreshCover } from '@/components/shared/refresh-cover'
@@ -121,9 +121,9 @@ function chipText(label: string, count: number | null): string {
 }
 
 /** 状態の札の色。10 の状態を5色に畳む（色は CSS の data-tone）。 */
-const BADGE_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
+const BADGE_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'caution' | 'success' | 'danger'> = {
   draft: 'neutral',
-  pending_approval: 'warning',
+  pending_approval: 'caution',
   scheduled: 'info',
   preparing: 'info',
   sending: 'warning',
@@ -132,6 +132,43 @@ const BADGE_TONE: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'd
   failed: 'danger',
   stopped: 'neutral',
   expired: 'neutral',
+}
+
+function percent(rate: number | null | undefined): string | null {
+  return rate != null ? `${(rate * 100).toFixed(1)}%` : null
+}
+
+/**
+ * 結果の列。広い幅は「届いた・開封・クリック」の3列で右にそろえ、狭い幅（1280 以下）は
+ * 1列の2段（上に人数・下に開封とクリック）。どちらも省略しない。
+ * まだ送っていない配信は数を作らず — にする（0件・0人は「届かなかった」に読める）。
+ */
+function BroadcastResultCells({ broadcast, insight, narrow }: { broadcast: ApiBroadcast; insight: BroadcastInsight | undefined; narrow: boolean }) {
+  const sent = broadcast.status === 'sent'
+  const delivered = sent ? `${formatNumber(insight?.delivered ?? broadcast.successCount)} 人` : null
+  const open = sent ? percent(insight?.openRate) : null
+  const click = sent ? percent(insight?.clickRate) : null
+  if (!narrow) {
+    return (
+      <>
+        <Td align="right"><span className={styles.resultNumber}>{delivered ?? emptyValue('unknown')}</span></Td>
+        <Td align="right"><span className={styles.resultNumber}>{open ?? emptyValue('unknown')}</span></Td>
+        <Td align="right"><span className={styles.resultNumber}>{click ?? emptyValue('unknown')}</span></Td>
+      </>
+    )
+  }
+  return (
+    <Td>
+      {delivered === null ? <span className={styles.cellMain}>{emptyValue('unknown')}</span> : (
+        <>
+          <span className={styles.resultMain}>{delivered}</span>
+          {open !== null || click !== null ? (
+            <span className={styles.resultSub}>{[open !== null ? `開封 ${open}` : '', click !== null ? `クリック ${click}` : ''].filter(Boolean).join('・')}</span>
+          ) : null}
+        </>
+      )}
+    </Td>
+  )
 }
 
 function StatusBadge({ broadcast }: { broadcast: ApiBroadcast }) {
@@ -789,24 +826,6 @@ export default function BroadcastListV8() {
     </FilterPopover>
   )
 
-  /* 閲覧のみは保存できないので置かない。場所だけ空けて「保存した検索」までの並びを保つ。 */
-  const saveCurrentButton = canEdit ? (
-    <Button
-      type="button"
-      variant="text"
-      textTone="quiet"
-      onClick={() => setSavedViewOpen((open) => !open)}
-    >
-      <Bookmark size={16} aria-hidden="true" />
-      この条件を保存する
-    </Button>
-  ) : (
-    <span className={`${styles.ghostButton} ${styles.viewerSpace}`} aria-hidden="true">
-      <Bookmark size={16} aria-hidden="true" />
-      この条件を保存する
-    </span>
-  )
-
   const savedSearchBox = (
     <div className={styles.savedBox}>
       <Button
@@ -817,12 +836,16 @@ export default function BroadcastListV8() {
       >
         <Bookmark size={16} aria-hidden="true" />
         {savedViews.find((view) => view.id === savedViewId)?.name ?? '保存した検索'}
+        <ChevronDown size={16} aria-hidden="true" />
       </Button>
+      {/* 絞り込み中で、まだ保存した検索として開いていない時だけ、保存できることを小さな点で知らせる。 */}
+      {canEdit && !savedViewId && (filterActive || dateFrom || dateTo) ? <span className={styles.savableDot} data-savable-dot="" title="今の条件を保存できます" aria-hidden="true" /> : null}
       <ActionMenu
         open={savedMenuOpen}
         onClose={() => setSavedMenuOpen(false)}
         anchorRef={savedAnchorRef}
         ariaLabel="保存した検索"
+        choiceHeading="保存した検索"
         items={[
           ...savedViews.map((view) => ({
             id: `view-${view.id}`,
@@ -833,7 +856,7 @@ export default function BroadcastListV8() {
           // 閲覧のみは保存できないので、押せない項目を置かない
           ...(canEdit ? [{
             id: 'view-save',
-            label: '＋ この条件を保存する',
+            label: '＋ 今の条件を保存する',
             dividerBefore: savedViews.length > 0,
             onSelect: () => { setSavedMenuOpen(false); setSavedViewOpen(true) },
           }] : []),
@@ -889,7 +912,7 @@ export default function BroadcastListV8() {
     <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         {searchBox}
-        <ListToolbarOptional collapse="overflow" label="配信日・検索条件">{dateBox}{saveCurrentButton}<ListToolbarEnd>{savedSearchBox}</ListToolbarEnd></ListToolbarOptional>
+        <ListToolbarOptional collapse="overflow" label="配信日・検索条件">{dateBox}<ListToolbarEnd>{savedSearchBox}</ListToolbarEnd></ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
         {statusChips}
@@ -929,7 +952,13 @@ export default function BroadcastListV8() {
         <Th className={styles.colStatus}>状態</Th>
         {narrow ? null : <Th className={styles.colAudience}>配信条件</Th>}
         <Th className={styles.colDate}>配信日時</Th>
-        <Th className={narrow ? styles.colResult : styles.colResultWide}>結果</Th>
+        {narrow ? <Th className={styles.colResult}>結果</Th> : (
+          <>
+            <Th align="right" className={styles.colDelivered}>届いた</Th>
+            <Th align="right" className={styles.colRate}>開封</Th>
+            <Th align="right" className={styles.colRate}>クリック</Th>
+          </>
+        )}
         <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
       </TableHeadRow>
     </thead>
@@ -946,7 +975,11 @@ export default function BroadcastListV8() {
             <Td><Skeleton width={72} height={22} className="rounded-pill" /></Td>
             {narrow ? null : <Td><Skeleton width={120} height={12} /></Td>}
             <Td><Skeleton width={96} height={16} /></Td>
-            <Td><Skeleton width={64} height={16} /></Td>
+            {narrow ? <Td><Skeleton width={64} height={16} /></Td> : <>
+              <Td align="right"><Skeleton width={48} height={16} /></Td>
+              <Td align="right"><Skeleton width={40} height={16} /></Td>
+              <Td align="right"><Skeleton width={40} height={16} /></Td>
+            </>}
             <Td />
           </Tr>
         ))}
@@ -1021,30 +1054,14 @@ export default function BroadcastListV8() {
                 <Td><span className={styles.audience} title={audience}>{audience}</span></Td>
               )}
               <Td>
-                <span className={styles.cellMain}>
-                  {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? <ListDateTime value={broadcast.sentAt} /> : emptyValue('unknown'))
-                    : (broadcast.scheduledAt ? <ListDateTime value={broadcast.scheduledAt} /> : emptyValue('unconfigured'))}
-                </span>
-                {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
+                {/* 日時だけの1行。予約中（まだ先）の日時だけ少し濃くする。「予約」は状態の札にあるので重ねない。 */}
+                {(() => {
+                  const at = broadcast.status === 'sent' ? broadcast.sentAt : broadcast.scheduledAt
+                  if (!at) return <EmptyCell />
+                  return <span className={styles.cellMain} data-upcoming={broadcast.status === 'scheduled' || undefined}><ListDateTime value={at} /></span>
+                })()}
               </Td>
-              <Td>
-                {broadcast.status !== 'sent' ? (
-                  <span className={styles.cellMain}>{emptyValue('unknown')}</span>
-                ) : (
-                  <>
-                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)} 人に届いた</span>
-                    {insight && (insight.openRate != null || insight.clickRate != null) ? (
-                      <span className={styles.cellSub}>
-                        {[
-                          insight.openRate != null ? `開封 ${(insight.openRate * 100).toFixed(1)}%` : '',
-                          insight.clickRate != null ? `クリック ${(insight.clickRate * 100).toFixed(1)}%` : '',
-                        ].filter(Boolean).join('・')}
-                      </span>
-                    ) : null}
-                  </>
-                )}
-              </Td>
+              <BroadcastResultCells broadcast={broadcast} insight={insight} narrow={narrow} />
               <Td className={styles.colMenu}>
                 {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                 {canEdit ? <div className={styles.menuBox}>

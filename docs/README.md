@@ -468,7 +468,7 @@
 - [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
 - [スマートフォンの幅で店名を切れにくく](release-log/unreleased/1804-kenta-hq-card-narrow.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
-- [二段階認証の画面を見やすく](release-log/unreleased/0000-kenta-two-factor-card.md)
+- [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)
 - [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
 - [fielderr2.md](release-log/drafts/fielderr2.md)
 - [kenta-form-fixed-1010.md](release-log/drafts/kenta-form-fixed-1010.md)
@@ -800,5 +800,10 @@
 - [直し③⑤（部品と言葉づかい）](release-log/unreleased/1836-kenta-train-m2c-1026.md)
 - [分け方のタグ・シナリオの見本と、本部の初期セットを標準に戻す口](release-log/unreleased/1838-kenta-starter-samples.md)
 - [直し④（部品の手入れ）](release-log/unreleased/1839-kenta-train-m2e-1026.md)
+- [使っている部品に重大な弱点が見つかった週は、自動の点検が赤くなって分かるようにし](release-log/unreleased/1840-kenta-audit-weekly-red.md)
+- [統括のアカウントのカードの高さとボタンの位置を、同じ行でそろえた](release-log/unreleased/1841-kenta-hq-card-height.md)
+- [最初の10分の全アカウントのまとめ（運営だけ）](release-log/unreleased/1843-kenta-funnel-summary.md)
+- [状態の札を地の色のある札にそろえた](release-log/unreleased/1842-kenta-status-chip.md)
+- [ダッシュボードの数を4枚にそろえ、いつもと違う端末の知らせを見やすい場所に移した](release-log/unreleased/1844-kenta-dashboard-kpi.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22

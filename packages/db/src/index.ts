@@ -698,7 +698,7 @@ export type {
 } from './affiliate-payouts';
 export {
   accountFeatureOffExclusionSql, getAccountSetting, getAccountSettings, getLinkBaseUrl, getMileageManualAdjustmentPolicy, getTrackedLinkBaseUrl,
-  getVersionedAccountSetting, hasSavedFeatureConfiguration, isAccountFeatureEnabled, saveVersionedAccountSetting, setAccountSetting, setLinkBaseUrl,
+  getVersionedAccountSetting, hasSavedFeatureConfiguration, isSavedFeatureConfiguration, isAccountFeatureEnabled, saveVersionedAccountSetting, setAccountSetting, setLinkBaseUrl,
   setMileageManualAdjustmentPolicy, setTrackedLinkBaseUrl,
 } from './account-settings';
 export type {

@@ -42,6 +42,7 @@ import { styleSetupRead, styleSetupWrite } from './style-setup-fixtures.mjs'
 import { encodePng } from './v8-png.mjs'
 import { LARGE_ENABLED, largeBody } from './large-mode.mjs'
 import { BILLING_INVOICES, BILLING_SUMMARY, BILLING_METRICS } from './billing-fixture.mjs'
+import { opsFirstRunMock } from './ops-first-run-mock.mjs'
 import {
   mileageWriteResponse,
   MILEAGE_REWARDS,
@@ -3345,10 +3346,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       }
     }
   }
-  if (method === 'GET' && pathname === '/api/ops/dashboard') {
-    const period = query.get('period')
-    const selected = period === 'prev_month' || period === 'year' ? period : 'month'
-    return { success: true, data: { ...OPS_DASHBOARD, period: selected } }
+  if (method === 'GET' && (pathname === '/api/ops/dashboard' || pathname === '/api/ops/dashboard/first-run')) {
+    const selected = ['prev_month', 'year'].includes(query.get('period')) ? query.get('period') : 'month'
+    return { success: true, data: pathname === '/api/ops/dashboard' ? { ...OPS_DASHBOARD, period: selected } : opsFirstRunMock(selected) }
   }
   if (method === 'GET' && pathname === '/api/ops/dashboard/line-unregistered') {
     return { success: true, data: OPS_LINE_UNREGISTERED }

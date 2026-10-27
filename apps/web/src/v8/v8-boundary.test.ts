@@ -49,4 +49,23 @@ describe('V8 の画面（src/v8）の決まり', () => {
     })
     expect(bad).toEqual([])
   })
+
+  /*
+   * 表・一覧の値の無い欄は共通の EmptyCell（薄い灰の「—」）を使う。画面の中で字の色の箱に「—」を手で入れない。
+   * 下の一覧は、欄の並び（省略・大きな数など）も同じ箱が持っていて、置き換えに判断が要る所。減らすだけで、足さない。
+   */
+  it('値の無い欄を手で書かず、共通の EmptyCell を使う', () => {
+    const allowed: Record<string, number> = {
+      'booking-payments/payments-side.tsx': 1, 'broadcasts/list.tsx': 1, 'dashboard/sections.tsx': 1,
+      'hq-broadcasts/create.tsx': 1, 'hq-broadcasts/list.tsx': 1, 'hq-templates/detail.tsx': 1,
+      'inflow-links/detail.tsx': 1, 'inflow-links/list.tsx': 1, 'nen-health/parts.tsx': 1,
+      'style-dashboard/lesson-roster.tsx': 2, 'style-dashboard/parts.tsx': 1, 'tag-edit/search-edit.tsx': 1,
+    }
+    const over = code.flatMap((f) => {
+      const count = [...readFileSync(f, 'utf8').matchAll(/<span className=\{[^}]*\}>(?:\{emptyValue\('unknown'\)\}|—)<\/span>/g)].length
+      const name = relative(ROOT, f)
+      return count > (allowed[name] ?? 0) ? [`${name}: ${count}`] : []
+    })
+    expect(over).toEqual([])
+  })
 })

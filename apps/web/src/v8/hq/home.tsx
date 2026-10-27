@@ -4,7 +4,7 @@ import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
-import { Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
+import { Folder as FolderIcon, Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { ListPage, ListPageCards } from '@/components/templates';
@@ -43,6 +43,7 @@ import { connectionReasonLine } from './connection-reasons';
 import styles from './home.module.css';
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/public/folder-colors/index'
 import StatusBadge from '@/components/shared/status-badge';
+import IconLabel from '@/components/shared/icon-label';
 import TagPill from '@/components/shared/tag-pill';
 import TagOverflow from '@/components/shared/tag-overflow';
 import TruncatedText from '@/components/shared/truncated-text';
@@ -429,7 +430,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accounts.length} unit="件" detail={null} />
         <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="全アカウントの合計" />
         <KpiCard title="今月の配信" value={totals.messages} unit="通" detail={null} />
-        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone="warning" />
+        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone={totals.warnings > 0 ? 'warning' : 'default'} />
       </KpiBand>
 
       <ListToolbarFrame layout="stacked">
@@ -527,10 +528,10 @@ export default function HqHomeV8() {
                     {/* B-31：名前の下は1行で省略し、全文は title。 */}
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
                   </div>
-                  <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>
+                  <StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>
                 </div>
                 <TagOverflow label={`${name}の分類`}>
-                  {folderDotOf(account) ? <TagPill name={folderDotOf(account)!.name} color={folderDotOf(account)!.color} aria-label={`フォルダ：${folderDotOf(account)!.name}`} /> : null}
+                  {folderDotOf(account) ? <IconLabel icon={FolderIcon} aria-label={`フォルダ：${folderDotOf(account)!.name}`}>{folderDotOf(account)!.name}</IconLabel> : null}
                   {(account.tags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
                 </TagOverflow>
                 <dl className={styles.stats}>
@@ -570,7 +571,7 @@ export default function HqHomeV8() {
               <Tr key={account.id}>
                 <PersonCell avatarName={name} avatarSrc={accountIconUrl(account)} avatarShape="rounded" avatarAlt={name} avatarSize={32} nameTitle={[name, state.label, accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))].filter(Boolean).join(' / ')} name={
                   <span className={styles.cardName}>
-                    <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>}>
+                    <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>}>
                       <TruncatedText className={styles.name} value={String(name ?? '')} />
                     </FolderDotName>
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
