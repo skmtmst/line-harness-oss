@@ -874,6 +874,8 @@ export default function Sidebar({
             title={collapsed ? undefined : "設定"}
             aria-label={collapsed ? "設定" : undefined}
             data-rail-label="設定"
+            aria-current={settingsActive ? 'page' : undefined}
+            data-nav-active={settingsActive ? '' : undefined}
             className={`${styles.item} ${settingsActive ? styles.active : ''}`}
           >
             <span className="shrink-0"><V8_SETTINGS_ICON className={styles.v8NavIcon} aria-hidden="true" /></span>
@@ -894,6 +896,8 @@ export default function Sidebar({
             title={collapsed ? undefined : "統括の設定"}
             aria-label={collapsed ? "統括の設定" : undefined}
             data-rail-label="統括の設定"
+            aria-current={hqSettingsActive ? 'page' : undefined}
+            data-nav-active={hqSettingsActive ? '' : undefined}
             className={`${styles.item} ${hqSettingsActive ? styles.active : ''}`}
           >
             <span className="shrink-0"><V8_SETTINGS_ICON className={styles.v8NavIcon} aria-hidden="true" /></span>

@@ -4,8 +4,9 @@ import { formatDateTime } from '@/lib/format'
 /**
  * メニューの下に出す版の表示（★管理画面 監査の直し E）の組み立て。
  *
- * - 1行目: `Ver. 2.7.0（a1b2c3d）`
- * - 2行目: `9/27 13:05 配備・検証環境`
+ * - たたんだ1行: `v2.7.0・検証環境`
+ * - 開いた1行目: `Ver. 2.7.0（a1b2c3d）`
+ * - 開いた2行目: `9/27 13:05 配備・検証環境`
  * - 取れない・仮の値のときは null（画面は「版の情報なし」と出す。仮値は出さない）
  */
 
@@ -46,6 +47,8 @@ export function deployEnvLabel(env: string | null | undefined): string | null {
 }
 
 export interface DeployInfoLines {
+  /** たたんだときの1行。版と環境だけ。 */
+  short: string
   line1: string
   /** 日時も環境も取れないときは空。 */
   line2: string
@@ -66,5 +69,5 @@ export function formatDeployInfo(detail: AdminVersionDetail | null | undefined):
   if (at) second.push(`${at} 配備`)
   const env = deployEnvLabel(detail.deploy_env)
   if (env) second.push(env)
-  return { line1, line2: second.join('・') }
+  return { short: env ? `v${version}・${env}` : `v${version}`, line1, line2: second.join('・') }
 }
