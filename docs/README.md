@@ -813,5 +813,6 @@
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
 - [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
+- [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
