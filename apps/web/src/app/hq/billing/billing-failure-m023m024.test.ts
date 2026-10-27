@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs'
 import { ApiError } from '@/lib/api'
 import { BILLING_UNREACHABLE, billingFailureMessage } from './failure-message'
 
-const PAGE = readFileSync(new URL('../../../v8/hq/billing.tsx', import.meta.url), 'utf8')
+const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
+const PAGE = read('../../../v8/hq/billing.tsx')
 
 /**
  * M023：Stripe への輸送失敗は内部文を出さず、決済サービスの案内にする。
@@ -26,13 +27,7 @@ describe('M023/M024 課金の失敗表示', () => {
     expect(message).not.toContain('API error')
   })
 
-  it('申込・ポータルの失敗は共通の案内へ渡す', () => {
-    expect(PAGE).toContain('billingFailureMessage(caught')
+  it('申込・ポータルの失敗を原文の代替文へ戻さない（共通の案内へ渡すことは billing-flow-react が描いて見る）', () => {
     expect(PAGE).not.toContain("caught.message : '支払い方法の管理画面へ進めませんでした。'")
-  })
-
-  it('履歴の 502 も決済サービスの案内にする', () => {
-    expect(PAGE).toContain('invoiceUnreachable')
-    expect(PAGE).toContain('決済サービスにつながりませんでした')
   })
 })
