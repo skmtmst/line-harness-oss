@@ -41,14 +41,8 @@ describe('保存した検索の上部指標', () => {
     })
   })
 
-  it('V8の4指標を共通カードで出し、呼び出し回数はAPIの実値だけを合計する', () => {
-    expect(LIST).toContain('<KpiBand')
-    expect(LIST).toContain("title: '保存した条件'")
-    expect(LIST).toContain("title: '配信で使っている'")
-    expect(LIST).toContain("title: '該当なし'")
-    expect(LIST).toContain("title: '今月の利用'")
-    expect(LIST).toContain('kpis.callsThisMonth')
-    expect(LIST).toContain('api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true })')
+  // 4つの指標を描いて実値を出すことは `v8/tags/searches-tab-react.test.tsx` が見る。ここは禁止の見張りだけ。
+  it('上部指標に固定の数を書かない', () => {
     expect(LIST).not.toContain('value={84}')
   })
 })
