@@ -50,7 +50,7 @@ describe('マイル', () => {
   it('遡及は初期オフで、オフのまま保存すると確認窓を出さずに送る', () => {
     const onSave = renderForm()
     openRegion('マイル')
-    expect((screen.getByRole('checkbox', { name: 'さかのぼって反映' }) as HTMLInputElement).checked).toBe(false)
+    expect(screen.getByRole('switch', { name: 'さかのぼって反映' }).getAttribute('aria-checked')).toBe('false')
     fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ applyToExisting: false }), false)
     expect(screen.queryByText(/さかのぼってマイルを積みますか？$/)).toBeNull()
@@ -59,7 +59,7 @@ describe('マイル', () => {
   it('遡及をオンにして保存すると、サーバーの人数で専用の確認窓を出し、確かめて押すと引き換え券つきで送る', async () => {
     const onSave = renderForm()
     openRegion('マイル')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'さかのぼって反映' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'さかのぼって反映' }))
     fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
     const title = await screen.findByText('5人にさかのぼってマイルを積みますか？')
     const dialog = title.closest<HTMLElement>('[role="dialog"], [role="alertdialog"]')!
