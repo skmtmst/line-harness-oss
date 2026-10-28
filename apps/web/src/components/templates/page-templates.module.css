@@ -183,6 +183,10 @@
 :global(:root) .createNotice { padding: var(--tpl-create-notice-pad); }
 :global(:root) .createNotice:empty { display: none; }
 :global(:root) .createNotice[data-notice-spacing='band'] { padding: var(--tpl-fe-band-slot-pad); }
+/* 閲覧帯と本文先頭の知らせが続くとき、後の知らせの上余白へ間隔を集約する。 */
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) { padding-bottom: 0; }
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) > :global([data-read-only-notice]) { margin-bottom: 0; }
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only'] + .split > .createContent[data-content-spacing='notice-after-read-only'] { padding-top: 0; }
 
 :global(:root) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--polish-space-row); }
 
@@ -310,6 +314,9 @@
   :global(:root) .inboxSummary, :global(:root) .analyticsAside, :global(:root) .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global(:root) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global(:root) .asideToggle { display: block; }
+  /* 先頭の知らせが持つ上余白へ集約し、操作の下と本文の上に重ねて足さない。 */
+  :global(:root) .asideToggle[data-content-spacing='notice-after-preview'] { padding-bottom: 0; }
+  :global(:root) .asideToggle[data-content-spacing='notice-after-preview'] + .split > .createContent[data-content-spacing='notice-after-preview'] { padding-top: 0; }
   :global(:root) .inboxList { width: 348px; }
   :global(:root) .settings { flex-direction: column; gap: var(--polish-space-card); }
   :global(:root) .settingsNav { width: 100%; flex-direction: row; flex-wrap: wrap; }

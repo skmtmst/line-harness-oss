@@ -34,6 +34,25 @@ describe('作成の型の余白の口', () => {
     expect(preview.hasAttribute('data-preview-surface')).toBe(false)
   })
 
+  it('プレビュー後の案内の余白口は操作と本文へ渡し、既定とflush-topに混ぜない', () => {
+    const { container, rerender } = render(<CreatePage title="作成" dirty={false} preview={<p>見本</p>} previewToggle={<button>見本を開く</button>} contentSpacing="notice-after-preview" footerActions={null}>案内</CreatePage>)
+    expect(container.querySelector('[data-template-region="content"]')!.getAttribute('data-content-spacing')).toBe('notice-after-preview')
+    expect(container.querySelector('button')!.parentElement!.getAttribute('data-content-spacing')).toBe('notice-after-preview')
+    rerender(<CreatePage title="作成" dirty={false} preview={<p>見本</p>} previewToggle={<button>見本を開く</button>} contentSpacing="flush-top" footerActions={null}>案内</CreatePage>)
+    expect(container.querySelector('button')!.parentElement!.hasAttribute('data-content-spacing')).toBe(false)
+    expect(container.querySelector('[data-template-region="content"]')!.getAttribute('data-content-spacing')).toBe('flush-top')
+  })
+
+  it('直に続く閲覧案内だけに余白口を渡し、本文と両方の通知を残す', () => {
+    const { container, rerender } = render(<CreatePage title="作成" dirty={false} readOnly contentSpacing="notice-after-read-only" footerActions={null}><p>権限の説明</p></CreatePage>)
+    const slot = container.querySelector('[data-read-only-notice]')!.parentElement!
+    expect(slot.getAttribute('data-content-spacing')).toBe('notice-after-read-only')
+    expect(container.querySelector('[data-template-region="content"]')!.textContent).toBe('権限の説明')
+    expect(slot.nextElementSibling?.getAttribute('data-template-region')).toBe('body')
+    rerender(<CreatePage title="作成" dirty={false} readOnly contentSpacing="flush-top" footerActions={null}>権限の説明</CreatePage>)
+    expect(container.querySelector('[data-read-only-notice]')!.parentElement!.hasAttribute('data-content-spacing')).toBe(false)
+  })
+
   it('flush-top・plain を渡すと入力欄と右の列に印が付く', () => {
     const { container } = render(
       <CreatePage title="作成" contentSpacing="flush-top" previewSurface="plain" preview={<p>見え方</p>} footerActions={null}>入力</CreatePage>,
