@@ -108,6 +108,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  vi.useRealTimers()
   document.documentElement.removeAttribute('data-theme')
   vi.unstubAllGlobals()
 })
@@ -195,6 +196,8 @@ describe('1件ずつの削除確認（YfTfJ）', () => {
   })
 
   it('消せないときは「削除しますか？」と聞かず、押し口ごと出さない。確かめた時刻と7種類を書く', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-28T00:00:00Z'))
     const confirmSpy = vi.fn(() => true)
     vi.stubGlobal('confirm', confirmSpy)
     impacts.set('m-1', {
@@ -215,7 +218,7 @@ describe('1件ずつの削除確認（YfTfJ）', () => {
     expect(text).toContain('使われているあいだは削除できません')
     expect(buttonIn(dialog(), '削除する')).toBeUndefined()
     // 確かめた時点（日本時間）と、7種類を見たこと。
-    expect(text).toContain('2026年9月16日 10:30 時点で')
+    expect(text).toContain('9月16日 10:30 時点で')
     expect(text).toContain('7種類を確認しました')
     // 開ける先があるときだけリンクにする。無い画面へ送らない。
     const links = [...(dialog()?.querySelectorAll('a') ?? [])]

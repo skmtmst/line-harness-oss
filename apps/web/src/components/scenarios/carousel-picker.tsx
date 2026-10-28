@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import TextLink from '@/components/shared/text-link'
 import Select from '@/components/shared/select'
 import { scenarioReferenceData } from './scenario-reference-data'
 import Button from '@/components/shared/button'
@@ -169,9 +169,9 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
       <p className="text-ink-faint text-xs leading-relaxed">
         カルーセルを直すと、この通の中身も一緒に変わります。
       </p>
-      <Link href="/templates/carousel" className="text-info inline-block text-xs hover:underline">
+      <TextLink href="/templates/carousel">
         新しいカルーセルを作る
-      </Link>
+      </TextLink>
     </div>
   )
 }

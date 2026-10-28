@@ -130,16 +130,10 @@
   flex-direction: column;
   gap: var(--ob-panel-gap);
   padding: var(--polish-space-card);
-  border-radius: var(--polish-radius-card);
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
 }
 
 .skipped {
   gap: var(--polish-space-row);
-  border: 1px solid var(--surface-edge);
-  background: var(--color-surface-pearl);
-  box-shadow: none;
 }
 
 .cardHead {
@@ -227,7 +221,7 @@
 .link,
 .linkButton {
   flex: none;
-  color: var(--color-status-info);
+  color: var(--color-link);
   font-size: var(--text-body);
   font-weight: 600;
   line-height: var(--ob-body-lh);

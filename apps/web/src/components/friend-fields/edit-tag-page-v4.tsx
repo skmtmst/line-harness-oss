@@ -86,7 +86,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
           <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-medium">そのまま残る</dd></div>
         </dl>
       </div>
-      <Notice tone="danger" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
+      <Notice tone="warn" role="alert" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
       <div className="mt-5"><Field label={`確認のため「${tag.name}」と入力してください`} htmlFor={confirmationId} required><SaveErrorField names={["confirmation"]}><TextInput id={confirmationId} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked || deleting} /></SaveErrorField></Field></div>
     </Dialog>
   )

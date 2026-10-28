@@ -30,7 +30,7 @@
   min-width: 0;
   flex: 1;
   overflow: auto;
-  background: var(--color-shell);
+  background: var(--color-board-tint);
 }
 
 .content {
@@ -137,8 +137,8 @@
 /* ---------------------------------------------------------------------
  * ★V8 外側（移行③・Pencil `zUg8S` / lh-pro-ui §1）
  *
- * 地は全体が shell の灰。左メニューと上の帯は地の上に直接置き、
- * 中身だけを白い板1枚に載せる（板の外に中身を置かない）。
+ * 外の地は ground の灰。左メニューと上の帯は地の上に直接置き、
+ * 中身だけを薄い灰の板（board-tint）1枚に載せる。板の中のまとまりは白いカード。
  * PC 幅（1024px 以上）だけの見た目で、モバイルの引き出しは 管理画面 のまま。
  * ------------------------------------------------------------------- */
 @media (min-width: 1024px) {
@@ -148,7 +148,7 @@
     margin: 0 12px 12px 0;
     border: 1px solid var(--color-board-line);
     border-radius: var(--radius-panel);
-    background: var(--color-canvas);
+    background: var(--color-board-tint);
     box-shadow: var(--shadow-board);
   }
 

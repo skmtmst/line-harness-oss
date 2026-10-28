@@ -516,7 +516,7 @@ export default function HqHomeV8() {
             const warned = state.tone === 'warn'
             const name = account.displayName || account.name
             return (
-              <Card frame="flat" key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
+              <Card key={account.id} as="article" layout="vertical" padding="default" gap="var(--polish-space-field)" aria-label={name} actions={cardActions(account)}>
                 <div className={styles.cardHead}>
                   <Avatar name={name} src={accountIconUrl(account)} size={40} shape="rounded" alt={name} style={{ width: 'var(--tpl-hq-logo)', height: 'var(--tpl-hq-logo)' }} />
                   <div className={styles.cardName}>

@@ -48,9 +48,9 @@ const STATUS_TONES: Record<DeliveryOrderStatus, StatusBadgeTone> = {
   rejected: 'neutral',
 }
 
-/* 急ぎ度の帯。「ふつう」は帯を出さない（札だけで足りる）。 */
+/* 急ぎ度の帯。「ふつう」は帯を出さない（札だけで足りる）。赤は失敗の知らせだけなので、急ぎも注意の色にし、急ぎ度の違いは札で見せる。 */
 const URGENCY_NOTICE_TONES: Record<DeliveryUrgency, NoticeTone | null> = {
-  urgent: 'danger',
+  urgent: 'warn',
   watch: 'warn',
   normal: null,
 }
