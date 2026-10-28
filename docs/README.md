@@ -829,3 +829,4 @@
 - [予約メニューの案内の間隔](release-log/unreleased/1856-kenta-booking-notice-spacing.md)
 
 - [友だち一覧の差の印](release-log/unreleased/1862-kenta-friends-delta.md) — 増減と要確認の共通表示の反映履歴。
+- [版表示と窓の最初の操作](release-log/unreleased/1863-kenta-version-focus.md) — 表示と初期焦点の反映履歴。
