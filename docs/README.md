@@ -846,3 +846,4 @@
 - [バナーの参照画像の説明](release-log/unreleased/1878-kenta-banner-reference-icons.md) — 説明の印の配置に関する反映履歴。
 - [カルーセルのボタン削除](release-log/unreleased/1879-kenta-carousel-delete.md) — カルーセル内の操作に関する反映履歴。
 - [配達連携の解除ボタン](release-log/unreleased/1880-kenta-delivery-disconnect.md) — 配達連携の画面に関する反映履歴。
+- [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
