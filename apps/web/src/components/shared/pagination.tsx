@@ -59,7 +59,7 @@ function Ellipsis() {
   )
 }
 
-/** ・固定版jX2Uw。1ページでも現在地と前・次を残す。 */
+/** 件数を残し、移動先があるときだけ現在地と前・次を出す。 */
 export default function Pagination({
   page,
   pageCount,
@@ -80,12 +80,16 @@ export default function Pagination({
   const previousReason = pausedReason ?? (current <= 1 ? '最初のページです。' : undefined)
   const nextReason = pausedReason ?? (current >= total ? '最後のページです。' : undefined)
 
-  if (!Number.isFinite(pageCount) || pageCount <= 0) return null
+  const summaryNode = range ? <span className={styles.summary} data-pagination-summary>{paginationSummary(range.total, range.first, range.last, range.unit)}</span>
+    : summary ? <span className={styles.summary}>{summary}</span> : null
+
+  if (!Number.isFinite(pageCount) || total <= 1) {
+    return summaryNode ? <div data-pagination className={classes} data-spacing={spacing}>{summaryNode}</div> : null
+  }
 
   return (
     <nav aria-label={ariaLabel} data-pagination className={classes} data-spacing={spacing}>
-      {range ? <span className={styles.summary} data-pagination-summary>{paginationSummary(range.total, range.first, range.last, range.unit)}</span>
-        : summary ? <span className={styles.summary}>{summary}</span> : null}
+      {summaryNode}
       <button
         type="button"
         className={[styles.item, styles.control].join(' ')}
