@@ -843,3 +843,4 @@
 - [設定案内と配信結果の表現](release-log/unreleased/1875-kenta-setup-recipient-guidance.md) — 初期設定の一本化と宛先の受付表示の反映履歴。
 - [休憩表示と配信結果の位置](release-log/unreleased/1876-kenta-break-and-broadcast-results.md) — 休憩の見分け方と配信結果の数字の配置の反映履歴。
 - [二段階認証の説明](release-log/unreleased/1877-kenta-two-factor-help.md) — 二段階認証の画面に関する反映履歴。
+- [バナーの参照画像の説明](release-log/unreleased/1878-kenta-banner-reference-icons.md) — 説明の印の配置に関する反映履歴。
