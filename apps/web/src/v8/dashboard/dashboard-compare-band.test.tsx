@@ -13,7 +13,7 @@ vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('
 vi.mock('@/components/shared/list-navigation', async original => ({ ...(await original<object>()), useListNavigationRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ refreshAccounts: vi.fn(), selectedAccountId: 'A', selectedAccount: null, loading: false }) }))
 vi.mock('@/lib/staff-role', async original => ({ ...(await original<object>()), useStaffRole: () => 'owner', useStaffIdentity: () => null }))
-vi.mock('./first-steps', () => ({ useFirstSteps: () => ({ error: null, summary: null, folded: false, toggle: vi.fn(), reload: vi.fn() }), FirstStepsCard: () => null }))
+vi.mock('./first-steps', async original => ({ ...await original<typeof import('./first-steps')>(), useFirstSteps: () => ({ error: null, summary: null, steps: [], folded: false, toggle: vi.fn(), reload: vi.fn() }), FirstStepsCard: () => null }))
 vi.mock('@/v8/onboarding/public/use-style-setup/index', () => ({ useStyleSetup: () => ({ data: null, error: null, reload: vi.fn() }) }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
