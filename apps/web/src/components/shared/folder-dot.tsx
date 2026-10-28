@@ -24,7 +24,7 @@ export function folderDisplayColor(folder: { name: string; color?: string | null
  * ★V8 一覧の行の名前の前に置く「フォルダの色の丸」（2026-10-07 オーナー決定）。
  * 表に「フォルダ」列を置かず、左のフォルダの列と同じ色の丸で、どのフォルダかを見せる。
  * 色だけで意味を伝えないよう、読み上げと title に「フォルダ：〇〇」を持たせる。
- * 未分類（フォルダ無し）は色の無い輪で、名前の頭の位置をそろえる。
+ * 未分類（フォルダ無し）は灰色の丸で、丸の無い行を作らず名前の頭の位置をそろえる。
  */
 export interface FolderDotFolder {
   name: string
@@ -71,7 +71,7 @@ export function FolderDotName({ folder, nameCarriesDot, children, annotation, se
   return (
     <span className={styles.line} data-list-name="" data-has-annotation={annotation ? true : undefined} title={nameText(name)}>
       {selection}{selectionNodes}
-      {hasFolders && folder ? <FolderDot folder={folder} /> : null}
+      {hasFolders ? <FolderDot folder={folder} /> : null}
       {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{name}</span>}
       {annotation}
     </span>
