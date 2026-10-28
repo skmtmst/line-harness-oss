@@ -14,10 +14,11 @@ import { collectListRows } from '@/components/shared/collect-list-rows';
 import Link from '@/components/shared/list-navigation';
 import { useListScrollMemory,useListUrlJsonValue,useListUrlValue } from '@/components/shared/list-url-state';
 import StatusBadge from '@/components/shared/status-badge';
+import DeltaChip from '@/components/shared/delta-chip';
 import { statusLabel } from '@/lib/status-labels';
 import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
 import TagOverflow from '@/components/shared/tag-overflow';
-import { Bookmark,CircleDot,Columns3,Download,Megaphone,MessageSquare,SlidersHorizontal,Star,TrendingUp,Upload,UserPlus,UserRoundX,Users } from 'lucide-react';
+import { Bookmark,CircleDot,Columns3,Download,Megaphone,MessageSquare,SlidersHorizontal,Star,Upload,UserPlus,UserRoundX,Users } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
 
@@ -657,11 +658,10 @@ export default function FriendsListV8() {
           loading={statsLoading}
           detail={kpi.detail}
           onRetry={statsFailed ? () => void loadStats(selectedAccountId) : undefined}
-          delta={kpi.delta ? (
-            <span className={kpi.delta.tone === 'warn' ? `${styles.delta} ${styles.deltaWarn}` : kpi.delta.tone === 'up' ? `${styles.delta} ${styles.deltaUp}` : styles.delta}>
-              {kpi.delta.tone === 'up' ? <TrendingUp size={16} aria-hidden="true" /> : null}
-              {kpi.delta.text}
-            </span>
+          delta={kpi.delta ? kpi.delta.tone === 'neutral' ? (
+            <StatusBadge tone="neutral" size="compact" dot={false}>{kpi.delta.text}</StatusBadge>
+          ) : (
+            <DeltaChip tone={kpi.delta.tone === 'warn' ? 'attention' : 'up'}>{kpi.delta.text}</DeltaChip>
           ) : undefined}
         />
       ))}
