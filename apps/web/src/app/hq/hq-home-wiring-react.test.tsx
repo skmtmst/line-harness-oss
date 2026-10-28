@@ -3,7 +3,7 @@
  * 統括のアカウント（/hq・src/v8/hq/home.tsx）の配線を、描いて押して確かめる。
  * - 登録の口は一般の登録（/accounts/new）へ。閲覧のみには置かない
  * - 読み込みの失敗は共通の案内。403 は押しても直らないので「もう一度読み込む」を出さない
- * - 「更新する」は全アカウントの接続を確かめ直し、版を添えて送り、一覧を読み直す
+ * - 「全部を更新」は全アカウントの接続を確かめ直し、版を添えて送り、一覧を読み直す
  * - 「設定」→「LINE の登録内容を編集」で既存の編集の窓。保存のあとは一覧を読み直す
  * - 「入る」は選んだアカウントを覚え、店舗未選択から来たときは元の画面へ戻す
  */
@@ -135,11 +135,11 @@ describe('統括のアカウント：読み込みの失敗（M021）', () => {
 })
 
 describe('統括のアカウント：接続の確かめ直し', () => {
-  it('「更新する」で全アカウントへ版と重複よけの鍵を添えて送り、一覧と店の一覧を読み直す', async () => {
+  it('「全部を更新」で全アカウントへ版と重複よけの鍵を添えて送り、一覧と店の一覧を読み直す', async () => {
     mocks.list.mockResolvedValue({ success: true, data: [account('a1', '銀座店', 3), account('a/2', '梅田店', 7)] })
     render(<HqHomeV8 />)
     await screen.findAllByText('銀座店')
-    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: '更新する' })[0]) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '全部を更新' })) })
     await screen.findByText('2 件のLINE IDと接続状態を更新しました。')
     expect(mocks.fetchApi).toHaveBeenCalledTimes(2)
     const [firstPath, firstInit] = mocks.fetchApi.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }]
@@ -159,8 +159,8 @@ describe('統括のアカウント：接続の確かめ直し', () => {
     mocks.list.mockResolvedValue({ success: true, data: [account('a1', '銀座店', 3), account('a2', '梅田店', null)] })
     render(<HqHomeV8 />)
     await screen.findAllByText('銀座店')
-    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: '更新する' })[0]) })
-    await screen.findByText('1 件を更新し、1 件は更新できませんでした。')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '全部を更新' })) })
+    await screen.findByText('梅田店の接続情報を更新できませんでした。1 件を更新しました。')
     expect(mocks.fetchApi).toHaveBeenCalledTimes(1)
   })
 
@@ -177,6 +177,60 @@ describe('統括のアカウント：接続の確かめ直し', () => {
     await screen.findByText('1 件のLINE IDと接続状態を更新しました。')
     expect(mocks.fetchApi).toHaveBeenCalledTimes(1)
   })
+  it('全件更新は停止中・正常も対象にし、アーカイブには送らず失敗名を残す', async () => {
+    mocks.list.mockResolvedValue({ success: true, data: [
+      account('a1', '銀座店'), account('a2', '梅田店'),
+      { ...account('a3', '正常店'), connection: { status: 'ok', issues: [] } },
+      { ...account('a4', '停止店'), isActive: false },
+      { ...account('a5', '保管店'), archivedAt: '2026-10-01 00:00:00' },
+    ] })
+    mocks.fetchApi.mockResolvedValueOnce({ success: true, data: {} }).mockRejectedValueOnce(new ApiError(503, 'unavailable'))
+    render(<HqHomeV8 />)
+    await screen.findAllByText('銀座店')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '全部を更新' })) })
+    await screen.findByText('梅田店の接続情報を更新できませんでした。3 件を更新しました。')
+    expect(mocks.fetchApi.mock.calls.map(([path]) => path)).toEqual(['a1', 'a2', 'a3', 'a4'].map(id => `/api/line-accounts/${id}/connection-checks`))
+  })
+
+  it('成功しない応答を成功件数にせず、その店の失敗を表示する', async () => {
+    mocks.fetchApi.mockResolvedValueOnce({ success: false, error: 'REVISION_CONFLICT' })
+    render(<HqHomeV8 />)
+    await screen.findAllByText('銀座店')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '更新する' })) })
+    await screen.findByText('銀座店の接続情報を更新できませんでした。0 件を更新しました。')
+    expect(mocks.fetchApi).toHaveBeenCalledTimes(1)
+    expect(mocks.list).toHaveBeenCalledTimes(2)
+  })
+
+  it('再読込失敗は古い警告を残し、再読込だけで回復し更新を再送しない', async () => {
+    render(<HqHomeV8 />)
+    await screen.findAllByText('銀座店')
+    mocks.list.mockRejectedValueOnce(new ApiError(503, 'unavailable'))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '更新する' })) })
+    const message = await screen.findByText(/一覧を再読み込みできませんでした。もう一度読み込んでください。/)
+    expect(message.closest('[data-design-part="notice"]')?.getAttribute('data-tone')).toBe('danger')
+    expect(screen.getByRole('button', { name: '更新する' })).toBeTruthy()
+    mocks.list.mockResolvedValue({ success: true, data: [{ ...account('a1', '銀座店'), connection: { status: 'ok', issues: [] } }] })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' })) })
+    expect(screen.queryByText(/一覧を再読み込みできませんでした。/)).toBeNull()
+    expect(screen.queryByRole('button', { name: '更新する' })).toBeNull()
+    expect(mocks.fetchApi).toHaveBeenCalledTimes(1)
+    expect(mocks.list).toHaveBeenCalledTimes(3)
+    expect(mocks.refresh).toHaveBeenCalledTimes(2)
+  })
+
+  it('再読込が続けて失敗しても警告と再読込の口を失わない', async () => {
+    render(<HqHomeV8 />)
+    await screen.findAllByText('銀座店')
+    mocks.list.mockRejectedValue(new ApiError(503, 'unavailable'))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '更新する' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' })) })
+    expect(screen.getByText(/一覧を再読み込みできませんでした。もう一度読み込んでください。/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '更新する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
+    expect(mocks.fetchApi).toHaveBeenCalledTimes(1)
+  })
+
 })
 
 describe('統括のアカウント：設定と編集', () => {

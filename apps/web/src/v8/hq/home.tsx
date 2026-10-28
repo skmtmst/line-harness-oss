@@ -5,7 +5,7 @@ import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Folder as FolderIcon, Inbox, LayoutGrid, List, LogIn, Pencil, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { ListPage, ListPageCards } from '@/components/templates';
 import Card from '@/components/shared/card';
@@ -75,7 +75,8 @@ export default function HqHomeV8() {
   const [archiveTarget, setArchiveTarget] = useState<{ account: AccountWithStats; mode: 'archive' | 'restore' } | null>(null)
   const [checkingConnections, setCheckingConnections] = useState(false)
   const [connectionProgress, setConnectionProgress] = useState('')
-  const [connectionResult, setConnectionResult] = useState('')
+  const connectionUpdateInFlight = useRef(false)
+  const [connectionResult, setConnectionResult] = useState<{ tone: 'success' | 'danger'; message: string; needsReload: boolean } | null>(null)
 
   const [query, setQuery] = useListUrlValue('q', '')
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -146,41 +147,64 @@ export default function HqHomeV8() {
     }
   }
 
-  const refreshConnectionInfo = async () => {
-    if (checkingConnections || accounts.length === 0) return
+  const reloadConnections = async () => {
+    if (connectionUpdateInFlight.current) return
+    connectionUpdateInFlight.current = true
     setCheckingConnections(true)
-    setConnectionResult('')
+    try {
+      await Promise.all([load(), refreshAccounts()])
+      setConnectionResult(null)
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+    } finally {
+      connectionUpdateInFlight.current = false
+      setCheckingConnections(false)
+    }
+  }
+
+  const refreshConnectionInfo = async (target?: AccountWithStats) => {
+    if (!canManage || connectionUpdateInFlight.current || (target && isArchived(target))) return
+    const targets = target ? [target] : accounts.filter(account => !isArchived(account))
+    if (targets.length === 0) return
+    connectionUpdateInFlight.current = true
+    setCheckingConnections(true)
+    setConnectionResult(null)
     let succeeded = 0
-    let failed = 0
-    for (const [index, account] of accounts.entries()) {
-      setConnectionProgress(`接続情報を更新中（${index + 1}/${accounts.length}）`)
+    const failed: string[] = []
+    for (const [index, account] of targets.entries()) {
+      setConnectionProgress(`接続情報を更新中（${index + 1}/${targets.length}）`)
       const expectedRevision = account.revision
       if (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision) || expectedRevision < 1) {
-        failed += 1
+        failed.push(account.displayName || account.name)
         continue
       }
       try {
-        await fetchApi(`/api/line-accounts/${encodeURIComponent(account.id)}/connection-checks`, {
+        const response = await fetchApi<{ success: boolean; error?: string }>(`/api/line-accounts/${encodeURIComponent(account.id)}/connection-checks`, {
           method: 'POST',
           headers: { 'Idempotency-Key': `hq-check-${account.id}-${crypto.randomUUID()}` },
           body: JSON.stringify({ expectedRevision }),
         })
+        if (!response.success) throw new Error(response.error || '接続情報を更新できませんでした')
         succeeded += 1
       } catch (saveFailure) {
         saveErrors.capture(saveFailure)
-        failed += 1
+        failed.push(account.displayName || account.name)
       }
     }
+    let message = failed.length > 0
+      ? `${failed.join('、')}の接続情報を更新できませんでした。${formatNumber(succeeded)} 件を更新しました。`
+      : `${formatNumber(succeeded)} 件のLINE IDと接続状態を更新しました。`
+    let needsReload = false
     try {
       await Promise.all([load(), refreshAccounts()])
-      setConnectionResult(failed === 0
-        ? `${formatNumber(succeeded)} 件のLINE IDと接続状態を更新しました。`
-        : `${formatNumber(succeeded)} 件を更新し、${formatNumber(failed)} 件は更新できませんでした。`)
     } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-      if (!fieldFailure) setConnectionResult(`${formatNumber(succeeded)} 件を確認しましたが、一覧を再読み込みできませんでした。`)
+      saveErrors.capture(saveFailure)
+      needsReload = true
+      message += ' 一覧を再読み込みできませんでした。もう一度読み込んでください。'
     } finally {
+      setConnectionResult({ tone: failed.length > 0 || needsReload ? 'danger' : 'success', message, needsReload })
       setConnectionProgress('')
+      connectionUpdateInFlight.current = false
       setCheckingConnections(false)
     }
   }
@@ -451,6 +475,7 @@ export default function HqHomeV8() {
             options={STATUS_FILTERS.map((item) => ({ value: item.value, label: item.label, count: statusCount(item.value) }))}
           />
           <ListToolbarEnd>
+          {canManage ? <Button type="button" variant="text" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections || accounts.every(isArchived)}>全部を更新</Button> : null}
           <SaveErrorField names={["view"]}><SegmentedControl<View>
             aria-label="表示の切り替え"
             value={view}
@@ -491,7 +516,9 @@ export default function HqHomeV8() {
   ) : (
     <>
       {connectionProgress ? <p className={styles.progress} role="status">{connectionProgress}</p> : null}
-      {connectionResult ? <Notice tone="info" message={connectionResult} /> : null}
+      {connectionResult ? <Notice tone={connectionResult.tone} message={connectionResult.message}
+        action={connectionResult.needsReload ? <Button type="button" onClick={() => void reloadConnections()} disabled={checkingConnections}>もう一度読み込む</Button> : undefined}
+      /> : null}
       {reloadFailed ? (
         <Notice
           tone="warn"
@@ -546,7 +573,7 @@ export default function HqHomeV8() {
                 {warned ? (() => {
                   const reason = connectionReasonLine(account)
                   return <Notice tone="warn" compact title={reason.title} message={reason.text}
-                    action={canManage ? <button type="button" onClick={() => void refreshConnectionInfo()} disabled={checkingConnections} className={styles.linkButton}>更新する</button> : undefined}
+                    action={canManage ? <button type="button" onClick={() => void refreshConnectionInfo(account)} disabled={checkingConnections} className={styles.linkButton}>更新する</button> : undefined}
                   />
                 })() : null}
               </Card>
