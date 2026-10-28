@@ -881,7 +881,7 @@
 
 - **10-12の差し戻し（axFrW）**：一覧の選択は共通Checkboxの16px・角4（`--choice-checkbox-radius`）。画面のCSSで丸みを上書きせず、クリック・Space・一部選択・権限の動きは維持。絵の16px・角4と司令塔の16:47 JST判定に従う。
 
-- **役目**：その場で効く＝Toggle、保存して効く＝Checkbox、3つ以上＝SegmentedControl か RadioCard
+- **役目**：設定のオン・オフ＝Toggle、複数選択・同意確認＝Checkbox、3つ以上の択一＝SegmentedControl か RadioCard。保存して反映する設定は、既存の保存操作を保つ。
 - **持ち主（コード）**：`apps/web/src/components/shared/toggle.tsx`・`apps/web/src/components/shared/checkbox.tsx`・`apps/web/src/components/shared/segmented.tsx`・`apps/web/src/components/shared/radio-card.tsx`・`apps/web/src/components/shared/radio.tsx`・`apps/web/src/components/shared/check-card.tsx`（部品 `Toggle`・`Checkbox`・`UnavailableSelection`・`SegmentedControl`・`RadioCard`・`RadioCardGroup`・`CheckCard`）
   - 読む変数：`--shadow-controls-toggle`
 - **持ち主（Pen）**：`bkjTv`「トグル/オン」・`LxHpj`「トグル/オフ」・`dQCCN`「チェック/オン」・`S9U7v`「チェック/オフ」・`dtJVi`「切り替え（3つ）」・`fNPdg`「選ぶカード/オン」・`r3xz1W`「選ぶカード/オフ」
