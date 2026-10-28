@@ -42,7 +42,7 @@
   height: var(--tag-pill-dot, 6px);
   flex-shrink: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-shell-gray);
+  background: var(--color-ink-disabled);
 }
 .name {
   min-width: 0;
