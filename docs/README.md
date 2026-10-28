@@ -837,4 +837,5 @@
 - [フォームの区切りと店の接続案内](release-log/unreleased/1868-kenta-form-divider-store-warning.md) — 二重線の解消と対象店名の反映履歴。
 - [シナリオの右詳細の整理](release-log/unreleased/1869-kenta-scenario-detail-panel.md) — 配信状況・説明・名前変更と操作の反映履歴。
 - [個別設定のスイッチ表示](release-log/unreleased/1871-kenta-individual-setting-switches.md) — タグ編集と機能設定のオン・オフの反映履歴。
+- [検証用店舗の同時投稿](release-log/unreleased/1872-masato-instagram-staging-post-test.md) — 検証対象に限る同時投稿の反映履歴。
 - [本文URLがないときの補足](release-log/unreleased/1873-kenta-template-url-note.md) — テンプレート本文のURL一覧を必要なときに表示する反映履歴。
