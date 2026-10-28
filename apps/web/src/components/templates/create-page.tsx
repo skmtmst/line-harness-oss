@@ -44,8 +44,10 @@ export interface CreatePageProps extends PageHeadingProps {
    * 入力欄と右の列の余白の口。渡さなければ型の既定（入力欄 上下 24・左右 28・段の間 16、右の列 24）。
    * `'flush-top'` は板の頭のすぐ下から始める絵（両方とも上 4・左右 24・下 24、入力欄の段の間 28。
    * E-9 統括の一括配信 p17Qku）。画面の CSS で型の余白を上書きせず、ここで選ぶ。
+   * `'notice-after-preview'` は先頭Noticeと直前の表示面を8pxで離す。狭幅のプレビュー操作と広幅のタブの両方へ適用する。
+   * `'notice-after-read-only'` は閲覧帯と本文先頭のNoticeが直に続くとき、後者の上余白だけで間隔を持つ。
    */
-  contentSpacing?: 'flush-top'
+  contentSpacing?: 'flush-top' | 'notice-after-preview' | 'notice-after-read-only'
   /** 右の列の地。`'plain'` は地の色を敷かない（E-9 p17Qku）。渡さなければ白い板と同じ地。 */
   previewSurface?: 'plain'
   footerActions: ReactNode
@@ -63,10 +65,10 @@ export function CreatePage({ step = null, readOnly, contentDisabled, contentLabe
   return <PageFrame kind="create" boardId={boardId} elementRef={elementRef} standalone={standalone} heightMode={heightMode ?? (footerActions ? 'viewport' : 'content')} hasFooter={!!footerActions}>
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     <PageHeading {...heading} />
-    {readOnly ? <div className={styles.createNotice} data-template-region="notice"><ReadOnlyNotice /></div> : null}
+    {readOnly ? <div className={styles.createNotice} data-template-region="notice" data-content-spacing={contentSpacing === 'notice-after-read-only' ? contentSpacing : undefined}><ReadOnlyNotice /></div> : null}
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
-    {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle}>{previewToggle ?? <PreviewLauncher label={previewLabel} title={previewTitle}>{dialogPreview}</PreviewLauncher>}</div> : null}
+    {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle} data-content-spacing={contentSpacing === 'notice-after-preview' ? contentSpacing : undefined}>{previewToggle ?? <PreviewLauncher label={previewLabel} title={previewTitle}>{dialogPreview}</PreviewLauncher>}</div> : null}
     <div className={styles.split} data-template-region="body">
       <Content step={step} as={contentDisabled === undefined ? 'div' : 'fieldset'} className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing} disabled={contentDisabled} aria-label={contentDisabled === undefined ? undefined : contentLabel ?? '入力内容'}>{children}</Content>
       {preview ? <aside aria-label={previewLabel} className={styles.preview} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{aside}</div></aside> : null}
