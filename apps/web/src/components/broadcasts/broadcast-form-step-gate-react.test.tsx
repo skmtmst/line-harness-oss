@@ -65,6 +65,7 @@ vi.hoisted(() => {
 
 import BroadcastForm from './broadcast-form'
 import type { BroadcastStepKey } from './broadcast-steps'
+import { PageChromeProvider } from '@/components/shell/page-chrome'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -78,19 +79,20 @@ async function flush() {
 }
 
 async function renderForm(step: BroadcastStepKey | null, extra: Partial<React.ComponentProps<typeof BroadcastForm>> = {}) {
+  document.title = ''
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   await act(async () => {
     root.render(
-      <BroadcastForm
+      <PageChromeProvider><BroadcastForm
         tags={[]}
         onSuccess={() => {}}
         onCancel={() => {}}
         currentStep={step}
         onStepChange={onStepChange}
         {...extra}
-      />,
+      /></PageChromeProvider>,
     )
   })
   await flush()
@@ -139,6 +141,60 @@ async function click(target: HTMLButtonElement) {
 }
 
 describe('段ごとの確かめで［次へ］を止める', () => {
+  it.each(['basic', 'audience', 'message', 'schedule', 'confirm'] as const)('%sでも作成画面の題と手順を同じ枠で表示する', async (step) => {
+    await renderForm(step)
+    try {
+      expect(container.querySelector('[data-page-template="create"]')).toBeTruthy()
+      expect(container.querySelector('h2')?.textContent).toBe('一斉配信を作る')
+      expect(document.title).toBe('一斉配信を作る | musubo')
+      expect(container.querySelector('[aria-label="配信作成の進み"]')).toBeTruthy()
+      if (step === 'basic') {
+        const memoLabel = container.querySelector('textarea[aria-label="社内メモ"]')?.closest('label')
+        expect(memoLabel?.querySelector('span')?.textContent).toContain('社内メモ')
+        expect(memoLabel?.querySelector('span')?.textContent).toContain('任意')
+        expect(memoLabel?.querySelector('[aria-hidden="true"]')?.textContent).toBe('任意')
+      }
+    } finally {
+      unmount()
+    }
+  })
+
+  it('手順のない埋め込みは作成画面の枠を足さない', async () => {
+    await renderForm(null)
+    try {
+      expect(container.querySelector('[data-page-template="create"]')).toBeNull()
+      expect(container.querySelector('h2')?.textContent).toBe('一斉配信を作る')
+    } finally {
+      unmount()
+    }
+  })
+
+  it('テンプレートを選ぶ間も通常の画面名を保つ', async () => {
+    await renderForm('message', { openTemplatePickerInitially: true })
+    try {
+      expect([...document.querySelectorAll('[role="dialog"]')].some(dialog => dialog.textContent?.includes('テンプレートを選ぶ'))).toBe(true)
+      expect(document.title).toBe('一斉配信を作る | musubo')
+      expect(createApi).not.toHaveBeenCalled()
+      expect(updateApi).not.toHaveBeenCalled()
+    } finally {
+      unmount()
+    }
+  })
+
+  it('配信前チェックを開くと専用の画面名へ切り替わる', async () => {
+    await renderForm('confirm')
+    try {
+      const open = [...container.querySelectorAll('button')].find(item => item.textContent === '配信前チェックを確認')
+      expect(open).toBeTruthy()
+      await click(open as HTMLButtonElement)
+      expect(document.title).toBe('一斉配信の配信前チェック | musubo')
+      expect(createApi).not.toHaveBeenCalled()
+      expect(updateApi).not.toHaveBeenCalled()
+    } finally {
+      unmount()
+    }
+  })
+
   it('配信名が空のうちは基本の段の［次へ］を押せず、理由を帯の左に出す。入れると押せる', async () => {
     await renderForm('basic')
     try {
