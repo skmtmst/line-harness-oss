@@ -1,69 +1,65 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { loadAdminVersionDetail } from '@/lib/admin-version-cache'
-import { formatDeployInfo, type DeployInfoLines } from '@/lib/deploy-info'
-import { useUpdateStatus } from '@/components/update/use-update-status'
+import { useEffect, useId, useState } from 'react'
+import { loadAdminVersionDetail, type AdminVersionDetail } from '@/lib/admin-version-cache'
+import { deployEnvLabel, formatDeployInfo } from '@/lib/deploy-info'
+import { MANUAL_UPDATE_GUIDE_URL, useUpdateStatus } from '@/components/update/use-update-status'
+import Button from '@/components/shared/button'
+import { FilterPopover } from '@/components/shared/filter-popover'
 import TextLink from '@/components/shared/text-link'
 
-/**
- * 共通メニューのいちばん下。いま動いている版・commit・配備日時と環境。
- * 設計 ★管理画面 監査の直し E（`PjoNp`）。
- *
- * 取れない・仮の値のときは「版の情報なし」。穴埋めの数字は出さない。
- * 押せない飾りなので button や link にしない。
- * 見た目はトークンの文字だけ（負債検査で静的に読める形にする）。
- */
+/** 版と環境を1行で出し、配備の詳細と更新の案内は共通の浮く面で開く。 */
 export default function SidebarVersion() {
-  const [lines, setLines] = useState<DeployInfoLines | null>(null)
+  const [detail, setDetail] = useState<AdminVersionDetail | null>(null)
   const [ready, setReady] = useState(false)
+  const [open, setOpen] = useState(false)
+  const detailId = useId()
   const update = useUpdateStatus()
 
   useEffect(() => {
     let cancelled = false
     loadAdminVersionDetail().then(
-      (detail) => {
+      (value) => {
         if (cancelled) return
-        setLines(formatDeployInfo(detail))
+        setDetail(value)
         setReady(true)
       },
-      () => {
-        // 取れなければ「版の情報なし」。赤や再読み込みボタンは出さない（1画面に1つ）。
-        if (!cancelled) setReady(true)
-      },
+      () => { if (!cancelled) setReady(true) },
     )
     return () => { cancelled = true }
   }, [])
 
-  /*
-   * 読み込む間も2行ぶんの高さを取っておく（動きの点検 11 番）。null にすると、版が
-   * 届いた瞬間に上の「設定」の入口が 59px 押し上げられて、全画面で少しずれていた。
-   */
-  if (!ready) {
-    return (
-      <div className="invisible border-t border-hairline px-4 pb-3 pt-2.5" aria-hidden="true" data-version-reserve="">
-        <p className="text-caption font-medium">&nbsp;</p>
-        <p className="mt-0.5 text-micro">&nbsp;</p>
-      </div>
-    )
-  }
-  if (!lines) return <p className="border-t border-hairline px-4 pb-3 pt-2.5 text-micro text-ink-faint">版の情報なし</p>
+  const lines = formatDeployInfo(detail)
+  const environment = deployEnvLabel(detail?.deploy_env)
+  const summary = lines && detail
+    ? `v${detail.version.trim()}${environment ? `・${environment}` : ''}`
+    : ready ? '版の情報なし' : '版の情報を取得中'
+
   return (
-    <div className="border-t border-hairline px-4 pb-3 pt-2.5">
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-caption font-medium text-ink-secondary">
-        <span className="whitespace-nowrap">{lines.line1}</span>
-        {/*
-          新しい版・カスタマイズ版の案内を版の行の右に出す。
-          どちらも /updates へ。
-        */}
-        {update.kind === 'upgrade' ? (
-          <TextLink href="/updates" className="shrink-0">更新あり</TextLink>
-        ) : null}
-        {update.kind === 'fork' ? (
-          <TextLink href="/updates" className="shrink-0">更新履歴</TextLink>
-        ) : null}
-      </p>
-      {lines.line2 ? <p className="mt-0.5 text-micro text-ink-faint">{lines.line2}</p> : null}
+    <div className="border-t border-hairline px-4 pb-3 pt-2.5" data-sidebar-version aria-busy={!ready}>
+      <FilterPopover
+        open={open}
+        onClose={() => setOpen(false)}
+        label="版の情報"
+        trigger={(
+          <Button variant="text" size="compact" textTone="quiet" className="max-w-full"
+            aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? detailId : undefined}
+            title={summary} onClick={() => setOpen(value => !value)}>
+            <span className="min-w-0 truncate">{summary}</span>
+          </Button>
+        )}
+        actions={<Button onClick={() => setOpen(false)}>閉じる</Button>}
+      >
+        <div id={detailId} className="flex flex-col gap-2 text-caption text-ink-secondary">
+          {lines ? <>
+            <p>{lines.line1}</p>
+            <p>{lines.line2 || '配備日時・環境の情報なし'}</p>
+          </> : <p role="status">{summary}</p>}
+          {update.kind === 'upgrade' ? <TextLink href="/updates">更新あり</TextLink> : null}
+          {update.kind === 'fork' ? <TextLink href="/updates">更新履歴</TextLink> : null}
+          <TextLink href={MANUAL_UPDATE_GUIDE_URL} external>手動で更新</TextLink>
+        </div>
+      </FilterPopover>
     </div>
   )
 }
