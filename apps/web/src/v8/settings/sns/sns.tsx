@@ -239,11 +239,11 @@ export default function SnsSettingsPage() {
                         <Link2 size={16} aria-hidden />
                         Instagram にログインして接続する
                       </Button>
-                      <span className={styles.note}>Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。</span>
                     </>
                   )}
                 </div>
               ) : null}
+              {canManage && igState !== 'connected' && igState !== 'unconfigured' ? <p className={styles.note}>Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。</p> : null}
             </>
           )}
         </Card>
