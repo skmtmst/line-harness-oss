@@ -213,9 +213,58 @@ export default function MenuPortal({
     if (!open) { readyRef.current = false; return }
     // ref が付いた時点では測定中の visibility:hidden。表示後にだけ通知する。
     if (!mounted || !geometry || readyRef.current) return
-    readyRef.current = true
-    onReadyRef.current?.()
-    if (focusPanel) panelRef.current?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]')?.focus()
+    const panel = panelRef.current
+    if (!panel) return
+    const origin = document.activeElement
+    let active = true
+    const cancel = () => {
+      active = false
+      panel.removeEventListener('transitionend', onTransitionEnd)
+      document.removeEventListener('focusin', onFocus, true)
+      document.removeEventListener('pointerdown', cancelByUser, true)
+      document.removeEventListener('keydown', cancelByUser, true)
+    }
+    const cancelByUser = () => {
+      // 利用者が先へ進んだ後は再測定でも初期焦点を取り直さない。
+      readyRef.current = true
+      cancel()
+    }
+    const onFocus = () => {
+      if (document.activeElement !== origin && document.activeElement !== document.body) cancelByUser()
+    }
+    const notifyWhenVisible = () => {
+      if (!active || readyRef.current || !panel.isConnected) return
+      const target = panel.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]')
+      const visibility = getComputedStyle(target ?? panel).visibility
+      // 親が表示済みでも、子は継承した visibility の遷移中のことがある。
+      const hidden = visibility === 'hidden' || visibility === 'collapse'
+      if (hidden) {
+        const transitioning = panel.getAnimations?.({ subtree: true }).some(animation => {
+          const end = animation.effect?.getComputedTiming().endTime
+          const owner = (animation.effect as KeyframeEffect | null)?.target
+          return 'transitionProperty' in animation && animation.transitionProperty === 'visibility'
+            && animation.playState === 'running' && typeof end === 'number' && Number.isFinite(end)
+            && owner instanceof Element && owner.contains(target ?? panel)
+        }) ?? false
+        // 元から隠れた操作や別の演出は、準備通知の完了条件にしない。
+        if (transitioning) {
+          document.addEventListener('focusin', onFocus, true)
+          document.addEventListener('pointerdown', cancelByUser, true)
+          document.addEventListener('keydown', cancelByUser, true)
+          return
+        }
+      }
+      readyRef.current = true
+      cancel()
+      onReadyRef.current?.()
+      if (focusPanel && !hidden) target?.focus()
+    }
+    const onTransitionEnd = (event: TransitionEvent) => {
+      if (event.propertyName === 'visibility') notifyWhenVisible()
+    }
+    panel.addEventListener('transitionend', onTransitionEnd)
+    notifyWhenVisible()
+    return cancel
   }, [open, mounted, geometry, focusPanel])
 
   // 下に続きがある間だけ下端の影を出す。入りきる時は影なし。
