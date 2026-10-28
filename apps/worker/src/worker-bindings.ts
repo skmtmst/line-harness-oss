@@ -124,6 +124,8 @@ export type WorkerBindings = {
     GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET?: string;
     /** 'true' のときだけGoogleへ書き込む（口コミ返信の公開）。既定は読み取りのみ。 */
     GOOGLE_BUSINESS_WRITE_ENABLED?: string;
+    /** 検証環境でGoogle投稿だけを試すLINEアカウントID。空なら投稿テストも停止する。 */
+    GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID?: string;
     /** 口コミ返信の下書きに使う Workers AI のモデル。未設定なら OPS_SUPPORT_AI_MODEL → 既定値。 */
     GOOGLE_BUSINESS_AI_MODEL?: string;
     /** 口コミ返信の下書きに使う OpenAI のモデル。未設定なら既定値。OPENAI_API_KEY が無い環境では Workers AI を使う。 */
