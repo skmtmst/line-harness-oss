@@ -11,7 +11,7 @@ import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval
 import { downloadApiFile, ApiError, describeSaveFailure } from '@/lib/api'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import type { HqBroadcastRun } from '@line-crm/shared'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { ListPageSection } from '@/components/templates/list-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -459,7 +459,7 @@ export default function HqBroadcastDetail() {
   }
 
   let body
-  if (!id) body = <Notice tone="warn">一括配信が選ばれていません。一括配信の一覧から開いてください。</Notice>
+  if (!id) body = null
   else if (loadError && !run) body = <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => void load()} />
   else if (!run) body = <DetailLoading />
   else body = run.status === 'prepared'
@@ -498,6 +498,18 @@ export default function HqBroadcastDetail() {
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
 
   if (!id) return <TargetMissing kind="unspecified" title="開く一括配信が指定されていません" description="一覧から開く一括配信を選び直してください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
+
+  /* 選ばれていない時は対象なしの1枚だけ。右の設定・スマホ・タブは出さない。 */
+  if (!id) {
+    return (
+      <PageFrame kind="detail" boardId="M2tJM xOXuY">
+        <PageHeading title="一括配信" />
+        <PageContent>
+          <TargetMissing kind="unspecified" title="一括配信が選ばれていません" description="一括配信の一覧から開いてください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
+        </PageContent>
+      </PageFrame>
+    )
+  }
 
   return (
     <>

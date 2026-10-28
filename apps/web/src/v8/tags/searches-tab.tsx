@@ -441,6 +441,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
             value={kpi.value}
             unit={kpi.value == null ? '' : kpi.unit}
             detail={kpi.detail}
+            loading={Boolean(accountId) && !loaded && !loadError && !forbidden}
           />
         ))}
       </KpiBand>
@@ -500,7 +501,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
       <DetailPanel
         open={activeSearch !== null}
         title={activeSearch?.name ?? ''}
-        description={activeSearch ? `${activeSearch.isShared ? '全員' : '自分だけ'}・v${activeSearch.revision ?? 1}` : undefined}
+        description={activeSearch ? `${activeSearch.isShared ? '全員' : '自分だけ'}・第${activeSearch.revision ?? 1}版` : undefined}
         onClose={() => setActiveSearchId(null)}
         hasPrev={activeSearchIndex > 0}
         hasNext={activeSearchIndex >= 0 && activeSearchIndex < visible.length - 1}

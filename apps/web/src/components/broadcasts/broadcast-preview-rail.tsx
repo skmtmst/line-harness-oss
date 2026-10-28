@@ -79,7 +79,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
         <div className={styles.previewHead}><h3>LINE の見え方</h3><SegmentedControl aria-label="プレビューの端末" size="small" fit="content" value={previewDevice} options={[{ value: 'phone', label: 'スマホ' }, { value: 'pc', label: 'PC' }]} onChange={setPreviewDevice} />{closeButton}</div>
         {ab.hasB ? <SegmentedControl aria-label="見本の案" size="compact" value={ab.tab} options={[{ value: 'A', label: 'A 案の見本' }, { value: 'B', label: 'B 案の見本' }]} onChange={ab.setTab} /> : null}
         <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
-          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={ Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
+          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は手順 4 で設定します'} empty={ Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
             <div className="flex flex-col gap-3 text-ink">{ (ab.tab === 'B' && ab.b ? ab.b : bubbles).map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
           </LinePreview>
         </div>

@@ -144,7 +144,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
 
   let body: ReactNode
   if (!today) {
-    body = failed ? <ListState kind="error" title="ダッシュボードを読み込めませんでした" onRetry={() => void reload()} /> : <ListState kind="loading" />
+    body = failed ? <ListState kind="error" title="ダッシュボードを読み込めませんでした" onRetry={() => void reload()} /> : <ListState kind="loading" loadingShape="cards" />
   } else if (tab === 'analytics') {
     body = <StyleAnalyticsView data={analytics} error={analyticsFailed} onTab={(t) => setParam({ sub: t })} onRetry={() => void loadAnalytics()} onRowOpen={() => router.push(cfg.links.bookings)} />
   } else if (style === 'consult' && tab === 'bookings') {

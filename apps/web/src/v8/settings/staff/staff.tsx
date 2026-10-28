@@ -1021,7 +1021,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       await api.staff.update(member.id, { isActive: active }, stepUpToken)
       setSuspendTarget(null)
       await load()
-      notifyToast(active ? '再開しました。対象者はもう一度ログインが必要です。' : '止めました。「止めた」の札を押すと、この人を一覧に戻せます。')
+      notifyToast(active ? '再開しました。対象者はもう一度ログインが必要です。' : '止めました。「止めた」の絞り込みを押すと、この人を一覧に戻せます。')
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
 

@@ -110,6 +110,8 @@ describe.each(['2026-10-11T15:09:00Z', '2026-10-11T23:59:00Z'])('Eo56k レポー
     await waitFor(() => expect(screen.getByText('田中 明')).toBeTruthy())
     expect(screen.getAllByText('未確定の報酬があります')).toHaveLength(2)
     expect(screen.queryByText('売上の 100.0%')).toBeNull()
+    // 画面の説明は題の横の「？」1つの中（洗い出し 74）。
+    fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
     expect(screen.getByText(/未確定の報酬は金額を出さず/)).toBeTruthy()
   })
 
@@ -122,6 +124,7 @@ describe.each(['2026-10-11T15:09:00Z', '2026-10-11T23:59:00Z'])('Eo56k レポー
     expect(screen.getByText('前の期間より +1')).toBeTruthy()
     expect(screen.getByText('成果になった注文の合計')).toBeTruthy()
     expect(screen.getByText('売上の 8.2%')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
     expect(screen.getByText(/期間は過去30日/)).toBeTruthy()
     expect(screen.getByText(/数は「認めた成果」だけ/)).toBeTruthy()
     expect(screen.getByText(/分析 › レポート/)).toBeTruthy()
@@ -150,7 +153,7 @@ describe.each(['2026-10-11T15:09:00Z', '2026-10-11T23:59:00Z'])('Eo56k レポー
     // a3：0件
     expect(screen.getByText('0件')).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: '操作' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '成果とアフィリエイトの説明' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
     expect(screen.getByText(/行を押すと、その人の成果の明細/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '案件ごと' }))
     await screen.findByText('定期便の初回')

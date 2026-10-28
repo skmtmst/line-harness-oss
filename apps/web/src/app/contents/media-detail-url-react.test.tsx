@@ -252,6 +252,8 @@ describe('登録メディア一覧の数の帯（O7hUt7）', () => {
     await waitForText('どこでも使っていない')
     await waitForText('使っている容量')
     await waitForText('一覧と新規選択から外したもの')
+    // 画面の説明は題の横の「？」1つの中（洗い出し 74）。
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="この画面の説明"]')!.click() })
     await waitForText('使っているメディアは消せません')
   })
 })

@@ -76,7 +76,7 @@ describe('店の比較の表', () => {
     const fullSummary = average.parentElement?.querySelector('[data-truncated-text]')
     expect(fullSummary?.getAttribute('title')).toBe(fullSummary?.textContent)
     for (const def of METRICS) expect(fullSummary?.getAttribute('title')).toContain(def.label)
-    expect(screen.getByText(/札は前の期間との差（赤＝悪い・緑＝良い）/)).toBeTruthy()
+    expect(screen.getByText(/数の横の印は前の期間との差（赤＝悪い・緑＝良い）/)).toBeTruthy()
   })
 
   it('列の見出しを押すとその数の順で頼み直す（同じ列をもう一度押すと向きが逆）', async () => {

@@ -37,7 +37,7 @@ export function actionsSummary(actions: LinkedAction[], linked: boolean): string
 /** マイルの畳んだときの1行：「今のマイル倍率 1.2倍」。倍率が無ければ付与の数を出す。 */
 export function mileageSummary(multiplier: string, reward: number, referral: number): string {
   if (multiplier) return `今のマイル倍率 ${multiplierLabel(multiplier)}`
-  if (reward > 0 || referral > 0) return `付くと本人 ${reward} mile・紹介者 ${referral} mile`
+  if (reward > 0 || referral > 0) return `付くと本人 ${reward} マイル・紹介者 ${referral} マイル`
   return 'マイルの設定はありません'
 }
 

@@ -2,7 +2,8 @@
 
 import { StageFrame } from './edit-model'
 
-import { firstReminderStepMessage,reminderTriggerLabel,renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { firstReminderStepMessage, reminderTriggerLabel } from '@/components/reminders/reminder-labels'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 import Button from '@/components/shared/button'
 import { emptyValue } from '@/components/shared/empty-value'
 import ListState from '@/components/shared/list-state'
@@ -85,7 +86,7 @@ export function ScheduleStageV8({
                 : preview ? '送信予定はまだありません' : '配信予定を確認しています'}
             empty={!nextItem}
             hasSampledBody={Boolean(nextItem && firstReminderStepMessage(settings, nextItem.stableStepId).trim())}
-            message={nextItem ? renderReminderBodySample(firstReminderStepMessage(settings, nextItem.stableStepId) || '本文はまだありません') : undefined}
+            message={nextItem ? fillPreviewSample(firstReminderStepMessage(settings, nextItem.stableStepId) || '本文はまだありません').text : undefined}
           />
         </>
       )}

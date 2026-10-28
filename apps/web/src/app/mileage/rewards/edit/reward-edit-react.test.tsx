@@ -317,7 +317,7 @@ describe('渡すものと交換できる人', () => {
     await render()
 
     const field = host.querySelector('#reward-action')?.closest('[data-entity-picker-field]')
-    expect(field?.textContent).toContain('VIPタグを付ける（公開版 v2）')
+    expect(field?.textContent).toContain('VIPタグを付ける（公開中の第2版）')
     expect(field?.textContent).not.toContain('現在選択中の公開版')
 
     await click(button('下書きを保存'))

@@ -496,7 +496,7 @@ describe('V8 コンバージョンの一覧：読み込みの扱い', () => {
       ? fail ? json({ success: false, error: 'forbidden' }, 403) : new Response('name\n', { status: 200, headers: { 'Content-Type': 'text/csv' } })
       : null))
     await mount()
-    fireEvent.click(screen.getByRole('button', { name: /CSV ?で書き出す/ }))
+    fireEvent.click(screen.getByRole('button', { name: /CSVで書き出す/ }))
     await flush()
     expect(calls.filter((call) => call === 'GET /api/conversions/export')).toHaveLength(1)
     expect(created).toHaveBeenCalledTimes(1)
@@ -504,7 +504,7 @@ describe('V8 コンバージョンの一覧：読み込みの扱い', () => {
     expect((clicked.mock.contexts[0] as HTMLAnchorElement).download).toMatch(/^成果地点.*\.csv$/)
     expect(revoked).toHaveBeenCalledWith('blob:points')
     fail = true
-    fireEvent.click(screen.getByRole('button', { name: /CSV ?で書き出す/ }))
+    fireEvent.click(screen.getByRole('button', { name: /CSVで書き出す/ }))
     await flush()
     expect(screen.getByText('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')).toBeTruthy()
     expect(created).toHaveBeenCalledTimes(1)

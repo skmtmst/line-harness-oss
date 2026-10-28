@@ -7,7 +7,7 @@ import Button from './button'
 import TargetMissing from './target-missing'
 import { loadFailureCopy, permissionDeniedMessage, type PermissionScope } from './api-error-message'
 import styles from './list-state.module.css'
-import { DelayedSkeleton, ListSkeleton } from './skeleton'
+import { DelayedSkeleton, ListSkeleton, type LoadingShape } from './skeleton'
 
 /**
  * 一覧に中身を出せないときの1枚。
@@ -60,10 +60,13 @@ const ICONS: Record<Exclude<ListStateKind, 'error' | 'loading'>, typeof Inbox> =
  * 「リマインダの読み込みに失敗しました。もう一度お試しください。」で、
  * ほかは「表示できませんでした」だった）。ここから引く。
  */
+/** 読めなかった表・数の言い方。読み込みの失敗を「0 件」に見せない。 */
+export const UNKNOWN_COUNT_TEXT = '読み込めていないため件数は分かりません。'
+
 export const PRESETS: Record<ListStateKind, { title: string; description: string }> = {
   loading: { title: '読み込んでいます', description: 'このまま少しお待ちください。' },
   empty: { title: 'データがありません', description: '条件を変えるか、新しく作成してください。' },
-  error: { title: '表示できませんでした', description: '再読み込みしても直らない場合はエラー報告へ。' },
+  error: { title: '表示できませんでした', description: `${UNKNOWN_COUNT_TEXT}再読み込みしても直らない場合はエラー報告へ。` },
   forbidden: { title: '表示する権限がありません', description: permissionDeniedMessage() },
 }
 
@@ -92,7 +95,8 @@ export default function ListState({
   icon,
   loadingShape = 'list',
 }: {
-  loadingShape?: 'list' | 'cards'
+  /** 読み込み中の形。一覧＝list、ダッシュボード＝cards、予約の盤＝board。 */
+  loadingShape?: LoadingShape
   permissionScope?: PermissionScope
   kind: ListStateKind
   /** 空の表示で、その機能の印を渡す。 */

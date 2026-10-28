@@ -44,7 +44,8 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs';
 import PageSizeSelect from '@/components/shared/page-size-select'
-import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels';
+import { reminderTriggerLabel, reminderStopSummary } from '@/components/reminders/reminder-labels'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
 import { csvFileName } from '@/lib/csv-file-name';
@@ -442,7 +443,7 @@ function ReminderDetailV8() {
 
   if (!reminderId) {
     return (
-      <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="開くリマインダが指定されていません" description="一覧から開くリマインダを選び直してください。" backHref="/reminders" backLabel="リマインダ一覧へ戻る" /></SaveErrorScope>
+      <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="リマインダが指定されていません" description="一覧から選び直してください。" backHref="/reminders" backLabel="リマインダ一覧へ戻る" /></SaveErrorScope>
     )
   }
   if (loading) return <SaveErrorScope errors={saveErrors}><DetailLoading label="リマインダの詳細を読み込んでいます" /></SaveErrorScope>
@@ -527,12 +528,12 @@ function ReminderDetailV8() {
             <LinePreview
               accountName={accountName}
               caption={data.summary.nextScheduledAt ? formatMd(data.summary.nextScheduledAt) : '次の送信予定はありません'}
-              note="届き方：次に送る通知が、友だちのLINEにこう届きます。差し込みは見本の値です。"
+              note={firstStep?.messageContent.trim() ? '届き方：次に送る通知が、友だちのLINEにこう届きます。差し込みは見本の値です。' : undefined}
               empty={!firstStep}
             >
               {firstStep ? (
                 <LinePreviewMessage accountName={accountName} avatar={accountName.slice(0, 1)} time={nextTime}>
-                  {renderReminderBodySample(firstStep.messageContent || '本文はまだありません')}
+                  {fillPreviewSample(firstStep.messageContent || '本文はまだありません').text}
                 </LinePreviewMessage>
               ) : null}
             </LinePreview>

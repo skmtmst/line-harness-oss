@@ -2,7 +2,8 @@
 
 import { StageFrame } from './edit-model'
 
-import { reminderPlaceholders,reminderStepTimings,reminderStopSummary,reminderTriggerLabel,renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { reminderPlaceholders, reminderStepTimings, reminderStopSummary, reminderTriggerLabel } from '@/components/reminders/reminder-labels'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 import { TestRecipientGuidance,testRecipientDestinationLabel,testRecipientNote } from '@/components/reminders/test-recipient-guidance'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import Button from '@/components/shared/button'
@@ -159,7 +160,7 @@ export function ConfirmStageV8({
             chip={firstStep ? `1通目は ${describeReminderTiming(firstStep, settings.deliveryMode)}に届きます` : '通知ステップがありません'}
             empty={!firstStep}
             hasSampledBody={Boolean(firstStep?.messageContent.trim())}
-            message={firstStep ? renderReminderBodySample(firstStep.messageContent || '本文はまだありません') : undefined}
+            message={firstStep ? fillPreviewSample(firstStep.messageContent || '本文はまだありません').text : undefined}
           />
         </>
       )}

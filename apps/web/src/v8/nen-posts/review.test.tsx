@@ -229,7 +229,7 @@ describe('V8 投稿（審査）', () => {
     await render()
     await click(buttons('版の履歴を見る')[0])
     const dialog = () => document.querySelector('[data-design-node="N1br7"]')
-    expect(dialog()?.textContent).toContain('v3')
+    expect(dialog()?.textContent).toContain('第3版')
     expect(dialog()?.textContent).toContain('採用 100・公式サイト掲載 さらに 200')
     expect(dialog()?.textContent).toContain('いま使っている版')
     expect(dialog()?.textContent).toContain('10/15 00:00 から')

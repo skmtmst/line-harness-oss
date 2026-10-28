@@ -179,16 +179,21 @@ afterEach(() => {
 })
 
 describe('V8 シナリオ配信の編集', () => {
-  it('下見は差し込みの名前を見本値に置き換える', async () => {
+  it.each([
+    'こんにちは、{{name}}さん。{{reservation_datetime}}からです。',
+    'こんにちは、{名前}さん。{予約日時}からです。',
+  ])('下見は差し込みを共通の見本値に置き換える（%s）', async (messageContent) => {
     vi.mocked(scenarioReferenceData.scenario).mockResolvedValueOnce({ success: true, data: {
       ...scenario,
-      steps: [{ ...scenario.steps[0], messageContent: 'こんにちは、{{name}}さん' }, scenario.steps[1]],
+      steps: [{ ...scenario.steps[0], messageContent }, scenario.steps[1]],
     } } as never)
     await render()
-    expect(screen.getByText('こんにちは、山田花子さん')).toBeTruthy()
+    const preview = screen.getByRole('region', { name: 'LINEでの見え方' })
+    expect(within(preview).getByText('こんにちは、山田 花子さん。10月2日 18:00からです。')).toBeTruthy()
+    expect(document.querySelector('[data-preview-sample-note]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方の説明' }))
     expect(screen.getByText('名前や日時は見本の値です。')).toBeTruthy()
-    expect(screen.queryByText('こんにちは、{{name}}さん')).toBeNull()
+    expect(within(preview).queryByText(messageContent)).toBeNull()
   })
 
   it('本文が空なら見本の説明を出さない', async () => {

@@ -28,14 +28,11 @@ describe('統括の情報欄・対応マーク', () => {
     await screen.findByText('愛犬のお名前')
     const toggle = screen.getByRole('button', { name: 'この画面の説明' })
     expect(toggle.closest('[data-template-region="heading"]')).toBeTruthy()
-    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
-    expect(body.textContent).toContain('情報欄のひな形を各アカウントへ配れます。')
-    expect(body.closest('[data-list-toolbar]')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '一覧の操作の説明' })).toBeNull()
     fireEvent.click(toggle)
-    expect(body.hidden).toBe(true)
+    expect(document.getElementById(toggle.getAttribute('aria-describedby') ?? '')?.textContent).toContain('情報欄のひな形を各アカウントへ配れます。')
     fireEvent.click(toggle)
-    expect(body.hidden).toBe(false)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('対応マークの説明は題から開閉し、数の帯と道具の間に一度だけ出す', async () => {
@@ -45,15 +42,12 @@ describe('統括の情報欄・対応マーク', () => {
     await screen.findByText('未対応')
     const toggle = screen.getByRole('button', { name: 'この画面の説明' })
     expect(toggle.closest('[data-template-region="heading"]')).toBeTruthy()
-    const body = document.getElementById(toggle.getAttribute('aria-controls')!)!
-    expect(body.textContent).toContain('新しいメッセージが来たら自動で変える')
-    expect(body.closest('[data-list-toolbar]')).toBeTruthy()
+    expect(screen.queryAllByText(/対応マークは、受信箱で/)).toHaveLength(0)
+    fireEvent.click(toggle)
+    expect(document.getElementById(toggle.getAttribute('aria-describedby') ?? '')?.textContent).toContain('新しいメッセージが来たら自動で変える')
     expect(screen.getAllByText(/対応マークは、受信箱で/)).toHaveLength(1)
     fireEvent.click(toggle)
-    expect(body.hidden).toBe(true)
-    expect(window.localStorage.getItem('lh_page_explanation_v1:hq-owner:hq:marks')).toBe('closed')
-    fireEvent.click(toggle)
-    expect(body.hidden).toBe(false)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(screen.getByRole('button', { name: '対応マーク「未対応」の操作' })).toBeTruthy()
   })
   it('店の情報欄一覧を使い、API未取得の使用先は—、閲覧のみは変更操作を隠す', async () => {
