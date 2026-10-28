@@ -9,6 +9,7 @@ import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatNumber } from '@/lib/format'
+import TextLink from '@/components/shared/text-link'
 
 /**
  * 出荷予定。
@@ -120,8 +121,7 @@ export default function ShipmentPanel({
         title="出荷予定"
         /* 今日・明日以降の予定を、最後に取れた時刻と一緒に示す（IDEA-01）。 */
         meta={dashboardLocalUpdatedAt(fetchedAt) ?? undefined}
-        action={<Link href="/ec-commerce" prefetch={false} className="hover:underline">すべて見る →</Link>}
-        actionTone="info"
+        action={<TextLink href="/ec-commerce">出荷予定へ</TextLink>}
       />
       <div className="px-[16px] pb-[16px]">
         {loading ? (

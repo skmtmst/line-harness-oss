@@ -88,6 +88,20 @@ export function cssShapeCandidates(css, tokens) {
   return [...new Set(hits)]
 }
 
+export function sharedCardIssues(css, tokens) {
+  const issues = []
+  postcss.parse(css).walkRules(rule => {
+    if (!/(?:^|[,\s])\.card(?:\b|[.:[#])/.test(rule.selector)) return
+    const declarations = Object.fromEntries((rule.nodes ?? []).filter(node => node.type === 'decl').map(node => [node.prop, node.value]))
+    if ('outline' in declarations || 'outline-width' in declarations) issues.push(`${rule.selector}: outline`)
+    const shadow = compact(resolveValue(declarations['box-shadow'] ?? '', tokens))
+    if (/0(?:px)?0(?:px)?0(?:px)?1(?:px)?/.test(shadow)) issues.push(`${rule.selector}: 1px shadow edge`)
+  })
+  const cardShadow = compact(resolveValue('var(--card-shadow)', tokens))
+  if (/0(?:px)?0(?:px)?0(?:px)?1(?:px)?/.test(cardShadow)) issues.push('--card-shadow: 1px shadow edge')
+  return issues
+}
+
 export function classShapeCandidates(source, tokens) {
   const ast = ts.createSourceFile('screen.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const definitions = new Map()

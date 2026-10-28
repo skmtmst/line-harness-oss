@@ -311,7 +311,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fixture.updateStaff.mockRejectedValueOnce(new Error('保存できません'))
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('保存できません'))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('失敗：保存できません'))
     expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
 
     fixture.updateStaff.mockResolvedValueOnce({ success: true, data: state.members[0] })

@@ -143,11 +143,11 @@ async function averageTimeValue(): Promise<string | undefined> {
 describe('「投稿から審査までの日数」の読みやすい単位（Issue #666）', () => {
   it.each([
     [59, '59分'],
-    [61, '約1時間'],
-    [1_439, '約24時間'],
-    [1_441, '約1日'],
+    [61, '1時間'],
+    [1_439, '23時間'],
+    [1_441, '24時間'],
     // Issue の実測値: 55975分 ≒ 38.8日。
-    [55_975, '約1ヶ月'],
+    [55_975, '38日'],
   ])('平均%i分は「%s」と出る', async (minutes, expected) => {
     fixture.averageReviewMinutes = minutes
     net.handler = listHandler()

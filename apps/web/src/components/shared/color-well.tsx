@@ -499,7 +499,7 @@ export default function ColorWell({
           {/* よく使う色 */}
           <div className={styles.group}>
             <span className={styles.headingText}>よく使う色</span>
-            {hexError ? <Notice tone="danger">6桁の16進数で色を入力してください。</Notice> : null}
+            {hexError ? <Notice tone="warn" role="alert">6桁の16進数で色を入力してください。</Notice> : null}
             <div className={styles.grid} role="listbox" aria-label="よく使う色">
               {palette.map((color) => (
                 <button

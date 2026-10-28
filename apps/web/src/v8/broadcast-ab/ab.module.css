@@ -6,15 +6,10 @@
   --ab-bar-h: 26px;
   --ab-variant-pad: 20px;
   --ab-metric-size: 20px;
-  --ab-outline-offset: -2px;
   display: flex;
   flex-direction: column;
   gap: var(--polish-space-card);
   padding: var(--ab-pad) var(--polish-space-section);
-  border: 1px solid var(--card-edge);
-  border-radius: var(--polish-radius-card);
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
 }
 
 .tabsCard {
@@ -22,12 +17,6 @@
   align-items: center;
   gap: var(--polish-space-row);
   padding: var(--polish-space-row) var(--polish-space-field);
-  border-color: var(--color-accent);
-}
-
-.settingsCard[data-on],
-.resultCard {
-  border-color: var(--color-accent);
 }
 
 .onlyA {
@@ -144,16 +133,6 @@
   min-width: 0;
   flex-direction: column;
   gap: var(--polish-space-field);
-  padding: var(--ab-variant-pad);
-  /* カードの中の小箱（カードではない）：角丸は部品の丸み。影は重ねない。 */
-  border: 1px solid var(--surface-edge);
-  border-radius: var(--radius-control);
-}
-
-.variant[data-winner] {
-  border-color: var(--color-accent);
-  outline: 1px solid var(--color-accent);
-  outline-offset: var(--ab-outline-offset);
 }
 
 .variantHead {
