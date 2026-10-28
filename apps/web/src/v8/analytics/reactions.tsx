@@ -1,4 +1,5 @@
 'use client'
+import { ListPageStats } from '@/components/templates/list-page'
 
 import { ValueBarChart } from '@/components/shared/charts'
 
@@ -75,12 +76,12 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
   const topHours = [...overview.trackedClickHours].sort((a, b) => b.clicks - a.clicks).slice(0, 3).filter((item) => item.clicks > 0).map((item) => item.hour)
 
   return <>
-    <KpiBand className={styles.band}>
+    <ListPageStats><KpiBand className={styles.band}>
       <KpiCard presentation="band" title="配信" icon={<Send size={16} aria-hidden="true" />} value={overview.campaigns.length} unit="件" detail={`一斉配信 ${broadcastShown}・シナリオ ${scenarioShown}`} />
       <KpiCard presentation="band" title="届いた人" icon={<Users size={16} aria-hidden="true" />} value={delivered} unit="人" detail={delivered === null ? (METRIC_STATE_TEXT[overview.metrics.delivered.state] || '未取得') : `対象 ${formatNumber(targets)} 人のうち`} />
       <KpiCard presentation="band" title="押された割合" icon={<MousePointerClick size={16} aria-hidden="true" />} value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
       <KpiCard presentation="band" title="取得できない配信" icon={<CircleHelp size={16} aria-hidden="true" />} value={shownValue(unavailable)} unit="件" detail={shownValue(unavailable) === null ? (METRIC_STATE_TEXT[unavailable.state] || '未取得') : '20人未満で数が出ない'} />
-    </KpiBand>
+    </KpiBand></ListPageStats>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>
         <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />

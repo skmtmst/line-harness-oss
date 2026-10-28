@@ -1,4 +1,5 @@
 'use client'
+import { ListPageStats } from '@/components/templates/list-page'
 
 /*
  * ★V8 分析「使われ方」（Pencil ）。
@@ -97,12 +98,12 @@ export default function UsageV8({ accountId }: { accountId: string }) {
   const observations = overview.categories.filter((item) => usageObservation(item).tone !== 'normal').slice(0, 3)
 
   return <>
-    <KpiBand className={styles.band}>
+    <ListPageStats><KpiBand className={styles.band}>
       <KpiCard presentation="band" title="使っている機能" icon={<LayoutGrid size={16} aria-hidden="true" />} value={menuFeatures?.enabled ?? null} unit={menuFeatures ? `/ ${menuFeatures.total}` : ''} detail={menuFeaturesError || 'メニューに出している機能のうち'} />
       <KpiCard presentation="band" title="自動で動いた回数" icon={<Zap size={16} aria-hidden="true" />} value={shownValue(overview.summary.automaticRuns)} unit="回" {...metricCardState(overview.summary.automaticRuns, { detail: `この${days}日・手で送ったのは${formatNumber(overview.summary.manualSends.value)} 回` }, state.retry)} />
       <KpiCard presentation="band" title="手作業が減った時間" icon={<Clock size={16} aria-hidden="true" />} value={hoursValue} unit="時間" detail={hours.reason ? (METRIC_STATE_TEXT[hours.state] || '未取得') : '1件30秒として試算'} description={hours.reason ?? undefined} onRetry={hours.state === 'failed' ? state.retry : undefined} />
       <KpiCard presentation="band" title="作ったのに使っていない" icon={<PackageOpen size={16} aria-hidden="true" />} value={shownValue(overview.summary.unusedItems)} unit="個" {...metricCardState(overview.summary.unusedItems, { detail: `参照切れ ${metricText(overview.summary.brokenReferences)} 件` }, state.retry)} description={overview.summary.brokenReferences.reason ?? overview.summary.unusedItems.reason ?? undefined} />
-    </KpiBand>
+    </KpiBand></ListPageStats>
     <div className={styles.body} data-gap="tab">
       {overview.stateReason
         ? <Notice tone="warn">{overview.stateReason}</Notice>
