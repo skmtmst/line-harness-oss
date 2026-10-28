@@ -15,8 +15,8 @@ import styles from './style-choice-step.module.css'
  * 見るのと選ぶのを分けるのは、見本を見ている途中に選んだつもりのないスタイルで保存しないため。
  */
 
-/** 開いた直後に焦点を寄せる［このスタイルにする］。選んだスタイルを見ている時は無い。 */
-export const STYLE_CHOICE_PICK_ID = 'style-choice-pick'
+/** 初回の焦点を上部へ置き、スタイルの切り替えを見える位置に保つ。 */
+export const STYLE_CHOICE_START_ID = 'style-choice-can'
 
 export const STYLE_CHOICE_ORDER: readonly AccountStyle[] = STYLE_EXPERIENCE_SCRIPT.order
 
@@ -51,8 +51,8 @@ export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, dis
             : { value: style, label: name }
         })}
       />
-      <section className={styles.can} aria-labelledby="style-choice-can">
-        <h3 id="style-choice-can" className={styles.canTitle}>{`${viewed.label}でできること`}</h3>
+      <section className={styles.can} aria-labelledby={STYLE_CHOICE_START_ID}>
+        <h3 id={STYLE_CHOICE_START_ID} tabIndex={-1} className={styles.canTitle}>{`${viewed.label}でできること`}</h3>
         <ul className={styles.canList}>
           {viewed.can.map((item) => <li key={item.text} className={styles.canItem}><Check aria-hidden="true" className={styles.canIcon} />{item.text}</li>)}
         </ul>
@@ -63,7 +63,7 @@ export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, dis
       <div className={styles.choose}>
         {chosen === viewing
           ? <StatusBadge tone="success" dot>選んでいます</StatusBadge>
-          : <Button id={STYLE_CHOICE_PICK_ID} onClick={() => onChoose(viewing)} disabled={disabled}>このスタイルにする</Button>}
+          : <Button id="style-choice-pick" onClick={() => onChoose(viewing)} disabled={disabled}>このスタイルにする</Button>}
       </div>
     </div>
   )
