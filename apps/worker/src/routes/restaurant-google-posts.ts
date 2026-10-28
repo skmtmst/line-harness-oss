@@ -66,6 +66,13 @@ restaurantGooglePosts.use('/api/restaurant-test/google/*', googleAccessGuard);
 
 const LIST_LIMIT_MAX = 100;
 
+/** 検証では指定されたLINEアカウントの投稿作成だけを許可し、他のGoogle書き込みは停止する。 */
+function postWriteEnabled(env: Env['Bindings'], store: StoreContext): boolean {
+  if (writeEnabled(env)) return true;
+  const testAccountId = env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID?.trim();
+  return env.DEPLOY_ENV === 'staging' && !!testAccountId && testAccountId === store.lineAccountId;
+}
+
 type PostStatus = 'draft' | 'scheduled' | 'pending_confirm' | 'accepted' | 'published' | 'rejected' | 'failed' | 'cancelled' | 'deleted';
 type PostFilter = 'all' | 'draft' | 'published' | 'attention' | 'scheduled';
 
@@ -488,7 +495,7 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
     page,
     perPage,
     counts,
-    writeEnabled: writeEnabled(c.env),
+    writeEnabled: postWriteEnabled(c.env, store),
     permissions: { canPublish: staff?.role === 'owner' || staff?.role === 'admin' }, items: responseItems, paging: { limit: perPage, offset: (page - 1) * perPage }, sort: [{ field: 'createdAt', direction: 'desc' }] }));
 });
 
@@ -633,7 +640,7 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts/:id', async (c) => 
     success: true,
     post: publicPost(row),
     store: { id: store.id, name: store.name },
-    writeEnabled: writeEnabled(c.env),
+    writeEnabled: postWriteEnabled(c.env, store),
     canPublish: staff?.role === 'owner' || staff?.role === 'admin',
   });
 });
@@ -680,7 +687,7 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/:id/publish', requ
   if (!row) return fail(c, 404, '投稿が見つかりません');
   const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });
   if (body.confirmed !== true) return fail(c, 400, '投稿先・種類・本文の確認が必要です', { code: 'confirmation_required' }, ["confirmed"]);
-  if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleへ投稿できません', { code: 'write_disabled' });
+  if (!postWriteEnabled(c.env, store)) return fail(c, 403, 'この環境ではGoogleへ投稿できません', { code: 'write_disabled' });
   if (row.status === 'published' || row.status === 'accepted') return fail(c, 409, 'この投稿はすでに送信済みです', { code: 'already_sent' });
   if (row.status === 'cancelled' || row.status === 'deleted') return fail(c, 409, 'この投稿は取り消されています', { code: 'cancelled' });
   if (row.publish_mode === 'scheduled') return fail(c, 400, '日時指定の投稿はこの環境では未対応です', { code: 'not_supported' }, ["store"]);
@@ -776,7 +783,7 @@ restaurantGooglePosts.post(
     if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
     const row = await postFor(c, store.id, c.req.param('id'));
     if (!row) return fail(c, 404, '投稿が見つかりません');
-    if (!writeEnabled(c.env)) return fail(c, 403, 'この環境では投稿できません', { code: 'write_disabled' });
+    if (!postWriteEnabled(c.env, store)) return fail(c, 403, 'この環境では投稿できません', { code: 'write_disabled' });
     if (row.instagram_enabled !== 1)
       return fail(c, 409, 'この投稿は Instagram へ出さない設定です', { code: 'instagram_disabled' });
     if (!row.google_post_name)
