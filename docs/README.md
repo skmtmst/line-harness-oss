@@ -461,6 +461,7 @@
 - [リマインダ](release-log/0.25.0.md)
 - [反映履歴の書き方](release-log/README.md)
 - [外部点検のボタン名・導線・表示崩れの修正](release-log/unreleased/1851-kenta-staging-ui.md)
+- [統括名の必須表示と入力エラー時の焦点復帰](release-log/unreleased/1857-kenta-hq-name-focus.md)
 - [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
 - [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
 - [対応が要るものの速さとお知らせの下の空き](release-log/unreleased/1798-kenta-hq-attention-speed.md)
