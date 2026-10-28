@@ -2,7 +2,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import ConversionsPage from './page'
+import ConversionsPage from '@/app/affiliates/page'
+import LegacyConversionsPage from './page'
 
 /*
  * R280: 成果地点の一覧で行の「…」を開くと、メニューが二重に出ていた。
@@ -118,11 +119,11 @@ function installFetch() {
 let container: HTMLDivElement
 let root: Root
 
-async function mount() {
+async function mount(Page = ConversionsPage) {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
-  await act(async () => { root.render(React.createElement(ConversionsPage)) })
+  await act(async () => { root.render(React.createElement(Page)) })
   await act(async () => { await Promise.resolve() })
 }
 
@@ -174,6 +175,10 @@ afterEach(async () => {
 describe('R280 成果地点の操作メニューは1つだけ', () => {
   it('「…」を開いても可視メニューは1つだけ', async () => {
     await mount()
+    expect(container.querySelector('[data-page-template="list"] [data-template-region="content"]')?.textContent).toContain('購入')
+    const createLinks = [...container.querySelectorAll('a')].filter(link => link.textContent?.trim() === '成果地点を作る')
+    expect(createLinks.length).toBeGreaterThan(0)
+    expect(createLinks.map(link => link.getAttribute('href'))).toEqual(createLinks.map(() => '/conversions/new'))
     expect(moreButtons().length).toBeGreaterThan(0)
     // PC表・スマホカードのどちらか片方を開く。共有状態のままだと両方が開く。
     await click(moreButtons()[0])
@@ -271,10 +276,13 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
 
   it('旧URLの紹介者や送り元を失わず成果とアフィリエイトへ送る', async () => {
     fixture.tab = 'approvals'
-    await mount()
+    await mount(LegacyConversionsPage)
     expect(fixture.replace).toHaveBeenCalledWith('/affiliates?tab=approvals&affiliate=affiliate-a&from=notice')
-    // 上の帯の画面名はナビ（lib/menu.ts）の「コンバージョン」と同じ名前を渡す。
-    expect(pageTitle).toHaveBeenCalledWith('コンバージョン')
+    // 旧入口では行き先を案内し、検索条件を保った新入口へ移す。
+    const loading = container.querySelector('[data-list-state="loading"]')
+    expect(loading).not.toBeNull()
+    expect(loading?.getAttribute('aria-busy')).toBe('true')
+    expect(loading?.getAttribute('aria-label')).toBe('成果とアフィリエイトへ移動しています')
     expect(container.querySelector('table')).toBeNull()
   })
 })

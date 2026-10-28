@@ -4,7 +4,7 @@
  * - 登録の口は一般の登録（/accounts/new）へ。閲覧のみには置かない
  * - 読み込みの失敗は共通の案内。403 は押しても直らないので「もう一度読み込む」を出さない
  * - 「更新する」は全アカウントの接続を確かめ直し、版を添えて送り、一覧を読み直す
- * - 「設定」→「詳しい数値を見る」で既存の編集の窓。保存のあとは一覧を読み直す
+ * - 「設定」→「LINE の登録内容を編集」で既存の編集の窓。保存のあとは一覧を読み直す
  * - 「入る」は選んだアカウントを覚え、店舗未選択から来たときは元の画面へ戻す
  */
 import React from 'react'
@@ -34,9 +34,9 @@ vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof impo
 /* 設定の窓と編集の窓の中身は、それぞれの試験が見る。ここでは画面からの受け渡しだけを見る。 */
 vi.mock('@/v8/hq/account-dialogs', async (original) => ({
   ...await original<typeof import('@/v8/hq/account-dialogs')>(),
-  AccountSettingsDialogV8: ({ account, onShowDetails, onSaved }: { account: { name: string }; onShowDetails: () => void; onSaved: () => void }) => (
+  AccountSettingsDialogV8: ({ account, onEditRegistration, onSaved }: { account: { name: string }; onEditRegistration: () => void; onSaved: () => void }) => (
     <div role="dialog" aria-label={`${account.name}の設定`}>
-      <button type="button" onClick={onShowDetails}>詳しい数値を見る</button>
+      <button type="button" onClick={onEditRegistration}>LINE の登録内容を編集</button>
       <button type="button" onClick={onSaved}>保存する</button>
     </div>
   ),
@@ -180,11 +180,11 @@ describe('統括のアカウント：接続の確かめ直し', () => {
 })
 
 describe('統括のアカウント：設定と編集', () => {
-  it('「設定」→「詳しい数値を見る」で既存の編集の窓にそのアカウントを渡し、保存のあと一覧を読み直す', async () => {
+  it('「設定」→「LINE の登録内容を編集」で既存の編集の窓にそのアカウントを渡し、保存のあと一覧を読み直す', async () => {
     render(<HqHomeV8 />)
     await screen.findAllByText('銀座店')
     fireEvent.click(screen.getByRole('button', { name: '銀座店 の設定' }))
-    fireEvent.click(screen.getByRole('button', { name: '詳しい数値を見る' }))
+    fireEvent.click(screen.getByRole('button', { name: 'LINE の登録内容を編集' }))
     expect(screen.getByRole('dialog', { name: 'アカウントの編集' })).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: '銀座店の設定' })).toBeNull()
     expect(mocks.editProps).toMatchObject({ accountId: 'a1', initialName: '銀座店', initialChannelId: 'ch-a1' })
