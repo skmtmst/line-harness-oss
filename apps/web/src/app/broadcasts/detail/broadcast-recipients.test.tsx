@@ -6,13 +6,14 @@
  */
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({ recipients: vi.fn() }))
 
 vi.mock('@/lib/api', () => ({ api: { broadcasts: { recipients: fixture.recipients } } }))
 
 import BroadcastRecipients from './broadcast-recipients'
+import type { BroadcastRecipientRow } from '@/lib/api'
 
 afterEach(() => {
   cleanup()
@@ -24,7 +25,7 @@ const SUMMARY = {
   pending: 0, total: 3, retryableCount: 1,
 }
 
-function row(displayName: string, group: string, label: string) {
+function row(displayName: string, group: BroadcastRecipientRow['group'], label: string) {
   return {
     friendId: `id-${displayName}`,
     displayName,
@@ -102,7 +103,9 @@ describe('宛先のタブ', () => {
     })
     render(<BroadcastRecipients broadcastId="b1" total={3} version={1} />)
     await waitFor(() => expect(screen.getByText('山田花子')).toBeTruthy())
-    expect(screen.getByText('届いた 1')).toBeTruthy()
+    expect(screen.getByText('LINEが受け付けました：1人')).toBeTruthy()
+    expect(within(screen.getByText('山田花子').closest('li')!).getByText('LINEが受け付けました')).toBeTruthy()
+    expect(screen.queryByText('届いた')).toBeNull()
     expect(screen.getByText('失敗 2')).toBeTruthy()
     expect(screen.getByText('送る前 0')).toBeTruthy()
     expect(screen.getByRole('button', { name: /1件を再送/ })).toBeTruthy()
@@ -132,5 +135,55 @@ describe('宛先のタブ', () => {
     })
     render(<BroadcastRecipients broadcastId="b1" total={150} version={1} />)
     await waitFor(() => expect(screen.getByText('宛先ごとの結果はありません')).toBeTruthy())
+    expect(screen.getByText('この配信は集約だけの古い記録です（成功の記録 120人）。お客さまに届いたかは確認できません。')).toBeTruthy()
+    expect(screen.queryByRole('list')).toBeNull()
+  })
+
+  it('受付が確定したgroupだけを受付表現にし、不明・失敗・送信中は元の結果を保つ', async () => {
+    fixture.recipients.mockResolvedValue({
+      success: true,
+      data: {
+        rows: [
+          row('受付済み', 'delivered', '届いた'),
+          row('未確認', 'unknown', '確認できていません'),
+          row('待機中', 'inflight', '送信中'),
+          row('一時失敗', 'failed_temporary', '一時的な失敗'),
+          row('恒久失敗', 'failed_permanent', '届けられなかった'),
+        ],
+        summary: { ...SUMMARY, unknown: 1, inFlight: 1, total: 5 },
+        aggregateOnly: false, aggregateReason: null, legacySuccessCount: null,
+      },
+    })
+    render(<BroadcastRecipients broadcastId="b1" total={5} version={1} />)
+    await waitFor(() => expect(screen.getByText('受付済み')).toBeTruthy())
+    const result = (name: string, label: string) => within(screen.getByText(name).closest('li')!).getByText(label)
+    expect(result('受付済み', 'LINEが受け付けました')).toBeTruthy()
+    expect(result('未確認', '確認できていません')).toBeTruthy()
+    expect(result('待機中', '送信中')).toBeTruthy()
+    expect(result('一時失敗', '一時的な失敗')).toBeTruthy()
+    expect(result('恒久失敗', '届けられなかった')).toBeTruthy()
+  })
+
+  it('受付件数0を保ち、旧集約の欠測は0人にせず、全員配信は宛先一覧を作らない', async () => {
+    fixture.recipients.mockResolvedValue({
+      success: true,
+      data: { rows: [], summary: { ...SUMMARY, sent: 0 }, aggregateOnly: false, aggregateReason: null, legacySuccessCount: null },
+    })
+    const view = render(<BroadcastRecipients broadcastId="b1" total={3} version={1} />)
+    await waitFor(() => expect(screen.getByText('LINEが受け付けました：0人')).toBeTruthy())
+    fixture.recipients.mockResolvedValue({
+      success: true,
+      data: { rows: [], summary: SUMMARY, aggregateOnly: true, aggregateReason: 'legacy', legacySuccessCount: null },
+    })
+    view.rerender(<BroadcastRecipients broadcastId="b2" total={3} version={1} />)
+    await waitFor(() => expect(screen.getByText('この配信は集約だけの古い記録です。お客さまに届いたかは確認できません。')).toBeTruthy())
+    expect(screen.queryByText(/成功の記録/)).toBeNull()
+    fixture.recipients.mockResolvedValue({
+      success: true,
+      data: { rows: [], summary: SUMMARY, aggregateOnly: true, aggregateReason: 'all', legacySuccessCount: null },
+    })
+    view.rerender(<BroadcastRecipients broadcastId="b3" total={3} version={1} />)
+    await waitFor(() => expect(screen.getByText('全員への配信は宛先の一覧を持ちません。')).toBeTruthy())
+    expect(screen.queryByRole('list')).toBeNull()
   })
 })
