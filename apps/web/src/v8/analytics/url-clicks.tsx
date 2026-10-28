@@ -1,4 +1,5 @@
 'use client'
+import { ListPageStats } from '@/components/templates/list-page'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useEffect, useMemo, useState } from 'react'
@@ -92,12 +93,12 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const zeroLinks = links.filter((item) => shownValue(item.clicks) === 0).length
 
   return <>
-    <KpiBand className={styles.band}>
+    <ListPageStats><KpiBand className={styles.band}>
       <KpiCard presentation="band" title="押された回数" icon={<MousePointerClick size={16} aria-hidden="true" />} value={clicks} unit="回" detail={`この${days}日`} />
       <KpiCard presentation="band" title="押した人（URLごとの合計）" icon={<Users size={16} aria-hidden="true" />} value={people} unit="人" detail="同じ人の何度押しは1人" />
       <KpiCard presentation="band" title="計測中のURL" icon={<Link2 size={16} aria-hidden="true" />} value={active} unit="件" detail={`止めている ${stopped}`} />
       <KpiCard presentation="band" title="押されていないURL" icon={<Unlink size={16} aria-hidden="true" />} value={zeroLinks} unit="件" detail="実測できたURLのうち" />
-    </KpiBand>
+    </KpiBand></ListPageStats>
     <div className={styles.body} data-gap="tab">
       {toolbar}
       {overview.stateReason ? <Notice tone="warn">{overview.stateReason}</Notice> : null}
