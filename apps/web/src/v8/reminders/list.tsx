@@ -1111,13 +1111,6 @@ export default function RemindersListV8() {
         <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="a5C1p">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
       )}
 
-      {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
-      {!friendId ? <KpiBand border="dividers" data-design="KPIs">
-        {kpis.map((kpi) => (
-          <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} action={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? { label: '失敗を見る', onClick: kpi.link } : undefined} />
-        ))}
-      </KpiBand> : null}
-
       <ConfirmDialog
         open={bulkPauseIds !== null}
         title={`${bulkPauseIds?.length ?? 0}件のリマインダを停止しますか？`}
@@ -1225,7 +1218,13 @@ export default function RemindersListV8() {
         </div>
       </ConfirmDialog>
 
-      <ListPageBody skeleton folders={<>
+      <ListPageBody skeleton
+        stats={!friendId ? <KpiBand border="dividers" data-design="KPIs">
+          {kpis.map((kpi) => (
+            <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} action={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? { label: '失敗を見る', onClick: kpi.link } : undefined} />
+          ))}
+        </KpiBand> : null}
+        folders={<>
           <ManagedFolderPanel
             createAction={canEdit ? <Button href="/reminders/new" variant="primary" className="v8-folder-create w-full">
               ＋ リマインダを作る
