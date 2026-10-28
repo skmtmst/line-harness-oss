@@ -834,3 +834,4 @@
 - [統括の接続情報の更新](release-log/unreleased/1865-kenta-connection-refresh.md) — 単件・全件と再読み込みの反映履歴。
 - [選択中の絞り込み表示](release-log/unreleased/1866-kenta-filter-selection.md) — 薄緑の地と緑の枠・文字の反映履歴。
 - [自動処理のタグ未選択表示](release-log/unreleased/1867-kenta-unselected-tag-summary.md) — 未選択と設定済みの区別の反映履歴。
+- [フォームの区切りと店の接続案内](release-log/unreleased/1868-kenta-form-divider-store-warning.md) — 二重線の解消と対象店名の反映履歴。
