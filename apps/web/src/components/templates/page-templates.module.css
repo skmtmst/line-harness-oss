@@ -112,6 +112,9 @@
 :global(:root) .frame[data-page-template='create'] [data-template-region='preview'] { background: var(--color-canvas); }
 /* 作成の型の余白の口（CreatePage の contentSpacing・previewSurface）。画面の CSS で型の余白を上書きしない。 */
 :global(:root) .createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }
+/* メニュー先頭の案内と直前の表示面は、幅を問わず同じ8pxで離す。 */
+:global(:root) .createContent[data-content-spacing='notice-after-preview'] { padding-top: 0; }
+:global(:root) .createContent[data-content-spacing='notice-after-preview'] > :first-child > :global([data-design-part='notice']):first-child { margin-top: var(--space-8); }
 :global(:root) .preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }
 :global(:root) .preview[data-preview-surface='plain'] { background: transparent; }
 :global(:root) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); box-shadow: var(--shadow-row-line); flex-wrap: wrap; }
@@ -316,7 +319,6 @@
   :global(:root) .asideToggle { display: block; }
   /* 先頭の知らせが持つ上余白へ集約し、操作の下と本文の上に重ねて足さない。 */
   :global(:root) .asideToggle[data-content-spacing='notice-after-preview'] { padding-bottom: 0; }
-  :global(:root) .asideToggle[data-content-spacing='notice-after-preview'] + .split > .createContent[data-content-spacing='notice-after-preview'] { padding-top: 0; }
   :global(:root) .inboxList { width: 348px; }
   :global(:root) .settings { flex-direction: column; gap: var(--polish-space-card); }
   :global(:root) .settingsNav { width: 100%; flex-direction: row; flex-wrap: wrap; }
