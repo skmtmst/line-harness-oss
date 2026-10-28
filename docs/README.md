@@ -842,3 +842,4 @@
 - [同時投稿画像の縦横比](release-log/unreleased/1874-masato-instagram-image-ratio.md) — Instagramへ投稿する画像の比率を整える反映履歴。
 - [設定案内と配信結果の表現](release-log/unreleased/1875-kenta-setup-recipient-guidance.md) — 初期設定の一本化と宛先の受付表示の反映履歴。
 - [休憩表示と配信結果の位置](release-log/unreleased/1876-kenta-break-and-broadcast-results.md) — 休憩の見分け方と配信結果の数字の配置の反映履歴。
+- [二段階認証の説明](release-log/unreleased/1877-kenta-two-factor-help.md) — 二段階認証の画面に関する反映履歴。

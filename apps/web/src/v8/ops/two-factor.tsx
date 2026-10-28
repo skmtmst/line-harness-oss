@@ -130,7 +130,7 @@ export default function OpsTwoFactorV8() {
     setState('done')
   }
 
-  if (state === 'security') return <OpsShell><OpsHead title="二段階認証" /><MfaPolicy loginPath="/ops/login" /><SelfMfa loginPath="/ops/login" /></OpsShell>
+  if (state === 'security') return <OpsShell><OpsHead title="二段階認証" description="管理画面へ入る時の確かめ方を決めます" /><MfaPolicy loginPath="/ops/login" /><SelfMfa loginPath="/ops/login" /></OpsShell>
 
   return (
     <SaveErrorScope errors={saveErrors}><main className={styles.page} data-design-node="qod6X">
@@ -142,7 +142,7 @@ export default function OpsTwoFactorV8() {
         </span>
       </div>
       <Card variant="form" className={styles.card} aria-labelledby="ops-totp-title">
-        <PageHeading inset="none" title="二段階認証を設定" titleId="ops-totp-title" titleAs="h1" subtitleSize="body" subtitle={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
+        <PageHeading inset="none" title="二段階認証を設定" titleId="ops-totp-title" titleAs="h1" subtitleSize="body" help={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} subtitle={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
 
         {session?.platformAdmin ? <MfaPolicy loginPath="/ops/login" /> : null}
         {state === 'loading' ? (
