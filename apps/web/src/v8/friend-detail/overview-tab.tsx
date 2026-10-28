@@ -8,7 +8,6 @@ import {
   Bell,
   CalendarDays,
   Link2,
-  List,
   MailOpen,
   MessageCircle,
   ShoppingBag,
@@ -377,10 +376,6 @@ export default function OverviewTab({
           ) : (
             <p className={styles.secNote}>確定した配信予定はありません</p>
           )}
-          {upcomingStatus === 'ready' && !deliveryFailed ? (
-            // 今の口は「いちばん近い1件」だけを返す。ほかがあるかは分からないことを、行の形で正直に出す。
-            <IconRow surface="muted" icon={<List size={16} aria-hidden />} title="ほかの進行中の配信・リマインダ" end="一覧はまだ見られません" />
-          ) : null}
         </section>
 
         {/* NEXT-10: 名寄せの実績（マイル口の応答の統合情報）から出す。 */}
