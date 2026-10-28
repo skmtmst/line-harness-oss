@@ -27,6 +27,9 @@
   line-height: 18px;
 }
 :root .attentionIcon { display: none; }
+/* 幅に余裕のある数のマスだけ、色が表す良し悪しも言葉で添える。 */
+:root .word { display: none; margin-inline-start: 4px; }
+@container kpi-card (width >= 260px) { :root .word { display: inline; } }
 :root .up { background: var(--color-success-bg); color: var(--color-success); }
 :root .down { background: var(--color-status-danger-soft); color: var(--color-danger); }
 :root .attention { background: var(--color-status-warn-soft); color: var(--color-warning); }
