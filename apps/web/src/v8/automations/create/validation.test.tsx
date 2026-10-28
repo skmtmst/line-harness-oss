@@ -3,8 +3,18 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const createDraft = vi.hoisted(() => vi.fn())
+const resources = vi.hoisted(() => vi.fn())
+const getDraft = vi.hoisted(() => vi.fn())
+const summaries = vi.hoisted(() => vi.fn())
 const permission = vi.hoisted(() => ({ value: true }))
 const listExisting = vi.hoisted(()=>vi.fn().mockResolvedValue({success:true,data:[]}))
+vi.mock('./automation-dialogs', async importOriginal => {
+  const actual = await importOriginal<typeof import('./automation-dialogs')>()
+  return { ...actual, AutomationDialogs: (props: Parameters<typeof actual.AutomationDialogs>[0]) => {
+    summaries(props.actionSummary)
+    return <actual.AutomationDialogs {...props} />
+  } }
+})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account' }) }))
 vi.mock('@/components/automations/use-common-action-permission', () => ({ useCanManageCommonActions: () => permission.value }))
@@ -15,7 +25,8 @@ vi.mock('@/lib/api', async importOriginal => {
     ...actual.api.automations,
     createDraftFromTemplate: createDraft,
     list: listExisting,
-    draftResources: vi.fn().mockResolvedValue({ success: true, data: { tags: [{ id: 'tag', name: '予約希望' }], scenarios: [], commonActions: [] } }),
+    draftResources: resources,
+    getDraft,
   } } }
 })
 
@@ -23,6 +34,9 @@ import { NewAutomationV8 } from './create'
 
 beforeEach(() => {
   permission.value = true
+  resources.mockReset().mockResolvedValue({ success: true, data: { tags: [{ id: 'tag', name: '予約希望' }], scenarios: [], commonActions: [] } })
+  getDraft.mockReset()
+  summaries.mockClear()
   window.sessionStorage.clear()
   window.history.replaceState(null, '', '/automations/new')
   vi.stubGlobal('sessionStorage', window.sessionStorage)
@@ -79,5 +93,43 @@ it('閲覧のみの人には保存と公開を出さず、入力した内容も�
   render(<NewAutomationV8 />)
   expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'つくって動かす' })).toBeNull()
+  expect(createDraft).not.toHaveBeenCalled()
+})
+
+
+it.each(['ready', 'loading', 'failed'] as const)('タグIDが空なら%sでも未選択を示し、保存を始めない', async state => {
+  if (state === 'loading') resources.mockImplementationOnce(() => new Promise(() => {}))
+  if (state === 'failed') resources.mockRejectedValueOnce(new Error('resources unavailable'))
+  render(<NewAutomationV8 />)
+  await waitFor(() => expect(resources).toHaveBeenCalledTimes(1))
+  expect(screen.getByText('友だちになったら、タグ（未選択）を付けます。')).toBeTruthy()
+  expect(summaries.mock.lastCall?.[0]).toBe('タグ（未選択）')
+  fireEvent.change(screen.getByRole('textbox', { name: '名前', exact: true }), { target: { value: '未選択の確認' } })
+  fireEvent.click(screen.getByRole('button', { name: 'つくって動かす', exact: true }))
+  expect(await screen.findByText('付けるタグを選んでください')).toBeTruthy()
+  expect(screen.queryByRole('dialog', { name: 'この内容で動かし始めますか' })).toBeNull()
+  expect(createDraft).not.toHaveBeenCalled()
+})
+
+it.each(['loading', 'failed', 'missing', 'empty-name', 'named'] as const)('保存済み非空IDを%sで未選択に読み替えず、確認へ同じ要約を渡す', async state => {
+  if (state === 'loading') resources.mockImplementationOnce(() => new Promise(() => {}))
+  else if (state === 'failed') resources.mockRejectedValueOnce(new Error('resources unavailable'))
+  else resources.mockResolvedValueOnce({ success: true, data: { tags: state === 'missing' ? [] : [{ id: 'retained-tag', name: state === 'empty-name' ? '' : '予約希望' }], scenarios: [], commonActions: [] } })
+  getDraft.mockResolvedValueOnce({ success: true, data: {
+    id: 'summary-draft', draftVersionId: 'v1', name: 'タグの確認', description: null,
+    eventType: 'friend_add', triggerConfig: {}, conditions: {},
+    actions: [{ id: 'tag-step', type: 'add_tag', params: { tagId: 'retained-tag' }, onFailure: 'stop' }],
+  } })
+  window.history.replaceState(null, '', '/automations/new?draft=summary-draft')
+  render(<NewAutomationV8 />)
+  await waitFor(() => expect((screen.getByRole('textbox', { name: '名前', exact: true }) as HTMLInputElement).value).toBe('タグの確認'))
+  const named = state === 'named'
+  await waitFor(() => expect(summaries.mock.lastCall?.[0]).toBe(named ? 'タグ「予約希望」を付ける' : '選んだタグを付ける'))
+  expect(screen.getByText(named ? '友だちになったら、タグ「予約希望」を付けます。' : '友だちになったら、タグを付けます。')).toBeTruthy()
+  expect(screen.queryByText(/タグ（未選択）/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'つくって動かす', exact: true }))
+  const confirm = await screen.findByRole('dialog', { name: 'この内容で動かし始めますか' })
+  expect(confirm.textContent).toContain(named ? 'タグ「予約希望」を付ける' : '選んだタグを付ける')
+  expect(getDraft).toHaveBeenCalledWith('summary-draft', 'account')
   expect(createDraft).not.toHaveBeenCalled()
 })
