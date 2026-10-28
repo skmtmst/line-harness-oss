@@ -175,16 +175,16 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     })
   }
 
-  it('テンプレートは「…」の中から配る。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
+  it('テンプレートは「…」の中から配る。配布の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
     const rows = [
       { ...ROWS[0], outdated_account_count: 1, this_month_sent_count: 1860 },
       { ...ROWS[1], this_month_sent_count: null },
       { ...row('t-3', '予約の受付', 1), outdated_account_count: 0, this_month_sent_count: 0 },
     ]
     const h = await render({ rows, stats: { thisMonthSentCount: 1860, outdatedTemplateCount: 1 } })
-    expect(host.textContent).toContain('未公開の変更')
-    expect(host.textContent).toContain('下書きだけ')
-    expect(host.textContent).toContain('公開中')
+    expect(host.textContent).toContain('更新の配布待ち')
+    expect(host.textContent).toContain('未配布')
+    expect(host.textContent).toContain('配布済み')
     expect(host.textContent).toContain('1,860通')
     expect(host.textContent).toContain('0通')
     expect(host.textContent).toContain('新しい版を未配布')
@@ -194,6 +194,29 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     await act(async () => { menu!.click() })
     await act(async () => { distributeItem()!.click() })
     expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
+  })
+
+  it.each(['template', 'rich_menu', 'form', 'scenario'] as const)('%sは配布記録の状態を出し、公開と未取得を推測しない', async type => {
+    await render({ type, kind: undefined, rows: [
+      { ...row('distributed', '配ったメニュー', 3), template_type: 'rich_menu', outdated_account_count: 0 },
+      { ...row('changed', '更新待ちメニュー', 3), template_type: 'rich_menu', outdated_account_count: 1 },
+      { ...row('draft', 'まだ配らないメニュー', 0), template_type: 'rich_menu' },
+      { ...row('unknown', '記録が未取得', 3), template_type: 'rich_menu', distributed_account_count: undefined },
+      { ...row('unknown-version', '版が未取得', 3), template_type: 'rich_menu' },
+    ] })
+    const column = [...host.querySelectorAll('thead th')].findIndex(th => th.textContent === '配布状況')
+    expect(column).toBeGreaterThanOrEqual(0)
+    for (const [id, state] of [['distributed', '配布済み'], ['changed', '更新の配布待ち'], ['draft', '未配布'], ['unknown', '—'], ['unknown-version', '—']]) {
+      const tr = host.querySelector('tr[data-row-id="' + id + '"]')!
+      expect(tr.querySelectorAll('td')[column].textContent).toBe(state)
+    }
+    expect(host.querySelector('tbody')!.textContent).not.toContain('公開中')
+  })
+
+  it.each([true, false])('一覧未取得中は配布済みの行を出さない（読込中=%s）', async busy => {
+    await render({ ready: false, busy })
+    expect(host.querySelector('tbody')).toBeNull()
+    expect(host.textContent).toContain(busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。')
   })
 
   it('タグは人数・付け方、リッチメニューは順・誰に出すか・今月押されたを出す（DzdC3・noVq4）', async () => {
