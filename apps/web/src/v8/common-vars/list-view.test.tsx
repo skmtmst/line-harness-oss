@@ -230,6 +230,16 @@ function rowNames(): string[] {
   return [...host.querySelectorAll('tbody tr')].map((row) => row.querySelector('a')?.textContent?.trim() ?? '')
 }
 
+it('CSV状況は見出しの外の一覧通知へ出し、見出しには書き出し操作だけを残す', async () => {
+  listExports.mockResolvedValue({ success: true, data: [{ id: 'expired', status: 'expired', downloadUrl: null }] })
+  await render()
+  const status = host.querySelector('[data-testid="vars-export-status"]')
+  expect(status).not.toBeNull()
+  expect(status?.closest('[data-template-region="heading"]')).toBeNull()
+  expect(status?.closest('[data-template-region="toolbar"]')).not.toBeNull()
+  expect(host.querySelector('[data-template-region="heading"]')?.textContent).toContain('CSVで書き出す')
+})
+
 describe('共通情報の一覧の出し方', () => {
   it('選択中のLINEアカウントで一覧とフォルダを読み、行ごとの予約は読まずに一覧の次回予定を使う', async () => {
     listVars.mockResolvedValue({ success: true, data: [{ ...company, nextSchedule: { id: 's1', effectiveFrom: '2026-10-01T10:00', value: '株式会社ネン' }, pendingScheduleCount: 1 }, contact] })

@@ -42,7 +42,7 @@ import { formatNumber } from '@/lib/format'
 import { clampSearchQuery } from '@/lib/search-query'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import type { CommonVar,CommonVarDeleteImpact,Folder } from '@line-crm/shared'
-import VarsExportPanel from './export-panel'
+import { useVarsExportPanel } from './export-panel'
 import styles from './list.module.css'
 import { filterAndSortCommonVars,placeholderText,reasonRequirement,type CommonVarOrder } from './model'
 
@@ -816,6 +816,12 @@ function CommonVarsListInner() {
     },
   ]
 
+  const exportPanel = useVarsExportPanel({
+    accountId: canExport ? selectedAccountId : null,
+    folderId: folderFilter && folderFilter !== UNGROUPED ? folderFilter : null,
+    ungrouped: folderFilter === UNGROUPED,
+  })
+
   const overlays = renderCommonVarDialogs({ activeIndex, activeItem, activeStopped, applyStatus, batchReason, batchRequestRef, canWrite, closeDelete, closeStatusDialog, confirmDirectDelete, confirmReplacement, confirmStopInstead, current, deleteBatchError, deleteBusy, deleteChoice, deleteError, deleteImpact, deletePhase, deleteReason, deleteTarget, deleteTargets, deleting, folderDotOf, items, openDelete, openStatusDialog, panelStatus, removeSelected, renameVar, replacementCandidates, replacementId, replacementImpact, replacementPhase, router, selectedAccountId, selectReplacement, setActiveId, setBatchReason, setDeleteBatchError, setDeleteChoice, setDeleteReason, setDeleteTargets, setPanelStatus, setStatusError, setStatusReason, setTypedKey, setUsageExpanded, statusAction, statusBusy, statusError, statusReason, statusScheduled, statusTarget, typedKey, usageExpanded })
 
   return (
@@ -825,13 +831,7 @@ function CommonVarsListInner() {
       headingSize="regular"
       title="共通情報"
       help="会社名・営業時間・電話番号など、何度も使う文字をここで持ち、テンプレートや配信に差し込みます。ここを変えると、差し込んだ所がまとめて変わります。"
-      actions={
-        canExport ? <VarsExportPanel
-          accountId={selectedAccountId}
-          folderId={folderFilter && folderFilter !== UNGROUPED ? folderFilter : null}
-          ungrouped={folderFilter === UNGROUPED}
-        /> : null
-      }
+      actions={canExport ? exportPanel.action : null}
       tabs={canWrite ? undefined : (
         /* 閲覧のみの帯（）。数の帯の上。 */
         <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
@@ -856,7 +856,7 @@ function CommonVarsListInner() {
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={<>{createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}{folderPanel}</>}
       toolbar={<>
-        {hasAlerts ? <div className={styles.alertSlot}>{alerts}</div> : null}
+        {hasAlerts || (canExport && exportPanel.status) ? <div className={styles.alertSlot}>{canExport ? exportPanel.status : null}{alerts}</div> : null}
         {wideToolbar}
       </>}
       pagination={listPager}

@@ -42,6 +42,18 @@ describe('スタイルを選ぶ画面（共通節 S）', () => {
     for (const style of STYLE_EXPERIENCE_SCRIPT.order) expect(STYLE_EXPERIENCE_SCRIPT.styles[style].can).toHaveLength(3)
   })
 
+  it('開いた直後は上部の見出しへ焦点を置き、切り替えだけでは保存しない', async () => {
+    render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: '飲食店でできること' })))
+    expect(within(group()).getAllByRole('button')).toHaveLength(6)
+    for (const style of STYLE_EXPERIENCE_SCRIPT.order) {
+      view(style)
+      expect(screen.getByRole('heading', { name: `${styleLabel(style)}でできること` })).toBeTruthy()
+      expect(viewing()).toBe(styleLabel(style))
+    }
+    expect(calls.save).not.toHaveBeenCalled()
+  })
+
   it('見る・選ぶでは保存せず、［次へ］の先の保存で選んだスタイルだけを送る', async () => {
     render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
     expect(viewing()).toBe(styleLabel('restaurant'))

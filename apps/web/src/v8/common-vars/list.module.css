@@ -11,23 +11,6 @@
   font-size: var(--text-label);
 }
 
-/* 頭の右の「CSVで書き出す」。結果は通常の並びで表示し、数の帯に重ねない。 */
-.exportBox {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-}
-
-.exportPop {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--tpl-cv-gap-s);
-  margin-top: var(--tpl-cv-gap-s);
-  max-width: min(100%, var(--tpl-cv-export-w));
-}
-
 /* 閲覧のみの帯。数の帯の上。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin-bottom: var(--tpl-cv-band-after); }
 
