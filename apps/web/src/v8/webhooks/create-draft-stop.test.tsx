@@ -33,12 +33,16 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 
 test('止められなかったら知らせて残り、もう一度押すと止めるだけやり直す', async () => {
   const calls: string[] = []
+  let savedSecret: string | undefined
   let puts = 0
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const method = init?.method ?? 'GET'
     if (method !== 'GET') calls.push(`${method} ${new URL(url).pathname}`)
-    if (method === 'POST' && url.includes('/api/webhooks/outgoing')) return json({ success: true, data: { id: 'wh-1', secret: 'x' } })
+    if (method === 'POST' && url.includes('/api/webhooks/outgoing')) {
+      savedSecret = JSON.parse(String(init?.body)).secret
+      return json({ success: true, data: { id: 'wh-1', secret: 'x' } })
+    }
     if (method === 'PUT' && url.includes('/api/webhooks/outgoing/wh-1')) {
       puts += 1
       return puts === 1 ? json({ success: false, error: 'down' }, 500) : json({ success: true, data: { id: 'wh-1' } })
@@ -49,7 +53,9 @@ test('止められなかったら知らせて残り、もう一度押すと止�
   render(<WebhooksCreateV8 />)
   fireEvent.change(document.querySelector('#wh-new-name')!, { target: { value: '予約台帳' } })
   fireEvent.change(document.querySelector('#wh-new-url')!, { target: { value: 'https://example.com/hook' } })
-  fireEvent.change(document.querySelector('#wh-new-secret')!, { target: { value: 'x'.repeat(40) } })
+  const secret = document.querySelector('#wh-new-secret') as HTMLInputElement
+  expect(secret.readOnly).toBe(true)
+  const generatedSecret = secret.value
   fireEvent.click(document.querySelector('input[name="wh-new-mode"][value="all"]')!)
   await act(async () => { screen.getByRole('button', { name: '下書きを保存' }).click() })
   await waitFor(() => expect(screen.getByText(/まだ止められていません/)).toBeTruthy())
@@ -58,6 +64,7 @@ test('止められなかったら知らせて残り、もう一度押すと止�
   await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/webhooks?highlight=wh-1'))
   expect(calls.filter((call) => call.startsWith('POST /api/webhooks/outgoing'))).toHaveLength(1)
   expect(puts).toBe(2)
+  expect(savedSecret).toBe(generatedSecret)
 })
 
 test('名前とURLが足りないまま保存すると、帯で済ませず欄が赤くなり、1つ目（名前）の欄へ移る', async () => {
@@ -98,9 +105,9 @@ test('欄から離れた時点で、触った欄だけ理由を出し、直す�
   fireEvent.change(url, { target: { value: 'https://example.com/hook' } })
   expect(screen.queryByText('URLは https:// で始めてください')).toBeNull()
 
-  fireEvent.change(secret, { target: { value: 'short' } })
+  expect(secret.readOnly).toBe(true)
   fireEvent.blur(secret)
-  expect(secret.getAttribute('aria-invalid')).toBe('true')
+  expect(secret.getAttribute('aria-invalid')).not.toBe('true')
 
   fireEvent.change(name, { target: { value: '予約台帳' } })
   expect(screen.queryByText('名前を入力してください')).toBeNull()

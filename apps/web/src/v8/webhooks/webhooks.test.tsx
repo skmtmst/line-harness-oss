@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, within } from '@testing-library/react'
+import { fireEvent, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -38,6 +38,7 @@ import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import WebhooksSamplesV8 from './samples'
 import WebhooksInteractionsV8 from './interactions'
 import WebhooksCreateV8 from './create'
+import { api, ApiError } from '@/lib/api'
 import { groupRuns } from './sheets'
 import { eventLabel, maskedUrl } from './words'
 
@@ -402,6 +403,53 @@ describe('外部連携 V8', () => {
     expect(host.querySelector('#wh-new-url')?.getAttribute('aria-invalid')).toBe('true')
     expect(host.querySelectorAll('[data-design-part=notice][role=alert]')).toHaveLength(0)
     expect(posted).toHaveLength(0)
+  })
+
+  it('送り先を作る：秘密の鍵は読み取り専用で、保存前にコピーできる', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    await render(<WebhooksCreateV8 />)
+    const secret = host.querySelector<HTMLInputElement>('#wh-new-secret')!
+    expect(secret.readOnly).toBe(true)
+    const initial = secret.value
+    expect(host.textContent).toContain('保存すると秘密の鍵は二度と表示されません。今コピーしてください。')
+    await act(async () => { buttons().find((button) => button.getAttribute('aria-label') === '秘密の鍵をコピー')!.click() })
+    expect(writeText).toHaveBeenCalledWith(initial)
+    await act(async () => { buttons().find((button) => button.textContent?.trim() === '作り直す')!.click() })
+    expect(secret.readOnly).toBe(true)
+    expect(secret.value).not.toBe(initial)
+    await act(async () => { buttons().find((button) => button.getAttribute('aria-label') === '秘密の鍵をコピー')!.click() })
+    expect(writeText).toHaveBeenLastCalledWith(secret.value)
+  })
+
+  it('鍵を作り直すとAPIの鍵の理由だけを消し、ほかの欄の理由を残す', async () => {
+    const create = vi.spyOn(api.webhooks.outgoing, 'create').mockRejectedValueOnce(
+      new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, {
+        secret: '新しい鍵を作り直してください', name: 'この名前を確認してください',
+      }),
+    )
+    try {
+      await render(<WebhooksCreateV8 />)
+      await act(async () => {
+        fireEvent.change(host.querySelector('#wh-new-name')!, { target: { value: '連携先' } })
+        fireEvent.change(host.querySelector('#wh-new-url')!, { target: { value: 'https://example.com/hook' } })
+        fireEvent.click(host.querySelector('input[name="wh-new-mode"][value="all"]')!)
+      })
+      const secret = host.querySelector<HTMLInputElement>('#wh-new-secret')!
+      const previous = secret.value
+      await act(async () => { fireEvent.click(within(host).getByRole('button', { name: /つくって動かす/ })) })
+      await waitFor(() => expect(secret.getAttribute('aria-invalid')).toBe('true'))
+      expect(host.textContent).toContain('新しい鍵を作り直してください')
+      expect(host.textContent).toContain('この名前を確認してください')
+      await act(async () => { fireEvent.click(within(host).getByRole('button', { name: '作り直す' })) })
+      expect(secret.value).not.toBe(previous)
+      expect(secret.readOnly).toBe(true)
+      expect(secret.getAttribute('aria-invalid')).not.toBe('true')
+      expect(host.textContent).not.toContain('新しい鍵を作り直してください')
+      expect(host.querySelector('#wh-new-name')?.getAttribute('aria-invalid')).toBe('true')
+      expect(host.textContent).toContain('この名前を確認してください')
+      expect(create).toHaveBeenCalledTimes(1)
+    } finally { create.mockRestore() }
   })
 
   it('同期の記録：同じ時刻の行を束ね、失敗で0件の行は書き出したものに数えない', () => {
