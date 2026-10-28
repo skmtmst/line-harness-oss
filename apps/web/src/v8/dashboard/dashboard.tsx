@@ -19,7 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { SetupCard, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { SetupTasks, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import type { DashboardCardId } from '@line-crm/shared'
@@ -29,7 +29,7 @@ import { useSearchParams } from 'next/navigation'
 import { Fragment,useEffect,useRef,useState,type ReactNode } from 'react'
 import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
-import { FirstStepsCard,useFirstSteps } from './first-steps'
+import { FirstStepsCard,summarizeFirstSteps,useFirstSteps } from './first-steps'
 import { FirstRunDoneDialog } from './first-run-done'
 import { StarterRetryNotice, starterRetryVisible, useStarterRetryResult } from './starter-retry'
 import { FriendAddLink } from './friend-add'
@@ -388,6 +388,8 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       inserted={starterResult.inserted} onInserted={starterResult.record} onDismiss={starterResult.clear}
       onChanged={() => { start.reload(); setup.reload() }} />
   ) : null
+  const onboardingSummary = canManage ? start.summary ?? (setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null) : null
+  const showOnboarding = canManage && Boolean(onboardingSummary || setupRest || start.error || setup.error)
   const notice = start.error || setup.error || start.summary || starterRetry || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
@@ -395,8 +397,16 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       ) : null}
       {setupBands}
       {starterRetry}
-      {start.error && canManage ? <ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={start.error} onRetry={start.reload} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} onRecheck={start.watchExpired ? start.rewatch : undefined} /> : null}
-      {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : null}
+      {showOnboarding ? <FirstStepsCard
+        summary={onboardingSummary} folded={start.folded} onToggle={start.toggle}
+        onRecheck={start.watchExpired ? start.rewatch : undefined}
+        onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : undefined}
+        setupTasks={setupRest ? <SetupTasks heading summary={setupRest} onOpenStep={openSetupStep} /> : undefined}
+        feedback={<>
+          {start.error ? <ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={start.error} onRetry={start.reload} /> : null}
+          {setup.error ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}
+        </>}
+      /> : null}
       {d.periodNotice ? <Notice tone="info" role="status">{d.periodNotice}</Notice> : null}
       {d.error ? (
         <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>

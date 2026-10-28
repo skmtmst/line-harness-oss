@@ -2,3 +2,4 @@
 export { SetupCard } from '../../setup-card'
 export { SetupWarningBands } from '../../setup-card'
 export { setupSummary } from '../../setup-card'
+export { SetupTasks } from '../../setup-card'
