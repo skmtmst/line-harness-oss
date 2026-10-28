@@ -226,6 +226,8 @@ describe('V8 一斉配信一覧の結果の列', () => {
     expect(heads).not.toContain('クリック')
     expect(sent.textContent).toContain('624 人')
     expect(sent.textContent).toContain('開封 71.2%・クリック 15.4%')
+    const resultCell = [...sent.querySelectorAll('td')].find((cell) => cell.textContent?.includes('開封 71.2%・クリック 15.4%'))
+    expect(resultCell?.getAttribute('data-align')).toBe('right')
     expect(unsent.textContent).not.toMatch(/0\s*人/)
   })
 })
