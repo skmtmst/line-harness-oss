@@ -125,9 +125,10 @@
   outline-offset: -2px;
 }
 
-/* いまの画面：薄い地＋太字・濃い字。 */
+/* いまの画面：左メニューと同じ白＋薄い影＋太字・濃い字。 */
 .itemActive {
-  background: var(--color-surface-pearl);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-nav-active);
   color: var(--color-ink);
   font-weight: 700;
 }

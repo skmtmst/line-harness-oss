@@ -270,7 +270,7 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
   }
 
   function settingsLink(): HTMLAnchorElement {
-    return screen.getByRole('link', { name: '設定を見る' }) as HTMLAnchorElement
+    return screen.getByRole('link', { name: 'マイル設定へ' }) as HTMLAnchorElement
   }
 
   test('行き先はマイルの付与ルールで、行動スコアのルールではない', async () => {

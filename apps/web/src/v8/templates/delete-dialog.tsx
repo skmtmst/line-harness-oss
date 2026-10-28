@@ -12,7 +12,7 @@ export default function TemplateDeleteDialog(props: Props) {
     titleIcon={false} confirmIcon={false} contentLayout="form" designLayout="stacked"
     confirmPlacement="start" actionWidthReserve="idle"
     confirmDisabledReason={props.confirmDisabled ? 'アカウントが切り替わりました。削除するテンプレートを選び直してください。' : undefined}>
-    <Notice tone="danger" appearance="soft" message="削除は元に戻せません。" />
-    {props.confirmDisabled ? <Notice tone="danger" message="アカウントが切り替わりました。削除するテンプレートを選び直してください。" /> : null}
+    <Notice tone="warn" role="alert" appearance="soft" message="削除は元に戻せません。" />
+    {props.confirmDisabled ? <Notice tone="warn" role="alert" message="アカウントが切り替わりました。削除するテンプレートを選び直してください。" /> : null}
   </ConfirmDialog>
 }

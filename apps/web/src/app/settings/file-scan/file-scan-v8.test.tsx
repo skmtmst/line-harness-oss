@@ -91,7 +91,7 @@ describe('PfA4o 状態の札', () => {
     expect(screen.getByText('invoice.pdf')).toBeTruthy()
     const safeguard = screen.getByText('確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。').closest('[data-design-part="notice"]')!
     expect(safeguard).toBeTruthy()
-    expect(safeguard.querySelector('.lucide-shield-check')).toBeTruthy()
+    expect(safeguard.querySelector('[data-notice-dot]')).toBeTruthy()
     const toggle = screen.getByRole('button', { name: 'この画面の説明' })
     fireEvent.click(toggle)
     expect(safeguard.isConnected).toBe(true)
@@ -100,7 +100,7 @@ describe('PfA4o 状態の札', () => {
     const safetyText = screen.getByText('確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。')
     const safety = safetyText.closest('[data-design-part="notice"]')
     expect(safety).not.toBeNull()
-    expect(safety?.querySelector('svg.lucide-shield-check')).not.toBeNull()
+    expect(safety?.querySelector('[data-notice-dot]')).not.toBeNull()
     expect(safetyText.closest('[data-page-explanation-body]')).toBeNull()
     const settings = screen.getByRole('button', { name: /設定を編集/ })
     expect(settings.querySelector('svg.lucide-sliders-horizontal')).not.toBeNull()

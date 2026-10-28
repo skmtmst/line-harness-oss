@@ -189,6 +189,7 @@ describe('V8 シナリオ配信の編集', () => {
     } } as never)
     await render()
     const preview = screen.getByRole('region', { name: 'LINEでの見え方' })
+    expect(within(preview).getByText('選んだ通（1通目）の見え方')).toBeTruthy()
     expect(within(preview).getByText('こんにちは、山田 花子さん。10月2日 18:00からです。')).toBeTruthy()
     expect(document.querySelector('[data-preview-sample-note]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方の説明' }))
@@ -210,7 +211,7 @@ describe('V8 シナリオ配信の編集', () => {
     for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
       expect(screen.getAllByRole(name === '配信結果を見る' ? 'link' : 'button', { name }).length, name).toBeGreaterThan(0)
     }
-    expect(screen.getByText('保存済み 2026年10月1日 14:02')).toBeTruthy()
+    expect(screen.getByText('保存済み 10月1日 14:02')).toBeTruthy()
     expect(screen.getByText('友だち追加のとき')).toBeTruthy()
     expect(screen.getByText('送っています')).toBeTruthy()
     expect(screen.getByText('何もしない（一時停止）')).toBeTruthy()

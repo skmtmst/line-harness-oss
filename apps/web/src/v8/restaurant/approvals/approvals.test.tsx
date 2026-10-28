@@ -54,7 +54,7 @@ it('管理者は承認待ちのカードで承認でき、改定の前後と差�
   expect(screen.getByText('¥3,800')).toBeTruthy()
   const reason = screen.getByText('期限を書いてください').closest('[role=note]')!
   expect(reason.getAttribute('data-appearance')).toBe('soft')
-  expect(reason.querySelector('svg')).toBeNull()
+  expect(reason.querySelector('[data-notice-dot]')).not.toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '承認する' }))
   await waitFor(() => expect(fixture.decideApproval).toHaveBeenCalledWith('account-1', 'apr-1', 'approve', undefined))
 })

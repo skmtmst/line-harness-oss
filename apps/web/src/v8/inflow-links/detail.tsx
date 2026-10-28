@@ -744,7 +744,7 @@ function InflowDetailContent() {
           onCancel={() => { if (!deleting) setDeleteOpen(false) }}
         >
           <div className={styles.deleteBody}>
-            <Notice tone="danger" message="削除すると、次のことが起きます">
+            <Notice tone="warn" role="alert" message="削除すると、次のことが起きます">
               <ul className={styles.deleteEffects}>
                 <li>貼り付けたURL・QRコード：このURLを置いた投稿や広告から開けなくなります（差し替えが必要）</li>
                 <li>{`この経路から来た記録：${formatNumber(funnel?.friend_add_count ?? 0)} 人の流入元と成果は過去の記録として残ります`}</li>

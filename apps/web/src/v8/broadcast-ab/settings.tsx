@@ -2,6 +2,7 @@
 
 import { Info } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -37,7 +38,7 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
   const decideAt = decideTime(start, ab.settings.decideAfterMinutes)
   const set = <K extends keyof typeof ab.settings>(key: K, value: (typeof ab.settings)[K]) => ab.setSettings({ ...ab.settings, [key]: value })
   return (
-    <section className={styles.settingsCard} data-on={on || undefined} aria-labelledby="ab-settings-title" data-design-node="cM35y">
+    <Card as="section" className={styles.settingsCard} contentPadding="var(--ab-pad)" data-on={on || undefined} aria-labelledby="ab-settings-title" data-design-node="cM35y">
       <div className={styles.settingsHead}>
         <h3 id="ab-settings-title" className={styles.title}>A/B で試す</h3>
         <HelpTip label="A/B で試すの説明">A 案・B 案を一部の人に試し、勝った方を残りの人へ送ります。2 つの割合の差が確からしさ 95% 以上・1 ポイント以上のときだけ勝ちを決め、そうでなければ「決められない」として送りません。試す人は無作為で、同じ人には 1 つの案だけ届きます。</HelpTip>
@@ -86,7 +87,7 @@ export default function BroadcastAbSettings({ ab, total, targetAll, start, appro
           )}
         </>
       ) : null}
-    </section>
+    </Card>
   )
 }
 

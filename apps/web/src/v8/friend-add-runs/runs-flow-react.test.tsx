@@ -130,6 +130,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   delete document.documentElement.dataset.theme
 })
@@ -240,10 +241,12 @@ describe('実行結果の数と状態', () => {
   })
 
   it('最後に送ったは集計の送信日時を日付つきで持ち、表の先頭行の処理時刻を使わない', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-28T00:00:00Z'))
     await render()
     const last = cardRow('最後に送った')
     const stamp = last?.querySelector('[title]')
-    expect(stamp?.getAttribute('title')).toMatch(/2026.*8.*30/)
+    expect(stamp?.getAttribute('title')).toBe('8月30日 12:04')
     expect(stamp?.getAttribute('title')).not.toMatch(/9.*7/)
   })
 

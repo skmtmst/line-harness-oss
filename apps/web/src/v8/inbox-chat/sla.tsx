@@ -8,6 +8,7 @@
  */
 import StatusBadge from '@/components/shared/status-badge'
 import type { InboxSlaState } from '@line-crm/shared'
+import { formatTimeSpan } from '@/lib/format-duration'
 
 /** 一覧の行に口が足す3つの値（契約 API-CONTRACT-GAP1.md の G3）。無い口・期限オフは undefined か none。 */
 export type ChatSlaFields = {
@@ -17,8 +18,7 @@ export type ChatSlaFields = {
 }
 
 export function formatSlaDistance(minutes: number): string {
-  const m = Math.max(1, Math.round(minutes))
-  return m >= 60 ? `${Math.floor(m / 60)} 時間` : `${m} 分`
+  return formatTimeSpan(Math.max(1, Math.round(minutes)), { gap: true })
 }
 
 export function slaBadgeOf(fields: ChatSlaFields, now: number): { tone: 'warning' | 'danger' | 'neutral'; text: string } | null {
