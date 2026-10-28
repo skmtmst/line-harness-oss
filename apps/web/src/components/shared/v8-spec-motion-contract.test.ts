@@ -44,13 +44,13 @@ describe('V8 仕上げ3回目の動き', () => {
     // 消える側に 120ms の逆再生を足すと、4秒・5秒・⌘Z の即時除去の
     // 契約が崩れるため入れない（toast.test.tsx が保証）。
     const save = vi.fn()
-    const view = render(React.createElement(Button, { busy: true, onClick: save, children: '保存する' }))
+    const view = render(React.createElement(Button, { busy: true, onClick: save }, '保存する'))
     const button = screen.getByRole('button', { name: '保存しています…' }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
     expect(button.getAttribute('aria-busy')).toBe('true')
     fireEvent.click(button)
     expect(save).not.toHaveBeenCalled()
-    view.rerender(React.createElement(Button, { disabled: true, disabledReason: '内容を入力してください', onClick: save, children: '保存する' }))
+    view.rerender(React.createElement(Button, { disabled: true, disabledReason: '内容を入力してください', onClick: save }, '保存する'))
     expect(button.disabled).toBe(true)
     fireEvent.click(button)
     expect(save).not.toHaveBeenCalled()

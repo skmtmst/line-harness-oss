@@ -74,9 +74,10 @@ function Fixture(){
    {id:'allowed',label:'許可の操作',group:'destructive',onSelect:()=>{globalThis.menuAllowedCalls=(globalThis.menuAllowedCalls||0)+1}}
   ]}/></section>
   <section id="windows">{['通常','確認','危険','警告','手順','選択','長文','引き出し'].map(name=><Button key={name} onClick={()=>setWindow(name)}>{name}</Button>)}</section>
+  <section><Button onClick={()=>setWindow('left-actions')}>左操作の窓を開く</Button></section>
   {window==='引き出し'?<Drawer open title="設定を編集する" headerIcon={props.headerIcon} description={props.description} onClose={()=>setWindow('')} footer={<Button onClick={()=>setWindow('')}>保存する</Button>}><input aria-label="名前" defaultValue="保持する名前"/></Drawer>:
    ['確認','危険','警告'].includes(window)?<ConfirmDialog {...props} title="内容を確認しますか？" destructive={window==='危険'} warning={window==='警告'}/>:
-   <Dialog {...props} open={!!window} widthPreset={window==='選択'?'picker':undefined} steps={window==='手順'?<Steps label="窓の手順" steps={steps} currentKey="now"/>:null}>
+   <Dialog {...props} open={!!window} footerLead={window==='left-actions'?<Button onClick={()=>{globalThis.dialogLeadCalls=(globalThis.dialogLeadCalls||0)+1}}>左の操作</Button>:undefined} widthPreset={window==='選択'?'picker':undefined} steps={window==='手順'?<Steps label="窓の手順" steps={steps} currentKey="now"/>:null}>
     <DialogContentRow tone="muted"><label>名前<input aria-label="名前" defaultValue="保持する名前"/></label></DialogContentRow><Notice tone="warn">入力した内容を確認してください。</Notice>{window==='長文'?<div style={{height:1600}}>長い内容</div>:null}
    </Dialog>}
  </main>
@@ -197,6 +198,40 @@ test('入力理由の既定を権限tooltipへ戻す故障を検出する', asyn
 })
 
 for (const width of [1024, 1152, 1440]) {
+  test(`窓の取消と保存は中央、独立した操作は左に保ち、配置故障を検出する ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ reducedMotion: 'reduce' })
+      await mount(page, width)
+      await page.evaluate(() => { globalThis.dialogLeadCalls = 0 })
+      await page.getByRole('button', { name: '左操作の窓を開く', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: '新しく作る', exact: true })
+      const measure = () => dialog.evaluate(root => {
+        const actions = root.querySelector('[data-dialog-action-pair]'), box = actions.getBoundingClientRect()
+        const lead = [...actions.querySelectorAll('button')].find(el => el.textContent === '左の操作').getBoundingClientRect()
+        const pair = actions.querySelector('[data-dialog-action]').parentElement.getBoundingClientRect()
+        return { center: Math.abs((pair.left + pair.right) / 2 - (box.left + box.right) / 2), leadInside: lead.left >= box.left && lead.right <= pair.left }
+      })
+      assert.ok((await measure()).center <= 0.5)
+      assert.equal((await measure()).leadInside, true)
+      const actions = dialog.locator('[data-dialog-action-pair]')
+      const original = await actions.getAttribute('style')
+      try {
+        await actions.evaluate(el => { el.style.gridTemplateColumns = 'auto auto' })
+        assert.ok((await measure()).center > 1)
+      } finally {
+        await actions.evaluate((el, original) => { if (original === null) el.removeAttribute('style'); else el.setAttribute('style', original) }, original)
+      }
+      assert.ok((await measure()).center <= 0.5)
+      assert.equal((await measure()).leadInside, true)
+      await dialog.getByRole('button', { name: '左の操作', exact: true }).click()
+      assert.equal(await page.evaluate(() => globalThis.dialogLeadCalls), 1)
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+    } finally { await browser.close() }
+  })
+
   test(`補足付きの保存帯も操作を中央に置き、権限の灰ボタンと条件数を保つ ${width}`, async () => {
     const browser = await connectGuardBrowser()
     try {
