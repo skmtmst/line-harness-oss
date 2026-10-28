@@ -25,6 +25,15 @@ const read = (path: string) => readFileSync(join(WEB, path), 'utf8')
 afterEach(cleanup)
 
 describe('作成の型の余白の口', () => {
+  it('タブが区切りを持つ見出しだけ線を外す口を渡し、既定へ戻せる', () => {
+    const { container, rerender } = render(<CreatePage title="編集" dirty={false} separator="none" steps={<div>タブ</div>} footerActions={null}>本文</CreatePage>)
+    expect(container.querySelector('[data-template-region="heading"]')!.getAttribute('data-heading-separator')).toBe('none')
+    expect(container.querySelector('[data-template-region="steps"]')!.textContent).toBe('タブ')
+    rerender(<CreatePage title="作成" dirty={false} footerActions={null}>本文</CreatePage>)
+    expect(container.querySelector('[data-template-region="heading"]')!.hasAttribute('data-heading-separator')).toBe(false)
+    expect(container.querySelector('[data-template-region="content"]')!.textContent).toBe('本文')
+  })
+
   it('渡さなければ型の既定（印を出さない）', () => {
     const { container } = render(<CreatePage title="作成" preview={<p>見え方</p>} footerActions={null}>入力</CreatePage>)
     const content = container.querySelector('[data-template-region="content"]')!
