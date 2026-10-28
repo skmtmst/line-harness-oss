@@ -1,4 +1,5 @@
 'use client'
+import { ListPageStats } from '@/components/templates/list-page'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { FunnelChart } from '@/components/shared/charts'
@@ -311,13 +312,13 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   const showForm = creating || editTarget
 
   return <SaveErrorScope errors={saveErrors}><>
-    {funnels.length > 0 ? <KpiBand className={styles.band}>
+    {funnels.length > 0 ? <ListPageStats><KpiBand className={styles.band}>
       <KpiCard presentation="band" title="入口" icon={<LogIn size={16} aria-hidden="true" />} value={overall?.entry ?? null} unit="人" detail={measurable ? (overall?.entryLabel ?? emptyValue('unknown')) : run ? '判定不能' : emptyValue('unknown')} />
       <KpiCard presentation="band" title="最後まで" icon={<Flag size={16} aria-hidden="true" />} value={overall?.last ?? null} unit="人" detail={measurable ? (overall?.rate != null ? `入口の ${overall.rate}%` : emptyValue('unknown')) : run ? '判定不能' : emptyValue('unknown')} />
       <KpiCard presentation="band" title="いちばん落ちる段" icon={<ArrowDownRight size={16} aria-hidden="true" />} value={worst ? -Math.round(worst.rate * 100) : null} unit="%" detail={worst && result ? `${result[worst.index - 1].label} → ${result[worst.index].label}` : run && !measurable ? '判定不能' : emptyValue('unknown')} />
       {/* 段ごとの到達日時を持っていない（集計は「通ったか」だけを見る）。 */}
       <KpiCard presentation="band" title="平均の到達日数" icon={<CalendarClock size={16} aria-hidden="true" />} value={null} unit="日" detail="到達日時が無く未取得" />
-    </KpiBand> : null}
+    </KpiBand></ListPageStats> : null}
     <div className={styles.body} data-gap="tab">
       {showForm && renderForm ? renderForm({
         edit: editTarget ?? undefined,

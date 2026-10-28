@@ -586,7 +586,8 @@
 
 /* 数の帯を白い板の余白の内側へ置く。道具に含む帯は道具の余白を使う。 */
 :global(:root) .stats:has([data-kpi-strip]) { padding: var(--space-8) var(--tpl-list-inset) 0; min-width: 0; max-width: 100%; }
-:global(:root) .listBody > .stats:has([data-kpi-strip]) { padding-bottom: var(--space-8); }
+:global(:root) .listBody > .stats:has([data-kpi-strip]),
+:global(:root) .listBody > .split > .main > .content > .stats:has([data-kpi-strip]) { padding-bottom: var(--space-8); }
 :global(:root) .section { border-bottom: 0; }
 
 @container v8-page (width < 1100px) {
