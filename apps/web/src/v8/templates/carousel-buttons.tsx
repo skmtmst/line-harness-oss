@@ -1,13 +1,13 @@
 'use client'
 
 import { Fragment, useState } from 'react'
-import { Trash2, Zap } from 'lucide-react'
+import { Zap } from 'lucide-react'
 import { CardHeader } from '@/components/shared/card'
 import { Field, FieldError } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
-import IconButton from '@/components/shared/icon-button'
+import Button from '@/components/shared/button'
 import { EntityPickerSummary } from '@/components/shared/entity-picker'
 import InlineSettings from '@/components/shared/inline-settings'
 import TapActionField, { type TapActionExtraKind } from '@/components/shared/tap-action-field'
@@ -59,11 +59,12 @@ export default function CarouselButtons({ actions, selectedIndex, fields, hqHost
       textMax={MESSAGE_TEXT_MAX}
     /></SaveErrorField></Field>
     return <Fragment key={ai}>
-      <CardHeader size="stacked" headingLevel={3} title={`ボタン ${ai + 1}`} action={actions.length > 1 ? <IconButton size="row" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} onClick={() => { setEditing(null); onChange(actions.filter((_, index) => index !== ai)) }}><Trash2 size={16} aria-hidden="true" /></IconButton> : undefined} />
+      <CardHeader size="stacked" headingLevel={3} title={`ボタン ${ai + 1}`} />
       <div {...fields.bind(`card-${selectedIndex}-button-${ai}`)} aria-describedby={fields.invalid(`card-${selectedIndex}-button-${ai}`) ? `cr-button-${ai}-error` : undefined}>
         {host ? <SettingsFormRow layout="columns">{label}{tap}</SettingsFormRow> : tap}
       </div>
       <FieldError id={`cr-button-${ai}-error`}>{fields.error(`card-${selectedIndex}-button-${ai}`)}</FieldError>
+      {actions.length > 1 ? <div><Button variant="text" textTone="danger" aria-label={`カード${selectedIndex + 1}のボタン${ai + 1}を外す`} onClick={() => { setEditing(null); onChange(actions.filter((_, index) => index !== ai)) }}>このボタンを消す</Button></div> : null}
       {host ? null : <InlineSettings flow="column" open={editing === ai && action.kind === 'action'} title={`ボタン${ai + 1}の動き`} onClose={() => setEditing(null)}>{editing === ai && action.kind === 'action' ? editActions() : null}</InlineSettings>}
     </Fragment>
   })}</>
