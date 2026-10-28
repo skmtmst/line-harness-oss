@@ -8,7 +8,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { formatJstDateTime } from '@/lib/presentation'
 import { onlyWhenVisible } from '@/lib/visible-polling'
 import { formatNumber } from '@/lib/format'
-import { Download } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import styles from './list.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -62,6 +62,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
 
   const [jobs, setJobs] = useState<CommonVarExportJob[]>([])
   const [active, setActive] = useState<CommonVarExportJob | null>(null)
+  const [dismissedJobId, setDismissedJobId] = useState<string | null>(null)
   const [requesting, setRequesting] = useState(false)
   const [error, setError] = useState('')
   /** 遅れて返った別アカウントの結果を映さないための世代番号。 */
@@ -193,19 +194,24 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
         onClick={() => void start()}
         disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={16} aria-hidden="true" />CSVで書き出す
       </Button>
-      {error || active || jobs.length > 1 ? (
+      {error || (active && active.id !== dismissedJobId) || jobs.length > 1 ? (
       <div className={styles.exportPop}>
 
       {error ? (
         <Notice tone="danger" message={error} onClose={() => setError('')} />
       ) : null}
 
-      {active ? (
+      {active && active.id !== dismissedJobId ? (
         <div
           className="border-hairline bg-canvas rounded-control min-w-80 border px-4 py-3 text-sm"
           aria-live="polite"
           data-testid="vars-export-status"
         >
+          <div className="mb-2 flex justify-end">
+            <Button type="button" variant="secondary" aria-label="書き出し状況を閉じる" onClick={() => setDismissedJobId(active.id)}>
+              <X size={16} aria-hidden="true" />
+            </Button>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone={statusTone(active.status)} size="compact">
               {statusLabel(active.status)}

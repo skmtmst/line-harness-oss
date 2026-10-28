@@ -154,6 +154,7 @@ function VisitStampsScreen() {
   const [name, setName] = useState('')
   const [settings, setSettings] = useState<VisitStampSettings>(defaultSettings)
   const [accountIds, setAccountIds] = useState<string[]>([])
+  const [draftReady, setDraftReady] = useState(false)
   const [saving, setSaving] = useState(false)
   const [imageBusy, setImageBusy] = useState(false)
   const [issue, setIssue] = useState<{ field: StampSettingField; message: string } | null>(null)
@@ -180,6 +181,7 @@ function VisitStampsScreen() {
     setName(c?.name ?? '来店スタンプカード')
     setSettings(c?.settings ?? defaultSettings())
     setAccountIds(c?.accountIds ?? (selectedAccountId ? [selectedAccountId] : []))
+    setDraftReady(true)
   }, [selectedAccountId])
 
   const loadCards = useCallback(async () => {
@@ -191,13 +193,17 @@ function VisitStampsScreen() {
  { if (!fieldFailure) setLoadError(caught) }
   }
   }, [saveErrors])
+  useEffect(() => { setDraftReady(false) }, [selectedAccountId])
   useEffect(() => { void loadCards() }, [loadCards])
   useEffect(() => { if (cards) resetDraft(card) }, [cards, card, resetDraft])
 
   const dirty = useMemo(() => {
+    // 一覧の読込前は初期値が空で、比較対象のカードもまだ無い。読込中に
+    // 「保存していない変更」を出さない。
+    if (!cards || !draftReady) return false
     const base = card ? { name: card.name, settings: card.settings, accountIds: card.accountIds } : null
     return !base || JSON.stringify(base) !== JSON.stringify({ name, settings, accountIds })
-  }, [card, name, settings, accountIds])
+  }, [cards, draftReady, card, name, settings, accountIds])
 
   /* ①② の下書きを保存せずに離れるときは確かめる（保存できる人だけ。閲覧のみは変えられない）。 */
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({

@@ -135,8 +135,17 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   await eventually(() => {
     expect(host.querySelector('[data-design-node="apLqS"], [data-design-node="Iffil"]')).toBeTruthy()
   })
+  const folderColumn = host.querySelector('aside[data-template-region="folders"][data-shared-part="folder-column"]')
+  expect(folderColumn, '共通のフォルダ領域に接続されている').not.toBeNull()
+  expect(folderColumn?.closest('[data-list-folders]')?.getAttribute('data-list-folders')).toBe('true')
+  const folderPanel = folderColumn!.querySelector('aside[aria-label="フォルダ"]')
+  expect(folderPanel?.closest('[data-shared-part="folder-column"]')).toBe(folderColumn)
+  expect(folderPanel?.querySelector('button[data-folder-select][title="未分類"]')?.textContent).toBe('未分類0')
   // 見本が決めた帯と見出し
   expect(host.textContent).toContain('リマインダを作る')
+  const createLinks = [...host.querySelectorAll('a')].filter(link => link.textContent?.trim() === '＋ リマインダを作る')
+  expect(createLinks.length).toBeGreaterThan(0)
+  expect(createLinks.map(link => link.getAttribute('href'))).toEqual(createLinks.map(() => '/reminders/new'))
   expect(host.textContent).toContain('有効')
   expect(host.textContent).toContain('これから送る')
   expect(host.textContent).toContain('今月送った')
@@ -154,6 +163,17 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('基準日の 3日前 09:00')
   expect(host.textContent).toContain('5通')
   expect(host.textContent).toContain('10/10')
+  const band = host.querySelector('[data-design="KPIs"]')!
+  const failureActions = Array.from(band.querySelectorAll('button')).filter(button => button.textContent === '失敗を見る')
+  expect(failureActions).toHaveLength(1)
+  expect(band.textContent).not.toContain('理由を見る')
+  const requestedStatuses: Array<string | null> = []
+  handler = url => {
+    if (url.pathname === '/api/reminders') requestedStatuses.push(url.searchParams.get('status'))
+    return base(url)
+  }
+  await act(async () => { failureActions[0].dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  await eventually(() => expect(requestedStatuses).toContain('failed'))
 })
 
 test('v8 の一覧で失敗のある行は「失敗 N」の札を出す', async () => {

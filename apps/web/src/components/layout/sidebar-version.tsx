@@ -60,7 +60,7 @@ export default function SidebarVersion() {
           <TextLink href="/updates" className="shrink-0">更新あり</TextLink>
         ) : null}
         {update.kind === 'fork' ? (
-          <TextLink href="/updates" className="shrink-0">手動で更新</TextLink>
+          <TextLink href="/updates" className="shrink-0">更新履歴</TextLink>
         ) : null}
       </p>
       {lines.line2 ? <p className="mt-0.5 text-micro text-ink-faint">{lines.line2}</p> : null}

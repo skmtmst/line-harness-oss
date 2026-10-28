@@ -73,6 +73,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 import { api, ApiError } from '@/lib/api'
 import { NewAutomationV8 as NewAutomationPage } from '@/v8/automations/create/create'
+import NewAutomationEntry from './page'
 import { pickAutomationTag, pickAutomationTestFriend } from '@/test-utils/automation-v8-interactions'
 
 const mockList = api.automations.list as unknown as ReturnType<typeof vi.fn>
@@ -154,11 +155,11 @@ async function drainMicrotasks(): Promise<void> {
   for (let index = 0; index < 8; index += 1) await Promise.resolve()
 }
 
-async function mountPage(): Promise<HTMLDivElement> {
+async function mountPage(node: React.ReactNode = <NewAutomationPage />): Promise<HTMLDivElement> {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
-  await act(async () => { root!.render(<NewAutomationPage />) })
+  await act(async () => { root!.render(node) })
   await act(async () => { await drainMicrotasks() })
   if (!container.textContent?.includes('きっかけ')) throw new Error('新規作成が出ませんでした')
   return container
@@ -201,7 +202,8 @@ async function activateRule(el: HTMLDivElement): Promise<void> {
 
 describe('R484・R485・R488: 1人テストの確認と実行', () => {
   it('R485: 送信前の読み取り待ちに「やめる」を押したら送信しない', async () => {
-    const el = await mountPage()
+    const el = await mountPage(<NewAutomationEntry />)
+    expect(el.querySelector('#v8-rule-name')?.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
     await openTestConfirmation(el)
     // 送信直前の読み取りを止める。
     let releaseRead!: (value: unknown) => void

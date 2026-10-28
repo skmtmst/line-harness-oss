@@ -14,6 +14,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { TextArea } from '@/components/shared/text-field'
 
 /*
  * 個別操作から開く2つの窓：対応状況を編集（N-035）・シナリオに登録する（NEXT-09）。
@@ -38,6 +39,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
   const scope = scopeRef.current
   const [status, setStatus] = useState<Chat['status']>('resolved')
   const [operatorId, setOperatorId] = useState('')
+  const [notes, setNotes] = useState('')
   const [revision, setRevision] = useState(0)
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const [busy, setBusy] = useState(false)
@@ -71,6 +73,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       if (chatRes.success) {
         setStatus(chatRes.data.status)
         setOperatorId(chatRes.data.operatorId ?? '')
+        setNotes(chatRes.data.notes ?? '')
         setRevision(chatRes.data.revision)
       }
       if (operatorRes.success) setOperators(operatorRes.data)
@@ -92,14 +95,14 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
     setError('')
     try {
       // 読んだ改訂値を付けて、ほかの人の変更を黙って上書きしない。
-      const res = await api.chats.update(owner, { status, operatorId: operatorId || null, revision })
+      const res = await api.chats.update(owner, { status, operatorId: operatorId || null, notes: notes || null, revision })
       if (gen !== genRef.current) return
       if (!res.success) {
         setError(res.error)
         return
       }
       setOpen(false)
-      onSaved('担当・対応状況を更新しました')
+      onSaved('対応状況とメモを更新しました')
     } catch (err) {
       if (gen !== genRef.current) return
       const fieldFailure = saveErrors.capture(err);
@@ -135,7 +138,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
   const dialog = (
     <SaveErrorScope errors={saveErrors}><Dialog
       open={open && target === friendId && targetAccount === accountId}
-      title="対応状況を編集"
+      title="対応・メモを編集"
       designWidth={440}
       busy={busy}
       error={error}
@@ -144,6 +147,13 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       onCancel={() => setOpen(false)}
     >
       <div className={styles.dialogBody} data-support-editor>
+        <Field label="メモ"><SaveErrorField names={["notes"]}><TextArea
+            aria-label="メモ"
+            value={notes}
+            disabled={busy}
+            maxLength={2000}
+            onChange={(event) => setNotes(event.target.value)}
+          /></SaveErrorField></Field>
         <Field label="対応状況"><SaveErrorField names={["status"]}><Select
             size="full"
             value={status}

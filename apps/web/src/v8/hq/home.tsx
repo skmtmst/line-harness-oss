@@ -4,7 +4,7 @@ import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
-import { Folder as FolderIcon, Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
+import { Folder as FolderIcon, Inbox, LayoutGrid, List, LogIn, Pencil, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { ListPage, ListPageCards } from '@/components/templates';
@@ -376,8 +376,7 @@ export default function HqHomeV8() {
       return (
         <div className={styles.cardButtons}>
           <Button className={styles.grow} onClick={() => setEditingAccount(account)}>
-            {/* 絵 JKjsE：「詳細」の印は log-in。 */}
-            <LogIn aria-hidden="true" className={styles.buttonIcon} />詳細
+            <Pencil aria-hidden="true" className={styles.buttonIcon} />登録内容を編集
           </Button>
           {isOwner ? (
             <Button onClick={() => setArchiveTarget({ account, mode: 'restore' })}>
@@ -406,7 +405,7 @@ export default function HqHomeV8() {
     const name = account.displayName || account.name
     const items = isArchived(account)
       ? [
-          { id: 'detail', label: '詳細', onSelect: () => setEditingAccount(account) },
+          { id: 'edit-registration', label: '登録内容を編集', onSelect: () => setEditingAccount(account) },
           ...(isOwner ? [{ id: 'restore', label: '戻す', onSelect: () => setArchiveTarget({ account, mode: 'restore' as const }) }] : []),
         ]
       : [
@@ -607,7 +606,7 @@ export default function HqHomeV8() {
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
-      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「詳細」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。`}</>}
+      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。`}</>}
 
       folders={folderColumn}
       folderInset toolbar={toolbar} toolbarSpacing="stats" toolbarRowGap="card"
@@ -630,7 +629,7 @@ export default function HqHomeV8() {
             setArchiveTarget({ account: settingsAccount, mode: isArchived(settingsAccount) ? 'restore' : 'archive' })
             setSettingsAccount(null)
           }}
-          onShowDetails={() => { setEditingAccount(settingsAccount); setSettingsAccount(null) }}
+          onEditRegistration={() => { setEditingAccount(settingsAccount); setSettingsAccount(null) }}
           canCreateFolder={canManage}
           onFolderCreated={() => void loadFolders()}
         />

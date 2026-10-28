@@ -34,6 +34,7 @@ import { columnsWithDiff, coverageLabel, diffCount, diffCountLabel, diffCountSho
 import styles from './list.module.css'
 import { formatNumber } from '@/lib/format'
 import { EmptyCell } from '@/components/shared/empty-value'
+import { notifyToast } from '@/components/shared/toast'
 
 /*
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`）。行＝店、列＝7つの数。
@@ -198,7 +199,7 @@ export default function StoreComparisonList() {
   ) : columns.length === 0 ? (
     <ListState kind="empty" emptyPreset="filtered" title="全店の平均と違う数はありません" description="どの店も、7 つの数が全店の平均と同じです。" action={<Button variant="secondary" onClick={() => setDiffOnly(false)}>すべて表示</Button>} />
   ) : (
-    <>
+    <ListPageSection>
       <DataTable columns={`minmax(0, 1.1fr) repeat(${columns.length}, minmax(0, 1fr))`}>
         <thead>
           <TableHeadRow>
@@ -246,7 +247,7 @@ export default function StoreComparisonList() {
         <TruncatedText className={styles.averageText} value={METRICS.map((def) => `${def.label} ${formatMetric(def.key, data.average[def.key] ?? null)}`).join('・')} />
         <span className={styles.averageNote}>{`数の横の印は${compare === 'average' ? '全店の平均' : '前の期間'}との差（赤＝悪い・緑＝良い）${compare === 'average' ? '' : '・「違う」の数は全店の平均と比べます'}`}</span>
       </div>
-    </>
+    </ListPageSection>
   )
 
   return (
@@ -375,7 +376,7 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
       onClose={onClose}
       footer={row ? (
         <div className={styles.footer}>
-          <Button variant="primary" onClick={() => { setSelectedAccountId(row.accountId); router.push('/') }}>この店を開く</Button>
+          <Button variant="primary" onClick={() => { notifyToast(`${row.name} に切り替えました`, { tone: 'info' }); setSelectedAccountId(row.accountId); router.push('/') }}>この店を開く</Button>
         </div>
       ) : undefined}
     >
@@ -438,7 +439,7 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
             {current.status === 'error' || (current.status === 'ready' && attention?.status !== 'ready') ? <p className={styles.mute}>対応が要るものを読み込めませんでした。</p> : null}
             {current.status === 'ready' && attention?.status === 'ready' ? ATTENTION.map(item => <div key={item.key}>
               <p>{item.label} {attention.counts[item.key]}件</p>
-              {(attention.targets?.[item.key] ?? []).map(target => <Button key={target.href} variant="text" onClick={() => { setSelectedAccountId(row.accountId); router.push(target.href) }}>{attentionTargetLabel(target.href)} {formatNumber(target.count)}件</Button>)}
+              {(attention.targets?.[item.key] ?? []).map(target => <Button key={target.href} variant="text" onClick={() => { notifyToast(`${row.name} に切り替えました`, { tone: 'info' }); setSelectedAccountId(row.accountId); router.push(target.href) }}>{attentionTargetLabel(target.href)} {formatNumber(target.count)}件</Button>)}
             </div>) : null}
           </Card>
         </div>

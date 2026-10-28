@@ -3,14 +3,15 @@
 # コンバージョン（V8）の動き
 
 入口：
-- 一覧 `app/conversions/page.tsx`（V8専用で `src/v8/conversions/list.tsx`。成果とアフィリエイトのタブ `?tab=affiliates|offers|approvals|payment|report` は今までどおり `/affiliates` へ移す）
+- 一覧は `app/affiliates/page.tsx` から `src/v8/affiliates/affiliates.tsx` を通り、`?tab=points` の時に `src/v8/conversions/list.tsx` を描く。
+- 旧 `app/conversions/page.tsx` はタブ指定と検索条件を残して `/affiliates?tab=...` へ移す。一覧の新しいURLは `/affiliates?tab=points`。
 - 作る `app/conversions/new/page.tsx`（V8専用で `src/v8/conversions/create.tsx`。入口はV8の画面を直接読み込む）
 
 絵：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・状態の見本帳 `E2l8cw`、作る `j8p3yj`・競合 `cXqlS`。
 
 ## 受け付ける URL と指定
-- `/conversions?highlight=<成果地点ID>`：作る画面から戻ったとき。その行の頁へ移し、行を目立たせ、「保存しました」の帯を出す（今と同じ）
-- `/conversions?tab=points`：成果地点のタブ（既定）。ほかのタブ名は `/affiliates` へ
+- `/affiliates?tab=points&highlight=<成果地点ID>`：作る画面から戻ったとき。その行の頁へ移し、行を目立たせ、「保存しました」の帯を出す（今と同じ）
+- `/conversions?highlight=<成果地点ID>` などの旧一覧URL：条件を維持し、新しい成果地点タブへ移る。
 - `/conversions/new?name=<名前>`：**新しく足した**。名前を入れて開く。同じ名前の成果地点があれば、開いた時点で競合の帯（cXqlS）が出る
 
 ## 呼ぶ口（今の画面と同じ）

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import StatusPill from '@/components/shared/status-pill'
 import Link from '@/components/shared/list-navigation'
 import {
@@ -15,8 +15,10 @@ import {
   Tag as TagIcon,
   Workflow,
 } from 'lucide-react'
-import type { FriendField } from '@line-crm/shared'
+import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import Checkbox from '@/components/shared/checkbox'
 import TagPill from '@/components/shared/tag-pill'
 import CustomerInfoPanel, { CustomerInfoRail } from '@/components/shared/customer-info-panel'
 import TagOverflow from '@/components/shared/tag-overflow'
@@ -26,7 +28,7 @@ import { formatDay, formatDateTime, formatNumber, formatRelative } from '@/lib/f
 import type { FriendDetail } from '@/lib/api'
 import type { FriendDetailState } from './use-friend-detail'
 import type { FriendDetailPermissions } from './permissions'
-import { inboxHrefForFriend, timelineSourceHref, timelineTypeLabel, timelineKey, type FriendTimelineItem } from './timeline'
+import { timelineSourceHref, timelineTypeLabel, timelineKey, type FriendTimelineItem } from './timeline'
 import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
 import styles from './detail.module.css'
 import IconRow from '@/components/shared/icon-row'
@@ -37,6 +39,9 @@ import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { memberRanksApi } from '@/lib/api/helpers/gap3'
 import DeliveryConsentDrawer, { DeliveryConsentSummary, useDeliveryConsents } from './delivery-consent'
+import { api } from '@/lib/api'
+import { notifyToast } from '@/components/shared/toast'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
 /*
@@ -91,14 +96,90 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
   realName: string
   onEditSupport: () => void
 }) {
-  const inbox = inboxHrefForFriend(friendId)
+  const { selectedAccountId } = useAccount()
+  const saveErrors = useSaveFormErrors()
   const starred = fields.filter((f) => f.isStarred)
   const { mileage, mileageStatus, richMenu, richMenuStatus } = data
   const support = friend.support
+  const [tagDialogOpen, setTagDialogOpen] = useState(false)
+  const [availableTags, setAvailableTags] = useState<Tag[]>([])
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [tagBusy, setTagBusy] = useState(false)
+  const [tagError, setTagError] = useState('')
+  const tagRequestRef = useRef(0)
+  const tagScopeRef = useRef({ friendId, accountId: selectedAccountId, canEdit: perms.editSupport })
+  if (tagScopeRef.current.friendId !== friendId || tagScopeRef.current.accountId !== selectedAccountId || tagScopeRef.current.canEdit !== perms.editSupport) {
+    tagRequestRef.current += 1
+    tagScopeRef.current = { friendId, accountId: selectedAccountId, canEdit: perms.editSupport }
+  }
+  const tagScope = tagScopeRef.current
+  useEffect(() => {
+    tagRequestRef.current += 1
+    setTagDialogOpen(false)
+    setTagBusy(false)
+    setTagError('')
+    setAvailableTags([])
+    setSelectedTagIds([])
+    return () => { tagRequestRef.current += 1 }
+  }, [friendId, selectedAccountId, perms.editSupport])
+  const openTagEditor = async () => {
+    if (!tagScopeRef.current.canEdit || tagScope !== tagScopeRef.current) return
+    const request = ++tagRequestRef.current
+    const ownerId = friendId
+    const ownerAccountId = selectedAccountId
+    setTagDialogOpen(true)
+    setTagError('')
+    setTagBusy(true)
+    setSelectedTagIds((friend.tags ?? []).map((tag) => tag.id))
+    try {
+      const result = await api.tags.list({ accountId: ownerAccountId })
+      if (request !== tagRequestRef.current || ownerId !== tagScopeRef.current.friendId || ownerAccountId !== tagScopeRef.current.accountId) return
+      if (result.success) setAvailableTags(result.data)
+      else setTagError('タグを読み込めませんでした')
+    } catch {
+      if (request !== tagRequestRef.current) return
+      setTagError('タグを読み込めませんでした')
+    } finally {
+      if (request === tagRequestRef.current) setTagBusy(false)
+    }
+  }
+  const saveTags = async () => {
+    if (tagBusy || !tagScopeRef.current.canEdit || tagScope !== tagScopeRef.current) return
+    const request = ++tagRequestRef.current
+    const ownerId = friendId
+    const isCurrent = () => request === tagRequestRef.current && tagScope === tagScopeRef.current && tagScopeRef.current.canEdit
+    setTagBusy(true)
+    setTagError('')
+    const current = new Set((friend.tags ?? []).map((tag) => tag.id))
+    const next = new Set(selectedTagIds)
+    try {
+      const changes = await Promise.all([
+        ...[...next].filter((id) => !current.has(id)).map((id) => api.friends.addTag(ownerId, id)),
+        ...[...current].filter((id) => !next.has(id)).map((id) => api.friends.removeTag(ownerId, id)),
+      ])
+      if (!isCurrent()) return
+      if (changes.some((result) => !result.success)) {
+        await data.loadFriend()
+        if (!isCurrent()) return
+        setTagError('一部のタグを保存できませんでした。現在の内容を読み直してください')
+        return
+      }
+      await data.loadFriend()
+      if (!isCurrent()) return
+      setTagDialogOpen(false)
+      notifyToast('タグを更新しました')
+    } catch (caught) {
+      if (!isCurrent()) return
+      await data.loadFriend()
+      if (!isCurrent()) return
+      setTagError(saveErrors.capture(caught) ? '' : 'タグを保存できませんでした。現在の内容を読み直してください')
+    } finally {
+      if (isCurrent()) setTagBusy(false)
+    }
+  }
   /* ★V8 mAbif：配信の受け取り（段と右の引き出し）と、会員ランクの1行。 */
   const consents = useDeliveryConsents(friendId)
   const [consentOpen, setConsentOpen] = useState(false)
-  const { selectedAccountId } = useAccount()
   const [rankLine, setRankLine] = useState<string | null>(null)
   useEffect(() => {
     if (!selectedAccountId) return
@@ -126,11 +207,11 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         <Kv label="担当">{support?.operatorName ?? <span className={styles.faint}>未割り当て</span>}</Kv>
         <Kv label="最後の連絡">{data.historyStatus === 'ready' ? lastContactText(data.historyItems) : emptyValue('unknown')}</Kv>
       </dl></> },
-        { key: 'tags', label: 'タグ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording href={inbox}>編集</Button> : null, content: <><div className={styles.tags}>
+        { key: 'tags', label: 'タグ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={() => void openTagEditor()}>編集</Button> : null, content: <><div className={styles.tags}>
         {friend.tags?.length
           ? <TagOverflow maxVisible={2}>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow>
           : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
-        {perms.editSupport ? <Link className={`${styles.tag} ${styles.tagAdd}`} href={inbox}>＋ 追加</Link> : null}
+        {perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={() => void openTagEditor()}>＋ 追加</Button> : null}
       </div></> },
         { key: 'mileage', label: 'マイル', action: <Link className={styles.groupLink} href={`/mileage/friends/detail?id=${encodeURIComponent(friendId)}`}>詳細を見る</Link>, content: <>{mileageStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
@@ -158,7 +239,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
             : emptyValue('unknown')}
         </p>
       )}</> },
-        { key: 'memo', label: 'メモ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording href={inbox}>編集</Button> : null, content: <><p className={`${styles.memo} ${support?.notes ? '' : styles.faint}`}>{support?.notes || 'メモはありません'}</p></> }]}
+        { key: 'memo', label: 'メモ', action: perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={onEditSupport}>編集</Button> : null, content: <><p className={`${styles.memo} ${support?.notes ? '' : styles.faint}`}>{support?.notes || 'メモはありません'}</p></> }]}
       more={<div className={styles.more}>
         {starred.length > 0 ? (
           <section className={styles.group} aria-label="★つき友だち情報">
@@ -192,7 +273,14 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         </section>
       </div>}
     />
-  </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} rows={consents.rows} canEdit={perms.manage} onClose={() => setConsentOpen(false)} onSaved={consents.reload} /></>
+  </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} rows={consents.rows} canEdit={perms.manage} onClose={() => setConsentOpen(false)} onSaved={consents.reload} />
+    <SaveErrorScope errors={saveErrors}><Dialog open={tagDialogOpen && perms.editSupport} title="タグを編集" designWidth={480} busy={tagBusy} error={tagError} confirmLabel="保存する" onConfirm={() => void saveTags()} onCancel={() => setTagDialogOpen(false)}>
+      <div className={styles.dialogBody} data-friend-tag-editor>
+        {availableTags.map((tag) => <Checkbox key={tag.id} checked={selectedTagIds.includes(tag.id)} disabled={tagBusy} onCheckedChange={(checked) => setSelectedTagIds((current) => checked ? [...current, tag.id] : current.filter((id) => id !== tag.id))}>{tag.name}</Checkbox>)}
+        {!tagBusy && availableTags.length === 0 && !tagError ? <p className={styles.memo}>選べるタグはありません</p> : null}
+      </div>
+    </Dialog></SaveErrorScope>
+  </>
   )
 }
 

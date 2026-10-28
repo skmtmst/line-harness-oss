@@ -65,6 +65,8 @@ test('v8 では hsD8e の作る画面（向き・見本・下の帯）が出る'
   expect(board).not.toBeNull()
   expect(board?.textContent).toContain('送り先を作る')
   expect(board?.textContent).toContain('こちらから送る')
+  expect(board?.querySelector('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBe(board)
+  expect(board?.querySelector('[data-template-region="content"]')?.textContent).toContain('こちらから送る')
   expect(board?.textContent).toContain('届く中身の見本')
   expect(board?.textContent).toContain('つくって動かす')
   expect(board?.textContent).toContain('下書きを保存')

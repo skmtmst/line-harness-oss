@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import ConversionsPage from './page'
+import ConversionsPage from '@/app/affiliates/page'
 
 /*
  * R596 回帰：集計の再試行の応答が遅れたとき、切り替え後のアカウントの
@@ -18,7 +18,7 @@ const accountStore = vi.hoisted(() => ({ id: 'account-a' }))
 
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams('tab=points'),
   useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({

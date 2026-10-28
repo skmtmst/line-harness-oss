@@ -150,5 +150,6 @@ describe('R578 メニューの取得失敗と未登録を言い分ける', () =>
     await screen.findByRole('checkbox', { name: /カット/ })
     expect(screen.queryByText('メニューを読み込めませんでした')).toBeNull()
     expect((screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }) as HTMLInputElement).value).toBe('田中')
+    expect(screen.getByRole('textbox', { name: 'スタッフ名（管理画面での呼び名）' }).closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
   })
 })

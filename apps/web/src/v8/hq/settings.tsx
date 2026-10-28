@@ -67,7 +67,7 @@ export default function HqSettingsV8() {
         <TenantNameCard canEdit={canEdit} draftRef={nameDraft} onDirtyChange={setNameDirty} locked={saving} />
         {canEdit ? <CompanyContactCard canEdit draftRef={contactDraft} onDirtyChange={setContactDirty} locked={saving} /> : null}
       </div>
-      {canEdit && (nameDirty || contactDirty || saving) ? <PageFooter status="変更した項目を保存します" actions={<><Button disabled={saving} onClick={() => { nameDraft.current?.reset(); contactDraft.current?.reset() }}>キャンセル</Button><Button variant="primary" disabled={saving} busy={saving} onClick={() => void saveAll()}>保存する</Button></>} /> : null}
+      {canEdit && (nameDirty || contactDirty || saving) ? <PageFooter status="変更した項目を保存します" actions={<><Button disabled={saving} onClick={() => { nameDraft.current?.reset(); contactDraft.current?.reset() }}>変更を取り消す</Button><Button variant="primary" disabled={saving} busy={saving} onClick={() => void saveAll()}>保存する</Button></>} /> : null}
     </ListPage>
   )
 }
