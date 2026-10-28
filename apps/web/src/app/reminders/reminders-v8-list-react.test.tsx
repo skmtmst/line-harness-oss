@@ -154,6 +154,17 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('基準日の 3日前 09:00')
   expect(host.textContent).toContain('5通')
   expect(host.textContent).toContain('10/10')
+  const band = host.querySelector('[data-design="KPIs"]')!
+  const failureActions = Array.from(band.querySelectorAll('button')).filter(button => button.textContent === '失敗を見る')
+  expect(failureActions).toHaveLength(1)
+  expect(band.textContent).not.toContain('理由を見る')
+  const requestedStatuses: Array<string | null> = []
+  handler = url => {
+    if (url.pathname === '/api/reminders') requestedStatuses.push(url.searchParams.get('status'))
+    return base(url)
+  }
+  await act(async () => { failureActions[0].dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  await eventually(() => expect(requestedStatuses).toContain('failed'))
 })
 
 test('v8 の一覧で失敗のある行は「失敗 N」の札を出す', async () => {

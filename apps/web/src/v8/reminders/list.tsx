@@ -639,7 +639,7 @@ export default function RemindersListV8() {
       icon: TriangleAlert,
       value: statsFailed ? null : reminderStats?.failed ?? null,
       unit: '通',
-      detail: '理由を見る',
+      detail: '',
       link: () => setStatusFilter('失敗あり'),
     },
   ]
