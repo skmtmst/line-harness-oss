@@ -65,6 +65,7 @@ export default function HqHomeV8() {
   const isOwner = !readOnlyImpersonation && role === 'owner'
   const { setSelectedAccountId, refreshAccounts } = useAccount()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
+  const currentAccounts = useMemo(() => accounts.filter((account) => !isArchived(account)), [accounts])
   const [tenantName, setTenantName] = useState('')
   const [loading, setLoading] = useState(true)
   // M021：捕まえた失敗を持ち、共通部品へ渡す（403 は権限の案内になる）。
@@ -218,23 +219,23 @@ export default function HqHomeV8() {
     router.push(back ?? '/')
   }
 
-  const totals = useMemo(() => accounts.reduce((sum, account) => ({
+  const totals = useMemo(() => currentAccounts.reduce((sum, account) => ({
     friends: sum.friends + (account.stats?.friendCount ?? 0),
     messages: sum.messages + (account.stats?.messagesThisMonth ?? 0),
-    warnings: sum.warnings + (!isArchived(account) && account.connection?.status === 'warn' ? 1 : 0),
-  }), { friends: 0, messages: 0, warnings: 0 }), [accounts])
+    warnings: sum.warnings + (account.connection?.status === 'warn' ? 1 : 0),
+  }), { friends: 0, messages: 0, warnings: 0 }), [currentAccounts])
 
   /* 所属は1つ（API-17 の folderId）。サーバーの数が無いときは手元で数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
   const folderCounts = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const account of accounts) {
+    for (const account of currentAccounts) {
       const id = folderOf(account)
       if (id) counts.set(id, (counts.get(id) ?? 0) + 1)
     }
     return counts
-  }, [accounts, folderOf])
-  const localUnfiled = useMemo(() => accounts.filter((account) => !isArchived(account) && !folderOf(account)).length, [accounts, folderOf])
+  }, [currentAccounts, folderOf])
+  const localUnfiled = useMemo(() => currentAccounts.filter((account) => !folderOf(account)).length, [currentAccounts, folderOf])
 
   const filtered = useMemo(() => {
     const words = query.trim().toLocaleLowerCase()
@@ -356,7 +357,7 @@ export default function HqHomeV8() {
   }
 
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: ALL, label: 'すべて', count: accounts.length, icon: <Inbox size={16} aria-hidden="true" /> },
+    { kind: 'all' as const, id: ALL, label: 'すべて', count: currentAccounts.length, icon: <Inbox size={16} aria-hidden="true" /> },
     ...folders.map((f, index) => ({
       kind: 'folder' as const,
       id: f.id,
@@ -450,8 +451,8 @@ export default function HqHomeV8() {
   const toolbar = loadError || loading || accounts.length === 0 ? null : <>
       <PlatformNotices />
       <KpiBand className={styles.full} data-design="KPIs">
-        <KpiCard title="アカウント" value={accounts.length} unit="件" detail={null} />
-        <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="全アカウントの合計" />
+        <KpiCard title="アカウント" value={currentAccounts.length} unit="件" detail={null} />
+        <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={totals.messages} unit="通" detail={null} />
         <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone={totals.warnings > 0 ? 'warning' : 'default'} />
       </KpiBand>
